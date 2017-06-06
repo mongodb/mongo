@@ -41,7 +41,14 @@ AC_DEFUN([AM_GCC_WARNINGS], [
 	w="$w -Wno-error=inline"
 	w="$w -Wno-error=unsafe-loop-optimizations"
 
+	# GCC 4.7
+	#	WiredTiger uses anonymous structures/unions, a C11 extension,
+	#	turn off those warnings.
+	# GCC 6.X
+	#	Additional warning messages.
 	case "$1" in
+	[*4.7.[0-9]*])					# gcc4.7
+		w="$w -Wno-c11-extensions";;
 	[*6.[0-9].[0-9]*])				# gcc6.X
 		w="$w -Wduplicated-cond"
 		w="$w -Wmisleading-indentation";;

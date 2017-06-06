@@ -1,5 +1,5 @@
 /*-
- * Copyright (c) 2014-2016 MongoDB, Inc.
+ * Copyright (c) 2014-2017 MongoDB, Inc.
  * Copyright (c) 2008-2014 WiredTiger, Inc.
  *	All rights reserved.
  *
@@ -102,8 +102,8 @@ __wt_spin_unlock(WT_SESSION_IMPL *session, WT_SPINLOCK *t)
 	__sync_lock_release(&t->lock);
 }
 
-#elif SPINLOCK_TYPE == SPINLOCK_PTHREAD_MUTEX ||\
-	SPINLOCK_TYPE == SPINLOCK_PTHREAD_MUTEX_ADAPTIVE
+#elif SPINLOCK_TYPE == SPINLOCK_PTHREAD_MUTEX ||			\
+    SPINLOCK_TYPE == SPINLOCK_PTHREAD_MUTEX_ADAPTIVE
 
 /*
  * __wt_spin_init --
@@ -142,8 +142,8 @@ __wt_spin_destroy(WT_SESSION_IMPL *session, WT_SPINLOCK *t)
 	}
 }
 
-#if SPINLOCK_TYPE == SPINLOCK_PTHREAD_MUTEX ||\
-	SPINLOCK_TYPE == SPINLOCK_PTHREAD_MUTEX_ADAPTIVE
+#if SPINLOCK_TYPE == SPINLOCK_PTHREAD_MUTEX ||				\
+    SPINLOCK_TYPE == SPINLOCK_PTHREAD_MUTEX_ADAPTIVE
 
 /*
  * __wt_spin_trylock --

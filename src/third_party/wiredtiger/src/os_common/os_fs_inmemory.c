@@ -1,5 +1,5 @@
 /*-
- * Copyright (c) 2014-2016 MongoDB, Inc.
+ * Copyright (c) 2014-2017 MongoDB, Inc.
  * Copyright (c) 2008-2014 WiredTiger, Inc.
  *	All rights reserved.
  *
@@ -52,7 +52,7 @@ __im_handle_search(WT_FILE_SYSTEM *file_system, const char *name)
  */
 static int
 __im_handle_remove(WT_SESSION_IMPL *session,
-    WT_FILE_SYSTEM *file_system, WT_FILE_HANDLE_INMEM *im_fh)
+    WT_FILE_SYSTEM *file_system, WT_FILE_HANDLE_INMEM *im_fh, bool force)
 {
 	WT_FILE_HANDLE *fhp;
 	WT_FILE_SYSTEM_INMEM *im_fs;
@@ -60,9 +60,11 @@ __im_handle_remove(WT_SESSION_IMPL *session,
 
 	im_fs = (WT_FILE_SYSTEM_INMEM *)file_system;
 
-	if (im_fh->ref != 0)
-		WT_RET_MSG(session, EBUSY,
-		    "%s: file-remove", im_fh->iface.name);
+	if (im_fh->ref != 0) {
+		__wt_err(session, EBUSY, "%s: file-remove", im_fh->iface.name);
+		if (!force)
+			return (EBUSY);
+	}
 
 	bucket = im_fh->name_hash % WT_HASH_ARRAY_SIZE;
 	WT_FILE_HANDLE_REMOVE(im_fs, im_fh, bucket);
@@ -205,7 +207,7 @@ __im_fs_remove(WT_FILE_SYSTEM *file_system,
 
 	ret = ENOENT;
 	if ((im_fh = __im_handle_search(file_system, name)) != NULL)
-		ret = __im_handle_remove(session, file_system, im_fh);
+		ret = __im_handle_remove(session, file_system, im_fh, false);
 
 	__wt_spin_unlock(session, &im_fs->lock);
 	return (ret);
@@ -511,15 +513,16 @@ static int
 __im_terminate(WT_FILE_SYSTEM *file_system, WT_SESSION *wt_session)
 {
 	WT_DECL_RET;
-	WT_FILE_HANDLE_INMEM *im_fh;
+	WT_FILE_HANDLE_INMEM *im_fh, *im_fh_tmp;
 	WT_FILE_SYSTEM_INMEM *im_fs;
 	WT_SESSION_IMPL *session;
 
 	session = (WT_SESSION_IMPL *)wt_session;
 	im_fs = (WT_FILE_SYSTEM_INMEM *)file_system;
 
-	while ((im_fh = TAILQ_FIRST(&im_fs->fhqh)) != NULL)
-		WT_TRET(__im_handle_remove(session, file_system, im_fh));
+	WT_TAILQ_SAFE_REMOVE_BEGIN(im_fh, &im_fs->fhqh, q, im_fh_tmp) {
+		WT_TRET(__im_handle_remove(session, file_system, im_fh, true));
+	} WT_TAILQ_SAFE_REMOVE_END
 
 	__wt_spin_destroy(session, &im_fs->lock);
 	__wt_free(session, im_fs);

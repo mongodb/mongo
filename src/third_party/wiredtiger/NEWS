@@ -1,3 +1,43 @@
+Ticket reference tags refer to tickets in the MongoDB JIRA tracking system:
+https://jira.mongodb.org
+
+WiredTiger release 2.9.2, 2017-05-25
+------------------------------------
+
+See the upgrading documentation for details of API and behavior changes.
+
+Significant changes:
+* SERVER-16796  Increase logging activity for journal recovery operations
+* SERVER-28168  Cannot start or repair MongoDB after unexpected shutdown.
+* SERVER-28194  Fix a bug where a missing WiredTiger.turtle file can result in data loss
+* WT-98         Update the current cursor value without a search
+* WT-2439       Enhance reconciliation page layout
+* WT-2898       Improve performance of eviction-heavy workloads by dynamically controlling the number of eviction threads
+* WT-3097       Race on reconfigure or shutdown can lead to waiting for statistics log server
+* WT-3106       Add truncate support to command line wt utility
+* WT-3114       Avoid archiving log files immediately after recovery
+* WT-3115       Change the dhandle lock to a read/write lock
+* WT-3127       Fix a bug with CPU yield calls don't necessarily imply memory barriers
+* WT-3135       Fix a bug with search_near() for index with custom collator
+* WT-3137       Fix a hang in __log_slot_join/__log_slot_switch_internal
+* WT-3144       Fix a bug where random cursor returns not-found when descending to an empty page
+* WT-3148       Improve eviction efficiency with many small trees
+* WT-3149       Change eviction to start new walks from a random place in the tree
+* WT-3150       Reduce impact of checkpoints on eviction server
+* WT-3152       Convert table lock from a spinlock to a read write lock
+* WT-3157       Fix a bug in checkpoint/transaction integrity issue when writes fail.
+* WT-3158       Fix structure packing on Windows.
+* WT-3188       Fix error handling in logging where fatal errors could lead to a hang
+* WT-3193       Close a race between verify opening a handle and eviction visiting it
+* WT-3206       Fix a bug where core dump happened on NULL page index
+* WT-3218       Fix a bug that could lead to unexpected checkpoint ordering failures
+* WT-3243       Reorder log slot release so joins don't wait on IO
+* WT-3262       Stop making schema operations wait for cache
+
+See JIRA changelog for a full listing:
+https://jira.mongodb.org/browse/WT/fixforversion/17874
+
+
 WiredTiger release 2.9.1, 2016-12-22
 ------------------------------------
 

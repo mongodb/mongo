@@ -53,7 +53,7 @@ if [ $# -ne 0 ]; then
 	exit 0
 fi
 
-trap 'rm -f $c1 $c2 $c3 $c4' 0 1 2 3 13 15
+trap 'rm -f $c1 $c2 $c3 $c4 $c5' 0 1 2 3 13 15
 
 year=`date +%Y`
 
@@ -117,11 +117,16 @@ fi
 	-e '/api\/leveldb\/hyperleveldb\//d' \
 	-e '/api\/leveldb\/leveldb\//d' \
 	-e '/api\/leveldb\/rocksdb\//d' \
+	-e '/checksum\/power8\//d' \
+	-e '/checksum\/zseries\//d' \
 	-e '/\/3rdparty\//d' \
 	-e '/\/node_modules\//d' \
 	-e '/dist\/__/d' \
 	-e 's/^\.\///' |
     xargs $xp -n 1 -I{} sh dist/s_copyright {})
+
+# One-offs.
+(cd .. && sh dist/s_copyright test/syscall/wt2336_base/base.run)
 
 # A few special cases: LICENSE, documentation, wt utility, some of which have
 # more than one copyright notice in the file. For files that have only a single
@@ -129,6 +134,7 @@ fi
 string1="Copyright \(c\) 2014-$year MongoDB, Inc."
 string2="Copyright \(c\) 2008-$year MongoDB, Inc."
 string3="printf.*Copyright \(c\) 2008-$year MongoDB, Inc."
+string4="Public Domain 2014-$year MongoDB, Inc."
 special_copyright()
 {
 	cnt=`egrep "$3" ../$1 | wc -l`
@@ -138,6 +144,7 @@ special_copyright()
 }
 
 special_copyright LICENSE 1 "$string1"
+special_copyright dist/s_c_test_create 1 "$string4"
 special_copyright src/docs/build-javadoc.sh 1 "$string2"
 special_copyright src/docs/style/footer.html 2 "$string2"
 special_copyright src/utilities/util_cpyright.c 1 "$string3"

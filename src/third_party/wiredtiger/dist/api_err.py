@@ -41,10 +41,10 @@ errors = [
         WT_CURSOR::update or WT_CURSOR::remove.'''),
     Error('WT_PANIC', -31804,
         'WiredTiger library panic', '''
-        This error indicates an underlying problem that requires the
-        application exit and restart. The application can exit
-        immediately when \c WT_PANIC is returned from a WiredTiger
-        interface, no further WiredTiger calls are required.'''),
+        This error indicates an underlying problem that requires a database
+        restart. The application may exit immediately, no further WiredTiger
+        calls are required (and further calls will themselves immediately
+        fail).'''),
     Error('WT_RESTART', -31805,
         'restart the operation (internal)', undoc=True),
     Error('WT_RUN_RECOVERY', -31806,
@@ -112,8 +112,6 @@ tfile.write('''/* DO NOT EDIT: automatically built by dist/api_err.py. */
 const char *
 __wt_wiredtiger_error(int error)
 {
-\tconst char *p;
-
 \t/*
 \t * Check for WiredTiger specific errors.
 \t */
@@ -125,14 +123,20 @@ for err in errors:
     tfile.write('\t\treturn ("' + err.name + ': ' + err.desc + '");\n')
 tfile.write('''\t}
 
+\t/* Windows strerror doesn't support ENOTSUP. */
+\tif (error == ENOTSUP)
+\t\treturn ("Operation not supported");
+
 \t/*
-\t * POSIX errors are non-negative integers; check for 0 explicitly incase
-\t * the underlying strerror doesn't handle 0, some historically didn't.
+\t * Check for 0 in case the underlying strerror doesn't handle it, some
+\t * historically didn't.
 \t */
 \tif (error == 0)
 \t\treturn ("Successful return: 0");
-\tif (error > 0 && (p = strerror(error)) != NULL)
-\t\treturn (p);
+
+\t/* POSIX errors are non-negative integers. */
+\tif (error > 0)
+\t\treturn (strerror(error));
 
 \treturn (NULL);
 }

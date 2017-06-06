@@ -1,5 +1,5 @@
 /*-
- * Copyright (c) 2014-2016 MongoDB, Inc.
+ * Copyright (c) 2014-2017 MongoDB, Inc.
  * Copyright (c) 2008-2014 WiredTiger, Inc.
  *	All rights reserved.
  *
@@ -225,7 +225,7 @@ err:	__wt_spin_unlock(session, &__wt_process.spinlock);
 		__wt_free(session, pool_name);
 	if (ret != 0 && created) {
 		__wt_free(session, cp->name);
-		WT_TRET(__wt_cond_destroy(session, &cp->cache_pool_cond));
+		__wt_cond_destroy(session, &cp->cache_pool_cond);
 		__wt_free(session, cp);
 	}
 	return (ret);
@@ -277,7 +277,7 @@ __wt_conn_cache_pool_open(WT_SESSION_IMPL *session)
 	 * the active connection shuts down.
 	 */
 	F_SET(cp, WT_CACHE_POOL_ACTIVE);
-	F_SET(cache, WT_CACHE_POOL_RUN);
+	FLD_SET(cache->pool_flags, WT_CACHE_POOL_RUN);
 	WT_RET(__wt_thread_create(session, &cache->cp_tid,
 	    __wt_cache_pool_server, cache->cp_session));
 
@@ -340,7 +340,7 @@ __wt_conn_cache_pool_destroy(WT_SESSION_IMPL *session)
 		__wt_spin_unlock(session, &cp->cache_pool_lock);
 		cp_locked = false;
 
-		F_CLR(cache, WT_CACHE_POOL_RUN);
+		FLD_CLR(cache->pool_flags, WT_CACHE_POOL_RUN);
 		__wt_cond_signal(session, cp->cache_pool_cond);
 		WT_TRET(__wt_thread_join(session, cache->cp_tid));
 
@@ -391,7 +391,7 @@ __wt_conn_cache_pool_destroy(WT_SESSION_IMPL *session)
 		__wt_free(session, cp->name);
 
 		__wt_spin_destroy(session, &cp->cache_pool_lock);
-		WT_TRET(__wt_cond_destroy(session, &cp->cache_pool_cond));
+		__wt_cond_destroy(session, &cp->cache_pool_cond);
 		__wt_free(session, cp);
 	}
 
@@ -399,7 +399,7 @@ __wt_conn_cache_pool_destroy(WT_SESSION_IMPL *session)
 		__wt_spin_unlock(session, &cp->cache_pool_lock);
 
 		/* Notify other participants if we were managing */
-		if (F_ISSET(cache, WT_CACHE_POOL_MANAGER)) {
+		if (FLD_ISSET(cache->pool_flags, WT_CACHE_POOL_MANAGER)) {
 			cp->pool_managed = 0;
 			__wt_verbose(session, WT_VERB_SHARED_CACHE,
 			    "Shutting down shared cache manager connection");
@@ -449,7 +449,8 @@ __cache_pool_balance(WT_SESSION_IMPL *session, bool forward)
 	for (i = 0;
 	    i < 2 * WT_CACHE_POOL_BUMP_THRESHOLD &&
 	    F_ISSET(cp, WT_CACHE_POOL_ACTIVE) &&
-	    F_ISSET(S2C(session)->cache, WT_CACHE_POOL_RUN); i++) {
+	    FLD_ISSET(S2C(session)->cache->pool_flags, WT_CACHE_POOL_RUN);
+	    i++) {
 		__cache_pool_adjust(
 		    session, highest, bump_threshold, forward, &adjusted);
 		/*
@@ -760,7 +761,7 @@ __wt_cache_pool_server(void *arg)
 	forward = true;
 
 	while (F_ISSET(cp, WT_CACHE_POOL_ACTIVE) &&
-	    F_ISSET(cache, WT_CACHE_POOL_RUN)) {
+	    FLD_ISSET(cache->pool_flags, WT_CACHE_POOL_RUN)) {
 		if (cp->currently_used <= cp->size)
 			__wt_cond_wait(
 			    session, cp->cache_pool_cond, WT_MILLION, NULL);
@@ -770,12 +771,12 @@ __wt_cache_pool_server(void *arg)
 		 * lock on shutdown.
 		 */
 		if (!F_ISSET(cp, WT_CACHE_POOL_ACTIVE) &&
-		    F_ISSET(cache, WT_CACHE_POOL_RUN))
+		    FLD_ISSET(cache->pool_flags, WT_CACHE_POOL_RUN))
 			break;
 
 		/* Try to become the managing thread */
 		if (__wt_atomic_cas8(&cp->pool_managed, 0, 1)) {
-			F_SET(cache, WT_CACHE_POOL_MANAGER);
+			FLD_SET(cache->pool_flags, WT_CACHE_POOL_MANAGER);
 			__wt_verbose(session, WT_VERB_SHARED_CACHE,
 			    "Cache pool switched manager thread");
 		}
@@ -784,7 +785,7 @@ __wt_cache_pool_server(void *arg)
 		 * Continue even if there was an error. Details of errors are
 		 * reported in the balance function.
 		 */
-		if (F_ISSET(cache, WT_CACHE_POOL_MANAGER)) {
+		if (FLD_ISSET(cache->pool_flags, WT_CACHE_POOL_MANAGER)) {
 			__cache_pool_balance(session, forward);
 			forward = !forward;
 		}

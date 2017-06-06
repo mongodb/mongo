@@ -1,6 +1,6 @@
 #!/usr/bin/env python
 #
-# Public Domain 2014-2016 MongoDB, Inc.
+# Public Domain 2014-2017 MongoDB, Inc.
 # Public Domain 2008-2014 WiredTiger, Inc.
 #
 # This is free and unencumbered software released into the public domain.
@@ -108,12 +108,15 @@ class test_inmem01(wttest.WiredTigerTestCase):
 
         cursor.reset()
         # Spin inserting to give eviction a chance to reclaim space
+        sleeps = 0
         inserted = False
         for i in range(1, 1000):
             try:
                 cursor[ds.key(1)] = ds.value(1)
             except wiredtiger.WiredTigerError:
                 cursor.reset()
+                sleeps = sleeps + 1
+                self.assertLess(sleeps, 60 * 5)
                 sleep(1)
                 continue
             inserted = True

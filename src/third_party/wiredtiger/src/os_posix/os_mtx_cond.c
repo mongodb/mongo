@@ -1,5 +1,5 @@
 /*-
- * Copyright (c) 2014-2016 MongoDB, Inc.
+ * Copyright (c) 2014-2017 MongoDB, Inc.
  * Copyright (c) 2008-2014 WiredTiger, Inc.
  *	All rights reserved.
  *
@@ -153,7 +153,7 @@ err:
  * __wt_cond_destroy --
  *	Destroy a condition variable.
  */
-int
+void
 __wt_cond_destroy(WT_SESSION_IMPL *session, WT_CONDVAR **condp)
 {
 	WT_CONDVAR *cond;
@@ -161,11 +161,15 @@ __wt_cond_destroy(WT_SESSION_IMPL *session, WT_CONDVAR **condp)
 
 	cond = *condp;
 	if (cond == NULL)
-		return (0);
+		return;
 
-	ret = pthread_cond_destroy(&cond->cond);
-	WT_TRET(pthread_mutex_destroy(&cond->mtx));
+	if ((ret = pthread_cond_destroy(&cond->cond)) != 0)
+		WT_PANIC_MSG(
+		    session, ret, "pthread_cond_destroy: %s", cond->name);
+
+	if ((ret = pthread_mutex_destroy(&cond->mtx)) != 0)
+		WT_PANIC_MSG(
+		    session, ret, "pthread_mutex_destroy: %s", cond->name);
+
 	__wt_free(session, *condp);
-
-	return (ret);
 }

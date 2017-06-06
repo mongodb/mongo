@@ -1,5 +1,5 @@
 /*-
- * Copyright (c) 2014-2016 MongoDB, Inc.
+ * Copyright (c) 2014-2017 MongoDB, Inc.
  * Copyright (c) 2008-2014 WiredTiger, Inc.
  *	All rights reserved.
  *
@@ -25,7 +25,10 @@
  */
 typedef pthread_cond_t		wt_cond_t;
 typedef pthread_mutex_t		wt_mutex_t;
-typedef pthread_t		wt_thread_t;
+typedef struct {
+	bool created;
+	pthread_t id;
+} wt_thread_t;
 
 /*
  * Thread callbacks need to match the platform specific callback types

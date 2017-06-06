@@ -1,5 +1,5 @@
 /*-
- * Copyright (c) 2014-2016 MongoDB, Inc.
+ * Copyright (c) 2014-2017 MongoDB, Inc.
  * Copyright (c) 2008-2014 WiredTiger, Inc.
  *	All rights reserved.
  *
@@ -140,8 +140,9 @@ __wt_las_set_written(WT_SESSION_IMPL *session)
 		conn->las_written = true;
 
 		/*
-		 * Push the flag: unnecessary, but from now page reads must deal
-		 * with lookaside table records, and we only do the write once.
+		 * Future page reads must deal with lookaside table records.
+		 * No write could be cached until a future read might matter,
+		 * the barrier is more documentation than requirement.
 		 */
 		WT_FULL_BARRIER();
 	}
@@ -393,8 +394,8 @@ err:		__wt_buf_free(session, key);
 	 * arithmetic is signed, so underflow isn't fatal, but check anyway so
 	 * we don't skew low over time.
 	 */
-	if (remove_cnt > S2C(session)->las_record_cnt)
-		S2C(session)->las_record_cnt = 0;
+	if (remove_cnt > conn->las_record_cnt)
+		conn->las_record_cnt = 0;
 	else if (remove_cnt > 0)
 		(void)__wt_atomic_subi64(&conn->las_record_cnt, remove_cnt);
 

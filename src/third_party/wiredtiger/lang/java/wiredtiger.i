@@ -1,5 +1,5 @@
 /*-
- * Public Domain 2014-2016 MongoDB, Inc.
+ * Public Domain 2014-2017 MongoDB, Inc.
  * Public Domain 2008-2014 WiredTiger, Inc.
  *
  * This is free and unencumbered software released into the public domain.
@@ -47,6 +47,7 @@
 %}
 
 %{
+#include "wiredtiger.h"
 #include "src/include/wt_internal.h"
 
 /*
@@ -108,6 +109,23 @@ static void throwWiredTigerException(JNIEnv *jenv, int err) {
 		(*jenv)->ThrowNew(jenv, excep, wiredtiger_strerror(err));
 }
 
+struct __wt_java_modify_impl;
+struct __wt_java_modify_list;
+typedef struct __wt_java_modify_impl WT_MODIFY_IMPL;
+typedef struct __wt_java_modify_list WT_MODIFY_LIST;
+static void modify_impl_release(WT_MODIFY_IMPL *impl);
+static void modify_list_release(WT_MODIFY_LIST *impl);
+
+/*
+ * An extension to the WT_MODIFY struct, so we can associate some Java-specific
+ * information with it.
+ */
+typedef struct __wt_java_modify_impl {
+	WT_MODIFY modify;
+	JNIEnv *jnienv;
+	jobject ref;
+} WT_MODIFY_IMPL;
+
 %}
 
 /* No finalizers */
@@ -157,6 +175,32 @@ static void throwWiredTigerException(JNIEnv *jenv, int err) {
 		(*jenv)->SetByteArrayRegion(jenv,
 		    $result, 0, (jsize)$1.size, $1.data);
 	}
+%}
+
+/*
+ * In some cases, for an internal interface, we need something like a WT_ITEM,
+ * but we need to hold onto the memory past the method call, and release it
+ * later.  A WT_ITEM_HOLD serves the purpose, it retains the java object
+ * for the byte array that we make into a global reference.
+ */
+%typemap(jni) WT_ITEM_HOLD, WT_ITEM_HOLD * "jbyteArray"
+%typemap(jtype) WT_ITEM_HOLD, WT_ITEM_HOLD * "byte[]"
+%typemap(jstype) WT_ITEM_HOLD, WT_ITEM_HOLD * "byte[]"
+
+%typemap(javain) WT_ITEM_HOLD, WT_ITEM_HOLD * "$javainput"
+%typemap(javaout) WT_ITEM_HOLD, WT_ITEM_HOLD * {
+	return ($jnicall);
+}
+%typemap(in) WT_ITEM_HOLD * (WT_ITEM_HOLD item) %{
+	$1 = &item;
+	$1->data = (*jenv)->GetByteArrayElements(jenv, $input, 0);
+	$1->size = (size_t)(*jenv)->GetArrayLength(jenv, $input);
+	$1->jnienv = jenv;
+	$1->ref = (*jenv)->NewGlobalRef(jenv, $input);
+%}
+
+%typemap(argout) WT_ITEM_HOLD * %{
+	/* Explicitly don't release the byte array elements here. */
 %}
 
 /* Don't require empty config strings. */
@@ -309,6 +353,10 @@ WT_CLASS(struct __wt_async_op, WT_ASYNC_OP, op)
 %rename (prev_wrap) __wt_cursor::prev;
 %javamethodmodifiers __wt_cursor::key_format "protected";
 %javamethodmodifiers __wt_cursor::value_format "protected";
+%ignore __wt_modify::data;
+%ignore __wt_modify::position;
+%ignore __wt_modify::size;
+%ignore __wt_cursor::modify;
 
 %ignore __wt_cursor::compare(WT_CURSOR *, WT_CURSOR *, int *);
 %rename (compare_wrap) __wt_cursor::compare;
@@ -1224,6 +1272,47 @@ WT_ASYNC_CALLBACK javaApiAsyncHandler = {javaAsyncHandler};
 		JCALL1(DeleteLocalRef, jcb->jnienv, jcursor);
 		return (0);
 	}
+
+	int modify_wrap(WT_MODIFY_LIST *list, WT_ITEM *k) {
+		int ret;
+
+		$self->set_key($self, k);
+		ret = $self->modify(self, list->mod_array, list->count);
+		modify_list_release(list);
+		return (ret);
+	}
+
+	/*
+	 * Called internally after a new call.  The artificial constructor for
+	 * WT_MODIFY_LIST has no opportunity to throw an exception on a memory
+	 * allocation failure, so the the null check must be made within a
+	 * method on WT_CURSOR.
+	 */
+	bool _new_check_modify_list(WT_MODIFY_LIST *list) {
+		JAVA_CALLBACK *jcb;
+		if (list == NULL) {
+			jcb = (JAVA_CALLBACK *)$self->lang_private;
+			throwWiredTigerException(jcb->jnienv, ENOMEM);
+			return (false);
+		}
+		return (true);
+	}
+
+	/*
+	 * Called internally after a new call.  The artificial constructor for
+	 * WT_MODIFY has no opportunity to throw an exception on a memory
+	 * allocation failure, so the the null check must be made within a
+	 * method on WT_CURSOR.
+	 */
+	bool _new_check_modify(WT_MODIFY *mod) {
+		JAVA_CALLBACK *jcb;
+		if (mod == NULL) {
+			jcb = (JAVA_CALLBACK *)$self->lang_private;
+			throwWiredTigerException(jcb->jnienv, ENOMEM);
+			return (false);
+		}
+		return (true);
+	}
 }
 
 /* Cache key/value formats in Cursor */
@@ -1820,6 +1909,149 @@ WT_ASYNC_CALLBACK javaApiAsyncHandler = {javaAsyncHandler};
 			return new PackInputStream(valueFormat,
 			    get_value_wrap(), _java_raw());
 	}
+
+	/**
+	 * Modify an existing record.
+	 *
+	 * The cursor must already be positioned, and the key's value will be
+	 * updated.
+	 *
+	 * \param mods an array of modifications.
+	 * \return 0 on success, errno on error.
+	 */
+	public int modify(Modify mods[])
+	throws WiredTigerException {
+		byte[] key = keyPacker.getValue();
+		keyPacker.reset();
+
+		WT_MODIFY_LIST l = new WT_MODIFY_LIST(mods.length);
+		if (!_new_check_modify_list(l))
+			return (0);   // exception is already thrown
+		int pos = 0;
+
+		for (Modify m : mods) {
+			if (!_new_check_modify(m))
+				return (0);   // exception is already thrown
+			l.set(pos, m);
+			pos++;
+		}
+		return modify_wrap(l, key);
+	}
+%}
+
+/*
+ * Support for WT_CURSOR.modify.
+ */
+
+%inline %{
+typedef struct __wt_java_item_hold {
+#ifndef SWIG
+	void *data;
+	size_t size;
+	JNIEnv *jnienv;
+	jobject ref;
+#endif
+} WT_ITEM_HOLD;
+
+/*
+ * An internal Java class encapsulates a list of Modify objects (stored as a
+ * WT_MODIFY array in C).
+ */
+typedef struct __wt_java_modify_list {
+#ifndef SWIG
+	WT_MODIFY *mod_array;
+	jobject *ref_array;
+	JNIEnv *jnienv;
+	int count;
+#endif
+} WT_MODIFY_LIST;
+%}
+%extend __wt_java_modify_list {
+	__wt_java_modify_list(int count) {
+		WT_MODIFY_LIST *self;
+		if (__wt_calloc_def(NULL, 1, &self) != 0)
+			return (NULL);
+		if (__wt_calloc_def(NULL, (size_t)count,
+		    &self->mod_array) != 0) {
+			__wt_free(NULL, self);
+			return (NULL);
+		}
+		if (__wt_calloc_def(NULL, (size_t)count,
+		    &self->ref_array) != 0) {
+			__wt_free(NULL, self->mod_array);
+			__wt_free(NULL, self);
+			return (NULL);
+		}
+		self->count = count;
+		return (self);
+	}
+	~__wt_java_modify_list() {
+		modify_list_release(self);
+		__wt_free(NULL, self);
+	}
+	void set(int i, WT_MODIFY *m) {
+		WT_MODIFY_IMPL *impl = (WT_MODIFY_IMPL *)m;
+		self->mod_array[i] = *m;
+		self->ref_array[i] = impl->ref;
+		impl->ref = (jobject)0;
+		self->jnienv = impl->jnienv;
+	}
+};
+
+%extend __wt_modify {
+	__wt_modify() {
+		WT_MODIFY_IMPL *self;
+		if (__wt_calloc_def(NULL, 1, &self) != 0)
+			return (NULL);
+		self->modify.data.data = NULL;
+		self->modify.data.size = 0;
+		self->modify.offset = 0;
+		self->modify.size = 0;
+		return (&self->modify);
+	}
+	__wt_modify(WT_ITEM_HOLD *itemdata,
+	    size_t offset, size_t size) {
+		WT_MODIFY_IMPL *self;
+		if (__wt_calloc_def(NULL, 1, &self) != 0)
+			return (NULL);
+		self->modify.data.data = itemdata->data;
+		self->modify.data.size = itemdata->size;
+		self->modify.offset = offset;
+		self->modify.size = size;
+		self->ref = itemdata->ref;
+		self->jnienv = itemdata->jnienv;
+		return (&self->modify);
+	}
+	~__wt_modify() {
+		modify_impl_release((WT_MODIFY_IMPL *)self);
+		__wt_free(NULL, self);
+	}
+};
+
+%{
+static void modify_list_release(WT_MODIFY_LIST *list) {
+	for (int i = 0; i < list->count; i++)
+		if (list->ref_array[i] != (jobject)0) {
+			(*list->jnienv)->ReleaseByteArrayElements(
+			    list->jnienv, list->ref_array[i],
+			    (jbyte *)list->mod_array[i].data.data, 0);
+			(*list->jnienv)->DeleteGlobalRef(
+			    list->jnienv, list->ref_array[i]);
+		}
+	__wt_free(NULL, list->ref_array);
+	__wt_free(NULL, list->mod_array);
+	list->count = 0;
+}
+
+static void modify_impl_release(WT_MODIFY_IMPL *impl) {
+	if (impl->ref != (jobject)0) {
+		(*impl->jnienv)->ReleaseByteArrayElements(
+		    impl->jnienv, impl->ref,
+		    (jbyte *)impl->modify.data.data, 0);
+		(*impl->jnienv)->DeleteGlobalRef(impl->jnienv, impl->ref);
+		impl->ref = (jobject)0;
+	}
+}
 %}
 
 /* Put a WiredTigerException on all wrapped methods. We'd like this
@@ -1902,6 +2134,7 @@ REQUIRE_WRAP(WT_ASYNC_OP::get_id, __wt_async_op::get_id,getId)
 
 %rename(AsyncOp) __wt_async_op;
 %rename(Cursor) __wt_cursor;
+%rename(Modify) __wt_modify;
 %rename(Session) __wt_session;
 %rename(Connection) __wt_connection;
 

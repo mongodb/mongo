@@ -18,6 +18,7 @@ JAVA_SRC = \
 		$(JAVADESTFULL)/AsyncOpType.java \
 		$(JAVADESTFULL)/Connection.java \
 		$(JAVADESTFULL)/Cursor.java \
+		$(JAVADESTFULL)/Modify.java \
 		$(JAVADESTFULL)/SearchStatus.java \
 		$(JAVADESTFULL)/PackFormatInputStream.java \
 		$(JAVADESTFULL)/PackInputStream.java \
@@ -31,6 +32,7 @@ JAVA_SRC = \
 		$(JAVADESTFULL)/wiredtiger.java \
 		$(JAVADESTFULL)/wiredtigerConstants.java \
 		$(JAVADESTFULL)/wiredtigerJNI.java \
+		$(JAVADESTFULL)/WT_MODIFY_LIST.java \
 		$(JAVAEXAMPLES)/ex_access.java \
 		$(JAVAEXAMPLES)/ex_all.java \
 		$(JAVAEXAMPLES)/ex_async.java \

@@ -1,5 +1,5 @@
 /*-
- * Copyright (c) 2014-2016 MongoDB, Inc.
+ * Copyright (c) 2014-2017 MongoDB, Inc.
  * Copyright (c) 2008-2014 WiredTiger, Inc.
  *	All rights reserved.
  *
@@ -276,3 +276,22 @@ union __wt_rand_state {
 		uint32_t w, z;
 	} x;
 };
+
+/*
+ * WT_TAILQ_SAFE_REMOVE_BEGIN/END --
+ *	Macro to safely walk a TAILQ where we're expecting some underlying
+ * function to remove elements from the list, but we don't want to stop on
+ * error, nor do we want an error to turn into an infinite loop. Used during
+ * shutdown, when we're shutting down various lists. Unlike TAILQ_FOREACH_SAFE,
+ * this macro works even when the next element gets removed along with the
+ * current one.
+ */
+#define	WT_TAILQ_SAFE_REMOVE_BEGIN(var, head, field, tvar)		\
+	for ((tvar) = NULL; ((var) = TAILQ_FIRST(head)) != NULL;	\
+	    (tvar) = (var)) {						\
+		if ((tvar) == (var)) {					\
+			/* Leak the structure. */			\
+			TAILQ_REMOVE(head, (var), field);		\
+			continue;					\
+		}
+#define	WT_TAILQ_SAFE_REMOVE_END }

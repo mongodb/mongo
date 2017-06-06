@@ -1,5 +1,5 @@
 /*-
- * Copyright (c) 2014-2016 MongoDB, Inc.
+ * Copyright (c) 2014-2017 MongoDB, Inc.
  * Copyright (c) 2008-2014 WiredTiger, Inc.
  *	All rights reserved.
  *
@@ -58,11 +58,11 @@ __curbulk_insert_fix(WT_CURSOR *cursor)
 	if (F_ISSET(cursor, WT_CURSTD_APPEND))
 		recno = cbulk->recno + 1;
 	else {
-		WT_CURSOR_CHECKKEY(cursor);
+		WT_ERR(__cursor_checkkey(cursor));
 		if ((recno = cursor->recno) <= cbulk->recno)
 			WT_ERR(__bulk_col_keycmp_err(cbulk));
 	}
-	WT_CURSOR_CHECKVALUE(cursor);
+	WT_ERR(__cursor_checkvalue(cursor));
 
 	/*
 	 * Insert any skipped records as deleted records, update the current
@@ -101,7 +101,7 @@ __curbulk_insert_fix_bitmap(WT_CURSOR *cursor)
 	CURSOR_API_CALL(cursor, session, insert, btree);
 	WT_STAT_DATA_INCR(session, cursor_insert_bulk);
 
-	WT_CURSOR_CHECKVALUE(cursor);
+	WT_ERR(__cursor_checkvalue(cursor));
 
 	/* Insert the current record. */
 	ret = __wt_bulk_insert_fix_bitmap(session, cbulk);
@@ -140,11 +140,11 @@ __curbulk_insert_var(WT_CURSOR *cursor)
 	if (F_ISSET(cursor, WT_CURSTD_APPEND))
 		recno = cbulk->recno + 1;
 	else {
-		WT_CURSOR_CHECKKEY(cursor);
+		WT_ERR(__cursor_checkkey(cursor));
 		if ((recno = cursor->recno) <= cbulk->recno)
 			WT_ERR(__bulk_col_keycmp_err(cbulk));
 	}
-	WT_CURSOR_CHECKVALUE(cursor);
+	WT_ERR(__cursor_checkvalue(cursor));
 
 	if (!cbulk->first_insert) {
 		/*
@@ -241,8 +241,8 @@ __curbulk_insert_row(WT_CURSOR *cursor)
 	CURSOR_API_CALL(cursor, session, insert, btree);
 	WT_STAT_DATA_INCR(session, cursor_insert_bulk);
 
-	WT_CURSOR_CHECKKEY(cursor);
-	WT_CURSOR_CHECKVALUE(cursor);
+	WT_ERR(__cursor_checkkey(cursor));
+	WT_ERR(__cursor_checkvalue(cursor));
 
 	/*
 	 * If this isn't the first key inserted, compare it against the last key
@@ -288,8 +288,8 @@ __curbulk_insert_row_skip_check(WT_CURSOR *cursor)
 	CURSOR_API_CALL(cursor, session, insert, btree);
 	WT_STAT_DATA_INCR(session, cursor_insert_bulk);
 
-	WT_CURSOR_CHECKKEY(cursor);
-	WT_CURSOR_CHECKVALUE(cursor);
+	WT_ERR(__cursor_checkkey(cursor));
+	WT_ERR(__cursor_checkvalue(cursor));
 
 	ret = __wt_bulk_insert_row(session, cbulk);
 

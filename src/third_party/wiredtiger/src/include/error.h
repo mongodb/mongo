@@ -1,12 +1,12 @@
 /*-
- * Copyright (c) 2014-2016 MongoDB, Inc.
+ * Copyright (c) 2014-2017 MongoDB, Inc.
  * Copyright (c) 2008-2014 WiredTiger, Inc.
  *	All rights reserved.
  *
  * See the file LICENSE for redistribution information.
  */
 
-#define	WT_DEBUG_POINT	((void *)0xdeadbeef)
+#define	WT_DEBUG_POINT	((void *)(uintptr_t)0xdeadbeef)
 #define	WT_DEBUG_BYTE	(0xab)
 
 /* In DIAGNOSTIC mode, yield in places where we want to encourage races. */

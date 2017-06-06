@@ -1,5 +1,5 @@
 /*-
- * Public Domain 2014-2016 MongoDB, Inc.
+ * Public Domain 2014-2017 MongoDB, Inc.
  * Public Domain 2008-2014 WiredTiger, Inc.
  *
  * This is free and unencumbered software released into the public domain.
@@ -296,6 +296,49 @@ cursor_ops(WT_SESSION *session)
 	if (ret == 0)
 		ret = cursor->get_key(cursor, &recno);
 	/*! [Insert a new record and assign a record number] */
+	}
+
+	{
+	/*! [Reserve a record] */
+	const char *key = "some key";
+	ret = session->open_cursor(
+	    session, "table:mytable", NULL, NULL, &cursor);
+	cursor->set_key(cursor, key);
+	ret = cursor->reserve(cursor);
+	/*! [Reserve a record] */
+	}
+
+	{
+	/*! [Modify an existing record] */
+	WT_MODIFY entries[3];
+	const char *key = "some key";
+	ret = session->open_cursor(
+	    session, "table:mytable", NULL, NULL, &cursor);
+
+	/* Position the cursor. */
+	cursor->set_key(cursor, key);
+	ret = cursor->search(cursor);
+
+	/* Replace 20 bytes starting at byte offset 5. */
+	entries[0].data.data = "some data";
+	entries[0].data.size = strlen(entries[0].data.data);
+	entries[0].offset = 5;
+	entries[0].size = 20;
+
+	/* Insert data at byte offset 40. */
+	entries[1].data.data = "and more data";
+	entries[1].data.size = strlen(entries[1].data.data);
+	entries[1].offset = 40;
+	entries[1].size = 0;
+
+	/* Replace 2 bytes starting at byte offset 10. */
+	entries[2].data.data = "and more data";
+	entries[2].data.size = strlen(entries[2].data.data);
+	entries[2].offset = 10;
+	entries[2].size = 2;
+
+	ret = cursor->modify(cursor, entries, 3);
+	/*! [Modify an existing record] */
 	}
 
 	{

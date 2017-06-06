@@ -1,5 +1,5 @@
 /*-
- * Copyright (c) 2014-2016 MongoDB, Inc.
+ * Copyright (c) 2014-2017 MongoDB, Inc.
  * Copyright (c) 2008-2014 WiredTiger, Inc.
  *	All rights reserved.
  *
@@ -16,9 +16,7 @@
 #define	WT_PTRDIFFT_FMT	"Id"			/* ptrdiff_t format string */
 #define	WT_SIZET_FMT	"Iu"			/* size_t format string */
 
-/*
- * Add MSVC-specific attributes and pragmas to types and function declarations.
- */
+/* MSVC-specific attributes. */
 #define	WT_PACKED_STRUCT_BEGIN(name)					\
 	__pragma(pack(push,1))						\
 	struct name {

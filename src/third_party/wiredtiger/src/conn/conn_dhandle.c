@@ -1,5 +1,5 @@
 /*-
- * Copyright (c) 2014-2016 MongoDB, Inc.
+ * Copyright (c) 2014-2017 MongoDB, Inc.
  * Copyright (c) 2008-2014 WiredTiger, Inc.
  *	All rights reserved.
  *
@@ -52,7 +52,7 @@ __wt_conn_dhandle_alloc(
 
 	WT_RET(__wt_calloc_one(session, &dhandle));
 
-	__wt_rwlock_init(session, &dhandle->rwlock);
+	WT_ERR(__wt_rwlock_init(session, &dhandle->rwlock));
 	dhandle->name_hash = __wt_hash_city64(uri, strlen(uri));
 	WT_ERR(__wt_strdup(session, uri, &dhandle->name));
 	WT_ERR(__wt_strdup(session, checkpoint, &dhandle->checkpoint));
@@ -199,8 +199,13 @@ __wt_conn_btree_sync_and_close(WT_SESSION_IMPL *session, bool final, bool force)
 			/* Reset the tree's eviction priority (if any). */
 			__wt_evict_priority_clear(session);
 		}
-		if (!marked_dead || final)
-			WT_ERR(__wt_checkpoint_close(session, final));
+		if (!marked_dead || final) {
+			if ((ret = __wt_checkpoint_close(
+			    session, final)) == EBUSY)
+				WT_ERR(ret);
+			else
+				WT_TRET(ret);
+		}
 	}
 
 	WT_TRET(__wt_btree_close(session));
@@ -364,8 +369,8 @@ __wt_conn_btree_open(
 	F_SET(dhandle, WT_DHANDLE_OPEN);
 
 	/*
-	 * Checkpoint handles are read only, so eviction calculations
-	 * based on the number of btrees are better to ignore them.
+	 * Checkpoint handles are read-only, so eviction calculations based on
+	 * the number of btrees are better to ignore them.
 	 */
 	if (dhandle->checkpoint == NULL)
 		++S2C(session)->open_btree_count;
@@ -634,7 +639,7 @@ int
 __wt_conn_dhandle_discard(WT_SESSION_IMPL *session)
 {
 	WT_CONNECTION_IMPL *conn;
-	WT_DATA_HANDLE *dhandle;
+	WT_DATA_HANDLE *dhandle, *dhandle_tmp;
 	WT_DECL_RET;
 
 	conn = S2C(session);
@@ -680,10 +685,11 @@ restart:
 		WT_TRET(session->meta_cursor->close(session->meta_cursor));
 
 	/* Close the metadata file handle. */
-	while ((dhandle = TAILQ_FIRST(&conn->dhqh)) != NULL)
+	WT_TAILQ_SAFE_REMOVE_BEGIN(dhandle, &conn->dhqh, q, dhandle_tmp) {
 		WT_WITH_DHANDLE(session, dhandle,
 		    WT_TRET(__wt_conn_dhandle_discard_single(
 		    session, true, F_ISSET(conn, WT_CONN_IN_MEMORY))));
+	} WT_TAILQ_SAFE_REMOVE_END
 
 	return (ret);
 }

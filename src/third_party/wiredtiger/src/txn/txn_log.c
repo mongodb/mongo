@@ -1,5 +1,5 @@
 /*-
- * Copyright (c) 2014-2016 MongoDB, Inc.
+ * Copyright (c) 2014-2017 MongoDB, Inc.
  * Copyright (c) 2008-2014 WiredTiger, Inc.
  *	All rights reserved.
  *
@@ -13,6 +13,51 @@ typedef struct {
 	uint32_t flags;
 } WT_TXN_PRINTLOG_ARGS;
 
+#ifdef HAVE_DIAGNOSTIC
+/*
+ * __txn_op_log_row_key_check --
+ *	Confirm the cursor references the correct key.
+ */
+static void
+__txn_op_log_row_key_check(WT_SESSION_IMPL *session, WT_CURSOR_BTREE *cbt)
+{
+	WT_CURSOR *cursor;
+	WT_ITEM key;
+	WT_PAGE *page;
+	WT_ROW *rip;
+
+	cursor = &cbt->iface;
+	WT_ASSERT(session, F_ISSET(cursor, WT_CURSTD_KEY_SET));
+
+	memset(&key, 0, sizeof(key));
+
+	/*
+	 * We used to take the key for row-store logging from the page
+	 * referenced by the cursor, when we switched to taking it from the
+	 * cursor itself. Check that they are the same.
+	 *
+	 * If the cursor references a WT_INSERT item, take the key from there,
+	 * else take the key from the original page.
+	 */
+	if (cbt->ins == NULL) {
+		session = (WT_SESSION_IMPL *)cbt->iface.session;
+		page = cbt->ref->page;
+		rip = &page->pg_row[cbt->slot];
+		WT_ASSERT(session,
+		    __wt_row_leaf_key(session, page, rip, &key, false) == 0);
+	} else {
+		key.data = WT_INSERT_KEY(cbt->ins);
+		key.size = WT_INSERT_KEY_SIZE(cbt->ins);
+	}
+
+	WT_ASSERT(session,
+	    key.size == cursor->key.size &&
+	    memcmp(key.data, cursor->key.data, key.size) == 0);
+
+	__wt_buf_free(session, &key);
+}
+#endif
+
 /*
  * __txn_op_log --
  *	Log an operation for the current transaction.
@@ -21,46 +66,46 @@ static int
 __txn_op_log(WT_SESSION_IMPL *session,
     WT_ITEM *logrec, WT_TXN_OP *op, WT_CURSOR_BTREE *cbt)
 {
-	WT_DECL_RET;
-	WT_ITEM key, value;
+	WT_CURSOR *cursor;
+	WT_ITEM value;
 	WT_UPDATE *upd;
 	uint64_t recno;
 
-	WT_CLEAR(key);
+	cursor = &cbt->iface;
+
 	upd = op->u.upd;
 	value.data = WT_UPDATE_DATA(upd);
 	value.size = upd->size;
 
 	/*
-	 * Log the operation.  It must be one of the following:
-	 * 1) column store remove;
-	 * 2) column store insert/update;
-	 * 3) row store remove; or
-	 * 4) row store insert/update.
+	 * Log the operation. It must be a row- or column-store insert, remove
+	 * or update, all of which require log records. We shouldn't ever log
+	 * reserve operations.
 	 */
+	WT_ASSERT(session, upd->type != WT_UPDATE_RESERVED);
 	if (cbt->btree->type == BTREE_ROW) {
-		WT_ERR(__wt_cursor_row_leaf_key(cbt, &key));
-
-		if (WT_UPDATE_DELETED_ISSET(upd))
-			WT_ERR(__wt_logop_row_remove_pack(session, logrec,
-			    op->fileid, &key));
+#ifdef HAVE_DIAGNOSTIC
+		__txn_op_log_row_key_check(session, cbt);
+#endif
+		if (upd->type == WT_UPDATE_DELETED)
+			WT_RET(__wt_logop_row_remove_pack(
+			    session, logrec, op->fileid, &cursor->key));
 		else
-			WT_ERR(__wt_logop_row_put_pack(session, logrec,
-			    op->fileid, &key, &value));
+			WT_RET(__wt_logop_row_put_pack(
+			    session, logrec, op->fileid, &cursor->key, &value));
 	} else {
 		recno = WT_INSERT_RECNO(cbt->ins);
 		WT_ASSERT(session, recno != WT_RECNO_OOB);
 
-		if (WT_UPDATE_DELETED_ISSET(upd))
-			WT_ERR(__wt_logop_col_remove_pack(session, logrec,
-			    op->fileid, recno));
+		if (upd->type == WT_UPDATE_DELETED)
+			WT_RET(__wt_logop_col_remove_pack(
+			    session, logrec, op->fileid, recno));
 		else
-			WT_ERR(__wt_logop_col_put_pack(session, logrec,
-			    op->fileid, recno, &value));
+			WT_RET(__wt_logop_col_put_pack(
+			    session, logrec, op->fileid, recno, &value));
 	}
 
-err:	__wt_buf_free(session, &key);
-	return (ret);
+	return (0);
 }
 
 /*
@@ -289,6 +334,7 @@ int
 __wt_txn_checkpoint_log(
     WT_SESSION_IMPL *session, bool full, uint32_t flags, WT_LSN *lsnp)
 {
+	WT_CONNECTION_IMPL *conn;
 	WT_DECL_ITEM(logrec);
 	WT_DECL_RET;
 	WT_ITEM *ckpt_snapshot, empty;
@@ -299,6 +345,7 @@ __wt_txn_checkpoint_log(
 	uint32_t i, rectype = WT_LOGREC_CHECKPOINT;
 	const char *fmt = WT_UNCHECKED_STRING(IIIIu);
 
+	conn = S2C(session);
 	txn = &session->txn;
 	ckpt_lsn = &txn->ckpt_lsn;
 
@@ -363,20 +410,20 @@ __wt_txn_checkpoint_log(
 		    txn->ckpt_nsnapshot, ckpt_snapshot));
 		logrec->size += (uint32_t)recsize;
 		WT_ERR(__wt_log_write(session, logrec, lsnp,
-		    F_ISSET(S2C(session), WT_CONN_CKPT_SYNC) ?
+		    F_ISSET(conn, WT_CONN_CKPT_SYNC) ?
 		    WT_LOG_FSYNC : 0));
 
 		/*
 		 * If this full checkpoint completed successfully and there is
-		 * no hot backup in progress and this is not recovery, tell
-		 * the logging subsystem the checkpoint LSN so that it can
-		 * archive.  Do not update the logging checkpoint LSN if this
-		 * is during a clean connection close, only during a full
-		 * checkpoint.  A clean close may not update any metadata LSN
-		 * and we do not want to archive in that case.
+		 * no hot backup in progress and this is not an unclean
+		 * recovery, tell the logging subsystem the checkpoint LSN so
+		 * that it can archive.  Do not update the logging checkpoint
+		 * LSN if this is during a clean connection close, only during
+		 * a full checkpoint.  A clean close may not update any
+		 * metadata LSN and we do not want to archive in that case.
 		 */
-		if (!S2C(session)->hot_backup &&
-		    !F_ISSET(S2C(session), WT_CONN_RECOVERING) &&
+		if (!conn->hot_backup &&
+		    !FLD_ISSET(conn->log_flags, WT_CONN_LOG_RECOVER_DIRTY) &&
 		    txn->full_ckpt)
 			__wt_log_ckpt(session, ckpt_lsn);
 

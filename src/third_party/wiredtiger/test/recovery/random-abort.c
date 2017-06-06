@@ -1,5 +1,5 @@
 /*-
- * Public Domain 2014-2016 MongoDB, Inc.
+ * Public Domain 2014-2017 MongoDB, Inc.
  * Public Domain 2008-2014 WiredTiger, Inc.
  *
  * This is free and unencumbered software released into the public domain.
@@ -47,9 +47,9 @@ static bool inmem;
 #define	RECORDS_FILE	"records-%" PRIu32
 
 #define	ENV_CONFIG_DEF						\
-    "create,log=(file_max=10M,archive=false,enabled)"
+    "create,log=(file_max=10M,enabled)"
 #define	ENV_CONFIG_TXNSYNC					\
-    "create,log=(file_max=10M,archive=false,enabled),"		\
+    "create,log=(file_max=10M,enabled),"		\
     "transaction_sync=(enabled,method=none)"
 #define	ENV_CONFIG_REC "log=(recover=on)"
 #define	MAX_VAL	4096
