@@ -121,19 +121,19 @@ NOINLINE_DECL void wasserted(const char* expr, const char* file, unsigned line) 
     lastWhen = time(0);
     lastLine = line;
 
-    log() << "warning assertion failure " << expr << ' ' << file << ' ' << dec << line << endl;
+    warning() << "warning assertion failure " << expr << ' ' << file << ' ' << dec << line << endl;
     logContext();
     assertionCount.condrollover(++assertionCount.warning);
 #if defined(MONGO_CONFIG_DEBUG_BUILD)
     // this is so we notice in buildbot
-    log() << "\n\n***aborting after wassert() failure in a debug/test build\n\n" << endl;
+    severe() << "\n\n***aborting after wassert() failure in a debug/test build\n\n" << endl;
     std::abort();
 #endif
 }
 
 NOINLINE_DECL void verifyFailed(const char* expr, const char* file, unsigned line) {
     assertionCount.condrollover(++assertionCount.regular);
-    log() << "Assertion failure " << expr << ' ' << file << ' ' << dec << line << endl;
+    error() << "Assertion failure " << expr << ' ' << file << ' ' << dec << line << endl;
     logContext();
     stringstream temp;
     temp << "assertion " << file << ":" << line;
@@ -141,16 +141,16 @@ NOINLINE_DECL void verifyFailed(const char* expr, const char* file, unsigned lin
     breakpoint();
 #if defined(MONGO_CONFIG_DEBUG_BUILD)
     // this is so we notice in buildbot
-    log() << "\n\n***aborting after verify() failure as this is a debug/test build\n\n" << endl;
+    severe() << "\n\n***aborting after verify() failure as this is a debug/test build\n\n" << endl;
     std::abort();
 #endif
     throw e;
 }
 
 NOINLINE_DECL void invariantFailed(const char* expr, const char* file, unsigned line) noexcept {
-    log() << "Invariant failure " << expr << ' ' << file << ' ' << dec << line << endl;
+    severe() << "Invariant failure " << expr << ' ' << file << ' ' << dec << line << endl;
     breakpoint();
-    log() << "\n\n***aborting after invariant() failure\n\n" << endl;
+    severe() << "\n\n***aborting after invariant() failure\n\n" << endl;
     std::abort();
 }
 
@@ -158,26 +158,26 @@ NOINLINE_DECL void invariantOKFailed(const char* expr,
                                      const Status& status,
                                      const char* file,
                                      unsigned line) noexcept {
-    log() << "Invariant failure: " << expr << " resulted in status " << redact(status) << " at "
-          << file << ' ' << dec << line;
+    severe() << "Invariant failure: " << expr << " resulted in status " << redact(status) << " at "
+             << file << ' ' << dec << line;
     breakpoint();
-    log() << "\n\n***aborting after invariant() failure\n\n" << endl;
+    severe() << "\n\n***aborting after invariant() failure\n\n" << endl;
     std::abort();
 }
 
 NOINLINE_DECL void fassertFailedWithLocation(int msgid, const char* file, unsigned line) noexcept {
-    log() << "Fatal Assertion " << msgid << " at " << file << " " << dec << line;
+    severe() << "Fatal Assertion " << msgid << " at " << file << " " << dec << line;
     breakpoint();
-    log() << "\n\n***aborting after fassert() failure\n\n" << endl;
+    severe() << "\n\n***aborting after fassert() failure\n\n" << endl;
     std::abort();
 }
 
 NOINLINE_DECL void fassertFailedNoTraceWithLocation(int msgid,
                                                     const char* file,
                                                     unsigned line) noexcept {
-    log() << "Fatal Assertion " << msgid << " at " << file << " " << dec << line;
+    severe() << "Fatal Assertion " << msgid << " at " << file << " " << dec << line;
     breakpoint();
-    log() << "\n\n***aborting after fassert() failure\n\n" << endl;
+    severe() << "\n\n***aborting after fassert() failure\n\n" << endl;
     quickExit(EXIT_ABRUPT);
 }
 
@@ -185,10 +185,10 @@ MONGO_COMPILER_NORETURN void fassertFailedWithStatusWithLocation(int msgid,
                                                                  const Status& status,
                                                                  const char* file,
                                                                  unsigned line) noexcept {
-    log() << "Fatal assertion " << msgid << " " << redact(status) << " at " << file << " " << dec
-          << line;
+    severe() << "Fatal assertion " << msgid << " " << redact(status) << " at " << file << " " << dec
+             << line;
     breakpoint();
-    log() << "\n\n***aborting after fassert() failure\n\n" << endl;
+    severe() << "\n\n***aborting after fassert() failure\n\n" << endl;
     std::abort();
 }
 
@@ -196,10 +196,10 @@ MONGO_COMPILER_NORETURN void fassertFailedWithStatusNoTraceWithLocation(int msgi
                                                                         const Status& status,
                                                                         const char* file,
                                                                         unsigned line) noexcept {
-    log() << "Fatal assertion " << msgid << " " << redact(status) << " at " << file << " " << dec
-          << line;
+    severe() << "Fatal assertion " << msgid << " " << redact(status) << " at " << file << " " << dec
+             << line;
     breakpoint();
-    log() << "\n\n***aborting after fassert() failure\n\n" << endl;
+    severe() << "\n\n***aborting after fassert() failure\n\n" << endl;
     quickExit(EXIT_ABRUPT);
 }
 
@@ -233,8 +233,8 @@ NOINLINE_DECL void msgassertedWithLocation(int msgid,
                                            const char* file,
                                            unsigned line) {
     assertionCount.condrollover(++assertionCount.warning);
-    log() << "Assertion: " << msgid << ":" << redact(msg) << ' ' << file << ' ' << dec << line
-          << endl;
+    error() << "Assertion: " << msgid << ":" << redact(msg) << ' ' << file << ' ' << dec << line
+            << endl;
     logContext();
     throw MsgAssertionException(msgid, msg);
 }
@@ -244,8 +244,8 @@ NOINLINE_DECL void msgassertedNoTraceWithLocation(int msgid,
                                                   const char* file,
                                                   unsigned line) {
     assertionCount.condrollover(++assertionCount.warning);
-    log() << "Assertion: " << msgid << ":" << redact(msg) << ' ' << file << ' ' << dec << line
-          << endl;
+    error() << "Assertion: " << msgid << ":" << redact(msg) << ' ' << file << ' ' << dec << line
+            << endl;
     throw MsgAssertionException(msgid, msg);
 }
 
