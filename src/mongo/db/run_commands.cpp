@@ -252,8 +252,6 @@ LogicalTime getClientOperationTime(OperationContext* opCtx) {
  * members, it uses the last optime in the oplog for writes, last committed optime for majority
  * reads, and the last applied optime for every other read. An uninitialized logical time is
  * returned for non replica set members.
- *
- * TODO: SERVER-28419 Do not compute operationTime if replica set does not propagate clusterTime.
  */
 LogicalTime computeOperationTime(OperationContext* opCtx,
                                  LogicalTime startOperationTime,
@@ -286,7 +284,8 @@ LogicalTime computeOperationTime(OperationContext* opCtx,
 bool runCommandImpl(OperationContext* opCtx,
                     Command* command,
                     const OpMsgRequest& request,
-                    rpc::ReplyBuilderInterface* replyBuilder) {
+                    rpc::ReplyBuilderInterface* replyBuilder,
+                    LogicalTime startOperationTime) {
     auto bytesToReserve = command->reserveBytesForReply();
 
 // SERVER-22100: In Windows DEBUG builds, the CRT heap debugging overhead, in conjunction with the
@@ -332,7 +331,6 @@ bool runCommandImpl(OperationContext* opCtx,
 
     std::string errmsg;
     bool result;
-    auto startOperationTime = getClientOperationTime(opCtx);
     if (!command->supportsWriteConcern(cmd)) {
         if (commandSpecifiesWriteConcern(cmd)) {
             auto result = Command::appendCommandStatus(
@@ -419,6 +417,8 @@ void execCommandDatabase(OperationContext* opCtx,
                          Command* command,
                          const OpMsgRequest& request,
                          rpc::ReplyBuilderInterface* replyBuilder) {
+
+    auto startOperationTime = getClientOperationTime(opCtx);
     try {
         {
             stdx::lock_guard<Client> lk(*opCtx->getClient());
@@ -573,7 +573,7 @@ void execCommandDatabase(OperationContext* opCtx,
                 << rpc::TrackingMetadata::get(opCtx).toString();
             rpc::TrackingMetadata::get(opCtx).setIsLogged(true);
         }
-        retval = runCommandImpl(opCtx, command, request, replyBuilder);
+        retval = runCommandImpl(opCtx, command, request, replyBuilder, startOperationTime);
 
         if (!retval) {
             command->incrementCommandsFailed();
@@ -593,15 +593,13 @@ void execCommandDatabase(OperationContext* opCtx,
         BSONObjBuilder metadataBob;
         appendReplyMetadata(opCtx, request, &metadataBob);
 
-        // Ideally this should be using computeOperationTime, but with the code
-        // structured as it currently is we don't know the startOperationTime or
-        // readConcern at this point. Using the cluster time instead of the actual
-        // operation time is correct, but can result in extra waiting on subsequent
-        // afterClusterTime reads.
-        //
-        // TODO: SERVER-28445 change this to use computeOperationTime once the exception handling
-        // path is moved into Command::run()
-        auto operationTime = LogicalClock::get(opCtx)->getClusterTime();
+        const std::string db = request.getDatabase().toString();
+        auto readConcernArgsStatus =
+            _extractReadConcern(request.body, command->supportsReadConcern(db, request.body));
+        auto operationTime = readConcernArgsStatus.isOK()
+            ? computeOperationTime(
+                  opCtx, startOperationTime, readConcernArgsStatus.getValue().getLevel())
+            : LogicalClock::get(opCtx)->getClusterTime();
 
         // An uninitialized operation time means the cluster time is not propagated, so the
         // operation time should not be attached to the error response.
