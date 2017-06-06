@@ -81,9 +81,12 @@ executor:
       eval: "var testingReplication = true; load('jstests/libs/override_methods/set_read_and_write_concerns.js');"
       readMode: commands
   hooks:
-  - class: ValidateCollections
+  # The CheckReplDBHash hook waits until all operations have replicated to and have been applied
+  # on the secondaries, so we run the ValidateCollections hook after it to ensure we're
+  # validating the entire contents of the collection.
   - class: CheckReplOplogs
   - class: CheckReplDBHash
+  - class: ValidateCollections
   - class: CleanEveryN
     n: 20
   fixture:

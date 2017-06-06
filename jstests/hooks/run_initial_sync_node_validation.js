@@ -37,10 +37,14 @@
     var res = assert.commandWorked(hiddenNode.adminCommand({replSetGetStatus: 1}));
     assert.eq(res.myState, ReplSetTest.State.SECONDARY, tojson(res));
 
-    load('jstests/hooks/run_validate_collections.js');
+    /* The checkReplicatedDataHashes call waits until all operations have replicated to and
+       have been applied on the secondaries, so we run the validation script after it
+       to ensure we're validating the entire contents of the collection */
 
     // For checkDBHashes
     rst.checkReplicatedDataHashes();
+
+    load('jstests/hooks/run_validate_collections.js');
 
     var totalTime = Date.now() - startTime;
     print('Finished consistency checks of initial sync node in ' + totalTime + ' ms.');
