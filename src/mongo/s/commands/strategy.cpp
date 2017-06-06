@@ -519,22 +519,25 @@ DbResponse Strategy::clientOpQueryCommand(OperationContext* opCtx,
 }
 
 DbResponse Strategy::clientOpMsgCommand(OperationContext* opCtx, const Message& m) {
-    auto request = OpMsg::parse(m);
+    // TODO SERVER-28964 If this parsing the request fails we reply to an invalid request which
+    // isn't always safe. Unfortunately tests currently rely on this. Figure out what to do
+    // (probably throw a special exception type like ConnectionFatalMessageParseError).
+    bool canReply = true;
+    boost::optional<OpMsgRequest> request;
     OpMsgBuilder reply;
     try {
-        std::string db = "admin";
-        if (auto elem = request.body["$db"])
-            db = elem.String();
-
-        runCommand(opCtx, db, request.body, reply.beginBody());
+        request.emplace(OpMsgRequest::parse(m));  // Request is validated here.
+        canReply = !request->isFlagSet(OpMsg::kMoreToCome);
+        runCommand(opCtx, request->getDatabase(), request->body, reply.beginBody());
     } catch (const DBException& ex) {
         reply.reset();
         auto bob = reply.beginBody();
         Command::appendCommandStatus(bob, ex.toStatus());
     }
 
-    if (request.isFlagSet(OpMsg::kMoreToCome))
+    if (!canReply)
         return {};
+
     return DbResponse{reply.finish()};
 }
 

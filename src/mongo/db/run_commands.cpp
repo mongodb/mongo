@@ -642,9 +642,9 @@ void curOpCommandSetup(OperationContext* opCtx, const OpMsgRequest& request) {
 DbResponse runCommands(OperationContext* opCtx, const Message& message) {
     auto replyBuilder = rpc::makeReplyBuilder(rpc::protocolForMessage(message));
 
-    // TODO If this parsing the request fails we reply to an invalid request which isn't always
-    // safe. Unfortunately tests currently rely on this. Figure out what to do (probably throw a
-    // special exception type like ConnectionFatalMessageParseError).
+    // TODO SERVER-28964 If this parsing the request fails we reply to an invalid request which
+    // isn't always safe. Unfortunately tests currently rely on this. Figure out what to do
+    // (probably throw a special exception type like ConnectionFatalMessageParseError).
     bool canReply = true;
     auto curOp = CurOp::get(opCtx);
     boost::optional<OpMsgRequest> request;
