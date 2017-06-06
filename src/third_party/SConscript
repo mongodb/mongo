@@ -13,10 +13,12 @@ mozjsSuffix = '-45'
 yamlSuffix = '-0.5.3'
 icuSuffix = '-57.1'
 gperftoolsSuffix = '-2.5'
+timelibSuffix = '-2017.05beta3'
 
 thirdPartyIncludePathList = [
     ('s2', '#/src/third_party/s2'),
     ('tz', '#/src/third_party/tz'),
+    ('timelib', '#/src/third_party/timelib' + timelibSuffix),
 ]
 
 if not use_system_version_of_library('tcmalloc'):
@@ -306,6 +308,20 @@ tzEnv.Library(
         'shim_tz.cpp',
     ])
 
+
+timelibEnv = env.Clone();
+timelibEnv.InjectThirdPartyIncludePaths(libraries=['timelib'])
+timelibEnv.SConscript('timelib' + timelibSuffix + '/SConscript', exports={ 'env' : timelibEnv })
+timelibEnv = timelibEnv.Clone(
+    LIBDEPS=[
+        ('timelib' + timelibSuffix + '/timelib', libdeps.dependency.Interface),
+    ])
+
+timelibEnv.Library(
+    target='shim_timelib',
+    source=[
+        'shim_timelib.cpp',
+    ])
 
 if wiredtiger:
     if use_system_version_of_library("wiredtiger"):
