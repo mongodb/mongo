@@ -454,6 +454,7 @@ void CollectionCloner::_findCallback(const StatusWith<Fetcher::QueryResponse>& f
         invariant(getMoreBob);
         getMoreBob->append("getMore", batchData.cursorId);
         getMoreBob->append("collection", batchData.nss.coll());
+        getMoreBob->append("batchSize", batchSize);
     }
 }
 
