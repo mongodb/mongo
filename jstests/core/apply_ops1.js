@@ -310,8 +310,8 @@
 
     var res = assert.commandWorked(db.runCommand({
         applyOps: [
-            {op: "u", ns: t.getFullName(), o2: {_id: 5}, o: {$inc: {x: 1}}},
-            {op: "u", ns: t.getFullName(), o2: {_id: 5}, o: {$inc: {x: 1}}}
+            {op: "u", ns: t.getFullName(), o2: {_id: 5}, o: {$set: {x: 18}}},
+            {op: "u", ns: t.getFullName(), o2: {_id: 5}, o: {$set: {x: 19}}}
         ]
     }));
 
@@ -326,8 +326,8 @@
     // preCondition fully matches
     res = db.runCommand({
         applyOps: [
-            {op: "u", ns: t.getFullName(), o2: {_id: 5}, o: {$inc: {x: 1}}},
-            {op: "u", ns: t.getFullName(), o2: {_id: 5}, o: {$inc: {x: 1}}}
+            {op: "u", ns: t.getFullName(), o2: {_id: 5}, o: {$set: {x: 20}}},
+            {op: "u", ns: t.getFullName(), o2: {_id: 5}, o: {$set: {x: 21}}}
         ],
         preCondition: [{ns: t.getFullName(), q: {_id: 5}, res: {x: 19}}]
     });
@@ -343,8 +343,8 @@
     // preCondition doesn't match ns
     res = db.runCommand({
         applyOps: [
-            {op: "u", ns: t.getFullName(), o2: {_id: 5}, o: {$inc: {x: 1}}},
-            {op: "u", ns: t.getFullName(), o2: {_id: 5}, o: {$inc: {x: 1}}}
+            {op: "u", ns: t.getFullName(), o2: {_id: 5}, o: {$set: {x: 22}}},
+            {op: "u", ns: t.getFullName(), o2: {_id: 5}, o: {$set: {x: 23}}}
         ],
         preCondition: [{ns: "foo.otherName", q: {_id: 5}, res: {x: 21}}]
     });
@@ -354,8 +354,8 @@
     // preCondition doesn't match query
     res = db.runCommand({
         applyOps: [
-            {op: "u", ns: t.getFullName(), o2: {_id: 5}, o: {$inc: {x: 1}}},
-            {op: "u", ns: t.getFullName(), o2: {_id: 5}, o: {$inc: {x: 1}}}
+            {op: "u", ns: t.getFullName(), o2: {_id: 5}, o: {$set: {x: 22}}},
+            {op: "u", ns: t.getFullName(), o2: {_id: 5}, o: {$set: {x: 23}}}
         ],
         preCondition: [{ns: t.getFullName(), q: {_id: 5}, res: {x: 19}}]
     });
@@ -364,8 +364,8 @@
 
     res = db.runCommand({
         applyOps: [
-            {op: "u", ns: t.getFullName(), o2: {_id: 5}, o: {$inc: {x: 1}}},
-            {op: "u", ns: t.getFullName(), o2: {_id: 6}, o: {$inc: {x: 1}}}
+            {op: "u", ns: t.getFullName(), o2: {_id: 5}, o: {$set: {x: 22}}},
+            {op: "u", ns: t.getFullName(), o2: {_id: 6}, o: {$set: {x: 23}}}
         ]
     });
 
