@@ -279,6 +279,7 @@ class _CppHeaderFileWriter(_CppFileWriterBase):
             'method_name': common.title_case(field.cpp_name),
             'param_type': param_type,
             'body': cpp_type_info.get_getter_body(member_name),
+            'const_type': 'const ' if cpp_type_info.is_const_type() else '',
         }
 
         # Generate a getter that disables xvalue for view types (i.e. StringData), constructed
@@ -291,7 +292,7 @@ class _CppHeaderFileWriter(_CppFileWriterBase):
                 self._writer.write_template('void get${method_name}() && = delete;')
             else:
                 self._writer.write_template(
-                    'const ${param_type} get${method_name}() const { ${body} }')
+                    '${const_type}${param_type} get${method_name}() const { ${body} }')
 
     def gen_setter(self, field):
         # type: (ast.Field) -> None

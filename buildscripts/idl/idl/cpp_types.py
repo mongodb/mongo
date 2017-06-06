@@ -26,6 +26,8 @@ from . import bson
 from . import common
 from . import writer
 
+_STD_ARRAY_UINT8_16 = 'std::array<std::uint8_t,16>'
+
 
 def _is_primitive_type(cpp_type):
     # type: (unicode) -> bool
@@ -33,7 +35,7 @@ def _is_primitive_type(cpp_type):
     cpp_type = cpp_type.replace(' ', '')
     return cpp_type in [
         'bool', 'double', 'std::int32_t', 'std::uint32_t', 'std::uint64_t', 'std::int64_t',
-        'std::array<std::uint8_t,16>'
+        _STD_ARRAY_UINT8_16
     ]
 
 
@@ -75,6 +77,12 @@ class CppTypeBase(object):
     def get_getter_setter_type(self):
         # type: () -> unicode
         """Get the C++ type name for the getter/setter parameter for a field."""
+        pass
+
+    @abstractmethod
+    def is_const_type(self):
+        # type: () -> bool
+        """Return True if the type should be returned by const."""
         pass
 
     @abstractmethod
@@ -144,6 +152,11 @@ class _CppTypeBasic(CppTypeBase):
         # type: () -> unicode
         return self.get_type_name()
 
+    def is_const_type(self):
+        # type: () -> bool
+        type_name = self.get_type_name().replace(' ', '')
+        return not _is_primitive_type(type_name) or type_name == _STD_ARRAY_UINT8_16
+
     def return_by_reference(self):
         # type: () -> bool
         return not _is_primitive_type(self.get_type_name()) and not self._field.enum_type
@@ -193,6 +206,10 @@ class _CppTypeView(CppTypeBase):
     def get_getter_setter_type(self):
         # type: () -> unicode
         return self._view_type
+
+    def is_const_type(self):
+        # type: () -> bool
+        return True
 
     def return_by_reference(self):
         # type: () -> bool
@@ -246,6 +263,10 @@ class _CppTypeVector(CppTypeBase):
     def get_getter_setter_type(self):
         # type: () -> unicode
         return 'ConstDataRange'
+
+    def is_const_type(self):
+        # type: () -> bool
+        return True
 
     def return_by_reference(self):
         # type: () -> bool
@@ -303,6 +324,10 @@ class _CppTypeDelegating(CppTypeBase):
     def get_getter_setter_type(self):
         # type: () -> unicode
         return self._base.get_getter_setter_type()
+
+    def is_const_type(self):
+        # type: () -> bool
+        return True
 
     def return_by_reference(self):
         # type: () -> bool
