@@ -41,6 +41,16 @@ env.Library(
     ],
 )
 
+env.CppUnitTest(
+    target = 'restriction_test',
+    source = 'restriction_test.cpp',
+    LIBDEPS = [
+        '$BUILD_DIR/mongo/base',
+        'authentication_restriction',
+    ],
+)
+
+
 # Just the data structures used
 env.Library('authcore', ['action_set.cpp',
                          'action_type.cpp',
