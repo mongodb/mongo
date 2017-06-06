@@ -126,15 +126,20 @@ Status processCommandMetadata(OperationContext* opCtx, const BSONObj& cmdObj) {
  * Append required fields to command response.
  */
 void appendRequiredFieldsToResponse(OperationContext* opCtx, BSONObjBuilder* responseBuilder) {
+    // Add $logicalTime.
     auto validator = LogicalTimeValidator::get(opCtx);
     auto currentTime =
         validator->signLogicalTime(opCtx, LogicalClock::get(opCtx)->getClusterTime());
-    rpc::LogicalTimeMetadata logicalTimeMetadata(currentTime);
-    logicalTimeMetadata.writeToMetadata(responseBuilder);
-    auto tracker = OperationTimeTracker::get(opCtx);
-    if (tracker) {
+    rpc::LogicalTimeMetadata(currentTime).writeToMetadata(responseBuilder);
+
+    // Add operationTime.
+    if (auto tracker = OperationTimeTracker::get(opCtx)) {
         auto operationTime = OperationTimeTracker::get(opCtx)->getMaxOperationTime();
         responseBuilder->append(kOperationTime, operationTime.asTimestamp());
+    } else if (currentTime.getTime() != LogicalTime::kUninitialized) {
+        // If we don't know the actual operation time, use the cluster time instead. This is safe
+        // but not optimal because we can always return a later operation time than actual.
+        responseBuilder->append(kOperationTime, currentTime.getTime().asTimestamp());
     }
 }
 
