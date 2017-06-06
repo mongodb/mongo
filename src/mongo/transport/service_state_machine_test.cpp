@@ -35,10 +35,6 @@
 #include "mongo/bson/bsonobjbuilder.h"
 #include "mongo/db/dbmessage.h"
 #include "mongo/db/service_context_noop.h"
-#include "mongo/rpc/command_reply.h"
-#include "mongo/rpc/command_reply_builder.h"
-#include "mongo/rpc/command_request.h"
-#include "mongo/rpc/command_request_builder.h"
 #include "mongo/stdx/memory.h"
 #include "mongo/transport/mock_session.h"
 #include "mongo/transport/mock_ticket.h"
@@ -49,6 +45,7 @@
 #include "mongo/util/assert_util.h"
 #include "mongo/util/clock_source_mock.h"
 #include "mongo/util/log.h"
+#include "mongo/util/net/op_msg.h"
 #include "mongo/util/tick_source_mock.h"
 
 namespace mongo {
@@ -66,18 +63,17 @@ public:
         _ranHandler = true;
         ASSERT_TRUE(haveClient());
 
-        rpc::CommandRequest req(&request);
-        ASSERT_BSONOBJ_EQ(BSON("ping" << 1), req.getCommandArgs());
+        auto req = OpMsgRequest::parse(request);
+        ASSERT_BSONOBJ_EQ(BSON("ping" << 1), req.body);
 
         // Build out a dummy reply
-        rpc::CommandReplyBuilder builder;
-        builder.setRawCommandReply(BSON("ok" << 1));
-        builder.setMetadata(BSONObj{});
+        OpMsgBuilder builder;
+        builder.setBody(BSON("ok" << 1));
 
         if (_uassertInHandler)
             uassert(40469, "Synthetic uassert failure", false);
 
-        return DbResponse{builder.done()};
+        return DbResponse{builder.finish()};
     }
 
     void setUassertInHandler() {
@@ -192,13 +188,9 @@ private:
 };
 
 Message buildRequest(BSONObj input) {
-    rpc::CommandRequestBuilder builder;
-    builder.setDatabase("admin");
-    builder.setCommandName("ping");
-    builder.setCommandArgs(input);
-    builder.setMetadata(BSONObj{});
-
-    return builder.done();
+    OpMsgBuilder builder;
+    builder.setBody(input);
+    return builder.finish();
 }
 
 }  // namespace
@@ -256,9 +248,8 @@ ServiceStateMachine::State ServiceStateMachineFixture::runPingTest() {
 
 void ServiceStateMachineFixture::checkPingOk() {
     auto msg = _tl->getLastSunk();
-    rpc::CommandReply reply(&msg);
-
-    ASSERT_BSONOBJ_EQ(reply.getCommandReply(), BSON("ok" << 1));
+    auto reply = OpMsg::parse(msg);
+    ASSERT_BSONOBJ_EQ(reply.body, BSON("ok" << 1));
 }
 
 TEST_F(ServiceStateMachineFixture, TestOkaySimpleCommand) {
