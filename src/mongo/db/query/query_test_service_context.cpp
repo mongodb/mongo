@@ -44,4 +44,13 @@ ServiceContext::UniqueOperationContext QueryTestServiceContext::makeOperationCon
     return _uniqueClient->makeOperationContext();
 }
 
+ServiceContext::UniqueOperationContext QueryTestServiceContext::makeOperationContext(
+    LogicalSessionId lsid) {
+    return _uniqueClient->makeOperationContext(std::move(lsid));
+}
+
+Client* QueryTestServiceContext::getClient() const {
+    return _uniqueClient.get();
+}
+
 }  // namespace mongo

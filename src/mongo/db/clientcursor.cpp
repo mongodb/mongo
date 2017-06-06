@@ -77,13 +77,15 @@ long long ClientCursor::totalOpen() {
     return cursorStatsOpen.get();
 }
 
-ClientCursor::ClientCursor(ClientCursorParams&& params,
+ClientCursor::ClientCursor(ClientCursorParams params,
                            CursorManager* cursorManager,
                            CursorId cursorId,
+                           boost::optional<LogicalSessionId> lsid,
                            Date_t now)
     : _cursorid(cursorId),
       _nss(std::move(params.nss)),
       _authenticatedUsers(std::move(params.authenticatedUsers)),
+      _lsid(std::move(lsid)),
       _isReadCommitted(params.isReadCommitted),
       _cursorManager(cursorManager),
       _originatingCommand(params.originatingCommandObj),

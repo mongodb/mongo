@@ -613,6 +613,7 @@ env.Library(
     ],
     LIBDEPS=[
         "$BUILD_DIR/mongo/base",
+        "$BUILD_DIR/mongo/db/logical_session_id",
         "$BUILD_DIR/mongo/util/background_job",
         "query/query",
         "background",
