@@ -321,7 +321,7 @@ def create_test_membership_map(fail_on_missing_selector=False):
                     continue
             raise
 
-        for testfile in suite.test_group.tests:
+        for testfile in suite.tests:
             if isinstance(testfile, dict):
                 continue
             test_membership[testfile].append(suite_name)

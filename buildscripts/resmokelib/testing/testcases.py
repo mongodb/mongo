@@ -48,7 +48,7 @@ class TestCase(unittest.TestCase):
         if not isinstance(test_name, basestring):
             raise TypeError("test_name must be a string")
 
-        # When the TestCase is created by the TestGroupExecutor (through a call to make_test_case())
+        # When the TestCase is created by the TestSuiteExecutor (through a call to make_test_case())
         # logger is an instance of TestQueueLogger. When the TestCase is created by a hook
         # implementation it is an instance of BaseLogger.
         self.logger = logger

@@ -19,7 +19,7 @@ if __name__ == "__main__" and __package__ is None:
 
 def _execute_suite(suite):
     """
-    Executes each test group of 'suite', failing fast if requested.
+    Executes the test suite, failing fast if requested.
 
     Returns true if the execution of the suite was interrupted by the
     user, and false otherwise.
@@ -29,46 +29,43 @@ def _execute_suite(suite):
 
     if resmokelib.config.SHUFFLE:
         logger.info("Shuffling order of tests for %ss in suite %s. The seed is %d.",
-                    suite.test_group.test_kind, suite.get_name(), resmokelib.config.RANDOM_SEED)
+                    suite.test_kind, suite.get_name(), resmokelib.config.RANDOM_SEED)
         random.seed(resmokelib.config.RANDOM_SEED)
-        random.shuffle(suite.test_group.tests)
+        random.shuffle(suite.tests)
 
     if resmokelib.config.DRY_RUN == "tests":
         sb = []
         sb.append("Tests that would be run for %ss in suite %s:"
-                  % (suite.test_group.test_kind, suite.get_name()))
-        if len(suite.test_group.tests) > 0:
-            for test in suite.test_group.tests:
+                  % (suite.test_kind, suite.get_name()))
+        if len(suite.tests) > 0:
+            for test in suite.tests:
                 sb.append(test)
         else:
             sb.append("(no tests)")
         logger.info("\n".join(sb))
 
-        # Set a successful return code on the test group because we want to output the tests
+        # Set a successful return code on the test suite because we want to output the tests
         # that would get run by any other suites the user specified.
-        suite.test_group.return_code = 0
+        suite.return_code = 0
         return True
 
-    if len(suite.test_group.tests) == 0:
-        logger.info("Skipping %ss, no tests to run", suite.test_group.test_kind)
+    if len(suite.tests) == 0:
+        logger.info("Skipping %ss, no tests to run", suite.test_kind)
         return True
 
-    group_config = suite.get_executor_config()
-    executor = resmokelib.testing.executor.TestGroupExecutor(logger,
-                                                             suite.test_group,
-                                                             **group_config)
+    suite_config = suite.get_executor_config()
+    executor = resmokelib.testing.executor.TestSuiteExecutor(logger, suite, **suite_config)
 
     try:
         executor.run()
-        if resmokelib.config.FAIL_FAST and suite.test_group.return_code != 0:
-            suite.return_code = suite.test_group.return_code
+        if resmokelib.config.FAIL_FAST and suite.return_code != 0:
             return False
     except resmokelib.errors.UserInterrupt:
         suite.return_code = 130  # Simulate SIGINT as exit code.
         return True
     except:
         logger.exception("Encountered an error when running %ss of suite %s.",
-                         suite.test_group.test_kind, suite.get_name())
+                         suite.test_kind, suite.get_name())
         suite.return_code = 2
         return False
 
@@ -112,7 +109,7 @@ def find_suites_by_test(suites):
     memberships = {}
     test_membership = resmokelib.parser.create_test_membership_map()
     for suite in suites:
-        for test in suite.test_group.tests:
+        for test in suite.tests:
             memberships[test] = test_membership[test]
     return memberships
 
@@ -159,9 +156,9 @@ def main():
         for suite in suites:
             resmoke_logger.info(_dump_suite_config(suite, logging_config))
 
-            suite.record_start()
+            suite.record_suite_start()
             interrupted = _execute_suite(suite)
-            suite.record_end()
+            suite.record_suite_end()
 
             resmoke_logger.info("=" * 80)
             resmoke_logger.info("Summary of %s suite: %s",
