@@ -566,7 +566,6 @@ env.Library(
 env.Library(
     target="service_context_d",
     source=[
-        "operation_context_impl.cpp",
         "service_context_d.cpp",
     ],
     LIBDEPS=[

@@ -459,8 +459,8 @@ Status SimpleRecordStoreV1::compact(OperationContext* opCtx,
     }
 
     stdx::unique_lock<Client> lk(*opCtx->getClient());
-    ProgressMeterHolder pm(
-        *opCtx->setMessage_inlock("compact extent", "Extent Compacting Progress", extents.size()));
+    ProgressMeterHolder pm(CurOp::get(opCtx)->setMessage_inlock(
+        "compact extent", "Extent Compacting Progress", extents.size()));
     lk.unlock();
 
     // Go through all old extents and move each record to a new set of extents.

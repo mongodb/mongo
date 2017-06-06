@@ -60,18 +60,6 @@ public:
         setRecoveryUnit(new RecoveryUnitNoop(), kNotInUnitOfWork);
         setLockState(stdx::make_unique<LockerNoop>());
     }
-
-    virtual ~OperationContextNoop() = default;
-
-    virtual ProgressMeter* setMessage_inlock(const char* msg,
-                                             const std::string& name,
-                                             unsigned long long progressMeterTotal,
-                                             int secondsBetween) override {
-        return &_pm;
-    }
-
-private:
-    ProgressMeter _pm;
 };
 
 }  // namespace mongo

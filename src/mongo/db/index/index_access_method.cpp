@@ -466,10 +466,11 @@ Status IndexAccessMethod::commitBulk(OperationContext* opCtx,
     std::unique_ptr<BulkBuilder::Sorter::Iterator> i(bulk->_sorter->done());
 
     stdx::unique_lock<Client> lk(*opCtx->getClient());
-    ProgressMeterHolder pm(*opCtx->setMessage_inlock("Index Bulk Build: (2/3) btree bottom up",
-                                                     "Index: (2/3) BTree Bottom Up Progress",
-                                                     bulk->_keysInserted,
-                                                     10));
+    ProgressMeterHolder pm(
+        CurOp::get(opCtx)->setMessage_inlock("Index Bulk Build: (2/3) btree bottom up",
+                                             "Index: (2/3) BTree Bottom Up Progress",
+                                             bulk->_keysInserted,
+                                             10));
     lk.unlock();
 
     std::unique_ptr<SortedDataBuilderInterface> builder;

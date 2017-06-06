@@ -37,6 +37,7 @@
 #include "mongo/base/static_assert.h"
 #include "mongo/db/catalog/collection.h"
 #include "mongo/db/client.h"
+#include "mongo/db/curop.h"
 #include "mongo/db/operation_context.h"
 #include "mongo/db/storage/mmap_v1/extent.h"
 #include "mongo/db/storage/mmap_v1/extent_manager.h"
@@ -883,8 +884,8 @@ Status RecordStoreV1Base::touch(OperationContext* opCtx, BSONObjBuilder* output)
 
     std::string progress_msg = "touch " + ns() + " extents";
     stdx::unique_lock<Client> lk(*opCtx->getClient());
-    ProgressMeterHolder pm(
-        *opCtx->setMessage_inlock(progress_msg.c_str(), "Touch Progress", ranges.size()));
+    ProgressMeterHolder pm(CurOp::get(opCtx)->setMessage_inlock(
+        progress_msg.c_str(), "Touch Progress", ranges.size()));
     lk.unlock();
 
     for (std::vector<touch_location>::iterator it = ranges.begin(); it != ranges.end(); ++it) {

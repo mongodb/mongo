@@ -84,6 +84,8 @@ public:
         kFailedUnitOfWork   // in a unit of work that has failed and must be aborted
     };
 
+    OperationContext(Client* client, unsigned int opId, boost::optional<LogicalSessionId> lsid);
+
     virtual ~OperationContext() = default;
 
     /**
@@ -238,17 +240,6 @@ public:
         stdx::condition_variable& cv, stdx::unique_lock<stdx::mutex>& m, Date_t deadline) noexcept;
 
     /**
-     * Delegates to CurOp, but is included here to break dependencies.
-     * Caller does not own the pointer.
-     *
-     * Caller must have locked the "Client" associated with this context.
-     */
-    virtual ProgressMeter* setMessage_inlock(const char* msg,
-                                             const std::string& name = "Progress",
-                                             unsigned long long progressMeterTotal = 0,
-                                             int secondsBetween = 3) = 0;
-
-    /**
      * Returns the service context under which this operation context runs.
      */
     ServiceContext* getServiceContext() const {
@@ -386,9 +377,6 @@ public:
      * value Microseconds::max() if the operation has no time limit.
      */
     Microseconds getRemainingMaxTimeMicros() const;
-
-protected:
-    OperationContext(Client* client, unsigned int opId, boost::optional<LogicalSessionId> lsid);
 
 private:
     /**

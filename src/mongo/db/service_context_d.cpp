@@ -37,8 +37,8 @@
 #include "mongo/base/init.h"
 #include "mongo/base/initializer.h"
 #include "mongo/db/client.h"
+#include "mongo/db/concurrency/lock_state.h"
 #include "mongo/db/op_observer.h"
-#include "mongo/db/operation_context_impl.h"
 #include "mongo/db/service_context.h"
 #include "mongo/db/storage/storage_engine.h"
 #include "mongo/db/storage/storage_engine_lock_file.h"
@@ -268,8 +268,17 @@ const StorageEngine::Factory* StorageFactoriesIteratorMongoD::next() {
 std::unique_ptr<OperationContext> ServiceContextMongoD::_newOpCtx(
     Client* client, unsigned opId, boost::optional<LogicalSessionId> lsid) {
     invariant(&cc() == client);
-    return std::unique_ptr<OperationContextImpl>(
-        new OperationContextImpl(client, opId, std::move(lsid)));
+    auto opCtx = stdx::make_unique<OperationContext>(client, opId, std::move(lsid));
+
+    if (isMMAPV1()) {
+        opCtx->setLockState(stdx::make_unique<MMAPV1LockerImpl>());
+    } else {
+        opCtx->setLockState(stdx::make_unique<DefaultLockerImpl>());
+    }
+
+    opCtx->setRecoveryUnit(getGlobalStorageEngine()->newRecoveryUnit(),
+                           OperationContext::kNotInUnitOfWork);
+    return opCtx;
 }
 
 void ServiceContextMongoD::setOpObserver(std::unique_ptr<OpObserver> opObserver) {

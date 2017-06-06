@@ -274,7 +274,7 @@ public:
 
         {
             stdx::lock_guard<Client> lk(*opCtx->getClient());
-            opCtx->setMessage_inlock("waiting for write concern");
+            CurOp::get(opCtx)->setMessage_inlock("waiting for write concern");
         }
 
         WriteConcernResult wcResult;

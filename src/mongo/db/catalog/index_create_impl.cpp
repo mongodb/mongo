@@ -298,7 +298,7 @@ Status MultiIndexBlockImpl::insertAllDocumentsInCollection(std::set<RecordId>* d
     const auto numRecords = _collection->numRecords(_opCtx);
     stdx::unique_lock<Client> lk(*_opCtx->getClient());
     ProgressMeterHolder progress(
-        *_opCtx->setMessage_inlock(curopMessage, curopMessage, numRecords));
+        CurOp::get(_opCtx)->setMessage_inlock(curopMessage, curopMessage, numRecords));
     lk.unlock();
 
     Timer t;
