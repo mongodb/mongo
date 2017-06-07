@@ -471,7 +471,7 @@ __lsm_tree_open(WT_SESSION_IMPL *session,
 
 	/* Try to open the tree. */
 	WT_RET(__wt_calloc_one(session, &lsm_tree));
-	__wt_rwlock_init(session, &lsm_tree->rwlock);
+	WT_ERR(__wt_rwlock_init(session, &lsm_tree->rwlock));
 
 	WT_ERR(__lsm_tree_set_name(session, lsm_tree, uri));
 

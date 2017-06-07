@@ -126,7 +126,7 @@ __wt_txn_get_snapshot(WT_SESSION_IMPL *session)
 	n = 0;
 
 	/* We're going to scan the table: wait for the lock. */
-	__wt_readlock_spin(session, &txn_global->scan_rwlock);
+	__wt_readlock(session, &txn_global->scan_rwlock);
 
 	current_id = pinned_id = txn_global->current;
 	prev_oldest_id = txn_global->oldest_id;
@@ -293,7 +293,7 @@ __wt_txn_update_oldest(WT_SESSION_IMPL *session, uint32_t flags)
 
 	/* First do a read-only scan. */
 	if (wait)
-		__wt_readlock_spin(session, &txn_global->scan_rwlock);
+		__wt_readlock(session, &txn_global->scan_rwlock);
 	else if ((ret =
 	    __wt_try_readlock(session, &txn_global->scan_rwlock)) != 0)
 		return (ret == EBUSY ? 0 : ret);
@@ -768,8 +768,8 @@ __wt_txn_global_init(WT_SESSION_IMPL *session, const char *cfg[])
 
 	WT_RET(__wt_spin_init(session,
 	    &txn_global->id_lock, "transaction id lock"));
-	__wt_rwlock_init(session, &txn_global->scan_rwlock);
-	__wt_rwlock_init(session, &txn_global->nsnap_rwlock);
+	WT_RET(__wt_rwlock_init(session, &txn_global->scan_rwlock));
+	WT_RET(__wt_rwlock_init(session, &txn_global->nsnap_rwlock));
 	txn_global->nsnap_oldest_id = WT_TXN_NONE;
 	TAILQ_INIT(&txn_global->nsnaph);
 

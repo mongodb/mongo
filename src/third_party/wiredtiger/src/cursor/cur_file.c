@@ -486,7 +486,14 @@ __curfile_create(WT_SESSION_IMPL *session,
 	WT_STAT_DATA_INCR(session, cursor_create);
 
 	if (0) {
-err:		WT_TRET(__curfile_close(cursor));
+err:		/*
+		 * Our caller expects to release the data handle if we fail.
+		 * Disconnect it from the cursor before closing.
+		 */
+		if (session->dhandle != NULL)
+			__wt_cursor_dhandle_decr_use(session);
+		cbt->btree = NULL;
+		WT_TRET(__curfile_close(cursor));
 		*cursorp = NULL;
 	}
 
