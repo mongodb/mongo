@@ -48,6 +48,7 @@
 #include "mongo/rpc/metadata/client_metadata.h"
 #include "mongo/rpc/metadata/client_metadata_ismaster.h"
 #include "mongo/util/log.h"
+#include "mongo/util/time_support.h"
 
 namespace mongo {
 
@@ -157,6 +158,7 @@ public:
 
             // Operation context specific information
             infoBuilder.appendBool("active", static_cast<bool>(clientOpCtx));
+            infoBuilder.append("currentOpTime", Date_t::now().toString());
             if (clientOpCtx) {
                 infoBuilder.append("opid", clientOpCtx->getOpID());
                 if (clientOpCtx->isKillPending()) {
