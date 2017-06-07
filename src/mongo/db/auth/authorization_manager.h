@@ -102,6 +102,12 @@ public:
     static const NamespaceString defaultTempRolesCollectionNamespace;  // for mongorestore
 
     /**
+     * Status to be returned when authentication fails. Being consistent about our returned Status
+     * prevents information leakage.
+     */
+    static const Status authenticationFailedStatus;
+
+    /**
      * Query to match the auth schema version document in the versionCollectionNamespace.
      */
     static const BSONObj versionDocumentQuery;

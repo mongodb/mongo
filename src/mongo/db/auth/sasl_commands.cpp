@@ -183,7 +183,7 @@ Status doSaslStep(const Client* client,
 
         sleepmillis(saslGlobalParams.authFailedDelay.load());
         // All the client needs to know is that authentication has failed.
-        return Status(ErrorCodes::AuthenticationFailed, "Authentication failed.");
+        return AuthorizationManager::authenticationFailedStatus;
     }
 
     status = buildResponse(session, responsePayload, type, result);

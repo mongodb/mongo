@@ -244,6 +244,7 @@ env.CppUnitTest(
         'authmocks',
         'saslauth',
         'authorization_session_for_test',
+        '$BUILD_DIR/mongo/transport/transport_layer_mock',
     ]
 )
 

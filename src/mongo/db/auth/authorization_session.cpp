@@ -41,6 +41,7 @@
 #include "mongo/db/auth/authorization_manager.h"
 #include "mongo/db/auth/authz_session_external_state.h"
 #include "mongo/db/auth/privilege.h"
+#include "mongo/db/auth/restriction_environment.h"
 #include "mongo/db/auth/security_key.h"
 #include "mongo/db/auth/user_management_commands_parser.h"
 #include "mongo/db/bson/dotted_path_support.h"
@@ -79,6 +80,37 @@ Status checkAuthForCreateOrModifyView(AuthorizationSession* authzSession,
     return authzSession->checkAuthForAggregate(
         viewOnNs, BSON("aggregate" << viewOnNs.coll() << "pipeline" << viewPipeline), isMongos);
 }
+
+/** Deleter for User*.
+ * Will release a User* back to its owning AuthorizationManager on destruction.
+ * If a borrowing UserSet and the iterator it uses to store the User* is provided, this
+ * deleter will release the User* from the set if the iterator still points to the deleting User*.
+ */
+class UserReleaser {
+public:
+    explicit UserReleaser(AuthorizationManager* owner) : _owner(owner), _borrower(nullptr) {}
+    UserReleaser(AuthorizationManager* owner, UserSet* borrower, UserSet::iterator borrowerIt)
+        : _owner(owner), _borrower(borrower), _it(borrowerIt) {}
+
+    void operator()(User* user) {
+        // Remove the user from the borrower if it hasn't already been swapped out.
+        if (_borrower && *_it == user) {
+            fassert(40546, _borrower->removeAt(_it) == user);
+        }
+        _owner->releaseUser(user);
+    }
+
+protected:
+    AuthorizationManager* _owner;
+    UserSet* _borrower;
+    UserSet::iterator _it;
+};
+/** Holder for User*s. If this Holder falls out of scope while holding a User*, it will release
+ * the User* from its AuthorizationManager, and extract it from a UserSet if the set still contains
+ * it. Use this object to guard User*s which will need to be destroyed in the event of an exception.
+ */
+using UserHolder = std::unique_ptr<User, UserReleaser>;
+
 }  // namespace
 
 AuthorizationSession::AuthorizationSession(std::unique_ptr<AuthzSessionExternalState> externalState)
@@ -103,17 +135,31 @@ void AuthorizationSession::startRequest(OperationContext* opCtx) {
 Status AuthorizationSession::addAndAuthorizeUser(OperationContext* opCtx,
                                                  const UserName& userName) {
     User* user;
-    Status status = getAuthorizationManager().acquireUserForInitialAuth(opCtx, userName, &user);
+    AuthorizationManager* authzManager = AuthorizationManager::get(opCtx->getServiceContext());
+    Status status = authzManager->acquireUserForInitialAuth(opCtx, userName, &user);
     if (!status.isOK()) {
         return status;
     }
 
+    UserHolder userHolder(user, UserReleaser(authzManager));
+
+    const auto& restrictionSet = userHolder->getRestrictions();
+    if (opCtx->getClient() == nullptr) {
+        return Status(ErrorCodes::AuthenticationFailed,
+                      "Unable to evaluate restrictions, OperationContext has no Client");
+    }
+
+    Status restrictionStatus =
+        restrictionSet.validate(RestrictionEnvironment::get(*opCtx->getClient()));
+    if (!restrictionStatus.isOK()) {
+        log() << "Failed to acquire user because of unmet authentication restrictions: "
+              << restrictionStatus.reason();
+        return AuthorizationManager::authenticationFailedStatus;
+    }
+
     // Calling add() on the UserSet may return a user that was replaced because it was from the
     // same database.
-    User* replacedUser = _authenticatedUsers.add(user);
-    if (replacedUser) {
-        getAuthorizationManager().releaseUser(replacedUser);
-    }
+    userHolder.reset(_authenticatedUsers.add(userHolder.release()));
 
     // If there are any users and roles in the impersonation data, clear it out.
     clearImpersonatedUserData();
@@ -936,9 +982,35 @@ void AuthorizationSession::_refreshUserInfoAsNeeded(OperationContext* opCtx) {
 
             switch (status.code()) {
                 case ErrorCodes::OK: {
+
+                    // Verify the updated user object's authentication restrictions.
+                    UserHolder userHolder(user, UserReleaser(&authMan, &_authenticatedUsers, it));
+                    UserHolder updatedUserHolder(updatedUser, UserReleaser(&authMan));
+                    try {
+                        const auto& restrictionSet =
+                            updatedUserHolder->getRestrictions();  // Owned by updatedUser
+                        invariant(opCtx->getClient());
+                        Status restrictionStatus = restrictionSet.validate(
+                            RestrictionEnvironment::get(*opCtx->getClient()));
+                        if (!restrictionStatus.isOK()) {
+                            log() << "Removed user " << name
+                                  << " with unmet authentication restrictions from session cache of"
+                                  << " user information. Restriction failed because: "
+                                  << restrictionStatus.reason();
+                            // If we remove from the UserSet, we cannot increment the iterator.
+                            continue;
+                        }
+                    } catch (...) {
+                        log() << "Evaluating authentication restrictions for " << name
+                              << " resulted in an unknown exception. Removing user from the"
+                              << " session cache.";
+                        continue;
+                    }
+
                     // Success! Replace the old User object with the updated one.
-                    fassert(17067, _authenticatedUsers.replaceAt(it, updatedUser) == user);
-                    authMan.releaseUser(user);
+                    fassert(17067,
+                            _authenticatedUsers.replaceAt(it, updatedUserHolder.release()) ==
+                                userHolder.get());
                     LOG(1) << "Updated session cache of user information for " << name;
                     break;
                 }

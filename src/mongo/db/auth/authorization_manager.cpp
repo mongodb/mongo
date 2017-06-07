@@ -103,6 +103,9 @@ const NamespaceString AuthorizationManager::versionCollectionNamespace("admin.sy
 const NamespaceString AuthorizationManager::defaultTempUsersCollectionNamespace("admin.tempusers");
 const NamespaceString AuthorizationManager::defaultTempRolesCollectionNamespace("admin.temproles");
 
+const Status AuthorizationManager::authenticationFailedStatus(ErrorCodes::AuthenticationFailed,
+                                                              "Authentication failed.");
+
 const BSONObj AuthorizationManager::versionDocumentQuery = BSON("_id"
                                                                 << "authSchema");
 

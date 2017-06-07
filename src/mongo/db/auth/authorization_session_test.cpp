@@ -37,12 +37,15 @@
 #include "mongo/db/auth/authorization_session_for_test.h"
 #include "mongo/db/auth/authz_manager_external_state_mock.h"
 #include "mongo/db/auth/authz_session_external_state_mock.h"
+#include "mongo/db/auth/restriction_environment.h"
 #include "mongo/db/jsobj.h"
 #include "mongo/db/json.h"
 #include "mongo/db/namespace_string.h"
-#include "mongo/db/operation_context_noop.h"
-#include "mongo/s/is_mongos.h"
+#include "mongo/db/operation_context.h"
+#include "mongo/db/service_context_noop.h"
 #include "mongo/stdx/memory.h"
+#include "mongo/transport/session.h"
+#include "mongo/transport/transport_layer_mock.h"
 #include "mongo/unittest/unittest.h"
 #include "mongo/util/map_util.h"
 
@@ -79,18 +82,29 @@ private:
 class AuthorizationSessionTest : public ::mongo::unittest::Test {
 public:
     FailureCapableAuthzManagerExternalStateMock* managerState;
-    OperationContextNoop _opCtx;
+    transport::TransportLayerMock transportLayer;
+    transport::SessionHandle session;
+    ServiceContextNoop serviceContext;
+    ServiceContext::UniqueClient client;
+    ServiceContext::UniqueOperationContext _opCtx;
     AuthzSessionExternalStateMock* sessionState;
-    std::unique_ptr<AuthorizationManager> authzManager;
+    AuthorizationManager* authzManager;
     std::unique_ptr<AuthorizationSessionForTest> authzSession;
 
     void setUp() {
+        session = transportLayer.createSession();
+        client = serviceContext.makeClient("testClient", session);
+        RestrictionEnvironment::set(
+            session, stdx::make_unique<RestrictionEnvironment>(SockAddr(), SockAddr()));
+        _opCtx = client->makeOperationContext();
         auto localManagerState = stdx::make_unique<FailureCapableAuthzManagerExternalStateMock>();
         managerState = localManagerState.get();
         managerState->setAuthzVersion(AuthorizationManager::schemaVersion26Final);
-        authzManager = stdx::make_unique<AuthorizationManager>(std::move(localManagerState));
-        auto localSessionState =
-            stdx::make_unique<AuthzSessionExternalStateMock>(authzManager.get());
+        auto uniqueAuthzManager =
+            stdx::make_unique<AuthorizationManager>(std::move(localManagerState));
+        authzManager = uniqueAuthzManager.get();
+        AuthorizationManager::set(&serviceContext, std::move(uniqueAuthzManager));
+        auto localSessionState = stdx::make_unique<AuthzSessionExternalStateMock>(authzManager);
         sessionState = localSessionState.get();
         authzSession = stdx::make_unique<AuthorizationSessionForTest>(std::move(localSessionState));
         authzManager->setAuthEnabled(true);
@@ -147,10 +161,10 @@ TEST_F(AuthorizationSessionTest, AddUserAndCheckAuthorization) {
 
     // Check that you can't authorize a user that doesn't exist.
     ASSERT_EQUALS(ErrorCodes::UserNotFound,
-                  authzSession->addAndAuthorizeUser(&_opCtx, UserName("spencer", "test")));
+                  authzSession->addAndAuthorizeUser(_opCtx.get(), UserName("spencer", "test")));
 
     // Add a user with readWrite and dbAdmin on the test DB
-    ASSERT_OK(managerState->insertPrivilegeDocument(&_opCtx,
+    ASSERT_OK(managerState->insertPrivilegeDocument(_opCtx.get(),
                                                     BSON("user"
                                                          << "spencer"
                                                          << "db"
@@ -168,7 +182,7 @@ TEST_F(AuthorizationSessionTest, AddUserAndCheckAuthorization) {
                                                                                << "db"
                                                                                << "test"))),
                                                     BSONObj()));
-    ASSERT_OK(authzSession->addAndAuthorizeUser(&_opCtx, UserName("spencer", "test")));
+    ASSERT_OK(authzSession->addAndAuthorizeUser(_opCtx.get(), UserName("spencer", "test")));
 
     ASSERT_TRUE(
         authzSession->isAuthorizedForActionsOnResource(testFooCollResource, ActionType::insert));
@@ -179,7 +193,7 @@ TEST_F(AuthorizationSessionTest, AddUserAndCheckAuthorization) {
 
     // Add an admin user with readWriteAnyDatabase
     ASSERT_OK(
-        managerState->insertPrivilegeDocument(&_opCtx,
+        managerState->insertPrivilegeDocument(_opCtx.get(),
                                               BSON("user"
                                                    << "admin"
                                                    << "db"
@@ -193,7 +207,7 @@ TEST_F(AuthorizationSessionTest, AddUserAndCheckAuthorization) {
                                                                       << "db"
                                                                       << "admin"))),
                                               BSONObj()));
-    ASSERT_OK(authzSession->addAndAuthorizeUser(&_opCtx, UserName("admin", "admin")));
+    ASSERT_OK(authzSession->addAndAuthorizeUser(_opCtx.get(), UserName("admin", "admin")));
 
     ASSERT_TRUE(authzSession->isAuthorizedForActionsOnResource(
         ResourcePattern::forExactNamespace(NamespaceString("anydb.somecollection")),
@@ -226,7 +240,7 @@ TEST_F(AuthorizationSessionTest, AddUserAndCheckAuthorization) {
 
 TEST_F(AuthorizationSessionTest, DuplicateRolesOK) {
     // Add a user with doubled-up readWrite and single dbAdmin on the test DB
-    ASSERT_OK(managerState->insertPrivilegeDocument(&_opCtx,
+    ASSERT_OK(managerState->insertPrivilegeDocument(_opCtx.get(),
                                                     BSON("user"
                                                          << "spencer"
                                                          << "db"
@@ -248,7 +262,7 @@ TEST_F(AuthorizationSessionTest, DuplicateRolesOK) {
                                                                                << "db"
                                                                                << "test"))),
                                                     BSONObj()));
-    ASSERT_OK(authzSession->addAndAuthorizeUser(&_opCtx, UserName("spencer", "test")));
+    ASSERT_OK(authzSession->addAndAuthorizeUser(_opCtx.get(), UserName("spencer", "test")));
 
     ASSERT_TRUE(
         authzSession->isAuthorizedForActionsOnResource(testFooCollResource, ActionType::insert));
@@ -259,7 +273,7 @@ TEST_F(AuthorizationSessionTest, DuplicateRolesOK) {
 }
 
 TEST_F(AuthorizationSessionTest, SystemCollectionsAccessControl) {
-    ASSERT_OK(managerState->insertPrivilegeDocument(&_opCtx,
+    ASSERT_OK(managerState->insertPrivilegeDocument(_opCtx.get(),
                                                     BSON("user"
                                                          << "rw"
                                                          << "db"
@@ -277,7 +291,7 @@ TEST_F(AuthorizationSessionTest, SystemCollectionsAccessControl) {
                                                                                << "db"
                                                                                << "test"))),
                                                     BSONObj()));
-    ASSERT_OK(managerState->insertPrivilegeDocument(&_opCtx,
+    ASSERT_OK(managerState->insertPrivilegeDocument(_opCtx.get(),
                                                     BSON("user"
                                                          << "useradmin"
                                                          << "db"
@@ -292,7 +306,7 @@ TEST_F(AuthorizationSessionTest, SystemCollectionsAccessControl) {
                                                                             << "test"))),
                                                     BSONObj()));
     ASSERT_OK(
-        managerState->insertPrivilegeDocument(&_opCtx,
+        managerState->insertPrivilegeDocument(_opCtx.get(),
                                               BSON("user"
                                                    << "rwany"
                                                    << "db"
@@ -311,7 +325,7 @@ TEST_F(AuthorizationSessionTest, SystemCollectionsAccessControl) {
                                                                          << "admin"))),
                                               BSONObj()));
     ASSERT_OK(
-        managerState->insertPrivilegeDocument(&_opCtx,
+        managerState->insertPrivilegeDocument(_opCtx.get(),
                                               BSON("user"
                                                    << "useradminany"
                                                    << "db"
@@ -326,7 +340,7 @@ TEST_F(AuthorizationSessionTest, SystemCollectionsAccessControl) {
                                                                       << "admin"))),
                                               BSONObj()));
 
-    ASSERT_OK(authzSession->addAndAuthorizeUser(&_opCtx, UserName("rwany", "test")));
+    ASSERT_OK(authzSession->addAndAuthorizeUser(_opCtx.get(), UserName("rwany", "test")));
 
     ASSERT_FALSE(
         authzSession->isAuthorizedForActionsOnResource(testUsersCollResource, ActionType::insert));
@@ -346,7 +360,7 @@ TEST_F(AuthorizationSessionTest, SystemCollectionsAccessControl) {
         authzSession->isAuthorizedForActionsOnResource(otherProfileCollResource, ActionType::find));
 
     // Logging in as useradminany@test implicitly logs out rwany@test.
-    ASSERT_OK(authzSession->addAndAuthorizeUser(&_opCtx, UserName("useradminany", "test")));
+    ASSERT_OK(authzSession->addAndAuthorizeUser(_opCtx.get(), UserName("useradminany", "test")));
     ASSERT_FALSE(
         authzSession->isAuthorizedForActionsOnResource(testUsersCollResource, ActionType::insert));
     ASSERT_TRUE(
@@ -365,7 +379,7 @@ TEST_F(AuthorizationSessionTest, SystemCollectionsAccessControl) {
         authzSession->isAuthorizedForActionsOnResource(otherProfileCollResource, ActionType::find));
 
     // Logging in as rw@test implicitly logs out useradminany@test.
-    ASSERT_OK(authzSession->addAndAuthorizeUser(&_opCtx, UserName("rw", "test")));
+    ASSERT_OK(authzSession->addAndAuthorizeUser(_opCtx.get(), UserName("rw", "test")));
 
     ASSERT_FALSE(
         authzSession->isAuthorizedForActionsOnResource(testUsersCollResource, ActionType::insert));
@@ -386,7 +400,7 @@ TEST_F(AuthorizationSessionTest, SystemCollectionsAccessControl) {
 
 
     // Logging in as useradmin@test implicitly logs out rw@test.
-    ASSERT_OK(authzSession->addAndAuthorizeUser(&_opCtx, UserName("useradmin", "test")));
+    ASSERT_OK(authzSession->addAndAuthorizeUser(_opCtx.get(), UserName("useradmin", "test")));
     ASSERT_FALSE(
         authzSession->isAuthorizedForActionsOnResource(testUsersCollResource, ActionType::insert));
     ASSERT_FALSE(
@@ -407,7 +421,7 @@ TEST_F(AuthorizationSessionTest, SystemCollectionsAccessControl) {
 
 TEST_F(AuthorizationSessionTest, InvalidateUser) {
     // Add a readWrite user
-    ASSERT_OK(managerState->insertPrivilegeDocument(&_opCtx,
+    ASSERT_OK(managerState->insertPrivilegeDocument(_opCtx.get(),
                                                     BSON("user"
                                                          << "spencer"
                                                          << "db"
@@ -421,7 +435,7 @@ TEST_F(AuthorizationSessionTest, InvalidateUser) {
                                                                             << "db"
                                                                             << "test"))),
                                                     BSONObj()));
-    ASSERT_OK(authzSession->addAndAuthorizeUser(&_opCtx, UserName("spencer", "test")));
+    ASSERT_OK(authzSession->addAndAuthorizeUser(_opCtx.get(), UserName("spencer", "test")));
 
     ASSERT_TRUE(
         authzSession->isAuthorizedForActionsOnResource(testFooCollResource, ActionType::find));
@@ -434,10 +448,13 @@ TEST_F(AuthorizationSessionTest, InvalidateUser) {
     // Change the user to be read-only
     int ignored;
     managerState
-        ->remove(
-            &_opCtx, AuthorizationManager::usersCollectionNamespace, BSONObj(), BSONObj(), &ignored)
+        ->remove(_opCtx.get(),
+                 AuthorizationManager::usersCollectionNamespace,
+                 BSONObj(),
+                 BSONObj(),
+                 &ignored)
         .transitional_ignore();
-    ASSERT_OK(managerState->insertPrivilegeDocument(&_opCtx,
+    ASSERT_OK(managerState->insertPrivilegeDocument(_opCtx.get(),
                                                     BSON("user"
                                                          << "spencer"
                                                          << "db"
@@ -454,7 +471,7 @@ TEST_F(AuthorizationSessionTest, InvalidateUser) {
 
     // Make sure that invalidating the user causes the session to reload its privileges.
     authzManager->invalidateUserByName(user->getName());
-    authzSession->startRequest(&_opCtx);  // Refreshes cached data for invalid users
+    authzSession->startRequest(_opCtx.get());  // Refreshes cached data for invalid users
     ASSERT_TRUE(
         authzSession->isAuthorizedForActionsOnResource(testFooCollResource, ActionType::find));
     ASSERT_FALSE(
@@ -465,12 +482,15 @@ TEST_F(AuthorizationSessionTest, InvalidateUser) {
 
     // Delete the user.
     managerState
-        ->remove(
-            &_opCtx, AuthorizationManager::usersCollectionNamespace, BSONObj(), BSONObj(), &ignored)
+        ->remove(_opCtx.get(),
+                 AuthorizationManager::usersCollectionNamespace,
+                 BSONObj(),
+                 BSONObj(),
+                 &ignored)
         .transitional_ignore();
     // Make sure that invalidating the user causes the session to reload its privileges.
     authzManager->invalidateUserByName(user->getName());
-    authzSession->startRequest(&_opCtx);  // Refreshes cached data for invalid users
+    authzSession->startRequest(_opCtx.get());  // Refreshes cached data for invalid users
     ASSERT_FALSE(
         authzSession->isAuthorizedForActionsOnResource(testFooCollResource, ActionType::find));
     ASSERT_FALSE(
@@ -480,7 +500,7 @@ TEST_F(AuthorizationSessionTest, InvalidateUser) {
 
 TEST_F(AuthorizationSessionTest, UseOldUserInfoInFaceOfConnectivityProblems) {
     // Add a readWrite user
-    ASSERT_OK(managerState->insertPrivilegeDocument(&_opCtx,
+    ASSERT_OK(managerState->insertPrivilegeDocument(_opCtx.get(),
                                                     BSON("user"
                                                          << "spencer"
                                                          << "db"
@@ -494,7 +514,7 @@ TEST_F(AuthorizationSessionTest, UseOldUserInfoInFaceOfConnectivityProblems) {
                                                                             << "db"
                                                                             << "test"))),
                                                     BSONObj()));
-    ASSERT_OK(authzSession->addAndAuthorizeUser(&_opCtx, UserName("spencer", "test")));
+    ASSERT_OK(authzSession->addAndAuthorizeUser(_opCtx.get(), UserName("spencer", "test")));
 
     ASSERT_TRUE(
         authzSession->isAuthorizedForActionsOnResource(testFooCollResource, ActionType::find));
@@ -508,10 +528,13 @@ TEST_F(AuthorizationSessionTest, UseOldUserInfoInFaceOfConnectivityProblems) {
     int ignored;
     managerState->setFindsShouldFail(true);
     managerState
-        ->remove(
-            &_opCtx, AuthorizationManager::usersCollectionNamespace, BSONObj(), BSONObj(), &ignored)
+        ->remove(_opCtx.get(),
+                 AuthorizationManager::usersCollectionNamespace,
+                 BSONObj(),
+                 BSONObj(),
+                 &ignored)
         .transitional_ignore();
-    ASSERT_OK(managerState->insertPrivilegeDocument(&_opCtx,
+    ASSERT_OK(managerState->insertPrivilegeDocument(_opCtx.get(),
                                                     BSON("user"
                                                          << "spencer"
                                                          << "db"
@@ -530,7 +553,7 @@ TEST_F(AuthorizationSessionTest, UseOldUserInfoInFaceOfConnectivityProblems) {
     // document lookup to fail, the authz session should continue to use its known out-of-date
     // privilege data.
     authzManager->invalidateUserByName(user->getName());
-    authzSession->startRequest(&_opCtx);  // Refreshes cached data for invalid users
+    authzSession->startRequest(_opCtx.get());  // Refreshes cached data for invalid users
     ASSERT_TRUE(
         authzSession->isAuthorizedForActionsOnResource(testFooCollResource, ActionType::find));
     ASSERT_TRUE(
@@ -539,7 +562,7 @@ TEST_F(AuthorizationSessionTest, UseOldUserInfoInFaceOfConnectivityProblems) {
     // Once we configure document lookup to succeed again, authorization checks should
     // observe the new values.
     managerState->setFindsShouldFail(false);
-    authzSession->startRequest(&_opCtx);  // Refreshes cached data for invalid users
+    authzSession->startRequest(_opCtx.get());  // Refreshes cached data for invalid users
     ASSERT_TRUE(
         authzSession->isAuthorizedForActionsOnResource(testFooCollResource, ActionType::find));
     ASSERT_FALSE(
@@ -968,7 +991,7 @@ TEST_F(AuthorizationSessionTest,
 }
 
 TEST_F(AuthorizationSessionTest, AuthorizedSessionIsNotCoauthorizedWithEmptyUserSet) {
-    ASSERT_OK(managerState->insertPrivilegeDocument(&_opCtx,
+    ASSERT_OK(managerState->insertPrivilegeDocument(_opCtx.get(),
                                                     BSON("user"
                                                          << "spencer"
                                                          << "db"
@@ -979,7 +1002,7 @@ TEST_F(AuthorizationSessionTest, AuthorizedSessionIsNotCoauthorizedWithEmptyUser
                                                          << "roles"
                                                          << BSONArray()),
                                                     BSONObj()));
-    ASSERT_OK(authzSession->addAndAuthorizeUser(&_opCtx, UserName("spencer", "test")));
+    ASSERT_OK(authzSession->addAndAuthorizeUser(_opCtx.get(), UserName("spencer", "test")));
     std::vector<UserName> userSet;
     ASSERT_FALSE(
         authzSession->isCoauthorizedWith(makeUserNameIterator(userSet.begin(), userSet.end())));
@@ -988,7 +1011,7 @@ TEST_F(AuthorizationSessionTest, AuthorizedSessionIsNotCoauthorizedWithEmptyUser
 TEST_F(AuthorizationSessionTest,
        AuthorizedSessionIsCoauthorizedWithEmptyUserSetWhenAuthIsDisabled) {
     authzManager->setAuthEnabled(false);
-    ASSERT_OK(managerState->insertPrivilegeDocument(&_opCtx,
+    ASSERT_OK(managerState->insertPrivilegeDocument(_opCtx.get(),
                                                     BSON("user"
                                                          << "spencer"
                                                          << "db"
@@ -999,14 +1022,14 @@ TEST_F(AuthorizationSessionTest,
                                                          << "roles"
                                                          << BSONArray()),
                                                     BSONObj()));
-    ASSERT_OK(authzSession->addAndAuthorizeUser(&_opCtx, UserName("spencer", "test")));
+    ASSERT_OK(authzSession->addAndAuthorizeUser(_opCtx.get(), UserName("spencer", "test")));
     std::vector<UserName> userSet;
     ASSERT_TRUE(
         authzSession->isCoauthorizedWith(makeUserNameIterator(userSet.begin(), userSet.end())));
 }
 
 TEST_F(AuthorizationSessionTest, AuthorizedSessionIsCoauthorizedWithIntersectingUserSet) {
-    ASSERT_OK(managerState->insertPrivilegeDocument(&_opCtx,
+    ASSERT_OK(managerState->insertPrivilegeDocument(_opCtx.get(),
                                                     BSON("user"
                                                          << "spencer"
                                                          << "db"
@@ -1017,7 +1040,7 @@ TEST_F(AuthorizationSessionTest, AuthorizedSessionIsCoauthorizedWithIntersecting
                                                          << "roles"
                                                          << BSONArray()),
                                                     BSONObj()));
-    ASSERT_OK(managerState->insertPrivilegeDocument(&_opCtx,
+    ASSERT_OK(managerState->insertPrivilegeDocument(_opCtx.get(),
                                                     BSON("user"
                                                          << "admin"
                                                          << "db"
@@ -1028,8 +1051,8 @@ TEST_F(AuthorizationSessionTest, AuthorizedSessionIsCoauthorizedWithIntersecting
                                                          << "roles"
                                                          << BSONArray()),
                                                     BSONObj()));
-    ASSERT_OK(authzSession->addAndAuthorizeUser(&_opCtx, UserName("spencer", "test")));
-    ASSERT_OK(authzSession->addAndAuthorizeUser(&_opCtx, UserName("admin", "test")));
+    ASSERT_OK(authzSession->addAndAuthorizeUser(_opCtx.get(), UserName("spencer", "test")));
+    ASSERT_OK(authzSession->addAndAuthorizeUser(_opCtx.get(), UserName("admin", "test")));
     std::vector<UserName> userSet;
     userSet.emplace_back("admin", "test");
     userSet.emplace_back("tess", "test");
@@ -1038,7 +1061,7 @@ TEST_F(AuthorizationSessionTest, AuthorizedSessionIsCoauthorizedWithIntersecting
 }
 
 TEST_F(AuthorizationSessionTest, AuthorizedSessionIsNotCoauthorizedWithNonintersectingUserSet) {
-    ASSERT_OK(managerState->insertPrivilegeDocument(&_opCtx,
+    ASSERT_OK(managerState->insertPrivilegeDocument(_opCtx.get(),
                                                     BSON("user"
                                                          << "spencer"
                                                          << "db"
@@ -1049,7 +1072,7 @@ TEST_F(AuthorizationSessionTest, AuthorizedSessionIsNotCoauthorizedWithNoninters
                                                          << "roles"
                                                          << BSONArray()),
                                                     BSONObj()));
-    ASSERT_OK(managerState->insertPrivilegeDocument(&_opCtx,
+    ASSERT_OK(managerState->insertPrivilegeDocument(_opCtx.get(),
                                                     BSON("user"
                                                          << "admin"
                                                          << "db"
@@ -1060,8 +1083,8 @@ TEST_F(AuthorizationSessionTest, AuthorizedSessionIsNotCoauthorizedWithNoninters
                                                          << "roles"
                                                          << BSONArray()),
                                                     BSONObj()));
-    ASSERT_OK(authzSession->addAndAuthorizeUser(&_opCtx, UserName("spencer", "test")));
-    ASSERT_OK(authzSession->addAndAuthorizeUser(&_opCtx, UserName("admin", "test")));
+    ASSERT_OK(authzSession->addAndAuthorizeUser(_opCtx.get(), UserName("spencer", "test")));
+    ASSERT_OK(authzSession->addAndAuthorizeUser(_opCtx.get(), UserName("admin", "test")));
     std::vector<UserName> userSet;
     userSet.emplace_back("tess", "test");
     ASSERT_FALSE(
@@ -1071,7 +1094,7 @@ TEST_F(AuthorizationSessionTest, AuthorizedSessionIsNotCoauthorizedWithNoninters
 TEST_F(AuthorizationSessionTest,
        AuthorizedSessionIsCoauthorizedWithNonintersectingUserSetWhenAuthIsDisabled) {
     authzManager->setAuthEnabled(false);
-    ASSERT_OK(managerState->insertPrivilegeDocument(&_opCtx,
+    ASSERT_OK(managerState->insertPrivilegeDocument(_opCtx.get(),
                                                     BSON("user"
                                                          << "spencer"
                                                          << "db"
@@ -1082,7 +1105,7 @@ TEST_F(AuthorizationSessionTest,
                                                          << "roles"
                                                          << BSONArray()),
                                                     BSONObj()));
-    ASSERT_OK(managerState->insertPrivilegeDocument(&_opCtx,
+    ASSERT_OK(managerState->insertPrivilegeDocument(_opCtx.get(),
                                                     BSON("user"
                                                          << "admin"
                                                          << "db"
@@ -1093,8 +1116,8 @@ TEST_F(AuthorizationSessionTest,
                                                          << "roles"
                                                          << BSONArray()),
                                                     BSONObj()));
-    ASSERT_OK(authzSession->addAndAuthorizeUser(&_opCtx, UserName("spencer", "test")));
-    ASSERT_OK(authzSession->addAndAuthorizeUser(&_opCtx, UserName("admin", "test")));
+    ASSERT_OK(authzSession->addAndAuthorizeUser(_opCtx.get(), UserName("spencer", "test")));
+    ASSERT_OK(authzSession->addAndAuthorizeUser(_opCtx.get(), UserName("admin", "test")));
     std::vector<UserName> userSet;
     userSet.emplace_back("tess", "test");
     ASSERT_TRUE(
