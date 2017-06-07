@@ -502,8 +502,12 @@ __wt_panic(WT_SESSION_IMPL *session)
 #if defined(HAVE_DIAGNOSTIC)
 	__wt_abort(session);			/* Drop core if testing. */
 	/* NOTREACHED */
-#else
+#endif
+#if !defined(HAVE_DIAGNOSTIC) || defined(_WIN32)
 	/*
+	 * Confusing #ifdef structure because gcc knows we can't get here and
+	 * Visual Studio doesn't.
+	 *
 	 * Chaos reigns within.
 	 * Reflect, repent, and reboot.
 	 * Order shall return.
@@ -525,12 +529,7 @@ __wt_illegal_value(WT_SESSION_IMPL *session, const char *name)
 	    name == NULL ? "" : name, name == NULL ? "" : ": ",
 	    "encountered an illegal file format or internal value");
 
-#if defined(HAVE_DIAGNOSTIC)
-	__wt_abort(session);			/* Drop core if testing. */
-	/* NOTREACHED */
-#else
 	return (__wt_panic(session));
-#endif
 }
 
 /*

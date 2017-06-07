@@ -32,7 +32,7 @@
  * compaction --
  *	Periodically do a compaction operation.
  */
-void *
+WT_THREAD_RET
 compact(void *arg)
 {
 	WT_CONNECTION *conn;
@@ -44,7 +44,7 @@ compact(void *arg)
 
 	/* Compaction isn't supported for all data sources. */
 	if (DATASOURCE("helium") || DATASOURCE("kvsbdb"))
-		return (NULL);
+		return (WT_THREAD_RET_VALUE);
 
 	/* Open a session. */
 	conn = g.wts_conn;
@@ -70,5 +70,5 @@ compact(void *arg)
 
 	testutil_check(session->close(session, NULL));
 
-	return (NULL);
+	return (WT_THREAD_RET_VALUE);
 }

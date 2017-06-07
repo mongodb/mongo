@@ -129,8 +129,7 @@ main(int argc, char *argv[])
 
 			wt_startup(config_open);
 
-			if (fop_start(nthreads))
-				return (EXIT_FAILURE);
+			fop_start(nthreads);
 
 			wt_shutdown();
 			printf("\n");

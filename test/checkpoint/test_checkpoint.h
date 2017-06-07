@@ -64,12 +64,12 @@ typedef struct {
 	int running;				/* Whether to stop */
 	int status;				/* Exit status */
 	COOKIE *cookies;			/* Per-thread info */
-	pthread_t checkpoint_thread;		/* Checkpoint thread */
+	wt_thread_t checkpoint_thread;		/* Checkpoint thread */
 } GLOBAL;
 extern GLOBAL g;
 
-int end_checkpoints(void);
-int log_print_err(const char *, int, int);
-int start_checkpoints(void);
-int start_workers(table_type);
+void	end_checkpoints(void);
+int	log_print_err(const char *, int, int);
+void	start_checkpoints(void);
+int	start_workers(table_type);
 const char *type_to_string(table_type);

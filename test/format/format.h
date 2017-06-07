@@ -259,7 +259,7 @@ typedef struct {
 	uint64_t deadlock;
 
 	int       id;				/* simple thread ID */
-	pthread_t tid;				/* thread ID */
+	wt_thread_t tid;			/* thread ID */
 
 	int quit;				/* thread should quit */
 
@@ -279,9 +279,9 @@ void	 bdb_remove(uint64_t, int *);
 void	 bdb_update(const void *, size_t, const void *, size_t);
 #endif
 
-void	*alter(void *);
-void	*backup(void *);
-void	*compact(void *);
+WT_THREAD_RET alter(void *);
+WT_THREAD_RET backup(void *);
+WT_THREAD_RET compact(void *);
 void	 config_clear(void);
 void	 config_error(void);
 void	 config_file(const char *);
@@ -293,7 +293,7 @@ void	 key_gen(WT_ITEM *, uint64_t);
 void	 key_gen_insert(WT_RAND_STATE *, WT_ITEM *, uint64_t);
 void	 key_gen_setup(WT_ITEM *);
 void	 key_len_setup(void);
-void	*lrt(void *);
+WT_THREAD_RET lrt(void *);
 void	 path_setup(const char *);
 int	 read_row(WT_CURSOR *, WT_ITEM *, WT_ITEM *, uint64_t);
 uint32_t rng(WT_RAND_STATE *);
