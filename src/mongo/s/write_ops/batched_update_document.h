@@ -31,9 +31,9 @@
 #include <string>
 #include <vector>
 
-#include "mongo/base/disallow_copying.h"
 #include "mongo/base/string_data.h"
 #include "mongo/db/jsobj.h"
+#include "mongo/s/bson_serializable.h"
 
 namespace mongo {
 
@@ -41,7 +41,7 @@ namespace mongo {
  * This class represents the layout and content of a update document runCommand,
  * in the request side.
  */
-class BatchedUpdateDocument {
+class BatchedUpdateDocument : public BSONSerializable {
     MONGO_DISALLOW_COPYING(BatchedUpdateDocument);
 
 public:
@@ -56,7 +56,12 @@ public:
     static const BSONField<BSONObj> collation;
     static const BSONField<BSONArray> arrayFilters;
 
+    //
+    // construction / destruction
+    //
+
     BatchedUpdateDocument();
+    virtual ~BatchedUpdateDocument();
 
     /** Copies all the fields present in 'this' to 'other'. */
     void cloneTo(BatchedUpdateDocument* other) const;
@@ -65,11 +70,15 @@ public:
     // bson serializable interface implementation
     //
 
-    bool isValid(std::string* errMsg) const;
-    BSONObj toBSON() const;
-    bool parseBSON(const BSONObj& source, std::string* errMsg);
-    void clear();
-    std::string toString() const;
+    virtual bool isValid(std::string* errMsg) const;
+    virtual BSONObj toBSON() const;
+    virtual bool parseBSON(const BSONObj& source, std::string* errMsg);
+    virtual void clear();
+    virtual std::string toString() const;
+
+    //
+    // individual field accessors
+    //
 
     void setQuery(const BSONObj& query);
     void unsetQuery();

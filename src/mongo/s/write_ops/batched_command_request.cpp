@@ -36,6 +36,10 @@
 
 namespace mongo {
 
+using std::unique_ptr;
+using std::string;
+using std::vector;
+
 const size_t BatchedCommandRequest::kMaxWriteBatchSize = 1000;
 
 BatchedCommandRequest::BatchedCommandRequest(BatchType batchType) : _batchType(batchType) {
@@ -67,6 +71,10 @@ BatchedCommandRequest::BatchedCommandRequest(BatchType batchType) : _batchType(b
         }                                                                           \
     }
 
+BatchedCommandRequest::BatchType BatchedCommandRequest::getBatchType() const {
+    return _batchType;
+}
+
 BatchedInsertRequest* BatchedCommandRequest::getInsertRequest() const {
     return _insertReq.get();
 }
@@ -95,8 +103,8 @@ bool BatchedCommandRequest::isUniqueIndexRequest() const {
     return extractUniqueIndex(getInsertRequest()->getDocumentsAt(0));
 }
 
-bool BatchedCommandRequest::isValidIndexRequest(std::string* errMsg) const {
-    std::string dummy;
+bool BatchedCommandRequest::isValidIndexRequest(string* errMsg) const {
+    string dummy;
     if (!errMsg)
         errMsg = &dummy;
     dassert(isInsertIndexRequest());
@@ -122,7 +130,7 @@ bool BatchedCommandRequest::isValidIndexRequest(std::string* errMsg) const {
     return true;
 }
 
-std::string BatchedCommandRequest::getTargetingNS() const {
+string BatchedCommandRequest::getTargetingNS() const {
     return getTargetingNSS().toString();
 }
 
@@ -154,6 +162,29 @@ bool BatchedCommandRequest::isVerboseWC() const {
     }
 
     return false;
+}
+
+void BatchedCommandRequest::cloneTo(BatchedCommandRequest* other) const {
+    other->_insertReq.reset();
+    other->_updateReq.reset();
+    other->_deleteReq.reset();
+    other->_batchType = _batchType;
+
+    switch (getBatchType()) {
+        case BatchedCommandRequest::BatchType_Insert:
+            other->_insertReq.reset(new BatchedInsertRequest);
+            _insertReq->cloneTo(other->_insertReq.get());
+            return;
+        case BatchedCommandRequest::BatchType_Update:
+            other->_updateReq.reset(new BatchedUpdateRequest);
+            _updateReq->cloneTo(other->_updateReq.get());
+            return;
+        default:
+            dassert(getBatchType() == BatchedCommandRequest::BatchType_Delete);
+            other->_deleteReq.reset(new BatchedDeleteRequest);
+            _deleteReq->cloneTo(other->_deleteReq.get());
+            return;
+    }
 }
 
 bool BatchedCommandRequest::isValid(std::string* errMsg) const {
@@ -293,17 +324,16 @@ bool BatchedCommandRequest::shouldBypassValidation() const {
 BatchedCommandRequest* BatchedCommandRequest::cloneWithIds(
     const BatchedCommandRequest& origCmdRequest) {
     if (origCmdRequest.getBatchType() != BatchedCommandRequest::BatchType_Insert ||
-        origCmdRequest.isInsertIndexRequest()) {
-        return nullptr;
-    }
+        origCmdRequest.isInsertIndexRequest())
+        return NULL;
 
-    std::unique_ptr<BatchedInsertRequest> idRequest;
+    unique_ptr<BatchedInsertRequest> idRequest;
     BatchedInsertRequest* origRequest = origCmdRequest.getInsertRequest();
 
-    const std::vector<BSONObj>& inserts = origRequest->getDocuments();
+    const vector<BSONObj>& inserts = origRequest->getDocuments();
 
     size_t i = 0u;
-    for (auto it = inserts.begin(); it != inserts.end(); ++it, ++i) {
+    for (vector<BSONObj>::const_iterator it = inserts.begin(); it != inserts.end(); ++it, ++i) {
         const BSONObj& insert = *it;
         BSONObj idInsert;
 
@@ -314,7 +344,7 @@ BatchedCommandRequest* BatchedCommandRequest::cloneWithIds(
             idInsert = idInsertB.obj();
         }
 
-        if (!idRequest && !idInsert.isEmpty()) {
+        if (NULL == idRequest.get() && !idInsert.isEmpty()) {
             idRequest.reset(new BatchedInsertRequest);
             origRequest->cloneTo(idRequest.get());
         }
@@ -324,25 +354,24 @@ BatchedCommandRequest* BatchedCommandRequest::cloneWithIds(
         }
     }
 
-    if (!idRequest) {
-        return nullptr;
-    }
+    if (NULL == idRequest.get())
+        return NULL;
 
     // Command request owns idRequest
     return new BatchedCommandRequest(idRequest.release());
 }
 
 bool BatchedCommandRequest::containsNoIDUpsert(const BatchedCommandRequest& request) {
-    if (request.getBatchType() != BatchedCommandRequest::BatchType_Update) {
+    if (request.getBatchType() != BatchedCommandRequest::BatchType_Update)
         return false;
-    }
 
-    const auto& updates = request.getUpdateRequest()->getUpdates();
+    const vector<BatchedUpdateDocument*>& updates = request.getUpdateRequest()->getUpdates();
 
-    for (const auto& updateDoc : updates) {
-        if (updateDoc->getUpsert() && updateDoc->getQuery()["_id"].eoo()) {
+    for (vector<BatchedUpdateDocument*>::const_iterator it = updates.begin(); it != updates.end();
+         ++it) {
+        const BatchedUpdateDocument* updateDoc = *it;
+        if (updateDoc->getUpsert() && updateDoc->getQuery()["_id"].eoo())
             return true;
-        }
     }
 
     return false;
@@ -367,8 +396,8 @@ bool BatchedCommandRequest::containsUpserts(const BSONObj& writeCmdObj) {
 }
 
 bool BatchedCommandRequest::getIndexedNS(const BSONObj& writeCmdObj,
-                                         std::string* nsToIndex,
-                                         std::string* errMsg) {
+                                         string* nsToIndex,
+                                         string* errMsg) {
     BSONElement documentsEl = writeCmdObj[BatchedInsertRequest::documents()];
     if (documentsEl.type() != Array) {
         *errMsg = "index write batch is invalid";

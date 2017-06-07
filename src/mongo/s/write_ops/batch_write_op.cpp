@@ -405,10 +405,13 @@ void BatchWriteOp::buildBatchRequest(const TargetedWriteBatch& targetedBatch,
     request->setNS(_clientRequest.getNS());
     request->setShouldBypassValidation(_clientRequest.shouldBypassValidation());
 
-    const auto batchType = _clientRequest.getBatchType();
+    const vector<TargetedWrite*>& targetedWrites = targetedBatch.getWrites();
 
-    for (auto& targetedWrite : targetedBatch.getWrites()) {
-        const WriteOpRef& writeOpRef = targetedWrite->writeOpRef;
+    for (vector<TargetedWrite*>::const_iterator it = targetedWrites.begin();
+         it != targetedWrites.end();
+         ++it) {
+        const WriteOpRef& writeOpRef = (*it)->writeOpRef;
+        BatchedCommandRequest::BatchType batchType = _clientRequest.getBatchType();
 
         // NOTE:  We copy the batch items themselves here from the client request
         // TODO: This could be inefficient, maybe we want to just reference in the future
@@ -421,20 +424,19 @@ void BatchWriteOp::buildBatchRequest(const TargetedWriteBatch& targetedBatch,
             BatchedUpdateDocument* updateDoc = new BatchedUpdateDocument;
             clientUpdateRequest->getUpdatesAt(writeOpRef.first)->cloneTo(updateDoc);
             request->getUpdateRequest()->addToUpdates(updateDoc);
-        } else if (batchType == BatchedCommandRequest::BatchType_Delete) {
+        } else {
+            dassert(batchType == BatchedCommandRequest::BatchType_Delete);
             BatchedDeleteRequest* clientDeleteRequest = _clientRequest.getDeleteRequest();
             BatchedDeleteDocument* deleteDoc = new BatchedDeleteDocument;
             clientDeleteRequest->getDeletesAt(writeOpRef.first)->cloneTo(deleteDoc);
             request->getDeleteRequest()->addToDeletes(deleteDoc);
-        } else {
-            MONGO_UNREACHABLE;
         }
 
         // TODO: We can add logic here to allow aborting individual ops
         // if ( NULL == response ) {
         //    ->responses.erase( it++ );
         //    continue;
-        // }
+        //}
     }
 
     if (_clientRequest.isWriteConcernSet()) {

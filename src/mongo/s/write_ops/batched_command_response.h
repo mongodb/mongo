@@ -31,11 +31,11 @@
 #include <string>
 #include <vector>
 
-#include "mongo/base/disallow_copying.h"
 #include "mongo/base/string_data.h"
 #include "mongo/db/jsobj.h"
 #include "mongo/db/repl/optime.h"
 #include "mongo/rpc/write_concern_error_detail.h"
+#include "mongo/s/bson_serializable.h"
 #include "mongo/s/write_ops/batched_upsert_detail.h"
 #include "mongo/s/write_ops/write_error_detail.h"
 
@@ -45,8 +45,7 @@ namespace mongo {
  * This class represents the layout and content of a insert/update/delete runCommand,
  * the response side.
  */
-class BatchedCommandResponse {
-    MONGO_DISALLOW_COPYING(BatchedCommandResponse);
+class BatchedCommandResponse : public BSONSerializable {
 
 public:
     //
@@ -63,18 +62,32 @@ public:
     static const BSONField<std::vector<WriteErrorDetail*>> writeErrors;
     static const BSONField<WriteConcernErrorDetail*> writeConcernError;
 
+    //
+    // construction / destruction
+    //
+
     BatchedCommandResponse();
+    virtual ~BatchedCommandResponse();
+
+    //
+    // BatchedCommandResponse should have a move constructor but not a copy constructor
+    //
+
     BatchedCommandResponse(BatchedCommandResponse&&) = default;
     BatchedCommandResponse& operator=(BatchedCommandResponse&&) = default;
 
     /** Copies all the fields present in 'this' to 'other'. */
     void cloneTo(BatchedCommandResponse* other) const;
 
-    bool isValid(std::string* errMsg) const;
-    BSONObj toBSON() const;
-    bool parseBSON(const BSONObj& source, std::string* errMsg);
-    void clear();
-    std::string toString() const;
+    //
+    // bson serializable interface implementation
+    //
+
+    virtual bool isValid(std::string* errMsg) const;
+    virtual BSONObj toBSON() const;
+    virtual bool parseBSON(const BSONObj& source, std::string* errMsg);
+    virtual void clear();
+    virtual std::string toString() const;
 
     //
     // individual field accessors

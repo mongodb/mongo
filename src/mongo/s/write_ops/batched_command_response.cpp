@@ -58,6 +58,11 @@ BatchedCommandResponse::BatchedCommandResponse() {
     clear();
 }
 
+BatchedCommandResponse::~BatchedCommandResponse() {
+    unsetErrDetails();
+    unsetUpsertDetails();
+}
+
 bool BatchedCommandResponse::isValid(std::string* errMsg) const {
     std::string dummy;
     if (errMsg == NULL) {
