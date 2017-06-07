@@ -256,13 +256,12 @@ void ClusterWriter::write(OperationContext* opCtx,
 
             Status targetInitStatus = targeter.init(opCtx);
             if (!targetInitStatus.isOK()) {
-                toBatchError(Status(targetInitStatus.code(),
-                                    str::stream()
-                                        << "unable to target"
-                                        << (request->isInsertIndexRequest() ? " index" : "")
-                                        << " write op for collection "
-                                        << request->getTargetingNS()
-                                        << causedBy(targetInitStatus)),
+                toBatchError({targetInitStatus.code(),
+                              str::stream() << "unable to target"
+                                            << (request->isInsertIndexRequest() ? " index" : "")
+                                            << " write op for collection "
+                                            << request->getTargetingNSS().toString()
+                                            << causedBy(targetInitStatus)},
                              response);
                 return;
             }

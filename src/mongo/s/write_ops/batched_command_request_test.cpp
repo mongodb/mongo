@@ -81,61 +81,6 @@ TEST(BatchedCommandRequest, InsertWithShardVersion) {
     ASSERT_EQ(ChunkVersion(1, 2, epoch).toString(), insertRequest.getShardVersion().toString());
 }
 
-TEST(BatchedCommandRequest, InsertClone) {
-    auto insertRequest = stdx::make_unique<BatchedInsertRequest>();
-    BatchedCommandRequest batchedRequest(insertRequest.release());
-
-    batchedRequest.setNS(NamespaceString("xyz.abc"));
-    batchedRequest.setOrdered(true);
-    batchedRequest.setWriteConcern(BSON("w" << 2));
-    batchedRequest.setShouldBypassValidation(true);
-
-    BatchedCommandRequest clonedRequest(BatchedCommandRequest::BatchType_Insert);
-    batchedRequest.cloneTo(&clonedRequest);
-
-    ASSERT_EQ("xyz.abc", clonedRequest.getNS().toString());
-    ASSERT_EQ("xyz.abc", clonedRequest.getTargetingNSS().toString());
-    ASSERT_TRUE(clonedRequest.getOrdered());
-    ASSERT_BSONOBJ_EQ(BSON("w" << 2), clonedRequest.getWriteConcern());
-    ASSERT_TRUE(clonedRequest.shouldBypassValidation());
-
-    batchedRequest.setShouldBypassValidation(false);
-    batchedRequest.cloneTo(&clonedRequest);
-    ASSERT_FALSE(clonedRequest.shouldBypassValidation());
-}
-
-TEST(BatchedCommandRequest, InsertIndexClone) {
-    BSONObj indexSpec(BSON("ns"
-                           << "xyz.user"
-                           << "key"
-                           << BSON("x" << 1)
-                           << "name"
-                           << "y"));
-
-    auto insertRequest = stdx::make_unique<BatchedInsertRequest>();
-    insertRequest->setOrdered(true);
-    insertRequest->setWriteConcern(BSON("w" << 2));
-    insertRequest->addToDocuments(indexSpec);
-
-    BatchedCommandRequest batchedRequest(insertRequest.release());
-    batchedRequest.setNS(NamespaceString("xyz.system.indexes"));
-
-    BatchedCommandRequest clonedRequest(BatchedCommandRequest::BatchType_Insert);
-    batchedRequest.cloneTo(&clonedRequest);
-
-    ASSERT_EQ("xyz.system.indexes", clonedRequest.getNS().toString());
-    ASSERT_EQ("xyz.user", clonedRequest.getTargetingNSS().toString());
-    ASSERT_TRUE(clonedRequest.getOrdered());
-    ASSERT_BSONOBJ_EQ(BSON("w" << 2), clonedRequest.getWriteConcern());
-
-    auto* clonedInsert = clonedRequest.getInsertRequest();
-    ASSERT_TRUE(clonedInsert != nullptr);
-
-    auto insertDocs = clonedInsert->getDocuments();
-    ASSERT_EQ(1u, insertDocs.size());
-    ASSERT_BSONOBJ_EQ(indexSpec, insertDocs.front());
-}
-
 TEST(BatchedCommandRequest, InsertCloneWithId) {
     auto insertRequest = stdx::make_unique<BatchedInsertRequest>();
     insertRequest->setOrdered(true);
@@ -164,42 +109,6 @@ TEST(BatchedCommandRequest, InsertCloneWithId) {
     const auto& insertDoc = insertDocs.front();
     ASSERT_EQ(jstOID, insertDoc["_id"].type());
     ASSERT_EQ(4, insertDoc["x"].numberLong());
-}
-
-TEST(BatchedCommandRequest, UpdateClone) {
-    auto insertRequest = stdx::make_unique<BatchedUpdateRequest>();
-    BatchedCommandRequest batchedRequest(insertRequest.release());
-
-    batchedRequest.setNS(NamespaceString("xyz.abc"));
-    batchedRequest.setOrdered(true);
-    batchedRequest.setWriteConcern(BSON("w" << 2));
-    batchedRequest.setShouldBypassValidation(true);
-
-    BatchedCommandRequest clonedRequest(BatchedCommandRequest::BatchType_Update);
-    batchedRequest.cloneTo(&clonedRequest);
-
-    ASSERT_EQ("xyz.abc", clonedRequest.getNS().toString());
-    ASSERT_EQ("xyz.abc", clonedRequest.getTargetingNSS().toString());
-    ASSERT_TRUE(clonedRequest.getOrdered());
-    ASSERT_BSONOBJ_EQ(BSON("w" << 2), clonedRequest.getWriteConcern());
-    ASSERT_TRUE(clonedRequest.shouldBypassValidation());
-}
-
-TEST(BatchedCommandRequest, DeleteClone) {
-    auto insertRequest = stdx::make_unique<BatchedDeleteRequest>();
-    BatchedCommandRequest batchedRequest(insertRequest.release());
-
-    batchedRequest.setNS(NamespaceString("xyz.abc"));
-    batchedRequest.setOrdered(true);
-    batchedRequest.setWriteConcern(BSON("w" << 2));
-
-    BatchedCommandRequest clonedRequest(BatchedCommandRequest::BatchType_Delete);
-    batchedRequest.cloneTo(&clonedRequest);
-
-    ASSERT_EQ("xyz.abc", clonedRequest.getNS().toString());
-    ASSERT_EQ("xyz.abc", clonedRequest.getTargetingNSS().toString());
-    ASSERT_TRUE(clonedRequest.getOrdered());
-    ASSERT_BSONOBJ_EQ(BSON("w" << 2), clonedRequest.getWriteConcern());
 }
 
 }  // namespace

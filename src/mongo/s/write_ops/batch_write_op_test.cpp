@@ -1733,9 +1733,11 @@ TEST(WriteOpLimitTests, UpdateOverheadIncluded) {
     ASSERT_EQUALS(targeted.size(), 1u);
     ASSERT_LESS_THAN(targeted.begin()->second->getWrites().size(), 1000u);
 
-    BatchedCommandRequest childRequest(BatchedCommandRequest::BatchType_Update);
-    batchOp.buildBatchRequest(*targeted.begin()->second, &childRequest);
-    ASSERT_LESS_THAN(childRequest.toBSON().objsize(), BSONObjMaxInternalSize);
+    {
+        BatchedCommandRequest childRequest(BatchedCommandRequest::BatchType_Update);
+        batchOp.buildBatchRequest(*targeted.begin()->second, &childRequest);
+        ASSERT_LESS_THAN(childRequest.toBSON().objsize(), BSONObjMaxInternalSize);
+    }
 
     BatchedCommandResponse response;
     buildResponse(1, &response);
@@ -1749,9 +1751,11 @@ TEST(WriteOpLimitTests, UpdateOverheadIncluded) {
     ASSERT_EQUALS(targeted.size(), 1u);
     ASSERT_LESS_THAN(targeted.begin()->second->getWrites().size(), 1000u);
 
-    childRequest.clear();
-    batchOp.buildBatchRequest(*targeted.begin()->second, &childRequest);
-    ASSERT_LESS_THAN(childRequest.toBSON().objsize(), BSONObjMaxInternalSize);
+    {
+        BatchedCommandRequest childRequest(BatchedCommandRequest::BatchType_Update);
+        batchOp.buildBatchRequest(*targeted.begin()->second, &childRequest);
+        ASSERT_LESS_THAN(childRequest.toBSON().objsize(), BSONObjMaxInternalSize);
+    }
 
     batchOp.noteBatchResponse(*targeted.begin()->second, response, NULL);
     ASSERT(batchOp.isFinished());

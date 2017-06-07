@@ -226,8 +226,7 @@ private:
         // Note that this implementation will not handle targeting retries and does not completely
         // emulate write behavior
         TargeterStats stats;
-        ChunkManagerTargeter targeter(
-            NamespaceString(targetingBatchItem.getRequest()->getTargetingNS()), &stats);
+        ChunkManagerTargeter targeter(targetingBatchItem.getRequest()->getTargetingNSS(), &stats);
         Status status = targeter.init(opCtx);
         if (!status.isOK())
             return status;

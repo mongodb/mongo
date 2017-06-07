@@ -159,16 +159,16 @@ void BatchWriteExec::executeBatch(OperationContext* opCtx,
             vector<AsyncRequestsSender::Request> requests;
 
             // Get as many batches as we can at once
-            for (auto it = childBatches.begin(); it != childBatches.end(); ++it) {
+            for (auto& childBatch : childBatches) {
+                TargetedWriteBatch* const nextBatch = childBatch.second;
 
-                TargetedWriteBatch* nextBatch = it->second;
-
-                // If the batch is NULL, we sent it previously, so skip
-                if (nextBatch == NULL)
+                // If the batch is nullptr, we sent it previously, so skip
+                if (!nextBatch)
                     continue;
 
                 // If we already have a batch for this shard, wait until the next time
                 ShardId targetShardId = nextBatch->getEndpoint().shardName;
+
                 OwnedShardBatchMap::MapType::iterator pendingIt =
                     pendingBatches.find(targetShardId);
                 if (pendingIt != pendingBatches.end())
@@ -191,7 +191,7 @@ void BatchWriteExec::executeBatch(OperationContext* opCtx,
                 // We'll only get duplicate hostEndpoints if we have broadcast and non-broadcast
                 // endpoints for the same host, so this should be pretty efficient without
                 // moving stuff around.
-                it->second = NULL;
+                childBatch.second = NULL;
 
                 // Recv-side is responsible for cleaning up the nextBatch when used
                 pendingBatches.insert(make_pair(targetShardId, nextBatch));

@@ -216,12 +216,9 @@ public:
     // TODO: BSONElement extraction of types below
 
     /**
-     * Extracts a mandatory BSONSerializable structure 'field' from the object 'doc'. Write
-     * the extracted contents to '*out' if successful or fills '*errMsg', if exising,
-     * otherwise.  This variant relies on T having a parseBSON, which all
-     * BSONSerializable's have.
-     *
-     * TODO: Tighten for BSONSerializable's only
+     * Extracts a mandatory 'field' from the object 'doc'. Writes the extracted contents to '*out'
+     * if successful or fills '*errMsg', if exising, otherwise. This variant relies on T having a
+     * parseBSON method.
      */
     template <typename T>
     static FieldState extract(BSONObj doc,
@@ -229,19 +226,17 @@ public:
                               T* out,
                               std::string* errMsg = NULL);
 
+    /**
+     * Similar to the mandatory 'extract' but on a optional field. The '*out' value would only be
+     * allocated if the field is present. The ownership of '*out' would be transferred to the
+     * caller, in that case.
+     */
     template <typename T>
     static FieldState extract(BSONObj doc,
                               const BSONField<T*>& field,
                               T** out,
                               std::string* errMsg = NULL);
 
-    /**
-     * Similar to the mandatory 'extract' but on a optional field. '*out' would only be
-     * allocated if the field is present. The ownership of '*out' would be transferred to
-     * the caller, in that case.
-     *
-     * TODO: Tighten for BSONSerializable's only
-     */
     template <typename T>
     static FieldState extract(BSONObj doc,
                               const BSONField<T>& field,
@@ -249,14 +244,11 @@ public:
                               std::string* errMsg = NULL);
 
     /**
-     * Extracts a mandatory repetition of BSONSerializable structures, 'field', from the
-     * object 'doc'. Write the extracted contents to '*out' if successful or fills
-     * '*errMsg', if exising, otherwise.  This variant relies on T having a parseBSON,
-     * which all BSONSerializable's have.
+     * Extracts a mandatory repetition of 'field', from the object 'doc'. Writes the extracted
+     * contents to '*out' if successful or fills '*errMsg', if exising, otherwise.  This variant
+     * relies on T having a parseBSON method.
      *
      * The vector owns the instances of T.
-     *
-     * TODO: Tighten for BSONSerializable's only
      */
     template <typename T>
     static FieldState extract(BSONObj doc,
@@ -265,14 +257,11 @@ public:
                               std::string* errMsg = NULL);
 
     /**
-     * Extracts a mandatory repetition of BSONSerializable structures, 'field', from the
-     * field 'elem'. Write the extracted contents to '*out' if successful or fills
-     * '*errMsg', if exising, otherwise.  This variant relies on T having a parseBSON,
-     * which all BSONSerializable's have.
+     * Extracts a mandatory repetition of 'field', from the field 'elem'. Writes the extracted
+     * contents to '*out' if successful or fills '*errMsg', if exising, otherwise.  This variant
+     * relies on T having a parseBSON method.
      *
      * The vector owns the instances of T.
-     *
-     * TODO: Tighten for BSONSerializable's only
      */
     template <typename T>
     static FieldState extract(BSONElement elem,
@@ -281,13 +270,11 @@ public:
                               std::string* errMsg = NULL);
 
     /**
-     * Similar to the mandatory repetition' extract but on an optional field. '*out' would
-     * only be allocated if the field is present. The ownership of '*out' would be
-     * transferred to the caller, in that case.
+     * Similar to the mandatory repetition' extract but on an optional field. The '*out' value would
+     * only be allocated if the field is present. The ownership of '*out' would be transferred to
+     * the caller, in that case.
      *
      * The vector owns the instances of T.
-     *
-     * TODO: Tighten for BSONSerializable's only
      */
     template <typename T>
     static FieldState extract(BSONObj doc,
