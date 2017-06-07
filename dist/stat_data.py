@@ -436,6 +436,7 @@ connection_stats = [
     TxnStat('txn_snapshots_created', 'number of named snapshots created'),
     TxnStat('txn_snapshots_dropped', 'number of named snapshots dropped'),
     TxnStat('txn_sync', 'transaction sync calls'),
+    TxnStat('txn_update_conflict', 'update conflicts'),
 
     ##########################################
     # Yield statistics

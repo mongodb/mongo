@@ -888,6 +888,7 @@ static const char * const __stats_connection_desc[] = {
 	"transaction: transaction sync calls",
 	"transaction: transactions committed",
 	"transaction: transactions rolled back",
+	"transaction: update conflicts",
 };
 
 int
@@ -1186,6 +1187,7 @@ __wt_stat_connection_clear_single(WT_CONNECTION_STATS *stats)
 	stats->txn_sync = 0;
 	stats->txn_commit = 0;
 	stats->txn_rollback = 0;
+	stats->txn_update_conflict = 0;
 }
 
 void
@@ -1563,6 +1565,7 @@ __wt_stat_connection_aggregate(
 	to->txn_sync += WT_STAT_READ(from, txn_sync);
 	to->txn_commit += WT_STAT_READ(from, txn_commit);
 	to->txn_rollback += WT_STAT_READ(from, txn_rollback);
+	to->txn_update_conflict += WT_STAT_READ(from, txn_update_conflict);
 }
 
 static const char * const __stats_join_desc[] = {

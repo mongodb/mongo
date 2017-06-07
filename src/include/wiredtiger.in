@@ -4986,6 +4986,8 @@ extern int wiredtiger_extension_terminate(WT_CONNECTION *connection);
 #define	WT_STAT_CONN_TXN_COMMIT				1254
 /*! transaction: transactions rolled back */
 #define	WT_STAT_CONN_TXN_ROLLBACK			1255
+/*! transaction: update conflicts */
+#define	WT_STAT_CONN_TXN_UPDATE_CONFLICT		1256
 
 /*!
  * @}
