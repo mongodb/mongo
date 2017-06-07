@@ -150,27 +150,6 @@ bool isValidUTF8(const char* s) {
     return true;
 }
 
-long long parseLL(const char* n) {
-    long long ret;
-    uassert(13307, "cannot convert empty string to long long", *n != 0);
-#if !defined(_WIN32)
-    char* endPtr = 0;
-    errno = 0;
-    ret = strtoll(n, &endPtr, 10);
-    uassert(13305, "could not convert string to long long", *endPtr == 0 && errno == 0);
-#else
-    size_t endLen = 0;
-    try {
-        ret = stoll(n, &endLen, 10);
-    } catch (...) {
-        endLen = 0;
-    }
-    uassert(13306, "could not convert string to long long", endLen != 0 && n[endLen] == 0);
-#endif  // !defined(_WIN32)
-    return ret;
-}
-
-
 #if defined(_WIN32)
 
 std::string toUtf8String(const std::wstring& wide) {
