@@ -316,6 +316,7 @@ void FileAllocator::ensureLength(int fd, long size) {
             uassert(10443, errnoWithPrefix("FileAllocator: file write failed"), written > 0);
             left -= written;
         }
+		log() << "filling zeroes in file..." << endl;
     }
 }
 
@@ -394,7 +395,7 @@ void FileAllocator::run(FileAllocator* fa) {
             string tmp;
             long fd = 0;
             try {
-                log() << "allocating new datafile " << name << ", filling with zeroes..." << endl;
+                log() << "allocating new datafile " << name << endl;
 
                 boost::filesystem::path parent = ensureParentDirCreated(name);
                 tmp = fa->makeTempFileName(parent);
