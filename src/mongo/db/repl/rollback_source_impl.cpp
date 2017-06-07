@@ -53,6 +53,11 @@ const OplogInterface& RollbackSourceImpl::getOplog() const {
     return _oplog;
 }
 
+const HostAndPort& RollbackSourceImpl::getSource() const {
+    return _source;
+}
+
+
 int RollbackSourceImpl::getRollbackId() const {
     bo info;
     _getConnection()->simpleCommand("admin", &info, "replSetGetRBID");

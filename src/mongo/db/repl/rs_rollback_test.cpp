@@ -54,6 +54,7 @@
 #include "mongo/stdx/memory.h"
 #include "mongo/unittest/death_test.h"
 #include "mongo/unittest/unittest.h"
+#include "mongo/util/net/hostandport.h"
 
 namespace {
 
@@ -68,6 +69,7 @@ public:
     RollbackSourceMock(std::unique_ptr<OplogInterface> oplog);
     int getRollbackId() const override;
     const OplogInterface& getOplog() const override;
+    const HostAndPort& getSource() const override;
     BSONObj getLastOperation() const override;
     BSONObj findOne(const NamespaceString& nss, const BSONObj& filter) const override;
     void copyCollectionFromRemote(OperationContext* opCtx,
@@ -76,6 +78,7 @@ public:
 
 private:
     std::unique_ptr<OplogInterface> _oplog;
+    HostAndPort _source;
 };
 
 RollbackSourceMock::RollbackSourceMock(std::unique_ptr<OplogInterface> oplog)
@@ -83,6 +86,10 @@ RollbackSourceMock::RollbackSourceMock(std::unique_ptr<OplogInterface> oplog)
 
 const OplogInterface& RollbackSourceMock::getOplog() const {
     return *_oplog;
+}
+
+const HostAndPort& RollbackSourceMock::getSource() const {
+    return _source;
 }
 
 int RollbackSourceMock::getRollbackId() const {
@@ -188,8 +195,7 @@ TEST_F(RSRollbackTest, RemoteGetRollbackIdThrows) {
                                     RollbackSourceLocal(stdx::make_unique<OplogInterfaceMock>()),
                                     {},
                                     _coordinator,
-                                    _replicationProcess.get())
-                           .transitional_ignore(),
+                                    _replicationProcess.get()),
                        UserException,
                        ErrorCodes::UnknownError);
 }
@@ -212,8 +218,7 @@ TEST_F(RSRollbackTest, RemoteGetRollbackIdDiffersFromRequiredRBID) {
                                     RollbackSourceLocal(stdx::make_unique<OplogInterfaceMock>()),
                                     1,
                                     _coordinator,
-                                    _replicationProcess.get())
-                           .transitional_ignore(),
+                                    _replicationProcess.get()),
                        UserException,
                        ErrorCodes::Error(40362));
 }
@@ -245,7 +250,7 @@ Collection* _createCollection(OperationContext* opCtx,
     mongo::WriteUnitOfWork wuow(opCtx);
     auto db = dbHolder().openDb(opCtx, nss.db());
     ASSERT_TRUE(db);
-    db->dropCollection(opCtx, nss.ns()).transitional_ignore();
+    db->dropCollection(opCtx, nss.ns());
     auto coll = db->createCollection(opCtx, nss.ns(), options);
     ASSERT_TRUE(coll);
     wuow.commit();
@@ -385,7 +390,7 @@ TEST_F(RSRollbackTest, RollbackInsertDocumentWithNoId) {
     stopCapturingLogMessages();
     ASSERT_EQUALS(ErrorCodes::UnrecoverableRollbackError, status.code());
     ASSERT_EQUALS(18752, status.location());
-    ASSERT_EQUALS(1, countLogLinesContaining("cannot rollback op with no _id. ns: test.t,"));
+    ASSERT_EQUALS(1, countLogLinesContaining("Cannot roll back op with no _id. ns: test.t,"));
     ASSERT_FALSE(rollbackSource.called);
 }
 
@@ -448,8 +453,7 @@ TEST_F(RSRollbackTest, RollbackCreateIndexCommand) {
         _coordinator,
         _replicationProcess.get()));
     stopCapturingLogMessages();
-    ASSERT_EQUALS(1,
-                  countLogLinesContaining("rollback drop index: collection: test.t. index: a_1"));
+    ASSERT_EQUALS(1, countLogLinesContaining("Dropping index: collection = test.t. index = a_1"));
     ASSERT_FALSE(rollbackSource.called);
     {
         Lock::DBLock dbLock(_opCtx.get(), "test", MODE_S);
@@ -509,9 +513,8 @@ TEST_F(RSRollbackTest, RollbackCreateIndexCommandIndexNotInCatalog) {
                            _coordinator,
                            _replicationProcess.get()));
     stopCapturingLogMessages();
-    ASSERT_EQUALS(1,
-                  countLogLinesContaining("rollback drop index: collection: test.t. index: a_1"));
-    ASSERT_EQUALS(1, countLogLinesContaining("rollback failed to drop index a_1 in test.t"));
+    ASSERT_EQUALS(1, countLogLinesContaining("Dropping index: collection = test.t. index = a_1"));
+    ASSERT_EQUALS(1, countLogLinesContaining("Rollback failed to drop index a_1 in test.t"));
     ASSERT_FALSE(rollbackSource.called);
     {
         Lock::DBLock dbLock(_opCtx.get(), "test", MODE_S);
@@ -901,8 +904,7 @@ TEST_F(RSRollbackTest, RollbackDropCollectionCommandFailsIfRBIDChangesWhileSynci
                                     rollbackSource,
                                     0,
                                     _coordinator,
-                                    _replicationProcess.get())
-                           .transitional_ignore(),
+                                    _replicationProcess.get()),
                        DBException,
                        40365);
     ASSERT(rollbackSource.copyCollectionCalled);
@@ -1163,8 +1165,7 @@ TEST(RSRollbackTest, LocalEntryWithoutNsIsFatal) {
     const auto validOplogEntry = fromjson("{op: 'i', ns: 'test.t', o: {_id:1, a: 1}}");
     FixUpInfo fui;
     ASSERT_OK(updateFixUpInfoFromLocalOplogEntry(fui, validOplogEntry));
-    ASSERT_THROWS(updateFixUpInfoFromLocalOplogEntry(fui, validOplogEntry.removeField("ns"))
-                      .transitional_ignore(),
+    ASSERT_THROWS(updateFixUpInfoFromLocalOplogEntry(fui, validOplogEntry.removeField("ns")),
                   RSFatalException);
 }
 
@@ -1172,8 +1173,7 @@ TEST(RSRollbackTest, LocalEntryWithoutOIsFatal) {
     const auto validOplogEntry = fromjson("{op: 'i', ns: 'test.t', o: {_id:1, a: 1}}");
     FixUpInfo fui;
     ASSERT_OK(updateFixUpInfoFromLocalOplogEntry(fui, validOplogEntry));
-    ASSERT_THROWS(updateFixUpInfoFromLocalOplogEntry(fui, validOplogEntry.removeField("o"))
-                      .transitional_ignore(),
+    ASSERT_THROWS(updateFixUpInfoFromLocalOplogEntry(fui, validOplogEntry.removeField("o")),
                   RSFatalException);
 }
 
@@ -1182,8 +1182,7 @@ TEST(RSRollbackTest, LocalEntryWithoutO2IsFatal) {
         fromjson("{op: 'u', ns: 'test.t', o2: {_id: 1}, o: {_id:1, a: 1}}");
     FixUpInfo fui;
     ASSERT_OK(updateFixUpInfoFromLocalOplogEntry(fui, validOplogEntry));
-    ASSERT_THROWS(updateFixUpInfoFromLocalOplogEntry(fui, validOplogEntry.removeField("o2"))
-                      .transitional_ignore(),
+    ASSERT_THROWS(updateFixUpInfoFromLocalOplogEntry(fui, validOplogEntry.removeField("o2")),
                   RSFatalException);
 }
 
@@ -1252,7 +1251,7 @@ TEST_F(RSRollbackTest, RollbackLogsRetryMessageAndReturnsOnNonUnrecoverableRollb
     stopCapturingLogMessages();
 
     ASSERT_EQUALS(
-        1, countLogLinesContaining("rollback cannot complete at this time (retrying later)"));
+        1, countLogLinesContaining("Rollback cannot complete at this time (retrying later)"));
     ASSERT_EQUALS(MemberState(MemberState::RS_RECOVERING), _coordinator->getMemberState());
 }
 

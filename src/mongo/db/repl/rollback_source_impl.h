@@ -58,6 +58,8 @@ public:
 
     const OplogInterface& getOplog() const override;
 
+    const HostAndPort& getSource() const override;
+
     int getRollbackId() const override;
 
     BSONObj getLastOperation() const override;
