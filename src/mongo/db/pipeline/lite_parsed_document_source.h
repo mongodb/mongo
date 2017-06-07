@@ -90,6 +90,13 @@ public:
     virtual bool isCollStats() const {
         return false;
     }
+
+    /**
+     * Returns true if this is a $changeNotification stage.
+     */
+    virtual bool isChangeNotification() const {
+        return false;
+    }
 };
 
 class LiteParsedDocumentSourceDefault final : public LiteParsedDocumentSource {

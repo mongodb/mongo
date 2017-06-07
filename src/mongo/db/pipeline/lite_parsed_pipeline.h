@@ -78,6 +78,13 @@ public:
         return !_stageSpecs.empty() && _stageSpecs.front()->isCollStats();
     }
 
+    /**
+     * Returns true if the pipeline begins with a $changeNotification stage.
+     */
+    bool startsWithChangeNotification() const {
+        return !_stageSpecs.empty() && _stageSpecs.front()->isChangeNotification();
+    }
+
 private:
     std::vector<std::unique_ptr<LiteParsedDocumentSource>> _stageSpecs;
 };

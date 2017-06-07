@@ -71,11 +71,12 @@ public:
      *
      * The cursor is added to the front of the pipeline's sources.
      *
-     * Callers must take care to ensure that 'collection' is locked in at least IS-mode.
+     * Callers must take care to ensure that 'nss' is locked in at least IS-mode.
      *
      * When not null, 'aggRequest' provides access to pipeline command options such as hint.
      */
     static void prepareCursorSource(Collection* collection,
+                                    const NamespaceString& nss,
                                     const AggregationRequest* aggRequest,
                                     Pipeline* pipeline);
 
