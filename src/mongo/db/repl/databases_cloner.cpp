@@ -248,7 +248,7 @@ StatusWith<std::vector<BSONElement>> DatabasesCloner::_parseListDatabasesRespons
     BSONElement response = dbResponse["databases"];
     try {
         return response.Array();
-    } catch (const MsgAssertionException& e) {
+    } catch (const AssertionException& e) {
         return Status(ErrorCodes::BadValue,
                       "The 'listDatabases' response is unable to be transformed into an array.");
     }

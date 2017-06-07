@@ -88,7 +88,7 @@ public:
      */
     using DeferredComparison = BSONComparatorInterfaceBase<BSONElement>::DeferredComparison;
 
-    /** These functions, which start with a capital letter, throw a MsgAssertionException if the
+    /** These functions, which start with a capital letter, throw if the
         element is not of the required type. Example:
 
         std::string foo = obj["foo"].String(); // std::exception if not a std::string type or DNE
@@ -690,19 +690,19 @@ private:
 
     friend class BSONObjIterator;
     friend class BSONObj;
-    const BSONElement& chk(int t) const {
+    const BSONElement& chk(BSONType t) const {
         if (t != type()) {
             StringBuilder ss;
             if (eoo())
                 ss << "field not found, expected type " << t;
             else
                 ss << "wrong type for field (" << fieldName() << ") " << type() << " != " << t;
-            msgasserted(13111, ss.str());
+            uasserted(13111, ss.str());
         }
         return *this;
     }
     const BSONElement& chk(bool expr) const {
-        massert(13118, "unexpected or missing type value in BSON object", expr);
+        uassert(13118, "unexpected or missing type value in BSON object", expr);
         return *this;
     }
 };
