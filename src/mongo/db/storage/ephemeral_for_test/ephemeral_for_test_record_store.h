@@ -161,14 +161,6 @@ public:
     void setCappedCallback(CappedCallback* cb) {
         _cappedCallback = cb;
     }
-    bool cappedMaxDocs() const {
-        invariant(_isCapped);
-        return _cappedMaxDocs;
-    }
-    bool cappedMaxSize() const {
-        invariant(_isCapped);
-        return _cappedMaxSize;
-    }
 
 private:
     class InsertChange;
