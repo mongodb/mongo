@@ -342,6 +342,10 @@ TEST_F(AddShardTest, CreateShardIdentityUpsertForAddShard) {
                                                                               .toString()))
                                                 << "upsert"
                                                 << true))
+                                << "bypassDocumentValidation"
+                                << false
+                                << "ordered"
+                                << true
                                 << "writeConcern"
                                 << BSON("w"
                                         << "majority"

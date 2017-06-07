@@ -213,8 +213,8 @@ void trackErrors(const ShardEndpoint& endpoint,
 
 }  // namespace
 
-BatchWriteOp::BatchWriteOp(const BatchedCommandRequest& clientRequest)
-    : _clientRequest(clientRequest) {
+BatchWriteOp::BatchWriteOp(OperationContext* opCtx, const BatchedCommandRequest& clientRequest)
+    : _opCtx(opCtx), _clientRequest(clientRequest) {
     _writeOps.reserve(_clientRequest.sizeWriteOps());
 
     for (size_t i = 0; i < _clientRequest.sizeWriteOps(); ++i) {
@@ -227,8 +227,7 @@ BatchWriteOp::~BatchWriteOp() {
     invariant(_targeted.empty());
 }
 
-Status BatchWriteOp::targetBatch(OperationContext* opCtx,
-                                 const NSTargeter& targeter,
+Status BatchWriteOp::targetBatch(const NSTargeter& targeter,
                                  bool recordTargetErrors,
                                  std::map<ShardId, TargetedWriteBatch*>* targetedBatches) {
     //
@@ -288,7 +287,7 @@ Status BatchWriteOp::targetBatch(OperationContext* opCtx,
         OwnedPointerVector<TargetedWrite> writesOwned;
         vector<TargetedWrite*>& writes = writesOwned.mutableVector();
 
-        Status targetStatus = writeOp.targetWrites(opCtx, targeter, &writes);
+        Status targetStatus = writeOp.targetWrites(_opCtx, targeter, &writes);
 
         if (!targetStatus.isOK()) {
             WriteErrorDetail targetError;
@@ -406,7 +405,7 @@ void BatchWriteOp::buildBatchRequest(const TargetedWriteBatch& targetedBatch,
     request->setShouldBypassValidation(_clientRequest.shouldBypassValidation());
 
     const auto batchType = _clientRequest.getBatchType();
-    const auto batchTxnNum = _clientRequest.getTxnNum();
+    const auto batchTxnNum = _opCtx->getTxnNumber();
 
     boost::optional<std::vector<int32_t>> stmtIdsForOp;
     if (batchTxnNum) {
@@ -437,7 +436,8 @@ void BatchWriteOp::buildBatchRequest(const TargetedWriteBatch& targetedBatch,
         }
 
         if (stmtIdsForOp) {
-            stmtIdsForOp->push_back(_clientRequest.getStmtIdForWriteAt(writeOpRef.first));
+            stmtIdsForOp->push_back(write_ops::getStmtIdForWriteAt(
+                _clientRequest.getWriteCommandBase(), writeOpRef.first));
         }
 
         // TODO: We can add logic here to allow aborting individual ops
@@ -457,14 +457,10 @@ void BatchWriteOp::buildBatchRequest(const TargetedWriteBatch& targetedBatch,
         }
     }
 
-    if (!request->isOrderedSet()) {
-        request->setOrdered(_clientRequest.getOrdered());
-    }
-
+    request->setOrdered(_clientRequest.getOrdered());
     request->setShardVersion(targetedBatch.getEndpoint().shardVersion);
 
     if (batchTxnNum) {
-        request->setTxnNum(batchTxnNum);
         request->setStmtIds(std::move(stmtIdsForOp));
     }
 }

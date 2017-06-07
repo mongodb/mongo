@@ -1,0 +1,146 @@
+# Copyright (C) 2017 MongoDB Inc.
+#
+# This program is free software: you can redistribute it and/or  modify
+# it under the terms of the GNU Affero General Public License, version 3,
+# as published by the Free Software Foundation.
+#
+# This program is distributed in the hope that it will be useful,
+# but WITHOUT ANY WARRANTY; without even the implied warranty of
+# MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+# GNU Affero General Public License for more details.
+#
+# You should have received a copy of the GNU Affero General Public License
+# along with this program.  If not, see <http://www.gnu.org/licenses/>.
+#
+
+global:
+    cpp_namespace: "mongo::write_ops"
+    cpp_includes:
+        - "mongo/db/ops/write_ops_parsers.h"
+
+imports:
+    - "mongo/db/logical_session_id.idl"
+
+types:
+    multi_delete_bool:
+        bson_serialization_type: any
+        description: "An inverted boolean type used to parse the 'limit' property of the delete
+                      command, which has a mandatory value of either 0 or 1, where 0 means multi
+                      delete and 1 means delete just one."
+        cpp_type: "bool"
+        serializer: "::mongo::write_ops::writeMultiDeleteProperty"
+        deserializer: "::mongo::write_ops::readMultiDeleteProperty"
+
+structs:
+
+    WriteCommandBase:
+        description: "Contains basic information included by all write commands"
+        strict: false
+        fields:
+            bypassDocumentValidation:
+                description: "Enables the operation to bypass document validation. This lets you
+                              write documents that do not meet the validation requirements."
+                type: safeBool
+                default: false
+            ordered:
+                description: "If true, then when an write statement fails, the command returns
+                              without executing the remaining statements. If false, then statements
+                              are allowed to be executed in parallel and if a statement fails,
+                              continue with the remaining statements, if any."
+                type: bool
+                default: true
+            stmtIds:
+                description: "An array of statement numbers relative to the transaction. If this
+                              field is set, its size must be exactly the same as the number of
+                              entries in the corresponding insert/update/delete request. If it is
+                              not set, the statement ids of the contained operation will be
+                              implicitly generated based on their offset, starting from 0."
+                type: array<int>
+                optional: true
+
+    UpdateOpEntry:
+        description: "Parser for the entries in the 'updates' array of an update command."
+        strict: true
+        fields:
+            q:
+                description: "The query that matches documents to update. Uses the same query
+                              selectors as used in the 'find' operation."
+                type: object
+            u:
+                description: "Set of modifications to apply."
+                type: object
+            arrayFilters:
+                description: "Specifies which array elements an update modifier should apply to."
+                type: array<object>
+                optional: true
+            multi:
+                description: "If true, updates all documents that meet the query criteria. If false,
+                              limits the update to one document which meets the query criteria."
+                type: bool
+                default: false
+            upsert:
+                description: "If true, perform an insert if no documents match the query. If both
+                              upsert and multi are true and no documents match the query, the update
+                              operation inserts only a single document."
+                type: bool
+                default: false
+            collation:
+                description: "Specifies the collation to use for the operation."
+                type: object
+                optional: true
+
+    DeleteOpEntry:
+        description: "Parser for the entries in the 'deletes' array of a delete command."
+        strict: true
+        fields:
+            q:
+                description: "The query that matches documents to delete. Uses the same query
+                              selectors as used in the 'find' operation."
+                type: object
+            limit:
+                description: "The number of matching documents to delete. Value of 0 deletes all
+                              matching documents and 1 deletes a single document."
+                type: multi_delete_bool
+                cpp_name: multi
+            collation:
+                description: "Specifies the collation to use for the operation."
+                type: object
+                optional: true
+
+commands:
+
+    insert:
+        description: "Parser for the 'insert' command."
+        strict: true
+        namespace: concatenate_with_db
+        chained_structs:
+            WriteCommandBase: writeCommandBase
+        fields:
+            documents:
+                description: "An array of one or more documents to insert."
+                type: array<object>
+                supports_doc_sequence: true
+
+    update:
+        description: "Parser for the 'update' command."
+        strict: true
+        namespace: concatenate_with_db
+        chained_structs:
+            WriteCommandBase: writeCommandBase
+        fields:
+            updates:
+                description: "An array of one or more update statements to perform."
+                type: array<UpdateOpEntry>
+                supports_doc_sequence: true
+
+    delete:
+        description: "Parser for the 'delete' command."
+        strict: true
+        namespace: concatenate_with_db
+        chained_structs:
+            WriteCommandBase: writeCommandBase
+        fields:
+            deletes:
+                description: "An array of one or more delete statements to perform."
+                type: array<DeleteOpEntry>
+                supports_doc_sequence: true

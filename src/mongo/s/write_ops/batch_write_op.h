@@ -89,7 +89,7 @@ class BatchWriteOp {
     MONGO_DISALLOW_COPYING(BatchWriteOp);
 
 public:
-    explicit BatchWriteOp(const BatchedCommandRequest& clientRequest);
+    BatchWriteOp(OperationContext* opCtx, const BatchedCommandRequest& clientRequest);
     ~BatchWriteOp();
 
     /**
@@ -108,8 +108,7 @@ public:
      *
      * Returned TargetedWriteBatches are owned by the caller.
      */
-    Status targetBatch(OperationContext* opCtx,
-                       const NSTargeter& targeter,
+    Status targetBatch(const NSTargeter& targeter,
                        bool recordTargetErrors,
                        std::map<ShardId, TargetedWriteBatch*>* targetedBatches);
 
@@ -171,6 +170,8 @@ private:
      * Helper function to cancel all the write ops of targeted batches in a map.
      */
     void _cancelBatches(const WriteErrorDetail& why, TargetedBatchMap&& batchMapToCancel);
+
+    OperationContext* const _opCtx;
 
     // The incoming client request
     const BatchedCommandRequest& _clientRequest;

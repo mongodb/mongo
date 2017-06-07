@@ -167,10 +167,12 @@ env.Library(
     target='write_ops_parsers',
     source=[
         'write_ops_parsers.cpp',
+        env.Idlc('write_ops.idl')[0],
     ],
     LIBDEPS=[
         '$BUILD_DIR/mongo/base',
         '$BUILD_DIR/mongo/db/dbmessage',
+        '$BUILD_DIR/mongo/idl/idl_parser',
     ],
 )
 

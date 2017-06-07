@@ -1827,6 +1827,8 @@ TEST_F(ShardingCatalogClientTest, EnableShardingNoDBExists) {
                 multi: false,
                 upsert: true
             }],
+            bypassDocumentValidation: false,
+            ordered: true,
             writeConcern: { w: "majority", wtimeout: 15000 },
             maxTimeMS: 30000
         })"));
@@ -1921,6 +1923,8 @@ TEST_F(ShardingCatalogClientTest, EnableShardingDBExists) {
                 multi: false,
                 upsert: true
             }],
+            bypassDocumentValidation: false,
+            ordered: true,
             writeConcern: { w: "majority", wtimeout: 15000 },
             maxTimeMS: 30000
         })"));

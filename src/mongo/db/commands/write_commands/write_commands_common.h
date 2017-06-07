@@ -44,5 +44,6 @@ Status checkAuthForWriteCommand(AuthorizationSession* authzSession,
                                 BatchedCommandRequest::BatchType cmdType,
                                 const NamespaceString& cmdNSS,
                                 const BSONObj& cmdObj);
-}
-}
+
+}  // namespace auth
+}  // namespace mongo

@@ -147,13 +147,11 @@ TEST(WriteOpTests, SingleOp) {
     request.setNS(nss);
     request.getInsertRequest()->addToDocuments(BSON("x" << 1));
 
-    BatchWriteOp batchOp(request);
+    BatchWriteOp batchOp(&opCtx, request);
 
     OwnedPointerMap<ShardId, TargetedWriteBatch> targetedOwned;
     map<ShardId, TargetedWriteBatch*>& targeted = targetedOwned.mutableMap();
-    Status status = batchOp.targetBatch(&opCtx, targeter, false, &targeted);
-
-    ASSERT(status.isOK());
+    ASSERT_OK(batchOp.targetBatch(targeter, false, &targeted));
     ASSERT(!batchOp.isFinished());
     ASSERT_EQUALS(targeted.size(), 1u);
     assertEndpointsEqual(targeted.begin()->second->getEndpoint(), endpoint);
@@ -185,13 +183,11 @@ TEST(WriteOpTests, SingleError) {
     request.setNS(nss);
     request.getDeleteRequest()->addToDeletes(buildDelete(BSON("x" << 1), 1));
 
-    BatchWriteOp batchOp(request);
+    BatchWriteOp batchOp(&opCtx, request);
 
     OwnedPointerMap<ShardId, TargetedWriteBatch> targetedOwned;
     map<ShardId, TargetedWriteBatch*>& targeted = targetedOwned.mutableMap();
-    Status status = batchOp.targetBatch(&opCtx, targeter, false, &targeted);
-
-    ASSERT(status.isOK());
+    ASSERT_OK(batchOp.targetBatch(targeter, false, &targeted));
     ASSERT(!batchOp.isFinished());
     ASSERT_EQUALS(targeted.size(), 1u);
     assertEndpointsEqual(targeted.begin()->second->getEndpoint(), endpoint);
@@ -229,20 +225,16 @@ TEST(WriteOpTests, SingleTargetError) {
     request.setNS(nss);
     request.getDeleteRequest()->addToDeletes(buildDelete(BSON("x" << 1), 1));
 
-    BatchWriteOp batchOp(request);
+    BatchWriteOp batchOp(&opCtx, request);
 
     OwnedPointerMap<ShardId, TargetedWriteBatch> targetedOwned;
     map<ShardId, TargetedWriteBatch*>& targeted = targetedOwned.mutableMap();
-    Status status = batchOp.targetBatch(&opCtx, targeter, false, &targeted);
-
-    ASSERT(!status.isOK());
+    ASSERT_NOT_OK(batchOp.targetBatch(targeter, false, &targeted));
     ASSERT(!batchOp.isFinished());
     ASSERT_EQUALS(targeted.size(), 0u);
 
     // Record targeting failures
-    status = batchOp.targetBatch(&opCtx, targeter, true, &targeted);
-
-    ASSERT(status.isOK());
+    ASSERT_OK(batchOp.targetBatch(targeter, true, &targeted));
     ASSERT(batchOp.isFinished());
     ASSERT_EQUALS(targeted.size(), 0u);
 
@@ -270,13 +262,11 @@ TEST(WriteOpTests, SingleWriteConcernErrorOrdered) {
     request.getInsertRequest()->addToDocuments(BSON("x" << 1));
     request.setWriteConcern(BSON("w" << 3));
 
-    BatchWriteOp batchOp(request);
+    BatchWriteOp batchOp(&opCtx, request);
 
     OwnedPointerMap<ShardId, TargetedWriteBatch> targetedOwned;
     map<ShardId, TargetedWriteBatch*>& targeted = targetedOwned.mutableMap();
-    Status status = batchOp.targetBatch(&opCtx, targeter, false, &targeted);
-
-    ASSERT(status.isOK());
+    ASSERT_OK(batchOp.targetBatch(targeter, false, &targeted));
     ASSERT(!batchOp.isFinished());
     ASSERT_EQUALS(targeted.size(), 1u);
     assertEndpointsEqual(targeted.begin()->second->getEndpoint(), endpoint);
@@ -317,11 +307,11 @@ TEST(WriteOpTests, SingleStaleError) {
     request.setNS(nss);
     request.getInsertRequest()->addToDocuments(BSON("x" << 1));
 
-    BatchWriteOp batchOp(request);
+    BatchWriteOp batchOp(&opCtx, request);
 
     OwnedPointerMap<ShardId, TargetedWriteBatch> targetedOwned;
     map<ShardId, TargetedWriteBatch*>& targeted = targetedOwned.mutableMap();
-    Status status = batchOp.targetBatch(&opCtx, targeter, false, &targeted);
+    ASSERT_OK(batchOp.targetBatch(targeter, false, &targeted));
 
     BatchedCommandResponse response;
     buildResponse(0, &response);
@@ -332,14 +322,14 @@ TEST(WriteOpTests, SingleStaleError) {
     ASSERT(!batchOp.isFinished());
 
     targetedOwned.clear();
-    status = batchOp.targetBatch(&opCtx, targeter, false, &targeted);
+    ASSERT_OK(batchOp.targetBatch(targeter, false, &targeted));
 
     // Respond again with a stale response
     batchOp.noteBatchResponse(*targeted.begin()->second, response, NULL);
     ASSERT(!batchOp.isFinished());
 
     targetedOwned.clear();
-    status = batchOp.targetBatch(&opCtx, targeter, false, &targeted);
+    ASSERT_OK(batchOp.targetBatch(targeter, false, &targeted));
 
     buildResponse(1, &response);
 
@@ -376,13 +366,11 @@ TEST(WriteOpTests, MultiOpSameShardOrdered) {
     request.getUpdateRequest()->addToUpdates(buildUpdate(BSON("x" << 1), false));
     request.getUpdateRequest()->addToUpdates(buildUpdate(BSON("x" << 2), false));
 
-    BatchWriteOp batchOp(request);
+    BatchWriteOp batchOp(&opCtx, request);
 
     OwnedPointerMap<ShardId, TargetedWriteBatch> targetedOwned;
     map<ShardId, TargetedWriteBatch*>& targeted = targetedOwned.mutableMap();
-    Status status = batchOp.targetBatch(&opCtx, targeter, false, &targeted);
-
-    ASSERT(status.isOK());
+    ASSERT_OK(batchOp.targetBatch(targeter, false, &targeted));
     ASSERT(!batchOp.isFinished());
     ASSERT_EQUALS(targeted.size(), 1u);
     ASSERT_EQUALS(targeted.begin()->second->getWrites().size(), 2u);
@@ -418,13 +406,11 @@ TEST(WriteOpTests, MultiOpSameShardUnordered) {
     request.getUpdateRequest()->addToUpdates(buildUpdate(BSON("x" << 1), false));
     request.getUpdateRequest()->addToUpdates(buildUpdate(BSON("x" << 2), false));
 
-    BatchWriteOp batchOp(request);
+    BatchWriteOp batchOp(&opCtx, request);
 
     OwnedPointerMap<ShardId, TargetedWriteBatch> targetedOwned;
     map<ShardId, TargetedWriteBatch*>& targeted = targetedOwned.mutableMap();
-    Status status = batchOp.targetBatch(&opCtx, targeter, false, &targeted);
-
-    ASSERT(status.isOK());
+    ASSERT_OK(batchOp.targetBatch(targeter, false, &targeted));
     ASSERT(!batchOp.isFinished());
     ASSERT_EQUALS(targeted.size(), 1u);
     ASSERT_EQUALS(targeted.begin()->second->getWrites().size(), 2u);
@@ -462,13 +448,11 @@ TEST(WriteOpTests, MultiOpTwoShardsOrdered) {
     request.getInsertRequest()->addToDocuments(BSON("x" << -1));
     request.getInsertRequest()->addToDocuments(BSON("x" << 1));
 
-    BatchWriteOp batchOp(request);
+    BatchWriteOp batchOp(&opCtx, request);
 
     OwnedPointerMap<ShardId, TargetedWriteBatch> targetedOwned;
     map<ShardId, TargetedWriteBatch*>& targeted = targetedOwned.mutableMap();
-    Status status = batchOp.targetBatch(&opCtx, targeter, false, &targeted);
-
-    ASSERT(status.isOK());
+    ASSERT_OK(batchOp.targetBatch(targeter, false, &targeted));
     ASSERT(!batchOp.isFinished());
     ASSERT_EQUALS(targeted.size(), 1u);
     ASSERT_EQUALS(targeted.begin()->second->getWrites().size(), 1u);
@@ -482,8 +466,8 @@ TEST(WriteOpTests, MultiOpTwoShardsOrdered) {
     ASSERT(!batchOp.isFinished());
 
     targetedOwned.clear();
-    status = batchOp.targetBatch(&opCtx, targeter, false, &targeted);
-    ASSERT(status.isOK());
+
+    ASSERT_OK(batchOp.targetBatch(targeter, false, &targeted));
     ASSERT(!batchOp.isFinished());
     ASSERT_EQUALS(targeted.size(), 1u);
     ASSERT_EQUALS(targeted.begin()->second->getWrites().size(), 1u);
@@ -535,13 +519,11 @@ TEST(WriteOpTests, MultiOpTwoShardsUnordered) {
     request.getInsertRequest()->addToDocuments(BSON("x" << -1));
     request.getInsertRequest()->addToDocuments(BSON("x" << 1));
 
-    BatchWriteOp batchOp(request);
+    BatchWriteOp batchOp(&opCtx, request);
 
     OwnedPointerMap<ShardId, TargetedWriteBatch> targetedOwned;
     map<ShardId, TargetedWriteBatch*>& targeted = targetedOwned.mutableMap();
-    Status status = batchOp.targetBatch(&opCtx, targeter, false, &targeted);
-
-    ASSERT(status.isOK());
+    ASSERT_OK(batchOp.targetBatch(targeter, false, &targeted));
     ASSERT(!batchOp.isFinished());
     ASSERT_EQUALS(targeted.size(), 2u);
     verifyTargetedBatches({{endpointA.shardName, 1u}, {endpointB.shardName, 1u}}, targeted);
@@ -584,13 +566,11 @@ TEST(WriteOpTests, MultiOpTwoShardsEachOrdered) {
     BSONObj queryB = BSON("x" << GTE << -2 << LT << 1);
     request.getDeleteRequest()->addToDeletes(buildDelete(queryB, 0));
 
-    BatchWriteOp batchOp(request);
+    BatchWriteOp batchOp(&opCtx, request);
 
     OwnedPointerMap<ShardId, TargetedWriteBatch> targetedOwned;
     map<ShardId, TargetedWriteBatch*>& targeted = targetedOwned.mutableMap();
-    Status status = batchOp.targetBatch(&opCtx, targeter, false, &targeted);
-
-    ASSERT(status.isOK());
+    ASSERT_OK(batchOp.targetBatch(targeter, false, &targeted));
     ASSERT(!batchOp.isFinished());
     ASSERT_EQUALS(targeted.size(), 2u);
     verifyTargetedBatches({{endpointA.shardName, 1u}, {endpointB.shardName, 1u}}, targeted);
@@ -606,8 +586,8 @@ TEST(WriteOpTests, MultiOpTwoShardsEachOrdered) {
     ASSERT(!batchOp.isFinished());
 
     targetedOwned.clear();
-    status = batchOp.targetBatch(&opCtx, targeter, false, &targeted);
-    ASSERT(status.isOK());
+
+    ASSERT_OK(batchOp.targetBatch(targeter, false, &targeted));
     ASSERT(!batchOp.isFinished());
     ASSERT_EQUALS(targeted.size(), 2u);
     verifyTargetedBatches({{endpointA.shardName, 1u}, {endpointB.shardName, 1u}}, targeted);
@@ -647,13 +627,11 @@ TEST(WriteOpTests, MultiOpTwoShardsEachUnordered) {
     BSONObj queryB = BSON("x" << GTE << -2 << LT << 1);
     request.getUpdateRequest()->addToUpdates(buildUpdate(queryB, true));
 
-    BatchWriteOp batchOp(request);
+    BatchWriteOp batchOp(&opCtx, request);
 
     OwnedPointerMap<ShardId, TargetedWriteBatch> targetedOwned;
     map<ShardId, TargetedWriteBatch*>& targeted = targetedOwned.mutableMap();
-    Status status = batchOp.targetBatch(&opCtx, targeter, false, &targeted);
-
-    ASSERT(status.isOK());
+    ASSERT_OK(batchOp.targetBatch(targeter, false, &targeted));
     ASSERT(!batchOp.isFinished());
     ASSERT_EQUALS(targeted.size(), 2u);
     verifyTargetedBatches({{endpointA.shardName, 2u}, {endpointB.shardName, 2u}}, targeted);
@@ -704,13 +682,11 @@ TEST(WriteOpTests, MultiOpOneOrTwoShardsOrdered) {
     request.getDeleteRequest()->addToDeletes(buildDelete(BSON("x" << 1), 1));
     request.getDeleteRequest()->addToDeletes(buildDelete(BSON("x" << 2), 1));
 
-    BatchWriteOp batchOp(request);
+    BatchWriteOp batchOp(&opCtx, request);
 
     OwnedPointerMap<ShardId, TargetedWriteBatch> targetedOwned;
     map<ShardId, TargetedWriteBatch*>& targeted = targetedOwned.mutableMap();
-    Status status = batchOp.targetBatch(&opCtx, targeter, false, &targeted);
-
-    ASSERT(status.isOK());
+    ASSERT_OK(batchOp.targetBatch(targeter, false, &targeted));
     ASSERT(!batchOp.isFinished());
     ASSERT_EQUALS(targeted.size(), 1u);
     ASSERT_EQUALS(targeted.begin()->second->getWrites().size(), 2u);
@@ -725,9 +701,8 @@ TEST(WriteOpTests, MultiOpOneOrTwoShardsOrdered) {
     ASSERT(!batchOp.isFinished());
 
     targetedOwned.clear();
-    status = batchOp.targetBatch(&opCtx, targeter, false, &targeted);
 
-    ASSERT(status.isOK());
+    ASSERT_OK(batchOp.targetBatch(targeter, false, &targeted));
     ASSERT(!batchOp.isFinished());
     ASSERT_EQUALS(targeted.size(), 2u);
     verifyTargetedBatches({{endpointA.shardName, 1u}, {endpointB.shardName, 1u}}, targeted);
@@ -743,9 +718,8 @@ TEST(WriteOpTests, MultiOpOneOrTwoShardsOrdered) {
     ASSERT(!batchOp.isFinished());
 
     targetedOwned.clear();
-    status = batchOp.targetBatch(&opCtx, targeter, false, &targeted);
 
-    ASSERT(status.isOK());
+    ASSERT_OK(batchOp.targetBatch(targeter, false, &targeted));
     ASSERT(!batchOp.isFinished());
     ASSERT_EQUALS(targeted.size(), 2u);
     verifyTargetedBatches({{endpointA.shardName, 1u}, {endpointB.shardName, 1u}}, targeted);
@@ -758,9 +732,8 @@ TEST(WriteOpTests, MultiOpOneOrTwoShardsOrdered) {
     ASSERT(!batchOp.isFinished());
 
     targetedOwned.clear();
-    status = batchOp.targetBatch(&opCtx, targeter, false, &targeted);
 
-    ASSERT(status.isOK());
+    ASSERT_OK(batchOp.targetBatch(targeter, false, &targeted));
     ASSERT(!batchOp.isFinished());
     ASSERT_EQUALS(targeted.size(), 1u);
     ASSERT_EQUALS(targeted.begin()->second->getWrites().size(), 2u);
@@ -808,13 +781,11 @@ TEST(WriteOpTests, MultiOpOneOrTwoShardsUnordered) {
     request.getUpdateRequest()->addToUpdates(buildUpdate(BSON("x" << 1), false));
     request.getUpdateRequest()->addToUpdates(buildUpdate(BSON("x" << 2), false));
 
-    BatchWriteOp batchOp(request);
+    BatchWriteOp batchOp(&opCtx, request);
 
     OwnedPointerMap<ShardId, TargetedWriteBatch> targetedOwned;
     map<ShardId, TargetedWriteBatch*>& targeted = targetedOwned.mutableMap();
-    Status status = batchOp.targetBatch(&opCtx, targeter, false, &targeted);
-
-    ASSERT(status.isOK());
+    ASSERT_OK(batchOp.targetBatch(targeter, false, &targeted));
     ASSERT(!batchOp.isFinished());
     ASSERT_EQUALS(targeted.size(), 2u);
     verifyTargetedBatches({{endpointA.shardName, 4u}, {endpointB.shardName, 4u}}, targeted);
@@ -856,13 +827,11 @@ TEST(WriteOpTests, MultiOpSingleShardErrorUnordered) {
     request.getInsertRequest()->addToDocuments(BSON("x" << -1));
     request.getInsertRequest()->addToDocuments(BSON("x" << 1));
 
-    BatchWriteOp batchOp(request);
+    BatchWriteOp batchOp(&opCtx, request);
 
     OwnedPointerMap<ShardId, TargetedWriteBatch> targetedOwned;
     map<ShardId, TargetedWriteBatch*>& targeted = targetedOwned.mutableMap();
-    Status status = batchOp.targetBatch(&opCtx, targeter, false, &targeted);
-
-    ASSERT(status.isOK());
+    ASSERT_OK(batchOp.targetBatch(targeter, false, &targeted));
     ASSERT(!batchOp.isFinished());
     ASSERT_EQUALS(targeted.size(), 2u);
     verifyTargetedBatches({{endpointA.shardName, 1u}, {endpointB.shardName, 1u}}, targeted);
@@ -919,13 +888,11 @@ TEST(WriteOpTests, MultiOpTwoShardErrorsUnordered) {
     request.getInsertRequest()->addToDocuments(BSON("x" << -1));
     request.getInsertRequest()->addToDocuments(BSON("x" << 1));
 
-    BatchWriteOp batchOp(request);
+    BatchWriteOp batchOp(&opCtx, request);
 
     OwnedPointerMap<ShardId, TargetedWriteBatch> targetedOwned;
     map<ShardId, TargetedWriteBatch*>& targeted = targetedOwned.mutableMap();
-    Status status = batchOp.targetBatch(&opCtx, targeter, false, &targeted);
-
-    ASSERT(status.isOK());
+    ASSERT_OK(batchOp.targetBatch(targeter, false, &targeted));
     ASSERT(!batchOp.isFinished());
     ASSERT_EQUALS(targeted.size(), 2u);
     verifyTargetedBatches({{endpointA.shardName, 1u}, {endpointB.shardName, 1u}}, targeted);
@@ -981,13 +948,11 @@ TEST(WriteOpTests, MultiOpPartialSingleShardErrorUnordered) {
     BSONObj queryB = BSON("x" << GTE << -2 << LT << 1);
     request.getDeleteRequest()->addToDeletes(buildDelete(queryB, 0));
 
-    BatchWriteOp batchOp(request);
+    BatchWriteOp batchOp(&opCtx, request);
 
     OwnedPointerMap<ShardId, TargetedWriteBatch> targetedOwned;
     map<ShardId, TargetedWriteBatch*>& targeted = targetedOwned.mutableMap();
-    Status status = batchOp.targetBatch(&opCtx, targeter, false, &targeted);
-
-    ASSERT(status.isOK());
+    ASSERT_OK(batchOp.targetBatch(targeter, false, &targeted));
     ASSERT(!batchOp.isFinished());
     ASSERT_EQUALS(targeted.size(), 2u);
     verifyTargetedBatches({{endpointA.shardName, 2u}, {endpointB.shardName, 2u}}, targeted);
@@ -1047,13 +1012,11 @@ TEST(WriteOpTests, MultiOpPartialSingleShardErrorOrdered) {
     BSONObj queryB = BSON("x" << GTE << -2 << LT << 1);
     request.getDeleteRequest()->addToDeletes(buildDelete(queryB, 0));
 
-    BatchWriteOp batchOp(request);
+    BatchWriteOp batchOp(&opCtx, request);
 
     OwnedPointerMap<ShardId, TargetedWriteBatch> targetedOwned;
     map<ShardId, TargetedWriteBatch*>& targeted = targetedOwned.mutableMap();
-    Status status = batchOp.targetBatch(&opCtx, targeter, false, &targeted);
-
-    ASSERT(status.isOK());
+    ASSERT_OK(batchOp.targetBatch(targeter, false, &targeted));
     ASSERT(!batchOp.isFinished());
     ASSERT_EQUALS(targeted.size(), 2u);
     verifyTargetedBatches({{endpointA.shardName, 1u}, {endpointB.shardName, 1u}}, targeted);
@@ -1115,11 +1078,11 @@ TEST(WriteOpTests, MultiOpErrorAndWriteConcernErrorUnordered) {
     request.getInsertRequest()->addToDocuments(BSON("x" << 1));
     request.setWriteConcern(BSON("w" << 3));
 
-    BatchWriteOp batchOp(request);
+    BatchWriteOp batchOp(&opCtx, request);
 
     OwnedPointerMap<ShardId, TargetedWriteBatch> targetedOwned;
     map<ShardId, TargetedWriteBatch*>& targeted = targetedOwned.mutableMap();
-    Status status = batchOp.targetBatch(&opCtx, targeter, false, &targeted);
+    ASSERT_OK(batchOp.targetBatch(targeter, false, &targeted));
 
     BatchedCommandResponse response;
     buildResponse(1, &response);
@@ -1159,11 +1122,11 @@ TEST(WriteOpTests, SingleOpErrorAndWriteConcernErrorOrdered) {
     request.getUpdateRequest()->addToUpdates(buildUpdate(query, true));
     request.setWriteConcern(BSON("w" << 3));
 
-    BatchWriteOp batchOp(request);
+    BatchWriteOp batchOp(&opCtx, request);
 
     OwnedPointerMap<ShardId, TargetedWriteBatch> targetedOwned;
     map<ShardId, TargetedWriteBatch*>& targeted = targetedOwned.mutableMap();
-    Status status = batchOp.targetBatch(&opCtx, targeter, false, &targeted);
+    ASSERT_OK(batchOp.targetBatch(targeter, false, &targeted));
 
     // Respond to batches.
     auto targetedIt = targeted.begin();
@@ -1214,21 +1177,19 @@ TEST(WriteOpTests, MultiOpFailedTargetOrdered) {
 
     // Do single-target, multi-doc batch write op
 
-    BatchWriteOp batchOp(request);
+    BatchWriteOp batchOp(&opCtx, request);
 
     OwnedPointerMap<ShardId, TargetedWriteBatch> targetedOwned;
     map<ShardId, TargetedWriteBatch*>& targeted = targetedOwned.mutableMap();
-    Status status = batchOp.targetBatch(&opCtx, targeter, false, &targeted);
+    ASSERT_NOT_OK(batchOp.targetBatch(targeter, false, &targeted));
 
     // First targeting round fails since we may be stale
-    ASSERT(!status.isOK());
     ASSERT(!batchOp.isFinished());
 
     targetedOwned.clear();
-    status = batchOp.targetBatch(&opCtx, targeter, true, &targeted);
+    ASSERT_OK(batchOp.targetBatch(targeter, true, &targeted));
 
     // Second targeting round is ok, but should stop at first write
-    ASSERT(status.isOK());
     ASSERT(!batchOp.isFinished());
     ASSERT_EQUALS(targeted.size(), 1u);
     ASSERT_EQUALS(targeted.begin()->second->getWrites().size(), 1u);
@@ -1241,10 +1202,9 @@ TEST(WriteOpTests, MultiOpFailedTargetOrdered) {
     ASSERT(!batchOp.isFinished());
 
     targetedOwned.clear();
-    status = batchOp.targetBatch(&opCtx, targeter, true, &targeted);
+    ASSERT_OK(batchOp.targetBatch(targeter, true, &targeted));
 
     // Second targeting round results in an error which finishes the batch
-    ASSERT(status.isOK());
     ASSERT(batchOp.isFinished());
     ASSERT_EQUALS(targeted.size(), 0u);
 
@@ -1277,21 +1237,19 @@ TEST(WriteOpTests, MultiOpFailedTargetUnordered) {
 
     // Do single-target, multi-doc batch write op
 
-    BatchWriteOp batchOp(request);
+    BatchWriteOp batchOp(&opCtx, request);
 
     OwnedPointerMap<ShardId, TargetedWriteBatch> targetedOwned;
     map<ShardId, TargetedWriteBatch*>& targeted = targetedOwned.mutableMap();
-    Status status = batchOp.targetBatch(&opCtx, targeter, false, &targeted);
+    ASSERT_NOT_OK(batchOp.targetBatch(targeter, false, &targeted));
 
     // First targeting round fails since we may be stale
-    ASSERT(!status.isOK());
     ASSERT(!batchOp.isFinished());
 
     targetedOwned.clear();
-    status = batchOp.targetBatch(&opCtx, targeter, true, &targeted);
+    ASSERT_OK(batchOp.targetBatch(targeter, true, &targeted));
 
     // Second targeting round is ok, and should record an error
-    ASSERT(status.isOK());
     ASSERT(!batchOp.isFinished());
     ASSERT_EQUALS(targeted.size(), 1u);
     ASSERT_EQUALS(targeted.begin()->second->getWrites().size(), 2u);
@@ -1331,11 +1289,11 @@ TEST(WriteOpTests, MultiOpFailedBatchOrdered) {
     request.getInsertRequest()->addToDocuments(BSON("x" << 2));
     request.getInsertRequest()->addToDocuments(BSON("x" << 3));
 
-    BatchWriteOp batchOp(request);
+    BatchWriteOp batchOp(&opCtx, request);
 
     OwnedPointerMap<ShardId, TargetedWriteBatch> targetedOwned;
     map<ShardId, TargetedWriteBatch*>& targeted = targetedOwned.mutableMap();
-    Status status = batchOp.targetBatch(&opCtx, targeter, false, &targeted);
+    ASSERT_OK(batchOp.targetBatch(targeter, false, &targeted));
 
     BatchedCommandResponse response;
     buildResponse(1, &response);
@@ -1345,7 +1303,7 @@ TEST(WriteOpTests, MultiOpFailedBatchOrdered) {
     ASSERT(!batchOp.isFinished());
 
     targetedOwned.clear();
-    status = batchOp.targetBatch(&opCtx, targeter, true, &targeted);
+    ASSERT_OK(batchOp.targetBatch(targeter, true, &targeted));
 
     buildErrResponse(ErrorCodes::UnknownError, "mock error", &response);
 
@@ -1384,11 +1342,11 @@ TEST(WriteOpTests, MultiOpFailedBatchUnordered) {
     request.getInsertRequest()->addToDocuments(BSON("x" << 2));
     request.getInsertRequest()->addToDocuments(BSON("x" << 3));
 
-    BatchWriteOp batchOp(request);
+    BatchWriteOp batchOp(&opCtx, request);
 
     OwnedPointerMap<ShardId, TargetedWriteBatch> targetedOwned;
     map<ShardId, TargetedWriteBatch*>& targeted = targetedOwned.mutableMap();
-    Status status = batchOp.targetBatch(&opCtx, targeter, false, &targeted);
+    ASSERT_OK(batchOp.targetBatch(targeter, false, &targeted));
 
     // Respond to batches.
     auto targetedIt = targeted.begin();
@@ -1440,11 +1398,11 @@ TEST(WriteOpTests, MultiOpAbortOrdered) {
     request.getInsertRequest()->addToDocuments(BSON("x" << 2));
     request.getInsertRequest()->addToDocuments(BSON("x" << 3));
 
-    BatchWriteOp batchOp(request);
+    BatchWriteOp batchOp(&opCtx, request);
 
     OwnedPointerMap<ShardId, TargetedWriteBatch> targetedOwned;
     map<ShardId, TargetedWriteBatch*>& targeted = targetedOwned.mutableMap();
-    Status status = batchOp.targetBatch(&opCtx, targeter, false, &targeted);
+    ASSERT_OK(batchOp.targetBatch(targeter, false, &targeted));
 
     BatchedCommandResponse response;
     buildResponse(1, &response);
@@ -1489,7 +1447,7 @@ TEST(WriteOpTests, MultiOpAbortUnordered) {
     request.getInsertRequest()->addToDocuments(BSON("x" << -1));
     request.getInsertRequest()->addToDocuments(BSON("x" << -2));
 
-    BatchWriteOp batchOp(request);
+    BatchWriteOp batchOp(&opCtx, request);
 
     WriteErrorDetail abortError;
     abortError.setErrCode(ErrorCodes::UnknownError);
@@ -1529,11 +1487,11 @@ TEST(WriteOpTests, MultiOpTwoWCErrors) {
     request.getInsertRequest()->addToDocuments(BSON("x" << 2));
     request.setWriteConcern(BSON("w" << 3));
 
-    BatchWriteOp batchOp(request);
+    BatchWriteOp batchOp(&opCtx, request);
 
     OwnedPointerMap<ShardId, TargetedWriteBatch> targetedOwned;
     map<ShardId, TargetedWriteBatch*>& targeted = targetedOwned.mutableMap();
-    Status status = batchOp.targetBatch(&opCtx, targeter, false, &targeted);
+    ASSERT_OK(batchOp.targetBatch(targeter, false, &targeted));
 
     BatchedCommandResponse response;
     buildResponse(1, &response);
@@ -1544,7 +1502,7 @@ TEST(WriteOpTests, MultiOpTwoWCErrors) {
     ASSERT(!batchOp.isFinished());
 
     targetedOwned.clear();
-    status = batchOp.targetBatch(&opCtx, targeter, true, &targeted);
+    ASSERT_OK(batchOp.targetBatch(targeter, true, &targeted));
 
     // Second shard write write concern fails.
     batchOp.noteBatchResponse(*targeted.begin()->second, response, NULL);
@@ -1581,12 +1539,11 @@ TEST(WriteOpLimitTests, OneBigDoc) {
     request.setNS(nss);
     request.getInsertRequest()->addToDocuments(BSON("x" << 1 << "data" << bigString));
 
-    BatchWriteOp batchOp(request);
+    BatchWriteOp batchOp(&opCtx, request);
 
     OwnedPointerMap<ShardId, TargetedWriteBatch> targetedOwned;
     map<ShardId, TargetedWriteBatch*>& targeted = targetedOwned.mutableMap();
-    Status status = batchOp.targetBatch(&opCtx, targeter, false, &targeted);
-    ASSERT(status.isOK());
+    ASSERT_OK(batchOp.targetBatch(targeter, false, &targeted));
     ASSERT_EQUALS(targeted.size(), 1u);
 
     BatchedCommandResponse response;
@@ -1617,12 +1574,11 @@ TEST(WriteOpLimitTests, OneBigOneSmall) {
     request.getUpdateRequest()->addToUpdates(bigUpdateDoc);
     request.getUpdateRequest()->addToUpdates(buildUpdate(BSON("x" << 2), BSONObj(), false));
 
-    BatchWriteOp batchOp(request);
+    BatchWriteOp batchOp(&opCtx, request);
 
     OwnedPointerMap<ShardId, TargetedWriteBatch> targetedOwned;
     map<ShardId, TargetedWriteBatch*>& targeted = targetedOwned.mutableMap();
-    Status status = batchOp.targetBatch(&opCtx, targeter, false, &targeted);
-    ASSERT(status.isOK());
+    ASSERT_OK(batchOp.targetBatch(targeter, false, &targeted));
     ASSERT_EQUALS(targeted.size(), 1u);
     ASSERT_EQUALS(targeted.begin()->second->getWrites().size(), 1u);
 
@@ -1633,8 +1589,7 @@ TEST(WriteOpLimitTests, OneBigOneSmall) {
     ASSERT(!batchOp.isFinished());
 
     targetedOwned.clear();
-    status = batchOp.targetBatch(&opCtx, targeter, false, &targeted);
-    ASSERT(status.isOK());
+    ASSERT_OK(batchOp.targetBatch(targeter, false, &targeted));
     ASSERT_EQUALS(targeted.size(), 1u);
     ASSERT_EQUALS(targeted.begin()->second->getWrites().size(), 1u);
 
@@ -1661,12 +1616,11 @@ TEST(WriteOpLimitTests, TooManyOps) {
         request.getDeleteRequest()->addToDeletes(buildDelete(BSON("x" << 2), 0));
     }
 
-    BatchWriteOp batchOp(request);
+    BatchWriteOp batchOp(&opCtx, request);
 
     OwnedPointerMap<ShardId, TargetedWriteBatch> targetedOwned;
     map<ShardId, TargetedWriteBatch*>& targeted = targetedOwned.mutableMap();
-    Status status = batchOp.targetBatch(&opCtx, targeter, false, &targeted);
-    ASSERT(status.isOK());
+    ASSERT_OK(batchOp.targetBatch(targeter, false, &targeted));
     ASSERT_EQUALS(targeted.size(), 1u);
     ASSERT_EQUALS(targeted.begin()->second->getWrites().size(), 1000u);
 
@@ -1677,8 +1631,8 @@ TEST(WriteOpLimitTests, TooManyOps) {
     ASSERT(!batchOp.isFinished());
 
     targetedOwned.clear();
-    status = batchOp.targetBatch(&opCtx, targeter, false, &targeted);
-    ASSERT(status.isOK());
+
+    ASSERT_OK(batchOp.targetBatch(targeter, false, &targeted));
     ASSERT_EQUALS(targeted.size(), 1u);
     ASSERT_EQUALS(targeted.begin()->second->getWrites().size(), 2u);
 
@@ -1724,12 +1678,11 @@ TEST(WriteOpLimitTests, UpdateOverheadIncluded) {
 
     ASSERT_GREATER_THAN(estSizeBytes, BSONObjMaxInternalSize);
 
-    BatchWriteOp batchOp(request);
+    BatchWriteOp batchOp(&opCtx, request);
 
     OwnedPointerMap<ShardId, TargetedWriteBatch> targetedOwned;
     map<ShardId, TargetedWriteBatch*>& targeted = targetedOwned.mutableMap();
-    Status status = batchOp.targetBatch(&opCtx, targeter, false, &targeted);
-    ASSERT(status.isOK());
+    ASSERT_OK(batchOp.targetBatch(targeter, false, &targeted));
     ASSERT_EQUALS(targeted.size(), 1u);
     ASSERT_LESS_THAN(targeted.begin()->second->getWrites().size(), 1000u);
 
@@ -1746,8 +1699,8 @@ TEST(WriteOpLimitTests, UpdateOverheadIncluded) {
     ASSERT(!batchOp.isFinished());
 
     targetedOwned.clear();
-    status = batchOp.targetBatch(&opCtx, targeter, false, &targeted);
-    ASSERT(status.isOK());
+
+    ASSERT_OK(batchOp.targetBatch(targeter, false, &targeted));
     ASSERT_EQUALS(targeted.size(), 1u);
     ASSERT_LESS_THAN(targeted.begin()->second->getWrites().size(), 1000u);
 

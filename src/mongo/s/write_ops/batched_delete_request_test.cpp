@@ -48,8 +48,7 @@ TEST(BatchedDeleteRequest, Basic) {
         << BSON(BatchedDeleteDocument::query(BSON("b" << 1)) << BatchedDeleteDocument::limit(1)));
 
     BSONObj origDeleteRequestObj = BSON(
-        BatchedDeleteRequest::collName("test") << BatchedDeleteRequest::deletes() << deleteArray
-                                               << BatchedDeleteRequest::ordered(true));
+        BatchedDeleteRequest::collName("test") << BatchedDeleteRequest::deletes() << deleteArray);
 
     string errMsg;
     for (auto docSeq : {false, true}) {

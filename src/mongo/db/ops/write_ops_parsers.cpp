@@ -30,15 +30,17 @@
 
 #include "mongo/db/ops/write_ops_parsers.h"
 
-#include "mongo/bson/util/bson_check.h"
 #include "mongo/client/dbclientinterface.h"
-#include "mongo/db/catalog/document_validation.h"
-#include "mongo/db/commands.h"
 #include "mongo/db/dbmessage.h"
+#include "mongo/db/ops/write_ops.h"
 #include "mongo/util/assert_util.h"
 #include "mongo/util/mongoutils/str.h"
 
 namespace mongo {
+
+using write_ops::UpdateOpEntry;
+using write_ops::DeleteOpEntry;
+
 namespace {
 
 // The specified limit to the number of operations that can be included in a single write command.
@@ -47,258 +49,161 @@ namespace {
 // not be used if the protocol changes to avoid the 16MB limit on reply size.
 const size_t kMaxWriteBatchSize = 1000;
 
-void checkTypeInArray(BSONType expectedType,
-                      const BSONElement& elem,
-                      const BSONElement& arrayElem) {
-    uassert(ErrorCodes::TypeMismatch,
-            str::stream() << "Wrong type for " << arrayElem.fieldNameStringData() << '['
-                          << elem.fieldNameStringData()
-                          << "]. Expected a "
-                          << typeName(expectedType)
-                          << ", got a "
-                          << typeName(elem.type())
-                          << '.',
-            elem.type() == expectedType);
-}
-
-void checkOpCountForCommand(size_t numOps) {
+template <class T>
+void checkOpCountForCommand(const T& op, size_t numOps) {
     uassert(ErrorCodes::InvalidLength,
             str::stream() << "Write batch sizes must be between 1 and " << kMaxWriteBatchSize
                           << ". Got "
                           << numOps
                           << " operations.",
             numOps != 0 && numOps <= kMaxWriteBatchSize);
+
+    const auto& stmtIds = op.getWriteCommandBase().getStmtIds();
+    uassert(ErrorCodes::InvalidLength,
+            "Number of statement ids must match the number of batch entries",
+            !stmtIds || stmtIds->size() == numOps);
 }
 
-/**
- * Parses the fields common to all write commands and sets uniqueField to the element named
- * uniqueFieldName. The uniqueField is the only top-level field that is unique to the specific type
- * of write command.
- */
-void parseWriteCommand(const OpMsgRequest& request,
-                       StringData uniqueFieldName,
-                       std::vector<BSONObj>* uniqueField,
-                       ParsedWriteOp* op) {
-    // Command dispatch wouldn't get here with an empty object because the first field indicates
-    // which command to run.
-    invariant(!request.body.isEmpty());
+}  // namespace
 
-    bool haveUniqueField = false;
-    bool firstElement = true;
-    for (BSONElement field : request.body) {
-        if (firstElement) {
-            // The key is the command name and the value is the collection name
-            checkBSONType(String, field);
-            op->ns = NamespaceString(request.getDatabase(), field.valueStringData());
-            uassert(ErrorCodes::InvalidNamespace,
-                    str::stream() << "Invalid namespace: " << op->ns.ns(),
-                    op->ns.isValid());
-            firstElement = false;
-            continue;
-        }
+namespace write_ops {
 
-        const StringData fieldName = field.fieldNameStringData();
-        if (fieldName == "bypassDocumentValidation") {
-            op->bypassDocumentValidation = field.trueValue();
-        } else if (fieldName == "ordered") {
-            checkBSONType(Bool, field);
-            op->continueOnError = !field.Bool();
-        } else if (fieldName == uniqueFieldName) {
-            uassert(ErrorCodes::FailedToParse,
-                    str::stream() << "Duplicate field " << uniqueFieldName,
-                    !haveUniqueField);
-            haveUniqueField = true;
-            checkBSONType(Array, field);
-            for (auto subField : field.Obj()) {
-                checkTypeInArray(Object, subField, field);
-                uniqueField->push_back(subField.Obj());
-            }
-        } else if (!Command::isGenericArgument(fieldName)) {
-            uasserted(ErrorCodes::FailedToParse,
-                      str::stream() << "Unknown option to " << request.getCommandName()
-                                    << " command: "
-                                    << fieldName);
-        }
-    }
-
-    for (auto&& seq : request.sequences) {
-        uassert(ErrorCodes::FailedToParse,
-                str::stream() << "Unknown document sequence option to " << request.getCommandName()
-                              << " command: "
-                              << seq.name,
-                seq.name == uniqueFieldName);
-        uassert(ErrorCodes::FailedToParse,
-                str::stream() << "Duplicate document sequence " << uniqueFieldName,
-                !haveUniqueField);
-        haveUniqueField = true;
-        *uniqueField = seq.objs;
-    }
-
+bool readMultiDeleteProperty(const BSONElement& limitElement) {
+    // Using a double to avoid throwing away illegal fractional portion. Don't want to accept 0.5
+    // here
+    const double limit = limitElement.numberDouble();
     uassert(ErrorCodes::FailedToParse,
-            str::stream() << "The " << uniqueFieldName << " option is required to the "
-                          << request.getCommandName()
-                          << " command.",
-            haveUniqueField);
-}
+            str::stream() << "The limit field in delete objects must be 0 or 1. Got " << limit,
+            limit == 0 || limit == 1);
+
+    return limit == 0;
 }
 
-InsertOp parseInsertCommand(const OpMsgRequest& request) {
-    invariant(request.getCommandName() == "insert");
-    InsertOp op;
-    parseWriteCommand(request, "documents", &op.documents, &op);
-    checkOpCountForCommand(op.documents.size());
+void writeMultiDeleteProperty(bool isMulti, StringData fieldName, BSONObjBuilder* builder) {
+    builder->append(fieldName, isMulti ? 0 : 1);
+}
 
-    if (op.ns.isSystemDotIndexes()) {
+int32_t getStmtIdForWriteAt(const WriteCommandBase& writeCommandBase, size_t writePos) {
+    const auto& stmtIds = writeCommandBase.getStmtIds();
+
+    if (stmtIds) {
+        return stmtIds->at(writePos);
+    }
+
+    const int32_t kFirstStmtId = 0;
+    return kFirstStmtId + writePos;
+}
+
+}  // namespace write_ops
+
+InsertOp InsertOp::parse(const OpMsgRequest& request) {
+    auto insertOp = Insert::parse(IDLParserErrorContext("insert"), request);
+
+    if (insertOp.getNamespace().isSystemDotIndexes()) {
         // This is only for consistency with sharding.
         uassert(ErrorCodes::InvalidLength,
                 "Insert commands to system.indexes are limited to a single insert",
-                op.documents.size() == 1);
+                insertOp.getDocuments().size() == 1);
     }
 
-    return op;
+    checkOpCountForCommand(insertOp, insertOp.getDocuments().size());
+    return {std::move(insertOp)};
 }
 
-UpdateOp parseUpdateCommand(const OpMsgRequest& request) {
-    invariant(request.getCommandName() == "update");
-    std::vector<BSONObj> updates;
-    UpdateOp op;
-    parseWriteCommand(request, "updates", &updates, &op);
-    for (auto&& doc : updates) {
-        op.updates.emplace_back();
-        auto& update = op.updates.back();
-        bool haveQ = false;
-        bool haveU = false;
-        for (auto field : doc) {
-            const StringData fieldName = field.fieldNameStringData();
-            if (fieldName == "q") {
-                haveQ = true;
-                checkBSONType(Object, field);
-                update.query = field.Obj();
-            } else if (fieldName == "u") {
-                haveU = true;
-                checkBSONType(Object, field);
-                update.update = field.Obj();
-            } else if (fieldName == "collation") {
-                checkBSONType(Object, field);
-                update.collation = field.Obj();
-            } else if (fieldName == "arrayFilters") {
-                checkBSONType(Array, field);
-                for (auto arrayFilter : field.Obj()) {
-                    checkBSONType(Object, arrayFilter);
-                    update.arrayFilters.push_back(arrayFilter.Obj());
-                }
-            } else if (fieldName == "multi") {
-                checkBSONType(Bool, field);
-                update.multi = field.Bool();
-            } else if (fieldName == "upsert") {
-                checkBSONType(Bool, field);
-                update.upsert = field.Bool();
-            } else {
-                uasserted(ErrorCodes::FailedToParse,
-                          str::stream() << "Unrecognized field in update operation: " << fieldName);
-            }
-        }
-
-        uassert(ErrorCodes::FailedToParse, "The 'q' field is required for all updates", haveQ);
-        uassert(ErrorCodes::FailedToParse, "The 'u' field is required for all updates", haveU);
-    }
-    checkOpCountForCommand(op.updates.size());
-    return op;
-}
-
-DeleteOp parseDeleteCommand(const OpMsgRequest& request) {
-    invariant(request.getCommandName() == "delete");
-    std::vector<BSONObj> deletes;
-    DeleteOp op;
-    parseWriteCommand(request, "deletes", &deletes, &op);
-    for (auto&& doc : deletes) {
-        op.deletes.emplace_back();
-        auto& del = op.deletes.back();  // delete is a reserved word.
-        bool haveQ = false;
-        bool haveLimit = false;
-        for (auto field : doc) {
-            const StringData fieldName = field.fieldNameStringData();
-            if (fieldName == "q") {
-                haveQ = true;
-                checkBSONType(Object, field);
-                del.query = field.Obj();
-            } else if (fieldName == "collation") {
-                checkBSONType(Object, field);
-                del.collation = field.Obj();
-            } else if (fieldName == "limit") {
-                haveLimit = true;
-                uassert(ErrorCodes::TypeMismatch,
-                        str::stream()
-                            << "The limit field in delete objects must be a number. Got a "
-                            << typeName(field.type()),
-                        field.isNumber());
-
-                // Using a double to avoid throwing away illegal fractional portion. Don't want to
-                // accept 0.5 here.
-                const double limit = field.numberDouble();
-                uassert(ErrorCodes::FailedToParse,
-                        str::stream() << "The limit field in delete objects must be 0 or 1. Got "
-                                      << limit,
-                        limit == 0 || limit == 1);
-                del.multi = (limit == 0);
-            } else {
-                uasserted(ErrorCodes::FailedToParse,
-                          str::stream() << "Unrecognized field in delete operation: " << fieldName);
-            }
-        }
-        uassert(ErrorCodes::FailedToParse, "The 'q' field is required for all deletes", haveQ);
-        uassert(
-            ErrorCodes::FailedToParse, "The 'limit' field is required for all deletes", haveLimit);
-    }
-    checkOpCountForCommand(op.deletes.size());
-    return op;
-}
-
-InsertOp parseLegacyInsert(const Message& msgRaw) {
+InsertOp InsertOp::parseLegacy(const Message& msgRaw) {
     DbMessage msg(msgRaw);
 
-    InsertOp op;
-    op.ns = NamespaceString(msg.getns());
-    op.continueOnError = msg.reservedField() & InsertOption_ContinueOnError;
+    InsertOp op(NamespaceString(msg.getns()));
+
+    {
+        write_ops::WriteCommandBase writeCommandBase;
+        writeCommandBase.setBypassDocumentValidation(false);
+        writeCommandBase.setOrdered(!(msg.reservedField() & InsertOption_ContinueOnError));
+        op.setWriteCommandBase(std::move(writeCommandBase));
+    }
+
     uassert(ErrorCodes::InvalidLength, "Need at least one object to insert", msg.moreJSObjs());
-    while (msg.moreJSObjs()) {
-        op.documents.push_back(msg.nextJsObj());
+
+    op.setDocuments([&] {
+        std::vector<BSONObj> documents;
+        while (msg.moreJSObjs()) {
+            documents.push_back(msg.nextJsObj());
+        }
+
+        return documents;
+    }());
+
+    return op;
+}
+
+UpdateOp UpdateOp::parse(const OpMsgRequest& request) {
+    auto updateOp = Update::parse(IDLParserErrorContext("update"), request);
+
+    checkOpCountForCommand(updateOp, updateOp.getUpdates().size());
+    return {std::move(updateOp)};
+}
+
+UpdateOp UpdateOp::parseLegacy(const Message& msgRaw) {
+    DbMessage msg(msgRaw);
+
+    UpdateOp op(NamespaceString(msg.getns()));
+
+    {
+        write_ops::WriteCommandBase writeCommandBase;
+        writeCommandBase.setBypassDocumentValidation(false);
+        writeCommandBase.setOrdered(true);
+        op.setWriteCommandBase(std::move(writeCommandBase));
     }
-    // There is no limit on the number of inserts in a legacy batch.
+
+    op.setUpdates([&] {
+        std::vector<write_ops::UpdateOpEntry> updates;
+        updates.emplace_back();
+
+        // Legacy updates only allowed one update per operation. Layout is flags, query, update.
+        auto& singleUpdate = updates.back();
+        const int flags = msg.pullInt();
+        singleUpdate.setUpsert(flags & UpdateOption_Upsert);
+        singleUpdate.setMulti(flags & UpdateOption_Multi);
+        singleUpdate.setQ(msg.nextJsObj());
+        singleUpdate.setU(msg.nextJsObj());
+
+        return updates;
+    }());
 
     return op;
 }
 
-UpdateOp parseLegacyUpdate(const Message& msgRaw) {
-    DbMessage msg(msgRaw);
+DeleteOp DeleteOp::parse(const OpMsgRequest& request) {
+    auto deleteOp = Delete::parse(IDLParserErrorContext("delete"), request);
 
-    UpdateOp op;
-    op.ns = NamespaceString(msg.getns());
-
-    // Legacy updates only allowed one update per operation. Layout is flags, query, update.
-    op.updates.emplace_back();
-    auto& singleUpdate = op.updates.back();
-    const int flags = msg.pullInt();
-    singleUpdate.upsert = flags & UpdateOption_Upsert;
-    singleUpdate.multi = flags & UpdateOption_Multi;
-    singleUpdate.query = msg.nextJsObj();
-    singleUpdate.update = msg.nextJsObj();
-
-    return op;
+    checkOpCountForCommand(deleteOp, deleteOp.getDeletes().size());
+    return {std::move(deleteOp)};
 }
 
-DeleteOp parseLegacyDelete(const Message& msgRaw) {
+DeleteOp DeleteOp::parseLegacy(const Message& msgRaw) {
     DbMessage msg(msgRaw);
 
-    DeleteOp op;
-    op.ns = NamespaceString(msg.getns());
+    DeleteOp op(NamespaceString(msg.getns()));
 
-    // Legacy deletes only allowed one delete per operation. Layout is flags, query.
-    op.deletes.emplace_back();
-    auto& singleDelete = op.deletes.back();
-    const int flags = msg.pullInt();
-    singleDelete.multi = !(flags & RemoveOption_JustOne);
-    singleDelete.query = msg.nextJsObj();
+    {
+        write_ops::WriteCommandBase writeCommandBase;
+        writeCommandBase.setBypassDocumentValidation(false);
+        writeCommandBase.setOrdered(true);
+        op.setWriteCommandBase(std::move(writeCommandBase));
+    }
+
+    op.setDeletes([&]() {
+        std::vector<write_ops::DeleteOpEntry> deletes;
+        deletes.emplace_back();
+
+        // Legacy deletes only allowed one delete per operation. Layout is flags, query.
+        auto& singleDelete = deletes.back();
+        const int flags = msg.pullInt();
+        singleDelete.setMulti(!(flags & RemoveOption_JustOne));
+        singleDelete.setQ(msg.nextJsObj());
+
+        return deletes;
+    }());
 
     return op;
 }

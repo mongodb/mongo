@@ -68,7 +68,6 @@ TEST(WriteBatchUpconvert, BasicInsert) {
     BatchedCommandRequest* request = requests.back().get();
     ASSERT_EQUALS(request->getBatchType(), BatchedCommandRequest::BatchType_Insert);
     string errMsg;
-    ASSERT(request->isValid(&errMsg));
     ASSERT_EQUALS(request->getNS().toString(), ns);
     ASSERT(!request->getOrdered());
     ASSERT_EQUALS(request->sizeWriteOps(), 1u);
@@ -103,7 +102,6 @@ TEST(WriteBatchUpconvert, BasicUpdate) {
     BatchedCommandRequest* request = requests.back().get();
     ASSERT_EQUALS(request->getBatchType(), BatchedCommandRequest::BatchType_Update);
     string errMsg;
-    ASSERT(request->isValid(&errMsg));
     ASSERT_EQUALS(request->getNS().toString(), ns);
     ASSERT_EQUALS(request->sizeWriteOps(), 1u);
     ASSERT(query.woCompare(request->getUpdateRequest()->getUpdatesAt(0)->getQuery()) == 0);
@@ -136,7 +134,6 @@ TEST(WriteBatchUpconvert, BasicDelete) {
     BatchedCommandRequest* request = requests.back().get();
     ASSERT_EQUALS(request->getBatchType(), BatchedCommandRequest::BatchType_Delete);
     string errMsg;
-    ASSERT(request->isValid(&errMsg));
     ASSERT_EQUALS(request->getNS().toString(), ns);
     ASSERT_EQUALS(request->sizeWriteOps(), 1u);
     ASSERT(query.woCompare(request->getDeleteRequest()->getDeletesAt(0)->getQuery()) == 0);

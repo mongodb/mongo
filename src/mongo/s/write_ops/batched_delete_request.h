@@ -47,17 +47,8 @@ class BatchedDeleteRequest {
     MONGO_DISALLOW_COPYING(BatchedDeleteRequest);
 
 public:
-    //
-    // schema declarations
-    //
-
-    // Name used for the batched delete invocation.
-    static const std::string BATCHED_DELETE_REQUEST;
-
-    // Field names and types in the batched delete command type.
     static const BSONField<std::string> collName;
     static const BSONField<std::vector<BatchedDeleteDocument*>> deletes;
-    static const BSONField<bool> ordered;
 
     //
     // construction / destruction
@@ -88,20 +79,6 @@ public:
     const std::vector<BatchedDeleteDocument*>& getDeletes() const;
     const BatchedDeleteDocument* getDeletesAt(std::size_t pos) const;
 
-    void setOrdered(bool ordered);
-    void unsetOrdered();
-    bool isOrderedSet() const;
-    bool getOrdered() const;
-
-    /**
-     * These are no-ops since delete never validates documents. They only exist to fulfill the
-     * unified API.
-     */
-    void setShouldBypassValidation(bool newVal) {}
-    bool shouldBypassValidation() const {
-        return false;
-    }
-
 private:
     // Convention: (M)andatory, (O)ptional
 
@@ -112,10 +89,6 @@ private:
     // (M)  array of individual deletes
     std::vector<BatchedDeleteDocument*> _deletes;
     bool _isDeletesSet;
-
-    // (O)  whether batch is issued in parallel or not
-    bool _ordered;
-    bool _isOrderedSet;
 };
 
 }  // namespace mongo

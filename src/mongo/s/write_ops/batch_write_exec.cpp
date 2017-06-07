@@ -89,10 +89,12 @@ void BatchWriteExec::executeBatch(OperationContext* opCtx,
                                   const BatchedCommandRequest& clientRequest,
                                   BatchedCommandResponse* clientResponse,
                                   BatchWriteExecStats* stats) {
-    LOG(4) << "starting execution of write batch of size "
-           << static_cast<int>(clientRequest.sizeWriteOps()) << " for " << clientRequest.getNS();
+    const auto& nss(clientRequest.getNS());
 
-    BatchWriteOp batchOp(clientRequest);
+    LOG(4) << "Starting execution of write batch of size "
+           << static_cast<int>(clientRequest.sizeWriteOps()) << " for " << nss.ns();
+
+    BatchWriteOp batchOp(opCtx, clientRequest);
 
     // Current batch status
     bool refreshedTargeter = false;
@@ -131,8 +133,7 @@ void BatchWriteExec::executeBatch(OperationContext* opCtx,
         // If we've already had a targeting error, we've refreshed the metadata once and can
         // record target errors definitively.
         bool recordTargetErrors = refreshedTargeter;
-        Status targetStatus =
-            batchOp.targetBatch(opCtx, targeter, recordTargetErrors, &childBatches);
+        Status targetStatus = batchOp.targetBatch(targeter, recordTargetErrors, &childBatches);
         if (!targetStatus.isOK()) {
             // Don't do anything until a targeter refresh
             targeter.noteCouldNotTarget();
@@ -174,24 +175,37 @@ void BatchWriteExec::executeBatch(OperationContext* opCtx,
                 if (pendingIt != pendingBatches.end())
                     continue;
 
-                BatchedCommandRequest request(clientRequest.getBatchType());
-                batchOp.buildBatchRequest(*nextBatch, &request);
+                const auto request = [&]() {
+                    BatchedCommandRequest request(clientRequest.getBatchType());
+                    request.setNS(nss);
 
-                // Internally we use full namespaces for request/response, but we send the
-                // command to a database with the collection name in the request.
-                NamespaceString nss(request.getNS());
-                request.setNS(nss);
+                    batchOp.buildBatchRequest(*nextBatch, &request);
 
-                LOG(4) << "sending write batch to " << targetShardId << ": "
-                       << redact(request.toString());
+                    BSONObjBuilder requestBuilder;
+                    requestBuilder.appendElements(request.toBSON());
 
-                requests.emplace_back(targetShardId, request.toBSON());
+                    {
+                        OperationSessionInfo sessionInfo;
 
-                // Indicate we're done by setting the batch to NULL
-                // We'll only get duplicate hostEndpoints if we have broadcast and non-broadcast
-                // endpoints for the same host, so this should be pretty efficient without
-                // moving stuff around.
-                childBatch.second = NULL;
+                        if (opCtx->getLogicalSessionId()) {
+                            sessionInfo.setSessionId(*opCtx->getLogicalSessionId());
+                        }
+
+                        sessionInfo.setTxnNumber(opCtx->getTxnNumber());
+                        sessionInfo.serialize(&requestBuilder);
+                    }
+
+                    return requestBuilder.obj();
+                }();
+
+                LOG(4) << "Sending write batch to " << targetShardId << ": " << redact(request);
+
+                requests.emplace_back(targetShardId, request);
+
+                // Indicate we're done by setting the batch to nullptr. We'll only get duplicate
+                // hostEndpoints if we have broadcast and non-broadcast endpoints for the same host,
+                // so this should be pretty efficient without moving stuff around.
+                childBatch.second = nullptr;
 
                 // Recv-side is responsible for cleaning up the nextBatch when used
                 pendingBatches.insert(make_pair(targetShardId, nextBatch));

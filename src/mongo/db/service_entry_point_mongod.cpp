@@ -49,8 +49,8 @@
 #include "mongo/db/logical_clock.h"
 #include "mongo/db/logical_session_id.h"
 #include "mongo/db/logical_time_validator.h"
+#include "mongo/db/ops/write_ops.h"
 #include "mongo/db/ops/write_ops_exec.h"
-#include "mongo/db/ops/write_ops_parsers.h"
 #include "mongo/db/query/find.h"
 #include "mongo/db/read_concern.h"
 #include "mongo/db/repl/repl_client_info.h"
@@ -923,9 +923,10 @@ void receivedKillCursors(OperationContext* opCtx, const Message& m) {
 }
 
 void receivedInsert(OperationContext* opCtx, const NamespaceString& nsString, const Message& m) {
-    auto insertOp = parseLegacyInsert(m);
-    invariant(insertOp.ns == nsString);
-    for (const auto& obj : insertOp.documents) {
+    auto insertOp = InsertOp::parseLegacy(m);
+    invariant(insertOp.getNamespace() == nsString);
+
+    for (const auto& obj : insertOp.getDocuments()) {
         Status status =
             AuthorizationSession::get(opCtx->getClient())->checkAuthForInsert(opCtx, nsString, obj);
         audit::logInsertAuthzCheck(opCtx->getClient(), nsString, obj, status.code());
@@ -935,20 +936,22 @@ void receivedInsert(OperationContext* opCtx, const NamespaceString& nsString, co
 }
 
 void receivedUpdate(OperationContext* opCtx, const NamespaceString& nsString, const Message& m) {
-    auto updateOp = parseLegacyUpdate(m);
-    auto& singleUpdate = updateOp.updates[0];
-    invariant(updateOp.ns == nsString);
+    auto updateOp = UpdateOp::parseLegacy(m);
+    auto& singleUpdate = updateOp.getUpdates()[0];
+    invariant(updateOp.getNamespace() == nsString);
 
-    Status status =
-        AuthorizationSession::get(opCtx->getClient())
-            ->checkAuthForUpdate(
-                opCtx, nsString, singleUpdate.query, singleUpdate.update, singleUpdate.upsert);
+    Status status = AuthorizationSession::get(opCtx->getClient())
+                        ->checkAuthForUpdate(opCtx,
+                                             nsString,
+                                             singleUpdate.getQ(),
+                                             singleUpdate.getU(),
+                                             singleUpdate.getUpsert());
     audit::logUpdateAuthzCheck(opCtx->getClient(),
                                nsString,
-                               singleUpdate.query,
-                               singleUpdate.update,
-                               singleUpdate.upsert,
-                               singleUpdate.multi,
+                               singleUpdate.getQ(),
+                               singleUpdate.getU(),
+                               singleUpdate.getUpsert(),
+                               singleUpdate.getMulti(),
                                status.code());
     uassertStatusOK(status);
 
@@ -956,13 +959,13 @@ void receivedUpdate(OperationContext* opCtx, const NamespaceString& nsString, co
 }
 
 void receivedDelete(OperationContext* opCtx, const NamespaceString& nsString, const Message& m) {
-    auto deleteOp = parseLegacyDelete(m);
-    auto& singleDelete = deleteOp.deletes[0];
-    invariant(deleteOp.ns == nsString);
+    auto deleteOp = DeleteOp::parseLegacy(m);
+    auto& singleDelete = deleteOp.getDeletes()[0];
+    invariant(deleteOp.getNamespace() == nsString);
 
     Status status = AuthorizationSession::get(opCtx->getClient())
-                        ->checkAuthForDelete(opCtx, nsString, singleDelete.query);
-    audit::logDeleteAuthzCheck(opCtx->getClient(), nsString, singleDelete.query, status.code());
+                        ->checkAuthForDelete(opCtx, nsString, singleDelete.getQ());
+    audit::logDeleteAuthzCheck(opCtx->getClient(), nsString, singleDelete.getQ(), status.code());
     uassertStatusOK(status);
 
     performDeletes(opCtx, deleteOp);

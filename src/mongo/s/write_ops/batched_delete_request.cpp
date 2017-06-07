@@ -26,23 +26,17 @@
  *    then also delete it in the license file.
  */
 
+#include "mongo/platform/basic.h"
+
 #include "mongo/s/write_ops/batched_delete_request.h"
 
-#include "mongo/db/commands.h"
-#include "mongo/db/field_parser.h"
+#include "mongo/db/ops/write_ops.h"
 #include "mongo/util/mongoutils/str.h"
 
 namespace mongo {
 
-using std::unique_ptr;
-using std::string;
-
-using mongoutils::str::stream;
-
-const std::string BatchedDeleteRequest::BATCHED_DELETE_REQUEST = "delete";
 const BSONField<std::string> BatchedDeleteRequest::collName("delete");
 const BSONField<std::vector<BatchedDeleteDocument*>> BatchedDeleteRequest::deletes("deletes");
-const BSONField<bool> BatchedDeleteRequest::ordered("ordered", true);
 
 BatchedDeleteRequest::BatchedDeleteRequest() {
     clear();
@@ -60,12 +54,12 @@ bool BatchedDeleteRequest::isValid(std::string* errMsg) const {
 
     // All the mandatory fields must be present.
     if (!_isNSSet) {
-        *errMsg = stream() << "missing " << collName.name() << " field";
+        *errMsg = str::stream() << "missing " << collName.name() << " field";
         return false;
     }
 
     if (!_isDeletesSet) {
-        *errMsg = stream() << "missing " << deletes.name() << " field";
+        *errMsg = str::stream() << "missing " << deletes.name() << " field";
         return false;
     }
 
@@ -89,63 +83,27 @@ BSONObj BatchedDeleteRequest::toBSON() const {
         deletesBuilder.done();
     }
 
-    if (_isOrderedSet)
-        builder.append(ordered(), _ordered);
-
     return builder.obj();
 }
 
 void BatchedDeleteRequest::parseRequest(const OpMsgRequest& request) {
     clear();
 
-    for (BSONElement field : request.body) {
-        auto extractField = [&](const auto& fieldDesc, auto* valOut, auto* isSetOut) {
-            std::string errMsg;
-            FieldParser::FieldState fieldState =
-                FieldParser::extract(field, fieldDesc, valOut, &errMsg);
-            if (fieldState == FieldParser::FIELD_INVALID) {
-                uasserted(ErrorCodes::FailedToParse, errMsg);
-            }
-            *isSetOut = fieldState == FieldParser::FIELD_SET;
-        };
+    auto deleteOp = DeleteOp::parse(request);
 
-        const StringData fieldName = field.fieldNameStringData();
-        if (fieldName == collName.name()) {
-            std::string collNameTemp;
-            extractField(collName, &collNameTemp, &_isNSSet);
-            _ns = NamespaceString(request.getDatabase(), collNameTemp);
-            uassert(ErrorCodes::InvalidNamespace,
-                    str::stream() << "Invalid namespace: " << _ns.ns(),
-                    _ns.isValid());
-        } else if (fieldName == deletes.name()) {
-            extractField(deletes, &_deletes, &_isDeletesSet);
-        } else if (fieldName == ordered.name()) {
-            extractField(ordered, &_ordered, &_isOrderedSet);
-        } else if (!Command::isGenericArgument(fieldName)) {
-            uasserted(ErrorCodes::FailedToParse,
-                      str::stream() << "Unknown option to delete command: " << fieldName);
-        }
+    _ns = std::move(deleteOp.getNamespace());
+    _isNSSet = true;
+
+    for (auto&& deleteEntry : deleteOp.getDeletes()) {
+        _deletes.push_back(new BatchedDeleteDocument());  // _deletes takes ownership.
+        std::string errMsg;
+        uassert(ErrorCodes::FailedToParse,
+                errMsg,
+                _deletes.back()->parseBSON(deleteEntry.toBSON(), &errMsg) &&
+                    _deletes.back()->isValid(&errMsg));
     }
 
-    for (auto&& seq : request.sequences) {
-        uassert(ErrorCodes::FailedToParse,
-                str::stream() << "Unknown document sequence option to " << request.getCommandName()
-                              << " command: "
-                              << seq.name,
-                seq.name == deletes());
-        uassert(ErrorCodes::FailedToParse,
-                str::stream() << "Duplicate document sequence " << deletes(),
-                !_isDeletesSet);
-        _isDeletesSet = true;
-
-        for (auto&& obj : seq.objs) {
-            _deletes.push_back(new BatchedDeleteDocument());  // _deletes takes ownership.
-            std::string errMsg;
-            uassert(ErrorCodes::FailedToParse,
-                    errMsg,
-                    _deletes.back()->parseBSON(obj, &errMsg) && _deletes.back()->isValid(&errMsg));
-        }
-    }
+    _isDeletesSet = true;
 }
 
 void BatchedDeleteRequest::clear() {
@@ -153,9 +111,6 @@ void BatchedDeleteRequest::clear() {
     _isNSSet = false;
 
     unsetDeletes();
-
-    _ordered = false;
-    _isOrderedSet = false;
 }
 
 std::string BatchedDeleteRequest::toString() const {
@@ -199,27 +154,6 @@ const BatchedDeleteDocument* BatchedDeleteRequest::getDeletesAt(size_t pos) cons
     dassert(_isDeletesSet);
     dassert(_deletes.size() > pos);
     return _deletes.at(pos);
-}
-
-void BatchedDeleteRequest::setOrdered(bool ordered) {
-    _ordered = ordered;
-    _isOrderedSet = true;
-}
-
-void BatchedDeleteRequest::unsetOrdered() {
-    _isOrderedSet = false;
-}
-
-bool BatchedDeleteRequest::isOrderedSet() const {
-    return _isOrderedSet;
-}
-
-bool BatchedDeleteRequest::getOrdered() const {
-    if (_isOrderedSet) {
-        return _ordered;
-    } else {
-        return ordered.getDefault();
-    }
 }
 
 }  // namespace mongo

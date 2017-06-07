@@ -28,27 +28,23 @@
 
 #pragma once
 
-#include "mongo/db/ops/write_ops.h"
-#include "mongo/util/net/message.h"
-#include "mongo/util/net/op_msg.h"
+#include "mongo/base/string_data.h"
+#include "mongo/bson/bsonelement.h"
+#include "mongo/bson/bsonobjbuilder.h"
 
 namespace mongo {
+namespace write_ops {
 
 /**
- * This file contains functions to parse write operations from the user-facing wire format using
- * either write commands or the legacy OP_INSERT/OP_UPDATE/OP_DELETE wire operations. Parse errors
- * are reported by uasserting.
- *
- * These only parse and validate the operation structure. No attempt is made to parse or validate
- * the objects to insert, or update and query operators.
+ * Parses the 'limit' property of a delete entry, which has inverted meaning from the 'multi'
+ * property of an update.
  */
+bool readMultiDeleteProperty(const BSONElement& limitElement);
 
-InsertOp parseInsertCommand(const OpMsgRequest& request);
-UpdateOp parseUpdateCommand(const OpMsgRequest& request);
-DeleteOp parseDeleteCommand(const OpMsgRequest& request);
+/**
+ * Writes the 'isMulti' value as a limit property.
+ */
+void writeMultiDeleteProperty(bool isMulti, StringData fieldName, BSONObjBuilder* builder);
 
-InsertOp parseLegacyInsert(const Message& msg);
-UpdateOp parseLegacyUpdate(const Message& msg);
-DeleteOp parseLegacyDelete(const Message& msg);
-
+}  // namespace write_ops
 }  // namespace mongo

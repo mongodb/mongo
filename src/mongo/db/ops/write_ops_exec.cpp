@@ -191,7 +191,8 @@ void makeCollection(OperationContext* opCtx, const NamespaceString& ns) {
  */
 bool handleError(OperationContext* opCtx,
                  const DBException& ex,
-                 const ParsedWriteOp& wholeOp,
+                 const NamespaceString& nss,
+                 const write_ops::WriteCommandBase& wholeOp,
                  WriteResult* out) {
     LastError::get(opCtx->getClient()).setLastError(ex.getCode(), ex.getInfo().msg);
     auto& curOp = *CurOp::get(opCtx);
@@ -218,7 +219,7 @@ bool handleError(OperationContext* opCtx,
 
         if (!opCtx->getClient()->isInDirectClient()) {
             ShardingState::get(opCtx)
-                ->onStaleShardVersion(opCtx, wholeOp.ns, staleConfigException->getVersionReceived())
+                ->onStaleShardVersion(opCtx, nss, staleConfigException->getVersionReceived())
                 .transitional_ignore();
         }
         out->staleConfigException =
@@ -227,14 +228,13 @@ bool handleError(OperationContext* opCtx,
     }
 
     out->results.emplace_back(ex.toStatus());
-    return wholeOp.continueOnError;
+
+    return !wholeOp.getOrdered();
 }
 
-}  // namespace
-
-static SingleWriteResult createIndex(OperationContext* opCtx,
-                                     const NamespaceString& systemIndexes,
-                                     const BSONObj& spec) {
+SingleWriteResult createIndex(OperationContext* opCtx,
+                              const NamespaceString& systemIndexes,
+                              const BSONObj& spec) {
     BSONElement nsElement = spec["ns"];
     uassert(ErrorCodes::NoSuchKey, "Missing \"ns\" field in index description", !nsElement.eoo());
     uassert(ErrorCodes::TypeMismatch,
@@ -272,7 +272,7 @@ static SingleWriteResult createIndex(OperationContext* opCtx,
     return result;
 }
 
-static WriteResult performCreateIndexes(OperationContext* opCtx, const InsertOp& wholeOp) {
+WriteResult performCreateIndexes(OperationContext* opCtx, const InsertOp& wholeOp) {
     // Currently this creates each index independently. We could pass multiple indexes to
     // createIndexes, but there is a lot of complexity involved in doing it correctly. For one
     // thing, createIndexes only takes indexes to a single collection, but this batch could include
@@ -281,15 +281,16 @@ static WriteResult performCreateIndexes(OperationContext* opCtx, const InsertOp&
     // errors or stops at the first one. These could theoretically be worked around, but it doesn't
     // seem worth it since users that want faster index builds should just use the createIndexes
     // command rather than a legacy emulation.
-    LastOpFixer lastOpFixer(opCtx, wholeOp.ns);
+    LastOpFixer lastOpFixer(opCtx, wholeOp.getNamespace());
     WriteResult out;
-    for (auto&& spec : wholeOp.documents) {
+    for (auto&& spec : wholeOp.getDocuments()) {
         try {
             lastOpFixer.startingOp();
-            out.results.emplace_back(createIndex(opCtx, wholeOp.ns, spec));
+            out.results.emplace_back(createIndex(opCtx, wholeOp.getNamespace(), spec));
             lastOpFixer.finishedOpSuccessfully();
         } catch (const DBException& ex) {
-            const bool canContinue = handleError(opCtx, ex, wholeOp, &out);
+            const bool canContinue =
+                handleError(opCtx, ex, wholeOp.getNamespace(), wholeOp.getWriteCommandBase(), &out);
             if (!canContinue)
                 break;
         }
@@ -297,10 +298,10 @@ static WriteResult performCreateIndexes(OperationContext* opCtx, const InsertOp&
     return out;
 }
 
-static void insertDocuments(OperationContext* opCtx,
-                            Collection* collection,
-                            std::vector<BSONObj>::const_iterator begin,
-                            std::vector<BSONObj>::const_iterator end) {
+void insertDocuments(OperationContext* opCtx,
+                     Collection* collection,
+                     std::vector<BSONObj>::const_iterator begin,
+                     std::vector<BSONObj>::const_iterator end) {
     // Intentionally not using a WRITE_CONFLICT_RETRY_LOOP. That is handled by the caller so it can
     // react to oversized batches.
     WriteUnitOfWork wuow(opCtx);
@@ -312,11 +313,11 @@ static void insertDocuments(OperationContext* opCtx,
 /**
  * Returns true if caller should try to insert more documents. Does nothing else if batch is empty.
  */
-static bool insertBatchAndHandleErrors(OperationContext* opCtx,
-                                       const InsertOp& wholeOp,
-                                       const std::vector<BSONObj>& batch,
-                                       LastOpFixer* lastOpFixer,
-                                       WriteResult* out) {
+bool insertBatchAndHandleErrors(OperationContext* opCtx,
+                                const InsertOp& wholeOp,
+                                const std::vector<BSONObj>& batch,
+                                LastOpFixer* lastOpFixer,
+                                WriteResult* out) {
     if (batch.empty())
         return true;
 
@@ -331,16 +332,16 @@ static bool insertBatchAndHandleErrors(OperationContext* opCtx,
                 uasserted(ErrorCodes::InternalError, "failAllInserts failpoint active!");
             }
 
-            collection.emplace(opCtx, wholeOp.ns, MODE_IX);
+            collection.emplace(opCtx, wholeOp.getNamespace(), MODE_IX);
             if (collection->getCollection())
                 break;
 
             collection.reset();  // unlock.
-            makeCollection(opCtx, wholeOp.ns);
+            makeCollection(opCtx, wholeOp.getNamespace());
         }
 
         curOp.raiseDbProfileLevel(collection->getDb()->getProfilingLevel());
-        assertCanWrite_inlock(opCtx, wholeOp.ns);
+        assertCanWrite_inlock(opCtx, wholeOp.getNamespace());
     };
 
     try {
@@ -371,7 +372,7 @@ static bool insertBatchAndHandleErrors(OperationContext* opCtx,
     for (auto it = batch.begin(); it != batch.end(); ++it) {
         globalOpCounters.gotInsert();
         try {
-            writeConflictRetry(opCtx, "insert", wholeOp.ns.ns(), [&] {
+            writeConflictRetry(opCtx, "insert", wholeOp.getNamespace().ns(), [&] {
                 try {
                     if (!collection)
                         acquireCollection();
@@ -390,7 +391,8 @@ static bool insertBatchAndHandleErrors(OperationContext* opCtx,
                 }
             });
         } catch (const DBException& ex) {
-            bool canContinue = handleError(opCtx, ex, wholeOp, out);
+            bool canContinue =
+                handleError(opCtx, ex, wholeOp.getNamespace(), wholeOp.getWriteCommandBase(), out);
             if (!canContinue)
                 return false;
         }
@@ -398,6 +400,8 @@ static bool insertBatchAndHandleErrors(OperationContext* opCtx,
 
     return true;
 }
+
+}  // namespace
 
 WriteResult performInserts(OperationContext* opCtx, const InsertOp& wholeOp) {
     invariant(!opCtx->lockState()->inAWriteUnitOfWork());  // Does own retries.
@@ -408,7 +412,7 @@ WriteResult performInserts(OperationContext* opCtx, const InsertOp& wholeOp) {
         curOp.done();
         Top::get(opCtx->getServiceContext())
             .record(opCtx,
-                    wholeOp.ns.ns(),
+                    wholeOp.getNamespace().ns(),
                     LogicalOp::opInsert,
                     Top::LockType::WriteLocked,
                     durationCount<Microseconds>(curOp.elapsedTimeExcludingPauses()),
@@ -419,31 +423,32 @@ WriteResult performInserts(OperationContext* opCtx, const InsertOp& wholeOp) {
 
     {
         stdx::lock_guard<Client> lk(*opCtx->getClient());
-        curOp.setNS_inlock(wholeOp.ns.ns());
+        curOp.setNS_inlock(wholeOp.getNamespace().ns());
         curOp.setLogicalOp_inlock(LogicalOp::opInsert);
         curOp.ensureStarted();
         curOp.debug().ninserted = 0;
     }
 
-    uassertStatusOK(userAllowedWriteNS(wholeOp.ns));
+    uassertStatusOK(userAllowedWriteNS(wholeOp.getNamespace()));
 
-    if (wholeOp.ns.isSystemDotIndexes()) {
+    if (wholeOp.getNamespace().isSystemDotIndexes()) {
         return performCreateIndexes(opCtx, wholeOp);
     }
 
-    DisableDocumentValidationIfTrue docValidationDisabler(opCtx, wholeOp.bypassDocumentValidation);
-    LastOpFixer lastOpFixer(opCtx, wholeOp.ns);
+    DisableDocumentValidationIfTrue docValidationDisabler(
+        opCtx, wholeOp.getWriteCommandBase().getBypassDocumentValidation());
+    LastOpFixer lastOpFixer(opCtx, wholeOp.getNamespace());
 
     WriteResult out;
-    out.results.reserve(wholeOp.documents.size());
+    out.results.reserve(wholeOp.getDocuments().size());
 
     size_t bytesInBatch = 0;
     std::vector<BSONObj> batch;
     const size_t maxBatchSize = internalInsertMaxBatchSize.load();
-    batch.reserve(std::min(wholeOp.documents.size(), maxBatchSize));
+    batch.reserve(std::min(wholeOp.getDocuments().size(), maxBatchSize));
 
-    for (auto&& doc : wholeOp.documents) {
-        const bool isLastDoc = (&doc == &wholeOp.documents.back());
+    for (auto&& doc : wholeOp.getDocuments()) {
+        const bool isLastDoc = (&doc == &wholeOp.getDocuments().back());
         auto fixedDoc = fixDocumentForInsert(opCtx->getServiceContext(), doc);
         if (!fixedDoc.isOK()) {
             // Handled after we insert anything in the batch to be sure we report errors in the
@@ -465,7 +470,8 @@ WriteResult performInserts(OperationContext* opCtx, const InsertOp& wholeOp) {
             canContinue = handleError(
                 opCtx,
                 UserException(fixedDoc.getStatus().code(), fixedDoc.getStatus().reason()),
-                wholeOp,
+                wholeOp.getNamespace(),
+                wholeOp.getWriteCommandBase(),
                 &out);
         }
 
@@ -478,7 +484,7 @@ WriteResult performInserts(OperationContext* opCtx, const InsertOp& wholeOp) {
 
 static SingleWriteResult performSingleUpdateOp(OperationContext* opCtx,
                                                const NamespaceString& ns,
-                                               const UpdateOp::SingleUpdate& op) {
+                                               const write_ops::UpdateOpEntry& op) {
     globalOpCounters.gotUpdate();
     auto& curOp = *CurOp::get(opCtx);
     {
@@ -493,12 +499,12 @@ static SingleWriteResult performSingleUpdateOp(OperationContext* opCtx,
     UpdateLifecycleImpl updateLifecycle(ns);
     UpdateRequest request(ns);
     request.setLifecycle(&updateLifecycle);
-    request.setQuery(op.query);
-    request.setCollation(op.collation);
-    request.setUpdates(op.update);
-    request.setArrayFilters(op.arrayFilters);
-    request.setMulti(op.multi);
-    request.setUpsert(op.upsert);
+    request.setQuery(op.getQ());
+    request.setUpdates(op.getU());
+    request.setCollation(write_ops::collationOf(op));
+    request.setArrayFilters(write_ops::arrayFiltersOf(op));
+    request.setMulti(op.getMulti());
+    request.setUpsert(op.getUpsert());
     request.setYieldPolicy(PlanExecutor::YIELD_AUTO);  // ParsedUpdate overrides this for $isolated.
 
     ParsedUpdate parsedUpdate(opCtx, &request);
@@ -515,7 +521,7 @@ static SingleWriteResult performSingleUpdateOp(OperationContext* opCtx,
                            ns,
                            MODE_IX,  // DB is always IX, even if collection is X.
                            parsedUpdate.isIsolated() ? MODE_X : MODE_IX);
-        if (collection->getCollection() || !op.upsert)
+        if (collection->getCollection() || !op.getUpsert())
             break;
 
         collection.reset();  // unlock.
@@ -569,14 +575,15 @@ static SingleWriteResult performSingleUpdateOp(OperationContext* opCtx,
 
 WriteResult performUpdates(OperationContext* opCtx, const UpdateOp& wholeOp) {
     invariant(!opCtx->lockState()->inAWriteUnitOfWork());  // Does own retries.
-    uassertStatusOK(userAllowedWriteNS(wholeOp.ns));
+    uassertStatusOK(userAllowedWriteNS(wholeOp.getNamespace()));
 
-    DisableDocumentValidationIfTrue docValidationDisabler(opCtx, wholeOp.bypassDocumentValidation);
-    LastOpFixer lastOpFixer(opCtx, wholeOp.ns);
+    DisableDocumentValidationIfTrue docValidationDisabler(
+        opCtx, wholeOp.getWriteCommandBase().getBypassDocumentValidation());
+    LastOpFixer lastOpFixer(opCtx, wholeOp.getNamespace());
 
     WriteResult out;
-    out.results.reserve(wholeOp.updates.size());
-    for (auto&& singleOp : wholeOp.updates) {
+    out.results.reserve(wholeOp.getUpdates().size());
+    for (auto&& singleOp : wholeOp.getUpdates()) {
         // TODO: don't create nested CurOp for legacy writes.
         // Add Command pointer to the nested CurOp.
         auto& parentCurOp = *CurOp::get(opCtx);
@@ -589,10 +596,12 @@ WriteResult performUpdates(OperationContext* opCtx, const UpdateOp& wholeOp) {
         ON_BLOCK_EXIT([&] { finishCurOp(opCtx, &curOp); });
         try {
             lastOpFixer.startingOp();
-            out.results.emplace_back(performSingleUpdateOp(opCtx, wholeOp.ns, singleOp));
+            out.results.emplace_back(
+                performSingleUpdateOp(opCtx, wholeOp.getNamespace(), singleOp));
             lastOpFixer.finishedOpSuccessfully();
         } catch (const DBException& ex) {
-            const bool canContinue = handleError(opCtx, ex, wholeOp, &out);
+            const bool canContinue =
+                handleError(opCtx, ex, wholeOp.getNamespace(), wholeOp.getWriteCommandBase(), &out);
             if (!canContinue)
                 break;
         }
@@ -603,7 +612,7 @@ WriteResult performUpdates(OperationContext* opCtx, const UpdateOp& wholeOp) {
 
 static SingleWriteResult performSingleDeleteOp(OperationContext* opCtx,
                                                const NamespaceString& ns,
-                                               const DeleteOp::SingleDelete& op) {
+                                               const write_ops::DeleteOpEntry& op) {
     globalOpCounters.gotDelete();
     auto& curOp = *CurOp::get(opCtx);
     {
@@ -618,9 +627,9 @@ static SingleWriteResult performSingleDeleteOp(OperationContext* opCtx,
     curOp.debug().ndeleted = 0;
 
     DeleteRequest request(ns);
-    request.setQuery(op.query);
-    request.setCollation(op.collation);
-    request.setMulti(op.multi);
+    request.setQuery(op.getQ());
+    request.setCollation(write_ops::collationOf(op));
+    request.setMulti(op.getMulti());
     request.setYieldPolicy(PlanExecutor::YIELD_AUTO);  // ParsedDelete overrides this for $isolated.
 
     ParsedDelete parsedDelete(opCtx, &request);
@@ -676,14 +685,15 @@ static SingleWriteResult performSingleDeleteOp(OperationContext* opCtx,
 
 WriteResult performDeletes(OperationContext* opCtx, const DeleteOp& wholeOp) {
     invariant(!opCtx->lockState()->inAWriteUnitOfWork());  // Does own retries.
-    uassertStatusOK(userAllowedWriteNS(wholeOp.ns));
+    uassertStatusOK(userAllowedWriteNS(wholeOp.getNamespace()));
 
-    DisableDocumentValidationIfTrue docValidationDisabler(opCtx, wholeOp.bypassDocumentValidation);
-    LastOpFixer lastOpFixer(opCtx, wholeOp.ns);
+    DisableDocumentValidationIfTrue docValidationDisabler(
+        opCtx, wholeOp.getWriteCommandBase().getBypassDocumentValidation());
+    LastOpFixer lastOpFixer(opCtx, wholeOp.getNamespace());
 
     WriteResult out;
-    out.results.reserve(wholeOp.deletes.size());
-    for (auto&& singleOp : wholeOp.deletes) {
+    out.results.reserve(wholeOp.getDeletes().size());
+    for (auto&& singleOp : wholeOp.getDeletes()) {
         // TODO: don't create nested CurOp for legacy writes.
         // Add Command pointer to the nested CurOp.
         auto& parentCurOp = *CurOp::get(opCtx);
@@ -696,10 +706,12 @@ WriteResult performDeletes(OperationContext* opCtx, const DeleteOp& wholeOp) {
         ON_BLOCK_EXIT([&] { finishCurOp(opCtx, &curOp); });
         try {
             lastOpFixer.startingOp();
-            out.results.emplace_back(performSingleDeleteOp(opCtx, wholeOp.ns, singleOp));
+            out.results.emplace_back(
+                performSingleDeleteOp(opCtx, wholeOp.getNamespace(), singleOp));
             lastOpFixer.finishedOpSuccessfully();
         } catch (const DBException& ex) {
-            const bool canContinue = handleError(opCtx, ex, wholeOp, &out);
+            const bool canContinue =
+                handleError(opCtx, ex, wholeOp.getNamespace(), wholeOp.getWriteCommandBase(), &out);
             if (!canContinue)
                 break;
         }

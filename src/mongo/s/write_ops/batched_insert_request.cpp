@@ -26,23 +26,25 @@
  *    then also delete it in the license file.
  */
 
+#include "mongo/platform/basic.h"
+
 #include "mongo/s/write_ops/batched_insert_request.h"
 
-#include "mongo/db/catalog/document_validation.h"
-#include "mongo/db/commands.h"
-#include "mongo/db/field_parser.h"
+#include "mongo/db/ops/write_ops.h"
 #include "mongo/util/mongoutils/str.h"
 
 namespace mongo {
+namespace {
 
-using std::string;
+void extractIndexNSS(const BSONObj& indexDesc, NamespaceString* indexNSS) {
+    *indexNSS = NamespaceString(indexDesc["ns"].str());
+}
 
-using mongoutils::str::stream;
+}  // namespace
 
-const std::string BatchedInsertRequest::BATCHED_INSERT_REQUEST = "insert";
+
 const BSONField<std::string> BatchedInsertRequest::collName("insert");
 const BSONField<std::vector<BSONObj>> BatchedInsertRequest::documents("documents");
-const BSONField<bool> BatchedInsertRequest::ordered("ordered", true);
 
 BatchedInsertRequest::BatchedInsertRequest() {
     clear();
@@ -56,12 +58,12 @@ bool BatchedInsertRequest::isValid(std::string* errMsg) const {
 
     // All the mandatory fields must be present.
     if (!_isNSSet) {
-        *errMsg = stream() << "missing " << collName.name() << " field";
+        *errMsg = str::stream() << "missing " << collName.name() << " field";
         return false;
     }
 
     if (!_isDocumentsSet) {
-        *errMsg = stream() << "missing " << documents.name() << " field";
+        *errMsg = str::stream() << "missing " << documents.name() << " field";
         return false;
     }
 
@@ -83,68 +85,26 @@ BSONObj BatchedInsertRequest::toBSON() const {
         documentsBuilder.done();
     }
 
-    if (_isOrderedSet)
-        builder.append(ordered(), _ordered);
-
-    if (_shouldBypassValidation)
-        builder.append(bypassDocumentValidationCommandOption(), true);
-
     return builder.obj();
-}
-
-static void extractIndexNSS(const BSONObj& indexDesc, NamespaceString* indexNSS) {
-    *indexNSS = NamespaceString(indexDesc["ns"].str());
 }
 
 void BatchedInsertRequest::parseRequest(const OpMsgRequest& request) {
     clear();
 
-    for (auto&& sourceEl : request.body) {
-        const auto fieldName = sourceEl.fieldNameStringData();
+    auto insertOp = InsertOp::parse(request);
 
-        auto extractField = [&](const auto& field, auto* valOut, auto* isSetOut) {
-            std::string errMsg;
-            FieldParser::FieldState fieldState =
-                FieldParser::extract(sourceEl, field, valOut, &errMsg);
-            if (fieldState == FieldParser::FIELD_INVALID) {
-                uasserted(ErrorCodes::FailedToParse, errMsg);
-            }
-            *isSetOut = fieldState == FieldParser::FIELD_SET;
-        };
+    _ns = std::move(insertOp.getNamespace());
+    _isNSSet = true;
 
-        if (fieldName == collName()) {
-            std::string temp;
-            extractField(collName, &temp, &_isNSSet);
-            _ns = NamespaceString(request.getDatabase(), temp);
-            uassert(ErrorCodes::InvalidNamespace,
-                    str::stream() << "Invalid namespace: " << _ns.ns(),
-                    _ns.isValid());
-        } else if (fieldName == documents()) {
-            extractField(documents, &_documents, &_isDocumentsSet);
-            if (_documents.size() >= 1)
-                extractIndexNSS(_documents.at(0), &_targetNSS);
-        } else if (fieldName == ordered()) {
-            extractField(ordered, &_ordered, &_isOrderedSet);
-        } else if (fieldName == bypassDocumentValidationCommandOption()) {
-            _shouldBypassValidation = sourceEl.trueValue();
-        } else if (!Command::isGenericArgument(fieldName)) {
-            uasserted(ErrorCodes::FailedToParse,
-                      str::stream() << "Unknown option to insert command: " << fieldName);
-        }
+    for (auto&& documentEntry : insertOp.getDocuments()) {
+        _documents.push_back(documentEntry.getOwned());
     }
 
-    for (auto&& seq : request.sequences) {
-        uassert(ErrorCodes::FailedToParse,
-                str::stream() << "Unknown document sequence option to " << request.getCommandName()
-                              << " command: "
-                              << seq.name,
-                seq.name == documents());
-        uassert(ErrorCodes::FailedToParse,
-                str::stream() << "Duplicate document sequence " << documents(),
-                !_isDocumentsSet);
-        _isDocumentsSet = true;
-        _documents = seq.objs;
+    if (_documents.size() >= 1) {
+        extractIndexNSS(_documents.at(0), &_targetNSS);
     }
+
+    _isDocumentsSet = true;
 }
 
 void BatchedInsertRequest::clear() {
@@ -154,11 +114,6 @@ void BatchedInsertRequest::clear() {
 
     _documents.clear();
     _isDocumentsSet = false;
-
-    _ordered = false;
-    _isOrderedSet = false;
-
-    _shouldBypassValidation = false;
 }
 
 void BatchedInsertRequest::cloneTo(BatchedInsertRequest* other) const {
@@ -173,11 +128,6 @@ void BatchedInsertRequest::cloneTo(BatchedInsertRequest* other) const {
         other->addToDocuments(*it);
     }
     other->_isDocumentsSet = _isDocumentsSet;
-
-    other->_ordered = _ordered;
-    other->_isOrderedSet = _isOrderedSet;
-
-    other->_shouldBypassValidation = _shouldBypassValidation;
 }
 
 std::string BatchedInsertRequest::toString() const {
@@ -202,8 +152,9 @@ void BatchedInsertRequest::addToDocuments(const BSONObj& documents) {
     _documents.push_back(documents);
     _isDocumentsSet = true;
 
-    if (_documents.size() == 1)
+    if (_documents.size() == 1) {
         extractIndexNSS(_documents.at(0), &_targetNSS);
+    }
 }
 
 size_t BatchedInsertRequest::sizeDocuments() const {
@@ -227,24 +178,4 @@ void BatchedInsertRequest::setDocumentAt(size_t pos, const BSONObj& doc) {
     _documents[pos] = doc;
 }
 
-void BatchedInsertRequest::setOrdered(bool ordered) {
-    _ordered = ordered;
-    _isOrderedSet = true;
-}
-
-void BatchedInsertRequest::unsetOrdered() {
-    _isOrderedSet = false;
-}
-
-bool BatchedInsertRequest::isOrderedSet() const {
-    return _isOrderedSet;
-}
-
-bool BatchedInsertRequest::getOrdered() const {
-    if (_isOrderedSet) {
-        return _ordered;
-    } else {
-        return ordered.getDefault();
-    }
-}
 }  // namespace mongo

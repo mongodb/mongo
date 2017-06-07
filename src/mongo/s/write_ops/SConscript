@@ -16,11 +16,11 @@ env.Library(
         'batched_update_request.cpp',
         'batched_upsert_detail.cpp',
         'write_error_detail.cpp',
-        env.Idlc('write_ops.idl')[0],
     ],
     LIBDEPS=[
         '$BUILD_DIR/mongo/base',
         '$BUILD_DIR/mongo/db/common',
+        '$BUILD_DIR/mongo/db/ops/write_ops_parsers',
         '$BUILD_DIR/mongo/db/repl/optime',
         '$BUILD_DIR/mongo/s/common',
     ],

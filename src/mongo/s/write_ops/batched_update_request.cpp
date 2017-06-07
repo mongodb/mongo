@@ -26,24 +26,17 @@
  *    then also delete it in the license file.
  */
 
+#include "mongo/platform/basic.h"
+
 #include "mongo/s/write_ops/batched_update_request.h"
 
-#include "mongo/db/catalog/document_validation.h"
-#include "mongo/db/commands.h"
-#include "mongo/db/field_parser.h"
+#include "mongo/db/ops/write_ops.h"
 #include "mongo/util/mongoutils/str.h"
 
 namespace mongo {
 
-using std::unique_ptr;
-using std::string;
-
-using mongoutils::str::stream;
-
-const std::string BatchedUpdateRequest::BATCHED_UPDATE_REQUEST = "update";
 const BSONField<std::string> BatchedUpdateRequest::collName("update");
 const BSONField<std::vector<BatchedUpdateDocument*>> BatchedUpdateRequest::updates("updates");
-const BSONField<bool> BatchedUpdateRequest::ordered("ordered", true);
 
 BatchedUpdateRequest::BatchedUpdateRequest() {
     clear();
@@ -61,12 +54,12 @@ bool BatchedUpdateRequest::isValid(std::string* errMsg) const {
 
     // All the mandatory fields must be present.
     if (!_isNSSet) {
-        *errMsg = stream() << "missing " << collName.name() << " field";
+        *errMsg = str::stream() << "missing " << collName.name() << " field";
         return false;
     }
 
     if (!_isUpdatesSet) {
-        *errMsg = stream() << "missing " << updates.name() << " field";
+        *errMsg = str::stream() << "missing " << updates.name() << " field";
         return false;
     }
 
@@ -90,68 +83,27 @@ BSONObj BatchedUpdateRequest::toBSON() const {
         updatesBuilder.done();
     }
 
-    if (_isOrderedSet)
-        builder.append(ordered(), _ordered);
-
-    if (_shouldBypassValidation)
-        builder.append(bypassDocumentValidationCommandOption(), true);
-
     return builder.obj();
 }
 
 void BatchedUpdateRequest::parseRequest(const OpMsgRequest& request) {
     clear();
 
-    for (auto&& elem : request.body) {
-        auto extractField = [&](const auto& fieldDesc, auto* valOut, auto* isSetOut) {
-            std::string errMsg;
-            FieldParser::FieldState fieldState =
-                FieldParser::extract(elem, fieldDesc, valOut, &errMsg);
-            if (fieldState == FieldParser::FIELD_INVALID) {
-                uasserted(ErrorCodes::FailedToParse, errMsg);
-            }
-            *isSetOut = fieldState == FieldParser::FIELD_SET;
-        };
+    auto updateOp = UpdateOp::parse(request);
 
-        const StringData fieldName = elem.fieldNameStringData();
-        if (fieldName == collName.name()) {
-            std::string collNameTemp;
-            extractField(collName, &collNameTemp, &_isNSSet);
-            _ns = NamespaceString(request.getDatabase(), collNameTemp);
-            uassert(ErrorCodes::InvalidNamespace,
-                    str::stream() << "Invalid namespace: " << _ns.ns(),
-                    _ns.isValid());
-        } else if (fieldName == updates.name()) {
-            extractField(updates, &_updates, &_isUpdatesSet);
-        } else if (fieldName == ordered.name()) {
-            extractField(ordered, &_ordered, &_isOrderedSet);
-        } else if (fieldName == bypassDocumentValidationCommandOption()) {
-            _shouldBypassValidation = elem.trueValue();
-        } else if (!Command::isGenericArgument(fieldName)) {
-            uasserted(ErrorCodes::FailedToParse,
-                      str::stream() << "Unknown option to update command: " << fieldName);
-        }
+    _ns = std::move(updateOp.getNamespace());
+    _isNSSet = true;
+
+    for (auto&& updateEntry : updateOp.getUpdates()) {
+        _updates.push_back(new BatchedUpdateDocument());
+        std::string errMsg;
+        uassert(ErrorCodes::FailedToParse,
+                errMsg,
+                _updates.back()->parseBSON(updateEntry.toBSON(), &errMsg) &&
+                    _updates.back()->isValid(&errMsg));
     }
 
-    for (auto&& seq : request.sequences) {
-        uassert(ErrorCodes::FailedToParse,
-                str::stream() << "Unknown document sequence option to " << request.getCommandName()
-                              << " command: "
-                              << seq.name,
-                seq.name == updates());
-        uassert(ErrorCodes::FailedToParse,
-                str::stream() << "Duplicate document sequence " << updates(),
-                !_isUpdatesSet);
-        _isUpdatesSet = true;
-
-        for (auto&& obj : seq.objs) {
-            _updates.push_back(new BatchedUpdateDocument());  // _updates takes ownership.
-            std::string errMsg;
-            uassert(ErrorCodes::FailedToParse,
-                    errMsg,
-                    _updates.back()->parseBSON(obj, &errMsg) && _updates.back()->isValid(&errMsg));
-        }
-    }
+    _isUpdatesSet = true;
 }
 
 void BatchedUpdateRequest::clear() {
@@ -159,11 +111,6 @@ void BatchedUpdateRequest::clear() {
     _isNSSet = false;
 
     unsetUpdates();
-
-    _ordered = false;
-    _isOrderedSet = false;
-
-    _shouldBypassValidation = false;
 }
 
 std::string BatchedUpdateRequest::toString() const {
@@ -209,24 +156,4 @@ const BatchedUpdateDocument* BatchedUpdateRequest::getUpdatesAt(size_t pos) cons
     return _updates.at(pos);
 }
 
-void BatchedUpdateRequest::setOrdered(bool ordered) {
-    _ordered = ordered;
-    _isOrderedSet = true;
-}
-
-void BatchedUpdateRequest::unsetOrdered() {
-    _isOrderedSet = false;
-}
-
-bool BatchedUpdateRequest::isOrderedSet() const {
-    return _isOrderedSet;
-}
-
-bool BatchedUpdateRequest::getOrdered() const {
-    if (_isOrderedSet) {
-        return _ordered;
-    } else {
-        return ordered.getDefault();
-    }
-}
 }  // namespace mongo

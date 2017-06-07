@@ -103,11 +103,6 @@ public:
         invariant(request.getDatabase() == dbname);  // Ensured by explain command's run() method.
         batchedRequest.parseRequest(request);
 
-        std::string errMsg;
-        if (!batchedRequest.isValid(&errMsg)) {
-            return Status(ErrorCodes::FailedToParse, errMsg);
-        }
-
         // We can only explain write batches of size 1.
         if (batchedRequest.sizeWriteOps() != 1U) {
             return Status(ErrorCodes::InvalidLength, "explained write batches must be of size 1");
@@ -136,31 +131,22 @@ public:
                      string& errmsg,
                      BSONObjBuilder& result) final {
         BatchedCommandRequest batchedRequest(_writeType);
-        BatchedCommandResponse response;
+        batchedRequest.parseRequest(request);
+
+        auto& lastError = LastError::get(opCtx->getClient());
 
         ClusterWriter writer(true, 0);
-
-        LastError* cmdLastError = &LastError::get(cc());
+        BatchedCommandResponse response;
 
         {
             // Disable the last error object for the duration of the write
-            LastError::Disabled disableLastError(cmdLastError);
-            batchedRequest.parseRequest(request);
-            if (!batchedRequest.isValid(&errmsg)) {
-                // Batch parse failure
-                response.setOk(false);
-                response.setErrCode(ErrorCodes::FailedToParse);
-                response.setErrMessage(errmsg);
-            } else {
-                writer.write(opCtx, batchedRequest, &response);
-            }
-
-            dassert(response.isValid(NULL));
+            LastError::Disabled disableLastError(&lastError);
+            writer.write(opCtx, batchedRequest, &response);
         }
 
         // Populate the lastError object based on the write response
-        cmdLastError->reset();
-        batchErrorToLastError(batchedRequest, response, cmdLastError);
+        lastError.reset();
+        batchErrorToLastError(batchedRequest, response, &lastError);
 
         size_t numAttempts;
 
