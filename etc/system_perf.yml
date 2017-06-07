@@ -835,7 +835,7 @@ modules:
 - name: YCSB
   repo: git@github.com:mongodb-labs/YCSB.git
   prefix: YCSB
-  branch: evergreen
+  revision: 57427818119075d4ed8da64fffd68e9303c9a7eb
 
 
 
