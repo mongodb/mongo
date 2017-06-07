@@ -386,7 +386,7 @@ __wt_reconcile(WT_SESSION_IMPL *session, WT_REF *ref,
 	 *    In-memory splits: reconciliation of an internal page cannot handle
 	 * a child page splitting during the reconciliation.
 	 */
-	__wt_writelock(session, &page->page_lock);
+	WT_PAGE_LOCK(session, page);
 
 	oldest_id = __wt_txn_oldest_id(session);
 	if (LF_ISSET(WT_EVICTING))
@@ -405,7 +405,7 @@ __wt_reconcile(WT_SESSION_IMPL *session, WT_REF *ref,
 	/* Initialize the reconciliation structure for each new run. */
 	if ((ret = __rec_write_init(
 	    session, ref, flags, salvage, &session->reconcile)) != 0) {
-		__wt_writeunlock(session, &page->page_lock);
+		WT_PAGE_UNLOCK(session, page);
 		return (ret);
 	}
 	r = session->reconcile;
@@ -446,7 +446,7 @@ __wt_reconcile(WT_SESSION_IMPL *session, WT_REF *ref,
 		WT_TRET(__rec_write_wrapup_err(session, r, page));
 
 	/* Release the reconciliation lock. */
-	__wt_writeunlock(session, &page->page_lock);
+	WT_PAGE_UNLOCK(session, page);
 
 	/*
 	 * If our caller can configure lookaside table reconciliation, flag if

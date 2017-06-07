@@ -97,6 +97,10 @@ struct __wt_session_impl {
 	 */
 	TAILQ_HEAD(__tables, __wt_table) tables;
 
+	/* Current rwlock for callback. */
+	WT_RWLOCK *current_rwlock;
+	uint8_t current_rwticket;
+
 	WT_ITEM	**scratch;		/* Temporary memory for any function */
 	u_int	  scratch_alloc;	/* Currently allocated */
 	size_t	  scratch_cached;	/* Scratch bytes cached */

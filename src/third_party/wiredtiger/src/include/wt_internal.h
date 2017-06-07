@@ -268,6 +268,8 @@ struct __wt_ref;
     typedef struct __wt_ref WT_REF;
 struct __wt_row;
     typedef struct __wt_row WT_ROW;
+struct __wt_rwlock;
+    typedef struct __wt_rwlock WT_RWLOCK;
 struct __wt_salvage_cookie;
     typedef struct __wt_salvage_cookie WT_SALVAGE_COOKIE;
 struct __wt_save_upd;
@@ -302,8 +304,6 @@ union __wt_lsn;
     typedef union __wt_lsn WT_LSN;
 union __wt_rand_state;
     typedef union __wt_rand_state WT_RAND_STATE;
-union __wt_rwlock;
-    typedef union __wt_rwlock WT_RWLOCK;
 /*
  * Forward type declarations for internal types: END
  * DO NOT EDIT: automatically built by dist/s_typedef.
