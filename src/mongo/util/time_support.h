@@ -219,6 +219,11 @@ public:
         return !(*this < other);
     }
 
+    friend std::ostream& operator<<(std::ostream& out, const Date_t& date) {
+        out << date.toString();
+        return out;
+    }
+
 private:
     constexpr explicit Date_t(long long m) : millis(m) {}
 

@@ -820,6 +820,24 @@ TEST(TimeFormatting, DurationFormatting) {
     ASSERT_EQUALS("52ms52\xce\xbcs52s", os.str());
 }
 
+TEST(TimeFormatting, WriteToStream) {
+    const std::vector<std::string> dateStrings = {
+        "1996-04-07T00:00:00.000Z",
+        "1996-05-02T00:00:00.000Z",
+        "1997-06-23T07:55:00.000Z",
+        "2015-05-14T17:28:33.123Z",
+        "2036-02-29T00:00:00.000Z",
+    };
+
+    for (const std::string& isoTimeString : dateStrings) {
+        const Date_t aDate = unittest::assertGet(dateFromISOString(isoTimeString));
+        std::ostringstream testStream;
+        testStream << aDate;
+        std::string streamOut = testStream.str();
+        ASSERT_EQUALS(aDate.toString(), streamOut);
+    }
+}
+
 TEST(SystemTime, ConvertDateToSystemTime) {
     const std::string isoTimeString = "2015-05-14T17:28:33.123Z";
     const Date_t aDate = unittest::assertGet(dateFromISOString(isoTimeString));
