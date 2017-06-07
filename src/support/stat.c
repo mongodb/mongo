@@ -774,16 +774,20 @@ static const char * const __stats_connection_desc[] = {
 	"lock: checkpoint lock acquisitions",
 	"lock: checkpoint lock application thread wait time (usecs)",
 	"lock: checkpoint lock internal thread wait time (usecs)",
-	"lock: handle-list lock eviction thread wait time (usecs)",
+	"lock: dhandle lock application thread time waiting for the dhandle lock (usecs)",
+	"lock: dhandle lock internal thread time waiting for the dhandle lock (usecs)",
+	"lock: dhandle read lock acquisitions",
+	"lock: dhandle write lock acquisitions",
 	"lock: metadata lock acquisitions",
 	"lock: metadata lock application thread wait time (usecs)",
 	"lock: metadata lock internal thread wait time (usecs)",
 	"lock: schema lock acquisitions",
 	"lock: schema lock application thread wait time (usecs)",
 	"lock: schema lock internal thread wait time (usecs)",
-	"lock: table lock acquisitions",
 	"lock: table lock application thread time waiting for the table lock (usecs)",
 	"lock: table lock internal thread time waiting for the table lock (usecs)",
+	"lock: table read lock acquisitions",
+	"lock: table write lock acquisitions",
 	"log: busy returns attempting to switch slots",
 	"log: log bytes of payload data",
 	"log: log bytes written",
@@ -1073,16 +1077,20 @@ __wt_stat_connection_clear_single(WT_CONNECTION_STATS *stats)
 	stats->lock_checkpoint_count = 0;
 	stats->lock_checkpoint_wait_application = 0;
 	stats->lock_checkpoint_wait_internal = 0;
-	stats->lock_handle_list_wait_eviction = 0;
+	stats->lock_dhandle_wait_application = 0;
+	stats->lock_dhandle_wait_internal = 0;
+	stats->lock_dhandle_read_count = 0;
+	stats->lock_dhandle_write_count = 0;
 	stats->lock_metadata_count = 0;
 	stats->lock_metadata_wait_application = 0;
 	stats->lock_metadata_wait_internal = 0;
 	stats->lock_schema_count = 0;
 	stats->lock_schema_wait_application = 0;
 	stats->lock_schema_wait_internal = 0;
-	stats->lock_table_count = 0;
 	stats->lock_table_wait_application = 0;
 	stats->lock_table_wait_internal = 0;
+	stats->lock_table_read_count = 0;
+	stats->lock_table_write_count = 0;
 	stats->log_slot_switch_busy = 0;
 	stats->log_bytes_payload = 0;
 	stats->log_bytes_written = 0;
@@ -1398,8 +1406,14 @@ __wt_stat_connection_aggregate(
 	    WT_STAT_READ(from, lock_checkpoint_wait_application);
 	to->lock_checkpoint_wait_internal +=
 	    WT_STAT_READ(from, lock_checkpoint_wait_internal);
-	to->lock_handle_list_wait_eviction +=
-	    WT_STAT_READ(from, lock_handle_list_wait_eviction);
+	to->lock_dhandle_wait_application +=
+	    WT_STAT_READ(from, lock_dhandle_wait_application);
+	to->lock_dhandle_wait_internal +=
+	    WT_STAT_READ(from, lock_dhandle_wait_internal);
+	to->lock_dhandle_read_count +=
+	    WT_STAT_READ(from, lock_dhandle_read_count);
+	to->lock_dhandle_write_count +=
+	    WT_STAT_READ(from, lock_dhandle_write_count);
 	to->lock_metadata_count += WT_STAT_READ(from, lock_metadata_count);
 	to->lock_metadata_wait_application +=
 	    WT_STAT_READ(from, lock_metadata_wait_application);
@@ -1410,11 +1424,14 @@ __wt_stat_connection_aggregate(
 	    WT_STAT_READ(from, lock_schema_wait_application);
 	to->lock_schema_wait_internal +=
 	    WT_STAT_READ(from, lock_schema_wait_internal);
-	to->lock_table_count += WT_STAT_READ(from, lock_table_count);
 	to->lock_table_wait_application +=
 	    WT_STAT_READ(from, lock_table_wait_application);
 	to->lock_table_wait_internal +=
 	    WT_STAT_READ(from, lock_table_wait_internal);
+	to->lock_table_read_count +=
+	    WT_STAT_READ(from, lock_table_read_count);
+	to->lock_table_write_count +=
+	    WT_STAT_READ(from, lock_table_write_count);
 	to->log_slot_switch_busy += WT_STAT_READ(from, log_slot_switch_busy);
 	to->log_bytes_payload += WT_STAT_READ(from, log_bytes_payload);
 	to->log_bytes_written += WT_STAT_READ(from, log_bytes_written);
