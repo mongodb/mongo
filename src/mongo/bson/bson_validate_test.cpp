@@ -186,10 +186,11 @@ TEST(BSONValidate, Fuzz) {
         }
         BSONObj fuzzed(buffer.get());
 
-        // Check that the two validation implementations agree (and neither crashes).
-        ASSERT_EQUALS(
-            fuzzed.valid(BSONVersion::kLatest),
-            validateBSON(fuzzed.objdata(), fuzzed.objsize(), BSONVersion::kLatest).isOK());
+        // There is no assert here because there is no other BSON validator oracle
+        // to compare outputs against (BSONObj::valid() is a wrapper for validateBSON()).
+        // Thus, the reason for this test is to ensure that validateBSON() doesn't trip
+        // any ASAN or UBSAN check when fed fuzzed input.
+        validateBSON(fuzzed.objdata(), fuzzed.objsize(), BSONVersion::kLatest).isOK();
     }
 }
 
