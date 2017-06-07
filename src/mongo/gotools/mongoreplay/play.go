@@ -240,7 +240,7 @@ func Play(context *ExecutionContext,
 	repeat int,
 	queueTime int) error {
 
-	sessionChans := make(map[string]chan<- *RecordedOp)
+	sessionChans := make(map[int64]chan<- *RecordedOp)
 	var playbackStartTime, recordingStartTime time.Time
 	var connectionID int64
 	var opCounter int
@@ -276,30 +276,23 @@ func Play(context *ExecutionContext,
 			time.Sleep(op.PlayAt.Add(time.Duration(-queueTime) * time.Second).Sub(time.Now()))
 		}
 
-		var connectionString string
-		if op.OpCode() == OpCodeReply || op.OpCode() == OpCodeCommandReply {
-			connectionString = op.ReversedConnectionString()
-		} else {
-			connectionString = op.ConnectionString()
-		}
-		sessionChan, ok := sessionChans[connectionString]
+		sessionChan, ok := sessionChans[op.SeenConnectionNum]
 		if !ok {
 			connectionID++
 			sessionChan = context.newExecutionSession(url, op.PlayAt.Time, connectionID)
-			sessionChans[connectionString] = sessionChan
+			sessionChans[op.SeenConnectionNum] = sessionChan
 		}
 		if op.EOF {
 			userInfoLogger.Logv(DebugLow, "EOF Seen in playback")
 			close(sessionChan)
-			delete(sessionChans, connectionString)
+			delete(sessionChans, op.SeenConnectionNum)
 		} else {
 			sessionChan <- op
-
 		}
 	}
-	for connectionString, sessionChan := range sessionChans {
+	for connectionNum, sessionChan := range sessionChans {
 		close(sessionChan)
-		delete(sessionChans, connectionString)
+		delete(sessionChans, connectionNum)
 	}
 	toolDebugLogger.Logvf(Info, "Waiting for sessions to finish")
 	context.SessionChansWaitGroup.Wait()

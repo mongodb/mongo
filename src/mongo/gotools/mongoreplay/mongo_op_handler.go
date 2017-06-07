@@ -52,6 +52,7 @@ func (stream *stream) ReassemblyComplete() {
 		panic("negative openStreamCount")
 	}
 	if count == 0 {
+		stream.bidi.handleStreamCompleted()
 		stream.bidi.close()
 	}
 }
@@ -307,6 +308,22 @@ func (bidi *bidi) handleStreamStateOutOfSync(stream *stream) {
 	stream.reassembly.Bytes = stream.reassembly.Bytes[:0]
 	return
 }
+func (bidi *bidi) handleStreamCompleted() {
+	var lastOpTimeStamp time.Time
+	if bidi.streams[0].opTimeStamp.After(bidi.streams[1].opTimeStamp) {
+		lastOpTimeStamp = bidi.streams[0].opTimeStamp
+	} else {
+		lastOpTimeStamp = bidi.streams[1].opTimeStamp
+	}
+	if !lastOpTimeStamp.IsZero() {
+		bidi.opStream.unorderedOps <- RecordedOp{
+			Seen:              &PreciseTime{lastOpTimeStamp.Add(time.Nanosecond)},
+			SeenConnectionNum: bidi.connectionNumber,
+			EOF:               true,
+		}
+	}
+	bidi.logvf(Info, "Connection %v: finishing", bidi.connectionNumber)
+}
 
 // streamOps reads tcpassembly.Reassembly[] blocks from the
 // stream's and tries to create whole protocol messages from them.
@@ -323,7 +340,7 @@ func (bidi *bidi) streamOps() {
 			reassembliesStream = 1
 		}
 		if !ok {
-			break
+			return
 		}
 		stream := bidi.streams[reassembliesStream]
 
@@ -361,5 +378,4 @@ func (bidi *bidi) streamOps() {
 		// inform the tcpassembly that we've finished with the reassemblies.
 		stream.done <- nil
 	}
-	bidi.logvf(Info, "Connection %v: finishing", bidi.connectionNumber)
 }
