@@ -389,7 +389,7 @@ public:
     void setPreciseClockSource(std::unique_ptr<ClockSource> newSource);
 
     /**
-     * Binds the service entry point implementation to the service context
+     * Binds the service entry point implementation to the service context.
      */
     void setServiceEntryPoint(std::unique_ptr<ServiceEntryPoint> sep);
 
