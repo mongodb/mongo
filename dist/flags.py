@@ -67,6 +67,7 @@ flags = {
         'VERB_FILEOPS',
         'VERB_HANDLEOPS',
         'VERB_LOG',
+        'VERB_LOOKASIDE',
         'VERB_LSM',
         'VERB_LSM_MANAGER',
         'VERB_METADATA',
