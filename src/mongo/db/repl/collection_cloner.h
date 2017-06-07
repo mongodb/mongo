@@ -109,7 +109,8 @@ public:
                      const NamespaceString& sourceNss,
                      const CollectionOptions& options,
                      const CallbackFn& onCompletion,
-                     StorageInterface* storageInterface);
+                     StorageInterface* storageInterface,
+                     const int batchSize);
 
     virtual ~CollectionCloner();
 
@@ -238,6 +239,7 @@ private:
         _scheduleDbWorkFn;         // (RT) Function for scheduling database work using the executor.
     Stats _stats;                  // (M) stats for this instance.
     ProgressMeter _progressMeter;  // (M) progress meter for this instance.
+    const int _batchSize;
 
     // State transitions:
     // PreStart --> Running --> ShuttingDown --> Complete

@@ -82,10 +82,12 @@ Milliseconds calculateAwaitDataTimeout(const ReplSetConfig& config) {
 BSONObj makeGetMoreCommandObject(const NamespaceString& nss,
                                  CursorId cursorId,
                                  OpTimeWithTerm lastCommittedWithCurrentTerm,
-                                 Milliseconds fetcherMaxTimeMS) {
+                                 Milliseconds fetcherMaxTimeMS,
+                                 int batchSize) {
     BSONObjBuilder cmdBob;
     cmdBob.append("getMore", cursorId);
     cmdBob.append("collection", nss.coll());
+    cmdBob.append("batchSize", batchSize);
     cmdBob.append("maxTimeMS", durationCount<Milliseconds>(fetcherMaxTimeMS));
     if (lastCommittedWithCurrentTerm.value != OpTime::kUninitializedTerm) {
         cmdBob.append("term", lastCommittedWithCurrentTerm.value);
@@ -311,7 +313,8 @@ OplogFetcher::OplogFetcher(executor::TaskExecutor* executor,
                            bool requireFresherSyncSource,
                            DataReplicatorExternalState* dataReplicatorExternalState,
                            EnqueueDocumentsFn enqueueDocumentsFn,
-                           OnShutdownCallbackFn onShutdownCallbackFn)
+                           OnShutdownCallbackFn onShutdownCallbackFn,
+                           const int batchSize)
     : AbstractOplogFetcher(executor,
                            lastFetched,
                            source,
@@ -324,7 +327,8 @@ OplogFetcher::OplogFetcher(executor::TaskExecutor* executor,
       _requireFresherSyncSource(requireFresherSyncSource),
       _dataReplicatorExternalState(dataReplicatorExternalState),
       _enqueueDocumentsFn(enqueueDocumentsFn),
-      _awaitDataTimeout(calculateAwaitDataTimeout(config)) {
+      _awaitDataTimeout(calculateAwaitDataTimeout(config)),
+      _batchSize(batchSize) {
 
     invariant(config.isInitialized());
     invariant(enqueueDocumentsFn);
@@ -348,6 +352,7 @@ BSONObj OplogFetcher::_makeFindCommandObject(const NamespaceString& nss,
     cmdBob.append("awaitData", true);
     cmdBob.append("maxTimeMS",
                   durationCount<Milliseconds>(AbstractOplogFetcher::kOplogInitialFindMaxTime));
+    cmdBob.append("batchSize", _batchSize);
     if (term != OpTime::kUninitializedTerm) {
         cmdBob.append("term", term);
     }
@@ -482,8 +487,11 @@ StatusWith<BSONObj> OplogFetcher::_onSuccessfulBatch(const Fetcher::QueryRespons
 
     auto lastCommittedWithCurrentTerm =
         _dataReplicatorExternalState->getCurrentTermAndLastCommittedOpTime();
-    return makeGetMoreCommandObject(
-        queryResponse.nss, queryResponse.cursorId, lastCommittedWithCurrentTerm, _awaitDataTimeout);
+    return makeGetMoreCommandObject(queryResponse.nss,
+                                    queryResponse.cursorId,
+                                    lastCommittedWithCurrentTerm,
+                                    _awaitDataTimeout,
+                                    _batchSize);
 }
 }  // namespace repl
 }  // namespace mongo

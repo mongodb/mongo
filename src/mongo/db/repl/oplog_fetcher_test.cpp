@@ -60,6 +60,10 @@ protected:
      * the oplog query and shuts down.
      * Returns shutdown state.
      */
+
+    // 16MB max batch size / 12 byte min doc size * 10 (for good measure) = defaultBatchSize to use.
+    const int defaultBatchSize = (16 * 1024 * 1024) / 12 * 10;
+
     std::unique_ptr<ShutdownState> processSingleBatch(executor::RemoteCommandResponse response,
                                                       bool requireFresherSyncSource = true);
     std::unique_ptr<ShutdownState> processSingleBatch(BSONObj obj,
@@ -167,7 +171,8 @@ std::unique_ptr<ShutdownState> OplogFetcherTest::processSingleBatch(RemoteComman
                               requireFresherSyncSource,
                               dataReplicatorExternalState.get(),
                               enqueueDocumentsFn,
-                              stdx::ref(*shutdownState));
+                              stdx::ref(*shutdownState),
+                              defaultBatchSize);
 
     ASSERT_FALSE(oplogFetcher.isActive());
     ASSERT_OK(oplogFetcher.startup());
@@ -211,7 +216,8 @@ TEST_F(
                               true,
                               dataReplicatorExternalState.get(),
                               enqueueDocumentsFn,
-                              [](Status) {});
+                              [](Status) {},
+                              defaultBatchSize);
     auto cmdObj = oplogFetcher.getFindQuery_forTest();
     ASSERT_EQUALS(mongo::BSONType::Object, cmdObj["filter"].type());
     ASSERT_BSONOBJ_EQ(BSON("ts" << BSON("$gte" << lastFetched.opTime.getTimestamp())),
@@ -233,7 +239,8 @@ TEST_F(OplogFetcherTest,
                               true,
                               dataReplicatorExternalState.get(),
                               enqueueDocumentsFn,
-                              [](Status) {});
+                              [](Status) {},
+                              defaultBatchSize);
     auto cmdObj = oplogFetcher.getFindQuery_forTest();
     ASSERT_EQUALS(mongo::BSONType::Object, cmdObj["filter"].type());
     ASSERT_BSONOBJ_EQ(BSON("ts" << BSON("$gte" << lastFetched.opTime.getTimestamp())),
@@ -253,7 +260,8 @@ TEST_F(OplogFetcherTest, MetadataObjectContainsMetadataFieldsUnderProtocolVersio
                                     true,
                                     dataReplicatorExternalState.get(),
                                     enqueueDocumentsFn,
-                                    [](Status) {})
+                                    [](Status) {},
+                                    defaultBatchSize)
                            .getMetadataObject_forTest();
     ASSERT_EQUALS(3, metadataObj.nFields());
     ASSERT_EQUALS(1, metadataObj[rpc::kReplSetMetadataFieldName].numberInt());
@@ -271,7 +279,8 @@ TEST_F(OplogFetcherTest, MetadataObjectIsEmptyUnderProtocolVersion0) {
                                     true,
                                     dataReplicatorExternalState.get(),
                                     enqueueDocumentsFn,
-                                    [](Status) {})
+                                    [](Status) {},
+                                    defaultBatchSize)
                            .getMetadataObject_forTest();
     ASSERT_BSONOBJ_EQ(ReadPreferenceSetting::secondaryPreferredMetadata(), metadataObj);
 }
@@ -288,7 +297,8 @@ TEST_F(OplogFetcherTest, AwaitDataTimeoutShouldEqualHalfElectionTimeoutUnderProt
                                 true,
                                 dataReplicatorExternalState.get(),
                                 enqueueDocumentsFn,
-                                [](Status) {})
+                                [](Status) {},
+                                defaultBatchSize)
                        .getAwaitDataTimeout_forTest();
     ASSERT_EQUALS(config.getElectionTimeoutPeriod() / 2, timeout);
 }
@@ -304,7 +314,8 @@ TEST_F(OplogFetcherTest, AwaitDataTimeoutShouldBeAConstantUnderProtocolVersion0)
                                 true,
                                 dataReplicatorExternalState.get(),
                                 enqueueDocumentsFn,
-                                [](Status) {})
+                                [](Status) {},
+                                defaultBatchSize)
                        .getAwaitDataTimeout_forTest();
     ASSERT_EQUALS(OplogFetcher::kDefaultProtocolZeroAwaitDataTimeout, timeout);
 }
@@ -742,7 +753,8 @@ RemoteCommandRequest OplogFetcherTest::testTwoBatchHandling(bool isV1ElectionPro
                               true,
                               dataReplicatorExternalState.get(),
                               enqueueDocumentsFn,
-                              stdx::ref(shutdownState));
+                              stdx::ref(shutdownState),
+                              defaultBatchSize);
     ASSERT_EQUALS(OplogFetcher::State::kPreStart, oplogFetcher.getState_forTest());
 
     ASSERT_OK(oplogFetcher.startup());

@@ -98,11 +98,17 @@ using QueryResponseStatus = StatusWith<Fetcher::QueryResponse>;
 using UniqueLock = stdx::unique_lock<stdx::mutex>;
 using LockGuard = stdx::lock_guard<stdx::mutex>;
 
+// 16MB max batch size / 12 byte min doc size * 10 (for good measure) = defaultBatchSize to use.
+const auto defaultBatchSize = (16 * 1024 * 1024) / 12 * 10;
+
 // The number of attempts to connect to a sync source.
 MONGO_EXPORT_SERVER_PARAMETER(numInitialSyncConnectAttempts, int, 10);
 
 // The number of attempts to call find on the remote oplog.
 MONGO_EXPORT_SERVER_PARAMETER(numInitialSyncOplogFindAttempts, int, 3);
+
+// The batchSize to use for the find/getMore queries called by the OplogFetcher
+MONGO_EXPORT_STARTUP_SERVER_PARAMETER(initialSyncOplogFetcherBatchSize, int, defaultBatchSize);
 
 // The number of initial sync attempts that have failed since server startup. Each instance of
 // InitialSyncer may run multiple attempts to fulfill an initial sync request that is triggered
@@ -666,25 +672,24 @@ void InitialSyncer::_lastOplogEntryFetcherCallbackForBeginTimestamp(
     }
 
     const auto& config = configResult.getValue();
-    _oplogFetcher =
-        stdx::make_unique<OplogFetcher>(_exec,
-                                        lastOpTimeWithHash,
-                                        _syncSource,
-                                        _opts.remoteOplogNS,
-                                        config,
-                                        _opts.oplogFetcherMaxFetcherRestarts,
-                                        _rollbackChecker->getBaseRBID(),
-                                        false /* requireFresherSyncSource */,
-                                        _dataReplicatorExternalState.get(),
-                                        stdx::bind(&InitialSyncer::_enqueueDocuments,
-                                                   this,
-                                                   stdx::placeholders::_1,
-                                                   stdx::placeholders::_2,
-                                                   stdx::placeholders::_3),
-                                        stdx::bind(&InitialSyncer::_oplogFetcherCallback,
-                                                   this,
-                                                   stdx::placeholders::_1,
-                                                   onCompletionGuard));
+    _oplogFetcher = stdx::make_unique<OplogFetcher>(
+        _exec,
+        lastOpTimeWithHash,
+        _syncSource,
+        _opts.remoteOplogNS,
+        config,
+        _opts.oplogFetcherMaxFetcherRestarts,
+        _rollbackChecker->getBaseRBID(),
+        false /* requireFresherSyncSource */,
+        _dataReplicatorExternalState.get(),
+        stdx::bind(&InitialSyncer::_enqueueDocuments,
+                   this,
+                   stdx::placeholders::_1,
+                   stdx::placeholders::_2,
+                   stdx::placeholders::_3),
+        stdx::bind(
+            &InitialSyncer::_oplogFetcherCallback, this, stdx::placeholders::_1, onCompletionGuard),
+        initialSyncOplogFetcherBatchSize);
 
     LOG(2) << "Starting OplogFetcher: " << _oplogFetcher->toString();
 

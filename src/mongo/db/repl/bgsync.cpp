@@ -71,9 +71,14 @@ const char kHashFieldName[] = "h";
 const int kSleepToAllowBatchingMillis = 2;
 const int kSmallBatchLimitBytes = 40000;
 const Milliseconds kRollbackOplogSocketTimeout(10 * 60 * 1000);
+// 16MB max batch size / 12 byte min doc size * 10 (for good measure) = defaultBatchSize to use.
+const auto defaultBatchSize = (16 * 1024 * 1024) / 12 * 10;
 
 // Set this to true to force rollbacks to use the 3.4 implementation.
 MONGO_EXPORT_STARTUP_SERVER_PARAMETER(use3dot4Rollback, bool, true);
+
+// The batchSize to use for the find/getMore queries called by the OplogFetcher
+MONGO_EXPORT_STARTUP_SERVER_PARAMETER(bgSyncOplogFetcherBatchSize, int, defaultBatchSize);
 
 /**
  * Extends DataReplicatorExternalStateImpl to be member state aware.
@@ -439,7 +444,8 @@ void BackgroundSync::_produce(OperationContext* opCtx) {
                        stdx::placeholders::_1,
                        stdx::placeholders::_2,
                        stdx::placeholders::_3),
-            onOplogFetcherShutdownCallbackFn);
+            onOplogFetcherShutdownCallbackFn,
+            bgSyncOplogFetcherBatchSize);
         stdx::lock_guard<stdx::mutex> lock(_mutex);
         if (_state != ProducerState::Running) {
             return;
