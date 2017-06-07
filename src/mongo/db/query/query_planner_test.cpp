@@ -5269,4 +5269,125 @@ TEST_F(QueryPlannerTest, ContainedOrPathLevelMultikeyCannotCompoundTrailingField
     assertSolutionExists("{cscan: {dir: 1}}}}");
 }
 
+TEST_F(QueryPlannerTest, EmptyQueryWithoutProjectionUsesCollscan) {
+    addIndex(BSON("a" << 1));
+    runQuery(BSONObj());
+    assertNumSolutions(1);
+    assertSolutionExists("{cscan: {dir: 1}}}");
+}
+
+TEST_F(QueryPlannerTest, EmptyQueryWithProjectionUsesCoveredIxscan) {
+    params.options &= ~QueryPlannerParams::INCLUDE_COLLSCAN;
+    addIndex(BSON("a" << 1));
+    runQueryAsCommand(fromjson("{find: 'testns', projection: {_id: 0, a: 1}}"));
+    assertNumSolutions(1);
+    assertSolutionExists(
+        "{proj: {spec: {_id: 0, a: 1}, node: "
+        "{ixscan: {filter: null, pattern: {a: 1},"
+        "bounds: {a: [['MinKey', 'MaxKey', true, true]]}}}}}");
+}
+
+TEST_F(QueryPlannerTest, EmptyQueryWithProjectionUsesCoveredIxscanOnCompoundIndex) {
+    params.options &= ~QueryPlannerParams::INCLUDE_COLLSCAN;
+    addIndex(BSON("a" << 1 << "b" << 1 << "c" << 1));
+    runQueryAsCommand(fromjson("{find: 'testns', projection: {_id: 0, a: 1, c: 1}}"));
+    assertNumSolutions(1);
+    assertSolutionExists(
+        "{proj: {spec: {_id: 0, a: 1, c: 1}, node: "
+        "{ixscan: {filter: null, pattern: {a: 1, b: 1, c: 1}, bounds:"
+        "{a: [['MinKey', 'MaxKey', true, true]], b: [['MinKey', 'MaxKey', true, true]],"
+        "c: [['MinKey', 'MaxKey', true, true]]}}}}}");
+}
+
+TEST_F(QueryPlannerTest, PlannerDoesNotConsiderCoveredIxscanForProjIfItWouldNotRespectTheHint) {
+    addIndex(BSON("a" << 1));
+    runQueryAsCommand(fromjson("{find: 'testns', projection: {_id: 0, a: 1}, hint: {_id: 1}}"));
+    assertNumSolutions(1);
+    assertSolutionExists(
+        "{proj: {spec: {_id: 0, a: 1}, node: "
+        "{fetch: {filter: null, node: "
+        "{ixscan: {filter: null, pattern: {_id: 1}, "
+        "bounds: {_id: [['MinKey', 'MaxKey', true, true]]}}}}}}}");
+}
+
+TEST_F(QueryPlannerTest, EmptyQueryWithProjectionUsesCollscanIfNoCoveredIxscans) {
+    addIndex(BSON("a" << 1));
+    runQueryAsCommand(fromjson("{find: 'testns', projection: {a: 1}}"));
+    assertNumSolutions(1);
+    assertSolutionExists(
+        "{proj: {spec: {a: 1}, node:"
+        "{cscan: {dir: 1}}}}");
+}
+
+TEST_F(QueryPlannerTest, EmptyQueryWithProjectionUsesCoveredIxscanOnDotttedNonMultikeyIndex) {
+    params.options &= ~QueryPlannerParams::INCLUDE_COLLSCAN;
+    addIndex(BSON("a.b" << 1));
+    runQueryAsCommand(fromjson("{find: 'testns', projection: {_id: 0, 'a.b': 1}}"));
+    assertNumSolutions(1);
+    assertSolutionExists(
+        "{proj: {spec: {_id: 0, 'a.b': 1}, node: "
+        "{ixscan: {filter: null, pattern: {'a.b': 1},"
+        "bounds: {'a.b': [['MinKey', 'MaxKey', true, true]]}}}}}");
+}
+
+TEST_F(QueryPlannerTest, EmptyQueryWithProjectionUsesCollscanIfIndexIsMultikey) {
+    constexpr bool isMultikey = true;
+    addIndex(BSON("a" << 1 << "b" << 1), isMultikey);
+    runQueryAsCommand(fromjson("{find: 'testns', projection: {_id: 0, a: 1, b: 1}}"));
+    assertNumSolutions(1);
+    assertSolutionExists(
+        "{proj: {spec: {_id: 0, a: 1, b: 1}, node: "
+        "{cscan: {dir: 1}}}}");
+}
+
+TEST_F(QueryPlannerTest, EmptyQueryWithProjectionUsesCollscanIfIndexIsSparse) {
+    constexpr bool isMultikey = false;
+    constexpr bool isSparse = true;
+    addIndex(BSON("a" << 1), isMultikey, isSparse);
+    runQueryAsCommand(fromjson("{find: 'testns', projection: {_id: 0, a: 1, b: 1}}"));
+    assertNumSolutions(1);
+    assertSolutionExists(
+        "{proj: {spec: {_id: 0, a: 1, b: 1}, node: "
+        "{cscan: {dir: 1}}}}");
+}
+
+TEST_F(QueryPlannerTest, EmptyQueryWithProjectionUsesCollscanIfIndexIsPartial) {
+    FalseMatchExpression matchExpr("foo"_sd);
+    addIndex(BSON("a" << 1), &matchExpr);
+    runQueryAsCommand(fromjson("{find: 'testns', projection: {_id: 0, a: 1}}"));
+    assertNumSolutions(1);
+    assertSolutionExists(
+        "{proj: {spec: {_id: 0, a: 1}, node: "
+        "{cscan: {dir: 1}}}}");
+}
+
+TEST_F(QueryPlannerTest, EmptyQueryWithProjectionUsesCollscanIfIndexIsText) {
+    addIndex(BSON("a"
+                  << "text"));
+    runQueryAsCommand(fromjson("{find: 'testns', projection: {_id: 0, a: 1}}"));
+    assertNumSolutions(1);
+    assertSolutionExists(
+        "{proj: {spec: {_id: 0, a: 1}, node: "
+        "{cscan: {dir: 1}}}}");
+}
+
+TEST_F(QueryPlannerTest, EmptyQueryWithProjectionUsesCollscanIfIndexIsGeo) {
+    addIndex(BSON("a"
+                  << "2dsphere"));
+    runQueryAsCommand(fromjson("{find: 'testns', projection: {_id: 0, a: 1}}"));
+    assertNumSolutions(1);
+    assertSolutionExists(
+        "{proj: {spec: {_id: 0, a: 1}, node: "
+        "{cscan: {dir: 1}}}}");
+}
+
+TEST_F(QueryPlannerTest, EmptyQueryWithProjectionUsesCollscanIfIndexCollationDiffers) {
+    CollatorInterfaceMock collator(CollatorInterfaceMock::MockType::kReverseString);
+    addIndex(BSON("a" << 1), &collator);
+    runQueryAsCommand(fromjson("{find: 'testns', projection: {_id: 0, a: 1}}"));
+    assertNumSolutions(1);
+    assertSolutionExists(
+        "{proj: {spec: {_id: 0, a: 1}, node: "
+        "{cscan: {dir: 1}}}}");
+}
 }  // namespace

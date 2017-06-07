@@ -1002,6 +1002,40 @@ Status QueryPlanner::plan(const CanonicalQuery& query,
         }
     }
 
+    // If a projection exists, there may be an index that allows for a covered plan, even if none
+    // were considered earlier.
+    const auto projection = query.getProj();
+    if (out->size() == 0 && query.getQueryObj().isEmpty() && projection &&
+        !projection->requiresDocument()) {
+
+        const auto* indicesToConsider = hintIndex.isEmpty() ? &params.indices : &relevantIndices;
+        for (auto&& index : *indicesToConsider) {
+            if (index.type != INDEX_BTREE || index.multikey || index.sparse || index.filterExpr ||
+                !CollatorInterface::collatorsMatch(index.collator, query.getCollator())) {
+                continue;
+            }
+
+            QueryPlannerParams paramsForCoveredIxScan;
+            paramsForCoveredIxScan.options =
+                params.options | QueryPlannerParams::NO_UNCOVERED_PROJECTIONS;
+            auto soln = buildWholeIXSoln(index, query, paramsForCoveredIxScan);
+            if (soln) {
+                LOG(5) << "Planner: outputting soln that uses index to provide projection.";
+                PlanCacheIndexTree* indexTree = new PlanCacheIndexTree();
+                indexTree->setIndexEntry(index);
+
+                SolutionCacheData* scd = new SolutionCacheData();
+                scd->tree.reset(indexTree);
+                scd->solnType = SolutionCacheData::WHOLE_IXSCAN_SOLN;
+                scd->wholeIXSolnDir = 1;
+                soln->cacheData.reset(scd);
+
+                out->push_back(soln);
+                break;
+            }
+        }
+    }
+
     // geoNear and text queries *require* an index.
     // Also, if a hint is specified it indicates that we MUST use it.
     bool possibleToCollscan =

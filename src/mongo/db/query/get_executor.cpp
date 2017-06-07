@@ -1311,6 +1311,11 @@ StatusWith<unique_ptr<PlanExecutor, PlanExecutor::Deleter>> getExecutorCount(
 bool turnIxscanIntoDistinctIxscan(QuerySolution* soln, const string& field) {
     QuerySolutionNode* root = soln->root.get();
 
+    // Solution must have a filter.
+    if (soln->filterData.isEmpty()) {
+        return false;
+    }
+
     // Root stage must be a project.
     if (STAGE_PROJECTION != root->getType()) {
         return false;
