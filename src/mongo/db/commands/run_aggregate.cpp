@@ -54,7 +54,6 @@
 #include "mongo/db/query/find_common.h"
 #include "mongo/db/query/get_executor.h"
 #include "mongo/db/query/plan_summary_stats.h"
-#include "mongo/db/repl/oplog.h"
 #include "mongo/db/service_context.h"
 #include "mongo/db/storage/storage_options.h"
 #include "mongo/db/views/view.h"
@@ -271,7 +270,7 @@ Status runAggregate(OperationContext* opCtx,
                     const BSONObj& cmdObj,
                     BSONObjBuilder& result) {
     // For operations on views, this will be the underlying namespace.
-    NamespaceString nss = request.getNamespaceString();
+    const NamespaceString& nss = request.getNamespaceString();
 
     // Parse the user-specified collation, if any.
     std::unique_ptr<CollatorInterface> userSpecifiedCollator = request.getCollation().isEmpty()
@@ -284,11 +283,6 @@ Status runAggregate(OperationContext* opCtx,
     Pipeline* unownedPipeline;
     auto curOp = CurOp::get(opCtx);
     {
-        const LiteParsedPipeline liteParsedPipeline(request);
-        if (liteParsedPipeline.startsWithChangeNotification()) {
-            nss = NamespaceString(repl::rsOplogName);
-        }
-
         // This will throw if the sharding version for this connection is out of date. If the
         // namespace is a view, the lock will be released before re-running the aggregation.
         AutoGetCollectionOrViewForReadCommand ctx(opCtx, nss);
@@ -299,8 +293,8 @@ Status runAggregate(OperationContext* opCtx,
         // recursively calling runAggregate(), which will re-acquire locks on the underlying
         // collection.  (The lock must be released because recursively acquiring locks on the
         // database will prohibit yielding.)
+        const LiteParsedPipeline liteParsedPipeline(request);
         if (ctx.getView() && !liteParsedPipeline.startsWithCollStats()) {
-            invariant(nss != repl::rsOplogName);
             // Check that the default collation of 'view' is compatible with the operation's
             // collation. The check is skipped if the 'request' has the empty collation, which
             // means that no collation was specified.
@@ -396,7 +390,7 @@ Status runAggregate(OperationContext* opCtx,
 
         // This does mongod-specific stuff like creating the input PlanExecutor and adding
         // it to the front of the pipeline if needed.
-        PipelineD::prepareCursorSource(collection, nss, &request, pipeline.get());
+        PipelineD::prepareCursorSource(collection, &request, pipeline.get());
 
         // Transfer ownership of the Pipeline to the PipelineProxyStage.
         unownedPipeline = pipeline.get();
