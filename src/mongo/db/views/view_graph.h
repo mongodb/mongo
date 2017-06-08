@@ -179,6 +179,6 @@ private:
     // Maps node ids to nodes. There is a 1-1 correspondence with _namespaceIds, hence the lifetime
     // of a node is the same as the lifetime as its corresponding node id.
     stdx::unordered_map<uint64_t, Node> _graph;
-    static uint64_t _idCounter;
+    uint64_t _idCounter = 0;
 };
 }  // namespace mongo
