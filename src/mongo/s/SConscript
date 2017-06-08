@@ -89,6 +89,7 @@ env.Library(
         'move_chunk_request.cpp',
         'set_shard_version_request.cpp',
         'shard_key_pattern.cpp',
+        env.Idlc('request_types/move_primary.idl')[0],
         env.Idlc('request_types/shard_collection.idl')[0],
     ],
     LIBDEPS=[

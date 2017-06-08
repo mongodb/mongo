@@ -228,7 +228,7 @@
 
         // Test movePrimary fails with an invalid database name.
         assertFailsWithInvalidNamespacesForField(
-            "movePrimary", {movePrimary: ""}, isNotFullyQualified, isAdminCommand);
+            "movePrimary", {movePrimary: "", to: "dummy"}, isNotFullyQualified, isAdminCommand);
 
         // Test updateZoneKeyRange fails with an invalid collection name.
         assertFailsWithInvalidNamespacesForField(
