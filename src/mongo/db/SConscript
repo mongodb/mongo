@@ -547,6 +547,7 @@ env.Library(
         '$BUILD_DIR/mongo/client/clientdriver',
         'curop',
         'lasterror',
+        'assemble_response',
     ],
 )
 
@@ -566,13 +567,9 @@ env.Library(
     target="service_context_d",
     source=[
         "service_context_d.cpp",
-        "service_entry_point_mongod.cpp",
     ],
     LIBDEPS=[
         '$BUILD_DIR/mongo/base',
-        '$BUILD_DIR/mongo/transport/service_entry_point',
-        '$BUILD_DIR/mongo/transport/transport_layer_common',
-        'assemble_response',
         'concurrency/lock_manager',
         'curop',
         'storage/storage_engine_lock_file',
