@@ -47,6 +47,8 @@ namespace mongo {
  */
 class LogicalSessionCache {
 public:
+    using SessionList = std::list<LogicalSessionId>;
+
     static constexpr int kLogicalSessionCacheDefaultCapacity = 10000;
     static constexpr Minutes kLogicalSessionDefaultTimeout = Minutes(30);
     static constexpr Minutes kLogicalSessionDefaultRefresh = Minutes(5);

@@ -54,6 +54,7 @@ namespace mongo {
  */
 class MockSessionsCollectionImpl {
 public:
+    using SessionList = std::list<LogicalSessionId>;
     using SessionMap =
         stdx::unordered_map<LogicalSessionId, LogicalSessionRecord, LogicalSessionId::Hash>;
 
@@ -61,8 +62,8 @@ public:
 
     using FetchHook = stdx::function<StatusWith<LogicalSessionRecord>(LogicalSessionId)>;
     using InsertHook = stdx::function<Status(LogicalSessionRecord)>;
-    using RefreshHook = stdx::function<LogicalSessionIdSet(LogicalSessionIdSet)>;
-    using RemoveHook = stdx::function<void(LogicalSessionIdSet)>;
+    using RefreshHook = stdx::function<SessionList(SessionList)>;
+    using RemoveHook = stdx::function<void(SessionList)>;
 
     // Set custom hooks to override default behavior
     void setFetchHook(FetchHook hook);
@@ -76,8 +77,8 @@ public:
     // Forwarding methods from the MockSessionsCollection
     StatusWith<LogicalSessionRecord> fetchRecord(LogicalSessionId lsid);
     Status insertRecord(LogicalSessionRecord record);
-    LogicalSessionIdSet refreshSessions(LogicalSessionIdSet sessions);
-    void removeRecords(LogicalSessionIdSet sessions);
+    SessionList refreshSessions(SessionList sessions);
+    void removeRecords(SessionList sessions);
 
     // Test-side methods that operate on the _sessions map
     void add(LogicalSessionRecord record);
@@ -90,8 +91,8 @@ private:
     // Default implementations, may be overridden with custom hooks.
     StatusWith<LogicalSessionRecord> _fetchRecord(LogicalSessionId lsid);
     Status _insertRecord(LogicalSessionRecord record);
-    LogicalSessionIdSet _refreshSessions(LogicalSessionIdSet sessions);
-    void _removeRecords(LogicalSessionIdSet sessions);
+    SessionList _refreshSessions(SessionList sessions);
+    void _removeRecords(SessionList sessions);
 
     stdx::mutex _mutex;
     SessionMap _sessions;
@@ -109,6 +110,8 @@ private:
  */
 class MockSessionsCollection : public SessionsCollection {
 public:
+    using SessionList = std::list<LogicalSessionId>;
+
     explicit MockSessionsCollection(std::shared_ptr<MockSessionsCollectionImpl> impl)
         : _impl(std::move(impl)) {}
 
@@ -120,11 +123,11 @@ public:
         return _impl->insertRecord(std::move(record));
     }
 
-    LogicalSessionIdSet refreshSessions(LogicalSessionIdSet sessions) override {
+    SessionList refreshSessions(SessionList sessions) override {
         return _impl->refreshSessions(std::move(sessions));
     }
 
-    void removeRecords(LogicalSessionIdSet sessions) override {
+    void removeRecords(SessionList sessions) override {
         return _impl->removeRecords(std::move(sessions));
     }
 

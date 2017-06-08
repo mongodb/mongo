@@ -28,7 +28,6 @@
 
 #pragma once
 
-#include "mongo/db/logical_session_id.h"
 #include "mongo/db/logical_session_record.h"
 
 namespace mongo {
@@ -41,6 +40,8 @@ namespace mongo {
  */
 class SessionsCollection {
 public:
+    using SessionList = std::list<LogicalSessionId>;
+
     virtual ~SessionsCollection();
 
     /**
@@ -65,7 +66,7 @@ public:
      * Returns a list of sessions for which no authoritative record was found,
      * and hence were not refreshed.
      */
-    virtual LogicalSessionIdSet refreshSessions(LogicalSessionIdSet sessions) = 0;
+    virtual SessionList refreshSessions(SessionList sessions) = 0;
 
     /**
      * Removes the authoritative records for the specified sessions.
@@ -73,7 +74,7 @@ public:
      * Implementations should perform authentication checks to ensure that
      * session records may only be removed if their owner is logged in.
      */
-    virtual void removeRecords(LogicalSessionIdSet sessions) = 0;
+    virtual void removeRecords(SessionList sessions) = 0;
 };
 
 }  // namespace mongo

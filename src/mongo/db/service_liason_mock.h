@@ -54,10 +54,12 @@ namespace mongo {
  */
 class MockServiceLiasonImpl {
 public:
+    using SessionList = std::list<LogicalSessionId>;
+
     MockServiceLiasonImpl();
 
     // Forwarding methods from the MockServiceLiason
-    LogicalSessionIdSet getActiveSessions() const;
+    SessionList getActiveSessions() const;
     Date_t now() const;
     void scheduleJob(PeriodicRunner::PeriodicJob job);
     void join();
@@ -74,7 +76,7 @@ private:
     std::unique_ptr<PeriodicRunnerASIO> _runner;
 
     mutable stdx::mutex _mutex;
-    LogicalSessionIdSet _activeSessions;
+    SessionList _activeSessions;
 };
 
 /**
@@ -82,10 +84,12 @@ private:
  */
 class MockServiceLiason : public ServiceLiason {
 public:
+    using SessionList = std::list<LogicalSessionId>;
+
     explicit MockServiceLiason(std::shared_ptr<MockServiceLiasonImpl> impl)
         : _impl(std::move(impl)) {}
 
-    LogicalSessionIdSet getActiveSessions() const override {
+    SessionList getActiveSessions() const override {
         return _impl->getActiveSessions();
     }
 

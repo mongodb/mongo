@@ -44,13 +44,15 @@ namespace mongo {
  */
 class ServiceLiason {
 public:
+    using SessionList = std::list<LogicalSessionId>;
+
     virtual ~ServiceLiason();
 
     /**
      * Return a list of sessions that are currently being used to run operations
      * on this service.
      */
-    virtual LogicalSessionIdSet getActiveSessions() const = 0;
+    virtual SessionList getActiveSessions() const = 0;
 
     /**
      * Schedule a job to be run at regular intervals until the server shuts down.

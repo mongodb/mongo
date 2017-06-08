@@ -145,8 +145,8 @@ Status LogicalSessionCache::startSession(LogicalSessionRecord authoritativeRecor
 }
 
 void LogicalSessionCache::_refresh() {
-    LogicalSessionIdSet activeSessions;
-    LogicalSessionIdSet deadSessions;
+    SessionList activeSessions;
+    SessionList deadSessions;
 
     auto now = _service->now();
 
@@ -164,9 +164,9 @@ void LogicalSessionCache::_refresh() {
     for (auto& it : cacheCopy) {
         auto record = it.second;
         if (!_isDead(record, now)) {
-            activeSessions.insert(record.getLsid());
+            activeSessions.push_back(record.getLsid());
         } else {
-            deadSessions.insert(record.getLsid());
+            deadSessions.push_back(record.getLsid());
         }
     }
 
@@ -190,28 +190,25 @@ void LogicalSessionCache::_refresh() {
                 // by another thread.
                 it->second.setLastUse(now);
             }
-
-            activeSessions.insert(lsid);
         }
     }
+
+    activeSessions.splice(activeSessions.begin(), serviceSessions);
 
     // Query into the sessions collection to do the refresh. If any sessions have
     // failed to refresh, it means their authoritative records were removed, and
     // we should remove such records from our cache as well.
     auto failedToRefresh = _sessionsColl->refreshSessions(std::move(activeSessions));
+    deadSessions.splice(deadSessions.begin(), failedToRefresh);
 
     // Prune any dead records out of the cache. Dead records are ones that failed to
     // refresh, or ones that have expired locally. We don't make an effort to check
     // if the locally-expired records still have live authoritative records in the
     // sessions collection. We also don't attempt to resurrect our expired records.
-    // However, we *do* keep records alive if they are active on the service.
     {
         stdx::unique_lock<stdx::mutex> lk(_cacheMutex);
-        for (auto deadId : failedToRefresh) {
-            auto it = serviceSessions.find(deadId);
-            if (it == serviceSessions.end()) {
-                _cache.erase(deadId);
-            }
+        for (auto deadId : deadSessions) {
+            _cache.erase(deadId);
         }
     }
 }

@@ -42,7 +42,7 @@ MockServiceLiasonImpl::MockServiceLiasonImpl() {
     _runner->startup();
 }
 
-LogicalSessionIdSet MockServiceLiasonImpl::getActiveSessions() const {
+MockServiceLiasonImpl::SessionList MockServiceLiasonImpl::getActiveSessions() const {
     stdx::unique_lock<stdx::mutex> lk(_mutex);
     return _activeSessions;
 }
@@ -61,12 +61,13 @@ void MockServiceLiasonImpl::scheduleJob(PeriodicRunner::PeriodicJob job) {
 
 void MockServiceLiasonImpl::add(LogicalSessionId lsid) {
     stdx::unique_lock<stdx::mutex> lk(_mutex);
-    _activeSessions.insert(std::move(lsid));
+    _activeSessions.push_back(std::move(lsid));
 }
 
 void MockServiceLiasonImpl::remove(LogicalSessionId lsid) {
     stdx::unique_lock<stdx::mutex> lk(_mutex);
-    _activeSessions.erase(lsid);
+    _activeSessions.erase(std::remove(_activeSessions.begin(), _activeSessions.end(), lsid),
+                          _activeSessions.end());
 }
 
 void MockServiceLiasonImpl::clear() {
