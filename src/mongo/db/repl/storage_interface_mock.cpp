@@ -67,11 +67,10 @@ Status StorageInterfaceMock::incrementRollbackID(OperationContext* opCtx) {
     _rbid++;
     return Status::OK();
 }
-Status CollectionBulkLoaderMock::init(Collection* coll,
-                                      const std::vector<BSONObj>& secondaryIndexSpecs) {
+Status CollectionBulkLoaderMock::init(const std::vector<BSONObj>& secondaryIndexSpecs) {
     LOG(1) << "CollectionBulkLoaderMock::init called";
     stats->initCalled = true;
-    return initFn(coll, secondaryIndexSpecs);
+    return Status::OK();
 };
 
 Status CollectionBulkLoaderMock::insertDocuments(const std::vector<BSONObj>::const_iterator begin,

@@ -53,7 +53,7 @@ class CollectionBulkLoaderMock : public CollectionBulkLoader {
 public:
     CollectionBulkLoaderMock(CollectionMockStats* collStats) : stats(collStats){};
     virtual ~CollectionBulkLoaderMock() = default;
-    virtual Status init(Collection* coll, const std::vector<BSONObj>& secondaryIndexSpecs) override;
+    virtual Status init(const std::vector<BSONObj>& secondaryIndexSpecs) override;
 
     virtual Status insertDocuments(const std::vector<BSONObj>::const_iterator begin,
                                    const std::vector<BSONObj>::const_iterator end) override;
@@ -75,8 +75,6 @@ public:
                           const std::vector<BSONObj>::const_iterator) { return Status::OK(); };
     stdx::function<Status()> abortFn = []() { return Status::OK(); };
     stdx::function<Status()> commitFn = []() { return Status::OK(); };
-    stdx::function<Status(Collection* coll, const std::vector<BSONObj>& secondaryIndexSpecs)>
-        initFn = [](Collection*, const std::vector<BSONObj>&) { return Status::OK(); };
 };
 
 class StorageInterfaceMock : public StorageInterface {

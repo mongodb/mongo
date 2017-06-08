@@ -38,8 +38,6 @@
 #include "mongo/db/namespace_string.h"
 #include "mongo/db/repl/collection_bulk_loader.h"
 #include "mongo/db/repl/storage_interface.h"
-#include "mongo/db/repl/task_runner.h"
-#include "mongo/util/concurrency/old_thread_pool.h"
 
 namespace mongo {
 namespace repl {
@@ -61,16 +59,13 @@ public:
         BSONObj toBSON() const;
     };
 
-    CollectionBulkLoaderImpl(OperationContext* opCtx,
-                             Collection* coll,
-                             const BSONObj idIndexSpec,
-                             std::unique_ptr<OldThreadPool> threadPool,
-                             std::unique_ptr<TaskRunner> runner,
-                             std::unique_ptr<AutoGetOrCreateDb> autoDB,
-                             std::unique_ptr<AutoGetCollection> autoColl);
+    CollectionBulkLoaderImpl(ServiceContext::UniqueClient&& client,
+                             ServiceContext::UniqueOperationContext&& opCtx,
+                             std::unique_ptr<AutoGetCollection>&& autoColl,
+                             const BSONObj& idIndexSpec);
     virtual ~CollectionBulkLoaderImpl();
 
-    virtual Status init(Collection* coll, const std::vector<BSONObj>& secondaryIndexSpecs) override;
+    virtual Status init(const std::vector<BSONObj>& secondaryIndexSpecs) override;
 
     virtual Status insertDocuments(const std::vector<BSONObj>::const_iterator begin,
                                    const std::vector<BSONObj>::const_iterator end) override;
@@ -83,16 +78,13 @@ public:
 
 private:
     void _releaseResources();
-    Status _runTaskReleaseResourcesOnFailure(
-        TaskRunner::SynchronousTask task,
-        TaskRunner::NextAction nextAction = TaskRunner::NextAction::kKeepOperationContext);
 
-    std::unique_ptr<OldThreadPool> _threadPool;
-    std::unique_ptr<TaskRunner> _runner;
+    template <typename F>
+    Status _runTaskReleaseResourcesOnFailure(F task) noexcept;
+
+    ServiceContext::UniqueClient _client;
+    ServiceContext::UniqueOperationContext _opCtx;
     std::unique_ptr<AutoGetCollection> _autoColl;
-    std::unique_ptr<AutoGetOrCreateDb> _autoDB;
-    OperationContext* _opCtx = nullptr;
-    Collection* _coll = nullptr;
     NamespaceString _nss;
     std::unique_ptr<MultiIndexBlock> _idIndexBlock;
     std::unique_ptr<MultiIndexBlock> _secondaryIndexesBlock;

@@ -70,10 +70,8 @@
 #include "mongo/db/repl/replication_coordinator.h"
 #include "mongo/db/repl/replication_coordinator_global.h"
 #include "mongo/db/repl/rollback_gen.h"
-#include "mongo/db/repl/task_runner.h"
 #include "mongo/db/service_context.h"
 #include "mongo/util/assert_util.h"
-#include "mongo/util/concurrency/old_thread_pool.h"
 #include "mongo/util/log.h"
 #include "mongo/util/mongoutils/str.h"
 
@@ -169,94 +167,94 @@ StorageInterfaceImpl::createCollectionForBulkLoading(
     const std::vector<BSONObj>& secondaryIndexSpecs) {
 
     LOG(2) << "StorageInterfaceImpl::createCollectionForBulkLoading called for ns: " << nss.ns();
-    auto threadPool =
-        stdx::make_unique<OldThreadPool>(1, str::stream() << "InitialSyncInserters-" << nss.ns());
-    std::unique_ptr<TaskRunner> runner = stdx::make_unique<TaskRunner>(threadPool.get());
 
-    // Setup cond_var for signalling when done.
-    std::unique_ptr<CollectionBulkLoader> loaderToReturn;
-    Collection* collection;
-
-    auto status = runner->runSynchronousTask([&](OperationContext* opCtx) -> Status {
-        // We are not replicating nor validating writes under this OperationContext*.
-        // The OperationContext* is used for all writes to the (newly) cloned collection.
-        UnreplicatedWritesBlock uwb(opCtx);
-        documentValidationDisabled(opCtx) = true;
-
-        // Retry if WCE.
-        MONGO_WRITE_CONFLICT_RETRY_LOOP_BEGIN {
-            // Get locks and create the collection.
-            auto db = stdx::make_unique<AutoGetOrCreateDb>(opCtx, nss.db(), MODE_IX);
-            auto coll = stdx::make_unique<AutoGetCollection>(opCtx, nss, MODE_X);
-            collection = coll->getCollection();
-
-            if (collection) {
-                return {ErrorCodes::NamespaceExists, "Collection already exists."};
+    class StashClient {
+    public:
+        StashClient() {
+            if (Client::getCurrent()) {
+                _stashedClient = Client::releaseCurrent();
             }
-
-            // Create the collection.
-            WriteUnitOfWork wunit(opCtx);
-            collection = db->getDb()->createCollection(opCtx, nss.ns(), options, false);
-            invariant(collection);
-            wunit.commit();
-
-            // Build empty capped indexes.  Capped indexes cannot be build by the MultiIndexBlock
-            // because the cap might delete documents off the back while we are inserting them into
-            // the front.
-            if (options.capped) {
-                WriteUnitOfWork wunit(opCtx);
-                if (!idIndexSpec.isEmpty()) {
-                    auto status = collection->getIndexCatalog()->createIndexOnEmptyCollection(
-                        opCtx, idIndexSpec);
-                    if (!status.getStatus().isOK()) {
-                        return status.getStatus();
-                    }
-                }
-                for (auto&& spec : secondaryIndexSpecs) {
-                    auto status =
-                        collection->getIndexCatalog()->createIndexOnEmptyCollection(opCtx, spec);
-                    if (!status.getStatus().isOK()) {
-                        return status.getStatus();
-                    }
-                }
-                wunit.commit();
-            }
-
-
-            coll = stdx::make_unique<AutoGetCollection>(opCtx, nss, MODE_IX);
-
-            // Move locks into loader, so it now controls their lifetime.
-            auto loader = stdx::make_unique<CollectionBulkLoaderImpl>(opCtx,
-                                                                      collection,
-                                                                      options.capped ? BSONObj()
-                                                                                     : idIndexSpec,
-                                                                      std::move(threadPool),
-                                                                      std::move(runner),
-                                                                      std::move(db),
-                                                                      std::move(coll));
-
-            // Move the loader into the StatusWith.
-            loaderToReturn = std::move(loader);
-            return Status::OK();
         }
-        MONGO_WRITE_CONFLICT_RETRY_LOOP_END(opCtx, "beginCollectionClone", nss.ns());
-        MONGO_UNREACHABLE;
-    });
+        ~StashClient() {
+            if (Client::getCurrent()) {
+                Client::releaseCurrent();
+            }
+            if (_stashedClient) {
+                Client::setCurrent(std::move(_stashedClient));
+            }
+        }
 
+    private:
+        ServiceContext::UniqueClient _stashedClient;
+    } stash;
+    Client::setCurrent(
+        getGlobalServiceContext()->makeClient(str::stream() << nss.ns() << " loader"));
+    auto opCtx = cc().makeOperationContext();
+
+    // We are not replicating nor validating writes under this OperationContext*.
+    // The OperationContext* is used for all writes to the (newly) cloned collection.
+    UnreplicatedWritesBlock uwb(opCtx.get());
+    documentValidationDisabled(opCtx.get()) = true;
+
+    std::unique_ptr<AutoGetCollection> autoColl;
+    // Retry if WCE.
+    MONGO_WRITE_CONFLICT_RETRY_LOOP_BEGIN {
+        // Get locks and create the collection.
+        AutoGetOrCreateDb db(opCtx.get(), nss.db(), MODE_X);
+        AutoGetCollection coll(opCtx.get(), nss, MODE_IX);
+
+        if (coll.getCollection()) {
+            return {ErrorCodes::NamespaceExists,
+                    str::stream() << "Collection " << nss.ns() << " already exists."};
+        }
+        {
+            // Create the collection.
+            WriteUnitOfWork wunit(opCtx.get());
+            fassert(40332, db.getDb()->createCollection(opCtx.get(), nss.ns(), options, false));
+            wunit.commit();
+        }
+
+        autoColl = stdx::make_unique<AutoGetCollection>(opCtx.get(), nss, MODE_IX);
+
+        // Build empty capped indexes.  Capped indexes cannot be built by the MultiIndexBlock
+        // because the cap might delete documents off the back while we are inserting them into
+        // the front.
+        if (options.capped) {
+            WriteUnitOfWork wunit(opCtx.get());
+            if (!idIndexSpec.isEmpty()) {
+                auto status =
+                    autoColl->getCollection()->getIndexCatalog()->createIndexOnEmptyCollection(
+                        opCtx.get(), idIndexSpec);
+                if (!status.getStatus().isOK()) {
+                    return status.getStatus();
+                }
+            }
+            for (auto&& spec : secondaryIndexSpecs) {
+                auto status =
+                    autoColl->getCollection()->getIndexCatalog()->createIndexOnEmptyCollection(
+                        opCtx.get(), spec);
+                if (!status.getStatus().isOK()) {
+                    return status.getStatus();
+                }
+            }
+            wunit.commit();
+        }
+    }
+    MONGO_WRITE_CONFLICT_RETRY_LOOP_END(opCtx.get(), "beginCollectionClone", nss.ns());
+
+    // Move locks into loader, so it now controls their lifetime.
+    auto loader =
+        stdx::make_unique<CollectionBulkLoaderImpl>(Client::releaseCurrent(),
+                                                    std::move(opCtx),
+                                                    std::move(autoColl),
+                                                    options.capped ? BSONObj() : idIndexSpec);
+
+    auto status = loader->init(options.capped ? std::vector<BSONObj>() : secondaryIndexSpecs);
     if (!status.isOK()) {
         return status;
     }
-
-    invariant(collection);
-
-    status = loaderToReturn->init(collection,
-                                  options.capped ? std::vector<BSONObj>() : secondaryIndexSpecs);
-    if (!status.isOK()) {
-        return status;
-    }
-    return std::move(loaderToReturn);
+    return {std::move(loader)};
 }
-
 
 Status StorageInterfaceImpl::insertDocument(OperationContext* opCtx,
                                             const NamespaceString& nss,

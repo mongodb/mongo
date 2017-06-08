@@ -51,51 +51,68 @@
 namespace mongo {
 namespace repl {
 
-CollectionBulkLoaderImpl::CollectionBulkLoaderImpl(OperationContext* opCtx,
-                                                   Collection* coll,
-                                                   const BSONObj idIndexSpec,
-                                                   std::unique_ptr<OldThreadPool> threadPool,
-                                                   std::unique_ptr<TaskRunner> runner,
-                                                   std::unique_ptr<AutoGetOrCreateDb> autoDb,
-                                                   std::unique_ptr<AutoGetCollection> autoColl)
-    : _threadPool(std::move(threadPool)),
-      _runner(std::move(runner)),
-      _autoColl(std::move(autoColl)),
-      _autoDB(std::move(autoDb)),
-      _opCtx(opCtx),
-      _coll(coll),
-      _nss{coll->ns()},
-      _idIndexBlock(stdx::make_unique<MultiIndexBlock>(opCtx, coll)),
-      _secondaryIndexesBlock(stdx::make_unique<MultiIndexBlock>(opCtx, coll)),
-      _idIndexSpec(idIndexSpec) {
-    invariant(opCtx);
-    invariant(coll);
-    invariant(_runner);
-    invariant(_autoDB);
-    invariant(_autoColl);
-    invariant(_autoDB->getDb());
-    invariant(_autoColl->getDb() == _autoDB->getDb());
+namespace {
+
+/**
+ * Utility class to temporarily swap which client is bound to the running thread.
+ *
+ * Use this class to bind a client to the current thread for the duration of the
+ * AlternativeClientRegion's lifetime, restoring the prior client, if any, at the
+ * end of the block.
+ */
+class AlternativeClientRegion {
+public:
+    explicit AlternativeClientRegion(ServiceContext::UniqueClient& clientToUse)
+        : _alternateClient(&clientToUse) {
+        invariant(clientToUse);
+        if (Client::getCurrent()) {
+            _originalClient = Client::releaseCurrent();
+        }
+        Client::setCurrent(std::move(*_alternateClient));
+    }
+
+    ~AlternativeClientRegion() {
+        *_alternateClient = Client::releaseCurrent();
+        if (_originalClient) {
+            Client::setCurrent(std::move(_originalClient));
+        }
+    }
+
+private:
+    ServiceContext::UniqueClient _originalClient;
+    ServiceContext::UniqueClient* const _alternateClient;
+};
+
+}  // namespace
+
+CollectionBulkLoaderImpl::CollectionBulkLoaderImpl(ServiceContext::UniqueClient&& client,
+                                                   ServiceContext::UniqueOperationContext&& opCtx,
+                                                   std::unique_ptr<AutoGetCollection>&& autoColl,
+                                                   const BSONObj& idIndexSpec)
+    : _client{std::move(client)},
+      _opCtx{std::move(opCtx)},
+      _autoColl{std::move(autoColl)},
+      _nss{_autoColl->getCollection()->ns()},
+      _idIndexBlock(stdx::make_unique<MultiIndexBlock>(_opCtx.get(), _autoColl->getCollection())),
+      _secondaryIndexesBlock(
+          stdx::make_unique<MultiIndexBlock>(_opCtx.get(), _autoColl->getCollection())),
+      _idIndexSpec(idIndexSpec.getOwned()) {
+
+    invariant(_opCtx);
+    invariant(_autoColl->getCollection());
 }
 
 CollectionBulkLoaderImpl::~CollectionBulkLoaderImpl() {
-    DESTRUCTOR_GUARD({
-        _releaseResources();
-        _runner->cancel();
-        _runner->join();
-        _threadPool->join();
-    })
+    AlternativeClientRegion acr(_client);
+    DESTRUCTOR_GUARD({ _releaseResources(); })
 }
 
-Status CollectionBulkLoaderImpl::init(Collection* coll,
-                                      const std::vector<BSONObj>& secondaryIndexSpecs) {
+Status CollectionBulkLoaderImpl::init(const std::vector<BSONObj>& secondaryIndexSpecs) {
     return _runTaskReleaseResourcesOnFailure(
-        [coll, &secondaryIndexSpecs, this](OperationContext* opCtx) -> Status {
-            invariant(opCtx);
-            invariant(coll);
-            invariant(opCtx->getClient() == &cc());
+        [ coll = _autoColl->getCollection(), &secondaryIndexSpecs, this ]()->Status {
             // All writes in CollectionBulkLoaderImpl should be unreplicated.
             // The opCtx is accessed indirectly through _secondaryIndexesBlock.
-            UnreplicatedWritesBlock uwb(opCtx);
+            UnreplicatedWritesBlock uwb(_opCtx.get());
             std::vector<BSONObj> specs(secondaryIndexSpecs);
             // This enforces the buildIndexes setting in the replica set configuration.
             _secondaryIndexesBlock->removeExistingIndexes(&specs);
@@ -124,10 +141,8 @@ Status CollectionBulkLoaderImpl::init(Collection* coll,
 Status CollectionBulkLoaderImpl::insertDocuments(const std::vector<BSONObj>::const_iterator begin,
                                                  const std::vector<BSONObj>::const_iterator end) {
     int count = 0;
-    return _runTaskReleaseResourcesOnFailure([begin, end, &count, this](
-                                                 OperationContext* opCtx) -> Status {
-        invariant(opCtx);
-        UnreplicatedWritesBlock uwb(opCtx);
+    return _runTaskReleaseResourcesOnFailure([&]() -> Status {
+        UnreplicatedWritesBlock uwb(_opCtx.get());
 
         for (auto iter = begin; iter != end; ++iter) {
             std::vector<MultiIndexBlock*> indexers;
@@ -138,18 +153,20 @@ Status CollectionBulkLoaderImpl::insertDocuments(const std::vector<BSONObj>::con
                 indexers.push_back(_secondaryIndexesBlock.get());
             }
             MONGO_WRITE_CONFLICT_RETRY_LOOP_BEGIN {
-                WriteUnitOfWork wunit(opCtx);
+                WriteUnitOfWork wunit(_opCtx.get());
                 if (!indexers.empty()) {
                     // This flavor of insertDocument will not update any pre-existing indexes, only
                     // the indexers passed in.
-                    const auto status = _coll->insertDocument(opCtx, *iter, indexers, false);
+                    const auto status = _autoColl->getCollection()->insertDocument(
+                        _opCtx.get(), *iter, indexers, false);
                     if (!status.isOK()) {
                         return status;
                     }
                 } else {
                     // For capped collections, we use regular insertDocument, which will update
                     // pre-existing indexes.
-                    const auto status = _coll->insertDocument(opCtx, *iter, nullptr, false, false);
+                    const auto status = _autoColl->getCollection()->insertDocument(
+                        _opCtx.get(), *iter, nullptr, false);
                     if (!status.isOK()) {
                         return status;
                     }
@@ -158,7 +175,7 @@ Status CollectionBulkLoaderImpl::insertDocuments(const std::vector<BSONObj>::con
                 wunit.commit();
             }
             MONGO_WRITE_CONFLICT_RETRY_LOOP_END(
-                _opCtx, "CollectionBulkLoaderImpl::insertDocuments", _nss.ns());
+                _opCtx.get(), "CollectionBulkLoaderImpl::insertDocuments", _nss.ns());
 
             ++count;
         }
@@ -167,80 +184,76 @@ Status CollectionBulkLoaderImpl::insertDocuments(const std::vector<BSONObj>::con
 }
 
 Status CollectionBulkLoaderImpl::commit() {
-    return _runTaskReleaseResourcesOnFailure(
-        [this](OperationContext* opCtx) -> Status {
-            _stats.startBuildingIndexes = Date_t::now();
-            LOG(2) << "Creating indexes for ns: " << _nss.ns();
-            invariant(opCtx->getClient() == &cc());
-            invariant(opCtx == _opCtx);
-            UnreplicatedWritesBlock uwb(opCtx);
+    return _runTaskReleaseResourcesOnFailure([this]() -> Status {
+        _stats.startBuildingIndexes = Date_t::now();
+        LOG(2) << "Creating indexes for ns: " << _nss.ns();
+        UnreplicatedWritesBlock uwb(_opCtx.get());
 
-            // Commit before deleting dups, so the dups will be removed from secondary indexes when
-            // deleted.
-            if (_secondaryIndexesBlock) {
-                std::set<RecordId> secDups;
-                auto status = _secondaryIndexesBlock->doneInserting(&secDups);
-                if (!status.isOK()) {
-                    return status;
-                }
-                if (secDups.size()) {
-                    return Status{ErrorCodes::UserDataInconsistent,
-                                  str::stream() << "Found " << secDups.size()
-                                                << " duplicates on secondary index(es) even though "
-                                                   "MultiIndexBlock::ignoreUniqueConstraint set."};
-                }
+        // Commit before deleting dups, so the dups will be removed from secondary indexes when
+        // deleted.
+        if (_secondaryIndexesBlock) {
+            std::set<RecordId> secDups;
+            auto status = _secondaryIndexesBlock->doneInserting(&secDups);
+            if (!status.isOK()) {
+                return status;
+            }
+            if (secDups.size()) {
+                return Status{ErrorCodes::UserDataInconsistent,
+                              str::stream() << "Found " << secDups.size()
+                                            << " duplicates on secondary index(es) even though "
+                                               "MultiIndexBlock::ignoreUniqueConstraint set."};
+            }
+            MONGO_WRITE_CONFLICT_RETRY_LOOP_BEGIN {
+                WriteUnitOfWork wunit(_opCtx.get());
+                _secondaryIndexesBlock->commit();
+                wunit.commit();
+            }
+            MONGO_WRITE_CONFLICT_RETRY_LOOP_END(
+                _opCtx.get(), "CollectionBulkLoaderImpl::commit", _nss.ns());
+        }
+
+        if (_idIndexBlock) {
+            // Delete dups.
+            std::set<RecordId> dups;
+            // Do not do inside a WriteUnitOfWork (required by doneInserting).
+            auto status = _idIndexBlock->doneInserting(&dups);
+            if (!status.isOK()) {
+                return status;
+            }
+
+            for (auto&& it : dups) {
                 MONGO_WRITE_CONFLICT_RETRY_LOOP_BEGIN {
-                    WriteUnitOfWork wunit(opCtx);
-                    _secondaryIndexesBlock->commit();
+                    WriteUnitOfWork wunit(_opCtx.get());
+                    _autoColl->getCollection()->deleteDocument(_opCtx.get(),
+                                                               it,
+                                                               nullptr /** OpDebug **/,
+                                                               false /* fromMigrate */,
+                                                               true /* noWarn */);
                     wunit.commit();
                 }
                 MONGO_WRITE_CONFLICT_RETRY_LOOP_END(
-                    _opCtx, "CollectionBulkLoaderImpl::commit", _nss.ns());
+                    _opCtx.get(), "CollectionBulkLoaderImpl::commit", _nss.ns());
             }
 
-            if (_idIndexBlock) {
-                // Delete dups.
-                std::set<RecordId> dups;
-                // Do not do inside a WriteUnitOfWork (required by doneInserting).
-                auto status = _idIndexBlock->doneInserting(&dups);
-                if (!status.isOK()) {
-                    return status;
-                }
-
-                for (auto&& it : dups) {
-                    MONGO_WRITE_CONFLICT_RETRY_LOOP_BEGIN {
-                        WriteUnitOfWork wunit(_opCtx);
-                        _coll->deleteDocument(_opCtx,
-                                              it,
-                                              nullptr /** OpDebug **/,
-                                              false /* fromMigrate */,
-                                              true /* noWarn */);
-                        wunit.commit();
-                    }
-                    MONGO_WRITE_CONFLICT_RETRY_LOOP_END(
-                        _opCtx, "CollectionBulkLoaderImpl::commit", _nss.ns());
-                }
-
-                // Commit _id index, without dups.
-                MONGO_WRITE_CONFLICT_RETRY_LOOP_BEGIN {
-                    WriteUnitOfWork wunit(opCtx);
-                    _idIndexBlock->commit();
-                    wunit.commit();
-                }
-                MONGO_WRITE_CONFLICT_RETRY_LOOP_END(
-                    _opCtx, "CollectionBulkLoaderImpl::commit", _nss.ns());
+            // Commit _id index, without dups.
+            MONGO_WRITE_CONFLICT_RETRY_LOOP_BEGIN {
+                WriteUnitOfWork wunit(_opCtx.get());
+                _idIndexBlock->commit();
+                wunit.commit();
             }
-            _stats.endBuildingIndexes = Date_t::now();
-            LOG(2) << "Done creating indexes for ns: " << _nss.ns()
-                   << ", stats: " << _stats.toString();
+            MONGO_WRITE_CONFLICT_RETRY_LOOP_END(
+                _opCtx.get(), "CollectionBulkLoaderImpl::commit", _nss.ns());
+        }
+        _stats.endBuildingIndexes = Date_t::now();
+        LOG(2) << "Done creating indexes for ns: " << _nss.ns() << ", stats: " << _stats.toString();
 
-            _releaseResources();
-            return Status::OK();
-        },
-        TaskRunner::NextAction::kDisposeOperationContext);
+        _releaseResources();
+        return Status::OK();
+    });
 }
 
 void CollectionBulkLoaderImpl::_releaseResources() {
+    invariant(&cc() == _opCtx->getClient());
     if (_secondaryIndexesBlock) {
         // A valid Client is required to drop unfinished indexes.
         Client::initThreadIfNotAlready();
@@ -254,22 +267,26 @@ void CollectionBulkLoaderImpl::_releaseResources() {
     }
 
     // release locks.
-    _coll = nullptr;
-    _autoColl.reset(nullptr);
-    _autoDB.reset(nullptr);
+    _autoColl.reset();
 }
 
-Status CollectionBulkLoaderImpl::_runTaskReleaseResourcesOnFailure(
-    TaskRunner::SynchronousTask task, TaskRunner::NextAction nextAction) {
-    auto newTask = [this, &task](OperationContext* opCtx) -> Status {
-        ScopeGuard guard = MakeGuard(&CollectionBulkLoaderImpl::_releaseResources, this);
-        const auto status = task(opCtx);
+template <typename F>
+Status CollectionBulkLoaderImpl::_runTaskReleaseResourcesOnFailure(F task) noexcept {
+
+    AlternativeClientRegion acr(_client);
+    ScopeGuard guard = MakeGuard(&CollectionBulkLoaderImpl::_releaseResources, this);
+    try {
+        const auto status = [&task]() noexcept {
+            return task();
+        }
+        ();
         if (status.isOK()) {
             guard.Dismiss();
         }
         return status;
-    };
-    return _runner->runSynchronousTask(newTask, nextAction);
+    } catch (...) {
+        std::terminate();
+    }
 }
 
 CollectionBulkLoaderImpl::Stats CollectionBulkLoaderImpl::getStats() const {
