@@ -69,7 +69,6 @@ functions:
         revisions: # for each module include revision as <module_name> : ${<module_name>_rev}
           dsi: ${dsi_rev}
           workloads: ${workloads_rev}
-          YCSB: ${YCSB_rev}
     - command: shell.exec
       params:
         working_dir: work
@@ -104,7 +103,6 @@ functions:
           dsi_rev: ${dsi_rev}
           compare_task: ${compare_task}
           workloads_rev: ${workloads_rev}
-          YCSB_rev: ${YCSB_rev}
 
           # compositions of expansions
           mongodb_binary_archive: "https://s3.amazonaws.com/mciuploads/${project}/${version_id}/${revision}/${platform}/mongod-${version_id}.tar.gz"
@@ -751,12 +749,6 @@ modules:
   prefix: workloads
   branch: master
 
-- name: YCSB
-  repo: git@github.com:mongodb-labs/YCSB.git
-  prefix: YCSB
-  branch: evergreen
-
-
 
 #######################################
 #         Linux Buildvariants         #
@@ -769,7 +761,6 @@ buildvariants:
   modules: &modules
     - dsi
     - workloads
-    - YCSB
   expansions:
     setup: single-replica
     cluster: single
