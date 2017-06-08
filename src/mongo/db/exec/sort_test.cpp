@@ -66,7 +66,7 @@ public:
 
     /**
      * Test function to verify sort stage.
-     * SortStageParams will be initialized using patternStr, collator, queryStr and limit.
+     * SortStageParams will be initialized using patternStr, collator, and limit.
      * inputStr represents the input data set in a BSONObj.
      *     {input: [doc1, doc2, doc3, ...]}
      * expectedStr represents the expected sorted data set.
@@ -74,7 +74,6 @@ public:
      */
     void testWork(const char* patternStr,
                   CollatorInterface* collator,
-                  const char* queryStr,
                   int limit,
                   const char* inputStr,
                   const char* expectedStr) {
@@ -107,12 +106,8 @@ public:
         params.pattern = fromjson(patternStr);
         params.limit = limit;
 
-        auto sortKeyGen = stdx::make_unique<SortKeyGeneratorStage>(getOpCtx(),
-                                                                   queuedDataStage.release(),
-                                                                   &ws,
-                                                                   params.pattern,
-                                                                   fromjson(queryStr),
-                                                                   collator);
+        auto sortKeyGen = stdx::make_unique<SortKeyGeneratorStage>(
+            getOpCtx(), queuedDataStage.release(), &ws, params.pattern, collator);
 
         SortStage sort(getOpCtx(), params, &ws, sortKeyGen.release());
 
@@ -151,8 +146,8 @@ public:
             mongoutils::str::stream ss;
             // Even though we have the original string representation of the expected output,
             // we invoke BSONObj::toString() to get a format consistent with outputObj.
-            ss << "Unexpected sort result with query=" << queryStr << "; pattern=" << patternStr
-               << "; limit=" << limit << ":\n"
+            ss << "Unexpected sort result with pattern=" << patternStr << "; limit=" << limit
+               << ":\n"
                << "Expected: " << expectedObj.toString() << "\n"
                << "Actual:   " << outputObj.toString() << "\n";
             FAIL(ss);
@@ -177,7 +172,7 @@ TEST_F(SortStageTest, SortEmptyWorkingSet) {
     // QueuedDataStage will be owned by SortStage.
     auto queuedDataStage = stdx::make_unique<QueuedDataStage>(getOpCtx(), &ws);
     auto sortKeyGen = stdx::make_unique<SortKeyGeneratorStage>(
-        getOpCtx(), queuedDataStage.release(), &ws, BSONObj(), BSONObj(), nullptr);
+        getOpCtx(), queuedDataStage.release(), &ws, BSONObj(), nullptr);
     SortStageParams params;
     SortStage sort(getOpCtx(), params, &ws, sortKeyGen.release());
 
@@ -216,7 +211,6 @@ TEST_F(SortStageTest, SortEmptyWorkingSet) {
 TEST_F(SortStageTest, SortAscending) {
     testWork("{a: 1}",
              nullptr,
-             "{}",
              0,
              "{input: [{a: 2}, {a: 1}, {a: 3}]}",
              "{output: [{a: 1}, {a: 2}, {a: 3}]}");
@@ -225,7 +219,6 @@ TEST_F(SortStageTest, SortAscending) {
 TEST_F(SortStageTest, SortDescending) {
     testWork("{a: -1}",
              nullptr,
-             "{}",
              0,
              "{input: [{a: 2}, {a: 1}, {a: 3}]}",
              "{output: [{a: 3}, {a: 2}, {a: 1}]}");
@@ -234,7 +227,6 @@ TEST_F(SortStageTest, SortDescending) {
 TEST_F(SortStageTest, SortIrrelevantSortKey) {
     testWork("{b: 1}",
              nullptr,
-             "{}",
              0,
              "{input: [{a: 2}, {a: 1}, {a: 3}]}",
              "{output: [{a: 2}, {a: 1}, {a: 3}]}");
@@ -247,21 +239,13 @@ TEST_F(SortStageTest, SortIrrelevantSortKey) {
 //
 
 TEST_F(SortStageTest, SortAscendingWithLimit) {
-    testWork("{a: 1}",
-             nullptr,
-             "{}",
-             2,
-             "{input: [{a: 2}, {a: 1}, {a: 3}]}",
-             "{output: [{a: 1}, {a: 2}]}");
+    testWork(
+        "{a: 1}", nullptr, 2, "{input: [{a: 2}, {a: 1}, {a: 3}]}", "{output: [{a: 1}, {a: 2}]}");
 }
 
 TEST_F(SortStageTest, SortDescendingWithLimit) {
-    testWork("{a: -1}",
-             nullptr,
-             "{}",
-             2,
-             "{input: [{a: 2}, {a: 1}, {a: 3}]}",
-             "{output: [{a: 3}, {a: 2}]}");
+    testWork(
+        "{a: -1}", nullptr, 2, "{input: [{a: 2}, {a: 1}, {a: 3}]}", "{output: [{a: 3}, {a: 2}]}");
 }
 
 //
@@ -273,7 +257,6 @@ TEST_F(SortStageTest, SortDescendingWithLimit) {
 TEST_F(SortStageTest, SortAscendingWithLimitGreaterThanInputSize) {
     testWork("{a: 1}",
              nullptr,
-             "{}",
              10,
              "{input: [{a: 2}, {a: 1}, {a: 3}]}",
              "{output: [{a: 1}, {a: 2}, {a: 3}]}");
@@ -282,7 +265,6 @@ TEST_F(SortStageTest, SortAscendingWithLimitGreaterThanInputSize) {
 TEST_F(SortStageTest, SortDescendingWithLimitGreaterThanInputSize) {
     testWork("{a: -1}",
              nullptr,
-             "{}",
              10,
              "{input: [{a: 2}, {a: 1}, {a: 3}]}",
              "{output: [{a: 3}, {a: 2}, {a: 1}]}");
@@ -294,19 +276,17 @@ TEST_F(SortStageTest, SortDescendingWithLimitGreaterThanInputSize) {
 //
 
 TEST_F(SortStageTest, SortAscendingWithLimitOfOne) {
-    testWork("{a: 1}", nullptr, "{}", 1, "{input: [{a: 2}, {a: 1}, {a: 3}]}", "{output: [{a: 1}]}");
+    testWork("{a: 1}", nullptr, 1, "{input: [{a: 2}, {a: 1}, {a: 3}]}", "{output: [{a: 1}]}");
 }
 
 TEST_F(SortStageTest, SortDescendingWithLimitOfOne) {
-    testWork(
-        "{a: -1}", nullptr, "{}", 1, "{input: [{a: 2}, {a: 1}, {a: 3}]}", "{output: [{a: 3}]}");
+    testWork("{a: -1}", nullptr, 1, "{input: [{a: 2}, {a: 1}, {a: 3}]}", "{output: [{a: 3}]}");
 }
 
 TEST_F(SortStageTest, SortAscendingWithCollation) {
     CollatorInterfaceMock collator(CollatorInterfaceMock::MockType::kReverseString);
     testWork("{a: 1}",
              &collator,
-             "{}",
              0,
              "{input: [{a: 'ba'}, {a: 'aa'}, {a: 'ab'}]}",
              "{output: [{a: 'aa'}, {a: 'ba'}, {a: 'ab'}]}");
@@ -316,7 +296,6 @@ TEST_F(SortStageTest, SortDescendingWithCollation) {
     CollatorInterfaceMock collator(CollatorInterfaceMock::MockType::kReverseString);
     testWork("{a: -1}",
              &collator,
-             "{}",
              0,
              "{input: [{a: 'ba'}, {a: 'aa'}, {a: 'ab'}]}",
              "{output: [{a: 'ab'}, {a: 'ba'}, {a: 'aa'}]}");

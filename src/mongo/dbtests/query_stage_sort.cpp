@@ -120,7 +120,7 @@ public:
         params.limit = limit();
 
         auto keyGenStage = make_unique<SortKeyGeneratorStage>(
-            &_opCtx, queuedDataStage.release(), ws.get(), params.pattern, BSONObj(), nullptr);
+            &_opCtx, queuedDataStage.release(), ws.get(), params.pattern, nullptr);
 
         auto ss = make_unique<SortStage>(&_opCtx, params, ws.get(), keyGenStage.release());
 
@@ -159,7 +159,7 @@ public:
         params.limit = limit();
 
         auto keyGenStage = make_unique<SortKeyGeneratorStage>(
-            &_opCtx, queuedDataStage.release(), ws.get(), params.pattern, BSONObj(), nullptr);
+            &_opCtx, queuedDataStage.release(), ws.get(), params.pattern, nullptr);
 
         auto sortStage = make_unique<SortStage>(&_opCtx, params, ws.get(), keyGenStage.release());
 
@@ -560,7 +560,7 @@ public:
         params.limit = 0;
 
         auto keyGenStage = make_unique<SortKeyGeneratorStage>(
-            &_opCtx, queuedDataStage.release(), ws.get(), params.pattern, BSONObj(), nullptr);
+            &_opCtx, queuedDataStage.release(), ws.get(), params.pattern, nullptr);
 
         auto sortStage = make_unique<SortStage>(&_opCtx, params, ws.get(), keyGenStage.release());
 

@@ -42,7 +42,6 @@
 #include "mongo/db/exec/working_set_computed_data.h"
 #include "mongo/db/matcher/extensions_callback_noop.h"
 #include "mongo/db/query/collation/collator_interface.h"
-#include "mongo/db/query/query_planner.h"
 #include "mongo/stdx/memory.h"
 #include "mongo/util/log.h"
 
@@ -54,13 +53,8 @@ namespace mongo {
 
 SortKeyGenerator::SortKeyGenerator(OperationContext* opCtx,
                                    const BSONObj& sortSpec,
-                                   const BSONObj& queryObj,
                                    const CollatorInterface* collator)
-    : _collator(collator) {
-    _hasBounds = false;
-    _sortHasMeta = false;
-    _rawSortSpec = sortSpec;
-
+    : _collator(collator), _rawSortSpec(sortSpec) {
     // 'sortSpec' can be a mix of $meta and index key expressions.  We pick it apart so that
     // we only generate Btree keys for the index key expressions.
 
@@ -68,17 +62,14 @@ SortKeyGenerator::SortKeyGenerator(OperationContext* opCtx,
     // key generator below as part of generating sort keys for the docs.
     BSONObjBuilder btreeBob;
 
-    BSONObjIterator it(sortSpec);
-    while (it.more()) {
-        BSONElement elt = it.next();
+    for (auto&& elt : sortSpec) {
         if (elt.isNumber()) {
-            // Btree key.  elt (should be) foo: 1 or foo: -1.
             btreeBob.append(elt);
-        } else if (QueryRequest::isTextScoreMeta(elt)) {
-            _sortHasMeta = true;
         } else {
-            // Sort spec. should have been validated before here.
-            verify(false);
+            // If this field of the sort pattern is non-numeric, we expect it to be a text-score
+            // meta sort. This is validated upstream.
+            invariant(QueryRequest::isTextScoreMeta(elt));
+            _sortHasMeta = true;
         }
     }
 
@@ -95,21 +86,13 @@ SortKeyGenerator::SortKeyGenerator(OperationContext* opCtx,
     // the sort order.
     std::vector<const char*> fieldNames;
     std::vector<BSONElement> fixed;
-    BSONObjIterator btreeIt(_btreeObj);
-    while (btreeIt.more()) {
-        BSONElement patternElt = btreeIt.next();
+    for (auto&& patternElt : _btreeObj) {
         fieldNames.push_back(patternElt.fieldName());
         fixed.push_back(BSONElement());
     }
 
-    _keyGen.reset(new BtreeKeyGeneratorV1(fieldNames, fixed, false /* not sparse */, _collator));
-
-    // The bounds checker only works on the Btree part of the sort key.
-    getBoundsForSort(opCtx, queryObj, _btreeObj);
-
-    if (_hasBounds) {
-        _boundsChecker.reset(new IndexBoundsChecker(&_bounds, _btreeObj, 1 /* == order */));
-    }
+    constexpr bool isSparse = false;
+    _keyGen = stdx::make_unique<BtreeKeyGeneratorV1>(fieldNames, fixed, isSparse, _collator);
 }
 
 Status SortKeyGenerator::getSortKey(const WorkingSetMember& member, BSONObj* objOut) const {
@@ -203,91 +186,8 @@ StatusWith<BSONObj> SortKeyGenerator::getSortKeyFromObject(const WorkingSetMembe
     // Key generator isn't sparse so we should at least get an all-null key.
     invariant(!keys.empty());
 
-    // No bounds?  No problem!  Use the first key.
-    if (!_hasBounds) {
-        // Note that we sort 'keys' according to the pattern '_btreeObj'.
-        return *keys.begin();
-    }
-
-    // To decide which key to use in sorting, we must consider not only the sort pattern but
-    // the query.  Assume we have the query {a: {$gte: 5}} and a document {a:1}.  That
-    // document wouldn't match the query.  As such, the key '1' in an array {a: [1, 10]}
-    // should not be considered as being part of the result set and thus that array cannot
-    // sort using the key '1'.  To ensure that the keys we sort by are valid w.r.t. the
-    // query we use a bounds checker.
-    verify(NULL != _boundsChecker.get());
-    for (BSONObjSet::const_iterator it = keys.begin(); it != keys.end(); ++it) {
-        if (_boundsChecker->isValidKey(*it)) {
-            return *it;
-        }
-    }
-
-    // No key is in our bounds.
-    // TODO: will this ever happen?  don't think it should.
+    // The sort key is the first index key, ordered according to the pattern '_btreeObj'.
     return *keys.begin();
-}
-
-void SortKeyGenerator::getBoundsForSort(OperationContext* opCtx,
-                                        const BSONObj& queryObj,
-                                        const BSONObj& sortObj) {
-    QueryPlannerParams params;
-    params.options = QueryPlannerParams::NO_TABLE_SCAN;
-
-    // We're creating a "virtual index" with key pattern equal to the sort order. The "virtual
-    // index" has the collation which the query is using.
-    IndexEntry sortOrder(sortObj,
-                         IndexNames::BTREE,
-                         true,
-                         MultikeyPaths{},
-                         false,
-                         false,
-                         "doesnt_matter",
-                         NULL,
-                         BSONObj(),
-                         _collator);
-    params.indices.push_back(sortOrder);
-
-    auto qr = stdx::make_unique<QueryRequest>(NamespaceString("fake.ns"));
-    qr->setFilter(queryObj);
-    if (_collator) {
-        qr->setCollation(_collator->getSpec().toBSON());
-    }
-
-    auto statusWithQueryForSort =
-        CanonicalQuery::canonicalize(opCtx, std::move(qr), ExtensionsCallbackNoop());
-    verify(statusWithQueryForSort.isOK());
-    std::unique_ptr<CanonicalQuery> queryForSort = std::move(statusWithQueryForSort.getValue());
-
-    std::vector<QuerySolution*> solns;
-    LOG(5) << "Sort key generation: Planning to obtain bounds for sort.";
-    QueryPlanner::plan(*queryForSort, params, &solns).transitional_ignore();
-
-    // TODO: are there ever > 1 solns?  If so, do we look for a specific soln?
-    if (1 == solns.size()) {
-        IndexScanNode* ixScan = NULL;
-        QuerySolutionNode* rootNode = solns[0]->root.get();
-
-        if (rootNode->getType() == STAGE_FETCH) {
-            FetchNode* fetchNode = static_cast<FetchNode*>(rootNode);
-            if (fetchNode->children[0]->getType() != STAGE_IXSCAN) {
-                delete solns[0];
-                // No bounds.
-                return;
-            }
-            ixScan = static_cast<IndexScanNode*>(fetchNode->children[0]);
-        } else if (rootNode->getType() == STAGE_IXSCAN) {
-            ixScan = static_cast<IndexScanNode*>(rootNode);
-        }
-
-        if (ixScan) {
-            _bounds.fields.swap(ixScan->bounds.fields);
-            _hasBounds = true;
-        }
-    }
-
-    for (size_t i = 0; i < solns.size(); ++i) {
-        delete solns[i];
-    }
 }
 
 //
@@ -300,13 +200,8 @@ SortKeyGeneratorStage::SortKeyGeneratorStage(OperationContext* opCtx,
                                              PlanStage* child,
                                              WorkingSet* ws,
                                              const BSONObj& sortSpecObj,
-                                             const BSONObj& queryObj,
                                              const CollatorInterface* collator)
-    : PlanStage(kStageType, opCtx),
-      _ws(ws),
-      _sortSpec(sortSpecObj),
-      _query(queryObj),
-      _collator(collator) {
+    : PlanStage(kStageType, opCtx), _ws(ws), _sortSpec(sortSpecObj), _collator(collator) {
     _children.emplace_back(child);
 }
 
@@ -316,7 +211,7 @@ bool SortKeyGeneratorStage::isEOF() {
 
 PlanStage::StageState SortKeyGeneratorStage::doWork(WorkingSetID* out) {
     if (!_sortKeyGen) {
-        _sortKeyGen = stdx::make_unique<SortKeyGenerator>(getOpCtx(), _sortSpec, _query, _collator);
+        _sortKeyGen = stdx::make_unique<SortKeyGenerator>(getOpCtx(), _sortSpec, _collator);
         return PlanStage::NEED_TIME;
     }
 

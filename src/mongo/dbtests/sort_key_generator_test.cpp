@@ -50,10 +50,7 @@ namespace {
  *
  * Returns the BSON representation of the sort key, to be checked against the expected sort key.
  */
-BSONObj extractSortKey(const char* sortSpec,
-                       const char* doc,
-                       const char* query,
-                       const CollatorInterface* collator) {
+BSONObj extractSortKey(const char* sortSpec, const char* doc, const CollatorInterface* collator) {
     QueryTestServiceContext serviceContext;
     auto opCtx = serviceContext.makeOperationContext();
 
@@ -62,8 +59,8 @@ BSONObj extractSortKey(const char* sortSpec,
     wsm.transitionToOwnedObj();
 
     BSONObj sortKey;
-    auto sortKeyGen = stdx::make_unique<SortKeyGenerator>(
-        opCtx.get(), fromjson(sortSpec), fromjson(query), collator);
+    auto sortKeyGen =
+        stdx::make_unique<SortKeyGenerator>(opCtx.get(), fromjson(sortSpec), collator);
     ASSERT_OK(sortKeyGen->getSortKey(wsm, &sortKey));
 
     return sortKey;
@@ -93,49 +90,49 @@ BSONObj extractSortKeyCovered(const char* sortSpec,
 
     BSONObj sortKey;
     auto sortKeyGen =
-        stdx::make_unique<SortKeyGenerator>(opCtx.get(), fromjson(sortSpec), BSONObj(), collator);
+        stdx::make_unique<SortKeyGenerator>(opCtx.get(), fromjson(sortSpec), collator);
     ASSERT_OK(sortKeyGen->getSortKey(*wsm, &sortKey));
 
     return sortKey;
 }
 
 TEST(SortKeyGeneratorTest, SortKeyNormal) {
-    BSONObj actualOut = extractSortKey("{a: 1}", "{_id: 0, a: 5}", "", nullptr);
+    BSONObj actualOut = extractSortKey("{a: 1}", "{_id: 0, a: 5}", nullptr);
     BSONObj expectedOut = BSON("" << 5);
     ASSERT_BSONOBJ_EQ(actualOut, expectedOut);
 }
 
 TEST(SortKeyGeneratorTest, SortKeyNormal2) {
-    BSONObj actualOut = extractSortKey("{a: 1}", "{_id: 0, z: 10, a: 6, b: 16}", "", nullptr);
+    BSONObj actualOut = extractSortKey("{a: 1}", "{_id: 0, z: 10, a: 6, b: 16}", nullptr);
     BSONObj expectedOut = BSON("" << 6);
     ASSERT_BSONOBJ_EQ(actualOut, expectedOut);
 }
 
 TEST(SortKeyGeneratorTest, SortKeyString) {
     BSONObj actualOut =
-        extractSortKey("{a: 1}", "{_id: 0, z: 'thing1', a: 'thing2', b: 16}", "", nullptr);
+        extractSortKey("{a: 1}", "{_id: 0, z: 'thing1', a: 'thing2', b: 16}", nullptr);
     BSONObj expectedOut = BSON(""
                                << "thing2");
     ASSERT_BSONOBJ_EQ(actualOut, expectedOut);
 }
 
 TEST(SortKeyGeneratorTest, SortKeyCompound) {
-    BSONObj actualOut = extractSortKey(
-        "{a: 1, b: 1}", "{_id: 0, z: 'thing1', a: 99, c: {a: 4}, b: 16}", "", nullptr);
+    BSONObj actualOut =
+        extractSortKey("{a: 1, b: 1}", "{_id: 0, z: 'thing1', a: 99, c: {a: 4}, b: 16}", nullptr);
     BSONObj expectedOut = BSON("" << 99 << "" << 16);
     ASSERT_BSONOBJ_EQ(actualOut, expectedOut);
 }
 
 TEST(SortKeyGeneratorTest, SortKeyEmbedded) {
     BSONObj actualOut = extractSortKey(
-        "{'c.a': 1, b: 1}", "{_id: 0, z: 'thing1', a: 99, c: {a: 4}, b: 16}", "", nullptr);
+        "{'c.a': 1, b: 1}", "{_id: 0, z: 'thing1', a: 99, c: {a: 4}, b: 16}", nullptr);
     BSONObj expectedOut = BSON("" << 4 << "" << 16);
     ASSERT_BSONOBJ_EQ(actualOut, expectedOut);
 }
 
 TEST(SortKeyGeneratorTest, SortKeyArray) {
     BSONObj actualOut = extractSortKey(
-        "{'c': 1, b: 1}", "{_id: 0, z: 'thing1', a: 99, c: [2, 4, 1], b: 16}", "", nullptr);
+        "{'c': 1, b: 1}", "{_id: 0, z: 'thing1', a: 99, c: [2, 4, 1], b: 16}", nullptr);
     BSONObj expectedOut = BSON("" << 1 << "" << 16);
     ASSERT_BSONOBJ_EQ(actualOut, expectedOut);
 }
@@ -194,7 +191,7 @@ TEST(SortKeyGeneratorTest, SortKeyCoveredCompound3) {
 TEST(SortKeyGeneratorTest, ExtractStringSortKeyWithCollatorUsesComparisonKey) {
     CollatorInterfaceMock collator(CollatorInterfaceMock::MockType::kReverseString);
     BSONObj actualOut =
-        extractSortKey("{a: 1}", "{_id: 0, z: 'thing1', a: 'thing2', b: 16}", "", &collator);
+        extractSortKey("{a: 1}", "{_id: 0, z: 'thing1', a: 'thing2', b: 16}", &collator);
     BSONObj expectedOut = BSON(""
                                << "2gniht");
     ASSERT_BSONOBJ_EQ(actualOut, expectedOut);
@@ -202,7 +199,7 @@ TEST(SortKeyGeneratorTest, ExtractStringSortKeyWithCollatorUsesComparisonKey) {
 
 TEST(SortKeyGeneratorTest, CollatorHasNoEffectWhenExtractingNonStringSortKey) {
     CollatorInterfaceMock collator(CollatorInterfaceMock::MockType::kReverseString);
-    BSONObj actualOut = extractSortKey("{a: 1}", "{_id: 0, z: 10, a: 6, b: 16}", "", &collator);
+    BSONObj actualOut = extractSortKey("{a: 1}", "{_id: 0, z: 10, a: 6, b: 16}", &collator);
     BSONObj expectedOut = BSON("" << 6);
     ASSERT_BSONOBJ_EQ(actualOut, expectedOut);
 }
@@ -220,28 +217,26 @@ TEST(SortKeyGeneratorTest, CollatorHasNoAffectWhenExtractingCoveredSortKey) {
     ASSERT_BSONOBJ_EQ(actualOut, expectedOut);
 }
 
-TEST(SortKeyGeneratorTest, SortKeyGenerationForArraysUsesTheQueryPredicate) {
-    BSONObj actualOut =
-        extractSortKey("{a: -1}", "{_id: 0, a: [1, 2, 3, 4]}", "{a: {$lt: 3}}", nullptr);
-    BSONObj expectedOut = BSON("" << 2);
+TEST(SortKeyGeneratorTest, SortKeyGenerationForArraysChoosesCorrectKey) {
+    BSONObj actualOut = extractSortKey("{a: -1}", "{_id: 0, a: [1, 2, 3, 4]}", nullptr);
+    BSONObj expectedOut = BSON("" << 4);
     ASSERT_BSONOBJ_EQ(actualOut, expectedOut);
 }
 
 TEST(SortKeyGeneratorTest, EnsureSortKeyGenerationForArraysRespectsCollation) {
     CollatorInterfaceMock collator(CollatorInterfaceMock::MockType::kReverseString);
     BSONObj actualOut =
-        extractSortKey("{a: 1}", "{_id: 0, a: ['aaz', 'zza', 'yya', 'zzb']}", "", &collator);
+        extractSortKey("{a: 1}", "{_id: 0, a: ['aaz', 'zza', 'yya', 'zzb']}", &collator);
     BSONObj expectedOut = BSON(""
                                << "ayy");
     ASSERT_BSONOBJ_EQ(actualOut, expectedOut);
 }
 
-TEST(SortKeyGeneratorTest, EnsureSortKeyGenerationForArraysWithPredicateRespectsCollation) {
-    CollatorInterfaceMock collator(CollatorInterfaceMock::MockType::kReverseString);
-    BSONObj actualOut = extractSortKey(
-        "{a: 1}", "{_id: 0, a: ['aaz', 'zza', 'yya', 'zzb']}", "{a: {$gt: 'yya'}}", &collator);
-    BSONObj expectedOut = BSON(""
-                               << "azz");
+TEST(SortKeyGeneratorTest, SortKeyGenerationForArraysRespectsCompoundOrdering) {
+    BSONObj actualOut = extractSortKey("{'a.b': 1, 'a.c': -1}",
+                                       "{_id: 0, a: [{b: 1, c: 0}, {b: 0, c: 3}, {b: 0, c: 1}]}",
+                                       nullptr);
+    BSONObj expectedOut = BSON("" << 0 << "" << 3);
     ASSERT_BSONOBJ_EQ(actualOut, expectedOut);
 }
 

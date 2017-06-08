@@ -653,8 +653,29 @@ std::set<StringData> IndexScanNode::getFieldsWithStringBounds(const IndexBounds&
     return ret;
 }
 
+namespace {
+std::set<StringData> getMultikeyFields(const BSONObj& keyPattern,
+                                       const MultikeyPaths& multikeyPaths) {
+    std::set<StringData> multikeyFields;
+    size_t i = 0;
+    for (auto&& elem : keyPattern) {
+        if (!multikeyPaths[i].empty()) {
+            multikeyFields.insert(elem.fieldNameStringData());
+        }
+        ++i;
+    }
+    return multikeyFields;
+}
+}  // namespace
+
 void IndexScanNode::computeProperties() {
     _sorts.clear();
+
+    // If the index is multikey but does not have path-level multikey metadata, then this index
+    // cannot provide any sorts.
+    if (index.multikey && index.multikeyPaths.empty()) {
+        return;
+    }
 
     BSONObj sortPattern = QueryPlannerAnalysis::getSortPattern(index.keyPattern);
     if (direction == -1) {
@@ -729,6 +750,27 @@ void IndexScanNode::computeProperties() {
 
             if (!matched) {
                 sortsIt++;
+            }
+        }
+    }
+
+    // We cannot provide a sort which involves a multikey field. Prune such sort orders, if the
+    // index is multikey.
+    if (index.multikey) {
+        auto multikeyFields = getMultikeyFields(index.keyPattern, index.multikeyPaths);
+        for (auto sortsIt = _sorts.begin(); sortsIt != _sorts.end();) {
+            bool foundMultikeyField = false;
+            for (auto&& elt : *sortsIt) {
+                if (multikeyFields.find(elt.fieldNameStringData()) != multikeyFields.end()) {
+                    foundMultikeyField = true;
+                    break;
+                }
+            }
+
+            if (foundMultikeyField) {
+                sortsIt = _sorts.erase(sortsIt);
+            } else {
+                ++sortsIt;
             }
         }
     }
@@ -840,8 +882,6 @@ void SortKeyGeneratorNode::appendToString(mongoutils::str::stream* ss, int inden
     *ss << "SORT_KEY_GENERATOR\n";
     addIndent(ss, indent + 1);
     *ss << "sortSpec = " << sortSpec.toString() << '\n';
-    addIndent(ss, indent + 1);
-    *ss << "queryObj = " << queryObj.toString() << '\n';
     addCommon(ss, indent);
     addIndent(ss, indent + 1);
     *ss << "Child:" << '\n';
@@ -851,7 +891,6 @@ void SortKeyGeneratorNode::appendToString(mongoutils::str::stream* ss, int inden
 QuerySolutionNode* SortKeyGeneratorNode::clone() const {
     SortKeyGeneratorNode* copy = new SortKeyGeneratorNode();
     cloneBaseData(copy);
-    copy->queryObj = this->queryObj;
     copy->sortSpec = this->sortSpec;
     return copy;
 }

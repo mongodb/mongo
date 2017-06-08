@@ -300,13 +300,12 @@ StatusWith<PrepareExecutionResult> prepareExecution(OperationContext* opCtx,
 
             // Add a SortKeyGeneratorStage if there is a $meta sortKey projection.
             if (canonicalQuery->getProj()->wantSortKey()) {
-                root = make_unique<SortKeyGeneratorStage>(
-                    opCtx,
-                    root.release(),
-                    ws,
-                    canonicalQuery->getQueryRequest().getSort(),
-                    canonicalQuery->getQueryRequest().getFilter(),
-                    canonicalQuery->getCollator());
+                root =
+                    make_unique<SortKeyGeneratorStage>(opCtx,
+                                                       root.release(),
+                                                       ws,
+                                                       canonicalQuery->getQueryRequest().getSort(),
+                                                       canonicalQuery->getCollator());
             }
 
             // Stuff the right data into the params depending on what proj impl we use.

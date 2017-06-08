@@ -597,10 +597,6 @@ struct SortKeyGeneratorNode : public QuerySolutionNode {
 
     void appendToString(mongoutils::str::stream* ss, int indent) const final;
 
-    // The query predicate provided by the user. For sorted by an array field, the sort key depends
-    // on the predicate.
-    BSONObj queryObj;
-
     // The user-supplied sort pattern.
     BSONObj sortSpec;
 };

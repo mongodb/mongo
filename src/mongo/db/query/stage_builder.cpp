@@ -129,12 +129,8 @@ PlanStage* buildStages(OperationContext* opCtx,
             if (nullptr == childStage) {
                 return nullptr;
             }
-            return new SortKeyGeneratorStage(opCtx,
-                                             childStage,
-                                             ws,
-                                             keyGenNode->sortSpec,
-                                             keyGenNode->queryObj,
-                                             cq.getCollator());
+            return new SortKeyGeneratorStage(
+                opCtx, childStage, ws, keyGenNode->sortSpec, cq.getCollator());
         }
         case STAGE_PROJECTION: {
             const ProjectionNode* pn = static_cast<const ProjectionNode*>(root);

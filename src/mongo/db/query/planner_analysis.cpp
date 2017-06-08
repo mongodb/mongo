@@ -525,7 +525,6 @@ QuerySolutionNode* QueryPlannerAnalysis::analyzeSort(const CanonicalQuery& query
     // And build the full sort stage. The sort stage has to have a sort key generating stage
     // as its child, supplying it with the appropriate sort keys.
     SortKeyGeneratorNode* keyGenNode = new SortKeyGeneratorNode();
-    keyGenNode->queryObj = qr.getFilter();
     keyGenNode->sortSpec = sortObj;
     keyGenNode->children.push_back(solnRoot);
     solnRoot = keyGenNode;
@@ -796,7 +795,6 @@ QuerySolution* QueryPlannerAnalysis::analyzeDataAccess(
         // generate the sort key computed data.
         if (!hasSortStage && query.getProj()->wantSortKey()) {
             SortKeyGeneratorNode* keyGenNode = new SortKeyGeneratorNode();
-            keyGenNode->queryObj = qr.getFilter();
             keyGenNode->sortSpec = qr.getSort();
             keyGenNode->children.push_back(solnRoot.release());
             solnRoot.reset(keyGenNode);

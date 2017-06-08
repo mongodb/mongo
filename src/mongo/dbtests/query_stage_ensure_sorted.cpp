@@ -79,7 +79,7 @@ public:
         // Initialization.
         BSONObj pattern = fromjson(patternStr);
         auto sortKeyGen = stdx::make_unique<SortKeyGeneratorStage>(
-            opCtx.get(), queuedDataStage.release(), &ws, pattern, BSONObj(), collator);
+            opCtx.get(), queuedDataStage.release(), &ws, pattern, collator);
         EnsureSortedStage ess(opCtx.get(), pattern, &ws, sortKeyGen.release());
         WorkingSetID id = WorkingSet::INVALID_ID;
         PlanStage::StageState state = PlanStage::NEED_TIME;
@@ -117,7 +117,7 @@ TEST_F(QueryStageEnsureSortedTest, EnsureSortedEmptyWorkingSet) {
     WorkingSet ws;
     auto queuedDataStage = stdx::make_unique<QueuedDataStage>(opCtx.get(), &ws);
     auto sortKeyGen = stdx::make_unique<SortKeyGeneratorStage>(
-        opCtx.get(), queuedDataStage.release(), &ws, BSONObj(), BSONObj(), nullptr);
+        opCtx.get(), queuedDataStage.release(), &ws, BSONObj(), nullptr);
     EnsureSortedStage ess(opCtx.get(), BSONObj(), &ws, sortKeyGen.release());
 
     WorkingSetID id = WorkingSet::INVALID_ID;

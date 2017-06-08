@@ -708,7 +708,8 @@ TEST_F(QueryPlannerTest, CompoundGeoNoGeoPredicateMultikey) {
         "{sort: {pattern: {creationDate: 1}, limit: 0, node: {sortKeyGen: "
         "{node: {cscan: {dir: 1}}}}}}");
     assertSolutionExists(
-        "{fetch: {node: {ixscan: {pattern: {creationDate: 1, 'foo.bar': '2dsphere'}}}}}");
+        "{sort: {pattern: {creationDate: 1}, limit: 0, node: {sortKeyGen: {node: {fetch: {node: "
+        "{ixscan: {pattern: {creationDate: 1, 'foo.bar': '2dsphere'}}}}}}}}}");
 }
 
 // Test that a 2dsphere index can satisfy a whole index scan solution if the query has a GEO
