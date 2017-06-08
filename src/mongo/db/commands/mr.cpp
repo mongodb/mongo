@@ -380,7 +380,7 @@ void State::dropTempCollections() {
             }
         }
         MONGO_WRITE_CONFLICT_RETRY_LOOP_END(
-            _opCtx, "M/R dropTempCollections", _config.tempNamespace.ns())
+            _opCtx, "M/R dropTempCollections", _config.tempNamespace.ns());
         // Always forget about temporary namespaces, so we don't cache lots of them
         ShardConnection::forgetNS(_config.tempNamespace.ns());
     }
@@ -397,7 +397,8 @@ void State::dropTempCollections() {
                 wunit.commit();
             }
         }
-        MONGO_WRITE_CONFLICT_RETRY_LOOP_END(_opCtx, "M/R dropTempCollections", _config.incLong.ns())
+        MONGO_WRITE_CONFLICT_RETRY_LOOP_END(
+            _opCtx, "M/R dropTempCollections", _config.incLong.ns());
 
         ShardConnection::forgetNS(_config.incLong.ns());
     }
@@ -522,7 +523,7 @@ void State::prepTempCollection() {
         wuow.commit();
     }
     MONGO_WRITE_CONFLICT_RETRY_LOOP_END(
-        _opCtx, "M/R prepTempCollection", _config.tempNamespace.ns())
+        _opCtx, "M/R prepTempCollection", _config.tempNamespace.ns());
 }
 
 /**
