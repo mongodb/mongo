@@ -120,7 +120,7 @@
         // var output = rawMongoProgramOutput();
         var fields = output.split(" ");
         // First field is the prefix, second field is the `ls -l` permissions.
-        assert.eq(fields[1], "-rw-------", targetFile + " has bad permissions");
+        assert.eq(fields[1].substr(0, 10), "-rw-------", targetFile + " has bad permissions");
     }
 
 })();
