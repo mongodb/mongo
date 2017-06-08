@@ -49,6 +49,10 @@ std::string kDummyNamespaceString = "test.foo";
 
 using LogicalClockTest = LogicalClockTestFixture;
 
+LogicalTime buildLogicalTime(unsigned secs, unsigned inc) {
+    return LogicalTime(Timestamp(secs, inc));
+}
+
 // Check that the initial time does not change during logicalClock creation.
 TEST_F(LogicalClockTest, roundtrip) {
     Timestamp tX(1);
@@ -213,6 +217,117 @@ TEST_F(LogicalClockTest, WallClockSetTooFarInFuture) {
 
     ASSERT_OK(getClock()->advanceClusterTime(nextTime));
     ASSERT_TRUE(getClock()->getClusterTime() == nextTime);
+}
+
+// Verify the behavior of advancing cluster time around the max allowed values.
+TEST_F(LogicalClockTest, ReserveTicksBehaviorAroundMaxTime) {
+    unsigned maxVal = LogicalClock::kMaxSignedInt;
+
+    // Verify clock can be advanced near the max values.
+
+    // Can always advance to the max value for the inc field.
+    resetClock()->setClusterTimeFromTrustedSource(buildLogicalTime(maxVal - 1, maxVal - 1));
+    getClock()->reserveTicks(1);
+    ASSERT_TRUE(getClock()->getClusterTime() == buildLogicalTime(maxVal - 1, maxVal));
+
+    resetClock()->setClusterTimeFromTrustedSource(buildLogicalTime(maxVal - 1, maxVal - 5));
+    getClock()->reserveTicks(5);
+    ASSERT_TRUE(getClock()->getClusterTime() == buildLogicalTime(maxVal - 1, maxVal));
+
+    resetClock()->setClusterTimeFromTrustedSource(buildLogicalTime(0, maxVal - 1));
+    getClock()->reserveTicks(1);
+    ASSERT_TRUE(getClock()->getClusterTime() == buildLogicalTime(0, maxVal));
+
+    // Can overflow inc into seconds to reach max seconds value.
+    resetClock()->setClusterTimeFromTrustedSource(buildLogicalTime(maxVal - 1, maxVal));
+    getClock()->reserveTicks(1);
+    ASSERT_TRUE(getClock()->getClusterTime() == buildLogicalTime(maxVal, 1));
+
+    resetClock()->setClusterTimeFromTrustedSource(buildLogicalTime(maxVal - 1, maxVal - 5));
+    getClock()->reserveTicks(10);
+    ASSERT_TRUE(getClock()->getClusterTime() == buildLogicalTime(maxVal, 10));
+
+    resetClock()->setClusterTimeFromTrustedSource(buildLogicalTime(maxVal - 1, 1));
+    getClock()->reserveTicks(maxVal);
+    ASSERT_TRUE(getClock()->getClusterTime() == buildLogicalTime(maxVal, maxVal));
+
+    // Can advance inc field when seconds field is at the max value.
+    resetClock()->setClusterTimeFromTrustedSource(buildLogicalTime(maxVal, 1));
+    getClock()->reserveTicks(1);
+    ASSERT_TRUE(getClock()->getClusterTime() == buildLogicalTime(maxVal, 2));
+
+    resetClock()->setClusterTimeFromTrustedSource(buildLogicalTime(maxVal, 1));
+    getClock()->reserveTicks(100);
+    ASSERT_TRUE(getClock()->getClusterTime() == buildLogicalTime(maxVal, 101));
+
+    // Can advance to the max value for both the inc and seconds fields.
+    resetClock()->setClusterTimeFromTrustedSource(buildLogicalTime(maxVal, maxVal - 1));
+    getClock()->reserveTicks(1);
+    ASSERT_TRUE(getClock()->getClusterTime() == buildLogicalTime(maxVal, maxVal));
+
+    resetClock()->setClusterTimeFromTrustedSource(buildLogicalTime(maxVal, maxVal - 5));
+    getClock()->reserveTicks(5);
+    ASSERT_TRUE(getClock()->getClusterTime() == buildLogicalTime(maxVal, maxVal));
+
+    // Verify scenarios where the clock cannot be advanced.
+
+    // Can't overflow inc into seconds when seconds field is at the max value.
+    resetClock()->setClusterTimeFromTrustedSource(buildLogicalTime(maxVal, maxVal));
+    ASSERT_THROWS(getClock()->reserveTicks(1), std::exception);
+    ASSERT_TRUE(getClock()->getClusterTime() == buildLogicalTime(maxVal, maxVal));
+
+    resetClock()->setClusterTimeFromTrustedSource(buildLogicalTime(maxVal, maxVal));
+    ASSERT_THROWS(getClock()->reserveTicks(5), std::exception);
+    ASSERT_TRUE(getClock()->getClusterTime() == buildLogicalTime(maxVal, maxVal));
+
+    resetClock()->setClusterTimeFromTrustedSource(buildLogicalTime(maxVal, maxVal - 1));
+    ASSERT_THROWS(getClock()->reserveTicks(2), std::exception);
+    ASSERT_TRUE(getClock()->getClusterTime() == buildLogicalTime(maxVal, maxVal - 1));
+
+    resetClock()->setClusterTimeFromTrustedSource(buildLogicalTime(maxVal, maxVal - 11));
+    ASSERT_THROWS(getClock()->reserveTicks(12), std::exception);
+    ASSERT_TRUE(getClock()->getClusterTime() == buildLogicalTime(maxVal, maxVal - 11));
+}
+
+// Verify behavior of advancing cluster time when the wall clock is near the max allowed value.
+TEST_F(LogicalClockTest, ReserveTicksBehaviorWhenWallClockNearMaxTime) {
+    unsigned maxVal = LogicalClock::kMaxSignedInt;
+
+    // Can be set to the max possible time by catching up to the wall clock.
+    setMockClockSourceTime(Date_t::fromDurationSinceEpoch(Seconds(maxVal)));
+
+    resetClock()->setClusterTimeFromTrustedSource(buildLogicalTime(1, 1));
+    getClock()->reserveTicks(1);
+    ASSERT_TRUE(getClock()->getClusterTime() == buildLogicalTime(maxVal, 1));
+
+    // Should fail when wall clock would advance cluster time beyond the max allowed time.
+    setMockClockSourceTime(Date_t::max());
+
+    resetClock()->setClusterTimeFromTrustedSource(buildLogicalTime(1, 1));
+    ASSERT_THROWS(getClock()->reserveTicks(1), std::exception);
+    ASSERT_TRUE(getClock()->getClusterTime() == buildLogicalTime(1, 1));
+}
+
+// Verify the clock rejects logical times greater than the max allowed time.
+TEST_F(LogicalClockTest, RejectsLogicalTimesGreaterThanMaxTime) {
+    unsigned maxVal = LogicalClock::kMaxSignedInt;
+
+    // A logical time can be greater than the maximum value allowed because the signed integer
+    // maximum is used for legacy compatibility, but these fields are stored as unsigned integers.
+    auto beyondMaxTime = buildLogicalTime(maxVal + 1, maxVal + 1);
+
+    // The clock can't be initialized to a time greater than the max possible.
+    resetClock();
+    ASSERT_THROWS(getClock()->setClusterTimeFromTrustedSource(beyondMaxTime), std::exception);
+    ASSERT_TRUE(getClock()->getClusterTime() == LogicalTime());
+
+    // The time can't be advanced through metadata to a time greater than the max possible.
+    // Advance the wall clock close enough to the new value so the rate check is passed.
+    auto almostMaxSecs =
+        Seconds(maxVal) - LogicalClock::kMaxAcceptableLogicalClockDriftSecs + Seconds(10);
+    setMockClockSourceTime(Date_t::fromDurationSinceEpoch(almostMaxSecs));
+    ASSERT_THROWS(getClock()->advanceClusterTime(beyondMaxTime), std::exception);
+    ASSERT_TRUE(getClock()->getClusterTime() == LogicalTime());
 }
 
 }  // unnamed namespace

@@ -72,6 +72,16 @@ void LogicalClockTestFixture::tearDown() {
     ShardingMongodTestFixture::tearDown();
 }
 
+LogicalClock* LogicalClockTestFixture::resetClock() {
+    auto service = getServiceContext();
+    auto logicalClock = stdx::make_unique<LogicalClock>(service);
+
+    LogicalClock::set(service, std::move(logicalClock));
+    _clock = LogicalClock::get(service);
+
+    return _clock;
+}
+
 LogicalClock* LogicalClockTestFixture::getClock() const {
     return _clock;
 }

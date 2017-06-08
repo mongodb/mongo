@@ -57,6 +57,8 @@ protected:
 
     void tearDown() override;
 
+    LogicalClock* resetClock();
+
     LogicalClock* getClock() const;
 
     ClockSourceMock* getMockClockSource() const;

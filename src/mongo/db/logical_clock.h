@@ -46,6 +46,8 @@ public:
     static LogicalClock* get(OperationContext* ctx);
     static void set(ServiceContext* service, std::unique_ptr<LogicalClock> logicalClock);
 
+    static const uint32_t kMaxSignedInt = ((1U << 31) - 1);
+
     static constexpr Seconds kMaxAcceptableLogicalClockDriftSecs =
         Seconds(365 * 24 * 60 * 60);  // 1 year
 

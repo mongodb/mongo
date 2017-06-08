@@ -69,6 +69,11 @@ public:
 
 namespace {
 const auto getLogicalClock = ServiceContext::declareDecoration<std::unique_ptr<LogicalClock>>();
+
+bool lessThanOrEqualToMaxPossibleTime(LogicalTime time, uint64_t nTicks) {
+    return time.asTimestamp().getSecs() <= LogicalClock::kMaxSignedInt &&
+        time.asTimestamp().getInc() <= (LogicalClock::kMaxSignedInt - nTicks);
+}
 }
 
 LogicalClock* LogicalClock::get(ServiceContext* service) {
@@ -108,7 +113,7 @@ Status LogicalClock::advanceClusterTime(const LogicalTime newTime) {
 
 LogicalTime LogicalClock::reserveTicks(uint64_t nTicks) {
 
-    invariant(nTicks > 0 && nTicks < (1U << 31));
+    invariant(nTicks > 0 && nTicks <= kMaxSignedInt);
 
     stdx::lock_guard<stdx::mutex> lock(_mutex);
 
@@ -127,7 +132,7 @@ LogicalTime LogicalClock::reserveTicks(uint64_t nTicks) {
     // in order to preserve compatibility with potentially signed or unsigned integral Timestamp
     // increment types. It is also unlikely to apply more than 2^31 oplog entries in the span of one
     // second.
-    else if (clusterTime.asTimestamp().getInc() >= ((1U << 31) - nTicks)) {
+    else if (clusterTime.asTimestamp().getInc() > (kMaxSignedInt - nTicks)) {
 
         log() << "Exceeded maximum allowable increment value within one second. Moving clusterTime "
                  "forward to the next second.";
@@ -135,6 +140,10 @@ LogicalTime LogicalClock::reserveTicks(uint64_t nTicks) {
         // Move time forward to the next second
         clusterTime = LogicalTime(Timestamp(clusterTime.asTimestamp().getSecs() + 1, 0));
     }
+
+    uassert(40482,
+            "cluster time cannot be advanced beyond its maximum value",
+            lessThanOrEqualToMaxPossibleTime(clusterTime, nTicks));
 
     // Save the next cluster time.
     clusterTime.addTicks(1);
@@ -153,6 +162,10 @@ void LogicalClock::setClusterTimeFromTrustedSource(LogicalTime newTime) {
 
     // Rate limit checks are skipped here so a server with no activity for longer than
     // maxAcceptableLogicalClockDriftSecs seconds can still have its cluster time initialized.
+
+    uassert(40483,
+            "cluster time cannot be advanced beyond its maximum value",
+            lessThanOrEqualToMaxPossibleTime(newTime, 0));
 
     if (newTime > _clusterTime) {
         _clusterTime = newTime;
@@ -173,6 +186,10 @@ Status LogicalClock::_passesRateLimiter_inlock(LogicalTime newTime) {
                                     << wallClockSecs
                                     << ".");
     }
+
+    uassert(40484,
+            "cluster time cannot be advanced beyond its maximum value",
+            lessThanOrEqualToMaxPossibleTime(newTime, 0));
 
     return Status::OK();
 }
