@@ -543,14 +543,16 @@ functions:
                         unreliable|${task_name}|${build_variant}|${distro_id}"
         fi
 
+        # Remove spaces from the tags argument.
+        resmoke_tags=$(echo $resmoke_tags| tr -d " ")
+
+        # Set report file for reliable test run.
+        report_file=report_reliable.json
+
         # Disable errexit, until we run combine_reports, so we can execute the reliable and
         # unreliable tests.
         set +o errexit
 
-        # Remove spaces from the tags argument.
-        resmoke_tags=$(echo $resmoke_tags| tr -d " ")
-
-        report_file=report_reliable.json
         # If the "resmoke_wrapper" expansion is used for 'burn_in_tests' then add the reportFile.
         echo "$wrapper" | grep -q burn_in_tests
         add_report_file=$?
@@ -559,6 +561,7 @@ functions:
           wrapper_report_file="--reportFile=$report_file"
         fi
 
+        # Set up resmoke to run without tagged tests.
         resmoke_base="$resmoke                         \
                  --excludeWithAnyTags='$resmoke_tags'  \
                  --reportFailureStatus=fail            \
@@ -567,8 +570,12 @@ functions:
 
         # Run reliable set of tests once.
         eval $preamble $wrapper $wrapper_report_file $resmoke_base
+        exit_codes=$?
 
+        # Set report file for unreliable test run.
         report_file=report_unreliable.json
+
+        # Set up resmoke to run with only tagged tests.
         resmoke_base="$resmoke                         \
                  --includeWithAnyTags='$resmoke_tags'  \
                  --reportFailureStatus=silentfail      \
@@ -582,6 +589,7 @@ functions:
 
         # Run unreliable set of tests.
         eval $preamble $wrapper $wrapper_report_file $resmoke_base
+        exit_codes="$exit_codes $?"
 
         #  Reenable errexit, as the return from combine_reports will return the cumulative error.
         set -o errexit
@@ -592,6 +600,17 @@ functions:
 
         # Combine reliable and unreliable reports.
         ${python|/opt/mongodbtoolchain/v2/bin/python2} buildscripts/combine_reports.py -o report.json report_reliable.json report_unreliable.json
+
+        # We mask any errors from the resmoke runs above (by disabling errexit) until both have
+        # completed. If any of the resmoke runs failed due to non-test failures
+        # (i.e fixture failures), we need to exit with non-zero status.
+        for exit_code in $exit_codes
+        do
+          if [ $exit_code -ne 0 ]; then
+            echo "resmoke.py failed with error code: $exit_code"
+            exit $exit_code
+          fi
+        done
 
   "do jepsen setup" :
     - command: shell.exec
