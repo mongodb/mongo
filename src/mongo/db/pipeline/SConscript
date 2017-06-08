@@ -178,7 +178,6 @@ env.Library(
         'dependencies',
         'document_value',
         'expression_context',
-        '$BUILD_DIR/mongo/db/query/datetime/date_time_support',
         '$BUILD_DIR/mongo/util/summation',
     ]
 )

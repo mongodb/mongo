@@ -272,11 +272,6 @@ Status addGeneralServerOptions(moe::OptionSection* options) {
                                moe::String,
                                "full path to pidfile (if not set, no pidfile is created)");
 
-    options->addOptionChaining("processManagement.timeZoneInfo",
-                               "timeZoneInfo",
-                               moe::String,
-                               "full path to time zone info directory, e.g. /usr/share/zoneinfo");
-
     options
         ->addOptionChaining(
             "security.keyFile", "keyFile", moe::String, "private key for cluster authentication")
@@ -985,10 +980,6 @@ Status storeServerOptions(const moe::Environment& params) {
 
     if (params.count("processManagement.pidFilePath")) {
         serverGlobalParams.pidFile = params["processManagement.pidFilePath"].as<string>();
-    }
-
-    if (params.count("processManagement.timeZoneInfo")) {
-        serverGlobalParams.timeZoneInfoPath = params["processManagement.timeZoneInfo"].as<string>();
     }
 
     if (params.count("setParameter")) {

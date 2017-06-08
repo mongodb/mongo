@@ -33,7 +33,7 @@
             return;
         }
 
-        assert.eq(res.cursor.firstBatch[0].result, expResult, tojson(pipeline));
+        assert.eq(res.cursor.firstBatch[0].result, expResult, pipeline);
     }
 
     // While development, there was a bug which caused an error with $dateToString if the order of

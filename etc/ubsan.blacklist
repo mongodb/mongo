@@ -15,9 +15,6 @@ src:src/third_party/unicode-*/*
 src:src/third_party/yaml-cpp-*/*
 src:src/third_party/zlib-*/*
 
-# See SERVER-29505.
-src:src/third_party/timelib-*/*
-
 # See SERVER-22705. We depend on the C flexible array trick
 # which trips up UBSAN.
 src:src/mongo/db/storage/mmap_v1/*

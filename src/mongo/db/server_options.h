@@ -76,9 +76,8 @@ struct ServerGlobalParams {
 
     int unixSocketPermissions = DEFAULT_UNIX_PERMS;  // permissions for the UNIX domain socket
 
-    std::string keyFile;           // Path to keyfile, or empty if none.
-    std::string pidFile;           // Path to pid file, or empty if none.
-    std::string timeZoneInfoPath;  // Path to time zone info directory, or empty if none.
+    std::string keyFile;  // Path to keyfile, or empty if none.
+    std::string pidFile;  // Path to pid file, or empty if none.
 
     std::string logpath;            // Path to log file, if logging to a file; otherwise, empty.
     bool logAppend = false;         // True if logging to a file in append mode.
