@@ -41,7 +41,6 @@ namespace mongo {
 const int ViewGraph::kMaxViewPipelineSizeBytes = 16 * 1000 * 1000;
 
 const int ViewGraph::kMaxViewDepth = 20;
-uint64_t ViewGraph::_idCounter = 0;
 
 void ViewGraph::clear() {
     _graph.clear();
