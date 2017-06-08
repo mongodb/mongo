@@ -114,4 +114,9 @@ inline StringBuilder& operator<<(StringBuilder& s, const LogicalSessionId& lsid)
     return (s << lsid.toString());
 }
 
+/**
+ * An alias for sets of session ids.
+ */
+using LogicalSessionIdSet = stdx::unordered_set<LogicalSessionId, LogicalSessionId::Hash>;
+
 }  // namespace mongo

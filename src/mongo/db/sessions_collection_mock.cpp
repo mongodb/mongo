@@ -73,12 +73,11 @@ Status MockSessionsCollectionImpl::insertRecord(LogicalSessionRecord record) {
     return _insert(std::move(record));
 }
 
-MockSessionsCollectionImpl::SessionList MockSessionsCollectionImpl::refreshSessions(
-    SessionList sessions) {
+LogicalSessionIdSet MockSessionsCollectionImpl::refreshSessions(LogicalSessionIdSet sessions) {
     return _refresh(std::move(sessions));
 }
 
-void MockSessionsCollectionImpl::removeRecords(SessionList sessions) {
+void MockSessionsCollectionImpl::removeRecords(LogicalSessionIdSet sessions) {
     _remove(std::move(sessions));
 }
 
@@ -131,16 +130,15 @@ Status MockSessionsCollectionImpl::_insertRecord(LogicalSessionRecord record) {
     return Status::OK();
 }
 
-MockSessionsCollectionImpl::SessionList MockSessionsCollectionImpl::_refreshSessions(
-    SessionList sessions) {
-    SessionList notFound{};
+LogicalSessionIdSet MockSessionsCollectionImpl::_refreshSessions(LogicalSessionIdSet sessions) {
+    LogicalSessionIdSet notFound{};
 
     {
         stdx::unique_lock<stdx::mutex> lk(_mutex);
         for (auto& lsid : sessions) {
             auto it = _sessions.find(lsid);
             if (it == _sessions.end()) {
-                notFound.push_back(lsid);
+                notFound.insert(lsid);
             }
         }
     }
@@ -148,7 +146,7 @@ MockSessionsCollectionImpl::SessionList MockSessionsCollectionImpl::_refreshSess
     return notFound;
 }
 
-void MockSessionsCollectionImpl::_removeRecords(SessionList sessions) {
+void MockSessionsCollectionImpl::_removeRecords(LogicalSessionIdSet sessions) {
     stdx::unique_lock<stdx::mutex> lk(_mutex);
     for (auto& lsid : sessions) {
         _sessions.erase(lsid);
