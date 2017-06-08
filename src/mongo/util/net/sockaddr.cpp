@@ -138,6 +138,10 @@ SockAddr::SockAddr(struct sockaddr_storage& other, socklen_t size)
     _hostOrIp = toString(true);
 }
 
+bool SockAddr::isIP() const {
+    return (getType() == AF_INET) || (getType() == AF_INET6);
+}
+
 bool SockAddr::isLocalHost() const {
     switch (getType()) {
         case AF_INET:

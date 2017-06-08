@@ -89,6 +89,8 @@ struct SockAddr {
         return _isValid;
     }
 
+    bool isIP() const;
+
     /**
      * @return one of AF_INET, AF_INET6, or AF_UNIX
      */

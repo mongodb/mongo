@@ -247,6 +247,26 @@ env.CppUnitTest(
     ]
 )
 
+env.Library(
+    target='address_restriction',
+    source='address_restriction.cpp',
+    LIBDEPS=[
+        'authentication_restriction',
+        '$BUILD_DIR/mongo/base',
+        '$BUILD_DIR/mongo/util/net/cidr',
+    ],
+)
+
+env.CppUnitTest(
+    target='address_restriction_test',
+    source='address_restriction_test.cpp',
+    LIBDEPS=[
+       'address_restriction',
+       '$BUILD_DIR/mongo/base',
+       '$BUILD_DIR/mongo/util/net/cidr',
+    ],
+)
+
 env.CppUnitTest('sasl_scramsha1_test',
                 'sasl_scramsha1_test.cpp',
                 LIBDEPS=[
