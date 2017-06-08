@@ -476,6 +476,49 @@ err:	WT_DHANDLE_RELEASE(dhandle);
 }
 
 /*
+ * __conn_dhandle_close_one --
+ *	Lock and, if necessary, close a data handle.
+ */
+static int
+__conn_dhandle_close_one(WT_SESSION_IMPL *session,
+    const char *uri, const char *checkpoint, bool force)
+{
+	WT_DECL_RET;
+
+	/*
+	 * Lock the handle exclusively.  If this is part of schema-changing
+	 * operation (indicated by metadata tracking being enabled), hold the
+	 * lock for the duration of the operation.
+	 */
+	WT_RET(__wt_session_get_btree(session, uri, checkpoint,
+	    NULL, WT_DHANDLE_EXCLUSIVE | WT_DHANDLE_LOCK_ONLY));
+	if (WT_META_TRACKING(session))
+		WT_RET(__wt_meta_track_handle_lock(session, false));
+
+	/*
+	 * We have an exclusive lock, which means there are no cursors open at
+	 * this point.  Close the handle, if necessary.
+	 */
+	if (F_ISSET(session->dhandle, WT_DHANDLE_OPEN)) {
+		__wt_meta_track_sub_on(session);
+		ret = __wt_conn_btree_sync_and_close(session, false, force);
+
+		/*
+		 * If the close succeeded, drop any locks it acquired.  If
+		 * there was a failure, this function will fail and the whole
+		 * transaction will be rolled back.
+		 */
+		if (ret == 0)
+			ret = __wt_meta_track_sub_off(session);
+	}
+
+	if (!WT_META_TRACKING(session))
+		WT_TRET(__wt_session_release_btree(session));
+
+	return (ret);
+}
+
+/*
  * __wt_conn_dhandle_close_all --
  *	Close all data handles handles with matching name (including all
  *	checkpoint handles).
@@ -495,48 +538,22 @@ __wt_conn_dhandle_close_all(
 	    F_ISSET(session, WT_SESSION_LOCKED_HANDLE_LIST_WRITE));
 	WT_ASSERT(session, session->dhandle == NULL);
 
+	/*
+	 * Lock the live handle first.  This ordering is important: we rely on
+	 * locking the live handle to fail fast if the tree is busy (e.g., with
+	 * cursors open or in a checkpoint).
+	 */
+	WT_ERR(__conn_dhandle_close_one(session, uri, NULL, force));
+
 	bucket = __wt_hash_city64(uri, strlen(uri)) % WT_HASH_ARRAY_SIZE;
 	TAILQ_FOREACH(dhandle, &conn->dhhash[bucket], hashq) {
 		if (strcmp(dhandle->name, uri) != 0 ||
+		    dhandle->checkpoint == NULL ||
 		    F_ISSET(dhandle, WT_DHANDLE_DEAD))
 			continue;
 
-		session->dhandle = dhandle;
-
-		/*
-		 * Lock the handle exclusively.  If this is part of
-		 * schema-changing operation (indicated by metadata tracking
-		 * being enabled), hold the lock for the duration of the
-		 * operation.
-		 */
-		WT_ERR(__wt_session_get_btree(session,
-		    dhandle->name, dhandle->checkpoint,
-		    NULL, WT_DHANDLE_EXCLUSIVE | WT_DHANDLE_LOCK_ONLY));
-		if (WT_META_TRACKING(session))
-			WT_ERR(__wt_meta_track_handle_lock(session, false));
-
-		/*
-		 * We have an exclusive lock, which means there are no cursors
-		 * open at this point.  Close the handle, if necessary.
-		 */
-		if (F_ISSET(dhandle, WT_DHANDLE_OPEN)) {
-			__wt_meta_track_sub_on(session);
-			ret = __wt_conn_btree_sync_and_close(
-			    session, false, force);
-
-			/*
-			 * If the close succeeded, drop any locks it acquired.
-			 * If there was a failure, this function will fail and
-			 * the whole transaction will be rolled back.
-			 */
-			if (ret == 0)
-				ret = __wt_meta_track_sub_off(session);
-		}
-
-		if (!WT_META_TRACKING(session))
-			WT_TRET(__wt_session_release_btree(session));
-
-		WT_ERR(ret);
+		WT_ERR(__conn_dhandle_close_one(
+		    session, dhandle->name, dhandle->checkpoint, force));
 	}
 
 err:	session->dhandle = NULL;

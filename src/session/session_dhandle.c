@@ -229,7 +229,8 @@ __wt_session_lock_dhandle(
 			WT_ASSERT(session, !F_ISSET(dhandle, WT_DHANDLE_DEAD));
 			return (0);
 		}
-		if (ret != EBUSY || (is_open && want_exclusive))
+		if (ret != EBUSY || (is_open && want_exclusive) ||
+		    LF_ISSET(WT_DHANDLE_LOCK_ONLY))
 			return (ret);
 		lock_busy = true;
 
