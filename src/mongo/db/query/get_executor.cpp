@@ -1056,21 +1056,23 @@ namespace {
 bool turnIxscanIntoCount(QuerySolution* soln) {
     QuerySolutionNode* root = soln->root.get();
 
-    // Root should be a fetch w/o any filters.
-    if (STAGE_FETCH != root->getType()) {
+    // Root should be an ixscan or fetch w/o any filters.
+    if (!(STAGE_FETCH == root->getType() || STAGE_IXSCAN == root->getType())) {
         return false;
     }
 
-    if (NULL != root->filter.get()) {
+    if (STAGE_FETCH == root->getType() && NULL != root->filter.get()) {
         return false;
     }
 
-    // Child should be an ixscan.
-    if (STAGE_IXSCAN != root->children[0]->getType()) {
+    // If the root is a fetch, its child should be an ixscan
+    if (STAGE_FETCH == root->getType() && STAGE_IXSCAN != root->children[0]->getType()) {
         return false;
     }
 
-    IndexScanNode* isn = static_cast<IndexScanNode*>(root->children[0]);
+    IndexScanNode* isn = (STAGE_FETCH == root->getType())
+        ? static_cast<IndexScanNode*>(root->children[0])
+        : static_cast<IndexScanNode*>(root);
 
     // No filters allowed and side-stepping isSimpleRange for now.  TODO: do we ever see
     // isSimpleRange here?  because we could well use it.  I just don't think we ever do see

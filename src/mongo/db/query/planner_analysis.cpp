@@ -812,7 +812,7 @@ QuerySolution* QueryPlannerAnalysis::analyzeDataAccess(
         solnRoot.reset(projNode);
     } else {
         // If there's no projection, we must fetch, as the user wants the entire doc.
-        if (!solnRoot->fetched()) {
+        if (!solnRoot->fetched() && !(params.options & QueryPlannerParams::IS_COUNT)) {
             FetchNode* fetch = new FetchNode();
             fetch->children.push_back(solnRoot.release());
             solnRoot.reset(fetch);
