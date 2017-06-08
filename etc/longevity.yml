@@ -67,10 +67,6 @@ functions:
         directory: src
         revisions: # for each module include revision as <module_name> : ${<module_name>_rev}
           dsi: ${dsi_rev}
-          YCSB: ${YCSB_rev}
-    - command: git.apply_patch
-      params:
-        directory: src
     - command: shell.exec
       params:
         working_dir: work
@@ -105,7 +101,6 @@ functions:
           dsi_rev: ${dsi_rev}
           compare_task: ${compare_task}
           workloads_rev: ${workloads_rev}
-          YCSB_rev: ${YCSB_rev}
 
           # compositions of expansions
           mongodb_binary_archive: "https://s3.amazonaws.com/mciuploads/${project}/${version_id}/${revision}/${platform}/mongod-${version_id}.tar.gz"
@@ -341,12 +336,6 @@ modules:
   prefix: dsi
   branch: master
 
-- name: YCSB
-  repo: git@github.com:mongodb-labs/YCSB.git
-  prefix: YCSB
-  branch: evergreen
-
-
 
 buildvariants:
 - name: linux-wt-shard
@@ -354,7 +343,6 @@ buildvariants:
   batchtime: 40320 # 4 weeks
   modules: &modules
     - dsi
-    - YCSB
   expansions:
     compile_flags: -j$(grep -c ^processor /proc/cpuinfo) CC=/opt/mongodbtoolchain/bin/gcc CXX=/opt/mongodbtoolchain/bin/g++ --release
     setup: shard-longevity
