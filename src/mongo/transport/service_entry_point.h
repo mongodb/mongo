@@ -55,9 +55,7 @@ public:
     /**
      * Processes a request and fills out a DbResponse.
      */
-    virtual DbResponse handleRequest(OperationContext* opCtx,
-                                     const Message& request,
-                                     const HostAndPort& client) = 0;
+    virtual DbResponse handleRequest(OperationContext* opCtx, const Message& request) = 0;
 
 protected:
     ServiceEntryPoint() = default;

@@ -62,9 +62,7 @@ BSONObj buildErrReply(const DBException& ex) {
 }  // namespace
 
 
-DbResponse ServiceEntryPointMongos::handleRequest(OperationContext* opCtx,
-                                                  const Message& message,
-                                                  const HostAndPort& remote) {
+DbResponse ServiceEntryPointMongos::handleRequest(OperationContext* opCtx, const Message& message) {
     // Release any cached egress connections for client back to pool before destroying
     auto guard = MakeGuard(ShardConnection::releaseMyConnections);
 

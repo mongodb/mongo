@@ -165,7 +165,7 @@ void ServiceStateMachine::processMessage() {
 
     // The handleRequest is implemented in a subclass for mongod/mongos and actually all the
     // database work for this request.
-    DbResponse dbresponse = _sep->handleRequest(opCtx.get(), _inMessage, session()->remote());
+    DbResponse dbresponse = _sep->handleRequest(opCtx.get(), _inMessage);
 
     // opCtx must be destroyed here so that the operation cannot show
     // up in currentOp results after the response reaches the client

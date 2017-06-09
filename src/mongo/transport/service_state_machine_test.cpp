@@ -56,9 +56,7 @@ public:
 
     void startSession(transport::SessionHandle session) override {}
 
-    DbResponse handleRequest(OperationContext* opCtx,
-                             const Message& request,
-                             const HostAndPort& client) override {
+    DbResponse handleRequest(OperationContext* opCtx, const Message& request) override {
         log() << "In handleRequest";
         _ranHandler = true;
         ASSERT_TRUE(haveClient());

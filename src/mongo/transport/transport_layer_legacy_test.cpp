@@ -47,9 +47,7 @@ public:
         tll->end(session);
     }
 
-    DbResponse handleRequest(OperationContext* opCtx,
-                             const Message& request,
-                             const HostAndPort& client) override {
+    DbResponse handleRequest(OperationContext* opCtx, const Message& request) override {
         MONGO_UNREACHABLE;
     }
 

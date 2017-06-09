@@ -36,12 +36,6 @@ struct DbResponse;
 class Message;
 class OperationContext;
 
-// Pass this as the 'client' argument to assembleResponse
-// to indicate that the call is on behalf of a DBDirectClient.
-extern const HostAndPort kHostAndPortForDirectClient;
-
-DbResponse assembleResponse(OperationContext* opCtx,
-                            const Message& request,
-                            const HostAndPort& client);
+DbResponse assembleResponse(OperationContext* opCtx, const Message& request);
 
 }  // namespace mongo

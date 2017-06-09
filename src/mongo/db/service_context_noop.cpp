@@ -35,7 +35,6 @@
 #include "mongo/stdx/memory.h"
 
 namespace mongo {
-
 StorageEngine* ServiceContextNoop::getGlobalStorageEngine() {
     return NULL;
 }

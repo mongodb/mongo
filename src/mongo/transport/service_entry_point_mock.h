@@ -65,9 +65,7 @@ public:
      */
     void startSession(transport::SessionHandle session) override;
 
-    DbResponse handleRequest(OperationContext* opCtx,
-                             const Message& request,
-                             const HostAndPort& client) override;
+    DbResponse handleRequest(OperationContext* opCtx, const Message& request) override;
 
 private:
     void run(transport::SessionHandle session);

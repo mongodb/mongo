@@ -32,7 +32,6 @@
 
 #include "mongo/db/dbdirectclient.h"
 
-#include "mongo/db/assemble_response.h"
 #include "mongo/db/client.h"
 #include "mongo/db/commands.h"
 #include "mongo/db/curop.h"
@@ -40,6 +39,7 @@
 #include "mongo/db/operation_context.h"
 #include "mongo/db/wire_version.h"
 #include "mongo/rpc/get_status_from_command_result.h"
+#include "mongo/transport/service_entry_point.h"
 #include "mongo/util/log.h"
 
 namespace mongo {
@@ -119,12 +119,18 @@ QueryOptions DBDirectClient::_lookupAvailableOptions() {
     return QueryOptions(DBClientBase::_lookupAvailableOptions() & ~QueryOption_Exhaust);
 }
 
+namespace {
+DbResponse loopbackBuildResponse(OperationContext* const opCtx, Message& toSend) {
+    return opCtx->getServiceContext()->getServiceEntryPoint()->handleRequest(opCtx, toSend);
+}
+}  // namespace
+
 bool DBDirectClient::call(Message& toSend, Message& response, bool assertOk, string* actualServer) {
     DirectClientScope directClientScope(_opCtx);
     LastError::get(_opCtx->getClient()).startRequest();
 
     CurOp curOp(_opCtx);
-    auto dbResponse = assembleResponse(_opCtx, toSend, kHostAndPortForDirectClient);
+    auto dbResponse = loopbackBuildResponse(_opCtx, toSend);
     invariant(!dbResponse.response.empty());
     response = std::move(dbResponse.response);
 
@@ -136,7 +142,7 @@ void DBDirectClient::say(Message& toSend, bool isRetry, string* actualServer) {
     LastError::get(_opCtx->getClient()).startRequest();
 
     CurOp curOp(_opCtx);
-    auto dbResponse = assembleResponse(_opCtx, toSend, kHostAndPortForDirectClient);
+    auto dbResponse = loopbackBuildResponse(_opCtx, toSend);
     invariant(dbResponse.response.empty());
 }
 

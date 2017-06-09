@@ -74,7 +74,7 @@ void ServiceEntryPointMock::run(transport::SessionHandle session) {
             break;
         }
 
-        auto resp = handleRequest(nullptr, inMessage, session->remote());
+        auto resp = handleRequest(nullptr, inMessage);
 
         // sinkMessage()
         if (!session->sinkMessage(resp.response).wait().isOK()) {
@@ -83,9 +83,7 @@ void ServiceEntryPointMock::run(transport::SessionHandle session) {
     }
 }
 
-DbResponse ServiceEntryPointMock::handleRequest(OperationContext* opCtx,
-                                                const Message& request,
-                                                const HostAndPort& client) {
+DbResponse ServiceEntryPointMock::handleRequest(OperationContext* opCtx, const Message& request) {
     // Need to set up our { ok : 1 } response.
     BufBuilder b{};
 

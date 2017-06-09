@@ -41,9 +41,7 @@ class ServiceEntryPointMongod final : public ServiceEntryPointImpl {
 
 public:
     using ServiceEntryPointImpl::ServiceEntryPointImpl;
-    DbResponse handleRequest(OperationContext* opCtx,
-                             const Message& request,
-                             const HostAndPort& client) override;
+    DbResponse handleRequest(OperationContext* opCtx, const Message& request) override;
 };
 
 }  // namespace mongo
