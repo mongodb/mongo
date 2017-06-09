@@ -145,22 +145,20 @@ void appendRequiredFieldsToResponse(OperationContext* opCtx, BSONObjBuilder* res
 
 void execCommandClient(OperationContext* opCtx,
                        Command* c,
-                       StringData dbname,
-                       BSONObj& cmdObj,
+                       const OpMsgRequest& request,
                        BSONObjBuilder& result) {
     ON_BLOCK_EXIT([opCtx, &result] { appendRequiredFieldsToResponse(opCtx, &result); });
 
+    const auto dbname = request.getDatabase().toString();
     uassert(ErrorCodes::IllegalOperation,
             "Can't use 'local' database through mongos",
             dbname != NamespaceString::kLocalDb);
-
     uassert(ErrorCodes::InvalidNamespace,
             str::stream() << "Invalid database name: '" << dbname << "'",
             NamespaceString::validDBName(dbname, NamespaceString::DollarInDbNameBehavior::Allow));
 
-    dassert(dbname == nsToDatabase(dbname));
     StringMap<int> topLevelFields;
-    for (auto&& element : cmdObj) {
+    for (auto&& element : request.body) {
         StringData fieldName = element.fieldNameStringData();
         if (fieldName == "help" && element.type() == Bool && element.Bool()) {
             std::stringstream help;
@@ -177,7 +175,7 @@ void execCommandClient(OperationContext* opCtx,
                 topLevelFields[fieldName]++ == 0);
     }
 
-    Status status = Command::checkAuthorization(c, opCtx, dbname.toString(), cmdObj);
+    Status status = Command::checkAuthorization(c, opCtx, dbname, request.body);
     if (!status.isOK()) {
         Command::appendCommandStatus(result, status);
         return;
@@ -190,13 +188,13 @@ void execCommandClient(OperationContext* opCtx,
     }
 
     StatusWith<WriteConcernOptions> wcResult =
-        WriteConcernOptions::extractWCFromCommand(cmdObj, dbname.toString());
+        WriteConcernOptions::extractWCFromCommand(request.body, dbname);
     if (!wcResult.isOK()) {
         Command::appendCommandStatus(result, wcResult.getStatus());
         return;
     }
 
-    bool supportsWriteConcern = c->supportsWriteConcern(cmdObj);
+    bool supportsWriteConcern = c->supportsWriteConcern(request.body);
     if (!supportsWriteConcern && !wcResult.getValue().usedDefault) {
         // This command doesn't do writes so it should not be passed a writeConcern.
         // If we did not use the default writeConcern, one was provided when it shouldn't have
@@ -211,7 +209,7 @@ void execCommandClient(OperationContext* opCtx,
     trackingMetadata.initWithOperName(c->getName());
     rpc::TrackingMetadata::get(opCtx) = trackingMetadata;
 
-    auto metadataStatus = processCommandMetadata(opCtx, cmdObj);
+    auto metadataStatus = processCommandMetadata(opCtx, request.body);
     if (!metadataStatus.isOK()) {
         Command::appendCommandStatus(result, metadataStatus);
         return;
@@ -221,14 +219,14 @@ void execCommandClient(OperationContext* opCtx,
     bool ok = false;
     try {
         if (!supportsWriteConcern) {
-            ok = c->run(opCtx, dbname.toString(), cmdObj, errmsg, result);
+            ok = c->enhancedRun(opCtx, request, errmsg, result);
         } else {
             // Change the write concern while running the command.
             const auto oldWC = opCtx->getWriteConcern();
             ON_BLOCK_EXIT([&] { opCtx->setWriteConcern(oldWC); });
             opCtx->setWriteConcern(wcResult.getValue());
 
-            ok = c->run(opCtx, dbname.toString(), cmdObj, errmsg, result);
+            ok = c->enhancedRun(opCtx, request, errmsg, result);
         }
     } catch (const DBException& e) {
         result.resetToEmpty();
@@ -251,31 +249,29 @@ void execCommandClient(OperationContext* opCtx,
 }
 
 void runAgainstRegistered(OperationContext* opCtx,
-                          StringData db,
-                          BSONObj& jsobj,
+                          const OpMsgRequest& request,
                           BSONObjBuilder& anObjBuilder) {
-    BSONElement e = jsobj.firstElement();
-    const auto commandName = e.fieldNameStringData();
-    Command* c = e.type() ? Command::findCommand(commandName) : NULL;
+    const auto commandName = request.getCommandName();
+    Command* c = Command::findCommand(commandName);
     if (!c) {
         Command::appendCommandStatus(
-            anObjBuilder, false, str::stream() << "no such cmd: " << commandName);
-        anObjBuilder.append("code", ErrorCodes::CommandNotFound);
+            anObjBuilder,
+            {ErrorCodes::CommandNotFound, str::stream() << "no such cmd: " << commandName});
         Command::unknownCommands.increment();
         return;
     }
 
-    execCommandClient(opCtx, c, db, jsobj, anObjBuilder);
+    execCommandClient(opCtx, c, request, anObjBuilder);
 }
 
-void runCommand(OperationContext* opCtx, StringData db, BSONObj cmdObj, BSONObjBuilder&& builder) {
+void runCommand(OperationContext* opCtx, const OpMsgRequest& request, BSONObjBuilder&& builder) {
     // Handle command option maxTimeMS.
     uassert(ErrorCodes::InvalidOptions,
             "no such command option $maxTimeMs; use maxTimeMS instead",
-            cmdObj[QueryRequest::queryOptionMaxTimeMS].eoo());
+            request.body[QueryRequest::queryOptionMaxTimeMS].eoo());
 
-    const int maxTimeMS =
-        uassertStatusOK(QueryRequest::parseMaxTimeMS(cmdObj[QueryRequest::cmdOptionMaxTimeMS]));
+    const int maxTimeMS = uassertStatusOK(
+        QueryRequest::parseMaxTimeMS(request.body[QueryRequest::cmdOptionMaxTimeMS]));
     if (maxTimeMS > 0) {
         opCtx->setDeadlineAfterNowBy(Milliseconds{maxTimeMS});
     }
@@ -285,13 +281,13 @@ void runCommand(OperationContext* opCtx, StringData db, BSONObj cmdObj, BSONObjB
     while (true) {
         builder.resetToEmpty();
         try {
-            runAgainstRegistered(opCtx, db, cmdObj, builder);
+            runAgainstRegistered(opCtx, request, builder);
             return;
         } catch (const StaleConfigException& e) {
             if (e.getns().empty()) {
                 // This should be impossible but older versions tried incorrectly to handle it here.
                 log() << "Received a stale config error with an empty namespace while executing "
-                      << redact(cmdObj) << " : " << redact(e);
+                      << redact(request.body) << " : " << redact(e);
                 throw;
             }
 
@@ -299,7 +295,7 @@ void runCommand(OperationContext* opCtx, StringData db, BSONObj cmdObj, BSONObjB
                 throw e;
 
             loops--;
-            log() << "Retrying command " << redact(cmdObj) << causedBy(e);
+            log() << "Retrying command " << redact(request.body) << causedBy(e);
 
             ShardConnection::checkMyConnectionVersions(opCtx, e.getns());
             if (loops < 4) {
@@ -484,8 +480,9 @@ DbResponse Strategy::clientOpQueryCommand(OperationContext* opCtx,
         }
     }
 
+    auto request = OpMsgRequest::fromDBAndBody(nss.db(), cmdObj);
     OpQueryReplyBuilder reply;
-    runCommand(opCtx, nss.db(), cmdObj, BSONObjBuilder(reply.bufBuilderForResults()));
+    runCommand(opCtx, request, BSONObjBuilder(reply.bufBuilderForResults()));
     return DbResponse{reply.toCommandReply()};
 }
 
@@ -499,7 +496,7 @@ DbResponse Strategy::clientOpMsgCommand(OperationContext* opCtx, const Message& 
     try {
         request.emplace(OpMsgRequest::parse(m));  // Request is validated here.
         canReply = !request->isFlagSet(OpMsg::kMoreToCome);
-        runCommand(opCtx, request->getDatabase(), request->body, reply.beginBody());
+        runCommand(opCtx, *request, reply.beginBody());
     } catch (const DBException& ex) {
         reply.reset();
         auto bob = reply.beginBody();
@@ -668,7 +665,8 @@ void Strategy::writeOp(OperationContext* opCtx, DbMessage* dbm) {
             BSONObj commandBSON = commandRequest->toBSON();
 
             BSONObjBuilder builder;
-            runAgainstRegistered(opCtx, fullNS.db(), commandBSON, builder);
+            runAgainstRegistered(
+                opCtx, OpMsgRequest::fromDBAndBody(fullNS.db(), commandBSON), builder);
 
             bool parsed = commandResponse.parseBSON(builder.done(), nullptr);
             (void)parsed;  // for compile
