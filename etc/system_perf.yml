@@ -442,6 +442,46 @@ tasks:
     - func: "make test log artifact"
     - func: "analyze"
 
+- name: agg_query_comparison_bestbuy_WT
+  depends_on:
+    - name: compile
+      variant: linux-standalone
+  commands:
+    - func: "prepare environment"
+      vars:
+        storageEngine: "wiredTiger"
+        test: "agg_query_comparison_bestbuy"
+    - func: "infrastructure provisioning"
+    - func: "configure mongodb cluster"
+      vars:
+        storageEngine: "wiredTiger"
+    - func: "run test"
+      vars:
+        storageEngine: "wiredTiger"
+        test: "agg_query_comparison_bestbuy"
+    - func: "make test log artifact"
+    - func: "analyze"
+
+- name: agg_query_comparison_bestbuy_MMAPv1
+  depends_on:
+    - name: compile
+      variant: linux-standalone
+  commands:
+    - func: "prepare environment"
+      vars:
+        storageEngine: "mmapv1"
+        test: "agg_query_comparison_bestbuy"
+    - func: "infrastructure provisioning"
+    - func: "configure mongodb cluster"
+      vars:
+        storageEngine: "mmapv1"
+    - func: "run test"
+      vars:
+        storageEngine: "mmapv1"
+        test: "agg_query_comparison_bestbuy"
+    - func: "make test log artifact"
+    - func: "analyze"
+
 - name: non_sharded_workloads_WT
   depends_on:
     - name: compile
@@ -775,6 +815,8 @@ buildvariants:
     - name: core_workloads_MMAPv1
     - name: non_sharded_workloads_WT
     - name: non_sharded_workloads_MMAPv1
+    - name: agg_query_comparison_bestbuy_WT
+    - name: agg_query_comparison_bestbuy_MMAPv1
 
 - name: linux-standalone
   display_name: Linux Standalone
@@ -801,6 +843,8 @@ buildvariants:
     - name: core_workloads_MMAPv1
     - name: non_sharded_workloads_WT
     - name: non_sharded_workloads_MMAPv1
+    - name: agg_query_comparison_bestbuy_WT
+    - name: agg_query_comparison_bestbuy_MMAPv1
 
 - name: linux-3-shard
   display_name: Linux 3-Shard Cluster
@@ -822,10 +866,12 @@ buildvariants:
     - name: mongos_workloads_MMAPv1
     - name: move_chunk_workloads_WT
     - name: move_chunk_workloads_MMAPv1
+    - name: agg_query_comparison_bestbuy_WT
+    - name: agg_query_comparison_bestbuy_MMAPv1
 
 - name: linux-3-node-replSet
   display_name: Linux 3-Node ReplSet
-  batchtime: 1440 # 24 hours
+  batchtime: 1440  # 24 hours
   modules: *modules
   expansions:
     setup: replica
@@ -843,10 +889,12 @@ buildvariants:
     - name: secondary_performance_MMAPv1
     - name: non_sharded_workloads_WT
     - name: non_sharded_workloads_MMAPv1
+    - name: agg_query_comparison_bestbuy_WT
+    - name: agg_query_comparison_bestbuy_MMAPv1
 
 - name: linux-3-node-replSet-initialsync
   display_name: Linux 3-Node ReplSet Initial Sync
-  batchtime: 1440 # 24 hours
+  batchtime: 1440  # 24 hours
   modules: *modules
   expansions:
     setup: replica-2node
