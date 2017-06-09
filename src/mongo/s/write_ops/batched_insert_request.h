@@ -63,7 +63,6 @@ public:
     //
 
     BatchedInsertRequest();
-    ~BatchedInsertRequest();
 
     /** Copies all the fields present in 'this' to 'other'. */
     void cloneTo(BatchedInsertRequest* other) const;

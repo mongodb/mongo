@@ -32,7 +32,6 @@
 
 #include "mongo/client/connection_string.h"
 #include "mongo/db/jsobj.h"
-#include "mongo/s/write_ops/batched_update_request.h"
 
 namespace mongo {
 

@@ -34,7 +34,6 @@
 
 #include "mongo/db/jsobj.h"
 #include "mongo/s/shard_id.h"
-#include "mongo/s/write_ops/batched_update_request.h"
 
 namespace mongo {
 

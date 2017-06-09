@@ -64,10 +64,6 @@ public:
     //
 
     BatchedUpdateRequest();
-    ~BatchedUpdateRequest();
-
-    /** Copies all the fields present in 'this' to 'other'. */
-    void cloneTo(BatchedUpdateRequest* other) const;
 
     bool isValid(std::string* errMsg) const;
     BSONObj toBSON() const;

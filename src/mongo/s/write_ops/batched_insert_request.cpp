@@ -49,8 +49,6 @@ BatchedInsertRequest::BatchedInsertRequest() {
     clear();
 }
 
-BatchedInsertRequest::~BatchedInsertRequest() {}
-
 bool BatchedInsertRequest::isValid(std::string* errMsg) const {
     std::string dummy;
     if (errMsg == NULL) {

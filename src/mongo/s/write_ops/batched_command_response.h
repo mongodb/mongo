@@ -64,6 +64,7 @@ public:
     static const BSONField<WriteConcernErrorDetail*> writeConcernError;
 
     BatchedCommandResponse();
+    ~BatchedCommandResponse();
     BatchedCommandResponse(BatchedCommandResponse&&) = default;
     BatchedCommandResponse& operator=(BatchedCommandResponse&&) = default;
 

@@ -64,10 +64,6 @@ public:
     //
 
     BatchedDeleteRequest();
-    ~BatchedDeleteRequest();
-
-    /** Copies all the fields present in 'this' to 'other'. */
-    void cloneTo(BatchedDeleteRequest* other) const;
 
     bool isValid(std::string* errMsg) const;
     BSONObj toBSON() const;

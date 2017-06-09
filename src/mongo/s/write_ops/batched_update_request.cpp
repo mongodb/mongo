@@ -50,10 +50,6 @@ BatchedUpdateRequest::BatchedUpdateRequest() {
     clear();
 }
 
-BatchedUpdateRequest::~BatchedUpdateRequest() {
-    unsetUpdates();
-}
-
 bool BatchedUpdateRequest::isValid(std::string* errMsg) const {
     std::string dummy;
     if (errMsg == NULL) {
@@ -165,30 +161,6 @@ void BatchedUpdateRequest::clear() {
     _isOrderedSet = false;
 
     _shouldBypassValidation = false;
-}
-
-void BatchedUpdateRequest::cloneTo(BatchedUpdateRequest* other) const {
-    other->clear();
-
-    other->_ns = _ns;
-    other->_isNSSet = _isNSSet;
-
-    for (std::vector<BatchedUpdateDocument*>::const_iterator it = _updates.begin();
-         it != _updates.end();
-         ++it) {
-        unique_ptr<BatchedUpdateDocument> tempBatchUpdateDocument(new BatchedUpdateDocument);
-        (*it)->cloneTo(tempBatchUpdateDocument.get());
-        other->addToUpdates(tempBatchUpdateDocument.release());
-    }
-    other->_isUpdatesSet = _isUpdatesSet;
-
-    other->_writeConcern = _writeConcern;
-    other->_isWriteConcernSet = _isWriteConcernSet;
-
-    other->_ordered = _ordered;
-    other->_isOrderedSet = _isOrderedSet;
-
-    other->_shouldBypassValidation = _shouldBypassValidation;
 }
 
 std::string BatchedUpdateRequest::toString() const {
