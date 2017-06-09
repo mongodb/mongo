@@ -275,12 +275,12 @@ generateConfigHeaderFile = env.Substfile(
 )
 env.Alias('generated-sources', generateConfigHeaderFile)
 
-mongod = env.Program(
-    target="mongod",
+env.Library(
+    target="mongodmain",
     source=[
         "db/db.cpp",
         "db/mongod_options_init.cpp",
-    ] + env.WindowsResourceFile("db/db.rc"),
+    ],
     LIBDEPS=[
         'db/commands/core',
         'db/conn_pool_options',
@@ -314,6 +314,15 @@ mongod = env.Program(
         'util/ntservice',
         'util/periodic_runner_factory',
         'util/version_impl',
+    ],
+)
+mongod = env.Program(
+    target="mongod",
+    source=[
+        "db/dbmain.cpp",
+    ] + env.WindowsResourceFile("db/db.rc"),
+    LIBDEPS=[
+        'mongodmain',
     ],
 )
 env.Default(env.Install('#/', mongod))

@@ -30,6 +30,8 @@
 
 #include "mongo/platform/basic.h"
 
+#include "mongo/db/dbmain.h"
+
 #include <boost/filesystem/operations.hpp>
 #include <boost/optional.hpp>
 #include <fstream>
@@ -768,45 +770,17 @@ ExitCode initAndListen(int listenPort) {
     }
 }
 
-}  // namespace
-
 #if defined(_WIN32)
 ExitCode initService() {
     return initAndListen(serverGlobalParams.port);
 }
 #endif
 
-}  // namespace mongo
-
-using namespace mongo;
-
-static int mongoDbMain(int argc, char* argv[], char** envp);
-
-#if defined(_WIN32)
-// In Windows, wmain() is an alternate entry point for main(), and receives the same parameters
-// as main() but encoded in Windows Unicode (UTF-16); "wide" 16-bit wchar_t characters.  The
-// WindowsCommandLine object converts these wide character strings to a UTF-8 coded equivalent
-// and makes them available through the argv() and envp() members.  This enables mongoDbMain()
-// to process UTF-8 encoded arguments and environment variables without regard to platform.
-int wmain(int argc, wchar_t* argvW[], wchar_t* envpW[]) {
-    WindowsCommandLine wcl(argc, argvW, envpW);
-    int exitCode = mongoDbMain(argc, wcl.argv(), wcl.envp());
-    quickExit(exitCode);
-}
-#else
-int main(int argc, char* argv[], char** envp) {
-    int exitCode = mongoDbMain(argc, argv, envp);
-    quickExit(exitCode);
-}
-#endif
-
-namespace {
 MONGO_INITIALIZER_GENERAL(ForkServer, ("EndStartupOptionHandling"), ("default"))
 (InitializerContext* context) {
     mongo::forkServerOrDie();
     return Status::OK();
 }
-}  // namespace
 
 /*
  * This function should contain the startup "actions" that we take based on the startup config.  It
@@ -1090,7 +1064,9 @@ static void shutdownTask() {
     audit::logShutdown(&cc());
 }
 
-static int mongoDbMain(int argc, char* argv[], char** envp) {
+}  // namespace
+
+int mongoDbMain(int argc, char* argv[], char** envp) {
     registerShutdownTask(shutdownTask);
 
     setupSignalHandlers();
@@ -1125,3 +1101,5 @@ static int mongoDbMain(int argc, char* argv[], char** envp) {
     exitCleanly(exitCode);
     return 0;
 }
+
+}  // namespace mongo
