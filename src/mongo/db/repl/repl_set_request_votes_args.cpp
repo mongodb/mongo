@@ -62,17 +62,6 @@ const std::string kLegalArgsFieldNames[] = {
     kOperationTime,
 };
 
-const std::string kLegalResponseFieldNames[] = {
-    kOkFieldName,
-    kReasonFieldName,
-    kTermFieldName,
-    kVoteGrantedFieldName,
-    kOperationTime,
-    "$gleStats",
-    "$logicalTime",
-    "$configServerState",
-};
-
 }  // namespace
 
 
@@ -144,12 +133,7 @@ void ReplSetRequestVotesArgs::addToBSON(BSONObjBuilder* builder) const {
 }
 
 Status ReplSetRequestVotesResponse::initialize(const BSONObj& argsObj) {
-    Status status =
-        bsonCheckOnlyHasFields("ReplSetRequestVotes", argsObj, kLegalResponseFieldNames);
-    if (!status.isOK())
-        return status;
-
-    status = bsonExtractIntegerField(argsObj, kTermFieldName, &_term);
+    auto status = bsonExtractIntegerField(argsObj, kTermFieldName, &_term);
     if (!status.isOK())
         return status;
 
