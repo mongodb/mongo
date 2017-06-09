@@ -1201,7 +1201,7 @@ post:
           # On platforms with GDB, we get the binary name from core file
           gdb=/opt/mongodbtoolchain/gdb/bin/gdb
           if [ -f $gdb ]; then
-            binary_file=$($gdb -batch --quiet -ex "core $core_file" 2> /dev/null | grep "Core was generated" | cut -f2 -d "\`" | cut -f1 -d "'")
+            binary_file=$($gdb -batch --quiet -ex "core $core_file" 2> /dev/null | grep "Core was generated" | cut -f2 -d "\`" | cut -f1 -d "'" | cut -f1 -d " ")
             binary_file_locations=$binary_file
           else
             # Find the base file name from the core file name, note it may be truncated.
