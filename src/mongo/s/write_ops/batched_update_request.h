@@ -64,6 +64,7 @@ public:
     //
 
     BatchedUpdateRequest();
+    ~BatchedUpdateRequest();
 
     bool isValid(std::string* errMsg) const;
     BSONObj toBSON() const;

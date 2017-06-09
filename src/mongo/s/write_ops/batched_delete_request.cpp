@@ -49,6 +49,10 @@ BatchedDeleteRequest::BatchedDeleteRequest() {
     clear();
 }
 
+BatchedDeleteRequest::~BatchedDeleteRequest() {
+    unsetDeletes();
+}
+
 bool BatchedDeleteRequest::isValid(std::string* errMsg) const {
     std::string dummy;
     if (errMsg == NULL) {

@@ -50,6 +50,10 @@ BatchedUpdateRequest::BatchedUpdateRequest() {
     clear();
 }
 
+BatchedUpdateRequest::~BatchedUpdateRequest() {
+    unsetUpdates();
+}
+
 bool BatchedUpdateRequest::isValid(std::string* errMsg) const {
     std::string dummy;
     if (errMsg == NULL) {

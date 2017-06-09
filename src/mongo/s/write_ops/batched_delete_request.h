@@ -64,6 +64,7 @@ public:
     //
 
     BatchedDeleteRequest();
+    ~BatchedDeleteRequest();
 
     bool isValid(std::string* errMsg) const;
     BSONObj toBSON() const;
