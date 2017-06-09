@@ -230,8 +230,7 @@ Status attachMetadataIfNeeded(RemoteCommandRequest& request,
     // Append the metadata of the request with metadata from the metadata hook
     // if a hook is installed
     if (metadataHook) {
-        BSONObjBuilder augmentedBob;
-        augmentedBob.appendElements(request.metadata);
+        BSONObjBuilder augmentedBob(std::move(request.metadata));
 
         auto writeStatus = callNoexcept(*metadataHook,
                                         &rpc::EgressMetadataHook::writeRequestMetadata,

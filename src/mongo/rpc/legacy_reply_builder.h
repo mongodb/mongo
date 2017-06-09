@@ -49,7 +49,7 @@ public:
     ~LegacyReplyBuilder() final;
 
     // Override of setCommandReply specifically used to handle SendStaleConfigException.
-    LegacyReplyBuilder& setCommandReply(Status nonOKStatus, const BSONObj& extraErrorInfo) final;
+    LegacyReplyBuilder& setCommandReply(Status nonOKStatus, BSONObj extraErrorInfo) final;
     LegacyReplyBuilder& setRawCommandReply(const BSONObj& commandReply) final;
 
     BSONObjBuilder getInPlaceReplyBuilder(std::size_t) final;

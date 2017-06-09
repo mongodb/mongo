@@ -303,7 +303,7 @@ void Command::generateHelpResponse(OperationContext* opCtx,
     command.help(ss);
     helpBuilder.append("help", ss.str());
 
-    replyBuilder->setCommandReply(helpBuilder.done());
+    replyBuilder->setCommandReply(helpBuilder.obj());
     replyBuilder->setMetadata(rpc::makeEmptyMetadata());
 }
 

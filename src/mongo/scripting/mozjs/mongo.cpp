@@ -583,9 +583,7 @@ void MongoBase::Functions::copyDatabaseWithSCRAM::call(JSContext* cx, JS::CallAr
         status = session->step(payload, &responsePayload);
         uassertStatusOK(status);
 
-        BSONObjBuilder commandBuilder;
-
-        commandBuilder.appendElements(saslCommandPrefix);
+        BSONObjBuilder commandBuilder(std::move(saslCommandPrefix));
         commandBuilder.appendBinData(saslCommandPayloadFieldName,
                                      static_cast<int>(responsePayload.size()),
                                      BinDataGeneral,

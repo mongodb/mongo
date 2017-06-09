@@ -164,8 +164,7 @@ private:
     template <class T>
     void appendComplex(const char* fieldName, const T& val) {
         makeComplex();
-        BSONObjBuilder b;
-        b.appendElements(obj);
+        BSONObjBuilder b(std::move(obj));
         b.append(fieldName, val);
         obj = b.obj();
     }

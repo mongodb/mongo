@@ -80,6 +80,9 @@ class SharedBufferAllocator {
 
 public:
     SharedBufferAllocator() = default;
+    SharedBufferAllocator(SharedBuffer buf) : _buf(std::move(buf)) {
+        invariant(!_buf.isShared());
+    }
 
     // Allow moving but not copying. It would be an error for two SharedBufferAllocators to use the
     // same underlying buffer.
@@ -312,6 +315,18 @@ public:
     void claimReservedBytes(int bytes) {
         invariant(reservedBytes >= bytes);
         reservedBytes -= bytes;
+    }
+
+    /**
+     * Replaces the buffer backing this BufBuilder with the passed in SharedBuffer.
+     * Only legal to call when this builder is empty and when the SharedBuffer isn't shared.
+     */
+    void useSharedBuffer(SharedBuffer buf) {
+        MONGO_STATIC_ASSERT(std::is_same<BufferAllocator, SharedBufferAllocator>());
+        invariant(l == 0);  // Can only do this while empty.
+        invariant(reservedBytes == 0);
+        size = buf.capacity();
+        _buf = SharedBufferAllocator(std::move(buf));
     }
 
 private:

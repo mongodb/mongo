@@ -381,8 +381,7 @@ public:
 
         if (configObj.getField("version").eoo()) {
             // Missing version field defaults to version 1.
-            BSONObjBuilder builder;
-            builder.appendElements(configObj);
+            BSONObjBuilder builder(std::move(configObj));
             builder.append("version", 1);
             configObj = builder.obj();
         }

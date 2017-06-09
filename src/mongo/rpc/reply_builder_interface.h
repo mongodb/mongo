@@ -84,8 +84,7 @@ public:
      * interfacing with legacy code that adds additional data to a failed command reply and
      * its use is discouraged in new code.
      */
-    virtual ReplyBuilderInterface& setCommandReply(Status nonOKStatus,
-                                                   const BSONObj& extraErrorInfo);
+    virtual ReplyBuilderInterface& setCommandReply(Status nonOKStatus, BSONObj extraErrorInfo);
 
     /**
      * Gets the protocol used to serialize this reply. This should be used for validity checks

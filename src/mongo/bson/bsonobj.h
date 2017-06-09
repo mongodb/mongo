@@ -204,9 +204,15 @@ public:
         shareOwnershipWith(other.sharedBuffer());
     }
 
-    ConstSharedBuffer sharedBuffer() const {
+    const ConstSharedBuffer& sharedBuffer() const {
         invariant(isOwned());
         return _ownedBuffer;
+    }
+
+    ConstSharedBuffer releaseSharedBuffer() {
+        invariant(isOwned());
+        BSONObj sink = std::move(*this);  // Leave *this in a valid moved-from state.
+        return std::move(sink._ownedBuffer);
     }
 
     /** If the data buffer is under the control of this BSONObj, return it.

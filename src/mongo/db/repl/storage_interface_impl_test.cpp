@@ -118,8 +118,7 @@ void createCollection(OperationContext* opCtx,
  * Creates an oplog entry with given optime.
  */
 BSONObj makeOplogEntry(OpTime opTime) {
-    BSONObjBuilder bob;
-    bob.appendElements(opTime.toBSON());
+    BSONObjBuilder bob(opTime.toBSON());
     bob.append("h", 1LL);
     bob.append("op", "c");
     bob.append("ns", "test.t");

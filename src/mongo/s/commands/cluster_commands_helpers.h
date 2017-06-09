@@ -62,7 +62,7 @@ void appendWriteConcernErrorToCmdResponse(const ShardId& shardID,
 /**
  * Returns a copy of 'cmdObj' with 'version' appended.
  */
-BSONObj appendShardVersion(const BSONObj& cmdObj, ChunkVersion version);
+BSONObj appendShardVersion(BSONObj cmdObj, ChunkVersion version);
 
 /**
  * Generic function for dispatching commands to the cluster.

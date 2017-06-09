@@ -179,8 +179,9 @@ public:
                     if (!status->isOK()) {
                         commandReply = StatusWith<BSONObj>(*status);
                     }
-                    auto cmdResponse =
-                        replyBuilder->setCommandReply(commandReply).setMetadata(metadata).done();
+                    auto cmdResponse = replyBuilder->setCommandReply(std::move(commandReply))
+                                           .setMetadata(metadata)
+                                           .done();
                     _mp->say(cmdResponse, requestId);
                     continue;
                 }

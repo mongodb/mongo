@@ -52,7 +52,7 @@ LegacyReplyBuilder::LegacyReplyBuilder(Message&& message) : _message{std::move(m
 LegacyReplyBuilder::~LegacyReplyBuilder() {}
 
 LegacyReplyBuilder& LegacyReplyBuilder::setCommandReply(Status nonOKStatus,
-                                                        const BSONObj& extraErrorInfo) {
+                                                        BSONObj extraErrorInfo) {
     invariant(_state == State::kCommandReply);
     if (nonOKStatus == ErrorCodes::SendStaleConfig) {
         _staleConfigError = true;
@@ -66,7 +66,7 @@ LegacyReplyBuilder& LegacyReplyBuilder::setCommandReply(Status nonOKStatus,
         setRawCommandReply(err.done());
     } else {
         // All other errors proceed through the normal path, which also handles state transitions.
-        ReplyBuilderInterface::setCommandReply(std::move(nonOKStatus), extraErrorInfo);
+        ReplyBuilderInterface::setCommandReply(std::move(nonOKStatus), std::move(extraErrorInfo));
     }
     return *this;
 }

@@ -124,6 +124,33 @@ public:
         _b.reserveBytes(1);
     }
 
+    /**
+     * Creates a new BSONObjBuilder prefixed with the fields in 'prefix'.
+     *
+     * If prefix is an rvalue referring to the only view of the underlying BSON buffer, it will be
+     * able to avoid copying and will just reuse the buffer. Therefore, you should try to std::move
+     * into this constructor where possible.
+     */
+    BSONObjBuilder(BSONObj prefix)
+        : _b(_buf), _buf(0), _offset(0), _s(this), _tracker(0), _doneCalled(false) {
+        // If prefix wasn't owned or we don't have exclusive access to it, we must copy.
+        if (!prefix.isOwned() || prefix.sharedBuffer().isShared()) {
+            _b.grow(prefix.objsize());  // Make sure we won't need to realloc().
+            _b.setlen(sizeof(int));     // Skip over size bytes (see first constructor).
+            _b.reserveBytes(1);         // Reserve room for our EOO byte.
+            appendElements(prefix);
+            return;
+        }
+
+        const auto size = prefix.objsize();
+        const char* const firstByte = prefix.objdata();
+        auto buf = prefix.releaseSharedBuffer().constCast();
+        _offset = firstByte - buf.get();
+        _b.useSharedBuffer(std::move(buf));
+        _b.setlen(_offset + size - 1);  // Position right before prefix's EOO byte.
+        _b.reserveBytes(1);             // Reserve room for our EOO byte.
+    }
+
     // Move constructible, but not assignable due to reference member.
     BSONObjBuilder(BSONObjBuilder&& other)
         : _b(&other._b == &other._buf ? _buf : other._b),
@@ -146,10 +173,10 @@ public:
     }
 
     /** add all the fields from the object specified to this object */
-    BSONObjBuilder& appendElements(BSONObj x);
+    BSONObjBuilder& appendElements(const BSONObj& x);
 
     /** add all the fields from the object specified to this object if they don't exist already */
-    BSONObjBuilder& appendElementsUnique(BSONObj x);
+    BSONObjBuilder& appendElementsUnique(const BSONObj& x);
 
     /** append element to the object we are building */
     BSONObjBuilder& append(const BSONElement& e) {
@@ -637,8 +664,9 @@ public:
     */
     BSONObj obj() {
         massert(10335, "builder does not own memory", owned());
-        doneFast();
-        return BSONObj(_b.release());
+        auto out = done();
+        out.shareOwnershipWith(_b.release());
+        return out;
     }
 
     /** Fetch the object we have built.

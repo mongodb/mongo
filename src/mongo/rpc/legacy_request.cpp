@@ -55,7 +55,7 @@ OpMsgRequest opMsgRequestFromLegacyRequest(const Message& message) {
     auto bodyAndMetadata = rpc::upconvertRequestMetadata(qm.query, qm.queryOptions);
 
     return OpMsgRequest::fromDBAndBody(
-        ns.db(), std::get<0>(bodyAndMetadata), std::get<1>(bodyAndMetadata));
+        ns.db(), std::move(std::get<0>(bodyAndMetadata)), std::get<1>(bodyAndMetadata));
 }
 
 }  // namespace rpc

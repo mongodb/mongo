@@ -109,12 +109,11 @@ struct OpMsgRequest : public OpMsg {
     }
 
     static OpMsgRequest fromDBAndBody(StringData db,
-                                      const BSONObj& body,
+                                      BSONObj body,
                                       const BSONObj& extraFields = {}) {
         OpMsgRequest request;
         request.body = ([&] {
-            BSONObjBuilder bodyBuilder;
-            bodyBuilder.appendElements(body);
+            BSONObjBuilder bodyBuilder(std::move(body));
             bodyBuilder.appendElements(extraFields);
             bodyBuilder.append("$db", db);
             return bodyBuilder.obj();

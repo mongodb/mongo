@@ -118,7 +118,7 @@ private:
             commandResponse.append("minWireVersion", WireVersion::RELEASE_2_4_AND_BEFORE);
         }
 
-        auto response = reply->setCommandReply(commandResponse.done())
+        auto response = reply->setCommandReply(commandResponse.obj())
                             .setMetadata(rpc::makeEmptyMetadata())
                             .done();
 

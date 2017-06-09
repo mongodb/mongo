@@ -188,7 +188,7 @@ BSONObjBuilder& BSONObjBuilder::appendDate(StringData fieldName, Date_t dt) {
 }
 
 /* add all the fields from the object specified to this object */
-BSONObjBuilder& BSONObjBuilder::appendElements(BSONObj x) {
+BSONObjBuilder& BSONObjBuilder::appendElements(const BSONObj& x) {
     if (!x.isEmpty())
         _b.appendBuf(x.objdata() + 4,   // skip over leading length
                      x.objsize() - 5);  // ignore leading length and trailing \0
@@ -196,7 +196,7 @@ BSONObjBuilder& BSONObjBuilder::appendElements(BSONObj x) {
 }
 
 /* add all the fields from the object specified to this object if they don't exist */
-BSONObjBuilder& BSONObjBuilder::appendElementsUnique(BSONObj x) {
+BSONObjBuilder& BSONObjBuilder::appendElementsUnique(const BSONObj& x) {
     std::set<std::string> have;
     {
         BSONObjIterator i = iterator();

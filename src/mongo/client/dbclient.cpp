@@ -185,8 +185,7 @@ rpc::UniqueReply DBClientWithCommands::runCommandWithMetadata(StringData databas
     // call() oddly takes this by pointer, so we need to put it on the stack.
     auto host = getServerAddress();
 
-    BSONObjBuilder metadataBob;
-    metadataBob.appendElements(metadata);
+    BSONObjBuilder metadataBob(std::move(metadata));
 
     if (_metadataWriter) {
         uassertStatusOK(
@@ -198,7 +197,7 @@ rpc::UniqueReply DBClientWithCommands::runCommandWithMetadata(StringData databas
     requestBuilder->setDatabase(database);
     requestBuilder->setCommandName(command);
     requestBuilder->setCommandArgs(commandArgs);
-    requestBuilder->setMetadata(metadataBob.done());
+    requestBuilder->setMetadata(metadataBob.obj());
     auto requestMsg = requestBuilder->done();
 
     Message replyMsg;

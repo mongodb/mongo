@@ -213,9 +213,8 @@ StatusWith<std::vector<AsyncRequestsSender::Response>> gatherResponses(
 
 }  // namespace
 
-BSONObj appendShardVersion(const BSONObj& cmdObj, ChunkVersion version) {
-    BSONObjBuilder cmdWithVersionBob;
-    cmdWithVersionBob.appendElements(cmdObj);
+BSONObj appendShardVersion(BSONObj cmdObj, ChunkVersion version) {
+    BSONObjBuilder cmdWithVersionBob(std::move(cmdObj));
     version.appendForCommands(&cmdWithVersionBob);
     return cmdWithVersionBob.obj();
 }

@@ -72,8 +72,7 @@ Message assembleCommandRequest(DBClientWithCommands* cli,
     std::tie(upconvertedCommand, upconvertedMetadata) =
         rpc::upconvertRequestMetadata(std::move(legacyQuery), legacyQueryOptions);
 
-    BSONObjBuilder metadataBob;
-    metadataBob.appendElements(upconvertedMetadata);
+    BSONObjBuilder metadataBob(std::move(upconvertedMetadata));
     if (cli->getRequestMetadataWriter()) {
         uassertStatusOK(cli->getRequestMetadataWriter()(
             (haveClient() ? cc().getOperationContext() : nullptr), &metadataBob));
@@ -84,7 +83,7 @@ Message assembleCommandRequest(DBClientWithCommands* cli,
     // been wrapped.
     requestBuilder->setCommandName(upconvertedCommand.firstElementFieldName());
     requestBuilder->setCommandArgs(std::move(upconvertedCommand));
-    requestBuilder->setMetadata(metadataBob.done());
+    requestBuilder->setMetadata(metadataBob.obj());
 
     return requestBuilder->done();
 }

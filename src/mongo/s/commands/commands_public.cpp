@@ -1296,8 +1296,7 @@ public:
                 // long as we keep getting more chunks. The end condition is when we go to
                 // look for chunk n and it doesn't exist. This means that the file's last
                 // chunk is n-1, so we return the computed md5 results.
-                BSONObjBuilder bb;
-                bb.appendElements(filterCommandRequestForPassthrough(cmdObj));
+                BSONObjBuilder bb(filterCommandRequestForPassthrough(cmdObj));
                 bb.appendBool("partialOk", true);
                 bb.append("startAt", n);
                 if (!lastResult.isEmpty()) {

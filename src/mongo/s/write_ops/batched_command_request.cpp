@@ -138,21 +138,18 @@ bool BatchedCommandRequest::isValid(std::string* errMsg) const {
 }
 
 BSONObj BatchedCommandRequest::toBSON() const {
-    BSONObjBuilder builder;
-
-    switch (getBatchType()) {
-        case BatchedCommandRequest::BatchType_Insert:
-            builder.appendElements(_insertReq->toBSON());
-            break;
-        case BatchedCommandRequest::BatchType_Update:
-            builder.appendElements(_updateReq->toBSON());
-            break;
-        case BatchedCommandRequest::BatchType_Delete:
-            builder.appendElements(_deleteReq->toBSON());
-            break;
-        default:
-            MONGO_UNREACHABLE;
-    }
+    BSONObjBuilder builder([&] {
+        switch (getBatchType()) {
+            case BatchedCommandRequest::BatchType_Insert:
+                return _insertReq->toBSON();
+            case BatchedCommandRequest::BatchType_Update:
+                return _updateReq->toBSON();
+            case BatchedCommandRequest::BatchType_Delete:
+                return _deleteReq->toBSON();
+            default:
+                MONGO_UNREACHABLE;
+        }
+    }());
 
     // Append the shard version
     if (_shardVersion) {

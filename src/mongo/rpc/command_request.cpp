@@ -105,8 +105,7 @@ ParsedOpCommand ParsedOpCommand::parse(const Message& message) {
 OpMsgRequest opMsgRequestFromCommandRequest(const Message& message) {
     auto parsed = ParsedOpCommand::parse(message);
 
-    BSONObjBuilder bodyBuilder;
-    bodyBuilder.appendElements(parsed.body);
+    BSONObjBuilder bodyBuilder(std::move(parsed.body));
 
     // OP_COMMAND is only used when communicating with 3.4 nodes and they serialize their metadata
     // fields differently. We do all up-conversion here so that the rest of the code only has to

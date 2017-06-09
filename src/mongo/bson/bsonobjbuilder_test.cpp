@@ -366,5 +366,85 @@ TEST(BSONArrayBuilderTest, MovingABSONArrayBuilderWorks) {
     ASSERT_BSONOBJ_EQ(bob.obj(), BSON("a" << 1 << "array" << BSON_ARRAY(1 << "2" << 3 << "4")));
 }
 
+TEST(BSONObjBuilderTest, SeedingBSONObjBuilderWithRootedUnsharedOwnedBsonWorks) {
+    auto origObj = BSON("a" << 1);
+    auto origObjPtr = origObj.objdata();
+
+    BSONObjBuilder bob(std::move(origObj));  // moving.
+    bob.append("b", 1);
+    const auto obj = bob.obj();
+    ASSERT_BSONOBJ_EQ(origObj, BSONObj());
+    ASSERT_BSONOBJ_EQ(obj, BSON("a" << 1 << "b" << 1));
+    ASSERT_EQ(static_cast<const void*>(obj.objdata()), static_cast<const void*>(origObjPtr));
+}
+
+TEST(BSONObjBuilderTest, SeedingBSONObjBuilderWithRootedSharedOwnedBsonWorks) {
+    const auto origObj = BSON("a" << 1);
+    auto origObjPtr = origObj.objdata();
+
+    BSONObjBuilder bob(origObj);  // not moving.
+    bob.append("b", 1);
+    const auto obj = bob.obj();
+    ASSERT_BSONOBJ_EQ(origObj, BSON("a" << 1));
+    ASSERT_BSONOBJ_EQ(obj, BSON("a" << 1 << "b" << 1));
+    ASSERT_NE(static_cast<const void*>(obj.objdata()), static_cast<const void*>(origObjPtr));
+}
+
+TEST(BSONObjBuilderTest, SeedingBSONObjBuilderWithRootedUnownedBsonWorks) {
+    const auto origObjHolder = BSON("a" << 1);
+    auto origObjPtr = origObjHolder.objdata();
+    const auto origObj = BSONObj(origObjPtr);
+    invariant(!origObj.isOwned());
+
+    BSONObjBuilder bob(origObj);  // not moving.
+    bob.append("b", 1);
+    const auto obj = bob.obj();
+    ASSERT_BSONOBJ_EQ(origObj, BSON("a" << 1));
+    ASSERT_BSONOBJ_EQ(obj, BSON("a" << 1 << "b" << 1));
+    ASSERT_NE(static_cast<const void*>(obj.objdata()), static_cast<const void*>(origObjPtr));
+}
+
+TEST(BSONObjBuilderTest, SeedingBSONObjBuilderWithNonrootedUnsharedOwnedBsonWorks) {
+    auto origObjHolder = BSON("" << BSON("a" << 1));
+    auto origObj = origObjHolder.firstElement().Obj();
+    auto origObjPtr = origObj.objdata();
+    origObj.shareOwnershipWith(origObjHolder.releaseSharedBuffer());
+
+    BSONObjBuilder bob(std::move(origObj));  // moving.
+    bob.append("b", 1);
+    const auto obj = bob.obj();
+    ASSERT_BSONOBJ_EQ(origObj, BSONObj());
+    ASSERT_BSONOBJ_EQ(obj, BSON("a" << 1 << "b" << 1));
+    ASSERT_EQ(static_cast<const void*>(obj.objdata()), static_cast<const void*>(origObjPtr));
+}
+
+TEST(BSONObjBuilderTest, SeedingBSONObjBuilderWithNonrootedSharedOwnedBsonWorks) {
+    auto origObjHolder = BSON("" << BSON("a" << 1));
+    auto origObj = origObjHolder.firstElement().Obj();
+    auto origObjPtr = origObj.objdata();
+    origObj.shareOwnershipWith(origObjHolder.releaseSharedBuffer());
+
+    BSONObjBuilder bob(origObj);  // not moving.
+    bob.append("b", 1);
+    const auto obj = bob.obj();
+    ASSERT_BSONOBJ_EQ(origObj, BSON("a" << 1));
+    ASSERT_BSONOBJ_EQ(obj, BSON("a" << 1 << "b" << 1));
+    ASSERT_NE(static_cast<const void*>(obj.objdata()), static_cast<const void*>(origObjPtr));
+}
+
+TEST(BSONObjBuilderTest, SeedingBSONObjBuilderWithNonrootedUnownedBsonWorks) {
+    auto origObjHolder = BSON("" << BSON("a" << 1));
+    auto origObj = origObjHolder.firstElement().Obj();
+    auto origObjPtr = origObj.objdata();
+    invariant(!origObj.isOwned());
+
+    BSONObjBuilder bob(origObj);  // not moving.
+    bob.append("b", 1);
+    const auto obj = bob.obj();
+    ASSERT_BSONOBJ_EQ(origObj, BSON("a" << 1));
+    ASSERT_BSONOBJ_EQ(obj, BSON("a" << 1 << "b" << 1));
+    ASSERT_NE(static_cast<const void*>(obj.objdata()), static_cast<const void*>(origObjPtr));
+}
+
 }  // namespace
 }  // namespace mongo

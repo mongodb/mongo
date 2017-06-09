@@ -164,8 +164,7 @@ CommandAndMetadata upconvertRequestMetadata(BSONObj legacyCmdObj, int queryFlags
 LegacyCommandAndFlags downconvertRequestMetadata(BSONObj cmdObj, BSONObj metadata) {
     int legacyQueryFlags = 0;
     if (auto logicalTime = metadata[LogicalTimeMetadata::fieldName()]) {
-        BSONObjBuilder logicalTimeCommandBob;
-        logicalTimeCommandBob.appendElements(cmdObj);
+        BSONObjBuilder logicalTimeCommandBob(std::move(cmdObj));
         logicalTimeCommandBob.append(logicalTime);
         cmdObj = logicalTimeCommandBob.obj();
     }

@@ -473,8 +473,7 @@ DbResponse Strategy::clientOpQueryCommand(OperationContext* opCtx,
             // If the slaveOK bit is set, behave as-if read preference secondary-preferred was
             // specified.
             const auto readPref = ReadPreferenceSetting(ReadPreference::SecondaryPreferred);
-            BSONObjBuilder finalCmdObjBuilder;
-            finalCmdObjBuilder.appendElements(cmdObj);
+            BSONObjBuilder finalCmdObjBuilder(std::move(cmdObj));
             readPref.toContainingBSON(&finalCmdObjBuilder);
             cmdObj = finalCmdObjBuilder.obj();
         }
@@ -662,11 +661,9 @@ void Strategy::writeOp(OperationContext* opCtx, DbMessage* dbm) {
             // Adjust namespace for command
             const NamespaceString& fullNS(commandRequest->getNS());
 
-            BSONObj commandBSON = commandRequest->toBSON();
-
             BSONObjBuilder builder;
             runAgainstRegistered(
-                opCtx, OpMsgRequest::fromDBAndBody(fullNS.db(), commandBSON), builder);
+                opCtx, OpMsgRequest::fromDBAndBody(fullNS.db(), commandRequest->toBSON()), builder);
 
             bool parsed = commandResponse.parseBSON(builder.done(), nullptr);
             (void)parsed;  // for compile

@@ -468,7 +468,8 @@ Status ClusterAggregate::aggPassthrough(OperationContext* opCtx,
         opCtx,
         ReadPreferenceSetting::get(opCtx),
         namespaces.executionNss.db().toString(),
-        !shard->isConfig() ? appendShardVersion(cmdObj, ChunkVersion::UNSHARDED()) : cmdObj,
+        !shard->isConfig() ? appendShardVersion(std::move(cmdObj), ChunkVersion::UNSHARDED())
+                           : std::move(cmdObj),
         Shard::RetryPolicy::kNoRetry));
 
     if (ErrorCodes::isStaleShardingError(cmdResponse.commandStatus.code())) {

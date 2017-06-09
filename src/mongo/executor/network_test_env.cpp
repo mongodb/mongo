@@ -47,12 +47,10 @@ void NetworkTestEnv::onCommand(OnCommandFunction func) {
     const NetworkInterfaceMock::NetworkOperationIterator noi = _mockNetwork->getNextReadyRequest();
     const RemoteCommandRequest& request = noi->getRequest();
 
-    const auto& resultStatus = func(request);
-
-    BSONObjBuilder result;
+    auto resultStatus = func(request);
 
     if (resultStatus.isOK()) {
-        result.appendElements(resultStatus.getValue());
+        BSONObjBuilder result(std::move(resultStatus.getValue()));
         Command::appendCommandStatus(result, resultStatus.getStatus());
         const RemoteCommandResponse response(result.obj(), BSONObj(), Milliseconds(1));
 
@@ -72,12 +70,10 @@ void NetworkTestEnv::onCommandWithMetadata(OnCommandWithMetadataFunction func) {
     const NetworkInterfaceMock::NetworkOperationIterator noi = _mockNetwork->getNextReadyRequest();
     const RemoteCommandRequest& request = noi->getRequest();
 
-    const auto cmdResponseStatus = func(request);
-
-    BSONObjBuilder result;
+    auto cmdResponseStatus = func(request);
 
     if (cmdResponseStatus.isOK()) {
-        result.appendElements(cmdResponseStatus.data);
+        BSONObjBuilder result(std::move(cmdResponseStatus.data));
         Command::appendCommandStatus(result, cmdResponseStatus.status);
         const RemoteCommandResponse response(
             result.obj(), cmdResponseStatus.metadata, Milliseconds(1));
