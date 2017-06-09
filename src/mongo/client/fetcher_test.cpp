@@ -117,7 +117,8 @@ void FetcherTest::setUp() {
 }
 
 void FetcherTest::tearDown() {
-    executor::ThreadPoolExecutorTest::tearDown();
+    getExecutor().shutdown();
+    getExecutor().join();
     // Executor may still invoke fetcher's callback before shutting down.
     fetcher.reset();
 }

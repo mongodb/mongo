@@ -99,9 +99,6 @@ private:
 
 class RollbackCommonPointResolverTest : public AbstractOplogFetcherTest {
 protected:
-    void setUp() override;
-    void tearDown() override;
-
     /**
      * Starts a rollback common point resolver. Processes a single batch of results from
      * the oplog query and shuts down.
@@ -151,16 +148,6 @@ protected:
     std::unique_ptr<RollbackCommonPointResolver> resolver;
     std::unique_ptr<ShutdownState> shutdownState;
 };
-
-void RollbackCommonPointResolverTest::setUp() {
-    AbstractOplogFetcherTest::setUp();
-}
-
-void RollbackCommonPointResolverTest::tearDown() {
-    AbstractOplogFetcherTest::tearDown();
-    resolver.reset();
-    shutdownState.reset();
-}
 
 HostAndPort source("localhost:12345");
 NamespaceString nss("local.oplog.rs");

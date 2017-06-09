@@ -288,6 +288,11 @@ private:
     enum ThreadType { kNoThread = 0, kExecutorThread = 1, kNetworkThread = 2 };
 
     /**
+     * Implementation of startup behavior.
+     */
+    void _startup_inlock();
+
+    /**
      * Returns information about the state of this mock for diagnostic purposes.
      */
     std::string _getDiagnosticString_inlock() const;

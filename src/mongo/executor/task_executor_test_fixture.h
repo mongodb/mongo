@@ -73,13 +73,6 @@ public:
      */
     void setUp() override;
 
-    /**
-     * Destroys the replication executor.
-     *
-     * Shuts down and joins the running executor.
-     */
-    void tearDown() override;
-
     void launchExecutorThread();
     void shutdownExecutorThread();
     void joinExecutorThread();
@@ -102,12 +95,6 @@ private:
 
     NetworkInterfaceMock* _net;
     std::unique_ptr<TaskExecutor> _executor;
-
-    /**
-     * kPreStart -> kRunning -> kJoinRequired -> kJoining -> kShutdownComplete
-     */
-    enum LifecycleState { kPreStart, kRunning, kJoinRequired, kJoining, kShutdownComplete };
-    LifecycleState _executorState = LifecycleState::kPreStart;
 };
 
 }  // namespace executor

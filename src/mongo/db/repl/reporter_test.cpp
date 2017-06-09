@@ -182,7 +182,8 @@ void ReporterTest::setUp() {
 }
 
 void ReporterTest::tearDown() {
-    executor::ThreadPoolExecutorTest::tearDown();
+    getExecutor().shutdown();
+    getExecutor().join();
     // Executor may still invoke reporter's callback before shutting down.
     reporter.reset();
     posUpdater.reset();

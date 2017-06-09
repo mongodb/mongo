@@ -82,7 +82,6 @@ public:
 
 protected:
     void setUp() override;
-    void tearDown() override;
 
     /**
      * Schedules network response and instructs network interface to process response.

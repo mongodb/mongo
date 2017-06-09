@@ -45,7 +45,6 @@ public:
 private:
     executor::ThreadPoolMock::Options makeThreadPoolMockOptions() const override;
     void setUp() override;
-    void tearDown() override;
 };
 
 executor::ThreadPoolMock::Options MultiApplierTest::makeThreadPoolMockOptions() const {
@@ -58,15 +57,6 @@ void MultiApplierTest::setUp() {
     executor::ThreadPoolExecutorTest::setUp();
 
     launchExecutorThread();
-}
-
-void MultiApplierTest::tearDown() {
-    executor::ThreadPoolExecutorTest::shutdownExecutorThread();
-    executor::ThreadPoolExecutorTest::joinExecutorThread();
-
-    // Local tear down steps here.
-
-    executor::ThreadPoolExecutorTest::tearDown();
 }
 
 Status applyOperation(MultiApplier::OperationPtrs*) {

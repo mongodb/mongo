@@ -54,7 +54,6 @@ using NetworkGuard = executor::NetworkInterfaceMock::InNetworkGuard;
 class OplogFetcherTest : public AbstractOplogFetcherTest {
 protected:
     void setUp() override;
-    void tearDown() override;
 
     /**
      * Starts an oplog fetcher. Processes a single batch of results from
@@ -115,10 +114,6 @@ void OplogFetcherTest::setUp() {
         lastEnqueuedDocumentsInfo = info;
         return Status::OK();
     };
-}
-
-void OplogFetcherTest::tearDown() {
-    AbstractOplogFetcherTest::tearDown();
 }
 
 BSONObj OplogFetcherTest::makeOplogQueryMetadataObject(OpTime lastAppliedOpTime,

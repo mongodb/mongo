@@ -92,10 +92,6 @@ void AbstractOplogFetcherTest::setUp() {
     lastFetched = {456LL, {{123, 0}, 1}};
 }
 
-void AbstractOplogFetcherTest::tearDown() {
-    executor::ThreadPoolExecutorTest::tearDown();
-}
-
 executor::RemoteCommandRequest AbstractOplogFetcherTest::processNetworkResponse(
     executor::RemoteCommandResponse response, bool expectReadyRequestsAfterProcessing) {
 

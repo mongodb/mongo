@@ -360,8 +360,8 @@ protected:
         if (_executorThreadShutdownComplete) {
             return;
         }
-        executor::ThreadPoolExecutorTest::shutdownExecutorThread();
-        executor::ThreadPoolExecutorTest::joinExecutorThread();
+        getExecutor().shutdown();
+        getExecutor().join();
         _executorThreadShutdownComplete = true;
     }
 
@@ -372,9 +372,6 @@ protected:
         _dbWorkThreadPool.reset();
         _replicationProcess.reset();
         _storageInterface.reset();
-
-        // tearDown() destroys the task executor which was referenced by the initial syncer.
-        executor::ThreadPoolExecutorTest::tearDown();
     }
 
     /**

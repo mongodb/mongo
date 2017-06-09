@@ -75,8 +75,6 @@ TEST_F(ThreadPoolExecutorTest, TimelyCancelationOfScheduleWorkAt) {
     executor.wait(cb1);
     ASSERT_EQUALS(ErrorCodes::CallbackCanceled, status1);
     ASSERT_EQUALS(startTime + Milliseconds(200), net->now());
-    executor.shutdown();
-    joinExecutorThread();
 }
 
 bool sharedCallbackStateDestroyed = false;
@@ -120,9 +118,6 @@ TEST_F(ThreadPoolExecutorTest,
     // to ThreadPoolTaskExecutor::CallbackState).
     ASSERT_TRUE(callbackInvoked);
     ASSERT_TRUE(sharedCallbackStateDestroyed);
-
-    executor.shutdown();
-    joinExecutorThread();
 }
 
 TEST_F(ThreadPoolExecutorTest, ShutdownAndScheduleRaceDoesNotCrash) {
@@ -162,7 +157,7 @@ TEST_F(ThreadPoolExecutorTest, ShutdownAndScheduleRaceDoesNotCrash) {
     barrier.countDownAndWait();
     MONGO_FAIL_POINT_PAUSE_WHILE_SET((*fpTPTE1));
     executor.shutdown();
-    joinExecutorThread();
+    executor.join();
     ASSERT_OK(status1);
     ASSERT_EQUALS(ErrorCodes::CallbackCanceled, status2);
 }

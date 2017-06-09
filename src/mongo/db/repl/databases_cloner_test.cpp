@@ -186,12 +186,9 @@ protected:
     }
 
     void tearDown() override {
-        executor::ThreadPoolExecutorTest::shutdownExecutorThread();
-        executor::ThreadPoolExecutorTest::joinExecutorThread();
-
+        getExecutor().shutdown();
+        getExecutor().join();
         _dbWorkThreadPool.join();
-
-        executor::ThreadPoolExecutorTest::tearDown();
     }
 
     /**

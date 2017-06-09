@@ -196,6 +196,10 @@ bool NetworkInterfaceMock::onNetworkThread() {
 
 void NetworkInterfaceMock::startup() {
     stdx::lock_guard<stdx::mutex> lk(_mutex);
+    _startup_inlock();
+}
+
+void NetworkInterfaceMock::_startup_inlock() {
     invariant(!_hasStarted);
     _hasStarted = true;
     _inShutdown.store(false);
@@ -207,7 +211,9 @@ void NetworkInterfaceMock::shutdown() {
     invariant(!inShutdown());
 
     stdx::unique_lock<stdx::mutex> lk(_mutex);
-    invariant(_hasStarted);
+    if (!_hasStarted) {
+        _startup_inlock();
+    }
     _inShutdown.store(true);
     NetworkOperationList todo;
     todo.splice(todo.end(), _scheduled);

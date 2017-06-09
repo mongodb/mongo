@@ -52,7 +52,7 @@ namespace executor {
 struct ConnectionPoolStats;
 
 /**
- * Generic event loop with notions of events and callbacks.
+ * Executor with notions of events and callbacks.
  *
  * Callbacks represent work to be performed by the executor.
  * They may be scheduled by client threads or by other callbacks.  Methods that
@@ -68,9 +68,6 @@ struct ConnectionPoolStats;
  *
  * If an event is unsignaled when shutdown is called, the executor will ensure that any threads
  * blocked in waitForEvent() eventually return.
- *
- * Logically, Callbacks and Events exist for the life of the executor.  That means that while
- * the executor is in scope, no CallbackHandle or EventHandle is stale.
  */
 class TaskExecutor {
     MONGO_DISALLOW_COPYING(TaskExecutor);
@@ -105,6 +102,10 @@ public:
      */
     using RemoteCommandCallbackFn = stdx::function<void(const RemoteCommandCallbackArgs&)>;
 
+    /**
+     * Destroys the task executor. Implicitly performs the equivalent of shutdown() and join()
+     * before returning, if necessary.
+     */
     virtual ~TaskExecutor();
 
     /**
@@ -115,21 +116,21 @@ public:
     virtual void startup() = 0;
 
     /**
-     * Signals to the executor that it should shut down. This method should not block. After
-     * calling shutdown, it is illegal to schedule more tasks on the executor and join should be
-     * called to wait for shutdown to complete.
+     * Signals to the executor that it should shut down. This method may be called from within a
+     * callback.  As such, this method must not block. After shutdown returns, attempts to schedule
+     * more tasks on the executor will return errors.
      *
-     * It is legal to call this method multiple times, but it should only be called after startup
-     * has been called.
+     * It is legal to call this method multiple times. If the task executor goes out of scope
+     * before this method is called, the destructor performs this activity.
      */
     virtual void shutdown() = 0;
 
     /**
-     * Waits for the shutdown sequence initiated by an earlier call to shutdown to complete. It is
-     * only legal to call this method if startup has been called earlier.
+     * Waits for the shutdown sequence initiated by a call to shutdown() to complete. Must not be
+     * called from within a callback.
      *
-     * If startup is ever called, the code must ensure that join is eventually called once and only
-     * once.
+     * Unlike stdx::thread::join, this method may be called from any thread that wishes to wait for
+     * shutdown to complete.
      */
     virtual void join() = 0;
 

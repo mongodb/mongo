@@ -177,8 +177,6 @@ void AbstractAsyncComponentTest::setUp() {
 void AbstractAsyncComponentTest::tearDown() {
     shutdownExecutorThread();
     joinExecutorThread();
-
-    executor::ThreadPoolExecutorTest::tearDown();
 }
 
 TEST_F(AbstractAsyncComponentTest, ConstructorThrowsUserAssertionOnNullTaskExecutor) {

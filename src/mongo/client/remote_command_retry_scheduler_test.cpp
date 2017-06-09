@@ -63,7 +63,6 @@ public:
 
 protected:
     void setUp() override;
-    void tearDown() override;
 };
 
 class CallbackResponseSaver {
@@ -150,10 +149,6 @@ void RemoteCommandRetrySchedulerTest::runReadyNetworkOperations() {
 void RemoteCommandRetrySchedulerTest::setUp() {
     executor::ThreadPoolExecutorTest::setUp();
     launchExecutorThread();
-}
-
-void RemoteCommandRetrySchedulerTest::tearDown() {
-    executor::ThreadPoolExecutorTest::tearDown();
 }
 
 CallbackResponseSaver::CallbackResponseSaver() = default;

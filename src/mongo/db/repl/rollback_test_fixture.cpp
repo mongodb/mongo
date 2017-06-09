@@ -90,7 +90,6 @@ void RollbackTest::setUp() {
 void RollbackTest::tearDown() {
     _coordinator = nullptr;
     _opCtx.reset();
-    _threadPoolExecutorTest.tearDown();
 
     // We cannot unset the global replication coordinator because ServiceContextMongoD::tearDown()
     // calls dropAllDatabasesExceptLocal() which requires the replication coordinator to clear all

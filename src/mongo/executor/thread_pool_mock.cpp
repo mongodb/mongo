@@ -45,6 +45,7 @@ ThreadPoolMock::~ThreadPoolMock() {
     stdx::unique_lock<stdx::mutex> lk(_mutex);
     _inShutdown = true;
     _net->signalWorkAvailable();
+    _net->exitNetwork();
     if (_started) {
         if (_worker.joinable()) {
             lk.unlock();
@@ -82,6 +83,7 @@ void ThreadPoolMock::join() {
     if (_started) {
         stdx::thread toJoin = std::move(_worker);
         _net->signalWorkAvailable();
+        _net->exitNetwork();
         lk.unlock();
         toJoin.join();
         lk.lock();

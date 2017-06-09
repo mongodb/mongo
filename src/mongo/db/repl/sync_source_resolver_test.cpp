@@ -108,14 +108,12 @@ void SyncSourceResolverTest::setUp() {
 }
 
 void SyncSourceResolverTest::tearDown() {
-    executor::ThreadPoolExecutorTest::shutdownExecutorThread();
-    executor::ThreadPoolExecutorTest::joinExecutorThread();
+    getExecutor().shutdown();
+    getExecutor().join();
 
     _resolver.reset();
     _selector.reset();
     _executorProxy.reset();
-
-    executor::ThreadPoolExecutorTest::tearDown();
 }
 
 std::unique_ptr<SyncSourceResolver> SyncSourceResolverTest::_makeResolver(

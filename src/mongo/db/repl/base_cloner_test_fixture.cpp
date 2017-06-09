@@ -111,14 +111,12 @@ void BaseClonerTest::setUp() {
 }
 
 void BaseClonerTest::tearDown() {
-    executor::ThreadPoolExecutorTest::shutdownExecutorThread();
-    executor::ThreadPoolExecutorTest::joinExecutorThread();
+    getExecutor().shutdown();
+    getExecutor().join();
 
     storageInterface.reset();
     dbWorkThreadPool->join();
     dbWorkThreadPool.reset();
-
-    executor::ThreadPoolExecutorTest::tearDown();
 }
 
 void BaseClonerTest::clear() {
