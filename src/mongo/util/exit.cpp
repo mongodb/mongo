@@ -66,7 +66,11 @@ void runTasks(decltype(shutdownTasks) tasks) {
     }
 }
 
-MONGO_COMPILER_NORETURN void logAndQuickExit(ExitCode code) {
+// The logAndQuickExit_inlock() function should be called while holding the 'shutdownMutex' to
+// prevent multiple threads from attempting to log that they are exiting. The quickExit() function
+// has its own 'quickExitMutex' to prohibit multiple threads from attempting to call _exit().
+MONGO_COMPILER_NORETURN void logAndQuickExit_inlock() {
+    ExitCode code = shutdownExitCode.get();
     log() << "shutting down with code:" << code;
     quickExit(code);
 }
@@ -83,7 +87,10 @@ bool globalInShutdownDeprecated() {
 
 ExitCode waitForShutdown() {
     stdx::unique_lock<stdx::mutex> lk(shutdownMutex);
-    shutdownTasksComplete.wait(lk, [] { return static_cast<bool>(shutdownExitCode); });
+    shutdownTasksComplete.wait(lk, [] {
+        const auto shutdownStarted = static_cast<bool>(shutdownExitCode);
+        return shutdownStarted && !shutdownTasksInProgress;
+    });
 
     return shutdownExitCode.get();
 }
@@ -107,14 +114,23 @@ void shutdown(ExitCode code) {
             // Re-entrant calls to shutdown are not allowed.
             invariant(shutdownTasksThreadId != stdx::this_thread::get_id());
 
+            ExitCode originallyRequestedCode = shutdownExitCode.get();
+            if (code != originallyRequestedCode) {
+                log() << "While running shutdown tasks with the intent to exit with code "
+                      << originallyRequestedCode << ", an additional shutdown request arrived with "
+                                                    "the intent to exit with a different exit code "
+                      << code << "; ignoring the conflicting exit code";
+            }
+
             // Wait for the shutdown tasks to complete
             while (shutdownTasksInProgress)
                 shutdownTasksComplete.wait(lock);
 
-            logAndQuickExit(code);
+            logAndQuickExit_inlock();
         }
 
         setShutdownFlag();
+        shutdownExitCode.emplace(code);
         shutdownTasksInProgress = true;
         shutdownTasksThreadId = stdx::this_thread::get_id();
 
@@ -126,12 +142,11 @@ void shutdown(ExitCode code) {
     {
         stdx::lock_guard<stdx::mutex> lock(shutdownMutex);
         shutdownTasksInProgress = false;
-        shutdownExitCode.emplace(code);
+
+        shutdownTasksComplete.notify_all();
+
+        logAndQuickExit_inlock();
     }
-
-    shutdownTasksComplete.notify_all();
-
-    logAndQuickExit(code);
 }
 
 void shutdownNoTerminate() {
