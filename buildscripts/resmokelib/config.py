@@ -55,7 +55,7 @@ DEFAULTS = {
     "seed": long(time.time() * 256),  # Taken from random.py code in Python 2.7.
     "shellReadMode": None,
     "shellWriteMode": None,
-    "shuffle": False,
+    "shuffle": None,
     "staggerJobs": None,
     "storageEngine": None,
     "storageEngineCacheSizeGB": None,

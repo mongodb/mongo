@@ -189,8 +189,15 @@ def parse_command_line():
                       choices=("commands", "compatibility", "legacy"), metavar="WRITE_MODE",
                       help="The write mode used by the mongo shell.")
 
-    parser.add_option("--shuffle", action="store_true", dest="shuffle",
-                      help="Randomize the order in which tests are executed.")
+    parser.add_option("--shuffle", action="store_const", const="on", dest="shuffle",
+                      help=("Randomize the order in which tests are executed. This is equivalent"
+                            " to specifying --shuffleMode=on."))
+
+    parser.add_option("--shuffleMode", type="choice", action="store", dest="shuffle",
+                      choices=("on", "off", "auto"), metavar="ON|OFF|AUTO",
+                      help=("Control whether to randomize the order in which tests are executed."
+                            " Defaults to auto when not supplied. auto enables randomization in"
+                            " all cases except when the number of jobs requested is 1."))
 
     parser.add_option("--staggerJobs", type="choice", action="store", dest="stagger_jobs",
                       choices=("on", "off"), metavar="ON|OFF",
@@ -225,6 +232,7 @@ def parse_command_line():
                         find_suites=False,
                         list_suites=False,
                         prealloc_journal="off",
+                        shuffle="auto",
                         stagger_jobs="off")
 
     return parser.parse_args()
@@ -271,7 +279,6 @@ def update_config_vars(values):
     _config.REPORT_FILE = config.pop("reportFile")
     _config.SHELL_READ_MODE = config.pop("shellReadMode")
     _config.SHELL_WRITE_MODE = config.pop("shellWriteMode")
-    _config.SHUFFLE = config.pop("shuffle")
     _config.STAGGER_JOBS = config.pop("staggerJobs") == "on"
     _config.STORAGE_ENGINE = config.pop("storageEngine")
     _config.STORAGE_ENGINE_CACHE_SIZE = config.pop("storageEngineCacheSizeGB")
@@ -280,6 +287,15 @@ def update_config_vars(values):
     _config.WT_COLL_CONFIG = config.pop("wiredTigerCollectionConfigString")
     _config.WT_ENGINE_CONFIG = config.pop("wiredTigerEngineConfigString")
     _config.WT_INDEX_CONFIG = config.pop("wiredTigerIndexConfigString")
+
+    shuffle = config.pop("shuffle")
+    if shuffle == "auto":
+        # If the user specified a value for --jobs > 1 (or -j > 1), then default to randomize
+        # the order in which tests are executed. This is because with multiple threads the tests
+        # wouldn't run in a deterministic order anyway.
+        _config.SHUFFLE = _config.JOBS > 1
+    else:
+        _config.SHUFFLE = shuffle == "on"
 
     if config:
         raise optparse.OptionValueError("Unknown option(s): %s" % (config.keys()))
