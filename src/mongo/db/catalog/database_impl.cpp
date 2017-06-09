@@ -449,10 +449,14 @@ Status DatabaseImpl::dropCollectionEvenIfSystem(OperationContext* opCtx,
 
     // Drop unreplicated collections immediately.
     // If 'dropOpTime' is provided, we should proceed to rename the collection.
+    // Under master/slave, collections are always dropped immediately. This is because drop-pending
+    // collections support the rollback process which is not applicable to master/slave.
     auto replCoord = repl::ReplicationCoordinator::get(opCtx);
     auto opObserver = getGlobalServiceContext()->getOpObserver();
     auto isOplogDisabledForNamespace = replCoord->isOplogDisabledFor(opCtx, fullns);
-    if (dropOpTime.isNull() && isOplogDisabledForNamespace) {
+    auto isMasterSlave =
+        repl::ReplicationCoordinator::modeMasterSlave == replCoord->getReplicationMode();
+    if ((dropOpTime.isNull() && isOplogDisabledForNamespace) || isMasterSlave) {
         auto status = _finishDropCollection(opCtx, fullns, collection);
         if (!status.isOK()) {
             return status;
