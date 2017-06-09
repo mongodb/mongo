@@ -67,10 +67,6 @@ functions:
           rm -rf ./*
           mkdir src
           mkdir work
-          mkdir bin
-          mkdir keys
-          pwd
-          ls
     - command: manifest.load
     - command: git.get_project
       params:
@@ -145,7 +141,7 @@ functions:
           virtualenv ./venv
           source ./venv/bin/activate
           pip install -r ../src/dsi/dsi/requirements.txt
-          python ../src/dsi/dsi/bin/bootstrap.py --production
+          python ../src/dsi/dsi/bin/bootstrap.py
     - command: shell.exec
       params:
         script: |
@@ -153,28 +149,19 @@ functions:
           set -e
           source work/dsienv.sh
           $DSI_PATH/bin/setup-dsi-env.sh
-          cp terraform/* work/
-          ls work
-    - command: shell.exec
-      params:
-        working_dir: work
-        script: |
-           set -v
-           set -e
-           ./terraform get --update
+          ls -a work
 
-  "bring up 3 shard cluster":
+  "infrastructure provisioning":
     - command: shell.exec
-      # bring up the cluster
+      # call infrastructure-provisioning.sh. This will either create a cluster, or update tags on existing instances.
       params:
         working_dir: work
-        silent: true
         script: |
-          # to create a mongod EC2 cluster
           set -e
-          set -o verbose
+          set -v
           source ./dsienv.sh
-          $DSI_PATH/bin/setup-cluster.sh ${cluster} false --skip-fio
+          export PRODUCTION=true
+          $DSI_PATH/bin/infrastructure_provisioning.sh ${cluster}
 
   "configure mongodb cluster":
     - command: shell.exec
@@ -214,10 +201,13 @@ functions:
           set -e
           set -o verbose
           source ./dsienv.sh
-          # destroy the EC2 cluster
-          yes yes | ./terraform destroy --var-file=cluster.json
-          yes yes | ./terraform destroy --var-file=cluster.json
+          # Longevity runs so rarely, we simply teardown the cluster when done.
+          # Note that nowadays infrastructure_teardown.sh is actually copying the terraform.tfstate into /data/infrastructure_provisioning
+          # but as of this writing the rhel70-perf-longevity distro didn't actually use the teardown hook.
+          source ./dsienv.sh
+          $DSI_PATH/bin/infrastructure_teardown.sh
           echo "Cluster DESTROYED."
+          echo
           echo "All perf results"
           cd ..
           cat perf.json | egrep "name|ops_per_sec"
@@ -324,7 +314,7 @@ tasks:
       vars:
         storageEngine: "wiredTiger"
         test: "ycsb"
-    - func: "bring up 3 shard cluster"
+    - func: "infrastructure provisioning"
     - func: "configure mongodb cluster"
     - func: "run test"
       vars:
@@ -345,7 +335,7 @@ tasks:
       vars:
         storageEngine: "mmapv1"
         test: "ycsb"
-    - func: "bring up 3 shard cluster"
+    - func: "infrastructure provisioning"
     - func: "configure mongodb cluster"
     - func: "run test"
       vars:

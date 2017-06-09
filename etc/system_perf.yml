@@ -62,9 +62,6 @@ functions:
           rm -rf ./*
           mkdir src
           mkdir work
-          mkdir bin
-          pwd
-          ls
     - command: manifest.load
     - command: git.get_project
       params:
@@ -150,97 +147,19 @@ functions:
           set -e
           source work/dsienv.sh
           $DSI_PATH/bin/setup-dsi-env.sh
-          cp terraform/* work/
-          ls work
-    - command: shell.exec
-      params:
-        working_dir: work
-        script: |
-          set -v
-          set -e
-          ./terraform get --update
-    - command: shell.exec
-      # set up /data/infrastructure_provisioning to keep track of resources,
-      # and allow Evergreen to release resources from there
-      params:
-        script: |
-          set -o verbose
-
-          # To force re-creation of existing instances, e.g. for a patch build, you can uncomment this:
-          #if [ -d "/data/infrastructure_provisioning" ]; then
-          #  /data/infrastructure_provisioning/terraform/infrastructure_teardown.sh \
-          #  && rm -rf /data/infrastructure_provisioning
-          #fi
-
-          # IF there's anything still in $HOME it's old or a mistake. Clean it up.
-          if [ -d "$HOME/infrastructure_provisioning" ]; then
-           $HOME/infrastructure_provisioning/terraform/infrastructure_teardown.sh \
-           && rm -rf $HOME/infrastructure_provisioning
-          fi
-
-          if [ ! -d "/data/infrastructure_provisioning" ]; then
-            echo "copying terraform to Evergreen host"
-            mkdir /data/infrastructure_provisioning
-            cp -r terraform /data/infrastructure_provisioning/.
-            cp -r modules /data/infrastructure_provisioning/.
-            echo "copying infrastructure_teardown.sh to Evergreen host"
-            cp src/dsi/dsi/bin/destroy_cluster.sh /data/infrastructure_provisioning/terraform/infrastructure_teardown.sh
-          fi
-          ls -l /data/infrastructure_provisioning
+          ls -a work
 
   "infrastructure provisioning":
     - command: shell.exec
-      # if /data/infrastructure_provisioning exists, get info about provisioned resources
-      # from there otherwise provision resources from the cloud
+      # call infrastructure-provisioning.sh. This will either create a cluster, or update tags on existing instances.
       params:
         working_dir: work
         script: |
           set -e
-          set -o verbose
-          if [ -e "/data/infrastructure_provisioning/terraform/terraform.tfstate" ]; then
-            echo "Restrieving info for existing resources"
-            cp /data/infrastructure_provisioning/terraform/terraform.tfstate .
-          else
-            echo "No existing resources found"
-          fi
-    - command: shell.exec
-      # call setup-cluster.sh, in most cases this only updates tags
-      params:
-        working_dir: work
-        script: |
-          # don't run this with "set -e" so we can set up properly for the teardown.sh
-          set -o verbose
+          set -v
           source ./dsienv.sh
-          if [ ! -e /data/infrastructure_provisioning/terraform/provisioned.${cluster} ]; then
-            EXISTING="false"
-          else
-            EXISTING="true"
-          fi
-
-          # Disabling fio pre-qualification as of PERF-826
-          $DSI_PATH/bin/setup-cluster.sh ${cluster} $EXISTING --skip-fio
-          # handle the case when setup-cluster.sh fail
-          if [ $? -eq 0 ]; then
-            echo "Resource provisioned/updated."
-            # copy terraform information needed for teardown
-            cp {terraform.tfstate,cluster.tf,terraform.tfvars,security.tf,cluster.json} /data/infrastructure_provisioning/terraform/.
-            rsync -vr ../modules /data/infrastructure_provisioning/modules
-            cd /data/infrastructure_provisioning/terraform
-            ./terraform get
-            # use provisioned.${shard} to indicate the type of clusters held by EVG host
-            # remove previous information and keep the latest cluster type
-            rm provisioned.*
-            touch provisioned.${cluster}
-            echo "Provisioning state updated on Evergreen host."
-          else
-            echo "Failed to provision resources. Cleaning up partial state."
-            cp ../src/dsi/dsi/bin/destroy_cluster.sh .
-            ./destroy_cluster.sh
-            echo "Resource released."
-            rm -r /data/infrastructure_provisioning
-            echo "Cleaned up provisioning state on Evergreen host. Exiting test."
-            exit 1
-          fi
+          export PRODUCTION=true
+          $DSI_PATH/bin/infrastructure_provisioning.sh ${cluster}
 
   "configure mongodb cluster":
     - command: shell.exec
@@ -252,7 +171,7 @@ functions:
           set -o verbose
           source ./dsienv.sh
           source ./venv/bin/activate
-          $DSI_PATH/bin/mongodb_setup.py && echo "${cluster} MongoDB Cluster STARTED."
+          $DSI_PATH/bin/mongodb_setup.py && echo "${setup} MongoDB Cluster STARTED."
 
   "run test":
     - command: shell.exec
