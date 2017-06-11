@@ -746,20 +746,16 @@ env.Library(
         "run_commands.cpp",
     ],
     LIBDEPS=[
+        "auth/authmongod",
+        "commands/dcommands_fsync",
         "curop",
         "curop_metrics",
         "diag_log",
         "lasterror",
         "ops/write_ops_parsers",
+        "rw_concern_d",
+        "s/sharding",
         "storage/storage_options",
-        #'introspect', # CYCLE
-        #'$BUILD_DIR/mongo/db/ops/write_ops', # CYCLE
-        #'$BUILD_DIR/mongo/db/catalog/catalog', # CYCLE
-        #'$BUILD_DIR/mongo/db/commands/dcommands_fsync', # CYCLE
-    ],
-    LIBDEPS_TAGS=[
-        # TODO(ADAM, 2017-05-16): See `CYCLE` tags above
-        'illegal_cyclic_or_unresolved_dependencies_whitelisted',
     ],
 )
 
@@ -796,7 +792,6 @@ env.Library(
         "$BUILD_DIR/mongo/db/storage/mmap_v1/file_allocator",
         "$BUILD_DIR/third_party/shim_snappy",
         '$BUILD_DIR/mongo/db/ttl_collection_cache',
-        "assemble_response",
         "auth/authmongod",
         "authz_manager_external_state_factory_d",
         "background",

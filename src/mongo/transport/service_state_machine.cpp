@@ -32,7 +32,6 @@
 
 #include "mongo/transport/service_state_machine.h"
 
-#include "mongo/db/assemble_response.h"
 #include "mongo/db/client.h"
 #include "mongo/db/dbmessage.h"
 #include "mongo/stdx/memory.h"
