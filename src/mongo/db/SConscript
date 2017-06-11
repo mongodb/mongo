@@ -566,6 +566,7 @@ env.Library(
 env.Library(
     target="service_context_d",
     source=[
+        "run_commands.cpp",
         "service_context_d.cpp",
         "service_entry_point_mongod.cpp",
     ],
@@ -573,12 +574,19 @@ env.Library(
         '$BUILD_DIR/mongo/base',
         '$BUILD_DIR/mongo/transport/service_entry_point',
         '$BUILD_DIR/mongo/transport/transport_layer_common',
-        'assemble_response',
-        'concurrency/lock_manager',
-        'curop',
-        'storage/storage_engine_lock_file',
-        'storage/storage_engine_metadata',
-        'storage/storage_options',
+        "auth/authmongod",
+        "commands/dcommands_fsync",
+        "concurrency/lock_manager",
+        "curop",
+        "curop_metrics",
+        "diag_log",
+        "lasterror",
+        "ops/write_ops_parsers",
+        "rw_concern_d",
+        "s/sharding",
+        "storage/storage_engine_lock_file",
+        "storage/storage_engine_metadata",
+        "storage/storage_options",
     ],
 )
 
@@ -735,26 +743,6 @@ env.Library(
         "diag_log.cpp",
     ],
     LIBDEPS=[
-        "storage/storage_options",
-    ],
-)
-
-env.Library(
-    target="assemble_response",
-    source=[
-        "assemble_response.cpp",
-        "run_commands.cpp",
-    ],
-    LIBDEPS=[
-        "auth/authmongod",
-        "commands/dcommands_fsync",
-        "curop",
-        "curop_metrics",
-        "diag_log",
-        "lasterror",
-        "ops/write_ops_parsers",
-        "rw_concern_d",
-        "s/sharding",
         "storage/storage_options",
     ],
 )
