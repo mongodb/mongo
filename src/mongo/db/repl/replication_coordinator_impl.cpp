@@ -1653,7 +1653,8 @@ bool ReplicationCoordinatorImpl::_tryToStepDown_inlock(const Date_t waitUntil,
         uasserted(ErrorCodes::ExceededTimeLimit,
                   str::stream() << "No electable secondaries caught up as of "
                                 << dateToISOStringLocal(now)
-                                << ". Please use {force: true} to force node to step down.");
+                                << "Please use the replSetStepDown command with the argument "
+                                << "{force: true} to force node to step down.");
     }
     return false;
 }
