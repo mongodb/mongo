@@ -1897,7 +1897,7 @@ TEST_F(ShardingCatalogClientTest, EnableShardingNoDBExists) {
     onCommand([](const RemoteCommandRequest& request) {
         ASSERT_EQ(HostAndPort("shard0:12"), request.target);
         ASSERT_EQ("admin", request.dbname);
-        ASSERT_BSONOBJ_EQ(BSON("listDatabases" << 1), request.cmdObj);
+        ASSERT_BSONOBJ_EQ(BSON("listDatabases" << 1 << "maxTimeMS" << 600000), request.cmdObj);
 
         ASSERT_BSONOBJ_EQ(rpc::ServerSelectionMetadata(true, boost::none).toBSON(),
                           rpc::TrackingMetadata::removeTrackingData(request.metadata));
