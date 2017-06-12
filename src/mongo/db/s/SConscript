@@ -175,6 +175,7 @@ env.Library(
         'config/configsvr_control_balancer_command.cpp',
         'config/configsvr_merge_chunk_command.cpp',
         'config/configsvr_move_chunk_command.cpp',
+	'config/configsvr_move_primary_command.cpp',
         'config/configsvr_remove_shard_from_zone_command.cpp',
         'config/configsvr_set_feature_compatibility_version_command.cpp',
         'config/configsvr_split_chunk_command.cpp',
