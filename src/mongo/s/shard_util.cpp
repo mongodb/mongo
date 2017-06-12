@@ -59,15 +59,22 @@ StatusWith<long long> retrieveTotalShardSize(OperationContext* opCtx, const Shar
         return shardStatus.getStatus();
     }
 
+    // Since 'listDatabases' is potentially slow in the presence of large number of collections, use
+    // a higher maxTimeMS to prevent it from prematurely timing out
+    const Minutes maxTimeMSOverride{10};
+
     auto listDatabasesStatus = shardStatus.getValue()->runCommandWithFixedRetryAttempts(
         opCtx,
         ReadPreferenceSetting{ReadPreference::PrimaryPreferred},
         "admin",
         BSON("listDatabases" << 1),
+        maxTimeMSOverride,
         Shard::RetryPolicy::kIdempotent);
+
     if (!listDatabasesStatus.isOK()) {
         return std::move(listDatabasesStatus.getStatus());
     }
+
     if (!listDatabasesStatus.getValue().commandStatus.isOK()) {
         return std::move(listDatabasesStatus.getValue().commandStatus);
     }
