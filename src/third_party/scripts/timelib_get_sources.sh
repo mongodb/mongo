@@ -11,7 +11,7 @@ set -o errexit
 # 0.16.
 #
 
-VERSION=2017.05beta3
+VERSION=2017.05beta4
 NAME=timelib
 TARBALL=$VERSION.tar.gz
 TARBALL_DIR=$NAME-$VERSION

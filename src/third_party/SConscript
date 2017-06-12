@@ -13,7 +13,7 @@ mozjsSuffix = '-45'
 yamlSuffix = '-0.5.3'
 icuSuffix = '-57.1'
 gperftoolsSuffix = '-2.5'
-timelibSuffix = '-2017.05beta3'
+timelibSuffix = '-2017.05beta4'
 
 thirdPartyIncludePathList = [
     ('s2', '#/src/third_party/s2'),

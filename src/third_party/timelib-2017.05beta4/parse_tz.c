@@ -38,11 +38,30 @@
 # endif
 #endif
 
-#ifdef WORDS_BIGENDIAN
-#define timelib_conv_int(l) (l)
-#else
-#define timelib_conv_int(l) ((l & 0x000000ff) << 24) + ((l & 0x0000ff00) << 8) + ((l & 0x00ff0000) >> 8) + ((l & 0xff000000) >> 24)
+#if defined(__s390__)
+# if __BYTE_ORDER__ == __ORDER_BIG_ENDIAN__
+#  define WORDS_BIGENDIAN
+# else
+#  undef WORDS_BIGENDIAN
+# endif
 #endif
+
+#ifdef WORDS_BIGENDIAN
+static inline uint32_t timelib_conv_int_unsigned(uint32_t value)
+{
+	return value;
+}
+#else
+static inline uint32_t timelib_conv_int_unsigned(uint32_t value)
+{
+	return ((value & 0x000000ff) << 24) +
+		((value & 0x0000ff00) << 8) +
+		((value & 0x00ff0000) >> 8) +
+		((value & 0xff000000) >> 24);
+}
+#endif
+
+#define timelib_conv_int_signed(value) ((int32_t) timelib_conv_int_unsigned((int32_t) value))
 
 static int read_php_preamble(const unsigned char **tzf, timelib_tzinfo *tz)
 {
@@ -118,12 +137,12 @@ static void read_header(const unsigned char **tzf, timelib_tzinfo *tz)
 	uint32_t buffer[6];
 
 	memcpy(&buffer, *tzf, sizeof(buffer));
-	tz->bit32.ttisgmtcnt = timelib_conv_int(buffer[0]);
-	tz->bit32.ttisstdcnt = timelib_conv_int(buffer[1]);
-	tz->bit32.leapcnt    = timelib_conv_int(buffer[2]);
-	tz->bit32.timecnt    = timelib_conv_int(buffer[3]);
-	tz->bit32.typecnt    = timelib_conv_int(buffer[4]);
-	tz->bit32.charcnt    = timelib_conv_int(buffer[5]);
+	tz->bit32.ttisgmtcnt = timelib_conv_int_unsigned(buffer[0]);
+	tz->bit32.ttisstdcnt = timelib_conv_int_unsigned(buffer[1]);
+	tz->bit32.leapcnt    = timelib_conv_int_unsigned(buffer[2]);
+	tz->bit32.timecnt    = timelib_conv_int_unsigned(buffer[3]);
+	tz->bit32.typecnt    = timelib_conv_int_unsigned(buffer[4]);
+	tz->bit32.charcnt    = timelib_conv_int_unsigned(buffer[5]);
 	*tzf += sizeof(buffer);
 }
 
@@ -149,7 +168,7 @@ static int read_transistions(const unsigned char **tzf, timelib_tzinfo *tz)
 		memcpy(buffer, *tzf, sizeof(int32_t) * tz->bit32.timecnt);
 		*tzf += (sizeof(int32_t) * tz->bit32.timecnt);
 		for (i = 0; i < tz->bit32.timecnt; i++) {
-			buffer[i] = timelib_conv_int(buffer[i]);
+			buffer[i] = timelib_conv_int_signed(buffer[i]);
 			/* Sanity check to see whether TS is just increasing */
 			if (i > 0 && !(buffer[i] > buffer[i - 1])) {
 				return TIMELIB_ERROR_CORRUPT_TRANSITIONS_DONT_INCREASE;
@@ -207,7 +226,8 @@ static int read_types(const unsigned char **tzf, timelib_tzinfo *tz)
 
 	for (i = 0; i < tz->bit32.typecnt; i++) {
 		j = i * 6;
-		tz->type[i].offset = (buffer[j] * 16777216) + (buffer[j + 1] * 65536) + (buffer[j + 2] * 256) + buffer[j + 3];
+		tz->type[i].offset = 0;
+		tz->type[i].offset += (int32_t) (((uint32_t) buffer[j]) << 24) + (buffer[j + 1] << 16) + (buffer[j + 2] << 8) + tz->type[i].offset + buffer[j + 3];
 		tz->type[i].isdst = buffer[j + 4];
 		tz->type[i].abbr_idx = buffer[j + 5];
 	}
@@ -234,8 +254,8 @@ static int read_types(const unsigned char **tzf, timelib_tzinfo *tz)
 			return TIMELIB_ERROR_CANNOT_ALLOCATE;
 		}
 		for (i = 0; i < tz->bit32.leapcnt; i++) {
-			tz->leap_times[i].trans = timelib_conv_int(leap_buffer[i * 2]);
-			tz->leap_times[i].offset = timelib_conv_int(leap_buffer[i * 2 + 1]);
+			tz->leap_times[i].trans = timelib_conv_int_signed(leap_buffer[i * 2]);
+			tz->leap_times[i].offset = timelib_conv_int_signed(leap_buffer[i * 2 + 1]);
 		}
 		timelib_free(leap_buffer);
 	}
@@ -289,11 +309,11 @@ static void read_location(const unsigned char **tzf, timelib_tzinfo *tz)
 	uint32_t comments_len;
 
 	memcpy(&buffer, *tzf, sizeof(buffer));
-	tz->location.latitude = timelib_conv_int(buffer[0]);
+	tz->location.latitude = timelib_conv_int_unsigned(buffer[0]);
 	tz->location.latitude = (tz->location.latitude / 100000) - 90;
-	tz->location.longitude = timelib_conv_int(buffer[1]);
+	tz->location.longitude = timelib_conv_int_unsigned(buffer[1]);
 	tz->location.longitude = (tz->location.longitude / 100000) - 180;
-	comments_len = timelib_conv_int(buffer[2]);
+	comments_len = timelib_conv_int_unsigned(buffer[2]);
 	*tzf += sizeof(buffer);
 
 	tz->location.comments = timelib_malloc(comments_len + 1);
@@ -434,12 +454,12 @@ static void read_64bit_header(const unsigned char **tzf, timelib_tzinfo *tz)
 	uint32_t buffer[6];
 
 	memcpy(&buffer, *tzf, sizeof(buffer));
-	tz->bit64.ttisgmtcnt = timelib_conv_int(buffer[0]);
-	tz->bit64.ttisstdcnt = timelib_conv_int(buffer[1]);
-	tz->bit64.leapcnt    = timelib_conv_int(buffer[2]);
-	tz->bit64.timecnt    = timelib_conv_int(buffer[3]);
-	tz->bit64.typecnt    = timelib_conv_int(buffer[4]);
-	tz->bit64.charcnt    = timelib_conv_int(buffer[5]);
+	tz->bit64.ttisgmtcnt = timelib_conv_int_unsigned(buffer[0]);
+	tz->bit64.ttisstdcnt = timelib_conv_int_unsigned(buffer[1]);
+	tz->bit64.leapcnt    = timelib_conv_int_unsigned(buffer[2]);
+	tz->bit64.timecnt    = timelib_conv_int_unsigned(buffer[3]);
+	tz->bit64.typecnt    = timelib_conv_int_unsigned(buffer[4]);
+	tz->bit64.charcnt    = timelib_conv_int_unsigned(buffer[5]);
 	*tzf += sizeof(buffer);
 }
 

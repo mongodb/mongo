@@ -299,10 +299,14 @@ typedef timelib_tzinfo* (*timelib_tz_get_wrapper)(char *tzname, const timelib_tz
 timelib_sll timelib_day_of_week(timelib_sll y, timelib_sll m, timelib_sll d);
 timelib_sll timelib_iso_day_of_week(timelib_sll y, timelib_sll m, timelib_sll d);
 timelib_sll timelib_day_of_year(timelib_sll y, timelib_sll m, timelib_sll d);
-timelib_sll timelib_daynr_from_weeknr(timelib_sll y, timelib_sll w, timelib_sll d);
+timelib_sll timelib_daynr_from_weeknr(timelib_sll iy, timelib_sll iw, timelib_sll id);
 timelib_sll timelib_days_in_month(timelib_sll y, timelib_sll m);
+
 void timelib_isoweek_from_date(timelib_sll y, timelib_sll m, timelib_sll d, timelib_sll *iw, timelib_sll *iy);
 void timelib_isodate_from_date(timelib_sll y, timelib_sll m, timelib_sll d, timelib_sll *iy, timelib_sll *iw, timelib_sll *id);
+
+void timelib_date_from_isodate(timelib_sll iy, timelib_sll iw, timelib_sll id, timelib_sll *y, timelib_sll *m, timelib_sll *d);
+
 int timelib_valid_time(timelib_sll h, timelib_sll i, timelib_sll s);
 int timelib_valid_date(timelib_sll y, timelib_sll m, timelib_sll d);
 
@@ -351,7 +355,11 @@ timelib_tzdb *timelib_zoneinfo(char *directory);
 void timelib_zoneinfo_dtor(timelib_tzdb *tzdb);
 
 /* From timelib.c */
+
+/* Returns a static string containing an error message belonging to a specific
+ * error code. */
 const char *timelib_get_error_message(int error_code);
+
 timelib_tzinfo* timelib_tzinfo_ctor(char *name);
 void timelib_time_tz_abbr_update(timelib_time* tm, char* tz_abbr);
 void timelib_time_tz_name_update(timelib_time* tm, char* tz_name);
