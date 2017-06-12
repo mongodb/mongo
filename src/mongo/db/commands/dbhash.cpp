@@ -50,12 +50,6 @@
 
 namespace mongo {
 
-using std::list;
-using std::set;
-using std::string;
-using std::unique_ptr;
-using std::vector;
-
 namespace {
 
 class DBHashCmd : public Command {
@@ -79,13 +73,13 @@ public:
     }
 
     virtual bool run(OperationContext* opCtx,
-                     const string& dbname,
+                     const std::string& dbname,
                      const BSONObj& cmdObj,
-                     string& errmsg,
+                     std::string& errmsg,
                      BSONObjBuilder& result) {
         Timer timer;
 
-        set<string> desiredCollections;
+        std::set<std::string> desiredCollections;
         if (cmdObj["collections"].type() == Array) {
             BSONObjIterator i(cmdObj["collections"].Obj());
             while (i.more()) {
@@ -98,7 +92,6 @@ public:
             }
         }
 
-        list<string> colls;
         const std::string ns = parseNs(dbname, cmdObj);
         uassert(ErrorCodes::InvalidNamespace,
                 str::stream() << "Invalid db name: " << ns,
@@ -108,6 +101,7 @@ public:
         // change for the snapshot.
         AutoGetDb autoDb(opCtx, ns, MODE_S);
         Database* db = autoDb.getDb();
+        std::list<std::string> colls;
         if (db) {
             db->getDatabaseCatalogEntry()->getCollectionNamespaces(&colls);
             colls.sort();
@@ -118,43 +112,47 @@ public:
         md5_state_t globalState;
         md5_init(&globalState);
 
-        const std::initializer_list<StringData> replicatedSystemCollections{"system.backup_users",
-                                                                            "system.js",
-                                                                            "system.new_users",
-                                                                            "system.roles",
-                                                                            "system.users",
-                                                                            "system.version",
-                                                                            "system.views"};
+        // A set of 'system' collections that are replicated, and therefore included in the db hash.
+        const std::set<StringData> replicatedSystemCollections{"system.backup_users",
+                                                               "system.js",
+                                                               "system.new_users",
+                                                               "system.roles",
+                                                               "system.users",
+                                                               "system.version",
+                                                               "system.views"};
 
 
         BSONObjBuilder bb(result.subobjStart("collections"));
-        for (list<string>::iterator i = colls.begin(); i != colls.end(); i++) {
-            string fullCollectionName = *i;
-            if (fullCollectionName.size() - 1 <= dbname.size()) {
-                errmsg = str::stream() << "weird fullCollectionName [" << fullCollectionName << "]";
+        for (const auto& collectionName : colls) {
+
+            NamespaceString collNss(collectionName);
+
+            if (collNss.size() - 1 <= dbname.size()) {
+                errmsg = str::stream() << "weird fullCollectionName [" << collNss.toString() << "]";
                 return false;
             }
-            string shortCollectionName = fullCollectionName.substr(dbname.size() + 1);
 
-            if (shortCollectionName.find("system.") == 0 &&
-                std::find(replicatedSystemCollections.begin(),
-                          replicatedSystemCollections.end(),
-                          shortCollectionName) == replicatedSystemCollections.end())
+            // Only include 'system' collections that are replicated.
+            bool isReplicatedSystemColl =
+                (replicatedSystemCollections.count(collNss.coll().toString()) > 0);
+            if (collNss.isSystem() && !isReplicatedSystemColl)
                 continue;
 
-            if (desiredCollections.size() > 0 && desiredCollections.count(shortCollectionName) == 0)
+            if (desiredCollections.size() > 0 &&
+                desiredCollections.count(collNss.coll().toString()) == 0)
                 continue;
 
-            string hash = _hashCollection(opCtx, db, fullCollectionName);
+            // Compute the hash for this collection.
+            std::string hash = _hashCollection(opCtx, db, collNss.toString());
 
-            bb.append(shortCollectionName, hash);
+            bb.append(collNss.coll(), hash);
             md5_append(&globalState, (const md5_byte_t*)hash.c_str(), hash.size());
         }
         bb.done();
 
         md5digest d;
         md5_finish(&globalState, d);
-        string hash = digestToString(d);
+        std::string hash = digestToString(d);
 
         result.append("md5", hash);
         result.appendNumber("timeMillis", timer.millis());
@@ -175,7 +173,7 @@ private:
 
         IndexDescriptor* desc = collection->getIndexCatalog()->findIdIndex(opCtx);
 
-        unique_ptr<PlanExecutor, PlanExecutor::Deleter> exec;
+        std::unique_ptr<PlanExecutor, PlanExecutor::Deleter> exec;
         if (desc) {
             exec = InternalPlanner::indexScan(opCtx,
                                               collection,
@@ -213,7 +211,7 @@ private:
         }
         md5digest d;
         md5_finish(&st, d);
-        string hash = digestToString(d);
+        std::string hash = digestToString(d);
 
         return hash;
     }
