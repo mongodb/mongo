@@ -311,6 +311,15 @@ protected:
         ASSERT_OK(result);
     };
 
+    std::unique_ptr<DatabasesCloner> makeDummyDatabasesCloner() {
+        return stdx::make_unique<DatabasesCloner>(&getStorage(),
+                                                  &getExecutor(),
+                                                  &getDbWorkThreadPool(),
+                                                  HostAndPort{"local:1234"},
+                                                  [](const BSONObj&) { return true; },
+                                                  [](const Status&) {});
+    }
+
 private:
     executor::ThreadPoolMock::Options makeThreadPoolMockOptions() const override;
 
@@ -445,6 +454,87 @@ TEST_F(DBsClonerTest, StartupReturnsInternalErrorAfterSuccessfulStartup) {
 
     ASSERT_EQUALS(ErrorCodes::InternalError, cloner.startup());
     ASSERT_TRUE(cloner.isActive());
+}
+
+TEST_F(DBsClonerTest, ParseAndSetAdminFirstWhenAdminInListDatabasesResponse) {
+    const Responses responsesWithAdmin = {
+        {"listDatabases", fromjson("{ok:1, databases:[{name:'a'}, {name:'aab'}, {name:'admin'}]}")},
+        {"listDatabases", fromjson("{ok:1, databases:[{name:'admin'}, {name:'a'}, {name:'b'}]}")},
+    };
+    std::unique_ptr<DatabasesCloner> cloner = makeDummyDatabasesCloner();
+
+    for (auto&& resp : responsesWithAdmin) {
+        auto parseResponseStatus = cloner->parseListDatabasesResponse_forTest(resp.second);
+        ASSERT_TRUE(parseResponseStatus.isOK());
+        std::vector<BSONElement> dbNamesArray = parseResponseStatus.getValue();
+        cloner->setAdminAsFirst_forTest(dbNamesArray);
+        ASSERT_EQUALS("admin", dbNamesArray[0].Obj().firstElement().str());
+    }
+}
+
+TEST_F(DBsClonerTest, ParseAndAttemptSetAdminFirstWhenAdminNotInListDatabasesResponse) {
+    const Responses responsesWithoutAdmin = {
+        {"listDatabases", fromjson("{ok:1, databases:[{name:'a'}, {name:'aab'}, {name:'abc'}]}")},
+        {"listDatabases", fromjson("{ok:1, databases:[{name:'foo'}, {name:'a'}, {name:'b'}]}")},
+        {"listDatabases", fromjson("{ok:1, databases:[{name:1}, {name:2}, {name:3}]}")},
+    };
+    std::unique_ptr<DatabasesCloner> cloner = makeDummyDatabasesCloner();
+
+    for (auto&& resp : responsesWithoutAdmin) {
+        auto parseResponseStatus = cloner->parseListDatabasesResponse_forTest(resp.second);
+        ASSERT_TRUE(parseResponseStatus.isOK());
+        std::vector<BSONElement> dbNamesArray = parseResponseStatus.getValue();
+        std::string expectedResult = dbNamesArray[0].Obj().firstElement().str();
+        cloner->setAdminAsFirst_forTest(dbNamesArray);
+        ASSERT_EQUALS(expectedResult, dbNamesArray[0].Obj().firstElement().str());
+    }
+}
+
+
+TEST_F(DBsClonerTest, ParseListDatabasesResponseWithMalformedResponses) {
+    Status expectedResultForNoDatabasesField{
+        ErrorCodes::BadValue,
+        "The 'listDatabases' command response does not contain a databases field."};
+    Status expectedResultForNoArrayOfDatabases{
+        ErrorCodes::BadValue,
+        "The 'listDatabases' command response is unable to be transformed into an array."};
+
+    const Responses responsesWithoutDatabasesField = {
+        {"listDatabases", fromjson("{ok:1, fake:[{name:'a'}, {name:'aab'}, {name:'foo'}]}")},
+        {"listDatabases", fromjson("{ok:1, fake:[{name:'admin'}, {name:'a'}, {name:'b'}]}")},
+    };
+
+    const Responses responsesWithoutArrayOfDatabases = {
+        {"listDatabases", fromjson("{ok:1, databases:1}")},
+        {"listDatabases", fromjson("{ok:1, databases:'abc'}")},
+    };
+
+    const Responses responsesWithInvalidAdminNameField = {
+        {"listDatabases", fromjson("{ok:1, databases:[{name:'a'}, {name:'aab'}, {fake:'admin'}]}")},
+        {"listDatabases", fromjson("{ok:1, databases:[{fake:'admin'}, {name:'a'}, {name:'b'}]}")},
+    };
+
+    std::unique_ptr<DatabasesCloner> cloner = makeDummyDatabasesCloner();
+
+    for (auto&& resp : responsesWithoutDatabasesField) {
+        auto parseResponseStatus = cloner->parseListDatabasesResponse_forTest(resp.second);
+        ASSERT_EQ(parseResponseStatus.getStatus(), expectedResultForNoDatabasesField);
+    }
+
+    for (auto&& resp : responsesWithoutArrayOfDatabases) {
+        auto parseResponseStatus = cloner->parseListDatabasesResponse_forTest(resp.second);
+        ASSERT_EQ(parseResponseStatus.getStatus(), expectedResultForNoArrayOfDatabases);
+    }
+
+    for (auto&& resp : responsesWithInvalidAdminNameField) {
+        auto parseResponseStatus = cloner->parseListDatabasesResponse_forTest(resp.second);
+        ASSERT_TRUE(parseResponseStatus.isOK());
+        // We expect no elements to be swapped.
+        std::vector<BSONElement> dbNamesArray = parseResponseStatus.getValue();
+        std::string expectedResult = dbNamesArray[0].Obj().firstElement().str();
+        cloner->setAdminAsFirst_forTest(dbNamesArray);
+        ASSERT_EQUALS(expectedResult, dbNamesArray[0].Obj().firstElement().str());
+    }
 }
 
 TEST_F(DBsClonerTest, FailsOnListDatabases) {
