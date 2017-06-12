@@ -7,6 +7,7 @@ env = env.Clone()
 env.SConscript(
     dirs=[
         "collation",
+        "datetime",
     ],
     exports=[
         'env'
@@ -106,6 +107,7 @@ env.Library(
         "$BUILD_DIR/mongo/base",
         "$BUILD_DIR/mongo/util/fail_point",
         "collation/collator_icu",
+        "datetime/init_timezone_data",
         "explain_options",
         "query_planner",
         "query_request",
