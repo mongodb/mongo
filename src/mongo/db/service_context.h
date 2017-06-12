@@ -42,6 +42,7 @@
 #include "mongo/transport/session.h"
 #include "mongo/util/clock_source.h"
 #include "mongo/util/decorable.h"
+#include "mongo/util/periodic_runner.h"
 #include "mongo/util/tick_source.h"
 
 namespace mongo {
@@ -314,6 +315,23 @@ public:
     void registerKillOpListener(KillOpListenerInterface* listener);
 
     //
+    // Background tasks.
+    //
+
+    /**
+     * Set a periodic runner on the service context. The runner should already be
+     * started when it is moved onto the service context. The service context merely
+     * takes ownership of this object to allow it to continue running for the life of
+     * the process
+     */
+    void setPeriodicRunner(std::unique_ptr<PeriodicRunner> runner);
+
+    /**
+     * Returns a pointer to the global periodic runner owned by this service context.
+     */
+    PeriodicRunner* getPeriodicRunner() const;
+
+    //
     // Transport.
     //
 
@@ -417,6 +435,10 @@ private:
      */
     void _killOperation_inlock(OperationContext* opCtx, ErrorCodes::Error killCode);
 
+    /**
+     * The periodic runner.
+     */
+    std::unique_ptr<PeriodicRunner> _runner;
 
     /**
      * The TransportLayerManager.

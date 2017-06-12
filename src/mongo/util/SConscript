@@ -335,6 +335,7 @@ env.Library(
     LIBDEPS=[
         "$BUILD_DIR/mongo/base",
         "$BUILD_DIR/third_party/shim_asio",
+        "$BUILD_DIR/mongo/executor/async_timer_asio",
         "periodic_runner",
     ],
 )
@@ -347,6 +348,17 @@ env.CppUnitTest(
     LIBDEPS=[
         "periodic_runner_asio",
         "$BUILD_DIR/mongo/executor/async_timer_mock",
+    ],
+)
+
+env.Library(
+    target='periodic_runner_factory',
+    source=[
+        'periodic_runner_factory.cpp',
+    ],
+    LIBDEPS=[
+        'periodic_runner',
+        'periodic_runner_asio',
     ],
 )
 

@@ -31,6 +31,7 @@ env.Library(
         '$BUILD_DIR/mongo/s/catalog/dist_lock_catalog_impl',
         '$BUILD_DIR/mongo/s/catalog/replset_dist_lock_manager',
         '$BUILD_DIR/mongo/db/s/sharding_task_executor',
+        '$BUILD_DIR/mongo/util/periodic_runner_factory',
         'client/sharding_connection_hook',
         'coreshard',
     ],

@@ -101,6 +101,8 @@
 #include "mongo/util/net/ssl_manager.h"
 #include "mongo/util/ntservice.h"
 #include "mongo/util/options_parser/startup_options.h"
+#include "mongo/util/periodic_runner.h"
+#include "mongo/util/periodic_runner_factory.h"
 #include "mongo/util/processinfo.h"
 #include "mongo/util/quick_exit.h"
 #include "mongo/util/signal_handlers.h"
@@ -145,8 +147,15 @@ static void cleanupTask() {
             opCtx = uniqueTxn.get();
         }
 
-        if (serviceContext)
+        if (serviceContext) {
             serviceContext->setKillAllOperations();
+
+            // Shut down the background periodic task runner.
+            auto runner = serviceContext->getPeriodicRunner();
+            if (runner) {
+                runner->shutdown();
+            }
+        }
 
         // Validator shutdown must be called after setKillAllOperations is called. Otherwise, this
         // can deadlock.
@@ -333,6 +342,11 @@ static ExitCode runMongosServer() {
     }
 
     PeriodicTask::startRunningPeriodicTasks();
+
+    // Set up the periodic runner for background job execution
+    auto runner = makePeriodicRunner();
+    runner->startup();
+    getGlobalServiceContext()->setPeriodicRunner(std::move(runner));
 
     auto start = getGlobalServiceContext()->addAndStartTransportLayer(std::move(transportLayer));
     if (!start.isOK()) {

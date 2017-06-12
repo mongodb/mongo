@@ -136,6 +136,8 @@
 #include "mongo/util/net/ssl_manager.h"
 #include "mongo/util/ntservice.h"
 #include "mongo/util/options_parser/startup_options.h"
+#include "mongo/util/periodic_runner.h"
+#include "mongo/util/periodic_runner_factory.h"
 #include "mongo/util/quick_exit.h"
 #include "mongo/util/ramlog.h"
 #include "mongo/util/scopeguard.h"
@@ -700,6 +702,11 @@ ExitCode _initAndListen(int listenPort) {
 
     PeriodicTask::startRunningPeriodicTasks();
 
+    // Set up the periodic runner for background job execution
+    auto runner = makePeriodicRunner();
+    runner->startup();
+    globalServiceContext->setPeriodicRunner(std::move(runner));
+
     // MessageServer::run will return when exit code closes its socket and we don't need the
     // operation context anymore
     startupOpCtx.reset();
@@ -966,8 +973,15 @@ static void shutdownTask() {
         repl::ReplicationCoordinator::get(opCtx)->shutdown(opCtx);
     }
 
-    if (serviceContext)
+    if (serviceContext) {
         serviceContext->setKillAllOperations();
+
+        // Shut down the background periodic task runner.
+        auto runner = serviceContext->getPeriodicRunner();
+        if (runner) {
+            runner->shutdown();
+        }
+    }
 
     ReplicaSetMonitor::shutdown();
     if (auto sr = grid.shardRegistry()) {  // TODO: race: sr is a naked pointer

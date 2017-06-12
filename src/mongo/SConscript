@@ -310,6 +310,7 @@ mongod = env.Program(
         'util/clock_sources',
         'util/fail_point',
         'util/ntservice',
+        'util/periodic_runner_factory',
         'util/version_impl',
     ],
 )

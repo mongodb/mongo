@@ -155,6 +155,15 @@ ServiceContext::UniqueClient ServiceContext::makeClient(std::string desc,
     return UniqueClient(client.release());
 }
 
+void ServiceContext::setPeriodicRunner(std::unique_ptr<PeriodicRunner> runner) {
+    invariant(!_runner);
+    _runner = std::move(runner);
+}
+
+PeriodicRunner* ServiceContext::getPeriodicRunner() const {
+    return _runner.get();
+}
+
 transport::TransportLayer* ServiceContext::getTransportLayer() const {
     return _transportLayerManager.get();
 }
