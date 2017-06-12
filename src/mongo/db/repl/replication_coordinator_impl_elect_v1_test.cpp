@@ -1336,7 +1336,7 @@ protected:
         }
     }
 
-    ReplSetConfig setUp3NodeReplSetAndRunForElection(OpTime opTime, bool infiniteTimeout = false) {
+    ReplSetConfig setUp3NodeReplSetAndRunForElection(OpTime opTime, long long timeout = 5000) {
         BSONObj configObj = BSON("_id"
                                  << "mySet"
                                  << "version"
@@ -1352,7 +1352,7 @@ protected:
                                  << 1
                                  << "settings"
                                  << BSON("heartbeatTimeoutSecs" << 1 << "catchUpTimeoutMillis"
-                                                                << (infiniteTimeout ? -1 : 5000)));
+                                                                << timeout));
         assertStartSuccess(configObj, HostAndPort("node1", 12345));
         ReplSetConfig config = assertMakeRSConfig(configObj);
 
@@ -1713,7 +1713,8 @@ TEST_F(PrimaryCatchUpTest, InfiniteTimeoutAndAbort) {
 
     OpTime time1(Timestamp(100, 1), 0);
     OpTime time2(Timestamp(100, 2), 0);
-    ReplSetConfig config = setUp3NodeReplSetAndRunForElection(time1, true);
+    auto infiniteTimeout = ReplSetConfig::kInfiniteCatchUpTimeout.count();
+    ReplSetConfig config = setUp3NodeReplSetAndRunForElection(time1, infiniteTimeout);
 
     // Run time far forward and ensure we are still in catchup mode.
     // This is an arbitrary time 'far' into the future.
@@ -1746,6 +1747,20 @@ TEST_F(PrimaryCatchUpTest, InfiniteTimeoutAndAbort) {
     ASSERT_EQUALS(1, countLogLinesContaining("Exited primary catch-up mode"));
     ASSERT_EQUALS(0, countLogLinesContaining("Caught up to the latest"));
     ASSERT_EQUALS(0, countLogLinesContaining("Catchup timed out"));
+    auto opCtx = makeOperationContext();
+    getReplCoord()->signalDrainComplete(opCtx.get(), getReplCoord()->getTerm());
+    Lock::GlobalLock lock(opCtx.get(), MODE_IX, UINT_MAX);
+    ASSERT_TRUE(getReplCoord()->canAcceptWritesForDatabase(opCtx.get(), "test"));
+}
+
+TEST_F(PrimaryCatchUpTest, ZeroTimeout) {
+    startCapturingLogMessages();
+
+    OpTime time1(Timestamp(100, 1), 0);
+    ReplSetConfig config = setUp3NodeReplSetAndRunForElection(time1, 0);
+    ASSERT(getReplCoord()->getApplierState() == ApplierState::Draining);
+    stopCapturingLogMessages();
+    ASSERT_EQUALS(1, countLogLinesContaining("Skipping primary catchup"));
     auto opCtx = makeOperationContext();
     getReplCoord()->signalDrainComplete(opCtx.get(), getReplCoord()->getTerm());
     Lock::GlobalLock lock(opCtx.get(), MODE_IX, UINT_MAX);

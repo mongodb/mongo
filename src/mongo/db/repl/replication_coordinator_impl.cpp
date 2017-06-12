@@ -2492,6 +2492,15 @@ void ReplicationCoordinatorImpl::CatchupState::start_inlock() {
         return;
     }
 
+    auto catchupTimeout = _repl->_rsConfig.getCatchUpTimeoutPeriod();
+
+    // When catchUpTimeoutMillis is 0, we skip doing catchup entirely.
+    if (catchupTimeout == Milliseconds::zero()) {
+        log() << "Skipping primary catchup since the catchup timeout is 0.";
+        abort_inlock();
+        return;
+    }
+
     auto mutex = &_repl->_mutex;
     auto timeoutCB = [this, mutex](const CallbackArgs& cbData) {
         if (!cbData.status.isOK()) {
@@ -2506,13 +2515,12 @@ void ReplicationCoordinatorImpl::CatchupState::start_inlock() {
         abort_inlock();
     };
 
-    // Schedule timeout callback.
-    auto catchupTimeout = _repl->_rsConfig.getCatchUpTimeoutPeriod();
     // Deal with infinity and overflow - no timeout.
     if (catchupTimeout == ReplSetConfig::kInfiniteCatchUpTimeout ||
         Date_t::max() - _repl->_replExecutor->now() <= catchupTimeout) {
         return;
     }
+    // Schedule timeout callback.
     auto timeoutDate = _repl->_replExecutor->now() + catchupTimeout;
     auto status = _repl->_replExecutor->scheduleWorkAt(timeoutDate, timeoutCB);
     if (!status.isOK()) {
