@@ -564,6 +564,9 @@ long long Value::coerceToDate() const {
         case bsonTimestamp:
             return getTimestamp().getSecs() * 1000LL;
 
+        case jstOID:
+            return getOid().asDateT().toMillisSinceEpoch();
+
         default:
             uassert(16006,
                     str::stream() << "can't convert from BSON type " << typeName(getType())

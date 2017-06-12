@@ -2,24 +2,28 @@
 
 (function() {
     "use strict";
-    var coll = db.server7695;
-    var testOpCount = 0;
+    const coll = db.server7695;
+    let testOpCount = 0;
+
+    load('jstests/libs/dateutil.js');
 
     coll.drop();
 
     // Seed collection so that the pipeline will execute.
     assert.writeOK(coll.insert({}));
 
-    // Helper for testing that op returns expResult.
+    /**
+     * Helper for testing that 'op' returns 'expResult'.
+     */
     function testOp(op, value, expResult) {
         testOpCount++;
-        var pipeline = [{$project: {_id: 0, result: {}}}];
+        let pipeline = [{$project: {_id: 0, result: {}}}];
         pipeline[0].$project.result[op] = value;
-        var msg = "Exptected {" + op + ": " + value + "} to equal: " + expResult;
-        var res = coll.runCommand('aggregate', {pipeline: pipeline, cursor: {}});
+        let msg = "Exptected {" + op + ": " + value + "} to equal: " + expResult;
+        let res = coll.runCommand('aggregate', {pipeline: pipeline, cursor: {}});
 
         // in the case of $dateToString the date is on property date
-        var date = value.date || value;
+        let date = value.date || value;
         if (date.valueOf() < 0 && _isWindows() && res.code === 16422) {
             // some versions of windows (but not all) fail with dates before 1970
             print("skipping test of " + date.tojson() +
@@ -44,7 +48,7 @@
 
     // 1900 is special because it's devisible by 4 and by 100 but not 400 so it's not a leap year.
     // 2000 is special, because it's devisible by 4, 100, 400 and so it is a leap year.
-    var years = {
+    const years = {
         common: [
             1900,  // Starting and ending on Monday (special).
             2002,  // Starting and ending on Tuesday.
@@ -74,62 +78,26 @@
         ],
     };
 
-    var MONDAY = 1;
-    var TUESDAY = 2;
-    var WEDNESDAY = 3;
-    var THURSDAY = 4;
-    var FRIDAY = 5;
-    var SATURDAY = 6;
-    var SUNDAY = 7;
-
-    // Make numbers at least with two digits with 0 in front if shorter than two digits
-    function padded(val) {
-        return ("00" + val).slice(-2);
-    }
-    function getNewYear(year) {
-        return new Date("" + year + "-01-01T00:00:00Z");
-    }
-    function getEndOfFirstWeekInYear(year, day) {
-        return new Date("" + year + "-01-" + (padded(7 - day + 1)) + "T23:59:59Z");
-    }
-    function getStartOfSecondWeekInYear(year, day) {
-        return new Date("" + year + "-01-" + (padded(7 - day + 2)) + "T00:00:00Z");
-    }
-    function getBirthday(year) {
-        return new Date("" + year + "-07-05T21:36:00+02:00");
-    }
-    function getEndOfSecondToLastWeekInYear(year, day, type) {
-        if (type === 'leap') {
-            return new Date("" + year + "-12-" + padded(31 - day - 1) + "T23:59:59Z");
-        } else {
-            return new Date("" + year + "-12-" + padded(31 - day) + "T23:59:59Z");
-        }
-    }
-    function getStartOfLastWeekInYear(year, day, type) {
-        if (type === 'leap') {
-            return new Date("" + year + "-12-" + padded(31 - day) + "T00:00:00Z");
-        } else {
-            return new Date("" + year + "-12-" + padded(31 - day + 1) + "T00:00:00Z");
-        }
-    }
-    function getNewYearsEve(year) {
-        return new Date("" + year + "-12-31T23:59:59Z");
-    }
-    function shiftWeekday(dayOfWeek, daysToAdd) {
-        return ((dayOfWeek - 1 + daysToAdd) % 7) + 1;
-    }
+    const MONDAY = 1;
+    const TUESDAY = 2;
+    const WEDNESDAY = 3;
+    const THURSDAY = 4;
+    const FRIDAY = 5;
+    const SATURDAY = 6;
+    const SUNDAY = 7;
 
     ['common', 'leap', 'commonAfterLeap'].forEach(function(type) {
         years[type].forEach(function(year, day) {
             // forEach starts indexing at zero but weekdays start with Monday on 1 so we add +1.
-            var day = day + 1;
-            var newYear = getNewYear(year);
-            var endOfFirstWeekInYear = getEndOfFirstWeekInYear(year, day);
-            var startOfSecondWeekInYear = getStartOfSecondWeekInYear(year, day);
-            var birthday = getBirthday(year);
-            var endOfSecondToLastWeekInYear = getEndOfSecondToLastWeekInYear(year, day, type);
-            var startOfLastWeekInYear = getStartOfLastWeekInYear(year, day, type);
-            var newYearsEve = getNewYearsEve(year);
+            day = day + 1;
+            let newYear = DateUtil.getNewYear(year);
+            let endOfFirstWeekInYear = DateUtil.getEndOfFirstWeekInYear(year, day);
+            let startOfSecondWeekInYear = DateUtil.getStartOfSecondWeekInYear(year, day);
+            let birthday = DateUtil.getBirthday(year);
+            let endOfSecondToLastWeekInYear =
+                DateUtil.getEndOfSecondToLastWeekInYear(year, day, type);
+            let startOfLastWeekInYear = DateUtil.getStartOfLastWeekInYear(year, day, type);
+            let newYearsEve = DateUtil.getNewYearsEve(year);
 
             testOp('$isoDayOfWeek', newYear, day);
             testOp('$isoDayOfWeek', endOfFirstWeekInYear, SUNDAY);
@@ -137,15 +105,15 @@
             testOp('$isoDayOfWeek', endOfSecondToLastWeekInYear, SUNDAY);
             testOp('$isoDayOfWeek', startOfLastWeekInYear, MONDAY);
             if (type === 'leap') {
-                testOp('$isoDayOfWeek', newYearsEve, shiftWeekday(day, 1));
+                testOp('$isoDayOfWeek', newYearsEve, DateUtil.shiftWeekday(day, 1));
             } else {
                 testOp('$isoDayOfWeek', newYearsEve, day);
             }
 
             if (type === 'leap') {
-                testOp('$isoDayOfWeek', birthday, shiftWeekday(day, 4));
+                testOp('$isoDayOfWeek', birthday, DateUtil.shiftWeekday(day, 4));
             } else {
-                testOp('$isoDayOfWeek', birthday, shiftWeekday(day, 3));
+                testOp('$isoDayOfWeek', birthday, DateUtil.shiftWeekday(day, 3));
             }
 
             testOp('$isoWeekYear', birthday, year);
@@ -207,7 +175,7 @@
                     testOp('$isoWeekYear', startOfLastWeekInYear, year + 1);
                     testOp('$dateToString',
                            {format: '%G-W%V-%u', date: newYearsEve},
-                           "" + (year + 1) + "-W01-" + shiftWeekday(day, 1));
+                           "" + (year + 1) + "-W01-" + DateUtil.shiftWeekday(day, 1));
                 } else if (day <= THURSDAY) {
                     // A leap year starting on Wednesday or Thursday will always end with week 53.
                     testOp('$isoWeek', newYearsEve, 53);
@@ -218,7 +186,7 @@
                     testOp('$isoWeekYear', startOfLastWeekInYear, year);
                     testOp('$dateToString',
                            {format: '%G-W%V-%u', date: newYearsEve},
-                           "" + (year) + "-W53-" + shiftWeekday(day, 1));
+                           "" + (year) + "-W53-" + DateUtil.shiftWeekday(day, 1));
                 } else if (day <= SATURDAY) {
                     // A leap year starting on Friday or Sarturday will always and with week 52
                     testOp('$isoWeek', newYearsEve, 52);
@@ -229,7 +197,7 @@
                     testOp('$isoWeekYear', startOfLastWeekInYear, year);
                     testOp('$dateToString',
                            {format: '%G-W%V-%u', date: newYearsEve},
-                           "" + (year) + "-W52-" + shiftWeekday(day, 1));
+                           "" + (year) + "-W52-" + DateUtil.shiftWeekday(day, 1));
                 } else {
                     // A leap year starting on Sunday will always end with week 1
                     testOp('$isoWeek', newYearsEve, 1);
@@ -240,7 +208,7 @@
                     testOp('$isoWeekYear', startOfLastWeekInYear, year);
                     testOp('$dateToString',
                            {format: '%G-W%V-%u', date: newYearsEve},
-                           "" + (year + 1) + "-W01-" + shiftWeekday(day, 1));
+                           "" + (year + 1) + "-W01-" + DateUtil.shiftWeekday(day, 1));
                 }
             } else {
                 if (day <= WEDNESDAY) {
