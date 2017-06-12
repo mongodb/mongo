@@ -70,7 +70,9 @@ private:
 }  // namespace
 
 
-DBDirectClient::DBDirectClient(OperationContext* opCtx) : _opCtx(opCtx) {}
+DBDirectClient::DBDirectClient(OperationContext* opCtx) : _opCtx(opCtx) {
+    _setServerRPCProtocols(rpc::supports::kAll);
+}
 
 bool DBDirectClient::isFailed() const {
     return false;

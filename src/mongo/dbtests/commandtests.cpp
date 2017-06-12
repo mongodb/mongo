@@ -62,15 +62,9 @@ TEST(CommandTests, InputDocumentSequeceWorksEndToEnd) {
                               BSON("_id" << 5),
                           }}};
 
-    // Until the egress layer provides an API for document sequences, this needs to be handled
-    // manually.
-    Message rawReqest = request.serialize();
-    Message rawReply;
-    db.call(rawReqest, rawReply);
-    const auto reply = OpMsg::parse(rawReply);
-
-    ASSERT_BSONOBJ_EQ(reply.body, BSON("n" << 5 << "ok" << 1.0));
-    ASSERT(reply.sequences.empty());
+    const auto reply = db.runCommand(std::move(request));
+    ASSERT_EQ(int(reply->getProtocol()), int(rpc::Protocol::kOpMsg));
+    ASSERT_BSONOBJ_EQ(reply->getCommandReply(), BSON("n" << 5 << "ok" << 1.0));
     ASSERT_EQ(db.count(ns.ns()), 5u);
 }
 

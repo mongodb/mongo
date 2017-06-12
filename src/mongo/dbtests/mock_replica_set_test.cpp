@@ -28,6 +28,7 @@
 #include "mongo/platform/basic.h"
 
 #include "mongo/client/dbclientinterface.h"
+#include "mongo/dbtests/mock/mock_dbclient_connection.h"
 #include "mongo/dbtests/mock/mock_replica_set.h"
 #include "mongo/unittest/unittest.h"
 
@@ -41,6 +42,7 @@ using mongo::BSONObjBuilder;
 using mongo::BSONObjIterator;
 using mongo::ConnectionString;
 using mongo::HostAndPort;
+using mongo::MockDBClientConnection;
 using mongo::MockRemoteDBServer;
 using mongo::MockReplicaSet;
 using mongo::repl::ReplSetConfig;
@@ -77,8 +79,8 @@ TEST(MockReplicaSetTest, IsMasterNode0) {
 
     BSONObj cmdResponse;
     MockRemoteDBServer* node = replSet.getNode("$n0:27017");
-    const MockRemoteDBServer::InstanceID id = node->getInstanceID();
-    bool ok = node->runCommand(id, "foo.bar", BSON("ismaster" << 1), cmdResponse);
+    bool ok =
+        MockDBClientConnection(node).runCommand("foo.bar", BSON("ismaster" << 1), cmdResponse);
     ASSERT(ok);
 
     ASSERT(cmdResponse["ismaster"].trueValue());
@@ -105,8 +107,8 @@ TEST(MockReplicaSetTest, IsMasterNode1) {
 
     BSONObj cmdResponse;
     MockRemoteDBServer* node = replSet.getNode("$n1:27017");
-    const MockRemoteDBServer::InstanceID id = node->getInstanceID();
-    bool ok = node->runCommand(id, "foo.bar", BSON("ismaster" << 1), cmdResponse);
+    bool ok =
+        MockDBClientConnection(node).runCommand("foo.bar", BSON("ismaster" << 1), cmdResponse);
     ASSERT(ok);
 
     ASSERT(!cmdResponse["ismaster"].trueValue());
@@ -133,8 +135,8 @@ TEST(MockReplicaSetTest, IsMasterNode2) {
 
     BSONObj cmdResponse;
     MockRemoteDBServer* node = replSet.getNode("$n2:27017");
-    const MockRemoteDBServer::InstanceID id = node->getInstanceID();
-    bool ok = node->runCommand(id, "foo.bar", BSON("ismaster" << 1), cmdResponse);
+    bool ok =
+        MockDBClientConnection(node).runCommand("foo.bar", BSON("ismaster" << 1), cmdResponse);
     ASSERT(ok);
 
     ASSERT(!cmdResponse["ismaster"].trueValue());
@@ -161,8 +163,8 @@ TEST(MockReplicaSetTest, ReplSetGetStatusNode0) {
 
     BSONObj cmdResponse;
     MockRemoteDBServer* node = replSet.getNode("$n0:27017");
-    const MockRemoteDBServer::InstanceID id = node->getInstanceID();
-    bool ok = node->runCommand(id, "foo.bar", BSON("replSetGetStatus" << 1), cmdResponse);
+    bool ok = MockDBClientConnection(node).runCommand(
+        "foo.bar", BSON("replSetGetStatus" << 1), cmdResponse);
     ASSERT(ok);
 
     ASSERT_EQUALS("n", cmdResponse["set"].str());
@@ -194,8 +196,8 @@ TEST(MockReplicaSetTest, ReplSetGetStatusNode1) {
 
     BSONObj cmdResponse;
     MockRemoteDBServer* node = replSet.getNode("$n1:27017");
-    const MockRemoteDBServer::InstanceID id = node->getInstanceID();
-    bool ok = node->runCommand(id, "foo.bar", BSON("replSetGetStatus" << 1), cmdResponse);
+    bool ok = MockDBClientConnection(node).runCommand(
+        "foo.bar", BSON("replSetGetStatus" << 1), cmdResponse);
     ASSERT(ok);
 
     ASSERT_EQUALS("n", cmdResponse["set"].str());
@@ -229,8 +231,8 @@ TEST(MockReplicaSetTest, ReplSetGetStatusNode2) {
 
     BSONObj cmdResponse;
     MockRemoteDBServer* node = replSet.getNode("$n2:27017");
-    const MockRemoteDBServer::InstanceID id = node->getInstanceID();
-    bool ok = node->runCommand(id, "foo.bar", BSON("replSetGetStatus" << 1), cmdResponse);
+    bool ok = MockDBClientConnection(node).runCommand(
+        "foo.bar", BSON("replSetGetStatus" << 1), cmdResponse);
     ASSERT(ok);
 
     ASSERT_EQUALS("n", cmdResponse["set"].str());
@@ -299,8 +301,8 @@ TEST(MockReplicaSetTest, IsMasterReconfigNodeRemoved) {
         // Check isMaster for node still in set
         BSONObj cmdResponse;
         MockRemoteDBServer* node = replSet.getNode("$n0:27017");
-        const MockRemoteDBServer::InstanceID id = node->getInstanceID();
-        bool ok = node->runCommand(id, "foo.bar", BSON("ismaster" << 1), cmdResponse);
+        bool ok =
+            MockDBClientConnection(node).runCommand("foo.bar", BSON("ismaster" << 1), cmdResponse);
         ASSERT(ok);
 
         ASSERT(cmdResponse["ismaster"].trueValue());
@@ -327,8 +329,8 @@ TEST(MockReplicaSetTest, IsMasterReconfigNodeRemoved) {
         // Check isMaster for node still not in set anymore
         BSONObj cmdResponse;
         MockRemoteDBServer* node = replSet.getNode(hostToRemove);
-        const MockRemoteDBServer::InstanceID id = node->getInstanceID();
-        bool ok = node->runCommand(id, "foo.bar", BSON("ismaster" << 1), cmdResponse);
+        bool ok =
+            MockDBClientConnection(node).runCommand("foo.bar", BSON("ismaster" << 1), cmdResponse);
         ASSERT(ok);
 
         ASSERT(!cmdResponse["ismaster"].trueValue());
@@ -350,8 +352,8 @@ TEST(MockReplicaSetTest, replSetGetStatusReconfigNodeRemoved) {
         // Check replSetGetStatus for node still in set
         BSONObj cmdResponse;
         MockRemoteDBServer* node = replSet.getNode("$n2:27017");
-        const MockRemoteDBServer::InstanceID id = node->getInstanceID();
-        bool ok = node->runCommand(id, "foo.bar", BSON("replSetGetStatus" << 1), cmdResponse);
+        bool ok = MockDBClientConnection(node).runCommand(
+            "foo.bar", BSON("replSetGetStatus" << 1), cmdResponse);
         ASSERT(ok);
 
         ASSERT_EQUALS("n", cmdResponse["set"].str());
@@ -383,8 +385,8 @@ TEST(MockReplicaSetTest, replSetGetStatusReconfigNodeRemoved) {
         // Check replSetGetStatus for node still not in set anymore
         BSONObj cmdResponse;
         MockRemoteDBServer* node = replSet.getNode(hostToRemove);
-        const MockRemoteDBServer::InstanceID id = node->getInstanceID();
-        bool ok = node->runCommand(id, "foo.bar", BSON("replSetGetStatus" << 1), cmdResponse);
+        bool ok = MockDBClientConnection(node).runCommand(
+            "foo.bar", BSON("replSetGetStatus" << 1), cmdResponse);
         ASSERT(ok);
 
         ASSERT_EQUALS("n", cmdResponse["set"].str());

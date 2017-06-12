@@ -58,38 +58,19 @@ bool MockDBClientConnection::connect(const char* hostName,
     return false;
 }
 
-bool MockDBClientConnection::runCommand(const string& dbname,
-                                        const BSONObj& cmdObj,
-                                        BSONObj& info,
-                                        int options) {
+std::pair<rpc::UniqueReply, DBClientWithCommands*> MockDBClientConnection::runCommandWithTarget(
+    OpMsgRequest request) {
+
     checkConnection();
 
     try {
-        return _remoteServer->runCommand(_remoteServerInstanceID, dbname, cmdObj, info, options);
+        return {_remoteServer->runCommand(_remoteServerInstanceID, request), this};
     } catch (const mongo::SocketException&) {
         _isFailed = true;
         throw;
     }
-
-    return false;
 }
 
-rpc::UniqueReply MockDBClientConnection::runCommandWithMetadata(StringData database,
-                                                                StringData command,
-                                                                const BSONObj& metadata,
-                                                                const BSONObj& commandArgs) {
-    checkConnection();
-
-    try {
-        return _remoteServer->runCommandWithMetadata(
-            _remoteServerInstanceID, database, command, metadata, commandArgs);
-    } catch (const mongo::SocketException&) {
-        _isFailed = true;
-        throw;
-    }
-
-    MONGO_UNREACHABLE;
-}
 
 std::unique_ptr<mongo::DBClientCursor> MockDBClientConnection::query(const string& ns,
                                                                      mongo::Query query,

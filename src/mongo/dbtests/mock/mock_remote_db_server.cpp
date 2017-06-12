@@ -136,20 +136,16 @@ void MockRemoteDBServer::remove(const string& ns, Query query, int flags) {
     _dataMgr.erase(ns);
 }
 
-rpc::UniqueReply MockRemoteDBServer::runCommandWithMetadata(MockRemoteDBServer::InstanceID id,
-                                                            StringData database,
-                                                            StringData commandName,
-                                                            const BSONObj& metadata,
-                                                            const BSONObj& commandArgs) {
+rpc::UniqueReply MockRemoteDBServer::runCommand(InstanceID id, const OpMsgRequest& request) {
     checkIfUp(id);
-    std::string cmdName = commandName.toString();
+    std::string cmdName = request.getCommandName().toString();
 
     BSONObj reply;
     {
         scoped_spinlock lk(_lock);
 
         uassert(ErrorCodes::IllegalOperation,
-                str::stream() << "no reply for command: " << commandName,
+                str::stream() << "no reply for command: " << cmdName,
                 _cmdMap.count(cmdName));
 
         reply = _cmdMap[cmdName]->next();
@@ -174,25 +170,6 @@ rpc::UniqueReply MockRemoteDBServer::runCommandWithMetadata(MockRemoteDBServer::
                        .done();
     auto replyView = stdx::make_unique<rpc::CommandReply>(&message);
     return rpc::UniqueReply(std::move(message), std::move(replyView));
-}
-
-bool MockRemoteDBServer::runCommand(MockRemoteDBServer::InstanceID id,
-                                    const string& dbname,
-                                    const BSONObj& cmdObj,
-                                    BSONObj& info,
-                                    int options) {
-    BSONObj upconvertedRequest;
-    BSONObj upconvertedMetadata;
-    std::tie(upconvertedRequest, upconvertedMetadata) =
-        rpc::upconvertRequestMetadata(cmdObj, options);
-
-    StringData commandName = upconvertedRequest.firstElementFieldName();
-
-    auto res =
-        runCommandWithMetadata(id, dbname, commandName, upconvertedMetadata, upconvertedRequest);
-
-    info = res->getCommandReply().getOwned();
-    return info["ok"].trueValue();
 }
 
 mongo::BSONArray MockRemoteDBServer::query(MockRemoteDBServer::InstanceID id,

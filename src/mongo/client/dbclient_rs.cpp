@@ -903,19 +903,8 @@ void DBClientReplicaSet::checkResponse(const char* data,
     }
 }
 
-rpc::UniqueReply DBClientReplicaSet::runCommandWithMetadata(StringData database,
-                                                            StringData command,
-                                                            const BSONObj& metadata,
-                                                            const BSONObj& commandArgs) {
-    auto ret = runCommandWithMetadataAndTarget(database, command, metadata, commandArgs);
-    return std::move(std::get<0>(ret));
-}
-
-std::tuple<rpc::UniqueReply, DBClientWithCommands*>
-DBClientReplicaSet::runCommandWithMetadataAndTarget(StringData database,
-                                                    StringData command,
-                                                    const BSONObj& metadata,
-                                                    const BSONObj& commandArgs) {
+std::pair<rpc::UniqueReply, DBClientWithCommands*> DBClientReplicaSet::runCommandWithTarget(
+    OpMsgRequest request) {
     // This overload exists so we can parse out the read preference and then use server
     // selection directly without having to re-parse the raw message.
 
@@ -923,15 +912,14 @@ DBClientReplicaSet::runCommandWithMetadataAndTarget(StringData database,
     // so we don't have to re-parse it, however, that will come with its own set of
     // complications (e.g. some kind of base class or concept for MetadataSerializable
     // objects). For now we do it the stupid way.
-    auto readPref = uassertStatusOK(ReadPreferenceSetting::fromContainingBSON(metadata));
+    auto readPref = uassertStatusOK(ReadPreferenceSetting::fromContainingBSON(request.body));
 
     if (readPref.pref == ReadPreference::PrimaryOnly ||
         // If the command is not runnable on a secondary, we run it on the primary
         // regardless of the read preference.
-        !_isSecondaryCommand(command, commandArgs)) {
+        !_isSecondaryCommand(request.getCommandName(), request.body)) {
         auto conn = checkMaster();
-        return std::make_tuple(
-            conn->runCommandWithMetadata(database, command, metadata, commandArgs), conn);
+        return conn->runCommandWithTarget(std::move(request));
     }
 
     auto rpShared = std::make_shared<ReadPreferenceSetting>(std::move(readPref));
@@ -942,10 +930,8 @@ DBClientReplicaSet::runCommandWithMetadataAndTarget(StringData database,
             if (conn == nullptr) {
                 break;
             }
-            // We can't move database and command in case this throws
-            // and we retry.
-            return std::make_tuple(
-                conn->runCommandWithMetadata(database, command, metadata, commandArgs), conn);
+            // We can't move the request since we need it to retry.
+            return conn->runCommandWithTarget(request);
         } catch (const DBException& ex) {
             _invalidateLastSlaveOkCache(ex.toStatus());
         }
@@ -954,7 +940,7 @@ DBClientReplicaSet::runCommandWithMetadataAndTarget(StringData database,
     uasserted(ErrorCodes::NodeNotFound,
               str::stream() << "Could not satisfy $readPreference of '" << readPref.toString()
                             << "' while attempting to run command "
-                            << command);
+                            << request.getCommandName());
 }
 
 bool DBClientReplicaSet::call(Message& toSend,

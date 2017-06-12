@@ -47,6 +47,7 @@
 #include "mongo/util/mongoutils/str.h"
 #include "mongo/util/net/abstract_message_port.h"
 #include "mongo/util/net/message.h"
+#include "mongo/util/net/op_msg.h"
 
 namespace mongo {
 
@@ -410,15 +411,29 @@ public:
     const rpc::ReplyMetadataReader& getReplyMetadataReader();
 
     /**
+     * Runs the specified command request.
+     */
+    virtual std::pair<rpc::UniqueReply, DBClientWithCommands*> runCommandWithTarget(
+        OpMsgRequest request);
+
+    /**
+     * Runs the specified command request. This thin wrapper just unwraps the reply and ignores the
+     * target connection from the above runCommandWithTarget().
+     */
+    rpc::UniqueReply runCommand(OpMsgRequest request) {
+        return runCommandWithTarget(std::move(request)).first;
+    }
+
+    /**
      * Runs a database command. This variant allows the caller to manually specify the metadata
      * for the request, and receive it for the reply.
      *
      * TODO: rename this to runCommand, and change the old one to runCommandLegacy.
      */
-    virtual rpc::UniqueReply runCommandWithMetadata(StringData database,
-                                                    StringData command,
-                                                    const BSONObj& metadata,
-                                                    const BSONObj& commandArgs);
+    rpc::UniqueReply runCommandWithMetadata(StringData database,
+                                            StringData command,
+                                            const BSONObj& metadata,
+                                            BSONObj commandArgs);
 
     /*
      * This wraps up the runCommandWithMetadata function above, but returns the DBClient that
@@ -427,11 +442,8 @@ public:
      *
      * This is used in the shell so that cursors can send getMore through the correct connection.
      */
-    virtual std::tuple<rpc::UniqueReply, DBClientWithCommands*> runCommandWithMetadataAndTarget(
-        StringData database,
-        StringData command,
-        const BSONObj& metadata,
-        const BSONObj& commandArgs);
+    std::tuple<rpc::UniqueReply, DBClientWithCommands*> runCommandWithMetadataAndTarget(
+        StringData database, StringData command, const BSONObj& metadata, BSONObj commandArgs);
 
     /** Run a database command.  Database commands are represented as BSON objects.  Common database
         commands have prebuilt helper functions -- see below.  If a helper is not available you can
@@ -446,10 +458,7 @@ public:
 
         @return true if the command returned "ok".
     */
-    virtual bool runCommand(const std::string& dbname,
-                            const BSONObj& cmd,
-                            BSONObj& info,
-                            int options = 0);
+    bool runCommand(const std::string& dbname, BSONObj cmd, BSONObj& info, int options = 0);
 
     /*
      * This wraps up the runCommand function avove, but returns the DBClient that actually ran
@@ -458,10 +467,10 @@ public:
      *
      * This is used in the shell so that cursors can send getMore through the correct connection.
      */
-    virtual std::tuple<bool, DBClientWithCommands*> runCommandWithTarget(const std::string& dbname,
-                                                                         const BSONObj& cmd,
-                                                                         BSONObj& info,
-                                                                         int options = 0);
+    std::tuple<bool, DBClientWithCommands*> runCommandWithTarget(const std::string& dbname,
+                                                                 BSONObj cmd,
+                                                                 BSONObj& info,
+                                                                 int options = 0);
 
     /**
     * Authenticates to another cluster member using appropriate authentication data.
@@ -1056,10 +1065,9 @@ public:
                                      const BSONObj* fieldsToReturn,
                                      int queryOptions);
 
-    virtual bool runCommand(const std::string& dbname,
-                            const BSONObj& cmd,
-                            BSONObj& info,
-                            int options = 0);
+    using DBClientWithCommands::runCommandWithTarget;
+    std::pair<rpc::UniqueReply, DBClientWithCommands*> runCommandWithTarget(
+        OpMsgRequest request) override;
 
     /**
        @return true if this connection is currently in a failed state.  When autoreconnect is on,

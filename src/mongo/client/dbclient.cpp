@@ -169,13 +169,12 @@ const rpc::ReplyMetadataReader& DBClientWithCommands::getReplyMetadataReader() {
     return _metadataReader;
 }
 
-rpc::UniqueReply DBClientWithCommands::runCommandWithMetadata(StringData database,
-                                                              StringData command,
-                                                              const BSONObj& metadataIn,
-                                                              const BSONObj& commandArgs) {
+std::pair<rpc::UniqueReply, DBClientWithCommands*> DBClientWithCommands::runCommandWithTarget(
+    OpMsgRequest request) {
     uassert(ErrorCodes::InvalidNamespace,
-            str::stream() << "Database name '" << database << "' is not valid.",
-            NamespaceString::validDBName(database, NamespaceString::DollarInDbNameBehavior::Allow));
+            str::stream() << "Database name '" << request.getDatabase() << "' is not valid.",
+            NamespaceString::validDBName(request.getDatabase(),
+                                         NamespaceString::DollarInDbNameBehavior::Allow));
 
     // Make sure to reconnect if needed before building our request, since the request depends on
     // the negotiated protocol which can change due to a reconnect.
@@ -184,19 +183,15 @@ rpc::UniqueReply DBClientWithCommands::runCommandWithMetadata(StringData databas
     // call() oddly takes this by pointer, so we need to put it on the stack.
     auto host = getServerAddress();
 
-    auto metadata = metadataIn;
-
     if (_metadataWriter) {
-        BSONObjBuilder metadataBob(std::move(metadata));
+        BSONObjBuilder metadataBob(std::move(request.body));
         uassertStatusOK(
             _metadataWriter((haveClient() ? cc().getOperationContext() : nullptr), &metadataBob));
-        metadata = metadataBob.obj();
+        request.body = metadataBob.obj();
     }
 
-    auto requestMsg = rpc::messageFromOpMsgRequest(
-        getClientRPCProtocols(),
-        getServerRPCProtocols(),
-        OpMsgRequest::fromDBAndBody(database, std::move(commandArgs), metadata));
+    auto requestMsg =
+        rpc::messageFromOpMsgRequest(getClientRPCProtocols(), getServerRPCProtocols(), request);
 
     Message replyMsg;
 
@@ -206,7 +201,7 @@ rpc::UniqueReply DBClientWithCommands::runCommandWithMetadata(StringData databas
     uassert(ErrorCodes::HostUnreachable,
             str::stream() << "network error while attempting to run "
                           << "command '"
-                          << command
+                          << request.getCommandName()
                           << "' "
                           << "on host '"
                           << host
@@ -234,43 +229,48 @@ rpc::UniqueReply DBClientWithCommands::runCommandWithMetadata(StringData databas
                                        commandReply->getCommandReply());
     }
 
-    return rpc::UniqueReply(std::move(replyMsg), std::move(commandReply));
+    return {rpc::UniqueReply(std::move(replyMsg), std::move(commandReply)), this};
+}
+
+rpc::UniqueReply DBClientWithCommands::runCommandWithMetadata(StringData database,
+                                                              StringData command,
+                                                              const BSONObj& metadata,
+                                                              BSONObj commandArgs) {
+    return runCommand(OpMsgRequest::fromDBAndBody(database, std::move(commandArgs), metadata));
 }
 
 std::tuple<rpc::UniqueReply, DBClientWithCommands*>
 DBClientWithCommands::runCommandWithMetadataAndTarget(StringData database,
                                                       StringData command,
                                                       const BSONObj& metadata,
-                                                      const BSONObj& commandArgs) {
-    return std::make_tuple(runCommandWithMetadata(database, command, metadata, commandArgs), this);
+                                                      BSONObj commandArgs) {
+    return runCommandWithTarget(
+        OpMsgRequest::fromDBAndBody(database, std::move(commandArgs), metadata));
 }
 
 std::tuple<bool, DBClientWithCommands*> DBClientWithCommands::runCommandWithTarget(
-    const string& dbname, const BSONObj& cmd, BSONObj& info, int options) {
+    const string& dbname, BSONObj cmd, BSONObj& info, int options) {
     BSONObj upconvertedCmd;
     BSONObj upconvertedMetadata;
 
     // TODO: This will be downconverted immediately if the underlying
     // requestBuilder is a legacyRequest builder. Not sure what the best
     // way to get around that is without breaking the abstraction.
-    std::tie(upconvertedCmd, upconvertedMetadata) = rpc::upconvertRequestMetadata(cmd, options);
+    std::tie(upconvertedCmd, upconvertedMetadata) =
+        rpc::upconvertRequestMetadata(std::move(cmd), options);
 
-    auto commandName = upconvertedCmd.firstElementFieldName();
+    auto result = runCommandWithTarget(
+        OpMsgRequest::fromDBAndBody(dbname, std::move(upconvertedCmd), upconvertedMetadata));
 
-    auto resultTuple =
-        runCommandWithMetadataAndTarget(dbname, commandName, upconvertedMetadata, upconvertedCmd);
-    auto result = std::move(std::get<0>(resultTuple));
-
-    info = result->getCommandReply().getOwned();
-
-    return std::make_tuple(isOk(info), std::get<1>(resultTuple));
+    info = result.first->getCommandReply().getOwned();
+    return std::make_tuple(isOk(info), result.second);
 }
 
 bool DBClientWithCommands::runCommand(const string& dbname,
-                                      const BSONObj& cmd,
+                                      BSONObj cmd,
                                       BSONObj& info,
                                       int options) {
-    auto res = runCommandWithTarget(dbname, cmd, info, options);
+    auto res = runCommandWithTarget(dbname, std::move(cmd), info, options);
     return std::get<0>(res);
 }
 
@@ -918,18 +918,18 @@ void DBClientConnection::logout(const string& dbname, BSONObj& info) {
     runCommand(dbname, BSON("logout" << 1), info);
 }
 
-bool DBClientConnection::runCommand(const string& dbname,
-                                    const BSONObj& cmd,
-                                    BSONObj& info,
-                                    int options) {
-    if (DBClientWithCommands::runCommand(dbname, cmd, info, options))
-        return true;
+std::pair<rpc::UniqueReply, DBClientWithCommands*> DBClientConnection::runCommandWithTarget(
+    OpMsgRequest request) {
 
+    auto out = DBClientWithCommands::runCommandWithTarget(std::move(request));
     if (!_parentReplSetName.empty()) {
-        handleNotMasterResponse(info["errmsg"]);
+        const auto replyBody = out.first->getCommandReply();
+        if (!isOk(replyBody)) {
+            handleNotMasterResponse(replyBody["errmsg"]);
+        }
     }
 
-    return false;
+    return out;
 }
 
 void DBClientConnection::_checkConnection() {
