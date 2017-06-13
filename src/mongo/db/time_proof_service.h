@@ -75,7 +75,7 @@ private:
          * Returns true if it has proof for time greater or equal than the argument.
          */
         bool hasProof(LogicalTime time, const Key& key) const {
-            return key == _key && time <= _time;
+            return key == _key && time == _time;
         }
 
         TimeProof _proof;

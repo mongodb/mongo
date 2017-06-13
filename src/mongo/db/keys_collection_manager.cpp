@@ -47,6 +47,7 @@ namespace {
 
 Milliseconds kDefaultRefreshWaitTime(30 * 1000);
 Milliseconds kRefreshIntervalIfErrored(200);
+Milliseconds kMaxRefreshWaitTime(10 * 60 * 1000);
 
 /**
  * Returns the amount of time to wait until the monitoring thread should attempt to refresh again.
@@ -69,7 +70,7 @@ Milliseconds howMuchSleepNeedFor(const LogicalTime& currentTime,
         return interval;
     }
 
-    return kRefreshIntervalIfErrored;
+    return Milliseconds(millisBeforeExpire);
 }
 
 }  // unnamed namespace
@@ -204,6 +205,7 @@ void KeysCollectionManager::PeriodicRunner::_doPeriodicRefresh(ServiceContext* s
         auto opCtx = cc().makeOperationContext();
 
         bool hasRefreshRequestInitially = false;
+        unsigned errorCount = 0;
         std::shared_ptr<RefreshFunc> doRefresh;
         {
             stdx::lock_guard<stdx::mutex> lock(_mutex);
@@ -221,14 +223,19 @@ void KeysCollectionManager::PeriodicRunner::_doPeriodicRefresh(ServiceContext* s
 
         auto latestKeyStatusWith = (*doRefresh)(opCtx.get());
         if (latestKeyStatusWith.getStatus().isOK()) {
+            errorCount = 0;
             const auto& latestKey = latestKeyStatusWith.getValue();
             auto currentTime = LogicalClock::get(service)->getClusterTime();
 
             nextWakeup =
                 howMuchSleepNeedFor(currentTime, latestKey.getExpiresAt(), refreshInterval);
+        } else {
+            errorCount += 1;
+            nextWakeup = Milliseconds(kRefreshIntervalIfErrored.count() * errorCount);
+            if (nextWakeup > kMaxRefreshWaitTime) {
+                nextWakeup = kMaxRefreshWaitTime;
+            }
         }
-
-        // TODO: Add backoff to nextWakeup if it has a very small value in a row to avoid spinning.
 
         stdx::unique_lock<stdx::mutex> lock(_mutex);
 
