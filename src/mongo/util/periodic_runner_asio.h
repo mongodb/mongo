@@ -42,6 +42,16 @@ namespace mongo {
  * to schedule and run jobs at regular intervals.
  *
  * This class takes a timer factory so that it may be mocked out for testing.
+ *
+ * The runner will set up a client on its internal thread. Scheduled jobs that require
+ * an operation context should use Client::getCurrent()->makeOperationContext() to
+ * create one for themselves, and MUST clear it before they return.
+ *
+ * The thread running internally will use the thread name "PeriodicRunnerASIO" and
+ * anything logged from within a scheduled background task will use this thread name.
+ * Scheduled tasks may set the thread name to a custom value as they run. However,
+ * if they do this, they MUST set the thread name back to its original value before
+ * they return.
  */
 class PeriodicRunnerASIO : public PeriodicRunner {
 public:

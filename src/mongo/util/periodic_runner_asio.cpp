@@ -35,6 +35,7 @@
 
 #include "mongo/util/periodic_runner_asio.h"
 
+#include "mongo/db/client.h"
 #include "mongo/util/log.h"
 
 namespace mongo {
@@ -109,6 +110,8 @@ Status PeriodicRunnerASIO::startup() {
     _state = State::kRunning;
     _thread = stdx::thread([this]() {
         try {
+            Client::initThread("PeriodicRunnerASIO");
+
             asio::io_service::work workItem(_io_service);
             std::error_code ec;
             _io_service.run(ec);

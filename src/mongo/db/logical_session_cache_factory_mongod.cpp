@@ -32,7 +32,7 @@
 
 #include "mongo/db/logical_session_cache_factory_mongod.h"
 
-#include "mongo/db/service_liason_mock.h"
+#include "mongo/db/service_liason_mongod.h"
 #include "mongo/db/sessions_collection_mock.h"
 #include "mongo/stdx/memory.h"
 
@@ -62,8 +62,7 @@ std::unique_ptr<SessionsCollection> makeSessionsCollection(LogicalSessionCacheSe
 }  // namespace
 
 std::unique_ptr<LogicalSessionCache> makeLogicalSessionCacheD(LogicalSessionCacheServer state) {
-    // TODO SERVER-29198 replace with ServiceLiasonMongod
-    auto liason = stdx::make_unique<MockServiceLiason>(std::make_shared<MockServiceLiasonImpl>());
+    auto liason = stdx::make_unique<ServiceLiasonMongod>();
 
     // Set up the logical session cache
     auto sessionsColl = makeSessionsCollection(state);

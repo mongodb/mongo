@@ -295,6 +295,7 @@ env.Library(
     ],
     LIBDEPS=[
         "$BUILD_DIR/mongo/base",
+        "$BUILD_DIR/mongo/db/service_context",
         "$BUILD_DIR/third_party/shim_asio",
         "$BUILD_DIR/mongo/executor/async_timer_asio",
         "periodic_runner",
@@ -307,8 +308,9 @@ env.CppUnitTest(
         "periodic_runner_asio_test.cpp",
     ],
     LIBDEPS=[
-        "periodic_runner_asio",
+        '$BUILD_DIR/mongo/db/service_context_noop_init',
         "$BUILD_DIR/mongo/executor/async_timer_mock",
+        "periodic_runner_asio",
     ],
 )
 
