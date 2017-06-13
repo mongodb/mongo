@@ -34,6 +34,7 @@
 #include "mongo/base/status.h"
 #include "mongo/base/string_data.h"
 #include "mongo/bson/bsonobj.h"
+#include "mongo/db/jsobj.h"
 #include "mongo/s/async_requests_sender.h"
 #include "mongo/s/chunk_version.h"
 #include "mongo/s/commands/strategy.h"
@@ -44,7 +45,14 @@ namespace mongo {
 class CachedCollectionRoutingInfo;
 class CachedDatabaseInfo;
 class OperationContext;
+class ShardId;
 
+/**
+ * This function appends the provided writeConcernError BSONElement to the sharded response.
+ */
+void appendWriteConcernErrorToCmdResponse(const ShardId& shardID,
+                                          const BSONElement& wcErrorElem,
+                                          BSONObjBuilder& responseBuilder);
 /**
  * Returns a copy of 'cmdObj' with 'version' appended.
  */

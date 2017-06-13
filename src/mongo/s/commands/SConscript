@@ -8,11 +8,15 @@ env = env.Clone()
 env.Library(
     target='shared_cluster_commands',
     source=[
+        'cluster_commands_helpers.cpp',
         'cluster_get_shard_map_cmd.cpp',
     ],
     LIBDEPS=[
         '$BUILD_DIR/mongo/db/commands',
         '$BUILD_DIR/mongo/s/client/sharding_client',
+        '$BUILD_DIR/mongo/db/commands/killcursors_common',
+        '$BUILD_DIR/mongo/s/async_requests_sender',
+        '$BUILD_DIR/mongo/s/client/parallel',
         '$BUILD_DIR/mongo/s/coreshard',
     ]
 )
@@ -27,7 +31,6 @@ env.Library(
         'cluster_aggregate.cpp',
         'cluster_apply_ops_cmd.cpp',
         'cluster_available_query_options_cmd.cpp',
-        'cluster_commands_common.cpp',
         'cluster_compact_cmd.cpp',
         'cluster_control_balancer_cmd.cpp',
         'cluster_count_cmd.cpp',
@@ -76,7 +79,6 @@ env.Library(
         'cluster_write.cpp',
         'cluster_write_cmd.cpp',
         'commands_public.cpp',
-        'sharded_command_processing.cpp',
         'strategy.cpp',
     ],
     LIBDEPS=[
@@ -93,5 +95,6 @@ env.Library(
         '$BUILD_DIR/mongo/s/write_ops/cluster_write_op',
         '$BUILD_DIR/mongo/s/write_ops/cluster_write_op_conversion',
         '$BUILD_DIR/mongo/transport/transport_layer_common',
+        'shared_cluster_commands',
     ]
 )

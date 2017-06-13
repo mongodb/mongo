@@ -30,26 +30,41 @@
 
 #include "mongo/platform/basic.h"
 
-#include "mongo/s/commands/cluster_commands_common.h"
+#include "mongo/s/commands/cluster_commands_helpers.h"
 
 #include "mongo/db/commands.h"
 #include "mongo/db/namespace_string.h"
 #include "mongo/db/query/cursor_response.h"
 #include "mongo/executor/task_executor_pool.h"
 #include "mongo/rpc/get_status_from_command_result.h"
+#include "mongo/rpc/write_concern_error_detail.h"
 #include "mongo/s/catalog/type_collection.h"
 #include "mongo/s/catalog_cache.h"
 #include "mongo/s/client/parallel.h"
 #include "mongo/s/client/shard_connection.h"
 #include "mongo/s/client/shard_registry.h"
 #include "mongo/s/client/version_manager.h"
-#include "mongo/s/commands/sharded_command_processing.h"
 #include "mongo/s/grid.h"
+#include "mongo/s/shard_id.h"
 #include "mongo/s/stale_exception.h"
 #include "mongo/util/log.h"
 #include "mongo/util/scopeguard.h"
 
 namespace mongo {
+
+void appendWriteConcernErrorToCmdResponse(const ShardId& shardId,
+                                          const BSONElement& wcErrorElem,
+                                          BSONObjBuilder& responseBuilder) {
+    WriteConcernErrorDetail wcError;
+    std::string errMsg;
+    auto wcErrorObj = wcErrorElem.Obj();
+    if (!wcError.parseBSON(wcErrorObj, &errMsg)) {
+        wcError.setErrMessage("Failed to parse writeConcernError: " + wcErrorObj.toString() +
+                              ", Received error: " + errMsg);
+    }
+    wcError.setErrMessage(wcError.getErrMessage() + " at " + shardId.toString());
+    responseBuilder.append("writeConcernError", wcError.toBSON());
+}
 
 namespace {
 
