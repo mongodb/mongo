@@ -37,6 +37,11 @@
 
 namespace mongo {
 
+using TxnNumber = std::int64_t;
+using StmtId = std::int32_t;
+
+const TxnNumber kUninitializedTxnNumber = -1;
+
 class BSONObjBuilder;
 
 /**

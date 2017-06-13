@@ -24,27 +24,51 @@
 # exception statement from all source files in the program, then also delete
 # it in the license file.
 
-# Write op single results IDL
+# Session Transaction Entry IDL File
 
 global:
     cpp_namespace: "mongo"
+    cpp_includes:
+        - "mongo/db/logical_session_id.h"
 
 imports:
     - "mongo/idl/basic_types.idl"
+    - "mongo/db/logical_session_id.idl"
+    - "mongo/db/ops/single_write_result.idl"
+
+types:
+    LogicalSessionId:
+        description: "Logical_session_id"
+        bson_serialization_type: object
+        cpp_type: "mongo::LogicalSessionId"
+        deserializer: "mongo::LogicalSessionId::parse"
+        serializer: "mongo::LogicalSessionId::toBSON"
 
 structs:
-    singleWriteResult:
+    txnStmtTupleId:
+        description: "Unique tuple that identifies a single statment within a logical transaction."
+        fields:
+            sessionId:
+                type: LogicalSessionId
+                description: "The id of the session this transaction belongs to."
+            txnNum:
+                type: TxnNumber
+                description: "The id representing this transaction."
+            stmtId:
+                type: StmtId
+                description: "The id of the last known statement that was executed successfully
+                          with side effects in this transaction."
+
+    sessionTxnRecord:
         description: "A document used for storing session transaction states."
         fields:
-            n:
-                type: long
-                description: "For insert: number of documents inserted.
-                              For update: number of documents that matched the query predicate.
-                              For delete: number of documents deleted."
-            nModified:
-                type: long
-                description: "The number of documents modified by an update operation."
-            upsertedId:
-                type: object
-                description: "The _id value of the object that was upserted."
+            _id:
+                cpp_name: "Id"
+                type: txnStmtTupleId
+            result:
+                type: singleWriteResult
+                description: "This is the structure for storing the partial results of this
+                              session transaction."
+
+            # TODO: add opTime
 

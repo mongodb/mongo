@@ -1304,3 +1304,30 @@ asioEnv.CppIntegrationTest(
         '$BUILD_DIR/mongo/executor/network_interface_asio_fixture',
     ],
 )
+
+env.Library(
+    target='session_transaction',
+    source=[
+        'session_transaction_table.cpp',
+        'session_txn_state.cpp',
+        'session_txn_state_holder.cpp',
+        env.Idlc('session_txn_record.idl')[0],
+    ],
+    LIBDEPS=[
+        '$BUILD_DIR/mongo/db/logical_session_id',
+        '$BUILD_DIR/mongo/db/ops/write_ops',
+        '$BUILD_DIR/mongo/idl/idl_parser',
+    ],
+)
+
+env.CppUnitTest(
+    target='session_transaction_state_test',
+    source=[
+        'session_transaction_state_test.cpp',
+    ],
+    LIBDEPS=[
+        'service_context_d_test_fixture',
+        'session_transaction',
+    ],
+)
+

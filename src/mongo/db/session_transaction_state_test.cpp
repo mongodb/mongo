@@ -1,5 +1,5 @@
 /**
- *    Copyright (C) 2017 MongoDB Inc.
+ *    Copyright (C) 2017 MongoDB, Inc.
  *
  *    This program is free software: you can redistribute it and/or  modify
  *    it under the terms of the GNU Affero General Public License, version 3,
@@ -28,35 +28,47 @@
 
 #include "mongo/platform/basic.h"
 
-#include "mongo/db/operation_time_tracker.h"
-#include "mongo/stdx/mutex.h"
+#include <memory>
+
+#include "mongo/base/init.h"
+#include "mongo/db/operation_context_noop.h"
+#include "mongo/db/repl/optime.h"
+#include "mongo/db/service_context_noop.h"
+#include "mongo/db/session_transaction_table.h"
+#include "mongo/db/session_txn_state_holder.h"
+#include "mongo/stdx/memory.h"
+#include "mongo/unittest/unittest.h"
 
 namespace mongo {
-namespace {
-auto getOperationTimeTracker =
-    OperationContext::declareDecoration<std::shared_ptr<OperationTimeTracker>>();
-}
 
-std::shared_ptr<OperationTimeTracker> OperationTimeTracker::get(OperationContext* opCtx) {
-    return getOperationTimeTracker(opCtx);
-}
+TEST(SessionTxnStateHolder, Demo) {
+    SessionTransactionTable table(nullptr);
+    auto txnStateHolder = table.getSessionTxnState(LogicalSessionId::gen());
 
-void OperationTimeTracker::set(OperationContext* opCtx,
-                               std::shared_ptr<OperationTimeTracker> trackerArg) {
-    auto& tracker = getOperationTimeTracker(opCtx);
-    tracker = std::move(trackerArg);
-}
+    OperationContextNoop opCtx;
 
-LogicalTime OperationTimeTracker::getMaxOperationTime() const {
-    stdx::lock_guard<stdx::mutex> lock(_mutex);
-    return _maxOperationTime;
-}
+    {
+        // Caller has now control of txn state and can read/write from it.
+        auto txnStateToken = txnStateHolder->getTransactionState(&opCtx, 1);
 
-void OperationTimeTracker::updateOperationTime(LogicalTime newTime) {
-    stdx::lock_guard<stdx::mutex> lock(_mutex);
-    if (newTime > _maxOperationTime) {
-        _maxOperationTime = std::move(newTime);
+        auto partialResults = txnStateToken.get()->getPartialResults();
+
+        // Go over request object, and mark all statements that has results in partialResults as
+        // done.
+
+        // For every statement that is not yet 'done':
+        // Perform write op, and then store result:
+
+        // Commented out since OperationContextNoop uses LockerNoop
+        // SingleWriteResult result;
+        // repl::OpTime opTime;
+        // StmtId stmtId = 0;
+        // txnStateToken.get()->storePartialResult(&opCtx, stmtId, result, opTime);
+
+        // Consolidate partial results into final results for command response
     }
+
+    // Caller now releases txnStateToken, other threads can now get a chance to access it.
 }
 
 }  // namespace mongo

@@ -1,5 +1,5 @@
 /**
- *    Copyright (C) 2017 MongoDB Inc.
+ *    Copyright (C) 2017 MongoDB, Inc.
  *
  *    This program is free software: you can redistribute it and/or  modify
  *    it under the terms of the GNU Affero General Public License, version 3,
@@ -26,37 +26,55 @@
  *    it in the license file.
  */
 
-#include "mongo/platform/basic.h"
+#pragma once
 
-#include "mongo/db/operation_time_tracker.h"
+#include <map>
+#include <memory>
+
+#include "mongo/db/logical_session_id.h"
+#include "mongo/db/session_txn_state_holder.h"
 #include "mongo/stdx/mutex.h"
 
 namespace mongo {
-namespace {
-auto getOperationTimeTracker =
-    OperationContext::declareDecoration<std::shared_ptr<OperationTimeTracker>>();
-}
 
-std::shared_ptr<OperationTimeTracker> OperationTimeTracker::get(OperationContext* opCtx) {
-    return getOperationTimeTracker(opCtx);
-}
+class LogicalSessionCache;
+class OperationContext;
+class ServiceContext;
 
-void OperationTimeTracker::set(OperationContext* opCtx,
-                               std::shared_ptr<OperationTimeTracker> trackerArg) {
-    auto& tracker = getOperationTimeTracker(opCtx);
-    tracker = std::move(trackerArg);
-}
+/**
+ * Keeps track of the latest transaction for every session.
+ */
+class SessionTransactionTable {
+public:
+    /**
+     * Note: sessionsCache should outlive this object.
+     */
+    explicit SessionTransactionTable(LogicalSessionCache* sessionsCache);
 
-LogicalTime OperationTimeTracker::getMaxOperationTime() const {
-    stdx::lock_guard<stdx::mutex> lock(_mutex);
-    return _maxOperationTime;
-}
+    static SessionTransactionTable* get(ServiceContext* service);
+    static void set(ServiceContext* service, std::unique_ptr<SessionTransactionTable> txnTable);
 
-void OperationTimeTracker::updateOperationTime(LogicalTime newTime) {
-    stdx::lock_guard<stdx::mutex> lock(_mutex);
-    if (newTime > _maxOperationTime) {
-        _maxOperationTime = std::move(newTime);
-    }
-}
+    /**
+     * Returns transaction state with the given sessionId and txnNum.
+     * Throws if:
+     *  - session is no longer active.
+     *  - there is already a SessionTransaction that has a higher TxnNumber.
+     */
+    std::shared_ptr<SessionTxnStateHolder> getSessionTxnState(const LogicalSessionId& sessionId);
+
+    /**
+     * Removes all entries with sessions that are no longer active.
+     */
+    void cleanupInactiveSessions(OperationContext* opCtx);
+
+private:
+    LogicalSessionCache* const _sessionsCache;
+
+    stdx::mutex _mutex;
+    std::unordered_map<LogicalSessionId,
+                       std::shared_ptr<SessionTxnStateHolder>,
+                       LogicalSessionId::Hash>
+        _txnTable;
+};
 
 }  // namespace mongo
