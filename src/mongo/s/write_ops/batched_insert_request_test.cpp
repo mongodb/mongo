@@ -31,6 +31,7 @@
 #include <string>
 
 #include "mongo/db/jsobj.h"
+#include "mongo/db/ops/write_ops_parsers_test_helpers.h"
 #include "mongo/s/write_ops/batched_command_request.h"
 #include "mongo/s/write_ops/batched_insert_request.h"
 #include "mongo/unittest/unittest.h"
@@ -50,13 +51,14 @@ TEST(BatchedInsertRequest, Basic) {
                                                << BatchedInsertRequest::writeConcern(BSON("w" << 1))
                                                << BatchedInsertRequest::ordered(true));
 
-    string errMsg;
-    BatchedInsertRequest request;
-    ASSERT_TRUE(request.parseBSON("foo", origInsertRequestObj, &errMsg));
+    for (auto docSeq : {false, true}) {
+        BatchedInsertRequest request;
+        request.parseRequest(toOpMsg("foo", origInsertRequestObj, docSeq));
 
-    ASSERT_EQ("foo.test", request.getNS().ns());
+        ASSERT_EQ("foo.test", request.getNS().ns());
 
-    ASSERT_BSONOBJ_EQ(origInsertRequestObj, request.toBSON());
+        ASSERT_BSONOBJ_EQ(origInsertRequestObj, request.toBSON());
+    }
 }
 
 TEST(BatchedInsertRequest, GenIDAll) {

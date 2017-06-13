@@ -275,8 +275,8 @@ TEST_F(InsertRetryTest, DuplicateKeyErrorAfterWriteConcernFailureMatch) {
 
     onCommand([&](const RemoteCommandRequest& request) {
         BatchedInsertRequest actualBatchedInsert;
-        std::string errmsg;
-        ASSERT_TRUE(actualBatchedInsert.parseBSON(request.dbname, request.cmdObj, &errmsg));
+        actualBatchedInsert.parseRequest(
+            OpMsgRequest::fromDBAndBody(request.dbname, request.cmdObj));
         ASSERT_EQUALS(kTestNamespace.ns(), actualBatchedInsert.getNS().ns());
 
         BatchedCommandResponse response;
@@ -337,8 +337,8 @@ TEST_F(UpdateRetryTest, Success) {
 
     onCommand([&](const RemoteCommandRequest& request) {
         BatchedUpdateRequest actualBatchedUpdate;
-        std::string errmsg;
-        ASSERT_TRUE(actualBatchedUpdate.parseBSON(request.dbname, request.cmdObj, &errmsg));
+        actualBatchedUpdate.parseRequest(
+            OpMsgRequest::fromDBAndBody(request.dbname, request.cmdObj));
         ASSERT_EQUALS(kTestNamespace.ns(), actualBatchedUpdate.getNS().ns());
 
         BatchedCommandResponse response;
@@ -449,8 +449,8 @@ TEST_F(UpdateRetryTest, NotMasterOnceSuccessAfterRetry) {
 
     onCommand([&](const RemoteCommandRequest& request) {
         BatchedUpdateRequest actualBatchedUpdate;
-        std::string errmsg;
-        ASSERT_TRUE(actualBatchedUpdate.parseBSON(request.dbname, request.cmdObj, &errmsg));
+        actualBatchedUpdate.parseRequest(
+            OpMsgRequest::fromDBAndBody(request.dbname, request.cmdObj));
         ASSERT_EQUALS(kTestNamespace.ns(), actualBatchedUpdate.getNS().ns());
 
         BatchedCommandResponse response;
@@ -484,8 +484,8 @@ TEST_F(UpdateRetryTest, OperationInterruptedDueToPrimaryStepDown) {
 
     onCommand([&](const RemoteCommandRequest& request) {
         BatchedUpdateRequest actualBatchedUpdate;
-        std::string errmsg;
-        ASSERT_TRUE(actualBatchedUpdate.parseBSON(request.dbname, request.cmdObj, &errmsg));
+        actualBatchedUpdate.parseRequest(
+            OpMsgRequest::fromDBAndBody(request.dbname, request.cmdObj));
         ASSERT_EQUALS(kTestNamespace.ns(), actualBatchedUpdate.getNS().ns());
 
         BatchedCommandResponse response;
@@ -501,8 +501,8 @@ TEST_F(UpdateRetryTest, OperationInterruptedDueToPrimaryStepDown) {
 
     onCommand([&](const RemoteCommandRequest& request) {
         BatchedUpdateRequest actualBatchedUpdate;
-        std::string errmsg;
-        ASSERT_TRUE(actualBatchedUpdate.parseBSON(request.dbname, request.cmdObj, &errmsg));
+        actualBatchedUpdate.parseRequest(
+            OpMsgRequest::fromDBAndBody(request.dbname, request.cmdObj));
         ASSERT_EQUALS(kTestNamespace.ns(), actualBatchedUpdate.getNS().ns());
 
         BatchedCommandResponse response;
@@ -536,8 +536,8 @@ TEST_F(UpdateRetryTest, WriteConcernFailure) {
 
     onCommand([&](const RemoteCommandRequest& request) {
         BatchedUpdateRequest actualBatchedUpdate;
-        std::string errmsg;
-        ASSERT_TRUE(actualBatchedUpdate.parseBSON(request.dbname, request.cmdObj, &errmsg));
+        actualBatchedUpdate.parseRequest(
+            OpMsgRequest::fromDBAndBody(request.dbname, request.cmdObj));
         ASSERT_EQUALS(kTestNamespace.ns(), actualBatchedUpdate.getNS().ns());
 
         BatchedCommandResponse response;
@@ -562,8 +562,8 @@ TEST_F(UpdateRetryTest, WriteConcernFailure) {
 
     onCommand([&](const RemoteCommandRequest& request) {
         BatchedUpdateRequest actualBatchedUpdate;
-        std::string errmsg;
-        ASSERT_TRUE(actualBatchedUpdate.parseBSON(request.dbname, request.cmdObj, &errmsg));
+        actualBatchedUpdate.parseRequest(
+            OpMsgRequest::fromDBAndBody(request.dbname, request.cmdObj));
         ASSERT_EQUALS(kTestNamespace.ns(), actualBatchedUpdate.getNS().ns());
 
         BatchedCommandResponse response;

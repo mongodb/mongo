@@ -328,8 +328,8 @@ void ShardingTestFixture::expectInserts(const NamespaceString& nss,
         ASSERT_EQUALS(nss.db(), request.dbname);
 
         BatchedInsertRequest actualBatchedInsert;
-        std::string errmsg;
-        ASSERT_TRUE(actualBatchedInsert.parseBSON(request.dbname, request.cmdObj, &errmsg));
+        actualBatchedInsert.parseRequest(
+            OpMsgRequest::fromDBAndBody(request.dbname, request.cmdObj));
 
         ASSERT_EQUALS(nss.toString(), actualBatchedInsert.getNS().toString());
 
@@ -383,8 +383,8 @@ void ShardingTestFixture::expectConfigCollectionInsert(const HostAndPort& config
         ASSERT_EQUALS("config", request.dbname);
 
         BatchedInsertRequest actualBatchedInsert;
-        std::string errmsg;
-        ASSERT_TRUE(actualBatchedInsert.parseBSON(request.dbname, request.cmdObj, &errmsg));
+        actualBatchedInsert.parseRequest(
+            OpMsgRequest::fromDBAndBody(request.dbname, request.cmdObj));
 
         ASSERT_EQ("config", actualBatchedInsert.getNS().db());
         ASSERT_EQ(collName, actualBatchedInsert.getNS().coll());
@@ -448,8 +448,8 @@ void ShardingTestFixture::expectUpdateCollection(const HostAndPort& expectedHost
         ASSERT_EQUALS("config", request.dbname);
 
         BatchedUpdateRequest actualBatchedUpdate;
-        std::string errmsg;
-        ASSERT_TRUE(actualBatchedUpdate.parseBSON(request.dbname, request.cmdObj, &errmsg));
+        actualBatchedUpdate.parseRequest(
+            OpMsgRequest::fromDBAndBody(request.dbname, request.cmdObj));
         ASSERT_EQUALS(CollectionType::ConfigNS, actualBatchedUpdate.getNS().ns());
         auto updates = actualBatchedUpdate.getUpdates();
         ASSERT_EQUALS(1U, updates.size());

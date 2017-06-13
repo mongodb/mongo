@@ -159,8 +159,8 @@ TEST_F(RemoveShardTest, RemoveShardStartDraining) {
                           rpc::TrackingMetadata::removeTrackingData(request.metadata));
 
         BatchedUpdateRequest actualBatchedUpdate;
-        std::string errmsg;
-        ASSERT_TRUE(actualBatchedUpdate.parseBSON(request.dbname, request.cmdObj, &errmsg));
+        actualBatchedUpdate.parseRequest(
+            OpMsgRequest::fromDBAndBody(request.dbname, request.cmdObj));
         ASSERT_EQUALS(ShardType::ConfigNS, actualBatchedUpdate.getNS().ns());
         auto updates = actualBatchedUpdate.getUpdates();
         ASSERT_EQUALS(1U, updates.size());
@@ -335,8 +335,8 @@ TEST_F(RemoveShardTest, RemoveShardCompletion) {
                           rpc::TrackingMetadata::removeTrackingData(request.metadata));
 
         BatchedDeleteRequest actualBatchedDelete;
-        std::string errmsg;
-        ASSERT_TRUE(actualBatchedDelete.parseBSON(request.dbname, request.cmdObj, &errmsg));
+        actualBatchedDelete.parseRequest(
+            OpMsgRequest::fromDBAndBody(request.dbname, request.cmdObj));
         ASSERT_EQUALS(ShardType::ConfigNS, actualBatchedDelete.getNS().ns());
         auto deletes = actualBatchedDelete.getDeletes();
         ASSERT_EQUALS(1U, deletes.size());

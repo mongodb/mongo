@@ -31,6 +31,7 @@
 #include <string>
 
 #include "mongo/db/jsobj.h"
+#include "mongo/db/ops/write_ops_parsers_test_helpers.h"
 #include "mongo/s/write_ops/batched_update_document.h"
 #include "mongo/s/write_ops/batched_update_request.h"
 #include "mongo/unittest/unittest.h"
@@ -57,13 +58,14 @@ TEST(BatchedUpdateRequest, Basic) {
                                                << BatchedUpdateRequest::writeConcern(BSON("w" << 1))
                                                << BatchedUpdateRequest::ordered(true));
 
-    string errMsg;
-    BatchedUpdateRequest request;
-    ASSERT_TRUE(request.parseBSON("foo", origUpdateRequestObj, &errMsg));
+    for (auto docSeq : {false, true}) {
+        BatchedUpdateRequest request;
+        request.parseRequest(toOpMsg("foo", origUpdateRequestObj, docSeq));
 
-    ASSERT_EQ("foo.test", request.getNS().ns());
+        ASSERT_EQ("foo.test", request.getNS().ns());
 
-    ASSERT_BSONOBJ_EQ(origUpdateRequestObj, request.toBSON());
+        ASSERT_BSONOBJ_EQ(origUpdateRequestObj, request.toBSON());
+    }
 }
 
 TEST(BatchedUpdateRequest, CloneBatchedUpdateDocCopiesAllFields) {
@@ -150,18 +152,19 @@ TEST(BatchedUpdateRequest, CollationFieldParsesFromBSONCorrectly) {
     BSONObj origUpdateRequestObj = BSON(
         BatchedUpdateRequest::collName("test") << BatchedUpdateRequest::updates() << updateArray);
 
-    std::string errMsg;
-    BatchedUpdateRequest request;
-    ASSERT_TRUE(request.parseBSON("foo", origUpdateRequestObj, &errMsg));
+    for (auto docSeq : {false, true}) {
+        BatchedUpdateRequest request;
+        request.parseRequest(toOpMsg("foo", origUpdateRequestObj, docSeq));
 
-    ASSERT_EQ(1U, request.sizeUpdates());
-    ASSERT_TRUE(request.getUpdatesAt(0)->isCollationSet());
-    ASSERT_BSONOBJ_EQ(BSON("locale"
-                           << "en_US"),
-                      request.getUpdatesAt(0)->getCollation());
+        ASSERT_EQ(1U, request.sizeUpdates());
+        ASSERT_TRUE(request.getUpdatesAt(0)->isCollationSet());
+        ASSERT_BSONOBJ_EQ(BSON("locale"
+                               << "en_US"),
+                          request.getUpdatesAt(0)->getCollation());
 
-    // Ensure we re-serialize to the original BSON request.
-    ASSERT_BSONOBJ_EQ(origUpdateRequestObj, request.toBSON());
+        // Ensure we re-serialize to the original BSON request.
+        ASSERT_BSONOBJ_EQ(origUpdateRequestObj, request.toBSON());
+    }
 }
 
 TEST(BatchedUpdateRequest, CanSetAndRetrieveArrayFiltersField) {
@@ -214,17 +217,18 @@ TEST(BatchedUpdateRequest, ArrayFiltersFieldParsesFromBSONCorrectly) {
     BSONObj origUpdateRequestObj = BSON(
         BatchedUpdateRequest::collName("test") << BatchedUpdateRequest::updates() << updateArray);
 
-    std::string errMsg;
-    BatchedUpdateRequest request;
-    ASSERT_TRUE(request.parseBSON("foo", origUpdateRequestObj, &errMsg));
+    for (auto docSeq : {false, true}) {
+        BatchedUpdateRequest request;
+        request.parseRequest(toOpMsg("foo", origUpdateRequestObj, docSeq));
 
-    ASSERT_EQ(1U, request.sizeUpdates());
-    ASSERT_TRUE(request.getUpdatesAt(0)->isArrayFiltersSet());
-    ASSERT_EQ(1U, request.getUpdatesAt(0)->getArrayFilters().size());
-    ASSERT_BSONOBJ_EQ(BSON("i" << 5), request.getUpdatesAt(0)->getArrayFilters()[0]);
+        ASSERT_EQ(1U, request.sizeUpdates());
+        ASSERT_TRUE(request.getUpdatesAt(0)->isArrayFiltersSet());
+        ASSERT_EQ(1U, request.getUpdatesAt(0)->getArrayFilters().size());
+        ASSERT_BSONOBJ_EQ(BSON("i" << 5), request.getUpdatesAt(0)->getArrayFilters()[0]);
 
-    // Ensure we re-serialize to the original BSON request.
-    ASSERT_BSONOBJ_EQ(origUpdateRequestObj, request.toBSON());
+        // Ensure we re-serialize to the original BSON request.
+        ASSERT_BSONOBJ_EQ(origUpdateRequestObj, request.toBSON());
+    }
 }
 
 }  // namespace

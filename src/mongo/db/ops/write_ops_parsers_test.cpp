@@ -31,29 +31,10 @@
 #include "mongo/client/dbclientinterface.h"
 #include "mongo/db/catalog/document_validation.h"
 #include "mongo/db/ops/write_ops_parsers.h"
+#include "mongo/db/ops/write_ops_parsers_test_helpers.h"
 #include "mongo/unittest/unittest.h"
 
 namespace mongo {
-namespace {
-std::set<StringData> sequenceFields{"documents", "updates", "deletes", "GARBAGE"};
-OpMsgRequest toOpMsg(StringData db, const BSONObj& cmd, bool useDocSequence) {
-    OpMsgRequest request;
-    BSONObjBuilder body;
-    for (auto field : cmd) {
-        if (useDocSequence && sequenceFields.count(field.fieldNameStringData())) {
-            request.sequences.push_back(OpMsg::DocumentSequence{field.fieldName()});
-            for (auto obj : field.Obj()) {
-                request.sequences.back().objs.push_back(obj.Obj());
-            }
-        } else {
-            body.append(field);
-        }
-    }
-    body.append("$db", db);
-    request.body = body.obj();
-    return request;
-}
-}
 
 TEST(CommandWriteOpsParsers, CommonFields_BypassDocumentValidation) {
     for (BSONElement bypassDocumentValidation : BSON_ARRAY(true << false << 1 << 0 << 1.0 << 0.0)) {

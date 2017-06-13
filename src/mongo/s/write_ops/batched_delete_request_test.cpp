@@ -31,6 +31,7 @@
 #include <string>
 
 #include "mongo/db/jsobj.h"
+#include "mongo/db/ops/write_ops_parsers_test_helpers.h"
 #include "mongo/s/write_ops/batched_delete_document.h"
 #include "mongo/s/write_ops/batched_delete_request.h"
 #include "mongo/unittest/unittest.h"
@@ -52,12 +53,14 @@ TEST(BatchedDeleteRequest, Basic) {
                                                << BatchedDeleteRequest::ordered(true));
 
     string errMsg;
-    BatchedDeleteRequest request;
-    ASSERT_TRUE(request.parseBSON("foo", origDeleteRequestObj, &errMsg));
+    for (auto docSeq : {false, true}) {
+        BatchedDeleteRequest request;
+        request.parseRequest(toOpMsg("foo", origDeleteRequestObj, docSeq));
 
-    ASSERT_EQ("foo.test", request.getNS().ns());
+        ASSERT_EQ("foo.test", request.getNS().ns());
 
-    ASSERT_BSONOBJ_EQ(origDeleteRequestObj, request.toBSON());
+        ASSERT_BSONOBJ_EQ(origDeleteRequestObj, request.toBSON());
+    }
 }
 
 TEST(BatchedDeleteRequest, CloneBatchedDeleteDocCopiesAllFields) {
@@ -130,18 +133,19 @@ TEST(BatchedDeleteRequest, CollationFieldParsesFromBSONCorrectly) {
     BSONObj origDeleteRequestObj = BSON(
         BatchedDeleteRequest::collName("test") << BatchedDeleteRequest::deletes() << deleteArray);
 
-    std::string errMsg;
-    BatchedDeleteRequest request;
-    ASSERT_TRUE(request.parseBSON("foo", origDeleteRequestObj, &errMsg));
+    for (auto docSeq : {false, true}) {
+        BatchedDeleteRequest request;
+        request.parseRequest(toOpMsg("foo", origDeleteRequestObj, docSeq));
 
-    ASSERT_EQ(1U, request.sizeDeletes());
-    ASSERT_TRUE(request.getDeletesAt(0)->isCollationSet());
-    ASSERT_BSONOBJ_EQ(BSON("locale"
-                           << "en_US"),
-                      request.getDeletesAt(0)->getCollation());
+        ASSERT_EQ(1U, request.sizeDeletes());
+        ASSERT_TRUE(request.getDeletesAt(0)->isCollationSet());
+        ASSERT_BSONOBJ_EQ(BSON("locale"
+                               << "en_US"),
+                          request.getDeletesAt(0)->getCollation());
 
-    // Ensure we re-serialize to the original BSON request.
-    ASSERT_BSONOBJ_EQ(origDeleteRequestObj, request.toBSON());
+        // Ensure we re-serialize to the original BSON request.
+        ASSERT_BSONOBJ_EQ(origDeleteRequestObj, request.toBSON());
+    }
 }
 
 }  // namespace

@@ -162,55 +162,38 @@ BSONObj BatchedCommandRequest::toBSON() const {
     return builder.obj();
 }
 
-bool BatchedCommandRequest::parseBSON(StringData dbName,
-                                      const BSONObj& source,
-                                      std::string* errMsg) {
-    bool succeeded;
+void BatchedCommandRequest::parseRequest(const OpMsgRequest& request) {
 
     switch (getBatchType()) {
         case BatchedCommandRequest::BatchType_Insert:
-            succeeded = _insertReq->parseBSON(dbName, source, errMsg);
+            _insertReq->parseRequest(request);
             break;
         case BatchedCommandRequest::BatchType_Update:
-            succeeded = _updateReq->parseBSON(dbName, source, errMsg);
+            _updateReq->parseRequest(request);
             break;
         case BatchedCommandRequest::BatchType_Delete:
-            succeeded = _deleteReq->parseBSON(dbName, source, errMsg);
+            _deleteReq->parseRequest(request);
             break;
         default:
             MONGO_UNREACHABLE;
     }
 
-    if (!succeeded)
-        return false;
-
-    // Parse the command's shard version
-    auto chunkVersion = ChunkVersion::parseFromBSONForCommands(source);
-    if (chunkVersion.isOK()) {
-        _shardVersion = chunkVersion.getValue();
-    } else if (chunkVersion != ErrorCodes::NoSuchKey) {
-        *errMsg = chunkVersion.getStatus().toString();
-        return false;
+    // Now parse out the chunk version and optime.
+    auto chunkVersion = ChunkVersion::parseFromBSONForCommands(request.body);
+    if (chunkVersion != ErrorCodes::NoSuchKey) {
+        _shardVersion = uassertStatusOK(chunkVersion);
     }
 
     // Parse the command's transaction info and do extra validation not done by the parser
-    try {
-        _txnInfo = WriteOpTxnInfo::parse(IDLParserErrorContext("WriteOpTxnInfo"), source);
+    _txnInfo = WriteOpTxnInfo::parse(IDLParserErrorContext("WriteOpTxnInfo"), request.body);
 
-        const auto& stmtIds = _txnInfo.getStmtIds();
-        uassert(ErrorCodes::BadValue,
-                str::stream() << "The size of the statement ids array (" << stmtIds->size()
-                              << ") does not match the number of operations ("
-                              << sizeWriteOps()
-                              << ")",
-                !stmtIds || stmtIds->size() == sizeWriteOps());
-    } catch (const DBException& ex) {
-        *errMsg = str::stream() << "Failed to parse the write op retriability information due to "
-                                << ex.toString();
-        return false;
-    }
-
-    return true;
+    const auto& stmtIds = _txnInfo.getStmtIds();
+    uassert(ErrorCodes::BadValue,
+            str::stream() << "The size of the statement ids array (" << stmtIds->size()
+                          << ") does not match the number of operations ("
+                          << sizeWriteOps()
+                          << ")",
+            !stmtIds || stmtIds->size() == sizeWriteOps());
 }
 
 std::string BatchedCommandRequest::toString() const {

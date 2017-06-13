@@ -103,53 +103,61 @@ BSONObj BatchedUpdateRequest::toBSON() const {
     return builder.obj();
 }
 
-bool BatchedUpdateRequest::parseBSON(StringData dbName, const BSONObj& source, string* errMsg) {
+void BatchedUpdateRequest::parseRequest(const OpMsgRequest& request) {
     clear();
 
-    std::string dummy;
-    if (!errMsg)
-        errMsg = &dummy;
+    for (auto&& elem : request.body) {
+        auto extractField = [&](const auto& fieldDesc, auto* valOut, auto* isSetOut) {
+            std::string errMsg;
+            FieldParser::FieldState fieldState =
+                FieldParser::extract(elem, fieldDesc, valOut, &errMsg);
+            if (fieldState == FieldParser::FIELD_INVALID) {
+                uasserted(ErrorCodes::FailedToParse, errMsg);
+            }
+            *isSetOut = fieldState == FieldParser::FIELD_SET;
+        };
 
-    FieldParser::FieldState fieldState;
-
-    BSONObjIterator it(source);
-    while (it.more()) {
-        const BSONElement& elem = it.next();
-        StringData fieldName = elem.fieldNameStringData();
-
+        const StringData fieldName = elem.fieldNameStringData();
         if (fieldName == collName.name()) {
             std::string collNameTemp;
-            fieldState = FieldParser::extract(elem, collName, &collNameTemp, errMsg);
-            if (fieldState == FieldParser::FIELD_INVALID)
-                return false;
-            _ns = NamespaceString(dbName, collNameTemp);
+            extractField(collName, &collNameTemp, &_isNSSet);
+            _ns = NamespaceString(request.getDatabase(), collNameTemp);
             uassert(ErrorCodes::InvalidNamespace,
                     str::stream() << "Invalid namespace: " << _ns.ns(),
                     _ns.isValid());
-            _isNSSet = fieldState == FieldParser::FIELD_SET;
         } else if (fieldName == updates.name()) {
-            fieldState = FieldParser::extract(elem, updates, &_updates, errMsg);
-            if (fieldState == FieldParser::FIELD_INVALID)
-                return false;
-            _isUpdatesSet = fieldState == FieldParser::FIELD_SET;
+            extractField(updates, &_updates, &_isUpdatesSet);
         } else if (fieldName == writeConcern.name()) {
-            fieldState = FieldParser::extract(elem, writeConcern, &_writeConcern, errMsg);
-            if (fieldState == FieldParser::FIELD_INVALID)
-                return false;
-            _isWriteConcernSet = fieldState == FieldParser::FIELD_SET;
+            extractField(writeConcern, &_writeConcern, &_isWriteConcernSet);
         } else if (fieldName == ordered.name()) {
-            fieldState = FieldParser::extract(elem, ordered, &_ordered, errMsg);
-            if (fieldState == FieldParser::FIELD_INVALID)
-                return false;
-            _isOrderedSet = fieldState == FieldParser::FIELD_SET;
+            extractField(ordered, &_ordered, &_isOrderedSet);
         } else if (fieldName == bypassDocumentValidationCommandOption()) {
             _shouldBypassValidation = elem.trueValue();
         } else if (!Command::isGenericArgument(fieldName)) {
-            *errMsg = str::stream() << "Unknown option to update command: " << fieldName;
-            return false;
+            uasserted(ErrorCodes::FailedToParse,
+                      str::stream() << "Unknown option to update command: " << fieldName);
         }
     }
-    return true;
+
+    for (auto&& seq : request.sequences) {
+        uassert(ErrorCodes::FailedToParse,
+                str::stream() << "Unknown document sequence option to " << request.getCommandName()
+                              << " command: "
+                              << seq.name,
+                seq.name == updates());
+        uassert(ErrorCodes::FailedToParse,
+                str::stream() << "Duplicate document sequence " << updates(),
+                !_isUpdatesSet);
+        _isUpdatesSet = true;
+
+        for (auto&& obj : seq.objs) {
+            _updates.push_back(new BatchedUpdateDocument());  // _updates takes ownership.
+            std::string errMsg;
+            uassert(ErrorCodes::FailedToParse,
+                    errMsg,
+                    _updates.back()->parseBSON(obj, &errMsg) && _updates.back()->isValid(&errMsg));
+        }
+    }
 }
 
 void BatchedUpdateRequest::clear() {

@@ -66,6 +66,7 @@ env.CppUnitTest(
     ],
     LIBDEPS=[
         'batch_write_types',
+        '$BUILD_DIR/mongo/db/ops/write_ops_parsers_test_helpers',
     ]
 )
 

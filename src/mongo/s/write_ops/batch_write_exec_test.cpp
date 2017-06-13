@@ -98,8 +98,8 @@ public:
             ASSERT_EQUALS(nss.db(), request.dbname);
 
             BatchedInsertRequest actualBatchedInsert;
-            std::string errmsg;
-            ASSERT_TRUE(actualBatchedInsert.parseBSON(request.dbname, request.cmdObj, &errmsg));
+            actualBatchedInsert.parseRequest(
+                OpMsgRequest::fromDBAndBody(request.dbname, request.cmdObj));
 
             ASSERT_EQUALS(nss.toString(), actualBatchedInsert.getNS().toString());
 
@@ -128,8 +128,8 @@ public:
             ASSERT_EQUALS(nss.db(), request.dbname);
 
             BatchedInsertRequest actualBatchedInsert;
-            std::string errmsg;
-            ASSERT_TRUE(actualBatchedInsert.parseBSON(request.dbname, request.cmdObj, &errmsg));
+            actualBatchedInsert.parseRequest(
+                OpMsgRequest::fromDBAndBody(request.dbname, request.cmdObj));
 
             ASSERT_EQUALS(nss.toString(), actualBatchedInsert.getNS().toString());
 
@@ -235,8 +235,8 @@ TEST_F(BatchWriteExecTest, SingleOpError) {
         ASSERT_EQUALS(nss.db(), request.dbname);
 
         BatchedInsertRequest actualBatchedInsert;
-        std::string errmsg;
-        ASSERT_TRUE(actualBatchedInsert.parseBSON(request.dbname, request.cmdObj, &errmsg));
+        actualBatchedInsert.parseRequest(
+            OpMsgRequest::fromDBAndBody(request.dbname, request.cmdObj));
 
         ASSERT_EQUALS(nss.toString(), actualBatchedInsert.getNS().toString());
 

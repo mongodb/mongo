@@ -157,8 +157,7 @@ protected:
 
         // Get the BatchedUpdateRequest from the upsert command.
         BatchedCommandRequest request(BatchedCommandRequest::BatchType::BatchType_Update);
-        std::string errMsg;
-        invariant(request.parseBSON("admin", upsertCmdObj, &errMsg) || !request.isValid(&errMsg));
+        request.parseRequest(OpMsgRequest::fromDBAndBody("admin", upsertCmdObj));
 
         expectUpdatesReturnSuccess(expectedHost,
                                    NamespaceString(NamespaceString::kServerConfigurationNamespace),
@@ -174,8 +173,7 @@ protected:
 
         // Get the BatchedUpdateRequest from the upsert command.
         BatchedCommandRequest request(BatchedCommandRequest::BatchType::BatchType_Update);
-        std::string errMsg;
-        invariant(request.parseBSON("admin", upsertCmdObj, &errMsg) || !request.isValid(&errMsg));
+        request.parseRequest(OpMsgRequest::fromDBAndBody("admin", upsertCmdObj));
 
         expectUpdatesReturnFailure(expectedHost,
                                    NamespaceString(NamespaceString::kServerConfigurationNamespace),
@@ -198,8 +196,8 @@ protected:
             ASSERT_EQUALS(expectedNss.db(), request.dbname);
 
             BatchedUpdateRequest actualBatchedUpdates;
-            std::string errmsg;
-            ASSERT_TRUE(actualBatchedUpdates.parseBSON(request.dbname, request.cmdObj, &errmsg));
+            actualBatchedUpdates.parseRequest(
+                OpMsgRequest::fromDBAndBody(request.dbname, request.cmdObj));
 
             // Check that the db and collection names in the BatchedUpdateRequest match the
             // expected.
@@ -244,8 +242,8 @@ protected:
             ASSERT_EQUALS(expectedNss.db(), request.dbname);
 
             BatchedUpdateRequest actualBatchedUpdates;
-            std::string errmsg;
-            ASSERT_TRUE(actualBatchedUpdates.parseBSON(request.dbname, request.cmdObj, &errmsg));
+            actualBatchedUpdates.parseRequest(
+                OpMsgRequest::fromDBAndBody(request.dbname, request.cmdObj));
 
             // Check that the db and collection names in the BatchedUpdateRequest match the
             // expected.

@@ -99,48 +99,59 @@ BSONObj BatchedDeleteRequest::toBSON() const {
     return builder.obj();
 }
 
-bool BatchedDeleteRequest::parseBSON(StringData dbName, const BSONObj& source, string* errMsg) {
+void BatchedDeleteRequest::parseRequest(const OpMsgRequest& request) {
     clear();
 
-    std::string dummy;
-    if (!errMsg)
-        errMsg = &dummy;
+    for (BSONElement field : request.body) {
+        auto extractField = [&](const auto& fieldDesc, auto* valOut, auto* isSetOut) {
+            std::string errMsg;
+            FieldParser::FieldState fieldState =
+                FieldParser::extract(field, fieldDesc, valOut, &errMsg);
+            if (fieldState == FieldParser::FIELD_INVALID) {
+                uasserted(ErrorCodes::FailedToParse, errMsg);
+            }
+            *isSetOut = fieldState == FieldParser::FIELD_SET;
+        };
 
-    FieldParser::FieldState fieldState;
-    for (BSONElement field : source) {
         const StringData fieldName = field.fieldNameStringData();
         if (fieldName == collName.name()) {
             std::string collNameTemp;
-            fieldState = FieldParser::extract(field, collName, &collNameTemp, errMsg);
-            if (fieldState == FieldParser::FIELD_INVALID)
-                return false;
-            _ns = NamespaceString(dbName, collNameTemp);
+            extractField(collName, &collNameTemp, &_isNSSet);
+            _ns = NamespaceString(request.getDatabase(), collNameTemp);
             uassert(ErrorCodes::InvalidNamespace,
                     str::stream() << "Invalid namespace: " << _ns.ns(),
                     _ns.isValid());
-            _isNSSet = fieldState == FieldParser::FIELD_SET;
         } else if (fieldName == deletes.name()) {
-            fieldState = FieldParser::extract(field, deletes, &_deletes, errMsg);
-            if (fieldState == FieldParser::FIELD_INVALID)
-                return false;
-            _isDeletesSet = fieldState == FieldParser::FIELD_SET;
+            extractField(deletes, &_deletes, &_isDeletesSet);
         } else if (fieldName == writeConcern.name()) {
-            fieldState = FieldParser::extract(field, writeConcern, &_writeConcern, errMsg);
-            if (fieldState == FieldParser::FIELD_INVALID)
-                return false;
-            _isWriteConcernSet = fieldState == FieldParser::FIELD_SET;
+            extractField(writeConcern, &_writeConcern, &_isWriteConcernSet);
         } else if (fieldName == ordered.name()) {
-            fieldState = FieldParser::extract(field, ordered, &_ordered, errMsg);
-            if (fieldState == FieldParser::FIELD_INVALID)
-                return false;
-            _isOrderedSet = fieldState == FieldParser::FIELD_SET;
+            extractField(ordered, &_ordered, &_isOrderedSet);
         } else if (!Command::isGenericArgument(fieldName)) {
-            *errMsg = str::stream() << "Unknown option to delete command: " << fieldName;
-            return false;
+            uasserted(ErrorCodes::FailedToParse,
+                      str::stream() << "Unknown option to delete command: " << fieldName);
         }
     }
 
-    return true;
+    for (auto&& seq : request.sequences) {
+        uassert(ErrorCodes::FailedToParse,
+                str::stream() << "Unknown document sequence option to " << request.getCommandName()
+                              << " command: "
+                              << seq.name,
+                seq.name == deletes());
+        uassert(ErrorCodes::FailedToParse,
+                str::stream() << "Duplicate document sequence " << deletes(),
+                !_isDeletesSet);
+        _isDeletesSet = true;
+
+        for (auto&& obj : seq.objs) {
+            _deletes.push_back(new BatchedDeleteDocument());  // _deletes takes ownership.
+            std::string errMsg;
+            uassert(ErrorCodes::FailedToParse,
+                    errMsg,
+                    _deletes.back()->parseBSON(obj, &errMsg) && _deletes.back()->isValid(&errMsg));
+        }
+    }
 }
 
 void BatchedDeleteRequest::clear() {

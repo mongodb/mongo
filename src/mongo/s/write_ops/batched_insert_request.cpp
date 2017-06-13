@@ -100,59 +100,57 @@ static void extractIndexNSS(const BSONObj& indexDesc, NamespaceString* indexNSS)
     *indexNSS = NamespaceString(indexDesc["ns"].str());
 }
 
-bool BatchedInsertRequest::parseBSON(StringData dbName, const BSONObj& source, string* errMsg) {
+void BatchedInsertRequest::parseRequest(const OpMsgRequest& request) {
     clear();
 
-    std::string dummy;
-    if (!errMsg)
-        errMsg = &dummy;
-
-    BSONObjIterator sourceIt(source);
-
-    while (sourceIt.more()) {
-        BSONElement sourceEl = sourceIt.next();
+    for (auto&& sourceEl : request.body) {
         const auto fieldName = sourceEl.fieldNameStringData();
+
+        auto extractField = [&](const auto& field, auto* valOut, auto* isSetOut) {
+            std::string errMsg;
+            FieldParser::FieldState fieldState =
+                FieldParser::extract(sourceEl, field, valOut, &errMsg);
+            if (fieldState == FieldParser::FIELD_INVALID) {
+                uasserted(ErrorCodes::FailedToParse, errMsg);
+            }
+            *isSetOut = fieldState == FieldParser::FIELD_SET;
+        };
 
         if (fieldName == collName()) {
             std::string temp;
-            FieldParser::FieldState fieldState =
-                FieldParser::extract(sourceEl, collName, &temp, errMsg);
-            if (fieldState == FieldParser::FIELD_INVALID)
-                return false;
-            _ns = NamespaceString(dbName, temp);
+            extractField(collName, &temp, &_isNSSet);
+            _ns = NamespaceString(request.getDatabase(), temp);
             uassert(ErrorCodes::InvalidNamespace,
                     str::stream() << "Invalid namespace: " << _ns.ns(),
                     _ns.isValid());
-            _isNSSet = fieldState == FieldParser::FIELD_SET;
         } else if (fieldName == documents()) {
-            FieldParser::FieldState fieldState =
-                FieldParser::extract(sourceEl, documents, &_documents, errMsg);
-            if (fieldState == FieldParser::FIELD_INVALID)
-                return false;
-            _isDocumentsSet = fieldState == FieldParser::FIELD_SET;
+            extractField(documents, &_documents, &_isDocumentsSet);
             if (_documents.size() >= 1)
                 extractIndexNSS(_documents.at(0), &_targetNSS);
         } else if (fieldName == writeConcern()) {
-            FieldParser::FieldState fieldState =
-                FieldParser::extract(sourceEl, writeConcern, &_writeConcern, errMsg);
-            if (fieldState == FieldParser::FIELD_INVALID)
-                return false;
-            _isWriteConcernSet = fieldState == FieldParser::FIELD_SET;
+            extractField(writeConcern, &_writeConcern, &_isWriteConcernSet);
         } else if (fieldName == ordered()) {
-            FieldParser::FieldState fieldState =
-                FieldParser::extract(sourceEl, ordered, &_ordered, errMsg);
-            if (fieldState == FieldParser::FIELD_INVALID)
-                return false;
-            _isOrderedSet = fieldState == FieldParser::FIELD_SET;
+            extractField(ordered, &_ordered, &_isOrderedSet);
         } else if (fieldName == bypassDocumentValidationCommandOption()) {
             _shouldBypassValidation = sourceEl.trueValue();
         } else if (!Command::isGenericArgument(fieldName)) {
-            *errMsg = str::stream() << "Unknown option to insert command: " << sourceEl.fieldName();
-            return false;
+            uasserted(ErrorCodes::FailedToParse,
+                      str::stream() << "Unknown option to insert command: " << fieldName);
         }
     }
 
-    return true;
+    for (auto&& seq : request.sequences) {
+        uassert(ErrorCodes::FailedToParse,
+                str::stream() << "Unknown document sequence option to " << request.getCommandName()
+                              << " command: "
+                              << seq.name,
+                seq.name == documents());
+        uassert(ErrorCodes::FailedToParse,
+                str::stream() << "Duplicate document sequence " << documents(),
+                !_isDocumentsSet);
+        _isDocumentsSet = true;
+        _documents = seq.objs;
+    }
 }
 
 void BatchedInsertRequest::clear() {

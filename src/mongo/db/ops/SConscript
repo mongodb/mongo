@@ -174,12 +174,33 @@ env.Library(
     ],
 )
 
+env.Library(
+    target='write_ops_parsers_test_helpers',
+    source=[
+        'write_ops_parsers_test_helpers.cpp',
+    ],
+    LIBDEPS=[
+        '$BUILD_DIR/mongo/base',
+        '$BUILD_DIR/mongo/db/dbmessage',
+    ],
+)
+
 env.CppUnitTest(
     target='write_ops_parsers_test',
     source='write_ops_parsers_test.cpp',
     LIBDEPS=[
         'write_ops_parsers',
+        'write_ops_parsers_test_helpers',
         '$BUILD_DIR/mongo/client/clientdriver',
+    ],
+)
+
+env.CppIntegrationTest(
+    target='write_ops_document_stream_integration_test',
+    source='write_ops_document_stream_integration_test.cpp',
+    LIBDEPS=[
+        '$BUILD_DIR/mongo/client/clientdriver',
+        '$BUILD_DIR/mongo/util/version_impl',
     ],
 )
 

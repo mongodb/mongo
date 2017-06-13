@@ -29,6 +29,7 @@
 #include "mongo/platform/basic.h"
 
 #include "mongo/bson/json.h"
+#include "mongo/db/ops/write_ops_parsers_test_helpers.h"
 #include "mongo/s/write_ops/batched_command_request.h"
 #include "mongo/stdx/memory.h"
 #include "mongo/unittest/unittest.h"
@@ -48,12 +49,13 @@ TEST(BatchedCommandRequest, BasicInsert) {
                                         << "ordered"
                                         << true);
 
-    std::string errMsg;
-    BatchedCommandRequest insertRequest(BatchedCommandRequest::BatchType_Insert);
-    ASSERT_TRUE(insertRequest.parseBSON("TestDB", origInsertRequestObj, &errMsg));
+    for (auto docSeq : {false, true}) {
+        BatchedCommandRequest insertRequest(BatchedCommandRequest::BatchType_Insert);
+        insertRequest.parseRequest(toOpMsg("TestDB", origInsertRequestObj, docSeq));
 
-    ASSERT_EQ("TestDB.test", insertRequest.getInsertRequest()->getNS().toString());
-    ASSERT(!insertRequest.hasShardVersion());
+        ASSERT_EQ("TestDB.test", insertRequest.getInsertRequest()->getNS().toString());
+        ASSERT(!insertRequest.hasShardVersion());
+    }
 }
 
 TEST(BatchedCommandRequest, InsertWithShardVersion) {
@@ -72,13 +74,14 @@ TEST(BatchedCommandRequest, InsertWithShardVersion) {
                                         << "shardVersion"
                                         << BSON_ARRAY(Timestamp(1, 2) << epoch));
 
-    std::string errMsg;
-    BatchedCommandRequest insertRequest(BatchedCommandRequest::BatchType_Insert);
-    ASSERT_TRUE(insertRequest.parseBSON("TestDB", origInsertRequestObj, &errMsg));
+    for (auto docSeq : {false, true}) {
+        BatchedCommandRequest insertRequest(BatchedCommandRequest::BatchType_Insert);
+        insertRequest.parseRequest(toOpMsg("TestDB", origInsertRequestObj, docSeq));
 
-    ASSERT_EQ("TestDB.test", insertRequest.getInsertRequest()->getNS().toString());
-    ASSERT(insertRequest.hasShardVersion());
-    ASSERT_EQ(ChunkVersion(1, 2, epoch).toString(), insertRequest.getShardVersion().toString());
+        ASSERT_EQ("TestDB.test", insertRequest.getInsertRequest()->getNS().toString());
+        ASSERT(insertRequest.hasShardVersion());
+        ASSERT_EQ(ChunkVersion(1, 2, epoch).toString(), insertRequest.getShardVersion().toString());
+    }
 }
 
 TEST(BatchedCommandRequest, InsertCloneWithId) {

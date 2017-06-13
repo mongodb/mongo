@@ -97,15 +97,19 @@ public:
                            const BSONObj& cmdObj,
                            ExplainOptions::Verbosity verbosity,
                            BSONObjBuilder* out) const {
-        BatchedCommandRequest request(_writeType);
+        BatchedCommandRequest batchedRequest(_writeType);
+        OpMsgRequest request;
+        request.body = cmdObj;
+        invariant(request.getDatabase() == dbname);  // Ensured by explain command's run() method.
+        batchedRequest.parseRequest(request);
 
-        string errMsg;
-        if (!request.parseBSON(dbname, cmdObj, &errMsg) || !request.isValid(&errMsg)) {
+        std::string errMsg;
+        if (!batchedRequest.isValid(&errMsg)) {
             return Status(ErrorCodes::FailedToParse, errMsg);
         }
 
         // We can only explain write batches of size 1.
-        if (request.sizeWriteOps() != 1U) {
+        if (batchedRequest.sizeWriteOps() != 1U) {
             return Status(ErrorCodes::InvalidLength, "explained write batches must be of size 1");
         }
 
@@ -115,7 +119,7 @@ public:
         Timer timer;
 
         // Target the command to the shards based on the singleton batch item.
-        BatchItemRef targetingBatchItem(&request, 0);
+        BatchItemRef targetingBatchItem(&batchedRequest, 0);
         vector<Strategy::CommandResult> shardResults;
         Status status =
             _commandOpWrite(opCtx, dbname, explainCmd, targetingBatchItem, &shardResults);
@@ -127,12 +131,11 @@ public:
             opCtx, shardResults, ClusterExplain::kWriteOnShards, timer.millis(), out);
     }
 
-    virtual bool run(OperationContext* opCtx,
-                     const string& dbname,
-                     const BSONObj& cmdObj,
+    bool enhancedRun(OperationContext* opCtx,
+                     const OpMsgRequest& request,
                      string& errmsg,
-                     BSONObjBuilder& result) {
-        BatchedCommandRequest request(_writeType);
+                     BSONObjBuilder& result) final {
+        BatchedCommandRequest batchedRequest(_writeType);
         BatchedCommandResponse response;
 
         ClusterWriter writer(true, 0);
@@ -142,14 +145,14 @@ public:
         {
             // Disable the last error object for the duration of the write
             LastError::Disabled disableLastError(cmdLastError);
-
-            if (!request.parseBSON(dbname, cmdObj, &errmsg) || !request.isValid(&errmsg)) {
+            batchedRequest.parseRequest(request);
+            if (!batchedRequest.isValid(&errmsg)) {
                 // Batch parse failure
                 response.setOk(false);
                 response.setErrCode(ErrorCodes::FailedToParse);
                 response.setErrMessage(errmsg);
             } else {
-                writer.write(opCtx, request, &response);
+                writer.write(opCtx, batchedRequest, &response);
             }
 
             dassert(response.isValid(NULL));
@@ -157,17 +160,17 @@ public:
 
         // Populate the lastError object based on the write response
         cmdLastError->reset();
-        batchErrorToLastError(request, response, cmdLastError);
+        batchErrorToLastError(batchedRequest, response, cmdLastError);
 
         size_t numAttempts;
 
         if (!response.getOk()) {
             numAttempts = 0;
-        } else if (request.getOrdered() && response.isErrDetailsSet()) {
+        } else if (batchedRequest.getOrdered() && response.isErrDetailsSet()) {
             // Add one failed attempt
             numAttempts = response.getErrDetailsAt(0)->getIndex() + 1;
         } else {
-            numAttempts = request.sizeWriteOps();
+            numAttempts = batchedRequest.sizeWriteOps();
         }
 
         // TODO: increase opcounters by more than one

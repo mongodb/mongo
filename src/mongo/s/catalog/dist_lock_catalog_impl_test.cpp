@@ -1121,9 +1121,8 @@ TEST_F(DistLockCatalogFixture, BasicUnlockAll) {
         ASSERT_EQUALS(dummyHost, request.target);
         ASSERT_EQUALS("config", request.dbname);
 
-        std::string errmsg;
         BatchedUpdateRequest batchRequest;
-        ASSERT(batchRequest.parseBSON("config", request.cmdObj, &errmsg));
+        batchRequest.parseRequest(OpMsgRequest::fromDBAndBody(request.dbname, request.cmdObj));
         ASSERT_EQUALS(LocksType::ConfigNS, batchRequest.getNS().toString());
         ASSERT_BSONOBJ_EQ(BSON("w" << 1 << "wtimeout" << 0), batchRequest.getWriteConcern());
         auto updates = batchRequest.getUpdates();

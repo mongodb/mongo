@@ -34,6 +34,7 @@
 #include "mongo/base/string_data.h"
 #include "mongo/db/jsobj.h"
 #include "mongo/db/namespace_string.h"
+#include "mongo/util/net/op_msg.h"
 
 namespace mongo {
 
@@ -69,7 +70,7 @@ public:
 
     bool isValid(std::string* errMsg) const;
     BSONObj toBSON() const;
-    bool parseBSON(StringData dbName, const BSONObj& source, std::string* errMsg);
+    void parseRequest(const OpMsgRequest& request);
     void clear();
     std::string toString() const;
 

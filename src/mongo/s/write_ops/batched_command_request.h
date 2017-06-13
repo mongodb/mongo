@@ -36,6 +36,7 @@
 #include "mongo/s/write_ops/batched_insert_request.h"
 #include "mongo/s/write_ops/batched_update_request.h"
 #include "mongo/s/write_ops/write_ops_gen.h"
+#include "mongo/util/net/op_msg.h"
 
 namespace mongo {
 
@@ -79,7 +80,7 @@ public:
 
     bool isValid(std::string* errMsg) const;
     BSONObj toBSON() const;
-    bool parseBSON(StringData dbName, const BSONObj& source, std::string* errMsg);
+    void parseRequest(const OpMsgRequest& request);
     std::string toString() const;
 
     //
