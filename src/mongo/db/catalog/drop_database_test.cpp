@@ -204,13 +204,13 @@ void _testDropDatabase(OperationContext* opCtx,
     }
 }
 
-TEST_F(DropDatabaseTest, DropDatabaseDoesNotNotifyOpObserverOfDroppedUserCollection) {
-    _testDropDatabase(_opCtx.get(), _opObserver, _nss, false);
+TEST_F(DropDatabaseTest, DropDatabaseNotifiesOpObserverOfDroppedUserCollection) {
+    _testDropDatabase(_opCtx.get(), _opObserver, _nss, true);
 }
 
-TEST_F(DropDatabaseTest, DropDatabaseDoesNotNotifyOpObserverOfDroppedReplicatedSystemCollection) {
+TEST_F(DropDatabaseTest, DropDatabaseNotifiesOpObserverOfDroppedReplicatedSystemCollection) {
     NamespaceString replicatedSystemNss(_nss.getSisterNS("system.js"));
-    _testDropDatabase(_opCtx.get(), _opObserver, replicatedSystemNss, false);
+    _testDropDatabase(_opCtx.get(), _opObserver, replicatedSystemNss, true);
 }
 
 TEST_F(DropDatabaseTest, DropDatabaseSkipsDropPendingCollectionWhenDroppingCollections) {
