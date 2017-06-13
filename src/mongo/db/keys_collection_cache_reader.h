@@ -53,6 +53,8 @@ public:
     StatusWith<KeysCollectionDocument> refresh(OperationContext* opCtx) override;
 
     StatusWith<KeysCollectionDocument> getKey(const LogicalTime& forThisTime) override;
+    StatusWith<KeysCollectionDocument> getKeyById(long long keyId,
+                                                  const LogicalTime& forThisTime) override;
 
 private:
     const std::string _purpose;

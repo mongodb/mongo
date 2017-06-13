@@ -50,6 +50,13 @@ public:
      * the forThisTime argument.
      */
     virtual StatusWith<KeysCollectionDocument> getKey(const LogicalTime& forThisTime) = 0;
+
+    /**
+     * Returns the key in the cache that matches the keyId and expiresAt value to be no less than
+     * the forThisTime argument.
+     */
+    virtual StatusWith<KeysCollectionDocument> getKeyById(long long keyId,
+                                                          const LogicalTime& forThisTime) = 0;
 };
 
 }  // namespace mongo

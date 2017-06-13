@@ -71,6 +71,23 @@ StatusWith<KeysCollectionDocument> KeysCollectionCacheReader::refresh(OperationC
     return _cache.crbegin()->second;
 }
 
+StatusWith<KeysCollectionDocument> KeysCollectionCacheReader::getKeyById(
+    long long keyId, const LogicalTime& forThisTime) {
+    stdx::lock_guard<stdx::mutex> lk(_cacheMutex);
+
+    for (auto iter = _cache.lower_bound(forThisTime); iter != _cache.cend(); ++iter) {
+        if (iter->second.getKeyId() == keyId) {
+            return iter->second;
+        }
+    }
+
+    return {ErrorCodes::KeyNotFound,
+            str::stream() << "No keys found for " << _purpose << " that is valid for time: "
+                          << forThisTime.toString()
+                          << " with id: "
+                          << keyId};
+}
+
 StatusWith<KeysCollectionDocument> KeysCollectionCacheReader::getKey(
     const LogicalTime& forThisTime) {
     stdx::lock_guard<stdx::mutex> lk(_cacheMutex);

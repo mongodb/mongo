@@ -102,24 +102,13 @@ StatusWith<KeysCollectionDocument> KeysCollectionManager::getKeyForSigning(
 
 StatusWith<KeysCollectionDocument> KeysCollectionManager::_getKeyWithKeyIdCheck(
     long long keyId, const LogicalTime& forThisTime) {
-    auto keyStatus = _getKey(forThisTime);
+    auto keyStatus = _keysCache.getKeyById(keyId, forThisTime);
 
     if (!keyStatus.isOK()) {
         return keyStatus;
     }
 
-    auto key = keyStatus.getValue();
-
-    if (keyId == key.getKeyId()) {
-        return key;
-    }
-
-    // Key not expired but keyId does not match!
-    return {ErrorCodes::KeyNotFound,
-            str::stream() << "No keys found for " << _purpose << " that is valid for time: "
-                          << forThisTime.toString()
-                          << " with id: "
-                          << keyId};
+    return keyStatus.getValue();
 }
 
 StatusWith<KeysCollectionDocument> KeysCollectionManager::_getKey(const LogicalTime& forThisTime) {

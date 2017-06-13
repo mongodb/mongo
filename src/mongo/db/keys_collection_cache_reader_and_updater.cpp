@@ -144,4 +144,8 @@ StatusWith<KeysCollectionDocument> KeysCollectionCacheReaderAndUpdater::getKey(
     return KeysCollectionCacheReader::getKey(forThisTime);
 }
 
+StatusWith<KeysCollectionDocument> KeysCollectionCacheReaderAndUpdater::getKeyById(
+    long long keyId, const LogicalTime& forThisTime) {
+    return KeysCollectionCacheReader::getKeyById(keyId, forThisTime);
+}
 }  // namespace mongo

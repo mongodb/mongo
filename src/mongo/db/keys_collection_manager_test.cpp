@@ -95,7 +95,7 @@ TEST_F(KeysManagerTest, GetKeyForValidationErrorsIfKeyDoesntExist) {
     ASSERT_EQ(ErrorCodes::KeyNotFound, keyStatus.getStatus());
 }
 
-TEST_F(KeysManagerTest, GetKeyShouldReturnRightKey) {
+TEST_F(KeysManagerTest, GetKeyWithSingleKey) {
     keyManager()->startMonitoring(getServiceContext());
 
     KeysCollectionDocument origKey1(
@@ -111,6 +111,38 @@ TEST_F(KeysManagerTest, GetKeyShouldReturnRightKey) {
     ASSERT_EQ(1, key.getKeyId());
     ASSERT_EQ(origKey1.getKey(), key.getKey());
     ASSERT_EQ(Timestamp(105, 0), key.getExpiresAt().asTimestamp());
+}
+
+TEST_F(KeysManagerTest, GetKeyWithMultipleKeys) {
+    keyManager()->startMonitoring(getServiceContext());
+
+    KeysCollectionDocument origKey1(
+        1, "dummy", TimeProofService::generateRandomKey(), LogicalTime(Timestamp(105, 0)));
+    ASSERT_OK(insertToConfigCollection(
+        operationContext(), NamespaceString(KeysCollectionDocument::ConfigNS), origKey1.toBSON()));
+
+    KeysCollectionDocument origKey2(
+        2, "dummy", TimeProofService::generateRandomKey(), LogicalTime(Timestamp(205, 0)));
+    ASSERT_OK(insertToConfigCollection(
+        operationContext(), NamespaceString(KeysCollectionDocument::ConfigNS), origKey2.toBSON()));
+
+    auto keyStatus =
+        keyManager()->getKeyForValidation(operationContext(), 1, LogicalTime(Timestamp(100, 0)));
+    ASSERT_OK(keyStatus.getStatus());
+
+    auto key = keyStatus.getValue();
+    ASSERT_EQ(1, key.getKeyId());
+    ASSERT_EQ(origKey1.getKey(), key.getKey());
+    ASSERT_EQ(Timestamp(105, 0), key.getExpiresAt().asTimestamp());
+
+    keyStatus =
+        keyManager()->getKeyForValidation(operationContext(), 2, LogicalTime(Timestamp(100, 0)));
+    ASSERT_OK(keyStatus.getStatus());
+
+    key = keyStatus.getValue();
+    ASSERT_EQ(2, key.getKeyId());
+    ASSERT_EQ(origKey2.getKey(), key.getKey());
+    ASSERT_EQ(Timestamp(205, 0), key.getExpiresAt().asTimestamp());
 }
 
 TEST_F(KeysManagerTest, GetKeyShouldErrorIfKeyIdMismatchKey) {
