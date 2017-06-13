@@ -142,6 +142,10 @@ public:
                 desiredCollections.count(collNss.coll().toString()) == 0)
                 continue;
 
+            // Don't include 'drop pending' collections.
+            if (collNss.isDropPendingNamespace())
+                continue;
+
             // Compute the hash for this collection.
             std::string hash = _hashCollection(opCtx, db, collNss.toString());
 

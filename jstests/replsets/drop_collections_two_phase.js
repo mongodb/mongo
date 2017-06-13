@@ -6,17 +6,34 @@
  * 'Prepare' phase. The 'Commit' phase (physically dropping the collection) of a drop operation with
  * optime T should only be executed when C >= T, where C is the majority commit point of the replica
  * set.
+ *
+ * Verifies that collections get properly get moved into the "system.drop" namespace while pending
+ * drop, and then physically dropped once the commit point advances. Also checks that the dbHash
+ * does not include drop pending collections.
  */
 
 (function() {
     "use strict";
 
-    // List all collections in a given database. Use 'args' as the command arguments.
+    // Return a list of all collections in a given database. Use 'args' as the
+    // 'listCollections' command arguments.
     function listCollections(database, args) {
         var args = args || {};
         var failMsg = "'listCollections' command failed";
         var res = assert.commandWorked(database.runCommand("listCollections", args), failMsg);
         return res.cursor.firstBatch;
+    }
+
+    // Return a list of all collection names in a given database.
+    function listCollectionNames(database, args) {
+        return listCollections(database, args).map(c => c.name);
+    }
+
+    // Compute db hash for all collections on given database.
+    function getDbHash(database) {
+        var res =
+            assert.commandWorked(database.runCommand({dbhash: 1}), "'dbHash' command failed.");
+        return res.md5;
     }
 
     // Set a fail point on a specified node.
@@ -27,6 +44,7 @@
     var testName = "drop_collections_two_phase";
     var replTest = new ReplSetTest({name: testName, nodes: 2});
 
+    // Initiate the replica set.
     replTest.startSet();
     replTest.initiate();
     replTest.awaitReplication();
@@ -48,10 +66,13 @@
     setFailPoint(secondary, "rsSyncApplyStop", "alwaysOn");
 
     // Make sure the collection was created.
-    collections = listCollections(primaryDB);
-    collection = collections.find(c => c.name === collToDrop);
-    assert(collection, "Collection '" + collToDrop + "' wasn't created properly");
-    assert.eq(collToDrop, collection.name);
+    var collNames = listCollectionNames(primaryDB);
+    assert.contains(
+        collToDrop, collNames, "Collection '" + collToDrop + "' wasn't created properly");
+
+    /**
+     * DROP COLLECTION PREPARE PHASE
+     */
 
     // Drop the collection on the primary.
     jsTestLog("Dropping collection '" + collToDrop + "' on primary node.");
@@ -77,6 +98,13 @@
     collections = listCollections(primaryDB);
     assert.eq(undefined, collections.find(c => c.name === collToDrop));
 
+    // Save the dbHash while drop is in 'pending' state.
+    var dropPendingDbHash = getDbHash(primaryDB);
+
+    /**
+     * DROP COLLECTION COMMIT PHASE
+     */
+
     // Let the secondary apply the collection drop operation, so that the replica set commit point
     // will advance, and the 'Commit' phase of the collection drop will complete on the primary.
     jsTestLog("Restarting oplog application on the secondary node.");
@@ -95,6 +123,14 @@
         assert.eq(undefined, collections.find(c => pendingDropRegex.test(c.name)));
         return true;
     });
+
+    // Save the dbHash after the drop has been committed.
+    var dropCommittedDbHash = getDbHash(primaryDB);
+
+    // The dbHash calculation should ignore drop pending collections. Therefore, therefore, the hash
+    // during prepare phase and commit phase should match.
+    var failMsg = "dbHash during drop pending phase did not match dbHash after drop was committed.";
+    assert.eq(dropPendingDbHash, dropCommittedDbHash, failMsg);
 
     replTest.stopSet();
 
