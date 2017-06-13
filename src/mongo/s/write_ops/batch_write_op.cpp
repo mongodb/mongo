@@ -406,6 +406,12 @@ void BatchWriteOp::buildBatchRequest(const TargetedWriteBatch& targetedBatch,
     request->setShouldBypassValidation(_clientRequest.shouldBypassValidation());
 
     const auto batchType = _clientRequest.getBatchType();
+    const auto batchTxnNum = _clientRequest.getTxnNum();
+
+    boost::optional<std::vector<int32_t>> stmtIdsForOp;
+    if (batchTxnNum) {
+        stmtIdsForOp.emplace();
+    }
 
     for (auto& targetedWrite : targetedBatch.getWrites()) {
         const WriteOpRef& writeOpRef = targetedWrite->writeOpRef;
@@ -430,6 +436,10 @@ void BatchWriteOp::buildBatchRequest(const TargetedWriteBatch& targetedBatch,
             MONGO_UNREACHABLE;
         }
 
+        if (stmtIdsForOp) {
+            stmtIdsForOp->push_back(_clientRequest.getStmtIdForWriteAt(writeOpRef.first));
+        }
+
         // TODO: We can add logic here to allow aborting individual ops
         // if ( NULL == response ) {
         //    ->responses.erase( it++ );
@@ -452,6 +462,11 @@ void BatchWriteOp::buildBatchRequest(const TargetedWriteBatch& targetedBatch,
     }
 
     request->setShardVersion(targetedBatch.getEndpoint().shardVersion);
+
+    if (batchTxnNum) {
+        request->setTxnNum(batchTxnNum);
+        request->setStmtIds(std::move(stmtIdsForOp));
+    }
 }
 
 void BatchWriteOp::noteBatchResponse(const TargetedWriteBatch& targetedBatch,
