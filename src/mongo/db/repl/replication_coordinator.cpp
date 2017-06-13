@@ -73,6 +73,10 @@ bool ReplicationCoordinator::isOplogDisabledFor(OperationContext* opCtx,
         return true;
     }
 
+    if (!opCtx->writesAreReplicated()) {
+        return true;
+    }
+
     if (nss.db() == "local") {
         return true;
     }
@@ -81,7 +85,7 @@ bool ReplicationCoordinator::isOplogDisabledFor(OperationContext* opCtx,
         return true;
     }
 
-    if (!opCtx->writesAreReplicated()) {
+    if (nss.isDropPendingNamespace()) {
         return true;
     }
 

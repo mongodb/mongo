@@ -768,6 +768,7 @@ env.Library(
     LIBDEPS=[
         'optime',
         'replication_process',
+        '$BUILD_DIR/mongo/db/namespace_string',
         '$BUILD_DIR/mongo/db/service_context',
         '$BUILD_DIR/mongo/util/net/hostandport',
         '$BUILD_DIR/mongo/util/decorable',
