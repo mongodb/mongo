@@ -79,7 +79,6 @@ shared_ptr<ReplicaSetMonitor> ReplicaSetMonitorManager::getMonitor(StringData se
 
 void ReplicaSetMonitorManager::_setupTaskExecutorInLock(const std::string& name) {
     auto hookList = stdx::make_unique<rpc::EgressMetadataHookList>();
-    // TODO SERVER-27750: add LogicalTimeMetadataHook
 
     // do not restart taskExecutor if is in shutdown
     if (!_taskExecutor && !_isShutdown) {
