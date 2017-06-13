@@ -33,6 +33,7 @@
 
 #include "mongo/base/status_with.h"
 #include "mongo/db/operation_context.h"
+#include "mongo/db/ops/single_write_result_gen.h"
 #include "mongo/db/ops/write_ops.h"
 #include "mongo/s/stale_exception.h"
 
@@ -42,18 +43,12 @@ namespace mongo {
  * The result of performing a single write, possibly within a batch.
  */
 struct WriteResult {
-    struct SingleResult {
-        int64_t n;
-        int64_t nModified;
-        BSONObj upsertedId;  // Non-empty if something was upserted.
-    };
-
     /**
      * Maps 1-to-1 to single ops in request. May be shorter than input if there are errors.
      *
      * staleConfigException should be considered appended to this if it is non-null.
      */
-    std::vector<StatusWith<SingleResult>> results;
+    std::vector<StatusWith<SingleWriteResult>> results;
 
     /**
      * If non-null, the SendStaleConfigException that was encountered while processing the op after

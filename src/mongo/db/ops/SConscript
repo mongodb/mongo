@@ -194,6 +194,7 @@ env.Library(
         "update_lifecycle_impl.cpp",
         "update_result.cpp",
         "write_ops_exec.cpp",
+        env.Idlc('single_write_result.idl')[0],
     ],
     LIBDEPS=[
         '$BUILD_DIR/mongo/base',

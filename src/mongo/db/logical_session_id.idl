@@ -42,6 +42,12 @@ types:
     cpp_type: "std::int64_t"
     deserializer: "mongo::BSONElement::_numberLong"
 
+  StmtId:
+    description: "A number representing an operation within a transaction."
+    bson_serialization_type: long
+    cpp_type: "std::int32_t"
+    deserializer: "mongo::BSONElement::_numberLong"
+
 structs:
 
   logical_session_id:
