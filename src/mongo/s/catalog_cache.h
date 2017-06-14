@@ -46,7 +46,7 @@ class CachedDatabaseInfo;
 class CachedCollectionRoutingInfo;
 class OperationContext;
 
-static constexpr int kMaxNumStaleVersionRetries = 3;
+static constexpr int kMaxNumStaleVersionRetries = 10;
 
 /**
  * This is the root of the "read-only" hierarchy of cached catalog metadata. It is read only
