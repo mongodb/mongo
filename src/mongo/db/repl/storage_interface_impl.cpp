@@ -191,14 +191,13 @@ StorageInterfaceImpl::createCollectionForBulkLoading(
         getGlobalServiceContext()->makeClient(str::stream() << nss.ns() << " loader"));
     auto opCtx = cc().makeOperationContext();
 
-    // We are not replicating nor validating writes under this OperationContext*.
-    // The OperationContext* is used for all writes to the (newly) cloned collection.
-    UnreplicatedWritesBlock uwb(opCtx.get());
     documentValidationDisabled(opCtx.get()) = true;
 
     std::unique_ptr<AutoGetCollection> autoColl;
     // Retry if WCE.
     MONGO_WRITE_CONFLICT_RETRY_LOOP_BEGIN {
+        UnreplicatedWritesBlock uwb(opCtx.get());
+
         // Get locks and create the collection.
         AutoGetOrCreateDb db(opCtx.get(), nss.db(), MODE_X);
         AutoGetCollection coll(opCtx.get(), nss, MODE_IX);
