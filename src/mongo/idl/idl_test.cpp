@@ -482,7 +482,7 @@ TEST(IDLFieldTests, TestOptionalFields) {
         assert_same_types<decltype(testStruct.getField1()),
                           const boost::optional<mongo::StringData>>();
         assert_same_types<decltype(testStruct.getField3()),
-                          const boost::optional<mongo::BSONObj>>();
+                          const boost::optional<mongo::BSONObj>&>();
         assert_same_types<decltype(testStruct.getField4()),
                           const boost::optional<ConstDataRange>>();
         assert_same_types<decltype(testStruct.getField5()),
@@ -542,7 +542,7 @@ TEST(IDLNestedStruct, TestDuplicateTypes) {
 
     assert_same_types<decltype(testStruct.getField1()), const RequiredStrictField3&>();
     assert_same_types<decltype(testStruct.getField2()),
-                      const boost::optional<RequiredNonStrictField3>>();
+                      const boost::optional<RequiredNonStrictField3>&>();
     assert_same_types<decltype(testStruct.getField3()), const RequiredStrictField3&>();
 
     ASSERT_EQUALS(1, testStruct.getField1().getField1());
@@ -677,13 +677,13 @@ TEST(IDLArrayTests, TestSimpleOptionalArrays) {
     assert_same_types<decltype(testStruct.getField1()),
                       const boost::optional<std::vector<mongo::StringData>>>();
     assert_same_types<decltype(testStruct.getField2()),
-                      const boost::optional<std::vector<std::int32_t>>>();
+                      const boost::optional<std::vector<std::int32_t>>&>();
     assert_same_types<decltype(testStruct.getField3()),
-                      const boost::optional<std::vector<double>>>();
+                      const boost::optional<std::vector<double>>&>();
     assert_same_types<decltype(testStruct.getField4()),
                       const boost::optional<std::vector<ConstDataRange>>>();
     assert_same_types<decltype(testStruct.getField5()),
-                      const boost::optional<std::vector<std::array<std::uint8_t, 16>>>>();
+                      const boost::optional<std::vector<std::array<std::uint8_t, 16>>>&>();
 
     std::vector<StringData> field1{"Foo", "Bar", "???"};
     ASSERT_TRUE(field1 == testStruct.getField1().get());
@@ -842,17 +842,17 @@ TEST(IDLArrayTests, TestArraysOfComplexTypes) {
     assert_same_types<decltype(testStruct.getField6()), const std::vector<mongo::One_string>&>();
 
     assert_same_types<decltype(testStruct.getField1o()),
-                      const boost::optional<std::vector<std::int64_t>>>();
+                      const boost::optional<std::vector<std::int64_t>>&>();
     assert_same_types<decltype(testStruct.getField2o()),
-                      const boost::optional<std::vector<mongo::NamespaceString>>>();
+                      const boost::optional<std::vector<mongo::NamespaceString>>&>();
     assert_same_types<decltype(testStruct.getField3o()),
-                      const boost::optional<std::vector<mongo::AnyBasicType>>>();
+                      const boost::optional<std::vector<mongo::AnyBasicType>>&>();
     assert_same_types<decltype(testStruct.getField4o()),
-                      const boost::optional<std::vector<mongo::ObjectBasicType>>>();
+                      const boost::optional<std::vector<mongo::ObjectBasicType>>&>();
     assert_same_types<decltype(testStruct.getField5o()),
-                      const boost::optional<std::vector<mongo::BSONObj>>>();
+                      const boost::optional<std::vector<mongo::BSONObj>>&>();
     assert_same_types<decltype(testStruct.getField6o()),
-                      const boost::optional<std::vector<mongo::One_string>>>();
+                      const boost::optional<std::vector<mongo::One_string>>&>();
 
     std::vector<std::int64_t> field1{1, 2, 3};
     ASSERT_TRUE(field1 == testStruct.getField1());

@@ -440,7 +440,9 @@ class _CppTypeOptional(_CppTypeDelegating):
 
     def return_by_reference(self):
         # type: () -> bool
-        return False
+        if self._base.is_view_type():
+            return False
+        return self._base.return_by_reference()
 
     def get_getter_body(self, member_name):
         # type: (unicode) -> unicode
@@ -461,11 +463,14 @@ class _CppTypeOptional(_CppTypeDelegating):
                 """),
                 member_name=member_name,
                 convert=convert)
-        else:
+        elif self.is_view_type():
+            # For optionals around view types, do an explicit construction
             return common.template_args(
                 'return ${param_type}{${member_name}};',
                 param_type=self.get_getter_setter_type(),
                 member_name=member_name)
+        else:
+            return common.template_args('return ${member_name};', member_name=member_name)
 
     def get_setter_body(self, member_name):
         # type: (unicode) -> unicode
