@@ -15,6 +15,7 @@
 int
 __wt_thread_create(WT_SESSION_IMPL *session,
     wt_thread_t *tidret, WT_THREAD_CALLBACK(*func)(void *), void *arg)
+    WT_GCC_FUNC_ATTRIBUTE((visibility("default")))
 {
 	WT_DECL_RET;
 
@@ -40,6 +41,7 @@ __wt_thread_create(WT_SESSION_IMPL *session,
  */
 int
 __wt_thread_join(WT_SESSION_IMPL *session, wt_thread_t tid)
+    WT_GCC_FUNC_ATTRIBUTE((visibility("default")))
 {
 	WT_DECL_RET;
 

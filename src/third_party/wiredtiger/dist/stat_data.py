@@ -295,16 +295,20 @@ connection_stats = [
     LockStat('lock_checkpoint_count', 'checkpoint lock acquisitions'),
     LockStat('lock_checkpoint_wait_application', 'checkpoint lock application thread wait time (usecs)'),
     LockStat('lock_checkpoint_wait_internal', 'checkpoint lock internal thread wait time (usecs)'),
-    LockStat('lock_handle_list_wait_eviction', 'handle-list lock eviction thread wait time (usecs)'),
+    LockStat('lock_dhandle_read_count', 'dhandle read lock acquisitions'),
+    LockStat('lock_dhandle_wait_application', 'dhandle lock application thread time waiting for the dhandle lock (usecs)'),
+    LockStat('lock_dhandle_wait_internal', 'dhandle lock internal thread time waiting for the dhandle lock (usecs)'),
+    LockStat('lock_dhandle_write_count', 'dhandle write lock acquisitions'),
     LockStat('lock_metadata_count', 'metadata lock acquisitions'),
     LockStat('lock_metadata_wait_application', 'metadata lock application thread wait time (usecs)'),
     LockStat('lock_metadata_wait_internal', 'metadata lock internal thread wait time (usecs)'),
     LockStat('lock_schema_count', 'schema lock acquisitions'),
     LockStat('lock_schema_wait_application', 'schema lock application thread wait time (usecs)'),
     LockStat('lock_schema_wait_internal', 'schema lock internal thread wait time (usecs)'),
-    LockStat('lock_table_count', 'table lock acquisitions'),
+    LockStat('lock_table_read_count', 'table read lock acquisitions'),
     LockStat('lock_table_wait_application', 'table lock application thread time waiting for the table lock (usecs)'),
     LockStat('lock_table_wait_internal', 'table lock internal thread time waiting for the table lock (usecs)'),
+    LockStat('lock_table_write_count', 'table write lock acquisitions'),
 
     ##########################################
     # Logging statistics
@@ -436,6 +440,7 @@ connection_stats = [
     TxnStat('txn_snapshots_created', 'number of named snapshots created'),
     TxnStat('txn_snapshots_dropped', 'number of named snapshots dropped'),
     TxnStat('txn_sync', 'transaction sync calls'),
+    TxnStat('txn_update_conflict', 'update conflicts'),
 
     ##########################################
     # Yield statistics

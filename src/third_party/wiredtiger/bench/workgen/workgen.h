@@ -358,6 +358,7 @@ struct WorkloadOptions {
     int run_time;
     int sample_interval;
     int sample_rate;
+    std::string sample_file;
 
     WorkloadOptions();
     WorkloadOptions(const WorkloadOptions &other);

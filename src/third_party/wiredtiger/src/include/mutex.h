@@ -50,9 +50,33 @@ struct __wt_rwlock {			/* Read/write lock */
 		} s;
 	} u;
 
+	int16_t stat_read_count_off;	/* read acquisitions offset */
+	int16_t stat_write_count_off;	/* write acquisitions offset */
+	int16_t stat_app_usecs_off;	/* waiting application threads offset */
+	int16_t stat_int_usecs_off;	/* waiting server threads offset */
+
 	WT_CONDVAR *cond_readers;	/* Blocking readers */
 	WT_CONDVAR *cond_writers;	/* Blocking writers */
 };
+
+/*
+ * WT_RWLOCK_INIT_TRACKED --
+ *	Read write lock initialization, with tracking.
+ *
+ * Implemented as a macro so we can pass in a statistics field and convert
+ * it into a statistics structure array offset.
+ */
+#define	WT_RWLOCK_INIT_TRACKED(session, l, name) do {                   \
+	WT_RET(__wt_rwlock_init(session, l));                           \
+	(l)->stat_read_count_off = (int16_t)WT_STATS_FIELD_TO_OFFSET(   \
+	    S2C(session)->stats, lock_##name##_read_count);             \
+	(l)->stat_write_count_off = (int16_t)WT_STATS_FIELD_TO_OFFSET(  \
+	    S2C(session)->stats, lock_##name##_write_count);            \
+	(l)->stat_app_usecs_off = (int16_t)WT_STATS_FIELD_TO_OFFSET(    \
+	    S2C(session)->stats, lock_##name##_wait_application);       \
+	(l)->stat_int_usecs_off = (int16_t)WT_STATS_FIELD_TO_OFFSET(    \
+	    S2C(session)->stats, lock_##name##_wait_internal);          \
+} while (0)
 
 /*
  * Spin locks:

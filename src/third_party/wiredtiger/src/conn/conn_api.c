@@ -1803,6 +1803,7 @@ __wt_verbose_config(WT_SESSION_IMPL *session, const char *cfg[])
 		{ "fileops",		WT_VERB_FILEOPS },
 		{ "handleops",		WT_VERB_HANDLEOPS },
 		{ "log",		WT_VERB_LOG },
+		{ "lookaside_activity",	WT_VERB_LOOKASIDE },
 		{ "lsm",		WT_VERB_LSM },
 		{ "lsm_manager",	WT_VERB_LSM_MANAGER },
 		{ "metadata",		WT_VERB_METADATA },
