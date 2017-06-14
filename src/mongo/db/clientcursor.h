@@ -28,10 +28,13 @@
 
 #pragma once
 
+#include <boost/optional.hpp>
+
 #include "mongo/client/dbclientinterface.h"
 #include "mongo/db/auth/user_name.h"
 #include "mongo/db/cursor_id.h"
 #include "mongo/db/jsobj.h"
+#include "mongo/db/logical_session_id.h"
 #include "mongo/db/query/plan_executor.h"
 #include "mongo/db/record_id.h"
 #include "mongo/stdx/functional.h"
@@ -106,6 +109,10 @@ public:
 
     UserNameIterator getAuthenticatedUsers() const {
         return makeUserNameIterator(_authenticatedUsers.begin(), _authenticatedUsers.end());
+    }
+
+    boost::optional<LogicalSessionId> getSessionId() const {
+        return _lsid;
     }
 
     bool isReadCommitted() const {
@@ -218,9 +225,10 @@ private:
      * Constructs a ClientCursor. Since cursors must come into being registered and pinned, this is
      * private. See cursor_manager.h for more details.
      */
-    ClientCursor(ClientCursorParams&& params,
+    ClientCursor(ClientCursorParams params,
                  CursorManager* cursorManager,
                  CursorId cursorId,
+                 boost::optional<LogicalSessionId> lsid,
                  Date_t now);
 
     /**
@@ -256,6 +264,9 @@ private:
 
     // The set of authenticated users when this cursor was created.
     std::vector<UserName> _authenticatedUsers;
+
+    // A logical session id for this cursor, if it is running inside of a session.
+    const boost::optional<LogicalSessionId> _lsid;
 
     const bool _isReadCommitted = false;
 

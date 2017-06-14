@@ -28,6 +28,11 @@
 
 #include "mongo/platform/basic.h"
 
+#include <algorithm>
+
+#include <boost/optional/optional.hpp>
+#include <boost/optional/optional_io.hpp>
+
 #include "mongo/db/client.h"
 #include "mongo/db/clientcursor.h"
 #include "mongo/db/cursor_manager.h"
@@ -35,6 +40,7 @@
 #include "mongo/db/exec/working_set.h"
 #include "mongo/db/exec/working_set_common.h"
 #include "mongo/db/operation_context.h"
+#include "mongo/db/operation_context_noop.h"
 #include "mongo/db/query/plan_executor.h"
 #include "mongo/db/query/query_test_service_context.h"
 #include "mongo/dbtests/dbtests.h"
@@ -85,13 +91,26 @@ public:
     }
 
     std::unique_ptr<PlanExecutor, PlanExecutor::Deleter> makeFakePlanExecutor() {
+        return makeFakePlanExecutor(_opCtx.get());
+    }
+
+    std::unique_ptr<PlanExecutor, PlanExecutor::Deleter> makeFakePlanExecutor(
+        OperationContext* opCtx) {
         auto workingSet = stdx::make_unique<WorkingSet>();
-        auto queuedDataStage = stdx::make_unique<QueuedDataStage>(_opCtx.get(), workingSet.get());
-        return unittest::assertGet(PlanExecutor::make(_opCtx.get(),
+        auto queuedDataStage = stdx::make_unique<QueuedDataStage>(opCtx, workingSet.get());
+        return unittest::assertGet(PlanExecutor::make(opCtx,
                                                       std::move(workingSet),
                                                       std::move(queuedDataStage),
                                                       kTestNss,
                                                       PlanExecutor::YieldPolicy::NO_YIELD));
+    }
+
+    ClientCursorParams makeParams(OperationContext* opCtx) {
+        return {makeFakePlanExecutor(opCtx), kTestNss, {}, false, BSONObj()};
+    }
+
+    ClientCursorPin makeCursor(OperationContext* opCtx) {
+        return _cursorManager.registerCursor(opCtx, makeParams(opCtx));
     }
 
     ClockSourceMock* useClock() {
@@ -109,6 +128,16 @@ protected:
 private:
     ClockSourceMock* _clock;
     CursorManager _cursorManager{kTestNss};
+};
+
+class CursorManagerTestCustomOpCtx : public CursorManagerTest {
+    void setUp() override {
+        _queryServiceContext->getClient()->resetOperationContext();
+    }
+
+    void tearDown() override {
+        _queryServiceContext->getClient()->setOperationContext(_opCtx.get());
+    }
 };
 
 TEST_F(CursorManagerTest, GlobalCursorManagerShouldReportOwnershipOfCursorsItCreated) {
@@ -397,5 +426,158 @@ TEST_F(CursorManagerTest, CursorShouldNotTimeOutUntilIdleForLongEnoughAfterBeing
     ASSERT_EQ(1UL, cursorManager->timeoutCursors(_opCtx.get(), clock->now()));
     ASSERT_EQ(0UL, cursorManager->numCursors());
 }
+
+/**
+ * Test that cursors inherit the logical session id from their operation context
+ */
+TEST_F(CursorManagerTestCustomOpCtx, LogicalSessionIdOnOperationCtxTest) {
+    // Cursors created on an op ctx without a session id have no session id.
+    {
+        auto opCtx = _queryServiceContext->makeOperationContext();
+        auto pinned = makeCursor(opCtx.get());
+
+        ASSERT_EQUALS(pinned.getCursor()->getSessionId(), boost::none);
+    }
+
+    // Cursors created on an op ctx with a session id have a session id.
+    {
+        auto lsid = LogicalSessionId::gen();
+        auto opCtx2 = _queryServiceContext->makeOperationContext(lsid);
+        auto pinned2 = makeCursor(opCtx2.get());
+
+        ASSERT_EQUALS(pinned2.getCursor()->getSessionId(), lsid);
+    }
+}
+
+/**
+ * Test that a manager whose cursors do not have sessions does not return them.
+ */
+TEST_F(CursorManagerTestCustomOpCtx, CursorsWithoutSessions) {
+    // Add a cursor with no session to the cursor manager.
+    auto opCtx = _queryServiceContext->makeOperationContext();
+    auto pinned = makeCursor(opCtx.get());
+    ASSERT_EQUALS(pinned.getCursor()->getSessionId(), boost::none);
+
+    // Retrieve all sessions active in manager - set should be empty.
+    LogicalSessionIdSet lsids;
+    useCursorManager()->appendActiveSessions(&lsids);
+    ASSERT(lsids.empty());
+}
+
+/**
+ * Test a manager that has one cursor running inside of a session.
+ */
+TEST_F(CursorManagerTestCustomOpCtx, OneCursorWithASession) {
+    // Add a cursor with a session to the cursor manager.
+    auto lsid = LogicalSessionId::gen();
+    auto opCtx = _queryServiceContext->makeOperationContext(lsid);
+    auto pinned = makeCursor(opCtx.get());
+
+    // Retrieve all sessions active in manager - set should contain just lsid.
+    LogicalSessionIdSet lsids;
+    useCursorManager()->appendActiveSessions(&lsids);
+    ASSERT_EQ(lsids.size(), size_t(1));
+    ASSERT(lsids.find(lsid) != lsids.end());
+
+    // Retrieve all cursors for this lsid - should be just ours.
+    auto cursors = useCursorManager()->getCursorsForSession(lsid);
+    ASSERT_EQ(cursors.size(), size_t(1));
+    auto cursorId = pinned.getCursor()->cursorid();
+    ASSERT(cursors.find(cursorId) != cursors.end());
+
+    // Remove the cursor from the manager.
+    pinned.release();
+    ASSERT_OK(useCursorManager()->eraseCursor(opCtx.get(), cursorId, false));
+
+    // There should be no more cursor entries by session id.
+    LogicalSessionIdSet sessions;
+    useCursorManager()->appendActiveSessions(&sessions);
+    ASSERT(sessions.empty());
+    ASSERT(useCursorManager()->getCursorsForSession(lsid).empty());
+}
+
+/**
+ * Test a manager with multiple cursors running inside of the same session.
+ */
+TEST_F(CursorManagerTestCustomOpCtx, MultipleCursorsWithSameSession) {
+    // Add two cursors on the same session to the cursor manager.
+    auto lsid = LogicalSessionId::gen();
+    auto opCtx = _queryServiceContext->makeOperationContext(lsid);
+    auto pinned = makeCursor(opCtx.get());
+    auto pinned2 = makeCursor(opCtx.get());
+
+    // Retrieve all sessions - set should contain just lsid.
+    stdx::unordered_set<LogicalSessionId, LogicalSessionId::Hash> lsids;
+    useCursorManager()->appendActiveSessions(&lsids);
+    ASSERT_EQ(lsids.size(), size_t(1));
+    ASSERT(lsids.find(lsid) != lsids.end());
+
+    // Retrieve all cursors for session - should be both cursors.
+    auto cursors = useCursorManager()->getCursorsForSession(lsid);
+    ASSERT_EQ(cursors.size(), size_t(2));
+    ASSERT(cursors.find(pinned.getCursor()->cursorid()) != cursors.end());
+    ASSERT(cursors.find(pinned2.getCursor()->cursorid()) != cursors.end());
+
+    // Remove one cursor from the manager.
+    pinned.release();
+    ASSERT_OK(useCursorManager()->eraseCursor(opCtx.get(), pinned.getCursor()->cursorid(), false));
+
+    // Should still be able to retrieve the session.
+    lsids.clear();
+    useCursorManager()->appendActiveSessions(&lsids);
+    ASSERT_EQ(lsids.size(), size_t(1));
+    ASSERT(lsids.find(lsid) != lsids.end());
+
+    // Should still be able to retrieve remaining cursor by session.
+    cursors = useCursorManager()->getCursorsForSession(lsid);
+    ASSERT_EQ(cursors.size(), size_t(1));
+    ASSERT(cursors.find(pinned2.getCursor()->cursorid()) != cursors.end());
+}
+
+/**
+ * Test a manager with multiple cursors running inside of different sessions.
+ */
+TEST_F(CursorManagerTestCustomOpCtx, MultipleCursorsMultipleSessions) {
+    auto lsid1 = LogicalSessionId::gen();
+    auto lsid2 = LogicalSessionId::gen();
+
+    CursorId cursor1;
+    CursorId cursor2;
+
+    // Cursor with session 1.
+    {
+        auto opCtx1 = _queryServiceContext->makeOperationContext(lsid1);
+        cursor1 = makeCursor(opCtx1.get()).getCursor()->cursorid();
+    }
+
+    // Cursor with session 2.
+    {
+        auto opCtx2 = _queryServiceContext->makeOperationContext(lsid2);
+        cursor2 = makeCursor(opCtx2.get()).getCursor()->cursorid();
+    }
+
+    // Cursor with no session.
+    {
+        auto opCtx3 = _queryServiceContext->makeOperationContext();
+        makeCursor(opCtx3.get()).getCursor();
+    }
+
+    // Retrieve all sessions - should be both lsids.
+    LogicalSessionIdSet lsids;
+    useCursorManager()->appendActiveSessions(&lsids);
+    ASSERT_EQ(lsids.size(), size_t(2));
+    ASSERT(lsids.find(lsid1) != lsids.end());
+    ASSERT(lsids.find(lsid2) != lsids.end());
+
+    // Retrieve cursors for each session - should be just one.
+    auto cursors1 = useCursorManager()->getCursorsForSession(lsid1);
+    ASSERT_EQ(cursors1.size(), size_t(1));
+    ASSERT(cursors1.find(cursor1) != cursors1.end());
+
+    auto cursors2 = useCursorManager()->getCursorsForSession(lsid2);
+    ASSERT_EQ(cursors2.size(), size_t(1));
+    ASSERT(cursors2.find(cursor2) != cursors2.end());
+}
+
 }  // namespace
 }  // namespace mongo

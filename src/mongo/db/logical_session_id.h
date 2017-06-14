@@ -32,6 +32,7 @@
 
 #include "mongo/base/status_with.h"
 #include "mongo/db/logical_session_id_gen.h"
+#include "mongo/stdx/unordered_set.h"
 #include "mongo/util/uuid.h"
 
 namespace mongo {
