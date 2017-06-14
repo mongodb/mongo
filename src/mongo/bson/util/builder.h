@@ -478,11 +478,10 @@ private:
     StringBuilderImpl& appendIntegral(T val, int maxSize) {
         MONGO_STATIC_ASSERT(!std::is_same<T, char>());  // char shouldn't append as number.
         MONGO_STATIC_ASSERT(std::is_integral<T>());
-        MONGO_STATIC_ASSERT(std::numeric_limits<T>::max() <= std::numeric_limits<uint64_t>::max());
 
         if (val < 0) {
             *this << '-';
-            append(StringData(ItoA(-uint64_t(val))));  // Send the magnitude to ItoA.
+            append(StringData(ItoA(0 - uint64_t(val))));  // Send the magnitude to ItoA.
         } else {
             append(StringData(ItoA(uint64_t(val))));
         }
