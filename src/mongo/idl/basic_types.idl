@@ -67,6 +67,18 @@ types:
         cpp_type: "bool"
         deserializer: "mongo::BSONElement::boolean"
 
+    safeBool:
+        bson_serialization_type:
+                                - bool
+                                - long
+                                - int
+                                - decimal
+                                - double
+        description: "Accepts any numerical type (including bool) which can be interpreted as a
+                      true/false value"
+        cpp_type: bool
+        deserializer: "mongo::BSONElement::trueValue"
+
     bindata_generic:
         bson_serialization_type: bindata
         bindata_subtype: generic
