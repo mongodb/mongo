@@ -8,6 +8,8 @@ selector:
   - jstests/sharding/config_version_rollback.js
   # Behavior change to addShard
   - jstests/sharding/addshard_idempotent.js
+  # SERVER-27597: Reenable when 3.4.6 becomes last-stable
+  - jstests/sharding/migration_critical_section_concurrency.js
   # 3.6 mongods have improved covering behavior for queries on shard key index. Un-blacklist when
   # 3.6 becomes 'last-stable'.
   - jstests/sharding/covered_shard_key_indexes.js
