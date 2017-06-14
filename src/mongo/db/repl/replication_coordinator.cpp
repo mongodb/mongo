@@ -89,6 +89,11 @@ bool ReplicationCoordinator::isOplogDisabledFor(OperationContext* opCtx,
         return true;
     }
 
+    // <db>.system.namespaces is a MMAP-only collection and is not replicated.
+    if (nss.coll() == "system.namespaces"_sd) {
+        return true;
+    }
+
     fassert(28626, opCtx->recoveryUnit());
 
     return false;
