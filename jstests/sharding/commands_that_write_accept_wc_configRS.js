@@ -33,6 +33,9 @@ load('jstests/multiVersion/libs/auth_helpers.js');
     var counter = 0;
 
     function dropTestData() {
+        st.configRS.awaitReplication();
+        st.rs0.awaitReplication();
+        st.rs1.awaitReplication();
         db.dropUser('username');
         db.dropUser('user1');
         localDB.dropUser('user2');
@@ -201,7 +204,10 @@ load('jstests/multiVersion/libs/auth_helpers.js');
         if (cmd.runsOnShards) {
             if (cmd.failsOnShards) {
                 // This command fails when there is a writeConcernError on the shards.
-                req.writeConcern.wtimeout = 3000;
+                // We set the timeout high enough that the command should not time out against the
+                // config server, but not exorbitantly high, because it will always time out against
+                // shards and so will increase the runtime of this test.
+                req.writeConcern.wtimeout = 15 * 1000;
                 res = runCommandCheckAdmin(db, cmd);
                 restartReplicationOnAllShards(st);
                 assert.commandFailed(res);
@@ -212,7 +218,10 @@ load('jstests/multiVersion/libs/auth_helpers.js');
             } else {
                 // This command passes and returns a writeConcernError when there is a
                 // writeConcernError on the shards.
-                req.writeConcern.wtimeout = 3000;
+                // We set the timeout high enough that the command should not time out against the
+                // config server, but not exorbitantly high, because it will always time out against
+                // shards and so will increase the runtime of this test.
+                req.writeConcern.wtimeout = 15 * 1000;
                 res = runCommandCheckAdmin(db, cmd);
                 restartReplicationOnAllShards(st);
                 assert.commandWorked(res);
@@ -237,7 +246,7 @@ load('jstests/multiVersion/libs/auth_helpers.js');
         var setupFunc = cmd.setupFunc;
         var confirmFunc = cmd.confirmFunc;
 
-        req.writeConcern = {w: 'majority', wtimeout: 25000};
+        req.writeConcern = {w: 'majority', wtimeout: ReplSetTest.kDefaultTimeoutMS};
         jsTest.log("Testing " + tojson(req));
 
         dropTestData();
