@@ -179,6 +179,13 @@ class _EnumTypeInt(EnumTypeInfoBase):
                 indented_writer.write_template('return static_cast<std::int32_t>(value);')
 
 
+def _get_constant_enum_name(idl_enum, enum_value):
+    # type: (Union[syntax.Enum,ast.Enum], Union[syntax.EnumValue,ast.EnumValue]) -> unicode
+    """Return the C++ name for a string constant of string enum value."""
+    return common.template_args(
+        'k${enum_name}_${name}', enum_name=common.title_case(idl_enum.name), name=enum_value.name)
+
+
 class _EnumTypeString(EnumTypeInfoBase):
     """Type information for string enumerations."""
 
@@ -215,11 +222,23 @@ class _EnumTypeString(EnumTypeInfoBase):
             'function_name': self.get_deserializer_declaration(),
         }
 
+        # Generate an anonymous namespace full of string constants
+        #
+        with writer.NamespaceScopeBlock(indented_writer, ['']):
+            for enum_value in self._enum.values:
+                indented_writer.write_line(
+                    common.template_args(
+                        'constexpr StringData ${constant_name} = "${value}"_sd;',
+                        constant_name=_get_constant_enum_name(self._enum, enum_value),
+                        value=enum_value.value))
+        indented_writer.write_empty_line()
+
         with writer.TemplateContext(indented_writer, template_params):
             with writer.IndentedScopedBlock(indented_writer, "${function_name} {", "}"):
                 for enum_value in self._enum.values:
-                    with writer.IndentedScopedBlock(indented_writer, 'if (value == "%s") {' %
-                                                    (enum_value.value), "}"):
+                    predicate = 'if (value == %s) {' % (_get_constant_enum_name(self._enum,
+                                                                                enum_value))
+                    with writer.IndentedScopedBlock(indented_writer, predicate, "}"):
                         indented_writer.write_template('return ${enum_name}::%s;' %
                                                        (enum_value.name))
 
@@ -247,7 +266,8 @@ class _EnumTypeString(EnumTypeInfoBase):
                     with writer.IndentedScopedBlock(indented_writer,
                                                     'if (value == ${enum_name}::%s) {' %
                                                     (enum_value.name), "}"):
-                        indented_writer.write_line('return "%s";' % (enum_value.value))
+                        indented_writer.write_line('return %s;' % (_get_constant_enum_name(
+                            self._enum, enum_value)))
 
                 indented_writer.write_line('MONGO_UNREACHABLE;')
                 indented_writer.write_line('return StringData();')

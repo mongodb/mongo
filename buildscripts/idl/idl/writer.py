@@ -205,3 +205,27 @@ class IndentedScopedBlock(object):
         """Unindent the block and print the ending."""
         self._writer.unindent()
         self._writer.write_template(self._closing)
+
+
+class NamespaceScopeBlock(object):
+    """Generate an unindented blocks for a list of namespaces, and do not indent the contents."""
+
+    def __init__(self, indented_writer, namespaces):
+        # type: (IndentedTextWriter, List[unicode]) -> None
+        """Create a block."""
+        self._writer = indented_writer
+        self._namespaces = namespaces
+
+    def __enter__(self):
+        # type: () -> None
+        """Write the beginning of the block and do not indent."""
+        for namespace in self._namespaces:
+            self._writer.write_unindented_line('namespace %s {' % (namespace))
+
+    def __exit__(self, *args):
+        # type: (*str) -> None
+        """Write the end of the block and do not change indentation."""
+        self._namespaces.reverse()
+
+        for namespace in self._namespaces:
+            self._writer.write_unindented_line('}  // namespace %s' % (namespace))
