@@ -32,24 +32,34 @@
 
 namespace mongo {
 
-Status bsonExtractField(const BSONObj& object, StringData fieldName, BSONElement* outElement) {
+namespace {
+
+Status bsonExtractFieldImpl(const BSONObj& object,
+                            StringData fieldName,
+                            BSONElement* outElement,
+                            bool withDefault) {
     BSONElement element = object.getField(fieldName);
-    if (element.eoo())
-        return Status(ErrorCodes::NoSuchKey,
-                      mongoutils::str::stream() << "Missing expected field \""
-                                                << fieldName.toString()
-                                                << "\" in object '"
-                                                << object
-                                                << "'.");
-    *outElement = element;
-    return Status::OK();
+
+    if (!element.eoo()) {
+        *outElement = element;
+        return Status::OK();
+    }
+    if (withDefault) {
+        static const Status kDefaultCase(ErrorCodes::NoSuchKey,
+                                         "bsonExtractFieldImpl default case no such key error");
+        return kDefaultCase;
+    }
+    return Status(ErrorCodes::NoSuchKey,
+                  mongoutils::str::stream() << "Missing expected field \"" << fieldName.toString()
+                                            << "\"");
 }
 
-Status bsonExtractTypedField(const BSONObj& object,
-                             StringData fieldName,
-                             BSONType type,
-                             BSONElement* outElement) {
-    Status status = bsonExtractField(object, fieldName, outElement);
+Status bsonExtractTypedFieldImpl(const BSONObj& object,
+                                 StringData fieldName,
+                                 BSONType type,
+                                 BSONElement* outElement,
+                                 bool withDefault) {
+    Status status = bsonExtractFieldImpl(object, fieldName, outElement, withDefault);
     if (!status.isOK())
         return status;
     if (type != outElement->type()) {
@@ -60,141 +70,170 @@ Status bsonExtractTypedField(const BSONObj& object,
                                                 << ", found "
                                                 << typeName(outElement->type()));
     }
-    return Status::OK();
+    return status;
+}
+
+Status bsonExtractIntegerFieldImpl(const BSONObj& object,
+                                   StringData fieldName,
+                                   long long* out,
+                                   bool withDefault) {
+    BSONElement element;
+    Status status = bsonExtractFieldImpl(object, fieldName, &element, withDefault);
+    if (!status.isOK())
+        return status;
+    if (!element.isNumber()) {
+        return Status(ErrorCodes::TypeMismatch,
+                      mongoutils::str::stream() << "Expected field \"" << fieldName
+                                                << "\" to have numeric type, but found "
+                                                << typeName(element.type()));
+    }
+    long long result = element.safeNumberLong();
+    if (result != element.numberDouble()) {
+        return Status(
+            ErrorCodes::BadValue,
+            mongoutils::str::stream() << "Expected field \"" << fieldName
+                                      << "\" to have a value "
+                                         "exactly representable as a 64-bit integer, but found "
+                                      << element);
+    }
+    *out = result;
+    return status;
+}
+
+Status bsonExtractDoubleFieldImpl(const BSONObj& object,
+                                  StringData fieldName,
+                                  double* out,
+                                  bool withDefault) {
+    BSONElement element;
+    Status status = bsonExtractField(object, fieldName, &element);
+    if (!status.isOK())
+        return status;
+    if (!element.isNumber()) {
+        return Status(ErrorCodes::TypeMismatch,
+                      mongoutils::str::stream() << "Expected field \"" << fieldName
+                                                << "\" to have numeric type, but found "
+                                                << typeName(element.type()));
+    }
+    *out = element.numberDouble();
+    return status;
+}
+}  // namespace
+
+
+Status bsonExtractField(const BSONObj& object, StringData fieldName, BSONElement* outElement) {
+    return bsonExtractFieldImpl(object, fieldName, outElement, false);
+}
+
+Status bsonExtractTypedField(const BSONObj& object,
+                             StringData fieldName,
+                             BSONType type,
+                             BSONElement* outElement) {
+    return bsonExtractTypedFieldImpl(object, fieldName, type, outElement, false);
 }
 
 Status bsonExtractBooleanField(const BSONObj& object, StringData fieldName, bool* out) {
     BSONElement element;
     Status status = bsonExtractTypedField(object, fieldName, Bool, &element);
-    if (!status.isOK())
-        return status;
-    *out = element.boolean();
-    return Status::OK();
+    if (status.isOK())
+        *out = element.boolean();
+    return status;
 }
 
 Status bsonExtractBooleanFieldWithDefault(const BSONObj& object,
                                           StringData fieldName,
                                           bool defaultValue,
                                           bool* out) {
-    BSONElement value;
-    Status status = bsonExtractField(object, fieldName, &value);
+    BSONElement element;
+    Status status = bsonExtractFieldImpl(object, fieldName, &element, true);
     if (status == ErrorCodes::NoSuchKey) {
         *out = defaultValue;
         return Status::OK();
-    } else if (!status.isOK()) {
+    }
+
+    if (!status.isOK())
         return status;
-    } else if (!value.isNumber() && !value.isBoolean()) {
+
+    if (!element.isNumber() && !element.isBoolean()) {
         return Status(ErrorCodes::TypeMismatch,
                       mongoutils::str::stream() << "Expected boolean or number type for field \""
                                                 << fieldName
                                                 << "\", found "
-                                                << typeName(value.type()));
-    } else {
-        *out = value.trueValue();
-        return Status::OK();
+                                                << typeName(element.type()));
     }
+    *out = element.trueValue();
+    return status;
 }
 
 Status bsonExtractStringField(const BSONObj& object, StringData fieldName, std::string* out) {
     BSONElement element;
     Status status = bsonExtractTypedField(object, fieldName, String, &element);
-    if (!status.isOK())
-        return status;
-    *out = element.str();
-    return Status::OK();
+    if (status.isOK())
+        *out = element.str();
+    return status;
 }
 
 Status bsonExtractTimestampField(const BSONObj& object, StringData fieldName, Timestamp* out) {
     BSONElement element;
     Status status = bsonExtractTypedField(object, fieldName, bsonTimestamp, &element);
-    if (!status.isOK())
-        return status;
-    *out = element.timestamp();
-    return Status::OK();
+    if (status.isOK())
+        *out = element.timestamp();
+    return status;
 }
 
 Status bsonExtractOIDField(const BSONObj& object, StringData fieldName, OID* out) {
     BSONElement element;
     Status status = bsonExtractTypedField(object, fieldName, jstOID, &element);
-    if (!status.isOK())
-        return status;
-    *out = element.OID();
-    return Status::OK();
+    if (status.isOK())
+        *out = element.OID();
+    return status;
 }
 
 Status bsonExtractOIDFieldWithDefault(const BSONObj& object,
                                       StringData fieldName,
                                       const OID& defaultValue,
                                       OID* out) {
-    Status status = bsonExtractOIDField(object, fieldName, out);
+    BSONElement element;
+    Status status = bsonExtractTypedFieldImpl(object, fieldName, jstOID, &element, true);
     if (status == ErrorCodes::NoSuchKey) {
         *out = defaultValue;
-    } else if (!status.isOK()) {
-        return status;
+        return Status::OK();
     }
-    return Status::OK();
+    if (status.isOK())
+        *out = element.OID();
+    return status;
 }
 
 Status bsonExtractStringFieldWithDefault(const BSONObj& object,
                                          StringData fieldName,
                                          StringData defaultValue,
                                          std::string* out) {
-    Status status = bsonExtractStringField(object, fieldName, out);
+    BSONElement element;
+    Status status = bsonExtractTypedFieldImpl(object, fieldName, String, &element, true);
     if (status == ErrorCodes::NoSuchKey) {
         *out = defaultValue.toString();
-    } else if (!status.isOK()) {
-        return status;
+        return Status::OK();
     }
-    return Status::OK();
+    if (status.isOK())
+        *out = element.str();
+    return status;
 }
 
 Status bsonExtractIntegerField(const BSONObj& object, StringData fieldName, long long* out) {
-    BSONElement value;
-    Status status = bsonExtractField(object, fieldName, &value);
-    if (!status.isOK())
-        return status;
-    if (!value.isNumber()) {
-        return Status(ErrorCodes::TypeMismatch,
-                      mongoutils::str::stream() << "Expected field \"" << fieldName
-                                                << "\" to have numeric type, but found "
-                                                << typeName(value.type()));
-    }
-    long long result = value.safeNumberLong();
-    if (result != value.numberDouble()) {
-        return Status(
-            ErrorCodes::BadValue,
-            mongoutils::str::stream() << "Expected field \"" << fieldName
-                                      << "\" to have a value "
-                                         "exactly representable as a 64-bit integer, but found "
-                                      << value);
-    }
-    *out = result;
-    return Status::OK();
+    return bsonExtractIntegerFieldImpl(object, fieldName, out, false);
 }
 
 Status bsonExtractDoubleField(const BSONObj& object, StringData fieldName, double* out) {
-    BSONElement value;
-    Status status = bsonExtractField(object, fieldName, &value);
-    if (!status.isOK())
-        return status;
-    if (!value.isNumber()) {
-        return Status(ErrorCodes::TypeMismatch,
-                      mongoutils::str::stream() << "Expected field \"" << fieldName
-                                                << "\" to have numeric type, but found "
-                                                << typeName(value.type()));
-    }
-    *out = value.numberDouble();
-    return Status::OK();
+    return bsonExtractDoubleFieldImpl(object, fieldName, out, false);
 }
 
 Status bsonExtractDoubleFieldWithDefault(const BSONObj& object,
                                          StringData fieldName,
                                          double defaultValue,
                                          double* out) {
-    Status status = bsonExtractDoubleField(object, fieldName, out);
+    Status status = bsonExtractDoubleFieldImpl(object, fieldName, out, true);
     if (status == ErrorCodes::NoSuchKey) {
         *out = defaultValue;
-        status = Status::OK();
+        return Status::OK();
     }
     return status;
 }
@@ -203,10 +242,10 @@ Status bsonExtractIntegerFieldWithDefault(const BSONObj& object,
                                           StringData fieldName,
                                           long long defaultValue,
                                           long long* out) {
-    Status status = bsonExtractIntegerField(object, fieldName, out);
+    Status status = bsonExtractIntegerFieldImpl(object, fieldName, out, true);
     if (status == ErrorCodes::NoSuchKey) {
         *out = defaultValue;
-        status = Status::OK();
+        return Status::OK();
     }
     return status;
 }
@@ -217,7 +256,7 @@ Status bsonExtractIntegerFieldWithDefaultIf(const BSONObj& object,
                                             stdx::function<bool(long long)> pred,
                                             const std::string& predDescription,
                                             long long* out) {
-    auto status = bsonExtractIntegerFieldWithDefault(object, fieldName, defaultValue, out);
+    Status status = bsonExtractIntegerFieldWithDefault(object, fieldName, defaultValue, out);
     if (!status.isOK()) {
         return status;
     }
@@ -228,7 +267,7 @@ Status bsonExtractIntegerFieldWithDefaultIf(const BSONObj& object,
                                       << ": "
                                       << predDescription);
     }
-    return Status::OK();
+    return status;
 }
 
 Status bsonExtractIntegerFieldWithDefaultIf(const BSONObj& object,
