@@ -49,7 +49,8 @@ const BSONField<BSONObj> ShardCollectionType::keyPattern("key");
 const BSONField<BSONObj> ShardCollectionType::defaultCollation("defaultCollation");
 const BSONField<bool> ShardCollectionType::unique("unique");
 const BSONField<bool> ShardCollectionType::refreshing("refreshing");
-const BSONField<long long> ShardCollectionType::refreshSequenceNumber("refreshSequenceNumber");
+const BSONField<Date_t> ShardCollectionType::lastRefreshedCollectionVersion(
+    "lastRefreshedCollectionVersion");
 
 ShardCollectionType::ShardCollectionType(const NamespaceString& uuid,
                                          const NamespaceString& nss,
@@ -137,8 +138,8 @@ StatusWith<ShardCollectionType> ShardCollectionType::fromBSON(const BSONObj& sou
 
     // Below are optional fields.
 
-    bool refreshing;
     {
+        bool refreshing;
         Status status =
             bsonExtractBooleanField(source, ShardCollectionType::refreshing.name(), &refreshing);
         if (status.isOK()) {
@@ -150,16 +151,16 @@ StatusWith<ShardCollectionType> ShardCollectionType::fromBSON(const BSONObj& sou
         }
     }
 
-    long long refreshSequenceNumber;
     {
-        Status status = bsonExtractIntegerField(
-            source, ShardCollectionType::refreshSequenceNumber.name(), &refreshSequenceNumber);
-        if (status.isOK()) {
-            shardCollectionType.setRefreshSequenceNumber(refreshSequenceNumber);
-        } else if (status == ErrorCodes::NoSuchKey) {
-            // The field is not set yet, which is okay.
-        } else {
-            return status;
+        if (!source[lastRefreshedCollectionVersion.name()].eoo()) {
+            auto statusWithLastRefreshedCollectionVersion =
+                ChunkVersion::parseFromBSONWithFieldAndSetEpoch(
+                    source, lastRefreshedCollectionVersion.name(), epoch);
+            if (!statusWithLastRefreshedCollectionVersion.isOK()) {
+                return statusWithLastRefreshedCollectionVersion.getStatus();
+            }
+            shardCollectionType.setLastRefreshedCollectionVersion(
+                std::move(statusWithLastRefreshedCollectionVersion.getValue()));
         }
     }
 
@@ -183,8 +184,9 @@ BSONObj ShardCollectionType::toBSON() const {
     if (_refreshing) {
         builder.append(refreshing.name(), _refreshing.get());
     }
-    if (_refreshSequenceNumber) {
-        builder.append(refreshSequenceNumber.name(), _refreshSequenceNumber.get());
+    if (_lastRefreshedCollectionVersion) {
+        builder.appendTimestamp(lastRefreshedCollectionVersion.name(),
+                                _lastRefreshedCollectionVersion->toLong());
     }
 
     return builder.obj();
@@ -218,9 +220,10 @@ const bool ShardCollectionType::getRefreshing() const {
     invariant(_refreshing);
     return _refreshing.get();
 }
-const long long ShardCollectionType::getRefreshSequenceNumber() const {
-    invariant(_refreshSequenceNumber);
-    return _refreshSequenceNumber.get();
+
+const ChunkVersion& ShardCollectionType::getLastRefreshedCollectionVersion() const {
+    invariant(_lastRefreshedCollectionVersion);
+    return _lastRefreshedCollectionVersion.get();
 }
 
 }  // namespace mongo

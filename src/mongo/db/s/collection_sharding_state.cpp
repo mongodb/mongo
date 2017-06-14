@@ -402,8 +402,9 @@ void CollectionShardingState::_onConfigRefreshCompleteInvalidateCachedMetadata(
                         bsonExtractTypedField(update, StringData("$set"), Object, &updateElement));
         BSONObj setField = updateElement.Obj();
 
-        // The refreshSequenceNumber is only updated when a chunk metadata refresh completes.
-        if (setField.hasField(ShardCollectionType::refreshSequenceNumber.name())) {
+        // The lastRefreshedCollectionVersion is only updated when a chunk metadata refresh
+        // completes.
+        if (setField.hasField(ShardCollectionType::lastRefreshedCollectionVersion.name())) {
             Grid::get(opCtx)->catalogCache()->invalidateShardedCollection(refreshCollection);
         }
     }

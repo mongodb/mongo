@@ -75,7 +75,6 @@ protected:
         ASSERT_OK(updateShardCollectionsEntry(operationContext(),
                                               BSON(ShardCollectionType::uuid(kNss.ns())),
                                               shardCollectionType.toBSON(),
-                                              BSONObj(),
                                               true /*upsert*/));
         return shardCollectionType;
     }
@@ -188,9 +187,6 @@ TEST_F(ShardMetadataUtilTest, UpdateAndReadCollectionsEntry) {
     ShardCollectionType readShardCollectionType =
         assertGet(readShardCollectionsEntry(operationContext(), kNss));
 
-    // updateShardCollectionsEntry initializes 'refreshSequenceNumber' that isn't present in
-    // 'insertedShardCollectionType', so must compare fields.
-
     ASSERT_EQUALS(updateShardCollectionType.getUUID(), readShardCollectionType.getUUID());
     ASSERT_EQUALS(updateShardCollectionType.getNss(), readShardCollectionType.getNss());
     ASSERT_EQUALS(updateShardCollectionType.getEpoch(), readShardCollectionType.getEpoch());
@@ -201,8 +197,10 @@ TEST_F(ShardMetadataUtilTest, UpdateAndReadCollectionsEntry) {
     ASSERT_EQUALS(updateShardCollectionType.getUnique(), readShardCollectionType.getUnique());
     ASSERT_EQUALS(updateShardCollectionType.hasRefreshing(),
                   readShardCollectionType.hasRefreshing());
-    ASSERT(!updateShardCollectionType.hasRefreshSequenceNumber());
-    ASSERT(!readShardCollectionType.hasRefreshSequenceNumber());
+
+    // Refresh fields should not have been set.
+    ASSERT(!updateShardCollectionType.hasLastRefreshedCollectionVersion());
+    ASSERT(!readShardCollectionType.hasLastRefreshedCollectionVersion());
 }
 
 TEST_F(ShardMetadataUtilTest, PersistedRefreshSignalStartAndFinish) {
@@ -221,7 +219,7 @@ TEST_F(ShardMetadataUtilTest, PersistedRefreshSignalStartAndFinish) {
     ASSERT_BSONOBJ_EQ(shardCollectionsEntry.getDefaultCollation(), getDefaultCollation());
     ASSERT_EQUALS(shardCollectionsEntry.getUnique(), kUnique);
     ASSERT_EQUALS(shardCollectionsEntry.getRefreshing(), true);
-    ASSERT(!shardCollectionsEntry.hasRefreshSequenceNumber());
+    ASSERT(!shardCollectionsEntry.hasLastRefreshedCollectionVersion());
 
     // Signal refresh start again to make sure nothing changes
     ASSERT_OK(setPersistedRefreshFlags(operationContext(), kNss));
@@ -230,16 +228,17 @@ TEST_F(ShardMetadataUtilTest, PersistedRefreshSignalStartAndFinish) {
 
     ASSERT_EQUALS(state.epoch, getCollectionVersion().epoch());
     ASSERT_EQUALS(state.refreshing, true);
-    ASSERT_EQUALS(state.sequenceNumber, 0LL);
+    ASSERT_EQUALS(state.lastRefreshedCollectionVersion,
+                  ChunkVersion(0, 0, getCollectionVersion().epoch()));
 
     // Signal refresh finish
-    ASSERT_OK(unsetPersistedRefreshFlags(operationContext(), kNss));
+    ASSERT_OK(unsetPersistedRefreshFlags(operationContext(), kNss, getCollectionVersion()));
 
     state = assertGet(getPersistedRefreshFlags(operationContext(), kNss));
 
     ASSERT_EQUALS(state.epoch, getCollectionVersion().epoch());
     ASSERT_EQUALS(state.refreshing, false);
-    ASSERT_EQUALS(state.sequenceNumber, 1LL);
+    ASSERT_EQUALS(state.lastRefreshedCollectionVersion, getCollectionVersion());
 }
 
 TEST_F(ShardMetadataUtilTest, WriteAndReadChunks) {

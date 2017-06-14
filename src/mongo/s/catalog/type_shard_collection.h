@@ -60,8 +60,8 @@ class StatusWith;
  *          "locale" : "fr_CA"
  *      },
  *      "unique" : false,
- *      "refreshing" : true
- *      "refreshSequenceNumber" : 5
+ *      "refreshing" : true,
+ *      "lastRefreshedCollectionVersion" : Timestamp(1, 0)
  *   }
  *
  */
@@ -77,7 +77,7 @@ public:
     static const BSONField<BSONObj> defaultCollation;
     static const BSONField<bool> unique;
     static const BSONField<bool> refreshing;
-    static const BSONField<long long> refreshSequenceNumber;
+    static const BSONField<Date_t> lastRefreshedCollectionVersion;
 
     explicit ShardCollectionType(const NamespaceString& uuid,
                                  const NamespaceString& nss,
@@ -143,12 +143,12 @@ public:
         _refreshing = refreshing;
     }
 
-    const bool hasRefreshSequenceNumber() const {
-        return _refreshSequenceNumber.is_initialized();
+    const bool hasLastRefreshedCollectionVersion() const {
+        return _lastRefreshedCollectionVersion.is_initialized();
     }
-    const long long getRefreshSequenceNumber() const;
-    void setRefreshSequenceNumber(const long long seqNum) {
-        _refreshSequenceNumber = seqNum;
+    const ChunkVersion& getLastRefreshedCollectionVersion() const;
+    void setLastRefreshedCollectionVersion(const ChunkVersion& version) {
+        _lastRefreshedCollectionVersion = version;
     }
 
 private:
@@ -171,9 +171,14 @@ private:
     bool _unique;
 
     // Refresh fields set by primaries and used by shard secondaries to safely refresh chunk
-    // metadata.
+    // metadata. '_refreshing' indicates whether the chunks collection is currently being updated,
+    // which means read results won't provide a complete view of the chunk metadata.
+    // '_lastRefreshedCollectionVersion' indicates the collection version of the last complete chunk
+    // metadata refresh, and is used to indicate a refresh occurred if the value is different than
+    // when the caller last checked -- because 'refreshing' will be false both before and after a
+    // refresh occurs.
     boost::optional<bool> _refreshing{boost::none};
-    boost::optional<long long> _refreshSequenceNumber{boost::none};
+    boost::optional<ChunkVersion> _lastRefreshedCollectionVersion{boost::none};
 };
 
 }  // namespace mongo

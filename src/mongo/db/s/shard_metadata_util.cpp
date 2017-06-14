@@ -75,29 +75,28 @@ QueryAndSort createShardChunkDiffQuery(const ChunkVersion& collectionVersion) {
 
 bool RefreshState::operator==(RefreshState& other) {
     return (other.epoch == epoch) && (other.refreshing == refreshing) &&
-        (other.sequenceNumber == sequenceNumber);
+        (other.lastRefreshedCollectionVersion == lastRefreshedCollectionVersion);
 }
 
 Status setPersistedRefreshFlags(OperationContext* opCtx, const NamespaceString& nss) {
     // Set 'refreshing' to true.
     BSONObj update = BSON(ShardCollectionType::refreshing() << true);
     return updateShardCollectionsEntry(
-        opCtx, BSON(ShardCollectionType::uuid() << nss.ns()), update, BSONObj(), false /*upsert*/);
+        opCtx, BSON(ShardCollectionType::uuid() << nss.ns()), update, false /*upsert*/);
 }
 
-Status unsetPersistedRefreshFlags(OperationContext* opCtx, const NamespaceString& nss) {
-    // Set 'refreshing' to false and increment the sequence number so it's differs from the last
-    // stable state. Note: incrementing a non-existent field sets the field to the increment value,
-    // so such a situation is safe.
-    BSONObj update = BSON(ShardCollectionType::refreshing()
-                          << false
-                          << "$inc"
-                          << BSON(ShardCollectionType::refreshSequenceNumber() << 1));
+Status unsetPersistedRefreshFlags(OperationContext* opCtx,
+                                  const NamespaceString& nss,
+                                  const ChunkVersion& refreshedVersion) {
+    // Set 'refreshing' to false and update the last refreshed collection version.
+    BSONObjBuilder updateBuilder;
+    updateBuilder.append(ShardCollectionType::refreshing(), false);
+    updateBuilder.appendTimestamp(ShardCollectionType::lastRefreshedCollectionVersion(),
+                                  refreshedVersion.toLong());
 
     return updateShardCollectionsEntry(opCtx,
                                        BSON(ShardCollectionType::uuid() << nss.ns()),
-                                       BSON(ShardCollectionType::refreshing() << false),
-                                       BSON(ShardCollectionType::refreshSequenceNumber() << 1),
+                                       updateBuilder.obj(),
                                        false /*upsert*/);
 }
 
@@ -109,9 +108,22 @@ StatusWith<RefreshState> getPersistedRefreshFlags(OperationContext* opCtx,
     }
     ShardCollectionType entry = statusWithCollectionEntry.getValue();
 
+    // Ensure the results have not been incorrectly set somehow.
+    if (entry.hasRefreshing()) {
+        // If 'refreshing' is present and false, a refresh must have occurred (otherwise the field
+        // would never have been added to the document) and there should always be a refresh
+        // version.
+        invariant(entry.getRefreshing() ? true : entry.hasLastRefreshedCollectionVersion());
+    } else {
+        // If 'refreshing' is not present, no refresh version should exist.
+        invariant(!entry.hasLastRefreshedCollectionVersion());
+    }
+
     return RefreshState{entry.getEpoch(),
                         entry.hasRefreshing() ? entry.getRefreshing() : false,
-                        entry.hasRefreshSequenceNumber() ? entry.getRefreshSequenceNumber() : 0LL};
+                        entry.hasLastRefreshedCollectionVersion()
+                            ? entry.getLastRefreshedCollectionVersion()
+                            : ChunkVersion(0, 0, entry.getEpoch())};
 }
 
 StatusWith<ShardCollectionType> readShardCollectionsEntry(OperationContext* opCtx,
@@ -154,24 +166,18 @@ StatusWith<ShardCollectionType> readShardCollectionsEntry(OperationContext* opCt
 Status updateShardCollectionsEntry(OperationContext* opCtx,
                                    const BSONObj& query,
                                    const BSONObj& update,
-                                   const BSONObj& inc,
                                    const bool upsert) {
     invariant(query.hasField("_id"));
     if (upsert) {
         // If upserting, this should be an update from the config server that does not have shard
         // refresh information.
         invariant(!update.hasField(ShardCollectionType::refreshing()));
-        invariant(!update.hasField(ShardCollectionType::refreshSequenceNumber()));
-        invariant(inc.isEmpty());
+        invariant(!update.hasField(ShardCollectionType::lastRefreshedCollectionVersion()));
     }
 
     // Want to modify the document, not replace it.
     BSONObjBuilder updateBuilder;
     updateBuilder.append("$set", update);
-    if (!inc.isEmpty()) {
-        updateBuilder.append("$inc", inc);
-    }
-
     std::unique_ptr<BatchedUpdateDocument> updateDoc(new BatchedUpdateDocument());
     updateDoc->setQuery(query);
     updateDoc->setUpdateExpr(updateBuilder.obj());

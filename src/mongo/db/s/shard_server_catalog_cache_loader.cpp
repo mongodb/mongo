@@ -81,11 +81,8 @@ Status persistCollectionAndChangedChunks(OperationContext* opCtx,
                                                      collAndChunks.shardKeyPattern,
                                                      collAndChunks.defaultCollation,
                                                      collAndChunks.shardKeyIsUnique);
-    Status status = updateShardCollectionsEntry(opCtx,
-                                                BSON(ShardCollectionType::uuid() << nss.ns()),
-                                                update.toBSON(),
-                                                BSONObj(),
-                                                true /*upsert*/);
+    Status status = updateShardCollectionsEntry(
+        opCtx, BSON(ShardCollectionType::uuid() << nss.ns()), update.toBSON(), true /*upsert*/);
     if (!status.isOK()) {
         return status;
     }
@@ -103,7 +100,8 @@ Status persistCollectionAndChangedChunks(OperationContext* opCtx,
     }
 
     // Mark the chunk metadata as done refreshing.
-    status = unsetPersistedRefreshFlags(opCtx, nss);
+    status =
+        unsetPersistedRefreshFlags(opCtx, nss, collAndChunks.changedChunks.back().getVersion());
     if (!status.isOK()) {
         return status;
     }

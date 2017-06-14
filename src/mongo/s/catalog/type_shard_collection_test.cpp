@@ -48,7 +48,7 @@ const BSONObj kDefaultCollation = BSON("locale"
 
 TEST(ShardCollectionType, ToFromBSON) {
     const OID epoch = OID::gen();
-    const long long refreshSequenceNumber = 2LL;
+    const ChunkVersion lastRefreshedCollectionVersion(2, 0, epoch);
 
     BSONObjBuilder builder;
     builder.append(ShardCollectionType::uuid.name(), kNss.ns());
@@ -58,7 +58,8 @@ TEST(ShardCollectionType, ToFromBSON) {
     builder.append(ShardCollectionType::defaultCollation(), kDefaultCollation);
     builder.append(ShardCollectionType::unique(), true);
     builder.append(ShardCollectionType::refreshing(), false);
-    builder.append(ShardCollectionType::refreshSequenceNumber(), refreshSequenceNumber);
+    builder.appendTimestamp(ShardCollectionType::lastRefreshedCollectionVersion(),
+                            lastRefreshedCollectionVersion.toLong());
     BSONObj obj = builder.obj();
 
     ShardCollectionType shardCollectionType = assertGet(ShardCollectionType::fromBSON(obj));
@@ -70,7 +71,8 @@ TEST(ShardCollectionType, ToFromBSON) {
     ASSERT_BSONOBJ_EQ(shardCollectionType.getDefaultCollation(), kDefaultCollation);
     ASSERT_EQUALS(shardCollectionType.getUnique(), true);
     ASSERT_EQUALS(shardCollectionType.getRefreshing(), false);
-    ASSERT_EQUALS(shardCollectionType.getRefreshSequenceNumber(), refreshSequenceNumber);
+    ASSERT_EQUALS(shardCollectionType.getLastRefreshedCollectionVersion(),
+                  lastRefreshedCollectionVersion);
 
     ASSERT_BSONOBJ_EQ(obj, shardCollectionType.toBSON());
 }

@@ -271,7 +271,8 @@ StatusWith<ChunkType> ChunkType::fromShardBSON(const BSONObj& source, const OID&
     }
 
     {
-        auto statusWithChunkVersion = ChunkVersion::parseFromBSONAndSetEpoch(source, epoch);
+        auto statusWithChunkVersion = ChunkVersion::parseFromBSONWithFieldAndSetEpoch(
+            source, DEPRECATED_lastmod.name(), epoch);
         if (!statusWithChunkVersion.isOK()) {
             return statusWithChunkVersion.getStatus();
         }

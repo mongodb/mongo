@@ -34,10 +34,10 @@
 #include "mongo/base/status.h"
 #include "mongo/bson/bsonobj.h"
 #include "mongo/bson/oid.h"
+#include "mongo/s/chunk_version.h"
 
 namespace mongo {
 
-struct ChunkVersion;
 class ChunkType;
 class CollectionMetadata;
 class NamespaceString;
@@ -67,7 +67,7 @@ struct RefreshState {
 
     OID epoch;
     bool refreshing;
-    long long sequenceNumber;
+    ChunkVersion lastRefreshedCollectionVersion;
 };
 
 /**
@@ -103,13 +103,20 @@ Status setPersistedRefreshFlags(OperationContext* opCtx, const NamespaceString& 
 
 /**
  * Writes a persisted signal to indicate that it is once again safe to read from the chunks
- * collection for 'nss'. It is essential to call this after updating the chunks collection so that
- * secondaries know they can safely use the chunk metadata again.
+ * collection for 'nss' and updates the collection's collection version to 'refreshedVersion'. It is
+ * essential to call this after updating the chunks collection so that secondaries know they can
+ * safely use the chunk metadata again.
+ *
+ * It is safe to call this multiple times: it's an idempotent action.
+ *
+ * refreshedVersion - the new collection version for the completed refresh.
  *
  * Note: if there is no document present in the collections collection for 'nss', nothing is
  * updated.
  */
-Status unsetPersistedRefreshFlags(OperationContext* opCtx, const NamespaceString& nss);
+Status unsetPersistedRefreshFlags(OperationContext* opCtx,
+                                  const NamespaceString& nss,
+                                  const ChunkVersion& refreshedVersion);
 
 /**
  * Reads the persisted refresh signal for 'nss' and returns those settings.
@@ -129,17 +136,12 @@ StatusWith<ShardCollectionType> readShardCollectionsEntry(OperationContext* opCt
  *
  * Uses the $set operator on the update so that updates can be applied without resetting everything.
  *
- * If 'upsert' is true, $setOnInsert is used to initialize the 'refreshSequenceNumber'.
- * upsert should only be used when applying updates from the config server, where the update never
- * includes the 'refreshing' and 'refreshSequenceNumber' fields.
- *
- * 'inc' contains fields and the desired increments, e.g. {'refreshSequenceNumber': 1}. Never use
- * 'upsert' true with a non-empty 'inc' object.
+ * If 'upsert' is true, expects neither 'refreshing' or 'lastRefreshedCollectionVersion' to be
+ * present in the update: these refreshing fields should only be added to an existing document.
  */
 Status updateShardCollectionsEntry(OperationContext* opCtx,
                                    const BSONObj& query,
                                    const BSONObj& update,
-                                   const BSONObj& inc,
                                    const bool upsert);
 
 /**
