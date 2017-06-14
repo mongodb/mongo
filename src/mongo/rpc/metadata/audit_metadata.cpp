@@ -60,31 +60,12 @@ Status AuditMetadata::writeToMetadata(BSONObjBuilder*) const {
     return Status::OK();
 }
 
-Status AuditMetadata::downconvert(const BSONObj& command,
-                                  const BSONObj&,
-                                  BSONObjBuilder* commandBob,
-                                  int*) {
-    commandBob->appendElements(command);
-    return Status::OK();
-}
-
-Status AuditMetadata::upconvert(const BSONObj& command,
-                                const int,
-                                BSONObjBuilder* commandBob,
-                                BSONObjBuilder*) {
-    commandBob->appendElements(command);
-    return Status::OK();
-}
-
 #endif
 
 const boost::optional<AuditMetadata::UsersAndRoles>& AuditMetadata::getImpersonatedUsersAndRoles()
     const {
     return _impersonatedUsersAndRoles;
 }
-
-const char kLegacyImpersonatedUsersFieldName[] = "impersonatedUsers";
-const char kLegacyImpersonatedRolesFieldName[] = "impersonatedRoles";
 
 }  // namespace rpc
 }  // namespace mongo

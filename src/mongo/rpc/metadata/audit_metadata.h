@@ -65,16 +65,6 @@ public:
 
     Status writeToMetadata(BSONObjBuilder* metadataBob) const;
 
-    static Status downconvert(const BSONObj& command,
-                              const BSONObj& metadata,
-                              BSONObjBuilder* legacyCommandBob,
-                              int* legacyQueryFlags);
-
-    static Status upconvert(const BSONObj& legacyCommand,
-                            const int legacyQueryFlags,
-                            BSONObjBuilder* commandBob,
-                            BSONObjBuilder* metadataBob);
-
     using UsersAndRoles = std::tuple<std::vector<UserName>, std::vector<RoleName>>;
 
     const boost::optional<UsersAndRoles>& getImpersonatedUsersAndRoles() const;
@@ -88,16 +78,6 @@ public:
 private:
     boost::optional<UsersAndRoles> _impersonatedUsersAndRoles;
 };
-
-/**
- * The legacy field name used to hold impersonated users.
- */
-extern const char kLegacyImpersonatedUsersFieldName[];
-
-/**
- * The legacy field name used to hold impersonated roles.
- */
-extern const char kLegacyImpersonatedRolesFieldName[];
 
 }  // namespace rpc
 }  // namespace mongo

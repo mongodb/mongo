@@ -149,14 +149,8 @@ CommandAndMetadata upconvertRequestMetadata(BSONObj legacyCmdObj, int queryFlags
         ReadPreferenceSetting(ReadPreference::SecondaryPreferred).toContainingBSON(&metadataBob);
     }
 
-    // Ordering is important here - AuditMetadata::upconvert() expects the above up-conversion to
-    // already be done.
-    BSONObjBuilder auditCommandBob;
-    uassertStatusOK(
-        AuditMetadata::upconvert(legacyCmdObj, queryFlags, &auditCommandBob, &metadataBob));
-
     BSONObjBuilder logicalTimeCommandBob;
-    for (auto elem : auditCommandBob.done()) {
+    for (auto elem : legacyCmdObj) {
         if (elem.fieldNameStringData() == LogicalTimeMetadata::fieldName()) {
             metadataBob.append(elem);
         } else {
@@ -169,18 +163,12 @@ CommandAndMetadata upconvertRequestMetadata(BSONObj legacyCmdObj, int queryFlags
 
 LegacyCommandAndFlags downconvertRequestMetadata(BSONObj cmdObj, BSONObj metadata) {
     int legacyQueryFlags = 0;
-    BSONObjBuilder logicalTimeCommandBob;
-    logicalTimeCommandBob.appendElements(cmdObj);
     if (auto logicalTime = metadata[LogicalTimeMetadata::fieldName()]) {
+        BSONObjBuilder logicalTimeCommandBob;
+        logicalTimeCommandBob.appendElements(cmdObj);
         logicalTimeCommandBob.append(logicalTime);
+        cmdObj = logicalTimeCommandBob.obj();
     }
-
-    // Ordering is important here - AuditingMetadata must be downconverted before ReadPreference.
-    BSONObjBuilder auditCommandBob;
-    uassertStatusOK(AuditMetadata::downconvert(
-        logicalTimeCommandBob.done(), metadata, &auditCommandBob, &legacyQueryFlags));
-
-    cmdObj = auditCommandBob.obj();
 
     auto readPref = metadata["$readPreference"];
     if (!readPref)
