@@ -103,7 +103,11 @@ class BSONObjPrinter:
         # Handle the endianness of the BSON object size, which is represented as a 32-bit integer
         # in little-endian format.
         inferior = gdb.selected_inferior()
-        self.size = struct.unpack('<I', inferior.read_memory(self.ptr, 4))[0]
+        try:
+            self.size = struct.unpack('<I', inferior.read_memory(self.ptr, 4))[0]
+        except gdb.error as gdberr:
+            # If the value has been optimized out, we cannot decode it.
+            self.size = 0
 
     def display_hint(self):
         return 'map'
