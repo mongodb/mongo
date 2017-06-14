@@ -7,6 +7,7 @@ Combines JSON report files used in Evergreen
 from __future__ import absolute_import
 from __future__ import print_function
 
+import errno
 import json
 import os
 import sys
@@ -46,6 +47,10 @@ def main():
                       help="If '-', then the combined report file is written to stdout."
                            " Any other value is treated as the output file name. By default,"
                            " output is written to stdout.")
+    parser.add_option("-m", "--ignore-missing-reports",
+                      dest="ignore_missing",
+                      action="store_true",
+                      help="Ignore any input report file that does not exist.")
 
     (options, args) = parser.parse_args()
 
@@ -55,8 +60,15 @@ def main():
     report_files = args
     test_reports = []
     for report_file in report_files:
-        report_file_json = read_json_file(report_file)
-        test_reports.append(report.TestReport.from_dict(report_file_json))
+        try:
+            report_file_json = read_json_file(report_file)
+            test_reports.append(report.TestReport.from_dict(report_file_json))
+        except IOError as e:
+            # errno.ENOENT is the error code for "No such file or directory".
+            if options.ignore_missing and e.errno == errno.ENOENT:
+                print("Ignoring missing file {}".format(report_file))
+                continue
+            raise
 
     combined_test_report = report.TestReport.combine(*test_reports)
     combined_report = combined_test_report.as_dict()
