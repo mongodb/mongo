@@ -276,12 +276,36 @@ StorageInterfaceImpl::createCollectionForBulkLoading(
             collection = db->getDb()->createCollection(txn, nss.ns(), options, false);
             invariant(collection);
             wunit.commit();
+
+            // Build empty capped indexes.  Capped indexes cannot be build by the MultiIndexBlock
+            // because the cap might delete documents off the back while we are inserting them into
+            // the front.
+            if (options.capped) {
+                WriteUnitOfWork wunit(txn);
+                if (!idIndexSpec.isEmpty()) {
+                    auto status = collection->getIndexCatalog()->createIndexOnEmptyCollection(
+                        txn, idIndexSpec);
+                    if (!status.getStatus().isOK()) {
+                        return status.getStatus();
+                    }
+                }
+                for (auto&& spec : secondaryIndexSpecs) {
+                    auto status =
+                        collection->getIndexCatalog()->createIndexOnEmptyCollection(txn, spec);
+                    if (!status.getStatus().isOK()) {
+                        return status.getStatus();
+                    }
+                }
+                wunit.commit();
+            }
+
             coll = stdx::make_unique<AutoGetCollection>(txn, nss, MODE_IX);
 
             // Move locks into loader, so it now controls their lifetime.
             auto loader = stdx::make_unique<CollectionBulkLoaderImpl>(txn,
                                                                       collection,
-                                                                      idIndexSpec,
+                                                                      options.capped ? BSONObj()
+                                                                                     : idIndexSpec,
                                                                       std::move(threadPool),
                                                                       std::move(runner),
                                                                       std::move(db),
@@ -300,7 +324,8 @@ StorageInterfaceImpl::createCollectionForBulkLoading(
     }
 
     invariant(collection);
-    status = loaderToReturn->init(collection, secondaryIndexSpecs);
+    status = loaderToReturn->init(collection,
+                                  options.capped ? std::vector<BSONObj>() : secondaryIndexSpecs);
     if (!status.isOK()) {
         return status;
     }
