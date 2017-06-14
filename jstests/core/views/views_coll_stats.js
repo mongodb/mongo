@@ -64,4 +64,20 @@
         viewsDB.runCommand(
             {aggregate: "a", pipeline: [{$collStats: {storageStats: {}}}], cursor: {}}),
         ErrorCodes.CommandNotSupportedOnView);
+    clear();
+
+    // Assert that attempting to retrieve collection record count on an identity views fails.
+    makeView("a", "b");
+    assert.commandFailedWithCode(
+        viewsDB.runCommand({aggregate: "a", pipeline: [{$collStats: {count: {}}}], cursor: {}}),
+        ErrorCodes.CommandNotSupportedOnView);
+    clear();
+
+    // Assert that attempting to retrieve collection record count on a non-identity view fails.
+    makeView("a", "b", [{$match: {a: 0}}]);
+    assert.commandFailedWithCode(
+        viewsDB.runCommand({aggregate: "a", pipeline: [{$collStats: {count: {}}}], cursor: {}}),
+        ErrorCodes.CommandNotSupportedOnView);
+    clear();
+
 }());

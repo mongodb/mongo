@@ -77,6 +77,12 @@ intrusive_ptr<DocumentSource> DocumentSourceCollStats::createFromBson(
                                   << " of type "
                                   << typeName(elem.type()),
                     elem.type() == BSONType::Object);
+        } else if ("count" == fieldName) {
+            uassert(40480,
+                    str::stream() << "count argument must be an object, but got " << elem
+                                  << " of type "
+                                  << typeName(elem.type()),
+                    elem.type() == BSONType::Object);
         } else {
             uasserted(40168, str::stream() << "unrecognized option to $collStats: " << fieldName);
         }
@@ -115,6 +121,15 @@ DocumentSource::GetNextResult DocumentSourceCollStats::getNext() {
         if (!status.isOK()) {
             uasserted(40280,
                       str::stream() << "Unable to retrieve storageStats in $collStats stage: "
+                                    << status.reason());
+        }
+    }
+
+    if (_collStatsSpec.hasField("count")) {
+        Status status = _mongod->appendRecordCount(pExpCtx->ns, &builder);
+        if (!status.isOK()) {
+            uasserted(40481,
+                      str::stream() << "Unable to retrieve count in $collStats stage: "
                                     << status.reason());
         }
     }
