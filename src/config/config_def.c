@@ -148,11 +148,12 @@ static const WT_CONFIG_CHECK confchk_WT_CONNECTION_reconfigure[] = {
 	{ "verbose", "list",
 	    NULL, "choices=[\"api\",\"block\",\"checkpoint\",\"compact\","
 	    "\"evict\",\"evict_stuck\",\"evictserver\",\"fileops\","
-	    "\"handleops\",\"log\",\"lsm\",\"lsm_manager\",\"metadata\","
-	    "\"mutex\",\"overflow\",\"read\",\"rebalance\",\"reconcile\","
-	    "\"recovery\",\"recovery_progress\",\"salvage\",\"shared_cache\","
-	    "\"split\",\"temporary\",\"thread_group\",\"transaction\","
-	    "\"verify\",\"version\",\"write\"]",
+	    "\"handleops\",\"log\",\"lookaside_activity\",\"lsm\","
+	    "\"lsm_manager\",\"metadata\",\"mutex\",\"overflow\",\"read\","
+	    "\"rebalance\",\"reconcile\",\"recovery\",\"recovery_progress\","
+	    "\"salvage\",\"shared_cache\",\"split\",\"temporary\","
+	    "\"thread_group\",\"transaction\",\"verify\",\"version\","
+	    "\"write\"]",
 	    NULL, 0 },
 	{ NULL, NULL, NULL, NULL, NULL, 0 }
 };
@@ -751,11 +752,12 @@ static const WT_CONFIG_CHECK confchk_wiredtiger_open[] = {
 	{ "verbose", "list",
 	    NULL, "choices=[\"api\",\"block\",\"checkpoint\",\"compact\","
 	    "\"evict\",\"evict_stuck\",\"evictserver\",\"fileops\","
-	    "\"handleops\",\"log\",\"lsm\",\"lsm_manager\",\"metadata\","
-	    "\"mutex\",\"overflow\",\"read\",\"rebalance\",\"reconcile\","
-	    "\"recovery\",\"recovery_progress\",\"salvage\",\"shared_cache\","
-	    "\"split\",\"temporary\",\"thread_group\",\"transaction\","
-	    "\"verify\",\"version\",\"write\"]",
+	    "\"handleops\",\"log\",\"lookaside_activity\",\"lsm\","
+	    "\"lsm_manager\",\"metadata\",\"mutex\",\"overflow\",\"read\","
+	    "\"rebalance\",\"reconcile\",\"recovery\",\"recovery_progress\","
+	    "\"salvage\",\"shared_cache\",\"split\",\"temporary\","
+	    "\"thread_group\",\"transaction\",\"verify\",\"version\","
+	    "\"write\"]",
 	    NULL, 0 },
 	{ "write_through", "list",
 	    NULL, "choices=[\"data\",\"log\"]",
@@ -838,11 +840,12 @@ static const WT_CONFIG_CHECK confchk_wiredtiger_open_all[] = {
 	{ "verbose", "list",
 	    NULL, "choices=[\"api\",\"block\",\"checkpoint\",\"compact\","
 	    "\"evict\",\"evict_stuck\",\"evictserver\",\"fileops\","
-	    "\"handleops\",\"log\",\"lsm\",\"lsm_manager\",\"metadata\","
-	    "\"mutex\",\"overflow\",\"read\",\"rebalance\",\"reconcile\","
-	    "\"recovery\",\"recovery_progress\",\"salvage\",\"shared_cache\","
-	    "\"split\",\"temporary\",\"thread_group\",\"transaction\","
-	    "\"verify\",\"version\",\"write\"]",
+	    "\"handleops\",\"log\",\"lookaside_activity\",\"lsm\","
+	    "\"lsm_manager\",\"metadata\",\"mutex\",\"overflow\",\"read\","
+	    "\"rebalance\",\"reconcile\",\"recovery\",\"recovery_progress\","
+	    "\"salvage\",\"shared_cache\",\"split\",\"temporary\","
+	    "\"thread_group\",\"transaction\",\"verify\",\"version\","
+	    "\"write\"]",
 	    NULL, 0 },
 	{ "version", "string", NULL, NULL, NULL, 0 },
 	{ "write_through", "list",
@@ -920,11 +923,12 @@ static const WT_CONFIG_CHECK confchk_wiredtiger_open_basecfg[] = {
 	{ "verbose", "list",
 	    NULL, "choices=[\"api\",\"block\",\"checkpoint\",\"compact\","
 	    "\"evict\",\"evict_stuck\",\"evictserver\",\"fileops\","
-	    "\"handleops\",\"log\",\"lsm\",\"lsm_manager\",\"metadata\","
-	    "\"mutex\",\"overflow\",\"read\",\"rebalance\",\"reconcile\","
-	    "\"recovery\",\"recovery_progress\",\"salvage\",\"shared_cache\","
-	    "\"split\",\"temporary\",\"thread_group\",\"transaction\","
-	    "\"verify\",\"version\",\"write\"]",
+	    "\"handleops\",\"log\",\"lookaside_activity\",\"lsm\","
+	    "\"lsm_manager\",\"metadata\",\"mutex\",\"overflow\",\"read\","
+	    "\"rebalance\",\"reconcile\",\"recovery\",\"recovery_progress\","
+	    "\"salvage\",\"shared_cache\",\"split\",\"temporary\","
+	    "\"thread_group\",\"transaction\",\"verify\",\"version\","
+	    "\"write\"]",
 	    NULL, 0 },
 	{ "version", "string", NULL, NULL, NULL, 0 },
 	{ "write_through", "list",
@@ -1002,11 +1006,12 @@ static const WT_CONFIG_CHECK confchk_wiredtiger_open_usercfg[] = {
 	{ "verbose", "list",
 	    NULL, "choices=[\"api\",\"block\",\"checkpoint\",\"compact\","
 	    "\"evict\",\"evict_stuck\",\"evictserver\",\"fileops\","
-	    "\"handleops\",\"log\",\"lsm\",\"lsm_manager\",\"metadata\","
-	    "\"mutex\",\"overflow\",\"read\",\"rebalance\",\"reconcile\","
-	    "\"recovery\",\"recovery_progress\",\"salvage\",\"shared_cache\","
-	    "\"split\",\"temporary\",\"thread_group\",\"transaction\","
-	    "\"verify\",\"version\",\"write\"]",
+	    "\"handleops\",\"log\",\"lookaside_activity\",\"lsm\","
+	    "\"lsm_manager\",\"metadata\",\"mutex\",\"overflow\",\"read\","
+	    "\"rebalance\",\"reconcile\",\"recovery\",\"recovery_progress\","
+	    "\"salvage\",\"shared_cache\",\"split\",\"temporary\","
+	    "\"thread_group\",\"transaction\",\"verify\",\"version\","
+	    "\"write\"]",
 	    NULL, 0 },
 	{ "write_through", "list",
 	    NULL, "choices=[\"data\",\"log\"]",

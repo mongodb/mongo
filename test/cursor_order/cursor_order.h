@@ -50,5 +50,5 @@ typedef struct {
 } SHARED_CONFIG;
 
 void load(SHARED_CONFIG *, const char *);
-int  ops_start(SHARED_CONFIG *);
+void ops_start(SHARED_CONFIG *);
 void verify(SHARED_CONFIG *, const char *);

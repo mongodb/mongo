@@ -42,3 +42,5 @@ extern void
 workgen_random_free(struct workgen_random_state *rnd_state);
 extern void
 workgen_u64_to_string_zf(uint64_t n, char *buf, size_t len);
+extern void
+workgen_version(char *buf, size_t len);

@@ -267,16 +267,18 @@ int ContextInternal::create_all() {
 }
 
 Monitor::Monitor(WorkloadRunner &wrunner) :
-    _errno(0), _exception(), _wrunner(wrunner), _stop(false), _handle() {}
+    _errno(0), _exception(), _wrunner(wrunner), _stop(false), _handle(),
+    _out(NULL), _json(NULL) {}
 Monitor::~Monitor() {}
 
 int Monitor::run() {
     struct timespec t;
     struct tm *tm, _tm;
-    char time_buf[64];
+    char time_buf[64], version[100];
     Stats prev_totals;
     WorkloadOptions *options = &_wrunner._workload->options;
     uint64_t latency_max = (uint64_t)options->max_latency;
+    bool first;
 
     (*_out) << "#time,"
             << "totalsec,"
@@ -295,6 +297,8 @@ int Monitor::run() {
             << "update maximum latency(uS)"
             << std::endl;
 
+    first = true;
+    workgen_version(version, sizeof(version));
     Stats prev_interval;
     while (!_stop) {
         for (int i = 0; i < options->sample_interval && !_stop; i++)
@@ -336,6 +340,32 @@ int Monitor::run() {
                 << "," << interval.update.min_latency
                 << "," << interval.update.max_latency
                 << std::endl;
+
+        if (_json != NULL) {
+#define	WORKGEN_TIMESTAMP_JSON		"%Y-%m-%dT%H:%M:%S.000Z"
+            (void)strftime(time_buf, sizeof(time_buf),
+              WORKGEN_TIMESTAMP_JSON, tm);
+
+#define TRACK_JSON(name, t)                                        \
+            "\"" << (name) << "\":{"                               \
+            << "\"ops per sec\":" << ((t).ops / interval_secs)     \
+            << ",\"average latency\":" << (t).average_latency()    \
+            << ",\"min latency\":" << (t).min_latency              \
+            << ",\"max latency\":" << (t).max_latency              \
+            << "}"
+
+            (*_json) << "{";
+            if (first) {
+                (*_json) << "\"version\":\"" << version << "\",";
+                first = false;
+            }
+            (*_json) << "\"localTime\":\"" << time_buf
+                     << "\",\"workgen\":{"
+                     << TRACK_JSON("read", interval.read) << ","
+                     << TRACK_JSON("insert", interval.insert) << ","
+                     << TRACK_JSON("update", interval.update)
+                     << "}}" << std::endl;
+        }
 
         uint64_t read_max = interval.read.max_latency;
         uint64_t insert_max = interval.read.max_latency;
@@ -1315,8 +1345,8 @@ TableInternal::TableInternal(const TableInternal &other) : _tint(other._tint),
 TableInternal::~TableInternal() {}
 
 WorkloadOptions::WorkloadOptions() : max_latency(0),
-    report_file("workload.stat"), report_interval(0),
-    run_time(0), sample_interval(0), sample_rate(1),
+    report_file("workload.stat"), report_interval(0), run_time(0),
+    sample_file("sample.json"), sample_interval(0), sample_rate(1),
     _options() {
     _options.add_int("max_latency", max_latency,
       "prints warning if any latency measured exceeds this number of "
@@ -1329,6 +1359,11 @@ WorkloadOptions::WorkloadOptions() : max_latency(0),
       "The file name is relative to the connection's home directory. "
       "When set to the empty string, stdout is used.");
     _options.add_int("run_time", run_time, "total workload seconds");
+    _options.add_string("sample_file", sample_file,
+      "file name for collecting latency output in a JSON-like format, "
+      "enabled by the report_interval option. "
+      "The file name is relative to the connection's home directory. "
+      "When set to the empty string, no JSON is emitted.");
     _options.add_int("sample_interval", sample_interval,
       "performance logging every interval seconds, 0 to disable");
     _options.add_int("sample_rate", sample_rate,
@@ -1492,6 +1527,7 @@ int WorkloadRunner::run_all() {
     WorkloadOptions *options = &_workload->options;
     Monitor monitor(*this);
     std::ofstream monitor_out;
+    std::ofstream monitor_json;
     std::ostream &out = *_report_out;
     WT_DECL_RET;
 
@@ -1509,6 +1545,12 @@ int WorkloadRunner::run_all() {
     if (options->sample_interval > 0) {
         open_report_file(monitor_out, "monitor", "monitor output file");
         monitor._out = &monitor_out;
+
+        if (!options->sample_file.empty()) {
+            open_report_file(monitor_json, options->sample_file.c_str(),
+              "sample JSON output file");
+            monitor._json = &monitor_json;
+        }
 
         if ((ret = pthread_create(&monitor._handle, NULL, monitor_main,
           &monitor)) != 0) {
@@ -1588,6 +1630,10 @@ int WorkloadRunner::run_all() {
                       << std::endl;
         if (exception == NULL && !monitor._exception._str.empty())
             exception = &monitor._exception;
+
+        monitor_out.close();
+        if (!options->sample_file.empty())
+            monitor_json.close();
     }
 
     // issue the final report

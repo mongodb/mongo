@@ -88,5 +88,5 @@ except:
 shutil.rmtree('WT_TEST', True)
 os.mkdir('WT_TEST')
 
-from .core import txn, extensions_config
+from .core import txn, extensions_config, op_group_transaction, op_log_like, op_multi_table
 from .latency import workload_latency

@@ -292,8 +292,7 @@ __wt_las_sweep(WT_SESSION_IMPL *session)
 	WT_DECL_ITEM(las_key);
 	WT_DECL_RET;
 	WT_ITEM *key;
-	uint64_t cnt, las_counter, las_txnid;
-	int64_t remove_cnt;
+	uint64_t cnt, las_counter, las_txnid, remove_cnt;
 	uint32_t las_id, session_flags;
 	int notused;
 
@@ -342,7 +341,7 @@ __wt_las_sweep(WT_SESSION_IMPL *session)
 	 * blocks in the cache in order to get rid of them, and slowly review
 	 * lookaside blocks that have already been evicted.
 	 */
-	cnt = (uint64_t)WT_MAX(100, conn->las_record_cnt / 30);
+	cnt = WT_MAX(100, conn->las_record_cnt / 30);
 
 	/* Discard pages we read as soon as we're done with them. */
 	F_SET(session, WT_SESSION_NO_CACHE);
@@ -390,14 +389,13 @@ err:		__wt_buf_free(session, key);
 	WT_TRET(__wt_las_cursor_close(session, &cursor, session_flags));
 
 	/*
-	 * If there were races to remove records, we can over-count.  All
-	 * arithmetic is signed, so underflow isn't fatal, but check anyway so
-	 * we don't skew low over time.
+	 * If there were races to remove records, we can over-count. Underflow
+	 * isn't fatal, but check anyway so we don't skew low over time.
 	 */
 	if (remove_cnt > conn->las_record_cnt)
 		conn->las_record_cnt = 0;
 	else if (remove_cnt > 0)
-		(void)__wt_atomic_subi64(&conn->las_record_cnt, remove_cnt);
+		(void)__wt_atomic_sub64(&conn->las_record_cnt, remove_cnt);
 
 	F_CLR(session, WT_SESSION_NO_CACHE);
 

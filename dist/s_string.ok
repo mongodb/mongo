@@ -305,6 +305,7 @@ RMW
 RNG
 RPC
 RUNDIR
+RWLOCK
 RXB
 Radu
 ReadFile

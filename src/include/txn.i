@@ -424,6 +424,8 @@ __wt_txn_update_check(WT_SESSION_IMPL *session, WT_UPDATE *upd)
 	if (txn->isolation == WT_ISO_SNAPSHOT)
 		while (upd != NULL && !__wt_txn_visible(session, upd->txnid)) {
 			if (upd->txnid != WT_TXN_ABORTED) {
+				WT_STAT_CONN_INCR(
+				    session, txn_update_conflict);
 				WT_STAT_DATA_INCR(
 				    session, txn_update_conflict);
 				return (WT_ROLLBACK);

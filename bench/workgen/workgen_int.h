@@ -146,6 +146,7 @@ struct Monitor {
     volatile bool _stop;
     pthread_t _handle;
     std::ostream *_out;
+    std::ostream *_json;
 
     Monitor(WorkloadRunner &wrunner);
     ~Monitor();

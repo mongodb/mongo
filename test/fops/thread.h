@@ -39,7 +39,7 @@ extern const char *config;			/* Object config */
 
 extern pthread_rwlock_t single;			/* Single-thread */
 
-int  fop_start(u_int);
+void fop_start(u_int);
 void obj_bulk(void);
 void obj_bulk_unique(int);
 void obj_checkpoint(void);

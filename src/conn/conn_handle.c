@@ -62,9 +62,9 @@ __wt_connection_init(WT_CONNECTION_IMPL *conn)
 	WT_RET(__wt_spin_init(session, &conn->turtle_lock, "turtle file"));
 
 	/* Read-write locks */
-	WT_RET(__wt_rwlock_init(session, &conn->dhandle_lock));
+	WT_RWLOCK_INIT_TRACKED(session, &conn->dhandle_lock, dhandle);
 	WT_RET(__wt_rwlock_init(session, &conn->hot_backup_lock));
-	WT_RET(__wt_rwlock_init(session, &conn->table_lock));
+	WT_RWLOCK_INIT_TRACKED(session, &conn->table_lock, table);
 
 	/* Setup the spin locks for the LSM manager queues. */
 	WT_RET(__wt_spin_init(session,

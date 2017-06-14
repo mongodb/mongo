@@ -31,26 +31,15 @@ static int  __evict_walk_file(
 static int
 __evict_lock_handle_list(WT_SESSION_IMPL *session)
 {
-	struct timespec enter, leave;
 	WT_CACHE *cache;
 	WT_CONNECTION_IMPL *conn;
 	WT_DECL_RET;
 	WT_RWLOCK *dh_lock;
 	u_int spins;
-	bool dh_stats;
 
 	conn = S2C(session);
 	cache = conn->cache;
 	dh_lock = &conn->dhandle_lock;
-
-	/*
-	 * Setup tracking of handle lock acquisition wait time if statistics
-	 * are enabled.
-	 */
-	dh_stats = WT_STAT_ENABLED(session);
-
-	if (dh_stats)
-		__wt_epoch(session, &enter);
 
 	/*
 	 * Use a custom lock acquisition back off loop so the eviction server
@@ -64,17 +53,7 @@ __evict_lock_handle_list(WT_SESSION_IMPL *session)
 		else
 			__wt_sleep(0, WT_THOUSAND);
 	}
-	/*
-	 * Only record statistics on success.
-	 */
-	WT_RET(ret);
-	if (dh_stats) {
-		__wt_epoch(session, &leave);
-		WT_STAT_CONN_INCRV(
-		    session, lock_handle_list_wait_eviction,
-		    (int64_t)WT_TIMEDIFF_US(leave, enter));
-	}
-	return (0);
+	return (ret);
 }
 
 /*

@@ -87,3 +87,16 @@ workgen_u64_to_string_zf(uint64_t n, char *buf, size_t len)
 {
 	u64_to_string_zf(n, buf, len);
 }
+
+#define	WORKGEN_VERSION_PREFIX	"workgen-"
+extern void
+workgen_version(char *buf, size_t len)
+{
+	size_t prefix_len;
+
+	prefix_len = strlen(WORKGEN_VERSION_PREFIX);
+	(void)strncpy(buf, WORKGEN_VERSION_PREFIX, len);
+	if (len > prefix_len)
+		(void)strncpy(&buf[prefix_len], WIREDTIGER_VERSION_STRING,
+		    len - prefix_len);
+}

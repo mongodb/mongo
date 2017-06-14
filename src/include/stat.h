@@ -399,16 +399,20 @@ struct __wt_connection_stats {
 	int64_t lock_checkpoint_count;
 	int64_t lock_checkpoint_wait_application;
 	int64_t lock_checkpoint_wait_internal;
-	int64_t lock_handle_list_wait_eviction;
+	int64_t lock_dhandle_wait_application;
+	int64_t lock_dhandle_wait_internal;
+	int64_t lock_dhandle_read_count;
+	int64_t lock_dhandle_write_count;
 	int64_t lock_metadata_count;
 	int64_t lock_metadata_wait_application;
 	int64_t lock_metadata_wait_internal;
 	int64_t lock_schema_count;
 	int64_t lock_schema_wait_application;
 	int64_t lock_schema_wait_internal;
-	int64_t lock_table_count;
 	int64_t lock_table_wait_application;
 	int64_t lock_table_wait_internal;
+	int64_t lock_table_read_count;
+	int64_t lock_table_write_count;
 	int64_t log_slot_switch_busy;
 	int64_t log_bytes_payload;
 	int64_t log_bytes_written;
@@ -513,6 +517,7 @@ struct __wt_connection_stats {
 	int64_t txn_sync;
 	int64_t txn_commit;
 	int64_t txn_rollback;
+	int64_t txn_update_conflict;
 };
 
 /*

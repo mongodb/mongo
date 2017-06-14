@@ -59,6 +59,11 @@ During the period the backup cursor is open, database checkpoints can
 be created, but no checkpoints can be deleted.  This may result in
 significant file growth.
 
+Additionally, if a crash occurs during the period the backup cursor is open and
+logging is disabled, then the system will be restored to the most recent
+checkpoint prior to the opening of the backup cursor, even if later database
+checkpoints were created.
+
 The following is a programmatic example of creating a backup:
 
 @snippet ex_all.c backup
