@@ -267,7 +267,9 @@ __wt_metadata_search(WT_SESSION_IMPL *session, const char *key, char **valuep)
 		 * that Coverity complains a lot, add an error check to get some
 		 * peace and quiet.
 		 */
-		if ((ret = __wt_turtle_read(session, key, valuep)) != 0)
+		WT_WITH_TURTLE_LOCK(session,
+		    ret = __wt_turtle_read(session, key, valuep));
+		if (ret != 0)
 			__wt_free(session, *valuep);
 		return (ret);
 	}
