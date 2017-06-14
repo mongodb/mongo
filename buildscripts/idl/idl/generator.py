@@ -17,6 +17,7 @@
 
 from __future__ import absolute_import, print_function, unicode_literals
 
+from abc import ABCMeta, abstractmethod
 import io
 import os
 import string
@@ -81,34 +82,64 @@ def _get_bson_type_check(bson_element, ctxt_name, field):
         return '%s.checkAndAssertTypes(%s, %s)' % (ctxt_name, bson_element, type_list)
 
 
-class _FieldUsageChecker(object):
+class _FieldUsageCheckerBase(object):
     """Check for duplicate fields, and required fields as needed."""
+
+    __metaclass__ = ABCMeta
 
     def __init__(self, indented_writer):
         # type: (writer.IndentedTextWriter) -> None
         """Create a field usage checker."""
         self._writer = indented_writer  # type: writer.IndentedTextWriter
-        self.fields = []  # type: List[ast.Field]
+        self._fields = []  # type: List[ast.Field]
 
-        # TODO: use a more optimal data type
+    @abstractmethod
+    def add_store(self):
+        # type: () -> None
+        """Create the C++ field store initialization code."""
+        pass
+
+    @abstractmethod
+    def add(self, field):
+        # type: (ast.Field) -> None
+        """Add a field to track."""
+        pass
+
+    @abstractmethod
+    def add_final_checks(self):
+        # type: () -> None
+        """Output the code to check for missing fields."""
+        pass
+
+
+class _SlowFieldUsageChecker(_FieldUsageCheckerBase):
+    """
+    Check for duplicate fields, and required fields as needed.
+
+    Detects duplicate extra fields.
+    Generates code with a C++ std::set to maintain a set of fields seen while parsing a BSON
+    document. The std::set has O(N lg N) lookup, and allocates memory in the heap.
+    """
+
+    def __init__(self, indented_writer):
+        # type: (writer.IndentedTextWriter) -> None
+        super(_SlowFieldUsageChecker, self).__init__(indented_writer)
+
         self._writer.write_line('std::set<StringData> usedFields;')
 
     def add_store(self):
         # type: () -> None
-        """Create the C++ field store initialization code."""
         self._writer.write_line('auto push_result = usedFields.insert(fieldName);')
         with writer.IndentedScopedBlock(self._writer, 'if (push_result.second == false) {', '}'):
             self._writer.write_line('ctxt.throwDuplicateField(element);')
 
     def add(self, field):
         # type: (ast.Field) -> None
-        """Add a field to track."""
-        self.fields.append(field)
+        self._fields.append(field)
 
     def add_final_checks(self):
         # type: () -> None
-        """Output the code to check for missing fields."""
-        for field in self.fields:
+        for field in self._fields:
             if (not field.optional) and (not field.ignore) and (not field.chained):
                 with writer.IndentedScopedBlock(self._writer,
                                                 'if (usedFields.find(%s) == usedFields.end()) {' %
@@ -119,6 +150,81 @@ class _FieldUsageChecker(object):
                     else:
                         self._writer.write_line('ctxt.throwMissingField(%s);' %
                                                 (_get_field_constant_name(field)))
+
+
+def _gen_field_usage_constant(field):
+    # type: (ast.Field) -> unicode
+    """Get the name for a bitset constant in field usage checking."""
+    return "k%sBit" % (common.title_case(field.cpp_name))
+
+
+class _FastFieldUsageChecker(_FieldUsageCheckerBase):
+    """
+    Check for duplicate fields, and required fields as needed.
+
+    Does not detect duplicate extra fields. Only works for strict parsers.
+    Generates code with a C++ std::bitset to maintain a record each field seen while parsing a
+    document. The std::bitset has O(1) lookup, and allocates a single int or similar on the stack.
+    """
+
+    def __init__(self, indented_writer, fields):
+        # type: (writer.IndentedTextWriter, List[ast.Field]) -> None
+        super(_FastFieldUsageChecker, self).__init__(indented_writer)
+
+        self._writer.write_line('std::bitset<%d> usedFields;' % (len(fields)))
+
+        bit_id = 0
+        for field in fields:
+            if field.chained:
+                continue
+
+            self._writer.write_line('const size_t %s = %d;' %
+                                    (_gen_field_usage_constant(field), bit_id))
+            bit_id += 1
+
+    def add_store(self):
+        # type: () -> None
+        """Create the C++ field store initialization code."""
+        pass
+
+    def add(self, field):
+        # type: (ast.Field) -> None
+        """Add a field to track."""
+        self._fields.append(field)
+
+        with writer.IndentedScopedBlock(self._writer, 'if (usedFields[%s]) {' %
+                                        (_gen_field_usage_constant(field)), '}'):
+            self._writer.write_line('ctxt.throwDuplicateField(element);')
+        self._writer.write_empty_line()
+
+        self._writer.write_line('usedFields.set(%s);' % (_gen_field_usage_constant(field)))
+        self._writer.write_empty_line()
+
+    def add_final_checks(self):
+        # type: () -> None
+        """Output the code to check for missing fields."""
+        with writer.IndentedScopedBlock(self._writer, 'if (!usedFields.all()) {', '}'):
+            for field in self._fields:
+                if (not field.optional) and (not field.ignore):
+                    with writer.IndentedScopedBlock(self._writer, 'if (!usedFields[%s]) {' %
+                                                    (_gen_field_usage_constant(field)), '}'):
+                        if field.default:
+                            self._writer.write_line('%s = %s;' %
+                                                    (_get_field_member_name(field), field.default))
+                        else:
+                            self._writer.write_line('ctxt.throwMissingField(%s);' %
+                                                    (_get_field_constant_name(field)))
+
+
+def _get_field_usage_checker(indented_writer, struct):
+    # type: (writer.IndentedTextWriter, ast.Struct) -> _FieldUsageCheckerBase
+
+    # Only use the fast field usage checker if we never expect extra fields that we need to ignore
+    # but still wish to do duplicate detection on.
+    if struct.strict:
+        return _FastFieldUsageChecker(indented_writer, struct.fields)
+
+    return _SlowFieldUsageChecker(indented_writer)
 
 
 class _CppFileWriterBase(object):
@@ -614,7 +720,7 @@ class _CppSourceFileWriter(_CppFileWriterBase):
         func_def = struct_type_info.get_deserializer_method().get_definition()
         with self._block('%s {' % (func_def), '}'):
 
-            field_usage_check = _FieldUsageChecker(self._writer)
+            field_usage_check = _get_field_usage_checker(self._writer, struct)
             if isinstance(struct, ast.Command):
                 self._writer.write_line('bool firstFieldFound = false;')
 
@@ -638,9 +744,10 @@ class _CppSourceFileWriter(_CppFileWriterBase):
                         continue
 
                     field_predicate = 'fieldName == %s' % (_get_field_constant_name(field))
-                    field_usage_check.add(field)
 
                     with self._predicate(field_predicate, not first_field):
+                        field_usage_check.add(field)
+
                         if field.ignore:
                             self._writer.write_line('// ignore field')
                         else:
@@ -855,7 +962,14 @@ class _CppSourceFileWriter(_CppFileWriterBase):
         self.write_empty_line()
 
         # Generate system includes second
-        self.gen_system_include('set')
+        header_list = [
+            'bitset',
+            'set',
+        ]
+
+        for include in header_list:
+            self.gen_system_include(include)
+
         self.write_empty_line()
 
         # Generate mongo includes third
