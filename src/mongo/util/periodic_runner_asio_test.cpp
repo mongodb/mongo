@@ -60,6 +60,12 @@ public:
         return _runner;
     }
 
+    void sleepForReschedule(int jobs) {
+        while (timerFactory().jobs() < jobs) {
+            sleepmillis(2);
+        }
+    }
+
 protected:
     executor::AsyncTimerFactoryMock* _timerFactory;
     std::unique_ptr<PeriodicRunnerASIO> _runner;
@@ -109,6 +115,7 @@ TEST_F(PeriodicRunnerASIOTest, OneJobTest) {
             stdx::unique_lock<stdx::mutex> lk(mutex);
             cv.wait(lk, [&count, &i] { return count > i; });
         }
+        sleepForReschedule(2);
     }
 }
 
@@ -207,6 +214,7 @@ TEST_F(PeriodicRunnerASIOTest, TwoJobsTest) {
             stdx::unique_lock<stdx::mutex> lk(mutex);
             cv.wait(lk, [&countA, &countB, &i] { return (countA > i && countB >= i / 2); });
         }
+        sleepForReschedule(3);
     }
 }
 
