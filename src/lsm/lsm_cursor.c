@@ -1661,8 +1661,6 @@ __wt_clsm_close(WT_CURSOR *cursor)
 	/* In case we were somehow left positioned, clear that. */
 	__clsm_leave(clsm);
 
-	/* The WT_LSM_TREE owns the URI. */
-	cursor->uri = NULL;
 	if (clsm->lsm_tree != NULL)
 		__wt_lsm_tree_release(session, clsm->lsm_tree);
 	WT_TRET(__wt_cursor_close(cursor));
@@ -1744,7 +1742,7 @@ __wt_clsm_open(WT_SESSION_IMPL *session,
 	cursor = &clsm->iface;
 	*cursor = iface;
 	cursor->session = &session->iface;
-	cursor->uri = lsm_tree->name;
+	WT_ERR(__wt_strdup(session, lsm_tree->name, &cursor->uri));
 	cursor->key_format = lsm_tree->key_format;
 	cursor->value_format = lsm_tree->value_format;
 
