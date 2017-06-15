@@ -142,10 +142,6 @@ public:
         return appendCollectionStorageStats(_ctx->opCtx, nss, param, builder);
     }
 
-    Status appendRecordCount(const NamespaceString& nss, BSONObjBuilder* builder) const final {
-        return appendCollectionRecordCount(_ctx->opCtx, nss, builder);
-    }
-
     BSONObj getCollectionOptions(const NamespaceString& nss) final {
         const auto infos =
             _client.getCollectionInfos(nss.db().toString(), BSON("name" << nss.coll()));
