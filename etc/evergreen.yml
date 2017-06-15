@@ -3909,7 +3909,7 @@ buildvariants:
   modules:
   - mongo-tools
   run_on:
-  - osx-1010
+  - macos-1012
   batchtime: 1440 # 1 day
   expansions:
     push_path: osx
@@ -3998,7 +3998,7 @@ buildvariants:
   modules:
   - mongo-tools
   run_on:
-  - osx-1010
+  - macos-1012
   batchtime: 1440 # 1 day
   expansions:
     push_path: osx
@@ -4088,7 +4088,7 @@ buildvariants:
   modules:
   - mongo-tools
   run_on:
-  - osx-1010
+  - macos-1012
   expansions:
     push_path: osx
     push_bucket: downloads.mongodb.org
@@ -4130,7 +4130,7 @@ buildvariants:
   - enterprise
   - mongo-tools
   run_on:
-  - osx-1010
+  - macos-1012
   batchtime: 1440 # 1 day
   expansions:
     push_path: osx
