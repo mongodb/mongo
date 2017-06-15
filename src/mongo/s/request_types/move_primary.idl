@@ -48,3 +48,14 @@ structs:
             to:
                 type: string
                 description: "The shard serving as the destination for un-sharded collections."
+
+    ConfigsvrMovePrimary:
+        description: "The internal movePrimary command on the config server"
+        strict: false
+        fields:
+            _configsvrMovePrimary:
+                type: namespacestring
+                description: "The namespace of the database whose primary shard is to be reassigned."
+            to:
+                type: string
+                description: "The shard serving as the destination for un-sharded collections."

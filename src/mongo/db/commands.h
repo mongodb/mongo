@@ -488,6 +488,12 @@ public:
                                      const BSONObj& cmdObj);
 
     /**
+     * Appends passthrough fields from a cmdObj to a given request.
+     */
+    static BSONObj appendPassthroughFields(const BSONObj& cmdObjWithPassthroughFields,
+                                           const BSONObj& request);
+
+    /**
      * Returns true if the provided argument is one that is handled by the command processing layer
      * and should generally be ignored by individual command implementations. In particular,
      * commands that fail on unrecognized arguments must not fail for any of these.

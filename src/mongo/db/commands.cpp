@@ -75,6 +75,20 @@ ExportedServerParameter<bool, ServerParameterType::kStartupOnly> testCommandsPar
 
 Command::~Command() = default;
 
+BSONObj Command::appendPassthroughFields(const BSONObj& cmdObjWithPassthroughFields,
+                                         const BSONObj& request) {
+    BSONObjBuilder b;
+    b.appendElements(request);
+    for (const auto& elem : cmdObjWithPassthroughFields) {
+        const auto name = elem.fieldNameStringData();
+        // $db is one of the generic arguments, but is implicitly contained in request
+        if (Command::isGenericArgument(name) && !request.hasField(name) && name != "$db") {
+            b.append(elem);
+        }
+    }
+    return b.obj();
+}
+
 string Command::parseNsFullyQualified(const string& dbname, const BSONObj& cmdObj) {
     BSONElement first = cmdObj.firstElement();
     uassert(ErrorCodes::BadValue,
