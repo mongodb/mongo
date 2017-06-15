@@ -7,7 +7,7 @@ from __future__ import absolute_import
 import os
 
 from . import interface
-from .. import testcases
+from ..testcases import interface as testcase
 from ... import errors
 
 
@@ -22,7 +22,7 @@ class CleanEveryN(interface.CustomBehavior):
     def __init__(self, hook_logger, fixture, n=DEFAULT_N):
         description = "CleanEveryN (restarts the fixture after running `n` tests)"
         interface.CustomBehavior.__init__(self, hook_logger, fixture, description)
-        self.hook_test_case = testcases.TestCase(hook_logger, "Hook", "CleanEveryN")
+        self.hook_test_case = testcase.TestCase(hook_logger, "Hook", "CleanEveryN")
 
         # Try to isolate what test triggers the leak by restarting the fixture each time.
         if "detect_leaks=1" in os.getenv("ASAN_OPTIONS", ""):

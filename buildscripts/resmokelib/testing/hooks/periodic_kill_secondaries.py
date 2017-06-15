@@ -15,9 +15,9 @@ import pymongo.errors
 from . import dbhash
 from . import interface
 from . import validate
-from .. import testcases
 from ..fixtures import interface as fixture
 from ..fixtures import replicaset
+from ..testcases import interface as testcase
 from ... import errors
 from ... import utils
 
@@ -88,7 +88,7 @@ class PeriodicKillSecondaries(interface.CustomBehavior):
         self._run(test_report)
 
     def _run(self, test_report):
-        self.hook_test_case = testcases.TestCase(
+        self.hook_test_case = testcase.TestCase(
             self.logger,
             "Hook",
             "%s:%s" % (self._last_test_name, self.logger_name))

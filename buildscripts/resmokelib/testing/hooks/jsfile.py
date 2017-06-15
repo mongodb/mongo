@@ -11,7 +11,7 @@ import pymongo
 import pymongo.errors
 
 from . import interface
-from .. import testcases
+from ..testcases import jstest
 from ... import errors
 from ...utils import registry
 
@@ -21,10 +21,10 @@ class JsCustomBehavior(interface.CustomBehavior):
 
     def __init__(self, hook_logger, fixture, js_filename, description, shell_options=None):
         interface.CustomBehavior.__init__(self, hook_logger, fixture, description)
-        self.hook_test_case = testcases.JSTestCase(hook_logger,
-                                                   js_filename,
-                                                   shell_options=shell_options,
-                                                   test_kind="Hook")
+        self.hook_test_case = jstest.JSTestCase(hook_logger,
+                                                js_filename,
+                                                shell_options=shell_options,
+                                                test_kind="Hook")
         self.test_case_is_configured = False
 
     def before_suite(self, test_report):
