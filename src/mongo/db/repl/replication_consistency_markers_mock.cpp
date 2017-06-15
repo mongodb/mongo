@@ -33,6 +33,20 @@
 namespace mongo {
 namespace repl {
 
+void ReplicationConsistencyMarkersMock::initializeMinValidDocument(OperationContext* opCtx) {
+    {
+        stdx::lock_guard<stdx::mutex> lock(_initialSyncFlagMutex);
+        _initialSyncFlag = false;
+    }
+
+    {
+        stdx::lock_guard<stdx::mutex> lock(_minValidBoundariesMutex);
+        _minValid = {};
+        _oplogDeleteFromPoint = {};
+        _appliedThrough = {};
+    }
+}
+
 bool ReplicationConsistencyMarkersMock::getInitialSyncFlag(OperationContext* opCtx) const {
     stdx::lock_guard<stdx::mutex> lock(_initialSyncFlagMutex);
     return _initialSyncFlag;

@@ -50,6 +50,8 @@ class ReplicationConsistencyMarkersMock : public ReplicationConsistencyMarkers {
 public:
     ReplicationConsistencyMarkersMock() = default;
 
+    void initializeMinValidDocument(OperationContext* opCtx) override;
+
     bool getInitialSyncFlag(OperationContext* opCtx) const override;
     void setInitialSyncFlag(OperationContext* opCtx) override;
     void clearInitialSyncFlag(OperationContext* opCtx) override;

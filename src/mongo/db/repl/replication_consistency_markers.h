@@ -72,6 +72,12 @@ public:
     ReplicationConsistencyMarkers();
     virtual ~ReplicationConsistencyMarkers();
 
+    /**
+     * Initializes the minValid document with the required fields. This is safe to call on an
+     * already initialized minValid document and will add any required fields that do not exist.
+     */
+    virtual void initializeMinValidDocument(OperationContext* opCtx) = 0;
+
     // -------- Initial Sync Flag ----------
 
     /**

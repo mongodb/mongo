@@ -130,6 +130,7 @@ TEST_F(ReplicationConsistencyMarkersTest, InitialSyncFlag) {
 
     ReplicationConsistencyMarkersImpl minValid(getStorageInterface(), nss);
     auto opCtx = getOperationContext();
+    minValid.initializeMinValidDocument(opCtx);
 
     // Initial sync flag should be unset after initializing a new storage engine.
     ASSERT_FALSE(minValid.getInitialSyncFlag(opCtx));
@@ -140,10 +141,8 @@ TEST_F(ReplicationConsistencyMarkersTest, InitialSyncFlag) {
 
     // Check min valid document using storage engine interface.
     auto minValidDocument = getMinValidDocument(opCtx, nss);
-    ASSERT_TRUE(
-        minValidDocument.hasField(ReplicationConsistencyMarkersImpl::kInitialSyncFlagFieldName));
-    ASSERT_TRUE(minValidDocument.getBoolField(
-        ReplicationConsistencyMarkersImpl::kInitialSyncFlagFieldName));
+    ASSERT_TRUE(minValidDocument.hasField(MinValidDocument::kInitialSyncFlagFieldName));
+    ASSERT_TRUE(minValidDocument.getBoolField(MinValidDocument::kInitialSyncFlagFieldName));
 
     // Clearing initial sync flag should affect getInitialSyncFlag() result.
     minValid.clearInitialSyncFlag(opCtx);
@@ -155,6 +154,7 @@ TEST_F(ReplicationConsistencyMarkersTest, GetMinValidAfterSettingInitialSyncFlag
 
     ReplicationConsistencyMarkersImpl minValid(getStorageInterface(), nss);
     auto opCtx = getOperationContext();
+    minValid.initializeMinValidDocument(opCtx);
 
     // Initial sync flag should be unset after initializing a new storage engine.
     ASSERT_FALSE(minValid.getInitialSyncFlag(opCtx));
@@ -173,6 +173,7 @@ TEST_F(ReplicationConsistencyMarkersTest, ReplicationConsistencyMarkers) {
 
     ReplicationConsistencyMarkersImpl minValid(getStorageInterface(), nss);
     auto opCtx = getOperationContext();
+    minValid.initializeMinValidDocument(opCtx);
 
     // MinValid boundaries should all be null after initializing a new storage engine.
     ASSERT(minValid.getMinValid(opCtx).isNull());
@@ -200,16 +201,14 @@ TEST_F(ReplicationConsistencyMarkersTest, ReplicationConsistencyMarkers) {
 
     // Check min valid document using storage engine interface.
     auto minValidDocument = getMinValidDocument(opCtx, nss);
-    ASSERT_TRUE(minValidDocument.hasField(ReplicationConsistencyMarkersImpl::kBeginFieldName));
-    ASSERT_TRUE(minValidDocument[ReplicationConsistencyMarkersImpl::kBeginFieldName].isABSONObj());
+    ASSERT_TRUE(minValidDocument.hasField(MinValidDocument::kAppliedThroughFieldName));
+    ASSERT_TRUE(minValidDocument[MinValidDocument::kAppliedThroughFieldName].isABSONObj());
     ASSERT_EQUALS(startOpTime,
                   unittest::assertGet(OpTime::parseFromOplogEntry(
-                      minValidDocument[ReplicationConsistencyMarkersImpl::kBeginFieldName].Obj())));
+                      minValidDocument[MinValidDocument::kAppliedThroughFieldName].Obj())));
     ASSERT_EQUALS(endOpTime, unittest::assertGet(OpTime::parseFromOplogEntry(minValidDocument)));
-    ASSERT_EQUALS(
-        endOpTime.getTimestamp(),
-        minValidDocument[ReplicationConsistencyMarkersImpl::kOplogDeleteFromPointFieldName]
-            .timestamp());
+    ASSERT_EQUALS(endOpTime.getTimestamp(),
+                  minValidDocument[MinValidDocument::kOplogDeleteFromPointFieldName].timestamp());
 
     // Recovery unit will be owned by "opCtx".
     RecoveryUnitWithDurabilityTracking* recoveryUnit = new RecoveryUnitWithDurabilityTracking();

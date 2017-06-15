@@ -31,6 +31,7 @@
 #include "mongo/base/disallow_copying.h"
 #include "mongo/db/namespace_string.h"
 #include "mongo/db/repl/replication_consistency_markers.h"
+#include "mongo/db/repl/replication_consistency_markers_gen.h"
 
 namespace mongo {
 
@@ -48,13 +49,12 @@ class ReplicationConsistencyMarkersImpl : public ReplicationConsistencyMarkers {
 
 public:
     static constexpr StringData kDefaultMinValidNamespace = "local.replset.minvalid"_sd;
-    static constexpr StringData kInitialSyncFlagFieldName = "doingInitialSync"_sd;
-    static constexpr StringData kBeginFieldName = "begin"_sd;
-    static constexpr StringData kOplogDeleteFromPointFieldName = "oplogDeleteFromPoint"_sd;
 
     explicit ReplicationConsistencyMarkersImpl(StorageInterface* storageInterface);
     ReplicationConsistencyMarkersImpl(StorageInterface* storageInterface,
                                       NamespaceString minValidNss);
+
+    void initializeMinValidDocument(OperationContext* opCtx) override;
 
     bool getInitialSyncFlag(OperationContext* opCtx) const override;
     void setInitialSyncFlag(OperationContext* opCtx) override;
@@ -73,9 +73,9 @@ public:
 private:
     /**
      * Reads the MinValid document from disk.
-     * Returns an empty document if not present.
+     * Returns boost::none if not present.
      */
-    BSONObj _getMinValidDocument(OperationContext* opCtx) const;
+    boost::optional<MinValidDocument> _getMinValidDocument(OperationContext* opCtx) const;
 
     /**
      * Updates the MinValid document according to the provided update spec. If the collection does

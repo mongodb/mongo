@@ -388,6 +388,8 @@ void ReplicationCoordinatorImpl::appendConnectionStats(executor::ConnectionPoolS
 }
 
 bool ReplicationCoordinatorImpl::_startLoadLocalConfig(OperationContext* opCtx) {
+    _replicationProcess->getConsistencyMarkers()->initializeMinValidDocument(opCtx);
+
     StatusWith<LastVote> lastVote = _externalState->loadLocalLastVoteDocument(opCtx);
     if (!lastVote.isOK()) {
         if (lastVote.getStatus() == ErrorCodes::NoMatchingDocument) {

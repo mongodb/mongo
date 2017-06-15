@@ -44,13 +44,9 @@ namespace mongo {
 namespace repl {
 
 constexpr StringData ReplicationConsistencyMarkersImpl::kDefaultMinValidNamespace;
-constexpr StringData ReplicationConsistencyMarkersImpl::kInitialSyncFlagFieldName;
-constexpr StringData ReplicationConsistencyMarkersImpl::kBeginFieldName;
-constexpr StringData ReplicationConsistencyMarkersImpl::kOplogDeleteFromPointFieldName;
 
 namespace {
-const BSONObj kInitialSyncFlag(BSON(ReplicationConsistencyMarkersImpl::kInitialSyncFlagFieldName
-                                    << true));
+const BSONObj kInitialSyncFlag(BSON(MinValidDocument::kInitialSyncFlagFieldName << true));
 }  // namespace
 
 ReplicationConsistencyMarkersImpl::ReplicationConsistencyMarkersImpl(
@@ -63,17 +59,21 @@ ReplicationConsistencyMarkersImpl::ReplicationConsistencyMarkersImpl(
     StorageInterface* storageInterface, NamespaceString minValidNss)
     : _storageInterface(storageInterface), _minValidNss(minValidNss) {}
 
-BSONObj ReplicationConsistencyMarkersImpl::_getMinValidDocument(OperationContext* opCtx) const {
+boost::optional<MinValidDocument> ReplicationConsistencyMarkersImpl::_getMinValidDocument(
+    OperationContext* opCtx) const {
     auto result = _storageInterface->findSingleton(opCtx, _minValidNss);
     if (!result.isOK()) {
         if (result.getStatus() == ErrorCodes::NamespaceNotFound ||
             result.getStatus() == ErrorCodes::CollectionIsEmpty) {
-            return BSONObj();
+            return boost::none;
         }
         // Fail if there is an error other than the collection being missing or being empty.
         fassertFailedWithStatus(40466, result.getStatus());
     }
-    return result.getValue();
+
+    auto minValid =
+        MinValidDocument::parse(IDLParserErrorContext("MinValidDocument"), result.getValue());
+    return minValid;
 }
 
 void ReplicationConsistencyMarkersImpl::_updateMinValidDocument(OperationContext* opCtx,
@@ -91,11 +91,33 @@ void ReplicationConsistencyMarkersImpl::_updateMinValidDocument(OperationContext
     fassertStatusOK(40467, status);
 }
 
+void ReplicationConsistencyMarkersImpl::initializeMinValidDocument(OperationContext* opCtx) {
+    LOG(3) << "Initializing minValid document";
+
+    // This initializes the values of the required fields if they are not already set.
+    // If one of the fields is already set, the $max will prefer the existing value since it
+    // will always be greater than the provided ones.
+    _updateMinValidDocument(opCtx,
+                            BSON("$max" << BSON(MinValidDocument::kMinValidTimestampFieldName
+                                                << Timestamp()
+                                                << MinValidDocument::kMinValidTermFieldName
+                                                << OpTime::kUninitializedTerm
+                                                << MinValidDocument::kOplogDeleteFromPointFieldName
+                                                << Timestamp())));
+}
+
 bool ReplicationConsistencyMarkersImpl::getInitialSyncFlag(OperationContext* opCtx) const {
-    const BSONObj doc = _getMinValidDocument(opCtx);
-    const auto flag = doc[kInitialSyncFlagFieldName].trueValue();
-    LOG(3) << "returning initial sync flag value of " << flag;
-    return flag;
+    auto doc = _getMinValidDocument(opCtx);
+    invariant(doc);  // Initialized at startup so it should never be missing.
+
+    boost::optional<bool> flag = doc->getInitialSyncFlag();
+    if (!flag) {
+        LOG(3) << "No initial sync flag set, returning initial sync flag value of false.";
+        return false;
+    }
+
+    LOG(3) << "returning initial sync flag value of " << flag.get();
+    return flag.get();
 }
 
 void ReplicationConsistencyMarkersImpl::setInitialSyncFlag(OperationContext* opCtx) {
@@ -109,12 +131,14 @@ void ReplicationConsistencyMarkersImpl::clearInitialSyncFlag(OperationContext* o
 
     auto replCoord = repl::ReplicationCoordinator::get(opCtx);
     OpTime time = replCoord->getMyLastAppliedOpTime();
-    _updateMinValidDocument(
-        opCtx,
-        BSON("$unset" << kInitialSyncFlag << "$set"
-                      << BSON("ts" << time.getTimestamp() << "t" << time.getTerm()
-                                   << kBeginFieldName
-                                   << time)));
+    _updateMinValidDocument(opCtx,
+                            BSON("$unset" << kInitialSyncFlag << "$set"
+                                          << BSON(MinValidDocument::kMinValidTimestampFieldName
+                                                  << time.getTimestamp()
+                                                  << MinValidDocument::kMinValidTermFieldName
+                                                  << time.getTerm()
+                                                  << MinValidDocument::kAppliedThroughFieldName
+                                                  << time)));
 
     if (getGlobalServiceContext()->getGlobalStorageEngine()->isDurable()) {
         opCtx->recoveryUnit()->waitUntilDurable();
@@ -123,21 +147,11 @@ void ReplicationConsistencyMarkersImpl::clearInitialSyncFlag(OperationContext* o
 }
 
 OpTime ReplicationConsistencyMarkersImpl::getMinValid(OperationContext* opCtx) const {
-    const BSONObj doc = _getMinValidDocument(opCtx);
-    const auto opTimeStatus = OpTime::parseFromOplogEntry(doc);
-    // If any of the keys (fields) are missing from the minvalid document, we return
-    // a null OpTime.
-    if (opTimeStatus == ErrorCodes::NoSuchKey) {
-        return {};
-    }
+    auto doc = _getMinValidDocument(opCtx);
+    invariant(doc);  // Initialized at startup so it should never be missing.
 
-    if (!opTimeStatus.isOK()) {
-        severe() << "Error parsing minvalid entry: " << redact(doc)
-                 << ", with status:" << opTimeStatus.getStatus();
-        fassertFailedNoTrace(40052);
-    }
+    auto minValid = OpTime(doc->getMinValidTimestamp(), doc->getMinValidTerm());
 
-    OpTime minValid = opTimeStatus.getValue();
     LOG(3) << "returning minvalid: " << minValid.toString() << "(" << minValid.toBSON() << ")";
 
     return minValid;
@@ -147,60 +161,71 @@ void ReplicationConsistencyMarkersImpl::setMinValid(OperationContext* opCtx,
                                                     const OpTime& minValid) {
     LOG(3) << "setting minvalid to exactly: " << minValid.toString() << "(" << minValid.toBSON()
            << ")";
-    _updateMinValidDocument(
-        opCtx, BSON("$set" << BSON("ts" << minValid.getTimestamp() << "t" << minValid.getTerm())));
+    _updateMinValidDocument(opCtx,
+                            BSON("$set" << BSON(MinValidDocument::kMinValidTimestampFieldName
+                                                << minValid.getTimestamp()
+                                                << MinValidDocument::kMinValidTermFieldName
+                                                << minValid.getTerm())));
 }
 
 void ReplicationConsistencyMarkersImpl::setMinValidToAtLeast(OperationContext* opCtx,
                                                              const OpTime& minValid) {
     LOG(3) << "setting minvalid to at least: " << minValid.toString() << "(" << minValid.toBSON()
            << ")";
-    _updateMinValidDocument(
-        opCtx, BSON("$max" << BSON("ts" << minValid.getTimestamp() << "t" << minValid.getTerm())));
+    _updateMinValidDocument(opCtx,
+                            BSON("$max" << BSON(MinValidDocument::kMinValidTimestampFieldName
+                                                << minValid.getTimestamp()
+                                                << MinValidDocument::kMinValidTermFieldName
+                                                << minValid.getTerm())));
 }
 
 void ReplicationConsistencyMarkersImpl::setOplogDeleteFromPoint(OperationContext* opCtx,
                                                                 const Timestamp& timestamp) {
     LOG(3) << "setting oplog delete from point to: " << timestamp.toStringPretty();
-    _updateMinValidDocument(opCtx,
-                            BSON("$set" << BSON(kOplogDeleteFromPointFieldName << timestamp)));
+    _updateMinValidDocument(
+        opCtx, BSON("$set" << BSON(MinValidDocument::kOplogDeleteFromPointFieldName << timestamp)));
 }
 
 Timestamp ReplicationConsistencyMarkersImpl::getOplogDeleteFromPoint(
     OperationContext* opCtx) const {
-    const BSONObj doc = _getMinValidDocument(opCtx);
-    Timestamp out = {};
-    if (auto field = doc[kOplogDeleteFromPointFieldName]) {
-        out = field.timestamp();
+    auto doc = _getMinValidDocument(opCtx);
+    invariant(doc);  // Initialized at startup so it should never be missing.
+
+    auto oplogDeleteFromPoint = doc->getOplogDeleteFromPoint();
+    if (!oplogDeleteFromPoint) {
+        LOG(3) << "No oplogDeleteFromPoint timestamp set, returning empty timestamp.";
+        return Timestamp();
     }
 
-    LOG(3) << "returning oplog delete from point: " << out;
-    return out;
+    LOG(3) << "returning oplog delete from point: " << oplogDeleteFromPoint.get();
+    return oplogDeleteFromPoint.get();
 }
 
 void ReplicationConsistencyMarkersImpl::setAppliedThrough(OperationContext* opCtx,
                                                           const OpTime& optime) {
     LOG(3) << "setting appliedThrough to: " << optime.toString() << "(" << optime.toBSON() << ")";
     if (optime.isNull()) {
-        _updateMinValidDocument(opCtx, BSON("$unset" << BSON(kBeginFieldName << 1)));
+        _updateMinValidDocument(
+            opCtx, BSON("$unset" << BSON(MinValidDocument::kAppliedThroughFieldName << 1)));
     } else {
-        _updateMinValidDocument(opCtx, BSON("$set" << BSON(kBeginFieldName << optime)));
+        _updateMinValidDocument(
+            opCtx, BSON("$set" << BSON(MinValidDocument::kAppliedThroughFieldName << optime)));
     }
 }
 
 OpTime ReplicationConsistencyMarkersImpl::getAppliedThrough(OperationContext* opCtx) const {
-    const BSONObj doc = _getMinValidDocument(opCtx);
-    const auto opTimeStatus = OpTime::parseFromOplogEntry(doc.getObjectField(kBeginFieldName));
-    if (!opTimeStatus.isOK()) {
-        // Return null OpTime on any parse failure, including if "begin" is missing.
+    auto doc = _getMinValidDocument(opCtx);
+    invariant(doc);  // Initialized at startup so it should never be missing.
+
+    auto appliedThrough = doc->getAppliedThrough();
+    if (!appliedThrough) {
+        LOG(3) << "No appliedThrough OpTime set, returning empty appliedThrough OpTime.";
         return {};
     }
+    LOG(3) << "returning appliedThrough: " << appliedThrough->toString() << "("
+           << appliedThrough->toBSON() << ")";
 
-    OpTime appliedThrough = opTimeStatus.getValue();
-    LOG(3) << "returning appliedThrough: " << appliedThrough.toString() << "("
-           << appliedThrough.toBSON() << ")";
-
-    return appliedThrough;
+    return appliedThrough.get();
 }
 
 }  // namespace repl

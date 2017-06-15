@@ -185,6 +185,18 @@ env.CppUnitTest(
 )
 
 env.Library(
+    target='replication_consistency_markers_idl',
+    source=[
+        env.Idlc('replication_consistency_markers.idl')[0],
+    ],
+    LIBDEPS=[
+        'optime',
+        '$BUILD_DIR/mongo/base',
+        '$BUILD_DIR/mongo/idl/idl_parser',
+    ],
+)
+
+env.Library(
     target='replication_consistency_markers_impl',
     source=[
         'replication_consistency_markers_impl.cpp',
@@ -192,6 +204,7 @@ env.Library(
     LIBDEPS=[
         'optime',
         'repl_coordinator_impl',
+	'replication_consistency_markers_idl',
     ],
 )
 

@@ -60,8 +60,12 @@ printjson(lastOp);
 
 // Overwrite minvalid document to simulate an inconsistent state (as might result from a server
 // crash.
-local.replset.minvalid.update(
-    {}, {ts: new Timestamp(lastOp.ts.t, lastOp.ts.i + 1)}, {upsert: true});
+local.replset.minvalid.update({},
+                              {
+                                ts: new Timestamp(lastOp.ts.t, lastOp.ts.i + 1),
+                                t: NumberLong(-1),
+                              },
+                              {upsert: true});
 printjson(local.replset.minvalid.findOne());
 
 print("5: shut down master");
