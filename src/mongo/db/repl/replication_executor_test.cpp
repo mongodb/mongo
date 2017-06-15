@@ -52,6 +52,7 @@ namespace repl {
 namespace {
 
 using executor::NetworkInterfaceMock;
+using executor::RemoteCommandResponse;
 using unittest::assertGet;
 
 const int64_t prngSeed = 1;
@@ -250,6 +251,85 @@ TEST_F(ReplicationExecutorTest, ScheduleCallbackAtAFutureTime) {
     executor.waitForEvent(finishEvent);
 }
 
+
+TEST_F(ReplicationExecutorTest, TestForCancelRace) {
+    launchExecutorThread();
+    getNet()->exitNetwork();
+
+    unittest::Barrier enterCallback(2U), runCallback(2U);
+
+    ReplicationExecutor& executor = getReplExecutor();
+    bool firstEventDone = false;
+    bool firstEventCanceled = false;
+    auto fn = [&executor, &enterCallback, &runCallback, &firstEventDone, &firstEventCanceled](
+        const executor::TaskExecutor::RemoteCommandCallbackArgs& cbData) {
+        // This barrier lets the test code wait until we're in the callback.
+        enterCallback.countDownAndWait();
+        // This barrier lets the test code keep us in the callback until it has run the cancel.
+        runCallback.countDownAndWait();
+        firstEventCanceled = !cbData.response.getStatus().isOK();
+        firstEventDone = true;
+    };
+
+    // First, schedule a network event to run.
+    const executor::RemoteCommandRequest request(
+        HostAndPort("test1", 1234), "mydb", BSON("nothing" << 0));
+    auto firstCallback = assertGet(executor.scheduleRemoteCommand(request, fn));
+
+    // Now let the request happen.
+    // We need to run the network on another thread, because the test
+    // fixture will hang waiting for the callbacks to complete.
+    auto timeThread = stdx::thread([this] {
+        getNet()->enterNetwork();
+        ASSERT(getNet()->hasReadyRequests());
+        auto noi = getNet()->getNextReadyRequest();
+        getNet()->scheduleResponse(noi, getNet()->now(), RemoteCommandResponse());
+        getNet()->runReadyNetworkOperations();
+        getNet()->exitNetwork();
+    });
+
+    // Wait until we're in the callback.
+    enterCallback.countDownAndWait();
+
+    // Schedule a different network event to run.
+    bool secondEventDone = false;
+    bool secondEventCanceled = false;
+    auto fn2 = [&executor, &secondEventDone, &secondEventCanceled](
+        const executor::TaskExecutor::RemoteCommandCallbackArgs& cbData) {
+        secondEventCanceled = !cbData.response.getStatus().isOK();
+        secondEventDone = true;
+    };
+    auto secondCallback = assertGet(executor.scheduleRemoteCommand(request, fn2));
+    ASSERT_FALSE(firstEventDone);  // The first event should be stuck at runCallback barrier.
+    // Cancel the first callback.  This cancel should have no effect as the callback has
+    // already been started.
+    executor.cancel(firstCallback);
+
+    // Let the first callback continue to completion.
+    runCallback.countDownAndWait();
+
+    // Now the time thread can continue.
+    timeThread.join();
+
+    // The first event should be done, the second event should be pending.
+    ASSERT(firstEventDone);
+    ASSERT_FALSE(secondEventDone);
+
+    // Run the network thread, which should run the second request.
+    {
+        getNet()->enterNetwork();
+        // The second request should be ready.
+        ASSERT(getNet()->hasReadyRequests()) << "Second request is not ready (cancelled?)";
+        auto noi = getNet()->getNextReadyRequest();
+        getNet()->scheduleResponse(noi, getNet()->now(), RemoteCommandResponse());
+        getNet()->runReadyNetworkOperations();
+        getNet()->exitNetwork();
+    }
+
+    // The second callback should have run without being canceled.
+    ASSERT_TRUE(secondEventDone);
+    ASSERT_FALSE(secondEventCanceled);
+}
 
 }  // namespace
 }  // namespace repl

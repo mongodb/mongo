@@ -428,7 +428,9 @@ void ReplicationExecutor::_doOperation(OperationContext* txn,
         return;
     Callback* callback = _getCallbackFromHandle(cbHandle);
     const WorkQueue::iterator iter = callback->_iter;
+    callback->_isRemoved = true;
     iter->callback = CallbackHandle();
+    iter->isNetworkOperation = false;
     _freeQueue.splice(_freeQueue.begin(), *workQueue, iter);
     lk.unlock();
     {
@@ -495,7 +497,10 @@ ReplicationExecutor::getWork() {
     }
     const WorkItem work = *_readyQueue.begin();
     const CallbackHandle cbHandle = work.callback;
+    Callback* callback = _getCallbackFromHandle(cbHandle);
+    callback->_isRemoved = true;
     _readyQueue.begin()->callback = CallbackHandle();
+    _readyQueue.begin()->isNetworkOperation = false;
     _freeQueue.splice(_freeQueue.begin(), _readyQueue, _readyQueue.begin());
     return std::make_pair(work, cbHandle);
 }
@@ -592,6 +597,7 @@ ReplicationExecutor::Callback::Callback(ReplicationExecutor* executor,
       _callbackFn(callbackFn),
       _isCanceled(false),
       _isSleeper(false),
+      _isRemoved(false),
       _iter(iter),
       _finishedEvent(finishedEvent) {}
 
@@ -604,6 +610,11 @@ bool ReplicationExecutor::Callback::isCanceled() const {
 
 void ReplicationExecutor::Callback::cancel() {
     stdx::unique_lock<stdx::mutex> lk(_executor->_mutex);
+    // If this element has already been removed from the queues,
+    // the cancel is too late and has no effect.
+    if (_isRemoved)
+        return;
+
     _isCanceled = true;
 
     if (_isSleeper) {
