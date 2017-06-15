@@ -38,6 +38,7 @@
 #include "mongo/db/service_context.h"
 #include "mongo/stdx/memory.h"
 #include "mongo/util/concurrency/idle_thread_block.h"
+#include "mongo/util/fail_point_service.h"
 #include "mongo/util/mongoutils/str.h"
 #include "mongo/util/time_support.h"
 
@@ -48,6 +49,10 @@ namespace {
 Milliseconds kDefaultRefreshWaitTime(30 * 1000);
 Milliseconds kRefreshIntervalIfErrored(200);
 Milliseconds kMaxRefreshWaitTime(10 * 60 * 1000);
+
+// Prevents the refresher thread from waiting longer than the given number of milliseconds, even on
+// a successful refresh.
+MONGO_FP_DECLARE(maxKeyRefreshWaitTimeOverrideMS);
 
 /**
  * Returns the amount of time to wait until the monitoring thread should attempt to refresh again.
@@ -170,6 +175,10 @@ void KeysCollectionManager::enableKeyGenerator(OperationContext* opCtx, bool doE
     }
 }
 
+bool KeysCollectionManager::hasSeenKeys() {
+    return _refresher.hasSeenKeys();
+}
+
 void KeysCollectionManager::PeriodicRunner::refreshNow(OperationContext* opCtx) {
     auto refreshRequest = [this]() {
         stdx::lock_guard<stdx::mutex> lk(_mutex);
@@ -227,6 +236,11 @@ void KeysCollectionManager::PeriodicRunner::_doPeriodicRefresh(ServiceContext* s
             const auto& latestKey = latestKeyStatusWith.getValue();
             auto currentTime = LogicalClock::get(service)->getClusterTime();
 
+            {
+                stdx::unique_lock<stdx::mutex> lock(_mutex);
+                _hasSeenKeys = true;
+            }
+
             nextWakeup =
                 howMuchSleepNeedFor(currentTime, latestKey.getExpiresAt(), refreshInterval);
         } else {
@@ -234,6 +248,14 @@ void KeysCollectionManager::PeriodicRunner::_doPeriodicRefresh(ServiceContext* s
             nextWakeup = Milliseconds(kRefreshIntervalIfErrored.count() * errorCount);
             if (nextWakeup > kMaxRefreshWaitTime) {
                 nextWakeup = kMaxRefreshWaitTime;
+            }
+        }
+
+        MONGO_FAIL_POINT_BLOCK(maxKeyRefreshWaitTimeOverrideMS, data) {
+            const BSONObj& dataObj = data.getData();
+            auto overrideMS = Milliseconds(dataObj["overrideMS"].numberInt());
+            if (nextWakeup > overrideMS) {
+                nextWakeup = overrideMS;
             }
         }
 
@@ -306,6 +328,11 @@ void KeysCollectionManager::PeriodicRunner::stop() {
     }
 
     _backgroundThread.join();
+}
+
+bool KeysCollectionManager::PeriodicRunner::hasSeenKeys() {
+    stdx::lock_guard<stdx::mutex> lock(_mutex);
+    return _hasSeenKeys;
 }
 
 }  // namespace mongo

@@ -181,4 +181,8 @@ bool LogicalTimeValidator::isAuthorizedToAdvanceClock(OperationContext* opCtx) {
         advanceLogicalClockPrivilege);
 }
 
+bool LogicalTimeValidator::shouldGossipLogicalTime() {
+    return _keyManager->hasSeenKeys();
+}
+
 }  // namespace mongo

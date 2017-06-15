@@ -83,6 +83,7 @@ selector:
   - jstests/sharding/server_status.js
   - jstests/sharding/drop_configdb.js
   - jstests/sharding/shard_identity_config_update.js
+  - jstests/sharding/mongos_does_not_gossip_logical_time_without_keys.js
   # Runs setShardVersion/getShardVersion against the config server and we don't support retries
   # for this command
   - jstests/sharding/major_version_check.js

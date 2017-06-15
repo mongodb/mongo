@@ -91,6 +91,12 @@ public:
      */
     static bool isAuthorizedToAdvanceClock(OperationContext* opCtx);
 
+    /**
+     * Returns true if the server should gossip, sign, and validate logical times. False until there
+     * are keys in the config server.
+     */
+    bool shouldGossipLogicalTime();
+
 private:
     SignedLogicalTime _getProof(const KeysCollectionDocument& keyDoc, LogicalTime newTime);
 

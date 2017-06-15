@@ -17,6 +17,9 @@
  *     mongos {number|Object|Array.<Object>}: number of mongos or mongos
  *       configuration object(s)(*). @see MongoRunner.runMongos
  *
+ *     mongosWaitsForKeys {boolean}: if true, wait for mongos to discover keys from the config
+ *       server and to start sending logical times.
+ *
  *     rs {Object|Array.<Object>}: replica set configuration object. Can
  *       contain:
  *       {
@@ -1481,5 +1484,22 @@ var ShardingTest = function(params) {
         jsTest.authenticate(configConnection);
         jsTest.authenticateNodes(this._configServers);
         jsTest.authenticateNodes(this._mongos);
+    }
+
+    // Mongos does not block for keys from the config servers at startup, so it may not initially
+    // return logical times. If mongosWaitsForKeys is set, block until all mongos servers have found
+    // the keys and begun to send logical times. Retry every 500 milliseconds and timeout after 60
+    // seconds.
+    if (params.mongosWaitsForKeys) {
+        assert.soon(function() {
+            for (let i = 0; i < numMongos; i++) {
+                const res = self._mongos[i].adminCommand({isMaster: 1});
+                if (!res.hasOwnProperty("$logicalTime")) {
+                    print("Waiting for mongos #" + i + " to start sending logical times.");
+                    return false;
+                }
+            }
+            return true;
+        }, "waiting for all mongos servers to return logical times", 60 * 1000, 500);
     }
 };

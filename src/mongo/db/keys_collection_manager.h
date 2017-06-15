@@ -98,6 +98,11 @@ public:
      */
     void enableKeyGenerator(OperationContext* opCtx, bool doEnable);
 
+    /**
+     * Returns true if the refresher has ever successfully returned keys from the config server.
+     */
+    bool hasSeenKeys();
+
 private:
     /**
      * This is responsible for periodically performing refresh in the background.
@@ -143,6 +148,11 @@ private:
          */
         void stop();
 
+        /**
+         * Returns true if keys have ever successfully been returned from the config server.
+         */
+        bool hasSeenKeys();
+
     private:
         void _doPeriodicRefresh(ServiceContext* service,
                                 std::string threadName,
@@ -155,6 +165,7 @@ private:
         stdx::thread _backgroundThread;
         std::shared_ptr<RefreshFunc> _doRefresh;
 
+        bool _hasSeenKeys = false;
         bool _inShutdown = false;
     };
 

@@ -314,4 +314,52 @@ TEST_F(KeysManagerTest, ShouldStillBeAbleToUpdateCacheEvenIfItCantCreateKeys) {
     ASSERT_EQ(Timestamp(105, 0), key.getExpiresAt().asTimestamp());
 }
 
+TEST_F(KeysManagerTest, ShouldNotCreateKeysWithDisableKeyGenerationFailPoint) {
+    const LogicalTime currentTime(Timestamp(100, 0));
+    LogicalClock::get(operationContext())->setClusterTimeFromTrustedSource(currentTime);
+
+    {
+        FailPointEnableBlock failKeyGenerationBlock("disableKeyGeneration");
+        keyManager()->startMonitoring(getServiceContext());
+        keyManager()->enableKeyGenerator(operationContext(), true);
+
+        keyManager()->refreshNow(operationContext());
+        auto keyStatus = keyManager()->getKeyForValidation(
+            operationContext(), 1, LogicalTime(Timestamp(100, 0)));
+        ASSERT_EQ(ErrorCodes::KeyNotFound, keyStatus.getStatus());
+    }
+
+    // Once the failpoint is disabled, the generator can make keys again.
+    keyManager()->refreshNow(operationContext());
+    auto keyStatus = keyManager()->getKeyForSigning(LogicalTime(Timestamp(100, 0)));
+    ASSERT_OK(keyStatus.getStatus());
+}
+
+TEST_F(KeysManagerTest, HasSeenKeysIsFalseUntilKeysAreFound) {
+    const LogicalTime currentTime(Timestamp(100, 0));
+    LogicalClock::get(operationContext())->setClusterTimeFromTrustedSource(currentTime);
+
+    ASSERT_EQ(false, keyManager()->hasSeenKeys());
+
+    {
+        FailPointEnableBlock failKeyGenerationBlock("disableKeyGeneration");
+        keyManager()->startMonitoring(getServiceContext());
+        keyManager()->enableKeyGenerator(operationContext(), true);
+
+        keyManager()->refreshNow(operationContext());
+        auto keyStatus = keyManager()->getKeyForValidation(
+            operationContext(), 1, LogicalTime(Timestamp(100, 0)));
+        ASSERT_EQ(ErrorCodes::KeyNotFound, keyStatus.getStatus());
+
+        ASSERT_EQ(false, keyManager()->hasSeenKeys());
+    }
+
+    // Once the failpoint is disabled, the generator can make keys again.
+    keyManager()->refreshNow(operationContext());
+    auto keyStatus = keyManager()->getKeyForSigning(LogicalTime(Timestamp(100, 0)));
+    ASSERT_OK(keyStatus.getStatus());
+
+    ASSERT_EQ(true, keyManager()->hasSeenKeys());
+}
+
 }  // namespace mongo

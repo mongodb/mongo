@@ -85,6 +85,20 @@ protected:
     }
 
     /**
+     * Replaces the test's LogicalTimeValidator with a new one with a disabled keyGenerator.
+     */
+    void resetValidator() {
+        _validator->shutDown();
+
+        auto catalogClient = Grid::get(operationContext())->catalogClient(operationContext());
+        auto keyManager =
+            stdx::make_unique<KeysCollectionManager>("dummy", catalogClient, Seconds(1000));
+        _keyManager = keyManager.get();
+        _validator = stdx::make_unique<LogicalTimeValidator>(std::move(keyManager));
+        _validator->init(operationContext()->getServiceContext());
+    }
+
+    /**
      * Forces KeyManager to refresh cache and generate new keys.
      */
     void refreshKeyManager() {
@@ -148,6 +162,33 @@ TEST_F(LogicalTimeValidatorTest, ValidateErrorsOnInvalidTimeWithImplicitRefresh)
     // ErrorCodes::TimeProofMismatch);
     auto status = validator()->validate(operationContext(), invalidTime);
     ASSERT_EQ(ErrorCodes::TimeProofMismatch, status);
+}
+
+TEST_F(LogicalTimeValidatorTest, ShouldGossipLogicalTimeIsFalseUntilKeysAreFound) {
+    // Use a new validator with a disabled key generator.
+    resetValidator();
+
+    // shouldGossipLogicalTime initially returns false.
+    ASSERT_EQ(false, validator()->shouldGossipLogicalTime());
+
+    // Enable key generation.
+    validator()->enableKeyGenerator(operationContext(), true);
+
+    // shouldGossipLogicalTime still returns false after an unsuccessful refresh.
+    validator()->enableKeyGenerator(operationContext(), false);
+    refreshKeyManager();
+
+    LogicalTime t1(Timestamp(20, 0));
+    validator()->trySignLogicalTime(t1);
+    ASSERT_EQ(false, validator()->shouldGossipLogicalTime());
+
+    // Once keys are successfully found, shouldGossipLogicalTime returns true.
+    validator()->enableKeyGenerator(operationContext(), true);
+    refreshKeyManager();
+    auto newTime = validator()->signLogicalTime(operationContext(), t1);
+
+    ASSERT_EQ(true, validator()->shouldGossipLogicalTime());
+    ASSERT_OK(validator()->validate(operationContext(), newTime));
 }
 
 }  // unnamed namespace

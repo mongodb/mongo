@@ -4,7 +4,7 @@
  * where the logical time metadata can propagated, making it inherently racy.
  */
 (function() {
-    var st = new ShardingTest({shards: {rs0: {nodes: 3}}});
+    var st = new ShardingTest({shards: {rs0: {nodes: 3}}, mongosWaitsForKeys: true});
     st.s.adminCommand({enableSharding: 'test'});
 
     var db = st.s.getDB('test');

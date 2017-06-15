@@ -106,11 +106,8 @@
 
     // Start the sharding test and add the majority readConcern enabled replica set.
     const name = "causal_consistency_shell_support";
-    const st = new ShardingTest({
-        name: name,
-        shards: 1,
-        manualAddShard: true,
-    });
+    const st =
+        new ShardingTest({name: name, shards: 1, manualAddShard: true, mongosWaitsForKeys: true});
     assert.commandWorked(st.s.adminCommand({addShard: rst.getURL()}));
 
     const testDB = st.s.getDB("test");

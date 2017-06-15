@@ -38,7 +38,8 @@
     const st = new ShardingTest({
         shards: 1,
         shardOptions: {setParameter: {maxAcceptableLogicalClockDriftSecs: maxDriftValue}},
-        mongosOptions: {setParameter: {maxAcceptableLogicalClockDriftSecs: maxDriftValue}}
+        mongosOptions: {setParameter: {maxAcceptableLogicalClockDriftSecs: maxDriftValue}},
+        mongosWaitsForKeys: true
     });
     let testDB = st.s.getDB("test");
 

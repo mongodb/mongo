@@ -429,4 +429,23 @@ TEST_F(CacheUpdaterTest, ShouldNotCreateNewKeyIfThereAre2UnexpiredKeys) {
     }
 }
 
+TEST_F(CacheUpdaterTest, ShouldNotCreateKeysWithDisableKeyGenerationFailPoint) {
+    auto catalogClient = Grid::get(operationContext())->catalogClient(operationContext());
+    KeysCollectionCacheReaderAndUpdater updater("dummy", catalogClient, Seconds(5));
+
+    const LogicalTime currentTime(LogicalTime(Timestamp(100, 0)));
+    LogicalClock::get(operationContext())->setClusterTimeFromTrustedSource(currentTime);
+
+    {
+        FailPointEnableBlock failKeyGenerationBlock("disableKeyGeneration");
+
+        auto keyStatus = updater.refresh(operationContext());
+        ASSERT_EQ(ErrorCodes::FailPointEnabled, keyStatus.getStatus());
+    }
+
+    auto allKeys = getKeys(operationContext());
+
+    ASSERT_EQ(0U, allKeys.size());
+}
+
 }  // namespace mongo

@@ -34,9 +34,7 @@
     rst.initiate();
 
     // Start the sharding test and add the majority read concern enabled replica set.
-    const st = new ShardingTest({
-        manualAddShard: true,
-    });
+    const st = new ShardingTest({manualAddShard: true, mongosWaitsForKeys: true});
     assert.commandWorked(st.s.adminCommand({addShard: rst.getURL()}));
 
     const testDB = st.s.getDB("test");
