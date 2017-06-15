@@ -141,10 +141,10 @@ private:
             const Date_t now = Date_t::now();
             const auto interruptInterval = Milliseconds{getScriptingEngineInterruptInterval()};
 
-            if ((interruptInterval.count() > 0) && (now - lastInterruptCycle > interruptInterval)) {
+            if (now - lastInterruptCycle > interruptInterval) {
                 for (const auto& task : _tasks) {
-                    if (task.second > now)
-                        task.first->interrupt();
+                    if (task.first->isKillPending())
+                        task.first->kill();
                 }
                 lastInterruptCycle = now;
             }
