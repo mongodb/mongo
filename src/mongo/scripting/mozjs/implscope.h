@@ -345,6 +345,9 @@ public:
     };
 
 private:
+    template <typename ImplScopeFunction>
+    auto _runSafely(ImplScopeFunction&& functionToRun) -> decltype(functionToRun());
+
     void _MozJSCreateFunction(StringData raw, JS::MutableHandleValue fun);
 
     /**
