@@ -458,6 +458,11 @@ __wt_txn_recover(WT_SESSION_IMPL *session)
 		 * larger than any checkpoint LSN we have from the earlier time.
 		 */
 		WT_ERR(__recovery_file_scan(&r));
+		/*
+		 * The array can be re-allocated in recovery_file_scan.  Reset
+		 * our pointer after scanning all the files.
+		 */
+		metafile = &r.files[WT_METAFILE_ID];
 		conn->next_file_id = r.max_fileid;
 
 		if (FLD_ISSET(conn->log_flags, WT_CONN_LOG_ENABLED) &&
@@ -509,6 +514,11 @@ __wt_txn_recover(WT_SESSION_IMPL *session)
 
 	/* Scan the metadata to find the live files and their IDs. */
 	WT_ERR(__recovery_file_scan(&r));
+	/*
+	 * Clear this out.  We no longer need it and it could have been
+	 * re-allocated when scanning the files.
+	 */
+	metafile = NULL;
 
 	/*
 	 * We no longer need the metadata cursor: close it to avoid pinning any
