@@ -42,19 +42,39 @@ if SCons.Util.case_sensitive_suffixes('.c', '.C'):
 
 # We make no effort to avoid rebuilding the entries. Someday, perhaps we could and even
 # integrate with the cache, but there doesn't seem to be much call for it.
-class __CompilationDbNode(SCons.Node.Node):
-    def __init__(self):
-        SCons.Node.Node.__init__(self)
+class __CompilationDbNode(SCons.Node.Python.Value):
+    def __init__(self, value):
+        SCons.Node.Python.Value.__init__(self, value)
         self.Decider(changed_since_last_build_node)
 
+
 def changed_since_last_build_node(node, target, prev_ni):
+    """ Dummy decider to force alwasy building"""
     return True
 
-def makeEmitCompilationDbEntry(comstr):
-    user_action = SCons.Action.Action(comstr)
-    def EmitCompilationDbEntry(target, source, env):
 
-        dbtarget = __CompilationDbNode()
+def makeEmitCompilationDbEntry(comstr):
+    """
+    Effectively this creates a lambda function to capture:
+    * command line
+    * source
+    * target
+    :param comstr: unevaluated command line
+    :return: an emitter which has captured the above
+    """
+    user_action = SCons.Action.Action(comstr)
+
+    def EmitCompilationDbEntry(target, source, env):
+        """
+        This emitter will be added to each c/c++ object build to capture the info needed
+        for clang tools
+        :param target: target node(s)
+        :param source: source node(s)
+        :param env: Environment for use building this node
+        :return: target(s), source(s)
+        """
+
+        dbtarget = __CompilationDbNode(source)
 
         entry = env.__COMPILATIONDB_Entry(
             target=dbtarget,
@@ -76,7 +96,18 @@ def makeEmitCompilationDbEntry(comstr):
 
     return EmitCompilationDbEntry
 
+
 def CompilationDbEntryAction(target, source, env, **kw):
+    """
+    Create a dictionary with evaluated command line, target, source
+    and store that info as an attribute on the target
+    (Which has been stored in __COMPILATION_DB_ENTRIES array
+    :param target: target node(s)
+    :param source: source node(s)
+    :param env: Environment for use building this node
+    :param kw:
+    :return: None
+    """
 
     command = env['__COMPILATIONDB_UACTION'].strfunction(
         target=env['__COMPILATIONDB_UTARGET'],
@@ -89,19 +120,21 @@ def CompilationDbEntryAction(target, source, env, **kw):
         "file": str(env['__COMPILATIONDB_USOURCE'][0])
     }
 
-    setattr(target[0], '__COMPILATION_DB_ENTRY', entry)
+    target[0].write(entry)
+
 
 def WriteCompilationDb(target, source, env):
     entries = []
 
     for s in __COMPILATION_DB_ENTRIES:
-        entries.append(getattr(s, '__COMPILATION_DB_ENTRY'))
+        entries.append(s.read())
 
     with open(str(target[0]), 'w') as target_file:
         json.dump(entries, target_file,
                   sort_keys=True,
                   indent=4,
                   separators=(',', ': '))
+
 
 def ScanCompilationDb(node, env, path):
     return __COMPILATION_DB_ENTRIES
