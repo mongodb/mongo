@@ -37,6 +37,7 @@
 #include "mongo/db/logical_clock.h"
 #include "mongo/db/namespace_string.h"
 #include "mongo/db/operation_context.h"
+#include "mongo/db/server_options.h"
 #include "mongo/s/catalog/dist_lock_manager_mock.h"
 #include "mongo/s/config_server_test_fixture.h"
 #include "mongo/s/grid.h"
@@ -51,6 +52,10 @@ class CacheUpdaterTest : public ConfigServerTestFixture {
 protected:
     void setUp() override {
         ConfigServerTestFixture::setUp();
+
+        serverGlobalParams.featureCompatibility.version.store(
+            ServerGlobalParams::FeatureCompatibility::Version::k36);
+        serverGlobalParams.featureCompatibility.validateFeaturesAsMaster.store(true);
 
         auto clockSource = stdx::make_unique<ClockSourceMock>();
         operationContext()->getServiceContext()->setFastClockSource(std::move(clockSource));
@@ -446,6 +451,49 @@ TEST_F(CacheUpdaterTest, ShouldNotCreateKeysWithDisableKeyGenerationFailPoint) {
     auto allKeys = getKeys(operationContext());
 
     ASSERT_EQ(0U, allKeys.size());
+}
+
+TEST_F(CacheUpdaterTest, ShouldNotCreateNewKeysInFeatureCompatiblityVersion34) {
+    serverGlobalParams.featureCompatibility.version.store(
+        ServerGlobalParams::FeatureCompatibility::Version::k34);
+
+    auto catalogClient = Grid::get(operationContext())->catalogClient(operationContext());
+    KeysCollectionCacheReaderAndUpdater updater("dummy", catalogClient, Seconds(5));
+
+    const LogicalTime currentTime(LogicalTime(Timestamp(100, 0)));
+    LogicalClock::get(operationContext())->setClusterTimeFromTrustedSource(currentTime);
+
+    {
+        auto keyStatus = updater.refresh(operationContext());
+        ASSERT_EQ(ErrorCodes::KeyNotFound, keyStatus.getStatus());
+
+        auto allKeys = getKeys(operationContext());
+        ASSERT_EQ(0u, allKeys.size());
+    }
+
+    // Increase the feature compatibility version and verify keys are found after refresh.
+    serverGlobalParams.featureCompatibility.version.store(
+        ServerGlobalParams::FeatureCompatibility::Version::k36);
+
+    {
+        auto keyStatus = updater.refresh(operationContext());
+        ASSERT_OK(keyStatus.getStatus());
+
+        auto allKeys = getKeys(operationContext());
+        ASSERT_EQ(2u, allKeys.size());
+
+        const auto& key1 = allKeys.front();
+        ASSERT_EQ(currentTime.asTimestamp().asLL(), key1.getKeyId());
+        ASSERT_EQ("dummy", key1.getPurpose());
+        ASSERT_EQ(Timestamp(105, 0), key1.getExpiresAt().asTimestamp());
+
+        const auto& key2 = allKeys.back();
+        ASSERT_EQ(currentTime.asTimestamp().asLL() + 1, key2.getKeyId());
+        ASSERT_EQ("dummy", key2.getPurpose());
+        ASSERT_EQ(Timestamp(110, 0), key2.getExpiresAt().asTimestamp());
+
+        ASSERT_NE(key1.getKey(), key2.getKey());
+    }
 }
 
 }  // namespace mongo

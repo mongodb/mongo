@@ -1066,6 +1066,7 @@ env.Library(
         'logical_clock',
         'keys_collection_document',
         'logical_time',
+        'server_options',
         '$BUILD_DIR/mongo/s/catalog/sharding_catalog_client',
     ],
 )

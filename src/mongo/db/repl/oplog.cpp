@@ -79,6 +79,7 @@
 #include "mongo/db/repl/replication_coordinator_global.h"
 #include "mongo/db/repl/snapshot_thread.h"
 #include "mongo/db/repl/sync_tail.h"
+#include "mongo/db/server_options.h"
 #include "mongo/db/server_parameters.h"
 #include "mongo/db/service_context.h"
 #include "mongo/db/stats/counters.h"
@@ -275,7 +276,9 @@ OplogDocWriter _logOpWriter(OperationContext* opCtx,
     if (o2)
         b.append("o2", *o2);
 
-    if (wallTime != Date_t{}) {
+    if (wallTime != Date_t{} &&
+        serverGlobalParams.featureCompatibility.version.load() !=
+            ServerGlobalParams::FeatureCompatibility::Version::k34) {
         b.appendDate("wall", wallTime);
     }
 

@@ -32,6 +32,7 @@
 
 #include "mongo/db/logical_clock.h"
 #include "mongo/db/logical_time_validator.h"
+#include "mongo/db/server_options.h"
 #include "mongo/rpc/metadata/logical_time_metadata.h"
 #include "mongo/stdx/memory.h"
 
@@ -66,6 +67,11 @@ Status LogicalTimeMetadataHook::readReplyMetadata(StringData replySource,
     // LogicalTimeMetadata is default constructed if no logical time metadata was sent, so a
     // default constructed SignedLogicalTime should be ignored.
     if (signedTime.getTime() == LogicalTime::kUninitialized) {
+        return Status::OK();
+    }
+
+    if (serverGlobalParams.featureCompatibility.version.load() ==
+        ServerGlobalParams::FeatureCompatibility::Version::k34) {
         return Status::OK();
     }
 

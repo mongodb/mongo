@@ -34,6 +34,7 @@
 #include "mongo/db/jsobj.h"
 #include "mongo/db/logical_clock.h"
 #include "mongo/db/logical_time_validator.h"
+#include "mongo/db/server_options.h"
 #include "mongo/rpc/metadata/audit_metadata.h"
 #include "mongo/rpc/metadata/client_metadata_ismaster.h"
 #include "mongo/rpc/metadata/config_server_metadata.h"
@@ -97,18 +98,23 @@ void readRequestMetadata(OperationContext* opCtx, const BSONObj& metadataObj) {
         // LogicalTimeMetadata is default constructed if no logical time metadata was sent, so a
         // default constructed SignedLogicalTime should be ignored.
         if (signedTime.getTime() != LogicalTime::kUninitialized) {
-            auto logicalTimeValidator = LogicalTimeValidator::get(opCtx);
-            if (!LogicalTimeValidator::isAuthorizedToAdvanceClock(opCtx)) {
-                if (!logicalTimeValidator) {
-                    uasserted(ErrorCodes::CannotVerifyAndSignLogicalTime,
-                              "Cannot accept logicalTime: " + signedTime.getTime().toString() +
-                                  ". May not be a part of a sharded cluster");
-                } else {
-                    uassertStatusOK(logicalTimeValidator->validate(opCtx, signedTime));
+            // Logical times are only sent by sharding aware mongod servers, so this point is only
+            // reached in sharded clusters.
+            if (serverGlobalParams.featureCompatibility.version.load() !=
+                ServerGlobalParams::FeatureCompatibility::Version::k34) {
+                auto logicalTimeValidator = LogicalTimeValidator::get(opCtx);
+                if (!LogicalTimeValidator::isAuthorizedToAdvanceClock(opCtx)) {
+                    if (!logicalTimeValidator) {
+                        uasserted(ErrorCodes::CannotVerifyAndSignLogicalTime,
+                                  "Cannot accept logicalTime: " + signedTime.getTime().toString() +
+                                      ". May not be a part of a sharded cluster");
+                    } else {
+                        uassertStatusOK(logicalTimeValidator->validate(opCtx, signedTime));
+                    }
                 }
-            }
 
-            uassertStatusOK(logicalClock->advanceClusterTime(signedTime.getTime()));
+                uassertStatusOK(logicalClock->advanceClusterTime(signedTime.getTime()));
+            }
         }
     }
 }

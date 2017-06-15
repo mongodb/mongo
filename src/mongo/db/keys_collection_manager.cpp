@@ -35,6 +35,7 @@
 #include "mongo/db/logical_clock.h"
 #include "mongo/db/logical_time.h"
 #include "mongo/db/operation_context.h"
+#include "mongo/db/server_options.h"
 #include "mongo/db/service_context.h"
 #include "mongo/stdx/memory.h"
 #include "mongo/util/concurrency/idle_thread_block.h"
@@ -230,25 +231,31 @@ void KeysCollectionManager::PeriodicRunner::_doPeriodicRefresh(ServiceContext* s
 
         Milliseconds nextWakeup = kRefreshIntervalIfErrored;
 
-        auto latestKeyStatusWith = (*doRefresh)(opCtx.get());
-        if (latestKeyStatusWith.getStatus().isOK()) {
-            errorCount = 0;
-            const auto& latestKey = latestKeyStatusWith.getValue();
-            auto currentTime = LogicalClock::get(service)->getClusterTime();
+        // No need to refresh keys in FCV 3.4, since key generation will be disabled.
+        if (serverGlobalParams.featureCompatibility.version.load() !=
+            ServerGlobalParams::FeatureCompatibility::Version::k34) {
+            auto latestKeyStatusWith = (*doRefresh)(opCtx.get());
+            if (latestKeyStatusWith.getStatus().isOK()) {
+                errorCount = 0;
+                const auto& latestKey = latestKeyStatusWith.getValue();
+                auto currentTime = LogicalClock::get(service)->getClusterTime();
 
-            {
-                stdx::unique_lock<stdx::mutex> lock(_mutex);
-                _hasSeenKeys = true;
+                {
+                    stdx::unique_lock<stdx::mutex> lock(_mutex);
+                    _hasSeenKeys = true;
+                }
+
+                nextWakeup =
+                    howMuchSleepNeedFor(currentTime, latestKey.getExpiresAt(), refreshInterval);
+            } else {
+                errorCount += 1;
+                nextWakeup = Milliseconds(kRefreshIntervalIfErrored.count() * errorCount);
+                if (nextWakeup > kMaxRefreshWaitTime) {
+                    nextWakeup = kMaxRefreshWaitTime;
+                }
             }
-
-            nextWakeup =
-                howMuchSleepNeedFor(currentTime, latestKey.getExpiresAt(), refreshInterval);
         } else {
-            errorCount += 1;
-            nextWakeup = Milliseconds(kRefreshIntervalIfErrored.count() * errorCount);
-            if (nextWakeup > kMaxRefreshWaitTime) {
-                nextWakeup = kMaxRefreshWaitTime;
-            }
+            nextWakeup = kDefaultRefreshWaitTime;
         }
 
         MONGO_FAIL_POINT_BLOCK(maxKeyRefreshWaitTimeOverrideMS, data) {
