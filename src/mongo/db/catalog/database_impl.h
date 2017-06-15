@@ -148,6 +148,10 @@ public:
         return _profileName.c_str();
     }
 
+    void setDropPending(OperationContext* opCtx, bool dropPending) final;
+
+    bool isDropPending(OperationContext* opCtx) const final;
+
     void getStats(OperationContext* opCtx, BSONObjBuilder* output, double scale = 1) final;
 
     const DatabaseCatalogEntry* getDatabaseCatalogEntry() const final;
@@ -276,6 +280,11 @@ private:
     const std::string _viewsName;        // "dbname.system.views"
 
     int _profile;  // 0=off.
+
+    // If '_dropPending' is true, this Database is in the midst of a two-phase drop. No new
+    // collections may be created in this Database.
+    // This variable may only be read/written while the database is locked in MODE_X.
+    bool _dropPending = false;
 
     CollectionMap _collections;
 

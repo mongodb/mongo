@@ -28,6 +28,7 @@
 
 #include "mongo/platform/basic.h"
 
+#include "mongo/bson/util/builder.h"
 #include "mongo/db/catalog/index_create.h"
 #include "mongo/db/client.h"
 #include "mongo/db/concurrency/write_conflict_exception.h"
@@ -105,6 +106,33 @@ void DatabaseTest::tearDown() {
     repl::StorageInterface::set(service, {});
 
     ServiceContextMongoDTest::tearDown();
+}
+
+TEST_F(DatabaseTest, SetDropPendingThrowsExceptionIfDatabaseIsAlreadyInADropPendingState) {
+    writeConflictRetry(_opCtx.get(), "testSetDropPending", _nss.ns(), [this] {
+        AutoGetOrCreateDb autoDb(_opCtx.get(), _nss.db(), MODE_X);
+        auto db = autoDb.getDb();
+        ASSERT_TRUE(db);
+
+        ASSERT_FALSE(db->isDropPending(_opCtx.get()));
+        db->setDropPending(_opCtx.get(), true);
+        ASSERT_TRUE(db->isDropPending(_opCtx.get()));
+
+        ASSERT_THROWS_CODE_AND_WHAT(
+            db->setDropPending(_opCtx.get(), true),
+            UserException,
+            ErrorCodes::DatabaseDropPending,
+            (StringBuilder() << "Unable to drop database " << _nss.db()
+                             << " because it is already in the process of being dropped.")
+                .stringData());
+
+        db->setDropPending(_opCtx.get(), false);
+        ASSERT_FALSE(db->isDropPending(_opCtx.get()));
+
+        // It's fine to reset 'dropPending' multiple times.
+        db->setDropPending(_opCtx.get(), false);
+        ASSERT_FALSE(db->isDropPending(_opCtx.get()));
+    });
 }
 
 void _testDropCollection(OperationContext* opCtx,

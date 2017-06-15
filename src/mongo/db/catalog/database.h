@@ -73,6 +73,10 @@ public:
 
         virtual const char* getProfilingNS() const = 0;
 
+        virtual void setDropPending(OperationContext* opCtx, bool dropPending) = 0;
+
+        virtual bool isDropPending(OperationContext* opCtx) const = 0;
+
         virtual void getStats(OperationContext* opCtx, BSONObjBuilder* output, double scale) = 0;
 
         virtual const DatabaseCatalogEntry* getDatabaseCatalogEntry() const = 0;
@@ -222,6 +226,26 @@ public:
 
     inline const char* getProfilingNS() const {
         return this->_impl().getProfilingNS();
+    }
+
+    /**
+     * Sets the 'drop-pending' state of this Database.
+     * This is done at the beginning of a dropDatabase operation and is used to reject subsequent
+     * collection creation requests on this database.
+     * Throws a UserAssertion if this is called on a Database that is already in a 'drop-pending'
+     * state.
+     * The database must be locked in MODE_X when calling this function.
+     */
+    inline void setDropPending(OperationContext* opCtx, bool dropPending) {
+        this->_impl().setDropPending(opCtx, dropPending);
+    }
+
+    /**
+     * Returns the 'drop-pending' state of this Database.
+     * The database must be locked in MODE_X when calling this function.
+     */
+    inline bool isDropPending(OperationContext* opCtx) const {
+        return this->_impl().isDropPending(opCtx);
     }
 
     inline void getStats(OperationContext* const opCtx,

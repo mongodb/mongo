@@ -327,6 +327,24 @@ Status DatabaseImpl::setProfilingLevel(OperationContext* opCtx, int newLevel) {
     return Status::OK();
 }
 
+void DatabaseImpl::setDropPending(OperationContext* opCtx, bool dropPending) {
+    invariant(opCtx->lockState()->isDbLockedForMode(name(), MODE_X));
+    if (dropPending) {
+        uassert(ErrorCodes::DatabaseDropPending,
+                str::stream() << "Unable to drop database " << name()
+                              << " because it is already in the process of being dropped.",
+                !_dropPending);
+        _dropPending = true;
+    } else {
+        _dropPending = false;
+    }
+}
+
+bool DatabaseImpl::isDropPending(OperationContext* opCtx) const {
+    invariant(opCtx->lockState()->isDbLockedForMode(name(), MODE_X));
+    return _dropPending;
+}
+
 void DatabaseImpl::getStats(OperationContext* opCtx, BSONObjBuilder* output, double scale) {
     list<string> collections;
     _dbEntry->getCollectionNamespaces(&collections);
