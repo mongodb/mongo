@@ -128,52 +128,9 @@ private:
     const Lock::CollectionLock _collLock;
     Collection* const _coll;
 
-    friend class AutoGetCollectionOrView;
     friend class AutoGetCollectionForRead;
     friend class AutoGetCollectionForReadCommand;
     friend class AutoGetCollectionOrViewForReadCommand;
-};
-
-/**
- * RAII-style class which acquires the appropriate hierarchy of locks for a collection or
- * view. The pointer to a view definition is nullptr if it does not exist.
- *
- * Use this when you have not yet determined if the namespace is a view or a collection.
- * For example, you can use this to access a namespace's CursorManager.
- *
- * It is guaranteed that locks will be released when this object goes out of scope, therefore
- * the view returned by this class should not be retained.
- */
-class AutoGetCollectionOrView {
-    MONGO_DISALLOW_COPYING(AutoGetCollectionOrView);
-
-public:
-    AutoGetCollectionOrView(OperationContext* opCtx, const NamespaceString& nss, LockMode modeAll);
-
-    /**
-     * Returns nullptr if the database didn't exist.
-     */
-    Database* getDb() const {
-        return _autoColl.getDb();
-    }
-
-    /**
-     * Returns nullptr if the collection didn't exist.
-     */
-    Collection* getCollection() const {
-        return _autoColl.getCollection();
-    }
-
-    /**
-     * Returns nullptr if the view didn't exist.
-     */
-    ViewDefinition* getView() const {
-        return _view.get();
-    }
-
-private:
-    const AutoGetCollection _autoColl;
-    std::shared_ptr<ViewDefinition> _view;
 };
 
 /**

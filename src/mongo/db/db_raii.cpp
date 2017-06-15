@@ -72,14 +72,6 @@ AutoGetCollection::AutoGetCollection(OperationContext* opCtx,
     }
 }
 
-AutoGetCollectionOrView::AutoGetCollectionOrView(OperationContext* opCtx,
-                                                 const NamespaceString& nss,
-                                                 LockMode modeAll)
-    : _autoColl(opCtx, nss, modeAll, modeAll, AutoGetCollection::ViewMode::kViewsPermitted),
-      _view(_autoColl.getDb() && !_autoColl.getCollection()
-                ? _autoColl.getDb()->getViewCatalog()->lookup(opCtx, nss.ns())
-                : nullptr) {}
-
 AutoGetOrCreateDb::AutoGetOrCreateDb(OperationContext* opCtx, StringData ns, LockMode mode)
     : _dbLock(opCtx, ns, mode), _db(dbHolder().get(opCtx, ns)) {
     invariant(mode == MODE_IX || mode == MODE_X);

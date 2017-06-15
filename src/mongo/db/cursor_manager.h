@@ -36,7 +36,6 @@
 #include "mongo/db/record_id.h"
 #include "mongo/platform/unordered_map.h"
 #include "mongo/platform/unordered_set.h"
-#include "mongo/stdx/unordered_set.h"
 #include "mongo/util/concurrency/mutex.h"
 #include "mongo/util/duration.h"
 
@@ -78,12 +77,6 @@ public:
     // The number of minutes a cursor is allowed to be idle before timing out.
     static constexpr Minutes kDefaultCursorTimeoutMinutes{10};
     using RegistrationToken = Partitioned<unordered_set<PlanExecutor*>>::PartitionId;
-
-    /**
-     * Appends the sessions that have open cursors on the global cursor manager and across
-     * all collection-level cursor managers to the given set of lsids.
-     */
-    static void appendAllActiveSessions(OperationContext* opCtx, LogicalSessionIdSet* lsids);
 
     CursorManager(NamespaceString nss);
 
@@ -164,16 +157,6 @@ public:
     Status eraseCursor(OperationContext* opCtx, CursorId id, bool shouldAudit);
 
     void getCursorIds(std::set<CursorId>* openCursors) const;
-
-    /**
-     * Appends sessions that have open cursors in this cursor manager to the given set of lsids.
-     */
-    void appendActiveSessions(LogicalSessionIdSet* lsids) const;
-
-    /*
-     * Returns a list of all open cursors for the given session.
-     */
-    stdx::unordered_set<CursorId> getCursorsForSession(LogicalSessionId lsid) const;
 
     /**
      * Returns the number of ClientCursors currently registered. Excludes any registered bare

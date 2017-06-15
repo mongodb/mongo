@@ -101,8 +101,6 @@ public:
 
     std::size_t timeoutCursors(OperationContext* opCtx, Date_t now);
 
-    void appendActiveSessions(OperationContext* opCtx, LogicalSessionIdSet* lsids);
-
     int64_t nextSeed();
 
 private:
@@ -269,45 +267,10 @@ std::size_t GlobalCursorIdCache::timeoutCursors(OperationContext* opCtx, Date_t 
 }
 }  // namespace
 
-void GlobalCursorIdCache::appendActiveSessions(OperationContext* opCtx,
-                                               LogicalSessionIdSet* lsids) {
-    // Get active session ids from the global cursor manager
-    globalCursorManager->appendActiveSessions(lsids);
-
-    // Compute the set of collection names that we have to get sessions for
-    vector<NamespaceString> namespaces;
-    {
-        stdx::lock_guard<SimpleMutex> lk(_mutex);
-        for (auto&& entry : _idToNss) {
-            namespaces.push_back(entry.second);
-        }
-    }
-
-    // For each collection, get its sessions under the collection lock (to prevent the
-    // collection from going away during the erase).
-    for (auto&& ns : namespaces) {
-        AutoGetCollectionOrView ctx(opCtx, NamespaceString(ns), MODE_IS);
-        if (!ctx.getDb()) {
-            continue;
-        }
-
-        Collection* collection = ctx.getCollection();
-        if (!collection) {
-            continue;
-        }
-
-        collection->getCursorManager()->appendActiveSessions(lsids);
-    }
-}
-
 // ---
 
 CursorManager* CursorManager::getGlobalCursorManager() {
     return globalCursorManager.get();
-}
-
-void CursorManager::appendAllActiveSessions(OperationContext* opCtx, LogicalSessionIdSet* lsids) {
-    globalCursorIdCache->appendActiveSessions(opCtx, lsids);
 }
 
 std::size_t CursorManager::timeoutCursorsGlobal(OperationContext* opCtx, Date_t now) {
@@ -519,34 +482,6 @@ void CursorManager::getCursorIds(std::set<CursorId>* openCursors) const {
     }
 }
 
-void CursorManager::appendActiveSessions(LogicalSessionIdSet* lsids) const {
-    auto allPartitions = _cursorMap->lockAllPartitions();
-    for (auto&& partition : allPartitions) {
-        for (auto&& entry : partition) {
-            auto cursor = entry.second;
-            if (auto id = cursor->getSessionId()) {
-                lsids->insert(id.value());
-            }
-        }
-    }
-}
-
-stdx::unordered_set<CursorId> CursorManager::getCursorsForSession(LogicalSessionId lsid) const {
-    stdx::unordered_set<CursorId> cursors;
-
-    auto allPartitions = _cursorMap->lockAllPartitions();
-    for (auto&& partition : allPartitions) {
-        for (auto&& entry : partition) {
-            auto cursor = entry.second;
-            if (cursor->getSessionId() == lsid) {
-                cursors.insert(cursor->cursorid());
-            }
-        }
-    }
-
-    return cursors;
-}
-
 size_t CursorManager::numCursors() const {
     return _cursorMap->size();
 }
@@ -591,8 +526,8 @@ ClientCursorPin CursorManager::registerCursor(OperationContext* opCtx,
     // we don't insert two cursors with the same cursor id.
     stdx::lock_guard<SimpleMutex> lock(_registrationLock);
     CursorId cursorId = allocateCursorId_inlock();
-    std::unique_ptr<ClientCursor, ClientCursor::Deleter> clientCursor(new ClientCursor(
-        std::move(cursorParams), this, cursorId, opCtx->getLogicalSessionId(), now));
+    std::unique_ptr<ClientCursor, ClientCursor::Deleter> clientCursor(
+        new ClientCursor(std::move(cursorParams), this, cursorId, now));
 
     // Transfer ownership of the cursor to '_cursorMap'.
     auto partition = _cursorMap->lockOnePartition(cursorId);

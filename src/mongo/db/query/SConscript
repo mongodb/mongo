@@ -255,7 +255,6 @@ env.Library(
     ],
     LIBDEPS=[
         "collation/collator_factory_mock",
-        "$BUILD_DIR/mongo/db/logical_session_id",
         "$BUILD_DIR/mongo/db/service_context",
     ],
 )
