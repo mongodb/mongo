@@ -52,6 +52,7 @@
 #include "mongo/logger/redaction.h"
 #include "mongo/logger/tee.h"
 #include "mongo/util/concurrency/thread_name.h"
+#include "mongo/util/errno_util.h"
 
 // Provide log component in global scope so that MONGO_LOG will always have a valid component.
 // Global log component will be kDefault unless overridden by MONGO_LOG_DEFAULT_COMPONENT.
@@ -225,16 +226,8 @@ inline bool shouldLog(logger::LogSeverity severity) {
  */
 bool rotateLogs(bool renameFiles);
 
-/** output the error # and error message with prefix.
-    handy for use as parm in uassert/massert.
-    */
-std::string errnoWithPrefix(StringData prefix);
-
 extern Tee* const warnings;            // Things put here go in serverStatus
 extern Tee* const startupWarningsLog;  // Things put here get reported in MMS
-
-std::string errnoWithDescription(int errorcode = -1);
-std::pair<int, std::string> errnoAndDescription();
 
 /**
  * Write the current context (backtrace), along with the optional "msg".

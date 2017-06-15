@@ -83,11 +83,12 @@
  *
  */
 
+#include "mongo/platform/basic.h"
+
 #ifdef _WIN32
 
 #include <conio.h>
 #include <io.h>
-#include <windows.h>
 #define strcasecmp _stricmp
 #define strdup _strdup
 #define isatty _isatty
@@ -113,9 +114,12 @@
 #include "mk_wcwidth.h"
 #include <errno.h>
 #include <fcntl.h>
+#include <sstream>
 #include <stdio.h>
 #include <string>
 #include <vector>
+
+#include "mongo/util/errno_util.h"
 
 using std::string;
 using std::vector;
@@ -2759,42 +2763,59 @@ int linenoiseHistorySetMaxLen(int len) {
     return 1;
 }
 
-/* Save the history in the specified file. On success 0 is returned
- * otherwise -1 is returned. */
-int linenoiseHistorySave(const char* filename) {
+namespace {
+mongo::Status linenoiseFileError(mongo::ErrorCodes::Error code,
+                                 const char* what,
+                                 const char* filename) {
+    std::stringstream ss;
+    ss << "Unable to " << what << " file " << filename << ": " << mongo::errnoWithDescription();
+    return {code, ss.str()};
+}
+}  // namespace
+
+/* Save the history in the specified file. */
+mongo::Status linenoiseHistorySave(const char* filename) {
     FILE* fp;
 #if _POSIX_C_SOURCE >= 1 || _XOPEN_SOURCE || _POSIX_SOURCE || defined(__APPLE__)
     int fd = open(filename, O_WRONLY | O_TRUNC | O_CREAT, S_IRUSR | S_IWUSR);
     if (fd == -1) {
-        // report errno somehow?
-        return -1;
+        return linenoiseFileError(mongo::ErrorCodes::FileOpenFailed, "open()", filename);
     }
     fp = fdopen(fd, "wt");
+    if (fp == NULL) {
+        // We've already failed, so no need to report any close() failure.
+        (void)close(fd);
+        return linenoiseFileError(mongo::ErrorCodes::FileOpenFailed, "fdopen()", filename);
+    }
 #else
     fp = fopen(filename, "wt");
-#endif  // _POSIX_C_SOURCE >= 1 || _XOPEN_SOURCE || _POSIX_SOURCE || defined(__APPLE__)
     if (fp == NULL) {
-        return -1;
+        return linenoiseFileError(mongo::ErrorCodes::FileOpenFailed, "fopen()", filename);
     }
+#endif  // _POSIX_C_SOURCE >= 1 || _XOPEN_SOURCE || _POSIX_SOURCE || defined(__APPLE__)
 
     for (int j = 0; j < historyLen; ++j) {
         if (history[j][0] != '\0') {
-            fprintf(fp, "%s\n", history[j]);
+            if (fprintf(fp, "%s\n", history[j]) < 0) {
+                // We've already failed, so no need to report any fclose() failure.
+                (void)fclose(fp);
+                return linenoiseFileError(
+                    mongo::ErrorCodes::FileStreamFailed, "fprintf() to", filename);
+            }
         }
     }
-    fclose(fp);  // Also causes fd to be closed.
-    return 0;
+    // Closing fp also causes fd to be closed.
+    if (fclose(fp) != 0) {
+        return linenoiseFileError(mongo::ErrorCodes::FileStreamFailed, "fclose()", filename);
+    }
+    return mongo::Status::OK();
 }
 
-/* Load the history from the specified file. If the file does not exist
- * zero is returned and no operation is performed.
- *
- * If the file exists and the operation succeeded 0 is returned, otherwise
- * on error -1 is returned. */
-int linenoiseHistoryLoad(const char* filename) {
+/* Load the history from the specified file. */
+mongo::Status linenoiseHistoryLoad(const char* filename) {
     FILE* fp = fopen(filename, "rt");
     if (fp == NULL) {
-        return -1;
+        return linenoiseFileError(mongo::ErrorCodes::FileOpenFailed, "fopen()", filename);
     }
 
     char buf[LINENOISE_MAX_LINE];
@@ -2810,6 +2831,15 @@ int linenoiseHistoryLoad(const char* filename) {
             linenoiseHistoryAdd(buf);
         }
     }
-    fclose(fp);
-    return 0;
+    // fgets() returns NULL on error or EOF (with nothing read).
+    // So if we aren't EOF, it must have been an error.
+    if (!feof(fp)) {
+        // We've already failed, so no need to report any fclose() failure.
+        (void)fclose(fp);
+        return linenoiseFileError(mongo::ErrorCodes::FileStreamFailed, "fgets() from", filename);
+    }
+    if (fclose(fp) != 0) {
+        return linenoiseFileError(mongo::ErrorCodes::FileStreamFailed, "fclose()", filename);
+    }
+    return mongo::Status::OK();
 }

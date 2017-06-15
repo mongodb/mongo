@@ -283,15 +283,6 @@ std::string causedBy(const Status& e) {
     return causedBy(e.toString());
 }
 
-string errnoWithPrefix(StringData prefix) {
-    const auto suffix = errnoWithDescription();
-    stringstream ss;
-    if (!prefix.empty())
-        ss << prefix << ": ";
-    ss << suffix;
-    return ss.str();
-}
-
 string demangleName(const type_info& typeinfo) {
 #ifdef _WIN32
     return typeinfo.name();

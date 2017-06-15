@@ -143,12 +143,18 @@ void shellHistoryInit() {
     ss << ".dbshell";
     historyFile = ss.str();
 
-    linenoiseHistoryLoad(historyFile.c_str());
+    Status res = linenoiseHistoryLoad(historyFile.c_str());
+    if (!res.isOK()) {
+        error() << "Error loading history file: " << res;
+    }
     linenoiseSetCompletionCallback(completionHook);
 }
 
 void shellHistoryDone() {
-    linenoiseHistorySave(historyFile.c_str());
+    Status res = linenoiseHistorySave(historyFile.c_str());
+    if (!res.isOK()) {
+        error() << "Error saving history file: " << res;
+    }
     linenoiseHistoryFree();
 }
 void shellHistoryAdd(const char* line) {
