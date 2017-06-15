@@ -333,10 +333,10 @@ Status MMAPV1DatabaseCatalogEntry::_renameSingleNamespace(OperationContext* opCt
     // some sanity checking
     NamespaceDetails* fromDetails = _namespaceIndex.details(fromNS);
     if (!fromDetails)
-        return Status(ErrorCodes::BadValue, "from namespace doesn't exist");
+        return Status(ErrorCodes::NamespaceNotFound, "from namespace doesn't exist");
 
     if (_namespaceIndex.details(toNS))
-        return Status(ErrorCodes::BadValue, "to namespace already exists");
+        return Status(ErrorCodes::NamespaceExists, "to namespace already exists");
 
     // at this point, we haven't done anything destructive yet
 
