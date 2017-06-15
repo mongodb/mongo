@@ -1336,6 +1336,24 @@ timeout:
 #               Tasks                 #
 #######################################
 
+## The test_lifecycle_excluded_tasks are a list of tasks names which include:
+##   - Non jstests, i.e., compile, unittests
+##   - Non standard jstests, i.e., jstestfuzz
+## Note that the task name supports glob patterns.
+test_lifecycle_excluded_tasks:
+- burn_in_tests
+- compile*
+- dbtest*
+- idl_tests
+- integration*
+- jepsen*
+- jstestfuzz*
+- lint
+- mongos*
+- package
+- push
+- unittests*
+
 tasks:
 
 ## compile - build all scons targets except unittests ##

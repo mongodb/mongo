@@ -24,7 +24,7 @@ API_SERVER_DEFAULT = "http://evergreen-api.mongodb.com:8080"
 # Get relative imports to work when the package is not installed on the PYTHONPATH.
 if __name__ == "__main__" and __package__ is None:
     sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
-    from buildscripts import resmokelib
+from buildscripts import resmokelib
 
 
 def parse_command_line():
@@ -274,6 +274,17 @@ def create_buildvariant_list(evergreen_file):
     return [li["name"] for li in evg["buildvariants"]]
 
 
+def get_resmoke_args(evg_task):
+    """
+    Returns the resmoke_args from a task in evergreen.
+    """
+    for command in evg_task["commands"]:
+        if ("func" in command and command["func"] == "run tests" and
+                "vars" in command and "resmoke_args" in command["vars"]):
+            return command["vars"]["resmoke_args"]
+    return None
+
+
 def create_task_list(evergreen_file, buildvariant, suites, exclude_tasks):
     """
     Parses etc/evergreen.yml to find associated tasks for the specified buildvariant
@@ -301,10 +312,7 @@ def create_task_list(evergreen_file, buildvariant, suites, exclude_tasks):
     # Find all the buildvariant task's resmoke_args.
     variant_task_args = {}
     for task in [a for a in evg["tasks"] if a["name"] in set(variant_tasks) - set(exclude_tasks)]:
-        for command in task["commands"]:
-            if ("func" in command and command["func"] == "run tests" and
-                    "vars" in command and "resmoke_args" in command["vars"]):
-                variant_task_args[task["name"]] = command["vars"]["resmoke_args"]
+        variant_task_args[task["name"]] = get_resmoke_args(task)
 
     # Find if the buildvariant has a test_flags expansion, which will be passed onto resmoke.py.
     test_flags = evg_buildvariant.get("expansions", {}).get("test_flags", "")
