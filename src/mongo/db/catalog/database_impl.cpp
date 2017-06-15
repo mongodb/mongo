@@ -666,6 +666,10 @@ void DatabaseImpl::_checkCanCreateCollection(OperationContext* opCtx,
 
     uassert(17316, "cannot create a blank collection", nss.coll() > 0);
     uassert(28838, "cannot create a non-capped oplog collection", options.capped || !nss.isOplog());
+    uassert(ErrorCodes::DatabaseDropPending,
+            str::stream() << "Cannot create collection " << nss.ns()
+                          << " - database is in the process of being dropped.",
+            !_dropPending);
 }
 
 Status DatabaseImpl::createView(OperationContext* opCtx,

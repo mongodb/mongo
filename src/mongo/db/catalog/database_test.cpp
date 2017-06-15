@@ -135,6 +135,33 @@ TEST_F(DatabaseTest, SetDropPendingThrowsExceptionIfDatabaseIsAlreadyInADropPend
     });
 }
 
+TEST_F(DatabaseTest, CreateCollectionThrowsExceptionWhenDatabaseIsInADropPendingState) {
+    writeConflictRetry(
+        _opCtx.get(), "testÇreateCollectionWhenDatabaseIsInADropPendingState", _nss.ns(), [this] {
+            AutoGetOrCreateDb autoDb(_opCtx.get(), _nss.db(), MODE_X);
+            auto db = autoDb.getDb();
+            ASSERT_TRUE(db);
+
+            db->setDropPending(_opCtx.get(), true);
+
+            WriteUnitOfWork wuow(_opCtx.get());
+
+            // If createCollection() unexpectedly succeeds, we need to commit the collection
+            // creation to
+            // avoid leaving the ephemeralForTest storage engine in a bad state for subsequent
+            // tests.
+            ON_BLOCK_EXIT([&wuow] { wuow.commit(); });
+
+            ASSERT_THROWS_CODE_AND_WHAT(
+                db->createCollection(_opCtx.get(), _nss.ns()),
+                UserException,
+                ErrorCodes::DatabaseDropPending,
+                (StringBuilder() << "Cannot create collection " << _nss.ns()
+                                 << " - database is in the process of being dropped.")
+                    .stringData());
+        });
+}
+
 void _testDropCollection(OperationContext* opCtx,
                          const NamespaceString& nss,
                          bool createCollectionBeforeDrop,
