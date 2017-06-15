@@ -32,6 +32,8 @@
 
 #include "mongo/client/mongo_uri.h"
 
+#include <regex>
+
 #include "mongo/base/status_with.h"
 #include "mongo/bson/bsonobjbuilder.h"
 #include "mongo/client/dbclientinterface.h"
@@ -43,7 +45,6 @@
 #include <boost/algorithm/string/classification.hpp>
 #include <boost/algorithm/string/predicate.hpp>
 #include <boost/algorithm/string/split.hpp>
-#include <boost/regex.hpp>
 
 namespace mongo {
 
@@ -84,11 +85,9 @@ StatusWith<MongoURI> MongoURI::parse(const std::string& url) {
 
         return MongoURI(cs_status.getValue());
     }
-
-    const boost::regex mongoUrlRe(kMongoDBURL);
-
-    boost::smatch matches;
-    if (!boost::regex_match(url, matches, mongoUrlRe)) {
+    const std::regex mongoUrlRe(kMongoDBURL);
+    std::smatch matches;
+    if (!std::regex_match(url, matches, mongoUrlRe)) {
         return Status(ErrorCodes::FailedToParse,
                       str::stream() << "Failed to parse mongodb:// URL: " << url);
     }

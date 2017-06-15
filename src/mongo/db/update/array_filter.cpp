@@ -30,16 +30,16 @@
 
 #include "mongo/db/update/array_filter.h"
 
-#include "mongo/db/matcher/expression_parser.h"
+#include <regex>
 
-#include <boost/regex.hpp>
+#include "mongo/db/matcher/expression_parser.h"
 
 namespace mongo {
 
 namespace {
 
 // The array filter must begin with a lowercase letter and contain no special characters.
-boost::regex idRegex("^[a-z][a-zA-Z0-9]*$");
+const std::regex idRegex("^[a-z][a-zA-Z0-9]*$");
 
 /**
  * Finds the top-level field that 'expr' is over. The must be unique and not the empty string.
@@ -105,7 +105,7 @@ StatusWith<std::unique_ptr<ArrayFilter>> ArrayFilter::parse(
         return statusWithId.getStatus();
     }
     auto id = statusWithId.getValue().toString();
-    if (!boost::regex_match(id, idRegex)) {
+    if (!std::regex_match(id, idRegex)) {
         return Status(ErrorCodes::BadValue,
                       str::stream()
                           << "The top-level field name in an array filter must be an alphanumeric "
