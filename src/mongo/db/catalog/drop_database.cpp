@@ -42,6 +42,7 @@
 #include "mongo/db/repl/replication_coordinator.h"
 #include "mongo/db/service_context.h"
 #include "mongo/util/log.h"
+#include "mongo/util/scopeguard.h"
 
 namespace mongo {
 
@@ -76,6 +77,11 @@ Status dropDatabase(OperationContext* opCtx, const std::string& dbName) {
         }
 
         log() << "dropDatabase " << dbName << " - starting";
+        db->setDropPending(opCtx, true);
+
+        // If Database::dropDatabase() fails, we should reset the drop-pending state on Database.
+        auto dropPendingGuard = MakeGuard([&db, opCtx] { db->setDropPending(opCtx, false); });
+
         for (auto collection : *db) {
             const auto& nss = collection->ns();
             if (replCoord->isOplogDisabledFor(opCtx, nss) || nss.isSystemDotIndexes()) {
@@ -87,6 +93,7 @@ Status dropDatabase(OperationContext* opCtx, const std::string& dbName) {
             wunit.commit();
         }
         Database::dropDatabase(opCtx, db);
+        dropPendingGuard.Dismiss();
         log() << "dropDatabase " << dbName << " - finished";
 
         WriteUnitOfWork wunit(opCtx);

@@ -49,6 +49,7 @@
 #include "mongo/db/service_context_d_test_fixture.h"
 #include "mongo/stdx/memory.h"
 #include "mongo/unittest/unittest.h"
+#include "mongo/util/assert_util.h"
 
 namespace {
 
@@ -56,6 +57,8 @@ using namespace mongo;
 
 /**
  * Mock OpObserver that tracks dropped collections and databases.
+ * Since this class is used exclusively to test dropDatabase(), we will also check the drop-pending
+ * flag in the Database object being tested (if provided).
  */
 class OpObserverMock : public OpObserverNoop {
 public:
@@ -66,6 +69,8 @@ public:
 
     std::set<std::string> droppedDatabaseNames;
     std::set<NamespaceString> droppedCollectionNames;
+    Database* db = nullptr;
+    bool onDropCollectionThrowsException = false;
 };
 
 void OpObserverMock::onDropDatabase(OperationContext* opCtx, const std::string& dbName) {
@@ -82,6 +87,15 @@ repl::OpTime OpObserverMock::onDropCollection(OperationContext* opCtx,
     auto opTime = OpObserverNoop::onDropCollection(opCtx, collectionName, uuid);
     // Do not update 'droppedCollectionNames' if OpObserverNoop::onDropCollection() throws.
     droppedCollectionNames.insert(collectionName);
+
+    // Check drop-pending flag in Database if provided.
+    if (db) {
+        ASSERT_TRUE(db->isDropPending(opCtx));
+    }
+
+    uassert(
+        ErrorCodes::OperationFailed, "onDropCollection() failed", !onDropCollectionThrowsException);
+
     return opTime;
 }
 
@@ -182,6 +196,7 @@ TEST_F(DropDatabaseTest, DropDatabaseReturnsNotMasterIfNotPrimary) {
  * Tests successful drop of a database containing a single collection.
  * Checks expected number of onDropCollection() and onDropDatabase() invocations on the
  * OpObserver.
+ * Checks that drop-pending flag is set by dropDatabase() during the collection drop phase.
  */
 void _testDropDatabase(OperationContext* opCtx,
                        OpObserverMock* opObserver,
@@ -189,9 +204,15 @@ void _testDropDatabase(OperationContext* opCtx,
                        bool expectedOnDropCollection) {
     _createCollection(opCtx, nss);
 
-    ASSERT_TRUE(AutoGetDb(opCtx, nss.db(), MODE_X).getDb());
+    // Set OpObserverMock::db so that we can check Database::isDropPending() while dropping
+    // collections.
+    auto db = AutoGetDb(opCtx, nss.db(), MODE_X).getDb();
+    ASSERT_TRUE(db);
+    opObserver->db = db;
+
     ASSERT_OK(dropDatabase(opCtx, nss.db().toString()));
     ASSERT_FALSE(AutoGetDb(opCtx, nss.db(), MODE_X).getDb());
+    opObserver->db = nullptr;
 
     ASSERT_EQUALS(1U, opObserver->droppedDatabaseNames.size());
     ASSERT_EQUALS(nss.db().toString(), *(opObserver->droppedDatabaseNames.begin()));
@@ -233,6 +254,24 @@ TEST_F(DropDatabaseTest, DropDatabaseSkipsSystemProfileCollectionWhenDroppingCol
     repl::OpTime dropOpTime(Timestamp(Seconds(100), 0), 1LL);
     NamespaceString profileNss(_nss.getSisterNS("system.profile"));
     _testDropDatabase(_opCtx.get(), _opObserver, profileNss, false);
+}
+
+TEST_F(DropDatabaseTest, DropDatabaseResetsDropPendingStateOnException) {
+    // Update OpObserverMock so that onDropCollection() throws an exception when called.
+    _opObserver->onDropCollectionThrowsException = true;
+
+    _createCollection(_opCtx.get(), _nss);
+
+    AutoGetDb autoDb(_opCtx.get(), _nss.db(), MODE_X);
+    auto db = autoDb.getDb();
+    ASSERT_TRUE(db);
+
+    ASSERT_THROWS_CODE_AND_WHAT(dropDatabase(_opCtx.get(), _nss.db().toString()).ignore(),
+                                UserException,
+                                ErrorCodes::OperationFailed,
+                                "onDropCollection() failed");
+
+    ASSERT_FALSE(db->isDropPending(_opCtx.get()));
 }
 
 }  // namespace
