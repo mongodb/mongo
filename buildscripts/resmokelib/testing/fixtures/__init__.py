@@ -4,29 +4,14 @@ Fixtures for executing JSTests against.
 
 from __future__ import absolute_import
 
-from .interface import Fixture, ReplFixture
-from .standalone import MongoDFixture
-from .replicaset import ReplicaSetFixture
-from .masterslave import MasterSlaveFixture
-from .shardedcluster import ShardedClusterFixture
+from .interface import Fixture as _Fixture
+from .interface import make_fixture
+from ...utils import autoloader as _autoloader
 
 
-NOOP_FIXTURE_CLASS = "Fixture"
-
-_FIXTURES = {
-    "Fixture": Fixture,
-    "MongoDFixture": MongoDFixture,
-    "ReplicaSetFixture": ReplicaSetFixture,
-    "MasterSlaveFixture": MasterSlaveFixture,
-    "ShardedClusterFixture": ShardedClusterFixture,
-}
+NOOP_FIXTURE_CLASS = _Fixture.REGISTERED_NAME
 
 
-def make_fixture(class_name, *args, **kwargs):
-    """
-    Factory function for creating Fixture instances.
-    """
-
-    if class_name not in _FIXTURES:
-        raise ValueError("Unknown fixture class '%s'" % (class_name))
-    return _FIXTURES[class_name](*args, **kwargs)
+# We dynamically load all modules in the fixtures/ package so that any Fixture classes declared
+# within them are automatically registered.
+_autoloader.load_all_modules(name=__name__, path=__path__)

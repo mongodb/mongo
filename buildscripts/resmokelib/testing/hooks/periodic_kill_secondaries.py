@@ -15,8 +15,9 @@ import pymongo.errors
 from . import dbhash
 from . import interface
 from . import validate
-from .. import fixtures
 from .. import testcases
+from ..fixtures import interface as fixture
+from ..fixtures import replicaset
 from ... import errors
 from ... import utils
 
@@ -31,7 +32,7 @@ class PeriodicKillSecondaries(interface.CustomBehavior):
     DEFAULT_PERIOD_SECS = 30
 
     def __init__(self, hook_logger, fixture, period_secs=DEFAULT_PERIOD_SECS):
-        if not isinstance(fixture, fixtures.ReplicaSetFixture):
+        if not isinstance(fixture, replicaset.ReplicaSetFixture):
             raise TypeError("%s either does not support replication or does not support writing to"
                             " its oplog early"
                             % (fixture.__class__.__name__))
@@ -299,12 +300,12 @@ class PeriodicKillSecondaries(interface.CustomBehavior):
             client.admin.command(bson.SON([
                 ("replSetTest", 1),
                 ("waitForMemberState", 2),  # 2 = SECONDARY
-                ("timeoutMillis", fixtures.ReplFixture.AWAIT_REPL_TIMEOUT_MINS * 60 * 1000)]))
+                ("timeoutMillis", fixture.ReplFixture.AWAIT_REPL_TIMEOUT_MINS * 60 * 1000)]))
         except pymongo.errors.OperationFailure as err:
             self.hook_test_case.logger.exception(
                 "mongod on port %d failed to reach state SECONDARY after %d seconds",
                 secondary.port,
-                fixtures.ReplFixture.AWAIT_REPL_TIMEOUT_MINS * 60)
+                fixture.ReplFixture.AWAIT_REPL_TIMEOUT_MINS * 60)
             raise errors.ServerFailure(
                 "mongod on port %d failed to reach state SECONDARY after %d seconds: %s"
-                % (secondary.port, fixtures.ReplFixture.AWAIT_REPL_TIMEOUT_MINS * 60, err.args[0]))
+                % (secondary.port, fixture.ReplFixture.AWAIT_REPL_TIMEOUT_MINS * 60, err.args[0]))

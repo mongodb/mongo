@@ -10,12 +10,32 @@ import pymongo
 
 from ... import errors
 from ... import logging
+from ...utils import registry
+
+
+_FIXTURES = {}
+
+
+def make_fixture(class_name, *args, **kwargs):
+    """
+    Factory function for creating Fixture instances.
+    """
+
+    if class_name not in _FIXTURES:
+        raise ValueError("Unknown fixture class '%s'" % (class_name))
+    return _FIXTURES[class_name](*args, **kwargs)
 
 
 class Fixture(object):
     """
     Base class for all fixtures.
     """
+
+    __metaclass__ = registry.make_registry_metaclass(_FIXTURES)
+
+    # We explicitly set the 'REGISTERED_NAME' attribute so that PyLint realizes that the attribute
+    # is defined for all subclasses of Fixture.
+    REGISTERED_NAME = "Fixture"
 
     def __init__(self, logger, job_num):
         """
@@ -98,6 +118,8 @@ class ReplFixture(Fixture):
     """
     Base class for all fixtures that support replication.
     """
+
+    REGISTERED_NAME = registry.LEAVE_UNREGISTERED
 
     AWAIT_REPL_TIMEOUT_MINS = 5
 

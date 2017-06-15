@@ -18,6 +18,7 @@ from ... import config
 from ... import core
 from ... import errors
 from ... import utils
+from ...utils import registry
 
 
 class ShardedClusterFixture(interface.Fixture):
@@ -291,6 +292,8 @@ class _MongoSFixture(interface.Fixture):
     """
     Fixture which provides JSTests with a mongos to connect to.
     """
+
+    REGISTERED_NAME = registry.LEAVE_UNREGISTERED
 
     def __init__(self,
                  logger,
