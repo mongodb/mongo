@@ -89,7 +89,7 @@ StatusWith<std::uint32_t> storageValidChildren(const mb::ConstElement&,
 StatusWith<std::uint32_t> storageValid(const mb::Document& doc,
                                        bool deep,
                                        std::uint32_t recursionLevel) {
-    if (recursionLevel >= BSONDepth::getMaxDepthForUserStorage()) {
+    if (recursionLevel > BSONDepth::getMaxDepthForUserStorage()) {
         return Status(ErrorCodes::Overflow,
                       str::stream() << "Document exceeds maximum nesting depth of "
                                     << BSONDepth::getMaxDepthForUserStorage());
@@ -203,7 +203,7 @@ Status validateDollarPrefixElement(const mb::ConstElement elem, const bool deep)
  */
 StatusWith<std::uint32_t> storageValidParents(const mb::ConstElement& elem,
                                               std::uint32_t recursionLevel) {
-    if (recursionLevel >= BSONDepth::getMaxDepthForUserStorage()) {
+    if (recursionLevel > BSONDepth::getMaxDepthForUserStorage()) {
         return Status(ErrorCodes::Overflow,
                       str::stream() << "Document exceeds maximum nesting depth of "
                                     << BSONDepth::getMaxDepthForUserStorage());
@@ -232,7 +232,7 @@ StatusWith<std::uint32_t> storageValid(const mb::ConstElement& elem,
     if (!elem.ok())
         return Status(ErrorCodes::BadValue, "Invalid elements cannot be stored.");
 
-    if (recursionLevel >= BSONDepth::getMaxDepthForUserStorage()) {
+    if (recursionLevel > BSONDepth::getMaxDepthForUserStorage()) {
         return Status(ErrorCodes::Overflow,
                       str::stream() << "Document exceeds maximum nesting depth of "
                                     << BSONDepth::getMaxDepthForUserStorage());
@@ -322,7 +322,7 @@ inline Status validate(const BSONObj& original,
         if (opts.enforceOkForStorage) {
             // No specific fields were updated so the whole doc must be checked
             const bool doRecursiveCheck = true;
-            const std::uint32_t recursionLevel = 1;
+            const std::uint32_t recursionLevel = 0;
             auto documentDepth = storageValid(updated, doRecursiveCheck, recursionLevel);
             if (!documentDepth.isOK()) {
                 return documentDepth.getStatus();

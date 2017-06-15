@@ -35,6 +35,7 @@
 #include "mongo/db/query/canonical_query.h"
 #include "mongo/db/query/collation/collator_factory_interface.h"
 #include "mongo/db/query/query_planner_common.h"
+#include "mongo/db/server_options.h"
 
 namespace mongo {
 
@@ -132,11 +133,19 @@ Status ParsedUpdate::parseUpdate() {
     _driver.setModOptions(ModifierInterface::Options(
         !_opCtx->writesAreReplicated(), shouldValidate, _collator.get()));
 
-    return _driver.parse(_request->getUpdates(), _request->isMulti());
+    return _driver.parse(_request->getUpdates(), _arrayFilters, _request->isMulti());
 }
 
 Status ParsedUpdate::parseArrayFilters() {
     const ExtensionsCallbackReal extensionsCallback(_opCtx, &_request->getNamespaceString());
+
+    if (!_request->getArrayFilters().empty() &&
+        serverGlobalParams.featureCompatibility.version.load() ==
+            ServerGlobalParams::FeatureCompatibility::Version::k34) {
+        return Status(ErrorCodes::InvalidOptions,
+                      "The featureCompatibilityVersion must be 3.6 to use arrayFilters. See "
+                      "http://dochub.mongodb.org/core/3.6-feature-compatibility.");
+    }
 
     for (auto rawArrayFilter : _request->getArrayFilters()) {
         auto arrayFilterStatus =
@@ -195,6 +204,10 @@ void ParsedUpdate::setCollator(std::unique_ptr<CollatorInterface> collator) {
     _collator = std::move(collator);
 
     _driver.setCollator(_collator.get());
+
+    for (auto&& arrayFilter : _arrayFilters) {
+        arrayFilter.second->getFilter()->setCollator(_collator.get());
+    }
 }
 
 }  // namespace mongo

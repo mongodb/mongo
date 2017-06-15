@@ -50,8 +50,8 @@ class UpdateDriver;
 UpdateResult update(OperationContext* opCtx, Database* db, const UpdateRequest& request);
 
 /**
- * takes the from document and returns a new document
- * after apply all the operators
+ * Takes the 'from' document and returns a new document after applying 'operators'. arrayFilters are
+ * not supported.
  * e.g.
  *   applyUpdateOperators( BSON( "x" << 1 ) , BSON( "$inc" << BSON( "x" << 1 ) ) );
  *   returns: { x : 2 }

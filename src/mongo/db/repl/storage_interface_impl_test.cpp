@@ -1890,10 +1890,13 @@ TEST_F(StorageInterfaceImplTest,
     auto nss = makeNamespace(_agent);
     ASSERT_OK(storage.createCollection(opCtx, nss, CollectionOptions()));
 
-    auto status = storage.upsertById(
-        opCtx, nss, BSON("" << 1).firstElement(), BSON("$unknownUpdateOp" << BSON("x" << 1000)));
-    ASSERT_EQUALS(ErrorCodes::FailedToParse, status);
-    ASSERT_STRING_CONTAINS(status.reason(), "Unknown modifier: $unknownUpdateOp");
+    ASSERT_THROWS_CODE_AND_WHAT(storage.upsertById(opCtx,
+                                                   nss,
+                                                   BSON("" << 1).firstElement(),
+                                                   BSON("$unknownUpdateOp" << BSON("x" << 1000))),
+                                UserException,
+                                ErrorCodes::FailedToParse,
+                                "Unknown modifier: $unknownUpdateOp");
 }
 
 TEST_F(StorageInterfaceImplTest, DeleteByFilterReturnsNamespaceNotFoundWhenDatabaseDoesNotExist) {

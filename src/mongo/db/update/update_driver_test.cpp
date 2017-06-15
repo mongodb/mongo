@@ -44,30 +44,17 @@
 #include "mongo/db/update_index_data.h"
 #include "mongo/unittest/unittest.h"
 
+namespace mongo {
 namespace {
 
-using mongo::BSONElement;
-using mongo::BSONElementComparator;
-using mongo::BSONObj;
-using mongo::BSONObjIterator;
-using mongo::CollatorInterfaceMock;
-using mongo::FieldRef;
-using mongo::OperationContext;
-using mongo::OwnedPointerVector;
-using mongo::QueryTestServiceContext;
-using mongo::ServiceContext;
-using mongo::SimpleStringDataComparator;
-using mongo::StringData;
-using mongo::UpdateDriver;
-using mongo::UpdateIndexData;
-using mongo::fromjson;
 using mongo::mutablebson::Document;
 using mongoutils::str::stream;
 
 TEST(Parse, Normal) {
     UpdateDriver::Options opts;
     UpdateDriver driver(opts);
-    ASSERT_OK(driver.parse(fromjson("{$set:{a:1}}")));
+    std::map<StringData, std::unique_ptr<ArrayFilter>> arrayFilters;
+    ASSERT_OK(driver.parse(fromjson("{$set:{a:1}}"), arrayFilters));
     ASSERT_EQUALS(driver.numMods(), 1U);
     ASSERT_FALSE(driver.isDocReplacement());
 }
@@ -75,7 +62,8 @@ TEST(Parse, Normal) {
 TEST(Parse, MultiMods) {
     UpdateDriver::Options opts;
     UpdateDriver driver(opts);
-    ASSERT_OK(driver.parse(fromjson("{$set:{a:1, b:1}}")));
+    std::map<StringData, std::unique_ptr<ArrayFilter>> arrayFilters;
+    ASSERT_OK(driver.parse(fromjson("{$set:{a:1, b:1}}"), arrayFilters));
     ASSERT_EQUALS(driver.numMods(), 2U);
     ASSERT_FALSE(driver.isDocReplacement());
 }
@@ -83,7 +71,8 @@ TEST(Parse, MultiMods) {
 TEST(Parse, MixingMods) {
     UpdateDriver::Options opts;
     UpdateDriver driver(opts);
-    ASSERT_OK(driver.parse(fromjson("{$set:{a:1}, $unset:{b:1}}")));
+    std::map<StringData, std::unique_ptr<ArrayFilter>> arrayFilters;
+    ASSERT_OK(driver.parse(fromjson("{$set:{a:1}, $unset:{b:1}}"), arrayFilters));
     ASSERT_EQUALS(driver.numMods(), 2U);
     ASSERT_FALSE(driver.isDocReplacement());
 }
@@ -91,38 +80,59 @@ TEST(Parse, MixingMods) {
 TEST(Parse, ObjectReplacment) {
     UpdateDriver::Options opts;
     UpdateDriver driver(opts);
-    ASSERT_OK(driver.parse(fromjson("{obj: \"obj replacement\"}")));
+    std::map<StringData, std::unique_ptr<ArrayFilter>> arrayFilters;
+    ASSERT_OK(driver.parse(fromjson("{obj: \"obj replacement\"}"), arrayFilters));
     ASSERT_TRUE(driver.isDocReplacement());
 }
 
 TEST(Parse, EmptyMod) {
     UpdateDriver::Options opts;
     UpdateDriver driver(opts);
-    ASSERT_NOT_OK(driver.parse(fromjson("{$set:{}}")));
+    std::map<StringData, std::unique_ptr<ArrayFilter>> arrayFilters;
+    ASSERT_THROWS_CODE_AND_WHAT(
+        driver.parse(fromjson("{$set:{}}"), arrayFilters),
+        UserException,
+        ErrorCodes::FailedToParse,
+        "'$set' is empty. You must specify a field like so: {$set: {<field>: ...}}");
 }
 
 TEST(Parse, WrongMod) {
     UpdateDriver::Options opts;
     UpdateDriver driver(opts);
-    ASSERT_NOT_OK(driver.parse(fromjson("{$xyz:{a:1}}")));
+    std::map<StringData, std::unique_ptr<ArrayFilter>> arrayFilters;
+    ASSERT_THROWS_CODE_AND_WHAT(driver.parse(fromjson("{$xyz:{a:1}}"), arrayFilters),
+                                UserException,
+                                ErrorCodes::FailedToParse,
+                                "Unknown modifier: $xyz");
 }
 
 TEST(Parse, WrongType) {
     UpdateDriver::Options opts;
     UpdateDriver driver(opts);
-    ASSERT_NOT_OK(driver.parse(fromjson("{$set:[{a:1}]}")));
+    std::map<StringData, std::unique_ptr<ArrayFilter>> arrayFilters;
+    ASSERT_THROWS_CODE_AND_WHAT(driver.parse(fromjson("{$set:[{a:1}]}"), arrayFilters),
+                                UserException,
+                                ErrorCodes::FailedToParse,
+                                "Modifiers operate on fields but we found type array instead. For "
+                                "example: {$mod: {<field>: ...}} not {$set: [ { a: 1 } ]}");
 }
 
 TEST(Parse, ModsWithLaterObjReplacement) {
     UpdateDriver::Options opts;
     UpdateDriver driver(opts);
-    ASSERT_NOT_OK(driver.parse(fromjson("{$set:{a:1}, obj: \"obj replacement\"}")));
+    std::map<StringData, std::unique_ptr<ArrayFilter>> arrayFilters;
+    ASSERT_THROWS_CODE_AND_WHAT(
+        driver.parse(fromjson("{$set:{a:1}, obj: \"obj replacement\"}"), arrayFilters),
+        UserException,
+        ErrorCodes::FailedToParse,
+        "Unknown modifier: obj");
 }
 
 TEST(Parse, PushAll) {
     UpdateDriver::Options opts;
     UpdateDriver driver(opts);
-    ASSERT_OK(driver.parse(fromjson("{$pushAll:{a:[1,2,3]}}")));
+    std::map<StringData, std::unique_ptr<ArrayFilter>> arrayFilters;
+    ASSERT_OK(driver.parse(fromjson("{$pushAll:{a:[1,2,3]}}"), arrayFilters));
     ASSERT_EQUALS(driver.numMods(), 1U);
     ASSERT_FALSE(driver.isDocReplacement());
 }
@@ -130,7 +140,8 @@ TEST(Parse, PushAll) {
 TEST(Parse, SetOnInsert) {
     UpdateDriver::Options opts;
     UpdateDriver driver(opts);
-    ASSERT_OK(driver.parse(fromjson("{$setOnInsert:{a:1}}")));
+    std::map<StringData, std::unique_ptr<ArrayFilter>> arrayFilters;
+    ASSERT_OK(driver.parse(fromjson("{$setOnInsert:{a:1}}"), arrayFilters));
     ASSERT_EQUALS(driver.numMods(), 1U);
     ASSERT_FALSE(driver.isDocReplacement());
 }
@@ -140,8 +151,9 @@ TEST(Collator, SetCollationUpdatesModifierInterfaces) {
     BSONObj updateDocument = fromjson("{$max: {a: 'abd'}}");
     UpdateDriver::Options opts;
     UpdateDriver driver(opts);
+    std::map<StringData, std::unique_ptr<ArrayFilter>> arrayFilters;
 
-    ASSERT_OK(driver.parse(updateDocument));
+    ASSERT_OK(driver.parse(updateDocument, arrayFilters));
     ASSERT_EQUALS(driver.numMods(), 1U);
 
     bool modified = false;
@@ -164,8 +176,8 @@ public:
     CreateFromQueryFixture()
         : _driverOps(new UpdateDriver(UpdateDriver::Options())),
           _driverRepl(new UpdateDriver(UpdateDriver::Options())) {
-        _driverOps->parse(fromjson("{$set:{'_':1}}")).transitional_ignore();
-        _driverRepl->parse(fromjson("{}")).transitional_ignore();
+        _driverOps->parse(fromjson("{$set:{'_':1}}"), _arrayFilters).transitional_ignore();
+        _driverRepl->parse(fromjson("{}"), _arrayFilters).transitional_ignore();
         _opCtx = _serviceContext.makeOperationContext();
     }
 
@@ -188,6 +200,7 @@ public:
 private:
     QueryTestServiceContext _serviceContext;
     ServiceContext::UniqueOperationContext _opCtx;
+    std::map<StringData, std::unique_ptr<ArrayFilter>> _arrayFilters;
     std::unique_ptr<UpdateDriver> _driverOps;
     std::unique_ptr<UpdateDriver> _driverRepl;
     Document _doc;
@@ -428,4 +441,5 @@ TEST_F(CreateFromQuery, NotFullShardKeyRepl) {
         opCtx(), query, &immutablePaths.vector(), doc()));
 }
 
-}  // unnamed namespace
+}  // namespace
+}  // namespace mongo

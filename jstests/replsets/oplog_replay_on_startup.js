@@ -72,10 +72,6 @@
         var injectedMinValidDoc = {
             _id: ObjectId(),
 
-            // minvalid:
-            ts: ts(minValid),
-            t: term,
-
             // appliedThrough
             begin: {
                 ts: ts(begin),
@@ -83,6 +79,10 @@
             },
 
             oplogDeleteFromPoint: ts(deletePoint),
+
+            // minvalid:
+            t: term,
+            ts: ts(minValid),
         };
 
         // This weird mechanism is the only way to bypass mongod's attempt to fill in null

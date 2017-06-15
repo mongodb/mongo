@@ -209,7 +209,9 @@ public:
             request.setQuery(query);
             request.setUpdates(updates);
 
-            ASSERT_OK(driver.parse(request.getUpdates(), request.isMulti()));
+            const std::map<StringData, std::unique_ptr<ArrayFilter>> arrayFilters;
+
+            ASSERT_OK(driver.parse(request.getUpdates(), arrayFilters, request.isMulti()));
 
             // Setup update params.
             UpdateStageParams params(&request, &driver, opDebug);
@@ -280,7 +282,9 @@ public:
             request.setQuery(query);
             request.setUpdates(updates);
 
-            ASSERT_OK(driver.parse(request.getUpdates(), request.isMulti()));
+            const std::map<StringData, std::unique_ptr<ArrayFilter>> arrayFilters;
+
+            ASSERT_OK(driver.parse(request.getUpdates(), arrayFilters, request.isMulti()));
 
             // Configure the scan.
             CollectionScanParams collScanParams;
@@ -393,7 +397,9 @@ public:
         request.setReturnDocs(UpdateRequest::RETURN_OLD);
         request.setLifecycle(&updateLifecycle);
 
-        ASSERT_OK(driver.parse(request.getUpdates(), request.isMulti()));
+        const std::map<StringData, std::unique_ptr<ArrayFilter>> arrayFilters;
+
+        ASSERT_OK(driver.parse(request.getUpdates(), arrayFilters, request.isMulti()));
 
         // Configure a QueuedDataStage to pass the first object in the collection back in a
         // RID_AND_OBJ state.
@@ -481,7 +487,9 @@ public:
         request.setReturnDocs(UpdateRequest::RETURN_NEW);
         request.setLifecycle(&updateLifecycle);
 
-        ASSERT_OK(driver.parse(request.getUpdates(), request.isMulti()));
+        const std::map<StringData, std::unique_ptr<ArrayFilter>> arrayFilters;
+
+        ASSERT_OK(driver.parse(request.getUpdates(), arrayFilters, request.isMulti()));
 
         // Configure a QueuedDataStage to pass the first object in the collection back in a
         // RID_AND_OBJ state.
@@ -559,7 +567,9 @@ public:
         request.setMulti(false);
         request.setLifecycle(&updateLifecycle);
 
-        ASSERT_OK(driver.parse(request.getUpdates(), request.isMulti()));
+        const std::map<StringData, std::unique_ptr<ArrayFilter>> arrayFilters;
+
+        ASSERT_OK(driver.parse(request.getUpdates(), arrayFilters, request.isMulti()));
 
         // Configure a QueuedDataStage to pass an OWNED_OBJ to the update stage.
         auto qds = make_unique<QueuedDataStage>(&_opCtx, ws.get());

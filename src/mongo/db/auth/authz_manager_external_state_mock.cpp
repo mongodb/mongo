@@ -179,7 +179,8 @@ Status AuthzManagerExternalStateMock::updateOne(OperationContext* opCtx,
     namespace mmb = mutablebson;
     UpdateDriver::Options updateOptions;
     UpdateDriver driver(updateOptions);
-    Status status = driver.parse(updatePattern);
+    std::map<StringData, std::unique_ptr<ArrayFilter>> arrayFilters;
+    Status status = driver.parse(updatePattern, arrayFilters);
     if (!status.isOK())
         return status;
 

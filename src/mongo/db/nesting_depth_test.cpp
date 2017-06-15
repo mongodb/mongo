@@ -207,6 +207,42 @@ void appendUpdateCommandWithNestedDocuments(BSONObjBuilder* builder,
     builder->doneFast();
 }
 
+/**
+ * Appends a command to 'builder' that replaces a document with nesting depth 'originalNestingDepth'
+ * with a document 'newNestingDepth' levels deep. For example,
+ *
+ *      BSONObjBuilder b;
+ *      appendUpdateCommandWithNestedDocuments(&b, 1, 2);
+ *
+ * appends an update to 'b' that replaces { a: 1 } with { a: { a: 1 } }.
+ */
+void appendUpdateReplaceCommandWithNestedDocuments(BSONObjBuilder* builder,
+                                                   size_t originalNestingDepth,
+                                                   size_t newNestingDepth) {
+    ASSERT_GT(newNestingDepth, originalNestingDepth);
+
+    auto originalFieldName = getRepeatedFieldName(originalNestingDepth);
+    builder->append("update", kCollectionName);
+    {
+        BSONArrayBuilder updates(builder->subarrayStart("updates"));
+        {
+            BSONObjBuilder updateDoc(updates.subobjStart());
+            {
+                BSONObjBuilder query(updateDoc.subobjStart("q"));
+                query.append(originalFieldName, 1);
+                query.doneFast();
+            }
+            {
+                BSONObjBuilder update(updateDoc.subobjStart("u"));
+                appendNestedObject(&update, newNestingDepth);
+                update.doneFast();
+            }
+            updateDoc.doneFast();
+        }
+    }
+    builder->doneFast();
+}
+
 TEST_F(NestingDepthFixture, CanUpdateDocumentIfItStaysWithinDepthLimit) {
     BSONObjBuilder insertCmd;
     appendInsertCommandWithNestedDocument(&insertCmd, 3);
@@ -237,6 +273,40 @@ TEST_F(NestingDepthFixture, CannotUpdateDocumentToExceedDepthLimit) {
 
     BSONObjBuilder updateCmd;
     appendUpdateCommandWithNestedDocuments(
+        &updateCmd, largeButValidDepth, BSONDepth::getMaxDepthForUserStorage() + 1);
+    assertWriteError(kCollectionName, updateCmd.obj(), ErrorCodes::Overflow);
+}
+
+TEST_F(NestingDepthFixture, CanReplaceDocumentIfItStaysWithinDepthLimit) {
+    BSONObjBuilder insertCmd;
+    appendInsertCommandWithNestedDocument(&insertCmd, 3);
+    assertCommandOK(kCollectionName, insertCmd.obj());
+
+    BSONObjBuilder updateCmd;
+    appendUpdateReplaceCommandWithNestedDocuments(&updateCmd, 3, 5);
+    assertCommandOK(kCollectionName, updateCmd.obj());
+}
+
+TEST_F(NestingDepthFixture, CanReplaceDocumentToBeExactlyAtDepthLimit) {
+    const auto largeButValidDepth = BSONDepth::getMaxDepthForUserStorage() - 2;
+    BSONObjBuilder insertCmd;
+    appendInsertCommandWithNestedDocument(&insertCmd, largeButValidDepth);
+    assertCommandOK(kCollectionName, insertCmd.obj());
+
+    BSONObjBuilder updateCmd;
+    appendUpdateReplaceCommandWithNestedDocuments(
+        &updateCmd, largeButValidDepth, BSONDepth::getMaxDepthForUserStorage());
+    assertCommandOK(kCollectionName, updateCmd.obj());
+}
+
+TEST_F(NestingDepthFixture, CannotReplaceDocumentToExceedDepthLimit) {
+    const auto largeButValidDepth = BSONDepth::getMaxDepthForUserStorage() - 3;
+    BSONObjBuilder insertCmd;
+    appendInsertCommandWithNestedDocument(&insertCmd, largeButValidDepth);
+    assertCommandOK(kCollectionName, insertCmd.obj());
+
+    BSONObjBuilder updateCmd;
+    appendUpdateReplaceCommandWithNestedDocuments(
         &updateCmd, largeButValidDepth, BSONDepth::getMaxDepthForUserStorage() + 1);
     assertWriteError(kCollectionName, updateCmd.obj(), ErrorCodes::Overflow);
 }
@@ -295,6 +365,45 @@ void appendUpdateCommandWithNestedArrays(BSONObjBuilder* builder,
     builder->doneFast();
 }
 
+/**
+ * Appends a command to 'builder' that replaces a document with an array nested
+ * 'originalNestingDepth' levels deep with a document with an array nested 'newNestingDepth' levels
+ * deep. For example,
+ *
+ *      BSONObjBuilder b;
+ *      appendUpdateCommandWithNestedDocuments(&b, 3, 4);
+ *
+ * appends an update to 'b' that replaces { a: [[1]] } with { a: [[[1]]] }.
+ */
+void appendUpdateReplaceCommandWithNestedArrays(BSONObjBuilder* builder,
+                                                size_t originalNestingDepth,
+                                                size_t newNestingDepth) {
+    ASSERT_GT(newNestingDepth, originalNestingDepth);
+
+    auto originalFieldName = getRepeatedArrayPath(originalNestingDepth);
+    builder->append("update", kCollectionName);
+    {
+        BSONArrayBuilder updates(builder->subarrayStart("updates"));
+        {
+            BSONObjBuilder updateDoc(updates.subobjStart());
+            {
+                BSONObjBuilder query(updateDoc.subobjStart("q"));
+                query.append(originalFieldName, 1);
+                query.doneFast();
+            }
+            {
+                BSONObjBuilder update(updateDoc.subobjStart("u"));
+                BSONArrayBuilder field(update.subobjStart(originalFieldName));
+                appendNestedArray(&field, newNestingDepth - 1);
+                field.doneFast();
+                update.doneFast();
+            }
+            updateDoc.doneFast();
+        }
+    }
+    builder->doneFast();
+}
+
 TEST_F(NestingDepthFixture, CanUpdateArrayIfItStaysWithinDepthLimit) {
     BSONObjBuilder insertCmd;
     appendInsertCommandWithNestedArray(&insertCmd, 3);
@@ -325,6 +434,40 @@ TEST_F(NestingDepthFixture, CannotUpdateArrayToExceedDepthLimit) {
 
     BSONObjBuilder updateCmd;
     appendUpdateCommandWithNestedArrays(
+        &updateCmd, largeButValidDepth, BSONDepth::getMaxDepthForUserStorage() + 1);
+    assertWriteError(kCollectionName, updateCmd.obj(), ErrorCodes::Overflow);
+}
+
+TEST_F(NestingDepthFixture, CanReplaceArrayIfItStaysWithinDepthLimit) {
+    BSONObjBuilder insertCmd;
+    appendInsertCommandWithNestedArray(&insertCmd, 3);
+    assertCommandOK(kCollectionName, insertCmd.obj());
+
+    BSONObjBuilder updateCmd;
+    appendUpdateReplaceCommandWithNestedArrays(&updateCmd, 3, 5);
+    assertCommandOK(kCollectionName, updateCmd.obj());
+}
+
+TEST_F(NestingDepthFixture, CanReplaceArrayToBeExactlyAtDepthLimit) {
+    const auto largeButValidDepth = BSONDepth::getMaxDepthForUserStorage() - 1;
+    BSONObjBuilder insertCmd;
+    appendInsertCommandWithNestedArray(&insertCmd, largeButValidDepth);
+    assertCommandOK(kCollectionName, insertCmd.obj());
+
+    BSONObjBuilder updateCmd;
+    appendUpdateReplaceCommandWithNestedArrays(
+        &updateCmd, largeButValidDepth, BSONDepth::getMaxDepthForUserStorage());
+    assertCommandOK(kCollectionName, updateCmd.obj());
+}
+
+TEST_F(NestingDepthFixture, CannotReplaceArrayToExceedDepthLimit) {
+    const auto largeButValidDepth = BSONDepth::getMaxDepthForUserStorage() - 4;
+    BSONObjBuilder insertCmd;
+    appendInsertCommandWithNestedArray(&insertCmd, largeButValidDepth);
+    assertCommandOK(kCollectionName, insertCmd.obj());
+
+    BSONObjBuilder updateCmd;
+    appendUpdateReplaceCommandWithNestedArrays(
         &updateCmd, largeButValidDepth, BSONDepth::getMaxDepthForUserStorage() + 1);
     assertWriteError(kCollectionName, updateCmd.obj(), ErrorCodes::Overflow);
 }

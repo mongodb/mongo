@@ -21,20 +21,12 @@
     }
     assert.commandWorked(coll.createIndex({a: 1}));
 
-    assert.writeOK(coll.update({a: {$gte: 2}},
-                               {$set: {c: 1}, $inc: {a: -10}},
-                               db.getMongo().writeMode() === "commands"
-                                   ? {collation: {locale: "fr"}, arrayFilters: [{i: 0}]}
-                                   : {}));
+    assert.writeOK(coll.update({a: {$gte: 2}}, {$set: {c: 1}, $inc: {a: -10}}));
 
     var profileObj = getLatestProfilerEntry(testDB);
 
     assert.eq(profileObj.ns, coll.getFullName(), tojson(profileObj));
     assert.eq(profileObj.op, "update", tojson(profileObj));
-    if (db.getMongo().writeMode() === "commands") {
-        assert.eq(profileObj.command.collation, {locale: "fr"}, tojson(profileObj));
-        assert.eq(profileObj.command.arrayFilters, [{i: 0}], tojson(profileObj));
-    }
     assert.eq(profileObj.keysExamined, 1, tojson(profileObj));
     assert.eq(profileObj.docsExamined, 1, tojson(profileObj));
     assert.eq(profileObj.keysInserted, 1, tojson(profileObj));
@@ -47,6 +39,25 @@
     assert(profileObj.hasOwnProperty("numYield"), tojson(profileObj));
     assert(profileObj.hasOwnProperty("locks"), tojson(profileObj));
     assert.eq(profileObj.appName, "MongoDB Shell", tojson(profileObj));
+
+    //
+    // Confirm metrics for parameters that require "commands" mode.
+    //
+
+    if (db.getMongo().writeMode() === "commands") {
+        coll.drop();
+        assert.writeOK(coll.insert({_id: 0, a: [0]}));
+
+        assert.writeOK(coll.update(
+            {_id: 0}, {$set: {"a.$[i]": 1}}, {collation: {locale: "fr"}, arrayFilters: [{i: 0}]}));
+
+        profileObj = getLatestProfilerEntry(testDB);
+
+        assert.eq(profileObj.ns, coll.getFullName(), tojson(profileObj));
+        assert.eq(profileObj.op, "update", tojson(profileObj));
+        assert.eq(profileObj.command.collation, {locale: "fr"}, tojson(profileObj));
+        assert.eq(profileObj.command.arrayFilters, [{i: 0}], tojson(profileObj));
+    }
 
     //
     // Confirm metrics for multiple indexed document update.

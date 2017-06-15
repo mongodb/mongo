@@ -103,7 +103,9 @@ void ArithmeticNode::updateExistingElement(mutablebson::Element* element, bool* 
     if (element->getValue().ok() && valueToSet.isIdentical(originalValue)) {
         *noop = true;
     } else {
-        invariantOK(element->setValueSafeNum(valueToSet));
+
+        // This can fail if 'valueToSet' is not representable as a 64-bit integer.
+        uassertStatusOK(element->setValueSafeNum(valueToSet));
     }
 }
 
@@ -119,7 +121,9 @@ void ArithmeticNode::setValueForNewElement(mutablebson::Element* element) const 
             valueToSet *= SafeNum(static_cast<int32_t>(0));
             break;
     }
-    invariantOK(element->setValueSafeNum(valueToSet));
+
+    // This can fail if 'valueToSet' is not representable as a 64-bit integer.
+    uassertStatusOK(element->setValueSafeNum(valueToSet));
 }
 
 }  // namespace mongo

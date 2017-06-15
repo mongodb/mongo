@@ -129,7 +129,8 @@ UpdateResult update(OperationContext* opCtx, Database* db, const UpdateRequest& 
 BSONObj applyUpdateOperators(const BSONObj& from, const BSONObj& operators) {
     UpdateDriver::Options opts;
     UpdateDriver driver(opts);
-    Status status = driver.parse(operators);
+    std::map<StringData, std::unique_ptr<ArrayFilter>> arrayFilters;
+    Status status = driver.parse(operators, arrayFilters);
     if (!status.isOK()) {
         uasserted(16838, status.reason());
     }

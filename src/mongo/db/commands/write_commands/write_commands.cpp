@@ -313,6 +313,7 @@ public:
         updateRequest.setQuery(batch.updates[0].query);
         updateRequest.setCollation(batch.updates[0].collation);
         updateRequest.setUpdates(batch.updates[0].update);
+        updateRequest.setArrayFilters(batch.updates[0].arrayFilters);
         updateRequest.setMulti(batch.updates[0].multi);
         updateRequest.setUpsert(batch.updates[0].upsert);
         updateRequest.setYieldPolicy(PlanExecutor::YIELD_AUTO);

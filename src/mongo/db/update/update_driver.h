@@ -39,6 +39,7 @@
 #include "mongo/db/ops/modifier_interface.h"
 #include "mongo/db/query/canonical_query.h"
 #include "mongo/db/update/modifier_table.h"
+#include "mongo/db/update/update_object_node.h"
 #include "mongo/db/update_index_data.h"
 
 namespace mongo {
@@ -54,10 +55,18 @@ public:
     ~UpdateDriver();
 
     /**
-     * Returns OK and fills in '_mods' if 'updateExpr' is correct. Otherwise returns an
-     * error status with a corresponding description.
+     * Parses the update expression 'updateExpr'. If the featurCompatibilityVersion is 3.6,
+     * 'updateExpr' is parsed into '_root'. Otherwise, 'updateExpr' is parsed into '_mods'. This is
+     * done because applying updates via UpdateNode creates new fields in lexicographic order,
+     * whereas applying updates via ModifierInterface creates new fields in the order they are
+     * specified in 'updateExpr', so it is necessary that the whole replica set have version 3.6 in
+     * order to use UpdateNode. Uasserts if the featureCompatibilityVersion is 3.4 and
+     * 'arrayFilters' is non-empty. Uasserts or returns a non-ok status if 'updateExpr' fails to
+     * parse.
      */
-    Status parse(const BSONObj& updateExpr, const bool multi = false);
+    Status parse(const BSONObj& updateExpr,
+                 const std::map<StringData, std::unique_ptr<ArrayFilter>>& arrayFilters,
+                 const bool multi = false);
 
     /**
      * Fills in document with any fields in the query which are valid.
@@ -157,7 +166,12 @@ private:
     // Is there a list of $mod's on '_mods' or is it just full object replacement?
     bool _replacementMode;
 
-    // Collection of update mod instances. Owned here.
+    // The root of the UpdateNode tree. If the featureCompatibilityVersion is 3.6, the update
+    // expression is parsed into '_root'.
+    std::unique_ptr<UpdateObjectNode> _root;
+
+    // Collection of update mod instances. Owned here. If the featureCompatibilityVersion is 3.4,
+    // the update expression is parsed into '_mods'.
     std::vector<ModifierInterface*> _mods;
 
     // What are the list of fields in the collection over which the update is going to be

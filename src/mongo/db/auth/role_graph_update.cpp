@@ -175,7 +175,10 @@ Status handleOplogUpdate(OperationContext* opCtx,
 
     UpdateDriver::Options updateOptions;
     UpdateDriver driver(updateOptions);
-    status = driver.parse(updatePattern);
+
+    // Oplog updates do not have array filters.
+    std::map<StringData, std::unique_ptr<ArrayFilter>> arrayFilters;
+    status = driver.parse(updatePattern, arrayFilters);
     if (!status.isOK())
         return status;
 

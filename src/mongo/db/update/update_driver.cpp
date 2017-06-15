@@ -37,6 +37,7 @@
 #include "mongo/db/matcher/expression_leaf.h"
 #include "mongo/db/matcher/extensions_callback_noop.h"
 #include "mongo/db/ops/modifier_object_replace.h"
+#include "mongo/db/server_options.h"
 #include "mongo/db/update/log_builder.h"
 #include "mongo/db/update/modifier_table.h"
 #include "mongo/db/update/path_support.h"
@@ -53,6 +54,82 @@ using std::vector;
 
 using pathsupport::EqualityMatches;
 
+namespace {
+
+modifiertable::ModifierType validateMod(BSONElement mod) {
+    auto modType = modifiertable::getType(mod.fieldName());
+
+    uassert(ErrorCodes::FailedToParse,
+            str::stream() << "Unknown modifier: " << mod.fieldName(),
+            modType != modifiertable::MOD_UNKNOWN);
+
+    uassert(ErrorCodes::FailedToParse,
+            str::stream() << "Modifiers operate on fields but we found type "
+                          << typeName(mod.type())
+                          << " instead. For example: {$mod: {<field>: ...}}"
+                          << " not {"
+                          << mod
+                          << "}",
+            mod.type() == BSONType::Object);
+
+    uassert(ErrorCodes::FailedToParse,
+            str::stream() << "'" << mod.fieldName()
+                          << "' is empty. You must specify a field like so: "
+                             "{"
+                          << mod.fieldName()
+                          << ": {<field>: ...}}",
+            !mod.embeddedObject().isEmpty());
+
+    return modType;
+}
+
+// Parses 'updateExpr' and merges it into 'root'. Returns whether 'updateExpr' is positional.
+StatusWith<bool> parseUpdateExpression(
+    BSONObj updateExpr,
+    UpdateObjectNode* root,
+    const CollatorInterface* collator,
+    const std::map<StringData, std::unique_ptr<ArrayFilter>>& arrayFilters) {
+    bool positional = false;
+    std::set<std::string> foundIdentifiers;
+    for (auto&& mod : updateExpr) {
+        auto modType = validateMod(mod);
+        for (auto&& field : mod.Obj()) {
+            auto statusWithPositional = UpdateObjectNode::parseAndMerge(
+                root, modType, field, collator, arrayFilters, foundIdentifiers);
+            if (!statusWithPositional.isOK()) {
+
+                // Check whether we failed to parse because this mod type is not yet supported by
+                // UpdateNode.
+                // TODO SERVER-28777: Skip this check.
+                auto leaf = modifiertable::makeUpdateLeafNode(modType);
+                if (!leaf) {
+                    uassert(ErrorCodes::InvalidOptions,
+                            str::stream() << "Cannot use array filters with modifier "
+                                          << mod.fieldName(),
+                            arrayFilters.empty());
+                    return statusWithPositional;
+                }
+
+                uassertStatusOK(statusWithPositional);
+                MONGO_UNREACHABLE;
+            }
+            positional = positional || statusWithPositional.getValue();
+        }
+    }
+
+    for (const auto& arrayFilter : arrayFilters) {
+        uassert(ErrorCodes::FailedToParse,
+                str::stream() << "The array filter for identifier '" << arrayFilter.first
+                              << "' was not used in the update "
+                              << updateExpr,
+                foundIdentifiers.find(arrayFilter.first.toString()) != foundIdentifiers.end());
+    }
+
+    return positional;
+}
+
+}  // namespace
+
 UpdateDriver::UpdateDriver(const Options& opts)
     : _replacementMode(false),
       _indexedFields(NULL),
@@ -65,7 +142,9 @@ UpdateDriver::~UpdateDriver() {
     clear();
 }
 
-Status UpdateDriver::parse(const BSONObj& updateExpr, const bool multi) {
+Status UpdateDriver::parse(const BSONObj& updateExpr,
+                           const std::map<StringData, std::unique_ptr<ArrayFilter>>& arrayFilters,
+                           const bool multi) {
     clear();
 
     // Check if the update expression is a full object replacement.
@@ -93,54 +172,40 @@ Status UpdateDriver::parse(const BSONObj& updateExpr, const bool multi) {
         return Status::OK();
     }
 
-    // The update expression is made of mod operators, that is
-    // { <$mod>: {...}, <$mod>: {...}, ...  }
-    BSONObjIterator outerIter(updateExpr);
-    while (outerIter.more()) {
-        BSONElement outerModElem = outerIter.next();
+    // Register the fact that this driver is not doing a full object replacement.
+    _replacementMode = false;
 
-        // Check whether this is a valid mod type.
-        modifiertable::ModifierType modType = modifiertable::getType(outerModElem.fieldName());
-        if (modType == modifiertable::MOD_UNKNOWN) {
-            return Status(ErrorCodes::FailedToParse,
-                          str::stream() << "Unknown modifier: " << outerModElem.fieldName());
+    // If the featureCompatibilityVersion is 3.6, parse using UpdateNode.
+    // TODO SERVER-28777: Remove the restriction that this is only done if the update is not from
+    // replication.
+    if (serverGlobalParams.featureCompatibility.version.load() ==
+            ServerGlobalParams::FeatureCompatibility::Version::k36 &&
+        !_modOptions.fromReplication) {
+        _root = stdx::make_unique<UpdateObjectNode>();
+        auto statusWithPositional =
+            parseUpdateExpression(updateExpr, _root.get(), _modOptions.collator, arrayFilters);
+        if (statusWithPositional.isOK()) {
+            _positional = statusWithPositional.getValue();
+            return Status::OK();
         }
+        _root.reset();
+    }
 
-        // Check whether there is indeed a list of mods under this modifier.
-        if (outerModElem.type() != Object) {
-            return Status(ErrorCodes::FailedToParse,
-                          str::stream() << "Modifiers operate on fields but we found type "
-                                        << typeName(outerModElem.type())
-                                        << " instead. For example: {$mod: {<field>: ...}}"
-                                        << " not {"
-                                        << outerModElem.toString()
-                                        << "}");
-        }
-
-        // Check whether there are indeed mods under this modifier.
-        if (outerModElem.embeddedObject().isEmpty()) {
-            return Status(ErrorCodes::FailedToParse,
-                          str::stream() << "'" << outerModElem.fieldName()
-                                        << "' is empty. You must specify a field like so: "
-                                           "{"
-                                        << outerModElem.fieldName()
-                                        << ": {<field>: ...}}");
-        }
-
-        BSONObjIterator innerIter(outerModElem.embeddedObject());
-        while (innerIter.more()) {
-            BSONElement innerModElem = innerIter.next();
-
-            Status status = addAndParse(modType, innerModElem);
+    // TODO SERVER-28777: This can be an else case, since we will not fall back to the old parsing
+    // if we fail to parse using the new implementation.
+    uassert(ErrorCodes::InvalidOptions,
+            "The featureCompatibilityVersion must be 3.6 to use arrayFilters. See "
+            "http://dochub.mongodb.org/core/3.6-feature-compatibility.",
+            arrayFilters.empty());
+    for (auto&& mod : updateExpr) {
+        auto modType = validateMod(mod);
+        for (auto&& field : mod.Obj()) {
+            auto status = addAndParse(modType, field);
             if (!status.isOK()) {
                 return status;
             }
         }
     }
-
-    // Register the fact that there will be only $mod's in this driver -- no object
-    // replacement.
-    _replacementMode = false;
 
     return Status::OK();
 }
@@ -248,74 +313,103 @@ Status UpdateDriver::update(StringData matchedField,
     _logDoc.reset();
     LogBuilder logBuilder(_logDoc.root());
 
-    // Ask each of the mods to type check whether they can operate over the current document
-    // and, if so, to change that document accordingly.
-    for (vector<ModifierInterface*>::iterator it = _mods.begin(); it != _mods.end(); ++it) {
-        ModifierInterface::ExecInfo execInfo;
-        Status status = (*it)->prepare(doc->root(), matchedField, &execInfo);
-        if (!status.isOK()) {
-            return status;
+    if (_root) {
+
+        // We parsed using the new UpdateNode implementation.
+        FieldRef pathToCreate;
+        FieldRef pathTaken;
+        bool indexesAffected = false;
+        bool noop = false;
+        _root->apply(doc->root(),
+                     &pathToCreate,
+                     &pathTaken,
+                     matchedField,
+                     _modOptions.fromReplication,
+                     _indexedFields,
+                     (_logOp && logOpRec) ? &logBuilder : nullptr,
+                     &indexesAffected,
+                     &noop);
+        if (indexesAffected) {
+            _affectIndices = true;
+            doc->disableInPlaceUpdates();
+        }
+        if (docWasModified) {
+            *docWasModified = !noop;
         }
 
-        // If a mod wants to be applied only if this is an upsert (or only if this is a
-        // strict update), we should respect that. If a mod doesn't care, it would state
-        // it is fine with ANY update context.
-        const bool validContext = (execInfo.context == ModifierInterface::ExecInfo::ANY_CONTEXT ||
-                                   execInfo.context == _context);
+    } else {
 
-        // Nothing to do if not in a valid context.
-        if (!validContext) {
-            continue;
-        }
-
-
-        // Gather which fields this mod is interested on and whether these fields were
-        // "taken" by previous mods.  Note that not all mods are multi-field mods. When we
-        // see an empty field, we may stop looking for others.
-        for (int i = 0; i < ModifierInterface::ExecInfo::MAX_NUM_FIELDS; i++) {
-            if (execInfo.fieldRef[i] == 0) {
-                break;
-            }
-
-            // Record each field being updated but check for conflicts first
-            const FieldRef* other;
-            if (!targetFields->insert(execInfo.fieldRef[i], &other)) {
-                return Status(ErrorCodes::ConflictingUpdateOperators,
-                              str::stream() << "Cannot update '" << other->dottedField()
-                                            << "' and '"
-                                            << execInfo.fieldRef[i]->dottedField()
-                                            << "' at the same time");
-            }
-
-            // We start with the expectation that a mod will be in-place. But if the mod
-            // touched an indexed field and the mod will indeed be executed -- that is, it
-            // is not a no-op and it is in a valid context -- then we switch back to a
-            // non-in-place mode.
-            //
-            // TODO: make mightBeIndexed and fieldRef like each other.
-            if (!_affectIndices && !execInfo.noOp && _indexedFields &&
-                _indexedFields->mightBeIndexed(execInfo.fieldRef[i]->dottedField())) {
-                _affectIndices = true;
-                doc->disableInPlaceUpdates();
-            }
-        }
-
-        if (!execInfo.noOp) {
-            status = (*it)->apply();
-
-            if (docWasModified)
-                *docWasModified = true;
-
+        // We parsed using the old ModifierInterface implementation.
+        // Ask each of the mods to type check whether they can operate over the current document
+        // and, if so, to change that document accordingly.
+        for (vector<ModifierInterface*>::iterator it = _mods.begin(); it != _mods.end(); ++it) {
+            ModifierInterface::ExecInfo execInfo;
+            Status status = (*it)->prepare(doc->root(), matchedField, &execInfo);
             if (!status.isOK()) {
                 return status;
             }
-        }
 
-        // If we require a replication oplog entry for this update, go ahead and generate one.
-        if (!execInfo.noOp && _logOp && logOpRec) {
-            status = (*it)->log(&logBuilder);
-            if (!status.isOK()) {
-                return status;
+            // If a mod wants to be applied only if this is an upsert (or only if this is a
+            // strict update), we should respect that. If a mod doesn't care, it would state
+            // it is fine with ANY update context.
+            const bool validContext =
+                (execInfo.context == ModifierInterface::ExecInfo::ANY_CONTEXT ||
+                 execInfo.context == _context);
+
+            // Nothing to do if not in a valid context.
+            if (!validContext) {
+                continue;
+            }
+
+
+            // Gather which fields this mod is interested on and whether these fields were
+            // "taken" by previous mods.  Note that not all mods are multi-field mods. When we
+            // see an empty field, we may stop looking for others.
+            for (int i = 0; i < ModifierInterface::ExecInfo::MAX_NUM_FIELDS; i++) {
+                if (execInfo.fieldRef[i] == 0) {
+                    break;
+                }
+
+                // Record each field being updated but check for conflicts first
+                const FieldRef* other;
+                if (!targetFields->insert(execInfo.fieldRef[i], &other)) {
+                    return Status(ErrorCodes::ConflictingUpdateOperators,
+                                  str::stream() << "Cannot update '" << other->dottedField()
+                                                << "' and '"
+                                                << execInfo.fieldRef[i]->dottedField()
+                                                << "' at the same time");
+                }
+
+                // We start with the expectation that a mod will be in-place. But if the mod
+                // touched an indexed field and the mod will indeed be executed -- that is, it
+                // is not a no-op and it is in a valid context -- then we switch back to a
+                // non-in-place mode.
+                //
+                // TODO: make mightBeIndexed and fieldRef like each other.
+                if (!_affectIndices && !execInfo.noOp && _indexedFields &&
+                    _indexedFields->mightBeIndexed(execInfo.fieldRef[i]->dottedField())) {
+                    _affectIndices = true;
+                    doc->disableInPlaceUpdates();
+                }
+            }
+
+            if (!execInfo.noOp) {
+                status = (*it)->apply();
+
+                if (docWasModified)
+                    *docWasModified = true;
+
+                if (!status.isOK()) {
+                    return status;
+                }
+            }
+
+            // If we require a replication oplog entry for this update, go ahead and generate one.
+            if (!execInfo.noOp && _logOp && logOpRec) {
+                status = (*it)->log(&logBuilder);
+                if (!status.isOK()) {
+                    return status;
+                }
             }
         }
     }
