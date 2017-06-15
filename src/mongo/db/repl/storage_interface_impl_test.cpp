@@ -33,6 +33,7 @@
 #include <memory>
 
 #include "mongo/bson/bsonmisc.h"
+#include "mongo/db/catalog/collection_catalog_entry.h"
 #include "mongo/db/catalog/collection_options.h"
 #include "mongo/db/catalog/database.h"
 #include "mongo/db/catalog/document_validation.h"
@@ -657,6 +658,108 @@ TEST_F(StorageInterfaceImplTest, DropCollectionWorksWithSystemCollection) {
 
     ASSERT_OK(storage.dropCollection(opCtx, nss));
     ASSERT_FALSE(AutoGetCollectionForReadCommand(opCtx, nss).getCollection());
+}
+
+TEST_F(StorageInterfaceImplTest, RenameCollectionWorksWhenCollectionExists) {
+    auto opCtx = getOperationContext();
+    StorageInterfaceImpl storage;
+    auto nss = makeNamespace(_agent);
+    auto toNss = NamespaceString("local.toNs");
+    createCollection(opCtx, nss);
+
+    ASSERT_OK(storage.renameCollection(opCtx, nss, toNss, false));
+
+    AutoGetCollectionForReadCommand autoColl(opCtx, nss);
+    ASSERT_FALSE(autoColl.getCollection());
+
+    AutoGetCollectionForReadCommand autoColl2(opCtx, toNss);
+    ASSERT_TRUE(autoColl2.getCollection());
+}
+
+TEST_F(StorageInterfaceImplTest, RenameCollectionWithStayTempFalseMakesItNotTemp) {
+    auto opCtx = getOperationContext();
+    StorageInterfaceImpl storage;
+    auto nss = makeNamespace(_agent);
+    auto toNss = NamespaceString("local.toNs");
+    CollectionOptions opts;
+    opts.temp = true;
+    createCollection(opCtx, nss, opts);
+
+    ASSERT_OK(storage.renameCollection(opCtx, nss, toNss, false));
+
+    AutoGetCollectionForReadCommand autoColl(opCtx, nss);
+    ASSERT_FALSE(autoColl.getCollection());
+
+    AutoGetCollectionForReadCommand autoColl2(opCtx, toNss);
+    ASSERT_TRUE(autoColl2.getCollection());
+    ASSERT_FALSE(autoColl2.getCollection()->getCatalogEntry()->getCollectionOptions(opCtx).temp);
+}
+
+TEST_F(StorageInterfaceImplTest, RenameCollectionWithStayTempTrueMakesItTemp) {
+    auto opCtx = getOperationContext();
+    StorageInterfaceImpl storage;
+    auto nss = makeNamespace(_agent);
+    auto toNss = NamespaceString("local.toNs");
+    CollectionOptions opts;
+    opts.temp = true;
+    createCollection(opCtx, nss, opts);
+
+    ASSERT_OK(storage.renameCollection(opCtx, nss, toNss, true));
+
+    AutoGetCollectionForReadCommand autoColl(opCtx, nss);
+    ASSERT_FALSE(autoColl.getCollection());
+
+    AutoGetCollectionForReadCommand autoColl2(opCtx, toNss);
+    ASSERT_TRUE(autoColl2.getCollection());
+    ASSERT_TRUE(autoColl2.getCollection()->getCatalogEntry()->getCollectionOptions(opCtx).temp);
+}
+
+TEST_F(StorageInterfaceImplTest, RenameCollectionFailsBetweenDatabases) {
+    auto opCtx = getOperationContext();
+    StorageInterfaceImpl storage;
+    auto nss = makeNamespace(_agent);
+    auto toNss = NamespaceString("notLocal.toNs");
+    createCollection(opCtx, nss);
+
+    ASSERT_EQ(ErrorCodes::InvalidNamespace, storage.renameCollection(opCtx, nss, toNss, false));
+
+    AutoGetCollectionForReadCommand autoColl(opCtx, nss);
+    ASSERT_TRUE(autoColl.getCollection());
+
+    AutoGetCollectionForReadCommand autoColl2(opCtx, toNss);
+    ASSERT_FALSE(autoColl2.getCollection());
+}
+
+TEST_F(StorageInterfaceImplTest, RenameCollectionFailsWhenToCollectionAlreadyExists) {
+    auto opCtx = getOperationContext();
+    StorageInterfaceImpl storage;
+    auto nss = makeNamespace(_agent);
+    auto toNss = NamespaceString("local.toNs");
+    createCollection(opCtx, nss);
+    createCollection(opCtx, toNss);
+
+    ASSERT_EQ(ErrorCodes::NamespaceExists, storage.renameCollection(opCtx, nss, toNss, false));
+
+    AutoGetCollectionForReadCommand autoColl(opCtx, nss);
+    ASSERT_TRUE(autoColl.getCollection());
+
+    AutoGetCollectionForReadCommand autoColl2(opCtx, toNss);
+    ASSERT_TRUE(autoColl2.getCollection());
+}
+
+TEST_F(StorageInterfaceImplTest, RenameCollectionFailsWhenFromCollectionDoesNotExist) {
+    auto opCtx = getOperationContext();
+    StorageInterfaceImpl storage;
+    auto nss = makeNamespace(_agent);
+    auto toNss = NamespaceString("local.toNs");
+
+    ASSERT_EQ(ErrorCodes::NamespaceNotFound, storage.renameCollection(opCtx, nss, toNss, false));
+
+    AutoGetCollectionForReadCommand autoColl(opCtx, nss);
+    ASSERT_FALSE(autoColl.getCollection());
+
+    AutoGetCollectionForReadCommand autoColl2(opCtx, toNss);
+    ASSERT_FALSE(autoColl2.getCollection());
 }
 
 TEST_F(StorageInterfaceImplTest, FindDocumentsReturnsInvalidNamespaceIfCollectionIsMissing) {

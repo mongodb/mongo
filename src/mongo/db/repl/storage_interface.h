@@ -141,6 +141,15 @@ public:
     virtual Status dropCollection(OperationContext* opCtx, const NamespaceString& nss) = 0;
 
     /**
+     * Renames a collection from the "fromNS" to the "toNS". Fails if the new collection already
+     * exists.
+     */
+    virtual Status renameCollection(OperationContext* opCtx,
+                                    const NamespaceString& fromNS,
+                                    const NamespaceString& toNS,
+                                    bool stayTemp) = 0;
+
+    /**
      * Drops all databases except "local".
      */
     virtual Status dropReplicatedDatabases(OperationContext* opCtx) = 0;

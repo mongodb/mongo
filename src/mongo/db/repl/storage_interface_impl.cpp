@@ -408,6 +408,40 @@ Status StorageInterfaceImpl::dropCollection(OperationContext* opCtx, const Names
     MONGO_WRITE_CONFLICT_RETRY_LOOP_END(opCtx, "StorageInterfaceImpl::dropCollection", nss.ns());
 }
 
+Status StorageInterfaceImpl::renameCollection(OperationContext* opCtx,
+                                              const NamespaceString& fromNS,
+                                              const NamespaceString& toNS,
+                                              bool stayTemp) {
+    if (fromNS.db() != toNS.db()) {
+        return Status(ErrorCodes::InvalidNamespace,
+                      str::stream() << "Cannot rename collection between databases. From NS: "
+                                    << fromNS.ns()
+                                    << "; to NS: "
+                                    << toNS.ns());
+    }
+
+    MONGO_WRITE_CONFLICT_RETRY_LOOP_BEGIN {
+        AutoGetDb autoDB(opCtx, fromNS.db(), MODE_X);
+        if (!autoDB.getDb()) {
+            return Status(ErrorCodes::NamespaceNotFound,
+                          str::stream() << "Cannot rename collection from " << fromNS.ns() << " to "
+                                        << toNS.ns()
+                                        << ". Database "
+                                        << fromNS.db()
+                                        << " not found.");
+        }
+        WriteUnitOfWork wunit(opCtx);
+        const auto status =
+            autoDB.getDb()->renameCollection(opCtx, fromNS.ns(), toNS.ns(), stayTemp);
+        if (status.isOK()) {
+            wunit.commit();
+        }
+        return status;
+    }
+    MONGO_WRITE_CONFLICT_RETRY_LOOP_END(
+        opCtx, "StorageInterfaceImpl::renameCollection", fromNS.ns());
+}
+
 namespace {
 
 /**

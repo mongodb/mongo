@@ -167,6 +167,14 @@ public:
         return dropCollFn(opCtx, nss);
     };
 
+    Status renameCollection(OperationContext* opCtx,
+                            const NamespaceString& fromNS,
+                            const NamespaceString& toNS,
+                            bool stayTemp) override {
+
+        return Status{ErrorCodes::IllegalOperation, "renameCollection not implemented."};
+    }
+
     StatusWith<std::vector<BSONObj>> findDocuments(OperationContext* opCtx,
                                                    const NamespaceString& nss,
                                                    boost::optional<StringData> indexName,
