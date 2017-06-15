@@ -58,8 +58,8 @@ OplogEntry::CommandType parseCommandType(const BSONObj& objectField) {
         return OplogEntry::CommandType::kEmptyCapped;
     } else if (commandString == "convertToCapped") {
         return OplogEntry::CommandType::kConvertToCapped;
-    } else if (commandString == "createIndex") {
-        return OplogEntry::CommandType::kCreateIndex;
+    } else if (commandString == "createIndexes") {
+        return OplogEntry::CommandType::kCreateIndexes;
     } else if (commandString == "dropIndexes") {
         return OplogEntry::CommandType::kDropIndexes;
     } else if (commandString == "deleteIndexes") {

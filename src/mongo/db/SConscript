@@ -504,7 +504,7 @@ env.Library(
         'commands/test_commands_enabled',
         'service_context',
         '$BUILD_DIR/mongo/util/uuid',
-        '$BUILD_DIR/mongo/util/uuid_catalog',
+        '$BUILD_DIR/mongo/db/catalog/uuid_catalog',
     ],
 )
 
@@ -608,7 +608,7 @@ env.Library(
         '$BUILD_DIR/mongo/base',
         'repl/serveronly',
         'views/views_mongod',
-        '$BUILD_DIR/mongo/util/uuid_catalog',
+        '$BUILD_DIR/mongo/db/catalog/uuid_catalog',
     ],
 )
 
@@ -1230,6 +1230,8 @@ env.Library(
     ],
     LIBDEPS= [
         '$BUILD_DIR/mongo/db/repl/optime',
+        '$BUILD_DIR/mongo/db/catalog/uuid_catalog',
+        '$BUILD_DIR/mongo/db/catalog/database_holder',
     ],
 )
 

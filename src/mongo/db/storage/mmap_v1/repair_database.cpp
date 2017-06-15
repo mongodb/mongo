@@ -41,6 +41,7 @@
 #include "mongo/db/catalog/database.h"
 #include "mongo/db/catalog/database_holder.h"
 #include "mongo/db/catalog/index_create.h"
+#include "mongo/db/catalog/uuid_catalog.h"
 #include "mongo/db/client.h"
 #include "mongo/db/db_raii.h"
 #include "mongo/db/index/index_descriptor.h"
@@ -319,8 +320,9 @@ Status MMAPV1Engine::repairDatabase(OperationContext* opCtx,
         unique_ptr<Database> tempDatabase;
 
         // Must call this before MMAPV1DatabaseCatalogEntry's destructor closes the DB files
-        ON_BLOCK_EXIT([&dbEntry, &opCtx] {
+        ON_BLOCK_EXIT([&dbEntry, &opCtx, &tempDatabase] {
             getDur().syncDataAndTruncateJournal(opCtx);
+            UUIDCatalog::get(opCtx).onCloseDatabase(tempDatabase.get());
             dbEntry->close(opCtx);
         });
 
@@ -362,7 +364,7 @@ Status MMAPV1Engine::repairDatabase(OperationContext* opCtx,
                     CollectionOptions options;
                     if (obj["options"].isABSONObj()) {
                         Status status =
-                            options.parse(obj["options"].Obj(), CollectionOptions::parseForCommand);
+                            options.parse(obj["options"].Obj(), CollectionOptions::parseForStorage);
                         if (!status.isOK())
                             return status;
                     }
@@ -381,6 +383,9 @@ Status MMAPV1Engine::repairDatabase(OperationContext* opCtx,
             Collection* tempCollection = NULL;
             {
                 WriteUnitOfWork wunit(opCtx);
+                if (options.uuid) {
+                    UUIDCatalog::get(opCtx).onDropCollection(opCtx, options.uuid.get());
+                }
                 tempCollection = tempDatabase->createCollection(opCtx, ns, options, false);
                 wunit.commit();
             }

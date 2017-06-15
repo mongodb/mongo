@@ -503,6 +503,26 @@ bool BSONObj::getObjectID(BSONElement& e) const {
     return false;
 }
 
+BSONObj BSONObj::addField(const BSONElement& field) const {
+    if (!field.ok())
+        return copy();
+    BSONObjBuilder b;
+    StringData name = field.fieldNameStringData();
+    bool added = false;
+    for (auto e : *this) {
+        if (e.fieldNameStringData() == name) {
+            if (!added)
+                b.append(field);
+            added = true;
+        } else {
+            b.append(e);
+        }
+    }
+    if (!added)
+        b.append(field);
+    return b.obj();
+}
+
 BSONObj BSONObj::removeField(StringData name) const {
     BSONObjBuilder b;
     BSONObjIterator i(*this);

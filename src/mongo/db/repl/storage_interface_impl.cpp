@@ -49,6 +49,7 @@
 #include "mongo/db/catalog/document_validation.h"
 #include "mongo/db/catalog/index_catalog.h"
 #include "mongo/db/catalog/index_create.h"
+#include "mongo/db/catalog/uuid_catalog.h"
 #include "mongo/db/client.h"
 #include "mongo/db/concurrency/d_concurrency.h"
 #include "mongo/db/concurrency/write_conflict_exception.h"
@@ -432,9 +433,15 @@ Status StorageInterfaceImpl::renameCollection(OperationContext* opCtx,
         WriteUnitOfWork wunit(opCtx);
         const auto status =
             autoDB.getDb()->renameCollection(opCtx, fromNS.ns(), toNS.ns(), stayTemp);
-        if (status.isOK()) {
-            wunit.commit();
+        if (!status.isOK()) {
+            return status;
         }
+
+        auto newColl = autoDB.getDb()->getCollection(opCtx, toNS);
+        if (newColl->uuid()) {
+            UUIDCatalog::get(opCtx).onRenameCollection(opCtx, newColl, newColl->uuid().get());
+        }
+        wunit.commit();
         return status;
     }
     MONGO_WRITE_CONFLICT_RETRY_LOOP_END(

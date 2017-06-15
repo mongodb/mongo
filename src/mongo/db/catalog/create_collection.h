@@ -34,6 +34,7 @@
 namespace mongo {
 class BSONObj;
 class OperationContext;
+class BSONElement;
 
 /**
  * Creates a collection as described in "cmdObj" on the database "dbName". Creates the collection's
@@ -44,4 +45,17 @@ Status createCollection(OperationContext* opCtx,
                         const std::string& dbName,
                         const BSONObj& cmdObj,
                         const BSONObj& idIndex = BSONObj());
+
+/**
+ * As above, but only used by replication to apply operations. This allows recreating collections
+ * with specific UUIDs (if ui is given), and in that case will rename any existing collections with
+ * the same name and a UUID to a temporary name. If ui is not given, an existing collection will
+ * result in an error.
+ */
+Status createCollectionForApplyOps(OperationContext* opCtx,
+                                   const std::string& dbName,
+                                   const BSONElement& ui,
+                                   const BSONObj& cmdObj,
+                                   const BSONObj& idIndex = BSONObj());
+
 }  // namespace mongo

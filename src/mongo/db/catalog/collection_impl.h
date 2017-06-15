@@ -32,6 +32,7 @@
 #include "mongo/db/catalog/collection_catalog_entry.h"
 
 namespace mongo {
+class UUIDCatalog;
 class CollectionImpl final : virtual public Collection::Impl,
                              virtual CappedCallback,
                              virtual UpdateNotifier {

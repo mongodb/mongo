@@ -26,7 +26,7 @@
  *    it in the license file.
  */
 
-#include "mongo/util/uuid_catalog.h"
+#include "mongo/db/catalog/uuid_catalog.h"
 
 #include "mongo/db/catalog/collection_mock.h"
 #include "mongo/db/operation_context_noop.h"

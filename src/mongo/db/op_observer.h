@@ -192,7 +192,8 @@ public:
                                OptionalCollectionUUID uuid) = 0;
     virtual void onConvertToCapped(OperationContext* opCtx,
                                    const NamespaceString& collectionName,
-                                   OptionalCollectionUUID uuid,
+                                   OptionalCollectionUUID origUUID,
+                                   OptionalCollectionUUID cappedUUID,
                                    double size) = 0;
 };
 

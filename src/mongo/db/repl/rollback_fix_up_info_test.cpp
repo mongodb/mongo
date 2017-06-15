@@ -407,7 +407,7 @@ TEST_F(
     RollbackFixUpInfoTest,
     ProcessCreateCollectionOplogEntryInsertsDocumentIntoRollbackCollectionUuidCollectionWithEmptyNamespace) {
     // State of oplog:
-    // {create: mynewcoll}, {createIndex: myindex}, {collMod: mynewcoll}, {op: 'i'}, ....
+    // {create: mynewcoll}, {createIndexes: myindex}, {collMod: mynewcoll}, {op: 'i'}, ....
     // (earliest optime) ---> (latest optime)
     //
     // Oplog entries are processed in reverse optime order.
@@ -685,12 +685,12 @@ TEST_F(RollbackFixUpInfoTest,
                   << "ui"
                   << UUID::gen()
                   << "o"
-                  << BSON("createIndex" << 1 << "v" << 2 << "key" << BSON("b" << 1) << "name"
-                                        << "b_1"
-                                        << "ns"
-                                        << "mydb.mycoll"
-                                        << "expireAfterSeconds"
-                                        << 60));
+                  << BSON("createIndexes" << 1 << "v" << 2 << "key" << BSON("b" << 1) << "name"
+                                          << "b_1"
+                                          << "ns"
+                                          << "mydb.mycoll"
+                                          << "expireAfterSeconds"
+                                          << 60));
     auto collectionUuid = unittest::assertGet(UUID::parse(operation["ui"]));
     auto indexName = operation["o"].Obj()["name"].String();
 
@@ -716,7 +716,7 @@ TEST_F(RollbackFixUpInfoTest,
        ProcessCreateIndexOplogEntryWhenExistingDocumentHasDropOpTypeRemovesExistingDocument) {
 
     // State of oplog:
-    // {createIndex: indexA}, ...., {dropIndexes: indexA}, ....
+    // {createIndexes: indexA}, ...., {dropIndexes: indexA}, ....
     // (earliest optime) ---> (latest optime)
     //
     // Oplog entries are processed in reverse optime order.
@@ -741,7 +741,7 @@ TEST_F(RollbackFixUpInfoTest,
                     << "infoObj"
                     << infoObj)});
 
-    // Next, process createIndex. This should cancel out the existing 'drop' operation and remove
+    // Next, process createIndexes. This should cancel out the existing 'drop' operation and remove
     // existing document from the collection.
     ASSERT_OK(
         rollbackFixUpInfo.processCreateIndexOplogEntry(opCtx.get(), collectionUuid, indexName));
@@ -752,7 +752,7 @@ TEST_F(RollbackFixUpInfoTest,
        ProcessCreateIndexOplogEntryWhenExistingDocumentHasUpdateTTLOpTypeReplacesExistingDocument) {
 
     // State of oplog:
-    // {createIndex: indexA}, ...., {collMod: indexA}, ....
+    // {createIndexes: indexA}, ...., {collMod: indexA}, ....
     // (earliest optime) ---> (latest optime)
     //
     // Oplog entries are processed in reverse optime order.
@@ -775,7 +775,7 @@ TEST_F(RollbackFixUpInfoTest,
                     << "infoObj"
                     << BSON("expireAfterSeconds" << 60))});
 
-    // Next, process createIndex. This should replace the existing 'updateTTL' operation so that
+    // Next, process createIndexes. This should replace the existing 'updateTTL' operation so that
     // we drop the index when it's time to apply the fix up info.
     ASSERT_OK(
         rollbackFixUpInfo.processCreateIndexOplogEntry(opCtx.get(), collectionUuid, indexName));
@@ -812,7 +812,7 @@ TEST_F(
     _assertDocumentsInCollectionEquals(
         opCtx.get(), RollbackFixUpInfo::kRollbackIndexNamespace, {malformedDoc});
 
-    // Process createIndex. This should log an error when checking the operation type on the
+    // Process createIndexes. This should log an error when checking the operation type on the
     // existing document. The malformed document should be replaced.
     ASSERT_OK(
         rollbackFixUpInfo.processCreateIndexOplogEntry(opCtx.get(), collectionUuid, indexName));
@@ -1001,13 +1001,13 @@ TEST_F(RollbackFixUpInfoTest,
        ProcessDropIndexOplogEntryWhenExistingDocumentHasCreateOpTypeReplacesExistingDocument) {
 
     // State of oplog:
-    // {dropIndexes: indexA}, ...., {createIndex: indexA}, ....
+    // {dropIndexes: indexA}, ...., {createIndexes: indexA}, ....
     // (earliest optime) ---> (latest optime)
     //
     // Oplog entries are processed in reverse optime order.
 
-    // First, process createIndex. This should insert a document into the collection with a 'create'
-    // op type.
+    // First, process createIndexes. This should insert a document into the collection with a
+    // 'create' op type.
     auto collectionUuid = UUID::gen();
     std::string indexName = "b_1";
     auto infoObj = BSON("v" << 2 << "key" << BSON("b" << 1) << "name" << indexName << "ns"

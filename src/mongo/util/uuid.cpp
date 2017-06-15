@@ -91,6 +91,10 @@ bool UUID::isUUIDString(const std::string& s) {
     return std::regex_match(s, uuidRegex);
 }
 
+bool UUID::isRFC4122v4() const {
+    return (_uuid[6] & ~0x0f) == 0x40 && (_uuid[8] & ~0x3f) == 0x80;  // See RFC 4122, section 4.4.
+}
+
 UUID UUID::gen() {
     int64_t randomWords[2];
 

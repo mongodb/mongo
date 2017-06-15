@@ -891,20 +891,6 @@ public:
     }
 };
 
-class EmptyPushSparseIndex : public EmptyPush {
-public:
-    EmptyPushSparseIndex() {
-        _client.insert("unittests.system.indexes",
-                       BSON("ns" << ns() << "key" << BSON("a" << 1) << "name"
-                                 << "foo"
-                                 << "sparse"
-                                 << true));
-    }
-    ~EmptyPushSparseIndex() {
-        _client.dropIndexes(ns());
-    }
-};
-
 class PushAll : public Base {
 public:
     void doIt() const {
@@ -1465,7 +1451,6 @@ public:
         add<Idempotence::PushUpsert>();
         add<Idempotence::MultiPush>();
         add<Idempotence::EmptyPush>();
-        add<Idempotence::EmptyPushSparseIndex>();
         add<Idempotence::PushAll>();
         add<Idempotence::PushSlice>();
         add<Idempotence::PushSliceInitiallyInexistent>();

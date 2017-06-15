@@ -51,7 +51,7 @@ public:
         kDropDatabase,
         kEmptyCapped,
         kConvertToCapped,
-        kCreateIndex,
+        kCreateIndexes,
         kDropIndexes
     };
 

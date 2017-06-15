@@ -7,7 +7,7 @@
     // Helper for testing that pipeline returns correct set of results.
     function testPipeline(pipeline, expectedResult, collection) {
         // Strip the oplog fields we aren't testing.
-        pipeline.push({$project: {ts: 0, t: 0, h: 0, v: 0, wall: 0}});
+        pipeline.push({$project: {ts: 0, t: 0, h: 0, v: 0, wall: 0, ui: 0}});
         assert.docEq(collection.aggregate(pipeline).toArray(), expectedResult);
     }
 

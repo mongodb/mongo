@@ -45,6 +45,8 @@
 #include "mongo/db/catalog/database_catalog_entry.h"
 #include "mongo/db/catalog/document_validation.h"
 #include "mongo/db/catalog/index_create.h"
+#include "mongo/db/catalog/namespace_uuid_cache.h"
+#include "mongo/db/catalog/uuid_catalog.h"
 #include "mongo/db/clientcursor.h"
 #include "mongo/db/commands/server_status_metric.h"
 #include "mongo/db/concurrency/d_concurrency.h"
@@ -205,6 +207,17 @@ CollectionImpl::~CollectionImpl() {
     if (isCapped()) {
         _recordStore->setCappedCallback(nullptr);
         _cappedNotifier->kill();
+    }
+
+    if (_uuid) {
+        if (auto opCtx = cc().getOperationContext()) {
+            auto& uuidCatalog = UUIDCatalog::get(opCtx);
+            invariant(uuidCatalog.lookupCollectionByUUID(_uuid.get()) != _this);
+            auto& cache = NamespaceUUIDCache::get(opCtx);
+            // TODO(geert): cache.verifyNotCached(ns(), uuid().get());
+            cache.evictNamespace(ns());
+        }
+        LOG(2) << "destructed collection " << ns() << " with UUID " << uuid()->toString();
     }
     _magic = 0;
 }

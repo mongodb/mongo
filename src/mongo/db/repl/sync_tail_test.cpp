@@ -368,7 +368,8 @@ Status failedApplyCommand(OperationContext* opCtx, const BSONObj& theOperation, 
 TEST_F(SyncTailTest, SyncApplyNoNamespaceBadOp) {
     const BSONObj op = BSON("op"
                             << "x");
-    ASSERT_OK(SyncTail::syncApply(_opCtx.get(), op, false, _applyOp, _applyCmd, _incOps));
+    ASSERT_EQUALS(ErrorCodes::BadValue,
+                  SyncTail::syncApply(_opCtx.get(), op, false, _applyOp, _applyCmd, _incOps));
     ASSERT_EQUALS(0U, _opsApplied);
 }
 
@@ -1137,6 +1138,11 @@ OplogEntry IdempotencyTest::dropIndex(const std::string& indexName) {
 }
 
 CollectionState IdempotencyTest::validate() {
+    // We check that a given operation will not resolve the same NamespaceString to different UUIDs,
+    // make sure to use a new operation here.
+    _opCtx.reset();
+    _opCtx = cc().makeOperationContext();
+
     AutoGetCollectionForReadCommand autoColl(_opCtx.get(), nss);
     auto collection = autoColl.getCollection();
 
@@ -1178,6 +1184,7 @@ CollectionState IdempotencyTest::validate() {
 
     auto collectionCatalog = collection->getCatalogEntry();
     auto collectionOptions = collectionCatalog->getCollectionOptions(_opCtx.get());
+    collectionOptions.uuid.reset();
     std::vector<std::string> allIndexes;
     BSONObjSet indexSpecs = SimpleBSONObjComparator::kInstance.makeBSONObjSet();
     collectionCatalog->getAllIndexes(_opCtx.get(), &allIndexes);

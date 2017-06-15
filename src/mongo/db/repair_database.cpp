@@ -44,6 +44,8 @@
 #include "mongo/db/catalog/document_validation.h"
 #include "mongo/db/catalog/index_create.h"
 #include "mongo/db/catalog/index_key_validate.h"
+#include "mongo/db/catalog/namespace_uuid_cache.h"
+#include "mongo/db/catalog/uuid_catalog.h"
 #include "mongo/db/index/index_descriptor.h"
 #include "mongo/db/repl/replication_coordinator.h"
 #include "mongo/db/storage/mmap_v1/mmap_v1_engine.h"
@@ -242,7 +244,15 @@ Status repairDatabase(OperationContext* opCtx,
         return Status(ErrorCodes::BadValue, "backupOriginalFiles not supported");
     }
 
-    // Close the db to invalidate all current users and caches.
+    // Close the db and invalidate all current users and caches.
+    {
+        Database* db = dbHolder().get(opCtx, dbName);
+        if (db) {
+            UUIDCatalog::get(opCtx).onCloseDatabase(db);
+            for (auto&& coll : *db)
+                NamespaceUUIDCache::get(opCtx).evictNamespace(coll->ns());
+        }
+    }
     dbHolder().close(opCtx, dbName, "database closed for repair");
     ON_BLOCK_EXIT([&dbName, &opCtx] {
         try {

@@ -101,26 +101,9 @@ env.Library(
     target='uuid',
     source=[
         'uuid.cpp',
-        'namespace_uuid_cache.cpp',
     ],
     LIBDEPS=[
         '$BUILD_DIR/mongo/base',
-        '$BUILD_DIR/mongo/db/catalog/collection',
-        '$BUILD_DIR/mongo/util/decorable',
-        '$BUILD_DIR/third_party/murmurhash3/murmurhash3',
-    ],
-)
-
-env.Library(
-    target='uuid_catalog',
-    source=[
-        'uuid_catalog.cpp'
-    ],
-    LIBDEPS=[
-        'uuid',
-        '$BUILD_DIR/mongo/base',
-        '$BUILD_DIR/mongo/db/catalog/collection',
-        '$BUILD_DIR/mongo/db/namespace_string',
         '$BUILD_DIR/mongo/util/decorable',
         '$BUILD_DIR/third_party/murmurhash3/murmurhash3',
     ],
@@ -136,28 +119,6 @@ env.CppUnitTest(
         'uuid',
     ],
 )
-
-env.CppUnitTest(
-    target='namespace_uuid_cache_test',
-    source=[
-        'namespace_uuid_cache_test.cpp'
-    ],
-    LIBDEPS=[
-        'uuid',
-    ],
-)
-
-env.CppUnitTest(
-    target='uuid_catalog_test',
-    source=[
-        'uuid_catalog_test.cpp',
-        ],
-    LIBDEPS=[
-        'uuid_catalog',
-        'uuid',
-        '$BUILD_DIR/mongo/db/service_context',
-        ]
-    )
 
 env.Library(
     target='summation',

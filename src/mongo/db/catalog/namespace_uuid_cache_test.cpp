@@ -26,38 +26,39 @@
  *    it in the license file.
  */
 
-#include "namespace_uuid_cache.h"
+#include "mongo/db/catalog/namespace_uuid_cache.h"
 
-#include "mongo/util/assert_util.h"
+#include "mongo/unittest/unittest.h"
 
-namespace mongo {
+using namespace mongo;
 
-const OperationContext::Decoration<NamespaceUUIDCache> NamespaceUUIDCache::get =
-    OperationContext::declareDecoration<NamespaceUUIDCache>();
+namespace {
 
-void NamespaceUUIDCache::ensureNamespaceInCache(const NamespaceString& nss, CollectionUUID uuid) {
-    StringData ns(nss.ns());
-    CollectionUUIDMap::const_iterator it = _cache.find(ns);
-    if (it == _cache.end()) {
-        // Add ns, uuid pair to the cache if it does not yet exist.
-        invariant(_cache.try_emplace(ns, uuid).second == true);
-    } else {
-        // If ns exists in the cache, make sure it does not correspond to another uuid.
-        uassert(40418,
-                "Cannot continue operation on namespace " + ns + ": it now resolves " +
-                    uuid.toString() + " instead of " + it->second.toString(),
-                it->second == uuid);
+TEST(NamespaceUUIDCache, ensureNamespaceInCache) {
+    NamespaceUUIDCache cache;
+    CollectionUUID uuid = CollectionUUID::gen();
+    CollectionUUID uuidConflict = CollectionUUID::gen();
+    NamespaceString nss("test", "test_collection_ns");
+    // Add nss, uuid to cache.
+    cache.ensureNamespaceInCache(nss, uuid);
+    // Do nothing if we query for existing nss, uuid pairing.
+    cache.ensureNamespaceInCache(nss, uuid);
+
+    if (debugCollectionUUIDs) {
+        // Uassert if we query for existing nss and uuid that does not match.
+        ASSERT_THROWS(cache.ensureNamespaceInCache(nss, uuidConflict), UserException);
     }
 }
-void NamespaceUUIDCache::onDropCollection(const NamespaceString& nss) {
-    _evictNamespace(nss);
-}
 
-void NamespaceUUIDCache::onRenameCollection(const NamespaceString& nss) {
-    _evictNamespace(nss);
+TEST(NamespaceUUIDCache, onDropCollection) {
+    NamespaceUUIDCache cache;
+    CollectionUUID uuid = CollectionUUID::gen();
+    CollectionUUID newUuid = CollectionUUID::gen();
+    NamespaceString nss("test", "test_collection_ns");
+    cache.ensureNamespaceInCache(nss, uuid);
+    cache.evictNamespace(nss);
+    // Add nss to the cache with a different uuid. This should not throw since
+    // we evicted the previous entry from the cache.
+    cache.ensureNamespaceInCache(nss, newUuid);
 }
-
-void NamespaceUUIDCache::_evictNamespace(const NamespaceString& nss) {
-    invariant(_cache.erase(nss.ns()) <= 1);
-}
-}  // namespace mongo
+}  // namespace

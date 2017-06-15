@@ -262,15 +262,18 @@ mongo::Status mongo::convertToCapped(OperationContext* opCtx,
     }
 
     BackgroundOperation::assertNoBgOpInProgForDb(dbname);
+    auto opObserver = getGlobalServiceContext()->getOpObserver();
 
     std::string shortTmpName = str::stream() << "tmp.convertToCapped." << shortSource;
     NamespaceString longTmpName(dbname, shortTmpName);
 
-    if (db->getCollection(opCtx, longTmpName)) {
+    if (auto existingTmpColl = db->getCollection(opCtx, longTmpName)) {
         WriteUnitOfWork wunit(opCtx);
         Status status = db->dropCollection(opCtx, longTmpName.ns());
         if (!status.isOK())
             return status;
+        opObserver->onDropCollection(opCtx, longTmpName, existingTmpColl->uuid());
+        wunit.commit();
     }
 
     {
@@ -283,7 +286,8 @@ mongo::Status mongo::convertToCapped(OperationContext* opCtx,
         }
     }
 
-    OptionalCollectionUUID uuid = db->getCollection(opCtx, longTmpName)->uuid();
+    OptionalCollectionUUID origUUID = db->getCollection(opCtx, collectionName)->uuid();
+    OptionalCollectionUUID cappedUUID = db->getCollection(opCtx, longTmpName)->uuid();
 
     {
         WriteUnitOfWork wunit(opCtx);
@@ -299,7 +303,7 @@ mongo::Status mongo::convertToCapped(OperationContext* opCtx,
             return status;
 
         getGlobalServiceContext()->getOpObserver()->onConvertToCapped(
-            opCtx, collectionName, uuid, size);
+            opCtx, collectionName, origUUID, cappedUUID, size);
 
         wunit.commit();
     }

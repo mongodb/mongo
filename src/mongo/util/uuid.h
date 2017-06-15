@@ -64,7 +64,7 @@ public:
     static constexpr int kNumBytes = sizeof(UUIDStorage);
 
     /**
-     * Generate a new random v4 UUID per RFC 4122.
+     * Generates a new random v4 UUID per RFC 4122.
      */
     static UUID gen();
 
@@ -81,7 +81,7 @@ public:
     static StatusWith<UUID> parse(BSONElement from);
 
     /**
-     * Parse a BSON document of the form { uuid: BinData(4, "...") }.
+     * Parses a BSON document of the form { uuid: BinData(4, "...") }.
      *
      * For IDL.
      */
@@ -107,17 +107,17 @@ public:
     }
 
     /**
-     * Append to builder as BinData(4, "...") element with the given name.
+     * Appends to builder as BinData(4, "...") element with the given name.
      */
     void appendToBuilder(BSONObjBuilder* builder, StringData name) const;
 
     /**
-     * Return a BSON object of the form { uuid: BinData(4, "...") }.
+     * Returns a BSON object of the form { uuid: BinData(4, "...") }.
      */
     BSONObj toBSON() const;
 
     /**
-     * Return a string representation of this UUID, in hexadecimal,
+     * Returns a string representation of this UUID, in hexadecimal,
      * as per RFC 4122:
      *
      * 4 Octets - 2 Octets - 2 Octets - 2 Octets - 6 Octets
@@ -131,6 +131,11 @@ public:
     inline bool operator!=(const UUID& rhs) const {
         return !(*this == rhs);
     }
+
+    /**
+     * Returns true only if the UUID is the RFC 4122 variant, v4 (random).
+     */
+    bool isRFC4122v4() const;
 
     /**
      * Custom hasher so UUIDs can be used in unordered data structures.

@@ -40,6 +40,7 @@
 #include "mongo/db/catalog/document_validation.h"
 #include "mongo/db/catalog/index_catalog.h"
 #include "mongo/db/catalog/index_create.h"
+#include "mongo/db/catalog/uuid_catalog.h"
 #include "mongo/db/client.h"
 #include "mongo/db/concurrency/write_conflict_exception.h"
 #include "mongo/db/curop.h"
@@ -62,6 +63,37 @@ static void dropCollection(OperationContext* opCtx, Database* db, StringData col
     }
 }
 }  // namespace
+
+Status renameCollectionForApplyOps(OperationContext* opCtx,
+                                   const std::string& dbName,
+                                   const BSONElement& ui,
+                                   const BSONObj& cmd) {
+
+    const auto sourceNsElt = cmd.firstElement();
+    const auto targetNsElt = cmd["to"];
+    uassert(ErrorCodes::TypeMismatch,
+            "'renameCollection' must be of type String",
+            sourceNsElt.type() == BSONType::String);
+    uassert(ErrorCodes::TypeMismatch,
+            "'to' must be of type String",
+            targetNsElt.type() == BSONType::String);
+
+    NamespaceString sourceNss(sourceNsElt.valueStringData());
+    NamespaceString targetNss(targetNsElt.valueStringData());
+    if (!ui.eoo()) {
+        auto statusWithUUID = UUID::parse(ui);
+        uassertStatusOK(statusWithUUID);
+        auto uuid = statusWithUUID.getValue();
+        Collection* source = UUIDCatalog::get(opCtx).lookupCollectionByUUID(uuid);
+        uassert(ErrorCodes::NamespaceNotFound,
+                "cannot find collection with UUID " + uuid.toString(),
+                source);
+        sourceNss = source->ns();
+    }
+
+    return renameCollection(
+        opCtx, sourceNss, targetNss, cmd["dropTarget"].trueValue(), cmd["stayTemp"].trueValue());
+}
 
 Status renameCollection(OperationContext* opCtx,
                         const NamespaceString& source,

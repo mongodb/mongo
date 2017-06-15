@@ -245,6 +245,13 @@ public:
     /** note: addFields always adds _id even if not specified */
     int addFields(BSONObj& from, std::set<std::string>& fields); /* returns n added */
 
+    /**
+     * Add specific field to the end of the object if it did not exist, otherwise replace it
+     * preserving original field order. Returns newly built object. Returns copy of this for empty
+     * field.
+     */
+    BSONObj addField(const BSONElement& field) const;
+
     /** remove specified field and return a new object with the remaining fields.
         slowish as builds a full new object
      */

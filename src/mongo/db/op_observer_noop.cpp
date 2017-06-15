@@ -28,6 +28,11 @@
 
 #include "mongo/platform/basic.h"
 
+#include "mongo/db/catalog/collection.h"
+#include "mongo/db/catalog/database.h"
+#include "mongo/db/catalog/database_holder.h"
+#include "mongo/db/catalog/namespace_uuid_cache.h"
+#include "mongo/db/catalog/uuid_catalog.h"
 #include "mongo/db/op_observer_noop.h"
 
 namespace mongo {
@@ -58,11 +63,19 @@ void OpObserverNoop::onDelete(OperationContext*,
 
 void OpObserverNoop::onOpMessage(OperationContext*, const BSONObj&) {}
 
-void OpObserverNoop::onCreateCollection(OperationContext*,
-                                        Collection*,
-                                        const NamespaceString&,
-                                        const CollectionOptions&,
-                                        const BSONObj&) {}
+void OpObserverNoop::onCreateCollection(OperationContext* opCtx,
+                                        Collection* coll,
+                                        const NamespaceString& collectionName,
+                                        const CollectionOptions& options,
+                                        const BSONObj& idIndex) {
+    if (options.uuid) {
+        UUIDCatalog& catalog = UUIDCatalog::get(opCtx);
+        catalog.onCreateCollection(opCtx, coll, options.uuid.get());
+        NamespaceUUIDCache& cache = NamespaceUUIDCache::get(opCtx);
+        opCtx->recoveryUnit()->onRollback(
+            [&cache, collectionName]() { cache.evictNamespace(collectionName); });
+    }
+}
 
 void OpObserverNoop::onCollMod(OperationContext*,
                                const NamespaceString&,
@@ -73,9 +86,19 @@ void OpObserverNoop::onCollMod(OperationContext*,
 
 void OpObserverNoop::onDropDatabase(OperationContext*, const std::string&) {}
 
-repl::OpTime OpObserverNoop::onDropCollection(OperationContext*,
-                                              const NamespaceString&,
-                                              OptionalCollectionUUID) {
+repl::OpTime OpObserverNoop::onDropCollection(OperationContext* opCtx,
+                                              const NamespaceString& collectionName,
+                                              OptionalCollectionUUID uuid) {
+    // Evict namespace entry from the namespace/uuid cache if it exists.
+    NamespaceUUIDCache& cache = NamespaceUUIDCache::get(opCtx);
+    cache.evictNamespace(collectionName);
+
+    // Remove collection from the uuid catalog.
+    if (uuid) {
+        UUIDCatalog& catalog = UUIDCatalog::get(opCtx);
+        catalog.onDropCollection(opCtx, uuid.get());
+    }
+
     return {};
 }
 
@@ -85,19 +108,36 @@ void OpObserverNoop::onDropIndex(OperationContext*,
                                  const std::string&,
                                  const BSONObj&) {}
 
-void OpObserverNoop::onRenameCollection(OperationContext*,
-                                        const NamespaceString&,
-                                        const NamespaceString&,
-                                        OptionalCollectionUUID,
-                                        bool,
-                                        OptionalCollectionUUID,
-                                        OptionalCollectionUUID,
-                                        bool) {}
+void OpObserverNoop::onRenameCollection(OperationContext* opCtx,
+                                        const NamespaceString& fromCollection,
+                                        const NamespaceString& toCollection,
+                                        OptionalCollectionUUID uuid,
+                                        bool dropTarget,
+                                        OptionalCollectionUUID dropTargetUUID,
+                                        OptionalCollectionUUID dropSourceUUID,
+                                        bool stayTemp) {
+    // Evict namespace entry from the namespace/uuid cache if it exists.
+    NamespaceUUIDCache& cache = NamespaceUUIDCache::get(opCtx);
+    cache.evictNamespace(fromCollection);
+    cache.evictNamespace(toCollection);
+    opCtx->recoveryUnit()->onRollback(
+        [&cache, toCollection]() { cache.evictNamespace(toCollection); });
+
+    // Finally update the UUID Catalog.
+    if (uuid) {
+        auto db = dbHolder().get(opCtx, toCollection.db());
+        auto newColl = db->getCollection(opCtx, toCollection);
+        invariant(newColl);
+        UUIDCatalog& catalog = UUIDCatalog::get(opCtx);
+        catalog.onRenameCollection(opCtx, newColl, uuid.get());
+    }
+}
 
 void OpObserverNoop::onApplyOps(OperationContext*, const std::string&, const BSONObj&) {}
 
 void OpObserverNoop::onConvertToCapped(OperationContext*,
                                        const NamespaceString&,
+                                       OptionalCollectionUUID,
                                        OptionalCollectionUUID,
                                        double) {}
 

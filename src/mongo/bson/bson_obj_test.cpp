@@ -608,4 +608,24 @@ TEST(BSONObj, ShareOwnershipWith) {
     ASSERT_BSONOBJ_EQ(obj, BSON("a" << 1));
 }
 
+TEST(BSONObj, addField) {
+    auto obj = BSON("a" << 1 << "b" << 2);
+
+    // Check that replacing a field maintains the same ordering and doesn't add a field.
+    auto objA2 = BSON("a" << 2);
+    auto elemA2 = objA2.firstElement();
+    auto addFieldA2 = obj.addField(elemA2);
+    ASSERT_EQ(addFieldA2.nFields(), 2);
+    ASSERT_BSONOBJ_EQ(addFieldA2, BSON("a" << 2 << "b" << 2));
+
+    // Check that adding a new field places it at the end.
+    auto objC3 = BSON("c" << 3);
+    auto elemC3 = objC3.firstElement();
+    auto addFieldC3 = obj.addField(elemC3);
+    ASSERT_BSONOBJ_EQ(addFieldC3, BSON("a" << 1 << "b" << 2 << "c" << 3));
+
+    // Check that after all this obj is unchanged.
+    ASSERT_BSONOBJ_EQ(obj, BSON("a" << 1 << "b" << 2));
+}
+
 }  // unnamed namespace

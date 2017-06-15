@@ -32,8 +32,10 @@
 #include "mongo/db/catalog/collection.h"
 #include "mongo/db/catalog/database_catalog_entry.h"
 #include "mongo/db/catalog/database_holder.h"
+#include "mongo/db/catalog/drop_collection.h"
 #include "mongo/db/catalog/head_manager.h"
 #include "mongo/db/catalog/index_create.h"
+#include "mongo/db/catalog/rename_collection.h"
 #include "mongo/db/client.h"
 #include "mongo/db/db_raii.h"
 #include "mongo/db/index/index_descriptor.h"
@@ -80,8 +82,7 @@ Status renameCollection(OperationContext* opCtx,
                         const NamespaceString& source,
                         const NamespaceString& target) {
     ASSERT_EQ(source.db(), target.db());
-    Database* db = dbHolder().get(opCtx, source.db());
-    return db->renameCollection(opCtx, source.ns(), target.ns(), false);
+    return renameCollection(opCtx, source, target, false, false);
 }
 Status truncateCollection(OperationContext* opCtx, const NamespaceString& nss) {
     Collection* coll = dbHolder().get(opCtx, nss.db())->getCollection(opCtx, nss);
@@ -317,7 +318,13 @@ public:
 
         {
             WriteUnitOfWork uow(&opCtx);
-            ASSERT_OK(ctx.db()->dropCollection(&opCtx, target.ns()));
+            BSONObjBuilder result;
+            ASSERT_OK(
+                dropCollection(&opCtx,
+                               target,
+                               result,
+                               {},
+                               DropCollectionSystemCollectionMode::kDisallowSystemCollectionDrops));
             ASSERT_OK(renameCollection(&opCtx, source, target));
             ASSERT(!collectionExists(&ctx, source.ns()));
             ASSERT(collectionExists(&ctx, target.ns()));
@@ -375,7 +382,13 @@ public:
 
         {
             WriteUnitOfWork uow(&opCtx);
-            ASSERT_OK(ctx.db()->dropCollection(&opCtx, nss.ns()));
+            BSONObjBuilder result;
+            ASSERT_OK(
+                dropCollection(&opCtx,
+                               nss,
+                               result,
+                               {},
+                               DropCollectionSystemCollectionMode::kDisallowSystemCollectionDrops));
             ASSERT(!collectionExists(&ctx, nss.ns()));
             ASSERT_OK(userCreateNS(&opCtx,
                                    ctx.db(),
@@ -428,7 +441,13 @@ public:
             insertRecord(&opCtx, nss, doc);
             assertOnlyRecord(&opCtx, nss, doc);
 
-            ASSERT_OK(ctx.db()->dropCollection(&opCtx, nss.ns()));
+            BSONObjBuilder result;
+            ASSERT_OK(
+                dropCollection(&opCtx,
+                               nss,
+                               result,
+                               {},
+                               DropCollectionSystemCollectionMode::kDisallowSystemCollectionDrops));
             ASSERT(!collectionExists(&ctx, nss.ns()));
 
             if (!rollback) {

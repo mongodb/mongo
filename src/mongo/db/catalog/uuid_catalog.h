@@ -42,19 +42,37 @@ namespace mongo {
  * collection lookup by UUID.
  */
 using CollectionUUID = UUID;
+class Database;
 
 class UUIDCatalog {
     MONGO_DISALLOW_COPYING(UUIDCatalog);
 
 public:
-    static const ServiceContext::Decoration<UUIDCatalog> get;
+    static UUIDCatalog& get(ServiceContext* svcCtx);
+    static UUIDCatalog& get(OperationContext* opCtx);
     UUIDCatalog() = default;
 
-    /* This function inserts the entry for uuid, coll into the UUID
-     * Collection. It is called by the op observer when a collection
-     * is created.
+    /**
+     * This function inserts the entry for uuid, coll into the UUID Collection. It is called by
+     * the op observer when a collection is created.
      */
     void onCreateCollection(OperationContext* opCtx, Collection* coll, CollectionUUID uuid);
+
+    /**
+     * This function removes the entry for uuid from the UUID catalog. It is called by the op
+     * observer when a collection is dropped.
+     */
+    void onDropCollection(OperationContext* opCtx, CollectionUUID uuid);
+
+    /**
+     * Combination of onDropCollection and onCreateCollection.
+     */
+    void onRenameCollection(OperationContext* opCtx, Collection* newColl, CollectionUUID uuid);
+
+    /**
+     * Implies onDropCollection for all collections in db, but is not transactional.
+     */
+    void onCloseDatabase(Database* db);
 
     /* This function gets the Collection* pointer that corresponds to
      * CollectionUUID uuid. The required locks should be obtained prior
@@ -68,11 +86,6 @@ public:
      * NamespaceString is returned.
      */
     NamespaceString lookupNSSByUUID(CollectionUUID uuid) const;
-
-    /* This function removes the entry for uuid from the UUID catalog. It
-     * is called by the op observer when a collection is dropped.
-     */
-    void onDropCollection(OperationContext* opCtx, CollectionUUID uuid);
 
 private:
     mutable mongo::stdx::mutex _catalogLock;

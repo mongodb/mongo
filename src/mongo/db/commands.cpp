@@ -43,6 +43,7 @@
 #include "mongo/db/auth/authorization_manager.h"
 #include "mongo/db/auth/authorization_session.h"
 #include "mongo/db/auth/privilege.h"
+#include "mongo/db/catalog/uuid_catalog.h"
 #include "mongo/db/client.h"
 #include "mongo/db/curop.h"
 #include "mongo/db/jsobj.h"
@@ -50,7 +51,6 @@
 #include "mongo/db/server_parameters.h"
 #include "mongo/rpc/write_concern_error_detail.h"
 #include "mongo/util/log.h"
-#include "mongo/util/uuid_catalog.h"
 
 namespace mongo {
 
@@ -108,7 +108,7 @@ NamespaceString Command::parseNsOrUUID(OperationContext* opCtx,
     if (first.type() == BinData && first.binDataType() == BinDataType::newUUID) {
         StatusWith<UUID> uuidRes = UUID::parse(first);
         uassertStatusOK(uuidRes);
-        UUIDCatalog& catalog = UUIDCatalog::get(opCtx->getServiceContext());
+        UUIDCatalog& catalog = UUIDCatalog::get(opCtx);
         return catalog.lookupNSSByUUID(uuidRes.getValue());
     } else {
         // Ensure collection identifier is not a Command or specialCommand

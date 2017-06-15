@@ -149,6 +149,44 @@ env.Library(
 )
 
 env.Library(
+    target='uuid_catalog',
+    source=[
+        'namespace_uuid_cache.cpp',
+        'uuid_catalog.cpp',
+    ],
+    LIBDEPS=[
+        'collection',
+        'database',
+        '$BUILD_DIR/mongo/base',
+        '$BUILD_DIR/mongo/db/namespace_string',
+        '$BUILD_DIR/mongo/db/storage/storage_options',
+        '$BUILD_DIR/mongo/util/decorable',
+        '$BUILD_DIR/mongo/util/uuid',
+    ],
+)
+
+env.CppUnitTest(
+    target='namespace_uuid_cache_test',
+    source=[
+        'namespace_uuid_cache_test.cpp'
+    ],
+    LIBDEPS=[
+        'uuid_catalog',
+    ],
+)
+
+env.CppUnitTest(
+    target='uuid_catalog_test',
+    source=[
+        'uuid_catalog_test.cpp',
+        ],
+    LIBDEPS=[
+        'uuid_catalog',
+        '$BUILD_DIR/mongo/db/service_context',
+        ]
+    )
+
+env.Library(
     target='catalog',
     source=[
         "collection_compact.cpp",

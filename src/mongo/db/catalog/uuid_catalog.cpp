@@ -31,20 +31,56 @@
 
 #include "uuid_catalog.h"
 
+#include "mongo/db/catalog/database.h"
 #include "mongo/db/storage/recovery_unit.h"
 #include "mongo/util/log.h"
 #include "mongo/util/uuid.h"
 
 namespace mongo {
-
-const ServiceContext::Decoration<UUIDCatalog> UUIDCatalog::get =
+namespace {
+const ServiceContext::Decoration<UUIDCatalog> getCatalog =
     ServiceContext::declareDecoration<UUIDCatalog>();
+}  // namespace
+
+UUIDCatalog& UUIDCatalog::get(ServiceContext* svcCtx) {
+    return getCatalog(svcCtx);
+}
+UUIDCatalog& UUIDCatalog::get(OperationContext* opCtx) {
+    return getCatalog(opCtx->getServiceContext());
+}
 
 void UUIDCatalog::onCreateCollection(OperationContext* opCtx,
                                      Collection* coll,
                                      CollectionUUID uuid) {
     _registerUUIDCatalogEntry(uuid, coll);
     opCtx->recoveryUnit()->onRollback([this, uuid] { _removeUUIDCatalogEntry(uuid); });
+}
+
+void UUIDCatalog::onDropCollection(OperationContext* opCtx, CollectionUUID uuid) {
+    Collection* foundColl = _removeUUIDCatalogEntry(uuid);
+    opCtx->recoveryUnit()->onRollback(
+        [this, foundColl, uuid] { _registerUUIDCatalogEntry(uuid, foundColl); });
+}
+
+void UUIDCatalog::onRenameCollection(OperationContext* opCtx,
+                                     Collection* newColl,
+                                     CollectionUUID uuid) {
+    Collection* oldColl = _removeUUIDCatalogEntry(uuid);
+    _registerUUIDCatalogEntry(uuid, newColl);
+    opCtx->recoveryUnit()->onRollback([this, oldColl, uuid] {
+        _removeUUIDCatalogEntry(uuid);
+        _registerUUIDCatalogEntry(uuid, oldColl);
+    });
+}
+
+void UUIDCatalog::onCloseDatabase(Database* db) {
+    for (auto&& coll : *db) {
+        if (coll->uuid()) {
+            // While the collection does not actually get dropped, we're going to destroy the
+            // Collection object, so for purposes of the UUIDCatalog it looks the same.
+            _removeUUIDCatalogEntry(coll->uuid().get());
+        }
+    }
 }
 
 Collection* UUIDCatalog::lookupCollectionByUUID(CollectionUUID uuid) const {
@@ -56,28 +92,28 @@ Collection* UUIDCatalog::lookupCollectionByUUID(CollectionUUID uuid) const {
 NamespaceString UUIDCatalog::lookupNSSByUUID(CollectionUUID uuid) const {
     stdx::lock_guard<stdx::mutex> lock(_catalogLock);
     auto foundIt = _catalog.find(uuid);
-    return foundIt == _catalog.end() ? NamespaceString() : foundIt->second->ns();
-}
-
-void UUIDCatalog::onDropCollection(OperationContext* opCtx, CollectionUUID uuid) {
-    Collection* foundCol = _removeUUIDCatalogEntry(uuid);
-    opCtx->recoveryUnit()->onRollback(
-        [this, foundCol, uuid] { _registerUUIDCatalogEntry(uuid, foundCol); });
+    Collection* coll = foundIt == _catalog.end() ? nullptr : foundIt->second;
+    return foundIt == _catalog.end() ? NamespaceString() : coll->ns();
 }
 
 void UUIDCatalog::_registerUUIDCatalogEntry(CollectionUUID uuid, Collection* coll) {
     stdx::lock_guard<stdx::mutex> lock(_catalogLock);
     if (coll) {
         std::pair<CollectionUUID, Collection*> entry = std::make_pair(uuid, coll);
-        LOG(2) << "registering collection " << coll->ns() << " as having UUID " << uuid.toString();
-        invariant(_catalog.insert(entry).second);
+        LOG(2) << "registering collection " << coll->ns() << " with UUID " << uuid.toString();
+        invariant(_catalog.insert(entry).second == true);
     }
 }
 
 Collection* UUIDCatalog::_removeUUIDCatalogEntry(CollectionUUID uuid) {
     stdx::lock_guard<stdx::mutex> lock(_catalogLock);
-    Collection* foundCol = _catalog[uuid];
-    invariant(_catalog.erase(uuid) <= 1);
+    auto foundIt = _catalog.find(uuid);
+    if (foundIt == _catalog.end())
+        return nullptr;
+
+    auto foundCol = foundIt->second;
+    LOG(2) << "unregistering collection " << foundCol->ns() << " with UUID " << uuid.toString();
+    _catalog.erase(foundIt);
     return foundCol;
 }
 }  // namespace mongo

@@ -96,7 +96,8 @@ public:
                        OptionalCollectionUUID uuid);
     void onConvertToCapped(OperationContext* opCtx,
                            const NamespaceString& collectionName,
-                           OptionalCollectionUUID uuid,
+                           OptionalCollectionUUID origUUID,
+                           OptionalCollectionUUID cappedUUID,
                            double size) override;
 };
 

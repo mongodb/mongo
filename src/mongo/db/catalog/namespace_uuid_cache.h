@@ -36,11 +36,14 @@
 
 namespace mongo {
 
+extern bool debugCollectionUUIDs;
+
 /**
  * This class comprises the NamespaceString to UUID cache that prevents given namespaces
  * from resolving to multiple UUIDs.
  */
 using CollectionUUID = UUID;
+class Database;
 
 class NamespaceUUIDCache {
     MONGO_DISALLOW_COPYING(NamespaceUUIDCache);
@@ -50,36 +53,36 @@ public:
     NamespaceUUIDCache() = default;
 
     /**
-     * This function adds the pair nss.ns(), uuid to the namespace uuid cache
+     * This function adds the pair nss.ns(), uuid to the namespace UUID cache
      * if it does not yet exist. If nss.ns() already exists in the cache with
-     * a different uuid, a UserException is thrown, so we can guarantee that
+     * a different UUID, a UserException is thrown, so we can guarantee that
      * an operation will always resolve the same name to the same collection,
      * even in presence of drops and renames.
      */
     void ensureNamespaceInCache(const NamespaceString& nss, CollectionUUID uuid);
 
     /**
-     * This function removes the entry for nss.ns() from the namespace uuid
+     * This function removes the entry for nss.ns() from the namespace UUID
      * cache. Does nothing if the entry doesn't exist. It is called via the
-     * op observer when a collection is dropped.
+     * op observer when a collection is dropped or renamed.
      */
-    void onDropCollection(const NamespaceString& nss);
+    void evictNamespace(const NamespaceString& nss);
 
     /**
-     * This function removes the entry for nss.ns() from the namespace uuid
-     * cache. Does nothing if the entry doesn't exist. It is called via the
-     * op observer when a collection is renamed.
+     * Same as above, but for all registered namespaces in the given dbname.
      */
-    void onRenameCollection(const NamespaceString& nss);
+    void evictNamespacesInDatabase(StringData dbname);
+
+    /**
+     * For testing only: verify that 'nss' is not cached.
+     */
+    void verifyNotCached(const NamespaceString& nss, CollectionUUID uuid) {
+        auto it = _cache.find(nss.ns());
+        invariant(it == _cache.end() || it->second != uuid);
+    }
 
 private:
-    /**
-     * This function removes the entry for nss.ns() from the namespace uuid
-     * cache. Does nothing if the entry doesn't exist.
-     */
-    void _evictNamespace(const NamespaceString& nss);
     using CollectionUUIDMap = StringMap<CollectionUUID>;
     CollectionUUIDMap _cache;
 };
-
 }  // namespace mongo
