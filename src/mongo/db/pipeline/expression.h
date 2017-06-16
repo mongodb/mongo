@@ -828,6 +828,25 @@ private:
     typedef ExpressionFixedArity<ExpressionCond, 3> Base;
 };
 
+class ExpressionDateFromString final : public Expression {
+public:
+    boost::intrusive_ptr<Expression> optimize() final;
+    Value serialize(bool explain) const final;
+    Value evaluate(const Document&) const final;
+    void addDependencies(DepsTracker*) const final;
+
+    static boost::intrusive_ptr<Expression> parse(
+        const boost::intrusive_ptr<ExpressionContext>& expCtx,
+        BSONElement expr,
+        const VariablesParseState& vps);
+
+private:
+    ExpressionDateFromString(const boost::intrusive_ptr<ExpressionContext>& expCtx,
+                             boost::intrusive_ptr<Expression> dateString);
+
+    boost::intrusive_ptr<Expression> _dateString;
+};
+
 class ExpressionDateFromParts final : public Expression {
 public:
     boost::intrusive_ptr<Expression> optimize() final;
