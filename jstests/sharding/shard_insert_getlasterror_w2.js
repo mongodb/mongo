@@ -42,7 +42,7 @@
     var testDB = mongosConn.getDB(testDBName);
 
     // Add replSet1 as only shard
-    mongosConn.adminCommand({addshard: replSet1.getURL()});
+    assert.commandWorked(mongosConn.adminCommand({addshard: replSet1.getURL()}));
 
     // Enable sharding on test db and its collection foo
     assert.commandWorked(mongosConn.getDB('admin').runCommand({enablesharding: testDBName}));
@@ -51,7 +51,7 @@
         {shardcollection: testDBName + '.' + testCollName, key: {x: 1}}));
 
     // Test case where GLE should return an error
-    testDB.foo.insert({_id: 'a', x: 1});
+    assert.writeOK(testDB.foo.insert({_id: 'a', x: 1}));
     assert.writeError(testDB.foo.insert({_id: 'a', x: 1}, {writeConcern: {w: 2, wtimeout: 30000}}));
 
     // Add more data
