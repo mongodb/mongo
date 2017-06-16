@@ -75,6 +75,10 @@ public:
         MONGO_UNREACHABLE;
     }
 
+    Status appendRecordCount(const NamespaceString& nss, BSONObjBuilder* builder) const override {
+        MONGO_UNREACHABLE;
+    }
+
     BSONObj getCollectionOptions(const NamespaceString& nss) override {
         MONGO_UNREACHABLE;
     }

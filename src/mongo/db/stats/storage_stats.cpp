@@ -108,4 +108,24 @@ Status appendCollectionStorageStats(OperationContext* opCtx,
 
     return Status::OK();
 }
+
+Status appendCollectionRecordCount(OperationContext* opCtx,
+                                   const NamespaceString& nss,
+                                   BSONObjBuilder* result) {
+    AutoGetCollectionForReadCommand ctx(opCtx, nss);
+    if (!ctx.getDb()) {
+        return {ErrorCodes::BadValue,
+                str::stream() << "Database [" << nss.db().toString() << "] not found."};
+    }
+
+    Collection* collection = ctx.getCollection();
+    if (!collection) {
+        return {ErrorCodes::BadValue,
+                str::stream() << "Collection [" << nss.toString() << "] not found."};
+    }
+
+    result->appendNumber("count", static_cast<long long>(collection->numRecords(opCtx)));
+
+    return Status::OK();
+}
 }  // namespace mongo

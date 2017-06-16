@@ -599,6 +599,12 @@ public:
                                           BSONObjBuilder* builder) const = 0;
 
         /**
+         * Appends the record count for collection "nss" to "builder".
+         */
+        virtual Status appendRecordCount(const NamespaceString& nss,
+                                         BSONObjBuilder* builder) const = 0;
+
+        /**
          * Gets the collection options for the collection given by 'nss'.
          */
         virtual BSONObj getCollectionOptions(const NamespaceString& nss) = 0;
