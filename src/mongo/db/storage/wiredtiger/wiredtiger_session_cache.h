@@ -97,7 +97,9 @@ public:
 
     void releaseCursor(uint64_t id, WT_CURSOR* cursor);
 
-    void closeAllCursors();
+    void closeCursorsForQueuedDrops(WiredTigerKVEngine* engine);
+
+    void closeAllCursors(const std::string& uri);
 
     int cursorsOut() const {
         return _cursorsOut;
@@ -167,10 +169,15 @@ public:
     void closeAll();
 
     /**
+     * Closes cached cursors for tables that are queued to be dropped.
+     */
+    void closeCursorsForQueuedDrops();
+
+    /**
      * Closes all cached cursors and ensures that previously opened cursors will be closed on
      * release.
      */
-    void closeAllCursors();
+    void closeAllCursors(const std::string& uri);
 
     /**
      * Transitions the cache to shutting down mode. Any already released sessions are freed and
