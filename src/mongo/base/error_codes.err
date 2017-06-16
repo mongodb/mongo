@@ -213,6 +213,7 @@ error_code("IncompatibleRollbackAlgorithm", 212)
 error_code("DuplicateSession", 213)
 error_code("AuthenticationRestrictionUnmet", 214)
 error_code("DatabaseDropPending", 215)
+error_code("ElectionInProgress", 216)
 
 # Error codes 4000-8999 are reserved.
 

@@ -374,7 +374,7 @@ DEATH_TEST_F(RollbackImplTest, RollbackTerminatesIfCompletionCallbackThrowsExcep
 }
 
 TEST_F(RollbackImplTest, RollbackReturnsNotSecondaryOnFailingToTransitionToRollback) {
-    _coordinator->_failSetFollowerModeOnThisMemberState = MemberState::RS_ROLLBACK;
+    _coordinator->failSettingFollowerMode(MemberState::RS_ROLLBACK, ErrorCodes::NotSecondary);
     ASSERT_OK(_rollback->startup());
     _rollback->join();
     ASSERT_EQUALS(ErrorCodes::NotSecondary, _onCompletionResult);
@@ -400,7 +400,7 @@ DEATH_TEST_F(
     RollbackTriggersFatalAssertionOnFailingToTransitionFromRollbackToSecondaryDuringTearDownPhase,
     "Failed to transition into SECONDARY; expected to be in state ROLLBACK; found self in "
     "ROLLBACK") {
-    _coordinator->_failSetFollowerModeOnThisMemberState = MemberState::RS_SECONDARY;
+    _coordinator->failSettingFollowerMode(MemberState::RS_SECONDARY, ErrorCodes::IllegalOperation);
 
     ASSERT_OK(_rollback->startup());
 
@@ -458,7 +458,7 @@ TEST_F(RollbackImplTest, RollbackResetsOnCompletionCallbackFunctionPointerUponCo
 
     // Completion callback will be invoked on errors after startup() returns successfully.
     // We cause the the rollback process to error out early by failing to transition to rollback.
-    _coordinator->_failSetFollowerModeOnThisMemberState = MemberState::RS_ROLLBACK;
+    _coordinator->failSettingFollowerMode(MemberState::RS_ROLLBACK, ErrorCodes::NotSecondary);
 
     ASSERT_OK(_rollback->startup());
 

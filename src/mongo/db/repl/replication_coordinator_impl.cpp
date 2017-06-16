@@ -812,10 +812,12 @@ Status ReplicationCoordinatorImpl::setFollowerMode(const MemberState& newState) 
         // We were a candidate, which means _topCoord believed us to be in state RS_SECONDARY, and
         // we know that newState != RS_SECONDARY because we would have returned early, above if
         // the old and new state were equal. So, try again after the election is over to
-        // finish setting the follower mode.
-        lk.unlock();
-        _replExecutor->waitForEvent(electionFinishedEvent);
-        return setFollowerMode(newState);
+        // finish setting the follower mode.  We cannot wait for the election to finish here as we
+        // may be holding a global X lock, so we return a bad status and rely on the caller to
+        // retry.
+        return Status(ErrorCodes::ElectionInProgress,
+                      str::stream() << "Cannot set follower mode to " << newState.toString()
+                                    << " because we are in the middle of running an election");
     }
 
     _topCoord->setFollowerMode(newState.s);

@@ -606,7 +606,7 @@ TEST_F(ReplCoordTest, ElectionFailsWhenInsufficientVotesAreReceivedDuringRequest
                   countLogLinesContaining("not becoming primary, we received insufficient votes"));
 }
 
-TEST_F(ReplCoordTest, ElectionsAbortWhenNodeTransitionsToRollbackState) {
+TEST_F(ReplCoordTest, TransitionToRollbackFailsWhenElectionInProgress) {
     BSONObj configObj = BSON("_id"
                              << "mySet"
                              << "version"
@@ -632,11 +632,13 @@ TEST_F(ReplCoordTest, ElectionsAbortWhenNodeTransitionsToRollbackState) {
     simulateEnoughHeartbeatsForAllNodesUp();
     simulateSuccessfulDryRun();
 
-    ASSERT_OK(getReplCoord()->setFollowerMode(MemberState::RS_ROLLBACK));
+    ASSERT_EQUALS(ErrorCodes::ElectionInProgress,
+                  getReplCoord()->setFollowerMode(MemberState::RS_ROLLBACK));
+
+    ASSERT_FALSE(getReplCoord()->getMemberState().rollback());
 
     // We do not need to respond to any pending network operations because setFollowerMode() will
-    // cancel the vote requester.
-    ASSERT_TRUE(getReplCoord()->getMemberState().rollback());
+    // cancel the freshness checker and election command runner.
 }
 
 TEST_F(ReplCoordTest, ElectionFailsWhenVoteRequestResponseContainsANewerTerm) {

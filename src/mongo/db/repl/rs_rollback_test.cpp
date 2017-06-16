@@ -1259,7 +1259,7 @@ TEST_F(RSRollbackTest, RollbackReturnsImmediatelyOnFailureToTransitionToRollback
     // Inject ReplicationCoordinator::setFollowerMode() error. We set the current member state
     // because it will be logged by rollback() on failing to transition to ROLLBACK.
     ASSERT_OK(_coordinator->setFollowerMode(MemberState::RS_SECONDARY));
-    _coordinator->_failSetFollowerModeOnThisMemberState = MemberState::RS_ROLLBACK;
+    _coordinator->failSettingFollowerMode(MemberState::RS_ROLLBACK, ErrorCodes::NotSecondary);
 
     startCapturingLogMessages();
     rollback(_opCtx.get(),
@@ -1345,7 +1345,7 @@ DEATH_TEST_F(
     RollbackSourceMock rollbackSource(
         std::unique_ptr<OplogInterface>(new OplogInterfaceMock({commonOperation})));
 
-    _coordinator->_failSetFollowerModeOnThisMemberState = MemberState::RS_RECOVERING;
+    _coordinator->failSettingFollowerMode(MemberState::RS_RECOVERING, ErrorCodes::IllegalOperation);
 
     createOplog(_opCtx.get());
     rollback(_opCtx.get(), localOplog, rollbackSource, {}, _coordinator, _replicationProcess.get());

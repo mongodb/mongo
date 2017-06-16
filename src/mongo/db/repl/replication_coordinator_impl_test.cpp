@@ -2443,7 +2443,8 @@ TEST_F(ReplCoordTest, DoNotAllowSettingMaintenanceModeWhileConductingAnElection)
     // This cancels the actual election.
     // We do not need to respond to any pending network operations because setFollowerMode() will
     // cancel the vote requester.
-    ASSERT_OK(getReplCoord()->setFollowerMode(MemberState::RS_ROLLBACK));
+    ASSERT_EQUALS(ErrorCodes::ElectionInProgress,
+                  getReplCoord()->setFollowerMode(MemberState::RS_ROLLBACK));
 }
 
 TEST_F(ReplCoordTest,

@@ -329,7 +329,7 @@ TEST_F(ReplCoordElectTest, VotesWithStringValuesAreNotCountedAsYeas) {
                   countLogLinesContaining("wrong type for vote argument in replSetElect command"));
 }
 
-TEST_F(ReplCoordElectTest, ElectionsAbortWhenNodeTransitionsToRollbackState) {
+TEST_F(ReplCoordElectTest, TransitionToRollbackFailsWhenElectionInProgress) {
     BSONObj configObj = BSON("_id"
                              << "mySet"
                              << "version"
@@ -352,11 +352,13 @@ TEST_F(ReplCoordElectTest, ElectionsAbortWhenNodeTransitionsToRollbackState) {
     simulateEnoughHeartbeatsForAllNodesUp();
     simulateFreshEnoughForElectability();
 
-    ASSERT_OK(getReplCoord()->setFollowerMode(MemberState::RS_ROLLBACK));
+    ASSERT_EQUALS(ErrorCodes::ElectionInProgress,
+                  getReplCoord()->setFollowerMode(MemberState::RS_ROLLBACK));
+
+    ASSERT_FALSE(getReplCoord()->getMemberState().rollback());
 
     // We do not need to respond to any pending network operations because setFollowerMode() will
     // cancel the freshness checker and election command runner.
-    ASSERT_TRUE(getReplCoord()->getMemberState().rollback());
 }
 
 TEST_F(ReplCoordElectTest, NodeWillNotStandForElectionDuringHeartbeatReconfig) {

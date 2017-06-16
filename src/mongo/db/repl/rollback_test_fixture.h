@@ -114,8 +114,17 @@ public:
      */
     Status setFollowerMode(const MemberState& newState) override;
 
+    /**
+     * Set this to make transitioning to the given follower mode fail with the given error code.
+     */
+    void failSettingFollowerMode(const MemberState& transitionToFail,
+                                 ErrorCodes::Error codeToFailWith);
+
+private:
     // Override this to make setFollowerMode() fail when called with this state.
     MemberState _failSetFollowerModeOnThisMemberState = MemberState::RS_UNKNOWN;
+
+    ErrorCodes::Error _failSetFollowerModeWithThisCode = ErrorCodes::InternalError;
 };
 
 }  // namespace repl

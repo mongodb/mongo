@@ -111,10 +111,16 @@ RollbackTest::ReplicationCoordinatorRollbackMock::ReplicationCoordinatorRollback
 void RollbackTest::ReplicationCoordinatorRollbackMock::resetLastOpTimesFromOplog(
     OperationContext* opCtx) {}
 
+void RollbackTest::ReplicationCoordinatorRollbackMock::failSettingFollowerMode(
+    const MemberState& transitionToFail, ErrorCodes::Error codeToFailWith) {
+    _failSetFollowerModeOnThisMemberState = transitionToFail;
+    _failSetFollowerModeWithThisCode = codeToFailWith;
+}
+
 Status RollbackTest::ReplicationCoordinatorRollbackMock::setFollowerMode(
     const MemberState& newState) {
     if (newState == _failSetFollowerModeOnThisMemberState) {
-        return Status(ErrorCodes::IllegalOperation,
+        return Status(_failSetFollowerModeWithThisCode,
                       str::stream()
                           << "ReplicationCoordinatorRollbackMock set to fail on setting state to "
                           << _failSetFollowerModeOnThisMemberState.toString());
