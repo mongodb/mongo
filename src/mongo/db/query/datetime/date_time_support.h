@@ -114,6 +114,11 @@ public:
     std::string formatDate(StringData format, Date_t) const;
 
     /**
+     * Returns the raw timelib_tzinfo pointer that timelib functions need
+     */
+    timelib_tzinfo *getTZInfo();
+
+    /**
      * Like formatDate, except outputs to an output stream like a std::ostream or a StringBuilder.
      */
     template <typename OutputStream>
@@ -259,6 +264,11 @@ public:
                     std::unique_ptr<TimeZoneDatabase> timeZoneDatabase);
 
     /**
+     * Use the timezone database to create a Date_t from a string
+     */
+    Date_t fromString(StringData dateString) const;
+
+    /**
      * Returns a TimeZone object representing the UTC time zone.
      */
     static TimeZone utcZone();
@@ -273,6 +283,11 @@ public:
      * Creates a TimeZoneDatabase object using time zone rules given by 'timeZoneDatabase'.
      */
     TimeZoneDatabase(std::unique_ptr<_timelib_tzdb, TimeZoneDBDeleter> timeZoneDatabase);
+
+    /**
+     * Wrapper to use with timelib_strtotime to fetch a timelib_tzinfo structure
+     */
+    timelib_tzinfo *getTZInfoWrapper(char *tz_id, const _timelib_tzdb *db, int *error);
 
 private:
     /**
