@@ -70,7 +70,7 @@ int main(int argc, char** argv, char** envp) {
     setupSynchronousSignalHandlers();
     runGlobalInitializersOrDie(argc, argv, envp);
 
-    return unittest::Suite::run(std::vector<std::string>(), "", 1);
+    quickExit(unittest::Suite::run(std::vector<std::string>(), "", 1));
 }
 
 namespace moe = mongo::optionenvironment;
