@@ -425,9 +425,9 @@ int WiredTigerUtil::verifyTable(OperationContext* opCtx,
     ErrorAccumulator eventHandler(errors);
 
     // Try to close as much as possible to avoid EBUSY errors.
-    WiredTigerRecoveryUnit::get(opCtx)->getSession(opCtx)->closeAllCursors();
+    WiredTigerRecoveryUnit::get(opCtx)->getSession(opCtx)->closeAllCursors(uri);
     WiredTigerSessionCache* sessionCache = WiredTigerRecoveryUnit::get(opCtx)->getSessionCache();
-    sessionCache->closeAllCursors();
+    sessionCache->closeAllCursors(uri);
 
     // Open a new session with custom error handlers.
     WT_CONNECTION* conn = WiredTigerRecoveryUnit::get(opCtx)->getSessionCache()->conn();
