@@ -88,7 +88,7 @@ void DatabaseTest::setUp() {
 
     // Ensure that we are primary.
     auto replCoord = repl::ReplicationCoordinator::get(_opCtx.get());
-    ASSERT_TRUE(replCoord->setFollowerMode(repl::MemberState::RS_PRIMARY));
+    ASSERT_OK(replCoord->setFollowerMode(repl::MemberState::RS_PRIMARY));
 
     // Set up OpObserver so that Database will append actual oplog entries to the oplog using
     // repl::logOp(). repl::logOp() will also store the oplog entry's optime in ReplClientInfo.

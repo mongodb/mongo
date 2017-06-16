@@ -87,7 +87,8 @@ void ShardLocalTest::setUp() {
     const repl::ReplSettings replSettings = {};
     repl::setGlobalReplicationCoordinator(
         new repl::ReplicationCoordinatorMock(_opCtx->getServiceContext(), replSettings));
-    repl::getGlobalReplicationCoordinator()->setFollowerMode(repl::MemberState::RS_PRIMARY);
+    ASSERT_OK(
+        repl::getGlobalReplicationCoordinator()->setFollowerMode(repl::MemberState::RS_PRIMARY));
 }
 
 void ShardLocalTest::tearDown() {

@@ -175,7 +175,7 @@ public:
 
     virtual int getMyId() const override;
 
-    virtual bool setFollowerMode(const MemberState& newState) override;
+    virtual Status setFollowerMode(const MemberState& newState) override;
 
     virtual ApplierState getApplierState() override;
 

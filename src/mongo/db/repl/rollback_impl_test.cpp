@@ -398,7 +398,7 @@ DEATH_TEST_F(RollbackImplTest,
 DEATH_TEST_F(
     RollbackImplTest,
     RollbackTriggersFatalAssertionOnFailingToTransitionFromRollbackToSecondaryDuringTearDownPhase,
-    "Failed to transition into SECONDARY; expected to be in state ROLLBACK but found self in "
+    "Failed to transition into SECONDARY; expected to be in state ROLLBACK; found self in "
     "ROLLBACK") {
     _coordinator->_failSetFollowerModeOnThisMemberState = MemberState::RS_SECONDARY;
 

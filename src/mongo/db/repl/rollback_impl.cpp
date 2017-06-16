@@ -135,12 +135,14 @@ void RollbackImpl::_transitionToRollbackCallback(
     {
         Lock::GlobalWrite globalWrite(opCtx.get());
 
-        if (!_replicationCoordinator->setFollowerMode(MemberState::RS_ROLLBACK)) {
+        status = _replicationCoordinator->setFollowerMode(MemberState::RS_ROLLBACK);
+        if (!status.isOK()) {
             std::string msg = str::stream()
                 << "Cannot transition from " << _replicationCoordinator->getMemberState().toString()
-                << " to " << MemberState(MemberState::RS_ROLLBACK).toString();
+                << " to " << MemberState(MemberState::RS_ROLLBACK).toString()
+                << causedBy(status.reason());
             log() << msg;
-            status = Status(ErrorCodes::NotSecondary, msg);
+            status = Status(status.code(), msg);
         }
     }
     if (!status.isOK()) {
@@ -192,10 +194,12 @@ void RollbackImpl::_transitionFromRollbackToSecondary(OperationContext* opCtx) {
         return;
     }
 
-    if (!_replicationCoordinator->setFollowerMode(MemberState::RS_SECONDARY)) {
+    auto status = _replicationCoordinator->setFollowerMode(MemberState::RS_SECONDARY);
+    if (!status.isOK()) {
         severe() << "Failed to transition into " << MemberState(MemberState::RS_SECONDARY)
                  << "; expected to be in state " << MemberState(MemberState::RS_ROLLBACK)
-                 << " but found self in " << _replicationCoordinator->getMemberState();
+                 << "; found self in " << _replicationCoordinator->getMemberState()
+                 << causedBy(status);
         fassertFailedNoTrace(40408);
     }
 }

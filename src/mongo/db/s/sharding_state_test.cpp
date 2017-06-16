@@ -409,7 +409,7 @@ TEST_F(ShardingStateTest,
 TEST_F(ShardingStateTest,
        InitializeShardingAwarenessIfNeededNotReadOnlyAndShardServerAndInvalidShardIdentity) {
 
-    replicationCoordinator()->setFollowerMode(repl::MemberState::RS_PRIMARY);
+    ASSERT_OK(replicationCoordinator()->setFollowerMode(repl::MemberState::RS_PRIMARY));
 
     // Insert the shardIdentity doc to disk before setting the clusterRole, since if the clusterRole
     // is ShardServer, the OpObserver for inserts will prevent the insert from occurring, since the
@@ -435,7 +435,7 @@ TEST_F(ShardingStateTest,
 TEST_F(ShardingStateTest,
        InitializeShardingAwarenessIfNeededNotReadOnlyAndShardServerAndValidShardIdentity) {
 
-    replicationCoordinator()->setFollowerMode(repl::MemberState::RS_PRIMARY);
+    ASSERT_OK(replicationCoordinator()->setFollowerMode(repl::MemberState::RS_PRIMARY));
 
     // Insert the shardIdentity doc to disk before setting the clusterRole, since if the clusterRole
     // is ShardServer, the OpObserver for inserts will trigger sharding initialization from the

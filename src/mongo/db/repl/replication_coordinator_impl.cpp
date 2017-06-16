@@ -797,14 +797,15 @@ void ReplicationCoordinatorImpl::clearSyncSourceBlacklist() {
     _topCoord->clearSyncSourceBlacklist();
 }
 
-bool ReplicationCoordinatorImpl::setFollowerMode(const MemberState& newState) {
+Status ReplicationCoordinatorImpl::setFollowerMode(const MemberState& newState) {
     stdx::unique_lock<stdx::mutex> lk(_mutex);
 
     if (newState == _topCoord->getMemberState()) {
-        return true;
+        return Status::OK();
     }
     if (_topCoord->getRole() == TopologyCoordinator::Role::leader) {
-        return false;
+        return Status(ErrorCodes::NotSecondary,
+                      "Cannot set follower mode when node is currently the leader");
     }
 
     if (auto electionFinishedEvent = _cancelElectionIfNeeded_inlock()) {
@@ -823,7 +824,7 @@ bool ReplicationCoordinatorImpl::setFollowerMode(const MemberState& newState) {
     lk.unlock();
     _performPostMemberStateUpdateAction(action);
 
-    return true;
+    return Status::OK();
 }
 
 ReplicationCoordinator::ApplierState ReplicationCoordinatorImpl::getApplierState() {

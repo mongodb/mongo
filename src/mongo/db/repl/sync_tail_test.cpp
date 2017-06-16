@@ -1199,7 +1199,8 @@ CollectionState IdempotencyTest::validate() {
 }
 
 TEST_F(IdempotencyTest, Geo2dsphereIndexFailedOnUpdate) {
-    ReplicationCoordinator::get(_opCtx.get())->setFollowerMode(MemberState::RS_RECOVERING);
+    ASSERT_OK(
+        ReplicationCoordinator::get(_opCtx.get())->setFollowerMode(MemberState::RS_RECOVERING));
     ASSERT_OK(runOp(createCollection()));
     auto insertOp = insert(fromjson("{_id: 1, loc: 'hi'}"));
     auto updateOp = update(1, fromjson("{$set: {loc: [1, 2]}}"));
@@ -1212,13 +1213,14 @@ TEST_F(IdempotencyTest, Geo2dsphereIndexFailedOnUpdate) {
     ASSERT_OK(runOps(ops));
     ASSERT_EQUALS(state, validate());
 
-    ReplicationCoordinator::get(_opCtx.get())->setFollowerMode(MemberState::RS_PRIMARY);
+    ASSERT_OK(ReplicationCoordinator::get(_opCtx.get())->setFollowerMode(MemberState::RS_PRIMARY));
     auto status = runOps(ops);
     ASSERT_EQ(status.code(), 16755);
 }
 
 TEST_F(IdempotencyTest, Geo2dsphereIndexFailedOnIndexing) {
-    ReplicationCoordinator::get(_opCtx.get())->setFollowerMode(MemberState::RS_RECOVERING);
+    ASSERT_OK(
+        ReplicationCoordinator::get(_opCtx.get())->setFollowerMode(MemberState::RS_RECOVERING));
     ASSERT_OK(runOp(createCollection()));
     auto indexOp = buildIndex(fromjson("{loc: '2dsphere'}"), BSON("2dsphereIndexVersion" << 3));
     auto dropIndexOp = dropIndex("loc_index");
@@ -1231,13 +1233,14 @@ TEST_F(IdempotencyTest, Geo2dsphereIndexFailedOnIndexing) {
     ASSERT_OK(runOps(ops));
     ASSERT_EQUALS(state, validate());
 
-    ReplicationCoordinator::get(_opCtx.get())->setFollowerMode(MemberState::RS_PRIMARY);
+    ASSERT_OK(ReplicationCoordinator::get(_opCtx.get())->setFollowerMode(MemberState::RS_PRIMARY));
     auto status = runOps(ops);
     ASSERT_EQ(status.code(), 16755);
 }
 
 TEST_F(IdempotencyTest, Geo2dIndex) {
-    ReplicationCoordinator::get(_opCtx.get())->setFollowerMode(MemberState::RS_RECOVERING);
+    ASSERT_OK(
+        ReplicationCoordinator::get(_opCtx.get())->setFollowerMode(MemberState::RS_RECOVERING));
     ASSERT_OK(runOp(createCollection()));
     auto insertOp = insert(fromjson("{_id: 1, loc: [1]}"));
     auto updateOp = update(1, fromjson("{$set: {loc: [1, 2]}}"));
@@ -1250,13 +1253,14 @@ TEST_F(IdempotencyTest, Geo2dIndex) {
     ASSERT_OK(runOps(ops));
     ASSERT_EQUALS(state, validate());
 
-    ReplicationCoordinator::get(_opCtx.get())->setFollowerMode(MemberState::RS_PRIMARY);
+    ASSERT_OK(ReplicationCoordinator::get(_opCtx.get())->setFollowerMode(MemberState::RS_PRIMARY));
     auto status = runOps(ops);
     ASSERT_EQ(status.code(), 13068);
 }
 
 TEST_F(IdempotencyTest, UniqueKeyIndex) {
-    ReplicationCoordinator::get(_opCtx.get())->setFollowerMode(MemberState::RS_RECOVERING);
+    ASSERT_OK(
+        ReplicationCoordinator::get(_opCtx.get())->setFollowerMode(MemberState::RS_RECOVERING));
     ASSERT_OK(runOp(createCollection()));
     auto insertOp = insert(fromjson("{_id: 1, x: 5}"));
     auto updateOp = update(1, fromjson("{$set: {x: 6}}"));
@@ -1270,13 +1274,14 @@ TEST_F(IdempotencyTest, UniqueKeyIndex) {
     ASSERT_OK(runOps(ops));
     ASSERT_EQUALS(state, validate());
 
-    ReplicationCoordinator::get(_opCtx.get())->setFollowerMode(MemberState::RS_PRIMARY);
+    ASSERT_OK(ReplicationCoordinator::get(_opCtx.get())->setFollowerMode(MemberState::RS_PRIMARY));
     auto status = runOps(ops);
     ASSERT_EQ(status.code(), ErrorCodes::DuplicateKey);
 }
 
 TEST_F(IdempotencyTest, ParallelArrayError) {
-    ReplicationCoordinator::get(_opCtx.get())->setFollowerMode(MemberState::RS_RECOVERING);
+    ASSERT_OK(
+        ReplicationCoordinator::get(_opCtx.get())->setFollowerMode(MemberState::RS_RECOVERING));
 
     ASSERT_OK(runOp(createCollection()));
     ASSERT_OK(runOp(insert(fromjson("{_id: 1}"))));
@@ -1293,13 +1298,14 @@ TEST_F(IdempotencyTest, ParallelArrayError) {
     ASSERT_OK(runOps(ops));
     ASSERT_EQUALS(state, validate());
 
-    ReplicationCoordinator::get(_opCtx.get())->setFollowerMode(MemberState::RS_PRIMARY);
+    ASSERT_OK(ReplicationCoordinator::get(_opCtx.get())->setFollowerMode(MemberState::RS_PRIMARY));
     auto status = runOps(ops);
     ASSERT_EQ(status.code(), ErrorCodes::CannotIndexParallelArrays);
 }
 
 TEST_F(IdempotencyTest, IndexKeyTooLongError) {
-    ReplicationCoordinator::get(_opCtx.get())->setFollowerMode(MemberState::RS_RECOVERING);
+    ASSERT_OK(
+        ReplicationCoordinator::get(_opCtx.get())->setFollowerMode(MemberState::RS_RECOVERING));
 
     ASSERT_OK(runOp(createCollection()));
     ASSERT_OK(runOp(insert(fromjson("{_id: 1}"))));
@@ -1319,13 +1325,14 @@ TEST_F(IdempotencyTest, IndexKeyTooLongError) {
     ASSERT_OK(runOps(ops));
     ASSERT_EQUALS(state, validate());
 
-    ReplicationCoordinator::get(_opCtx.get())->setFollowerMode(MemberState::RS_PRIMARY);
+    ASSERT_OK(ReplicationCoordinator::get(_opCtx.get())->setFollowerMode(MemberState::RS_PRIMARY));
     auto status = runOps(ops);
     ASSERT_EQ(status.code(), ErrorCodes::KeyTooLong);
 }
 
 TEST_F(IdempotencyTest, IndexWithDifferentOptions) {
-    ReplicationCoordinator::get(_opCtx.get())->setFollowerMode(MemberState::RS_RECOVERING);
+    ASSERT_OK(
+        ReplicationCoordinator::get(_opCtx.get())->setFollowerMode(MemberState::RS_RECOVERING));
 
     ASSERT_OK(runOp(createCollection()));
     ASSERT_OK(runOp(insert(fromjson("{_id: 1, x: 'hi'}"))));
@@ -1341,13 +1348,14 @@ TEST_F(IdempotencyTest, IndexWithDifferentOptions) {
     ASSERT_OK(runOps(ops));
     ASSERT_EQUALS(state, validate());
 
-    ReplicationCoordinator::get(_opCtx.get())->setFollowerMode(MemberState::RS_PRIMARY);
+    ASSERT_OK(ReplicationCoordinator::get(_opCtx.get())->setFollowerMode(MemberState::RS_PRIMARY));
     auto status = runOps(ops);
     ASSERT_EQ(status.code(), ErrorCodes::IndexOptionsConflict);
 }
 
 TEST_F(IdempotencyTest, TextIndexDocumentHasNonStringLanguageField) {
-    ReplicationCoordinator::get(_opCtx.get())->setFollowerMode(MemberState::RS_RECOVERING);
+    ASSERT_OK(
+        ReplicationCoordinator::get(_opCtx.get())->setFollowerMode(MemberState::RS_RECOVERING));
 
     ASSERT_OK(runOp(createCollection()));
     auto insertOp = insert(fromjson("{_id: 1, x: 'words to index', language: 1}"));
@@ -1361,13 +1369,14 @@ TEST_F(IdempotencyTest, TextIndexDocumentHasNonStringLanguageField) {
     ASSERT_OK(runOps(ops));
     ASSERT_EQUALS(state, validate());
 
-    ReplicationCoordinator::get(_opCtx.get())->setFollowerMode(MemberState::RS_PRIMARY);
+    ASSERT_OK(ReplicationCoordinator::get(_opCtx.get())->setFollowerMode(MemberState::RS_PRIMARY));
     auto status = runOps(ops);
     ASSERT_EQ(status.code(), 17261);
 }
 
 TEST_F(IdempotencyTest, InsertDocumentWithNonStringLanguageFieldWhenTextIndexExists) {
-    ReplicationCoordinator::get(_opCtx.get())->setFollowerMode(MemberState::RS_RECOVERING);
+    ASSERT_OK(
+        ReplicationCoordinator::get(_opCtx.get())->setFollowerMode(MemberState::RS_RECOVERING));
 
     ASSERT_OK(runOp(createCollection()));
     auto indexOp = buildIndex(fromjson("{x: 'text'}"), BSONObj());
@@ -1381,13 +1390,14 @@ TEST_F(IdempotencyTest, InsertDocumentWithNonStringLanguageFieldWhenTextIndexExi
     ASSERT_OK(runOps(ops));
     ASSERT_EQUALS(state, validate());
 
-    ReplicationCoordinator::get(_opCtx.get())->setFollowerMode(MemberState::RS_PRIMARY);
+    ASSERT_OK(ReplicationCoordinator::get(_opCtx.get())->setFollowerMode(MemberState::RS_PRIMARY));
     auto status = runOps(ops);
     ASSERT_EQ(status.code(), 17261);
 }
 
 TEST_F(IdempotencyTest, TextIndexDocumentHasNonStringLanguageOverrideField) {
-    ReplicationCoordinator::get(_opCtx.get())->setFollowerMode(MemberState::RS_RECOVERING);
+    ASSERT_OK(
+        ReplicationCoordinator::get(_opCtx.get())->setFollowerMode(MemberState::RS_RECOVERING));
 
     ASSERT_OK(runOp(createCollection()));
     auto insertOp = insert(fromjson("{_id: 1, x: 'words to index', y: 1}"));
@@ -1401,13 +1411,14 @@ TEST_F(IdempotencyTest, TextIndexDocumentHasNonStringLanguageOverrideField) {
     ASSERT_OK(runOps(ops));
     ASSERT_EQUALS(state, validate());
 
-    ReplicationCoordinator::get(_opCtx.get())->setFollowerMode(MemberState::RS_PRIMARY);
+    ASSERT_OK(ReplicationCoordinator::get(_opCtx.get())->setFollowerMode(MemberState::RS_PRIMARY));
     auto status = runOps(ops);
     ASSERT_EQ(status.code(), 17261);
 }
 
 TEST_F(IdempotencyTest, InsertDocumentWithNonStringLanguageOverrideFieldWhenTextIndexExists) {
-    ReplicationCoordinator::get(_opCtx.get())->setFollowerMode(MemberState::RS_RECOVERING);
+    ASSERT_OK(
+        ReplicationCoordinator::get(_opCtx.get())->setFollowerMode(MemberState::RS_RECOVERING));
 
     ASSERT_OK(runOp(createCollection()));
     auto indexOp = buildIndex(fromjson("{x: 'text'}"), fromjson("{language_override: 'y'}"));
@@ -1421,13 +1432,14 @@ TEST_F(IdempotencyTest, InsertDocumentWithNonStringLanguageOverrideFieldWhenText
     ASSERT_OK(runOps(ops));
     ASSERT_EQUALS(state, validate());
 
-    ReplicationCoordinator::get(_opCtx.get())->setFollowerMode(MemberState::RS_PRIMARY);
+    ASSERT_OK(ReplicationCoordinator::get(_opCtx.get())->setFollowerMode(MemberState::RS_PRIMARY));
     auto status = runOps(ops);
     ASSERT_EQ(status.code(), 17261);
 }
 
 TEST_F(IdempotencyTest, TextIndexDocumentHasUnknownLanguage) {
-    ReplicationCoordinator::get(_opCtx.get())->setFollowerMode(MemberState::RS_RECOVERING);
+    ASSERT_OK(
+        ReplicationCoordinator::get(_opCtx.get())->setFollowerMode(MemberState::RS_RECOVERING));
 
     ASSERT_OK(runOp(createCollection()));
     auto insertOp = insert(fromjson("{_id: 1, x: 'words to index', language: 'bad'}"));
@@ -1441,13 +1453,14 @@ TEST_F(IdempotencyTest, TextIndexDocumentHasUnknownLanguage) {
     ASSERT_OK(runOps(ops));
     ASSERT_EQUALS(state, validate());
 
-    ReplicationCoordinator::get(_opCtx.get())->setFollowerMode(MemberState::RS_PRIMARY);
+    ASSERT_OK(ReplicationCoordinator::get(_opCtx.get())->setFollowerMode(MemberState::RS_PRIMARY));
     auto status = runOps(ops);
     ASSERT_EQ(status.code(), 17262);
 }
 
 TEST_F(IdempotencyTest, CreateCollectionWithValidation) {
-    ReplicationCoordinator::get(_opCtx.get())->setFollowerMode(MemberState::RS_RECOVERING);
+    ASSERT_OK(
+        ReplicationCoordinator::get(_opCtx.get())->setFollowerMode(MemberState::RS_RECOVERING));
 
     auto runOpsAndValidate = [this]() {
         auto options1 = fromjson("{'validator' : {'phone' : {'$type' : 'string' } } }");
@@ -1470,7 +1483,7 @@ TEST_F(IdempotencyTest, CreateCollectionWithValidation) {
 }
 
 TEST_F(IdempotencyTest, CreateCollectionWithCollation) {
-    getGlobalReplicationCoordinator()->setFollowerMode(MemberState::RS_RECOVERING);
+    ASSERT_OK(getGlobalReplicationCoordinator()->setFollowerMode(MemberState::RS_RECOVERING));
     ASSERT_OK(runOp(createCollection()));
 
     auto runOpsAndValidate = [this]() {
@@ -1514,7 +1527,7 @@ TEST_F(IdempotencyTest, CreateCollectionWithCollation) {
 }
 
 TEST_F(IdempotencyTest, CreateCollectionWithIdIndex) {
-    getGlobalReplicationCoordinator()->setFollowerMode(MemberState::RS_RECOVERING);
+    ASSERT_OK(getGlobalReplicationCoordinator()->setFollowerMode(MemberState::RS_RECOVERING));
 
     auto options1 = BSON("idIndex" << BSON("key" << fromjson("{_id: 1}") << "name"
                                                  << "_id_"
@@ -1544,7 +1557,7 @@ TEST_F(IdempotencyTest, CreateCollectionWithIdIndex) {
 }
 
 TEST_F(IdempotencyTest, CreateCollectionWithView) {
-    getGlobalReplicationCoordinator()->setFollowerMode(MemberState::RS_RECOVERING);
+    ASSERT_OK(getGlobalReplicationCoordinator()->setFollowerMode(MemberState::RS_RECOVERING));
 
     // Create data collection
     ASSERT_OK(runOp(createCollection()));
@@ -1567,7 +1580,7 @@ TEST_F(IdempotencyTest, CreateCollectionWithView) {
 }
 
 TEST_F(IdempotencyTest, CollModNamespaceNotFound) {
-    getGlobalReplicationCoordinator()->setFollowerMode(MemberState::RS_RECOVERING);
+    ASSERT_OK(getGlobalReplicationCoordinator()->setFollowerMode(MemberState::RS_RECOVERING));
 
     ASSERT_OK(runOp(createCollection()));
     ASSERT_OK(runOp(buildIndex(BSON("createdAt" << 1), BSON("expireAfterSeconds" << 3600))));
@@ -1586,7 +1599,7 @@ TEST_F(IdempotencyTest, CollModNamespaceNotFound) {
 }
 
 TEST_F(IdempotencyTest, CollModIndexNotFound) {
-    getGlobalReplicationCoordinator()->setFollowerMode(MemberState::RS_RECOVERING);
+    ASSERT_OK(getGlobalReplicationCoordinator()->setFollowerMode(MemberState::RS_RECOVERING));
 
     ASSERT_OK(runOp(createCollection()));
     ASSERT_OK(runOp(buildIndex(BSON("createdAt" << 1), BSON("expireAfterSeconds" << 3600))));
@@ -1605,7 +1618,8 @@ TEST_F(IdempotencyTest, CollModIndexNotFound) {
 }
 
 TEST_F(IdempotencyTest, ResyncOnRenameCollection) {
-    ReplicationCoordinator::get(_opCtx.get())->setFollowerMode(MemberState::RS_RECOVERING);
+    ASSERT_OK(
+        ReplicationCoordinator::get(_opCtx.get())->setFollowerMode(MemberState::RS_RECOVERING));
 
     auto cmd = BSON("renameCollection" << nss.ns() << "to"
                                        << "test.bar"

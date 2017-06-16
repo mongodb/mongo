@@ -138,7 +138,7 @@ public:
 
     virtual int getMyId() const;
 
-    virtual bool setFollowerMode(const MemberState& newState);
+    virtual Status setFollowerMode(const MemberState& newState);
 
     virtual ApplierState getApplierState();
 

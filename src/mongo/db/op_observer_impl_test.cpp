@@ -59,7 +59,7 @@ private:
 
         // Ensure that we are primary.
         auto replCoord = repl::ReplicationCoordinator::get(opCtx.get());
-        ASSERT_TRUE(replCoord->setFollowerMode(repl::MemberState::RS_PRIMARY));
+        ASSERT_OK(replCoord->setFollowerMode(repl::MemberState::RS_PRIMARY));
     }
 
 protected:

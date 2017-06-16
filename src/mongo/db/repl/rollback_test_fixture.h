@@ -107,11 +107,12 @@ public:
     void resetLastOpTimesFromOplog(OperationContext* opCtx) override;
 
     /**
-     * Returns false (does not forward call to ReplicationCoordinatorMock::setFollowerMode())
+     * Returns IllegalOperation (does not forward call to
+     * ReplicationCoordinatorMock::setFollowerMode())
      * if new state requested is '_failSetFollowerModeOnThisMemberState'.
      * Otherwise, calls ReplicationCoordinatorMock::setFollowerMode().
      */
-    bool setFollowerMode(const MemberState& newState) override;
+    Status setFollowerMode(const MemberState& newState) override;
 
     // Override this to make setFollowerMode() fail when called with this state.
     MemberState _failSetFollowerModeOnThisMemberState = MemberState::RS_UNKNOWN;

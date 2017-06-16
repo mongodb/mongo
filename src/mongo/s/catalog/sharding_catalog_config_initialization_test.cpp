@@ -214,9 +214,10 @@ TEST_F(ConfigInitializationTest, ReRunsIfDocRolledBackThenReElected) {
     // Now remove the version document and re-run initializeConfigDatabaseIfNeeded().
     {
         // Mirror what happens if the config.version document is rolled back.
-        ON_BLOCK_EXIT(
-            [&] { replicationCoordinator()->setFollowerMode(repl::MemberState::RS_PRIMARY); });
-        replicationCoordinator()->setFollowerMode(repl::MemberState::RS_ROLLBACK);
+        ON_BLOCK_EXIT([&] {
+            replicationCoordinator()->setFollowerMode(repl::MemberState::RS_PRIMARY).ignore();
+        });
+        ASSERT_OK(replicationCoordinator()->setFollowerMode(repl::MemberState::RS_ROLLBACK));
         auto opCtx = operationContext();
         repl::UnreplicatedWritesBlock uwb(opCtx);
         auto nss = NamespaceString(VersionType::ConfigNS);

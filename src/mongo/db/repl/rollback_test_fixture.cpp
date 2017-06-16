@@ -39,6 +39,7 @@
 #include "mongo/db/repl/replication_coordinator_mock.h"
 #include "mongo/db/repl/replication_process.h"
 #include "mongo/stdx/memory.h"
+#include "mongo/util/mongoutils/str.h"
 
 namespace mongo {
 namespace repl {
@@ -110,10 +111,13 @@ RollbackTest::ReplicationCoordinatorRollbackMock::ReplicationCoordinatorRollback
 void RollbackTest::ReplicationCoordinatorRollbackMock::resetLastOpTimesFromOplog(
     OperationContext* opCtx) {}
 
-bool RollbackTest::ReplicationCoordinatorRollbackMock::setFollowerMode(
+Status RollbackTest::ReplicationCoordinatorRollbackMock::setFollowerMode(
     const MemberState& newState) {
     if (newState == _failSetFollowerModeOnThisMemberState) {
-        return false;
+        return Status(ErrorCodes::IllegalOperation,
+                      str::stream()
+                          << "ReplicationCoordinatorRollbackMock set to fail on setting state to "
+                          << _failSetFollowerModeOnThisMemberState.toString());
     }
     return ReplicationCoordinatorMock::setFollowerMode(newState);
 }

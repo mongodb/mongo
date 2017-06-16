@@ -103,7 +103,10 @@ void RSDataSync::_run() {
                 continue;
             }
 
-            if (!_replCoord->setFollowerMode(MemberState::RS_RECOVERING)) {
+            auto status = _replCoord->setFollowerMode(MemberState::RS_RECOVERING);
+            if (!status.isOK()) {
+                LOG(2) << "Failed to transition to RECOVERING to start data replication"
+                       << causedBy(status);
                 continue;
             }
 

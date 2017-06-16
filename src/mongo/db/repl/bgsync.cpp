@@ -369,10 +369,10 @@ void BackgroundSync::_produce(OperationContext* opCtx) {
         if (!status.isOK()) {
             warning() << "Failed to transition into maintenance mode: " << status;
         }
-        bool worked = _replCoord->setFollowerMode(MemberState::RS_RECOVERING);
-        if (!worked) {
+        status = _replCoord->setFollowerMode(MemberState::RS_RECOVERING);
+        if (!status.isOK()) {
             warning() << "Failed to transition into " << MemberState(MemberState::RS_RECOVERING)
-                      << ". Current state: " << _replCoord->getMemberState();
+                      << ". Current state: " << _replCoord->getMemberState() << causedBy(status);
         }
         return;
     } else if (syncSourceResp.isOK() && !syncSourceResp.getSyncSource().empty()) {

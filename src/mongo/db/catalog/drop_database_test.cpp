@@ -140,7 +140,7 @@ void DropDatabaseTest::setUp() {
     repl::createOplog(_opCtx.get());
 
     // Ensure that we are primary.
-    ASSERT_TRUE(_replCoord->setFollowerMode(repl::MemberState::RS_PRIMARY));
+    ASSERT_OK(_replCoord->setFollowerMode(repl::MemberState::RS_PRIMARY));
 
     // Use OpObserverMock to track notifications for collection and database drops.
     auto opObserver = stdx::make_unique<OpObserverMock>();
@@ -198,7 +198,7 @@ TEST_F(DropDatabaseTest, DropDatabaseReturnsNamespaceNotFoundIfDatabaseDoesNotEx
 
 TEST_F(DropDatabaseTest, DropDatabaseReturnsNotMasterIfNotPrimary) {
     _createCollection(_opCtx.get(), _nss);
-    ASSERT_TRUE(_replCoord->setFollowerMode(repl::MemberState::RS_SECONDARY));
+    ASSERT_OK(_replCoord->setFollowerMode(repl::MemberState::RS_SECONDARY));
     ASSERT_TRUE(_opCtx->writesAreReplicated());
     ASSERT_FALSE(_replCoord->canAcceptWritesForDatabase(_opCtx.get(), _nss.db()));
     ASSERT_EQUALS(ErrorCodes::NotMaster, dropDatabase(_opCtx.get(), _nss.db().toString()));

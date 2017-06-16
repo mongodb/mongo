@@ -1258,7 +1258,7 @@ TEST_F(RSRollbackTest, RollbackReturnsImmediatelyOnFailureToTransitionToRollback
 
     // Inject ReplicationCoordinator::setFollowerMode() error. We set the current member state
     // because it will be logged by rollback() on failing to transition to ROLLBACK.
-    _coordinator->setFollowerMode(MemberState::RS_SECONDARY);
+    ASSERT_OK(_coordinator->setFollowerMode(MemberState::RS_SECONDARY));
     _coordinator->_failSetFollowerModeOnThisMemberState = MemberState::RS_ROLLBACK;
 
     startCapturingLogMessages();
@@ -1338,7 +1338,7 @@ DEATH_TEST_F(RSRollbackTest,
 DEATH_TEST_F(
     RSRollbackTest,
     RollbackTriggersFatalAssertionOnFailingToTransitionToRecoveringAfterSyncRollbackReturns,
-    "Failed to transition into RECOVERING; expected to be in state ROLLBACK but found self in "
+    "Failed to transition into RECOVERING; expected to be in state ROLLBACK; found self in "
     "ROLLBACK") {
     auto commonOperation = makeNoopOplogEntryAndRecordId(Seconds(1));
     OplogInterfaceMock localOplog({commonOperation});

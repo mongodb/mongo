@@ -129,7 +129,9 @@ int dbtestsMain(int argc, char** argv, char** envp) {
 
     repl::setGlobalReplicationCoordinator(
         new repl::ReplicationCoordinatorMock(service, replSettings));
-    repl::getGlobalReplicationCoordinator()->setFollowerMode(repl::MemberState::RS_PRIMARY);
+    repl::getGlobalReplicationCoordinator()
+        ->setFollowerMode(repl::MemberState::RS_PRIMARY)
+        .ignore();
     getGlobalAuthorizationManager()->setAuthEnabled(false);
     ScriptEngine::setup();
     StartupTest::runTests();

@@ -243,9 +243,9 @@ int ReplicationCoordinatorMock::getMyId() const {
     return 0;
 }
 
-bool ReplicationCoordinatorMock::setFollowerMode(const MemberState& newState) {
+Status ReplicationCoordinatorMock::setFollowerMode(const MemberState& newState) {
     _memberState = newState;
-    return true;
+    return Status::OK();
 }
 
 ReplicationCoordinator::ApplierState ReplicationCoordinatorMock::getApplierState() {

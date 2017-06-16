@@ -95,9 +95,18 @@ public:
                 return appendCommandStatus(
                     result, Status(ErrorCodes::NotYetInitialized, "no replication yet active"));
             }
-            if (memberState.primary() || !replCoord->setFollowerMode(MemberState::RS_STARTUP2)) {
+            if (memberState.primary()) {
                 return appendCommandStatus(
                     result, Status(ErrorCodes::NotSecondary, "primaries cannot resync"));
+            }
+            auto status = replCoord->setFollowerMode(MemberState::RS_STARTUP2);
+            if (!status.isOK()) {
+                return appendCommandStatus(
+                    result,
+                    Status(status.code(),
+                           str::stream()
+                               << "Failed to transition to STARTUP2 state to perform resync: "
+                               << status.reason()));
             }
             uassertStatusOKWithLocation(replCoord->resyncData(opCtx, waitForResync), "resync", 0);
             return true;

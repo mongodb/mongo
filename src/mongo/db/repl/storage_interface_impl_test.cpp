@@ -1960,7 +1960,7 @@ TEST_F(
 
     // deleteByFilter() checks the current member state indirectly through
     // ReplicationCoordinator::canAcceptWrites() if replicated writes are enabled.
-    ASSERT_TRUE(getReplicationCoordinatorMock()->setFollowerMode(MemberState::RS_ROLLBACK));
+    ASSERT_OK(getReplicationCoordinatorMock()->setFollowerMode(MemberState::RS_ROLLBACK));
 
     auto filter = BSON("x" << 0);
     ASSERT_EQUALS(ErrorCodes::PrimarySteppedDown, storage.deleteByFilter(opCtx, nss, filter));
