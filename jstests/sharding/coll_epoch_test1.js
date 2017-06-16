@@ -3,7 +3,7 @@
 (function() {
     'use strict';
 
-    var st = new ShardingTest({shards: 3, mongos: 3});
+    var st = new ShardingTest({shards: 3, mongos: 3, causallyConsistent: true});
 
     var config = st.s0.getDB("config");
     var admin = st.s0.getDB("admin");

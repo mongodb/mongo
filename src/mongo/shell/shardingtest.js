@@ -65,11 +65,16 @@
  *          Can be used to specify options that are common all mongos.
  *       enableBalancer {boolean} : if true, enable the balancer
  *       enableAutoSplit {boolean} : if true, enable autosplitting; else, default to the
- * enableBalancer setting
+ *          enableBalancer setting
  *       manualAddShard {boolean}: shards will not be added if true.
  *
  *       useBridge {boolean}: If true, then a mongobridge process is started for each node in the
  *          sharded cluster. Defaults to false.
+ *
+ *       causallyConsistent {boolean}: Specifies whether the connections to the replica set nodes
+ *          should be created with the 'causal consistency' flag enabled, which means they will
+ *          gossip the cluster time and add readConcern afterClusterTime where applicable.
+ *          Defaults to false.
  *
  *       bridgeOptions {Object}: Options to apply to all mongobridge processes. Defaults to {}.
  *
@@ -1083,6 +1088,7 @@ var ShardingTest = function(params) {
     otherParams.useHostname = otherParams.useHostname == undefined ? true : otherParams.useHostname;
     otherParams.useBridge = otherParams.useBridge || false;
     otherParams.bridgeOptions = otherParams.bridgeOptions || {};
+    otherParams.causallyConsistent = otherParams.causallyConsistent || false;
 
     if (jsTestOptions().networkMessageCompressors) {
         otherParams.bridgeOptions["networkMessageCompressors"] =
@@ -1409,6 +1415,10 @@ var ShardingTest = function(params) {
         var conn = MongoRunner.runMongos(options);
         if (!conn) {
             throw new Error("Failed to start mongos " + i);
+        }
+
+        if (options.causallyConsistent) {
+            conn.setCausalConsistency(true);
         }
 
         if (otherParams.useBridge) {

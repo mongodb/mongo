@@ -37,11 +37,15 @@
  *           options are merged with the opts.bridgeOptions options, where the node-specific options
  *           take precedence.
  *
- *     nodeOptions {Object}: Options to apply to all nodes in the replica set.
+ *     nodeOptions {Object}: Command-line options to apply to all nodes in the replica set.
  *        Format for Object:
  *          { cmdline-param-with-no-arg : "",
  *            param-with-arg : arg }
  *        This turns into "mongod --cmdline-param-with-no-arg --param-with-arg arg"
+ *
+ *     causallyConsistent {boolean}: Specifies whether the connections to the replica set nodes
+ *        should be created with the 'causal consistency' flag enabled, which means they will gossip
+ *        the cluster time and add readConcern afterClusterTime where applicable. Defaults to false.
  *
  *     oplogSize {number}: Default: 40
  *     useSeedList {boolean}: Use the connection string format of this set
@@ -84,6 +88,8 @@ var ReplSetTest = function(opts) {
     var _bridgeOptions;
     var _unbridgedPorts;
     var _unbridgedNodes;
+
+    var _causalConsistency;
 
     this.kDefaultTimeoutMS = 10 * 60 * 1000;
     var oplogName = 'oplog.rs';
@@ -1641,6 +1647,10 @@ var ReplSetTest = function(opts) {
             _waitForHealth(this.nodes[n], Health.UP, wait);
         }
 
+        if (_causalConsistency) {
+            this.nodes[n].setCausalConsistency(true);
+        }
+
         return this.nodes[n];
     };
 
@@ -1800,6 +1810,8 @@ var ReplSetTest = function(opts) {
 
         _useBridge = opts.useBridge || false;
         _bridgeOptions = opts.bridgeOptions || {};
+
+        _causalConsistency = opts.causallyConsistent || false;
 
         _configSettings = opts.settings || false;
 
