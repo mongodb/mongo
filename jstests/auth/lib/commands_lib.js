@@ -640,7 +640,6 @@ var authCommandsLib = {
         {
           testname: "aggregate_currentOp_allUsers_true",
           command: {aggregate: 1, pipeline: [{$currentOp: {allUsers: true}}], cursor: {}},
-          skipSharded: true,
           testcases: [
               {
                 runOnDb: adminDbName,
@@ -658,8 +657,8 @@ var authCommandsLib = {
         {
           testname: "aggregate_currentOp_allUsers_false",
           command: {aggregate: 1, pipeline: [{$currentOp: {allUsers: false}}], cursor: {}},
-          skipSharded: true,
-          testcases: [{runOnDb: adminDbName, roles: roles_all}]
+          testcases: [{runOnDb: adminDbName, roles: roles_all}],
+          skipSharded: true
         },
         {
           testname: "aggregate_lookup",

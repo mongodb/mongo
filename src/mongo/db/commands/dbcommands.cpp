@@ -528,7 +528,7 @@ public:
                                        const std::string& dbname,
                                        const BSONObj& cmdObj) {
         const NamespaceString nss(parseNs(dbname, cmdObj));
-        return AuthorizationSession::get(client)->checkAuthForCreate(nss, cmdObj);
+        return AuthorizationSession::get(client)->checkAuthForCreate(nss, cmdObj, false);
     }
 
     virtual bool run(OperationContext* opCtx,
@@ -1026,7 +1026,7 @@ public:
                                        const std::string& dbname,
                                        const BSONObj& cmdObj) {
         const NamespaceString nss(parseNs(dbname, cmdObj));
-        return AuthorizationSession::get(client)->checkAuthForCollMod(nss, cmdObj);
+        return AuthorizationSession::get(client)->checkAuthForCollMod(nss, cmdObj, false);
     }
 
     bool run(OperationContext* opCtx,

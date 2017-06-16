@@ -180,16 +180,16 @@ public:
     Status checkAuthForKillCursors(const NamespaceString& ns, long long cursorID);
 
     // Checks if this connection has the privileges necessary to run the aggregation pipeline
-    // specified in 'cmdObj' on the namespace 'ns'.
-    Status checkAuthForAggregate(const NamespaceString& ns, const BSONObj& cmdObj);
+    // specified in 'cmdObj' on the namespace 'ns' either directly on mongoD or via mongoS.
+    Status checkAuthForAggregate(const NamespaceString& ns, const BSONObj& cmdObj, bool isMongos);
 
     // Checks if this connection has the privileges necessary to create 'ns' with the options
-    // supplied in 'cmdObj'.
-    Status checkAuthForCreate(const NamespaceString& ns, const BSONObj& cmdObj);
+    // supplied in 'cmdObj' either directly on mongoD or via mongoS.
+    Status checkAuthForCreate(const NamespaceString& ns, const BSONObj& cmdObj, bool isMongos);
 
     // Checks if this connection has the privileges necessary to modify 'ns' with the options
-    // supplied in 'cmdObj'.
-    Status checkAuthForCollMod(const NamespaceString& ns, const BSONObj& cmdObj);
+    // supplied in 'cmdObj' either directly on mongoD or via mongoS.
+    Status checkAuthForCollMod(const NamespaceString& ns, const BSONObj& cmdObj, bool isMongos);
 
     // Checks if this connection has the privileges necessary to grant the given privilege
     // to a role.

@@ -71,8 +71,10 @@ public:
         auto shardResponses =
             uassertStatusOK(scatterGather(opCtx,
                                           dbName,
+                                          boost::none,
                                           filterCommandRequestForPassthrough(cmdObj),
-                                          ReadPreferenceSetting::get(opCtx)));
+                                          ReadPreferenceSetting::get(opCtx),
+                                          ShardTargetingPolicy::BroadcastToAllShards));
         if (!appendRawResponses(opCtx, &errmsg, &output, shardResponses)) {
             return false;
         }

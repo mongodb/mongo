@@ -68,7 +68,8 @@ const std::string ADMIN_DBNAME = "admin";
 Status checkAuthForCreateOrModifyView(AuthorizationSession* authzSession,
                                       const NamespaceString& viewNs,
                                       const NamespaceString& viewOnNs,
-                                      const BSONArray& viewPipeline) {
+                                      const BSONArray& viewPipeline,
+                                      bool isMongos) {
     // It's safe to allow a user to create or modify a view if they can't read it anyway.
     if (!authzSession->isAuthorizedForActionsOnNamespace(viewNs, ActionType::find)) {
         return Status::OK();
@@ -78,7 +79,7 @@ Status checkAuthForCreateOrModifyView(AuthorizationSession* authzSession,
     // view definition with an invalid specification like {$lookup: "blah"}, the authorization check
     // will succeed but the pipeline will fail to parse later in Command::run().
     return authzSession->checkAuthForAggregate(
-        viewOnNs, BSON("aggregate" << viewOnNs.coll() << "pipeline" << viewPipeline));
+        viewOnNs, BSON("aggregate" << viewOnNs.coll() << "pipeline" << viewPipeline), isMongos);
 }
 }  // namespace
 
@@ -254,7 +255,8 @@ void AuthorizationSession::_addPrivilegesForStage(const std::string& db,
 }
 
 Status AuthorizationSession::checkAuthForAggregate(const NamespaceString& ns,
-                                                   const BSONObj& cmdObj) {
+                                                   const BSONObj& cmdObj,
+                                                   bool isMongos) {
     std::string db(ns.db().toString());
     uassert(
         17138, mongoutils::str::stream() << "Invalid input namespace, " << ns.ns(), ns.isValid());
@@ -287,37 +289,48 @@ Status AuthorizationSession::checkAuthForAggregate(const NamespaceString& ns,
         // We treat the first stage in the pipeline specially, as some aggregation stages that are
         // valid initial sources have different auth requirements.
         BSONObj firstPipelineStage = pipeline.firstElement().embeddedObject();
-        if (str::equals("$indexStats", firstPipelineStage.firstElementFieldName())) {
+        BSONElement firstStageSpec = firstPipelineStage.firstElement();
+        if (str::equals("$indexStats", firstStageSpec.fieldName())) {
             Privilege::addPrivilegeToPrivilegeVector(
                 &privileges,
                 Privilege(ResourcePattern::forExactNamespace(ns), ActionType::indexStats));
-        } else if (str::equals("$collStats", firstPipelineStage.firstElementFieldName())) {
+        } else if (str::equals("$collStats", firstStageSpec.fieldName())) {
             Privilege::addPrivilegeToPrivilegeVector(
                 &privileges,
                 Privilege(ResourcePattern::forExactNamespace(ns), ActionType::collStats));
-        } else if (str::equals("$currentOp", firstPipelineStage.firstElementFieldName())) {
+        } else if (str::equals("$currentOp", firstStageSpec.fieldName())) {
             // Need to check the value of allUsers; if true then inprog privilege is required.
             // {$currentOp: {idleConnections: <boolean|false>, allUsers: <boolean|false>}}
-            BSONElement spec = firstPipelineStage["$currentOp"];
-
-            if (spec.type() != BSONType::Object) {
+            if (firstStageSpec.type() != BSONType::Object) {
                 return Status(
                     ErrorCodes::TypeMismatch,
                     str::stream()
                         << "$currentOp options must be specified in an object, but found: "
-                        << typeName(spec.type()));
+                        << typeName(firstStageSpec.type()));
             }
 
-            auto allUsersElt = spec["allUsers"];
+            bool allUsers = false;
 
-            if (allUsersElt && allUsersElt.type() != BSONType::Bool) {
-                return Status(ErrorCodes::TypeMismatch,
-                              str::stream() << "The 'allUsers' parameter of the $currentOp stage "
-                                               "must be a boolean value, but found: "
-                                            << typeName(allUsersElt.type()));
+            // Check the spec for all fields named 'allUsers'. If any of them are 'true', we require
+            // the 'inprog' privilege. This avoids the possibility that a spec with multiple
+            // allUsers fields might allow an unauthorized user to view all operations.
+            for (auto&& elem : firstStageSpec.embeddedObject()) {
+                if (elem.fieldNameStringData() == "allUsers"_sd) {
+                    if (elem.type() != BSONType::Bool) {
+                        return Status(ErrorCodes::TypeMismatch,
+                                      str::stream()
+                                          << "The 'allUsers' parameter of the $currentOp stage "
+                                             "must be a boolean value, but found: "
+                                          << typeName(elem.type()));
+                    } else if (elem.Bool()) {
+                        allUsers = true;
+                        break;
+                    }
+                }
             }
 
-            if (allUsersElt && allUsersElt.boolean()) {
+            // In a sharded cluster, we always need the inprog privilege to run $currentOp.
+            if (isMongos || allUsers) {
                 Privilege::addPrivilegeToPrivilegeVector(
                     &privileges,
                     Privilege(ResourcePattern::forClusterResource(), ActionType::inprog));
@@ -506,7 +519,9 @@ Status AuthorizationSession::checkAuthForKillCursors(const NamespaceString& ns,
     return Status::OK();
 }
 
-Status AuthorizationSession::checkAuthForCreate(const NamespaceString& ns, const BSONObj& cmdObj) {
+Status AuthorizationSession::checkAuthForCreate(const NamespaceString& ns,
+                                                const BSONObj& cmdObj,
+                                                bool isMongos) {
     if (cmdObj["capped"].trueValue() &&
         !isAuthorizedForActionsOnNamespace(ns, ActionType::convertToCapped)) {
         return Status(ErrorCodes::Unauthorized, "unauthorized");
@@ -528,7 +543,7 @@ Status AuthorizationSession::checkAuthForCreate(const NamespaceString& ns, const
         NamespaceString viewOnNs(ns.db(), cmdObj["viewOn"].checkAndGetStringData());
         auto pipeline =
             cmdObj.hasField("pipeline") ? BSONArray(cmdObj["pipeline"].Obj()) : BSONArray();
-        return checkAuthForCreateOrModifyView(this, ns, viewOnNs, pipeline);
+        return checkAuthForCreateOrModifyView(this, ns, viewOnNs, pipeline, isMongos);
     }
 
     // To create a regular collection, ActionType::createCollection or ActionType::insert are
@@ -540,7 +555,9 @@ Status AuthorizationSession::checkAuthForCreate(const NamespaceString& ns, const
     return Status(ErrorCodes::Unauthorized, "unauthorized");
 }
 
-Status AuthorizationSession::checkAuthForCollMod(const NamespaceString& ns, const BSONObj& cmdObj) {
+Status AuthorizationSession::checkAuthForCollMod(const NamespaceString& ns,
+                                                 const BSONObj& cmdObj,
+                                                 bool isMongos) {
     if (!isAuthorizedForActionsOnNamespace(ns, ActionType::collMod)) {
         return Status(ErrorCodes::Unauthorized, "unauthorized");
     }
@@ -559,7 +576,7 @@ Status AuthorizationSession::checkAuthForCollMod(const NamespaceString& ns, cons
     if (hasViewOn) {
         NamespaceString viewOnNs(ns.db(), cmdObj["viewOn"].checkAndGetStringData());
         auto viewPipeline = BSONArray(cmdObj["pipeline"].Obj());
-        return checkAuthForCreateOrModifyView(this, ns, viewOnNs, viewPipeline);
+        return checkAuthForCreateOrModifyView(this, ns, viewOnNs, viewPipeline, isMongos);
     }
 
     return Status::OK();

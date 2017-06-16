@@ -141,14 +141,16 @@ public:
         auto countCmdObj = countCmdBuilder.done();
 
         BSONObj viewDefinition;
-        auto swShardResponses = scatterGatherForNamespace(opCtx,
-                                                          nss,
-                                                          countCmdObj,
-                                                          ReadPreferenceSetting::get(opCtx),
-                                                          filter,
-                                                          collation,
-                                                          true,  // do shard versioning
-                                                          &viewDefinition);
+        auto swShardResponses = scatterGather(opCtx,
+                                              dbname,
+                                              nss,
+                                              countCmdObj,
+                                              ReadPreferenceSetting::get(opCtx),
+                                              ShardTargetingPolicy::UseRoutingTable,
+                                              filter,
+                                              collation,
+                                              true,  // do shard versioning
+                                              &viewDefinition);
 
         if (ErrorCodes::CommandOnShardedViewNotSupportedOnMongod == swShardResponses.getStatus()) {
             if (viewDefinition.isEmpty()) {
@@ -269,14 +271,16 @@ public:
         Timer timer;
 
         BSONObj viewDefinition;
-        auto swShardResponses = scatterGatherForNamespace(opCtx,
-                                                          nss,
-                                                          explainCmd,
-                                                          ReadPreferenceSetting::get(opCtx),
-                                                          targetingQuery,
-                                                          targetingCollation,
-                                                          true,  // do shard versioning
-                                                          &viewDefinition);
+        auto swShardResponses = scatterGather(opCtx,
+                                              dbname,
+                                              nss,
+                                              explainCmd,
+                                              ReadPreferenceSetting::get(opCtx),
+                                              ShardTargetingPolicy::UseRoutingTable,
+                                              targetingQuery,
+                                              targetingCollation,
+                                              true,  // do shard versioning
+                                              &viewDefinition);
 
         long long millisElapsed = timer.millis();
 

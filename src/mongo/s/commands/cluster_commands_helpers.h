@@ -47,6 +47,12 @@ class CachedDatabaseInfo;
 class OperationContext;
 class ShardId;
 
+/*
+ * Allows callers of routing functions to specify a preferred targeting policy. See scatterGather
+ * for a usage example.
+ */
+enum class ShardTargetingPolicy { UseRoutingTable, BroadcastToAllShards };
+
 /**
  * This function appends the provided writeConcernError BSONElement to the sharded response.
  */
@@ -59,44 +65,39 @@ void appendWriteConcernErrorToCmdResponse(const ShardId& shardID,
 BSONObj appendShardVersion(const BSONObj& cmdObj, ChunkVersion version);
 
 /**
- * Broadcasts 'cmdObj' to all shards and returns the responses as a vector.
+ * Generic function for dispatching commands to the cluster.
  *
- * Returns a non-OK status if a failure occurs on *this* node during execution.
+ * If 'targetPolicy' is ShardTargetingPolicy::BroadcastToAllShards, the command will be sent
+ * unversioned to all shards and run on database 'dbName'. The 'query', 'collation' and
+ * 'appendShardVersion' arguments, if supplied, will be ignored.
+ *
+ * If 'targetPolicy' is ShardTargetingPolicy::UseRoutingTable, the routing table cache will be used
+ * to determine which shards the command should be dispatched to. If the namespace specified by
+ * 'nss' is an unsharded collection, the command will be sent to the Primary shard for the database.
+ * If 'query' is specified, only shards that own data needed by the query are targeted; otherwise,
+ * all shards are targeted. By default, shardVersions are attached to the outgoing requests, and the
+ * function will re-target and retry if it receives a stale shardVersion error from any shard.
+ *
+ * Returns a non-OK status if a failure occurs on *this* node during execution or on seeing an error
+ * from a shard that means the operation as a whole should fail, such as a exceeding retries for
+ * stale shardVersion errors.
+ *
+ * If a shard returns an error saying that the request was on a view, the shard will also return a
+ * view definition. This will be stored in the BSONObj* viewDefinition argument, if non-null, so
+ * that the caller can re-run the operation as an aggregation.
+ *
  * Otherwise, returns success and a list of responses from shards (including errors from the shards
  * or errors reaching the shards).
  */
 StatusWith<std::vector<AsyncRequestsSender::Response>> scatterGather(
     OperationContext* opCtx,
     const std::string& dbName,
-    const BSONObj& cmdObj,
-    const ReadPreferenceSetting& readPref);
-
-/**
- * Uses the routing table cache to broadcast a command on a namespace. By default, attaches
- * shardVersions to the outgoing requests to shards, and retargets and retries if it receives a
- * stale shardVersion error from any shard.
- *
- * If 'query' is specified, only shards that own data for the namespace are targeted. Otherwise,
- * all shards are targeted.
- *
- * Returns a non-OK status if a failure occurs on *this* node during execution or on seeing an error
- * from a shard that means the operation as a whole should fail, such as a exceeding retries for
- * stale shardVersion errors.
- * Otherwise, returns success and a list of responses from shards (including errors from the shards
- * or errors reaching the shards).
- *
- * @appendShardVersion: if false, does not attach shardVersions to the outgoing requests.
- * @viewDefinition: if a shard returns an error saying that the request was on a view, the shard
- *                  will also return a view definition. The returned viewDefinition is stored in
- *                  this parameter, so that the caller can re-run the operation as an aggregation.
- */
-StatusWith<std::vector<AsyncRequestsSender::Response>> scatterGatherForNamespace(
-    OperationContext* opCtx,
-    const NamespaceString& nss,
+    const boost::optional<NamespaceString> nss,
     const BSONObj& cmdObj,
     const ReadPreferenceSetting& readPref,
-    const boost::optional<BSONObj> query,
-    const boost::optional<BSONObj> collation,
+    const ShardTargetingPolicy targetPolicy = ShardTargetingPolicy::UseRoutingTable,
+    const boost::optional<BSONObj> query = boost::none,
+    const boost::optional<BSONObj> collation = boost::none,
     const bool appendShardVersion = true,
     BSONObj* viewDefinition = nullptr);
 

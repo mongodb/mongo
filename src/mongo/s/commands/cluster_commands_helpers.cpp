@@ -223,52 +223,68 @@ BSONObj appendShardVersion(const BSONObj& cmdObj, ChunkVersion version) {
 StatusWith<std::vector<AsyncRequestsSender::Response>> scatterGather(
     OperationContext* opCtx,
     const std::string& dbName,
-    const BSONObj& cmdObj,
-    const ReadPreferenceSetting& readPref) {
-    auto requests = buildRequestsForAllShards(opCtx, cmdObj);
-    return gatherResponses(opCtx, dbName, cmdObj, readPref, requests, nullptr /* viewDefinition */);
-}
-
-StatusWith<std::vector<AsyncRequestsSender::Response>> scatterGatherForNamespace(
-    OperationContext* opCtx,
-    const NamespaceString& nss,
+    const boost::optional<NamespaceString> nss,
     const BSONObj& cmdObj,
     const ReadPreferenceSetting& readPref,
+    const ShardTargetingPolicy targetPolicy,
     const boost::optional<BSONObj> query,
     const boost::optional<BSONObj> collation,
     const bool appendShardVersion,
     BSONObj* viewDefinition) {
-    int numAttempts = 0;
-    StatusWith<std::vector<AsyncRequestsSender::Response>> swResponses(
-        (std::vector<AsyncRequestsSender::Response>()));
-    do {
-        // Get the routing table cache.
-        auto swRoutingInfo = Grid::get(opCtx)->catalogCache()->getCollectionRoutingInfo(opCtx, nss);
-        if (!swRoutingInfo.isOK()) {
-            return swRoutingInfo.getStatus();
+
+    // If a NamespaceString is specified, it must match the dbName.
+    invariant(!nss || (nss.get().db() == dbName));
+
+    switch (targetPolicy) {
+        case ShardTargetingPolicy::BroadcastToAllShards: {
+            // Send unversioned commands to all shards.
+            auto requests = buildRequestsForAllShards(opCtx, cmdObj);
+            return gatherResponses(opCtx, dbName, cmdObj, readPref, requests, viewDefinition);
         }
-        auto routingInfo = swRoutingInfo.getValue();
 
-        // Use the routing table cache to decide which shards to target, and build the requests to
-        // send to them.
-        auto requests = buildRequestsForShardsForNamespace(
-            opCtx, routingInfo, cmdObj, query, collation, appendShardVersion);
+        case ShardTargetingPolicy::UseRoutingTable: {
+            // We must have a valid NamespaceString.
+            invariant(nss && nss.get().isValid());
 
-        // Retrieve the responses from the shards.
-        swResponses =
-            gatherResponses(opCtx, nss.db().toString(), cmdObj, readPref, requests, viewDefinition);
-        ++numAttempts;
+            int numAttempts = 0;
+            StatusWith<std::vector<AsyncRequestsSender::Response>> swResponses(
+                (std::vector<AsyncRequestsSender::Response>()));
 
-        // If any shard returned a stale shardVersion error, invalidate the routing table cache.
-        // This will cause the cache to be refreshed the next time it is accessed.
-        if (ErrorCodes::isStaleShardingError(swResponses.getStatus().code())) {
-            Grid::get(opCtx)->catalogCache()->onStaleConfigError(std::move(routingInfo));
-            LOG(1) << "got stale shardVersion error " << swResponses.getStatus()
-                   << " while dispatching " << redact(cmdObj) << " after " << numAttempts
-                   << " dispatch attempts";
+            do {
+                // Get the routing table cache.
+                auto swRoutingInfo =
+                    Grid::get(opCtx)->catalogCache()->getCollectionRoutingInfo(opCtx, *nss);
+                if (!swRoutingInfo.isOK()) {
+                    return swRoutingInfo.getStatus();
+                }
+                auto routingInfo = swRoutingInfo.getValue();
+
+                // Use the routing table cache to decide which shards to target, and build the
+                // requests to send to them.
+                auto requests = buildRequestsForShardsForNamespace(
+                    opCtx, routingInfo, cmdObj, query, collation, appendShardVersion);
+
+                // Retrieve the responses from the shards.
+                swResponses =
+                    gatherResponses(opCtx, dbName, cmdObj, readPref, requests, viewDefinition);
+                ++numAttempts;
+
+                // If any shard returned a stale shardVersion error, invalidate the routing table
+                // cache. This will cause the cache to be refreshed the next time it is accessed.
+                if (ErrorCodes::isStaleShardingError(swResponses.getStatus().code())) {
+                    Grid::get(opCtx)->catalogCache()->onStaleConfigError(std::move(routingInfo));
+                    LOG(1) << "got stale shardVersion error " << swResponses.getStatus()
+                           << " while dispatching " << redact(cmdObj) << " after " << numAttempts
+                           << " dispatch attempts";
+                }
+            } while (numAttempts < kMaxNumStaleVersionRetries && !swResponses.getStatus().isOK());
+
+            return swResponses;
         }
-    } while (numAttempts < kMaxNumStaleVersionRetries && !swResponses.getStatus().isOK());
-    return swResponses;
+
+        default:
+            MONGO_UNREACHABLE;
+    }
 }
 
 bool appendRawResponses(OperationContext* opCtx,

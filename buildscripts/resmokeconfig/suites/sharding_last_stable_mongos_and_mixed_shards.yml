@@ -32,6 +32,9 @@ selector:
   - jstests/sharding/migration_ignore_interrupts_4.js
   - jstests/sharding/mongos_query_comment.js
   - jstests/sharding/sharded_profile.js
+  # SERVER-19318: added new $currentOp agg stage in 3.6
+  - jstests/sharding/aggregation_currentop.js
+  - jstests/sharding/read_pref_cmd.js
 
 executor:
   config:

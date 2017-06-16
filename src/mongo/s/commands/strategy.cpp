@@ -698,14 +698,16 @@ Status Strategy::explainFind(OperationContext* opCtx,
     Timer timer;
 
     BSONObj viewDefinition;
-    auto swShardResponses = scatterGatherForNamespace(opCtx,
-                                                      qr.nss(),
-                                                      explainCmd,
-                                                      readPref,
-                                                      qr.getFilter(),
-                                                      qr.getCollation(),
-                                                      true,  // do shard versioning
-                                                      &viewDefinition);
+    auto swShardResponses = scatterGather(opCtx,
+                                          qr.nss().db().toString(),
+                                          qr.nss(),
+                                          explainCmd,
+                                          readPref,
+                                          ShardTargetingPolicy::UseRoutingTable,
+                                          qr.getFilter(),
+                                          qr.getCollation(),
+                                          true,  // do shard versioning
+                                          &viewDefinition);
 
     long long millisElapsed = timer.millis();
 

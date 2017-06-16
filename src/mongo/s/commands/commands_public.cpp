@@ -224,13 +224,15 @@ protected:
         }
 
         auto shardResponses =
-            uassertStatusOK(scatterGatherForNamespace(opCtx,
-                                                      nss,
-                                                      filterCommandRequestForPassthrough(cmdObj),
-                                                      ReadPreferenceSetting::get(opCtx),
-                                                      boost::none,  // filter
-                                                      boost::none,  // collation
-                                                      _appendShardVersion));
+            uassertStatusOK(scatterGather(opCtx,
+                                          dbName,
+                                          nss,
+                                          filterCommandRequestForPassthrough(cmdObj),
+                                          ReadPreferenceSetting::get(opCtx),
+                                          ShardTargetingPolicy::UseRoutingTable,
+                                          boost::none,  // filter
+                                          boost::none,  // collation
+                                          _appendShardVersion));
         return appendRawResponses(opCtx, &errmsg, &output, std::move(shardResponses));
     }
 
@@ -327,7 +329,7 @@ public:
                                        const std::string& dbname,
                                        const BSONObj& cmdObj) {
         const NamespaceString nss(parseNsCollectionRequired(dbname, cmdObj));
-        return AuthorizationSession::get(client)->checkAuthForCollMod(nss, cmdObj);
+        return AuthorizationSession::get(client)->checkAuthForCollMod(nss, cmdObj, true);
     }
 
     virtual bool supportsWriteConcern(const BSONObj& cmd) const override {
@@ -421,7 +423,7 @@ public:
                                const std::string& dbname,
                                const BSONObj& cmdObj) override {
         const NamespaceString nss(parseNsCollectionRequired(dbname, cmdObj));
-        return AuthorizationSession::get(client)->checkAuthForCreate(nss, cmdObj);
+        return AuthorizationSession::get(client)->checkAuthForCreate(nss, cmdObj, true);
     }
 
     bool supportsWriteConcern(const BSONObj& cmd) const override {
@@ -1151,14 +1153,16 @@ public:
         Timer timer;
 
         BSONObj viewDefinition;
-        auto swShardResponses = scatterGatherForNamespace(opCtx,
-                                                          nss,
-                                                          explainCmd,
-                                                          ReadPreferenceSetting::get(opCtx),
-                                                          targetingQuery,
-                                                          targetingCollation,
-                                                          true,  // do shard versioning
-                                                          &viewDefinition);
+        auto swShardResponses = scatterGather(opCtx,
+                                              dbname,
+                                              nss,
+                                              explainCmd,
+                                              ReadPreferenceSetting::get(opCtx),
+                                              ShardTargetingPolicy::UseRoutingTable,
+                                              targetingQuery,
+                                              targetingCollation,
+                                              true,  // do shard versioning
+                                              &viewDefinition);
 
         long long millisElapsed = timer.millis();
 

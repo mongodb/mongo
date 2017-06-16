@@ -77,7 +77,7 @@ public:
                                const std::string& dbname,
                                const BSONObj& cmdObj) override {
         const NamespaceString nss(AggregationRequest::parseNs(dbname, cmdObj));
-        return AuthorizationSession::get(client)->checkAuthForAggregate(nss, cmdObj);
+        return AuthorizationSession::get(client)->checkAuthForAggregate(nss, cmdObj, false);
     }
 
     bool run(OperationContext* opCtx,

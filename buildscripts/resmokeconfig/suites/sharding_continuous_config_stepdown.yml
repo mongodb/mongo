@@ -10,6 +10,7 @@ selector:
   - jstests/sharding/localhostAuthBypass.js
   - jstests/sharding/mongos_rs_auth_shard_failure_tolerance.js
   - jstests/sharding/mrShardedOutputAuth.js
+  - jstests/sharding/aggregation_currentop.js
   # Count/write/aggregate/group commands against the config shard do not support retries yet
   - jstests/sharding/addshard1.js
   - jstests/sharding/addshard2.js

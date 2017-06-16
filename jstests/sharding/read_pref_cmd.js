@@ -178,15 +178,12 @@ var testReadPreference = function(conn, hostList, isMongos, mode, tagSets, secEx
             formatProfileQuery({aggregate: 'mrIn'}));
 
     // Test $currentOp aggregation stage.
-    // TODO SERVER-19318: Remove check once the $currentOp stage is supported on mongos.
-    if (!isMongos) {
-        let curOpComment = 'agg_currentOp_' + ObjectId();
+    let curOpComment = 'agg_currentOp_' + ObjectId();
 
-        cmdTest({aggregate: 1, pipeline: [{$currentOp: {}}], comment: curOpComment, cursor: {}},
-                true,
-                formatProfileQuery({comment: curOpComment}),
-                "admin");
-    }
+    cmdTest({aggregate: 1, pipeline: [{$currentOp: {}}], comment: curOpComment, cursor: {}},
+            true,
+            formatProfileQuery({comment: curOpComment}),
+            "admin");
 };
 
 /**
