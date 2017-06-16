@@ -711,7 +711,7 @@ Value ExpressionArrayToObject::evaluateInternal(Variables* vars) const {
                     str::stream() << "$arrayToObject requires an object with keys 'k' and 'v'. "
                                      "Missing either or both keys from: "
                                   << elem.toString(),
-                    (!key.nullish() && !value.nullish()));
+                    (!key.missing() && !value.missing()));
 
             uassert(
                 40394,
