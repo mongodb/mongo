@@ -953,6 +953,74 @@ const char* ExpressionConstant::getOpName() const {
     return "$const";
 }
 
+/* ---------------------- ExpressionDateFromString --------------------- */
+
+REGISTER_EXPRESSION(dateFromString, ExpressionDateFromString::parse);
+intrusive_ptr<Expression> ExpressionDateFromString::parse(
+    const boost::intrusive_ptr<ExpressionContext>& expCtx,
+    BSONElement expr,
+    const VariablesParseState& vps) {
+    verify(str::equals(expr.fieldName(), "$dateFromString"));
+
+    uassert(40480,
+            str::stream() << "$dateFromString only supports an object as an argument, found: "
+                          << typeName(expr.type()),
+            expr.type() == Object);
+
+    BSONElement dateStringElem;
+    const BSONObj args = expr.embeddedObject();
+    BSONForEach(arg, args) {
+        if (str::equals(arg.fieldName(), "dateString")) {
+            dateStringElem = arg;
+        } else {
+            uasserted(40481,
+                      str::stream() << "Unrecognized argument to $dateFromString: "
+                                    << arg.fieldName());
+        }
+    }
+
+    uassert(40482, "Missing 'dateString' parameter to $dateFromString", !dateStringElem.eoo());
+
+    return new ExpressionDateFromString(expCtx, parseOperand(expCtx, dateStringElem, vps));
+}
+
+ExpressionDateFromString::ExpressionDateFromString(
+    const boost::intrusive_ptr<ExpressionContext>& expCtx,
+    intrusive_ptr<Expression> dateString)
+    : Expression(expCtx), _dateString(dateString) {}
+
+intrusive_ptr<Expression> ExpressionDateFromString::optimize() {
+    _dateString = _dateString->optimize();
+    return this;
+}
+
+Value ExpressionDateFromString::serialize(bool explain) const {
+    return Value(
+        DOC("$dateFromString" << DOC("dateString" << _dateString->serialize(explain))));
+}
+
+Value ExpressionDateFromString::evaluate(const Document& root) const {
+    const Value dateString = _dateString->evaluate(root);
+
+    if (dateString.nullish()) {
+        return Value(BSONNULL);
+    }
+
+    uassert(40483,
+            str::stream() << "$dateFromString requires that 'dateString' be an string, found: "
+                          << dateString.toString(),
+            dateString.getType() == String);
+    const std::string& dateTimeString = dateString.getString();
+
+    auto tzdb = TimeZoneDatabase::get(_expCtx->opCtx->getServiceContext());
+
+    return Value(tzdb->fromString(dateTimeString));
+}
+
+void ExpressionDateFromString::addDependencies(DepsTracker* deps) const {
+    _dateString->addDependencies(deps);
+}
+
 /* ---------------------- ExpressionDateToString ----------------------- */
 
 REGISTER_EXPRESSION(dateToString, ExpressionDateToString::parse);

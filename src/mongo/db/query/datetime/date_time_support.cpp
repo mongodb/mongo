@@ -77,6 +77,15 @@ void TimeZoneDatabase::set(ServiceContext* serviceContext,
     getTimeZoneDatabase(serviceContext) = std::move(dateTimeSupport);
 }
 
+timelib_tzinfo *TimeZoneDatabase::getTZInfoWrapper(char *tz_id, const _timelib_tzdb *db, int *error)
+{
+	auto it = _timeZones.find(tz_id);
+	if (it != _timeZones.end()) {
+		return it->second.getTZInfo();
+	}
+	return NULL;
+}
+
 TimeZoneDatabase::TimeZoneDatabase() {
     loadTimeZoneInfo({const_cast<timelib_tzdb*>(timelib_builtin_db()), TimeZoneDBDeleter()});
 }
@@ -122,6 +131,16 @@ TimeZone TimeZoneDatabase::utcZone() {
     return TimeZone{nullptr};
 }
 
+Date_t TimeZoneDatabase::fromString(StringData dateString) const {
+	timelib_time *t;
+	timelib_error_container *errors;
+
+	t = timelib_strtotime((char*) dateString.toString().c_str(), dateString.size(), &errors, _timeZoneDatabase, TimeZoneDatabase::getTZInfoWrapper);
+	
+	return Date_t::fromMillisSinceEpoch(t->sse * 1000);
+}
+
+
 TimeZone::DateParts::DateParts(const timelib_time& timelib_time, Date_t date)
     : year(timelib_time.y),
       month(timelib_time.m),
@@ -151,6 +170,11 @@ timelib_time TimeZone::getTimelibTime(Date_t date) const {
         timelib_unixtime2gmt(&time, seconds(date));
     }
     return time;
+}
+
+timelib_tzinfo *TimeZone::getTZInfo()
+{
+	return _tzInfo.get();
 }
 
 TimeZone::DateParts TimeZone::dateParts(Date_t date) const {

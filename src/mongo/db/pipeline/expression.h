@@ -661,6 +661,25 @@ private:
     Value pValue;
 };
 
+class ExpressionDateFromString final : public Expression {
+public:
+    boost::intrusive_ptr<Expression> optimize() final;
+    Value serialize(bool explain) const final;
+    Value evaluate(const Document& root) const final;
+    void addDependencies(DepsTracker* deps) const final;
+
+    static boost::intrusive_ptr<Expression> parse(
+        const boost::intrusive_ptr<ExpressionContext>& expCtx,
+        BSONElement expr,
+        const VariablesParseState& vps);
+
+private:
+    ExpressionDateFromString(const boost::intrusive_ptr<ExpressionContext>& expCtx,
+                           boost::intrusive_ptr<Expression> dateString);  // the string containing the date to convert
+
+    boost::intrusive_ptr<Expression> _dateString;
+};
+
 class ExpressionDateToString final : public Expression {
 public:
     boost::intrusive_ptr<Expression> optimize() final;
