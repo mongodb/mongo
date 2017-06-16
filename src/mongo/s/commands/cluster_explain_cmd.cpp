@@ -120,6 +120,14 @@ public:
         // Command::explain() method.
         const BSONObj explainObj = ([&] {
             const auto innerObj = cmdObj.firstElement().Obj();
+            if (auto innerDb = innerObj["$db"]) {
+                uassert(ErrorCodes::InvalidNamespace,
+                        str::stream() << "Mismatched $db in explain command. Expected " << dbName
+                                      << " but got "
+                                      << innerDb.checkAndGetStringData(),
+                        innerDb.checkAndGetStringData() == dbName);
+            }
+
             BSONObjBuilder bob;
             bob.appendElements(innerObj);
             for (auto outerElem : cmdObj) {

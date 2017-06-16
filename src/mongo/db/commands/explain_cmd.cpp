@@ -133,6 +133,14 @@ public:
         // This is the nested command which we are explaining.
         BSONObj explainObj = cmdObj.firstElement().Obj();
 
+        if (auto innerDb = explainObj["$db"]) {
+            uassert(ErrorCodes::InvalidNamespace,
+                    str::stream() << "Mismatched $db in explain command. Expected " << dbname
+                                  << " but got "
+                                  << innerDb.checkAndGetStringData(),
+                    innerDb.checkAndGetStringData() == dbname);
+        }
+
         Command* commToExplain = Command::findCommand(explainObj.firstElementFieldName());
         if (NULL == commToExplain) {
             mongoutils::str::stream ss;
