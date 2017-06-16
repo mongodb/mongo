@@ -391,6 +391,15 @@ private:
      **/
     bool _memberIsBlacklisted(const MemberConfig& memberConfig, Date_t now) const;
 
+    /**
+     * Returns true if we are a one-node replica set, we're the one member,
+     * we're electable, we're not in maintenance mode, and we are currently in followerMode
+     * SECONDARY.
+     *
+     * This is used to decide if we should transition to Role::candidate in a one-node replica set.
+     */
+    bool _isElectableNodeInSingleNodeReplicaSet() const;
+
     // This node's role in the replication protocol.
     Role _role;
 

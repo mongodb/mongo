@@ -1802,6 +1802,45 @@ TEST_F(ReplCoordTest, NodeBecomesPrimaryAgainWhenStepDownTimeoutExpiresInASingle
     ASSERT_TRUE(getReplCoord()->getMemberState().primary());
 }
 
+TEST_F(
+    ReplCoordTest,
+    NodeGoesIntoRecoveryAgainWhenStepDownTimeoutExpiresInASingleNodeSetAndWeAreInMaintenanceMode) {
+    init("mySet");
+
+    assertStartSuccess(BSON("_id"
+                            << "mySet"
+                            << "version"
+                            << 1
+                            << "members"
+                            << BSON_ARRAY(BSON("_id" << 0 << "host"
+                                                     << "test1:1234"))),
+                       HostAndPort("test1", 1234));
+    runSingleNodeElection(makeOperationContext(), getReplCoord(), getNet());
+    const auto opCtx = makeOperationContext();
+
+    ASSERT_OK(getReplCoord()->stepDown(opCtx.get(), true, Milliseconds(0), Milliseconds(1000)));
+    getNet()->enterNetwork();  // Must do this before inspecting the topocoord
+    Date_t stepdownUntil = getNet()->now() + Seconds(1);
+    ASSERT_EQUALS(stepdownUntil, getTopoCoord().getStepDownTime());
+    ASSERT_TRUE(getTopoCoord().getMemberState().secondary());
+    ASSERT_TRUE(getReplCoord()->getMemberState().secondary());
+
+    // Go into maintenance mode.
+    ASSERT_EQUALS(0, getTopoCoord().getMaintenanceCount());
+    ASSERT_FALSE(getReplCoord()->getMaintenanceMode());
+    ASSERT_OK(getReplCoord()->setMaintenanceMode(true));
+    ASSERT_EQUALS(1, getTopoCoord().getMaintenanceCount());
+    ASSERT_TRUE(getReplCoord()->getMaintenanceMode());
+
+    // Now run time forward and make sure that the node goes into RECOVERING again when the stepdown
+    // period ends.
+    getNet()->runUntil(stepdownUntil);
+    ASSERT_EQUALS(stepdownUntil, getNet()->now());
+    ASSERT_EQUALS(MemberState(MemberState::RS_RECOVERING), getTopoCoord().getMemberState());
+    getNet()->exitNetwork();
+    ASSERT_EQUALS(MemberState(MemberState::RS_RECOVERING), getReplCoord()->getMemberState());
+}
+
 TEST_F(StepDownTest,
        NodeReturnsExceededTimeLimitWhenNoSecondaryIsCaughtUpWithinStepDownsSecondaryCatchUpPeriod) {
     OpTimeWithTermOne optime1(100, 1);

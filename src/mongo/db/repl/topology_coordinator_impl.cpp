@@ -2084,11 +2084,10 @@ TopologyCoordinatorImpl::prepareFreezeResponse(Date_t now, int secs, BSONObjBuil
         log() << "'unfreezing'";
         response->append("info", "unfreezing");
 
-        if (_followerMode == MemberState::RS_SECONDARY && _rsConfig.getNumMembers() == 1 &&
-            _selfIndex == 0 && _rsConfig.getMemberAt(_selfIndex).isElectable()) {
+        if (_isElectableNodeInSingleNodeReplicaSet()) {
             // If we are a one-node replica set, we're the one member,
-            // we're electable, and we are currently in followerMode SECONDARY,
-            // we must transition to candidate now that our stepdown period
+            // we're electable, we're not in maintenance mode, and we are currently in followerMode
+            // SECONDARY, we must transition to candidate now that our stepdown period
             // is no longer active, in leiu of heartbeats.
             _role = Role::candidate;
             return PrepareFreezeResponseResult::kElectSelf;
@@ -2109,11 +2108,10 @@ bool TopologyCoordinatorImpl::becomeCandidateIfStepdownPeriodOverAndSingleNodeSe
         return false;
     }
 
-    if (_followerMode == MemberState::RS_SECONDARY && _rsConfig.getNumMembers() == 1 &&
-        _selfIndex == 0 && _rsConfig.getMemberAt(_selfIndex).isElectable()) {
+    if (_isElectableNodeInSingleNodeReplicaSet()) {
         // If the new config describes a one-node replica set, we're the one member,
-        // we're electable, and we are currently in followerMode SECONDARY,
-        // we must transition to candidate, in leiu of heartbeats.
+        // we're electable, we're not in maintenance mode, and we are currently in followerMode
+        // SECONDARY, we must transition to candidate, in leiu of heartbeats.
         _role = Role::candidate;
         return true;
     }
@@ -2230,11 +2228,10 @@ void TopologyCoordinatorImpl::updateConfig(const ReplSetConfig& newConfig,
     // By this point we know we are in Role::follower
     _currentPrimaryIndex = -1;  // force secondaries to re-detect who the primary is
 
-    if (_followerMode == MemberState::RS_SECONDARY && _rsConfig.getNumMembers() == 1 &&
-        _selfIndex == 0 && _rsConfig.getMemberAt(_selfIndex).isElectable()) {
+    if (_isElectableNodeInSingleNodeReplicaSet()) {
         // If the new config describes a one-node replica set, we're the one member,
-        // we're electable, and we are currently in followerMode SECONDARY,
-        // we must transition to candidate, in leiu of heartbeats.
+        // we're electable, we're not in maintenance mode and we are currently in followerMode
+        // SECONDARY, we must transition to candidate, in leiu of heartbeats.
         _role = Role::candidate;
     }
 }
@@ -2602,10 +2599,15 @@ void TopologyCoordinatorImpl::setFollowerMode(MemberState::MS newMode) {
     // be a candidate here.  This is necessary because a single node replica set has no
     // heartbeats that would normally change the role to candidate.
 
-    if (_rsConfig.getNumMembers() == 1 && _selfIndex == 0 &&
-        _rsConfig.getMemberAt(_selfIndex).isElectable()) {
+    if (_isElectableNodeInSingleNodeReplicaSet()) {
         _role = Role::candidate;
     }
+}
+
+bool TopologyCoordinatorImpl::_isElectableNodeInSingleNodeReplicaSet() const {
+    return _followerMode == MemberState::RS_SECONDARY && _rsConfig.getNumMembers() == 1 &&
+        _selfIndex == 0 && _rsConfig.getMemberAt(_selfIndex).isElectable() &&
+        _maintenanceModeCalls == 0;
 }
 
 bool TopologyCoordinatorImpl::stepDownIfPending() {

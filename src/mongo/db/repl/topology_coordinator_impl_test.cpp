@@ -4413,6 +4413,34 @@ TEST_F(TopoCoordTest,
         "cannot freeze node when primary or running for election. state: Running-Election");
 }
 
+TEST_F(TopoCoordTest, DoNotBecomeCandidateOnUnfreezingInMaintenanceMode) {
+    updateConfig(BSON("_id"
+                      << "rs0"
+                      << "version"
+                      << 5
+                      << "members"
+                      << BSON_ARRAY(BSON("_id" << 0 << "host"
+                                               << "host1:27017"))),
+                 0);
+    setSelfMemberState(MemberState::RS_SECONDARY);
+
+    BSONObjBuilder response;
+    ASSERT_EQUALS(
+        TopologyCoordinator::PrepareFreezeResponseResult::kNoAction,
+        unittest::assertGet(getTopoCoord().prepareFreezeResponse(now()++, 20, &response)));
+    ASSERT(response.obj().isEmpty());
+    BSONObjBuilder response2;
+
+    // We should not transition to Role::candidate if we are in maintenance upon unfreezing.
+    getTopoCoord().adjustMaintenanceCountBy(1);
+
+    ASSERT_EQUALS(
+        TopologyCoordinator::PrepareFreezeResponseResult::kNoAction,
+        unittest::assertGet(getTopoCoord().prepareFreezeResponse(now()++, 0, &response2)));
+    ASSERT_EQUALS("unfreezing", response2.obj()["info"].String());
+    ASSERT(TopologyCoordinator::Role::follower == getTopoCoord().getRole());
+}
+
 class PrepareHeartbeatResponseTest : public TopoCoordTest {
 public:
     virtual void setUp() {
