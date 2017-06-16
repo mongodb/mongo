@@ -59,7 +59,7 @@ def makeEmitCompilationDbEntry(comstr):
     * command line
     * source
     * target
-    :param comstr: command line
+    :param comstr: unevaluated command line
     :return: an emitter which has captured the above
     """
     user_action = SCons.Action.Action(comstr)
@@ -68,9 +68,9 @@ def makeEmitCompilationDbEntry(comstr):
         """
         This emitter will be added to each c/c++ object build to capture the info needed
         for clang tools
-        :param target:
-        :param source:
-        :param env:
+        :param target: target node(s)
+        :param source: source node(s)
+        :param env: Environment for use building this node
         :return: target(s), source(s)
         """
 
@@ -102,9 +102,9 @@ def CompilationDbEntryAction(target, source, env, **kw):
     Create a dictionary with evaluated command line, target, source
     and store that info as an attribute on the target
     (Which has been stored in __COMPILATION_DB_ENTRIES array
-    :param target:
-    :param source:
-    :param env:
+    :param target: target node(s)
+    :param source: source node(s)
+    :param env: Environment for use building this node
     :param kw:
     :return: None
     """
@@ -121,14 +121,12 @@ def CompilationDbEntryAction(target, source, env, **kw):
     }
 
     target[0].write(entry)
-    # setattr(target[0], '__COMPILATION_DB_ENTRY', entry)
 
 
 def WriteCompilationDb(target, source, env):
     entries = []
 
     for s in __COMPILATION_DB_ENTRIES:
-        # entries.append(getattr(s, '__COMPILATION_DB_ENTRY'))
         entries.append(s.read())
 
     with open(str(target[0]), 'w') as target_file:
