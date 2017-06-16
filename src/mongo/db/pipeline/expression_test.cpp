@@ -4884,6 +4884,45 @@ TEST_F(DateExpressionTest, DoesResultInNullIfGivenNullishInput) {
 
 }  // namespace DateExpressionsTest
 
+namespace ExpressionDateFromStringTest {
+
+// This provides access to an ExpressionContext that has a valid ServiceContext with a
+// TimeZoneDatabase via getExpCtx(), but we'll use a different name for this test suite.
+using ExpressionDateFromStringTest = AggregationContextFixture;
+
+TEST_F(ExpressionDateFromStringTest, SerializesToObjectSyntax) {
+    auto expCtx = getExpCtx();
+
+    // Test that it serializes to the full format if given an object specification.
+    BSONObj spec = BSON("$dateFromString" << BSON("dateString"
+                                                  << "2017-07-04T13:06:44Z"));
+    auto dateExp = Expression::parseExpression(expCtx, spec, expCtx->variablesParseState);
+    auto expectedSerialization = Value(
+        Document{{"$dateFromString",
+                  Document{{"dateString", Document{{"$const", "2017-07-04T13:06:44Z"_sd}}}}}});
+    ASSERT_VALUE_EQ(dateExp->serialize(true), expectedSerialization);
+    ASSERT_VALUE_EQ(dateExp->serialize(false), expectedSerialization);
+}
+
+TEST_F(ExpressionDateFromStringTest, OptimizesToConstantIfAllInputsAreConstant) {
+    auto expCtx = getExpCtx();
+    auto spec = BSON("$dateFromString" << BSON("dateString"
+                                               << "2017-07-04T13:09:57Z"));
+    auto dateExp = Expression::parseExpression(expCtx, spec, expCtx->variablesParseState);
+    ASSERT(dynamic_cast<ExpressionConstant*>(dateExp->optimize().get()));
+
+    Date_t dateVal = Date_t::fromMillisSinceEpoch(1499173797000);
+    ASSERT_VALUE_EQ(Value(dateVal), dateExp->evaluate(Document{}));
+
+    // Test that it does *not* become a constant if dateString is not a constant.
+    spec = BSON("$dateFromString" << BSON("dateString"
+                                          << "$date"));
+    dateExp = Expression::parseExpression(expCtx, spec, expCtx->variablesParseState);
+    ASSERT_FALSE(dynamic_cast<ExpressionConstant*>(dateExp->optimize().get()));
+}
+
+}  // namespace ExpressionDateFromStringTest
+
 class All : public Suite {
 public:
     All() : Suite("expression") {}

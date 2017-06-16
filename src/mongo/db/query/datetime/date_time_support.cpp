@@ -122,6 +122,52 @@ TimeZone TimeZoneDatabase::utcZone() {
     return TimeZone{nullptr};
 }
 
+extern "C" {
+static timelib_tzinfo* timezonedatabase_gettzinfowrapper(char* tz_id,
+                                                         const _timelib_tzdb* db,
+                                                         int* error) {
+    uasserted(
+        40544,
+        str::stream()
+            << "passing a time zone identifier as part of the string is not allowed, found: \""
+            << tz_id
+            << "\"");
+
+    return nullptr;
+}
+
+}  // extern "C"
+
+Date_t TimeZoneDatabase::fromString(StringData dateString) const {
+    std::unique_ptr<timelib_time, TimeZone::TimelibTimeDeleter> t(
+        timelib_strtotime(const_cast<char*>(dateString.toString().c_str()),
+                          dateString.size(),
+                          nullptr,
+                          _timeZoneDatabase.get(),
+                          timezonedatabase_gettzinfowrapper));
+
+    // If the time portion is fully missing, initialize to 0. This allows for the '%Y-%m-%d' format
+    // to be passed too, which is what the BI connector may request
+    if (t->h == TIMELIB_UNSET && t->i == TIMELIB_UNSET && t->s == TIMELIB_UNSET) {
+        t->h = t->i = t->s = t->f = 0;
+    }
+
+    if (t->y == TIMELIB_UNSET || t->m == TIMELIB_UNSET || t->d == TIMELIB_UNSET ||
+        t->h == TIMELIB_UNSET || t->i == TIMELIB_UNSET || t->s == TIMELIB_UNSET) {
+        uasserted(40545,
+                  str::stream()
+                      << "an incomplete date/time string has been found, with elements missing: \""
+                      << dateString
+                      << "\"");
+    }
+
+    timelib_update_ts(t.get(), nullptr);
+    timelib_unixtime2local(t.get(), t->sse);
+
+    return Date_t::fromMillisSinceEpoch((static_cast<double>(t->sse) + static_cast<double>(t->f)) *
+                                        1000);
+}
+
 TimeZone TimeZoneDatabase::getTimeZone(StringData timeZoneId) const {
     auto tz = _timeZones.find(timeZoneId);
     if (tz != _timeZones.end()) {
