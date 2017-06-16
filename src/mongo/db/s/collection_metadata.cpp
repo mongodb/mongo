@@ -170,7 +170,7 @@ Status CollectionMetadata::checkChunkIsValid(const ChunkType& chunk) {
     ChunkType existingChunk;
 
     if (!getNextChunk(chunk.getMin(), &existingChunk)) {
-        return {ErrorCodes::IncompatibleShardingMetadata,
+        return {ErrorCodes::StaleShardVersion,
                 str::stream() << "Chunk with bounds "
                               << ChunkRange(chunk.getMin(), chunk.getMax()).toString()
                               << " is not owned by this shard."};
@@ -178,7 +178,7 @@ Status CollectionMetadata::checkChunkIsValid(const ChunkType& chunk) {
 
     if (existingChunk.getMin().woCompare(chunk.getMin()) ||
         existingChunk.getMax().woCompare(chunk.getMax())) {
-        return {ErrorCodes::IncompatibleShardingMetadata,
+        return {ErrorCodes::StaleShardVersion,
                 str::stream() << "Unable to find chunk with the exact bounds "
                               << ChunkRange(chunk.getMin(), chunk.getMax()).toString()
                               << " at collection version "
