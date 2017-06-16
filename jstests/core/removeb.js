@@ -11,6 +11,9 @@ t.remove({});
 
 // Insert some data.
 for (i = 0; i < 20000; ++i) {
+    if (i % 100 == 0) {
+        print(i + " of first set of 20000 documents inserted");
+    }
     t.insert({a: i});
 }
 
@@ -23,7 +26,7 @@ p = startParallelShell(
     'for( i = 20000; i < 40000; ++i ) {' +
     '    db.jstests_removeb.insert( { a:i } );' +
     '    if (i % 1000 == 0) {' +
-    '        print( i-20000 + \" of 20000 documents inserted\" );' +
+    '        print( i-20000 + \" of second set of 20000 documents inserted\" );' +
     '    }' +
     '}');
 
