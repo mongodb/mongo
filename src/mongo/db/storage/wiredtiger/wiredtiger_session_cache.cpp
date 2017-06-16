@@ -106,16 +106,31 @@ void WiredTigerSession::releaseCursor(uint64_t id, WT_CURSOR* cursor) {
     }
 }
 
-void WiredTigerSession::closeAllCursors(uint64_t cursorEpoch) {
+void WiredTigerSession::closeAllCursors(const std::string& uri) {
     invariant(_session);
-    for (CursorCache::iterator i = _cursors.begin(); i != _cursors.end(); ++i) {
+
+    for (auto i = _cursors.begin(); i != _cursors.end();) {
+        WT_CURSOR* cursor = i->_cursor;
+        if (cursor && uri == cursor->uri) {
+            invariantWTOK(cursor->close(cursor));
+            i = _cursors.erase(i);
+        } else
+            ++i;
+    }
+}
+
+void WiredTigerSession::closeCursorsForQueuedDrops(uint64_t cursorEpoch,
+                                                   WiredTigerKVEngine* engine) {
+    invariant(_session);
+
+    auto toDrop = engine->filterCursorsWithQueuedDrops(&_cursors);
+
+    for (auto i = toDrop.begin(); i != toDrop.end(); i++) {
         WT_CURSOR* cursor = i->_cursor;
         if (cursor) {
             invariantWTOK(cursor->close(cursor));
         }
     }
-    _cursors.clear();
-    _cursorEpoch = cursorEpoch;
 }
 
 namespace {
@@ -221,13 +236,20 @@ void WiredTigerSessionCache::waitUntilDurable(bool forceCheckpoint) {
     _journalListener->onDurable(token);
 }
 
-void WiredTigerSessionCache::closeAllCursors() {
+void WiredTigerSessionCache::closeAllCursors(const std::string& uri) {
+    stdx::lock_guard<stdx::mutex> lock(_cacheLock);
+    for (SessionCache::iterator i = _sessions.begin(); i != _sessions.end(); i++) {
+        (*i)->closeAllCursors(uri);
+    }
+}
+
+void WiredTigerSessionCache::closeCursorsForQueuedDrops() {
     // Increment the cursor epoch so that all cursors from this epoch are closed.
     uint64_t cursorEpoch = _cursorEpoch.addAndFetch(1);
 
     stdx::lock_guard<stdx::mutex> lock(_cacheLock);
     for (SessionCache::iterator i = _sessions.begin(); i != _sessions.end(); i++) {
-        (*i)->closeAllCursors(cursorEpoch);
+        (*i)->closeCursorsForQueuedDrops(cursorEpoch, _engine);
     }
 }
 
@@ -300,7 +322,7 @@ void WiredTigerSessionCache::releaseSession(WiredTigerSession* session) {
     // If the cursor epoch has moved on, close all cursors in the session.
     uint64_t cursorEpoch = _cursorEpoch.load();
     if (session->_getCursorEpoch() != cursorEpoch)
-        session->closeAllCursors(cursorEpoch);
+        session->closeCursorsForQueuedDrops(cursorEpoch, _engine);
 
     bool returnedToCache = false;
     uint64_t currentEpoch = _epoch.load();
