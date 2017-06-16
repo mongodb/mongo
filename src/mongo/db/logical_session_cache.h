@@ -39,6 +39,10 @@
 
 namespace mongo {
 
+extern int logicalSessionRecordCacheSize;
+extern int localLogicalSessionTimeoutMinutes;
+extern int logicalSessionRefreshMinutes;
+
 /**
  * A thread-safe cache structure for logical session records.
  *
@@ -59,15 +63,19 @@ public:
 
         /**
          * The number of session records to keep in the cache.
+         *
+         * May be set with --setParameter logicalSessionRecordCacheSize=X.
          */
-        int capacity = kLogicalSessionCacheDefaultCapacity;
+        int capacity = logicalSessionRecordCacheSize;
 
         /**
          * A timeout value to use for sessions in the cache, in minutes.
          *
          * By default, this is set to 30 minutes.
+         *
+         * May be set with --setParameter localLogicalSessionTimeoutMinutes=X.
          */
-        Minutes sessionTimeout = kLogicalSessionDefaultTimeout;
+        Minutes sessionTimeout = Minutes(localLogicalSessionTimeoutMinutes);
 
         /**
          * The interval over which the cache will refresh session records.
@@ -75,8 +83,10 @@ public:
          * By default, this is set to every 5 minutes. If the caller is
          * setting the sessionTimeout by hand, it is suggested that they
          * consider also setting the refresh interval accordingly.
+         *
+         * May be set with --setParameter logicalSessionRefreshMinutes=X.
          */
-        Minutes refreshInterval = kLogicalSessionDefaultRefresh;
+        Minutes refreshInterval = Minutes(logicalSessionRefreshMinutes);
     };
 
     /**

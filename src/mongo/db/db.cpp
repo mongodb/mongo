@@ -74,6 +74,8 @@
 #include "mongo/db/json.h"
 #include "mongo/db/log_process_details.h"
 #include "mongo/db/logical_clock.h"
+#include "mongo/db/logical_session_cache.h"
+#include "mongo/db/logical_session_cache_factory_mongod.h"
 #include "mongo/db/logical_time_metadata_hook.h"
 #include "mongo/db/logical_time_validator.h"
 #include "mongo/db/mongod_options.h"
@@ -706,6 +708,17 @@ ExitCode _initAndListen(int listenPort) {
     auto runner = makePeriodicRunner();
     runner->startup();
     globalServiceContext->setPeriodicRunner(std::move(runner));
+
+    // Set up the logical session cache
+    LogicalSessionCacheServer kind = LogicalSessionCacheServer::kStandalone;
+    if (shardingInitialized) {
+        kind = LogicalSessionCacheServer::kSharded;
+    } else if (replSettings.usingReplSets()) {
+        kind = LogicalSessionCacheServer::kReplicaSet;
+    }
+
+    auto sessionCache = makeLogicalSessionCacheD(kind);
+    globalServiceContext->setLogicalSessionCache(std::move(sessionCache));
 
     // MessageServer::run will return when exit code closes its socket and we don't need the
     // operation context anymore

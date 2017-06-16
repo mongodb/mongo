@@ -32,11 +32,24 @@
 
 #include "mongo/db/logical_session_cache.h"
 
+#include "mongo/db/server_parameters.h"
 #include "mongo/util/duration.h"
 #include "mongo/util/log.h"
 #include "mongo/util/periodic_runner.h"
 
 namespace mongo {
+
+MONGO_EXPORT_STARTUP_SERVER_PARAMETER(logicalSessionRecordCacheSize,
+                                      int,
+                                      LogicalSessionCache::kLogicalSessionCacheDefaultCapacity);
+
+MONGO_EXPORT_STARTUP_SERVER_PARAMETER(localLogicalSessionTimeoutMinutes,
+                                      int,
+                                      LogicalSessionCache::kLogicalSessionDefaultTimeout.count());
+
+MONGO_EXPORT_STARTUP_SERVER_PARAMETER(logicalSessionRefreshMinutes,
+                                      int,
+                                      LogicalSessionCache::kLogicalSessionDefaultRefresh.count());
 
 constexpr int LogicalSessionCache::kLogicalSessionCacheDefaultCapacity;
 constexpr Minutes LogicalSessionCache::kLogicalSessionDefaultTimeout;

@@ -453,6 +453,7 @@ env.Library(
         '$BUILD_DIR/mongo/util/periodic_runner',
         '$BUILD_DIR/mongo/transport/transport_layer_common',
         '$BUILD_DIR/mongo/transport/transport_layer_manager',
+        'logical_session_cache',
     ],
 )
 
@@ -885,7 +886,7 @@ env.Library(
     ],
     LIBDEPS=[
         '$BUILD_DIR/mongo/base',
-        '$BUILD_DIR/mongo/db/auth/authcore',
+        '$BUILD_DIR/mongo/db/auth/user_name',
         '$BUILD_DIR/mongo/idl/idl_parser',
         'logical_session_id'
     ],
@@ -956,6 +957,7 @@ env.Library(
     LIBDEPS=[
         'logical_session_record',
         'sessions_collection',
+        'server_parameters',
         'service_liason',
     ],
 )
@@ -970,6 +972,30 @@ envWithAsio.CppUnitTest(
         'logical_session_cache',
         'service_liason_mock',
         'sessions_collection_mock',
+    ],
+)
+
+envWithAsio.Library(
+    target='logical_session_cache_factory_mongod',
+    source=[
+        'logical_session_cache_factory_mongod.cpp',
+    ],
+    LIBDEPS=[
+        'logical_session_cache',
+        'service_liason_mock', # TODO SERVER-29198 replace with service_liason_mongod
+        'sessions_collection_mock', # TODO SERVER-29201, SERVER-29202, SERVER-29203
+    ],
+)
+
+envWithAsio.Library(
+    target='logical_session_cache_factory_mongos',
+    source=[
+        'logical_session_cache_factory_mongos.cpp',
+    ],
+    LIBDEPS=[
+        'logical_session_cache',
+        'service_liason_mock', # TODO SERVER-29199 replace with service_liason_mongos
+        'sessions_collection_mock', # TODO SERVER-29203 replace with sessions_collection_sharded
     ],
 )
 

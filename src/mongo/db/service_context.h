@@ -33,6 +33,7 @@
 #include <vector>
 
 #include "mongo/base/disallow_copying.h"
+#include "mongo/db/logical_session_cache.h"
 #include "mongo/db/logical_session_id.h"
 #include "mongo/db/storage/storage_engine.h"
 #include "mongo/platform/atomic_word.h"
@@ -332,6 +333,21 @@ public:
     PeriodicRunner* getPeriodicRunner() const;
 
     //
+    // Logical sessions.
+    //
+
+    /**
+     * Set the logical session cache on this service context.
+     */
+    void setLogicalSessionCache(std::unique_ptr<LogicalSessionCache> cache) &;
+
+    /**
+     * Return a pointer to the logical session cache on this service context.
+     */
+    LogicalSessionCache* getLogicalSessionCache() const&;
+    LogicalSessionCache* getLogicalSessionCache() && = delete;
+
+    //
     // Transport.
     //
 
@@ -439,6 +455,11 @@ private:
      * The periodic runner.
      */
     std::unique_ptr<PeriodicRunner> _runner;
+
+    /**
+     * The logical session cache.
+     */
+    std::unique_ptr<LogicalSessionCache> _sessionCache;
 
     /**
      * The TransportLayerManager.

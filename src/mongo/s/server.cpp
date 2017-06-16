@@ -54,6 +54,8 @@
 #include "mongo/db/lasterror.h"
 #include "mongo/db/log_process_details.h"
 #include "mongo/db/logical_clock.h"
+#include "mongo/db/logical_session_cache.h"
+#include "mongo/db/logical_session_cache_factory_mongos.h"
 #include "mongo/db/logical_time_metadata_hook.h"
 #include "mongo/db/logical_time_validator.h"
 #include "mongo/db/operation_context.h"
@@ -347,6 +349,9 @@ static ExitCode runMongosServer() {
     auto runner = makePeriodicRunner();
     runner->startup();
     getGlobalServiceContext()->setPeriodicRunner(std::move(runner));
+
+    // Set up the logical session cache
+    getGlobalServiceContext()->setLogicalSessionCache(makeLogicalSessionCacheS());
 
     auto start = getGlobalServiceContext()->addAndStartTransportLayer(std::move(transportLayer));
     if (!start.isOK()) {

@@ -289,6 +289,7 @@ mongod = env.Program(
         'db/ftdc/ftdc_mongod',
         'db/index_d',
         'db/initialize_snmp',
+        'db/logical_session_cache_factory_mongod',
         'db/mongod_options',
         'db/mongodandmongos',
         'db/op_observer_d',
