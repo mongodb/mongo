@@ -33,6 +33,7 @@
 
 #ifndef _WIN32
 #include <cstdio>
+#include <sys/resource.h>
 #include <sys/wait.h>
 #include <unistd.h>
 #endif
@@ -105,6 +106,13 @@ void DeathTestImpl::_doTest() {
     checkSyscall(close(pipes[0]));
     checkSyscall(dup2(pipes[1], 1));
     checkSyscall(dup2(1, 2));
+
+    // We disable the creation of core dump files in the child process since the child process is
+    // expected to exit uncleanly. This avoids unnecessarily creating core dump files when the child
+    // process calls std::abort() or std::terminate().
+    const struct rlimit kNoCoreDump { 0U, 0U };
+    checkSyscall(setrlimit(RLIMIT_CORE, &kNoCoreDump));
+
     try {
         _test->run();
     } catch (const TestAssertionFailureException& tafe) {
