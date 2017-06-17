@@ -270,21 +270,7 @@ intrusive_ptr<DocumentSource> DocumentSourceFacet::createFromBson(
     for (auto&& rawFacet : extractRawPipelines(elem)) {
         const auto facetName = rawFacet.first;
 
-        auto pipeline = uassertStatusOK(Pipeline::parse(rawFacet.second, expCtx));
-
-        uassert(40172,
-                str::stream() << "sub-pipeline in $facet stage cannot be empty: " << facetName,
-                !pipeline->getSources().empty());
-
-        // Disallow any stages that need to be the first stage in the pipeline.
-        for (auto&& stage : pipeline->getSources()) {
-            if (stage->isInitialSource()) {
-                uasserted(40173,
-                          str::stream() << stage->getSourceName()
-                                        << " is not allowed to be used within a $facet stage: "
-                                        << elem.toString());
-            }
-        }
+        auto pipeline = uassertStatusOK(Pipeline::parseFacetPipeline(rawFacet.second, expCtx));
 
         facetPipelines.emplace_back(facetName, std::move(pipeline));
     }

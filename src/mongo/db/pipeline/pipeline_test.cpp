@@ -1349,6 +1349,15 @@ TEST_F(PipelineInitialSourceNSTest, CollectionNSNotValidIfInitialStageIsCollecti
     ASSERT_NOT_OK(Pipeline::create({collectionlessSource}, ctx).getStatus());
 }
 
+TEST_F(PipelineInitialSourceNSTest, AggregateOneNSValidForFacetPipelineRegardlessOfInitialStage) {
+    const std::vector<BSONObj> rawPipeline = {fromjson("{$match: {}}")};
+    auto ctx = getExpCtx();
+
+    ctx->ns = NamespaceString::makeCollectionlessAggregateNSS("unittests");
+
+    ASSERT_OK(Pipeline::parseFacetPipeline(rawPipeline, ctx).getStatus());
+}
+
 }  // namespace Namespaces
 
 namespace Dependencies {

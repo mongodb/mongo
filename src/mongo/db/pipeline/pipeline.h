@@ -97,9 +97,9 @@ public:
     };
 
     /**
-     * Parses a Pipeline from a BSONElement representing a list of DocumentSources. Returns a non-OK
-     * status if it failed to parse. The returned pipeline is not optimized, but the caller may
-     * convert it to an optimized pipeline by calling optimizePipeline().
+     * Parses a Pipeline from a vector of BSONObjs. Returns a non-OK status if it failed to parse.
+     * The returned pipeline is not optimized, but the caller may convert it to an optimized
+     * pipeline by calling optimizePipeline().
      *
      * It is illegal to create a pipeline using an ExpressionContext which contains a collation that
      * will not be used during execution of the pipeline. Doing so may cause comparisons made during
@@ -110,12 +110,32 @@ public:
         const boost::intrusive_ptr<ExpressionContext>& expCtx);
 
     /**
+     * Parses a $facet Pipeline from a vector of BSONObjs. Validation checks which are only relevant
+     * to top-level pipelines are skipped, and additional checks applicable to $facet pipelines are
+     * performed. Returns a non-OK status if it failed to parse. The returned pipeline is not
+     * optimized, but the caller may convert it to an optimized pipeline by calling
+     * optimizePipeline().
+     */
+    static StatusWith<std::unique_ptr<Pipeline, Pipeline::Deleter>> parseFacetPipeline(
+        const std::vector<BSONObj>& rawPipeline,
+        const boost::intrusive_ptr<ExpressionContext>& expCtx);
+
+    /**
      * Creates a Pipeline from an existing SourceContainer.
      *
      * Returns a non-OK status if any stage is in an invalid position. For example, if an $out stage
      * is present but is not the last stage.
      */
     static StatusWith<std::unique_ptr<Pipeline, Pipeline::Deleter>> create(
+        SourceContainer sources, const boost::intrusive_ptr<ExpressionContext>& expCtx);
+
+    /**
+     * Creates a $facet Pipeline from an existing SourceContainer.
+     *
+     * Returns a non-OK status if any stage is invalid. For example, if the pipeline is empty or if
+     * any stage is an initial source.
+     */
+    static StatusWith<std::unique_ptr<Pipeline, Pipeline::Deleter>> createFacetPipeline(
         SourceContainer sources, const boost::intrusive_ptr<ExpressionContext>& expCtx);
 
     /**
@@ -234,6 +254,24 @@ private:
 
     friend class Optimizations::Sharded;
 
+    /**
+     * Used by both Pipeline::parse() and Pipeline::parseFacetPipeline() to build and validate the
+     * pipeline.
+     */
+    static StatusWith<std::unique_ptr<Pipeline, Pipeline::Deleter>> parseTopLevelOrFacetPipeline(
+        const std::vector<BSONObj>& rawPipeline,
+        const boost::intrusive_ptr<ExpressionContext>& expCtx,
+        const bool isFacetPipeline);
+
+    /**
+     * Used by both Pipeline::create() and Pipeline::createFacetPipeline() to build and validate the
+     * pipeline.
+     */
+    static StatusWith<std::unique_ptr<Pipeline, Pipeline::Deleter>> createTopLevelOrFacetPipeline(
+        SourceContainer sources,
+        const boost::intrusive_ptr<ExpressionContext>& expCtx,
+        const bool isSubPipeline);
+
     Pipeline(const boost::intrusive_ptr<ExpressionContext>& pCtx);
     Pipeline(SourceContainer stages, const boost::intrusive_ptr<ExpressionContext>& pCtx);
 
@@ -257,7 +295,21 @@ private:
      * if an $out stage is present then it must come last in the pipeline, while initial stages such
      * as $indexStats must be at the start.
      */
-    Status validate() const;
+    Status validatePipeline() const;
+
+    /**
+     * Returns a non-OK status if the $facet pipeline fails any of a set of semantic checks. For
+     * example, the pipeline cannot be empty and may not contain any initial stages.
+     */
+    Status validateFacetPipeline() const;
+
+    /**
+     * Helper method which validates that each stage in pipeline is in a legal position. For
+     * example, $out must be at the end, while a $match stage with a text query must be at the
+     * start. Note that this method accepts an initial source as the first stage, which is illegal
+     * for $facet pipelines.
+     */
+    Status ensureAllStagesAreInLegalPositions() const;
 
     SourceContainer _sources;
 

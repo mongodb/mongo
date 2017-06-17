@@ -276,6 +276,29 @@
             }).itcount(),
             numExpectedMatches);
 
+        // Test that $currentOp output can be processed by $facet subpipelines.
+        assert.eq(cmdCursor(adminDB, {
+                      aggregate: 1,
+                      pipeline: [
+                          {$currentOp: {}},
+                          {
+                            $facet: {
+                                testFacet: [
+                                    {$match: {[matchField]: "agg_current_op_facets"}},
+                                    {$count: "count"}
+                                ]
+                            }
+                          },
+                          {$unwind: "$testFacet"},
+                          {$replaceRoot: {newRoot: "$testFacet"}}
+                      ],
+                      comment: "agg_current_op_facets",
+                      cursor: {}
+                  })
+                      .next()
+                      .count,
+                  numExpectedMatches);
+
         // Test that $currentOp is explainable.
         const explainPlan = assert.commandWorked(adminDB.runCommand({
             aggregate: 1,

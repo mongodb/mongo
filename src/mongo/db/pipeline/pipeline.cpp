@@ -63,7 +63,7 @@ namespace dps = ::mongo::dotted_path_support;
 Pipeline::Pipeline(const intrusive_ptr<ExpressionContext>& pTheCtx) : pCtx(pTheCtx) {}
 
 Pipeline::Pipeline(SourceContainer stages, const intrusive_ptr<ExpressionContext>& expCtx)
-    : _sources(stages), pCtx(expCtx) {}
+    : _sources(std::move(stages)), pCtx(expCtx) {}
 
 Pipeline::~Pipeline() {
     invariant(_disposed);
@@ -71,29 +71,47 @@ Pipeline::~Pipeline() {
 
 StatusWith<std::unique_ptr<Pipeline, Pipeline::Deleter>> Pipeline::parse(
     const std::vector<BSONObj>& rawPipeline, const intrusive_ptr<ExpressionContext>& expCtx) {
-    std::unique_ptr<Pipeline, Pipeline::Deleter> pipeline(new Pipeline(expCtx),
-                                                          Pipeline::Deleter(expCtx->opCtx));
+    return parseTopLevelOrFacetPipeline(rawPipeline, expCtx, false);
+}
+
+StatusWith<std::unique_ptr<Pipeline, Pipeline::Deleter>> Pipeline::parseFacetPipeline(
+    const std::vector<BSONObj>& rawPipeline, const intrusive_ptr<ExpressionContext>& expCtx) {
+    return parseTopLevelOrFacetPipeline(rawPipeline, expCtx, true);
+}
+
+StatusWith<std::unique_ptr<Pipeline, Pipeline::Deleter>> Pipeline::parseTopLevelOrFacetPipeline(
+    const std::vector<BSONObj>& rawPipeline,
+    const intrusive_ptr<ExpressionContext>& expCtx,
+    const bool isFacetPipeline) {
+
+    SourceContainer stages;
 
     for (auto&& stageObj : rawPipeline) {
         auto parsedSources = DocumentSource::parse(expCtx, stageObj);
-        pipeline->_sources.insert(
-            pipeline->_sources.end(), parsedSources.begin(), parsedSources.end());
+        stages.insert(stages.end(), parsedSources.begin(), parsedSources.end());
     }
 
-    auto status = pipeline->validate();
-    if (!status.isOK()) {
-        return status;
-    }
-
-    pipeline->stitch();
-    return std::move(pipeline);
+    return createTopLevelOrFacetPipeline(std::move(stages), expCtx, isFacetPipeline);
 }
 
 StatusWith<std::unique_ptr<Pipeline, Pipeline::Deleter>> Pipeline::create(
     SourceContainer stages, const intrusive_ptr<ExpressionContext>& expCtx) {
-    std::unique_ptr<Pipeline, Pipeline::Deleter> pipeline(new Pipeline(stages, expCtx),
+    return createTopLevelOrFacetPipeline(std::move(stages), expCtx, false);
+}
+
+StatusWith<std::unique_ptr<Pipeline, Pipeline::Deleter>> Pipeline::createFacetPipeline(
+    SourceContainer stages, const intrusive_ptr<ExpressionContext>& expCtx) {
+    return createTopLevelOrFacetPipeline(std::move(stages), expCtx, true);
+}
+
+StatusWith<std::unique_ptr<Pipeline, Pipeline::Deleter>> Pipeline::createTopLevelOrFacetPipeline(
+    SourceContainer stages,
+    const intrusive_ptr<ExpressionContext>& expCtx,
+    const bool isFacetPipeline) {
+    std::unique_ptr<Pipeline, Pipeline::Deleter> pipeline(new Pipeline(std::move(stages), expCtx),
                                                           Pipeline::Deleter(expCtx->opCtx));
-    auto status = pipeline->validate();
+    auto status =
+        (isFacetPipeline ? pipeline->validateFacetPipeline() : pipeline->validatePipeline());
     if (!status.isOK()) {
         return status;
     }
@@ -102,7 +120,7 @@ StatusWith<std::unique_ptr<Pipeline, Pipeline::Deleter>> Pipeline::create(
     return std::move(pipeline);
 }
 
-Status Pipeline::validate() const {
+Status Pipeline::validatePipeline() const {
     // Verify that the specified namespace is valid for the initial stage of this pipeline.
     const NamespaceString& nss = pCtx->ns;
 
@@ -130,7 +148,26 @@ Status Pipeline::validate() const {
         }
     }
 
-    // Verify that all stages of the pipeline are in legal positions.
+    // Verify that each stage is in a legal position within the pipeline.
+    return ensureAllStagesAreInLegalPositions();
+}
+
+Status Pipeline::validateFacetPipeline() const {
+    if (_sources.empty()) {
+        return {ErrorCodes::BadValue, "sub-pipeline in $facet stage cannot be empty."};
+    } else if (_sources.front()->isInitialSource()) {
+        return {ErrorCodes::BadValue,
+                str::stream() << _sources.front()->getSourceName()
+                              << " is not allowed to be used within a $facet stage."};
+    }
+
+    // Facet pipelines cannot have any stages which are initial sources. We've already validated the
+    // first stage, and the 'ensureAllStagesAreInLegalPositions' method checks that there are no
+    // initial sources in positions 1...N, so we can just return its result directly.
+    return ensureAllStagesAreInLegalPositions();
+}
+
+Status Pipeline::ensureAllStagesAreInLegalPositions() const {
     size_t i = 0;
     for (auto&& stage : _sources) {
         if (stage->isInitialSource() && i != 0) {
