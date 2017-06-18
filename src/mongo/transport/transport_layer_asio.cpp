@@ -273,17 +273,26 @@ Status TransportLayerASIO::start() {
     stdx::lock_guard<stdx::mutex> lk(_mutex);
     _running.store(true);
 
+    // If we're in async mode then the ServiceExecutor will handle calling run_one() in a pool
+    // of threads. Otherwise we need a thread to just handle the async_accept calls.
+    if (!_listenerOptions.async) {
+        _listenerThread = stdx::thread([this] {
+            setThreadName("listener");
+            while (_running.load()) {
+                try {
+                    _ioContext->run();
+                    _ioContext->reset();
+                } catch (...) {
+                    severe() << "Uncaught exception in the listener: " << exceptionToStatus();
+                    fassertFailed(40491);
+                }
+            }
+        });
+    }
+
     for (auto& acceptor : _acceptors) {
         acceptor.listen();
-        if (!_listenerOptions.async) {
-            _listenerThreads.emplace_back(stdx::thread([this, &acceptor] {
-                do {
-                    _acceptConnection(acceptor);
-                } while (_running.load());
-            }));
-        } else {
-            _acceptConnection(acceptor);
-        }
+        _acceptConnection(acceptor);
     }
 
     return Status::OK();
@@ -291,12 +300,11 @@ Status TransportLayerASIO::start() {
 
 void TransportLayerASIO::shutdown() {
     stdx::lock_guard<stdx::mutex> lk(_mutex);
-    _acceptors.clear();
     _running.store(false);
     _ioContext->stop();
 
-    for (auto& thread : _listenerThreads) {
-        thread.join();
+    if (_listenerThread.joinable()) {
+        _listenerThread.join();
     }
 }
 
@@ -310,9 +318,7 @@ void TransportLayerASIO::eraseSession(TransportLayerASIO::SessionsListIterator i
 void TransportLayerASIO::_acceptConnection(GenericAcceptor& acceptor) {
     auto session = createSession();
     if (!session) {
-        if (_listenerOptions.async) {
-            _acceptConnection(acceptor);
-        }
+        _acceptConnection(acceptor);
         return;
     }
 
@@ -321,9 +327,7 @@ void TransportLayerASIO::_acceptConnection(GenericAcceptor& acceptor) {
         if (ec) {
             log() << "Error accepting new connection on "
                   << endpointToHostAndPort(acceptor.local_endpoint()) << ": " << ec.message();
-            if (_listenerOptions.async) {
-                _acceptConnection(acceptor);
-            }
+            _acceptConnection(acceptor);
             return;
         }
 
@@ -334,9 +338,7 @@ void TransportLayerASIO::_acceptConnection(GenericAcceptor& acceptor) {
             if (_sessions.size() + 1 > _listenerOptions.maxConns) {
                 log() << "connection refused because too many open connections: "
                       << _sessions.size();
-                if (_listenerOptions.async) {
-                    _acceptConnection(acceptor);
-                }
+                _acceptConnection(acceptor);
                 return;
             }
             listIt = _sessions.emplace(_sessions.end(), session);
@@ -352,19 +354,10 @@ void TransportLayerASIO::_acceptConnection(GenericAcceptor& acceptor) {
         }
 
         _sep->startSession(std::move(session));
-
-        if (_listenerOptions.async) {
-            _acceptConnection(acceptor);
-        }
+        _acceptConnection(acceptor);
     };
 
-    if (_listenerOptions.async) {
-        acceptor.async_accept(socket, std::move(acceptCb));
-    } else {
-        std::error_code ec;
-        acceptor.accept(socket, ec);
-        acceptCb(ec);
-    }
+    acceptor.async_accept(socket, std::move(acceptCb));
 }
 
 }  // namespace transport

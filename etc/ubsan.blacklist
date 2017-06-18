@@ -1,6 +1,6 @@
 # Don't UBSAN most of third_party, but do ubsan WT
 src:src/third_party/IntelRDFPMathLib20U1/*
-src:src/third_party/asio-asio-*/*
+src:src/third_party/asio-*/*
 src:src/third_party/boost-*/*
 src:src/third_party/gperftools-*/*
 src:src/third_party/icu4c-*/*

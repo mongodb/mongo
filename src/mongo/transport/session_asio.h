@@ -102,21 +102,12 @@ public:
         _socket.non_blocking(async, ec);
         fassert(40490, ec.value() == 0);
 
-// Prevent a warning about unused variables on Solaris -- only create this variable for codepaths
-// which use it.
-#if defined(__linux) || defined(SO_NOSIGPIPE)
-        const auto sock = _socket.native_handle();
-#endif
-#ifdef SO_NOSIGPIPE
-        // ignore SIGPIPE signals on osx, to avoid process exit
-        const int one = 1;
-        setsockopt(sock, SOL_SOCKET, SO_NOSIGPIPE, &one, sizeof(int));
-#endif
         auto family = endpointToSockAddr(_socket.local_endpoint()).getType();
         if (family == AF_INET || family == AF_INET6) {
             _socket.set_option(asio::ip::tcp::no_delay(true));
             _socket.set_option(asio::socket_base::keep_alive(true));
 #ifdef __linux__
+            const auto sock = _socket.native_handle();
             // On linux the default keep alive value may be very high - say an hour.
             // Here we set it to a minimum of 5 minutes if the default value was over five minutes.
             // See SERVER-3604.

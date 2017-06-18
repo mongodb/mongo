@@ -133,7 +133,9 @@ private:
     stdx::mutex _mutex;
     std::vector<GenericAcceptor> _acceptors;
     stdx::list<std::weak_ptr<ASIOSession>> _sessions;
-    std::vector<stdx::thread> _listenerThreads;
+
+    // Only used if _listenerOptions.async is false.
+    stdx::thread _listenerThread;
 
     std::unique_ptr<asio::io_context> _ioContext;
 #ifdef MONGO_CONFIG_SSL
