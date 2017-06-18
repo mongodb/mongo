@@ -119,7 +119,7 @@ void logCommonStartupWarnings(const ServerGlobalParams& serverParams) {
               << startupWarningsLog;
         log() << "**          Start the server with --bind_ip <address> to specify which IP "
               << startupWarningsLog;
-        log() << "**          addressses it should serve responses from, or with --bind_ip_all to"
+        log() << "**          addresses it should serve responses from, or with --bind_ip_all to"
               << startupWarningsLog;
         log() << "**          bind to all interfaces. If this behavior is desired, start the"
               << startupWarningsLog;
