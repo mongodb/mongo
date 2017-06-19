@@ -1055,6 +1055,8 @@ public:
             }
 
             uint32_t indexNsHash;
+            const auto& pattern = descriptor->keyPattern();
+            const Ordering ord = Ordering::make(pattern);
             MurmurHash3_x86_32(indexNs.c_str(), indexNs.size(), 0, &indexNsHash);
 
             for (const auto& key : documentKeySet) {
@@ -1063,9 +1065,11 @@ public:
                     _longKeys[indexNs]++;
                     continue;
                 }
-                uint32_t indexEntryHash = hashIndexEntry(key, recordId, indexNsHash);
-                uint64_t& indexEntryCount = (*_ikc)[indexEntryHash];
 
+                // We want to use the latest version of KeyString here.
+                KeyString ks(KeyString::kLatestVersion, key, ord, recordId);
+                uint32_t indexEntryHash = hashIndexEntry(ks, indexNsHash);
+                uint64_t& indexEntryCount = (*_ikc)[indexEntryHash];
                 if (indexEntryCount != 0) {
                     indexEntryCount--;
                     dassert(indexEntryCount >= 0);
@@ -1104,15 +1108,21 @@ public:
 
         if (_level == kValidateFull) {
             const auto& key = descriptor->keyPattern();
-            BSONObj prevIndexEntryKey;
+            const Ordering ord = Ordering::make(key);
+            KeyString::Version version = KeyString::kLatestVersion;
+            std::unique_ptr<KeyString> prevIndexKeyString = nullptr;
             bool isFirstEntry = true;
 
             std::unique_ptr<SortedDataInterface::Cursor> cursor = iam->newCursor(_opCtx, true);
             // Seeking to BSONObj() is equivalent to seeking to the first entry of an index.
             for (auto indexEntry = cursor->seek(BSONObj(), true); indexEntry;
                  indexEntry = cursor->next()) {
+
+                // We want to use the latest version of KeyString here.
+                std::unique_ptr<KeyString> indexKeyString =
+                    stdx::make_unique<KeyString>(version, indexEntry->key, ord, indexEntry->loc);
                 // Ensure that the index entries are in increasing or decreasing order.
-                if (!isFirstEntry && (indexEntry->key).woCompare(prevIndexEntryKey, key) < 0) {
+                if (!isFirstEntry && *indexKeyString < *prevIndexKeyString) {
                     if (results.valid) {
                         results.errors.push_back(
                             "one or more indexes are not in strictly ascending or descending "
@@ -1120,15 +1130,16 @@ public:
                     }
                     results.valid = false;
                 }
-                isFirstEntry = false;
-                prevIndexEntryKey = indexEntry->key;
 
                 // Cache the index keys to cross-validate with documents later.
-                uint32_t keyHash = hashIndexEntry(indexEntry->key, indexEntry->loc, indexNsHash);
+                uint32_t keyHash = hashIndexEntry(*indexKeyString, indexNsHash);
                 if ((*_ikc)[keyHash] == 0) {
                     _indexKeyCountTableNumEntries++;
                 }
                 (*_ikc)[keyHash]++;
+
+                isFirstEntry = false;
+                prevIndexKeyString.swap(indexKeyString);
             }
         }
     }
@@ -1203,9 +1214,7 @@ private:
     IndexCatalog* _indexCatalog;             // Not owned.
     ValidateResultsMap* _indexNsResultsMap;  // Not owned.
 
-    uint32_t hashIndexEntry(const BSONObj& key, const RecordId& loc, uint32_t hash) {
-        // We're only using KeyString to get something hashable here, so version doesn't matter.
-        KeyString ks(KeyString::Version::V1, key, Ordering::make(BSONObj()), loc);
+    uint32_t hashIndexEntry(KeyString& ks, uint32_t hash) {
         MurmurHash3_x86_32(ks.getTypeBits().getBuffer(), ks.getTypeBits().getSize(), hash, &hash);
         MurmurHash3_x86_32(ks.getBuffer(), ks.getSize(), hash, &hash);
         return hash % kKeyCountTableSize;

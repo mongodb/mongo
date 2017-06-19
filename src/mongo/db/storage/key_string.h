@@ -54,6 +54,11 @@ public:
     }
 
     /**
+     * Provides the latest version of KeyString available.
+     */
+    static const Version kLatestVersion = Version::V1;
+
+    /**
      * Encodes info needed to restore the original BSONTypes from a KeyString. They cannot be
      * stored in place since we don't want them to affect the ordering (1 and 1.0 compare as
      * equal).
