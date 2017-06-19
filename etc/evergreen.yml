@@ -2851,7 +2851,7 @@ tasks:
   - func: "run tests"
     timeout_secs: 21600 # 6 hour timeout
     vars:
-      resmoke_args: --executor=concurrency jstests/concurrency/fsm_all_simultaneous.js --storageEngine=mmapv1
+      resmoke_args: --suites=concurrency jstests/concurrency/fsm_all_simultaneous.js --storageEngine=mmapv1
 
 - <<: *task_template
   name: concurrency_simultaneous_WT
@@ -2860,7 +2860,7 @@ tasks:
   - func: "run tests"
     timeout_secs: 21600 # 6 hour timeout
     vars:
-      resmoke_args: --executor=concurrency jstests/concurrency/fsm_all_simultaneous.js --storageEngine=wiredTiger
+      resmoke_args: --suites=concurrency jstests/concurrency/fsm_all_simultaneous.js --storageEngine=wiredTiger
 
 - <<: *task_template
   name: rlp

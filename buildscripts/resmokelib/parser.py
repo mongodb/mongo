@@ -64,14 +64,9 @@ def parse_command_line():
                       help=("Comma separated list of YAML files that each specify the configuration"
                             " of a suite. If the file is located in the resmokeconfig/suites/"
                             " directory, then the basename without the .yml extension can be"
-                            " specified, e.g. 'core'."))
-
-    parser.add_option("--executor", dest="executor_file", metavar="EXECUTOR",
-                      help=("A YAML file that specifies the executor configuration. If the file is"
-                            " located in the resmokeconfig/suites/ directory, then the basename"
-                            " without the .yml extension can be specified, e.g. 'core_small_oplog'."
-                            " If specified in combination with the --suites option, then the suite"
-                            " configuration takes precedence."))
+                            " specified, e.g. 'core'. If a list of files is passed in as"
+                            " positional arguments, they will be run using the suites'"
+                            " configurations"))
 
     parser.add_option("--log", dest="logger_file", metavar="LOGGER",
                       help=("A YAML file that specifies the logging configuration. If the file is"
@@ -226,11 +221,15 @@ def parse_command_line():
     parser.add_option("--wiredTigerIndexConfigString", dest="wt_index_config", metavar="CONFIG",
                       help="Set the WiredTiger index configuration setting for all mongod's.")
 
-    parser.set_defaults(executor_file="with_server",
-                        logger_file="console",
+    parser.add_option("--executor", dest="executor_file",
+                      help="OBSOLETE: Superceded by --suites; specify --suites=SUITE path/to/test"
+                           " to run a particular test under a particular suite configuration.")
+
+    parser.set_defaults(logger_file="console",
                         dry_run="off",
                         find_suites=False,
                         list_suites=False,
+                        suite_files="with_server",
                         prealloc_journal="off",
                         shuffle="auto",
                         stagger_jobs="off")
@@ -333,34 +332,30 @@ def create_test_membership_map(fail_on_missing_selector=False, test_kind=None):
 
 
 def get_suites(values, args):
-    if (values.suite_files is None and not args) or (values.suite_files is not None and args):
-        raise optparse.OptionValueError("Must specify either --suites or a list of tests")
+    if values.executor_file:
+        raise optparse.OptionError(
+            "superceded by --suites; specify --suites={} {} to run the test(s) under those suite"
+            " configuration(s)".format(values.executor_file, " ".join(args)), "--executor")
 
-    _config.INTERNAL_EXECUTOR_NAME = values.executor_file
-
-    # If there are no suites specified, but args, collect the specified files.
+    suite_roots = None
     if args:
         # Do not change the execution order of the tests passed as args, unless a tag option is
         # specified. If an option is specified, then sort the tests for consistent execution order.
         _config.ORDER_TESTS_BY_NAME = any(tag_filter is not None for
                                           tag_filter in (_config.EXCLUDE_WITH_ANY_TAGS,
                                                          _config.INCLUDE_WITH_ANY_TAGS))
-        # No specified config, just use the following, and default the logging and executor.
-        suite_config = _make_config(args)
-        _ensure_executor(suite_config, values.executor_file)
-        # The test_kind comes from the executor file.
-        _ensure_test_kind(suite_config,
-                          _get_yaml_config("executor", values.executor_file),
-                          values.executor_file)
-        suite = testing.suite.Suite("<%s>" % suite_config["test_kind"], suite_config)
-        return [suite]
+        # Build configuration for list of files to run.
+        suite_roots = _get_suite_roots(args)
+
 
     suite_files = values.suite_files.split(",")
 
     suites = []
     for suite_filename in suite_files:
         suite_config = _get_suite_config(suite_filename)
-        _ensure_executor(suite_config, values.executor_file)
+        if suite_roots:
+            # Override the suite's default test files with those passed in from the command line.
+            suite_config.update(suite_roots)
         suite = testing.suite.Suite(suite_filename, suite_config)
         suites.append(suite)
     return suites
@@ -416,7 +411,7 @@ def _get_suite_config(pathname):
     return _get_yaml_config("suite", pathname)
 
 
-def _make_config(files):
+def _get_suite_roots(files):
     return {"selector": {"roots": files}}
 
 
@@ -438,12 +433,6 @@ def _get_yaml_config(kind, pathname):
         raise optparse.OptionValueError("Expected a %s YAML config, but got '%s'"
                                         % (kind, pathname))
     return utils.load_yaml_file(pathname)
-
-
-def _ensure_executor(suite_config, pathname):
-    if "executor" not in suite_config:
-        # Named executors are specified as the basename of the file, without the .yml extension.
-        suite_config["executor"] = _get_yaml_config("executor", pathname).pop("executor")
 
 
 def _expand_user(pathname):

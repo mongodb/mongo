@@ -67,11 +67,10 @@ def parse_command_line():
                         check_evergreen=False,
                         evergreen_file="etc/evergreen.yml",
                         selector_file="etc/burn_in_tests.yml",
-                        executor_file="with_server",
                         max_revisions=25,
                         no_exec=False,
                         report_file="report.json",
-                        suite_files=None,
+                        suite_files="with_server",
                         test_list_file=None,
                         test_list_outfile=None)
 
@@ -179,7 +178,7 @@ def find_changed_tests(branch_name, base_commit, max_revisions, buildvariant, ch
     # The lines with untracked files start with '?? '.
     for line in untracked_files:
         if line.startswith("?"):
-            (status, line) = line.split(" ")
+            (status, line) = line.split(" ", 1)
             changed_files.append(line)
 
     for line in changed_files:
@@ -325,12 +324,11 @@ def create_task_list(evergreen_file, buildvariant, suites, exclude_tasks):
             # function. This allows the storage engine to be overridden.
             task_arg = "{} {}".format(task_arg, test_flags)
             # Find the resmoke_args for matching suite names.
-            # Change the --suites to --executor
-            if (re.compile('--suites=' + suite + '(?:\s+|$)').match(task_arg) or
-                    re.compile('--executor=' + suite + '(?:\s+|$)').match(task_arg)):
+            if (re.compile('--suites=' + suite + '(?:\s+|$)').match(task_arg)):
                 tasks_to_run[task_name] = {
-                    "resmoke_args": task_arg.replace("--suites", "--executor"),
-                    "tests": suites[suite]}
+                    "resmoke_args": task_arg,
+                    "tests": suites[suite]
+                }
 
     return tasks_to_run
 
@@ -373,7 +371,6 @@ def _save_report_data(saved_data, pathname, task):
 
 
 def main():
-    values = collections.defaultdict(list)
     values, args = parse_command_line()
 
     # If a resmoke.py command wasn't passed in, use a simple version.
