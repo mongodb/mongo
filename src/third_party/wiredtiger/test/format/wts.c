@@ -1,5 +1,5 @@
 /*-
- * Public Domain 2014-2015 MongoDB, Inc.
+ * Public Domain 2014-2016 MongoDB, Inc.
  * Public Domain 2008-2014 WiredTiger, Inc.
  *
  * This is free and unencumbered software released into the public domain.
@@ -28,18 +28,53 @@
 
 #include "format.h"
 
+/*
+ * compressor --
+ *	Configure compression.
+ */
+static const char *
+compressor(uint32_t compress_flag)
+{
+	switch (compress_flag) {
+	case COMPRESS_NONE:
+		return ("none");
+	case COMPRESS_LZ4:
+		return ("lz4");
+	case COMPRESS_LZ4_NO_RAW:
+		return ("lz4-noraw");
+	case COMPRESS_LZO:
+		return ("LZO1B-6");
+	case COMPRESS_SNAPPY:
+		return ("snappy");
+	case COMPRESS_ZLIB:
+		return ("zlib");
+	case COMPRESS_ZLIB_NO_RAW:
+		return ("zlib-noraw");
+	default:
+		break;
+	}
+	testutil_die(EINVAL,
+	    "illegal compression flag: %#" PRIx32, compress_flag);
+}
+
 static int
 handle_message(WT_EVENT_HANDLER *handler,
     WT_SESSION *session, const char *message)
 {
+	int out;
+
 	(void)(handler);
 	(void)(session);
 
-	if (g.logfp != NULL)
-		return (fprintf(
-		    g.logfp, "%p:%s\n", session, message) < 0 ? -1 : 0);
-
-	return (printf("%p:%s\n", session, message) < 0 ? -1 : 0);
+	/* Write and flush the message so we're up-to-date on error. */
+	if (g.logfp == NULL) {
+		out = printf("%p:%s\n", (void *)session, message);
+		(void)fflush(stdout);
+	} else {
+		out = fprintf(g.logfp, "%p:%s\n", (void *)session, message);
+		(void)fflush(g.logfp);
+	}
+	return (out < 0 ? EIO : 0);
 }
 
 /*
@@ -72,26 +107,23 @@ static WT_EVENT_HANDLER event_handler = {
  *	Open a connection to a WiredTiger database.
  */
 void
-wts_open(const char *home, int set_api, WT_CONNECTION **connp)
+wts_open(const char *home, bool set_api, WT_CONNECTION **connp)
 {
 	WT_CONNECTION *conn;
-	int ret;
-	char config[4096], *end, *p;
+	WT_DECL_RET;
+	char *config, *end, *p, helium_config[1024];
 
 	*connp = NULL;
 
-	p = config;
-	end = config + sizeof(config);
+	config = p = g.wiredtiger_open_config;
+	end = config + sizeof(g.wiredtiger_open_config);
 
 	p += snprintf(p, REMAIN(p, end),
-	    "create,checkpoint_sync=false,cache_size=%" PRIu32 "MB",
-	    g.c_cache);
-
-#ifdef _WIN32
-	p += snprintf(p, REMAIN(p, end), ",error_prefix=\"t_format.exe\"");
-#else
-	p += snprintf(p, REMAIN(p, end), ",error_prefix=\"%s\"", g.progname);
-#endif
+	    "create=true,"
+	    "cache_size=%" PRIu32 "MB,"
+	    "checkpoint_sync=false,"
+	    "error_prefix=\"%s\"",
+	    g.c_cache, g.progname);
 
 	/* LSM configuration. */
 	if (DATASOURCE("lsm"))
@@ -107,16 +139,21 @@ wts_open(const char *home, int set_api, WT_CONNECTION **connp)
 	/* Logging configuration. */
 	if (g.c_logging)
 		p += snprintf(p, REMAIN(p, end),
-		    ",log=(enabled=true,archive=%d,prealloc=%d)",
+		    ",log=(enabled=true,archive=%d,prealloc=%d"
+		    ",compressor=\"%s\")",
 		    g.c_logging_archive ? 1 : 0,
-		    g.c_logging_prealloc ? 1 : 0);
+		    g.c_logging_prealloc ? 1 : 0,
+		    compressor(g.c_logging_compression_flag));
 
 	/* Miscellaneous. */
-#ifndef _WIN32
+#ifdef HAVE_POSIX_MEMALIGN
 	p += snprintf(p, REMAIN(p, end), ",buffer_alignment=512");
 #endif
 
 	p += snprintf(p, REMAIN(p, end), ",mmap=%d", g.c_mmap ? 1 : 0);
+
+	if (g.c_direct_io)
+		p += snprintf(p, REMAIN(p, end), ",direct_io=(data)");
 
 	if (g.c_data_extend)
 		p += snprintf(p, REMAIN(p, end), ",file_extend=(data=8MB)");
@@ -141,9 +178,8 @@ wts_open(const char *home, int set_api, WT_CONNECTION **connp)
 	/* Extensions. */
 	p += snprintf(p, REMAIN(p, end),
 	    ",extensions=["
-	    "\"%s\", \"%s\", \"%s\", \"%s\", \"%s\", \"%s\", \"%s\"],",
+	    "\"%s\", \"%s\", \"%s\", \"%s\", \"%s\", \"%s\"],",
 	    g.c_reverse ? REVERSE_PATH : "",
-	    access(BZIP_PATH, R_OK) == 0 ? BZIP_PATH : "",
 	    access(LZ4_PATH, R_OK) == 0 ? LZ4_PATH : "",
 	    access(LZO_PATH, R_OK) == 0 ? LZO_PATH : "",
 	    access(SNAPPY_PATH, R_OK) == 0 ? SNAPPY_PATH : "",
@@ -161,19 +197,20 @@ wts_open(const char *home, int set_api, WT_CONNECTION **connp)
 		p += snprintf(p, REMAIN(p, end), ",%s", g.config_open);
 
 	if (REMAIN(p, end) == 0)
-		die(ENOMEM, "wiredtiger_open configuration buffer too small");
+		testutil_die(ENOMEM,
+		    "wiredtiger_open configuration buffer too small");
 
 	/*
 	 * Direct I/O may not work with backups, doing copies through the buffer
 	 * cache after configuring direct I/O in Linux won't work.  If direct
-	 * I/O is configured, turn off backups.   This isn't a great place to do
+	 * I/O is configured, turn off backups. This isn't a great place to do
 	 * this check, but it's only here we have the configuration string.
 	 */
 	if (strstr(config, "direct_io") != NULL)
 		g.c_backups = 0;
 
-	if ((ret = wiredtiger_open(home, &event_handler, config, &conn)) != 0)
-		die(ret, "wiredtiger_open: %s", home);
+	testutil_checkfmt(
+	    wiredtiger_open(home, &event_handler, config, &conn), "%s", home);
 
 	if (set_api)
 		g.wt_api = conn->get_extension_api(conn);
@@ -186,20 +223,36 @@ wts_open(const char *home, int set_api, WT_CONNECTION **connp)
 	 */
 	if (DATASOURCE("helium")) {
 		if (g.helium_mount == NULL)
-			die(EINVAL, "no Helium mount point specified");
-		(void)snprintf(config, sizeof(config),
+			testutil_die(EINVAL, "no Helium mount point specified");
+		(void)snprintf(helium_config, sizeof(helium_config),
 		    "entry=wiredtiger_extension_init,config=["
 		    "helium_verbose=0,"
 		    "dev1=[helium_devices=\"he://./%s\","
 		    "helium_o_volume_truncate=1]]",
 		    g.helium_mount);
-		if ((ret =
-		    conn->load_extension(conn, HELIUM_PATH, config)) != 0)
-			die(ret,
+		if ((ret = conn->load_extension(
+		    conn, HELIUM_PATH, helium_config)) != 0)
+			testutil_die(ret,
 			   "WT_CONNECTION.load_extension: %s:%s",
-			   HELIUM_PATH, config);
+			   HELIUM_PATH, helium_config);
 	}
 	*connp = conn;
+}
+
+/*
+ * wts_reopen --
+ *	Re-open a connection to a WiredTiger database.
+ */
+void
+wts_reopen(void)
+{
+	WT_CONNECTION *conn;
+
+	testutil_checkfmt(wiredtiger_open(g.home, &event_handler,
+	    g.wiredtiger_open_config, &conn), "%s", g.home);
+
+	g.wt_api = conn->get_extension_api(conn);
+	g.wts_conn = conn;
 }
 
 /*
@@ -207,12 +260,11 @@ wts_open(const char *home, int set_api, WT_CONNECTION **connp)
  *	Create the underlying store.
  */
 void
-wts_create(void)
+wts_init(void)
 {
 	WT_CONNECTION *conn;
 	WT_SESSION *session;
 	uint32_t maxintlpage, maxintlkey, maxleafpage, maxleafkey, maxleafvalue;
-	int ret;
 	char config[4096], *end, *p;
 
 	conn = g.wts_conn;
@@ -222,15 +274,16 @@ wts_create(void)
 
 	/*
 	 * Ensure that we can service at least one operation per-thread
-	 * concurrently without filling the cache with pinned pages. We
-	 * choose a multiplier of three because the max configurations control
-	 * on disk size and in memory pages are often significantly larger
-	 * than their disk counterparts.
+	 * concurrently without filling the cache with pinned pages. We choose
+	 * a multiplier of three because the max configurations control on disk
+	 * size and in memory pages are often significantly larger than their
+	 * disk counterparts.  We also apply the default eviction_dirty_trigger
+	 * of 20% so that workloads don't get stuck with dirty pages in cache.
 	 */
 	maxintlpage = 1U << g.c_intl_page_max;
 	maxleafpage = 1U << g.c_leaf_page_max;
 	while (3 * g.c_threads * (maxintlpage + maxleafpage) >
-	    g.c_cache << 20) {
+	    (g.c_cache << 20) / 5) {
 		if (maxleafpage <= 512 && maxintlpage <= 512)
 			break;
 		if (maxintlpage > 512)
@@ -241,7 +294,7 @@ wts_create(void)
 	p += snprintf(p, REMAIN(p, end),
 	    "key_format=%s,"
 	    "allocation_size=512,%s"
-	    "internal_page_max=%d,leaf_page_max=%d",
+	    "internal_page_max=%" PRIu32 ",leaf_page_max=%" PRIu32,
 	    (g.type == ROW) ? "u" : "r",
 	    g.c_firstfit ? "block_allocation=first," : "",
 	    maxintlpage, maxleafpage);
@@ -253,15 +306,15 @@ wts_create(void)
 	maxintlkey = mmrand(NULL, maxintlpage / 50, maxintlpage / 40);
 	if (maxintlkey > 20)
 		p += snprintf(p, REMAIN(p, end),
-		    ",internal_key_max=%d", maxintlkey);
+		    ",internal_key_max=%" PRIu32, maxintlkey);
 	maxleafkey = mmrand(NULL, maxleafpage / 50, maxleafpage / 40);
 	if (maxleafkey > 20)
 		p += snprintf(p, REMAIN(p, end),
-		    ",leaf_key_max=%d", maxleafkey);
+		    ",leaf_key_max=%" PRIu32, maxleafkey);
 	maxleafvalue = mmrand(NULL, maxleafpage * 10, maxleafpage / 40);
 	if (maxleafvalue > 40 && maxleafvalue < 100 * 1024)
 		p += snprintf(p, REMAIN(p, end),
-		    ",leaf_value_max=%d", maxleafvalue);
+		    ",leaf_value_max=%" PRIu32, maxleafvalue);
 
 	switch (g.type) {
 	case FIX:
@@ -289,7 +342,7 @@ wts_create(void)
 			    ",huffman_value=english");
 		if (g.c_dictionary)
 			p += snprintf(p, REMAIN(p, end),
-			    ",dictionary=%d", mmrand(NULL, 123, 517));
+			    ",dictionary=%" PRIu32, mmrand(NULL, 123, 517));
 		break;
 	}
 
@@ -307,38 +360,9 @@ wts_create(void)
 	}
 
 	/* Configure compression. */
-	switch (g.c_compression_flag) {
-	case COMPRESS_NONE:
-		break;
-	case COMPRESS_BZIP:
-		p += snprintf(p, REMAIN(p, end),
-		    ",block_compressor=\"bzip2\"");
-		break;
-	case COMPRESS_BZIP_RAW:
-		p += snprintf(p, REMAIN(p, end),
-		    ",block_compressor=\"bzip2-raw-test\"");
-		break;
-	case COMPRESS_LZ4:
-		p += snprintf(p, REMAIN(p, end),
-		    ",block_compressor=\"lz4\"");
-		break;
-	case COMPRESS_LZO:
-		p += snprintf(p, REMAIN(p, end),
-		    ",block_compressor=\"LZO1B-6\"");
-		break;
-	case COMPRESS_SNAPPY:
-		p += snprintf(p, REMAIN(p, end),
-		    ",block_compressor=\"snappy\"");
-		break;
-	case COMPRESS_ZLIB:
-		p += snprintf(p, REMAIN(p, end),
-		    ",block_compressor=\"zlib\"");
-		break;
-	case COMPRESS_ZLIB_NO_RAW:
-		p += snprintf(p, REMAIN(p, end),
-		    ",block_compressor=\"zlib-noraw\"");
-		break;
-	}
+	if (g.c_compression_flag != COMPRESS_NONE)
+		p += snprintf(p, REMAIN(p, end), ",block_compressor=\"%s\"",
+		    compressor(g.c_compression_flag));
 
 	/* Configure Btree internal key truncation. */
 	p += snprintf(p, REMAIN(p, end), ",internal_key_truncate=%s",
@@ -385,51 +409,50 @@ wts_create(void)
 	}
 
 	if (REMAIN(p, end) == 0)
-		die(ENOMEM, "WT_SESSION.create configuration buffer too small");
+		testutil_die(ENOMEM,
+		    "WT_SESSION.create configuration buffer too small");
 
 	/*
 	 * Create the underlying store.
 	 */
-	if ((ret = conn->open_session(conn, NULL, NULL, &session)) != 0)
-		die(ret, "connection.open_session");
-	if ((ret = session->create(session, g.uri, config)) != 0)
-		die(ret, "session.create: %s", g.uri);
-	if ((ret = session->close(session, NULL)) != 0)
-		die(ret, "session.close");
+	testutil_check(conn->open_session(conn, NULL, NULL, &session));
+	testutil_checkfmt(session->create(session, g.uri, config), "%s", g.uri);
+	testutil_check(session->close(session, NULL));
 }
 
 void
 wts_close(void)
 {
 	WT_CONNECTION *conn;
-	int ret;
 	const char *config;
 
 	conn = g.wts_conn;
 
 	config = g.c_leak_memory ? "leak_memory" : NULL;
 
-	if ((ret = conn->close(conn, config)) != 0)
-		die(ret, "connection.close");
+	testutil_check(conn->close(conn, config));
+	g.wts_conn = NULL;
+	g.wt_api = NULL;
 }
 
 void
 wts_dump(const char *tag, int dump_bdb)
 {
+#ifdef HAVE_BERKELEY_DB
 	size_t len;
-	int ret;
 	char *cmd;
 
-	/* Some data-sources don't support dump through the wt utility. */
+	/*
+	 * In-memory configurations and data-sources don't support dump through
+	 * the wt utility.
+	 */
 	if (DATASOURCE("helium") || DATASOURCE("kvsbdb"))
 		return;
 
-#ifndef _WIN32
 	track("dump files and compare", 0ULL, NULL);
 
 	len = strlen(g.home) + strlen(BERKELEY_DB_PATH) + strlen(g.uri) + 100;
-	if ((cmd = malloc(len)) == NULL)
-		die(errno, "malloc");
+	cmd = dmalloc(len);
 	(void)snprintf(cmd, len,
 	    "sh s_dumpcmp -h %s %s %s %s %s %s",
 	    g.home,
@@ -439,9 +462,11 @@ wts_dump(const char *tag, int dump_bdb)
 	    g.uri == NULL ? "" : "-n",
 	    g.uri == NULL ? "" : g.uri);
 
-	if ((ret = system(cmd)) != 0)
-		die(ret, "%s: dump comparison failed", tag);
+	testutil_checkfmt(system(cmd), "%s: dump comparison failed", tag);
 	free(cmd);
+#else
+	(void)tag;				/* [-Wunused-variable] */
+	(void)dump_bdb;				/* [-Wunused-variable] */
 #endif
 }
 
@@ -449,14 +474,16 @@ void
 wts_verify(const char *tag)
 {
 	WT_CONNECTION *conn;
+	WT_DECL_RET;
 	WT_SESSION *session;
-	int ret;
+
+	if (g.c_verify == 0)
+		return;
 
 	conn = g.wts_conn;
 	track("verify", 0ULL, NULL);
 
-	if ((ret = conn->open_session(conn, NULL, NULL, &session)) != 0)
-		die(ret, "connection.open_session");
+	testutil_check(conn->open_session(conn, NULL, NULL, &session));
 	if (g.logging != 0)
 		(void)g.wt_api->msg_printf(g.wt_api, session,
 		    "=============== verify start ===============");
@@ -464,13 +491,12 @@ wts_verify(const char *tag)
 	/* Session operations for LSM can return EBUSY. */
 	ret = session->verify(session, g.uri, "strict");
 	if (ret != 0 && !(ret == EBUSY && DATASOURCE("lsm")))
-		die(ret, "session.verify: %s: %s", g.uri, tag);
+		testutil_die(ret, "session.verify: %s: %s", g.uri, tag);
 
 	if (g.logging != 0)
 		(void)g.wt_api->msg_printf(g.wt_api, session,
 		    "=============== verify stop ===============");
-	if ((ret = session->close(session, NULL)) != 0)
-		die(ret, "session.close");
+	testutil_check(session->close(session, NULL));
 }
 
 /*
@@ -482,12 +508,13 @@ wts_stats(void)
 {
 	WT_CONNECTION *conn;
 	WT_CURSOR *cursor;
+	WT_DECL_RET;
 	WT_SESSION *session;
 	FILE *fp;
+	size_t len;
 	char *stat_name;
 	const char *pval, *desc;
 	uint64_t v;
-	int ret;
 
 	/* Ignore statistics if they're not configured. */
 	if (g.c_statistics == 0)
@@ -500,52 +527,44 @@ wts_stats(void)
 	conn = g.wts_conn;
 	track("stat", 0ULL, NULL);
 
-	if ((ret = conn->open_session(conn, NULL, NULL, &session)) != 0)
-		die(ret, "connection.open_session");
+	testutil_check(conn->open_session(conn, NULL, NULL, &session));
 
 	if ((fp = fopen(g.home_stats, "w")) == NULL)
-		die(errno, "fopen: %s", g.home_stats);
+		testutil_die(errno, "fopen: %s", g.home_stats);
 
 	/* Connection statistics. */
 	fprintf(fp, "====== Connection statistics:\n");
-	if ((ret = session->open_cursor(session,
-	    "statistics:", NULL, NULL, &cursor)) != 0)
-		die(ret, "session.open_cursor");
+	testutil_check(session->open_cursor(
+	    session, "statistics:", NULL, NULL, &cursor));
 
 	while ((ret = cursor->next(cursor)) == 0 &&
 	    (ret = cursor->get_value(cursor, &desc, &pval, &v)) == 0)
 		if (fprintf(fp, "%s=%s\n", desc, pval) < 0)
-			die(errno, "fprintf");
+			testutil_die(errno, "fprintf");
 
 	if (ret != WT_NOTFOUND)
-		die(ret, "cursor.next");
-	if ((ret = cursor->close(cursor)) != 0)
-		die(ret, "cursor.close");
+		testutil_die(ret, "cursor.next");
+	testutil_check(cursor->close(cursor));
 
 	/* Data source statistics. */
 	fprintf(fp, "\n\n====== Data source statistics:\n");
-	if ((stat_name =
-	    malloc(strlen("statistics:") + strlen(g.uri) + 1)) == NULL)
-		die(errno, "malloc");
-	sprintf(stat_name, "statistics:%s", g.uri);
-	if ((ret = session->open_cursor(
-	    session, stat_name, NULL, NULL, &cursor)) != 0)
-		die(ret, "session.open_cursor");
+	len = strlen("statistics:") + strlen(g.uri) + 1;
+	stat_name = dmalloc(len);
+	snprintf(stat_name, len, "statistics:%s", g.uri);
+	testutil_check(session->open_cursor(
+	    session, stat_name, NULL, NULL, &cursor));
 	free(stat_name);
 
 	while ((ret = cursor->next(cursor)) == 0 &&
 	    (ret = cursor->get_value(cursor, &desc, &pval, &v)) == 0)
 		if (fprintf(fp, "%s=%s\n", desc, pval) < 0)
-			die(errno, "fprintf");
+			testutil_die(errno, "fprintf");
 
 	if (ret != WT_NOTFOUND)
-		die(ret, "cursor.next");
-	if ((ret = cursor->close(cursor)) != 0)
-		die(ret, "cursor.close");
+		testutil_die(ret, "cursor.next");
+	testutil_check(cursor->close(cursor));
 
-	if ((ret = fclose(fp)) != 0)
-		die(ret, "fclose");
+	fclose_and_clear(&fp);
 
-	if ((ret = session->close(session, NULL)) != 0)
-		die(ret, "session.close");
+	testutil_check(session->close(session, NULL));
 }

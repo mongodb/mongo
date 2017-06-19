@@ -1,5 +1,5 @@
 /*-
- * Public Domain 2014-2015 MongoDB, Inc.
+ * Public Domain 2014-2016 MongoDB, Inc.
  * Public Domain 2008-2014 WiredTiger, Inc.
  *
  * This is free and unencumbered software released into the public domain.
@@ -26,52 +26,22 @@
  * OTHER DEALINGS IN THE SOFTWARE.
  */
 
-#include <sys/stat.h>
-#ifndef _WIN32
-#include <sys/time.h>
-#endif
-#include <sys/types.h>
-
-#include <assert.h>
-#include <ctype.h>
-#include <errno.h>
-#include <fcntl.h>
-#include <inttypes.h>
-#include <limits.h>
-#ifndef _WIN32
-#include <pthread.h>
-#endif
-#include <signal.h>
-#include <stdio.h>
-#include <stdlib.h>
-#include <string.h>
-#ifndef _WIN32
-#include <unistd.h>
-#endif
-#include <time.h>
-
-#ifdef _WIN32
-#include "windows_shim.h"
-#endif
-
-#include <wt_internal.h>
+#include "test_util.h"
 
 #ifdef BDB
+/*
+ * Berkeley DB has an #ifdef we need to provide a value for, we'll see an
+ * undefined error if it's unset during a strict compile.
+ */
+#ifndef	DB_DBM_HSEARCH
+#define	DB_DBM_HSEARCH	0
+#endif
+#include <assert.h>
 #include <db.h>
 #endif
 
-#if defined(__GNUC__)
-#define	WT_GCC_ATTRIBUTE(x)	__attribute__(x)
-#else
-#define	WT_GCC_ATTRIBUTE(x)
-#endif
-
-extern WT_EXTENSION_API *wt_api;
-
 #define	EXTPATH	"../../ext/"			/* Extensions path */
 
-#define	BZIP_PATH							\
-	EXTPATH "compressors/bzip2/.libs/libwiredtiger_bzip2.so"
 #define	LZ4_PATH							\
 	EXTPATH "compressors/lz4/.libs/libwiredtiger_lz4.so"
 #define	SNAPPY_PATH							\
@@ -95,8 +65,6 @@ extern WT_EXTENSION_API *wt_api;
 #define	KILOBYTE(v)	((v) * 1024)
 #undef	MEGABYTE
 #define	MEGABYTE(v)	((v) * 1048576)
-#undef	GIGABYTE
-#define	GIGABYTE(v)	((v) * 1073741824ULL)
 
 #define	WT_NAME	"wt"				/* Object name */
 
@@ -104,12 +72,6 @@ extern WT_EXTENSION_API *wt_api;
 #define	SINGLETHREADED	(g.c_threads == 1)
 
 #define	FORMAT_OPERATION_REPS	3		/* 3 thread operations sets */
-
-#ifndef _WIN32
-#define	SIZET_FMT	"%zu"			/* size_t format string */
-#else
-#define	SIZET_FMT	"%Iu"			/* size_t format string */
-#endif
 
 typedef struct {
 	char *progname;				/* Program name */
@@ -120,7 +82,6 @@ typedef struct {
 	char *home_bdb;				/* BDB directory */
 	char *home_config;			/* Run CONFIG file path */
 	char *home_init;			/* Initialize home command */
-	char *home_kvs;				/* KVS directory */
 	char *home_log;				/* Operation log file path */
 	char *home_rand;			/* RNG log file path */
 	char *home_salvage_copy;		/* Salvage copy command */
@@ -128,14 +89,18 @@ typedef struct {
 
 	char *helium_mount;			/* Helium volume */
 
+	char wiredtiger_open_config[8 * 1024];	/* Database open config */
+
+#ifdef HAVE_BERKELEY_DB
 	void *bdb;				/* BDB comparison handle */
 	void *dbc;				/* BDB cursor handle */
+#endif
 
 	WT_CONNECTION	 *wts_conn;
 	WT_EXTENSION_API *wt_api;
 
 	int   rand_log_stop;			/* Logging turned off */
-	FILE *rand_log;				/* Random number log */
+	FILE *randfp;				/* Random number log */
 
 	uint32_t run_cnt;			/* Run counter */
 
@@ -146,10 +111,10 @@ typedef struct {
 	FILE *logfp;				/* Log file */
 
 	int replay;				/* Replaying a run. */
-	int track;				/* Track progress */
 	int workers_finished;			/* Operations completed */
 
-	pthread_rwlock_t backup_lock;		/* Hot backup running */
+	pthread_rwlock_t backup_lock;		/* Backup running */
+	pthread_rwlock_t checkpoint_lock;	/* Checkpoint running */
 
 	WT_RAND_STATE rnd;			/* Global RNG state */
 
@@ -162,6 +127,8 @@ typedef struct {
 	size_t    append_max;			/* Maximum unresolved records */
 	size_t	  append_cnt;			/* Current unresolved records */
 	pthread_rwlock_t append_lock;		/* Single-thread resolution */
+
+	pthread_rwlock_t death_lock;		/* Single-thread failure */
 
 	char *uri;				/* Object name */
 
@@ -178,23 +145,24 @@ typedef struct {
 	uint32_t c_cache;
 	uint32_t c_compact;
 	uint32_t c_checkpoints;
-	char	*c_checksum;
+	char *c_checksum;
 	uint32_t c_chunk_size;
-	char	*c_compression;
-	char	*c_config_open;
+	char *c_compression;
+	char *c_config_open;
 	uint32_t c_data_extend;
-	char	*c_data_source;
+	char *c_data_source;
 	uint32_t c_delete_pct;
 	uint32_t c_dictionary;
+	uint32_t c_direct_io;
 	uint32_t c_evict_max;
 	uint32_t c_firstfit;
-	char	*c_file_type;
+	char *c_file_type;
 	uint32_t c_huffman_key;
 	uint32_t c_huffman_value;
 	uint32_t c_insert_pct;
 	uint32_t c_internal_key_truncation;
 	uint32_t c_intl_page_max;
-	char	*c_isolation;
+	char *c_isolation;
 	uint32_t c_key_gap;
 	uint32_t c_key_max;
 	uint32_t c_key_min;
@@ -202,27 +170,33 @@ typedef struct {
 	uint32_t c_leak_memory;
 	uint32_t c_logging;
 	uint32_t c_logging_archive;
+	char *c_logging_compression;
 	uint32_t c_logging_prealloc;
+	uint32_t c_long_running_txn;
 	uint32_t c_lsm_worker_threads;
 	uint32_t c_merge_max;
 	uint32_t c_mmap;
 	uint32_t c_ops;
+	uint32_t c_quiet;
 	uint32_t c_prefix_compression;
 	uint32_t c_prefix_compression_min;
 	uint32_t c_repeat_data_pct;
 	uint32_t c_reverse;
 	uint32_t c_rows;
 	uint32_t c_runs;
+	uint32_t c_salvage;
 	uint32_t c_split_pct;
 	uint32_t c_statistics;
 	uint32_t c_statistics_server;
 	uint32_t c_threads;
 	uint32_t c_timer;
+	uint32_t c_txn_freq;
 	uint32_t c_value_max;
 	uint32_t c_value_min;
+	uint32_t c_verify;
 	uint32_t c_write_pct;
 
-#define	FIX				1	
+#define	FIX				1
 #define	ROW				2
 #define	VAR				3
 	u_int type;				/* File type's flag value */
@@ -233,14 +207,14 @@ typedef struct {
 	u_int c_checksum_flag;			/* Checksum flag value */
 
 #define	COMPRESS_NONE			1
-#define	COMPRESS_BZIP			2
-#define	COMPRESS_BZIP_RAW		3
-#define	COMPRESS_LZ4			4
-#define	COMPRESS_LZO			5
-#define	COMPRESS_SNAPPY			6
-#define	COMPRESS_ZLIB			7
-#define	COMPRESS_ZLIB_NO_RAW		8
+#define	COMPRESS_LZ4			2
+#define	COMPRESS_LZ4_NO_RAW		3
+#define	COMPRESS_LZO			4
+#define	COMPRESS_SNAPPY			5
+#define	COMPRESS_ZLIB			6
+#define	COMPRESS_ZLIB_NO_RAW		7
 	u_int c_compression_flag;		/* Compression flag value */
+	u_int c_logging_compression_flag;	/* Log compression flag value */
 
 #define	ISOLATION_RANDOM		1
 #define	ISOLATION_READ_UNCOMMITTED	2
@@ -255,7 +229,7 @@ typedef struct {
 } GLOBAL;
 extern GLOBAL g;
 
-typedef struct {
+typedef struct WT_COMPILER_TYPE_ALIGN(WT_CACHE_LINE_ALIGNMENT) {
 	WT_RAND_STATE rnd;			/* thread RNG state */
 
 	uint64_t search;			/* operations */
@@ -277,15 +251,17 @@ typedef struct {
 #define	TINFO_COMPLETE	2			/* Finished */
 #define	TINFO_JOINED	3			/* Resolved */
 	volatile int state;			/* state */
-} TINFO WT_GCC_ATTRIBUTE((aligned(64)));
+} TINFO;
 
+#ifdef HAVE_BERKELEY_DB
 void	 bdb_close(void);
 void	 bdb_insert(const void *, size_t, const void *, size_t);
 void	 bdb_np(int, void *, size_t *, void *, size_t *, int *);
 void	 bdb_open(void);
 void	 bdb_read(uint64_t, void *, size_t *, int *);
 void	 bdb_remove(uint64_t, int *);
-void	 bdb_update(const void *, size_t, const void *, size_t, int *);
+void	 bdb_update(const void *, size_t, const void *, size_t);
+#endif
 
 void	*backup(void *);
 void	*compact(void *);
@@ -296,31 +272,28 @@ void	 config_print(int);
 void	 config_setup(void);
 void	 config_single(const char *, int);
 void	 fclose_and_clear(FILE **);
-void	 key_gen(uint8_t *, size_t *, uint64_t);
-void	 key_gen_insert(WT_RAND_STATE *, uint8_t *, size_t *, uint64_t);
-void	 key_gen_setup(uint8_t **);
+void	 key_gen(WT_ITEM *, uint64_t);
+void	 key_gen_insert(WT_RAND_STATE *, WT_ITEM *, uint64_t);
+void	 key_gen_setup(WT_ITEM *);
 void	 key_len_setup(void);
+void	*lrt(void *);
 void	 path_setup(const char *);
+int	 read_row(WT_CURSOR *, WT_ITEM *, WT_ITEM *, uint64_t);
 uint32_t rng(WT_RAND_STATE *);
 void	 track(const char *, uint64_t, TINFO *);
-void	 val_gen(WT_RAND_STATE *, uint8_t *, size_t *, uint64_t);
-void	 val_gen_setup(WT_RAND_STATE *, uint8_t **);
+void	 val_gen(WT_RAND_STATE *, WT_ITEM *, uint64_t);
+void	 val_gen_setup(WT_RAND_STATE *, WT_ITEM *);
 void	 wts_close(void);
-void	 wts_create(void);
 void	 wts_dump(const char *, int);
+void	 wts_init(void);
 void	 wts_load(void);
-void	 wts_open(const char *, int, WT_CONNECTION **);
+void	 wts_open(const char *, bool, WT_CONNECTION **);
 void	 wts_ops(int);
 void	 wts_read_scan(void);
+void	 wts_reopen(void);
 void	 wts_salvage(void);
 void	 wts_stats(void);
 void	 wts_verify(const char *);
-
-void	 die(int, const char *, ...)
-#if defined(__GNUC__)
-__attribute__((__noreturn__))
-#endif
-;
 
 /*
  * mmrand --

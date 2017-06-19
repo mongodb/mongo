@@ -1,5 +1,5 @@
 /*-
- * Public Domain 2014-2015 MongoDB, Inc.
+ * Public Domain 2014-2016 MongoDB, Inc.
  * Public Domain 2008-2014 WiredTiger, Inc.
  *
  * This is free and unencumbered software released into the public domain.
@@ -30,15 +30,17 @@
 #include "config.h"
 
 static void	   config_checksum(void);
-static void	   config_compression(void);
+static void	   config_compression(const char *);
 static const char *config_file_type(u_int);
 static CONFIG	  *config_find(const char *, size_t);
 static int	   config_is_perm(const char *);
 static void	   config_isolation(void);
+static void	   config_lrt(void);
 static void	   config_map_checksum(const char *, u_int *);
 static void	   config_map_compression(const char *, u_int *);
 static void	   config_map_file_type(const char *, u_int *);
 static void	   config_map_isolation(const char *, u_int *);
+static void	   config_reset(void);
 
 /*
  * config_setup --
@@ -50,7 +52,7 @@ config_setup(void)
 	CONFIG *cp;
 
 	/* Clear any temporary values. */
-	config_clear();
+	config_reset();
 
 	/*
 	 * Choose a data source type and a file type: they're interrelated (LSM
@@ -100,8 +102,7 @@ config_setup(void)
 	 * our configuration, LSM or KVS devices are "tables", but files are
 	 * tested as well.
 	 */
-	if ((g.uri = malloc(256)) == NULL)
-		die(errno, "malloc");
+	g.uri = dmalloc(256);
 	strcpy(g.uri, DATASOURCE("file") ? "file:" : "table:");
 	if (DATASOURCE("helium"))
 		strcat(g.uri, "dev1/");
@@ -120,22 +121,19 @@ config_setup(void)
 		if (F_ISSET(cp, C_BOOL))
 			*cp->v = mmrand(NULL, 1, 100) <= cp->min ? 1 : 0;
 		else
-			*cp->v = CONF_RAND(cp);
+			*cp->v = mmrand(NULL, cp->min, cp->maxrand);
 	}
 
 	/* Required shared libraries. */
 	if (DATASOURCE("helium") && access(HELIUM_PATH, R_OK) != 0)
-		die(errno, "Levyx/helium shared library: %s", HELIUM_PATH);
+		testutil_die(errno,
+		    "Levyx/helium shared library: %s", HELIUM_PATH);
 	if (DATASOURCE("kvsbdb") && access(KVS_BDB_PATH, R_OK) != 0)
-		die(errno, "kvsbdb shared library: %s", KVS_BDB_PATH);
+		testutil_die(errno, "kvsbdb shared library: %s", KVS_BDB_PATH);
 
 	/* Some data-sources don't support user-specified collations. */
 	if (DATASOURCE("helium") || DATASOURCE("kvsbdb"))
-		g.c_reverse = 0;
-
-	config_checksum();
-	config_compression();
-	config_isolation();
+		config_single("reverse=off", 0);
 
 	/*
 	 * Periodically, run single-threaded so we can compare the results to
@@ -145,13 +143,19 @@ config_setup(void)
 	if (!g.replay && g.run_cnt % 20 == 19 && !config_is_perm("threads"))
 		g.c_threads = 1;
 
+	config_checksum();
+	config_compression("compression");
+	config_compression("logging_compression");
+	config_isolation();
+	config_lrt();
+
 	/*
 	 * Periodically, set the delete percentage to 0 so salvage gets run,
 	 * as long as the delete percentage isn't nailed down.
 	 * Don't do it on the first run, all our smoke tests would hit it.
 	 */
 	if (!g.replay && g.run_cnt % 10 == 9 && !config_is_perm("delete_pct"))
-		g.c_delete_pct = 0;
+		config_single("delete_pct=0", 0);
 
 	/*
 	 * If this is an LSM run, set the cache size and crank up the insert
@@ -165,9 +169,22 @@ config_setup(void)
 			g.c_insert_pct = mmrand(NULL, 50, 85);
 	}
 
-	/* Make the default maximum-run length 20 minutes. */
-	if (!config_is_perm("timer"))
-		g.c_timer = 20;
+	/* Ensure there is at least 1MB of cache per thread. */
+	if (!config_is_perm("cache") && g.c_cache < g.c_threads)
+		g.c_cache = g.c_threads;
+
+	/*
+	 * Run-length configured by a number of operations and a timer. If the
+	 * operation count and the timer are both set by a configuration, there
+	 * isn't anything to do. If only the operation count was configured,
+	 * set a default maximum-run of 20 minutes. If only the timer is set,
+	 * clear the operations count (which was set randomly).
+	 */
+	if (config_is_perm("timer")) {
+		if (!config_is_perm("ops"))
+			config_single("ops=0", 0);
+	} else
+		config_single("timer=20", 0);
 
 	/*
 	 * Key/value minimum/maximum are related, correct unless specified by
@@ -178,14 +195,15 @@ config_setup(void)
 	if (!config_is_perm("key_max") && g.c_key_max < g.c_key_min)
 		g.c_key_max = g.c_key_min;
 	if (g.c_key_min > g.c_key_max)
-		die(EINVAL, "key_min may not be larger than key_max");
+		testutil_die(EINVAL, "key_min may not be larger than key_max");
 
 	if (!config_is_perm("value_min") && g.c_value_min > g.c_value_max)
 		g.c_value_min = g.c_value_max;
 	if (!config_is_perm("value_max") && g.c_value_max < g.c_value_min)
 		g.c_value_max = g.c_value_min;
 	if (g.c_value_min > g.c_value_max)
-		die(EINVAL, "value_min may not be larger than value_max");
+		testutil_die(EINVAL,
+		    "value_min may not be larger than value_max");
 
 	/* Reset the key count. */
 	g.key_cnt = 0;
@@ -218,39 +236,63 @@ config_checksum(void)
  *	Compression configuration.
  */
 static void
-config_compression(void)
+config_compression(const char *conf_name)
 {
 	const char *cstr;
+	char confbuf[128];
+
+	/* Return if already specified. */
+	if (config_is_perm(conf_name))
+		return;
 
 	/*
-	 * Compression: choose something if compression wasn't specified,
-	 * otherwise confirm the appropriate shared library is available.
-	 * We used to verify that the libraries existed but that's no longer
-	 * robust, since it's possible to build compression libraries into
-	 * the WiredTiger library.
+	 * Don't configure a compression engine for logging if logging isn't
+	 * configured (it won't break, but it's confusing).
 	 */
-	if (!config_is_perm("compression")) {
-		cstr = "compression=none";
-		switch (mmrand(NULL, 1, 20)) {
-		case 1: case 2: case 3: case 4:		/* 20% no compression */
-			break;
-		case 8: case 9: case 10: case 11:	/* 20% lz4 */
-			cstr = "compression=lz4";
-			break;
-		case 5: case 6: case 7:
-		case 12: case 13: case 14: case 15:	/* 35% snappy */
-			cstr = "compression=snappy";
-			break;
-		case 16: case 17: case 18: case 19:	/* 20% zlib */
-			cstr = "compression=zlib";
-			break;
-		case 20:				/* 5% zlib-no-raw */
-			cstr = "compression=zlib-noraw";
-			break;
-		}
-
-		config_single(cstr, 0);
+	cstr = "none";
+	if (strcmp(conf_name, "logging_compression") == 0 && g.c_logging == 0) {
+		(void)snprintf(
+		    confbuf, sizeof(confbuf), "%s=%s", conf_name, cstr);
+		config_single(confbuf, 0);
+		return;
 	}
+
+	/*
+	 * Select a compression type from the list of built-in engines.
+	 *
+	 * Listed percentages are only correct if all of the possible engines
+	 * are compiled in.
+	 */
+	switch (mmrand(NULL, 1, 20)) {
+#ifdef HAVE_BUILTIN_EXTENSION_LZ4
+	case 1: case 2: case 3: case 4:		/* 20% lz4 */
+		cstr = "lz4";
+		break;
+	case 5:					/* 5% lz4-no-raw */
+		cstr = "lz4-noraw";
+		break;
+#endif
+#ifdef HAVE_BUILTIN_EXTENSION_SNAPPY
+	case 6: case 7: case 8: case 9:		/* 30% snappy */
+	case 10: case 11:
+		cstr = "snappy";
+		break;
+#endif
+#ifdef HAVE_BUILTIN_EXTENSION_ZLIB
+	case 12: case 13: case 14: case 15:	/* 20% zlib */
+		cstr = "zlib";
+		break;
+	case 16:				/* 5% zlib-no-raw */
+		cstr = "zlib-noraw";
+		break;
+#endif
+	case 17: case 18: case 19: case 20:	/* 15% no compression */
+	default:
+		break;
+	}
+
+	(void)snprintf(confbuf, sizeof(confbuf), "%s=%s", conf_name, cstr);
+	config_single(confbuf, 0);
 }
 
 /*
@@ -283,6 +325,22 @@ config_isolation(void)
 			break;
 		}
 		config_single(cstr, 0);
+	}
+}
+
+/*
+ * config_lrt --
+ *	Long-running transaction configuration.
+ */
+static void
+config_lrt(void)
+{
+	if (g.type == FIX) {
+		if (config_is_perm("long_running_txn"))
+			testutil_die(EINVAL,
+			    "long_running_txn not supported with fixed-length "
+			    "column store");
+		config_single("long_running_txn=off", 0);
 	}
 }
 
@@ -320,7 +378,7 @@ config_print(int error_display)
 		fp = stdout;
 	else
 		if ((fp = fopen(g.home_config, "w")) == NULL)
-			die(errno, "fopen: %s", g.home_config);
+			testutil_die(errno, "fopen: %s", g.home_config);
 
 	fprintf(fp, "############################################\n");
 	fprintf(fp, "#  RUN PARAMETERS\n");
@@ -335,8 +393,12 @@ config_print(int error_display)
 			fprintf(fp, "%s=%" PRIu32 "\n", cp->name, *cp->v);
 
 	fprintf(fp, "############################################\n");
+
+	/* Flush so we're up-to-date on error. */
+	(void)fflush(fp);
+
 	if (fp != stdout)
-		(void)fclose(fp);
+		fclose_and_clear(&fp);
 }
 
 /*
@@ -350,7 +412,7 @@ config_file(const char *name)
 	char *p, buf[256];
 
 	if ((fp = fopen(name, "r")) == NULL)
-		die(errno, "fopen: %s", name);
+		testutil_die(errno, "fopen: %s", name);
 	while (fgets(buf, sizeof(buf), fp) != NULL) {
 		for (p = buf; *p != '\0' && *p != '\n'; ++p)
 			;
@@ -359,24 +421,42 @@ config_file(const char *name)
 			continue;
 		config_single(buf, 1);
 	}
-	(void)fclose(fp);
+	fclose_and_clear(&fp);
 }
 
 /*
  * config_clear --
- *	Clear per-run values.
+ *	Clear all configuration values.
  */
 void
 config_clear(void)
 {
 	CONFIG *cp;
 
-	/* Clear configuration data. */
+	/* Clear all allocated configuration data. */
+	for (cp = c; cp->name != NULL; ++cp)
+		if (cp->vstr != NULL) {
+			free((void *)*cp->vstr);
+			*cp->vstr = NULL;
+		}
+	free(g.uri);
+	g.uri = NULL;
+}
+
+/*
+ * config_reset --
+ *	Clear per-run configuration values.
+ */
+static void
+config_reset(void)
+{
+	CONFIG *cp;
+
+	/* Clear temporary allocated configuration data. */
 	for (cp = c; cp->name != NULL; ++cp) {
 		F_CLR(cp, C_TEMP);
-		if (!F_ISSET(cp, C_PERM) &&
-		    F_ISSET(cp, C_STRING) && cp->vstr != NULL) {
-			free(*cp->vstr);
+		if (!F_ISSET(cp, C_PERM) && cp->vstr != NULL) {
+			free((void *)*cp->vstr);
 			*cp->vstr = NULL;
 		}
 	}
@@ -392,7 +472,7 @@ void
 config_single(const char *s, int perm)
 {
 	CONFIG *cp;
-	uint64_t v;
+	long v;
 	char *p;
 	const char *ep;
 
@@ -418,35 +498,55 @@ config_single(const char *s, int perm)
 			    exit(EXIT_FAILURE);
 		}
 
+		/*
+		 * Free the previous setting if a configuration has been
+		 * passed in twice.
+		 */
+		if (*cp->vstr != NULL) {
+			free(*cp->vstr);
+			*cp->vstr = NULL;
+		}
+
 		if (strncmp(s, "checksum", strlen("checksum")) == 0) {
 			config_map_checksum(ep, &g.c_checksum_flag);
-			*cp->vstr = strdup(ep);
+			*cp->vstr = dstrdup(ep);
 		} else if (strncmp(
 		    s, "compression", strlen("compression")) == 0) {
 			config_map_compression(ep, &g.c_compression_flag);
-			*cp->vstr = strdup(ep);
+			*cp->vstr = dstrdup(ep);
 		} else if (strncmp(s, "isolation", strlen("isolation")) == 0) {
 			config_map_isolation(ep, &g.c_isolation_flag);
-			*cp->vstr = strdup(ep);
+			*cp->vstr = dstrdup(ep);
 		} else if (strncmp(s, "file_type", strlen("file_type")) == 0) {
 			config_map_file_type(ep, &g.type);
-			*cp->vstr = strdup(config_file_type(g.type));
+			*cp->vstr = dstrdup(config_file_type(g.type));
+		} else if (strncmp(s, "logging_compression",
+		    strlen("logging_compression")) == 0) {
+			config_map_compression(ep,
+			    &g.c_logging_compression_flag);
+			*cp->vstr = dstrdup(ep);
 		} else {
-			if (*cp->vstr != NULL)
-				free(*cp->vstr);
-			*cp->vstr = strdup(ep);
+			free((void *)*cp->vstr);
+			*cp->vstr = dstrdup(ep);
 		}
-		if (*cp->vstr == NULL)
-			die(errno, "malloc");
 
 		return;
 	}
 
-	v = strtoul(ep, &p, 10);
-	if (*p != '\0') {
-		fprintf(stderr, "%s: %s: illegal numeric value\n",
-		    g.progname, s);
-		exit(EXIT_FAILURE);
+	v = -1;
+	if (F_ISSET(cp, C_BOOL)) {
+		if (strncmp(ep, "off", strlen("off")) == 0)
+			v = 0;
+		else if (strncmp(ep, "on", strlen("on")) == 0)
+			v = 1;
+	}
+	if (v == -1) {
+		v = strtol(ep, &p, 10);
+		if (*p != '\0') {
+			fprintf(stderr, "%s: %s: illegal numeric value\n",
+			    g.progname, s);
+			exit(EXIT_FAILURE);
+		}
 	}
 	if (F_ISSET(cp, C_BOOL)) {
 		if (v != 0 && v != 1) {
@@ -454,10 +554,10 @@ config_single(const char *s, int perm)
 			    g.progname, s);
 			exit(EXIT_FAILURE);
 		}
-	} else if ((uint32_t)v < cp->min || (uint32_t)v > cp->maxset) {
-		fprintf(stderr, "%s: %s: value of %" PRIu32
-		    " outside min/max values of %" PRIu32 "-%" PRIu32 "\n",
-		    g.progname, s, *cp->v, cp->min, cp->maxset);
+	} else if (v < cp->min || v > cp->maxset) {
+		fprintf(stderr, "%s: %s: value outside min/max values of %"
+		    PRIu32 "-%" PRIu32 "\n",
+		    g.progname, s, cp->min, cp->maxset);
 		exit(EXIT_FAILURE);
 	}
 	*cp->v = (uint32_t)v;
@@ -480,7 +580,7 @@ config_map_file_type(const char *s, u_int *vp)
 	    strcmp(s, "row-store") == 0)
 		*vp = ROW;
 	else
-		die(EINVAL, "illegal file type configuration: %s", s);
+		testutil_die(EINVAL, "illegal file type configuration: %s", s);
 }
 
 /*
@@ -497,7 +597,7 @@ config_map_checksum(const char *s, u_int *vp)
 	else if (strcmp(s, "uncompressed") == 0)
 		*vp = CHECKSUM_UNCOMPRESSED;
 	else
-		die(EINVAL, "illegal checksum configuration: %s", s);
+		testutil_die(EINVAL, "illegal checksum configuration: %s", s);
 }
 
 /*
@@ -509,12 +609,10 @@ config_map_compression(const char *s, u_int *vp)
 {
 	if (strcmp(s, "none") == 0)
 		*vp = COMPRESS_NONE;
-	else if (strcmp(s, "bzip") == 0)
-		*vp = COMPRESS_BZIP;
-	else if (strcmp(s, "bzip-raw") == 0)
-		*vp = COMPRESS_BZIP_RAW;
 	else if (strcmp(s, "lz4") == 0)
 		*vp = COMPRESS_LZ4;
+	else if (strcmp(s, "lz4-noraw") == 0)
+		*vp = COMPRESS_LZ4_NO_RAW;
 	else if (strcmp(s, "lzo") == 0)
 		*vp = COMPRESS_LZO;
 	else if (strcmp(s, "snappy") == 0)
@@ -524,7 +622,8 @@ config_map_compression(const char *s, u_int *vp)
 	else if (strcmp(s, "zlib-noraw") == 0)
 		*vp = COMPRESS_ZLIB_NO_RAW;
 	else
-		die(EINVAL, "illegal compression configuration: %s", s);
+		testutil_die(EINVAL,
+		    "illegal compression configuration: %s", s);
 }
 
 /*
@@ -543,7 +642,7 @@ config_map_isolation(const char *s, u_int *vp)
 	else if (strcmp(s, "snapshot") == 0)
 		*vp = ISOLATION_SNAPSHOT;
 	else
-		die(EINVAL, "illegal isolation configuration: %s", s);
+		testutil_die(EINVAL, "illegal isolation configuration: %s", s);
 }
 
 /*
@@ -555,7 +654,7 @@ config_find(const char *s, size_t len)
 {
 	CONFIG *cp;
 
-	for (cp = c; cp->name != NULL; ++cp) 
+	for (cp = c; cp->name != NULL; ++cp)
 		if (strncmp(s, cp->name, len) == 0 && cp->name[len] == '\0')
 			return (cp);
 

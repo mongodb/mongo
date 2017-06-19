@@ -1,5 +1,5 @@
 /*-
- * Public Domain 2014-2015 MongoDB, Inc.
+ * Public Domain 2014-2016 MongoDB, Inc.
  * Public Domain 2008-2014 WiredTiger, Inc.
  *
  * This is free and unencumbered software released into the public domain.
@@ -36,9 +36,9 @@ void *
 compact(void *arg)
 {
 	WT_CONNECTION *conn;
+	WT_DECL_RET;
 	WT_SESSION *session;
 	u_int period;
-	int ret;
 
 	(void)(arg);
 
@@ -48,8 +48,7 @@ compact(void *arg)
 
 	/* Open a session. */
 	conn = g.wts_conn;
-	if ((ret = conn->open_session(conn, NULL, NULL, &session)) != 0)
-		die(ret, "connection.open_session");
+	testutil_check(conn->open_session(conn, NULL, NULL, &session));
 
 	/*
 	 * Perform compaction at somewhere under 15 seconds (so we get at
@@ -66,11 +65,10 @@ compact(void *arg)
 
 		if ((ret = session->compact(
 		    session, g.uri, NULL)) != 0 && ret != WT_ROLLBACK)
-			die(ret, "session.compact");
+			testutil_die(ret, "session.compact");
 	}
 
-	if ((ret = session->close(session, NULL)) != 0)
-		die(ret, "session.close");
+	testutil_check(session->close(session, NULL));
 
 	return (NULL);
 }

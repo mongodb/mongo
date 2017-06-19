@@ -92,6 +92,16 @@ for f in \
 		cat $t
 	}
 
+	# If we don't have matching pack-begin and pack-end calls, we don't get
+	# an error, we just get a Windows performance regression. Using awk and
+	# not wc to ensure there's no whitespace in the assignment.
+	egrep WT_PACKED_STRUCT $f > $t
+	cnt=`awk 'BEGIN { line = 0 } { ++line } END { print line }' < $t`
+	test `expr "$cnt" % 2` -ne 0 && {
+		echo "$f: mismatched WT_PACKED_STRUCT_BEGIN/END lines"
+		cat $t
+	}
+
 	# Direct calls to functions we're not supposed to use in the library.
 	# We don't check for all of them, just a few of the common ones.
 	if ! expr "$f" : 'bench/.*' > /dev/null &&

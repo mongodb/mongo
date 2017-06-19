@@ -1,5 +1,5 @@
 /*-
- * Public Domain 2014-2015 MongoDB, Inc.
+ * Public Domain 2014-2016 MongoDB, Inc.
  * Public Domain 2008-2014 WiredTiger, Inc.
  *
  * This is free and unencumbered software released into the public domain.
@@ -37,7 +37,7 @@ typedef struct {
 	/* Value is a boolean, yes if roll of 1-to-100 is <= CONFIG->min. */
 #define	C_BOOL		0x001
 
-	/* Not a simple randomization, handle outside the main loop. */ 
+	/* Not a simple randomization, handle outside the main loop. */
 #define	C_IGNORE	0x002
 
 	/* Value was set from command-line or file, ignore for all runs. */
@@ -57,11 +57,8 @@ typedef struct {
 	char		**vstr;		/* Value for string options */
 } CONFIG;
 
-/*
- * Get a random value between a config min/max pair (inclusive for both min
- * and max).
- */
-#define	CONF_RAND(cp)	mmrand(NULL, (cp)->min, (cp)->maxrand)
+#define	COMPRESSION_LIST						\
+	"(none | lz4 | lz4-noraw | snappy | zlib | zlib-noraw)"
 
 static CONFIG c[] = {
 	{ "abort",
@@ -72,9 +69,9 @@ static CONFIG c[] = {
 	  "if LSM inserts are throttled",			/* 90% */
 	  C_BOOL, 90, 0, 0, &g.c_auto_throttle, NULL },
 
-	{ "firstfit",
-	  "if allocation is firstfit",				/* 10% */
-	  C_BOOL, 10, 0, 0, &g.c_firstfit, NULL },
+	{ "backups",
+	  "if backups are enabled",				/* 20% */
+	  C_BOOL, 20, 0, 0, &g.c_backups, NULL },
 
 	{ "bitcnt",
 	  "number of bits for fixed-length column-store files",
@@ -117,8 +114,7 @@ static CONFIG c[] = {
 	  C_BOOL, 10, 0, 0, &g.c_compact, NULL },
 
 	{ "compression",
-	  "type of compression "
-	  "(none | bzip | bzip-raw | lz4 | lzo | snappy | zlib | zlib-noraw)",
+	  "type of compression " COMPRESSION_LIST,
 	  C_IGNORE|C_STRING, 0, 0, 0, NULL, &g.c_compression },
 
 	{ "data_extend",
@@ -127,7 +123,7 @@ static CONFIG c[] = {
 
 	{ "data_source",
 	  "data source (file | helium | kvsbdb | lsm | table)",
-	  C_IGNORE | C_STRING, 0, 0, 0, NULL, &g.c_data_source },
+	  C_IGNORE|C_STRING, 0, 0, 0, NULL, &g.c_data_source },
 
 	{ "delete_pct",
 	  "percent operations that are deletes",
@@ -137,6 +133,10 @@ static CONFIG c[] = {
 	  "if values are dictionary compressed",		/* 20% */
 	  C_BOOL, 20, 0, 0, &g.c_dictionary, NULL },
 
+	{ "direct_io",
+	  "if direct I/O is configured for data objects",	/* 0% */
+	  C_IGNORE, 0, 0, 1, &g.c_direct_io, NULL },
+
 	{ "evict_max",
 	  "the maximum number of eviction workers",
 	  0x0, 0, 5, 100, &g.c_evict_max, NULL },
@@ -145,9 +145,9 @@ static CONFIG c[] = {
 	  "type of store to create (fix | var | row)",
 	  C_IGNORE|C_STRING, 1, 3, 3, NULL, &g.c_file_type },
 
-	{ "backups",
-	  "if backups are enabled",				/* 5% */
-	  C_BOOL, 5, 0, 0, &g.c_backups, NULL },
+	{ "firstfit",
+	  "if allocation is firstfit",				/* 10% */
+	  C_BOOL, 10, 0, 0, &g.c_firstfit, NULL },
 
 	{ "huffman_key",
 	  "if keys are huffman encoded",			/* 20% */
@@ -186,25 +186,33 @@ static CONFIG c[] = {
 	  "minimum size of keys",
 	  0x0, 10, 32, 256, &g.c_key_min, NULL },
 
-	{ "leak_memory",
-	  "if memory should be leaked on close",
-	  C_BOOL, 0, 0, 0, &g.c_leak_memory, NULL },
-
 	{ "leaf_page_max",
 	  "maximum size of Btree leaf nodes",
 	  0x0, 9, 17, 27, &g.c_leaf_page_max, NULL },
 
+	{ "leak_memory",
+	  "if memory should be leaked on close",
+	  C_BOOL, 0, 0, 0, &g.c_leak_memory, NULL },
+
 	{ "logging",
-	  "if logging configured",				/* 30% */
-	  C_BOOL, 30, 0, 0, &g.c_logging, NULL },
+	  "if logging configured",				/* 50% */
+	  C_BOOL, 50, 0, 0, &g.c_logging, NULL },
 
 	{ "logging_archive",
 	  "if log file archival configured",			/* 50% */
 	  C_BOOL, 50, 0, 0, &g.c_logging_archive, NULL },
 
+	{ "logging_compression",
+	  "type of logging compression " COMPRESSION_LIST,
+	  C_IGNORE|C_STRING, 0, 0, 0, NULL, &g.c_logging_compression },
+
 	{ "logging_prealloc",
 	  "if log file pre-allocation configured",		/* 50% */
 	  C_BOOL, 50, 0, 0, &g.c_logging_prealloc, NULL },
+
+	{ "long_running_txn",
+	  "if a long-running transaction configured",		/* 0% */
+	  C_BOOL, 0, 0, 0, &g.c_long_running_txn, NULL },
 
 	{ "lsm_worker_threads",
 	  "the number of LSM worker threads",
@@ -230,6 +238,10 @@ static CONFIG c[] = {
 	  "minimum gain before prefix compression is used",
 	  0x0, 0, 8, 256, &g.c_prefix_compression_min, NULL },
 
+	{ "quiet",
+	  "quiet run (same as -q)",
+	  C_IGNORE|C_BOOL, 0, 0, 0, &g.c_quiet, NULL },
+
 	{ "repeat_data_pct",
 	  "percent duplicate values in row- or var-length column-stores",
 	  0x0, 0, 90, 90, &g.c_repeat_data_pct, NULL },
@@ -245,6 +257,10 @@ static CONFIG c[] = {
 	{ "runs",
 	  "the number of runs",
 	  C_IGNORE, 0, UINT_MAX, UINT_MAX, &g.c_runs, NULL },
+
+	{ "salvage",
+	  "salvage testing",					/* 100% */
+	  C_BOOL, 100, 1, 0, &g.c_salvage, NULL },
 
 	{ "split_pct",
 	  "page split size as a percentage of the maximum page size",
@@ -266,6 +282,10 @@ static CONFIG c[] = {
 	  "maximum time to run in minutes (default 20 minutes)",
 	  C_IGNORE, 0, UINT_MAX, UINT_MAX, &g.c_timer, NULL },
 
+	{ "transaction-frequency",
+	  "percent operations done inside an explicit transaction",
+	  0x0, 1, 100, 100, &g.c_txn_freq, NULL },
+
 	{ "value_max",
 	  "maximum size of values",
 	  0x0, 32, 4096, MEGABYTE(10), &g.c_value_max, NULL },
@@ -273,6 +293,10 @@ static CONFIG c[] = {
 	{ "value_min",
 	  "minimum size of values",
 	  0x0, 0, 20, 4096, &g.c_value_min, NULL },
+
+	{ "verify",
+	  "to regularly verify during a run",			/* 100% */
+	  C_BOOL, 100, 1, 0, &g.c_verify, NULL },
 
 	{ "wiredtiger_config",
 	  "configuration string used to wiredtiger_open",

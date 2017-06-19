@@ -195,6 +195,13 @@ __wt_cache_full_check(WT_SESSION_IMPL *session)
 		return (0);
 
 	/*
+	 * If the connection is closing we do not need eviction from an
+	 * application thread.  The eviction subsystem is already closed.
+	 */
+	if (F_ISSET(S2C(session), WT_CONN_CLOSING))
+		return (0);
+
+	/*
 	 * Only wake the eviction server the first time through here (if the
 	 * cache is too full).
 	 *

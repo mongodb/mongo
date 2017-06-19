@@ -684,7 +684,7 @@ struct __wt_ref {
 	 * up our slot in the page's index structure.
 	 */
 	WT_PAGE * volatile home;	/* Reference page */
-	uint32_t pindex_hint;		/* Reference page index hint */
+	volatile uint32_t pindex_hint;	/* Reference page index hint */
 
 #define	WT_REF_DISK	0		/* Page is on disk */
 #define	WT_REF_DELETED	1		/* Page is on disk, but deleted */
@@ -888,7 +888,7 @@ WT_PACKED_STRUCT_BEGIN(__wt_update)
 #define	WT_UPDATE_MEMSIZE(upd)						\
 	WT_ALIGN(sizeof(WT_UPDATE) +					\
 	    (WT_UPDATE_DELETED_ISSET(upd) ? 0 : (upd)->size), 32)
-};
+WT_PACKED_STRUCT_END
 
 /*
  * WT_INSERT --

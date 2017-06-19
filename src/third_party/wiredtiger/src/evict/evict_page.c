@@ -413,7 +413,8 @@ __evict_review(
 		if (closing)
 			FLD_SET(reconcile_flags, WT_SKIP_UPDATE_ERR);
 		else if (!WT_PAGE_IS_INTERNAL(page) &&
-		    page->read_gen == WT_READGEN_OLDEST)
+		    (page->read_gen == WT_READGEN_OLDEST ||
+		    !__wt_txn_visible_all(session, page->modify->update_txn)))
 			FLD_SET(reconcile_flags, WT_SKIP_UPDATE_RESTORE);
 		WT_RET(__wt_reconcile(session, ref, NULL, reconcile_flags));
 		WT_ASSERT(session,

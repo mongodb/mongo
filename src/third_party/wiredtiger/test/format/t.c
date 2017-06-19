@@ -1,5 +1,5 @@
 /*-
- * Public Domain 2014-2015 MongoDB, Inc.
+ * Public Domain 2014-2016 MongoDB, Inc.
  * Public Domain 2008-2014 WiredTiger, Inc.
  *
  * This is free and unencumbered software released into the public domain.
@@ -30,8 +30,10 @@
 
 GLOBAL g;
 
+static void format_die(void);
 static void startup(void);
-static void usage(void);
+static void usage(void)
+    WT_GCC_FUNC_DECL_ATTRIBUTE((noreturn));
 
 extern int __wt_optind;
 extern char *__wt_optarg;
@@ -40,15 +42,21 @@ int
 main(int argc, char *argv[])
 {
 	time_t start;
-	int ch, i, reps, ret;
+	int ch, onerun, reps;
 	const char *config, *home;
+
+	custom_die = format_die;		/* Local death handler. */
 
 	config = NULL;
 
-	if ((g.progname = strrchr(argv[0], '/')) == NULL)
+#ifdef _WIN32
+	g.progname = "t_format.exe";
+#else
+	if ((g.progname = strrchr(argv[0], DIR_DELIM)) == NULL)
 		g.progname = argv[0];
 	else
 		++g.progname;
+#endif
 
 #if 0
 	/* Configure the GNU malloc for debugging. */
@@ -60,15 +68,16 @@ main(int argc, char *argv[])
 #endif
 
 	/* Track progress unless we're re-directing output to a file. */
-	g.track = isatty(1) ? 1 : 0;
+	g.c_quiet = isatty(1) ? 0 : 1;
 
 	/* Set values from the command line. */
 	home = NULL;
+	onerun = 0;
 	while ((ch = __wt_getopt(
 	    g.progname, argc, argv, "1C:c:H:h:Llqrt:")) != EOF)
 		switch (ch) {
 		case '1':			/* One run */
-			g.c_runs = 1;
+			onerun = 1;
 			break;
 		case 'C':			/* wiredtiger_open config */
 			g.config_open = __wt_optarg;
@@ -94,7 +103,7 @@ main(int argc, char *argv[])
 			g.logging = LOG_OPS;
 			break;
 		case 'q':			/* Quiet */
-			g.track = 0;
+			g.c_quiet = 1;
 			break;
 		case 'r':			/* Replay a run */
 			g.replay = 1;
@@ -105,14 +114,8 @@ main(int argc, char *argv[])
 	argc -= __wt_optind;
 	argv += __wt_optind;
 
-	/*
-	 * Initialize the global RNG. Start with the standard seeds, and then
-	 * use seconds since the Epoch modulo a prime to run the RNG for some
-	 * number of steps, so we don't start with the same values every time.
-	 */
+	/* Initialize the global RNG. */
 	__wt_random_init(&g.rnd);
-	for (i = (int)time(NULL) % 10007; i > 0; --i)
-		(void)__wt_random(&g.rnd);
 
 	/* Set up paths. */
 	path_setup(home);
@@ -120,9 +123,9 @@ main(int argc, char *argv[])
 	/* If it's a replay, use the home directory's CONFIG file. */
 	if (g.replay) {
 		if (config != NULL)
-			die(EINVAL, "-c incompatible with -r");
+			testutil_die(EINVAL, "-c incompatible with -r");
 		if (access(g.home_config, R_OK) != 0)
-			die(ENOENT, "%s", g.home_config);
+			testutil_die(ENOENT, "%s", g.home_config);
 		config = g.home_config;
 	}
 
@@ -160,20 +163,21 @@ main(int argc, char *argv[])
 	if (g.replay && SINGLETHREADED)
 		g.c_runs = 1;
 
-	/* Use line buffering on stdout so status updates aren't buffered. */
-	(void)setvbuf(stdout, NULL, _IOLBF, 32);
+	/*
+	 * Let the command line -1 flag override runs configured from other
+	 * sources.
+	 */
+	if (onerun)
+		g.c_runs = 1;
 
 	/*
-	 * Initialize locks to single-thread named checkpoints and backups, and
-	 * to single-thread last-record updates.
+	 * Initialize locks to single-thread named checkpoints and backups, last
+	 * last-record updates, and failures.
 	 */
-	if ((ret = pthread_rwlock_init(&g.append_lock, NULL)) != 0)
-		die(ret, "pthread_rwlock_init: append lock");
-	if ((ret = pthread_rwlock_init(&g.backup_lock, NULL)) != 0)
-		die(ret, "pthread_rwlock_init: backup lock");
-
-	/* Seed the random number generator. */
-	srand((u_int)(0xdeadbeef ^ (u_int)time(NULL)));
+	testutil_check(pthread_rwlock_init(&g.append_lock, NULL));
+	testutil_check(pthread_rwlock_init(&g.backup_lock, NULL));
+	testutil_check(pthread_rwlock_init(&g.checkpoint_lock, NULL));
+	testutil_check(pthread_rwlock_init(&g.death_lock, NULL));
 
 	printf("%s: process %" PRIdMAX "\n", g.progname, (intmax_t)getpid());
 	while (++g.run_cnt <= g.c_runs || g.c_runs == 0 ) {
@@ -186,10 +190,12 @@ main(int argc, char *argv[])
 		start = time(NULL);
 		track("starting up", 0ULL, NULL);
 
+#ifdef HAVE_BERKELEY_DB
 		if (SINGLETHREADED)
 			bdb_open();		/* Initial file config */
-		wts_open(g.home, 1, &g.wts_conn);
-		wts_create();
+#endif
+		wts_open(g.home, true, &g.wts_conn);
+		wts_init();
 
 		wts_load();			/* Load initial records */
 		wts_verify("post-bulk verify");	/* Verify */
@@ -225,8 +231,10 @@ main(int argc, char *argv[])
 			}
 
 		track("shutting down", 0ULL, NULL);
+#ifdef HAVE_BERKELEY_DB
 		if (SINGLETHREADED)
 			bdb_close();
+#endif
 		wts_close();
 
 		/*
@@ -242,25 +250,24 @@ main(int argc, char *argv[])
 		wts_salvage();
 
 		/* Overwrite the progress line with a completion line. */
-		if (g.track)
+		if (!g.c_quiet)
 			printf("\r%78s\r", " ");
 		printf("%4d: %s, %s (%.0f seconds)\n",
 		    g.run_cnt, g.c_data_source,
 		    g.c_file_type, difftime(time(NULL), start));
+		fflush(stdout);
 	}
 
 	/* Flush/close any logging information. */
-	if (g.logfp != NULL)
-		(void)fclose(g.logfp);
-	if (g.rand_log != NULL)
-		(void)fclose(g.rand_log);
+	fclose_and_clear(&g.logfp);
+	fclose_and_clear(&g.randfp);
 
 	config_print(0);
 
-	if ((ret = pthread_rwlock_destroy(&g.append_lock)) != 0)
-		die(ret, "pthread_rwlock_destroy: append lock");
-	if ((ret = pthread_rwlock_destroy(&g.backup_lock)) != 0)
-		die(ret, "pthread_rwlock_destroy: backup lock");
+	testutil_check(pthread_rwlock_destroy(&g.append_lock));
+	testutil_check(pthread_rwlock_destroy(&g.backup_lock));
+	testutil_check(pthread_rwlock_destroy(&g.checkpoint_lock));
+	testutil_check(pthread_rwlock_destroy(&g.death_lock));
 
 	config_clear();
 
@@ -274,81 +281,51 @@ main(int argc, char *argv[])
 static void
 startup(void)
 {
-	int ret;
+	WT_DECL_RET;
 
-	/* Close the logging file. */
-	if (g.logfp != NULL) {
-		(void)fclose(g.logfp);
-		g.logfp = NULL;
-	}
+	/* Flush/close any logging information. */
+	fclose_and_clear(&g.logfp);
+	fclose_and_clear(&g.randfp);
 
-	/* Close the random number logging file. */
-	if (g.rand_log != NULL) {
-		(void)fclose(g.rand_log);
-		g.rand_log = NULL;
-	}
-
-	/* Create home if it doesn't yet exist. */
-	if (access(g.home, X_OK) != 0 && mkdir(g.home, 0777) != 0)
-		die(errno, "mkdir: %s", g.home);
-
-	/* Remove the run's files except for rand. */
+	/* Create or initialize the home and data-source directories. */
 	if ((ret = system(g.home_init)) != 0)
-		die(ret, "home directory initialization failed");
+		testutil_die(ret, "home directory initialization failed");
 
-	/* Create the data-source directory. */
-	if (mkdir(g.home_kvs, 0777) != 0)
-		die(errno, "mkdir: %s", g.home_kvs);
+	/* Open/truncate the logging file. */
+	if (g.logging != 0 && (g.logfp = fopen(g.home_log, "w")) == NULL)
+		testutil_die(errno, "fopen: %s", g.home_log);
 
-	/*
-	 * Open/truncate the logging file; line buffer so we see up-to-date
-	 * information on error.
-	 */
-	if (g.logging != 0) {
-		if ((g.logfp = fopen(g.home_log, "w")) == NULL)
-			die(errno, "fopen: %s", g.home_log);
-		(void)setvbuf(g.logfp, NULL, _IOLBF, 0);
-	}
-
-	/*
-	 * Open/truncate the random number logging file; line buffer so we see
-	 * up-to-date information on error.
-	 */
-	if ((g.rand_log = fopen(g.home_rand, g.replay ? "r" : "w")) == NULL)
-		die(errno, "%s", g.home_rand);
-	(void)setvbuf(g.rand_log, NULL, _IOLBF, 32);
+	/* Open/truncate the random number logging file. */
+	if ((g.randfp = fopen(g.home_rand, g.replay ? "r" : "w")) == NULL)
+		testutil_die(errno, "%s", g.home_rand);
 }
 
 /*
  * die --
- *	Report an error and quit, dumping the configuration.
+ *	Report an error, dumping the configuration.
  */
-void
-die(int e, const char *fmt, ...)
+static void
+format_die(void)
 {
-	va_list ap;
+	/*
+	 * Single-thread error handling, our caller exits after calling
+	 * us - don't release the lock.
+	 */
+	(void)pthread_rwlock_wrlock(&g.death_lock);
 
-	if (fmt != NULL) {				/* Death message. */
-		fprintf(stderr, "%s: ", g.progname);
-		va_start(ap, fmt);
-		vfprintf(stderr, fmt, ap);
-		va_end(ap);
-		if (e != 0)
-			fprintf(stderr, ": %s", wiredtiger_strerror(e));
+	/* Try and turn off tracking so it doesn't obscure the error message. */
+	if (!g.c_quiet) {
+		g.c_quiet = 1;
 		fprintf(stderr, "\n");
 	}
 
 	/* Flush/close any logging information. */
-	if (g.logfp != NULL)
-		(void)fclose(g.logfp);
-	if (g.rand_log != NULL)
-		(void)fclose(g.rand_log);
+	fclose_and_clear(&g.logfp);
+	fclose_and_clear(&g.randfp);
 
 	/* Display the configuration that failed. */
 	if (g.run_cnt)
 		config_print(1);
-
-	exit(EXIT_FAILURE);
 }
 
 /*

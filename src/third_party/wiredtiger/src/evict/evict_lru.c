@@ -837,9 +837,8 @@ __evict_lru_walk(WT_SESSION_IMPL *session, uint32_t flags)
 {
 	WT_CACHE *cache;
 	WT_DECL_RET;
-	WT_EVICT_ENTRY *evict;
 	uint64_t cutoff;
-	uint32_t candidates, entries, i;
+	uint32_t candidates, entries;
 
 	cache = S2C(session)->cache;
 
@@ -856,6 +855,14 @@ __evict_lru_walk(WT_SESSION_IMPL *session, uint32_t flags)
 
 	while (entries > 0 && cache->evict[entries - 1].ref == NULL)
 		--entries;
+
+	/*
+	 * If we have more entries than the maximum tracked between walks,
+	 * clear them.  Do this before figuring out how many of the entries are
+	 * candidates so we never end up with more candidates than entries.
+	 */
+	while (entries > WT_EVICT_WALK_BASE)
+		__evict_list_clear(session, &cache->evict[--entries]);
 
 	cache->evict_entries = entries;
 
@@ -898,15 +905,6 @@ __evict_lru_walk(WT_SESSION_IMPL *session, uint32_t flags)
 			    &cache->evict[candidates]) > cutoff)
 				break;
 		cache->evict_candidates = candidates;
-	}
-
-	/* If we have more than the minimum number of entries, clear them. */
-	if (cache->evict_entries > WT_EVICT_WALK_BASE) {
-		for (i = WT_EVICT_WALK_BASE, evict = cache->evict + i;
-		    i < cache->evict_entries;
-		    i++, evict++)
-			__evict_list_clear(session, evict);
-		cache->evict_entries = WT_EVICT_WALK_BASE;
 	}
 
 	cache->evict_current = cache->evict;
@@ -1155,7 +1153,7 @@ __evict_init_candidate(
 	evict->ref = ref;
 	evict->btree = S2BT(session);
 
-	/* Mark the page on the list */
+	/* Mark the page on the list; set last to flush the other updates. */
 	F_SET_ATOMIC(ref->page, WT_PAGE_EVICT_LRU);
 }
 

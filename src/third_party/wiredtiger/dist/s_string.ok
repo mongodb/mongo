@@ -16,6 +16,7 @@ ASYNC
 Addr
 Ailamaki
 Alakuijala
+Alexandrescu's
 Alloc
 Async
 Athanassoulis
@@ -331,6 +332,7 @@ Subtree
 Subtrees
 TAILQ
 TCMalloc
+TESTUTIL
 TODO
 TOOSMALL
 TORTIOUS
@@ -389,6 +391,7 @@ WiredTigerTxn
 WithSeeds
 Wmissing
 Wuninitialized
+Wunused
 XP
 ZLIB
 Zlib
@@ -416,6 +419,7 @@ arg
 argc
 args
 argv
+assertfmt
 async
 asyncopp
 autockpt
@@ -472,6 +476,8 @@ centric
 cfg
 cfkos
 change's
+chdir
+checkfmt
 checkfrag
 checkpointed
 checkpointer
@@ -539,6 +545,7 @@ datasets
 datasource
 datastore
 dbc
+dcalloc
 decile
 deciles
 decl
@@ -569,12 +576,16 @@ dlh
 dll
 dlopen
 dlsym
+dmalloc
 dmsg
+drealloc
 ds
 dsk
 dsrc
 dst
 dstlen
+dstrdup
+dstrndup
 dsync
 dt
 dtype
@@ -648,6 +659,7 @@ fread
 free'd
 freelist
 fs
+fscanf
 fsm
 fstat
 fsync
@@ -690,6 +702,7 @@ iSh
 ibackup
 icount
 idx
+ifdef
 ifdef's
 ifndef
 ikey
@@ -781,6 +794,7 @@ lsnappy
 lu
 lz
 lzo
+mT
 madvise
 majorp
 malloc
@@ -882,6 +896,7 @@ optype
 os
 ovfl
 ownp
+pR
 packv
 parens
 parserp
@@ -1117,6 +1132,7 @@ uid
 uint
 uintmax
 unbare
+unbuffered
 uncompressing
 uncompresssed
 undef
@@ -1150,6 +1166,7 @@ usr
 utf
 util
 uu
+vW
 va
 valuep
 valuev
@@ -1170,6 +1187,7 @@ vsnprintf
 vtype
 vunpack
 vupdate
+waitpid
 walk's
 wb
 wiredtiger
@@ -1189,6 +1207,7 @@ xxxx
 xxxxx
 xxxxxx
 zalloc
+zf
 zfree
 zlib
 zu

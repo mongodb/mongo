@@ -634,6 +634,8 @@ __debug_page_metadata(WT_DBG *ds, WT_PAGE *page)
 		__dmsg(ds, ", evict-lru");
 	if (F_ISSET_ATOMIC(page, WT_PAGE_SCANNING))
 		__dmsg(ds, ", scanning");
+	if (F_ISSET_ATOMIC(page, WT_PAGE_SPLIT_INSERT))
+		__dmsg(ds, ", split-insert");
 	if (F_ISSET_ATOMIC(page, WT_PAGE_SPLIT_LOCKED))
 		__dmsg(ds, ", split locked");
 

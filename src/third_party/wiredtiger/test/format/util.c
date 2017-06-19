@@ -1,5 +1,5 @@
 /*-
- * Public Domain 2014-2015 MongoDB, Inc.
+ * Public Domain 2014-2016 MongoDB, Inc.
  * Public Domain 2008-2014 WiredTiger, Inc.
  *
  * This is free and unencumbered software released into the public domain.
@@ -32,28 +32,11 @@
 #define	MAX(a, b)	(((a) > (b)) ? (a) : (b))
 #endif
 
-static inline uint32_t
-kv_len(WT_RAND_STATE *rnd, uint64_t keyno, uint32_t min, uint32_t max)
-{
-	/*
-	 * Focus on relatively small key/value items, admitting the possibility
-	 * of larger items.  Pick a size close to the minimum most of the time,
-	 * only create a larger item 1 in 20 times, and a really big item 1 in
-	 * 1000 times. (Configuration can force large key/value minimum sizes,
-	 * where every key/value item is an overflow.)
-	 */
-	if (keyno % 1000 == 0 && max < KILOBYTE(80)) {
-		min = KILOBYTE(80);
-		max = KILOBYTE(100);
-	} else if (keyno % 20 != 0 && max > min + 20)
-		max = min + 20;
-	return (mmrand(rnd, min, max));
-}
-
 void
 key_len_setup(void)
 {
 	size_t i;
+	uint32_t max;
 
 	/*
 	 * The key is a variable length item with a leading 10-digit value.
@@ -63,73 +46,123 @@ key_len_setup(void)
 	 * the pre-loaded lengths.
 	 *
 	 * Fill in the random key lengths.
+	 *
+	 * Focus on relatively small items, admitting the possibility of larger
+	 * items. Pick a size close to the minimum most of the time, only create
+	 * a larger item 1 in 20 times.
 	 */
-	for (i = 0; i < sizeof(g.key_rand_len) / sizeof(g.key_rand_len[0]); ++i)
-		g.key_rand_len[i] =
-		    kv_len(NULL, (uint64_t)i, g.c_key_min, g.c_key_max);
+	for (i = 0;
+	    i < sizeof(g.key_rand_len) / sizeof(g.key_rand_len[0]); ++i) {
+		max = g.c_key_max;
+		if (i % 20 != 0 && max > g.c_key_min + 20)
+			max = g.c_key_min + 20;
+		g.key_rand_len[i] = mmrand(NULL, g.c_key_min, max);
+	}
 }
 
 void
-key_gen_setup(uint8_t **keyp)
+key_gen_setup(WT_ITEM *key)
 {
-	uint8_t *key;
 	size_t i, len;
-
-	*keyp = NULL;
+	char *p;
 
 	len = MAX(KILOBYTE(100), g.c_key_max);
-	if ((key = malloc(len)) == NULL)
-		die(errno, "malloc");
+	p = dmalloc(len);
 	for (i = 0; i < len; ++i)
-		key[i] = (uint8_t)("abcdefghijklmnopqrstuvwxyz"[i % 26]);
-	*keyp = key;
+		p[i] = "abcdefghijklmnopqrstuvwxyz"[i % 26];
+
+	key->mem = p;
+	key->memsize = len;
+	key->data = key->mem;
+	key->size = 0;
 }
 
 static void
-key_gen_common(uint8_t *key, size_t *sizep, uint64_t keyno, int suffix)
+key_gen_common(WT_ITEM *key, uint64_t keyno, const char * const suffix)
 {
 	int len;
+	char *p;
+
+	p = key->mem;
 
 	/*
-	 * The key always starts with a 10-digit string (the specified cnt)
+	 * The key always starts with a 10-digit string (the specified row)
 	 * followed by two digits, a random number between 1 and 15 if it's
 	 * an insert, otherwise 00.
 	 */
-	len = sprintf((char *)key, "%010" PRIu64 ".%02d", keyno, suffix);
+	u64_to_string_zf(keyno, key->mem, 11);
+	p[10] = '.';
+	p[11] = suffix[0];
+	p[12] = suffix[1];
+	len = 13;
 
 	/*
-	 * In a column-store, the key is only used for BDB, and so it doesn't
-	 * need a random length.
+	 * In a column-store, the key is only used for Berkeley DB inserts,
+	 * and so it doesn't need a random length.
 	 */
 	if (g.type == ROW) {
-		key[len] = '/';
-		len = (int)g.key_rand_len[keyno %
-		    (sizeof(g.key_rand_len) / sizeof(g.key_rand_len[0]))];
+		p[len] = '/';
+
+		/*
+		 * Because we're doing table lookup for key sizes, we weren't
+		 * able to set really big keys sizes in the table, the table
+		 * isn't big enough to keep our hash from selecting too many
+		 * big keys and blowing out the cache. Handle that here, use a
+		 * really big key 1 in 2500 times.
+		 */
+		len = keyno % 2500 == 0 && g.c_key_max < KILOBYTE(80) ?
+		    KILOBYTE(80) :
+		    (int)g.key_rand_len[keyno % WT_ELEMENTS(g.key_rand_len)];
 	}
-	*sizep = (size_t)len;
+
+	key->data = key->mem;
+	key->size = (size_t)len;
 }
 
 void
-key_gen(uint8_t *key, size_t *sizep, uint64_t keyno)
+key_gen(WT_ITEM *key, uint64_t keyno)
 {
-	key_gen_common(key, sizep, keyno, 0);
+	key_gen_common(key, keyno, "00");
 }
 
 void
-key_gen_insert(WT_RAND_STATE *rnd, uint8_t *key, size_t *sizep, uint64_t keyno)
+key_gen_insert(WT_RAND_STATE *rnd, WT_ITEM *key, uint64_t keyno)
 {
-	key_gen_common(key, sizep, keyno, (int)mmrand(rnd, 1, 15));
+	static const char * const suffix[15] = {
+	    "01", "02", "03", "04", "05",
+	    "06", "07", "08", "09", "10",
+	    "11", "12", "13", "14", "15"
+	};
+
+	key_gen_common(key, keyno, suffix[mmrand(rnd, 1, 15) - 1]);
 }
 
 static uint32_t val_dup_data_len;	/* Length of duplicate data items */
 
-void
-val_gen_setup(WT_RAND_STATE *rnd, uint8_t **valp)
+static inline uint32_t
+value_len(WT_RAND_STATE *rnd, uint64_t keyno, uint32_t min, uint32_t max)
 {
-	uint8_t *val;
-	size_t i, len;
+	/*
+	 * Focus on relatively small items, admitting the possibility of larger
+	 * items. Pick a size close to the minimum most of the time, only create
+	 * a larger item 1 in 20 times, and a really big item 1 in somewhere
+	 * around 2500 items.
+	 */
+	if (keyno % 2500 == 0 && max < KILOBYTE(80)) {
+		min = KILOBYTE(80);
+		max = KILOBYTE(100);
+	} else if (keyno % 20 != 0 && max > min + 20)
+		max = min + 20;
+	return (mmrand(rnd, min, max));
+}
 
-	*valp = NULL;
+void
+val_gen_setup(WT_RAND_STATE *rnd, WT_ITEM *value)
+{
+	size_t i, len;
+	char *p;
+
+	memset(value, 0, sizeof(WT_ITEM));
 
 	/*
 	 * Set initial buffer contents to recognizable text.
@@ -139,36 +172,43 @@ val_gen_setup(WT_RAND_STATE *rnd, uint8_t **valp)
 	 * data for column-store run-length encoded files.
 	 */
 	len = MAX(KILOBYTE(100), g.c_value_max) + 20;
-	if ((val = malloc(len)) == NULL)
-		die(errno, "malloc");
+	p = dmalloc(len);
 	for (i = 0; i < len; ++i)
-		val[i] = (uint8_t)("ABCDEFGHIJKLMNOPQRSTUVWXYZ"[i % 26]);
+		p[i] = "ABCDEFGHIJKLMNOPQRSTUVWXYZ"[i % 26];
 
-	*valp = val;
+	value->mem = p;
+	value->memsize = len;
+	value->data = value->mem;
+	value->size = 0;
 
-	val_dup_data_len = kv_len(rnd,
+	val_dup_data_len = value_len(rnd,
 	    (uint64_t)mmrand(rnd, 1, 20), g.c_value_min, g.c_value_max);
 }
 
 void
-val_gen(WT_RAND_STATE *rnd, uint8_t *val, size_t *sizep, uint64_t keyno)
+val_gen(WT_RAND_STATE *rnd, WT_ITEM *value, uint64_t keyno)
 {
+	char *p;
+
+	p = value->mem;
+	value->data = value->mem;
+
 	/*
 	 * Fixed-length records: take the low N bits from the last digit of
 	 * the record number.
 	 */
 	if (g.type == FIX) {
 		switch (g.c_bitcnt) {
-		case 8: val[0] = mmrand(rnd, 1, 0xff); break;
-		case 7: val[0] = mmrand(rnd, 1, 0x7f); break;
-		case 6: val[0] = mmrand(rnd, 1, 0x3f); break;
-		case 5: val[0] = mmrand(rnd, 1, 0x1f); break;
-		case 4: val[0] = mmrand(rnd, 1, 0x0f); break;
-		case 3: val[0] = mmrand(rnd, 1, 0x07); break;
-		case 2: val[0] = mmrand(rnd, 1, 0x03); break;
-		case 1: val[0] = 1; break;
+		case 8: p[0] = (char)mmrand(rnd, 1, 0xff); break;
+		case 7: p[0] = (char)mmrand(rnd, 1, 0x7f); break;
+		case 6: p[0] = (char)mmrand(rnd, 1, 0x3f); break;
+		case 5: p[0] = (char)mmrand(rnd, 1, 0x1f); break;
+		case 4: p[0] = (char)mmrand(rnd, 1, 0x0f); break;
+		case 3: p[0] = (char)mmrand(rnd, 1, 0x07); break;
+		case 2: p[0] = (char)mmrand(rnd, 1, 0x03); break;
+		case 1: p[0] = 1; break;
 		}
-		*sizep = 1;
+		value->size = 1;
 		return;
 	}
 
@@ -177,29 +217,24 @@ val_gen(WT_RAND_STATE *rnd, uint8_t *val, size_t *sizep, uint64_t keyno)
 	 * test that by inserting a zero-length data item every so often.
 	 */
 	if (keyno % 63 == 0) {
-		val[0] = '\0';
-		*sizep = 0;
+		p[0] = '\0';
+		value->size = 0;
 		return;
 	}
 
 	/*
-	 * Start the data with a 10-digit number.
-	 *
-	 * For row and non-repeated variable-length column-stores, change the
-	 * leading number to ensure every data item is unique.	For repeated
-	 * variable-length column-stores (that is, to test run-length encoding),
-	 * use the same data value all the time.
+	 * Data items have unique leading numbers by default and random lengths;
+	 * variable-length column-stores use a duplicate data value to test RLE.
 	 */
-	if ((g.type == ROW || g.type == VAR) &&
-	    g.c_repeat_data_pct != 0 &&
-	    mmrand(rnd, 1, 100) < g.c_repeat_data_pct) {
-		(void)strcpy((char *)val, "DUPLICATEV");
-		val[10] = '/';
-		*sizep = val_dup_data_len;
+	if (g.type == VAR && mmrand(rnd, 1, 100) < g.c_repeat_data_pct) {
+		(void)strcpy(p, "DUPLICATEV");
+		p[10] = '/';
+		value->size = val_dup_data_len;
 	} else {
-		(void)sprintf((char *)val, "%010" PRIu64, keyno);
-		val[10] = '/';
-		*sizep = kv_len(rnd, keyno, g.c_value_min, g.c_value_max);
+		u64_to_string_zf(keyno, p, 11);
+		p[10] = '/';
+		value->size =
+		    value_len(rnd, keyno, g.c_value_min, g.c_value_max);
 	}
 }
 
@@ -210,7 +245,7 @@ track(const char *tag, uint64_t cnt, TINFO *tinfo)
 	int len;
 	char msg[128];
 
-	if (!g.track || tag == NULL)
+	if (g.c_quiet || tag == NULL)
 		return;
 
 	if (tinfo == NULL && cnt == 0)
@@ -242,9 +277,9 @@ track(const char *tag, uint64_t cnt, TINFO *tinfo)
 	lastlen = len;
 
 	if (printf("%s\r", msg) < 0)
-		die(EIO, "printf");
+		testutil_die(EIO, "printf");
 	if (fflush(stdout) == EOF)
-		die(errno, "fflush");
+		testutil_die(errno, "fflush");
 }
 
 /*
@@ -257,80 +292,82 @@ path_setup(const char *home)
 	size_t len;
 
 	/* Home directory. */
-	if ((g.home = strdup(home == NULL ? "RUNDIR" : home)) == NULL)
-		die(errno, "malloc");
+	g.home = dstrdup(home == NULL ? "RUNDIR" : home);
 
 	/* Log file. */
 	len = strlen(g.home) + strlen("log") + 2;
-	if ((g.home_log = malloc(len)) == NULL)
-		die(errno, "malloc");
+	g.home_log = dmalloc(len);
 	snprintf(g.home_log, len, "%s/%s", g.home, "log");
 
 	/* RNG log file. */
 	len = strlen(g.home) + strlen("rand") + 2;
-	if ((g.home_rand = malloc(len)) == NULL)
-		die(errno, "malloc");
+	g.home_rand = dmalloc(len);
 	snprintf(g.home_rand, len, "%s/%s", g.home, "rand");
 
 	/* Run file. */
 	len = strlen(g.home) + strlen("CONFIG") + 2;
-	if ((g.home_config = malloc(len)) == NULL)
-		die(errno, "malloc");
+	g.home_config = dmalloc(len);
 	snprintf(g.home_config, len, "%s/%s", g.home, "CONFIG");
 
 	/* Statistics file. */
 	len = strlen(g.home) + strlen("stats") + 2;
-	if ((g.home_stats = malloc(len)) == NULL)
-		die(errno, "malloc");
+	g.home_stats = dmalloc(len);
 	snprintf(g.home_stats, len, "%s/%s", g.home, "stats");
-
-	/* Backup directory. */
-	len = strlen(g.home) + strlen("BACKUP") + 2;
-	if ((g.home_backup = malloc(len)) == NULL)
-		die(errno, "malloc");
-	snprintf(g.home_backup, len, "%s/%s", g.home, "BACKUP");
 
 	/* BDB directory. */
 	len = strlen(g.home) + strlen("bdb") + 2;
-	if ((g.home_bdb = malloc(len)) == NULL)
-		die(errno, "malloc");
+	g.home_bdb = dmalloc(len);
 	snprintf(g.home_bdb, len, "%s/%s", g.home, "bdb");
 
-	/* KVS directory. */
-	len = strlen(g.home) + strlen("KVS") + 2;
-	if ((g.home_kvs = malloc(len)) == NULL)
-		die(errno, "malloc");
-	snprintf(g.home_kvs, len, "%s/%s", g.home, "KVS");
-
 	/*
-	 * Home directory initialize command: remove everything except the RNG
-	 * log file.
+	 * Home directory initialize command: create the directory if it doesn't
+	 * exist, else remove everything except the RNG log file, create the KVS
+	 * sub-directory.
 	 *
 	 * Redirect the "cd" command to /dev/null so chatty cd implementations
 	 * don't add the new working directory to our output.
 	 */
 #undef	CMD
 #ifdef _WIN32
-#define	CMD	"cd %s && del /s /q * >:nul && rd /s /q KVS"
+#define	CMD  "del /q rand.copy & " \
+	     "(IF EXIST %s\\rand copy /y %s\\rand rand.copy) & "	\
+	     "(IF EXIST %s rd /s /q %s) & mkdir %s & "			\
+	     "(IF EXIST rand.copy copy rand.copy %s\\rand) & " \
+	     "cd %s & mkdir KVS"
+	len = strlen(g.home) * 7 + strlen(CMD) + 1;
+	g.home_init = dmalloc(len);
+	snprintf(g.home_init, len, CMD,
+	    g.home, g.home, g.home, g.home, g.home, g.home, g.home);
 #else
-#define	CMD	"cd %s > /dev/null && rm -rf `ls | sed /rand/d`"
+#define	CMD	"test -e %s || mkdir %s; "				\
+		"cd %s > /dev/null && rm -rf `ls | sed /rand/d`; "	\
+		"mkdir KVS"
+	len = strlen(g.home) * 3 + strlen(CMD) + 1;
+	g.home_init = dmalloc(len);
+	snprintf(g.home_init, len, CMD, g.home, g.home, g.home);
 #endif
-	len = strlen(g.home) + strlen(CMD) + 1;
-	if ((g.home_init = malloc(len)) == NULL)
-		die(errno, "malloc");
-	snprintf(g.home_init, len, CMD, g.home);
 
-	/* Backup directory initialize command, remove and re-create it. */
+	/* Primary backup directory. */
+	len = strlen(g.home) + strlen("BACKUP") + 2;
+	g.home_backup = dmalloc(len);
+	snprintf(g.home_backup, len, "%s/%s", g.home, "BACKUP");
+
+	/*
+	 * Backup directory initialize command, remove and re-create the primary
+	 * backup directory, plus a copy we maintain for recovery testing.
+	 */
 #undef	CMD
 #ifdef _WIN32
-#define	CMD	"del /s /q >:nul && mkdir %s"
+#define	CMD	"rd /s /q %s\\%s %s\\%s & mkdir %s\\%s %s\\%s"
 #else
-#define	CMD	"rm -rf %s && mkdir %s"
+#define	CMD	"rm -rf %s/%s %s/%s && mkdir %s/%s %s/%s"
 #endif
-	len = strlen(g.home_backup) * 2 + strlen(CMD) + 1;
-	if ((g.home_backup_init = malloc(len)) == NULL)
-		die(errno, "malloc");
-	snprintf(g.home_backup_init, len, CMD, g.home_backup, g.home_backup);
+	len = strlen(g.home) * 4 +
+	    strlen("BACKUP") * 2 + strlen("BACKUP_COPY") * 2 + strlen(CMD) + 1;
+	g.home_backup_init = dmalloc(len);
+	snprintf(g.home_backup_init, len, CMD,
+	    g.home, "BACKUP", g.home, "BACKUP_COPY",
+	    g.home, "BACKUP", g.home, "BACKUP_COPY");
 
 	/*
 	 * Salvage command, save the interesting files so we can replay the
@@ -352,8 +389,7 @@ path_setup(const char *home)
 	"cp WiredTiger* wt* slvg.copy/"
 #endif
 	len = strlen(g.home) + strlen(CMD) + 1;
-	if ((g.home_salvage_copy = malloc(len)) == NULL)
-		die(errno, "malloc");
+	g.home_salvage_copy = dmalloc(len);
 	snprintf(g.home_salvage_copy, len, CMD, g.home);
 }
 
@@ -375,12 +411,8 @@ rng(WT_RAND_STATE *rnd)
 		rnd = &g.rnd;
 
 	/*
-	 * We can entirely reproduce a run based on the random numbers used
-	 * in the initial run, plus the configuration files.  It would be
-	 * nice to just log the initial RNG seed, rather than logging every
-	 * random number generated, but we'd have to include our own RNG,
-	 * Berkeley DB calls rand() internally, and that messes up the pattern
-	 * of random numbers.
+	 * We can reproduce a single-threaded run based on the random numbers
+	 * used in the initial run, plus the configuration files.
 	 *
 	 * Check g.replay and g.rand_log_stop: multithreaded runs log/replay
 	 * until they get to the operations phase, then turn off log/replay,
@@ -390,14 +422,13 @@ rng(WT_RAND_STATE *rnd)
 		return (__wt_random(rnd));
 
 	if (g.replay) {
-		if (fgets(buf, sizeof(buf), g.rand_log) == NULL) {
-			if (feof(g.rand_log)) {
+		if (fgets(buf, sizeof(buf), g.randfp) == NULL) {
+			if (feof(g.randfp)) {
 				fprintf(stderr,
-				    "end of random number log reached, "
-				    "exiting\n");
+				    "\n" "end of random number log reached\n");
 				exit(EXIT_SUCCESS);
 			}
-			die(errno, "random number log");
+			testutil_die(errno, "random number log");
 		}
 
 		return ((uint32_t)strtoul(buf, NULL, 10));
@@ -405,6 +436,26 @@ rng(WT_RAND_STATE *rnd)
 
 	r = __wt_random(rnd);
 
-	fprintf(g.rand_log, "%" PRIu32 "\n", r);
+	/* Save and flush the random number so we're up-to-date on error. */
+	(void)fprintf(g.randfp, "%" PRIu32 "\n", r);
+	(void)fflush(g.randfp);
+
 	return (r);
+}
+
+/*
+ * fclose_and_clear --
+ *	Close a file and clear the handle so we don't close twice.
+ */
+void
+fclose_and_clear(FILE **fpp)
+{
+	FILE *fp;
+
+	if ((fp = *fpp) == NULL)
+		return;
+	*fpp = NULL;
+	if (fclose(fp) != 0)
+		testutil_die(errno, "fclose");
+	return;
 }

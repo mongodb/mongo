@@ -1,5 +1,5 @@
 /*-
- * Public Domain 2014-2015 MongoDB, Inc.
+ * Public Domain 2014-2016 MongoDB, Inc.
  * Public Domain 2008-2014 WiredTiger, Inc.
  *
  * This is free and unencumbered software released into the public domain.
@@ -37,41 +37,39 @@ check_copy(void)
 {
 	WT_CONNECTION *conn;
 	WT_SESSION *session;
-	int ret;
 
-	wts_open(g.home_backup, 0, &conn);
+	wts_open(g.home_backup, false, &conn);
 
-	if ((ret = conn->open_session(
-	    conn, NULL, NULL, &session)) != 0)
-		die(ret, "connection.open_session: %s", g.home_backup);
+	testutil_checkfmt(
+	    conn->open_session(conn, NULL, NULL, &session),
+	    "%s", g.home_backup);
 
-	ret = session->verify(session, g.uri, NULL);
-	if (ret != 0)
-		die(ret, "session.verify: %s: %s", g.home_backup, g.uri);
+	testutil_checkfmt(
+	    session->verify(session, g.uri, NULL),
+	    "%s: %s", g.home_backup, g.uri);
 
-	if ((ret = conn->close(conn, NULL)) != 0)
-		die(ret, "connection.close: %s", g.home_backup);
+	testutil_checkfmt(conn->close(conn, NULL), "%s", g.home_backup);
 }
 
 /*
  * copy_file --
- *	Copy a single file into the backup directory.
+ *	Copy a single file into the backup directories.
  */
 static void
-copy_file(const char *name)
+copy_file(WT_SESSION *session, const char *name)
 {
 	size_t len;
 	char *cmd;
 	int ret;
 
-	len = strlen(g.home) + strlen(g.home_backup) + strlen(name) * 2 + 20;
-	if ((cmd = malloc(len)) == NULL)
-		die(errno, "malloc");
-	(void)snprintf(cmd, len,
-	    "cp %s/%s %s/%s", g.home, name, g.home_backup, name);
-	if ((ret = system(cmd)) != 0)
-		die(ret, "backup copy: %s", cmd);
-	free(cmd);
+       len = strlen(g.home) + strlen(g.home_backup) + strlen(name) * 2 + 20;
+       if ((cmd = malloc(len)) == NULL)
+	       testutil_die(errno, "malloc");
+       (void)snprintf(cmd, len,
+	   "cp %s/%s %s/%s", g.home, name, g.home_backup, name);
+       if ((ret = system(cmd)) != 0)
+	       testutil_die(ret, "backup copy: %s", cmd);
+       free(cmd);
 }
 
 /*
@@ -83,10 +81,11 @@ backup(void *arg)
 {
 	WT_CONNECTION *conn;
 	WT_CURSOR *backup_cursor;
+	WT_DECL_RET;
 	WT_SESSION *session;
-	u_int period;
-	int ret;
-	const char *key;
+	u_int incremental, period;
+	bool full;
+	const char *config, *key;
 
 	(void)(arg);
 
@@ -97,58 +96,90 @@ backup(void *arg)
 		return (NULL);
 
 	/* Open a session. */
-	if ((ret = conn->open_session(conn, NULL, NULL, &session)) != 0)
-		die(ret, "connection.open_session");
+	testutil_check(conn->open_session(conn, NULL, NULL, &session));
 
 	/*
-	 * Perform a backup at somewhere under 10 seconds (so we get at
-	 * least one done), and then at 45 second intervals.
+	 * Perform a full backup at somewhere under 10 seconds (that way there's
+	 * at least one), then at larger intervals, optionally do incremental
+	 * backups between full backups.
 	 */
-	for (period = mmrand(NULL, 1, 10);; period = 45) {
+	incremental = 0;
+	for (period = mmrand(NULL, 1, 10);; period = mmrand(NULL, 20, 45)) {
 		/* Sleep for short periods so we don't make the run wait. */
 		while (period > 0 && !g.workers_finished) {
 			--period;
 			sleep(1);
 		}
-		if (g.workers_finished)
-			break;
-
-		/* Lock out named checkpoints */
-		if ((ret = pthread_rwlock_wrlock(&g.backup_lock)) != 0)
-			die(ret, "pthread_rwlock_wrlock: backup lock");
-
-		/* Re-create the backup directory. */
-		if ((ret = system(g.home_backup_init)) != 0)
-			die(ret, "backup directory creation failed");
 
 		/*
-		 * open_cursor can return EBUSY if a metadata operation is
-		 * currently happening - retry in that case.
+		 * We can't drop named checkpoints while there's a backup in
+		 * progress, serialize backups with named checkpoints. Wait
+		 * for the checkpoint to complete, otherwise backups might be
+		 * starved out.
 		 */
-		while ((ret = session->open_cursor(session,
-		    "backup:", NULL, NULL, &backup_cursor)) == EBUSY)
-			sleep(1);
-		if (ret != 0)
-			die(ret, "session.open_cursor: backup");
-
-		while ((ret = backup_cursor->next(backup_cursor)) == 0) {
-			if ((ret =
-			    backup_cursor->get_key(backup_cursor, &key)) != 0)
-				die(ret, "cursor.get_key");
-			copy_file(key);
+		testutil_check(pthread_rwlock_wrlock(&g.backup_lock));
+		if (g.workers_finished) {
+			testutil_check(pthread_rwlock_unlock(&g.backup_lock));
+			break;
 		}
 
-		if ((ret = backup_cursor->close(backup_cursor)) != 0)
-			die(ret, "cursor.close");
+		if (incremental) {
+			config = "target=(\"log:\")";
+			full = false;
+		} else {
+			/* Re-create the backup directory. */
+			testutil_checkfmt(
+			    system(g.home_backup_init),
+			    "%s", "backup directory creation failed");
 
-		if ((ret = pthread_rwlock_unlock(&g.backup_lock)) != 0)
-			die(ret, "pthread_rwlock_unlock: backup lock");
+			config = NULL;
+			full = true;
+		}
 
-		check_copy();
+		/*
+		 * open_cursor can return EBUSY if concurrent with a metadata
+		 * operation, retry in that case.
+		 */
+		while ((ret = session->open_cursor(
+		    session, "backup:", NULL, config, &backup_cursor)) == EBUSY)
+			__wt_yield();
+		if (ret != 0)
+			testutil_die(ret, "session.open_cursor: backup");
+
+		while ((ret = backup_cursor->next(backup_cursor)) == 0) {
+			testutil_check(
+			    backup_cursor->get_key(backup_cursor, &key));
+			copy_file(session, key);
+		}
+		if (ret != WT_NOTFOUND)
+			testutil_die(ret, "backup-cursor");
+
+		/* After an incremental backup, truncate the log files. */
+		if (incremental)
+			testutil_check(session->truncate(
+			    session, "log:", backup_cursor, NULL, NULL));
+
+		testutil_check(backup_cursor->close(backup_cursor));
+		testutil_check(pthread_rwlock_unlock(&g.backup_lock));
+
+		/*
+		 * If automatic log archival isn't configured, optionally do
+		 * incremental backups after each full backup. If we're not
+		 * doing any more incremental, verify the backup (we can't
+		 * verify intermediate states, once we perform recovery on the
+		 * backup database, we can't do any more incremental backups).
+		 */
+		if (full)
+			incremental =
+			    g.c_logging_archive ? 1 : mmrand(NULL, 1, 5);
+		if (--incremental == 0)
+			check_copy();
 	}
 
-	if ((ret = session->close(session, NULL)) != 0)
-		die(ret, "session.close");
+	if (incremental != 0)
+		check_copy();
+
+	testutil_check(session->close(session, NULL));
 
 	return (NULL);
 }

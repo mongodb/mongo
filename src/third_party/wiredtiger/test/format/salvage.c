@@ -1,5 +1,5 @@
 /*-
- * Public Domain 2014-2015 MongoDB, Inc.
+ * Public Domain 2014-2016 MongoDB, Inc.
  * Public Domain 2008-2014 WiredTiger, Inc.
  *
  * This is free and unencumbered software released into the public domain.
@@ -36,18 +36,16 @@ static void
 salvage(void)
 {
 	WT_CONNECTION *conn;
+	WT_DECL_RET;
 	WT_SESSION *session;
-	int ret;
 
 	conn = g.wts_conn;
 	track("salvage", 0ULL, NULL);
 
-	if ((ret = conn->open_session(conn, NULL, NULL, &session)) != 0)
-		die(ret, "connection.open_session");
+	testutil_check(conn->open_session(conn, NULL, NULL, &session));
 	if ((ret = session->salvage(session, g.uri, "force=true")) != 0)
-		die(ret, "session.salvage: %s", g.uri);
-	if ((ret = session->close(session, NULL)) != 0)
-		die(ret, "session.close");
+		testutil_die(ret, "session.salvage: %s", g.uri);
+	testutil_check(session->close(session, NULL));
 }
 
 /*
@@ -101,37 +99,37 @@ corrupt(void)
 	return (0);
 
 found:	if (fstat(fd, &sb) == -1)
-		die(errno, "salvage-corrupt: fstat");
+		testutil_die(errno, "salvage-corrupt: fstat");
 
-	offset = mmrand(NULL, 0, sb.st_size);
+	offset = mmrand(NULL, 0, (u_int)sb.st_size);
 	len = (size_t)(20 + (sb.st_size / 100) * 2);
 	(void)snprintf(buf, sizeof(buf), "%s/slvg.corrupt", g.home);
 	if ((fp = fopen(buf, "w")) == NULL)
-		die(errno, "salvage-corrupt: open: %s", buf);
+		testutil_die(errno, "salvage-corrupt: open: %s", buf);
 	(void)fprintf(fp,
-	    "salvage-corrupt: offset %" PRIuMAX ", length " SIZET_FMT "\n",
+	    "salvage-corrupt: offset %" PRIuMAX ", length %" WT_SIZET_FMT "\n",
 	    (uintmax_t)offset, len);
-	(void)fclose(fp);
+	fclose_and_clear(&fp);
 
 	if (lseek(fd, offset, SEEK_SET) == -1)
-		die(errno, "salvage-corrupt: lseek");
+		testutil_die(errno, "salvage-corrupt: lseek");
 
 	memset(buf, 'z', sizeof(buf));
 	for (; len > 0; len -= nw) {
 		nw = (size_t)(len > sizeof(buf) ? sizeof(buf) : len);
 		if (write(fd, buf, nw) == -1)
-			die(errno, "salvage-corrupt: write");
+			testutil_die(errno, "salvage-corrupt: write");
 	}
 
 	if (close(fd) == -1)
-		die(errno, "salvage-corrupt: close");
+		testutil_die(errno, "salvage-corrupt: close");
 
 	/*
 	 * Save a copy of the corrupted file so we can replay the salvage step
 	 * as necessary.
 	 */
 	if ((ret = system(copycmd)) != 0)
-		die(ret, "salvage corrupt copy step failed");
+		testutil_die(ret, "salvage corrupt copy step failed");
 
 	return (1);
 }
@@ -143,10 +141,13 @@ found:	if (fstat(fd, &sb) == -1)
 void
 wts_salvage(void)
 {
-	int ret;
+	WT_DECL_RET;
 
 	/* Some data-sources don't support salvage. */
 	if (DATASOURCE("helium") || DATASOURCE("kvsbdb"))
+		return;
+
+	if (g.c_salvage == 0)
 		return;
 
 	/*
@@ -154,10 +155,10 @@ wts_salvage(void)
 	 * step as necessary.
 	 */
 	if ((ret = system(g.home_salvage_copy)) != 0)
-		die(ret, "salvage copy step failed");
+		testutil_die(ret, "salvage copy step failed");
 
 	/* Salvage, then verify. */
-	wts_open(g.home, 1, &g.wts_conn);
+	wts_open(g.home, true, &g.wts_conn);
 	salvage();
 	wts_verify("post-salvage verify");
 	wts_close();
@@ -173,7 +174,7 @@ wts_salvage(void)
 
 	/* Corrupt the file randomly, salvage, then verify. */
 	if (corrupt()) {
-		wts_open(g.home, 1, &g.wts_conn);
+		wts_open(g.home, true, &g.wts_conn);
 		salvage();
 		wts_verify("post-corrupt-salvage verify");
 		wts_close();
