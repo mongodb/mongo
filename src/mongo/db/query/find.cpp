@@ -278,13 +278,16 @@ Message getMore(OperationContext* opCtx,
                 ? boost::optional<int>{autoDb.getDb()->getProfilingLevel()}
                 : boost::none;
             statsTracker.emplace(opCtx, *nssForCurOp, Top::LockType::NotLocked, profilingLevel);
+            auto view = autoDb.getDb()
+                ? autoDb.getDb()->getViewCatalog()->lookup(opCtx, nssForCurOp->ns())
+                : nullptr;
             uassert(
                 ErrorCodes::CommandNotSupportedOnView,
                 str::stream() << "Namespace " << nssForCurOp->ns()
                               << " is a view. OP_GET_MORE operations are not supported on views. "
                               << "Only clients which support the getMore command can be used to "
                                  "query views.",
-                !autoDb.getDb()->getViewCatalog()->lookup(opCtx, nssForCurOp->ns()));
+                !view);
         }
     } else {
         readLock.emplace(opCtx, nss);
