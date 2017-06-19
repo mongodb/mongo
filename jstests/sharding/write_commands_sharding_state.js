@@ -23,10 +23,10 @@
     printjson(st.config.getSiblingDB('config').chunks.find().toArray());
 
     // Move 10 and 20 to shard00001
-    assert.commandWorked(
-        st.s0.adminCommand({moveChunk: collName, find: {Key: 19}, to: 'shard0001'}));
-    assert.commandWorked(
-        st.s0.adminCommand({moveChunk: collName, find: {Key: 21}, to: 'shard0001'}));
+    assert.commandWorked(st.s0.adminCommand(
+        {moveChunk: collName, find: {Key: 19}, to: 'shard0001', _waitForDelete: true}));
+    assert.commandWorked(st.s0.adminCommand(
+        {moveChunk: collName, find: {Key: 21}, to: 'shard0001', _waitForDelete: true}));
 
     printjson(st.config.getSiblingDB('config').chunks.find().toArray());
 
@@ -47,8 +47,8 @@
     assert.eq(1, st.d1.getDB(dbTestName).TestColl.find({Key: 21}).count());
 
     // Move chunk [0, 19] to shard0000 and make sure the documents are correctly placed
-    assert.commandWorked(
-        st.s0.adminCommand({moveChunk: collName, find: {Key: 19}, to: 'shard0000'}));
+    assert.commandWorked(st.s0.adminCommand(
+        {moveChunk: collName, find: {Key: 19}, _waitForDelete: true, to: 'shard0000'}));
 
     printjson(st.config.getSiblingDB('config').chunks.find().toArray());
     printjson(st.d0.getDB(dbTestName).TestColl.find({}).toArray());

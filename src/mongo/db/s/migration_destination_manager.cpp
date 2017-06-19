@@ -1018,7 +1018,7 @@ void MigrationDestinationManager::_forgetPending(OperationContext* opCtx,
         return;
     }
 
-    (void)css->forgetReceive(range);
+    css->forgetReceive(range);
 }
 
 }  // namespace mongo

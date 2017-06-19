@@ -228,8 +228,12 @@ private:
         moveTimingHelper.done(6);
         MONGO_FAIL_POINT_PAUSE_WHILE_SET(moveChunkHangAtStep6);
 
+        auto nss = moveChunkRequest.getNss();
         auto range = ChunkRange(moveChunkRequest.getMinKey(), moveChunkRequest.getMaxKey());
-        if (moveChunkRequest.getWaitForDelete()) {
+        auto const now = CollectionShardingState::kNow, later = CollectionShardingState::kDelayed;
+        auto whenToClean = moveChunkRequest.getWaitForDelete() ? now : later;
+        if (whenToClean == now) {
+            log() << "Waiting for cleanup of " << nss.ns() << " range " << redact(range.toString());
             CollectionShardingState::waitForClean(
                 opCtx, moveChunkRequest.getNss(), moveChunkRequest.getVersionEpoch(), range)
                 .transitional_ignore();
@@ -237,8 +241,8 @@ private:
             // the deletes performed by the range deleter thread.
             repl::ReplClientInfo::forClient(opCtx->getClient()).setLastOpToSystemLastOpTime(opCtx);
         } else {
-            log() << "Leaving cleanup of " << moveChunkRequest.getNss().ns() << " range "
-                  << redact(range.toString()) << " to complete in background";
+            log() << "Leaving cleanup of " << nss.ns() << " range " << redact(range.toString())
+                  << " to complete in background";
         }
         moveTimingHelper.done(7);
         MONGO_FAIL_POINT_PAUSE_WHILE_SET(moveChunkHangAtStep7);

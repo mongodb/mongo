@@ -406,7 +406,10 @@ Status MigrationSourceManager::commitChunkMetadataOnConfig(OperationContext* opC
 
         // Schedule clearing out orphaned documents when they are no longer in active use.
         const auto orphans = ChunkRange(_args.getMinKey(), _args.getMaxKey());
-        auto notification = css->cleanUpRange(orphans);
+        auto const now = CollectionShardingState::kNow, later = CollectionShardingState::kDelayed;
+        auto whenToClean = _args.getWaitForDelete() ? now : later;
+
+        auto notification = css->cleanUpRange(orphans, whenToClean);
         if (notification.ready() && !notification.waitStatus(opCtx).isOK()) {
             // if it fails immediately, report that and continue.
             warning() << "Failed to initiate cleanup of " << getNss().ns() << " orphan range "

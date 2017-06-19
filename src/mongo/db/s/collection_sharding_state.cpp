@@ -47,6 +47,7 @@
 #include "mongo/db/s/sharding_state.h"
 #include "mongo/db/s/type_shard_identity.h"
 #include "mongo/db/server_options.h"
+#include "mongo/db/server_parameters.h"
 #include "mongo/db/service_context.h"
 #include "mongo/s/catalog/sharding_catalog_manager.h"
 #include "mongo/s/catalog/type_config_version.h"
@@ -60,6 +61,8 @@
 #include "mongo/util/log.h"
 
 namespace mongo {
+
+MONGO_EXPORT_SERVER_PARAMETER(orphanCleanupDelaySecs, int, 900);  // 900s = 15m
 
 namespace {
 
@@ -156,8 +159,11 @@ void CollectionShardingState::forgetReceive(const ChunkRange& range) {
     _metadataManager->forgetReceive(range);
 }
 
-auto CollectionShardingState::cleanUpRange(ChunkRange const& range) -> CleanupNotification {
-    return _metadataManager->cleanUpRange(range);
+auto CollectionShardingState::cleanUpRange(ChunkRange const& range, CleanWhen when)
+    -> MetadataManager::CleanupNotification {
+    Date_t time = (when == kNow) ? Date_t{} : Date_t::now() +
+            stdx::chrono::seconds{orphanCleanupDelaySecs.load()};
+    return _metadataManager->cleanUpRange(range, time);
 }
 
 auto CollectionShardingState::overlappingMetadata(ChunkRange const& range) const

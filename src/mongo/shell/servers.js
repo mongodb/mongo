@@ -1015,17 +1015,22 @@ var MongoRunner, _startMongod, startMongoProgram, runMongoProgram, startMongoPro
 
         // programName includes the version, e.g., mongod-3.2.
         // baseProgramName is the program name without any version information, e.g., mongod.
-        var programName = argArray[0];
+        let programName = argArray[0];
 
         // Object containing log component levels for the "logComponentVerbosity" parameter
-        var logComponentVerbosity = {};
+        let logComponentVerbosity = {};
 
-        var [baseProgramName, programVersion] = programName.split("-");
+        let [baseProgramName, programVersion] = programName.split("-");
+        let programMajorMinorVersion = 0;
+        if (programVersion) {
+            let [major, minor, point] = programVersion.split(".");
+            programMajorMinorVersion = parseInt(major) * 100 + parseInt(minor);
+        }
+
         if (baseProgramName === 'mongod' || baseProgramName === 'mongos') {
             if (jsTest.options().enableTestCommands) {
                 argArray.push(...['--setParameter', "enableTestCommands=1"]);
-                if (!programVersion || (parseInt(programVersion.split(".")[0]) >= 3 &&
-                                        parseInt(programVersion.split(".")[1]) >= 3)) {
+                if (!programVersion || programMajorMinorVersion >= 303) {
                     if (!argArrayContains("logComponentVerbosity")) {
                         logComponentVerbosity["tracking"] = 0;
                     }
@@ -1065,9 +1070,22 @@ var MongoRunner, _startMongod, startMongoProgram, runMongoProgram, startMongoPro
             } else if (baseProgramName === 'mongod') {
                 // Set storageEngine for mongod. There was no storageEngine parameter before 3.0.
                 if (jsTest.options().storageEngine &&
-                    (!programVersion || parseInt(programVersion.split(".")[0]) >= 3)) {
-                    if (argArray.indexOf("--storageEngine") < 0) {
+                    (!programVersion || programMajorMinorVersion >= 300)) {
+                    if (!argArrayContains("--storageEngine")) {
                         argArray.push(...['--storageEngine', jsTest.options().storageEngine]);
+                    }
+                }
+
+                // TODO: Make this unconditional in 3.8.
+                if (!programMajorMinorVersion || programMajorMinorVersion > 304) {
+                    let hasParam = false;
+                    for (let arg of argArray) {
+                        if (typeof arg === 'string' && arg.startsWith('orphanCleanupDelaySecs=')) {
+                            hasParam = true;
+                        }
+                    }
+                    if (!hasParam) {
+                        argArray.push(...['--setParameter', 'orphanCleanupDelaySecs=0']);
                     }
                 }
 

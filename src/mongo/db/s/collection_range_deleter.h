@@ -32,6 +32,7 @@
 #include "mongo/executor/task_executor.h"
 #include "mongo/s/catalog/type_chunk.h"
 #include "mongo/util/concurrency/notification.h"
+#include "mongo/util/time_support.h"
 
 namespace mongo {
 
@@ -94,13 +95,14 @@ public:
         std::shared_ptr<Notification<Status>> notification;
     };
 
+
     struct Deletion {
-        Deletion(ChunkRange r) : range(std::move(r)) {}
+        Deletion(ChunkRange r, Date_t when) : range(std::move(r)), whenToDelete(when) {}
+
         ChunkRange range;
+        Date_t whenToDelete;  // A value of Date_t{} means immediately.
         DeleteNotification notification{};
     };
-
-    enum Action { kFinished, kMore, kWriteOpLog };
 
     CollectionRangeDeleter() = default;
     ~CollectionRangeDeleter();
@@ -111,10 +113,12 @@ public:
     //
 
     /**
-     * Splices range's elements to the list to be cleaned up by the deleter thread. Returns true
-     * if the list is newly non-empty, so the caller knows to schedule a deletion task.
+     * Splices range's elements to the list to be cleaned up by the deleter thread.  Deletions d
+     * with d.delay == true are added to the delayed queue, and scheduled at time `later`.
+     * Returns the time to begin deletions, if needed, or boost::none if deletions are already
+     * scheduled.
      */
-    bool add(std::list<Deletion> ranges);
+    auto add(std::list<Deletion> ranges) -> boost::optional<Date_t>;
 
     /**
      * Reports whether the argument range overlaps any of the ranges to clean.  If there is overlap,
@@ -149,18 +153,18 @@ public:
      * watchers of ranges as they are done being deleted. It performs its own collection locking, so
      * it must be called without locks.
      *
-     * Returns kMore or kWriteOpLog if it should be scheduled to run again because there might be
-     * more documents to delete, or kFinished otherwise.  When calling again, pass the value
-     * returned.
+     * If it should be scheduled to run again because there might be more documents to delete,
+     * returns the time to begin, or boost::none otherwise.
      *
      * Argument 'forTestOnly' is used in unit tests that exercise the CollectionRangeDeleter class,
      * so that they do not need to set up CollectionShardingState and MetadataManager objects.
      */
-    static Action cleanUpNextRange(OperationContext*,
-                                   NamespaceString const& nss,
-                                   Action,
-                                   int maxToDelete,
-                                   CollectionRangeDeleter* forTestOnly = nullptr);
+    static auto cleanUpNextRange(OperationContext*,
+                                 NamespaceString const& nss,
+                                 OID const& epoch,
+                                 int maxToDelete,
+                                 CollectionRangeDeleter* forTestOnly = nullptr)
+        -> boost::optional<Date_t>;
 
 private:
     /**
@@ -187,6 +191,7 @@ private:
      * As each range is completed, its notification is signaled before it is popped.
      */
     std::list<Deletion> _orphans;
+    std::list<Deletion> _delayedOrphans;
 };
 
 }  // namespace mongo

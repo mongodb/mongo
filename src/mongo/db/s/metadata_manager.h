@@ -91,27 +91,28 @@ public:
     }
 
     /**
-     * If no running queries can depend on documents in the range, schedules any such documents for
-     * immediate cleanup. Otherwise, returns false.
+     * Schedules any documents in `range` for immediate cleanup iff no running queries can depend
+     * on them, and adds the range to the list of pending ranges. Otherwise, returns a notification
+     * that yields bad status immediately.  Does not block.  Call waitStatus(opCtx) on the result
+     * to wait for the deletion to complete or fail.
      */
     CleanupNotification beginReceive(ChunkRange const& range);
 
     /**
-     * Removes the range from the pending list, and schedules any documents in the range for
-     * immediate cleanup.  Assumes no active queries can see any local documents in the range.
+     * Removes `range` from the list of pending ranges, and schedules any documents in the range for
+     * immediate cleanup.  Does not block.  If no such range is scheduled, does nothing.
      */
     void forgetReceive(const ChunkRange& range);
 
     /**
-     * Initiates cleanup of the orphaned documents as if a chunk has been migrated out. If any
-     * documents in the range might still be in use by running queries, queues cleanup to begin
-     * after they have all terminated.  Otherwise, schedules documents for immediate cleanup.
-     * Fails if the range overlaps any current local shard chunk.
+     * Schedules documents in `range` for cleanup after any running queries that may depend on them
+     * have terminated. Does not block. Fails if the range overlaps any current local shard chunk.
+     * If `whenToDelete` is Date_t{}, deletion is scheduled immediately after the last dependent
+     * query completes; otherwise, deletion is postponed until the time specified.
      *
-     * Must be called with the collection locked for writing.  To monitor completion, use
-     * trackOrphanedDataCleanup or CollectionShardingState::waitForClean.
+     * Call waitStatus(opCtx) on the result to wait for the deletion to complete or fail.
      */
-    CleanupNotification cleanUpRange(ChunkRange const& range);
+    CleanupNotification cleanUpRange(ChunkRange const& range, Date_t whenToDelete);
 
     /**
      * Returns a vector of ScopedCollectionMetadata objects representing metadata instances in use
@@ -147,17 +148,6 @@ public:
     using Deletion = CollectionRangeDeleter::Deletion;
 
 private:
-    /**
-     * Deletes ranges, in background, until done, normally using a task executor attached to the
-     * ShardingState.
-     *
-     * Each time it completes cleaning up a range, it wakes up clients waiting on completion of
-     * that range, which may then verify their range has no more deletions scheduled, and proceed.
-     */
-    static void _scheduleCleanup(executor::TaskExecutor*,
-                                 NamespaceString nss,
-                                 CollectionRangeDeleter::Action);
-
     // All of the following functions must be called while holding _managerLock.
 
     /**
@@ -190,8 +180,8 @@ private:
     bool _overlapsInUseChunk(ChunkRange const& range);
 
     /**
-     * Returns true if any range (possibly) still in use, but scheduled for cleanup, overlaps
-     * the argument range.
+     * Returns a notification if any range (possibly) still in use, but scheduled for cleanup,
+     * overlaps the argument range.
      */
     auto _overlapsInUseCleanups(ChunkRange const& range) -> boost::optional<CleanupNotification>;
 
@@ -199,7 +189,7 @@ private:
      * Copies the argument range to the list of ranges scheduled for immediate deletion, and
      * schedules a a background task to perform the work.
      */
-    CleanupNotification _pushRangeToClean(ChunkRange const& range);
+    auto _pushRangeToClean(ChunkRange const& range, Date_t when) -> CleanupNotification;
 
     /**
      * Splices the argument list elements to the list of ranges scheduled for immediate deletion,
@@ -246,10 +236,10 @@ private:
     // for access to _rangesToClean and _managerLock under task callback
     friend auto CollectionRangeDeleter::cleanUpNextRange(OperationContext*,
                                                          NamespaceString const&,
-                                                         CollectionRangeDeleter::Action,
+                                                         OID const& epoch,
                                                          int maxToDelete,
                                                          CollectionRangeDeleter*)
-        -> CollectionRangeDeleter::Action;
+        -> boost::optional<Date_t>;
     friend class ScopedCollectionMetadata;
 };
 

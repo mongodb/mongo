@@ -50,6 +50,7 @@
 #include "mongo/s/chunk_version.h"
 #include "mongo/s/client/shard_registry.h"
 #include "mongo/s/sharding_mongod_test_fixture.h"
+#include "mongo/unittest/unittest.h"
 
 namespace mongo {
 
@@ -60,18 +61,16 @@ const std::string kPattern = "_id";
 const BSONObj kKeyPattern = BSON(kPattern << 1);
 const std::string kShardName{"a"};
 const HostAndPort dummyHost("dummy", 123);
-const NamespaceString kAdminSystemVersion = NamespaceString("admin", "system.version");
+const NamespaceString kAdminSysVer = NamespaceString("admin", "system.version");
 
 class CollectionRangeDeleterTest : public ShardingMongodTestFixture {
 public:
     using Deletion = CollectionRangeDeleter::Deletion;
-    using Action = CollectionRangeDeleter::Action;
 
 protected:
-    auto next(CollectionRangeDeleter& rangeDeleter, Action action, int maxToDelete)
-        -> CollectionRangeDeleter::Action {
+    auto next(CollectionRangeDeleter& rangeDeleter, int maxToDelete) -> boost::optional<Date_t> {
         return CollectionRangeDeleter::cleanUpNextRange(
-            operationContext(), kNss, action, maxToDelete, &rangeDeleter);
+            operationContext(), kNss, epoch(), maxToDelete, &rangeDeleter);
     }
     std::shared_ptr<RemoteCommandTargeterMock> configTargeter() {
         return RemoteCommandTargeterMock::get(shardRegistry()->getConfigShard()->getTargeter());
@@ -101,10 +100,6 @@ private:
 
     OID _epoch;
 };
-
-std::ostream& operator<<(std::ostream& os, CollectionRangeDeleter::Action a) {
-    return os << (int)a;
-}
 
 void CollectionRangeDeleterTest::setUp() {
     _epoch = OID::gen();
@@ -147,7 +142,7 @@ namespace {
 // Tests the case that there is nothing in the database.
 TEST_F(CollectionRangeDeleterTest, EmptyDatabase) {
     CollectionRangeDeleter rangeDeleter;
-    ASSERT_EQ(Action::kFinished, next(rangeDeleter, Action::kWriteOpLog, 1));
+    ASSERT_FALSE(next(rangeDeleter, 1));
 }
 
 // Tests the case that there is data, but it is not in a range to clean.
@@ -158,15 +153,16 @@ TEST_F(CollectionRangeDeleterTest, NoDataInGivenRangeToClean) {
     dbclient.insert(kNss.toString(), insertedDoc);
     ASSERT_BSONOBJ_EQ(insertedDoc, dbclient.findOne(kNss.toString(), QUERY(kPattern << 25)));
     std::list<Deletion> ranges;
-    ranges.emplace_back(Deletion(ChunkRange(BSON(kPattern << 0), BSON(kPattern << 10))));
-    ASSERT_TRUE(rangeDeleter.add(std::move(ranges)));
+    ranges.emplace_back(Deletion{ChunkRange{BSON(kPattern << 0), BSON(kPattern << 10)}, Date_t{}});
+    auto when = rangeDeleter.add(std::move(ranges));
+    ASSERT(when && *when == Date_t{});
     ASSERT_EQ(1u, rangeDeleter.size());
-    ASSERT_EQ(Action::kWriteOpLog, next(rangeDeleter, Action::kWriteOpLog, 1));
+    ASSERT_TRUE(next(rangeDeleter, 1));
 
     ASSERT_EQ(0u, rangeDeleter.size());
     ASSERT_BSONOBJ_EQ(insertedDoc, dbclient.findOne(kNss.toString(), QUERY(kPattern << 25)));
 
-    ASSERT_EQ(Action::kFinished, next(rangeDeleter, Action::kWriteOpLog, 1));
+    ASSERT_FALSE(next(rangeDeleter, 1));
 }
 
 // Tests the case that there is a single document within a range to clean.
@@ -178,26 +174,29 @@ TEST_F(CollectionRangeDeleterTest, OneDocumentInOneRangeToClean) {
     ASSERT_BSONOBJ_EQ(insertedDoc, dbclient.findOne(kNss.toString(), QUERY(kPattern << 5)));
 
     std::list<Deletion> ranges;
-    Deletion deletion{ChunkRange(BSON(kPattern << 0), BSON(kPattern << 10))};
+    auto deletion = Deletion{ChunkRange(BSON(kPattern << 0), BSON(kPattern << 10)), Date_t{}};
     ranges.emplace_back(std::move(deletion));
-    ASSERT_TRUE(rangeDeleter.add(std::move(ranges)));
+    auto when = rangeDeleter.add(std::move(ranges));
+    ASSERT(when && *when == Date_t{});
     ASSERT_TRUE(ranges.empty());  // spliced elements out of it
 
     auto optNotifn = rangeDeleter.overlaps(ChunkRange(BSON(kPattern << 0), BSON(kPattern << 10)));
     ASSERT(optNotifn);
     auto notifn = *optNotifn;
     ASSERT(!notifn.ready());
-    ASSERT_EQ(Action::kMore, next(rangeDeleter, Action::kWriteOpLog, 1));  // actually delete one
+    // actually delete one
+    ASSERT_TRUE(next(rangeDeleter, 1));
     ASSERT(!notifn.ready());
 
     ASSERT_EQ(rangeDeleter.size(), 1u);
     // range empty, pop range, notify
-    ASSERT_EQ(Action::kWriteOpLog, next(rangeDeleter, Action::kMore, 1));
+    ASSERT_TRUE(next(rangeDeleter, 1));
     ASSERT_TRUE(rangeDeleter.isEmpty());
     ASSERT(notifn.ready() && notifn.waitStatus(operationContext()).isOK());
 
     ASSERT_TRUE(dbclient.findOne(kNss.toString(), QUERY(kPattern << 5)).isEmpty());
-    ASSERT_EQ(Action::kFinished, next(rangeDeleter, Action::kWriteOpLog, 1));
+    ASSERT_FALSE(next(rangeDeleter, 1));
+    ASSERT_EQUALS(0ULL, dbclient.count(kAdminSysVer.ns(), BSON(kPattern << "startRangeDeletion")));
 }
 
 // Tests the case that there are multiple documents within a range to clean.
@@ -210,14 +209,16 @@ TEST_F(CollectionRangeDeleterTest, MultipleDocumentsInOneRangeToClean) {
     ASSERT_EQUALS(3ULL, dbclient.count(kNss.toString(), BSON(kPattern << LT << 5)));
 
     std::list<Deletion> ranges;
-    Deletion deletion{ChunkRange(BSON(kPattern << 0), BSON(kPattern << 10))};
+    auto deletion = Deletion{ChunkRange(BSON(kPattern << 0), BSON(kPattern << 10)), Date_t{}};
     ranges.emplace_back(std::move(deletion));
-    ASSERT_TRUE(rangeDeleter.add(std::move(ranges)));
+    auto when = rangeDeleter.add(std::move(ranges));
+    ASSERT(when && *when == Date_t{});
 
-    ASSERT_EQ(Action::kMore, next(rangeDeleter, Action::kWriteOpLog, 100));
-    ASSERT_EQ(Action::kWriteOpLog, next(rangeDeleter, Action::kMore, 100));
+    ASSERT_TRUE(next(rangeDeleter, 100));
+    ASSERT_TRUE(next(rangeDeleter, 100));
     ASSERT_EQUALS(0ULL, dbclient.count(kNss.toString(), BSON(kPattern << LT << 5)));
-    ASSERT_EQ(Action::kFinished, next(rangeDeleter, Action::kWriteOpLog, 100));
+    ASSERT_FALSE(next(rangeDeleter, 100));
+    ASSERT_EQUALS(0ULL, dbclient.count(kAdminSysVer.ns(), BSON(kPattern << "startRangeDeletion")));
 }
 
 // Tests the case that there are multiple documents within a range to clean, and the range deleter
@@ -231,20 +232,22 @@ TEST_F(CollectionRangeDeleterTest, MultipleCleanupNextRangeCalls) {
     ASSERT_EQUALS(3ULL, dbclient.count(kNss.toString(), BSON(kPattern << LT << 5)));
 
     std::list<Deletion> ranges;
-    Deletion deletion{ChunkRange(BSON(kPattern << 0), BSON(kPattern << 10))};
+    auto deletion = Deletion{ChunkRange(BSON(kPattern << 0), BSON(kPattern << 10)), Date_t{}};
     ranges.emplace_back(std::move(deletion));
-    ASSERT_TRUE(rangeDeleter.add(std::move(ranges)));
+    auto when = rangeDeleter.add(std::move(ranges));
+    ASSERT(when && *when == Date_t{});
 
-    ASSERT_EQ(Action::kMore, next(rangeDeleter, Action::kWriteOpLog, 1));
+    ASSERT_TRUE(next(rangeDeleter, 1));
     ASSERT_EQUALS(2ULL, dbclient.count(kNss.toString(), BSON(kPattern << LT << 5)));
 
-    ASSERT_EQ(Action::kMore, next(rangeDeleter, Action::kMore, 1));
+    ASSERT_TRUE(next(rangeDeleter, 1));
     ASSERT_EQUALS(1ULL, dbclient.count(kNss.toString(), BSON(kPattern << LT << 5)));
 
-    ASSERT_EQ(Action::kMore, next(rangeDeleter, Action::kMore, 1));
-    ASSERT_EQ(Action::kWriteOpLog, next(rangeDeleter, Action::kMore, 1));
+    ASSERT_TRUE(next(rangeDeleter, 1));
+    ASSERT_TRUE(next(rangeDeleter, 1));
     ASSERT_EQUALS(0ULL, dbclient.count(kNss.toString(), BSON(kPattern << LT << 5)));
-    ASSERT_EQ(Action::kFinished, next(rangeDeleter, Action::kWriteOpLog, 1));
+    ASSERT_FALSE(next(rangeDeleter, 1));
+    ASSERT_EQUALS(0ULL, dbclient.count(kAdminSysVer.ns(), BSON(kPattern << "startRangeDeletion")));
 }
 
 // Tests the case that there are two ranges to clean, each containing multiple documents.
@@ -260,20 +263,36 @@ TEST_F(CollectionRangeDeleterTest, MultipleDocumentsInMultipleRangesToClean) {
     ASSERT_EQUALS(6ULL, dbclient.count(kNss.toString(), BSON(kPattern << LT << 10)));
 
     std::list<Deletion> ranges;
-    ranges.emplace_back(Deletion{ChunkRange{BSON(kPattern << 0), BSON(kPattern << 4)}});
-    ASSERT_TRUE(rangeDeleter.add(std::move(ranges)));
-    ASSERT_TRUE(ranges.empty());
-    ranges.emplace_back(Deletion{ChunkRange{BSON(kPattern << 4), BSON(kPattern << 7)}});
-    ASSERT_FALSE(rangeDeleter.add(std::move(ranges)));
+    auto later = Date_t::now();
+    ranges.emplace_back(Deletion{ChunkRange{BSON(kPattern << 0), BSON(kPattern << 3)}, later});
+    auto when = rangeDeleter.add(std::move(ranges));
+    ASSERT(when && *when == later);
+    ASSERT_TRUE(ranges.empty());  // not guaranteed by std, but failure would indicate a problem.
 
-    auto optNotifn1 = rangeDeleter.overlaps(ChunkRange{BSON(kPattern << 0), BSON(kPattern << 4)});
+    std::list<Deletion> ranges2;
+    ranges2.emplace_back(Deletion{ChunkRange{BSON(kPattern << 4), BSON(kPattern << 7)}, later});
+    when = rangeDeleter.add(std::move(ranges2));
+    ASSERT(!when);
+
+    std::list<Deletion> ranges3;
+    ranges3.emplace_back(Deletion{ChunkRange{BSON(kPattern << 3), BSON(kPattern << 4)}, Date_t{}});
+    when = rangeDeleter.add(std::move(ranges3));
+    ASSERT(when);
+
+    auto optNotifn1 = rangeDeleter.overlaps(ChunkRange{BSON(kPattern << 0), BSON(kPattern << 3)});
     ASSERT_TRUE(optNotifn1);
     auto& notifn1 = *optNotifn1;
     ASSERT_FALSE(notifn1.ready());
+
     auto optNotifn2 = rangeDeleter.overlaps(ChunkRange{BSON(kPattern << 4), BSON(kPattern << 7)});
     ASSERT_TRUE(optNotifn2);
     auto& notifn2 = *optNotifn2;
     ASSERT_FALSE(notifn2.ready());
+
+    auto optNotifn3 = rangeDeleter.overlaps(ChunkRange{BSON(kPattern << 3), BSON(kPattern << 4)});
+    ASSERT_TRUE(optNotifn3);
+    auto& notifn3 = *optNotifn3;
+    ASSERT_FALSE(notifn3.ready());
 
     // test op== on notifications
     ASSERT_TRUE(notifn1 == *optNotifn1);
@@ -281,62 +300,112 @@ TEST_F(CollectionRangeDeleterTest, MultipleDocumentsInMultipleRangesToClean) {
     ASSERT_TRUE(notifn1 != *optNotifn2);
     ASSERT_FALSE(notifn1 != *optNotifn1);
 
-    ASSERT_EQUALS(0ULL,
-                  dbclient.count(kAdminSystemVersion.ns(), BSON(kPattern << "startRangeDeletion")));
+    // no op log entry yet
+    ASSERT_EQUALS(0ULL, dbclient.count(kAdminSysVer.ns(), BSON(kPattern << "startRangeDeletion")));
 
-    ASSERT_EQ(Action::kMore, next(rangeDeleter, Action::kWriteOpLog, 100));
+    ASSERT_EQUALS(6ULL, dbclient.count(kNss.ns(), BSON(kPattern << LT << 7)));
+
+    // catch range3, [3..4) only
+    auto next1 = next(rangeDeleter, 100);
+    ASSERT_TRUE(next1);
+    ASSERT_EQUALS(*next1, Date_t{});
+
+    // no op log entry for immediate deletions
+    ASSERT_EQUALS(0ULL, dbclient.count(kAdminSysVer.ns(), BSON(kPattern << "startRangeDeletion")));
+
+    // 3 gone
+    ASSERT_EQUALS(5ULL, dbclient.count(kNss.ns(), BSON(kPattern << LT << 7)));
+    ASSERT_EQUALS(2ULL, dbclient.count(kNss.ns(), BSON(kPattern << LT << 4)));
+
+    ASSERT_FALSE(notifn1.ready());  // no trigger yet
+    ASSERT_FALSE(notifn2.ready());  // no trigger yet
+    ASSERT_FALSE(notifn3.ready());  // no trigger yet
+
+    // this will find the [3..4) range empty, so pop the range and notify
+    auto next2 = next(rangeDeleter, 100);
+    ASSERT_TRUE(next2);
+    ASSERT_EQUALS(*next2, Date_t{});
+
+    // still no op log entry, because not delayed
+    ASSERT_EQUALS(0ULL, dbclient.count(kAdminSysVer.ns(), BSON(kPattern << "startRangeDeletion")));
+
+    // deleted 1, 5 left
+    ASSERT_EQUALS(2ULL, dbclient.count(kNss.ns(), BSON(kPattern << LT << 4)));
+    ASSERT_EQUALS(5ULL, dbclient.count(kNss.ns(), BSON(kPattern << LT << 10)));
+
+    ASSERT_FALSE(notifn1.ready());  // no trigger yet
+    ASSERT_FALSE(notifn2.ready());  // no trigger yet
+    ASSERT_TRUE(notifn3.ready());   // triggered.
+    ASSERT_OK(notifn3.waitStatus(operationContext()));
+
+    // This will find the regular queue empty, but the [0..3) range in the delayed queue.
+    // However, the time to delete them is now, so the range is moved to the regular queue.
+    auto next3 = next(rangeDeleter, 100);
+    ASSERT_TRUE(next3);
+    ASSERT_EQUALS(*next3, Date_t{});
+
     ASSERT_FALSE(notifn1.ready());  // no trigger yet
     ASSERT_FALSE(notifn2.ready());  // no trigger yet
 
-    ASSERT_EQUALS(1ULL,
-                  dbclient.count(kAdminSystemVersion.ns(), BSON(kPattern << "startRangeDeletion")));
-    // clang-format off
-    ASSERT_BSONOBJ_EQ(
-        BSON("_id" << "startRangeDeletion" << "ns" << kNss.ns()
-          << "epoch" << epoch() << "min" << BSON("_id" << 0) << "max" << BSON("_id" << 4)),
-        dbclient.findOne(kAdminSystemVersion.ns(), QUERY("_id" << "startRangeDeletion")));
-    // clang-format on
-
-    ASSERT_EQUALS(0ULL, dbclient.count(kNss.ns(), BSON(kPattern << LT << 4)));
+    // deleted 3, 3 left
     ASSERT_EQUALS(3ULL, dbclient.count(kNss.ns(), BSON(kPattern << LT << 10)));
 
-    // discover there are no more < 4, pop range 1
-    ASSERT_EQ(Action::kWriteOpLog, next(rangeDeleter, Action::kMore, 100));
-
-    ASSERT_EQUALS(1ULL,
-                  dbclient.count(kAdminSystemVersion.ns(), BSON(kPattern << "startRangeDeletion")));
+    ASSERT_EQUALS(1ULL, dbclient.count(kAdminSysVer.ns(), BSON(kPattern << "startRangeDeletion")));
     // clang-format off
     ASSERT_BSONOBJ_EQ(
         BSON("_id" << "startRangeDeletion" << "ns" << kNss.ns()
-          << "epoch" << epoch() << "min" << BSON("_id" << 0) << "max" << BSON("_id" << 4)),
-        dbclient.findOne(kAdminSystemVersion.ns(), QUERY("_id" << "startRangeDeletion")));
+          << "epoch" << epoch() << "min" << BSON("_id" << 0) << "max" << BSON("_id" << 3)),
+        dbclient.findOne(kAdminSysVer.ns(), QUERY("_id" << "startRangeDeletion")));
     // clang-format on
 
-    ASSERT_TRUE(notifn1.ready() && notifn1.waitStatus(operationContext()).isOK());
+    // this will find the [0..3) range empty, so pop the range and notify
+    auto next4 = next(rangeDeleter, 100);
+    ASSERT_TRUE(next4);
+    ASSERT_EQUALS(*next4, Date_t{});
+
+    ASSERT_TRUE(notifn1.ready());
+    ASSERT_OK(notifn1.waitStatus(operationContext()));
     ASSERT_FALSE(notifn2.ready());
 
+    // op log entry unchanged
+    // clang-format off
+    ASSERT_BSONOBJ_EQ(
+        BSON("_id" << "startRangeDeletion" << "ns" << kNss.ns()
+          << "epoch" << epoch() << "min" << BSON("_id" << 0) << "max" << BSON("_id" << 3)),
+        dbclient.findOne(kAdminSysVer.ns(), QUERY("_id" << "startRangeDeletion")));
+    // clang-format on
+
+    // still 3 left
     ASSERT_EQUALS(3ULL, dbclient.count(kNss.ns(), BSON(kPattern << LT << 10)));
 
     // delete the remaining documents
-    ASSERT_EQ(Action::kMore, next(rangeDeleter, Action::kWriteOpLog, 100));
+    auto next5 = next(rangeDeleter, 100);
+    ASSERT_TRUE(next5);
+    ASSERT_EQUALS(*next5, Date_t{});
+
     ASSERT_FALSE(notifn2.ready());
 
+    // Another delayed range, so logged
     // clang-format off
     ASSERT_BSONOBJ_EQ(
         BSON("_id" << "startRangeDeletion" << "ns" << kNss.ns()
           << "epoch" << epoch() << "min" << BSON("_id" << 4) << "max" << BSON("_id" << 7)),
-        dbclient.findOne(kAdminSystemVersion.ns(), QUERY("_id" << "startRangeDeletion")));
+        dbclient.findOne(kAdminSysVer.ns(), QUERY("_id" << "startRangeDeletion")));
     // clang-format on
 
+    // all docs gone
     ASSERT_EQUALS(0ULL, dbclient.count(kNss.ns(), BSON(kPattern << LT << 10)));
 
     // discover there are no more, pop range 2
-    ASSERT_EQ(Action::kWriteOpLog, next(rangeDeleter, Action::kMore, 1));
+    auto next6 = next(rangeDeleter, 100);
+    ASSERT_TRUE(next6);
+    ASSERT_EQUALS(*next6, Date_t{});
 
-    ASSERT_TRUE(notifn2.ready() && notifn2.waitStatus(operationContext()).isOK());
+    ASSERT_TRUE(notifn2.ready());
+    ASSERT_OK(notifn2.waitStatus(operationContext()));
 
     // discover there are no more ranges
-    ASSERT_EQ(Action::kFinished, next(rangeDeleter, Action::kWriteOpLog, 1));
+    ASSERT_FALSE(next(rangeDeleter, 1));
 }
 
 }  // unnamed namespace

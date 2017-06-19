@@ -121,7 +121,7 @@ CleanupResult cleanupOrphanedData(OperationContext* opCtx,
 
         targetRange.emplace(
             ChunkRange(orphanRange->minKey.getOwned(), orphanRange->maxKey.getOwned()));
-        notifn = css->cleanUpRange(*targetRange);
+        notifn = css->cleanUpRange(*targetRange, CollectionShardingState::kNow);
     }
 
     // Sleep waiting for our own deletion. We don't actually care about any others, so there is no

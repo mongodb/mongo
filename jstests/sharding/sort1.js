@@ -25,7 +25,7 @@
         movechunk: "test.data",
         find: {'sub.num': 50},
         to: s.getOther(s.getPrimaryShard("test")).name,
-        waitForDelete: true
+        _waitForDelete: true
     });
 
     assert.lte(3, s.config.chunks.find().itcount(), "A1");

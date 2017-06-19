@@ -43,6 +43,7 @@
 #include "mongo/stdx/memory.h"
 #include "mongo/util/assert_util.h"
 #include "mongo/util/log.h"
+#include "mongo/util/time_support.h"
 
 // MetadataManager maintains pointers to CollectionMetadata objects in a member list named
 // _metadata.  Each CollectionMetadata contains an immutable _chunksMap of chunks assigned to this
@@ -133,7 +134,7 @@ void MetadataManager::_clearAllCleanups() {
 
 void MetadataManager::_clearAllCleanups(Status status) {
     for (auto& metadata : _metadata) {
-        _pushListToClean(std::move(metadata->_tracker.orphans));
+        std::ignore = _rangesToClean.add(std::move(metadata->_tracker.orphans));
     }
     _rangesToClean.clear(status);
 }
@@ -251,7 +252,7 @@ void MetadataManager::_retireExpiredMetadata() {
         // No ScopedCollectionMetadata can see _metadata->front(), other than, maybe, the caller.
         if (!_metadata.front()->_tracker.orphans.empty()) {
             log() << "Queries possibly dependent on " << _nss.ns()
-                  << " range(s) finished; scheduling for deletion";
+                  << " range(s) finished; scheduling ranges for deletion";
             // It is safe to push orphan ranges from _metadata.back(), even though new queries might
             // start any time, because any request to delete a range it maps is rejected.
             _pushListToClean(std::move(_metadata.front()->_tracker.orphans));
@@ -357,34 +358,52 @@ void MetadataManager::append(BSONObjBuilder* builder) {
     amrArr.done();
 }
 
-void MetadataManager::_scheduleCleanup(executor::TaskExecutor* executor,
-                                       NamespaceString nss,
-                                       CollectionRangeDeleter::Action action) {
-    executor
-        ->scheduleWork([executor, nss, action](auto&) {
+namespace {
+
+/**
+ * Deletes ranges, in background, until done, normally using a task executor attached to the
+ * ShardingState.
+ *
+ * Each time it completes cleaning up a range, it wakes up clients waiting on completion of
+ * that range, which may then verify that their range has no more deletions scheduled, and proceed.
+ */
+void scheduleCleanup(executor::TaskExecutor* executor,
+                     NamespaceString nss,
+                     OID epoch,
+                     Date_t when) {
+    LOG(1) << "Scheduling cleanup on " << nss.ns() << " at " << when;
+    std::ignore = executor->scheduleWorkAt(
+        when, [ executor, nss = std::move(nss), epoch = std::move(epoch) ](auto&) {
             const int maxToDelete = std::max(int(internalQueryExecYieldIterations.load()), 1);
             Client::initThreadIfNotAlready("Collection Range Deleter");
             auto UniqueOpCtx = Client::getCurrent()->makeOperationContext();
             auto opCtx = UniqueOpCtx.get();
-            auto next = CollectionRangeDeleter::cleanUpNextRange(opCtx, nss, action, maxToDelete);
-            if (next != CollectionRangeDeleter::Action::kFinished) {
-                _scheduleCleanup(executor, nss, next);
+            auto next = CollectionRangeDeleter::cleanUpNextRange(opCtx, nss, epoch, maxToDelete);
+            if (next) {
+                scheduleCleanup(executor, std::move(nss), std::move(epoch), *next);
             }
-        })
-        .status_with_transitional_ignore();
+        });
+    // Ignore the result because we don't use the callback, and the only failure is when shutting
+    // down and there is nothing to do.
 }
 
-auto MetadataManager::_pushRangeToClean(ChunkRange const& range) -> CleanupNotification {
+}  // namespace
+
+auto MetadataManager::_pushRangeToClean(ChunkRange const& range, Date_t when)
+    -> CleanupNotification {
     std::list<Deletion> ranges;
-    ranges.emplace_back(Deletion{ChunkRange{range.getMin().getOwned(), range.getMax().getOwned()}});
+    auto ownedRange = ChunkRange{range.getMin().getOwned(), range.getMax().getOwned()};
+    ranges.emplace_back(Deletion{std::move(ownedRange), when});
     auto& notifn = ranges.back().notification;
     _pushListToClean(std::move(ranges));
     return notifn;
 }
 
 void MetadataManager::_pushListToClean(std::list<Deletion> ranges) {
-    if (_rangesToClean.add(std::move(ranges))) {
-        _scheduleCleanup(_executor, _nss, CollectionRangeDeleter::Action::kWriteOpLog);
+    auto when = _rangesToClean.add(std::move(ranges));
+    if (when) {
+        auto epoch = _metadata.back()->getCollVersion().epoch();
+        scheduleCleanup(_executor, _nss, std::move(epoch), *when);
     }
     invariant(ranges.empty());
 }
@@ -406,7 +425,7 @@ auto MetadataManager::beginReceive(ChunkRange const& range) -> CleanupNotificati
     _addToReceiving(range);
     log() << "Scheduling deletion of any documents in " << _nss.ns() << " range "
           << redact(range.toString()) << " before migrating in a chunk covering the range";
-    return _pushRangeToClean(range);
+    return _pushRangeToClean(range, Date_t{});
 }
 
 void MetadataManager::_removeFromReceiving(ChunkRange const& range) {
@@ -426,10 +445,11 @@ void MetadataManager::forgetReceive(ChunkRange const& range) {
 
     invariant(!_overlapsInUseChunk(range));
     _removeFromReceiving(range);
-    _pushRangeToClean(range).abandon();
+    _pushRangeToClean(range, Date_t{}).abandon();
 }
 
-auto MetadataManager::cleanUpRange(ChunkRange const& range) -> CleanupNotification {
+auto MetadataManager::cleanUpRange(ChunkRange const& range, Date_t whenToDelete)
+    -> CleanupNotification {
     stdx::unique_lock<stdx::mutex> scopedLock(_managerLock);
     invariant(!_metadata.empty());
 
@@ -445,18 +465,18 @@ auto MetadataManager::cleanUpRange(ChunkRange const& range) -> CleanupNotificati
                                        " migrated in"};
     }
 
+    StringData whenStr = (whenToDelete == Date_t{}) ? "immediate"_sd : "deferred"_sd;
     if (!_overlapsInUseChunk(range)) {
         // No running queries can depend on it, so queue it for deletion immediately.
-        log() << "Scheduling " << _nss.ns() << " range " << redact(range.toString())
-              << " for immediate deletion";
-        return _pushRangeToClean(range);
+        log() << "Scheduling " << whenStr << " deletion of " << _nss.ns() << " range "
+              << redact(range.toString());
+        return _pushRangeToClean(range, whenToDelete);
     }
+    auto ownedRange = ChunkRange{range.getMin().getOwned(), range.getMax().getOwned()};
+    activeMetadata->_tracker.orphans.emplace_back(Deletion{std::move(ownedRange), whenToDelete});
 
-    activeMetadata->_tracker.orphans.emplace_back(
-        Deletion{ChunkRange{range.getMin().getOwned(), range.getMax().getOwned()}});
-
-    log() << "Scheduling " << _nss.ns() << " range " << redact(range.toString())
-          << " for deletion after all possibly-dependent queries finish";
+    log() << "Scheduling deletion of " << _nss.ns() << " range " << redact(range.toString())
+          << " after all possibly-dependent queries finish";
 
     return activeMetadata->_tracker.orphans.back().notification;
 }
