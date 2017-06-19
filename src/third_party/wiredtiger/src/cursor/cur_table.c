@@ -943,6 +943,12 @@ __wt_curtable_open(WT_SESSION_IMPL *session,
 		    table->cgroups[0]->source, NULL, cfg, cursorp);
 
 		__wt_schema_release_table(session, table);
+		if (ret == 0) {
+			/* Fix up the public URI to match what was passed in. */
+			cursor = *cursorp;
+			__wt_free(session, cursor->uri);
+			WT_TRET(__wt_strdup(session, uri, &cursor->uri));
+		}
 		return (ret);
 	}
 

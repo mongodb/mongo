@@ -1105,7 +1105,6 @@ int
 __wt_session_range_truncate(WT_SESSION_IMPL *session,
     const char *uri, WT_CURSOR *start, WT_CURSOR *stop)
 {
-	WT_CURSOR *cursor;
 	WT_DECL_RET;
 	int cmp;
 	bool local_start;
@@ -1134,12 +1133,13 @@ __wt_session_range_truncate(WT_SESSION_IMPL *session,
 	}
 
 	/*
-	 * Cursor truncate is only supported for some objects, check for the
-	 * supporting methods we need, range_truncate and compare.
+	 * Cursor truncate is only supported for some objects, check for a
+	 * supporting compare method.
 	 */
-	cursor = start == NULL ? stop : start;
-	if (cursor->compare == NULL)
-		WT_ERR(__wt_bad_object_type(session, cursor->uri));
+	if (start != NULL && start->compare == NULL)
+		WT_ERR(__wt_bad_object_type(session, start->uri));
+	if (stop != NULL && stop->compare == NULL)
+		WT_ERR(__wt_bad_object_type(session, stop->uri));
 
 	/*
 	 * If both cursors set, check they're correctly ordered with respect to
@@ -1150,6 +1150,9 @@ __wt_session_range_truncate(WT_SESSION_IMPL *session,
 	 * reference the same object and the keys are set.
 	 */
 	if (start != NULL && stop != NULL) {
+						/* quiet clang scan-build */
+		WT_ASSERT(session, start->compare != NULL);
+
 		WT_ERR(start->compare(start, stop, &cmp));
 		if (cmp > 0)
 			WT_ERR_MSG(session, EINVAL,
