@@ -37,6 +37,7 @@
 #include "mongo/db/namespace_string.h"
 #include "mongo/db/service_context.h"
 #include "mongo/platform/compiler.h"
+#include "mongo/stdx/new.h"
 #include "mongo/util/background.h"
 #include "mongo/util/concurrency/ticketholder.h"
 #include "mongo/util/debug_util.h"
@@ -86,7 +87,7 @@ public:
 private:
     // This alignment is a best effort approach to ensure that each partition falls on a
     // separate page/cache line in order to avoid false sharing.
-    struct MONGO_COMPILER_ALIGN_TYPE(128) AlignedLockStats {
+    struct alignas(stdx::hardware_destructive_interference_size) AlignedLockStats {
         AtomicLockStats stats;
     };
 
