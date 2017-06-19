@@ -236,6 +236,15 @@ functions:
             printf "Cannot collect mongo-diskstats on this platform\n"
         fi
 
+  "collect system resource info": &collect_system_resource_info
+    command: shell.exec
+    params:
+      working_dir: src
+      background: true
+      system_log: true
+      script: |
+        ${python|/opt/mongodbtoolchain/v2/bin/python2} buildscripts/collect_resource_info.py -o system_resource_info_${task_id}.json -i 5
+
   # Run a monitor process as a background, system task to periodically
   # display how many threads interesting processes are using.
   "monitor process threads": &monitor_process_threads
@@ -402,6 +411,7 @@ functions:
   - *setup_credentials
   - *run_diskstats
   - *monitor_process_threads
+  - *collect_system_resource_info
 
   "set up virtualenv" :
     command: shell.exec
@@ -1294,6 +1304,25 @@ post:
       permissions: public-read
       content_type: ${content_type|application/x-gzip}
       display_name: Disk Stats - Execution ${execution}
+      optional: true
+
+  # Gather and archive system resource information.
+  - command: archive.targz_pack
+    params:
+      target: "system-resource-info.tgz"
+      source_dir: src
+      include:
+        - "./system_resource_info*"
+  - command: s3.put
+    params:
+      aws_key: ${aws_key}
+      aws_secret: ${aws_secret}
+      local_file: system-resource-info.tgz
+      remote_file: mongodb-mongo-master/${build_variant}/${revision}/systemresourceinfo/mongo-system-resource-info-${task_id}-${execution}.tgz
+      bucket: mciuploads
+      permissions: public-read
+      content_type: ${content_type|application/x-gzip}
+      display_name: System Resource Info - Execution ${execution}
       optional: true
 
   # Cleanup steps.
