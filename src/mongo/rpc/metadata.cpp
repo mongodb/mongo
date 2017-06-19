@@ -167,13 +167,5 @@ CommandAndMetadata upconvertRequestMetadata(BSONObj legacyCmdObj, int queryFlags
     return std::make_tuple(logicalTimeCommandBob.obj(), metadataBob.obj());
 }
 
-CommandReplyWithMetadata upconvertReplyMetadata(const BSONObj& legacyReply) {
-    BSONObjBuilder commandReplyBob;
-    BSONObjBuilder metadataBob;
-
-    uassertStatusOK(ShardingMetadata::upconvert(legacyReply, &commandReplyBob, &metadataBob));
-    return std::make_tuple(commandReplyBob.obj(), metadataBob.obj());
-}
-
 }  // namespace rpc
 }  // namespace mongo

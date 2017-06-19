@@ -73,17 +73,6 @@ using LegacyCommandAndFlags = std::tuple<BSONObj, int>;
 CommandAndMetadata upconvertRequestMetadata(BSONObj legacyCmdObj, int queryFlags);
 
 /**
- * A command reply and associated metadata object.
- */
-using CommandReplyWithMetadata = std::tuple<BSONObj, BSONObj>;
-
-/**
- * Given a legacy command reply, attempts to strip the metadata from the reply and construct
- * a metadata object.
- */
-CommandReplyWithMetadata upconvertReplyMetadata(const BSONObj& legacyReply);
-
-/**
  * A function type for writing request metadata. The function takes a pointer to an optional
  * OperationContext so metadata associated with a Client can be appended, a pointer to a
  * BSONObjBuilder used to construct the metadata object and returns a Status indicating if the

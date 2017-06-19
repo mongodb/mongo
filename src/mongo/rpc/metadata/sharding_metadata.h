@@ -58,22 +58,6 @@ public:
     Status writeToMetadata(BSONObjBuilder* metadataBob) const;
 
     /**
-     * Rewrites the ShardingMetadata from the legacy OP_QUERY format to the metadata object
-     * format.
-     */
-    static Status downconvert(const BSONObj& commandReply,
-                              const BSONObj& replyMetadata,
-                              BSONObjBuilder* legacyCommandReply);
-
-    /**
-     * Rewrites the ShardingMetadata from the legacy OP_QUERY format to the metadata object
-     * format.
-     */
-    static Status upconvert(const BSONObj& legacyCommandReply,
-                            BSONObjBuilder* commandReplyBob,
-                            BSONObjBuilder* metadataBob);
-
-    /**
      * Gets the OpTime of the oplog entry of the last successful write operation executed by the
      * server that produced the metadata.
      */

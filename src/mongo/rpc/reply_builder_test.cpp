@@ -35,6 +35,7 @@
 #include "mongo/rpc/command_reply_builder.h"
 #include "mongo/rpc/legacy_reply.h"
 #include "mongo/rpc/legacy_reply_builder.h"
+#include "mongo/rpc/op_msg_rpc_impls.h"
 #include "mongo/unittest/death_test.h"
 #include "mongo/unittest/unittest.h"
 
@@ -43,24 +44,34 @@ namespace {
 using namespace mongo;
 
 template <typename T>
-void testRoundTrip(rpc::ReplyBuilderInterface& replyBuilder);
+void testRoundTrip(rpc::ReplyBuilderInterface& replyBuilder, bool unifiedBodyAndMetadata);
 
 TEST(LegacyReplyBuilder, RoundTrip) {
     rpc::LegacyReplyBuilder r;
-    testRoundTrip<rpc::LegacyReply>(r);
+    testRoundTrip<rpc::LegacyReply>(r, true);
 }
 
 TEST(CommandReplyBuilder, RoundTrip) {
     rpc::CommandReplyBuilder r;
-    testRoundTrip<rpc::CommandReply>(r);
+    testRoundTrip<rpc::CommandReply>(r, false);
+}
+
+TEST(OpMsgReplyBuilder, RoundTrip) {
+    rpc::OpMsgReplyBuilder r;
+    testRoundTrip<rpc::OpMsgReply>(r, true);
 }
 
 BSONObj buildMetadata() {
-    BSONObjBuilder metadataTop{};
-    BSONObjBuilder metadataGle{};
-    metadataGle.append("lastOpTime", Timestamp());
-    metadataGle.append("electionId", OID("5592bee00d21e3aa796e185e"));
-    metadataTop.append("$gleStats", metadataGle.done());
+    BSONObjBuilder metadataTop;
+    {
+        BSONObjBuilder metadataGle(metadataTop.subobjStart("$gleStats"));
+        metadataGle.append("lastOpTime", Timestamp());
+        metadataGle.append("electionId", OID("5592bee00d21e3aa796e185e"));
+    }
+
+    // For now we don't need a real $logicalTime and just ensure that it just round trips whatever
+    // is there. If that ever changes, we will need to construct a real $logicalTime here.
+    metadataTop.append("$logicalTime", BSON("bogus" << true));
     return metadataTop.obj();
 }
 
@@ -123,68 +134,65 @@ TEST(LegacyReplyBuilder, CommandError) {
 
     rpc::LegacyReply parsed(&msg);
 
-    ASSERT_BSONOBJ_EQ(parsed.getMetadata(), metadata);
-    ASSERT_BSONOBJ_EQ(parsed.getCommandReply(), buildErrReply(status, extraObj));
+    const auto body = ([&] {
+        BSONObjBuilder unifiedBuilder(buildErrReply(status, extraObj));
+        unifiedBuilder.appendElements(metadata);
+        return unifiedBuilder.obj();
+    }());
+
+    ASSERT_BSONOBJ_EQ(parsed.getMetadata(), body);
+    ASSERT_BSONOBJ_EQ(parsed.getCommandReply(), body);
 }
 
-TEST(CommandReplyBuilder, MemAccess) {
+TEST(OpMsgReplyBuilder, CommandError) {
+    const Status status(ErrorCodes::InvalidLength, "Response payload too long");
     BSONObj metadata = buildMetadata();
-    BSONObj commandReply = buildCommand();
-    rpc::CommandReplyBuilder replyBuilder;
-    replyBuilder.setCommandReply(commandReply);
+    BSONObjBuilder extra;
+    extra.append("a", "b");
+    extra.append("c", "d");
+    const BSONObj extraObj = extra.obj();
+    rpc::OpMsgReplyBuilder replyBuilder;
+    replyBuilder.setCommandReply(status, extraObj);
     replyBuilder.setMetadata(metadata);
     auto msg = replyBuilder.done();
 
-    rpc::CommandReply parsed(&msg);
+    rpc::OpMsgReply parsed(&msg);
 
-    ASSERT_BSONOBJ_EQ(parsed.getMetadata(), metadata);
-    ASSERT_BSONOBJ_EQ(parsed.getCommandReply(), commandReply);
-}
+    const auto body = ([&] {
+        BSONObjBuilder unifiedBuilder(buildErrReply(status, extraObj));
+        unifiedBuilder.appendElements(metadata);
+        return unifiedBuilder.obj();
+    }());
 
-TEST(LegacyReplyBuilder, MemAccess) {
-    BSONObj metadata = buildMetadata();
-    BSONObj commandReply = buildEmptyCommand();
-    rpc::LegacyReplyBuilder replyBuilder;
-    replyBuilder.setRawCommandReply(commandReply);
-    replyBuilder.setMetadata(metadata);
-    auto msg = replyBuilder.done();
-
-    rpc::LegacyReply parsed(&msg);
-
-    ASSERT_BSONOBJ_EQ(parsed.getMetadata(), metadata);
-    ASSERT_BSONOBJ_EQ(parsed.getCommandReply(), commandReply);
+    ASSERT_BSONOBJ_EQ(parsed.getMetadata(), body);
+    ASSERT_BSONOBJ_EQ(parsed.getCommandReply(), body);
 }
 
 template <typename T>
-void testRoundTrip(rpc::ReplyBuilderInterface& replyBuilder) {
+void testRoundTrip(rpc::ReplyBuilderInterface& replyBuilder, bool unifiedBodyAndMetadata) {
     auto metadata = buildMetadata();
     auto commandReply = buildEmptyCommand();
 
     replyBuilder.setCommandReply(commandReply);
     replyBuilder.setMetadata(metadata);
 
-    BSONObjBuilder outputDoc1Bob{};
-    outputDoc1Bob.append("z", "t");
-    auto outputDoc1 = outputDoc1Bob.done();
-
-    BSONObjBuilder outputDoc2Bob{};
-    outputDoc2Bob.append("h", "j");
-    auto outputDoc2 = outputDoc2Bob.done();
-
-    BSONObjBuilder outputDoc3Bob{};
-    outputDoc3Bob.append("g", "p");
-    auto outputDoc3 = outputDoc3Bob.done();
-
-    BufBuilder outputDocs;
-    outputDoc1.appendSelfToBufBuilder(outputDocs);
-    outputDoc2.appendSelfToBufBuilder(outputDocs);
-    outputDoc3.appendSelfToBufBuilder(outputDocs);
-
     auto msg = replyBuilder.done();
 
     T parsed(&msg);
 
-    ASSERT_BSONOBJ_EQ(parsed.getMetadata(), metadata);
+    if (unifiedBodyAndMetadata) {
+        const auto body = ([&] {
+            BSONObjBuilder unifiedBuilder(std::move(commandReply));
+            unifiedBuilder.appendElements(metadata);
+            return unifiedBuilder.obj();
+        }());
+
+        ASSERT_BSONOBJ_EQ(parsed.getCommandReply(), body);
+        ASSERT_BSONOBJ_EQ(parsed.getMetadata(), body);
+    } else {
+        ASSERT_BSONOBJ_EQ(parsed.getCommandReply(), commandReply);
+        ASSERT_BSONOBJ_EQ(parsed.getMetadata(), metadata);
+    }
 }
 
 }  // namespace

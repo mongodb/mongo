@@ -37,6 +37,7 @@ namespace rpc {
 
 class OpMsgReply final : public rpc::ReplyInterface {
 public:
+    explicit OpMsgReply(const Message* message) : _msg(OpMsg::parseOwned(*message)) {}
     explicit OpMsgReply(OpMsg msg) : _msg(std::move(msg)) {}
     const BSONObj& getMetadata() const override {
         return _msg.body;

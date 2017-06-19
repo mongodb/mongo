@@ -43,10 +43,10 @@
 namespace mongo {
 namespace rpc {
 
-LegacyReply::LegacyReply(const Message* message) : _message(std::move(message)) {
+LegacyReply::LegacyReply(const Message* message) {
     invariant(message->operation() == opReply);
 
-    QueryResult::View qr = _message->singleData().view2ptr();
+    QueryResult::View qr = message->singleData().view2ptr();
 
     // should be checked by caller.
     invariant(qr.msgdata().getNetworkOp() == opReply);
@@ -75,13 +75,14 @@ LegacyReply::LegacyReply(const Message* message) : _message(std::move(message)) 
                           << causedBy(status),
             status.isOK());
 
-    std::tie(_commandReply, _metadata) = rpc::upconvertReplyMetadata(BSONObj(qr.data()));
+    _commandReply = BSONObj(qr.data());
+    _commandReply.shareOwnershipWith(message->sharedBuffer());
 
     return;
 }
 
 const BSONObj& LegacyReply::getMetadata() const {
-    return _metadata;
+    return _commandReply;
 }
 
 const BSONObj& LegacyReply::getCommandReply() const {

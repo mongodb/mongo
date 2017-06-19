@@ -63,11 +63,7 @@ public:
     Protocol getProtocol() const final;
 
 private:
-    const Message* _message;
-
-    BSONObj _commandReply{};  // will hold unowned
-    BSONObj _metadata{};
-    BufBuilder _docBuffer{};
+    BSONObj _commandReply;
 };
 
 }  // namespace rpc

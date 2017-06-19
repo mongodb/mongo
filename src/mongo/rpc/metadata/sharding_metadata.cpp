@@ -106,49 +106,6 @@ Status ShardingMetadata::writeToMetadata(BSONObjBuilder* metadataBob) const {
     return Status::OK();
 }
 
-Status ShardingMetadata::downconvert(const BSONObj& commandReply,
-                                     const BSONObj& replyMetadata,
-                                     BSONObjBuilder* legacyCommandReplyBob) {
-    legacyCommandReplyBob->appendElements(commandReply);
-
-    auto swShardingMetadata = readFromMetadata(replyMetadata);
-    if (swShardingMetadata.isOK()) {
-        // We can reuse the same logic to write the sharding metadata out to the legacy
-        // command as the element has the same format whether it is there or on the metadata
-        // object.
-        swShardingMetadata.getValue().writeToMetadata(legacyCommandReplyBob).transitional_ignore();
-    } else if (swShardingMetadata.getStatus() == ErrorCodes::NoSuchKey) {
-        // It is valid to not have a $gleStats field.
-    } else {
-        return swShardingMetadata.getStatus();
-    }
-    return Status::OK();
-}
-
-Status ShardingMetadata::upconvert(const BSONObj& legacyCommand,
-                                   BSONObjBuilder* commandBob,
-                                   BSONObjBuilder* metadataBob) {
-    // We can reuse the same logic to read the sharding metadata out from the legacy command
-    // as it has the same format whether it is there or on the metadata object.
-    auto swShardingMetadata = readFromMetadata(legacyCommand);
-    if (swShardingMetadata.isOK()) {
-        swShardingMetadata.getValue().writeToMetadata(metadataBob).transitional_ignore();
-
-        // Write out the command excluding the $gleStats subobject.
-        for (const auto& elem : legacyCommand) {
-            if (elem.fieldNameStringData() != StringData(kGLEStatsFieldName)) {
-                commandBob->append(elem);
-            }
-        }
-    } else if (swShardingMetadata.getStatus() == ErrorCodes::NoSuchKey) {
-        // it is valid to not have a $gleStats field
-        commandBob->appendElements(legacyCommand);
-    } else {
-        return swShardingMetadata.getStatus();
-    }
-    return Status::OK();
-}
-
 ShardingMetadata::ShardingMetadata(repl::OpTime lastOpTime, OID lastElectionId)
     : _lastOpTime(std::move(lastOpTime)), _lastElectionId(std::move(lastElectionId)) {}
 
