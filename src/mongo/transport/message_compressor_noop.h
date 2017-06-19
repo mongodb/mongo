@@ -39,13 +39,13 @@ public:
     }
 
     StatusWith<std::size_t> compressData(ConstDataRange input, DataRange output) override {
-        output.write(input);
+        output.write(input).transitional_ignore();
         counterHitCompress(input.length(), input.length());
         return {input.length()};
     }
 
     StatusWith<std::size_t> decompressData(ConstDataRange input, DataRange output) override {
-        output.write(input);
+        output.write(input).transitional_ignore();
         counterHitDecompress(input.length(), input.length());
         return {input.length()};
     }

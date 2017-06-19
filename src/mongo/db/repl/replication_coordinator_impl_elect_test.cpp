@@ -391,15 +391,17 @@ TEST_F(ReplCoordElectTest, NodeWillNotStandForElectionDuringHeartbeatReconfig) {
     net->enterNetwork();
     ReplSetHeartbeatResponse hbResp2;
     ReplSetConfig config;
-    config.initialize(BSON("_id"
-                           << "mySet"
-                           << "version"
-                           << 3
-                           << "members"
-                           << BSON_ARRAY(BSON("_id" << 1 << "host"
-                                                    << "node1:12345")
-                                         << BSON("_id" << 2 << "host"
-                                                       << "node2:12345"))));
+    config
+        .initialize(BSON("_id"
+                         << "mySet"
+                         << "version"
+                         << 3
+                         << "members"
+                         << BSON_ARRAY(BSON("_id" << 1 << "host"
+                                                  << "node1:12345")
+                                       << BSON("_id" << 2 << "host"
+                                                     << "node2:12345"))))
+        .transitional_ignore();
     hbResp2.setConfig(config);
     hbResp2.setConfigVersion(3);
     hbResp2.setSetName("mySet");

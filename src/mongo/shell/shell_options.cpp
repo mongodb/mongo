@@ -130,7 +130,7 @@ Status addMongoShellOptions(moe::OptionSection* options) {
         moe::String,
         "Remote host name to use for purpose of GSSAPI/Kerberos authentication");
 
-    options->addSection(authenticationOptions);
+    options->addSection(authenticationOptions).transitional_ignore();
 
     options->addOptionChaining("help", "help,h", moe::Switch, "show this usage information");
 

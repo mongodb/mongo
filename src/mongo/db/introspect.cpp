@@ -122,7 +122,7 @@ void profile(OperationContext* opCtx, NetworkOp op) {
             if (acquireDbXLock) {
                 autoGetDb.reset(new AutoGetDb(opCtx, dbName, MODE_X));
                 if (autoGetDb->getDb()) {
-                    createProfileCollection(opCtx, autoGetDb->getDb());
+                    createProfileCollection(opCtx, autoGetDb->getDb()).transitional_ignore();
                 }
             } else {
                 autoGetDb.reset(new AutoGetDb(opCtx, dbName, MODE_IX));
@@ -142,7 +142,7 @@ void profile(OperationContext* opCtx, NetworkOp op) {
             if (coll) {
                 WriteUnitOfWork wuow(opCtx);
                 OpDebug* const nullOpDebug = nullptr;
-                coll->insertDocument(opCtx, p, nullOpDebug, false);
+                coll->insertDocument(opCtx, p, nullOpDebug, false).transitional_ignore();
                 wuow.commit();
 
                 break;

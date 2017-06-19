@@ -214,7 +214,7 @@ Status ModifierPull::apply() const {
     std::vector<mb::Element>::const_iterator where = _preparedState->elementsToRemove.begin();
     const std::vector<mb::Element>::const_iterator end = _preparedState->elementsToRemove.end();
     for (; where != end; ++where)
-        const_cast<mb::Element&>(*where).remove();
+        const_cast<mb::Element&>(*where).remove().transitional_ignore();
 
     return Status::OK();
 }

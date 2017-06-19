@@ -135,7 +135,7 @@ public:
         // This is what sets a backup plan, should we test for it.
         PlanYieldPolicy yieldPolicy(PlanExecutor::NO_YIELD,
                                     _opCtx.getServiceContext()->getFastClockSource());
-        _mps->pickBestPlan(&yieldPolicy);
+        _mps->pickBestPlan(&yieldPolicy).transitional_ignore();
         ASSERT(_mps->bestPlanChosen());
 
         size_t bestPlanIdx = _mps->bestPlanIdx();

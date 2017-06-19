@@ -82,7 +82,7 @@ void RollbackTest::setUp() {
     _opCtx = cc().makeOperationContext();
     _replicationProcess->getConsistencyMarkers()->setAppliedThrough(_opCtx.get(), OpTime{});
     _replicationProcess->getConsistencyMarkers()->setMinValid(_opCtx.get(), OpTime{});
-    _replicationProcess->initializeRollbackID(_opCtx.get());
+    _replicationProcess->initializeRollbackID(_opCtx.get()).transitional_ignore();
 
     _threadPoolExecutorTest.launchExecutorThread();
 }

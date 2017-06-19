@@ -1967,7 +1967,9 @@ StatusWith<BSONObj> TopologyCoordinatorImpl::prepareReplSetUpdatePositionCommand
 
     // Add metadata to command. Old style parsing logic will reject the metadata.
     if (commandStyle == ReplicationCoordinator::ReplSetUpdatePositionCommandStyle::kNewStyle) {
-        prepareReplSetMetadata(currentCommittedSnapshotOpTime).writeToMetadata(&cmdBuilder);
+        prepareReplSetMetadata(currentCommittedSnapshotOpTime)
+            .writeToMetadata(&cmdBuilder)
+            .transitional_ignore();
     }
     return cmdBuilder.obj();
 }

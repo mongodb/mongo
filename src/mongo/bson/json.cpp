@@ -739,7 +739,7 @@ Status JParse::array(StringData fieldName, BSONObjBuilder& builder, bool subObje
  * have the same behavior.  XXX: this may not be desired. */
 Status JParse::constructor(StringData fieldName, BSONObjBuilder& builder) {
     if (readToken("Date")) {
-        date(fieldName, builder);
+        date(fieldName, builder).transitional_ignore();
     } else {
         return parseError("\"new\" keyword not followed by Date constructor");
     }

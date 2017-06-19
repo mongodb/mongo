@@ -86,7 +86,7 @@ void prefetchIndexPages(OperationContext* opCtx,
                     return;
                 IndexAccessMethod* iam = collection->getIndexCatalog()->getIndex(desc);
                 invariant(iam);
-                iam->touch(opCtx, obj);
+                iam->touch(opCtx, obj).transitional_ignore();
             } catch (const DBException& e) {
                 LOG(2) << "ignoring exception in prefetchIndexPages(): " << redact(e);
             }
@@ -104,7 +104,7 @@ void prefetchIndexPages(OperationContext* opCtx,
                     IndexDescriptor* desc = ii.next();
                     IndexAccessMethod* iam = collection->getIndexCatalog()->getIndex(desc);
                     verify(iam);
-                    iam->touch(opCtx, obj);
+                    iam->touch(opCtx, obj).transitional_ignore();
                 } catch (const DBException& e) {
                     LOG(2) << "ignoring exception in prefetchIndexPages(): " << redact(e);
                 }

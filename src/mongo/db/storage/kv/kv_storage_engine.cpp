@@ -86,7 +86,7 @@ KVStorageEngine::KVStorageEngine(
     if (options.forRepair && catalogExists) {
         log() << "Repairing catalog metadata";
         // TODO should also validate all BSON in the catalog.
-        engine->repairIdent(&opCtx, catalogInfo);
+        engine->repairIdent(&opCtx, catalogInfo).transitional_ignore();
     }
 
     if (!catalogExists) {
@@ -161,7 +161,7 @@ KVStorageEngine::KVStorageEngine(
                 continue;
             log() << "dropping unused ident: " << toRemove;
             WriteUnitOfWork wuow(&opCtx);
-            _engine->dropIdent(&opCtx, toRemove);
+            _engine->dropIdent(&opCtx, toRemove).transitional_ignore();
             wuow.commit();
         }
     }
@@ -239,7 +239,7 @@ Status KVStorageEngine::dropDatabase(OperationContext* opCtx, StringData db) {
 
     for (std::list<std::string>::iterator it = toDrop.begin(); it != toDrop.end(); ++it) {
         string coll = *it;
-        entry->dropCollection(opCtx, coll);
+        entry->dropCollection(opCtx, coll).transitional_ignore();
     }
     toDrop.clear();
     entry->getCollectionNamespaces(&toDrop);

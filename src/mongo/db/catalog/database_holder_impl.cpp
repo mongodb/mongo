@@ -198,7 +198,10 @@ void DatabaseHolderImpl::close(OperationContext* opCtx, StringData ns, const std
     delete it->second;
     _dbs.erase(it);
 
-    getGlobalServiceContext()->getGlobalStorageEngine()->closeDatabase(opCtx, dbName.toString());
+    getGlobalServiceContext()
+        ->getGlobalStorageEngine()
+        ->closeDatabase(opCtx, dbName.toString())
+        .transitional_ignore();
 }
 
 bool DatabaseHolderImpl::closeAll(OperationContext* opCtx,
@@ -234,7 +237,10 @@ bool DatabaseHolderImpl::closeAll(OperationContext* opCtx,
 
         _dbs.erase(name);
 
-        getGlobalServiceContext()->getGlobalStorageEngine()->closeDatabase(opCtx, name);
+        getGlobalServiceContext()
+            ->getGlobalStorageEngine()
+            ->closeDatabase(opCtx, name)
+            .transitional_ignore();
 
         bb.append(name);
     }

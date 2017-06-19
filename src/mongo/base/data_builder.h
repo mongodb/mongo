@@ -234,7 +234,8 @@ private:
     template <typename T>
     std::size_t _getSerializedSize(const T& value) {
         std::size_t advance = 0;
-        DataType::store(value, nullptr, std::numeric_limits<std::size_t>::max(), &advance, 0);
+        DataType::store(value, nullptr, std::numeric_limits<std::size_t>::max(), &advance, 0)
+            .transitional_ignore();
 
         return advance;
     }

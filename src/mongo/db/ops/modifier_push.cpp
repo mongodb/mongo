@@ -623,7 +623,7 @@ Status ModifierPush::apply() const {
         // Slice 0 means to remove all
         if (_slice == 0) {
             while (_preparedState->elemFound.ok() && _preparedState->elemFound.rightChild().ok()) {
-                _preparedState->elemFound.rightChild().remove();
+                _preparedState->elemFound.rightChild().remove().transitional_ignore();
             }
         }
 

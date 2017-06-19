@@ -1294,7 +1294,7 @@ Status Element::rename(StringData newName) {
         // For leaf elements we just create a new Element with the current value and
         // replace. Note that the 'setValue' call below will invalidate thisRep.
         Element replacement = _doc->makeElementWithNewFieldName(newName, *this);
-        setValue(replacement._repIdx);
+        setValue(replacement._repIdx).transitional_ignore();
     } else {
         // The easy case: just update what our field name offset refers to.
         impl.insertFieldName(*thisRep, newName);

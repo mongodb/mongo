@@ -180,7 +180,7 @@ TEST(QueryPlannerAnalysis, GeoSkipValidation) {
     std::unique_ptr<GeoMatchExpression> exprPtr = stdx::make_unique<GeoMatchExpression>();
 
     GeoMatchExpression* expr = exprPtr.get();
-    expr->init("geometry.field", nullptr, BSONObj());
+    expr->init("geometry.field", nullptr, BSONObj()).transitional_ignore();
 
     FetchNode* fetchNode = fetchNodePtr.get();
     // Takes ownership.

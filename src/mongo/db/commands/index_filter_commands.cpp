@@ -267,7 +267,7 @@ Status ClearFilters::clear(OperationContext* opCtx,
         querySettings->removeAllowedIndices(planCache->computeKey(*cq));
 
         // Remove entry from plan cache
-        planCache->remove(*cq);
+        planCache->remove(*cq).transitional_ignore();
 
         LOG(0) << "Removed index filter on " << ns << " " << redact(cq->toStringShort());
 
@@ -316,7 +316,7 @@ Status ClearFilters::clear(OperationContext* opCtx,
         std::unique_ptr<CanonicalQuery> cq = std::move(statusWithCQ.getValue());
 
         // Remove plan cache entry.
-        planCache->remove(*cq);
+        planCache->remove(*cq).transitional_ignore();
     }
 
     LOG(0) << "Removed all index filters for collection: " << ns;
@@ -394,7 +394,7 @@ Status SetFilter::set(OperationContext* opCtx,
     querySettings->setAllowedIndices(*cq, planCache->computeKey(*cq), indexes, indexNames);
 
     // Remove entry from plan cache.
-    planCache->remove(*cq);
+    planCache->remove(*cq).transitional_ignore();
 
     LOG(0) << "Index filter set on " << ns << " " << redact(cq->toStringShort()) << " "
            << indexesElt;

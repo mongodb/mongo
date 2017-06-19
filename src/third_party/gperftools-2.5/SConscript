@@ -115,7 +115,7 @@ def removeIfPresent(lst, item):
     except ValueError:
         pass
 
-for to_remove in ['-Werror', "-Wsign-compare","-Wall"]:
+for to_remove in ['-Werror', "-Wsign-compare","-Wall","-Werror=unused-result"]:
     removeIfPresent(env['CCFLAGS'], to_remove)
 
 # GCC on PowerPC under C++11 mode does not define __linux which gperftools depends on

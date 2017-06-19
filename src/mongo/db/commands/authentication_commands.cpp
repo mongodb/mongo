@@ -145,7 +145,7 @@ void CmdAuthenticate::redactForLogging(mutablebson::Document* cmdObj) {
         for (mmb::Element element = mmb::findFirstChildNamed(cmdObj->root(), redactedFields[i]);
              element.ok();
              element = mmb::findElementNamed(element.rightSibling(), redactedFields[i])) {
-            element.setValueString("xxx");
+            element.setValueString("xxx").transitional_ignore();
         }
     }
 }

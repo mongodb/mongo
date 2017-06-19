@@ -173,7 +173,7 @@ StatusWith<CollModRequest> parseCollModRequest(OperationContext* opCtx,
         } else if (fieldName == "validationAction" && !isView) {
             auto statusW = coll->parseValidationAction(e.String());
             if (!statusW.isOK())
-                statusW.getStatus();
+                return statusW.getStatus();
 
             cmr.collValidationAction = e.String();
         } else if (fieldName == "pipeline") {
@@ -371,15 +371,15 @@ mongo::Status mongo::collMod(OperationContext* opCtx,
 
     // Validator
     if (!cmr.collValidator.eoo())
-        coll->setValidator(opCtx, cmr.collValidator.Obj());
+        coll->setValidator(opCtx, cmr.collValidator.Obj()).transitional_ignore();
 
     // ValidationAction
     if (!cmr.collValidationAction.empty())
-        coll->setValidationAction(opCtx, cmr.collValidationAction);
+        coll->setValidationAction(opCtx, cmr.collValidationAction).transitional_ignore();
 
     // ValidationLevel
     if (!cmr.collValidationLevel.empty())
-        coll->setValidationLevel(opCtx, cmr.collValidationLevel);
+        coll->setValidationLevel(opCtx, cmr.collValidationLevel).transitional_ignore();
 
     // UsePowerof2Sizes
     if (!cmr.usePowerOf2Sizes.eoo())

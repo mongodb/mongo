@@ -149,8 +149,10 @@ void ReplicationCoordinatorImpl::_startElectSelfV1_inlock() {
         return;
     }
     fassert(28685, nextPhaseEvh.getStatus());
-    _replExecutor->onEvent(nextPhaseEvh.getValue(),
-                           stdx::bind(&ReplicationCoordinatorImpl::_onDryRunComplete, this, term));
+    _replExecutor
+        ->onEvent(nextPhaseEvh.getValue(),
+                  stdx::bind(&ReplicationCoordinatorImpl::_onDryRunComplete, this, term))
+        .status_with_transitional_ignore();
     lossGuard.dismiss();
 }
 
@@ -244,9 +246,10 @@ void ReplicationCoordinatorImpl::_startVoteRequester_inlock(long long newTerm) {
         return;
     }
     fassert(28643, nextPhaseEvh.getStatus());
-    _replExecutor->onEvent(
-        nextPhaseEvh.getValue(),
-        stdx::bind(&ReplicationCoordinatorImpl::_onVoteRequestComplete, this, newTerm));
+    _replExecutor
+        ->onEvent(nextPhaseEvh.getValue(),
+                  stdx::bind(&ReplicationCoordinatorImpl::_onVoteRequestComplete, this, newTerm))
+        .status_with_transitional_ignore();
 }
 
 void ReplicationCoordinatorImpl::_onVoteRequestComplete(long long originalTerm) {

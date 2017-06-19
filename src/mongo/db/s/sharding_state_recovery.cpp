@@ -233,7 +233,8 @@ Status ShardingStateRecovery::startMetadataOp(OperationContext* opCtx) {
         // Couldn't wait for the replication to complete, but the local write was performed. Clear
         // it up fast (without any waiting for journal or replication) and still treat it as
         // failure.
-        modifyRecoveryDocument(opCtx, RecoveryDocument::Decrement, WriteConcernOptions());
+        modifyRecoveryDocument(opCtx, RecoveryDocument::Decrement, WriteConcernOptions())
+            .transitional_ignore();
     }
 
     return upsertStatus;

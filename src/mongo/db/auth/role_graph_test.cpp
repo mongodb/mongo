@@ -529,7 +529,7 @@ TEST(RoleGraphTest, CopySwap) {
     // Make a copy of the graph to do further modifications on.
     RoleGraph tempGraph(graph);
     ASSERT_OK(tempGraph.addRoleToRole(roleB, roleC));
-    tempGraph.recomputePrivilegeData();
+    tempGraph.recomputePrivilegeData().transitional_ignore();
 
     // Now swap the copy back with the original graph and make sure the original was updated
     // properly.
@@ -686,10 +686,10 @@ TEST(RoleGraphTest, BuiltinRolesOnlyOnAppropriateDatabases) {
 
 TEST(RoleGraphTest, getRolesForDatabase) {
     RoleGraph graph;
-    graph.createRole(RoleName("myRole", "test"));
+    graph.createRole(RoleName("myRole", "test")).transitional_ignore();
     // Make sure that a role on "test2" doesn't show up in the roles list for "test"
-    graph.createRole(RoleName("anotherRole", "test2"));
-    graph.createRole(RoleName("myAdminRole", "admin"));
+    graph.createRole(RoleName("anotherRole", "test2")).transitional_ignore();
+    graph.createRole(RoleName("myAdminRole", "admin")).transitional_ignore();
 
     // Non-admin DB with no user-defined roles
     RoleNameIterator it = graph.getRolesForDatabase("fakedb");

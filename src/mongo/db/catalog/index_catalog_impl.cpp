@@ -432,7 +432,7 @@ void IndexCatalogImpl::IndexBuildBlock::fail() {
     invariant(entry == _entry);
 
     if (entry) {
-        IndexCatalogImpl::_dropIndex(_catalog, _opCtx, entry);
+        IndexCatalogImpl::_dropIndex(_catalog, _opCtx, entry).transitional_ignore();
     } else {
         IndexCatalog::_deleteIndexFromDisk(_catalog, _opCtx, _indexName, _indexNamespace);
     }
@@ -890,7 +890,7 @@ void IndexCatalogImpl::dropAllIndexes(OperationContext* opCtx,
         LOG(1) << "\t dropAllIndexes dropping: " << desc->toString();
         IndexCatalogEntry* entry = _entries.find(desc);
         invariant(entry);
-        _dropIndex(opCtx, entry);
+        _dropIndex(opCtx, entry).transitional_ignore();
 
         if (droppedIndexes != nullptr) {
             droppedIndexes->emplace(desc->indexName(), desc->infoObj());
@@ -1403,7 +1403,7 @@ void IndexCatalogImpl::unindexRecord(OperationContext* opCtx,
 
         // If it's a background index, we DO NOT want to log anything.
         bool logIfError = entry->isReady(opCtx) ? !noWarn : false;
-        _unindexRecord(opCtx, entry, obj, loc, logIfError, keysDeletedOut);
+        _unindexRecord(opCtx, entry, obj, loc, logIfError, keysDeletedOut).transitional_ignore();
     }
 }
 

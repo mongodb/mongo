@@ -55,7 +55,7 @@ FTDCFileManager::FTDCFileManager(const FTDCConfig* config,
     : _config(config), _writer(_config), _path(path), _rotateCollectors(collection) {}
 
 FTDCFileManager::~FTDCFileManager() {
-    close();
+    close().transitional_ignore();
 }
 
 StatusWith<std::unique_ptr<FTDCFileManager>> FTDCFileManager::create(

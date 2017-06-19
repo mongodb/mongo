@@ -167,12 +167,14 @@ public:
         const auto shardedColls = getAllShardedCollectionsForDb(opCtx, dbname);
 
         // Record start in changelog
-        catalogClient->logChange(
-            opCtx,
-            "movePrimary.start",
-            dbname,
-            _buildMoveLogEntry(dbname, fromShard->toString(), toShard->toString(), shardedColls),
-            ShardingCatalogClient::kMajorityWriteConcern);
+        catalogClient
+            ->logChange(opCtx,
+                        "movePrimary.start",
+                        dbname,
+                        _buildMoveLogEntry(
+                            dbname, fromShard->toString(), toShard->toString(), shardedColls),
+                        ShardingCatalogClient::kMajorityWriteConcern)
+            .transitional_ignore();
 
         ScopedDbConnection toconn(toShard->getConnString());
 
@@ -292,12 +294,13 @@ public:
         result << "primary" << toShard->toString();
 
         // Record finish in changelog
-        catalogClient->logChange(
-            opCtx,
-            "movePrimary",
-            dbname,
-            _buildMoveLogEntry(dbname, oldPrimary, toShard->toString(), shardedColls),
-            ShardingCatalogClient::kMajorityWriteConcern);
+        catalogClient
+            ->logChange(opCtx,
+                        "movePrimary",
+                        dbname,
+                        _buildMoveLogEntry(dbname, oldPrimary, toShard->toString(), shardedColls),
+                        ShardingCatalogClient::kMajorityWriteConcern)
+            .transitional_ignore();
 
         return true;
     }

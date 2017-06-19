@@ -360,16 +360,18 @@ void MetadataManager::append(BSONObjBuilder* builder) {
 void MetadataManager::_scheduleCleanup(executor::TaskExecutor* executor,
                                        NamespaceString nss,
                                        CollectionRangeDeleter::Action action) {
-    executor->scheduleWork([executor, nss, action](auto&) {
-        const int maxToDelete = std::max(int(internalQueryExecYieldIterations.load()), 1);
-        Client::initThreadIfNotAlready("Collection Range Deleter");
-        auto UniqueOpCtx = Client::getCurrent()->makeOperationContext();
-        auto opCtx = UniqueOpCtx.get();
-        auto next = CollectionRangeDeleter::cleanUpNextRange(opCtx, nss, action, maxToDelete);
-        if (next != CollectionRangeDeleter::Action::kFinished) {
-            _scheduleCleanup(executor, nss, next);
-        }
-    });
+    executor
+        ->scheduleWork([executor, nss, action](auto&) {
+            const int maxToDelete = std::max(int(internalQueryExecYieldIterations.load()), 1);
+            Client::initThreadIfNotAlready("Collection Range Deleter");
+            auto UniqueOpCtx = Client::getCurrent()->makeOperationContext();
+            auto opCtx = UniqueOpCtx.get();
+            auto next = CollectionRangeDeleter::cleanUpNextRange(opCtx, nss, action, maxToDelete);
+            if (next != CollectionRangeDeleter::Action::kFinished) {
+                _scheduleCleanup(executor, nss, next);
+            }
+        })
+        .status_with_transitional_ignore();
 }
 
 auto MetadataManager::_pushRangeToClean(ChunkRange const& range) -> CleanupNotification {

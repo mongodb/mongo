@@ -550,7 +550,7 @@ TEST(CanonicalQueryTest, NormalizeWithInPreservesCollator) {
     BSONObj obj = fromjson("{'': 'string'}");
     auto inMatchExpression = stdx::make_unique<InMatchExpression>();
     inMatchExpression->setCollator(&collator);
-    inMatchExpression->addEquality(obj.firstElement());
+    inMatchExpression->addEquality(obj.firstElement()).transitional_ignore();
     unique_ptr<MatchExpression> matchExpression(
         CanonicalQuery::normalizeTree(inMatchExpression.release()));
     ASSERT(matchExpression->matchType() == MatchExpression::MatchType::EQ);

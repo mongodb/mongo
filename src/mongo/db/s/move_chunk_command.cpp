@@ -231,7 +231,8 @@ private:
         auto range = ChunkRange(moveChunkRequest.getMinKey(), moveChunkRequest.getMaxKey());
         if (moveChunkRequest.getWaitForDelete()) {
             CollectionShardingState::waitForClean(
-                opCtx, moveChunkRequest.getNss(), moveChunkRequest.getVersionEpoch(), range);
+                opCtx, moveChunkRequest.getNss(), moveChunkRequest.getVersionEpoch(), range)
+                .transitional_ignore();
             // Ensure that wait for write concern for the chunk cleanup will include
             // the deletes performed by the range deleter thread.
             repl::ReplClientInfo::forClient(opCtx->getClient()).setLastOpToSystemLastOpTime(opCtx);

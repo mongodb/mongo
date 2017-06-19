@@ -184,7 +184,7 @@ public:
 
     virtual std::unique_ptr<MatchExpression> shallowClone() const {
         std::unique_ptr<NotMatchExpression> self = stdx::make_unique<NotMatchExpression>();
-        self->init(_exp->shallowClone().release());
+        self->init(_exp->shallowClone().release()).transitional_ignore();
         if (getTag()) {
             self->setTag(getTag()->clone());
         }

@@ -227,7 +227,7 @@ Status renameCollection(OperationContext* opCtx,
             }
             indexesToCopy.push_back(newIndex.obj());
         }
-        indexer.init(indexesToCopy);
+        indexer.init(indexesToCopy).status_with_transitional_ignore();
     }
 
     {

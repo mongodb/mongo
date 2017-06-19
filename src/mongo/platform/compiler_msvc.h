@@ -50,6 +50,8 @@
 #define MONGO_COMPILER_API_EXPORT __declspec(dllexport)
 #define MONGO_COMPILER_API_IMPORT __declspec(dllimport)
 
+#define MONGO_WARN_UNUSED_RESULT_CLASS
+
 #ifdef _M_IX86
 // 32-bit x86 supports multiple of calling conventions.  We build supporting the cdecl convention
 // (most common).  By labeling our exported and imported functions as such, we do a small favor to

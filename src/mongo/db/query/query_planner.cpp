@@ -832,7 +832,7 @@ Status QueryPlanner::plan(const CanonicalQuery& query,
         enumParams.indices = &relevantIndices;
 
         PlanEnumerator isp(enumParams);
-        isp.init();
+        isp.init().transitional_ignore();
 
         MatchExpression* rawTree;
         while (isp.getNext(&rawTree) && (out->size() < params.maxIndexedSolutions)) {

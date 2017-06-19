@@ -110,7 +110,7 @@ Reporter::Reporter(executor::TaskExecutor* executor,
 }
 
 Reporter::~Reporter() {
-    DESTRUCTOR_GUARD(shutdown(); join(););
+    DESTRUCTOR_GUARD(shutdown(); join().transitional_ignore(););
 }
 
 std::string Reporter::toString() const {

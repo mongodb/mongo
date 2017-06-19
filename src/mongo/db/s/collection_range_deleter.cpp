@@ -279,7 +279,7 @@ StatusWith<int> CollectionRangeDeleter::_doDeletion(OperationContext* opCtx,
         MONGO_WRITE_CONFLICT_RETRY_LOOP_BEGIN {
             WriteUnitOfWork wuow(opCtx);
             if (saver) {
-                saver->goingToDelete(obj);
+                saver->goingToDelete(obj).transitional_ignore();
             }
             collection->deleteDocument(opCtx, rloc, nullptr, true);
             wuow.commit();

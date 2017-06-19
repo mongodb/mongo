@@ -47,7 +47,7 @@ DEATH_TEST(UnsetNodeTest, InitFailsForEmptyElement, "Invariant failure modExpr.o
     auto update = fromjson("{$unset: {}}");
     const CollatorInterface* collator = nullptr;
     UnsetNode node;
-    node.init(update["$unset"].embeddedObject().firstElement(), collator);
+    node.init(update["$unset"].embeddedObject().firstElement(), collator).transitional_ignore();
 }
 
 DEATH_TEST(UnsetNodeTest, ApplyToRootFails, "Invariant failure parent.ok()") {

@@ -362,11 +362,13 @@ TEST_F(ClusterCursorManagerTest, KillCursorWrongCursorId) {
 
 // Test that killing all mortal expired cursors correctly kills a mortal expired cursor.
 TEST_F(ClusterCursorManagerTest, KillMortalCursorsInactiveSinceBasic) {
-    getManager()->registerCursor(nullptr,
-                                 allocateMockCursor(),
-                                 nss,
-                                 ClusterCursorManager::CursorType::NamespaceNotSharded,
-                                 ClusterCursorManager::CursorLifetime::Mortal);
+    getManager()
+        ->registerCursor(nullptr,
+                         allocateMockCursor(),
+                         nss,
+                         ClusterCursorManager::CursorType::NamespaceNotSharded,
+                         ClusterCursorManager::CursorLifetime::Mortal)
+        .status_with_transitional_ignore();
     getManager()->killMortalCursorsInactiveSince(getClockSource()->now());
     ASSERT(!isMockCursorKilled(0));
     getManager()->reapZombieCursors();
@@ -377,11 +379,13 @@ TEST_F(ClusterCursorManagerTest, KillMortalCursorsInactiveSinceBasic) {
 TEST_F(ClusterCursorManagerTest, KillMortalCursorsInactiveSinceSkipUnexpired) {
     Date_t timeBeforeCursorCreation = getClockSource()->now();
     getClockSource()->advance(Milliseconds(1));
-    getManager()->registerCursor(nullptr,
-                                 allocateMockCursor(),
-                                 nss,
-                                 ClusterCursorManager::CursorType::NamespaceNotSharded,
-                                 ClusterCursorManager::CursorLifetime::Mortal);
+    getManager()
+        ->registerCursor(nullptr,
+                         allocateMockCursor(),
+                         nss,
+                         ClusterCursorManager::CursorType::NamespaceNotSharded,
+                         ClusterCursorManager::CursorLifetime::Mortal)
+        .status_with_transitional_ignore();
     getManager()->killMortalCursorsInactiveSince(timeBeforeCursorCreation);
     ASSERT(!isMockCursorKilled(0));
     getManager()->reapZombieCursors();
@@ -390,11 +394,13 @@ TEST_F(ClusterCursorManagerTest, KillMortalCursorsInactiveSinceSkipUnexpired) {
 
 // Test that killing all mortal expired cursors does not kill a cursor that is immortal.
 TEST_F(ClusterCursorManagerTest, KillMortalCursorsInactiveSinceSkipImmortal) {
-    getManager()->registerCursor(nullptr,
-                                 allocateMockCursor(),
-                                 nss,
-                                 ClusterCursorManager::CursorType::NamespaceNotSharded,
-                                 ClusterCursorManager::CursorLifetime::Immortal);
+    getManager()
+        ->registerCursor(nullptr,
+                         allocateMockCursor(),
+                         nss,
+                         ClusterCursorManager::CursorType::NamespaceNotSharded,
+                         ClusterCursorManager::CursorLifetime::Immortal)
+        .status_with_transitional_ignore();
     getManager()->killMortalCursorsInactiveSince(getClockSource()->now());
     ASSERT(!isMockCursorKilled(0));
     getManager()->reapZombieCursors();
@@ -432,11 +438,13 @@ TEST_F(ClusterCursorManagerTest, KillMortalCursorsInactiveSinceMultipleCursors) 
         if (i < numKilledCursorsExpected) {
             cutoff = getClockSource()->now();
         }
-        getManager()->registerCursor(nullptr,
-                                     allocateMockCursor(),
-                                     nss,
-                                     ClusterCursorManager::CursorType::NamespaceNotSharded,
-                                     ClusterCursorManager::CursorLifetime::Mortal);
+        getManager()
+            ->registerCursor(nullptr,
+                             allocateMockCursor(),
+                             nss,
+                             ClusterCursorManager::CursorType::NamespaceNotSharded,
+                             ClusterCursorManager::CursorLifetime::Mortal)
+            .status_with_transitional_ignore();
         getClockSource()->advance(Milliseconds(1));
     }
     getManager()->killMortalCursorsInactiveSince(cutoff);
@@ -457,11 +465,13 @@ TEST_F(ClusterCursorManagerTest, KillMortalCursorsInactiveSinceMultipleCursors) 
 TEST_F(ClusterCursorManagerTest, KillAllCursors) {
     const size_t numCursors = 10;
     for (size_t i = 0; i < numCursors; ++i) {
-        getManager()->registerCursor(nullptr,
-                                     allocateMockCursor(),
-                                     nss,
-                                     ClusterCursorManager::CursorType::NamespaceNotSharded,
-                                     ClusterCursorManager::CursorLifetime::Mortal);
+        getManager()
+            ->registerCursor(nullptr,
+                             allocateMockCursor(),
+                             nss,
+                             ClusterCursorManager::CursorType::NamespaceNotSharded,
+                             ClusterCursorManager::CursorLifetime::Mortal)
+            .status_with_transitional_ignore();
     }
     getManager()->killAllCursors();
     for (size_t i = 0; i < numCursors; ++i) {
@@ -506,11 +516,13 @@ TEST_F(ClusterCursorManagerTest, ReapZombieCursorsSkipPinned) {
 // Test that reaping does not call kill() on the underlying ClusterClientCursor for cursors that
 // haven't been killed.
 TEST_F(ClusterCursorManagerTest, ReapZombieCursorsSkipNonZombies) {
-    getManager()->registerCursor(nullptr,
-                                 allocateMockCursor(),
-                                 nss,
-                                 ClusterCursorManager::CursorType::NamespaceNotSharded,
-                                 ClusterCursorManager::CursorLifetime::Mortal);
+    getManager()
+        ->registerCursor(nullptr,
+                         allocateMockCursor(),
+                         nss,
+                         ClusterCursorManager::CursorType::NamespaceNotSharded,
+                         ClusterCursorManager::CursorLifetime::Mortal)
+        .status_with_transitional_ignore();
     ASSERT(!isMockCursorKilled(0));
     getManager()->reapZombieCursors();
     ASSERT(!isMockCursorKilled(0));
@@ -525,21 +537,25 @@ TEST_F(ClusterCursorManagerTest, StatsInitAsZero) {
 
 // Test that registering a sharded cursor updates the corresponding counter in stats().
 TEST_F(ClusterCursorManagerTest, StatsRegisterShardedCursor) {
-    getManager()->registerCursor(nullptr,
-                                 allocateMockCursor(),
-                                 nss,
-                                 ClusterCursorManager::CursorType::NamespaceSharded,
-                                 ClusterCursorManager::CursorLifetime::Mortal);
+    getManager()
+        ->registerCursor(nullptr,
+                         allocateMockCursor(),
+                         nss,
+                         ClusterCursorManager::CursorType::NamespaceSharded,
+                         ClusterCursorManager::CursorLifetime::Mortal)
+        .status_with_transitional_ignore();
     ASSERT_EQ(1U, getManager()->stats().cursorsSharded);
 }
 
 // Test that registering a not-sharded cursor updates the corresponding counter in stats().
 TEST_F(ClusterCursorManagerTest, StatsRegisterNotShardedCursor) {
-    getManager()->registerCursor(nullptr,
-                                 allocateMockCursor(),
-                                 nss,
-                                 ClusterCursorManager::CursorType::NamespaceNotSharded,
-                                 ClusterCursorManager::CursorLifetime::Mortal);
+    getManager()
+        ->registerCursor(nullptr,
+                         allocateMockCursor(),
+                         nss,
+                         ClusterCursorManager::CursorType::NamespaceNotSharded,
+                         ClusterCursorManager::CursorLifetime::Mortal)
+        .status_with_transitional_ignore();
     ASSERT_EQ(1U, getManager()->stats().cursorsNotSharded);
 }
 
@@ -560,21 +576,25 @@ TEST_F(ClusterCursorManagerTest, StatsPinCursor) {
 TEST_F(ClusterCursorManagerTest, StatsRegisterMultipleCursors) {
     const size_t numShardedCursors = 10;
     for (size_t i = 0; i < numShardedCursors; ++i) {
-        getManager()->registerCursor(nullptr,
-                                     allocateMockCursor(),
-                                     nss,
-                                     ClusterCursorManager::CursorType::NamespaceSharded,
-                                     ClusterCursorManager::CursorLifetime::Mortal);
+        getManager()
+            ->registerCursor(nullptr,
+                             allocateMockCursor(),
+                             nss,
+                             ClusterCursorManager::CursorType::NamespaceSharded,
+                             ClusterCursorManager::CursorLifetime::Mortal)
+            .status_with_transitional_ignore();
         ASSERT_EQ(i + 1, getManager()->stats().cursorsSharded);
         ASSERT_EQ(0U, getManager()->stats().cursorsNotSharded);
     }
     const size_t numNotShardedCursors = 10;
     for (size_t i = 0; i < numNotShardedCursors; ++i) {
-        getManager()->registerCursor(nullptr,
-                                     allocateMockCursor(),
-                                     nss,
-                                     ClusterCursorManager::CursorType::NamespaceNotSharded,
-                                     ClusterCursorManager::CursorLifetime::Mortal);
+        getManager()
+            ->registerCursor(nullptr,
+                             allocateMockCursor(),
+                             nss,
+                             ClusterCursorManager::CursorType::NamespaceNotSharded,
+                             ClusterCursorManager::CursorLifetime::Mortal)
+            .status_with_transitional_ignore();
         ASSERT_EQ(numShardedCursors, getManager()->stats().cursorsSharded);
         ASSERT_EQ(i + 1, getManager()->stats().cursorsNotSharded);
     }

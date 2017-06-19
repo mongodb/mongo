@@ -442,7 +442,7 @@ TEST_F(CheckQuorumForInitiate, QuorumCheckFailedDueToSetIdMismatch) {
                                           rpc::ReplSetMetadata::kNoPrimary,
                                           -1);
             BSONObjBuilder metadataBuilder;
-            metadata.writeToMetadata(&metadataBuilder);
+            metadata.writeToMetadata(&metadataBuilder).transitional_ignore();
 
             getNet()->scheduleResponse(
                 noi,

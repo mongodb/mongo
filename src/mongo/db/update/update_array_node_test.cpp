@@ -189,8 +189,8 @@ DEATH_TEST(UpdateArrayNodeTest,
                                               foundIdentifiers));
 
     Document doc(fromjson("{a: [{c: 0}, {c: 0}, {c: 1}]}"));
-    doc.root()["a"]["1"]["c"].setValueInt(1);
-    doc.root()["a"]["2"]["c"].setValueInt(0);
+    doc.root()["a"]["1"]["c"].setValueInt(1).transitional_ignore();
+    doc.root()["a"]["2"]["c"].setValueInt(0).transitional_ignore();
     FieldRef pathToCreate("");
     FieldRef pathTaken("");
     StringData matchedField;

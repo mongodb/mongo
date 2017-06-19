@@ -147,7 +147,7 @@ TEST(Collator, SetCollationUpdatesModifierInterfaces) {
     bool modified = false;
     Document doc(fromjson("{a: 'cba'}"));
     driver.setCollator(&collator);
-    driver.update(StringData(), &doc, nullptr, nullptr, &modified);
+    driver.update(StringData(), &doc, nullptr, nullptr, &modified).transitional_ignore();
 
     ASSERT_TRUE(modified);
 }
@@ -164,8 +164,8 @@ public:
     CreateFromQueryFixture()
         : _driverOps(new UpdateDriver(UpdateDriver::Options())),
           _driverRepl(new UpdateDriver(UpdateDriver::Options())) {
-        _driverOps->parse(fromjson("{$set:{'_':1}}"));
-        _driverRepl->parse(fromjson("{}"));
+        _driverOps->parse(fromjson("{$set:{'_':1}}")).transitional_ignore();
+        _driverRepl->parse(fromjson("{}")).transitional_ignore();
         _opCtx = _serviceContext.makeOperationContext();
     }
 

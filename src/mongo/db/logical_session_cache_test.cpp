@@ -147,7 +147,7 @@ TEST_F(LogicalSessionCacheTest, TestCacheHitsOnly) {
     ASSERT(!res.isOK());
 
     // When the record is present, returns the owner
-    cache()->getOwner(lsid);
+    cache()->getOwner(lsid).status_with_transitional_ignore();
     res = cache()->getOwnerFromCache(lsid);
     ASSERT(res.isOK());
     auto fetched = res.getValue();
@@ -234,8 +234,8 @@ TEST_F(LogicalSessionCacheTest, CacheRefreshesOwnRecords) {
     // Insert two records into the cache
     auto record1 = newRecord();
     auto record2 = newRecord();
-    cache()->startSession(record1);
-    cache()->startSession(record2);
+    cache()->startSession(record1).transitional_ignore();
+    cache()->startSession(record2).transitional_ignore();
 
     stdx::promise<int> hitRefresh;
     auto refreshFuture = hitRefresh.get_future();
@@ -284,8 +284,8 @@ TEST_F(LogicalSessionCacheTest, CacheDeletesRecordsThatFailToRefresh) {
     // Put two sessions into the cache
     auto record1 = newRecord();
     auto record2 = newRecord();
-    cache()->startSession(record1);
-    cache()->startSession(record2);
+    cache()->startSession(record1).transitional_ignore();
+    cache()->startSession(record2).transitional_ignore();
 
     stdx::promise<void> hitRefresh;
     auto refreshFuture = hitRefresh.get_future();
@@ -313,9 +313,9 @@ TEST_F(LogicalSessionCacheTest, KeepActiveSessionAliveEvenIfRefreshFails) {
     // Put two sessions into the cache, one into the service
     auto record1 = newRecord();
     auto record2 = newRecord();
-    cache()->startSession(record1);
+    cache()->startSession(record1).transitional_ignore();
     service()->add(record1.getLsid());
-    cache()->startSession(record2);
+    cache()->startSession(record2).transitional_ignore();
 
     stdx::promise<void> hitRefresh;
     auto refreshFuture = hitRefresh.get_future();
@@ -342,7 +342,7 @@ TEST_F(LogicalSessionCacheTest, KeepActiveSessionAliveEvenIfRefreshFails) {
 TEST_F(LogicalSessionCacheTest, BasicSessionExpiration) {
     // Insert a record
     auto record = newRecord();
-    cache()->startSession(record);
+    cache()->startSession(record).transitional_ignore();
     auto res = cache()->getOwnerFromCache(record.getLsid());
     ASSERT(res.isOK());
 
@@ -411,7 +411,7 @@ TEST_F(LogicalSessionCacheTest, RefreshCachedAndServiceRecordsTogether) {
     auto record1 = newRecord();
     service()->add(record1.getLsid());
     auto record2 = newRecord();
-    cache()->startSession(record2);
+    cache()->startSession(record2).transitional_ignore();
 
     stdx::promise<void> hitRefresh;
     auto refreshFuture = hitRefresh.get_future();
@@ -433,7 +433,7 @@ TEST_F(LogicalSessionCacheTest, ManyRecordsInCacheRefresh) {
     int count = LogicalSessionCache::kLogicalSessionCacheDefaultCapacity;
     for (int i = 0; i < count; i++) {
         auto record = newRecord();
-        cache()->startSession(record);
+        cache()->startSession(record).transitional_ignore();
     }
 
     stdx::promise<void> hitRefresh;
@@ -482,7 +482,7 @@ TEST_F(LogicalSessionCacheTest, ManySessionsRefreshComboDeluxe) {
         service()->add(record.getLsid());
 
         auto record2 = newRecord();
-        cache()->startSession(record2);
+        cache()->startSession(record2).transitional_ignore();
     }
 
     stdx::mutex mutex;

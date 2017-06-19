@@ -56,7 +56,7 @@ public:
         OldClientContext ctx(&opCtx, _ns);
         WriteUnitOfWork wuow(&opCtx);
 
-        _db->dropCollection(&opCtx, _ns);
+        _db->dropCollection(&opCtx, _ns).transitional_ignore();
         wuow.commit();
     }
 
@@ -67,8 +67,8 @@ public:
 
         int numFinishedIndexesStart = _catalog->numIndexesReady(&opCtx);
 
-        dbtests::createIndex(&opCtx, _ns, BSON("x" << 1));
-        dbtests::createIndex(&opCtx, _ns, BSON("y" << 1));
+        dbtests::createIndex(&opCtx, _ns, BSON("x" << 1)).transitional_ignore();
+        dbtests::createIndex(&opCtx, _ns, BSON("y" << 1)).transitional_ignore();
 
         ASSERT_TRUE(_catalog->numIndexesReady(&opCtx) == numFinishedIndexesStart + 2);
 
@@ -123,7 +123,7 @@ public:
         OldClientContext ctx(&opCtx, _ns);
         WriteUnitOfWork wuow(&opCtx);
 
-        _db->dropCollection(&opCtx, _ns);
+        _db->dropCollection(&opCtx, _ns).transitional_ignore();
         wuow.commit();
     }
 

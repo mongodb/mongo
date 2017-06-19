@@ -345,8 +345,9 @@ Status AuthzManagerExternalStateLocal::_getRoleDescription_inlock(const RoleName
             fassert(17323, resultDoc.root().pushBack(inheritedPrivilegesElement));
         }
     } else if (showPrivileges == PrivilegeFormat::kShowSeparate) {
-        warningsElement.appendString(
-            "", "Role graph state inconsistent; only direct privileges available.");
+        warningsElement
+            .appendString("", "Role graph state inconsistent; only direct privileges available.")
+            .transitional_ignore();
         addPrivilegeObjectsOrWarningsToArrayElement(
             privilegesElement, warningsElement, _roleGraph.getDirectPrivileges(roleName));
     }

@@ -325,7 +325,7 @@ MatchExpression* CanonicalQuery::normalizeTree(MatchExpression* root) {
 
             // Make a NOT to be the new root and transfer ownership of the child to it.
             auto newRoot = stdx::make_unique<NotMatchExpression>();
-            newRoot->init(child.release());
+            newRoot->init(child.release()).transitional_ignore();
 
             return newRoot.release();
         }
@@ -358,7 +358,7 @@ MatchExpression* CanonicalQuery::normalizeTree(MatchExpression* root) {
 
             // Create a new RegexMatchExpression, because 'childRe' does not have a path.
             auto re = stdx::make_unique<RegexMatchExpression>();
-            re->init(in->path(), childRe->getString(), childRe->getFlags());
+            re->init(in->path(), childRe->getString(), childRe->getFlags()).transitional_ignore();
             if (in->getTag()) {
                 re->setTag(in->getTag()->clone());
             }
@@ -368,7 +368,7 @@ MatchExpression* CanonicalQuery::normalizeTree(MatchExpression* root) {
         // IN of 1 equality is the equality.
         if (in->getEqualities().size() == 1 && in->getRegexes().empty()) {
             auto eq = stdx::make_unique<EqualityMatchExpression>();
-            eq->init(in->path(), *(in->getEqualities().begin()));
+            eq->init(in->path(), *(in->getEqualities().begin())).transitional_ignore();
             eq->setCollator(in->getCollator());
             if (in->getTag()) {
                 eq->setTag(in->getTag()->clone());

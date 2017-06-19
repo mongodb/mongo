@@ -43,7 +43,7 @@ namespace mongo {
 TEST(LeafMatchExpressionTest, Equal1) {
     BSONObj temp = BSON("x" << 5);
     EqualityMatchExpression e;
-    e.init("x", temp["x"]);
+    e.init("x", temp["x"]).transitional_ignore();
 
     ASSERT_TRUE(e.matchesBSON(fromjson("{ x : 5 }")));
     ASSERT_TRUE(e.matchesBSON(fromjson("{ x : [5] }")));
@@ -62,7 +62,7 @@ TEST(LeafMatchExpressionTest, Comp1) {
 
     {
         LTEMatchExpression e;
-        e.init("x", temp["x"]);
+        e.init("x", temp["x"]).transitional_ignore();
         ASSERT_TRUE(e.matchesBSON(fromjson("{ x : 5 }")));
         ASSERT_TRUE(e.matchesBSON(fromjson("{ x : 4 }")));
         ASSERT_FALSE(e.matchesBSON(fromjson("{ x : 6 }")));
@@ -71,7 +71,7 @@ TEST(LeafMatchExpressionTest, Comp1) {
 
     {
         LTMatchExpression e;
-        e.init("x", temp["x"]);
+        e.init("x", temp["x"]).transitional_ignore();
         ASSERT_FALSE(e.matchesBSON(fromjson("{ x : 5 }")));
         ASSERT_TRUE(e.matchesBSON(fromjson("{ x : 4 }")));
         ASSERT_FALSE(e.matchesBSON(fromjson("{ x : 6 }")));
@@ -80,7 +80,7 @@ TEST(LeafMatchExpressionTest, Comp1) {
 
     {
         GTEMatchExpression e;
-        e.init("x", temp["x"]);
+        e.init("x", temp["x"]).transitional_ignore();
         ASSERT_TRUE(e.matchesBSON(fromjson("{ x : 5 }")));
         ASSERT_FALSE(e.matchesBSON(fromjson("{ x : 4 }")));
         ASSERT_TRUE(e.matchesBSON(fromjson("{ x : 6 }")));
@@ -89,7 +89,7 @@ TEST(LeafMatchExpressionTest, Comp1) {
 
     {
         GTMatchExpression e;
-        e.init("x", temp["x"]);
+        e.init("x", temp["x"]).transitional_ignore();
         ASSERT_FALSE(e.matchesBSON(fromjson("{ x : 5 }")));
         ASSERT_FALSE(e.matchesBSON(fromjson("{ x : 4 }")));
         ASSERT_TRUE(e.matchesBSON(fromjson("{ x : 6 }")));

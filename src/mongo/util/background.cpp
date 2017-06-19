@@ -262,7 +262,7 @@ Status PeriodicTask::stopRunningPeriodicTasks(int gracePeriodMillis) {
     if (runnerDestroyed || !runner)
         return status;
 
-    runner->cancel();
+    runner->cancel().transitional_ignore();
     status = runner->stop(gracePeriodMillis);
 
     if (status.isOK()) {

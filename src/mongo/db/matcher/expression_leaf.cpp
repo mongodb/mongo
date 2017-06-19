@@ -513,7 +513,7 @@ Status InMatchExpression::init(StringData path) {
 
 std::unique_ptr<MatchExpression> InMatchExpression::shallowClone() const {
     auto next = stdx::make_unique<InMatchExpression>();
-    next->init(path());
+    next->init(path()).transitional_ignore();
     next->setCollator(_collator);
     if (getTag()) {
         next->setTag(getTag()->clone());

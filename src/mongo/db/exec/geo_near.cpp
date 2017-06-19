@@ -506,7 +506,7 @@ class TwoDPtInAnnulusExpression : public LeafMatchExpression {
 public:
     TwoDPtInAnnulusExpression(const R2Annulus& annulus, StringData twoDPath)
         : LeafMatchExpression(INTERNAL_2D_POINT_IN_ANNULUS), _annulus(annulus) {
-        setPath(twoDPath);
+        setPath(twoDPath).transitional_ignore();
     }
 
     void serialize(BSONObjBuilder* out) const final {
@@ -726,7 +726,7 @@ StatusWith<NearStage::CoveredInterval*>  //
 
     // These parameters are stored by the index, and so must be ok
     GeoHashConverter::Parameters hashParams;
-    GeoHashConverter::parseParameters(_twoDIndex->infoObj(), &hashParams);
+    GeoHashConverter::parseParameters(_twoDIndex->infoObj(), &hashParams).transitional_ignore();
 
     // 2D indexes support covered search over additional fields they contain
     IndexScan* scan = new IndexScan(opCtx, scanParams, workingSet, _nearParams.filter);

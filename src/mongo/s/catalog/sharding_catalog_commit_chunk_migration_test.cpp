@@ -55,7 +55,7 @@ TEST_F(CommitChunkMigrate, CheckCorrectOpsCommandWithCtl) {
     shard1.setName("shard1");
     shard1.setHost("shard1:12");
 
-    setupShards({shard0, shard1});
+    setupShards({shard0, shard1}).transitional_ignore();
 
     int origMajorVersion = 12;
     auto const origVersion = ChunkVersion(origMajorVersion, 7, OID::gen());
@@ -80,7 +80,7 @@ TEST_F(CommitChunkMigrate, CheckCorrectOpsCommandWithCtl) {
     auto chunkMaxax = BSON("a" << 20);
     chunk1.setMax(chunkMaxax);
 
-    setupChunks({chunk0, chunk1});
+    setupChunks({chunk0, chunk1}).transitional_ignore();
 
     // use crefs to verify it will take consts:
     ChunkType const& chunk0cref = chunk0;
@@ -129,7 +129,7 @@ TEST_F(CommitChunkMigrate, CheckCorrectOpsCommandNoCtl) {
     shard1.setName("shard1");
     shard1.setHost("shard1:12");
 
-    setupShards({shard0, shard1});
+    setupShards({shard0, shard1}).transitional_ignore();
 
     int origMajorVersion = 15;
     auto const origVersion = ChunkVersion(origMajorVersion, 4, OID::gen());
@@ -145,7 +145,7 @@ TEST_F(CommitChunkMigrate, CheckCorrectOpsCommandNoCtl) {
     auto chunkMax = BSON("a" << 10);
     chunk0.setMax(chunkMax);
 
-    setupChunks({chunk0});
+    setupChunks({chunk0}).transitional_ignore();
 
     StatusWith<BSONObj> resultBSON =
         catalogManager()->commitChunkMigration(operationContext(),
@@ -185,7 +185,7 @@ TEST_F(CommitChunkMigrate, RejectWrongCollectionEpoch0) {
     shard1.setName("shard1");
     shard1.setHost("shard1:12");
 
-    setupShards({shard0, shard1});
+    setupShards({shard0, shard1}).transitional_ignore();
 
     int origMajorVersion = 12;
     auto const origVersion = ChunkVersion(origMajorVersion, 7, OID::gen());
@@ -210,7 +210,7 @@ TEST_F(CommitChunkMigrate, RejectWrongCollectionEpoch0) {
     auto chunkMaxax = BSON("a" << 20);
     chunk1.setMax(chunkMaxax);
 
-    setupChunks({chunk0, chunk1});
+    setupChunks({chunk0, chunk1}).transitional_ignore();
 
     StatusWith<BSONObj> resultBSON =
         catalogManager()->commitChunkMigration(operationContext(),
@@ -236,7 +236,7 @@ TEST_F(CommitChunkMigrate, RejectWrongCollectionEpoch1) {
     shard1.setName("shard1");
     shard1.setHost("shard1:12");
 
-    setupShards({shard0, shard1});
+    setupShards({shard0, shard1}).transitional_ignore();
 
     int origMajorVersion = 12;
     auto const origVersion = ChunkVersion(origMajorVersion, 7, OID::gen());
@@ -263,7 +263,7 @@ TEST_F(CommitChunkMigrate, RejectWrongCollectionEpoch1) {
     chunk1.setMax(chunkMaxax);
 
     // get version from the control chunk this time
-    setupChunks({chunk1, chunk0});
+    setupChunks({chunk1, chunk0}).transitional_ignore();
 
     StatusWith<BSONObj> resultBSON =
         catalogManager()->commitChunkMigration(operationContext(),
@@ -289,7 +289,7 @@ TEST_F(CommitChunkMigrate, RejectChunkMissing0) {
     shard1.setName("shard1");
     shard1.setHost("shard1:12");
 
-    setupShards({shard0, shard1});
+    setupShards({shard0, shard1}).transitional_ignore();
 
     int origMajorVersion = 12;
     auto const origVersion = ChunkVersion(origMajorVersion, 7, OID::gen());
@@ -314,7 +314,7 @@ TEST_F(CommitChunkMigrate, RejectChunkMissing0) {
     auto chunkMaxax = BSON("a" << 20);
     chunk1.setMax(chunkMaxax);
 
-    setupChunks({chunk1});
+    setupChunks({chunk1}).transitional_ignore();
 
     StatusWith<BSONObj> resultBSON =
         catalogManager()->commitChunkMigration(operationContext(),
@@ -340,7 +340,7 @@ TEST_F(CommitChunkMigrate, RejectChunkMissing1) {
     shard1.setName("shard1");
     shard1.setHost("shard1:12");
 
-    setupShards({shard0, shard1});
+    setupShards({shard0, shard1}).transitional_ignore();
 
     int origMajorVersion = 12;
     auto const origVersion = ChunkVersion(origMajorVersion, 7, OID::gen());
@@ -365,7 +365,7 @@ TEST_F(CommitChunkMigrate, RejectChunkMissing1) {
     auto chunkMaxax = BSON("a" << 20);
     chunk1.setMax(chunkMaxax);
 
-    setupChunks({chunk0});
+    setupChunks({chunk0}).transitional_ignore();
 
     StatusWith<BSONObj> resultBSON =
         catalogManager()->commitChunkMigration(operationContext(),

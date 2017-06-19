@@ -394,8 +394,10 @@ Status ShardingCatalogManagerImpl::commitChunkSplit(OperationContext* opCtx,
         appendShortVersion(&logDetail.subobjStart("left"), newChunks[0]);
         appendShortVersion(&logDetail.subobjStart("right"), newChunks[1]);
 
-        Grid::get(opCtx)->catalogClient(opCtx)->logChange(
-            opCtx, "split", ns.ns(), logDetail.obj(), WriteConcernOptions());
+        Grid::get(opCtx)
+            ->catalogClient(opCtx)
+            ->logChange(opCtx, "split", ns.ns(), logDetail.obj(), WriteConcernOptions())
+            .transitional_ignore();
     } else {
         BSONObj beforeDetailObj = logDetail.obj();
         BSONObj firstDetailObj = beforeDetailObj.getOwned();
@@ -408,8 +410,10 @@ Status ShardingCatalogManagerImpl::commitChunkSplit(OperationContext* opCtx,
             chunkDetail.append("of", newChunksSize);
             appendShortVersion(&chunkDetail.subobjStart("chunk"), newChunks[i]);
 
-            Grid::get(opCtx)->catalogClient(opCtx)->logChange(
-                opCtx, "multi-split", ns.ns(), chunkDetail.obj(), WriteConcernOptions());
+            Grid::get(opCtx)
+                ->catalogClient(opCtx)
+                ->logChange(opCtx, "multi-split", ns.ns(), chunkDetail.obj(), WriteConcernOptions())
+                .transitional_ignore();
         }
     }
 
@@ -517,8 +521,10 @@ Status ShardingCatalogManagerImpl::commitChunkMerge(OperationContext* opCtx,
     collVersion.addToBSON(logDetail, "prevShardVersion");
     mergeVersion.addToBSON(logDetail, "mergedVersion");
 
-    Grid::get(opCtx)->catalogClient(opCtx)->logChange(
-        opCtx, "merge", ns.ns(), logDetail.obj(), WriteConcernOptions());
+    Grid::get(opCtx)
+        ->catalogClient(opCtx)
+        ->logChange(opCtx, "merge", ns.ns(), logDetail.obj(), WriteConcernOptions())
+        .transitional_ignore();
 
     return applyOpsStatus;
 }

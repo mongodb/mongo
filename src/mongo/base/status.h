@@ -32,12 +32,13 @@
 
 #include "mongo/base/error_codes.h"
 #include "mongo/platform/atomic_word.h"
+#include "mongo/platform/compiler.h"
 
 namespace mongoutils {
 namespace str {
 class stream;
-}
-}
+}  // namespace str
+}  // namespace mongoutils
 
 namespace mongo {
 
@@ -64,7 +65,7 @@ namespace mongo {
  * TODO: generate base/error_codes.h out of a description file
  * TODO: check 'location' duplicates against assert numbers
  */
-class Status {
+class MONGO_WARN_UNUSED_RESULT_CLASS Status {
 public:
     // Short-hand for returning an OK status.
     static inline Status OK();
@@ -126,6 +127,27 @@ public:
     inline int location() const;
 
     std::string toString() const;
+
+    /**
+     * Call this method to indicate that it is your intention to ignore a returned status. Ignoring
+     * is only possible if the value being ignored is an xvalue -- it is not appropriate to create a
+     * status variable and then ignore it.
+     */
+    inline void ignore() && noexcept {}
+    inline void ignore() const& noexcept = delete;
+
+    /**
+     * This method is a transitional tool, to facilitate transition to compile-time enforced status
+     * checking.
+     *
+     * NOTE: DO NOT ADD NEW CALLS TO THIS METHOD. This method serves the same purpose as
+     * `.ignore()`; however, it indicates a situation where the code that presently ignores a status
+     * code has not been audited for correctness. This method will be removed at some point. If you
+     * encounter a compiler error from ignoring the result of a status-returning function be sure to
+     * check the return value, or deliberately ignore the return value.
+     */
+    inline void transitional_ignore() && noexcept {};
+    inline void transitional_ignore() const& noexcept = delete;
 
     //
     // Below interface used for testing code only.

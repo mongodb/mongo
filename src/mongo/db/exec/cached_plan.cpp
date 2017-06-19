@@ -230,7 +230,7 @@ Status CachedPlanStage::replan(PlanYieldPolicy* yieldPolicy, bool shouldCache) {
         // cache entry if requested by the caller.
         if (shouldCache) {
             PlanCache* cache = _collection->infoCache()->getPlanCache();
-            cache->remove(*_canonicalQuery);
+            cache->remove(*_canonicalQuery).transitional_ignore();
         }
 
         PlanStage* newRoot;

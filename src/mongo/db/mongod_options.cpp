@@ -512,18 +512,18 @@ Status addMongodOptions(moe::OptionSection* options) {
         .setSources(moe::SourceYAMLConfig);
 
 
-    options->addSection(general_options);
+    options->addSection(general_options).transitional_ignore();
 #if defined(_WIN32)
-    options->addSection(windows_scm_options);
+    options->addSection(windows_scm_options).transitional_ignore();
 #endif
-    options->addSection(replication_options);
-    options->addSection(ms_options);
-    options->addSection(rs_options);
-    options->addSection(sharding_options);
+    options->addSection(replication_options).transitional_ignore();
+    options->addSection(ms_options).transitional_ignore();
+    options->addSection(rs_options).transitional_ignore();
+    options->addSection(sharding_options).transitional_ignore();
 #ifdef MONGO_CONFIG_SSL
-    options->addSection(ssl_options);
+    options->addSection(ssl_options).transitional_ignore();
 #endif
-    options->addSection(storage_options);
+    options->addSection(storage_options).transitional_ignore();
 
     // The following are legacy options that are disallowed in the JSON config file
 

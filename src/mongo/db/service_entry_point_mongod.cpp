@@ -225,7 +225,9 @@ public:
               repl::getGlobalReplicationCoordinator()->setMaintenanceMode(true).isOK()) {}
     ~MaintenanceModeSetter() {
         if (maintenanceModeSet)
-            repl::getGlobalReplicationCoordinator()->setMaintenanceMode(false);
+            repl::getGlobalReplicationCoordinator()
+                ->setMaintenanceMode(false)
+                .transitional_ignore();
     }
 
 private:
@@ -250,7 +252,8 @@ void appendReplyMetadata(OperationContext* opCtx,
         // TODO: refactor out of here as part of SERVER-18236
         if (isShardingAware || isConfig) {
             rpc::ShardingMetadata(lastOpTimeFromClient, replCoord->getElectionId())
-                .writeToMetadata(metadataBob);
+                .writeToMetadata(metadataBob)
+                .transitional_ignore();
             if (LogicalTimeValidator::isAuthorizedToAdvanceClock(opCtx)) {
                 // No need to sign logical times for internal clients.
                 SignedLogicalTime currentTime(
@@ -670,8 +673,10 @@ void execCommandDatabase(OperationContext* opCtx,
             invariant(sce);  // do not upcasts from DBException created by uassert variants.
 
             if (!opCtx->getClient()->isInDirectClient()) {
-                ShardingState::get(opCtx)->onStaleShardVersion(
-                    opCtx, NamespaceString(sce->getns()), sce->getVersionReceived());
+                ShardingState::get(opCtx)
+                    ->onStaleShardVersion(
+                        opCtx, NamespaceString(sce->getns()), sce->getVersionReceived())
+                    .transitional_ignore();
             }
         }
 
@@ -864,8 +869,9 @@ DbResponse receivedQuery(OperationContext* opCtx,
         // If we got a stale config, wait in case the operation is stuck in a critical section
         if (!opCtx->getClient()->isInDirectClient() && e.getCode() == ErrorCodes::SendStaleConfig) {
             auto& sce = static_cast<const StaleConfigException&>(e);
-            ShardingState::get(opCtx)->onStaleShardVersion(
-                opCtx, NamespaceString(sce.getns()), sce.getVersionReceived());
+            ShardingState::get(opCtx)
+                ->onStaleShardVersion(opCtx, NamespaceString(sce.getns()), sce.getVersionReceived())
+                .transitional_ignore();
         }
 
         dbResponse.response.reset();

@@ -335,7 +335,7 @@ MONGO_INITIALIZER(RegisterShortCircuitExitHandler)(InitializerContext*) {
 }
 
 bool initializeServerGlobalState() {
-    Listener::globalTicketHolder.resize(serverGlobalParams.maxConns);
+    Listener::globalTicketHolder.resize(serverGlobalParams.maxConns).transitional_ignore();
 
 #ifndef _WIN32
     if (!fs::is_directory(serverGlobalParams.socket)) {

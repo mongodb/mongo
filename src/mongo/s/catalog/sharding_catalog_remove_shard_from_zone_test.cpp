@@ -49,7 +49,7 @@ TEST_F(RemoveShardFromZoneTest, RemoveZoneThatNoLongerExistsShouldNotError) {
     shard.setName("a");
     shard.setHost("a:1234");
 
-    setupShards({shard});
+    setupShards({shard}).transitional_ignore();
 
     ASSERT_OK(catalogManager()->removeShardFromZone(operationContext(), shard.getName(), "z"));
     auto shardDocStatus = getShardDoc(operationContext(), shard.getName());
@@ -70,7 +70,7 @@ TEST_F(RemoveShardFromZoneTest, RemovingZoneThatIsOnlyReferencedByAnotherShardSh
     shardB.setName("b");
     shardB.setHost("b:1234");
 
-    setupShards({shardA, shardB});
+    setupShards({shardA, shardB}).transitional_ignore();
 
     ASSERT_OK(catalogManager()->removeShardFromZone(operationContext(), shardB.getName(), "z"));
 
@@ -102,7 +102,7 @@ TEST_F(RemoveShardFromZoneTest, RemoveLastZoneFromShardShouldSucceedWhenNoChunks
     shardB.setName("b");
     shardB.setHost("b:1234");
 
-    setupShards({shardA, shardB});
+    setupShards({shardA, shardB}).transitional_ignore();
 
     // Insert a chunk range document referring to a different zone
     TagsType tagDoc;
@@ -111,7 +111,8 @@ TEST_F(RemoveShardFromZoneTest, RemoveLastZoneFromShardShouldSucceedWhenNoChunks
     tagDoc.setMaxKey(BSON("x" << 10));
     tagDoc.setTag("y");
     insertToConfigCollection(
-        operationContext(), NamespaceString(TagsType::ConfigNS), tagDoc.toBSON());
+        operationContext(), NamespaceString(TagsType::ConfigNS), tagDoc.toBSON())
+        .transitional_ignore();
 
     ASSERT_OK(catalogManager()->removeShardFromZone(operationContext(), shardA.getName(), "z"));
 
@@ -142,7 +143,7 @@ TEST_F(RemoveShardFromZoneTest, RemoveLastZoneFromShardShouldFailWhenAChunkRefer
     shardB.setName("b");
     shardB.setHost("b:1234");
 
-    setupShards({shardA, shardB});
+    setupShards({shardA, shardB}).transitional_ignore();
 
     TagsType tagDoc;
     tagDoc.setNS("test.foo");
@@ -150,7 +151,8 @@ TEST_F(RemoveShardFromZoneTest, RemoveLastZoneFromShardShouldFailWhenAChunkRefer
     tagDoc.setMaxKey(BSON("x" << 10));
     tagDoc.setTag("z");
     insertToConfigCollection(
-        operationContext(), NamespaceString(TagsType::ConfigNS), tagDoc.toBSON());
+        operationContext(), NamespaceString(TagsType::ConfigNS), tagDoc.toBSON())
+        .transitional_ignore();
 
     auto status = catalogManager()->removeShardFromZone(operationContext(), shardA.getName(), "z");
     ASSERT_EQ(ErrorCodes::ZoneStillInUse, status);
@@ -180,7 +182,7 @@ TEST_F(RemoveShardFromZoneTest, RemoveZoneShouldFailIfShardDoesntExist) {
     shardA.setHost("a:1234");
     shardA.setTags({"z"});
 
-    setupShards({shardA});
+    setupShards({shardA}).transitional_ignore();
 
     auto status = catalogManager()->removeShardFromZone(operationContext(), "b", "z");
     ASSERT_EQ(ErrorCodes::ShardNotFound, status);
@@ -206,7 +208,7 @@ TEST_F(RemoveShardFromZoneTest, RemoveZoneFromShardShouldOnlyRemoveZoneOnSpecifi
     shardB.setHost("b:1234");
     shardB.setTags({"y", "z"});
 
-    setupShards({shardA, shardB});
+    setupShards({shardA, shardB}).transitional_ignore();
 
     ASSERT_OK(catalogManager()->removeShardFromZone(operationContext(), shardB.getName(), "z"));
 

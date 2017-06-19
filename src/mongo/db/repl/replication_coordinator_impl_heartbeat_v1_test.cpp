@@ -379,7 +379,7 @@ TEST_F(ReplCoordHBV1Test, IgnoreTheContentsOfMetadataWhenItsReplicaSetIdDoesNotM
         rpc::ReplSetMetadata metadata(
             opTime.getTerm(), opTime, opTime, rsConfig.getConfigVersion(), unexpectedId, 1, -1);
         BSONObjBuilder metadataBuilder;
-        metadata.writeToMetadata(&metadataBuilder);
+        metadata.writeToMetadata(&metadataBuilder).transitional_ignore();
 
         heartbeatResponse = makeResponseStatus(responseBuilder.obj(), metadataBuilder.obj());
     }

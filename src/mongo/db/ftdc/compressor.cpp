@@ -45,7 +45,8 @@ using std::swap;
 StatusWith<boost::optional<std::tuple<ConstDataRange, FTDCCompressor::CompressorState, Date_t>>>
 FTDCCompressor::addSample(const BSONObj& sample, Date_t date) {
     if (_referenceDoc.isEmpty()) {
-        FTDCBSONUtil::extractMetricsFromDocument(sample, sample, &_metrics);
+        FTDCBSONUtil::extractMetricsFromDocument(sample, sample, &_metrics)
+            .status_with_transitional_ignore();
         _reset(sample, date);
         return {boost::none};
     }

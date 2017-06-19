@@ -302,7 +302,7 @@ TEST(Parsing, SubSection) {
     moe::OptionSection subSection("Section Name");
 
     subSection.addOptionChaining("port", "port", moe::Int, "Port");
-    testOpts.addSection(subSection);
+    testOpts.addSection(subSection).transitional_ignore();
 
     std::vector<std::string> argv;
     argv.push_back("binaryname");
@@ -4020,7 +4020,7 @@ TEST(OptionCount, Basic) {
     moe::OptionSection subSection("Section Name");
     subSection.addOptionChaining("port", "port", moe::Int, "Port")
         .setSources(moe::SourceYAMLConfig);
-    testOpts.addSection(subSection);
+    testOpts.addSection(subSection).transitional_ignore();
 
     int numOptions;
     ASSERT_OK(testOpts.countOptions(&numOptions, true /*visibleOnly*/, moe::SourceCommandLine));

@@ -47,7 +47,7 @@ DEATH_TEST(SetNodeTest, InitFailsForEmptyElement, "Invariant failure modExpr.ok(
     auto update = fromjson("{$set: {}}");
     const CollatorInterface* collator = nullptr;
     SetNode node;
-    node.init(update["$set"].embeddedObject().firstElement(), collator);
+    node.init(update["$set"].embeddedObject().firstElement(), collator).transitional_ignore();
 }
 
 TEST(SetNodeTest, InitSucceedsForNonemptyElement) {
@@ -387,7 +387,7 @@ TEST(SetNodeTest, IdentityOpOnDeserializedIsNotANoOp) {
 
     Document doc(fromjson("{a: { b: NumberInt(0)}}"));
     // Apply a mutation to the document that will make it non-serialized.
-    doc.root()["a"]["b"].setValueInt(2);
+    doc.root()["a"]["b"].setValueInt(2).transitional_ignore();
 
     FieldRef pathToCreate("");
     FieldRef pathTaken("a");
@@ -1724,9 +1724,9 @@ TEST(SetNodeTest, ApplySetModToEphemeralDocument) {
 
     Document doc;
     Element x = doc.makeElementObject("x");
-    doc.root().pushBack(x);
+    doc.root().pushBack(x).transitional_ignore();
     Element a = doc.makeElementInt("a", 100);
-    x.pushBack(a);
+    x.pushBack(a).transitional_ignore();
 
     FieldRef pathToCreate("");
     FieldRef pathTaken("x");

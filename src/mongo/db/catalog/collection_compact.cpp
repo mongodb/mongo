@@ -94,7 +94,7 @@ public:
     }
 
     virtual void inserted(const RecordData& recData, const RecordId& newLocation) {
-        _multiIndexBlock->insert(recData.toBson(), newLocation);
+        _multiIndexBlock->insert(recData.toBson(), newLocation).transitional_ignore();
     }
 
 private:

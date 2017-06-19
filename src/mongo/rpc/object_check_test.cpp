@@ -68,7 +68,7 @@ TEST(DataTypeValidated, BSONValidationEnabled) {
         // mess up the data
         DataRangeCursor drc(begin(buf), end(buf));
         // skip past size so we don't trip any sanity checks.
-        drc.advance(4);  // skip size
+        drc.advance(4).transitional_ignore();  // skip size
         while (drc.writeAndAdvance(0xFF).isOK())
             ;
     }

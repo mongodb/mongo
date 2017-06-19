@@ -289,7 +289,7 @@ Status Balancer::moveSingleChunk(OperationContext* opCtx,
 
 void Balancer::report(OperationContext* opCtx, BSONObjBuilder* builder) {
     auto balancerConfig = Grid::get(opCtx)->getBalancerConfiguration();
-    balancerConfig->refreshAndCheck(opCtx);
+    balancerConfig->refreshAndCheck(opCtx).transitional_ignore();
 
     const auto mode = balancerConfig->getBalancerMode();
 
@@ -389,7 +389,8 @@ void Balancer::_mainThread() {
                                               _balancedLastTime);
 
                     shardingContext->catalogClient(opCtx.get())
-                        ->logAction(opCtx.get(), "balancer.round", "", roundDetails.toBSON());
+                        ->logAction(opCtx.get(), "balancer.round", "", roundDetails.toBSON())
+                        .transitional_ignore();
                 }
 
                 LOG(1) << "*** End of balancing round";
@@ -408,7 +409,8 @@ void Balancer::_mainThread() {
             roundDetails.setFailed(e.what());
 
             shardingContext->catalogClient(opCtx.get())
-                ->logAction(opCtx.get(), "balancer.round", "", roundDetails.toBSON());
+                ->logAction(opCtx.get(), "balancer.round", "", roundDetails.toBSON())
+                .transitional_ignore();
 
             // Sleep a fair amount before retrying because of the error
             _endRound(opCtx.get(), kBalanceRoundDefaultInterval);

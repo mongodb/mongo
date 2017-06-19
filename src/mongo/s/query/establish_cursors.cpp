@@ -151,8 +151,10 @@ StatusWith<std::vector<ClusterClientCursorParams::RemoteCursor>> establishCursor
 
             // We do not process the response to the killCursors request (we make a good-faith
             // attempt at cleaning up the cursors, but ignore any returned errors).
-            executor->scheduleRemoteCommand(
-                request, [](const executor::TaskExecutor::RemoteCommandCallbackArgs& cbData) {});
+            executor
+                ->scheduleRemoteCommand(
+                    request, [](const executor::TaskExecutor::RemoteCommandCallbackArgs& cbData) {})
+                .status_with_transitional_ignore();
         }
 
         return status;

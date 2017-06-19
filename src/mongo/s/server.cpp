@@ -318,7 +318,10 @@ static ExitCode runMongosServer() {
             return EXIT_SHARDING_ERROR;
         }
 
-        Grid::get(opCtx.get())->getBalancerConfiguration()->refreshAndCheck(opCtx.get());
+        Grid::get(opCtx.get())
+            ->getBalancerConfiguration()
+            ->refreshAndCheck(opCtx.get())
+            .transitional_ignore();
     }
 
     Status status = getGlobalAuthorizationManager()->initialize(NULL);
@@ -344,7 +347,7 @@ static ExitCode runMongosServer() {
 
     // Set up the periodic runner for background job execution
     auto runner = makePeriodicRunner();
-    runner->startup();
+    runner->startup().transitional_ignore();
     getGlobalServiceContext()->setPeriodicRunner(std::move(runner));
 
     // Set up the logical session cache

@@ -73,8 +73,9 @@ public:
 
 protected:
     void noRetryAfterSuccessfulCreate() {
-        auto future = launchAsync(
-            [this] { log("moved a chunk", "foo.bar", BSON("min" << 3 << "max" << 4)); });
+        auto future = launchAsync([this] {
+            log("moved a chunk", "foo.bar", BSON("min" << 3 << "max" << 4)).transitional_ignore();
+        });
 
         expectConfigCollectionCreate(configHost, getConfigCollName(), _cappedSize, BSON("ok" << 1));
         expectConfigCollectionInsert(configHost,
@@ -88,8 +89,10 @@ protected:
         future.timed_get(kFutureTimeout);
 
         // Now log another change and confirm that we don't re-attempt to create the collection
-        future = launchAsync(
-            [this] { log("moved a second chunk", "foo.bar", BSON("min" << 4 << "max" << 5)); });
+        future = launchAsync([this] {
+            log("moved a second chunk", "foo.bar", BSON("min" << 4 << "max" << 5))
+                .transitional_ignore();
+        });
 
         expectConfigCollectionInsert(configHost,
                                      getConfigCollName(),
@@ -103,8 +106,9 @@ protected:
     }
 
     void noRetryCreateIfAlreadyExists() {
-        auto future = launchAsync(
-            [this] { log("moved a chunk", "foo.bar", BSON("min" << 3 << "max" << 4)); });
+        auto future = launchAsync([this] {
+            log("moved a chunk", "foo.bar", BSON("min" << 3 << "max" << 4)).transitional_ignore();
+        });
 
         BSONObjBuilder createResponseBuilder;
         Command::appendCommandStatus(createResponseBuilder,
@@ -122,8 +126,10 @@ protected:
         future.timed_get(kFutureTimeout);
 
         // Now log another change and confirm that we don't re-attempt to create the collection
-        future = launchAsync(
-            [this] { log("moved a second chunk", "foo.bar", BSON("min" << 4 << "max" << 5)); });
+        future = launchAsync([this] {
+            log("moved a second chunk", "foo.bar", BSON("min" << 4 << "max" << 5))
+                .transitional_ignore();
+        });
 
         expectConfigCollectionInsert(configHost,
                                      getConfigCollName(),
@@ -137,8 +143,9 @@ protected:
     }
 
     void createFailure() {
-        auto future = launchAsync(
-            [this] { log("moved a chunk", "foo.bar", BSON("min" << 3 << "max" << 4)); });
+        auto future = launchAsync([this] {
+            log("moved a chunk", "foo.bar", BSON("min" << 3 << "max" << 4)).transitional_ignore();
+        });
 
         BSONObjBuilder createResponseBuilder;
         Command::appendCommandStatus(createResponseBuilder,
@@ -150,8 +157,10 @@ protected:
         future.timed_get(kFutureTimeout);
 
         // Now log another change and confirm that we *do* attempt to create the collection
-        future = launchAsync(
-            [this] { log("moved a second chunk", "foo.bar", BSON("min" << 4 << "max" << 5)); });
+        future = launchAsync([this] {
+            log("moved a second chunk", "foo.bar", BSON("min" << 4 << "max" << 5))
+                .transitional_ignore();
+        });
 
         expectConfigCollectionCreate(configHost, getConfigCollName(), _cappedSize, BSON("ok" << 1));
         expectConfigCollectionInsert(configHost,

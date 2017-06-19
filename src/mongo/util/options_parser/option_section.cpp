@@ -474,7 +474,7 @@ Status OptionSection::getAllOptions(std::vector<OptionDescription>* options) con
 
     std::list<OptionSection>::const_iterator ositerator;
     for (ositerator = _subSections.begin(); ositerator != _subSections.end(); ositerator++) {
-        ositerator->getAllOptions(options);
+        ositerator->getAllOptions(options).transitional_ignore();
     }
 
     return Status::OK();
@@ -490,7 +490,7 @@ Status OptionSection::getDefaults(std::map<Key, Value>* values) const {
 
     std::list<OptionSection>::const_iterator ositerator;
     for (ositerator = _subSections.begin(); ositerator != _subSections.end(); ositerator++) {
-        ositerator->getDefaults(values);
+        ositerator->getDefaults(values).transitional_ignore();
     }
 
     return Status::OK();
@@ -511,7 +511,7 @@ Status OptionSection::countOptions(int* numOptions, bool visibleOnly, OptionSour
     std::list<OptionSection>::const_iterator ositerator;
     for (ositerator = _subSections.begin(); ositerator != _subSections.end(); ositerator++) {
         int numSubOptions = 0;
-        ositerator->countOptions(&numSubOptions, visibleOnly, sources);
+        ositerator->countOptions(&numSubOptions, visibleOnly, sources).transitional_ignore();
         *numOptions += numSubOptions;
     }
 
@@ -531,7 +531,7 @@ Status OptionSection::getConstraints(std::vector<std::shared_ptr<Constraint>>* c
 
     std::list<OptionSection>::const_iterator ositerator;
     for (ositerator = _subSections.begin(); ositerator != _subSections.end(); ositerator++) {
-        ositerator->getConstraints(constraints);
+        ositerator->getConstraints(constraints).transitional_ignore();
     }
 
     return Status::OK();

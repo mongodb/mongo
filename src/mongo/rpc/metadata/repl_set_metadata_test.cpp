@@ -52,7 +52,7 @@ TEST(ReplResponseMetadataTest, Roundtrip) {
     ASSERT_TRUE(metadata.hasReplicaSetId());
 
     BSONObjBuilder builder;
-    metadata.writeToMetadata(&builder);
+    metadata.writeToMetadata(&builder).transitional_ignore();
 
     BSONObj expectedObj(
         BSON(kReplSetMetadataFieldName
@@ -82,7 +82,7 @@ TEST(ReplResponseMetadataTest, Roundtrip) {
     ASSERT_EQ(metadata.getReplicaSetId(), clonedMetadata.getReplicaSetId());
 
     BSONObjBuilder clonedBuilder;
-    clonedMetadata.writeToMetadata(&clonedBuilder);
+    clonedMetadata.writeToMetadata(&clonedBuilder).transitional_ignore();
 
     BSONObj clonedSerializedObj = clonedBuilder.obj();
     ASSERT_BSONOBJ_EQ(expectedObj, clonedSerializedObj);

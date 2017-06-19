@@ -142,7 +142,7 @@ TEST(WiredTigerRecordStoreTest, Isolation1) {
 
         try {
             // this should fail
-            rs->updateRecord(t2.get(), id1, "c", 2, false, NULL);
+            rs->updateRecord(t2.get(), id1, "c", 2, false, NULL).transitional_ignore();
             ASSERT(0);
         } catch (WriteConflictException& dle) {
             w2.reset(NULL);
@@ -197,7 +197,7 @@ TEST(WiredTigerRecordStoreTest, Isolation2) {
             ASSERT_EQUALS(string("a"), rs->dataFor(t2.get(), id1).data());
             try {
                 // this should fail as our version of id1 is too old
-                rs->updateRecord(t2.get(), id1, "c", 2, false, NULL);
+                rs->updateRecord(t2.get(), id1, "c", 2, false, NULL).transitional_ignore();
                 ASSERT(0);
             } catch (WriteConflictException& dle) {
             }
@@ -358,7 +358,7 @@ TEST(WiredTigerRecordStoreTest, CappedOrder) {
         // we make sure we can't find the 2nd until the first is commited
         ServiceContext::UniqueOperationContext t1(harnessHelper->newOperationContext());
         unique_ptr<WriteUnitOfWork> w1(new WriteUnitOfWork(t1.get()));
-        rs->insertRecord(t1.get(), "b", 2, false);
+        rs->insertRecord(t1.get(), "b", 2, false).status_with_transitional_ignore();
         // do not commit yet
 
         {  // create 2nd doc
@@ -366,7 +366,7 @@ TEST(WiredTigerRecordStoreTest, CappedOrder) {
             auto t2 = harnessHelper->newOperationContext(client2.get());
             {
                 WriteUnitOfWork w2(t2.get());
-                rs->insertRecord(t2.get(), "c", 2, false);
+                rs->insertRecord(t2.get(), "c", 2, false).status_with_transitional_ignore();
                 w2.commit();
             }
         }

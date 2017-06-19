@@ -892,7 +892,7 @@ bool MigrationDestinationManager::_applyMigrateOp(OperationContext* opCtx,
             }
 
             if (serverGlobalParams.moveParanoia) {
-                rs.goingToDelete(fullObj);
+                rs.goingToDelete(fullObj).transitional_ignore();
             }
 
             deleteObjects(opCtx,

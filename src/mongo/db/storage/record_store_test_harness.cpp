@@ -384,7 +384,7 @@ TEST(RecordStoreTestHarness, Truncate1) {
         ServiceContext::UniqueOperationContext opCtx(harnessHelper->newOperationContext());
         {
             WriteUnitOfWork uow(opCtx.get());
-            rs->truncate(opCtx.get());
+            rs->truncate(opCtx.get()).transitional_ignore();
             uow.commit();
         }
     }

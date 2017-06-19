@@ -91,17 +91,20 @@ TEST_F(LogTestUnadornedEncoder, DetachAppender) {
     MessageLogDomain domain;
 
     // Appending to the domain before attaching the appender does not affect the appender.
-    domain.append(MessageEventEphemeral(Date_t(), LogSeverity::Log(), "", "1"));
+    domain.append(MessageEventEphemeral(Date_t(), LogSeverity::Log(), "", "1"))
+        .transitional_ignore();
     ASSERT_EQUALS(0, dynamic_cast<CountAppender*>(countAppender.get())->getCount());
 
     // Appending to the domain after attaching the appender does affect the appender.
     MessageLogDomain::AppenderHandle handle = domain.attachAppender(std::move(countAppender));
-    domain.append(MessageEventEphemeral(Date_t(), LogSeverity::Log(), "", "2"));
+    domain.append(MessageEventEphemeral(Date_t(), LogSeverity::Log(), "", "2"))
+        .transitional_ignore();
     countAppender = domain.detachAppender(handle);
     ASSERT_EQUALS(1, dynamic_cast<CountAppender*>(countAppender.get())->getCount());
 
     // Appending to the domain after detaching the appender does not affect the appender.
-    domain.append(MessageEventEphemeral(Date_t(), LogSeverity::Log(), "", "3"));
+    domain.append(MessageEventEphemeral(Date_t(), LogSeverity::Log(), "", "3"))
+        .transitional_ignore();
     ASSERT_EQUALS(1, dynamic_cast<CountAppender*>(countAppender.get())->getCount());
 }
 

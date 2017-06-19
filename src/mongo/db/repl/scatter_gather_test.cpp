@@ -157,7 +157,9 @@ TEST_F(ScatterGatherTest, DeleteAlgorithmAfterItHasCompleted) {
     ScatterGatherRunner* sgr = new ScatterGatherRunner(sga, &getExecutor());
     bool ranCompletion = false;
     StatusWith<executor::TaskExecutor::EventHandle> status = sgr->start();
-    getExecutor().onEvent(status.getValue(), getOnCompletionTestFunction(&ranCompletion));
+    getExecutor()
+        .onEvent(status.getValue(), getOnCompletionTestFunction(&ranCompletion))
+        .status_with_transitional_ignore();
     ASSERT_OK(status.getStatus());
     ASSERT_FALSE(ranCompletion);
 
@@ -245,7 +247,9 @@ TEST_F(ScatterGatherTest, ShutdownExecutorAfterStart) {
     ScatterGatherRunner sgr(&sga, &getExecutor());
     bool ranCompletion = false;
     StatusWith<executor::TaskExecutor::EventHandle> status = sgr.start();
-    getExecutor().onEvent(status.getValue(), getOnCompletionTestFunction(&ranCompletion));
+    getExecutor()
+        .onEvent(status.getValue(), getOnCompletionTestFunction(&ranCompletion))
+        .status_with_transitional_ignore();
     shutdownExecutorThread();
     sga.finish();
     ASSERT_FALSE(ranCompletion);
@@ -258,7 +262,9 @@ TEST_F(ScatterGatherTest, DoNotProcessMoreThanSufficientResponses) {
     ScatterGatherRunner sgr(&sga, &getExecutor());
     bool ranCompletion = false;
     StatusWith<executor::TaskExecutor::EventHandle> status = sgr.start();
-    getExecutor().onEvent(status.getValue(), getOnCompletionTestFunction(&ranCompletion));
+    getExecutor()
+        .onEvent(status.getValue(), getOnCompletionTestFunction(&ranCompletion))
+        .status_with_transitional_ignore();
     ASSERT_OK(status.getStatus());
     ASSERT_FALSE(ranCompletion);
 
@@ -300,7 +306,9 @@ TEST_F(ScatterGatherTest, DoNotCreateCallbacksIfHasSufficientResponsesReturnsTru
     ScatterGatherRunner sgr(&sga, &getExecutor());
     bool ranCompletion = false;
     StatusWith<executor::TaskExecutor::EventHandle> status = sgr.start();
-    getExecutor().onEvent(status.getValue(), getOnCompletionTestFunction(&ranCompletion));
+    getExecutor()
+        .onEvent(status.getValue(), getOnCompletionTestFunction(&ranCompletion))
+        .status_with_transitional_ignore();
     ASSERT_OK(status.getStatus());
     // Wait until callback finishes.
     NetworkInterfaceMock* net = getNet();

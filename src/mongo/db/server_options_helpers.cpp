@@ -653,7 +653,7 @@ Status canonicalizeServerOptions(moe::Environment* params) {
 
         if (params->count("verbose")) {
             std::string verbosity;
-            params->get("verbose", &verbosity);
+            params->get("verbose", &verbosity).transitional_ignore();
             if (s == verbosity ||
                 // Treat a verbosity of "true" the same as a single "v".  See SERVER-11471.
                 (s == "v" && verbosity == "true")) {

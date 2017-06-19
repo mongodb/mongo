@@ -557,7 +557,7 @@ void MongoBase::Functions::copyDatabaseWithSCRAM::call(JSContext* cx, JS::CallAr
     session->setParameter(SaslClientSession::parameterMechanism, "SCRAM-SHA-1");
     session->setParameter(SaslClientSession::parameterUser, user);
     session->setParameter(SaslClientSession::parameterPassword, hashedPwd);
-    session->initialize();
+    session->initialize().transitional_ignore();
 
     BSONObj saslFirstCommandPrefix =
         BSON("copydbsaslstart" << 1 << "fromhost" << fromHost << "fromdb" << fromDb

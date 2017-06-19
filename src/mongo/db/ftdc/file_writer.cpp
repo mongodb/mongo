@@ -47,7 +47,7 @@
 namespace mongo {
 
 FTDCFileWriter::~FTDCFileWriter() {
-    close();
+    close().transitional_ignore();
 }
 
 Status FTDCFileWriter::open(const boost::filesystem::path& file) {

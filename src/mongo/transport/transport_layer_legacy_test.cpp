@@ -70,8 +70,8 @@ TEST(TransportLayerLegacy, endSessionsDoesntDoubleClose) {
 
     sepu.tll = &tll;
 
-    tll.setup();
-    tll.start();
+    tll.setup().transitional_ignore();
+    tll.start().transitional_ignore();
 
     stdx::mutex mutex;
     bool end = false;

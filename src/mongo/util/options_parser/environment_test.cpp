@@ -46,7 +46,7 @@ TEST(Environment, EmptyValue) {
 TEST(Environment, Immutable) {
     moe::Environment environment;
     moe::ImmutableKeyConstraint immutableKeyConstraint(moe::Key("port"));
-    environment.addKeyConstraint(&immutableKeyConstraint);
+    environment.addKeyConstraint(&immutableKeyConstraint).transitional_ignore();
     ASSERT_OK(environment.set(moe::Key("port"), moe::Value(5)));
     ASSERT_OK(environment.validate());
     ASSERT_NOT_OK(environment.set(moe::Key("port"), moe::Value(0)));
@@ -55,7 +55,7 @@ TEST(Environment, Immutable) {
 TEST(Environment, OutOfRange) {
     moe::Environment environment;
     moe::NumericKeyConstraint numericKeyConstraint(moe::Key("port"), 1000, 65535);
-    environment.addKeyConstraint(&numericKeyConstraint);
+    environment.addKeyConstraint(&numericKeyConstraint).transitional_ignore();
     ASSERT_OK(environment.validate());
     ASSERT_NOT_OK(environment.set(moe::Key("port"), moe::Value(0)));
 }
@@ -63,7 +63,7 @@ TEST(Environment, OutOfRange) {
 TEST(Environment, NonNumericRangeConstraint) {
     moe::Environment environment;
     moe::NumericKeyConstraint numericKeyConstraint(moe::Key("port"), 1000, 65535);
-    environment.addKeyConstraint(&numericKeyConstraint);
+    environment.addKeyConstraint(&numericKeyConstraint).transitional_ignore();
     ASSERT_OK(environment.validate());
     ASSERT_NOT_OK(environment.set(moe::Key("port"), moe::Value("string")));
 }
@@ -71,7 +71,7 @@ TEST(Environment, NonNumericRangeConstraint) {
 TEST(Environment, BadType) {
     moe::Environment environment;
     moe::TypeKeyConstraint<int> typeKeyConstraintInt(moe::Key("port"));
-    environment.addKeyConstraint(&typeKeyConstraintInt);
+    environment.addKeyConstraint(&typeKeyConstraintInt).transitional_ignore();
     ASSERT_OK(environment.set(moe::Key("port"), moe::Value("string")));
     ASSERT_NOT_OK(environment.validate());
 }
@@ -79,9 +79,9 @@ TEST(Environment, BadType) {
 TEST(Environment, AllowNumeric) {
     moe::Environment environment;
     moe::TypeKeyConstraint<long> typeKeyConstraintLong(moe::Key("port"));
-    environment.addKeyConstraint(&typeKeyConstraintLong);
+    environment.addKeyConstraint(&typeKeyConstraintLong).transitional_ignore();
     moe::TypeKeyConstraint<int> typeKeyConstraintInt(moe::Key("port"));
-    environment.addKeyConstraint(&typeKeyConstraintInt);
+    environment.addKeyConstraint(&typeKeyConstraintInt).transitional_ignore();
     ASSERT_OK(environment.set(moe::Key("port"), moe::Value(1)));
     ASSERT_OK(environment.validate());
 }
@@ -89,7 +89,7 @@ TEST(Environment, AllowNumeric) {
 TEST(Environment, MutuallyExclusive) {
     moe::Environment environment;
     moe::MutuallyExclusiveKeyConstraint constraint(moe::Key("key"), moe::Key("otherKey"));
-    environment.addKeyConstraint(&constraint);
+    environment.addKeyConstraint(&constraint).transitional_ignore();
     ASSERT_OK(environment.set(moe::Key("key"), moe::Value(1)));
     ASSERT_OK(environment.set(moe::Key("otherKey"), moe::Value(1)));
     ASSERT_NOT_OK(environment.validate());
@@ -98,7 +98,7 @@ TEST(Environment, MutuallyExclusive) {
 TEST(Environment, RequiresOther) {
     moe::Environment environment;
     moe::RequiresOtherKeyConstraint constraint(moe::Key("key"), moe::Key("otherKey"));
-    environment.addKeyConstraint(&constraint);
+    environment.addKeyConstraint(&constraint).transitional_ignore();
     ASSERT_OK(environment.set(moe::Key("key"), moe::Value(1)));
     ASSERT_NOT_OK(environment.validate());
     ASSERT_OK(environment.set(moe::Key("otherKey"), moe::Value(1)));
@@ -108,7 +108,7 @@ TEST(Environment, RequiresOther) {
 TEST(Environment, StringFormat) {
     moe::Environment environment;
     moe::StringFormatKeyConstraint constraint(moe::Key("key"), "[0-9]", "[0-9]");
-    environment.addKeyConstraint(&constraint);
+    environment.addKeyConstraint(&constraint).transitional_ignore();
     ASSERT_OK(environment.set(moe::Key("key"), moe::Value(1)));
     ASSERT_NOT_OK(environment.validate());
     ASSERT_OK(environment.set(moe::Key("key"), moe::Value(std::string("a"))));

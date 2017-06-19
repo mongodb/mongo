@@ -57,7 +57,7 @@ public:
     virtual void commit() {}
     virtual void rollback() {
         // Intentionally ignoring failure.
-        _cce->_engine->dropIdent(_opCtx, _ident);
+        _cce->_engine->dropIdent(_opCtx, _ident).transitional_ignore();
     }
 
     OperationContext* const _opCtx;
@@ -74,7 +74,7 @@ public:
     virtual void commit() {
         // Intentionally ignoring failure here. Since we've removed the metadata pointing to the
         // index, we should never see it again anyway.
-        _cce->_engine->dropIdent(_opCtx, _ident);
+        _cce->_engine->dropIdent(_opCtx, _ident).transitional_ignore();
     }
 
     OperationContext* const _opCtx;

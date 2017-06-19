@@ -305,7 +305,7 @@ TEST(AndOfElemMatch, MatchesElement) {
     // and1 = { a : 1, b : 1 }
 
     unique_ptr<ElemMatchObjectMatchExpression> elemMatch1(new ElemMatchObjectMatchExpression());
-    elemMatch1->init("x", and1.release());
+    elemMatch1->init("x", and1.release()).transitional_ignore();
     // elemMatch1 = { x : { $elemMatch : { a : 1, b : 1 } } }
 
     BSONObj baseOperanda2 = BSON("a" << 2);
@@ -322,7 +322,7 @@ TEST(AndOfElemMatch, MatchesElement) {
     // and2 = { a : 2, b : 2 }
 
     unique_ptr<ElemMatchObjectMatchExpression> elemMatch2(new ElemMatchObjectMatchExpression());
-    elemMatch2->init("x", and2.release());
+    elemMatch2->init("x", and2.release()).transitional_ignore();
     // elemMatch2 = { x : { $elemMatch : { a : 2, b : 2 } } }
 
     unique_ptr<AndMatchExpression> andOfEM(new AndMatchExpression());
@@ -357,7 +357,7 @@ TEST(AndOfElemMatch, Matches) {
     ASSERT(lt1->init("", baseOperandlt1["$lt"]).isOK());
 
     unique_ptr<ElemMatchValueMatchExpression> elemMatch1(new ElemMatchValueMatchExpression());
-    elemMatch1->init("x");
+    elemMatch1->init("x").transitional_ignore();
     elemMatch1->add(gt1.release());
     elemMatch1->add(lt1.release());
     // elemMatch1 = { x : { $elemMatch : { $gt : 1 , $lt : 10 } } }
@@ -371,7 +371,7 @@ TEST(AndOfElemMatch, Matches) {
     ASSERT(lt2->init("", baseOperandlt2["$lt"]).isOK());
 
     unique_ptr<ElemMatchValueMatchExpression> elemMatch2(new ElemMatchValueMatchExpression());
-    elemMatch2->init("x");
+    elemMatch2->init("x").transitional_ignore();
     elemMatch2->add(gt2.release());
     elemMatch2->add(lt2.release());
     // elemMatch2 = { x : { $elemMatch : { $gt : 101 , $lt : 110 } } }
@@ -453,9 +453,9 @@ TEST(SizeMatchExpression, Equivalent) {
     SizeMatchExpression e2;
     SizeMatchExpression e3;
 
-    e1.init("a", 5);
-    e2.init("a", 6);
-    e3.init("v", 5);
+    e1.init("a", 5).transitional_ignore();
+    e2.init("a", 6).transitional_ignore();
+    e3.init("v", 5).transitional_ignore();
 
     ASSERT(e1.equivalent(&e1));
     ASSERT(!e1.equivalent(&e2));

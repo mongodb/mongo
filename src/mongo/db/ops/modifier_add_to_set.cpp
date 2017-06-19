@@ -64,7 +64,7 @@ void deduplicate(mb::Element parent, Ordering comp, Equality equal) {
         std::vector<mb::Element>::iterator next = where;
         ++next;
         while (next != end && equal(*where, *next)) {
-            next->remove();
+            next->remove().transitional_ignore();
             ++next;
         }
         where = next;

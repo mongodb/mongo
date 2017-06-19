@@ -142,9 +142,10 @@ void ReplicationCoordinatorImpl::_startElectSelf_inlock() {
         return;
     }
     fassert(18681, nextPhaseEvh.getStatus());
-    _replExecutor->onEvent(
-        nextPhaseEvh.getValue(),
-        stdx::bind(&ReplicationCoordinatorImpl::_onFreshnessCheckComplete, this));
+    _replExecutor
+        ->onEvent(nextPhaseEvh.getValue(),
+                  stdx::bind(&ReplicationCoordinatorImpl::_onFreshnessCheckComplete, this))
+        .status_with_transitional_ignore();
     lossGuard.dismiss();
 }
 
@@ -217,9 +218,10 @@ void ReplicationCoordinatorImpl::_onFreshnessCheckComplete() {
     }
     fassert(18685, nextPhaseEvh.getStatus());
 
-    _replExecutor->onEvent(
-        nextPhaseEvh.getValue(),
-        stdx::bind(&ReplicationCoordinatorImpl::_onElectCmdRunnerComplete, this));
+    _replExecutor
+        ->onEvent(nextPhaseEvh.getValue(),
+                  stdx::bind(&ReplicationCoordinatorImpl::_onElectCmdRunnerComplete, this))
+        .status_with_transitional_ignore();
     lossGuard.dismiss();
 }
 

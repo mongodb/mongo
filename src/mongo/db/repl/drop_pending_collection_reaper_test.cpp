@@ -132,7 +132,7 @@ TEST_F(DropPendingCollectionReaperTest,
         opTime[i] = OpTime({Seconds((i + 1) * 10), 0}, 1LL);
         ns[i] = NamespaceString("test", str::stream() << "coll" << i);
         dpns[i] = ns[i].makeDropPendingNamespace(opTime[i]);
-        _storageInterface->createCollection(opCtx.get(), dpns[i], {});
+        _storageInterface->createCollection(opCtx.get(), dpns[i], {}).transitional_ignore();
     }
 
     // Add drop-pending namespaces with drop optimes out of order and check that

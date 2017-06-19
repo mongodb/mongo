@@ -111,7 +111,7 @@ TEST(FTDCFileManagerTest, TestFull) {
                                                     Date_t()));
     }
 
-    mgr->close();
+    mgr->close().transitional_ignore();
 
     auto files = scanDirectory(dir);
 
@@ -211,7 +211,7 @@ TEST(FTDCFileManagerTest, TestNormalRestart) {
                                                         Date_t()));
         }
 
-        mgr->close();
+        mgr->close().transitional_ignore();
 
         // Validate the interim file does not have data
         ValidateInterimFileHasData(dir, false);
@@ -281,7 +281,7 @@ TEST(FTDCFileManagerTest, TestCorruptCrashRestart) {
                                                         Date_t()));
         }
 
-        mgr->close();
+        mgr->close().transitional_ignore();
 
         auto swFile = mgr->generateArchiveFileName(dir, "0test-crash");
         ASSERT_OK(swFile);

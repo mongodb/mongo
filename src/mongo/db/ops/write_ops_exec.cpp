@@ -218,8 +218,9 @@ bool handleError(OperationContext* opCtx,
         }
 
         if (!opCtx->getClient()->isInDirectClient()) {
-            ShardingState::get(opCtx)->onStaleShardVersion(
-                opCtx, wholeOp.ns, staleConfigException->getVersionReceived());
+            ShardingState::get(opCtx)
+                ->onStaleShardVersion(opCtx, wholeOp.ns, staleConfigException->getVersionReceived())
+                .transitional_ignore();
         }
         out->staleConfigException =
             stdx::make_unique<SendStaleConfigException>(*staleConfigException);

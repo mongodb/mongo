@@ -205,8 +205,9 @@ TEST(KVCatalogTest, Coll1) {
     {
         MyOperationContext opCtx(engine);
         WriteUnitOfWork uow(&opCtx);
-        catalog->dropCollection(&opCtx, "a.b");
-        catalog->newCollection(&opCtx, "a.b", CollectionOptions(), KVPrefix::kNotPrefixed);
+        catalog->dropCollection(&opCtx, "a.b").transitional_ignore();
+        catalog->newCollection(&opCtx, "a.b", CollectionOptions(), KVPrefix::kNotPrefixed)
+            .transitional_ignore();
         uow.commit();
     }
     ASSERT_NOT_EQUALS(ident, catalog->getCollectionIdent("a.b"));

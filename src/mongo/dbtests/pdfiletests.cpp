@@ -50,7 +50,7 @@ public:
         if (!collection())
             return;
         WriteUnitOfWork wunit(&_opCtx);
-        _context.db()->dropCollection(&_opCtx, ns());
+        _context.db()->dropCollection(&_opCtx, ns()).transitional_ignore();
         wunit.commit();
     }
 

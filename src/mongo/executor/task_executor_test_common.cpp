@@ -252,8 +252,10 @@ EventChainAndWaitingTest::~EventChainAndWaitingTest() {
 }
 
 void EventChainAndWaitingTest::run() {
-    executor->onEvent(goEvent,
-                      stdx::bind(&EventChainAndWaitingTest::onGo, this, stdx::placeholders::_1));
+    executor
+        ->onEvent(goEvent,
+                  stdx::bind(&EventChainAndWaitingTest::onGo, this, stdx::placeholders::_1))
+        .status_with_transitional_ignore();
     executor->signalEvent(goEvent);
     executor->waitForEvent(goEvent);
     executor->waitForEvent(event2);

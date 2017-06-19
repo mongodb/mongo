@@ -108,9 +108,10 @@ TEST(ConnectionPoolASIO, TestPing) {
             RemoteCommandRequest request{
                 fixture.getServers()[0], "admin", BSON("ping" << 1), BSONObj(), nullptr};
             net.startCommand(
-                makeCallbackHandle(), request, [&deferred](RemoteCommandResponse resp) {
-                    deferred.emplace(std::move(resp));
-                });
+                   makeCallbackHandle(),
+                   request,
+                   [&deferred](RemoteCommandResponse resp) { deferred.emplace(std::move(resp)); })
+                .transitional_ignore();
 
             ASSERT_OK(deferred.get().status);
         });
@@ -143,9 +144,10 @@ TEST(ConnectionPoolASIO, TestHostTimeoutRace) {
         Deferred<RemoteCommandResponse> deferred;
         RemoteCommandRequest request{
             fixture.getServers()[0], "admin", BSON("ping" << 1), BSONObj(), nullptr};
-        net.startCommand(makeCallbackHandle(), request, [&](RemoteCommandResponse resp) {
-            deferred.emplace(std::move(resp));
-        });
+        net.startCommand(makeCallbackHandle(),
+                         request,
+                         [&](RemoteCommandResponse resp) { deferred.emplace(std::move(resp)); })
+            .transitional_ignore();
 
         ASSERT_OK(deferred.get().status);
         sleepmillis(1);
@@ -171,9 +173,10 @@ TEST(ConnectionPoolASIO, ConnSetupTimeout) {
     Deferred<RemoteCommandResponse> deferred;
     RemoteCommandRequest request{
         fixture.getServers()[0], "admin", BSON("ping" << 1), BSONObj(), nullptr};
-    net.startCommand(makeCallbackHandle(), request, [&](RemoteCommandResponse resp) {
-        deferred.emplace(std::move(resp));
-    });
+    net.startCommand(makeCallbackHandle(),
+                     request,
+                     [&](RemoteCommandResponse resp) { deferred.emplace(std::move(resp)); })
+        .transitional_ignore();
 
     ASSERT_EQ(deferred.get().status.code(), ErrorCodes::ExceededTimeLimit);
 }
@@ -206,9 +209,10 @@ TEST(ConnectionPoolASIO, ConnRefreshHappens) {
                                  nullptr};
 
     for (auto& deferred : deferreds) {
-        net.startCommand(makeCallbackHandle(), request, [&](RemoteCommandResponse resp) {
-            deferred.emplace(std::move(resp));
-        });
+        net.startCommand(makeCallbackHandle(),
+                         request,
+                         [&](RemoteCommandResponse resp) { deferred.emplace(std::move(resp)); })
+            .transitional_ignore();
     }
 
     for (auto& deferred : deferreds) {
@@ -243,9 +247,10 @@ TEST(ConnectionPoolASIO, ConnRefreshSurvivesFailure) {
 
     RemoteCommandRequest request{
         fixture.getServers()[0], "admin", BSON("ping" << 1), BSONObj(), nullptr};
-    net.startCommand(makeCallbackHandle(), request, [&](RemoteCommandResponse resp) {
-        deferred.emplace(std::move(resp));
-    });
+    net.startCommand(makeCallbackHandle(),
+                     request,
+                     [&](RemoteCommandResponse resp) { deferred.emplace(std::move(resp)); })
+        .transitional_ignore();
 
     deferred.get();
 
@@ -301,11 +306,14 @@ TEST(ConnectionPoolASIO, ConnSetupSurvivesFailure) {
                                                           << 3),
                                              BSONObj(),
                                              nullptr};
-                net.startCommand(makeCallbackHandle(), request, [&](RemoteCommandResponse resp) {
-                    if (!unfinished.subtractAndFetch(1)) {
-                        condvar.notify_one();
-                    }
-                });
+                net.startCommand(makeCallbackHandle(),
+                                 request,
+                                 [&](RemoteCommandResponse resp) {
+                                     if (!unfinished.subtractAndFetch(1)) {
+                                         condvar.notify_one();
+                                     }
+                                 })
+                    .transitional_ignore();
                 unstarted.subtractAndFetch(1);
             }
         });
@@ -313,7 +321,7 @@ TEST(ConnectionPoolASIO, ConnSetupSurvivesFailure) {
 
     stdx::thread timerThrasher([&] {
         while (unstarted.load()) {
-            net.setAlarm(Date_t::now() + Seconds(1), [] {});
+            net.setAlarm(Date_t::now() + Seconds(1), [] {}).transitional_ignore();
         }
     });
 

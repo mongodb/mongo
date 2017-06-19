@@ -89,7 +89,7 @@ TEST(EqOp, MatchesElement) {
     BSONObj notMatch = BSON("a" << 6);
 
     EqualityMatchExpression eq;
-    eq.init("", operand["a"]);
+    eq.init("", operand["a"]).transitional_ignore();
     ASSERT(eq.matchesSingleElement(match.firstElement()));
     ASSERT(!eq.matchesSingleElement(notMatch.firstElement()));
 
@@ -105,7 +105,7 @@ TEST(EqOp, InvalidEooOperand) {
 TEST(EqOp, MatchesScalar) {
     BSONObj operand = BSON("a" << 5);
     EqualityMatchExpression eq;
-    eq.init("a", operand["a"]);
+    eq.init("a", operand["a"]).transitional_ignore();
     ASSERT(eq.matchesBSON(BSON("a" << 5.0), NULL));
     ASSERT(!eq.matchesBSON(BSON("a" << 4), NULL));
 }
@@ -113,7 +113,7 @@ TEST(EqOp, MatchesScalar) {
 TEST(EqOp, MatchesArrayValue) {
     BSONObj operand = BSON("a" << 5);
     EqualityMatchExpression eq;
-    eq.init("a", operand["a"]);
+    eq.init("a", operand["a"]).transitional_ignore();
     ASSERT(eq.matchesBSON(BSON("a" << BSON_ARRAY(5.0 << 6)), NULL));
     ASSERT(!eq.matchesBSON(BSON("a" << BSON_ARRAY(6 << 7)), NULL));
 }
@@ -121,7 +121,7 @@ TEST(EqOp, MatchesArrayValue) {
 TEST(EqOp, MatchesReferencedObjectValue) {
     BSONObj operand = BSON("a.b" << 5);
     EqualityMatchExpression eq;
-    eq.init("a.b", operand["a.b"]);
+    eq.init("a.b", operand["a.b"]).transitional_ignore();
     ASSERT(eq.matchesBSON(BSON("a" << BSON("b" << 5)), NULL));
     ASSERT(eq.matchesBSON(BSON("a" << BSON("b" << BSON_ARRAY(5))), NULL));
     ASSERT(eq.matchesBSON(BSON("a" << BSON_ARRAY(BSON("b" << 5))), NULL));
@@ -130,7 +130,7 @@ TEST(EqOp, MatchesReferencedObjectValue) {
 TEST(EqOp, MatchesReferencedArrayValue) {
     BSONObj operand = BSON("a.0" << 5);
     EqualityMatchExpression eq;
-    eq.init("a.0", operand["a.0"]);
+    eq.init("a.0", operand["a.0"]).transitional_ignore();
     ASSERT(eq.matchesBSON(BSON("a" << BSON_ARRAY(5)), NULL));
     ASSERT(!eq.matchesBSON(BSON("a" << BSON_ARRAY(BSON_ARRAY(5))), NULL));
 }
@@ -138,7 +138,7 @@ TEST(EqOp, MatchesReferencedArrayValue) {
 TEST(EqOp, MatchesNull) {
     BSONObj operand = BSON("a" << BSONNULL);
     EqualityMatchExpression eq;
-    eq.init("a", operand["a"]);
+    eq.init("a", operand["a"]).transitional_ignore();
     ASSERT(eq.matchesBSON(BSONObj(), NULL));
     ASSERT(eq.matchesBSON(BSON("a" << BSONNULL), NULL));
     ASSERT(!eq.matchesBSON(BSON("a" << 4), NULL));
@@ -151,7 +151,7 @@ TEST(EqOp, MatchesNull) {
 TEST(EqOp, MatchesNestedNull) {
     BSONObj operand = BSON("a.b" << BSONNULL);
     EqualityMatchExpression eq;
-    eq.init("a.b", operand["a.b"]);
+    eq.init("a.b", operand["a.b"]).transitional_ignore();
     // null matches any empty object that is on a subpath of a.b
     ASSERT(eq.matchesBSON(BSONObj(), NULL));
     ASSERT(eq.matchesBSON(BSON("a" << BSONObj()), NULL));
@@ -171,7 +171,7 @@ TEST(EqOp, MatchesNestedNull) {
 TEST(EqOp, MatchesMinKey) {
     BSONObj operand = BSON("a" << MinKey);
     EqualityMatchExpression eq;
-    eq.init("a", operand["a"]);
+    eq.init("a", operand["a"]).transitional_ignore();
     ASSERT(eq.matchesBSON(BSON("a" << MinKey), NULL));
     ASSERT(!eq.matchesBSON(BSON("a" << MaxKey), NULL));
     ASSERT(!eq.matchesBSON(BSON("a" << 4), NULL));
@@ -200,7 +200,7 @@ TEST(EqOp, MatchesFullArray) {
 TEST(EqOp, MatchesThroughNestedArray) {
     BSONObj operand = BSON("a.b.c.d" << 3);
     EqualityMatchExpression eq;
-    eq.init("a.b.c.d", operand["a.b.c.d"]);
+    eq.init("a.b.c.d", operand["a.b.c.d"]).transitional_ignore();
     BSONObj obj = fromjson("{a:{b:[{c:[{d:1},{d:2}]},{c:[{d:3}]}]}}");
     ASSERT(eq.matchesBSON(obj, NULL));
 }
@@ -243,9 +243,9 @@ TEST(EqOp, Equality1) {
 
     BSONObj operand = BSON("a" << 5 << "b" << 5 << "c" << 4);
 
-    eq1.init("a", operand["a"]);
-    eq2.init("a", operand["b"]);
-    eq3.init("c", operand["c"]);
+    eq1.init("a", operand["a"]).transitional_ignore();
+    eq2.init("a", operand["b"]).transitional_ignore();
+    eq3.init("c", operand["c"]).transitional_ignore();
 
     ASSERT(eq1.equivalent(&eq1));
     ASSERT(eq1.equivalent(&eq2));
@@ -1239,10 +1239,10 @@ TEST(ModMatchExpression, Equality1) {
     ModMatchExpression m3;
     ModMatchExpression m4;
 
-    m1.init("a", 1, 2);
-    m2.init("a", 2, 2);
-    m3.init("a", 1, 1);
-    m4.init("b", 1, 2);
+    m1.init("a", 1, 2).transitional_ignore();
+    m2.init("a", 2, 2).transitional_ignore();
+    m3.init("a", 1, 1).transitional_ignore();
+    m4.init("b", 1, 2).transitional_ignore();
 
     ASSERT(m1.equivalent(&m1));
     ASSERT(!m1.equivalent(&m2));
@@ -1313,8 +1313,8 @@ TEST(ExistsMatchExpression, ElemMatchKey) {
 TEST(ExistsMatchExpression, Equivalent) {
     ExistsMatchExpression e1;
     ExistsMatchExpression e2;
-    e1.init("a");
-    e2.init("b");
+    e1.init("a").transitional_ignore();
+    e2.init("b").transitional_ignore();
 
     ASSERT(e1.equivalent(&e1));
     ASSERT(!e1.equivalent(&e2));
@@ -1459,9 +1459,9 @@ TEST(TypeMatchExpression, Equivalent) {
     TypeMatchExpression e1;
     TypeMatchExpression e2;
     TypeMatchExpression e3;
-    e1.initWithBSONType("a", String);
-    e2.initWithBSONType("a", NumberDouble);
-    e3.initWithBSONType("b", String);
+    e1.initWithBSONType("a", String).transitional_ignore();
+    e2.initWithBSONType("a", NumberDouble).transitional_ignore();
+    e3.initWithBSONType("b", String).transitional_ignore();
 
     ASSERT(e1.equivalent(&e1));
     ASSERT(!e1.equivalent(&e2));
@@ -1473,14 +1473,14 @@ TEST(InMatchExpression, MatchesElementSingle) {
     BSONObj match = BSON("a" << 1);
     BSONObj notMatch = BSON("a" << 2);
     InMatchExpression in;
-    in.addEquality(operand.firstElement());
+    in.addEquality(operand.firstElement()).transitional_ignore();
     ASSERT(in.matchesSingleElement(match["a"]));
     ASSERT(!in.matchesSingleElement(notMatch["a"]));
 }
 
 TEST(InMatchExpression, MatchesEmpty) {
     InMatchExpression in;
-    in.init("a");
+    in.init("a").transitional_ignore();
 
     BSONObj notMatch = BSON("a" << 2);
     ASSERT(!in.matchesSingleElement(notMatch["a"]));
@@ -1491,10 +1491,10 @@ TEST(InMatchExpression, MatchesEmpty) {
 TEST(InMatchExpression, MatchesElementMultiple) {
     BSONObj operand = BSON_ARRAY(1 << "r" << true << 1);
     InMatchExpression in;
-    in.addEquality(operand[0]);
-    in.addEquality(operand[1]);
-    in.addEquality(operand[2]);
-    in.addEquality(operand[3]);
+    in.addEquality(operand[0]).transitional_ignore();
+    in.addEquality(operand[1]).transitional_ignore();
+    in.addEquality(operand[2]).transitional_ignore();
+    in.addEquality(operand[3]).transitional_ignore();
 
     BSONObj matchFirst = BSON("a" << 1);
     BSONObj matchSecond = BSON("a"
@@ -1511,8 +1511,8 @@ TEST(InMatchExpression, MatchesElementMultiple) {
 TEST(InMatchExpression, MatchesScalar) {
     BSONObj operand = BSON_ARRAY(5);
     InMatchExpression in;
-    in.init("a");
-    in.addEquality(operand.firstElement());
+    in.init("a").transitional_ignore();
+    in.addEquality(operand.firstElement()).transitional_ignore();
 
     ASSERT(in.matchesBSON(BSON("a" << 5.0), NULL));
     ASSERT(!in.matchesBSON(BSON("a" << 4), NULL));
@@ -1521,8 +1521,8 @@ TEST(InMatchExpression, MatchesScalar) {
 TEST(InMatchExpression, MatchesArrayValue) {
     BSONObj operand = BSON_ARRAY(5);
     InMatchExpression in;
-    in.init("a");
-    in.addEquality(operand.firstElement());
+    in.init("a").transitional_ignore();
+    in.addEquality(operand.firstElement()).transitional_ignore();
 
     ASSERT(in.matchesBSON(BSON("a" << BSON_ARRAY(5.0 << 6)), NULL));
     ASSERT(!in.matchesBSON(BSON("a" << BSON_ARRAY(6 << 7)), NULL));
@@ -1533,8 +1533,8 @@ TEST(InMatchExpression, MatchesNull) {
     BSONObj operand = BSON_ARRAY(BSONNULL);
 
     InMatchExpression in;
-    in.init("a");
-    in.addEquality(operand.firstElement());
+    in.init("a").transitional_ignore();
+    in.addEquality(operand.firstElement()).transitional_ignore();
 
     ASSERT(in.matchesBSON(BSONObj(), NULL));
     ASSERT(in.matchesBSON(BSON("a" << BSONNULL), NULL));
@@ -1547,7 +1547,7 @@ TEST(InMatchExpression, MatchesUndefined) {
     BSONObj operand = BSON_ARRAY(BSONUndefined);
 
     InMatchExpression in;
-    in.init("a");
+    in.init("a").transitional_ignore();
     Status s = in.addEquality(operand.firstElement());
     ASSERT_NOT_OK(s);
 }
@@ -1555,8 +1555,8 @@ TEST(InMatchExpression, MatchesUndefined) {
 TEST(InMatchExpression, MatchesMinKey) {
     BSONObj operand = BSON_ARRAY(MinKey);
     InMatchExpression in;
-    in.init("a");
-    in.addEquality(operand.firstElement());
+    in.init("a").transitional_ignore();
+    in.addEquality(operand.firstElement()).transitional_ignore();
 
     ASSERT(in.matchesBSON(BSON("a" << MinKey), NULL));
     ASSERT(!in.matchesBSON(BSON("a" << MaxKey), NULL));
@@ -1566,8 +1566,8 @@ TEST(InMatchExpression, MatchesMinKey) {
 TEST(InMatchExpression, MatchesMaxKey) {
     BSONObj operand = BSON_ARRAY(MaxKey);
     InMatchExpression in;
-    in.init("a");
-    in.addEquality(operand.firstElement());
+    in.init("a").transitional_ignore();
+    in.addEquality(operand.firstElement()).transitional_ignore();
 
     ASSERT(in.matchesBSON(BSON("a" << MaxKey), NULL));
     ASSERT(!in.matchesBSON(BSON("a" << MinKey), NULL));
@@ -1577,10 +1577,10 @@ TEST(InMatchExpression, MatchesMaxKey) {
 TEST(InMatchExpression, MatchesFullArray) {
     BSONObj operand = BSON_ARRAY(BSON_ARRAY(1 << 2) << 4 << 5);
     InMatchExpression in;
-    in.init("a");
-    in.addEquality(operand[0]);
-    in.addEquality(operand[1]);
-    in.addEquality(operand[2]);
+    in.init("a").transitional_ignore();
+    in.addEquality(operand[0]).transitional_ignore();
+    in.addEquality(operand[1]).transitional_ignore();
+    in.addEquality(operand[2]).transitional_ignore();
 
     ASSERT(in.matchesBSON(BSON("a" << BSON_ARRAY(1 << 2)), NULL));
     ASSERT(!in.matchesBSON(BSON("a" << BSON_ARRAY(1 << 2 << 3)), NULL));
@@ -1591,9 +1591,9 @@ TEST(InMatchExpression, MatchesFullArray) {
 TEST(InMatchExpression, ElemMatchKey) {
     BSONObj operand = BSON_ARRAY(5 << 2);
     InMatchExpression in;
-    in.init("a");
-    in.addEquality(operand[0]);
-    in.addEquality(operand[1]);
+    in.init("a").transitional_ignore();
+    in.addEquality(operand[0]).transitional_ignore();
+    in.addEquality(operand[1]).transitional_ignore();
 
     MatchDetails details;
     details.requestElemMatchKey();
@@ -1611,7 +1611,7 @@ TEST(InMatchExpression, InMatchExpressionsWithDifferentNumbersOfElementsAreUnequ
                        << "string");
     InMatchExpression eq1;
     InMatchExpression eq2;
-    eq1.addEquality(obj.firstElement());
+    eq1.addEquality(obj.firstElement()).transitional_ignore();
     ASSERT(!eq1.equivalent(&eq2));
 }
 
@@ -1647,8 +1647,8 @@ TEST(InMatchExpression, InMatchExpressionsWithCollationEquivalentElementsAreEqua
     InMatchExpression eq2;
     eq2.setCollator(&collator2);
 
-    eq1.addEquality(obj1.firstElement());
-    eq2.addEquality(obj2.firstElement());
+    eq1.addEquality(obj1.firstElement()).transitional_ignore();
+    eq2.addEquality(obj2.firstElement()).transitional_ignore();
     ASSERT(eq1.equivalent(&eq2));
 }
 
@@ -1664,8 +1664,8 @@ TEST(InMatchExpression, InMatchExpressionsWithCollationNonEquivalentElementsAreU
     InMatchExpression eq2;
     eq2.setCollator(&collator2);
 
-    eq1.addEquality(obj1.firstElement());
-    eq2.addEquality(obj2.firstElement());
+    eq1.addEquality(obj1.firstElement()).transitional_ignore();
+    eq2.addEquality(obj2.firstElement()).transitional_ignore();
     ASSERT(!eq1.equivalent(&eq2));
 }
 
@@ -1674,7 +1674,7 @@ TEST(InMatchExpression, StringMatchingWithNullCollatorUsesBinaryComparison) {
     BSONObj notMatch = BSON("a"
                             << "string2");
     InMatchExpression in;
-    in.addEquality(operand.firstElement());
+    in.addEquality(operand.firstElement()).transitional_ignore();
     ASSERT(!in.matchesSingleElement(notMatch["a"]));
 }
 
@@ -1685,7 +1685,7 @@ TEST(InMatchExpression, StringMatchingRespectsCollation) {
     CollatorInterfaceMock collator(CollatorInterfaceMock::MockType::kAlwaysEqual);
     InMatchExpression in;
     in.setCollator(&collator);
-    in.addEquality(operand.firstElement());
+    in.addEquality(operand.firstElement()).transitional_ignore();
     ASSERT(in.matchesSingleElement(match["a"]));
 }
 
@@ -1698,8 +1698,8 @@ TEST(InMatchExpression, ChangingCollationAfterAddingEqualitiesPreservesEqualitie
     CollatorInterfaceMock collatorReverseString(CollatorInterfaceMock::MockType::kReverseString);
     InMatchExpression in;
     in.setCollator(&collatorAlwaysEqual);
-    in.addEquality(obj1.firstElement());
-    in.addEquality(obj2.firstElement());
+    in.addEquality(obj1.firstElement()).transitional_ignore();
+    in.addEquality(obj2.firstElement()).transitional_ignore();
     ASSERT(in.getEqualities().size() == 1);
     in.setCollator(&collatorReverseString);
     ASSERT(in.getEqualities().size() == 2);

@@ -203,7 +203,7 @@ Status AuthzManagerExternalStateMock::updateOne(OperationContext* opCtx,
         return Status::OK();
     } else if (status == ErrorCodes::NoMatchingDocument && upsert) {
         if (query.hasField("_id")) {
-            document.root().appendElement(query["_id"]);
+            document.root().appendElement(query["_id"]).transitional_ignore();
         }
         status = driver.populateDocumentWithQueryFields(opCtx, query, NULL, document);
         if (!status.isOK()) {

@@ -310,7 +310,7 @@ Status valueMapToBSON(const std::map<Key, Value>& params,
             // Use the section name in our object builder, and recursively call
             // valueMapToBSON with our sub map with keys that have the section name removed.
             BSONObjBuilder sectionObjBuilder(builder->subobjStart(sectionName));
-            valueMapToBSON(sectionMap, &sectionObjBuilder, sectionName);
+            valueMapToBSON(sectionMap, &sectionObjBuilder, sectionName).transitional_ignore();
             sectionObjBuilder.done();
 
             // Our iterator is currently on the last field that matched our dot and prefix, so

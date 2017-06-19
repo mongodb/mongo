@@ -437,10 +437,10 @@ boost::intrusive_ptr<DocumentSourceMatch> DocumentSourceMatch::descendMatchOnPat
         if (node->isLeaf() && node->matchType() != MatchExpression::TYPE_OPERATOR &&
             node->matchType() != MatchExpression::WHERE) {
             auto leafNode = static_cast<LeafMatchExpression*>(node);
-            leafNode->setPath(newPath);
+            leafNode->setPath(newPath).transitional_ignore();
         } else if (node->isArray()) {
             auto arrayNode = static_cast<ArrayMatchingMatchExpression*>(node);
-            arrayNode->setPath(newPath);
+            arrayNode->setPath(newPath).transitional_ignore();
         }
     });
 

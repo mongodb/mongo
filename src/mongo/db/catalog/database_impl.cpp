@@ -740,7 +740,10 @@ void DatabaseImpl::dropDatabase(OperationContext* opCtx, Database* db) {
     db = NULL;  // d is now deleted
 
     MONGO_WRITE_CONFLICT_RETRY_LOOP_BEGIN {
-        getGlobalServiceContext()->getGlobalStorageEngine()->dropDatabase(opCtx, name);
+        getGlobalServiceContext()
+            ->getGlobalStorageEngine()
+            ->dropDatabase(opCtx, name)
+            .transitional_ignore();
     }
     MONGO_WRITE_CONFLICT_RETRY_LOOP_END(opCtx, "dropDatabase", name);
 }

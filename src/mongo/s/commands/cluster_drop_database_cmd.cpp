@@ -103,11 +103,13 @@ public:
 
         uassertStatusOK(dbInfoStatus.getStatus());
 
-        catalogClient->logChange(opCtx,
-                                 "dropDatabase.start",
-                                 dbname,
-                                 BSONObj(),
-                                 ShardingCatalogClient::kMajorityWriteConcern);
+        catalogClient
+            ->logChange(opCtx,
+                        "dropDatabase.start",
+                        dbname,
+                        BSONObj(),
+                        ShardingCatalogClient::kMajorityWriteConcern)
+            .transitional_ignore();
 
         auto& dbInfo = dbInfoStatus.getValue();
 
@@ -145,8 +147,13 @@ public:
         // Invalidate the database so the next access will do a full reload
         catalogCache->purgeDatabase(dbname);
 
-        catalogClient->logChange(
-            opCtx, "dropDatabase", dbname, BSONObj(), ShardingCatalogClient::kMajorityWriteConcern);
+        catalogClient
+            ->logChange(opCtx,
+                        "dropDatabase",
+                        dbname,
+                        BSONObj(),
+                        ShardingCatalogClient::kMajorityWriteConcern)
+            .transitional_ignore();
 
         result.append("dropped", dbname);
         return true;

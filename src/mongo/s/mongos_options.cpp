@@ -103,16 +103,16 @@ Status addMongosOptions(moe::OptionSection* options) {
         .setSources(moe::SourceAllLegacy);
 
 
-    options->addSection(general_options);
+    options->addSection(general_options).transitional_ignore();
 
 #if defined(_WIN32)
-    options->addSection(windows_scm_options);
+    options->addSection(windows_scm_options).transitional_ignore();
 #endif
 
-    options->addSection(sharding_options);
+    options->addSection(sharding_options).transitional_ignore();
 
 #ifdef MONGO_CONFIG_SSL
-    options->addSection(ssl_options);
+    options->addSection(ssl_options).transitional_ignore();
 #endif
 
     return Status::OK();

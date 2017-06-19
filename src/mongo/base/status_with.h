@@ -1,5 +1,3 @@
-// status_with.h
-
 /*    Copyright 2013 10gen Inc.
  *
  *    This program is free software: you can redistribute it and/or  modify
@@ -36,10 +34,12 @@
 
 #include "mongo/base/static_assert.h"
 #include "mongo/base/status.h"
+#include "mongo/platform/compiler.h"
 
 #define MONGO_INCLUDE_INVARIANT_H_WHITELISTED
 #include "mongo/util/invariant.h"
 #undef MONGO_INCLUDE_INVARIANT_H_WHITELISTED
+
 
 namespace mongo {
 
@@ -61,7 +61,7 @@ namespace mongo {
  * }
  */
 template <typename T>
-class StatusWith {
+class MONGO_WARN_UNUSED_RESULT_CLASS StatusWith {
     MONGO_STATIC_ASSERT_MSG(!(std::is_same<T, mongo::Status>::value),
                             "StatusWith<Status> is banned.");
 
@@ -111,6 +111,22 @@ public:
     bool isOK() const {
         return _status.isOK();
     }
+
+
+    /**
+     * This method is a transitional tool, to facilitate transition to compile-time enforced status
+     * checking.
+     *
+     * NOTE: DO NOT ADD NEW CALLS TO THIS METHOD. This method serves the same purpose as
+     * `.getStatus().ignore()`; however, it indicates a situation where the code that presently
+     * ignores a status code has not been audited for correctness. This method will be removed at
+     * some point. If you encounter a compiler error from ignoring the result of a `StatusWith`
+     * returning function be sure to check the return value, or deliberately ignore the return
+     * value. The function is named to be auditable independently from unaudited `Status` ignore
+     * cases.
+     */
+    inline void status_with_transitional_ignore() && noexcept {};
+    inline void status_with_transitional_ignore() const& noexcept = delete;
 
 private:
     Status _status;

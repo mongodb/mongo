@@ -143,7 +143,15 @@
  *    adversarial inputs, but for some reason the compiler cannot figure this out on its own, for
  *    example after a call to a function that never returns but cannot be labeled with
  *    MONGO_COMPILER_NORETURN. In almost all cases MONGO_UNREACHABLE is preferred.
+ *
+ *
+ * MONGO_WARN_UNUSED_RESULT_CLASS
+ *
+ *    Tells the compiler that a class defines a type for which checking results is necessary.  Types
+ *    thus defined turn functions returning them into "must check results" style functions.  Preview
+ *    of the `[[nodiscard]]` C++17 attribute.
  */
+
 
 #if defined(_MSC_VER)
 #include "mongo/platform/compiler_msvc.h"

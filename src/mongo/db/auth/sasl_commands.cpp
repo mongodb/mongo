@@ -264,7 +264,7 @@ void CmdSaslStart::help(std::stringstream& os) const {
 void CmdSaslStart::redactForLogging(mutablebson::Document* cmdObj) {
     mutablebson::Element element = mutablebson::findFirstChildNamed(cmdObj->root(), "payload");
     if (element.ok()) {
-        element.setValueString("xxx");
+        element.setValueString("xxx").transitional_ignore();
     }
 }
 

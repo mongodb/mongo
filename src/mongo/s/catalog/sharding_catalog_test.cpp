@@ -121,7 +121,7 @@ TEST_F(ShardingCatalogClientTest, GetCollectionExisting) {
 
             ReplSetMetadata metadata(10, newOpTime, newOpTime, 100, OID(), 30, -1);
             BSONObjBuilder builder;
-            metadata.writeToMetadata(&builder);
+            metadata.writeToMetadata(&builder).transitional_ignore();
 
             return std::make_tuple(vector<BSONObj>{expectedColl.toBSON()}, builder.obj());
         });
@@ -184,7 +184,7 @@ TEST_F(ShardingCatalogClientTest, GetDatabaseExisting) {
 
         ReplSetMetadata metadata(10, newOpTime, newOpTime, 100, OID(), 30, -1);
         BSONObjBuilder builder;
-        metadata.writeToMetadata(&builder);
+        metadata.writeToMetadata(&builder).transitional_ignore();
 
         return std::make_tuple(vector<BSONObj>{expectedDb.toBSON()}, builder.obj());
     });
@@ -402,7 +402,7 @@ TEST_F(ShardingCatalogClientTest, GetChunksForNSWithSortAndLimit) {
 
             ReplSetMetadata metadata(10, newOpTime, newOpTime, 100, OID(), 30, -1);
             BSONObjBuilder builder;
-            metadata.writeToMetadata(&builder);
+            metadata.writeToMetadata(&builder).transitional_ignore();
 
             return std::make_tuple(vector<BSONObj>{chunkA.toConfigBSON(), chunkB.toConfigBSON()},
                                    builder.obj());
@@ -817,7 +817,7 @@ TEST_F(ShardingCatalogClientTest, GetCollectionsValidResultsNoDb) {
 
             ReplSetMetadata metadata(10, newOpTime, newOpTime, 100, OID(), 30, -1);
             BSONObjBuilder builder;
-            metadata.writeToMetadata(&builder);
+            metadata.writeToMetadata(&builder).transitional_ignore();
 
             return std::make_tuple(vector<BSONObj>{coll1.toBSON(), coll2.toBSON(), coll3.toBSON()},
                                    builder.obj());
@@ -2037,7 +2037,7 @@ TEST_F(ShardingCatalogClientTest, BasicReadAfterOpTime) {
 
             ReplSetMetadata metadata(10, newOpTime, newOpTime, 100, OID(), 30, -1);
             BSONObjBuilder builder;
-            metadata.writeToMetadata(&builder);
+            metadata.writeToMetadata(&builder).transitional_ignore();
 
             return RemoteCommandResponse(BSON("ok" << 1), builder.obj(), Milliseconds(1));
         });
@@ -2073,7 +2073,7 @@ TEST_F(ShardingCatalogClientTest, ReadAfterOpTimeShouldNotGoBack) {
 
         ReplSetMetadata metadata(10, newOpTime, newOpTime, 100, OID(), 30, -1);
         BSONObjBuilder builder;
-        metadata.writeToMetadata(&builder);
+        metadata.writeToMetadata(&builder).transitional_ignore();
 
         return RemoteCommandResponse(BSON("ok" << 1), builder.obj(), Milliseconds(1));
     });
@@ -2102,7 +2102,7 @@ TEST_F(ShardingCatalogClientTest, ReadAfterOpTimeShouldNotGoBack) {
 
         ReplSetMetadata metadata(10, oldOpTime, oldOpTime, 100, OID(), 30, -1);
         BSONObjBuilder builder;
-        metadata.writeToMetadata(&builder);
+        metadata.writeToMetadata(&builder).transitional_ignore();
 
         return RemoteCommandResponse(BSON("ok" << 1), builder.obj(), Milliseconds(1));
     });
@@ -2127,7 +2127,7 @@ TEST_F(ShardingCatalogClientTest, ReadAfterOpTimeShouldNotGoBack) {
 
         ReplSetMetadata metadata(10, oldOpTime, oldOpTime, 100, OID(), 30, -1);
         BSONObjBuilder builder;
-        metadata.writeToMetadata(&builder);
+        metadata.writeToMetadata(&builder).transitional_ignore();
 
         return RemoteCommandResponse(BSON("ok" << 1), builder.obj(), Milliseconds(1));
     });
@@ -2153,7 +2153,7 @@ TEST_F(ShardingCatalogClientTest, ReadAfterOpTimeFindThenCmd) {
 
             ReplSetMetadata metadata(10, newOpTime, newOpTime, 100, OID(), 30, -1);
             BSONObjBuilder builder;
-            metadata.writeToMetadata(&builder);
+            metadata.writeToMetadata(&builder).transitional_ignore();
 
             DatabaseType dbType;
             dbType.setName("TestDB");
@@ -2215,7 +2215,7 @@ TEST_F(ShardingCatalogClientTest, ReadAfterOpTimeCmdThenFind) {
 
         ReplSetMetadata metadata(10, newOpTime, newOpTime, 100, OID(), 30, -1);
         BSONObjBuilder builder;
-        metadata.writeToMetadata(&builder);
+        metadata.writeToMetadata(&builder).transitional_ignore();
 
         return RemoteCommandResponse(BSON("ok" << 1), builder.obj(), Milliseconds(1));
     });

@@ -76,7 +76,7 @@ TEST(FTDCFileTest, TestFileBasicMetadata) {
     ASSERT_OK(writer.writeMetadata(doc1, Date_t()));
     ASSERT_OK(writer.writeMetadata(doc2, Date_t()));
 
-    writer.close();
+    writer.close().transitional_ignore();
 
     FTDCFileReader reader;
     ASSERT_OK(reader.open(p));
@@ -127,7 +127,7 @@ TEST(FTDCFileTest, TestFileBasicCompress) {
     ASSERT_OK(writer.writeSample(doc1, Date_t()));
     ASSERT_OK(writer.writeSample(doc2, Date_t()));
 
-    writer.close();
+    writer.close().transitional_ignore();
 
     FTDCFileReader reader;
     ASSERT_OK(reader.open(p));
@@ -194,7 +194,7 @@ private:
             ASSERT_OK(sw);
         }
 
-        _writer.close();
+        _writer.close().transitional_ignore();
 
         ValidateDocumentList(_path, _docs);
     }

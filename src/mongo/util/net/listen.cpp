@@ -649,7 +649,7 @@ void Listener::checkTicketNumbers() {
             log() << " --maxConns too high, can only handle " << want;
         }
     }
-    globalTicketHolder.resize(want);
+    globalTicketHolder.resize(want).transitional_ignore();
 }
 
 void Listener::shutdown() {

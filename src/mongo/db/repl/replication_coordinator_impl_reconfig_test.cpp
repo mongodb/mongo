@@ -520,15 +520,17 @@ TEST_F(
     net->enterNetwork();
     ReplSetHeartbeatResponse hbResp2;
     ReplSetConfig config;
-    config.initialize(BSON("_id"
-                           << "mySet"
-                           << "version"
-                           << 3
-                           << "members"
-                           << BSON_ARRAY(BSON("_id" << 1 << "host"
-                                                    << "node1:12345")
-                                         << BSON("_id" << 2 << "host"
-                                                       << "node2:12345"))));
+    config
+        .initialize(BSON("_id"
+                         << "mySet"
+                         << "version"
+                         << 3
+                         << "members"
+                         << BSON_ARRAY(BSON("_id" << 1 << "host"
+                                                  << "node1:12345")
+                                       << BSON("_id" << 2 << "host"
+                                                     << "node2:12345"))))
+        .transitional_ignore();
     hbResp2.setConfig(config);
     hbResp2.setConfigVersion(3);
     hbResp2.setSetName("mySet");
@@ -591,15 +593,17 @@ TEST_F(ReplCoordTest, NodeDoesNotAcceptHeartbeatReconfigWhileInTheMidstOfReconfi
     const NetworkInterfaceMock::NetworkOperationIterator noi = net->getNextReadyRequest();
     ReplSetHeartbeatResponse hbResp;
     ReplSetConfig config;
-    config.initialize(BSON("_id"
-                           << "mySet"
-                           << "version"
-                           << 4
-                           << "members"
-                           << BSON_ARRAY(BSON("_id" << 1 << "host"
-                                                    << "node1:12345")
-                                         << BSON("_id" << 2 << "host"
-                                                       << "node2:12345"))));
+    config
+        .initialize(BSON("_id"
+                         << "mySet"
+                         << "version"
+                         << 4
+                         << "members"
+                         << BSON_ARRAY(BSON("_id" << 1 << "host"
+                                                  << "node1:12345")
+                                       << BSON("_id" << 2 << "host"
+                                                     << "node2:12345"))))
+        .transitional_ignore();
     hbResp.setConfig(config);
     hbResp.setConfigVersion(4);
     hbResp.setSetName("mySet");

@@ -833,17 +833,19 @@ public:
         Timestamp lastOpTimeApplied(100, 0);
 
         ReplSetConfig config;
-        config.initialize(BSON("_id"
-                               << "rs0"
-                               << "version"
-                               << 1
-                               << "members"
-                               << BSON_ARRAY(BSON("_id" << 0 << "host"
-                                                        << "host0")
-                                             << BSON("_id" << 1 << "host"
-                                                           << "host1")
-                                             << BSON("_id" << 2 << "host"
-                                                           << "host2"))));
+        config
+            .initialize(BSON("_id"
+                             << "rs0"
+                             << "version"
+                             << 1
+                             << "members"
+                             << BSON_ARRAY(BSON("_id" << 0 << "host"
+                                                      << "host0")
+                                           << BSON("_id" << 1 << "host"
+                                                         << "host1")
+                                           << BSON("_id" << 2 << "host"
+                                                         << "host2"))))
+            .transitional_ignore();
 
         std::vector<HostAndPort> hosts;
         for (ReplSetConfig::MemberIterator mem = ++config.membersBegin();

@@ -603,7 +603,7 @@ public:
             Collection* droppedColl;
             droppedColl = db->createCollection(&opCtx, droppedName);
             ASSERT_EQUALS(db->getCollection(&opCtx, droppedName), droppedColl);
-            db->dropCollection(&opCtx, droppedName);
+            db->dropCollection(&opCtx, droppedName).transitional_ignore();
             wunit.commit();
         }
 
@@ -616,7 +616,7 @@ public:
             Collection* rolledBackColl = db->createCollection(&opCtx, rolledBackName);
             wunit.commit();
             ASSERT_EQUALS(db->getCollection(&opCtx, rolledBackName), rolledBackColl);
-            db->dropCollection(&opCtx, rolledBackName);
+            db->dropCollection(&opCtx, rolledBackName).transitional_ignore();
             // not committing so dropping should be rolled back
         }
 

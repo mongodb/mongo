@@ -859,7 +859,7 @@ void ReplicationCoordinatorExternalStateImpl::createSnapshot(OperationContext* o
                                                              SnapshotName name) {
     auto manager = _service->getGlobalStorageEngine()->getSnapshotManager();
     invariant(manager);  // This should never be called if there is no SnapshotManager.
-    manager->createSnapshot(opCtx, name);
+    manager->createSnapshot(opCtx, name).transitional_ignore();
 }
 
 void ReplicationCoordinatorExternalStateImpl::forceSnapshotCreation() {
@@ -959,7 +959,7 @@ void ReplicationCoordinatorExternalStateImpl::onDurable(const JournalListener::T
 
 void ReplicationCoordinatorExternalStateImpl::startNoopWriter(OpTime opTime) {
     invariant(_noopWriter);
-    _noopWriter->startWritingPeriodicNoops(opTime);
+    _noopWriter->startWritingPeriodicNoops(opTime).transitional_ignore();
 }
 
 void ReplicationCoordinatorExternalStateImpl::stopNoopWriter() {

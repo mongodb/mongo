@@ -525,9 +525,11 @@ void AsyncResultsMerger::scheduleKillCursors_inlock(OperationContext* opCtx) {
             executor::RemoteCommandRequest request(
                 remote.getTargetHost(), _params->nsString.db().toString(), cmdObj, opCtx);
 
-            _executor->scheduleRemoteCommand(
-                request,
-                stdx::bind(&AsyncResultsMerger::handleKillCursorsResponse, stdx::placeholders::_1));
+            _executor
+                ->scheduleRemoteCommand(request,
+                                        stdx::bind(&AsyncResultsMerger::handleKillCursorsResponse,
+                                                   stdx::placeholders::_1))
+                .status_with_transitional_ignore();
         }
     }
 }

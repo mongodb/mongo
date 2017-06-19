@@ -337,8 +337,12 @@ executor::TaskExecutor::EventHandle ReplicationCoordinatorImpl::_stepDownStart()
         return finishEvent;
     }
 
-    _replExecutor->scheduleWork(stdx::bind(
-        &ReplicationCoordinatorImpl::_stepDownFinish, this, stdx::placeholders::_1, finishEvent));
+    _replExecutor
+        ->scheduleWork(stdx::bind(&ReplicationCoordinatorImpl::_stepDownFinish,
+                                  this,
+                                  stdx::placeholders::_1,
+                                  finishEvent))
+        .status_with_transitional_ignore();
     return finishEvent;
 }
 
@@ -398,17 +402,21 @@ void ReplicationCoordinatorImpl::_scheduleHeartbeatReconfig_inlock(const ReplSet
                               << newConfig.getConfigVersion()
                               << " to be processed after election is cancelled.";
 
-        _replExecutor->onEvent(electionFinishedEvent,
-                               stdx::bind(&ReplicationCoordinatorImpl::_heartbeatReconfigStore,
-                                          this,
-                                          stdx::placeholders::_1,
-                                          newConfig));
+        _replExecutor
+            ->onEvent(electionFinishedEvent,
+                      stdx::bind(&ReplicationCoordinatorImpl::_heartbeatReconfigStore,
+                                 this,
+                                 stdx::placeholders::_1,
+                                 newConfig))
+            .status_with_transitional_ignore();
         return;
     }
-    _replExecutor->scheduleWork(stdx::bind(&ReplicationCoordinatorImpl::_heartbeatReconfigStore,
-                                           this,
-                                           stdx::placeholders::_1,
-                                           newConfig));
+    _replExecutor
+        ->scheduleWork(stdx::bind(&ReplicationCoordinatorImpl::_heartbeatReconfigStore,
+                                  this,
+                                  stdx::placeholders::_1,
+                                  newConfig))
+        .status_with_transitional_ignore();
 }
 
 void ReplicationCoordinatorImpl::_heartbeatReconfigStore(
@@ -490,13 +498,14 @@ void ReplicationCoordinatorImpl::_heartbeatReconfigFinish(
     if (MONGO_FAIL_POINT(blockHeartbeatReconfigFinish)) {
         LOG_FOR_HEARTBEATS(0) << "blockHeartbeatReconfigFinish fail point enabled. Rescheduling "
                                  "_heartbeatReconfigFinish until fail point is disabled.";
-        _replExecutor->scheduleWorkAt(
-            _replExecutor->now() + Milliseconds{10},
-            stdx::bind(&ReplicationCoordinatorImpl::_heartbeatReconfigFinish,
-                       this,
-                       stdx::placeholders::_1,
-                       newConfig,
-                       myIndex));
+        _replExecutor
+            ->scheduleWorkAt(_replExecutor->now() + Milliseconds{10},
+                             stdx::bind(&ReplicationCoordinatorImpl::_heartbeatReconfigFinish,
+                                        this,
+                                        stdx::placeholders::_1,
+                                        newConfig,
+                                        myIndex))
+            .status_with_transitional_ignore();
         return;
     }
 
@@ -522,12 +531,14 @@ void ReplicationCoordinatorImpl::_heartbeatReconfigFinish(
             << "Waiting for election to complete before finishing reconfig to version "
             << newConfig.getConfigVersion();
         // Wait for the election to complete and the node's Role to be set to follower.
-        _replExecutor->onEvent(electionFinishedEvent,
-                               stdx::bind(&ReplicationCoordinatorImpl::_heartbeatReconfigFinish,
-                                          this,
-                                          stdx::placeholders::_1,
-                                          newConfig,
-                                          myIndex));
+        _replExecutor
+            ->onEvent(electionFinishedEvent,
+                      stdx::bind(&ReplicationCoordinatorImpl::_heartbeatReconfigFinish,
+                                 this,
+                                 stdx::placeholders::_1,
+                                 newConfig,
+                                 myIndex))
+            .status_with_transitional_ignore();
         return;
     }
 

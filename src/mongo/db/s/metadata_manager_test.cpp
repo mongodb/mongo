@@ -81,7 +81,8 @@ protected:
     void setUp() override {
         ShardingMongodTestFixture::setUp();
         serverGlobalParams.clusterRole = ClusterRole::ShardServer;
-        initializeGlobalShardingStateForMongodForTest(ConnectionString(dummyHost));
+        initializeGlobalShardingStateForMongodForTest(ConnectionString(dummyHost))
+            .transitional_ignore();
 
         configTargeter()->setFindHostReturnValue(dummyHost);
     }

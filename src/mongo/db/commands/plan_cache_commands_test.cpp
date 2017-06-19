@@ -153,7 +153,7 @@ TEST(PlanCacheCommandsTest, planCacheListQueryShapesOneKey) {
     qs.cacheData.reset(createSolutionCacheData());
     std::vector<QuerySolution*> solns;
     solns.push_back(&qs);
-    planCache.add(*cq, solns, createDecision(1U));
+    planCache.add(*cq, solns, createDecision(1U)).transitional_ignore();
 
     vector<BSONObj> shapes = getShapes(planCache);
     ASSERT_EQUALS(shapes.size(), 1U);
@@ -186,7 +186,7 @@ TEST(PlanCacheCommandsTest, planCacheClearAllShapes) {
     qs.cacheData.reset(createSolutionCacheData());
     std::vector<QuerySolution*> solns;
     solns.push_back(&qs);
-    planCache.add(*cq, solns, createDecision(1U));
+    planCache.add(*cq, solns, createDecision(1U)).transitional_ignore();
     ASSERT_EQUALS(getShapes(planCache).size(), 1U);
 
     // Clear cache and confirm number of keys afterwards.
@@ -327,8 +327,8 @@ TEST(PlanCacheCommandsTest, planCacheClearOneKey) {
     qs.cacheData.reset(createSolutionCacheData());
     std::vector<QuerySolution*> solns;
     solns.push_back(&qs);
-    planCache.add(*cqA, solns, createDecision(1U));
-    planCache.add(*cqB, solns, createDecision(1U));
+    planCache.add(*cqA, solns, createDecision(1U)).transitional_ignore();
+    planCache.add(*cqB, solns, createDecision(1U)).transitional_ignore();
 
     // Check keys in cache before dropping {b: 1}
     vector<BSONObj> shapesBefore = getShapes(planCache);
@@ -386,8 +386,8 @@ TEST(PlanCacheCommandsTest, planCacheClearOneKeyCollation) {
     qs.cacheData.reset(createSolutionCacheData());
     std::vector<QuerySolution*> solns;
     solns.push_back(&qs);
-    planCache.add(*cq, solns, createDecision(1U));
-    planCache.add(*cqCollation, solns, createDecision(1U));
+    planCache.add(*cq, solns, createDecision(1U)).transitional_ignore();
+    planCache.add(*cqCollation, solns, createDecision(1U)).transitional_ignore();
 
     // Check keys in cache before dropping the query with collation.
     vector<BSONObj> shapesBefore = getShapes(planCache);
@@ -530,7 +530,7 @@ TEST(PlanCacheCommandsTest, planCacheListPlansOnlyOneSolutionTrue) {
     qs.cacheData.reset(createSolutionCacheData());
     std::vector<QuerySolution*> solns;
     solns.push_back(&qs);
-    planCache.add(*cq, solns, createDecision(1U));
+    planCache.add(*cq, solns, createDecision(1U)).transitional_ignore();
 
     vector<BSONObj> plans = getPlans(planCache,
                                      cq->getQueryObj(),
@@ -560,7 +560,7 @@ TEST(PlanCacheCommandsTest, planCacheListPlansOnlyOneSolutionFalse) {
     std::vector<QuerySolution*> solns;
     solns.push_back(&qs);
     solns.push_back(&qs);
-    planCache.add(*cq, solns, createDecision(2U));
+    planCache.add(*cq, solns, createDecision(2U)).transitional_ignore();
 
     vector<BSONObj> plans = getPlans(planCache,
                                      cq->getQueryObj(),
@@ -599,11 +599,11 @@ TEST(PlanCacheCommandsTest, planCacheListPlansCollation) {
     qs.cacheData.reset(createSolutionCacheData());
     std::vector<QuerySolution*> solns;
     solns.push_back(&qs);
-    planCache.add(*cq, solns, createDecision(1U));
+    planCache.add(*cq, solns, createDecision(1U)).transitional_ignore();
     std::vector<QuerySolution*> twoSolns;
     twoSolns.push_back(&qs);
     twoSolns.push_back(&qs);
-    planCache.add(*cqCollation, twoSolns, createDecision(2U));
+    planCache.add(*cqCollation, twoSolns, createDecision(2U)).transitional_ignore();
 
     // Normal query should have one solution.
     vector<BSONObj> plans = getPlans(planCache,

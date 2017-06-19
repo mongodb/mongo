@@ -1811,7 +1811,8 @@ void BtreeLogic<BtreeLayout>::split(OperationContext* opCtx,
                 splitkey.recordLoc,
                 true,  // dupsallowed
                 bucketLoc,
-                rLoc);
+                rLoc)
+            .transitional_ignore();
     }
 
     int newpos = keypos;
@@ -2336,7 +2337,7 @@ DiskLoc BtreeLogic<BtreeLayout>::_locate(OperationContext* opCtx,
     int position;
     BucketType* bucket = getBucket(opCtx, bucketLoc);
     // XXX: owned to not owned conversion(?)
-    _find(opCtx, bucket, key, recordLoc, false, &position, foundOut);
+    _find(opCtx, bucket, key, recordLoc, false, &position, foundOut).transitional_ignore();
 
     // Look in our current bucket.
     if (*foundOut) {

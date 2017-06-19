@@ -71,7 +71,7 @@ void redactTooLongLog(mutablebson::Document* cmdObj, StringData fieldName) {
 
     // Redact the log if there are more than one documents or operations.
     if (field.countChildren() > 1) {
-        field.setValueInt(field.countChildren());
+        field.setValueInt(field.countChildren()).transitional_ignore();
     }
 }
 

@@ -1238,7 +1238,8 @@ public:
                                AuthorizationManager::usersCollectionNamespace,
                                queryBuilder.done(),
                                projection.done(),
-                               function);
+                               function)
+                .transitional_ignore();
         }
         result.append("users", usersArrayBuilder.arr());
         return true;

@@ -380,7 +380,7 @@ TEST_F(CursorManagerTest, UsingACursorShouldUpdateTimeOfLastUse) {
     clock->advance(Milliseconds(1));
 
     // Touch the cursor with id 'usedCursorId' to advance its time of last use.
-    cursorManager->pinCursor(_opCtx.get(), usedCursorId);
+    cursorManager->pinCursor(_opCtx.get(), usedCursorId).status_with_transitional_ignore();
 
     // We should be able to time out the unused cursor, but the one we used should stay alive.
     ASSERT_EQ(2UL, cursorManager->numCursors());

@@ -144,7 +144,7 @@ ElemMatchValueMatchExpression::~ElemMatchValueMatchExpression() {
 }
 
 Status ElemMatchValueMatchExpression::init(StringData path, MatchExpression* sub) {
-    init(path);
+    init(path).transitional_ignore();
     add(sub);
     return Status::OK();
 }

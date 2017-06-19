@@ -318,17 +318,20 @@ StatusWith<TaskExecutor::CallbackHandle> ThreadPoolTaskExecutor::scheduleWorkAt(
         return cbHandle;
     }
     lk.unlock();
-    _net->setAlarm(when, [this, when, cbHandle] {
-        auto cbState = checked_cast<CallbackState*>(getCallbackFromHandle(cbHandle.getValue()));
-        if (cbState->canceled.load()) {
-            return;
-        }
-        stdx::unique_lock<stdx::mutex> lk(_mutex);
-        if (cbState->canceled.load()) {
-            return;
-        }
-        scheduleIntoPool_inlock(&_sleepersQueue, cbState->iter, std::move(lk));
-    });
+    _net->setAlarm(when,
+                   [this, when, cbHandle] {
+                       auto cbState =
+                           checked_cast<CallbackState*>(getCallbackFromHandle(cbHandle.getValue()));
+                       if (cbState->canceled.load()) {
+                           return;
+                       }
+                       stdx::unique_lock<stdx::mutex> lk(_mutex);
+                       if (cbState->canceled.load()) {
+                           return;
+                       }
+                       scheduleIntoPool_inlock(&_sleepersQueue, cbState->iter, std::move(lk));
+                   })
+        .transitional_ignore();
 
     return cbHandle;
 }
@@ -384,22 +387,24 @@ StatusWith<TaskExecutor::CallbackHandle> ThreadPoolTaskExecutor::scheduleRemoteC
     LOG(3) << "Scheduling remote command request: " << redact(scheduledRequest.toString());
     lk.unlock();
     _net->startCommand(
-        cbHandle.getValue(),
-        scheduledRequest,
-        [this, scheduledRequest, cbState, cb](const ResponseStatus& response) {
-            using std::swap;
-            CallbackFn newCb = [cb, scheduledRequest, response](const CallbackArgs& cbData) {
-                remoteCommandFinished(cbData, cb, scheduledRequest, response);
-            };
-            stdx::unique_lock<stdx::mutex> lk(_mutex);
-            if (_inShutdown_inlock()) {
-                return;
-            }
-            LOG(3) << "Received remote response: "
-                   << redact(response.isOK() ? response.toString() : response.status.toString());
-            swap(cbState->callback, newCb);
-            scheduleIntoPool_inlock(&_networkInProgressQueue, cbState->iter, std::move(lk));
-        });
+            cbHandle.getValue(),
+            scheduledRequest,
+            [this, scheduledRequest, cbState, cb](const ResponseStatus& response) {
+                using std::swap;
+                CallbackFn newCb = [cb, scheduledRequest, response](const CallbackArgs& cbData) {
+                    remoteCommandFinished(cbData, cb, scheduledRequest, response);
+                };
+                stdx::unique_lock<stdx::mutex> lk(_mutex);
+                if (_inShutdown_inlock()) {
+                    return;
+                }
+                LOG(3) << "Received remote response: "
+                       << redact(response.isOK() ? response.toString()
+                                                 : response.status.toString());
+                swap(cbState->callback, newCb);
+                scheduleIntoPool_inlock(&_networkInProgressQueue, cbState->iter, std::move(lk));
+            })
+        .transitional_ignore();
     return cbHandle;
 }
 

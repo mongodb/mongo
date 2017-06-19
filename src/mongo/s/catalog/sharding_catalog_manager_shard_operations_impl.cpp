@@ -684,8 +684,11 @@ StatusWith<std::string> ShardingCatalogManagerImpl::addShard(
     shardDetails.append("name", shardType.getName());
     shardDetails.append("host", shardConnectionString.toString());
 
-    Grid::get(opCtx)->catalogClient(opCtx)->logChange(
-        opCtx, "addShard", "", shardDetails.obj(), ShardingCatalogClient::kMajorityWriteConcern);
+    Grid::get(opCtx)
+        ->catalogClient(opCtx)
+        ->logChange(
+            opCtx, "addShard", "", shardDetails.obj(), ShardingCatalogClient::kMajorityWriteConcern)
+        .transitional_ignore();
 
     // Ensure the added shard is visible to this process.
     auto shardRegistry = Grid::get(opCtx)->shardRegistry();

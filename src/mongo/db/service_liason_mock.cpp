@@ -39,7 +39,7 @@ MockServiceLiasonImpl::MockServiceLiasonImpl() {
     auto timerFactory = stdx::make_unique<executor::AsyncTimerFactoryMock>();
     _timerFactory = timerFactory.get();
     _runner = stdx::make_unique<PeriodicRunnerASIO>(std::move(timerFactory));
-    _runner->startup();
+    _runner->startup().transitional_ignore();
 }
 
 LogicalSessionIdSet MockServiceLiasonImpl::getActiveSessions() const {

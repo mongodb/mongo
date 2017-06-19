@@ -335,15 +335,15 @@ private:
 
             // Save LogComponent::kDefault LogSeverity at root
             if (component == LogComponent::kDefault) {
-                doc.root().appendInt("verbosity", severity);
+                doc.root().appendInt("verbosity", severity).transitional_ignore();
                 continue;
             }
 
             mutablebson::Element element = doc.makeElementObject(component.getShortName());
-            element.appendInt("verbosity", severity);
+            element.appendInt("verbosity", severity).transitional_ignore();
 
             mutablebson::Element parentElement = _getParentElement(doc, component);
-            parentElement.pushBack(element);
+            parentElement.pushBack(element).transitional_ignore();
         }
 
         BSONObj result = doc.getObject();

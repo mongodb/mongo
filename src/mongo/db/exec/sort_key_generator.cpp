@@ -260,7 +260,7 @@ void SortKeyGenerator::getBoundsForSort(OperationContext* opCtx,
 
     std::vector<QuerySolution*> solns;
     LOG(5) << "Sort key generation: Planning to obtain bounds for sort.";
-    QueryPlanner::plan(*queryForSort, params, &solns);
+    QueryPlanner::plan(*queryForSort, params, &solns).transitional_ignore();
 
     // TODO: are there ever > 1 solns?  If so, do we look for a specific soln?
     if (1 == solns.size()) {

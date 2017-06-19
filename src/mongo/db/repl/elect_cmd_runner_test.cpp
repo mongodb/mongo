@@ -236,7 +236,7 @@ public:
         int selfConfigIndex = 0;
 
         ReplSetConfig config;
-        config.initialize(configObj);
+        config.initialize(configObj).transitional_ignore();
 
         std::vector<HostAndPort> hosts;
         for (ReplSetConfig::MemberIterator mem = ++config.membersBegin();

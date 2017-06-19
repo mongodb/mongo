@@ -75,15 +75,19 @@ TEST_F(ClusterGetLastErrorTest,
                                            BSON("unusued"
                                                 << "obj"),
                                            operationContext());
-        executor()->scheduleRemoteCommand(
-            request, [=](const executor::TaskExecutor::RemoteCommandCallbackArgs) -> void {});
+        executor()
+            ->scheduleRemoteCommand(
+                request, [=](const executor::TaskExecutor::RemoteCommandCallbackArgs) -> void {})
+            .status_with_transitional_ignore();
     });
 
     // Make the reply contain ShardingMetadata.
     repl::OpTime opTime{Timestamp{10, 10}, 10};
     onCommandWithMetadata([&](const RemoteCommandRequest& request) {
         BSONObjBuilder metadataBob;
-        rpc::ShardingMetadata(opTime, OID() /* ignored OID field */).writeToMetadata(&metadataBob);
+        rpc::ShardingMetadata(opTime, OID() /* ignored OID field */)
+            .writeToMetadata(&metadataBob)
+            .transitional_ignore();
         return RemoteCommandResponse(BSON("ok" << 1), metadataBob.obj(), Milliseconds(1));
     });
 
@@ -116,15 +120,19 @@ TEST_F(ClusterGetLastErrorTest, ClusterLastErrorInfoNotUpdatedIfNotInitialized) 
                                            BSON("unusued"
                                                 << "obj"),
                                            operationContext());
-        executor()->scheduleRemoteCommand(
-            request, [=](const executor::TaskExecutor::RemoteCommandCallbackArgs) -> void {});
+        executor()
+            ->scheduleRemoteCommand(
+                request, [=](const executor::TaskExecutor::RemoteCommandCallbackArgs) -> void {})
+            .status_with_transitional_ignore();
     });
 
     // Make the reply contain ShardingMetadata.
     repl::OpTime opTime{Timestamp{10, 10}, 10};
     onCommandWithMetadata([&](const RemoteCommandRequest& request) {
         BSONObjBuilder metadataBob;
-        rpc::ShardingMetadata(opTime, OID() /* ignored OID field */).writeToMetadata(&metadataBob);
+        rpc::ShardingMetadata(opTime, OID() /* ignored OID field */)
+            .writeToMetadata(&metadataBob)
+            .transitional_ignore();
         return RemoteCommandResponse(BSON("ok" << 1), metadataBob.obj(), Milliseconds(1));
     });
 
@@ -157,8 +165,10 @@ TEST_F(ClusterGetLastErrorTest, ClusterLastErrorInfoNotUpdatedIfReplyDoesntHaveS
                                            BSON("unusued"
                                                 << "obj"),
                                            operationContext());
-        executor()->scheduleRemoteCommand(
-            request, [=](const executor::TaskExecutor::RemoteCommandCallbackArgs) -> void {});
+        executor()
+            ->scheduleRemoteCommand(
+                request, [=](const executor::TaskExecutor::RemoteCommandCallbackArgs) -> void {})
+            .status_with_transitional_ignore();
     });
 
     // Do not return ShardingMetadata in the reply.

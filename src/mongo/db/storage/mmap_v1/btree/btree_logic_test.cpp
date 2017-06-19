@@ -185,7 +185,7 @@ class SimpleCreate : public BtreeLogicTestBase<OnDiskFormat> {
 public:
     void run() {
         OperationContextNoop opCtx;
-        this->_helper.btree.initAsEmpty(&opCtx);
+        this->_helper.btree.initAsEmpty(&opCtx).transitional_ignore();
 
         this->checkValidNumKeys(0);
     }
@@ -196,10 +196,10 @@ class SimpleInsertDelete : public BtreeLogicTestBase<OnDiskFormat> {
 public:
     void run() {
         OperationContextNoop opCtx;
-        this->_helper.btree.initAsEmpty(&opCtx);
+        this->_helper.btree.initAsEmpty(&opCtx).transitional_ignore();
 
         BSONObj key = simpleKey('z');
-        this->insert(key, this->_helper.dummyDiskLoc);
+        this->insert(key, this->_helper.dummyDiskLoc).transitional_ignore();
 
         this->checkValidNumKeys(1);
         this->locate(key, 0, true, this->_helper.headManager.getHead(&opCtx), 1);
@@ -216,14 +216,14 @@ class SplitUnevenBucketBase : public BtreeLogicTestBase<OnDiskFormat> {
 public:
     void run() {
         OperationContextNoop opCtx;
-        this->_helper.btree.initAsEmpty(&opCtx);
+        this->_helper.btree.initAsEmpty(&opCtx).transitional_ignore();
 
         for (int i = 0; i < 10; ++i) {
             BSONObj shortKey = simpleKey(shortToken(i), 1);
-            this->insert(shortKey, this->_helper.dummyDiskLoc);
+            this->insert(shortKey, this->_helper.dummyDiskLoc).transitional_ignore();
 
             BSONObj longKey = simpleKey(longToken(i), 800);
-            this->insert(longKey, this->_helper.dummyDiskLoc);
+            this->insert(longKey, this->_helper.dummyDiskLoc).transitional_ignore();
         }
 
         this->checkValidNumKeys(20);
@@ -280,11 +280,11 @@ class MissingLocate : public BtreeLogicTestBase<OnDiskFormat> {
 public:
     void run() {
         OperationContextNoop opCtx;
-        this->_helper.btree.initAsEmpty(&opCtx);
+        this->_helper.btree.initAsEmpty(&opCtx).transitional_ignore();
 
         for (int i = 0; i < 3; ++i) {
             BSONObj k = simpleKey('b' + 2 * i);
-            this->insert(k, this->_helper.dummyDiskLoc);
+            this->insert(k, this->_helper.dummyDiskLoc).transitional_ignore();
         }
 
         locateExtended(1, 'a', 'b', this->_helper.headManager.getHead(&opCtx));
@@ -318,20 +318,20 @@ class MissingLocateMultiBucket : public BtreeLogicTestBase<OnDiskFormat> {
 public:
     void run() {
         OperationContextNoop opCtx;
-        this->_helper.btree.initAsEmpty(&opCtx);
+        this->_helper.btree.initAsEmpty(&opCtx).transitional_ignore();
 
-        this->insert(simpleKey('A', 800), this->_helper.dummyDiskLoc);
-        this->insert(simpleKey('B', 800), this->_helper.dummyDiskLoc);
-        this->insert(simpleKey('C', 800), this->_helper.dummyDiskLoc);
-        this->insert(simpleKey('D', 800), this->_helper.dummyDiskLoc);
-        this->insert(simpleKey('E', 800), this->_helper.dummyDiskLoc);
-        this->insert(simpleKey('F', 800), this->_helper.dummyDiskLoc);
-        this->insert(simpleKey('G', 800), this->_helper.dummyDiskLoc);
-        this->insert(simpleKey('H', 800), this->_helper.dummyDiskLoc);
-        this->insert(simpleKey('J', 800), this->_helper.dummyDiskLoc);
+        this->insert(simpleKey('A', 800), this->_helper.dummyDiskLoc).transitional_ignore();
+        this->insert(simpleKey('B', 800), this->_helper.dummyDiskLoc).transitional_ignore();
+        this->insert(simpleKey('C', 800), this->_helper.dummyDiskLoc).transitional_ignore();
+        this->insert(simpleKey('D', 800), this->_helper.dummyDiskLoc).transitional_ignore();
+        this->insert(simpleKey('E', 800), this->_helper.dummyDiskLoc).transitional_ignore();
+        this->insert(simpleKey('F', 800), this->_helper.dummyDiskLoc).transitional_ignore();
+        this->insert(simpleKey('G', 800), this->_helper.dummyDiskLoc).transitional_ignore();
+        this->insert(simpleKey('H', 800), this->_helper.dummyDiskLoc).transitional_ignore();
+        this->insert(simpleKey('J', 800), this->_helper.dummyDiskLoc).transitional_ignore();
 
         // This causes split
-        this->insert(simpleKey('I', 800), this->_helper.dummyDiskLoc);
+        this->insert(simpleKey('I', 800), this->_helper.dummyDiskLoc).transitional_ignore();
 
         int pos;
         DiskLoc loc;
@@ -370,20 +370,20 @@ class SERVER983 : public BtreeLogicTestBase<OnDiskFormat> {
 public:
     void run() {
         OperationContextNoop opCtx;
-        this->_helper.btree.initAsEmpty(&opCtx);
+        this->_helper.btree.initAsEmpty(&opCtx).transitional_ignore();
 
-        this->insert(simpleKey('A', 800), this->_helper.dummyDiskLoc);
-        this->insert(simpleKey('B', 800), this->_helper.dummyDiskLoc);
-        this->insert(simpleKey('C', 800), this->_helper.dummyDiskLoc);
-        this->insert(simpleKey('D', 800), this->_helper.dummyDiskLoc);
-        this->insert(simpleKey('E', 800), this->_helper.dummyDiskLoc);
-        this->insert(simpleKey('F', 800), this->_helper.dummyDiskLoc);
-        this->insert(simpleKey('G', 800), this->_helper.dummyDiskLoc);
-        this->insert(simpleKey('H', 800), this->_helper.dummyDiskLoc);
-        this->insert(simpleKey('I', 800), this->_helper.dummyDiskLoc);
+        this->insert(simpleKey('A', 800), this->_helper.dummyDiskLoc).transitional_ignore();
+        this->insert(simpleKey('B', 800), this->_helper.dummyDiskLoc).transitional_ignore();
+        this->insert(simpleKey('C', 800), this->_helper.dummyDiskLoc).transitional_ignore();
+        this->insert(simpleKey('D', 800), this->_helper.dummyDiskLoc).transitional_ignore();
+        this->insert(simpleKey('E', 800), this->_helper.dummyDiskLoc).transitional_ignore();
+        this->insert(simpleKey('F', 800), this->_helper.dummyDiskLoc).transitional_ignore();
+        this->insert(simpleKey('G', 800), this->_helper.dummyDiskLoc).transitional_ignore();
+        this->insert(simpleKey('H', 800), this->_helper.dummyDiskLoc).transitional_ignore();
+        this->insert(simpleKey('I', 800), this->_helper.dummyDiskLoc).transitional_ignore();
 
         // This will cause split
-        this->insert(simpleKey('J', 800), this->_helper.dummyDiskLoc);
+        this->insert(simpleKey('J', 800), this->_helper.dummyDiskLoc).transitional_ignore();
 
         int pos;
         DiskLoc loc;
@@ -419,17 +419,17 @@ class DontReuseUnused : public BtreeLogicTestBase<OnDiskFormat> {
 public:
     void run() {
         OperationContextNoop opCtx;
-        this->_helper.btree.initAsEmpty(&opCtx);
+        this->_helper.btree.initAsEmpty(&opCtx).transitional_ignore();
 
         for (int i = 0; i < 10; ++i) {
             const BSONObj k = simpleKey('b' + 2 * i, 800);
-            this->insert(k, this->_helper.dummyDiskLoc);
+            this->insert(k, this->_helper.dummyDiskLoc).transitional_ignore();
         }
 
         const BSONObj root = simpleKey('p', 800);
         this->unindex(root);
 
-        this->insert(root, this->_helper.dummyDiskLoc);
+        this->insert(root, this->_helper.dummyDiskLoc).transitional_ignore();
         this->locate(root, 0, true, this->head()->nextChild, 1);
     }
 };
@@ -439,11 +439,11 @@ class MergeBucketsTestBase : public BtreeLogicTestBase<OnDiskFormat> {
 public:
     void run() {
         OperationContextNoop opCtx;
-        this->_helper.btree.initAsEmpty(&opCtx);
+        this->_helper.btree.initAsEmpty(&opCtx).transitional_ignore();
 
         for (int i = 0; i < 10; ++i) {
             const BSONObj k = simpleKey('b' + 2 * i, 800);
-            this->insert(k, this->_helper.dummyDiskLoc);
+            this->insert(k, this->_helper.dummyDiskLoc).transitional_ignore();
         }
 
         // numRecords() - 1, because this->_helper.dummyDiskLoc is actually in the record store too
@@ -495,11 +495,11 @@ class MergeBucketsDontReplaceHead : public BtreeLogicTestBase<OnDiskFormat> {
 public:
     void run() {
         OperationContextNoop opCtx;
-        this->_helper.btree.initAsEmpty(&opCtx);
+        this->_helper.btree.initAsEmpty(&opCtx).transitional_ignore();
 
         for (int i = 0; i < 18; ++i) {
             const BSONObj k = simpleKey('a' + i, 800);
-            this->insert(k, this->_helper.dummyDiskLoc);
+            this->insert(k, this->_helper.dummyDiskLoc).transitional_ignore();
         }
 
         // numRecords(NULL) - 1, because fixedDiskLoc is actually in the record store too
@@ -884,7 +884,7 @@ public:
 
     void run() {
         OperationContextNoop opCtx;
-        this->_helper.btree.initAsEmpty(&opCtx);
+        this->_helper.btree.initAsEmpty(&opCtx).transitional_ignore();
 
         ArtificialTreeBuilder<OnDiskFormat> builder(&opCtx, &this->_helper);
 
@@ -2181,14 +2181,14 @@ class LocateEmptyForward : public BtreeLogicTestBase<OnDiskFormat> {
 public:
     void run() {
         OperationContextNoop opCtx;
-        this->_helper.btree.initAsEmpty(&opCtx);
+        this->_helper.btree.initAsEmpty(&opCtx).transitional_ignore();
 
         BSONObj key1 = simpleKey('a');
-        this->insert(key1, this->_helper.dummyDiskLoc);
+        this->insert(key1, this->_helper.dummyDiskLoc).transitional_ignore();
         BSONObj key2 = simpleKey('b');
-        this->insert(key2, this->_helper.dummyDiskLoc);
+        this->insert(key2, this->_helper.dummyDiskLoc).transitional_ignore();
         BSONObj key3 = simpleKey('c');
-        this->insert(key3, this->_helper.dummyDiskLoc);
+        this->insert(key3, this->_helper.dummyDiskLoc).transitional_ignore();
 
         this->checkValidNumKeys(3);
         this->locate(BSONObj(), 0, false, this->_helper.headManager.getHead(&opCtx), 1);
@@ -2200,14 +2200,14 @@ class LocateEmptyReverse : public BtreeLogicTestBase<OnDiskFormat> {
 public:
     void run() {
         OperationContextNoop opCtx;
-        this->_helper.btree.initAsEmpty(&opCtx);
+        this->_helper.btree.initAsEmpty(&opCtx).transitional_ignore();
 
         BSONObj key1 = simpleKey('a');
-        this->insert(key1, this->_helper.dummyDiskLoc);
+        this->insert(key1, this->_helper.dummyDiskLoc).transitional_ignore();
         BSONObj key2 = simpleKey('b');
-        this->insert(key2, this->_helper.dummyDiskLoc);
+        this->insert(key2, this->_helper.dummyDiskLoc).transitional_ignore();
         BSONObj key3 = simpleKey('c');
-        this->insert(key3, this->_helper.dummyDiskLoc);
+        this->insert(key3, this->_helper.dummyDiskLoc).transitional_ignore();
 
         this->checkValidNumKeys(3);
         this->locate(BSONObj(), -1, false, DiskLoc(), -1);
@@ -2219,7 +2219,7 @@ class DuplicateKeys : public BtreeLogicTestBase<OnDiskFormat> {
 public:
     void run() {
         OperationContextNoop opCtx;
-        this->_helper.btree.initAsEmpty(&opCtx);
+        this->_helper.btree.initAsEmpty(&opCtx).transitional_ignore();
 
         BSONObj key1 = simpleKey('z');
         ASSERT_OK(this->insert(key1, this->_helper.dummyDiskLoc, true));

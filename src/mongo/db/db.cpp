@@ -644,7 +644,7 @@ ExitCode _initAndListen(int listenPort) {
         uassertStatusOK(ShardingState::get(startupOpCtx.get())
                             ->initializeShardingAwarenessIfNeeded(startupOpCtx.get()));
     if (shardingInitialized) {
-        waitForShardRegistryReload(startupOpCtx.get());
+        waitForShardRegistryReload(startupOpCtx.get()).transitional_ignore();
     }
 
     if (!storageGlobalParams.readOnly) {
@@ -705,7 +705,7 @@ ExitCode _initAndListen(int listenPort) {
 
     // Set up the periodic runner for background job execution
     auto runner = makePeriodicRunner();
-    runner->startup();
+    runner->startup().transitional_ignore();
     globalServiceContext->setPeriodicRunner(std::move(runner));
 
     // Set up the logical session cache

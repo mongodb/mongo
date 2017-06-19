@@ -70,13 +70,15 @@ void reportStatus(OperationContext* opCtx,
     mType.setMongoVersion(VersionInfoInterface::instance().version().toString());
 
     try {
-        Grid::get(opCtx)->catalogClient(opCtx)->updateConfigDocument(
-            opCtx,
-            MongosType::ConfigNS,
-            BSON(MongosType::name(instanceId)),
-            BSON("$set" << mType.toBSON()),
-            true,
-            ShardingCatalogClient::kMajorityWriteConcern);
+        Grid::get(opCtx)
+            ->catalogClient(opCtx)
+            ->updateConfigDocument(opCtx,
+                                   MongosType::ConfigNS,
+                                   BSON(MongosType::name(instanceId)),
+                                   BSON("$set" << mType.toBSON()),
+                                   true,
+                                   ShardingCatalogClient::kMajorityWriteConcern)
+            .status_with_transitional_ignore();
     } catch (const std::exception& e) {
         log() << "Caught exception while reporting uptime: " << e.what();
     }

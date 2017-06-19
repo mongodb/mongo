@@ -258,9 +258,11 @@ Status TransportLayerASIO::setup() {
         _sslContext = stdx::make_unique<asio::ssl::context>(asio::ssl::context::sslv23);
 
         const auto sslManager = getSSLManager();
-        sslManager->initSSLContext(_sslContext->native_handle(),
-                                   sslParams,
-                                   SSLManagerInterface::ConnectionDirection::kOutgoing);
+        sslManager
+            ->initSSLContext(_sslContext->native_handle(),
+                             sslParams,
+                             SSLManagerInterface::ConnectionDirection::kOutgoing)
+            .transitional_ignore();
     }
 #endif
 

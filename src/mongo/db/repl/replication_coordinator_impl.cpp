@@ -611,7 +611,7 @@ void ReplicationCoordinatorImpl::_startDataReplication(OperationContext* opCtx,
 
         // Clear maint. mode.
         while (getMaintenanceMode()) {
-            setMaintenanceMode(false);
+            setMaintenanceMode(false).transitional_ignore();
         }
 
         if (startCompleted) {
@@ -2208,14 +2208,16 @@ void ReplicationCoordinatorImpl::_finishReplSetReconfig(
     // Do not conduct an election during a reconfig, as the node may not be electable post-reconfig.
     if (auto electionFinishedEvent = _cancelElectionIfNeeded_inlock()) {
         // Wait for the election to complete and the node's Role to be set to follower.
-        _replExecutor->onEvent(electionFinishedEvent,
-                               stdx::bind(&ReplicationCoordinatorImpl::_finishReplSetReconfig,
-                                          this,
-                                          stdx::placeholders::_1,
-                                          newConfig,
-                                          isForceReconfig,
-                                          myIndex,
-                                          finishedEvent));
+        _replExecutor
+            ->onEvent(electionFinishedEvent,
+                      stdx::bind(&ReplicationCoordinatorImpl::_finishReplSetReconfig,
+                                 this,
+                                 stdx::placeholders::_1,
+                                 newConfig,
+                                 isForceReconfig,
+                                 myIndex,
+                                 finishedEvent))
+            .status_with_transitional_ignore();
         return;
     }
 
@@ -3028,12 +3030,12 @@ void ReplicationCoordinatorImpl::_prepareReplSetMetadata_inlock(const OpTime& la
     OpTime lastVisibleOpTime =
         std::max(lastOpTimeFromClient, _getCurrentCommittedSnapshotOpTime_inlock());
     auto metadata = _topCoord->prepareReplSetMetadata(lastVisibleOpTime);
-    metadata.writeToMetadata(builder);
+    metadata.writeToMetadata(builder).transitional_ignore();
 }
 
 void ReplicationCoordinatorImpl::_prepareOplogQueryMetadata_inlock(int rbid,
                                                                    BSONObjBuilder* builder) const {
-    _topCoord->prepareOplogQueryMetadata(rbid).writeToMetadata(builder);
+    _topCoord->prepareOplogQueryMetadata(rbid).writeToMetadata(builder).transitional_ignore();
 }
 
 bool ReplicationCoordinatorImpl::isV1ElectionProtocol() const {

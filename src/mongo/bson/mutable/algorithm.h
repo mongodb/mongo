@@ -140,9 +140,9 @@ void sortChildren(Element parent, Comparator comp) {
     const std::vector<Element>::iterator end = children.end();
     for (; where != end; ++where) {
         // Detach from its current location.
-        where->remove();
+        where->remove().transitional_ignore();
         // Make it the new rightmost element.
-        parent.pushBack(*where);
+        parent.pushBack(*where).transitional_ignore();
     }
 }
 
@@ -156,7 +156,7 @@ void deduplicateChildren(Element parent, EqualityComparator equal) {
     while (current.ok()) {
         Element next = current.rightSibling();
         if (next.ok() && equal(current, next)) {
-            next.remove();
+            next.remove().transitional_ignore();
         } else {
             current = next;
         }

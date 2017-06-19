@@ -52,7 +52,7 @@ TEST(MessageCompressorRegistry, RegularTest) {
     auto compressorListCheck = compressorList;
     registry.setSupportedCompressors(std::move(compressorList));
     registry.registerImplementation(std::move(compressor));
-    registry.finalizeSupportedCompressors();
+    registry.finalizeSupportedCompressors().transitional_ignore();
 
     ASSERT_TRUE(compressorListCheck == registry.getCompressorNames());
 

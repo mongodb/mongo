@@ -111,7 +111,8 @@ void CollectionRangeDeleterTest::setUp() {
     serverGlobalParams.clusterRole = ClusterRole::ShardServer;
     ShardingMongodTestFixture::setUp();
     replicationCoordinator()->alwaysAllowWrites(true);
-    initializeGlobalShardingStateForMongodForTest(ConnectionString(dummyHost));
+    initializeGlobalShardingStateForMongodForTest(ConnectionString(dummyHost))
+        .transitional_ignore();
 
     // RemoteCommandTargeterMock::get(shardRegistry()->getConfigShard()->getTargeter())
     //     ->setConnectionStringReturnValue(kConfigConnStr);

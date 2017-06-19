@@ -470,17 +470,19 @@ TEST_F(ReplCoordTest, NodeWillNotStandForElectionDuringHeartbeatReconfig) {
     net->enterNetwork();
     ReplSetHeartbeatResponse hbResp2;
     ReplSetConfig config;
-    config.initialize(BSON("_id"
-                           << "mySet"
-                           << "version"
-                           << 3
-                           << "members"
-                           << BSON_ARRAY(BSON("_id" << 1 << "host"
-                                                    << "node1:12345")
-                                         << BSON("_id" << 2 << "host"
-                                                       << "node2:12345"))
-                           << "protocolVersion"
-                           << 1));
+    config
+        .initialize(BSON("_id"
+                         << "mySet"
+                         << "version"
+                         << 3
+                         << "members"
+                         << BSON_ARRAY(BSON("_id" << 1 << "host"
+                                                  << "node1:12345")
+                                       << BSON("_id" << 2 << "host"
+                                                     << "node2:12345"))
+                         << "protocolVersion"
+                         << 1))
+        .transitional_ignore();
     hbResp2.setConfig(config);
     hbResp2.setConfigVersion(3);
     hbResp2.setSetName("mySet");
@@ -759,7 +761,7 @@ TEST_F(ReplCoordTest, ElectionFailsWhenTermChangesDuringActualElection) {
     simulateEnoughHeartbeatsForAllNodesUp();
     simulateSuccessfulDryRun();
     // update to a future term before the election completes
-    getReplCoord()->updateTerm(&opCtx, 1000);
+    getReplCoord()->updateTerm(&opCtx, 1000).transitional_ignore();
 
     NetworkInterfaceMock* net = getNet();
     net->enterNetwork();

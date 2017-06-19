@@ -444,7 +444,7 @@ TEST(SimpleRecordStoreV1, Truncate) {
         ASSERT_EQUALS(em.getExtent(DiskLoc(0, 0))->length, em.minSize());
     }
 
-    rs.truncate(&opCtx);
+    rs.truncate(&opCtx).transitional_ignore();
 
     {
         LocAndSize recs[] = {{}};

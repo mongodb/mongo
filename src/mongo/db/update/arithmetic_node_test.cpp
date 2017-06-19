@@ -47,7 +47,7 @@ DEATH_TEST(ArithmeticNodeTest, InitFailsForEmptyElement, "Invariant failure modE
     auto update = fromjson("{$inc: {}}");
     const CollatorInterface* collator = nullptr;
     ArithmeticNode node(ArithmeticNode::ArithmeticOp::kAdd);
-    node.init(update["$inc"].embeddedObject().firstElement(), collator);
+    node.init(update["$inc"].embeddedObject().firstElement(), collator).transitional_ignore();
 }
 
 TEST(ArithmeticNodeTest, InitSucceedsForNumberIntElement) {
@@ -1742,7 +1742,7 @@ TEST(ArithmeticNodeTest, ApplyDeserializedDocNotNoOp) {
 
     Document doc(fromjson("{a: 1}"));
     // De-serialize the int.
-    doc.root()["a"].setValueInt(1);
+    doc.root()["a"].setValueInt(1).transitional_ignore();
 
     FieldRef pathToCreate("b");
     FieldRef pathTaken("");
@@ -1777,7 +1777,7 @@ TEST(ArithmeticNodeTest, ApplyToDeserializedDocNoOp) {
 
     Document doc(fromjson("{a: 1}"));
     // De-serialize the int.
-    doc.root()["a"].setValueInt(2);
+    doc.root()["a"].setValueInt(2).transitional_ignore();
 
     FieldRef pathToCreate("");
     FieldRef pathTaken("a");
@@ -1812,7 +1812,7 @@ TEST(ArithmeticNodeTest, ApplyToDeserializedDocNestedNoop) {
 
     Document doc{BSONObj()};
     // De-serialize the int.
-    doc.root().appendObject("a", BSON("b" << static_cast<int>(1)));
+    doc.root().appendObject("a", BSON("b" << static_cast<int>(1))).transitional_ignore();
 
     FieldRef pathToCreate("");
     FieldRef pathTaken("a.b");
@@ -1847,7 +1847,7 @@ TEST(ArithmeticNodeTest, ApplyToDeserializedDocNestedNotNoop) {
 
     Document doc{BSONObj()};
     // De-serialize the int.
-    doc.root().appendObject("a", BSON("b" << static_cast<int>(1)));
+    doc.root().appendObject("a", BSON("b" << static_cast<int>(1))).transitional_ignore();
 
     FieldRef pathToCreate("");
     FieldRef pathTaken("a.b");

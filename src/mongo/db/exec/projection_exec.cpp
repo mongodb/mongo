@@ -475,7 +475,7 @@ void ProjectionExec::appendArray(BSONObjBuilder* bob, const BSONObj& array, bool
                 BSONObjBuilder subBob;
                 BSONObjIterator jt(elt.embeddedObject());
                 while (jt.more()) {
-                    append(&subBob, jt.next());
+                    append(&subBob, jt.next()).transitional_ignore();
                 }
                 bob->append(bob->numStr(index++), subBob.obj());
                 break;
@@ -518,7 +518,7 @@ Status ProjectionExec::append(BSONObjBuilder* bob,
         BSONObjBuilder subBob;
         BSONObjIterator it(elt.embeddedObject());
         while (it.more()) {
-            subfm.append(&subBob, it.next(), details, arrayOpType);
+            subfm.append(&subBob, it.next(), details, arrayOpType).transitional_ignore();
         }
         bob->append(elt.fieldName(), subBob.obj());
     } else {

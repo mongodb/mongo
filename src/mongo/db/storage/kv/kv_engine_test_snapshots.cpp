@@ -91,7 +91,7 @@ public:
 
     void prepareSnapshot() {
         snapshotOperation = makeOperation();  // each prepare gets a new operation.
-        snapshotManager->prepareForCreateSnapshot(snapshotOperation);
+        snapshotManager->prepareForCreateSnapshot(snapshotOperation).transitional_ignore();
     }
 
     SnapshotName createSnapshot() {

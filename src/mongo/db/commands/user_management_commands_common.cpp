@@ -57,7 +57,7 @@ void redactPasswordData(mutablebson::Element parent) {
     const auto pwdFieldName = "pwd"_sd;
     for (mmb::Element pwdElement = mmb::findFirstChildNamed(parent, pwdFieldName); pwdElement.ok();
          pwdElement = mmb::findElementNamed(pwdElement.rightSibling(), pwdFieldName)) {
-        pwdElement.setValueString("xxx");
+        pwdElement.setValueString("xxx").transitional_ignore();
     }
 }
 

@@ -66,7 +66,7 @@ public:
             _database = _context.db();
             _collection = _database->getCollection(&_opCtx, ns());
             if (_collection) {
-                _database->dropCollection(&_opCtx, ns());
+                _database->dropCollection(&_opCtx, ns()).transitional_ignore();
             }
             _collection = _database->createCollection(&_opCtx, ns());
             wunit.commit();
@@ -109,9 +109,9 @@ protected:
             oid.init();
             b.appendOID("_id", &oid);
             b.appendElements(o);
-            _collection->insertDocument(&_opCtx, b.obj(), nullOpDebug, false);
+            _collection->insertDocument(&_opCtx, b.obj(), nullOpDebug, false).transitional_ignore();
         } else {
-            _collection->insertDocument(&_opCtx, o, nullOpDebug, false);
+            _collection->insertDocument(&_opCtx, o, nullOpDebug, false).transitional_ignore();
         }
         wunit.commit();
     }
@@ -193,7 +193,7 @@ public:
             Database* db = ctx.db();
             if (db->getCollection(&_opCtx, ns())) {
                 _collection = NULL;
-                db->dropCollection(&_opCtx, ns());
+                db->dropCollection(&_opCtx, ns()).transitional_ignore();
             }
             _collection = db->createCollection(&_opCtx, ns(), CollectionOptions(), false);
             wunit.commit();

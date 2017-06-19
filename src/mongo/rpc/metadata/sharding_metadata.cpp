@@ -116,7 +116,7 @@ Status ShardingMetadata::downconvert(const BSONObj& commandReply,
         // We can reuse the same logic to write the sharding metadata out to the legacy
         // command as the element has the same format whether it is there or on the metadata
         // object.
-        swShardingMetadata.getValue().writeToMetadata(legacyCommandReplyBob);
+        swShardingMetadata.getValue().writeToMetadata(legacyCommandReplyBob).transitional_ignore();
     } else if (swShardingMetadata.getStatus() == ErrorCodes::NoSuchKey) {
         // It is valid to not have a $gleStats field.
     } else {
@@ -132,7 +132,7 @@ Status ShardingMetadata::upconvert(const BSONObj& legacyCommand,
     // as it has the same format whether it is there or on the metadata object.
     auto swShardingMetadata = readFromMetadata(legacyCommand);
     if (swShardingMetadata.isOK()) {
-        swShardingMetadata.getValue().writeToMetadata(metadataBob);
+        swShardingMetadata.getValue().writeToMetadata(metadataBob).transitional_ignore();
 
         // Write out the command excluding the $gleStats subobject.
         for (const auto& elem : legacyCommand) {

@@ -432,8 +432,10 @@ TEST_F(AuthorizationSessionTest, InvalidateUser) {
 
     // Change the user to be read-only
     int ignored;
-    managerState->remove(
-        &_opCtx, AuthorizationManager::usersCollectionNamespace, BSONObj(), BSONObj(), &ignored);
+    managerState
+        ->remove(
+            &_opCtx, AuthorizationManager::usersCollectionNamespace, BSONObj(), BSONObj(), &ignored)
+        .transitional_ignore();
     ASSERT_OK(managerState->insertPrivilegeDocument(&_opCtx,
                                                     BSON("user"
                                                          << "spencer"
@@ -461,8 +463,10 @@ TEST_F(AuthorizationSessionTest, InvalidateUser) {
     ASSERT(user->isValid());
 
     // Delete the user.
-    managerState->remove(
-        &_opCtx, AuthorizationManager::usersCollectionNamespace, BSONObj(), BSONObj(), &ignored);
+    managerState
+        ->remove(
+            &_opCtx, AuthorizationManager::usersCollectionNamespace, BSONObj(), BSONObj(), &ignored)
+        .transitional_ignore();
     // Make sure that invalidating the user causes the session to reload its privileges.
     authzManager->invalidateUserByName(user->getName());
     authzSession->startRequest(&_opCtx);  // Refreshes cached data for invalid users
@@ -502,8 +506,10 @@ TEST_F(AuthorizationSessionTest, UseOldUserInfoInFaceOfConnectivityProblems) {
     // Change the user to be read-only
     int ignored;
     managerState->setFindsShouldFail(true);
-    managerState->remove(
-        &_opCtx, AuthorizationManager::usersCollectionNamespace, BSONObj(), BSONObj(), &ignored);
+    managerState
+        ->remove(
+            &_opCtx, AuthorizationManager::usersCollectionNamespace, BSONObj(), BSONObj(), &ignored)
+        .transitional_ignore();
     ASSERT_OK(managerState->insertPrivilegeDocument(&_opCtx,
                                                     BSON("user"
                                                          << "spencer"
@@ -726,7 +732,9 @@ TEST_F(AuthorizationSessionTest, AddPrivilegesForStageFailsIfOutNamespaceIsNotVa
                                          << ""));
     BSONObj cmdObj = BSON("aggregate" << testFooNss.coll() << "pipeline" << pipeline);
     ASSERT_THROWS_CODE(
-        authzSession->checkAuthForAggregate(testFooNss, cmdObj, false), UserException, 17139);
+        authzSession->checkAuthForAggregate(testFooNss, cmdObj, false).transitional_ignore(),
+        UserException,
+        17139);
 }
 
 TEST_F(AuthorizationSessionTest, CannotAggregateOutWithoutInsertAndRemoveOnTargetNamespace) {

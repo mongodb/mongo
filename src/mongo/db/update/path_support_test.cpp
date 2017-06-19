@@ -500,7 +500,7 @@ TEST_F(ArrayDoc, ExcessivePaddingNotRequestedIfArrayAlreadyPadded) {
         Element arrayA = doc().root().leftChild();
         ASSERT_EQ(arrayA.getFieldName(), "a");
         ASSERT_EQ(arrayA.getType(), mongo::Array);
-        arrayA.appendInt("", 1);
+        arrayA.appendInt("", 1).transitional_ignore();
     }
 
     size_t idxFound;

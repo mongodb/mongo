@@ -212,7 +212,7 @@ Status ModifierPullAll::apply() const {
     vector<mutablebson::Element>::const_iterator curr = _preparedState->elementsToRemove.begin();
     const vector<mutablebson::Element>::const_iterator end = _preparedState->elementsToRemove.end();
     for (; curr != end; ++curr) {
-        const_cast<mutablebson::Element&>(*curr).remove();
+        const_cast<mutablebson::Element&>(*curr).remove().transitional_ignore();
     }
     return Status::OK();
 }

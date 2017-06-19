@@ -82,9 +82,10 @@ private:
 TEST_F(KeysManagerTest, GetKeyForValidationTimesOutIfRefresherIsNotRunning) {
     operationContext()->setDeadlineAfterNowBy(Microseconds(250 * 1000));
 
-    ASSERT_THROWS(
-        keyManager()->getKeyForValidation(operationContext(), 1, LogicalTime(Timestamp(100, 0))),
-        DBException);
+    ASSERT_THROWS(keyManager()
+                      ->getKeyForValidation(operationContext(), 1, LogicalTime(Timestamp(100, 0)))
+                      .status_with_transitional_ignore(),
+                  DBException);
 }
 
 TEST_F(KeysManagerTest, GetKeyForValidationErrorsIfKeyDoesntExist) {

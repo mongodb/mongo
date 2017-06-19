@@ -165,10 +165,13 @@ int MallocFreeOStreamGuard::terminateDepth = 0;
 
 // must hold MallocFreeOStreamGuard to call
 void writeMallocFreeStreamToLog() {
-    logger::globalLogDomain()->append(
-        logger::MessageEventEphemeral(
-            Date_t::now(), logger::LogSeverity::Severe(), getThreadName(), mallocFreeOStream.str())
-            .setIsTruncatable(false));
+    logger::globalLogDomain()
+        ->append(logger::MessageEventEphemeral(Date_t::now(),
+                                               logger::LogSeverity::Severe(),
+                                               getThreadName(),
+                                               mallocFreeOStream.str())
+                     .setIsTruncatable(false))
+        .transitional_ignore();
     mallocFreeOStream.rewind();
 }
 

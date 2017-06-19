@@ -53,7 +53,7 @@ public:
     virtual void setup() {
         WriteUnitOfWork wunit(&_opCtx);
 
-        _ctx.db()->dropCollection(&_opCtx, ns());
+        _ctx.db()->dropCollection(&_opCtx, ns()).transitional_ignore();
         _coll = _ctx.db()->createCollection(&_opCtx, ns());
 
         ASSERT_OK(_coll->getIndexCatalog()->createIndexOnEmptyCollection(

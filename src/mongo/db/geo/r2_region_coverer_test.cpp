@@ -275,11 +275,13 @@ GeometryContainer* getRandomCircle(double radius) {
 
     // Format: { $center : [ [-74, 40.74], 10 ] }
     GeometryContainer* container = new GeometryContainer();
-    container->parseFromQuery(
-        BSON("$center" << BSON_ARRAY(BSON_ARRAY(randDouble(radius, MAXBOUND - radius)
-                                                << randDouble(radius, MAXBOUND - radius))
-                                     << radius))
-            .firstElement());
+    container
+        ->parseFromQuery(
+            BSON("$center" << BSON_ARRAY(BSON_ARRAY(randDouble(radius, MAXBOUND - radius)
+                                                    << randDouble(radius, MAXBOUND - radius))
+                                         << radius))
+                .firstElement())
+        .transitional_ignore();
     return container;
 }
 

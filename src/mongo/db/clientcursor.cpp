@@ -140,7 +140,9 @@ void ClientCursor::updateSlaveLocation(OperationContext* opCtx) {
     if (!rid.isSet())
         return;
 
-    repl::getGlobalReplicationCoordinator()->setLastOptimeForSlave(rid, _slaveReadTill);
+    repl::getGlobalReplicationCoordinator()
+        ->setLastOptimeForSlave(rid, _slaveReadTill)
+        .transitional_ignore();
 }
 
 //

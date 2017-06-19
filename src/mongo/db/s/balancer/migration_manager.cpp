@@ -80,7 +80,8 @@ Status extractMigrationStatusFromCommandResponse(const BSONObj& commandResponse)
 
     if (!commandStatus.isOK()) {
         bool chunkTooBig = false;
-        bsonExtractBooleanFieldWithDefault(commandResponse, kChunkTooBig, false, &chunkTooBig);
+        bsonExtractBooleanFieldWithDefault(commandResponse, kChunkTooBig, false, &chunkTooBig)
+            .transitional_ignore();
         if (chunkTooBig) {
             commandStatus = {ErrorCodes::ChunkTooBig, commandStatus.reason()};
         }
@@ -594,8 +595,9 @@ void MigrationManager::_abandonActiveMigrationsAndEnableManager(OperationContext
 
     // Clear the config.migrations collection so that those chunks can be scheduled for migration
     // again.
-    catalogClient->removeConfigDocuments(
-        opCtx, MigrationType::ConfigNS, BSONObj(), kMajorityWriteConcern);
+    catalogClient
+        ->removeConfigDocuments(opCtx, MigrationType::ConfigNS, BSONObj(), kMajorityWriteConcern)
+        .transitional_ignore();
 
     _state = State::kEnabled;
     _condVar.notify_all();

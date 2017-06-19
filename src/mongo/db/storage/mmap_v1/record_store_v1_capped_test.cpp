@@ -74,7 +74,7 @@ void simpleInsertTest(const char* buf, int size) {
 
     ASSERT_NOT_OK(rs.insertRecord(&opCtx, buf, 3, 1000).getStatus());
 
-    rs.insertRecord(&opCtx, buf, size, 10000);
+    rs.insertRecord(&opCtx, buf, size, 10000).status_with_transitional_ignore();
 
     {
         BSONObjBuilder b;
@@ -119,7 +119,8 @@ TEST(CappedRecordStoreV1, EmptySingleExtent) {
         initializeV1RS(&opCtx, records, drecs, NULL, &em, md);
     }
 
-    rs.insertRecord(&opCtx, zeros, 100 - MmapV1RecordHeader::HeaderSize, false);
+    rs.insertRecord(&opCtx, zeros, 100 - MmapV1RecordHeader::HeaderSize, false)
+        .status_with_transitional_ignore();
 
     {
         LocAndSize recs[] = {{DiskLoc(0, 1000), 100}, {}};
@@ -150,7 +151,8 @@ TEST(CappedRecordStoreV1, FirstLoopWithSingleExtentExactSize) {
         initializeV1RS(&opCtx, records, drecs, NULL, &em, md);
     }
 
-    rs.insertRecord(&opCtx, zeros, 100 - MmapV1RecordHeader::HeaderSize, false);
+    rs.insertRecord(&opCtx, zeros, 100 - MmapV1RecordHeader::HeaderSize, false)
+        .status_with_transitional_ignore();
 
     {
         LocAndSize recs[] = {{DiskLoc(0, 1200), 100},  // first old record
@@ -188,7 +190,8 @@ TEST(CappedRecordStoreV1, NonFirstLoopWithSingleExtentExactSize) {
         initializeV1RS(&opCtx, records, drecs, NULL, &em, md);
     }
 
-    rs.insertRecord(&opCtx, zeros, 100 - MmapV1RecordHeader::HeaderSize, false);
+    rs.insertRecord(&opCtx, zeros, 100 - MmapV1RecordHeader::HeaderSize, false)
+        .status_with_transitional_ignore();
 
     {
         LocAndSize recs[] = {{DiskLoc(0, 1200), 100},  // first old record
@@ -229,7 +232,8 @@ TEST(CappedRecordStoreV1, WillLoopWithout24SpareBytes) {
         initializeV1RS(&opCtx, records, drecs, NULL, &em, md);
     }
 
-    rs.insertRecord(&opCtx, zeros, 100 - MmapV1RecordHeader::HeaderSize, false);
+    rs.insertRecord(&opCtx, zeros, 100 - MmapV1RecordHeader::HeaderSize, false)
+        .status_with_transitional_ignore();
 
     {
         LocAndSize recs[] = {{DiskLoc(0, 1200), 100},  // first old record
@@ -266,7 +270,8 @@ TEST(CappedRecordStoreV1, WontLoopWith24SpareBytes) {
         initializeV1RS(&opCtx, records, drecs, NULL, &em, md);
     }
 
-    rs.insertRecord(&opCtx, zeros, 100 - MmapV1RecordHeader::HeaderSize, false);
+    rs.insertRecord(&opCtx, zeros, 100 - MmapV1RecordHeader::HeaderSize, false)
+        .status_with_transitional_ignore();
 
     {
         LocAndSize recs[] = {{DiskLoc(0, 1000), 100},
@@ -301,7 +306,8 @@ TEST(CappedRecordStoreV1, MoveToSecondExtentUnLooped) {
         initializeV1RS(&opCtx, records, drecs, NULL, &em, md);
     }
 
-    rs.insertRecord(&opCtx, zeros, 100 - MmapV1RecordHeader::HeaderSize, false);
+    rs.insertRecord(&opCtx, zeros, 100 - MmapV1RecordHeader::HeaderSize, false)
+        .status_with_transitional_ignore();
 
     {
         LocAndSize recs[] = {{DiskLoc(0, 1000), 500},
@@ -339,7 +345,8 @@ TEST(CappedRecordStoreV1, MoveToSecondExtentLooped) {
         initializeV1RS(&opCtx, records, drecs, NULL, &em, md);
     }
 
-    rs.insertRecord(&opCtx, zeros, 200 - MmapV1RecordHeader::HeaderSize, false);
+    rs.insertRecord(&opCtx, zeros, 200 - MmapV1RecordHeader::HeaderSize, false)
+        .status_with_transitional_ignore();
 
     {
         LocAndSize recs[] = {{DiskLoc(0, 1000), 500},
@@ -424,13 +431,16 @@ TEST(CappedRecordStoreV1Scrambler, Minimal) {
         initializeV1RS(&opCtx, records, drecs, NULL, &em, md);
     }
 
-    rs.insertRecord(&opCtx, zeros, 500 - MmapV1RecordHeader::HeaderSize, false);
-    rs.insertRecord(&opCtx, zeros, 300 - MmapV1RecordHeader::HeaderSize, false);
-    rs.insertRecord(
-        &opCtx, zeros, 400 - MmapV1RecordHeader::HeaderSize, false);  // won't fit at end so wraps
-    rs.insertRecord(&opCtx, zeros, 120 - MmapV1RecordHeader::HeaderSize, false);  // fits at end
-    rs.insertRecord(
-        &opCtx, zeros, 60 - MmapV1RecordHeader::HeaderSize, false);  // fits in earlier hole
+    rs.insertRecord(&opCtx, zeros, 500 - MmapV1RecordHeader::HeaderSize, false)
+        .status_with_transitional_ignore();
+    rs.insertRecord(&opCtx, zeros, 300 - MmapV1RecordHeader::HeaderSize, false)
+        .status_with_transitional_ignore();
+    rs.insertRecord(&opCtx, zeros, 400 - MmapV1RecordHeader::HeaderSize, false)
+        .status_with_transitional_ignore();  // won't fit at end so wraps
+    rs.insertRecord(&opCtx, zeros, 120 - MmapV1RecordHeader::HeaderSize, false)
+        .status_with_transitional_ignore();  // fits at end
+    rs.insertRecord(&opCtx, zeros, 60 - MmapV1RecordHeader::HeaderSize, false)
+        .status_with_transitional_ignore();  // fits in earlier hole
 
     {
         LocAndSize recs[] = {{DiskLoc(0, 1500), 300},  // 2nd insert
@@ -467,34 +477,62 @@ TEST(CappedRecordStoreV1Scrambler, FourDeletedRecordsInSingleExtent) {
 
     // This list of sizes was empirically generated to achieve this outcome. Don't think too
     // much about them.
-    rs.insertRecord(&opCtx, zeros, 500 - MmapV1RecordHeader::HeaderSize, false);
-    rs.insertRecord(&opCtx, zeros, 300 - MmapV1RecordHeader::HeaderSize, false);
-    rs.insertRecord(&opCtx, zeros, 304 - MmapV1RecordHeader::HeaderSize, false);
-    rs.insertRecord(&opCtx, zeros, 76 - MmapV1RecordHeader::HeaderSize, false);
-    rs.insertRecord(&opCtx, zeros, 100 - MmapV1RecordHeader::HeaderSize, false);
-    rs.insertRecord(&opCtx, zeros, 96 - MmapV1RecordHeader::HeaderSize, false);
-    rs.insertRecord(&opCtx, zeros, 76 - MmapV1RecordHeader::HeaderSize, false);
-    rs.insertRecord(&opCtx, zeros, 200 - MmapV1RecordHeader::HeaderSize, false);
-    rs.insertRecord(&opCtx, zeros, 100 - MmapV1RecordHeader::HeaderSize, false);
-    rs.insertRecord(&opCtx, zeros, 100 - MmapV1RecordHeader::HeaderSize, false);
-    rs.insertRecord(&opCtx, zeros, 200 - MmapV1RecordHeader::HeaderSize, false);
-    rs.insertRecord(&opCtx, zeros, 56 - MmapV1RecordHeader::HeaderSize, false);
-    rs.insertRecord(&opCtx, zeros, 100 - MmapV1RecordHeader::HeaderSize, false);
-    rs.insertRecord(&opCtx, zeros, 96 - MmapV1RecordHeader::HeaderSize, false);
-    rs.insertRecord(&opCtx, zeros, 104 - MmapV1RecordHeader::HeaderSize, false);
-    rs.insertRecord(&opCtx, zeros, 96 - MmapV1RecordHeader::HeaderSize, false);
-    rs.insertRecord(&opCtx, zeros, 60 - MmapV1RecordHeader::HeaderSize, false);
-    rs.insertRecord(&opCtx, zeros, 60 - MmapV1RecordHeader::HeaderSize, false);
-    rs.insertRecord(&opCtx, zeros, 146 - MmapV1RecordHeader::HeaderSize, false);
-    rs.insertRecord(&opCtx, zeros, 146 - MmapV1RecordHeader::HeaderSize, false);
-    rs.insertRecord(&opCtx, zeros, 40 - MmapV1RecordHeader::HeaderSize, false);
-    rs.insertRecord(&opCtx, zeros, 40 - MmapV1RecordHeader::HeaderSize, false);
-    rs.insertRecord(&opCtx, zeros, 36 - MmapV1RecordHeader::HeaderSize, false);
-    rs.insertRecord(&opCtx, zeros, 100 - MmapV1RecordHeader::HeaderSize, false);
-    rs.insertRecord(&opCtx, zeros, 96 - MmapV1RecordHeader::HeaderSize, false);
-    rs.insertRecord(&opCtx, zeros, 200 - MmapV1RecordHeader::HeaderSize, false);
-    rs.insertRecord(&opCtx, zeros, 60 - MmapV1RecordHeader::HeaderSize, false);
-    rs.insertRecord(&opCtx, zeros, 64 - MmapV1RecordHeader::HeaderSize, false);
+    rs.insertRecord(&opCtx, zeros, 500 - MmapV1RecordHeader::HeaderSize, false)
+        .status_with_transitional_ignore();
+    rs.insertRecord(&opCtx, zeros, 300 - MmapV1RecordHeader::HeaderSize, false)
+        .status_with_transitional_ignore();
+    rs.insertRecord(&opCtx, zeros, 304 - MmapV1RecordHeader::HeaderSize, false)
+        .status_with_transitional_ignore();
+    rs.insertRecord(&opCtx, zeros, 76 - MmapV1RecordHeader::HeaderSize, false)
+        .status_with_transitional_ignore();
+    rs.insertRecord(&opCtx, zeros, 100 - MmapV1RecordHeader::HeaderSize, false)
+        .status_with_transitional_ignore();
+    rs.insertRecord(&opCtx, zeros, 96 - MmapV1RecordHeader::HeaderSize, false)
+        .status_with_transitional_ignore();
+    rs.insertRecord(&opCtx, zeros, 76 - MmapV1RecordHeader::HeaderSize, false)
+        .status_with_transitional_ignore();
+    rs.insertRecord(&opCtx, zeros, 200 - MmapV1RecordHeader::HeaderSize, false)
+        .status_with_transitional_ignore();
+    rs.insertRecord(&opCtx, zeros, 100 - MmapV1RecordHeader::HeaderSize, false)
+        .status_with_transitional_ignore();
+    rs.insertRecord(&opCtx, zeros, 100 - MmapV1RecordHeader::HeaderSize, false)
+        .status_with_transitional_ignore();
+    rs.insertRecord(&opCtx, zeros, 200 - MmapV1RecordHeader::HeaderSize, false)
+        .status_with_transitional_ignore();
+    rs.insertRecord(&opCtx, zeros, 56 - MmapV1RecordHeader::HeaderSize, false)
+        .status_with_transitional_ignore();
+    rs.insertRecord(&opCtx, zeros, 100 - MmapV1RecordHeader::HeaderSize, false)
+        .status_with_transitional_ignore();
+    rs.insertRecord(&opCtx, zeros, 96 - MmapV1RecordHeader::HeaderSize, false)
+        .status_with_transitional_ignore();
+    rs.insertRecord(&opCtx, zeros, 104 - MmapV1RecordHeader::HeaderSize, false)
+        .status_with_transitional_ignore();
+    rs.insertRecord(&opCtx, zeros, 96 - MmapV1RecordHeader::HeaderSize, false)
+        .status_with_transitional_ignore();
+    rs.insertRecord(&opCtx, zeros, 60 - MmapV1RecordHeader::HeaderSize, false)
+        .status_with_transitional_ignore();
+    rs.insertRecord(&opCtx, zeros, 60 - MmapV1RecordHeader::HeaderSize, false)
+        .status_with_transitional_ignore();
+    rs.insertRecord(&opCtx, zeros, 146 - MmapV1RecordHeader::HeaderSize, false)
+        .status_with_transitional_ignore();
+    rs.insertRecord(&opCtx, zeros, 146 - MmapV1RecordHeader::HeaderSize, false)
+        .status_with_transitional_ignore();
+    rs.insertRecord(&opCtx, zeros, 40 - MmapV1RecordHeader::HeaderSize, false)
+        .status_with_transitional_ignore();
+    rs.insertRecord(&opCtx, zeros, 40 - MmapV1RecordHeader::HeaderSize, false)
+        .status_with_transitional_ignore();
+    rs.insertRecord(&opCtx, zeros, 36 - MmapV1RecordHeader::HeaderSize, false)
+        .status_with_transitional_ignore();
+    rs.insertRecord(&opCtx, zeros, 100 - MmapV1RecordHeader::HeaderSize, false)
+        .status_with_transitional_ignore();
+    rs.insertRecord(&opCtx, zeros, 96 - MmapV1RecordHeader::HeaderSize, false)
+        .status_with_transitional_ignore();
+    rs.insertRecord(&opCtx, zeros, 200 - MmapV1RecordHeader::HeaderSize, false)
+        .status_with_transitional_ignore();
+    rs.insertRecord(&opCtx, zeros, 60 - MmapV1RecordHeader::HeaderSize, false)
+        .status_with_transitional_ignore();
+    rs.insertRecord(&opCtx, zeros, 64 - MmapV1RecordHeader::HeaderSize, false)
+        .status_with_transitional_ignore();
 
     {
         LocAndSize recs[] = {{DiskLoc(0, 1148), 148},

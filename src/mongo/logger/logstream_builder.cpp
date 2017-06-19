@@ -104,7 +104,7 @@ LogstreamBuilder::~LogstreamBuilder() {
         MessageEventEphemeral message(
             Date_t::now(), _severity, _component, _contextName, _baseMessage);
         message.setIsTruncatable(_isTruncatable);
-        _domain->append(message);
+        _domain->append(message).transitional_ignore();
         if (_tee) {
             _os->str("");
             logger::MessageEventDetailsEncoder teeEncoder;

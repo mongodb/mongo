@@ -134,7 +134,7 @@ TEST(SimpleMod, PrepareIdentityOpOnDeserializedIsNotANoOp) {
     Document doc(fromjson("{a: { b: NumberInt(0)}}"));
 
     // Apply a mutation to the document that will make it non-serialized.
-    doc.root()["a"]["b"].setValueInt(2);
+    doc.root()["a"]["b"].setValueInt(2).transitional_ignore();
 
     // Apply an op that would be a no-op.
     Mod setMod(fromjson("{$set: {a: {b : NumberInt(2)}}}"));
@@ -786,9 +786,9 @@ TEST(Ephemeral, ApplySetModToEphemeralDocument) {
     // $set.
     Document doc;
     Element x = doc.makeElementObject("x");
-    doc.root().pushBack(x);
+    doc.root().pushBack(x).transitional_ignore();
     Element a = doc.makeElementInt("a", 100);
-    x.pushBack(a);
+    x.pushBack(a).transitional_ignore();
 
     Mod setMod(fromjson("{ $set: { x: { a: 100, b: 2 }}}"), true);
 

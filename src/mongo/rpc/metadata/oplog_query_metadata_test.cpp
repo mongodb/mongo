@@ -47,7 +47,7 @@ TEST(ReplResponseMetadataTest, OplogQueryMetadataRoundtrip) {
     ASSERT_EQ(opTime2, metadata.getLastOpApplied());
 
     BSONObjBuilder builder;
-    metadata.writeToMetadata(&builder);
+    metadata.writeToMetadata(&builder).transitional_ignore();
 
     BSONObj expectedObj(BSON(kOplogQueryMetadataFieldName << BSON(
                                  "lastOpCommitted"
@@ -75,7 +75,7 @@ TEST(ReplResponseMetadataTest, OplogQueryMetadataRoundtrip) {
     ASSERT_EQ(metadata.getSyncSourceIndex(), clonedMetadata.getSyncSourceIndex());
 
     BSONObjBuilder clonedBuilder;
-    clonedMetadata.writeToMetadata(&clonedBuilder);
+    clonedMetadata.writeToMetadata(&clonedBuilder).transitional_ignore();
 
     BSONObj clonedSerializedObj = clonedBuilder.obj();
     ASSERT_BSONOBJ_EQ(expectedObj, clonedSerializedObj);

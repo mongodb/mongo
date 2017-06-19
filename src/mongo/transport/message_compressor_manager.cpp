@@ -52,9 +52,9 @@ struct CompressionHeader {
     uint8_t compressorId;
 
     void serialize(DataRangeCursor* cursor) {
-        cursor->writeAndAdvance<LittleEndian<int32_t>>(originalOpCode);
-        cursor->writeAndAdvance<LittleEndian<int32_t>>(uncompressedSize);
-        cursor->writeAndAdvance<LittleEndian<uint8_t>>(compressorId);
+        cursor->writeAndAdvance<LittleEndian<int32_t>>(originalOpCode).transitional_ignore();
+        cursor->writeAndAdvance<LittleEndian<int32_t>>(uncompressedSize).transitional_ignore();
+        cursor->writeAndAdvance<LittleEndian<uint8_t>>(compressorId).transitional_ignore();
     }
 
     CompressionHeader(int32_t _opcode, int32_t _size, uint8_t _id)

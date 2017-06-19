@@ -120,9 +120,10 @@ void ShardingMongodTestFixture::setUp() {
         serversBob.append(BSON("host" << _servers[i].toString() << "_id" << static_cast<int>(i)));
     }
     repl::ReplSetConfig replSetConfig;
-    replSetConfig.initialize(BSON("_id" << _setName << "protocolVersion" << 1 << "version" << 3
-                                        << "members"
-                                        << serversBob.arr()));
+    replSetConfig
+        .initialize(BSON("_id" << _setName << "protocolVersion" << 1 << "version" << 3 << "members"
+                               << serversBob.arr()))
+        .transitional_ignore();
     replCoordPtr->setGetConfigReturnValue(replSetConfig);
 
     repl::ReplicationCoordinator::set(service, std::move(replCoordPtr));
@@ -136,7 +137,9 @@ void ShardingMongodTestFixture::setUp() {
         service,
         stdx::make_unique<repl::ReplicationProcess>(
             storagePtr.get(), stdx::make_unique<repl::ReplicationConsistencyMarkersMock>()));
-    repl::ReplicationProcess::get(_opCtx.get())->initializeRollbackID(_opCtx.get());
+    repl::ReplicationProcess::get(_opCtx.get())
+        ->initializeRollbackID(_opCtx.get())
+        .transitional_ignore();
 
     repl::StorageInterface::set(service, std::move(storagePtr));
 

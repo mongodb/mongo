@@ -575,7 +575,8 @@ Status ShardingCatalogClientImpl::shardCollection(OperationContext* opCtx,
                   "shardCollection.start",
                   ns,
                   collectionDetail.obj(),
-                  ShardingCatalogClientImpl::kMajorityWriteConcern);
+                  ShardingCatalogClientImpl::kMajorityWriteConcern)
+            .transitional_ignore();
     }
 
     const NamespaceString nss(ns);
@@ -652,7 +653,8 @@ Status ShardingCatalogClientImpl::shardCollection(OperationContext* opCtx,
               "shardCollection.end",
               ns,
               BSON("version" << collVersion.toString()),
-              ShardingCatalogClientImpl::kMajorityWriteConcern);
+              ShardingCatalogClientImpl::kMajorityWriteConcern)
+        .transitional_ignore();
 
     return Status::OK();
 }
@@ -715,7 +717,8 @@ StatusWith<ShardDrainingStatus> ShardingCatalogClientImpl::removeShard(Operation
                   "removeShard.start",
                   "",
                   BSON("shard" << name),
-                  ShardingCatalogClientImpl::kMajorityWriteConcern);
+                  ShardingCatalogClientImpl::kMajorityWriteConcern)
+            .transitional_ignore();
 
         return ShardDrainingStatus::STARTED;
     }
@@ -765,7 +768,8 @@ StatusWith<ShardDrainingStatus> ShardingCatalogClientImpl::removeShard(Operation
               "removeShard",
               "",
               BSON("shard" << name),
-              ShardingCatalogClientImpl::kMajorityWriteConcern);
+              ShardingCatalogClientImpl::kMajorityWriteConcern)
+        .transitional_ignore();
 
     return ShardDrainingStatus::COMPLETED;
 }
@@ -921,7 +925,8 @@ Status ShardingCatalogClientImpl::dropCollection(OperationContext* opCtx,
               "dropCollection.start",
               ns.ns(),
               BSONObj(),
-              ShardingCatalogClientImpl::kMajorityWriteConcern);
+              ShardingCatalogClientImpl::kMajorityWriteConcern)
+        .transitional_ignore();
 
     auto shardsStatus = getAllShards(opCtx, repl::ReadConcernLevel::kMajorityReadConcern);
     if (!shardsStatus.isOK()) {
@@ -1099,7 +1104,8 @@ Status ShardingCatalogClientImpl::dropCollection(OperationContext* opCtx,
               "dropCollection",
               ns.ns(),
               BSONObj(),
-              ShardingCatalogClientImpl::kMajorityWriteConcern);
+              ShardingCatalogClientImpl::kMajorityWriteConcern)
+        .transitional_ignore();
 
     return Status::OK();
 }

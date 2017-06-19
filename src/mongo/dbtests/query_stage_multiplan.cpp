@@ -188,7 +188,7 @@ public:
 
         // Plan 0 aka the first plan aka the index scan should be the best.
         PlanYieldPolicy yieldPolicy(PlanExecutor::NO_YIELD, _clock);
-        mps->pickBestPlan(&yieldPolicy);
+        mps->pickBestPlan(&yieldPolicy).transitional_ignore();
         ASSERT(mps->bestPlanChosen());
         ASSERT_EQUALS(0, mps->bestPlanIdx());
 
@@ -272,7 +272,7 @@ public:
 
         // This sets a backup plan.
         PlanYieldPolicy yieldPolicy(PlanExecutor::NO_YIELD, _clock);
-        mps->pickBestPlan(&yieldPolicy);
+        mps->pickBestPlan(&yieldPolicy).transitional_ignore();
         ASSERT(mps->bestPlanChosen());
         ASSERT(mps->hasBackupPlan());
 
@@ -423,7 +423,7 @@ public:
 
         ASSERT_EQ(exec->getRootStage()->stageType(), STAGE_MULTI_PLAN);
 
-        exec->executePlan();
+        exec->executePlan().transitional_ignore();
 
         PlanSummaryStats stats;
         Explain::getSummaryStats(*exec, &stats);

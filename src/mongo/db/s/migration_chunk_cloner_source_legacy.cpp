@@ -327,7 +327,8 @@ void MigrationChunkClonerSourceLegacy::cancelClone(OperationContext* opCtx) {
         case kDone:
             break;
         case kCloning:
-            _callRecipient(createRequestWithSessionId(kRecvChunkAbort, _args.getNss(), _sessionId));
+            _callRecipient(createRequestWithSessionId(kRecvChunkAbort, _args.getNss(), _sessionId))
+                .status_with_transitional_ignore();
         // Intentional fall through
         case kNew:
             _cleanup(opCtx);

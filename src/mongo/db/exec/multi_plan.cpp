@@ -127,7 +127,7 @@ PlanStage::StageState MultiPlanStage::doWork(WorkingSetID* out) {
         // if the best solution fails. Alternatively we could try to
         // defer cache insertion to be after the first produced result.
 
-        _collection->infoCache()->getPlanCache()->remove(*_query);
+        _collection->infoCache()->getPlanCache()->remove(*_query).transitional_ignore();
 
         _bestPlanIdx = _backupPlanIdx;
         _backupPlanIdx = kNoSuchPlan;
@@ -323,7 +323,10 @@ Status MultiPlanStage::pickBestPlan(PlanYieldPolicy* yieldPolicy) {
         }
 
         if (validSolutions) {
-            _collection->infoCache()->getPlanCache()->add(*_query, solutions, ranking.release());
+            _collection->infoCache()
+                ->getPlanCache()
+                ->add(*_query, solutions, ranking.release())
+                .transitional_ignore();
         }
     }
 

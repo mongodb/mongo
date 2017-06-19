@@ -62,7 +62,7 @@ public:
     virtual void rollback() {
         if (_dropOnRollback) {
             // Intentionally ignoring failure
-            _dce->_engine->getEngine()->dropIdent(_opCtx, _ident);
+            _dce->_engine->getEngine()->dropIdent(_opCtx, _ident).transitional_ignore();
         }
 
         const CollectionMap::iterator it = _dce->_collections.find(_collection);
@@ -100,7 +100,7 @@ public:
         // Intentionally ignoring failure here. Since we've removed the metadata pointing to the
         // collection, we should never see it again anyway.
         if (_dropOnCommit)
-            _dce->_engine->getEngine()->dropIdent(_opCtx, _ident);
+            _dce->_engine->getEngine()->dropIdent(_opCtx, _ident).transitional_ignore();
     }
 
     virtual void rollback() {
@@ -346,7 +346,7 @@ Status KVDatabaseCatalogEntryBase::dropCollection(OperationContext* opCtx, Strin
         std::vector<std::string> indexNames;
         entry->getAllIndexes(opCtx, &indexNames);
         for (size_t i = 0; i < indexNames.size(); i++) {
-            entry->removeIndex(opCtx, indexNames[i]);
+            entry->removeIndex(opCtx, indexNames[i]).transitional_ignore();
         }
     }
 

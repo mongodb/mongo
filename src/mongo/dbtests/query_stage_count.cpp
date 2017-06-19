@@ -64,17 +64,18 @@ public:
     virtual void setup() {
         WriteUnitOfWork wunit(&_opCtx);
 
-        _ctx.db()->dropCollection(&_opCtx, ns());
+        _ctx.db()->dropCollection(&_opCtx, ns()).transitional_ignore();
         _coll = _ctx.db()->createCollection(&_opCtx, ns());
 
-        _coll->getIndexCatalog()->createIndexOnEmptyCollection(&_opCtx,
-                                                               BSON("key" << BSON("x" << 1)
-                                                                          << "name"
-                                                                          << "x_1"
-                                                                          << "ns"
-                                                                          << ns()
-                                                                          << "v"
-                                                                          << 1));
+        _coll->getIndexCatalog()
+            ->createIndexOnEmptyCollection(&_opCtx,
+                                           BSON("key" << BSON("x" << 1) << "name"
+                                                      << "x_1"
+                                                      << "ns"
+                                                      << ns()
+                                                      << "v"
+                                                      << 1))
+            .status_with_transitional_ignore();
 
         for (int i = 0; i < kDocuments; i++) {
             insert(BSON(GENOID << "x" << i));
@@ -107,7 +108,7 @@ public:
     void insert(const BSONObj& doc) {
         WriteUnitOfWork wunit(&_opCtx);
         OpDebug* const nullOpDebug = nullptr;
-        _coll->insertDocument(&_opCtx, doc, nullOpDebug, false);
+        _coll->insertDocument(&_opCtx, doc, nullOpDebug, false).transitional_ignore();
         wunit.commit();
     }
 
@@ -123,14 +124,16 @@ public:
         BSONObj oldDoc = _coll->getRecordStore()->dataFor(&_opCtx, oldrecordId).releaseToBson();
         OplogUpdateEntryArgs args;
         args.nss = _coll->ns();
-        _coll->updateDocument(&_opCtx,
-                              oldrecordId,
-                              Snapshotted<BSONObj>(_opCtx.recoveryUnit()->getSnapshotId(), oldDoc),
-                              newDoc,
-                              false,
-                              true,
-                              NULL,
-                              &args);
+        _coll
+            ->updateDocument(&_opCtx,
+                             oldrecordId,
+                             Snapshotted<BSONObj>(_opCtx.recoveryUnit()->getSnapshotId(), oldDoc),
+                             newDoc,
+                             false,
+                             true,
+                             NULL,
+                             &args)
+            .status_with_transitional_ignore();
         wunit.commit();
     }
 

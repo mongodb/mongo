@@ -45,13 +45,13 @@ TEST(ServerParameters, Simple1) {
     ExportedServerParameter<int, ServerParameterType::kStartupAndRuntime> ff(NULL, "ff", &f);
     ASSERT_EQUALS("ff", ff.name());
 
-    ff.set(6);
+    ff.set(6).transitional_ignore();
     ASSERT_EQUALS(6, f.load());
 
-    ff.set(BSON("x" << 7).firstElement());
+    ff.set(BSON("x" << 7).firstElement()).transitional_ignore();
     ASSERT_EQUALS(7, f.load());
 
-    ff.setFromString("8");
+    ff.setFromString("8").transitional_ignore();
     ASSERT_EQUALS(8, f.load());
 }
 
@@ -63,7 +63,7 @@ TEST(ServerParameters, Vector1) {
     BSONObj x = BSON("x" << BSON_ARRAY("a"
                                        << "b"
                                        << "c"));
-    vv.set(x.firstElement());
+    vv.set(x.firstElement()).transitional_ignore();
 
     ASSERT_EQUALS(3U, v.size());
     ASSERT_EQUALS("a", v[0]);
@@ -79,7 +79,7 @@ TEST(ServerParameters, Vector1) {
     ASSERT(x.firstElement().woCompare(y.firstElement(), false) == 0);
 
 
-    vv.setFromString("d,e");
+    vv.setFromString("d,e").transitional_ignore();
     ASSERT_EQUALS(2U, v.size());
     ASSERT_EQUALS("d", v[0]);
     ASSERT_EQUALS("e", v[1]);

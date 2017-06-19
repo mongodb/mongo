@@ -39,7 +39,7 @@ namespace mongo {
 
 void checkRoundTrip(const CollectionOptions& options1) {
     CollectionOptions options2;
-    options2.parse(options1.toBSON());
+    options2.parse(options1.toBSON()).transitional_ignore();
     ASSERT_BSONOBJ_EQ(options1.toBSON(), options2.toBSON());
 }
 

@@ -758,7 +758,7 @@ TEST_F(FetcherTest, CancelDuringCallbackPutsFetcherInShutdown) {
         fetchStatus1 = fetchResult.getStatus();
         fetcher->shutdown();
     };
-    fetcher->schedule();
+    fetcher->schedule().transitional_ignore();
     const BSONObj doc = BSON("_id" << 1);
     processNetworkResponse(BSON("cursor" << BSON("id" << 1LL << "ns"
                                                       << "db.coll"

@@ -193,7 +193,7 @@ CollectionImpl::CollectionImpl(Collection* _this_init,
 
 void CollectionImpl::init(OperationContext* opCtx) {
     _magic = kMagicNumber;
-    _indexCatalog.init(opCtx);
+    _indexCatalog.init(opCtx).transitional_ignore();
     if (isCapped())
         _recordStore->setCappedCallback(this);
 
@@ -1236,7 +1236,7 @@ Status CollectionImpl::validate(OperationContext* opCtx,
             IndexAccessMethod* iam = _indexCatalog.getIndex(descriptor);
             ValidateResults curIndexResults;
             int64_t numKeys;
-            iam->validate(opCtx, &numKeys, &curIndexResults);
+            iam->validate(opCtx, &numKeys, &curIndexResults).transitional_ignore();
             keysPerIndex.appendNumber(descriptor->indexNamespace(),
                                       static_cast<long long>(numKeys));
 

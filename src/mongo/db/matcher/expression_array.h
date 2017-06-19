@@ -77,7 +77,7 @@ public:
     virtual std::unique_ptr<MatchExpression> shallowClone() const {
         std::unique_ptr<ElemMatchObjectMatchExpression> e =
             stdx::make_unique<ElemMatchObjectMatchExpression>();
-        e->init(path(), _sub->shallowClone().release());
+        e->init(path(), _sub->shallowClone().release()).transitional_ignore();
         if (getTag()) {
             e->setTag(getTag()->clone());
         }
@@ -122,7 +122,7 @@ public:
     virtual std::unique_ptr<MatchExpression> shallowClone() const {
         std::unique_ptr<ElemMatchValueMatchExpression> e =
             stdx::make_unique<ElemMatchValueMatchExpression>();
-        e->init(path());
+        e->init(path()).transitional_ignore();
         for (size_t i = 0; i < _subs.size(); ++i) {
             e->add(_subs[i]->shallowClone().release());
         }
@@ -161,7 +161,7 @@ public:
 
     virtual std::unique_ptr<MatchExpression> shallowClone() const {
         std::unique_ptr<SizeMatchExpression> e = stdx::make_unique<SizeMatchExpression>();
-        e->init(path(), _size);
+        e->init(path(), _size).transitional_ignore();
         if (getTag()) {
             e->setTag(getTag()->clone());
         }
