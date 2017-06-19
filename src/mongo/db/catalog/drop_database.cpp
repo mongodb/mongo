@@ -41,10 +41,41 @@
 #include "mongo/db/op_observer.h"
 #include "mongo/db/repl/replication_coordinator.h"
 #include "mongo/db/service_context.h"
+#include "mongo/db/write_concern_options.h"
 #include "mongo/util/log.h"
 #include "mongo/util/scopeguard.h"
 
 namespace mongo {
+
+namespace {
+
+// This is used to wait for the collection drops to replicate to a majority of the replica set.
+// Note: Even though we're setting UNSET here, kMajority implies JOURNAL if journaling is supported
+// by mongod and writeConcernMajorityJournalDefault is set to true in the ReplSetConfig.
+const WriteConcernOptions kDropDatabaseWriteConcern(WriteConcernOptions::kMajority,
+                                                    WriteConcernOptions::SyncMode::UNSET,
+                                                    Minutes(10));
+
+/**
+ * Removes database from catalog and writes dropDatabase entry to oplog.
+ */
+Status _finishDropDatabase(OperationContext* opCtx, const std::string& dbName, Database* db) {
+    // If Database::dropDatabase() fails, we should reset the drop-pending state on Database.
+    auto dropPendingGuard = MakeGuard([db, opCtx] { db->setDropPending(opCtx, false); });
+
+    Database::dropDatabase(opCtx, db);
+    dropPendingGuard.Dismiss();
+
+    log() << "dropDatabase " << dbName << " - finished";
+
+    WriteUnitOfWork wunit(opCtx);
+    getGlobalServiceContext()->getOpObserver()->onDropDatabase(opCtx, dbName);
+    wunit.commit();
+
+    return Status::OK();
+}
+
+}  // namespace
 
 Status dropDatabase(OperationContext* opCtx, const std::string& dbName) {
     uassert(ErrorCodes::IllegalOperation,
@@ -57,6 +88,9 @@ Status dropDatabase(OperationContext* opCtx, const std::string& dbName) {
         CurOp::get(opCtx)->setNS_inlock(dbName);
     }
 
+    auto replCoord = repl::ReplicationCoordinator::get(opCtx);
+    std::size_t numCollectionsToDrop = 0;
+
     MONGO_WRITE_CONFLICT_RETRY_LOOP_BEGIN {
         Lock::GlobalWrite lk(opCtx);
         AutoGetDb autoDB(opCtx, dbName, MODE_X);
@@ -67,7 +101,6 @@ Status dropDatabase(OperationContext* opCtx, const std::string& dbName) {
                                         << " because it does not exist");
         }
 
-        auto replCoord = repl::ReplicationCoordinator::get(opCtx);
         bool userInitiatedWritesAndNotPrimary =
             opCtx->writesAreReplicated() && !replCoord->canAcceptWritesForDatabase(opCtx, dbName);
 
@@ -79,7 +112,8 @@ Status dropDatabase(OperationContext* opCtx, const std::string& dbName) {
         log() << "dropDatabase " << dbName << " - starting";
         db->setDropPending(opCtx, true);
 
-        // If Database::dropDatabase() fails, we should reset the drop-pending state on Database.
+        // If Database::dropCollectionEventIfSystem() fails, we should reset the drop-pending state
+        // on Database.
         auto dropPendingGuard = MakeGuard([&db, opCtx] { db->setDropPending(opCtx, false); });
 
         for (auto collection : *db) {
@@ -91,20 +125,57 @@ Status dropDatabase(OperationContext* opCtx, const std::string& dbName) {
             WriteUnitOfWork wunit(opCtx);
             fassertStatusOK(40476, db->dropCollectionEvenIfSystem(opCtx, nss));
             wunit.commit();
+            numCollectionsToDrop++;
         }
-        Database::dropDatabase(opCtx, db);
         dropPendingGuard.Dismiss();
-        log() << "dropDatabase " << dbName << " - finished";
 
-        WriteUnitOfWork wunit(opCtx);
-
-        getGlobalServiceContext()->getOpObserver()->onDropDatabase(opCtx, dbName);
-
-        wunit.commit();
+        // If there are no collection drops to wait for, we complete the drop database operation.
+        if (numCollectionsToDrop == 0U) {
+            return _finishDropDatabase(opCtx, dbName, db);
+        }
     }
-    MONGO_WRITE_CONFLICT_RETRY_LOOP_END(opCtx, "dropDatabase", dbName);
+    MONGO_WRITE_CONFLICT_RETRY_LOOP_END(opCtx, "dropDatabase_collection", dbName);
 
-    return Status::OK();
+    // If waitForWriteConcern() returns an error or throws an exception, we should reset the
+    // drop-pending state on Database.
+    auto dropPendingGuardWhileAwaitingReplication = MakeGuard([dbName, opCtx] {
+        Lock::GlobalWrite lk(opCtx);
+        AutoGetDb autoDB(opCtx, dbName, MODE_X);
+        if (auto db = autoDB.getDb()) {
+            db->setDropPending(opCtx, false);
+        }
+    });
+
+    auto status =
+        replCoord->awaitReplicationOfLastOpForClient(opCtx, kDropDatabaseWriteConcern).status;
+    if (!status.isOK()) {
+        return Status(status.code(),
+                      str::stream() << "dropDatabase " << dbName << " failed waiting for "
+                                    << numCollectionsToDrop
+                                    << " collection drops to replicate: "
+                                    << status.reason());
+    }
+
+    log() << "dropDatabase " << dbName << " - successfully dropped " << numCollectionsToDrop
+          << " collections. dropping database";
+    dropPendingGuardWhileAwaitingReplication.Dismiss();
+
+    MONGO_WRITE_CONFLICT_RETRY_LOOP_BEGIN {
+        Lock::GlobalWrite lk(opCtx);
+        AutoGetDb autoDB(opCtx, dbName, MODE_X);
+        if (auto db = autoDB.getDb()) {
+            return _finishDropDatabase(opCtx, dbName, db);
+        }
+
+        return Status(ErrorCodes::NamespaceNotFound,
+                      str::stream() << "Could not drop database " << dbName
+                                    << " because it does not exist after dropping "
+                                    << numCollectionsToDrop
+                                    << " collection(s).");
+    }
+    MONGO_WRITE_CONFLICT_RETRY_LOOP_END(opCtx, "dropDatabase_database", dbName);
+
+    MONGO_UNREACHABLE;
 }
 
 }  // namespace mongo
