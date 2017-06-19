@@ -361,6 +361,17 @@ public:
     boost::optional<Date_t> getPriorityTakeover_forTest() const;
 
     /**
+     * Returns the scheduled time of the catchup takeover callback. If a catchup
+     * takeover has not been scheduled, returns boost::none.
+     */
+    boost::optional<Date_t> getCatchupTakeover_forTest() const;
+
+    /**
+     * Returns the catchup takeover CallbackHandle.
+     */
+    executor::TaskExecutor::CallbackHandle getCatchupTakeoverCbh_forTest() const;
+
+    /**
      * Simple wrappers around _setLastOptime_inlock to make it easier to test.
      */
     Status setLastAppliedOptime_forTest(long long cfgVer, long long memberId, const OpTime& opTime);
@@ -1033,6 +1044,11 @@ private:
     void _cancelPriorityTakeover_inlock();
 
     /**
+     * Cancels all outstanding _catchupTakeover callbacks.
+     */
+    void _cancelCatchupTakeover_inlock();
+
+    /**
      * Cancels the current _handleElectionTimeout callback and reschedules a new callback.
      * Returns immediately otherwise.
      */
@@ -1282,13 +1298,21 @@ private:
     // Used for testing only.
     Date_t _handleElectionTimeoutWhen;  // (M)
 
-    // Callback Handle used to cancel a scheduled PriorityTakover callback.
+    // Callback Handle used to cancel a scheduled PriorityTakeover callback.
     executor::TaskExecutor::CallbackHandle _priorityTakeoverCbh;  // (M)
 
     // Priority takeover callback will not run before this time.
     // If this date is Date_t(), the callback is either unscheduled or canceled.
     // Used for testing only.
     Date_t _priorityTakeoverWhen;  // (M)
+
+    // Callback Handle used to cancel a scheduled CatchupTakeover callback.
+    executor::TaskExecutor::CallbackHandle _catchupTakeoverCbh;  // (M)
+
+    // Catchup takeover callback will not run before this time.
+    // If this date is Date_t(), the callback is either unscheduled or canceled.
+    // Used for testing only.
+    Date_t _catchupTakeoverWhen;  // (M)
 
     // Callback handle used by _waitForStartUpComplete() to block until configuration
     // is loaded and external state threads have been started (unless this node is an arbiter).

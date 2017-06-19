@@ -50,7 +50,8 @@ public:
         StartElection,
         StepDownSelf,
         StepDownRemotePrimary,
-        PriorityTakeover
+        PriorityTakeover,
+        CatchupTakeover
     };
 
     /**
@@ -73,6 +74,12 @@ public:
      * primary after the appropriate priority takeover delay.
      */
     static HeartbeatResponseAction makePriorityTakeoverAction();
+
+    /**
+     * Makes a new action telling the current node to schedule an event to attempt to elect itself
+     * primary after the appropriate catchup takeover delay.
+     */
+    static HeartbeatResponseAction makeCatchupTakeoverAction();
 
     /**
      * Makes a new action telling the current node to step down as primary.

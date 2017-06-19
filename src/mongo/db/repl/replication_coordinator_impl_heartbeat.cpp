@@ -274,8 +274,8 @@ stdx::unique_lock<stdx::mutex> ReplicationCoordinatorImpl::_handleHeartbeatRespo
             break;
         }
         case HeartbeatResponseAction::PriorityTakeover: {
-            // Don't schedule a takeover if one is already scheduled.
-            if (!_priorityTakeoverCbh.isValid()) {
+            // Don't schedule a priority takeover if any takeover is already scheduled.
+            if (!_priorityTakeoverCbh.isValid() && !_catchupTakeoverCbh.isValid()) {
 
                 // Add randomized offset to calculated priority takeover delay.
                 Milliseconds priorityTakeoverDelay = _rsConfig.getPriorityTakeoverDelay(_selfIndex);
@@ -287,6 +287,21 @@ stdx::unique_lock<stdx::mutex> ReplicationCoordinatorImpl::_handleHeartbeatRespo
                     stdx::bind(&ReplicationCoordinatorImpl::_startElectSelfIfEligibleV1,
                                this,
                                StartElectionV1Reason::kPriorityTakeover));
+            }
+            break;
+        }
+        case HeartbeatResponseAction::CatchupTakeover: {
+            // Don't schedule a catchup takeover if any takeover is already scheduled.
+            if (!_catchupTakeoverCbh.isValid() && !_priorityTakeoverCbh.isValid()) {
+                Milliseconds catchupTakeoverDelay = _rsConfig.getCatchupTakeoverDelay();
+                _catchupTakeoverWhen = _replExecutor->now() + catchupTakeoverDelay;
+                log() << "Scheduling catchup takeover at " << _catchupTakeoverWhen;
+                _catchupTakeoverCbh = _scheduleWorkAt(
+                    _catchupTakeoverWhen, [this](const executor::TaskExecutor::CallbackArgs& args) {
+                        stdx::lock_guard<stdx::mutex> lock(_mutex);
+                        _cancelCatchupTakeover_inlock();
+                        log() << "Starting an election for a catchup takeover [NOOP]";
+                    });
             }
             break;
         }
@@ -705,6 +720,15 @@ void ReplicationCoordinatorImpl::_cancelPriorityTakeover_inlock() {
     }
 }
 
+void ReplicationCoordinatorImpl::_cancelCatchupTakeover_inlock() {
+    if (_catchupTakeoverCbh.isValid()) {
+        log() << "Canceling catchup takeover callback";
+        _replExecutor->cancel(_catchupTakeoverCbh);
+        _catchupTakeoverCbh = CallbackHandle();
+        _catchupTakeoverWhen = Date_t();
+    }
+}
+
 void ReplicationCoordinatorImpl::_cancelAndRescheduleElectionTimeout_inlock() {
     if (_handleElectionTimeoutCbh.isValid()) {
         LOG(4) << "Canceling election timeout callback at " << _handleElectionTimeoutWhen;
@@ -755,6 +779,7 @@ void ReplicationCoordinatorImpl::_startElectSelfIfEligibleV1(StartElectionV1Reas
     // We should always reschedule this callback even if we do not make it to the election
     // process.
     {
+        _cancelCatchupTakeover_inlock();
         _cancelPriorityTakeover_inlock();
         _cancelAndRescheduleElectionTimeout_inlock();
         if (_inShutdown) {

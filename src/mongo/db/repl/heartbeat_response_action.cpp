@@ -49,6 +49,12 @@ HeartbeatResponseAction HeartbeatResponseAction::makePriorityTakeoverAction() {
     return result;
 }
 
+HeartbeatResponseAction HeartbeatResponseAction::makeCatchupTakeoverAction() {
+    HeartbeatResponseAction result;
+    result._action = CatchupTakeover;
+    return result;
+}
+
 HeartbeatResponseAction HeartbeatResponseAction::makeElectAction() {
     HeartbeatResponseAction result;
     result._action = StartElection;

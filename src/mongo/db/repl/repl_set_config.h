@@ -66,6 +66,7 @@ public:
     static const Seconds kDefaultHeartbeatTimeoutPeriod;
     static const Milliseconds kDefaultCatchUpTimeoutPeriod;
     static const bool kDefaultChainingAllowed;
+    static const Milliseconds kDefaultCatchupTakeoverDelay;
 
     /**
      * Initializes this ReplSetConfig from the contents of "cfg".
@@ -339,6 +340,12 @@ public:
      * "memberIdx") sees that it has higher priority than the current primary.
      */
     Milliseconds getPriorityTakeoverDelay(int memberIdx) const;
+
+    /**
+     * Returns the duration to wait before running for election when this node
+     * sees that it is more caught up than the current primary.
+     */
+    Milliseconds getCatchupTakeoverDelay() const;
 
 private:
     /**

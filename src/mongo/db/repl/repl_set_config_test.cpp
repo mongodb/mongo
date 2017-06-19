@@ -1632,6 +1632,31 @@ TEST(ReplSetConfig, GetPriorityTakeoverDelay) {
     ASSERT_EQUALS(Milliseconds(1000), configB.getPriorityTakeoverDelay(4));
 }
 
+TEST(ReplSetConfig, GetCatchupTakeoverDelay) {
+    ReplSetConfig configA;
+    ASSERT_OK(configA.initialize(BSON("_id"
+                                      << "rs0"
+                                      << "version"
+                                      << 1
+                                      << "members"
+                                      << BSON_ARRAY(BSON("_id" << 0 << "host"
+                                                               << "localhost:12345"
+                                                               << "priority"
+                                                               << 1)
+                                                    << BSON("_id" << 1 << "host"
+                                                                  << "localhost:54321"
+                                                                  << "priority"
+                                                                  << 2)
+                                                    << BSON("_id" << 2 << "host"
+                                                                  << "localhost:5321"
+                                                                  << "priority"
+                                                                  << 3))
+                                      << "settings"
+                                      << BSON("electionTimeoutMillis" << 1000))));
+    ASSERT_OK(configA.validate());
+    ASSERT_EQUALS(Milliseconds(30000), configA.getCatchupTakeoverDelay());
+}
+
 TEST(ReplSetConfig, ConfirmDefaultValuesOfAndAbilityToSetWriteConcernMajorityJournalDefault) {
     // PV0, should default to false.
     ReplSetConfig config;

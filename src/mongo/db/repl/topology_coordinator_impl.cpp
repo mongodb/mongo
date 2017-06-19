@@ -1301,20 +1301,34 @@ HeartbeatResponseAction TopologyCoordinatorImpl::_updatePrimaryFromHBDataV1(
     // Clear last heartbeat message on ourselves.
     setMyHeartbeatMessage(now, "");
 
-    // Priority takeover when the replset is stable.
+    // Takeover when the replset is stable.
     //
     // Take over the primary only if the remote primary is in the latest term I know.
     // This is done only when we get a heartbeat response from the primary.
     // Otherwise, there must be an outstanding election, which may succeed or not, but
     // the remote primary will become aware of that election eventually and step down.
-    if (_memberData.at(primaryIndex).getTerm() == _term && updatedConfigIndex == primaryIndex &&
-        _rsConfig.getMemberAt(primaryIndex).getPriority() <
-            _rsConfig.getMemberAt(_selfIndex).getPriority()) {
-        LOG(4) << "I can take over the primary due to higher priority."
-               << " Current primary index: " << primaryIndex << " in term "
-               << _memberData.at(primaryIndex).getTerm();
+    if (_memberData.at(primaryIndex).getTerm() == _term && updatedConfigIndex == primaryIndex) {
 
-        return HeartbeatResponseAction::makePriorityTakeoverAction();
+        if (_memberData.at(primaryIndex).getLastAppliedOpTime() <
+            _memberData.at(_selfIndex).getLastAppliedOpTime()) {
+            LOG(2) << "I can take over the primary due to fresher data."
+                   << " Current primary index: " << primaryIndex << " in term "
+                   << _memberData.at(primaryIndex).getTerm() << "."
+                   << " Current primary optime: "
+                   << _memberData.at(primaryIndex).getLastAppliedOpTime()
+                   << " My optime: " << _memberData.at(_selfIndex).getLastAppliedOpTime();
+
+            return HeartbeatResponseAction::makeCatchupTakeoverAction();
+        }
+
+        if (_rsConfig.getMemberAt(primaryIndex).getPriority() <
+            _rsConfig.getMemberAt(_selfIndex).getPriority()) {
+            LOG(4) << "I can take over the primary due to higher priority."
+                   << " Current primary index: " << primaryIndex << " in term "
+                   << _memberData.at(primaryIndex).getTerm();
+
+            return HeartbeatResponseAction::makePriorityTakeoverAction();
+        }
     }
     return HeartbeatResponseAction::makeNoAction();
 }

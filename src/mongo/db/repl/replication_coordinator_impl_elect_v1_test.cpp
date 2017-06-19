@@ -791,16 +791,16 @@ TEST_F(ReplCoordTest, ElectionFailsWhenTermChangesDuringActualElection) {
                   countLogLinesContaining("not becoming primary, we have been superceded already"));
 }
 
-class PriorityTakeoverTest : public ReplCoordTest {
+class TakeoverTest : public ReplCoordTest {
 public:
     /*
      * Verify that a given priority takeover delay is valid. Takeover delays are
      * verified in terms of bounds since the delay value is randomized.
      */
-    void assertValidTakeoverDelay(ReplSetConfig config,
-                                  Date_t now,
-                                  Date_t priorityTakeoverTime,
-                                  int nodeIndex) {
+    void assertValidPriorityTakeoverDelay(ReplSetConfig config,
+                                          Date_t now,
+                                          Date_t priorityTakeoverTime,
+                                          int nodeIndex) {
 
         Milliseconds priorityTakeoverDelay = priorityTakeoverTime - now;
         Milliseconds electionTimeout = config.getElectionTimeoutPeriod();
@@ -922,7 +922,384 @@ private:
     }
 };
 
-TEST_F(PriorityTakeoverTest, SchedulesPriorityTakeoverIfNodeHasHigherPriorityThanCurrentPrimary) {
+TEST_F(TakeoverTest, SchedulesCatchupTakeoverIfNodeIsFresherThanCurrentPrimary) {
+    BSONObj configObj = BSON("_id"
+                             << "mySet"
+                             << "version"
+                             << 1
+                             << "members"
+                             << BSON_ARRAY(BSON("_id" << 1 << "host"
+                                                      << "node1:12345")
+                                           << BSON("_id" << 2 << "host"
+                                                         << "node2:12345")
+                                           << BSON("_id" << 3 << "host"
+                                                         << "node3:12345"))
+                             << "protocolVersion"
+                             << 1);
+    assertStartSuccess(configObj, HostAndPort("node1", 12345));
+    ReplSetConfig config = assertMakeRSConfig(configObj);
+
+    auto replCoord = getReplCoord();
+    auto now = getNet()->now();
+
+    OperationContextNoop opCtx;
+    OpTime currentOptime(Timestamp(200, 1), 0);
+    replCoord->setMyLastAppliedOpTime(currentOptime);
+    replCoord->setMyLastDurableOpTime(currentOptime);
+    OpTime behindOptime(Timestamp(100, 1), 0);
+
+    // Make sure we're secondary and that no catchup takeover has been scheduled yet.
+    ASSERT_OK(replCoord->setFollowerMode(MemberState::RS_SECONDARY));
+    ASSERT_FALSE(replCoord->getCatchupTakeover_forTest());
+
+    // Mock a first round of heartbeat responses, which should give us enough information to know
+    // that we are fresher than the current primary, prompting the scheduling of a catchup
+    // takeover.
+    now = respondToHeartbeatsUntil(config, now, HostAndPort("node2", 12345), behindOptime);
+
+    // Make sure that the catchup takeover has actually been scheduled and at the
+    // correct time.
+    ASSERT(replCoord->getCatchupTakeover_forTest());
+    auto catchupTakeoverTime = replCoord->getCatchupTakeover_forTest().get();
+    Milliseconds catchupTakeoverDelay = catchupTakeoverTime - now;
+    ASSERT_EQUALS(config.getCatchupTakeoverDelay(), catchupTakeoverDelay);
+}
+
+TEST_F(TakeoverTest, SchedulesCatchupTakeoverIfBothTakeoversAnOption) {
+    BSONObj configObj = BSON("_id"
+                             << "mySet"
+                             << "version"
+                             << 1
+                             << "members"
+                             << BSON_ARRAY(BSON("_id" << 1 << "host"
+                                                      << "node1:12345"
+                                                      << "priority"
+                                                      << 2)
+                                           << BSON("_id" << 2 << "host"
+                                                         << "node2:12345")
+                                           << BSON("_id" << 3 << "host"
+                                                         << "node3:12345"))
+                             << "protocolVersion"
+                             << 1);
+    assertStartSuccess(configObj, HostAndPort("node1", 12345));
+    ReplSetConfig config = assertMakeRSConfig(configObj);
+
+    auto replCoord = getReplCoord();
+    auto now = getNet()->now();
+
+    OperationContextNoop opCtx;
+    OpTime currentOptime(Timestamp(200, 1), 0);
+    replCoord->setMyLastAppliedOpTime(currentOptime);
+    replCoord->setMyLastDurableOpTime(currentOptime);
+    OpTime behindOptime(Timestamp(100, 1), 0);
+
+    // Make sure we're secondary and that no catchup takeover has been scheduled.
+    ASSERT_OK(replCoord->setFollowerMode(MemberState::RS_SECONDARY));
+    ASSERT_FALSE(replCoord->getCatchupTakeover_forTest());
+
+    // Mock a first round of heartbeat responses, which should give us enough information to know
+    // that we are fresher than the current primary, prompting the scheduling of a catchup
+    // takeover.
+    now = respondToHeartbeatsUntil(config, now, HostAndPort("node2", 12345), behindOptime);
+
+    // Make sure that the catchup takeover has actually been scheduled at the
+    // correct time and that a priority takeover has not been scheduled.
+    ASSERT(replCoord->getCatchupTakeover_forTest());
+    ASSERT_FALSE(replCoord->getPriorityTakeover_forTest());
+    auto catchupTakeoverTime = replCoord->getCatchupTakeover_forTest().get();
+    Milliseconds catchupTakeoverDelay = catchupTakeoverTime - now;
+    ASSERT_EQUALS(config.getCatchupTakeoverDelay(), catchupTakeoverDelay);
+}
+
+TEST_F(TakeoverTest, CatchupTakeoverNotScheduledTwice) {
+    BSONObj configObj = BSON("_id"
+                             << "mySet"
+                             << "version"
+                             << 1
+                             << "members"
+                             << BSON_ARRAY(BSON("_id" << 1 << "host"
+                                                      << "node1:12345")
+                                           << BSON("_id" << 2 << "host"
+                                                         << "node2:12345")
+                                           << BSON("_id" << 3 << "host"
+                                                         << "node3:12345"))
+                             << "protocolVersion"
+                             << 1);
+    assertStartSuccess(configObj, HostAndPort("node1", 12345));
+    ReplSetConfig config = assertMakeRSConfig(configObj);
+
+    auto replCoord = getReplCoord();
+    auto now = getNet()->now();
+
+    OperationContextNoop opCtx;
+    OpTime currentOptime(Timestamp(200, 1), 0);
+    replCoord->setMyLastAppliedOpTime(currentOptime);
+    replCoord->setMyLastDurableOpTime(currentOptime);
+    OpTime behindOptime(Timestamp(100, 1), 0);
+
+    // Make sure we're secondary and that no catchup takeover has been scheduled.
+    ASSERT_OK(replCoord->setFollowerMode(MemberState::RS_SECONDARY));
+    ASSERT_FALSE(replCoord->getCatchupTakeover_forTest());
+
+    // Mock a first round of heartbeat responses, which should give us enough information to know
+    // that we are fresher than the current primary, prompting the scheduling of a catchup
+    // takeover.
+    now = respondToHeartbeatsUntil(config, now, HostAndPort("node2", 12345), behindOptime);
+
+    // Make sure that the catchup takeover has actually been scheduled and at the
+    // correct time.
+    ASSERT(replCoord->getCatchupTakeover_forTest());
+    executor::TaskExecutor::CallbackHandle catchupTakeoverCbh =
+        replCoord->getCatchupTakeoverCbh_forTest();
+    auto catchupTakeoverTime = replCoord->getCatchupTakeover_forTest().get();
+    Milliseconds catchupTakeoverDelay = catchupTakeoverTime - now;
+    ASSERT_EQUALS(config.getCatchupTakeoverDelay(), catchupTakeoverDelay);
+
+    // Mock another round of heartbeat responses
+    now = respondToHeartbeatsUntil(
+        config, now + config.getHeartbeatInterval(), HostAndPort("node2", 12345), behindOptime);
+
+    // Make sure another catchup takeover wasn't scheduled
+    ASSERT_EQUALS(catchupTakeoverTime, replCoord->getCatchupTakeover_forTest().get());
+    ASSERT_TRUE(catchupTakeoverCbh == replCoord->getCatchupTakeoverCbh_forTest());
+}
+
+TEST_F(TakeoverTest, CatchupAndPriorityTakeoverNotScheduledAtSameTime) {
+    BSONObj configObj = BSON("_id"
+                             << "mySet"
+                             << "version"
+                             << 1
+                             << "members"
+                             << BSON_ARRAY(BSON("_id" << 1 << "host"
+                                                      << "node1:12345"
+                                                      << "priority"
+                                                      << 2)
+                                           << BSON("_id" << 2 << "host"
+                                                         << "node2:12345")
+                                           << BSON("_id" << 3 << "host"
+                                                         << "node3:12345"))
+                             << "protocolVersion"
+                             << 1);
+    assertStartSuccess(configObj, HostAndPort("node1", 12345));
+    ReplSetConfig config = assertMakeRSConfig(configObj);
+
+    auto replCoord = getReplCoord();
+    auto now = getNet()->now();
+
+    OperationContextNoop opCtx;
+    OpTime currentOptime(Timestamp(200, 1), 0);
+    replCoord->setMyLastAppliedOpTime(currentOptime);
+    replCoord->setMyLastDurableOpTime(currentOptime);
+    OpTime behindOptime(Timestamp(100, 1), 0);
+
+    // Make sure we're secondary and that no catchup takeover has been scheduled.
+    ASSERT_OK(replCoord->setFollowerMode(MemberState::RS_SECONDARY));
+    ASSERT_FALSE(replCoord->getCatchupTakeover_forTest());
+
+    // Mock a first round of heartbeat responses, which should give us enough information to know
+    // that we are fresher than the current primary, prompting the scheduling of a catchup
+    // takeover.
+    now = respondToHeartbeatsUntil(config, now, HostAndPort("node2", 12345), behindOptime);
+
+    // Make sure that the catchup takeover has actually been scheduled and at the
+    // correct time.
+    ASSERT(replCoord->getCatchupTakeover_forTest());
+    auto catchupTakeoverTime = replCoord->getCatchupTakeover_forTest().get();
+    Milliseconds catchupTakeoverDelay = catchupTakeoverTime - now;
+    ASSERT_EQUALS(config.getCatchupTakeoverDelay(), catchupTakeoverDelay);
+
+    // Mock another heartbeat where the primary is now up to date
+    now = respondToHeartbeatsUntil(
+        config, now + catchupTakeoverDelay / 2, HostAndPort("node2", 12345), currentOptime);
+
+    // Since we are no longer ahead of the primary, we can't schedule a catchup
+    // takeover anymore. But we are still higher priority than the primary, so
+    // after the heartbeat we will try to schedule a priority takeover.
+    // Because we can't schedule two takeovers at the same time and the
+    // catchup takeover hasn't fired yet, make sure that we don't schedule a
+    // priority takeover.
+    ASSERT(replCoord->getCatchupTakeover_forTest());
+    ASSERT_FALSE(replCoord->getPriorityTakeover_forTest());
+}
+
+TEST_F(TakeoverTest, CatchupTakeoverCallbackCanceledIfElectionTimeoutRuns) {
+    BSONObj configObj = BSON("_id"
+                             << "mySet"
+                             << "version"
+                             << 1
+                             << "members"
+                             << BSON_ARRAY(BSON("_id" << 1 << "host"
+                                                      << "node1:12345")
+                                           << BSON("_id" << 2 << "host"
+                                                         << "node2:12345")
+                                           << BSON("_id" << 3 << "host"
+                                                         << "node3:12345"))
+                             << "protocolVersion"
+                             << 1);
+    assertStartSuccess(configObj, HostAndPort("node1", 12345));
+    ReplSetConfig config = assertMakeRSConfig(configObj);
+
+    auto replCoord = getReplCoord();
+    auto now = getNet()->now();
+
+    OperationContextNoop opCtx;
+    OpTime currentOptime(Timestamp(200, 1), 0);
+    replCoord->setMyLastAppliedOpTime(currentOptime);
+    replCoord->setMyLastDurableOpTime(currentOptime);
+    OpTime behindOptime(Timestamp(100, 1), 0);
+
+    // Make sure we're secondary and that no catchup takeover has been scheduled.
+    ASSERT_OK(replCoord->setFollowerMode(MemberState::RS_SECONDARY));
+    ASSERT_FALSE(replCoord->getCatchupTakeover_forTest());
+
+    startCapturingLogMessages();
+
+    // Mock a first round of heartbeat responses, which should give us enough information to know
+    // that we are fresher than the current primary, prompting the scheduling of a catchup
+    // takeover.
+    now = respondToHeartbeatsUntil(config, now, HostAndPort("node2", 12345), behindOptime);
+
+    // Make sure that the catchup takeover has actually been scheduled and at the
+    // correct time.
+    ASSERT(replCoord->getCatchupTakeover_forTest());
+    auto catchupTakeoverTime = replCoord->getCatchupTakeover_forTest().get();
+    Milliseconds catchupTakeoverDelay = catchupTakeoverTime - now;
+    ASSERT_EQUALS(config.getCatchupTakeoverDelay(), catchupTakeoverDelay);
+
+    // Fast forward clock to after electionTimeout and black hole all
+    // heartbeat requests to make sure the election timeout runs.
+    Date_t electionTimeout = replCoord->getElectionTimeout_forTest();
+    auto net = getNet();
+    net->enterNetwork();
+    while (net->now() < electionTimeout) {
+        net->runUntil(electionTimeout);
+        while (net->hasReadyRequests()) {
+            auto noi = net->getNextReadyRequest();
+            net->blackHole(noi);
+        }
+    }
+    ASSERT_EQUALS(electionTimeout, net->now());
+    net->exitNetwork();
+
+    stopCapturingLogMessages();
+
+    ASSERT_EQUALS(1, countLogLinesContaining("Starting an election, since we've seen no PRIMARY"));
+
+    // Make sure catchup takeover never happend and CatchupTakeover callback was canceled.
+    ASSERT_FALSE(replCoord->getCatchupTakeover_forTest());
+    ASSERT(replCoord->getMemberState().secondary());
+    ASSERT_EQUALS(1, countLogLinesContaining("Canceling catchup takeover callback"));
+    ASSERT_EQUALS(0, countLogLinesContaining("Starting an election for a catchup takeover"));
+}
+
+TEST_F(TakeoverTest, CatchupTakeoverCanceledIfTransitionToRollback) {
+    BSONObj configObj = BSON("_id"
+                             << "mySet"
+                             << "version"
+                             << 1
+                             << "members"
+                             << BSON_ARRAY(BSON("_id" << 1 << "host"
+                                                      << "node1:12345")
+                                           << BSON("_id" << 2 << "host"
+                                                         << "node2:12345")
+                                           << BSON("_id" << 3 << "host"
+                                                         << "node3:12345"))
+                             << "protocolVersion"
+                             << 1);
+    assertStartSuccess(configObj, HostAndPort("node1", 12345));
+    ReplSetConfig config = assertMakeRSConfig(configObj);
+
+    auto replCoord = getReplCoord();
+    auto now = getNet()->now();
+
+    OperationContextNoop opCtx;
+    OpTime currentOptime(Timestamp(200, 1), 0);
+    replCoord->setMyLastAppliedOpTime(currentOptime);
+    replCoord->setMyLastDurableOpTime(currentOptime);
+    OpTime behindOptime(Timestamp(100, 1), 0);
+
+    // Make sure we're secondary and that no catchup takeover has been scheduled.
+    ASSERT_OK(replCoord->setFollowerMode(MemberState::RS_SECONDARY));
+    ASSERT_FALSE(replCoord->getCatchupTakeover_forTest());
+
+    startCapturingLogMessages();
+
+    // Mock a first round of heartbeat responses, which should give us enough information to know
+    // that we are fresher than the current primary, prompting the scheduling of a catchup
+    // takeover.
+    now = respondToHeartbeatsUntil(config, now, HostAndPort("node2", 12345), behindOptime);
+
+    // Make sure that the catchup takeover has actually been scheduled and at the
+    // correct time.
+    ASSERT(replCoord->getCatchupTakeover_forTest());
+    auto catchupTakeoverTime = replCoord->getCatchupTakeover_forTest().get();
+    Milliseconds catchupTakeoverDelay = catchupTakeoverTime - now;
+    ASSERT_EQUALS(config.getCatchupTakeoverDelay(), catchupTakeoverDelay);
+
+    // Transitioning to rollback state should cancel the takeover
+    ASSERT_OK(replCoord->setFollowerMode(MemberState::RS_ROLLBACK));
+    ASSERT_TRUE(replCoord->getMemberState().rollback());
+
+    stopCapturingLogMessages();
+
+    // Make sure catchup takeover never happend and CatchupTakeover callback was canceled.
+    ASSERT_FALSE(replCoord->getCatchupTakeover_forTest());
+    ASSERT_EQUALS(1, countLogLinesContaining("Canceling catchup takeover callback"));
+    ASSERT_EQUALS(0, countLogLinesContaining("Starting an election for a catchup takeover"));
+}
+
+TEST_F(TakeoverTest, CatchupTakeoverElectionIsANoop) {
+    BSONObj configObj = BSON("_id"
+                             << "mySet"
+                             << "version"
+                             << 1
+                             << "members"
+                             << BSON_ARRAY(BSON("_id" << 1 << "host"
+                                                      << "node1:12345")
+                                           << BSON("_id" << 2 << "host"
+                                                         << "node2:12345")
+                                           << BSON("_id" << 3 << "host"
+                                                         << "node3:12345"))
+                             << "protocolVersion"
+                             << 1);
+    assertStartSuccess(configObj, HostAndPort("node1", 12345));
+    ReplSetConfig config = assertMakeRSConfig(configObj);
+    HostAndPort primaryHostAndPort("node2", 12345);
+
+    auto replCoord = getReplCoord();
+    auto now = getNet()->now();
+
+    OperationContextNoop opCtx;
+    OpTime currentOptime(Timestamp(100, 5000), 0);
+    OpTime behindOptime(Timestamp(100, 4000), 0);
+
+    replCoord->setMyLastAppliedOpTime(currentOptime);
+    replCoord->setMyLastDurableOpTime(currentOptime);
+
+    // Make sure we're secondary and that no takeover has been scheduled.
+    ASSERT_OK(replCoord->setFollowerMode(MemberState::RS_SECONDARY));
+    ASSERT_FALSE(replCoord->getCatchupTakeover_forTest());
+
+    // Mock a first round of heartbeat responses.
+    now = respondToHeartbeatsUntil(config, now, primaryHostAndPort, behindOptime);
+
+    // Make sure that the catchup takeover has actually been scheduled and at the
+    // correct time.
+    ASSERT(replCoord->getCatchupTakeover_forTest());
+    auto catchupTakeoverTime = replCoord->getCatchupTakeover_forTest().get();
+    Milliseconds catchupTakeoverDelay = catchupTakeoverTime - now;
+    ASSERT_EQUALS(config.getCatchupTakeoverDelay(), catchupTakeoverDelay);
+
+    startCapturingLogMessages();
+    now = respondToHeartbeatsUntil(config, catchupTakeoverTime, primaryHostAndPort, behindOptime);
+    stopCapturingLogMessages();
+
+    // Make sure that the catchup takeover fired as a NOOP.
+    ASSERT(replCoord->getMemberState().secondary());
+    ASSERT_EQUALS(1, countLogLinesContaining("Starting an election for a catchup takeover [NOOP]"));
+}
+
+TEST_F(TakeoverTest, SchedulesPriorityTakeoverIfNodeHasHigherPriorityThanCurrentPrimary) {
     BSONObj configObj = BSON("_id"
                              << "mySet"
                              << "version"
@@ -962,14 +1339,14 @@ TEST_F(PriorityTakeoverTest, SchedulesPriorityTakeoverIfNodeHasHigherPriorityTha
     // correct time.
     ASSERT(replCoord->getPriorityTakeover_forTest());
     auto priorityTakeoverTime = replCoord->getPriorityTakeover_forTest().get();
-    assertValidTakeoverDelay(config, now, priorityTakeoverTime, 0);
+    assertValidPriorityTakeoverDelay(config, now, priorityTakeoverTime, 0);
 
     // Also make sure that updating the term cancels the scheduled priority takeover.
     ASSERT_EQUALS(ErrorCodes::StaleTerm, replCoord->updateTerm(&opCtx, replCoord->getTerm() + 1));
     ASSERT_FALSE(replCoord->getPriorityTakeover_forTest());
 }
 
-TEST_F(PriorityTakeoverTest, SuccessfulPriorityTakeover) {
+TEST_F(TakeoverTest, SuccessfulPriorityTakeover) {
     BSONObj configObj = BSON("_id"
                              << "mySet"
                              << "version"
@@ -1009,7 +1386,7 @@ TEST_F(PriorityTakeoverTest, SuccessfulPriorityTakeover) {
     // correct time.
     ASSERT(replCoord->getPriorityTakeover_forTest());
     auto priorityTakeoverTime = replCoord->getPriorityTakeover_forTest().get();
-    assertValidTakeoverDelay(config, now, priorityTakeoverTime, 0);
+    assertValidPriorityTakeoverDelay(config, now, priorityTakeoverTime, 0);
 
     // The priority takeover might be scheduled at a time later than one election
     // timeout after our initial heartbeat responses, so mock another round of
@@ -1021,7 +1398,7 @@ TEST_F(PriorityTakeoverTest, SuccessfulPriorityTakeover) {
     performSuccessfulPriorityTakeover(priorityTakeoverTime);
 }
 
-TEST_F(PriorityTakeoverTest, DontCallForPriorityTakeoverWhenLaggedSameSecond) {
+TEST_F(TakeoverTest, DontCallForPriorityTakeoverWhenLaggedSameSecond) {
     BSONObj configObj = BSON("_id"
                              << "mySet"
                              << "version"
@@ -1064,7 +1441,7 @@ TEST_F(PriorityTakeoverTest, DontCallForPriorityTakeoverWhenLaggedSameSecond) {
     // correct time.
     ASSERT(replCoord->getPriorityTakeover_forTest());
     auto priorityTakeoverTime = replCoord->getPriorityTakeover_forTest().get();
-    assertValidTakeoverDelay(config, now, priorityTakeoverTime, 0);
+    assertValidPriorityTakeoverDelay(config, now, priorityTakeoverTime, 0);
 
     // At this point the other nodes are all ahead of the current node, so it can't call for
     // priority takeover.
@@ -1088,7 +1465,7 @@ TEST_F(PriorityTakeoverTest, DontCallForPriorityTakeoverWhenLaggedSameSecond) {
     // correct time.
     ASSERT(replCoord->getPriorityTakeover_forTest());
     priorityTakeoverTime = replCoord->getPriorityTakeover_forTest().get();
-    assertValidTakeoverDelay(config, now, priorityTakeoverTime, 0);
+    assertValidPriorityTakeoverDelay(config, now, priorityTakeoverTime, 0);
 
     // Now make us caught up enough to call for priority takeover to succeed.
     replCoord->setMyLastAppliedOpTime(closeEnoughOpTime);
@@ -1097,7 +1474,7 @@ TEST_F(PriorityTakeoverTest, DontCallForPriorityTakeoverWhenLaggedSameSecond) {
     performSuccessfulPriorityTakeover(priorityTakeoverTime);
 }
 
-TEST_F(PriorityTakeoverTest, DontCallForPriorityTakeoverWhenLaggedDifferentSecond) {
+TEST_F(TakeoverTest, DontCallForPriorityTakeoverWhenLaggedDifferentSecond) {
     BSONObj configObj = BSON("_id"
                              << "mySet"
                              << "version"
@@ -1139,7 +1516,7 @@ TEST_F(PriorityTakeoverTest, DontCallForPriorityTakeoverWhenLaggedDifferentSecon
     // correct time.
     ASSERT(replCoord->getPriorityTakeover_forTest());
     auto priorityTakeoverTime = replCoord->getPriorityTakeover_forTest().get();
-    assertValidTakeoverDelay(config, now, priorityTakeoverTime, 0);
+    assertValidPriorityTakeoverDelay(config, now, priorityTakeoverTime, 0);
 
     // At this point the other nodes are all ahead of the current node, so it can't call for
     // priority takeover.
@@ -1163,7 +1540,7 @@ TEST_F(PriorityTakeoverTest, DontCallForPriorityTakeoverWhenLaggedDifferentSecon
     // correct time.
     ASSERT(replCoord->getPriorityTakeover_forTest());
     priorityTakeoverTime = replCoord->getPriorityTakeover_forTest().get();
-    assertValidTakeoverDelay(config, now, priorityTakeoverTime, 0);
+    assertValidPriorityTakeoverDelay(config, now, priorityTakeoverTime, 0);
 
     // Now make us caught up enough to call for priority takeover to succeed.
     replCoord->setMyLastAppliedOpTime(closeEnoughOpTime);

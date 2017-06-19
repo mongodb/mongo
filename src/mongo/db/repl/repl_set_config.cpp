@@ -54,6 +54,7 @@ const Seconds ReplSetConfig::kDefaultHeartbeatTimeoutPeriod(10);
 const Milliseconds ReplSetConfig::kDefaultElectionTimeoutPeriod(10000);
 const Milliseconds ReplSetConfig::kDefaultCatchUpTimeoutPeriod(kInfiniteCatchUpTimeout);
 const bool ReplSetConfig::kDefaultChainingAllowed(true);
+const Milliseconds ReplSetConfig::kDefaultCatchupTakeoverDelay(30000);
 
 namespace {
 
@@ -828,6 +829,10 @@ Milliseconds ReplSetConfig::getPriorityTakeoverDelay(int memberIdx) const {
     auto member = getMemberAt(memberIdx);
     int priorityRank = _calculatePriorityRank(member.getPriority());
     return (priorityRank + 1) * getElectionTimeoutPeriod();
+}
+
+Milliseconds ReplSetConfig::getCatchupTakeoverDelay() const {
+    return kDefaultCatchupTakeoverDelay;
 }
 
 int ReplSetConfig::_calculatePriorityRank(double priority) const {
