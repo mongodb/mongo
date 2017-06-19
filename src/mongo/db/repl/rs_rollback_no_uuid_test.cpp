@@ -49,7 +49,7 @@
 #include "mongo/db/repl/oplog_interface_mock.h"
 #include "mongo/db/repl/rollback_source.h"
 #include "mongo/db/repl/rollback_test_fixture.h"
-#include "mongo/db/repl/rs_rollback.h"
+#include "mongo/db/repl/rs_rollback_no_uuid.h"
 #include "mongo/db/s/shard_identity_rollback_notifier.h"
 #include "mongo/stdx/memory.h"
 #include "mongo/unittest/death_test.h"
@@ -60,7 +60,7 @@ namespace {
 
 using namespace mongo;
 using namespace mongo::repl;
-using namespace mongo::repl::rollback_internal;
+using namespace mongo::repl::rollback_internal_no_uuid;
 
 const auto kIndexVersion = IndexDescriptor::IndexVersion::kV2;
 
@@ -138,12 +138,12 @@ TEST_F(RSRollbackTest, InconsistentMinValid) {
         _opCtx.get(), OpTime(Timestamp(Seconds(0), 0), 0));
     _replicationProcess->getConsistencyMarkers()->setMinValid(_opCtx.get(),
                                                               OpTime(Timestamp(Seconds(1), 0), 0));
-    auto status = syncRollback(_opCtx.get(),
-                               OplogInterfaceMock(),
-                               RollbackSourceMock(stdx::make_unique<OplogInterfaceMock>()),
-                               {},
-                               _coordinator,
-                               _replicationProcess.get());
+    auto status = syncRollbackNoUUID(_opCtx.get(),
+                                     OplogInterfaceMock(),
+                                     RollbackSourceMock(stdx::make_unique<OplogInterfaceMock>()),
+                                     {},
+                                     _coordinator,
+                                     _replicationProcess.get());
     ASSERT_EQUALS(ErrorCodes::UnrecoverableRollbackError, status.code());
     ASSERT_EQUALS(18752, status.location());
 }
@@ -155,12 +155,12 @@ TEST_F(RSRollbackTest, OplogStartMissing) {
     OplogInterfaceMock::Operations remoteOperations({operation});
     auto remoteOplog = stdx::make_unique<OplogInterfaceMock>(remoteOperations);
     ASSERT_EQUALS(ErrorCodes::OplogStartMissing,
-                  syncRollback(_opCtx.get(),
-                               OplogInterfaceMock(),
-                               RollbackSourceMock(std::move(remoteOplog)),
-                               {},
-                               _coordinator,
-                               _replicationProcess.get())
+                  syncRollbackNoUUID(_opCtx.get(),
+                                     OplogInterfaceMock(),
+                                     RollbackSourceMock(std::move(remoteOplog)),
+                                     {},
+                                     _coordinator,
+                                     _replicationProcess.get())
                       .code());
 }
 
@@ -168,12 +168,12 @@ TEST_F(RSRollbackTest, NoRemoteOpLog) {
     OpTime ts(Timestamp(Seconds(1), 0), 0);
     auto operation =
         std::make_pair(BSON("ts" << ts.getTimestamp() << "h" << ts.getTerm()), RecordId());
-    auto status = syncRollback(_opCtx.get(),
-                               OplogInterfaceMock({operation}),
-                               RollbackSourceMock(stdx::make_unique<OplogInterfaceMock>()),
-                               {},
-                               _coordinator,
-                               _replicationProcess.get());
+    auto status = syncRollbackNoUUID(_opCtx.get(),
+                                     OplogInterfaceMock({operation}),
+                                     RollbackSourceMock(stdx::make_unique<OplogInterfaceMock>()),
+                                     {},
+                                     _coordinator,
+                                     _replicationProcess.get());
     ASSERT_EQUALS(ErrorCodes::UnrecoverableRollbackError, status.code());
     ASSERT_EQUALS(18752, status.location());
 }
@@ -190,15 +190,16 @@ TEST_F(RSRollbackTest, RemoteGetRollbackIdThrows) {
             uassert(ErrorCodes::UnknownError, "getRollbackId() failed", false);
         }
     };
-    ASSERT_THROWS_CODE(syncRollback(_opCtx.get(),
-                                    OplogInterfaceMock({operation}),
-                                    RollbackSourceLocal(stdx::make_unique<OplogInterfaceMock>()),
-                                    {},
-                                    _coordinator,
-                                    _replicationProcess.get())
-                           .transitional_ignore(),
-                       UserException,
-                       ErrorCodes::UnknownError);
+    ASSERT_THROWS_CODE(
+        syncRollbackNoUUID(_opCtx.get(),
+                           OplogInterfaceMock({operation}),
+                           RollbackSourceLocal(stdx::make_unique<OplogInterfaceMock>()),
+                           {},
+                           _coordinator,
+                           _replicationProcess.get())
+            .transitional_ignore(),
+        UserException,
+        ErrorCodes::UnknownError);
 }
 
 TEST_F(RSRollbackTest, RemoteGetRollbackIdDiffersFromRequiredRBID) {
@@ -214,15 +215,16 @@ TEST_F(RSRollbackTest, RemoteGetRollbackIdDiffersFromRequiredRBID) {
         }
     };
 
-    ASSERT_THROWS_CODE(syncRollback(_opCtx.get(),
-                                    OplogInterfaceMock({operation}),
-                                    RollbackSourceLocal(stdx::make_unique<OplogInterfaceMock>()),
-                                    1,
-                                    _coordinator,
-                                    _replicationProcess.get())
-                           .transitional_ignore(),
-                       UserException,
-                       ErrorCodes::Error(40506));
+    ASSERT_THROWS_CODE(
+        syncRollbackNoUUID(_opCtx.get(),
+                           OplogInterfaceMock({operation}),
+                           RollbackSourceLocal(stdx::make_unique<OplogInterfaceMock>()),
+                           1,
+                           _coordinator,
+                           _replicationProcess.get())
+            .transitional_ignore(),
+        UserException,
+        ErrorCodes::Error(40362));
 }
 
 TEST_F(RSRollbackTest, BothOplogsAtCommonPoint) {
@@ -230,15 +232,15 @@ TEST_F(RSRollbackTest, BothOplogsAtCommonPoint) {
     OpTime ts(Timestamp(Seconds(1), 0), 1);
     auto operation =
         std::make_pair(BSON("ts" << ts.getTimestamp() << "h" << ts.getTerm()), RecordId(1));
-    ASSERT_OK(
-        syncRollback(_opCtx.get(),
-                     OplogInterfaceMock({operation}),
-                     RollbackSourceMock(std::unique_ptr<OplogInterface>(new OplogInterfaceMock({
-                         operation,
-                     }))),
-                     {},
-                     _coordinator,
-                     _replicationProcess.get()));
+    ASSERT_OK(syncRollbackNoUUID(
+        _opCtx.get(),
+        OplogInterfaceMock({operation}),
+        RollbackSourceMock(std::unique_ptr<OplogInterface>(new OplogInterfaceMock({
+            operation,
+        }))),
+        {},
+        _coordinator,
+        _replicationProcess.get()));
 }
 
 /**
@@ -303,12 +305,12 @@ int _testRollbackDelete(OperationContext* opCtx,
                                        std::unique_ptr<OplogInterface>(new OplogInterfaceMock({
                                            commonOperation,
                                        })));
-    ASSERT_OK(syncRollback(opCtx,
-                           OplogInterfaceMock({deleteOperation, commonOperation}),
-                           rollbackSource,
-                           {},
-                           coordinator,
-                           replicationProcess));
+    ASSERT_OK(syncRollbackNoUUID(opCtx,
+                                 OplogInterfaceMock({deleteOperation, commonOperation}),
+                                 rollbackSource,
+                                 {},
+                                 coordinator,
+                                 replicationProcess));
     ASSERT_TRUE(rollbackSource.called);
 
     Lock::DBLock dbLock(opCtx, "test", MODE_S);
@@ -383,12 +385,12 @@ TEST_F(RSRollbackTest, RollbackInsertDocumentWithNoId) {
         commonOperation,
     })));
     startCapturingLogMessages();
-    auto status = syncRollback(_opCtx.get(),
-                               OplogInterfaceMock({insertDocumentOperation, commonOperation}),
-                               rollbackSource,
-                               {},
-                               _coordinator,
-                               _replicationProcess.get());
+    auto status = syncRollbackNoUUID(_opCtx.get(),
+                                     OplogInterfaceMock({insertDocumentOperation, commonOperation}),
+                                     rollbackSource,
+                                     {},
+                                     _coordinator,
+                                     _replicationProcess.get());
     stopCapturingLogMessages();
     ASSERT_EQUALS(ErrorCodes::UnrecoverableRollbackError, status.code());
     ASSERT_EQUALS(18752, status.location());
@@ -447,7 +449,7 @@ TEST_F(RSRollbackTest, RollbackCreateIndexCommand) {
     // Repeat index creation operation and confirm that rollback attempts to drop index just once.
     // This can happen when an index is re-created with different options.
     startCapturingLogMessages();
-    ASSERT_OK(syncRollback(
+    ASSERT_OK(syncRollbackNoUUID(
         _opCtx.get(),
         OplogInterfaceMock({insertDocumentOperation, insertDocumentOperation, commonOperation}),
         rollbackSource,
@@ -508,12 +510,12 @@ TEST_F(RSRollbackTest, RollbackCreateIndexCommandIndexNotInCatalog) {
         commonOperation,
     })));
     startCapturingLogMessages();
-    ASSERT_OK(syncRollback(_opCtx.get(),
-                           OplogInterfaceMock({insertDocumentOperation, commonOperation}),
-                           rollbackSource,
-                           {},
-                           _coordinator,
-                           _replicationProcess.get()));
+    ASSERT_OK(syncRollbackNoUUID(_opCtx.get(),
+                                 OplogInterfaceMock({insertDocumentOperation, commonOperation}),
+                                 rollbackSource,
+                                 {},
+                                 _coordinator,
+                                 _replicationProcess.get()));
     stopCapturingLogMessages();
     ASSERT_EQUALS(1, countLogLinesContaining("Dropping index: collection = test.t. index = a_1"));
     ASSERT_EQUALS(1, countLogLinesContaining("Rollback failed to drop index a_1 in test.t"));
@@ -556,12 +558,12 @@ TEST_F(RSRollbackTest, RollbackCreateIndexCommandMissingNamespace) {
         commonOperation,
     })));
     startCapturingLogMessages();
-    auto status = syncRollback(_opCtx.get(),
-                               OplogInterfaceMock({insertDocumentOperation, commonOperation}),
-                               rollbackSource,
-                               {},
-                               _coordinator,
-                               _replicationProcess.get());
+    auto status = syncRollbackNoUUID(_opCtx.get(),
+                                     OplogInterfaceMock({insertDocumentOperation, commonOperation}),
+                                     rollbackSource,
+                                     {},
+                                     _coordinator,
+                                     _replicationProcess.get());
     stopCapturingLogMessages();
     ASSERT_EQUALS(ErrorCodes::UnrecoverableRollbackError, status.code());
     ASSERT_EQUALS(18752, status.location());
@@ -619,12 +621,12 @@ TEST_F(RSRollbackTest, RollbackDropIndexCommandWithOneIndex) {
     RollbackSourceLocal rollbackSource(std::unique_ptr<OplogInterface>(new OplogInterfaceMock({
         commonOperation,
     })));
-    ASSERT_OK(syncRollback(_opCtx.get(),
-                           OplogInterfaceMock({dropIndexOperation, commonOperation}),
-                           rollbackSource,
-                           {},
-                           _coordinator,
-                           _replicationProcess.get()));
+    ASSERT_OK(syncRollbackNoUUID(_opCtx.get(),
+                                 OplogInterfaceMock({dropIndexOperation, commonOperation}),
+                                 rollbackSource,
+                                 {},
+                                 _coordinator,
+                                 _replicationProcess.get()));
     ASSERT(rollbackSource.called);
 }
 
@@ -698,7 +700,7 @@ TEST_F(RSRollbackTest, RollbackDropIndexCommandWithMultipleIndexes) {
     RollbackSourceLocal rollbackSource(std::unique_ptr<OplogInterface>(new OplogInterfaceMock({
         commonOperation,
     })));
-    ASSERT_OK(syncRollback(
+    ASSERT_OK(syncRollbackNoUUID(
         _opCtx.get(),
         OplogInterfaceMock({dropIndexOperation2, dropIndexOperation1, commonOperation}),
         rollbackSource,
@@ -742,12 +744,12 @@ TEST_F(RSRollbackTest, RollbackCreateIndexCommandInvalidNamespace) {
         commonOperation,
     })));
     startCapturingLogMessages();
-    auto status = syncRollback(_opCtx.get(),
-                               OplogInterfaceMock({insertDocumentOperation, commonOperation}),
-                               rollbackSource,
-                               {},
-                               _coordinator,
-                               _replicationProcess.get());
+    auto status = syncRollbackNoUUID(_opCtx.get(),
+                                     OplogInterfaceMock({insertDocumentOperation, commonOperation}),
+                                     rollbackSource,
+                                     {},
+                                     _coordinator,
+                                     _replicationProcess.get());
     stopCapturingLogMessages();
     ASSERT_EQUALS(ErrorCodes::UnrecoverableRollbackError, status.code());
     ASSERT_EQUALS(18752, status.location());
@@ -788,12 +790,12 @@ TEST_F(RSRollbackTest, RollbackCreateIndexCommandMissingIndexName) {
         commonOperation,
     })));
     startCapturingLogMessages();
-    auto status = syncRollback(_opCtx.get(),
-                               OplogInterfaceMock({insertDocumentOperation, commonOperation}),
-                               rollbackSource,
-                               {},
-                               _coordinator,
-                               _replicationProcess.get());
+    auto status = syncRollbackNoUUID(_opCtx.get(),
+                                     OplogInterfaceMock({insertDocumentOperation, commonOperation}),
+                                     rollbackSource,
+                                     {},
+                                     _coordinator,
+                                     _replicationProcess.get());
     stopCapturingLogMessages();
     ASSERT_EQUALS(ErrorCodes::UnrecoverableRollbackError, status.code());
     ASSERT_EQUALS(18752, status.location());
@@ -822,15 +824,15 @@ TEST_F(RSRollbackTest, RollbackUnknownCommand) {
         ASSERT_TRUE(db->getOrCreateCollection(_opCtx.get(), NamespaceString("test.t")));
         wuow.commit();
     }
-    auto status =
-        syncRollback(_opCtx.get(),
-                     OplogInterfaceMock({unknownCommandOperation, commonOperation}),
-                     RollbackSourceMock(std::unique_ptr<OplogInterface>(new OplogInterfaceMock({
-                         commonOperation,
-                     }))),
-                     {},
-                     _coordinator,
-                     _replicationProcess.get());
+    auto status = syncRollbackNoUUID(
+        _opCtx.get(),
+        OplogInterfaceMock({unknownCommandOperation, commonOperation}),
+        RollbackSourceMock(std::unique_ptr<OplogInterface>(new OplogInterfaceMock({
+            commonOperation,
+        }))),
+        {},
+        _coordinator,
+        _replicationProcess.get());
     ASSERT_EQUALS(ErrorCodes::UnrecoverableRollbackError, status.code());
     ASSERT_EQUALS(18751, status.location());
 }
@@ -862,12 +864,12 @@ TEST_F(RSRollbackTest, RollbackDropCollectionCommand) {
         commonOperation,
     })));
     _createCollection(_opCtx.get(), "test.t", CollectionOptions());
-    ASSERT_OK(syncRollback(_opCtx.get(),
-                           OplogInterfaceMock({dropCollectionOperation, commonOperation}),
-                           rollbackSource,
-                           {},
-                           _coordinator,
-                           _replicationProcess.get()));
+    ASSERT_OK(syncRollbackNoUUID(_opCtx.get(),
+                                 OplogInterfaceMock({dropCollectionOperation, commonOperation}),
+                                 rollbackSource,
+                                 {},
+                                 _coordinator,
+                                 _replicationProcess.get()));
     ASSERT_TRUE(rollbackSource.called);
 }
 
@@ -901,15 +903,16 @@ TEST_F(RSRollbackTest, RollbackDropCollectionCommandFailsIfRBIDChangesWhileSynci
     })));
 
     _createCollection(_opCtx.get(), "test.t", CollectionOptions());
-    ASSERT_THROWS_CODE(syncRollback(_opCtx.get(),
-                                    OplogInterfaceMock({dropCollectionOperation, commonOperation}),
-                                    rollbackSource,
-                                    0,
-                                    _coordinator,
-                                    _replicationProcess.get())
-                           .transitional_ignore(),
-                       DBException,
-                       40508);
+    ASSERT_THROWS_CODE(
+        syncRollbackNoUUID(_opCtx.get(),
+                           OplogInterfaceMock({dropCollectionOperation, commonOperation}),
+                           rollbackSource,
+                           0,
+                           _coordinator,
+                           _replicationProcess.get())
+            .transitional_ignore(),
+        DBException,
+        40365);
     ASSERT(rollbackSource.copyCollectionCalled);
 }
 
@@ -1027,12 +1030,12 @@ TEST_F(RSRollbackTest, RollbackApplyOpsCommand) {
     } rollbackSource(std::unique_ptr<OplogInterface>(new OplogInterfaceMock({commonOperation})));
 
     _createCollection(_opCtx.get(), "test.t", CollectionOptions());
-    ASSERT_OK(syncRollback(_opCtx.get(),
-                           OplogInterfaceMock({applyOpsOperation, commonOperation}),
-                           rollbackSource,
-                           {},
-                           _coordinator,
-                           _replicationProcess.get()));
+    ASSERT_OK(syncRollbackNoUUID(_opCtx.get(),
+                                 OplogInterfaceMock({applyOpsOperation, commonOperation}),
+                                 rollbackSource,
+                                 {},
+                                 _coordinator,
+                                 _replicationProcess.get()));
     ASSERT_EQUALS(4U, rollbackSource.searchedIds.size());
     ASSERT_EQUALS(1U, rollbackSource.searchedIds.count(1));
     ASSERT_EQUALS(1U, rollbackSource.searchedIds.count(2));
@@ -1068,12 +1071,12 @@ TEST_F(RSRollbackTest, RollbackCreateCollectionCommand) {
         commonOperation,
     })));
     _createCollection(_opCtx.get(), "test.t", CollectionOptions());
-    ASSERT_OK(syncRollback(_opCtx.get(),
-                           OplogInterfaceMock({createCollectionOperation, commonOperation}),
-                           rollbackSource,
-                           {},
-                           _coordinator,
-                           _replicationProcess.get()));
+    ASSERT_OK(syncRollbackNoUUID(_opCtx.get(),
+                                 OplogInterfaceMock({createCollectionOperation, commonOperation}),
+                                 rollbackSource,
+                                 {},
+                                 _coordinator,
+                                 _replicationProcess.get()));
     {
         Lock::DBLock dbLock(_opCtx.get(), "test", MODE_S);
         auto db = dbHolder().get(_opCtx.get(), "test");
@@ -1112,7 +1115,8 @@ TEST_F(RSRollbackTest, RollbackCollectionModificationCommand) {
     })));
     _createCollection(_opCtx.get(), "test.t", CollectionOptions());
     startCapturingLogMessages();
-    ASSERT_OK(syncRollback(_opCtx.get(),
+    ASSERT_OK(
+        syncRollbackNoUUID(_opCtx.get(),
                            OplogInterfaceMock({collectionModificationOperation, commonOperation}),
                            rollbackSource,
                            {},
@@ -1154,12 +1158,12 @@ TEST_F(RSRollbackTest, RollbackCollectionModificationCommandInvalidCollectionOpt
     })));
     _createCollection(_opCtx.get(), "test.t", CollectionOptions());
     auto status =
-        syncRollback(_opCtx.get(),
-                     OplogInterfaceMock({collectionModificationOperation, commonOperation}),
-                     rollbackSource,
-                     {},
-                     _coordinator,
-                     _replicationProcess.get());
+        syncRollbackNoUUID(_opCtx.get(),
+                           OplogInterfaceMock({collectionModificationOperation, commonOperation}),
+                           rollbackSource,
+                           {},
+                           _coordinator,
+                           _replicationProcess.get());
     ASSERT_EQUALS(ErrorCodes::UnrecoverableRollbackError, status.code());
     ASSERT_EQUALS(18753, status.location());
 }
@@ -1205,12 +1209,12 @@ TEST_F(RSRollbackTest, RollbackReturnsImmediatelyOnFailureToTransitionToRollback
     _coordinator->_failSetFollowerModeOnThisMemberState = MemberState::RS_ROLLBACK;
 
     startCapturingLogMessages();
-    rollback(_opCtx.get(),
-             localOplogWithSingleOplogEntry,
-             rollbackSourceWithInvalidOplog,
-             {},
-             _coordinator,
-             _replicationProcess.get());
+    rollbackNoUUID(_opCtx.get(),
+                   localOplogWithSingleOplogEntry,
+                   rollbackSourceWithInvalidOplog,
+                   {},
+                   _coordinator,
+                   _replicationProcess.get());
     stopCapturingLogMessages();
 
     ASSERT_EQUALS(1, countLogLinesContaining("Cannot transition from SECONDARY to ROLLBACK"));
@@ -1228,12 +1232,12 @@ DEATH_TEST_F(RSRollbackTest,
     OplogInterfaceMock localOplogWithSingleOplogEntry({makeNoopOplogEntryAndRecordId(Seconds(1))});
     RollbackSourceMock rollbackSourceWithInvalidOplog(stdx::make_unique<OplogInterfaceMock>());
 
-    rollback(_opCtx.get(),
-             localOplogWithSingleOplogEntry,
-             rollbackSourceWithInvalidOplog,
-             {},
-             _coordinator,
-             _replicationProcess.get());
+    rollbackNoUUID(_opCtx.get(),
+                   localOplogWithSingleOplogEntry,
+                   rollbackSourceWithInvalidOplog,
+                   {},
+                   _coordinator,
+                   _replicationProcess.get());
 }
 
 TEST_F(RSRollbackTest, RollbackLogsRetryMessageAndReturnsOnNonUnrecoverableRollbackError) {
@@ -1247,13 +1251,13 @@ TEST_F(RSRollbackTest, RollbackLogsRetryMessageAndReturnsOnNonUnrecoverableRollb
     auto noopSleepSecsFn = [](int) {};
 
     startCapturingLogMessages();
-    rollback(_opCtx.get(),
-             localOplogWithNoEntries,
-             rollbackSourceWithValidOplog,
-             {},
-             _coordinator,
-             _replicationProcess.get(),
-             noopSleepSecsFn);
+    rollbackNoUUID(_opCtx.get(),
+                   localOplogWithNoEntries,
+                   rollbackSourceWithValidOplog,
+                   {},
+                   _coordinator,
+                   _replicationProcess.get(),
+                   noopSleepSecsFn);
     stopCapturingLogMessages();
 
     ASSERT_EQUALS(
@@ -1275,7 +1279,8 @@ DEATH_TEST_F(RSRollbackTest,
     ASSERT_TRUE(ShardIdentityRollbackNotifier::get(_opCtx.get())->didRollbackHappen());
 
     createOplog(_opCtx.get());
-    rollback(_opCtx.get(), localOplog, rollbackSource, {}, _coordinator, _replicationProcess.get());
+    rollbackNoUUID(
+        _opCtx.get(), localOplog, rollbackSource, {}, _coordinator, _replicationProcess.get());
 }
 
 DEATH_TEST_F(
@@ -1291,7 +1296,8 @@ DEATH_TEST_F(
     _coordinator->_failSetFollowerModeOnThisMemberState = MemberState::RS_RECOVERING;
 
     createOplog(_opCtx.get());
-    rollback(_opCtx.get(), localOplog, rollbackSource, {}, _coordinator, _replicationProcess.get());
+    rollbackNoUUID(
+        _opCtx.get(), localOplog, rollbackSource, {}, _coordinator, _replicationProcess.get());
 }
 
 // The testcases used here are trying to detect off-by-one errors in

@@ -48,6 +48,7 @@
 #include "mongo/db/repl/replication_process.h"
 #include "mongo/db/repl/rollback_source_impl.h"
 #include "mongo/db/repl/rs_rollback.h"
+#include "mongo/db/repl/rs_rollback_no_uuid.h"
 #include "mongo/db/repl/rs_sync.h"
 #include "mongo/db/repl/storage_interface.h"
 #include "mongo/db/s/shard_identity_rollback_notifier.h"
@@ -55,7 +56,6 @@
 #include "mongo/rpc/get_status_from_command_result.h"
 #include "mongo/rpc/metadata/repl_set_metadata.h"
 #include "mongo/stdx/memory.h"
-#include "mongo/util/fail_point_service.h"
 #include "mongo/util/log.h"
 #include "mongo/util/mongoutils/str.h"
 #include "mongo/util/time_support.h"
@@ -700,7 +700,8 @@ void BackgroundSync::_fallBackOn3dot4Rollback(OperationContext* opCtx,
     };
 
     RollbackSourceImpl rollbackSource(getConnection, source, rsOplogName);
-    rollback(opCtx, *localOplog, rollbackSource, requiredRBID, _replCoord, _replicationProcess);
+    rollbackNoUUID(
+        opCtx, *localOplog, rollbackSource, requiredRBID, _replCoord, _replicationProcess);
 }
 
 HostAndPort BackgroundSync::getSyncTarget() const {

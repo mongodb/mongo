@@ -71,6 +71,7 @@ env.Library(
         'rollback_impl',
         'rollback_source_impl',
         'rs_rollback',
+        'rs_rollback_no_uuid',
         'storage_interface',
         'sync_source_resolver',
         '$BUILD_DIR/mongo/client/connection_pool',
@@ -85,7 +86,6 @@ env.Library(
         '$BUILD_DIR/mongo/executor/thread_pool_task_executor',
         '$BUILD_DIR/mongo/db/repl/repl_coordinator_global',
         '$BUILD_DIR/mongo/util/concurrency/thread_pool',
-        '$BUILD_DIR/mongo/util/fail_point',
     ],
 )
 
@@ -384,6 +384,22 @@ env.Library(
 )
 
 env.Library(
+    target='rs_rollback_no_uuid',
+    source=[
+        'rs_rollback_no_uuid.cpp',
+    ],
+    LIBDEPS=[
+        'oplog',
+        'replication_process',
+        'roll_back_local_operations',
+        '$BUILD_DIR/mongo/db/catalog/database_holder',
+        '$BUILD_DIR/mongo/db/s/sharding',
+        '$BUILD_DIR/mongo/util/fail_point',
+        '$BUILD_DIR/mongo/db/dbhelpers',
+    ],
+)
+
+env.Library(
     target='rs_rollback',
     source=[
         'rs_rollback.cpp',
@@ -450,6 +466,19 @@ env.CppUnitTest(
         'oplog_interface_mock',
         'rollback_test_fixture',
         'rs_rollback',
+    ],
+)
+
+env.CppUnitTest(
+    target='rs_rollback_no_uuid_test',
+    source=[
+        'rs_rollback_no_uuid_test.cpp',
+    ],
+    LIBDEPS=[
+        'oplog_interface_local',
+        'oplog_interface_mock',
+        'rollback_test_fixture',
+        'rs_rollback_no_uuid',
     ],
 )
 
@@ -1395,6 +1424,7 @@ env.Library(
     LIBDEPS=[
         'optime',
         '$BUILD_DIR/mongo/base',
+        '$BUILD_DIR/mongo/util/fail_point',
     ],
 )
 

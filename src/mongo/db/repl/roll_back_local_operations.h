@@ -36,9 +36,18 @@
 #include "mongo/db/repl/oplog_interface.h"
 #include "mongo/db/repl/optime.h"
 #include "mongo/stdx/functional.h"
+#include "mongo/util/fail_point_service.h"
 
 namespace mongo {
 namespace repl {
+
+// It is necessary to have this forward declare for the mongo fail point
+// at this location because of the splitting of the rollback algorithms into
+// two separate files, rs_rollback and rs_rollback_no_uuid. However, after
+// MongoDB 3.8 is released, we no longer need to maintain rs_rollback_no_uuid
+// code and these forward declares can be removed. See SERVER-29766.
+MONGO_FP_FORWARD_DECLARE(rollbackHangBeforeFinish);
+MONGO_FP_FORWARD_DECLARE(rollbackHangThenFailAfterWritingMinValid);
 
 class RollBackLocalOperations {
     MONGO_DISALLOW_COPYING(RollBackLocalOperations);

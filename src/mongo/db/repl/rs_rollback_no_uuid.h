@@ -1,5 +1,5 @@
 /**
- *    Copyright (C) 2014 MongoDB Inc.
+ *    Copyright (C) 2017 MongoDB Inc.
  *
  *    This program is free software: you can redistribute it and/or  modify
  *    it under the terms of the GNU Affero General Public License, version 3,
@@ -36,7 +36,11 @@
 #include "mongo/util/time_support.h"
 
 /**
- * This rollback algorithm requires featureCompatibilityVersion 3.6.
+ * This rollback algorithm does not make use of the UUID oplog field that was implemented in 3.6.
+ * It is only used to maintain 3.4 compatibility and should not be updated in the future.
+ * After MongoDB 3.8 is released, this file along with rs_rollback_no_uuid.cpp and
+ * rs_rollback_no_uuid_test.cpp can be removed as we will no longer support functionality for
+ * oplog entries that do not include UUID's in 3.8. See SERVER-29766.
  *
  * Rollback Overview:
  *
@@ -139,13 +143,13 @@ class RollbackSource;
  * 'sleepSecsFn' is an optional testing-only argument for overriding mongo::sleepsecs().
  */
 
-void rollback(OperationContext* opCtx,
-              const OplogInterface& localOplog,
-              const RollbackSource& rollbackSource,
-              int requiredRBID,
-              ReplicationCoordinator* replCoord,
-              ReplicationProcess* replicationProcess,
-              stdx::function<void(int)> sleepSecsFn = [](int secs) { sleepsecs(secs); });
+void rollbackNoUUID(OperationContext* opCtx,
+                    const OplogInterface& localOplog,
+                    const RollbackSource& rollbackSource,
+                    int requiredRBID,
+                    ReplicationCoordinator* replCoord,
+                    ReplicationProcess* replicationProcess,
+                    stdx::function<void(int)> sleepSecsFn = [](int secs) { sleepsecs(secs); });
 
 /**
  * Initiates the rollback process after transition to ROLLBACK.
@@ -172,20 +176,20 @@ void rollback(OperationContext* opCtx,
  * fatally. All other errors should be considered recoverable regardless of whether reported as a
  * status or exception.
  */
-Status syncRollback(OperationContext* opCtx,
-                    const OplogInterface& localOplog,
-                    const RollbackSource& rollbackSource,
-                    int requiredRBID,
-                    ReplicationCoordinator* replCoord,
-                    ReplicationProcess* replicationProcess);
+Status syncRollbackNoUUID(OperationContext* opCtx,
+                          const OplogInterface& localOplog,
+                          const RollbackSource& rollbackSource,
+                          int requiredRBID,
+                          ReplicationCoordinator* replCoord,
+                          ReplicationProcess* replicationProcess);
 
 
 /*
 Rollback function flowchart:
 
-1.    rollback() called.
-      a.    syncRollback() called by rollback().
-            i.    _syncRollback() called by syncRollback().
+1.    rollbackNoUUID() called.
+      a.    syncRollbackNoUUID() called by rollbackNoUUID().
+            i.    _syncRollback() called by syncRollbackNoUUID().
                   I.    syncRollbackLocalOperations() called by _syncRollback().
                         A.    processOperationFixUp called by syncRollbackLocalOperations().
                               1.    updateFixUpInfoFromLocalOplogEntry called by
@@ -200,8 +204,8 @@ Rollback function flowchart:
                         6.    Drops indexes.
                         7.    Deletes, updates and inserts individual oplogs.
                         8.    Truncates the oplog.
-                 IV.    Returns back to syncRollback().
-           ii.   Returns back to rollback().
+                 IV.    Returns back to syncRollbackNoUUID().
+           ii.   Returns back to rollbackNoUUID().
       b.   Rollback ends.
 */
 
@@ -210,7 +214,7 @@ Rollback function flowchart:
  * This namespace contains internal details of the rollback system. It is only exposed in a header
  * for unit testing. Nothing here should be used outside of rs_rollback.cpp or its unit test.
  */
-namespace rollback_internal {
+namespace rollback_internal_no_uuid {
 
 struct DocID {
     BSONObj ownedObj;
