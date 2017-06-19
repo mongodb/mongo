@@ -2957,6 +2957,50 @@ def doConfigure(myenv):
         if not check_all_atomics(' with libatomic'):
             myenv.ConfError("The toolchain does not support std::atomic, cannot continue")
 
+    def CheckExtendedAlignment(context, size):
+        test_body = """
+            #include <atomic>
+            #include <mutex>
+            #include <cstddef>
+
+            static_assert(alignof(std::max_align_t) < {0}, "whatever");
+
+            alignas({0}) std::mutex aligned_mutex;
+            alignas({0}) std::atomic<int> aligned_atomic;
+
+            struct alignas({0}) aligned_struct_mutex {{
+                std::mutex m;
+            }};
+
+            struct alignas({0}) aligned_struct_atomic {{
+                std::atomic<int> m;
+            }};
+
+            struct holds_aligned_mutexes {{
+                alignas({0}) std::mutex m1;
+                alignas({0}) std::mutex m2;
+            }} hm;
+
+            struct holds_aligned_atomics {{
+                alignas({0}) std::atomic<int> a1;
+                alignas({0}) std::atomic<int> a2;
+            }} ha;
+        """.format(size)
+
+        context.Message('Checking for extended alignment {0} for concurrency types... '.format(size))
+        ret = context.TryCompile(textwrap.dedent(test_body), ".cpp")
+        context.Result(ret)
+        return ret
+
+    conf.AddTest('CheckExtendedAlignment', CheckExtendedAlignment)
+
+    # We are aware of no architecture with a cache line bigger than
+    # 256. If we had a way to get the cache line size of TARGET_ARCH
+    # that would be better, but we don't seem to have that.
+    for size in (64, 128, 256):
+        if conf.CheckExtendedAlignment(size):
+            conf.env.SetConfigHeaderDefine("MONGO_CONFIG_MAX_EXTENDED_ALIGNMENT", size)
+
     # ask each module to configure itself and the build environment.
     moduleconfig.configure_modules(mongo_modules, conf)
 

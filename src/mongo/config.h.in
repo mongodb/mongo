@@ -67,6 +67,9 @@
 // Defined if thread_local storage class is available
 @mongo_config_have_thread_local@
 
+// A number, if we have some extended alignment ability
+@mongo_config_max_extended_alignment@
+
 // Defined if building an optimized build
 @mongo_config_optimized_build@
 
