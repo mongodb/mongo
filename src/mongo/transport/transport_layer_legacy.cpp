@@ -151,7 +151,7 @@ Ticket TransportLayerLegacy::sourceMessage(const SessionHandle& session,
             return {ErrorCodes::HostUnreachable, "Recv failed"};
         }
 
-        networkCounter.hitPhysical(message->size(), 0);
+        networkCounter.hitPhysicalIn(message->size());
         return Status::OK();
     };
 
@@ -180,7 +180,7 @@ Ticket TransportLayerLegacy::sinkMessage(const SessionHandle& session,
     auto sinkCb = [&message](AbstractMessagingPort* amp) -> Status {
         try {
             amp->say(message);
-            networkCounter.hitPhysical(0, message.size());
+            networkCounter.hitPhysicalOut(message.size());
 
             return Status::OK();
         } catch (const SocketException& e) {

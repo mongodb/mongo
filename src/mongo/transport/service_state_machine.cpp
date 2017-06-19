@@ -172,7 +172,7 @@ void ServiceStateMachine::processMessage() {
         wasCompressed = false;
     }
 
-    networkCounter.hitLogical(_inMessage.size(), 0);
+    networkCounter.hitLogicalIn(_inMessage.size());
 
     // 2. Pass sourced Message to handler to generate response.
     auto opCtx = cc().makeOperationContext();
@@ -199,7 +199,7 @@ void ServiceStateMachine::processMessage() {
             _inMessage.reset();
         }
 
-        networkCounter.hitLogical(0, toSink.size());
+        networkCounter.hitLogicalOut(toSink.size());
 
         if (wasCompressed) {
             auto swm = compressorMgr.compressMessage(toSink);

@@ -134,47 +134,69 @@ BSONObj OpCounters::getObj() const {
     return b.obj();
 }
 
-void NetworkCounter::hitPhysical(long long bytesIn, long long bytesOut) {
-    const int64_t MAX = 1ULL << 60;
+void NetworkCounter::hitPhysicalIn(long long bytes) {
+    static const int64_t MAX = 1ULL << 60;
 
     // don't care about the race as its just a counter
-    bool overflow = _physicalBytesIn.loadRelaxed() > MAX || _physicalBytesOut.loadRelaxed() > MAX;
+    const bool overflow = _physicalBytesIn.loadRelaxed() > MAX;
 
     if (overflow) {
-        _physicalBytesIn.store(bytesIn);
-        _physicalBytesOut.store(bytesOut);
+        _physicalBytesIn.store(bytes);
     } else {
-        _physicalBytesIn.fetchAndAdd(bytesIn);
-        _physicalBytesOut.fetchAndAdd(bytesOut);
+        _physicalBytesIn.fetchAndAdd(bytes);
     }
 }
 
-void NetworkCounter::hitLogical(long long bytesIn, long long bytesOut) {
-    const int64_t MAX = 1ULL << 60;
+void NetworkCounter::hitPhysicalOut(long long bytes) {
+    static const int64_t MAX = 1ULL << 60;
 
     // don't care about the race as its just a counter
-    bool overflow = _logicalBytesIn.loadRelaxed() > MAX || _logicalBytesOut.loadRelaxed() > MAX;
+    const bool overflow = _physicalBytesOut.loadRelaxed() > MAX;
 
     if (overflow) {
-        _logicalBytesIn.store(bytesIn);
-        _logicalBytesOut.store(bytesOut);
+        _physicalBytesOut.store(bytes);
+    } else {
+        _physicalBytesOut.fetchAndAdd(bytes);
+    }
+}
+
+void NetworkCounter::hitLogicalIn(long long bytes) {
+    static const int64_t MAX = 1ULL << 60;
+
+    // don't care about the race as its just a counter
+    const bool overflow = _together.logicalBytesIn.loadRelaxed() > MAX;
+
+    if (overflow) {
+        _together.logicalBytesIn.store(bytes);
         // The requests field only gets incremented here (and not in hitPhysical) because the
         // hitLogical and hitPhysical are each called for each operation. Incrementing it in both
         // functions would double-count the number of operations.
-        _requests.store(1);
+        _together.requests.store(1);
     } else {
-        _logicalBytesIn.fetchAndAdd(bytesIn);
-        _logicalBytesOut.fetchAndAdd(bytesOut);
-        _requests.fetchAndAdd(1);
+        _together.logicalBytesIn.fetchAndAdd(bytes);
+        _together.requests.fetchAndAdd(1);
+    }
+}
+
+void NetworkCounter::hitLogicalOut(long long bytes) {
+    static const int64_t MAX = 1ULL << 60;
+
+    // don't care about the race as its just a counter
+    const bool overflow = _logicalBytesOut.loadRelaxed() > MAX;
+
+    if (overflow) {
+        _logicalBytesOut.store(bytes);
+    } else {
+        _logicalBytesOut.fetchAndAdd(bytes);
     }
 }
 
 void NetworkCounter::append(BSONObjBuilder& b) {
-    b.append("bytesIn", static_cast<long long>(_logicalBytesIn.loadRelaxed()));
+    b.append("bytesIn", static_cast<long long>(_together.logicalBytesIn.loadRelaxed()));
     b.append("bytesOut", static_cast<long long>(_logicalBytesOut.loadRelaxed()));
     b.append("physicalBytesIn", static_cast<long long>(_physicalBytesIn.loadRelaxed()));
     b.append("physicalBytesOut", static_cast<long long>(_physicalBytesOut.loadRelaxed()));
-    b.append("numRequests", static_cast<long long>(_requests.loadRelaxed()));
+    b.append("numRequests", static_cast<long long>(_together.requests.loadRelaxed()));
 }
 
 

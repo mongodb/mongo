@@ -79,7 +79,7 @@ void TransportLayerASIO::ASIOSourceTicket::_bodyCallback(const std::error_code& 
     }
 
     _target->setData(std::move(_buffer));
-    networkCounter.hitPhysical(0, _target->size());
+    networkCounter.hitPhysicalIn(_target->size());
     finishFill(Status::OK());
 }
 
@@ -129,7 +129,7 @@ void TransportLayerASIO::ASIOSourceTicket::fillImpl() {
 }
 
 void TransportLayerASIO::ASIOSinkTicket::_sinkCallback(const std::error_code& ec, size_t size) {
-    networkCounter.hitPhysical(0, _msgToSend.size());
+    networkCounter.hitPhysicalOut(_msgToSend.size());
     finishFill(ec ? errorCodeToStatus(ec) : Status::OK());
 }
 

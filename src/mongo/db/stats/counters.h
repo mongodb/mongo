@@ -35,6 +35,7 @@
 #include "mongo/util/concurrency/spin_lock.h"
 #include "mongo/util/net/message.h"
 #include "mongo/util/processinfo.h"
+#include "mongo/util/with_alignment.h"
 
 namespace mongo {
 
@@ -80,14 +81,12 @@ public:
 private:
     void _checkWrap();
 
-    // todo: there will be a lot of cache line contention on these.  need to do something
-    //       else eventually.
-    AtomicUInt32 _insert;
-    AtomicUInt32 _query;
-    AtomicUInt32 _update;
-    AtomicUInt32 _delete;
-    AtomicUInt32 _getmore;
-    AtomicUInt32 _command;
+    CacheAligned<AtomicUInt32> _insert;
+    CacheAligned<AtomicUInt32> _query;
+    CacheAligned<AtomicUInt32> _update;
+    CacheAligned<AtomicUInt32> _delete;
+    CacheAligned<AtomicUInt32> _getmore;
+    CacheAligned<AtomicUInt32> _command;
 };
 
 extern OpCounters globalOpCounters;
@@ -96,19 +95,31 @@ extern OpCounters replOpCounters;
 class NetworkCounter {
 public:
     // Increment the counters for the number of bytes read directly off the wire
-    void hitPhysical(long long bytesIn, long long bytesOut);
+    void hitPhysicalIn(long long bytes);
+    void hitPhysicalOut(long long bytes);
+
     // Increment the counters for the number of bytes passed out of the TransportLayer to the
     // server
-    void hitLogical(long long bytesIn, long long bytesOut);
+    void hitLogicalIn(long long bytes);
+    void hitLogicalOut(long long bytes);
+
     void append(BSONObjBuilder& b);
 
 private:
-    AtomicInt64 _physicalBytesIn{0};
-    AtomicInt64 _physicalBytesOut{0};
-    AtomicInt64 _logicalBytesIn{0};
-    AtomicInt64 _logicalBytesOut{0};
+    CacheAligned<AtomicInt64> _physicalBytesIn{0};
+    CacheAligned<AtomicInt64> _physicalBytesOut{0};
 
-    AtomicInt64 _requests{0};
+    // These two counters are always incremented at the same time, so
+    // we place them on the same cache line.
+    struct Together {
+        AtomicInt64 logicalBytesIn{0};
+        AtomicInt64 requests{0};
+    };
+    CacheAligned<Together> _together{};
+    static_assert(sizeof(decltype(_together)) <= stdx::hardware_constructive_interference_size,
+                  "cache line spill");
+
+    CacheAligned<AtomicInt64> _logicalBytesOut{0};
 };
 
 extern NetworkCounter networkCounter;
