@@ -499,7 +499,7 @@ Refresher::NextStep Refresher::getNextStep() {
     if (_scan->hostsToScan.empty()) {
         // We've tried all hosts we can, so nothing more to do in this round.
         if (!_scan->foundUpMaster) {
-            warning() << "No primary detected for set " << _set->name;
+            warning() << "Unable to reach primary for set " << _set->name;
 
             // Since we've talked to everyone we could but still didn't find a primary, we
             // do the best we can, and assume all unconfirmedReplies are actually from nodes
@@ -532,7 +532,8 @@ Refresher::NextStep Refresher::getNextStep() {
         } else {
             auto nScans = _set->consecutiveFailedScans++;
             if (nScans <= 10 || nScans % 10 == 0) {
-                log() << "All nodes for set " << _set->name << " are down. "
+                log() << "Cannot reach any nodes for set " << _set->name
+                      << ". Please check network connectivity and the status of the set. "
                       << "This has happened for " << _set->consecutiveFailedScans
                       << " checks in a row.";
             }
