@@ -1,9 +1,24 @@
+config_variables:
+- &keyFile jstests/libs/authTestsKey
+- &keyFileData Thiskeyisonlyforrunningthesuitewithauthenticationdontuseitinanytestsdirectly
+- &authOptions
+  authenticationDatabase: admin
+  authenticationMechanism: SCRAM-SHA-1
+  password: *keyFileData
+  username: __system
+
 test_kind: js_test
 
 selector:
   roots:
   - jstests/core/**/*.js
   exclude_files:
+  # Skip any tests that run with auth explicitly.
+  - jstests/core/*[aA]uth*.js
+  # Skip any tests that require privileges for non test databases.
+  - jstests/core/copydatabase_no_id_index.js
+  - jstests/core/copydb.js
+  - jstests/core/system_profile.js
   # TODO SERVER-29700: findAndModify returns an operationTime prior to when its write took place.
   - jstests/core/find_and_modify_*.js
   - jstests/core/update_find_and_modify_id.js
@@ -121,16 +136,48 @@ selector:
 executor:
   config:
     shell_options:
-      eval: load("jstests/libs/override_methods/enable_causal_consistency.js")
+      global_vars:
+        TestData:
+          auth: true
+          authMechanism: SCRAM-SHA-1
+          keyFile: *keyFile
+          keyFileData: *keyFileData
+      eval: |
+        jsTest.authenticate(db.getMongo());
+        (function() {
+          const username = "misha";
+          const password = "pwd";
+
+          const res = db.runCommand({
+              createUser: username,
+              pwd: password,
+              roles: ["dbOwner"],
+          });
+
+          if (res.ok === 1) {
+              assert.commandWorked(res);
+          } else {
+              // If 'username' already exists, then attempts to create a user with the same name
+              // will fail with a duplicate key error.
+              assert.commandFailedWithCode(res, ErrorCodes.DuplicateKey);
+          }
+
+          db.logout();
+          db.auth(username, password);
+        })();
+        load("jstests/libs/override_methods/enable_causal_consistency.js");
+      <<: *authOptions
       readMode: commands
   hooks:
   - class: ValidateCollections
+    shell_options: *authOptions
   - class: CleanEveryN
     n: 20
   fixture:
     class: ShardedClusterFixture
     mongos_options:
       bind_ip_all: ''
+      keyFile: *keyFile
       set_parameters:
         enableTestCommands: 1
         logComponentVerbosity:
@@ -144,8 +191,11 @@ executor:
       bind_ip_all: ''
       nopreallocj: ''
       enableMajorityReadConcern: ''
+      auth: ''
+      keyFile: *keyFile
       set_parameters:
         enableTestCommands: 1
+        enableLocalhostAuthBypass: false
         logComponentVerbosity:
           verbosity: 0
           command: 1
@@ -159,3 +209,4 @@ executor:
     num_rs_nodes_per_shard: 2
     enable_sharding:
     - test
+    auth_options: *authOptions

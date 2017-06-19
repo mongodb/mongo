@@ -3166,6 +3166,17 @@ tasks:
       resmoke_args: --suites=causally_consistent_jscore_passthrough --storageEngine=wiredTiger
       run_multiple_jobs: true
 
+- <<: *task_template
+  name: causally_consistent_jscore_passthrough_auth_WT
+  depends_on:
+  - name: jsCore_WT
+  commands:
+  - func: "do setup"
+  - func: "run tests"
+    vars:
+      resmoke_args: --suites=causally_consistent_jscore_passthrough_auth --storageEngine=wiredTiger
+      run_multiple_jobs: true
+
 - name: idl_tests
   depends_on:
   - name: compile
@@ -5077,6 +5088,7 @@ buildvariants:
   - name: auth
   - name: auth_WT
   - name: causally_consistent_jscore_passthrough_WT
+  - name: causally_consistent_jscore_passthrough_auth_WT
   - name: dbtest
   - name: dbtest_WT
   - name: disk
@@ -5509,6 +5521,7 @@ buildvariants:
   - name: bulk_gle_passthrough
   - name: bulk_gle_passthrough_WT
   - name: causally_consistent_jscore_passthrough_WT
+  - name: causally_consistent_jscore_passthrough_auth_WT
   - name: concurrency
   - name: concurrency_WT
   - name: concurrency_replication
@@ -5742,6 +5755,7 @@ buildvariants:
   - name: bulk_gle_passthrough
   - name: bulk_gle_passthrough_WT
   - name: causally_consistent_jscore_passthrough_WT
+  - name: causally_consistent_jscore_passthrough_auth_WT
   - name: concurrency
   - name: concurrency_WT
   - name: concurrency_replication
@@ -8076,6 +8090,7 @@ buildvariants:
   - name: auth_audit
   - name: bulk_gle_passthrough
   - name: causally_consistent_jscore_passthrough_WT
+  - name: causally_consistent_jscore_passthrough_auth_WT
   - name: concurrency
     distros:
     - rhel62-large  # Some workloads require a lot of memory, use a bigger machine for this suite.
@@ -8495,6 +8510,7 @@ buildvariants:
   - name: bulk_gle_passthrough
   - name: bulk_gle_passthrough_WT
   - name: causally_consistent_jscore_passthrough_WT
+  - name: causally_consistent_jscore_passthrough_auth_WT
   - name: concurrency
   - name: concurrency_WT
   - name: concurrency_replication
@@ -8671,6 +8687,7 @@ buildvariants:
   - name: bulk_gle_passthrough
   - name: bulk_gle_passthrough_WT
   - name: causally_consistent_jscore_passthrough_WT
+  - name: causally_consistent_jscore_passthrough_auth_WT
   - name: concurrency
   - name: concurrency_WT
   - name: concurrency_replication
