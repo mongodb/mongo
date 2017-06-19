@@ -361,6 +361,7 @@ env.CppUnitTest(
     target='agg_expression_test',
     source='expression_test.cpp',
     LIBDEPS=[
+        '$BUILD_DIR/mongo/db/query/query_test_service_context',
         'accumulator',
         'document_value_test_util',
         'expression',

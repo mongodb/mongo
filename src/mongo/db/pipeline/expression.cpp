@@ -953,6 +953,494 @@ const char* ExpressionConstant::getOpName() const {
     return "$const";
 }
 
+/* ---------------------- ExpressionDateFromParts ----------------------- */
+
+/* Helper functions also shared with ExpressionDateToParts */
+
+namespace {
+
+bool isNullOrConstant(intrusive_ptr<Expression> exp) {
+    return !exp || dynamic_cast<ExpressionConstant*>(exp.get());
+}
+
+boost::optional<TimeZone> makeTimeZone(const TimeZoneDatabase* tzdb,
+                                       const Document& root,
+                                       intrusive_ptr<Expression> _timeZone) {
+    if (!_timeZone) {
+        return mongo::TimeZoneDatabase::utcZone();
+    }
+
+    auto timeZoneId = _timeZone->evaluate(root);
+
+    if (timeZoneId.nullish()) {
+        return boost::none;
+    }
+
+    uassert(40517,
+            str::stream() << "timezone must evaluate to a string, found "
+                          << typeName(timeZoneId.getType()),
+            timeZoneId.getType() == BSONType::String);
+
+    return tzdb->getTimeZone(timeZoneId.getString());
+}
+
+}  // namespace
+
+
+REGISTER_EXPRESSION(dateFromParts, ExpressionDateFromParts::parse);
+intrusive_ptr<Expression> ExpressionDateFromParts::parse(
+    const boost::intrusive_ptr<ExpressionContext>& expCtx,
+    BSONElement expr,
+    const VariablesParseState& vps) {
+
+    uassert(40519,
+            "$dateFromParts only supports an object as its argument",
+            expr.type() == BSONType::Object);
+
+    BSONElement yearElem;
+    BSONElement monthElem;
+    BSONElement dayElem;
+    BSONElement hourElem;
+    BSONElement minuteElem;
+    BSONElement secondElem;
+    BSONElement millisecondsElem;
+    BSONElement isoYearElem;
+    BSONElement isoWeekYearElem;
+    BSONElement isoDayOfWeekElem;
+    BSONElement timeZoneElem;
+
+    const BSONObj args = expr.embeddedObject();
+    for (auto&& arg : args) {
+        auto field = arg.fieldNameStringData();
+
+        if (field == "year"_sd) {
+            yearElem = arg;
+        } else if (field == "month"_sd) {
+            monthElem = arg;
+        } else if (field == "day"_sd) {
+            dayElem = arg;
+        } else if (field == "hour"_sd) {
+            hourElem = arg;
+        } else if (field == "minute"_sd) {
+            minuteElem = arg;
+        } else if (field == "second"_sd) {
+            secondElem = arg;
+        } else if (field == "milliseconds"_sd) {
+            millisecondsElem = arg;
+        } else if (field == "isoYear"_sd) {
+            isoYearElem = arg;
+        } else if (field == "isoWeekYear"_sd) {
+            isoWeekYearElem = arg;
+        } else if (field == "isoDayOfWeek"_sd) {
+            isoDayOfWeekElem = arg;
+        } else if (field == "timezone"_sd) {
+            timeZoneElem = arg;
+        } else {
+            uasserted(40518,
+                      str::stream() << "Unrecognized argument to $dateFromParts: "
+                                    << arg.fieldName());
+        }
+    }
+
+    if (!yearElem && !isoYearElem) {
+        uasserted(40516, "$dateFromParts requires either 'year' or 'isoYear' to be present");
+    }
+
+    if (yearElem && (isoYearElem || isoWeekYearElem || isoDayOfWeekElem)) {
+        uasserted(40489, "$dateFromParts does not allow mixing natural dates with ISO dates");
+    }
+
+    if (isoYearElem && (yearElem || monthElem || dayElem)) {
+        uasserted(40525, "$dateFromParts does not allow mixing ISO dates with natural dates");
+    }
+
+    return new ExpressionDateFromParts(
+        expCtx,
+        yearElem ? parseOperand(expCtx, yearElem, vps) : nullptr,
+        monthElem ? parseOperand(expCtx, monthElem, vps) : nullptr,
+        dayElem ? parseOperand(expCtx, dayElem, vps) : nullptr,
+        hourElem ? parseOperand(expCtx, hourElem, vps) : nullptr,
+        minuteElem ? parseOperand(expCtx, minuteElem, vps) : nullptr,
+        secondElem ? parseOperand(expCtx, secondElem, vps) : nullptr,
+        millisecondsElem ? parseOperand(expCtx, millisecondsElem, vps) : nullptr,
+        isoYearElem ? parseOperand(expCtx, isoYearElem, vps) : nullptr,
+        isoWeekYearElem ? parseOperand(expCtx, isoWeekYearElem, vps) : nullptr,
+        isoDayOfWeekElem ? parseOperand(expCtx, isoDayOfWeekElem, vps) : nullptr,
+        timeZoneElem ? parseOperand(expCtx, timeZoneElem, vps) : nullptr);
+}
+
+ExpressionDateFromParts::ExpressionDateFromParts(
+    const boost::intrusive_ptr<ExpressionContext>& expCtx,
+    intrusive_ptr<Expression> year,
+    intrusive_ptr<Expression> month,
+    intrusive_ptr<Expression> day,
+    intrusive_ptr<Expression> hour,
+    intrusive_ptr<Expression> minute,
+    intrusive_ptr<Expression> second,
+    intrusive_ptr<Expression> milliseconds,
+    intrusive_ptr<Expression> isoYear,
+    intrusive_ptr<Expression> isoWeekYear,
+    intrusive_ptr<Expression> isoDayOfWeek,
+    intrusive_ptr<Expression> timeZone)
+    : Expression(expCtx),
+      _year(year),
+      _month(month),
+      _day(day),
+      _hour(hour),
+      _minute(minute),
+      _second(second),
+      _milliseconds(milliseconds),
+      _isoYear(isoYear),
+      _isoWeekYear(isoWeekYear),
+      _isoDayOfWeek(isoDayOfWeek),
+      _timeZone(timeZone) {}
+
+intrusive_ptr<Expression> ExpressionDateFromParts::optimize() {
+    if (_year) {
+        _year = _year->optimize();
+    }
+    if (_month) {
+        _month = _month->optimize();
+    }
+    if (_day) {
+        _day = _day->optimize();
+    }
+    if (_hour) {
+        _hour = _hour->optimize();
+    }
+    if (_minute) {
+        _minute = _minute->optimize();
+    }
+    if (_second) {
+        _second = _second->optimize();
+    }
+    if (_milliseconds) {
+        _milliseconds = _milliseconds->optimize();
+    }
+    if (_isoYear) {
+        _isoYear = _isoYear->optimize();
+    }
+    if (_isoWeekYear) {
+        _isoWeekYear = _isoWeekYear->optimize();
+    }
+    if (_isoDayOfWeek) {
+        _isoDayOfWeek = _isoDayOfWeek->optimize();
+    }
+    if (_timeZone) {
+        _timeZone = _timeZone->optimize();
+    }
+
+    if (isNullOrConstant(_year) && isNullOrConstant(_month) && isNullOrConstant(_day) &&
+        isNullOrConstant(_hour) && isNullOrConstant(_minute) && isNullOrConstant(_second) &&
+        isNullOrConstant(_milliseconds) && isNullOrConstant(_isoYear) &&
+        isNullOrConstant(_isoWeekYear) && isNullOrConstant(_isoDayOfWeek) &&
+        isNullOrConstant(_timeZone)) {
+        // Everything is a constant, so we can turn into a constant.
+        return ExpressionConstant::create(getExpressionContext(), evaluate(Document{}));
+    }
+
+    return this;
+}
+
+Value ExpressionDateFromParts::serialize(bool explain) const {
+    return Value(Document{
+        {"$dateFromParts",
+         Document{{"year", _year ? _year->serialize(explain) : Value()},
+                  {"month", _month ? _month->serialize(explain) : Value()},
+                  {"day", _day ? _day->serialize(explain) : Value()},
+                  {"hour", _hour ? _hour->serialize(explain) : Value()},
+                  {"minute", _minute ? _minute->serialize(explain) : Value()},
+                  {"second", _second ? _second->serialize(explain) : Value()},
+                  {"milliseconds", _milliseconds ? _milliseconds->serialize(explain) : Value()},
+                  {"isoYear", _isoYear ? _isoYear->serialize(explain) : Value()},
+                  {"isoWeekYear", _isoWeekYear ? _isoWeekYear->serialize(explain) : Value()},
+                  {"isoDayOfWeek", _isoDayOfWeek ? _isoDayOfWeek->serialize(explain) : Value()},
+                  {"timezone", _timeZone ? _timeZone->serialize(explain) : Value()}}}});
+}
+
+/**
+ * This function checks whether a field is a number, and fits in the given range.
+ *
+ * If the field does not exist, the default value is returned trough the returnValue out parameter
+ * and the function returns true.
+ *
+ * If the field exists:
+ * - if the value is "nullish", the function returns false, so that the calling function can return
+ *   a BSONNULL value.
+ * - if the value can not be coerced to an integral value, an exception is returned.
+ * - if the value is out of the range [minValue..maxValue], an exception is returned.
+ * - otherwise, the coerced integral value is returned through the returnValue
+ *   out parameter, and the function returns true.
+ */
+bool ExpressionDateFromParts::evaluateNumberWithinRange(const Document& root,
+                                                        intrusive_ptr<Expression> field,
+                                                        StringData fieldName,
+                                                        int defaultValue,
+                                                        int minValue,
+                                                        int maxValue,
+                                                        int* returnValue) const {
+    if (!field) {
+        *returnValue = defaultValue;
+        return true;
+    }
+
+    auto fieldValue = field->evaluate(root);
+
+    if (fieldValue.nullish()) {
+        return false;
+    }
+
+    uassert(40515,
+            str::stream() << "'" << fieldName << "' must evaluate to an integer, found "
+                          << typeName(fieldValue.getType())
+                          << " with value "
+                          << fieldValue.toString(),
+            fieldValue.integral());
+
+    *returnValue = fieldValue.coerceToInt();
+
+    uassert(40523,
+            str::stream() << "'" << fieldName << "' must evaluate to an integer in the range "
+                          << minValue
+                          << " to "
+                          << maxValue
+                          << ", found "
+                          << *returnValue,
+            *returnValue >= minValue && *returnValue <= maxValue);
+
+    return true;
+}
+
+Value ExpressionDateFromParts::evaluate(const Document& root) const {
+    int hour, minute, second, milliseconds;
+
+    if (!evaluateNumberWithinRange(root, _hour, "hour"_sd, 0, 0, 24, &hour) ||
+        !evaluateNumberWithinRange(root, _minute, "minute"_sd, 0, 0, 59, &minute) ||
+        !evaluateNumberWithinRange(root, _second, "second"_sd, 0, 0, 59, &second) ||
+        !evaluateNumberWithinRange(
+            root, _milliseconds, "milliseconds"_sd, 0, 0, 999, &milliseconds)) {
+        return Value(BSONNULL);
+    }
+
+    auto timeZone = makeTimeZone(
+        TimeZoneDatabase::get(getExpressionContext()->opCtx->getServiceContext()), root, _timeZone);
+
+    if (!timeZone) {
+        return Value(BSONNULL);
+    }
+
+    if (_year) {
+        int year, month, day;
+
+        if (!evaluateNumberWithinRange(root, _year, "year"_sd, 1970, 0, 9999, &year) ||
+            !evaluateNumberWithinRange(root, _month, "month"_sd, 1, 1, 12, &month) ||
+            !evaluateNumberWithinRange(root, _day, "day"_sd, 1, 1, 31, &day)) {
+            return Value(BSONNULL);
+        }
+
+        return Value(
+            timeZone->createFromDateParts(year, month, day, hour, minute, second, milliseconds));
+    }
+
+    if (_isoYear) {
+        int isoYear, isoWeekYear, isoDayOfWeek;
+
+        if (!evaluateNumberWithinRange(root, _isoYear, "isoYear"_sd, 1970, 0, 9999, &isoYear) ||
+            !evaluateNumberWithinRange(
+                root, _isoWeekYear, "isoWeekYear"_sd, 1, 1, 53, &isoWeekYear) ||
+            !evaluateNumberWithinRange(
+                root, _isoDayOfWeek, "isoDayOfWeek"_sd, 1, 1, 7, &isoDayOfWeek)) {
+            return Value(BSONNULL);
+        }
+
+        return Value(timeZone->createFromIso8601DateParts(
+            isoYear, isoWeekYear, isoDayOfWeek, hour, minute, second, milliseconds));
+    }
+
+    MONGO_UNREACHABLE;
+}
+
+void ExpressionDateFromParts::addDependencies(DepsTracker* deps) const {
+    if (_year) {
+        _year->addDependencies(deps);
+    }
+    if (_month) {
+        _month->addDependencies(deps);
+    }
+    if (_day) {
+        _day->addDependencies(deps);
+    }
+    if (_hour) {
+        _hour->addDependencies(deps);
+    }
+    if (_minute) {
+        _minute->addDependencies(deps);
+    }
+    if (_second) {
+        _second->addDependencies(deps);
+    }
+    if (_milliseconds) {
+        _milliseconds->addDependencies(deps);
+    }
+    if (_isoYear) {
+        _isoYear->addDependencies(deps);
+    }
+    if (_isoWeekYear) {
+        _isoWeekYear->addDependencies(deps);
+    }
+    if (_isoDayOfWeek) {
+        _isoDayOfWeek->addDependencies(deps);
+    }
+    if (_timeZone) {
+        _timeZone->addDependencies(deps);
+    }
+}
+
+/* ---------------------- ExpressionDateToParts ----------------------- */
+
+REGISTER_EXPRESSION(dateToParts, ExpressionDateToParts::parse);
+intrusive_ptr<Expression> ExpressionDateToParts::parse(
+    const boost::intrusive_ptr<ExpressionContext>& expCtx,
+    BSONElement expr,
+    const VariablesParseState& vps) {
+
+    uassert(40524,
+            "$dateToParts only supports an object as its argument",
+            expr.type() == BSONType::Object);
+
+    BSONElement dateElem;
+    BSONElement timeZoneElem;
+    BSONElement isoDateElem;
+
+    const BSONObj args = expr.embeddedObject();
+    for (auto&& arg : args) {
+        auto field = arg.fieldNameStringData();
+
+        if (field == "date"_sd) {
+            dateElem = arg;
+        } else if (field == "timezone"_sd) {
+            timeZoneElem = arg;
+        } else if (field == "iso8601"_sd) {
+            isoDateElem = arg;
+        } else {
+            uasserted(40520,
+                      str::stream() << "Unrecognized argument to $dateToParts: "
+                                    << arg.fieldName());
+        }
+    }
+
+    uassert(40522, "Missing 'date' parameter to $dateToParts", dateElem);
+
+    return new ExpressionDateToParts(
+        expCtx,
+        parseOperand(expCtx, dateElem, vps),
+        timeZoneElem ? parseOperand(expCtx, timeZoneElem, vps) : nullptr,
+        isoDateElem ? parseOperand(expCtx, isoDateElem, vps) : nullptr);
+}
+
+ExpressionDateToParts::ExpressionDateToParts(const boost::intrusive_ptr<ExpressionContext>& expCtx,
+                                             intrusive_ptr<Expression> date,
+                                             intrusive_ptr<Expression> timeZone,
+                                             intrusive_ptr<Expression> iso8601)
+    : Expression(expCtx), _date(date), _timeZone(timeZone), _iso8601(iso8601) {}
+
+intrusive_ptr<Expression> ExpressionDateToParts::optimize() {
+    _date = _date->optimize();
+    if (_timeZone) {
+        _timeZone = _timeZone->optimize();
+    }
+    if (_iso8601) {
+        _iso8601 = _iso8601->optimize();
+    }
+
+    if (dynamic_cast<ExpressionConstant*>(_date.get()) && isNullOrConstant(_iso8601) &&
+        isNullOrConstant(_timeZone)) {
+        // Everything is a constant, so we can turn into a constant.
+        return ExpressionConstant::create(getExpressionContext(), evaluate(Document{}));
+    }
+
+    return this;
+}
+
+Value ExpressionDateToParts::serialize(bool explain) const {
+    return Value(
+        Document{{"$dateToParts",
+                  Document{{"date", _date->serialize(explain)},
+                           {"timezone", _timeZone ? _timeZone->serialize(explain) : Value()},
+                           {"iso8601", _iso8601 ? _iso8601->serialize(explain) : Value()}}}});
+}
+
+boost::optional<int> ExpressionDateToParts::evaluateIso8601Flag(const Document& root) const {
+    if (!_iso8601) {
+        return false;
+    }
+
+    auto iso8601Output = _iso8601->evaluate(root);
+
+    if (iso8601Output.nullish()) {
+        return boost::none;
+    }
+
+    uassert(40521,
+            str::stream() << "iso8601 must evaluate to a bool, found "
+                          << typeName(iso8601Output.getType()),
+            iso8601Output.getType() == BSONType::Bool);
+
+    return iso8601Output.getBool();
+}
+
+Value ExpressionDateToParts::evaluate(const Document& root) const {
+    const Value date = _date->evaluate(root);
+
+    auto timeZone = makeTimeZone(
+        TimeZoneDatabase::get(getExpressionContext()->opCtx->getServiceContext()), root, _timeZone);
+    if (!timeZone) {
+        return Value(BSONNULL);
+    }
+
+    auto iso8601 = evaluateIso8601Flag(root);
+    if (!iso8601) {
+        return Value(BSONNULL);
+    }
+
+    if (date.nullish()) {
+        return Value(BSONNULL);
+    }
+
+    auto dateValue = date.coerceToDate();
+
+    if (*iso8601) {
+        auto parts = timeZone->dateIso8601Parts(dateValue);
+        return Value(Document{{"isoYear", parts.year},
+                              {"isoWeekYear", parts.weekOfYear},
+                              {"isoDayOfWeek", parts.dayOfWeek},
+                              {"hour", parts.hour},
+                              {"minute", parts.minute},
+                              {"second", parts.second},
+                              {"millisecond", parts.millisecond}});
+    } else {
+        auto parts = timeZone->dateParts(dateValue);
+        return Value(Document{{"year", parts.year},
+                              {"month", parts.month},
+                              {"day", parts.dayOfMonth},
+                              {"hour", parts.hour},
+                              {"minute", parts.minute},
+                              {"second", parts.second},
+                              {"millisecond", parts.millisecond}});
+    }
+}
+
+void ExpressionDateToParts::addDependencies(DepsTracker* deps) const {
+    _date->addDependencies(deps);
+    if (_timeZone) {
+        _timeZone->addDependencies(deps);
+    }
+    if (_iso8601) {
+        _iso8601->addDependencies(deps);
+    }
+}
+
+
 /* ---------------------- ExpressionDateToString ----------------------- */
 
 REGISTER_EXPRESSION(dateToString, ExpressionDateToString::parse);

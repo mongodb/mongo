@@ -42,6 +42,7 @@
 #include "mongo/db/pipeline/field_path.h"
 #include "mongo/db/pipeline/value.h"
 #include "mongo/db/pipeline/variables.h"
+#include "mongo/db/query/datetime/date_time_support.h"
 #include "mongo/stdx/functional.h"
 #include "mongo/util/intrusive_counter.h"
 #include "mongo/util/mongoutils/str.h"
@@ -661,6 +662,85 @@ private:
     Value pValue;
 };
 
+class ExpressionDateFromParts final : public Expression {
+public:
+    boost::intrusive_ptr<Expression> optimize() final;
+    Value serialize(bool explain) const final;
+    Value evaluate(const Document& root) const final;
+    void addDependencies(DepsTracker* deps) const final;
+
+    static boost::intrusive_ptr<Expression> parse(
+        const boost::intrusive_ptr<ExpressionContext>& expCtx,
+        BSONElement expr,
+        const VariablesParseState& vps);
+
+private:
+    ExpressionDateFromParts(const boost::intrusive_ptr<ExpressionContext>& expCtx,
+                            boost::intrusive_ptr<Expression> year,
+                            boost::intrusive_ptr<Expression> month,
+                            boost::intrusive_ptr<Expression> day,
+                            boost::intrusive_ptr<Expression> hour,
+                            boost::intrusive_ptr<Expression> minute,
+                            boost::intrusive_ptr<Expression> second,
+                            boost::intrusive_ptr<Expression> milliseconds,
+                            boost::intrusive_ptr<Expression> isoYear,
+                            boost::intrusive_ptr<Expression> isoWeekYear,
+                            boost::intrusive_ptr<Expression> isoDayOfWeek,
+                            boost::intrusive_ptr<Expression> timeZone);
+
+    /**
+     * Evaluates the value in field as number, and makes sure it fits in the minValue..maxValue
+     * range. If the field is missing or empty, the function returns the defaultValue.
+     */
+    bool evaluateNumberWithinRange(const Document& root,
+                                   boost::intrusive_ptr<Expression> field,
+                                   StringData fieldName,
+                                   int defaultValue,
+                                   int minValue,
+                                   int maxValue,
+                                   int* returnValue) const;
+
+    boost::intrusive_ptr<Expression> _year;
+    boost::intrusive_ptr<Expression> _month;
+    boost::intrusive_ptr<Expression> _day;
+    boost::intrusive_ptr<Expression> _hour;
+    boost::intrusive_ptr<Expression> _minute;
+    boost::intrusive_ptr<Expression> _second;
+    boost::intrusive_ptr<Expression> _milliseconds;
+    boost::intrusive_ptr<Expression> _isoYear;
+    boost::intrusive_ptr<Expression> _isoWeekYear;
+    boost::intrusive_ptr<Expression> _isoDayOfWeek;
+    boost::intrusive_ptr<Expression> _timeZone;
+};
+
+class ExpressionDateToParts final : public Expression {
+public:
+    boost::intrusive_ptr<Expression> optimize() final;
+    Value serialize(bool explain) const final;
+    Value evaluate(const Document& root) const final;
+    void addDependencies(DepsTracker* deps) const final;
+
+    static boost::intrusive_ptr<Expression> parse(
+        const boost::intrusive_ptr<ExpressionContext>& expCtx,
+        BSONElement expr,
+        const VariablesParseState& vps);
+
+private:
+    /**
+     * The iso8601 argument controls whether to output ISO8601 elements or natural calendar.
+     */
+    ExpressionDateToParts(const boost::intrusive_ptr<ExpressionContext>& expCtx,
+                          boost::intrusive_ptr<Expression> date,
+                          boost::intrusive_ptr<Expression> timeZone,
+                          boost::intrusive_ptr<Expression> iso8601);
+
+    boost::optional<int> evaluateIso8601Flag(const Document& root) const;
+
+    boost::intrusive_ptr<Expression> _date;
+    boost::intrusive_ptr<Expression> _timeZone;
+    boost::intrusive_ptr<Expression> _iso8601;
+};
+
 class ExpressionDateToString final : public Expression {
 public:
     boost::intrusive_ptr<Expression> optimize() final;
@@ -677,8 +757,6 @@ private:
     ExpressionDateToString(const boost::intrusive_ptr<ExpressionContext>& expCtx,
                            const std::string& format,               // the format string
                            boost::intrusive_ptr<Expression> date);  // the date to format
-
-    static void insertPadded(StringBuilder& sb, int number, int spaces);
 
     const std::string _format;
     boost::intrusive_ptr<Expression> _date;

@@ -33,6 +33,7 @@
 #include "mongo/db/jsobj.h"
 #include "mongo/db/json.h"
 #include "mongo/db/pipeline/accumulator.h"
+#include "mongo/db/pipeline/aggregation_context_fixture.h"
 #include "mongo/db/pipeline/document.h"
 #include "mongo/db/pipeline/document_value_test_util.h"
 #include "mongo/db/pipeline/expression.h"
@@ -4373,6 +4374,197 @@ TEST(GetComputedPathsTest, ExpressionMapNotConsideredRenameWithDottedInputPath) 
 }
 
 }  // namespace GetComputedPathsTest
+
+namespace ExpressionDateFromPartsTest {
+
+// This provides access to an ExpressionContext that has a valid ServiceContext with a
+// TimeZoneDatabase via getExpCtx(), but we'll use a different name for this test suite.
+using ExpressionDateFromPartsTest = AggregationContextFixture;
+
+TEST_F(ExpressionDateFromPartsTest, SerializesToObjectSyntax) {
+    auto expCtx = getExpCtx();
+
+    // Test that it serializes to the full format if given an object specification.
+    BSONObj spec =
+        BSON("$dateFromParts" << BSON(
+                 "year" << 2017 << "month" << 6 << "day" << 27 << "hour" << 14 << "minute" << 37
+                        << "second"
+                        << 15
+                        << "milliseconds"
+                        << 414
+                        << "timezone"
+                        << "America/Los_Angeles"));
+    auto dateExp = Expression::parseExpression(expCtx, spec, expCtx->variablesParseState);
+    auto expectedSerialization =
+        Value(Document{{"$dateFromParts",
+                        Document{{"year", Document{{"$const", 2017}}},
+                                 {"month", Document{{"$const", 6}}},
+                                 {"day", Document{{"$const", 27}}},
+                                 {"hour", Document{{"$const", 14}}},
+                                 {"minute", Document{{"$const", 37}}},
+                                 {"second", Document{{"$const", 15}}},
+                                 {"milliseconds", Document{{"$const", 414}}},
+                                 {"timezone", Document{{"$const", "America/Los_Angeles"_sd}}}}}});
+    ASSERT_VALUE_EQ(dateExp->serialize(true), expectedSerialization);
+    ASSERT_VALUE_EQ(dateExp->serialize(false), expectedSerialization);
+}
+
+TEST_F(ExpressionDateFromPartsTest, OptimizesToConstantIfAllInputsAreConstant) {
+    auto expCtx = getExpCtx();
+    auto spec = BSON("$dateFromParts" << BSON("year" << 2017));
+    auto dateExp = Expression::parseExpression(expCtx, spec, expCtx->variablesParseState);
+    ASSERT(dynamic_cast<ExpressionConstant*>(dateExp->optimize().get()));
+
+    // Test that it becomes a constant if both year, month and day are provided, and are both
+    // constants.
+    spec = BSON("$dateFromParts" << BSON("year" << 2017 << "month" << 6 << "day" << 27));
+    dateExp = Expression::parseExpression(expCtx, spec, expCtx->variablesParseState);
+    ASSERT(dynamic_cast<ExpressionConstant*>(dateExp->optimize().get()));
+
+    // Test that it becomes a constant if both year, hour and minute are provided, and are both
+    // expressions which evaluate to constants.
+    spec = BSON("$dateFromParts" << BSON("year" << BSON("$add" << BSON_ARRAY(1900 << 107)) << "hour"
+                                                << BSON("$add" << BSON_ARRAY(13 << 1))
+                                                << "minute"
+                                                << BSON("$add" << BSON_ARRAY(40 << 3))));
+    dateExp = Expression::parseExpression(expCtx, spec, expCtx->variablesParseState);
+    ASSERT(dynamic_cast<ExpressionConstant*>(dateExp->optimize().get()));
+
+    // Test that it becomes a constant if both year and milliseconds are provided, and year is an
+    // expressions which evaluate to a constant, with milliseconds a constant
+    spec = BSON("$dateFromParts" << BSON(
+                    "year" << BSON("$add" << BSON_ARRAY(1900 << 107)) << "milliseconds" << 514));
+    dateExp = Expression::parseExpression(expCtx, spec, expCtx->variablesParseState);
+    ASSERT(dynamic_cast<ExpressionConstant*>(dateExp->optimize().get()));
+
+    // Test that it becomes a constant if both isoYear, and isoWeekYear are provided, and are both
+    // constants.
+    spec = BSON("$dateFromParts" << BSON("isoYear" << 2017 << "isoWeekYear" << 26));
+    dateExp = Expression::parseExpression(expCtx, spec, expCtx->variablesParseState);
+    ASSERT(dynamic_cast<ExpressionConstant*>(dateExp->optimize().get()));
+
+    // Test that it becomes a constant if both isoYear, isoWeekYear and isoDayOfWeek are provided,
+    // and are both expressions which evaluate to constants.
+    spec = BSON("$dateFromParts" << BSON("isoYear" << BSON("$add" << BSON_ARRAY(1017 << 1000))
+                                                   << "isoWeekYear"
+                                                   << BSON("$add" << BSON_ARRAY(20 << 6))
+                                                   << "isoDayOfWeek"
+                                                   << BSON("$add" << BSON_ARRAY(3 << 2))));
+    dateExp = Expression::parseExpression(expCtx, spec, expCtx->variablesParseState);
+    ASSERT(dynamic_cast<ExpressionConstant*>(dateExp->optimize().get()));
+
+    // Test that it does *not* become a constant if both year and month are provided, but
+    // year is not a constant.
+    spec = BSON("$dateFromParts" << BSON("year"
+                                         << "$year"
+                                         << "month"
+                                         << 6));
+    dateExp = Expression::parseExpression(expCtx, spec, expCtx->variablesParseState);
+    ASSERT_FALSE(dynamic_cast<ExpressionConstant*>(dateExp->optimize().get()));
+
+    // Test that it does *not* become a constant if both year and day are provided, but
+    // day is not a constant.
+    spec = BSON("$dateFromParts" << BSON("year" << 2017 << "day"
+                                                << "$day"));
+    dateExp = Expression::parseExpression(expCtx, spec, expCtx->variablesParseState);
+    ASSERT_FALSE(dynamic_cast<ExpressionConstant*>(dateExp->optimize().get()));
+
+    // Test that it does *not* become a constant if both isoYear and isoDayOfWeek are provided, but
+    // isoDayOfWeek is not a constant.
+    spec = BSON("$dateFromParts" << BSON("isoYear" << 2017 << "isoDayOfWeek"
+                                                   << "$isoDayOfWeekday"));
+    dateExp = Expression::parseExpression(expCtx, spec, expCtx->variablesParseState);
+    ASSERT_FALSE(dynamic_cast<ExpressionConstant*>(dateExp->optimize().get()));
+}
+
+}  // namespace ExpressionDateFromPartsTest
+
+namespace ExpressionDateToPartsTest {
+
+// This provides access to an ExpressionContext that has a valid ServiceContext with a
+// TimeZoneDatabase via getExpCtx(), but we'll use a different name for this test suite.
+using ExpressionDateToPartsTest = AggregationContextFixture;
+
+TEST_F(ExpressionDateToPartsTest, SerializesToObjectSyntax) {
+    auto expCtx = getExpCtx();
+
+    // Test that it serializes to the full format if given an object specification.
+    BSONObj spec = BSON("$dateToParts" << BSON("date" << Date_t{} << "timezone"
+                                                      << "Europe/London"
+                                                      << "iso8601"
+                                                      << false));
+    auto dateExp = Expression::parseExpression(expCtx, spec, expCtx->variablesParseState);
+    auto expectedSerialization =
+        Value(Document{{"$dateToParts",
+                        Document{{"date", Document{{"$const", Date_t{}}}},
+                                 {"timezone", Document{{"$const", "Europe/London"_sd}}},
+                                 {"iso8601", Document{{"$const", false}}}}}});
+    ASSERT_VALUE_EQ(dateExp->serialize(true), expectedSerialization);
+    ASSERT_VALUE_EQ(dateExp->serialize(false), expectedSerialization);
+}
+
+TEST_F(ExpressionDateToPartsTest, OptimizesToConstantIfAllInputsAreConstant) {
+    auto expCtx = getExpCtx();
+    auto spec = BSON("$dateToParts" << BSON("date" << Date_t{}));
+    auto dateExp = Expression::parseExpression(expCtx, spec, expCtx->variablesParseState);
+    ASSERT(dynamic_cast<ExpressionConstant*>(dateExp->optimize().get()));
+
+    // Test that it becomes a constant if both date and timezone are provided, and are both
+    // constants.
+    spec = BSON("$dateToParts" << BSON("date" << Date_t{} << "timezone"
+                                              << "UTC"));
+    dateExp = Expression::parseExpression(expCtx, spec, expCtx->variablesParseState);
+    ASSERT(dynamic_cast<ExpressionConstant*>(dateExp->optimize().get()));
+
+    // Test that it becomes a constant if both date and timezone are provided, and are both
+    // expressions which evaluate to constants.
+    spec = BSON("$dateToParts" << BSON("date" << BSON("$add" << BSON_ARRAY(Date_t{} << 1000))
+                                              << "timezone"
+                                              << BSON("$concat" << BSON_ARRAY("Europe"
+                                                                              << "/"
+                                                                              << "London"))));
+    dateExp = Expression::parseExpression(expCtx, spec, expCtx->variablesParseState);
+    ASSERT(dynamic_cast<ExpressionConstant*>(dateExp->optimize().get()));
+
+    // Test that it becomes a constant if both date and iso8601 are provided, and are both
+    // constants.
+    spec = BSON("$dateToParts" << BSON("date" << Date_t{} << "iso8601" << true));
+    dateExp = Expression::parseExpression(expCtx, spec, expCtx->variablesParseState);
+    ASSERT(dynamic_cast<ExpressionConstant*>(dateExp->optimize().get()));
+
+    // Test that it becomes a constant if both date and iso8601 are provided, and are both
+    // expressions which evaluate to constants.
+    spec = BSON("$dateToParts" << BSON("date" << BSON("$add" << BSON_ARRAY(Date_t{} << 1000))
+                                              << "iso8601"
+                                              << BSON("$not" << false)));
+    dateExp = Expression::parseExpression(expCtx, spec, expCtx->variablesParseState);
+    ASSERT(dynamic_cast<ExpressionConstant*>(dateExp->optimize().get()));
+
+    // Test that it does *not* become a constant if both date and timezone are provided, but
+    // date is not a constant.
+    spec = BSON("$dateToParts" << BSON("date"
+                                       << "$date"
+                                       << "timezone"
+                                       << "Europe/London"));
+    dateExp = Expression::parseExpression(expCtx, spec, expCtx->variablesParseState);
+    ASSERT_FALSE(dynamic_cast<ExpressionConstant*>(dateExp->optimize().get()));
+
+    // Test that it does *not* become a constant if both date and timezone are provided, but
+    // timezone is not a constant.
+    spec = BSON("$dateToParts" << BSON("date" << Date_t{} << "timezone"
+                                              << "$tz"));
+    dateExp = Expression::parseExpression(expCtx, spec, expCtx->variablesParseState);
+    ASSERT_FALSE(dynamic_cast<ExpressionConstant*>(dateExp->optimize().get()));
+
+    // Test that it does *not* become a constant if both date and iso8601 are provided, but
+    // iso8601 is not a constant.
+    spec = BSON("$dateToParts" << BSON("date" << Date_t{} << "iso8601"
+                                              << "$iso8601"));
+    dateExp = Expression::parseExpression(expCtx, spec, expCtx->variablesParseState);
+    ASSERT_FALSE(dynamic_cast<ExpressionConstant*>(dateExp->optimize().get()));
+}
+
+}  // namespace ExpressionDateToPartsTest
 
 class All : public Suite {
 public:

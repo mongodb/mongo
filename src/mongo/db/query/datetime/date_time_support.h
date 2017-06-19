@@ -64,13 +64,50 @@ public:
         int millisecond;
     };
 
+    /**
+     * A struct with member variables describing the different parts of the ISO8601 date.
+     */
+    struct Iso8601DateParts {
+        Iso8601DateParts(const timelib_time&, Date_t);
+
+        int year;
+        int weekOfYear;
+        int dayOfWeek;
+        int hour;
+        int minute;
+        int second;
+        int millisecond;
+    };
+
+
     explicit TimeZone(timelib_tzinfo* tzInfo);
     TimeZone() = default;
 
     /**
+     * Returns a Date_t populated with the argument values for the current timezone.
+     */
+    Date_t createFromDateParts(
+        int year, int month, int day, int hour, int minute, int second, int millisecond) const;
+
+    /**
+     * Returns a Date_t populated with the argument values for the current timezone.
+     */
+    Date_t createFromIso8601DateParts(int isoYear,
+                                      int isoWeekYear,
+                                      int isoDayOfWeek,
+                                      int hour,
+                                      int minute,
+                                      int second,
+                                      int millisecond) const;
+    /**
      * Returns a struct with members for each piece of the date.
      */
     DateParts dateParts(Date_t) const;
+
+    /**
+     * Returns a struct with members for each piece of the ISO8601 date.
+     */
+    Iso8601DateParts dateIso8601Parts(Date_t) const;
 
     /**
      * Returns the year according to the ISO 8601 standard. For example, Dec 31, 2014 is considered
@@ -262,6 +299,12 @@ public:
      * Returns a TimeZone object representing the UTC time zone.
      */
     static TimeZone utcZone();
+
+    /**
+     * Returns a TimeZone object representing the zone given by 'timeZoneId', or boost::none if it
+     * was not a recognized time zone.
+     */
+    TimeZone getTimeZone(StringData timeZoneId) const;
 
     /**
      * Creates a TimeZoneDatabase object with time zone data loaded from timelib's built-in timezone

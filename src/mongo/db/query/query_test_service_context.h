@@ -49,6 +49,10 @@ public:
 
     Client* getClient() const;
 
+    ServiceContext* getServiceContext() {
+        return &_serviceContext;
+    }
+
 private:
     ServiceContextNoop _serviceContext;
     ServiceContext::UniqueClient _uniqueClient;
