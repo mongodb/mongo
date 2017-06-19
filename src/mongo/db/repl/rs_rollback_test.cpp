@@ -195,7 +195,8 @@ TEST_F(RSRollbackTest, RemoteGetRollbackIdThrows) {
                                     RollbackSourceLocal(stdx::make_unique<OplogInterfaceMock>()),
                                     {},
                                     _coordinator,
-                                    _replicationProcess.get()),
+                                    _replicationProcess.get())
+                           .transitional_ignore(),
                        UserException,
                        ErrorCodes::UnknownError);
 }
@@ -218,7 +219,8 @@ TEST_F(RSRollbackTest, RemoteGetRollbackIdDiffersFromRequiredRBID) {
                                     RollbackSourceLocal(stdx::make_unique<OplogInterfaceMock>()),
                                     1,
                                     _coordinator,
-                                    _replicationProcess.get()),
+                                    _replicationProcess.get())
+                           .transitional_ignore(),
                        UserException,
                        ErrorCodes::Error(40362));
 }
@@ -250,7 +252,7 @@ Collection* _createCollection(OperationContext* opCtx,
     mongo::WriteUnitOfWork wuow(opCtx);
     auto db = dbHolder().openDb(opCtx, nss.db());
     ASSERT_TRUE(db);
-    db->dropCollection(opCtx, nss.ns());
+    db->dropCollection(opCtx, nss.ns()).transitional_ignore();
     auto coll = db->createCollection(opCtx, nss.ns(), options);
     ASSERT_TRUE(coll);
     wuow.commit();
@@ -904,7 +906,8 @@ TEST_F(RSRollbackTest, RollbackDropCollectionCommandFailsIfRBIDChangesWhileSynci
                                     rollbackSource,
                                     0,
                                     _coordinator,
-                                    _replicationProcess.get()),
+                                    _replicationProcess.get())
+                           .transitional_ignore(),
                        DBException,
                        40365);
     ASSERT(rollbackSource.copyCollectionCalled);
@@ -1165,7 +1168,8 @@ TEST(RSRollbackTest, LocalEntryWithoutNsIsFatal) {
     const auto validOplogEntry = fromjson("{op: 'i', ns: 'test.t', o: {_id:1, a: 1}}");
     FixUpInfo fui;
     ASSERT_OK(updateFixUpInfoFromLocalOplogEntry(fui, validOplogEntry));
-    ASSERT_THROWS(updateFixUpInfoFromLocalOplogEntry(fui, validOplogEntry.removeField("ns")),
+    ASSERT_THROWS(updateFixUpInfoFromLocalOplogEntry(fui, validOplogEntry.removeField("ns"))
+                      .transitional_ignore(),
                   RSFatalException);
 }
 
@@ -1173,7 +1177,8 @@ TEST(RSRollbackTest, LocalEntryWithoutOIsFatal) {
     const auto validOplogEntry = fromjson("{op: 'i', ns: 'test.t', o: {_id:1, a: 1}}");
     FixUpInfo fui;
     ASSERT_OK(updateFixUpInfoFromLocalOplogEntry(fui, validOplogEntry));
-    ASSERT_THROWS(updateFixUpInfoFromLocalOplogEntry(fui, validOplogEntry.removeField("o")),
+    ASSERT_THROWS(updateFixUpInfoFromLocalOplogEntry(fui, validOplogEntry.removeField("o"))
+                      .transitional_ignore(),
                   RSFatalException);
 }
 
@@ -1182,7 +1187,8 @@ TEST(RSRollbackTest, LocalEntryWithoutO2IsFatal) {
         fromjson("{op: 'u', ns: 'test.t', o2: {_id: 1}, o: {_id:1, a: 1}}");
     FixUpInfo fui;
     ASSERT_OK(updateFixUpInfoFromLocalOplogEntry(fui, validOplogEntry));
-    ASSERT_THROWS(updateFixUpInfoFromLocalOplogEntry(fui, validOplogEntry.removeField("o2")),
+    ASSERT_THROWS(updateFixUpInfoFromLocalOplogEntry(fui, validOplogEntry.removeField("o2"))
+                      .transitional_ignore(),
                   RSFatalException);
 }
 

@@ -44,7 +44,7 @@
 #define MONGO_COMPILER_NORETURN __attribute__((__noreturn__))
 // MONGO_WARN_UNUSED_RESULT is only supported in the semantics we want for classes in Clang, not in
 // GCC.
-#define MONGO_WARN_UNUSED_RESULT_CLASS
+#define MONGO_WARN_UNUSED_RESULT_CLASS [[gnu::warn_unused_result]]
 #else
 #define MONGO_COMPILER_COLD_FUNCTION __attribute__((__cold__))
 #define MONGO_COMPILER_NORETURN __attribute__((__noreturn__, __cold__))

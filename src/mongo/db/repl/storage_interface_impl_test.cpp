@@ -1890,10 +1890,12 @@ TEST_F(StorageInterfaceImplTest,
     auto nss = makeNamespace(_agent);
     ASSERT_OK(storage.createCollection(opCtx, nss, CollectionOptions()));
 
-    ASSERT_THROWS_CODE_AND_WHAT(storage.upsertById(opCtx,
-                                                   nss,
-                                                   BSON("" << 1).firstElement(),
-                                                   BSON("$unknownUpdateOp" << BSON("x" << 1000))),
+    ASSERT_THROWS_CODE_AND_WHAT(storage
+                                    .upsertById(opCtx,
+                                                nss,
+                                                BSON("" << 1).firstElement(),
+                                                BSON("$unknownUpdateOp" << BSON("x" << 1000)))
+                                    .transitional_ignore(),
                                 UserException,
                                 ErrorCodes::FailedToParse,
                                 "Unknown modifier: $unknownUpdateOp");

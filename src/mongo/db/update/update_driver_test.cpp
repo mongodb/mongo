@@ -90,7 +90,7 @@ TEST(Parse, EmptyMod) {
     UpdateDriver driver(opts);
     std::map<StringData, std::unique_ptr<ArrayFilter>> arrayFilters;
     ASSERT_THROWS_CODE_AND_WHAT(
-        driver.parse(fromjson("{$set:{}}"), arrayFilters),
+        driver.parse(fromjson("{$set:{}}"), arrayFilters).transitional_ignore(),
         UserException,
         ErrorCodes::FailedToParse,
         "'$set' is empty. You must specify a field like so: {$set: {<field>: ...}}");
@@ -100,21 +100,23 @@ TEST(Parse, WrongMod) {
     UpdateDriver::Options opts;
     UpdateDriver driver(opts);
     std::map<StringData, std::unique_ptr<ArrayFilter>> arrayFilters;
-    ASSERT_THROWS_CODE_AND_WHAT(driver.parse(fromjson("{$xyz:{a:1}}"), arrayFilters),
-                                UserException,
-                                ErrorCodes::FailedToParse,
-                                "Unknown modifier: $xyz");
+    ASSERT_THROWS_CODE_AND_WHAT(
+        driver.parse(fromjson("{$xyz:{a:1}}"), arrayFilters).transitional_ignore(),
+        UserException,
+        ErrorCodes::FailedToParse,
+        "Unknown modifier: $xyz");
 }
 
 TEST(Parse, WrongType) {
     UpdateDriver::Options opts;
     UpdateDriver driver(opts);
     std::map<StringData, std::unique_ptr<ArrayFilter>> arrayFilters;
-    ASSERT_THROWS_CODE_AND_WHAT(driver.parse(fromjson("{$set:[{a:1}]}"), arrayFilters),
-                                UserException,
-                                ErrorCodes::FailedToParse,
-                                "Modifiers operate on fields but we found type array instead. For "
-                                "example: {$mod: {<field>: ...}} not {$set: [ { a: 1 } ]}");
+    ASSERT_THROWS_CODE_AND_WHAT(
+        driver.parse(fromjson("{$set:[{a:1}]}"), arrayFilters).transitional_ignore(),
+        UserException,
+        ErrorCodes::FailedToParse,
+        "Modifiers operate on fields but we found type array instead. For "
+        "example: {$mod: {<field>: ...}} not {$set: [ { a: 1 } ]}");
 }
 
 TEST(Parse, ModsWithLaterObjReplacement) {
@@ -122,7 +124,8 @@ TEST(Parse, ModsWithLaterObjReplacement) {
     UpdateDriver driver(opts);
     std::map<StringData, std::unique_ptr<ArrayFilter>> arrayFilters;
     ASSERT_THROWS_CODE_AND_WHAT(
-        driver.parse(fromjson("{$set:{a:1}, obj: \"obj replacement\"}"), arrayFilters),
+        driver.parse(fromjson("{$set:{a:1}, obj: \"obj replacement\"}"), arrayFilters)
+            .transitional_ignore(),
         UserException,
         ErrorCodes::FailedToParse,
         "Unknown modifier: obj");
