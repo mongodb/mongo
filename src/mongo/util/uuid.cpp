@@ -54,7 +54,7 @@ StatusWith<UUID> UUID::parse(BSONElement from) {
     try {
         return UUID{from.uuid()};
     } catch (const UserException& e) {
-        return exceptionToStatus();
+        return e.toStatus();
     }
 }
 
