@@ -737,7 +737,6 @@ void DatabaseImpl::dropDatabase(OperationContext* opCtx, Database* db) {
     }
 
     dbHolder().close(opCtx, name, "database dropped");
-    db = NULL;  // d is now deleted
 
     MONGO_WRITE_CONFLICT_RETRY_LOOP_BEGIN {
         getGlobalServiceContext()
