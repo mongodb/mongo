@@ -27,7 +27,7 @@ from . import writer
 class MethodInfo(object):
     """Class that encapslates information about a method and how to declare, define, and call it."""
 
-    def __init__(self, class_name, method_name, args, return_type, static=False, const=False):
+    def __init__(self, class_name, method_name, args, return_type=None, static=False, const=False):
         # type: (unicode, unicode, List[unicode], unicode, bool, bool) -> None
         # pylint: disable=too-many-arguments
         """Create a MethodInfo instance."""
@@ -43,16 +43,21 @@ class MethodInfo(object):
         """Get a declaration for a method."""
         pre_modifiers = ''
         post_modifiers = ''
+        return_type_str = ''
+
         if self._static:
             pre_modifiers = 'static '
 
         if self._const:
             post_modifiers = ' const'
 
+        if self._return_type:
+            return_type_str = self._return_type + ' '
+
         return common.template_args(
-            "${pre_modifiers}${return_type} ${method_name}(${args})${post_modifiers};",
+            "${pre_modifiers}${return_type}${method_name}(${args})${post_modifiers};",
             pre_modifiers=pre_modifiers,
-            return_type=self._return_type,
+            return_type=return_type_str,
             method_name=self._method_name,
             args=', '.join(self._args),
             post_modifiers=post_modifiers)
@@ -62,14 +67,18 @@ class MethodInfo(object):
         """Get a definition for a method."""
         pre_modifiers = ''
         post_modifiers = ''
+        return_type_str = ''
 
         if self._const:
             post_modifiers = ' const'
 
+        if self._return_type:
+            return_type_str = self._return_type + ' '
+
         return common.template_args(
-            "${pre_modifiers}${return_type} ${class_name}::${method_name}(${args})${post_modifiers}",
+            "${pre_modifiers}${return_type}${class_name}::${method_name}(${args})${post_modifiers}",
             pre_modifiers=pre_modifiers,
-            return_type=self._return_type,
+            return_type=return_type_str,
             class_name=self._class_name,
             method_name=self._method_name,
             args=', '.join(self._args),
@@ -96,6 +105,12 @@ class StructTypeInfoBase(object):
     """Base class for struct and command code generation."""
 
     __metaclass__ = ABCMeta
+
+    @abstractmethod
+    def get_constructor_method(self):
+        # type: () -> MethodInfo
+        """Get the constructor method for a struct."""
+        pass
 
     @abstractmethod
     def get_serializer_method(self):
@@ -139,12 +154,6 @@ class StructTypeInfoBase(object):
         """Serialize the first field of a Command."""
         pass
 
-    @abstractmethod
-    def gen_namespace_check(self, indented_writer):
-        # type: (writer.IndentedTextWriter) -> None
-        """Generate the namespace check predicate for a command."""
-        pass
-
 
 class _StructTypeInfo(StructTypeInfoBase):
     """Class for struct code generation."""
@@ -153,6 +162,10 @@ class _StructTypeInfo(StructTypeInfoBase):
         # type: (ast.Struct) -> None
         """Create a _StructTypeInfo instance."""
         self._struct = struct
+
+    def get_constructor_method(self):
+        # type: () -> MethodInfo
+        pass
 
     def get_serializer_method(self):
         # type: () -> MethodInfo
@@ -190,10 +203,6 @@ class _StructTypeInfo(StructTypeInfoBase):
         pass
 
     def gen_serializer(self, indented_writer):
-        # type: (writer.IndentedTextWriter) -> None
-        pass
-
-    def gen_namespace_check(self, indented_writer):
         # type: (writer.IndentedTextWriter) -> None
         pass
 
@@ -236,10 +245,6 @@ class _IgnoredCommandTypeInfo(_StructTypeInfo):
         # type: (writer.IndentedTextWriter) -> None
         indented_writer.write_line('builder->append("%s", 1);' % (self._command.name))
 
-    def gen_namespace_check(self, indented_writer):
-        # type: (writer.IndentedTextWriter) -> None
-        pass
-
 
 class _CommandWithNamespaceTypeInfo(_StructTypeInfo):
     """Class for command code generation."""
@@ -251,23 +256,24 @@ class _CommandWithNamespaceTypeInfo(_StructTypeInfo):
 
         super(_CommandWithNamespaceTypeInfo, self).__init__(command)
 
+    def get_constructor_method(self):
+        # type: () -> MethodInfo
+        class_name = common.title_case(self._struct.name)
+        return MethodInfo(class_name, class_name, ['const NamespaceString& nss'])
+
     def get_serializer_method(self):
         # type: () -> MethodInfo
         # Commands that require namespaces require it as a parameter to serialize()
         return MethodInfo(
             common.title_case(self._struct.name),
-            'serialize', ['const NamespaceString& ns', 'BSONObjBuilder* builder'],
+            'serialize', ['BSONObjBuilder* builder'],
             'void',
             const=True)
 
     def get_to_bson_method(self):
         # type: () -> MethodInfo
         # Commands that require namespaces require it as a parameter to serialize()
-        return MethodInfo(
-            common.title_case(self._struct.name),
-            'toBSON', ['const NamespaceString& ns'],
-            'BSONObj',
-            const=True)
+        return MethodInfo(common.title_case(self._struct.name), 'toBSON', [], 'BSONObj', const=True)
 
     def get_deserializer_static_method(self):
         # type: () -> MethodInfo
@@ -290,20 +296,16 @@ class _CommandWithNamespaceTypeInfo(_StructTypeInfo):
 
     def gen_getter_method(self, indented_writer):
         # type: (writer.IndentedTextWriter) -> None
-        indented_writer.write_line('const NamespaceString& getNamespace() const { return _ns; }')
+        indented_writer.write_line('const NamespaceString& getNamespace() const { return _nss; }')
 
     def gen_member(self, indented_writer):
         # type: (writer.IndentedTextWriter) -> None
-        indented_writer.write_line('NamespaceString _ns;')
+        indented_writer.write_line('NamespaceString _nss;')
 
     def gen_serializer(self, indented_writer):
         # type: (writer.IndentedTextWriter) -> None
-        indented_writer.write_line('builder->append("%s", ns.toString());' % (self._command.name))
-
-    def gen_namespace_check(self, indented_writer):
-        # type: (writer.IndentedTextWriter) -> None
-        # TODO: should the name of the first element be validated??
-        indented_writer.write_line('_ns = ctxt.parseNSCollectionRequired(dbName, element);')
+        indented_writer.write_line('builder->append("%s", _nss.coll());' % (self._command.name))
+        indented_writer.write_empty_line()
 
 
 def get_struct_info(struct):

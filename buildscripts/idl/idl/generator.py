@@ -332,6 +332,14 @@ class _CppHeaderFileWriter(_CppFileWriterBase):
         return writer.IndentedScopedBlock(self._writer,
                                           'class %s {' % common.title_case(class_name), '};')
 
+    def gen_class_constructors(self, struct):
+        # type: (ast.Struct) -> None
+        """Generate the declarations for the class constructors."""
+        struct_type_info = struct_types.get_struct_info(struct)
+
+        if struct_type_info.get_constructor_method():
+            self._writer.write_line(struct_type_info.get_constructor_method().get_declaration())
+
     def gen_serializer_methods(self, struct):
         # type: (ast.Struct) -> None
         """Generate a serializer method declarations."""
@@ -529,6 +537,10 @@ class _CppHeaderFileWriter(_CppFileWriterBase):
                     self.write_empty_line()
 
                     # Write constructor
+                    self.gen_class_constructors(struct)
+                    self.write_empty_line()
+
+                    # Write serialization
                     self.gen_serializer_methods(struct)
 
                     if isinstance(struct, ast.Command):
@@ -693,16 +705,15 @@ class _CppSourceFileWriter(_CppFileWriterBase):
                 object_value = self._gen_field_deserializer_expression('element', field)
                 self._writer.write_line('%s = %s;' % (_get_field_member_name(field), object_value))
 
-    def gen_command_namespace_check(self, command):
-        # type: (ast.Command) -> None
-        """Generate a namespace check for a command."""
+    def gen_constructors(self, struct):
+        # type: (ast.Struct) -> None
+        """Generate the C++ constructor definitions."""
 
-        with self._predicate("firstFieldFound == false"):
-            struct_type_info = struct_types.get_struct_info(command)
-            struct_type_info.gen_namespace_check(self._writer)
-
-            self._writer.write_line('firstFieldFound = true;')
-            self._writer.write_line('continue;')
+        struct_type_info = struct_types.get_struct_info(struct)
+        if struct_type_info.get_constructor_method():
+            with self._block('%s : _nss(nss) {' %
+                             (struct_type_info.get_constructor_method().get_definition()), '}'):
+                self._writer.write_line('// Used for initialization only')
 
     def gen_deserializer_methods(self, struct):
         # type: (ast.Struct) -> None
@@ -713,7 +724,13 @@ class _CppSourceFileWriter(_CppFileWriterBase):
 
         with self._block('%s {' %
                          (struct_type_info.get_deserializer_static_method().get_definition()), '}'):
-            self._writer.write_line('%s object;' % common.title_case(struct.name))
+            if isinstance(struct, ast.Command) and struct_type_info.get_constructor_method():
+                self._writer.write_line('%s object(%s);' % (
+                    common.title_case(struct.name),
+                    'ctxt.parseNSCollectionRequired(dbName, bsonObject.firstElement())'))
+            else:
+                self._writer.write_line('%s object;' % common.title_case(struct.name))
+
             self._writer.write_line(struct_type_info.get_deserializer_method().get_call('object'))
             self._writer.write_line('return object;')
 
@@ -731,8 +748,12 @@ class _CppSourceFileWriter(_CppFileWriterBase):
                 self._writer.write_line('const auto fieldName = element.fieldNameStringData();')
                 self._writer.write_empty_line()
 
+                # For commands, we need to skip over the first field
                 if isinstance(struct, ast.Command):
-                    self.gen_command_namespace_check(struct)
+                    with self._predicate("firstFieldFound == false"):
+                        self._writer.write_line('firstFieldFound = true;')
+                        self._writer.write_line('continue;')
+                    self._writer.write_empty_line()
 
                 field_usage_check.add_store()
                 self._writer.write_empty_line()
@@ -986,6 +1007,10 @@ class _CppSourceFileWriter(_CppFileWriterBase):
 
             for struct in spec.structs:
                 self.gen_string_constants_definitions(struct)
+                self.write_empty_line()
+
+                # Write constructor
+                self.gen_constructors(struct)
                 self.write_empty_line()
 
                 # Write deserializer

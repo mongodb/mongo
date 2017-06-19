@@ -1455,7 +1455,7 @@ TEST(IDLCommand, TestConcatentateWithDb) {
     // Positive: Test we can roundtrip from the just parsed document
     {
         BSONObjBuilder builder;
-        testStruct.serialize(NamespaceString("coll1"), &builder);
+        testStruct.serialize(&builder);
         auto loopbackDoc = builder.obj();
 
         ASSERT_BSONOBJ_EQ(testDoc, loopbackDoc);
@@ -1464,10 +1464,10 @@ TEST(IDLCommand, TestConcatentateWithDb) {
     // Positive: Test we can serialize from nothing the same document
     {
         BSONObjBuilder builder;
-        BasicConcatenateWithDbCommand one_new;
+        BasicConcatenateWithDbCommand one_new(NamespaceString("db.coll1"));
         one_new.setField1(3);
         one_new.setField2("five");
-        one_new.serialize(NamespaceString("coll1"), &builder);
+        one_new.serialize(&builder);
 
         auto serializedDoc = builder.obj();
         ASSERT_BSONOBJ_EQ(testDoc, serializedDoc);
