@@ -53,7 +53,10 @@ using ChunkMap = BSONObjIndexedMap<std::shared_ptr<Chunk>>;
 // Map from a shard is to the max chunk version on that shard
 using ShardVersionMap = std::map<ShardId, ChunkVersion>;
 
-class ChunkManager {
+/**
+ * In-memory representation of the routing table for a single sharded collection.
+ */
+class ChunkManager : public std::enable_shared_from_this<ChunkManager> {
     MONGO_DISALLOW_COPYING(ChunkManager);
 
 public:
@@ -100,14 +103,32 @@ public:
         ConstChunkIterator _end;
     };
 
-    ChunkManager(NamespaceString nss,
-                 KeyPattern shardKeyPattern,
-                 std::unique_ptr<CollatorInterface> defaultCollator,
-                 bool unique,
-                 ChunkMap chunkMap,
-                 ChunkVersion collectionVersion);
+    /**
+     * Makes an instance with a routing table for collection "nss", sharded on
+     * "shardKeyPattern".
+     *
+     * "defaultCollator" is the default collation for the collection, "unique" indicates whether
+     * or not the shard key for each document will be globally unique, and "epoch" is the globally
+     * unique identifier for this version of the collection.
+     *
+     * The "chunks" vector must contain the chunk routing information sorted in ascending order by
+     * chunk version, and adhere to the requirements of the routing table update algorithm.
+     */
+    static std::shared_ptr<ChunkManager> makeNew(NamespaceString nss,
+                                                 KeyPattern shardKeyPattern,
+                                                 std::unique_ptr<CollatorInterface> defaultCollator,
+                                                 bool unique,
+                                                 OID epoch,
+                                                 const std::vector<ChunkType>& chunks);
 
-    ~ChunkManager();
+    /**
+     * Constructs a new instance with a routing table updated according to the changes described
+     * in "changedChunks".
+     *
+     * The changes in "changedChunks" must be sorted in ascending order by chunk version, and adhere
+     * to the requirements of the routing table update algorithm.
+     */
+    std::shared_ptr<ChunkManager> makeUpdated(const std::vector<ChunkType>& changedChunks);
 
     /**
      * Returns an increasing number of the reload sequence number of this chunk manager.
@@ -140,10 +161,6 @@ public:
 
     ConstRangeOfChunks chunks() const {
         return {ConstChunkIterator{_chunkMap.cbegin()}, ConstChunkIterator{_chunkMap.cend()}};
-    }
-
-    const ChunkMap& chunkMap() const {
-        return _chunkMap;
     }
 
     int numChunks() const {
@@ -219,8 +236,6 @@ public:
     std::string toString() const;
 
 private:
-    friend class CollectionRoutingDataLoader;
-
     /**
      * Represents a range of chunk keys [getMin(), getMax()) and the id of the shard on which they
      * reside according to the metadata.
@@ -258,6 +273,13 @@ private:
      * Does a single pass over the chunkMap and constructs the ChunkMapViews object.
      */
     static ChunkMapViews _constructChunkMapViews(const OID& epoch, const ChunkMap& chunkMap);
+
+    ChunkManager(NamespaceString nss,
+                 KeyPattern shardKeyPattern,
+                 std::unique_ptr<CollatorInterface> defaultCollator,
+                 bool unique,
+                 ChunkMap chunkMap,
+                 ChunkVersion collectionVersion);
 
     // The shard versioning mechanism hinges on keeping track of the number of times we reload
     // ChunkManagers.

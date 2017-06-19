@@ -36,6 +36,7 @@
 #include "mongo/base/status_with.h"
 #include "mongo/db/query/collation/collator_factory_interface.h"
 #include "mongo/db/repl/optime_with.h"
+#include "mongo/platform/unordered_set.h"
 #include "mongo/s/catalog/sharding_catalog_client.h"
 #include "mongo/s/catalog/type_collection.h"
 #include "mongo/s/catalog/type_database.h"
@@ -76,79 +77,36 @@ std::shared_ptr<ChunkManager> refreshCollectionRoutingInfo(
 
     const auto collectionAndChunks = uassertStatusOK(std::move(swCollectionAndChangedChunks));
 
-    // Check whether the collection epoch might have changed
-    ChunkVersion startingCollectionVersion;
-    ChunkMap chunkMap =
-        SimpleBSONObjComparator::kInstance.makeBSONObjIndexedMap<std::shared_ptr<Chunk>>();
+    auto chunkManager = [&] {
+        // If we have routing info already and it's for the same collection epoch, we're updating.
+        // Otherwise, we're making a whole new routing table.
+        if (existingRoutingInfo &&
+            existingRoutingInfo->getVersion().epoch() == collectionAndChunks.epoch) {
 
-    if (!existingRoutingInfo) {
-        // If we don't have a basis chunk manager, do a full refresh
-        startingCollectionVersion = ChunkVersion(0, 0, collectionAndChunks.epoch);
-    } else if (existingRoutingInfo->getVersion().epoch() != collectionAndChunks.epoch) {
-        // If the collection's epoch has changed, do a full refresh
-        startingCollectionVersion = ChunkVersion(0, 0, collectionAndChunks.epoch);
-    } else {
-        startingCollectionVersion = existingRoutingInfo->getVersion();
-        chunkMap = existingRoutingInfo->chunkMap();
+            return existingRoutingInfo->makeUpdated(collectionAndChunks.changedChunks);
+        }
+        auto defaultCollator = [&]() -> std::unique_ptr<CollatorInterface> {
+            if (!collectionAndChunks.defaultCollation.isEmpty()) {
+                // The collation should have been validated upon collection creation
+                return uassertStatusOK(CollatorFactoryInterface::get(opCtx->getServiceContext())
+                                           ->makeFromBSON(collectionAndChunks.defaultCollation));
+            }
+            return nullptr;
+        }();
+        return ChunkManager::makeNew(nss,
+                                     KeyPattern(collectionAndChunks.shardKeyPattern),
+                                     std::move(defaultCollator),
+                                     collectionAndChunks.shardKeyIsUnique,
+                                     collectionAndChunks.epoch,
+                                     collectionAndChunks.changedChunks);
+    }();
+
+    std::set<ShardId> shardIds;
+    chunkManager->getAllShardIds(&shardIds);
+    for (const auto& shardId : shardIds) {
+        uassertStatusOK(Grid::get(opCtx)->shardRegistry()->getShard(opCtx, shardId));
     }
-
-    ChunkVersion collectionVersion = startingCollectionVersion;
-
-    for (const auto& chunk : collectionAndChunks.changedChunks) {
-        const auto& chunkVersion = chunk.getVersion();
-
-        uassert(ErrorCodes::ConflictingOperationInProgress,
-                str::stream() << "Chunk " << chunk.genID(nss.ns(), chunk.getMin())
-                              << " has epoch different from that of the collection "
-                              << chunkVersion.epoch(),
-                collectionVersion.epoch() == chunkVersion.epoch());
-
-        // Chunks must always come in incrementally sorted order
-        invariant(chunkVersion >= collectionVersion);
-        collectionVersion = chunkVersion;
-
-        // Ensure chunk references a valid shard and that the shard is available and loaded
-        uassertStatusOK(Grid::get(opCtx)->shardRegistry()->getShard(opCtx, chunk.getShard()));
-
-        // Returns the first chunk with a max key that is > min - implies that the chunk overlaps
-        // min
-        const auto low = chunkMap.upper_bound(chunk.getMin());
-
-        // Returns the first chunk with a max key that is > max - implies that the next chunk cannot
-        // not overlap max
-        const auto high = chunkMap.upper_bound(chunk.getMax());
-
-        // Erase all chunks from the map, which overlap the chunk we got from the persistent store
-        chunkMap.erase(low, high);
-
-        // Insert only the chunk itself
-        chunkMap.insert(std::make_pair(chunk.getMax(), std::make_shared<Chunk>(chunk)));
-    }
-
-    // If at least one diff was applied, the metadata is correct, but it might not have changed so
-    // in this case there is no need to recreate the chunk manager.
-    //
-    // NOTE: In addition to the above statement, it is also important that we return the same chunk
-    // manager object, because the write commands' code relies on changes of the chunk manager's
-    // sequence number to detect batch writes not making progress because of chunks moving across
-    // shards too frequently.
-    if (collectionVersion == startingCollectionVersion) {
-        return existingRoutingInfo;
-    }
-
-    std::unique_ptr<CollatorInterface> defaultCollator;
-    if (!collectionAndChunks.defaultCollation.isEmpty()) {
-        // The collation should have been validated upon collection creation
-        defaultCollator = uassertStatusOK(CollatorFactoryInterface::get(opCtx->getServiceContext())
-                                              ->makeFromBSON(collectionAndChunks.defaultCollation));
-    }
-
-    return stdx::make_unique<ChunkManager>(nss,
-                                           KeyPattern(collectionAndChunks.shardKeyPattern),
-                                           std::move(defaultCollator),
-                                           collectionAndChunks.shardKeyIsUnique,
-                                           std::move(chunkMap),
-                                           collectionVersion);
+    return chunkManager;
 }
 
 }  // namespace

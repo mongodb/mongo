@@ -41,7 +41,6 @@
 #include "mongo/db/query/index_bounds_builder.h"
 #include "mongo/db/query/query_planner.h"
 #include "mongo/db/query/query_planner_common.h"
-#include "mongo/s/grid.h"
 #include "mongo/util/log.h"
 
 namespace mongo {
@@ -74,8 +73,6 @@ ChunkManager::ChunkManager(NamespaceString nss,
       _chunkMap(std::move(chunkMap)),
       _chunkMapViews(_constructChunkMapViews(collectionVersion.epoch(), _chunkMap)),
       _collectionVersion(collectionVersion) {}
-
-ChunkManager::~ChunkManager() = default;
 
 std::shared_ptr<Chunk> ChunkManager::findIntersectingChunk(const BSONObj& shardKey,
                                                            const BSONObj& collation) const {
@@ -342,7 +339,6 @@ std::string ChunkManager::toString() const {
 
 ChunkManager::ChunkMapViews ChunkManager::_constructChunkMapViews(const OID& epoch,
                                                                   const ChunkMap& chunkMap) {
-    invariant(!chunkMap.empty());
 
     ChunkRangeMap chunkRangeMap =
         SimpleBSONObjComparator::kInstance.makeBSONObjIndexedMap<ShardAndChunkRange>();
@@ -409,13 +405,86 @@ ChunkManager::ChunkMapViews ChunkManager::_constructChunkMapViews(const OID& epo
         invariant(maxShardVersion.isSet());
     }
 
-    invariant(!chunkRangeMap.empty());
-    invariant(!shardVersions.empty());
+    if (!chunkMap.empty()) {
+        invariant(!chunkRangeMap.empty());
+        invariant(!shardVersions.empty());
 
-    checkAllElementsAreOfType(MinKey, chunkRangeMap.begin()->second.min());
-    checkAllElementsAreOfType(MaxKey, chunkRangeMap.rbegin()->first);
+        checkAllElementsAreOfType(MinKey, chunkRangeMap.begin()->second.min());
+        checkAllElementsAreOfType(MaxKey, chunkRangeMap.rbegin()->first);
+    }
 
     return {std::move(chunkRangeMap), std::move(shardVersions)};
 }
 
+std::shared_ptr<ChunkManager> ChunkManager::makeNew(
+    NamespaceString nss,
+    KeyPattern shardKeyPattern,
+    std::unique_ptr<CollatorInterface> defaultCollator,
+    bool unique,
+    OID epoch,
+    const std::vector<ChunkType>& chunks) {
+
+    return ChunkManager(
+               std::move(nss),
+               std::move(shardKeyPattern),
+               std::move(defaultCollator),
+               std::move(unique),
+               SimpleBSONObjComparator::kInstance.makeBSONObjIndexedMap<std::shared_ptr<Chunk>>(),
+               {0, 0, epoch})
+        .makeUpdated(chunks);
+}
+
+std::shared_ptr<ChunkManager> ChunkManager::makeUpdated(
+    const std::vector<ChunkType>& changedChunks) {
+    const auto startingCollectionVersion = getVersion();
+    auto chunkMap = _chunkMap;
+
+    ChunkVersion collectionVersion = startingCollectionVersion;
+    for (const auto& chunk : changedChunks) {
+        const auto& chunkVersion = chunk.getVersion();
+
+        uassert(ErrorCodes::ConflictingOperationInProgress,
+                str::stream() << "Chunk " << chunk.genID(getns(), chunk.getMin())
+                              << " has epoch different from that of the collection "
+                              << chunkVersion.epoch(),
+                collectionVersion.epoch() == chunkVersion.epoch());
+
+        // Chunks must always come in incrementally sorted order
+        invariant(chunkVersion >= collectionVersion);
+        collectionVersion = chunkVersion;
+
+        // Returns the first chunk with a max key that is > min - implies that the chunk overlaps
+        // min
+        const auto low = chunkMap.upper_bound(chunk.getMin());
+
+        // Returns the first chunk with a max key that is > max - implies that the next chunk cannot
+        // not overlap max
+        const auto high = chunkMap.upper_bound(chunk.getMax());
+
+        // Erase all chunks from the map, which overlap the chunk we got from the persistent store
+        chunkMap.erase(low, high);
+
+        // Insert only the chunk itself
+        chunkMap.insert(std::make_pair(chunk.getMax(), std::make_shared<Chunk>(chunk)));
+    }
+
+    // If at least one diff was applied, the metadata is correct, but it might not have changed so
+    // in this case there is no need to recreate the chunk manager.
+    //
+    // NOTE: In addition to the above statement, it is also important that we return the same chunk
+    // manager object, because the write commands' code relies on changes of the chunk manager's
+    // sequence number to detect batch writes not making progress because of chunks moving across
+    // shards too frequently.
+    if (collectionVersion == startingCollectionVersion) {
+        return shared_from_this();
+    }
+
+    return std::shared_ptr<ChunkManager>(
+        new ChunkManager(_nss,
+                         KeyPattern(getShardKeyPattern().getKeyPattern()),
+                         CollatorInterface::cloneCollator(getDefaultCollator()),
+                         isUnique(),
+                         std::move(chunkMap),
+                         collectionVersion));
+}
 }  // namespace mongo
