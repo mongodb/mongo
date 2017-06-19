@@ -165,7 +165,8 @@ TEST_F(DatabaseTest, CreateCollectionThrowsExceptionWhenDatabaseIsInADropPending
 void _testDropCollection(OperationContext* opCtx,
                          const NamespaceString& nss,
                          bool createCollectionBeforeDrop,
-                         const repl::OpTime& dropOpTime = {}) {
+                         const repl::OpTime& dropOpTime = {},
+                         const CollectionOptions& collOpts = {}) {
     writeConflictRetry(opCtx, "testDropCollection", nss.ns(), [=] {
         AutoGetOrCreateDb autoDb(opCtx, nss.db(), MODE_X);
         auto db = autoDb.getDb();
@@ -173,7 +174,7 @@ void _testDropCollection(OperationContext* opCtx,
 
         WriteUnitOfWork wuow(opCtx);
         if (createCollectionBeforeDrop) {
-            ASSERT_TRUE(db->createCollection(opCtx, nss.ns()));
+            ASSERT_TRUE(db->createCollection(opCtx, nss.ns(), collOpts));
         } else {
             ASSERT_FALSE(db->getCollection(opCtx, nss));
         }
@@ -335,6 +336,14 @@ TEST_F(
     auto reaperEarliestDropOpTime =
         repl::DropPendingCollectionReaper::get(_opCtx.get())->getEarliestDropOpTime();
     ASSERT_FALSE(reaperEarliestDropOpTime);
+}
+
+TEST_F(DatabaseTest, DropPendingCollectionIsAllowedToHaveDocumentValidators) {
+    CollectionOptions opts;
+    opts.validator = BSON("x" << BSON("$type"
+                                      << "string"));
+    opts.validationAction = "error";
+    _testDropCollection(_opCtx.get(), _nss, true, {}, opts);
 }
 
 void _testDropCollectionThrowsExceptionIfThereAreIndexesInProgress(OperationContext* opCtx,
