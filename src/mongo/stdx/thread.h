@@ -112,22 +112,23 @@ inline void swap(thread& lhs, thread& rhs) BOOST_NOEXCEPT {
 }
 
 namespace this_thread {
-using std::this_thread::get_id;
-using std::this_thread::yield;
+using std::this_thread::get_id;  // NOLINT
+using std::this_thread::yield;   // NOLINT
 
 #ifdef _WIN32
-using std::this_thread::sleep_for;
-using std::this_thread::sleep_until;
+using std::this_thread::sleep_for;    // NOLINT
+using std::this_thread::sleep_until;  // NOLINT
 #else
 template <class Rep, class Period>
-inline void sleep_for(const std::chrono::duration<Rep, Period>& sleep_duration) {
+inline void sleep_for(const std::chrono::duration<Rep, Period>& sleep_duration) {  // NOLINT
     if (sleep_duration <= sleep_duration.zero())
         return;
 
-    const auto seconds = std::chrono::duration_cast<std::chrono::seconds>(sleep_duration);
+    const auto seconds =
+        std::chrono::duration_cast<std::chrono::seconds>(sleep_duration);  // NOLINT
     const auto nanoseconds =
-        std::chrono::duration_cast<std::chrono::nanoseconds>(sleep_duration - seconds);
-    struct timespec sleepVal = {static_cast<std::time_t>(seconds.count()),
+        std::chrono::duration_cast<std::chrono::nanoseconds>(sleep_duration - seconds);  // NOLINT
+    struct timespec sleepVal = {static_cast<std::time_t>(seconds.count()),               // NOLINT
                                 static_cast<long>(nanoseconds.count())};
     struct timespec remainVal;
     while (nanosleep(&sleepVal, &remainVal) == -1 && errno == EINTR) {
@@ -136,9 +137,9 @@ inline void sleep_for(const std::chrono::duration<Rep, Period>& sleep_duration) 
 }
 
 template <class Clock, class Duration>
-void sleep_until(const std::chrono::time_point<Clock, Duration>& sleep_time) {
+void sleep_until(const std::chrono::time_point<Clock, Duration>& sleep_time)  // NOLINT {
     const auto now = Clock::now();
-    sleep_for(sleep_time - now);
+sleep_for(sleep_time - now);
 }
 #endif
 }  // namespace this_thread
