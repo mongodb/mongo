@@ -137,9 +137,9 @@ inline void sleep_for(const std::chrono::duration<Rep, Period>& sleep_duration) 
 }
 
 template <class Clock, class Duration>
-void sleep_until(const std::chrono::time_point<Clock, Duration>& sleep_time)  // NOLINT {
+void sleep_until(const std::chrono::time_point<Clock, Duration>& sleep_time) {  // NOLINT
     const auto now = Clock::now();
-sleep_for(sleep_time - now);
+    sleep_for(sleep_time - now);
 }
 #endif
 }  // namespace this_thread
