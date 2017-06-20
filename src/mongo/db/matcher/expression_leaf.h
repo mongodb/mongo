@@ -461,10 +461,6 @@ private:
  */
 class BitTestMatchExpression : public LeafMatchExpression {
 public:
-    // Constant used in matchesSingleElement() and MatchExpressionParser::_parseBitTest. Is a
-    // double representation of 2^63.
-    static const double kLongLongMaxPlusOneAsDouble;
-
     BitTestMatchExpression(MatchType type) : LeafMatchExpression(type) {}
     virtual ~BitTestMatchExpression() {}
 

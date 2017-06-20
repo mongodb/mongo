@@ -89,7 +89,7 @@ void encodeUserString(StringData s, StringBuilder* keyBuilder) {
 }
 
 /**
- * 2-character encoding of MatchExpression::MatchType.
+ * String encoding of MatchExpression::MatchType.
  */
 const char* encodeMatchType(MatchExpression::MatchType mt) {
     switch (mt) {
@@ -171,8 +171,14 @@ const char* encodeMatchType(MatchExpression::MatchType mt) {
         case MatchExpression::BITS_ANY_CLEAR:
             return "yc";
             break;
+        case MatchExpression::INTERNAL_SCHEMA_MIN_ITEMS:
+            return "internalSchemaMinItems";
+            break;
+        case MatchExpression::INTERNAL_SCHEMA_MAX_ITEMS:
+            return "internalSchemaMaxItems";
+            break;
         default:
-            verify(0);
+            MONGO_UNREACHABLE;
             return "";
     }
 }

@@ -33,6 +33,7 @@
 #include "mongo/db/json.h"
 #include "mongo/db/matcher/expression.h"
 #include "mongo/db/matcher/expression_parser.h"
+#include "mongo/db/matcher/extensions_callback_disallow_extensions.h"
 #include "mongo/db/matcher/extensions_callback_noop.h"
 #include "mongo/db/matcher/matcher.h"
 #include "mongo/unittest/unittest.h"
@@ -986,6 +987,28 @@ TEST(SerializeBasic, ExpressionTextWithDefaultLanguageSerializesCorrectly) {
     ASSERT_BSONOBJ_EQ(*reserialized.getQuery(),
                       fromjson("{$text: {$search: 'a', $language: '', $caseSensitive: false, "
                                "$diacriticSensitive: false}}"));
+    ASSERT_BSONOBJ_EQ(*reserialized.getQuery(), serialize(reserialized.getMatchExpression()));
+}
+
+TEST(SerializeInternalSchema, ExpressionInternalSchemaMinItemsSerializesCorrectly) {
+    const CollatorInterface* collator = nullptr;
+    Matcher original(fromjson("{x: {$_internalSchemaMinItems: 1}}"),
+                     ExtensionsCallbackDisallowExtensions(),
+                     collator);
+    Matcher reserialized(
+        serialize(original.getMatchExpression()), ExtensionsCallbackDisallowExtensions(), collator);
+    ASSERT_BSONOBJ_EQ(*reserialized.getQuery(), fromjson("{x: {$_internalSchemaMinItems: 1}}"));
+    ASSERT_BSONOBJ_EQ(*reserialized.getQuery(), serialize(reserialized.getMatchExpression()));
+}
+
+TEST(SerializeInternalSchema, ExpressionInternalSchemaMaxItemsSerializesCorrectly) {
+    const CollatorInterface* collator = nullptr;
+    Matcher original(fromjson("{x: {$_internalSchemaMaxItems: 1}}"),
+                     ExtensionsCallbackDisallowExtensions(),
+                     collator);
+    Matcher reserialized(
+        serialize(original.getMatchExpression()), ExtensionsCallbackDisallowExtensions(), collator);
+    ASSERT_BSONOBJ_EQ(*reserialized.getQuery(), fromjson("{x: {$_internalSchemaMaxItems: 1}}"));
     ASSERT_BSONOBJ_EQ(*reserialized.getQuery(), serialize(reserialized.getMatchExpression()));
 }
 

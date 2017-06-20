@@ -95,7 +95,11 @@ public:
         // Expressions that are only created internally
         INTERNAL_2DSPHERE_KEY_IN_REGION,
         INTERNAL_2D_KEY_IN_REGION,
-        INTERNAL_2D_POINT_IN_ANNULUS
+        INTERNAL_2D_POINT_IN_ANNULUS,
+
+        // JSON Schema expressions.
+        INTERNAL_SCHEMA_MIN_ITEMS,
+        INTERNAL_SCHEMA_MAX_ITEMS,
     };
 
     MatchExpression(MatchType type);
