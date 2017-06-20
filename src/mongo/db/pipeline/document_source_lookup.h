@@ -44,7 +44,7 @@ namespace mongo {
 class DocumentSourceLookUp final : public DocumentSourceNeedsMongod,
                                    public SplittableDocumentSource {
 public:
-    static std::unique_ptr<LiteParsedDocumentSourceOneForeignCollection> liteParse(
+    static std::unique_ptr<LiteParsedDocumentSourceForeignCollections> liteParse(
         const AggregationRequest& request, const BSONElement& spec);
 
     GetNextResult getNext() final;
@@ -210,10 +210,11 @@ private:
     // namespace.
     boost::intrusive_ptr<ExpressionContext> _fromExpCtx;
 
-    // The aggregation pipeline to perform against the '_resolvedNs' namespace.
+    // The aggregation pipeline to perform against the '_resolvedNs' namespace. Referenced view
+    // namespaces have been resolved.
     std::vector<BSONObj> _resolvedPipeline;
-    // The pipeline defined with the user request, prior to optimization and addition of any view
-    // definitions.
+    // The aggregation pipeline defined with the user request, prior to optimization and view
+    // resolution.
     std::vector<BSONObj> _userPipeline;
 
     std::vector<LetVariable> _letVariables;

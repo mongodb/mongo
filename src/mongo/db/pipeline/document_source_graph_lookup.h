@@ -38,7 +38,7 @@ namespace mongo {
 
 class DocumentSourceGraphLookUp final : public DocumentSourceNeedsMongod {
 public:
-    static std::unique_ptr<LiteParsedDocumentSourceOneForeignCollection> liteParse(
+    static std::unique_ptr<LiteParsedDocumentSourceForeignCollections> liteParse(
         const AggregationRequest& request, const BSONElement& spec);
 
     GetNextResult getNext() final;

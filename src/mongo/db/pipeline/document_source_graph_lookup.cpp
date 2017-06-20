@@ -49,7 +49,7 @@ using boost::intrusive_ptr;
 
 namespace dps = ::mongo::dotted_path_support;
 
-std::unique_ptr<LiteParsedDocumentSourceOneForeignCollection> DocumentSourceGraphLookUp::liteParse(
+std::unique_ptr<LiteParsedDocumentSourceForeignCollections> DocumentSourceGraphLookUp::liteParse(
     const AggregationRequest& request, const BSONElement& spec) {
     uassert(40327,
             str::stream() << "the $graphLookup stage specification must be an object, but found "
@@ -69,7 +69,7 @@ std::unique_ptr<LiteParsedDocumentSourceOneForeignCollection> DocumentSourceGrap
 
     NamespaceString nss(request.getNamespaceString().db(), fromElement.valueStringData());
     uassert(40330, str::stream() << "invalid $graphLookup namespace: " << nss.ns(), nss.isValid());
-    return stdx::make_unique<LiteParsedDocumentSourceOneForeignCollection>(std::move(nss));
+    return stdx::make_unique<LiteParsedDocumentSourceForeignCollections>(std::move(nss));
 }
 
 REGISTER_DOCUMENT_SOURCE(graphLookup,

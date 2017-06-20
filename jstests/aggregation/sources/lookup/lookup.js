@@ -16,13 +16,23 @@ load("jstests/aggregation/extras/utils.js");  // For assertErrorCode.
         return 0;
     }
 
+    function generateNestedPipeline(foreignCollName, numLevels) {
+        let pipeline = [{"$lookup": {pipeline: [], from: foreignCollName, as: "same"}}];
+
+        for (let level = 0; level < numLevels; level++) {
+            pipeline = [{"$lookup": {pipeline: pipeline, from: foreignCollName, as: "same"}}];
+        }
+
+        return pipeline;
+    }
+
     // Helper for testing that pipeline returns correct set of results.
     function testPipeline(pipeline, expectedResult, collection) {
         assert.eq(collection.aggregate(pipeline).toArray().sort(compareId),
                   expectedResult.sort(compareId));
     }
 
-    function runTest(coll, from) {
+    function runTest(coll, from, thirdColl, fourthColl) {
         var db = null;  // Using the db variable is banned in this function.
 
         assert.writeOK(coll.insert({_id: 0, a: 1}));
@@ -598,6 +608,78 @@ load("jstests/aggregation/extras/utils.js");  // For assertErrorCode.
                         17276);
 
         //
+        // Pipeline syntax with nested $lookup.
+        //
+        coll.drop();
+        assert.writeOK(coll.insert({_id: 1, w: 1}));
+        assert.writeOK(coll.insert({_id: 2, w: 2}));
+        assert.writeOK(coll.insert({_id: 3, w: 3}));
+
+        from.drop();
+        assert.writeOK(from.insert({_id: 1, x: 1}));
+        assert.writeOK(from.insert({_id: 2, x: 2}));
+        assert.writeOK(from.insert({_id: 3, x: 3}));
+
+        thirdColl.drop();
+        assert.writeOK(thirdColl.insert({_id: 1, y: 1}));
+        assert.writeOK(thirdColl.insert({_id: 2, y: 2}));
+        assert.writeOK(thirdColl.insert({_id: 3, y: 3}));
+
+        fourthColl.drop();
+        assert.writeOK(fourthColl.insert({_id: 1, z: 1}));
+        assert.writeOK(fourthColl.insert({_id: 2, z: 2}));
+        assert.writeOK(fourthColl.insert({_id: 3, z: 3}));
+
+        // Nested $lookup pipeline.
+        pipeline = [
+            {$match: {_id: 1}},
+            {
+              $lookup: {
+                  pipeline: [
+                      {$match: {_id: 2}},
+                      {
+                        $lookup: {
+                            pipeline: [
+                                {$match: {_id: 3}},
+                                {
+                                  $lookup: {
+                                      pipeline: [
+                                          {$match: {_id: 1}},
+                                      ],
+                                      from: "fourthColl",
+                                      as: "thirdLookup"
+                                  }
+                                },
+                            ],
+                            from: "thirdColl",
+                            as: "secondLookup"
+                        }
+                      },
+                  ],
+                  from: "from",
+                  as: "firstLookup",
+              }
+            }
+        ];
+
+        expectedResults = [{
+            "_id": 1,
+            "w": 1,
+            "firstLookup": [{
+                "_id": 2,
+                x: 2, "secondLookup": [{"_id": 3, y: 3, "thirdLookup": [{_id: 1, z: 1}]}]
+            }]
+        }];
+        testPipeline(pipeline, expectedResults, coll);
+
+        // Deeply nested $lookup pipeline. Each $lookup stage adds 3 levels to the JSON object
+        // depth. The chosen depth allows for an aggregate command that is within the JSON-to-BSON
+        // conversion depth limit of 150 (with a small buffer to allow for running this test in
+        // passthroughs that may wrap a given pipeline, increasing depth).
+        const nestedPipeline = generateNestedPipeline("lookup", 45);
+        coll.aggregate(nestedPipeline);
+
+        //
         // Error cases.
         //
 
@@ -657,9 +739,9 @@ load("jstests/aggregation/extras/utils.js");  // For assertErrorCode.
 
         // 'pipeline' and 'let' must be of expected type.
         assertErrorCode(
-            coll, [{$lookup: {pipeline: 1, from: "from", as: "as"}}], ErrorCodes.FailedToParse);
+            coll, [{$lookup: {pipeline: 1, from: "from", as: "as"}}], ErrorCodes.TypeMismatch);
         assertErrorCode(
-            coll, [{$lookup: {pipeline: {}, from: "from", as: "as"}}], ErrorCodes.FailedToParse);
+            coll, [{$lookup: {pipeline: {}, from: "from", as: "as"}}], ErrorCodes.TypeMismatch);
         assertErrorCode(coll,
                         [{$lookup: {let : 1, pipeline: [], from: "from", as: "as"}}],
                         ErrorCodes.FailedToParse);
@@ -678,20 +760,40 @@ load("jstests/aggregation/extras/utils.js");  // For assertErrorCode.
     // Run tests on single node.
     db.lookUp.drop();
     db.from.drop();
-    runTest(db.lookUp, db.from);
+    db.thirdColl.drop();
+    db.fourthColl.drop();
+    runTest(db.lookUp, db.from, db.thirdColl, db.fourthColl);
 
     // Run tests in a sharded environment.
     var sharded = new ShardingTest({shards: 2, mongos: 1});
     assert(sharded.adminCommand({enableSharding: "test"}));
     sharded.getDB('test').lookUp.drop();
     sharded.getDB('test').from.drop();
+    sharded.getDB('test').thirdColl.drop();
+    sharded.getDB('test').fourthColl.drop();
     assert(sharded.adminCommand({shardCollection: "test.lookUp", key: {_id: 'hashed'}}));
-    runTest(sharded.getDB('test').lookUp, sharded.getDB('test').from);
+    runTest(sharded.getDB('test').lookUp,
+            sharded.getDB('test').from,
+            sharded.getDB('test').thirdColl,
+            sharded.getDB('test').fourthColl);
 
     // An error is thrown if the from collection is sharded.
     assert(sharded.adminCommand({shardCollection: "test.from", key: {_id: 1}}));
     assertErrorCode(sharded.getDB('test').lookUp,
                     [{$lookup: {localField: "a", foreignField: "b", from: "from", as: "same"}}],
                     28769);
+
+    // An error is thrown if nested $lookup from collection is sharded.
+    assert(sharded.adminCommand({shardCollection: "test.fourthColl", key: {_id: 1}}));
+    assertErrorCode(sharded.getDB('test').lookUp,
+                    [{
+                       $lookup: {
+                           pipeline: [{$lookup: {pipeline: [], from: "fourthColl", as: "same"}}],
+                           from: "thirdColl",
+                           as: "same"
+                       }
+                    }],
+                    28769);
+
     sharded.stop();
 }());

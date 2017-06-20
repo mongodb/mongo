@@ -140,6 +140,36 @@ TEST_F(DocumentSourceLookUpTest, AcceptsPipelineWithLetSyntax) {
     ASSERT_TRUE(lookup->wasConstructedWithPipelineSyntax());
 }
 
+
+TEST_F(DocumentSourceLookUpTest, LiteParsedDocumentSourceLookupContainsExpectedNamespaces) {
+    auto stageSpec =
+        BSON("$lookup" << BSON("from"
+                               << "namespace1"
+                               << "pipeline"
+                               << BSON_ARRAY(BSON(
+                                      "$lookup"
+                                      << BSON("from"
+                                              << "namespace2"
+                                              << "as"
+                                              << "lookup2"
+                                              << "pipeline"
+                                              << BSON_ARRAY(BSON("$match" << BSON("x" << 1))))))
+                               << "as"
+                               << "lookup1"));
+
+    NamespaceString nss("test.test");
+    std::vector<BSONObj> pipeline;
+    AggregationRequest aggRequest(nss, pipeline);
+    auto liteParsedLookup = DocumentSourceLookUp::liteParse(aggRequest, stageSpec.firstElement());
+
+    auto namespaceSet = liteParsedLookup->getInvolvedNamespaces();
+
+    ASSERT_EQ(1ul, namespaceSet.count(NamespaceString("test.namespace1")));
+    ASSERT_EQ(1ul, namespaceSet.count(NamespaceString("test.namespace2")));
+    ASSERT_EQ(2ul, namespaceSet.size());
+}
+
+
 TEST_F(DocumentSourceLookUpTest, RejectsLocalFieldForeignFieldWhenPipelineIsSpecified) {
     auto expCtx = getExpCtx();
     NamespaceString fromNs("test", "coll");

@@ -37,6 +37,7 @@
 #include "mongo/db/pipeline/document_path_support.h"
 #include "mongo/db/pipeline/expression.h"
 #include "mongo/db/pipeline/expression_context.h"
+#include "mongo/db/pipeline/lite_parsed_pipeline.h"
 #include "mongo/db/pipeline/value.h"
 #include "mongo/stdx/memory.h"
 
@@ -116,7 +117,7 @@ DocumentSourceLookUp::DocumentSourceLookUp(NamespaceString fromNs,
     }
 }
 
-std::unique_ptr<LiteParsedDocumentSourceOneForeignCollection> DocumentSourceLookUp::liteParse(
+std::unique_ptr<LiteParsedDocumentSourceForeignCollections> DocumentSourceLookUp::liteParse(
     const AggregationRequest& request, const BSONElement& spec) {
     uassert(ErrorCodes::FailedToParse,
             str::stream() << "the $lookup stage specification must be an object, but found "
@@ -137,7 +138,21 @@ std::unique_ptr<LiteParsedDocumentSourceOneForeignCollection> DocumentSourceLook
     uassert(ErrorCodes::InvalidNamespace,
             str::stream() << "invalid $lookup namespace: " << nss.ns(),
             nss.isValid());
-    return stdx::make_unique<LiteParsedDocumentSourceOneForeignCollection>(std::move(nss));
+
+    stdx::unordered_set<NamespaceString> foreignNssSet;
+
+    // Recursively lite parse the nested pipeline, if one exists.
+    auto pipelineElem = specObj["pipeline"];
+    if (pipelineElem) {
+        auto pipeline = uassertStatusOK(AggregationRequest::parsePipelineFromBSON(pipelineElem));
+        AggregationRequest foreignAggReq(nss, std::move(pipeline));
+        LiteParsedPipeline liteParsedPipeline(foreignAggReq);
+        auto pipelineInvolvedNamespaces = liteParsedPipeline.getInvolvedNamespaces();
+        foreignNssSet.insert(pipelineInvolvedNamespaces.begin(), pipelineInvolvedNamespaces.end());
+    }
+
+    foreignNssSet.insert(std::move(nss));
+    return stdx::make_unique<LiteParsedDocumentSourceForeignCollections>(std::move(foreignNssSet));
 }
 
 REGISTER_DOCUMENT_SOURCE(lookup,
@@ -537,11 +552,16 @@ void DocumentSourceLookUp::serializeToArray(
                               letVar.expression->serialize(static_cast<bool>(explain)));
         }
 
+        auto pipeline = _userPipeline;
+        if (_additionalFilter) {
+            pipeline.push_back(BSON("$match" << *_additionalFilter));
+        }
+
         doc = Document{{getSourceName(),
-                        Document{{"from", _resolvedNs.coll()},
+                        Document{{"from", _fromNs.coll()},
                                  {"as", _as.fullPath()},
                                  {"let", exprList.freeze()},
-                                 {"pipeline", _resolvedPipeline}}}};
+                                 {"pipeline", pipeline}}}};
     } else {
         doc = Document{{getSourceName(),
                         {Document{{"from", _fromNs.coll()},

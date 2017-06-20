@@ -119,19 +119,22 @@ public:
 };
 
 /**
- * Helper class for DocumentSources which work with exactly one foreign collection to register as
- * their lite parser.
+ * Helper class for DocumentSources which which reference one or more foreign collections.
  */
-class LiteParsedDocumentSourceOneForeignCollection : public LiteParsedDocumentSource {
+class LiteParsedDocumentSourceForeignCollections : public LiteParsedDocumentSource {
 public:
-    explicit LiteParsedDocumentSourceOneForeignCollection(NamespaceString foreignNss)
-        : _foreignNss(std::move(foreignNss)) {}
+    explicit LiteParsedDocumentSourceForeignCollections(NamespaceString foreignNss)
+        : _foreignNssSet{std::move(foreignNss)} {}
+
+    explicit LiteParsedDocumentSourceForeignCollections(
+        stdx::unordered_set<NamespaceString> foreignNssSet)
+        : _foreignNssSet(std::move(foreignNssSet)) {}
 
     stdx::unordered_set<NamespaceString> getInvolvedNamespaces() const final {
-        return {_foreignNss};
+        return {_foreignNssSet};
     }
 
 private:
-    NamespaceString _foreignNss;
+    stdx::unordered_set<NamespaceString> _foreignNssSet;
 };
 }  // namespace mongo
