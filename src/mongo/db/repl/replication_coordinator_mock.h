@@ -33,6 +33,7 @@
 #include "mongo/db/repl/repl_set_config.h"
 #include "mongo/db/repl/replication_coordinator.h"
 #include "mongo/platform/atomic_word.h"
+#include "mongo/stdx/functional.h"
 
 namespace mongo {
 
@@ -277,6 +278,14 @@ public:
     void setGetConfigReturnValue(ReplSetConfig returnValue);
 
     /**
+     * Sets the function to generate the return value for calls to awaitReplication() and
+     * awaitReplicationOfLastOpForClient().
+     */
+    using AwaitReplicationReturnValueFunction = stdx::function<StatusAndDuration()>;
+    void setAwaitReplicationReturnValueFunction(
+        AwaitReplicationReturnValueFunction returnValueFunction);
+
+    /**
      * Always allow writes even if this node is not master. Used by sharding unit tests.
      */
     void alwaysAllowWrites(bool allowWrites);
@@ -297,6 +306,9 @@ private:
     OpTime _myLastDurableOpTime;
     OpTime _myLastAppliedOpTime;
     ReplSetConfig _getConfigReturnValue;
+    AwaitReplicationReturnValueFunction _awaitReplicationReturnValueFunction = [] {
+        return StatusAndDuration(Status::OK(), Milliseconds(0));
+    };
     bool _alwaysAllowWrites = false;
 };
 
