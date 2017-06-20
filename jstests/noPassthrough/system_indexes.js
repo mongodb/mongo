@@ -1,4 +1,7 @@
 /** Ensure that authorization system collections' indexes are correctly generated.
+ *
+ * This test requires users to persist across a restart.
+ * @tags: [requires_persistence]
  */
 
 (function() {
