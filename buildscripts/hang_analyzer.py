@@ -495,11 +495,8 @@ def main():
         for process in processes_orig:
             sys.stdout.write("Ignoring process %d of %s\n" % (process[0], process[1]))
     else:
-        # Dump all other processes first since signaling the python script interrupts it
-        for process in [a for a in processes if not a[1].startswith("python")]:
-            sys.stdout.write("Dumping process %d of %s\n" % (process[0], process[1]))
-            dbg.dump_info(process[0], process[1], sys.stdout)
-
+        # Dump python processes by signalling them. The resmoke.py process will generate
+        # the report.json, when signalled, so we do this before attaching to other processes.
         for process in [a for a in processes if a[1].startswith("python")]:
             # On Windows, we set up an event object to wait on a signal. For Cygwin, we register
             # a signal handler to wait for the signal since it supports POSIX signals.
@@ -511,6 +508,11 @@ def main():
                 sys.stdout.write("Sending signal SIGUSR1 to python process %s with PID %d\n" %
                     (process[1], process[0]))
                 signal_process(process[0], signal.SIGUSR1)
+
+        # Dump all other processes
+        for process in [a for a in processes if not a[1].startswith("python")]:
+            sys.stdout.write("Dumping process %d of %s\n" % (process[0], process[1]))
+            dbg.dump_info(process[0], process[1], sys.stdout)
 
     # Suspend the timer so we can exit cleanly
     timer.cancel()
