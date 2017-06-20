@@ -197,54 +197,44 @@ Status TransportLayerASIO::setup() {
 #endif
     for (auto& ip : listenAddrs) {
         std::error_code ec;
-        auto address = asio::ip::address::from_string(ip, ec);
-        if (ec) {
-#ifndef _WIN32
-            if (_listenerOptions.useUnixSockets) {
-                asio::local::stream_protocol::endpoint endpoint(ip);
-                asio::local::stream_protocol::acceptor acceptor(*_ioContext);
-                acceptor.open(endpoint.protocol());
-                if (::unlink(ip.c_str()) == -1 && errno != ENOENT) {
-                    error() << "Failed to unlink socket file " << ip << " "
-                            << errnoWithDescription(errno);
-                    fassertFailedNoTrace(40486);
-                }
-
-                acceptor.bind(endpoint, ec);
-                if (ec) {
-                    return errorCodeToStatus(ec);
-                }
-
-                if (::chmod(ip.c_str(), serverGlobalParams.unixSocketPermissions) == -1) {
-                    error() << "Failed to chmod socket file " << ip << " "
-                            << errnoWithDescription(errno);
-                    fassertFailedNoTrace(40487);
-                }
-                _acceptors.emplace_back(std::move(acceptor));
-                continue;
-            } else {
-#endif
-                std::stringstream ss;
-                ss << "Bad listen address \"" << ip << ec.message();
-                return Status{ErrorCodes::BadValue, ss.str()};
-#ifndef _WIN32
-            }
-#endif
+        if (ip.empty()) {
+            warning() << "Skipping empty bind address";
+            continue;
         }
+        SockAddr addr(ip, _listenerOptions.port);
+        asio::generic::stream_protocol::endpoint endpoint(addr.raw(), addr.addressSize);
 
-        if (address.is_v6() && !_listenerOptions.enableIPv6) {
+#ifndef _WIN32
+        if (addr.getType() == AF_UNIX) {
+            if (::unlink(ip.c_str()) == -1 && errno != ENOENT) {
+                error() << "Failed to unlink socket file " << ip << " "
+                        << errnoWithDescription(errno);
+                fassertFailedNoTrace(40486);
+            }
+        }
+#endif
+        if (addr.getType() == AF_INET6 && !_listenerOptions.enableIPv6) {
             error() << "Specified ipv6 bind address, but ipv6 is disabled";
             fassertFailedNoTrace(40488);
         }
 
-        asio::ip::tcp::endpoint endpoint(address, _listenerOptions.port);
-        asio::ip::tcp::acceptor acceptor(*_ioContext);
+        GenericAcceptor acceptor(*_ioContext);
         acceptor.open(endpoint.protocol());
-        acceptor.set_option(asio::ip::tcp::acceptor::reuse_address(true));
+        acceptor.set_option(GenericAcceptor::reuse_address(true));
         acceptor.bind(endpoint, ec);
         if (ec) {
             return errorCodeToStatus(ec);
         }
+
+#ifndef _WIN32
+        if (addr.getType() == AF_UNIX) {
+            if (::chmod(ip.c_str(), serverGlobalParams.unixSocketPermissions) == -1) {
+                error() << "Failed to chmod socket file " << ip << " "
+                        << errnoWithDescription(errno);
+                fassertFailedNoTrace(40487);
+            }
+        }
+#endif
         _acceptors.emplace_back(std::move(acceptor));
     }
 
