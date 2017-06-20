@@ -33,8 +33,19 @@ replTest.waitForState(replTest.nodes[0], ReplSetTest.State.PRIMARY);
 var master = replTest.getPrimary();
 assert(master === conns[0], "conns[0] assumed to be master");
 assert(a_conn.host === master.host, "a_conn assumed to be master");
-var options = {writeConcern: {w: 2, wtimeout: 60000}, upsert: true};
+var writeConcern = {w: 2, wtimeout: replTest.kDefaultTimeoutMS};
+var options = {writeConcern: writeConcern, upsert: true};
 assert.writeOK(a_conn.getDB(name).foo.insert({x: 1}, options));
+
+// Since SERVER-29277, if there are any collections present in a database at the time of a
+// dropDatabase request, we will explicitly drop each collection and wait for the collection drops
+// to be replicated to a majority of nodes. However, due to the nature of this test, we will not
+// have a majority of nodes to complete collection drops after shutting down the initial primary
+// node A.
+// Therefore, we drop the collection now on all data bearing nodes. This still leaves the database
+// around for us to drop on the new primary node B (after shutting down node A).
+assert.commandWorked(a_conn.getDB(name).runCommand({drop: 'foo'}, {writeConcern: writeConcern}),
+                     "dropping collection failed.");
 
 // Shuts down the master.
 replTest.stop(AID);
@@ -42,8 +53,12 @@ replTest.stop(AID);
 // Drops the database which should cause FATAL when rolled back.
 master = replTest.getPrimary();
 assert(b_conn.host === master.host, "b_conn assumed to be master");
-b_conn.getDB(name).dropDatabase();
-assert.eq(0, b_conn.getDB(name).foo.find().itcount(), "dropping database failed");
+assert.commandWorked(b_conn.getDB(name).dropDatabase(), 'dropping database failed');
+assert.eq(1,
+          b_conn.getDB('local')
+              .oplog.rs.find({op: 'c', ns: name + '.$cmd', 'o.dropDatabase': 1})
+              .itcount(),
+          'dropDatabase oplog entry not written to oplog');
 
 // Shuts down B and brings back the original master.
 replTest.stop(BID);
