@@ -2994,12 +2994,26 @@ def doConfigure(myenv):
 
     conf.AddTest('CheckExtendedAlignment', CheckExtendedAlignment)
 
-    # We are aware of no architecture with a cache line bigger than
-    # 256. If we had a way to get the cache line size of TARGET_ARCH
-    # that would be better, but we don't seem to have that.
-    for size in (64, 128, 256):
+    # If we don't have a specialized search sequence for this
+    # architecture, assume 64 byte cache lines, which is pretty
+    # standard. If for some reason the compiler can't offer that, try
+    # 32.
+    default_alignment_search_sequence = [ 64, 32 ]
+
+    # The following are the target architectures for which we have
+    # some knowledge that they have larger cache line sizes. In
+    # particular, POWER8 uses 128 byte lines and zSeries uses 256. We
+    # start at the goal state, and work down until we find something
+    # the compiler can actualy do for us.
+    extended_alignment_search_sequence = {
+        'ppc64le' : [ 128, 64, 32 ],
+        's390x' : [ 256, 128, 64, 32 ],
+    }
+
+    for size in extended_alignment_search_sequence.get(env['TARGET_ARCH'], default_alignment_search_sequence):
         if conf.CheckExtendedAlignment(size):
             conf.env.SetConfigHeaderDefine("MONGO_CONFIG_MAX_EXTENDED_ALIGNMENT", size)
+            break
 
     # ask each module to configure itself and the build environment.
     moduleconfig.configure_modules(mongo_modules, conf)
