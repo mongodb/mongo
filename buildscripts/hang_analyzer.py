@@ -725,7 +725,21 @@ def main():
 
     max_dump_size_bytes = int(options.max_core_dumps_size) * 1024 * 1024
 
-    # Dump all other processes including go programs, except python & java.
+    # Dump python processes by signalling them. The resmoke.py process will generate
+    # the report.json, when signalled, so we do this before attaching to other processes.
+    for (pid, process_name) in [(p, pn) for (p, pn) in processes if pn.startswith("python")]:
+        # On Windows, we set up an event object to wait on a signal. For Cygwin, we register
+        # a signal handler to wait for the signal since it supports POSIX signals.
+        if _is_windows:
+            root_logger.info("Calling SetEvent to signal python process %s with PID %d" %
+                (process_name, pid))
+            signal_event_object(root_logger, pid)
+        else:
+            root_logger.info("Sending signal SIGUSR1 to python process %s with PID %d" %
+                (process_name, pid))
+            signal_process(root_logger, pid, signal.SIGUSR1)
+
+    # Dump all processes, except python & java.
     for (pid, process_name) in [(p, pn) for (p, pn) in processes
                                 if not re.match("^(java|python)", pn)]:
         process_logger = get_process_logger(options.debugger_output, pid, process_name)
@@ -749,19 +763,6 @@ def main():
         root_logger.info("Sending signal SIGABRT to go process %s with PID %d" %
             (process_name, pid))
         signal_process(root_logger, pid, signal.SIGABRT)
-
-    # Dump python processes by signalling them.
-    for (pid, process_name) in [(p, pn) for (p, pn) in processes if pn.startswith("python")]:
-        # On Windows, we set up an event object to wait on a signal. For Cygwin, we register
-        # a signal handler to wait for the signal since it supports POSIX signals.
-        if _is_windows:
-            root_logger.info("Calling SetEvent to signal python process %s with PID %d" %
-                (process_name, pid))
-            signal_event_object(root_logger, pid)
-        else:
-            root_logger.info("Sending signal SIGUSR1 to python process %s with PID %d" %
-                (process_name, pid))
-            signal_process(root_logger, pid, signal.SIGUSR1)
 
     root_logger.info("Done analyzing all processes for hangs")
 
