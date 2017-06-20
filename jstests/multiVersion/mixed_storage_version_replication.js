@@ -257,24 +257,6 @@ var RandomOps = {
     },
 
     /*
-     * Randomly drop a user created database.
-     */
-    dropDatabase: function(conn) {
-        var dbs = this.getCreatedDatabases(conn);
-        if (dbs.length === 0) {
-            return null;
-        }
-        var dbName = this.randomChoice(dbs);
-        if (this.verbose) {
-            print("Dropping database " + dbName);
-        }
-        assert.commandWorked(conn.getDB(dbName).runCommand({dropDatabase: 1}));
-        if (this.verbose) {
-            print("done.");
-        }
-    },
-
-    /*
      * Randomly drop a user created collection
      */
     dropCollection: function(conn) {
@@ -598,7 +580,6 @@ function startCmds(randomOps, host) {
         "remove",
         "update",
         "renameCollection",
-        "dropDatabase",
         "dropCollection",
         "createIndex",
         "dropIndex",
