@@ -96,6 +96,27 @@ public:
      */
     void dropCollectionsOlderThan(OperationContext* opCtx, const OpTime& opTime);
 
+    /**
+     * Drops the drop-pending namespace with the specified optime. There can only be one matching
+     * collection because optimes uniquely identify oplog entries.
+     * This function also removes the entry from '_dropPendingNamespaces'.
+     * This function returns false if there is no drop-pending collection at the specified optime.
+     */
+    bool dropCollectionAtOpTime(OperationContext* opCtx, const OpTime& opTime);
+
+    /**
+     * Renames the drop-pending namespace at the specified optime back to the provided name.
+     * There can only be one matching collection because optimes uniquely identify oplog entries.
+     * We cannot reconstruct the original namespace so we must get it passed in. It accepts the
+     * collection name, not a fully qualified namespace. The database name is taken from the
+     * existing collection.
+     * This function also removes the entry from '_dropPendingNamespaces'.
+     * This function returns false if there is no drop-pending collection at the specified optime.
+     */
+    bool rollBackDropPendingCollection(OperationContext* opCtx,
+                                       const OpTime& opTime,
+                                       StringData collName);
+
 private:
     // All member variables are labeled with one of the following codes indicating the
     // synchronization rules for accessing them.
