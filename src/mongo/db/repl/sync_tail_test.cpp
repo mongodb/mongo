@@ -34,6 +34,7 @@
 #include <vector>
 
 #include "mongo/db/catalog/collection.h"
+#include "mongo/db/catalog/collection_catalog_entry.h"
 #include "mongo/db/catalog/collection_options.h"
 #include "mongo/db/catalog/database.h"
 #include "mongo/db/catalog/database_holder.h"
@@ -68,6 +69,109 @@ namespace {
 
 using namespace mongo;
 using namespace mongo::repl;
+
+struct CollectionState {
+    CollectionState() = default;
+    CollectionState(CollectionOptions collectionOptions_,
+                    BSONObjSet indexSpecs_,
+                    std::string dataHash_)
+        : collectionOptions(std::move(collectionOptions_)),
+          indexSpecs(std::move(indexSpecs_)),
+          dataHash(std::move(dataHash_)),
+          exists(true){};
+
+    /**
+     * Compares BSON objects (BSONObj) in two sets of BSON objects (BSONObjSet) to see if the two
+     * sets are equivalent.
+     *
+     * Two sets are equivalent if and only if their sizes are the same and all of their elements
+     * that share the same index position are also equivalent in value.
+     */
+    bool cmpIndexSpecs(const BSONObjSet& otherSpecs) const {
+        if (indexSpecs.size() != otherSpecs.size()) {
+            return false;
+        }
+
+        auto thisIt = this->indexSpecs.begin();
+        auto otherIt = otherSpecs.begin();
+
+        // thisIt and otherIt cannot possibly be out of sync in terms of progression through
+        // their respective sets because we ensured earlier that their sizes are equal and we
+        // increment both by 1 on each iteration. We can avoid checking both iterator positions and
+        // only check one (thisIt).
+        for (; thisIt != this->indexSpecs.end(); ++thisIt, ++otherIt) {
+            // Since these are ordered sets, we expect that in the case of equivalent index specs,
+            // each copy will be in the same order in both sets, therefore each loop step should be
+            // true.
+
+            if (!thisIt->binaryEqual(*otherIt)) {
+                return false;
+            }
+        }
+
+        return true;
+    }
+
+    /**
+     * Returns a std::string representation of the CollectionState struct of which this is a member
+     * function. Returns out its representation in the form:
+     *
+     * Collection options: {...}; Index options: [...]; MD5 hash: <md5 digest string>
+     */
+    std::string toString() const {
+        if (!this->exists) {
+            return "Collection does not exist.";
+        }
+
+        BSONObj collectionOptionsBSON = this->collectionOptions.toBSON();
+        StringBuilder sb;
+        sb << "Collection options: " << collectionOptionsBSON.toString() << "; ";
+
+        sb << "Index specs: [ ";
+        bool firstIter = true;
+        for (auto indexSpec : this->indexSpecs) {
+            if (!firstIter) {
+                sb << ", ";
+            } else {
+                firstIter = false;
+            }
+            sb << indexSpec.toString();
+        }
+        sb << " ]; ";
+
+        sb << "MD5 Hash: ";
+        // Be more explicit about CollectionState structs without a supplied MD5 hash string.
+        sb << (this->dataHash.length() != 0 ? this->dataHash : "No hash");
+        return sb.str();
+    }
+
+    const CollectionOptions collectionOptions = CollectionOptions();
+    const BSONObjSet indexSpecs = SimpleBSONObjComparator::kInstance.makeBSONObjSet();
+    const std::string dataHash = "";
+    const bool exists = false;
+};
+
+bool operator==(const CollectionState& lhs, const CollectionState& rhs) {
+    if (!lhs.exists || !rhs.exists) {
+        return lhs.exists == rhs.exists;
+    }
+
+    BSONObj lhsCollectionOptionsBSON = lhs.collectionOptions.toBSON();
+    BSONObj rhsCollectionOptionsBSON = rhs.collectionOptions.toBSON();
+    // Since collection options uses deferred comparison, we opt to binary compare its BSON
+    // representations.
+    bool collectionOptionsEqual = lhsCollectionOptionsBSON.binaryEqual(rhsCollectionOptionsBSON);
+    bool indexSpecsEqual = lhs.cmpIndexSpecs(rhs.indexSpecs);
+    bool dataHashEqual = lhs.dataHash == rhs.dataHash;
+    bool existsEqual = lhs.exists == rhs.exists;
+    return collectionOptionsEqual && indexSpecsEqual && dataHashEqual && existsEqual;
+}
+
+std::ostream& operator<<(std::ostream& stream, const CollectionState& state) {
+    return stream << state.toString();
+}
+
+const auto kCollectionDoesNotExist = CollectionState();
 
 class SyncTailTest : public ServiceContextMongoDTest {
 protected:
@@ -984,7 +1088,7 @@ protected:
     Status runOp(const OplogEntry& entry);
     Status runOps(std::initializer_list<OplogEntry> ops);
     // Validate data and indexes. Return the MD5 hash of the documents ordered by _id.
-    std::string validate();
+    CollectionState validate();
 
     NamespaceString nss{"test.foo"};
     NamespaceString nssIndex{"test.system.indexes"};
@@ -1032,16 +1136,18 @@ OplogEntry IdempotencyTest::dropIndex(const std::string& indexName) {
     return makeCommandOplogEntry(nextOpTime(), nss, cmd);
 }
 
-std::string IdempotencyTest::validate() {
-    auto collection = AutoGetCollectionForReadCommand(_opCtx.get(), nss).getCollection();
+CollectionState IdempotencyTest::validate() {
+    AutoGetCollectionForReadCommand autoColl(_opCtx.get(), nss);
+    auto collection = autoColl.getCollection();
+
     if (!collection) {
-        return "CollectionNotFound";
+        // Return a mostly default initialized CollectionState struct with exists set to false to
+        // indicate an unfound Collection (or a view).
+        return kCollectionDoesNotExist;
     }
     ValidateResults validateResults;
     BSONObjBuilder bob;
 
-    Lock::DBLock lk(_opCtx.get(), nss.db(), MODE_IS);
-    Lock::CollectionLock lock(_opCtx->lockState(), nss.ns(), MODE_IS);
     ASSERT_OK(collection->validate(_opCtx.get(), kValidateFull, &validateResults, &bob));
     ASSERT_TRUE(validateResults.valid);
 
@@ -1068,7 +1174,21 @@ std::string IdempotencyTest::validate() {
     ASSERT_EQUALS(PlanExecutor::IS_EOF, state);
     md5digest d;
     md5_finish(&st, d);
-    return digestToString(d);
+    std::string dataHash = digestToString(d);
+
+    auto collectionCatalog = collection->getCatalogEntry();
+    auto collectionOptions = collectionCatalog->getCollectionOptions(_opCtx.get());
+    std::vector<std::string> allIndexes;
+    BSONObjSet indexSpecs = SimpleBSONObjComparator::kInstance.makeBSONObjSet();
+    collectionCatalog->getAllIndexes(_opCtx.get(), &allIndexes);
+    for (auto const& index : allIndexes) {
+        indexSpecs.insert(collectionCatalog->getIndexSpec(_opCtx.get(), index));
+    }
+    ASSERT_EQUALS(indexSpecs.size(), allIndexes.size());
+
+    CollectionState collectionState(collectionOptions, indexSpecs, dataHash);
+
+    return collectionState;
 }
 
 TEST_F(IdempotencyTest, Geo2dsphereIndexFailedOnUpdate) {
@@ -1081,9 +1201,9 @@ TEST_F(IdempotencyTest, Geo2dsphereIndexFailedOnUpdate) {
     auto ops = {insertOp, updateOp, indexOp};
 
     ASSERT_OK(runOps(ops));
-    auto hash = validate();
+    auto state = validate();
     ASSERT_OK(runOps(ops));
-    ASSERT_EQUALS(hash, validate());
+    ASSERT_EQUALS(state, validate());
 
     ReplicationCoordinator::get(_opCtx.get())->setFollowerMode(MemberState::RS_PRIMARY);
     auto status = runOps(ops);
@@ -1100,9 +1220,9 @@ TEST_F(IdempotencyTest, Geo2dsphereIndexFailedOnIndexing) {
     auto ops = {indexOp, dropIndexOp, insertOp};
 
     ASSERT_OK(runOps(ops));
-    auto hash = validate();
+    auto state = validate();
     ASSERT_OK(runOps(ops));
-    ASSERT_EQUALS(hash, validate());
+    ASSERT_EQUALS(state, validate());
 
     ReplicationCoordinator::get(_opCtx.get())->setFollowerMode(MemberState::RS_PRIMARY);
     auto status = runOps(ops);
@@ -1119,9 +1239,9 @@ TEST_F(IdempotencyTest, Geo2dIndex) {
     auto ops = {insertOp, updateOp, indexOp};
 
     ASSERT_OK(runOps(ops));
-    auto hash = validate();
+    auto state = validate();
     ASSERT_OK(runOps(ops));
-    ASSERT_EQUALS(hash, validate());
+    ASSERT_EQUALS(state, validate());
 
     ReplicationCoordinator::get(_opCtx.get())->setFollowerMode(MemberState::RS_PRIMARY);
     auto status = runOps(ops);
@@ -1139,9 +1259,9 @@ TEST_F(IdempotencyTest, UniqueKeyIndex) {
     auto ops = {insertOp, updateOp, insertOp2, indexOp};
 
     ASSERT_OK(runOps(ops));
-    auto hash = validate();
+    auto state = validate();
     ASSERT_OK(runOps(ops));
-    ASSERT_EQUALS(hash, validate());
+    ASSERT_EQUALS(state, validate());
 
     ReplicationCoordinator::get(_opCtx.get())->setFollowerMode(MemberState::RS_PRIMARY);
     auto status = runOps(ops);
@@ -1162,9 +1282,9 @@ TEST_F(IdempotencyTest, ParallelArrayError) {
     auto ops = {updateOp1, updateOp2, updateOp3, indexOp};
 
     ASSERT_OK(runOps(ops));
-    auto hash = validate();
+    auto state = validate();
     ASSERT_OK(runOps(ops));
-    ASSERT_EQUALS(hash, validate());
+    ASSERT_EQUALS(state, validate());
 
     ReplicationCoordinator::get(_opCtx.get())->setFollowerMode(MemberState::RS_PRIMARY);
     auto status = runOps(ops);
@@ -1188,9 +1308,9 @@ TEST_F(IdempotencyTest, IndexKeyTooLongError) {
     auto ops = {updateOp1, updateOp2, updateOp3, indexOp};
 
     ASSERT_OK(runOps(ops));
-    auto hash = validate();
+    auto state = validate();
     ASSERT_OK(runOps(ops));
-    ASSERT_EQUALS(hash, validate());
+    ASSERT_EQUALS(state, validate());
 
     ReplicationCoordinator::get(_opCtx.get())->setFollowerMode(MemberState::RS_PRIMARY);
     auto status = runOps(ops);
@@ -1210,9 +1330,9 @@ TEST_F(IdempotencyTest, IndexWithDifferentOptions) {
     auto ops = {indexOp1, dropIndexOp, indexOp2};
 
     ASSERT_OK(runOps(ops));
-    auto hash = validate();
+    auto state = validate();
     ASSERT_OK(runOps(ops));
-    ASSERT_EQUALS(hash, validate());
+    ASSERT_EQUALS(state, validate());
 
     ReplicationCoordinator::get(_opCtx.get())->setFollowerMode(MemberState::RS_PRIMARY);
     auto status = runOps(ops);
@@ -1230,9 +1350,9 @@ TEST_F(IdempotencyTest, TextIndexDocumentHasNonStringLanguageField) {
     auto ops = {insertOp, updateOp, indexOp};
 
     ASSERT_OK(runOps(ops));
-    auto hash = validate();
+    auto state = validate();
     ASSERT_OK(runOps(ops));
-    ASSERT_EQUALS(hash, validate());
+    ASSERT_EQUALS(state, validate());
 
     ReplicationCoordinator::get(_opCtx.get())->setFollowerMode(MemberState::RS_PRIMARY);
     auto status = runOps(ops);
@@ -1250,9 +1370,9 @@ TEST_F(IdempotencyTest, InsertDocumentWithNonStringLanguageFieldWhenTextIndexExi
     auto ops = {indexOp, dropIndexOp, insertOp};
 
     ASSERT_OK(runOps(ops));
-    auto hash = validate();
+    auto state = validate();
     ASSERT_OK(runOps(ops));
-    ASSERT_EQUALS(hash, validate());
+    ASSERT_EQUALS(state, validate());
 
     ReplicationCoordinator::get(_opCtx.get())->setFollowerMode(MemberState::RS_PRIMARY);
     auto status = runOps(ops);
@@ -1270,9 +1390,9 @@ TEST_F(IdempotencyTest, TextIndexDocumentHasNonStringLanguageOverrideField) {
     auto ops = {insertOp, updateOp, indexOp};
 
     ASSERT_OK(runOps(ops));
-    auto hash = validate();
+    auto state = validate();
     ASSERT_OK(runOps(ops));
-    ASSERT_EQUALS(hash, validate());
+    ASSERT_EQUALS(state, validate());
 
     ReplicationCoordinator::get(_opCtx.get())->setFollowerMode(MemberState::RS_PRIMARY);
     auto status = runOps(ops);
@@ -1290,9 +1410,9 @@ TEST_F(IdempotencyTest, InsertDocumentWithNonStringLanguageOverrideFieldWhenText
     auto ops = {indexOp, dropIndexOp, insertOp};
 
     ASSERT_OK(runOps(ops));
-    auto hash = validate();
+    auto state = validate();
     ASSERT_OK(runOps(ops));
-    ASSERT_EQUALS(hash, validate());
+    ASSERT_EQUALS(state, validate());
 
     ReplicationCoordinator::get(_opCtx.get())->setFollowerMode(MemberState::RS_PRIMARY);
     auto status = runOps(ops);
@@ -1310,9 +1430,9 @@ TEST_F(IdempotencyTest, TextIndexDocumentHasUnknownLanguage) {
     auto ops = {insertOp, updateOp, indexOp};
 
     ASSERT_OK(runOps(ops));
-    auto hash = validate();
+    auto state = validate();
     ASSERT_OK(runOps(ops));
-    ASSERT_EQUALS(hash, validate());
+    ASSERT_EQUALS(state, validate());
 
     ReplicationCoordinator::get(_opCtx.get())->setFollowerMode(MemberState::RS_PRIMARY);
     auto status = runOps(ops);
@@ -1332,14 +1452,14 @@ TEST_F(IdempotencyTest, CreateCollectionWithValidation) {
         auto ops = {createColl1, dropColl, createColl2};
 
         ASSERT_OK(runOps(ops));
-        auto hash = validate();
+        auto state = validate();
 
-        return hash;
+        return state;
     };
 
-    auto hash1 = runOpsAndValidate();
-    auto hash2 = runOpsAndValidate();
-    ASSERT_EQUALS(hash1, hash2);
+    auto state1 = runOpsAndValidate();
+    auto state2 = runOpsAndValidate();
+    ASSERT_EQUALS(state1, state2);
 }
 
 TEST_F(IdempotencyTest, CreateCollectionWithCollation) {
@@ -1376,14 +1496,14 @@ TEST_F(IdempotencyTest, CreateCollectionWithCollation) {
         auto ops = {insertOp1, insertOp2, updateOp, dropColl, createColl};
 
         ASSERT_OK(runOps(ops));
-        auto hash = validate();
+        auto state = validate();
 
-        return hash;
+        return state;
     };
 
-    auto hash1 = runOpsAndValidate();
-    auto hash2 = runOpsAndValidate();
-    ASSERT_EQUALS(hash1, hash2);
+    auto state1 = runOpsAndValidate();
+    auto state2 = runOpsAndValidate();
+    ASSERT_EQUALS(state1, state2);
 }
 
 TEST_F(IdempotencyTest, CreateCollectionWithIdIndex) {
@@ -1406,14 +1526,14 @@ TEST_F(IdempotencyTest, CreateCollectionWithIdIndex) {
         auto ops = {insertOp, dropColl, createColl2};
 
         ASSERT_OK(runOps(ops));
-        auto hash = validate();
+        auto state = validate();
 
-        return hash;
+        return state;
     };
 
-    auto hash1 = runOpsAndValidate();
-    auto hash2 = runOpsAndValidate();
-    ASSERT_EQUALS(hash1, hash2);
+    auto state1 = runOpsAndValidate();
+    auto state2 = runOpsAndValidate();
+    ASSERT_EQUALS(state1, state2);
 }
 
 TEST_F(IdempotencyTest, CreateCollectionWithView) {
@@ -1434,9 +1554,9 @@ TEST_F(IdempotencyTest, CreateCollectionWithView) {
     auto ops = {insertViewOp, dropColl};
 
     ASSERT_OK(runOps(ops));
-    auto hash = validate();
+    auto state = validate();
     ASSERT_OK(runOps(ops));
-    ASSERT_EQUALS(hash, validate());
+    ASSERT_EQUALS(state, validate());
 }
 
 TEST_F(IdempotencyTest, CollModNamespaceNotFound) {
@@ -1453,9 +1573,9 @@ TEST_F(IdempotencyTest, CollModNamespaceNotFound) {
     auto ops = {collModOp, dropCollOp};
 
     ASSERT_OK(runOps(ops));
-    auto hash = validate();
+    auto state = validate();
     ASSERT_OK(runOps(ops));
-    ASSERT_EQUALS(hash, validate());
+    ASSERT_EQUALS(state, validate());
 }
 
 TEST_F(IdempotencyTest, CollModIndexNotFound) {
@@ -1472,9 +1592,9 @@ TEST_F(IdempotencyTest, CollModIndexNotFound) {
     auto ops = {collModOp, dropIndexOp};
 
     ASSERT_OK(runOps(ops));
-    auto hash = validate();
+    auto state = validate();
     ASSERT_OK(runOps(ops));
-    ASSERT_EQUALS(hash, validate());
+    ASSERT_EQUALS(state, validate());
 }
 
 TEST_F(IdempotencyTest, ResyncOnRenameCollection) {
