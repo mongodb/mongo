@@ -424,27 +424,6 @@ public:
         return runCommandWithTarget(std::move(request)).first;
     }
 
-    /**
-     * Runs a database command. This variant allows the caller to manually specify the metadata
-     * for the request, and receive it for the reply.
-     *
-     * TODO: rename this to runCommand, and change the old one to runCommandLegacy.
-     */
-    rpc::UniqueReply runCommandWithMetadata(StringData database,
-                                            StringData command,
-                                            const BSONObj& metadata,
-                                            BSONObj commandArgs);
-
-    /*
-     * This wraps up the runCommandWithMetadata function above, but returns the DBClient that
-     * actually ran the command. When called against a replica set, this will return the specific
-     * replica set member the command ran against.
-     *
-     * This is used in the shell so that cursors can send getMore through the correct connection.
-     */
-    std::tuple<rpc::UniqueReply, DBClientWithCommands*> runCommandWithMetadataAndTarget(
-        StringData database, StringData command, const BSONObj& metadata, BSONObj commandArgs);
-
     /** Run a database command.  Database commands are represented as BSON objects.  Common database
         commands have prebuilt helper functions -- see below.  If a helper is not available you can
         directly call runCommand.

@@ -202,10 +202,9 @@ ConnectionPool::ConnectionList::iterator ConnectionPool::acquireConnection(
         if (postConnectRequest != boost::none) {
             auto start = Date_t::now();
             auto reply =
-                conn->runCommandWithMetadata(postConnectRequest->dbname,
-                                             postConnectRequest->cmdObj.firstElementFieldName(),
-                                             postConnectRequest->metadata,
-                                             postConnectRequest->cmdObj);
+                conn->runCommand(OpMsgRequest::fromDBAndBody(postConnectRequest->dbname,
+                                                             postConnectRequest->cmdObj,
+                                                             postConnectRequest->metadata));
 
             auto rcr = executor::RemoteCommandResponse(reply->getCommandReply().getOwned(),
                                                        reply->getMetadata().getOwned(),

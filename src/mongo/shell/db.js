@@ -135,9 +135,8 @@ var DB;
         }
     };
 
-    DB.prototype.runCommandWithMetadata = function(commandName, commandArgs, metadata) {
-        return this.getMongo().runCommandWithMetadata(
-            this._name, commandName, metadata, commandArgs);
+    DB.prototype.runCommandWithMetadata = function(commandArgs, metadata) {
+        return this.getMongo().runCommandWithMetadata(this._name, metadata, commandArgs);
     };
 
     DB.prototype._dbCommand = DB.prototype.runCommand;

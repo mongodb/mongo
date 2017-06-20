@@ -232,22 +232,6 @@ std::pair<rpc::UniqueReply, DBClientWithCommands*> DBClientWithCommands::runComm
     return {rpc::UniqueReply(std::move(replyMsg), std::move(commandReply)), this};
 }
 
-rpc::UniqueReply DBClientWithCommands::runCommandWithMetadata(StringData database,
-                                                              StringData command,
-                                                              const BSONObj& metadata,
-                                                              BSONObj commandArgs) {
-    return runCommand(OpMsgRequest::fromDBAndBody(database, std::move(commandArgs), metadata));
-}
-
-std::tuple<rpc::UniqueReply, DBClientWithCommands*>
-DBClientWithCommands::runCommandWithMetadataAndTarget(StringData database,
-                                                      StringData command,
-                                                      const BSONObj& metadata,
-                                                      BSONObj commandArgs) {
-    return runCommandWithTarget(
-        OpMsgRequest::fromDBAndBody(database, std::move(commandArgs), metadata));
-}
-
 std::tuple<bool, DBClientWithCommands*> DBClientWithCommands::runCommandWithTarget(
     const string& dbname, BSONObj cmd, BSONObj& info, int options) {
     BSONObj upconvertedCmd;
@@ -453,11 +437,9 @@ void DBClientWithCommands::_auth(const BSONObj& params) {
             BSONObj info;
             auto start = Date_t::now();
 
-            auto commandName = request.cmdObj.firstElementFieldName();
-
             try {
-                auto reply = runCommandWithMetadata(
-                    request.dbname, commandName, request.metadata, request.cmdObj);
+                auto reply = runCommand(
+                    OpMsgRequest::fromDBAndBody(request.dbname, request.cmdObj, request.metadata));
 
                 BSONObj data = reply->getCommandReply().getOwned();
                 BSONObj metadata = reply->getMetadata().getOwned();
@@ -740,8 +722,7 @@ executor::RemoteCommandResponse initWireVersion(DBClientConnection* conn,
         }
 
         Date_t start{Date_t::now()};
-        auto result =
-            conn->runCommandWithMetadata("admin", "isMaster", rpc::makeEmptyMetadata(), bob.done());
+        auto result = conn->runCommand(OpMsgRequest::fromDBAndBody("admin", bob.obj()));
         Date_t finish{Date_t::now()};
 
         BSONObj isMasterObj = result->getCommandReply().getOwned();

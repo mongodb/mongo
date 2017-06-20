@@ -21,7 +21,7 @@
 
     var maxSecs = Math.pow(2, 32) - 1;
     var metadata = {$configServerState: {opTime: {ts: Timestamp(maxSecs, 0), t: maxSecs}}};
-    var res = st.d0.getDB('test').runCommandWithMetadata("ping", {ping: 1}, metadata);
+    var res = st.d0.getDB('test').runCommandWithMetadata({ping: 1}, metadata);
 
     assert.commandFailedWithCode(res.commandReply, ErrorCodes.Unauthorized);
 
@@ -33,7 +33,7 @@
     st.d0.getDB('admin').createUser({user: 'internal', pwd: 'pwd', roles: ['__system']});
     st.d0.getDB('admin').auth('internal', 'pwd');
 
-    res = st.d0.getDB('test').runCommandWithMetadata("ping", {ping: 1}, metadata);
+    res = st.d0.getDB('test').runCommandWithMetadata({ping: 1}, metadata);
     assert.commandWorked(res.commandReply);
 
     status = st.d0.getDB('test').runCommand({serverStatus: 1});

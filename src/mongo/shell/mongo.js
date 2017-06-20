@@ -52,7 +52,14 @@ Mongo.prototype.setCausalConsistency = function(value) {
     this._isCausal = value;
 };
 
-Mongo.prototype.isCausalConsistencyEnabled = function(cmdName, cmdObj) {
+Mongo.prototype.isCausalConsistencyEnabled = function(cmdObj) {
+    var cmdName = (() => {
+        for (var name in cmdObj) {
+            return name;
+        }
+        doassert("empty cmdObj");
+    })();
+
     if (!this._isCausal) {
         return false;
     }
@@ -176,14 +183,14 @@ Mongo.prototype._setLogicalTimeFromReply = function(res) {
  */
 (function(original) {
     Mongo.prototype.runCommandWithMetadata = function runCommandWithMetadata(
-        dbName, cmdName, metadata, cmdObj) {
-        if (this.isCausalConsistencyEnabled(cmdName, cmdObj) && cmdObj) {
+        dbName, metadata, cmdObj) {
+        if (this.isCausalConsistencyEnabled(cmdObj) && cmdObj) {
             cmdObj = this._injectAfterClusterTime(cmdObj);
         }
         if (this._isCausal) {
             metadata = this._gossipLogicalTime(metadata);
         }
-        const res = original.call(this, dbName, cmdName, metadata, cmdObj);
+        const res = original.call(this, dbName, metadata, cmdObj);
         this._setLogicalTimeFromReply(res);
         return res;
     };
@@ -194,9 +201,7 @@ Mongo.prototype._setLogicalTimeFromReply = function(res) {
  */
 (function(original) {
     Mongo.prototype.runCommand = function runCommand(dbName, cmdObj, options) {
-        const cmdName = Object.keys(cmdObj)[0];
-
-        if (this.isCausalConsistencyEnabled(cmdName, cmdObj) && cmdObj) {
+        if (this.isCausalConsistencyEnabled(cmdObj) && cmdObj) {
             cmdObj = this._injectAfterClusterTime(cmdObj);
         }
         if (this._isCausal) {

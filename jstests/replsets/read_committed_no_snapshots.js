@@ -40,13 +40,13 @@ load("jstests/replsets/rslib.js");  // For reconfig and startSetIfSupportsReadMa
     var db = primary.getDB(name);
 
     // Do a write, wait for it to replicate, and ensure it is visible.
-    var res = db.runCommandWithMetadata("insert",
-                                        {
-                                          insert: "foo",
-                                          documents: [{_id: 1, state: 0}],
-                                          writeConcern: {w: "majority", wtimeout: 60 * 1000}
-                                        },
-                                        {"$replData": 1});
+    var res = db.runCommandWithMetadata(  //
+        {
+          insert: "foo",
+          documents: [{_id: 1, state: 0}],
+          writeConcern: {w: "majority", wtimeout: 60 * 1000}
+        },
+        {"$replData": 1});
     assert.commandWorked(res.commandReply);
 
     // We need to propagate the lastOpVisible from the primary as afterOpTime in the secondary to

@@ -219,33 +219,28 @@ void MongoBase::Functions::runCommand::call(JSContext* cx, JS::CallArgs args) {
 }
 
 void MongoBase::Functions::runCommandWithMetadata::call(JSContext* cx, JS::CallArgs args) {
-    if (args.length() != 4)
-        uasserted(ErrorCodes::BadValue, "runCommandWithMetadata needs 4 args");
+    if (args.length() != 3)
+        uasserted(ErrorCodes::BadValue, "runCommandWithMetadata needs 3 args");
 
     if (!args.get(0).isString())
         uasserted(ErrorCodes::BadValue,
                   "the database parameter to runCommandWithMetadata must be a string");
 
-    if (!args.get(1).isString())
-        uasserted(ErrorCodes::BadValue,
-                  "the commandName parameter to runCommandWithMetadata must be a string");
-
-    if (!args.get(2).isObject())
+    if (!args.get(1).isObject())
         uasserted(ErrorCodes::BadValue,
                   "the metadata argument to runCommandWithMetadata must be an object");
 
-    if (!args.get(3).isObject())
+    if (!args.get(2).isObject())
         uasserted(ErrorCodes::BadValue,
                   "the commandArgs argument to runCommandWithMetadata must be an object");
 
     std::string database = ValueWriter(cx, args.get(0)).toString();
-    std::string commandName = ValueWriter(cx, args.get(1)).toString();
-    BSONObj metadata = ValueWriter(cx, args.get(2)).toBSON();
-    BSONObj commandArgs = ValueWriter(cx, args.get(3)).toBSON();
+    BSONObj metadata = ValueWriter(cx, args.get(1)).toBSON();
+    BSONObj commandArgs = ValueWriter(cx, args.get(2)).toBSON();
 
     auto conn = getConnection(args);
     auto resTuple =
-        conn->runCommandWithMetadataAndTarget(database, commandName, metadata, commandArgs);
+        conn->runCommandWithTarget(OpMsgRequest::fromDBAndBody(database, commandArgs, metadata));
     auto res = std::move(std::get<0>(resTuple));
 
     BSONObjBuilder mergedResultBob;

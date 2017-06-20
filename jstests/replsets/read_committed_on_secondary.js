@@ -63,8 +63,7 @@ load("jstests/replsets/rslib.js");  // For startSetIfSupportsReadMajority.
 
     function saveDoc(state) {
         log("saving doc.");
-        var res = dbPrimary.runCommandWithMetadata(
-            'update',
+        var res = dbPrimary.runCommandWithMetadata(  //
             {
               update: name,
               writeConcern: {w: 2, wtimeout: 60 * 1000},

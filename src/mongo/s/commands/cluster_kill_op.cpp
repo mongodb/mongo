@@ -117,8 +117,7 @@ public:
 
         ScopedDbConnection conn(shard->getConnString());
         // intentionally ignore return value - that is how legacy killOp worked.
-        conn->runCommandWithMetadata(
-            "admin", "killOp", rpc::makeEmptyMetadata(), BSON("killOp" << 1 << "op" << opId));
+        conn->runCommand(OpMsgRequest::fromDBAndBody("admin", BSON("killOp" << 1 << "op" << opId)));
         conn.done();
 
         // The original behavior of killOp on mongos is to always return success, regardless of

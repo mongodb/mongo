@@ -11,7 +11,10 @@
     // Verifies causal consistency is either enabled or disabled for each given command name.
     function checkCausalConsistencySupportForCommandNames(cmdNames, isEnabled) {
         cmdNames.forEach(function(cmdName) {
-            assert.eq(testDB.getMongo().isCausalConsistencyEnabled(cmdName, {}),
+            var cmd = {};
+            cmd[cmdName] = 1;
+
+            assert.eq(testDB.getMongo().isCausalConsistencyEnabled(cmd),
                       isEnabled,
                       "expected causal consistency support for command, " + cmdName + ", to be " +
                           isEnabled);

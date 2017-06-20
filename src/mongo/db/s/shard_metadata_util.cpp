@@ -204,8 +204,8 @@ Status updateShardCollectionsEntry(OperationContext* opCtx,
     try {
         DBDirectClient client(opCtx);
 
-        rpc::UniqueReply commandResponse = client.runCommandWithMetadata(
-            "config", cmdObj.firstElementFieldName(), rpc::makeEmptyMetadata(), cmdObj);
+        rpc::UniqueReply commandResponse =
+            client.runCommand(OpMsgRequest::fromDBAndBody("config", cmdObj));
         BSONObj responseReply = commandResponse->getCommandReply().getOwned();
 
         Status commandStatus =
@@ -328,10 +328,7 @@ Status updateShardChunks(OperationContext* opCtx,
             const BSONObj deleteCmdObj = batchedDeleteRequest.toBSON();
 
             rpc::UniqueReply deleteCommandResponse =
-                client.runCommandWithMetadata(chunkMetadataNss.db().toString(),
-                                              deleteCmdObj.firstElementFieldName(),
-                                              rpc::makeEmptyMetadata(),
-                                              deleteCmdObj);
+                client.runCommand(OpMsgRequest::fromDBAndBody(chunkMetadataNss.db(), deleteCmdObj));
 
             auto deleteStatus =
                 getStatusFromWriteCommandResponse(deleteCommandResponse->getCommandReply());
@@ -348,10 +345,7 @@ Status updateShardChunks(OperationContext* opCtx,
             const BSONObj insertCmdObj = insertRequest.toBSON();
 
             rpc::UniqueReply insertCommandResponse =
-                client.runCommandWithMetadata(chunkMetadataNss.db().toString(),
-                                              insertCmdObj.firstElementFieldName(),
-                                              rpc::makeEmptyMetadata(),
-                                              insertCmdObj);
+                client.runCommand(OpMsgRequest::fromDBAndBody(chunkMetadataNss.db(), insertCmdObj));
 
             auto insertStatus =
                 getStatusFromWriteCommandResponse(insertCommandResponse->getCommandReply());
@@ -384,8 +378,8 @@ Status dropChunksAndDeleteCollectionsEntry(OperationContext* opCtx, const Namesp
         batchedDeleteRequest.setNS(NamespaceString(ShardCollectionType::ConfigNS));
         const BSONObj deleteCmdObj = batchedDeleteRequest.toBSON();
 
-        rpc::UniqueReply deleteCommandResponse = client.runCommandWithMetadata(
-            "config", deleteCmdObj.firstElementFieldName(), rpc::makeEmptyMetadata(), deleteCmdObj);
+        rpc::UniqueReply deleteCommandResponse =
+            client.runCommand(OpMsgRequest::fromDBAndBody("config", deleteCmdObj));
 
         auto deleteStatus =
             getStatusFromWriteCommandResponse(deleteCommandResponse->getCommandReply());
