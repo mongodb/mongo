@@ -4,6 +4,7 @@
  */
 (function() {
     "use strict";
+    const isMongos = db.runCommand({isdbgrid: 1}).isdbgrid;
 
     function runTest(badViewDefinition) {
         let viewsDB = db.getSiblingDB("invalid_system_views");
@@ -30,12 +31,17 @@
                 " in system.views";
         }
 
-        // Commands that run on existing regular collections should not be impacted by the presence
-        // of invalid views.
-        assert.commandWorked(
-            db.adminCommand(
-                {applyOps: [{op: "c", ns: "invalid_system_views.$cmd", o: {drop: "collection3"}}]}),
-            makeErrorMessage("applyOps"));
+        if (!isMongos) {
+            // Commands that run on existing regular collections should not be impacted by the
+            // presence of invalid views. However, applyOps doesn't work on mongos.
+            assert.commandWorked(
+                db.adminCommand(  //
+                    {
+                      applyOps:
+                          [{op: "c", ns: "invalid_system_views.$cmd", o: {drop: "collection3"}}]
+                    }),
+                makeErrorMessage("applyOps"));
+        }
 
         assert.writeOK(viewsDB.collection.insert({y: "baz"}), makeErrorMessage("insert"));
 
@@ -81,8 +87,8 @@
         assert.commandWorked(viewsDB.collection.reIndex(), makeErrorMessage("reIndex"));
 
         const storageEngine = jsTest.options().storageEngine;
-        if (storageEngine === "ephemeralForTest" || storageEngine === "inMemory") {
-            print("Not testing compact command on ephemeral storage engine " + storageEngine);
+        if (isMongos || storageEngine === "ephemeralForTest" || storageEngine === "inMemory") {
+            print("Not testing compact command on mongos or ephemeral storage engine");
         } else {
             assert.commandWorked(viewsDB.runCommand({compact: "collection", force: true}),
                                  makeErrorMessage("compact"));

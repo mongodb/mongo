@@ -48,7 +48,7 @@ OpMsgRequest opMsgRequestFromLegacyRequest(const Message& message) {
             ns.isCommand());
 
     uassert(16979,
-            str::stream() << "bad numberToReturn (" << qm.ntoreturn
+            str::stream() << "Bad numberToReturn (" << qm.ntoreturn
                           << ") for $cmd type ns - can only be 1 or -1",
             qm.ntoreturn == 1 || qm.ntoreturn == -1);
 

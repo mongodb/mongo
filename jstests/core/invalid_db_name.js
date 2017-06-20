@@ -1,4 +1,7 @@
 // Ensures that invalid DB names are reported as write errors
+//
+// Can't shard collection with invalid db name.
+// @tags: [assumes_unsharded_collection]
 (function() {
     var invalidDB = db.getSiblingDB("NonExistentDB");
 
