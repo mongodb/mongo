@@ -841,9 +841,15 @@ class _CppSourceFileWriter(_CppFileWriterBase):
                         # Call a method like class::method(BSONArrayBuilder*)
                         self._writer.write_template('item.${method_name}(&arrayBuilder);')
                 else:
-                    # Call a method like class::method(StringData, BSONObjBuilder*)
-                    self._writer.write_template(
-                        '${access_member}.${method_name}(${field_name}, builder);')
+                    if writer.is_function(field.serializer):
+                        # Call a method like method(value, StringData, BSONObjBuilder*)
+                        self._writer.write_template(
+                            '${method_name}(${access_member}, ${field_name}, builder);')
+                    else:
+                        # Call a method like class::method(StringData, BSONObjBuilder*)
+                        self._writer.write_template(
+                            '${access_member}.${method_name}(${field_name}, builder);')
+
             else:
                 method_name = writer.get_method_name(field.serializer)
                 template_params['method_name'] = method_name
