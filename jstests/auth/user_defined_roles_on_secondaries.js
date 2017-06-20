@@ -170,6 +170,7 @@
                   privileges: [{resource: {db: "db1", collection: "log"}, actions: ["insert"]}]
               }
             },
+            {op: "c", ns: "admin.$cmd", o: {drop: "system.roles"}},
             {op: "c", ns: "admin.$cmd", o: {dropDatabase: 1}},
             {op: "c", ns: "admin.$cmd", o: {create: "system.roles"}},
             {

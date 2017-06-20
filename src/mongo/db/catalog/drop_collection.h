@@ -44,12 +44,14 @@ class OpTime;
  * If we are applying an oplog entry for a collection drop on a secondary, 'dropOpTime' is set
  * to the optime in the oplog entry.
  */
-Status dropCollection(OperationContext* opCtx,
-                      const NamespaceString& collectionName,
-                      BSONObjBuilder& result);
+enum class DropCollectionSystemCollectionMode {
+    kDisallowSystemCollectionDrops,
+    kAllowSystemCollectionDrops
+};
 Status dropCollection(OperationContext* opCtx,
                       const NamespaceString& collectionName,
                       BSONObjBuilder& result,
-                      const repl::OpTime& dropOpTime);
+                      const repl::OpTime& dropOpTime,
+                      DropCollectionSystemCollectionMode systemCollectionMode);
 
 }  // namespace mongo

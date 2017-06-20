@@ -51,14 +51,9 @@ namespace mongo {
 
 Status dropCollection(OperationContext* opCtx,
                       const NamespaceString& collectionName,
-                      BSONObjBuilder& result) {
-    return dropCollection(opCtx, collectionName, result, {});
-}
-
-Status dropCollection(OperationContext* opCtx,
-                      const NamespaceString& collectionName,
                       BSONObjBuilder& result,
-                      const repl::OpTime& dropOpTime) {
+                      const repl::OpTime& dropOpTime,
+                      DropCollectionSystemCollectionMode systemCollectionMode) {
     if (!serverGlobalParams.quiet.load()) {
         log() << "CMD: drop " << collectionName;
     }
@@ -97,7 +92,10 @@ Status dropCollection(OperationContext* opCtx,
 
             BackgroundOperation::assertNoBgOpInProgForNs(collectionName.ns());
 
-            Status s = db->dropCollection(opCtx, collectionName.ns(), dropOpTime);
+            Status s = systemCollectionMode ==
+                    DropCollectionSystemCollectionMode::kDisallowSystemCollectionDrops
+                ? db->dropCollection(opCtx, collectionName.ns(), dropOpTime)
+                : db->dropCollectionEvenIfSystem(opCtx, collectionName, dropOpTime);
 
             if (!s.isOK()) {
                 return s;

@@ -499,7 +499,13 @@ public:
             return false;
         }
 
-        return appendCommandStatus(result, dropCollection(opCtx, nsToDrop, result));
+        return appendCommandStatus(
+            result,
+            dropCollection(opCtx,
+                           nsToDrop,
+                           result,
+                           {},
+                           DropCollectionSystemCollectionMode::kDisallowSystemCollectionDrops));
     }
 
 } cmdDrop;
