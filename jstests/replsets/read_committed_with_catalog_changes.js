@@ -70,6 +70,9 @@ load("jstests/replsets/rslib.js");       // For startSetIfSupportsReadMajority.
                 assert.writeOK(db.coll.insert({_id: 1}));
             },
             performOp: function(db) {
+                // Drop collection explicitly. Otherwise, dropDatabase() will drop the collection
+                // and wait for the collection drop to be replicated to a majority of the nodes.
+                assert(db.coll.drop());
                 assert.commandWorked(db.dropDatabase());
             },
             blockedCollections: [],
@@ -92,6 +95,9 @@ load("jstests/replsets/rslib.js");       // For startSetIfSupportsReadMajority.
                 assert.writeOK(db.coll.insert({_id: 1}));
             },
             performOp: function(db) {
+                // Drop collection explicitly. Otherwise, dropDatabase() will drop the collection
+                // and wait for the collection drop to be replicated to a majority of the nodes.
+                assert(db.coll.drop());
                 assert.commandWorked(db.dropDatabase());
                 assert.writeOK(db.coll.insert({_id: 1}));
             },
