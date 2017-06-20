@@ -622,9 +622,7 @@ std::map<std::string, ApplyOpMetadata> opsMap = {
                                 opTime,
                                 DropCollectionSystemCollectionMode::kAllowSystemCollectionDrops);
       },
-      // IllegalOperation is necessary because in 3.0 we replicate drops of system.profile
-      // TODO(dannenberg) remove IllegalOperation once we no longer need 3.0 compatibility
-      {ErrorCodes::NamespaceNotFound, ErrorCodes::IllegalOperation}}},
+      {ErrorCodes::NamespaceNotFound}}},
     // deleteIndex(es) is deprecated but still works as of April 10, 2015
     {"deleteIndex",
      {[](OperationContext* opCtx, const char* ns, BSONObj& cmd, const OpTime& opTime) -> Status {
