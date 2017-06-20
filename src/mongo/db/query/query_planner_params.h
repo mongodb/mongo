@@ -95,6 +95,9 @@ struct QueryPlannerParams {
         // Set this if you don't want any plans with a non-covered projection stage. All projections
         // must be provided/covered by an index.
         NO_UNCOVERED_PROJECTIONS = 1 << 10,
+
+        // Set this to generate covered whole IXSCAN plans.
+        GENERATE_COVERED_IXSCANS = 1 << 11,
     };
 
     // See Options enum above.

@@ -5294,8 +5294,8 @@ TEST_F(QueryPlannerTest, EmptyQueryWithoutProjectionUsesCollscan) {
     assertSolutionExists("{cscan: {dir: 1}}}");
 }
 
-TEST_F(QueryPlannerTest, EmptyQueryWithProjectionUsesCoveredIxscan) {
-    params.options &= ~QueryPlannerParams::INCLUDE_COLLSCAN;
+TEST_F(QueryPlannerTest, EmptyQueryWithProjectionUsesCoveredIxscanIfEnabled) {
+    params.options = QueryPlannerParams::GENERATE_COVERED_IXSCANS;
     addIndex(BSON("a" << 1));
     runQueryAsCommand(fromjson("{find: 'testns', projection: {_id: 0, a: 1}}"));
     assertNumSolutions(1);
@@ -5305,8 +5305,18 @@ TEST_F(QueryPlannerTest, EmptyQueryWithProjectionUsesCoveredIxscan) {
         "bounds: {a: [['MinKey', 'MaxKey', true, true]]}}}}}");
 }
 
-TEST_F(QueryPlannerTest, EmptyQueryWithProjectionUsesCoveredIxscanOnCompoundIndex) {
-    params.options &= ~QueryPlannerParams::INCLUDE_COLLSCAN;
+TEST_F(QueryPlannerTest, EmptyQueryWithProjectionDoesNotUseCoveredIxscanIfDisabled) {
+    params.options &= ~QueryPlannerParams::GENERATE_COVERED_IXSCANS;
+    addIndex(BSON("a" << 1));
+    runQueryAsCommand(fromjson("{find: 'testns', projection: {_id: 0, a: 1}}"));
+    assertNumSolutions(1);
+    assertSolutionExists(
+        "{proj: {spec: {_id: 0, a: 1}, node: "
+        "{cscan: {dir: 1}}}}");
+}
+
+TEST_F(QueryPlannerTest, EmptyQueryWithProjectionUsesCoveredIxscanOnCompoundIndexIfEnabled) {
+    params.options = QueryPlannerParams::GENERATE_COVERED_IXSCANS;
     addIndex(BSON("a" << 1 << "b" << 1 << "c" << 1));
     runQueryAsCommand(fromjson("{find: 'testns', projection: {_id: 0, a: 1, c: 1}}"));
     assertNumSolutions(1);
@@ -5317,7 +5327,18 @@ TEST_F(QueryPlannerTest, EmptyQueryWithProjectionUsesCoveredIxscanOnCompoundInde
         "c: [['MinKey', 'MaxKey', true, true]]}}}}}");
 }
 
-TEST_F(QueryPlannerTest, PlannerDoesNotConsiderCoveredIxscanForProjIfItWouldNotRespectTheHint) {
+TEST_F(QueryPlannerTest, EmptyQueryWithProjectionDoesNotUseCoveredIxscanOnCompoundIndexIfDisabled) {
+    params.options &= ~QueryPlannerParams::GENERATE_COVERED_IXSCANS;
+    addIndex(BSON("a" << 1 << "b" << 1 << "c" << 1));
+    runQueryAsCommand(fromjson("{find: 'testns', projection: {_id: 0, a: 1, c: 1}}"));
+    assertNumSolutions(1);
+    assertSolutionExists(
+        "{proj: {spec: {_id: 0, a: 1, c: 1}, node: "
+        "{cscan: {dir: 1}}}}");
+}
+
+TEST_F(QueryPlannerTest, EmptyQueryWithProjectionDoesNotConsiderNonHintedIndices) {
+    params.options = QueryPlannerParams::GENERATE_COVERED_IXSCANS;
     addIndex(BSON("a" << 1));
     runQueryAsCommand(fromjson("{find: 'testns', projection: {_id: 0, a: 1}, hint: {_id: 1}}"));
     assertNumSolutions(1);
@@ -5329,6 +5350,7 @@ TEST_F(QueryPlannerTest, PlannerDoesNotConsiderCoveredIxscanForProjIfItWouldNotR
 }
 
 TEST_F(QueryPlannerTest, EmptyQueryWithProjectionUsesCollscanIfNoCoveredIxscans) {
+    params.options = QueryPlannerParams::GENERATE_COVERED_IXSCANS;
     addIndex(BSON("a" << 1));
     runQueryAsCommand(fromjson("{find: 'testns', projection: {a: 1}}"));
     assertNumSolutions(1);
@@ -5337,8 +5359,9 @@ TEST_F(QueryPlannerTest, EmptyQueryWithProjectionUsesCollscanIfNoCoveredIxscans)
         "{cscan: {dir: 1}}}}");
 }
 
-TEST_F(QueryPlannerTest, EmptyQueryWithProjectionUsesCoveredIxscanOnDotttedNonMultikeyIndex) {
-    params.options &= ~QueryPlannerParams::INCLUDE_COLLSCAN;
+TEST_F(QueryPlannerTest,
+       EmptyQueryWithProjectionUsesCoveredIxscanOnDotttedNonMultikeyIndexIfEnabled) {
+    params.options = QueryPlannerParams::GENERATE_COVERED_IXSCANS;
     addIndex(BSON("a.b" << 1));
     runQueryAsCommand(fromjson("{find: 'testns', projection: {_id: 0, 'a.b': 1}}"));
     assertNumSolutions(1);
@@ -5348,7 +5371,19 @@ TEST_F(QueryPlannerTest, EmptyQueryWithProjectionUsesCoveredIxscanOnDotttedNonMu
         "bounds: {'a.b': [['MinKey', 'MaxKey', true, true]]}}}}}");
 }
 
+TEST_F(QueryPlannerTest,
+       EmptyQueryWithProjectionDoesNotUseCoveredIxscanOnDotttedNonMultikeyIndexIfDisabled) {
+    params.options &= ~QueryPlannerParams::GENERATE_COVERED_IXSCANS;
+    addIndex(BSON("a.b" << 1));
+    runQueryAsCommand(fromjson("{find: 'testns', projection: {_id: 0, 'a.b': 1}}"));
+    assertNumSolutions(1);
+    assertSolutionExists(
+        "{proj: {spec: {_id: 0, 'a.b': 1}, node: "
+        "{cscan: {dir: 1}}}}");
+}
+
 TEST_F(QueryPlannerTest, EmptyQueryWithProjectionUsesCollscanIfIndexIsMultikey) {
+    params.options = QueryPlannerParams::GENERATE_COVERED_IXSCANS;
     constexpr bool isMultikey = true;
     addIndex(BSON("a" << 1 << "b" << 1), isMultikey);
     runQueryAsCommand(fromjson("{find: 'testns', projection: {_id: 0, a: 1, b: 1}}"));
@@ -5359,6 +5394,7 @@ TEST_F(QueryPlannerTest, EmptyQueryWithProjectionUsesCollscanIfIndexIsMultikey) 
 }
 
 TEST_F(QueryPlannerTest, EmptyQueryWithProjectionUsesCollscanIfIndexIsSparse) {
+    params.options = QueryPlannerParams::GENERATE_COVERED_IXSCANS;
     constexpr bool isMultikey = false;
     constexpr bool isSparse = true;
     addIndex(BSON("a" << 1), isMultikey, isSparse);
@@ -5370,6 +5406,7 @@ TEST_F(QueryPlannerTest, EmptyQueryWithProjectionUsesCollscanIfIndexIsSparse) {
 }
 
 TEST_F(QueryPlannerTest, EmptyQueryWithProjectionUsesCollscanIfIndexIsPartial) {
+    params.options = QueryPlannerParams::GENERATE_COVERED_IXSCANS;
     FalseMatchExpression matchExpr("foo"_sd);
     addIndex(BSON("a" << 1), &matchExpr);
     runQueryAsCommand(fromjson("{find: 'testns', projection: {_id: 0, a: 1}}"));
@@ -5380,6 +5417,7 @@ TEST_F(QueryPlannerTest, EmptyQueryWithProjectionUsesCollscanIfIndexIsPartial) {
 }
 
 TEST_F(QueryPlannerTest, EmptyQueryWithProjectionUsesCollscanIfIndexIsText) {
+    params.options = QueryPlannerParams::GENERATE_COVERED_IXSCANS;
     addIndex(BSON("a"
                   << "text"));
     runQueryAsCommand(fromjson("{find: 'testns', projection: {_id: 0, a: 1}}"));
@@ -5390,6 +5428,7 @@ TEST_F(QueryPlannerTest, EmptyQueryWithProjectionUsesCollscanIfIndexIsText) {
 }
 
 TEST_F(QueryPlannerTest, EmptyQueryWithProjectionUsesCollscanIfIndexIsGeo) {
+    params.options = QueryPlannerParams::GENERATE_COVERED_IXSCANS;
     addIndex(BSON("a"
                   << "2dsphere"));
     runQueryAsCommand(fromjson("{find: 'testns', projection: {_id: 0, a: 1}}"));
@@ -5400,6 +5439,7 @@ TEST_F(QueryPlannerTest, EmptyQueryWithProjectionUsesCollscanIfIndexIsGeo) {
 }
 
 TEST_F(QueryPlannerTest, EmptyQueryWithProjectionUsesCollscanIfIndexCollationDiffers) {
+    params.options = QueryPlannerParams::GENERATE_COVERED_IXSCANS;
     CollatorInterfaceMock collator(CollatorInterfaceMock::MockType::kReverseString);
     addIndex(BSON("a" << 1), &collator);
     runQueryAsCommand(fromjson("{find: 'testns', projection: {_id: 0, a: 1}}"));

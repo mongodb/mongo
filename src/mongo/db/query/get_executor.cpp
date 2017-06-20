@@ -189,6 +189,10 @@ void fillOutPlannerParams(OperationContext* opCtx,
         plannerParams->options |= QueryPlannerParams::INDEX_INTERSECTION;
     }
 
+    if (internalQueryPlannerGenerateCoveredWholeIndexScans.load()) {
+        plannerParams->options |= QueryPlannerParams::GENERATE_COVERED_IXSCANS;
+    }
+
     plannerParams->options |= QueryPlannerParams::SPLIT_LIMITED_SORT;
 
     // Doc-level locking storage engines cannot answer predicates implicitly via exact index

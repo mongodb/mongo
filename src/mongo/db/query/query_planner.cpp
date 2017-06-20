@@ -1005,8 +1005,8 @@ Status QueryPlanner::plan(const CanonicalQuery& query,
     // If a projection exists, there may be an index that allows for a covered plan, even if none
     // were considered earlier.
     const auto projection = query.getProj();
-    if (out->size() == 0 && query.getQueryObj().isEmpty() && projection &&
-        !projection->requiresDocument()) {
+    if (params.options & QueryPlannerParams::GENERATE_COVERED_IXSCANS && out->size() == 0 &&
+        query.getQueryObj().isEmpty() && projection && !projection->requiresDocument()) {
 
         const auto* indicesToConsider = hintIndex.isEmpty() ? &params.indices : &relevantIndices;
         for (auto&& index : *indicesToConsider) {
