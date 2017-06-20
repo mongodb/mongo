@@ -24,6 +24,27 @@ env.CppUnitTest(
     ],
 )
 
+env.Library(
+    target='cidr',
+    source=[
+        'cidr.cpp',
+    ],
+    LIBDEPS=[
+        '$BUILD_DIR/mongo/base',
+    ],
+)
+
+env.CppUnitTest(
+    target='cidr_test',
+    source=[
+        'cidr_test.cpp',
+    ],
+    LIBDEPS=[
+        '$BUILD_DIR/mongo/base',
+        'cidr',
+    ],
+)
+
 networkEnv = env.Clone();
 
 networkEnv.InjectThirdPartyIncludePaths(libraries=[
@@ -61,6 +82,7 @@ networkEnv.Library(
         '$BUILD_DIR/mongo/util/fail_point',
         '$BUILD_DIR/mongo/util/options_parser/options_parser',
         '$BUILD_DIR/third_party/shim_asio',
+        'cidr',
         'hostandport',
     ],
 )
