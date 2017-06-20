@@ -616,7 +616,7 @@ Value ExpressionArrayToObject::evaluate(const Document& root) const {
                 str::stream() << "$arrayToObject requires an object with keys 'k' and 'v', where "
                                  "the value of 'k' must be of type string. Found type: "
                               << typeName(key.getType()),
-                (key.getType() == BSONType::String && !key.nullish()));
+                (key.getType() == BSONType::String));
 
             output.addField(key.getString(), value);
         }
