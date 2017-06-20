@@ -276,7 +276,7 @@ OplogDocWriter _logOpWriter(OperationContext* opCtx,
         b.append("o2", *o2);
 
     if (wallTime != Date_t{}) {
-        b.appendDate("wt", wallTime);
+        b.appendDate("wall", wallTime);
     }
 
     return OplogDocWriter(OplogDocWriter(b.obj(), obj));

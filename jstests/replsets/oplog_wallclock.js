@@ -5,7 +5,7 @@
 
     var assertLastOplogHasWT = function(primary, msg) {
         const opLogEntry = getLatestOp(primary);
-        assert(opLogEntry.hasOwnProperty('wt'),
+        assert(opLogEntry.hasOwnProperty('wall'),
                'oplog entry must contain wt field: ' + tojson(opLogEntry));
     };
 
