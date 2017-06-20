@@ -6757,7 +6757,8 @@ buildvariants:
   - name: tool_WT
   - name: push
     distros:
-    - rhel62-small
+    - rhel70
+    - rhel62-large
 
 ###########################################
 #          Ubuntu buildvariants           #
