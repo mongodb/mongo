@@ -31,6 +31,8 @@
  * the DBClientReplicaSet talks to, so the tests only covers the client side logic.
  */
 
+#include "mongo/platform/basic.h"
+
 #include <map>
 #include <memory>
 #include <string>

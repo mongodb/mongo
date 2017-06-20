@@ -96,13 +96,13 @@ using std::vector;
 vector<SockAddr> ipToAddrs(const char* ips, int port, bool useUnixSockets) {
     vector<SockAddr> out;
     if (*ips == '\0') {
-        out.push_back(SockAddr("127.0.0.1", port));  // IPv4 localhost
+        out.push_back(SockAddr("127.0.0.1", port, AF_INET));  // IPv4 localhost
 
         if (IPv6Enabled())
-            out.push_back(SockAddr("::1", port));  // IPv6 localhost
+            out.push_back(SockAddr("::1", port, AF_INET6));  // IPv6 localhost
 #ifndef _WIN32
         if (useUnixSockets)
-            out.push_back(SockAddr(makeUnixSockPath(port), port));  // Unix socket
+            out.push_back(SockAddr(makeUnixSockPath(port), port, AF_UNIX));  // Unix socket
 #endif
         return out;
     }
@@ -118,13 +118,13 @@ vector<SockAddr> ipToAddrs(const char* ips, int port, bool useUnixSockets) {
             ips = "";
         }
 
-        SockAddr sa(ip.c_str(), port);
+        SockAddr sa(ip.c_str(), port, IPv6Enabled() ? AF_UNSPEC : AF_INET);
         out.push_back(sa);
 
 #ifndef _WIN32
         if (sa.isValid() && useUnixSockets &&
             (sa.getAddr() == "127.0.0.1" || sa.getAddr() == "0.0.0.0"))  // only IPv4
-            out.push_back(SockAddr(makeUnixSockPath(port), port));
+            out.push_back(SockAddr(makeUnixSockPath(port), port, AF_INET));
 #endif
     }
     return out;

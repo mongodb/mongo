@@ -30,8 +30,11 @@
 #include <iosfwd>
 #include <string>
 
+#include <boost/optional.hpp>
+
 #include "mongo/bson/util/builder.h"
 #include "mongo/platform/hash_namespace.h"
+#include "mongo/util/net/sockaddr.h"
 
 namespace mongo {
 
@@ -75,6 +78,14 @@ struct HostAndPort {
     HostAndPort(const std::string& h, int p);
 
     /**
+     * Constructs a HostAndPort from a SockAddr
+     *
+     * Used by the TransportLayer to convert raw socket addresses into HostAndPorts to be
+     * accessed via tranport::Session
+     */
+    explicit HostAndPort(SockAddr addr);
+
+    /**
      * (Re-)initializes this HostAndPort by parsing "s".  Returns
      * Status::OK on success.  The state of this HostAndPort is unspecified
      * after initialize() returns a non-OK status, though it is safe to
@@ -116,6 +127,14 @@ struct HostAndPort {
      */
     bool empty() const;
 
+    /**
+     * Returns the SockAddr representation of this address, if available
+     */
+    const boost::optional<SockAddr>& sockAddr() const& {
+        return _addr;
+    }
+    void sockAddr() && = delete;
+
     const std::string& host() const {
         return _host;
     }
@@ -126,6 +145,7 @@ struct HostAndPort {
     }
 
 private:
+    boost::optional<SockAddr> _addr;
     std::string _host;
     int _port;  // -1 indicates unspecified
 };

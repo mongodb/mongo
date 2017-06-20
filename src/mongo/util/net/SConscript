@@ -8,6 +8,7 @@ env.Library(
     target='hostandport',
     source=[
         'hostandport.cpp',
+        'sockaddr.cpp',
     ],
     LIBDEPS=[
         '$BUILD_DIR/mongo/base',
@@ -63,7 +64,6 @@ networkEnv.Library(
         "message_port_startup_param.cpp",
         "op_msg.cpp",
         "sock.cpp",
-        "sockaddr.cpp",
         'socket_exception.cpp',
         "socket_poll.cpp",
         "ssl_expiration.cpp",

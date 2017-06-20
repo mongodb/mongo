@@ -43,6 +43,8 @@
 
 #endif  // not _WIN32
 
+#include "mongo/base/string_data.h"
+
 namespace mongo {
 
 #if defined(_WIN32)
@@ -58,16 +60,19 @@ struct sockaddr_un {
 
 #endif  // _WIN32
 
+// Generate a string representation for getaddrinfo return codes
+std::string getAddrInfoStrError(int code);
+
 /**
  * Wrapper around os representation of network address.
  */
 struct SockAddr {
     SockAddr();
+
     explicit SockAddr(int sourcePort); /* listener side */
-    SockAddr(
-        const char* ip,
-        int port); /* EndPoint (remote) side, or if you want to specify which interface locally */
-    SockAddr(const std::string& ip, int port) : SockAddr(ip.c_str(), port) {}
+
+    explicit SockAddr(StringData ip, int port, sa_family_t familyHint);
+
     explicit SockAddr(struct sockaddr_storage& other, socklen_t size);
 
     template <typename T>

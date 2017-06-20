@@ -79,7 +79,7 @@ TEST(TransportLayerLegacy, endSessionsDoesntDoubleClose) {
 
     stdx::thread thr{[&] {
         Socket s;
-        SockAddr sa{"localhost", 27017};
+        SockAddr sa{"localhost", 27017, AF_INET};
         s.connect(sa);
 
         stdx::unique_lock<stdx::mutex> lk(mutex);

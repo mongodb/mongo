@@ -201,7 +201,9 @@ Status TransportLayerASIO::setup() {
             warning() << "Skipping empty bind address";
             continue;
         }
-        SockAddr addr(ip, _listenerOptions.port);
+        SockAddr addr(StringData(ip),
+                      _listenerOptions.port,
+                      _listenerOptions.enableIPv6 ? AF_UNSPEC : AF_INET);
         asio::generic::stream_protocol::endpoint endpoint(addr.raw(), addr.addressSize);
 
 #ifndef _WIN32

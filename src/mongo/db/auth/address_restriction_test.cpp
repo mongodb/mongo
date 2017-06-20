@@ -162,7 +162,7 @@ TEST(AddressRestrictionTest, contains) {
     };
     for (const auto& p : contains) {
         const SockAddr dummy;
-        const SockAddr addr(p.address, 1024);
+        const SockAddr addr(p.address, 1024, AF_UNSPEC);
         const RestrictionEnvironment rec(addr, dummy);
         const RestrictionEnvironment res(dummy, addr);
 
