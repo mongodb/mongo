@@ -93,10 +93,15 @@ load('jstests/multiVersion/libs/auth_helpers.js');
         setupFunc: function() {
             coll.insert({type: 'oak'});
             db.pine_needles.insert({type: 'pine'});
+            // As of SERVER-29277, dropping a database with any replicated collections requires a
+            // majority of nodes to be able to complete the drop. Since this test case may run with
+            // less than a majority of nodes available, we empty out the database in the "setup"
+            // phase to allow the dropDatabase command to always run to completion.
+            db.pine_needles.drop();
+            coll.drop();
         },
         confirmFunc: function() {
-            assert.eq(coll.find().itcount(), 0);
-            assert.eq(db.pine_needles.find().itcount(), 0);
+            assert.isnull(db.getMongo().getDBNames().find(dbName => dbName == db.getName()));
         },
         requiresMajority: false,
         runsOnShards: true,
@@ -111,10 +116,15 @@ load('jstests/multiVersion/libs/auth_helpers.js');
             shardCollectionWithChunks(st, coll);
             coll.insert({type: 'oak', x: 11});
             db.pine_needles.insert({type: 'pine'});
+            // As of SERVER-29277, dropping a database with any replicated collections requires a
+            // majority of nodes to be able to complete the drop. Since this test case may run with
+            // less than a majority of nodes available, we empty out the database in the "setup"
+            // phase to allow the dropDatabase command to always run to completion.
+            db.pine_needles.drop();
+            coll.drop();
         },
         confirmFunc: function() {
-            assert.eq(coll.find().itcount(), 0);
-            assert.eq(db.pine_needles.find().itcount(), 0);
+            assert.isnull(db.getMongo().getDBNames().find(dbName => dbName == db.getName()));
         },
         requiresMajority: false,
         runsOnShards: true,
