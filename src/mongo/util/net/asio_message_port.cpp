@@ -482,7 +482,7 @@ HostAndPort ASIOMessagingPort::remote() const {
 }
 
 SockAddr ASIOMessagingPort::remoteAddr() const {
-    return SockAddr(_remote.host(), _remote.port());
+    return SockAddr(_remote.host(), _remote.port(), AF_UNSPEC);
 }
 
 SockAddr ASIOMessagingPort::localAddr() const {
@@ -493,14 +493,14 @@ SockAddr ASIOMessagingPort::localAddr() const {
             asio::ip::tcp::endpoint tcpEP;
             tcpEP.resize(ep.size());
             memcpy(tcpEP.data(), ep.data(), ep.size());
-            return SockAddr(tcpEP.address().to_string(), tcpEP.port());
+            return SockAddr(tcpEP.address().to_string(), tcpEP.port(), ep.protocol().family());
         }
 #ifndef _WIN32
         case AF_UNIX: {
             asio::local::stream_protocol::endpoint localEP;
             localEP.resize(ep.size());
             memcpy(localEP.data(), ep.data(), ep.size());
-            return SockAddr(localEP.path(), 0);
+            return SockAddr(localEP.path(), 0, AF_UNIX);
         }
 #endif  // _WIN32
         default: { MONGO_UNREACHABLE; }
