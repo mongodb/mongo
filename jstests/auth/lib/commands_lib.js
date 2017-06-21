@@ -696,6 +696,50 @@ var authCommandsLib = {
           ]
         },
         {
+          testname: "aggregate_lookup_nested_pipeline",
+          command: {
+              aggregate: "foo",
+              pipeline: [{
+                  $lookup: {
+                      from: "bar",
+                      pipeline: [{$lookup: {from: "baz", pipeline: [], as: "lookup2"}}],
+                      as: "lookup1"
+                  }
+              }],
+              cursor: {}
+          },
+          setup: function(db) {
+              db.createCollection("foo");
+              db.createCollection("bar");
+              db.createCollection("baz");
+          },
+          teardown: function(db) {
+              db.foo.drop();
+              db.bar.drop();
+              db.baz.drop();
+          },
+          testcases: [
+              {
+                runOnDb: firstDbName,
+                roles: roles_read,
+                privileges: [
+                    {resource: {db: firstDbName, collection: "foo"}, actions: ["find"]},
+                    {resource: {db: firstDbName, collection: "bar"}, actions: ["find"]},
+                    {resource: {db: firstDbName, collection: "baz"}, actions: ["find"]}
+                ]
+              },
+              {
+                runOnDb: secondDbName,
+                roles: roles_readAny,
+                privileges: [
+                    {resource: {db: secondDbName, collection: "foo"}, actions: ["find"]},
+                    {resource: {db: secondDbName, collection: "bar"}, actions: ["find"]},
+                    {resource: {db: secondDbName, collection: "baz"}, actions: ["find"]}
+                ]
+              }
+          ]
+        },
+        {
           testname: "aggregate_lookup_views",
           setup: function(db) {
               db.createView("view", "collection", [{$match: {}}]);

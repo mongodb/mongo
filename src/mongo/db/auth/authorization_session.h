@@ -313,11 +313,18 @@ private:
     bool _isAuthorizedForPrivilege(const Privilege& privilege);
 
     // Helper for recursively checking for privileges in an aggregation pipeline.
-    void _addPrivilegesForStage(const std::string& db,
-                                const BSONObj& cmdObj,
-                                PrivilegeVector* requiredPrivileges,
-                                BSONObj stageSpec,
-                                bool haveRecursed = false);
+    Status _addPrivilegesForPipeline(const NamespaceString& nss,
+                                     const BSONElement& pipelineElem,
+                                     bool bypassDocumentValidation,
+                                     bool isMongos,
+                                     PrivilegeVector* requiredPrivileges);
+
+    // Helper for recursively checking for privileges in an aggregation stage.
+    Status _addPrivilegesForStage(StringData db,
+                                  BSONObj stageSpec,
+                                  bool bypassDocumentValidation,
+                                  bool isMongos,
+                                  PrivilegeVector* requiredPrivileges);
 
     std::unique_ptr<AuthzSessionExternalState> _externalState;
 

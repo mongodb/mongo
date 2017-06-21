@@ -31,6 +31,7 @@
  * Unit tests of the AuthorizationSession type.
  */
 #include "mongo/base/status.h"
+#include "mongo/bson/bson_depth.h"
 #include "mongo/db/auth/action_type.h"
 #include "mongo/db/auth/authorization_manager.h"
 #include "mongo/db/auth/authorization_session_for_test.h"
@@ -728,13 +729,13 @@ TEST_F(AuthorizationSessionTest, CannotSpoofAllUsersTrueWithoutInprogActionOnMon
 }
 
 TEST_F(AuthorizationSessionTest, AddPrivilegesForStageFailsIfOutNamespaceIsNotValid) {
+    authzSession->assumePrivilegesForDB(Privilege(testFooCollResource, {ActionType::find}));
+
     BSONArray pipeline = BSON_ARRAY(BSON("$out"
                                          << ""));
     BSONObj cmdObj = BSON("aggregate" << testFooNss.coll() << "pipeline" << pipeline);
-    ASSERT_THROWS_CODE(
-        authzSession->checkAuthForAggregate(testFooNss, cmdObj, false).transitional_ignore(),
-        UserException,
-        17139);
+    ASSERT_EQ(ErrorCodes::InvalidNamespace,
+              authzSession->checkAuthForAggregate(testFooNss, cmdObj, false));
 }
 
 TEST_F(AuthorizationSessionTest, CannotAggregateOutWithoutInsertAndRemoveOnTargetNamespace) {
@@ -821,6 +822,72 @@ TEST_F(AuthorizationSessionTest, CanAggregateLookupWithFindOnJoinedNamespace) {
     BSONObj cmdObj = BSON("aggregate" << testFooNss.coll() << "pipeline" << pipeline);
     ASSERT_OK(authzSession->checkAuthForAggregate(testFooNss, cmdObj, false));
 }
+
+
+TEST_F(AuthorizationSessionTest, CannotAggregateLookupWithoutFindOnNestedJoinedNamespace) {
+    authzSession->assumePrivilegesForDB({Privilege(testFooCollResource, {ActionType::find}),
+                                         Privilege(testBarCollResource, {ActionType::find})});
+
+    BSONArray nestedPipeline = BSON_ARRAY(BSON("$lookup" << BSON("from" << testQuxNss.coll())));
+    BSONArray pipeline = BSON_ARRAY(
+        BSON("$lookup" << BSON("from" << testBarNss.coll() << "pipeline" << nestedPipeline)));
+    BSONObj cmdObj = BSON("aggregate" << testFooNss.coll() << "pipeline" << pipeline);
+    ASSERT_EQ(ErrorCodes::Unauthorized,
+              authzSession->checkAuthForAggregate(testFooNss, cmdObj, false));
+}
+
+TEST_F(AuthorizationSessionTest, CanAggregateLookupWithFindOnNestedJoinedNamespace) {
+    authzSession->assumePrivilegesForDB({Privilege(testFooCollResource, {ActionType::find}),
+                                         Privilege(testBarCollResource, {ActionType::find}),
+                                         Privilege(testQuxCollResource, {ActionType::find})});
+
+    BSONArray nestedPipeline = BSON_ARRAY(BSON("$lookup" << BSON("from" << testQuxNss.coll())));
+    BSONArray pipeline = BSON_ARRAY(
+        BSON("$lookup" << BSON("from" << testBarNss.coll() << "pipeline" << nestedPipeline)));
+    BSONObj cmdObj = BSON("aggregate" << testFooNss.coll() << "pipeline" << pipeline);
+    ASSERT_OK(authzSession->checkAuthForAggregate(testFooNss, cmdObj, false));
+}
+
+TEST_F(AuthorizationSessionTest, CheckAuthForAggregateWithDeeplyNestedLookup) {
+    authzSession->assumePrivilegesForDB(Privilege(testFooCollResource, {ActionType::find}));
+
+    // Recursively adds nested $lookup stages to 'pipelineBob', building a pipeline with
+    // 'levelsToGo' deep $lookup stages.
+    stdx::function<void(BSONArrayBuilder*, int)> addNestedPipeline;
+    addNestedPipeline = [&addNestedPipeline](BSONArrayBuilder* pipelineBob, int levelsToGo) {
+        if (levelsToGo == 0) {
+            return;
+        }
+
+        BSONObjBuilder objectBob(pipelineBob->subobjStart());
+        BSONObjBuilder lookupBob(objectBob.subobjStart("$lookup"));
+        lookupBob << "from" << testFooNss.coll() << "as"
+                  << "as";
+        BSONArrayBuilder subPipelineBob(lookupBob.subarrayStart("pipeline"));
+        addNestedPipeline(&subPipelineBob, --levelsToGo);
+        subPipelineBob.doneFast();
+        lookupBob.doneFast();
+        objectBob.doneFast();
+    };
+
+    // checkAuthForAggregate() should succeed for an aggregate command that has a deeply nested
+    // $lookup sub-pipeline chain. Each nested $lookup stage adds 3 to the depth of the command
+    // object. We set 'maxLookupDepth' depth to allow for a command object that is at or just under
+    // max BSONDepth.
+    const uint32_t aggregateCommandDepth = 1;
+    const uint32_t lookupDepth = 3;
+    const uint32_t maxLookupDepth =
+        (BSONDepth::getMaxAllowableDepth() - aggregateCommandDepth) / lookupDepth;
+
+    BSONObjBuilder cmdBuilder;
+    cmdBuilder << "aggregate" << testFooNss.coll();
+    BSONArrayBuilder pipelineBuilder(cmdBuilder.subarrayStart("pipeline"));
+    addNestedPipeline(&pipelineBuilder, maxLookupDepth);
+    pipelineBuilder.doneFast();
+
+    ASSERT_OK(authzSession->checkAuthForAggregate(testFooNss, cmdBuilder.obj(), false));
+}
+
 
 TEST_F(AuthorizationSessionTest, CannotAggregateGraphLookupWithoutFindOnJoinedNamespace) {
     authzSession->assumePrivilegesForDB(Privilege(testFooCollResource, {ActionType::find}));

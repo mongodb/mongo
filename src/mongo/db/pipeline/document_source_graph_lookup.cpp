@@ -51,24 +51,26 @@ namespace dps = ::mongo::dotted_path_support;
 
 std::unique_ptr<LiteParsedDocumentSourceForeignCollections> DocumentSourceGraphLookUp::liteParse(
     const AggregationRequest& request, const BSONElement& spec) {
-    uassert(40327,
+    uassert(ErrorCodes::FailedToParse,
             str::stream() << "the $graphLookup stage specification must be an object, but found "
                           << typeName(spec.type()),
             spec.type() == BSONType::Object);
 
     auto specObj = spec.Obj();
     auto fromElement = specObj["from"];
-    uassert(40328,
+    uassert(ErrorCodes::FailedToParse,
             str::stream() << "missing 'from' option to $graphLookup stage specification: "
                           << specObj,
             fromElement);
-    uassert(40329,
+    uassert(ErrorCodes::FailedToParse,
             str::stream() << "'from' option to $graphLookup must be a string, but was type "
                           << typeName(specObj["from"].type()),
             fromElement.type() == BSONType::String);
 
     NamespaceString nss(request.getNamespaceString().db(), fromElement.valueStringData());
-    uassert(40330, str::stream() << "invalid $graphLookup namespace: " << nss.ns(), nss.isValid());
+    uassert(ErrorCodes::InvalidNamespace,
+            str::stream() << "invalid $graphLookup namespace: " << nss.ns(),
+            nss.isValid());
     return stdx::make_unique<LiteParsedDocumentSourceForeignCollections>(std::move(nss));
 }
 
