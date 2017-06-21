@@ -32,12 +32,16 @@
 
 #include <map>
 #include <string>
+#include <vector>
 
 #include "mongo/base/static_assert.h"
 #include "mongo/base/status.h"
 #include "mongo/db/jsobj.h"
 #include "mongo/platform/atomic_proxy.h"
 #include "mongo/platform/atomic_word.h"
+#include "mongo/stdx/functional.h"
+#include "mongo/stdx/mutex.h"
+#include "mongo/util/stringutils.h"
 
 namespace mongo {
 
@@ -135,6 +139,131 @@ enum class ServerParameterType {
 };
 
 /**
+ * Lets you make server level settings easily configurable.
+ * Hooks into (set|get)Parameter, as well as command line processing
+ */
+template <typename T>
+class BoundServerParameter : public ServerParameter {
+private:
+    using setter = stdx::function<Status(const T&)>;
+    using getter = stdx::function<T()>;
+    using SPT = ServerParameterType;
+
+public:
+    BoundServerParameter(const std::string& name,
+                         const setter set,
+                         const getter get,
+                         SPT paramType = SPT::kStartupOnly)
+        : BoundServerParameter(ServerParameterSet::getGlobal(), name, set, get, paramType) {}
+
+    BoundServerParameter(ServerParameterSet* sps,
+                         const std::string& name,
+                         const setter set,
+                         const getter get,
+                         SPT paramType = SPT::kStartupOnly)
+        : ServerParameter(sps,
+                          name,
+                          paramType == SPT::kStartupOnly || paramType == SPT::kStartupAndRuntime,
+                          paramType == SPT::kRuntimeOnly || paramType == SPT::kStartupAndRuntime),
+          _setter(set),
+          _getter(get) {}
+    ~BoundServerParameter() override = default;
+
+    void append(OperationContext* opCtx, BSONObjBuilder& b, const std::string& name) override {
+        b.append(name, _getter());
+    }
+
+    Status set(const BSONElement& newValueElement) override {
+        T newValue;
+
+        if (!newValueElement.coerce(&newValue)) {
+            return Status(ErrorCodes::BadValue, "Can't coerce value");
+        }
+
+        return _setter(newValue);
+    }
+
+    Status setFromString(const std::string& str) override;
+
+private:
+    const setter _setter;
+    const getter _getter;
+};
+
+template <>
+inline Status BoundServerParameter<bool>::setFromString(const std::string& str) {
+    if ((str == "1") || (str == "true")) {
+        return _setter(true);
+    }
+    if ((str == "0") || (str == "false")) {
+        return _setter(false);
+    }
+    return Status(ErrorCodes::BadValue, "Value is not a valid boolean");
+}
+
+template <>
+inline Status BoundServerParameter<std::string>::setFromString(const std::string& str) {
+    return _setter(str);
+}
+
+template <>
+inline Status BoundServerParameter<std::vector<std::string>>::setFromString(
+    const std::string& str) {
+    std::vector<std::string> v;
+    splitStringDelim(str, &v, ',');
+    return _setter(v);
+}
+
+template <typename T>
+inline Status BoundServerParameter<T>::setFromString(const std::string& str) {
+    T value;
+    Status status = parseNumberFromString(str, &value);
+    if (!status.isOK()) {
+        return status;
+    }
+    return _setter(value);
+}
+
+template <typename T>
+class LockedServerParameter : public BoundServerParameter<T> {
+private:
+    using SPT = ServerParameterType;
+
+public:
+    LockedServerParameter(const std::string& name,
+                          const T& initval,
+                          SPT paramType = SPT::kStartupAndRuntime)
+        : LockedServerParameter(ServerParameterSet::getGlobal(), name, initval, paramType) {}
+
+    LockedServerParameter(ServerParameterSet* sps,
+                          const std::string& name,
+                          const T& initval,
+                          SPT paramType = SPT::kStartupAndRuntime)
+        : BoundServerParameter<T>(sps,
+                                  name,
+                                  [this](const T& v) { return setLocked(v); },
+                                  [this]() { return getLocked(); },
+                                  paramType),
+          _value(initval) {}
+    ~LockedServerParameter() override = default;
+
+    Status setLocked(const T& value) {
+        stdx::unique_lock<stdx::mutex> lk(_mutex);
+        _value = value;
+        return Status::OK();
+    }
+
+    T getLocked() const {
+        stdx::unique_lock<stdx::mutex> lk(_mutex);
+        return _value;
+    }
+
+private:
+    mutable stdx::mutex _mutex;
+    T _value;
+};
+
+/**
  * Type trait for ServerParameterType to identify which types are safe to use at runtime because
  * they have std::atomic or equivalent types.
  */
@@ -164,35 +293,59 @@ template <typename T, ServerParameterType paramType>
 class server_parameter_storage_type {
 public:
     using value_type = AtomicWord<T>;
+    static T get(value_type* v) {
+        return v->load();
+    }
+    static void set(value_type* v, const T& newValue) {
+        v->store(newValue);
+    }
 };
 
 template <typename T>
 class server_parameter_storage_type<T, ServerParameterType::kStartupOnly> {
 public:
     using value_type = T;
+    static T get(value_type* v) {
+        return *v;
+    }
+    static void set(value_type* v, const T& newValue) {
+        *v = newValue;
+    }
 };
 
 template <>
 class server_parameter_storage_type<double, ServerParameterType::kRuntimeOnly> {
 public:
     using value_type = AtomicDouble;
+    static double get(value_type* v) {
+        return v->load();
+    }
+    static void set(value_type* v, const double& newValue) {
+        v->store(newValue);
+    }
 };
 
 template <>
 class server_parameter_storage_type<double, ServerParameterType::kStartupAndRuntime> {
 public:
     using value_type = AtomicDouble;
+    static double get(value_type* v) {
+        return v->load();
+    }
+    static void set(value_type* v, const double& newValue) {
+        v->store(newValue);
+    }
 };
 
 /**
- * Implementation of ServerParameter for reading and writing a server parameter with a given
+ * Implementation of BoundServerParameter for reading and writing a server parameter with a given
  * name and type into a specific C++ variable.
  *
  * NOTE: ServerParameters set at runtime can be read or written to at anytime, and are not
  * thread-safe without atomic types or other concurrency techniques.
  */
 template <typename T, ServerParameterType paramType>
-class ExportedServerParameter : public ServerParameter {
+class ExportedServerParameter : public BoundServerParameter<T> {
 public:
     MONGO_STATIC_ASSERT_MSG(paramType == ServerParameterType::kStartupOnly ||
                                 is_safe_runtime_parameter_type<T>::value,
@@ -209,21 +362,28 @@ public:
      * may be set at runtime, e.g.  via the setParameter command.
      */
     ExportedServerParameter(ServerParameterSet* sps, const std::string& name, storage_type* value)
-        : ServerParameter(sps,
-                          name,
-                          paramType == ServerParameterType::kStartupOnly ||
-                              paramType == ServerParameterType::kStartupAndRuntime,
-                          paramType == ServerParameterType::kRuntimeOnly ||
-                              paramType == ServerParameterType::kStartupAndRuntime),
+        : BoundServerParameter<T>(
+              sps,
+              name,
+              [this](const T& v) { return set(v); },
+              [this] { return server_parameter_storage_type<T, paramType>::get(_value); },
+              paramType),
           _value(value) {}
-    virtual ~ExportedServerParameter() {}
+    ~ExportedServerParameter() override {}
 
-    virtual void append(OperationContext* opCtx, BSONObjBuilder& b, const std::string& name);
+    // Don't let the template method hide our inherited method
+    Status set(const BSONElement& newValueElement) override {
+        return BoundServerParameter<T>::set(newValueElement);
+    }
 
-    virtual Status set(const BSONElement& newValueElement);
-    virtual Status set(const T& newValue);
-
-    virtual Status setFromString(const std::string& str);
+    virtual Status set(const T& newValue) {
+        auto const status = validate(newValue);
+        if (!status.isOK()) {
+            return status;
+        }
+        server_parameter_storage_type<T, paramType>::set(_value, newValue);
+        return Status::OK();
+    }
 
 protected:
     virtual Status validate(const T& potentialNewValue) {
@@ -257,5 +417,3 @@ protected:
  */
 #define MONGO_EXPORT_RUNTIME_SERVER_PARAMETER(NAME, TYPE, INITIAL_VALUE) \
     MONGO_EXPORT_SERVER_PARAMETER_IMPL(NAME, TYPE, INITIAL_VALUE, ServerParameterType::kRuntimeOnly)
-
-#include "server_parameters_inline.h"
