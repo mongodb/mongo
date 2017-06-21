@@ -832,17 +832,17 @@ bool DBClientReplicaSet::recv(Message& m) {
     }
 }
 
-void DBClientReplicaSet::checkResponse(const char* data,
-                                       int nReturned,
+void DBClientReplicaSet::checkResponse(const std::vector<BSONObj>& batch,
+                                       bool networkError,
                                        bool* retry,
                                        string* targetHost) {
     // For now, do exactly as we did before, so as not to break things.  In general though, we
     // should fix this so checkResponse has a more consistent contract.
     if (!retry) {
         if (_lazyState._lastClient)
-            return _lazyState._lastClient->checkResponse(data, nReturned);
+            return _lazyState._lastClient->checkResponse(batch, networkError);
         else
-            return checkMaster()->checkResponse(data, nReturned);
+            return checkMaster()->checkResponse(batch, networkError);
     }
 
     *retry = false;
@@ -855,23 +855,22 @@ void DBClientReplicaSet::checkResponse(const char* data,
         return;
 
     // nReturned == 1 means that we got one result back, which might be an error
-    // nReturned == -1 is a sentinel value for "no data returned" aka (usually) network problem
+    // networkError is a sentinel value for "no data returned" aka (usually) network problem
     // If neither, this must be a query result so our response is ok wrt the replica set
-    if (nReturned != 1 && nReturned != -1)
+    if (batch.size() != 1 && !networkError)
         return;
 
     BSONObj dataObj;
-    if (nReturned == 1)
-        dataObj = BSONObj(data);
+    if (batch.size() == 1)
+        dataObj = batch[0];
 
     // Check if we should retry here
     if (_lazyState._lastOp == dbQuery && _lazyState._secondaryQueryOk) {
         // query could potentially go to a secondary, so see if this is an error (or empty) and
         // retry if we're not past our retry limit.
 
-        if (nReturned == -1 /* no result, maybe network problem */ ||
-            (hasErrField(dataObj) && !dataObj["code"].eoo() &&
-             dataObj["code"].Int() == ErrorCodes::NotMasterOrSecondary)) {
+        if (networkError || (hasErrField(dataObj) && !dataObj["code"].eoo() &&
+                             dataObj["code"].Int() == ErrorCodes::NotMasterOrSecondary)) {
             if (_lazyState._lastClient == _lastSlaveOkConn.get()) {
                 isntSecondary();
             } else if (_lazyState._lastClient == _master.get()) {
@@ -893,9 +892,8 @@ void DBClientReplicaSet::checkResponse(const char* data,
     } else if (_lazyState._lastOp == dbQuery) {
         // if query could not potentially go to a secondary, just mark the master as bad
 
-        if (nReturned == -1 /* no result, maybe network problem */ ||
-            (hasErrField(dataObj) && !dataObj["code"].eoo() &&
-             dataObj["code"].Int() == ErrorCodes::NotMasterNoSlaveOk)) {
+        if (networkError || (hasErrField(dataObj) && !dataObj["code"].eoo() &&
+                             dataObj["code"].Int() == ErrorCodes::NotMasterNoSlaveOk)) {
             if (_lazyState._lastClient == _master.get()) {
                 isntMaster();
             }

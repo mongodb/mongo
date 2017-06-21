@@ -172,7 +172,7 @@ protected:
             DBDirectClient db(&_opCtx);
             auto cursor = db.query(cllNS(), BSONObj());
             while (cursor->more()) {
-                ops.push_back(cursor->nextSafeOwned());
+                ops.push_back(cursor->nextSafe());
             }
         }
         {

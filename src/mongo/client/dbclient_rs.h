@@ -133,8 +133,8 @@ public:
 
     virtual void say(Message& toSend, bool isRetry = false, std::string* actualServer = 0);
     virtual bool recv(Message& toRecv);
-    virtual void checkResponse(const char* data,
-                               int nReturned,
+    virtual void checkResponse(const std::vector<BSONObj>& batch,
+                               bool networkError,
                                bool* retry = NULL,
                                std::string* targetHost = NULL);
 

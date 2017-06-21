@@ -370,8 +370,8 @@ public:
     }
 
     // In general, for lazy queries, we'll need to say, recv, then checkResponse
-    virtual void checkResponse(const char* data,
-                               int nReturned,
+    virtual void checkResponse(const std::vector<BSONObj>& batch,
+                               bool networkError,
                                bool* retry = nullptr,
                                std::string* targetHost = nullptr) {
         if (retry)
@@ -1097,8 +1097,8 @@ public:
 
     virtual void say(Message& toSend, bool isRetry = false, std::string* actualServer = 0);
     virtual bool recv(Message& m);
-    virtual void checkResponse(const char* data,
-                               int nReturned,
+    virtual void checkResponse(const std::vector<BSONObj>& batch,
+                               bool networkError,
                                bool* retry = NULL,
                                std::string* host = NULL);
     virtual bool call(Message& toSend, Message& response, bool assertOk, std::string* actualServer);

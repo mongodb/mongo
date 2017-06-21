@@ -70,7 +70,7 @@ public:
         then perhaps stop.
     */
     int objsLeftInBatch() const {
-        return _putBack.size() + batch.nReturned - batch.pos;
+        return _putBack.size() + batch.objs.size() - batch.pos;
     }
     bool moreInCurrentBatch() {
         return objsLeftInBatch() > 0;
@@ -81,9 +81,6 @@ public:
        on an error at the remote server, you will get back:
          { $err: <std::string> }
        if you do not want to handle that yourself, call nextSafe().
-
-       Warning: The returned BSONObj will become invalid after the next batch
-           is fetched or when this cursor is destroyed.
     */
     BSONObj next();
 
@@ -96,11 +93,6 @@ public:
 
     /** throws AssertionException if get back { $err : ... } */
     BSONObj nextSafe();
-    BSONObj nextSafeOwned() {
-        BSONObj out = nextSafe();
-        out.shareOwnershipWith(batch.m.sharedBuffer());
-        return out;
-    }
 
     /** peek ahead at items buffered for future next() calls.
         never requests new data from the server.  so peek only effective
@@ -193,10 +185,6 @@ public:
         return ns;
     }
 
-    Message* getMessage() {
-        return &batch.m;
-    }
-
     /**
      * actually does the query
      */
@@ -204,19 +192,6 @@ public:
 
     void initLazy(bool isRetry = false);
     bool initLazyFinish(bool& retry);
-
-    class Batch {
-        MONGO_DISALLOW_COPYING(Batch);
-        friend class DBClientCursor;
-        Message m;
-        int nReturned{0};
-        int pos{0};
-        const char* data{nullptr};
-        int remainingBytes{0};
-
-    public:
-        Batch() = default;
-    };
 
     /**
      * For exhaust. Used in DBClientConnection.
@@ -248,6 +223,11 @@ private:
 
     int nextBatchSize();
 
+    struct Batch {
+        std::vector<BSONObj> objs;
+        size_t pos = 0;
+    };
+
     Batch batch;
     DBClientBase* _client;
     std::string _originalHost;
@@ -269,19 +249,19 @@ private:
     bool wasError;
     BSONVersion _enabledBSONVersion;
 
-    void dataReceived() {
+    void dataReceived(const Message& reply) {
         bool retry;
         std::string lazyHost;
-        dataReceived(retry, lazyHost);
+        dataReceived(reply, retry, lazyHost);
     }
-    void dataReceived(bool& retry, std::string& lazyHost);
+    void dataReceived(const Message& reply, bool& retry, std::string& lazyHost);
 
     /**
      * Called by dataReceived when the query was actually a command. Parses the command reply
      * according to the RPC protocol used to send it, and then fills in the internal field
      * of this cursor with the received data.
      */
-    void commandDataReceived();
+    void commandDataReceived(const Message& reply);
 
     void requestMore();
 

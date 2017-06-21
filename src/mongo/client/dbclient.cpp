@@ -650,7 +650,7 @@ void DBClientInterface::findN(vector<BSONObj>& out,
     for (int i = 0; i < nToReturn; i++) {
         if (!c->more())
             break;
-        out.push_back(c->nextSafeOwned());
+        out.push_back(c->nextSafe());
     }
 }
 
@@ -1376,7 +1376,10 @@ bool hasErrField(const BSONObj& o) {
     return !getErrField(o).eoo();
 }
 
-void DBClientConnection::checkResponse(const char* data, int nReturned, bool* retry, string* host) {
+void DBClientConnection::checkResponse(const std::vector<BSONObj>& batch,
+                                       bool networkError,
+                                       bool* retry,
+                                       string* host) {
     /* check for errors.  the only one we really care about at
      * this stage is "not master"
     */
@@ -1384,10 +1387,8 @@ void DBClientConnection::checkResponse(const char* data, int nReturned, bool* re
     *retry = false;
     *host = _serverAddress.toString();
 
-    if (!_parentReplSetName.empty() && nReturned) {
-        verify(data);
-        BSONObj bsonView(data);
-        handleNotMasterResponse(getErrField(bsonView));
+    if (!_parentReplSetName.empty() && !batch.empty()) {
+        handleNotMasterResponse(getErrField(batch[0]));
     }
 }
 
