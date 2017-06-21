@@ -34,6 +34,7 @@
 #include "mongo/db/jsobj.h"
 #include "mongo/db/keypattern.h"
 #include "mongo/db/namespace_string.h"
+#include "mongo/util/uuid.h"
 
 namespace mongo {
 
@@ -60,6 +61,7 @@ class StatusWith;
  *          "locale" : "fr_CA"
  *      },
  *      "unique" : false,
+ *      "uuid" : UUID,
  *      "noBalance" : false
  *   }
  *
@@ -75,6 +77,7 @@ public:
     static const BSONField<BSONObj> keyPattern;
     static const BSONField<BSONObj> defaultCollation;
     static const BSONField<bool> unique;
+    static const BSONField<UUID> uuid;
 
     /**
      * Constructs a new DatabaseType object from BSON. Also does validation of the contents.
@@ -142,6 +145,14 @@ public:
         _unique = unique;
     }
 
+    boost::optional<UUID> getUUID() const {
+        return _uuid;
+    }
+
+    void setUUID(UUID uuid) {
+        _uuid = uuid;
+    }
+
     bool getAllowBalance() const {
         return _allowBalance.get_value_or(true);
     }
@@ -169,6 +180,9 @@ private:
 
     // Optional uniqueness of the sharding key. If missing, implies false.
     boost::optional<bool> _unique;
+
+    // Optional in 3.6 binaries, because UUID does not exist in featureCompatibilityVersion=3.4.
+    boost::optional<UUID> _uuid;
 
     // Optional whether balancing is allowed for this collection. If missing, implies true.
     boost::optional<bool> _allowBalance;

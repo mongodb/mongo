@@ -64,7 +64,12 @@ public:
     static constexpr int kNumBytes = sizeof(UUIDStorage);
 
     /**
-     * Generates a new random v4 UUID per RFC 4122.
+     * Creates an empty UUID.
+     */
+    UUID() = default;
+
+    /**
+     * Generate a new random v4 UUID per RFC 4122.
      */
     static UUID gen();
 
@@ -151,8 +156,6 @@ public:
     };
 
 private:
-    UUID() = default;
-
     UUID(const UUIDStorage& uuid) : _uuid(uuid) {}
 
     UUIDStorage _uuid;  // UUID in network byte order
