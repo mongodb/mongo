@@ -88,6 +88,31 @@ ExportedServerParameter<bool, ServerParameterType::kStartupOnly>
                                             "disableNonSSLConnectionLogging",
                                             &sslGlobalParams.disableNonSSLConnectionLogging);
 
+class OpenSSLCipherConfigParameter
+    : public ExportedServerParameter<std::string, ServerParameterType::kStartupOnly> {
+public:
+    OpenSSLCipherConfigParameter()
+        : ExportedServerParameter<std::string, ServerParameterType::kStartupOnly>(
+              ServerParameterSet::getGlobal(),
+              "opensslCipherConfig",
+              &sslGlobalParams.sslCipherConfig) {}
+    Status validate(const std::string& potentialNewValue) final {
+        if (!sslGlobalParams.sslCipherConfig.empty()) {
+            return Status(
+                ErrorCodes::BadValue,
+                "opensslCipherConfig setParameter is incompatible with net.ssl.sslCipherConfig");
+        }
+        // Note that there is very little validation that we can do here.
+        // OpenSSL exposes no API to validate a cipher config string. The only way to figure out
+        // what a string maps to is to make an SSL_CTX object, set the string on it, then parse the
+        // resulting STACK_OF object. If provided an invalid entry in the string, it will silently
+        // ignore it. Because an entry in the string may map to multiple ciphers, or remove ciphers
+        // from the final set produced by the full string, we can't tell if any entry failed
+        // to parse.
+        return Status::OK();
+    }
+} openSSLCipherConfig;
+
 #ifdef MONGO_CONFIG_SSL
 // Old copies of OpenSSL will not have constants to disable protocols they don't support.
 // Define them to values we can OR together safely to generically disable these protocols across
