@@ -917,6 +917,17 @@ TEST(PipelineOptimizationTest, MatchOnArrayFieldCanSplitAcrossRenameWithMapAndAd
     assertPipelineOptimizesTo(inputPipe, outputPipe);
 }
 
+TEST(PipelineOptimizationTest, MatchCannotSwapWithLimit) {
+    string pipeline = "[{$limit: 3}, {$match: {x: {$gt: 0}}}]";
+    assertPipelineOptimizesTo(pipeline, pipeline);
+}
+
+TEST(PipelineOptimizationTest, MatchCannotSwapWithSortLimit) {
+    string inputPipe = "[{$sort: {x: -1}}, {$limit: 3}, {$match: {x: {$gt: 0}}}]";
+    string outputPipe = "[{$sort: {sortKey: {x: -1}, limit: 3}}, {$match: {x: {$gt: 0}}}]";
+    assertPipelineOptimizesAndSerializesTo(inputPipe, outputPipe, inputPipe);
+}
+
 }  // namespace Local
 
 namespace Sharded {
