@@ -418,7 +418,10 @@ class _CppHeaderFileWriter(_CppFileWriterBase):
         member_type = cpp_type_info.get_storage_type()
         member_name = _get_field_member_name(field)
 
-        self._writer.write_line('%s %s;' % (member_type, member_name))
+        if field.default:
+            self._writer.write_line('%s %s{%s};' % (member_type, member_name, field.default))
+        else:
+            self._writer.write_line('%s %s;' % (member_type, member_name))
 
     def gen_string_constants_declarations(self, struct):
         # type: (ast.Struct) -> None

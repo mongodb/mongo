@@ -127,8 +127,7 @@ TEST_F(ReplicationProcessTest, GetRollbackProgressReturnsBadStatusIfApplyUntilFi
     ReplicationProcess replicationProcess(
         _storageInterface.get(),
         stdx::make_unique<ReplicationConsistencyMarkersImpl>(_storageInterface.get()));
-    ASSERT_EQUALS(mongo::AssertionException::convertExceptionCode(40410),
-                  replicationProcess.getRollbackProgress(opCtx.get()));
+    ASSERT_EQUALS(ErrorCodes::TypeMismatch, replicationProcess.getRollbackProgress(opCtx.get()));
 }
 
 TEST_F(ReplicationProcessTest,

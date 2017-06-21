@@ -323,8 +323,7 @@ TEST_F(StorageInterfaceImplTest, GetRollbackIDReturnsBadStatusIfRollbackIDIsNotI
                               << StorageInterfaceImpl::kRollbackIdFieldName
                               << "bad id")};
     ASSERT_OK(storage.insertDocuments(opCtx, nss, badDoc));
-    ASSERT_EQUALS(mongo::AssertionException::convertExceptionCode(40410),
-                  storage.getRollbackID(opCtx).getStatus());
+    ASSERT_EQUALS(ErrorCodes::TypeMismatch, storage.getRollbackID(opCtx).getStatus());
 }
 
 TEST_F(StorageInterfaceImplTest, SnapshotSupported) {
