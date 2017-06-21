@@ -86,6 +86,29 @@ private:
 };
 
 /**
+ * Used to notify the catalog cache loader of a new collection version.
+ */
+class CollectionVersionLogOpHandler final : public RecoveryUnit::Change {
+public:
+    CollectionVersionLogOpHandler(OperationContext* opCtx,
+                                  const NamespaceString& nss,
+                                  const ChunkVersion& updatedVersion)
+        : _opCtx(opCtx), _nss(nss), _updatedVersion(updatedVersion) {}
+
+    void commit() override {
+        Grid::get(_opCtx)->catalogCache()->notifyOfCollectionVersionUpdate(
+            _opCtx, _nss, _updatedVersion);
+    }
+
+    void rollback() override {}
+
+private:
+    OperationContext* _opCtx;
+    const NamespaceString _nss;
+    const ChunkVersion _updatedVersion;
+};
+
+/**
  * Checks via the ReplicationCoordinator whether this server is a primary/standalone that can do
  * writes. This function may return false if the server is primary but in drain mode.
  *
@@ -290,13 +313,12 @@ void CollectionShardingState::onUpdateOp(OperationContext* opCtx,
                                          const BSONObj& updatedDoc) {
     dassert(opCtx->lockState()->isCollectionLockedForMode(_nss.ns(), MODE_IX));
 
-    // TODO: should this be before or after my new code????
-    checkShardVersionOrThrow(opCtx);
-
     if (serverGlobalParams.clusterRole == ClusterRole::ShardServer &&
         _nss == NamespaceString::kShardConfigCollectionsCollectionName) {
-        _onConfigRefreshCompleteInvalidateCachedMetadata(opCtx, query, update);
+        _onConfigRefreshCompleteInvalidateCachedMetadataAndNotify(opCtx, query, update, updatedDoc);
     }
+
+    checkShardVersionOrThrow(opCtx);
 
     if (_sourceMgr) {
         _sourceMgr->getCloner()->onUpdateOp(opCtx, updatedDoc);
@@ -309,7 +331,7 @@ void CollectionShardingState::onDeleteOp(OperationContext* opCtx,
 
     if (serverGlobalParams.clusterRole == ClusterRole::ShardServer) {
         if (_nss == NamespaceString::kShardConfigCollectionsCollectionName) {
-            _onConfigDeleteInvalidateCachedMetadata(opCtx, deleteState.idDoc);
+            _onConfigDeleteInvalidateCachedMetadataAndNotify(opCtx, deleteState.idDoc);
         }
 
         if (_nss == NamespaceString::kServerConfigurationNamespace) {
@@ -382,13 +404,14 @@ void CollectionShardingState::onDropCollection(OperationContext* opCtx,
     }
 }
 
-void CollectionShardingState::_onConfigRefreshCompleteInvalidateCachedMetadata(
-    OperationContext* opCtx, const BSONObj& query, const BSONObj& update) {
+void CollectionShardingState::_onConfigRefreshCompleteInvalidateCachedMetadataAndNotify(
+    OperationContext* opCtx,
+    const BSONObj& query,
+    const BSONObj& update,
+    const BSONObj& updatedDoc) {
     dassert(opCtx->lockState()->isCollectionLockedForMode(_nss.ns(), MODE_IX));
     invariant(serverGlobalParams.clusterRole == ClusterRole::ShardServer);
 
-    // If not primary, check whether a chunk metadata refresh just finished and invalidate the
-    // catalog cache's in-memory chunk metadata cache if true.
     if (!isPrimary(opCtx, _nss)) {
         // Extract which collection entry is being updated
         std::string refreshCollection;
@@ -396,28 +419,44 @@ void CollectionShardingState::_onConfigRefreshCompleteInvalidateCachedMetadata(
             40477,
             bsonExtractStringField(query, ShardCollectionType::uuid.name(), &refreshCollection));
 
-        // Parse the '$set' update, which will contain the 'refreshSequenceNumber' if it is present.
+        // Parse the '$set' update, which will contain the 'lastRefreshedCollectionVersion' if it is
+        // present.
         BSONElement updateElement;
         fassertStatusOK(40478,
                         bsonExtractTypedField(update, StringData("$set"), Object, &updateElement));
         BSONObj setField = updateElement.Obj();
 
-        // The lastRefreshedCollectionVersion is only updated when a chunk metadata refresh
-        // completes.
+        // If 'lastRefreshedCollectionVersion' is present, then a refresh completed and the catalog
+        // cache must be invalidated and the catalog cache loader notified of the new version.
         if (setField.hasField(ShardCollectionType::lastRefreshedCollectionVersion.name())) {
-            Grid::get(opCtx)->catalogCache()->invalidateShardedCollection(refreshCollection);
+            // Get the version epoch from the 'updatedDoc', since it didn't get updated and won't be
+            // in 'update'.
+            BSONElement oidElem;
+            fassert(40513,
+                    bsonExtractTypedField(
+                        updatedDoc, ShardCollectionType::epoch(), BSONType::jstOID, &oidElem));
+
+            // Get the new collection version.
+            auto statusWithLastRefreshedChunkVersion =
+                ChunkVersion::parseFromBSONWithFieldAndSetEpoch(
+                    updatedDoc,
+                    ShardCollectionType::lastRefreshedCollectionVersion(),
+                    oidElem.OID());
+            fassert(40514, statusWithLastRefreshedChunkVersion.isOK());
+
+            opCtx->recoveryUnit()->registerChange(
+                new CollectionVersionLogOpHandler(opCtx,
+                                                  NamespaceString(refreshCollection),
+                                                  statusWithLastRefreshedChunkVersion.getValue()));
         }
     }
 }
 
-void CollectionShardingState::_onConfigDeleteInvalidateCachedMetadata(OperationContext* opCtx,
-                                                                      const BSONObj& query) {
+void CollectionShardingState::_onConfigDeleteInvalidateCachedMetadataAndNotify(
+    OperationContext* opCtx, const BSONObj& query) {
     dassert(opCtx->lockState()->isCollectionLockedForMode(_nss.ns(), MODE_IX));
     invariant(serverGlobalParams.clusterRole == ClusterRole::ShardServer);
 
-    // If not primary, invalidate the catalog cache's in-memory chunk metadata cache for the
-    // collection specified in 'query'. The collection metadata has been dropped, so the cached
-    // metadata must be invalidated.
     if (!isPrimary(opCtx, _nss)) {
         // Extract which collection entry is being deleted from the _id field.
         std::string deletedCollection;
@@ -425,7 +464,8 @@ void CollectionShardingState::_onConfigDeleteInvalidateCachedMetadata(OperationC
             40479,
             bsonExtractStringField(query, ShardCollectionType::uuid.name(), &deletedCollection));
 
-        Grid::get(opCtx)->catalogCache()->invalidateShardedCollection(deletedCollection);
+        opCtx->recoveryUnit()->registerChange(new CollectionVersionLogOpHandler(
+            opCtx, NamespaceString(deletedCollection), ChunkVersion::UNSHARDED()));
     }
 }
 

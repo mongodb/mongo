@@ -35,8 +35,11 @@
 #include "mongo/db/client.h"
 #include "mongo/db/operation_context.h"
 #include "mongo/db/s/shard_metadata_util.h"
+#include "mongo/db/s/version_notifications.h"
 #include "mongo/s/catalog/type_shard_collection.h"
+#include "mongo/s/catalog_cache.h"
 #include "mongo/s/config_server_catalog_cache_loader.h"
+#include "mongo/s/grid.h"
 #include "mongo/stdx/memory.h"
 #include "mongo/util/concurrency/thread_pool.h"
 #include "mongo/util/log.h"
@@ -224,10 +227,75 @@ StatusWith<CollectionAndChangedChunks> getPersistedMetadataSinceVersion(Operatio
 
 }  // namespace
 
+void ShardServerCatalogCacheLoader::notifyOfCollectionVersionUpdate(OperationContext* opCtx,
+                                                                    const NamespaceString& nss,
+                                                                    const ChunkVersion& version) {
+    Grid::get(opCtx)->catalogCache()->invalidateShardedCollection(nss);
+
+    stdx::lock_guard<stdx::mutex> lock(_mutex);
+    _versionNotifications->setAndNotifyIfNewEpochOrGTE(nss, version);
+}
+
+void ShardServerCatalogCacheLoader::waitForVersion(OperationContext* opCtx,
+                                                   const NamespaceString& nss,
+                                                   const ChunkVersion& version,
+                                                   const bool greaterVersion) {
+    stdx::unique_lock<stdx::mutex> lock(_mutex);
+
+    // Register the version we're waiting for so that we will receive updates.
+    ScopedVersionNotification notification =
+        _versionNotifications->createNotification(nss, version);
+
+    // The version we're waiting for could have arrived either before the version was registered or
+    // since the version has been registered. So we'll load the persisted version in case of the
+    // former, and check the registered version (under a mutex) for updates for the latter.
+
+    // Release the mutex for the disk read.
+    lock.unlock();
+    RefreshState refreshState = uassertStatusOK(getPersistedRefreshFlags(opCtx, nss));
+
+    // Reacquire the mutex so we can check for any registered version updates and safely start
+    // waiting without missing any updates.
+    lock.lock();
+
+    if (greaterVersion) {
+        if (refreshState.lastRefreshedCollectionVersion.epoch() != version.epoch() ||
+            refreshState.lastRefreshedCollectionVersion > version ||
+            notification.version().epoch() != version.epoch() || notification.version() > version) {
+            // The version has already arrived, no need to wait.
+            return;
+        }
+
+        if (refreshState.lastRefreshedCollectionVersion <= version) {
+            opCtx->waitForConditionOrInterrupt(*(notification.condVar()), lock, [&]() -> bool {
+                return notification.version().epoch() != version.epoch() ||
+                    notification.version() > version;
+            });
+        }
+    } else {
+        if (refreshState.lastRefreshedCollectionVersion.epoch() != version.epoch() ||
+            refreshState.lastRefreshedCollectionVersion >= version ||
+            notification.version().epoch() != version.epoch() ||
+            notification.version() >= version) {
+            // The version has already arrived, no need to wait.
+            return;
+        }
+
+        if (refreshState.lastRefreshedCollectionVersion <= version) {
+
+            opCtx->waitForConditionOrInterrupt(*(notification.condVar()), lock, [&]() -> bool {
+                return notification.version().epoch() != version.epoch() ||
+                    notification.version() >= version;
+            });
+        }
+    }
+}
+
 ShardServerCatalogCacheLoader::ShardServerCatalogCacheLoader(
     std::unique_ptr<CatalogCacheLoader> configLoader)
     : _configServerLoader(std::move(configLoader)), _threadPool(makeDefaultThreadPoolOptions()) {
     _threadPool.startup();
+    _versionNotifications = stdx::make_unique<VersionNotifications>();
 }
 
 ShardServerCatalogCacheLoader::~ShardServerCatalogCacheLoader() {

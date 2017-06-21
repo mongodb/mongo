@@ -31,6 +31,16 @@ env.Library(
 )
 
 env.Library(
+    target='version_notifications',
+    source=[
+        'version_notifications.cpp',
+    ],
+    LIBDEPS=[
+        '$BUILD_DIR/mongo/base',
+    ],
+)
+
+env.Library(
     target='sharding_task_executor',
     source=[
         'sharding_task_executor.cpp',
@@ -111,6 +121,7 @@ env.Library(
         'shard_metadata_util',
         'sharding_task_executor',
         'type_shard_identity',
+        'version_notifications',
         #'$BUILD_DIR/mongo/db/dbhelpers', # CYCLE
         #'$BUILD_DIR/mongo/db/ops/write_ops', # CYCLE
         #'$BUILD_DIR/mongo/s/catalog/sharding_catalog_manager_impl', # CYCLE
@@ -206,6 +217,16 @@ env.Library(
         'collection_metadata',
         'sharding',
     ],
+)
+
+env.CppUnitTest(
+    target='version_notifications_test',
+    source=[
+        'version_notifications_test.cpp',
+    ],
+    LIBDEPS=[
+        'version_notifications',
+    ]
 )
 
 env.CppUnitTest(

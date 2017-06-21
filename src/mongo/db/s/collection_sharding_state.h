@@ -222,34 +222,42 @@ public:
 
 private:
     /**
-     * On shard secondaries, invalidates the catalog cache's in-memory routing table for the
-     * collection specified in the _id field of 'query' if 'update' bumps the refreshSequenceNumber
-     * -- meaning a chunk metadata refresh finished being applied to the collection's locally
-     * persisted metadata store. Invalidating the catalog cache's routing table will provoke a
-     * routing table refresh next time the routing table is requested and the new metadata updates
-     * will be found.
+     * Registers a task on the opCtx -- to run after writes from the oplog are committed and visible
+     * to reads -- to notify the catalog cache loader of a new collection version. The catalog
+     * cache's routing table for the collection will also be invalidated at that time so that the
+     * next caller to the catalog cache for routing information will provoke a routing table
+     * refresh.
+     *
+     * This only runs on secondaries, and only when 'lastRefreshedCollectionVersion' is in 'update',
+     * meaning a chunk metadata refresh finished being applied to the collection's locally persisted
+     * metadata store.
      *
      * query - BSON with an _id that identifies which collections entry is being updated.
-     * update - the $set update being applied to the collections entry.
+     * update - the update being applied to the collections entry.
+     * updatedDoc - the document identified by 'query' with the 'update' applied.
      *
      * The global exclusive lock is expected to be held by the caller.
      */
-    void _onConfigRefreshCompleteInvalidateCachedMetadata(OperationContext* opCtx,
-                                                          const BSONObj& query,
-                                                          const BSONObj& update);
+    void _onConfigRefreshCompleteInvalidateCachedMetadataAndNotify(OperationContext* opCtx,
+                                                                   const BSONObj& query,
+                                                                   const BSONObj& update,
+                                                                   const BSONObj& updatedDoc);
 
     /**
-     * On secondaries, invalidates the catalog cache's in-memory routing table for the collection
-     * specified in the _id field of 'query' because the collection entry has been deleted as part
-     * of dropping the data collection. Invalidating the catalog cache's routing table will provoke
-     * a routing table refresh next time the routing table is requested and the metadata update will
-     * be discovered.
+     * Registers a task on the opCtx -- to run after writes from the oplog are committed and visible
+     * to reads -- to notify the catalog cache loader of a new collection version. The catalog
+     * cache's routing table for the collection will also be invalidated at that time so that the
+     * next caller to the catalog cache for routing information will provoke a routing table
+     * refresh.
+     *
+     * This only runs on secondaries
      *
      * query - BSON with an _id field that identifies which collections entry is being updated.
      *
      * The global exclusive lock is expected to be held by the caller.
      */
-    void _onConfigDeleteInvalidateCachedMetadata(OperationContext* opCtx, const BSONObj& query);
+    void _onConfigDeleteInvalidateCachedMetadataAndNotify(OperationContext* opCtx,
+                                                          const BSONObj& query);
 
     /**
      * Checks whether the shard version of the operation matches that of the collection.

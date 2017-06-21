@@ -172,6 +172,12 @@ void CatalogCache::onStepUp() {
     _cacheLoader->onStepUp();
 }
 
+void CatalogCache::notifyOfCollectionVersionUpdate(OperationContext* opCtx,
+                                                   const NamespaceString& nss,
+                                                   const ChunkVersion& version) {
+    _cacheLoader->notifyOfCollectionVersionUpdate(opCtx, nss, version);
+}
+
 StatusWith<CachedDatabaseInfo> CatalogCache::getDatabase(OperationContext* opCtx,
                                                          StringData dbName) {
     try {

@@ -89,6 +89,13 @@ public:
     virtual void onStepUp() = 0;
 
     /**
+     * Notifies the loader that the persisted collection version for 'nss' has been updated.
+     */
+    virtual void notifyOfCollectionVersionUpdate(OperationContext* opCtx,
+                                                 const NamespaceString& nss,
+                                                 const ChunkVersion& version) = 0;
+
+    /**
      * Non-blocking call, which requests the chunks changed since the specified version to be
      * fetched from the persistent metadata store and invokes the callback function with the result.
      * The callback function must never throw - it is a fatal error to do so.

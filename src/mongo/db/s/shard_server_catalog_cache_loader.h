@@ -35,6 +35,7 @@ namespace mongo {
 
 class ConfigServerCatalogCacheLoader;
 class ThreadPoolInterface;
+class VersionNotifications;
 
 /**
  * Shard implementation of the CatalogCacheLoader used by the CatalogCache. Retrieves chunk metadata
@@ -66,6 +67,29 @@ public:
      * Updates internal state so that the loader can start behaving like a primary.
      */
     void onStepUp() override;
+
+    /**
+     * Sets any notifications waiting for this version to arrive and invalidates the catalog cache's
+     * chunk metadata for collection 'nss' so that the next caller provokes a refresh.
+     */
+    void notifyOfCollectionVersionUpdate(OperationContext* opCtx,
+                                         const NamespaceString& nss,
+                                         const ChunkVersion& version);
+
+    /**
+     * This function can throw a DBException if the opCtx is interrupted by stepUp/Down.
+     *
+     * Waits for the persisted collection version to be GTE to 'version', or an epoch change.
+     *
+     * If 'greaterVersion' is set, will wait for a version GT 'version', rather than GTE.
+     *
+     * Only call this function if you KNOW that a version GT or GTE WILL eventually replicate to the
+     * secondary!
+     */
+    void waitForVersion(OperationContext* opCtx,
+                        const NamespaceString& nss,
+                        const ChunkVersion& version,
+                        const bool greaterVersion);
 
     /**
      * This must be called serially, never in parallel, including waiting for the returned
@@ -288,6 +312,8 @@ private:
     // Indicates whether this server is the primary or not, so that the appropriate loading action
     // can be taken.
     ReplicaSetRole _role{ReplicaSetRole::None};
+
+    std::unique_ptr<VersionNotifications> _versionNotifications;
 };
 
 }  // namespace mongo

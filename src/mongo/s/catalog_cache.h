@@ -88,6 +88,16 @@ public:
     void onStepUp();
 
     /**
+     * Tells the catalog cache loader that the persisted collection version for 'nss' has been
+     * updated.
+     *
+     * This can only be called on a shard!
+     */
+    void notifyOfCollectionVersionUpdate(OperationContext* opCtx,
+                                         const NamespaceString& nss,
+                                         const ChunkVersion& version);
+
+    /**
      * Retrieves the cached metadata for the specified database. The returned value is still owned
      * by the cache and should not be kept elsewhere. I.e., it should only be used as a local
      * variable. The reason for this is so that if the cache gets invalidated, the caller does not

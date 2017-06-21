@@ -153,6 +153,12 @@ void ConfigServerCatalogCacheLoader::onStepUp() {
     MONGO_UNREACHABLE;
 }
 
+void ConfigServerCatalogCacheLoader::notifyOfCollectionVersionUpdate(OperationContext* opCtx,
+                                                                     const NamespaceString& nss,
+                                                                     const ChunkVersion& version) {
+    MONGO_UNREACHABLE;
+}
+
 std::shared_ptr<Notification<void>> ConfigServerCatalogCacheLoader::getChunksSince(
     const NamespaceString& nss,
     ChunkVersion version,
