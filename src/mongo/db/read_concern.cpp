@@ -70,8 +70,16 @@ Status makeNoopWriteIfNeeded(OperationContext* opCtx, LogicalTime clusterTime) {
     repl::ReplicationCoordinator* const replCoord = repl::ReplicationCoordinator::get(opCtx);
     invariant(replCoord->isReplEnabled());
 
-    auto lastAppliedTime = LogicalTime(replCoord->getMyLastAppliedOpTime().getTimestamp());
-    if (clusterTime > lastAppliedTime) {
+    static stdx::mutex mutex;
+    static std::shared_ptr<Notification<Status>> writeRequest;
+
+    auto lastAppliedOpTime = LogicalTime(replCoord->getMyLastAppliedOpTime().getTimestamp());
+    auto status = Status::OK();
+    int remainingAttempts = 3;
+    // this loop addresses the case when two or more threads need to advance the opLog time but the
+    // one that waits for the notification gets the later clusterTime, so when the request finishes
+    // it needs to be repeated with the later time.
+    while (clusterTime > lastAppliedOpTime && status.isOK()) {
         auto shardingState = ShardingState::get(opCtx);
         // standalone replica set, so there is no need to advance the OpLog on the primary.
         if (!shardingState->enabled()) {
@@ -84,16 +92,44 @@ Status makeNoopWriteIfNeeded(OperationContext* opCtx, LogicalTime clusterTime) {
             return myShard.getStatus();
         }
 
-        auto swRes = myShard.getValue()->runCommand(
-            opCtx,
-            ReadPreferenceSetting(ReadPreference::PrimaryOnly),
-            "admin",
-            BSON("appendOplogNote" << 1 << "maxClusterTime" << clusterTime.asTimestamp() << "data"
-                                   << BSON("noop write for afterClusterTime read concern" << 1)),
-            Shard::RetryPolicy::kIdempotent);
-        return swRes.getStatus();
+        if (!remainingAttempts--) {
+            std::stringstream ss;
+            ss << "Requested clusterTime" << clusterTime.toString()
+               << " is greater than the last primary OpTime: " << lastAppliedOpTime.toString()
+               << " no retries left";
+            return Status(ErrorCodes::InternalError, ss.str());
+        }
+
+        stdx::unique_lock<stdx::mutex> lock(mutex);
+        auto myWriteRequest = writeRequest;
+        if (!myWriteRequest) {
+            myWriteRequest = (writeRequest = std::make_shared<Notification<Status>>());
+            lock.unlock();
+            auto swRes = myShard.getValue()->runCommand(
+                opCtx,
+                ReadPreferenceSetting(ReadPreference::PrimaryOnly),
+                "admin",
+                BSON(
+                    "appendOplogNote" << 1 << "maxClusterTime" << clusterTime.asTimestamp()
+                                      << "data"
+                                      << BSON("noop write for afterClusterTime read concern" << 1)),
+                Shard::RetryPolicy::kIdempotent);
+            myWriteRequest->set(swRes.getStatus());
+            lock.lock();
+            writeRequest = nullptr;
+            lock.unlock();
+            status = swRes.getStatus();
+        } else {
+            lock.unlock();
+            try {
+                status = myWriteRequest->get(opCtx);
+            } catch (const DBException& ex) {
+                return ex.toStatus();
+            }
+        }
+        lastAppliedOpTime = LogicalTime(replCoord->getMyLastAppliedOpTime().getTimestamp());
     }
-    return Status::OK();
+    return status;
 }
 }  // namespace
 
