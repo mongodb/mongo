@@ -1,5 +1,5 @@
 /**
- *    Copyright (C) 2015 MongoDB Inc.
+ *    Copyright (C) 2017 MongoDB Inc.
  *
  *    This program is free software: you can redistribute it and/or  modify
  *    it under the terms of the GNU Affero General Public License, version 3,
@@ -28,16 +28,18 @@
 
 #include "mongo/platform/basic.h"
 
+#include "mongo/client/dbclientinterface.h"
+#include "mongo/db/dbmessage.h"
 #include "mongo/db/jsobj.h"
-#include "mongo/rpc/command_request.h"
-#include "mongo/rpc/command_request_builder.h"
+#include "mongo/rpc/legacy_request.h"
+#include "mongo/rpc/legacy_request_builder.h"
 #include "mongo/unittest/unittest.h"
 
 namespace {
 
 using namespace mongo;
 
-TEST(CommandRequestBuilder, RoundTrip) {
+TEST(LegacyRequest, RoundTrip) {
     auto databaseName = "barbaz";
     auto commandName = "foobar";
 
@@ -51,47 +53,52 @@ TEST(CommandRequestBuilder, RoundTrip) {
 
     auto request = OpMsgRequest::fromDBAndBody(databaseName, commandArgs, metadata);
     request.sequences.push_back({"sequence", {BSON("a" << 1), BSON("b" << 2)}});
-    auto msg = rpc::opCommandRequestFromOpMsgRequest(request);
+    auto msg = rpc::legacyRequestFromOpMsgRequest(request);
 
-    auto bodyAndSequence = BSONObjBuilder(commandArgs)
-                               .append("sequence", BSON_ARRAY(BSON("a" << 1) << BSON("b" << 2)))
-                               .obj();
+    auto metadataAndSequece = BSONObjBuilder(metadata)
+                                  .append("sequence", BSON_ARRAY(BSON("a" << 1) << BSON("b" << 2)))
+                                  .obj();
 
-    auto parsed = mongo::rpc::ParsedOpCommand::parse(msg);
-
-    ASSERT_EQUALS(parsed.database, databaseName);
-    ASSERT_EQUALS(StringData(parsed.body.firstElementFieldName()), commandName);
-    ASSERT_BSONOBJ_EQ(parsed.metadata, metadata);
-    ASSERT_BSONOBJ_EQ(parsed.body, bodyAndSequence);
+    auto parsed = rpc::opMsgRequestFromLegacyRequest(msg);
+    ASSERT_BSONOBJ_EQ(
+        parsed.body,
+        OpMsgRequest::fromDBAndBody(databaseName, commandArgs, metadataAndSequece).body);
 }
 
-TEST(CommandRequestBuilder, DownconvertSecondaryReadPreferenceToSSM) {
+TEST(LegacyRequestBuilder, DownconvertSecondaryReadPreference) {
     auto readPref = BSON("mode"
                          << "secondary");
-    auto msg = rpc::opCommandRequestFromOpMsgRequest(
+    auto msg = rpc::legacyRequestFromOpMsgRequest(
         OpMsgRequest::fromDBAndBody("admin", BSON("ping" << 1 << "$readPreference" << readPref)));
-    auto parsed = mongo::rpc::ParsedOpCommand::parse(msg);
+    auto parsed = QueryMessage(msg);
 
-    ASSERT(!parsed.body.hasField("$readPreference"));
-    ASSERT(!parsed.body.hasField("$ssm"));
-    ASSERT(!parsed.metadata.hasField("$readPreference"));
-
-    ASSERT_BSONOBJ_EQ(parsed.metadata["$ssm"]["$readPreference"].Obj(), readPref);
-    ASSERT(parsed.metadata["$ssm"]["$secondaryOk"].trueValue());
+    ASSERT_EQ(parsed.ns, "admin.$cmd"_sd);
+    ASSERT_EQ(parsed.queryOptions, QueryOption_SlaveOk);
+    ASSERT_BSONOBJ_EQ(parsed.query,
+                      fromjson("{$query: {ping: 1}, $readPreference : {mode: 'secondary'}}"));
 }
 
-TEST(CommandRequestBuilder, DownconvertPrimaryReadPreferenceToSSM) {
+TEST(CommandRequestBuilder, DownconvertExplicitPrimaryReadPreference) {
     auto readPref = BSON("mode"
                          << "primary");
-    auto msg = rpc::opCommandRequestFromOpMsgRequest(
+    auto msg = rpc::legacyRequestFromOpMsgRequest(
         OpMsgRequest::fromDBAndBody("admin", BSON("ping" << 1 << "$readPreference" << readPref)));
-    auto parsed = mongo::rpc::ParsedOpCommand::parse(msg);
+    auto parsed = QueryMessage(msg);
 
-    ASSERT(!parsed.body.hasField("$readPreference"));
-    ASSERT(!parsed.body.hasField("$ssm"));
-    ASSERT(!parsed.metadata.hasField("$readPreference"));
+    ASSERT_EQ(parsed.ns, "admin.$cmd"_sd);
+    ASSERT_EQ(parsed.queryOptions, 0);
+    ASSERT_BSONOBJ_EQ(parsed.query,
+                      fromjson("{$query: {ping: 1}, $readPreference : {mode: 'primary'}}"));
+}
 
-    ASSERT(!parsed.metadata["$ssm"]["$secondaryOk"].trueValue());
+TEST(CommandRequestBuilder, DownconvertImplicitPrimaryReadPreference) {
+    auto msg =
+        rpc::legacyRequestFromOpMsgRequest(OpMsgRequest::fromDBAndBody("admin", BSON("ping" << 1)));
+    auto parsed = QueryMessage(msg);
+
+    ASSERT_EQ(parsed.ns, "admin.$cmd"_sd);
+    ASSERT_EQ(parsed.queryOptions, 0);
+    ASSERT_BSONOBJ_EQ(parsed.query, fromjson("{ping: 1}"));
 }
 
 }  // namespace

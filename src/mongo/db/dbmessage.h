@@ -301,7 +301,7 @@ public:
      * parses the message into the above fields
      * Warning: constructor mutates DbMessage.
      */
-    QueryMessage(DbMessage& d) {
+    explicit QueryMessage(DbMessage& d) {
         ns = d.getns();
         ntoskip = d.pullInt();
         ntoreturn = d.pullInt();
@@ -310,6 +310,14 @@ public:
             fields = d.nextJsObj();
         }
         queryOptions = DataView(d.msg().header().data()).read<LittleEndian<int32_t>>();
+    }
+
+    /**
+     * A non-muting constructor from the whole message.
+     */
+    explicit QueryMessage(const Message& message) {
+        DbMessage dbm(message);
+        *this = QueryMessage(dbm);
     }
 };
 

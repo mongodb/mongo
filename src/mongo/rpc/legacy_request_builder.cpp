@@ -45,12 +45,19 @@ namespace mongo {
 namespace rpc {
 
 namespace {
+void mergeInDocumentSequences(const OpMsgRequest& request, BSONObjBuilder* body) {
+    for (auto&& seq : request.sequences) {
+        invariant(seq.name.find('.') == std::string::npos);  // Only support top-level for now.
+        dassert(!body->asTempObj().hasField(seq.name));
+        body->append(seq.name, seq.objs);
+    }
+}
+
 /**
  * Given a command request, attempts to construct a legacy command
  * object and query flags bitfield augmented with the given metadata.
  */
 BSONObj downconvertRequestBody(const OpMsgRequest& request, int* queryOptions) {
-    invariant(request.sequences.empty());  // Not supported yet.
     *queryOptions = 0;
 
     if (auto readPref = request.body["$readPreference"]) {
@@ -70,11 +77,14 @@ BSONObj downconvertRequestBody(const OpMsgRequest& request, int* queryOptions) {
                     inner.append(field);
                 }
             }
+            mergeInDocumentSequences(request, &inner);
         }
         outer.append(readPref);
         return outer.obj();
     } else {
-        return request.body.removeField("$db");  // No additional downconversion needed.
+        BSONObjBuilder body(request.body.removeField("$db"));
+        mergeInDocumentSequences(request, &body);
+        return body.obj();
     }
 }
 }  // namespace

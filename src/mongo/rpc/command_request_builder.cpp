@@ -54,8 +54,6 @@ bool fieldGoesInMetadata(StringData commandName, StringData field) {
 }  // namespace
 
 Message opCommandRequestFromOpMsgRequest(const OpMsgRequest& request) {
-    invariant(request.sequences.empty());  // Not supported yet.
-
     const auto commandName = request.getCommandName();
 
     BufBuilder builder;
@@ -87,6 +85,11 @@ Message opCommandRequestFromOpMsgRequest(const OpMsgRequest& request) {
             } else {
                 bodyBuilder.append(elem);
             }
+        }
+        for (auto&& seq : request.sequences) {
+            invariant(seq.name.find('.') == std::string::npos);  // Only support top-level for now.
+            dassert(!bodyBuilder.asTempObj().hasField(seq.name));
+            bodyBuilder.append(seq.name, seq.objs);
         }
     }
     metadataBuilder.obj().appendSelfToBufBuilder(builder);
