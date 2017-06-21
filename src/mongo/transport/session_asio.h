@@ -57,7 +57,9 @@ public:
         : _socket(std::move(socket)), _tl(tl) {}
 
     virtual ~ASIOSession() {
-        _tl->eraseSession(_sessionsListIterator);
+        if (_sessionsListIterator) {
+            _tl->eraseSession(*_sessionsListIterator);
+        }
     }
 
     TransportLayer* getTransportLayer() const override {
@@ -137,8 +139,11 @@ public:
         }
 
         _local = endpointToHostAndPort(_socket.local_endpoint());
-        _remote = endpointToHostAndPort(_socket.remote_endpoint());
-        _sessionsListIterator = std::move(listIt);
+        _remote = endpointToHostAndPort(_socket.remote_endpoint(ec));
+        if (ec) {
+            LOG(3) << "Unable to get remote endpoint address: " << ec.message();
+        }
+        _sessionsListIterator.emplace(std::move(listIt));
     }
 
     template <typename MutableBufferSequence, typename CompleteHandler>
@@ -313,7 +318,7 @@ private:
 #endif
 
     TransportLayerASIO* const _tl;
-    TransportLayerASIO::SessionsListIterator _sessionsListIterator;
+    boost::optional<TransportLayerASIO::SessionsListIterator> _sessionsListIterator;
 };
 
 }  // namespace transport
