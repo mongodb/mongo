@@ -49,16 +49,6 @@ def write_yaml_file(yaml_file, object):
         yaml.dump(object, fstream, default_flow_style=False)
 
 
-def get_test_suites_membership():
-    """Return a dictionary with keys of all js_tests and list of associated suites."""
-    # SERVER-29486 - Non-JS tests can be returned, so we'll filter them here.
-    test_membership_map = resmokelib.parser.create_test_membership_map()
-    for test in test_membership_map.keys():
-        if not resmokelib.utils.is_js_file(test):
-            del test_membership_map[test]
-    return test_membership_map
-
-
 def get_suite_tasks_membership(evg_yaml):
     """Return a dictionary with keys of all suites and list of associated tasks."""
     evg = read_yaml_file(evg_yaml)
@@ -74,7 +64,7 @@ def get_suite_tasks_membership(evg_yaml):
 
 def get_test_tasks_membership(evg_yaml):
     """Return a dictionary with keys of all tests and list of associated tasks."""
-    test_suites_membership = get_test_suites_membership()
+    test_suites_membership = resmokelib.parser.create_test_membership_map(test_kind="js_test")
     suite_tasks_membership = get_suite_tasks_membership(evg_yaml)
     test_tasks_membership = collections.defaultdict(list)
     for test in test_suites_membership.keys():

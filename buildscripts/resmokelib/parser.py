@@ -301,9 +301,11 @@ def update_config_vars(values):
         raise optparse.OptionValueError("Unknown option(s): %s" % (config.keys()))
 
 
-def create_test_membership_map(fail_on_missing_selector=False):
+def create_test_membership_map(fail_on_missing_selector=False, test_kind=None):
     """
     Returns a dict keyed by test name containing all of the suites that will run that test.
+
+    If 'test_kind' is specified then only the mappings for that kind are returned.
     Since this iterates through every available suite, it should only be run once.
     """
 
@@ -312,6 +314,8 @@ def create_test_membership_map(fail_on_missing_selector=False):
     for suite_name in suite_names:
         try:
             suite_config = _get_suite_config(suite_name)
+            if test_kind and suite_config.get("test_kind") != test_kind:
+                continue
             suite = testing.suite.Suite(suite_name, suite_config)
         except IOError as err:
             # If unittests.txt or integration_tests.txt aren't there we'll ignore the error because
