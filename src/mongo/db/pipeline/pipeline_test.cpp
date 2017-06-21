@@ -870,6 +870,27 @@ class MatchShouldNotSwapBeforeSkip : public Base {
     }
 };
 
+class MatchCannotSwapWithLimit : public Base {
+    string inputPipeJson() final {
+        return "[{$limit: 3}, {$match: {x: {$gt: 0}}}]";
+    }
+    string outputPipeJson() final {
+        return inputPipeJson();
+    }
+};
+
+class MatchCannotSwapWithSortLimit : public Base {
+    string inputPipeJson() final {
+        return "[{$sort: {x: -1}}, {$limit: 3}, {$match: {x: {$gt: 0}}}]";
+    }
+    string outputPipeJson() final {
+        return "[{$sort: {sortKey: {x: -1}, limit: 3}}, {$match: {x: {$gt: 0}}}]";
+    }
+    string serializedPipeJson() override {
+        return inputPipeJson();
+    }
+};
+
 }  // namespace Local
 
 namespace Sharded {
@@ -1492,6 +1513,8 @@ public:
         add<Optimizations::Local::NeighboringMatchesShouldCoalesce>();
         add<Optimizations::Local::MatchShouldNotSwapBeforeLimit>();
         add<Optimizations::Local::MatchShouldNotSwapBeforeSkip>();
+        add<Optimizations::Local::MatchCannotSwapWithLimit>();
+        add<Optimizations::Local::MatchCannotSwapWithSortLimit>();
         add<Optimizations::Sharded::Empty>();
         add<Optimizations::Sharded::coalesceLookUpAndUnwind::ShouldCoalesceUnwindOnAs>();
         add<Optimizations::Sharded::coalesceLookUpAndUnwind::

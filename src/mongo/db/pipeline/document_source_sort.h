@@ -51,7 +51,9 @@ public:
     }
 
     bool canSwapWithMatch() const final {
-        return true;
+        // Can't swap with a $match if a limit has been absorbed, since in general match can't swap
+        // with limit.
+        return !limitSrc;
     }
 
     BSONObjSet getOutputSorts() final {
