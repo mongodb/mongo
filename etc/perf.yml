@@ -95,8 +95,18 @@ functions:
           set -e
           set -o verbose
           sleep 5
+
           # if we started a replset, initiate it and wait for it to become primary
-          ./mongo --eval "if(db.isMaster().isreplicaset){rs.initiate(); assert.soon(function(){return db.isMaster().ismaster}, 'no primary')}"
+          #
+          # Note: This process is always currently started with --nojournal (not a recommended production configuration, see
+          #       https://docs.mongodb.com/manual/tutorial/manage-journaling/#disable-journaling).
+          #       As a result, writeConcernMajorityJournalDefault can be set to false. If this becomes configurable later
+          #       then the correct value should be passed to rs.initiate or getCmdLineOpts needs to interrogated (but
+          #       only after db.createUser).
+          ./mongo --eval "if(db.isMaster().isreplicaset){\
+                             rs.initiate({_id: 'test', version: 1, members: [ { _id: 0, host : 'localhost:27017' }], writeConcernMajorityJournalDefault:false});\
+                             assert.soon(function(){return db.isMaster().ismaster}, 'no primary');\
+                          }"
 
           # benchRun() authenticates against the admin db, with a user that must has admin access.
           # Note: This is possibly a legacy requirement from times when it would call serverStatus.
@@ -104,7 +114,10 @@ functions:
           ./mongo --eval "db.createUser({user: 'admin', pwd: 'password', roles:\
                          [ { role: 'root', db: 'admin' } ] })"\
                            admin
-            echo "MONGOD STARTED."
+
+          # print the replset config unless this is a standalone
+          ./mongo --eval "if( db.isMaster().hosts ) { printjson(rs.config()); }" --username admin --password password admin
+          echo "MONGOD STARTED."
   "analyze":
     - command: shell.exec
       params:
