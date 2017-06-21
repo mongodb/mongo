@@ -34,6 +34,7 @@
 
 #include <set>
 
+#include "mongo/base/data_type_endian.h"
 #include "mongo/db/bson/dotted_path_support.h"
 #include "mongo/rpc/object_check.h"
 #include "mongo/util/bufreader.h"
@@ -58,7 +59,8 @@ OpMsg OpMsg::parse(const Message& message) try {
     OpMsg msg;
     // Use a separate BufReader for the flags since the flags can change how much room we have
     // for sections.
-    BufReader(message.singleData().data(), message.dataSize()).read(msg.flags);
+    msg.flags =
+        BufReader(message.singleData().data(), message.dataSize()).read<LittleEndian<uint32_t>>();
     uassert(40429,
             str::stream() << "Message contains illegal flags value: " << msg.flags,
             !containsUnknownRequiredFlags(msg.flags));
@@ -82,7 +84,8 @@ OpMsg OpMsg::parse(const Message& message) try {
 
             case Section::kDocSequence: {
                 // The first 4 bytes are the total size, including themselves.
-                const auto remainingSize = sectionsBuf.read<int32_t>() - sizeof(int32_t);
+                const auto remainingSize =
+                    sectionsBuf.read<LittleEndian<int32_t>>() - sizeof(int32_t);
                 BufReader seqBuf(sectionsBuf.skip(remainingSize), remainingSize);
                 const auto name = seqBuf.readCStr();
                 uassert(40431,
