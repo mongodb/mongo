@@ -606,6 +606,26 @@ env.CppUnitTest(
     ],
 )
 
+env.Library(
+    target='idempotency_test_util',
+    source=[
+        'idempotency_document_structure.cpp',
+    ],
+    LIBDEPS=[
+        '$BUILD_DIR/mongo/base',
+    ],
+)
+
+env.CppUnitTest(
+    target='idempotency_document_structure_test',
+    source=[
+        'idempotency_document_structure_test.cpp',
+    ],
+    LIBDEPS=[
+        'idempotency_test_util',
+    ],
+)
+
 env.Library('topology_coordinator',
             [
                 'heartbeat_response_action.cpp',
