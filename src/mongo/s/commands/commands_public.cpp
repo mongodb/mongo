@@ -1450,19 +1450,7 @@ public:
         double objectsLoaded = 0;
         while (!ars.done()) {
             // Block until a response is available.
-            auto shardResponse = ars.next();
-
-            // Abandon processing responses on any error.
-            if (!shardResponse.swResponse.isOK()) {
-                auto errorStatus = std::move(shardResponse.swResponse.getStatus());
-                errmsg = errorStatus.reason();
-                result.append("code", errorStatus.code());
-                return false;
-            }
-
-            // Process a successful response.
-            auto shardResult = std::move(shardResponse.swResponse.getValue().data);
-
+            auto shardResult = uassertStatusOK(ars.next().swResponse).data;
             if (shardResult.hasField("near")) {
                 nearStr = shardResult["near"].String();
             }

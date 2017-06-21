@@ -217,9 +217,9 @@ void execCommandClient(OperationContext* opCtx,
         return;
     }
 
-    std::string errmsg;
-    bool ok = false;
     try {
+        std::string errmsg;
+        bool ok = false;
         if (!supportsWriteConcern) {
             ok = c->enhancedRun(opCtx, request, errmsg, result);
         } else {
@@ -230,6 +230,10 @@ void execCommandClient(OperationContext* opCtx,
 
             ok = c->enhancedRun(opCtx, request, errmsg, result);
         }
+        if (!ok) {
+            c->incrementCommandsFailed();
+        }
+        Command::appendCommandStatus(result, ok, errmsg);
     } catch (const DBException& e) {
         result.resetToEmpty();
         const int code = e.getCode();
@@ -239,15 +243,9 @@ void execCommandClient(OperationContext* opCtx,
             throw;
         }
 
-        errmsg = e.what();
-        result.append("code", code);
-    }
-
-    if (!ok) {
         c->incrementCommandsFailed();
+        Command::appendCommandStatus(result, e.toStatus());
     }
-
-    Command::appendCommandStatus(result, ok, errmsg);
 }
 
 void runAgainstRegistered(OperationContext* opCtx,

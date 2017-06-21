@@ -216,15 +216,8 @@ public:
                 foundParameter->second->append(opCtx, result, "was");
             }
 
-            Status status = foundParameter->second->set(parameter);
-            if (status.isOK()) {
-                numSet++;
-                continue;
-            }
-
-            errmsg = status.reason();
-            result.append("code", status.code());
-            return false;
+            uassertStatusOK(foundParameter->second->set(parameter));
+            numSet++;
         }
 
         if (numSet == 0 && !found) {

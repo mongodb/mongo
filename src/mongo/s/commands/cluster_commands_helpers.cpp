@@ -354,6 +354,7 @@ bool appendRawResponses(OperationContext* opCtx,
         // a top-level field "code" with this value to the output object.
         if (commonErrCode > 0) {
             output->append("code", commonErrCode);
+            output->append("codeName", ErrorCodes::errorString(ErrorCodes::fromInt(commonErrCode)));
         }
         return false;
     }

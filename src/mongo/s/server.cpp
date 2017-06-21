@@ -179,16 +179,6 @@ static void cleanupTask() {
     audit::logShutdown(Client::getCurrent());
 }
 
-static BSONObj buildErrReply(const DBException& ex) {
-    BSONObjBuilder errB;
-    errB.append("$err", ex.what());
-    errB.append("code", ex.getCode());
-    if (!ex._shard.empty()) {
-        errB.append("shard", ex._shard);
-    }
-    return errB.obj();
-}
-
 }  // namespace mongo
 
 using namespace mongo;
