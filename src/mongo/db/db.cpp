@@ -984,14 +984,16 @@ static void shutdownTask() {
     }
 
 #if __has_feature(address_sanitizer)
-    if (auto sep = checked_cast<ServiceEntryPointImpl*>(serviceContext->getServiceEntryPoint())) {
+    auto sep = checked_cast<ServiceEntryPointImpl*>(serviceContext->getServiceEntryPoint());
+    auto tl = serviceContext->getTransportLayer();
+    if (sep && tl) {
         // When running under address sanitizer, we get false positive leaks due to disorder around
         // the lifecycle of a connection and request. When we are running under ASAN, we try a lot
         // harder to dry up the server from active connections before going on to really shut down.
 
         log(LogComponent::kNetwork)
             << "shutdown: going to close all sockets because ASAN is active...";
-        getGlobalServiceContext()->getTransportLayer()->shutdown();
+        tl->shutdown();
 
         // Close all sockets in a detached thread, and then wait for the number of active
         // connections to reach zero. Give the detached background thread a 10 second deadline. If
