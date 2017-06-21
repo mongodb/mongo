@@ -34,5 +34,8 @@ namespace address_restriction_detail {
 constexpr StringData ClientSource::label;
 constexpr StringData ClientSource::field;
 
+constexpr StringData ServerAddress::label;
+constexpr StringData ServerAddress::field;
+
 }  // address_restriction_detail
 }  // mongo

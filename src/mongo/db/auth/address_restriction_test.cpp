@@ -57,6 +57,15 @@ TEST(AddressRestrictionTest, toAndFromString) {
             expected << "{\"clientSource\": \"" << p.output << "\"}";
             ASSERT_EQUALS(actual.str(), expected.str());
         }
+
+        {
+            const ServerAddressRestriction sar(CIDR(p.input));
+            std::ostringstream actual;
+            actual << sar;
+            std::ostringstream expected;
+            expected << "{\"serverAddress\": \"" << p.output << "\"}";
+            ASSERT_EQUALS(actual.str(), expected.str());
+        }
     }
 }
 
@@ -160,6 +169,10 @@ TEST(AddressRestrictionTest, contains) {
         const ClientSourceRestriction csr(CIDR(p.range));
         ASSERT_EQ(csr.validate(rec).isOK(), p.valid);
         ASSERT_FALSE(csr.validate(res).isOK());
+
+        const ServerAddressRestriction sar(CIDR(p.range));
+        ASSERT_EQ(sar.validate(res).isOK(), p.valid);
+        ASSERT_FALSE(sar.validate(rec).isOK());
     }
 }
 

@@ -48,6 +48,13 @@ struct ClientSource {
         return environment.getClientSource();
     }
 };
+struct ServerAddress {
+    static constexpr auto label = "Server address "_sd;
+    static constexpr auto const field = "serverAddress"_sd;
+    static auto addr(const RestrictionEnvironment& environment) {
+        return environment.getServerAddress();
+    }
+};
 
 // Represents a restriction based on client or server address
 template <typename T>
@@ -139,10 +146,22 @@ private:
 
 using ClientSourceRestriction =
     address_restriction_detail::AddressRestriction<address_restriction_detail::ClientSource>;
+using ServerAddressRestriction =
+    address_restriction_detail::AddressRestriction<address_restriction_detail::ServerAddress>;
 
 template <>
 inline BSONObjBuilder& BSONObjBuilderValueStream::operator<<<ClientSourceRestriction>(
     ClientSourceRestriction value) {
+    BSONObjBuilder b;
+    value.appendToBuilder(&b);
+    _builder->append(_fieldName, b.obj());
+    _fieldName = StringData();
+    return *_builder;
+}
+
+template <>
+inline BSONObjBuilder& BSONObjBuilderValueStream::operator<<<ServerAddressRestriction>(
+    ServerAddressRestriction value) {
     BSONObjBuilder b;
     value.appendToBuilder(&b);
     _builder->append(_fieldName, b.obj());
