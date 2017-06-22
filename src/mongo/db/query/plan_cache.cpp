@@ -185,6 +185,11 @@ const char* encodeMatchType(MatchExpression::MatchType mt) {
             break;
         case MatchExpression::INTERNAL_SCHEMA_OBJECT_MATCH:
             return "internalSchemaObjectMatch";
+        case MatchExpression::INTERNAL_SCHEMA_MIN_LENGTH:
+            return "internalSchemaMinLength";
+            break;
+        case MatchExpression::INTERNAL_SCHEMA_MAX_LENGTH:
+            return "internalSchemaMaxLength";
             break;
         default:
             MONGO_UNREACHABLE;

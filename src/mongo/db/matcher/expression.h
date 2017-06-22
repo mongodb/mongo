@@ -103,6 +103,8 @@ public:
         INTERNAL_SCHEMA_OBJECT_MATCH,
         INTERNAL_SCHEMA_UNIQUE_ITEMS,
         INTERNAL_SCHEMA_XOR,
+        INTERNAL_SCHEMA_MIN_LENGTH,
+        INTERNAL_SCHEMA_MAX_LENGTH,
     };
 
     MatchExpression(MatchType type);

@@ -112,6 +112,10 @@ TEST_F(DocumentSourceMatchTest, RedactSafePortion) {
 
     assertExpectedRedactSafePortion("{a: {$_internalSchemaUniqueItems: true}}", "{}");
 
+    assertExpectedRedactSafePortion("{a: {$_internalSchemaMinLength: 1}}", "{}");
+
+    assertExpectedRedactSafePortion("{a: {$_internalSchemaMaxLength: 1}}", "{}");
+
     // Combinations
     assertExpectedRedactSafePortion("{a:1, b: 'asdf'}", "{a:1, b: 'asdf'}");
 

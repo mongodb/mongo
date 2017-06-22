@@ -1136,6 +1136,42 @@ TEST(SplitMatchExpression, ShouldNotMoveMaxItemsAcrossRename) {
     ASSERT_BSONOBJ_EQ(secondBob.obj(), fromjson("{a: {$_internalSchemaMaxItems: 3}}"));
 }
 
+TEST(SplitMatchExpression, ShouldMoveMinLengthAcrossRename) {
+    BSONObj matchPredicate = fromjson("{a: {$_internalSchemaMinLength: 3}}");
+    const CollatorInterface* collator = nullptr;
+    auto matcher = MatchExpressionParser::parse(matchPredicate, ExtensionsCallbackNoop(), collator);
+    ASSERT_OK(matcher.getStatus());
+
+    StringMap<std::string> renames{{"a", "c"}};
+    std::pair<unique_ptr<MatchExpression>, unique_ptr<MatchExpression>> splitExpr =
+        expression::splitMatchExpressionBy(std::move(matcher.getValue()), {}, renames);
+
+    ASSERT_TRUE(splitExpr.first.get());
+    BSONObjBuilder firstBob;
+    splitExpr.first->serialize(&firstBob);
+    ASSERT_BSONOBJ_EQ(firstBob.obj(), fromjson("{c: {$_internalSchemaMinLength: 3}}"));
+
+    ASSERT_FALSE(splitExpr.second.get());
+}
+
+TEST(SplitMatchExpression, ShouldMoveMaxLengthAcrossRename) {
+    BSONObj matchPredicate = fromjson("{a: {$_internalSchemaMaxLength: 3}}");
+    const CollatorInterface* collator = nullptr;
+    auto matcher = MatchExpressionParser::parse(matchPredicate, ExtensionsCallbackNoop(), collator);
+    ASSERT_OK(matcher.getStatus());
+
+    StringMap<std::string> renames{{"a", "c"}};
+    std::pair<unique_ptr<MatchExpression>, unique_ptr<MatchExpression>> splitExpr =
+        expression::splitMatchExpressionBy(std::move(matcher.getValue()), {}, renames);
+
+    ASSERT_TRUE(splitExpr.first.get());
+    BSONObjBuilder firstBob;
+    splitExpr.first->serialize(&firstBob);
+    ASSERT_BSONOBJ_EQ(firstBob.obj(), fromjson("{c: {$_internalSchemaMaxLength: 3}}"));
+
+    ASSERT_FALSE(splitExpr.second.get());
+}
+
 TEST(MapOverMatchExpression, DoesMapOverLogicalNodes) {
     BSONObj matchPredicate = fromjson("{a: {$not: {$eq: 1}}}");
     const CollatorInterface* collator = nullptr;

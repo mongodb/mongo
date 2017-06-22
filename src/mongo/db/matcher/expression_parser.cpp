@@ -37,7 +37,9 @@
 #include "mongo/db/matcher/expression_leaf.h"
 #include "mongo/db/matcher/expression_tree.h"
 #include "mongo/db/matcher/schema/expression_internal_schema_max_items.h"
+#include "mongo/db/matcher/schema/expression_internal_schema_max_length.h"
 #include "mongo/db/matcher/schema/expression_internal_schema_min_items.h"
+#include "mongo/db/matcher/schema/expression_internal_schema_min_length.h"
 #include "mongo/db/matcher/schema/expression_internal_schema_object_match.h"
 #include "mongo/db/matcher/schema/expression_internal_schema_unique_items.h"
 #include "mongo/db/matcher/schema/expression_internal_schema_xor.h"
@@ -327,6 +329,16 @@ StatusWithMatchExpression MatchExpressionParser::_parseSubField(const BSONObj& c
                 return status;
             }
             return {std::move(expr)};
+        }
+
+        case BSONObj::opINTERNAL_SCHEMA_MIN_LENGTH: {
+            return _parseInternalSchemaSingleIntegerArgument<
+                InternalSchemaMinLengthMatchExpression>(name, e);
+        }
+
+        case BSONObj::opINTERNAL_SCHEMA_MAX_LENGTH: {
+            return _parseInternalSchemaSingleIntegerArgument<
+                InternalSchemaMaxLengthMatchExpression>(name, e);
         }
     }
 
