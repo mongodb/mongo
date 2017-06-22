@@ -183,9 +183,9 @@ void serializeReply(OperationContext* opCtx,
     }
 }
 
-class WriteCommand : public BasicCommand {
+class WriteCommand : public Command {
 public:
-    explicit WriteCommand(StringData name) : BasicCommand(name) {}
+    explicit WriteCommand(StringData name) : Command(name) {}
 
     bool slaveOk() const final {
         return false;

@@ -365,10 +365,10 @@ bool Command::isUserManagementCommand(const std::string& name) {
     return userManagementCommands.count(name);
 }
 
-bool Command::enhancedRun(OperationContext* opCtx,
-                          const OpMsgRequest& request,
-                          std::string& errmsg,
-                          BSONObjBuilder& result) {
+bool BasicCommand::enhancedRun(OperationContext* opCtx,
+                               const OpMsgRequest& request,
+                               std::string& errmsg,
+                               BSONObjBuilder& result) {
     uassert(40472,
             str::stream() << "The " << getName() << " command does not support document sequences.",
             request.sequences.empty());

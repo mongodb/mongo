@@ -96,24 +96,10 @@ public:
     virtual std::size_t reserveBytesForReply() const = 0;
 
     /**
-     * run the given command
-     * implement this...
-     *
-     * return value is true if succeeded.  if false, set errmsg text.
-     */
-    virtual bool run(OperationContext* opCtx,
-                     const std::string& db,
-                     const BSONObj& cmdObj,
-                     std::string& errmsg,
-                     BSONObjBuilder& result) {
-        MONGO_UNREACHABLE;
-    }
-
-    /**
      * Runs the command.
      *
      * The default implementation verifies that request has no document sections then forwards to
-     * run().
+     * BasicCommand::run().
      *
      * For now commands should only implement if they need access to OP_MSG-specific functionality.
      */
@@ -323,11 +309,6 @@ public:
     std::size_t reserveBytesForReply() const override {
         return 0u;
     }
-
-    bool enhancedRun(OperationContext* opCtx,
-                     const OpMsgRequest& request,
-                     std::string& errmsg,
-                     BSONObjBuilder& result) override;
 
     bool adminOnly() const override {
         return false;
@@ -577,6 +558,33 @@ private:
     ServerStatusMetricField<Counter64> _commandsFailedMetric;
 };
 
-using BasicCommand = Command;
+/**
+ * A subclass of Command that only cares about the BSONObj body and doesn't need access to document
+ * sequences.
+ */
+class BasicCommand : public Command {
+public:
+    using Command::Command;
+
+    /**
+     * Calls run() as defined below.
+     */
+    bool enhancedRun(OperationContext* opCtx,
+                     const OpMsgRequest& request,
+                     std::string& errmsg,
+                     BSONObjBuilder& result) final;
+
+    /**
+     * run the given command
+     * implement this...
+     *
+     * return value is true if succeeded.  if false, set errmsg text.
+     */
+    virtual bool run(OperationContext* opCtx,
+                     const std::string& db,
+                     const BSONObj& cmdObj,
+                     std::string& errmsg,
+                     BSONObjBuilder& result) = 0;
+};
 
 }  // namespace mongo
