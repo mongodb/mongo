@@ -38,6 +38,10 @@
 #include <netinet/in.h>
 #endif
 
+using std::begin;
+using std::find;
+using std::end;
+
 namespace mongo {
 
 namespace {
@@ -87,18 +91,18 @@ StatusWith<CIDR> CIDR::parse(BSONElement from) noexcept {
     if (from.type() != String) {
         return {ErrorCodes::UnsupportedFormat, "CIDR range must be a string"};
     }
-    return parse(from.valueStringData().toString());
+    return parse(from.valueStringData());
 }
 
-StatusWith<CIDR> CIDR::parse(const std::string& s) noexcept try {
+StatusWith<CIDR> CIDR::parse(StringData s) noexcept try {
     return CIDR(s);
 } catch (const CIDRException& e) {
     return {ErrorCodes::UnsupportedFormat, e.what()};
 }
 
-CIDR::CIDR(const std::string& s) try {
-    auto slash = std::find(begin(s), end(s), '/');
-    auto ip = (slash == end(s)) ? s : s.substr(0, slash - begin(s));
+CIDR::CIDR(StringData s) try {
+    auto slash = find(begin(s), end(s), '/');
+    auto ip = (slash == end(s)) ? s.toString() : s.substr(0, slash - begin(s)).toString();
 
     if (inet_pton(AF_INET, ip.c_str(), _ip.data())) {
         _family = AF_INET;

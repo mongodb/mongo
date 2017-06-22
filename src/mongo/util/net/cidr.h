@@ -29,6 +29,7 @@
 #pragma once
 
 #include "mongo/base/status_with.h"
+#include "mongo/base/string_data.h"
 #include "mongo/bson/bsonelement.h"
 #include "mongo/bson/bsonmisc.h"
 
@@ -51,7 +52,7 @@ public:
  */
 class CIDR {
 public:
-    explicit CIDR(const std::string&);
+    explicit CIDR(StringData);
 
     /**
      * If the given BSONElement represents a valid CIDR range,
@@ -65,7 +66,7 @@ public:
      * constructs and returns the CIDR.
      * Otherwise returns an error.
      */
-    static StatusWith<CIDR> parse(const std::string& from) noexcept;
+    static StatusWith<CIDR> parse(StringData from) noexcept;
 
     /**
      * Returns true if the provided address range is contained
