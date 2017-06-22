@@ -156,6 +156,7 @@ else:
     env.Library(
         target='scripting',
         source=[
+            'scripting_none.cpp'
         ],
         LIBDEPS=[
             'scripting_none',

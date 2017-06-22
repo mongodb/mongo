@@ -1526,6 +1526,32 @@ tasks:
         # because it should be the same everywhere, so just use linux-64/windows-64-2k8.
         build_variants: [ linux-64, windows-64-2k8-ssl ]
 
+
+## compile_all_notest - build all scons targets including unittests, but run no tests
+- name: compile_all_notest
+  commands:
+    - command: manifest.load
+    - *git_get_project
+    - func: "get buildnumber"
+    - func: "setup credentials"
+    - func: "build new tools" # noop if ${newtools} is not "true"
+    - func: "build rocksdb" # noop if ${build_rocksdb} is not "true"
+    - *generate_compile_expansions
+    # Then we load the generated version data into the agent so we can use it in task definitions.
+    - *apply_compile_expansions
+
+    - command: shell.exec
+      type: test
+      params:
+        working_dir: src
+        script: |
+          set -o errexit
+          set -o verbose
+
+          rm -rf ${install_directory|/data/mongo-install-directory}
+
+          ${compile_env|} ${python|/opt/mongodbtoolchain/v2/bin/python2} ./buildscripts/scons.py ${compile_flags|} ${scons_cache_args|} --use-new-tools --build-mongoreplay="${build_mongoreplay}" all ${additional_targets|} MONGO_VERSION=${version}
+
 ## compile_all - build all scons targets including unittests ##
 - name: compile_all
   depends_on: compile
@@ -5726,6 +5752,54 @@ buildvariants:
   - name: push
     distros:
     - rhel70-small
+
+- name: ios-102-debug
+  display_name: "iOS 10.2 DEBUG"
+  run_on:
+  - macos-1012
+  batchtime: 1440 # 1 day
+  expansions:
+    compile_env: DEVELOPER_DIR=/Applications/Xcode8.3.app
+    compile_flags: -j$(sysctl -n hw.logicalcpu) --dbg=on --disable-warnings-as-errors --js-engine=none --variables-files=etc/scons/xcode_ios.vars all
+    python: python2.7
+  tasks:
+  - name: compile_all_notest
+
+- name: ios-sim-102-debug
+  display_name: "iOS Simulator 10.2 DEBUG"
+  run_on:
+  - macos-1012
+  batchtime: 1440 # 1 day
+  expansions:
+    compile_env: DEVELOPER_DIR=/Applications/Xcode8.3.app
+    compile_flags: -j$(sysctl -n hw.logicalcpu) --dbg=on --disable-warnings-as-errors --js-engine=none --variables-files=etc/scons/xcode_ios_sim.vars all
+    python: python2.7
+  tasks:
+  - name: compile_all_notest
+
+- name: tvos-101-debug
+  display_name: "tvOS 10.1 DEBUG"
+  run_on:
+  - macos-1012
+  batchtime: 1440 # 1 day
+  expansions:
+    compile_env: DEVELOPER_DIR=/Applications/Xcode8.3.app
+    compile_flags: -j$(sysctl -n hw.logicalcpu) --dbg=on --disable-warnings-as-errors --js-engine=none --variables-files=etc/scons/xcode_tvos.vars all
+    python: python2.7
+  tasks:
+  - name: compile_all_notest
+
+- name: tvos-sim-101-debug
+  display_name: "tvOS Simulator 10.1 DEBUG"
+  run_on:
+  - macos-1012
+  batchtime: 1440 # 1 day
+  expansions:
+    compile_env: DEVELOPER_DIR=/Applications/Xcode8.3.app
+    compile_flags: -j$(sysctl -n hw.logicalcpu) --dbg=on --disable-warnings-as-errors --js-engine=none --variables-files=etc/scons/xcode_tvos_sim.vars all
+    python: python2.7
+  tasks:
+  - name: compile_all_notest
 
 ###########################################
 #          Redhat buildvariants           #

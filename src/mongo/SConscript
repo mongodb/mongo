@@ -539,8 +539,9 @@ installBinary( env, "mongos" )
 
 if shellEnv is not None:
     installBinary( shellEnv, "mongo" )
+    env.Alias( "core", [ '#/%s' % b for b in [ add_exe( "mongo" ) ] ] )
 
-env.Alias( "core", [ '#/%s' % b for b in [ add_exe( "mongo" ), add_exe( "mongod" ), add_exe( "mongos" ) ] ] )
+env.Alias( "core", [ '#/%s' % b for b in [ add_exe( "mongod" ), add_exe( "mongos" ) ] ] )
 
 # Stage the top-level mongodb banners
 distsrc = env.Dir('#distsrc')
