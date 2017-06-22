@@ -70,8 +70,7 @@ DocumentSource::GetNextResult DocumentSourceIndexStats::getNext() {
 }
 
 DocumentSourceIndexStats::DocumentSourceIndexStats(const intrusive_ptr<ExpressionContext>& pExpCtx)
-    : DocumentSourceNeedsMongod(pExpCtx),
-      _processName(str::stream() << getHostNameCached() << ":" << serverGlobalParams.port) {}
+    : DocumentSourceNeedsMongod(pExpCtx), _processName(getHostNameCachedAndPort()) {}
 
 intrusive_ptr<DocumentSource> DocumentSourceIndexStats::createFromBson(
     BSONElement elem, const intrusive_ptr<ExpressionContext>& pExpCtx) {

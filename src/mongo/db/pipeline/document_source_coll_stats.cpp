@@ -100,7 +100,16 @@ DocumentSource::GetNextResult DocumentSourceCollStats::getNext() {
     _finished = true;
 
     BSONObjBuilder builder;
+
     builder.append("ns", pExpCtx->ns.ns());
+
+    auto shardName = _mongod->getShardName(pExpCtx->opCtx);
+
+    if (!shardName.empty()) {
+        builder.append("shard", shardName);
+    }
+
+    builder.append("host", getHostNameCachedAndPort());
     builder.appendDate("localTime", jsTime());
 
     if (_collStatsSpec.hasField("latencyStats")) {

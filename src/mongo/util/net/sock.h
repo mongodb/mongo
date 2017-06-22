@@ -102,6 +102,10 @@ std::string getHostName();
  * will be stale */
 std::string getHostNameCached();
 
+/** Returns getHostNameCached():<port>. */
+std::string getHostNameCachedAndPort();
+
+/** Returns getHostNameCached(), or getHostNameCached():<port> if running on a non-default port. */
 std::string prettyHostName();
 
 /**

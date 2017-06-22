@@ -244,12 +244,14 @@ string getHostNameCached() {
     return temp;
 }
 
+string getHostNameCachedAndPort() {
+    return str::stream() << getHostNameCached() << ':' << serverGlobalParams.port;
+}
+
 string prettyHostName() {
-    StringBuilder s;
-    s << getHostNameCached();
-    if (serverGlobalParams.port != ServerGlobalParams::DefaultDBPort)
-        s << ':' << mongo::serverGlobalParams.port;
-    return s.str();
+    return (serverGlobalParams.port == ServerGlobalParams::DefaultDBPort
+                ? getHostNameCached()
+                : getHostNameCachedAndPort());
 }
 
 #ifdef MSG_NOSIGNAL
