@@ -57,6 +57,7 @@ public:
             kInclusionProjection,
             kComputedProjection,
             kReplaceRoot,
+            kChangeNotificationTransformation,
         };
         virtual ~TransformerInterface() = default;
         virtual Document applyTransformation(const Document& input) = 0;

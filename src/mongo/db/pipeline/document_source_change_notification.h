@@ -29,6 +29,7 @@
 #pragma once
 
 #include "mongo/db/pipeline/document_source.h"
+#include "mongo/db/pipeline/document_source_single_document_transformation.h"
 
 namespace mongo {
 
@@ -54,6 +55,20 @@ public:
         }
     };
 
+    class Transformation : public DocumentSourceSingleDocumentTransformation::TransformerInterface {
+    public:
+        ~Transformation() = default;
+        Document applyTransformation(const Document& input) final;
+        TransformerType getType() const final {
+            return TransformerType::kChangeNotificationTransformation;
+        };
+        void optimize() final{};
+        Document serializeStageOptions(
+            boost::optional<ExplainOptions::Verbosity> explain) const final;
+        DocumentSource::GetDepsReturn addDependencies(DepsTracker* deps) const final;
+        DocumentSource::GetModPathsReturn getModifiedPaths() const final;
+    };
+
     /**
      * Produce the BSON for the $match stage based on a $changeNotification stage.
      */
@@ -65,6 +80,9 @@ public:
      */
     static std::vector<boost::intrusive_ptr<DocumentSource>> createFromBson(
         BSONElement elem, const boost::intrusive_ptr<ExpressionContext>& expCtx);
+
+    static boost::intrusive_ptr<DocumentSource> createTransformationStage(
+        const boost::intrusive_ptr<ExpressionContext>& pExpCtx);
 
 private:
     // It is illegal to construct a DocumentSourceChangeNotification directly, use createFromBson()
