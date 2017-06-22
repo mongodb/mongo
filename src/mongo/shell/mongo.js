@@ -108,11 +108,9 @@ Mongo.prototype.getDB = function(name) {
         ((typeof this.authenticated == 'undefined') || !this.authenticated)) {
         jsTest.authenticate(this);
     }
-    // There is a weird issue where typeof(db._name) !== "string" when the db name
-    // is created from objects returned from native C++ methods.
-    // This hack ensures that the db._name is always a string.
-    if (typeof(name) === "object") {
-        name = name.toString();
+    if (typeof name != 'string') {
+        throw Error('getDB failed: db name must be a string: (type: ' + (typeof name) + ') ' +
+                    tojson(name));
     }
     return new DB(this, name);
 };
