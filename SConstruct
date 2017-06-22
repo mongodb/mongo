@@ -2069,31 +2069,6 @@ def doConfigure(myenv):
             #   requires LTO builds.
             pass
 
-    # Check if we need to disable null-conversion warnings
-    if myenv.ToolchainIs('clang'):
-        def CheckNullConversion(context):
-
-            test_body = """
-            #include <boost/shared_ptr.hpp>
-            struct TestType { int value; bool boolValue; };
-            bool foo() {
-                boost::shared_ptr<TestType> sp(new TestType);
-                return NULL != sp;
-            }
-            """
-
-            context.Message('Checking if implicit boost::shared_ptr null conversion is supported... ')
-            ret = context.TryCompile(textwrap.dedent(test_body), ".cpp")
-            context.Result(ret)
-            return ret
-
-        conf = Configure(myenv, help=False, custom_tests = {
-            'CheckNullConversion' : CheckNullConversion,
-        })
-        if conf.CheckNullConversion() == False:
-            env.Append( CCFLAGS="-Wno-null-conversion" )
-        conf.Finish()
-
     if has_option('osx-version-min'):
         message="""
         The --osx-version-min option is no longer supported.
