@@ -57,6 +57,7 @@
 #include "mongo/db/s/operation_sharding_state.h"
 #include "mongo/db/s/sharded_connection_info.h"
 #include "mongo/db/s/sharding_state.h"
+#include "mongo/db/server_options.h"
 #include "mongo/db/stats/counters.h"
 #include "mongo/db/stats/top.h"
 #include "mongo/rpc/factory.h"
@@ -254,17 +255,21 @@ void appendReplyMetadata(OperationContext* opCtx,
             rpc::ShardingMetadata(lastOpTimeFromClient, replCoord->getElectionId())
                 .writeToMetadata(metadataBob)
                 .transitional_ignore();
-            if (LogicalTimeValidator::isAuthorizedToAdvanceClock(opCtx)) {
-                // No need to sign logical times for internal clients.
-                SignedLogicalTime currentTime(
-                    LogicalClock::get(opCtx)->getClusterTime(), TimeProofService::TimeProof(), 0);
-                rpc::LogicalTimeMetadata logicalTimeMetadata(currentTime);
-                logicalTimeMetadata.writeToMetadata(metadataBob);
-            } else if (auto validator = LogicalTimeValidator::get(opCtx)) {
-                auto currentTime =
-                    validator->trySignLogicalTime(LogicalClock::get(opCtx)->getClusterTime());
-                rpc::LogicalTimeMetadata logicalTimeMetadata(currentTime);
-                logicalTimeMetadata.writeToMetadata(metadataBob);
+            if (serverGlobalParams.featureCompatibility.version.load() ==
+                ServerGlobalParams::FeatureCompatibility::Version::k36) {
+                if (LogicalTimeValidator::isAuthorizedToAdvanceClock(opCtx)) {
+                    // No need to sign logical times for internal clients.
+                    SignedLogicalTime currentTime(LogicalClock::get(opCtx)->getClusterTime(),
+                                                  TimeProofService::TimeProof(),
+                                                  0);
+                    rpc::LogicalTimeMetadata logicalTimeMetadata(currentTime);
+                    logicalTimeMetadata.writeToMetadata(metadataBob);
+                } else if (auto validator = LogicalTimeValidator::get(opCtx)) {
+                    auto currentTime =
+                        validator->trySignLogicalTime(LogicalClock::get(opCtx)->getClusterTime());
+                    rpc::LogicalTimeMetadata logicalTimeMetadata(currentTime);
+                    logicalTimeMetadata.writeToMetadata(metadataBob);
+                }
             }
         }
     }
@@ -481,7 +486,9 @@ bool runCommandImpl(OperationContext* opCtx,
 
     // An uninitialized operation time means the cluster time is not propagated, so the operation
     // time should not be attached to the response.
-    if (operationTime != LogicalTime::kUninitialized) {
+    if (operationTime != LogicalTime::kUninitialized &&
+        serverGlobalParams.featureCompatibility.version.load() ==
+            ServerGlobalParams::FeatureCompatibility::Version::k36) {
         Command::appendOperationTime(inPlaceReplyBob, operationTime);
     }
 
@@ -693,7 +700,9 @@ void execCommandDatabase(OperationContext* opCtx,
 
         // An uninitialized operation time means the cluster time is not propagated, so the
         // operation time should not be attached to the error response.
-        if (operationTime != LogicalTime::kUninitialized) {
+        if (operationTime != LogicalTime::kUninitialized &&
+            serverGlobalParams.featureCompatibility.version.load() ==
+                ServerGlobalParams::FeatureCompatibility::Version::k36) {
             LOG(1) << "assertion while executing command '" << request.getCommandName() << "' "
                    << "on database '" << request.getDatabase() << "' "
                    << "with arguments '" << command->getRedactedCopyForLogging(request.body)
