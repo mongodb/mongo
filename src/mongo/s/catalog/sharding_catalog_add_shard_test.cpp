@@ -36,11 +36,8 @@
 #include "mongo/client/remote_command_targeter_factory_mock.h"
 #include "mongo/client/remote_command_targeter_mock.h"
 #include "mongo/db/commands.h"
-#include "mongo/db/query/query_request.h"
-#include "mongo/db/repl/member_state.h"
 #include "mongo/db/repl/replication_coordinator_mock.h"
 #include "mongo/db/s/type_shard_identity.h"
-#include "mongo/rpc/metadata/repl_set_metadata.h"
 #include "mongo/s/catalog/config_server_version.h"
 #include "mongo/s/catalog/sharding_catalog_manager.h"
 #include "mongo/s/catalog/type_changelog.h"
@@ -66,13 +63,6 @@ using executor::RemoteCommandRequest;
 using executor::RemoteCommandResponse;
 using std::vector;
 using unittest::assertGet;
-
-const BSONObj kReplSecondaryOkMetadata{[] {
-    BSONObjBuilder o;
-    ReadPreferenceSetting(ReadPreference::Nearest).toContainingBSON(&o);
-    o.append(rpc::kReplSetMetadataFieldName, 1);
-    return o.obj();
-}()};
 
 // TODO (SERVER-27029): This value was chosen to be greater than the time it takes for the hang
 // analyzer to kick in. Remove once the cause for the test failure has been figured out.

@@ -34,13 +34,13 @@
 #include <string>
 #include <vector>
 
+#include "mongo/client/read_preference.h"
 #include "mongo/client/remote_command_targeter_factory_mock.h"
 #include "mongo/client/remote_command_targeter_mock.h"
 #include "mongo/db/client.h"
 #include "mongo/db/commands.h"
 #include "mongo/executor/network_interface_mock.h"
 #include "mongo/executor/task_executor.h"
-#include "mongo/rpc/metadata/repl_set_metadata.h"
 #include "mongo/rpc/metadata/tracking_metadata.h"
 #include "mongo/s/catalog/dist_lock_catalog_impl.h"
 #include "mongo/s/catalog/sharding_catalog_manager_impl.h"
@@ -73,13 +73,6 @@ using std::set;
 using std::string;
 using std::vector;
 using unittest::assertGet;
-
-const BSONObj kReplSecondaryOkMetadata{[] {
-    BSONObjBuilder o;
-    ReadPreferenceSetting(ReadPreference::Nearest).toContainingBSON(&o);
-    o.append(rpc::kReplSetMetadataFieldName, 1);
-    return o.obj();
-}()};
 
 class ShardCollectionTest : public ConfigServerTestFixture {
 public:

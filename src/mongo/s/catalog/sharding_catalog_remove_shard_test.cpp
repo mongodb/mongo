@@ -62,14 +62,14 @@ using std::string;
 using std::vector;
 using unittest::assertGet;
 
-static const Seconds kFutureTimeout{5};
+const Seconds kFutureTimeout{5};
 
-const BSONObj kReplSecondaryOkMetadata{[] {
+BSONObj getReplSecondaryOkMetadata() {
     BSONObjBuilder o;
     ReadPreferenceSetting(ReadPreference::Nearest).toContainingBSON(&o);
     o.append(rpc::kReplSetMetadataFieldName, 1);
     return o.obj();
-}()};
+}
 
 class RemoveShardTest : public ShardingCatalogTestFixture {
 public:
@@ -181,7 +181,7 @@ TEST_F(RemoveShardTest, RemoveShardStartDraining) {
     // Respond to request to reload information about existing shards
     onFindCommand([&](const RemoteCommandRequest& request) {
         ASSERT_EQUALS(configHost, request.target);
-        ASSERT_BSONOBJ_EQ(kReplSecondaryOkMetadata,
+        ASSERT_BSONOBJ_EQ(getReplSecondaryOkMetadata(),
                           rpc::TrackingMetadata::removeTrackingData(request.metadata));
 
         const NamespaceString nss(request.dbname, request.cmdObj.firstElement().String());
@@ -355,7 +355,7 @@ TEST_F(RemoveShardTest, RemoveShardCompletion) {
     // Respond to request to reload information about existing shards
     onFindCommand([&](const RemoteCommandRequest& request) {
         ASSERT_EQUALS(configHost, request.target);
-        ASSERT_BSONOBJ_EQ(kReplSecondaryOkMetadata,
+        ASSERT_BSONOBJ_EQ(getReplSecondaryOkMetadata(),
                           rpc::TrackingMetadata::removeTrackingData(request.metadata));
 
         const NamespaceString nss(request.dbname, request.cmdObj.firstElement().String());

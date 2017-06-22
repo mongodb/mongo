@@ -51,12 +51,12 @@ using executor::RemoteCommandRequest;
 using std::vector;
 using unittest::assertGet;
 
-const BSONObj kReplSecondaryOkMetadata{[] {
+BSONObj getReplSecondaryOkMetadata() {
     BSONObjBuilder o;
     ReadPreferenceSetting(ReadPreference::Nearest).toContainingBSON(&o);
     o.append(rpc::kReplSetMetadataFieldName, 1);
     return o.obj();
-}()};
+}
 
 class BalancerConfigurationTestFixture : public ShardingTestFixture {
 protected:
@@ -66,7 +66,7 @@ protected:
      */
     void expectSettingsQuery(StringData key, StatusWith<boost::optional<BSONObj>> result) {
         onFindCommand([&](const RemoteCommandRequest& request) {
-            ASSERT_BSONOBJ_EQ(kReplSecondaryOkMetadata,
+            ASSERT_BSONOBJ_EQ(getReplSecondaryOkMetadata(),
                               rpc::TrackingMetadata::removeTrackingData(request.metadata));
 
             const NamespaceString nss(request.dbname, request.cmdObj.firstElement().String());

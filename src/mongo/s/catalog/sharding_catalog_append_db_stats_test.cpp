@@ -50,12 +50,12 @@ using executor::RemoteCommandResponse;
 
 using ShardingCatalogClientAppendDbStatsTest = ShardingCatalogTestFixture;
 
-const BSONObj kReplSecondaryOkMetadata{[] {
+BSONObj getReplSecondaryOkMetadata() {
     BSONObjBuilder o;
     ReadPreferenceSetting(ReadPreference::PrimaryPreferred).toContainingBSON(&o);
     o.append(rpc::kReplSetMetadataFieldName, 1);
     return o.obj();
-}()};
+}
 
 TEST_F(ShardingCatalogClientAppendDbStatsTest, BasicAppendDBStats) {
     configTargeter()->setFindHostReturnValue(HostAndPort("TestHost1"));
@@ -67,7 +67,7 @@ TEST_F(ShardingCatalogClientAppendDbStatsTest, BasicAppendDBStats) {
     });
 
     onCommand([](const RemoteCommandRequest& request) {
-        ASSERT_BSONOBJ_EQ(kReplSecondaryOkMetadata,
+        ASSERT_BSONOBJ_EQ(getReplSecondaryOkMetadata(),
                           rpc::TrackingMetadata::removeTrackingData(request.metadata));
 
         ASSERT_EQ("admin", request.dbname);
@@ -130,7 +130,7 @@ TEST_F(ShardingCatalogClientAppendDbStatsTest, AppendDBStatsWithFilter) {
     });
 
     onCommand([](const RemoteCommandRequest& request) {
-        ASSERT_BSONOBJ_EQ(kReplSecondaryOkMetadata,
+        ASSERT_BSONOBJ_EQ(getReplSecondaryOkMetadata(),
                           rpc::TrackingMetadata::removeTrackingData(request.metadata));
 
         ASSERT_EQ("admin", request.dbname);
