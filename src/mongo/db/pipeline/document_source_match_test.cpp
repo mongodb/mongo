@@ -446,42 +446,5 @@ TEST_F(DocumentSourceMatchTest, ShouldCorrectlyEvaluateElemMatchPredicate) {
     ASSERT_TRUE(match->getNext().isEOF());
 }
 
-TEST(ObjectForMatch, ShouldExtractTopLevelFieldIfDottedFieldNeeded) {
-    Document input(fromjson("{a: 1, b: {c: 1, d: 1}}"));
-    BSONObj expected = fromjson("{b: {c: 1, d: 1}}");
-    ASSERT_BSONOBJ_EQ(expected, DocumentSourceMatch::getObjectForMatch(input, {"b.c"}));
-}
-
-TEST(ObjectForMatch, ShouldExtractEntireArray) {
-    Document input(fromjson("{a: [1, 2, 3], b: 1}"));
-    BSONObj expected = fromjson("{a: [1, 2, 3]}");
-    ASSERT_BSONOBJ_EQ(expected, DocumentSourceMatch::getObjectForMatch(input, {"a"}));
-}
-
-TEST(ObjectForMatch, ShouldOnlyAddPrefixedFieldOnceIfTwoDottedSubfields) {
-    Document input(fromjson("{a: 1, b: {c: 1, f: {d: {e: 1}}}}"));
-    BSONObj expected = fromjson("{b: {c: 1, f: {d: {e: 1}}}}");
-    ASSERT_BSONOBJ_EQ(expected, DocumentSourceMatch::getObjectForMatch(input, {"b.f", "b.f.d.e"}));
-}
-
-TEST(ObjectForMatch, MissingFieldShouldNotAppearInResult) {
-    Document input(fromjson("{a: 1}"));
-    BSONObj expected;
-    ASSERT_BSONOBJ_EQ(expected, DocumentSourceMatch::getObjectForMatch(input, {"b", "c"}));
-}
-
-TEST(ObjectForMatch, ShouldSerializeNothingIfNothingIsNeeded) {
-    Document input(fromjson("{a: 1, b: {c: 1}}"));
-    BSONObj expected;
-    ASSERT_BSONOBJ_EQ(expected,
-                      DocumentSourceMatch::getObjectForMatch(input, std::set<std::string>{}));
-}
-
-TEST(ObjectForMatch, ShouldExtractEntireArrayFromPrefixOfDottedField) {
-    Document input(fromjson("{a: [{b: 1}, {b: 2}], c: 1}"));
-    BSONObj expected = fromjson("{a: [{b: 1}, {b: 2}]}");
-    ASSERT_BSONOBJ_EQ(expected, DocumentSourceMatch::getObjectForMatch(input, {"a.b"}));
-}
-
 }  // namespace
 }  // namespace mongo

@@ -32,7 +32,7 @@
 
 #include "mongo/bson/bsonobj.h"
 #include "mongo/db/exec/plan_stage.h"
-#include "mongo/db/index/btree_key_generator.h"
+#include "mongo/db/index/sort_key_generator.h"
 #include "mongo/db/query/index_bounds.h"
 #include "mongo/db/query/stage_types.h"
 
@@ -41,49 +41,6 @@ namespace mongo {
 class CollatorInterface;
 class Collection;
 class WorkingSetMember;
-
-/**
- * Maps a WSM value to a BSONObj key that can then be sorted via BSONObjCmp.
- */
-class SortKeyGenerator {
-public:
-    /**
-     * 'sortSpec' is the BSONObj in the .sort(...) clause.
-     *
-     * 'opCtx' must point to a valid OperationContext, but 'opCtx' does not need to outlive the
-     * constructed SortKeyGenerator.
-     */
-    SortKeyGenerator(OperationContext* opCtx,
-                     const BSONObj& sortSpec,
-                     const CollatorInterface* collator);
-
-    /**
-     * Returns the key used to sort 'member'. If the member is in LOC_AND_IDX state, it must not
-     * contain a $meta textScore in its sort spec, and this function will use the index key data
-     * stored in 'member' to extract the sort key. Otherwise, if the member is in LOC_AND_OBJ or
-     * OWNED_OBJ state, this function will use the object data stored in 'member' to extract the
-     * sort key.
-     */
-    Status getSortKey(const WorkingSetMember& member, BSONObj* objOut) const;
-
-private:
-    StatusWith<BSONObj> getSortKeyFromIndexKey(const WorkingSetMember& member) const;
-    StatusWith<BSONObj> getSortKeyFromObject(const WorkingSetMember& member) const;
-
-    const CollatorInterface* _collator = nullptr;
-
-    // The raw object in .sort()
-    BSONObj _rawSortSpec;
-
-    // The sort pattern with any non-Btree sort pulled out.
-    BSONObj _btreeObj;
-
-    // If we're not sorting with a $meta value we can short-cut some work.
-    bool _sortHasMeta = false;
-
-    // Helper to extract sorting keys from documents.
-    std::unique_ptr<BtreeKeyGenerator> _keyGen;
-};
 
 /**
  * Passes results from the child through after adding the sort key for each result as
@@ -99,8 +56,6 @@ public:
 
     bool isEOF() final;
 
-    StageState doWork(WorkingSetID* out) final;
-
     StageType stageType() const final {
         return STAGE_SORT_KEY_GENERATOR;
     }
@@ -111,7 +66,12 @@ public:
 
     static const char* kStageType;
 
+protected:
+    StageState doWork(WorkingSetID* out) final;
+
 private:
+    StatusWith<BSONObj> getSortKeyFromIndexKey(const WorkingSetMember& member) const;
+
     WorkingSet* const _ws;
 
     // The raw sort pattern as expressed by the user.

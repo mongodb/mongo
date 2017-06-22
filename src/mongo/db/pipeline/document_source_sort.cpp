@@ -32,6 +32,7 @@
 
 #include "mongo/db/jsobj.h"
 #include "mongo/db/pipeline/document.h"
+#include "mongo/db/pipeline/document_path_support.h"
 #include "mongo/db/pipeline/document_source_merge_cursors.h"
 #include "mongo/db/pipeline/expression.h"
 #include "mongo/db/pipeline/expression_context.h"
@@ -108,29 +109,18 @@ long long DocumentSourceSort::getLimit() const {
     return limitSrc ? limitSrc->getLimit() : -1;
 }
 
-void DocumentSourceSort::addKey(StringData fieldPath, bool ascending) {
-    VariablesParseState vps = pExpCtx->variablesParseState;
-    vSortKey.push_back(ExpressionFieldPath::parse(pExpCtx, "$$ROOT." + fieldPath.toString(), vps));
-    vAscending.push_back(ascending);
-}
-
 Document DocumentSourceSort::serializeSortKey(bool explain) const {
     MutableDocument keyObj;
-    // add the key fields
-    const size_t n = vSortKey.size();
+    const size_t n = _sortPattern.size();
     for (size_t i = 0; i < n; ++i) {
-        if (ExpressionFieldPath* efp = dynamic_cast<ExpressionFieldPath*>(vSortKey[i].get())) {
-            // ExpressionFieldPath gets special syntax that includes direction
-            const FieldPath& withVariable = efp->getFieldPath();
-            verify(withVariable.getPathLength() > 1);
-            verify(withVariable.getFieldName(0) == "ROOT");
-            const string fieldPath = withVariable.tail().fullPath();
-
-            // append a named integer based on the sort order
-            keyObj.setField(fieldPath, Value(vAscending[i] ? 1 : -1));
+        if (_sortPattern[i].fieldPath) {
+            // Append a named integer based on whether the sort is ascending/descending.
+            keyObj.setField(_sortPattern[i].fieldPath->fullPath(),
+                            Value(_sortPattern[i].isAscending ? 1 : -1));
         } else {
-            // other expressions use a made-up field name
-            keyObj[string(str::stream() << "$computed" << i)] = vSortKey[i]->serialize(explain);
+            // For sorts that are not simply on a field path, use a made-up field name.
+            keyObj[string(str::stream() << "$computed" << i)] =
+                _sortPattern[i].expression->serialize(explain);
         }
     }
     return keyObj.freeze();
@@ -152,8 +142,12 @@ Pipeline::SourceContainer::iterator DocumentSourceSort::doOptimizeAt(
 }
 
 DocumentSource::GetDepsReturn DocumentSourceSort::getDependencies(DepsTracker* deps) const {
-    for (size_t i = 0; i < vSortKey.size(); ++i) {
-        vSortKey[i]->addDependencies(deps);
+    for (auto&& keyPart : _sortPattern) {
+        if (keyPart.expression) {
+            keyPart.expression->addDependencies(deps);
+        } else {
+            deps->fields.insert(keyPart.fieldPath->fullPath());
+        }
     }
 
     return SEE_NEXT;
@@ -173,7 +167,7 @@ intrusive_ptr<DocumentSourceSort> DocumentSourceSort::create(
     uint64_t maxMemoryUsageBytes) {
     intrusive_ptr<DocumentSourceSort> pSort(new DocumentSourceSort(pExpCtx));
     pSort->_maxMemoryUsageBytes = maxMemoryUsageBytes;
-    pSort->_sort = sortOrder.getOwned();
+    pSort->_rawSort = sortOrder.getOwned();
 
     for (auto&& keyField : sortOrder) {
         auto fieldName = keyField.fieldNameStringData();
@@ -184,6 +178,8 @@ intrusive_ptr<DocumentSourceSort> DocumentSourceSort::create(
             continue;
         }
 
+        SortPatternPart patternPart;
+
         if (keyField.type() == Object) {
             BSONObj metaDoc = keyField.Obj();
             // this restriction is due to needing to figure out sort direction
@@ -191,12 +187,18 @@ intrusive_ptr<DocumentSourceSort> DocumentSourceSort::create(
                     "$meta is the only expression supported by $sort right now",
                     metaDoc.firstElement().fieldNameStringData() == "$meta");
 
+            uassert(ErrorCodes::FailedToParse,
+                    "Cannot have additional keys in a $meta sort specification",
+                    metaDoc.nFields() == 1);
+
             VariablesParseState vps = pExpCtx->variablesParseState;
-            pSort->vSortKey.push_back(ExpressionMeta::parse(pExpCtx, metaDoc.firstElement(), vps));
+            patternPart.expression = ExpressionMeta::parse(pExpCtx, metaDoc.firstElement(), vps);
 
             // If sorting by textScore, sort highest scores first. If sorting by randVal, order
             // doesn't matter, so just always use descending.
-            pSort->vAscending.push_back(false);
+            patternPart.isAscending = false;
+
+            pSort->_sortPattern.push_back(std::move(patternPart));
             continue;
         }
 
@@ -210,10 +212,17 @@ intrusive_ptr<DocumentSourceSort> DocumentSourceSort::create(
                 "$sort key ordering must be 1 (for ascending) or -1 (for descending)",
                 ((sortOrder == 1) || (sortOrder == -1)));
 
-        pSort->addKey(fieldName, (sortOrder > 0));
+        patternPart.fieldPath = FieldPath{fieldName};
+        patternPart.isAscending = (sortOrder > 0);
+        pSort->_paths.insert(patternPart.fieldPath->fullPath());
+        pSort->_sortPattern.push_back(std::move(patternPart));
     }
 
-    uassert(15976, "$sort stage must have at least one sort key", !pSort->vSortKey.empty());
+    uassert(15976, "$sort stage must have at least one sort key", !pSort->_sortPattern.empty());
+
+    const bool isExplain = false;
+    pSort->_sortKeyGen =
+        SortKeyGenerator{pSort->serializeSortKey(isExplain).toBson(), pExpCtx->getCollator()};
 
     if (limit > 0) {
         pSort->setLimitSrc(DocumentSourceLimit::create(pExpCtx, limit));
@@ -224,7 +233,7 @@ intrusive_ptr<DocumentSourceSort> DocumentSourceSort::create(
 
 SortOptions DocumentSourceSort::makeSortOptions() const {
     /* make sure we've got a sort key */
-    verify(vSortKey.size());
+    verify(_sortPattern.size());
 
     SortOptions opts;
     if (limitSrc)
@@ -305,17 +314,68 @@ void DocumentSourceSort::populateFromCursors(const vector<DBClientCursor*>& curs
     _populated = true;
 }
 
-Value DocumentSourceSort::extractKey(const Document& d) const {
-    if (vSortKey.size() == 1) {
-        return vSortKey[0]->evaluate(d);
+StatusWith<Value> DocumentSourceSort::extractKeyPart(const Document& doc,
+                                                     const SortPatternPart& patternPart) const {
+    if (patternPart.fieldPath) {
+        invariant(!patternPart.expression);
+        return document_path_support::extractElementAlongNonArrayPath(doc, *patternPart.fieldPath);
+    } else {
+        invariant(patternPart.expression);
+        return patternPart.expression->evaluate(doc);
+    }
+}
+
+StatusWith<Value> DocumentSourceSort::extractKeyFast(const Document& doc) const {
+    if (_sortPattern.size() == 1u) {
+        return extractKeyPart(doc, _sortPattern[0]);
     }
 
     vector<Value> keys;
-    keys.reserve(vSortKey.size());
-    for (size_t i = 0; i < vSortKey.size(); i++) {
-        keys.push_back(vSortKey[i]->evaluate(d));
+    keys.reserve(_sortPattern.size());
+    for (auto&& keyPart : _sortPattern) {
+        auto extractedKey = extractKeyPart(doc, keyPart);
+        if (!extractedKey.isOK()) {
+            // We can't use the fast path, so bail out.
+            return extractedKey;
+        }
+
+        keys.push_back(std::move(extractedKey.getValue()));
     }
-    return Value(std::move(keys));
+    return Value{std::move(keys)};
+}
+
+Value DocumentSourceSort::extractKeyWithArray(const Document& doc) const {
+    SortKeyGenerator::Metadata metadata;
+    if (doc.hasTextScore()) {
+        metadata.textScore = doc.getTextScore();
+    }
+    if (doc.hasRandMetaField()) {
+        metadata.randVal = doc.getRandMetaField();
+    }
+
+    // Convert the Document to a BSONObj, but only do the conversion for the paths we actually need.
+    // Then run the result through the SortKeyGenerator to obtain the final sort key.
+    auto bsonDoc = document_path_support::documentToBsonWithPaths(doc, _paths);
+    auto bsonKey = uassertStatusOK(_sortKeyGen->getSortKey(std::move(bsonDoc), &metadata));
+
+    // Convert BSON sort key, which is an object with empty field names, into the corresponding
+    // array of keys representation as a Value. BSONObj {'': 1, '': [2, 3]} becomes Value [1, [2,
+    // 3]].
+    vector<Value> keys;
+    keys.reserve(_sortPattern.size());
+    for (auto&& elt : bsonKey) {
+        keys.push_back(Value{elt});
+    }
+    return Value{std::move(keys)};
+}
+
+Value DocumentSourceSort::extractKey(const Document& doc) const {
+    auto key = extractKeyFast(doc);
+    if (key.isOK()) {
+        return key.getValue();
+    }
+
+    return extractKeyWithArray(doc);
 }
 
 int DocumentSourceSort::compare(const Value& lhs, const Value& rhs) const {
@@ -326,9 +386,9 @@ int DocumentSourceSort::compare(const Value& lhs, const Value& rhs) const {
       However, the tricky part is what to do is none of the sort keys are
       present.  In this case, consider the document less.
     */
-    const size_t n = vSortKey.size();
+    const size_t n = _sortPattern.size();
     if (n == 1) {  // simple fast case
-        if (vAscending[0])
+        if (_sortPattern[0].isAscending)
             return pExpCtx->getValueComparator().compare(lhs, rhs);
         else
             return -pExpCtx->getValueComparator().compare(lhs, rhs);
@@ -339,7 +399,7 @@ int DocumentSourceSort::compare(const Value& lhs, const Value& rhs) const {
         int cmp = pExpCtx->getValueComparator().compare(lhs[i], rhs[i]);
         if (cmp) {
             /* if necessary, adjust the return value by the key ordering */
-            if (!vAscending[i])
+            if (!_sortPattern[i].isAscending)
                 cmp = -cmp;
 
             return cmp;
@@ -361,11 +421,10 @@ intrusive_ptr<DocumentSource> DocumentSourceSort::getShardSource() {
 intrusive_ptr<DocumentSource> DocumentSourceSort::getMergeSource() {
     verify(!_mergingPresorted);
     intrusive_ptr<DocumentSourceSort> other = new DocumentSourceSort(pExpCtx);
-    other->vAscending = vAscending;
-    other->vSortKey = vSortKey;
+    other->_sortPattern = _sortPattern;
     other->limitSrc = limitSrc;
     other->_mergingPresorted = true;
-    other->_sort = _sort;
+    other->_rawSort = _rawSort;
     return other;
 }
 }

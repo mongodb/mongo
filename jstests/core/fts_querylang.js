@@ -4,8 +4,6 @@ var t = db.getSiblingDB("test").getCollection("fts_querylang");
 var cursor;
 var results;
 
-db.adminCommand({setParameter: 1, newQueryFrameworkEnabled: true});
-
 t.drop();
 
 t.insert({_id: 0, unindexedField: 0, a: "textual content"});

@@ -281,6 +281,101 @@ TEST(VisitAllValuesAtPathTest, DoesNotAddMissingValueWithinArrayToResults) {
     ASSERT_EQ(values.count(Value(2)), 1UL);
 }
 
+TEST(ExtractElementAlongNonArrayPathTest, ReturnsMissingIfPathDoesNotExist) {
+    Document doc{{"a", 1}, {"b", 2}};
+    auto result = extractElementAlongNonArrayPath(doc, FieldPath{"c.d"});
+    ASSERT_OK(result.getStatus());
+    ASSERT_VALUE_EQ(result.getValue(), Value{});
+}
+
+TEST(ExtractElementAlongNonArrayPathTest, ReturnsMissingIfPathPartiallyExists) {
+    Document doc{fromjson("{a: {b: {c: 1}}}")};
+    auto result = extractElementAlongNonArrayPath(doc, FieldPath{"a.b.c.d"});
+    ASSERT_OK(result.getStatus());
+    ASSERT_VALUE_EQ(result.getValue(), Value{});
+}
+
+TEST(ExtractElementAlongNonArrayPathTest, ReturnsValueIfPathExists) {
+    Document doc{fromjson("{a: {b: {c: {d: {e: 1}}}}}")};
+    auto result = extractElementAlongNonArrayPath(doc, FieldPath{"a.b.c.d"});
+    ASSERT_OK(result.getStatus());
+    ASSERT_VALUE_EQ(result.getValue(), Value{BSON("e" << 1)});
+}
+
+TEST(ExtractElementAlongNonArrayPathTest, FailsIfPathTerminatesAtEmptyArray) {
+    Document doc{fromjson("{a: {b: {c: {d: []}}}}}")};
+    auto result = extractElementAlongNonArrayPath(doc, FieldPath{"a.b.c.d"});
+    ASSERT_EQ(result.getStatus(), ErrorCodes::InternalError);
+}
+
+TEST(ExtractElementAlongNonArrayPathTest, FailsIfPathTerminatesAtNonEmptyArray) {
+    Document doc{fromjson("{a: {b: {c: {d: [1, 2, 3]}}}}}")};
+    auto result = extractElementAlongNonArrayPath(doc, FieldPath{"a.b.c.d"});
+    ASSERT_EQ(result.getStatus(), ErrorCodes::InternalError);
+}
+
+TEST(ExtractElementAlongNonArrayPathTest, FailsIfPathContainsArray) {
+    Document doc{fromjson("{a: {b: [{c: {d: 1}}]}}")};
+    auto result = extractElementAlongNonArrayPath(doc, FieldPath{"a.b.c.d"});
+    ASSERT_EQ(result.getStatus(), ErrorCodes::InternalError);
+}
+
+TEST(ExtractElementAlongNonArrayPathTest, FailsIfFirstPathComponentIsArray) {
+    Document doc{fromjson("{a: [1, 2, {b: 1}]}")};
+    auto result = extractElementAlongNonArrayPath(doc, FieldPath{"a.b"});
+    ASSERT_EQ(result.getStatus(), ErrorCodes::InternalError);
+}
+
+TEST(DocumentToBsonWithPathsTest, ShouldExtractTopLevelFieldIfDottedFieldNeeded) {
+    Document input(fromjson("{a: 1, b: {c: 1, d: 1}}"));
+    BSONObj expected = fromjson("{b: {c: 1, d: 1}}");
+    ASSERT_BSONOBJ_EQ(expected, document_path_support::documentToBsonWithPaths(input, {"b.c"}));
+}
+
+TEST(DocumentToBsonWithPathsTest, ShouldExtractEntireArray) {
+    Document input(fromjson("{a: [1, 2, 3], b: 1}"));
+    BSONObj expected = fromjson("{a: [1, 2, 3]}");
+    ASSERT_BSONOBJ_EQ(expected, document_path_support::documentToBsonWithPaths(input, {"a"}));
+}
+
+TEST(DocumentToBsonWithPathsTest, ShouldExtractEntireArrayWithNumericPathComponent) {
+    Document input(fromjson("{a: [1, 2, 3], b: 1}"));
+    BSONObj expected = fromjson("{a: [1, 2, 3]}");
+    ASSERT_BSONOBJ_EQ(expected, document_path_support::documentToBsonWithPaths(input, {"a.0"}));
+}
+
+TEST(DocumentToBsonWithPathsTest, ShouldExtractEntireObjectWithNumericPathComponent) {
+    Document input(fromjson("{a: {'0': 2, c: 3}, b: 1}"));
+    BSONObj expected = fromjson("{a: {'0': 2, c: 3}}");
+    ASSERT_BSONOBJ_EQ(expected, document_path_support::documentToBsonWithPaths(input, {"a.0"}));
+}
+
+TEST(DocumentToBsonWithPathsTest, ShouldOnlyAddPrefixedFieldOnceIfTwoDottedSubfields) {
+    Document input(fromjson("{a: 1, b: {c: 1, f: {d: {e: 1}}}}"));
+    BSONObj expected = fromjson("{b: {c: 1, f: {d: {e: 1}}}}");
+    ASSERT_BSONOBJ_EQ(expected,
+                      document_path_support::documentToBsonWithPaths(input, {"b.f", "b.f.d.e"}));
+}
+
+TEST(DocumentToBsonWithPathsTest, MissingFieldShouldNotAppearInResult) {
+    Document input(fromjson("{a: 1}"));
+    BSONObj expected;
+    ASSERT_BSONOBJ_EQ(expected, document_path_support::documentToBsonWithPaths(input, {"b", "c"}));
+}
+
+TEST(DocumentToBsonWithPathsTest, ShouldSerializeNothingIfNothingIsNeeded) {
+    Document input(fromjson("{a: 1, b: {c: 1}}"));
+    BSONObj expected;
+    ASSERT_BSONOBJ_EQ(
+        expected, document_path_support::documentToBsonWithPaths(input, std::set<std::string>{}));
+}
+
+TEST(DocumentToBsonWithPathsTest, ShouldExtractEntireArrayFromPrefixOfDottedField) {
+    Document input(fromjson("{a: [{b: 1}, {b: 2}], c: 1}"));
+    BSONObj expected = fromjson("{a: [{b: 1}, {b: 2}]}");
+    ASSERT_BSONOBJ_EQ(expected, document_path_support::documentToBsonWithPaths(input, {"a.b"}));
+}
+
 }  // namespace
 }  // namespace document_path_support
 }  // namespace mongo

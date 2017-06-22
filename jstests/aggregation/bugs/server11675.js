@@ -80,6 +80,38 @@ var server11675 = function() {
         limit: 1
     });
 
+    // $meta sort specification should be rejected if it has additional keys.
+    assert.throws(function() {
+        t.aggregate([
+             {$match: {$text: {$search: 'apple banana'}}},
+             {$sort: {textScore: {$meta: 'textScore', extra: 1}}}
+         ]).itcount();
+    });
+
+    // $meta sort specification should be rejected if the type of meta sort is not known.
+    assert.throws(function() {
+        t.aggregate([
+             {$match: {$text: {$search: 'apple banana'}}},
+             {$sort: {textScore: {$meta: 'unknown'}}}
+         ]).itcount();
+    });
+
+    // Sort specification should be rejected if a $-keyword other than $meta is used.
+    assert.throws(function() {
+        t.aggregate([
+             {$match: {$text: {$search: 'apple banana'}}},
+             {$sort: {textScore: {$notMeta: 'textScore'}}}
+         ]).itcount();
+    });
+
+    // Sort specification should be rejected if it is a string, not an object with $meta.
+    assert.throws(function() {
+        t.aggregate([
+             {$match: {$text: {$search: 'apple banana'}}},
+             {$sort: {textScore: 'textScore'}}
+         ]).itcount();
+    });
+
     // sharded find requires projecting the score to sort, but sharded agg does not.
     var findRes = t.find({$text: {$search: "apple banana"}}, {textScore: {$meta: 'textScore'}})
                       .sort({textScore: {$meta: 'textScore'}})

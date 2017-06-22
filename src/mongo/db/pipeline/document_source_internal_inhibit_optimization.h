@@ -1,5 +1,5 @@
 /**
- * Copyright (C) 2016 MongoDB Inc.
+ * Copyright (C) 2017 MongoDB Inc.
  *
  * This program is free software: you can redistribute it and/or  modify
  * it under the terms of the GNU Affero General Public License, version 3,
@@ -28,41 +28,34 @@
 
 #pragma once
 
-#include <vector>
-
-#include "mongo/db/pipeline/document.h"
-#include "mongo/db/pipeline/expression_context.h"
-#include "mongo/db/pipeline/field_path.h"
-#include "mongo/db/pipeline/value.h"
-#include "mongo/db/pipeline/value_comparator.h"
-#include "mongo/stdx/functional.h"
+#include "mongo/db/pipeline/document_source.h"
 
 namespace mongo {
-namespace document_path_support {
 
 /**
- * Calls 'callback' once for each value found at 'path' in the document 'doc'. If an array value is
- * found at 'path', it is expanded and 'callback' is invoked once for each value within the array.
- *
- * For example, 'callback' will be invoked on the values 1, 1, {a: 1}, 2 and 3 are on the path "x.y"
- * in the document {x: [{y: 1}, {y: 1}, {y: {a: 1}}, {y: [2, 3]}, 3, 4]}.
+ * An internal stage available for testing. Acts as a simple passthrough of intermediate results
+ * from the source stage. Does not participate in optimizations such as swapping, coalescing, or
+ * pushdown into the query system, so this stage can be useful in tests to ensure that an
+ * unoptimized code path is being exercised.
  */
-void visitAllValuesAtPath(const Document& doc,
-                          const FieldPath& path,
-                          stdx::function<void(const Value&)> callback);
+class DocumentSourceInternalInhibitOptimization final : public DocumentSource {
+public:
+    static constexpr StringData kStageName = "$_internalInhibitOptimization"_sd;
 
-/**
- * Returns the element at 'path' in 'doc', or a missing Value if the path does not fully exist.
- *
- * Returns ErrorCodes::InternalError if an array is encountered along the path or at the end of the
- * path.
- */
-StatusWith<Value> extractElementAlongNonArrayPath(const Document& doc, const FieldPath& path);
+    static boost::intrusive_ptr<DocumentSource> createFromBson(
+        BSONElement, const boost::intrusive_ptr<ExpressionContext>&);
 
-/**
- * Extracts 'paths' from the input document and returns a BSON object containing only those paths.
- */
-BSONObj documentToBsonWithPaths(const Document&, const std::set<std::string>& paths);
+    DocumentSourceInternalInhibitOptimization(const boost::intrusive_ptr<ExpressionContext>& expCtx)
+        : DocumentSource(expCtx) {}
 
-}  // namespace document_path_support
-}  // namespace mongo
+    const char* getSourceName() const final {
+        return kStageName.rawData();
+    }
+
+    GetNextResult getNext() final;
+
+private:
+    Value serialize(boost::optional<ExplainOptions::Verbosity> explain = boost::none) const final;
+};
+
+}  // namesace mongo

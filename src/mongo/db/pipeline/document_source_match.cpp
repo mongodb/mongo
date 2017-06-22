@@ -37,6 +37,7 @@
 #include "mongo/db/matcher/expression_parser.h"
 #include "mongo/db/matcher/extensions_callback_noop.h"
 #include "mongo/db/pipeline/document.h"
+#include "mongo/db/pipeline/document_path_support.h"
 #include "mongo/db/pipeline/expression.h"
 #include "mongo/db/pipeline/lite_parsed_document_source.h"
 #include "mongo/stdx/memory.h"
@@ -78,7 +79,8 @@ DocumentSource::GetNextResult DocumentSourceMatch::getNext() {
         // only serialize the fields we need to do the match.
         BSONObj toMatch = _dependencies.needWholeDocument
             ? nextInput.getDocument().toBson()
-            : getObjectForMatch(nextInput.getDocument(), _dependencies.fields);
+            : document_path_support::documentToBsonWithPaths(nextInput.getDocument(),
+                                                             _dependencies.fields);
 
         if (_expression->matchesBSON(toMatch)) {
             return nextInput;
@@ -118,22 +120,6 @@ Pipeline::SourceContainer::iterator DocumentSourceMatch::doOptimizeAt(
         return itr == container->begin() ? itr : std::prev(itr);
     }
     return std::next(itr);
-}
-
-BSONObj DocumentSourceMatch::getObjectForMatch(const Document& input,
-                                               const std::set<std::string>& fields) {
-    BSONObjBuilder matchObject;
-    for (auto&& field : fields) {
-        // getNestedField does not handle dotted paths correctly, so instead of retrieving the
-        // entire path, we just extract the first element of the path.
-        const auto prefix = FieldPath::extractFirstFieldFromDottedPath(field);
-        if (!matchObject.hasField(prefix)) {
-            // Avoid adding the same prefix twice.
-            input.getField(prefix).addToBsonObj(&matchObject, prefix);
-        }
-    }
-
-    return matchObject.obj();
 }
 
 namespace {

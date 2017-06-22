@@ -119,5 +119,37 @@ void visitAllValuesAtPath(const Document& doc,
     visitAllValuesAtPathHelper(doc, path, 0, callback);
 }
 
+StatusWith<Value> extractElementAlongNonArrayPath(const Document& doc, const FieldPath& path) {
+    invariant(path.getPathLength() > 0);
+    Value curValue = doc.getField(path.getFieldName(0));
+    if (curValue.getType() == BSONType::Array) {
+        return {ErrorCodes::InternalError, "array along path"};
+    }
+
+    for (size_t i = 1; i < path.getPathLength(); i++) {
+        curValue = curValue[path.getFieldName(i)];
+        if (curValue.getType() == BSONType::Array) {
+            return {ErrorCodes::InternalError, "array along path"};
+        }
+    }
+
+    return curValue;
+}
+
+BSONObj documentToBsonWithPaths(const Document& input, const std::set<std::string>& paths) {
+    BSONObjBuilder outputBuilder;
+    for (auto&& path : paths) {
+        // getNestedField does not handle dotted paths correctly, so instead of retrieving the
+        // entire path, we just extract the first element of the path.
+        const auto prefix = FieldPath::extractFirstFieldFromDottedPath(path);
+        if (!outputBuilder.hasField(prefix)) {
+            // Avoid adding the same prefix twice.
+            input.getField(prefix).addToBsonObj(&outputBuilder, prefix);
+        }
+    }
+
+    return outputBuilder.obj();
+}
+
 }  // namespace document_path_support
 }  // namespace mongo

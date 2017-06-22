@@ -28,7 +28,9 @@
 
 #include "mongo/platform/basic.h"
 
+#include "mongo/db/exec/queued_data_stage.h"
 #include "mongo/db/exec/sort_key_generator.h"
+#include "mongo/db/exec/working_set_computed_data.h"
 #include "mongo/db/json.h"
 #include "mongo/db/query/collation/collator_interface_mock.h"
 #include "mongo/db/query/query_test_service_context.h"
@@ -39,42 +41,53 @@ namespace mongo {
 
 namespace {
 
+BSONObj extractKeyFromKeyGenStage(SortKeyGeneratorStage* sortKeyGen, WorkingSet* workingSet) {
+    WorkingSetID wsid;
+    PlanStage::StageState state = PlanStage::NEED_TIME;
+    while (state == PlanStage::NEED_TIME) {
+        state = sortKeyGen->work(&wsid);
+    }
+
+    ASSERT_EQ(state, PlanStage::ADVANCED);
+    auto wsm = workingSet->get(wsid);
+    auto sortKeyComputedData =
+        static_cast<const SortKeyComputedData*>(wsm->getComputed(WSM_SORT_KEY));
+    return sortKeyComputedData->getSortKey();
+}
+
 /**
- * Test function to verify that the SortKeyGenerator can generate a sortKey from a fetched document.
+ * Given a JSON string 'sortSpec' representing a sort pattern, returns the corresponding sort key
+ * from 'doc', a JSON string representation of a user document. Does so using the SORT_KEY_GENERATOR
+ * stage.
  *
- * sortSpec - The JSON representation of the sort spec BSONObj.
- * doc - The JSON representation of the BSON document.
- * queryObj - The JSON representation of the query predicate. Used when generating the sort key from
- * an array.
- * collator - The collation for the sort that we are are generating keys for.
- *
- * Returns the BSON representation of the sort key, to be checked against the expected sort key.
+ * The 'collator' is used to specify the string comparison semantics that should be used when
+ * generating the sort key.
  */
 BSONObj extractSortKey(const char* sortSpec, const char* doc, const CollatorInterface* collator) {
     QueryTestServiceContext serviceContext;
     auto opCtx = serviceContext.makeOperationContext();
 
-    WorkingSetMember wsm;
-    wsm.obj = Snapshotted<BSONObj>(SnapshotId(), fromjson(doc));
-    wsm.transitionToOwnedObj();
+    WorkingSet workingSet;
 
-    BSONObj sortKey;
-    auto sortKeyGen =
-        stdx::make_unique<SortKeyGenerator>(opCtx.get(), fromjson(sortSpec), collator);
-    ASSERT_OK(sortKeyGen->getSortKey(wsm, &sortKey));
+    auto mockStage = stdx::make_unique<QueuedDataStage>(opCtx.get(), &workingSet);
+    auto wsid = workingSet.allocate();
+    auto wsm = workingSet.get(wsid);
+    wsm->obj = Snapshotted<BSONObj>(SnapshotId(), fromjson(doc));
+    wsm->transitionToOwnedObj();
+    mockStage->pushBack(wsid);
 
-    return sortKey;
+    BSONObj sortPattern = fromjson(sortSpec);
+    SortKeyGeneratorStage sortKeyGen{
+        opCtx.get(), mockStage.release(), &workingSet, std::move(sortPattern), collator};
+    return extractKeyFromKeyGenStage(&sortKeyGen, &workingSet);
 }
 
 /**
- * Test function to verify that the SortKeyGenerator can generate a sortKey while using only index
- * data (that is, the document will not be fetched). For SERVER-20117.
+ * Given a JSON string 'sortSpec' representing a sort pattern, returns the corresponding sort key
+ * from the index key 'ikd'. Does so using the SORT_KEY_GENERATOR stage.
  *
- * sortSpec - The JSON representation of the sort spec BSONObj.
- * ikd - The data stored in the index.
- * collator - The collation for the sort that we are are generating keys for.
- *
- * Returns the BSON representation of the sort key, to be checked against the expected sort key.
+ * The 'collator' is used to specify the string comparison semantics that should be used when
+ * generating the sort key.
  */
 BSONObj extractSortKeyCovered(const char* sortSpec,
                               const IndexKeyDatum& ikd,
@@ -82,33 +95,34 @@ BSONObj extractSortKeyCovered(const char* sortSpec,
     QueryTestServiceContext serviceContext;
     auto opCtx = serviceContext.makeOperationContext();
 
-    WorkingSet ws;
-    WorkingSetID wsid = ws.allocate();
-    WorkingSetMember* wsm = ws.get(wsid);
+    WorkingSet workingSet;
+
+    auto mockStage = stdx::make_unique<QueuedDataStage>(opCtx.get(), &workingSet);
+    auto wsid = workingSet.allocate();
+    auto wsm = workingSet.get(wsid);
     wsm->keyData.push_back(ikd);
-    ws.transitionToRecordIdAndIdx(wsid);
+    workingSet.transitionToRecordIdAndIdx(wsid);
+    mockStage->pushBack(wsid);
 
-    BSONObj sortKey;
-    auto sortKeyGen =
-        stdx::make_unique<SortKeyGenerator>(opCtx.get(), fromjson(sortSpec), collator);
-    ASSERT_OK(sortKeyGen->getSortKey(*wsm, &sortKey));
-
-    return sortKey;
+    BSONObj sortPattern = fromjson(sortSpec);
+    SortKeyGeneratorStage sortKeyGen{
+        opCtx.get(), mockStage.release(), &workingSet, std::move(sortPattern), collator};
+    return extractKeyFromKeyGenStage(&sortKeyGen, &workingSet);
 }
 
-TEST(SortKeyGeneratorTest, SortKeyNormal) {
+TEST(SortKeyGeneratorStageTest, SortKeyNormal) {
     BSONObj actualOut = extractSortKey("{a: 1}", "{_id: 0, a: 5}", nullptr);
     BSONObj expectedOut = BSON("" << 5);
     ASSERT_BSONOBJ_EQ(actualOut, expectedOut);
 }
 
-TEST(SortKeyGeneratorTest, SortKeyNormal2) {
+TEST(SortKeyGeneratorStageTest, SortKeyNormal2) {
     BSONObj actualOut = extractSortKey("{a: 1}", "{_id: 0, z: 10, a: 6, b: 16}", nullptr);
     BSONObj expectedOut = BSON("" << 6);
     ASSERT_BSONOBJ_EQ(actualOut, expectedOut);
 }
 
-TEST(SortKeyGeneratorTest, SortKeyString) {
+TEST(SortKeyGeneratorStageTest, SortKeyString) {
     BSONObj actualOut =
         extractSortKey("{a: 1}", "{_id: 0, z: 'thing1', a: 'thing2', b: 16}", nullptr);
     BSONObj expectedOut = BSON(""
@@ -116,28 +130,28 @@ TEST(SortKeyGeneratorTest, SortKeyString) {
     ASSERT_BSONOBJ_EQ(actualOut, expectedOut);
 }
 
-TEST(SortKeyGeneratorTest, SortKeyCompound) {
+TEST(SortKeyGeneratorStageTest, SortKeyCompound) {
     BSONObj actualOut =
         extractSortKey("{a: 1, b: 1}", "{_id: 0, z: 'thing1', a: 99, c: {a: 4}, b: 16}", nullptr);
     BSONObj expectedOut = BSON("" << 99 << "" << 16);
     ASSERT_BSONOBJ_EQ(actualOut, expectedOut);
 }
 
-TEST(SortKeyGeneratorTest, SortKeyEmbedded) {
+TEST(SortKeyGeneratorStageTest, SortKeyEmbedded) {
     BSONObj actualOut = extractSortKey(
         "{'c.a': 1, b: 1}", "{_id: 0, z: 'thing1', a: 99, c: {a: 4}, b: 16}", nullptr);
     BSONObj expectedOut = BSON("" << 4 << "" << 16);
     ASSERT_BSONOBJ_EQ(actualOut, expectedOut);
 }
 
-TEST(SortKeyGeneratorTest, SortKeyArray) {
+TEST(SortKeyGeneratorStageTest, SortKeyArray) {
     BSONObj actualOut = extractSortKey(
         "{'c': 1, b: 1}", "{_id: 0, z: 'thing1', a: 99, c: [2, 4, 1], b: 16}", nullptr);
     BSONObj expectedOut = BSON("" << 1 << "" << 16);
     ASSERT_BSONOBJ_EQ(actualOut, expectedOut);
 }
 
-TEST(SortKeyGeneratorTest, SortKeyCoveredNormal) {
+TEST(SortKeyGeneratorStageTest, SortKeyCoveredNormal) {
     CollatorInterface* collator = nullptr;
     BSONObj actualOut = extractSortKeyCovered(
         "{a: 1}", IndexKeyDatum(BSON("a" << 1), BSON("" << 5), nullptr), collator);
@@ -145,7 +159,7 @@ TEST(SortKeyGeneratorTest, SortKeyCoveredNormal) {
     ASSERT_BSONOBJ_EQ(actualOut, expectedOut);
 }
 
-TEST(SortKeyGeneratorTest, SortKeyCoveredEmbedded) {
+TEST(SortKeyGeneratorStageTest, SortKeyCoveredEmbedded) {
     CollatorInterface* collator = nullptr;
     BSONObj actualOut = extractSortKeyCovered(
         "{'a.c': 1}",
@@ -155,7 +169,7 @@ TEST(SortKeyGeneratorTest, SortKeyCoveredEmbedded) {
     ASSERT_BSONOBJ_EQ(actualOut, expectedOut);
 }
 
-TEST(SortKeyGeneratorTest, SortKeyCoveredCompound) {
+TEST(SortKeyGeneratorStageTest, SortKeyCoveredCompound) {
     CollatorInterface* collator = nullptr;
     BSONObj actualOut = extractSortKeyCovered(
         "{a: 1, c: 1}",
@@ -165,7 +179,7 @@ TEST(SortKeyGeneratorTest, SortKeyCoveredCompound) {
     ASSERT_BSONOBJ_EQ(actualOut, expectedOut);
 }
 
-TEST(SortKeyGeneratorTest, SortKeyCoveredCompound2) {
+TEST(SortKeyGeneratorStageTest, SortKeyCoveredCompound2) {
     CollatorInterface* collator = nullptr;
     BSONObj actualOut = extractSortKeyCovered("{a: 1, b: 1}",
                                               IndexKeyDatum(BSON("a" << 1 << "b" << 1 << "c" << 1),
@@ -176,7 +190,7 @@ TEST(SortKeyGeneratorTest, SortKeyCoveredCompound2) {
     ASSERT_BSONOBJ_EQ(actualOut, expectedOut);
 }
 
-TEST(SortKeyGeneratorTest, SortKeyCoveredCompound3) {
+TEST(SortKeyGeneratorStageTest, SortKeyCoveredCompound3) {
     CollatorInterface* collator = nullptr;
     BSONObj actualOut =
         extractSortKeyCovered("{b: 1, c: 1}",
@@ -188,7 +202,7 @@ TEST(SortKeyGeneratorTest, SortKeyCoveredCompound3) {
     ASSERT_BSONOBJ_EQ(actualOut, expectedOut);
 }
 
-TEST(SortKeyGeneratorTest, ExtractStringSortKeyWithCollatorUsesComparisonKey) {
+TEST(SortKeyGeneratorStageTest, ExtractStringSortKeyWithCollatorUsesComparisonKey) {
     CollatorInterfaceMock collator(CollatorInterfaceMock::MockType::kReverseString);
     BSONObj actualOut =
         extractSortKey("{a: 1}", "{_id: 0, z: 'thing1', a: 'thing2', b: 16}", &collator);
@@ -197,14 +211,14 @@ TEST(SortKeyGeneratorTest, ExtractStringSortKeyWithCollatorUsesComparisonKey) {
     ASSERT_BSONOBJ_EQ(actualOut, expectedOut);
 }
 
-TEST(SortKeyGeneratorTest, CollatorHasNoEffectWhenExtractingNonStringSortKey) {
+TEST(SortKeyGeneratorStageTest, CollatorHasNoEffectWhenExtractingNonStringSortKey) {
     CollatorInterfaceMock collator(CollatorInterfaceMock::MockType::kReverseString);
     BSONObj actualOut = extractSortKey("{a: 1}", "{_id: 0, z: 10, a: 6, b: 16}", &collator);
     BSONObj expectedOut = BSON("" << 6);
     ASSERT_BSONOBJ_EQ(actualOut, expectedOut);
 }
 
-TEST(SortKeyGeneratorTest, CollatorHasNoAffectWhenExtractingCoveredSortKey) {
+TEST(SortKeyGeneratorStageTest, CollatorHasNoAffectWhenExtractingCoveredSortKey) {
     CollatorInterfaceMock collator(CollatorInterfaceMock::MockType::kReverseString);
     BSONObj actualOut = extractSortKeyCovered("{b: 1}",
                                               IndexKeyDatum(BSON("a" << 1 << "b" << 1),
@@ -217,13 +231,13 @@ TEST(SortKeyGeneratorTest, CollatorHasNoAffectWhenExtractingCoveredSortKey) {
     ASSERT_BSONOBJ_EQ(actualOut, expectedOut);
 }
 
-TEST(SortKeyGeneratorTest, SortKeyGenerationForArraysChoosesCorrectKey) {
+TEST(SortKeyGeneratorStageTest, SortKeyGenerationForArraysChoosesCorrectKey) {
     BSONObj actualOut = extractSortKey("{a: -1}", "{_id: 0, a: [1, 2, 3, 4]}", nullptr);
     BSONObj expectedOut = BSON("" << 4);
     ASSERT_BSONOBJ_EQ(actualOut, expectedOut);
 }
 
-TEST(SortKeyGeneratorTest, EnsureSortKeyGenerationForArraysRespectsCollation) {
+TEST(SortKeyGeneratorStageTest, EnsureSortKeyGenerationForArraysRespectsCollation) {
     CollatorInterfaceMock collator(CollatorInterfaceMock::MockType::kReverseString);
     BSONObj actualOut =
         extractSortKey("{a: 1}", "{_id: 0, a: ['aaz', 'zza', 'yya', 'zzb']}", &collator);
@@ -232,7 +246,7 @@ TEST(SortKeyGeneratorTest, EnsureSortKeyGenerationForArraysRespectsCollation) {
     ASSERT_BSONOBJ_EQ(actualOut, expectedOut);
 }
 
-TEST(SortKeyGeneratorTest, SortKeyGenerationForArraysRespectsCompoundOrdering) {
+TEST(SortKeyGeneratorStageTest, SortKeyGenerationForArraysRespectsCompoundOrdering) {
     BSONObj actualOut = extractSortKey("{'a.b': 1, 'a.c': -1}",
                                        "{_id: 0, a: [{b: 1, c: 0}, {b: 0, c: 3}, {b: 0, c: 1}]}",
                                        nullptr);

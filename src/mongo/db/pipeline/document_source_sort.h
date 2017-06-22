@@ -28,13 +28,13 @@
 
 #pragma once
 
+#include "mongo/db/index/sort_key_generator.h"
 #include "mongo/db/pipeline/document_source.h"
 #include "mongo/db/pipeline/document_source_limit.h"
+#include "mongo/db/pipeline/expression.h"
 #include "mongo/db/sorter/sorter.h"
 
 namespace mongo {
-
-class Expression;
 
 class DocumentSourceSort final : public DocumentSource, public SplittableDocumentSource {
 public:
@@ -59,7 +59,7 @@ public:
     }
 
     BSONObjSet getOutputSorts() final {
-        return allPrefixes(_sort);
+        return allPrefixes(_rawSort);
     }
 
     GetDepsReturn getDependencies(DepsTracker* deps) const final;
@@ -126,16 +126,39 @@ protected:
     void doDispose() final;
 
 private:
+    // This is used to merge pre-sorted results from a DocumentSourceMergeCursors.
+    class IteratorFromCursor;
+
+    using MySorter = Sorter<Value, Document>;
+
+    // For MySorter.
+    class Comparator {
+    public:
+        explicit Comparator(const DocumentSourceSort& source) : _source(source) {}
+        int operator()(const MySorter::Data& lhs, const MySorter::Data& rhs) const {
+            return _source.compare(lhs.first, rhs.first);
+        }
+
+    private:
+        const DocumentSourceSort& _source;
+    };
+
+    // Represents one of the components in a compound sort pattern. Each component is either the
+    // field path by which we are sorting, or an Expression which can be used to retrieve the sort
+    // value in the case of a $meta-sort (but not both).
+    struct SortPatternPart {
+        bool isAscending = true;
+        boost::optional<FieldPath> fieldPath;
+        boost::intrusive_ptr<Expression> expression;
+    };
+
+    using SortPattern = std::vector<SortPatternPart>;
+
     explicit DocumentSourceSort(const boost::intrusive_ptr<ExpressionContext>& pExpCtx);
 
     Value serialize(boost::optional<ExplainOptions::Verbosity> explain = boost::none) const final {
         MONGO_UNREACHABLE;  // Should call serializeToArray instead.
     }
-
-    /**
-     * Helper to add a sort key to this stage.
-     */
-    void addKey(StringData fieldPath, bool ascending);
 
     /**
      * Before returning anything, we have to consume all input and sort it. This method consumes all
@@ -146,27 +169,34 @@ private:
      * GetNextResult encountered, which may be either kEOF or kPauseExecution.
      */
     GetNextResult populate();
-    bool _populated = false;
-
-    BSONObj _sort;
 
     SortOptions makeSortOptions() const;
 
-    // This is used to merge pre-sorted results from a DocumentSourceMergeCursors.
-    class IteratorFromCursor;
+    /**
+     * Returns the sort key for 'doc' based on the SortPattern. Attempts to generate the key using a
+     * fast path that does not handle arrays. If an array is encountered, falls back on
+     * extractKeyWithArray().
+     */
+    Value extractKey(const Document& doc) const;
 
-    /* these two parallel each other */
-    typedef std::vector<boost::intrusive_ptr<Expression>> SortKey;
-    SortKey vSortKey;
-    std::vector<char> vAscending;  // used like std::vector<bool> but without specialization
+    /**
+     * Returns the sort key for 'doc' based on the SortPattern, or ErrorCodes::InternalError if an
+     * array is encountered during sort key generation.
+     */
+    StatusWith<Value> extractKeyFast(const Document& doc) const;
 
-    /// Extracts the fields in vSortKey from the Document;
-    Value extractKey(const Document& d) const;
+    /**
+     * Extracts the sort key component described by 'keyPart' from 'doc' and returns it. Returns
+     * ErrorCodes::Internal error if the path for 'keyPart' contains an array in 'doc'.
+     */
+    StatusWith<Value> extractKeyPart(const Document& doc, const SortPatternPart& keyPart) const;
 
-    /// Compare two Values according to the specified sort key.
+    /**
+     * Returns the sort key for 'doc' based on the SortPattern.
+     */
+    Value extractKeyWithArray(const Document& doc) const;
+
     int compare(const Value& lhs, const Value& rhs) const;
-
-    typedef Sorter<Value, Document> MySorter;
 
     /**
      * Absorbs 'limit', enabling a top-k sort. It is safe to call this multiple times, it will keep
@@ -178,17 +208,16 @@ private:
         }
     }
 
-    // For MySorter
-    class Comparator {
-    public:
-        explicit Comparator(const DocumentSourceSort& source) : _source(source) {}
-        int operator()(const MySorter::Data& lhs, const MySorter::Data& rhs) const {
-            return _source.compare(lhs.first, rhs.first);
-        }
+    bool _populated = false;
 
-    private:
-        const DocumentSourceSort& _source;
-    };
+    BSONObj _rawSort;
+
+    boost::optional<SortKeyGenerator> _sortKeyGen;
+
+    SortPattern _sortPattern;
+
+    // The set of paths on which we're sorting.
+    std::set<std::string> _paths;
 
     boost::intrusive_ptr<DocumentSourceLimit> limitSrc;
 

@@ -125,11 +125,6 @@ public:
     splitSourceBy(const std::set<std::string>& fields, const StringMap<std::string>& renames);
 
     /**
-     * Given a document 'input', extract 'fields' and produce a BSONObj with those values.
-     */
-    static BSONObj getObjectForMatch(const Document& input, const std::set<std::string>& fields);
-
-    /**
      * Returns a new DocumentSourceMatch with a MatchExpression that, if executed on the
      * sub-document at 'path', is equivalent to 'expression'.
      *

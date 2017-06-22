@@ -348,9 +348,9 @@ TEST_F(DocumentSourceSortExecutionTest, MissingObjectWithinArray) {
 /** Compare nested values from within an array. */
 TEST_F(DocumentSourceSortExecutionTest, ExtractArrayValues) {
     checkResults({Document{{"_id", 0}, {"a", DOC_ARRAY(DOC("b" << 1) << DOC("b" << 2))}},
-                  Document{{"_id", 1}, {"a", DOC_ARRAY(DOC("b" << 1) << DOC("b" << 1))}}},
+                  Document{{"_id", 1}, {"a", DOC_ARRAY(DOC("b" << 1) << DOC("b" << 0))}}},
                  BSON("a.b" << 1),
-                 "[{_id:1,a:[{b:1},{b:1}]},{_id:0,a:[{b:1},{b:2}]}]");
+                 "[{_id:1,a:[{b:1},{b:0}]},{_id:0,a:[{b:1},{b:2}]}]");
 }
 
 TEST_F(DocumentSourceSortExecutionTest, ShouldPauseWhenAskedTo) {
