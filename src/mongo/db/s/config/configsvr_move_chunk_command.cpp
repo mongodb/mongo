@@ -47,9 +47,9 @@ namespace {
 using std::string;
 using str::stream;
 
-class ConfigSvrMoveChunkCommand : public Command {
+class ConfigSvrMoveChunkCommand : public BasicCommand {
 public:
-    ConfigSvrMoveChunkCommand() : Command("_configsvrMoveChunk") {}
+    ConfigSvrMoveChunkCommand() : BasicCommand("_configsvrMoveChunk") {}
 
     void help(std::stringstream& help) const override {
         help << "Internal command, which is exported by the sharding config server. Do not call "

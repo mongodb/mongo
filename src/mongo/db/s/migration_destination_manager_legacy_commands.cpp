@@ -55,9 +55,9 @@ using std::string;
 
 namespace {
 
-class RecvChunkStartCommand : public Command {
+class RecvChunkStartCommand : public BasicCommand {
 public:
-    RecvChunkStartCommand() : Command("_recvChunkStart") {}
+    RecvChunkStartCommand() : BasicCommand("_recvChunkStart") {}
 
     void help(std::stringstream& h) const {
         h << "internal";
@@ -156,9 +156,9 @@ public:
 
 } recvChunkStartCmd;
 
-class RecvChunkStatusCommand : public Command {
+class RecvChunkStatusCommand : public BasicCommand {
 public:
-    RecvChunkStatusCommand() : Command("_recvChunkStatus") {}
+    RecvChunkStatusCommand() : BasicCommand("_recvChunkStatus") {}
 
     void help(std::stringstream& h) const {
         h << "internal";
@@ -195,9 +195,9 @@ public:
 
 } recvChunkStatusCommand;
 
-class RecvChunkCommitCommand : public Command {
+class RecvChunkCommitCommand : public BasicCommand {
 public:
-    RecvChunkCommitCommand() : Command("_recvChunkCommit") {}
+    RecvChunkCommitCommand() : BasicCommand("_recvChunkCommit") {}
 
     void help(std::stringstream& h) const {
         h << "internal";
@@ -242,9 +242,9 @@ public:
 
 } recvChunkCommitCommand;
 
-class RecvChunkAbortCommand : public Command {
+class RecvChunkAbortCommand : public BasicCommand {
 public:
-    RecvChunkAbortCommand() : Command("_recvChunkAbort") {}
+    RecvChunkAbortCommand() : BasicCommand("_recvChunkAbort") {}
 
     void help(std::stringstream& h) const {
         h << "internal";

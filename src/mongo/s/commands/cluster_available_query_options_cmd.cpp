@@ -35,9 +35,9 @@
 namespace mongo {
 namespace {
 
-class AvailableQueryOptions : public Command {
+class AvailableQueryOptions : public BasicCommand {
 public:
-    AvailableQueryOptions() : Command("availableQueryOptions", "availablequeryoptions") {}
+    AvailableQueryOptions() : BasicCommand("availableQueryOptions", "availablequeryoptions") {}
 
     bool slaveOk() const override {
         return true;

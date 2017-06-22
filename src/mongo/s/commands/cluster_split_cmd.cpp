@@ -84,9 +84,9 @@ BSONObj selectMedianKey(OperationContext* opCtx,
               "Unable to find median in chunk, possibly because chunk is empty.");
 }
 
-class SplitCollectionCmd : public Command {
+class SplitCollectionCmd : public BasicCommand {
 public:
-    SplitCollectionCmd() : Command("split", "split") {}
+    SplitCollectionCmd() : BasicCommand("split", "split") {}
 
     bool slaveOk() const override {
         return true;

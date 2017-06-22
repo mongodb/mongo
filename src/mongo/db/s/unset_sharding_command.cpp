@@ -44,9 +44,9 @@
 namespace mongo {
 namespace {
 
-class UnsetShardingCommand : public Command {
+class UnsetShardingCommand : public BasicCommand {
 public:
-    UnsetShardingCommand() : Command("unsetSharding") {}
+    UnsetShardingCommand() : BasicCommand("unsetSharding") {}
 
     void help(std::stringstream& help) const override {
         help << "internal";

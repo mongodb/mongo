@@ -54,9 +54,9 @@ namespace dps = ::mongo::dotted_path_support;
 
 namespace {
 
-class CheckShardingIndex : public Command {
+class CheckShardingIndex : public BasicCommand {
 public:
-    CheckShardingIndex() : Command("checkShardingIndex") {}
+    CheckShardingIndex() : BasicCommand("checkShardingIndex") {}
 
     virtual void help(std::stringstream& help) const {
         help << "Internal command.\n";

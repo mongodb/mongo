@@ -67,11 +67,11 @@ const char kTermField[] = "term";
 /**
  * A command for running .find() queries.
  */
-class FindCmd : public Command {
+class FindCmd : public BasicCommand {
     MONGO_DISALLOW_COPYING(FindCmd);
 
 public:
-    FindCmd() : Command("find") {}
+    FindCmd() : BasicCommand("find") {}
 
 
     virtual bool supportsWriteConcern(const BSONObj& cmd) const override {

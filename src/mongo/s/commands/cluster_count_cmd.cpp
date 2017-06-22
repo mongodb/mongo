@@ -47,9 +47,9 @@
 namespace mongo {
 namespace {
 
-class ClusterCountCmd : public Command {
+class ClusterCountCmd : public BasicCommand {
 public:
-    ClusterCountCmd() : Command("count") {}
+    ClusterCountCmd() : BasicCommand("count") {}
 
     bool slaveOk() const override {
         return true;

@@ -64,7 +64,7 @@ using std::stringstream;
 using std::vector;
 
 /* "dropIndexes" is now the preferred form - "deleteIndexes" deprecated */
-class CmdDropIndexes : public Command {
+class CmdDropIndexes : public BasicCommand {
 public:
     virtual bool slaveOk() const {
         return false;
@@ -83,7 +83,7 @@ public:
         out->push_back(Privilege(parseResourcePattern(dbname, cmdObj), actions));
     }
 
-    CmdDropIndexes() : Command("dropIndexes", "deleteIndexes") {}
+    CmdDropIndexes() : BasicCommand("dropIndexes", "deleteIndexes") {}
     bool run(OperationContext* opCtx,
              const string& dbname,
              const BSONObj& jsobj,
@@ -95,7 +95,7 @@ public:
 
 } cmdDropIndexes;
 
-class CmdReIndex : public Command {
+class CmdReIndex : public BasicCommand {
 public:
     virtual bool slaveOk() const {
         return true;
@@ -113,7 +113,7 @@ public:
         actions.addAction(ActionType::reIndex);
         out->push_back(Privilege(parseResourcePattern(dbname, cmdObj), actions));
     }
-    CmdReIndex() : Command("reIndex") {}
+    CmdReIndex() : BasicCommand("reIndex") {}
 
     bool run(OperationContext* opCtx,
              const string& dbname,

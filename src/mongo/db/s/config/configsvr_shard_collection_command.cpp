@@ -124,9 +124,9 @@ BSONObj makeCreateIndexesCmd(const NamespaceString& nss,
 /**
  * Internal sharding command run on config servers to add a shard to the cluster.
  */
-class ConfigSvrShardCollectionCommand : public Command {
+class ConfigSvrShardCollectionCommand : public BasicCommand {
 public:
-    ConfigSvrShardCollectionCommand() : Command("_configsvrShardCollection") {}
+    ConfigSvrShardCollectionCommand() : BasicCommand("_configsvrShardCollection") {}
 
     Status checkAuthForCommand(Client* client,
                                const std::string& dbname,

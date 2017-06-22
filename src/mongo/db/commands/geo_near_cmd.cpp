@@ -60,9 +60,9 @@ namespace mongo {
 using std::unique_ptr;
 using std::stringstream;
 
-class Geo2dFindNearCmd : public Command {
+class Geo2dFindNearCmd : public BasicCommand {
 public:
-    Geo2dFindNearCmd() : Command("geoNear") {}
+    Geo2dFindNearCmd() : BasicCommand("geoNear") {}
 
     virtual bool supportsWriteConcern(const BSONObj& cmd) const override {
         return false;

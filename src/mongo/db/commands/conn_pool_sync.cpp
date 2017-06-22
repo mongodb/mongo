@@ -37,9 +37,9 @@
 
 namespace mongo {
 
-class PoolFlushCmd : public Command {
+class PoolFlushCmd : public BasicCommand {
 public:
-    PoolFlushCmd() : Command("connPoolSync", "connpoolsync") {}
+    PoolFlushCmd() : BasicCommand("connPoolSync", "connpoolsync") {}
     virtual void help(std::stringstream& help) const {
         help << "internal";
     }

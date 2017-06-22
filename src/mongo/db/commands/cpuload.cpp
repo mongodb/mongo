@@ -39,9 +39,9 @@ using std::string;
 using std::stringstream;
 
 // Testing-only, enabled via command line.
-class CPULoadCommand : public Command {
+class CPULoadCommand : public BasicCommand {
 public:
-    CPULoadCommand() : Command("cpuload") {}
+    CPULoadCommand() : BasicCommand("cpuload") {}
     virtual bool slaveOk() const {
         return true;
     }

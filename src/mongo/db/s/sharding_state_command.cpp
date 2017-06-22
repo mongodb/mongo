@@ -43,9 +43,9 @@
 namespace mongo {
 namespace {
 
-class ShardingStateCmd : public Command {
+class ShardingStateCmd : public BasicCommand {
 public:
-    ShardingStateCmd() : Command("shardingState") {}
+    ShardingStateCmd() : BasicCommand("shardingState") {}
 
     virtual bool supportsWriteConcern(const BSONObj& cmd) const override {
         return false;

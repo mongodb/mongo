@@ -130,9 +130,9 @@ bool _checkMetadataForSuccess(OperationContext* opCtx,
     return true;
 }
 
-class SplitChunkCommand : public Command {
+class SplitChunkCommand : public BasicCommand {
 public:
-    SplitChunkCommand() : Command("splitChunk") {}
+    SplitChunkCommand() : BasicCommand("splitChunk") {}
 
     void help(std::stringstream& help) const override {
         help << "internal command usage only\n"

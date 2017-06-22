@@ -53,7 +53,7 @@ namespace mongo {
 using std::string;
 using std::stringstream;
 
-class CompactCmd : public Command {
+class CompactCmd : public BasicCommand {
 public:
     virtual bool supportsWriteConcern(const BSONObj& cmd) const override {
         return false;
@@ -84,7 +84,7 @@ public:
                 "  validate - check records are noncorrupt before adding to newly compacting "
                 "extents. slower but safer (defaults to true in this version)\n";
     }
-    CompactCmd() : Command("compact") {}
+    CompactCmd() : BasicCommand("compact") {}
 
     virtual bool run(OperationContext* opCtx,
                      const string& db,

@@ -147,9 +147,9 @@ BSONObj fixForShards(const BSONObj& orig,
  *
  * 11. Inspects the BSONObject size from step #8 and determines if it needs to split.
  */
-class MRCmd : public Command {
+class MRCmd : public BasicCommand {
 public:
-    MRCmd() : Command("mapReduce", "mapreduce") {}
+    MRCmd() : BasicCommand("mapReduce", "mapreduce") {}
 
     bool slaveOk() const override {
         return true;

@@ -39,9 +39,9 @@ namespace mongo {
 using std::string;
 using std::stringstream;
 
-class IsSelfCommand : public Command {
+class IsSelfCommand : public BasicCommand {
 public:
-    IsSelfCommand() : Command("_isSelf") {}
+    IsSelfCommand() : BasicCommand("_isSelf") {}
     virtual bool slaveOk() const {
         return true;
     }

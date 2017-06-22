@@ -33,9 +33,9 @@
 namespace mongo {
 namespace {
 
-class CompactCmd : public Command {
+class CompactCmd : public BasicCommand {
 public:
-    CompactCmd() : Command("compact") {}
+    CompactCmd() : BasicCommand("compact") {}
 
     bool slaveOk() const override {
         return true;

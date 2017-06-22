@@ -59,9 +59,9 @@ namespace mongo {
 using std::string;
 using std::vector;
 
-class GeoHaystackSearchCommand : public Command {
+class GeoHaystackSearchCommand : public BasicCommand {
 public:
-    GeoHaystackSearchCommand() : Command("geoSearch") {}
+    GeoHaystackSearchCommand() : BasicCommand("geoSearch") {}
 
     virtual bool supportsWriteConcern(const BSONObj& cmd) const override {
         return false;

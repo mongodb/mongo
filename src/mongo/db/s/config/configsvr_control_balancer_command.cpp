@@ -41,9 +41,9 @@
 namespace mongo {
 namespace {
 
-class ConfigSvrBalancerControlCommand : public Command {
+class ConfigSvrBalancerControlCommand : public BasicCommand {
 public:
-    ConfigSvrBalancerControlCommand(StringData name) : Command(name) {}
+    ConfigSvrBalancerControlCommand(StringData name) : BasicCommand(name) {}
 
     void help(std::stringstream& help) const override {
         help << "Internal command, which is exported by the sharding config server. Do not call "

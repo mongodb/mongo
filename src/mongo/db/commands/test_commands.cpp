@@ -56,9 +56,9 @@ using std::string;
 using std::stringstream;
 
 /* For testing only, not for general use. Enabled via command-line */
-class GodInsert : public Command {
+class GodInsert : public BasicCommand {
 public:
-    GodInsert() : Command("godinsert") {}
+    GodInsert() : BasicCommand("godinsert") {}
     virtual bool adminOnly() const {
         return false;
     }
@@ -108,7 +108,7 @@ public:
 };
 
 /* for diagnostic / testing purposes. Enabled via command line. */
-class CmdSleep : public Command {
+class CmdSleep : public BasicCommand {
 public:
     virtual bool supportsWriteConcern(const BSONObj& cmd) const override {
         return false;
@@ -148,7 +148,7 @@ public:
         opCtx->sleepFor(Milliseconds(millis));
     }
 
-    CmdSleep() : Command("sleep") {}
+    CmdSleep() : BasicCommand("sleep") {}
     bool run(OperationContext* opCtx,
              const string& ns,
              const BSONObj& cmdObj,
@@ -199,9 +199,9 @@ public:
 };
 
 // Testing only, enabled via command-line.
-class CapTrunc : public Command {
+class CapTrunc : public BasicCommand {
 public:
-    CapTrunc() : Command("captrunc") {}
+    CapTrunc() : BasicCommand("captrunc") {}
     virtual bool slaveOk() const {
         return false;
     }
@@ -275,9 +275,9 @@ public:
 };
 
 // Testing-only, enabled via command line.
-class EmptyCapped : public Command {
+class EmptyCapped : public BasicCommand {
 public:
-    EmptyCapped() : Command("emptycapped") {}
+    EmptyCapped() : BasicCommand("emptycapped") {}
     virtual bool slaveOk() const {
         return false;
     }

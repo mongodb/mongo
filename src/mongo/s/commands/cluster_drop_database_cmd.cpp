@@ -45,9 +45,9 @@
 namespace mongo {
 namespace {
 
-class DropDatabaseCmd : public Command {
+class DropDatabaseCmd : public BasicCommand {
 public:
-    DropDatabaseCmd() : Command("dropDatabase") {}
+    DropDatabaseCmd() : BasicCommand("dropDatabase") {}
 
     bool slaveOk() const override {
         return true;

@@ -62,7 +62,7 @@ using std::stringstream;
 
 const bool autoAuthorizeDefault = true;
 
-class CmdSaslStart : public Command {
+class CmdSaslStart : public BasicCommand {
 public:
     CmdSaslStart();
     virtual ~CmdSaslStart();
@@ -91,7 +91,7 @@ public:
     }
 };
 
-class CmdSaslContinue : public Command {
+class CmdSaslContinue : public BasicCommand {
 public:
     CmdSaslContinue();
     virtual ~CmdSaslContinue();
@@ -254,7 +254,7 @@ Status doSaslContinue(const Client* client,
     return doSaslStep(client, session, cmdObj, result);
 }
 
-CmdSaslStart::CmdSaslStart() : Command(saslStartCommandName) {}
+CmdSaslStart::CmdSaslStart() : BasicCommand(saslStartCommandName) {}
 CmdSaslStart::~CmdSaslStart() {}
 
 void CmdSaslStart::help(std::stringstream& os) const {
@@ -302,7 +302,7 @@ bool CmdSaslStart::run(OperationContext* opCtx,
     return status.isOK();
 }
 
-CmdSaslContinue::CmdSaslContinue() : Command(saslContinueCommandName) {}
+CmdSaslContinue::CmdSaslContinue() : BasicCommand(saslContinueCommandName) {}
 CmdSaslContinue::~CmdSaslContinue() {}
 
 void CmdSaslContinue::help(std::stringstream& os) const {

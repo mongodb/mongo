@@ -1325,9 +1325,9 @@ BSONObj _bailFromJS(const BSONObj& args, void* data) {
 /**
  * This class represents a map/reduce command executed on a single server
  */
-class MapReduceCommand : public Command {
+class MapReduceCommand : public BasicCommand {
 public:
-    MapReduceCommand() : Command("mapReduce", "mapreduce") {}
+    MapReduceCommand() : BasicCommand("mapReduce", "mapreduce") {}
 
     virtual bool slaveOk() const {
         return repl::getGlobalReplicationCoordinator()->getReplicationMode() !=
@@ -1654,12 +1654,12 @@ public:
 /**
  * This class represents a map/reduce command executed on the output server of a sharded env
  */
-class MapReduceFinishCommand : public Command {
+class MapReduceFinishCommand : public BasicCommand {
 public:
     void help(stringstream& h) const {
         h << "internal";
     }
-    MapReduceFinishCommand() : Command("mapreduce.shardedfinish") {}
+    MapReduceFinishCommand() : BasicCommand("mapreduce.shardedfinish") {}
     virtual bool slaveOk() const {
         return repl::getGlobalReplicationCoordinator()->getReplicationMode() !=
             repl::ReplicationCoordinator::modeReplSet;

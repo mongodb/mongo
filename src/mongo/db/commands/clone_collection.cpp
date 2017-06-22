@@ -59,9 +59,9 @@ using std::string;
 using std::stringstream;
 using std::endl;
 
-class CmdCloneCollection : public Command {
+class CmdCloneCollection : public BasicCommand {
 public:
-    CmdCloneCollection() : Command("cloneCollection") {}
+    CmdCloneCollection() : BasicCommand("cloneCollection") {}
 
     virtual bool slaveOk() const {
         return false;

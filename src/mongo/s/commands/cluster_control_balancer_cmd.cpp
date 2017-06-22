@@ -41,12 +41,12 @@ namespace {
 
 const ReadPreferenceSetting kPrimaryOnlyReadPreference{ReadPreference::PrimaryOnly};
 
-class BalancerControlCommand : public Command {
+class BalancerControlCommand : public BasicCommand {
 public:
     BalancerControlCommand(StringData name,
                            StringData configsvrCommandName,
                            ActionType authorizationAction)
-        : Command(name),
+        : BasicCommand(name),
           _configsvrCommandName(configsvrCommandName),
           _authorizationAction(authorizationAction) {}
 

@@ -43,9 +43,9 @@ namespace repl {
 /**
  * Base class for repl set commands.
  */
-class ReplSetCommand : public Command {
+class ReplSetCommand : public BasicCommand {
 protected:
-    ReplSetCommand(const char* s) : Command(s) {}
+    ReplSetCommand(const char* s) : BasicCommand(s) {}
 
     bool slaveOk() const override {
         return true;

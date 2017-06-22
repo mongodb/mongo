@@ -74,7 +74,7 @@ namespace {
  *   ]
  * }
  */
-class CmdListIndexes : public Command {
+class CmdListIndexes : public BasicCommand {
 public:
     virtual bool slaveOk() const {
         return false;
@@ -114,7 +114,7 @@ public:
                                     << ns.coll());
     }
 
-    CmdListIndexes() : Command("listIndexes") {}
+    CmdListIndexes() : BasicCommand("listIndexes") {}
 
     bool run(OperationContext* opCtx,
              const string& dbname,

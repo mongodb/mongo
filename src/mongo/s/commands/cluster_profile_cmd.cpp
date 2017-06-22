@@ -33,9 +33,9 @@
 namespace mongo {
 namespace {
 
-class ProfileCmd : public Command {
+class ProfileCmd : public BasicCommand {
 public:
-    ProfileCmd() : Command("profile") {}
+    ProfileCmd() : BasicCommand("profile") {}
 
     virtual bool slaveOk() const {
         return true;

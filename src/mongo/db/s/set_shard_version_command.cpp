@@ -60,9 +60,9 @@ using str::stream;
 
 namespace {
 
-class SetShardVersion : public Command {
+class SetShardVersion : public BasicCommand {
 public:
-    SetShardVersion() : Command("setShardVersion") {}
+    SetShardVersion() : BasicCommand("setShardVersion") {}
 
     void help(std::stringstream& help) const override {
         help << "internal";

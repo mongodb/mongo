@@ -58,10 +58,10 @@ namespace {
  *   _configsvrSetFeatureCompatibilityVersion: <string version>
  * }
  */
-class ConfigSvrSetFeatureCompatibilityVersionCommand : public Command {
+class ConfigSvrSetFeatureCompatibilityVersionCommand : public BasicCommand {
 public:
     ConfigSvrSetFeatureCompatibilityVersionCommand()
-        : Command("_configsvrSetFeatureCompatibilityVersion") {}
+        : BasicCommand("_configsvrSetFeatureCompatibilityVersion") {}
 
     void help(std::stringstream& help) const override {
         help << "Internal command, which is exported by the sharding config server. Do not call "

@@ -49,9 +49,9 @@ using std::unique_ptr;
 using std::string;
 using std::stringstream;
 
-class CmdCloneCollectionAsCapped : public Command {
+class CmdCloneCollectionAsCapped : public BasicCommand {
 public:
-    CmdCloneCollectionAsCapped() : Command("cloneCollectionAsCapped") {}
+    CmdCloneCollectionAsCapped() : BasicCommand("cloneCollectionAsCapped") {}
     virtual bool slaveOk() const {
         return false;
     }
@@ -148,9 +148,9 @@ public:
    This command is not highly used, and is not currently supported with sharded
    environments.
    */
-class CmdConvertToCapped : public Command {
+class CmdConvertToCapped : public BasicCommand {
 public:
-    CmdConvertToCapped() : Command("convertToCapped") {}
+    CmdConvertToCapped() : BasicCommand("convertToCapped") {}
     virtual bool slaveOk() const {
         return false;
     }

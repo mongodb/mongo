@@ -56,9 +56,9 @@ using std::string;
  *   writeConcern: <BSONObj>
  * }
  */
-class ConfigSvrAddShardToZoneCommand : public Command {
+class ConfigSvrAddShardToZoneCommand : public BasicCommand {
 public:
-    ConfigSvrAddShardToZoneCommand() : Command("_configsvrAddShardToZone") {}
+    ConfigSvrAddShardToZoneCommand() : BasicCommand("_configsvrAddShardToZone") {}
 
     void help(std::stringstream& help) const override {
         help << "Internal command, which is exported by the sharding config server. Do not call "

@@ -113,7 +113,7 @@ using std::vector;
 using std::unique_ptr;
 
 IndexFilterCommand::IndexFilterCommand(const string& name, const string& helpText)
-    : Command(name), helpText(helpText) {}
+    : BasicCommand(name), helpText(helpText) {}
 
 bool IndexFilterCommand::run(OperationContext* opCtx,
                              const string& dbname,

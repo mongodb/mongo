@@ -52,9 +52,9 @@ namespace mongo {
 
 namespace {
 
-class DBHashCmd : public Command {
+class DBHashCmd : public BasicCommand {
 public:
-    DBHashCmd() : Command("dbHash", "dbhash") {}
+    DBHashCmd() : BasicCommand("dbHash", "dbhash") {}
 
     virtual bool supportsWriteConcern(const BSONObj& cmd) const override {
         return false;

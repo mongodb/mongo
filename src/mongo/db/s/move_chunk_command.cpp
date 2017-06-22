@@ -79,9 +79,9 @@ MONGO_FP_DECLARE(moveChunkHangAtStep5);
 MONGO_FP_DECLARE(moveChunkHangAtStep6);
 MONGO_FP_DECLARE(moveChunkHangAtStep7);
 
-class MoveChunkCommand : public Command {
+class MoveChunkCommand : public BasicCommand {
 public:
-    MoveChunkCommand() : Command("moveChunk") {}
+    MoveChunkCommand() : BasicCommand("moveChunk") {}
 
     void help(std::stringstream& help) const override {
         help << "should not be calling this directly";

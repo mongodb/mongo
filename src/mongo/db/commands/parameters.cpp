@@ -63,9 +63,9 @@ void appendParameterNames(stringstream& help) {
 }
 }
 
-class CmdGet : public Command {
+class CmdGet : public BasicCommand {
 public:
-    CmdGet() : Command("getParameter") {}
+    CmdGet() : BasicCommand("getParameter") {}
     virtual bool slaveOk() const {
         return true;
     }
@@ -112,9 +112,9 @@ public:
     }
 } cmdGet;
 
-class CmdSet : public Command {
+class CmdSet : public BasicCommand {
 public:
-    CmdSet() : Command("setParameter") {}
+    CmdSet() : BasicCommand("setParameter") {}
     virtual bool slaveOk() const {
         return true;
     }

@@ -38,9 +38,9 @@ namespace mongo {
 using std::string;
 using std::stringstream;
 
-class CmdConnectionStatus : public Command {
+class CmdConnectionStatus : public BasicCommand {
 public:
-    CmdConnectionStatus() : Command("connectionStatus") {}
+    CmdConnectionStatus() : BasicCommand("connectionStatus") {}
     virtual bool slaveOk() const {
         return true;
     }

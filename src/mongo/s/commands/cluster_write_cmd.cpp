@@ -63,7 +63,7 @@ namespace {
  *
  * Batch execution (targeting and dispatching) is performed by the BatchWriteExec class.
  */
-class ClusterWriteCmd : public Command {
+class ClusterWriteCmd : public BasicCommand {
 public:
     virtual ~ClusterWriteCmd() {}
 
@@ -195,7 +195,7 @@ protected:
      * write batches of type "writeType", and will require privilege "action" to run.
      */
     ClusterWriteCmd(StringData name, BatchedCommandRequest::BatchType writeType)
-        : Command(name), _writeType(writeType) {}
+        : BasicCommand(name), _writeType(writeType) {}
 
 private:
     // Type of batch (e.g. insert, update).

@@ -47,7 +47,7 @@ using std::stringstream;
 /**
  * Admin command to display global lock information
  */
-class CmdLockInfo : public Command {
+class CmdLockInfo : public BasicCommand {
 public:
     virtual bool slaveOk() const {
         return true;
@@ -77,7 +77,7 @@ public:
         return isAuthorized ? Status::OK() : Status(ErrorCodes::Unauthorized, "Unauthorized");
     }
 
-    CmdLockInfo() : Command("lockInfo") {}
+    CmdLockInfo() : BasicCommand("lockInfo") {}
 
     bool run(OperationContext* opCtx,
              const string& dbname,

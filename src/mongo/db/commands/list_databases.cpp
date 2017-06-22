@@ -55,7 +55,7 @@ using std::vector;
 // XXX: remove and put into storage api
 intmax_t dbSize(const string& database);
 
-class CmdListDatabases : public Command {
+class CmdListDatabases : public BasicCommand {
 public:
     virtual bool slaveOk() const {
         return false;
@@ -81,7 +81,7 @@ public:
         out->push_back(Privilege(ResourcePattern::forClusterResource(), actions));
     }
 
-    CmdListDatabases() : Command("listDatabases") {}
+    CmdListDatabases() : BasicCommand("listDatabases") {}
 
     bool run(OperationContext* opCtx,
              const string& dbname,

@@ -61,9 +61,9 @@ using std::string;
  *   writeConcern: <BSONObj>
  * }
  */
-class ConfigSvrSplitChunkCommand : public Command {
+class ConfigSvrSplitChunkCommand : public BasicCommand {
 public:
-    ConfigSvrSplitChunkCommand() : Command("_configsvrCommitChunkSplit") {}
+    ConfigSvrSplitChunkCommand() : BasicCommand("_configsvrCommitChunkSplit") {}
 
     void help(std::stringstream& help) const override {
         help << "Internal command, which is sent by a shard to the sharding config server. Do "

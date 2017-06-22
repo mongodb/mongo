@@ -78,13 +78,13 @@ public:
     virtual void run();
 };
 
-class FSyncCommand : public Command {
+class FSyncCommand : public BasicCommand {
 public:
     static const char* url() {
         return "http://dochub.mongodb.org/core/fsynccommand";
     }
 
-    FSyncCommand() : Command("fsync") {}
+    FSyncCommand() : BasicCommand("fsync") {}
 
     virtual ~FSyncCommand() {
         // The FSyncLockThread is owned by the FSyncCommand and accesses FsyncCommand state. It must
@@ -264,9 +264,9 @@ private:
     bool _fsyncLocked = false;
 } fsyncCmd;
 
-class FSyncUnlockCommand : public Command {
+class FSyncUnlockCommand : public BasicCommand {
 public:
-    FSyncUnlockCommand() : Command("fsyncUnlock") {}
+    FSyncUnlockCommand() : BasicCommand("fsyncUnlock") {}
 
 
     virtual bool supportsWriteConcern(const BSONObj& cmd) const override {

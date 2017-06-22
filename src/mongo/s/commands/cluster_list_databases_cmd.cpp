@@ -51,9 +51,9 @@ using std::vector;
 
 namespace {
 
-class ListDatabasesCmd : public Command {
+class ListDatabasesCmd : public BasicCommand {
 public:
-    ListDatabasesCmd() : Command("listDatabases", "listdatabases") {}
+    ListDatabasesCmd() : BasicCommand("listDatabases", "listdatabases") {}
 
     virtual bool slaveOk() const {
         return true;

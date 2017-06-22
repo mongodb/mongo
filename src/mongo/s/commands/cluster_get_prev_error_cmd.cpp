@@ -38,9 +38,9 @@
 namespace mongo {
 namespace {
 
-class GetPrevErrorCmd : public Command {
+class GetPrevErrorCmd : public BasicCommand {
 public:
-    GetPrevErrorCmd() : Command("getPrevError", "getpreverror") {}
+    GetPrevErrorCmd() : BasicCommand("getPrevError", "getpreverror") {}
 
 
     virtual bool supportsWriteConcern(const BSONObj& cmd) const override {

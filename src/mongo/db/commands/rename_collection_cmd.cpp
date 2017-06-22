@@ -56,9 +56,9 @@ using std::stringstream;
 
 namespace {
 
-class CmdRenameCollection : public Command {
+class CmdRenameCollection : public BasicCommand {
 public:
-    CmdRenameCollection() : Command("renameCollection") {}
+    CmdRenameCollection() : BasicCommand("renameCollection") {}
     virtual bool adminOnly() const {
         return true;
     }

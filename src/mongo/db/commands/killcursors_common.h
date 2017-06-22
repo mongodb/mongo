@@ -37,9 +37,9 @@ namespace mongo {
  * Base class for the killCursors command, which attempts to kill all given cursors.  Contains code
  * common to mongos and mongod implementations.
  */
-class KillCursorsCmdBase : public Command {
+class KillCursorsCmdBase : public BasicCommand {
 public:
-    KillCursorsCmdBase() : Command("killCursors") {}
+    KillCursorsCmdBase() : BasicCommand("killCursors") {}
 
     virtual ~KillCursorsCmdBase() {}
 

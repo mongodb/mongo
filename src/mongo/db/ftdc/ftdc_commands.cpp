@@ -45,9 +45,9 @@ namespace {
  *
  * Document will be empty if FTDC has never run.
  */
-class GetDiagnosticDataCommand final : public Command {
+class GetDiagnosticDataCommand final : public BasicCommand {
 public:
-    GetDiagnosticDataCommand() : Command("getDiagnosticData") {}
+    GetDiagnosticDataCommand() : BasicCommand("getDiagnosticData") {}
 
     bool adminOnly() const override {
         return true;

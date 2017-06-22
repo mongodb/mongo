@@ -58,9 +58,9 @@ using std::string;
  *   writeConcern: <BSONObj>
  * }
  */
-class ConfigsvrUpdateZoneKeyRangeCommand : public Command {
+class ConfigsvrUpdateZoneKeyRangeCommand : public BasicCommand {
 public:
-    ConfigsvrUpdateZoneKeyRangeCommand() : Command("_configsvrUpdateZoneKeyRange") {}
+    ConfigsvrUpdateZoneKeyRangeCommand() : BasicCommand("_configsvrUpdateZoneKeyRange") {}
 
     void help(std::stringstream& help) const override {
         help << "Internal command, which is exported by the sharding config server. Do not call "

@@ -50,9 +50,9 @@ namespace mongo {
 using std::string;
 using std::stringstream;
 
-class CmdReplSetResizeOplog : public Command {
+class CmdReplSetResizeOplog : public BasicCommand {
 public:
-    CmdReplSetResizeOplog() : Command("replSetResizeOplog") {}
+    CmdReplSetResizeOplog() : BasicCommand("replSetResizeOplog") {}
 
     virtual bool slaveOk() const final {
         return true;

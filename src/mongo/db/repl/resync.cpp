@@ -48,7 +48,7 @@ constexpr StringData kWaitFieldName = "wait"_sd;
 }  // namespace
 
 // operator requested resynchronization of replication (on a slave or secondary). {resync: 1}
-class CmdResync : public Command {
+class CmdResync : public BasicCommand {
 public:
     virtual bool slaveOk() const {
         return true;
@@ -71,7 +71,7 @@ public:
         h << "resync (from scratch) a stale slave or replica set secondary node.\n";
     }
 
-    CmdResync() : Command(kResyncFieldName) {}
+    CmdResync() : BasicCommand(kResyncFieldName) {}
     virtual bool run(OperationContext* opCtx,
                      const string& dbname,
                      const BSONObj& cmdObj,

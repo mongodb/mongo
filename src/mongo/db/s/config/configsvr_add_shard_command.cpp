@@ -55,9 +55,9 @@ const long long kMaxSizeMBDefault = 0;
 /**
  * Internal sharding command run on config servers to add a shard to the cluster.
  */
-class ConfigSvrAddShardCommand : public Command {
+class ConfigSvrAddShardCommand : public BasicCommand {
 public:
-    ConfigSvrAddShardCommand() : Command("_configsvrAddShard") {}
+    ConfigSvrAddShardCommand() : BasicCommand("_configsvrAddShard") {}
 
     void help(std::stringstream& help) const override {
         help << "Internal command, which is exported by the sharding config server. Do not call "

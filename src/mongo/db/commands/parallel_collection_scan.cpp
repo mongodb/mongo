@@ -49,7 +49,7 @@ using stdx::make_unique;
 
 namespace {
 
-class ParallelCollectionScanCmd : public Command {
+class ParallelCollectionScanCmd : public BasicCommand {
 public:
     struct ExtentInfo {
         ExtentInfo(RecordId dl, size_t s) : diskLoc(dl), size(s) {}
@@ -57,7 +57,7 @@ public:
         size_t size;
     };
 
-    ParallelCollectionScanCmd() : Command("parallelCollectionScan") {}
+    ParallelCollectionScanCmd() : BasicCommand("parallelCollectionScan") {}
 
     virtual bool supportsWriteConcern(const BSONObj& cmd) const override {
         return false;

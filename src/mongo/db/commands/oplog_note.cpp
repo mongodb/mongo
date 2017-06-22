@@ -82,9 +82,9 @@ Status _performNoopWrite(OperationContext* opCtx, BSONObj msgObj, StringData not
 using std::string;
 using std::stringstream;
 
-class AppendOplogNoteCmd : public Command {
+class AppendOplogNoteCmd : public BasicCommand {
 public:
-    AppendOplogNoteCmd() : Command("appendOplogNote") {}
+    AppendOplogNoteCmd() : BasicCommand("appendOplogNote") {}
 
     virtual bool slaveOk() const {
         return false;

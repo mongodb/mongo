@@ -53,7 +53,7 @@ namespace mongo {
 using std::string;
 using std::stringstream;
 
-class TouchCmd : public Command {
+class TouchCmd : public BasicCommand {
 public:
     virtual bool supportsWriteConcern(const BSONObj& cmd) const override {
         return false;
@@ -80,7 +80,7 @@ public:
         actions.addAction(ActionType::touch);
         out->push_back(Privilege(ResourcePattern::forClusterResource(), actions));
     }
-    TouchCmd() : Command("touch") {}
+    TouchCmd() : BasicCommand("touch") {}
 
     virtual bool run(OperationContext* opCtx,
                      const string& dbname,

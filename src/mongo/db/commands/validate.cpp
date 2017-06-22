@@ -49,9 +49,9 @@ using std::stringstream;
 
 MONGO_FP_DECLARE(validateCmdCollectionNotValid);
 
-class ValidateCmd : public Command {
+class ValidateCmd : public BasicCommand {
 public:
-    ValidateCmd() : Command("validate") {}
+    ValidateCmd() : BasicCommand("validate") {}
 
     virtual bool slaveOk() const {
         return true;

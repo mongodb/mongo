@@ -64,9 +64,9 @@ boost::filesystem::path getJournalDir();
 }
 
 // Testing-only, enabled via command line
-class JournalLatencyTestCmd : public Command {
+class JournalLatencyTestCmd : public BasicCommand {
 public:
-    JournalLatencyTestCmd() : Command("journalLatencyTest") {}
+    JournalLatencyTestCmd() : BasicCommand("journalLatencyTest") {}
 
     virtual bool slaveOk() const {
         return true;

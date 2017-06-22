@@ -44,9 +44,9 @@ namespace {
  * getDiagnosticData is a MongoD only command. We implement in MongoS to give users a better error
  * message.
  */
-class GetDiagnosticDataCommand final : public Command {
+class GetDiagnosticDataCommand final : public BasicCommand {
 public:
-    GetDiagnosticDataCommand() : Command("getDiagnosticData") {}
+    GetDiagnosticDataCommand() : BasicCommand("getDiagnosticData") {}
 
     bool adminOnly() const override {
         return true;

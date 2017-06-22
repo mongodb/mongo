@@ -69,9 +69,9 @@ using std::string;
 using std::stringstream;
 using std::vector;
 
-class CmdBuildInfo : public Command {
+class CmdBuildInfo : public BasicCommand {
 public:
-    CmdBuildInfo() : Command("buildInfo", "buildinfo") {}
+    CmdBuildInfo() : BasicCommand("buildInfo", "buildinfo") {}
     virtual bool slaveOk() const {
         return true;
     }
@@ -102,9 +102,9 @@ public:
 } cmdBuildInfo;
 
 
-class PingCommand : public Command {
+class PingCommand : public BasicCommand {
 public:
-    PingCommand() : Command("ping") {}
+    PingCommand() : BasicCommand("ping") {}
     virtual bool slaveOk() const {
         return true;
     }
@@ -128,9 +128,9 @@ public:
     }
 } pingCmd;
 
-class FeaturesCmd : public Command {
+class FeaturesCmd : public BasicCommand {
 public:
-    FeaturesCmd() : Command("features") {}
+    FeaturesCmd() : BasicCommand("features") {}
     void help(stringstream& h) const {
         h << "return build level feature settings";
     }
@@ -163,9 +163,9 @@ public:
 
 } featuresCmd;
 
-class HostInfoCmd : public Command {
+class HostInfoCmd : public BasicCommand {
 public:
-    HostInfoCmd() : Command("hostInfo") {}
+    HostInfoCmd() : BasicCommand("hostInfo") {}
     virtual bool slaveOk() const {
         return true;
     }
@@ -213,9 +213,9 @@ public:
 
 } hostInfoCmd;
 
-class LogRotateCmd : public Command {
+class LogRotateCmd : public BasicCommand {
 public:
-    LogRotateCmd() : Command("logRotate") {}
+    LogRotateCmd() : BasicCommand("logRotate") {}
     virtual bool supportsWriteConcern(const BSONObj& cmd) const override {
         return false;
     }
@@ -245,12 +245,12 @@ public:
 
 } logRotateCmd;
 
-class ListCommandsCmd : public Command {
+class ListCommandsCmd : public BasicCommand {
 public:
     virtual void help(stringstream& help) const {
         help << "get a list of all db commands";
     }
-    ListCommandsCmd() : Command("listCommands") {}
+    ListCommandsCmd() : BasicCommand("listCommands") {}
     virtual bool supportsWriteConcern(const BSONObj& cmd) const override {
         return false;
     }
@@ -346,7 +346,7 @@ void CmdShutdown::shutdownHelper() {
 }
 
 /* for testing purposes only */
-class CmdForceError : public Command {
+class CmdForceError : public BasicCommand {
 public:
     virtual void help(stringstream& help) const {
         help << "for testing purposes only.  forces a user assertion exception";
@@ -360,7 +360,7 @@ public:
     virtual void addRequiredPrivileges(const std::string& dbname,
                                        const BSONObj& cmdObj,
                                        std::vector<Privilege>* out) {}  // No auth required
-    CmdForceError() : Command("forceerror") {}
+    CmdForceError() : BasicCommand("forceerror") {}
     bool run(OperationContext* opCtx,
              const string& dbnamne,
              const BSONObj& cmdObj,
@@ -371,9 +371,9 @@ public:
     }
 } cmdForceError;
 
-class GetLogCmd : public Command {
+class GetLogCmd : public BasicCommand {
 public:
-    GetLogCmd() : Command("getLog") {}
+    GetLogCmd() : BasicCommand("getLog") {}
 
     virtual bool slaveOk() const {
         return true;
@@ -442,9 +442,9 @@ public:
 
 } getLogCmd;
 
-class ClearLogCmd : public Command {
+class ClearLogCmd : public BasicCommand {
 public:
-    ClearLogCmd() : Command("clearLog") {}
+    ClearLogCmd() : BasicCommand("clearLog") {}
 
     virtual bool slaveOk() const {
         return true;
@@ -496,9 +496,9 @@ MONGO_INITIALIZER(RegisterClearLogCmd)(InitializerContext* context) {
     return Status::OK();
 }
 
-class CmdGetCmdLineOpts : Command {
+class CmdGetCmdLineOpts : public BasicCommand {
 public:
-    CmdGetCmdLineOpts() : Command("getCmdLineOpts") {}
+    CmdGetCmdLineOpts() : BasicCommand("getCmdLineOpts") {}
     void help(stringstream& h) const {
         h << "get argv";
     }

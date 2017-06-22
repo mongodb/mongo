@@ -68,9 +68,9 @@ const WriteConcernOptions kMajorityWriteConcern(WriteConcernOptions::kMajority,
  *   zone: <string zone|null>,
  * }
  */
-class UpdateZoneKeyRangeCmd : public Command {
+class UpdateZoneKeyRangeCmd : public BasicCommand {
 public:
-    UpdateZoneKeyRangeCmd() : Command("updateZoneKeyRange", "updatezonekeyRange") {}
+    UpdateZoneKeyRangeCmd() : BasicCommand("updateZoneKeyRange", "updatezonekeyRange") {}
 
     virtual bool slaveOk() const {
         return true;

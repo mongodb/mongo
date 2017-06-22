@@ -39,9 +39,9 @@
 #include "mongo/db/storage/snapshot_manager.h"
 
 namespace mongo {
-class CmdMakeSnapshot final : public Command {
+class CmdMakeSnapshot final : public BasicCommand {
 public:
-    CmdMakeSnapshot() : Command("makeSnapshot") {}
+    CmdMakeSnapshot() : BasicCommand("makeSnapshot") {}
 
     virtual bool slaveOk() const {
         return true;
@@ -88,9 +88,9 @@ public:
     }
 };
 
-class CmdSetCommittedSnapshot final : public Command {
+class CmdSetCommittedSnapshot final : public BasicCommand {
 public:
-    CmdSetCommittedSnapshot() : Command("setCommittedSnapshot") {}
+    CmdSetCommittedSnapshot() : BasicCommand("setCommittedSnapshot") {}
 
     virtual bool slaveOk() const {
         return true;

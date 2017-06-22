@@ -47,9 +47,9 @@
 namespace mongo {
 namespace {
 
-class EnableShardingCmd : public Command {
+class EnableShardingCmd : public BasicCommand {
 public:
-    EnableShardingCmd() : Command("enableSharding", "enablesharding") {}
+    EnableShardingCmd() : BasicCommand("enableSharding", "enablesharding") {}
 
     virtual bool slaveOk() const {
         return true;

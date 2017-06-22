@@ -44,9 +44,9 @@ bool isMergePipeline(const std::vector<BSONObj>& pipeline) {
     return pipeline[0].hasField("$mergeCursors");
 }
 
-class PipelineCommand : public Command {
+class PipelineCommand : public BasicCommand {
 public:
-    PipelineCommand() : Command("aggregate") {}
+    PipelineCommand() : BasicCommand("aggregate") {}
 
     void help(std::stringstream& help) const override {
         help << "Runs the aggregation command. See http://dochub.mongodb.org/core/aggregation for "

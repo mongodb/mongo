@@ -51,9 +51,9 @@ namespace {
  * This command like a dispatcher: it just retrieves a pointer to the nested command and invokes
  * its explain() implementation.
  */
-class CmdExplain : public Command {
+class CmdExplain : public BasicCommand {
 public:
-    CmdExplain() : Command("explain") {}
+    CmdExplain() : BasicCommand("explain") {}
 
     virtual bool supportsWriteConcern(const BSONObj& cmd) const override {
         return false;

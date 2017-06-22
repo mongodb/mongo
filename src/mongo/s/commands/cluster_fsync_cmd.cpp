@@ -38,9 +38,9 @@
 namespace mongo {
 namespace {
 
-class FsyncCommand : public Command {
+class FsyncCommand : public BasicCommand {
 public:
-    FsyncCommand() : Command("fsync", "fsync") {}
+    FsyncCommand() : BasicCommand("fsync", "fsync") {}
 
     virtual bool slaveOk() const {
         return true;

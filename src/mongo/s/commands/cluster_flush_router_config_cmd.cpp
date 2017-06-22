@@ -35,9 +35,9 @@
 namespace mongo {
 namespace {
 
-class FlushRouterConfigCmd : public Command {
+class FlushRouterConfigCmd : public BasicCommand {
 public:
-    FlushRouterConfigCmd() : Command("flushRouterConfig", "flushrouterconfig") {}
+    FlushRouterConfigCmd() : BasicCommand("flushRouterConfig", "flushrouterconfig") {}
 
     virtual bool slaveOk() const {
         return true;

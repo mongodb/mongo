@@ -44,9 +44,9 @@
 namespace mongo {
 namespace {
 
-class CmdIsMaster : public Command {
+class CmdIsMaster : public BasicCommand {
 public:
-    CmdIsMaster() : Command("isMaster", "ismaster") {}
+    CmdIsMaster() : BasicCommand("isMaster", "ismaster") {}
 
 
     virtual bool supportsWriteConcern(const BSONObj& cmd) const override {

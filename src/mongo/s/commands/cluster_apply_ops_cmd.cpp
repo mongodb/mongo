@@ -34,9 +34,9 @@
 namespace mongo {
 namespace {
 
-class ApplyOpsCmd : public Command {
+class ApplyOpsCmd : public BasicCommand {
 public:
-    ApplyOpsCmd() : Command("applyOps") {}
+    ApplyOpsCmd() : BasicCommand("applyOps") {}
 
     bool slaveOk() const override {
         return true;

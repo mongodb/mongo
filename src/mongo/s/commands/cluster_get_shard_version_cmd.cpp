@@ -43,9 +43,9 @@
 namespace mongo {
 namespace {
 
-class GetShardVersion : public Command {
+class GetShardVersion : public BasicCommand {
 public:
-    GetShardVersion() : Command("getShardVersion", "getshardversion") {}
+    GetShardVersion() : BasicCommand("getShardVersion", "getshardversion") {}
 
     bool slaveOk() const override {
         return true;

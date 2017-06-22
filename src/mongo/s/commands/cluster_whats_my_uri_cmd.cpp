@@ -34,9 +34,9 @@
 namespace mongo {
 namespace {
 
-class WhatsMyUriCmd : public Command {
+class WhatsMyUriCmd : public BasicCommand {
 public:
-    WhatsMyUriCmd() : Command("whatsmyuri") {}
+    WhatsMyUriCmd() : BasicCommand("whatsmyuri") {}
 
     virtual bool slaveOk() const {
         return true;

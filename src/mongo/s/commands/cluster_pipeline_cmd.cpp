@@ -38,9 +38,9 @@
 namespace mongo {
 namespace {
 
-class ClusterPipelineCommand : public Command {
+class ClusterPipelineCommand : public BasicCommand {
 public:
-    ClusterPipelineCommand() : Command("aggregate") {}
+    ClusterPipelineCommand() : BasicCommand("aggregate") {}
 
     void help(std::stringstream& help) const {
         help << "Runs the sharded aggregation command. See "

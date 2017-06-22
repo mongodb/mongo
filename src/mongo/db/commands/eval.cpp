@@ -152,7 +152,7 @@ bool dbEval(OperationContext* opCtx,
 }
 
 
-class CmdEval : public Command {
+class CmdEval : public BasicCommand {
 public:
     virtual bool slaveOk() const {
         return false;
@@ -172,7 +172,7 @@ public:
         RoleGraph::generateUniversalPrivileges(out);
     }
 
-    CmdEval() : Command("eval", "$eval") {}
+    CmdEval() : BasicCommand("eval", "$eval") {}
 
     bool run(OperationContext* opCtx,
              const string& dbname,

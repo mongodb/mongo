@@ -40,9 +40,9 @@ namespace {
 
 using std::vector;
 
-class DBStatsCmd : public Command {
+class DBStatsCmd : public BasicCommand {
 public:
-    DBStatsCmd() : Command("dbStats", "dbstats") {}
+    DBStatsCmd() : BasicCommand("dbStats", "dbstats") {}
 
     bool slaveOk() const override {
         return true;

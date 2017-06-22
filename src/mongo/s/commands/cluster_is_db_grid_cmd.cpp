@@ -33,9 +33,9 @@
 namespace mongo {
 namespace {
 
-class IsDbGridCmd : public Command {
+class IsDbGridCmd : public BasicCommand {
 public:
-    IsDbGridCmd() : Command("isdbgrid") {}
+    IsDbGridCmd() : BasicCommand("isdbgrid") {}
 
 
     virtual bool supportsWriteConcern(const BSONObj& cmd) const override {

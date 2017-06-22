@@ -87,9 +87,9 @@ using std::stringstream;
  * NOTE: Since internal cluster auth works differently, "copydb" currently doesn't work between
  * shards in a cluster when auth is enabled.  See SERVER-13080.
  */
-class CmdCopyDb : public Command {
+class CmdCopyDb : public BasicCommand {
 public:
-    CmdCopyDb() : Command("copydb") {}
+    CmdCopyDb() : BasicCommand("copydb") {}
 
     virtual bool adminOnly() const {
         return true;

@@ -577,4 +577,6 @@ private:
     ServerStatusMetricField<Counter64> _commandsFailedMetric;
 };
 
+using BasicCommand = Command;
+
 }  // namespace mongo

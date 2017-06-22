@@ -357,12 +357,12 @@ void ReplSource::forceResyncDead(OperationContext* opCtx, const char* requester)
     replAllDead = 0;
 }
 
-class HandshakeCmd : public Command {
+class HandshakeCmd : public BasicCommand {
 public:
     void help(stringstream& h) const {
         h << "internal";
     }
-    HandshakeCmd() : Command("handshake") {}
+    HandshakeCmd() : BasicCommand("handshake") {}
     virtual bool supportsWriteConcern(const BSONObj& cmd) const override {
         return false;
     }

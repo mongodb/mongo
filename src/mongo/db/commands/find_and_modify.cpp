@@ -217,7 +217,7 @@ void recordStatsForTopCommand(OperationContext* opCtx) {
 }  // namespace
 
 /* Find and Modify an object returning either the old (default) or new value*/
-class CmdFindAndModify : public Command {
+class CmdFindAndModify : public BasicCommand {
 public:
     void help(std::stringstream& help) const override {
         help << "{ findAndModify: \"collection\", query: {processed:false}, update: {$set: "
@@ -228,7 +228,7 @@ public:
                 "Output is in the \"value\" field\n";
     }
 
-    CmdFindAndModify() : Command("findAndModify", "findandmodify") {}
+    CmdFindAndModify() : BasicCommand("findAndModify", "findandmodify") {}
 
     bool slaveOk() const override {
         return false;

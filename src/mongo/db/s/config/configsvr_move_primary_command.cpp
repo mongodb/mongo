@@ -58,9 +58,9 @@ namespace {
 /**
  * Internal sharding command run on config servers to change a database's primary shard.
  */
-class ConfigSvrMovePrimaryCommand : public Command {
+class ConfigSvrMovePrimaryCommand : public BasicCommand {
 public:
-    ConfigSvrMovePrimaryCommand() : Command("_configsvrMovePrimary") {}
+    ConfigSvrMovePrimaryCommand() : BasicCommand("_configsvrMovePrimary") {}
 
     virtual bool slaveOk() const {
         return false;

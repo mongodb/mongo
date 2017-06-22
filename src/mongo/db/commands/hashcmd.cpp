@@ -50,9 +50,9 @@ using std::string;
 using std::stringstream;
 
 // Testing only, enabled via command-line.
-class CmdHashElt : public Command {
+class CmdHashElt : public BasicCommand {
 public:
-    CmdHashElt() : Command("_hashBSONElement"){};
+    CmdHashElt() : BasicCommand("_hashBSONElement"){};
     virtual bool supportsWriteConcern(const BSONObj& cmd) const override {
         return false;
     }

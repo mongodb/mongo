@@ -50,9 +50,9 @@ using std::vector;
 
 namespace {
 
-class RemoveShardCmd : public Command {
+class RemoveShardCmd : public BasicCommand {
 public:
-    RemoveShardCmd() : Command("removeShard", "removeshard") {}
+    RemoveShardCmd() : BasicCommand("removeShard", "removeshard") {}
 
     virtual bool slaveOk() const {
         return true;

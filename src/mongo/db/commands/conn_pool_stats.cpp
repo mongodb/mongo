@@ -49,9 +49,9 @@
 namespace mongo {
 namespace {
 
-class PoolStats final : public Command {
+class PoolStats final : public BasicCommand {
 public:
-    PoolStats() : Command("connPoolStats") {}
+    PoolStats() : BasicCommand("connPoolStats") {}
 
     void help(std::stringstream& help) const override {
         help << "stats about connections between servers in a replica set or sharded cluster.";

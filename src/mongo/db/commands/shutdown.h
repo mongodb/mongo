@@ -35,9 +35,9 @@
 
 namespace mongo {
 
-class CmdShutdown : public Command {
+class CmdShutdown : public BasicCommand {
 public:
-    CmdShutdown() : Command("shutdown") {}
+    CmdShutdown() : BasicCommand("shutdown") {}
 
     virtual bool requiresAuth() {
         return true;

@@ -208,9 +208,9 @@ StatusWith<std::vector<BSONObj>> resolveCollectionDefaultProperties(
 /**
  * { createIndexes : "bar", indexes : [ { ns : "test.bar", key : { x : 1 }, name: "x_1" } ] }
  */
-class CmdCreateIndex : public Command {
+class CmdCreateIndex : public BasicCommand {
 public:
-    CmdCreateIndex() : Command(kCommandName) {}
+    CmdCreateIndex() : BasicCommand(kCommandName) {}
 
     virtual bool supportsWriteConcern(const BSONObj& cmd) const override {
         return true;

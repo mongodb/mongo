@@ -54,11 +54,11 @@ const char kTermField[] = "term";
 /**
  * Implements the find command on mongos.
  */
-class ClusterFindCmd : public Command {
+class ClusterFindCmd : public BasicCommand {
     MONGO_DISALLOW_COPYING(ClusterFindCmd);
 
 public:
-    ClusterFindCmd() : Command("find") {}
+    ClusterFindCmd() : BasicCommand("find") {}
 
 
     virtual bool supportsWriteConcern(const BSONObj& cmd) const override {

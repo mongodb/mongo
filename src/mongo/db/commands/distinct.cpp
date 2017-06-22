@@ -71,9 +71,9 @@ using std::stringstream;
 
 namespace dps = ::mongo::dotted_path_support;
 
-class DistinctCommand : public Command {
+class DistinctCommand : public BasicCommand {
 public:
-    DistinctCommand() : Command("distinct") {}
+    DistinctCommand() : BasicCommand("distinct") {}
 
     virtual bool slaveOk() const {
         return false;

@@ -211,7 +211,7 @@ public:
     }
 } oplogInfoServerStatus;
 
-class CmdIsMaster : public Command {
+class CmdIsMaster : public BasicCommand {
 public:
     virtual bool requiresAuth() {
         return false;
@@ -230,7 +230,7 @@ public:
     virtual void addRequiredPrivileges(const std::string& dbname,
                                        const BSONObj& cmdObj,
                                        std::vector<Privilege>* out) {}  // No auth required
-    CmdIsMaster() : Command("isMaster", "ismaster") {}
+    CmdIsMaster() : BasicCommand("isMaster", "ismaster") {}
     virtual bool run(OperationContext* opCtx,
                      const string&,
                      const BSONObj& cmdObj,

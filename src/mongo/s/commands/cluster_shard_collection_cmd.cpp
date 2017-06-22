@@ -66,9 +66,9 @@
 namespace mongo {
 namespace {
 
-class ShardCollectionCmd : public Command {
+class ShardCollectionCmd : public BasicCommand {
 public:
-    ShardCollectionCmd() : Command("shardCollection", "shardcollection") {}
+    ShardCollectionCmd() : BasicCommand("shardCollection", "shardcollection") {}
 
     bool slaveOk() const override {
         return true;

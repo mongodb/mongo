@@ -55,9 +55,9 @@ using std::string;
 
 namespace {
 
-class MoveChunkCmd : public Command {
+class MoveChunkCmd : public BasicCommand {
 public:
-    MoveChunkCmd() : Command("moveChunk", "movechunk") {}
+    MoveChunkCmd() : BasicCommand("moveChunk", "movechunk") {}
 
     bool slaveOk() const override {
         return true;

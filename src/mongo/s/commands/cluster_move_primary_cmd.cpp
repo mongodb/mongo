@@ -53,9 +53,9 @@ using std::string;
 
 namespace {
 
-class MoveDatabasePrimaryCommand : public Command {
+class MoveDatabasePrimaryCommand : public BasicCommand {
 public:
-    MoveDatabasePrimaryCommand() : Command("movePrimary", "moveprimary") {}
+    MoveDatabasePrimaryCommand() : BasicCommand("movePrimary", "moveprimary") {}
 
     virtual bool slaveOk() const {
         return true;

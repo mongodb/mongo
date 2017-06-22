@@ -68,9 +68,9 @@ namespace {
 /**
  * Common code for the implementation of cpu profiler commands.
  */
-class CpuProfilerCommand : public Command {
+class CpuProfilerCommand : public BasicCommand {
 public:
-    CpuProfilerCommand(char const* name) : Command(name) {}
+    CpuProfilerCommand(char const* name) : BasicCommand(name) {}
     virtual bool slaveOk() const {
         return true;
     }

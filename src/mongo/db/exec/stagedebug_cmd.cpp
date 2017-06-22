@@ -115,9 +115,9 @@ BSONObj stripFieldNames(const BSONObj& obj) {
  * node -> {dedup: {filter: {filter}, args: {node: node, field: field}}}
  * node -> {unwind: {filter: filter}, args: {node: node, field: field}}
  */
-class StageDebugCmd : public Command {
+class StageDebugCmd : public BasicCommand {
 public:
-    StageDebugCmd() : Command("stageDebug") {}
+    StageDebugCmd() : BasicCommand("stageDebug") {}
 
     virtual bool supportsWriteConcern(const BSONObj& cmd) const override {
         return false;

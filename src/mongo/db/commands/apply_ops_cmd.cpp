@@ -61,9 +61,9 @@ using std::stringstream;
 
 namespace {
 
-class ApplyOpsCmd : public Command {
+class ApplyOpsCmd : public BasicCommand {
 public:
-    ApplyOpsCmd() : Command("applyOps") {}
+    ApplyOpsCmd() : BasicCommand("applyOps") {}
 
     virtual bool slaveOk() const {
         return false;

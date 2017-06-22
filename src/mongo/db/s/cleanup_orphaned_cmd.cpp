@@ -168,9 +168,9 @@ CleanupResult cleanupOrphanedData(OperationContext* opCtx,
  *      writeConcern: { <writeConcern options> }
  * }
  */
-class CleanupOrphanedCommand : public Command {
+class CleanupOrphanedCommand : public BasicCommand {
 public:
-    CleanupOrphanedCommand() : Command("cleanupOrphaned") {}
+    CleanupOrphanedCommand() : BasicCommand("cleanupOrphaned") {}
 
     virtual bool slaveOk() const {
         return false;

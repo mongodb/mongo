@@ -68,9 +68,9 @@ std::unique_ptr<DBClientBase>& CopyDbAuthConnection::forClient(Client* client) {
  * nonce from the source of a "copydb" operation for authentication purposes.  See the
  * description of the "copydb" command below.
  */
-class CmdCopyDbGetNonce : public Command {
+class CmdCopyDbGetNonce : public BasicCommand {
 public:
-    CmdCopyDbGetNonce() : Command("copydbgetnonce") {}
+    CmdCopyDbGetNonce() : BasicCommand("copydbgetnonce") {}
 
     virtual bool adminOnly() const {
         return true;
@@ -140,9 +140,9 @@ public:
  * Run against the mongod that is the intended target for the "copydb" command.  Used to
  * initialize a SASL auth session for a "copydb" operation for authentication purposes.
  */
-class CmdCopyDbSaslStart : public Command {
+class CmdCopyDbSaslStart : public BasicCommand {
 public:
-    CmdCopyDbSaslStart() : Command("copydbsaslstart") {}
+    CmdCopyDbSaslStart() : BasicCommand("copydbsaslstart") {}
 
     virtual bool adminOnly() const {
         return true;

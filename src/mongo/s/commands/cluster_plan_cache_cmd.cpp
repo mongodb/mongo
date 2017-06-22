@@ -48,7 +48,7 @@ using std::vector;
  * Cluster plan cache commands don't do much more than
  * forwarding the commands to all shards and combining the results.
  */
-class ClusterPlanCacheCmd : public Command {
+class ClusterPlanCacheCmd : public BasicCommand {
     MONGO_DISALLOW_COPYING(ClusterPlanCacheCmd);
 
 public:
@@ -98,7 +98,7 @@ public:
      * "helpText", and will require privilege "actionType" to run.
      */
     ClusterPlanCacheCmd(const std::string& name, const std::string& helpText, ActionType actionType)
-        : Command(name), _helpText(helpText), _actionType(actionType) {}
+        : BasicCommand(name), _helpText(helpText), _actionType(actionType) {}
 
 private:
     std::string _helpText;

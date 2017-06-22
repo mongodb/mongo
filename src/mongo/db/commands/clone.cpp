@@ -52,9 +52,9 @@ using std::stringstream;
    Note: doesn't work with authentication enabled, except as internal operation or for
    old-style users for backwards compatibility.
 */
-class CmdClone : public Command {
+class CmdClone : public BasicCommand {
 public:
-    CmdClone() : Command("clone") {}
+    CmdClone() : BasicCommand("clone") {}
 
     virtual bool slaveOk() const {
         return false;

@@ -36,9 +36,9 @@
 namespace mongo {
 namespace {
 
-class NetStatCmd : public Command {
+class NetStatCmd : public BasicCommand {
 public:
-    NetStatCmd() : Command("netstat") {}
+    NetStatCmd() : BasicCommand("netstat") {}
 
     virtual bool slaveOk() const {
         return true;

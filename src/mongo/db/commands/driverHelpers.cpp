@@ -52,9 +52,9 @@ namespace mongo {
 
 using std::string;
 
-class BasicDriverHelper : public Command {
+class BasicDriverHelper : public BasicCommand {
 public:
-    BasicDriverHelper(const char* name) : Command(name) {}
+    BasicDriverHelper(const char* name) : BasicCommand(name) {}
 
     virtual bool supportsWriteConcern(const BSONObj& cmd) const override {
         return false;

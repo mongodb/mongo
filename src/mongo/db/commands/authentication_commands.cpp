@@ -97,9 +97,9 @@ void CmdAuthenticate::disableAuthMechanism(std::string authMechanism) {
    where <key> is md5(<nonce_str><username><pwd_digest_str>) as a string
 */
 
-class CmdGetNonce : public Command {
+class CmdGetNonce : public BasicCommand {
 public:
-    CmdGetNonce() : Command("getnonce"), _random(SecureRandom::create()) {}
+    CmdGetNonce() : BasicCommand("getnonce"), _random(SecureRandom::create()) {}
 
     virtual bool slaveOk() const {
         return true;
@@ -360,7 +360,7 @@ Status CmdAuthenticate::_authenticateX509(OperationContext* opCtx,
 #endif
 CmdAuthenticate cmdAuthenticate;
 
-class CmdLogout : public Command {
+class CmdLogout : public BasicCommand {
 public:
     virtual bool slaveOk() const {
         return true;
@@ -374,7 +374,7 @@ public:
     virtual bool supportsWriteConcern(const BSONObj& cmd) const override {
         return false;
     }
-    CmdLogout() : Command("logout") {}
+    CmdLogout() : BasicCommand("logout") {}
     bool run(OperationContext* opCtx,
              const string& dbname,
              const BSONObj& cmdObj,

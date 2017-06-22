@@ -37,9 +37,9 @@
 
 namespace mongo {
 
-class CurrentOpCommandBase : public Command {
+class CurrentOpCommandBase : public BasicCommand {
 public:
-    CurrentOpCommandBase() : Command("currentOp") {}
+    CurrentOpCommandBase() : BasicCommand("currentOp") {}
 
     virtual ~CurrentOpCommandBase() {}
 

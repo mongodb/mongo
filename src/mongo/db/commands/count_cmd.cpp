@@ -54,9 +54,9 @@ using std::stringstream;
 /**
  * Implements the MongoD side of the count command.
  */
-class CmdCount : public Command {
+class CmdCount : public BasicCommand {
 public:
-    CmdCount() : Command("count") {}
+    CmdCount() : BasicCommand("count") {}
 
     virtual bool supportsWriteConcern(const BSONObj& cmd) const override {
         return false;

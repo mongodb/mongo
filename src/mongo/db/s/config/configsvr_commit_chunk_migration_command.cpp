@@ -83,9 +83,9 @@ namespace {
  * }
  *
  */
-class ConfigSvrCommitChunkMigrationCommand : public Command {
+class ConfigSvrCommitChunkMigrationCommand : public BasicCommand {
 public:
-    ConfigSvrCommitChunkMigrationCommand() : Command("_configsvrCommitChunkMigration") {}
+    ConfigSvrCommitChunkMigrationCommand() : BasicCommand("_configsvrCommitChunkMigration") {}
 
     void help(std::stringstream& help) const override {
         help << "should not be calling this directly";

@@ -195,7 +195,7 @@ BSONObj buildCollectionBson(OperationContext* opCtx,
     return b.obj();
 }
 
-class CmdListCollections : public Command {
+class CmdListCollections : public BasicCommand {
 public:
     virtual bool slaveOk() const {
         return false;
@@ -227,7 +227,7 @@ public:
                       str::stream() << "Not authorized to list collections on db: " << dbname);
     }
 
-    CmdListCollections() : Command("listCollections") {}
+    CmdListCollections() : BasicCommand("listCollections") {}
 
     bool run(OperationContext* opCtx,
              const string& dbname,

@@ -46,9 +46,10 @@ namespace {
  *   setFeatureCompatibilityVersion: <string version>
  * }
  */
-class SetFeatureCompatibilityVersionCommand : public Command {
+class SetFeatureCompatibilityVersionCommand : public BasicCommand {
 public:
-    SetFeatureCompatibilityVersionCommand() : Command(FeatureCompatibilityVersion::kCommandName) {}
+    SetFeatureCompatibilityVersionCommand()
+        : BasicCommand(FeatureCompatibilityVersion::kCommandName) {}
 
     virtual bool slaveOk() const {
         return false;

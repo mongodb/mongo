@@ -36,9 +36,9 @@
 namespace mongo {
 namespace {
 
-class CmdReplSetGetStatus : public Command {
+class CmdReplSetGetStatus : public BasicCommand {
 public:
-    CmdReplSetGetStatus() : Command("replSetGetStatus") {}
+    CmdReplSetGetStatus() : BasicCommand("replSetGetStatus") {}
 
     virtual bool slaveOk() const {
         return true;

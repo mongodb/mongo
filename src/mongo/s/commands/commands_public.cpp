@@ -147,9 +147,9 @@ StatusWith<BSONObj> getCollation(const BSONObj& cmdObj) {
     return BSONObj();
 }
 
-class PublicGridCommand : public Command {
+class PublicGridCommand : public BasicCommand {
 protected:
-    PublicGridCommand(const char* n, const char* oldname = NULL) : Command(n, oldname) {}
+    PublicGridCommand(const char* n, const char* oldname = NULL) : BasicCommand(n, oldname) {}
 
     virtual bool slaveOk() const {
         return true;
@@ -194,13 +194,13 @@ protected:
  * Base class for commands on collections that simply need to broadcast the command to shards that
  * own data for the collection and aggregate the raw results.
  */
-class AllShardsCollectionCommand : public Command {
+class AllShardsCollectionCommand : public BasicCommand {
 protected:
     AllShardsCollectionCommand(const char* name,
                                const char* oldname = NULL,
                                bool implicitCreateDb = false,
                                bool appendShardVersion = true)
-        : Command(name, oldname),
+        : BasicCommand(name, oldname),
           _implicitCreateDb(implicitCreateDb),
           _appendShardVersion(appendShardVersion) {}
 

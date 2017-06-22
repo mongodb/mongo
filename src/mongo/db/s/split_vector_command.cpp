@@ -69,9 +69,9 @@ BSONObj prettyKey(const BSONObj& keyPattern, const BSONObj& key) {
     return key.replaceFieldNames(keyPattern).clientReadable();
 }
 
-class SplitVector : public Command {
+class SplitVector : public BasicCommand {
 public:
-    SplitVector() : Command("splitVector") {}
+    SplitVector() : BasicCommand("splitVector") {}
 
     bool supportsWriteConcern(const BSONObj& cmd) const override {
         return false;

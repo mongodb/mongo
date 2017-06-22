@@ -54,9 +54,9 @@ namespace {
 /**
  * Mongos-side command for merging chunks, passes command to appropriate shard.
  */
-class ClusterMergeChunksCommand : public Command {
+class ClusterMergeChunksCommand : public BasicCommand {
 public:
-    ClusterMergeChunksCommand() : Command("mergeChunks") {}
+    ClusterMergeChunksCommand() : BasicCommand("mergeChunks") {}
 
     void help(stringstream& h) const override {
         h << "Merge Chunks command\n"

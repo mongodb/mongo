@@ -39,9 +39,9 @@
 namespace mongo {
 namespace {
 
-class ListShardsCmd : public Command {
+class ListShardsCmd : public BasicCommand {
 public:
-    ListShardsCmd() : Command("listShards", "listshards") {}
+    ListShardsCmd() : BasicCommand("listShards", "listshards") {}
 
     virtual bool slaveOk() const {
         return true;

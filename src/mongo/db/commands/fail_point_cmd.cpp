@@ -64,9 +64,9 @@ using std::stringstream;
  *    data: <Object> // optional arbitrary object to store.
  * }
  */
-class FaultInjectCmd : public Command {
+class FaultInjectCmd : public BasicCommand {
 public:
-    FaultInjectCmd() : Command("configureFailPoint") {}
+    FaultInjectCmd() : BasicCommand("configureFailPoint") {}
 
     virtual bool slaveOk() const {
         return true;

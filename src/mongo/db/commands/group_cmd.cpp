@@ -58,9 +58,9 @@ namespace {
  * The group command is deprecated. Users should prefer the aggregation framework or mapReduce. See
  * http://dochub.mongodb.org/core/group-command-deprecation for more detail.
  */
-class GroupCommand : public Command {
+class GroupCommand : public BasicCommand {
 public:
-    GroupCommand() : Command("group") {}
+    GroupCommand() : BasicCommand("group") {}
 
 private:
     virtual bool supportsWriteConcern(const BSONObj& cmd) const override {

@@ -319,9 +319,9 @@ Status mergeChunks(OperationContext* opCtx,
     return Status::OK();
 }
 
-class MergeChunksCommand : public Command {
+class MergeChunksCommand : public BasicCommand {
 public:
-    MergeChunksCommand() : Command("mergeChunks") {}
+    MergeChunksCommand() : BasicCommand("mergeChunks") {}
 
     void help(stringstream& h) const override {
         h << "Merge Chunks command\n"

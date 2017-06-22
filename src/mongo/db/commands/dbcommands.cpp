@@ -146,7 +146,7 @@ public:
 
 } cmdShutdownMongoD;
 
-class CmdDropDatabase : public Command {
+class CmdDropDatabase : public BasicCommand {
 public:
     virtual void help(stringstream& help) const {
         help << "drop (delete) this database";
@@ -168,7 +168,7 @@ public:
         return true;
     }
 
-    CmdDropDatabase() : Command("dropDatabase") {}
+    CmdDropDatabase() : BasicCommand("dropDatabase") {}
 
     bool run(OperationContext* opCtx,
              const string& dbname,
@@ -211,7 +211,7 @@ public:
 
 } cmdDropDatabase;
 
-class CmdRepairDatabase : public Command {
+class CmdRepairDatabase : public BasicCommand {
 public:
     virtual bool slaveOk() const {
         return true;
@@ -236,7 +236,7 @@ public:
         out->push_back(Privilege(ResourcePattern::forDatabaseName(dbname), actions));
     }
 
-    CmdRepairDatabase() : Command("repairDatabase") {}
+    CmdRepairDatabase() : BasicCommand("repairDatabase") {}
 
     bool run(OperationContext* opCtx,
              const string& dbname,
@@ -296,7 +296,7 @@ public:
    todo: how do we handle profiling information put in the db with replication?
          sensibly or not?
 */
-class CmdProfile : public Command {
+class CmdProfile : public BasicCommand {
 public:
     virtual bool slaveOk() const {
         return true;
@@ -339,7 +339,7 @@ public:
         return Status(ErrorCodes::Unauthorized, "unauthorized");
     }
 
-    CmdProfile() : Command("profile") {}
+    CmdProfile() : BasicCommand("profile") {}
 
     bool run(OperationContext* opCtx,
              const string& dbname,
@@ -395,12 +395,12 @@ public:
 
 } cmdProfile;
 
-class CmdDiagLogging : public Command {
+class CmdDiagLogging : public BasicCommand {
 public:
     virtual bool slaveOk() const {
         return true;
     }
-    CmdDiagLogging() : Command("diagLogging") {}
+    CmdDiagLogging() : BasicCommand("diagLogging") {}
     bool adminOnly() const {
         return true;
     }
@@ -455,9 +455,9 @@ public:
 } cmddiaglogging;
 
 /* drop collection */
-class CmdDrop : public Command {
+class CmdDrop : public BasicCommand {
 public:
-    CmdDrop() : Command("drop") {}
+    CmdDrop() : BasicCommand("drop") {}
     virtual bool slaveOk() const {
         return false;
     }
@@ -511,9 +511,9 @@ public:
 } cmdDrop;
 
 /* create collection */
-class CmdCreate : public Command {
+class CmdCreate : public BasicCommand {
 public:
-    CmdCreate() : Command("create") {}
+    CmdCreate() : BasicCommand("create") {}
     virtual bool slaveOk() const {
         return false;
     }
@@ -628,9 +628,9 @@ public:
 } cmdCreate;
 
 
-class CmdFileMD5 : public Command {
+class CmdFileMD5 : public BasicCommand {
 public:
-    CmdFileMD5() : Command("filemd5") {}
+    CmdFileMD5() : BasicCommand("filemd5") {}
 
     virtual bool slaveOk() const {
         return true;
@@ -803,13 +803,13 @@ public:
 } cmdFileMD5;
 
 
-class CmdDatasize : public Command {
+class CmdDatasize : public BasicCommand {
     virtual string parseNs(const string& dbname, const BSONObj& cmdObj) const {
         return parseNsFullyQualified(dbname, cmdObj);
     }
 
 public:
-    CmdDatasize() : Command("dataSize", "datasize") {}
+    CmdDatasize() : BasicCommand("dataSize", "datasize") {}
 
     virtual bool slaveOk() const {
         return true;
@@ -957,9 +957,9 @@ public:
 
 } cmdDatasize;
 
-class CollectionStats : public Command {
+class CollectionStats : public BasicCommand {
 public:
-    CollectionStats() : Command("collStats", "collstats") {}
+    CollectionStats() : BasicCommand("collStats", "collstats") {}
 
     virtual bool slaveOk() const {
         return true;
@@ -1005,9 +1005,9 @@ public:
 
 } cmdCollectionStats;
 
-class CollectionModCommand : public Command {
+class CollectionModCommand : public BasicCommand {
 public:
-    CollectionModCommand() : Command("collMod") {}
+    CollectionModCommand() : BasicCommand("collMod") {}
 
     virtual bool slaveOk() const {
         return false;
@@ -1040,9 +1040,9 @@ public:
 
 } collectionModCommand;
 
-class DBStats : public Command {
+class DBStats : public BasicCommand {
 public:
-    DBStats() : Command("dbStats", "dbstats") {}
+    DBStats() : BasicCommand("dbStats", "dbstats") {}
 
     virtual bool slaveOk() const {
         return true;
@@ -1133,9 +1133,9 @@ public:
 } cmdDBStats;
 
 /* Returns client's uri */
-class CmdWhatsMyUri : public Command {
+class CmdWhatsMyUri : public BasicCommand {
 public:
-    CmdWhatsMyUri() : Command("whatsmyuri") {}
+    CmdWhatsMyUri() : BasicCommand("whatsmyuri") {}
     virtual bool slaveOk() const {
         return true;
     }
@@ -1158,9 +1158,9 @@ public:
     }
 } cmdWhatsMyUri;
 
-class AvailableQueryOptions : public Command {
+class AvailableQueryOptions : public BasicCommand {
 public:
-    AvailableQueryOptions() : Command("availableQueryOptions", "availablequeryoptions") {}
+    AvailableQueryOptions() : BasicCommand("availableQueryOptions", "availablequeryoptions") {}
 
     virtual bool slaveOk() const {
         return true;

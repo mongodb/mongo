@@ -38,9 +38,9 @@
 namespace mongo {
 namespace {
 
-class CmdGetShardMap : public Command {
+class CmdGetShardMap : public BasicCommand {
 public:
-    CmdGetShardMap() : Command("getShardMap") {}
+    CmdGetShardMap() : BasicCommand("getShardMap") {}
 
 
     virtual bool supportsWriteConcern(const BSONObj& cmd) const override {

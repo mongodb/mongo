@@ -108,7 +108,7 @@ using std::unique_ptr;
 PlanCacheCommand::PlanCacheCommand(const string& name,
                                    const string& helpText,
                                    ActionType actionType)
-    : Command(name), helpText(helpText), actionType(actionType) {}
+    : BasicCommand(name), helpText(helpText), actionType(actionType) {}
 
 bool PlanCacheCommand::run(OperationContext* opCtx,
                            const string& dbname,

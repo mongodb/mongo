@@ -48,11 +48,11 @@ namespace {
  * support a new-style explain, then the entire explain will fail (i.e. new-style
  * explains cannot be used in multiversion clusters).
  */
-class ClusterExplainCmd : public Command {
+class ClusterExplainCmd : public BasicCommand {
     MONGO_DISALLOW_COPYING(ClusterExplainCmd);
 
 public:
-    ClusterExplainCmd() : Command("explain") {}
+    ClusterExplainCmd() : BasicCommand("explain") {}
 
     virtual bool supportsWriteConcern(const BSONObj& cmd) const override {
         return false;

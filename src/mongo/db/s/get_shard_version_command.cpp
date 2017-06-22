@@ -47,9 +47,9 @@
 namespace mongo {
 namespace {
 
-class GetShardVersion : public Command {
+class GetShardVersion : public BasicCommand {
 public:
-    GetShardVersion() : Command("getShardVersion") {}
+    GetShardVersion() : BasicCommand("getShardVersion") {}
 
     void help(std::stringstream& help) const override {
         help << " example: { getShardVersion : 'alleyinsider.foo'  } ";

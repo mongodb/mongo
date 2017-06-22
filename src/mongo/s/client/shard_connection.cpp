@@ -89,9 +89,9 @@ private:
 /**
  * Command to allow access to the sharded conn pool information in mongos.
  */
-class ShardedPoolStats : public Command {
+class ShardedPoolStats : public BasicCommand {
 public:
-    ShardedPoolStats() : Command("shardConnPoolStats") {}
+    ShardedPoolStats() : BasicCommand("shardConnPoolStats") {}
     virtual void help(stringstream& help) const {
         help << "stats about the shard connection pool";
     }

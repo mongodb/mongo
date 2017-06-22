@@ -75,11 +75,11 @@ MONGO_FP_DECLARE(rsStopGetMoreCmd);
  * Can be used in combination with any cursor-generating command (e.g. find, aggregate,
  * listIndexes).
  */
-class GetMoreCmd : public Command {
+class GetMoreCmd : public BasicCommand {
     MONGO_DISALLOW_COPYING(GetMoreCmd);
 
 public:
-    GetMoreCmd() : Command("getMore") {}
+    GetMoreCmd() : BasicCommand("getMore") {}
 
 
     virtual bool supportsWriteConcern(const BSONObj& cmd) const override {

@@ -51,9 +51,9 @@
 namespace mongo {
 namespace {
 
-class ClusterKillOpCommand : public Command {
+class ClusterKillOpCommand : public BasicCommand {
 public:
-    ClusterKillOpCommand() : Command("killOp") {}
+    ClusterKillOpCommand() : BasicCommand("killOp") {}
 
 
     virtual bool supportsWriteConcern(const BSONObj& cmd) const override {

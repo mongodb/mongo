@@ -61,9 +61,9 @@ namespace {
  * Takes a single argument, a namespace string, and forces this node to refresh its routing table
  * cache entry for that namespace.
  */
-class ForceRoutingTableRefresh : public Command {
+class ForceRoutingTableRefresh : public BasicCommand {
 public:
-    ForceRoutingTableRefresh() : Command("forceRoutingTableRefresh") {}
+    ForceRoutingTableRefresh() : BasicCommand("forceRoutingTableRefresh") {}
 
     void help(std::stringstream& help) const override {
         help << "internal command to force a node to refresh its routing table entry for a "
