@@ -896,9 +896,13 @@ Status OptionsParser::readConfigFile(const std::string& filename, std::string* c
         configVector.resize(nread);
     }
 
+    // config file cannot have null bytes
+    if (end(configVector) != std::find(begin(configVector), end(configVector), '\0')) {
+        return Status(ErrorCodes::FailedToParse, "Config file has null bytes");
+    }
+
     // Copy the vector contents into our result string
     *contents = std::string(configVector.begin(), configVector.end());
-
     return Status::OK();
 }
 
