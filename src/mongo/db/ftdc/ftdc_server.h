@@ -93,11 +93,7 @@ public:
 
 private:
     std::string _name;
-    std::string _ns;
-    BSONObj _cmdObj;
-
-    // Not owned
-    Command* _command;
+    const OpMsgRequest _request;
 };
 
 }  // namespace mongo

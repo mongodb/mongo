@@ -164,23 +164,12 @@ unsigned long long DBDirectClient::count(
     BSONObj cmdObj = _countCmd(ns, query, options, limit, skip);
 
     NamespaceString nsString(ns);
-    std::string dbname = nsString.db().toString();
 
-    Command* countCmd = Command::findCommand("count");
-    invariant(countCmd);
+    auto result = Command::runCommandDirectly(
+        _opCtx, OpMsgRequest::fromDBAndBody(nsString.db(), std::move(cmdObj)));
 
-    std::string errmsg;
-    BSONObjBuilder result;
-    bool runRetval = countCmd->run(_opCtx, dbname, cmdObj, errmsg, result);
-    if (!runRetval) {
-        Command::appendCommandStatus(result, runRetval, errmsg);
-        Status commandStatus = getStatusFromCommandResult(result.obj());
-        invariant(!commandStatus.isOK());
-        uassertStatusOK(commandStatus);
-    }
-
-    BSONObj resultObj = result.obj();
-    return static_cast<unsigned long long>(resultObj["n"].numberLong());
+    uassertStatusOK(getStatusFromCommandResult(result));
+    return static_cast<unsigned long long>(result["n"].numberLong());
 }
 
 }  // namespace mongo

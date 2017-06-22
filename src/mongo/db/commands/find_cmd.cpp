@@ -53,6 +53,7 @@
 #include "mongo/db/server_parameters.h"
 #include "mongo/db/service_context.h"
 #include "mongo/db/stats/counters.h"
+#include "mongo/rpc/get_status_from_command_result.h"
 #include "mongo/util/log.h"
 
 namespace mongo {
@@ -284,19 +285,19 @@ public:
             if (!viewAggregationCommand.isOK())
                 return appendCommandStatus(result, viewAggregationCommand.getStatus());
 
-            Command* agg = Command::findCommand("aggregate");
-            try {
-                agg->run(opCtx, dbname, viewAggregationCommand.getValue(), errmsg, result);
-            } catch (DBException& error) {
-                if (error.getCode() == ErrorCodes::InvalidPipelineOperator) {
-                    return appendCommandStatus(
-                        result,
-                        {ErrorCodes::InvalidPipelineOperator,
-                         str::stream() << "Unsupported in view pipeline: " << error.what()});
-                }
-                return appendCommandStatus(result, error.toStatus());
+            BSONObj aggResult = Command::runCommandDirectly(
+                opCtx,
+                OpMsgRequest::fromDBAndBody(dbname, std::move(viewAggregationCommand.getValue())));
+            auto status = getStatusFromCommandResult(aggResult);
+            if (status.code() == ErrorCodes::InvalidPipelineOperator) {
+                return appendCommandStatus(
+                    result,
+                    {ErrorCodes::InvalidPipelineOperator,
+                     str::stream() << "Unsupported in view pipeline: " << status.reason()});
             }
-            return true;
+            result.resetToEmpty();
+            result.appendElements(aggResult);
+            return status.isOK();
         }
 
         // Get the execution plan for the query.

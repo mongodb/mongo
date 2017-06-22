@@ -247,21 +247,14 @@ FTDCSimpleInternalCommandCollector::FTDCSimpleInternalCommandCollector(StringDat
                                                                        StringData name,
                                                                        StringData ns,
                                                                        BSONObj cmdObj)
-    : _name(name.toString()), _ns(ns.toString()), _cmdObj(std::move(cmdObj)) {
-    _command = Command::findCommand(command);
-    invariant(_command);
+    : _name(name.toString()), _request(OpMsgRequest::fromDBAndBody(ns, std::move(cmdObj))) {
+    invariant(command == _request.getCommandName());
+    invariant(Command::findCommand(command));  // Fail early if it doesn't exist.
 }
 
 void FTDCSimpleInternalCommandCollector::collect(OperationContext* opCtx, BSONObjBuilder& builder) {
-    std::string errmsg;
-
-    bool ret = _command->run(opCtx, _ns, _cmdObj, errmsg, builder);
-
-    // Some commands return errmsgs when they return false (collstats)
-    // Some commands return bson objs when they return false (replGetStatus)
-    // We append the status as needed to ensure readers of the collected data can check the
-    // status of any individual command.
-    _command->appendCommandStatus(builder, ret, errmsg);
+    auto result = Command::runCommandDirectly(opCtx, _request);
+    builder.appendElements(result);
 }
 
 std::string FTDCSimpleInternalCommandCollector::name() const {

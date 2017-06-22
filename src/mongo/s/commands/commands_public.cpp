@@ -1041,11 +1041,10 @@ public:
                     resolvedView.asExpandedViewAggregation(aggRequestOnView.getValue());
                 auto resolvedAggCmd = resolvedAggRequest.serializeToCommandObj().toBson();
 
-                BSONObjBuilder aggResult;
-                Command::findCommand("aggregate")
-                    ->run(opCtx, dbName, resolvedAggCmd, errmsg, aggResult);
+                BSONObj aggResult = Command::runCommandDirectly(
+                    opCtx, OpMsgRequest::fromDBAndBody(dbName, std::move(resolvedAggCmd)));
 
-                ViewResponseFormatter formatter(aggResult.obj());
+                ViewResponseFormatter formatter(aggResult);
                 auto formatStatus = formatter.appendAsDistinctResponse(&result);
                 if (!formatStatus.isOK()) {
                     return appendCommandStatus(result, formatStatus);

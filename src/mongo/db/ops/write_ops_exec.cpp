@@ -252,14 +252,9 @@ SingleWriteResult createIndex(OperationContext* opCtx,
     BSONObjBuilder cmdBuilder;
     cmdBuilder << "createIndexes" << ns.coll();
     cmdBuilder << "indexes" << BSON_ARRAY(spec);
-    auto cmd = cmdBuilder.obj();
 
-    BSONObjBuilder cmdReplyBuilder;
-    std::string errMsg;
-    bool ok = Command::findCommand("createIndexes")
-                  ->run(opCtx, systemIndexes.db().toString(), cmd, errMsg, cmdReplyBuilder);
-    Command::appendCommandStatus(cmdReplyBuilder, ok, errMsg);
-    auto cmdResult = cmdReplyBuilder.obj();
+    auto cmdResult = Command::runCommandDirectly(
+        opCtx, OpMsgRequest::fromDBAndBody(systemIndexes.db(), cmdBuilder.obj()));
     uassertStatusOK(getStatusFromCommandResult(cmdResult));
 
     // Unlike normal inserts, it is not an error to "insert" a duplicate index.

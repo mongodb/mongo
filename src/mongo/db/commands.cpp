@@ -50,6 +50,7 @@
 #include "mongo/db/namespace_string.h"
 #include "mongo/db/server_parameters.h"
 #include "mongo/rpc/write_concern_error_detail.h"
+#include "mongo/s/stale_exception.h"
 #include "mongo/util/log.h"
 
 namespace mongo {
@@ -180,6 +181,26 @@ Status Command::explain(OperationContext* opCtx,
                         ExplainOptions::Verbosity verbosity,
                         BSONObjBuilder* out) const {
     return {ErrorCodes::IllegalOperation, str::stream() << "Cannot explain cmd: " << getName()};
+}
+
+BSONObj Command::runCommandDirectly(OperationContext* opCtx, const OpMsgRequest& request) {
+    auto command = Command::findCommand(request.getCommandName());
+    invariant(command);
+
+    BSONObjBuilder out;
+    try {
+        std::string errmsg;
+        bool ok = command->enhancedRun(opCtx, request, errmsg, out);
+        appendCommandStatus(out, ok, errmsg);
+    } catch (const StaleConfigException& ex) {
+        // These exceptions are intended to be handled at a higher level and cannot losslessly
+        // round-trip through Status.
+        throw;
+    } catch (const DBException& ex) {
+        out.resetToEmpty();
+        appendCommandStatus(out, ex.toStatus());
+    }
+    return out.obj();
 }
 
 Command* Command::findCommand(StringData name) {

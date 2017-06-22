@@ -401,6 +401,13 @@ public:
     // Counter for unknown commands
     static Counter64 unknownCommands;
 
+    /**
+     * Runs a command directly and returns the result. Does not do any other work normally handled
+     * by command dispatch, such as checking auth, dealing with CurOp or waiting for write concern.
+     * It is illegal to call this if the command does not exist.
+     */
+    static BSONObj runCommandDirectly(OperationContext* txn, const OpMsgRequest& request);
+
     static Command* findCommand(StringData name);
 
     // Helper for setting errmsg and ok field in command result object.
