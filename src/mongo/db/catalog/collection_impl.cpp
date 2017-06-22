@@ -1266,16 +1266,15 @@ Status CollectionImpl::validate(OperationContext* opCtx,
             // `results`.
             dassert(status.isOK());
 
+            // The error message can't be more specific because even if the index is invalid, we
+            // won't know if the corruption occurred on the index entry or in the document.
+            const std::string invalidIdxMsg = "One or more indexes contain invalid index entries.";
 
-            string msg = "One or more indexes contain invalid index entries.";
             // when there's an index key/document mismatch, both `if` and `else if` statements
             // will be true. But if we only check tooFewIndexEntries(), we'll be able to see
             // which specific index is invalid.
             if (indexValidator->tooFewIndexEntries()) {
-                // The error message can't be more specific because even though the index is
-                // invalid, we won't know if the corruption occurred on the index entry or in
-                // the document.
-                results->errors.push_back(msg);
+                results->errors.push_back(invalidIdxMsg);
                 results->valid = false;
             } else if (indexValidator->tooManyIndexEntries()) {
                 for (auto& it : indexNsResultsMap) {
@@ -1283,8 +1282,7 @@ Status CollectionImpl::validate(OperationContext* opCtx,
                     ValidateResults& r = it.second;
                     r.valid = false;
                 }
-                string msg = "One or more indexes contain invalid index entries.";
-                results->errors.push_back(msg);
+                results->errors.push_back(invalidIdxMsg);
                 results->valid = false;
             }
         }
