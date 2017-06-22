@@ -47,6 +47,7 @@
 #include "mongo/db/auth/authorization_session.h"
 #include "mongo/db/auth/authz_manager_external_state.h"
 #include "mongo/db/auth/privilege.h"
+#include "mongo/db/auth/privilege_parser.h"
 #include "mongo/db/auth/role_graph.h"
 #include "mongo/db/auth/sasl_options.h"
 #include "mongo/db/auth/user.h"
