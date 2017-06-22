@@ -59,7 +59,16 @@ class StorageInterface;
  *                  ts: <Timestamp>,
  *                  t: <long long>
  *             },                           // field for 'appliedThrough'
- *      oplogDeleteFromPoint: <Timestamp>
+ * }
+ *
+ * The oplogTruncateAfterPoint document, in 'local.replset.oplogTruncateAfterPoint', is used to
+ * indicate how much of the oplog is consistent and where the oplog should be truncated when
+ * entering recovery.
+ *
+ * Example of all fields:
+ * {
+ *      _id: 'oplogTruncateAfterPoint',
+ *      oplogTruncateAfterPoint: <Timestamp>
  * }
  *
  * See below for explanations of each field.
@@ -142,8 +151,9 @@ public:
      *
      * If null, no documents should be deleted.
      */
-    virtual void setOplogDeleteFromPoint(OperationContext* opCtx, const Timestamp& timestamp) = 0;
-    virtual Timestamp getOplogDeleteFromPoint(OperationContext* opCtx) const = 0;
+    virtual void setOplogTruncateAfterPoint(OperationContext* opCtx,
+                                            const Timestamp& timestamp) = 0;
+    virtual Timestamp getOplogTruncateAfterPoint(OperationContext* opCtx) const = 0;
 
     // -------- Applied Through ----------
 

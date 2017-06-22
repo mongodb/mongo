@@ -45,10 +45,6 @@ structs:
                 cpp_name: minValidTerm
                 type: safeInt64
                 description: "The term for the OpTime at which the data on disk will be consistent; -1 for PV0."
-            oplogDeleteFromPoint:
-                type: timestamp
-                optional: true
-                description: "The timestamp of the first oplog entry in a batch when we are writing oplog entries to the oplog after which the oplog may be inconsistent."
             begin:
                 cpp_name: appliedThrough
                 type: optime
@@ -63,3 +59,12 @@ structs:
                 type: objectid
                 optional: true # This is automatically created when the document is upserted
                 description: "An objectid that is not used but is automatically generated"
+    OplogTruncateAfterPointDocument:
+        description: A document in which the server stores information on where to truncate the oplog on unclean shutdown.
+        fields:
+            oplogTruncateAfterPoint:
+                type: timestamp
+                description: "The timestamp of the first oplog entry in a batch when we are writing oplog entries to the oplog after which the oplog may be inconsistent."
+            _id:
+                type: string
+                description: "Always set to 'oplogTruncateAfterPoint' to easily retrieve it."

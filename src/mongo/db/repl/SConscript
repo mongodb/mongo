@@ -204,7 +204,7 @@ env.Library(
     LIBDEPS=[
         'optime',
         'repl_coordinator_impl',
-	'replication_consistency_markers_idl',
+        'replication_consistency_markers_idl',
     ],
 )
 

@@ -60,8 +60,8 @@ public:
     void setMinValid(OperationContext* opCtx, const OpTime& minValid) override;
     void setMinValidToAtLeast(OperationContext* opCtx, const OpTime& minValid) override;
 
-    void setOplogDeleteFromPoint(OperationContext* opCtx, const Timestamp& timestamp) override;
-    Timestamp getOplogDeleteFromPoint(OperationContext* opCtx) const override;
+    void setOplogTruncateAfterPoint(OperationContext* opCtx, const Timestamp& timestamp) override;
+    Timestamp getOplogTruncateAfterPoint(OperationContext* opCtx) const override;
 
     void setAppliedThrough(OperationContext* opCtx, const OpTime& optime) override;
     OpTime getAppliedThrough(OperationContext* opCtx) const override;
@@ -73,7 +73,7 @@ private:
     mutable stdx::mutex _minValidBoundariesMutex;
     OpTime _appliedThrough;
     OpTime _minValid;
-    Timestamp _oplogDeleteFromPoint;
+    Timestamp _oplogTruncateAfterPoint;
 };
 
 }  // namespace repl

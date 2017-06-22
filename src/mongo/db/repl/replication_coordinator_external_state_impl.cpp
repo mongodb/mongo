@@ -336,7 +336,7 @@ void ReplicationCoordinatorExternalStateImpl::shutdown(OperationContext* opCtx) 
 
     // Perform additional shutdown steps below that must be done outside _threadMutex.
 
-    if (_replicationProcess->getConsistencyMarkers()->getOplogDeleteFromPoint(opCtx).isNull() &&
+    if (_replicationProcess->getConsistencyMarkers()->getOplogTruncateAfterPoint(opCtx).isNull() &&
         loadLastOpTime(opCtx) ==
             _replicationProcess->getConsistencyMarkers()->getAppliedThrough(opCtx)) {
         // Clear the appliedThrough marker to indicate we are consistent with the top of the
@@ -415,7 +415,7 @@ OpTime ReplicationCoordinatorExternalStateImpl::onTransitionToPrimary(OperationC
     // Clear the appliedThrough marker so on startup we'll use the top of the oplog. This must be
     // done before we add anything to our oplog.
     invariant(
-        _replicationProcess->getConsistencyMarkers()->getOplogDeleteFromPoint(opCtx).isNull());
+        _replicationProcess->getConsistencyMarkers()->getOplogTruncateAfterPoint(opCtx).isNull());
     _replicationProcess->getConsistencyMarkers()->setAppliedThrough(opCtx, {});
 
     if (isV1ElectionProtocol) {
@@ -569,28 +569,28 @@ void ReplicationCoordinatorExternalStateImpl::cleanUpLastApplyBatch(OperationCon
         return;  // Initial Sync will take over so no cleanup is needed.
     }
 
-    const auto deleteFromPoint =
-        _replicationProcess->getConsistencyMarkers()->getOplogDeleteFromPoint(opCtx);
+    const auto truncateAfterPoint =
+        _replicationProcess->getConsistencyMarkers()->getOplogTruncateAfterPoint(opCtx);
     const auto appliedThrough =
         _replicationProcess->getConsistencyMarkers()->getAppliedThrough(opCtx);
 
-    const bool needToDeleteEndOfOplog = !deleteFromPoint.isNull() &&
-        // This version should never have a non-null deleteFromPoint with a null appliedThrough.
+    const bool needToDeleteEndOfOplog = !truncateAfterPoint.isNull() &&
+        // This version should never have a non-null truncateAfterPoint with a null appliedThrough.
         // This scenario means that we downgraded after unclean shutdown, then the downgraded node
         // deleted the ragged end of our oplog, then did a clean shutdown.
         !appliedThrough.isNull() &&
-        // Similarly we should never have an appliedThrough higher than the deleteFromPoint. This
+        // Similarly we should never have an appliedThrough higher than the truncateAfterPoint. This
         // means that the downgraded node deleted our ragged end then applied ahead of our
-        // deleteFromPoint and then had an unclean shutdown before upgrading. We are ok with
+        // truncateAfterPoint and then had an unclean shutdown before upgrading. We are ok with
         // applying these ops because older versions wrote to the oplog from a single thread so we
         // know they are in order.
-        !(appliedThrough.getTimestamp() >= deleteFromPoint);
+        !(appliedThrough.getTimestamp() >= truncateAfterPoint);
     if (needToDeleteEndOfOplog) {
-        log() << "Removing unapplied entries starting at: " << deleteFromPoint;
-        truncateOplogTo(opCtx, deleteFromPoint);
+        log() << "Removing unapplied entries starting at: " << truncateAfterPoint;
+        truncateOplogTo(opCtx, truncateAfterPoint);
     }
-    _replicationProcess->getConsistencyMarkers()->setOplogDeleteFromPoint(
-        opCtx, {});  // clear the deleteFromPoint
+    _replicationProcess->getConsistencyMarkers()->setOplogTruncateAfterPoint(
+        opCtx, {});  // clear the truncateAfterPoint
 
     if (appliedThrough.isNull()) {
         // No follow-up work to do.

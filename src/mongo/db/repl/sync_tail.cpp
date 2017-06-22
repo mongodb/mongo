@@ -1277,7 +1277,7 @@ StatusWith<OpTime> multiApply(OperationContext* opCtx,
         ON_BLOCK_EXIT([&] { workerPool->join(); });
 
         // Write batch of ops into oplog.
-        consistencyMarkers->setOplogDeleteFromPoint(opCtx, ops.front().getTimestamp());
+        consistencyMarkers->setOplogTruncateAfterPoint(opCtx, ops.front().getTimestamp());
         scheduleWritesToOplog(opCtx, workerPool, ops);
         fillWriterVectors(opCtx, &ops, &writerVectors);
 
@@ -1285,7 +1285,7 @@ StatusWith<OpTime> multiApply(OperationContext* opCtx,
         workerPool->join();
 
         // Reset consistency markers in case the node fails while applying ops.
-        consistencyMarkers->setOplogDeleteFromPoint(opCtx, Timestamp());
+        consistencyMarkers->setOplogTruncateAfterPoint(opCtx, Timestamp());
         consistencyMarkers->setMinValidToAtLeast(opCtx, ops.back().getOpTime());
 
         applyOps(writerVectors, workerPool, applyOperation, &statusVector);

@@ -1,4 +1,3 @@
-
 /**
  *    Copyright (C) 2017 MongoDB Inc.
  *
@@ -44,20 +43,30 @@ namespace mongo {
 namespace repl {
 
 constexpr StringData ReplicationConsistencyMarkersImpl::kDefaultMinValidNamespace;
+constexpr StringData ReplicationConsistencyMarkersImpl::kDefaultOplogTruncateAfterPointNamespace;
+constexpr StringData ReplicationConsistencyMarkersImpl::kOldOplogDeleteFromPointFieldName;
 
 namespace {
 const BSONObj kInitialSyncFlag(BSON(MinValidDocument::kInitialSyncFlagFieldName << true));
+const BSONObj kOplogTruncateAfterPointId(BSON("_id"
+                                              << "oplogTruncateAfterPoint"));
 }  // namespace
 
 ReplicationConsistencyMarkersImpl::ReplicationConsistencyMarkersImpl(
     StorageInterface* storageInterface)
     : ReplicationConsistencyMarkersImpl(
           storageInterface,
-          NamespaceString(ReplicationConsistencyMarkersImpl::kDefaultMinValidNamespace)) {}
+          NamespaceString(ReplicationConsistencyMarkersImpl::kDefaultMinValidNamespace),
+          NamespaceString(
+              ReplicationConsistencyMarkersImpl::kDefaultOplogTruncateAfterPointNamespace)) {}
 
 ReplicationConsistencyMarkersImpl::ReplicationConsistencyMarkersImpl(
-    StorageInterface* storageInterface, NamespaceString minValidNss)
-    : _storageInterface(storageInterface), _minValidNss(minValidNss) {}
+    StorageInterface* storageInterface,
+    NamespaceString minValidNss,
+    NamespaceString oplogTruncateAfterPointNss)
+    : _storageInterface(storageInterface),
+      _minValidNss(minValidNss),
+      _oplogTruncateAfterPointNss(oplogTruncateAfterPointNss) {}
 
 boost::optional<MinValidDocument> ReplicationConsistencyMarkersImpl::_getMinValidDocument(
     OperationContext* opCtx) const {
@@ -83,9 +92,9 @@ void ReplicationConsistencyMarkersImpl::_updateMinValidDocument(OperationContext
     // If the collection doesn't exist, create it and try again.
     if (status == ErrorCodes::NamespaceNotFound) {
         status = _storageInterface->createCollection(opCtx, _minValidNss, CollectionOptions());
-        if (status.isOK()) {
-            status = _storageInterface->putSingleton(opCtx, _minValidNss, updateSpec);
-        }
+        fassertStatusOK(40509, status);
+
+        status = _storageInterface->putSingleton(opCtx, _minValidNss, updateSpec);
     }
 
     fassertStatusOK(40467, status);
@@ -96,14 +105,17 @@ void ReplicationConsistencyMarkersImpl::initializeMinValidDocument(OperationCont
 
     // This initializes the values of the required fields if they are not already set.
     // If one of the fields is already set, the $max will prefer the existing value since it
-    // will always be greater than the provided ones.
+    // will always be greater than the provided ones. We unset the old 'oplogDeleteFromPoint'
+    // field so that we can remove it from the IDL struct. This is required because servers
+    // upgrading from 3.4 may have created an 'oplogDeleteFromPoint' field already. The field
+    // is guaranteed to be empty on clean shutdown and thus on upgrade, but may still exist.
     _updateMinValidDocument(opCtx,
                             BSON("$max" << BSON(MinValidDocument::kMinValidTimestampFieldName
                                                 << Timestamp()
                                                 << MinValidDocument::kMinValidTermFieldName
-                                                << OpTime::kUninitializedTerm
-                                                << MinValidDocument::kOplogDeleteFromPointFieldName
-                                                << Timestamp())));
+                                                << OpTime::kUninitializedTerm)
+                                        << "$unset"
+                                        << BSON(kOldOplogDeleteFromPointFieldName << 1)));
 }
 
 bool ReplicationConsistencyMarkersImpl::getInitialSyncFlag(OperationContext* opCtx) const {
@@ -179,28 +191,6 @@ void ReplicationConsistencyMarkersImpl::setMinValidToAtLeast(OperationContext* o
                                                 << minValid.getTerm())));
 }
 
-void ReplicationConsistencyMarkersImpl::setOplogDeleteFromPoint(OperationContext* opCtx,
-                                                                const Timestamp& timestamp) {
-    LOG(3) << "setting oplog delete from point to: " << timestamp.toStringPretty();
-    _updateMinValidDocument(
-        opCtx, BSON("$set" << BSON(MinValidDocument::kOplogDeleteFromPointFieldName << timestamp)));
-}
-
-Timestamp ReplicationConsistencyMarkersImpl::getOplogDeleteFromPoint(
-    OperationContext* opCtx) const {
-    auto doc = _getMinValidDocument(opCtx);
-    invariant(doc);  // Initialized at startup so it should never be missing.
-
-    auto oplogDeleteFromPoint = doc->getOplogDeleteFromPoint();
-    if (!oplogDeleteFromPoint) {
-        LOG(3) << "No oplogDeleteFromPoint timestamp set, returning empty timestamp.";
-        return Timestamp();
-    }
-
-    LOG(3) << "returning oplog delete from point: " << oplogDeleteFromPoint.get();
-    return oplogDeleteFromPoint.get();
-}
-
 void ReplicationConsistencyMarkersImpl::setAppliedThrough(OperationContext* opCtx,
                                                           const OpTime& optime) {
     LOG(3) << "setting appliedThrough to: " << optime.toString() << "(" << optime.toBSON() << ")";
@@ -226,6 +216,68 @@ OpTime ReplicationConsistencyMarkersImpl::getAppliedThrough(OperationContext* op
            << appliedThrough->toBSON() << ")";
 
     return appliedThrough.get();
+}
+
+boost::optional<OplogTruncateAfterPointDocument>
+ReplicationConsistencyMarkersImpl::_getOplogTruncateAfterPointDocument(
+    OperationContext* opCtx) const {
+    auto doc = _storageInterface->findById(
+        opCtx, _oplogTruncateAfterPointNss, kOplogTruncateAfterPointId["_id"]);
+
+    if (!doc.isOK()) {
+        if (doc.getStatus() == ErrorCodes::NoSuchKey ||
+            doc.getStatus() == ErrorCodes::NamespaceNotFound) {
+            return boost::none;
+        } else {
+            // Fails if there is an error other than the collection being missing or being empty.
+            fassertFailedWithStatus(40510, doc.getStatus());
+        }
+    }
+
+    auto oplogTruncateAfterPoint = OplogTruncateAfterPointDocument::parse(
+        IDLParserErrorContext("OplogTruncateAfterPointDocument"), doc.getValue());
+    return oplogTruncateAfterPoint;
+}
+
+void ReplicationConsistencyMarkersImpl::_upsertOplogTruncateAfterPointDocument(
+    OperationContext* opCtx, const BSONObj& updateSpec) {
+    auto status = _storageInterface->upsertById(
+        opCtx, _oplogTruncateAfterPointNss, kOplogTruncateAfterPointId["_id"], updateSpec);
+
+    // If the collection doesn't exist, creates it and tries again.
+    if (status == ErrorCodes::NamespaceNotFound) {
+        status = _storageInterface->createCollection(
+            opCtx, _oplogTruncateAfterPointNss, CollectionOptions());
+        fassertStatusOK(40511, status);
+
+        status = _storageInterface->upsertById(
+            opCtx, _oplogTruncateAfterPointNss, kOplogTruncateAfterPointId["_id"], updateSpec);
+    }
+
+    fassertStatusOK(40512, status);
+}
+
+void ReplicationConsistencyMarkersImpl::setOplogTruncateAfterPoint(OperationContext* opCtx,
+                                                                   const Timestamp& timestamp) {
+    LOG(3) << "setting oplog truncate after point to: " << timestamp.toBSON();
+    _upsertOplogTruncateAfterPointDocument(
+        opCtx,
+        BSON("$set" << BSON(OplogTruncateAfterPointDocument::kOplogTruncateAfterPointFieldName
+                            << timestamp)));
+}
+
+Timestamp ReplicationConsistencyMarkersImpl::getOplogTruncateAfterPoint(
+    OperationContext* opCtx) const {
+    auto doc = _getOplogTruncateAfterPointDocument(opCtx);
+    if (!doc) {
+        LOG(3) << "Returning empty oplog truncate after point since document did not exist";
+        return {};
+    }
+
+    Timestamp out = doc->getOplogTruncateAfterPoint();
+
+    LOG(3) << "returning oplog truncate after point: " << out;
+    return out;
 }
 
 }  // namespace repl

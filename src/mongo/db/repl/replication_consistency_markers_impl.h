@@ -49,10 +49,15 @@ class ReplicationConsistencyMarkersImpl : public ReplicationConsistencyMarkers {
 
 public:
     static constexpr StringData kDefaultMinValidNamespace = "local.replset.minvalid"_sd;
+    static constexpr StringData kDefaultOplogTruncateAfterPointNamespace =
+        "local.replset.oplogTruncateAfterPoint"_sd;
+    // TODO: Remove this constant and its usage in minValid initialization in 3.8.
+    static constexpr StringData kOldOplogDeleteFromPointFieldName = "oplogDeleteFromPoint"_sd;
 
     explicit ReplicationConsistencyMarkersImpl(StorageInterface* storageInterface);
     ReplicationConsistencyMarkersImpl(StorageInterface* storageInterface,
-                                      NamespaceString minValidNss);
+                                      NamespaceString minValidNss,
+                                      NamespaceString oplogTruncateAfterNss);
 
     void initializeMinValidDocument(OperationContext* opCtx) override;
 
@@ -64,8 +69,8 @@ public:
     void setMinValid(OperationContext* opCtx, const OpTime& minValid) override;
     void setMinValidToAtLeast(OperationContext* opCtx, const OpTime& minValid) override;
 
-    void setOplogDeleteFromPoint(OperationContext* opCtx, const Timestamp& timestamp) override;
-    Timestamp getOplogDeleteFromPoint(OperationContext* opCtx) const override;
+    void setOplogTruncateAfterPoint(OperationContext* opCtx, const Timestamp& timestamp) override;
+    Timestamp getOplogTruncateAfterPoint(OperationContext* opCtx) const override;
 
     void setAppliedThrough(OperationContext* opCtx, const OpTime& optime) override;
     OpTime getAppliedThrough(OperationContext* opCtx) const override;
@@ -85,8 +90,25 @@ private:
      */
     void _updateMinValidDocument(OperationContext* opCtx, const BSONObj& updateSpec);
 
+    /**
+     * Reads the OplogTruncateAfterPoint document from disk.
+     * Returns boost::none if not present.
+     */
+    boost::optional<OplogTruncateAfterPointDocument> _getOplogTruncateAfterPointDocument(
+        OperationContext* opCtx) const;
+
+    /**
+     * Upserts the OplogTruncateAfterPoint document according to the provided update spec.
+     * If the collection does not exist, it is created. If the document does not exist,
+     * it is upserted.
+     *
+     * This fasserts on failure.
+     */
+    void _upsertOplogTruncateAfterPointDocument(OperationContext* opCtx, const BSONObj& updateSpec);
+
     StorageInterface* _storageInterface;
     const NamespaceString _minValidNss;
+    const NamespaceString _oplogTruncateAfterPointNss;
 };
 
 }  // namespace repl

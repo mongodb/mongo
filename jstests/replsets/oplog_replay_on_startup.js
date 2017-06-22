@@ -45,6 +45,7 @@
         assert.neq(null, conn, "failed to restart");
         var oplog = conn.getCollection('local.oplog.rs');
         var minValidColl = conn.getCollection('local.replset.minvalid');
+        var oplogTruncateAfterColl = conn.getCollection('local.replset.oplogTruncateAfterPoint');
         var coll = conn.getCollection(ns);
 
         // Reset state to empty.
@@ -78,11 +79,14 @@
                 t: term,
             },
 
-            oplogDeleteFromPoint: ts(deletePoint),
-
             // minvalid:
             t: term,
             ts: ts(minValid),
+        };
+
+        var injectedOplogTruncateAfterPointDoc = {
+            _id: "oplogTruncateAfterPoint",
+            oplogTruncateAfterPoint: ts(deletePoint)
         };
 
         // This weird mechanism is the only way to bypass mongod's attempt to fill in null
@@ -91,6 +95,13 @@
         assert.writeOK(minValidColl.update({}, {$set: injectedMinValidDoc}, {upsert: true}));
         assert.eq(minValidColl.findOne(),
                   injectedMinValidDoc,
+                  "If the Timestamps differ, the server may be filling in the null timestamps");
+
+        assert.writeOK(oplogTruncateAfterColl.remove({}));
+        assert.writeOK(oplogTruncateAfterColl.update(
+            {}, {$set: injectedOplogTruncateAfterPointDoc}, {upsert: true}));
+        assert.eq(oplogTruncateAfterColl.findOne(),
+                  injectedOplogTruncateAfterPointDoc,
                   "If the Timestamps differ, the server may be filling in the null timestamps");
 
         try {
