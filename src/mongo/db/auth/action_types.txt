@@ -101,6 +101,7 @@
 "shutdown",
 "splitChunk",
 "splitVector",
+"startSession",
 "storageDetails",
 "top",
 "touch",

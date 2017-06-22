@@ -66,6 +66,7 @@ env.Library(
         "mr_common.cpp",
         "parameters.cpp",
         "rename_collection_common.cpp",
+        "start_session_command.cpp",
         "user_management_commands_common.cpp",
     ],
     LIBDEPS=[

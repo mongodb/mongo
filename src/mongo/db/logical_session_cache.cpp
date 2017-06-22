@@ -171,7 +171,7 @@ Status LogicalSessionCache::startSession(SignedLogicalSessionId slsid) {
 }
 
 StatusWith<SignedLogicalSessionId> LogicalSessionCache::signLsid(OperationContext* opCtx,
-                                                                 LogicalSessionId* id,
+                                                                 const LogicalSessionId& id,
                                                                  boost::optional<OID> userId) {
     return _service->signLsid(opCtx, id, std::move(userId));
 }
