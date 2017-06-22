@@ -173,7 +173,8 @@
     rst.startSet();
     rst.initiate();
 
-    primaryAdminDB = rst.getPrimary().getDB("admin");
+    let primary = rst.getPrimary();
+    primaryAdminDB = primary.getDB("admin");
     assert.commandWorked(primaryAdminDB.runCommand({setFeatureCompatibilityVersion: "3.4"}));
     let secondary = rst.add({binVersion: downgrade});
     secondaryAdminDB = secondary.getDB("admin");
@@ -183,7 +184,6 @@
     replSetConfig = rst.getReplSetConfig();
     replSetConfig.version = 3;
     replSetConfig.members[1].priority = 0;
-    replSetConfig.members[1].votes = 0;
 
     // The default value for 'catchUpTimeoutMillis' on 3.6 is -1. A 3.4 secondary will refuse to
     // join a replica set with catchUpTimeoutMillis=-1.
@@ -195,8 +195,17 @@
         primaryAdminDB.getSiblingDB("test").coll.insert({awaitRepl: true}, {writeConcern: {w: 2}}));
 
     // Test that a 3.4 secondary crashes when syncing from a 3.6 primary and the
-    // featureCompatibilityVersion is set to 3.6.
-    assert.commandWorked(primaryAdminDB.runCommand({setFeatureCompatibilityVersion: "3.6"}));
+    // featureCompatibilityVersion is set to 3.6. The primary may step down before the command
+    // returns.
+    assert.adminCommandWorkedAllowingNetworkError(primary, {setFeatureCompatibilityVersion: "3.6"});
+    assert.soon(function() {
+        try {
+            secondaryAdminDB.runCommand({ping: 1});
+        } catch (e) {
+            return true;
+        }
+        return false;
+    }, "Expected 3.4 secondary to terminate due to replicating featureCompatibilityVersion=3.6");
     rst.stop(secondary, undefined, {allowedExitCode: MongoRunner.EXIT_ABRUPT});
     rst.stopSet();
 
