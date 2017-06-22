@@ -420,7 +420,7 @@ __evict_review(
 	WT_DECL_RET;
 	WT_PAGE *page;
 	uint32_t flags;
-	bool lookaside_retry, modified;
+	bool lookaside_retry, *lookaside_retryp, modified;
 
 	conn = S2C(session);
 	flags = WT_EVICTING;
@@ -541,6 +541,9 @@ __evict_review(
 	 * the page and keep it in memory.
 	 */
 	cache = conn->cache;
+	lookaside_retry = false;
+	lookaside_retryp = NULL;
+
 	if (closing)
 		LF_SET(WT_VISIBILITY_ERR);
 	else if (!WT_PAGE_IS_INTERNAL(page)) {
@@ -552,23 +555,26 @@ __evict_review(
 
 			if (F_ISSET(cache, WT_CACHE_EVICT_SCRUB))
 				LF_SET(WT_EVICT_SCRUB);
+
+			/*
+			 * Check if reconciliation suggests trying the
+			 * lookaside table.
+			 */
+			lookaside_retryp = &lookaside_retry;
 		}
 	}
 
 	/* Reconcile the page. */
-	ret = __wt_reconcile(session, ref, NULL, flags, &lookaside_retry);
+	ret = __wt_reconcile(session, ref, NULL, flags, lookaside_retryp);
 
 	/*
-	 * If reconciliation fails, eviction is stuck and reconciliation reports
-	 * it might succeed if we use the lookaside table (the page didn't have
-	 * uncommitted updates, it was not-yet-globally visible updates causing
-	 * the problem), configure reconciliation to write those updates to the
-	 * lookaside table, allowing the eviction of pages we'd otherwise have
-	 * to retain in cache to support older readers.
+	 * If reconciliation fails, eviction is stuck and reconciliation
+	 * reports it might succeed if we use the lookaside table, then
+	 * configure reconciliation to write those updates to the lookaside
+	 * table, allowing the eviction of pages we'd otherwise have to retain
+	 * in cache to support older readers.
 	 */
-	if (ret == EBUSY &&
-	    !F_ISSET(conn, WT_CONN_IN_MEMORY) &&
-	    __wt_cache_stuck(session) && lookaside_retry) {
+	if (ret == EBUSY && lookaside_retry && __wt_cache_stuck(session)) {
 		LF_CLR(WT_EVICT_SCRUB | WT_EVICT_UPDATE_RESTORE);
 		LF_SET(WT_EVICT_LOOKASIDE);
 		ret = __wt_reconcile(session, ref, NULL, flags, NULL);
