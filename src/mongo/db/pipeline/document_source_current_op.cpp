@@ -31,8 +31,6 @@
 #include "mongo/db/pipeline/document_source_current_op.h"
 
 #include "mongo/db/pipeline/lite_parsed_document_source.h"
-#include "mongo/db/server_options.h"
-#include "mongo/util/net/sock.h"
 
 namespace mongo {
 
@@ -43,6 +41,7 @@ const StringData kIdleConnectionsFieldName = "idleConnections"_sd;
 const StringData kOpIdFieldName = "opid"_sd;
 const StringData kClientFieldName = "client"_sd;
 const StringData kMongosClientFieldName = "client_s"_sd;
+const StringData kShardFieldName = "shard"_sd;
 }  // namespace
 
 using boost::intrusive_ptr;
@@ -85,6 +84,9 @@ DocumentSource::GetNextResult DocumentSourceCurrentOp::getNext() {
 
         const BSONObj& op = *_opsIter++;
         MutableDocument doc;
+
+        // Add the shard name to the output document.
+        doc.addField(kShardFieldName, Value(_shardName));
 
         // For operations on a shard, we change the opid from the raw numeric form to
         // 'shardname:opid'. We also change the fieldname 'client' to 'client_s' to indicate

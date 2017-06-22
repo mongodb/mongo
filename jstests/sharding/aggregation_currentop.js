@@ -339,24 +339,24 @@
             {aggregate: 1, pipeline: [{$currentOp: {allUsers: false}}], cursor: {}}),
         ErrorCodes.Unauthorized);
 
-    // Test that a $currentOp pipeline returns results from all shards.
+    // Test that a $currentOp pipeline returns results from all shards, and includes both the shard
+    // and host names.
     assert(clusterAdminDB.logout());
     assert(clusterAdminDB.auth("user_inprog", "pwd"));
 
     assert.eq(cmdCursor(clusterAdminDB, {
                   aggregate: 1,
                   pipeline: [
-                      {$currentOp: {allUsers: true}},
-                      {$project: {opid: {$split: ["$opid", ":"]}}},
-                      {$group: {_id: {$arrayElemAt: ["$opid", 0]}}},
+                      {$currentOp: {allUsers: true, idleConnections: true}},
+                      {$group: {_id: {shard: "$shard", host: "$host"}}},
                       {$sort: {_id: 1}}
                   ],
                   cursor: {}
               }).toArray(),
               [
-                {_id: "aggregation_currentop-rs0"},
-                {_id: "aggregation_currentop-rs1"},
-                {_id: "aggregation_currentop-rs2"}
+                {_id: {shard: "aggregation_currentop-rs0", host: st.rs0.getPrimary().host}},
+                {_id: {shard: "aggregation_currentop-rs1", host: st.rs1.getPrimary().host}},
+                {_id: {shard: "aggregation_currentop-rs2", host: st.rs2.getPrimary().host}}
               ]);
 
     //
@@ -459,4 +459,23 @@
     const aggAllUsersFalse = cmdCursor(shardAdminDB, aggCmd).toArray();
 
     assert.eq(aggAllUsersFalse, aggAllUsersTrue);
+
+    // Test that the host field is present and the shard field is absent when run on mongoD.
+    assert.eq(cmdCursor(shardAdminDB, {
+                  aggregate: 1,
+                  pipeline: [
+                      {$currentOp: {allUsers: true, idleConnections: true}},
+                      {$group: {_id: {shard: "$shard", host: "$host"}}}
+                  ],
+                  cursor: {}
+              }).toArray(),
+              [
+                {_id: {host: shardConn.host}},
+              ]);
+
+    // Test that attempting to 'spoof' a sharded request on non-shardsvr mongoD fails.
+    assert.commandFailedWithCode(
+        shardAdminDB.runCommand(
+            {aggregate: 1, pipeline: [{$currentOp: {}}], fromRouter: true, cursor: {}}),
+        40465);
 })();

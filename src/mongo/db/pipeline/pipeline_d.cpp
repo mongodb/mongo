@@ -223,6 +223,8 @@ public:
                                        CurrentOpUserMode userMode) const {
         AuthorizationSession* ctxAuth = AuthorizationSession::get(_ctx->opCtx->getClient());
 
+        const std::string hostName = getHostNameCachedAndPort();
+
         std::vector<BSONObj> ops;
 
         for (ServiceContext::LockedClientsCursor cursor(
@@ -246,6 +248,8 @@ public:
             }
 
             BSONObjBuilder infoBuilder;
+
+            infoBuilder.append("host", hostName);
 
             client->reportState(infoBuilder);
 

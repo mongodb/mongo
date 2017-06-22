@@ -176,7 +176,8 @@ TEST_F(DocumentSourceCurrentOpTest, ShouldReturnEOFImmediatelyIfNoCurrentOps) {
     ASSERT(currentOp->getNext().isEOF());
 }
 
-TEST_F(DocumentSourceCurrentOpTest, ShouldModifyOpIDAndClientFieldNameInShardedContext) {
+TEST_F(DocumentSourceCurrentOpTest,
+       ShouldAddShardNameModifyOpIDAndClientFieldNameInShardedContext) {
     getExpCtx()->inShard = true;
 
     std::vector<BSONObj> ops{fromjson("{ client: '192.168.1.10:50844', opid: 430 }")};
@@ -186,7 +187,8 @@ TEST_F(DocumentSourceCurrentOpTest, ShouldModifyOpIDAndClientFieldNameInShardedC
     currentOp->injectMongodInterface(mongod);
 
     const auto expectedOutput =
-        Document{{"client_s", std::string("192.168.1.10:50844")},
+        Document{{"shard", kMockShardName},
+                 {"client_s", std::string("192.168.1.10:50844")},
                  {"opid", std::string(str::stream() << kMockShardName << ":430")}};
 
     ASSERT_DOCUMENT_EQ(currentOp->getNext().getDocument(), expectedOutput);
