@@ -872,6 +872,25 @@ transaction_ops(WT_CONNECTION *conn, WT_SESSION *session)
 	/*! [transaction pinned range] */
 	}
 
+	/*! [transaction timestamp] */
+	ret = session->timestamp_transaction(session, "commit_timestamp=2a");
+	/*! [transaction timestamp] */
+
+	{
+#ifndef WT_TIMESTAMP_SIZE
+#define	WT_TIMESTAMP_SIZE	8
+#endif
+	/*! [query timestamp] */
+	char timestamp_buf[2 * WT_TIMESTAMP_SIZE + 1];
+
+	ret = conn->query_timestamp(conn, timestamp_buf, "get=all_committed");
+	/*! [query timestamp] */
+	}
+
+	/*! [set oldest timestamp] */
+	ret = conn->set_timestamp(conn, "oldest_timestamp=2a");
+	/*! [set oldest timestamp] */
+
 	return (ret);
 }
 

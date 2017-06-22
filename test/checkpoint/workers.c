@@ -166,8 +166,10 @@ real_worker(void)
 	WT_CURSOR **cursors;
 	WT_SESSION *session;
 	WT_RAND_STATE rnd;
+	uint64_t ts;
 	u_int i, keyno;
 	int j, ret, t_ret;
+	char config_buf[64];
 
 	ret = t_ret = 0;
 
@@ -202,8 +204,23 @@ real_worker(void)
 				break;
 		}
 		if (ret == 0) {
-			if ((ret = session->commit_transaction(
-			    session, NULL)) != 0) {
+			if (g.use_timestamps) {
+				ts = __wt_atomic_add64(&g.timestamp, 1);
+				if (ts > 100 && ts % 100 == 0) {
+					testutil_check(__wt_snprintf(
+					    config_buf, sizeof(config_buf),
+					    "oldest_timestamp=%" PRIx64,
+					    ts - 100));
+					testutil_check(g.conn->set_timestamp(
+					    g.conn, config_buf));
+				}
+				testutil_check(__wt_snprintf(
+				    config_buf, sizeof(config_buf),
+				    "commit_timestamp=%" PRIx64, ts));
+			}
+
+			if ((ret = session->commit_transaction(session,
+			    g.use_timestamps ? config_buf : NULL)) != 0) {
 				(void)log_print_err(
 				    "real_worker:commit_transaction", ret, 1);
 				goto err;

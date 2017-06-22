@@ -306,6 +306,10 @@ static CONFIG c[] = {
 	  "maximum time to run in minutes (default 20 minutes)",
 	  C_IGNORE, 0, UINT_MAX, UINT_MAX, &g.c_timer, NULL },
 
+	{ "transaction_timestamps",				/* 10% */
+	  "enable transaction timestamp support",
+	  C_BOOL, 10, 0, 0, &g.c_txn_timestamps, NULL },
+
 	{ "transaction-frequency",
 	  "percent operations done inside an explicit transaction",
 	  0x0, 1, 100, 100, &g.c_txn_freq, NULL },

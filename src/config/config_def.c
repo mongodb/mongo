@@ -32,6 +32,13 @@ static const WT_CONFIG_CHECK confchk_WT_CONNECTION_open_session[] = {
 	{ NULL, NULL, NULL, NULL, NULL, 0 }
 };
 
+static const WT_CONFIG_CHECK confchk_WT_CONNECTION_query_timestamp[] = {
+	{ "get", "string",
+	    NULL, "choices=[\"all_committed\"]",
+	    NULL, 0 },
+	{ NULL, NULL, NULL, NULL, NULL, 0 }
+};
+
 static const WT_CONFIG_CHECK
     confchk_wiredtiger_open_async_subconfigs[] = {
 	{ "enabled", "boolean", NULL, NULL, NULL, 0 },
@@ -158,6 +165,11 @@ static const WT_CONFIG_CHECK confchk_WT_CONNECTION_reconfigure[] = {
 	{ NULL, NULL, NULL, NULL, NULL, 0 }
 };
 
+static const WT_CONFIG_CHECK confchk_WT_CONNECTION_set_timestamp[] = {
+	{ "oldest_timestamp", "string", NULL, NULL, NULL, 0 },
+	{ NULL, NULL, NULL, NULL, NULL, 0 }
+};
+
 static const WT_CONFIG_CHECK confchk_WT_CURSOR_reconfigure[] = {
 	{ "append", "boolean", NULL, NULL, NULL, 0 },
 	{ "overwrite", "boolean", NULL, NULL, NULL, 0 },
@@ -179,6 +191,7 @@ static const WT_CONFIG_CHECK confchk_WT_SESSION_begin_transaction[] = {
 	    NULL, 0 },
 	{ "name", "string", NULL, NULL, NULL, 0 },
 	{ "priority", "int", NULL, "min=-100,max=100", NULL, 0 },
+	{ "read_timestamp", "string", NULL, NULL, NULL, 0 },
 	{ "snapshot", "string", NULL, NULL, NULL, 0 },
 	{ "sync", "boolean", NULL, NULL, NULL, 0 },
 	{ NULL, NULL, NULL, NULL, NULL, 0 }
@@ -188,11 +201,13 @@ static const WT_CONFIG_CHECK confchk_WT_SESSION_checkpoint[] = {
 	{ "drop", "list", NULL, NULL, NULL, 0 },
 	{ "force", "boolean", NULL, NULL, NULL, 0 },
 	{ "name", "string", NULL, NULL, NULL, 0 },
+	{ "read_timestamp", "string", NULL, NULL, NULL, 0 },
 	{ "target", "list", NULL, NULL, NULL, 0 },
 	{ NULL, NULL, NULL, NULL, NULL, 0 }
 };
 
 static const WT_CONFIG_CHECK confchk_WT_SESSION_commit_transaction[] = {
+	{ "commit_timestamp", "string", NULL, NULL, NULL, 0 },
 	{ "sync", "string",
 	    NULL, "choices=[\"background\",\"off\",\"on\"]",
 	    NULL, 0 },
@@ -386,6 +401,11 @@ static const WT_CONFIG_CHECK confchk_WT_SESSION_snapshot[] = {
 	    confchk_WT_SESSION_snapshot_drop_subconfigs, 4 },
 	{ "include_updates", "boolean", NULL, NULL, NULL, 0 },
 	{ "name", "string", NULL, NULL, NULL, 0 },
+	{ NULL, NULL, NULL, NULL, NULL, 0 }
+};
+
+static const WT_CONFIG_CHECK confchk_WT_SESSION_timestamp_transaction[] = {
+	{ "commit_timestamp", "string", NULL, NULL, NULL, 0 },
 	{ NULL, NULL, NULL, NULL, NULL, 0 }
 };
 
@@ -1057,6 +1077,10 @@ static const WT_CONFIG_ENTRY config_entries[] = {
 	  "ignore_cache_size=false,isolation=read-committed",
 	  confchk_WT_CONNECTION_open_session, 2
 	},
+	{ "WT_CONNECTION.query_timestamp",
+	  "get=all_committed",
+	  confchk_WT_CONNECTION_query_timestamp, 1
+	},
 	{ "WT_CONNECTION.reconfigure",
 	  "async=(enabled=false,ops_max=1024,threads=2),cache_overhead=8,"
 	  "cache_size=100MB,checkpoint=(log_size=0,wait=0),error_prefix=,"
@@ -1076,6 +1100,10 @@ static const WT_CONFIG_ENTRY config_entries[] = {
 	  "",
 	  NULL, 0
 	},
+	{ "WT_CONNECTION.set_timestamp",
+	  "oldest_timestamp=",
+	  confchk_WT_CONNECTION_set_timestamp, 1
+	},
 	{ "WT_CURSOR.close",
 	  "",
 	  NULL, 0
@@ -1089,20 +1117,20 @@ static const WT_CONFIG_ENTRY config_entries[] = {
 	  confchk_WT_SESSION_alter, 2
 	},
 	{ "WT_SESSION.begin_transaction",
-	  "isolation=,name=,priority=0,snapshot=,sync=",
-	  confchk_WT_SESSION_begin_transaction, 5
+	  "isolation=,name=,priority=0,read_timestamp=,snapshot=,sync=",
+	  confchk_WT_SESSION_begin_transaction, 6
 	},
 	{ "WT_SESSION.checkpoint",
-	  "drop=,force=false,name=,target=",
-	  confchk_WT_SESSION_checkpoint, 4
+	  "drop=,force=false,name=,read_timestamp=,target=",
+	  confchk_WT_SESSION_checkpoint, 5
 	},
 	{ "WT_SESSION.close",
 	  "",
 	  NULL, 0
 	},
 	{ "WT_SESSION.commit_transaction",
-	  "sync=",
-	  confchk_WT_SESSION_commit_transaction, 1
+	  "commit_timestamp=,sync=",
+	  confchk_WT_SESSION_commit_transaction, 2
 	},
 	{ "WT_SESSION.compact",
 	  "timeout=1200",
@@ -1184,6 +1212,10 @@ static const WT_CONFIG_ENTRY config_entries[] = {
 	{ "WT_SESSION.strerror",
 	  "",
 	  NULL, 0
+	},
+	{ "WT_SESSION.timestamp_transaction",
+	  "commit_timestamp=",
+	  confchk_WT_SESSION_timestamp_transaction, 1
 	},
 	{ "WT_SESSION.transaction_sync",
 	  "timeout_ms=1200000",

@@ -148,4 +148,48 @@ WT_SESSION::snapshot with a configuration that includes
 the semantics supported by the drop configuration.
 
 Named snapshots are not durable: they do not survive WT_CONNECTION::close.
+
+@section transaction_timestamps Application-specified Transaction Timestamps
+
+Some applications have their own notion of time, including an expected commit
+order for transactions that may be inconsistent with the order assigned by
+WiredTiger.  We assume that applications can represent their notion of a
+timestamp as an integral value of some size that generally increases over
+time.  For example, a simple 64-bit integer could be incremented to generate
+transaction timestamps, if that is sufficient for the application.
+
+The application's timestamp size is specified as a number of bytes at build
+time, with <code>configure --with-timestamp-size=X</code>.  The default
+timestamp size is 8 bytes (i.e., 64 bits).  Setting a size of zero disables
+transaction timestamp functionality.
+
+Applications can assign explicit commit timestamps to transactions, then read
+"as of" a timestamp.  Timestamps and are communicated to WiredTiger using a
+lower case hexadecimal encoding, so the encoded value can be twice as long as
+the raw timestamp value.
+
+Setting a read timestamp in WT_SESSION::begin_transaction forces a transaction
+to run at snapshot isolation and ignore any commits with a newer timestamp.
+
+Setting an oldest timestamp in WT_CONNECTION::set_timestamp indicates that
+future read timestamps will be at least as recent as the oldest timestamp, so
+WiredTiger can discard history before the specified point.  It is critical
+that the oldest timestamp update frequently or the cache can become full of
+updates, reducing performance.
+
+Commit timestamps cannot be set in the past of any read timestamp that has
+been used.  This is enforced by assertions in diagnostic builds, if
+applications violate this rule, data consistency can be violated.
+
+The commits to a particular data item must be performed in timestamp order.
+Again, this is only checked in diagnostic builds and if applications violate
+this rule, data consistency can be violated.
+
+@subsection Timestamp support in the extension API
+
+The extension API, used by modules that extend WiredTiger via
+WT_CONNECTION::get_extension_api, is not timestamp-aware.  In particular,
+WT_EXTENSION_API::transaction_oldest and
+WT_EXTENSION_API::transaction_visible do not take timestamps into account.
+Extensions relying on these functions may not work correctly with timestamps.
  */

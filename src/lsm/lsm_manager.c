@@ -388,8 +388,8 @@ __lsm_manager_run_server(WT_SESSION_IMPL *session)
 			if (!lsm_tree->active)
 				continue;
 			__wt_epoch(session, &now);
-			pushms = lsm_tree->work_push_ts.tv_sec == 0 ? 0 :
-			    WT_TIMEDIFF_MS(now, lsm_tree->work_push_ts);
+			pushms = lsm_tree->work_push_time.tv_sec == 0 ? 0 :
+			    WT_TIMEDIFF_MS(now, lsm_tree->work_push_time);
 			fillms = 3 * lsm_tree->chunk_fill_ms;
 			if (fillms == 0)
 				fillms = 10000;
@@ -644,7 +644,7 @@ __wt_lsm_manager_push_entry(WT_SESSION_IMPL *session,
 		return (0);
 	}
 
-	__wt_epoch(session, &lsm_tree->work_push_ts);
+	__wt_epoch(session, &lsm_tree->work_push_time);
 	WT_RET(__wt_calloc_one(session, &entry));
 	entry->type = type;
 	entry->flags = flags;

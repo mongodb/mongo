@@ -99,7 +99,7 @@ __ovfl_cache_col_visible(
 	 */
 	if (__wt_cell_rle(unpack) == 1 &&
 	    upd != NULL &&		/* Sanity: upd should always be set. */
-	    __wt_txn_visible_all(session, upd->txnid))
+	    __wt_txn_upd_visible_all(session, upd))
 		return (true);
 	return (false);
 }
@@ -115,7 +115,7 @@ __ovfl_cache_row_visible(WT_SESSION_IMPL *session, WT_PAGE *page, WT_ROW *rip)
 
 	/* Check to see if there's a globally visible update. */
 	for (upd = WT_ROW_UPDATE(page, rip); upd != NULL; upd = upd->next)
-		if (__wt_txn_visible_all(session, upd->txnid))
+		if (__wt_txn_upd_visible_all(session, upd))
 			return (true);
 
 	return (false);

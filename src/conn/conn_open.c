@@ -70,29 +70,13 @@ __wt_connection_close(WT_CONNECTION_IMPL *conn)
 	WT_DECL_RET;
 	WT_DLH *dlh;
 	WT_SESSION_IMPL *s, *session;
-	WT_TXN_GLOBAL *txn_global;
 	u_int i;
 
 	wt_conn = &conn->iface;
-	txn_global = &conn->txn_global;
 	session = conn->default_session;
 
-	/*
-	 * We're shutting down.  Make sure everything gets freed.
-	 *
-	 * It's possible that the eviction server is in the middle of a long
-	 * operation, with a transaction ID pinned.  In that case, we will loop
-	 * here until the transaction ID is released, when the oldest
-	 * transaction ID will catch up with the current ID.
-	 */
-	for (;;) {
-		WT_TRET(__wt_txn_update_oldest(session,
-		    WT_TXN_OLDEST_STRICT | WT_TXN_OLDEST_WAIT));
-		if (txn_global->oldest_id == txn_global->current &&
-		    txn_global->metadata_pinned == txn_global->current)
-			break;
-		__wt_yield();
-	}
+	/* Shut down transactions (wait for in-flight operations to complete. */
+	WT_TRET(__wt_txn_global_shutdown(session));
 
 	/* Shut down the subsystems, ensuring workers see the state change. */
 	F_SET(conn, WT_CONN_CLOSING);

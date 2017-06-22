@@ -482,22 +482,24 @@ __config_next(WT_CONFIG *conf, WT_CONFIG_ITEM *key, WT_CONFIG_ITEM *value)
  */
 #define	WT_SHIFT_INT64(v, s) do {					\
 	if ((v) < 0)							\
-		goto range;						\
+		goto nonum;						\
 	(v) = (int64_t)(((uint64_t)(v)) << (s));			\
+	if ((v) < 0)							\
+		goto nonum;						\
 } while (0)
 
 /*
  * __config_process_value --
  *	Deal with special config values like true / false.
  */
-static int
-__config_process_value(WT_CONFIG *conf, WT_CONFIG_ITEM *value)
+static void
+__config_process_value(WT_CONFIG_ITEM *value)
 {
 	char *endptr;
 
 	/* Empty values are okay: we can't do anything interesting with them. */
 	if (value->len == 0)
-		return (0);
+		return;
 
 	if (value->type == WT_CONFIG_ITEM_ID) {
 		if (WT_STRING_MATCH("false", value->str, value->len)) {
@@ -510,6 +512,14 @@ __config_process_value(WT_CONFIG *conf, WT_CONFIG_ITEM *value)
 	} else if (value->type == WT_CONFIG_ITEM_NUM) {
 		errno = 0;
 		value->val = strtoll(value->str, &endptr, 10);
+
+		/*
+		 * If we parsed the string but the number is out of range,
+		 * treat the value as an identifier.  If an integer is
+		 * expected, that will be caught by __wt_config_check.
+		 */
+		if (value->type == WT_CONFIG_ITEM_NUM && errno == ERANGE)
+			goto nonum;
 
 		/* Check any leftover characters. */
 		while (endptr < value->str + value->len)
@@ -539,28 +549,17 @@ __config_process_value(WT_CONFIG *conf, WT_CONFIG_ITEM *value)
 				WT_SHIFT_INT64(value->val, 50);
 				break;
 			default:
-				/*
-				 * We didn't get a well-formed number.  That
-				 * might be okay, the required type will be
-				 * checked by __wt_config_check.
-				 */
-				value->type = WT_CONFIG_ITEM_ID;
-				break;
+				goto nonum;
 			}
-
-		/*
-		 * If we parsed the whole string but the number is out of range,
-		 * report an error.  Don't report an error for strings that
-		 * aren't well-formed integers: if an integer is expected, that
-		 * will be caught by __wt_config_check.
-		 */
-		if (value->type == WT_CONFIG_ITEM_NUM && errno == ERANGE)
-			goto range;
 	}
 
-	return (0);
-
-range:	return (__config_err(conf, "Number out of range", ERANGE));
+	if (0) {
+nonum:		/*
+		 * We didn't get a well-formed number.  That might be okay, the
+		 * required type will be checked by __wt_config_check.
+		 */
+		value->type = WT_CONFIG_ITEM_ID;
+	}
 }
 
 /*
@@ -571,7 +570,8 @@ int
 __wt_config_next(WT_CONFIG *conf, WT_CONFIG_ITEM *key, WT_CONFIG_ITEM *value)
 {
 	WT_RET(__config_next(conf, key, value));
-	return (__config_process_value(conf, value));
+	__config_process_value(value);
+	return (0);
 }
 
 /*
@@ -611,7 +611,9 @@ __config_getraw(
 
 	if (!found)
 		return (WT_NOTFOUND);
-	return (top ? __config_process_value(cparser, value) : 0);
+	if (top)
+		__config_process_value(value);
+	return (0);
 }
 
 /*

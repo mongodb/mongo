@@ -293,15 +293,7 @@ __session_reconfigure(WT_SESSION *wt_session, const char *config)
 
 	WT_ERR(__wt_session_reset_cursors(session, false));
 
-	ret = __wt_config_getones(session, config, "isolation", &cval);
-	if (ret == 0 && cval.len != 0) {
-		session->isolation = session->txn.isolation =
-		    WT_STRING_MATCH("snapshot", cval.str, cval.len) ?
-		    WT_ISO_SNAPSHOT :
-		    WT_STRING_MATCH("read-uncommitted", cval.str, cval.len) ?
-		    WT_ISO_READ_UNCOMMITTED : WT_ISO_READ_COMMITTED;
-	}
-	WT_ERR_NOTFOUND_OK(ret);
+	WT_ERR(__wt_txn_reconfigure(session, config));
 
 	ret = __wt_config_getones(session, config, "ignore_cache_size", &cval);
 	if (ret == 0) {
@@ -1466,6 +1458,22 @@ err:	API_END_RET(session, ret);
 }
 
 /*
+ * __session_timestamp_transaction --
+ *	WT_SESSION->timestamp_transaction method.
+ */
+static int
+__session_timestamp_transaction(WT_SESSION *wt_session, const char *config)
+{
+	WT_DECL_RET;
+	WT_SESSION_IMPL *session;
+
+	session = (WT_SESSION_IMPL *)wt_session;
+	SESSION_API_CALL(session, timestamp_transaction, config, cfg);
+	WT_TRET(__wt_txn_set_timestamp(session, cfg));
+err:	API_END_RET(session, ret);
+}
+
+/*
  * __session_transaction_pinned_range --
  *	WT_SESSION->transaction_pinned_range method.
  */
@@ -1762,6 +1770,7 @@ __open_session(WT_CONNECTION_IMPL *conn,
 		__session_begin_transaction,
 		__session_commit_transaction,
 		__session_rollback_transaction,
+		__session_timestamp_transaction,
 		__session_checkpoint,
 		__session_snapshot,
 		__session_transaction_pinned_range,
@@ -1790,6 +1799,7 @@ __open_session(WT_CONNECTION_IMPL *conn,
 		__session_begin_transaction,
 		__session_commit_transaction,
 		__session_rollback_transaction,
+		__session_timestamp_transaction,
 		__session_checkpoint_readonly,
 		__session_snapshot,
 		__session_transaction_pinned_range,

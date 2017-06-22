@@ -86,7 +86,7 @@ struct __wt_cursor_lsm {
 struct __wt_lsm_chunk {
 	const char *uri;		/* Data source for this chunk */
 	const char *bloom_uri;		/* URI of Bloom filter, if any */
-	struct timespec create_ts;	/* Creation time (for rate limiting) */
+	struct timespec create_time;	/* Creation time (for rate limiting) */
 	uint64_t count;			/* Approximate count of records */
 	uint64_t size;			/* Final chunk size */
 
@@ -203,10 +203,10 @@ struct __wt_lsm_tree {
 	uint64_t ckpt_throttle;		/* Rate limiting due to checkpoints */
 	uint64_t merge_throttle;	/* Rate limiting due to merges */
 	uint64_t chunk_fill_ms;		/* Estimate of time to fill a chunk */
-	struct timespec last_flush_ts;	/* Timestamp last flush finished */
+	struct timespec last_flush_time;/* Time last flush finished */
 	uint64_t chunks_flushed;	/* Count of chunks flushed since open */
-	struct timespec merge_aggressive_ts;/* Timestamp for merge aggression */
-	struct timespec work_push_ts;	/* Timestamp last work unit added */
+	struct timespec merge_aggressive_time;/* Time for merge aggression */
+	struct timespec work_push_time;	/* Time last work unit added */
 	uint64_t merge_progressing;	/* Bumped when merges are active */
 	uint32_t merge_syncing;		/* Bumped when merges are syncing */
 
