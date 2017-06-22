@@ -245,7 +245,7 @@ var RandomOps = {
         if (coll === null) {
             return null;
         }
-        var newName = coll.getDB() + "." + new ObjectId().str;
+        var newName = coll.getDB().getName() + "." + new ObjectId().str;
         if (this.verbose) {
             print("renaming collection " + coll.getFullName() + " to " + newName);
         }
@@ -285,7 +285,7 @@ var RandomOps = {
         if (this.verbose) {
             print("Dropping collection " + coll.getFullName());
         }
-        assert.commandWorked(conn.getDB(coll.getDB()).runCommand({drop: coll.getName()}));
+        assert.commandWorked(coll.runCommand({drop: coll.getName()}));
         if (this.verbose) {
             print("done.");
         }
@@ -344,7 +344,7 @@ var RandomOps = {
             print("Modifying usePowerOf2Sizes to " + toggle + " on collection " +
                   coll.getFullName());
         }
-        conn.getDB(coll.getDB()).runCommand({collMod: coll.getName(), usePowerOf2Sizes: toggle});
+        coll.runCommand({collMod: coll.getName(), usePowerOf2Sizes: toggle});
         if (this.verbose) {
             print("done.");
         }
@@ -364,7 +364,7 @@ var RandomOps = {
         if (this.verbose) {
             print("Emptying capped collection: " + coll.getFullName());
         }
-        assert.commandWorked(conn.getDB(coll.getDB()).runCommand({emptycapped: coll.getName()}));
+        assert.commandWorked(coll.runCommand({emptycapped: coll.getName()}));
         if (this.verbose) {
             print("done.");
         }
@@ -431,8 +431,7 @@ var RandomOps = {
         if (this.verbose) {
             print("Converting " + coll.getFullName() + " to a capped collection.");
         }
-        assert.commandWorked(conn.getDB(coll.getDB())
-                                 .runCommand({convertToCapped: coll.getName(), size: 1024 * 1024}));
+        assert.commandWorked(coll.runCommand({convertToCapped: coll.getName(), size: 1024 * 1024}));
         if (this.verbose) {
             print("done.");
         }
@@ -457,7 +456,12 @@ var RandomOps = {
     doRandomWork: function(conn, numOps, possibleOps) {
         for (var i = 0; i < numOps; i++) {
             op = this.randomChoice(possibleOps);
-            this[op](conn);
+            try {
+                this[op](conn);
+            } catch (ex) {
+                print('doRandomWork - ' + op + ': failed: ' + ex);
+                throw ex;
+            }
         }
     }
 
