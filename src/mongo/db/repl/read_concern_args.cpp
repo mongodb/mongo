@@ -58,14 +58,16 @@ const string ReadConcernArgs::kLevelFieldName("level");
 
 ReadConcernArgs::ReadConcernArgs() = default;
 
+ReadConcernArgs::ReadConcernArgs(boost::optional<ReadConcernLevel> level)
+    : _level(std::move(level)) {}
+
 ReadConcernArgs::ReadConcernArgs(boost::optional<OpTime> opTime,
                                  boost::optional<ReadConcernLevel> level)
     : _opTime(std::move(opTime)), _level(std::move(level)) {}
 
-ReadConcernArgs::ReadConcernArgs(boost::optional<OpTime> opTime,
-                                 boost::optional<LogicalTime> clusterTime,
+ReadConcernArgs::ReadConcernArgs(boost::optional<LogicalTime> clusterTime,
                                  boost::optional<ReadConcernLevel> level)
-    : _opTime(std::move(opTime)), _clusterTime(std::move(clusterTime)), _level(std::move(level)) {}
+    : _clusterTime(std::move(clusterTime)), _level(std::move(level)) {}
 
 std::string ReadConcernArgs::toString() const {
     return toBSON().toString();
@@ -164,12 +166,15 @@ Status ReadConcernArgs::initialize(const BSONElement& readConcernElem) {
                                     << kAfterOpTimeFieldName);
     }
 
-    if (_clusterTime && (getLevel() != ReadConcernLevel::kMajorityReadConcern)) {
+    if (_clusterTime && getLevel() != ReadConcernLevel::kMajorityReadConcern &&
+        getLevel() != ReadConcernLevel::kLocalReadConcern) {
         return Status(ErrorCodes::InvalidOptions,
                       str::stream() << kAfterClusterTimeFieldName << " field can be set only if "
                                     << kLevelFieldName
                                     << " is equal to "
-                                    << kMajorityReadConcernStr);
+                                    << kMajorityReadConcernStr
+                                    << " or "
+                                    << kLocalReadConcernStr);
     }
 
     if (_clusterTime && _clusterTime == LogicalTime::kUninitialized) {

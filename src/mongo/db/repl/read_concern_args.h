@@ -54,10 +54,11 @@ public:
 
     ReadConcernArgs();
 
+    ReadConcernArgs(boost::optional<ReadConcernLevel> level);
+
     ReadConcernArgs(boost::optional<OpTime> opTime, boost::optional<ReadConcernLevel> level);
 
-    ReadConcernArgs(boost::optional<OpTime> opTime,
-                    boost::optional<LogicalTime> clusterTime,
+    ReadConcernArgs(boost::optional<LogicalTime> clusterTime,
                     boost::optional<ReadConcernLevel> level);
     /**
      * Format:

@@ -80,17 +80,16 @@
                   ", should be the logical time of the replicated local write, " +
                   localWriteOperationTime);
 
-    // readConcern level local:
-    // Not currently supported.
-    jsTestLog("Verifying readConcern local with afterClusterTime is not supported.");
+    // readConcern level linearizable is not currently supported.
+    jsTestLog("Verifying readConcern linearizable with afterClusterTime is not supported.");
     res = assert.commandFailedWithCode(
         testDB.runCommand({
             find: collectionName,
             filter: localDoc,
-            readConcern: {level: "local", afterClusterTime: majorityReadOperationTime}
+            readConcern: {level: "linearizable", afterClusterTime: majorityReadOperationTime}
         }),
         ErrorCodes.InvalidOptions,
-        "local reads with afterClusterTime are not supported and should not be allowed");
+        "linearizable reads with afterClusterTime are not supported and should not be allowed");
 
     // writeConcern level majority:
     // operationTime is the logical time of the write if it succeeds, or of the previous successful

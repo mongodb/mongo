@@ -57,7 +57,8 @@ Mongo.prototype.isCausalConsistencyEnabled = function(cmdName, cmdObj) {
         return false;
     }
 
-    // Currently, read concern afterClusterTime is only supported for read concern level majority.
+    // Currently, read concern afterClusterTime is only supported for commands that support read
+    // concern level majority.
     var commandsThatSupportMajorityReadConcern = [
         "count",
         "distinct",
@@ -137,13 +138,13 @@ Mongo.prototype._injectAfterClusterTime = function(cmdObj) {
         const readConcern = Object.assign({}, cmdObj.readConcern);
         // Currently server supports afterClusterTime only with level:majority. Going forward it
         // will be relaxed for any level of readConcern.
-        if (!readConcern.hasOwnProperty("level") || readConcern.level === "majority") {
-            if (!readConcern.hasOwnProperty("afterClusterTime")) {
-                readConcern.afterClusterTime = operationTime;
-            }
-            readConcern.level = "majority";
-            cmdObj.readConcern = readConcern;
+        if (!readConcern.hasOwnProperty("afterClusterTime")) {
+            readConcern.afterClusterTime = operationTime;
         }
+        if (!readConcern.hasOwnProperty("level")) {
+            readConcern.level = "local";
+        }
+        cmdObj.readConcern = readConcern;
     }
     return cmdObj;
 };

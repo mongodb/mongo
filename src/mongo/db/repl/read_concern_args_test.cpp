@@ -56,16 +56,37 @@ TEST(ReadAfterParse, OpTimeOnly) {
 
 TEST(ReadAfterParse, ClusterTimeOnly) {
     ReadConcernArgs readAfterOpTime;
-    // Must have level=majority
-    ASSERT_NOT_OK(
-        readAfterOpTime.initialize(BSON("find"
-                                        << "test"
-                                        << ReadConcernArgs::kReadConcernFieldName
-                                        << BSON(ReadConcernArgs::kAfterClusterTimeFieldName
-                                                << Timestamp(20, 30)))));
+    auto clusterTime = LogicalTime(Timestamp(20, 30));
+    ASSERT_OK(readAfterOpTime.initialize(BSON("find"
+                                              << "test"
+                                              << ReadConcernArgs::kReadConcernFieldName
+                                              << BSON(ReadConcernArgs::kAfterClusterTimeFieldName
+                                                      << clusterTime.asTimestamp()))));
+    auto argsClusterTime = readAfterOpTime.getArgsClusterTime();
+    ASSERT_TRUE(argsClusterTime);
+    ASSERT_TRUE(!readAfterOpTime.getArgsOpTime());
+    ASSERT_TRUE(clusterTime == *argsClusterTime);
 }
 
-TEST(ReadAfterParse, ClusterTimeAndLevel) {
+TEST(ReadAfterParse, ClusterTimeAndLevelLocal) {
+    ReadConcernArgs readAfterOpTime;
+    // Must have level=majority
+    auto clusterTime = LogicalTime(Timestamp(20, 30));
+    ASSERT_OK(readAfterOpTime.initialize(BSON("find"
+                                              << "test"
+                                              << ReadConcernArgs::kReadConcernFieldName
+                                              << BSON(ReadConcernArgs::kAfterClusterTimeFieldName
+                                                      << clusterTime.asTimestamp()
+                                                      << ReadConcernArgs::kLevelFieldName
+                                                      << "local"))));
+    auto argsClusterTime = readAfterOpTime.getArgsClusterTime();
+    ASSERT_TRUE(argsClusterTime);
+    ASSERT_TRUE(!readAfterOpTime.getArgsOpTime());
+    ASSERT_TRUE(clusterTime == *argsClusterTime);
+    ASSERT(ReadConcernLevel::kLocalReadConcern == readAfterOpTime.getLevel());
+}
+
+TEST(ReadAfterParse, ClusterTimeAndLevelMajority) {
     ReadConcernArgs readAfterOpTime;
     // Must have level=majority
     auto clusterTime = LogicalTime(Timestamp(20, 30));
@@ -226,7 +247,20 @@ TEST(ReadAfterSerialize, Empty) {
     ASSERT_BSONOBJ_EQ(BSON(ReadConcernArgs::kReadConcernFieldName << BSONObj()), obj);
 }
 
-TEST(ReadAfterSerialize, ReadAfterOnly) {
+TEST(ReadAfterSerialize, AfterClusterTimeOnly) {
+    BSONObjBuilder builder;
+    auto clusterTime = LogicalTime(Timestamp(20, 30));
+    ReadConcernArgs readAfterClusterTime(clusterTime, boost::none);
+    readAfterClusterTime.appendInfo(&builder);
+
+    BSONObj expectedObj(
+        BSON(ReadConcernArgs::kReadConcernFieldName
+             << BSON(ReadConcernArgs::kAfterClusterTimeFieldName << clusterTime.asTimestamp())));
+
+    ASSERT_BSONOBJ_EQ(expectedObj, builder.done());
+}
+
+TEST(ReadAfterSerialize, AfterOpTimeOnly) {
     BSONObjBuilder builder;
     ReadConcernArgs readAfterOpTime(OpTime(Timestamp(20, 30), 2), boost::none);
     readAfterOpTime.appendInfo(&builder);
@@ -241,7 +275,7 @@ TEST(ReadAfterSerialize, ReadAfterOnly) {
 
 TEST(ReadAfterSerialize, CommitLevelOnly) {
     BSONObjBuilder builder;
-    ReadConcernArgs readAfterOpTime(boost::none, ReadConcernLevel::kLocalReadConcern);
+    ReadConcernArgs readAfterOpTime(ReadConcernLevel::kLocalReadConcern);
     readAfterOpTime.appendInfo(&builder);
 
     BSONObj expectedObj(BSON(ReadConcernArgs::kReadConcernFieldName
@@ -250,7 +284,22 @@ TEST(ReadAfterSerialize, CommitLevelOnly) {
     ASSERT_BSONOBJ_EQ(expectedObj, builder.done());
 }
 
-TEST(ReadAfterSerialize, FullSpecification) {
+TEST(ReadAfterSerialize, iAfterCLusterTimeAndLevel) {
+    BSONObjBuilder builder;
+    auto clusterTime = LogicalTime(Timestamp(20, 30));
+    ReadConcernArgs readAfterClusterTime(clusterTime, ReadConcernLevel::kMajorityReadConcern);
+    readAfterClusterTime.appendInfo(&builder);
+
+    BSONObj expectedObj(
+        BSON(ReadConcernArgs::kReadConcernFieldName
+             << BSON(ReadConcernArgs::kLevelFieldName << "majority"
+                                                      << ReadConcernArgs::kAfterClusterTimeFieldName
+                                                      << clusterTime.asTimestamp())));
+
+    ASSERT_BSONOBJ_EQ(expectedObj, builder.done());
+}
+
+TEST(ReadAfterSerialize, AfterOpTimeAndLevel) {
     BSONObjBuilder builder;
     ReadConcernArgs readAfterOpTime(OpTime(Timestamp(20, 30), 2),
                                     ReadConcernLevel::kMajorityReadConcern);

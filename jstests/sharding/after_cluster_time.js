@@ -47,13 +47,25 @@
 
     // Test the afterClusterTime API without causal consistency enabled on the mongo connection.
 
-    // Reads with afterClusterTime require read concern level majority.
     assertAfterClusterTimeReadFailsWithCode(
-        testDB, {afterClusterTime: Timestamp(1, 1)}, ErrorCodes.InvalidOptions);
+        testDB,
+        {level: "linearizable", afterClusterTime: Timestamp(1, 1)},
+        ErrorCodes.InvalidOptions);
+
+    // Reads with afterClusterTime require a non-zero timestamp.
+    assertAfterClusterTimeReadFailsWithCode(
+        testDB, {level: "local", afterClusterTime: {}}, ErrorCodes.TypeMismatch);
 
     assertAfterClusterTimeReadFailsWithCode(
-        testDB, {level: "local", afterClusterTime: Timestamp(1, 1)}, ErrorCodes.InvalidOptions);
+        testDB, {level: "local", afterClusterTime: 10}, ErrorCodes.TypeMismatch);
 
+    assertAfterClusterTimeReadFailsWithCode(
+        testDB, {level: "local", afterClusterTime: Timestamp()}, ErrorCodes.InvalidOptions);
+
+    assertAfterClusterTimeReadFailsWithCode(
+        testDB, {level: "local", afterClusterTime: Timestamp(0, 0)}, ErrorCodes.InvalidOptions);
+
+    // Reads with proper afterClusterTime arguments return committed data after the given time.
     // Reads with afterClusterTime require a non-zero timestamp.
     assertAfterClusterTimeReadFailsWithCode(
         testDB, {level: "majority", afterClusterTime: {}}, ErrorCodes.TypeMismatch);
@@ -68,23 +80,32 @@
         testDB, {level: "majority", afterClusterTime: Timestamp(0, 0)}, ErrorCodes.InvalidOptions);
 
     // Reads with proper afterClusterTime arguments return committed data after the given time.
-    let res = assert.commandWorked(testDB.runCommand(
-        {find: "foo", readConcern: {level: "majority", afterClusterTime: Timestamp(1, 1)}}));
+    let testReadOwnWrite = function(readConcern) {
+        let res = assert.commandWorked(testDB.runCommand(
+            {find: "foo", readConcern: {level: readConcern, afterClusterTime: Timestamp(1, 1)}}));
 
-    assert.eq(res.cursor.firstBatch,
-              [{_id: 1, x: 1}],
-              "expected afterClusterTime read to return the committed document");
+        assert.eq(res.cursor.firstBatch,
+                  [{_id: 1, x: 1}],
+                  "expected afterClusterTime read to return the committed document");
 
-    // Test the afterClusterTime API with causal consistency enabled on the mongo connection.
-    testDB.getMongo().setCausalConsistency(true);
+        // Test the afterClusterTime API with causal consistency enabled on the mongo connection.
+        testDB.getMongo().setCausalConsistency(true);
 
-    // With causal consistency enabled, the shell sets read concern to level "majority" if it is not
-    // specified.
-    assertAfterClusterTimeReadSucceeds(testDB, {afterClusterTime: Timestamp(1, 1)});
+        // With causal consistency enabled, the shell sets read concern to level "majority" if it is
+        // not
+        // specified.
+        assertAfterClusterTimeReadSucceeds(testDB, {afterClusterTime: Timestamp(1, 1)});
+        testDB.getMongo().setCausalConsistency(false);
+    };
+
+    testReadOwnWrite("local");
+    testReadOwnWrite("majority");
 
     // Read concern levels other than majority are still not accepted.
     assertAfterClusterTimeReadFailsWithCode(
-        testDB, {level: "local", afterClusterTime: Timestamp(1, 1)}, ErrorCodes.InvalidOptions);
+        testDB,
+        {level: "linearizable", afterClusterTime: Timestamp(1, 1)},
+        ErrorCodes.InvalidOptions);
 
     // Reads with afterClusterTime still require a non-zero timestamp.
     assertAfterClusterTimeReadFailsWithCode(
@@ -98,14 +119,6 @@
 
     assertAfterClusterTimeReadFailsWithCode(
         testDB, {level: "majority", afterClusterTime: Timestamp(0, 0)}, ErrorCodes.InvalidOptions);
-
-    // Reads with proper afterClusterTime arguments return committed data after the given time.
-    res = assert.commandWorked(testDB.runCommand(
-        {find: "foo", readConcern: {level: "majority", afterClusterTime: Timestamp(1, 1)}}));
-
-    assert.eq(res.cursor.firstBatch,
-              [{_id: 1, x: 1}],
-              "expected afterClusterTime read to return the committed document");
 
     st.stop();
 })();

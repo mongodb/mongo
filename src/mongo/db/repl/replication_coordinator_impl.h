@@ -1094,18 +1094,24 @@ private:
     executor::TaskExecutor::EventHandle _cancelElectionIfNeeded_inlock();
 
     /**
-     * Waits until the optime of the current node is at least the opTime specified in 'readConcern'.
-     * It supports local readConcern, which _waitUntilClusterTimeForRead does not.
-     * TODO: remove when SERVER-28150 is done.
+     * Waits until the optime of the current node is at least the 'opTime'.
      */
+    Status _waitUntilOpTime(OperationContext* opCtx, bool isMajorityReadConcern, OpTime opTime);
+
+    /**
+     * Waits until the optime of the current node is at least the opTime specified in 'readConcern'.
+     * Supports local and majority readConcern.
+     */
+    // TODO: remove when SERVER-29729 is done
     Status _waitUntilOpTimeForReadDeprecated(OperationContext* opCtx,
                                              const ReadConcernArgs& readConcern);
 
     /**
-     * Waits until the logicalTime of the current node is at least the 'clusterTime'.
-     * TODO: Merge with waitUntilOpTimeForRead() when SERVER-28150 is done.
+     * Waits until the optime of the current node is at least the clusterTime specified in
+     * 'readConcern'. Supports local and majority readConcern.
      */
-    Status _waitUntilClusterTimeForRead(OperationContext* opCtx, LogicalTime clusterTime);
+    Status _waitUntilClusterTimeForRead(OperationContext* opCtx,
+                                        const ReadConcernArgs& readConcern);
 
     /**
      * Returns a pseudorandom number no less than 0 and less than limit (which must be positive).

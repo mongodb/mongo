@@ -188,7 +188,7 @@ void checkForExistingChunks(OperationContext* opCtx, const string& ns) {
     // Use readConcern local to guarantee we see any chunks that have been written and may
     // become committed; readConcern majority will not see the chunks if they have not made it
     // to the majority snapshot.
-    repl::ReadConcernArgs readConcern(boost::none, repl::ReadConcernLevel::kLocalReadConcern);
+    repl::ReadConcernArgs readConcern(repl::ReadConcernLevel::kLocalReadConcern);
     readConcern.appendInfo(&countBuilder);
 
     auto cmdResponse = uassertStatusOK(
