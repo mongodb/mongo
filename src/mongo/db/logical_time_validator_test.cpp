@@ -176,11 +176,7 @@ TEST_F(LogicalTimeValidatorTest, ShouldGossipLogicalTimeIsFalseUntilKeysAreFound
     // shouldGossipLogicalTime initially returns false.
     ASSERT_EQ(false, validator()->shouldGossipLogicalTime());
 
-    // Enable key generation.
-    validator()->enableKeyGenerator(operationContext(), true);
-
     // shouldGossipLogicalTime still returns false after an unsuccessful refresh.
-    validator()->enableKeyGenerator(operationContext(), false);
     refreshKeyManager();
 
     LogicalTime t1(Timestamp(20, 0));
