@@ -1,4 +1,8 @@
-// SERVER-27991 Allow inputting UUID to find and listIndexes commands
+/**
+* Tests that using a UUID as an argument to commands will retrieve results from the correct
+* collection.
+*/
+
 (function() {
     'use strict';
     let mainCollName = 'main_coll';
@@ -14,7 +18,6 @@
     }
     assert.commandWorked(db.runCommand({insert: mainCollName, documents: [{fooField: 'FOO'}]}));
     assert.commandWorked(db.runCommand({insert: subCollName, documents: [{fooField: 'BAR'}]}));
-
     // Ensure passing a UUID to find retrieves results from the correct collection.
     let cmd = {find: uuid};
     let res = db.runCommand(cmd);
@@ -34,4 +37,10 @@
     cursor.forEach(function(doc) {
         assert.eq(doc.ns, 'test.' + mainCollName);
     });
+
+    // Ensure passing a UUID to parallelCollectionScan retrieves results from the correct
+    // collection.
+    cmd = {parallelCollectionScan: uuid, numCursors: 1};
+    res = assert.commandWorked(db.runCommand(cmd, 'could not run ' + tojson(cmd)));
+    assert.eq(res.cursors[0].cursor.ns, 'test.' + mainCollName);
 }());
