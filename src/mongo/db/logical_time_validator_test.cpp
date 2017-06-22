@@ -75,7 +75,6 @@ protected:
         _keyManager = keyManager.get();
         _validator = stdx::make_unique<LogicalTimeValidator>(std::move(keyManager));
         _validator->init(operationContext()->getServiceContext());
-        _validator->enableKeyGenerator(operationContext(), true);
     }
 
     void tearDown() override {
@@ -87,20 +86,6 @@ protected:
         std::unique_ptr<DistLockCatalog> distLockCatalog) override {
         invariant(distLockCatalog);
         return stdx::make_unique<DistLockManagerMock>(std::move(distLockCatalog));
-    }
-
-    /**
-     * Replaces the test's LogicalTimeValidator with a new one with a disabled keyGenerator.
-     */
-    void resetValidator() {
-        _validator->shutDown();
-
-        auto catalogClient = Grid::get(operationContext())->catalogClient(operationContext());
-        auto keyManager =
-            stdx::make_unique<KeysCollectionManager>("dummy", catalogClient, Seconds(1000));
-        _keyManager = keyManager.get();
-        _validator = stdx::make_unique<LogicalTimeValidator>(std::move(keyManager));
-        _validator->init(operationContext()->getServiceContext());
     }
 
     /**
@@ -116,6 +101,8 @@ private:
 };
 
 TEST_F(LogicalTimeValidatorTest, GetTimeWithIncreasingTimes) {
+    validator()->enableKeyGenerator(operationContext(), true);
+
     LogicalTime t1(Timestamp(10, 0));
     auto newTime = validator()->trySignLogicalTime(t1);
 
@@ -130,6 +117,8 @@ TEST_F(LogicalTimeValidatorTest, GetTimeWithIncreasingTimes) {
 }
 
 TEST_F(LogicalTimeValidatorTest, ValidateReturnsOkForValidSignature) {
+    validator()->enableKeyGenerator(operationContext(), true);
+
     LogicalTime t1(Timestamp(20, 0));
     refreshKeyManager();
     auto newTime = validator()->trySignLogicalTime(t1);
@@ -138,6 +127,8 @@ TEST_F(LogicalTimeValidatorTest, ValidateReturnsOkForValidSignature) {
 }
 
 TEST_F(LogicalTimeValidatorTest, ValidateErrorsOnInvalidTime) {
+    validator()->enableKeyGenerator(operationContext(), true);
+
     LogicalTime t1(Timestamp(20, 0));
     refreshKeyManager();
     auto newTime = validator()->trySignLogicalTime(t1);
@@ -151,6 +142,8 @@ TEST_F(LogicalTimeValidatorTest, ValidateErrorsOnInvalidTime) {
 }
 
 TEST_F(LogicalTimeValidatorTest, ValidateReturnsOkForValidSignatureWithImplicitRefresh) {
+    validator()->enableKeyGenerator(operationContext(), true);
+
     LogicalTime t1(Timestamp(20, 0));
     auto newTime = validator()->signLogicalTime(operationContext(), t1);
 
@@ -158,6 +151,8 @@ TEST_F(LogicalTimeValidatorTest, ValidateReturnsOkForValidSignatureWithImplicitR
 }
 
 TEST_F(LogicalTimeValidatorTest, ValidateErrorsOnInvalidTimeWithImplicitRefresh) {
+    validator()->enableKeyGenerator(operationContext(), true);
+
     LogicalTime t1(Timestamp(20, 0));
     auto newTime = validator()->signLogicalTime(operationContext(), t1);
 
@@ -170,9 +165,6 @@ TEST_F(LogicalTimeValidatorTest, ValidateErrorsOnInvalidTimeWithImplicitRefresh)
 }
 
 TEST_F(LogicalTimeValidatorTest, ShouldGossipLogicalTimeIsFalseUntilKeysAreFound) {
-    // Use a new validator with a disabled key generator.
-    resetValidator();
-
     // shouldGossipLogicalTime initially returns false.
     ASSERT_EQ(false, validator()->shouldGossipLogicalTime());
 
