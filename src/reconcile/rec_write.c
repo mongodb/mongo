@@ -338,7 +338,8 @@ static int  __rec_split_write(WT_SESSION_IMPL *,
 		WT_RECONCILE *, WT_BOUNDARY *, WT_ITEM *, bool);
 static int  __rec_update_las(
 		WT_SESSION_IMPL *, WT_RECONCILE *, uint32_t, WT_BOUNDARY *);
-static int  __rec_write_check_complete(WT_SESSION_IMPL *, WT_RECONCILE *);
+static int  __rec_write_check_complete(
+		WT_SESSION_IMPL *, WT_RECONCILE *, bool *);
 static int  __rec_write_init(WT_SESSION_IMPL *,
 		WT_REF *, uint32_t, WT_SALVAGE_COOKIE *, void *);
 static void __rec_write_page_status(WT_SESSION_IMPL *, WT_RECONCILE *);
@@ -438,7 +439,7 @@ __wt_reconcile(WT_SESSION_IMPL *session, WT_REF *ref,
 
 	/* Checks for a successful reconciliation. */
 	if (ret == 0)
-		ret = __rec_write_check_complete(session, r);
+		ret = __rec_write_check_complete(session, r, lookaside_retryp);
 
 	/* Wrap up the page reconciliation. */
 	if (ret == 0 && (ret = __rec_write_wrapup(session, r, page)) == 0)
@@ -448,14 +449,6 @@ __wt_reconcile(WT_SESSION_IMPL *session, WT_REF *ref,
 
 	/* Release the reconciliation lock. */
 	WT_PAGE_UNLOCK(session, page);
-
-	/*
-	 * If our caller can configure lookaside table reconciliation, flag if
-	 * that's worth trying. The lookaside table doesn't help if we skipped
-	 * updates, it can only help with older readers preventing eviction.
-	 */
-	if (lookaside_retryp != NULL && r->update_mem_uncommitted == 0)
-		*lookaside_retryp = true;
 
 	/* Update statistics. */
 	WT_STAT_CONN_INCR(session, rec_pages);
@@ -561,7 +554,8 @@ __rec_las_checkpoint_test(WT_SESSION_IMPL *session, WT_RECONCILE *r)
  *	Check that reconciliation should complete.
  */
 static int
-__rec_write_check_complete(WT_SESSION_IMPL *session, WT_RECONCILE *r)
+__rec_write_check_complete(
+    WT_SESSION_IMPL *session, WT_RECONCILE *r, bool *lookaside_retryp)
 {
 	/*
 	 * Tests in this function are lookaside tests and tests to decide if
@@ -581,17 +575,62 @@ __rec_write_check_complete(WT_SESSION_IMPL *session, WT_RECONCILE *r)
 		return (EBUSY);
 
 	/*
-	 * If when doing update/restore based eviction, we didn't split and
-	 * didn't apply any updates, then give up.
+	 * Eviction can configure lookaside table reconciliation, consider if
+	 * it's worth giving up this reconciliation attempt and falling back to
+	 * using the lookaside table.  We continue with evict/restore if
+	 * switching to the lookaside doesn't make sense for any reason: we
+	 * won't retry an evict/restore reconciliation until/unless the
+	 * transactional system moves forward, so at worst it's a single wasted
+	 * effort.
 	 *
-	 * This may lead to saving the page to the lookaside table: that
-	 * decision is made by eviction.
+	 * First, check if the lookaside table is a possible alternative.
 	 */
-	if (F_ISSET(r, WT_EVICT_UPDATE_RESTORE) && r->bnd_next == 1 &&
-	    r->update_mem_all != 0 && r->update_mem_all == r->update_mem_saved)
-		return (EBUSY);
+	if (lookaside_retryp == NULL)
+		return (0);
 
-	return (0);
+	/*
+	 * We only suggest lookaside if currently in an evict/restore attempt
+	 * and some updates were saved.  Our caller sets the evict/restore flag
+	 * based on various conditions (like if this is a leaf page), which is
+	 * why we're testing that flag instead of a set of other conditions.
+	 * If no updates were saved, eviction will succeed without needing to
+	 * restore anything.
+	 */
+	if (!F_ISSET(r, WT_EVICT_UPDATE_RESTORE) || r->bnd->supd == NULL)
+		return (0);
+
+	/*
+	 * Check if this reconciliation attempt is making progress.  If there's
+	 * any sign of progress, don't fall back to the lookaside table.
+	 *
+	 * Check if the current reconciliation split, in which case we'll
+	 * likely get to write at least one of the blocks.  If that page is
+	 * empty, that's also progress.
+	 */
+	if (r->bnd_next != 1)
+		return (0);
+
+	/*
+	 * Check if the current reconciliation applied some updates, in which
+	 * case evict/restore should gain us some space.
+	 */
+	if (r->update_mem_saved != r->update_mem_all)
+		return (0);
+
+	/*
+	 * Check if lookaside eviction is possible.  If any of the updates we
+	 * saw were uncommitted, the lookaside table cannot be used: it only
+	 * helps with older readers preventing eviction.
+	 */
+	if (r->update_mem_uncommitted != 0)
+		return (0);
+
+	/*
+	 * The current evict/restore approach shows no signs of being useful,
+	 * lookaside is possible, suggest the lookaside table.
+	 */
+	*lookaside_retryp = true;
+	return (EBUSY);
 }
 
 /*
