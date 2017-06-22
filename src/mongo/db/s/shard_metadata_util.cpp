@@ -68,9 +68,8 @@ Status getStatusFromWriteCommandResponse(const BSONObj& commandResult) {
 }  // namespace
 
 QueryAndSort createShardChunkDiffQuery(const ChunkVersion& collectionVersion) {
-    return {BSON(ChunkType::DEPRECATED_lastmod()
-                 << BSON("$gte" << Timestamp(collectionVersion.toLong()))),
-            BSON(ChunkType::DEPRECATED_lastmod() << 1)};
+    return {BSON(ChunkType::lastmod() << BSON("$gte" << Timestamp(collectionVersion.toLong()))),
+            BSON(ChunkType::lastmod() << 1)};
 }
 
 bool RefreshState::operator==(RefreshState& other) {

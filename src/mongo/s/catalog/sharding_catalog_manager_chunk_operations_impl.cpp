@@ -65,7 +65,7 @@ void appendShortVersion(BufBuilder* b, const ChunkType& chunk) {
     bb.append(ChunkType::min(), chunk.getMin());
     bb.append(ChunkType::max(), chunk.getMax());
     if (chunk.isVersionSet())
-        chunk.getVersion().addToBSON(bb, ChunkType::DEPRECATED_lastmod());
+        chunk.getVersion().addToBSON(bb, ChunkType::lastmod());
     bb.done();
 }
 
@@ -123,9 +123,9 @@ BSONArray buildMergeChunksApplyOpsPrecond(const std::vector<ChunkType>& chunksTo
             BSON("query" << BSON(ChunkType::ns(chunk.getNS()) << ChunkType::min(chunk.getMin())
                                                               << ChunkType::max(chunk.getMax()))
                          << "orderby"
-                         << BSON(ChunkType::DEPRECATED_lastmod() << -1)));
+                         << BSON(ChunkType::lastmod() << -1)));
         b.append("res",
-                 BSON(ChunkType::DEPRECATED_epoch(collVersion.epoch())
+                 BSON(ChunkType::epoch(collVersion.epoch())
                       << ChunkType::shard(chunk.getShard().toString())));
         preCond.append(b.obj());
     }
@@ -183,7 +183,7 @@ BSONObj makeCommitChunkApplyOpsCommand(const NamespaceString& nss,
 
         BSONObjBuilder n(op.subobjStart("o"));
         n.append(ChunkType::name(), ChunkType::genID(nss.ns(), migratedChunk.getMin()));
-        migratedChunk.getVersion().addToBSON(n, ChunkType::DEPRECATED_lastmod());
+        migratedChunk.getVersion().addToBSON(n, ChunkType::lastmod());
         n.append(ChunkType::ns(), nss.ns());
         n.append(ChunkType::min(), migratedChunk.getMin());
         n.append(ChunkType::max(), migratedChunk.getMax());
@@ -206,7 +206,7 @@ BSONObj makeCommitChunkApplyOpsCommand(const NamespaceString& nss,
 
         BSONObjBuilder n(op.subobjStart("o"));
         n.append(ChunkType::name(), ChunkType::genID(nss.ns(), controlChunk->getMin()));
-        controlChunk->getVersion().addToBSON(n, ChunkType::DEPRECATED_lastmod());
+        controlChunk->getVersion().addToBSON(n, ChunkType::lastmod());
         n.append(ChunkType::ns(), nss.ns());
         n.append(ChunkType::min(), controlChunk->getMin());
         n.append(ChunkType::max(), controlChunk->getMax());
@@ -247,7 +247,7 @@ Status ShardingCatalogManagerImpl::commitChunkSplit(OperationContext* opCtx,
         repl::ReadConcernLevel::kLocalReadConcern,
         NamespaceString(ChunkType::ConfigNS),
         BSON("ns" << ns.ns()),
-        BSON(ChunkType::DEPRECATED_lastmod << -1),
+        BSON(ChunkType::lastmod << -1),
         1);
 
     if (!findStatus.isOK()) {
@@ -259,8 +259,7 @@ Status ShardingCatalogManagerImpl::commitChunkSplit(OperationContext* opCtx,
         return {ErrorCodes::IllegalOperation,
                 "collection does not exist, isn't sharded, or has no chunks"};
 
-    ChunkVersion collVersion =
-        ChunkVersion::fromBSON(chunksVector.front(), ChunkType::DEPRECATED_lastmod());
+    ChunkVersion collVersion = ChunkVersion::fromBSON(chunksVector.front(), ChunkType::lastmod());
 
     // Return an error if epoch of chunk does not match epoch of request
     if (collVersion.epoch() != requestEpoch) {
@@ -325,7 +324,7 @@ Status ShardingCatalogManagerImpl::commitChunkSplit(OperationContext* opCtx,
         // add the modified (new) chunk information as the update object
         BSONObjBuilder n(op.subobjStart("o"));
         n.append(ChunkType::name(), ChunkType::genID(ns.ns(), startKey));
-        currentMaxVersion.addToBSON(n, ChunkType::DEPRECATED_lastmod());
+        currentMaxVersion.addToBSON(n, ChunkType::lastmod());
         n.append(ChunkType::ns(), ns.ns());
         n.append(ChunkType::min(), startKey);
         n.append(ChunkType::max(), endKey);
@@ -359,10 +358,10 @@ Status ShardingCatalogManagerImpl::commitChunkSplit(OperationContext* opCtx,
                                                              << ChunkType::max()
                                                              << range.getMax())
                               << "orderby"
-                              << BSON(ChunkType::DEPRECATED_lastmod() << -1)));
+                              << BSON(ChunkType::lastmod() << -1)));
         {
             BSONObjBuilder bb(b.subobjStart("res"));
-            bb.append(ChunkType::DEPRECATED_epoch(), requestEpoch);
+            bb.append(ChunkType::epoch(), requestEpoch);
             bb.append(ChunkType::shard(), shardName);
         }
         preCond.append(b.obj());
@@ -387,7 +386,7 @@ Status ShardingCatalogManagerImpl::commitChunkSplit(OperationContext* opCtx,
         BSONObjBuilder b(logDetail.subobjStart("before"));
         b.append(ChunkType::min(), range.getMin());
         b.append(ChunkType::max(), range.getMax());
-        collVersion.addToBSON(b, ChunkType::DEPRECATED_lastmod());
+        collVersion.addToBSON(b, ChunkType::lastmod());
     }
 
     if (newChunks.size() == 2) {
@@ -441,7 +440,7 @@ Status ShardingCatalogManagerImpl::commitChunkMerge(OperationContext* opCtx,
         repl::ReadConcernLevel::kLocalReadConcern,
         NamespaceString(ChunkType::ConfigNS),
         BSON("ns" << ns.ns()),
-        BSON(ChunkType::DEPRECATED_lastmod << -1),
+        BSON(ChunkType::lastmod << -1),
         1);
 
     if (!findStatus.isOK()) {
@@ -453,8 +452,7 @@ Status ShardingCatalogManagerImpl::commitChunkMerge(OperationContext* opCtx,
         return {ErrorCodes::IllegalOperation,
                 "collection does not exist, isn't sharded, or has no chunks"};
 
-    ChunkVersion collVersion =
-        ChunkVersion::fromBSON(chunksVector.front(), ChunkType::DEPRECATED_lastmod());
+    ChunkVersion collVersion = ChunkVersion::fromBSON(chunksVector.front(), ChunkType::lastmod());
 
     // Return an error if epoch of chunk does not match epoch of request
     if (collVersion.epoch() != requestEpoch) {
@@ -559,7 +557,7 @@ StatusWith<BSONObj> ShardingCatalogManagerImpl::commitChunkMigration(
                                             repl::ReadConcernLevel::kLocalReadConcern,
                                             NamespaceString(ChunkType::ConfigNS),
                                             BSON("ns" << nss.ns()),
-                                            BSON(ChunkType::DEPRECATED_lastmod << -1),
+                                            BSON(ChunkType::lastmod << -1),
                                             1);
     if (!findResponse.isOK()) {
         return findResponse.getStatus();

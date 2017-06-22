@@ -361,7 +361,7 @@ TEST_F(ShardingCatalogClientTest, GetChunksForNSWithSortAndLimit) {
 
     const BSONObj chunksQuery(
         BSON(ChunkType::ns("TestDB.TestColl")
-             << ChunkType::DEPRECATED_lastmod()
+             << ChunkType::lastmod()
              << BSON("$gte" << static_cast<long long>(queryChunkVersion.toLong()))));
 
     const OpTime newOpTime(Timestamp(7, 6), 5);
@@ -372,7 +372,7 @@ TEST_F(ShardingCatalogClientTest, GetChunksForNSWithSortAndLimit) {
 
         ASSERT_OK(catalogClient()->getChunks(operationContext(),
                                              chunksQuery,
-                                             BSON(ChunkType::DEPRECATED_lastmod() << -1),
+                                             BSON(ChunkType::lastmod() << -1),
                                              1,
                                              &chunks,
                                              &opTime,
@@ -395,7 +395,7 @@ TEST_F(ShardingCatalogClientTest, GetChunksForNSWithSortAndLimit) {
 
             ASSERT_EQ(query->ns(), ChunkType::ConfigNS);
             ASSERT_BSONOBJ_EQ(query->getFilter(), chunksQuery);
-            ASSERT_BSONOBJ_EQ(query->getSort(), BSON(ChunkType::DEPRECATED_lastmod() << -1));
+            ASSERT_BSONOBJ_EQ(query->getSort(), BSON(ChunkType::lastmod() << -1));
             ASSERT_EQ(query->getLimit().get(), 1);
 
             checkReadConcern(request.cmdObj, Timestamp(0, 0), repl::OpTime::kUninitializedTerm);
@@ -420,7 +420,7 @@ TEST_F(ShardingCatalogClientTest, GetChunksForNSNoSortNoLimit) {
 
     const BSONObj chunksQuery(
         BSON(ChunkType::ns("TestDB.TestColl")
-             << ChunkType::DEPRECATED_lastmod()
+             << ChunkType::lastmod()
              << BSON("$gte" << static_cast<long long>(queryChunkVersion.toLong()))));
 
     auto future = launchAsync([this, &chunksQuery] {
@@ -467,7 +467,7 @@ TEST_F(ShardingCatalogClientTest, GetChunksForNSInvalidChunk) {
 
     const BSONObj chunksQuery(
         BSON(ChunkType::ns("TestDB.TestColl")
-             << ChunkType::DEPRECATED_lastmod()
+             << ChunkType::lastmod()
              << BSON("$gte" << static_cast<long long>(queryChunkVersion.toLong()))));
 
     auto future = launchAsync([this, &chunksQuery] {

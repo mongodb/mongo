@@ -79,9 +79,9 @@ struct QueryAndSort {
  * current position in the chunk cursor.
  */
 QueryAndSort createConfigDiffQuery(const NamespaceString& nss, ChunkVersion collectionVersion) {
-    return {BSON(ChunkType::ns() << nss.ns() << ChunkType::DEPRECATED_lastmod() << GTE
+    return {BSON(ChunkType::ns() << nss.ns() << ChunkType::lastmod() << GTE
                                  << Timestamp(collectionVersion.toLong())),
-            BSON(ChunkType::DEPRECATED_lastmod() << 1)};
+            BSON(ChunkType::lastmod() << 1)};
 }
 
 /**

@@ -98,11 +98,11 @@ protected:
 
         for (int i = 0; i < 4; ++i) {
             _maxCollVersion.incMajor();
-            BSONObj shardChunk = BSON(ChunkType::minShardID(mins[i])
-                                      << ChunkType::max(maxs[i])
-                                      << ChunkType::shard(kShardId.toString())
-                                      << ChunkType::DEPRECATED_lastmod(Date_t::fromMillisSinceEpoch(
-                                             _maxCollVersion.toLong())));
+            BSONObj shardChunk =
+                BSON(ChunkType::minShardID(mins[i])
+                     << ChunkType::max(maxs[i])
+                     << ChunkType::shard(kShardId.toString())
+                     << ChunkType::lastmod(Date_t::fromMillisSinceEpoch(_maxCollVersion.toLong())));
 
             chunks.push_back(
                 assertGet(ChunkType::fromShardBSON(shardChunk, _maxCollVersion.epoch())));

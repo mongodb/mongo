@@ -77,7 +77,7 @@ TEST_F(MergeChunkTest, MergeExistingChunksCorrectlyShouldSucceed) {
                                                  repl::ReadConcernLevel::kLocalReadConcern,
                                                  NamespaceString(ChunkType::ConfigNS),
                                                  BSON(ChunkType::ns() << "TestDB.TestColl"),
-                                                 BSON(ChunkType::DEPRECATED_lastmod << -1),
+                                                 BSON(ChunkType::lastmod << -1),
                                                  boost::none));
 
     const auto& chunksVector = findResponse.docs;
@@ -140,7 +140,7 @@ TEST_F(MergeChunkTest, MergeSeveralChunksCorrectlyShouldSucceed) {
                                                  repl::ReadConcernLevel::kLocalReadConcern,
                                                  NamespaceString(ChunkType::ConfigNS),
                                                  BSON(ChunkType::ns() << "TestDB.TestColl"),
-                                                 BSON(ChunkType::DEPRECATED_lastmod << -1),
+                                                 BSON(ChunkType::lastmod << -1),
                                                  boost::none));
 
     const auto& chunksVector = findResponse.docs;
@@ -207,7 +207,7 @@ TEST_F(MergeChunkTest, NewMergeShouldClaimHighestVersion) {
                                                  repl::ReadConcernLevel::kLocalReadConcern,
                                                  NamespaceString(ChunkType::ConfigNS),
                                                  BSON(ChunkType::ns() << "TestDB.TestColl"),
-                                                 BSON(ChunkType::DEPRECATED_lastmod << -1),
+                                                 BSON(ChunkType::lastmod << -1),
                                                  boost::none));
 
     const auto& chunksVector = findResponse.docs;
@@ -270,7 +270,7 @@ TEST_F(MergeChunkTest, MergeLeavesOtherChunksAlone) {
                                                  repl::ReadConcernLevel::kLocalReadConcern,
                                                  NamespaceString(ChunkType::ConfigNS),
                                                  BSON(ChunkType::ns() << "TestDB.TestColl"),
-                                                 BSON(ChunkType::DEPRECATED_lastmod << -1),
+                                                 BSON(ChunkType::lastmod << -1),
                                                  boost::none));
 
     const auto& chunksVector = findResponse.docs;
@@ -406,7 +406,7 @@ TEST_F(MergeChunkTest, MergeAlreadyHappenedFailsPrecondition) {
                                                  repl::ReadConcernLevel::kLocalReadConcern,
                                                  NamespaceString(ChunkType::ConfigNS),
                                                  BSON(ChunkType::ns() << "TestDB.TestColl"),
-                                                 BSON(ChunkType::DEPRECATED_lastmod << -1),
+                                                 BSON(ChunkType::lastmod << -1),
                                                  boost::none));
 
     const auto& chunksVector = findResponse.docs;

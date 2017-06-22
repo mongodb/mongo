@@ -160,8 +160,8 @@ public:
     static const BSONField<BSONObj> max;
     static const BSONField<std::string> shard;
     static const BSONField<bool> jumbo;
-    static const BSONField<Date_t> DEPRECATED_lastmod;
-    static const BSONField<OID> DEPRECATED_epoch;
+    static const BSONField<Date_t> lastmod;
+    static const BSONField<OID> epoch;
 
     ChunkType();
     ChunkType(NamespaceString nss, ChunkRange range, ChunkVersion version, ShardId shardId);

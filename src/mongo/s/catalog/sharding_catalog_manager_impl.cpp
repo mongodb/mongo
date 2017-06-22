@@ -194,11 +194,11 @@ Status ShardingCatalogManagerImpl::_initConfigIndexes(OperationContext* opCtx) {
                                     << causedBy(result));
     }
 
-    result = configShard->createIndexOnConfig(
-        opCtx,
-        NamespaceString(ChunkType::ConfigNS),
-        BSON(ChunkType::ns() << 1 << ChunkType::DEPRECATED_lastmod() << 1),
-        unique);
+    result =
+        configShard->createIndexOnConfig(opCtx,
+                                         NamespaceString(ChunkType::ConfigNS),
+                                         BSON(ChunkType::ns() << 1 << ChunkType::lastmod() << 1),
+                                         unique);
     if (!result.isOK()) {
         return Status(result.code(),
                       str::stream() << "couldn't create ns_1_lastmod_1 index on config db"

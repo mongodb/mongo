@@ -85,9 +85,8 @@ void Chunk::randomizeBytesWritten() {
 }
 
 std::string Chunk::toString() const {
-    return str::stream() << ChunkType::shard() << ": " << _shardId << ", "
-                         << ChunkType::DEPRECATED_lastmod() << ": " << _lastmod.toString() << ", "
-                         << _range.toString();
+    return str::stream() << ChunkType::shard() << ": " << _shardId << ", " << ChunkType::lastmod()
+                         << ": " << _lastmod.toString() << ", " << _range.toString();
 }
 
 void Chunk::markAsJumbo() {

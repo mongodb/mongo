@@ -300,7 +300,7 @@ public:
         if (prefixIn == "" && !obj["version"].eoo()) {
             prefix = (std::string) "version";
         }
-        // TODO: use ChunkType::DEPRECATED_lastmod()
+        // TODO: use ChunkType::lastmod()
         // NOTE: type_chunk.h includes this file
         else if (prefixIn == "" && !obj["lastmod"].eoo()) {
             prefix = (std::string) "lastmod";

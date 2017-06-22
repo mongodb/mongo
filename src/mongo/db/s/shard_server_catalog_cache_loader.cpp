@@ -136,7 +136,7 @@ ChunkVersion getPersistedMaxVersion(OperationContext* opCtx, const NamespaceStri
         shardmetadatautil::readShardChunks(opCtx,
                                            nss,
                                            BSONObj(),
-                                           BSON(ChunkType::DEPRECATED_lastmod() << -1),
+                                           BSON(ChunkType::lastmod() << -1),
                                            1LL,
                                            statusWithCollection.getValue().getEpoch());
     uassert(ErrorCodes::OperationFailed,

@@ -1238,7 +1238,7 @@ Status ShardingCatalogClientImpl::applyChunkOpsDeprecated(OperationContext* opCt
         // mod made it to the config server, then applyOps was successful.
         std::vector<ChunkType> newestChunk;
         BSONObjBuilder query;
-        lastChunkVersion.addToBSON(query, ChunkType::DEPRECATED_lastmod());
+        lastChunkVersion.addToBSON(query, ChunkType::lastmod());
         query.append(ChunkType::ns(), nss);
         Status chunkStatus =
             getChunks(opCtx, query.obj(), BSONObj(), 1, &newestChunk, nullptr, readConcern);
