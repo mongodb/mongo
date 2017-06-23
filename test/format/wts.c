@@ -548,7 +548,7 @@ wts_verify(const char *tag)
 		 */
 		testutil_check(__wt_snprintf(
 		    config_buf, sizeof(config_buf),
-		    "oldest_timestamp=%x", g.timestamp));
+		    "oldest_timestamp=%" PRIx64, g.timestamp));
 		testutil_check(conn->set_timestamp(conn, config_buf));
 	}
 

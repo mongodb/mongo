@@ -19,10 +19,10 @@ __wt_txn_parse_timestamp(WT_SESSION_IMPL *session,
 {
 	WT_DECL_RET;
 	WT_ITEM ts;
-	char padbuf[2 * WT_TIMESTAMP_SIZE];
 	wt_timestamp_t tsbuf;
-	const char *hexts;
 	size_t hexlen;
+	const char *hexts;
+	char padbuf[2 * WT_TIMESTAMP_SIZE + 1];
 
 	__wt_timestamp_set(timestamp, zero_timestamp);
 

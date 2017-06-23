@@ -93,7 +93,7 @@ main(int argc, char *argv[])
 			runs = atoi(__wt_optarg);
 			break;
 		case 's':
-#if HAVE_TIMESTAMPS
+#ifdef HAVE_TIMESTAMPS
 			g.use_timestamps = true;
 #endif
 			break;

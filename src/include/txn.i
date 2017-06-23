@@ -17,16 +17,18 @@ static const wt_timestamp_t zero_timestamp;
  *	Compare two timestamps.
  */
 static inline int
-__wt_timestamp_cmp(const uint8_t *ts1, const uint8_t *ts2) {
+__wt_timestamp_cmp(const uint8_t *ts1, const uint8_t *ts2)
+{
 	return (memcmp(ts1, ts2, WT_TIMESTAMP_SIZE));
 }
 
 /*
  * __wt_timestamp_set --
- *	Set a timestamp
+ *	Set a timestamp.
  */
 static inline void
-__wt_timestamp_set(uint8_t *dest, const uint8_t *src) {
+__wt_timestamp_set(uint8_t *dest, const uint8_t *src)
+{
 	(void)memcpy(dest, src, WT_TIMESTAMP_SIZE);
 }
 
@@ -35,7 +37,8 @@ __wt_timestamp_set(uint8_t *dest, const uint8_t *src) {
  *	Check if a timestamp is equal to the special "zero" time.
  */
 static inline bool
-__wt_timestamp_iszero(const uint8_t *ts) {
+__wt_timestamp_iszero(const uint8_t *ts)
+{
 	return (memcmp(ts, zero_timestamp, WT_TIMESTAMP_SIZE) == 0);
 }
 #endif
@@ -105,7 +108,7 @@ __wt_txn_modify(WT_SESSION_IMPL *session, WT_UPDATE *upd)
 	WT_RET(__txn_next_op(session, &op));
 	op->type = F_ISSET(session, WT_SESSION_LOGGING_INMEM) ?
 	    WT_TXN_OP_INMEM : WT_TXN_OP_BASIC;
-#if HAVE_TIMESTAMPS
+#ifdef HAVE_TIMESTAMPS
 	if (F_ISSET(txn, WT_TXN_HAS_TS_COMMIT)) {
 		__wt_timestamp_set(upd->timestamp, txn->commit_timestamp);
 		if (!F_ISSET(session, WT_SESSION_LOGGING_INMEM))

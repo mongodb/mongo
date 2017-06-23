@@ -424,13 +424,13 @@ commit_transaction(TINFO *tinfo, WT_SESSION *session)
 		if (ts > 100 && ts % 100 == 0) {
 			testutil_check(__wt_snprintf(
 			    config_buf, sizeof(config_buf),
-			    "oldest_timestamp=%x", ts));
+			    "oldest_timestamp=%" PRIx64, ts));
 			testutil_check(conn->set_timestamp(conn, config_buf));
 		}
 
 		testutil_check(__wt_snprintf(
 		    config_buf, sizeof(config_buf),
-		    "commit_timestamp=%x", ts));
+		    "commit_timestamp=%" PRIx64, ts));
 		commit_conf = config_buf;
 	} else
 		commit_conf = NULL;

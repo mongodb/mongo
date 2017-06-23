@@ -106,7 +106,7 @@ real_checkpointer(void)
 		if (g.use_timestamps && g.timestamp > 0)
 			testutil_check(__wt_snprintf(
 			    _buf + strlen(_buf), sizeof(_buf) - strlen(_buf),
-			    "read_timestamp=%x", g.timestamp));
+			    "read_timestamp=%" PRIx64, g.timestamp));
 
 		checkpoint_config = strlen(_buf) > 0 ? _buf : NULL;
 		/* Execute a checkpoint */
