@@ -29,11 +29,11 @@
 #pragma once
 
 #include <map>
-#include <memory>
 
 #include "mongo/db/logical_session_id.h"
 #include "mongo/db/session_txn_state_holder.h"
 #include "mongo/stdx/mutex.h"
+#include "mongo/stdx/unordered_map.h"
 
 namespace mongo {
 
@@ -71,9 +71,9 @@ private:
     LogicalSessionCache* const _sessionsCache;
 
     stdx::mutex _mutex;
-    std::unordered_map<LogicalSessionId,
-                       std::shared_ptr<SessionTxnStateHolder>,
-                       LogicalSessionId::Hash>
+    stdx::unordered_map<LogicalSessionId,
+                        std::shared_ptr<SessionTxnStateHolder>,
+                        LogicalSessionId::Hash>
         _txnTable;
 };
 
