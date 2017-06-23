@@ -27,7 +27,7 @@
            'split on bounds failed on chunk[' + tojson(chunkDoc) + ']: ' + tojson(cmdRes));
 
     chunkDoc = configDB.chunks.find().sort({min: 1}).skip(1).next();
-    var middle = chunkDoc.min + 1000000;
+    var middle = NumberLong(chunkDoc.min.x + 1000000);
 
     cmdRes = testDB.adminCommand({split: 'test.user', middle: {x: middle}});
     assert(cmdRes.ok, 'split failed with middle [' + middle + ']: ' + tojson(cmdRes));

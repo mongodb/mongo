@@ -44,6 +44,8 @@ selector:
   # SERVER-19318: added new $currentOp agg stage in 3.6
   - jstests/sharding/aggregation_currentop.js
   - jstests/sharding/read_pref_cmd.js
+  # SERVER-14761 only allow NumberLong as split key in hashed shard patterns
+  - jstests/sharding/hash_number_long_split.js
 
 executor:
   config:
