@@ -81,6 +81,7 @@ void db_destroy(libmongodbcapi_db* db) noexcept {
     if (db) {
         global_db = nullptr;
     }
+    last_error = LIBMONGODB_CAPI_ERROR_SUCCESS;
 }
 
 int db_pump(libmongodbcapi_db* db) noexcept try {
@@ -93,12 +94,15 @@ libmongodbcapi_client* client_new(libmongodbcapi_db* db) noexcept try {
     auto new_client = stdx::make_unique<libmongodbcapi_client>(db);
     libmongodbcapi_client* rv = new_client.get();
     db->open_clients.insert(std::make_pair(rv, std::move(new_client)));
+    last_error = LIBMONGODB_CAPI_ERROR_SUCCESS;
     return rv;
 } catch (const std::exception& e) {
+    last_error = LIBMONGODB_CAPI_ERROR_UNKNOWN;
     return nullptr;
 }
 
 void client_destroy(libmongodbcapi_client* client) noexcept {
+    last_error = LIBMONGODB_CAPI_ERROR_SUCCESS;
     if (!client) {
         return;
     }
@@ -113,7 +117,7 @@ int client_wire_protocol_rpc(libmongodbcapi_client* client,
     return LIBMONGODB_CAPI_ERROR_SUCCESS;
 }
 
-int get_last_error() noexcept {
+int get_last_capi_error() noexcept {
     return last_error;
 }
 }  // namespace
@@ -132,19 +136,23 @@ int libmongodbcapi_db_pump(libmongodbcapi_db* p) {
     return mongo::db_pump(p);
 }
 
-libmongodbcapi_client* libmongdbcapi_db_client_new(libmongodbcapi_db* db) {
+libmongodbcapi_client* libmongodbcapi_db_client_new(libmongodbcapi_db* db) {
     return mongo::client_new(db);
 }
 
-void libmongdbcapi_db_client_destroy(libmongodbcapi_client* client) {
+void libmongodbcapi_db_client_destroy(libmongodbcapi_client* client) {
     return mongo::client_destroy(client);
 }
 
-int libmongdbcapi_db_client_wire_protocol_rpc(libmongodbcapi_client* client,
-                                              const void* input,
-                                              size_t input_size,
-                                              void** output,
-                                              size_t* output_size) {
+int libmongodbcapi_db_client_wire_protocol_rpc(libmongodbcapi_client* client,
+                                               const void* input,
+                                               size_t input_size,
+                                               void** output,
+                                               size_t* output_size) {
     return mongo::client_wire_protocol_rpc(client, input, input_size, output, output_size);
+}
+
+int libmongodbcapi_get_last_error() {
+    return mongo::get_last_capi_error();
 }
 }

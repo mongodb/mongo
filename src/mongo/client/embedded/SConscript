@@ -9,8 +9,20 @@ capi = env.Library(
     source=[
         'libmongodbcapi.cpp',
     ],
-    LIBDEPS=[]
+    LIBDEPS=[
+        '$BUILD_DIR/mongo/base', 
+    ]
 )
 
 env.Alias( 'embedded_capi', capi)
 
+env.CppUnitTest(
+    target='mongo_embedded_capi_test',
+    source=[
+        'libmongodbcapi_test.cpp',
+    ],
+    LIBDEPS=[
+        '$BUILD_DIR/mongo/base', 
+        'mongo_embedded_capi',
+    ],
+)
