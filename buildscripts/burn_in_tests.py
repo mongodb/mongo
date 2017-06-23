@@ -69,6 +69,7 @@ def parse_command_line():
                         selector_file="etc/burn_in_tests.yml",
                         max_revisions=25,
                         no_exec=False,
+                        executor_file=None,
                         report_file="report.json",
                         suite_files="with_server",
                         test_list_file=None,
