@@ -28,8 +28,6 @@
 
 #pragma once
 
-#include <map>
-
 #include "mongo/db/logical_session_id.h"
 #include "mongo/db/session_txn_state_holder.h"
 #include "mongo/stdx/mutex.h"
@@ -46,13 +44,27 @@ class ServiceContext;
  */
 class SessionTransactionTable {
 public:
-    /**
-     * Note: sessionsCache should outlive this object.
-     */
-    explicit SessionTransactionTable(LogicalSessionCache* sessionsCache);
+    explicit SessionTransactionTable(ServiceContext* serviceContext);
 
+    /**
+     * Instantiates a transaction table on the specified service context. Must be called only once
+     * and is not thread-safe.
+     */
+    static void create(ServiceContext* service);
+
+    /**
+     * Retrieves the session transaction table associated with the service or operation context.
+     * Must only be called after 'create' has been called.
+     */
+    static SessionTransactionTable* get(OperationContext* opCtx);
     static SessionTransactionTable* get(ServiceContext* service);
-    static void set(ServiceContext* service, std::unique_ptr<SessionTransactionTable> txnTable);
+
+    /**
+     * Invoked when the node enters the primary state. Ensures that the transactions collection is
+     * created. Throws on severe exceptions due to which it is not safe to continue the step-up
+     * process.
+     */
+    void onStepUp(OperationContext* opCtx);
 
     /**
      * Returns transaction state with the given sessionId and txnNum.
@@ -68,7 +80,7 @@ public:
     void cleanupInactiveSessions(OperationContext* opCtx);
 
 private:
-    LogicalSessionCache* const _sessionsCache;
+    ServiceContext* const _serviceContext;
 
     stdx::mutex _mutex;
     stdx::unordered_map<LogicalSessionId,

@@ -26,32 +26,80 @@
  *    it in the license file.
  */
 
+#define MONGO_LOG_DEFAULT_COMPONENT ::mongo::logger::LogComponent::kWrite
+
 #include "mongo/platform/basic.h"
 
 #include "mongo/db/session_transaction_table.h"
 
+#include <boost/optional.hpp>
+
+#include "mongo/db/dbdirectclient.h"
+#include "mongo/db/namespace_string.h"
 #include "mongo/db/operation_context.h"
 #include "mongo/db/service_context.h"
+#include "mongo/rpc/get_status_from_command_result.h"
 #include "mongo/stdx/memory.h"
-#include "session_txn_state_holder.h"
+#include "mongo/util/log.h"
 
 namespace mongo {
+namespace {
 
 const auto sessionTransactionTableDecoration =
-    ServiceContext::declareDecoration<std::unique_ptr<SessionTransactionTable>>();
+    ServiceContext::declareDecoration<boost::optional<SessionTransactionTable>>();
+
+}  // namespace
+
+SessionTransactionTable::SessionTransactionTable(ServiceContext* serviceContext)
+    : _serviceContext(serviceContext) {}
+
+void SessionTransactionTable::create(ServiceContext* service) {
+    auto& sessionTransactionTable = sessionTransactionTableDecoration(service);
+    invariant(!sessionTransactionTable);
+
+    sessionTransactionTable.emplace(service);
+}
+
+SessionTransactionTable* SessionTransactionTable::get(OperationContext* opCtx) {
+    return get(opCtx->getServiceContext());
+}
 
 SessionTransactionTable* SessionTransactionTable::get(ServiceContext* service) {
-    return sessionTransactionTableDecoration(service).get();
+    auto& sessionTransactionTable = sessionTransactionTableDecoration(service);
+    invariant(sessionTransactionTable);
+
+    return sessionTransactionTable.get_ptr();
 }
 
-void SessionTransactionTable::set(ServiceContext* service,
-                                  std::unique_ptr<SessionTransactionTable> txnTable) {
-    auto& serviceTxnTable = sessionTransactionTableDecoration(service);
-    serviceTxnTable = std::move(txnTable);
-}
+void SessionTransactionTable::onStepUp(OperationContext* opCtx) {
+    DBDirectClient client(opCtx);
 
-SessionTransactionTable::SessionTransactionTable(LogicalSessionCache* sessionsCache)
-    : _sessionsCache(sessionsCache) {}
+    const size_t initialExtentSize = 0;
+    const bool capped = false;
+    const bool maxSize = 0;
+
+    BSONObj result;
+
+    if (client.createCollection(NamespaceString::kSessionTransactionsTableNamespace.ns(),
+                                initialExtentSize,
+                                capped,
+                                maxSize,
+                                &result)) {
+        return;
+    }
+
+    const auto status = getStatusFromCommandResult(result);
+
+    if (status == ErrorCodes::NamespaceExists) {
+        return;
+    }
+
+    uasserted(status.code(),
+              str::stream() << "Failed to create the "
+                            << NamespaceString::kSessionTransactionsTableNamespace.ns()
+                            << " collection due to "
+                            << status.reason());
+}
 
 std::shared_ptr<SessionTxnStateHolder> SessionTransactionTable::getSessionTxnState(
     const LogicalSessionId& sessionId) {
