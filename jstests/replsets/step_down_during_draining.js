@@ -117,7 +117,7 @@ load("jstests/replsets/rslib.js");
     assert.commandWorked(
         secondary.adminCommand({
             replSetTest: 1,
-            waitForDrainFinish: 5000,
+            waitForDrainFinish: replSet.kDefaultTimeoutMS,
         }),
         'replSetTest waitForDrainFinish should work when draining is allowed to complete');
 
