@@ -76,6 +76,8 @@ ERROR_ID_ENUM_NON_CONTINUOUS_RANGE = "ID0039"
 ERROR_ID_FIELD_MUST_BE_EMPTY_FOR_ENUM = "ID0040"
 ERROR_ID_BAD_COMMAND_NAMESPACE = "ID0041"
 ERROR_ID_FIELD_NO_COMMAND = "ID0042"
+ERROR_ID_NO_ARRAY_OF_CHAIN = "ID0043"
+ERROR_ID_ILLEGAL_FIELD_DEFAULT_AND_OPTIONAL = "ID0044"
 
 
 class IDLError(Exception):
@@ -564,6 +566,20 @@ class ParserContext(object):
         self._add_error(location, ERROR_ID_FIELD_NO_COMMAND,
                         ("Command '%s' cannot be used as a field type'. Commands must be top-level"
                          + " types due to their serialization rules.") % (command_name))
+
+    def add_bad_array_of_chain(self, location, field_name):
+        # type: (common.SourceLocation, unicode) -> None
+        """Add an error about a field being an array of chain_types."""
+        self._add_error(location, ERROR_ID_NO_ARRAY_OF_CHAIN,
+                        "Field '%s' cannot be an array of chained types" % (field_name))
+
+    def add_bad_field_default_and_optional(self, location, field_name):
+        # type: (common.SourceLocation, unicode) -> None
+        """Add an error about a field being optional and having a default value."""
+        # pylint: disable=invalid-name
+        self._add_error(location, ERROR_ID_ILLEGAL_FIELD_DEFAULT_AND_OPTIONAL, (
+            "Field '%s' can only be marked as optional or have a default value," + " not both.") %
+                        (field_name))
 
 
 def _assert_unique_error_messages():

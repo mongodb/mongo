@@ -738,6 +738,19 @@ class TestBinder(testcase.IDLTestcase):
                             default: 42
             """), idl.errors.ERROR_ID_BAD_BINDATA_DEFAULT)
 
+        # Test default and optional for the same field
+        self.assert_bind_fail(test_preamble + textwrap.dedent("""
+            structs:
+                foo:
+                    description: foo
+                    strict: true
+                    fields:
+                        foo:
+                            type: string
+                            default: 42
+                            optional: true
+            """), idl.errors.ERROR_ID_ILLEGAL_FIELD_DEFAULT_AND_OPTIONAL)
+
     def test_ignored_field_negative(self):
         # type: () -> None
         """Test that if a field is marked as ignored, no other properties are set."""
@@ -805,8 +818,6 @@ class TestBinder(testcase.IDLTestcase):
                 bson_serialization_type: string
                 serializer: foo
                 deserializer: foo
-                default: foo
-
 
             foo1:
                 description: foo
@@ -814,7 +825,6 @@ class TestBinder(testcase.IDLTestcase):
                 bson_serialization_type: chain
                 serializer: foo
                 deserializer: foo
-                default: foo
 
         """)
 
@@ -872,6 +882,27 @@ class TestBinder(testcase.IDLTestcase):
                 fields:
                     foo1: string
         """), idl.errors.ERROR_ID_UNKNOWN_TYPE)
+
+        # A regular field as a chained type
+        self.assert_bind_fail(test_preamble + textwrap.dedent("""
+        structs:
+            bar1:
+                description: foo
+                strict: false
+                fields:
+                    foo1: string
+                    foo2: foobar1
+        """), idl.errors.ERROR_ID_UNKNOWN_TYPE)
+
+        # Array of chained types
+        self.assert_bind_fail(test_preamble + textwrap.dedent("""
+        structs:
+            bar1:
+                description: foo
+                strict: true
+                fields:
+                    field1: array<foo1>
+        """), idl.errors.ERROR_ID_NO_ARRAY_OF_CHAIN)
 
     def test_chained_struct_positive(self):
         # type: () -> None

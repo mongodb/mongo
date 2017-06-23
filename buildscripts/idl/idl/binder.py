@@ -326,6 +326,29 @@ def _validate_field_of_type_enum(ctxt, field):
         ctxt.add_enum_field_must_be_empty_error(field, field.name, "default")
 
 
+def _validate_array_type(ctxt, syntax_symbol, field):
+    # type: (errors.ParserContext, Union[syntax.Command, syntax.Enum, syntax.Struct, syntax.Type], syntax.Field) -> None
+    """Validate this an array of plain objects or a struct."""
+    if isinstance(syntax_symbol, syntax.Enum):
+        ctxt.add_array_enum_error(field, field.name)
+
+    if field.default or (isinstance(syntax_symbol, syntax.Type) and syntax_symbol.default):
+        ctxt.add_array_no_default_error(field, field.name)
+
+
+def _validate_field_properties(ctxt, ast_field):
+    # type: (errors.ParserContext, ast.Field) -> None
+    """Validate field specific rules."""
+
+    if ast_field.default and ast_field.optional:
+        ctxt.add_bad_field_default_and_optional(ast_field, ast_field.name)
+
+    # A "chain" type should never appear as a field.
+    if len(ast_field.bson_serialization_type) == 1 and ast_field.bson_serialization_type[
+            0] == 'chain':
+        ctxt.add_bad_array_of_chain(ast_field, ast_field.name)
+
+
 def _bind_field(ctxt, parsed_spec, field):
     # type: (errors.ParserContext, syntax.IDLSpec, syntax.Field) -> ast.Field
     """
@@ -364,11 +387,7 @@ def _bind_field(ctxt, parsed_spec, field):
     if syntax.parse_array_type(field.type):
         ast_field.array = True
 
-        if isinstance(syntax_symbol, syntax.Enum):
-            ctxt.add_array_enum_error(ast_field, ast_field.name)
-
-        if field.default or (isinstance(syntax_symbol, syntax.Type) and syntax_symbol.default):
-            ctxt.add_array_no_default_error(field, field.name)
+        _validate_array_type(ctxt, syntax_symbol, field)
 
     # Copy over only the needed information if this a struct or a type
     if isinstance(syntax_symbol, syntax.Struct):
@@ -403,6 +422,9 @@ def _bind_field(ctxt, parsed_spec, field):
 
         # Validate merged type
         _validate_type_properties(ctxt, ast_field, "field")
+
+        # Validate merged type
+        _validate_field_properties(ctxt, ast_field)
 
     return ast_field
 
