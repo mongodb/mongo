@@ -811,7 +811,7 @@ TEST_F(RSRollbackTest, RollbackUnknownCommand) {
                                  << "ns"
                                  << "test.t"
                                  << "o"
-                                 << BSON("unknown_command"
+                                 << BSON("convertToCapped"
                                          << "t")),
                        RecordId(2));
     {
@@ -832,7 +832,7 @@ TEST_F(RSRollbackTest, RollbackUnknownCommand) {
                      _coordinator,
                      _replicationProcess.get());
     ASSERT_EQUALS(ErrorCodes::UnrecoverableRollbackError, status.code());
-    ASSERT_EQUALS(18751, status.location());
+    ASSERT_EQUALS(18752, status.location());
 }
 
 TEST_F(RSRollbackTest, RollbackDropCollectionCommand) {
@@ -968,6 +968,12 @@ TEST_F(RSRollbackTest, RollbackApplyOpsCommand) {
         std::make_pair(makeApplyOpsOplogEntry(Timestamp(Seconds(2), 0),
                                               {BSON("op"
                                                     << "u"
+                                                    << "ts"
+                                                    << Timestamp(1, 1)
+                                                    << "t"
+                                                    << 1LL
+                                                    << "h"
+                                                    << 2LL
                                                     << "ns"
                                                     << "test.t"
                                                     << "o2"
@@ -976,6 +982,12 @@ TEST_F(RSRollbackTest, RollbackApplyOpsCommand) {
                                                     << BSON("_id" << 1 << "v" << 2)),
                                                BSON("op"
                                                     << "u"
+                                                    << "ts"
+                                                    << Timestamp(2, 1)
+                                                    << "t"
+                                                    << 1LL
+                                                    << "h"
+                                                    << 2LL
                                                     << "ns"
                                                     << "test.t"
                                                     << "o2"
@@ -984,12 +996,24 @@ TEST_F(RSRollbackTest, RollbackApplyOpsCommand) {
                                                     << BSON("_id" << 2 << "v" << 4)),
                                                BSON("op"
                                                     << "d"
+                                                    << "ts"
+                                                    << Timestamp(3, 1)
+                                                    << "t"
+                                                    << 1LL
+                                                    << "h"
+                                                    << 2LL
                                                     << "ns"
                                                     << "test.t"
                                                     << "o"
                                                     << BSON("_id" << 3)),
                                                BSON("op"
                                                     << "i"
+                                                    << "ts"
+                                                    << Timestamp(4, 1)
+                                                    << "t"
+                                                    << 1LL
+                                                    << "h"
+                                                    << 2LL
                                                     << "ns"
                                                     << "test.t"
                                                     << "o"
@@ -1165,30 +1189,40 @@ TEST_F(RSRollbackTest, RollbackCollectionModificationCommandInvalidCollectionOpt
 }
 
 TEST(RSRollbackTest, LocalEntryWithoutNsIsFatal) {
-    const auto validOplogEntry = fromjson("{op: 'i', ns: 'test.t', o: {_id:1, a: 1}}");
+    const auto validOplogEntry = fromjson(
+        "{op: 'i', ts: Timestamp(1,1), t: NumberLong(1), h: NumberLong(1), ns: 'test.t', o: "
+        "{_id:1, a: 1}}");
     FixUpInfo fui;
     ASSERT_OK(updateFixUpInfoFromLocalOplogEntry(fui, validOplogEntry));
-    ASSERT_THROWS(updateFixUpInfoFromLocalOplogEntry(fui, validOplogEntry.removeField("ns"))
-                      .transitional_ignore(),
+    const auto invalidOplogEntry = fromjson(
+        "{op: 'i', ts: Timestamp(1,1), t: NumberLong(1), h: NumberLong(1),  ns: '', o: {_id:1, a: "
+        "1}}");
+    ASSERT_THROWS(updateFixUpInfoFromLocalOplogEntry(fui, invalidOplogEntry).transitional_ignore(),
                   RSFatalException);
 }
 
 TEST(RSRollbackTest, LocalEntryWithoutOIsFatal) {
-    const auto validOplogEntry = fromjson("{op: 'i', ns: 'test.t', o: {_id:1, a: 1}}");
+    const auto validOplogEntry = fromjson(
+        "{op: 'i', ts: Timestamp(1,1), t: NumberLong(1), h: NumberLong(1),  ns: 'test.t', o: "
+        "{_id:1, a: 1}}");
     FixUpInfo fui;
     ASSERT_OK(updateFixUpInfoFromLocalOplogEntry(fui, validOplogEntry));
-    ASSERT_THROWS(updateFixUpInfoFromLocalOplogEntry(fui, validOplogEntry.removeField("o"))
-                      .transitional_ignore(),
+    const auto invalidOplogEntry = fromjson(
+        "{op: 'i', ts: Timestamp(1,1), t: NumberLong(1), h: NumberLong(1), ns: 'test.t', o: {}}");
+    ASSERT_THROWS(updateFixUpInfoFromLocalOplogEntry(fui, invalidOplogEntry).transitional_ignore(),
                   RSFatalException);
 }
 
 TEST(RSRollbackTest, LocalEntryWithoutO2IsFatal) {
-    const auto validOplogEntry =
-        fromjson("{op: 'u', ns: 'test.t', o2: {_id: 1}, o: {_id:1, a: 1}}");
+    const auto validOplogEntry = fromjson(
+        "{op: 'u',  ts: Timestamp(1,1), t: NumberLong(1), h: NumberLong(1),ns: 'test.t', o2: {_id: "
+        "1}, o: {_id:1, a: 1}}");
     FixUpInfo fui;
     ASSERT_OK(updateFixUpInfoFromLocalOplogEntry(fui, validOplogEntry));
-    ASSERT_THROWS(updateFixUpInfoFromLocalOplogEntry(fui, validOplogEntry.removeField("o2"))
-                      .transitional_ignore(),
+    const auto invalidOplogEntry = fromjson(
+        "{op: 'u',  ts: Timestamp(1,1), t: NumberLong(1), h: NumberLong(1),ns: 'test.t', o2: {}, "
+        "o: {_id:1, a: 1}}");
+    ASSERT_THROWS(updateFixUpInfoFromLocalOplogEntry(fui, invalidOplogEntry).transitional_ignore(),
                   RSFatalException);
 }
 

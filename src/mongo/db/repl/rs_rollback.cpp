@@ -129,173 +129,171 @@ void FixUpInfo::removeRedundantOperations() {
 Status rollback_internal::updateFixUpInfoFromLocalOplogEntry(FixUpInfo& fixUpInfo,
                                                              const BSONObj& ourObj) {
 
-    const char* op = ourObj.getStringField("op");
-
-    if (*op == 'n')
-        return Status::OK();
-
     // Checks that the oplog entry is smaller than 512 MB. We do not roll back if the
     // oplog entry is larger than 512 MB.
     if (ourObj.objsize() > 512 * 1024 * 1024)
         throw RSFatalException(str::stream() << "Rollback too large, oplog size: "
                                              << ourObj.objsize());
 
-    DocID doc;
-    doc.ownedObj = ourObj.getOwned();
-    doc.ns = doc.ownedObj.getStringField("ns");
+    auto oplogEntry = OplogEntry(ourObj);
+    NamespaceString nss = oplogEntry.getNamespace();
 
-    if (*doc.ns == '\0') {
+    if (oplogEntry.getOpType() == OpTypeEnum::kNoop)
+        return Status::OK();
+
+    DocID doc;
+    doc.ownedObj = oplogEntry.raw;
+    doc.ns = oplogEntry.raw.getStringField("ns");
+
+    if (oplogEntry.getNamespace().isEmpty()) {
         throw RSFatalException(str::stream() << "Local op on rollback has no ns: "
-                                             << redact(doc.ownedObj));
+                                             << redact(oplogEntry.toBSON()));
     }
 
-    BSONObj obj = doc.ownedObj.getObjectField(*op == 'u' ? "o2" : "o");
+    BSONObj obj =
+        oplogEntry.raw.getObjectField(oplogEntry.getOpType() == OpTypeEnum::kUpdate ? "o2" : "o");
 
     if (obj.isEmpty()) {
         throw RSFatalException(str::stream() << "Local op on rollback has no object field: "
-                                             << redact(doc.ownedObj));
+                                             << redact(oplogEntry.toBSON()));
     }
 
-    if (*op == 'c') {
+    if (oplogEntry.getOpType() == OpTypeEnum::kCommand) {
 
         // The first element of the object is the name of the command
         // and the collection it is acting on, e.x. {renameCollection: "test.x"}.
         BSONElement first = obj.firstElement();
 
-        // Retrieves the namespace string.
-        NamespaceString nss(doc.ns);  // foo.$cmd
+        switch (oplogEntry.getCommandType()) {
+            case OplogEntry::CommandType::kCreate: {
+                // Create collection operation
+                // {
+                //     ts: ...,
+                //     h: ...,
+                //     op: "c",
+                //     ns: "foo.$cmd",
+                //     o: {
+                //            create: "abc", ...
+                //        }
+                //     ...
+                // }
 
-        // Retrieves the command name, so out of {renameCollection: "test.x"} it returns
-        // "renameCollection".
-        string cmdname = first.fieldName();
-        Command* cmd = Command::findCommand(cmdname.c_str());
-        if (cmd == NULL) {
-            severe() << "Rollback no such command " << first.fieldName();
-            return Status(ErrorCodes::UnrecoverableRollbackError,
-                          str::stream() << "Rollback no such command " << first.fieldName(),
-                          18751);
-        }
-        if (cmdname == "create") {
-            // Create collection operation
-            // {
-            //     ts: ...,
-            //     h: ...,
-            //     op: "c",
-            //     ns: "foo.$cmd",
-            //     o: {
-            //            create: "abc", ...
-            //        }
-            //     ...
-            // }
-
-            string ns = nss.db().toString() + '.' + first.valuestr();  // -> foo.abc
-            fixUpInfo.collectionsToDrop.insert(ns);
-            return Status::OK();
-        } else if (cmdname == "drop") {
-            // Drop collection operation
-            // {
-            //     ts: ...,
-            //     h: ...,
-            //     op: "c",
-            //     ns: "foo.$cmd",
-            //     o: {
-            //            drop: "abc"
-            //        }
-            //     ...
-            // }
-            string ns = nss.db().toString() + '.' + first.valuestr();  // -> foo.abc
-            fixUpInfo.collectionsToResyncData.insert(ns);
-            return Status::OK();
-        } else if (cmdname == "dropIndexes" || cmdname == "deleteIndexes") {
-            // TODO: This is bad.  We simply full resync the collection here,
-            //       which could be very slow.
-            warning() << "Rollback of dropIndexes is slow in this version of "
-                      << "mongod.";
-            string ns = nss.db().toString() + '.' + first.valuestr();
-            fixUpInfo.collectionsToResyncData.insert(ns);
-            return Status::OK();
-        } else if (cmdname == "renameCollection") {
-            // TODO: Slow.
-            warning() << "Rollback of renameCollection is slow in this version of "
-                      << "mongod.";
-            string from = first.valuestr();
-            string to = obj["to"].String();
-            fixUpInfo.collectionsToResyncData.insert(from);
-            fixUpInfo.collectionsToResyncData.insert(to);
-            return Status::OK();
-        } else if (cmdname == "dropDatabase") {
-            string message = "Can't roll back drop database. Full resync will be required.";
-            severe() << message << redact(obj);
-            throw RSFatalException(message);
-        } else if (cmdname == "collMod") {
-            const auto ns = NamespaceString(cmd->parseNs(nss.db().toString(), obj));
-            for (auto field : obj) {
-                // Example collMod obj
-                // o:{
-                //       collMod : "x",
-                //       validationLevel : "off",
-                //       index: {
-                //                  name: "indexName_1",
-                //                  expireAfterSeconds: 600
-                //              }
-                //    }
-
-                const auto modification = field.fieldNameStringData();
-                if (modification == cmdname) {
-                    continue;  // Skips the command name. The first field in the obj will be the
-                               // command name.
-                }
-
-                if (modification == "validator" || modification == "validationAction" ||
-                    modification == "validationLevel" || modification == "usePowerOf2Sizes" ||
-                    modification == "noPadding") {
-                    fixUpInfo.collectionsToResyncMetadata.insert(ns.ns());
-                    continue;
-                }
-                // Some collMod fields cannot be rolled back, such as the index field.
-                string message = "Cannot roll back a collMod command: ";
+                string ns = nss.db().toString() + '.' + first.valuestr();  // -> foo.abc
+                fixUpInfo.collectionsToDrop.insert(ns);
+                return Status::OK();
+            }
+            case OplogEntry::CommandType::kDrop: {
+                // Drop collection operation
+                // {
+                //     ts: ...,
+                //     h: ...,
+                //     op: "c",
+                //     ns: "foo.$cmd",
+                //     o: {
+                //            drop: "abc"
+                //        }
+                //     ...
+                // }
+                string ns = nss.db().toString() + '.' + first.valuestr();  // -> foo.abc
+                fixUpInfo.collectionsToResyncData.insert(ns);
+                return Status::OK();
+            }
+            case OplogEntry::CommandType::kDropIndexes: {
+                // TODO: This is bad.  We simply full resync the collection here,
+                //       which could be very slow.
+                warning() << "Rollback of dropIndexes is slow in this version of "
+                          << "mongod.";
+                string ns = nss.db().toString() + '.' + first.valuestr();
+                fixUpInfo.collectionsToResyncData.insert(ns);
+                return Status::OK();
+            }
+            case OplogEntry::CommandType::kRenameCollection: {
+                // TODO: Slow.
+                warning() << "Rollback of renameCollection is slow in this version of "
+                          << "mongod.";
+                string from = first.valuestr();
+                string to = obj["to"].String();
+                fixUpInfo.collectionsToResyncData.insert(from);
+                fixUpInfo.collectionsToResyncData.insert(to);
+                return Status::OK();
+            }
+            case OplogEntry::CommandType::kDropDatabase: {
+                string message = "Can't roll back drop database. Full resync will be required.";
                 severe() << message << redact(obj);
                 throw RSFatalException(message);
             }
-            return Status::OK();
-        } else if (cmdname == "applyOps") {
+            case OplogEntry::CommandType::kCollMod: {
+                const auto ns = nss.db().toString() + '.' + first.valuestr();  // -> foo.abc
+                for (auto field : obj) {
+                    // Example collMod obj
+                    // o:{
+                    //       collMod : "x",
+                    //       validationLevel : "off",
+                    //       index: {
+                    //                  name: "indexName_1",
+                    //                  expireAfterSeconds: 600
+                    //              }
+                    //    }
 
-            if (first.type() != Array) {
-                std::string message = str::stream()
-                    << "Expected applyOps argument to be an array; found " << redact(first);
-                severe() << message;
-                return Status(ErrorCodes::UnrecoverableRollbackError, message);
+                    const auto modification = field.fieldNameStringData();
+                    if (modification == "collMod") {
+                        continue;  // Skips the command name. The first field in the obj will be the
+                                   // command name.
+                    }
+
+                    if (modification == "validator" || modification == "validationAction" ||
+                        modification == "validationLevel" || modification == "usePowerOf2Sizes" ||
+                        modification == "noPadding") {
+                        fixUpInfo.collectionsToResyncMetadata.insert(ns);
+                        continue;
+                    }
+                    // Some collMod fields cannot be rolled back, such as the index field.
+                    string message = "Cannot roll back a collMod command: ";
+                    severe() << message << redact(obj);
+                    throw RSFatalException(message);
+                }
+                return Status::OK();
             }
-            for (const auto& subopElement : first.Array()) {
-                if (subopElement.type() != Object) {
+            case OplogEntry::CommandType::kApplyOps: {
+                if (first.type() != Array) {
                     std::string message = str::stream()
-                        << "Expected applyOps operations to be of Object type, but found "
-                        << redact(subopElement);
+                        << "Expected applyOps argument to be an array; found " << redact(first);
                     severe() << message;
                     return Status(ErrorCodes::UnrecoverableRollbackError, message);
                 }
-                // In applyOps, the object contains an array of different oplog entries, we call
-                // updateFixUpInfoFromLocalOplogEntry here in order to record the information
-                // needed for rollback that is contained within the applyOps, creating a nested
-                // call.
-                auto subStatus = updateFixUpInfoFromLocalOplogEntry(fixUpInfo, subopElement.Obj());
-                if (!subStatus.isOK()) {
-                    return subStatus;
+                for (const auto& subopElement : first.Array()) {
+                    if (subopElement.type() != Object) {
+                        std::string message = str::stream()
+                            << "Expected applyOps operations to be of Object type, but found "
+                            << redact(subopElement);
+                        severe() << message;
+                        return Status(ErrorCodes::UnrecoverableRollbackError, message);
+                    }
+                    // In applyOps, the object contains an array of different oplog entries, we call
+                    // updateFixUpInfoFromLocalOplogEntry here in order to record the information
+                    // needed for rollback that is contained within the applyOps, creating a nested
+                    // call.
+                    auto subStatus =
+                        updateFixUpInfoFromLocalOplogEntry(fixUpInfo, subopElement.Obj());
+                    if (!subStatus.isOK()) {
+                        return subStatus;
+                    }
                 }
+                return Status::OK();
             }
-            return Status::OK();
-        } else {
-            std::string message = str::stream() << "Can't roll back this command yet: "
-                                                << " cmdname = " << cmdname;
-            severe() << message << " document: " << redact(obj);
-            throw RSFatalException(message);
+            default: {
+                std::string message = str::stream() << "Can't roll back this command yet: "
+                                                    << " cmdname = " << first.fieldName();
+                severe() << message << " document: " << redact(obj);
+                throw RSFatalException(message);
+            }
         }
     }
 
-    NamespaceString nss(doc.ns);
     if (nss.isSystemDotIndexes()) {
-        if (*op != 'i') {
-            std::string message = str::stream() << "Unexpected operation type '" << *op
+        if (oplogEntry.getOpType() != OpTypeEnum::kInsert) {
+            std::string message = str::stream() << "Unexpected operation type '"
+                                                << oplogEntry.raw.getStringField("op")
                                                 << "' on system.indexes operation, "
                                                 << "document: ";
             severe() << message << redact(doc.ownedObj);
@@ -335,10 +333,10 @@ Status rollback_internal::updateFixUpInfoFromLocalOplogEntry(FixUpInfo& fixUpInf
         return Status::OK();
     }
 
-    doc._id = obj["_id"];
+    doc._id = oplogEntry.getIdElement();
     if (doc._id.eoo()) {
         std::string message = str::stream() << "Cannot roll back op with no _id. ns: " << doc.ns;
-        severe() << message << ", document: " << redact(doc.ownedObj);
+        severe() << message << ", document: " << redact(oplogEntry.toBSON());
         throw RSFatalException(message);
     }
 
