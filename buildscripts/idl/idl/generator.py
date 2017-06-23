@@ -436,6 +436,12 @@ class _CppHeaderFileWriter(_CppFileWriterBase):
                     constant_name=_get_field_constant_name(field),
                     field_name=field.name))
 
+        if isinstance(struct, ast.Command):
+            self._writer.write_line(
+                common.template_args(
+                    'static constexpr auto kCommandName = "${struct_name}"_sd;',
+                    struct_name=struct.name))
+
     def gen_enum_functions(self, idl_enum):
         # type: (ast.Enum) -> None
         """Generate the declaration for an enum's supporting functions."""
@@ -970,6 +976,12 @@ class _CppSourceFileWriter(_CppFileWriterBase):
                     'constexpr StringData ${class_name}::${constant_name};',
                     class_name=common.title_case(struct.name),
                     constant_name=_get_field_constant_name(field)))
+
+        if isinstance(struct, ast.Command):
+            self._writer.write_line(
+                common.template_args(
+                    'constexpr StringData ${class_name}::kCommandName;',
+                    class_name=common.title_case(struct.name)))
 
     def gen_enum_definition(self, idl_enum):
         # type: (ast.Enum) -> None

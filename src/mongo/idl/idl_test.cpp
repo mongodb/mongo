@@ -1438,12 +1438,11 @@ TEST(IDLEnum, TestStringEnumNegative) {
 TEST(IDLCommand, TestConcatentateWithDb) {
     IDLParserErrorContext ctxt("root");
 
-    auto testDoc = BSON("BasicConcatenateWithDbCommand"
-                        << "coll1"
-                        << "field1"
-                        << 3
-                        << "field2"
-                        << "five");
+    auto testDoc = BSON(BasicConcatenateWithDbCommand::kCommandName << "coll1"
+                                                                    << "field1"
+                                                                    << 3
+                                                                    << "field2"
+                                                                    << "five");
 
     auto testStruct = BasicConcatenateWithDbCommand::parse(ctxt, "db", testDoc);
     ASSERT_EQUALS(testStruct.getField1(), 3);
