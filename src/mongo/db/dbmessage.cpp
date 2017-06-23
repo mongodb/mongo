@@ -36,39 +36,6 @@
 
 namespace mongo {
 
-using std::string;
-using std::stringstream;
-
-string Message::toString() const {
-    stringstream ss;
-    ss << "op: " << networkOpToString(operation()) << " len: " << size();
-    if (operation() >= 2000 && operation() < 2100) {
-        DbMessage d(*this);
-        ss << " ns: " << d.getns();
-        switch (operation()) {
-            case dbUpdate: {
-                int flags = d.pullInt();
-                BSONObj q = d.nextJsObj();
-                BSONObj o = d.nextJsObj();
-                ss << " flags: " << flags << " query: " << q << " update: " << o;
-                break;
-            }
-            case dbInsert:
-                ss << d.nextJsObj();
-                break;
-            case dbDelete: {
-                int flags = d.pullInt();
-                BSONObj q = d.nextJsObj();
-                ss << " flags: " << flags << " query: " << q;
-                break;
-            }
-            default:
-                ss << " CANNOT HANDLE YET";
-        }
-    }
-    return ss.str();
-}
-
 DbMessage::DbMessage(const Message& msg) : _msg(msg), _nsStart(NULL), _mark(NULL), _nsLen(0) {
     // for received messages, Message has only one buffer
     _theEnd = _msg.singleData().data() + _msg.singleData().dataLen();

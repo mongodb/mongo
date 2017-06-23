@@ -458,8 +458,6 @@ public:
         return _buf.get();
     }
 
-    std::string toString() const;
-
     SharedBuffer sharedBuffer() {
         return _buf;
     }

@@ -211,7 +211,8 @@ public:
                                       << "\" command with arguments " << cmdRequest->body
                                       << " from " << hostName;
                             } else {
-                                log() << "Discarding message " << request << " from " << hostName;
+                                log() << "Discarding " << networkOpToString(request.operation())
+                                      << " from " << hostName;
                             }
                             continue;
                         }
