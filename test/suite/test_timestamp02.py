@@ -93,7 +93,7 @@ class test_timestamp02(wttest.WiredTigerTestCase, suite_subprocess):
         # timestamp
         for i, t in enumerate(orig_keys):
             self.check(self.session, 'read_timestamp=' + timestamp_str(t),
-                {k:1 for k in orig_keys[:i+1]})
+                dict((k, 1) for k in orig_keys[:i+1]))
 
         # Bump the oldest timestamp, we're not going back...
         self.assertEqual(self.conn.query_timestamp(), timestamp_ret_str(100))
