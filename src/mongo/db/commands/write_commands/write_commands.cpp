@@ -205,7 +205,6 @@ public:
 
     bool enhancedRun(OperationContext* opCtx,
                      const OpMsgRequest& request,
-                     std::string& errmsg,
                      BSONObjBuilder& result) final {
         try {
             runImpl(opCtx, request, result);

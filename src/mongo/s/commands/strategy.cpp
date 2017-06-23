@@ -220,22 +220,21 @@ void execCommandClient(OperationContext* opCtx,
     }
 
     try {
-        std::string errmsg;
         bool ok = false;
         if (!supportsWriteConcern) {
-            ok = c->enhancedRun(opCtx, request, errmsg, result);
+            ok = c->enhancedRun(opCtx, request, result);
         } else {
             // Change the write concern while running the command.
             const auto oldWC = opCtx->getWriteConcern();
             ON_BLOCK_EXIT([&] { opCtx->setWriteConcern(oldWC); });
             opCtx->setWriteConcern(wcResult.getValue());
 
-            ok = c->enhancedRun(opCtx, request, errmsg, result);
+            ok = c->enhancedRun(opCtx, request, result);
         }
         if (!ok) {
             c->incrementCommandsFailed();
         }
-        Command::appendCommandStatus(result, ok, errmsg);
+        Command::appendCommandStatus(result, ok);
     } catch (const DBException& e) {
         result.resetToEmpty();
         const int code = e.getCode();

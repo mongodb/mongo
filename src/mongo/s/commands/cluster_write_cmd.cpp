@@ -128,7 +128,6 @@ public:
 
     bool enhancedRun(OperationContext* opCtx,
                      const OpMsgRequest& request,
-                     string& errmsg,
                      BSONObjBuilder& result) final {
         BatchedCommandRequest batchedRequest(_writeType);
         batchedRequest.parseRequest(request);
@@ -180,13 +179,8 @@ public:
                 ->addHostOpTimes(writer.getStats().getWriteOpTimes());
         }
 
-        // TODO
-        // There's a pending issue about how to report response here. If we use
-        // the command infra-structure, we should reuse the 'errmsg' field. But
-        // we have already filed that message inside the BatchCommandResponse.
-        // return response.getOk();
         result.appendElements(response.toBSON());
-        return true;
+        return response.getOk();
     }
 
 protected:

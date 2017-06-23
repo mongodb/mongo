@@ -189,9 +189,8 @@ BSONObj Command::runCommandDirectly(OperationContext* opCtx, const OpMsgRequest&
 
     BSONObjBuilder out;
     try {
-        std::string errmsg;
-        bool ok = command->enhancedRun(opCtx, request, errmsg, out);
-        appendCommandStatus(out, ok, errmsg);
+        bool ok = command->enhancedRun(opCtx, request, out);
+        appendCommandStatus(out, ok);
     } catch (const StaleConfigException& ex) {
         // These exceptions are intended to be handled at a higher level and cannot losslessly
         // round-trip through Status.
@@ -367,13 +366,17 @@ bool Command::isUserManagementCommand(const std::string& name) {
 
 bool BasicCommand::enhancedRun(OperationContext* opCtx,
                                const OpMsgRequest& request,
-                               std::string& errmsg,
                                BSONObjBuilder& result) {
     uassert(40472,
             str::stream() << "The " << getName() << " command does not support document sequences.",
             request.sequences.empty());
 
-    return run(opCtx, request.getDatabase().toString(), request.body, errmsg, result);
+    std::string errmsg;
+    bool ok = run(opCtx, request.getDatabase().toString(), request.body, errmsg, result);
+    if (!errmsg.empty()) {
+        appendCommandStatus(result, ok, errmsg);
+    }
+    return ok;
 }
 
 BSONObj Command::filterCommandRequestForPassthrough(const BSONObj& cmdObj) {

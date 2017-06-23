@@ -105,7 +105,6 @@ public:
      */
     virtual bool enhancedRun(OperationContext* opCtx,
                              const OpMsgRequest& request,
-                             std::string& errmsg,
                              BSONObjBuilder& result) = 0;
 
     /**
@@ -392,7 +391,9 @@ public:
     static Command* findCommand(StringData name);
 
     // Helper for setting errmsg and ok field in command result object.
-    static void appendCommandStatus(BSONObjBuilder& result, bool ok, const std::string& errmsg);
+    static void appendCommandStatus(BSONObjBuilder& result,
+                                    bool ok,
+                                    const std::string& errmsg = {});
 
     // @return s.isOK()
     static bool appendCommandStatus(BSONObjBuilder& result, const Status& status);
@@ -571,7 +572,6 @@ public:
      */
     bool enhancedRun(OperationContext* opCtx,
                      const OpMsgRequest& request,
-                     std::string& errmsg,
                      BSONObjBuilder& result) final;
 
     /**

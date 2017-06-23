@@ -425,7 +425,6 @@ bool runCommandImpl(OperationContext* opCtx,
         return result;
     }
 
-    std::string errmsg;
     bool result;
     if (!command->supportsWriteConcern(cmd)) {
         if (commandSpecifiesWriteConcern(cmd)) {
@@ -437,7 +436,7 @@ bool runCommandImpl(OperationContext* opCtx,
             return result;
         }
 
-        result = command->enhancedRun(opCtx, request, errmsg, inPlaceReplyBob);
+        result = command->enhancedRun(opCtx, request, inPlaceReplyBob);
     } else {
         auto wcResult = extractWriteConcern(opCtx, cmd, db);
         if (!wcResult.isOK()) {
@@ -456,7 +455,7 @@ bool runCommandImpl(OperationContext* opCtx,
                 opCtx, command->getName(), &inPlaceReplyBob);
         });
 
-        result = command->enhancedRun(opCtx, request, errmsg, inPlaceReplyBob);
+        result = command->enhancedRun(opCtx, request, inPlaceReplyBob);
 
         // Nothing in run() should change the writeConcern.
         dassert(SimpleBSONObjComparator::kInstance.evaluate(opCtx->getWriteConcern().toBSON() ==
@@ -481,7 +480,7 @@ bool runCommandImpl(OperationContext* opCtx,
         }
     }
 
-    Command::appendCommandStatus(inPlaceReplyBob, result, errmsg);
+    Command::appendCommandStatus(inPlaceReplyBob, result);
 
     auto operationTime = computeOperationTime(
         opCtx, startOperationTime, readConcernArgsStatus.getValue().getLevel());
