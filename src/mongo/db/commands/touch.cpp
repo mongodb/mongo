@@ -53,7 +53,7 @@ namespace mongo {
 using std::string;
 using std::stringstream;
 
-class TouchCmd : public BasicCommand {
+class TouchCmd : public ErrmsgCommandDeprecated {
 public:
     virtual bool supportsWriteConcern(const BSONObj& cmd) const override {
         return false;
@@ -80,13 +80,13 @@ public:
         actions.addAction(ActionType::touch);
         out->push_back(Privilege(ResourcePattern::forClusterResource(), actions));
     }
-    TouchCmd() : BasicCommand("touch") {}
+    TouchCmd() : ErrmsgCommandDeprecated("touch") {}
 
-    virtual bool run(OperationContext* opCtx,
-                     const string& dbname,
-                     const BSONObj& cmdObj,
-                     string& errmsg,
-                     BSONObjBuilder& result) {
+    virtual bool errmsgRun(OperationContext* opCtx,
+                           const string& dbname,
+                           const BSONObj& cmdObj,
+                           string& errmsg,
+                           BSONObjBuilder& result) {
         const NamespaceString nss = parseNsCollectionRequired(dbname, cmdObj);
         if (!nss.isNormal()) {
             errmsg = "bad namespace name";

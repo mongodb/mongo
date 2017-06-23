@@ -68,7 +68,6 @@ public:
     virtual bool run(OperationContext* opCtx,
                      const std::string& db,
                      const BSONObj& cmdObj,
-                     std::string& errmsg,
                      BSONObjBuilder& result) {
         {
             BSONObjBuilder b(result.subobjStart("totals"));

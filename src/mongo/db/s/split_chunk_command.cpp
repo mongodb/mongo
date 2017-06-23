@@ -130,9 +130,9 @@ bool _checkMetadataForSuccess(OperationContext* opCtx,
     return true;
 }
 
-class SplitChunkCommand : public BasicCommand {
+class SplitChunkCommand : public ErrmsgCommandDeprecated {
 public:
-    SplitChunkCommand() : BasicCommand("splitChunk") {}
+    SplitChunkCommand() : ErrmsgCommandDeprecated("splitChunk") {}
 
     void help(std::stringstream& help) const override {
         help << "internal command usage only\n"
@@ -167,11 +167,11 @@ public:
         return parseNsFullyQualified(dbname, cmdObj);
     }
 
-    bool run(OperationContext* opCtx,
-             const std::string& dbname,
-             const BSONObj& cmdObj,
-             std::string& errmsg,
-             BSONObjBuilder& result) override {
+    bool errmsgRun(OperationContext* opCtx,
+                   const std::string& dbname,
+                   const BSONObj& cmdObj,
+                   std::string& errmsg,
+                   BSONObjBuilder& result) override {
         auto shardingState = ShardingState::get(opCtx);
         uassertStatusOK(shardingState->canAcceptShardedCommands());
 

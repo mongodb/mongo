@@ -69,9 +69,9 @@ BSONObj prettyKey(const BSONObj& keyPattern, const BSONObj& key) {
     return key.replaceFieldNames(keyPattern).clientReadable();
 }
 
-class SplitVector : public BasicCommand {
+class SplitVector : public ErrmsgCommandDeprecated {
 public:
-    SplitVector() : BasicCommand("splitVector") {}
+    SplitVector() : ErrmsgCommandDeprecated("splitVector") {}
 
     bool supportsWriteConcern(const BSONObj& cmd) const override {
         return false;
@@ -111,11 +111,11 @@ public:
         return parseNsFullyQualified(dbname, cmdObj);
     }
 
-    bool run(OperationContext* opCtx,
-             const string& dbname,
-             const BSONObj& jsobj,
-             string& errmsg,
-             BSONObjBuilder& result) override {
+    bool errmsgRun(OperationContext* opCtx,
+                   const string& dbname,
+                   const BSONObj& jsobj,
+                   string& errmsg,
+                   BSONObjBuilder& result) override {
         //
         // 1.a We'll parse the parameters in two steps. First, make sure the we can use the split
         //     index to get a good approximation of the size of the chunk -- without needing to

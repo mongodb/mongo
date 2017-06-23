@@ -73,16 +73,15 @@ public:
     bool run(OperationContext* opCtx,
              const string& db,
              const BSONObj& cmdObj,
-             string& errmsg,
              BSONObjBuilder& result) {
         LastError::get(opCtx->getClient()).reset();
         return true;
     }
 } cmdResetError;
 
-class CmdGetLastError : public BasicCommand {
+class CmdGetLastError : public ErrmsgCommandDeprecated {
 public:
-    CmdGetLastError() : BasicCommand("getLastError", "getlasterror") {}
+    CmdGetLastError() : ErrmsgCommandDeprecated("getLastError", "getlasterror") {}
     virtual bool supportsWriteConcern(const BSONObj& cmd) const override {
         return false;
     }
@@ -103,11 +102,11 @@ public:
              << "  { wtimeout:m} - timeout for w in m milliseconds";
     }
 
-    bool run(OperationContext* opCtx,
-             const string& dbname,
-             const BSONObj& cmdObj,
-             string& errmsg,
-             BSONObjBuilder& result) {
+    bool errmsgRun(OperationContext* opCtx,
+                   const string& dbname,
+                   const BSONObj& cmdObj,
+                   string& errmsg,
+                   BSONObjBuilder& result) {
         //
         // Correct behavior here is very finicky.
         //
@@ -314,7 +313,6 @@ public:
     bool run(OperationContext* opCtx,
              const string& dbname,
              const BSONObj& cmdObj,
-             string& errmsg,
              BSONObjBuilder& result) {
         LastError* le = &LastError::get(opCtx->getClient());
         le->disable();

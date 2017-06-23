@@ -101,8 +101,7 @@ public:
     bool run(OperationContext* opCtx,
              const std::string& dbname_unused,
              const BSONObj& cmdObj,
-             std::string& errmsg,
-             BSONObjBuilder& result) {
+             BSONObjBuilder& result) override {
 
         if (serverGlobalParams.clusterRole != ClusterRole::ConfigServer) {
             return appendCommandStatus(

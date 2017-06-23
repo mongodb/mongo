@@ -147,9 +147,9 @@ BSONObj fixForShards(const BSONObj& orig,
  *
  * 11. Inspects the BSONObject size from step #8 and determines if it needs to split.
  */
-class MRCmd : public BasicCommand {
+class MRCmd : public ErrmsgCommandDeprecated {
 public:
-    MRCmd() : BasicCommand("mapReduce", "mapreduce") {}
+    MRCmd() : ErrmsgCommandDeprecated("mapReduce", "mapreduce") {}
 
     bool slaveOk() const override {
         return true;
@@ -177,11 +177,11 @@ public:
         mr::addPrivilegesRequiredForMapReduce(this, dbname, cmdObj, out);
     }
 
-    bool run(OperationContext* opCtx,
-             const std::string& dbname,
-             const BSONObj& cmdObj,
-             std::string& errmsg,
-             BSONObjBuilder& result) override {
+    bool errmsgRun(OperationContext* opCtx,
+                   const std::string& dbname,
+                   const BSONObj& cmdObj,
+                   std::string& errmsg,
+                   BSONObjBuilder& result) override {
         Timer t;
 
         const NamespaceString nss(parseNs(dbname, cmdObj));

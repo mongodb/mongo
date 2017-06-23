@@ -89,7 +89,6 @@ public:
     bool run(OperationContext* opCtx,
              const std::string& dbname,
              const BSONObj& cmdObj,
-             std::string& errmsg,
              BSONObjBuilder& result);
 
 public:
@@ -112,7 +111,6 @@ private:
 bool ClusterPlanCacheCmd::run(OperationContext* opCtx,
                               const std::string& dbName,
                               const BSONObj& cmdObj,
-                              std::string& errMsg,
                               BSONObjBuilder& result) {
     const NamespaceString nss(parseNsCollectionRequired(dbName, cmdObj));
 

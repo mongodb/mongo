@@ -52,9 +52,9 @@ namespace mongo {
 
 namespace {
 
-class DBHashCmd : public BasicCommand {
+class DBHashCmd : public ErrmsgCommandDeprecated {
 public:
-    DBHashCmd() : BasicCommand("dbHash", "dbhash") {}
+    DBHashCmd() : ErrmsgCommandDeprecated("dbHash", "dbhash") {}
 
     virtual bool supportsWriteConcern(const BSONObj& cmd) const override {
         return false;
@@ -72,11 +72,11 @@ public:
         out->push_back(Privilege(ResourcePattern::forDatabaseName(dbname), actions));
     }
 
-    virtual bool run(OperationContext* opCtx,
-                     const std::string& dbname,
-                     const BSONObj& cmdObj,
-                     std::string& errmsg,
-                     BSONObjBuilder& result) {
+    virtual bool errmsgRun(OperationContext* opCtx,
+                           const std::string& dbname,
+                           const BSONObj& cmdObj,
+                           std::string& errmsg,
+                           BSONObjBuilder& result) {
         Timer timer;
 
         std::set<std::string> desiredCollections;

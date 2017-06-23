@@ -49,9 +49,9 @@ using std::stringstream;
 
 MONGO_FP_DECLARE(validateCmdCollectionNotValid);
 
-class ValidateCmd : public BasicCommand {
+class ValidateCmd : public ErrmsgCommandDeprecated {
 public:
-    ValidateCmd() : BasicCommand("validate") {}
+    ValidateCmd() : ErrmsgCommandDeprecated("validate") {}
 
     virtual bool slaveOk() const {
         return true;
@@ -75,11 +75,11 @@ public:
     }
     //{ validate: "collectionnamewithoutthedbpart" [, scandata: <bool>] [, full: <bool> } */
 
-    bool run(OperationContext* opCtx,
-             const string& dbname,
-             const BSONObj& cmdObj,
-             string& errmsg,
-             BSONObjBuilder& result) {
+    bool errmsgRun(OperationContext* opCtx,
+                   const string& dbname,
+                   const BSONObj& cmdObj,
+                   string& errmsg,
+                   BSONObjBuilder& result) {
         if (MONGO_FAIL_POINT(validateCmdCollectionNotValid)) {
             errmsg = "validateCmdCollectionNotValid fail point was triggered";
             result.appendBool("valid", false);

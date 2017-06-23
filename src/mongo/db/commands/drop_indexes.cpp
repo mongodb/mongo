@@ -87,7 +87,6 @@ public:
     bool run(OperationContext* opCtx,
              const string& dbname,
              const BSONObj& jsobj,
-             string& errmsg,
              BSONObjBuilder& result) {
         const NamespaceString nss = parseNsCollectionRequired(dbname, jsobj);
         return appendCommandStatus(result, dropIndexes(opCtx, nss, jsobj, &result));
@@ -95,7 +94,7 @@ public:
 
 } cmdDropIndexes;
 
-class CmdReIndex : public BasicCommand {
+class CmdReIndex : public ErrmsgCommandDeprecated {
 public:
     virtual bool slaveOk() const {
         return true;
@@ -113,13 +112,13 @@ public:
         actions.addAction(ActionType::reIndex);
         out->push_back(Privilege(parseResourcePattern(dbname, cmdObj), actions));
     }
-    CmdReIndex() : BasicCommand("reIndex") {}
+    CmdReIndex() : ErrmsgCommandDeprecated("reIndex") {}
 
-    bool run(OperationContext* opCtx,
-             const string& dbname,
-             const BSONObj& jsobj,
-             string& errmsg,
-             BSONObjBuilder& result) {
+    bool errmsgRun(OperationContext* opCtx,
+                   const string& dbname,
+                   const BSONObj& jsobj,
+                   string& errmsg,
+                   BSONObjBuilder& result) {
         DBDirectClient db(opCtx);
 
         const NamespaceString toReIndexNs = parseNsCollectionRequired(dbname, jsobj);

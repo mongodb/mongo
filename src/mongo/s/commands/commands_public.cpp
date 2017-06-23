@@ -194,13 +194,13 @@ protected:
  * Base class for commands on collections that simply need to broadcast the command to shards that
  * own data for the collection and aggregate the raw results.
  */
-class AllShardsCollectionCommand : public BasicCommand {
+class AllShardsCollectionCommand : public ErrmsgCommandDeprecated {
 protected:
     AllShardsCollectionCommand(const char* name,
                                const char* oldname = NULL,
                                bool implicitCreateDb = false,
                                bool appendShardVersion = true)
-        : BasicCommand(name, oldname),
+        : ErrmsgCommandDeprecated(name, oldname),
           _implicitCreateDb(implicitCreateDb),
           _appendShardVersion(appendShardVersion) {}
 
@@ -211,11 +211,11 @@ protected:
         return false;
     }
 
-    bool run(OperationContext* opCtx,
-             const string& dbName,
-             const BSONObj& cmdObj,
-             std::string& errmsg,
-             BSONObjBuilder& output) override {
+    bool errmsgRun(OperationContext* opCtx,
+                   const string& dbName,
+                   const BSONObj& cmdObj,
+                   std::string& errmsg,
+                   BSONObjBuilder& output) override {
         const NamespaceString nss(parseNsCollectionRequired(dbName, cmdObj));
         LOG(1) << "AllShardsCollectionCommand: " << nss << " cmd:" << redact(cmdObj);
 
@@ -251,7 +251,6 @@ protected:
     bool run(OperationContext* opCtx,
              const string& dbName,
              const BSONObj& cmdObj,
-             string& errmsg,
              BSONObjBuilder& result) override {
         const NamespaceString nss(parseNs(dbName, cmdObj));
 
@@ -357,7 +356,6 @@ public:
     bool run(OperationContext* opCtx,
              const string& dbName,
              const BSONObj& cmdObj,
-             string& errmsg,
              BSONObjBuilder& output) {
         const NamespaceString nss(parseNsCollectionRequired(dbName, cmdObj));
 
@@ -392,7 +390,7 @@ public:
             if (!result["errmsg"].eoo()) {
                 // errmsg indicates a user error, so returning the message from one shard is
                 // sufficient.
-                errmsg = result["errmsg"].toString();
+                output.append(result["errmsg"]);
                 errored = true;
             }
             rawResBuilder.append(shardName.toString(), result);
@@ -433,7 +431,6 @@ public:
     bool run(OperationContext* opCtx,
              const string& dbName,
              const BSONObj& cmdObj,
-             string& errmsg,
              BSONObjBuilder& result) override {
         uassertStatusOK(createShardDatabase(opCtx, dbName));
 
@@ -465,7 +462,6 @@ public:
     bool run(OperationContext* opCtx,
              const string& dbName,
              const BSONObj& cmdObj,
-             string& errmsg,
              BSONObjBuilder& result) override {
         const auto fullNsFromElt = cmdObj.firstElement();
         uassert(ErrorCodes::InvalidNamespace,
@@ -523,7 +519,6 @@ public:
     bool run(OperationContext* opCtx,
              const string& dbName,
              const BSONObj& cmdObj,
-             string& errmsg,
              BSONObjBuilder& result) override {
         const auto todbElt = cmdObj["todb"];
         uassert(ErrorCodes::InvalidNamespace,
@@ -596,7 +591,6 @@ public:
     bool run(OperationContext* opCtx,
              const string& dbName,
              const BSONObj& cmdObj,
-             string& errmsg,
              BSONObjBuilder& result) override {
         const NamespaceString nss(parseNsCollectionRequired(dbName, cmdObj));
 
@@ -638,7 +632,7 @@ public:
                     if (!res["code"].eoo()) {
                         result.append(res["code"]);
                     }
-                    errmsg = "failed on shard: " + res.toString();
+                    result.append("errmsg", "failed on shard: " + res.toString());
                     return false;
                 }
                 conn.done();
@@ -776,7 +770,6 @@ public:
     bool run(OperationContext* opCtx,
              const string& dbName,
              const BSONObj& cmdObj,
-             string& errmsg,
              BSONObjBuilder& result) override {
         const NamespaceString nss(parseNs(dbName, cmdObj));
 
@@ -969,14 +962,13 @@ public:
     bool run(OperationContext* opCtx,
              const string& dbName,
              const BSONObj& cmdObj,
-             string& errmsg,
              BSONObjBuilder& result) override {
         const std::string ns = parseNs(dbName, cmdObj);
         uassert(ErrorCodes::IllegalOperation,
                 "Performing splitVector across dbs isn't supported via mongos",
                 str::startsWith(ns, dbName));
 
-        return NotAllowedOnShardedCollectionCmd::run(opCtx, dbName, cmdObj, errmsg, result);
+        return NotAllowedOnShardedCollectionCmd::run(opCtx, dbName, cmdObj, result);
     }
 
 } splitVectorCmd;
@@ -1004,7 +996,6 @@ public:
     bool run(OperationContext* opCtx,
              const string& dbName,
              const BSONObj& cmdObj,
-             string& errmsg,
              BSONObjBuilder& result) override {
         const NamespaceString nss(parseNsCollectionRequired(dbName, cmdObj));
 
@@ -1252,7 +1243,6 @@ public:
     bool run(OperationContext* opCtx,
              const string& dbName,
              const BSONObj& cmdObj,
-             string& errmsg,
              BSONObjBuilder& result) override {
         const NamespaceString nss(parseNs(dbName, cmdObj));
 
@@ -1338,8 +1328,9 @@ public:
 
                     log() << "Sharded filemd5 failed: " << redact(result.asTempObj());
 
-                    errmsg =
-                        string("sharded filemd5 failed because: ") + res["errmsg"].valuestrsafe();
+                    result.append("errmsg",
+                                  string("sharded filemd5 failed because: ") +
+                                      res["errmsg"].valuestrsafe());
 
                     return false;
                 }
@@ -1368,9 +1359,9 @@ public:
 
         // We could support arbitrary shard keys by sending commands to all shards but I don't
         // think we should
-        errmsg =
-            "GridFS fs.chunks collection must be sharded on either {files_id:1} or "
-            "{files_id:1, n:1}";
+        result.append("errmsg",
+                      "GridFS fs.chunks collection must be sharded on either {files_id:1} or "
+                      "{files_id:1, n:1}");
         return false;
     }
 } fileMD5Cmd;
@@ -1398,7 +1389,6 @@ public:
     bool run(OperationContext* opCtx,
              const string& dbName,
              const BSONObj& cmdObj,
-             string& errmsg,
              BSONObjBuilder& result) override {
         const NamespaceString nss(parseNsCollectionRequired(dbName, cmdObj));
 
@@ -1523,7 +1513,6 @@ public:
     bool run(OperationContext* opCtx,
              const string& dbName,
              const BSONObj& cmdObj,
-             string& errmsg,
              BSONObjBuilder& result) override {
         RARELY {
             warning() << "the eval command is deprecated" << startupWarningsLog;
@@ -1568,7 +1557,6 @@ public:
     bool run(OperationContext* opCtx,
              const string& dbName,
              const BSONObj& cmdObj,
-             string& errmsg,
              BSONObjBuilder& result) final {
         auto nss = NamespaceString::makeListCollectionsNSS(dbName);
 
@@ -1617,7 +1605,6 @@ public:
     bool run(OperationContext* opCtx,
              const string& dbName,
              const BSONObj& cmdObj,
-             string& errmsg,
              BSONObjBuilder& result) final {
         const NamespaceString nss(parseNsCollectionRequired(dbName, cmdObj));
 

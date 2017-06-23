@@ -75,7 +75,6 @@ public:
     bool run(OperationContext* opCtx,
              const std::string& unusedDbName,
              const BSONObj& cmdObj,
-             std::string& errmsg,
              BSONObjBuilder& result) final {
         uassert(ErrorCodes::InternalError,
                 str::stream() << "Expected to find a " << getName() << " command, but found "

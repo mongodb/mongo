@@ -64,9 +64,9 @@ using std::stringstream;
  *    data: <Object> // optional arbitrary object to store.
  * }
  */
-class FaultInjectCmd : public BasicCommand {
+class FaultInjectCmd : public ErrmsgCommandDeprecated {
 public:
-    FaultInjectCmd() : BasicCommand("configureFailPoint") {}
+    FaultInjectCmd() : ErrmsgCommandDeprecated("configureFailPoint") {}
 
     virtual bool slaveOk() const {
         return true;
@@ -90,11 +90,11 @@ public:
         h << "modifies the settings of a fail point";
     }
 
-    bool run(OperationContext* opCtx,
-             const string& dbname,
-             const BSONObj& cmdObj,
-             string& errmsg,
-             BSONObjBuilder& result) {
+    bool errmsgRun(OperationContext* opCtx,
+                   const string& dbname,
+                   const BSONObj& cmdObj,
+                   string& errmsg,
+                   BSONObjBuilder& result) {
         const string failPointName(cmdObj.firstElement().str());
         FailPointRegistry* registry = getGlobalFailPointRegistry();
         FailPoint* failPoint = registry->getFailPoint(failPointName);

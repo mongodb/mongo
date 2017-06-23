@@ -87,9 +87,9 @@ using std::stringstream;
  * NOTE: Since internal cluster auth works differently, "copydb" currently doesn't work between
  * shards in a cluster when auth is enabled.  See SERVER-13080.
  */
-class CmdCopyDb : public BasicCommand {
+class CmdCopyDb : public ErrmsgCommandDeprecated {
 public:
-    CmdCopyDb() : BasicCommand("copydb") {}
+    CmdCopyDb() : ErrmsgCommandDeprecated("copydb") {}
 
     virtual bool adminOnly() const {
         return true;
@@ -115,11 +115,11 @@ public:
              << "[, slaveOk: <bool>, username: <username>, nonce: <nonce>, key: <key>]}";
     }
 
-    virtual bool run(OperationContext* opCtx,
-                     const string& dbname,
-                     const BSONObj& cmdObj,
-                     string& errmsg,
-                     BSONObjBuilder& result) {
+    virtual bool errmsgRun(OperationContext* opCtx,
+                           const string& dbname,
+                           const BSONObj& cmdObj,
+                           string& errmsg,
+                           BSONObjBuilder& result) {
         boost::optional<DisableDocumentValidation> maybeDisableValidation;
         if (shouldBypassDocumentValidationForCommand(cmdObj))
             maybeDisableValidation.emplace(opCtx);

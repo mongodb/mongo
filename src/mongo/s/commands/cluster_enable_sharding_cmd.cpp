@@ -47,9 +47,9 @@
 namespace mongo {
 namespace {
 
-class EnableShardingCmd : public BasicCommand {
+class EnableShardingCmd : public ErrmsgCommandDeprecated {
 public:
-    EnableShardingCmd() : BasicCommand("enableSharding", "enablesharding") {}
+    EnableShardingCmd() : ErrmsgCommandDeprecated("enableSharding", "enablesharding") {}
 
     virtual bool slaveOk() const {
         return true;
@@ -86,11 +86,11 @@ public:
         return cmdObj.firstElement().str();
     }
 
-    virtual bool run(OperationContext* opCtx,
-                     const std::string& dbname_unused,
-                     const BSONObj& cmdObj,
-                     std::string& errmsg,
-                     BSONObjBuilder& result) {
+    virtual bool errmsgRun(OperationContext* opCtx,
+                           const std::string& dbname_unused,
+                           const BSONObj& cmdObj,
+                           std::string& errmsg,
+                           BSONObjBuilder& result) {
         const std::string dbname = parseNs("", cmdObj);
 
         uassert(

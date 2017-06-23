@@ -55,7 +55,6 @@ public:
     virtual bool run(OperationContext* opCtx,
                      const std::string& dbname,
                      const BSONObj& cmdObj,
-                     std::string& errmsg,
                      BSONObjBuilder& result) {
         result.append("isdbgrid", 1);
         result.append("hostname", getHostNameCached());

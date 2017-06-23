@@ -84,7 +84,6 @@ public:
     bool run(OperationContext* opCtx,
              const string& dbname,
              const BSONObj& jsobj,
-             string& errmsg,
              BSONObjBuilder& result) {
         const NamespaceString nss("local", "oplog.rs");
         Lock::GlobalWrite global(opCtx);

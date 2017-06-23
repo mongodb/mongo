@@ -59,9 +59,9 @@ using std::string;
 using std::stringstream;
 using std::endl;
 
-class CmdCloneCollection : public BasicCommand {
+class CmdCloneCollection : public ErrmsgCommandDeprecated {
 public:
-    CmdCloneCollection() : BasicCommand("cloneCollection") {}
+    CmdCloneCollection() : ErrmsgCommandDeprecated("cloneCollection") {}
 
     virtual bool slaveOk() const {
         return false;
@@ -103,11 +103,11 @@ public:
                 "is placed at the same db.collection (namespace) as the source.\n";
     }
 
-    virtual bool run(OperationContext* opCtx,
-                     const string& dbname,
-                     const BSONObj& cmdObj,
-                     string& errmsg,
-                     BSONObjBuilder& result) {
+    virtual bool errmsgRun(OperationContext* opCtx,
+                           const string& dbname,
+                           const BSONObj& cmdObj,
+                           string& errmsg,
+                           BSONObjBuilder& result) {
         boost::optional<DisableDocumentValidation> maybeDisableValidation;
         if (shouldBypassDocumentValidationForCommand(cmdObj))
             maybeDisableValidation.emplace(opCtx);

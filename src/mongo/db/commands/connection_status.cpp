@@ -58,7 +58,6 @@ public:
     bool run(OperationContext* opCtx,
              const string&,
              const BSONObj& cmdObj,
-             string& errmsg,
              BSONObjBuilder& result) {
         AuthorizationSession* authSession = AuthorizationSession::get(Client::getCurrent());
 

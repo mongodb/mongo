@@ -319,9 +319,9 @@ Status mergeChunks(OperationContext* opCtx,
     return Status::OK();
 }
 
-class MergeChunksCommand : public BasicCommand {
+class MergeChunksCommand : public ErrmsgCommandDeprecated {
 public:
-    MergeChunksCommand() : BasicCommand("mergeChunks") {}
+    MergeChunksCommand() : ErrmsgCommandDeprecated("mergeChunks") {}
 
     void help(stringstream& h) const override {
         h << "Merge Chunks command\n"
@@ -361,11 +361,11 @@ public:
     // Optional, if the merge is only valid for a particular epoch
     static BSONField<OID> epochField;
 
-    bool run(OperationContext* opCtx,
-             const string& dbname,
-             const BSONObj& cmdObj,
-             string& errmsg,
-             BSONObjBuilder& result) override {
+    bool errmsgRun(OperationContext* opCtx,
+                   const string& dbname,
+                   const BSONObj& cmdObj,
+                   string& errmsg,
+                   BSONObjBuilder& result) override {
         uassertStatusOK(ShardingState::get(opCtx)->canAcceptShardedCommands());
 
         string ns = parseNs(dbname, cmdObj);

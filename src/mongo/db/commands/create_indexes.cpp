@@ -208,9 +208,9 @@ StatusWith<std::vector<BSONObj>> resolveCollectionDefaultProperties(
 /**
  * { createIndexes : "bar", indexes : [ { ns : "test.bar", key : { x : 1 }, name: "x_1" } ] }
  */
-class CmdCreateIndex : public BasicCommand {
+class CmdCreateIndex : public ErrmsgCommandDeprecated {
 public:
-    CmdCreateIndex() : BasicCommand(kCommandName) {}
+    CmdCreateIndex() : ErrmsgCommandDeprecated(kCommandName) {}
 
     virtual bool supportsWriteConcern(const BSONObj& cmd) const override {
         return true;
@@ -230,11 +230,11 @@ public:
         return Status(ErrorCodes::Unauthorized, "Unauthorized");
     }
 
-    virtual bool run(OperationContext* opCtx,
-                     const string& dbname,
-                     const BSONObj& cmdObj,
-                     string& errmsg,
-                     BSONObjBuilder& result) {
+    virtual bool errmsgRun(OperationContext* opCtx,
+                           const string& dbname,
+                           const BSONObj& cmdObj,
+                           string& errmsg,
+                           BSONObjBuilder& result) {
         const NamespaceString ns(parseNsCollectionRequired(dbname, cmdObj));
 
         Status status = userAllowedWriteNS(ns);

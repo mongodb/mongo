@@ -116,7 +116,6 @@ public:
     bool run(OperationContext* opCtx,
              const string&,
              const BSONObj& cmdObj,
-             string& errmsg,
              BSONObjBuilder& result) {
         nonce64 n = getNextNonce();
         stringstream ss;
@@ -153,7 +152,6 @@ void CmdAuthenticate::redactForLogging(mutablebson::Document* cmdObj) {
 bool CmdAuthenticate::run(OperationContext* opCtx,
                           const string& dbname,
                           const BSONObj& cmdObj,
-                          string& errmsg,
                           BSONObjBuilder& result) {
     if (!serverGlobalParams.quiet.load()) {
         mutablebson::Document cmdToLog(cmdObj, mutablebson::Document::kInPlaceDisabled);
@@ -378,7 +376,6 @@ public:
     bool run(OperationContext* opCtx,
              const string& dbname,
              const BSONObj& cmdObj,
-             string& errmsg,
              BSONObjBuilder& result) {
         AuthorizationSession* authSession = AuthorizationSession::get(Client::getCurrent());
         authSession->logoutDatabase(dbname);

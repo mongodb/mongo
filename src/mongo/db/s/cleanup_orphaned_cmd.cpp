@@ -168,9 +168,9 @@ CleanupResult cleanupOrphanedData(OperationContext* opCtx,
  *      writeConcern: { <writeConcern options> }
  * }
  */
-class CleanupOrphanedCommand : public BasicCommand {
+class CleanupOrphanedCommand : public ErrmsgCommandDeprecated {
 public:
-    CleanupOrphanedCommand() : BasicCommand("cleanupOrphaned") {}
+    CleanupOrphanedCommand() : ErrmsgCommandDeprecated("cleanupOrphaned") {}
 
     virtual bool slaveOk() const {
         return false;
@@ -203,11 +203,11 @@ public:
     // Output
     static BSONField<BSONObj> stoppedAtKeyField;
 
-    bool run(OperationContext* opCtx,
-             string const& db,
-             const BSONObj& cmdObj,
-             string& errmsg,
-             BSONObjBuilder& result) {
+    bool errmsgRun(OperationContext* opCtx,
+                   string const& db,
+                   const BSONObj& cmdObj,
+                   string& errmsg,
+                   BSONObjBuilder& result) {
         string ns;
         if (!FieldParser::extract(cmdObj, nsField, &ns, &errmsg)) {
             return false;

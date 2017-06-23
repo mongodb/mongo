@@ -87,7 +87,6 @@ public:
     bool run(OperationContext* opCtx,
              const string& dbname,
              const BSONObj& cmdObj,
-             string& errmsg,
              BSONObjBuilder& result) {
         boost::filesystem::path p = dur::getJournalDir();
         p /= "journalLatencyTest";

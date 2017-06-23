@@ -55,9 +55,9 @@ using std::string;
 
 namespace {
 
-class MoveChunkCmd : public BasicCommand {
+class MoveChunkCmd : public ErrmsgCommandDeprecated {
 public:
-    MoveChunkCmd() : BasicCommand("moveChunk", "movechunk") {}
+    MoveChunkCmd() : ErrmsgCommandDeprecated("moveChunk", "movechunk") {}
 
     bool slaveOk() const override {
         return true;
@@ -95,11 +95,11 @@ public:
         return parseNsFullyQualified(dbname, cmdObj);
     }
 
-    bool run(OperationContext* opCtx,
-             const std::string& dbname,
-             const BSONObj& cmdObj,
-             std::string& errmsg,
-             BSONObjBuilder& result) override {
+    bool errmsgRun(OperationContext* opCtx,
+                   const std::string& dbname,
+                   const BSONObj& cmdObj,
+                   std::string& errmsg,
+                   BSONObjBuilder& result) override {
         Timer t;
 
         const NamespaceString nss(parseNs(dbname, cmdObj));

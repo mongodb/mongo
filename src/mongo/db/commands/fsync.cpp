@@ -78,13 +78,13 @@ public:
     virtual void run();
 };
 
-class FSyncCommand : public BasicCommand {
+class FSyncCommand : public ErrmsgCommandDeprecated {
 public:
     static const char* url() {
         return "http://dochub.mongodb.org/core/fsynccommand";
     }
 
-    FSyncCommand() : BasicCommand("fsync") {}
+    FSyncCommand() : ErrmsgCommandDeprecated("fsync") {}
 
     virtual ~FSyncCommand() {
         // The FSyncLockThread is owned by the FSyncCommand and accesses FsyncCommand state. It must
@@ -117,11 +117,11 @@ public:
         actions.addAction(ActionType::fsync);
         out->push_back(Privilege(ResourcePattern::forClusterResource(), actions));
     }
-    virtual bool run(OperationContext* opCtx,
-                     const string& dbname,
-                     const BSONObj& cmdObj,
-                     string& errmsg,
-                     BSONObjBuilder& result) {
+    virtual bool errmsgRun(OperationContext* opCtx,
+                           const string& dbname,
+                           const BSONObj& cmdObj,
+                           string& errmsg,
+                           BSONObjBuilder& result) {
         if (opCtx->lockState()->isLocked()) {
             errmsg = "fsync: Cannot execute fsync command from contexts that hold a data lock";
             return false;
@@ -264,9 +264,9 @@ private:
     bool _fsyncLocked = false;
 } fsyncCmd;
 
-class FSyncUnlockCommand : public BasicCommand {
+class FSyncUnlockCommand : public ErrmsgCommandDeprecated {
 public:
-    FSyncUnlockCommand() : BasicCommand("fsyncUnlock") {}
+    FSyncUnlockCommand() : ErrmsgCommandDeprecated("fsyncUnlock") {}
 
 
     virtual bool supportsWriteConcern(const BSONObj& cmd) const override {
@@ -290,11 +290,11 @@ public:
         return isAuthorized ? Status::OK() : Status(ErrorCodes::Unauthorized, "Unauthorized");
     }
 
-    bool run(OperationContext* opCtx,
-             const std::string& db,
-             const BSONObj& cmdObj,
-             std::string& errmsg,
-             BSONObjBuilder& result) override {
+    bool errmsgRun(OperationContext* opCtx,
+                   const std::string& db,
+                   const BSONObj& cmdObj,
+                   std::string& errmsg,
+                   BSONObjBuilder& result) override {
         log() << "command: unlock requested";
 
         Lock::ExclusiveLock lk(opCtx->lockState(), commandMutex);

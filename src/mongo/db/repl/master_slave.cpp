@@ -383,7 +383,6 @@ public:
     virtual bool run(OperationContext* opCtx,
                      const string& ns,
                      const BSONObj& cmdObj,
-                     string& errmsg,
                      BSONObjBuilder& result) {
         HandshakeArgs handshake;
         Status status = handshake.initialize(cmdObj);

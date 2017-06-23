@@ -49,9 +49,9 @@ using std::unique_ptr;
 using std::string;
 using std::stringstream;
 
-class CmdCloneCollectionAsCapped : public BasicCommand {
+class CmdCloneCollectionAsCapped : public ErrmsgCommandDeprecated {
 public:
-    CmdCloneCollectionAsCapped() : BasicCommand("cloneCollectionAsCapped") {}
+    CmdCloneCollectionAsCapped() : ErrmsgCommandDeprecated("cloneCollectionAsCapped") {}
     virtual bool slaveOk() const {
         return false;
     }
@@ -84,11 +84,11 @@ public:
 
         out->push_back(Privilege(ResourcePattern::forExactNamespace(nss), targetActions));
     }
-    bool run(OperationContext* opCtx,
-             const string& dbname,
-             const BSONObj& jsobj,
-             string& errmsg,
-             BSONObjBuilder& result) {
+    bool errmsgRun(OperationContext* opCtx,
+                   const string& dbname,
+                   const BSONObj& jsobj,
+                   string& errmsg,
+                   BSONObjBuilder& result) {
         const auto fromElt = jsobj["cloneCollectionAsCapped"];
         const auto toElt = jsobj["toCollection"];
 
@@ -148,9 +148,9 @@ public:
    This command is not highly used, and is not currently supported with sharded
    environments.
    */
-class CmdConvertToCapped : public BasicCommand {
+class CmdConvertToCapped : public ErrmsgCommandDeprecated {
 public:
-    CmdConvertToCapped() : BasicCommand("convertToCapped") {}
+    CmdConvertToCapped() : ErrmsgCommandDeprecated("convertToCapped") {}
     virtual bool slaveOk() const {
         return false;
     }
@@ -168,11 +168,11 @@ public:
         out->push_back(Privilege(parseResourcePattern(dbname, cmdObj), actions));
     }
 
-    bool run(OperationContext* opCtx,
-             const string& dbname,
-             const BSONObj& jsobj,
-             string& errmsg,
-             BSONObjBuilder& result) {
+    bool errmsgRun(OperationContext* opCtx,
+                   const string& dbname,
+                   const BSONObj& jsobj,
+                   string& errmsg,
+                   BSONObjBuilder& result) {
         const NamespaceString nss(parseNsCollectionRequired(dbname, jsobj));
         double size = jsobj.getField("size").number();
 

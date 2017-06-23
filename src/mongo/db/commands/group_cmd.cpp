@@ -150,7 +150,6 @@ private:
     virtual bool run(OperationContext* opCtx,
                      const std::string& dbname,
                      const BSONObj& cmdObj,
-                     std::string& errmsg,
                      BSONObjBuilder& result) {
         RARELY {
             warning() << "The group command is deprecated. See "

@@ -68,9 +68,9 @@ std::unique_ptr<DBClientBase>& CopyDbAuthConnection::forClient(Client* client) {
  * nonce from the source of a "copydb" operation for authentication purposes.  See the
  * description of the "copydb" command below.
  */
-class CmdCopyDbGetNonce : public BasicCommand {
+class CmdCopyDbGetNonce : public ErrmsgCommandDeprecated {
 public:
-    CmdCopyDbGetNonce() : BasicCommand("copydbgetnonce") {}
+    CmdCopyDbGetNonce() : ErrmsgCommandDeprecated("copydbgetnonce") {}
 
     virtual bool adminOnly() const {
         return true;
@@ -96,11 +96,11 @@ public:
         help << "usage: {copydbgetnonce: 1, fromhost: <hostname>}";
     }
 
-    virtual bool run(OperationContext* opCtx,
-                     const string&,
-                     const BSONObj& cmdObj,
-                     string& errmsg,
-                     BSONObjBuilder& result) {
+    virtual bool errmsgRun(OperationContext* opCtx,
+                           const string&,
+                           const BSONObj& cmdObj,
+                           string& errmsg,
+                           BSONObjBuilder& result) {
         string fromhost = cmdObj.getStringField("fromhost");
         if (fromhost.empty()) {
             /* copy from self */
@@ -140,9 +140,9 @@ public:
  * Run against the mongod that is the intended target for the "copydb" command.  Used to
  * initialize a SASL auth session for a "copydb" operation for authentication purposes.
  */
-class CmdCopyDbSaslStart : public BasicCommand {
+class CmdCopyDbSaslStart : public ErrmsgCommandDeprecated {
 public:
-    CmdCopyDbSaslStart() : BasicCommand("copydbsaslstart") {}
+    CmdCopyDbSaslStart() : ErrmsgCommandDeprecated("copydbsaslstart") {}
 
     virtual bool adminOnly() const {
         return true;
@@ -169,11 +169,11 @@ public:
                 "from secure server\n";
     }
 
-    virtual bool run(OperationContext* opCtx,
-                     const string&,
-                     const BSONObj& cmdObj,
-                     string& errmsg,
-                     BSONObjBuilder& result) {
+    virtual bool errmsgRun(OperationContext* opCtx,
+                           const string&,
+                           const BSONObj& cmdObj,
+                           string& errmsg,
+                           BSONObjBuilder& result) {
         const auto fromdbElt = cmdObj["fromdb"];
         uassert(ErrorCodes::TypeMismatch,
                 "'renameCollection' must be of type String",

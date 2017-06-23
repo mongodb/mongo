@@ -583,8 +583,24 @@ public:
     virtual bool run(OperationContext* opCtx,
                      const std::string& db,
                      const BSONObj& cmdObj,
-                     std::string& errmsg,
                      BSONObjBuilder& result) = 0;
+};
+
+/**
+ * Deprecated. Do not add new subclasses.
+ */
+class ErrmsgCommandDeprecated : public BasicCommand {
+    using BasicCommand::BasicCommand;
+    bool run(OperationContext* opCtx,
+             const std::string& db,
+             const BSONObj& cmdObj,
+             BSONObjBuilder& result) final;
+
+    virtual bool errmsgRun(OperationContext* opCtx,
+                           const std::string& db,
+                           const BSONObj& cmdObj,
+                           std::string& errmsg,
+                           BSONObjBuilder& result) = 0;
 };
 
 }  // namespace mongo

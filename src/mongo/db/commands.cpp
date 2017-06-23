@@ -371,8 +371,15 @@ bool BasicCommand::enhancedRun(OperationContext* opCtx,
             str::stream() << "The " << getName() << " command does not support document sequences.",
             request.sequences.empty());
 
+    return run(opCtx, request.getDatabase().toString(), request.body, result);
+}
+
+bool ErrmsgCommandDeprecated::run(OperationContext* opCtx,
+                                  const std::string& db,
+                                  const BSONObj& cmdObj,
+                                  BSONObjBuilder& result) {
     std::string errmsg;
-    bool ok = run(opCtx, request.getDatabase().toString(), request.body, errmsg, result);
+    auto ok = errmsgRun(opCtx, db, cmdObj, errmsg, result);
     if (!errmsg.empty()) {
         appendCommandStatus(result, ok, errmsg);
     }

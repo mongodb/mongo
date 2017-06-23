@@ -234,7 +234,6 @@ public:
     virtual bool run(OperationContext* opCtx,
                      const string&,
                      const BSONObj& cmdObj,
-                     string& errmsg,
                      BSONObjBuilder& result) {
         /* currently request to arbiter is (somewhat arbitrarily) an ismaster request that is not
            authenticated.

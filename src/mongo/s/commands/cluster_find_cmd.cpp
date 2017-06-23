@@ -152,7 +152,6 @@ public:
     bool run(OperationContext* opCtx,
              const std::string& dbname,
              const BSONObj& cmdObj,
-             std::string& errmsg,
              BSONObjBuilder& result) final {
         // We count find command as a query op.
         globalOpCounters.gotQuery();

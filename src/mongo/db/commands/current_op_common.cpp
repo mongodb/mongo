@@ -39,7 +39,6 @@ namespace mongo {
 bool CurrentOpCommandBase::run(OperationContext* opCtx,
                                const std::string& dbName,
                                const BSONObj& cmdObj,
-                               std::string& errmsg,
                                BSONObjBuilder& result) {
     // Convert the currentOp command spec into an equivalent aggregation command. This will be
     // of the form {aggregate:1, pipeline: [{$currentOp: {idleConnections: $all, allUsers:

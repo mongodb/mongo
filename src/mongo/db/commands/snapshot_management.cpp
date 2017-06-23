@@ -67,7 +67,6 @@ public:
     bool run(OperationContext* opCtx,
              const std::string& dbname,
              const BSONObj& cmdObj,
-             std::string& errmsg,
              BSONObjBuilder& result) {
         auto snapshotManager =
             getGlobalServiceContext()->getGlobalStorageEngine()->getSnapshotManager();
@@ -116,7 +115,6 @@ public:
     bool run(OperationContext* opCtx,
              const std::string& dbname,
              const BSONObj& cmdObj,
-             std::string& errmsg,
              BSONObjBuilder& result) {
         auto snapshotManager =
             getGlobalServiceContext()->getGlobalStorageEngine()->getSnapshotManager();

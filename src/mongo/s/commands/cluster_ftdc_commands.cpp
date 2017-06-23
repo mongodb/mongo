@@ -44,9 +44,9 @@ namespace {
  * getDiagnosticData is a MongoD only command. We implement in MongoS to give users a better error
  * message.
  */
-class GetDiagnosticDataCommand final : public BasicCommand {
+class GetDiagnosticDataCommand final : public ErrmsgCommandDeprecated {
 public:
-    GetDiagnosticDataCommand() : BasicCommand("getDiagnosticData") {}
+    GetDiagnosticDataCommand() : ErrmsgCommandDeprecated("getDiagnosticData") {}
 
     bool adminOnly() const override {
         return true;
@@ -92,11 +92,11 @@ public:
         return Status::OK();
     }
 
-    bool run(OperationContext* opCtx,
-             const std::string& db,
-             const BSONObj& cmdObj,
-             std::string& errmsg,
-             BSONObjBuilder& result) override {
+    bool errmsgRun(OperationContext* opCtx,
+                   const std::string& db,
+                   const BSONObj& cmdObj,
+                   std::string& errmsg,
+                   BSONObjBuilder& result) override {
 
         result.append(
             "data",

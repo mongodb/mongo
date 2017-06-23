@@ -76,7 +76,6 @@ public:
     virtual bool run(OperationContext* opCtx,
                      const std::string& db,
                      const BSONObj& cmdObj,
-                     std::string& ignored,
                      BSONObjBuilder& result);
 
     virtual void help(stringstream& help) const;
@@ -103,7 +102,6 @@ public:
     virtual bool run(OperationContext* opCtx,
                      const std::string& db,
                      const BSONObj& cmdObj,
-                     std::string& ignored,
                      BSONObjBuilder& result);
 
     virtual void help(stringstream& help) const;
@@ -271,7 +269,6 @@ void CmdSaslStart::redactForLogging(mutablebson::Document* cmdObj) {
 bool CmdSaslStart::run(OperationContext* opCtx,
                        const std::string& db,
                        const BSONObj& cmdObj,
-                       std::string& ignored,
                        BSONObjBuilder& result) {
     Client* client = Client::getCurrent();
     AuthenticationSession::set(client, std::unique_ptr<AuthenticationSession>());
@@ -312,7 +309,6 @@ void CmdSaslContinue::help(std::stringstream& os) const {
 bool CmdSaslContinue::run(OperationContext* opCtx,
                           const std::string& db,
                           const BSONObj& cmdObj,
-                          std::string& ignored,
                           BSONObjBuilder& result) {
     Client* client = Client::getCurrent();
     std::unique_ptr<AuthenticationSession> sessionGuard;

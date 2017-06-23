@@ -47,9 +47,9 @@
 namespace mongo {
 namespace {
 
-class ClusterCountCmd : public BasicCommand {
+class ClusterCountCmd : public ErrmsgCommandDeprecated {
 public:
-    ClusterCountCmd() : BasicCommand("count") {}
+    ClusterCountCmd() : ErrmsgCommandDeprecated("count") {}
 
     bool slaveOk() const override {
         return true;
@@ -71,11 +71,11 @@ public:
         out->push_back(Privilege(parseResourcePattern(dbname, cmdObj), actions));
     }
 
-    bool run(OperationContext* opCtx,
-             const std::string& dbname,
-             const BSONObj& cmdObj,
-             std::string& errmsg,
-             BSONObjBuilder& result) override {
+    bool errmsgRun(OperationContext* opCtx,
+                   const std::string& dbname,
+                   const BSONObj& cmdObj,
+                   std::string& errmsg,
+                   BSONObjBuilder& result) override {
         const NamespaceString nss(parseNs(dbname, cmdObj));
         uassert(ErrorCodes::InvalidNamespace,
                 str::stream() << "Invalid namespace specified '" << nss.ns() << "'",

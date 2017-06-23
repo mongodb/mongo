@@ -40,9 +40,9 @@ namespace {
 
 using std::vector;
 
-class DBStatsCmd : public BasicCommand {
+class DBStatsCmd : public ErrmsgCommandDeprecated {
 public:
-    DBStatsCmd() : BasicCommand("dbStats", "dbstats") {}
+    DBStatsCmd() : ErrmsgCommandDeprecated("dbStats", "dbstats") {}
 
     bool slaveOk() const override {
         return true;
@@ -63,11 +63,11 @@ public:
         return false;
     }
 
-    bool run(OperationContext* opCtx,
-             const std::string& dbName,
-             const BSONObj& cmdObj,
-             std::string& errmsg,
-             BSONObjBuilder& output) override {
+    bool errmsgRun(OperationContext* opCtx,
+                   const std::string& dbName,
+                   const BSONObj& cmdObj,
+                   std::string& errmsg,
+                   BSONObjBuilder& output) override {
         auto shardResponses =
             uassertStatusOK(scatterGather(opCtx,
                                           dbName,

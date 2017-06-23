@@ -69,7 +69,6 @@ public:
     bool run(OperationContext* opCtx,
              const std::string& dbname,
              const BSONObj& cmdObj,
-             std::string& errmsg,
              BSONObjBuilder& result) override {
         return appendCommandStatus(result,
                                    _runAggCommand(opCtx, dbname, cmdObj, boost::none, &result));

@@ -142,7 +142,6 @@ public:
     bool run(OperationContext* opCtx,
              const std::string&,
              const BSONObj& cmdObj,
-             std::string& errmsg,
              BSONObjBuilder& result) {
         const MigrationSessionId migrationSessionId(
             uassertStatusOK(MigrationSessionId::extractFromBSON(cmdObj)));
@@ -205,7 +204,6 @@ public:
     bool run(OperationContext* opCtx,
              const std::string&,
              const BSONObj& cmdObj,
-             std::string& errmsg,
              BSONObjBuilder& result) {
         const MigrationSessionId migrationSessionId(
             uassertStatusOK(MigrationSessionId::extractFromBSON(cmdObj)));

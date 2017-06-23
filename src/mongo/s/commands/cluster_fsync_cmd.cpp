@@ -38,9 +38,9 @@
 namespace mongo {
 namespace {
 
-class FsyncCommand : public BasicCommand {
+class FsyncCommand : public ErrmsgCommandDeprecated {
 public:
-    FsyncCommand() : BasicCommand("fsync", "fsync") {}
+    FsyncCommand() : ErrmsgCommandDeprecated("fsync", "fsync") {}
 
     virtual bool slaveOk() const {
         return true;
@@ -67,11 +67,11 @@ public:
         out->push_back(Privilege(ResourcePattern::forClusterResource(), actions));
     }
 
-    virtual bool run(OperationContext* opCtx,
-                     const std::string& dbname,
-                     const BSONObj& cmdObj,
-                     std::string& errmsg,
-                     BSONObjBuilder& result) {
+    virtual bool errmsgRun(OperationContext* opCtx,
+                           const std::string& dbname,
+                           const BSONObj& cmdObj,
+                           std::string& errmsg,
+                           BSONObjBuilder& result) {
         if (cmdObj["lock"].trueValue()) {
             errmsg = "can't do lock through mongos";
             return false;

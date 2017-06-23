@@ -60,9 +60,9 @@ using str::stream;
 
 namespace {
 
-class SetShardVersion : public BasicCommand {
+class SetShardVersion : public ErrmsgCommandDeprecated {
 public:
-    SetShardVersion() : BasicCommand("setShardVersion") {}
+    SetShardVersion() : ErrmsgCommandDeprecated("setShardVersion") {}
 
     void help(std::stringstream& help) const override {
         help << "internal";
@@ -88,11 +88,11 @@ public:
         out->push_back(Privilege(ResourcePattern::forClusterResource(), actions));
     }
 
-    bool run(OperationContext* opCtx,
-             const std::string&,
-             const BSONObj& cmdObj,
-             string& errmsg,
-             BSONObjBuilder& result) {
+    bool errmsgRun(OperationContext* opCtx,
+                   const std::string&,
+                   const BSONObj& cmdObj,
+                   string& errmsg,
+                   BSONObjBuilder& result) {
         uassert(ErrorCodes::IllegalOperation,
                 "can't issue setShardVersion from 'eval'",
                 !opCtx->getClient()->isInDirectClient());

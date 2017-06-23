@@ -114,7 +114,6 @@ public:
     virtual bool run(OperationContext* opCtx,
                      const string& dbname,
                      const mongo::BSONObj& cmdObj,
-                     std::string& errmsg,
                      mongo::BSONObjBuilder& result) {
         // Connection information
         executor::ConnectionPoolStats stats{};

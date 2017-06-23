@@ -70,7 +70,6 @@ public:
     virtual bool run(OperationContext* opCtx,
                      const std::string& dbname,
                      const BSONObj& cmdObj,
-                     std::string& errmsg,
                      BSONObjBuilder& result) {
         // MongoD instances do not know that they are part of a sharded cluster until they
         // receive a setShardVersion command and that's when the catalog manager and the shard

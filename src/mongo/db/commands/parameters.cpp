@@ -63,9 +63,9 @@ void appendParameterNames(stringstream& help) {
 }
 }
 
-class CmdGet : public BasicCommand {
+class CmdGet : public ErrmsgCommandDeprecated {
 public:
-    CmdGet() : BasicCommand("getParameter") {}
+    CmdGet() : ErrmsgCommandDeprecated("getParameter") {}
     virtual bool slaveOk() const {
         return true;
     }
@@ -88,11 +88,11 @@ public:
         appendParameterNames(help);
         help << "{ getParameter:'*' } to get everything\n";
     }
-    bool run(OperationContext* opCtx,
-             const string& dbname,
-             const BSONObj& cmdObj,
-             string& errmsg,
-             BSONObjBuilder& result) {
+    bool errmsgRun(OperationContext* opCtx,
+                   const string& dbname,
+                   const BSONObj& cmdObj,
+                   string& errmsg,
+                   BSONObjBuilder& result) {
         bool all = *cmdObj.firstElement().valuestrsafe() == '*';
 
         int before = result.len();
@@ -112,9 +112,9 @@ public:
     }
 } cmdGet;
 
-class CmdSet : public BasicCommand {
+class CmdSet : public ErrmsgCommandDeprecated {
 public:
-    CmdSet() : BasicCommand("setParameter") {}
+    CmdSet() : ErrmsgCommandDeprecated("setParameter") {}
     virtual bool slaveOk() const {
         return true;
     }
@@ -136,11 +136,11 @@ public:
         help << "{ setParameter:1, <param>:<value> }\n";
         appendParameterNames(help);
     }
-    bool run(OperationContext* opCtx,
-             const string& dbname,
-             const BSONObj& cmdObj,
-             string& errmsg,
-             BSONObjBuilder& result) {
+    bool errmsgRun(OperationContext* opCtx,
+                   const string& dbname,
+                   const BSONObj& cmdObj,
+                   string& errmsg,
+                   BSONObjBuilder& result) {
         int numSet = 0;
         bool found = false;
 

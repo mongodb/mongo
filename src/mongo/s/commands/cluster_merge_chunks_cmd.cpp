@@ -54,9 +54,9 @@ namespace {
 /**
  * Mongos-side command for merging chunks, passes command to appropriate shard.
  */
-class ClusterMergeChunksCommand : public BasicCommand {
+class ClusterMergeChunksCommand : public ErrmsgCommandDeprecated {
 public:
-    ClusterMergeChunksCommand() : BasicCommand("mergeChunks") {}
+    ClusterMergeChunksCommand() : ErrmsgCommandDeprecated("mergeChunks") {}
 
     void help(stringstream& h) const override {
         h << "Merge Chunks command\n"
@@ -99,11 +99,11 @@ public:
     static BSONField<string> configField;
 
 
-    bool run(OperationContext* opCtx,
-             const string& dbname,
-             const BSONObj& cmdObj,
-             string& errmsg,
-             BSONObjBuilder& result) override {
+    bool errmsgRun(OperationContext* opCtx,
+                   const string& dbname,
+                   const BSONObj& cmdObj,
+                   string& errmsg,
+                   BSONObjBuilder& result) override {
         const NamespaceString nss(parseNs(dbname, cmdObj));
 
         auto routingInfo = uassertStatusOK(

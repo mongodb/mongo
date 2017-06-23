@@ -53,7 +53,7 @@ namespace mongo {
 using std::string;
 using std::stringstream;
 
-class CompactCmd : public BasicCommand {
+class CompactCmd : public ErrmsgCommandDeprecated {
 public:
     virtual bool supportsWriteConcern(const BSONObj& cmd) const override {
         return false;
@@ -84,13 +84,13 @@ public:
                 "  validate - check records are noncorrupt before adding to newly compacting "
                 "extents. slower but safer (defaults to true in this version)\n";
     }
-    CompactCmd() : BasicCommand("compact") {}
+    CompactCmd() : ErrmsgCommandDeprecated("compact") {}
 
-    virtual bool run(OperationContext* opCtx,
-                     const string& db,
-                     const BSONObj& cmdObj,
-                     string& errmsg,
-                     BSONObjBuilder& result) {
+    virtual bool errmsgRun(OperationContext* opCtx,
+                           const string& db,
+                           const BSONObj& cmdObj,
+                           string& errmsg,
+                           BSONObjBuilder& result) {
         NamespaceString nss = parseNsCollectionRequired(db, cmdObj);
 
         repl::ReplicationCoordinator* replCoord = repl::getGlobalReplicationCoordinator();

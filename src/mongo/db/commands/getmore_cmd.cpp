@@ -150,7 +150,6 @@ public:
                    const NamespaceString& origNss,
                    const GetMoreRequest& request,
                    const BSONObj& cmdObj,
-                   std::string& errmsg,
                    BSONObjBuilder& result) {
 
         auto curOp = CurOp::get(opCtx);
@@ -399,7 +398,6 @@ public:
     bool run(OperationContext* opCtx,
              const std::string& dbname,
              const BSONObj& cmdObj,
-             std::string& errmsg,
              BSONObjBuilder& result) override {
         // Counted as a getMore, not as a command.
         globalOpCounters.gotGetMore();
@@ -415,7 +413,7 @@ public:
             return appendCommandStatus(result, parsedRequest.getStatus());
         }
         auto request = parsedRequest.getValue();
-        return runParsed(opCtx, request.nss, request, cmdObj, errmsg, result);
+        return runParsed(opCtx, request.nss, request, cmdObj, result);
     }
 
     /**

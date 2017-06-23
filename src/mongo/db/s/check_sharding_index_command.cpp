@@ -54,9 +54,9 @@ namespace dps = ::mongo::dotted_path_support;
 
 namespace {
 
-class CheckShardingIndex : public BasicCommand {
+class CheckShardingIndex : public ErrmsgCommandDeprecated {
 public:
-    CheckShardingIndex() : BasicCommand("checkShardingIndex") {}
+    CheckShardingIndex() : ErrmsgCommandDeprecated("checkShardingIndex") {}
 
     virtual void help(std::stringstream& help) const {
         help << "Internal command.\n";
@@ -82,11 +82,11 @@ public:
         return parseNsFullyQualified(dbname, cmdObj);
     }
 
-    bool run(OperationContext* opCtx,
-             const std::string& dbname,
-             const BSONObj& jsobj,
-             std::string& errmsg,
-             BSONObjBuilder& result) {
+    bool errmsgRun(OperationContext* opCtx,
+                   const std::string& dbname,
+                   const BSONObj& jsobj,
+                   std::string& errmsg,
+                   BSONObjBuilder& result) {
         const NamespaceString nss = NamespaceString(parseNs(dbname, jsobj));
 
         BSONObj keyPattern = jsobj.getObjectField("keyPattern");

@@ -50,9 +50,9 @@ using std::string;
 using std::stringstream;
 
 // Testing only, enabled via command-line.
-class CmdHashElt : public BasicCommand {
+class CmdHashElt : public ErrmsgCommandDeprecated {
 public:
-    CmdHashElt() : BasicCommand("_hashBSONElement"){};
+    CmdHashElt() : ErrmsgCommandDeprecated("_hashBSONElement"){};
     virtual bool supportsWriteConcern(const BSONObj& cmd) const override {
         return false;
     }
@@ -79,11 +79,11 @@ public:
      *>  "out" : NumberLong(6271151123721111923),
      *>  "ok" : 1 }
      **/
-    bool run(OperationContext* opCtx,
-             const string& db,
-             const BSONObj& cmdObj,
-             string& errmsg,
-             BSONObjBuilder& result) {
+    bool errmsgRun(OperationContext* opCtx,
+                   const string& db,
+                   const BSONObj& cmdObj,
+                   string& errmsg,
+                   BSONObjBuilder& result) {
         result.appendAs(cmdObj.firstElement(), "key");
 
         int seed = 0;

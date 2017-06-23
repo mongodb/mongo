@@ -158,7 +158,6 @@ public:
     virtual bool run(OperationContext* opCtx,
                      const string& dbname,
                      const BSONObj& cmdObj,
-                     string& errmsg,
                      BSONObjBuilder& result) {
         const bool isExplain = false;
         auto request = CountRequest::parseFromBSON(dbname, cmdObj, isExplain);

@@ -1325,9 +1325,9 @@ BSONObj _bailFromJS(const BSONObj& args, void* data) {
 /**
  * This class represents a map/reduce command executed on a single server
  */
-class MapReduceCommand : public BasicCommand {
+class MapReduceCommand : public ErrmsgCommandDeprecated {
 public:
-    MapReduceCommand() : BasicCommand("mapReduce", "mapreduce") {}
+    MapReduceCommand() : ErrmsgCommandDeprecated("mapReduce", "mapreduce") {}
 
     virtual bool slaveOk() const {
         return repl::getGlobalReplicationCoordinator()->getReplicationMode() !=
@@ -1359,11 +1359,11 @@ public:
         addPrivilegesRequiredForMapReduce(this, dbname, cmdObj, out);
     }
 
-    bool run(OperationContext* opCtx,
-             const string& dbname,
-             const BSONObj& cmd,
-             string& errmsg,
-             BSONObjBuilder& result) {
+    bool errmsgRun(OperationContext* opCtx,
+                   const string& dbname,
+                   const BSONObj& cmd,
+                   string& errmsg,
+                   BSONObjBuilder& result) {
         Timer t;
 
         boost::optional<DisableDocumentValidation> maybeDisableValidation;
@@ -1680,7 +1680,6 @@ public:
     bool run(OperationContext* opCtx,
              const string& dbname,
              const BSONObj& cmdObj,
-             string& errmsg,
              BSONObjBuilder& result) {
         if (serverGlobalParams.clusterRole == ClusterRole::ConfigServer) {
             return appendCommandStatus(

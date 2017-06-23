@@ -36,9 +36,9 @@
 namespace mongo {
 namespace {
 
-class CmdReplSetGetStatus : public BasicCommand {
+class CmdReplSetGetStatus : public ErrmsgCommandDeprecated {
 public:
-    CmdReplSetGetStatus() : BasicCommand("replSetGetStatus") {}
+    CmdReplSetGetStatus() : ErrmsgCommandDeprecated("replSetGetStatus") {}
 
     virtual bool slaveOk() const {
         return true;
@@ -64,11 +64,11 @@ public:
         return Status::OK();
     }
 
-    virtual bool run(OperationContext* opCtx,
-                     const std::string& dbname,
-                     const BSONObj& cmdObj,
-                     std::string& errmsg,
-                     BSONObjBuilder& result) {
+    virtual bool errmsgRun(OperationContext* opCtx,
+                           const std::string& dbname,
+                           const BSONObj& cmdObj,
+                           std::string& errmsg,
+                           BSONObjBuilder& result) {
         if (cmdObj["forShell"].trueValue()) {
             LastError::get(cc()).disable();
             ClusterLastErrorInfo::get(cc())->disableForCommand();

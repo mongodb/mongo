@@ -152,7 +152,7 @@ bool dbEval(OperationContext* opCtx,
 }
 
 
-class CmdEval : public BasicCommand {
+class CmdEval : public ErrmsgCommandDeprecated {
 public:
     virtual bool slaveOk() const {
         return false;
@@ -172,13 +172,13 @@ public:
         RoleGraph::generateUniversalPrivileges(out);
     }
 
-    CmdEval() : BasicCommand("eval", "$eval") {}
+    CmdEval() : ErrmsgCommandDeprecated("eval", "$eval") {}
 
-    bool run(OperationContext* opCtx,
-             const string& dbname,
-             const BSONObj& cmdObj,
-             string& errmsg,
-             BSONObjBuilder& result) {
+    bool errmsgRun(OperationContext* opCtx,
+                   const string& dbname,
+                   const BSONObj& cmdObj,
+                   string& errmsg,
+                   BSONObjBuilder& result) {
         // Note: 'eval' is not allowed to touch sharded namespaces, but we can't check the
         // shardVersions of the namespaces accessed in the script until the script is evaluated.
         // Instead, we enforce that the script does not access sharded namespaces by ensuring the

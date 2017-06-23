@@ -57,7 +57,6 @@ public:
     virtual bool run(OperationContext* opCtx,
                      const std::string&,
                      const mongo::BSONObj&,
-                     std::string&,
                      mongo::BSONObjBuilder& result) {
         shardConnectionPool.flush();
         globalConnPool.flush();

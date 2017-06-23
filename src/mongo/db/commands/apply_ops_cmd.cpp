@@ -61,9 +61,9 @@ using std::stringstream;
 
 namespace {
 
-class ApplyOpsCmd : public BasicCommand {
+class ApplyOpsCmd : public ErrmsgCommandDeprecated {
 public:
-    ApplyOpsCmd() : BasicCommand("applyOps") {}
+    ApplyOpsCmd() : ErrmsgCommandDeprecated("applyOps") {}
 
     virtual bool slaveOk() const {
         return false;
@@ -85,11 +85,11 @@ public:
         return checkAuthForApplyOpsCommand(opCtx, dbname, cmdObj);
     }
 
-    virtual bool run(OperationContext* opCtx,
-                     const string& dbname,
-                     const BSONObj& cmdObj,
-                     string& errmsg,
-                     BSONObjBuilder& result) {
+    virtual bool errmsgRun(OperationContext* opCtx,
+                           const string& dbname,
+                           const BSONObj& cmdObj,
+                           string& errmsg,
+                           BSONObjBuilder& result) {
         validateApplyOpsCommand(cmdObj);
 
         boost::optional<DisableDocumentValidation> maybeDisableValidation;

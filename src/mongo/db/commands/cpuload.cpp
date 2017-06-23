@@ -61,7 +61,6 @@ public:
     virtual bool run(OperationContext* txn,
                      const string& badns,
                      const BSONObj& cmdObj,
-                     string& errmsg,
                      BSONObjBuilder& result) {
         double cpuFactor = 1;
         if (cmdObj["cpuFactor"].isNumber()) {

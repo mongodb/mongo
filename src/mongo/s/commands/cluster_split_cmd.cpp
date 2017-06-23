@@ -84,9 +84,9 @@ BSONObj selectMedianKey(OperationContext* opCtx,
               "Unable to find median in chunk, possibly because chunk is empty.");
 }
 
-class SplitCollectionCmd : public BasicCommand {
+class SplitCollectionCmd : public ErrmsgCommandDeprecated {
 public:
-    SplitCollectionCmd() : BasicCommand("split", "split") {}
+    SplitCollectionCmd() : ErrmsgCommandDeprecated("split", "split") {}
 
     bool slaveOk() const override {
         return true;
@@ -123,11 +123,11 @@ public:
         return parseNsFullyQualified(dbname, cmdObj);
     }
 
-    bool run(OperationContext* opCtx,
-             const std::string& dbname,
-             const BSONObj& cmdObj,
-             std::string& errmsg,
-             BSONObjBuilder& result) override {
+    bool errmsgRun(OperationContext* opCtx,
+                   const std::string& dbname,
+                   const BSONObj& cmdObj,
+                   std::string& errmsg,
+                   BSONObjBuilder& result) override {
         const NamespaceString nss(parseNs(dbname, cmdObj));
 
         auto routingInfo = uassertStatusOK(

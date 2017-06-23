@@ -56,9 +56,9 @@ using std::string;
 using std::stringstream;
 
 /* For testing only, not for general use. Enabled via command-line */
-class GodInsert : public BasicCommand {
+class GodInsert : public ErrmsgCommandDeprecated {
 public:
-    GodInsert() : BasicCommand("godinsert") {}
+    GodInsert() : ErrmsgCommandDeprecated("godinsert") {}
     virtual bool adminOnly() const {
         return false;
     }
@@ -75,11 +75,11 @@ public:
     virtual void help(stringstream& help) const {
         help << "internal. for testing only.";
     }
-    virtual bool run(OperationContext* opCtx,
-                     const string& dbname,
-                     const BSONObj& cmdObj,
-                     string& errmsg,
-                     BSONObjBuilder& result) {
+    virtual bool errmsgRun(OperationContext* opCtx,
+                           const string& dbname,
+                           const BSONObj& cmdObj,
+                           string& errmsg,
+                           BSONObjBuilder& result) {
         const NamespaceString nss(parseNsCollectionRequired(dbname, cmdObj));
         log() << "test only command godinsert invoked coll:" << nss.coll();
         BSONObj obj = cmdObj["obj"].embeddedObjectUserCheck();
@@ -152,7 +152,6 @@ public:
     bool run(OperationContext* opCtx,
              const string& ns,
              const BSONObj& cmdObj,
-             string& errmsg,
              BSONObjBuilder& result) {
         log() << "test only command sleep invoked";
         long long millis = 0;
@@ -215,7 +214,6 @@ public:
     virtual bool run(OperationContext* opCtx,
                      const string& dbname,
                      const BSONObj& cmdObj,
-                     string& errmsg,
                      BSONObjBuilder& result) {
         const NamespaceString fullNs = parseNsCollectionRequired(dbname, cmdObj);
         if (!fullNs.isValid()) {
@@ -292,7 +290,6 @@ public:
     virtual bool run(OperationContext* opCtx,
                      const string& dbname,
                      const BSONObj& cmdObj,
-                     string& errmsg,
                      BSONObjBuilder& result) {
         const NamespaceString nss = parseNsCollectionRequired(dbname, cmdObj);
 

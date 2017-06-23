@@ -33,9 +33,9 @@
 namespace mongo {
 namespace {
 
-class ProfileCmd : public BasicCommand {
+class ProfileCmd : public ErrmsgCommandDeprecated {
 public:
-    ProfileCmd() : BasicCommand("profile") {}
+    ProfileCmd() : ErrmsgCommandDeprecated("profile") {}
 
     virtual bool slaveOk() const {
         return true;
@@ -58,11 +58,11 @@ public:
         out->push_back(Privilege(ResourcePattern::forDatabaseName(dbname), actions));
     }
 
-    virtual bool run(OperationContext* opCtx,
-                     const std::string& dbname,
-                     const BSONObj& cmdObj,
-                     std::string& errmsg,
-                     BSONObjBuilder& result) {
+    virtual bool errmsgRun(OperationContext* opCtx,
+                           const std::string& dbname,
+                           const BSONObj& cmdObj,
+                           std::string& errmsg,
+                           BSONObjBuilder& result) {
         errmsg = "profile currently not supported via mongos";
         return false;
     }

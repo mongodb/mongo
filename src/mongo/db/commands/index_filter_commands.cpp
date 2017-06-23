@@ -118,7 +118,6 @@ IndexFilterCommand::IndexFilterCommand(const string& name, const string& helpTex
 bool IndexFilterCommand::run(OperationContext* opCtx,
                              const string& dbname,
                              const BSONObj& cmdObj,
-                             string& errmsg,
                              BSONObjBuilder& result) {
     const NamespaceString nss(parseNsCollectionRequired(dbname, cmdObj));
     Status status = runIndexFilterCommand(opCtx, nss.ns(), cmdObj, &result);

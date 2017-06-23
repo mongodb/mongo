@@ -59,9 +59,9 @@ namespace mongo {
 using std::string;
 using std::vector;
 
-class GeoHaystackSearchCommand : public BasicCommand {
+class GeoHaystackSearchCommand : public ErrmsgCommandDeprecated {
 public:
-    GeoHaystackSearchCommand() : BasicCommand("geoSearch") {}
+    GeoHaystackSearchCommand() : ErrmsgCommandDeprecated("geoSearch") {}
 
     virtual bool supportsWriteConcern(const BSONObj& cmd) const override {
         return false;
@@ -95,11 +95,11 @@ public:
         out->push_back(Privilege(parseResourcePattern(dbname, cmdObj), actions));
     }
 
-    bool run(OperationContext* opCtx,
-             const string& dbname,
-             const BSONObj& cmdObj,
-             string& errmsg,
-             BSONObjBuilder& result) {
+    bool errmsgRun(OperationContext* opCtx,
+                   const string& dbname,
+                   const BSONObj& cmdObj,
+                   string& errmsg,
+                   BSONObjBuilder& result) {
         const NamespaceString nss = parseNsCollectionRequired(dbname, cmdObj);
 
         AutoGetCollectionForReadCommand ctx(opCtx, nss);
