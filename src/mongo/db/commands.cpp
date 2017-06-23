@@ -300,7 +300,7 @@ static Status _checkAuthorizationImpl(Command* c,
         if (!status.isOK()) {
             return status;
         }
-    } else if (c->adminOnly() && c->localHostOnlyIfNoAuth(cmdObj) &&
+    } else if (c->adminOnly() && c->localHostOnlyIfNoAuth() &&
                !client->getIsLocalHostConnection()) {
         return Status(ErrorCodes::Unauthorized,
                       str::stream() << c->getName()

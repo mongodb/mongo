@@ -129,7 +129,7 @@ public:
      *
      * When localHostOnlyIfNoAuth() is true, adminOnly() must also be true.
      */
-    virtual bool localHostOnlyIfNoAuth(const BSONObj& cmdObj) = 0;
+    virtual bool localHostOnlyIfNoAuth() = 0;
 
     /* Return true if slaves are allowed to execute the command
     */
@@ -313,7 +313,7 @@ public:
         return false;
     }
 
-    bool localHostOnlyIfNoAuth(const BSONObj& cmdObj) override {
+    bool localHostOnlyIfNoAuth() override {
         return false;
     }
 

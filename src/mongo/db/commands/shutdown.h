@@ -45,7 +45,7 @@ public:
     virtual bool adminOnly() const {
         return true;
     }
-    virtual bool localHostOnlyIfNoAuth(const BSONObj& cmdObj) {
+    virtual bool localHostOnlyIfNoAuth() {
         return true;
     }
     virtual bool slaveOk() const {

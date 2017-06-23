@@ -178,9 +178,6 @@ public:
     virtual bool adminOnly() const {
         return true;
     }
-    virtual bool localHostOnlyIfNoAuth(const BSONObj& cmdObj) {
-        return false;
-    }
 
     virtual Status checkAuthForCommand(Client* client,
                                        const std::string& dbname,
