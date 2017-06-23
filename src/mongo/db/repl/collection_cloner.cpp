@@ -43,6 +43,7 @@
 #include "mongo/db/repl/storage_interface_mock.h"
 #include "mongo/db/server_parameters.h"
 #include "mongo/rpc/get_status_from_command_result.h"
+#include "mongo/s/query/cluster_client_cursor_params.h"
 #include "mongo/util/assert_util.h"
 #include "mongo/util/destructor_guard.h"
 #include "mongo/util/fail_point_service.h"
@@ -137,7 +138,9 @@ CollectionCloner::CollectionCloner(executor::TaskExecutor* executor,
                      kProgressMeterCheckInterval,
                      "documents copied",
                      str::stream() << _sourceNss.toString() << " collection clone progress"),
-      _batchSize(batchSize) {
+      _batchSize(batchSize),
+      _arm(executor,
+           stdx::make_unique<ClusterClientCursorParams>(_sourceNss, UserNameIterator()).get()) {
     // Fetcher throws an exception on null executor.
     invariant(executor);
     uassert(ErrorCodes::BadValue,

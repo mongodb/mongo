@@ -46,6 +46,7 @@
 #include "mongo/db/repl/storage_interface.h"
 #include "mongo/db/repl/task_runner.h"
 #include "mongo/executor/task_executor.h"
+#include "mongo/s/query/async_results_merger.h"
 #include "mongo/stdx/condition_variable.h"
 #include "mongo/stdx/functional.h"
 #include "mongo/stdx/mutex.h"
@@ -240,6 +241,8 @@ private:
     Stats _stats;                  // (M) stats for this instance.
     ProgressMeter _progressMeter;  // (M) progress meter for this instance.
     const int _batchSize;
+
+    AsyncResultsMerger _arm;
 
     // State transitions:
     // PreStart --> Running --> ShuttingDown --> Complete
