@@ -55,11 +55,18 @@ public:
      * Used as a return value for getChunksSince.
      */
     struct CollectionAndChangedChunks {
+        CollectionAndChangedChunks();
+        CollectionAndChangedChunks(const OID& collEpoch,
+                                   const BSONObj& collShardKeyPattern,
+                                   const BSONObj& collDefaultCollation,
+                                   bool collShardKeyIsUnique,
+                                   std::vector<ChunkType> chunks);
+
         // Information about the entire collection
         OID epoch;
         BSONObj shardKeyPattern;
         BSONObj defaultCollation;
-        bool shardKeyIsUnique;
+        bool shardKeyIsUnique{false};
 
         // The chunks which have changed sorted by their chunkVersion. This list might potentially
         // contain all the chunks in the collection.

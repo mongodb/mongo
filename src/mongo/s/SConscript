@@ -257,6 +257,7 @@ env.Library(
     source=[
         'balancer_configuration.cpp',
         'catalog_cache.cpp',
+        'catalog_cache_loader.cpp',
         'chunk.cpp',
         'chunk_manager.cpp',
         'cluster_identity_loader.cpp',
