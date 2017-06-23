@@ -45,6 +45,7 @@
 
 namespace mongo {
 
+const Seconds KeysCollectionManager::kKeyValidInterval{3 * 30 * 24 * 60 * 60};  // ~3 months
 namespace {
 
 Milliseconds kDefaultRefreshWaitTime(30 * 1000);

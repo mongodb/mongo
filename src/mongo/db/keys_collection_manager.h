@@ -53,6 +53,8 @@ class ShardingCatalogClient;
  */
 class KeysCollectionManager {
 public:
+    static const Seconds kKeyValidInterval;
+
     KeysCollectionManager(std::string purpose,
                           ShardingCatalogClient* client,
                           Seconds keyValidForInterval);

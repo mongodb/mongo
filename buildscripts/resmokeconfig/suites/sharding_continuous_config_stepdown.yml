@@ -85,6 +85,7 @@ selector:
   - jstests/sharding/shard_identity_config_update.js
   - jstests/sharding/mongos_does_not_gossip_logical_time_without_keys.js
   - jstests/sharding/key_rotation.js
+  - jstests/sharding/keys_rotation_interval_sec.js
   # Runs setShardVersion/getShardVersion against the config server and we don't support retries
   # for this command
   - jstests/sharding/major_version_check.js

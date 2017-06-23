@@ -34,6 +34,7 @@ selector:
   - jstests/sharding/advance_logical_time_with_valid_signature.js
   # New feature in v3.6 mongo shell.
   - jstests/sharding/causal_consistency_shell_support.js
+  - jstests/sharding/keys_rotation_interval_sec.js
   # Changes to currentOp format in 3.6.
   - jstests/sharding/features3.js
   - jstests/sharding/migration_ignore_interrupts_3.js

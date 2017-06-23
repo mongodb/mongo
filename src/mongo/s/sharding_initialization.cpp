@@ -89,6 +89,9 @@ MONGO_EXPORT_STARTUP_SERVER_PARAMETER(ShardingTaskExecutorPoolRefreshRequirement
 MONGO_EXPORT_STARTUP_SERVER_PARAMETER(ShardingTaskExecutorPoolRefreshTimeoutMS,
                                       int,
                                       ConnectionPool::kDefaultRefreshTimeout.count());
+MONGO_EXPORT_STARTUP_SERVER_PARAMETER(KeysRotationIntervalSec,
+                                      int,
+                                      KeysCollectionManager::kKeyValidInterval.count());
 
 namespace {
 
@@ -100,7 +103,6 @@ using executor::ShardingTaskExecutor;
 
 static constexpr auto kRetryInterval = Seconds{2};
 const std::string kKeyManagerPurposeString = "SigningClusterTime";
-const Seconds kKeyValidInterval(3 * 30 * 24 * 60 * 60);  // ~3 months
 
 auto makeTaskExecutor(std::unique_ptr<NetworkInterface> net) {
     auto netPtr = net.get();
@@ -236,7 +238,7 @@ Status initializeGlobalShardingState(OperationContext* opCtx,
     }
 
     auto keyManager = stdx::make_unique<KeysCollectionManager>(
-        kKeyManagerPurposeString, grid->catalogClient(opCtx), kKeyValidInterval);
+        kKeyManagerPurposeString, grid->catalogClient(opCtx), Seconds(KeysRotationIntervalSec));
     keyManager->startMonitoring(opCtx->getServiceContext());
 
     LogicalTimeValidator::set(opCtx->getServiceContext(),
