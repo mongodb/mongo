@@ -47,6 +47,5 @@ doTest = function(signal) {
 };
 
 doTest(15);  // SIGTERM
-doTest(9);   // SIGKILL
 
 print("repl3.js OK");

@@ -33,5 +33,4 @@ doTest = function(signal, extraOpts) {
     rt.stop();
 };
 
-doTest(15);                  // SIGTERM
-doTest(9, {journal: null});  // SIGKILL
+doTest(15);  // SIGTERM

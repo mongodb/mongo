@@ -66,5 +66,4 @@ doTest = function(signal, extraOpts) {
 
 };
 
-doTest(15, {"vv": null});                // SIGTERM
-doTest(9, {"vv": null, journal: null});  // SIGKILL
+doTest(15, {"vv": null});  // SIGTERM
