@@ -84,7 +84,7 @@ public:
         kFailedUnitOfWork   // in a unit of work that has failed and must be aborted
     };
 
-    OperationContext(Client* client, unsigned int opId, boost::optional<LogicalSessionId> lsid);
+    OperationContext(Client* client, unsigned int opId);
 
     virtual ~OperationContext() = default;
 
@@ -268,6 +268,26 @@ public:
     }
 
     /**
+     * Associates a logical session id with this operation context. May only be called once for the
+     * lifetime of the operation.
+     */
+    void setLogicalSessionId(LogicalSessionId lsid);
+
+    /**
+     * Returns the transaction number associated with thes operation. The combination of logical
+     * session id + transaction number is what constitutes the operation transaction id.
+     */
+    boost::optional<TxnNumber> getTxnNumber() const {
+        return _txnNumber;
+    }
+
+    /**
+     * Associates a transaction number with this operation context. May only be called once for the
+     * lifetime of the operation and the operation must have a logical session id assigned.
+     */
+    void setTxnNumber(TxnNumber txnNumber);
+
+    /**
      * Returns WriteConcernOptions of the current operation
      */
     const WriteConcernOptions& getWriteConcern() const {
@@ -408,7 +428,9 @@ private:
     friend class repl::UnreplicatedWritesBlock;
     Client* const _client;
     const unsigned int _opId;
+
     boost::optional<LogicalSessionId> _lsid;
+    boost::optional<TxnNumber> _txnNumber;
 
     std::unique_ptr<Locker> _locker;
 
@@ -525,5 +547,14 @@ private:
     const bool _shouldReplicateWrites;
 };
 }  // namespace repl
+
+/**
+ * Parses the session information from the body of a request and installs it on the current
+ * operation context. Must only be called once per operation and should be done right in the
+ * beginning.
+ *
+ * Throws if the sessionId/txnNumber combination is not properly formatted.
+ */
+void initializeOperationSessionInfo(OperationContext* opCtx, const BSONObj& requestBody);
 
 }  // namespace mongo

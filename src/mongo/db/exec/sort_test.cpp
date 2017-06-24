@@ -53,9 +53,9 @@ class SortStageTest : public unittest::Test {
 public:
     SortStageTest() {
         _service = stdx::make_unique<ServiceContextNoop>();
-        _service.get()->setFastClockSource(stdx::make_unique<ClockSourceMock>());
-        _client = _service.get()->makeClient("test");
-        _opCtxNoop.reset(new OperationContextNoop(_client.get(), 0, boost::none));
+        _service->setFastClockSource(stdx::make_unique<ClockSourceMock>());
+        _client = _service->makeClient("test");
+        _opCtxNoop = _client->makeOperationContext();
         _opCtx = _opCtxNoop.get();
         CollatorFactoryInterface::set(_service.get(), stdx::make_unique<CollatorFactoryMock>());
     }
@@ -163,7 +163,7 @@ private:
     // The UniqueClient must be destroyed before the ServiceContextNoop is destroyed.
     // The OperationContextNoop must be destroyed before the UniqueClient is destroyed.
     ServiceContext::UniqueClient _client;
-    std::unique_ptr<OperationContextNoop> _opCtxNoop;
+    ServiceContext::UniqueOperationContext _opCtxNoop;
 };
 
 TEST_F(SortStageTest, SortEmptyWorkingSet) {

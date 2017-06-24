@@ -60,7 +60,7 @@ TEST_F(UglyBSONFixture, DuplicateFields) {
                                     << BSONArray()
                                     << "documents"
                                     << BSONArray()),
-                               ErrorCodes::FailedToParse);
+                               ErrorCodes::fromInt(40413));
 }
 
 }  // namespace

@@ -43,10 +43,9 @@
 #include "mongo/util/system_tick_source.h"
 
 namespace mongo {
-
 namespace {
 
-ServiceContext* globalServiceContext = NULL;
+ServiceContext* globalServiceContext = nullptr;
 
 }  // namespace
 
@@ -227,9 +226,8 @@ void ServiceContext::ClientDeleter::operator()(Client* client) const {
     delete client;
 }
 
-ServiceContext::UniqueOperationContext ServiceContext::makeOperationContext(
-    Client* client, boost::optional<LogicalSessionId> lsid) {
-    auto opCtx = _newOpCtx(client, _nextOpId.fetchAndAdd(1), std::move(lsid));
+ServiceContext::UniqueOperationContext ServiceContext::makeOperationContext(Client* client) {
+    auto opCtx = _newOpCtx(client, _nextOpId.fetchAndAdd(1));
     auto observer = _clientObservers.begin();
     try {
         for (; observer != _clientObservers.cend(); ++observer) {

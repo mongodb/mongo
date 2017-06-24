@@ -269,10 +269,9 @@ const StorageEngine::Factory* StorageFactoriesIteratorMongoD::next() {
     return _curr++->second;
 }
 
-std::unique_ptr<OperationContext> ServiceContextMongoD::_newOpCtx(
-    Client* client, unsigned opId, boost::optional<LogicalSessionId> lsid) {
+std::unique_ptr<OperationContext> ServiceContextMongoD::_newOpCtx(Client* client, unsigned opId) {
     invariant(&cc() == client);
-    auto opCtx = stdx::make_unique<OperationContext>(client, opId, std::move(lsid));
+    auto opCtx = stdx::make_unique<OperationContext>(client, opId);
 
     if (isMMAPV1()) {
         opCtx->setLockState(stdx::make_unique<MMAPV1LockerImpl>());

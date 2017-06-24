@@ -39,9 +39,7 @@ namespace repl {
  */
 class ServiceContextReplMock : public ServiceContextNoop {
 private:
-    std::unique_ptr<OperationContext> _newOpCtx(Client* client,
-                                                unsigned opId,
-                                                boost::optional<LogicalSessionId>) override;
+    std::unique_ptr<OperationContext> _newOpCtx(Client* client, unsigned opId) override;
 };
 
 }  // namespace repl

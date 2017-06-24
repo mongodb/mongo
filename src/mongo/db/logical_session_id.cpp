@@ -31,13 +31,14 @@
 #include "mongo/db/logical_session_id.h"
 
 #include "mongo/bson/bsonobjbuilder.h"
-#include "mongo/db/logical_session_id_gen.h"
 #include "mongo/util/assert_util.h"
 
 namespace mongo {
 
-LogicalSessionId::LogicalSessionId() {
-    setId(UUID::gen());
+LogicalSessionId::LogicalSessionId() : LogicalSessionId(UUID::gen()) {}
+
+LogicalSessionId::LogicalSessionId(Logical_session_id&& lsid) {
+    static_cast<Logical_session_id&>(*this) = lsid;
 }
 
 LogicalSessionId::LogicalSessionId(UUID id) {

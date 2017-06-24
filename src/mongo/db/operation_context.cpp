@@ -75,12 +75,9 @@ MONGO_FP_DECLARE(checkForInterruptFail);
 
 }  // namespace
 
-OperationContext::OperationContext(Client* client,
-                                   unsigned int opId,
-                                   boost::optional<LogicalSessionId> lsid)
+OperationContext::OperationContext(Client* client, unsigned int opId)
     : _client(client),
       _opId(opId),
-      _lsid(std::move(lsid)),
       _elapsedTime(client ? client->getServiceContext()->getTickSource()
                           : SystemTickSource::get()) {}
 
@@ -348,6 +345,17 @@ void OperationContext::markKilled(ErrorCodes::Error killCode) {
     }
 }
 
+void OperationContext::setLogicalSessionId(LogicalSessionId lsid) {
+    invariant(!_lsid);
+    _lsid = std::move(lsid);
+}
+
+void OperationContext::setTxnNumber(TxnNumber txnNumber) {
+    invariant(_lsid);
+    invariant(!_txnNumber);
+    _txnNumber = txnNumber;
+}
+
 RecoveryUnit* OperationContext::releaseRecoveryUnit() {
     return _recoveryUnit.release();
 }
@@ -373,6 +381,27 @@ void OperationContext::setLockState(std::unique_ptr<Locker> locker) {
 
 Date_t OperationContext::getExpirationDateForWaitForValue(Milliseconds waitFor) {
     return getServiceContext()->getPreciseClockSource()->now() + waitFor;
+}
+
+void initializeOperationSessionInfo(OperationContext* opCtx, const BSONObj& requestBody) {
+    auto osi =
+        OperationSessionInfo::parse(IDLParserErrorContext("OperationSessionInfo"), requestBody);
+
+    if (osi.getSessionId()) {
+        auto lsid = *osi.getSessionId();
+        opCtx->setLogicalSessionId(LogicalSessionId(std::move(lsid)));
+    }
+
+    if (osi.getTxnNumber()) {
+        uassert(ErrorCodes::IllegalOperation,
+                "Transaction number requires a sessionId to be specified",
+                opCtx->getLogicalSessionId());
+        uassert(ErrorCodes::BadValue,
+                "Transaction number cannot be negative",
+                *osi.getTxnNumber() >= 0);
+
+        opCtx->setTxnNumber(*osi.getTxnNumber());
+    }
 }
 
 }  // namespace mongo

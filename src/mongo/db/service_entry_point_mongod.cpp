@@ -47,6 +47,7 @@
 #include "mongo/db/jsobj.h"
 #include "mongo/db/lasterror.h"
 #include "mongo/db/logical_clock.h"
+#include "mongo/db/logical_session_id.h"
 #include "mongo/db/logical_time_validator.h"
 #include "mongo/db/ops/write_ops_exec.h"
 #include "mongo/db/ops/write_ops_parsers.h"
@@ -524,6 +525,8 @@ void execCommandDatabase(OperationContext* opCtx,
         // see SERVER-18515 for details.
         rpc::readRequestMetadata(opCtx, request.body);
         rpc::TrackingMetadata::get(opCtx).initWithOperName(command->getName());
+
+        initializeOperationSessionInfo(opCtx, request.body);
 
         std::string dbname = request.getDatabase().toString();
         uassert(

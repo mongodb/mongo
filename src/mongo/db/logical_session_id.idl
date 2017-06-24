@@ -55,3 +55,17 @@ structs:
     strict: true
     fields:
       id: UUIDIDL
+
+  OperationSessionInfo:
+    description: "Parser for pulling out the sessionId/txnNumber combination from commands"
+    strict: false
+    fields:
+      lsid:
+        type: logical_session_id
+        cpp_name: sessionId
+        optional: true
+      txnNumber:
+        description: "The transaction number relative to the session in which a particular write
+                      operation executes."
+        type: TxnNumber
+        optional: true

@@ -30,6 +30,7 @@
 
 #include "mongo/db/query/query_test_service_context.h"
 
+#include "mongo/db/operation_context.h"
 #include "mongo/db/query/collation/collator_factory_mock.h"
 #include "mongo/stdx/memory.h"
 
@@ -46,7 +47,9 @@ ServiceContext::UniqueOperationContext QueryTestServiceContext::makeOperationCon
 
 ServiceContext::UniqueOperationContext QueryTestServiceContext::makeOperationContext(
     LogicalSessionId lsid) {
-    return _uniqueClient->makeOperationContext(std::move(lsid));
+    auto opCtx = makeOperationContext();
+    opCtx->setLogicalSessionId(lsid);
+    return opCtx;
 }
 
 Client* QueryTestServiceContext::getClient() const {

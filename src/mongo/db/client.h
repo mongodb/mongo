@@ -40,7 +40,6 @@
 
 #include "mongo/base/disallow_copying.h"
 #include "mongo/db/client.h"
-#include "mongo/db/logical_session_id.h"
 #include "mongo/db/namespace_string.h"
 #include "mongo/db/service_context.h"
 #include "mongo/platform/random.h"
@@ -173,8 +172,7 @@ public:
      *
      * If provided, the LogicalSessionId links this operation to a logical session.
      */
-    ServiceContext::UniqueOperationContext makeOperationContext(
-        boost::optional<LogicalSessionId> lsid = boost::none);
+    ServiceContext::UniqueOperationContext makeOperationContext();
 
     /**
      * Sets the active operation context on this client to "opCtx", which must be non-NULL.

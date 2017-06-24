@@ -30,23 +30,18 @@
 
 #include "mongo/db/repl/service_context_repl_mock.h"
 
-#include <boost/optional.hpp>
-#include <memory>
-
 #include "mongo/db/concurrency/lock_state.h"
-#include "mongo/db/concurrency/locker.h"
 #include "mongo/db/operation_context_noop.h"
 #include "mongo/stdx/memory.h"
 
 namespace mongo {
 namespace repl {
 
-std::unique_ptr<OperationContext> ServiceContextReplMock::_newOpCtx(
-    Client* client, unsigned opId, boost::optional<LogicalSessionId> lsid) {
-    auto opCtx = stdx::make_unique<OperationContextNoop>(client, opId, std::move(lsid));
+std::unique_ptr<OperationContext> ServiceContextReplMock::_newOpCtx(Client* client, unsigned opId) {
+    auto opCtx = stdx::make_unique<OperationContextNoop>(client, opId);
     opCtx->releaseLockState();
     opCtx->setLockState(stdx::make_unique<MMAPV1LockerImpl>());
-    return std::move(opCtx);
+    return {std::move(opCtx)};
 }
 
 }  // namespace repl

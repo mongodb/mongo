@@ -267,6 +267,8 @@ void runAgainstRegistered(OperationContext* opCtx,
 }
 
 void runCommand(OperationContext* opCtx, const OpMsgRequest& request, BSONObjBuilder&& builder) {
+    initializeOperationSessionInfo(opCtx, request.body);
+
     // Handle command option maxTimeMS.
     uassert(ErrorCodes::InvalidOptions,
             "no such command option $maxTimeMs; use maxTimeMS instead",

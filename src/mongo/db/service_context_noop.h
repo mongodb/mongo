@@ -28,12 +28,7 @@
 
 #pragma once
 
-#include <boost/optional.hpp>
-
-#include "mongo/db/logical_session_id.h"
 #include "mongo/db/service_context.h"
-
-#include "mongo/platform/atomic_word.h"
 
 namespace mongo {
 
@@ -57,9 +52,7 @@ public:
     OpObserver* getOpObserver() override;
 
 private:
-    std::unique_ptr<OperationContext> _newOpCtx(Client* client,
-                                                unsigned opId,
-                                                boost::optional<LogicalSessionId> lsid) override;
+    std::unique_ptr<OperationContext> _newOpCtx(Client* client, unsigned opId) override;
 };
 
 }  // namespace mongo
