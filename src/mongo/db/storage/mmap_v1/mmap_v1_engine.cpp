@@ -36,6 +36,10 @@
 #include <boost/filesystem/path.hpp>
 #include <fstream>
 
+#ifdef __linux__
+#include <sys/sysmacros.h>
+#endif
+
 #include "mongo/db/client.h"
 #include "mongo/db/mongod_options.h"
 #include "mongo/db/operation_context.h"
