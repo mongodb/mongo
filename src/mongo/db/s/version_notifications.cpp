@@ -37,7 +37,8 @@ ScopedVersionNotification VersionNotifications::createNotification(const Namespa
                                                                    const ChunkVersion& version) {
     stdx::lock_guard<stdx::mutex> lock(_mutex);
 
-    std::shared_ptr<stdx::condition_variable> condVar = std::make_shared<std::condition_variable>();
+    std::shared_ptr<stdx::condition_variable> condVar =
+        std::make_shared<stdx::condition_variable>();
     VersionAndConditionVariable versionAndConditionVariable = std::make_pair(version, condVar);
 
     auto mapIt = _versionAndConditionVariablesMap.find(nss);
