@@ -250,15 +250,20 @@ void Command::appendOperationTime(BSONObjBuilder& result, LogicalTime operationT
     result.append("operationTime", operationTime.asTimestamp());
 }
 
-Status Command::checkAuthForOperation(OperationContext* opCtx,
-                                      const std::string& dbname,
-                                      const BSONObj& cmdObj) {
+Status BasicCommand::checkAuthForRequest(OperationContext* opCtx, const OpMsgRequest& request) {
+    uassertNoDocumentSequences(request);
+    return checkAuthForOperation(opCtx, request.getDatabase().toString(), request.body);
+}
+
+Status BasicCommand::checkAuthForOperation(OperationContext* opCtx,
+                                           const std::string& dbname,
+                                           const BSONObj& cmdObj) {
     return checkAuthForCommand(opCtx->getClient(), dbname, cmdObj);
 }
 
-Status Command::checkAuthForCommand(Client* client,
-                                    const std::string& dbname,
-                                    const BSONObj& cmdObj) {
+Status BasicCommand::checkAuthForCommand(Client* client,
+                                         const std::string& dbname,
+                                         const BSONObj& cmdObj) {
     std::vector<Privilege> privileges;
     this->addRequiredPrivileges(dbname, cmdObj, &privileges);
     if (AuthorizationSession::get(client)->isAuthorizedForPrivileges(privileges))
@@ -279,19 +284,19 @@ BSONObj Command::getRedactedCopyForLogging(const BSONObj& cmdObj) {
 
 static Status _checkAuthorizationImpl(Command* c,
                                       OperationContext* opCtx,
-                                      const std::string& dbname,
-                                      const BSONObj& cmdObj) {
+                                      const OpMsgRequest& request) {
     namespace mmb = mutablebson;
     auto client = opCtx->getClient();
+    auto dbname = request.getDatabase();
     if (c->adminOnly() && dbname != "admin") {
         return Status(ErrorCodes::Unauthorized,
                       str::stream() << c->getName()
                                     << " may only be run against the admin database.");
     }
     if (AuthorizationSession::get(client)->getAuthorizationManager().isAuthEnabled()) {
-        Status status = c->checkAuthForOperation(opCtx, dbname, cmdObj);
+        Status status = c->checkAuthForRequest(opCtx, request);
         if (status == ErrorCodes::Unauthorized) {
-            mmb::Document cmdToLog(cmdObj, mmb::Document::kInPlaceDisabled);
+            mmb::Document cmdToLog(request.body, mmb::Document::kInPlaceDisabled);
             c->redactForLogging(&cmdToLog);
             return Status(ErrorCodes::Unauthorized,
                           str::stream() << "not authorized on " << dbname << " to execute command "
@@ -311,14 +316,13 @@ static Status _checkAuthorizationImpl(Command* c,
 
 Status Command::checkAuthorization(Command* c,
                                    OperationContext* opCtx,
-                                   const std::string& dbname,
-                                   const BSONObj& cmdObj) {
-    namespace mmb = mutablebson;
-    Status status = _checkAuthorizationImpl(c, opCtx, dbname, cmdObj);
+                                   const OpMsgRequest& request) {
+    Status status = _checkAuthorizationImpl(c, opCtx, request);
     if (!status.isOK()) {
         log(LogComponent::kAccessControl) << status;
     }
-    audit::logCommandAuthzCheck(opCtx->getClient(), dbname, cmdObj, c, status.code());
+    audit::logCommandAuthzCheck(
+        opCtx->getClient(), request.getDatabase().toString(), request.body, c, status.code());
     return status;
 }
 
@@ -364,13 +368,16 @@ bool Command::isUserManagementCommand(const std::string& name) {
     return userManagementCommands.count(name);
 }
 
-bool BasicCommand::enhancedRun(OperationContext* opCtx,
-                               const OpMsgRequest& request,
-                               BSONObjBuilder& result) {
+void BasicCommand::uassertNoDocumentSequences(const OpMsgRequest& request) {
     uassert(40472,
             str::stream() << "The " << getName() << " command does not support document sequences.",
             request.sequences.empty());
+}
 
+bool BasicCommand::enhancedRun(OperationContext* opCtx,
+                               const OpMsgRequest& request,
+                               BSONObjBuilder& result) {
+    uassertNoDocumentSequences(request);
     return run(opCtx, request.getDatabase().toString(), request.body, result);
 }
 

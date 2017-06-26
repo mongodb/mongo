@@ -35,6 +35,18 @@ env.Library(
 )
 
 env.Library(
+    target="write_commands_common",
+    source=[
+        "write_commands/write_commands_common.cpp",
+    ],
+    LIBDEPS=[
+        '$BUILD_DIR/mongo/base',
+        '$BUILD_DIR/mongo/db/commands',
+        '$BUILD_DIR/mongo/db/ops/write_ops_parsers',
+    ],
+)
+
+env.Library(
     target="core",
     source=[
         "authentication_commands.cpp",
@@ -52,7 +64,6 @@ env.Library(
         "parameters.cpp",
         "rename_collection_common.cpp",
         "user_management_commands_common.cpp",
-        "write_commands/write_commands_common.cpp",
     ],
     LIBDEPS=[
         '$BUILD_DIR/mongo/client/clientdriver',
@@ -205,7 +216,8 @@ env.Library(
         'current_op_common',
         'dcommands_fcv',
         'dcommands_fsync',
-        'killcursors_common'
+        'killcursors_common',
+        'write_commands_common',
     ],
 )
 

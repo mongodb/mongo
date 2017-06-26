@@ -171,13 +171,10 @@ public:
                            BSONObjBuilder* out) const = 0;
 
     /**
-     * Checks if the client associated with the given OperationContext, "opCtx", is authorized to
-     * run
-     * this command on database "dbname" with the invocation described by "cmdObj".
+     * Checks if the client associated with the given OperationContext is authorized to run this
+     * command.
      */
-    virtual Status checkAuthForOperation(OperationContext* opCtx,
-                                         const std::string& dbname,
-                                         const BSONObj& cmdObj) = 0;
+    virtual Status checkAuthForRequest(OperationContext* opCtx, const OpMsgRequest& request) = 0;
 
     /**
      * Redacts "cmdObj" in-place to a form suitable for writing to logs.
@@ -243,26 +240,6 @@ public:
      * Increment counter for how many times this command has failed.
      */
     virtual void incrementCommandsFailed() = 0;
-
-private:
-    /**
-     * Checks if the given client is authorized to run this command on database "dbname"
-     * with the invocation described by "cmdObj".
-     *
-     * NOTE: Implement checkAuthForOperation that takes an OperationContext* instead.
-     */
-    virtual Status checkAuthForCommand(Client* client,
-                                       const std::string& dbname,
-                                       const BSONObj& cmdObj) = 0;
-
-    /**
-     * Appends to "*out" the privileges required to run this command on database "dbname" with
-     * the invocation described by "cmdObj".  New commands shouldn't implement this, they should
-     * implement checkAuthForOperation (which takes an OperationContext*), instead.
-     */
-    virtual void addRequiredPrivileges(const std::string& dbname,
-                                       const BSONObj& cmdObj,
-                                       std::vector<Privilege>* out) = 0;
 };
 
 /**
@@ -332,10 +309,6 @@ public:
                    const BSONObj& cmdObj,
                    ExplainOptions::Verbosity verbosity,
                    BSONObjBuilder* out) const override;
-
-    Status checkAuthForOperation(OperationContext* opCtx,
-                                 const std::string& dbname,
-                                 const BSONObj& cmdObj) override;
 
     void redactForLogging(mutablebson::Document* cmdObj) override;
 
@@ -472,9 +445,8 @@ public:
      * authorized.
      */
     static Status checkAuthorization(Command* c,
-                                     OperationContext* client,
-                                     const std::string& dbname,
-                                     const BSONObj& cmdObj);
+                                     OperationContext* opCtx,
+                                     const OpMsgRequest& request);
 
     /**
      * Appends passthrough fields from a cmdObj to a given request.
@@ -536,17 +508,6 @@ public:
     static BSONObj filterCommandReplyForPassthrough(const BSONObj& reply);
 
 private:
-    Status checkAuthForCommand(Client* client,
-                               const std::string& dbname,
-                               const BSONObj& cmdObj) override;
-
-    void addRequiredPrivileges(const std::string& dbname,
-                               const BSONObj& cmdObj,
-                               std::vector<Privilege>* out) override {
-        // The default implementation of addRequiredPrivileges should never be hit.
-        fassertFailed(16940);
-    }
-
     // Counters for how many times this command has been executed and failed
     Counter64 _commandsExecuted;
     Counter64 _commandsFailed;
@@ -567,12 +528,9 @@ class BasicCommand : public Command {
 public:
     using Command::Command;
 
-    /**
-     * Calls run() as defined below.
-     */
-    bool enhancedRun(OperationContext* opCtx,
-                     const OpMsgRequest& request,
-                     BSONObjBuilder& result) final;
+    //
+    // Interface for subclasses to implement
+    //
 
     /**
      * run the given command
@@ -584,6 +542,59 @@ public:
                      const std::string& db,
                      const BSONObj& cmdObj,
                      BSONObjBuilder& result) = 0;
+
+    /**
+     * Checks if the client associated with the given OperationContext is authorized to run this
+     * command. Default implementation defers to checkAuthForCommand.
+     */
+    virtual Status checkAuthForOperation(OperationContext* opCtx,
+                                         const std::string& dbname,
+                                         const BSONObj& cmdObj);
+
+private:
+    //
+    // Deprecated virtual methods.
+    //
+
+    /**
+     * Checks if the given client is authorized to run this command on database "dbname"
+     * with the invocation described by "cmdObj".
+     *
+     * NOTE: Implement checkAuthForOperation that takes an OperationContext* instead.
+     */
+    virtual Status checkAuthForCommand(Client* client,
+                                       const std::string& dbname,
+                                       const BSONObj& cmdObj);
+
+    /**
+     * Appends to "*out" the privileges required to run this command on database "dbname" with
+     * the invocation described by "cmdObj".  New commands shouldn't implement this, they should
+     * implement checkAuthForOperation (which takes an OperationContext*), instead.
+     */
+    virtual void addRequiredPrivileges(const std::string& dbname,
+                                       const BSONObj& cmdObj,
+                                       std::vector<Privilege>* out) {
+        // The default implementation of addRequiredPrivileges should never be hit.
+        fassertFailed(16940);
+    }
+
+    //
+    // Methods provided for subclasses if they implement above interface.
+    //
+
+    /**
+     * Calls run().
+     */
+    bool enhancedRun(OperationContext* opCtx,
+                     const OpMsgRequest& request,
+                     BSONObjBuilder& result) final;
+
+    /**
+     * Calls checkAuthForOperation.
+     */
+    Status checkAuthForRequest(OperationContext* opCtx, const OpMsgRequest& request) final;
+
+    void uassertNoDocumentSequences(const OpMsgRequest& request);
 };
 
 /**

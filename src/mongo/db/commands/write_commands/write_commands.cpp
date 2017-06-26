@@ -73,10 +73,9 @@ void redactTooLongLog(mutablebson::Document* cmdObj, StringData fieldName) {
 
 Status checkAuthForWriteCommand(Client* client,
                                 BatchedCommandRequest::BatchType batchType,
-                                NamespaceString ns,
-                                const BSONObj& cmdObj) {
+                                const OpMsgRequest& request) {
     Status status =
-        auth::checkAuthForWriteCommand(AuthorizationSession::get(client), batchType, ns, cmdObj);
+        auth::checkAuthForWriteCommand(AuthorizationSession::get(client), batchType, request);
     if (!status.isOK()) {
         LastError::get(client).setLastError(status.code(), status.reason());
     }
@@ -232,13 +231,9 @@ public:
         help << "insert documents";
     }
 
-    Status checkAuthForCommand(Client* client,
-                               const std::string& dbname,
-                               const BSONObj& cmdObj) final {
-        return checkAuthForWriteCommand(client,
-                                        BatchedCommandRequest::BatchType_Insert,
-                                        NamespaceString(parseNs(dbname, cmdObj)),
-                                        cmdObj);
+    Status checkAuthForRequest(OperationContext* opCtx, const OpMsgRequest& request) final {
+        return checkAuthForWriteCommand(
+            opCtx->getClient(), BatchedCommandRequest::BatchType_Insert, request);
     }
 
     void runImpl(OperationContext* opCtx,
@@ -267,13 +262,9 @@ public:
         help << "update documents";
     }
 
-    Status checkAuthForCommand(Client* client,
-                               const std::string& dbname,
-                               const BSONObj& cmdObj) final {
-        return checkAuthForWriteCommand(client,
-                                        BatchedCommandRequest::BatchType_Update,
-                                        NamespaceString(parseNs(dbname, cmdObj)),
-                                        cmdObj);
+    Status checkAuthForRequest(OperationContext* opCtx, const OpMsgRequest& request) final {
+        return checkAuthForWriteCommand(
+            opCtx->getClient(), BatchedCommandRequest::BatchType_Update, request);
     }
 
     void runImpl(OperationContext* opCtx,
@@ -338,13 +329,9 @@ public:
         help << "delete documents";
     }
 
-    Status checkAuthForCommand(Client* client,
-                               const std::string& dbname,
-                               const BSONObj& cmdObj) final {
-        return checkAuthForWriteCommand(client,
-                                        BatchedCommandRequest::BatchType_Delete,
-                                        NamespaceString(parseNs(dbname, cmdObj)),
-                                        cmdObj);
+    Status checkAuthForRequest(OperationContext* opCtx, const OpMsgRequest& request) final {
+        return checkAuthForWriteCommand(
+            opCtx->getClient(), BatchedCommandRequest::BatchType_Delete, request);
     }
 
     void runImpl(OperationContext* opCtx,

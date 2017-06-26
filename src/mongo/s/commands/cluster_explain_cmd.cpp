@@ -102,7 +102,8 @@ public:
             return Status(ErrorCodes::CommandNotFound, ss);
         }
 
-        return commToExplain->checkAuthForOperation(opCtx, dbname, explainObj);
+        return commToExplain->checkAuthForRequest(
+            opCtx, OpMsgRequest::fromDBAndBody(dbname, std::move(explainObj)));
     }
 
     virtual bool run(OperationContext* opCtx,

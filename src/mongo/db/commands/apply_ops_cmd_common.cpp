@@ -79,7 +79,7 @@ Status checkOperationAuthorization(OperationContext* opCtx,
             return Status(ErrorCodes::FailedToParse, "Unrecognized command in op");
         }
 
-        return Command::checkAuthorization(command, opCtx, dbname, o);
+        return Command::checkAuthorization(command, opCtx, OpMsgRequest::fromDBAndBody(dbname, o));
     }
 
     if (opType == "i"_sd) {

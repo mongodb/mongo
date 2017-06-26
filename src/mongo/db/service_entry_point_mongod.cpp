@@ -573,7 +573,7 @@ void execCommandDatabase(OperationContext* opCtx,
         OperationContextSession sessionTxnState(opCtx);
 
         ImpersonationSessionGuard guard(opCtx);
-        uassertStatusOK(Command::checkAuthorization(command, opCtx, dbname, request.body));
+        uassertStatusOK(Command::checkAuthorization(command, opCtx, request));
 
         repl::ReplicationCoordinator* replCoord =
             repl::ReplicationCoordinator::get(opCtx->getClient()->getServiceContext());

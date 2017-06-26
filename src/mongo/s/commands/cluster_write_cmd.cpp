@@ -76,17 +76,13 @@ public:
         return true;
     }
 
-    virtual Status checkAuthForCommand(Client* client,
-                                       const std::string& dbname,
-                                       const BSONObj& cmdObj) {
-        Status status = auth::checkAuthForWriteCommand(AuthorizationSession::get(client),
-                                                       _writeType,
-                                                       NamespaceString(parseNs(dbname, cmdObj)),
-                                                       cmdObj);
+    Status checkAuthForRequest(OperationContext* opCtx, const OpMsgRequest& request) final {
+        Status status = auth::checkAuthForWriteCommand(
+            AuthorizationSession::get(opCtx->getClient()), _writeType, request);
 
         // TODO: Remove this when we standardize GLE reporting from commands
         if (!status.isOK()) {
-            LastError::get(client).setLastError(status.code(), status.reason());
+            LastError::get(opCtx->getClient()).setLastError(status.code(), status.reason());
         }
 
         return status;

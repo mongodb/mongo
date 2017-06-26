@@ -44,6 +44,7 @@ namespace mongo {
 namespace auth {
 namespace {
 
+using write_ops::Delete;
 using write_ops::Insert;
 using write_ops::Update;
 using write_ops::UpdateOpEntry;
@@ -51,17 +52,9 @@ using write_ops::UpdateOpEntry;
 /**
  * Helper to determine whether or not there are any upserts in the batch
  */
-bool containsUpserts(const BSONObj& writeCmdObj) {
-    BSONElement updatesEl = writeCmdObj[Update::kUpdatesFieldName];
-    if (updatesEl.type() != Array) {
-        return false;
-    }
-
-    for (const auto& updateEl : updatesEl.Array()) {
-        if (!updateEl.isABSONObj())
-            continue;
-
-        if (updateEl.Obj()[UpdateOpEntry::kUpsertFieldName].trueValue())
+bool containsUpserts(const std::vector<UpdateOpEntry>& updates) {
+    for (auto&& update : updates) {
+        if (update.getUpsert())
             return true;
     }
 
@@ -73,26 +66,18 @@ bool containsUpserts(const BSONObj& writeCmdObj) {
  *
  * TODO: Remove when we have parsing hooked before authorization.
  */
-StatusWith<NamespaceString> getIndexedNss(const BSONObj& writeCmdObj) {
-    BSONElement documentsEl = writeCmdObj[Insert::kDocumentsFieldName];
-    if (documentsEl.type() != Array) {
-        return {ErrorCodes::FailedToParse, "index write batch is invalid"};
-    }
-
-    BSONObjIterator it(documentsEl.Obj());
-    if (!it.more()) {
+StatusWith<NamespaceString> getIndexedNss(const std::vector<BSONObj>& documentsToInsert) {
+    if (documentsToInsert.empty()) {
         return {ErrorCodes::FailedToParse, "index write batch is empty"};
     }
 
-    BSONElement indexDescEl = it.next();
-
-    const std::string nsToIndex = indexDescEl["ns"].str();
+    const std::string nsToIndex = documentsToInsert.front()["ns"].str();
     if (nsToIndex.empty()) {
         return {ErrorCodes::FailedToParse,
                 "index write batch contains an invalid index descriptor"};
     }
 
-    if (it.more()) {
+    if (documentsToInsert.size() != 1) {
         return {ErrorCodes::FailedToParse,
                 "index write batches may only contain a single index descriptor"};
     }
@@ -104,21 +89,23 @@ StatusWith<NamespaceString> getIndexedNss(const BSONObj& writeCmdObj) {
 
 Status checkAuthForWriteCommand(AuthorizationSession* authzSession,
                                 BatchedCommandRequest::BatchType cmdType,
-                                const NamespaceString& cmdNSS,
-                                const BSONObj& cmdObj) {
+                                const OpMsgRequest& request) {
     std::vector<Privilege> privileges;
     ActionSet actionsOnCommandNSS;
 
-    if (shouldBypassDocumentValidationForCommand(cmdObj)) {
+    if (shouldBypassDocumentValidationForCommand(request.body)) {
         actionsOnCommandNSS.addAction(ActionType::bypassDocumentValidation);
     }
 
+    NamespaceString cmdNSS;
     if (cmdType == BatchedCommandRequest::BatchType_Insert) {
-        if (!cmdNSS.isSystemDotIndexes()) {
+        auto op = Insert::parse(IDLParserErrorContext("insert"), request);
+        cmdNSS = op.getNamespace();
+        if (!op.getNamespace().isSystemDotIndexes()) {
             actionsOnCommandNSS.addAction(ActionType::insert);
         } else {
             // Special-case indexes until we have a command
-            const auto swNssToIndex = getIndexedNss(cmdObj);
+            const auto swNssToIndex = getIndexedNss(op.getDocuments());
             if (!swNssToIndex.isOK()) {
                 return swNssToIndex.getStatus();
             }
@@ -128,14 +115,18 @@ Status checkAuthForWriteCommand(AuthorizationSession* authzSession,
                 Privilege(ResourcePattern::forExactNamespace(nssToIndex), ActionType::createIndex));
         }
     } else if (cmdType == BatchedCommandRequest::BatchType_Update) {
+        auto op = Update::parse(IDLParserErrorContext("update"), request);
+        cmdNSS = op.getNamespace();
         actionsOnCommandNSS.addAction(ActionType::update);
 
         // Upsert also requires insert privs
-        if (containsUpserts(cmdObj)) {
+        if (containsUpserts(op.getUpdates())) {
             actionsOnCommandNSS.addAction(ActionType::insert);
         }
     } else {
         fassert(17251, cmdType == BatchedCommandRequest::BatchType_Delete);
+        auto op = Delete::parse(IDLParserErrorContext("delete"), request);
+        cmdNSS = op.getNamespace();
         actionsOnCommandNSS.addAction(ActionType::remove);
     }
 
