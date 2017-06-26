@@ -108,18 +108,6 @@ private:
     const ChunkVersion _updatedVersion;
 };
 
-/**
- * Checks via the ReplicationCoordinator whether this server is a primary/standalone that can do
- * writes. This function may return false if the server is primary but in drain mode.
- *
- * Note: expects the global lock to be held so that a meaningful answer is returned -- replica set
- * state cannot change under a lock.
- */
-bool isPrimary(OperationContext* opCtx, const NamespaceString& nss) {
-    // If the server can execute writes, then it is either a primary or standalone.
-    return repl::ReplicationCoordinator::get(opCtx)->canAcceptWritesFor(opCtx, nss);
-}
-
 }  // unnamed namespace
 
 CollectionShardingState::CollectionShardingState(ServiceContext* sc, NamespaceString nss)
@@ -412,43 +400,37 @@ void CollectionShardingState::_onConfigRefreshCompleteInvalidateCachedMetadataAn
     dassert(opCtx->lockState()->isCollectionLockedForMode(_nss.ns(), MODE_IX));
     invariant(serverGlobalParams.clusterRole == ClusterRole::ShardServer);
 
-    if (!isPrimary(opCtx, _nss)) {
-        // Extract which collection entry is being updated
-        std::string refreshCollection;
-        fassertStatusOK(
-            40477,
-            bsonExtractStringField(query, ShardCollectionType::uuid.name(), &refreshCollection));
+    // Extract which collection entry is being updated
+    std::string refreshCollection;
+    fassertStatusOK(
+        40477, bsonExtractStringField(query, ShardCollectionType::uuid.name(), &refreshCollection));
 
-        // Parse the '$set' update, which will contain the 'lastRefreshedCollectionVersion' if it is
-        // present.
-        BSONElement updateElement;
-        fassertStatusOK(40478,
-                        bsonExtractTypedField(update, StringData("$set"), Object, &updateElement));
-        BSONObj setField = updateElement.Obj();
+    // Parse the '$set' update, which will contain the 'lastRefreshedCollectionVersion' if it is
+    // present.
+    BSONElement updateElement;
+    fassertStatusOK(40478,
+                    bsonExtractTypedField(update, StringData("$set"), Object, &updateElement));
+    BSONObj setField = updateElement.Obj();
 
-        // If 'lastRefreshedCollectionVersion' is present, then a refresh completed and the catalog
-        // cache must be invalidated and the catalog cache loader notified of the new version.
-        if (setField.hasField(ShardCollectionType::lastRefreshedCollectionVersion.name())) {
-            // Get the version epoch from the 'updatedDoc', since it didn't get updated and won't be
-            // in 'update'.
-            BSONElement oidElem;
-            fassert(40513,
-                    bsonExtractTypedField(
-                        updatedDoc, ShardCollectionType::epoch(), BSONType::jstOID, &oidElem));
+    // If 'lastRefreshedCollectionVersion' is present, then a refresh completed and the catalog
+    // cache must be invalidated and the catalog cache loader notified of the new version.
+    if (setField.hasField(ShardCollectionType::lastRefreshedCollectionVersion.name())) {
+        // Get the version epoch from the 'updatedDoc', since it didn't get updated and won't be
+        // in 'update'.
+        BSONElement oidElem;
+        fassert(40513,
+                bsonExtractTypedField(
+                    updatedDoc, ShardCollectionType::epoch(), BSONType::jstOID, &oidElem));
 
-            // Get the new collection version.
-            auto statusWithLastRefreshedChunkVersion =
-                ChunkVersion::parseFromBSONWithFieldAndSetEpoch(
-                    updatedDoc,
-                    ShardCollectionType::lastRefreshedCollectionVersion(),
-                    oidElem.OID());
-            fassert(40514, statusWithLastRefreshedChunkVersion.isOK());
+        // Get the new collection version.
+        auto statusWithLastRefreshedChunkVersion = ChunkVersion::parseFromBSONWithFieldAndSetEpoch(
+            updatedDoc, ShardCollectionType::lastRefreshedCollectionVersion(), oidElem.OID());
+        fassert(40514, statusWithLastRefreshedChunkVersion.isOK());
 
-            opCtx->recoveryUnit()->registerChange(
-                new CollectionVersionLogOpHandler(opCtx,
-                                                  NamespaceString(refreshCollection),
-                                                  statusWithLastRefreshedChunkVersion.getValue()));
-        }
+        opCtx->recoveryUnit()->registerChange(
+            new CollectionVersionLogOpHandler(opCtx,
+                                              NamespaceString(refreshCollection),
+                                              statusWithLastRefreshedChunkVersion.getValue()));
     }
 }
 
@@ -457,16 +439,13 @@ void CollectionShardingState::_onConfigDeleteInvalidateCachedMetadataAndNotify(
     dassert(opCtx->lockState()->isCollectionLockedForMode(_nss.ns(), MODE_IX));
     invariant(serverGlobalParams.clusterRole == ClusterRole::ShardServer);
 
-    if (!isPrimary(opCtx, _nss)) {
-        // Extract which collection entry is being deleted from the _id field.
-        std::string deletedCollection;
-        fassertStatusOK(
-            40479,
-            bsonExtractStringField(query, ShardCollectionType::uuid.name(), &deletedCollection));
+    // Extract which collection entry is being deleted from the _id field.
+    std::string deletedCollection;
+    fassertStatusOK(
+        40479, bsonExtractStringField(query, ShardCollectionType::uuid.name(), &deletedCollection));
 
-        opCtx->recoveryUnit()->registerChange(new CollectionVersionLogOpHandler(
-            opCtx, NamespaceString(deletedCollection), ChunkVersion::UNSHARDED()));
-    }
+    opCtx->recoveryUnit()->registerChange(new CollectionVersionLogOpHandler(
+        opCtx, NamespaceString(deletedCollection), ChunkVersion::UNSHARDED()));
 }
 
 bool CollectionShardingState::_checkShardVersionOk(OperationContext* opCtx,

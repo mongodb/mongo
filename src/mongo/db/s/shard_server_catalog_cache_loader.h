@@ -218,6 +218,16 @@ private:
     typedef std::map<NamespaceString, TaskList> TaskLists;
 
     /**
+     * Retrieves chunk metadata from the shard's persisted metadata store, then passes the results
+     * to the 'callbackFn'.
+     */
+    void _runSecondaryGetChunksSince(
+        OperationContext* opCtx,
+        const NamespaceString& nss,
+        const ChunkVersion& catalogCacheSinceVersion,
+        stdx::function<void(OperationContext*, StatusWith<CollectionAndChangedChunks>)> callbackFn);
+
+    /**
      * Refreshes chunk metadata from the config server's metadata store, and schedules maintenance
      * of the shard's persisted metadata store with the latest updates retrieved from the config
      * server.
@@ -291,6 +301,21 @@ private:
      * Only run on the shard primary.
      */
     bool _updatePersistedMetadata(OperationContext* opCtx, const NamespaceString& nss);
+
+    /**
+     * Attempt to read the collection and chunk metadata since version 'sinceVersion' from the shard
+     * persisted metadata store.
+     *
+     * Retries reading the metadata if the shard persisted metadata store becomes imcomplete due to
+     * concurrent updates being applied -- complete here means that every chunk range is accounted
+     * for.
+     *
+     * May return: a complete metadata update, which when applied to a complete metadata store up to
+     * 'sinceVersion' again produces a complete metadata store; or a NamespaceNotFound error, which
+     * means no metadata was found and the collection was dropped.
+     */
+    StatusWith<CollectionAndChangedChunks> _getCompletePersistedMetadataForSecondarySinceVersion(
+        OperationContext* opCtx, const NamespaceString& nss, const ChunkVersion& version);
 
     // Used by the shard primary to retrieve chunk metadata from the config server.
     const std::unique_ptr<CatalogCacheLoader> _configServerLoader;

@@ -60,13 +60,20 @@ struct QueryAndSort {
 };
 
 /**
- * Subset of the shard's collections collection related to refresh state.
+ * Subset of the shard's collections collection document that relates to refresh state.
  */
 struct RefreshState {
-    bool operator==(RefreshState& other);
+    bool operator==(RefreshState& other) const;
+    std::string toString() const;
 
+    // The current epoch of the collection metadata.
     OID epoch;
+
+    // Whether a refresh is currently in progress.
     bool refreshing;
+
+    // The collection version after the last complete refresh. Indicates change if refreshing has
+    // started and finished since last loaded.
     ChunkVersion lastRefreshedCollectionVersion;
 };
 

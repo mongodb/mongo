@@ -72,9 +72,16 @@ QueryAndSort createShardChunkDiffQuery(const ChunkVersion& collectionVersion) {
             BSON(ChunkType::lastmod() << 1)};
 }
 
-bool RefreshState::operator==(RefreshState& other) {
+bool RefreshState::operator==(RefreshState& other) const {
     return (other.epoch == epoch) && (other.refreshing == refreshing) &&
         (other.lastRefreshedCollectionVersion == lastRefreshedCollectionVersion);
+}
+
+std::string RefreshState::toString() const {
+    return str::stream() << "epoch: " << epoch
+                         << ", refreshing: " << (refreshing ? "true" : "false")
+                         << ", lastRefreshedCollectionVersion: "
+                         << lastRefreshedCollectionVersion.toString();
 }
 
 Status setPersistedRefreshFlags(OperationContext* opCtx, const NamespaceString& nss) {
@@ -119,7 +126,11 @@ StatusWith<RefreshState> getPersistedRefreshFlags(OperationContext* opCtx,
     }
 
     return RefreshState{entry.getEpoch(),
-                        entry.hasRefreshing() ? entry.getRefreshing() : false,
+                        // If the refreshing field has not yet been added, this means that the first
+                        // refresh has started, but no chunks have ever yet been applied, around
+                        // which these flags are set. So default to refreshing true because the
+                        // chunk metadata is being updated and is not yet ready to be read.
+                        entry.hasRefreshing() ? entry.getRefreshing() : true,
                         entry.hasLastRefreshedCollectionVersion()
                             ? entry.getLastRefreshedCollectionVersion()
                             : ChunkVersion(0, 0, entry.getEpoch())};
