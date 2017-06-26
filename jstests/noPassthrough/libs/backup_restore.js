@@ -282,8 +282,16 @@ var BackupRestoreTest = function(options) {
                 _runCmd(rsyncCmd);
                 sleep(10000);
             }
+            // Set an option to skip 'ns not found' error during collection validation
+            // when shutting down mongod.
+            TestData.skipValidationOnNamespaceNotFound = true;
+
             // Stop the mongod process
             rst.stop(secondary.nodeId);
+
+            // Unset to allow future collection validation on stopMongod.
+            TestData.skipValidationOnNamespaceNotFound = false;
+
             // One final rsync
             _runCmd(rsyncCmd);
             removeFile(hiddenDbpath + '/mongod.lock');
