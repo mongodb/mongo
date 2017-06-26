@@ -1194,10 +1194,24 @@ post:
       optional: true
 
   # Gather and archive mongo coredumps.
+  - command: shell.exec
+    params:
+      working_dir: "src"
+      script: |
+        # Find all core files and move to src
+        core_files=$(/usr/bin/find -H .. \( -name "*.core" -o -name "*.mdmp" \) 2> /dev/null)
+        for core_file in $core_files
+        do
+          base_name=$(echo $core_file | sed "s/.*\///")
+          # Move file if it does not already exist
+          if [ ! -f $base_name ]; then
+            mv $core_file .
+          fi
+        done
   - command: archive.targz_pack
     params:
       target: "mongo-coredumps.tgz"
-      source_dir: "./"
+      source_dir: "src"
       include:
         - "./**.core"
         - "./**.mdmp" # Windows: minidumps
@@ -1220,7 +1234,7 @@ post:
       script: |
         mkdir unittest_binaries
         # Find all core files
-        core_files=$(/usr/bin/find -H . -name "dump_*.core" -o -name "*.mdmp" 2> /dev/null)
+        core_files=$(/usr/bin/find -H . \( -name "dump_*.core" -o -name "*.mdmp" \) 2> /dev/null)
         for core_file in $core_files
         do
           # A core file name does not always have the executable name that generated it.
