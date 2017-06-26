@@ -453,6 +453,12 @@ var ReplSetTest = function(opts) {
         timeout = timeout || self.kDefaultTimeoutMS;
         nodes = nodes || self.nodes;
         expectedPrimaryNodeId = expectedPrimaryNodeId || -1;
+        if (expectedPrimaryNodeId === -1) {
+            print("AwaitNodesAgreeOnPrimary: Waiting for nodes to agree on any primary.");
+        } else {
+            print("AwaitNodesAgreeOnPrimary: Waiting for nodes to agree on " +
+                  nodes[expectedPrimaryNodeId].name + " as primary.");
+        }
 
         assert.soonNoExcept(function() {
             var primary = expectedPrimaryNodeId;
@@ -464,6 +470,10 @@ var ReplSetTest = function(opts) {
                     if (replSetGetStatus.members[j].state === ReplSetTest.State.PRIMARY) {
                         // Node sees two primaries.
                         if (nodesPrimary !== -1) {
+                            print("AwaitNodesAgreeOnPrimary: Retrying because " + nodes[i].name +
+                                  " thinks both " + nodes[nodesPrimary].name + " and " +
+                                  nodes[j].name + " are primary.");
+
                             return false;
                         }
                         nodesPrimary = j;
@@ -471,6 +481,8 @@ var ReplSetTest = function(opts) {
                 }
                 // Node doesn't see a primary.
                 if (nodesPrimary < 0) {
+                    print("AwaitNodesAgreeOnPrimary: Retrying because " + nodes[i].name +
+                          " does not see a primary.");
                     return false;
                 }
 
@@ -478,10 +490,14 @@ var ReplSetTest = function(opts) {
                     // If we haven't seen a primary yet, set it to this.
                     primary = nodesPrimary;
                 } else if (primary !== nodesPrimary) {
+                    print("AwaitNodesAgreeOnPrimary: Retrying because " + nodes[i].name +
+                          " thinks the primary is " + nodes[nodesPrimary].name + " instead of " +
+                          nodes[primary].name);
                     return false;
                 }
             }
 
+            print("AwaitNodesAgreeOnPrimary: Nodes agreed on primary " + nodes[primary].name);
             return true;
         }, "Awaiting nodes to agree on primary", timeout);
     };
