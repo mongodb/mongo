@@ -1146,7 +1146,7 @@ __curjoin_open_main(WT_SESSION_IMPL *session, WT_CURSOR_JOIN *cjoin,
 	const char *raw_cfg[] = { WT_CONFIG_BASE(
 	    session, WT_SESSION_open_cursor), "raw", NULL };
 
-	main_uri = NULL;
+	main_uri = newformat = NULL;
 	idx = entry->index;
 
 	newsize = strlen(cjoin->table->name) + idx->colconf.len + 1;
@@ -1169,9 +1169,11 @@ __curjoin_open_main(WT_SESSION_IMPL *session, WT_CURSOR_JOIN *cjoin,
 		    newformat, len, "%s0x", entry->main->value_format));
 		__wt_free(session, entry->main->value_format);
 		entry->main->value_format = newformat;
+		newformat = NULL;
 	}
 
 err:	__wt_free(session, main_uri);
+	__wt_free(session, newformat);
 	return (ret);
 }
 

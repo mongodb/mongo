@@ -318,10 +318,17 @@ void	 wts_verify(const char *);
 
 /*
  * mmrand --
- *	Return a random value between a min/max pair.
+ *	Return a random value between a min/max pair, inclusive.
  */
 static inline uint32_t
 mmrand(WT_RAND_STATE *rnd, u_int min, u_int max)
 {
-	return (rng(rnd) % (((max) + 1) - (min)) + (min));
+	uint32_t v;
+	u_int range;
+
+	v = rng(rnd);
+	range = (max - min) + 1;
+	v %= range;
+	v += min;
+	return (v);
 }
