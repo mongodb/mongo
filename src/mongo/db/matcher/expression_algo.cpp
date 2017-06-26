@@ -36,6 +36,7 @@
 #include "mongo/db/matcher/expression_array.h"
 #include "mongo/db/matcher/expression_leaf.h"
 #include "mongo/db/matcher/expression_tree.h"
+#include "mongo/db/matcher/schema/expression_internal_schema_xor.h"
 #include "mongo/db/pipeline/dependencies.h"
 #include "mongo/db/query/collation/collation_index_key.h"
 #include "mongo/db/query/collation/collator_interface.h"
@@ -274,6 +275,25 @@ unique_ptr<MatchExpression> createNorOfNodes(std::vector<unique_ptr<MatchExpress
     return std::move(splitNor);
 }
 
+/**
+ * Creates a MatchExpression that is equivalent to {$_internal_schema_xor: [children[0],
+ * children[1]...]}.
+ */
+unique_ptr<MatchExpression> createInternalSchemaXorOfNodes(
+    std::vector<unique_ptr<MatchExpression>>* children) {
+    if (children->empty()) {
+        return nullptr;
+    }
+
+    unique_ptr<InternalSchemaXorMatchExpression> splitInternalSchemaXor =
+        stdx::make_unique<InternalSchemaXorMatchExpression>();
+    for (auto&& expr : *children) {
+        splitInternalSchemaXor->add(expr.release());
+    }
+
+    return std::move(splitInternalSchemaXor);
+}
+
 void applyRenamesToExpression(MatchExpression* expr, const StringMap<std::string>& renames) {
     if (expr->isArray()) {
         return;
@@ -345,7 +365,9 @@ splitMatchExpressionByWithoutRenames(unique_ptr<MatchExpression> expr,
             }
             return {createNorOfNodes(&separate), createNorOfNodes(&reliant)};
         }
+
         case MatchExpression::OR:
+        case MatchExpression::INTERNAL_SCHEMA_XOR:
         case MatchExpression::NOT: {
             // If we aren't independent, we can't safely split.
             return {nullptr, std::move(expr)};

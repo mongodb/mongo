@@ -38,6 +38,7 @@
 #include "mongo/db/matcher/expression_tree.h"
 #include "mongo/db/matcher/schema/expression_internal_schema_max_items.h"
 #include "mongo/db/matcher/schema/expression_internal_schema_min_items.h"
+#include "mongo/db/matcher/schema/expression_internal_schema_xor.h"
 #include "mongo/db/namespace_string.h"
 #include "mongo/stdx/memory.h"
 #include "mongo/util/mongoutils/str.h"
@@ -331,6 +332,15 @@ StatusWithMatchExpression MatchExpressionParser::_parse(const BSONObj& obj,
                 if (e.type() != Array)
                     return {Status(ErrorCodes::BadValue, "$nor must be an array")};
                 std::unique_ptr<NorMatchExpression> temp = stdx::make_unique<NorMatchExpression>();
+                Status s = _parseTreeList(e.Obj(), temp.get(), collator, childIsTopLevel);
+                if (!s.isOK())
+                    return s;
+                root->add(temp.release());
+            } else if (mongoutils::str::equals("_internal_schema_xor", rest)) {
+                if (e.type() != Array)
+                    return {Status(ErrorCodes::BadValue, "$_internal_schema_xor must be an array")};
+                std::unique_ptr<InternalSchemaXorMatchExpression> temp =
+                    stdx::make_unique<InternalSchemaXorMatchExpression>();
                 Status s = _parseTreeList(e.Obj(), temp.get(), collator, childIsTopLevel);
                 if (!s.isOK())
                     return s;
@@ -703,6 +713,7 @@ StatusWithMatchExpression MatchExpressionParser::_parseElemMatch(const char* nam
 
         isElemMatchValue = !mongoutils::str::equals("$and", elt.fieldName()) &&
             !mongoutils::str::equals("$nor", elt.fieldName()) &&
+            !mongoutils::str::equals("$_internal_schema_xor", elt.fieldName()) &&
             !mongoutils::str::equals("$or", elt.fieldName()) &&
             !mongoutils::str::equals("$where", elt.fieldName());
     }
