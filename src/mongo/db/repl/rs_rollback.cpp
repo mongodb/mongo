@@ -50,6 +50,7 @@
 #include "mongo/db/db_raii.h"
 #include "mongo/db/dbhelpers.h"
 #include "mongo/db/exec/working_set_common.h"
+#include "mongo/db/logical_session_id.h"
 #include "mongo/db/ops/delete.h"
 #include "mongo/db/ops/update.h"
 #include "mongo/db/ops/update_lifecycle_impl.h"
@@ -66,6 +67,7 @@
 #include "mongo/db/repl/rollback_source.h"
 #include "mongo/db/repl/rslog.h"
 #include "mongo/db/s/shard_identity_rollback_notifier.h"
+#include "mongo/db/session_catalog.h"
 #include "mongo/util/exit.h"
 #include "mongo/util/fail_point_service.h"
 #include "mongo/util/log.h"
@@ -158,6 +160,29 @@ Status rollback_internal::updateFixUpInfoFromLocalOplogEntry(FixUpInfo& fixUpInf
     if (obj.isEmpty()) {
         throw RSFatalException(str::stream() << "Local op on rollback has no object field: "
                                              << redact(oplogEntry.toBSON()));
+    }
+
+    // If the operation being rolled back has a txnNumber, then the corresponding entry in the
+    // session transaction table needs to be refetched.
+    auto operationSessionInfo = oplogEntry.getOperationSessionInfo();
+    auto txnNumber = operationSessionInfo.getTxnNumber();
+    if (txnNumber) {
+        auto sessionId = operationSessionInfo.getSessionId();
+        invariant(sessionId);
+        invariant(oplogEntry.getStatementId());
+
+        DocID txnDoc;
+        BSONObjBuilder txnBob;
+        txnBob.append("_id", sessionId->toBSON());
+        txnDoc.ownedObj = txnBob.obj();
+        txnDoc._id = txnDoc.ownedObj.firstElement();
+        // TODO: SERVER-29667
+        // Once collection uuids replace namespace strings for rollback, this will need to be
+        // changed to the uuid of the session transaction table collection.
+        txnDoc.ns = NamespaceString::kSessionTransactionsTableNamespace.ns().c_str();
+
+        fixUpInfo.docsToRefetch.insert(txnDoc);
+        fixUpInfo.refetchTransactionDocs = true;
     }
 
     if (oplogEntry.getOpType() == OpTypeEnum::kCommand) {
@@ -856,6 +881,11 @@ void syncFixUp(OperationContext* opCtx,
     if (!status.isOK()) {
         severe() << "Failed to reinitialize auth data after rollback: " << redact(status);
         fassertFailedNoTrace(40496);
+    }
+
+    // If necessary, clear the in-memory session transaction table.
+    if (fixUpInfo.refetchTransactionDocs) {
+        SessionCatalog::get(opCtx)->clearTransactionTable();
     }
 
     // Reload the lastAppliedOpTime and lastDurableOpTime value in the replcoord and the

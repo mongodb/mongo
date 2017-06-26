@@ -64,6 +64,11 @@ void SessionCatalog::create(ServiceContext* service) {
     sessionTransactionTable.emplace(service);
 }
 
+void SessionCatalog::reset_forTest(ServiceContext* service) {
+    auto& sessionTransactionTable = sessionTransactionTableDecoration(service);
+    sessionTransactionTable.reset();
+}
+
 SessionCatalog* SessionCatalog::get(OperationContext* opCtx) {
     return get(opCtx->getServiceContext());
 }
@@ -128,6 +133,11 @@ ScopedSession SessionCatalog::checkOutSession(OperationContext* opCtx) {
     sri->state = SessionRuntimeInfo::kInUse;
 
     return ScopedSession(opCtx, std::move(sri));
+}
+
+void SessionCatalog::clearTransactionTable() {
+    stdx::lock_guard<stdx::mutex> lg(_mutex);
+    _txnTable.clear();
 }
 
 void SessionCatalog::_releaseSession(const LogicalSessionId& lsid) {

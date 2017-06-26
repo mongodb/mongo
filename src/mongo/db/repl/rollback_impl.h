@@ -193,6 +193,16 @@ private:
     void _checkShardIdentityRollback(OperationContext* opCtx);
 
     /**
+     * The in-memory session transaction table needs to be cleared after rollback, so it is forced
+     * to refetch from storage.
+     *
+     * 'opCtx' cannot be null.
+     *
+     * Called by _tearDown().
+     */
+    void _clearSessionTransactionTable(OperationContext* opCtx);
+
+    /**
      * Transitions the current member state from ROLLBACK to SECONDARY.
      * This operation must succeed. Otherwise, we will shut down the server.
      *

@@ -40,6 +40,7 @@
 #include "mongo/db/repl/replication_coordinator.h"
 #include "mongo/db/repl/rollback_impl_listener.h"
 #include "mongo/db/s/shard_identity_rollback_notifier.h"
+#include "mongo/db/session_catalog.h"
 #include "mongo/stdx/memory.h"
 #include "mongo/util/assert_util.h"
 #include "mongo/util/log.h"
@@ -182,6 +183,11 @@ void RollbackImpl::_checkShardIdentityRollback(OperationContext* opCtx) {
     }
 }
 
+void RollbackImpl::_clearSessionTransactionTable(OperationContext* opCtx) {
+    invariant(opCtx);
+    SessionCatalog::get(opCtx)->clearTransactionTable();
+}
+
 void RollbackImpl::_transitionFromRollbackToSecondary(OperationContext* opCtx) {
     invariant(opCtx);
 
@@ -208,6 +214,7 @@ void RollbackImpl::_tearDown(OperationContext* opCtx) {
     invariant(opCtx);
 
     _checkShardIdentityRollback(opCtx);
+    _clearSessionTransactionTable(opCtx);
     _transitionFromRollbackToSecondary(opCtx);
 }
 

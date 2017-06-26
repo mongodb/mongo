@@ -1396,6 +1396,93 @@ TEST(RSRollbackTest, LocalEntryWithoutO2IsFatal) {
                   RSFatalException);
 }
 
+DEATH_TEST_F(RSRollbackTest, LocalEntryWithTxnNumberWithoutSessionIdIsFatal, "invariant") {
+    auto validOplogEntry = BSON("ts" << Timestamp(Seconds(1), 0) << "t" << 1LL << "h" << 1LL << "op"
+                                     << "i"
+                                     << "ui"
+                                     << UUID::gen()
+                                     << "ns"
+                                     << "test.t"
+                                     << "o"
+                                     << BSON("_id" << 1 << "a" << 1));
+    FixUpInfo fui;
+    ASSERT_OK(updateFixUpInfoFromLocalOplogEntry(fui, validOplogEntry));
+
+    const auto txnNumber = BSON("txnNumber" << 1LL);
+    const auto noSessionIdOrStmtId = validOplogEntry.addField(txnNumber.firstElement());
+
+    const auto stmtId = BSON("stmtId" << 1);
+    const auto noSessionId = noSessionIdOrStmtId.addField(stmtId.firstElement());
+    ASSERT_THROWS(updateFixUpInfoFromLocalOplogEntry(fui, noSessionId).transitional_ignore(),
+                  RSFatalException);
+}
+
+DEATH_TEST_F(RSRollbackTest, LocalEntryWithTxnNumberWithoutStmtIdIsFatal, "invariant") {
+    auto validOplogEntry = BSON("ts" << Timestamp(Seconds(1), 0) << "t" << 1LL << "h" << 1LL << "op"
+                                     << "i"
+                                     << "ui"
+                                     << UUID::gen()
+                                     << "ns"
+                                     << "test.t"
+                                     << "o"
+                                     << BSON("_id" << 1 << "a" << 1));
+    FixUpInfo fui;
+    ASSERT_OK(updateFixUpInfoFromLocalOplogEntry(fui, validOplogEntry));
+
+    const auto txnNumber = BSON("txnNumber" << 1LL);
+    const auto noSessionIdOrStmtId = validOplogEntry.addField(txnNumber.firstElement());
+
+    const auto uuid = UUID::gen();
+    const auto sessionId = BSON("lsid" << BSON("id" << uuid.toBSON()));
+    const auto noStmtId = noSessionIdOrStmtId.addField(sessionId.firstElement());
+    ASSERT_THROWS(updateFixUpInfoFromLocalOplogEntry(fui, noStmtId).transitional_ignore(),
+                  RSFatalException);
+}
+
+TEST(RSRollbackTest, LocalEntryWithTxnNumberAddsTransactionTableDocToBeRefetched) {
+    FixUpInfo fui;
+    auto entryWithoutTxnNumber =
+        BSON("ts" << Timestamp(Seconds(1), 0) << "t" << 1LL << "h" << 1LL << "op"
+                  << "i"
+                  << "ui"
+                  << UUID::gen()
+                  << "ns"
+                  << "test.t2"
+                  << "o"
+                  << BSON("_id" << 2 << "a" << 2));
+    ASSERT_OK(updateFixUpInfoFromLocalOplogEntry(fui, entryWithoutTxnNumber));
+
+    // With no txnNumber present, no extra documents need to be refetched.
+    ASSERT_EQ(fui.docsToRefetch.size(), 1U);
+
+    auto entryWithTxnNumber =
+        BSON("ts" << Timestamp(Seconds(1), 0) << "t" << 1LL << "h" << 1LL << "op"
+                  << "i"
+                  << "ui"
+                  << UUID::gen()
+                  << "ns"
+                  << "test.t"
+                  << "o"
+                  << BSON("_id" << 1 << "a" << 1)
+                  << "txnNumber"
+                  << 1LL
+                  << "stmtId"
+                  << 1
+                  << "lsid"
+                  << BSON("id" << UUID::gen().toBSON()));
+    ASSERT_OK(updateFixUpInfoFromLocalOplogEntry(fui, entryWithTxnNumber));
+
+    // If txnNumber is present, the session transactions table document corresponding to the oplog
+    // entry's sessionId also needs to be refetched.
+    ASSERT_EQ(fui.docsToRefetch.size(), 3U);
+
+    DocID expectedTxnDoc;
+    expectedTxnDoc.ownedObj = BSON("_id" << entryWithTxnNumber["lsid"]);
+    expectedTxnDoc._id = expectedTxnDoc.ownedObj.firstElement();
+    expectedTxnDoc.ns = NamespaceString::kSessionTransactionsTableNamespace.ns().c_str();
+    ASSERT_TRUE(fui.docsToRefetch.find(expectedTxnDoc) != fui.docsToRefetch.end());
+}
+
 TEST_F(RSRollbackTest, RollbackReturnsImmediatelyOnFailureToTransitionToRollback) {
     // On failing to transition to ROLLBACK, rollback() should return immediately and not call
     // syncRollback(). We provide an empty oplog so that if syncRollback() is called erroneously,

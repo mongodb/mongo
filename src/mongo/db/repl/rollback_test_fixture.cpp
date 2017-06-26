@@ -38,6 +38,7 @@
 #include "mongo/db/repl/replication_coordinator.h"
 #include "mongo/db/repl/replication_coordinator_mock.h"
 #include "mongo/db/repl/replication_process.h"
+#include "mongo/db/session_catalog.h"
 #include "mongo/stdx/memory.h"
 #include "mongo/util/mongoutils/str.h"
 
@@ -83,6 +84,8 @@ void RollbackTest::setUp() {
                                 std::unique_ptr<ReplicationCoordinator>(_coordinator));
     setOplogCollectionName();
 
+    SessionCatalog::create(serviceContext);
+
     _opCtx = cc().makeOperationContext();
     _replicationProcess->getConsistencyMarkers()->setAppliedThrough(_opCtx.get(), OpTime{});
     _replicationProcess->getConsistencyMarkers()->setMinValid(_opCtx.get(), OpTime{});
@@ -94,6 +97,8 @@ void RollbackTest::setUp() {
 void RollbackTest::tearDown() {
     _coordinator = nullptr;
     _opCtx.reset();
+
+    SessionCatalog::reset_forTest(_serviceContextMongoDTest.getServiceContext());
 
     // We cannot unset the global replication coordinator because ServiceContextMongoD::tearDown()
     // calls dropAllDatabasesExceptLocal() which requires the replication coordinator to clear all

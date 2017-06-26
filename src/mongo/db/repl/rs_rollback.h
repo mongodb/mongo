@@ -250,6 +250,10 @@ struct FixUpInfo {
     stdx::unordered_map<UUID, std::pair<OpTime, std::string>, UUID::Hash>
         collectionsToRollBackPendingDrop;
 
+    // True if rollback requires re-fetching documents in the session transaction table. If true,
+    // after rollback the in-memory transaction table is cleared.
+    bool refetchTransactionDocs = false;
+
     OpTime commonPoint;
     RecordId commonPointOurDiskloc;
 

@@ -45,6 +45,11 @@ protected:
         ServiceContextMongoDTest::setUp();
         SessionCatalog::create(getServiceContext());
     }
+
+    void tearDown() final {
+        SessionCatalog::reset_forTest(getServiceContext());
+        ServiceContextMongoDTest::tearDown();
+    }
 };
 
 TEST_F(SessionCatalogTest, CheckoutAndReleaseSession) {

@@ -60,6 +60,12 @@ public:
     static void create(ServiceContext* service);
 
     /**
+     * Resets the transaction table on the specified service context to an uninitialized state.
+     * Meant only for testing.
+     */
+    static void reset_forTest(ServiceContext* service);
+
+    /**
      * Retrieves the session transaction table associated with the service or operation context.
      * Must only be called after 'create' has been called.
      */
@@ -85,6 +91,11 @@ public:
      * Throws exception on errors.
      */
     ScopedSession checkOutSession(OperationContext* opCtx);
+
+    /**
+     * Clears the entire transaction table. Invoked after rollback.
+     */
+    void clearTransactionTable();
 
 private:
     struct SessionRuntimeInfo {
