@@ -58,6 +58,7 @@
 #include "mongo/s/shard_util.h"
 #include "mongo/util/log.h"
 #include "mongo/util/mongoutils/str.h"
+#include "mongo/util/scopeguard.h"
 
 namespace mongo {
 namespace {
@@ -218,10 +219,12 @@ public:
         auto proposedKey(shardCollRequest.getKey().getOwned());
         ShardKeyPattern proposedKeyPattern(proposedKey);
         if (!proposedKeyPattern.isValid()) {
-            errmsg = str::stream() << "Unsupported shard key pattern. Pattern must"
-                                   << " either be a single hashed field, or a list"
-                                   << " of ascending fields.";
-            return false;
+            return appendCommandStatus(result,
+                                       {ErrorCodes::InvalidOptions,
+                                        str::stream() << "Unsupported shard key pattern "
+                                                      << proposedKeyPattern.toString()
+                                                      << ". Pattern must either be a single hashed "
+                                                         "field, or a list of ascending fields"});
         }
 
         bool isHashedShardKey = proposedKeyPattern.isHashedPattern();
@@ -229,12 +232,12 @@ public:
 
         if (isHashedShardKey && careAboutUnique) {
             dassert(proposedKey.nFields() == 1);
-
-            // it's possible to ensure uniqueness on the hashed field by
-            // declaring an additional (non-hashed) unique index on the field,
-            // but the hashed shard key itself should not be declared unique
-            errmsg = "hashed shard keys cannot be declared unique.";
-            return false;
+            return appendCommandStatus(result,
+                                       {ErrorCodes::InvalidOptions,
+                                        "Hashed shard keys cannot be declared unique. It's "
+                                        "possible to ensure uniqueness on the hashed field by "
+                                        "declaring an additional (non-hashed) unique index on the "
+                                        "field."});
         }
 
         uassert(ErrorCodes::IllegalOperation, "can't shard system namespaces", !nss.isSystem());
@@ -272,15 +275,19 @@ public:
         const int maxNumInitialChunksTotal = 1000 * 1000;  // Arbitrary limit to memory consumption
         int numChunks = shardCollRequest.getNumInitialChunks();
         if (numChunks > maxNumInitialChunksForShards || numChunks > maxNumInitialChunksTotal) {
-            errmsg = str::stream()
-                << "numInitialChunks cannot be more than either: " << maxNumInitialChunksForShards
-                << ", 8192 * number of shards; or " << maxNumInitialChunksTotal;
-            return false;
+            return appendCommandStatus(result,
+                                       {ErrorCodes::InvalidOptions,
+                                        str::stream()
+                                            << "numInitialChunks cannot be more than either: "
+                                            << maxNumInitialChunksForShards
+                                            << ", 8192 * number of shards; or "
+                                            << maxNumInitialChunksTotal});
         }
 
         // The rest of the checks require a connection to the primary db
         auto primaryShard = uassertStatusOK(shardRegistry->getShard(opCtx, dbType.getPrimary()));
         ScopedDbConnection conn(primaryShard->getConnString());
+        ON_BLOCK_EXIT([&conn] { conn.done(); });
 
         // Retrieve the collection metadata in order to verify that it is legal to shard this
         // collection.
@@ -301,12 +308,10 @@ public:
                 std::string namespaceType;
                 auto status = bsonExtractStringField(res, "type", &namespaceType);
                 if (!status.isOK()) {
-                    conn.done();
                     return appendCommandStatus(result, status);
                 }
 
                 if (namespaceType == "view") {
-                    conn.done();
                     return appendCommandStatus(
                         result,
                         {ErrorCodes::CommandNotSupportedOnView, "Views cannot be sharded."});
@@ -320,9 +325,8 @@ public:
 
             // Check that collection is not capped.
             if (collectionOptions["capped"].trueValue()) {
-                errmsg = "can't shard capped collection";
-                conn.done();
-                return false;
+                return appendCommandStatus(
+                    result, {ErrorCodes::InvalidOptions, "can't shard a capped collection"});
             }
 
             // Get collection default collation.
@@ -333,14 +337,12 @@ public:
                 if (status.isOK()) {
                     defaultCollation = collationElement.Obj().getOwned();
                     if (defaultCollation.isEmpty()) {
-                        conn.done();
                         return appendCommandStatus(
                             result,
                             {ErrorCodes::BadValue,
                              "Default collation in collection metadata cannot be empty."});
                     }
                 } else if (status != ErrorCodes::NoSuchKey) {
-                    conn.done();
                     return appendCommandStatus(
                         result,
                         {status.code(),
@@ -353,7 +355,6 @@ public:
             // If the collection has a non-simple default collation but the user did not specify the
             // simple collation explicitly, return an error.
             if (!defaultCollation.isEmpty() && !simpleCollationSpecified) {
-                conn.done();
                 return appendCommandStatus(result,
                                            {ErrorCodes::BadValue,
                                             str::stream()
@@ -398,13 +399,17 @@ public:
             BSONObj currentKey = idx["key"].embeddedObject();
             bool isUnique = idx["unique"].trueValue();
             if (isUnique && !proposedShardKey.isUniqueIndexCompatible(currentKey)) {
-                errmsg = str::stream() << "can't shard collection '" << nss.ns() << "' "
-                                       << "with unique index on " << currentKey << " "
-                                       << "and proposed shard key " << proposedKey << ". "
-                                       << "Uniqueness can't be maintained unless "
-                                       << "shard key is a prefix";
-                conn.done();
-                return false;
+                return appendCommandStatus(
+                    result,
+                    {ErrorCodes::InvalidOptions,
+                     str::stream()
+                         << "can't shard collection '"
+                         << nss.ns()
+                         << "' with unique index on "
+                         << currentKey
+                         << " and proposed shard key "
+                         << proposedKey
+                         << ". Uniqueness can't be maintained unless shard key is a prefix"});
             }
         }
 
@@ -421,12 +426,14 @@ public:
                 // per field per collection.
                 if (isHashedShardKey && !idx["seed"].eoo() &&
                     idx["seed"].numberInt() != BSONElementHasher::DEFAULT_HASH_SEED) {
-                    errmsg = str::stream() << "can't shard collection " << nss.ns()
-                                           << " with hashed shard key " << proposedKey
-                                           << " because the hashed index uses a non-default"
-                                           << " seed of " << idx["seed"].numberInt();
-                    conn.done();
-                    return false;
+                    return appendCommandStatus(
+                        result,
+                        {ErrorCodes::InvalidOptions,
+                         str::stream() << "can't shard collection " << nss.ns()
+                                       << " with hashed shard key "
+                                       << proposedKey
+                                       << " because the hashed index uses a non-default seed of "
+                                       << idx["seed"].numberInt()});
                 }
                 hasUsefulIndexForKey = true;
             }
@@ -455,11 +462,15 @@ public:
                 bool isCurrentID = str::equals(currKey.firstElementFieldName(), "_id");
 
                 if (!isExplicitlyUnique && !isCurrentID) {
-                    errmsg = str::stream() << "can't shard collection " << nss.ns() << ", "
-                                           << proposedKey << " index not unique, "
-                                           << "and unique index explicitly specified";
-                    conn.done();
-                    return false;
+                    return appendCommandStatus(
+                        result,
+                        {ErrorCodes::InvalidOptions,
+                         str::stream()
+                             << "can't shard collection "
+                             << nss.ns()
+                             << ", "
+                             << proposedKey
+                             << " index not unique, and unique index explicitly specified"});
                 }
             }
         }
@@ -472,18 +483,16 @@ public:
             checkShardingIndexCmd.append("keyPattern", proposedKey);
 
             if (!conn.get()->runCommand("admin", checkShardingIndexCmd.obj(), res)) {
-                errmsg = res["errmsg"].str();
-                conn.done();
-                return false;
+                return appendCommandStatus(result,
+                                           {ErrorCodes::OperationFailed, res["errmsg"].str()});
             }
         } else if (conn->count(nss.ns()) != 0) {
             // 4. if no useful index, and collection is non-empty, fail
-            errmsg = str::stream() << "please create an index that starts with the "
-                                   << "shard key before sharding.";
-            result.append("proposedKey", proposedKey);
-            result.append("curIndexes", indexes);
-            conn.done();
-            return false;
+            return appendCommandStatus(
+                result,
+                {ErrorCodes::InvalidOptions,
+                 "Please create an index that starts with the proposed shard key before "
+                 "sharding the collection"});
         } else {
             // 5. If no useful index exists, and collection empty, create one on proposedKey.
             //    Only need to call ensureIndex on primary shard, since indexes get copied to
@@ -508,17 +517,10 @@ public:
                     ? response.commandStatus
                     : response.writeConcernStatus;
             }
-            if (!createIndexesStatus.isOK()) {
-                errmsg = str::stream() << "ensureIndex failed to create index on "
-                                       << "primary shard: " << createIndexesStatus.reason();
-                conn.done();
-                return false;
-            }
+            uassertStatusOK(createIndexesStatus);
         }
 
         bool isEmpty = (conn->count(nss.ns()) == 0);
-
-        conn.done();
 
         // Pre-splitting:
         // For new collections which use hashed shard keys, we can can pre-split the
@@ -576,7 +578,6 @@ public:
                 }
             }
         } else if (numChunks > 0) {
-            conn.done();
             return appendCommandStatus(
                 result,
                 {ErrorCodes::InvalidOptions,
