@@ -63,7 +63,7 @@ public:
         // Sufficient bytes to encode extra type information for any BSON key that fits in 1KB.
         // The encoding format will need to change if we raise this limit.
         static const uint8_t kMaxBytesNeeded = 127;
-        static const uint32_t kMaxKeyBytes = 1024;
+        static const uint32_t kMaxKeyBytes = 4096;
         static const uint32_t kMaxTypeBitsPerDecimal = 17;
         static const uint32_t kBytesForTypeAndEmptyKey = 2;
         static const uint32_t kMaxDecimalsPerKey =

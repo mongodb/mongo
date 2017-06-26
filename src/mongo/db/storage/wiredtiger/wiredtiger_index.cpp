@@ -78,7 +78,7 @@ MONGO_FP_DECLARE(WTEmulateOutOfOrderNextIndexKey);
 using std::string;
 using std::vector;
 
-static const int TempKeyMaxSize = 1024;  // this goes away with SERVER-3372
+static const int TempKeyMaxSize = 4096;  // this goes away with SERVER-3372
 
 static const WiredTigerItem emptyItem(NULL, 0);
 
@@ -158,8 +158,8 @@ StatusWith<std::string> WiredTigerIndex::generateCreateString(const std::string&
 
     // Separate out a prefix and suffix in the default string. User configuration will override
     // values in the prefix, but not values in the suffix.  Page sizes are chosen so that index
-    // keys (up to 1024 bytes) will not overflow.
-    ss << "type=file,internal_page_max=16k,leaf_page_max=16k,";
+    // keys (up to 4096 bytes) will not overflow.
+    ss << "type=file,internal_page_max=64k,leaf_page_max=64k,";
     ss << "checksum=on,";
     if (wiredTigerGlobalOptions.useIndexPrefixCompression) {
         ss << "prefix_compression=true,";
