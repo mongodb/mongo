@@ -1256,12 +1256,12 @@ err:	switch (complete) {
 }
 
 /*
- * __split_internal_lock --
+ * __split_internal_lock_worker --
  *	Lock an internal page.
  */
 static int
-__split_internal_lock(WT_SESSION_IMPL *session, WT_REF *ref, bool trylock,
-    WT_PAGE **parentp, bool *hazardp)
+__split_internal_lock_worker(WT_SESSION_IMPL *session,
+    WT_REF *ref, bool trylock, WT_PAGE **parentp, bool *hazardp)
 {
 	WT_DECL_RET;
 	WT_PAGE *parent;
@@ -1336,6 +1336,32 @@ __split_internal_lock(WT_SESSION_IMPL *session, WT_REF *ref, bool trylock,
 	return (0);
 
 err:	WT_PAGE_UNLOCK(session, parent);
+	return (ret);
+}
+
+/*
+ * __split_internal_lock --
+ *	Lock an internal page.
+ */
+static int
+__split_internal_lock(WT_SESSION_IMPL *session,
+    WT_REF *ref, bool trylock, WT_PAGE **parentp, bool *hazardp)
+{
+	WT_DECL_RET;
+
+	/*
+	 * There's no lock on our parent page and we're about to acquire one,
+	 * which implies using the WT_REF.home field to reference our parent
+	 * page. As a child of the parent page, we prevent its eviction, but
+	 * that's a weak guarantee. If the parent page splits, and our WT_REF
+	 * were to move with the split, the WT_REF.home field might change
+	 * underneath us and we could race, and end up attempting to access
+	 * an evicted page. Set the session page-index generation so if the
+	 * parent splits, it still can't be evicted.
+	 */
+	WT_WITH_PAGE_INDEX(session,
+	    ret = __split_internal_lock_worker(
+	    session, ref, trylock, parentp, hazardp));
 	return (ret);
 }
 
