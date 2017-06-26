@@ -85,7 +85,6 @@ env.Library(
         'service_state_machine.cpp',
     ],
     LIBDEPS=[
-        '$BUILD_DIR/mongo/db/auth/authentication_restriction',
         "$BUILD_DIR/mongo/db/service_context",
         '$BUILD_DIR/mongo/db/stats/counters',
         "$BUILD_DIR/mongo/util/processinfo",

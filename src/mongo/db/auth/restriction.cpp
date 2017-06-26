@@ -26,8 +26,6 @@
  *    it in the license file.
  */
 
-#include "mongo/platform/basic.h"
-
 #include "mongo/db/auth/restriction.h"
 
 namespace mongo {

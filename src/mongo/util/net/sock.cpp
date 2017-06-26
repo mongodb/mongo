@@ -194,6 +194,15 @@ void disableNagle(int sock) {
 
 #endif
 
+string getAddrInfoStrError(int code) {
+#if !defined(_WIN32)
+    return gai_strerror(code);
+#else
+    /* gai_strerrorA is not threadsafe on windows. don't use it. */
+    return errnoWithDescription(code);
+#endif
+}
+
 // --- SockAddr
 
 string makeUnixSockPath(int port) {
@@ -204,7 +213,7 @@ string makeUnixSockPath(int port) {
 // If an ip address is passed in, just return that.  If a hostname is passed
 // in, look up its ip and return that.  Returns "" on failure.
 string hostbyname(const char* hostname) {
-    SockAddr sockAddr(hostname, 0, IPv6Enabled() ? AF_UNSPEC : AF_INET);
+    SockAddr sockAddr(hostname, 0);
     if (!sockAddr.isValid() || sockAddr.getAddr() == "0.0.0.0")
         return "";
     else

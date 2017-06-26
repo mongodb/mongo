@@ -38,6 +38,7 @@
 
 #include "mongo/base/checked_cast.h"
 #include "mongo/config.h"
+#include "mongo/db/auth/restriction_environment.h"
 #include "mongo/db/service_context.h"
 #include "mongo/db/stats/counters.h"
 #include "mongo/stdx/functional.h"
@@ -88,8 +89,8 @@ std::shared_ptr<TransportLayerLegacy::LegacySession> TransportLayerLegacy::Legac
 
 TransportLayerLegacy::LegacySession::LegacySession(std::unique_ptr<AbstractMessagingPort> amp,
                                                    TransportLayerLegacy* tl)
-    : _remote(amp->remoteAddr()),
-      _local(amp->localAddr()),
+    : _remote(amp->remote()),
+      _local(amp->localAddr().toString(true)),
       _tl(tl),
       _tags(kEmptyTagMask),
       _connection(stdx::make_unique<Connection>(std::move(amp))) {}
@@ -327,8 +328,11 @@ void TransportLayerLegacy::_handleNewConnection(std::unique_ptr<AbstractMessagin
     }
 
     amp->setLogLevel(logger::LogSeverity::Debug(1));
-
+    auto restrictionEnvironment =
+        stdx::make_unique<RestrictionEnvironment>(amp->remoteAddr(), amp->localAddr());
     auto session = LegacySession::create(std::move(amp), this);
+    RestrictionEnvironment::set(session, std::move(restrictionEnvironment));
+
     stdx::list<std::weak_ptr<LegacySession>> list;
     auto it = list.emplace(list.begin(), session);
 

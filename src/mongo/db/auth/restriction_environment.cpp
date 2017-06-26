@@ -26,8 +26,6 @@
  *    it in the license file.
  */
 
-#include "mongo/platform/basic.h"
-
 #include "mongo/db/auth/restriction_environment.h"
 #include "mongo/transport/session.h"
 

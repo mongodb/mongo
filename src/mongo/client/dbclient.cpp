@@ -845,9 +845,7 @@ Status DBClientConnection::connectSocketOnly(const HostAndPort& serverAddress) {
     _failed = true;
 
     // We need to construct a SockAddr so we can resolve the address.
-    SockAddr osAddr{serverAddress.host().c_str(),
-                    serverAddress.port(),
-                    static_cast<sa_family_t>(IPv6Enabled() ? AF_UNSPEC : AF_INET)};
+    SockAddr osAddr{serverAddress.host().c_str(), serverAddress.port()};
 
     if (!osAddr.isValid()) {
         return Status(ErrorCodes::InvalidOptions,

@@ -34,7 +34,6 @@
 
 #include <vector>
 
-#include "mongo/db/auth/restriction_environment.h"
 #include "mongo/transport/service_entry_point_utils.h"
 #include "mongo/transport/service_state_machine.h"
 #include "mongo/transport/session.h"
@@ -44,17 +43,8 @@
 namespace mongo {
 
 void ServiceEntryPointImpl::startSession(transport::SessionHandle session) {
-    // Setup the restriction environment on the Session, if the Session has local/remote Sockaddrs
-    const auto& remoteAddr = session->remote().sockAddr();
-    const auto& localAddr = session->local().sockAddr();
-    invariant(remoteAddr && localAddr);
-    auto restrictionEnvironment =
-        stdx::make_unique<RestrictionEnvironment>(*localAddr, *remoteAddr);
-    RestrictionEnvironment::set(session, std::move(restrictionEnvironment));
-
     // Pass ownership of the transport::SessionHandle into our worker thread. When this
     // thread exits, the session will end.
-    //
     launchServiceWorkerThread([ this, session = std::move(session) ]() mutable {
         _nWorkers.addAndFetch(1);
         const auto guard = MakeGuard([this] { _nWorkers.subtractAndFetch(1); });

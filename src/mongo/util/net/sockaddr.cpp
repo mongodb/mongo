@@ -47,22 +47,10 @@
 #endif
 
 #include "mongo/bson/util/builder.h"
-#include "mongo/util/itoa.h"
 #include "mongo/util/log.h"
+#include "mongo/util/net/sock.h"
 
 namespace mongo {
-namespace {
-constexpr int SOCK_FAMILY_UNKNOWN_ERROR = 13078;
-}  // namespace
-
-std::string getAddrInfoStrError(int code) {
-#if !defined(_WIN32)
-    return gai_strerror(code);
-#else
-    /* gai_strerrorA is not threadsafe on windows. don't use it. */
-    return errnoWithDescription(code);
-#endif
-}
 
 SockAddr::SockAddr() {
     addressSize = sizeof(sa);
@@ -80,21 +68,21 @@ SockAddr::SockAddr(int sourcePort) {
     _isValid = true;
 }
 
-SockAddr::SockAddr(StringData target, int port, sa_family_t familyHint)
-    : _hostOrIp(target.toString()) {
+SockAddr::SockAddr(const char* _iporhost, int port) : _hostOrIp(_iporhost) {
+    std::string target = _iporhost;
     if (target == "localhost") {
         target = "127.0.0.1";
     }
 
-    if (mongoutils::str::contains(_hostOrIp, '/')) {
+    if (mongoutils::str::contains(target, '/')) {
 #ifdef _WIN32
         uassert(13080, "no unix socket support on windows", false);
 #endif
         uassert(13079,
                 "path to unix socket too long",
-                _hostOrIp.size() < sizeof(as<sockaddr_un>().sun_path));
+                target.size() < sizeof(as<sockaddr_un>().sun_path));
         as<sockaddr_un>().sun_family = AF_UNIX;
-        strcpy(as<sockaddr_un>().sun_path, _hostOrIp.c_str());
+        strcpy(as<sockaddr_un>().sun_path, target.c_str());
         addressSize = sizeof(sockaddr_un);
         _isValid = true;
         return;
@@ -107,10 +95,11 @@ SockAddr::SockAddr(StringData target, int port, sa_family_t familyHint)
     // hints.ai_flags = AI_ADDRCONFIG; // This is often recommended but don't do it.
     // SERVER-1579
     hints.ai_flags |= AI_NUMERICHOST;  // first pass tries w/o DNS lookup
-    hints.ai_family = familyHint;
+    hints.ai_family = (IPv6Enabled() ? AF_UNSPEC : AF_INET);
 
-    ItoA portStr(port);
-    int ret = getaddrinfo(_hostOrIp.c_str(), StringData(portStr).rawData(), &hints, &addrs);
+    StringBuilder ss;
+    ss << port;
+    int ret = getaddrinfo(target.c_str(), ss.str().c_str(), &hints, &addrs);
 
 // old C compilers on IPv6-capable hosts return EAI_NODATA error
 #ifdef EAI_NODATA
@@ -121,14 +110,14 @@ SockAddr::SockAddr(StringData target, int port, sa_family_t familyHint)
     if ((ret == EAI_NONAME || nodata)) {
         // iporhost isn't an IP address, allow DNS lookup
         hints.ai_flags &= ~AI_NUMERICHOST;
-        ret = getaddrinfo(_hostOrIp.c_str(), StringData(portStr).rawData(), &hints, &addrs);
+        ret = getaddrinfo(target.c_str(), ss.str().c_str(), &hints, &addrs);
     }
 
     if (ret) {
         // we were unsuccessful
         if (target != "0.0.0.0") {  // don't log if this as it is a
                                     // CRT construction and log() may not work yet.
-            log() << "getaddrinfo(\"" << _hostOrIp << "\") failed: " << getAddrInfoStrError(ret);
+            log() << "getaddrinfo(\"" << target << "\") failed: " << getAddrInfoStrError(ret);
             _isValid = false;
             return;
         }
