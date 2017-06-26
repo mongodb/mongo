@@ -28,12 +28,7 @@
  * ex_cursor.c
  *	This is an example demonstrating some cursor types and operations.
  */
-
-#include <stdio.h>
-#include <stdlib.h>
-#include <string.h>
-
-#include <wiredtiger.h>
+#include <test_util.h>
 
 int cursor_reset(WT_CURSOR *cursor);
 int cursor_forward_scan(WT_CURSOR *cursor);
@@ -54,10 +49,12 @@ cursor_forward_scan(WT_CURSOR *cursor)
 	int ret;
 
 	while ((ret = cursor->next(cursor)) == 0) {
-		ret = cursor->get_key(cursor, &key);
-		ret = cursor->get_value(cursor, &value);
+		error_check(cursor->get_key(cursor, &key));
+		error_check(cursor->get_value(cursor, &value));
 	}
-	return (ret);
+	scan_end_check(ret == WT_NOTFOUND);
+
+	return (0);
 }
 /*! [cursor next] */
 
@@ -69,10 +66,12 @@ cursor_reverse_scan(WT_CURSOR *cursor)
 	int ret;
 
 	while ((ret = cursor->prev(cursor)) == 0) {
-		ret = cursor->get_key(cursor, &key);
-		ret = cursor->get_value(cursor, &value);
+		error_check(cursor->get_key(cursor, &key));
+		error_check(cursor->get_value(cursor, &value));
 	}
-	return (ret);
+	scan_end_check(ret == WT_NOTFOUND);
+
+	return (0);
 }
 /*! [cursor prev] */
 
@@ -89,14 +88,13 @@ int
 cursor_search(WT_CURSOR *cursor)
 {
 	const char *value;
-	int ret;
 
 	cursor->set_key(cursor, "foo");
 
-	if ((ret = cursor->search(cursor)) == 0)
-		ret = cursor->get_value(cursor, &value);
+	error_check(cursor->search(cursor));
+	error_check(cursor->get_value(cursor, &value));
 
-	return (ret);
+	return (0);
 }
 /*! [cursor search] */
 
@@ -105,26 +103,24 @@ int
 cursor_search_near(WT_CURSOR *cursor)
 {
 	const char *key, *value;
-	int exact, ret;
+	int exact;
 
 	cursor->set_key(cursor, "foo");
 
-	if ((ret = cursor->search_near(cursor, &exact)) == 0) {
-		switch (exact) {
-		case -1:	/* Returned key smaller than search key */
-			ret = cursor->get_key(cursor, &key);
-			break;
-		case 0:		/* Exact match found */
-			break;
-		case 1:		/* Returned key larger than search key */
-			ret = cursor->get_key(cursor, &key);
-			break;
-		}
-
-		ret = cursor->get_value(cursor, &value);
+	error_check(cursor->search_near(cursor, &exact));
+	switch (exact) {
+	case -1:	/* Returned key smaller than search key */
+		error_check(cursor->get_key(cursor, &key));
+		break;
+	case 0:		/* Exact match found */
+		break;
+	case 1:		/* Returned key larger than search key */
+		error_check(cursor->get_key(cursor, &key));
+		break;
 	}
+	error_check(cursor->get_value(cursor, &value));
 
-	return (ret);
+	return (0);
 }
 /*! [cursor search near] */
 
@@ -160,71 +156,57 @@ cursor_remove(WT_CURSOR *cursor)
 /*! [cursor remove] */
 
 int
-main(void)
+main(int argc, char *argv[])
 {
 	WT_CONNECTION *conn;
 	WT_CURSOR *cursor;
 	WT_SESSION *session;
-	int ret;
 
-	/*
-	 * Create a clean test directory for this run of the test program if the
-	 * environment variable isn't already set (as is done by make check).
-	 */
-	if (getenv("WIREDTIGER_HOME") == NULL) {
-		home = "WT_HOME";
-		ret = system("rm -rf WT_HOME && mkdir WT_HOME");
-	} else
-		home = NULL;
+	home = example_setup(argc, argv);
 
 	/* Open a connection to the database, creating it if necessary. */
-	if ((ret = wiredtiger_open(
-	    home, NULL, "create,statistics=(fast)", &conn)) != 0)
-		fprintf(stderr, "Error connecting to %s: %s\n",
-		    home == NULL ? "." : home, wiredtiger_strerror(ret));
+	error_check(wiredtiger_open(
+	    home, NULL, "create,statistics=(fast)", &conn));
 
 	/* Open a session for the current thread's work. */
-	if ((ret = conn->open_session(conn, NULL, NULL, &session)) != 0)
-		fprintf(stderr, "Error opening a session on %s: %s\n",
-		    home == NULL ? "." : home, wiredtiger_strerror(ret));
+	error_check(conn->open_session(conn, NULL, NULL, &session));
 
-	ret = session->create(session, "table:world",
+	error_check(session->create(session, "table:world",
 	    "key_format=r,value_format=5sii,"
-	    "columns=(id,country,population,area)");
+	    "columns=(id,country,population,area)"));
 
 	/*! [open cursor #1] */
-	ret = session->open_cursor(session, "table:world", NULL, NULL, &cursor);
+	error_check(session->open_cursor(
+	    session, "table:world", NULL, NULL, &cursor));
 	/*! [open cursor #1] */
 
 	/*! [open cursor #2] */
-	ret = session->open_cursor(session,
-	    "table:world(country,population)", NULL, NULL, &cursor);
+	error_check(session->open_cursor(session,
+	    "table:world(country,population)", NULL, NULL, &cursor));
 	/*! [open cursor #2] */
 
 	/*! [open cursor #3] */
-	ret = session->open_cursor(session, "statistics:", NULL, NULL, &cursor);
+	error_check(session->open_cursor(
+	    session, "statistics:", NULL, NULL, &cursor));
 	/*! [open cursor #3] */
 
 	/* Create a simple string table to illustrate basic operations. */
-	ret = session->create(session, "table:map",
-	    "key_format=S,value_format=S");
-	ret = session->open_cursor(session, "table:map", NULL, NULL, &cursor);
-	ret = cursor_insert(cursor);
-	ret = cursor_reset(cursor);
-	ret = cursor_forward_scan(cursor);
-	ret = cursor_reset(cursor);
-	ret = cursor_reverse_scan(cursor);
-	ret = cursor_search_near(cursor);
-	ret = cursor_update(cursor);
-	ret = cursor_remove(cursor);
-	ret = cursor->close(cursor);
+	error_check(session->create(
+	    session, "table:map", "key_format=S,value_format=S"));
+	error_check(session->open_cursor(
+	    session, "table:map", NULL, NULL, &cursor));
+	error_check(cursor_insert(cursor));
+	error_check(cursor_reset(cursor));
+	error_check(cursor_forward_scan(cursor));
+	error_check(cursor_reset(cursor));
+	error_check(cursor_reverse_scan(cursor));
+	error_check(cursor_search_near(cursor));
+	error_check(cursor_update(cursor));
+	error_check(cursor_remove(cursor));
+	error_check(cursor->close(cursor));
 
 	/* Note: closing the connection implicitly closes open session(s). */
-	if ((ret = conn->close(conn, NULL)) != 0) {
-		fprintf(stderr, "Error closing %s: %s\n",
-		    home == NULL ? "." : home, wiredtiger_strerror(ret));
-		return (EXIT_FAILURE);
-	}
+	error_check(conn->close(conn, NULL));
 
 	return (EXIT_SUCCESS);
 }

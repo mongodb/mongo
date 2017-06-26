@@ -29,56 +29,29 @@
  *	This is an example demonstrating how to connect to a database from
  *	multiple processes.
  */
-
-#include <stdio.h>
-#include <stdlib.h>
-#include <string.h>
-
-#include <wiredtiger.h>
+#include <test_util.h>
 
 static const char *home;
 
 int
-main(void)
+main(int argc, char *argv[])
 {
-	int ret;
 	WT_CONNECTION *conn;
 	WT_SESSION *session;
 
-	/*
-	 * Create a clean test directory for this run of the test program if the
-	 * environment variable isn't already set (as is done by make check).
-	 */
-	if (getenv("WIREDTIGER_HOME") == NULL) {
-		home = "WT_HOME";
-		ret = system("rm -rf WT_HOME && mkdir WT_HOME");
-	} else
-		home = NULL;
+	home = example_setup(argc, argv);
 
 	/*! [processes] */
 	/* Open a connection to the database, creating it if necessary. */
-	if ((ret =
-	    wiredtiger_open(home, NULL, "create,multiprocess", &conn)) != 0) {
-		fprintf(stderr, "Error connecting to %s: %s\n",
-		    home == NULL ? "." : home, wiredtiger_strerror(ret));
-		return (EXIT_FAILURE);
-	}
+	error_check(wiredtiger_open(home, NULL, "create,multiprocess", &conn));
 
 	/* Open a session for the current thread's work. */
-	if ((ret = conn->open_session(conn, NULL, NULL, &session)) != 0) {
-		fprintf(stderr, "Error opening a session on %s: %s\n",
-		    home == NULL ? "." : home, wiredtiger_strerror(ret));
-		return (EXIT_FAILURE);
-	}
+	error_check(conn->open_session(conn, NULL, NULL, &session));
 
 	/* XXX Do some work... */
 
 	/* Note: closing the connection implicitly closes open session(s). */
-	if ((ret = conn->close(conn, NULL)) != 0) {
-		fprintf(stderr, "Error closing %s: %s\n",
-		    home == NULL ? "." : home, wiredtiger_strerror(ret));
-		return (EXIT_FAILURE);
-	}
+	error_check(conn->close(conn, NULL));
 	/*! [processes] */
 
 	return (EXIT_SUCCESS);

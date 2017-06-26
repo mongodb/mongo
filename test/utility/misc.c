@@ -128,7 +128,7 @@ testutil_clean_work_dir(const char *dir)
  *	Delete the existing work directory, then create a new one.
  */
 void
-testutil_make_work_dir(char *dir)
+testutil_make_work_dir(const char *dir)
 {
 	size_t len;
 	int ret;
@@ -255,4 +255,27 @@ dstrndup(const char *str, size_t len)
 	p = dcalloc(len + 1, sizeof(char));
 	memcpy(p, str, len);
 	return (p);
+}
+
+/*
+ * example_setup --
+ *	Set the program name, create a home directory for the example programs.
+ */
+const char *
+example_setup(int argc, char * const *argv)
+{
+	const char *home;
+
+	(void)argc;					/* Unused variable */
+
+	(void)testutil_set_progname(argv);
+
+	/*
+	 * Create a clean test directory for this run of the test program if the
+	 * environment variable isn't already set (as is done by make check).
+	 */
+	if ((home = getenv("WIREDTIGER_HOME")) == NULL)
+		home = "WT_HOME";
+	testutil_make_work_dir(home);
+	return (home);
 }

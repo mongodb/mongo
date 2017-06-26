@@ -28,18 +28,7 @@
  * ex_extractor.c
  *	Example of how to use a WiredTiger custom index extractor extension.
  */
-
-#include <inttypes.h>
-#include <stdio.h>
-#include <stdlib.h>
-#include <string.h>
-#include <unistd.h>
-
-#include <wiredtiger.h>
-
-#define	RET_OK(ret)	((ret) == 0 || (ret) == WT_NOTFOUND)
-
-int add_extractor(WT_CONNECTION *conn);
+#include <test_util.h>
 
 static const char *home;
 
@@ -73,19 +62,17 @@ static int
 my_extract(WT_EXTRACTOR *extractor, WT_SESSION *session,
     const WT_ITEM *key, const WT_ITEM *value, WT_CURSOR *result_cursor)
 {
-	char *last_name, *first_name;
 	uint16_t term_end, term_start, year;
-	int ret;
+	char *last_name, *first_name;
 
 	/* Unused parameters */
 	(void)extractor;
 	(void)key;
 
 	/* Unpack the value. */
-	if ((ret = wiredtiger_struct_unpack(
+	error_check(wiredtiger_struct_unpack(
 	    session, value->data, value->size, "SSHH",
-	    &last_name, &first_name, &term_start, &term_end)) != 0)
-		return (ret);
+	    &last_name, &first_name, &term_start, &term_end));
 
 	/*
 	 * We have overlapping years, so multiple records may share the same
@@ -103,12 +90,7 @@ my_extract(WT_EXTRACTOR *extractor, WT_SESSION *session,
 		    "EXTRACTOR: index op for year %" PRIu16 ": %s %s\n",
 		    year, first_name, last_name);
 		result_cursor->set_key(result_cursor, year);
-		if ((ret = result_cursor->insert(result_cursor)) != 0) {
-			fprintf(stderr,
-			    "EXTRACTOR: op year %" PRIu16 ": error %d\n",
-			    year, ret);
-			return (ret);
-		}
+		error_check(result_cursor->insert(result_cursor));
 	}
 	return (0);
 }
@@ -126,23 +108,20 @@ my_extract_terminate(WT_EXTRACTOR *extractor, WT_SESSION *session)
 	return (0);
 }
 
-int
+static void
 add_extractor(WT_CONNECTION *conn)
 {
-	int ret;
-
 	static WT_EXTRACTOR my_extractor = {
 	    my_extract, NULL, my_extract_terminate
 	};
-	ret = conn->add_extractor(conn, "my_extractor", &my_extractor, NULL);
-
-	return (ret);
+	error_check(conn->add_extractor(
+	    conn, "my_extractor", &my_extractor, NULL));
 }
 
 /*
  * Read the index by year and print out who was in office that year.
  */
-static int
+static void
 read_index(WT_SESSION *session)
 {
 	WT_CURSOR *cursor;
@@ -152,96 +131,90 @@ read_index(WT_SESSION *session)
 
 	year = 0;
 	srand((unsigned int)getpid());
-	ret = session->open_cursor(
-	    session, "index:presidents:term", NULL, NULL, &cursor);
+	error_check(session->open_cursor(
+	    session, "index:presidents:term", NULL, NULL, &cursor));
+
 	/*
 	 * Pick 10 random years and read the data.
 	 */
-	for (i = 0; i < 10 && RET_OK(ret); i++) {
+	for (i = 0; i < 10; i++) {
 		year = (uint16_t)((rand() % YEAR_SPAN) + YEAR_BASE);
 		printf("Year %" PRIu16 ":\n", year);
 		cursor->set_key(cursor, year);
-		if ((ret = cursor->search(cursor)) != 0)
-			break;
-		if ((ret = cursor->get_key(cursor, &rec_year)) != 0)
-			break;
-		if ((ret = cursor->get_value(cursor,
-		    &last_name, &first_name, &term_start, &term_end)) != 0)
-			break;
+		error_check(cursor->search(cursor));
+		error_check(cursor->get_key(cursor, &rec_year));
+		error_check(cursor->get_value(cursor,
+		    &last_name, &first_name, &term_start, &term_end));
 
 		/* Report all presidents that served during the chosen year */
+		ret = 0;
 		while (term_start <= year &&
 		    year <= term_end && year == rec_year) {
 			printf("\t%s %s\n", first_name, last_name);
 			if ((ret = cursor->next(cursor)) != 0)
 				break;
-			if ((ret = cursor->get_key(cursor, &rec_year)) != 0)
-				break;
-			if ((ret = cursor->get_value(cursor, &last_name,
-			    &first_name, &term_start, &term_end)) != 0)
-				break;
+			error_check(cursor->get_key(cursor, &rec_year));
+			error_check(cursor->get_value(cursor,
+			    &last_name, &first_name, &term_start, &term_end));
 		}
+		scan_end_check(ret == 0 || ret == WT_NOTFOUND);
 	}
-	if (!RET_OK(ret))
-		fprintf(stderr, "Error %d for year %" PRIu16 "\n", ret, year);
 
-	ret = cursor->close(cursor);
-	return (ret);
+	error_check(cursor->close(cursor));
 }
 
 /*
  * Remove some items from the primary table.
  */
-static int
+static void
 remove_items(WT_SESSION *session)
 {
 	WT_CURSOR *cursor;
 	struct president_data p;
-	int i, ret;
+	int i;
 
 	/*
 	 * Removing items from the primary table will call the extractor
 	 * for the index and allow our custom extractor code to handle
 	 * each custom key.
 	 */
-	ret = session->open_cursor(
-	    session, "table:presidents", NULL, NULL, &cursor);
+	error_check(session->open_cursor(
+	    session, "table:presidents", NULL, NULL, &cursor));
 	/*
 	 * Just remove the first few items.
 	 */
 	for (i = 0; example_data[i].last_name != NULL && i < 2; i++) {
 		p = example_data[i];
 		cursor->set_key(cursor, p.id);
-		ret = cursor->remove(cursor);
+		error_check(cursor->remove(cursor));
 	}
-	return (ret);
 }
 
 /*
  * Set up the table and index of the data.
  */
-static int
+static void
 setup_table(WT_SESSION *session)
 {
 	WT_CURSOR *cursor;
 	struct president_data p;
-	int i, ret;
+	int i;
 
 	/* Create the primary table. It has a key of the unique ID. */
-	ret = session->create(session, "table:presidents",
+	error_check(session->create(session, "table:presidents",
 	    "key_format=I,value_format=SSHH,"
-	    "columns=(ID,last_name,first_name,term_begin,term_end)");
+	    "columns=(ID,last_name,first_name,term_begin,term_end)"));
 
 	/*
 	 * Create the index that is generated with an extractor. The index
 	 * will generate an entry in the index for each year a president
 	 * was in office.
 	 */
-	ret = session->create(session, "index:presidents:term",
-	    "key_format=H,columns=(term),extractor=my_extractor");
+	error_check(session->create(session, "index:presidents:term",
+	    "key_format=H,columns=(term),extractor=my_extractor"));
 
-	ret = session->open_cursor(
-	    session, "table:presidents", NULL, NULL, &cursor);
+	error_check(session->open_cursor(
+	    session, "table:presidents", NULL, NULL, &cursor));
 	for (i = 0; example_data[i].last_name != NULL; i++) {
 		p = example_data[i];
 		cursor->set_key(cursor, p.id);
@@ -251,37 +224,28 @@ setup_table(WT_SESSION *session)
 		    "SETUP: table insert %" PRIu16 "-%" PRIu16 ": %s %s\n",
 		    p.term_start, p.term_end,
 		    p.first_name, p.last_name);
-		ret = cursor->insert(cursor);
+		error_check(cursor->insert(cursor));
 	}
-	return (ret);
 }
 
 int
-main(void)
+main(int argc, char *argv[])
 {
 	WT_CONNECTION *conn;
 	WT_SESSION *session;
-	int ret;
 
-	/*
-	 * Create a clean test directory for this run of the test program if the
-	 * environment variable isn't already set (as is done by make check).
-	 */
-	if (getenv("WIREDTIGER_HOME") == NULL) {
-		home = "WT_HOME";
-		ret = system("rm -rf WT_HOME && mkdir WT_HOME");
-	} else
-		home = NULL;
+	home = example_setup(argc, argv);
 
-	ret = wiredtiger_open(home, NULL, "create,cache_size=500M", &conn);
-	ret = add_extractor(conn);
-	ret = conn->open_session(conn, NULL, NULL, &session);
+	error_check(
+	    wiredtiger_open(home, NULL, "create,cache_size=500M", &conn));
+	add_extractor(conn);
+	error_check(conn->open_session(conn, NULL, NULL, &session));
 
-	ret = setup_table(session);
-	ret = read_index(session);
-	ret = remove_items(session);
+	setup_table(session);
+	read_index(session);
+	remove_items(session);
 
-	ret = conn->close(conn, NULL);
+	error_check(conn->close(conn, NULL));
 
-	return (ret == 0 ? EXIT_SUCCESS : EXIT_FAILURE);
+	return (EXIT_SUCCESS);
 }

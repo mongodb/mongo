@@ -29,16 +29,7 @@
  *	This is an example demonstrating ways to extend WiredTiger with
  *	extractors, collators and loadable modules.
  */
-
-#include <stdio.h>
-#include <stdlib.h>
-#include <string.h>
-
-#include <wiredtiger.h>
-
-#ifdef _WIN32
-#define	strcasecmp stricmp
-#endif
+#include <test_util.h>
 
 static const char *home;
 
@@ -51,8 +42,8 @@ __compare_nocase(WT_COLLATOR *collator, WT_SESSION *session,
 	const char *s1 = (const char *)v1->data;
 	const char *s2 = (const char *)v2->data;
 
-	(void)session; /* unused */
-	(void)collator; /* unused */
+	(void)session;			/* unused variable */
+	(void)collator;			/* unused variable */
 
 	*cmp = strcasecmp(s1, s2);
 	return (0);
@@ -89,42 +80,29 @@ static PREFIX_COLLATOR pcoll10 = { {__compare_prefixes, NULL, NULL}, 10 };
 /*! [n character comparator] */
 
 int
-main(void)
+main(int argc, char *argv[])
 {
-	int ret;
 	WT_CONNECTION *conn;
 	WT_SESSION *session;
 
-	/*
-	 * Create a clean test directory for this run of the test program if the
-	 * environment variable isn't already set (as is done by make check).
-	 */
-	if (getenv("WIREDTIGER_HOME") == NULL) {
-		home = "WT_HOME";
-		ret = system("rm -rf WT_HOME && mkdir WT_HOME");
-	} else
-		home = NULL;
+	home = example_setup(argc, argv);
 
 	/* Open a connection to the database, creating it if necessary. */
-	if ((ret = wiredtiger_open(home, NULL, "create", &conn)) != 0)
-		fprintf(stderr, "Error connecting to %s: %s\n",
-		    home == NULL ? "." : home, wiredtiger_strerror(ret));
+	error_check(wiredtiger_open(home, NULL, "create", &conn));
 
 	/*! [add collator nocase] */
-	ret = conn->add_collator(conn, "nocase", &nocasecoll, NULL);
+	error_check(conn->add_collator(conn, "nocase", &nocasecoll, NULL));
 	/*! [add collator nocase] */
 	/*! [add collator prefix10] */
-	ret = conn->add_collator(conn, "prefix10", &pcoll10.iface, NULL);
+	error_check(conn->add_collator(conn, "prefix10", &pcoll10.iface, NULL));
 
 	/* Open a session for the current thread's work. */
-	if ((ret = conn->open_session(conn, NULL, NULL, &session)) != 0)
-		fprintf(stderr, "Error opening a session on %s: %s\n",
-		    home == NULL ? "." : home, wiredtiger_strerror(ret));
+	error_check(conn->open_session(conn, NULL, NULL, &session));
 
 	/* Do some work... */
 
-	ret = conn->close(conn, NULL);
+	error_check(conn->close(conn, NULL));
 	/*! [add collator prefix10] */
 
-	return (ret == 0 ? EXIT_SUCCESS : EXIT_FAILURE);
+	return (EXIT_SUCCESS);
 }

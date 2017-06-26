@@ -21,13 +21,15 @@ ext/test/kvs_bdb HAVE_BERKELEY_DB
 ext/test/fail_fs
 .
 api/leveldb LEVELDB
-examples/c
 lang/java JAVA
-examples/java JAVA
 lang/python PYTHON
 
-# Test/Benchmark support library.
+# Test/Benchmark/Examples support library.
 test/utility
+
+# Example programs.
+examples/c
+examples/java JAVA
 
 # Test programs.
 test/bloom

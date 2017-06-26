@@ -28,11 +28,7 @@
  * ex_data_source.c
  * 	demonstrates how to create and access a data source
  */
-#include <errno.h>
-#include <stdio.h>
-#include <stdlib.h>
-#include <string.h>
-#include <wiredtiger.h>
+#include <test_util.h>
 
 /*! [WT_EXTENSION_API declaration] */
 #include <wiredtiger_ext.h>
@@ -194,7 +190,6 @@ static int my_cursor_search_near(WT_CURSOR *wtcursor, int *exactp)
 static int my_cursor_insert(WT_CURSOR *wtcursor)
 {
 	WT_SESSION *session = NULL;
-	int ret;
 
 	/* Unused parameters */
 	(void)wtcursor;
@@ -233,7 +228,7 @@ static int my_cursor_insert(WT_CURSOR *wtcursor)
 	/*! [WT_EXTENSION transaction notify] */
 	WT_TXN_NOTIFY handler;
 	handler.notify = data_source_notify;
-	ret = wt_api->transaction_notify(wt_api, session, &handler);
+	error_check(wt_api->transaction_notify(wt_api, session, &handler));
 	/*! [WT_EXTENSION transaction notify] */
 	}
 
@@ -260,7 +255,8 @@ static int my_cursor_insert(WT_CURSOR *wtcursor)
 	second.data = key2;
 	second.size = key2_len;
 
-	ret = wt_api->collate(wt_api, session, collator, &first, &second, &cmp);
+	error_check(wt_api->collate(
+	    wt_api, session, collator, &first, &second, &cmp));
 	if (cmp == 0)
 		printf("key1 collates identically to key2\n");
 	else if (cmp < 0)
@@ -270,7 +266,7 @@ static int my_cursor_insert(WT_CURSOR *wtcursor)
 	/*! [WT_EXTENSION collate] */
 	}
 
-	return (ret);
+	return (0);
 }
 
 static int my_cursor_update(WT_CURSOR *wtcursor)
@@ -296,6 +292,7 @@ my_open_cursor(WT_DATA_SOURCE *dsrc, WT_SESSION *session,
     const char *uri, WT_CONFIG_ARG *config, WT_CURSOR **new_cursor)
 {
 	MY_CURSOR *cursor;
+	int ret;
 
 	/* Allocate and initialize a WiredTiger cursor. */
 	if ((cursor = calloc(1, sizeof(*cursor))) == NULL)
@@ -320,7 +317,6 @@ my_open_cursor(WT_DATA_SOURCE *dsrc, WT_SESSION *session,
 
 /*! [WT_DATA_SOURCE open_cursor] */
 	{
-	int ret = 0;
 	(void)dsrc;					/* Unused parameters */
 	(void)session;
 	(void)uri;
@@ -335,13 +331,8 @@ my_open_cursor(WT_DATA_SOURCE *dsrc, WT_SESSION *session,
 	 * Retrieve the value of the boolean type configuration string
 	 * "overwrite".
 	 */
-	if ((ret = wt_api->config_get(
-	    wt_api, session, config, "overwrite", &v)) != 0) {
-		(void)wt_api->err_printf(wt_api, session,
-		    "overwrite configuration: %s",
-		    session->strerror(session, ret));
-		return (ret);
-	}
+	error_check(wt_api->config_get(
+	    wt_api, session, config, "overwrite", &v));
 	my_data_source_overwrite = v.val != 0;
 	/*! [WT_EXTENSION_CONFIG boolean] */
 
@@ -357,13 +348,8 @@ my_open_cursor(WT_DATA_SOURCE *dsrc, WT_SESSION *session,
 	 * Retrieve the value of the integer type configuration string
 	 * "page_size".
 	 */
-	if ((ret = wt_api->config_get(
-	    wt_api, session, config, "page_size", &v)) != 0) {
-		(void)wt_api->err_printf(wt_api, session,
-		    "page_size configuration: %s",
-		    session->strerror(session, ret));
-		return (ret);
-	}
+	error_check(wt_api->config_get(
+	    wt_api, session, config, "page_size", &v));
 	my_data_source_page_size = v.val;
 	/*! [WT_EXTENSION_CONFIG integer] */
 
@@ -379,13 +365,8 @@ my_open_cursor(WT_DATA_SOURCE *dsrc, WT_SESSION *session,
 	 * Retrieve the value of the string type configuration string
 	 * "key_format".
 	 */
-	if ((ret = wt_api->config_get(
-	    wt_api, session, config, "key_format", &v)) != 0) {
-		(void)wt_api->err_printf(wt_api, session,
-		    "key_format configuration: %s",
-		    session->strerror(session, ret));
-		return (ret);
-	}
+	error_check(wt_api->config_get(
+	    wt_api, session, config, "key_format", &v));
 
 	/*
 	 * Values returned from WT_EXTENSION_API::config in the str field are
@@ -407,20 +388,15 @@ my_open_cursor(WT_DATA_SOURCE *dsrc, WT_SESSION *session,
 	/*
 	 * Configure the appropriate collator.
 	 */
-	if ((ret = wt_api->collator_config(wt_api, session,
-	    "dsrc:", config, &collator, &collator_owned)) != 0) {
-		(void)wt_api->err_printf(wt_api, session,
-		    "collator configuration: %s",
-		    session->strerror(session, ret));
-		return (ret);
-	}
+	error_check(wt_api->collator_config(wt_api, session,
+	    "dsrc:", config, &collator, &collator_owned));
 	/*! [WT_EXTENSION collator config] */
 	}
 
 	/*! [WT_DATA_SOURCE error message] */
 	/*
-	 * If an underlying function fails, log the error and then return an
-	 * error within WiredTiger's name space.
+	 * If an underlying function fails, log the error and then return a
+	 * non-zero value.
 	 */
 	if ((ret = data_source_cursor()) != 0) {
 		(void)wt_api->err_printf(wt_api,
@@ -437,12 +413,7 @@ my_open_cursor(WT_DATA_SOURCE *dsrc, WT_SESSION *session,
 	const char *key = "datasource_uri";
 	const char *value = "data source uri's record";
 
-	if ((ret = wt_api->metadata_insert(wt_api, session, key, value)) != 0) {
-		(void)wt_api->err_printf(wt_api, session,
-		    "%s: metadata insert: %s", key,
-		    session->strerror(session, ret));
-		return (ret);
-	}
+	error_check(wt_api->metadata_insert(wt_api, session, key, value));
 	/*! [WT_EXTENSION metadata insert] */
 	}
 
@@ -453,12 +424,7 @@ my_open_cursor(WT_DATA_SOURCE *dsrc, WT_SESSION *session,
 	 */
 	const char *key = "datasource_uri";
 
-	if ((ret = wt_api->metadata_remove(wt_api, session, key)) != 0) {
-		(void)wt_api->err_printf(wt_api, session,
-		    "%s: metadata remove: %s", key,
-		    session->strerror(session, ret));
-		return (ret);
-	}
+	error_check(wt_api->metadata_remove(wt_api, session, key));
 	/*! [WT_EXTENSION metadata remove] */
 	}
 
@@ -470,13 +436,7 @@ my_open_cursor(WT_DATA_SOURCE *dsrc, WT_SESSION *session,
 	const char *key = "datasource_uri";
 	char *value;
 
-	if ((ret =
-	    wt_api->metadata_search(wt_api, session, key, &value)) != 0) {
-		(void)wt_api->err_printf(wt_api, session,
-		    "%s: metadata search: %s", key,
-		     session->strerror(session, ret));
-		return (ret);
-	}
+	error_check(wt_api->metadata_search(wt_api, session, key, &value));
 	printf("metadata: %s has a value of %s\n", key, value);
 	/*! [WT_EXTENSION metadata search] */
 	}
@@ -490,12 +450,7 @@ my_open_cursor(WT_DATA_SOURCE *dsrc, WT_SESSION *session,
 	const char *key = "datasource_uri";
 	const char *value = "data source uri's record";
 
-	if ((ret = wt_api->metadata_update(wt_api, session, key, value)) != 0) {
-		(void)wt_api->err_printf(wt_api, session,
-		    "%s: metadata update: %s", key,
-		    session->strerror(session, ret));
-		return (ret);
-	}
+	error_check(wt_api->metadata_update(wt_api, session, key, value));
 	/*! [WT_EXTENSION metadata update] */
 	}
 
@@ -604,16 +559,16 @@ my_terminate(WT_DATA_SOURCE *dsrc, WT_SESSION *session)
 	return (0);
 }
 
+static const char *home;
+
 int
-main(void)
+main(int argc, char *argv[])
 {
 	WT_CONNECTION *conn;
-	WT_SESSION *session;
-	int ret;
 
-	ret = wiredtiger_open(NULL, NULL, "create", &conn);
-	ret = conn->open_session(conn, NULL, NULL, &session);
+	home = example_setup(argc, argv);
 
+	error_check(wiredtiger_open(home, NULL, "create", &conn));
 	my_data_source_init(conn);
 
 	{
@@ -632,42 +587,43 @@ main(void)
 		my_checkpoint,
 		my_terminate
 	};
-	ret = conn->add_data_source(conn, "dsrc:", &my_dsrc, NULL);
+	error_check(conn->add_data_source(conn, "dsrc:", &my_dsrc, NULL));
 	/*! [WT_DATA_SOURCE register] */
 	}
 
 	/*! [WT_DATA_SOURCE configure boolean] */
 	/* my_boolean defaults to true. */
-	ret = conn->configure_method(conn,
-	    "WT_SESSION.open_cursor", NULL, "my_boolean=true", "boolean", NULL);
+	error_check(conn->configure_method(
+	    conn, "WT_SESSION.open_cursor",
+	    NULL, "my_boolean=true", "boolean", NULL));
 	/*! [WT_DATA_SOURCE configure boolean] */
 
 	/*! [WT_DATA_SOURCE configure integer] */
 	/* my_integer defaults to 5. */
-	ret = conn->configure_method(conn,
-	    "WT_SESSION.open_cursor", NULL, "my_integer=5", "int", NULL);
+	error_check(conn->configure_method(conn,
+	    "WT_SESSION.open_cursor", NULL, "my_integer=5", "int", NULL));
 	/*! [WT_DATA_SOURCE configure integer] */
 
 	/*! [WT_DATA_SOURCE configure string] */
 	/* my_string defaults to "name". */
-	ret = conn->configure_method(conn,
-	    "WT_SESSION.open_cursor", NULL, "my_string=name", "string", NULL);
+	error_check(conn->configure_method(conn,
+	    "WT_SESSION.open_cursor", NULL, "my_string=name", "string", NULL));
 	/*! [WT_DATA_SOURCE configure string] */
 
 	/*! [WT_DATA_SOURCE configure list] */
 	/* my_list defaults to "first" and "second". */
-	ret = conn->configure_method(conn,
-	    "WT_SESSION.open_cursor",
-	    NULL, "my_list=[first, second]", "list", NULL);
+	error_check(conn->configure_method(
+	    conn, "WT_SESSION.open_cursor",
+	    NULL, "my_list=[first, second]", "list", NULL));
 	/*! [WT_DATA_SOURCE configure list] */
 
 	/*! [WT_DATA_SOURCE configure integer with checking] */
 	/*
 	 * Limit the number of devices to between 1 and 30; the default is 5.
 	 */
-	ret = conn->configure_method(conn,
+	error_check(conn->configure_method(conn,
 	    "WT_SESSION.open_cursor",
-	    NULL, "devices=5", "int", "min=1, max=30");
+	    NULL, "devices=5", "int", "min=1, max=30"));
 	/*! [WT_DATA_SOURCE configure integer with checking] */
 
 	/*! [WT_DATA_SOURCE configure string with checking] */
@@ -675,9 +631,9 @@ main(void)
 	 * Limit the target string to one of /device, /home or /target; default
 	 * to /home.
 	 */
-	ret = conn->configure_method(conn,
+	error_check(conn->configure_method(conn,
 	    "WT_SESSION.open_cursor", NULL, "target=/home", "string",
-	    "choices=[/device, /home, /target]");
+	    "choices=[/device, /home, /target]"));
 	/*! [WT_DATA_SOURCE configure string with checking] */
 
 	/*! [WT_DATA_SOURCE configure list with checking] */
@@ -685,16 +641,16 @@ main(void)
 	 * Limit the paths list to one or more of /device, /home, /mnt or
 	 * /target; default to /mnt.
 	 */
-	ret = conn->configure_method(conn,
+	error_check(conn->configure_method(conn,
 	    "WT_SESSION.open_cursor", NULL, "paths=[/mnt]", "list",
-	    "choices=[/device, /home, /mnt, /target]");
+	    "choices=[/device, /home, /mnt, /target]"));
 	/*! [WT_DATA_SOURCE configure list with checking] */
 
 	/*! [WT_EXTENSION_API default_session] */
 	(void)wt_api->msg_printf(wt_api, NULL, "configuration complete");
 	/*! [WT_EXTENSION_API default_session] */
 
-	ret = conn->close(conn, NULL);
+	error_check(conn->close(conn, NULL));
 
-	return (ret == 0 ? EXIT_SUCCESS : EXIT_FAILURE);
+	return (EXIT_SUCCESS);
 }

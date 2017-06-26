@@ -43,6 +43,8 @@
 #define	snprintf __wt_snprintf
 #endif
 
+#define	strcasecmp	stricmp
+
 /*
  * Emulate <sys/stat.h>
  */

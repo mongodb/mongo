@@ -28,87 +28,70 @@
  * ex_sync.c
  * 	demonstrates how to use the transaction sync configuration.
  */
-#include <errno.h>
-#include <inttypes.h>
-#include <stdio.h>
-#include <stdlib.h>
-#include <string.h>
-#ifndef _WIN32
-#include <unistd.h>
-#else
-/* snprintf is not supported on <= VS2013 */
-#define	snprintf _snprintf
-#endif
+#include <test_util.h>
 
-#include <wiredtiger.h>
-
-static const char *home = "WT_HOME";
-
-static const char * const uri = "table:test";
+static const char *home;
+static const char *const uri = "table:test";
 
 #define	CONN_CONFIG "create,cache_size=100MB,log=(archive=false,enabled=true)"
 #define	MAX_KEYS	100
 
 int
-main(void)
+main(int argc, char *argv[])
 {
 	WT_CONNECTION *wt_conn;
 	WT_CURSOR *cursor;
 	WT_SESSION *session;
 	int i, record_count, ret;
-	char cmd_buf[256], k[16], v[16];
+	char k[16], v[16];
 	const char *conf;
 
-	(void)snprintf(cmd_buf, sizeof(cmd_buf),
-	    "rm -rf %s && mkdir %s", home, home);
-	if ((ret = system(cmd_buf)) != 0) {
-		fprintf(stderr, "%s: failed ret %d\n", cmd_buf, ret);
-		return (EXIT_FAILURE);
-	}
-	if ((ret = wiredtiger_open(home, NULL, CONN_CONFIG, &wt_conn)) != 0) {
-		fprintf(stderr, "Error connecting to %s: %s\n",
-		    home, wiredtiger_strerror(ret));
-		return (EXIT_FAILURE);
-	}
+	home = example_setup(argc, argv);
+	error_check(wiredtiger_open(home, NULL, CONN_CONFIG, &wt_conn));
 
-	ret = wt_conn->open_session(wt_conn, NULL, NULL, &session);
-	ret = session->create(session, uri, "key_format=S,value_format=S");
+	error_check(wt_conn->open_session(wt_conn, NULL, NULL, &session));
+	error_check(session->create(
+	    session, uri, "key_format=S,value_format=S"));
 
-	ret = session->open_cursor(session, uri, NULL, NULL, &cursor);
+	error_check(session->open_cursor(session, uri, NULL, NULL, &cursor));
 	/*
 	 * Perform some operations with individual auto-commit transactions.
 	 */
-	ret = session->begin_transaction(session, NULL);
+	error_check(session->begin_transaction(session, NULL));
 	for (record_count = 0, i = 0; i < MAX_KEYS; i++, record_count++) {
 		if (i == MAX_KEYS/2) {
-			ret = session->commit_transaction(
-			    session, "sync=background");
+			error_check(session->commit_transaction(
+			    session, "sync=background"));
 			ret = session->transaction_sync(
 			    session, "timeout_ms=0");
 			if (ret == ETIMEDOUT)
 				printf("Transactions not yet stable\n");
-			else if (ret != 0)
-				printf("Got error %d\n", ret);
-			ret = session->begin_transaction(session, NULL);
+			else if (ret != 0) {
+				fprintf(stderr,
+				    "session.transaction_sync: error %s\n",
+				    session->strerror(session, ret));
+				exit (1);
+			}
+			error_check(session->begin_transaction(session, NULL));
 		} else {
 			if ((record_count % 3) == 0)
 				conf = "sync=background";
 			else
 				conf = "sync=off";
-			ret = session->commit_transaction(session, conf);
-			ret = session->begin_transaction(session, NULL);
+			error_check(session->commit_transaction(session, conf));
+			error_check(session->begin_transaction(session, NULL));
 		}
 		(void)snprintf(k, sizeof(k), "key%d", i);
 		(void)snprintf(v, sizeof(v), "value%d", i);
 		cursor->set_key(cursor, k);
 		cursor->set_value(cursor, v);
-		ret = cursor->insert(cursor);
+		error_check(cursor->insert(cursor));
 	}
-	ret = session->commit_transaction(session, "sync=background");
+	error_check(session->commit_transaction(session, "sync=background"));
 	printf("Wait forever until stable\n");
-	ret = session->transaction_sync(session, NULL);
+	error_check(session->transaction_sync(session, NULL));
 	printf("Transactions now stable\n");
-	ret = session->begin_transaction(session, NULL);
+	error_check(session->begin_transaction(session, NULL));
 	/*
 	 * Perform some operations within a single transaction.
 	 */
@@ -117,14 +100,11 @@ main(void)
 		(void)snprintf(v, sizeof(v), "value%d", i);
 		cursor->set_key(cursor, k);
 		cursor->set_value(cursor, v);
-		ret = cursor->insert(cursor);
+		error_check(cursor->insert(cursor));
 	}
-	ret = session->commit_transaction(session, "sync=on");
-	ret = session->transaction_sync(session, "timeout_ms=0");
-	if (ret != 0)
-		fprintf(stderr,
-		    "Unexpected error %d from WT_SESSION::transaction_sync\n",
-		    ret);
+	error_check(session->commit_transaction(session, "sync=on"));
+	error_check(session->transaction_sync(session, "timeout_ms=0"));
+
 	/*
 	 * Demonstrate using log_flush to force the log to disk.
 	 */
@@ -133,22 +113,22 @@ main(void)
 		(void)snprintf(v, sizeof(v), "value%d", record_count);
 		cursor->set_key(cursor, k);
 		cursor->set_value(cursor, v);
-		ret = cursor->insert(cursor);
+		error_check(cursor->insert(cursor));
 	}
-	ret = session->log_flush(session, "sync=on");
+	error_check(session->log_flush(session, "sync=on"));
 
 	for (i = 0; i < MAX_KEYS; i++, record_count++) {
 		(void)snprintf(k, sizeof(k), "key%d", record_count);
 		(void)snprintf(v, sizeof(v), "value%d", record_count);
 		cursor->set_key(cursor, k);
 		cursor->set_value(cursor, v);
-		ret = cursor->insert(cursor);
+		error_check(cursor->insert(cursor));
 	}
-	ret = cursor->close(cursor);
-	ret = session->log_flush(session, "sync=off");
-	ret = session->log_flush(session, "sync=on");
+	error_check(cursor->close(cursor));
+	error_check(session->log_flush(session, "sync=off"));
+	error_check(session->log_flush(session, "sync=on"));
 
-	ret = wt_conn->close(wt_conn, NULL);
+	error_check(wt_conn->close(wt_conn, NULL));
 
-	return (ret == 0 ? EXIT_SUCCESS : EXIT_FAILURE);
+	return (EXIT_SUCCESS);
 }

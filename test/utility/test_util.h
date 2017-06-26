@@ -117,6 +117,20 @@ typedef struct {
 } while (0)
 
 /*
+ * error_check --
+ *	Complain and quit if a function call fails. The same as testutil_check,
+ * but with a different name because it appears in the documentation.
+ */
+#define	error_check(call)	testutil_check(call)
+
+/*
+ * scan_end_check --
+ *	Complain and quit if something isn't true. The same as testutil_assert,
+ * with a different name because it appears in the documentation.
+ */
+#define	scan_end_check(a)	testutil_assert(a)
+
+/*
  * u64_to_string --
  *	Convert a uint64_t to a text string.
  *
@@ -183,10 +197,11 @@ void *dmalloc(size_t);
 void *drealloc(void *, size_t);
 void *dstrdup(const void *);
 void *dstrndup(const char *, size_t);
+const char *example_setup(int, char * const *);
 void  testutil_clean_work_dir(const char *);
 void  testutil_cleanup(TEST_OPTS *);
 bool  testutil_enable_long_tests(void);
-void  testutil_make_work_dir(char *);
+void  testutil_make_work_dir(const char *);
 int   testutil_parse_opts(int, char * const *, TEST_OPTS *);
 void  testutil_work_dir_from_path(char *, size_t, const char *);
 void *thread_append(void *);

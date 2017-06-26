@@ -28,164 +28,138 @@
  * ex_stat.c
  *	This is an example demonstrating how to query database statistics.
  */
+#include <test_util.h>
 
-#include <inttypes.h>
-#include <stdio.h>
-#include <stdlib.h>
-#include <string.h>
-
-#include <wiredtiger.h>
-
-int print_cursor(WT_CURSOR *);
-int print_database_stats(WT_SESSION *);
-int print_file_stats(WT_SESSION *);
-int print_join_cursor_stats(WT_SESSION *);
-int print_overflow_pages(WT_SESSION *);
-int get_stat(WT_CURSOR *cursor, int stat_field, uint64_t *valuep);
-int print_derived_stats(WT_SESSION *);
+void get_stat(WT_CURSOR *cursor, int stat_field, uint64_t *valuep);
+void print_cursor(WT_CURSOR *);
+void print_database_stats(WT_SESSION *);
+void print_derived_stats(WT_SESSION *);
+void print_file_stats(WT_SESSION *);
+void print_join_cursor_stats(WT_SESSION *);
+void print_overflow_pages(WT_SESSION *);
 
 static const char *home;
 
 /*! [statistics display function] */
-int
+void
 print_cursor(WT_CURSOR *cursor)
 {
 	const char *desc, *pvalue;
 	uint64_t value;
 	int ret;
 
-	while ((ret = cursor->next(cursor)) == 0 &&
-	    (ret = cursor->get_value(cursor, &desc, &pvalue, &value)) == 0)
+	while ((ret = cursor->next(cursor)) == 0) {
+		error_check(cursor->get_value(cursor, &desc, &pvalue, &value));
 		if (value != 0)
 			printf("%s=%s\n", desc, pvalue);
-
-	return (ret == WT_NOTFOUND ? 0 : ret);
+	}
+	scan_end_check(ret == WT_NOTFOUND);
 }
 /*! [statistics display function] */
 
-int
+void
 print_database_stats(WT_SESSION *session)
 {
 	WT_CURSOR *cursor;
-	int ret;
 
 	/*! [statistics database function] */
-	if ((ret = session->open_cursor(session,
-	    "statistics:", NULL, NULL, &cursor)) != 0)
-		return (ret);
+	error_check(session->open_cursor(
+	    session, "statistics:", NULL, NULL, &cursor));
 
-	ret = print_cursor(cursor);
-	ret = cursor->close(cursor);
+	print_cursor(cursor);
+	error_check(cursor->close(cursor));
 	/*! [statistics database function] */
-
-	return (ret);
 }
 
-int
+void
 print_file_stats(WT_SESSION *session)
 {
 	WT_CURSOR *cursor;
-	int ret;
 
 	/*! [statistics table function] */
-	if ((ret = session->open_cursor(session,
-	    "statistics:table:access", NULL, NULL, &cursor)) != 0)
-		return (ret);
+	error_check(session->open_cursor(
+	    session, "statistics:table:access", NULL, NULL, &cursor));
 
-	ret = print_cursor(cursor);
-	ret = cursor->close(cursor);
+	print_cursor(cursor);
+	error_check(cursor->close(cursor));
 	/*! [statistics table function] */
-
-	return (ret);
 }
 
-int
+void
 print_join_cursor_stats(WT_SESSION *session)
 {
 	WT_CURSOR *idx_cursor, *join_cursor, *stat_cursor;
-	int ret;
 
-	ret = session->create(
-	    session, "index:access:idx", "columns=(v)");
-	ret = session->open_cursor(
-	    session, "index:access:idx", NULL, NULL, &idx_cursor);
-	ret = idx_cursor->next(idx_cursor);
-	ret = session->open_cursor(
-	    session, "join:table:access", NULL, NULL, &join_cursor);
-	ret = session->join(session, join_cursor, idx_cursor, "compare=gt");
-	ret = join_cursor->next(join_cursor);
+	error_check(session->create(
+	    session, "index:access:idx", "columns=(v)"));
+	error_check(session->open_cursor(
+	    session, "index:access:idx", NULL, NULL, &idx_cursor));
+	error_check(idx_cursor->next(idx_cursor));
+	error_check(session->open_cursor(
+	    session, "join:table:access", NULL, NULL, &join_cursor));
+	error_check(session->join(
+	    session, join_cursor, idx_cursor, "compare=gt"));
+	print_cursor(join_cursor);
 
 	/*! [statistics join cursor function] */
-	if ((ret = session->open_cursor(session,
-	    "statistics:join", join_cursor, NULL, &stat_cursor)) != 0)
-		return (ret);
+	error_check(session->open_cursor(session,
+	    "statistics:join", join_cursor, NULL, &stat_cursor));
 
-	ret = print_cursor(stat_cursor);
-	ret = stat_cursor->close(stat_cursor);
+	print_cursor(stat_cursor);
+	error_check(stat_cursor->close(stat_cursor));
 	/*! [statistics join cursor function] */
 
-	ret = join_cursor->close(join_cursor);
-	ret = idx_cursor->close(idx_cursor);
-
-	return (ret);
+	error_check(join_cursor->close(join_cursor));
+	error_check(idx_cursor->close(idx_cursor));
 }
 
-int
+void
 print_overflow_pages(WT_SESSION *session)
 {
 	/*! [statistics retrieve by key] */
 	WT_CURSOR *cursor;
 	const char *desc, *pvalue;
 	uint64_t value;
-	int ret;
 
-	if ((ret = session->open_cursor(session,
-	    "statistics:table:access", NULL, NULL, &cursor)) != 0)
-		return (ret);
+	error_check(session->open_cursor(session,
+	    "statistics:table:access", NULL, NULL, &cursor));
 
 	cursor->set_key(cursor, WT_STAT_DSRC_BTREE_OVERFLOW);
-	ret = cursor->search(cursor);
-	ret = cursor->get_value(cursor, &desc, &pvalue, &value);
+	error_check(cursor->search(cursor));
+	error_check(cursor->get_value(cursor, &desc, &pvalue, &value));
 	printf("%s=%s\n", desc, pvalue);
 
-	ret = cursor->close(cursor);
+	error_check(cursor->close(cursor));
 	/*! [statistics retrieve by key] */
-
-	return (ret);
 }
 
 /*! [statistics calculation helper function] */
-int
+void
 get_stat(WT_CURSOR *cursor, int stat_field, uint64_t *valuep)
 {
 	const char *desc, *pvalue;
-	int ret;
 
 	cursor->set_key(cursor, stat_field);
-	if ((ret = cursor->search(cursor)) != 0)
-		return (ret);
-
-	return (cursor->get_value(cursor, &desc, &pvalue, valuep));
+	error_check(cursor->search(cursor));
+	error_check(cursor->get_value(cursor, &desc, &pvalue, valuep));
 }
 /*! [statistics calculation helper function] */
 
-int
+void
 print_derived_stats(WT_SESSION *session)
 {
 	WT_CURSOR *cursor;
-	int ret;
 
 	/*! [statistics calculate open table stats] */
-	if ((ret = session->open_cursor(session,
-	    "statistics:table:access", NULL, NULL, &cursor)) != 0)
-		return (ret);
+	error_check(session->open_cursor(session,
+	    "statistics:table:access", NULL, NULL, &cursor));
 	/*! [statistics calculate open table stats] */
 
 	{
 	/*! [statistics calculate table fragmentation] */
 	uint64_t ckpt_size, file_size, percent;
-	ret = get_stat(cursor, WT_STAT_DSRC_BLOCK_CHECKPOINT_SIZE, &ckpt_size);
-	ret = get_stat(cursor, WT_STAT_DSRC_BLOCK_SIZE, &file_size);
+	get_stat(cursor, WT_STAT_DSRC_BLOCK_CHECKPOINT_SIZE, &ckpt_size);
+	get_stat(cursor, WT_STAT_DSRC_BLOCK_SIZE, &file_size);
 
 	percent = 0;
 	if (file_size != 0)
@@ -198,11 +172,11 @@ print_derived_stats(WT_SESSION *session)
 	/*! [statistics calculate write amplification] */
 	uint64_t app_insert, app_remove, app_update, fs_writes;
 
-	ret = get_stat(cursor, WT_STAT_DSRC_CURSOR_INSERT_BYTES, &app_insert);
-	ret = get_stat(cursor, WT_STAT_DSRC_CURSOR_REMOVE_BYTES, &app_remove);
-	ret = get_stat(cursor, WT_STAT_DSRC_CURSOR_UPDATE_BYTES, &app_update);
+	get_stat(cursor, WT_STAT_DSRC_CURSOR_INSERT_BYTES, &app_insert);
+	get_stat(cursor, WT_STAT_DSRC_CURSOR_REMOVE_BYTES, &app_remove);
+	get_stat(cursor, WT_STAT_DSRC_CURSOR_UPDATE_BYTES, &app_update);
 
-	ret = get_stat(cursor, WT_STAT_DSRC_CACHE_BYTES_WRITE, &fs_writes);
+	get_stat(cursor, WT_STAT_DSRC_CACHE_BYTES_WRITE, &fs_writes);
 
 	if (app_insert + app_remove + app_update != 0)
 		printf("Write amplification is %.2lf\n",
@@ -210,54 +184,44 @@ print_derived_stats(WT_SESSION *session)
 	/*! [statistics calculate write amplification] */
 	}
 
-	ret = cursor->close(cursor);
-
-	return (ret);
+	error_check(cursor->close(cursor));
 }
 
 int
-main(void)
+main(int argc, char *argv[])
 {
 	WT_CONNECTION *conn;
 	WT_CURSOR *cursor;
 	WT_SESSION *session;
-	int ret;
 
-	/*
-	 * Create a clean test directory for this run of the test program if the
-	 * environment variable isn't already set (as is done by make check).
-	 */
-	if (getenv("WIREDTIGER_HOME") == NULL) {
-		home = "WT_HOME";
-		ret = system("rm -rf WT_HOME && mkdir WT_HOME");
-	} else
-		home = NULL;
+	home = example_setup(argc, argv);
 
-	ret = wiredtiger_open(home, NULL, "create,statistics=(all)", &conn);
-	ret = conn->open_session(conn, NULL, NULL, &session);
-	ret = session->create(session,
-	    "table:access", "key_format=S,value_format=S,columns=(k,v)");
+	error_check(
+	    wiredtiger_open(home, NULL, "create,statistics=(all)", &conn));
+	error_check(conn->open_session(conn, NULL, NULL, &session));
+	error_check(session->create(session,
+	    "table:access", "key_format=S,value_format=S,columns=(k,v)"));
 
-	ret = session->open_cursor(
-	    session, "table:access", NULL, NULL, &cursor);
+	error_check(session->open_cursor(
+	    session, "table:access", NULL, NULL, &cursor));
 	cursor->set_key(cursor, "key");
 	cursor->set_value(cursor, "value");
-	ret = cursor->insert(cursor);
-	ret = cursor->close(cursor);
+	error_check(cursor->insert(cursor));
+	error_check(cursor->close(cursor));
 
-	ret = session->checkpoint(session, NULL);
+	error_check(session->checkpoint(session, NULL));
 
-	ret = print_database_stats(session);
+	print_database_stats(session);
 
-	ret = print_file_stats(session);
+	print_file_stats(session);
 
-	ret = print_join_cursor_stats(session);
+	print_join_cursor_stats(session);
 
-	ret = print_overflow_pages(session);
+	print_overflow_pages(session);
 
-	ret = print_derived_stats(session);
+	print_derived_stats(session);
 
-	ret = conn->close(conn, NULL);
+	error_check(conn->close(conn, NULL));
 
-	return (ret == 0 ? EXIT_SUCCESS : EXIT_FAILURE);
+	return (EXIT_SUCCESS);
 }
