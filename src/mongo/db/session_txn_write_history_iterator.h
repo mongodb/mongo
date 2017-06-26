@@ -26,47 +26,39 @@
  *    it in the license file.
  */
 
-#include "mongo/platform/basic.h"
+#pragma once
 
-#include <memory>
-
-#include "mongo/base/init.h"
-#include "mongo/db/operation_context_noop.h"
+#include "mongo/db/repl/oplog_entry.h"
 #include "mongo/db/repl/optime.h"
-#include "mongo/db/service_context_noop.h"
-#include "mongo/db/session_transaction_table.h"
-#include "mongo/db/session_txn_state_holder.h"
-#include "mongo/stdx/memory.h"
-#include "mongo/unittest/unittest.h"
 
 namespace mongo {
 
-TEST(SessionTxnStateHolder, Demo) {
-    SessionTransactionTable table(nullptr);
-    auto txnStateHolder = table.getSessionTxnState(LogicalSessionId::gen());
+class OperationContext;
 
-    OperationContextNoop opCtx;
+/**
+ * An iterator class that can traverse through the oplog entries that are linked via the prevTs
+ * field.
+ */
+class SessionTxnWriteHistoryIterator {
+public:
+    /**
+     * Creates a new iterator starting with an oplog entry with the given start opTime.
+     */
+    SessionTxnWriteHistoryIterator(repl::OpTime startingOpTime);
 
-    {
-        // Caller has now control of txn state and can read/write from it.
-        auto txnStateToken = txnStateHolder->getTransactionState(&opCtx);
+    /**
+     * Returns false if there are no more entries to iterate.
+     */
+    bool hasNext() const;
 
-        auto writeHistory = txnStateToken.get()->getWriteHistory(&opCtx);
+    /**
+     * Returns the next oplog entry.
+     * Throws if hasNext is false.
+     */
+    repl::OplogEntry next(OperationContext* opCtx);
 
-        // Go over request object, and mark all statements that is in writeHistory as done.
-        // In addition, convert oplog entries into results appropriate for command.
-
-        // For every statement that is not yet 'done':
-        // Perform write op, and then store result:
-
-        // Commented out since OperationContextNoop uses LockerNoop
-        // repl::OpTime opTime;
-        // txnStateToken.get()->saveTxnProgress(&opCtx, opTime);
-
-        // Consolidate partial results into final results for command response
-    }
-
-    // Caller now releases txnStateToken, other threads can now get a chance to access it.
-}
+private:
+    repl::OpTime _nextOpTime;
+};
 
 }  // namespace mongo

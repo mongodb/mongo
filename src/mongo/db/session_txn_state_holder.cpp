@@ -39,20 +39,11 @@ namespace mongo {
 SessionTxnStateHolder::SessionTxnStateHolder(std::unique_ptr<SessionTxnState> txnState)
     : _sessionId(txnState->getSessionId()), _txnState(std::move(txnState)) {}
 
-TxnStateAccessToken SessionTxnStateHolder::getTransactionState(OperationContext* opCtx,
-                                                               TxnNumber txnNum) {
+TxnStateAccessToken SessionTxnStateHolder::getTransactionState(OperationContext* opCtx) {
     stdx::unique_lock<stdx::mutex> lk(_mutex);
 
     while (!_txnState) {
         opCtx->waitForConditionOrInterrupt(_txnStateAvailableCV, lk);
-    }
-
-    if (txnNum < _txnState->getTxnNum()) {
-        // uassert
-    }
-
-    if (txnNum > _txnState->getTxnNum()) {
-        _txnState = stdx::make_unique<SessionTxnState>(_sessionId, txnNum);
     }
 
     return TxnStateAccessToken(opCtx, this, std::move(_txnState));

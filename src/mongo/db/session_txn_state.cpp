@@ -40,7 +40,7 @@ auto getSessionTxnState = OperationContext::declareDecoration<SessionTxnState*>(
 
 }  // unnamed namespace
 
-const NamespaceString SessionTxnState::kConfigNS("admin.system.transactions");
+const NamespaceString SessionTxnState::kConfigNS("config.system.transactions");
 
 SessionTxnState* SessionTxnState::get(OperationContext* opCtx) {
     return getSessionTxnState(opCtx);
@@ -51,51 +51,38 @@ void SessionTxnState::set(OperationContext* opCtx, SessionTxnState* txnState) {
     sessionTxnState = txnState;
 }
 
-SessionTxnState::SessionTxnState(LogicalSessionId sessionId, TxnNumber txnNumber)
-    : _sessionId(std::move(sessionId)), _txnNumber(std::move(txnNumber)) {}
+SessionTxnState::SessionTxnState(LogicalSessionId sessionId) : _sessionId(std::move(sessionId)) {}
 
-void SessionTxnState::begin(OperationContext* opCtx) {
-    if (!_isInitialized) {
+void SessionTxnState::begin(OperationContext* opCtx, const TxnNumber& txnNumber) {
+    if (!_txnRecord) {
         // load txn table state from storage
     }
 
-    _isInitialized = true;
+    // TODO: assert if txnNumber < myTxnNumber
+    // TODO: if txnNumber > myTxnNumber, update record in storage then update _txnRecord.
 }
 
-void SessionTxnState::addResultFromStorage(const SessionTxnRecord& txnRecord) {
-    const auto& id = txnRecord.getId();
-    invariant(id.getSessionId() == _sessionId);
-    invariant(id.getTxnNum() == _txnNumber);
-
-    _partialResults.insert(std::make_pair(id.getStmtId(), txnRecord.getResult()));
-}
-
-void SessionTxnState::storePartialResult(OperationContext* opCtx,
-                                         StmtId stmtId,
-                                         SingleWriteResult result,
-                                         repl::OpTime opTime) {
+void SessionTxnState::saveTxnProgress(OperationContext* opCtx, repl::OpTime opTime) {
     // Needs to be in the same write unit of work with the write for this result.
     invariant(opCtx->lockState()->inAWriteUnitOfWork());
 
-    _partialResults.insert(std::make_pair(stmtId, std::move(result)));
-    // TODO: update collection, then update _writeResults & _lastWriteOpTime
-    // assert if cannot store -> could mean that a new txn started
+    // TODO: update collection, then update _lastWriteOpTime
 }
 
 const LogicalSessionId& SessionTxnState::getSessionId() const {
     return _sessionId;
 }
 
-const TxnNumber& SessionTxnState::getTxnNum() const {
-    return _txnNumber;
+TxnNumber SessionTxnState::getTxnNum() const {
+    return _txnRecord.value().getTxnNum();
 }
 
-const SessionTxnState::PartialResults& SessionTxnState::getPartialResults() const {
-    return _partialResults;
+const repl::OpTime& SessionTxnState::getLastWriteOpTime() const {
+    return _txnRecord.value().getLastWriteOpTime();
 }
 
-void SessionTxnState::cleanUpOlderTransactions(OperationContext* opCtx) {
-    // TODO: Remove all entries with txnNum < _txnNum && sessionId == _sessionId
+SessionTxnWriteHistoryIterator SessionTxnState::getWriteHistory(OperationContext* opCtx) const {
+    return SessionTxnWriteHistoryIterator(getLastWriteOpTime());
 }
 
 }  // namespace mongo

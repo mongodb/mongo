@@ -110,7 +110,7 @@ std::shared_ptr<SessionTxnStateHolder> SessionTransactionTable::getSessionTxnSta
         // TODO: consult sessions table (without network I/O). The fact that we reached this point
         // means that the session was previously active.
 
-        auto txnState = stdx::make_unique<SessionTxnState>(sessionId, kUninitializedTxnNumber);
+        auto txnState = stdx::make_unique<SessionTxnState>(sessionId);
         auto newEntry = std::make_shared<SessionTxnStateHolder>(std::move(txnState));
         _txnTable.insert(std::make_pair(sessionId, newEntry));
         return newEntry;

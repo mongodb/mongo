@@ -28,12 +28,13 @@
 
 #pragma once
 
+#include <boost/optional.hpp>
 #include <map>
 
 #include "mongo/db/logical_session_id.h"
-#include "mongo/db/ops/single_write_result_gen.h"
 #include "mongo/db/repl/optime.h"
 #include "mongo/db/session_txn_record_gen.h"
+#include "mongo/db/session_txn_write_history_iterator.h"
 
 namespace mongo {
 
@@ -45,38 +46,27 @@ class OperationContext;
 class SessionTxnState {
 public:
     static const NamespaceString kConfigNS;
-    using PartialResults = std::map<StmtId, SingleWriteResult>;
 
-    SessionTxnState(LogicalSessionId sessionId, TxnNumber txnNumber);
+    explicit SessionTxnState(LogicalSessionId sessionId);
 
     /**
      *  Load transaction state from storage if it hasn't.
      */
-    void begin(OperationContext* opCtx);
+    void begin(OperationContext* opCtx, const TxnNumber& txnNumber);
 
     /**
-     * Returns the partial results for this transaction.
+     * Returns the history of writes that has happened on this transaction.
      */
-    const PartialResults& getPartialResults() const;
+    SessionTxnWriteHistoryIterator getWriteHistory(OperationContext* opCtx) const;
 
     /**
      * Stores the result of a single write operation within this transaction.
      */
-    void storePartialResult(OperationContext* opCtx,
-                            StmtId stmtId,
-                            SingleWriteResult result,
-                            repl::OpTime opTime);
-
-    void addResultFromStorage(const SessionTxnRecord& txnRecord);
+    void saveTxnProgress(OperationContext* opCtx, repl::OpTime opTime);
 
     const LogicalSessionId& getSessionId() const;
-    const TxnNumber& getTxnNum() const;
-
-    /**
-     * Removes all previous transaction states in this logical session with transaction id smaller
-     * than this one.
-     */
-    void cleanUpOlderTransactions(OperationContext* opCtx);
+    TxnNumber getTxnNum() const;
+    const repl::OpTime& getLastWriteOpTime() const;
 
     /**
      * Returns a SessionTxnState stored in the operation context.
@@ -90,11 +80,7 @@ public:
 
 private:
     const LogicalSessionId _sessionId;
-    const TxnNumber _txnNumber;
-
-    bool _isInitialized = false;
-    PartialResults _partialResults;
-    repl::OpTime _lastWriteOpTime;
+    boost::optional<SessionTxnRecord> _txnRecord;
 };
 
 }  // namespace mongo

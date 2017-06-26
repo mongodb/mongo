@@ -30,11 +30,11 @@ global:
     cpp_namespace: "mongo"
     cpp_includes:
         - "mongo/db/logical_session_id.h"
+        - "mongo/db/repl/optime.h"
 
 imports:
     - "mongo/idl/basic_types.idl"
     - "mongo/db/logical_session_id.idl"
-    - "mongo/db/ops/single_write_result.idl"
 
 types:
     LogicalSessionId:
@@ -44,31 +44,25 @@ types:
         deserializer: "mongo::LogicalSessionId::parse"
         serializer: "mongo::LogicalSessionId::toBSON"
 
+    OpTime:
+        description: "repl::OpTime"
+        bson_serialization_type: object
+        cpp_type: "mongo::repl::OpTime"
+        deserializer: "mongo::repl::OpTime::parse"
+        serializer: "mongo::repl::OpTime::toBSON"
+
 structs:
-    txnStmtTupleId:
-        description: "Unique tuple that identifies a single statment within a logical transaction."
+    sessionTxnRecord:
+        description: "A document used for storing session transaction states."
         fields:
-            sessionId:
+            _id:
+                cpp_name: sessionId
                 type: LogicalSessionId
                 description: "The id of the session this transaction belongs to."
             txnNum:
                 type: TxnNumber
                 description: "The id representing this transaction."
-            stmtId:
-                type: StmtId
-                description: "The id of the last known statement that was executed successfully
-                          with side effects in this transaction."
-
-    sessionTxnRecord:
-        description: "A document used for storing session transaction states."
-        fields:
-            _id:
-                cpp_name: "Id"
-                type: txnStmtTupleId
-            result:
-                type: singleWriteResult
-                description: "This is the structure for storing the partial results of this
-                              session transaction."
-
-            # TODO: add opTime
+            lastWriteOpTime:
+                type: OpTime
+                description: "The optime of the last write on this transaction."
 

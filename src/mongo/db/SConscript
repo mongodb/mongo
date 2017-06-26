@@ -1313,6 +1313,7 @@ env.Library(
         'session_transaction_table.cpp',
         'session_txn_state.cpp',
         'session_txn_state_holder.cpp',
+        'session_txn_write_history_iterator.cpp',
         env.Idlc('session_txn_record.idl')[0],
     ],
     LIBDEPS=[

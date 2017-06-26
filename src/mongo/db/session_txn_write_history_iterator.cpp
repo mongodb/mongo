@@ -28,45 +28,22 @@
 
 #include "mongo/platform/basic.h"
 
-#include <memory>
-
-#include "mongo/base/init.h"
-#include "mongo/db/operation_context_noop.h"
-#include "mongo/db/repl/optime.h"
-#include "mongo/db/service_context_noop.h"
-#include "mongo/db/session_transaction_table.h"
-#include "mongo/db/session_txn_state_holder.h"
-#include "mongo/stdx/memory.h"
-#include "mongo/unittest/unittest.h"
+#include "mongo/db/operation_context.h"
+#include "mongo/db/session_txn_write_history_iterator.h"
 
 namespace mongo {
 
-TEST(SessionTxnStateHolder, Demo) {
-    SessionTransactionTable table(nullptr);
-    auto txnStateHolder = table.getSessionTxnState(LogicalSessionId::gen());
+SessionTxnWriteHistoryIterator::SessionTxnWriteHistoryIterator(repl::OpTime startingOpTime)
+    : _nextOpTime(std::move(startingOpTime)) {}
 
-    OperationContextNoop opCtx;
+bool SessionTxnWriteHistoryIterator::hasNext() const {
+    return !_nextOpTime.isNull();
+}
 
-    {
-        // Caller has now control of txn state and can read/write from it.
-        auto txnStateToken = txnStateHolder->getTransactionState(&opCtx);
-
-        auto writeHistory = txnStateToken.get()->getWriteHistory(&opCtx);
-
-        // Go over request object, and mark all statements that is in writeHistory as done.
-        // In addition, convert oplog entries into results appropriate for command.
-
-        // For every statement that is not yet 'done':
-        // Perform write op, and then store result:
-
-        // Commented out since OperationContextNoop uses LockerNoop
-        // repl::OpTime opTime;
-        // txnStateToken.get()->saveTxnProgress(&opCtx, opTime);
-
-        // Consolidate partial results into final results for command response
-    }
-
-    // Caller now releases txnStateToken, other threads can now get a chance to access it.
+repl::OplogEntry next(OperationContext* opCtx) {
+    // TODO: use DBDirectClient to fetch the oplog entry.
+    // assert if !hasNext().
+    return repl::OplogEntry(BSONObj());
 }
 
 }  // namespace mongo

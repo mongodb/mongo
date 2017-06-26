@@ -54,7 +54,7 @@ public:
      * Returns the active transaction to the caller. Blocks if the transaction state is currently
      * in use and waits for it to be available.
      */
-    TxnStateAccessToken getTransactionState(OperationContext* opCtx, TxnNumber txnNum);
+    TxnStateAccessToken getTransactionState(OperationContext* opCtx);
 
     /**
      * Returns the activeTxn back to this SessionTransactionState.
