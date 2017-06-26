@@ -667,7 +667,7 @@ session_ops(WT_SESSION *session)
 						/* Requires posix_fadvise */
 	/*! [os_cache_max configuration] */
 	error_check(session->create(
-	    session, "table:mytable", "os_cache_max=1GB");
+	    session, "table:mytable", "os_cache_max=1GB"));
 	/*! [os_cache_max configuration] */
 	error_check(session->drop(session, "table:mytable", NULL));
 #endif
