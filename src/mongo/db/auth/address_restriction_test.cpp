@@ -37,7 +37,7 @@ namespace mongo {
 namespace {
 
 
-TEST(AddressRestrictionTest, toAndFromString) {
+TEST(AddressRestrictionTest, toAndFromStringSingle) {
     const struct {
         std::string input;
         std::string output;
@@ -48,22 +48,51 @@ TEST(AddressRestrictionTest, toAndFromString) {
         {"169.254.0.0/16", "169.254.0.0/16"},
         {"fe80::/10", "fe80::/10"},
     };
-    for (auto&& p : strings) {
+    for (auto const& p : strings) {
         {
-            const ClientSourceRestriction csr(CIDR(p.input));
+            const ClientSourceRestriction csr(p.input);
             std::ostringstream actual;
             actual << csr;
             std::ostringstream expected;
-            expected << "{\"clientSource\": \"" << p.output << "\"}";
+            expected << "{\"clientSource\": [\"" << p.output << "\"]}";
             ASSERT_EQUALS(actual.str(), expected.str());
         }
 
         {
-            const ServerAddressRestriction sar(CIDR(p.input));
+            const ServerAddressRestriction sar(p.input);
             std::ostringstream actual;
             actual << sar;
             std::ostringstream expected;
-            expected << "{\"serverAddress\": \"" << p.output << "\"}";
+            expected << "{\"serverAddress\": [\"" << p.output << "\"]}";
+            ASSERT_EQUALS(actual.str(), expected.str());
+        }
+    }
+}
+
+TEST(AddressRestrictionTest, toAndFromStringVector) {
+    const struct {
+        std::vector<StringData> input;
+        std::string output;
+    } tests[] = {
+        {{"127.0.0.1", "169.254.0.0/16", "::1"},
+         "[\"127.0.0.1/32\", \"169.254.0.0/16\", \"::1/128\"]"},
+    };
+    for (auto const& p : tests) {
+        {
+            const ClientSourceRestriction csr(p.input);
+            std::ostringstream actual;
+            actual << csr;
+            std::ostringstream expected;
+            expected << "{\"clientSource\": " << p.output << "}";
+            ASSERT_EQUALS(actual.str(), expected.str());
+        }
+
+        {
+            const ServerAddressRestriction sar(p.input);
+            std::ostringstream actual;
+            actual << sar;
+            std::ostringstream expected;
+            expected << "{\"serverAddress\": " << p.output << "}";
             ASSERT_EQUALS(actual.str(), expected.str());
         }
     }
@@ -72,93 +101,113 @@ TEST(AddressRestrictionTest, toAndFromString) {
 TEST(AddressRestrictionTest, contains) {
     enableIPv6(true);
     const struct {
-        std::string range;
+        std::vector<StringData> range;
         std::string address;
         bool valid;
     } contains[] = {
-        {"127.0.0.1/8", "0.0.0.0", false},
-        {"127.0.0.1/8", "0.0.0.1", false},
-        {"127.0.0.1/8", "126.255.255.255", false},
-        {"127.0.0.1/8", "127.0.0.0", true},
-        {"127.0.0.1/8", "127.0.0.1", true},
-        {"127.0.0.1/8", "127.0.0.127", true},
-        {"127.0.0.1/8", "127.0.0.128", true},
-        {"127.0.0.1/8", "127.0.0.255", true},
-        {"127.0.0.1/8", "127.255.255.255", true},
-        {"127.0.0.1/8", "127.127.128.1", true},
-        {"127.0.0.1/8", "127.128.127.0", true},
-        {"127.0.0.1/8", "128.0.0.1", false},
-        {"127.0.0.1/8", "169.254.13.37", false},
-        {"127.0.0.1/8", "255.0.0.1", false},
-        {"127.0.0.1/8", "255.255.255.254", false},
-        {"127.0.0.1/8", "255.255.255.255", false},
+        {{"127.0.0.1/8"}, "0.0.0.0", false},
+        {{"127.0.0.1/8"}, "0.0.0.1", false},
+        {{"127.0.0.1/8"}, "126.255.255.255", false},
+        {{"127.0.0.1/8"}, "127.0.0.0", true},
+        {{"127.0.0.1/8"}, "127.0.0.1", true},
+        {{"127.0.0.1/8"}, "127.0.0.127", true},
+        {{"127.0.0.1/8"}, "127.0.0.128", true},
+        {{"127.0.0.1/8"}, "127.0.0.255", true},
+        {{"127.0.0.1/8"}, "127.255.255.255", true},
+        {{"127.0.0.1/8"}, "127.127.128.1", true},
+        {{"127.0.0.1/8"}, "127.128.127.0", true},
+        {{"127.0.0.1/8"}, "128.0.0.1", false},
+        {{"127.0.0.1/8"}, "169.254.13.37", false},
+        {{"127.0.0.1/8"}, "255.0.0.1", false},
+        {{"127.0.0.1/8"}, "255.255.255.254", false},
+        {{"127.0.0.1/8"}, "255.255.255.255", false},
 
-        {"127.0.0.1", "126.255.255.255", false},
-        {"127.0.0.1", "127.0.0.0", false},
-        {"127.0.0.1", "126.0.0.1", false},
-        {"127.0.0.1", "127.0.0.1", true},
-        {"127.0.0.1", "127.0.0.2", false},
-        {"127.0.0.1", "127.0.0.127", false},
-        {"127.0.0.1", "127.0.0.128", false},
-        {"127.0.0.1", "127.0.0.255", false},
-        {"127.0.0.1", "127.1.0.1", false},
-        {"127.0.0.1", "127.128.0.1", false},
-        {"127.0.0.1", "128.0.0.1", false},
+        {{"127.0.0.1"}, "126.255.255.255", false},
+        {{"127.0.0.1"}, "127.0.0.0", false},
+        {{"127.0.0.1"}, "126.0.0.1", false},
+        {{"127.0.0.1"}, "127.0.0.1", true},
+        {{"127.0.0.1"}, "127.0.0.2", false},
+        {{"127.0.0.1"}, "127.0.0.127", false},
+        {{"127.0.0.1"}, "127.0.0.128", false},
+        {{"127.0.0.1"}, "127.0.0.255", false},
+        {{"127.0.0.1"}, "127.1.0.1", false},
+        {{"127.0.0.1"}, "127.128.0.1", false},
+        {{"127.0.0.1"}, "128.0.0.1", false},
 
-        {"127.0.0.2/31", "127.0.0.0", false},
-        {"127.0.0.2/31", "127.0.0.1", false},
-        {"127.0.0.2/31", "127.0.0.2", true},
-        {"127.0.0.2/31", "127.0.0.3", true},
-        {"127.0.0.2/31", "127.0.0.4", false},
-        {"127.0.0.2/31", "127.0.1.1", false},
+        {{"127.0.0.2/31"}, "127.0.0.0", false},
+        {{"127.0.0.2/31"}, "127.0.0.1", false},
+        {{"127.0.0.2/31"}, "127.0.0.2", true},
+        {{"127.0.0.2/31"}, "127.0.0.3", true},
+        {{"127.0.0.2/31"}, "127.0.0.4", false},
+        {{"127.0.0.2/31"}, "127.0.1.1", false},
 
-        {"169.254.80.0/20", "169.254.79.255", false},
-        {"169.254.80.0/20", "169.254.80.0", true},
-        {"169.254.80.0/20", "169.254.95.255", true},
-        {"169.254.80.0/20", "169.254.96.0", false},
+        {{"169.254.80.0/20"}, "169.254.79.255", false},
+        {{"169.254.80.0/20"}, "169.254.80.0", true},
+        {{"169.254.80.0/20"}, "169.254.95.255", true},
+        {{"169.254.80.0/20"}, "169.254.96.0", false},
 
-        {"169.254.0.160/28", "169.254.0.159", false},
-        {"169.254.0.160/28", "169.254.0.160", true},
-        {"169.254.0.160/28", "169.254.0.175", true},
-        {"169.254.0.160/28", "169.254.0.176", false},
+        {{"169.254.0.160/28"}, "169.254.0.159", false},
+        {{"169.254.0.160/28"}, "169.254.0.160", true},
+        {{"169.254.0.160/28"}, "169.254.0.175", true},
+        {{"169.254.0.160/28"}, "169.254.0.176", false},
 
-        {"169.254.0.0/16", "8.8.8.8", false},
-        {"169.254.0.0/16", "127.0.0.1", false},
-        {"169.254.0.0/16", "169.254.0.0", true},
-        {"169.254.0.0/16", "169.254.0.1", true},
-        {"169.254.0.0/16", "169.254.31.17", true},
-        {"169.254.0.0/16", "169.254.255.254", true},
-        {"169.254.0.0/16", "169.254.255.255", true},
-        {"169.254.0.0/16", "240.0.0.1", false},
-        {"169.254.0.0/16", "255.255.255.255", false},
+        {{"169.254.0.0/16"}, "8.8.8.8", false},
+        {{"169.254.0.0/16"}, "127.0.0.1", false},
+        {{"169.254.0.0/16"}, "169.254.0.0", true},
+        {{"169.254.0.0/16"}, "169.254.0.1", true},
+        {{"169.254.0.0/16"}, "169.254.31.17", true},
+        {{"169.254.0.0/16"}, "169.254.255.254", true},
+        {{"169.254.0.0/16"}, "169.254.255.255", true},
+        {{"169.254.0.0/16"}, "240.0.0.1", false},
+        {{"169.254.0.0/16"}, "255.255.255.255", false},
 
-        {"::1", "::", false},
-        {"::1", "::0", false},
-        {"::1", "::1", true},
-        {"::1", "::2", false},
-        {"::1", "::1:0", false},
-        {"::1", "::1:0:0", false},
-        {"::1", "1::", false},
-        {"::1", "1::1", false},
-        {"::1", "8000::1", false},
+        {{"::1"}, "::", false},
+        {{"::1"}, "::0", false},
+        {{"::1"}, "::1", true},
+        {{"::1"}, "::2", false},
+        {{"::1"}, "::1:0", false},
+        {{"::1"}, "::1:0:0", false},
+        {{"::1"}, "1::", false},
+        {{"::1"}, "1::1", false},
+        {{"::1"}, "8000::1", false},
 
-        {"::1/96", "::1", true},
-        {"::1/96", "::1:0:0", false},
-        {"::1/96", "::DEAD:BEEF", true},
-        {"::1/96", "DEAD::BEEF", false},
+        {{"::1/96"}, "::1", true},
+        {{"::1/96"}, "::1:0:0", false},
+        {{"::1/96"}, "::DEAD:BEEF", true},
+        {{"::1/96"}, "DEAD::BEEF", false},
 
-        {"::2/127", "::0", false},
-        {"::2/127", "::1", false},
-        {"::2/127", "::2", true},
-        {"::2/127", "::3", true},
-        {"::2/127", "::4", false},
-        {"::2/127", "::5", false},
+        {{"::2/127"}, "::0", false},
+        {{"::2/127"}, "::1", false},
+        {{"::2/127"}, "::2", true},
+        {{"::2/127"}, "::3", true},
+        {{"::2/127"}, "::4", false},
+        {{"::2/127"}, "::5", false},
 
-        {"::1/128", "::", false},
-        {"::1/128", "::0", false},
-        {"::1/128", "::1", true},
-        {"::1/128", "::2", false},
-        {"::1/128", "8000::", false},
+        {{"::1/128"}, "::", false},
+        {{"::1/128"}, "::0", false},
+        {{"::1/128"}, "::1", true},
+        {{"::1/128"}, "::2", false},
+        {{"::1/128"}, "8000::", false},
+
+        {{"127.0.0.1/8", "::1"}, "127.0.0.0", true},
+        {{"127.0.0.1/8", "::1"}, "127.0.0.1", true},
+        {{"127.0.0.1/8", "::1"}, "127.0.0.254", true},
+        {{"127.0.0.1/8", "::1"}, "127.0.0.255", true},
+        {{"127.0.0.1/8", "::1"}, "169.254.0.1", false},
+        {{"127.0.0.1/8", "::1"}, "::1", true},
+        {{"127.0.0.1/8", "::1"}, "::2", false},
+
+        {{"169.254.0.0/16", "fe80::/10"}, "169.254.12.34", true},
+        {{"169.254.0.0/16", "fe80::/10"}, "10.0.0.1", false},
+        {{"169.254.0.0/16", "fe80::/10"}, "fe80::dead:beef", true},
+        {{"169.254.0.0/16", "fe80::/10"}, "fec0::dead:beef", false},
+
+        {{}, "127.0.0.1", false},
+        {{}, "::1", false},
+        {{}, "0.0.0.0", false},
+        {{}, "::", false},
+        {{}, "255.255.255.255", false},
+        {{}, "ffff:ffff:ffff:ffff:ffff:ffff:ffff:ffff", false},
     };
     for (const auto& p : contains) {
         const SockAddr dummy;
@@ -166,11 +215,11 @@ TEST(AddressRestrictionTest, contains) {
         const RestrictionEnvironment rec(addr, dummy);
         const RestrictionEnvironment res(dummy, addr);
 
-        const ClientSourceRestriction csr(CIDR(p.range));
+        const ClientSourceRestriction csr(p.range);
         ASSERT_EQ(csr.validate(rec).isOK(), p.valid);
         ASSERT_FALSE(csr.validate(res).isOK());
 
-        const ServerAddressRestriction sar(CIDR(p.range));
+        const ServerAddressRestriction sar(p.range);
         ASSERT_EQ(sar.validate(res).isOK(), p.valid);
         ASSERT_FALSE(sar.validate(rec).isOK());
     }

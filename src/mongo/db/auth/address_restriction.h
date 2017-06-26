@@ -61,14 +61,25 @@ template <typename T>
 class AddressRestriction : public Restriction {
 public:
     /**
-     * Construct an AddressRestriction based on a CIDR spec
+     * Construct an empty AddressRestriction.
+     * Note that an empty AddressRestriciton will not validate
+     * against any addresses, since nothing has been whitelisted.
      */
-    explicit AddressRestriction(CIDR cidr) noexcept : _cidr(std::move(cidr)) {}
+    AddressRestriction() = default;
 
     /**
      * Construct an AddressRestriction based on a human readable subnet spec
      */
-    explicit AddressRestriction(const StringData cidr) : _cidr(CIDR(cidr)) {}
+    explicit AddressRestriction(const StringData range) : _ranges({CIDR(range)}) {}
+
+    /**
+     * Construct an AddressRestriction based on several human readable subnet specs
+     */
+    explicit AddressRestriction(const std::vector<StringData>& ranges) {
+        for (auto const& range : ranges) {
+            _ranges.emplace_back(range);
+        }
+    }
 
     /**
      * If the given BSONElement represents a valid CIDR range,
@@ -108,39 +119,55 @@ public:
             return {ErrorCodes::AuthenticationRestrictionUnmet, s.str()};
         }
 
-        if (!_cidr.contains(CIDR(addr.getAddr()))) {
-            std::ostringstream s;
-            s << T::label << " does not fall within: " << addr.getAddr();
-            return {ErrorCodes::AuthenticationRestrictionUnmet, s.str()};
+        const CIDR address(addr.getAddr());
+        for (auto const& range : _ranges) {
+            if (range.contains(address)) {
+                return Status::OK();
+            }
         }
 
-        return Status::OK();
+        std::ostringstream s;
+        s << addr.getAddr() << " does not fall within: ";
+        serialize(s);
+        return {ErrorCodes::AuthenticationRestrictionUnmet, s.str()};
     }
 
     /**
      * Append to builder as string element with the human-readable CIDR range.
      */
     void appendToBuilder(BSONObjBuilder* builder) const {
-        builder->append(T::field, _cidr.toString());
+        BSONArrayBuilder b;
+        for (auto const& range : _ranges) {
+            b.append(range.toString());
+        }
+        builder->append(T::field, b.arr());
     }
 
     friend bool operator==(const AddressRestriction<T>& lhs, const AddressRestriction<T>& rhs) {
         return lhs.equalityLens() == rhs.equalityLens();
     }
     friend bool operator!=(const AddressRestriction<T>& lhs, const AddressRestriction<T>& rhs) {
-        return !(lhs._cidr == rhs._cidr);
+        return !(lhs == rhs);
     }
 
 private:
     auto equalityLens() const {
-        return std::tie(_cidr);
+        return std::tie(_ranges);
     }
 
     void serialize(std::ostream& os) const override {
-        os << "{\"" << T::field << "\": \"" << _cidr << "\"}";
+        os << "{\"" << T::field << "\": [";
+        auto sz = _ranges.size() - 1;
+        for (auto const& range : _ranges) {
+            os << '"' << range << '"';
+            if (sz--) {
+                os << ", ";
+            }
+        }
+        os << "]}";
     }
 
-    CIDR _cidr;
+    std::vector<CIDR> _ranges;
 };
 }  // namespace address_restriction_detail
 
