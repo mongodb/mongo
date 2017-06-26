@@ -24,21 +24,20 @@
     // Test that both shard and hostname are present for $collStats results on a sharded cluster.
     const st = new ShardingTest({name: jsTestName(), shards: 2});
 
+    st.stopBalancer();
+
     testDB = st.s.getDB(jsTestName());
     testColl = testDB.test;
 
-    st.stopBalancer();
+    assert.commandWorked(testDB.dropDatabase());
 
-    // Enable sharding and place one chunk on each shard.
+    // Enable sharding on the test database.
     assert.commandWorked(testDB.adminCommand({enableSharding: testDB.getName()}));
-    assert.commandWorked(
-        testDB.adminCommand({shardCollection: testColl.getFullName(), key: {_id: 1}}));
 
-    st.ensurePrimaryShard(testDB.getName(), "shard0000");
-
-    assert.commandWorked(testDB.adminCommand({split: testColl.getFullName(), middle: {_id: 0}}));
+    // Shard 'testColl' on {_id: 'hashed'}. This will automatically presplit the collection and
+    // place chunks on each shard.
     assert.commandWorked(
-        testDB.adminCommand({moveChunk: testColl.getFullName(), find: {_id: 0}, to: "shard0001"}));
+        testDB.adminCommand({shardCollection: testColl.getFullName(), key: {_id: "hashed"}}));
 
     // Group $collStats result by $shard and $host to confirm that both fields are present.
     assert.eq(testColl
