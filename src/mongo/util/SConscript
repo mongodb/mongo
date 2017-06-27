@@ -610,6 +610,16 @@ env.CppUnitTest(
     ]
 )
 
+env.CppUnitTest(
+    target='base64_test',
+    source=[
+        'base64_test.cpp',
+    ],
+    LIBDEPS=[
+        '$BUILD_DIR/mongo/base',
+    ],
+)
+
 if env.TargetOSIs('linux'):
     env.Library(
         target='procparser',
