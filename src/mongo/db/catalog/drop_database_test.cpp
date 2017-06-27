@@ -246,10 +246,37 @@ TEST_F(DropDatabaseTest, DropDatabaseNotifiesOpObserverOfDroppedReplicatedSystem
     _testDropDatabase(_opCtx.get(), _opObserver, replicatedSystemNss, true);
 }
 
-TEST_F(DropDatabaseTest, DropDatabaseSkipsDropPendingCollectionWhenDroppingCollections) {
+TEST_F(DropDatabaseTest, DropDatabaseWaitsForDropPendingCollectionOpTimeIfNoCollectionsAreDropped) {
+    repl::OpTime clientLastOpTime;
+
+    // Update ReplicationCoordinatorMock so that we record the optime passed to awaitReplication().
+    _replCoord->setAwaitReplicationReturnValueFunction(
+        [&clientLastOpTime, this](const repl::OpTime& opTime) {
+            clientLastOpTime = opTime;
+            ASSERT_GREATER_THAN(clientLastOpTime, repl::OpTime());
+            return repl::ReplicationCoordinator::StatusAndDuration(Status::OK(), Milliseconds(0));
+        });
+
     repl::OpTime dropOpTime(Timestamp(Seconds(100), 0), 1LL);
     auto dpns = _nss.makeDropPendingNamespace(dropOpTime);
     _testDropDatabase(_opCtx.get(), _opObserver, dpns, false);
+
+    ASSERT_EQUALS(dropOpTime, clientLastOpTime);
+}
+
+TEST_F(DropDatabaseTest, DropDatabasePassedThroughAwaitReplicationErrorForDropPendingCollection) {
+    // Update ReplicationCoordinatorMock so that we record the optime passed to awaitReplication().
+    _replCoord->setAwaitReplicationReturnValueFunction([this](const repl::OpTime& opTime) {
+        ASSERT_GREATER_THAN(opTime, repl::OpTime());
+        return repl::ReplicationCoordinator::StatusAndDuration(
+            Status(ErrorCodes::WriteConcernFailed, ""), Milliseconds(0));
+    });
+
+    repl::OpTime dropOpTime(Timestamp(Seconds(100), 0), 1LL);
+    auto dpns = _nss.makeDropPendingNamespace(dropOpTime);
+    _createCollection(_opCtx.get(), dpns);
+
+    ASSERT_EQUALS(ErrorCodes::WriteConcernFailed, dropDatabase(_opCtx.get(), _nss.db().toString()));
 }
 
 TEST_F(DropDatabaseTest, DropDatabaseSkipsSystemDotIndexesCollectionWhenDroppingCollections) {

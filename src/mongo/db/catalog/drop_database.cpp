@@ -32,6 +32,8 @@
 
 #include "mongo/db/catalog/drop_database.h"
 
+#include <algorithm>
+
 #include "mongo/db/background.h"
 #include "mongo/db/catalog/database.h"
 #include "mongo/db/client.h"
@@ -91,6 +93,10 @@ Status dropDatabase(OperationContext* opCtx, const std::string& dbName) {
     auto replCoord = repl::ReplicationCoordinator::get(opCtx);
     std::size_t numCollectionsToDrop = 0;
 
+    // We have to wait for the last drop-pending collection to be removed if there are no
+    // collections to drop.
+    repl::OpTime latestDropPendingOpTime;
+
     MONGO_WRITE_CONFLICT_RETRY_LOOP_BEGIN {
         Lock::GlobalWrite lk(opCtx);
         AutoGetDb autoDB(opCtx, dbName, MODE_X);
@@ -118,6 +124,13 @@ Status dropDatabase(OperationContext* opCtx, const std::string& dbName) {
 
         for (auto collection : *db) {
             const auto& nss = collection->ns();
+            if (nss.isDropPendingNamespace() && replCoord->isReplEnabled() &&
+                opCtx->writesAreReplicated()) {
+                log() << "dropDatabase " << dbName << " - found drop-pending collection: " << nss;
+                latestDropPendingOpTime = std::max(
+                    latestDropPendingOpTime, uassertStatusOK(nss.getDropPendingNamespaceOpTime()));
+                continue;
+            }
             if (replCoord->isOplogDisabledFor(opCtx, nss) || nss.isSystemDotIndexes()) {
                 continue;
             }
@@ -130,7 +143,7 @@ Status dropDatabase(OperationContext* opCtx, const std::string& dbName) {
         dropPendingGuard.Dismiss();
 
         // If there are no collection drops to wait for, we complete the drop database operation.
-        if (numCollectionsToDrop == 0U) {
+        if (numCollectionsToDrop == 0U && latestDropPendingOpTime.isNull()) {
             return _finishDropDatabase(opCtx, dbName, db);
         }
     }
@@ -146,18 +159,39 @@ Status dropDatabase(OperationContext* opCtx, const std::string& dbName) {
         }
     });
 
-    auto status =
-        replCoord->awaitReplicationOfLastOpForClient(opCtx, kDropDatabaseWriteConcern).status;
-    if (!status.isOK()) {
-        return Status(status.code(),
-                      str::stream() << "dropDatabase " << dbName << " failed waiting for "
-                                    << numCollectionsToDrop
-                                    << " collection drops to replicate: "
-                                    << status.reason());
-    }
+    if (numCollectionsToDrop > 0U) {
+        auto status =
+            replCoord->awaitReplicationOfLastOpForClient(opCtx, kDropDatabaseWriteConcern).status;
+        if (!status.isOK()) {
+            return Status(status.code(),
+                          str::stream() << "dropDatabase " << dbName << " failed waiting for "
+                                        << numCollectionsToDrop
+                                        << " collection drops to replicate: "
+                                        << status.reason());
+        }
 
-    log() << "dropDatabase " << dbName << " - successfully dropped " << numCollectionsToDrop
-          << " collections. dropping database";
+        log() << "dropDatabase " << dbName << " - successfully dropped " << numCollectionsToDrop
+              << " collections. dropping database";
+    } else {
+        invariant(!latestDropPendingOpTime.isNull());
+        auto status =
+            replCoord->awaitReplication(opCtx, latestDropPendingOpTime, kDropDatabaseWriteConcern)
+                .status;
+        if (!status.isOK()) {
+            return Status(
+                status.code(),
+                str::stream()
+                    << "dropDatabase "
+                    << dbName
+                    << " failed waiting for pending collection drops (most recent drop optime: "
+                    << latestDropPendingOpTime.toString()
+                    << ") to replicate: "
+                    << status.reason());
+        }
+
+        log() << "dropDatabase " << dbName
+              << " - pending collection drops completed. dropping database";
+    }
     dropPendingGuardWhileAwaitingReplication.Dismiss();
 
     MONGO_WRITE_CONFLICT_RETRY_LOOP_BEGIN {
