@@ -1578,12 +1578,6 @@ TEST(MatchExpressionParserTest, BitTestMatchExpressionInvalidMaskValue) {
                                                collator)
                       .getStatus());
 
-    ASSERT_NOT_OK(
-        MatchExpressionParser::parse(BSON("a" << BSON("$bitsAllSet" << Decimal128("2.5"))),
-                                     ExtensionsCallbackDisallowExtensions(),
-                                     collator)
-            .getStatus());
-
     ASSERT_NOT_OK(MatchExpressionParser::parse(fromjson("{a: {$bitsAllClear: NaN}}"),
                                                ExtensionsCallbackDisallowExtensions(),
                                                collator)
@@ -1606,12 +1600,6 @@ TEST(MatchExpressionParserTest, BitTestMatchExpressionInvalidMaskValue) {
                                                ExtensionsCallbackDisallowExtensions(),
                                                collator)
                       .getStatus());
-
-    ASSERT_NOT_OK(
-        MatchExpressionParser::parse(BSON("a" << BSON("$bitsAllClear" << Decimal128("2.5"))),
-                                     ExtensionsCallbackDisallowExtensions(),
-                                     collator)
-            .getStatus());
 
     ASSERT_NOT_OK(MatchExpressionParser::parse(fromjson("{a: {$bitsAnySet: NaN}}"),
                                                ExtensionsCallbackDisallowExtensions(),
@@ -1636,12 +1624,6 @@ TEST(MatchExpressionParserTest, BitTestMatchExpressionInvalidMaskValue) {
                                                collator)
                       .getStatus());
 
-    ASSERT_NOT_OK(
-        MatchExpressionParser::parse(BSON("a" << BSON("$bitsAnySet" << Decimal128("2.5"))),
-                                     ExtensionsCallbackDisallowExtensions(),
-                                     collator)
-            .getStatus());
-
     ASSERT_NOT_OK(MatchExpressionParser::parse(fromjson("{a: {$bitsAnyClear: NaN}}"),
                                                ExtensionsCallbackDisallowExtensions(),
                                                collator)
@@ -1664,12 +1646,6 @@ TEST(MatchExpressionParserTest, BitTestMatchExpressionInvalidMaskValue) {
                                                ExtensionsCallbackDisallowExtensions(),
                                                collator)
                       .getStatus());
-
-    ASSERT_NOT_OK(
-        MatchExpressionParser::parse(BSON("a" << BSON("$bitsAnyClear" << Decimal128("2.5"))),
-                                     ExtensionsCallbackDisallowExtensions(),
-                                     collator)
-            .getStatus());
 }
 
 TEST(MatchExpressionParserTest, BitTestMatchExpressionInvalidArray) {

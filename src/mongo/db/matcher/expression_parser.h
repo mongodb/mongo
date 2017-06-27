@@ -46,11 +46,6 @@ class OperationContext;
 class MatchExpressionParser {
 public:
     /**
-     * Constant double representation of 2^63.
-     */
-    static const double kLongLongMaxPlusOneAsDouble;
-
-    /**
      * caller has to maintain ownership obj
      * the tree has views (BSONElement) into obj
      */
@@ -60,17 +55,6 @@ public:
         const bool topLevelCall = true;
         return MatchExpressionParser(&extensionsCallback)._parse(obj, collator, topLevelCall);
     }
-
-    /**
-     * Parses a BSONElement of any numeric type into a positive long long, failing if the value
-     * is any of the following:
-     *
-     * - NaN
-     * - Too big or small to fit within a 64-bit signed integer.
-     * - A floating point number which is not integral.
-     */
-    static StatusWith<long long> parseIntegerElementToPositiveLong(const char* name,
-                                                                   const BSONElement& elem);
 
 private:
     MatchExpressionParser(const ExtensionsCallback* extensionsCallback)
@@ -184,15 +168,6 @@ private:
      * Converts 'theArray', a BSONArray of integers, into a std::vector of integers.
      */
     StatusWith<std::vector<uint32_t>> _parseBitPositionsArray(const BSONObj& theArray);
-
-    /**
-     * Parses the given BSONElement into a single integer argument and creates a MatchExpression
-     * of type 'T' that gets initialized with the resulting integer.
-     */
-    template <class T>
-    StatusWithMatchExpression _parseInternalSchemaSingleIntegerArgument(
-        const char* name, const BSONElement& elem) const;
-
 
     // The maximum allowed depth of a query tree. Just to guard against stack overflow.
     static const int kMaximumTreeDepth;

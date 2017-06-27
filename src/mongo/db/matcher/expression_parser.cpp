@@ -36,8 +36,6 @@
 #include "mongo/db/matcher/expression_array.h"
 #include "mongo/db/matcher/expression_leaf.h"
 #include "mongo/db/matcher/expression_tree.h"
-#include "mongo/db/matcher/schema/expression_internal_schema_max_items.h"
-#include "mongo/db/matcher/schema/expression_internal_schema_min_items.h"
 #include "mongo/db/namespace_string.h"
 #include "mongo/stdx/memory.h"
 #include "mongo/util/mongoutils/str.h"
@@ -68,9 +66,6 @@ namespace mongo {
 
 using std::string;
 using stdx::make_unique;
-
-const double MatchExpressionParser::kLongLongMaxPlusOneAsDouble =
-    scalbn(1, std::numeric_limits<long long>::digits);
 
 StatusWithMatchExpression MatchExpressionParser::_parseComparison(
     const char* name,
@@ -281,16 +276,6 @@ StatusWithMatchExpression MatchExpressionParser::_parseSubField(const BSONObj& c
 
         case BSONObj::opBITS_ANY_CLEAR: {
             return _parseBitTest<BitsAnyClearMatchExpression>(name, e);
-        }
-
-        case BSONObj::opINTERNAL_SCHEMA_MIN_ITEMS: {
-            return _parseInternalSchemaSingleIntegerArgument<InternalSchemaMinItemsMatchExpression>(
-                name, e);
-        }
-
-        case BSONObj::opINTERNAL_SCHEMA_MAX_ITEMS: {
-            return _parseInternalSchemaSingleIntegerArgument<InternalSchemaMaxItemsMatchExpression>(
-                name, e);
         }
     }
 
@@ -845,12 +830,45 @@ StatusWithMatchExpression MatchExpressionParser::_parseBitTest(const char* name,
         }
     } else if (e.isNumber()) {
         // Integer bitmask provided as value.
-        auto bitMask = parseIntegerElementToPositiveLong(name, e);
-        if (!bitMask.isOK()) {
-            return bitMask.getStatus();
+
+        if (e.type() == BSONType::NumberDouble) {
+            double eDouble = e.numberDouble();
+
+            // NaN doubles are rejected.
+            if (std::isnan(eDouble)) {
+                mongoutils::str::stream ss;
+                ss << name << " cannot take a NaN";
+                return Status(ErrorCodes::BadValue, ss);
+            }
+
+            // No integral doubles that are too large to be represented as a 64 bit signed integer.
+            // We use 'kLongLongMaxAsDouble' because if we just did eDouble > 2^63-1, it would be
+            // compared against 2^63. eDouble=2^63 would not get caught that way.
+            if (eDouble >= BitTestMatchExpression::kLongLongMaxPlusOneAsDouble ||
+                eDouble < std::numeric_limits<long long>::min()) {
+                mongoutils::str::stream ss;
+                ss << name << " cannot be represented as a 64-bit integer: " << e;
+                return Status(ErrorCodes::BadValue, ss);
+            }
+
+            // This checks if e is an integral double.
+            if (eDouble != static_cast<double>(static_cast<long long>(eDouble))) {
+                mongoutils::str::stream ss;
+                ss << name << " cannot have a fractional part but received: " << e;
+                return Status(ErrorCodes::BadValue, ss);
+            }
         }
 
-        Status s = bitTestMatchExpression->init(name, bitMask.getValue());
+        long long bitMask = e.numberLong();
+
+        // No negatives.
+        if (bitMask < 0) {
+            mongoutils::str::stream ss;
+            ss << name << " cannot take a negative number: " << e;
+            return Status(ErrorCodes::BadValue, ss);
+        }
+
+        Status s = bitTestMatchExpression->init(name, bitMask);
         if (!s.isOK()) {
             return s;
         }
@@ -946,75 +964,4 @@ StatusWithMatchExpression expressionParserGeoCallbackDefault(const char* name,
 }
 
 MatchExpressionParserGeoCallback expressionParserGeoCallback = expressionParserGeoCallbackDefault;
-
-StatusWith<long long> MatchExpressionParser::parseIntegerElementToPositiveLong(
-    const char* name, const BSONElement& elem) {
-    if (!elem.isNumber()) {
-        return Status(ErrorCodes::FailedToParse, str::stream() << name << " must be a number");
-    }
-
-    long long number = 0;
-    if (elem.type() == BSONType::NumberDouble) {
-        double eDouble = elem.numberDouble();
-
-        // NaN doubles are rejected.
-        if (std::isnan(eDouble)) {
-            return Status(ErrorCodes::FailedToParse, str::stream() << name << " cannot take a NaN");
-        }
-
-        // No integral doubles that are too large to be represented as a 64 bit signed integer.
-        // We use 'kLongLongMaxAsDouble' because if we just did eDouble > 2^63-1, it would be
-        // compared against 2^63. eDouble=2^63 would not get caught that way.
-        if (eDouble >= MatchExpressionParser::kLongLongMaxPlusOneAsDouble ||
-            eDouble < std::numeric_limits<long long>::min()) {
-            return Status(
-                ErrorCodes::FailedToParse,
-                str::stream() << name << " cannot be represented as a 64-bit integer: " << elem);
-        }
-
-        // This checks if elem is an integral double.
-        if (eDouble != static_cast<double>(static_cast<long long>(eDouble))) {
-            return Status(
-                ErrorCodes::FailedToParse,
-                str::stream() << name << " cannot have a fractional part but received: " << elem);
-        }
-
-        number = elem.numberLong();
-    } else if (elem.type() == BSONType::NumberDecimal) {
-        uint32_t signalingFlags = 0;
-        number = elem.numberDecimal().toLongExact(&signalingFlags);
-        if (Decimal128::hasFlag(signalingFlags, Decimal128::kInexact)) {
-            return Status(
-                ErrorCodes::FailedToParse,
-                str::stream() << name << " cannot be represented as a 64-bit integer: " << elem);
-        }
-    } else {
-        number = elem.numberLong();
-    }
-
-    if (number < 0) {
-        return Status(ErrorCodes::FailedToParse,
-                      str::stream() << name << " cannot take a negative number");
-    }
-
-    return number;
 }
-
-template <class T>
-StatusWithMatchExpression MatchExpressionParser::_parseInternalSchemaSingleIntegerArgument(
-    const char* name, const BSONElement& elem) const {
-
-    auto parsedInt = parseIntegerElementToPositiveLong(name, elem);
-    if (!parsedInt.isOK()) {
-        return parsedInt.getStatus();
-    }
-
-    auto matchExpression = stdx::make_unique<T>();
-    auto status = matchExpression->init(name, parsedInt.getValue());
-    if (!status.isOK()) {
-        return status;
-    }
-
-    return {std::move(matchExpression)};
-}
-}  // namespace mongo

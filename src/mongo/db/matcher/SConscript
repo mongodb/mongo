@@ -45,7 +45,6 @@ env.Library(
         'match_details.cpp',
         'matchable.cpp',
         'matcher.cpp',
-        'schema/expression_internal_schema_num_array_items.cpp',
     ],
     LIBDEPS=[
         '$BUILD_DIR/mongo/base',
@@ -65,8 +64,6 @@ env.CppUnitTest(
         'expression_leaf_test.cpp',
         'expression_test.cpp',
         'expression_tree_test.cpp',
-        'schema/expression_internal_schema_max_items_test.cpp',
-        'schema/expression_internal_schema_min_items_test.cpp',
     ],
     LIBDEPS=[
         '$BUILD_DIR/mongo/db/query/collation/collator_interface_mock',
@@ -81,7 +78,6 @@ env.CppUnitTest(
         'expression_parser_leaf_test.cpp',
         'expression_parser_test.cpp',
         'expression_parser_tree_test.cpp',
-        'schema/expression_parser_schema_test.cpp',
     ],
     LIBDEPS=[
         '$BUILD_DIR/mongo/db/query/collation/collator_interface_mock',
