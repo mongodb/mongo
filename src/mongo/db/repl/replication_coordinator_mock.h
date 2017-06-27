@@ -280,8 +280,10 @@ public:
     /**
      * Sets the function to generate the return value for calls to awaitReplication() and
      * awaitReplicationOfLastOpForClient().
+     * 'opTime' is the optime passed to awaitReplication() and set to null when called from
+     * awaitReplicationOfLastOpForClient().
      */
-    using AwaitReplicationReturnValueFunction = stdx::function<StatusAndDuration()>;
+    using AwaitReplicationReturnValueFunction = stdx::function<StatusAndDuration(const OpTime&)>;
     void setAwaitReplicationReturnValueFunction(
         AwaitReplicationReturnValueFunction returnValueFunction);
 
@@ -306,7 +308,7 @@ private:
     OpTime _myLastDurableOpTime;
     OpTime _myLastAppliedOpTime;
     ReplSetConfig _getConfigReturnValue;
-    AwaitReplicationReturnValueFunction _awaitReplicationReturnValueFunction = [] {
+    AwaitReplicationReturnValueFunction _awaitReplicationReturnValueFunction = [](const OpTime&) {
         return StatusAndDuration(Status::OK(), Milliseconds(0));
     };
     bool _alwaysAllowWrites = false;

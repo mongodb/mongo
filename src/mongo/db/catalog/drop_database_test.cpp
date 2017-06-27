@@ -308,7 +308,7 @@ void _testDropDatabaseResetsDropPendingStateIfAwaitReplicationFails(OperationCon
 TEST_F(DropDatabaseTest,
        DropDatabaseResetsDropPendingStateIfAwaitReplicationFailsAndDatabaseIsPresent) {
     // Update ReplicationCoordinatorMock so that awaitReplicationOfLastOpForClient() fails.
-    _replCoord->setAwaitReplicationReturnValueFunction([] {
+    _replCoord->setAwaitReplicationReturnValueFunction([](const repl::OpTime&) {
         return repl::ReplicationCoordinator::StatusAndDuration(
             Status(ErrorCodes::WriteConcernFailed, ""), Milliseconds(0));
     });
@@ -319,7 +319,7 @@ TEST_F(DropDatabaseTest,
 TEST_F(DropDatabaseTest,
        DropDatabaseResetsDropPendingStateIfAwaitReplicationFailsAndDatabaseIsMissing) {
     // Update ReplicationCoordinatorMock so that awaitReplicationOfLastOpForClient() fails.
-    _replCoord->setAwaitReplicationReturnValueFunction([this] {
+    _replCoord->setAwaitReplicationReturnValueFunction([this](const repl::OpTime&) {
         _removeDatabaseFromCatalog(_opCtx.get(), _nss.db());
         return repl::ReplicationCoordinator::StatusAndDuration(
             Status(ErrorCodes::WriteConcernFailed, ""), Milliseconds(0));
@@ -331,7 +331,7 @@ TEST_F(DropDatabaseTest,
 TEST_F(DropDatabaseTest,
        DropDatabaseReturnsNamespaceNotFoundIfDatabaseIsRemovedAfterCollectionsDropsAreReplicated) {
     // Update ReplicationCoordinatorMock so that awaitReplicationOfLastOpForClient() fails.
-    _replCoord->setAwaitReplicationReturnValueFunction([this] {
+    _replCoord->setAwaitReplicationReturnValueFunction([this](const repl::OpTime&) {
         _removeDatabaseFromCatalog(_opCtx.get(), _nss.db());
         return repl::ReplicationCoordinator::StatusAndDuration(Status::OK(), Milliseconds(0));
     });

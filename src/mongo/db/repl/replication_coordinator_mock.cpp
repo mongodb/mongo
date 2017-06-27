@@ -113,13 +113,13 @@ void ReplicationCoordinatorMock::clearSyncSourceBlacklist() {}
 
 ReplicationCoordinator::StatusAndDuration ReplicationCoordinatorMock::awaitReplication(
     OperationContext* opCtx, const OpTime& opTime, const WriteConcernOptions& writeConcern) {
-    return _awaitReplicationReturnValueFunction();
+    return _awaitReplicationReturnValueFunction(opTime);
 }
 
 ReplicationCoordinator::StatusAndDuration
 ReplicationCoordinatorMock::awaitReplicationOfLastOpForClient(
     OperationContext* opCtx, const WriteConcernOptions& writeConcern) {
-    return _awaitReplicationReturnValueFunction();
+    return _awaitReplicationReturnValueFunction({});
 }
 
 void ReplicationCoordinatorMock::setAwaitReplicationReturnValueFunction(
