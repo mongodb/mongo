@@ -1,5 +1,5 @@
 /**
- *    Copyright (C) 2016 MongoDB Inc.
+ *    Copyright (C) 2017 MongoDB Inc.
  *
  *    This program is free software: you can redistribute it and/or  modify
  *    it under the terms of the GNU Affero General Public License, version 3,
@@ -28,59 +28,33 @@
 
 #pragma once
 
-#include "mongo/base/status.h"
-#include "mongo/stdx/unordered_map.h"
-#include "mongo/transport/session.h"
-#include "mongo/transport/ticket.h"
-#include "mongo/transport/ticket_impl.h"
-#include "mongo/transport/transport_layer.h"
-#include "mongo/util/net/message.h"
-#include "mongo/util/net/ssl_types.h"
-#include "mongo/util/time_support.h"
+#include <vector>
+
+#include "mongo/stdx/thread.h"
+#include "mongo/transport/service_executor_base.h"
+#include "mongo/transport/transport_layer_asio.h"
 
 namespace mongo {
 namespace transport {
 
 /**
- * This TransportLayerMock is a noop TransportLayer implementation.
+ * This is an ASIO-based fixed-size ServiceExecutor. It should only be used for testing because
+ * it won't add any threads if all threads become blocked.
  */
-class TransportLayerMock : public TransportLayer {
-    MONGO_DISALLOW_COPYING(TransportLayerMock);
-
+class ServiceExecutorFixed : public ServiceExecutorBase {
 public:
-    TransportLayerMock();
-    ~TransportLayerMock();
+    explicit ServiceExecutorFixed(ServiceContext* ctx, std::shared_ptr<asio::io_context> ioCtx);
+    virtual ~ServiceExecutorFixed();
 
-    Ticket sourceMessage(const SessionHandle& session,
-                         Message* message,
-                         Date_t expiration = Ticket::kNoExpirationDate) override;
-    Ticket sinkMessage(const SessionHandle& session,
-                       const Message& message,
-                       Date_t expiration = Ticket::kNoExpirationDate) override;
-
-    Status wait(Ticket&& ticket) override;
-    void asyncWait(Ticket&& ticket, TicketCallback callback) override;
-
-    Stats sessionStats() override;
-
-    SessionHandle createSession();
-    SessionHandle get(Session::Id id);
-    bool owns(Session::Id id);
-    void end(const SessionHandle& session) override;
-
-    Status setup() override;
-    Status start() override;
-    void shutdown() override;
-    bool inShutdown() const;
+    Status start() final;
+    Status shutdown() final;
 
 private:
-    struct Connection {
-        bool ended;
-        SessionHandle session;
-        SSLPeerInfo peerInfo;
-    };
-    stdx::unordered_map<Session::Id, Connection> _sessions;
-    bool _shutdown;
+    Status _schedule(Task task) final;
+
+    std::shared_ptr<asio::io_context> _ioContext;
+    std::vector<stdx::thread> _threads;
+    AtomicWord<bool> _isRunning{false};
 };
 
 }  // namespace transport

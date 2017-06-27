@@ -74,6 +74,8 @@ public:
         return DbResponse{builder.finish()};
     }
 
+    void endAllSessions(transport::Session::TagMask tags) override {}
+
     void setUassertInHandler() {
         _uassertInHandler = true;
     }
@@ -213,8 +215,7 @@ protected:
         sc->setTransportLayer(std::move(tl));
         _tl->start().transitional_ignore();
 
-        _ssm = stdx::make_unique<ServiceStateMachine>(
-            getGlobalServiceContext(), _tl->createSession(), true);
+        _ssm = ServiceStateMachine::create(getGlobalServiceContext(), _tl->createSession(), true);
         _tl->setSSM(_ssm.get());
     }
 
@@ -228,7 +229,7 @@ protected:
     MockTL* _tl;
     MockSEP* _sep;
     SessionHandle _session;
-    std::unique_ptr<ServiceStateMachine> _ssm;
+    std::shared_ptr<ServiceStateMachine> _ssm;
     bool _ranHandler;
 };
 
@@ -236,7 +237,7 @@ ServiceStateMachine::State ServiceStateMachineFixture::runPingTest() {
     _tl->setNextMessage(buildRequest(BSON("ping" << 1)));
 
     ASSERT_FALSE(haveClient());
-    ASSERT_EQ(_ssm->state(), ServiceStateMachine::State::Source);
+    ASSERT_EQ(_ssm->state(), ServiceStateMachine::State::Created);
     log() << "run next";
     _ssm->runNext();
     auto ret = _ssm->state();

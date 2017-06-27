@@ -353,6 +353,14 @@ static ExitCode runMongosServer() {
         return EXIT_NET_ERROR;
     }
 
+    if (auto svcExec = getGlobalServiceContext()->getServiceExecutor()) {
+        start = svcExec->start();
+        if (!start.isOK()) {
+            error() << "Failed to start the service executor: " << start;
+            return EXIT_NET_ERROR;
+        }
+    }
+
     getGlobalServiceContext()->notifyStartupComplete();
 #if !defined(_WIN32)
     mongo::signalForkSuccess();

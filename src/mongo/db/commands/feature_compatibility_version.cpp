@@ -41,7 +41,7 @@
 #include "mongo/db/storage/storage_engine.h"
 #include "mongo/db/write_concern_options.h"
 #include "mongo/rpc/get_status_from_command_result.h"
-#include "mongo/transport/transport_layer.h"
+#include "mongo/transport/service_entry_point.h"
 #include "mongo/util/log.h"
 
 namespace mongo {
@@ -185,7 +185,7 @@ void FeatureCompatibilityVersion::set(OperationContext* opCtx, StringData versio
 
     // Close all internal connections to versions lower than 3.6.
     if (version == FeatureCompatibilityVersionCommandParser::kVersion36) {
-        opCtx->getServiceContext()->getTransportLayer()->endAllSessions(
+        opCtx->getServiceContext()->getServiceEntryPoint()->endAllSessions(
             transport::Session::kLatestVersionInternalClientKeepOpen |
             transport::Session::kExternalClientKeepOpen);
     }

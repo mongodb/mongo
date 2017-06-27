@@ -1,5 +1,5 @@
 /**
- *    Copyright (C) 2016 MongoDB Inc.
+ *    Copyright (C) 2017 MongoDB Inc.
  *
  *    This program is free software: you can redistribute it and/or  modify
  *    it under the terms of the GNU Affero General Public License, version 3,
@@ -28,59 +28,49 @@
 
 #pragma once
 
-#include "mongo/base/status.h"
-#include "mongo/stdx/unordered_map.h"
-#include "mongo/transport/session.h"
-#include "mongo/transport/ticket.h"
-#include "mongo/transport/ticket_impl.h"
-#include "mongo/transport/transport_layer.h"
-#include "mongo/util/net/message.h"
-#include "mongo/util/net/ssl_types.h"
-#include "mongo/util/time_support.h"
+#include "mongo/platform/atomic_word.h"
+#include "mongo/transport/service_executor.h"
+#include "mongo/util/tick_source.h"
 
 namespace mongo {
 namespace transport {
-
-/**
- * This TransportLayerMock is a noop TransportLayer implementation.
+/*
+ * This is the base class of ServiceExecutors.
+ *
+ * Service executors should derive from this class and implement scheduleImpl(). They may
+ * get timing/counter statistics by calling getStats().
  */
-class TransportLayerMock : public TransportLayer {
-    MONGO_DISALLOW_COPYING(TransportLayerMock);
-
+class ServiceExecutorBase : public ServiceExecutor {
 public:
-    TransportLayerMock();
-    ~TransportLayerMock();
+    Status schedule(Task task) final;
 
-    Ticket sourceMessage(const SessionHandle& session,
-                         Message* message,
-                         Date_t expiration = Ticket::kNoExpirationDate) override;
-    Ticket sinkMessage(const SessionHandle& session,
-                       const Message& message,
-                       Date_t expiration = Ticket::kNoExpirationDate) override;
+    struct Stats {
+        TickSource::Tick ticksRunning;  // Total number of ticks spent running tasks
+        TickSource::Tick ticksQueued;   // Total number of ticks tasks have spent waiting to run
+        int64_t tasksExecuted;          // Total number of tasks executed
+        int64_t tasksScheduled;         // Total number of tasks scheduled
+        int64_t outstandingTasks;       // Current number of tasks waiting to be run
+    };
 
-    Status wait(Ticket&& ticket) override;
-    void asyncWait(Ticket&& ticket, TicketCallback callback) override;
+    Stats getStats() const;
+    void appendStats(BSONObjBuilder* bob) const final;
 
-    Stats sessionStats() override;
+protected:
+    explicit ServiceExecutorBase(ServiceContext* ctx);
 
-    SessionHandle createSession();
-    SessionHandle get(Session::Id id);
-    bool owns(Session::Id id);
-    void end(const SessionHandle& session) override;
-
-    Status setup() override;
-    Status start() override;
-    void shutdown() override;
-    bool inShutdown() const;
+    TickSource* tickSource() const;
 
 private:
-    struct Connection {
-        bool ended;
-        SessionHandle session;
-        SSLPeerInfo peerInfo;
-    };
-    stdx::unordered_map<Session::Id, Connection> _sessions;
-    bool _shutdown;
+    // Sub-classes should implement this function to actually schedule the task. It will be called
+    // by schedule() with a wrapped task that does all the necessary stats/timing tracking.
+    virtual Status _schedule(Task task) = 0;
+
+    TickSource* _tickSource;
+    AtomicWord<TickSource::Tick> _ticksRunning{0};
+    AtomicWord<TickSource::Tick> _ticksQueued{0};
+    AtomicWord<int64_t> _tasksExecuted{0};
+    AtomicWord<int64_t> _tasksScheduled{0};
+    AtomicWord<int64_t> _outstandingTasks{0};
 };
 
 }  // namespace transport

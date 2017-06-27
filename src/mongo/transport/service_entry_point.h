@@ -53,6 +53,11 @@ public:
     virtual void startSession(transport::SessionHandle session) = 0;
 
     /**
+     * End all sessions that do not match the mask in tags.
+     */
+    virtual void endAllSessions(transport::Session::TagMask tags) = 0;
+
+    /**
      * Processes a request and fills out a DbResponse.
      */
     virtual DbResponse handleRequest(OperationContext* opCtx, const Message& request) = 0;

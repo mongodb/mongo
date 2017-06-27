@@ -36,6 +36,9 @@ env.Library(
     LIBDEPS=[
         'transport_layer',
     ],
+    LIBDEPS_PRIVATE=[
+        'service_executor',
+    ],
 )
 
 env.Library(
@@ -59,12 +62,27 @@ tlEnv.Library(
     ],
     LIBDEPS=[
         'transport_layer_common',
-        '$BUILD_DIR/mongo/db/auth/authentication_restriction',
-        '$BUILD_DIR/third_party/shim_asio',
         '$BUILD_DIR/mongo/base/system_error',
+        '$BUILD_DIR/mongo/db/auth/authentication_restriction',
         '$BUILD_DIR/mongo/db/server_options_core',
         '$BUILD_DIR/mongo/db/service_context',
         '$BUILD_DIR/mongo/db/stats/counters',
+        '$BUILD_DIR/third_party/shim_asio',
+    ],
+)
+
+tlEnv.Library(
+    target='service_executor',
+    source=[
+        'service_executor_base.cpp',
+        'service_executor_fixed.cpp',
+    ],
+    LIBDEPS=[
+        '$BUILD_DIR/mongo/db/service_context',
+    ],
+    LIBDEPS_PRIVATE=[
+        "$BUILD_DIR/mongo/util/processinfo",
+        '$BUILD_DIR/third_party/shim_asio',
     ],
 )
 

@@ -72,7 +72,6 @@ public:
     Stats sessionStats() override;
 
     void end(const SessionHandle& session) override;
-    void endAllSessions(Session::TagMask tags) override;
 
     Status start() override;
     void shutdown() override;

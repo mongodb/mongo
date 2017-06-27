@@ -48,6 +48,7 @@ def mongod_program(logger, executable=None, process_kwargs=None, **kwargs):
     shortcut_opts = {
         "nojournal": config.NO_JOURNAL,
         "nopreallocj": config.NO_PREALLOC_JOURNAL,
+        "serviceExecutor": config.SERVICE_EXECUTOR,
         "storageEngine": config.STORAGE_ENGINE,
         "wiredTigerCollectionConfigString": config.WT_COLL_CONFIG,
         "wiredTigerEngineConfigString": config.WT_ENGINE_CONFIG,
@@ -141,6 +142,7 @@ def mongo_shell_program(logger, executable=None, filename=None, process_kwargs=N
     shortcut_opts = {
         "noJournal": (config.NO_JOURNAL, False),
         "noJournalPrealloc": (config.NO_PREALLOC_JOURNAL, False),
+        "serviceExecutor": (config.SERVICE_EXECUTOR, ""),
         "storageEngine": (config.STORAGE_ENGINE, ""),
         "storageEngineCacheSizeGB": (config.STORAGE_ENGINE_CACHE_SIZE, ""),
         "testName": (os.path.splitext(os.path.basename(filename))[0], ""),

@@ -50,14 +50,6 @@
 
 namespace mongo {
 namespace transport {
-namespace {
-struct lock_weak {
-    template <typename T>
-    std::shared_ptr<T> operator()(const std::weak_ptr<T>& p) const {
-        return p.lock();
-    }
-};
-}  // namespace
 
 TransportLayerLegacy::Options::Options(const ServerGlobalParams* params)
     : port(params->port), ipList(params->bind_ip) {}
@@ -163,11 +155,7 @@ Ticket TransportLayerLegacy::sourceMessage(const SessionHandle& session,
 
 TransportLayer::Stats TransportLayerLegacy::sessionStats() {
     Stats stats;
-    {
-        stdx::lock_guard<stdx::mutex> lk(_sessionsMutex);
-        stats.numOpenSessions = _sessions.size();
-    }
-
+    stats.numOpenSessions = _currentConnections.load();
     stats.numAvailableSessions = Listener::globalTicketHolder.available();
     stats.numCreatedSessions = Listener::globalConnectionNumber.load();
 
@@ -222,48 +210,10 @@ void TransportLayerLegacy::_closeConnection(Connection* conn) {
     Listener::globalTicketHolder.release();
 }
 
-// Capture all of the weak pointers behind the lock, to delay their expiry until we leave the
-// locking context. This function requires proof of locking, by passing the lock guard.
-auto TransportLayerLegacy::lockAllSessions(const stdx::unique_lock<stdx::mutex>&) const
-    -> std::vector<LegacySessionHandle> {
-    using std::begin;
-    using std::end;
-    std::vector<std::shared_ptr<LegacySession>> result;
-    std::transform(begin(_sessions), end(_sessions), std::back_inserter(result), lock_weak());
-    // Skip expired weak pointers.
-    result.erase(std::remove(begin(result), end(result), nullptr), end(result));
-    return result;
-}
-
-void TransportLayerLegacy::endAllSessions(Session::TagMask tags) {
-    log() << "legacy transport layer closing all connections";
-    {
-        stdx::unique_lock<stdx::mutex> lk(_sessionsMutex);
-        // We want to capture the shared_ptrs to our sessions in a way which lets us destroy them
-        // outside of the lock.
-        const auto sessions = lockAllSessions(lk);
-
-        for (auto&& session : sessions) {
-            if (session->getTags() & tags) {
-                log() << "Skip closing connection for connection # "
-                      << session->conn()->connectionId;
-            } else {
-                _closeConnection(session->conn());
-            }
-        }
-        // TODO(SERVER-27069): Revamp this lock to not cover the loop. This unlock was put here
-        // specifically to minimize risk, just before the release of 3.4. The risk is that we would
-        // be in the loop without the lock, which most of our testing didn't do. We must unlock
-        // manually here, because the `sessions` vector must be destroyed *outside* of the lock.
-        lk.unlock();
-    }
-}
-
 void TransportLayerLegacy::shutdown() {
     _running.store(false);
     _listener->shutdown();
     _listenerThread.join();
-    endAllSessions(Session::kEmptyTagMask);
 }
 
 void TransportLayerLegacy::_destroy(LegacySession& session) {
@@ -271,8 +221,7 @@ void TransportLayerLegacy::_destroy(LegacySession& session) {
         _closeConnection(session.conn());
     }
 
-    stdx::lock_guard<stdx::mutex> lk(_sessionsMutex);
-    _sessions.erase(session.getIter());
+    _currentConnections.subtractAndFetch(1);
 }
 
 Status TransportLayerLegacy::_runTicket(Ticket ticket) {
@@ -328,17 +277,8 @@ void TransportLayerLegacy::_handleNewConnection(std::unique_ptr<AbstractMessagin
 
     amp->setLogLevel(logger::LogSeverity::Debug(1));
 
+    _currentConnections.addAndFetch(1);
     auto session = LegacySession::create(std::move(amp), this);
-    stdx::list<std::weak_ptr<LegacySession>> list;
-    auto it = list.emplace(list.begin(), session);
-
-    {
-        // Add the new session to our list
-        stdx::lock_guard<stdx::mutex> lk(_sessionsMutex);
-        session->setIter(it);
-        _sessions.splice(_sessions.begin(), list, it);
-    }
-
     invariant(_sep);
     _sep->startSession(std::move(session));
 }

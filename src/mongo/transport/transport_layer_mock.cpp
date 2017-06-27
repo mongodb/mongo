@@ -119,14 +119,6 @@ void TransportLayerMock::end(const SessionHandle& session) {
     _sessions[session->id()].ended = true;
 }
 
-void TransportLayerMock::endAllSessions(Session::TagMask tags) {
-    auto it = _sessions.begin();
-    while (it != _sessions.end()) {
-        end(it->second.session);
-        it++;
-    }
-}
-
 Status TransportLayerMock::setup() {
     return Status::OK();
 }
@@ -138,7 +130,6 @@ Status TransportLayerMock::start() {
 void TransportLayerMock::shutdown() {
     if (!inShutdown()) {
         _shutdown = true;
-        endAllSessions(Session::kEmptyTagMask);
     }
 }
 

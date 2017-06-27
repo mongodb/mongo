@@ -46,14 +46,7 @@ ServiceEntryPointMock::ServiceEntryPointMock(transport::TransportLayer* tl)
     : _tl(tl), _inShutdown(false) {}
 
 ServiceEntryPointMock::~ServiceEntryPointMock() {
-    {
-        stdx::lock_guard<stdx::mutex> lk(_shutdownLock);
-        _inShutdown = true;
-    }
-
-    for (auto& t : _threads) {
-        t.join();
-    }
+    endAllSessions(transport::Session::kEmptyTagMask);
 }
 
 void ServiceEntryPointMock::startSession(transport::SessionHandle session) {
@@ -104,6 +97,17 @@ DbResponse ServiceEntryPointMock::handleRequest(OperationContext* opCtx, const M
     msg.setOperation(dbCommandReply);
 
     return {Message(b.release()), ""};
+}
+
+void ServiceEntryPointMock::endAllSessions(transport::Session::TagMask) {
+    {
+        stdx::lock_guard<stdx::mutex> lk(_shutdownLock);
+        _inShutdown = true;
+    }
+
+    for (auto& t : _threads) {
+        t.join();
+    }
 }
 
 }  // namespace mongo

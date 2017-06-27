@@ -53,6 +53,7 @@ DEFAULTS = {
     "reportFailureStatus": "fail",
     "reportFile": None,
     "seed": long(time.time() * 256),  # Taken from random.py code in Python 2.7.
+    "serviceExecutor": None,
     "shellReadMode": None,
     "shellWriteMode": None,
     "shuffle": None,
@@ -140,6 +141,9 @@ REPORT_FAILURE_STATUS = None
 
 # If set, then resmoke.py will write out a report file with the status of each test that ran.
 REPORT_FILE = None
+
+# IF set, then mongod/mongos's started by resmoke.py will use the specified service executor
+SERVICE_EXECUTOR = None
 
 # If set, then mongo shells started by resmoke.py will use the specified read mode.
 SHELL_READ_MODE = None

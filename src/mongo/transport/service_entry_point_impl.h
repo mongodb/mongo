@@ -28,12 +28,13 @@
 
 #pragma once
 
-#include <vector>
 
 #include "mongo/base/disallow_copying.h"
 #include "mongo/platform/atomic_word.h"
+#include "mongo/stdx/list.h"
 #include "mongo/stdx/mutex.h"
 #include "mongo/transport/service_entry_point.h"
+#include "mongo/transport/service_state_machine.h"
 
 namespace mongo {
 class ServiceContext;
@@ -57,13 +58,19 @@ public:
 
     void startSession(transport::SessionHandle session) final;
 
-    std::size_t getNumberOfActiveWorkerThreads() const {
-        return _nWorkers.load();
-    }
+    void endAllSessions(transport::Session::TagMask tags) final;
+
+    std::size_t getNumberOfConnections() const;
 
 private:
-    ServiceContext* _svcCtx;
+    using SSMList = stdx::list<std::shared_ptr<ServiceStateMachine>>;
+    using SSMListIterator = SSMList::iterator;
+
+    ServiceContext* const _svcCtx;
     AtomicWord<std::size_t> _nWorkers;
+
+    mutable stdx::mutex _sessionsMutex;
+    SSMList _sessions;
 };
 
 }  // namespace mongo

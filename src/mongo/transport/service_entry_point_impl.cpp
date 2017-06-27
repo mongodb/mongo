@@ -38,6 +38,7 @@
 #include "mongo/transport/service_entry_point_utils.h"
 #include "mongo/transport/service_state_machine.h"
 #include "mongo/transport/session.h"
+#include "mongo/util/log.h"
 #include "mongo/util/processinfo.h"
 #include "mongo/util/scopeguard.h"
 
@@ -52,14 +53,30 @@ void ServiceEntryPointImpl::startSession(transport::SessionHandle session) {
         stdx::make_unique<RestrictionEnvironment>(*remoteAddr, *localAddr);
     RestrictionEnvironment::set(session, std::move(restrictionEnvironment));
 
-    // Pass ownership of the transport::SessionHandle into our worker thread. When this
-    // thread exits, the session will end.
-    //
-    launchServiceWorkerThread([ this, session = std::move(session) ]() mutable {
-        _nWorkers.addAndFetch(1);
-        const auto guard = MakeGuard([this] { _nWorkers.subtractAndFetch(1); });
+    SSMListIterator ssmIt;
 
-        ServiceStateMachine ssm(_svcCtx, std::move(session), true);
+    const auto sync = (_svcCtx->getServiceExecutor() == nullptr);
+    auto ssm = ServiceStateMachine::create(_svcCtx, std::move(session), sync);
+    {
+        stdx::lock_guard<decltype(_sessionsMutex)> lk(_sessionsMutex);
+        ssmIt = _sessions.emplace(_sessions.begin(), ssm);
+    }
+
+    ssm->setCleanupHook([this, ssmIt] {
+        stdx::lock_guard<decltype(_sessionsMutex)> lk(_sessionsMutex);
+        _sessions.erase(ssmIt);
+    });
+
+    if (!sync) {
+        dassert(_svcCtx->getServiceExecutor());
+        ssm->scheduleNext();
+        return;
+    }
+
+    launchServiceWorkerThread([ this, ssm = std::move(ssm) ]() mutable {
+        _nWorkers.addAndFetch(1);
+        const auto guard = MakeGuard([this, &ssm] { _nWorkers.subtractAndFetch(1); });
+
         const auto numCores = [] {
             ProcessInfo p;
             if (auto availCores = p.getNumAvailableCores()) {
@@ -68,12 +85,53 @@ void ServiceEntryPointImpl::startSession(transport::SessionHandle session) {
             return static_cast<unsigned>(p.getNumCores());
         }();
 
-        while (ssm.state() != ServiceStateMachine::State::Ended) {
-            ssm.runNext();
+        while (ssm->state() != ServiceStateMachine::State::Ended) {
+            ssm->runNext();
+
+            /*
+             * In perf testing we found that yielding after running a each request produced
+             * at 5% performance boost in microbenchmarks if the number of worker threads
+             * was greater than the number of available cores.
+             */
             if (_nWorkers.load() > numCores)
                 stdx::this_thread::yield();
         }
     });
+}
+
+void ServiceEntryPointImpl::endAllSessions(transport::Session::TagMask tags) {
+    SSMList connsToEnd;
+
+    // While holding the _sesionsMutex, loop over all the current connections, and if their tags
+    // do not match the requested tags to skip, create a copy of their shared_ptr and place it in
+    // connsToEnd.
+    //
+    // This will ensure that sessions to be ended will live at least long enough for us to call
+    // their terminate() function, even if they've already ended because of an i/o error.
+    {
+        stdx::unique_lock<decltype(_sessionsMutex)> lk(_sessionsMutex);
+        for (auto& ssm : _sessions) {
+            if (ssm->session()->getTags() & tags) {
+                log() << "Skip closing connection for connection # " << ssm->session()->id();
+            } else {
+                connsToEnd.emplace_back(ssm);
+            }
+        }
+    }
+
+    // Loop through all the connections we marked for ending and call terminate on them. They will
+    // then remove themselves from _sessions whenever they transition to the next state.
+    //
+    // If they've already ended, then this is a noop, and the SSM will be destroyed when connsToEnd
+    // goes out of scope.
+    for (auto& ssm : connsToEnd) {
+        ssm->terminate();
+    }
+}
+
+std::size_t ServiceEntryPointImpl::getNumberOfConnections() const {
+    stdx::unique_lock<decltype(_sessionsMutex)> lk(_sessionsMutex);
+    return _sessions.size();
 }
 
 }  // namespace mongo

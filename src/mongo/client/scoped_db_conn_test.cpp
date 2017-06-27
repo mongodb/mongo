@@ -90,6 +90,12 @@ public:
         _threads.emplace_back(&DummyServiceEntryPoint::run, this, std::move(session));
     }
 
+    // This is not used in this test, so it is only here to complete the interface of
+    // ServiceEntryPoint
+    void endAllSessions(transport::Session::TagMask tags) override {
+        MONGO_UNREACHABLE;
+    }
+
     void setReplyDelay(Milliseconds delay) {
         _replyDelay = delay;
     }

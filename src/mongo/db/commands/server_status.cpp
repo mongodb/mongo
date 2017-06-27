@@ -295,6 +295,10 @@ public:
         BSONObjBuilder b;
         networkCounter.append(b);
         appendMessageCompressionStats(&b);
+        auto executor = opCtx->getServiceContext()->getServiceExecutor();
+        if (executor)
+            executor->appendStats(&b);
+
         return b.obj();
     }
 

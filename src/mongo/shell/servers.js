@@ -1054,6 +1054,15 @@ var MongoRunner, _startMongod, startMongoProgram, runMongoProgram, startMongoPro
             if (jsTest.options().auth) {
                 argArray.push(...['--setParameter', "enableLocalhostAuthBypass=false"]);
             }
+
+            if (jsTest.options().serviceExecutor &&
+                (!programVersion || (parseInt(programVersion.split(".")[0]) >= 3 &&
+                                     parseInt(programVersion.split(".")[1]) >= 5))) {
+                if (!argArrayContains("serviceExecutor")) {
+                    argArray.push(...["--serviceExecutor", jsTest.options().serviceExecutor]);
+                }
+            }
+
             // Since options may not be backward compatible, mongos options are not
             // set on older versions, e.g., mongos-3.0.
             if (programName.endsWith('mongos')) {

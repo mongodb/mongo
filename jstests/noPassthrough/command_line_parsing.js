@@ -25,6 +25,7 @@ var m2expected = {
 var m2result = m2.getDB("admin").runCommand("getCmdLineOpts");
 
 // remove variables that depend on the way the test is started.
+delete m2result.parsed.net.serviceExecutor;
 delete m2result.parsed.storage.mmapv1;
 delete m2result.parsed.setParameter;
 delete m2result.parsed.storage.engine;
@@ -49,6 +50,7 @@ var m3expected = {
 var m3result = m3.getDB("admin").runCommand("getCmdLineOpts");
 
 // remove variables that depend on the way the test is started.
+delete m3result.parsed.net.serviceExecutor;
 delete m3result.parsed.storage.mmapv1;
 delete m3result.parsed.setParameter;
 delete m3result.parsed.storage.engine;

@@ -39,6 +39,7 @@ DEST_TO_CONFIG = {
     "report_failure_status": "reportFailureStatus",
     "report_file": "reportFile",
     "seed": "seed",
+    "service_executor": "serviceExecutor",
     "shell_read_mode": "shellReadMode",
     "shell_write_mode": "shellWriteMode",
     "shuffle": "shuffle",
@@ -176,6 +177,9 @@ def parse_command_line():
                       help=("Seed for the random number generator. Useful in combination with the"
                             " --shuffle option for producing a consistent test execution order."))
 
+    parser.add_option("--serviceExecutor", dest="service_executor", metavar="EXECUTOR",
+                      help="The service executor used by jstests")
+
     parser.add_option("--shellReadMode", type="choice", action="store", dest="shell_read_mode",
                       choices=("commands", "compatibility", "legacy"), metavar="READ_MODE",
                       help="The read mode used by the mongo shell.")
@@ -276,6 +280,7 @@ def update_config_vars(values):
     _config.REPEAT = config.pop("repeat")
     _config.REPORT_FAILURE_STATUS = config.pop("reportFailureStatus")
     _config.REPORT_FILE = config.pop("reportFile")
+    _config.SERVICE_EXECUTOR = config.pop("serviceExecutor")
     _config.SHELL_READ_MODE = config.pop("shellReadMode")
     _config.SHELL_WRITE_MODE = config.pop("shellWriteMode")
     _config.STAGGER_JOBS = config.pop("staggerJobs") == "on"

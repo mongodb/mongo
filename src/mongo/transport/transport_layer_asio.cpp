@@ -81,7 +81,7 @@ std::shared_ptr<TransportLayerASIO::ASIOSession> TransportLayerASIO::createSessi
 
 TransportLayerASIO::TransportLayerASIO(const TransportLayerASIO::Options& opts,
                                        ServiceEntryPoint* sep)
-    : _ioContext(stdx::make_unique<asio::io_context>()),
+    : _ioContext(std::make_shared<asio::io_context>()),
 #ifdef MONGO_CONFIG_SSL
       _sslContext(nullptr),
 #endif
@@ -129,10 +129,7 @@ void TransportLayerASIO::asyncWait(Ticket&& ticket, TicketCallback callback) {
 
 TransportLayer::Stats TransportLayerASIO::sessionStats() {
     TransportLayer::Stats ret;
-    auto sessionCount = [this] {
-        stdx::lock_guard<stdx::mutex> lk(_mutex);
-        return _sessions.size();
-    }();
+    auto sessionCount = _currentConnections.load();
     ret.numOpenSessions = sessionCount;
     ret.numCreatedSessions = _createdConnections.load();
     ret.numAvailableSessions = static_cast<size_t>(_listenerOptions.maxConns) - sessionCount;
@@ -143,39 +140,6 @@ TransportLayer::Stats TransportLayerASIO::sessionStats() {
 void TransportLayerASIO::end(const SessionHandle& session) {
     auto asioSession = checked_pointer_cast<ASIOSession>(session);
     asioSession->shutdown();
-}
-
-void TransportLayerASIO::endAllSessions(Session::TagMask tags) {
-    log() << "ASIO transport layer closing all connections";
-    std::vector<ASIOSessionHandle> sessions;
-    // This is more complicated than it seems. We need to lock() all the weak_ptrs in _sessions
-    // and then end them if their tags don't match the tags passed into the function.
-    //
-    // When you lock the session, the lifetime of the session is extended by creating a new
-    // shared_ptr, but the session could end before this lock is released, which means that we
-    // must extend the lifetime of the session past the scope of the lock_guard, or else the
-    // session's destructor will acquire a lock already held here and deadlock/crash.
-    {
-        stdx::lock_guard<stdx::mutex> lk(_mutex);
-        sessions.reserve(_sessions.size());
-        for (auto&& weakSession : _sessions) {
-            if (auto session = weakSession.lock()) {
-                sessions.emplace_back(std::move(session));
-            }
-        }
-    }
-
-    // Outside the lock we kill any sessions that don't match our tags.
-    for (auto&& session : sessions) {
-        if (session->getTags() & tags) {
-            log() << "Skip closing connection for connection # " << session->id();
-        } else {
-            end(session);
-        }
-    }
-
-    // Any other sessions that may have ended while this was running will get cleaned up by
-    // sessions being destructed at the end of this function.
 }
 
 Status TransportLayerASIO::setup() {
@@ -293,18 +257,29 @@ Status TransportLayerASIO::start() {
 void TransportLayerASIO::shutdown() {
     stdx::lock_guard<stdx::mutex> lk(_mutex);
     _running.store(false);
-    _ioContext->stop();
 
+    // Loop through the acceptors and cancel their calls to async_accept. This will prevent new
+    // connections from being opened.
+    for (auto& acceptor : _acceptors) {
+        acceptor.cancel();
+    }
+
+    // If the listener thread is joinable (that is, we created/started a listener thread), then
+    // the io_context is owned exclusively by the TransportLayer and we should stop it and join
+    // the listener thread.
+    //
+    // Otherwise the ServiceExecutor may need to continue running the io_context to drain running
+    // connections, so we just cancel the acceptors and return.
     if (_listenerThread.joinable()) {
+        // We should only have started a listener if the TransportLayer is in sync mode.
+        dassert(!_listenerOptions.async);
+        _ioContext->stop();
         _listenerThread.join();
     }
 }
 
-void TransportLayerASIO::eraseSession(TransportLayerASIO::SessionsListIterator it) {
-    if (it != _sessions.end()) {
-        stdx::lock_guard<stdx::mutex> lk(_mutex);
-        _sessions.erase(it);
-    }
+const std::shared_ptr<asio::io_context>& TransportLayerASIO::getIOContext() {
+    return _ioContext;
 }
 
 void TransportLayerASIO::_acceptConnection(GenericAcceptor& acceptor) {
@@ -316,6 +291,9 @@ void TransportLayerASIO::_acceptConnection(GenericAcceptor& acceptor) {
 
     auto& socket = session->getSocket();
     auto acceptCb = [ this, session = std::move(session), &acceptor ](std::error_code ec) mutable {
+        if (!_running.load())
+            return;
+
         if (ec) {
             log() << "Error accepting new connection on "
                   << endpointToHostAndPort(acceptor.local_endpoint()) << ": " << ec.message();
@@ -323,20 +301,15 @@ void TransportLayerASIO::_acceptConnection(GenericAcceptor& acceptor) {
             return;
         }
 
-        size_t connCount = 0;
-        SessionsListIterator listIt;
-        {
-            stdx::lock_guard<stdx::mutex> lk(_mutex);
-            if (_sessions.size() + 1 > _listenerOptions.maxConns) {
-                log() << "connection refused because too many open connections: "
-                      << _sessions.size();
-                _acceptConnection(acceptor);
-                return;
-            }
-            listIt = _sessions.emplace(_sessions.end(), session);
+        size_t connCount = _currentConnections.addAndFetch(1);
+        if (connCount > _listenerOptions.maxConns) {
+            log() << "connection refused because too many open connections: " << connCount;
+            _currentConnections.subtractAndFetch(1);
+            _acceptConnection(acceptor);
+            return;
         }
 
-        session->postAcceptSetup(_listenerOptions.async, listIt);
+        session->postAcceptSetup(_listenerOptions.async);
 
         _createdConnections.addAndFetch(1);
         if (!serverGlobalParams.quiet.load()) {

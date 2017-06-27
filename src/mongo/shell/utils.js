@@ -198,6 +198,7 @@ var _jsTestOptions = {enableTestCommands: true};  // Test commands should be ena
 jsTestOptions = function() {
     if (TestData) {
         return Object.merge(_jsTestOptions, {
+            serviceExecutor: TestData.serviceExecutor,
             setParameters: TestData.setParameters,
             setParametersMongos: TestData.setParametersMongos,
             storageEngine: TestData.storageEngine,

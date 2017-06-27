@@ -31,7 +31,10 @@ env.Library(
     ],
     LIBDEPS=[
         '$BUILD_DIR/mongo/db/commands',
-    ]
+    ],
+    LIBDEPS_PRIVATE=[
+        '$BUILD_DIR/mongo/transport/service_executor',
+    ],
 )
 
 env.Library(

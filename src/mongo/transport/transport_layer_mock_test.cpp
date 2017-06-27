@@ -249,13 +249,6 @@ void assertEnded(TransportLayer* tl,
     }
 }
 
-// endAllSessions() ends all sessions
-TEST_F(TransportLayerMockTest, EndAllSessions) {
-    std::vector<SessionHandle> sessions = createSessions(tl());
-    tl()->endAllSessions(Session::kEmptyTagMask);
-    assertEnded(tl(), sessions);
-}
-
 // shutdown() ends all sessions and shuts down
 TEST_F(TransportLayerMockTest, Shutdown) {
     std::vector<SessionHandle> sessions = createSessions(tl());

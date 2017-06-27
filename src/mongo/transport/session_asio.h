@@ -37,8 +37,6 @@
 #include "mongo/util/net/ssl_types.h"
 #endif
 
-#include "boost/optional.hpp"
-
 #include "asio.hpp"
 #ifdef MONGO_CONFIG_SSL
 #include "asio/ssl.hpp"
@@ -57,8 +55,13 @@ public:
         : _socket(std::move(socket)), _tl(tl) {}
 
     virtual ~ASIOSession() {
-        if (_sessionsListIterator) {
-            _tl->eraseSession(*_sessionsListIterator);
+        if (_didPostAcceptSetup) {
+            // This is incremented in TransportLayerASIO::_acceptConnection if there are less than
+            // maxConns connections already established. A call to postAcceptSetup means that the
+            // session is valid and will be handed off to the ServiceEntryPoint.
+            //
+            // We decrement this here to keep the counters in the TL accurate.
+            _tl->_currentConnections.subtractAndFetch(1);
         }
     }
 
@@ -85,6 +88,7 @@ public:
 
     void shutdown() {
         std::error_code ec;
+        getSocket().cancel();
         getSocket().shutdown(GenericSocket::shutdown_both, ec);
         if (ec) {
             error() << "Error closing socket: " << ec.message();
@@ -99,7 +103,7 @@ public:
 #endif
     }
 
-    void postAcceptSetup(bool async, TransportLayerASIO::SessionsListIterator listIt) {
+    void postAcceptSetup(bool async) {
         std::error_code ec;
         _socket.non_blocking(async, ec);
         fassert(40490, ec.value() == 0);
@@ -143,7 +147,8 @@ public:
         if (ec) {
             LOG(3) << "Unable to get remote endpoint address: " << ec.message();
         }
-        _sessionsListIterator.emplace(std::move(listIt));
+
+        _didPostAcceptSetup = true;
     }
 
     template <typename MutableBufferSequence, typename CompleteHandler>
@@ -153,7 +158,7 @@ public:
             return opportunisticRead(sync, *_sslSocket, buffers, std::move(handler));
         } else if (!_ranHandshake) {
             invariant(asio::buffer_size(buffers) >= sizeof(MSGHEADER::Value));
-            auto postHandshakeCb = [this, sync, &buffers, handler](Status status, bool needsRead) {
+            auto postHandshakeCb = [this, sync, buffers, handler](Status status, bool needsRead) {
                 if (status.isOK()) {
                     if (needsRead) {
                         read(sync, buffers, handler);
@@ -167,7 +172,7 @@ public:
             };
 
             auto handshakeRecvCb =
-                [ this, postHandshakeCb = std::move(postHandshakeCb), sync, &buffers, handler ](
+                [ this, postHandshakeCb = std::move(postHandshakeCb), sync, buffers, handler ](
                     const std::error_code& ec, size_t size) {
                 _ranHandshake = true;
                 if (ec) {
@@ -210,7 +215,14 @@ private:
         std::error_code ec;
         auto size = asio::read(stream, buffers, ec);
         if ((ec == asio::error::would_block || ec == asio::error::try_again) && !sync) {
-            asio::async_read(stream, buffers, std::move(handler));
+            // asio::read is a loop internally, so some of buffers may have been read into already.
+            // So we need to adjust the buffers passed into async_read to be offset by size, if
+            // size is > 0.
+            MutableBufferSequence asyncBuffers(buffers);
+            if (size > 0) {
+                asyncBuffers += size;
+            }
+            asio::async_read(stream, asyncBuffers, std::move(handler));
         } else {
             handler(ec, size);
         }
@@ -224,7 +236,14 @@ private:
         std::error_code ec;
         auto size = asio::write(stream, buffers, ec);
         if ((ec == asio::error::would_block || ec == asio::error::try_again) && !sync) {
-            asio::async_write(stream, buffers, std::move(handler));
+            // asio::write is a loop internally, so some of buffers may have been read into already.
+            // So we need to adjust the buffers passed into async_write to be offset by size, if
+            // size is > 0.
+            ConstBufferSequence asyncBuffers(buffers);
+            if (size > 0) {
+                asyncBuffers += size;
+            }
+            asio::async_write(stream, asyncBuffers, std::move(handler));
         } else {
             handler(ec, size);
         }
@@ -318,7 +337,7 @@ private:
 #endif
 
     TransportLayerASIO* const _tl;
-    boost::optional<TransportLayerASIO::SessionsListIterator> _sessionsListIterator;
+    bool _didPostAcceptSetup = false;
 };
 
 }  // namespace transport

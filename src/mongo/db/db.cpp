@@ -737,6 +737,14 @@ ExitCode _initAndListen(int listenPort) {
         return EXIT_NET_ERROR;
     }
 
+    if (globalServiceContext->getServiceExecutor()) {
+        start = globalServiceContext->getServiceExecutor()->start();
+        if (!start.isOK()) {
+            error() << "Failed to start the service executor: " << start;
+            return EXIT_NET_ERROR;
+        }
+    }
+
     globalServiceContext->notifyStartupComplete();
 #ifndef _WIN32
     mongo::signalForkSuccess();
@@ -997,18 +1005,22 @@ static void shutdownTask() {
 
         log(LogComponent::kNetwork)
             << "shutdown: going to close all sockets because ASAN is active...";
+
+        // Shutdown the TransportLayer so that new connections aren't accepted
         tl->shutdown();
+
+        // Request that all sessions end.
+        sep->endAllSessions(transport::Session::kEmptyTagMask);
 
         // Close all sockets in a detached thread, and then wait for the number of active
         // connections to reach zero. Give the detached background thread a 10 second deadline. If
         // we haven't closed drained all active operations within that deadline, just keep going
         // with shutdown: the OS will do it for us when the process terminates.
-
         stdx::packaged_task<void()> dryOutTask([sep] {
             // There isn't currently a way to wait on the TicketHolder to have all its tickets back,
             // unfortunately. So, busy wait in this detached thread.
             while (true) {
-                const auto runningWorkers = sep->getNumberOfActiveWorkerThreads();
+                const auto runningWorkers = sep->getNumberOfConnections();
 
                 if (runningWorkers == 0) {
                     log(LogComponent::kNetwork) << "shutdown: no running workers found...";
@@ -1026,6 +1038,12 @@ static void shutdownTask() {
             stdx::future_status::ready) {
             log(LogComponent::kNetwork) << "shutdown: exhausted grace period for"
                                         << " active workers to drain; continuing with shutdown... ";
+        }
+
+        // Shutdown and wait for the service executor to exit
+        auto svcExec = serviceContext->getServiceExecutor();
+        if (svcExec) {
+            fassertStatusOK(40550, svcExec->shutdown());
         }
     }
 #endif

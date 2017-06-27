@@ -34,7 +34,6 @@
 #include "mongo/config.h"
 #include "mongo/db/server_options.h"
 #include "mongo/stdx/condition_variable.h"
-#include "mongo/stdx/list.h"
 #include "mongo/stdx/memory.h"
 #include "mongo/stdx/mutex.h"
 #include "mongo/stdx/thread.h"
@@ -107,37 +106,33 @@ public:
 
     void end(const SessionHandle& session) final;
 
-    void endAllSessions(transport::Session::TagMask tags) final;
-
     Status setup() final;
     Status start() final;
 
     void shutdown() final;
+
+    const std::shared_ptr<asio::io_context>& getIOContext();
 
 private:
     class ASIOSession;
     class ASIOTicket;
     class ASIOSourceTicket;
     class ASIOSinkTicket;
-    class SessionListGuard;
 
     using ASIOSessionHandle = std::shared_ptr<ASIOSession>;
     using ConstASIOSessionHandle = std::shared_ptr<const ASIOSession>;
     using GenericAcceptor = asio::basic_socket_acceptor<asio::generic::stream_protocol>;
-    using SessionsListIterator = stdx::list<std::weak_ptr<ASIOSession>>::iterator;
 
     ASIOSessionHandle createSession();
-    void eraseSession(SessionsListIterator it);
     void _acceptConnection(GenericAcceptor& acceptor);
 
     stdx::mutex _mutex;
     std::vector<GenericAcceptor> _acceptors;
-    stdx::list<std::weak_ptr<ASIOSession>> _sessions;
 
     // Only used if _listenerOptions.async is false.
     stdx::thread _listenerThread;
 
-    std::unique_ptr<asio::io_context> _ioContext;
+    std::shared_ptr<asio::io_context> _ioContext;
 #ifdef MONGO_CONFIG_SSL
     std::unique_ptr<asio::ssl::context> _sslContext;
     SSLParams::SSLModes _sslMode;
@@ -148,6 +143,7 @@ private:
     Options _listenerOptions;
 
     AtomicWord<size_t> _createdConnections{0};
+    AtomicWord<size_t> _currentConnections{0};
 };
 
 }  // namespace transport

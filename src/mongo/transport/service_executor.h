@@ -1,5 +1,5 @@
 /**
- *    Copyright (C) 2016 MongoDB Inc.
+ *    Copyright (C) 2017 MongoDB Inc.
  *
  *    This program is free software: you can redistribute it and/or  modify
  *    it under the terms of the GNU Affero General Public License, version 3,
@@ -29,58 +29,48 @@
 #pragma once
 
 #include "mongo/base/status.h"
-#include "mongo/stdx/unordered_map.h"
-#include "mongo/transport/session.h"
-#include "mongo/transport/ticket.h"
-#include "mongo/transport/ticket_impl.h"
-#include "mongo/transport/transport_layer.h"
-#include "mongo/util/net/message.h"
-#include "mongo/util/net/ssl_types.h"
-#include "mongo/util/time_support.h"
+#include "mongo/bson/bsonobjbuilder.h"
+#include "mongo/stdx/functional.h"
 
 namespace mongo {
+// This needs to be forward declared here because the service_context.h is a circular dependency.
+class ServiceContext;
+
 namespace transport {
 
-/**
- * This TransportLayerMock is a noop TransportLayer implementation.
+/*
+ * This is the interface for all ServiceExecutors.
  */
-class TransportLayerMock : public TransportLayer {
-    MONGO_DISALLOW_COPYING(TransportLayerMock);
-
+class ServiceExecutor {
 public:
-    TransportLayerMock();
-    ~TransportLayerMock();
+    virtual ~ServiceExecutor() = default;
+    using Task = stdx::function<void()>;
 
-    Ticket sourceMessage(const SessionHandle& session,
-                         Message* message,
-                         Date_t expiration = Ticket::kNoExpirationDate) override;
-    Ticket sinkMessage(const SessionHandle& session,
-                       const Message& message,
-                       Date_t expiration = Ticket::kNoExpirationDate) override;
+    /*
+     * Starts the ServiceExecutor. This may create threads even if no tasks are scheduled.
+     */
+    virtual Status start() = 0;
 
-    Status wait(Ticket&& ticket) override;
-    void asyncWait(Ticket&& ticket, TicketCallback callback) override;
+    /*
+     * Schedules a task with the ServiceExecutor and returns immediately.
+     *
+     * This is guaranteed to unwind the stack before running the task, although the task may be
+     * run later in the same thread.
+     */
+    virtual Status schedule(Task task) = 0;
 
-    Stats sessionStats() override;
+    /*
+     * Stops and joins the ServiceExecutor. Any outstanding tasks will not be executed, and any
+     * associated callbacks waiting on I/O may get called with an error code.
+     *
+     * This should only be called during server shutdown to gracefully destroy the ServiceExecutor
+     */
+    virtual Status shutdown() = 0;
 
-    SessionHandle createSession();
-    SessionHandle get(Session::Id id);
-    bool owns(Session::Id id);
-    void end(const SessionHandle& session) override;
-
-    Status setup() override;
-    Status start() override;
-    void shutdown() override;
-    bool inShutdown() const;
-
-private:
-    struct Connection {
-        bool ended;
-        SessionHandle session;
-        SSLPeerInfo peerInfo;
-    };
-    stdx::unordered_map<Session::Id, Connection> _sessions;
-    bool _shutdown;
+    /*
+     * Appends statistics about task scheduling to a BSONObjBuilder for serverStatus output.
+     */
+    virtual void appendStats(BSONObjBuilder* bob) const = 0;
 };
 
 }  // namespace transport
