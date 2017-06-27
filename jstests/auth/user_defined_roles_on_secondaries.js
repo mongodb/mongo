@@ -171,7 +171,15 @@
               }
             },
             {op: "c", ns: "admin.$cmd", o: {drop: "system.roles"}},
-            {op: "c", ns: "admin.$cmd", o: {dropDatabase: 1}},
+        ]
+    }));
+
+    // The dropDatabase command cannot be run inside an applyOps if it still has any collections
+    // (drop-pending included). See SERVER-29874.
+    assert.commandWorked(rstest.getPrimary().getDB("admin").dropDatabase());
+
+    assert.commandWorked(rstest.getPrimary().getDB("admin").runCommand({
+        applyOps: [
             {op: "c", ns: "admin.$cmd", o: {create: "system.roles"}},
             {
               op: "i",
