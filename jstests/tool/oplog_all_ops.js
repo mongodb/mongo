@@ -20,7 +20,7 @@ testColl.insert({x: 1});
 testColl.insert({x: 2});
 
 // op c
-testDB.dropDatabase();
+testColl.drop();
 
 testColl.insert({y: 1});
 testColl.insert({y: 2});
