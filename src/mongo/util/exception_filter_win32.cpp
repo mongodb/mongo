@@ -68,12 +68,17 @@ void doMinidumpWithException(struct _EXCEPTION_POINTERS* exceptionInfo) {
         }
     }
 
-    std::wstring dumpName(moduleFileName);
+    std::wstring dumpName = L"dump_";
 
-    std::string currentTime = terseCurrentTime(false);
+    dumpName += moduleFileName;
 
     dumpName += L".";
 
+    dumpName += std::to_wstring(GetCurrentProcessId());
+
+    dumpName += L".";
+
+    std::string currentTime = terseCurrentTime(false);
     dumpName += toWideString(currentTime.c_str());
 
     dumpName += L".mdmp";
