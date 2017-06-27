@@ -11,8 +11,7 @@
 #include <sys/types.h>
 #include <endian.h>
 
-#if defined(HAVE_CRC32_HARDWARE)
-
+#if defined(__linux__) && defined(HAVE_CRC32_HARDWARE)
 #include <sys/auxv.h>
 
 /* RHEL 7 has kernel support, but does not define this constant in the lib c headers. */
@@ -100,7 +99,7 @@ __wt_checksum_hw(const void *chunk, size_t len)
 void
 __wt_checksum_init(void)
 {
-#if defined(HAVE_CRC32_HARDWARE)
+#if defined(__linux__) && defined(HAVE_CRC32_HARDWARE)
 	unsigned long caps = getauxval(AT_HWCAP);
 
 	if (caps & HWCAP_S390_VX)
@@ -108,7 +107,7 @@ __wt_checksum_init(void)
 	else
 		__wt_process.checksum = __wt_checksum_sw;
 
-#else /* !HAVE_CRC32_HARDWARE */
+#else
 	__wt_process.checksum = __wt_checksum_sw;
 #endif
 }

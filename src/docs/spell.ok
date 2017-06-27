@@ -237,6 +237,7 @@ fput
 freelist
 fsync
 ftruncate
+fvisibility
 gcc
 gdbm
 ge

@@ -1,5 +1,5 @@
 /*-
- * Copyright (c) 2014-2016 MongoDB, Inc.
+ * Copyright (c) 2014-2017 MongoDB, Inc.
  * Copyright (c) 2008-2014 WiredTiger, Inc.
  *	All rights reserved.
  *
@@ -175,21 +175,6 @@ struct __wt_connection_impl {
 	WT_SPINLOCK turtle_lock;	/* Turtle file spinlock */
 	WT_RWLOCK dhandle_lock;		/* Data handle list lock */
 
-	/*
-	 * We distribute the btree page locks across a set of spin locks. Don't
-	 * use too many: they are only held for very short operations, each one
-	 * is 64 bytes, so 256 will fill the L1 cache on most CPUs.
-	 *
-	 * Use a prime number of buckets rather than assuming a good hash
-	 * (Reference Sedgewick, Algorithms in C, "Hash Functions").
-	 *
-	 * Note: this can't be an array, we impose cache-line alignment and gcc
-	 * doesn't support that for arrays smaller than the alignment.
-	 */
-#define	WT_PAGE_LOCKS		17
-	WT_SPINLOCK *page_lock;	        /* Btree page spinlocks */
-	u_int	     page_lock_cnt;	/* Next spinlock to use */
-
 					/* Connection queue */
 	TAILQ_ENTRY(__wt_connection_impl) q;
 					/* Cache pool queue */
@@ -209,10 +194,6 @@ struct __wt_connection_impl {
 	size_t  foc_size;		/* Array size */
 
 	WT_FH *lock_fh;			/* Lock file handle */
-
-	volatile uint64_t  split_gen;	/* Generation number for splits */
-	uint64_t split_stashed_bytes;	/* Atomic: split statistics */
-	uint64_t split_stashed_objects;
 
 	/*
 	 * The connection keeps a cache of data handles. The set of handles
@@ -329,9 +310,10 @@ struct __wt_connection_impl {
 #define	WT_CONN_LOG_ARCHIVE		0x01	/* Archive is enabled */
 #define	WT_CONN_LOG_ENABLED		0x02	/* Logging is enabled */
 #define	WT_CONN_LOG_EXISTED		0x04	/* Log files found */
-#define	WT_CONN_LOG_RECOVER_DONE	0x08	/* Recovery completed */
-#define	WT_CONN_LOG_RECOVER_ERR		0x10	/* Error if recovery required */
-#define	WT_CONN_LOG_ZERO_FILL		0x20	/* Manually zero files */
+#define	WT_CONN_LOG_RECOVER_DIRTY	0x08	/* Recovering unclean */
+#define	WT_CONN_LOG_RECOVER_DONE	0x10	/* Recovery completed */
+#define	WT_CONN_LOG_RECOVER_ERR		0x20	/* Error if recovery required */
+#define	WT_CONN_LOG_ZERO_FILL		0x40	/* Manually zero files */
 	uint32_t	 log_flags;	/* Global logging configuration */
 	WT_CONDVAR	*log_cond;	/* Log server wait mutex */
 	WT_SESSION_IMPL *log_session;	/* Log server session */
@@ -378,7 +360,15 @@ struct __wt_connection_impl {
 	bool		 las_written;	/* Lookaside table has been written */
 
 	WT_ITEM		 las_sweep_key;	/* Sweep server's saved key */
-	int64_t		 las_record_cnt;/* Count of lookaside records */
+	uint64_t	 las_record_cnt;/* Count of lookaside records */
+
+	/*
+	 * The "lookaside_activity" verbose messages are throttled to once per
+	 * checkpoint. To accomplish this we track the checkpoint generation
+	 * for the most recent read and write verbose messages.
+	 */
+	volatile uint64_t	las_verb_gen_read;
+	volatile uint64_t	las_verb_gen_write;
 
 					/* Locked: collator list */
 	TAILQ_HEAD(__wt_coll_qh, __wt_named_collator) collqh;
@@ -401,7 +391,10 @@ struct __wt_connection_impl {
 	/* If non-zero, all buffers used for I/O will be aligned to this. */
 	size_t buffer_alignment;
 
-	uint32_t schema_gen;		/* Schema generation number */
+	uint64_t stashed_bytes;		/* Atomic: stashed memory statistics */
+	uint64_t stashed_objects;
+					/* Generations manager */
+	volatile uint64_t generations[WT_GENERATIONS];
 
 	wt_off_t data_extend_len;	/* file_extend data length */
 	wt_off_t log_extend_len;	/* file_extend log length */

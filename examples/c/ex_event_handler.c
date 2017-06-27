@@ -1,5 +1,5 @@
 /*-
- * Public Domain 2014-2016 MongoDB, Inc.
+ * Public Domain 2014-2017 MongoDB, Inc.
  * Public Domain 2008-2014 WiredTiger, Inc.
  *
  * This is free and unencumbered software released into the public domain.
@@ -69,6 +69,10 @@ handle_wiredtiger_error(WT_EVENT_HANDLER *handler,
 	fprintf(stderr,
 	    "app_id %s, thread context %p, error %d, message %s\n",
 	    custom_handler->app_id, (void *)session, error, message);
+
+	/* Exit if the database has a fatal error. */
+	if (error == WT_PANIC)
+		exit (1);
 
 	return (0);
 }

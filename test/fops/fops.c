@@ -1,5 +1,5 @@
 /*-
- * Public Domain 2014-2016 MongoDB, Inc.
+ * Public Domain 2014-2017 MongoDB, Inc.
  * Public Domain 2008-2014 WiredTiger, Inc.
  *
  * This is free and unencumbered software released into the public domain.
@@ -28,7 +28,7 @@
 
 #include "thread.h"
 
-static void *fop(void *);
+static WT_THREAD_RET fop(void *);
 static void  print_stats(u_int);
 
 typedef struct {
@@ -46,15 +46,13 @@ typedef struct {
 
 static STATS *run_stats;
 
-int
+void
 fop_start(u_int nthreads)
 {
 	struct timeval start, stop;
 	double seconds;
-	pthread_t *tids;
+	wt_thread_t *tids;
 	u_int i;
-	int ret;
-	void *thread_ret;
 
 	tids = NULL; /* Silence GCC 4.1 warning. */
 
@@ -66,13 +64,12 @@ fop_start(u_int nthreads)
 
 	/* Create threads. */
 	for (i = 0; i < nthreads; ++i)
-		if ((ret = pthread_create(
-		    &tids[i], NULL, fop, (void *)(uintptr_t)i)) != 0)
-			testutil_die(ret, "pthread_create");
+		testutil_check(__wt_thread_create(
+		    NULL, &tids[i], fop, (void *)(uintptr_t)i));
 
 	/* Wait for the threads. */
 	for (i = 0; i < nthreads; ++i)
-		(void)pthread_join(tids[i], &thread_ret);
+		testutil_check(__wt_thread_join(NULL, tids[i]));
 
 	(void)gettimeofday(&stop, NULL);
 	seconds = (stop.tv_sec - start.tv_sec) +
@@ -84,15 +81,13 @@ fop_start(u_int nthreads)
 
 	free(run_stats);
 	free(tids);
-
-	return (0);
 }
 
 /*
  * fop --
  *	File operation function.
  */
-static void *
+static WT_THREAD_RET
 fop(void *arg)
 {
 	STATS *s;
@@ -150,7 +145,7 @@ fop(void *arg)
 			break;
 		}
 
-	return (NULL);
+	return (WT_THREAD_RET_VALUE);
 }
 
 /*

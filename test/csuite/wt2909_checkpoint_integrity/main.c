@@ -1,5 +1,5 @@
 /*-
- * Public Domain 2014-2016 MongoDB, Inc.
+ * Public Domain 2014-2017 MongoDB, Inc.
  * Public Domain 2008-2014 WiredTiger, Inc.
  *
  * This is free and unencumbered software released into the public domain.
@@ -445,6 +445,31 @@ run_process(TEST_OPTS *opts, const char *prog, char *argv[], int *status)
 }
 
 /*
+* subtest_error_handler --
+*     Error event handler.
+*/
+static int
+subtest_error_handler(WT_EVENT_HANDLER *handler,
+    WT_SESSION *session, int error, const char *message)
+{
+	(void)(handler);
+	(void)(session);
+	(void)(message);
+
+	/* Exit on panic, there's no checking to be done. */
+	if (error == WT_PANIC)
+		exit (1);
+	return (0);
+}
+
+static WT_EVENT_HANDLER event_handler = {
+	subtest_error_handler,
+	NULL,   /* Message handler */
+	NULL,   /* Progress handler */
+	NULL    /* Close handler */
+};
+
+/*
  * subtest_main --
  *	The main program for the subtest
  */
@@ -478,7 +503,8 @@ subtest_main(int argc, char *argv[], bool close_test)
 	    WT_FAIL_FS_LIB
 	    "=(early_load,config={environment=true,verbose=true})]"));
 
-	testutil_check(wiredtiger_open(opts->home, NULL, config, &opts->conn));
+	testutil_check(
+	    wiredtiger_open(opts->home, &event_handler, config, &opts->conn));
 	testutil_check(
 	    opts->conn->open_session(opts->conn, NULL, NULL, &session));
 

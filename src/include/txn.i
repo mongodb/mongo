@@ -1,5 +1,5 @@
 /*-
- * Copyright (c) 2014-2016 MongoDB, Inc.
+ * Copyright (c) 2014-2017 MongoDB, Inc.
  * Copyright (c) 2008-2014 WiredTiger, Inc.
  *	All rights reserved.
  *
@@ -69,7 +69,7 @@ __wt_txn_modify(WT_SESSION_IMPL *session, WT_UPDATE *upd)
 
 	if (F_ISSET(txn, WT_TXN_READONLY))
 		WT_RET_MSG(session, WT_ROLLBACK,
-		    "Attempt to update in a read only transaction");
+		    "Attempt to update in a read-only transaction");
 
 	WT_RET(__txn_next_op(session, &op));
 	op->type = F_ISSET(session, WT_SESSION_LOGGING_INMEM) ?
@@ -126,7 +126,7 @@ __wt_txn_oldest_id(WT_SESSION_IMPL *session)
 	 */
 	oldest_id = txn_global->oldest_id;
 	include_checkpoint_txn = btree == NULL ||
-	    btree->checkpoint_gen != txn_global->checkpoint_gen;
+	    btree->checkpoint_gen != __wt_gen(session, WT_GEN_CHECKPOINT);
 	WT_READ_BARRIER();
 	checkpoint_pinned = txn_global->checkpoint_pinned;
 
@@ -233,8 +233,11 @@ __wt_txn_visible(WT_SESSION_IMPL *session, uint64_t id)
 static inline WT_UPDATE *
 __wt_txn_read(WT_SESSION_IMPL *session, WT_UPDATE *upd)
 {
-	while (upd != NULL && !__wt_txn_visible(session, upd->txnid))
-		upd = upd->next;
+	/* Skip reserved place-holders, they're never visible. */
+	for (; upd != NULL; upd = upd->next)
+		if (upd->type != WT_UPDATE_RESERVED &&
+		    __wt_txn_visible(session, upd->txnid))
+			break;
 
 	return (upd);
 }
@@ -421,6 +424,8 @@ __wt_txn_update_check(WT_SESSION_IMPL *session, WT_UPDATE *upd)
 	if (txn->isolation == WT_ISO_SNAPSHOT)
 		while (upd != NULL && !__wt_txn_visible(session, upd->txnid)) {
 			if (upd->txnid != WT_TXN_ABORTED) {
+				WT_STAT_CONN_INCR(
+				    session, txn_update_conflict);
 				WT_STAT_DATA_INCR(
 				    session, txn_update_conflict);
 				return (WT_ROLLBACK);
@@ -449,8 +454,7 @@ __wt_txn_read_last(WT_SESSION_IMPL *session)
 	 * snapshot here: it will be restored by WT_WITH_TXN_ISOLATION.
 	 */
 	if ((!F_ISSET(txn, WT_TXN_RUNNING) ||
-	    txn->isolation != WT_ISO_SNAPSHOT) &&
-	    txn->forced_iso == 0)
+	    txn->isolation != WT_ISO_SNAPSHOT) && txn->forced_iso == 0)
 		__wt_txn_release_snapshot(session);
 }
 

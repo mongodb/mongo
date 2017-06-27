@@ -1,5 +1,5 @@
 /*-
- * Public Domain 2014-2016 MongoDB, Inc.
+ * Public Domain 2014-2017 MongoDB, Inc.
  * Public Domain 2008-2014 WiredTiger, Inc.
  *
  * This is free and unencumbered software released into the public domain.
@@ -35,28 +35,40 @@
 static const char *
 compressor(uint32_t compress_flag)
 {
+	const char *p;
+
+	p = "unrecognized compressor flag";
 	switch (compress_flag) {
 	case COMPRESS_NONE:
-		return ("none");
-	case COMPRESS_LZ4:
-		return ("lz4");
-	case COMPRESS_LZ4_NO_RAW:
-		return ("lz4-noraw");
-	case COMPRESS_LZO:
-		return ("LZO1B-6");
-	case COMPRESS_SNAPPY:
-		return ("snappy");
-	case COMPRESS_ZLIB:
-		return ("zlib");
-	case COMPRESS_ZLIB_NO_RAW:
-		return ("zlib-noraw");
-	case COMPRESS_ZSTD:
-		return ("zstd");
-	default:
+		p ="none";
 		break;
+	case COMPRESS_LZ4:
+		p ="lz4";
+		break;
+	case COMPRESS_LZ4_NO_RAW:
+		p ="lz4-noraw";
+		break;
+	case COMPRESS_LZO:
+		p ="LZO1B-6";
+		break;
+	case COMPRESS_SNAPPY:
+		p ="snappy";
+		break;
+	case COMPRESS_ZLIB:
+		p ="zlib";
+		break;
+	case COMPRESS_ZLIB_NO_RAW:
+		p ="zlib-noraw";
+		break;
+	case COMPRESS_ZSTD:
+		p ="zstd";
+		break;
+	default:
+		testutil_die(EINVAL,
+		    "illegal compression flag: %#" PRIx32, compress_flag);
+		/* NOTREACHED */
 	}
-	testutil_die(EINVAL,
-	    "illegal compression flag: %#" PRIx32, compress_flag);
+	return (p);
 }
 
 /*
@@ -66,16 +78,22 @@ compressor(uint32_t compress_flag)
 static const char *
 encryptor(uint32_t encrypt_flag)
 {
+	const char *p;
+
+	p = "unrecognized encryptor flag";
 	switch (encrypt_flag) {
 	case ENCRYPT_NONE:
-		return ("none");
-	case ENCRYPT_ROTN_7:
-		return ("rotn,keyid=7");
-	default:
+		p = "none";
 		break;
+	case ENCRYPT_ROTN_7:
+		p = "rotn,keyid=7";
+		break;
+	default:
+		testutil_die(EINVAL,
+		    "illegal encryption flag: %#" PRIx32, encrypt_flag);
+		/* NOTREACHED */
 	}
-	testutil_die(EINVAL,
-	    "illegal encryption flag: %#" PRIx32, encrypt_flag);
+	return (p);
 }
 
 static int
@@ -276,8 +294,8 @@ wts_open(const char *home, bool set_api, WT_CONNECTION **connp)
 		if ((ret = conn->load_extension(
 		    conn, HELIUM_PATH, helium_config)) != 0)
 			testutil_die(ret,
-			   "WT_CONNECTION.load_extension: %s:%s",
-			   HELIUM_PATH, helium_config);
+			    "WT_CONNECTION.load_extension: %s:%s",
+			    HELIUM_PATH, helium_config);
 	}
 	*connp = conn;
 }

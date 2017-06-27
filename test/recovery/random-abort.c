@@ -1,5 +1,5 @@
 /*-
- * Public Domain 2014-2016 MongoDB, Inc.
+ * Public Domain 2014-2017 MongoDB, Inc.
  * Public Domain 2008-2014 WiredTiger, Inc.
  *
  * This is free and unencumbered software released into the public domain.
@@ -47,9 +47,9 @@ static bool inmem;
 #define	RECORDS_FILE	"records-%" PRIu32
 
 #define	ENV_CONFIG_DEF						\
-    "create,log=(file_max=10M,archive=false,enabled)"
+    "create,log=(file_max=10M,enabled)"
 #define	ENV_CONFIG_TXNSYNC					\
-    "create,log=(file_max=10M,archive=false,enabled),"		\
+    "create,log=(file_max=10M,enabled),"		\
     "transaction_sync=(enabled,method=none)"
 #define	ENV_CONFIG_REC "log=(recover=on)"
 #define	MAX_VAL	4096
@@ -69,7 +69,7 @@ typedef struct {
 	uint32_t id;
 } WT_THREAD_DATA;
 
-static void *
+static WT_THREAD_RET
 thread_run(void *arg)
 {
 	FILE *fp;
@@ -161,15 +161,15 @@ static void fill_db(uint32_t)
 static void
 fill_db(uint32_t nth)
 {
-	pthread_t *thr;
 	WT_CONNECTION *conn;
 	WT_SESSION *session;
 	WT_THREAD_DATA *td;
+	wt_thread_t *thr;
 	uint32_t i;
 	int ret;
 	const char *envconf;
 
-	thr = dcalloc(nth, sizeof(pthread_t));
+	thr = dcalloc(nth, sizeof(*thr));
 	td = dcalloc(nth, sizeof(WT_THREAD_DATA));
 	if (chdir(home) != 0)
 		testutil_die(errno, "Child chdir: %s", home);
@@ -192,9 +192,8 @@ fill_db(uint32_t nth)
 		td[i].conn = conn;
 		td[i].start = (UINT64_MAX / nth) * i;
 		td[i].id = i;
-		if ((ret = pthread_create(
-		    &thr[i], NULL, thread_run, &td[i])) != 0)
-			testutil_die(ret, "pthread_create");
+		testutil_check(__wt_thread_create(
+		    NULL, &thr[i], thread_run, &td[i]));
 	}
 	printf("Spawned %" PRIu32 " writer threads\n", nth);
 	fflush(stdout);
@@ -203,7 +202,7 @@ fill_db(uint32_t nth)
 	 * it is killed.
 	 */
 	for (i = 0; i < nth; ++i)
-		testutil_assert(pthread_join(thr[i], NULL) == 0);
+		testutil_check(__wt_thread_join(NULL, thr[i]));
 	/*
 	 * NOTREACHED
 	 */

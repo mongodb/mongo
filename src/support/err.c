@@ -1,5 +1,5 @@
 /*-
- * Copyright (c) 2014-2016 MongoDB, Inc.
+ * Copyright (c) 2014-2017 MongoDB, Inc.
  * Copyright (c) 2008-2014 WiredTiger, Inc.
  *	All rights reserved.
  *
@@ -144,6 +144,8 @@ __wt_event_handler_set(WT_SESSION_IMPL *session, WT_EVENT_HANDLER *handler)
 			handler->handle_message = __handle_message_default;
 		if (handler->handle_progress == NULL)
 			handler->handle_progress = __handle_progress_default;
+		if (handler->handle_close == NULL)
+			handler->handle_close = __handle_close_default;
 	}
 
 	session->event_handler = handler;
@@ -500,8 +502,12 @@ __wt_panic(WT_SESSION_IMPL *session)
 #if defined(HAVE_DIAGNOSTIC)
 	__wt_abort(session);			/* Drop core if testing. */
 	/* NOTREACHED */
-#else
+#endif
+#if !defined(HAVE_DIAGNOSTIC) || defined(_WIN32)
 	/*
+	 * Confusing #ifdef structure because gcc knows we can't get here and
+	 * Visual Studio doesn't.
+	 *
 	 * Chaos reigns within.
 	 * Reflect, repent, and reboot.
 	 * Order shall return.
@@ -523,12 +529,7 @@ __wt_illegal_value(WT_SESSION_IMPL *session, const char *name)
 	    name == NULL ? "" : name, name == NULL ? "" : ": ",
 	    "encountered an illegal file format or internal value");
 
-#if defined(HAVE_DIAGNOSTIC)
-	__wt_abort(session);			/* Drop core if testing. */
-	/* NOTREACHED */
-#else
 	return (__wt_panic(session));
-#endif
 }
 
 /*

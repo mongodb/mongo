@@ -1,5 +1,5 @@
 /*-
- * Copyright (c) 2014-2016 MongoDB, Inc.
+ * Copyright (c) 2014-2017 MongoDB, Inc.
  * Copyright (c) 2008-2014 WiredTiger, Inc.
  *	All rights reserved.
  *
@@ -175,13 +175,13 @@ __wt_conn_remove_collator(WT_SESSION_IMPL *session)
 	conn = S2C(session);
 
 	while ((ncoll = TAILQ_FIRST(&conn->collqh)) != NULL) {
+		/* Remove from the connection's list, free memory. */
+		TAILQ_REMOVE(&conn->collqh, ncoll, q);
 		/* Call any termination method. */
 		if (ncoll->collator->terminate != NULL)
 			WT_TRET(ncoll->collator->terminate(
 			    ncoll->collator, (WT_SESSION *)session));
 
-		/* Remove from the connection's list, free memory. */
-		TAILQ_REMOVE(&conn->collqh, ncoll, q);
 		__wt_free(session, ncoll->name);
 		__wt_free(session, ncoll);
 	}
@@ -281,13 +281,13 @@ __wt_conn_remove_compressor(WT_SESSION_IMPL *session)
 	conn = S2C(session);
 
 	while ((ncomp = TAILQ_FIRST(&conn->compqh)) != NULL) {
+		/* Remove from the connection's list, free memory. */
+		TAILQ_REMOVE(&conn->compqh, ncomp, q);
 		/* Call any termination method. */
 		if (ncomp->compressor->terminate != NULL)
 			WT_TRET(ncomp->compressor->terminate(
 			    ncomp->compressor, (WT_SESSION *)session));
 
-		/* Remove from the connection's list, free memory. */
-		TAILQ_REMOVE(&conn->compqh, ncomp, q);
 		__wt_free(session, ncomp->name);
 		__wt_free(session, ncomp);
 	}
@@ -346,13 +346,13 @@ __wt_conn_remove_data_source(WT_SESSION_IMPL *session)
 	conn = S2C(session);
 
 	while ((ndsrc = TAILQ_FIRST(&conn->dsrcqh)) != NULL) {
+		/* Remove from the connection's list, free memory. */
+		TAILQ_REMOVE(&conn->dsrcqh, ndsrc, q);
 		/* Call any termination method. */
 		if (ndsrc->dsrc->terminate != NULL)
 			WT_TRET(ndsrc->dsrc->terminate(
 			    ndsrc->dsrc, (WT_SESSION *)session));
 
-		/* Remove from the connection's list, free memory. */
-		TAILQ_REMOVE(&conn->dsrcqh, ndsrc, q);
 		__wt_free(session, ndsrc->prefix);
 		__wt_free(session, ndsrc);
 	}
@@ -536,14 +536,16 @@ __wt_conn_remove_encryptor(WT_SESSION_IMPL *session)
 	conn = S2C(session);
 
 	while ((nenc = TAILQ_FIRST(&conn->encryptqh)) != NULL) {
+		/* Remove from the connection's list, free memory. */
+		TAILQ_REMOVE(&conn->encryptqh, nenc, q);
 		while ((kenc = TAILQ_FIRST(&nenc->keyedqh)) != NULL) {
+			/* Remove from the connection's list, free memory. */
+			TAILQ_REMOVE(&nenc->keyedqh, kenc, q);
 			/* Call any termination method. */
 			if (kenc->owned && kenc->encryptor->terminate != NULL)
 				WT_TRET(kenc->encryptor->terminate(
 				    kenc->encryptor, (WT_SESSION *)session));
 
-			/* Remove from the connection's list, free memory. */
-			TAILQ_REMOVE(&nenc->keyedqh, kenc, q);
 			__wt_free(session, kenc->keyid);
 			__wt_free(session, kenc);
 		}
@@ -553,8 +555,6 @@ __wt_conn_remove_encryptor(WT_SESSION_IMPL *session)
 			WT_TRET(nenc->encryptor->terminate(
 			    nenc->encryptor, (WT_SESSION *)session));
 
-		/* Remove from the connection's list, free memory. */
-		TAILQ_REMOVE(&conn->encryptqh, nenc, q);
 		__wt_free(session, nenc->name);
 		__wt_free(session, nenc);
 	}
@@ -680,13 +680,13 @@ __wt_conn_remove_extractor(WT_SESSION_IMPL *session)
 	conn = S2C(session);
 
 	while ((nextractor = TAILQ_FIRST(&conn->extractorqh)) != NULL) {
+		/* Remove from the connection's list, free memory. */
+		TAILQ_REMOVE(&conn->extractorqh, nextractor, q);
 		/* Call any termination method. */
 		if (nextractor->extractor->terminate != NULL)
 			WT_TRET(nextractor->extractor->terminate(
 			    nextractor->extractor, (WT_SESSION *)session));
 
-		/* Remove from the connection's list, free memory. */
-		TAILQ_REMOVE(&conn->extractorqh, nextractor, q);
 		__wt_free(session, nextractor->name);
 		__wt_free(session, nextractor);
 	}
@@ -1803,6 +1803,7 @@ __wt_verbose_config(WT_SESSION_IMPL *session, const char *cfg[])
 		{ "fileops",		WT_VERB_FILEOPS },
 		{ "handleops",		WT_VERB_HANDLEOPS },
 		{ "log",		WT_VERB_LOG },
+		{ "lookaside_activity",	WT_VERB_LOOKASIDE },
 		{ "lsm",		WT_VERB_LSM },
 		{ "lsm_manager",	WT_VERB_LSM_MANAGER },
 		{ "metadata",		WT_VERB_METADATA },

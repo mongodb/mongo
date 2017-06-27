@@ -1,5 +1,5 @@
 /*-
- * Public Domain 2014-2016 MongoDB, Inc.
+ * Public Domain 2014-2017 MongoDB, Inc.
  * Public Domain 2008-2014 WiredTiger, Inc.
  *
  * This is free and unencumbered software released into the public domain.
@@ -28,7 +28,7 @@
 
 #include "test_checkpoint.h"
 
-static void *checkpointer(void *);
+static WT_THREAD_RET checkpointer(void *);
 static int compare_cursors(
     WT_CURSOR *, const char *, WT_CURSOR *, const char *);
 static int diagnose_key_error(WT_CURSOR *, int, WT_CURSOR *, int);
@@ -39,35 +39,28 @@ static int verify_checkpoint(WT_SESSION *);
  * start_checkpoints --
  *     Responsible for creating the checkpoint thread.
  */
-int
+void
 start_checkpoints(void)
 {
-	int ret;
-
-	if ((ret = pthread_create(
-	    &g.checkpoint_thread, NULL, checkpointer, NULL)) != 0)
-		return (log_print_err("pthread_create", ret, 1));
-	return (0);
+	testutil_check(__wt_thread_create(NULL,
+	    &g.checkpoint_thread, checkpointer, NULL));
 }
 
 /*
  * end_checkpoints --
  *     Responsible for cleanly shutting down the checkpoint thread.
  */
-int
+void
 end_checkpoints(void)
 {
-	void *thread_ret;
-
-	return (pthread_join(g.checkpoint_thread, &thread_ret));
-
+	testutil_check(__wt_thread_join(NULL, g.checkpoint_thread));
 }
 
 /*
  * checkpointer --
  *	Checkpoint thread start function.
  */
-static void *
+static WT_THREAD_RET
 checkpointer(void *arg)
 {
 	char tid[128];
@@ -78,7 +71,7 @@ checkpointer(void *arg)
 	printf("checkpointer thread starting: tid: %s\n", tid);
 
 	(void)real_checkpointer();
-	return (NULL);
+	return (WT_THREAD_RET_VALUE);
 }
 
 /*

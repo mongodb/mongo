@@ -1,5 +1,5 @@
 /*-
- * Public Domain 2014-2016 MongoDB, Inc.
+ * Public Domain 2014-2017 MongoDB, Inc.
  * Public Domain 2008-2014 WiredTiger, Inc.
  *
  * This is free and unencumbered software released into the public domain.
@@ -54,8 +54,8 @@ typedef struct {
 
 /*
  * LZ4 decompression requires the exact compressed byte count returned by the
- * LZ4_compress and LZ4_compress_destSize functions. WiredTiger doesn't track
- * that value, store it in the destination buffer.
+ * LZ4_compress_default and LZ4_compress_destSize functions. WiredTiger doesn't
+ * track that value, store it in the destination buffer.
  *
  * Additionally, LZ4_compress_destSize may compress into the middle of a record,
  * and after decompression we return the length to the last record successfully
@@ -137,11 +137,10 @@ lz4_compress(WT_COMPRESSOR *compressor, WT_SESSION *session,
 
 	(void)compressor;				/* Unused parameters */
 	(void)session;
-	(void)dst_len;
 
 	/* Compress, starting after the prefix bytes. */
-	lz4_len = LZ4_compress(
-	   (const char *)src, (char *)dst + sizeof(LZ4_PREFIX), (int)src_len);
+	lz4_len = LZ4_compress_default((const char *)src,
+	    (char *)dst + sizeof(LZ4_PREFIX), (int)src_len, (int)dst_len);
 
 	/*
 	 * If compression succeeded and the compressed length is smaller than
@@ -214,7 +213,7 @@ lz4_decompress(WT_COMPRESSOR *compressor, WT_SESSION *session,
 	 */
 	if (dst_len < prefix.uncompressed_len) {
 		if ((dst_tmp = wt_api->scr_alloc(
-		   wt_api, session, (size_t)prefix.uncompressed_len)) == NULL)
+		    wt_api, session, (size_t)prefix.uncompressed_len)) == NULL)
 			return (ENOMEM);
 
 		decoded = LZ4_decompress_safe(

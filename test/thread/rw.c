@@ -1,5 +1,5 @@
 /*-
- * Public Domain 2014-2016 MongoDB, Inc.
+ * Public Domain 2014-2017 MongoDB, Inc.
  * Public Domain 2008-2014 WiredTiger, Inc.
  *
  * This is free and unencumbered software released into the public domain.
@@ -29,8 +29,8 @@
 #include "thread.h"
 
 static void  print_stats(u_int);
-static void *reader(void *);
-static void *writer(void *);
+static WT_THREAD_RET reader(void *);
+static WT_THREAD_RET writer(void *);
 
 typedef struct {
 	char *name;				/* object name */
@@ -45,15 +45,13 @@ typedef struct {
 
 static INFO *run_info;
 
-int
+void
 rw_start(u_int readers, u_int writers)
 {
 	struct timeval start, stop;
+	wt_thread_t *tids;
 	double seconds;
-	pthread_t *tids;
 	u_int i, name_index, offset, total_nops;
-	int ret;
-	void *thread_ret;
 
 	tids = NULL;	/* Keep GCC 4.1 happy. */
 	total_nops = 0;
@@ -109,18 +107,15 @@ rw_start(u_int readers, u_int writers)
 
 	/* Create threads. */
 	for (i = 0; i < readers; ++i)
-		if ((ret = pthread_create(
-		    &tids[i], NULL, reader, (void *)(uintptr_t)i)) != 0)
-			testutil_die(ret, "pthread_create");
-	for (; i < readers + writers; ++i) {
-		if ((ret = pthread_create(
-		    &tids[i], NULL, writer, (void *)(uintptr_t)i)) != 0)
-			testutil_die(ret, "pthread_create");
-	}
+		testutil_check(__wt_thread_create(
+		    NULL, &tids[i], reader, (void *)(uintptr_t)i));
+	for (; i < readers + writers; ++i)
+		testutil_check(__wt_thread_create(
+		    NULL, &tids[i], writer, (void *)(uintptr_t)i));
 
 	/* Wait for the threads. */
 	for (i = 0; i < readers + writers; ++i)
-		(void)pthread_join(tids[i], &thread_ret);
+		testutil_check(__wt_thread_join(NULL, tids[i]));
 
 	(void)gettimeofday(&stop, NULL);
 	seconds = (stop.tv_sec - start.tv_sec) +
@@ -147,8 +142,6 @@ rw_start(u_int readers, u_int writers)
 
 	free(run_info);
 	free(tids);
-
-	return (0);
 }
 
 /*
@@ -186,7 +179,7 @@ reader_op(WT_SESSION *session, WT_CURSOR *cursor, INFO *s)
  * reader --
  *	Reader thread start function.
  */
-static void *
+static WT_THREAD_RET
 reader(void *arg)
 {
 	INFO *s;
@@ -234,7 +227,7 @@ reader(void *arg)
 	printf(" read thread %2d stopping: tid: %s, file: %s\n",
 	    id, tid, s->name);
 
-	return (NULL);
+	return (WT_THREAD_RET_VALUE);
 }
 
 /*
@@ -291,7 +284,7 @@ writer_op(WT_SESSION *session, WT_CURSOR *cursor, INFO *s)
  * writer --
  *	Writer thread start function.
  */
-static void *
+static WT_THREAD_RET
 writer(void *arg)
 {
 	INFO *s;
@@ -339,7 +332,7 @@ writer(void *arg)
 	printf("write thread %2d stopping: tid: %s, file: %s\n",
 	    id, tid, s->name);
 
-	return (NULL);
+	return (WT_THREAD_RET_VALUE);
 }
 
 /*

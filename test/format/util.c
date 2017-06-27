@@ -1,5 +1,5 @@
 /*-
- * Public Domain 2014-2016 MongoDB, Inc.
+ * Public Domain 2014-2017 MongoDB, Inc.
  * Public Domain 2008-2014 WiredTiger, Inc.
  *
  * This is free and unencumbered software released into the public domain.
@@ -472,7 +472,7 @@ fclose_and_clear(FILE **fpp)
  * alter --
  *	Periodically alter a table's metadata.
  */
-void *
+WT_THREAD_RET
 alter(void *arg)
 {
 	WT_CONNECTION *conn;
@@ -510,5 +510,5 @@ alter(void *arg)
 	}
 
 	testutil_check(session->close(session, NULL));
-	return (NULL);
+	return (WT_THREAD_RET_VALUE);
 }

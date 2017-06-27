@@ -1,5 +1,5 @@
 /*-
- * Copyright (c) 2014-2016 MongoDB, Inc.
+ * Copyright (c) 2014-2017 MongoDB, Inc.
  * Copyright (c) 2008-2014 WiredTiger, Inc.
  *	All rights reserved.
  *
@@ -391,13 +391,11 @@ __log_file_server(void *arg)
 			WT_ERR(__wt_log_extract_lognum(session, close_fh->name,
 			    &filenum));
 			/*
-			 * We update the close file handle before updating the
-			 * close LSN when changing files.  It is possible we
-			 * could see mismatched settings.  If we do, yield
-			 * until it is set.  This should rarely happen.
+			 * The closing file handle should have a correct close
+			 * LSN.
 			 */
-			while (log->log_close_lsn.l.file < filenum)
-				__wt_yield();
+			WT_ASSERT(session,
+			    log->log_close_lsn.l.file == filenum);
 
 			if (__wt_log_cmp(
 			    &log->write_lsn, &log->log_close_lsn) >= 0) {
@@ -522,7 +520,7 @@ __log_file_server(void *arg)
 	}
 
 	if (0) {
-err:		__wt_err(session, ret, "log close server error");
+err:		WT_PANIC_MSG(session, ret, "log close server error");
 	}
 	if (locked)
 		__wt_spin_unlock(session, &log->log_sync_lock);
@@ -740,7 +738,8 @@ __log_wrlsn_server(void *arg)
 	WT_ERR(__wt_log_force_write(session, 1, NULL));
 	__wt_log_wrlsn(session, NULL);
 	if (0) {
-err:		__wt_err(session, ret, "log wrlsn server error");
+err:		WT_PANIC_MSG(session, ret, "log wrlsn server error");
+
 	}
 	return (WT_THREAD_RET_VALUE);
 }
@@ -844,7 +843,7 @@ __log_server(void *arg)
 	}
 
 	if (0) {
-err:		__wt_err(session, ret, "log server error");
+err:		WT_PANIC_MSG(session, ret, "log server error");
 	}
 	return (WT_THREAD_RET_VALUE);
 }
@@ -880,7 +879,7 @@ __wt_logmgr_create(WT_SESSION_IMPL *session, const char *cfg[])
 	WT_RET(__wt_spin_init(session, &log->log_sync_lock, "log sync"));
 	WT_RET(__wt_spin_init(session, &log->log_writelsn_lock,
 	    "log write LSN"));
-	__wt_rwlock_init(session, &log->log_archive_lock);
+	WT_RET(__wt_rwlock_init(session, &log->log_archive_lock));
 	if (FLD_ISSET(conn->direct_io, WT_DIRECT_IO_LOG))
 		log->allocsize = (uint32_t)
 		    WT_MAX(conn->buffer_alignment, WT_LOG_ALIGN);
@@ -902,7 +901,7 @@ __wt_logmgr_create(WT_SESSION_IMPL *session, const char *cfg[])
 	WT_RET(__wt_cond_alloc(session, "log sync", &log->log_sync_cond));
 	WT_RET(__wt_cond_alloc(session, "log write", &log->log_write_cond));
 	WT_RET(__wt_log_open(session));
-	WT_RET(__wt_log_slot_init(session));
+	WT_RET(__wt_log_slot_init(session, true));
 
 	return (0);
 }
@@ -1043,12 +1042,12 @@ __wt_logmgr_destroy(WT_SESSION_IMPL *session)
 	}
 
 	/* Destroy the condition variables now that all threads are stopped */
-	WT_TRET(__wt_cond_destroy(session, &conn->log_cond));
-	WT_TRET(__wt_cond_destroy(session, &conn->log_file_cond));
-	WT_TRET(__wt_cond_destroy(session, &conn->log_wrlsn_cond));
+	__wt_cond_destroy(session, &conn->log_cond);
+	__wt_cond_destroy(session, &conn->log_file_cond);
+	__wt_cond_destroy(session, &conn->log_wrlsn_cond);
 
-	WT_TRET(__wt_cond_destroy(session, &conn->log->log_sync_cond));
-	WT_TRET(__wt_cond_destroy(session, &conn->log->log_write_cond));
+	__wt_cond_destroy(session, &conn->log->log_sync_cond);
+	__wt_cond_destroy(session, &conn->log->log_write_cond);
 	__wt_rwlock_destroy(session, &conn->log->log_archive_lock);
 	__wt_spin_destroy(session, &conn->log->log_lock);
 	__wt_spin_destroy(session, &conn->log->log_slot_lock);

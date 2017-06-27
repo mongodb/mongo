@@ -1,5 +1,5 @@
 /*-
- * Public Domain 2014-2016 MongoDB, Inc.
+ * Public Domain 2014-2017 MongoDB, Inc.
  * Public Domain 2008-2014 WiredTiger, Inc.
  *
  * This is free and unencumbered software released into the public domain.
@@ -232,7 +232,7 @@ struct __wtperf_thread {		/* Per-thread structure */
 
 	WT_RAND_STATE rnd;		/* Random number generation state */
 
-	pthread_t handle;		/* Handle */
+	wt_thread_t handle;		/* Handle */
 
 	char *key_buf, *value_buf;	/* Key/value memory */
 
@@ -269,8 +269,8 @@ int	 run_truncate(
 int	 setup_log_file(WTPERF *);
 void	 setup_throttle(WTPERF_THREAD *);
 int	 setup_truncate(WTPERF *, WTPERF_THREAD *, WT_SESSION *);
-int	 start_idle_table_cycle(WTPERF *, pthread_t *);
-int	 stop_idle_table_cycle(WTPERF *, pthread_t);
+void	 start_idle_table_cycle(WTPERF *, wt_thread_t *);
+void	 stop_idle_table_cycle(WTPERF *, wt_thread_t);
 void	 worker_throttle(WTPERF_THREAD *);
 uint64_t sum_ckpt_ops(WTPERF *);
 uint64_t sum_insert_ops(WTPERF *);

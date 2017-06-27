@@ -1,5 +1,5 @@
 /*-
- * Copyright (c) 2014-2016 MongoDB, Inc.
+ * Copyright (c) 2014-2017 MongoDB, Inc.
  * Copyright (c) 2008-2014 WiredTiger, Inc.
  *	All rights reserved.
  *
@@ -98,7 +98,6 @@ __page_out_int(WT_SESSION_IMPL *session, WT_PAGE **pagep, bool rewrite)
 	 */
 	WT_ASSERT(session, !__wt_page_is_modified(page));
 	WT_ASSERT(session, !F_ISSET_ATOMIC(page, WT_PAGE_EVICT_LRU));
-	WT_ASSERT(session, !__wt_rwlock_islocked(session, &page->page_lock));
 
 	/*
 	 * If a root page split, there may be one or more pages linked from the
@@ -254,6 +253,7 @@ __free_page_modify(WT_SESSION_IMPL *session, WT_PAGE *page)
 	__wt_ovfl_discard_free(session, page);
 
 	__wt_free(session, page->modify->ovfl_track);
+	__wt_spin_destroy(session, &page->modify->page_lock);
 
 	__wt_free(session, page->modify);
 }

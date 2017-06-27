@@ -1,5 +1,5 @@
 /*-
- * Copyright (c) 2014-2016 MongoDB, Inc.
+ * Copyright (c) 2014-2017 MongoDB, Inc.
  * Copyright (c) 2008-2014 WiredTiger, Inc.
  *	All rights reserved.
  *
@@ -15,6 +15,102 @@ static inline void
 __cursor_set_recno(WT_CURSOR_BTREE *cbt, uint64_t v)
 {
 	cbt->iface.recno = cbt->recno = v;
+}
+
+/*
+ * __cursor_novalue --
+ *	Release any cached value before an operation that could update the
+ * transaction context and free data a value is pointing to.
+ */
+static inline void
+__cursor_novalue(WT_CURSOR *cursor)
+{
+	F_CLR(cursor, WT_CURSTD_VALUE_INT);
+}
+
+/*
+ * __cursor_checkkey --
+ *	Check if a key is set without making a copy.
+ */
+static inline int
+__cursor_checkkey(WT_CURSOR *cursor)
+{
+	return (F_ISSET(cursor, WT_CURSTD_KEY_SET) ?
+	    0 : __wt_cursor_kv_not_set(cursor, true));
+}
+
+/*
+ * __cursor_checkvalue --
+ *	Check if a value is set without making a copy.
+ */
+static inline int
+__cursor_checkvalue(WT_CURSOR *cursor)
+{
+	return (F_ISSET(cursor, WT_CURSTD_VALUE_SET) ?
+	    0 : __wt_cursor_kv_not_set(cursor, false));
+}
+
+/*
+ * __cursor_localkey --
+ *	If the key points into the tree, get a local copy.
+ */
+static inline int
+__cursor_localkey(WT_CURSOR *cursor)
+{
+	if (F_ISSET(cursor, WT_CURSTD_KEY_INT)) {
+		if (!WT_DATA_IN_ITEM(&cursor->key))
+			WT_RET(__wt_buf_set((WT_SESSION_IMPL *)cursor->session,
+			    &cursor->key, cursor->key.data, cursor->key.size));
+		F_CLR(cursor, WT_CURSTD_KEY_INT);
+		F_SET(cursor, WT_CURSTD_KEY_EXT);
+	}
+	return (0);
+}
+
+/*
+ * __cursor_localvalue --
+ *	If the value points into the tree, get a local copy.
+ */
+static inline int
+__cursor_localvalue(WT_CURSOR *cursor)
+{
+	if (F_ISSET(cursor, WT_CURSTD_VALUE_INT)) {
+		if (!WT_DATA_IN_ITEM(&cursor->value))
+			WT_RET(__wt_buf_set((WT_SESSION_IMPL *)cursor->session,
+			    &cursor->value,
+			    cursor->value.data, cursor->value.size));
+		F_CLR(cursor, WT_CURSTD_VALUE_INT);
+		F_SET(cursor, WT_CURSTD_VALUE_EXT);
+	}
+	return (0);
+}
+
+/*
+ * __cursor_needkey --
+ *
+ * Check if we have a key set. There's an additional semantic here: if we're
+ * pointing into the tree, get a local copy of whatever we're referencing in
+ * the tree, there's an obvious race with the cursor moving and the reference.
+ */
+static inline int
+__cursor_needkey(WT_CURSOR *cursor)
+{
+	WT_RET(__cursor_localkey(cursor));
+	return (__cursor_checkkey(cursor));
+}
+
+/*
+ * __cursor_needvalue --
+ *
+ * Check if we have a value set. There's an additional semantic here: if we're
+ * pointing into the tree, get a local copy of whatever we're referencing in
+ * the tree, there's an obvious race with the cursor moving and the reference.
+ */
+static inline int
+__cursor_needvalue(WT_CURSOR *cursor)
+{
+	WT_RET(__cursor_localkey(cursor));
+	return (__cursor_checkvalue(cursor));
 }
 
 /*
@@ -129,27 +225,24 @@ static inline int
 __wt_curindex_get_valuev(WT_CURSOR *cursor, va_list ap)
 {
 	WT_CURSOR_INDEX *cindex;
-	WT_DECL_RET;
 	WT_ITEM *item;
 	WT_SESSION_IMPL *session;
 
 	cindex = (WT_CURSOR_INDEX *)cursor;
 	session = (WT_SESSION_IMPL *)cursor->session;
-	WT_CURSOR_NEEDVALUE(cursor);
+	WT_RET(__cursor_checkvalue(cursor));
 
 	if (F_ISSET(cursor, WT_CURSOR_RAW_OK)) {
-		ret = __wt_schema_project_merge(session,
+		WT_RET(__wt_schema_project_merge(session,
 		    cindex->cg_cursors, cindex->value_plan,
-		    cursor->value_format, &cursor->value);
-		if (ret == 0) {
-			item = va_arg(ap, WT_ITEM *);
-			item->data = cursor->value.data;
-			item->size = cursor->value.size;
-		}
+		    cursor->value_format, &cursor->value));
+		item = va_arg(ap, WT_ITEM *);
+		item->data = cursor->value.data;
+		item->size = cursor->value.size;
 	} else
-		ret = __wt_schema_project_out(session,
-		    cindex->cg_cursors, cindex->value_plan, ap);
-err:	return (ret);
+		WT_RET(__wt_schema_project_out(session,
+		    cindex->cg_cursors, cindex->value_plan, ap));
+	return (0);
 }
 
 /*
@@ -161,28 +254,25 @@ __wt_curtable_get_valuev(WT_CURSOR *cursor, va_list ap)
 {
 	WT_CURSOR *primary;
 	WT_CURSOR_TABLE *ctable;
-	WT_DECL_RET;
 	WT_ITEM *item;
 	WT_SESSION_IMPL *session;
 
 	ctable = (WT_CURSOR_TABLE *)cursor;
 	session = (WT_SESSION_IMPL *)cursor->session;
 	primary = *ctable->cg_cursors;
-	WT_CURSOR_NEEDVALUE(primary);
+	WT_RET(__cursor_checkvalue(primary));
 
 	if (F_ISSET(cursor, WT_CURSOR_RAW_OK)) {
-		ret = __wt_schema_project_merge(session,
+		WT_RET(__wt_schema_project_merge(session,
 		    ctable->cg_cursors, ctable->plan,
-		    cursor->value_format, &cursor->value);
-		if (ret == 0) {
-			item = va_arg(ap, WT_ITEM *);
-			item->data = cursor->value.data;
-			item->size = cursor->value.size;
-		}
+		    cursor->value_format, &cursor->value));
+		item = va_arg(ap, WT_ITEM *);
+		item->data = cursor->value.data;
+		item->size = cursor->value.size;
 	} else
-		ret = __wt_schema_project_out(session,
-		    ctable->cg_cursors, ctable->plan, ap);
-err:	return (ret);
+		WT_RET(__wt_schema_project_out(session,
+		    ctable->cg_cursors, ctable->plan, ap));
+	return (0);
 }
 
 /*

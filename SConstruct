@@ -67,15 +67,11 @@ var.Add('CPPPATH', 'C Preprocessor include path', [
 ])
 
 var.Add('CFLAGS', 'C Compiler Flags', [
-    "/Z7", # Generate debugging symbols
     "/wd4090", # Ignore warning about mismatched const qualifiers
     "/wd4996", # Ignore deprecated functions
     "/W3", # Warning level 3
-    #"/we4244", # Possible loss of data
-    "/we4013", # Error on undefined functions
-    #"/we4047", # Indirection differences in types
-    #"/we4024", # Differences in parameter types
-    #"/we4100", # Unreferenced local parameter
+    "/WX", # Warnings are fatal
+    "/Z7", # Generate debugging symbols
     "/TC", # Compile as C code
     #"/Od", # Disable optimization
     "/Ob1", # inline expansion
@@ -338,6 +334,8 @@ if GetOption("lang-python"):
             "-nodefaultctor",
             "-nodefaultdtor",
             ])
+    # Ignore warnings in swig-generated code.
+    pythonEnv['CFLAGS'].remove("/WX")
 
     swiglib = pythonEnv.SharedLibrary('_wiredtiger',
                       [ 'lang\python\wiredtiger.i'],
@@ -410,41 +408,37 @@ def builder_smoke_test(target, source, env):
 env.Append(BUILDERS={'SmokeTest' : Builder(action = builder_smoke_test)})
 
 #Build the tests and setup the "scons test" target
-
 testutil = env.Library('testutil',
             [
                 'test/utility/misc.c',
                 'test/utility/parse_opts.c'
             ])
+env.Append(CPPPATH=["test/utility"])
 
-#Don't test bloom on Windows, its broken
 t = env.Program("t_bloom",
     "test/bloom/test_bloom.c",
-    LIBS=[wtlib, testutil] + wtlibs)
-#env.Alias("check", env.SmokeTest(t))
+    LIBS=[wtlib, shim, testutil] + wtlibs)
 Default(t)
 
-#env.Program("t_checkpoint",
-    #["test/checkpoint/checkpointer.c",
-    #"test/checkpoint/test_checkpoint.c",
-    #"test/checkpoint/workers.c"],
-    #LIBS=[wtlib])
+t = env.Program("t_checkpoint",
+    ["test/checkpoint/checkpointer.c",
+    "test/checkpoint/test_checkpoint.c",
+    "test/checkpoint/workers.c"],
+    LIBS=[wtlib, shim, testutil] + wtlibs)
+Default(t)
 
-t = env.Program("t_huge",
-    "test/huge/huge.c",
-    LIBS=[wtlib] + wtlibs)
-
-#t = env.Program("t_recovery",
-#    "test/recovery/recovery.c",
-#    LIBS=[wtlib] + wtlibs)
-#Default(t)
+t = env.Program("t_cursor_order",
+    ["test/cursor_order/cursor_order.c",
+    "test/cursor_order/cursor_order_file.c",
+    "test/cursor_order/cursor_order_ops.c"],
+    LIBS=[wtlib, shim, testutil] + wtlibs)
+Default(t)
 
 t = env.Program("t_fops",
     ["test/fops/file.c",
     "test/fops/fops.c",
     "test/fops/t.c"],
     LIBS=[wtlib, shim, testutil] + wtlibs)
-env.Append(CPPPATH=["test/utility"])
 Default(t)
 
 t = env.Program("t_format",
@@ -459,19 +453,51 @@ t = env.Program("t_format",
     "test/format/t.c",
     "test/format/util.c",
     "test/format/wts.c"],
-     LIBS=[wtlib, shim, testutil] + wtlibs)
+    LIBS=[wtlib, shim, testutil] + wtlibs)
 Default(t)
 
-#env.Program("t_thread",
-    #["test/thread/file.c",
-    #"test/thread/rw.c",
-    #"test/thread/stats.c",
-    #"test/thread/t.c"],
-    #LIBS=[wtlib])
+t = env.Program("t_huge",
+    "test/huge/huge.c",
+    LIBS=[wtlib, shim, testutil] + wtlibs)
+Default(t)
 
-#env.Program("t_salvage",
-    #["test/salvage/salvage.c"],
-    #LIBS=[wtlib])
+t = env.Program("t_manydbs",
+    "test/manydbs/manydbs.c",
+    LIBS=[wtlib, shim, testutil] + wtlibs)
+Default(t)
+
+# t_readonly doesn't currently build/run.
+#t = env.Program("t_readonly",
+#    "test/readonly/readonly.c",
+#    LIBS=[wtlib, shim, testutil] + wtlibs)
+#Default(t)
+
+# t_random-abort doesn't currently build/run.
+#t = env.Program("t_random-abort",
+#    "test/recovery/random-abort.c",
+#    LIBS=[wtlib, shim, testutil] + wtlibs)
+#Default(t)
+
+# t_truncated-log doesn't currently build/run.
+#t = env.Program("t_truncated-log",
+#    "test/recovery/truncated-log.c",
+#    LIBS=[wtlib, shim, testutil] + wtlibs)
+#Default(t)
+
+# t_salvage-log doesn't currently build/run.
+#t = env.Program("t_salvage",
+#    "test/salvage/salvage.c",
+#    LIBS=[wtlib, shim, testutil] + wtlibs)
+#Default(t)
+
+# t_thread doesn't currently build/run.
+#t = env.Program("t_thread",
+#    ["test/thread/file.c",
+#    "test/thread/rw.c",
+#    "test/thread/stats.c",
+#    "test/thread/t.c"],
+#    LIBS=[wtlib, shim, testutil] + wtlibs)
+#Default(t)
 
 t = env.Program("wtperf", [
     "bench/wtperf/config.c",

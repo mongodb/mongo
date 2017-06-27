@@ -305,6 +305,7 @@ RMW
 RNG
 RPC
 RUNDIR
+RWLOCK
 RXB
 Radu
 ReadFile
@@ -344,6 +345,7 @@ Split's
 Stoica
 StoreLoad
 StoreStore
+Su
 Syscall
 TAILQ
 TCMalloc
@@ -353,6 +355,8 @@ TORTIOUS
 TSO
 TXN
 TXNC
+ThreadList
+ThreadListWrapper
 Timespec
 Timestamp
 TryCV
@@ -515,11 +519,13 @@ change's
 changelog
 chdir
 checkfmt
+checkkey
 checkpointed
 checkpointer
 checkpointing
 checksum
 checksums
+checkvalue
 children's
 chk
 chmod
@@ -731,6 +737,7 @@ fsyncLock
 fsyncs
 ftruncate
 func
+fvisibility
 gcc
 gdb
 ge
@@ -806,6 +813,7 @@ intl
 intnum
 intpack
 intptr
+intr
 intrin
 inuse
 io
@@ -864,7 +872,9 @@ llll
 llu
 loadtext
 localTime
+localkey
 localtime
+localvalue
 logf
 logmgr
 lognum
@@ -938,7 +948,10 @@ nbits
 nchunks
 nclr
 nd
+needkey
+needvalue
 negint
+nentries
 newbar
 newfile
 newuri
@@ -957,6 +970,7 @@ noraw
 notfound
 notsup
 notused
+novalue
 nowait
 nset
 nsnap
@@ -1081,6 +1095,7 @@ rotN
 rotn
 rp
 rpc
+ru
 run's
 runtime
 rwlock
@@ -1186,6 +1201,7 @@ txnid
 txnmin
 txt
 typedef
+typemaps
 uB
 uS
 ui
@@ -1266,6 +1282,7 @@ whitespace
 wiredTiger
 wiredtiger
 workFactor
+workgen
 wrapup
 writeable
 writelock

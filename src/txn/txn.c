@@ -1,5 +1,5 @@
 /*-
- * Copyright (c) 2014-2016 MongoDB, Inc.
+ * Copyright (c) 2014-2017 MongoDB, Inc.
  * Copyright (c) 2008-2014 WiredTiger, Inc.
  *	All rights reserved.
  *
@@ -126,7 +126,7 @@ __wt_txn_get_snapshot(WT_SESSION_IMPL *session)
 	n = 0;
 
 	/* We're going to scan the table: wait for the lock. */
-	__wt_readlock_spin(session, &txn_global->scan_rwlock);
+	__wt_readlock(session, &txn_global->scan_rwlock);
 
 	current_id = pinned_id = txn_global->current;
 	prev_oldest_id = txn_global->oldest_id;
@@ -293,7 +293,7 @@ __wt_txn_update_oldest(WT_SESSION_IMPL *session, uint32_t flags)
 
 	/* First do a read-only scan. */
 	if (wait)
-		__wt_readlock_spin(session, &txn_global->scan_rwlock);
+		__wt_readlock(session, &txn_global->scan_rwlock);
 	else if ((ret =
 	    __wt_try_readlock(session, &txn_global->scan_rwlock)) != 0)
 		return (ret == EBUSY ? 0 : ret);
@@ -477,10 +477,9 @@ __wt_txn_release(WT_SESSION_IMPL *session)
 	/* Free the scratch buffer allocated for logging. */
 	__wt_logrec_free(session, &txn->logrec);
 
-	/* Discard any memory from the session's split stash that we can. */
-	WT_ASSERT(session, session->split_gen == 0);
-	if (session->split_stash_cnt > 0)
-		__wt_split_stash_discard(session);
+	/* Discard any memory from the session's stash that we can. */
+	WT_ASSERT(session, __wt_session_gen(session, WT_GEN_SPLIT) == 0);
+	__wt_stash_discard(session);
 
 	/*
 	 * Reset the transaction state to not running and release the snapshot.
@@ -510,10 +509,9 @@ __wt_txn_commit(WT_SESSION_IMPL *session, const char *cfg[])
 	txn = &session->txn;
 	conn = S2C(session);
 	did_update = txn->mod_count != 0;
-	WT_ASSERT(session, !F_ISSET(txn, WT_TXN_ERROR) || !did_update);
 
-	if (!F_ISSET(txn, WT_TXN_RUNNING))
-		WT_RET_MSG(session, EINVAL, "No transaction is active");
+	WT_ASSERT(session, F_ISSET(txn, WT_TXN_RUNNING));
+	WT_ASSERT(session, !F_ISSET(txn, WT_TXN_ERROR) || !did_update);
 
 	/*
 	 * The default sync setting is inherited from the connection, but can
@@ -594,9 +592,26 @@ __wt_txn_commit(WT_SESSION_IMPL *session, const char *cfg[])
 		return (ret);
 	}
 
-	/* Free memory associated with updates. */
-	for (i = 0, op = txn->mod; i < txn->mod_count; i++, op++)
+	for (i = 0, op = txn->mod; i < txn->mod_count; i++, op++) {
+		switch (op->type) {
+		case WT_TXN_OP_BASIC:
+		case WT_TXN_OP_INMEM:
+			/*
+			 * Switch reserved operations to abort to simplify
+			 * obsolete update list truncation.
+			 */
+			if (op->u.upd->type == WT_UPDATE_RESERVED)
+				op->u.upd->txnid = WT_TXN_ABORTED;
+			break;
+		case WT_TXN_OP_REF:
+		case WT_TXN_OP_TRUNCATE_COL:
+		case WT_TXN_OP_TRUNCATE_ROW:
+			break;
+		}
+
+		/* Free memory associated with updates. */
 		__wt_txn_op_free(session, op);
+	}
 	txn->mod_count = 0;
 
 	__wt_txn_release(session);
@@ -618,8 +633,7 @@ __wt_txn_rollback(WT_SESSION_IMPL *session, const char *cfg[])
 	WT_UNUSED(cfg);
 
 	txn = &session->txn;
-	if (!F_ISSET(txn, WT_TXN_RUNNING))
-		WT_RET_MSG(session, EINVAL, "No transaction is active");
+	WT_ASSERT(session, F_ISSET(txn, WT_TXN_RUNNING));
 
 	/* Rollback notification. */
 	if (txn->notify != NULL)
@@ -768,8 +782,8 @@ __wt_txn_global_init(WT_SESSION_IMPL *session, const char *cfg[])
 
 	WT_RET(__wt_spin_init(session,
 	    &txn_global->id_lock, "transaction id lock"));
-	__wt_rwlock_init(session, &txn_global->scan_rwlock);
-	__wt_rwlock_init(session, &txn_global->nsnap_rwlock);
+	WT_RET(__wt_rwlock_init(session, &txn_global->scan_rwlock));
+	WT_RET(__wt_rwlock_init(session, &txn_global->nsnap_rwlock));
 	txn_global->nsnap_oldest_id = WT_TXN_NONE;
 	TAILQ_INIT(&txn_global->nsnaph);
 
@@ -836,7 +850,8 @@ __wt_verbose_dump_txn(WT_SESSION_IMPL *session)
 	WT_RET(__wt_msg(session, "checkpoint running? %s",
 	    txn_global->checkpoint_running ? "yes" : "no"));
 	WT_RET(__wt_msg(session,
-	    "checkpoint generation: %" PRIu64, txn_global->checkpoint_gen));
+	    "checkpoint generation: %" PRIu64,
+	    __wt_gen(session, WT_GEN_CHECKPOINT)));
 	WT_RET(__wt_msg(session,
 	    "checkpoint pinned ID: %" PRIu64, txn_global->checkpoint_pinned));
 	WT_RET(__wt_msg(session,

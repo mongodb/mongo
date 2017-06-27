@@ -1,5 +1,18 @@
 /*! @page upgrading Upgrading WiredTiger applications
 
+@section version_293 Upgrading to Version 2.9.3
+<dl>
+
+<dt>Logging subsystem statistics</dt>
+<dd>
+Two logging subsystem statistics have been removed as they were a duplicate of
+other statistics.  The \c log_slot_joins and \c log_slot_transitions statistics
+are no longer present.  They were duplicates of \c log_writes and
+\c log_slot_closes respectively.  Several new logging related statistics have
+been added.
+</dd>
+
+</dl><hr>
 @section version_292 Upgrading to Version 2.9.2
 <dl>
 
@@ -14,6 +27,15 @@ contents from the specified object.
 In the 2.9.1 release we added statistics tracking handle list lock timing, we
 have switched that lock from a spin lock to a read-write lock, and consequently
 changed the statistics tracking lock related wait time.
+</dd>
+
+<dt>Logging subsystem statistics</dt>
+<dd>
+Two logging subsystem statistics have been removed as they were a duplicate of
+other statistics.  The \c log_slot_joins and \c log_slot_transitions statistics
+are no longer present.  They were duplicates of \c log_writes and
+\c log_slot_closes respectively.  Several new logging related statistics have
+been added.
 </dd>
 
 <dt>Forced and named checkpoint error conditions changed</dt>

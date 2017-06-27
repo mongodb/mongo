@@ -57,6 +57,9 @@ noinst_PROGRAMS += test_wt3135_search_near_collator
 test_wt3184_dup_index_collator_SOURCES = wt3184_dup_index_collator/main.c
 noinst_PROGRAMS += test_wt3184_dup_index_collator
 
+test_rwlock_SOURCES = rwlock/main.c
+noinst_PROGRAMS += test_rwlock
+
 # Run this during a "make check" smoke test.
 TESTS = $(noinst_PROGRAMS)
 LOG_COMPILER = $(TEST_WRAPPER)

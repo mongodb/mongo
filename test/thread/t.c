@@ -1,5 +1,5 @@
 /*-
- * Public Domain 2014-2016 MongoDB, Inc.
+ * Public Domain 2014-2017 MongoDB, Inc.
  * Public Domain 2008-2014 WiredTiger, Inc.
  *
  * This is free and unencumbered software released into the public domain.
@@ -160,8 +160,7 @@ main(int argc, char *argv[])
 
 		wt_connect(config_open);	/* WiredTiger connection */
 
-		if (rw_start(readers, writers))	/* Loop operations */
-			return (EXIT_FAILURE);
+		rw_start(readers, writers);	/* Loop operations */
 
 		stats();			/* Statistics */
 

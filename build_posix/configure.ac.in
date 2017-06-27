@@ -25,6 +25,16 @@ AM_PROG_AS(as gas)
 define([AC_LIBTOOL_LANG_CXX_CONFIG], [:])dnl
 define([AC_LIBTOOL_LANG_F77_CONFIG], [:])dnl
 
+# Check whether the C++ compiler works by linking a trivial program.
+AC_CACHE_CHECK([whether the C++ compiler works],
+               [wt_cv_prog_cxx_works],
+               [AC_LANG_PUSH([C++])
+                AC_LINK_IFELSE([AC_LANG_PROGRAM([], [])],
+                               [wt_cv_prog_cxx_works=yes],
+                               [wt_cv_prog_cxx_works=no])
+                AC_LANG_POP([C++])])
+AM_CONDITIONAL([HAVE_CXX], [test "$wt_cv_prog_cxx_works" = "yes"])
+
 LT_PREREQ(2.2.6)
 LT_INIT([pic-only])
 AC_SUBST([LIBTOOL_DEPS])

@@ -1,5 +1,5 @@
 /*-
- * Public Domain 2014-2016 MongoDB, Inc.
+ * Public Domain 2014-2017 MongoDB, Inc.
  * Public Domain 2008-2014 WiredTiger, Inc.
  *
  * This is free and unencumbered software released into the public domain.
@@ -29,14 +29,20 @@
 #include "format.h"
 
 static int   col_insert(TINFO *, WT_CURSOR *, WT_ITEM *, WT_ITEM *, uint64_t *);
+static int   col_modify(
+		TINFO *, WT_CURSOR *, WT_ITEM *, WT_ITEM *, uint64_t, bool);
 static int   col_remove(WT_CURSOR *, WT_ITEM *, uint64_t, bool);
+static int   col_reserve(WT_CURSOR *, uint64_t, bool);
 static int   col_update(
 		TINFO *, WT_CURSOR *, WT_ITEM *, WT_ITEM *, uint64_t, bool);
 static int   nextprev(WT_CURSOR *, int);
-static void *ops(void *);
+static WT_THREAD_RET ops(void *);
 static int   row_insert(
 		TINFO *, WT_CURSOR *, WT_ITEM *, WT_ITEM *, uint64_t, bool);
+static int   row_modify(
+		TINFO *, WT_CURSOR *, WT_ITEM *, WT_ITEM *, uint64_t, bool);
 static int   row_remove(WT_CURSOR *, WT_ITEM *, uint64_t, bool);
+static int   row_reserve(WT_CURSOR *, WT_ITEM *, uint64_t, bool);
 static int   row_update(
 		TINFO *, WT_CURSOR *, WT_ITEM *, WT_ITEM *, uint64_t, bool);
 static void  table_append_init(void);
@@ -56,7 +62,7 @@ wts_ops(int lastrun)
 	TINFO **tinfo_list, *tinfo, total;
 	WT_CONNECTION *conn;
 	WT_SESSION *session;
-	pthread_t alter_tid, backup_tid, compact_tid, lrt_tid;
+	wt_thread_t alter_tid, backup_tid, compact_tid, lrt_tid;
 	int64_t fourths, thread_ops;
 	uint32_t i;
 	int running;
@@ -115,7 +121,8 @@ wts_ops(int lastrun)
 		tinfo_list[i] = tinfo = dcalloc(1, sizeof(TINFO));
 		tinfo->id = (int)i + 1;
 		tinfo->state = TINFO_RUNNING;
-		testutil_check(pthread_create(&tinfo->tid, NULL, ops, tinfo));
+		testutil_check(
+		    __wt_thread_create(NULL, &tinfo->tid, ops, tinfo));
 	}
 
 	/*
@@ -123,14 +130,16 @@ wts_ops(int lastrun)
 	 * long-running reader threads.
 	 */
 	if (g.c_alter)
-		testutil_check(pthread_create(&alter_tid, NULL, alter, NULL));
+		testutil_check(
+		    __wt_thread_create(NULL, &alter_tid, alter, NULL));
 	if (g.c_backups)
-		testutil_check(pthread_create(&backup_tid, NULL, backup, NULL));
+		testutil_check(
+		    __wt_thread_create(NULL, &backup_tid, backup, NULL));
 	if (g.c_compact)
 		testutil_check(
-		    pthread_create(&compact_tid, NULL, compact, NULL));
+		    __wt_thread_create(NULL, &compact_tid, compact, NULL));
 	if (!SINGLETHREADED && g.c_long_running_txn)
-		testutil_check(pthread_create(&lrt_tid, NULL, lrt, NULL));
+		testutil_check(__wt_thread_create(NULL, &lrt_tid, lrt, NULL));
 
 	/* Spin on the threads, calculating the totals. */
 	for (;;) {
@@ -152,7 +161,8 @@ wts_ops(int lastrun)
 				break;
 			case TINFO_COMPLETE:
 				tinfo->state = TINFO_JOINED;
-				(void)pthread_join(tinfo->tid, NULL);
+				testutil_check(
+				    __wt_thread_join(NULL, tinfo->tid));
 				break;
 			case TINFO_JOINED:
 				break;
@@ -190,13 +200,13 @@ wts_ops(int lastrun)
 	/* Wait for the backup, compaction, long-running reader threads. */
 	g.workers_finished = 1;
 	if (g.c_alter)
-		(void)pthread_join(alter_tid, NULL);
+		testutil_check(__wt_thread_join(NULL, alter_tid));
 	if (g.c_backups)
-		(void)pthread_join(backup_tid, NULL);
+		testutil_check(__wt_thread_join(NULL, backup_tid));
 	if (g.c_compact)
-		(void)pthread_join(compact_tid, NULL);
+		testutil_check(__wt_thread_join(NULL, compact_tid));
 	if (!SINGLETHREADED && g.c_long_running_txn)
-		(void)pthread_join(lrt_tid, NULL);
+		testutil_check(__wt_thread_join(NULL, lrt_tid));
 	g.workers_finished = 0;
 
 	if (g.logging != 0) {
@@ -398,10 +408,10 @@ snap_check(WT_CURSOR *cursor,
  * ops --
  *     Per-thread operations.
  */
-static void *
+static WT_THREAD_RET
 ops(void *arg)
 {
-	enum { INSERT, READ, REMOVE, UPDATE } op;
+	enum { INSERT, MODIFY, READ, REMOVE, UPDATE } op;
 	SNAP_OPS *snap, snap_list[64];
 	TINFO *tinfo;
 	WT_CONNECTION *conn;
@@ -608,11 +618,12 @@ skip_checkpoint:	/* Pick the next checkpoint operation. */
 				op = REMOVE;
 			else if (i < g.c_delete_pct + g.c_insert_pct)
 				op = INSERT;
-			else if (i <
-			    g.c_delete_pct + g.c_insert_pct + g.c_write_pct)
+			else if (i < g.c_delete_pct +
+			    g.c_insert_pct + g.c_modify_pct)
+				op = MODIFY;
+			else if (i < g.c_delete_pct +
+			    g.c_insert_pct + g.c_modify_pct + g.c_write_pct)
 				op = UPDATE;
-			else
-				op = READ;
 		}
 
 		/*
@@ -636,7 +647,7 @@ skip_checkpoint:	/* Pick the next checkpoint operation. */
 				testutil_assert(ret == WT_NOTFOUND);
 			}
 		}
-#if 0
+
 		/* Optionally reserve a row. */
 		if (!readonly && intxn && mmrand(&tinfo->rnd, 0, 20) == 1) {
 			switch (g.type) {
@@ -659,7 +670,7 @@ skip_checkpoint:	/* Pick the next checkpoint operation. */
 				testutil_assert(ret == WT_NOTFOUND);
 			}
 		}
-#endif
+
 		/* Perform the operation. */
 		switch (op) {
 		case INSERT:
@@ -694,6 +705,30 @@ skip_checkpoint:	/* Pick the next checkpoint operation. */
 				if (ret == WT_ROLLBACK && intxn)
 					goto deadlock;
 				testutil_assert(ret == 0 || ret == WT_ROLLBACK);
+			}
+			break;
+		case MODIFY:
+			++tinfo->update;
+			switch (g.type) {
+			case ROW:
+				ret = row_modify(tinfo, cursor,
+				    key, value, keyno, positioned);
+				break;
+			case VAR:
+				ret = col_modify(tinfo, cursor,
+				    key, value, keyno, positioned);
+				break;
+			}
+			if (ret == 0) {
+				positioned = true;
+				if (SNAP_TRACK)
+					snap_track(snap++, keyno, NULL, value);
+			} else {
+				positioned = false;
+				if (ret == WT_ROLLBACK && intxn)
+					goto deadlock;
+				testutil_assert(ret == 0 ||
+				    ret == WT_NOTFOUND || ret == WT_ROLLBACK);
 			}
 			break;
 		case READ:
@@ -740,17 +775,15 @@ skip_checkpoint:	/* Pick the next checkpoint operation. */
 		case UPDATE:
 update_instead_of_insert:
 			++tinfo->update;
-
-			/* Update the row. */
 			switch (g.type) {
 			case ROW:
-				ret = row_update(tinfo,
-				    cursor, key, value, keyno, positioned);
+				ret = row_update(tinfo, cursor,
+				    key, value, keyno, positioned);
 				break;
 			case FIX:
 			case VAR:
-				ret = col_update(tinfo,
-				    cursor, key, value, keyno, positioned);
+				ret = col_update(tinfo, cursor,
+				    key, value, keyno, positioned);
 				break;
 			}
 			if (ret == 0) {
@@ -835,7 +868,7 @@ deadlock:			++tinfo->deadlock;
 	free(value->mem);
 
 	tinfo->state = TINFO_COMPLETE;
-	return (NULL);
+	return (WT_THREAD_RET_VALUE);
 }
 
 /*
@@ -1103,7 +1136,6 @@ nextprev(WT_CURSOR *cursor, int next)
 	return (ret);
 }
 
-#if 0
 /*
  * row_reserve --
  *	Reserve a row in a row-store file.
@@ -1166,7 +1198,235 @@ col_reserve(WT_CURSOR *cursor, uint64_t keyno, bool positioned)
 	}
 	return (0);
 }
+
+/*
+ * modify_build --
+ *	Generate a set of modify vectors, and copy what the final result
+ * should be into the value buffer.
+ */
+static bool
+modify_build(TINFO *tinfo,
+    WT_CURSOR *cursor, WT_MODIFY *entries, int *nentriesp, WT_ITEM *value)
+{
+	static char repl[64];
+	size_t len, size;
+	u_int i, nentries;
+	WT_ITEM *ta, _ta, *tb, _tb, *tmp;
+
+	if (repl[0] == '\0')
+		memset(repl, '+', sizeof(repl));
+
+	ta = &_ta;
+	memset(ta, 0, sizeof(*ta));
+	tb = &_tb;
+	memset(tb, 0, sizeof(*tb));
+
+	testutil_check(cursor->get_value(cursor, value));
+
+	/*
+	 * Randomly select a number of byte changes, offsets and lengths. Start
+	 * at least 11 bytes in so we skip the leading key information.
+	 */
+	nentries = mmrand(&tinfo->rnd, 1, MAX_MODIFY_ENTRIES);
+	for (i = 0; i < nentries; ++i) {
+		entries[i].data.data = repl;
+		entries[i].data.size = (size_t)mmrand(&tinfo->rnd, 0, 10);
+		entries[i].offset = (size_t)mmrand(&tinfo->rnd, 20, 40);
+		entries[i].size = (size_t)mmrand(&tinfo->rnd, 0, 10);
+	}
+
+	/*
+	 * Process the entries to figure out how large a buffer we need. This is
+	 * a bit pessimistic because we're ignoring replacement bytes, but it's
+	 * a simpler calculation.
+	 */
+	for (size = cursor->value.size, i = 0; i < nentries; ++i) {
+		if (entries[i].offset >= size)
+			size = entries[i].offset;
+		size += entries[i].data.size;
+	}
+
+	/* If size is larger than the available buffer size, skip this one. */
+	if (size >= value->memsize)
+		return (false);
+
+	/* Allocate a pair of buffers. */
+	ta->mem = dcalloc(size, sizeof(uint8_t));
+	tb->mem = dcalloc(size, sizeof(uint8_t));
+
+	/*
+	 * Use a brute-force process to create the value WiredTiger will create
+	 * from this change vector. Don't do anything tricky to speed it up, we
+	 * want to use a different algorithm from WiredTiger's, the idea is to
+	 * bug-check the library.
+	 */
+	memcpy(ta->mem, value->data, value->size);
+	ta->size = value->size;
+	for (i = 0; i < nentries; ++i) {
+		/* Take leading bytes from the original, plus any gap bytes. */
+		if (entries[i].offset >= ta->size) {
+			memcpy(tb->mem, ta->mem, ta->size);
+			if (entries[i].offset > ta->size)
+				memset((uint8_t *)tb->mem + ta->size,
+				    '\0', entries[i].offset - ta->size);
+		} else
+			if (entries[i].offset > 0)
+				memcpy(tb->mem, ta->mem, entries[i].offset);
+		tb->size = entries[i].offset;
+
+		/* Take replacement bytes. */
+		if (entries[i].data.size > 0) {
+			memcpy((uint8_t *)tb->mem + tb->size,
+			    entries[i].data.data, entries[i].data.size);
+			tb->size += entries[i].data.size;
+		}
+
+		/* Take trailing bytes from the original. */
+		len = entries[i].offset + entries[i].size;
+		if (ta->size > len) {
+			memcpy((uint8_t *)tb->mem + tb->size,
+			    (uint8_t *)ta->mem + len, ta->size - len);
+			tb->size += ta->size - len;
+		}
+		testutil_assert(tb->size <= size);
+
+		tmp = ta;
+		ta = tb;
+		tb = tmp;
+	}
+
+	/* Copy the expected result into the value structure. */
+	memcpy(value->mem, ta->mem, ta->size);
+	value->data = value->mem;
+	value->size = ta->size;
+
+	free(ta->mem);
+	free(tb->mem);
+
+	*nentriesp = (int)nentries;
+	return (true);
+}
+
+/*
+ * row_modify --
+ *	Modify a row in a row-store file.
+ */
+static int
+row_modify(TINFO *tinfo, WT_CURSOR *cursor,
+    WT_ITEM *key, WT_ITEM *value, uint64_t keyno, bool positioned)
+{
+	WT_DECL_RET;
+	WT_MODIFY entries[MAX_MODIFY_ENTRIES];
+	int nentries;
+
+	if (!positioned) {
+		key_gen(key, keyno);
+		cursor->set_key(cursor, key);
+		switch (ret = cursor->search(cursor)) {
+		case 0:
+			break;
+		case WT_CACHE_FULL:
+		case WT_ROLLBACK:
+			return (WT_ROLLBACK);
+		case WT_NOTFOUND:
+			return (WT_NOTFOUND);
+		default:
+			testutil_die(ret,
+			    "row_modify: read row %" PRIu64 " by key", keyno);
+		}
+	}
+
+	/*
+	 * Generate a set of change vectors and copy the expected result into
+	 * the value buffer. If the return value is non-zero, there wasn't a
+	 * big enough value to work with, or for some reason we couldn't build
+	 * a reasonable change vector.
+	 */
+	ret = WT_NOTFOUND;
+	if (modify_build(tinfo, cursor, entries, &nentries, value))
+		ret = cursor->modify(cursor, entries, nentries);
+	switch (ret) {
+	case 0:
+		break;
+	case WT_CACHE_FULL:
+	case WT_ROLLBACK:
+		return (WT_ROLLBACK);
+	case WT_NOTFOUND:
+		return (WT_NOTFOUND);
+	default:
+		testutil_die(ret,
+		    "row_modify: modify row %" PRIu64 " by key", keyno);
+	}
+
+#ifdef HAVE_BERKELEY_DB
+	if (!SINGLETHREADED)
+		return (0);
+
+	bdb_update(key->data, key->size, value->data, value->size);
 #endif
+	return (0);
+}
+
+/*
+ * col_modify --
+ *	Modify a row in a column-store file.
+ */
+static int
+col_modify(TINFO *tinfo, WT_CURSOR *cursor,
+    WT_ITEM *key, WT_ITEM *value, uint64_t keyno, bool positioned)
+{
+	WT_DECL_RET;
+	WT_MODIFY entries[MAX_MODIFY_ENTRIES];
+	int nentries;
+
+	if (!positioned) {
+		cursor->set_key(cursor, keyno);
+		switch (ret = cursor->search(cursor)) {
+		case 0:
+			break;
+		case WT_CACHE_FULL:
+		case WT_ROLLBACK:
+			return (WT_ROLLBACK);
+		case WT_NOTFOUND:
+			return (WT_NOTFOUND);
+		default:
+			testutil_die(ret,
+			    "col_modify: read row %" PRIu64, keyno);
+		}
+	}
+
+	/*
+	 * Generate a set of change vectors and copy the expected result into
+	 * the value buffer. If the return value is non-zero, there wasn't a
+	 * big enough value to work with, or for some reason we couldn't build
+	 * a reasonable change vector.
+	 */
+	ret = WT_NOTFOUND;
+	if (modify_build(tinfo, cursor, entries, &nentries, value))
+		ret = cursor->modify(cursor, entries, nentries);
+	switch (ret) {
+	case 0:
+		break;
+	case WT_CACHE_FULL:
+	case WT_ROLLBACK:
+		return (WT_ROLLBACK);
+	case WT_NOTFOUND:
+		return (WT_NOTFOUND);
+	default:
+		testutil_die(ret, "col_modify: modify row %" PRIu64, keyno);
+	}
+
+#ifdef HAVE_BERKELEY_DB
+	if (!SINGLETHREADED)
+		return (0);
+
+	key_gen(key, keyno);
+	bdb_update(key->data, key->size, value->data, value->size);
+#else
+	(void)key;				/* [-Wunused-variable] */
+#endif
+	return (0);
+}
 
 /*
  * row_update --

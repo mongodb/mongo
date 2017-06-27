@@ -7,14 +7,24 @@
 (sed -n '1,/BEGIN SUBDIRS/p' Make.base
 
 echo "SUBDIRS ="
-sed -e 's/#.*$//' -e '/^$/d' Make.subdirs | while read dir cond ; do
+sed -e 's/#.*$//' -e '/^$/d' Make.subdirs | while read dir conds ; do
 	test -d ../$dir || continue
-	if test -n "$cond" ; then
-		cat <<END_CONDITIONAL
+	if test -n "$conds" ; then
+		# Multiple conditions are allowed, they will appear
+		# as nested 'if' statements.
+		for cond in $conds; do
+			cat <<END_CONDITIONAL
 if ${cond}
+END_CONDITIONAL
+		done
+			cat <<END_CONDITIONAL
     SUBDIRS += $dir
+END_CONDITIONAL
+		for cond in $conds; do
+			cat <<END_CONDITIONAL
 endif
 END_CONDITIONAL
+		done
 	else
 		echo "SUBDIRS += $dir"
 	fi

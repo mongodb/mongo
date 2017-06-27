@@ -1,5 +1,5 @@
 /*-
- * Public Domain 2014-2016 MongoDB, Inc.
+ * Public Domain 2014-2017 MongoDB, Inc.
  * Public Domain 2008-2014 WiredTiger, Inc.
  *
  * This is free and unencumbered software released into the public domain.
@@ -34,22 +34,14 @@
 #include <stdlib.h>
 #include <string.h>
 
-#ifndef _WIN32
-#include <pthread.h>
-#else
-#include "windows_shim.h"
-#endif
-
-#include <wiredtiger.h>
+#include "wt_internal.h"
 
 static const char *home;
-
-void *scan_thread(void *arg);
 
 #define	NUM_THREADS	10
 
 /*! [thread scan] */
-void *
+static WT_THREAD_RET
 scan_thread(void *conn_arg)
 {
 	WT_CONNECTION *conn;
@@ -74,7 +66,7 @@ scan_thread(void *conn_arg)
 		fprintf(stderr,
 		    "WT_CURSOR.next: %s\n", session->strerror(session, ret));
 
-	return (NULL);
+	return (WT_THREAD_RET_VALUE);
 }
 /*! [thread scan] */
 
@@ -85,7 +77,7 @@ main(void)
 	WT_CONNECTION *conn;
 	WT_SESSION *session;
 	WT_CURSOR *cursor;
-	pthread_t threads[NUM_THREADS];
+	wt_thread_t threads[NUM_THREADS];
 	int i, ret;
 
 	/*
@@ -114,10 +106,10 @@ main(void)
 	ret = session->close(session, NULL);
 
 	for (i = 0; i < NUM_THREADS; i++)
-		ret = pthread_create(&threads[i], NULL, scan_thread, conn);
+		ret = __wt_thread_create(NULL, &threads[i], scan_thread, conn);
 
 	for (i = 0; i < NUM_THREADS; i++)
-		ret = pthread_join(threads[i], NULL);
+		ret = __wt_thread_join(NULL, threads[i]);
 
 	ret = conn->close(conn, NULL);
 

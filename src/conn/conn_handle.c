@@ -1,5 +1,5 @@
 /*-
- * Copyright (c) 2014-2016 MongoDB, Inc.
+ * Copyright (c) 2014-2017 MongoDB, Inc.
  * Copyright (c) 2008-2014 WiredTiger, Inc.
  *	All rights reserved.
  *
@@ -62,14 +62,9 @@ __wt_connection_init(WT_CONNECTION_IMPL *conn)
 	WT_RET(__wt_spin_init(session, &conn->turtle_lock, "turtle file"));
 
 	/* Read-write locks */
-	__wt_rwlock_init(session, &conn->dhandle_lock);
-	__wt_rwlock_init(session, &conn->hot_backup_lock);
-	__wt_rwlock_init(session, &conn->table_lock);
-
-	WT_RET(__wt_calloc_def(session, WT_PAGE_LOCKS, &conn->page_lock));
-	for (i = 0; i < WT_PAGE_LOCKS; ++i)
-		WT_RET(
-		    __wt_spin_init(session, &conn->page_lock[i], "btree page"));
+	WT_RWLOCK_INIT_TRACKED(session, &conn->dhandle_lock, dhandle);
+	WT_RET(__wt_rwlock_init(session, &conn->hot_backup_lock));
+	WT_RWLOCK_INIT_TRACKED(session, &conn->table_lock, table);
 
 	/* Setup the spin locks for the LSM manager queues. */
 	WT_RET(__wt_spin_init(session,
@@ -81,15 +76,8 @@ __wt_connection_init(WT_CONNECTION_IMPL *conn)
 	WT_RET(__wt_cond_alloc(
 	    session, "LSM worker cond", &conn->lsm_manager.work_cond));
 
-	/*
-	 * Generation numbers.
-	 *
-	 * Start split generations at one.  Threads publish this generation
-	 * number before examining tree structures, and zero when they leave.
-	 * We need to distinguish between threads that are in a tree before the
-	 * first split has happened, and threads that are not in a tree.
-	 */
-	conn->split_gen = 1;
+	/* Initialize the generation manager. */
+	__wt_gen_init(session);
 
 	/*
 	 * Block manager.
@@ -113,7 +101,6 @@ void
 __wt_connection_destroy(WT_CONNECTION_IMPL *conn)
 {
 	WT_SESSION_IMPL *session;
-	u_int i;
 
 	/* Check there's something to destroy. */
 	if (conn == NULL)
@@ -144,9 +131,6 @@ __wt_connection_destroy(WT_CONNECTION_IMPL *conn)
 	__wt_spin_destroy(session, &conn->schema_lock);
 	__wt_rwlock_destroy(session, &conn->table_lock);
 	__wt_spin_destroy(session, &conn->turtle_lock);
-	for (i = 0; i < WT_PAGE_LOCKS; ++i)
-		__wt_spin_destroy(session, &conn->page_lock[i]);
-	__wt_free(session, conn->page_lock);
 
 	/* Free allocated memory. */
 	__wt_free(session, conn->cfg);

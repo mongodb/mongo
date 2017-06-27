@@ -1,5 +1,5 @@
 /*-
- * Public Domain 2014-2016 MongoDB, Inc.
+ * Public Domain 2014-2017 MongoDB, Inc.
  * Public Domain 2008-2014 WiredTiger, Inc.
  *
  * This is free and unencumbered software released into the public domain.
@@ -32,7 +32,7 @@
  * lrt --
  *	Start a long-running transaction.
  */
-void *
+WT_THREAD_RET
 lrt(void *arg)
 {
 	WT_CONNECTION *conn;
@@ -182,5 +182,5 @@ lrt(void *arg)
 	free(value.mem);
 	free(buf);
 
-	return (NULL);
+	return (WT_THREAD_RET_VALUE);
 }

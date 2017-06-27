@@ -1,5 +1,5 @@
 /*-
- * Public Domain 2014-2016 MongoDB, Inc.
+ * Public Domain 2014-2017 MongoDB, Inc.
  * Public Domain 2008-2014 WiredTiger, Inc.
  *
  * This is free and unencumbered software released into the public domain.
@@ -122,28 +122,5 @@ pthread_rwlock_wrlock(pthread_rwlock_t *rwlock)
 
 	rwlock->exclusive_locked = GetCurrentThreadId();
 
-	return (0);
-}
-
-#pragma warning( once : 4024 )
-#pragma warning( once : 4047 )
-int
-pthread_create(pthread_t *tidret, const pthread_attr_t *ignored,
-    void *(*func)(void *), void * arg)
-{
-	ignored = ignored;
-	*tidret = CreateThread(NULL, 0, func, arg, 0, NULL);
-
-	if (*tidret != NULL)
-		return (0);
-
-	return (1);
-}
-
-int
-pthread_join(pthread_t thread, void **ignored)
-{
-	ignored = ignored;
-	WaitForSingleObject(thread, INFINITE);
 	return (0);
 }

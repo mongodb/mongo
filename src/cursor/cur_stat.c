@@ -1,5 +1,5 @@
 /*-
- * Copyright (c) 2014-2016 MongoDB, Inc.
+ * Copyright (c) 2014-2017 MongoDB, Inc.
  * Copyright (c) 2008-2014 WiredTiger, Inc.
  *	All rights reserved.
  *
@@ -54,7 +54,7 @@ __curstat_get_key(WT_CURSOR *cursor, ...)
 	va_start(ap, cursor);
 	CURSOR_API_CALL(cursor, session, get_key, NULL);
 
-	WT_CURSOR_NEEDKEY(cursor);
+	WT_ERR(__cursor_needkey(cursor));
 
 	if (F_ISSET(cursor, WT_CURSTD_RAW)) {
 		WT_ERR(__wt_struct_size(
@@ -93,7 +93,7 @@ __curstat_get_value(WT_CURSOR *cursor, ...)
 	va_start(ap, cursor);
 	CURSOR_API_CALL(cursor, session, get_value, NULL);
 
-	WT_CURSOR_NEEDVALUE(cursor);
+	WT_ERR(__cursor_needvalue(cursor));
 
 	WT_ERR(cst->stats_desc(cst, WT_STAT_KEY_OFFSET(cst), &desc));
 	if (F_ISSET(cursor, WT_CURSTD_RAW)) {
@@ -287,7 +287,7 @@ __curstat_search(WT_CURSOR *cursor)
 	cst = (WT_CURSOR_STAT *)cursor;
 	CURSOR_API_CALL(cursor, session, search, NULL);
 
-	WT_CURSOR_NEEDKEY(cursor);
+	WT_ERR(__cursor_needkey(cursor));
 	F_CLR(cursor, WT_CURSTD_VALUE_SET | WT_CURSTD_VALUE_SET);
 
 	/* Initialize on demand. */
@@ -478,7 +478,7 @@ __curstat_join_desc(WT_CURSOR_STAT *cst, int slot, const char **resultp)
 	    strlen(static_desc) + 1;
 	WT_RET(__wt_realloc(session, NULL, len, &cst->desc_buf));
 	WT_RET(__wt_snprintf(
-	   cst->desc_buf, len, "join: %s%s", sgrp->desc_prefix, static_desc));
+	    cst->desc_buf, len, "join: %s%s", sgrp->desc_prefix, static_desc));
 	*resultp = cst->desc_buf;
 	return (0);
 }
@@ -576,8 +576,10 @@ __wt_curstat_open(WT_SESSION_IMPL *session,
 	    __curstat_search,			/* search */
 	    __wt_cursor_search_near_notsup,	/* search-near */
 	    __wt_cursor_notsup,			/* insert */
+	    __wt_cursor_modify_notsup,		/* modify */
 	    __wt_cursor_notsup,			/* update */
 	    __wt_cursor_notsup,			/* remove */
+	    __wt_cursor_notsup,			/* reserve */
 	    __wt_cursor_reconfigure_notsup,	/* reconfigure */
 	    __curstat_close);			/* close */
 	WT_CONFIG_ITEM cval, sval;

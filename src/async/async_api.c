@@ -1,5 +1,5 @@
 /*-
- * Copyright (c) 2014-2016 MongoDB, Inc.
+ * Copyright (c) 2014-2017 MongoDB, Inc.
  * Copyright (c) 2008-2014 WiredTiger, Inc.
  *	All rights reserved.
  *
@@ -395,13 +395,12 @@ __wt_async_reconfig(WT_SESSION_IMPL *session, const char *cfg[])
 			 * Join any worker we're stopping.
 			 * After the thread is stopped, close its session.
 			 */
-			WT_ASSERT(session, async->worker_tids[i] != 0);
+			WT_ASSERT(session, async->worker_tids[i].created);
 			WT_ASSERT(session, async->worker_sessions[i] != NULL);
 			F_CLR(async->worker_sessions[i],
 			    WT_SESSION_SERVER_ASYNC);
 			WT_TRET(__wt_thread_join(
 			    session, async->worker_tids[i]));
-			async->worker_tids[i] = 0;
 			wt_session = &async->worker_sessions[i]->iface;
 			WT_TRET(wt_session->close(wt_session, NULL));
 			async->worker_sessions[i] = NULL;
@@ -420,7 +419,7 @@ int
 __wt_async_destroy(WT_SESSION_IMPL *session)
 {
 	WT_ASYNC *async;
-	WT_ASYNC_FORMAT *af, *afnext;
+	WT_ASYNC_FORMAT *af;
 	WT_ASYNC_OP *op;
 	WT_CONNECTION_IMPL *conn;
 	WT_DECL_RET;
@@ -435,12 +434,8 @@ __wt_async_destroy(WT_SESSION_IMPL *session)
 
 	F_CLR(conn, WT_CONN_SERVER_ASYNC);
 	for (i = 0; i < conn->async_workers; i++)
-		if (async->worker_tids[i] != 0) {
-			WT_TRET(__wt_thread_join(
-			    session, async->worker_tids[i]));
-			async->worker_tids[i] = 0;
-		}
-	WT_TRET(__wt_cond_destroy(session, &async->flush_cond));
+		WT_TRET(__wt_thread_join(session, async->worker_tids[i]));
+	__wt_cond_destroy(session, &async->flush_cond);
 
 	/* Close the server threads' sessions. */
 	for (i = 0; i < conn->async_workers; i++)
@@ -459,15 +454,13 @@ __wt_async_destroy(WT_SESSION_IMPL *session)
 	}
 
 	/* Free format resources */
-	af = TAILQ_FIRST(&async->formatqh);
-	while (af != NULL) {
-		afnext = TAILQ_NEXT(af, q);
+	while ((af = TAILQ_FIRST(&async->formatqh)) != NULL) {
+		TAILQ_REMOVE(&async->formatqh, af, q);
 		__wt_free(session, af->uri);
 		__wt_free(session, af->config);
 		__wt_free(session, af->key_format);
 		__wt_free(session, af->value_format);
 		__wt_free(session, af);
-		af = afnext;
 	}
 	__wt_free(session, async->async_queue);
 	__wt_free(session, async->async_ops);
@@ -499,7 +492,7 @@ __wt_async_flush(WT_SESSION_IMPL *session)
 	 */
 	workers = 0;
 	for (i = 0; i < conn->async_workers; ++i)
-		if (async->worker_tids[i] != 0)
+		if (async->worker_tids[i].created)
 			++workers;
 	if (workers == 0)
 		return (0);

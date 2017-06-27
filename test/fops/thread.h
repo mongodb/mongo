@@ -1,5 +1,5 @@
 /*-
- * Public Domain 2014-2016 MongoDB, Inc.
+ * Public Domain 2014-2017 MongoDB, Inc.
  * Public Domain 2008-2014 WiredTiger, Inc.
  *
  * This is free and unencumbered software released into the public domain.
@@ -39,7 +39,7 @@ extern const char *config;			/* Object config */
 
 extern pthread_rwlock_t single;			/* Single-thread */
 
-int  fop_start(u_int);
+void fop_start(u_int);
 void obj_bulk(void);
 void obj_bulk_unique(int);
 void obj_checkpoint(void);

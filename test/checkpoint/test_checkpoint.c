@@ -1,5 +1,5 @@
 /*-
- * Public Domain 2014-2016 MongoDB, Inc.
+ * Public Domain 2014-2017 MongoDB, Inc.
  * Public Domain 2008-2014 WiredTiger, Inc.
  *
  * This is free and unencumbered software released into the public domain.
@@ -150,20 +150,14 @@ main(int argc, char *argv[])
 			break;
 		}
 
-		if ((ret = start_checkpoints()) != 0) {
-			(void)log_print_err("Start checkpoints failed", ret, 1);
-			break;
-		}
+		start_checkpoints();
 		if ((ret = start_workers(ttype)) != 0) {
 			(void)log_print_err("Start workers failed", ret, 1);
 			break;
 		}
 
 		g.running = 0;
-		if ((ret = end_checkpoints()) != 0) {
-			(void)log_print_err("Start workers failed", ret, 1);
-			break;
-		}
+		end_checkpoints();
 
 		free(g.cookies);
 		g.cookies = NULL;

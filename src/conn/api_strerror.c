@@ -18,8 +18,6 @@
 const char *
 __wt_wiredtiger_error(int error)
 {
-	const char *p;
-
 	/*
 	 * Check for WiredTiger specific errors.
 	 */
@@ -42,14 +40,20 @@ __wt_wiredtiger_error(int error)
 		return ("WT_CACHE_FULL: operation would overflow cache");
 	}
 
+	/* Windows strerror doesn't support ENOTSUP. */
+	if (error == ENOTSUP)
+		return ("Operation not supported");
+
 	/*
-	 * POSIX errors are non-negative integers; check for 0 explicitly incase
-	 * the underlying strerror doesn't handle 0, some historically didn't.
+	 * Check for 0 in case the underlying strerror doesn't handle it, some
+	 * historically didn't.
 	 */
 	if (error == 0)
 		return ("Successful return: 0");
-	if (error > 0 && (p = strerror(error)) != NULL)
-		return (p);
+
+	/* POSIX errors are non-negative integers. */
+	if (error > 0)
+		return (strerror(error));
 
 	return (NULL);
 }

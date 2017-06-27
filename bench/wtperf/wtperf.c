@@ -1,5 +1,5 @@
 /*-
- * Public Domain 2014-2016 MongoDB, Inc.
+ * Public Domain 2014-2017 MongoDB, Inc.
  * Public Domain 2008-2014 WiredTiger, Inc.
  *
  * This is free and unencumbered software released into the public domain.
@@ -32,23 +32,23 @@
 #define	DEFAULT_HOME		"WT_TEST"
 #define	DEFAULT_MONITOR_DIR	"WT_TEST"
 
-static void	*checkpoint_worker(void *);
+static WT_THREAD_RET checkpoint_worker(void *);
 static int	 drop_all_tables(WTPERF *);
 static int	 execute_populate(WTPERF *);
 static int	 execute_workload(WTPERF *);
 static int	 find_table_count(WTPERF *);
-static void	*monitor(void *);
-static void	*populate_thread(void *);
+static WT_THREAD_RET monitor(void *);
+static WT_THREAD_RET populate_thread(void *);
 static void	 randomize_value(WTPERF_THREAD *, char *);
 static void	 recreate_dir(const char *);
 static int	 start_all_runs(WTPERF *);
 static int	 start_run(WTPERF *);
-static int	 start_threads(WTPERF *,
-		    WORKLOAD *, WTPERF_THREAD *, u_int, void *(*)(void *));
-static int	 stop_threads(WTPERF *, u_int, WTPERF_THREAD *);
-static void	*thread_run_wtperf(void *);
+static void	 start_threads(WTPERF *, WORKLOAD *,
+		    WTPERF_THREAD *, u_int, WT_THREAD_CALLBACK(*)(void *));
+static void	 stop_threads(u_int, WTPERF_THREAD *);
+static WT_THREAD_RET thread_run_wtperf(void *);
 static void	 update_value_delta(WTPERF_THREAD *);
-static void	*worker(void *);
+static WT_THREAD_RET worker(void *);
 
 static uint64_t	 wtperf_rand(WTPERF_THREAD *);
 static uint64_t	 wtperf_value_range(WTPERF *);
@@ -312,7 +312,7 @@ op_name(uint8_t *op)
 	/* NOTREACHED */
 }
 
-static void *
+static WT_THREAD_RET
 worker_async(void *arg)
 {
 	CONFIG_OPTS *opts;
@@ -420,7 +420,7 @@ op_err:			lprintf(wtperf, ret, 0,
 	if (0) {
 err:		wtperf->error = wtperf->stop = true;
 	}
-	return (NULL);
+	return (WT_THREAD_RET_VALUE);
 }
 
 /*
@@ -513,7 +513,7 @@ err:		lprintf(wtperf, ret, 0, "Pre-workload traverse error");
 	return (ret);
 }
 
-static void *
+static WT_THREAD_RET
 worker(void *arg)
 {
 	struct timespec start, stop;
@@ -893,7 +893,7 @@ err:		wtperf->error = wtperf->stop = true;
 	}
 	free(cursors);
 
-	return (NULL);
+	return (WT_THREAD_RET_VALUE);
 }
 
 /*
@@ -1014,7 +1014,7 @@ run_mix_schedule(WTPERF *wtperf, WORKLOAD *workp)
 	return (0);
 }
 
-static void *
+static WT_THREAD_RET
 populate_thread(void *arg)
 {
 	struct timespec start, stop;
@@ -1163,10 +1163,10 @@ err:		wtperf->error = wtperf->stop = true;
 	}
 	free(cursors);
 
-	return (NULL);
+	return (WT_THREAD_RET_VALUE);
 }
 
-static void *
+static WT_THREAD_RET
 populate_async(void *arg)
 {
 	struct timespec start, stop;
@@ -1261,10 +1261,10 @@ populate_async(void *arg)
 	if (0) {
 err:		wtperf->error = wtperf->stop = true;
 	}
-	return (NULL);
+	return (WT_THREAD_RET_VALUE);
 }
 
-static void *
+static WT_THREAD_RET
 monitor(void *arg)
 {
 	struct timespec t;
@@ -1426,10 +1426,10 @@ err:		wtperf->error = wtperf->stop = true;
 		(void)fclose(fp);
 	free(path);
 
-	return (NULL);
+	return (WT_THREAD_RET_VALUE);
 }
 
-static void *
+static WT_THREAD_RET
 checkpoint_worker(void *arg)
 {
 	CONFIG_OPTS *opts;
@@ -1490,7 +1490,7 @@ checkpoint_worker(void *arg)
 err:		wtperf->error = wtperf->stop = true;
 	}
 
-	return (NULL);
+	return (WT_THREAD_RET_VALUE);
 }
 
 static int
@@ -1498,15 +1498,15 @@ execute_populate(WTPERF *wtperf)
 {
 	struct timespec start, stop;
 	CONFIG_OPTS *opts;
-	WTPERF_THREAD *popth;
 	WT_ASYNC_OP *asyncop;
-	pthread_t idle_table_cycle_thread;
+	WTPERF_THREAD *popth;
+	WT_THREAD_CALLBACK(*pfunc)(void *);
 	size_t i;
 	uint64_t last_ops, msecs, print_ops_sec;
 	uint32_t interval, tables;
+	wt_thread_t idle_table_cycle_thread;
 	double print_secs;
 	int elapsed, ret;
-	void *(*pfunc)(void *);
 
 	opts = wtperf->opts;
 
@@ -1516,9 +1516,7 @@ execute_populate(WTPERF *wtperf)
 	    opts->populate_threads, opts->icount);
 
 	/* Start cycling idle tables if configured. */
-	if ((ret =
-	    start_idle_table_cycle(wtperf, &idle_table_cycle_thread)) != 0)
-		return (ret);
+	start_idle_table_cycle(wtperf, &idle_table_cycle_thread);
 
 	wtperf->insert_key = 0;
 
@@ -1530,9 +1528,8 @@ execute_populate(WTPERF *wtperf)
 		pfunc = populate_async;
 	} else
 		pfunc = populate_thread;
-	if ((ret = start_threads(wtperf, NULL,
-	    wtperf->popthreads, opts->populate_threads, pfunc)) != 0)
-		return (ret);
+	start_threads(wtperf, NULL,
+	    wtperf->popthreads, opts->populate_threads, pfunc);
 
 	__wt_epoch(NULL, &start);
 	for (elapsed = 0, interval = 0, last_ops = 0;
@@ -1568,10 +1565,8 @@ execute_populate(WTPERF *wtperf)
 	 */
 	popth = wtperf->popthreads;
 	wtperf->popthreads = NULL;
-	ret = stop_threads(wtperf, opts->populate_threads, popth);
+	stop_threads(opts->populate_threads, popth);
 	free(popth);
-	if (ret != 0)
-		return (ret);
 
 	/* Report if any worker threads didn't finish. */
 	if (wtperf->error) {
@@ -1640,8 +1635,7 @@ execute_populate(WTPERF *wtperf)
 	}
 
 	/* Stop cycling idle tables. */
-	if ((ret = stop_idle_table_cycle(wtperf, idle_table_cycle_thread)) != 0)
-		return (ret);
+	stop_idle_table_cycle(wtperf, idle_table_cycle_thread);
 
 	return (0);
 }
@@ -1701,13 +1695,13 @@ execute_workload(WTPERF *wtperf)
 	WTPERF_THREAD *threads;
 	WT_CONNECTION *conn;
 	WT_SESSION **sessions;
-	pthread_t idle_table_cycle_thread;
+	WT_THREAD_CALLBACK(*pfunc)(void *);
+	wt_thread_t idle_table_cycle_thread;
 	uint64_t last_ckpts, last_inserts, last_reads, last_truncates;
 	uint64_t last_updates;
 	uint32_t interval, run_ops, run_time;
 	u_int i;
-	int ret, t_ret;
-	void *(*pfunc)(void *);
+	int ret;
 
 	opts = wtperf->opts;
 
@@ -1722,9 +1716,7 @@ execute_workload(WTPERF *wtperf)
 	sessions = NULL;
 
 	/* Start cycling idle tables. */
-	if ((ret =
-	    start_idle_table_cycle(wtperf, &idle_table_cycle_thread)) != 0)
-		return (ret);
+	start_idle_table_cycle(wtperf, &idle_table_cycle_thread);
 
 	if (opts->warmup != 0)
 		wtperf->in_warmup = true;
@@ -1768,9 +1760,8 @@ execute_workload(WTPERF *wtperf)
 			goto err;
 
 		/* Start the workload's threads. */
-		if ((ret = start_threads(
-		    wtperf, workp, threads, (u_int)workp->threads, pfunc)) != 0)
-			goto err;
+		start_threads(
+		    wtperf, workp, threads, (u_int)workp->threads, pfunc);
 		threads += workp->threads;
 	}
 
@@ -1836,12 +1827,9 @@ execute_workload(WTPERF *wtperf)
 err:	wtperf->stop = true;
 
 	/* Stop cycling idle tables. */
-	if ((ret = stop_idle_table_cycle(wtperf, idle_table_cycle_thread)) != 0)
-		return (ret);
+	stop_idle_table_cycle(wtperf, idle_table_cycle_thread);
 
-	if ((t_ret = stop_threads(wtperf,
-	    (u_int)wtperf->workers_cnt, wtperf->workers)) != 0 && ret == 0)
-		ret = t_ret;
+	stop_threads((u_int)wtperf->workers_cnt, wtperf->workers);
 
 	/* Drop tables if configured to and this isn't an error path */
 	if (ret == 0 &&
@@ -2163,9 +2151,9 @@ start_all_runs(WTPERF *wtperf)
 {
 	CONFIG_OPTS *opts;
 	WTPERF *next_wtperf, **wtperfs;
-	pthread_t *threads;
 	size_t i, len;
-	int ret, t_ret;
+	wt_thread_t *threads;
+	int ret;
 
 	opts = wtperf->opts;
 	wtperfs = NULL;
@@ -2178,7 +2166,7 @@ start_all_runs(WTPERF *wtperf)
 	wtperfs = dcalloc(opts->database_count, sizeof(WTPERF *));
 
 	/* Allocate an array to hold our thread IDs. */
-	threads = dcalloc(opts->database_count, sizeof(pthread_t));
+	threads = dcalloc(opts->database_count, sizeof(*threads));
 
 	for (i = 0; i < opts->database_count; i++) {
 		wtperf_copy(wtperf, &next_wtperf);
@@ -2203,22 +2191,15 @@ start_all_runs(WTPERF *wtperf)
 		    strcmp(next_wtperf->home, next_wtperf->monitor_dir) != 0)
 			recreate_dir(next_wtperf->monitor_dir);
 
-		if ((ret = pthread_create(
-		    &threads[i], NULL, thread_run_wtperf, next_wtperf)) != 0) {
-			lprintf(wtperf, ret, 0, "Error creating thread");
-			goto err;
-		}
+		testutil_check(__wt_thread_create(NULL,
+		    &threads[i], thread_run_wtperf, next_wtperf));
 	}
 
 	/* Wait for threads to finish. */
 	for (i = 0; i < opts->database_count; i++)
-		if ((t_ret = pthread_join(threads[i], NULL)) != 0) {
-			lprintf(wtperf, ret, 0, "Error joining thread");
-			if (ret == 0)
-				ret = t_ret;
-		}
+		testutil_check(__wt_thread_join(NULL, threads[i]));
 
-err:	for (i = 0; i < opts->database_count && wtperfs[i] != NULL; i++) {
+	for (i = 0; i < opts->database_count && wtperfs[i] != NULL; i++) {
 		wtperf_free(wtperfs[i]);
 		free(wtperfs[i]);
 	}
@@ -2229,7 +2210,7 @@ err:	for (i = 0; i < opts->database_count && wtperfs[i] != NULL; i++) {
 }
 
 /* Run an instance of wtperf for a given configuration. */
-static void *
+static WT_THREAD_RET
 thread_run_wtperf(void *arg)
 {
 	WTPERF *wtperf;
@@ -2238,14 +2219,14 @@ thread_run_wtperf(void *arg)
 	wtperf = (WTPERF *)arg;
 	if ((ret = start_run(wtperf)) != 0)
 		lprintf(wtperf, ret, 0, "Run failed for: %s.", wtperf->home);
-	return (NULL);
+	return (WT_THREAD_RET_VALUE);
 }
 
 static int
 start_run(WTPERF *wtperf)
 {
 	CONFIG_OPTS *opts;
-	pthread_t monitor_thread;
+	wt_thread_t monitor_thread;
 	uint64_t total_ops;
 	uint32_t run_time;
 	int monitor_created, ret, t_ret;
@@ -2272,12 +2253,8 @@ start_run(WTPERF *wtperf)
 
 	/* Start the monitor thread. */
 	if (opts->sample_interval != 0) {
-		if ((ret = pthread_create(
-		    &monitor_thread, NULL, monitor, wtperf)) != 0) {
-			lprintf(wtperf,
-			    ret, 0, "Error creating monitor thread.");
-			goto err;
-		}
+		testutil_check(__wt_thread_create(
+		    NULL, &monitor_thread, monitor, wtperf));
 		monitor_created = 1;
 	}
 
@@ -2306,9 +2283,8 @@ start_run(WTPERF *wtperf)
 			    opts->checkpoint_threads);
 			wtperf->ckptthreads = dcalloc(
 			     opts->checkpoint_threads, sizeof(WTPERF_THREAD));
-			if (start_threads(wtperf, NULL, wtperf->ckptthreads,
-			    opts->checkpoint_threads, checkpoint_worker) != 0)
-				goto err;
+			start_threads(wtperf, NULL, wtperf->ckptthreads,
+			    opts->checkpoint_threads, checkpoint_worker);
 		}
 		if (opts->pre_load_data && (ret = pre_load_data(wtperf)) != 0)
 			goto err;
@@ -2362,16 +2338,10 @@ err:		if (ret == 0)
 	/* Notify the worker threads they are done. */
 	wtperf->stop = true;
 
-	if ((t_ret = stop_threads(wtperf, 1, wtperf->ckptthreads)) != 0)
-		if (ret == 0)
-			ret = t_ret;
+	stop_threads(1, wtperf->ckptthreads);
 
-	if (monitor_created != 0 &&
-	    (t_ret = pthread_join(monitor_thread, NULL)) != 0) {
-		lprintf(wtperf, ret, 0, "Error joining monitor thread.");
-		if (ret == 0)
-			ret = t_ret;
-	}
+	if (monitor_created != 0)
+		testutil_check(__wt_thread_join(NULL, monitor_thread));
 
 	if (wtperf->conn != NULL && opts->close_conn &&
 	    (t_ret = wtperf->conn->close(wtperf->conn, NULL)) != 0) {
@@ -2728,14 +2698,13 @@ err:	wtperf_free(wtperf);
 	return (ret == 0 ? EXIT_SUCCESS : EXIT_FAILURE);
 }
 
-static int
-start_threads(WTPERF *wtperf,
-    WORKLOAD *workp, WTPERF_THREAD *base, u_int num, void *(*func)(void *))
+static void
+start_threads(WTPERF *wtperf, WORKLOAD *workp,
+    WTPERF_THREAD *base, u_int num, WT_THREAD_CALLBACK(*func)(void *))
 {
 	CONFIG_OPTS *opts;
 	WTPERF_THREAD *thread;
 	u_int i;
-	int ret;
 
 	opts = wtperf->opts;
 
@@ -2779,29 +2748,20 @@ start_threads(WTPERF *wtperf,
 
 	/* Start the threads. */
 	for (i = 0, thread = base; i < num; ++i, ++thread)
-		if ((ret = pthread_create(
-		    &thread->handle, NULL, func, thread)) != 0) {
-			lprintf(wtperf, ret, 0, "Error creating thread");
-			return (ret);
-		}
-
-	return (0);
+		testutil_check(__wt_thread_create(
+		    NULL, &thread->handle, func, thread));
 }
 
-static int
-stop_threads(WTPERF *wtperf, u_int num, WTPERF_THREAD *threads)
+static void
+stop_threads(u_int num, WTPERF_THREAD *threads)
 {
 	u_int i;
-	int ret;
 
 	if (num == 0 || threads == NULL)
-		return (0);
+		return;
 
 	for (i = 0; i < num; ++i, ++threads) {
-		if ((ret = pthread_join(threads->handle, NULL)) != 0) {
-			lprintf(wtperf, ret, 0, "Error joining thread");
-			return (ret);
-		}
+		testutil_check(__wt_thread_join(NULL, threads->handle));
 
 		free(threads->key_buf);
 		threads->key_buf = NULL;
@@ -2815,7 +2775,6 @@ stop_threads(WTPERF *wtperf, u_int num, WTPERF_THREAD *threads)
 	 * being read by the monitor thread (among others).  As a standalone
 	 * program, leaking memory isn't a concern, and it's simpler that way.
 	 */
-	return (0);
 }
 
 static void

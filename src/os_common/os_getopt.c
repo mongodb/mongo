@@ -1,5 +1,5 @@
 /*-
- * Public Domain 2014-2016 MongoDB, Inc.
+ * Public Domain 2014-2017 MongoDB, Inc.
  * Public Domain 2008-2014 WiredTiger, Inc.
  *
  * This is free and unencumbered software released into the public domain.
@@ -59,13 +59,17 @@
 
 #include "wt_internal.h"
 
-extern int __wt_opterr, __wt_optind, __wt_optopt, __wt_optreset;
+extern int __wt_opterr WT_ATTRIBUTE_LIBRARY_VISIBLE;
+extern int __wt_optind WT_ATTRIBUTE_LIBRARY_VISIBLE;
+extern int __wt_optopt WT_ATTRIBUTE_LIBRARY_VISIBLE;
+extern int __wt_optreset WT_ATTRIBUTE_LIBRARY_VISIBLE;
+
 int	__wt_opterr = 1,	/* if error message should be printed */
 	__wt_optind = 1,	/* index into parent argv vector */
 	__wt_optopt,		/* character checked for validity */
 	__wt_optreset;		/* reset getopt */
 
-extern char *__wt_optarg;
+extern char *__wt_optarg WT_ATTRIBUTE_LIBRARY_VISIBLE;
 char	*__wt_optarg;		/* argument associated with option */
 
 #define	BADCH	(int)'?'

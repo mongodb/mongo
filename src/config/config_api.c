@@ -1,5 +1,5 @@
 /*-
- * Copyright (c) 2014-2016 MongoDB, Inc.
+ * Copyright (c) 2014-2017 MongoDB, Inc.
  * Copyright (c) 2008-2014 WiredTiger, Inc.
  *	All rights reserved.
  *
@@ -158,11 +158,11 @@ wiredtiger_config_validate(WT_SESSION *wt_session,
 }
 
 /*
- * __wt_conn_foc_add --
+ * __conn_foc_add --
  *	Add a new entry into the connection's free-on-close list.
  */
-void
-__wt_conn_foc_add(WT_SESSION_IMPL *session, const void *p)
+static void
+__conn_foc_add(WT_SESSION_IMPL *session, const void *p)
 {
 	WT_CONNECTION_IMPL *conn;
 
@@ -327,12 +327,12 @@ __wt_configure_method(WT_SESSION_IMPL *session,
 	 * order to avoid freeing chunks of memory twice.  Again, this isn't a
 	 * commonly used API and it shouldn't ever happen, just leak it.
 	 */
-	__wt_conn_foc_add(session, entry->base);
-	__wt_conn_foc_add(session, entry);
-	__wt_conn_foc_add(session, checks);
-	__wt_conn_foc_add(session, newcheck->type);
-	__wt_conn_foc_add(session, newcheck->checks);
-	__wt_conn_foc_add(session, newcheck_name);
+	__conn_foc_add(session, entry->base);
+	__conn_foc_add(session, entry);
+	__conn_foc_add(session, checks);
+	__conn_foc_add(session, newcheck->type);
+	__conn_foc_add(session, newcheck->checks);
+	__conn_foc_add(session, newcheck_name);
 
 	/*
 	 * Instead of using locks to protect configuration information, assume

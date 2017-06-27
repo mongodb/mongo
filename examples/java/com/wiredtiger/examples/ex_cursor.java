@@ -1,5 +1,5 @@
 /*-
- * Public Domain 2014-2016 MongoDB, Inc.
+ * Public Domain 2014-2017 MongoDB, Inc.
  * Public Domain 2008-2014 WiredTiger, Inc.
  *
  * This is free and unencumbered software released into the public domain.
@@ -156,6 +156,41 @@ public class ex_cursor {
     }
     /*! [cursor remove] */
 
+    /*! [cursor modify] */
+    public static int
+    cursor_modify(Cursor cursor)
+        throws WiredTigerException
+    {
+        byte orig[] = new byte[4];
+        for (int i = 0; i < 4; i++)
+            orig[i] = (byte)i;
+        cursor.putKeyString("key");
+        cursor.putValueByteArray(orig);
+        cursor.insert();              //  0x0 0x1 0x2 0x3
+
+        byte b10[] = new byte[4];
+        for (int i = 0; i < 4; i++)
+            b10[i] = (byte)(0x10 + i);
+        byte b20[] = new byte[4];
+        for (int i = 0; i < 4; i++)
+            b20[i] = (byte)(0x20 + i);
+
+        Modify modlist[] = new Modify[2];
+        // The following Modify replaces one byte at position one by:
+        // (0x10 0x11 0x12 0x13), leaving:
+        //   0x0 0x10 0x11 0x12 0x13 0x2 0x3
+        modlist[0] = new Modify(b10, 1, 1);
+
+        // The following Modify replaces one byte at position three by:
+        // (0x20 0x21 0x22 0x23), leaving:
+        //   0x0 0x10 0x11 0x20 0x21 0x22 0x23 0x13 0x2 0x3
+        modlist[1] = new Modify(b20, 3, 1);
+
+        cursor.putKeyString("key");
+        return (cursor.modify(modlist));
+    }
+    /*! [cursor modify] */
+
     public static int
     cursorExample()
         throws WiredTigerException
@@ -217,6 +252,12 @@ public class ex_cursor {
         ret = cursor_search_near(cursor);
         ret = cursor_update(cursor);
         ret = cursor_remove(cursor);
+        ret = cursor.close();
+
+        /* Create a table with a raw value to illustrate certain operations. */
+        ret = session.create("table:raw", "key_format=S,value_format=u");
+        cursor = session.open_cursor("table:raw", null, null);
+        ret = cursor_modify(cursor);
         ret = cursor.close();
 
         /* Note: closing the connection implicitly closes open session(s). */

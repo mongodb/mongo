@@ -1,5 +1,5 @@
 /*-
- * Public Domain 2014-2016 MongoDB, Inc.
+ * Public Domain 2014-2017 MongoDB, Inc.
  * Public Domain 2008-2014 WiredTiger, Inc.
  *
  * This is free and unencumbered software released into the public domain.
@@ -151,6 +151,74 @@ from packing import pack, unpack
 	}
 }
 
+%typemap(in) WT_MODIFY * (int len, WT_MODIFY *modarray, int i) {
+	len = PyList_Size($input);
+	/*
+	 * We allocate an extra cleared WT_MODIFY struct, the first
+	 * entry will be used solely to transmit the array length to
+	 * the call site.
+	 */
+	if (__wt_calloc_def(NULL, (size_t)len + 1, &modarray) != 0)
+		SWIG_exception_fail(SWIG_MemoryError, "WT calloc failed");
+	modarray[0].size = (size_t)len;
+	for (i = 1; i <= len; i++) {
+		PyObject *dataobj, *modobj, *offsetobj, *sizeobj;
+		char *datadata;
+		long offset, size;
+		Py_ssize_t datasize;
+
+		if ((modobj = PySequence_GetItem($input, i - 1)) == NULL)
+			SWIG_exception_fail(SWIG_IndexError,
+			    "Modify sequence failed");
+
+		WT_GETATTR(dataobj, modobj, "data");
+		if (PyString_AsStringAndSize(dataobj, &datadata,
+		    &datasize) < 0) {
+			Py_DECREF(dataobj);
+			Py_DECREF(modobj);
+			SWIG_exception_fail(SWIG_AttributeError,
+			    "Modify.data bad value");
+		}
+		modarray[i].data.data = malloc(datasize);
+		memcpy(modarray[i].data.data, datadata, datasize);
+		modarray[i].data.size = datasize;
+		Py_DECREF(dataobj);
+
+		WT_GETATTR(offsetobj, modobj, "offset");
+		if ((offset = PyInt_AsLong(offsetobj)) < 0) {
+			Py_DECREF(offsetobj);
+			Py_DECREF(modobj);
+			SWIG_exception_fail(SWIG_RuntimeError,
+			    "Modify.offset bad value");
+		}
+		modarray[i].offset = offset;
+		Py_DECREF(offsetobj);
+
+		WT_GETATTR(sizeobj, modobj, "size");
+		if ((size = PyInt_AsLong(sizeobj)) < 0) {
+			Py_DECREF(sizeobj);
+			Py_DECREF(modobj);
+			SWIG_exception_fail(SWIG_RuntimeError,
+			    "Modify.size bad value");
+		}
+		modarray[i].size = size;
+		Py_DECREF(sizeobj);
+		Py_DECREF(modobj);
+	}
+	$1 = modarray;
+}
+
+%typemap(freearg) WT_MODIFY * {
+	/* The WT_MODIFY arg is in position 2.  Is there a better way? */
+	WT_MODIFY *modarray = modarray2;
+	size_t i, len;
+
+	len = modarray[0].size;
+	for (i = 1; i <= len; i++)
+		__wt_free(NULL, modarray[i].data.data);
+	__wt_free(NULL, modarray);
+}
+
 /* 64 bit typemaps. */
 %typemap(in) uint64_t {
 	$1 = PyLong_AsUnsignedLongLong($input);
@@ -244,6 +312,13 @@ static PyObject *wtError;
 
 static int sessionFreeHandler(WT_SESSION *session_arg);
 static int cursorFreeHandler(WT_CURSOR *cursor_arg);
+
+#define WT_GETATTR(var, parent, name)					\
+	do if ((var = PyObject_GetAttrString(parent, name)) == NULL) {	\
+		Py_DECREF(parent);					\
+		SWIG_exception_fail(SWIG_AttributeError,		\
+		    "Modify." #name " get failed");			\
+	} while(0)
 %}
 
 %init %{
@@ -373,8 +448,8 @@ retry:
 }
 %enddef
 
-/* Any API that returns an enum type uses this. */
-%define ENUM_OK(m)
+/* An API that returns a value that shouldn't be checked uses this. */
+%define ANY_OK(m)
 %exception m {
 	$action
 }
@@ -408,12 +483,14 @@ retry:
 %enddef
 
 EBUSY_OK(__wt_connection::async_new_op)
-ENUM_OK(__wt_async_op::get_type)
+ANY_OK(__wt_async_op::get_type)
 NOTFOUND_OK(__wt_cursor::next)
 NOTFOUND_OK(__wt_cursor::prev)
 NOTFOUND_OK(__wt_cursor::remove)
 NOTFOUND_OK(__wt_cursor::search)
 NOTFOUND_OK(__wt_cursor::update)
+ANY_OK(__wt_modify::__wt_modify)
+ANY_OK(__wt_modify::~__wt_modify)
 
 COMPARE_OK(__wt_cursor::_compare)
 COMPARE_OK(__wt_cursor::_equals)
@@ -448,6 +525,11 @@ COMPARE_NOTFOUND_OK(__wt_cursor::_search_near)
 %ignore __wt_cursor::get_value;
 %ignore __wt_cursor::set_key;
 %ignore __wt_cursor::set_value;
+%ignore __wt_cursor::modify(WT_CURSOR *, WT_MODIFY *, int);
+%rename (modify) __wt_cursor::_modify;
+%ignore __wt_modify::data;
+%ignore __wt_modify::offset;
+%ignore __wt_modify::size;
 
 /* Next, override methods that return integers via arguments. */
 %ignore __wt_cursor::compare(WT_CURSOR *, WT_CURSOR *, int *);
@@ -772,6 +854,15 @@ typedef int int_void;
 		return (cursorFreeHandler($self));
 	}
 
+	/*
+	 * modify: the size of the array was put into the first element by the
+	 * typemap.
+	 */
+	int _modify(WT_MODIFY *list) {
+		int count = (int)list[0].size;
+		return (self->modify(self, &list[1], count));
+	}
+
 %pythoncode %{
 	def get_key(self):
 		'''get_key(self) -> object
@@ -870,6 +961,21 @@ typedef int int_void;
 %}
 };
 
+/*
+ * Support for WT_CURSOR.modify.  The WT_MODIFY object is known to
+ * SWIG, but its attributes are regular Python attributes.
+ * We extract the attributes at the call site to WT_CURSOR.modify
+ * so we don't have to deal with managing Python objects references.
+ */
+%extend __wt_modify {
+%pythoncode %{
+	def __init__(self, data = '', offset = 0, size = 0):
+		self.data = data
+		self.offset = offset
+		self.size = size
+%}
+};
+
 %extend __wt_session {
 	int _log_printf(const char *msg) {
 		return self->log_printf(self, "%s", msg);
@@ -951,6 +1057,7 @@ OVERRIDE_METHOD(__wt_session, WT_SESSION, log_printf, (self, msg))
 
 %rename(AsyncOp) __wt_async_op;
 %rename(Cursor) __wt_cursor;
+%rename(Modify) __wt_modify;
 %rename(Session) __wt_session;
 %rename(Connection) __wt_connection;
 
@@ -974,7 +1081,7 @@ writeToPythonStream(const char *streamname, const char *message)
 	written = NULL;
 	arglist = arglist2 = NULL;
 	msglen = strlen(message);
-	msg = malloc(msglen + 2);
+	WT_RET(__wt_malloc(NULL, msglen + 2, &msg));
 	strcpy(msg, message);
 	strcpy(&msg[msglen], "\n");
 
@@ -1010,8 +1117,7 @@ err:	Py_XDECREF(arglist2);
 	/* Release python Global Interpreter Lock */
 	SWIG_PYTHON_THREAD_END_BLOCK;
 
-	if (msg)
-		free(msg);
+	__wt_free(NULL, msg);
 	return (ret);
 }
 
@@ -1232,4 +1338,3 @@ _rename_with_prefix('WT_STAT_CONN_', stat.conn)
 _rename_with_prefix('WT_STAT_DSRC_', stat.dsrc)
 del _rename_with_prefix
 %}
-

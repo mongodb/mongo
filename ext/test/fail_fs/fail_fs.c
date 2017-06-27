@@ -1,5 +1,5 @@
 /*-
- * Public Domain 2014-2016 MongoDB, Inc.
+ * Public Domain 2014-2017 MongoDB, Inc.
  * Public Domain 2008-2014 WiredTiger, Inc.
  *
  * This is free and unencumbered software released into the public domain.
@@ -740,12 +740,12 @@ fail_fs_size(WT_FILE_SYSTEM *file_system,
 static int
 fail_fs_terminate(WT_FILE_SYSTEM *file_system, WT_SESSION *session)
 {
-	FAIL_FILE_HANDLE *fail_fh;
+	FAIL_FILE_HANDLE *fail_fh, *fail_fh_tmp;
 	FAIL_FILE_SYSTEM *fail_fs;
 
 	fail_fs = (FAIL_FILE_SYSTEM *)file_system;
 
-	while ((fail_fh = TAILQ_FIRST(&fail_fs->fileq)) != NULL)
+	TAILQ_FOREACH_SAFE(fail_fh, &fail_fs->fileq, q, fail_fh_tmp)
 		fail_file_handle_remove(session, fail_fh);
 
 	fail_fs_destroy_lock(&fail_fs->lock);

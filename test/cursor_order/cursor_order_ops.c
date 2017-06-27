@@ -1,5 +1,5 @@
 /*-
- * Public Domain 2014-2016 MongoDB, Inc.
+ * Public Domain 2014-2017 MongoDB, Inc.
  * Public Domain 2008-2014 WiredTiger, Inc.
  *
  * This is free and unencumbered software released into the public domain.
@@ -28,9 +28,9 @@
 
 #include "cursor_order.h"
 
-static void *append_insert(void *);
+static WT_THREAD_RET append_insert(void *);
 static void  print_stats(SHARED_CONFIG *);
-static void *reverse_scan(void *);
+static WT_THREAD_RET reverse_scan(void *);
 
 typedef struct {
 	char *name;				/* object name */
@@ -45,15 +45,13 @@ typedef struct {
 
 static INFO *run_info;
 
-int
+void
 ops_start(SHARED_CONFIG *cfg)
 {
 	struct timeval start, stop;
 	double seconds;
-	pthread_t *tids;
+	wt_thread_t *tids;
 	uint64_t i, name_index, offset, total_nops;
-	int ret;
-	void *thread_ret;
 
 	tids = NULL;	/* Keep GCC 4.1 happy. */
 	total_nops = 0;
@@ -114,18 +112,15 @@ ops_start(SHARED_CONFIG *cfg)
 
 	/* Create threads. */
 	for (i = 0; i < cfg->reverse_scanners; ++i)
-		if ((ret = pthread_create(
-		    &tids[i], NULL, reverse_scan, (void *)(uintptr_t)i)) != 0)
-			testutil_die(ret, "pthread_create");
-	for (; i < cfg->reverse_scanners + cfg->append_inserters; ++i) {
-		if ((ret = pthread_create(
-		    &tids[i], NULL, append_insert, (void *)(uintptr_t)i)) != 0)
-			testutil_die(ret, "pthread_create");
-	}
+		testutil_check(__wt_thread_create(NULL,
+		    &tids[i], reverse_scan, (void *)(uintptr_t)i));
+	for (; i < cfg->reverse_scanners + cfg->append_inserters; ++i)
+		testutil_check(__wt_thread_create(NULL,
+		    &tids[i], append_insert, (void *)(uintptr_t)i));
 
 	/* Wait for the threads. */
 	for (i = 0; i < cfg->reverse_scanners + cfg->append_inserters; ++i)
-		(void)pthread_join(tids[i], &thread_ret);
+		testutil_check(__wt_thread_join(NULL, tids[i]));
 
 	(void)gettimeofday(&stop, NULL);
 	seconds = (stop.tv_sec - start.tv_sec) +
@@ -154,8 +149,6 @@ ops_start(SHARED_CONFIG *cfg)
 
 	free(run_info);
 	free(tids);
-
-	return (0);
 }
 
 /*
@@ -217,7 +210,7 @@ reverse_scan_op(
  * reverse_scan --
  *	Reader thread start function.
  */
-static void *
+static WT_THREAD_RET
 reverse_scan(void *arg)
 {
 	INFO *s;
@@ -260,7 +253,7 @@ reverse_scan(void *arg)
 	/* Notify all other threads to finish once the first thread is done */
 	cfg->thread_finish = true;
 
-	return (NULL);
+	return (WT_THREAD_RET_VALUE);
 }
 
 /*
@@ -307,7 +300,7 @@ append_insert_op(
  * append_insert --
  *	Writer thread start function.
  */
-static void *
+static WT_THREAD_RET
 append_insert(void *arg)
 {
 	INFO *s;
@@ -347,7 +340,7 @@ append_insert(void *arg)
 	/* Notify all other threads to finish once the first thread is done */
 	cfg->thread_finish = true;
 
-	return (NULL);
+	return (WT_THREAD_RET_VALUE);
 }
 
 /*

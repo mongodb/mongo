@@ -1,5 +1,5 @@
 /*-
- * Copyright (c) 2014-2016 MongoDB, Inc.
+ * Copyright (c) 2014-2017 MongoDB, Inc.
  * Copyright (c) 2008-2014 WiredTiger, Inc.
  *	All rights reserved.
  *
@@ -17,13 +17,14 @@ static int __col_insert_alloc(
  */
 int
 __wt_col_modify(WT_SESSION_IMPL *session, WT_CURSOR_BTREE *cbt,
-    uint64_t recno, WT_ITEM *value, WT_UPDATE *upd_arg, bool is_remove)
+    uint64_t recno, const WT_ITEM *value,
+    WT_UPDATE *upd_arg, u_int modify_type, bool exclusive)
 {
+	static const WT_ITEM col_fix_remove = { "", 1, NULL, 0, 0 };
 	WT_BTREE *btree;
 	WT_DECL_RET;
 	WT_INSERT *ins;
 	WT_INSERT_HEAD *ins_head, **ins_headp;
-	WT_ITEM _value;
 	WT_PAGE *page;
 	WT_PAGE_MODIFY *mod;
 	WT_UPDATE *old_upd, *upd;
@@ -37,14 +38,17 @@ __wt_col_modify(WT_SESSION_IMPL *session, WT_CURSOR_BTREE *cbt,
 	upd = upd_arg;
 	append = logged = false;
 
-	/* This code expects a remove to have a NULL value. */
-	if (is_remove) {
-		if (btree->type == BTREE_COL_FIX) {
-			value = &_value;
-			value->data = "";
-			value->size = 1;
-		} else
-			value = NULL;
+	if (modify_type == WT_UPDATE_DELETED ||
+	    modify_type == WT_UPDATE_RESERVED) {
+		/*
+		 * Fixed-size column-store doesn't have on-page deleted values,
+		 * it's a nul byte.
+		 */
+		if (modify_type == WT_UPDATE_DELETED &&
+		    btree->type == BTREE_COL_FIX) {
+			modify_type = WT_UPDATE_STANDARD;
+			value = &col_fix_remove;
+		}
 	} else {
 		/*
 		 * There's some chance the application specified a record past
@@ -83,11 +87,11 @@ __wt_col_modify(WT_SESSION_IMPL *session, WT_CURSOR_BTREE *cbt,
 		WT_ASSERT(session, upd_arg == NULL);
 
 		/* Make sure the update can proceed. */
-		WT_ERR(__wt_txn_update_check(
-		    session, old_upd = cbt->ins->upd));
+		WT_ERR(__wt_txn_update_check(session, old_upd = cbt->ins->upd));
 
 		/* Allocate a WT_UPDATE structure and transaction ID. */
-		WT_ERR(__wt_update_alloc(session, value, &upd, &upd_size));
+		WT_ERR(__wt_update_alloc(session,
+		    value, &upd, &upd_size, modify_type));
 		WT_ERR(__wt_txn_modify(session, upd));
 		logged = true;
 
@@ -103,7 +107,7 @@ __wt_col_modify(WT_SESSION_IMPL *session, WT_CURSOR_BTREE *cbt,
 
 		/* Serialize the update. */
 		WT_ERR(__wt_update_serial(
-		    session, page, &cbt->ins->upd, &upd, upd_size));
+		    session, page, &cbt->ins->upd, &upd, upd_size, false));
 	} else {
 		/* Allocate the append/update list reference as necessary. */
 		if (append) {
@@ -147,8 +151,8 @@ __wt_col_modify(WT_SESSION_IMPL *session, WT_CURSOR_BTREE *cbt,
 		    mod->mod_col_split_recno > recno));
 
 		if (upd_arg == NULL) {
-			WT_ERR(
-			    __wt_update_alloc(session, value, &upd, &upd_size));
+			WT_ERR(__wt_update_alloc(session,
+			    value, &upd, &upd_size, modify_type));
 			WT_ERR(__wt_txn_modify(session, upd));
 			logged = true;
 
@@ -185,15 +189,15 @@ __wt_col_modify(WT_SESSION_IMPL *session, WT_CURSOR_BTREE *cbt,
 		if (append)
 			WT_ERR(__wt_col_append_serial(
 			    session, page, cbt->ins_head, cbt->ins_stack,
-			    &ins, ins_size, &cbt->recno, skipdepth));
+			    &ins, ins_size, &cbt->recno, skipdepth, exclusive));
 		else
 			WT_ERR(__wt_insert_serial(
 			    session, page, cbt->ins_head, cbt->ins_stack,
-			    &ins, ins_size, skipdepth));
+			    &ins, ins_size, skipdepth, exclusive));
 	}
 
 	/* If the update was successful, add it to the in-memory log. */
-	if (logged)
+	if (logged && modify_type != WT_UPDATE_RESERVED)
 		WT_ERR(__wt_txn_log_op(session, cbt));
 
 	if (0) {

@@ -25,15 +25,20 @@ cat << UNUSED_STAT_FIELDS
 lock_checkpoint_count
 lock_checkpoint_wait_application
 lock_checkpoint_wait_internal
+lock_dhandle_read_count
+lock_dhandle_wait_application
+lock_dhandle_wait_internal
+lock_dhandle_write_count
 lock_metadata_count
 lock_metadata_wait_application
 lock_metadata_wait_internal
 lock_schema_count
 lock_schema_wait_application
 lock_schema_wait_internal
-lock_table_count
+lock_table_read_count
 lock_table_wait_application
 lock_table_wait_internal
+lock_table_write_count
 UNUSED_STAT_FIELDS
 
 echo "$search"

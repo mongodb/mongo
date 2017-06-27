@@ -1,6 +1,6 @@
 #!/usr/bin/env python
 #
-# Public Domain 2014-2016 MongoDB, Inc.
+# Public Domain 2014-2017 MongoDB, Inc.
 # Public Domain 2008-2014 WiredTiger, Inc.
 #
 # This is free and unencumbered software released into the public domain.
@@ -71,9 +71,9 @@ class BaseDataSet(object):
     # Create a key for a Simple or Complex data set.
     @staticmethod
     def key_by_format(i, key_format):
-        if key_format == 'i' or key_format == 'r' or key_format == 'u':
+        if key_format == 'i' or key_format == 'r':
             return i
-        elif key_format == 'S':
+        elif key_format == 'S' or key_format == 'u':
             return str('%015d' % i)
         else:
             raise AssertionError(
@@ -82,9 +82,9 @@ class BaseDataSet(object):
     # Create a value for a Simple data set.
     @staticmethod
     def value_by_format(i, value_format):
-        if value_format == 'i' or value_format == 'r' or value_format == 'u':
+        if value_format == 'i' or value_format == 'r':
             return i
-        elif value_format == 'S':
+        elif value_format == 'S' or value_format == 'u':
             return str(i) + ': abcdefghijklmnopqrstuvwxyz'
         elif value_format == '8t':
             value = (
@@ -94,8 +94,7 @@ class BaseDataSet(object):
             return value[i % len(value)]
         else:
             raise AssertionError(
-                'value: object has unexpected format: '
-                + value_format)
+                'value: object has unexpected format: ' + value_format)
 
     # Create a key for this data set.  Simple and Complex data sets have
     # the same key space.
@@ -119,6 +118,11 @@ class SimpleDataSet(BaseDataSet):
     def __init__(self, testcase, uri, rows, **kwargs):
         super(SimpleDataSet, self).__init__(testcase, uri, rows, **kwargs)
 
+    # A value suitable for checking the value returned by a cursor.
+    def comparable_value(self, i):
+        return BaseDataSet.value_by_format(i, self.value_format)
+
+    # A value suitable for assigning to a cursor.
     def value(self, i):
         return BaseDataSet.value_by_format(i, self.value_format)
 
@@ -260,9 +264,8 @@ class ComplexDataSet(BaseDataSet):
                 str(i) + ': abcdefghijklmnopqrstuvwxyz'[0:i%23],
                 str(i) + ': abcdefghijklmnopqrstuvwxyz'[0:i%18]]
 
-    # A value suitable for assigning to a cursor, as
-    # cursor.set_value() expects a tuple when there it is used with
-    # a single argument and the value is composite.
+    # A value suitable for assigning to a cursor, as cursor.set_value() expects
+    # a tuple when it is used with a single argument and the value is composite.
     def value(self, i):
         return tuple(self.comparable_value(i))
 

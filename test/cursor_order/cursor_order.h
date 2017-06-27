@@ -1,5 +1,5 @@
 /*-
- * Public Domain 2014-2016 MongoDB, Inc.
+ * Public Domain 2014-2017 MongoDB, Inc.
  * Public Domain 2008-2014 WiredTiger, Inc.
  *
  * This is free and unencumbered software released into the public domain.
@@ -50,5 +50,5 @@ typedef struct {
 } SHARED_CONFIG;
 
 void load(SHARED_CONFIG *, const char *);
-int  ops_start(SHARED_CONFIG *);
+void ops_start(SHARED_CONFIG *);
 void verify(SHARED_CONFIG *, const char *);

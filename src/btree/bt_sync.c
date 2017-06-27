@@ -1,5 +1,5 @@
 /*-
- * Copyright (c) 2014-2016 MongoDB, Inc.
+ * Copyright (c) 2014-2017 MongoDB, Inc.
  * Copyright (c) 2008-2014 WiredTiger, Inc.
  *	All rights reserved.
  *
@@ -179,22 +179,9 @@ __sync_file(WT_SESSION_IMPL *session, WT_CACHE_OP syncop)
 		 * Set the checkpointing flag to block such actions and wait for
 		 * any problematic eviction or page splits to complete.
 		 */
-		WT_PUBLISH(btree->checkpointing, WT_CKPT_PREPARE);
-
-		/*
-		 * Sync for checkpoint allows splits to happen while the queue
-		 * is being drained, but not reconciliation. We need to do this,
-		 * since draining the queue can take long enough for hot pages
-		 * to grow significantly larger than the configured maximum
-		 * size.
-		 */
-		F_SET(btree, WT_BTREE_ALLOW_SPLITS);
-		ret = __wt_evict_file_exclusive_on(session);
-		F_CLR(btree, WT_BTREE_ALLOW_SPLITS);
-		WT_ERR(ret);
-		__wt_evict_file_exclusive_off(session);
-
-		WT_PUBLISH(btree->checkpointing, WT_CKPT_RUNNING);
+		btree->checkpointing = WT_CKPT_PREPARE;
+		(void)__wt_gen_next_drain(session, WT_GEN_EVICT);
+		btree->checkpointing = WT_CKPT_RUNNING;
 
 		/* Write all dirty in-cache pages. */
 		flags |= WT_READ_NO_EVICT;
@@ -268,9 +255,8 @@ err:	/* On error, clear any left-over tree walk. */
 	    saved_pinned_id == WT_TXN_NONE)
 		__wt_txn_release_snapshot(session);
 
-	/* Clear the checkpoint flag and push the change. */
-	if (btree->checkpointing != WT_CKPT_OFF)
-		WT_PUBLISH(btree->checkpointing, WT_CKPT_OFF);
+	/* Clear the checkpoint flag. */
+	btree->checkpointing = WT_CKPT_OFF;
 
 	__wt_spin_unlock(session, &btree->flush_lock);
 

@@ -1,5 +1,5 @@
 /*-
- * Copyright (c) 2014-2016 MongoDB, Inc.
+ * Copyright (c) 2014-2017 MongoDB, Inc.
  * Copyright (c) 2008-2014 WiredTiger, Inc.
  *	All rights reserved.
  *
@@ -10,13 +10,9 @@
  * Tuning constants: I hesitate to call this tuning, but we want to review some
  * number of pages from each file's in-memory tree for each page we evict.
  */
-#define	WT_EVICT_INT_SKEW  (1<<20)	/* Prefer leaf pages over internal
-					   pages by this many increments of the
-					   read generation. */
+#define	WT_EVICT_MAX_TREES	1000	/* Maximum walk points */
 #define	WT_EVICT_WALK_BASE	300	/* Pages tracked across file visits */
 #define	WT_EVICT_WALK_INCR	100	/* Pages added each walk */
-
-#define	WT_EVICT_MAX_TREES	1000	/* Maximum walk points */
 
 /* Ways to position when starting an eviction walk. */
 typedef enum {
@@ -183,6 +179,10 @@ struct __wt_cache {
 	/*
 	 * Flags.
 	 */
+#define	WT_CACHE_POOL_MANAGER	  0x001 /* The active cache pool manager */
+#define	WT_CACHE_POOL_RUN	  0x002 /* Cache pool thread running */
+	uint32_t pool_flags;		/* Cache pool flags */
+
 #define	WT_CACHE_EVICT_CLEAN	  0x001 /* Evict clean pages */
 #define	WT_CACHE_EVICT_CLEAN_HARD 0x002 /* Clean % blocking app threads */
 #define	WT_CACHE_EVICT_DIRTY	  0x004 /* Evict dirty pages */
@@ -190,9 +190,6 @@ struct __wt_cache {
 #define	WT_CACHE_EVICT_SCRUB	  0x010 /* Scrub dirty pages */
 #define	WT_CACHE_EVICT_URGENT	  0x020 /* Pages are in the urgent queue */
 #define	WT_CACHE_EVICT_ALL	(WT_CACHE_EVICT_CLEAN | WT_CACHE_EVICT_DIRTY)
-#define	WT_CACHE_EVICT_MASK	  0x0FF
-#define	WT_CACHE_POOL_MANAGER	  0x100 /* The active cache pool manager */
-#define	WT_CACHE_POOL_RUN	  0x200 /* Cache pool thread running */
 	uint32_t flags;
 };
 

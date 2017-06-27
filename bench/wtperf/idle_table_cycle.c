@@ -1,5 +1,5 @@
 /*-
- * Public Domain 2014-2016 MongoDB, Inc.
+ * Public Domain 2014-2017 MongoDB, Inc.
  * Public Domain 2008-2014 WiredTiger, Inc.
  *
  * This is free and unencumbered software released into the public domain.
@@ -57,7 +57,7 @@ check_timing(WTPERF *wtperf,
  * Measure how long each step takes, and flag an error if it exceeds the
  * configured maximum.
  */
-static void *
+static WT_THREAD_RET
 cycle_idle_tables(void *arg)
 {
 	struct timespec start, stop;
@@ -76,7 +76,7 @@ cycle_idle_tables(void *arg)
 	    wtperf->conn, NULL, opts->sess_config, &session)) != 0) {
 		lprintf(wtperf, ret, 0,
 		    "Error opening a session on %s", wtperf->home);
-		return (NULL);
+		return (WT_THREAD_RET_VALUE);
 	}
 
 	for (cycle_count = 0; wtperf->idle_cycle_run; ++cycle_count) {
@@ -96,10 +96,10 @@ cycle_idle_tables(void *arg)
 			lprintf(wtperf, ret, 0,
 			     "Table create failed in cycle_idle_tables.");
 			wtperf->error = true;
-			return (NULL);
+			return (WT_THREAD_RET_VALUE);
 		}
 		if (check_timing(wtperf, "create", start, &stop) != 0)
-			return (NULL);
+			return (WT_THREAD_RET_VALUE);
 		start = stop;
 
 		/* Open and close cursor. */
@@ -108,16 +108,16 @@ cycle_idle_tables(void *arg)
 			lprintf(wtperf, ret, 0,
 			     "Cursor open failed in cycle_idle_tables.");
 			wtperf->error = true;
-			return (NULL);
+			return (WT_THREAD_RET_VALUE);
 		}
 		if ((ret = cursor->close(cursor)) != 0) {
 			lprintf(wtperf, ret, 0,
 			     "Cursor close failed in cycle_idle_tables.");
 			wtperf->error = true;
-			return (NULL);
+			return (WT_THREAD_RET_VALUE);
 		}
 		if (check_timing(wtperf, "cursor", start, &stop) != 0)
-			return (NULL);
+			return (WT_THREAD_RET_VALUE);
 		start = stop;
 
 #if 1
@@ -133,14 +133,14 @@ cycle_idle_tables(void *arg)
 			lprintf(wtperf, ret, 0,
 			     "Table drop failed in cycle_idle_tables.");
 			wtperf->error = true;
-			return (NULL);
+			return (WT_THREAD_RET_VALUE);
 		}
 		if (check_timing(wtperf, "drop", start, &stop) != 0)
-			return (NULL);
+			return (WT_THREAD_RET_VALUE);
 #endif
 	}
 
-	return (NULL);
+	return (WT_THREAD_RET_VALUE);
 }
 
 /*
@@ -150,47 +150,33 @@ cycle_idle_tables(void *arg)
  * structure. Should reshuffle the configuration structure so explicit static
  * initialization isn't necessary.
  */
-int
-start_idle_table_cycle(WTPERF *wtperf, pthread_t *idle_table_cycle_thread)
+void
+start_idle_table_cycle(WTPERF *wtperf, wt_thread_t *idle_table_cycle_thread)
 {
 	CONFIG_OPTS *opts;
-	pthread_t thread_id;
-	int ret;
+	wt_thread_t thread_id;
 
 	opts = wtperf->opts;
 
 	if (opts->idle_table_cycle == 0)
-		return (0);
+		return;
 
 	wtperf->idle_cycle_run = true;
-	if ((ret = pthread_create(
-	    &thread_id, NULL, cycle_idle_tables, wtperf)) != 0) {
-		lprintf(wtperf,
-		    ret, 0, "Error creating idle table cycle thread.");
-		wtperf->idle_cycle_run = false;
-		return (ret);
-	}
+	testutil_check(__wt_thread_create(
+	    NULL, &thread_id, cycle_idle_tables, wtperf));
 	*idle_table_cycle_thread = thread_id;
-
-	return (0);
 }
 
-int
-stop_idle_table_cycle(WTPERF *wtperf, pthread_t idle_table_cycle_thread)
+void
+stop_idle_table_cycle(WTPERF *wtperf, wt_thread_t idle_table_cycle_thread)
 {
 	CONFIG_OPTS *opts;
-	int ret;
 
 	opts = wtperf->opts;
 
 	if (opts->idle_table_cycle == 0 || !wtperf->idle_cycle_run)
-		return (0);
+		return;
 
 	wtperf->idle_cycle_run = false;
-	if ((ret = pthread_join(idle_table_cycle_thread, NULL)) != 0) {
-		lprintf(
-		    wtperf, ret, 0, "Error joining idle table cycle thread.");
-		return (ret);
-	}
-	return (0);
+	testutil_check(__wt_thread_join(NULL, idle_table_cycle_thread));
 }
