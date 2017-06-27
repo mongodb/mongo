@@ -37,6 +37,7 @@
 #include "mongo/db/background.h"
 #include "mongo/db/catalog/database.h"
 #include "mongo/db/client.h"
+#include "mongo/db/concurrency/d_concurrency.h"
 #include "mongo/db/concurrency/write_conflict_exception.h"
 #include "mongo/db/curop.h"
 #include "mongo/db/db_raii.h"
@@ -159,39 +160,58 @@ Status dropDatabase(OperationContext* opCtx, const std::string& dbName) {
         }
     });
 
-    if (numCollectionsToDrop > 0U) {
-        auto status =
-            replCoord->awaitReplicationOfLastOpForClient(opCtx, kDropDatabaseWriteConcern).status;
-        if (!status.isOK()) {
-            return Status(status.code(),
-                          str::stream() << "dropDatabase " << dbName << " failed waiting for "
-                                        << numCollectionsToDrop
-                                        << " collection drops to replicate: "
-                                        << status.reason());
-        }
+    {
+        // Holding of any locks is disallowed while awaiting replication because this can
+        // potentially block for long time while doing network activity.
+        //
+        // Even though dropDatabase() does not explicitly acquire any locks before awaiting
+        // replication, it is possible that the caller of this function may already have acquired
+        // a lock. The applyOps command is an example of a dropDatabase() caller that does this.
+        // Therefore, we have to release any locks using a TempRelease RAII object.
+        //
+        // TODO: Remove the use of this TempRelease object when SERVER-29802 is completed.
+        // The work in SERVER-29802 will adjust the locking rules around applyOps operations and
+        // dropDatabase is expected to be one of the operations where we expect to no longer acquire
+        // the global lock.
+        Lock::TempRelease release(opCtx->lockState());
 
-        log() << "dropDatabase " << dbName << " - successfully dropped " << numCollectionsToDrop
-              << " collections. dropping database";
-    } else {
-        invariant(!latestDropPendingOpTime.isNull());
-        auto status =
-            replCoord->awaitReplication(opCtx, latestDropPendingOpTime, kDropDatabaseWriteConcern)
-                .status;
-        if (!status.isOK()) {
-            return Status(
-                status.code(),
-                str::stream()
-                    << "dropDatabase "
-                    << dbName
-                    << " failed waiting for pending collection drops (most recent drop optime: "
-                    << latestDropPendingOpTime.toString()
-                    << ") to replicate: "
-                    << status.reason());
-        }
+        if (numCollectionsToDrop > 0U) {
+            auto status =
+                replCoord->awaitReplicationOfLastOpForClient(opCtx, kDropDatabaseWriteConcern)
+                    .status;
+            if (!status.isOK()) {
+                return Status(status.code(),
+                              str::stream() << "dropDatabase " << dbName << " failed waiting for "
+                                            << numCollectionsToDrop
+                                            << " collection drops to replicate: "
+                                            << status.reason());
+            }
 
-        log() << "dropDatabase " << dbName
-              << " - pending collection drops completed. dropping database";
+            log() << "dropDatabase " << dbName << " - successfully dropped " << numCollectionsToDrop
+                  << " collections. dropping database";
+        } else {
+            invariant(!latestDropPendingOpTime.isNull());
+            auto status =
+                replCoord
+                    ->awaitReplication(opCtx, latestDropPendingOpTime, kDropDatabaseWriteConcern)
+                    .status;
+            if (!status.isOK()) {
+                return Status(
+                    status.code(),
+                    str::stream()
+                        << "dropDatabase "
+                        << dbName
+                        << " failed waiting for pending collection drops (most recent drop optime: "
+                        << latestDropPendingOpTime.toString()
+                        << ") to replicate: "
+                        << status.reason());
+            }
+
+            log() << "dropDatabase " << dbName
+                  << " - pending collection drops completed. dropping database";
+        }
     }
+
     dropPendingGuardWhileAwaitingReplication.Dismiss();
 
     MONGO_WRITE_CONFLICT_RETRY_LOOP_BEGIN {
