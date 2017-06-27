@@ -82,8 +82,8 @@ SockAddr::SockAddr(int sourcePort) {
 
 SockAddr::SockAddr(StringData target, int port, sa_family_t familyHint)
     : _hostOrIp(target.toString()) {
-    if (target == "localhost") {
-        target = "127.0.0.1";
+    if (_hostOrIp == "localhost") {
+        _hostOrIp = "127.0.0.1";
     }
 
     if (mongoutils::str::contains(_hostOrIp, '/')) {
@@ -126,8 +126,8 @@ SockAddr::SockAddr(StringData target, int port, sa_family_t familyHint)
 
     if (ret) {
         // we were unsuccessful
-        if (target != "0.0.0.0") {  // don't log if this as it is a
-                                    // CRT construction and log() may not work yet.
+        if (_hostOrIp != "0.0.0.0") {  // don't log if this as it is a
+                                       // CRT construction and log() may not work yet.
             log() << "getaddrinfo(\"" << _hostOrIp << "\") failed: " << getAddrInfoStrError(ret);
             _isValid = false;
             return;
