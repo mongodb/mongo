@@ -34,19 +34,20 @@
         "tool_replset/127.0.0.1:" + replTest.ports[0] + ",127.0.0.1:" + replTest.ports[1];
 
     // Test with mongodump/mongorestore
-    print("dump the db");
     var data = MongoRunner.dataDir + "/tool_replset-dump1/";
+    print("using mongodump to dump the db to " + data);
     var exitCode = MongoRunner.runMongoTool("mongodump", {
         host: replSetConnString,
         out: data,
     });
     assert.eq(0, exitCode, "mongodump failed to dump from the replica set");
 
-    print("db successfully dumped, dropping now");
-    master.getDB("foo").dropDatabase();
+    print("db successfully dumped to " + data +
+          ". dropping collection before testing the restore process");
+    assert(master.getDB("foo").bar.drop());
     replTest.awaitReplication();
 
-    print("restore the db");
+    print("using mongorestore to restore the db from " + data);
     exitCode = MongoRunner.runMongoTool("mongorestore", {
         host: replSetConnString,
         dir: data,
