@@ -134,7 +134,9 @@ public:
 
 protected:
     static const int kInterruptCheckPeriod = 128;
-    ExpressionContext() : variablesParseState(variables.useIdGenerator()) {}
+
+    ExpressionContext(NamespaceString nss)
+        : ns(std::move(nss)), variablesParseState(variables.useIdGenerator()) {}
 
     /**
      * Sets '_collator' and resets '_documentComparator' and '_valueComparator'.

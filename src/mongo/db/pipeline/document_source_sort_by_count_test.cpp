@@ -46,8 +46,9 @@
 
 namespace mongo {
 namespace {
-using std::vector;
 using boost::intrusive_ptr;
+using std::list;
+using std::vector;
 
 /**
  * Fixture to test that $sortByCount returns a DocumentSourceGroup and DocumentSourceSort.
@@ -55,15 +56,15 @@ using boost::intrusive_ptr;
 class SortByCountReturnsGroupAndSort : public AggregationContextFixture {
 public:
     void testCreateFromBsonResult(BSONObj sortByCountSpec, Value expectedGroupExplain) {
-        vector<intrusive_ptr<DocumentSource>> result =
+        list<intrusive_ptr<DocumentSource>> result =
             DocumentSourceSortByCount::createFromBson(sortByCountSpec.firstElement(), getExpCtx());
 
         ASSERT_EQUALS(result.size(), 2UL);
 
-        const auto* groupStage = dynamic_cast<DocumentSourceGroup*>(result[0].get());
+        const auto* groupStage = dynamic_cast<DocumentSourceGroup*>(result.front().get());
         ASSERT(groupStage);
 
-        const auto* sortStage = dynamic_cast<DocumentSourceSort*>(result[1].get());
+        const auto* sortStage = dynamic_cast<DocumentSourceSort*>(result.back().get());
         ASSERT(sortStage);
 
         // Serialize the DocumentSourceGroup and DocumentSourceSort from $sortByCount so that we can
@@ -111,7 +112,7 @@ TEST_F(SortByCountReturnsGroupAndSort, ExpressionInObjectSpec) {
  */
 class InvalidSortByCountSpec : public AggregationContextFixture {
 public:
-    vector<intrusive_ptr<DocumentSource>> createSortByCount(BSONObj sortByCountSpec) {
+    list<intrusive_ptr<DocumentSource>> createSortByCount(BSONObj sortByCountSpec) {
         auto specElem = sortByCountSpec.firstElement();
         return DocumentSourceSortByCount::createFromBson(specElem, getExpCtx());
     }

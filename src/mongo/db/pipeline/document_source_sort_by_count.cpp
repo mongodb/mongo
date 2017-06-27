@@ -39,13 +39,13 @@
 namespace mongo {
 
 using boost::intrusive_ptr;
-using std::vector;
+using std::list;
 
 REGISTER_MULTI_STAGE_ALIAS(sortByCount,
                            LiteParsedDocumentSourceDefault::parse,
                            DocumentSourceSortByCount::createFromBson);
 
-vector<intrusive_ptr<DocumentSource>> DocumentSourceSortByCount::createFromBson(
+list<intrusive_ptr<DocumentSource>> DocumentSourceSortByCount::createFromBson(
     BSONElement elem, const intrusive_ptr<ExpressionContext>& pExpCtx) {
     if (elem.type() == Object) {
         // Make sure that the sortByCount field is an expression inside an object

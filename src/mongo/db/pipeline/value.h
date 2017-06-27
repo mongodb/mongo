@@ -117,6 +117,9 @@ public:
     explicit Value(const MaxKeyLabeler&) : _storage(MaxKey) {}        // MAXKEY
     explicit Value(const Date_t& date) : _storage(Date, date.toMillisSinceEpoch()) {}
 
+    explicit Value(const char*) = delete;  // Use StringData instead to prevent accidentally
+                                           // terminating the string at the first null byte.
+
     // TODO: add an unsafe version that can share storage with the BSONElement
     /// Deep-convert from BSONElement to Value
     explicit Value(const BSONElement& elem);
