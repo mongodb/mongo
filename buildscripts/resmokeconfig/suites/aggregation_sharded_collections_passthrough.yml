@@ -24,6 +24,8 @@ selector:
     - jstests/aggregation/bugs/cursor_timeout.js
     - jstests/aggregation/bugs/lookup_unwind_getmore.js
     - jstests/aggregation/bugs/lookup_unwind_killcursor.js
+    # The following tests assume that accessed collections are unsharded.
+    - jstests/aggregation/sources/lookup/lookup_absorb_match.js
 
 executor:
   js_test:

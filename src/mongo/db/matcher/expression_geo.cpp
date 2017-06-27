@@ -364,7 +364,11 @@ bool GeoMatchExpression::matchesSingleElement(const BSONElement& e) const {
 
 void GeoMatchExpression::debugString(StringBuilder& debug, int level) const {
     _debugAddSpace(debug, level);
-    debug << "GEO raw = " << _rawObj.toString();
+
+    BSONObjBuilder builder;
+    serialize(&builder);
+    debug << "GEO raw = " << builder.obj().toString();
+
     MatchExpression::TagData* td = getTag();
     if (NULL != td) {
         debug << " ";
@@ -374,7 +378,9 @@ void GeoMatchExpression::debugString(StringBuilder& debug, int level) const {
 }
 
 void GeoMatchExpression::serialize(BSONObjBuilder* out) const {
-    out->appendElements(_rawObj);
+    BSONObjBuilder subobj(out->subobjStart(path()));
+    subobj.appendElements(_rawObj);
+    subobj.doneFast();
 }
 
 bool GeoMatchExpression::equivalent(const MatchExpression* other) const {
@@ -431,7 +437,9 @@ void GeoNearMatchExpression::debugString(StringBuilder& debug, int level) const 
 }
 
 void GeoNearMatchExpression::serialize(BSONObjBuilder* out) const {
-    out->appendElements(_rawObj);
+    BSONObjBuilder subobj(out->subobjStart(path()));
+    subobj.appendElements(_rawObj);
+    subobj.doneFast();
 }
 
 bool GeoNearMatchExpression::equivalent(const MatchExpression* other) const {
