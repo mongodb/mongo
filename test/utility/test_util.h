@@ -72,8 +72,19 @@ typedef struct {
 	bool	   running;
 	char	  *uri;
 	volatile uint64_t   next_threadid;
+	uint64_t   unique_id;
 	uint64_t   max_inserted_id;
 } TEST_OPTS;
+
+/*
+ * A structure for the data specific to a single thread of those used by the
+ * group of threads defined below.
+ */
+typedef struct {
+	TEST_OPTS *testopts;
+	int threadnum;
+	int thread_counter;
+} TEST_PER_THREAD_OPTS;
 
 /*
  * testutil_assert --
@@ -198,6 +209,20 @@ void *drealloc(void *, size_t);
 void *dstrdup(const void *);
 void *dstrndup(const char *, size_t);
 const char *example_setup(int, char * const *);
+
+/*
+ * The functions below can generate errors that we wish to ignore. We have
+ * handler functions available for them here, to avoid making tests crash
+ * prematurely.
+ */
+int handle_op_error(WT_EVENT_HANDLER *, WT_SESSION *, int, const char *);
+int handle_op_message(WT_EVENT_HANDLER *, WT_SESSION *, const char *);
+void *op_bulk(void *);
+void *op_bulk_unique(void *);
+void *op_cursor(void *);
+void *op_create(void *);
+void *op_create_unique(void *);
+void *op_drop(void *);
 void  testutil_clean_work_dir(const char *);
 void  testutil_cleanup(TEST_OPTS *);
 bool  testutil_enable_long_tests(void);
