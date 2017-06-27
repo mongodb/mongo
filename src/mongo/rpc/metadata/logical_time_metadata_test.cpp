@@ -183,9 +183,11 @@ TEST(LogicalTimeMetadataTest, UpconvertPass) {
     auto commandObj = builder.done();
     BSONObjBuilder metadataBob;
     BSONObjBuilder commandBob;
-    auto converted = upconvertRequest(commandObj, 0);
-    ASSERT_BSONOBJ_EQ(BSON("aaa" << 1 << "bbb" << 1 << "$clusterTime" << logicalTimeMetadata),
-                      converted);
+    auto converted = upconvertRequest("db", commandObj, 0);
+    ASSERT_BSONOBJ_EQ(BSON("aaa" << 1 << "bbb" << 1 << "$clusterTime" << logicalTimeMetadata
+                                 << "$db"
+                                 << "db"),
+                      converted.body);
 }
 
 }  // namespace rpc

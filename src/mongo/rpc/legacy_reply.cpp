@@ -78,6 +78,17 @@ LegacyReply::LegacyReply(const Message* message) {
     _commandReply = BSONObj(qr.data());
     _commandReply.shareOwnershipWith(message->sharedBuffer());
 
+    if (_commandReply.firstElementFieldName() == "$err"_sd) {
+        // Upconvert legacy errors.
+        BSONObjBuilder bob;
+        bob.appendAs(_commandReply.firstElement(), "errmsg");
+        bob.append("ok", 0.0);
+        if (auto code = _commandReply["code"]) {
+            bob.append(code);
+        }
+        _commandReply = bob.obj();
+    }
+
     return;
 }
 

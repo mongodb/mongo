@@ -453,36 +453,7 @@ DbResponse Strategy::clientOpQueryCommand(OperationContext* opCtx,
         nss = NamespaceString("admin", "$cmd");
     }
 
-    {
-        bool haveReadPref = false;
-        BSONElement e = cmdObj.firstElement();
-        if (e.type() == Object && (e.fieldName()[0] == '$' ? str::equals("query", e.fieldName() + 1)
-                                                           : str::equals("query", e.fieldName()))) {
-            // Extract the embedded query object.
-            if (auto readPrefElem = cmdObj[Query::ReadPrefField.name()]) {
-                // The command has a read preference setting. We don't want to lose this information
-                // so we copy it to a new field called $queryOptions.$readPreference
-                haveReadPref = true;
-                BSONObjBuilder finalCmdObjBuilder;
-                finalCmdObjBuilder.appendElements(e.embeddedObject());
-                finalCmdObjBuilder.append(readPrefElem);
-                cmdObj = finalCmdObjBuilder.obj();
-            } else {
-                cmdObj = e.embeddedObject();
-            }
-        }
-
-        if (!haveReadPref && q.queryOptions & QueryOption_SlaveOk) {
-            // If the slaveOK bit is set, behave as-if read preference secondary-preferred was
-            // specified.
-            const auto readPref = ReadPreferenceSetting(ReadPreference::SecondaryPreferred);
-            BSONObjBuilder finalCmdObjBuilder(std::move(cmdObj));
-            readPref.toContainingBSON(&finalCmdObjBuilder);
-            cmdObj = finalCmdObjBuilder.obj();
-        }
-    }
-
-    auto request = OpMsgRequest::fromDBAndBody(nss.db(), cmdObj);
+    const auto request = rpc::upconvertRequest(nss.db(), std::move(cmdObj), q.queryOptions);
     OpQueryReplyBuilder reply;
     runCommand(opCtx, request, BSONObjBuilder(reply.bufBuilderForResults()));
     return DbResponse{reply.toCommandReply()};

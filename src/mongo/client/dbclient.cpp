@@ -230,8 +230,7 @@ std::tuple<bool, DBClientWithCommands*> DBClientWithCommands::runCommandWithTarg
     // TODO: This will be downconverted immediately if the underlying
     // requestBuilder is a legacyRequest builder. Not sure what the best
     // way to get around that is without breaking the abstraction.
-    auto result = runCommandWithTarget(
-        OpMsgRequest::fromDBAndBody(dbname, rpc::upconvertRequest(std::move(cmd), options)));
+    auto result = runCommandWithTarget(rpc::upconvertRequest(dbname, std::move(cmd), options));
 
     info = result.first->getCommandReply().getOwned();
     return std::make_tuple(isOk(info), result.second);

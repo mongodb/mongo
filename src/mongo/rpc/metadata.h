@@ -32,6 +32,7 @@
 
 #include "mongo/base/status_with.h"
 #include "mongo/stdx/functional.h"
+#include "mongo/util/net/op_msg.h"
 
 namespace mongo {
 class BSONObj;
@@ -62,9 +63,9 @@ void readRequestMetadata(OperationContext* opCtx, const BSONObj& metadataObj);
 using LegacyCommandAndFlags = std::tuple<BSONObj, int>;
 
 /**
- * Upconverts a legacy command object and a query flags bitfield. Does not add a $db field.
+ * Upconverts a legacy command request into an OpMessageRequest.
  */
-BSONObj upconvertRequest(BSONObj legacyCmdObj, int queryFlags);
+OpMsgRequest upconvertRequest(StringData db, BSONObj legacyCmdObj, int queryFlags);
 
 /**
  * A function type for writing request metadata. The function takes a pointer to an optional

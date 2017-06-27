@@ -41,6 +41,7 @@
 #include "mongo/rpc/metadata/logical_time_metadata.h"
 #include "mongo/rpc/metadata/sharding_metadata.h"
 #include "mongo/rpc/metadata/tracking_metadata.h"
+#include "mongo/util/string_map.h"
 
 namespace mongo {
 namespace rpc {
@@ -119,7 +120,27 @@ void readRequestMetadata(OperationContext* opCtx, const BSONObj& metadataObj) {
     }
 }
 
-BSONObj upconvertRequest(BSONObj cmdObj, int queryFlags) {
+namespace {
+const auto docSequenceFieldsForCommands = StringMap<std::string>{
+    {"insert", "documents"},  //
+    {"update", "updates"},
+    {"delete", "deletes"},
+};
+
+bool isArrayOfObjects(BSONElement array) {
+    if (array.type() != Array)
+        return false;
+
+    for (auto elem : array.Obj()) {
+        if (elem.type() != Object)
+            return false;
+    }
+
+    return true;
+}
+}
+
+OpMsgRequest upconvertRequest(StringData db, BSONObj cmdObj, int queryFlags) {
     cmdObj = cmdObj.getOwned();  // Usually this is a no-op since it is already owned.
 
     auto readPrefContainer = BSONObj();
@@ -155,7 +176,24 @@ BSONObj upconvertRequest(BSONObj cmdObj, int queryFlags) {
         cmdObj = bodyBuilder.obj();
     }
 
-    return cmdObj;
+    // Try to move supported array fields into document sequences.
+    auto docSequenceIt = docSequenceFieldsForCommands.find(cmdObj.firstElementFieldName());
+    auto docSequenceElem = docSequenceIt == docSequenceFieldsForCommands.end()
+        ? BSONElement()
+        : cmdObj[docSequenceIt->second];
+    if (!isArrayOfObjects(docSequenceElem))
+        return OpMsgRequest::fromDBAndBody(db, std::move(cmdObj));
+
+    auto docSequenceName = docSequenceElem.fieldNameStringData();
+
+    // Note: removing field before adding "$db" to avoid the need to copy the potentially large
+    // array.
+    auto out = OpMsgRequest::fromDBAndBody(db, cmdObj.removeField(docSequenceName));
+    out.sequences.push_back({docSequenceName.toString()});
+    for (auto elem : docSequenceElem.Obj()) {
+        out.sequences[0].objs.push_back(elem.Obj().shareOwnershipWith(cmdObj));
+    }
+    return out;
 }
 
 }  // namespace rpc

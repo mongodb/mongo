@@ -62,16 +62,17 @@ Message assembleCommandRequest(DBClientWithCommands* cli,
                                StringData database,
                                int legacyQueryOptions,
                                BSONObj legacyQuery) {
-    BSONObjBuilder bodyBob(rpc::upconvertRequest(std::move(legacyQuery), legacyQueryOptions));
+    auto request = rpc::upconvertRequest(database, std::move(legacyQuery), legacyQueryOptions);
 
     if (cli->getRequestMetadataWriter()) {
+        BSONObjBuilder bodyBob(std::move(request.body));
         auto opCtx = (haveClient() ? cc().getOperationContext() : nullptr);
         uassertStatusOK(cli->getRequestMetadataWriter()(opCtx, &bodyBob));
+        request.body = bodyBob.obj();
     }
 
-    return rpc::messageFromOpMsgRequest(cli->getClientRPCProtocols(),
-                                        cli->getServerRPCProtocols(),
-                                        OpMsgRequest::fromDBAndBody(database, bodyBob.obj()));
+    return rpc::messageFromOpMsgRequest(
+        cli->getClientRPCProtocols(), cli->getServerRPCProtocols(), std::move(request));
 }
 
 }  // namespace
