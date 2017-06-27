@@ -40,6 +40,23 @@ def _get_field_member_name(field):
     return '_%s' % (common.camel_case(field.cpp_name))
 
 
+def _get_has_field_member_name(field):
+    # type: (ast.Field) -> unicode
+    """Get the C++ class member name for bool 'has' member field."""
+    return '_has%s' % (common.title_case(field.cpp_name))
+
+
+def _is_required_serializer_field(field):
+    # type: (ast.Field) -> bool
+    """
+    Get whether we require this field to have a value set before serialization.
+
+    Fields that must be set before serialization are fields without default values, that are not
+    optional, and are not chained.
+    """
+    return not field.ignore and not field.optional and not field.default and not field.chained
+
+
 def _get_field_constant_name(field):
     # type: (ast.Field) -> unicode
     """Get the C++ string constant name for a field."""
@@ -337,8 +354,7 @@ class _CppHeaderFileWriter(_CppFileWriterBase):
         """Generate the declarations for the class constructors."""
         struct_type_info = struct_types.get_struct_info(struct)
 
-        if struct_type_info.get_constructor_method():
-            self._writer.write_line(struct_type_info.get_constructor_method().get_declaration())
+        self._writer.write_line(struct_type_info.get_constructor_method().get_declaration())
 
     def gen_serializer_methods(self, struct):
         # type: (ast.Struct) -> None
@@ -399,15 +415,21 @@ class _CppHeaderFileWriter(_CppFileWriterBase):
         param_type = cpp_type_info.get_getter_setter_type()
         member_name = _get_field_member_name(field)
 
+        post_body = ''
+        if _is_required_serializer_field(field):
+            post_body = '%s = true;' % (_get_has_field_member_name(field))
+
         template_params = {
             'method_name': common.title_case(field.cpp_name),
             'member_name': member_name,
             'param_type': param_type,
-            'body': cpp_type_info.get_setter_body(member_name)
+            'body': cpp_type_info.get_setter_body(member_name),
+            'post_body': post_body,
         }
 
         with self._with_template(template_params):
-            self._writer.write_template('void set${method_name}(${param_type} value) & { ${body} }')
+            self._writer.write_template('void set${method_name}(${param_type} value) & ' +
+                                        '{ ${body} ${post_body} }')
 
         self._writer.write_empty_line()
 
@@ -422,6 +444,14 @@ class _CppHeaderFileWriter(_CppFileWriterBase):
             self._writer.write_line('%s %s{%s};' % (member_type, member_name, field.default))
         else:
             self._writer.write_line('%s %s;' % (member_type, member_name))
+
+    def gen_serializer_member(self, field):
+        # type: (ast.Field) -> None
+        """Generate the C++ class bool has_<field> member definition for a field."""
+        has_member_name = _get_has_field_member_name(field)
+
+        # Use a bitfield to save space
+        self._writer.write_line('bool %s : 1;' % (has_member_name))
 
     def gen_string_constants_declarations(self, struct):
         # type: (ast.Struct) -> None
@@ -484,6 +514,7 @@ class _CppHeaderFileWriter(_CppFileWriterBase):
     def generate(self, spec):
         # type: (ast.IDLAST) -> None
         """Generate the C++ header to a stream."""
+        # pylint: disable=too-many-branches
         self.gen_file_header()
 
         self._writer.write_unindented_line('#pragma once')
@@ -576,6 +607,13 @@ class _CppHeaderFileWriter(_CppFileWriterBase):
                     for field in struct.fields:
                         if not field.ignore:
                             self.gen_member(field)
+
+                    # Write serializer member variables
+                    # Note: we write these out second to ensure the bit fields can be packed by
+                    # the compiler.
+                    for field in struct.fields:
+                        if _is_required_serializer_field(field):
+                            self.gen_serializer_member(field)
 
                 self.write_empty_line()
 
@@ -716,24 +754,37 @@ class _CppSourceFileWriter(_CppFileWriterBase):
 
     def gen_constructors(self, struct):
         # type: (ast.Struct) -> None
-        """Generate the C++ constructor definitions."""
+        """Generate the C++ constructor definition."""
 
         struct_type_info = struct_types.get_struct_info(struct)
-        if struct_type_info.get_constructor_method():
-            with self._block('%s : _nss(nss) {' %
-                             (struct_type_info.get_constructor_method().get_definition()), '}'):
-                self._writer.write_line('// Used for initialization only')
+        constructor = struct_type_info.get_constructor_method()
+
+        initializers = ['_%s(%s)' % (arg.name, arg.name) for arg in constructor.args]
+
+        initializers += [
+            '%s(false)' % _get_has_field_member_name(field) for field in struct.fields
+            if _is_required_serializer_field(field)
+        ]
+
+        initializers_str = ''
+        if initializers:
+            initializers_str = ': ' + ', '.join(initializers)
+
+        with self._block('%s %s {' % (constructor.get_definition(), initializers_str), '}'):
+            self._writer.write_line('// Used for initialization only')
 
     def gen_deserializer_methods(self, struct):
         # type: (ast.Struct) -> None
         """Generate the C++ deserializer method definitions."""
+        # pylint: disable=too-many-branches
         # Commands that have concatentate_with_db namespaces require db name as a parameter
 
         struct_type_info = struct_types.get_struct_info(struct)
 
         with self._block('%s {' %
                          (struct_type_info.get_deserializer_static_method().get_definition()), '}'):
-            if isinstance(struct, ast.Command) and struct_type_info.get_constructor_method():
+            if isinstance(struct,
+                          ast.Command) and struct.namespace != common.COMMAND_NAMESPACE_IGNORED:
                 self._writer.write_line('%s object(%s);' % (
                     common.title_case(struct.name),
                     'ctxt.parseNSCollectionRequired(dbName, bsonObject.firstElement())'))
@@ -781,6 +832,10 @@ class _CppSourceFileWriter(_CppFileWriterBase):
                         if field.ignore:
                             self._writer.write_line('// ignore field')
                         else:
+                            if _is_required_serializer_field(field):
+                                self._writer.write_line('%s = true;' %
+                                                        (_get_has_field_member_name(field)))
+
                             self.gen_field_deserializer(field)
 
                     if first_field:
@@ -907,6 +962,16 @@ class _CppSourceFileWriter(_CppFileWriterBase):
         struct_type_info = struct_types.get_struct_info(struct)
 
         with self._block('%s {' % (struct_type_info.get_serializer_method().get_definition()), '}'):
+            # Check all required fields have been specified
+            required_fields = [
+                _get_has_field_member_name(field) for field in struct.fields
+                if _is_required_serializer_field(field)
+            ]
+
+            if required_fields:
+                assert_fields_set = ' && '.join(required_fields)
+                self._writer.write_line('invariant(%s);' % assert_fields_set)
+                self._writer.write_empty_line()
 
             # Serialize the namespace as the first field
             if isinstance(struct, ast.Command):

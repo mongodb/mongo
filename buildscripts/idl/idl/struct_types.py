@@ -24,6 +24,22 @@ from . import common
 from . import writer
 
 
+class ArgumentInfo(object):
+    """Class that encapsulates information about an argument to a method."""
+
+    def __init__(self, arg):
+        # type: (unicode) -> None
+        """Create a instance of the ArgumentInfo class by parsing the argument string."""
+        parts = arg.split(' ')
+        self.type = ' '.join(parts[0:-1])
+        self.name = parts[-1]
+
+    def __str__(self):
+        # type: () -> str
+        """Return a formatted argument string."""
+        return "%s %s" % (self.type, self.name)  # type: ignore
+
+
 class MethodInfo(object):
     """Class that encapslates information about a method and how to declare, define, and call it."""
 
@@ -31,12 +47,12 @@ class MethodInfo(object):
         # type: (unicode, unicode, List[unicode], unicode, bool, bool) -> None
         # pylint: disable=too-many-arguments
         """Create a MethodInfo instance."""
-        self._class_name = class_name
-        self._method_name = method_name
-        self._args = args
-        self._return_type = return_type
-        self._static = static
-        self._const = const
+        self.class_name = class_name
+        self.method_name = method_name
+        self.args = [ArgumentInfo(arg) for arg in args]
+        self.return_type = return_type
+        self.static = static
+        self.const = const
 
     def get_declaration(self):
         # type: () -> unicode
@@ -45,21 +61,21 @@ class MethodInfo(object):
         post_modifiers = ''
         return_type_str = ''
 
-        if self._static:
+        if self.static:
             pre_modifiers = 'static '
 
-        if self._const:
+        if self.const:
             post_modifiers = ' const'
 
-        if self._return_type:
-            return_type_str = self._return_type + ' '
+        if self.return_type:
+            return_type_str = self.return_type + ' '
 
         return common.template_args(
             "${pre_modifiers}${return_type}${method_name}(${args})${post_modifiers};",
             pre_modifiers=pre_modifiers,
             return_type=return_type_str,
-            method_name=self._method_name,
-            args=', '.join(self._args),
+            method_name=self.method_name,
+            args=', '.join([str(arg) for arg in self.args]),
             post_modifiers=post_modifiers)
 
     def get_definition(self):
@@ -69,36 +85,33 @@ class MethodInfo(object):
         post_modifiers = ''
         return_type_str = ''
 
-        if self._const:
+        if self.const:
             post_modifiers = ' const'
 
-        if self._return_type:
-            return_type_str = self._return_type + ' '
+        if self.return_type:
+            return_type_str = self.return_type + ' '
 
         return common.template_args(
             "${pre_modifiers}${return_type}${class_name}::${method_name}(${args})${post_modifiers}",
             pre_modifiers=pre_modifiers,
             return_type=return_type_str,
-            class_name=self._class_name,
-            method_name=self._method_name,
-            args=', '.join(self._args),
+            class_name=self.class_name,
+            method_name=self.method_name,
+            args=', '.join([str(arg) for arg in self.args]),
             post_modifiers=post_modifiers)
 
     def get_call(self, obj):
         # type: (Optional[unicode]) -> unicode
         """Generate a simply call to the method using the defined args list."""
 
-        args = ', '.join([a.split(' ')[-1] for a in self._args])
+        args = ', '.join([arg.name for arg in self.args])
 
         if obj:
             return common.template_args(
-                "${obj}.${method_name}(${args});",
-                obj=obj,
-                method_name=self._method_name,
-                args=args)
+                "${obj}.${method_name}(${args});", obj=obj, method_name=self.method_name, args=args)
 
         return common.template_args(
-            "${method_name}(${args});", method_name=self._method_name, args=args)
+            "${method_name}(${args});", method_name=self.method_name, args=args)
 
 
 class StructTypeInfoBase(object):
@@ -161,27 +174,28 @@ class _StructTypeInfo(StructTypeInfoBase):
     def __init__(self, struct):
         # type: (ast.Struct) -> None
         """Create a _StructTypeInfo instance."""
-        self._struct = struct
+        self.struct = struct
 
     def get_constructor_method(self):
         # type: () -> MethodInfo
-        pass
+        class_name = common.title_case(self.struct.name)
+        return MethodInfo(class_name, class_name, [])
 
     def get_serializer_method(self):
         # type: () -> MethodInfo
         return MethodInfo(
-            common.title_case(self._struct.name),
+            common.title_case(self.struct.name),
             'serialize', ['BSONObjBuilder* builder'],
             'void',
             const=True)
 
     def get_to_bson_method(self):
         # type: () -> MethodInfo
-        return MethodInfo(common.title_case(self._struct.name), 'toBSON', [], 'BSONObj', const=True)
+        return MethodInfo(common.title_case(self.struct.name), 'toBSON', [], 'BSONObj', const=True)
 
     def get_deserializer_static_method(self):
         # type: () -> MethodInfo
-        class_name = common.title_case(self._struct.name)
+        class_name = common.title_case(self.struct.name)
         return MethodInfo(
             class_name,
             'parse', ['const IDLParserErrorContext& ctxt', 'const BSONObj& bsonObject'],
@@ -191,7 +205,7 @@ class _StructTypeInfo(StructTypeInfoBase):
     def get_deserializer_method(self):
         # type: () -> MethodInfo
         return MethodInfo(
-            common.title_case(self._struct.name), 'parseProtected',
+            common.title_case(self.struct.name), 'parseProtected',
             ['const IDLParserErrorContext& ctxt', 'const BSONObj& bsonObject'], 'void')
 
     def gen_getter_method(self, indented_writer):
@@ -213,7 +227,7 @@ class _IgnoredCommandTypeInfo(_StructTypeInfo):
     def __init__(self, command):
         # type: (ast.Command) -> None
         """Create a _IgnoredCommandTypeInfo instance."""
-        self._command = command
+        self.command = command
 
         super(_IgnoredCommandTypeInfo, self).__init__(command)
 
@@ -243,7 +257,7 @@ class _IgnoredCommandTypeInfo(_StructTypeInfo):
 
     def gen_serializer(self, indented_writer):
         # type: (writer.IndentedTextWriter) -> None
-        indented_writer.write_line('builder->append("%s", 1);' % (self._command.name))
+        indented_writer.write_line('builder->append("%s", 1);' % (self.command.name))
 
 
 class _CommandWithNamespaceTypeInfo(_StructTypeInfo):
@@ -252,20 +266,20 @@ class _CommandWithNamespaceTypeInfo(_StructTypeInfo):
     def __init__(self, command):
         # type: (ast.Command) -> None
         """Create a _CommandWithNamespaceTypeInfo instance."""
-        self._command = command
+        self.command = command
 
         super(_CommandWithNamespaceTypeInfo, self).__init__(command)
 
     def get_constructor_method(self):
         # type: () -> MethodInfo
-        class_name = common.title_case(self._struct.name)
+        class_name = common.title_case(self.struct.name)
         return MethodInfo(class_name, class_name, ['const NamespaceString& nss'])
 
     def get_serializer_method(self):
         # type: () -> MethodInfo
         # Commands that require namespaces require it as a parameter to serialize()
         return MethodInfo(
-            common.title_case(self._struct.name),
+            common.title_case(self.struct.name),
             'serialize', ['BSONObjBuilder* builder'],
             'void',
             const=True)
@@ -273,12 +287,12 @@ class _CommandWithNamespaceTypeInfo(_StructTypeInfo):
     def get_to_bson_method(self):
         # type: () -> MethodInfo
         # Commands that require namespaces require it as a parameter to serialize()
-        return MethodInfo(common.title_case(self._struct.name), 'toBSON', [], 'BSONObj', const=True)
+        return MethodInfo(common.title_case(self.struct.name), 'toBSON', [], 'BSONObj', const=True)
 
     def get_deserializer_static_method(self):
         # type: () -> MethodInfo
         # Commands that have concatentate_with_db namespaces require db name as a parameter
-        class_name = common.title_case(self._struct.name)
+        class_name = common.title_case(self.struct.name)
         return MethodInfo(
             class_name,
             'parse',
@@ -290,7 +304,7 @@ class _CommandWithNamespaceTypeInfo(_StructTypeInfo):
         # type: () -> MethodInfo
         # Commands that have concatentate_with_db namespaces require db name as a parameter
         return MethodInfo(
-            common.title_case(self._struct.name), 'parseProtected',
+            common.title_case(self.struct.name), 'parseProtected',
             ['const IDLParserErrorContext& ctxt', 'StringData dbName',
              'const BSONObj& bsonObject'], 'void')
 
@@ -304,7 +318,7 @@ class _CommandWithNamespaceTypeInfo(_StructTypeInfo):
 
     def gen_serializer(self, indented_writer):
         # type: (writer.IndentedTextWriter) -> None
-        indented_writer.write_line('builder->append("%s", _nss.coll());' % (self._command.name))
+        indented_writer.write_line('builder->append("%s", _nss.coll());' % (self.command.name))
         indented_writer.write_empty_line()
 
 
