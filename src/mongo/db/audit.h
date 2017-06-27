@@ -36,6 +36,7 @@
 #include "mongo/base/error_codes.h"
 #include "mongo/db/auth/privilege.h"
 #include "mongo/db/auth/user.h"
+#include "mongo/util/net/op_msg.h"
 
 namespace mongo {
 
@@ -69,8 +70,7 @@ void logAuthentication(Client* client,
  * Logs the result of a command authorization check.
  */
 void logCommandAuthzCheck(Client* client,
-                          const std::string& dbname,
-                          const BSONObj& cmdObj,
+                          const OpMsgRequest& cmdObj,
                           CommandInterface* command,
                           ErrorCodes::Error result);
 

@@ -321,8 +321,7 @@ Status Command::checkAuthorization(Command* c,
     if (!status.isOK()) {
         log(LogComponent::kAccessControl) << status;
     }
-    audit::logCommandAuthzCheck(
-        opCtx->getClient(), request.getDatabase().toString(), request.body, c, status.code());
+    audit::logCommandAuthzCheck(opCtx->getClient(), request, c, status.code());
     return status;
 }
 

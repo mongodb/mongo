@@ -44,8 +44,7 @@ void logAuthentication(Client* client,
                        ErrorCodes::Error result) MONGO_AUDIT_STUB
 
     void logCommandAuthzCheck(Client* client,
-                              const std::string& dbname,
-                              const BSONObj& cmdObj,
+                              const OpMsgRequest& cmdObj,
                               CommandInterface* command,
                               ErrorCodes::Error result) MONGO_AUDIT_STUB
 
