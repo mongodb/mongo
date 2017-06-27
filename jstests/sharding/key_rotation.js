@@ -3,6 +3,9 @@
  * - that a sharded cluster with no keys inserts new keys after startup.
  * - responses from servers in a sharded cluster contain a logical time object with a signature.
  * - manual key rotation is possible by deleting existing keys and restarting the cluster.
+ *
+ * Manual key rotation requires restarting a shard, so a persistent storage engine is necessary.
+ * @tags: [requires_persistence]
  */
 (function() {
     "use strict";
