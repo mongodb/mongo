@@ -28,6 +28,8 @@
 
 #pragma once
 
+#include "mongo/db/service_context.h"
+#include "mongo/db/service_context_noop.h"
 #include "mongo/db/service_liason.h"
 #include "mongo/executor/async_timer_mock.h"
 #include "mongo/platform/atomic_word.h"
@@ -101,8 +103,14 @@ public:
         return _impl->join();
     }
 
+protected:
+    ServiceContext* _context() override {
+        return _serviceContext.get();
+    }
+
 private:
     std::shared_ptr<MockServiceLiasonImpl> _impl;
+    std::unique_ptr<ServiceContextNoop> _serviceContext;
 };
 
 }  // namespace mongo

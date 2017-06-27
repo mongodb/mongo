@@ -30,6 +30,7 @@
 
 #include "mongo/db/logical_session_id.h"
 #include "mongo/db/logical_session_record.h"
+#include "mongo/db/signed_logical_session_id.h"
 
 namespace mongo {
 
@@ -44,10 +45,10 @@ public:
     virtual ~SessionsCollection();
 
     /**
-     * Returns a LogicalSessionRecord for the given LogicalSessionId. This method
+     * Returns a LogicalSessionRecord for the given session id. This method
      * may run networking operations on the calling thread.
      */
-    virtual StatusWith<LogicalSessionRecord> fetchRecord(LogicalSessionId lsid) = 0;
+    virtual StatusWith<LogicalSessionRecord> fetchRecord(SignedLogicalSessionId id) = 0;
 
     /**
      * Inserts the given record into the sessions collection. This method may run

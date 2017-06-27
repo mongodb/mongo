@@ -59,7 +59,7 @@ public:
 
     MockSessionsCollectionImpl();
 
-    using FetchHook = stdx::function<StatusWith<LogicalSessionRecord>(LogicalSessionId)>;
+    using FetchHook = stdx::function<StatusWith<LogicalSessionRecord>(SignedLogicalSessionId)>;
     using InsertHook = stdx::function<Status(LogicalSessionRecord)>;
     using RefreshHook = stdx::function<LogicalSessionIdSet(LogicalSessionIdSet)>;
     using RemoveHook = stdx::function<void(LogicalSessionIdSet)>;
@@ -74,7 +74,7 @@ public:
     void clearHooks();
 
     // Forwarding methods from the MockSessionsCollection
-    StatusWith<LogicalSessionRecord> fetchRecord(LogicalSessionId lsid);
+    StatusWith<LogicalSessionRecord> fetchRecord(SignedLogicalSessionId id);
     Status insertRecord(LogicalSessionRecord record);
     LogicalSessionIdSet refreshSessions(LogicalSessionIdSet sessions);
     void removeRecords(LogicalSessionIdSet sessions);
@@ -88,7 +88,7 @@ public:
 
 private:
     // Default implementations, may be overridden with custom hooks.
-    StatusWith<LogicalSessionRecord> _fetchRecord(LogicalSessionId lsid);
+    StatusWith<LogicalSessionRecord> _fetchRecord(SignedLogicalSessionId id);
     Status _insertRecord(LogicalSessionRecord record);
     LogicalSessionIdSet _refreshSessions(LogicalSessionIdSet sessions);
     void _removeRecords(LogicalSessionIdSet sessions);
@@ -112,8 +112,8 @@ public:
     explicit MockSessionsCollection(std::shared_ptr<MockSessionsCollectionImpl> impl)
         : _impl(std::move(impl)) {}
 
-    StatusWith<LogicalSessionRecord> fetchRecord(LogicalSessionId lsid) override {
-        return _impl->fetchRecord(std::move(lsid));
+    StatusWith<LogicalSessionRecord> fetchRecord(SignedLogicalSessionId id) override {
+        return _impl->fetchRecord(std::move(id));
     }
 
     Status insertRecord(LogicalSessionRecord record) override {

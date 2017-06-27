@@ -26,43 +26,32 @@
  *    it in the license file.
  */
 
-#pragma once
+#include "mongo/platform/basic.h"
 
-#include "mongo/db/logical_session_id.h"
-#include "mongo/db/operation_context.h"
-#include "mongo/db/service_liason.h"
-#include "mongo/util/periodic_runner.h"
-#include "mongo/util/time_support.h"
+#include "mongo/db/keys_collection_manager_zero.h"
+
+#include "mongo/db/keys_collection_document.h"
 
 namespace mongo {
 
-/**
- * This is the service liason to mongod for the logical session cache.
- *
- * This class will return active sessions for cursors stored in the
- * global cursor manager and cursors in per-collection managers. This
- * class will also walk the service context to find all sessions for
- * currently-running operations on this server.
- *
- * Job scheduling on this class will be handled behind the scenes by a
- * periodic runner for this mongod. The time will be returned from the
- * system clock.
- */
-class ServiceLiasonMongod : public ServiceLiason {
-public:
-    LogicalSessionIdSet getActiveSessions() const override;
+namespace {
 
-    void scheduleJob(PeriodicRunner::PeriodicJob job) override;
+const TimeProofService::Key kTimeProofServiceKey{};
+const long long kKeyId = 1;
 
-    void join() override;
+}  // namespace
 
-    Date_t now() const override;
+KeysCollectionManagerZero::KeysCollectionManagerZero(std::string purpose)
+    : _purpose(std::move(purpose)) {}
 
-protected:
-    /**
-     * Returns the service context.
-     */
-    ServiceContext* _context() override;
-};
+StatusWith<KeysCollectionDocument> KeysCollectionManagerZero::getKeyForValidation(
+    OperationContext* opCtx, long long keyId, const LogicalTime& forThisTime) {
+    return KeysCollectionDocument(keyId, _purpose, kTimeProofServiceKey, forThisTime);
+}
+
+StatusWith<KeysCollectionDocument> KeysCollectionManagerZero::getKeyForSigning(
+    OperationContext* opCtx, const LogicalTime& forThisTime) {
+    return KeysCollectionDocument(kKeyId, _purpose, kTimeProofServiceKey, forThisTime);
+}
 
 }  // namespace mongo

@@ -32,10 +32,8 @@
 #include <utility>
 
 #include "mongo/bson/bsonobj.h"
-#include "mongo/bson/oid.h"
-#include "mongo/db/auth/user_name.h"
-#include "mongo/db/logical_session_id.h"
 #include "mongo/db/logical_session_record_gen.h"
+#include "mongo/db/signed_logical_session_id.h"
 #include "mongo/util/time_support.h"
 
 namespace mongo {
@@ -46,17 +44,12 @@ namespace mongo {
  * The BSON representation of a session record follows this form:
  *
  * {
- *    lsid    : LogicalSessionId,
- *    lastUse : Date_t,
- *    owner   : {
- *        user   : UserName,
- *        userId : OID
- *    }
+ *    lsid    : SignedLogicalSessionId,
+ *    lastUse : Date_t
+ * }
  */
 class LogicalSessionRecord : public Logical_session_record {
 public:
-    using Owner = std::pair<UserName, boost::optional<OID>>;
-
     /**
      * Constructs and returns a LogicalSessionRecord from a BSON representation,
      * or throws an error. For IDL.
@@ -69,10 +62,7 @@ public:
      * only be used when the caller is intending to make a new authoritative
      * record and subsequently insert that record into the sessions collection.
      */
-    static LogicalSessionRecord makeAuthoritativeRecord(LogicalSessionId id,
-                                                        UserName user,
-                                                        boost::optional<OID> userId,
-                                                        Date_t now);
+    static LogicalSessionRecord makeAuthoritativeRecord(SignedLogicalSessionId id, Date_t now);
 
     /**
      * Return a BSON representation of this session record.
@@ -85,34 +75,17 @@ public:
     std::string toString() const;
 
     inline bool operator==(const LogicalSessionRecord& rhs) const {
-        return getLsid() == rhs.getLsid() && getSessionOwner() == rhs.getSessionOwner();
+        return getSignedLsid() == rhs.getSignedLsid();
     }
 
     inline bool operator!=(const LogicalSessionRecord& rhs) const {
         return !(*this == rhs);
     }
 
-    /**
-     * Return the username and id of the User who owns this session. Only a User
-     * that matches both the name and id returned by this method should be
-     * permitted to use this session.
-     *
-     * Note: if the returned optional OID is set to boost::none, this implies that
-     * the owning user is a pre-3.6 user that has no id. In this case, only a User
-     * with a matching UserName who also has an unset optional id should be
-     * permitted to use this session.
-     */
-    Owner getSessionOwner() const;
-
 private:
     LogicalSessionRecord() = default;
 
-    LogicalSessionRecord(LogicalSessionId id,
-                         UserName user,
-                         boost::optional<OID> userId,
-                         Date_t now);
-
-    Owner _owner;
+    LogicalSessionRecord(SignedLogicalSessionId id, Date_t now);
 };
 
 inline std::ostream& operator<<(std::ostream& s, const LogicalSessionRecord& record) {

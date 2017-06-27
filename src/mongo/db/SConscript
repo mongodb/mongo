@@ -448,6 +448,7 @@ env.Library(
         'operation_context_group.cpp'
     ],
     LIBDEPS=[
+        '$BUILD_DIR/mongo/db/logical_session_id',
         '$BUILD_DIR/mongo/util/clock_sources',
         '$BUILD_DIR/mongo/util/concurrency/spin_lock',
         '$BUILD_DIR/mongo/util/decorable',
@@ -455,7 +456,6 @@ env.Library(
         '$BUILD_DIR/mongo/util/net/network',
         '$BUILD_DIR/mongo/util/periodic_runner',
         '$BUILD_DIR/mongo/transport/transport_layer_common',
-        'logical_session_cache',
     ],
 )
 
@@ -894,6 +894,32 @@ env.CppUnitTest(
 )
 
 env.Library(
+    target='signed_logical_session_id',
+    source=[
+        'signed_logical_session_id.cpp',
+        env.Idlc('signed_logical_session_id.idl')[0],
+    ],
+    LIBDEPS=[
+        '$BUILD_DIR/mongo/base',
+        '$BUILD_DIR/mongo/crypto/sha1_block',
+        '$BUILD_DIR/mongo/idl/idl_parser',
+        '$BUILD_DIR/mongo/util/uuid',
+        'logical_session_id'
+    ],
+)
+
+env.CppUnitTest(
+    target='signed_logical_session_id_test',
+    source=[
+        'signed_logical_session_id_test.cpp',
+    ],
+    LIBDEPS=[
+        '$BUILD_DIR/mongo/base',
+        'signed_logical_session_id',
+    ],
+)
+
+env.Library(
     target='logical_session_record',
     source=[
         'logical_session_record.cpp',
@@ -903,7 +929,8 @@ env.Library(
         '$BUILD_DIR/mongo/base',
         '$BUILD_DIR/mongo/db/auth/user_name',
         '$BUILD_DIR/mongo/idl/idl_parser',
-        'logical_session_id'
+        'logical_session_id',
+        'signed_logical_session_id',
     ],
 )
 
@@ -925,6 +952,12 @@ env.Library(
         'service_liason.cpp',
     ],
     LIBDEPS=[
+        '$BUILD_DIR/mongo/crypto/sha1_block',
+        'keys_collection_document',
+        'keys_collection_manager',
+        'keys_collection_manager_zero',
+        'logical_clock',
+        'signed_logical_session_id',
     ],
 )
 
@@ -985,6 +1018,7 @@ env.Library(
         'logical_session_cache.cpp',
     ],
     LIBDEPS=[
+        'logical_session_id',
         'logical_session_record',
         'sessions_collection',
         'server_parameters',
@@ -1000,9 +1034,13 @@ envWithAsio.CppUnitTest(
     LIBDEPS=[
         '$BUILD_DIR/mongo/db/service_context_noop_init',
         '$BUILD_DIR/mongo/executor/async_timer_mock',
+        'keys_collection_manager',
+        'keys_collection_document',
+        'logical_clock',
         'logical_session_cache',
         'service_liason_mock',
         'sessions_collection_mock',
+        'signed_logical_session_id',
     ],
 )
 
@@ -1079,12 +1117,46 @@ env.Library(
     target='keys_collection_manager',
     source=[
         'keys_collection_manager.cpp',
+    ],
+    LIBDEPS=[
+    ],
+)
+
+env.Library(
+    target='keys_collection_manager_direct',
+    source=[
+        'keys_collection_manager_direct.cpp',
+    ],
+    LIBDEPS=[
+        'dbdirectclient',
+        'keys_collection_manager',
+        'logical_clock',
+        'logical_time',
+    ],
+)
+
+env.Library(
+    target='keys_collection_manager_zero',
+    source=[
+        'keys_collection_manager_zero.cpp',
+    ],
+    LIBDEPS=[
+        'keys_collection_manager',
+        'logical_time',
+    ],
+)
+
+env.Library(
+    target='keys_collection_manager_sharding',
+    source=[
+        'keys_collection_manager_sharding.cpp',
         'keys_collection_cache_reader.cpp',
         'keys_collection_cache_reader_and_updater.cpp',
     ],
     LIBDEPS=[
         'logical_clock',
         'keys_collection_document',
+        'keys_collection_manager',
         'logical_time',
         'server_options',
         '$BUILD_DIR/mongo/s/catalog/sharding_catalog_client',
@@ -1109,7 +1181,7 @@ env.Library(
         'logical_time_validator.cpp',
     ],
     LIBDEPS=[
-        'keys_collection_manager',
+        'keys_collection_manager_sharding',
         'service_context',
         'signed_logical_time',
         'time_proof_service',
@@ -1167,6 +1239,7 @@ env.CppUnitTest(
         'logical_time_validator_test.cpp',
     ],
     LIBDEPS=[
+        'keys_collection_manager_sharding',
         'logical_time_validator',
         '$BUILD_DIR/mongo/s/config_server_test_fixture',
         '$BUILD_DIR/mongo/s/coreshard',
@@ -1233,12 +1306,12 @@ env.CppUnitTest(
 )
 
 env.CppUnitTest(
-    target='keys_collection_manager_test',
+    target='keys_collection_manager_sharding_test',
     source=[
-        'keys_collection_manager_test.cpp',
+        'keys_collection_manager_sharding_test.cpp',
     ],
     LIBDEPS=[
-        'keys_collection_manager',
+        'keys_collection_manager_sharding',
         '$BUILD_DIR/mongo/s/config_server_test_fixture',
     ],
 )

@@ -73,6 +73,7 @@
 #include "mongo/db/initialize_snmp.h"
 #include "mongo/db/introspect.h"
 #include "mongo/db/json.h"
+#include "mongo/db/keys_collection_manager.h"
 #include "mongo/db/log_process_details.h"
 #include "mongo/db/logical_clock.h"
 #include "mongo/db/logical_session_cache.h"
@@ -724,7 +725,7 @@ ExitCode _initAndListen(int listenPort) {
     }
 
     auto sessionCache = makeLogicalSessionCacheD(kind);
-    globalServiceContext->setLogicalSessionCache(std::move(sessionCache));
+    LogicalSessionCache::set(globalServiceContext, std::move(sessionCache));
 
     // MessageServer::run will return when exit code closes its socket and we don't need the
     // operation context anymore

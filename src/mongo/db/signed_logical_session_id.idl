@@ -13,36 +13,38 @@
 # along with this program.  If not, see <http://www.gnu.org/licenses/>.
 #
 
-# This IDL file describes the BSON format for a LogicalSessionRecord, and
+# This IDL file describes the BSON format for a LogicalSessionId, and
 # handles the serialization to and deserialization from its BSON representation
 # for that class.
 
 global:
   cpp_namespace: "mongo"
   cpp_includes:
+    - "mongo/util/uuid.h"
     - "mongo/db/logical_session_id.h"
-    - "mongo/db/signed_logical_session_id.h"
 
 imports:
+  - "mongo/crypto/sha1_block.idl"
+  - "mongo/db/logical_session_id.idl"
   - "mongo/idl/basic_types.idl"
-  - "mongo/db/signed_logical_session_id.idl"
 
 types:
-  SignedLogicalSessionIdIDL:
-    description: "IDL representation of the SignedLogicalSessionId cpp type"
+  LogicalSessionIdIdl:
+    description: "IDL representation of the LogicalSessionId cpp type"
     bson_serialization_type: object
-    cpp_type: "mongo::SignedLogicalSessionId"
-    deserializer: "mongo::SignedLogicalSessionId::parse"
-    serializer: "mongo::SignedLogicalSessionId::toBSON"
+    cpp_type: "mongo::LogicalSessionId"
+    deserializer: "mongo::LogicalSessionId::parse"
+    serializer: "mongo::LogicalSessionId::toBSON"
 
 structs:
 
-  logical_session_record:
-    description: "A struct representing a LogicalSessionRecord"
+  signed_logical_session_id:
+    description: "A struct representing a SignedLogicalSessionId"
+    strict: true
     fields:
-      signedLsid:
-        description: "The id for this session record"
-        type: SignedLogicalSessionIdIDL
-      lastUse:
-        description: "The time at which this record was last used. Note: the date expressed in this in-memory record object may not match the date on the authoritative record for this session, which is stored in the sessions collection."
-        type: date
+      lsid: LogicalSessionIdIdl
+      userId:
+        optional: true
+        type: objectid
+      keyId: long
+      signature: sha1Block

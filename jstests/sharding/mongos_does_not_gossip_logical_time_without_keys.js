@@ -38,8 +38,7 @@
         assert.commandWorked(st.configRS.nodes[i].adminCommand(
             {"configureFailPoint": "disableKeyGeneration", "mode": "alwaysOn"}));
     }
-    let res =
-        st.configRS.getPrimary().getDB("admin").system.keys.remove({purpose: "SigningClusterTime"});
+    let res = st.configRS.getPrimary().getDB("admin").system.keys.remove({purpose: "HMAC"});
     assert(res.nRemoved >= 2);
     assert(st.s.getDB("admin").system.keys.count() == 0,
            "expected there to be no keys on the config server");

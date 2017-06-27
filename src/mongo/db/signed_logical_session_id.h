@@ -31,47 +31,53 @@
 #include <string>
 
 #include "mongo/base/status_with.h"
-#include "mongo/db/logical_session_id_gen.h"
+#include "mongo/bson/oid.h"
+#include "mongo/db/logical_session_id.h"
+#include "mongo/db/signed_logical_session_id_gen.h"
 #include "mongo/stdx/unordered_set.h"
 #include "mongo/util/uuid.h"
 
 namespace mongo {
 
-using TxnNumber = std::int64_t;
-using StmtId = std::int32_t;
-
-const StmtId kUninitializedStmtId = -1;
-const TxnNumber kUninitializedTxnNumber = -1;
-
 class BSONObjBuilder;
+class OperationContext;
 
 /**
- * A 128-bit unique identifier for a logical session.
+ * An identifier for a logical session. A LogicalSessionId has the following components:
+ *
+ * - A 128-bit unique identifier (UUID)
+ * - An optional user id (ObjectId)
+ * - A key id (long long)
+ * - An HMAC signature (SHA1Block)
  */
-class LogicalSessionId : public Logical_session_id {
+class SignedLogicalSessionId : public Signed_logical_session_id {
 public:
-    LogicalSessionId();
-    LogicalSessionId(Logical_session_id&& lsid);
+    using Owner = boost::optional<OID>;
 
     friend class Logical_session_id;
     friend class Logical_session_record;
-    friend class SignedLogicalSessionId;
+
+    using keyIdType = long long;
 
     /**
-     * Create and return a new LogicalSessionId with a random UUID.
+     * Create and return a new LogicalSessionId with a random UUID. This method
+     * should be used for testing only. The generated SignedLogicalSessionId will
+     * not be signed, and will have no owner.
      */
-    static LogicalSessionId gen();
+    static SignedLogicalSessionId gen();
 
     /**
-     * If the given string represents a valid UUID, constructs and returns
-     * a new LogicalSessionId. Otherwise returns an error.
+     * Creates a new SignedLogicalSessionId.
      */
-    static StatusWith<LogicalSessionId> parse(const std::string& s);
+    SignedLogicalSessionId(LogicalSessionId lsid,
+                           boost::optional<OID> userId,
+                           long long keyId,
+                           SHA1Block signature);
 
     /**
      * Constructs a new LogicalSessionId out of a BSONObj. For IDL.
      */
-    static LogicalSessionId parse(const BSONObj& doc);
+    static SignedLogicalSessionId parse(const BSONObj& doc);
 
     /**
      * Returns a string representation of this session id.
@@ -83,46 +89,27 @@ public:
      */
     BSONObj toBSON() const;
 
-    inline bool operator==(const LogicalSessionId& rhs) const {
-        return getId() == rhs.getId();
+    inline bool operator==(const SignedLogicalSessionId& rhs) const {
+        return getLsid() == rhs.getLsid() && getUserId() == rhs.getUserId() &&
+            getKeyId() == rhs.getKeyId() && getSignature() == rhs.getSignature();
     }
 
-    inline bool operator!=(const LogicalSessionId& rhs) const {
+    inline bool operator!=(const SignedLogicalSessionId& rhs) const {
         return !(*this == rhs);
     }
 
     /**
-     * Custom hasher so LogicalSessionIds can be used in unordered data structures.
-     *
-     * ex: std::unordered_set<LogicalSessionId, LogicalSessionId::Hash> lsidSet;
+     * This constructor exists for IDL only.
      */
-    struct Hash {
-        std::size_t operator()(const LogicalSessionId& lsid) const {
-            return _hasher(lsid.getId());
-        }
-
-    private:
-        UUID::Hash _hasher;
-    };
-
-private:
-    /**
-     * Construct a LogicalSessionId from a UUID.
-     */
-    LogicalSessionId(UUID id);
+    SignedLogicalSessionId();
 };
 
-inline std::ostream& operator<<(std::ostream& s, const LogicalSessionId& lsid) {
+inline std::ostream& operator<<(std::ostream& s, const SignedLogicalSessionId& lsid) {
     return (s << lsid.toString());
 }
 
-inline StringBuilder& operator<<(StringBuilder& s, const LogicalSessionId& lsid) {
+inline StringBuilder& operator<<(StringBuilder& s, const SignedLogicalSessionId& lsid) {
     return (s << lsid.toString());
 }
-
-/**
- * An alias for sets of session ids.
- */
-using LogicalSessionIdSet = stdx::unordered_set<LogicalSessionId, LogicalSessionId::Hash>;
 
 }  // namespace mongo

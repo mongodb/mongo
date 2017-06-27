@@ -31,7 +31,8 @@
 #include <vector>
 
 #include "mongo/base/disallow_copying.h"
-#include "mongo/db/logical_session_cache.h"
+#include "mongo/db/keys_collection_manager.h"
+#include "mongo/db/logical_session_id.h"
 #include "mongo/db/storage/storage_engine.h"
 #include "mongo/platform/atomic_word.h"
 #include "mongo/platform/unordered_set.h"
@@ -266,6 +267,28 @@ public:
     virtual StorageEngine* getGlobalStorageEngine() = 0;
 
     //
+    // Key manager, for HMAC keys.
+    //
+
+    /**
+     * Sets the key manager on this service context.
+     */
+    void setKeyManager(std::shared_ptr<KeysCollectionManager> keyManager) & {
+        stdx::lock_guard<stdx::mutex> lk(_mutex);
+        _keyManager = std::move(keyManager);
+    }
+
+    /**
+     * Returns a pointer to the keys collection manager owned by this service context.
+     */
+    std::shared_ptr<KeysCollectionManager> getKeyManager() & {
+        stdx::lock_guard<stdx::mutex> lk(_mutex);
+        return _keyManager;
+    }
+
+    std::shared_ptr<KeysCollectionManager> getKeyManager() && = delete;
+
+    //
     // Global operation management.  This may not belong here and there may be too many methods
     // here.
     //
@@ -327,21 +350,6 @@ public:
      * Returns a pointer to the global periodic runner owned by this service context.
      */
     PeriodicRunner* getPeriodicRunner() const;
-
-    //
-    // Logical sessions.
-    //
-
-    /**
-     * Set the logical session cache on this service context.
-     */
-    void setLogicalSessionCache(std::unique_ptr<LogicalSessionCache> cache) &;
-
-    /**
-     * Return a pointer to the logical session cache on this service context.
-     */
-    LogicalSessionCache* getLogicalSessionCache() const&;
-    LogicalSessionCache* getLogicalSessionCache() && = delete;
 
     //
     // Transport.
@@ -459,14 +467,14 @@ private:
     void _killOperation_inlock(OperationContext* opCtx, ErrorCodes::Error killCode);
 
     /**
+     * The key manager.
+     */
+    std::shared_ptr<KeysCollectionManager> _keyManager;
+
+    /**
      * The periodic runner.
      */
     std::unique_ptr<PeriodicRunner> _runner;
-
-    /**
-     * The logical session cache.
-     */
-    std::unique_ptr<LogicalSessionCache> _sessionCache;
 
     /**
      * The TransportLayer.

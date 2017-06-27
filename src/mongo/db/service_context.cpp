@@ -161,15 +161,6 @@ PeriodicRunner* ServiceContext::getPeriodicRunner() const {
     return _runner.get();
 }
 
-void ServiceContext::setLogicalSessionCache(std::unique_ptr<LogicalSessionCache> cache)& {
-    invariant(!_sessionCache);
-    _sessionCache = std::move(cache);
-}
-
-LogicalSessionCache* ServiceContext::getLogicalSessionCache() const& {
-    return _sessionCache.get();
-}
-
 transport::TransportLayer* ServiceContext::getTransportLayer() const {
     return _transportLayer.get();
 }

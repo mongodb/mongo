@@ -30,6 +30,7 @@
 
 #include "mongo/bson/timestamp.h"
 #include "mongo/db/keys_collection_manager.h"
+#include "mongo/db/keys_collection_manager_sharding.h"
 #include "mongo/db/logical_clock.h"
 #include "mongo/db/logical_time.h"
 #include "mongo/db/logical_time_validator.h"
@@ -70,10 +71,9 @@ protected:
         const LogicalTime currentTime(LogicalTime(Timestamp(1, 0)));
         LogicalClock::get(operationContext())->setClusterTimeFromTrustedSource(currentTime);
 
-        auto keyManager =
-            stdx::make_unique<KeysCollectionManager>("dummy", catalogClient, Seconds(1000));
-        _keyManager = keyManager.get();
-        _validator = stdx::make_unique<LogicalTimeValidator>(std::move(keyManager));
+        _keyManager =
+            std::make_shared<KeysCollectionManagerSharding>("dummy", catalogClient, Seconds(1000));
+        _validator = stdx::make_unique<LogicalTimeValidator>(_keyManager);
         _validator->init(operationContext()->getServiceContext());
     }
 
@@ -97,7 +97,7 @@ protected:
 
 private:
     std::unique_ptr<LogicalTimeValidator> _validator;
-    KeysCollectionManager* _keyManager;
+    std::shared_ptr<KeysCollectionManagerSharding> _keyManager;
 };
 
 TEST_F(LogicalTimeValidatorTest, GetTimeWithIncreasingTimes) {
@@ -133,7 +133,7 @@ TEST_F(LogicalTimeValidatorTest, ValidateErrorsOnInvalidTime) {
     refreshKeyManager();
     auto newTime = validator()->trySignLogicalTime(t1);
 
-    TimeProofService::TimeProof invalidProof = {{1, 2, 3}};
+    TimeProofService::TimeProof invalidProof = {{{1, 2, 3}}};
     SignedLogicalTime invalidTime(LogicalTime(Timestamp(30, 0)), invalidProof, newTime.getKeyId());
     // ASSERT_THROWS_CODE(validator()->validate(operationContext(), invalidTime), DBException,
     // ErrorCodes::TimeProofMismatch);
@@ -156,7 +156,7 @@ TEST_F(LogicalTimeValidatorTest, ValidateErrorsOnInvalidTimeWithImplicitRefresh)
     LogicalTime t1(Timestamp(20, 0));
     auto newTime = validator()->signLogicalTime(operationContext(), t1);
 
-    TimeProofService::TimeProof invalidProof = {{1, 2, 3}};
+    TimeProofService::TimeProof invalidProof = {{{1, 2, 3}}};
     SignedLogicalTime invalidTime(LogicalTime(Timestamp(30, 0)), invalidProof, newTime.getKeyId());
     // ASSERT_THROWS_CODE(validator()->validate(operationContext(), invalidTime), DBException,
     // ErrorCodes::TimeProofMismatch);

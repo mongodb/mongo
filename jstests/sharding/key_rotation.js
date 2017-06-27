@@ -42,8 +42,7 @@
     }
 
     // Delete all existing keys.
-    res =
-        st.configRS.getPrimary().getDB("admin").system.keys.remove({purpose: "SigningClusterTime"});
+    res = st.configRS.getPrimary().getDB("admin").system.keys.remove({purpose: "HMAC"});
     assert(res.nRemoved >= 2);
     assert(st.s.getDB("admin").system.keys.find().count() == 0);
 

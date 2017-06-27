@@ -31,7 +31,9 @@
 #include <array>
 #include <cstddef>
 #include <string>
+#include <vector>
 
+#include "mongo/base/data_range.h"
 #include "mongo/base/status_with.h"
 
 namespace mongo {
@@ -85,6 +87,10 @@ public:
 
     uint8_t* data() const&& = delete;
 
+    ConstDataRange toCDR() const {
+        return ConstDataRange(reinterpret_cast<const char*>(_hash.data()), kHashLength);
+    }
+
     size_t size() const {
         return _hash.size();
     }
@@ -93,6 +99,11 @@ public:
      * Make a new SHA1Block from a BSON BinData value.
      */
     static StatusWith<SHA1Block> fromBinData(const BSONBinData& binData);
+
+    /**
+     * Make a new SHA1Block from a vector of bytes representing bindata. For IDL.
+     */
+    static SHA1Block fromBinData(std::vector<unsigned char> bytes);
 
     /**
      * Append this to a builder using the given name as a BSON BinData type value.

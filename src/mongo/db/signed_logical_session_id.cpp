@@ -26,43 +26,48 @@
  *    it in the license file.
  */
 
-#pragma once
+#include "mongo/platform/basic.h"
 
-#include "mongo/db/logical_session_id.h"
-#include "mongo/db/operation_context.h"
-#include "mongo/db/service_liason.h"
-#include "mongo/util/periodic_runner.h"
-#include "mongo/util/time_support.h"
+#include "mongo/db/signed_logical_session_id.h"
+
+#include "mongo/bson/bsonobjbuilder.h"
+#include "mongo/util/assert_util.h"
 
 namespace mongo {
 
-/**
- * This is the service liason to mongod for the logical session cache.
- *
- * This class will return active sessions for cursors stored in the
- * global cursor manager and cursors in per-collection managers. This
- * class will also walk the service context to find all sessions for
- * currently-running operations on this server.
- *
- * Job scheduling on this class will be handled behind the scenes by a
- * periodic runner for this mongod. The time will be returned from the
- * system clock.
- */
-class ServiceLiasonMongod : public ServiceLiason {
-public:
-    LogicalSessionIdSet getActiveSessions() const override;
+SignedLogicalSessionId SignedLogicalSessionId::gen() {
+    return SignedLogicalSessionId();
+}
 
-    void scheduleJob(PeriodicRunner::PeriodicJob job) override;
+SignedLogicalSessionId::SignedLogicalSessionId() {
+    setLsid(LogicalSessionId::gen());
+}
 
-    void join() override;
+SignedLogicalSessionId::SignedLogicalSessionId(LogicalSessionId lsid,
+                                               boost::optional<OID> userId,
+                                               long long keyId,
+                                               SHA1Block signature) {
+    setLsid(std::move(lsid));
+    setUserId(std::move(userId));
+    setKeyId(std::move(keyId));
+    setSignature(std::move(signature));
+}
 
-    Date_t now() const override;
+SignedLogicalSessionId SignedLogicalSessionId::parse(const BSONObj& doc) {
+    IDLParserErrorContext ctx("signed logical session id");
+    SignedLogicalSessionId lsid;
+    lsid.parseProtected(ctx, doc);
+    return lsid;
+}
 
-protected:
-    /**
-     * Returns the service context.
-     */
-    ServiceContext* _context() override;
-};
+BSONObj SignedLogicalSessionId::toBSON() const {
+    BSONObjBuilder builder;
+    serialize(&builder);
+    return builder.obj();
+}
+
+std::string SignedLogicalSessionId::toString() const {
+    return getLsid().toString();
+}
 
 }  // namespace mongo

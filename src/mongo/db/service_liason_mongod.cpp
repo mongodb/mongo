@@ -88,4 +88,8 @@ Date_t ServiceLiasonMongod::now() const {
     return getGlobalServiceContext()->getFastClockSource()->now();
 }
 
+ServiceContext* ServiceLiasonMongod::_context() {
+    return getGlobalServiceContext();
+}
+
 }  // namespace mongo

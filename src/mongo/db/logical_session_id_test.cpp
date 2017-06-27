@@ -59,7 +59,10 @@ TEST(LogicalSessionIdTest, ToAndFromStringTest) {
 
 TEST(LogicalSessionIdTest, FromBSONTest) {
     auto uuid = UUID::gen();
-    auto bson = BSON("id" << uuid.toBSON());
+
+    BSONObjBuilder b;
+    b.append("id", uuid.toBSON());
+    auto bson = b.done();
 
     auto lsid = LogicalSessionId::parse(bson);
     ASSERT_EQUALS(lsid.toString(), uuid.toString());
@@ -73,7 +76,6 @@ TEST(LogicalSessionIdTest, FromBSONTest) {
                                                << "there")),
                   UserException);
 
-    // TODO: use these and add more once there is bindata
     ASSERT_THROWS(LogicalSessionId::parse(BSON("id"
                                                << "not a session id!")),
                   UserException);

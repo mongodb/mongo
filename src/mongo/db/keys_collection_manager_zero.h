@@ -1,5 +1,5 @@
 /**
- *    Copyright (C) 2017 MongoDB Inc.
+ *    Copyright (C) 2017 MongoDB, Inc.
  *
  *    This program is free software: you can redistribute it and/or  modify
  *    it under the terms of the GNU Affero General Public License, version 3,
@@ -28,41 +28,42 @@
 
 #pragma once
 
-#include "mongo/db/logical_session_id.h"
-#include "mongo/db/operation_context.h"
-#include "mongo/db/service_liason.h"
-#include "mongo/util/periodic_runner.h"
-#include "mongo/util/time_support.h"
+#include <memory>
+#include <string>
+
+#include "mongo/db/keys_collection_document.h"
+#include "mongo/db/keys_collection_manager.h"
 
 namespace mongo {
 
+class OperationContext;
+class LogicalTime;
+class ServiceContext;
+
 /**
- * This is the service liason to mongod for the logical session cache.
- *
- * This class will return active sessions for cursors stored in the
- * global cursor manager and cursors in per-collection managers. This
- * class will also walk the service context to find all sessions for
- * currently-running operations on this server.
- *
- * Job scheduling on this class will be handled behind the scenes by a
- * periodic runner for this mongod. The time will be returned from the
- * system clock.
+ * This implementation of the KeysCollectionManager always returns a zeroed key.  This is a
+ * transitional type to bridge the gap until we decide how to store and rotate keys in standalones
+ * and non-clustered replica sets.
  */
-class ServiceLiasonMongod : public ServiceLiason {
+class KeysCollectionManagerZero : public KeysCollectionManager {
 public:
-    LogicalSessionIdSet getActiveSessions() const override;
+    KeysCollectionManagerZero(std::string purpose);
 
-    void scheduleJob(PeriodicRunner::PeriodicJob job) override;
-
-    void join() override;
-
-    Date_t now() const override;
-
-protected:
     /**
-     * Returns the service context.
+     * Return a key that is valid for the given time and also matches the keyId.
      */
-    ServiceContext* _context() override;
+    StatusWith<KeysCollectionDocument> getKeyForValidation(OperationContext* opCtx,
+                                                           long long keyId,
+                                                           const LogicalTime& forThisTime) override;
+
+    /**
+     * Returns a key that is valid for the given time.
+     */
+    StatusWith<KeysCollectionDocument> getKeyForSigning(OperationContext* opCtx,
+                                                        const LogicalTime& forThisTime) override;
+
+private:
+    std::string _purpose;
 };
 
 }  // namespace mongo

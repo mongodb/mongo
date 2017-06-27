@@ -31,6 +31,7 @@
 
 #include <string>
 
+#include "mongo/base/data_range.h"
 #include "mongo/base/data_view.h"
 #include "mongo/base/static_assert.h"
 #include "mongo/bson/util/builder.h"
@@ -201,6 +202,10 @@ public:
 
     ConstDataView view() const {
         return ConstDataView(_data);
+    }
+
+    ConstDataRange toCDR() const {
+        return ConstDataRange(_data, kOIDSize);
     }
 
 private:

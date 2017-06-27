@@ -68,6 +68,13 @@ StatusWith<SHA1Block> SHA1Block::fromBinData(const BSONBinData& binData) {
     return SHA1Block(newHash);
 }
 
+SHA1Block SHA1Block::fromBinData(std::vector<unsigned char> bytes) {
+    HashType newHash;
+    invariant(bytes.size() == kHashLength);
+    memcpy(newHash.data(), bytes.data(), bytes.size());
+    return SHA1Block(newHash);
+}
+
 std::string SHA1Block::toString() const {
     return base64::encode(reinterpret_cast<const char*>(_hash.data()), _hash.size());
 }

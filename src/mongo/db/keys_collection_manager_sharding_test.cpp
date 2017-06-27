@@ -33,7 +33,7 @@
 
 #include "mongo/db/jsobj.h"
 #include "mongo/db/keys_collection_document.h"
-#include "mongo/db/keys_collection_manager.h"
+#include "mongo/db/keys_collection_manager_sharding.h"
 #include "mongo/db/logical_clock.h"
 #include "mongo/db/namespace_string.h"
 #include "mongo/db/operation_context.h"
@@ -48,9 +48,9 @@
 
 namespace mongo {
 
-class KeysManagerTest : public ConfigServerTestFixture {
+class KeysManagerShardedTest : public ConfigServerTestFixture {
 public:
-    KeysCollectionManager* keyManager() {
+    KeysCollectionManagerSharding* keyManager() {
         return _keyManager.get();
     }
 
@@ -65,7 +65,8 @@ protected:
         auto clockSource = stdx::make_unique<ClockSourceMock>();
         operationContext()->getServiceContext()->setFastClockSource(std::move(clockSource));
         auto catalogClient = Grid::get(operationContext())->catalogClient();
-        _keyManager = stdx::make_unique<KeysCollectionManager>("dummy", catalogClient, Seconds(1));
+        _keyManager =
+            stdx::make_unique<KeysCollectionManagerSharding>("dummy", catalogClient, Seconds(1));
     }
 
     void tearDown() override {
@@ -81,10 +82,10 @@ protected:
     }
 
 private:
-    std::unique_ptr<KeysCollectionManager> _keyManager;
+    std::unique_ptr<KeysCollectionManagerSharding> _keyManager;
 };
 
-TEST_F(KeysManagerTest, GetKeyForValidationTimesOutIfRefresherIsNotRunning) {
+TEST_F(KeysManagerShardedTest, GetKeyForValidationTimesOutIfRefresherIsNotRunning) {
     operationContext()->setDeadlineAfterNowBy(Microseconds(250 * 1000));
 
     ASSERT_THROWS(keyManager()
@@ -93,7 +94,7 @@ TEST_F(KeysManagerTest, GetKeyForValidationTimesOutIfRefresherIsNotRunning) {
                   DBException);
 }
 
-TEST_F(KeysManagerTest, GetKeyForValidationErrorsIfKeyDoesntExist) {
+TEST_F(KeysManagerShardedTest, GetKeyForValidationErrorsIfKeyDoesntExist) {
     keyManager()->startMonitoring(getServiceContext());
 
     auto keyStatus =
@@ -101,7 +102,7 @@ TEST_F(KeysManagerTest, GetKeyForValidationErrorsIfKeyDoesntExist) {
     ASSERT_EQ(ErrorCodes::KeyNotFound, keyStatus.getStatus());
 }
 
-TEST_F(KeysManagerTest, GetKeyWithSingleKey) {
+TEST_F(KeysManagerShardedTest, GetKeyWithSingleKey) {
     keyManager()->startMonitoring(getServiceContext());
 
     KeysCollectionDocument origKey1(
@@ -119,7 +120,7 @@ TEST_F(KeysManagerTest, GetKeyWithSingleKey) {
     ASSERT_EQ(Timestamp(105, 0), key.getExpiresAt().asTimestamp());
 }
 
-TEST_F(KeysManagerTest, GetKeyWithMultipleKeys) {
+TEST_F(KeysManagerShardedTest, GetKeyWithMultipleKeys) {
     keyManager()->startMonitoring(getServiceContext());
 
     KeysCollectionDocument origKey1(
@@ -151,7 +152,7 @@ TEST_F(KeysManagerTest, GetKeyWithMultipleKeys) {
     ASSERT_EQ(Timestamp(205, 0), key.getExpiresAt().asTimestamp());
 }
 
-TEST_F(KeysManagerTest, GetKeyShouldErrorIfKeyIdMismatchKey) {
+TEST_F(KeysManagerShardedTest, GetKeyShouldErrorIfKeyIdMismatchKey) {
     keyManager()->startMonitoring(getServiceContext());
 
     KeysCollectionDocument origKey1(
@@ -164,7 +165,7 @@ TEST_F(KeysManagerTest, GetKeyShouldErrorIfKeyIdMismatchKey) {
     ASSERT_EQ(ErrorCodes::KeyNotFound, keyStatus.getStatus());
 }
 
-TEST_F(KeysManagerTest, GetKeyWithoutRefreshShouldReturnRightKey) {
+TEST_F(KeysManagerShardedTest, GetKeyWithoutRefreshShouldReturnRightKey) {
     keyManager()->startMonitoring(getServiceContext());
 
     KeysCollectionDocument origKey1(
@@ -199,7 +200,7 @@ TEST_F(KeysManagerTest, GetKeyWithoutRefreshShouldReturnRightKey) {
     }
 }
 
-TEST_F(KeysManagerTest, GetKeyForSigningShouldReturnRightKey) {
+TEST_F(KeysManagerShardedTest, GetKeyForSigningShouldReturnRightKey) {
     keyManager()->startMonitoring(getServiceContext());
 
     KeysCollectionDocument origKey1(
@@ -209,7 +210,7 @@ TEST_F(KeysManagerTest, GetKeyForSigningShouldReturnRightKey) {
 
     keyManager()->refreshNow(operationContext());
 
-    auto keyStatus = keyManager()->getKeyForSigning(LogicalTime(Timestamp(100, 0)));
+    auto keyStatus = keyManager()->getKeyForSigning(nullptr, LogicalTime(Timestamp(100, 0)));
     ASSERT_OK(keyStatus.getStatus());
 
     auto key = keyStatus.getValue();
@@ -218,7 +219,7 @@ TEST_F(KeysManagerTest, GetKeyForSigningShouldReturnRightKey) {
     ASSERT_EQ(Timestamp(105, 0), key.getExpiresAt().asTimestamp());
 }
 
-TEST_F(KeysManagerTest, GetKeyForSigningShouldReturnRightOldKey) {
+TEST_F(KeysManagerShardedTest, GetKeyForSigningShouldReturnRightOldKey) {
     keyManager()->startMonitoring(getServiceContext());
 
     KeysCollectionDocument origKey1(
@@ -233,7 +234,7 @@ TEST_F(KeysManagerTest, GetKeyForSigningShouldReturnRightOldKey) {
     keyManager()->refreshNow(operationContext());
 
     {
-        auto keyStatus = keyManager()->getKeyForSigning(LogicalTime(Timestamp(100, 0)));
+        auto keyStatus = keyManager()->getKeyForSigning(nullptr, LogicalTime(Timestamp(100, 0)));
         ASSERT_OK(keyStatus.getStatus());
 
         auto key = keyStatus.getValue();
@@ -243,7 +244,7 @@ TEST_F(KeysManagerTest, GetKeyForSigningShouldReturnRightOldKey) {
     }
 
     {
-        auto keyStatus = keyManager()->getKeyForSigning(LogicalTime(Timestamp(105, 0)));
+        auto keyStatus = keyManager()->getKeyForSigning(nullptr, LogicalTime(Timestamp(105, 0)));
         ASSERT_OK(keyStatus.getStatus());
 
         auto key = keyStatus.getValue();
@@ -253,7 +254,7 @@ TEST_F(KeysManagerTest, GetKeyForSigningShouldReturnRightOldKey) {
     }
 }
 
-TEST_F(KeysManagerTest, ShouldCreateKeysIfKeyGeneratorEnabled) {
+TEST_F(KeysManagerShardedTest, ShouldCreateKeysIfKeyGeneratorEnabled) {
     keyManager()->startMonitoring(getServiceContext());
 
     const LogicalTime currentTime(LogicalTime(Timestamp(100, 0)));
@@ -262,14 +263,14 @@ TEST_F(KeysManagerTest, ShouldCreateKeysIfKeyGeneratorEnabled) {
     keyManager()->enableKeyGenerator(operationContext(), true);
     keyManager()->refreshNow(operationContext());
 
-    auto keyStatus = keyManager()->getKeyForSigning(LogicalTime(Timestamp(100, 100)));
+    auto keyStatus = keyManager()->getKeyForSigning(nullptr, LogicalTime(Timestamp(100, 100)));
     ASSERT_OK(keyStatus.getStatus());
 
     auto key = keyStatus.getValue();
     ASSERT_EQ(Timestamp(101, 0), key.getExpiresAt().asTimestamp());
 }
 
-TEST_F(KeysManagerTest, EnableModeFlipFlopStressTest) {
+TEST_F(KeysManagerShardedTest, EnableModeFlipFlopStressTest) {
     keyManager()->startMonitoring(getServiceContext());
 
     const LogicalTime currentTime(LogicalTime(Timestamp(100, 0)));
@@ -281,7 +282,7 @@ TEST_F(KeysManagerTest, EnableModeFlipFlopStressTest) {
         keyManager()->enableKeyGenerator(operationContext(), doEnable);
         keyManager()->refreshNow(operationContext());
 
-        auto keyStatus = keyManager()->getKeyForSigning(LogicalTime(Timestamp(100, 100)));
+        auto keyStatus = keyManager()->getKeyForSigning(nullptr, LogicalTime(Timestamp(100, 100)));
         ASSERT_OK(keyStatus.getStatus());
 
         auto key = keyStatus.getValue();
@@ -291,7 +292,7 @@ TEST_F(KeysManagerTest, EnableModeFlipFlopStressTest) {
     }
 }
 
-TEST_F(KeysManagerTest, ShouldStillBeAbleToUpdateCacheEvenIfItCantCreateKeys) {
+TEST_F(KeysManagerShardedTest, ShouldStillBeAbleToUpdateCacheEvenIfItCantCreateKeys) {
     KeysCollectionDocument origKey1(
         1, "dummy", TimeProofService::generateRandomKey(), LogicalTime(Timestamp(105, 0)));
     ASSERT_OK(insertToConfigCollection(
@@ -319,7 +320,7 @@ TEST_F(KeysManagerTest, ShouldStillBeAbleToUpdateCacheEvenIfItCantCreateKeys) {
     ASSERT_EQ(Timestamp(105, 0), key.getExpiresAt().asTimestamp());
 }
 
-TEST_F(KeysManagerTest, ShouldNotCreateKeysWithDisableKeyGenerationFailPoint) {
+TEST_F(KeysManagerShardedTest, ShouldNotCreateKeysWithDisableKeyGenerationFailPoint) {
     const LogicalTime currentTime(Timestamp(100, 0));
     LogicalClock::get(operationContext())->setClusterTimeFromTrustedSource(currentTime);
 
@@ -336,11 +337,11 @@ TEST_F(KeysManagerTest, ShouldNotCreateKeysWithDisableKeyGenerationFailPoint) {
 
     // Once the failpoint is disabled, the generator can make keys again.
     keyManager()->refreshNow(operationContext());
-    auto keyStatus = keyManager()->getKeyForSigning(LogicalTime(Timestamp(100, 0)));
+    auto keyStatus = keyManager()->getKeyForSigning(nullptr, LogicalTime(Timestamp(100, 0)));
     ASSERT_OK(keyStatus.getStatus());
 }
 
-TEST_F(KeysManagerTest, HasSeenKeysIsFalseUntilKeysAreFound) {
+TEST_F(KeysManagerShardedTest, HasSeenKeysIsFalseUntilKeysAreFound) {
     const LogicalTime currentTime(Timestamp(100, 0));
     LogicalClock::get(operationContext())->setClusterTimeFromTrustedSource(currentTime);
 
@@ -361,13 +362,13 @@ TEST_F(KeysManagerTest, HasSeenKeysIsFalseUntilKeysAreFound) {
 
     // Once the failpoint is disabled, the generator can make keys again.
     keyManager()->refreshNow(operationContext());
-    auto keyStatus = keyManager()->getKeyForSigning(LogicalTime(Timestamp(100, 0)));
+    auto keyStatus = keyManager()->getKeyForSigning(nullptr, LogicalTime(Timestamp(100, 0)));
     ASSERT_OK(keyStatus.getStatus());
 
     ASSERT_EQ(true, keyManager()->hasSeenKeys());
 }
 
-TEST_F(KeysManagerTest, ShouldNotReturnKeysInFeatureCompatibilityVersion34) {
+TEST_F(KeysManagerShardedTest, ShouldNotReturnKeysInFeatureCompatibilityVersion34) {
     serverGlobalParams.featureCompatibility.version.store(
         ServerGlobalParams::FeatureCompatibility::Version::k34);
 

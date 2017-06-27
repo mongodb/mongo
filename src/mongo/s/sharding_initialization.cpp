@@ -38,6 +38,7 @@
 #include "mongo/client/remote_command_targeter_factory_impl.h"
 #include "mongo/db/audit.h"
 #include "mongo/db/keys_collection_manager.h"
+#include "mongo/db/keys_collection_manager_sharding.h"
 #include "mongo/db/logical_clock.h"
 #include "mongo/db/logical_time_validator.h"
 #include "mongo/db/repl/replication_coordinator.h"
@@ -102,7 +103,8 @@ using executor::ThreadPoolTaskExecutor;
 using executor::ShardingTaskExecutor;
 
 static constexpr auto kRetryInterval = Seconds{2};
-const std::string kKeyManagerPurposeString = "SigningClusterTime";
+const std::string kKeyManagerPurposeString = "HMAC";
+const Seconds kKeyValidInterval(3 * 30 * 24 * 60 * 60);  // ~3 months
 
 auto makeTaskExecutor(std::unique_ptr<NetworkInterface> net) {
     auto netPtr = net.get();
@@ -234,12 +236,13 @@ Status initializeGlobalShardingState(OperationContext* opCtx,
         }
     }
 
-    auto keyManager = stdx::make_unique<KeysCollectionManager>(
+    auto keyManager = std::make_shared<KeysCollectionManagerSharding>(
         kKeyManagerPurposeString, grid->catalogClient(), Seconds(KeysRotationIntervalSec));
     keyManager->startMonitoring(opCtx->getServiceContext());
 
     LogicalTimeValidator::set(opCtx->getServiceContext(),
-                              stdx::make_unique<LogicalTimeValidator>(std::move(keyManager)));
+                              stdx::make_unique<LogicalTimeValidator>(keyManager));
+    opCtx->getServiceContext()->setKeyManager(keyManager);
 
     auto replCoord = repl::ReplicationCoordinator::get(opCtx->getClient()->getServiceContext());
     if (serverGlobalParams.clusterRole == ClusterRole::ConfigServer &&

@@ -33,11 +33,16 @@
 #include "mongo/db/logical_session_record.h"
 #include "mongo/db/service_liason.h"
 #include "mongo/db/sessions_collection.h"
+#include "mongo/db/signed_logical_session_id.h"
+#include "mongo/db/time_proof_service.h"
 #include "mongo/platform/atomic_word.h"
 #include "mongo/stdx/thread.h"
 #include "mongo/util/lru_cache.h"
 
 namespace mongo {
+
+class OperationContext;
+class ServiceContext;
 
 extern int logicalSessionRecordCacheSize;
 extern int localLogicalSessionTimeoutMinutes;
@@ -51,6 +56,13 @@ extern int logicalSessionRefreshMinutes;
  */
 class LogicalSessionCache {
 public:
+    /**
+     * Decorate the ServiceContext with a LogicalSessionCache instance.
+     */
+    static LogicalSessionCache* get(ServiceContext* service);
+    static LogicalSessionCache* get(OperationContext* opCtx);
+    static void set(ServiceContext* service, std::unique_ptr<LogicalSessionCache> sessionCache);
+
     static constexpr int kLogicalSessionCacheDefaultCapacity = 10000;
     static constexpr Minutes kLogicalSessionDefaultTimeout = Minutes(30);
     static constexpr Minutes kLogicalSessionDefaultRefresh = Minutes(5);
@@ -102,26 +114,22 @@ public:
     ~LogicalSessionCache();
 
     /**
-     * Returns the owner for the given session, or return an error if there
-     * is no authoritative record for this session.
+     * If the cache contains a record for this LogicalSessionId, promotes that lsid
+     * to be the most recently used and updates its lastUse date to be the current
+     * time. Otherwise, returns an error.
      *
-     * If the cache does not already contain a record for this session, this
-     * method may issue networking operations to obtain the record. Afterwards,
-     * the cache will keep the record for future use.
-     *
-     * This call will promote any record it touches to be the most-recently-used
-     * record in the cache.
+     * This method does not issue networking calls.
      */
-    StatusWith<LogicalSessionRecord::Owner> getOwner(LogicalSessionId lsid);
+    Status promote(SignedLogicalSessionId lsid);
 
     /**
-     * Returns the owner for the given session if we already have its record in the
-     * cache. Do not fetch the record from the network if we do not already have it.
+     * If the cache contains a record for this LogicalSessionId, promotes it.
+     * Otherwise, attempts to fetch the record for this LogicalSessionId from the
+     * sessions collection, and returns the record if found. Otherwise, returns an error.
      *
-     * This call will promote any record it touches to be the most-recently-used
-     * record in the cache.
+     * This method may issue networking calls.
      */
-    StatusWith<LogicalSessionRecord::Owner> getOwnerFromCache(LogicalSessionId lsid);
+    Status fetchAndPromote(SignedLogicalSessionId lsid);
 
     /**
      * Inserts a new authoritative session record into the cache. This method will
@@ -129,7 +137,22 @@ public:
      * should only be used when starting new sessions and should not be used to
      * insert records for existing sessions.
      */
-    Status startSession(LogicalSessionRecord authoritativeRecord);
+    Status startSession(SignedLogicalSessionId lsid);
+
+    /**
+     * Generates and sets a signature for the fields in this LogicalSessionId.
+     *
+     * If this method is not able to acquire a key to perform the signature
+     * this call will return an error.
+     */
+    StatusWith<SignedLogicalSessionId> signLsid(OperationContext* opCtx,
+                                                LogicalSessionId* id,
+                                                boost::optional<OID> userId);
+
+    /**
+     * Validates that this LogicalSessionId was signed with the correct key.
+     */
+    Status validateLsid(OperationContext* opCtx, const SignedLogicalSessionId& lsid);
 
     /**
      * Removes all local records in this cache. Does not remove the corresponding
