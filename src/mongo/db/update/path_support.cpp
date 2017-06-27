@@ -156,11 +156,12 @@ Status findLongestPrefix(const FieldRef& prefix,
     }
 }
 
-Status createPathAt(const FieldRef& prefix,
-                    size_t idxFound,
-                    mutablebson::Element elemFound,
-                    mutablebson::Element newElem) {
+StatusWith<mutablebson::Element> createPathAt(const FieldRef& prefix,
+                                              size_t idxFound,
+                                              mutablebson::Element elemFound,
+                                              mutablebson::Element newElem) {
     Status status = Status::OK();
+    auto firstNewElem = elemFound.getDocument().end();
 
     if (elemFound.getType() != BSONType::Object && elemFound.getType() != BSONType::Array) {
         return Status(ErrorCodes::PathNotViable,
@@ -228,10 +229,16 @@ Status createPathAt(const FieldRef& prefix,
                 return status;
             }
             inArray = false;
+            if (!firstNewElem.ok()) {
+                firstNewElem = arrayObj;
+            }
         } else {
             status = elemFound.pushBack(elem);
             if (!status.isOK()) {
                 return status;
+            }
+            if (!firstNewElem.ok()) {
+                firstNewElem = elem;
             }
         }
 
@@ -257,14 +264,21 @@ Status createPathAt(const FieldRef& prefix,
             return status;
         }
 
+        if (!firstNewElem.ok()) {
+            firstNewElem = arrayObj;
+        }
+
     } else {
         status = elemFound.pushBack(newElem);
         if (!status.isOK()) {
             return status;
         }
+        if (!firstNewElem.ok()) {
+            firstNewElem = newElem;
+        }
     }
 
-    return Status::OK();
+    return firstNewElem;
 }
 
 Status setElementAtPath(const FieldRef& path,
@@ -299,7 +313,7 @@ Status setElementAtPath(const FieldRef& path,
         StringData leafFieldName = path.getPart(path.numParts() - 1);
         mutablebson::Element leafElem = doc->makeElementWithNewFieldName(leafFieldName, value);
         dassert(leafElem.ok());
-        return createPathAt(path, deepestElemPathPart, deepestElem, leafElem);
+        return createPathAt(path, deepestElemPathPart, deepestElem, leafElem).getStatus();
     }
 }
 

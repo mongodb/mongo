@@ -65,6 +65,8 @@ TEST(UpdateArrayNodeTest, ApplyCreatePathFails) {
     FieldRef pathTaken("");
     StringData matchedField;
     auto fromReplication = false;
+    auto validateForStorage = true;
+    FieldRefSet immutablePaths;
     UpdateIndexData indexData;
     indexData.addPath("a");
     Document logDoc;
@@ -77,6 +79,8 @@ TEST(UpdateArrayNodeTest, ApplyCreatePathFails) {
                    &pathTaken,
                    matchedField,
                    fromReplication,
+                   validateForStorage,
+                   immutablePaths,
                    &indexData,
                    &logBuilder,
                    &indexesAffected,
@@ -107,6 +111,8 @@ TEST(UpdateArrayNodeTest, ApplyToNonArrayFails) {
     FieldRef pathTaken("");
     StringData matchedField;
     auto fromReplication = false;
+    auto validateForStorage = true;
+    FieldRefSet immutablePaths;
     UpdateIndexData indexData;
     indexData.addPath("a");
     Document logDoc;
@@ -118,6 +124,8 @@ TEST(UpdateArrayNodeTest, ApplyToNonArrayFails) {
                                            &pathTaken,
                                            matchedField,
                                            fromReplication,
+                                           validateForStorage,
+                                           immutablePaths,
                                            &indexData,
                                            &logBuilder,
                                            &indexesAffected,
@@ -148,6 +156,8 @@ TEST(UpdateArrayNodeTest, UpdateIsAppliedToAllMatchingElements) {
     FieldRef pathTaken("");
     StringData matchedField;
     auto fromReplication = false;
+    auto validateForStorage = true;
+    FieldRefSet immutablePaths;
     UpdateIndexData indexData;
     indexData.addPath("a");
     Document logDoc;
@@ -159,6 +169,8 @@ TEST(UpdateArrayNodeTest, UpdateIsAppliedToAllMatchingElements) {
                &pathTaken,
                matchedField,
                fromReplication,
+               validateForStorage,
+               immutablePaths,
                &indexData,
                &logBuilder,
                &indexesAffected,
@@ -195,6 +207,8 @@ DEATH_TEST(UpdateArrayNodeTest,
     FieldRef pathTaken("");
     StringData matchedField;
     auto fromReplication = false;
+    auto validateForStorage = true;
+    FieldRefSet immutablePaths;
     UpdateIndexData indexData;
     indexData.addPath("a");
     Document logDoc;
@@ -206,6 +220,8 @@ DEATH_TEST(UpdateArrayNodeTest,
                &pathTaken,
                matchedField,
                fromReplication,
+               validateForStorage,
+               immutablePaths,
                &indexData,
                &logBuilder,
                &indexesAffected,
@@ -230,6 +246,8 @@ TEST(UpdateArrayNodeTest, UpdateForEmptyIdentifierIsAppliedToAllArrayElements) {
     FieldRef pathTaken("");
     StringData matchedField;
     auto fromReplication = false;
+    auto validateForStorage = true;
+    FieldRefSet immutablePaths;
     UpdateIndexData indexData;
     indexData.addPath("a");
     Document logDoc;
@@ -241,6 +259,8 @@ TEST(UpdateArrayNodeTest, UpdateForEmptyIdentifierIsAppliedToAllArrayElements) {
                &pathTaken,
                matchedField,
                fromReplication,
+               validateForStorage,
+               immutablePaths,
                &indexData,
                &logBuilder,
                &indexesAffected,
@@ -291,6 +311,8 @@ TEST(UpdateArrayNodeTest, ApplyMultipleUpdatesToArrayElement) {
     FieldRef pathTaken("");
     StringData matchedField;
     auto fromReplication = false;
+    auto validateForStorage = true;
+    FieldRefSet immutablePaths;
     UpdateIndexData indexData;
     indexData.addPath("a");
     Document logDoc;
@@ -302,6 +324,8 @@ TEST(UpdateArrayNodeTest, ApplyMultipleUpdatesToArrayElement) {
                &pathTaken,
                matchedField,
                fromReplication,
+               validateForStorage,
+               immutablePaths,
                &indexData,
                &logBuilder,
                &indexesAffected,
@@ -342,6 +366,8 @@ TEST(UpdateArrayNodeTest, ApplyMultipleUpdatesToArrayElementsUsingMergedChildren
     FieldRef pathToCreate("");
     FieldRef pathTaken("");
     StringData matchedField;
+    auto validateForStorage = true;
+    FieldRefSet immutablePaths;
     auto fromReplication = false;
     UpdateIndexData indexData;
     indexData.addPath("a");
@@ -354,6 +380,8 @@ TEST(UpdateArrayNodeTest, ApplyMultipleUpdatesToArrayElementsUsingMergedChildren
                &pathTaken,
                matchedField,
                fromReplication,
+               validateForStorage,
+               immutablePaths,
                &indexData,
                &logBuilder,
                &indexesAffected,
@@ -404,6 +432,8 @@ TEST(UpdateArrayNodeTest, ApplyMultipleUpdatesToArrayElementsWithoutMergedChildr
     FieldRef pathTaken("");
     StringData matchedField;
     auto fromReplication = false;
+    auto validateForStorage = true;
+    FieldRefSet immutablePaths;
     UpdateIndexData indexData;
     indexData.addPath("a");
     Document logDoc;
@@ -415,6 +445,8 @@ TEST(UpdateArrayNodeTest, ApplyMultipleUpdatesToArrayElementsWithoutMergedChildr
                &pathTaken,
                matchedField,
                fromReplication,
+               validateForStorage,
+               immutablePaths,
                &indexData,
                &logBuilder,
                &indexesAffected,
@@ -450,6 +482,8 @@ TEST(UpdateArrayNodeTest, ApplyMultipleUpdatesToArrayElementWithEmptyIdentifiers
     FieldRef pathTaken("");
     StringData matchedField;
     auto fromReplication = false;
+    auto validateForStorage = true;
+    FieldRefSet immutablePaths;
     UpdateIndexData indexData;
     indexData.addPath("a");
     Document logDoc;
@@ -461,6 +495,8 @@ TEST(UpdateArrayNodeTest, ApplyMultipleUpdatesToArrayElementWithEmptyIdentifiers
                &pathTaken,
                matchedField,
                fromReplication,
+               validateForStorage,
+               immutablePaths,
                &indexData,
                &logBuilder,
                &indexesAffected,
@@ -508,6 +544,8 @@ TEST(UpdateArrayNodeTest, ApplyNestedArrayUpdates) {
     FieldRef pathTaken("");
     StringData matchedField;
     auto fromReplication = false;
+    auto validateForStorage = true;
+    FieldRefSet immutablePaths;
     UpdateIndexData indexData;
     indexData.addPath("a");
     Document logDoc;
@@ -519,6 +557,8 @@ TEST(UpdateArrayNodeTest, ApplyNestedArrayUpdates) {
                &pathTaken,
                matchedField,
                fromReplication,
+               validateForStorage,
+               immutablePaths,
                &indexData,
                &logBuilder,
                &indexesAffected,
@@ -560,6 +600,8 @@ TEST(UpdateArrayNodeTest, ApplyUpdatesWithMergeConflictToArrayElementFails) {
     FieldRef pathTaken("");
     StringData matchedField;
     auto fromReplication = false;
+    auto validateForStorage = true;
+    FieldRefSet immutablePaths;
     UpdateIndexData indexData;
     indexData.addPath("a");
     Document logDoc;
@@ -571,6 +613,8 @@ TEST(UpdateArrayNodeTest, ApplyUpdatesWithMergeConflictToArrayElementFails) {
                                            &pathTaken,
                                            matchedField,
                                            fromReplication,
+                                           validateForStorage,
+                                           immutablePaths,
                                            &indexData,
                                            &logBuilder,
                                            &indexesAffected,
@@ -610,6 +654,8 @@ TEST(UpdateArrayNodeTest, ApplyUpdatesWithEmptyIdentifiersWithMergeConflictToArr
     FieldRef pathTaken("");
     StringData matchedField;
     auto fromReplication = false;
+    auto validateForStorage = true;
+    FieldRefSet immutablePaths;
     UpdateIndexData indexData;
     indexData.addPath("a");
     Document logDoc;
@@ -621,6 +667,8 @@ TEST(UpdateArrayNodeTest, ApplyUpdatesWithEmptyIdentifiersWithMergeConflictToArr
                                            &pathTaken,
                                            matchedField,
                                            fromReplication,
+                                           validateForStorage,
+                                           immutablePaths,
                                            &indexData,
                                            &logBuilder,
                                            &indexesAffected,
@@ -666,6 +714,8 @@ TEST(UpdateArrayNodeTest, ApplyNestedArrayUpdatesWithMergeConflictFails) {
     FieldRef pathTaken("");
     StringData matchedField;
     auto fromReplication = false;
+    auto validateForStorage = true;
+    FieldRefSet immutablePaths;
     UpdateIndexData indexData;
     indexData.addPath("a");
     Document logDoc;
@@ -677,6 +727,8 @@ TEST(UpdateArrayNodeTest, ApplyNestedArrayUpdatesWithMergeConflictFails) {
                                            &pathTaken,
                                            matchedField,
                                            fromReplication,
+                                           validateForStorage,
+                                           immutablePaths,
                                            &indexData,
                                            &logBuilder,
                                            &indexesAffected,
@@ -707,6 +759,8 @@ TEST(UpdateArrayNodeTest, NoArrayElementsMatch) {
     FieldRef pathTaken("");
     StringData matchedField;
     auto fromReplication = false;
+    auto validateForStorage = true;
+    FieldRefSet immutablePaths;
     UpdateIndexData indexData;
     indexData.addPath("a");
     Document logDoc;
@@ -718,6 +772,8 @@ TEST(UpdateArrayNodeTest, NoArrayElementsMatch) {
                &pathTaken,
                matchedField,
                fromReplication,
+               validateForStorage,
+               immutablePaths,
                &indexData,
                &logBuilder,
                &indexesAffected,
@@ -750,6 +806,8 @@ TEST(UpdateArrayNodeTest, UpdatesToAllArrayElementsAreNoops) {
     FieldRef pathTaken("");
     StringData matchedField;
     auto fromReplication = false;
+    auto validateForStorage = true;
+    FieldRefSet immutablePaths;
     UpdateIndexData indexData;
     indexData.addPath("a");
     Document logDoc;
@@ -761,6 +819,8 @@ TEST(UpdateArrayNodeTest, UpdatesToAllArrayElementsAreNoops) {
                &pathTaken,
                matchedField,
                fromReplication,
+               validateForStorage,
+               immutablePaths,
                &indexData,
                &logBuilder,
                &indexesAffected,
@@ -793,6 +853,8 @@ TEST(UpdateArrayNodeTest, NoArrayElementAffectsIndexes) {
     FieldRef pathTaken("");
     StringData matchedField;
     auto fromReplication = false;
+    auto validateForStorage = true;
+    FieldRefSet immutablePaths;
     UpdateIndexData indexData;
     indexData.addPath("a.c");
     Document logDoc;
@@ -804,6 +866,8 @@ TEST(UpdateArrayNodeTest, NoArrayElementAffectsIndexes) {
                &pathTaken,
                matchedField,
                fromReplication,
+               validateForStorage,
+               immutablePaths,
                &indexData,
                &logBuilder,
                &indexesAffected,
@@ -836,6 +900,8 @@ TEST(UpdateArrayNodeTest, WhenOneElementIsMatchedLogElementUpdateDirectly) {
     FieldRef pathTaken("");
     StringData matchedField;
     auto fromReplication = false;
+    auto validateForStorage = true;
+    FieldRefSet immutablePaths;
     UpdateIndexData indexData;
     indexData.addPath("a");
     Document logDoc;
@@ -847,6 +913,8 @@ TEST(UpdateArrayNodeTest, WhenOneElementIsMatchedLogElementUpdateDirectly) {
                &pathTaken,
                matchedField,
                fromReplication,
+               validateForStorage,
+               immutablePaths,
                &indexData,
                &logBuilder,
                &indexesAffected,
@@ -879,6 +947,8 @@ TEST(UpdateArrayNodeTest, WhenOneElementIsModifiedLogElement) {
     FieldRef pathTaken("");
     StringData matchedField;
     auto fromReplication = false;
+    auto validateForStorage = true;
+    FieldRefSet immutablePaths;
     UpdateIndexData indexData;
     indexData.addPath("a");
     Document logDoc;
@@ -890,6 +960,8 @@ TEST(UpdateArrayNodeTest, WhenOneElementIsModifiedLogElement) {
                &pathTaken,
                matchedField,
                fromReplication,
+               validateForStorage,
+               immutablePaths,
                &indexData,
                &logBuilder,
                &indexesAffected,
@@ -919,6 +991,8 @@ TEST(UpdateArrayNodeTest, ArrayUpdateOnEmptyArrayIsANoop) {
     FieldRef pathTaken("");
     StringData matchedField;
     auto fromReplication = false;
+    auto validateForStorage = true;
+    FieldRefSet immutablePaths;
     UpdateIndexData indexData;
     indexData.addPath("a");
     Document logDoc;
@@ -930,6 +1004,8 @@ TEST(UpdateArrayNodeTest, ArrayUpdateOnEmptyArrayIsANoop) {
                &pathTaken,
                matchedField,
                fromReplication,
+               validateForStorage,
+               immutablePaths,
                &indexData,
                &logBuilder,
                &indexesAffected,
@@ -962,6 +1038,8 @@ TEST(UpdateArrayNodeTest, ApplyPositionalInsideArrayUpdate) {
     FieldRef pathTaken("");
     StringData matchedField = "1";
     auto fromReplication = false;
+    auto validateForStorage = true;
+    FieldRefSet immutablePaths;
     UpdateIndexData indexData;
     indexData.addPath("a");
     Document logDoc;
@@ -973,6 +1051,8 @@ TEST(UpdateArrayNodeTest, ApplyPositionalInsideArrayUpdate) {
                &pathTaken,
                matchedField,
                fromReplication,
+               validateForStorage,
+               immutablePaths,
                &indexData,
                &logBuilder,
                &indexesAffected,
@@ -1005,6 +1085,8 @@ TEST(UpdateArrayNodeTest, ApplyArrayUpdateFromReplication) {
     FieldRef pathTaken("");
     StringData matchedField;
     auto fromReplication = true;
+    auto validateForStorage = true;
+    FieldRefSet immutablePaths;
     UpdateIndexData indexData;
     indexData.addPath("a");
     Document logDoc;
@@ -1016,6 +1098,8 @@ TEST(UpdateArrayNodeTest, ApplyArrayUpdateFromReplication) {
                &pathTaken,
                matchedField,
                fromReplication,
+               validateForStorage,
+               immutablePaths,
                &indexData,
                &logBuilder,
                &indexesAffected,
@@ -1048,6 +1132,8 @@ TEST(UpdateArrayNodeTest, ApplyArrayUpdateNotFromReplication) {
     FieldRef pathTaken("");
     StringData matchedField;
     auto fromReplication = false;
+    auto validateForStorage = true;
+    FieldRefSet immutablePaths;
     UpdateIndexData indexData;
     indexData.addPath("a");
     Document logDoc;
@@ -1059,6 +1145,8 @@ TEST(UpdateArrayNodeTest, ApplyArrayUpdateNotFromReplication) {
                                            &pathTaken,
                                            matchedField,
                                            fromReplication,
+                                           validateForStorage,
+                                           immutablePaths,
                                            &indexData,
                                            &logBuilder,
                                            &indexesAffected,
@@ -1089,6 +1177,8 @@ TEST(UpdateArrayNodeTest, ApplyArrayUpdateWithoutLogBuilderOrIndexData) {
     FieldRef pathTaken("");
     StringData matchedField;
     auto fromReplication = true;
+    auto validateForStorage = true;
+    FieldRefSet immutablePaths;
     const UpdateIndexData* indexData = nullptr;
     LogBuilder* logBuilder = nullptr;
     auto indexesAffected = false;
@@ -1098,6 +1188,8 @@ TEST(UpdateArrayNodeTest, ApplyArrayUpdateWithoutLogBuilderOrIndexData) {
                &pathTaken,
                matchedField,
                fromReplication,
+               validateForStorage,
+               immutablePaths,
                indexData,
                logBuilder,
                &indexesAffected,

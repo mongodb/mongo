@@ -32,7 +32,7 @@
 
 #include "mongo/bson/bsonelement.h"
 #include "mongo/bson/mutable/element.h"
-#include "mongo/db/field_ref.h"
+#include "mongo/db/field_ref_set.h"
 #include "mongo/db/update/log_builder.h"
 #include "mongo/db/update_index_data.h"
 #include "mongo/util/assert_util.h"
@@ -87,13 +87,17 @@ public:
      * when the update is from replication. Uses the index information in 'indexData' to determine
      * whether indexes are affected. If a LogBuilder is provided, logs the update. Outputs whether
      * the operation was a no-op. Trips a uassert (which throws UserException) if the update node
-     * cannot be applied to the document.
+     * cannot be applied to the document. If 'validateForStorage' is true, ensures that modified
+     * elements do not violate depth or DBRef constraints. Ensures that no paths in 'immutablePaths'
+     * are modified (though they may be created, if they do not yet exist).
      */
     virtual void apply(mutablebson::Element element,
                        FieldRef* pathToCreate,
                        FieldRef* pathTaken,
                        StringData matchedField,
                        bool fromReplication,
+                       bool validateForStorage,
+                       const FieldRefSet& immutablePaths,
                        const UpdateIndexData* indexData,
                        LogBuilder* logBuilder,
                        bool* indexesAffected,

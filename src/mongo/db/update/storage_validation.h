@@ -28,43 +28,34 @@
 
 #pragma once
 
-#include "mongo/db/update/update_leaf_node.h"
-#include "mongo/stdx/memory.h"
+#include "mongo/bson/mutable/element.h"
 
 namespace mongo {
 
+namespace storage_validation {
+
 /**
- * Represents the application of a $rename to the value at the end of a path, where the path
- * represents the rename destination.
+ * Validates that the MutableBSON document 'doc' is acceptable for storage in a collection. The
+ * check is performed recursively on subdocuments. Uasserts if the validation fails or if the depth
+ * exceeds the maximum allowable depth.
  */
-class RenameNode : public UpdateLeafNode {
-public:
-    /**
-     * This init provides input validation on the source field (stored as the field name in
-     * "modExpr") and the destination field (stored as the value in "modExpr").
-     */
-    Status init(BSONElement modExpr, const CollatorInterface* collator) final;
+void storageValid(const mutablebson::Document& doc);
 
-    std::unique_ptr<UpdateNode> clone() const final {
-        return stdx::make_unique<RenameNode>(*this);
-    }
+/**
+ * Validates that the MutableBSON element 'elem' is acceptable for storage in a collection. If
+ * 'deep' is true, the check is performed recursively on subdocuments. Uasserts if the validation
+ * fails or if 'recursionLevel' exceeds the maximum allowable depth.
+ */
+void storageValid(mutablebson::ConstElement elem, const bool deep, std::uint32_t recursionLevel);
 
-    void setCollator(const CollatorInterface* collator) final {}
+/**
+ * Checks that all of the parents of the MutableBSON element 'elem' are valid for storage. Note that
+ * 'elem' must be in a valid state when using this function. Uasserts if the validation fails, or if
+ * 'recursionLevel' exceeds the maximum allowable depth. On success, an integer is returned that
+ * represents the number of steps from this element to the root through ancestor nodes.
+ */
+std::uint32_t storageValidParents(mutablebson::ConstElement elem, std::uint32_t recursionLevel);
 
-    void apply(mutablebson::Element element,
-               FieldRef* pathToCreate,
-               FieldRef* pathTaken,
-               StringData matchedField,
-               bool fromReplication,
-               bool validateForStorage,
-               const FieldRefSet& immutablePaths,
-               const UpdateIndexData* indexData,
-               LogBuilder* logBuilder,
-               bool* indexesAffected,
-               bool* noop) const final;
-
-private:
-    BSONElement _val;
-};
+}  // namespace storage_validation
 
 }  // namespace mongo

@@ -46,6 +46,8 @@ public:
                FieldRef* pathTaken,
                StringData matchedField,
                bool fromReplication,
+               bool validateForStorage,
+               const FieldRefSet& immutablePaths,
                const UpdateIndexData* indexData,
                LogBuilder* logBuilder,
                bool* indexesAffected,

@@ -119,6 +119,8 @@ TEST(ArithmeticNodeTest, ApplyIncNoOp) {
     FieldRef pathTaken("a");
     StringData matchedField;
     auto fromReplication = false;
+    auto validateForStorage = true;
+    FieldRefSet immutablePaths;
     UpdateIndexData indexData;
     indexData.addPath("a");
     Document logDoc;
@@ -130,6 +132,8 @@ TEST(ArithmeticNodeTest, ApplyIncNoOp) {
                &pathTaken,
                matchedField,
                fromReplication,
+               validateForStorage,
+               immutablePaths,
                &indexData,
                &logBuilder,
                &indexesAffected,
@@ -152,6 +156,8 @@ TEST(ArithmeticNodeTest, ApplyMulNoOp) {
     FieldRef pathTaken("a");
     StringData matchedField;
     auto fromReplication = false;
+    auto validateForStorage = true;
+    FieldRefSet immutablePaths;
     UpdateIndexData indexData;
     indexData.addPath("a");
     Document logDoc;
@@ -163,6 +169,8 @@ TEST(ArithmeticNodeTest, ApplyMulNoOp) {
                &pathTaken,
                matchedField,
                fromReplication,
+               validateForStorage,
+               immutablePaths,
                &indexData,
                &logBuilder,
                &indexesAffected,
@@ -185,6 +193,8 @@ TEST(ArithmeticNodeTest, ApplyRoundingNoOp) {
     FieldRef pathTaken("a");
     StringData matchedField;
     auto fromReplication = false;
+    auto validateForStorage = true;
+    FieldRefSet immutablePaths;
     UpdateIndexData indexData;
     indexData.addPath("a");
     Document logDoc;
@@ -196,6 +206,8 @@ TEST(ArithmeticNodeTest, ApplyRoundingNoOp) {
                &pathTaken,
                matchedField,
                fromReplication,
+               validateForStorage,
+               immutablePaths,
                &indexData,
                &logBuilder,
                &indexesAffected,
@@ -218,6 +230,8 @@ TEST(ArithmeticNodeTest, ApplyEmptyPathToCreate) {
     FieldRef pathTaken("a");
     StringData matchedField;
     auto fromReplication = false;
+    auto validateForStorage = true;
+    FieldRefSet immutablePaths;
     UpdateIndexData indexData;
     indexData.addPath("a");
     Document logDoc;
@@ -229,6 +243,8 @@ TEST(ArithmeticNodeTest, ApplyEmptyPathToCreate) {
                &pathTaken,
                matchedField,
                fromReplication,
+               validateForStorage,
+               immutablePaths,
                &indexData,
                &logBuilder,
                &indexesAffected,
@@ -251,6 +267,8 @@ TEST(ArithmeticNodeTest, ApplyCreatePath) {
     FieldRef pathTaken("a");
     StringData matchedField;
     auto fromReplication = false;
+    auto validateForStorage = true;
+    FieldRefSet immutablePaths;
     UpdateIndexData indexData;
     indexData.addPath("a");
     Document logDoc;
@@ -262,6 +280,8 @@ TEST(ArithmeticNodeTest, ApplyCreatePath) {
                &pathTaken,
                matchedField,
                fromReplication,
+               validateForStorage,
+               immutablePaths,
                &indexData,
                &logBuilder,
                &indexesAffected,
@@ -284,6 +304,8 @@ TEST(ArithmeticNodeTest, ApplyExtendPath) {
     FieldRef pathTaken("a");
     StringData matchedField;
     auto fromReplication = false;
+    auto validateForStorage = true;
+    FieldRefSet immutablePaths;
     UpdateIndexData indexData;
     indexData.addPath("a.b");
     LogBuilder* logBuilder = nullptr;
@@ -294,6 +316,8 @@ TEST(ArithmeticNodeTest, ApplyExtendPath) {
                &pathTaken,
                matchedField,
                fromReplication,
+               validateForStorage,
+               immutablePaths,
                &indexData,
                logBuilder,
                &indexesAffected,
@@ -315,6 +339,8 @@ TEST(ArithmeticNodeTest, ApplyCreatePathFromRoot) {
     FieldRef pathTaken("");
     StringData matchedField;
     auto fromReplication = false;
+    auto validateForStorage = true;
+    FieldRefSet immutablePaths;
     UpdateIndexData indexData;
     indexData.addPath("a");
     Document logDoc;
@@ -326,6 +352,8 @@ TEST(ArithmeticNodeTest, ApplyCreatePathFromRoot) {
                &pathTaken,
                matchedField,
                fromReplication,
+               validateForStorage,
+               immutablePaths,
                &indexData,
                &logBuilder,
                &indexesAffected,
@@ -348,6 +376,8 @@ TEST(ArithmeticNodeTest, ApplyPositional) {
     FieldRef pathTaken("a.1");
     StringData matchedField("1");
     auto fromReplication = false;
+    auto validateForStorage = true;
+    FieldRefSet immutablePaths;
     UpdateIndexData indexData;
     indexData.addPath("a");
     Document logDoc;
@@ -359,6 +389,8 @@ TEST(ArithmeticNodeTest, ApplyPositional) {
                &pathTaken,
                matchedField,
                fromReplication,
+               validateForStorage,
+               immutablePaths,
                &indexData,
                &logBuilder,
                &indexesAffected,
@@ -381,6 +413,8 @@ TEST(ArithmeticNodeTest, ApplyNonViablePathToInc) {
     FieldRef pathTaken("a");
     StringData matchedField;
     auto fromReplication = false;
+    auto validateForStorage = true;
+    FieldRefSet immutablePaths;
     UpdateIndexData indexData;
     indexData.addPath("a");
     Document logDoc;
@@ -392,6 +426,8 @@ TEST(ArithmeticNodeTest, ApplyNonViablePathToInc) {
                                            &pathTaken,
                                            matchedField,
                                            fromReplication,
+                                           validateForStorage,
+                                           immutablePaths,
                                            &indexData,
                                            &logBuilder,
                                            &indexesAffected,
@@ -412,6 +448,8 @@ TEST(ArithmeticNodeTest, ApplyNonViablePathToCreateFromReplicationIsNoOp) {
     FieldRef pathTaken("a");
     StringData matchedField;
     auto fromReplication = true;
+    auto validateForStorage = true;
+    FieldRefSet immutablePaths;
     UpdateIndexData indexData;
     indexData.addPath("a");
     Document logDoc;
@@ -423,6 +461,8 @@ TEST(ArithmeticNodeTest, ApplyNonViablePathToCreateFromReplicationIsNoOp) {
                &pathTaken,
                matchedField,
                fromReplication,
+               validateForStorage,
+               immutablePaths,
                &indexData,
                &logBuilder,
                &indexesAffected,
@@ -445,6 +485,8 @@ TEST(ArithmeticNodeTest, ApplyNoIndexDataNoLogBuilder) {
     FieldRef pathTaken("a");
     StringData matchedField;
     auto fromReplication = false;
+    auto validateForStorage = true;
+    FieldRefSet immutablePaths;
     const UpdateIndexData* indexData = nullptr;
     LogBuilder* logBuilder = nullptr;
     auto indexesAffected = false;
@@ -454,6 +496,8 @@ TEST(ArithmeticNodeTest, ApplyNoIndexDataNoLogBuilder) {
                &pathTaken,
                matchedField,
                fromReplication,
+               validateForStorage,
+               immutablePaths,
                indexData,
                logBuilder,
                &indexesAffected,
@@ -475,6 +519,8 @@ TEST(ArithmeticNodeTest, ApplyDoesNotAffectIndexes) {
     FieldRef pathTaken("a");
     StringData matchedField;
     auto fromReplication = false;
+    auto validateForStorage = true;
+    FieldRefSet immutablePaths;
     UpdateIndexData indexData;
     indexData.addPath("b");
     LogBuilder* logBuilder = nullptr;
@@ -485,6 +531,8 @@ TEST(ArithmeticNodeTest, ApplyDoesNotAffectIndexes) {
                &pathTaken,
                matchedField,
                fromReplication,
+               validateForStorage,
+               immutablePaths,
                &indexData,
                logBuilder,
                &indexesAffected,
@@ -506,6 +554,8 @@ TEST(ArithmeticNodeTest, IncTypePromotionIsNotANoOp) {
     FieldRef pathTaken("a");
     StringData matchedField;
     auto fromReplication = false;
+    auto validateForStorage = true;
+    FieldRefSet immutablePaths;
     UpdateIndexData indexData;
     indexData.addPath("a");
     LogBuilder* logBuilder = nullptr;
@@ -516,6 +566,8 @@ TEST(ArithmeticNodeTest, IncTypePromotionIsNotANoOp) {
                &pathTaken,
                matchedField,
                fromReplication,
+               validateForStorage,
+               immutablePaths,
                &indexData,
                logBuilder,
                &indexesAffected,
@@ -537,6 +589,8 @@ TEST(ArithmeticNodeTest, MulTypePromotionIsNotANoOp) {
     FieldRef pathTaken("a");
     StringData matchedField;
     auto fromReplication = false;
+    auto validateForStorage = true;
+    FieldRefSet immutablePaths;
     UpdateIndexData indexData;
     indexData.addPath("a");
     LogBuilder* logBuilder = nullptr;
@@ -547,6 +601,8 @@ TEST(ArithmeticNodeTest, MulTypePromotionIsNotANoOp) {
                &pathTaken,
                matchedField,
                fromReplication,
+               validateForStorage,
+               immutablePaths,
                &indexData,
                logBuilder,
                &indexesAffected,
@@ -568,6 +624,8 @@ TEST(ArithmeticNodeTest, TypePromotionFromIntToDecimalIsNotANoOp) {
     FieldRef pathTaken("a");
     StringData matchedField;
     auto fromReplication = false;
+    auto validateForStorage = true;
+    FieldRefSet immutablePaths;
     UpdateIndexData indexData;
     indexData.addPath("a");
     Document logDoc;
@@ -579,6 +637,8 @@ TEST(ArithmeticNodeTest, TypePromotionFromIntToDecimalIsNotANoOp) {
                &pathTaken,
                matchedField,
                fromReplication,
+               validateForStorage,
+               immutablePaths,
                &indexData,
                &logBuilder,
                &indexesAffected,
@@ -601,6 +661,8 @@ TEST(ArithmeticNodeTest, TypePromotionFromLongToDecimalIsNotANoOp) {
     FieldRef pathTaken("a");
     StringData matchedField;
     auto fromReplication = false;
+    auto validateForStorage = true;
+    FieldRefSet immutablePaths;
     UpdateIndexData indexData;
     indexData.addPath("a");
     Document logDoc;
@@ -612,6 +674,8 @@ TEST(ArithmeticNodeTest, TypePromotionFromLongToDecimalIsNotANoOp) {
                &pathTaken,
                matchedField,
                fromReplication,
+               validateForStorage,
+               immutablePaths,
                &indexData,
                &logBuilder,
                &indexesAffected,
@@ -634,6 +698,8 @@ TEST(ArithmeticNodeTest, TypePromotionFromDoubleToDecimalIsNotANoOp) {
     FieldRef pathTaken("a");
     StringData matchedField;
     auto fromReplication = false;
+    auto validateForStorage = true;
+    FieldRefSet immutablePaths;
     UpdateIndexData indexData;
     indexData.addPath("a");
     Document logDoc;
@@ -645,6 +711,8 @@ TEST(ArithmeticNodeTest, TypePromotionFromDoubleToDecimalIsNotANoOp) {
                &pathTaken,
                matchedField,
                fromReplication,
+               validateForStorage,
+               immutablePaths,
                &indexData,
                &logBuilder,
                &indexesAffected,
@@ -667,6 +735,8 @@ TEST(ArithmeticNodeTest, ApplyPromoteToFloatingPoint) {
     FieldRef pathTaken("a");
     StringData matchedField;
     auto fromReplication = false;
+    auto validateForStorage = true;
+    FieldRefSet immutablePaths;
     UpdateIndexData indexData;
     indexData.addPath("a");
     LogBuilder* logBuilder = nullptr;
@@ -677,6 +747,8 @@ TEST(ArithmeticNodeTest, ApplyPromoteToFloatingPoint) {
                &pathTaken,
                matchedField,
                fromReplication,
+               validateForStorage,
+               immutablePaths,
                &indexData,
                logBuilder,
                &indexesAffected,
@@ -698,6 +770,8 @@ TEST(ArithmeticNodeTest, IncrementedDecimalStaysDecimal) {
     FieldRef pathTaken("a");
     StringData matchedField;
     auto fromReplication = false;
+    auto validateForStorage = true;
+    FieldRefSet immutablePaths;
     UpdateIndexData indexData;
     indexData.addPath("a");
     Document logDoc;
@@ -709,6 +783,8 @@ TEST(ArithmeticNodeTest, IncrementedDecimalStaysDecimal) {
                &pathTaken,
                matchedField,
                fromReplication,
+               validateForStorage,
+               immutablePaths,
                &indexData,
                &logBuilder,
                &indexesAffected,
@@ -733,6 +809,8 @@ TEST(ArithmeticNodeTest, OverflowIntToLong) {
     FieldRef pathTaken("a");
     StringData matchedField;
     auto fromReplication = false;
+    auto validateForStorage = true;
+    FieldRefSet immutablePaths;
     UpdateIndexData indexData;
     indexData.addPath("a");
     Document logDoc;
@@ -744,6 +822,8 @@ TEST(ArithmeticNodeTest, OverflowIntToLong) {
                &pathTaken,
                matchedField,
                fromReplication,
+               validateForStorage,
+               immutablePaths,
                &indexData,
                logBuilder,
                &indexesAffected,
@@ -768,6 +848,8 @@ TEST(ArithmeticNodeTest, UnderflowIntToLong) {
     FieldRef pathTaken("a");
     StringData matchedField;
     auto fromReplication = false;
+    auto validateForStorage = true;
+    FieldRefSet immutablePaths;
     UpdateIndexData indexData;
     indexData.addPath("a");
     Document logDoc;
@@ -779,6 +861,8 @@ TEST(ArithmeticNodeTest, UnderflowIntToLong) {
                &pathTaken,
                matchedField,
                fromReplication,
+               validateForStorage,
+               immutablePaths,
                &indexData,
                logBuilder,
                &indexesAffected,
@@ -802,6 +886,8 @@ TEST(ArithmeticNodeTest, IncModeCanBeReused) {
     FieldRef pathTaken("a");
     StringData matchedField;
     auto fromReplication = false;
+    auto validateForStorage = true;
+    FieldRefSet immutablePaths;
     UpdateIndexData indexData;
     indexData.addPath("a");
     Document logDoc;
@@ -813,6 +899,8 @@ TEST(ArithmeticNodeTest, IncModeCanBeReused) {
                &pathTaken,
                matchedField,
                fromReplication,
+               validateForStorage,
+               immutablePaths,
                &indexData,
                logBuilder,
                &indexesAffected,
@@ -829,6 +917,8 @@ TEST(ArithmeticNodeTest, IncModeCanBeReused) {
                &pathTaken,
                matchedField,
                fromReplication,
+               validateForStorage,
+               immutablePaths,
                &indexData,
                logBuilder,
                &indexesAffected,
@@ -850,6 +940,8 @@ TEST(ArithmeticNodeTest, CreatedNumberHasSameTypeAsInc) {
     FieldRef pathTaken("");
     StringData matchedField;
     auto fromReplication = false;
+    auto validateForStorage = true;
+    FieldRefSet immutablePaths;
     UpdateIndexData indexData;
     indexData.addPath("a");
     LogBuilder* logBuilder = nullptr;
@@ -860,6 +952,8 @@ TEST(ArithmeticNodeTest, CreatedNumberHasSameTypeAsInc) {
                &pathTaken,
                matchedField,
                fromReplication,
+               validateForStorage,
+               immutablePaths,
                &indexData,
                logBuilder,
                &indexesAffected,
@@ -881,6 +975,8 @@ TEST(ArithmeticNodeTest, CreatedNumberHasSameTypeAsMul) {
     FieldRef pathTaken("");
     StringData matchedField;
     auto fromReplication = false;
+    auto validateForStorage = true;
+    FieldRefSet immutablePaths;
     UpdateIndexData indexData;
     indexData.addPath("a");
     LogBuilder* logBuilder = nullptr;
@@ -891,6 +987,8 @@ TEST(ArithmeticNodeTest, CreatedNumberHasSameTypeAsMul) {
                &pathTaken,
                matchedField,
                fromReplication,
+               validateForStorage,
+               immutablePaths,
                &indexData,
                logBuilder,
                &indexesAffected,
@@ -912,6 +1010,8 @@ TEST(ArithmeticNodeTest, ApplyEmptyDocument) {
     FieldRef pathTaken("");
     StringData matchedField;
     auto fromReplication = false;
+    auto validateForStorage = true;
+    FieldRefSet immutablePaths;
     UpdateIndexData indexData;
     indexData.addPath("a");
     LogBuilder* logBuilder = nullptr;
@@ -922,6 +1022,8 @@ TEST(ArithmeticNodeTest, ApplyEmptyDocument) {
                &pathTaken,
                matchedField,
                fromReplication,
+               validateForStorage,
+               immutablePaths,
                &indexData,
                logBuilder,
                &indexesAffected,
@@ -943,6 +1045,8 @@ TEST(ArithmeticNodeTest, ApplyIncToObjectFails) {
     FieldRef pathTaken("a");
     StringData matchedField;
     auto fromReplication = false;
+    auto validateForStorage = true;
+    FieldRefSet immutablePaths;
     UpdateIndexData indexData;
     indexData.addPath("a");
     LogBuilder* logBuilder = nullptr;
@@ -953,6 +1057,8 @@ TEST(ArithmeticNodeTest, ApplyIncToObjectFails) {
                                            &pathTaken,
                                            matchedField,
                                            fromReplication,
+                                           validateForStorage,
+                                           immutablePaths,
                                            &indexData,
                                            logBuilder,
                                            &indexesAffected,
@@ -974,6 +1080,8 @@ TEST(ArithmeticNodeTest, ApplyIncToArrayFails) {
     FieldRef pathTaken("a");
     StringData matchedField;
     auto fromReplication = false;
+    auto validateForStorage = true;
+    FieldRefSet immutablePaths;
     UpdateIndexData indexData;
     indexData.addPath("a");
     LogBuilder* logBuilder = nullptr;
@@ -984,6 +1092,8 @@ TEST(ArithmeticNodeTest, ApplyIncToArrayFails) {
                                            &pathTaken,
                                            matchedField,
                                            fromReplication,
+                                           validateForStorage,
+                                           immutablePaths,
                                            &indexData,
                                            logBuilder,
                                            &indexesAffected,
@@ -1005,6 +1115,8 @@ TEST(ArithmeticNodeTest, ApplyIncToStringFails) {
     FieldRef pathTaken("a");
     StringData matchedField;
     auto fromReplication = false;
+    auto validateForStorage = true;
+    FieldRefSet immutablePaths;
     UpdateIndexData indexData;
     indexData.addPath("a");
     LogBuilder* logBuilder = nullptr;
@@ -1015,6 +1127,8 @@ TEST(ArithmeticNodeTest, ApplyIncToStringFails) {
                                            &pathTaken,
                                            matchedField,
                                            fromReplication,
+                                           validateForStorage,
+                                           immutablePaths,
                                            &indexData,
                                            logBuilder,
                                            &indexesAffected,
@@ -1036,6 +1150,8 @@ TEST(ArithmeticNodeTest, ApplyNewPath) {
     FieldRef pathTaken("");
     StringData matchedField;
     auto fromReplication = false;
+    auto validateForStorage = true;
+    FieldRefSet immutablePaths;
     UpdateIndexData indexData;
     indexData.addPath("a");
     LogBuilder* logBuilder = nullptr;
@@ -1046,6 +1162,8 @@ TEST(ArithmeticNodeTest, ApplyNewPath) {
                &pathTaken,
                matchedField,
                fromReplication,
+               validateForStorage,
+               immutablePaths,
                &indexData,
                logBuilder,
                &indexesAffected,
@@ -1067,6 +1185,8 @@ TEST(ArithmeticNodeTest, ApplyEmptyIndexData) {
     FieldRef pathTaken("a");
     StringData matchedField;
     auto fromReplication = false;
+    auto validateForStorage = true;
+    FieldRefSet immutablePaths;
     const UpdateIndexData* indexData = nullptr;
     Document logDoc;
     LogBuilder logBuilder(logDoc.root());
@@ -1077,6 +1197,8 @@ TEST(ArithmeticNodeTest, ApplyEmptyIndexData) {
                &pathTaken,
                matchedField,
                fromReplication,
+               validateForStorage,
+               immutablePaths,
                indexData,
                &logBuilder,
                &indexesAffected,
@@ -1098,6 +1220,8 @@ TEST(ArithmeticNodeTest, ApplyNoOpDottedPath) {
     FieldRef pathTaken("a.b");
     StringData matchedField;
     auto fromReplication = false;
+    auto validateForStorage = true;
+    FieldRefSet immutablePaths;
     UpdateIndexData indexData;
     indexData.addPath("a.b");
     LogBuilder* logBuilder = nullptr;
@@ -1108,6 +1232,8 @@ TEST(ArithmeticNodeTest, ApplyNoOpDottedPath) {
                &pathTaken,
                matchedField,
                fromReplication,
+               validateForStorage,
+               immutablePaths,
                &indexData,
                logBuilder,
                &indexesAffected,
@@ -1129,6 +1255,8 @@ TEST(ArithmeticNodeTest, TypePromotionOnDottedPathIsNotANoOp) {
     FieldRef pathTaken("a.b");
     StringData matchedField;
     auto fromReplication = false;
+    auto validateForStorage = true;
+    FieldRefSet immutablePaths;
     UpdateIndexData indexData;
     indexData.addPath("a.b");
     LogBuilder* logBuilder = nullptr;
@@ -1139,6 +1267,8 @@ TEST(ArithmeticNodeTest, TypePromotionOnDottedPathIsNotANoOp) {
                &pathTaken,
                matchedField,
                fromReplication,
+               validateForStorage,
+               immutablePaths,
                &indexData,
                logBuilder,
                &indexesAffected,
@@ -1160,6 +1290,8 @@ TEST(ArithmeticNodeTest, ApplyPathNotViableArray) {
     FieldRef pathTaken("a");
     StringData matchedField;
     auto fromReplication = false;
+    auto validateForStorage = true;
+    FieldRefSet immutablePaths;
     const UpdateIndexData* indexData = nullptr;
     LogBuilder* logBuilder = nullptr;
     auto indexesAffected = false;
@@ -1169,6 +1301,8 @@ TEST(ArithmeticNodeTest, ApplyPathNotViableArray) {
                                            &pathTaken,
                                            matchedField,
                                            fromReplication,
+                                           validateForStorage,
+                                           immutablePaths,
                                            indexData,
                                            logBuilder,
                                            &indexesAffected,
@@ -1189,6 +1323,8 @@ TEST(ArithmeticNodeTest, ApplyInPlaceDottedPath) {
     FieldRef pathTaken("a.b");
     StringData matchedField;
     auto fromReplication = false;
+    auto validateForStorage = true;
+    FieldRefSet immutablePaths;
     UpdateIndexData indexData;
     indexData.addPath("a.b");
     LogBuilder* logBuilder = nullptr;
@@ -1199,6 +1335,8 @@ TEST(ArithmeticNodeTest, ApplyInPlaceDottedPath) {
                &pathTaken,
                matchedField,
                fromReplication,
+               validateForStorage,
+               immutablePaths,
                &indexData,
                logBuilder,
                &indexesAffected,
@@ -1220,6 +1358,8 @@ TEST(ArithmeticNodeTest, ApplyPromotionDottedPath) {
     FieldRef pathTaken("a.b");
     StringData matchedField;
     auto fromReplication = false;
+    auto validateForStorage = true;
+    FieldRefSet immutablePaths;
     UpdateIndexData indexData;
     indexData.addPath("a.b");
     LogBuilder* logBuilder = nullptr;
@@ -1230,6 +1370,8 @@ TEST(ArithmeticNodeTest, ApplyPromotionDottedPath) {
                &pathTaken,
                matchedField,
                fromReplication,
+               validateForStorage,
+               immutablePaths,
                &indexData,
                logBuilder,
                &indexesAffected,
@@ -1251,6 +1393,8 @@ TEST(ArithmeticNodeTest, ApplyDottedPathEmptyDoc) {
     FieldRef pathTaken("");
     StringData matchedField;
     auto fromReplication = false;
+    auto validateForStorage = true;
+    FieldRefSet immutablePaths;
     UpdateIndexData indexData;
     indexData.addPath("a.b");
     LogBuilder* logBuilder = nullptr;
@@ -1261,6 +1405,8 @@ TEST(ArithmeticNodeTest, ApplyDottedPathEmptyDoc) {
                &pathTaken,
                matchedField,
                fromReplication,
+               validateForStorage,
+               immutablePaths,
                &indexData,
                logBuilder,
                &indexesAffected,
@@ -1282,6 +1428,8 @@ TEST(ArithmeticNodeTest, ApplyFieldWithDot) {
     FieldRef pathTaken("");
     StringData matchedField;
     auto fromReplication = false;
+    auto validateForStorage = true;
+    FieldRefSet immutablePaths;
     UpdateIndexData indexData;
     indexData.addPath("a.b");
     LogBuilder* logBuilder = nullptr;
@@ -1292,6 +1440,8 @@ TEST(ArithmeticNodeTest, ApplyFieldWithDot) {
                &pathTaken,
                matchedField,
                fromReplication,
+               validateForStorage,
+               immutablePaths,
                &indexData,
                logBuilder,
                &indexesAffected,
@@ -1313,6 +1463,8 @@ TEST(ArithmeticNodeTest, ApplyNoOpArrayIndex) {
     FieldRef pathTaken("a.2.b");
     StringData matchedField;
     auto fromReplication = false;
+    auto validateForStorage = true;
+    FieldRefSet immutablePaths;
     UpdateIndexData indexData;
     indexData.addPath("a");
     LogBuilder* logBuilder = nullptr;
@@ -1323,6 +1475,8 @@ TEST(ArithmeticNodeTest, ApplyNoOpArrayIndex) {
                &pathTaken,
                matchedField,
                fromReplication,
+               validateForStorage,
+               immutablePaths,
                &indexData,
                logBuilder,
                &indexesAffected,
@@ -1344,6 +1498,8 @@ TEST(ArithmeticNodeTest, TypePromotionInArrayIsNotANoOp) {
     FieldRef pathTaken("a.2.b");
     StringData matchedField;
     auto fromReplication = false;
+    auto validateForStorage = true;
+    FieldRefSet immutablePaths;
     UpdateIndexData indexData;
     indexData.addPath("a");
     LogBuilder* logBuilder = nullptr;
@@ -1354,6 +1510,8 @@ TEST(ArithmeticNodeTest, TypePromotionInArrayIsNotANoOp) {
                &pathTaken,
                matchedField,
                fromReplication,
+               validateForStorage,
+               immutablePaths,
                &indexData,
                logBuilder,
                &indexesAffected,
@@ -1375,6 +1533,8 @@ TEST(ArithmeticNodeTest, ApplyNonViablePathThroughArray) {
     FieldRef pathTaken("a");
     StringData matchedField;
     auto fromReplication = false;
+    auto validateForStorage = true;
+    FieldRefSet immutablePaths;
     const UpdateIndexData* indexData = nullptr;
     LogBuilder* logBuilder = nullptr;
     auto indexesAffected = false;
@@ -1384,6 +1544,8 @@ TEST(ArithmeticNodeTest, ApplyNonViablePathThroughArray) {
                                            &pathTaken,
                                            matchedField,
                                            fromReplication,
+                                           validateForStorage,
+                                           immutablePaths,
                                            indexData,
                                            logBuilder,
                                            &indexesAffected,
@@ -1404,6 +1566,8 @@ TEST(ArithmeticNodeTest, ApplyInPlaceArrayIndex) {
     FieldRef pathTaken("a.2.b");
     StringData matchedField;
     auto fromReplication = false;
+    auto validateForStorage = true;
+    FieldRefSet immutablePaths;
     UpdateIndexData indexData;
     indexData.addPath("a");
     LogBuilder* logBuilder = nullptr;
@@ -1414,6 +1578,8 @@ TEST(ArithmeticNodeTest, ApplyInPlaceArrayIndex) {
                &pathTaken,
                matchedField,
                fromReplication,
+               validateForStorage,
+               immutablePaths,
                &indexData,
                logBuilder,
                &indexesAffected,
@@ -1435,6 +1601,8 @@ TEST(ArithmeticNodeTest, ApplyAppendArray) {
     FieldRef pathTaken("a");
     StringData matchedField;
     auto fromReplication = false;
+    auto validateForStorage = true;
+    FieldRefSet immutablePaths;
     UpdateIndexData indexData;
     indexData.addPath("a");
     LogBuilder* logBuilder = nullptr;
@@ -1445,6 +1613,8 @@ TEST(ArithmeticNodeTest, ApplyAppendArray) {
                &pathTaken,
                matchedField,
                fromReplication,
+               validateForStorage,
+               immutablePaths,
                &indexData,
                logBuilder,
                &indexesAffected,
@@ -1466,6 +1636,8 @@ TEST(ArithmeticNodeTest, ApplyPaddingArray) {
     FieldRef pathTaken("a");
     StringData matchedField;
     auto fromReplication = false;
+    auto validateForStorage = true;
+    FieldRefSet immutablePaths;
     UpdateIndexData indexData;
     indexData.addPath("a");
     LogBuilder* logBuilder = nullptr;
@@ -1476,6 +1648,8 @@ TEST(ArithmeticNodeTest, ApplyPaddingArray) {
                &pathTaken,
                matchedField,
                fromReplication,
+               validateForStorage,
+               immutablePaths,
                &indexData,
                logBuilder,
                &indexesAffected,
@@ -1497,6 +1671,8 @@ TEST(ArithmeticNodeTest, ApplyNumericObject) {
     FieldRef pathTaken("a");
     StringData matchedField;
     auto fromReplication = false;
+    auto validateForStorage = true;
+    FieldRefSet immutablePaths;
     UpdateIndexData indexData;
     indexData.addPath("a");
     LogBuilder* logBuilder = nullptr;
@@ -1507,6 +1683,8 @@ TEST(ArithmeticNodeTest, ApplyNumericObject) {
                &pathTaken,
                matchedField,
                fromReplication,
+               validateForStorage,
+               immutablePaths,
                &indexData,
                logBuilder,
                &indexesAffected,
@@ -1528,6 +1706,8 @@ TEST(ArithmeticNodeTest, ApplyNumericField) {
     FieldRef pathTaken("a.2.b");
     StringData matchedField;
     auto fromReplication = false;
+    auto validateForStorage = true;
+    FieldRefSet immutablePaths;
     UpdateIndexData indexData;
     indexData.addPath("a");
     LogBuilder* logBuilder = nullptr;
@@ -1538,6 +1718,8 @@ TEST(ArithmeticNodeTest, ApplyNumericField) {
                &pathTaken,
                matchedField,
                fromReplication,
+               validateForStorage,
+               immutablePaths,
                &indexData,
                logBuilder,
                &indexesAffected,
@@ -1559,6 +1741,8 @@ TEST(ArithmeticNodeTest, ApplyExtendNumericField) {
     FieldRef pathTaken("a.2");
     StringData matchedField;
     auto fromReplication = false;
+    auto validateForStorage = true;
+    FieldRefSet immutablePaths;
     UpdateIndexData indexData;
     indexData.addPath("a");
     LogBuilder* logBuilder = nullptr;
@@ -1569,6 +1753,8 @@ TEST(ArithmeticNodeTest, ApplyExtendNumericField) {
                &pathTaken,
                matchedField,
                fromReplication,
+               validateForStorage,
+               immutablePaths,
                &indexData,
                logBuilder,
                &indexesAffected,
@@ -1590,6 +1776,8 @@ TEST(ArithmeticNodeTest, ApplyNumericFieldToEmptyObject) {
     FieldRef pathTaken("a");
     StringData matchedField;
     auto fromReplication = false;
+    auto validateForStorage = true;
+    FieldRefSet immutablePaths;
     UpdateIndexData indexData;
     indexData.addPath("a");
     LogBuilder* logBuilder = nullptr;
@@ -1600,6 +1788,8 @@ TEST(ArithmeticNodeTest, ApplyNumericFieldToEmptyObject) {
                &pathTaken,
                matchedField,
                fromReplication,
+               validateForStorage,
+               immutablePaths,
                &indexData,
                logBuilder,
                &indexesAffected,
@@ -1621,6 +1811,8 @@ TEST(ArithmeticNodeTest, ApplyEmptyArray) {
     FieldRef pathTaken("a");
     StringData matchedField;
     auto fromReplication = false;
+    auto validateForStorage = true;
+    FieldRefSet immutablePaths;
     UpdateIndexData indexData;
     indexData.addPath("a");
     LogBuilder* logBuilder = nullptr;
@@ -1631,6 +1823,8 @@ TEST(ArithmeticNodeTest, ApplyEmptyArray) {
                &pathTaken,
                matchedField,
                fromReplication,
+               validateForStorage,
+               immutablePaths,
                &indexData,
                logBuilder,
                &indexesAffected,
@@ -1652,6 +1846,8 @@ TEST(ArithmeticNodeTest, ApplyLogDottedPath) {
     FieldRef pathTaken("a");
     StringData matchedField;
     auto fromReplication = false;
+    auto validateForStorage = true;
+    FieldRefSet immutablePaths;
     const UpdateIndexData* indexData = nullptr;
     Document logDoc;
     LogBuilder logBuilder(logDoc.root());
@@ -1662,6 +1858,8 @@ TEST(ArithmeticNodeTest, ApplyLogDottedPath) {
                &pathTaken,
                matchedField,
                fromReplication,
+               validateForStorage,
+               immutablePaths,
                indexData,
                &logBuilder,
                &indexesAffected,
@@ -1683,6 +1881,8 @@ TEST(ArithmeticNodeTest, LogEmptyArray) {
     FieldRef pathTaken("a");
     StringData matchedField;
     auto fromReplication = false;
+    auto validateForStorage = true;
+    FieldRefSet immutablePaths;
     const UpdateIndexData* indexData = nullptr;
     Document logDoc;
     LogBuilder logBuilder(logDoc.root());
@@ -1693,6 +1893,8 @@ TEST(ArithmeticNodeTest, LogEmptyArray) {
                &pathTaken,
                matchedField,
                fromReplication,
+               validateForStorage,
+               immutablePaths,
                indexData,
                &logBuilder,
                &indexesAffected,
@@ -1714,6 +1916,8 @@ TEST(ArithmeticNodeTest, LogEmptyObject) {
     FieldRef pathTaken("a");
     StringData matchedField;
     auto fromReplication = false;
+    auto validateForStorage = true;
+    FieldRefSet immutablePaths;
     const UpdateIndexData* indexData = nullptr;
     Document logDoc;
     LogBuilder logBuilder(logDoc.root());
@@ -1724,6 +1928,8 @@ TEST(ArithmeticNodeTest, LogEmptyObject) {
                &pathTaken,
                matchedField,
                fromReplication,
+               validateForStorage,
+               immutablePaths,
                indexData,
                &logBuilder,
                &indexesAffected,
@@ -1748,6 +1954,8 @@ TEST(ArithmeticNodeTest, ApplyDeserializedDocNotNoOp) {
     FieldRef pathTaken("");
     StringData matchedField;
     auto fromReplication = false;
+    auto validateForStorage = true;
+    FieldRefSet immutablePaths;
     const UpdateIndexData* indexData = nullptr;
     Document logDoc;
     LogBuilder logBuilder(logDoc.root());
@@ -1758,6 +1966,8 @@ TEST(ArithmeticNodeTest, ApplyDeserializedDocNotNoOp) {
                &pathTaken,
                matchedField,
                fromReplication,
+               validateForStorage,
+               immutablePaths,
                indexData,
                &logBuilder,
                &indexesAffected,
@@ -1783,6 +1993,8 @@ TEST(ArithmeticNodeTest, ApplyToDeserializedDocNoOp) {
     FieldRef pathTaken("a");
     StringData matchedField;
     auto fromReplication = false;
+    auto validateForStorage = true;
+    FieldRefSet immutablePaths;
     const UpdateIndexData* indexData = nullptr;
     Document logDoc;
     LogBuilder logBuilder(logDoc.root());
@@ -1793,6 +2005,8 @@ TEST(ArithmeticNodeTest, ApplyToDeserializedDocNoOp) {
                &pathTaken,
                matchedField,
                fromReplication,
+               validateForStorage,
+               immutablePaths,
                indexData,
                &logBuilder,
                &indexesAffected,
@@ -1818,6 +2032,8 @@ TEST(ArithmeticNodeTest, ApplyToDeserializedDocNestedNoop) {
     FieldRef pathTaken("a.b");
     StringData matchedField;
     auto fromReplication = false;
+    auto validateForStorage = true;
+    FieldRefSet immutablePaths;
     const UpdateIndexData* indexData = nullptr;
     Document logDoc;
     LogBuilder logBuilder(logDoc.root());
@@ -1828,6 +2044,8 @@ TEST(ArithmeticNodeTest, ApplyToDeserializedDocNestedNoop) {
                &pathTaken,
                matchedField,
                fromReplication,
+               validateForStorage,
+               immutablePaths,
                indexData,
                &logBuilder,
                &indexesAffected,
@@ -1853,6 +2071,8 @@ TEST(ArithmeticNodeTest, ApplyToDeserializedDocNestedNotNoop) {
     FieldRef pathTaken("a.b");
     StringData matchedField;
     auto fromReplication = false;
+    auto validateForStorage = true;
+    FieldRefSet immutablePaths;
     const UpdateIndexData* indexData = nullptr;
     Document logDoc;
     LogBuilder logBuilder(logDoc.root());
@@ -1863,6 +2083,8 @@ TEST(ArithmeticNodeTest, ApplyToDeserializedDocNestedNotNoop) {
                &pathTaken,
                matchedField,
                fromReplication,
+               validateForStorage,
+               immutablePaths,
                indexData,
                &logBuilder,
                &indexesAffected,

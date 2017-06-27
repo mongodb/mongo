@@ -106,8 +106,26 @@ TEST_F(EmptyDoc, NewField) {
 
     Element newElem = doc().makeElementInt("a", 1);
     ASSERT_TRUE(newElem.ok());
-    ASSERT_OK(createPathAt(field(), 0, root(), newElem));
+    auto firstNewElem = createPathAt(field(), 0, root(), newElem);
+    ASSERT_OK(firstNewElem);
+    ASSERT_EQUALS(firstNewElem.getValue().compareWithElement(root()["a"], nullptr), 0);
     ASSERT_EQUALS(fromjson("{a: 1}"), doc());
+}
+
+TEST_F(EmptyDoc, NewPath) {
+    setField("a.b.c");
+
+    size_t idxFound;
+    Element elemFound = root();
+    Status status = findLongestPrefix(field(), root(), &idxFound, &elemFound);
+    ASSERT_EQUALS(status, ErrorCodes::NonExistentPath);
+
+    Element newElem = doc().makeElementInt("c", 1);
+    ASSERT_TRUE(newElem.ok());
+    auto firstNewElem = createPathAt(field(), 0, root(), newElem);
+    ASSERT_OK(firstNewElem);
+    ASSERT_EQUALS(firstNewElem.getValue().compareWithElement(root()["a"], nullptr), 0);
+    ASSERT_EQUALS(fromjson("{a: {b: {c: 1}}}"), doc());
 }
 
 class SimpleDoc : public mongo::unittest::Test {
@@ -184,7 +202,9 @@ TEST_F(SimpleDoc, NotCommonPrefix) {
     ASSERT_TRUE(newElem.ok());
     ASSERT_EQUALS(countChildren(root()), 1u);
 
-    ASSERT_OK(createPathAt(field(), 0, root(), newElem));
+    auto firstNewElem = createPathAt(field(), 0, root(), newElem);
+    ASSERT_OK(firstNewElem);
+    ASSERT_EQUALS(firstNewElem.getValue().compareWithElement(root()["b"], nullptr), 0);
     ASSERT_EQUALS(newElem.getFieldName(), "b");
     ASSERT_EQUALS(newElem.getType(), NumberInt);
     ASSERT_TRUE(newElem.hasValue());
@@ -206,8 +226,8 @@ TEST_F(SimpleDoc, CreatePathAtFailsIfElemFoundIsNonObjectNonArray) {
     ASSERT_TRUE(newElem.ok());
     auto result = createPathAt(field(), 0, elemFound, newElem);
     ASSERT_NOT_OK(result);
-    ASSERT_EQ(result.code(), ErrorCodes::PathNotViable);
-    ASSERT_EQ(result.reason(), "Cannot create field 'b' in element {a: 1}");
+    ASSERT_EQ(result.getStatus().code(), ErrorCodes::PathNotViable);
+    ASSERT_EQ(result.getStatus().reason(), "Cannot create field 'b' in element {a: 1}");
 }
 
 class NestedDoc : public mongo::unittest::Test {
@@ -307,7 +327,9 @@ TEST_F(NestedDoc, NewFieldNested) {
     ASSERT_TRUE(newElem.ok());
     ASSERT_EQUALS(countChildren(elemFound), 1u);  // 'c' is a child of 'b'
 
-    ASSERT_OK(createPathAt(field(), idxFound + 1, elemFound, newElem));
+    auto firstNewElem = createPathAt(field(), idxFound + 1, elemFound, newElem);
+    ASSERT_OK(firstNewElem);
+    ASSERT_EQUALS(firstNewElem.getValue().compareWithElement(root()["a"]["b"]["d"], nullptr), 0);
     ASSERT_EQUALS(fromjson("{a: {b: {c: 1, d: 1}}}"), doc());
 }
 
@@ -410,7 +432,10 @@ TEST_F(ArrayDoc, ExtendingExistingObject) {
     ASSERT_TRUE(newElem.ok());
     ASSERT_EQUALS(countChildren(elemFound), 1u);  // '{c:1}' is a child of b.0
 
-    ASSERT_OK(createPathAt(field(), idxFound + 1, elemFound, newElem));
+    auto firstNewElem = createPathAt(field(), idxFound + 1, elemFound, newElem);
+    ASSERT_OK(firstNewElem);
+    ASSERT_EQUALS(
+        firstNewElem.getValue().compareWithElement(root()["b"].findNthChild(0)["d"], nullptr), 0);
     ASSERT_EQUALS(fromjson("{a: [], b: [{c:1, d:1}]}"), doc());
 }
 
@@ -429,7 +454,10 @@ TEST_F(ArrayDoc, NewObjectInsideArray) {
     ASSERT_TRUE(newElem.ok());
     ASSERT_EQUALS(countChildren(elemFound), 1u);  // '{c:1}' is a child of 'b'
 
-    ASSERT_OK(createPathAt(field(), idxFound + 1, elemFound, newElem));
+    auto firstNewElem = createPathAt(field(), idxFound + 1, elemFound, newElem);
+    ASSERT_OK(firstNewElem);
+    ASSERT_EQUALS(firstNewElem.getValue().compareWithElement(root()["b"].findNthChild(1), nullptr),
+                  0);
     ASSERT_EQUALS(fromjson("{a: [], b: [{c:1},{c:2}]}"), doc());
 }
 
@@ -448,7 +476,10 @@ TEST_F(ArrayDoc, NewNestedObjectInsideArray) {
     ASSERT_TRUE(newElem.ok());
     ASSERT_EQUALS(countChildren(elemFound), 1u);  // '{c:1}' is a child of 'b'
 
-    ASSERT_OK(createPathAt(field(), idxFound + 1, elemFound, newElem));
+    auto firstNewElem = createPathAt(field(), idxFound + 1, elemFound, newElem);
+    ASSERT_OK(firstNewElem);
+    ASSERT_EQUALS(firstNewElem.getValue().compareWithElement(root()["b"].findNthChild(1), nullptr),
+                  0);
     ASSERT_EQUALS(fromjson("{a: [], b: [{c:1},{c:{d:2}}]}"), doc());
 }
 
@@ -467,7 +498,10 @@ TEST_F(ArrayDoc, ArrayPaddingNecessary) {
     ASSERT_TRUE(newElem.ok());
     ASSERT_EQUALS(countChildren(elemFound), 1u);  // '{c:1}' is a child of 'b'
 
-    ASSERT_OK(createPathAt(field(), idxFound + 1, elemFound, newElem));
+    auto firstNewElem = createPathAt(field(), idxFound + 1, elemFound, newElem);
+    ASSERT_OK(firstNewElem);
+    ASSERT_EQUALS(firstNewElem.getValue().compareWithElement(root()["b"].findNthChild(5), nullptr),
+                  0);
     ASSERT_EQUALS(fromjson("{a: [], b: [{c:1},null,null,null,null,1]}"), doc());
 }
 
@@ -486,7 +520,7 @@ TEST_F(ArrayDoc, ExcessivePaddingRequested) {
     ASSERT_TRUE(newElem.ok());
     ASSERT_EQUALS(countChildren(elemFound), 1u);  // '{c:1}' is a child of 'b'
 
-    Status status = createPathAt(field(), idxFound + 1, elemFound, newElem);
+    Status status = createPathAt(field(), idxFound + 1, elemFound, newElem).getStatus();
     ASSERT_EQUALS(status.code(), ErrorCodes::CannotBackfillArray);
 }
 
@@ -512,7 +546,12 @@ TEST_F(ArrayDoc, ExcessivePaddingNotRequestedIfArrayAlreadyPadded) {
     Element newElem = doc().makeElementInt("", 99);
     ASSERT_TRUE(newElem.ok());
 
-    ASSERT_OK(createPathAt(field(), idxFound + 1, elemFound, newElem));
+    auto firstNewElem = createPathAt(field(), idxFound + 1, elemFound, newElem);
+    ASSERT_OK(firstNewElem);
+    ASSERT_EQUALS(
+        firstNewElem.getValue().compareWithElement(
+            root()["a"].findNthChild(mongo::pathsupport::kMaxPaddingAllowed + 5), nullptr),
+        0);
 
     // Array should now have maxPadding + 6 elements, since the highest array index is maxPadding +
     // 5. maxPadding of these elements are nulls adding as padding, 5 were appended at the
@@ -540,8 +579,8 @@ TEST_F(ArrayDoc, CreatePathAtFailsIfElemFoundIsArrayAndIdxFoundFieldIsNonNumeric
     ASSERT_TRUE(newElem.ok());
     auto result = createPathAt(field(), 0, elemFound, newElem);
     ASSERT_NOT_OK(result);
-    ASSERT_EQ(result.code(), ErrorCodes::PathNotViable);
-    ASSERT_EQ(result.reason(), "Cannot create field 'b' in element {a: []}");
+    ASSERT_EQ(result.getStatus().code(), ErrorCodes::PathNotViable);
+    ASSERT_EQ(result.getStatus().reason(), "Cannot create field 'b' in element {a: []}");
 }
 
 //

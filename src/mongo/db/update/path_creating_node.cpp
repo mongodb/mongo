@@ -30,15 +30,90 @@
 
 #include "mongo/db/update/path_creating_node.h"
 
+#include "mongo/db/bson/dotted_path_support.h"
 #include "mongo/db/update/path_support.h"
+#include "mongo/db/update/storage_validation.h"
 
 namespace mongo {
+
+namespace {
+
+/**
+ * Checks that no immutable paths were modified in the case where we are modifying an existing path
+ * in the document. 'element' should be the modified element. 'pathTaken' is the path to the
+ * modified element. If 'pathTaken' is a strict prefix of any immutable path, 'original' should be
+ * provided as the preimage of the whole document. We assume that we have already checked the update
+ * is not a noop.
+ */
+void checkImmutablePathsNotModified(mutablebson::Element element,
+                                    FieldRef* pathTaken,
+                                    const FieldRefSet& immutablePaths,
+                                    BSONObj original) {
+    for (auto immutablePath = immutablePaths.begin(); immutablePath != immutablePaths.end();
+         ++immutablePath) {
+        auto prefixSize = pathTaken->commonPrefixSize(**immutablePath);
+
+        // If 'immutablePath' is a (strict or non-strict) prefix of 'pathTaken', and the update is
+        // not a noop, then we have modified 'immutablePath', which is immutable.
+        if (prefixSize == (*immutablePath)->numParts()) {
+            uasserted(ErrorCodes::ImmutableField,
+                      str::stream() << "Updating the path '" << pathTaken->dottedField() << "' to "
+                                    << element.toString()
+                                    << " would modify the immutable field '"
+                                    << (*immutablePath)->dottedField()
+                                    << "'");
+        }
+
+        // If 'pathTaken' is a strict prefix of 'immutablePath', then we may have modified
+        // 'immutablePath'. We already know that 'pathTaken' is not equal to 'immutablePath', or we
+        // would have uasserted.
+        if (prefixSize == pathTaken->numParts()) {
+            auto oldElem = dotted_path_support::extractElementAtPath(
+                original, (*immutablePath)->dottedField());
+
+            // We are allowed to modify immutable paths that do not yet exist.
+            if (!oldElem.ok()) {
+                continue;
+            }
+
+            auto newElem = element;
+            for (size_t i = pathTaken->numParts(); i < (*immutablePath)->numParts(); ++i) {
+                uassert(ErrorCodes::NotSingleValueField,
+                        str::stream()
+                            << "After applying the update to the document, the immutable field '"
+                            << (*immutablePath)->dottedField()
+                            << "' was found to be an array or array descendant.",
+                        newElem.getType() != BSONType::Array);
+                newElem = newElem[(*immutablePath)->getPart(i)];
+                if (!newElem.ok()) {
+                    break;
+                }
+            }
+
+            uassert(ErrorCodes::ImmutableField,
+                    str::stream() << "After applying the update, the immutable field '"
+                                  << (*immutablePath)->dottedField()
+                                  << "' was found to have been removed.",
+                    newElem.ok());
+            uassert(ErrorCodes::ImmutableField,
+                    str::stream() << "After applying the update, the immutable field '"
+                                  << (*immutablePath)->dottedField()
+                                  << "' was found to have been altered to "
+                                  << newElem.toString(),
+                    newElem.compareWithBSONElement(oldElem, nullptr, false) == 0);
+        }
+    }
+}
+
+}  // namespace
 
 void PathCreatingNode::apply(mutablebson::Element element,
                              FieldRef* pathToCreate,
                              FieldRef* pathTaken,
                              StringData matchedField,
                              bool fromReplication,
+                             bool validateForStorage,
+                             const FieldRefSet& immutablePaths,
                              const UpdateIndexData* indexData,
                              LogBuilder* logBuilder,
                              bool* indexesAffected,
@@ -50,11 +125,31 @@ void PathCreatingNode::apply(mutablebson::Element element,
     mutablebson::Element valueToLog = element.getDocument().end();
 
     if (pathToCreate->empty()) {
+
+        // If 'pathTaken' is a strict prefix of any immutable path, store the original document to
+        // ensure the immutable path does not change.
+        BSONObj original;
+        for (auto immutablePath = immutablePaths.begin(); immutablePath != immutablePaths.end();
+             ++immutablePath) {
+            if (pathTaken->isPrefixOf(**immutablePath)) {
+                original = element.getDocument().getObject();
+                break;
+            }
+        }
+
         // We found an existing element at the update path.
         updateExistingElement(&element, noop);
         if (*noop) {
             return;  // Successful no-op update.
         }
+
+        if (validateForStorage) {
+            const bool doRecursiveCheck = true;
+            const uint32_t recursionLevel = pathTaken->numParts();
+            storage_validation::storageValid(element, doRecursiveCheck, recursionLevel);
+        }
+
+        checkImmutablePathsNotModified(element, pathTaken, immutablePaths, original);
 
         valueToLog = element;
     } else {
@@ -64,8 +159,9 @@ void PathCreatingNode::apply(mutablebson::Element element,
         setValueForNewElement(&newElement);
 
         invariant(newElement.ok());
-        auto status = pathsupport::createPathAt(*pathToCreate, 0, element, newElement);
-        if (!status.isOK()) {
+        auto statusWithFirstCreatedElem =
+            pathsupport::createPathAt(*pathToCreate, 0, element, newElement);
+        if (!statusWithFirstCreatedElem.isOK()) {
             // $sets on non-viable paths are ignored when the update came from replication. We do
             // not error because idempotency requires that any other update modifiers must still be
             // applied. For example, consider applying the following updates twice to an initially
@@ -77,12 +173,34 @@ void PathCreatingNode::apply(mutablebson::Element element,
             // (There are modifiers besides $set that use this code path, but they are not used for
             // replication, so we are not concerned with their behavior when "fromReplication" is
             // true.)
-            if (status.code() == ErrorCodes::PathNotViable && fromReplication) {
+            if (statusWithFirstCreatedElem.getStatus().code() == ErrorCodes::PathNotViable &&
+                fromReplication) {
                 *noop = true;
                 return;
             }
-            uassertStatusOK(status);
+            uassertStatusOK(statusWithFirstCreatedElem);
             MONGO_UNREACHABLE;  // The previous uassertStatusOK should always throw.
+        }
+
+        if (validateForStorage) {
+            const bool doRecursiveCheck = true;
+            const uint32_t recursionLevel = pathTaken->numParts() + 1;
+            storage_validation::storageValid(
+                statusWithFirstCreatedElem.getValue(), doRecursiveCheck, recursionLevel);
+        }
+
+        for (auto immutablePath = immutablePaths.begin(); immutablePath != immutablePaths.end();
+             ++immutablePath) {
+
+            // If 'immutablePath' is a (strict or non-strict) prefix of 'pathTaken', then we are
+            // modifying 'immutablePath'. For example, adding '_id.x' will illegally modify '_id'.
+            uassert(ErrorCodes::ImmutableField,
+                    str::stream() << "Updating the path '" << pathTaken->dottedField() << "' to "
+                                  << element.toString()
+                                  << " would modify the immutable field '"
+                                  << (*immutablePath)->dottedField()
+                                  << "'",
+                    pathTaken->commonPrefixSize(**immutablePath) != (*immutablePath)->numParts());
         }
 
         valueToLog = newElement;

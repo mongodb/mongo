@@ -118,6 +118,8 @@ TEST(RenameNodeTest, SimpleNumberAtRoot) {
     FieldRef pathTaken("");
     StringData matchedField;
     auto fromReplication = false;
+    auto validateForStorage = true;
+    FieldRefSet immutablePaths;
     UpdateIndexData indexData;
     indexData.addPath("a");
     Document logDoc;
@@ -129,6 +131,8 @@ TEST(RenameNodeTest, SimpleNumberAtRoot) {
                &pathTaken,
                matchedField,
                fromReplication,
+               validateForStorage,
+               immutablePaths,
                &indexData,
                &logBuilder,
                &indexesAffected,
@@ -150,6 +154,8 @@ TEST(RenameNodeTest, ToExistsAtSameLevel) {
     FieldRef pathTaken("b");
     StringData matchedField;
     auto fromReplication = false;
+    auto validateForStorage = true;
+    FieldRefSet immutablePaths;
     UpdateIndexData indexData;
     indexData.addPath("a");
     Document logDoc;
@@ -161,6 +167,8 @@ TEST(RenameNodeTest, ToExistsAtSameLevel) {
                &pathTaken,
                matchedField,
                fromReplication,
+               validateForStorage,
+               immutablePaths,
                &indexData,
                &logBuilder,
                &indexesAffected,
@@ -182,6 +190,8 @@ TEST(RenameNodeTest, ToAndFromHaveSameValue) {
     FieldRef pathTaken("b");
     StringData matchedField;
     auto fromReplication = false;
+    auto validateForStorage = true;
+    FieldRefSet immutablePaths;
     UpdateIndexData indexData;
     indexData.addPath("a");
     Document logDoc;
@@ -193,6 +203,8 @@ TEST(RenameNodeTest, ToAndFromHaveSameValue) {
                &pathTaken,
                matchedField,
                fromReplication,
+               validateForStorage,
+               immutablePaths,
                &indexData,
                &logBuilder,
                &indexesAffected,
@@ -214,6 +226,8 @@ TEST(RenameNodeTest, FromDottedElement) {
     FieldRef pathTaken("b");
     StringData matchedField;
     auto fromReplication = false;
+    auto validateForStorage = true;
+    FieldRefSet immutablePaths;
     UpdateIndexData indexData;
     indexData.addPath("a");
     Document logDoc;
@@ -225,6 +239,8 @@ TEST(RenameNodeTest, FromDottedElement) {
                &pathTaken,
                matchedField,
                fromReplication,
+               validateForStorage,
+               immutablePaths,
                &indexData,
                &logBuilder,
                &indexesAffected,
@@ -246,6 +262,8 @@ TEST(RenameNodeTest, RenameToExistingNestedFieldDoesNotReorderFields) {
     FieldRef pathTaken("a.b.c");
     StringData matchedField;
     auto fromReplication = false;
+    auto validateForStorage = true;
+    FieldRefSet immutablePaths;
     UpdateIndexData indexData;
     indexData.addPath("a");
     Document logDoc;
@@ -257,6 +275,8 @@ TEST(RenameNodeTest, RenameToExistingNestedFieldDoesNotReorderFields) {
                &pathTaken,
                matchedField,
                fromReplication,
+               validateForStorage,
+               immutablePaths,
                &indexData,
                &logBuilder,
                &indexesAffected,
@@ -278,6 +298,8 @@ TEST(RenameNodeTest, MissingCompleteTo) {
     FieldRef pathTaken("c");
     StringData matchedField;
     auto fromReplication = false;
+    auto validateForStorage = true;
+    FieldRefSet immutablePaths;
     UpdateIndexData indexData;
     indexData.addPath("a");
     Document logDoc;
@@ -289,6 +311,8 @@ TEST(RenameNodeTest, MissingCompleteTo) {
                &pathTaken,
                matchedField,
                fromReplication,
+               validateForStorage,
+               immutablePaths,
                &indexData,
                &logBuilder,
                &indexesAffected,
@@ -310,6 +334,8 @@ TEST(RenameNodeTest, ToIsCompletelyMissing) {
     FieldRef pathTaken("");
     StringData matchedField;
     auto fromReplication = false;
+    auto validateForStorage = true;
+    FieldRefSet immutablePaths;
     UpdateIndexData indexData;
     indexData.addPath("a");
     Document logDoc;
@@ -321,6 +347,8 @@ TEST(RenameNodeTest, ToIsCompletelyMissing) {
                &pathTaken,
                matchedField,
                fromReplication,
+               validateForStorage,
+               immutablePaths,
                &indexData,
                &logBuilder,
                &indexesAffected,
@@ -342,6 +370,8 @@ TEST(RenameNodeTest, ToMissingDottedField) {
     FieldRef pathTaken("");
     StringData matchedField;
     auto fromReplication = false;
+    auto validateForStorage = true;
+    FieldRefSet immutablePaths;
     UpdateIndexData indexData;
     indexData.addPath("a");
     Document logDoc;
@@ -353,6 +383,8 @@ TEST(RenameNodeTest, ToMissingDottedField) {
                &pathTaken,
                matchedField,
                fromReplication,
+               validateForStorage,
+               immutablePaths,
                &indexData,
                &logBuilder,
                &indexesAffected,
@@ -374,6 +406,8 @@ TEST(RenameNodeTest, MoveIntoArray) {
     FieldRef pathTaken("a");
     StringData matchedField;
     auto fromReplication = false;
+    auto validateForStorage = true;
+    FieldRefSet immutablePaths;
     UpdateIndexData indexData;
     indexData.addPath("a");
     Document logDoc;
@@ -385,6 +419,8 @@ TEST(RenameNodeTest, MoveIntoArray) {
                                            &pathTaken,
                                            matchedField,
                                            fromReplication,
+                                           validateForStorage,
+                                           immutablePaths,
                                            &indexData,
                                            &logBuilder,
                                            &indexesAffected,
@@ -406,6 +442,8 @@ TEST(RenameNodeTest, MoveIntoArrayNoId) {
     FieldRef pathTaken("a");
     StringData matchedField;
     auto fromReplication = false;
+    auto validateForStorage = true;
+    FieldRefSet immutablePaths;
     UpdateIndexData indexData;
     indexData.addPath("a");
     Document logDoc;
@@ -417,6 +455,8 @@ TEST(RenameNodeTest, MoveIntoArrayNoId) {
                                            &pathTaken,
                                            matchedField,
                                            fromReplication,
+                                           validateForStorage,
+                                           immutablePaths,
                                            &indexData,
                                            &logBuilder,
                                            &indexesAffected,
@@ -438,6 +478,8 @@ TEST(RenameNodeTest, MoveToArrayElement) {
     FieldRef pathTaken("a.1");
     StringData matchedField;
     auto fromReplication = false;
+    auto validateForStorage = true;
+    FieldRefSet immutablePaths;
     UpdateIndexData indexData;
     indexData.addPath("a");
     Document logDoc;
@@ -449,6 +491,8 @@ TEST(RenameNodeTest, MoveToArrayElement) {
                                            &pathTaken,
                                            matchedField,
                                            fromReplication,
+                                           validateForStorage,
+                                           immutablePaths,
                                            &indexData,
                                            &logBuilder,
                                            &indexesAffected,
@@ -470,6 +514,8 @@ TEST(RenameNodeTest, MoveOutOfArray) {
     FieldRef pathTaken("");
     StringData matchedField;
     auto fromReplication = false;
+    auto validateForStorage = true;
+    FieldRefSet immutablePaths;
     UpdateIndexData indexData;
     indexData.addPath("a");
     Document logDoc;
@@ -481,6 +527,8 @@ TEST(RenameNodeTest, MoveOutOfArray) {
                                            &pathTaken,
                                            matchedField,
                                            fromReplication,
+                                           validateForStorage,
+                                           immutablePaths,
                                            &indexData,
                                            &logBuilder,
                                            &indexesAffected,
@@ -502,6 +550,8 @@ TEST(RenameNodeTest, MoveNonexistentEmbeddedFieldOut) {
     FieldRef pathTaken("");
     StringData matchedField;
     auto fromReplication = false;
+    auto validateForStorage = true;
+    FieldRefSet immutablePaths;
     UpdateIndexData indexData;
     indexData.addPath("a");
     Document logDoc;
@@ -514,6 +564,8 @@ TEST(RenameNodeTest, MoveNonexistentEmbeddedFieldOut) {
                    &pathTaken,
                    matchedField,
                    fromReplication,
+                   validateForStorage,
+                   immutablePaths,
                    &indexData,
                    &logBuilder,
                    &indexesAffected,
@@ -534,6 +586,8 @@ TEST(RenameNodeTest, MoveEmbeddedFieldOutWithElementNumber) {
     FieldRef pathTaken("");
     StringData matchedField;
     auto fromReplication = false;
+    auto validateForStorage = true;
+    FieldRefSet immutablePaths;
     UpdateIndexData indexData;
     indexData.addPath("a");
     Document logDoc;
@@ -545,6 +599,8 @@ TEST(RenameNodeTest, MoveEmbeddedFieldOutWithElementNumber) {
                                            &pathTaken,
                                            matchedField,
                                            fromReplication,
+                                           validateForStorage,
+                                           immutablePaths,
                                            &indexData,
                                            &logBuilder,
                                            &indexesAffected,
@@ -566,6 +622,8 @@ TEST(RenameNodeTest, ReplaceArrayField) {
     FieldRef pathTaken("b");
     StringData matchedField;
     auto fromReplication = false;
+    auto validateForStorage = true;
+    FieldRefSet immutablePaths;
     UpdateIndexData indexData;
     indexData.addPath("a");
     Document logDoc;
@@ -577,6 +635,8 @@ TEST(RenameNodeTest, ReplaceArrayField) {
                &pathTaken,
                matchedField,
                fromReplication,
+               validateForStorage,
+               immutablePaths,
                &indexData,
                &logBuilder,
                &indexesAffected,
@@ -598,6 +658,8 @@ TEST(RenameNodeTest, ReplaceWithArrayField) {
     FieldRef pathTaken("b");
     StringData matchedField;
     auto fromReplication = false;
+    auto validateForStorage = true;
+    FieldRefSet immutablePaths;
     UpdateIndexData indexData;
     indexData.addPath("a");
     Document logDoc;
@@ -609,6 +671,8 @@ TEST(RenameNodeTest, ReplaceWithArrayField) {
                &pathTaken,
                matchedField,
                fromReplication,
+               validateForStorage,
+               immutablePaths,
                &indexData,
                &logBuilder,
                &indexesAffected,
@@ -630,6 +694,8 @@ TEST(RenameNodeTest, CanRenameFromInvalidFieldName) {
     FieldRef pathTaken("");
     StringData matchedField;
     auto fromReplication = false;
+    auto validateForStorage = true;
+    FieldRefSet immutablePaths;
     UpdateIndexData indexData;
     indexData.addPath("a");
     Document logDoc;
@@ -641,6 +707,8 @@ TEST(RenameNodeTest, CanRenameFromInvalidFieldName) {
                &pathTaken,
                matchedField,
                fromReplication,
+               validateForStorage,
+               immutablePaths,
                &indexData,
                &logBuilder,
                &indexesAffected,
@@ -662,6 +730,8 @@ TEST(RenameNodeTest, RenameWithoutLogBuilderOrIndexData) {
     FieldRef pathTaken("");
     StringData matchedField;
     auto fromReplication = false;
+    auto validateForStorage = true;
+    FieldRefSet immutablePaths;
     UpdateIndexData* indexData = nullptr;
     LogBuilder* logBuilder = nullptr;
     auto indexesAffected = false;
@@ -671,6 +741,8 @@ TEST(RenameNodeTest, RenameWithoutLogBuilderOrIndexData) {
                &pathTaken,
                matchedField,
                fromReplication,
+               validateForStorage,
+               immutablePaths,
                indexData,
                logBuilder,
                &indexesAffected,
@@ -690,6 +762,8 @@ TEST(RenameNodeTest, RenameFromNonExistentPathIsNoOp) {
     FieldRef pathTaken("b");
     StringData matchedField;
     auto fromReplication = false;
+    auto validateForStorage = true;
+    FieldRefSet immutablePaths;
     UpdateIndexData indexData;
     indexData.addPath("a");
     Document logDoc;
@@ -701,6 +775,8 @@ TEST(RenameNodeTest, RenameFromNonExistentPathIsNoOp) {
                &pathTaken,
                matchedField,
                fromReplication,
+               validateForStorage,
+               immutablePaths,
                &indexData,
                &logBuilder,
                &indexesAffected,
@@ -709,6 +785,297 @@ TEST(RenameNodeTest, RenameFromNonExistentPathIsNoOp) {
     ASSERT_FALSE(indexesAffected);
     ASSERT_EQUALS(fromjson("{b: 2}"), doc);
     ASSERT_EQUALS(fromjson("{}"), logDoc);
+}
+
+TEST(RenameNodeTest, ApplyCannotRemoveRequiredPartOfDBRef) {
+    auto update = fromjson("{$rename: {'a.$id': 'b'}}");
+    const CollatorInterface* collator = nullptr;
+    RenameNode node;
+    ASSERT_OK(node.init(update["$rename"]["a.$id"], collator));
+
+    Document doc(fromjson("{a: {$ref: 'c', $id: 0}}"));
+    FieldRef pathToCreate("b");
+    FieldRef pathTaken("");
+    StringData matchedField;
+    auto fromReplication = false;
+    auto validateForStorage = true;
+    FieldRefSet immutablePaths;
+    const UpdateIndexData* indexData = nullptr;
+    LogBuilder* logBuilder = nullptr;
+    auto indexesAffected = false;
+    auto noop = false;
+    ASSERT_THROWS_CODE_AND_WHAT(node.apply(doc.root(),
+                                           &pathToCreate,
+                                           &pathTaken,
+                                           matchedField,
+                                           fromReplication,
+                                           validateForStorage,
+                                           immutablePaths,
+                                           indexData,
+                                           logBuilder,
+                                           &indexesAffected,
+                                           &noop),
+                                UserException,
+                                ErrorCodes::InvalidDBRef,
+                                "The DBRef $ref field must be followed by a $id field");
+}
+
+TEST(RenameNodeTest, ApplyCanRemoveRequiredPartOfDBRefIfValidateForStorageIsFalse) {
+    auto update = fromjson("{$rename: {'a.$id': 'b'}}");
+    const CollatorInterface* collator = nullptr;
+    RenameNode node;
+    ASSERT_OK(node.init(update["$rename"]["a.$id"], collator));
+
+    Document doc(fromjson("{a: {$ref: 'c', $id: 0}}"));
+    FieldRef pathToCreate("b");
+    FieldRef pathTaken("");
+    StringData matchedField;
+    auto fromReplication = false;
+    auto validateForStorage = false;
+    FieldRefSet immutablePaths;
+    UpdateIndexData indexData;
+    indexData.addPath("a");
+    Document logDoc;
+    LogBuilder logBuilder(logDoc.root());
+    auto indexesAffected = false;
+    auto noop = false;
+    node.apply(doc.root(),
+               &pathToCreate,
+               &pathTaken,
+               matchedField,
+               fromReplication,
+               validateForStorage,
+               immutablePaths,
+               &indexData,
+               &logBuilder,
+               &indexesAffected,
+               &noop);
+    ASSERT_FALSE(noop);
+    ASSERT_TRUE(indexesAffected);
+    auto updated = BSON("a" << BSON("$ref"
+                                    << "c")
+                            << "b"
+                            << 0);
+    ASSERT_EQUALS(updated, doc);
+    ASSERT_FALSE(doc.isInPlaceModeEnabled());
+    ASSERT_EQUALS(fromjson("{$set: {'b': 0}, $unset: {'a.$id': true}}"), logDoc);
+}
+
+TEST(RenameNodeTest, ApplyCannotRemoveImmutablePath) {
+    auto update = fromjson("{$rename: {'a.b': 'c'}}");
+    const CollatorInterface* collator = nullptr;
+    RenameNode node;
+    ASSERT_OK(node.init(update["$rename"]["a.b"], collator));
+
+    Document doc(fromjson("{a: {b: 1}}"));
+    FieldRef pathToCreate("c");
+    FieldRef pathTaken("");
+    StringData matchedField;
+    auto fromReplication = false;
+    auto validateForStorage = true;
+    FieldRefSet immutablePaths;
+    FieldRef path("a.b");
+    immutablePaths.insert(&path);
+    const UpdateIndexData* indexData = nullptr;
+    LogBuilder* logBuilder = nullptr;
+    auto indexesAffected = false;
+    auto noop = false;
+    ASSERT_THROWS_CODE_AND_WHAT(
+        node.apply(doc.root(),
+                   &pathToCreate,
+                   &pathTaken,
+                   matchedField,
+                   fromReplication,
+                   validateForStorage,
+                   immutablePaths,
+                   indexData,
+                   logBuilder,
+                   &indexesAffected,
+                   &noop),
+        UserException,
+        ErrorCodes::ImmutableField,
+        "Unsetting the path 'a.b' using $rename would modify the immutable field 'a.b'");
+}
+
+TEST(RenameNodeTest, ApplyCannotRemovePrefixOfImmutablePath) {
+    auto update = fromjson("{$rename: {a: 'c'}}");
+    const CollatorInterface* collator = nullptr;
+    RenameNode node;
+    ASSERT_OK(node.init(update["$rename"]["a"], collator));
+
+    Document doc(fromjson("{a: {b: 1}}"));
+    FieldRef pathToCreate("c");
+    FieldRef pathTaken("");
+    StringData matchedField;
+    auto fromReplication = false;
+    auto validateForStorage = true;
+    FieldRefSet immutablePaths;
+    FieldRef path("a.b");
+    immutablePaths.insert(&path);
+    const UpdateIndexData* indexData = nullptr;
+    LogBuilder* logBuilder = nullptr;
+    auto indexesAffected = false;
+    auto noop = false;
+    ASSERT_THROWS_CODE_AND_WHAT(
+        node.apply(doc.root(),
+                   &pathToCreate,
+                   &pathTaken,
+                   matchedField,
+                   fromReplication,
+                   validateForStorage,
+                   immutablePaths,
+                   indexData,
+                   logBuilder,
+                   &indexesAffected,
+                   &noop),
+        UserException,
+        ErrorCodes::ImmutableField,
+        "Unsetting the path 'a' using $rename would modify the immutable field 'a.b'");
+}
+
+TEST(RenameNodeTest, ApplyCannotRemoveSuffixOfImmutablePath) {
+    auto update = fromjson("{$rename: {'a.b.c': 'd'}}");
+    const CollatorInterface* collator = nullptr;
+    RenameNode node;
+    ASSERT_OK(node.init(update["$rename"]["a.b.c"], collator));
+
+    Document doc(fromjson("{a: {b: {c: 1}}}"));
+    FieldRef pathToCreate("d");
+    FieldRef pathTaken("");
+    StringData matchedField;
+    auto fromReplication = false;
+    auto validateForStorage = true;
+    FieldRefSet immutablePaths;
+    FieldRef path("a.b");
+    immutablePaths.insert(&path);
+    const UpdateIndexData* indexData = nullptr;
+    LogBuilder* logBuilder = nullptr;
+    auto indexesAffected = false;
+    auto noop = false;
+    ASSERT_THROWS_CODE_AND_WHAT(
+        node.apply(doc.root(),
+                   &pathToCreate,
+                   &pathTaken,
+                   matchedField,
+                   fromReplication,
+                   validateForStorage,
+                   immutablePaths,
+                   indexData,
+                   logBuilder,
+                   &indexesAffected,
+                   &noop),
+        UserException,
+        ErrorCodes::ImmutableField,
+        "Unsetting the path 'a.b.c' using $rename would modify the immutable field 'a.b'");
+}
+
+TEST(RenameNodeTest, ApplyCanRemoveImmutablePathIfNoop) {
+    auto update = fromjson("{$rename: {'a.b.c': 'd'}}");
+    const CollatorInterface* collator = nullptr;
+    RenameNode node;
+    ASSERT_OK(node.init(update["$rename"]["a.b.c"], collator));
+
+    Document doc(fromjson("{a: {b: {}}}"));
+    FieldRef pathToCreate("d");
+    FieldRef pathTaken("");
+    StringData matchedField;
+    auto fromReplication = false;
+    auto validateForStorage = false;
+    FieldRefSet immutablePaths;
+    FieldRef path("a.b");
+    immutablePaths.insert(&path);
+    UpdateIndexData indexData;
+    indexData.addPath("a");
+    Document logDoc;
+    LogBuilder logBuilder(logDoc.root());
+    auto indexesAffected = false;
+    auto noop = false;
+    node.apply(doc.root(),
+               &pathToCreate,
+               &pathTaken,
+               matchedField,
+               fromReplication,
+               validateForStorage,
+               immutablePaths,
+               &indexData,
+               &logBuilder,
+               &indexesAffected,
+               &noop);
+    ASSERT_TRUE(noop);
+    ASSERT_FALSE(indexesAffected);
+    ASSERT_EQUALS(fromjson("{a: {b: {}}}"), doc);
+    ASSERT_TRUE(doc.isInPlaceModeEnabled());
+    ASSERT_EQUALS(fromjson("{}"), logDoc);
+}
+
+TEST(RenameNodeTest, ApplyCannotCreateDollarPrefixedField) {
+    auto update = fromjson("{$rename: {a: '$bad'}}");
+    const CollatorInterface* collator = nullptr;
+    RenameNode node;
+    ASSERT_OK(node.init(update["$rename"]["a"], collator));
+
+    Document doc(fromjson("{a: 0}"));
+    FieldRef pathToCreate("$bad");
+    FieldRef pathTaken("");
+    StringData matchedField;
+    auto fromReplication = false;
+    auto validateForStorage = true;
+    FieldRefSet immutablePaths;
+    const UpdateIndexData* indexData = nullptr;
+    LogBuilder* logBuilder = nullptr;
+    auto indexesAffected = false;
+    auto noop = false;
+    ASSERT_THROWS_CODE_AND_WHAT(
+        node.apply(doc.root(),
+                   &pathToCreate,
+                   &pathTaken,
+                   matchedField,
+                   fromReplication,
+                   validateForStorage,
+                   immutablePaths,
+                   indexData,
+                   logBuilder,
+                   &indexesAffected,
+                   &noop),
+        UserException,
+        ErrorCodes::DollarPrefixedFieldName,
+        "The dollar ($) prefixed field '$bad' in '$bad' is not valid for storage.");
+}
+
+TEST(RenameNodeTest, ApplyCannotOverwriteImmutablePath) {
+    auto update = fromjson("{$rename: {a: 'b'}}");
+    const CollatorInterface* collator = nullptr;
+    RenameNode node;
+    ASSERT_OK(node.init(update["$rename"]["a"], collator));
+
+    Document doc(fromjson("{a: 0, b: 1}"));
+    FieldRef pathToCreate("");
+    FieldRef pathTaken("b");
+    StringData matchedField;
+    auto fromReplication = false;
+    auto validateForStorage = true;
+    FieldRefSet immutablePaths;
+    FieldRef path("b");
+    immutablePaths.insert(&path);
+    const UpdateIndexData* indexData = nullptr;
+    LogBuilder* logBuilder = nullptr;
+    auto indexesAffected = false;
+    auto noop = false;
+    ASSERT_THROWS_CODE_AND_WHAT(
+        node.apply(doc.root()["b"],
+                   &pathToCreate,
+                   &pathTaken,
+                   matchedField,
+                   fromReplication,
+                   validateForStorage,
+                   immutablePaths,
+                   indexData,
+                   logBuilder,
+                   &indexesAffected,
+                   &noop),
+        UserException,
+        ErrorCodes::ImmutableField,
+        "Updating the path 'b' to b: 0 would modify the immutable field 'b'");
 }
 
 }  // namespace

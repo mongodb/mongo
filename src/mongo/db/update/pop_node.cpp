@@ -44,6 +44,8 @@ void PopNode::apply(mutablebson::Element element,
                     FieldRef* pathTaken,
                     StringData matchedField,
                     bool fromReplication,
+                    bool validateForStorage,
+                    const FieldRefSet& immutablePaths,
                     const UpdateIndexData* indexData,
                     LogBuilder* logBuilder,
                     bool* indexesAffected,
@@ -112,6 +114,21 @@ void PopNode::apply(mutablebson::Element element,
 
     auto elementToRemove = _popFromFront ? element.leftChild() : element.rightChild();
     invariantOK(elementToRemove.remove());
+
+    // No need to validate for storage, since we cannot have increased the BSON depth or interfered
+    // with a DBRef.
+
+    // Ensure we are not changing any immutable paths.
+    for (auto immutablePath = immutablePaths.begin(); immutablePath != immutablePaths.end();
+         ++immutablePath) {
+        uassert(ErrorCodes::ImmutableField,
+                str::stream() << "Performing a $pop on the path '" << pathTaken->dottedField()
+                              << "' would modify the immutable field '"
+                              << (*immutablePath)->dottedField()
+                              << "'",
+                pathTaken->commonPrefixSize(**immutablePath) <
+                    std::min(pathTaken->numParts(), (*immutablePath)->numParts()));
+    }
 
     if (logBuilder) {
         uassertStatusOK(logBuilder->addToSetsWithNewFieldName(pathTaken->dottedField(), element));

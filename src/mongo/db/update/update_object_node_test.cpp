@@ -1705,6 +1705,8 @@ TEST(UpdateObjectNodeTest, ApplyCreateField) {
     FieldRef pathTaken("");
     StringData matchedField;
     auto fromReplication = false;
+    auto validateForStorage = true;
+    FieldRefSet immutablePaths;
     UpdateIndexData indexData;
     indexData.addPath("b");
     Document logDoc;
@@ -1716,6 +1718,8 @@ TEST(UpdateObjectNodeTest, ApplyCreateField) {
                &pathTaken,
                matchedField,
                fromReplication,
+               validateForStorage,
+               immutablePaths,
                &indexData,
                &logBuilder,
                &indexesAffected,
@@ -1745,6 +1749,8 @@ TEST(UpdateObjectNodeTest, ApplyExistingField) {
     FieldRef pathTaken("");
     StringData matchedField;
     auto fromReplication = false;
+    auto validateForStorage = true;
+    FieldRefSet immutablePaths;
     UpdateIndexData indexData;
     indexData.addPath("a");
     Document logDoc;
@@ -1756,6 +1762,8 @@ TEST(UpdateObjectNodeTest, ApplyExistingField) {
                &pathTaken,
                matchedField,
                fromReplication,
+               validateForStorage,
+               immutablePaths,
                &indexData,
                &logBuilder,
                &indexesAffected,
@@ -1803,6 +1811,8 @@ TEST(UpdateObjectNodeTest, ApplyExistingAndNonexistingFields) {
     FieldRef pathTaken("");
     StringData matchedField;
     auto fromReplication = false;
+    auto validateForStorage = true;
+    FieldRefSet immutablePaths;
     UpdateIndexData indexData;
     indexData.addPath("a");
     Document logDoc;
@@ -1814,6 +1824,8 @@ TEST(UpdateObjectNodeTest, ApplyExistingAndNonexistingFields) {
                &pathTaken,
                matchedField,
                fromReplication,
+               validateForStorage,
+               immutablePaths,
                &indexData,
                &logBuilder,
                &indexesAffected,
@@ -1861,6 +1873,8 @@ TEST(UpdateObjectNodeTest, ApplyExistingNestedPaths) {
     FieldRef pathTaken("");
     StringData matchedField;
     auto fromReplication = false;
+    auto validateForStorage = true;
+    FieldRefSet immutablePaths;
     UpdateIndexData indexData;
     indexData.addPath("a");
     Document logDoc;
@@ -1872,6 +1886,8 @@ TEST(UpdateObjectNodeTest, ApplyExistingNestedPaths) {
                &pathTaken,
                matchedField,
                fromReplication,
+               validateForStorage,
+               immutablePaths,
                &indexData,
                &logBuilder,
                &indexesAffected,
@@ -1920,6 +1936,8 @@ TEST(UpdateObjectNodeTest, ApplyCreateNestedPaths) {
     FieldRef pathTaken("");
     StringData matchedField;
     auto fromReplication = false;
+    auto validateForStorage = true;
+    FieldRefSet immutablePaths;
     UpdateIndexData indexData;
     indexData.addPath("a");
     Document logDoc;
@@ -1931,6 +1949,8 @@ TEST(UpdateObjectNodeTest, ApplyCreateNestedPaths) {
                &pathTaken,
                matchedField,
                fromReplication,
+               validateForStorage,
+               immutablePaths,
                &indexData,
                &logBuilder,
                &indexesAffected,
@@ -1973,6 +1993,8 @@ TEST(UpdateObjectNodeTest, ApplyCreateDeeplyNestedPaths) {
     FieldRef pathTaken("");
     StringData matchedField;
     auto fromReplication = false;
+    auto validateForStorage = true;
+    FieldRefSet immutablePaths;
     UpdateIndexData indexData;
     indexData.addPath("a");
     Document logDoc;
@@ -1984,6 +2006,8 @@ TEST(UpdateObjectNodeTest, ApplyCreateDeeplyNestedPaths) {
                &pathTaken,
                matchedField,
                fromReplication,
+               validateForStorage,
+               immutablePaths,
                &indexData,
                &logBuilder,
                &indexesAffected,
@@ -2038,6 +2062,8 @@ TEST(UpdateObjectNodeTest, ChildrenShouldBeAppliedInAlphabeticalOrder) {
     FieldRef pathTaken("");
     StringData matchedField;
     auto fromReplication = false;
+    auto validateForStorage = true;
+    FieldRefSet immutablePaths;
     UpdateIndexData indexData;
     indexData.addPath("a");
     Document logDoc;
@@ -2049,6 +2075,8 @@ TEST(UpdateObjectNodeTest, ChildrenShouldBeAppliedInAlphabeticalOrder) {
                &pathTaken,
                matchedField,
                fromReplication,
+               validateForStorage,
+               immutablePaths,
                &indexData,
                &logBuilder,
                &indexesAffected,
@@ -2084,6 +2112,8 @@ TEST(UpdateObjectNodeTest, CollatorShouldNotAffectUpdateOrder) {
     FieldRef pathTaken("");
     StringData matchedField;
     auto fromReplication = false;
+    auto validateForStorage = true;
+    FieldRefSet immutablePaths;
     UpdateIndexData indexData;
     indexData.addPath("abc");
     Document logDoc;
@@ -2095,6 +2125,8 @@ TEST(UpdateObjectNodeTest, CollatorShouldNotAffectUpdateOrder) {
                &pathTaken,
                matchedField,
                fromReplication,
+               validateForStorage,
+               immutablePaths,
                &indexData,
                &logBuilder,
                &indexesAffected,
@@ -2136,6 +2168,8 @@ TEST(UpdateObjectNodeTest, ApplyNoop) {
     FieldRef pathTaken("");
     StringData matchedField;
     auto fromReplication = false;
+    auto validateForStorage = true;
+    FieldRefSet immutablePaths;
     UpdateIndexData indexData;
     indexData.addPath("a");
     indexData.addPath("b");
@@ -2149,6 +2183,8 @@ TEST(UpdateObjectNodeTest, ApplyNoop) {
                &pathTaken,
                matchedField,
                fromReplication,
+               validateForStorage,
+               immutablePaths,
                &indexData,
                &logBuilder,
                &indexesAffected,
@@ -2190,6 +2226,8 @@ TEST(UpdateObjectNodeTest, ApplySomeChildrenNoops) {
     FieldRef pathTaken("");
     StringData matchedField;
     auto fromReplication = false;
+    auto validateForStorage = true;
+    FieldRefSet immutablePaths;
     UpdateIndexData indexData;
     indexData.addPath("a");
     indexData.addPath("b");
@@ -2203,6 +2241,8 @@ TEST(UpdateObjectNodeTest, ApplySomeChildrenNoops) {
                &pathTaken,
                matchedField,
                fromReplication,
+               validateForStorage,
+               immutablePaths,
                &indexData,
                &logBuilder,
                &indexesAffected,
@@ -2232,6 +2272,8 @@ TEST(UpdateObjectNodeTest, ApplyBlockingElement) {
     FieldRef pathTaken("");
     StringData matchedField;
     auto fromReplication = false;
+    auto validateForStorage = true;
+    FieldRefSet immutablePaths;
     UpdateIndexData indexData;
     indexData.addPath("a");
     Document logDoc;
@@ -2243,6 +2285,8 @@ TEST(UpdateObjectNodeTest, ApplyBlockingElement) {
                                            &pathTaken,
                                            matchedField,
                                            fromReplication,
+                                           validateForStorage,
+                                           immutablePaths,
                                            &indexData,
                                            &logBuilder,
                                            &indexesAffected,
@@ -2276,6 +2320,8 @@ TEST(UpdateObjectNodeTest, ApplyBlockingElementFromReplication) {
     FieldRef pathTaken("");
     StringData matchedField;
     auto fromReplication = true;
+    auto validateForStorage = true;
+    FieldRefSet immutablePaths;
     UpdateIndexData indexData;
     indexData.addPath("a");
     Document logDoc;
@@ -2287,6 +2333,8 @@ TEST(UpdateObjectNodeTest, ApplyBlockingElementFromReplication) {
                &pathTaken,
                matchedField,
                fromReplication,
+               validateForStorage,
+               immutablePaths,
                &indexData,
                &logBuilder,
                &indexesAffected,
@@ -2316,6 +2364,8 @@ TEST(UpdateObjectNodeTest, ApplyPositionalMissingMatchedField) {
     FieldRef pathTaken("");
     StringData matchedField;
     auto fromReplication = false;
+    auto validateForStorage = true;
+    FieldRefSet immutablePaths;
     UpdateIndexData indexData;
     indexData.addPath("a");
     Document logDoc;
@@ -2328,6 +2378,8 @@ TEST(UpdateObjectNodeTest, ApplyPositionalMissingMatchedField) {
                    &pathTaken,
                    matchedField,
                    fromReplication,
+                   validateForStorage,
+                   immutablePaths,
                    &indexData,
                    &logBuilder,
                    &indexesAffected,
@@ -2361,6 +2413,8 @@ TEST(UpdateObjectNodeTest, ApplyMergePositionalChild) {
     FieldRef pathTaken("");
     StringData matchedField = "0";
     auto fromReplication = false;
+    auto validateForStorage = true;
+    FieldRefSet immutablePaths;
     UpdateIndexData indexData;
     indexData.addPath("a");
     Document logDoc;
@@ -2372,6 +2426,8 @@ TEST(UpdateObjectNodeTest, ApplyMergePositionalChild) {
                &pathTaken,
                matchedField,
                fromReplication,
+               validateForStorage,
+               immutablePaths,
                &indexData,
                &logBuilder,
                &indexesAffected,
@@ -2419,6 +2475,8 @@ TEST(UpdateObjectNodeTest, ApplyOrderMergedPositionalChild) {
     FieldRef pathTaken("");
     StringData matchedField = "1";
     auto fromReplication = false;
+    auto validateForStorage = true;
+    FieldRefSet immutablePaths;
     UpdateIndexData indexData;
     indexData.addPath("a");
     Document logDoc;
@@ -2430,6 +2488,8 @@ TEST(UpdateObjectNodeTest, ApplyOrderMergedPositionalChild) {
                &pathTaken,
                matchedField,
                fromReplication,
+               validateForStorage,
+               immutablePaths,
                &indexData,
                &logBuilder,
                &indexesAffected,
@@ -2466,6 +2526,8 @@ TEST(UpdateObjectNodeTest, ApplyMergeConflictWithPositionalChild) {
     FieldRef pathTaken("");
     StringData matchedField = "0";
     auto fromReplication = false;
+    auto validateForStorage = true;
+    FieldRefSet immutablePaths;
     UpdateIndexData indexData;
     indexData.addPath("a");
     Document logDoc;
@@ -2477,6 +2539,8 @@ TEST(UpdateObjectNodeTest, ApplyMergeConflictWithPositionalChild) {
                                            &pathTaken,
                                            matchedField,
                                            fromReplication,
+                                           validateForStorage,
+                                           immutablePaths,
                                            &indexData,
                                            &logBuilder,
                                            &indexesAffected,
@@ -2516,6 +2580,8 @@ TEST(UpdateObjectNodeTest, ApplyDoNotMergePositionalChild) {
     FieldRef pathTaken("");
     StringData matchedField = "1";
     auto fromReplication = false;
+    auto validateForStorage = true;
+    FieldRefSet immutablePaths;
     UpdateIndexData indexData;
     indexData.addPath("a");
     Document logDoc;
@@ -2527,6 +2593,8 @@ TEST(UpdateObjectNodeTest, ApplyDoNotMergePositionalChild) {
                &pathTaken,
                matchedField,
                fromReplication,
+               validateForStorage,
+               immutablePaths,
                &indexData,
                &logBuilder,
                &indexesAffected,
@@ -2568,6 +2636,8 @@ TEST(UpdateObjectNodeTest, ApplyPositionalChildLast) {
     FieldRef pathTaken("");
     StringData matchedField = "2";
     auto fromReplication = false;
+    auto validateForStorage = true;
+    FieldRefSet immutablePaths;
     UpdateIndexData indexData;
     indexData.addPath("a");
     Document logDoc;
@@ -2579,6 +2649,8 @@ TEST(UpdateObjectNodeTest, ApplyPositionalChildLast) {
                &pathTaken,
                matchedField,
                fromReplication,
+               validateForStorage,
+               immutablePaths,
                &indexData,
                &logBuilder,
                &indexesAffected,
@@ -2614,6 +2686,8 @@ TEST(UpdateObjectNodeTest, ApplyUseStoredMergedPositional) {
     FieldRef pathTaken("");
     StringData matchedField = "0";
     auto fromReplication = false;
+    auto validateForStorage = true;
+    FieldRefSet immutablePaths;
     UpdateIndexData indexData;
     indexData.addPath("a");
     Document logDoc;
@@ -2625,6 +2699,8 @@ TEST(UpdateObjectNodeTest, ApplyUseStoredMergedPositional) {
                &pathTaken,
                matchedField,
                fromReplication,
+               validateForStorage,
+               immutablePaths,
                &indexData,
                &logBuilder,
                &indexesAffected,
@@ -2643,6 +2719,8 @@ TEST(UpdateObjectNodeTest, ApplyUseStoredMergedPositional) {
                &pathTaken,
                matchedField,
                fromReplication,
+               validateForStorage,
+               immutablePaths,
                &indexData,
                &logBuilder2,
                &indexesAffected,
@@ -2684,6 +2762,8 @@ TEST(UpdateObjectNodeTest, ApplyDoNotUseStoredMergedPositional) {
     FieldRef pathTaken("");
     StringData matchedField = "0";
     auto fromReplication = false;
+    auto validateForStorage = true;
+    FieldRefSet immutablePaths;
     UpdateIndexData indexData;
     indexData.addPath("a");
     Document logDoc;
@@ -2695,6 +2775,8 @@ TEST(UpdateObjectNodeTest, ApplyDoNotUseStoredMergedPositional) {
                &pathTaken,
                matchedField,
                fromReplication,
+               validateForStorage,
+               immutablePaths,
                &indexData,
                &logBuilder,
                &indexesAffected,
@@ -2714,6 +2796,8 @@ TEST(UpdateObjectNodeTest, ApplyDoNotUseStoredMergedPositional) {
                &pathTaken,
                matchedField2,
                fromReplication,
+               validateForStorage,
+               immutablePaths,
                &indexData,
                &logBuilder2,
                &indexesAffected,
@@ -2750,6 +2834,8 @@ TEST(UpdateObjectNodeTest, SetAndPopModifiersWithCommonPrefixApplySuccessfully) 
     FieldRef pathTaken("");
     StringData matchedField;
     auto fromReplication = false;
+    auto validateForStorage = true;
+    FieldRefSet immutablePaths;
     const UpdateIndexData* indexData = nullptr;
     Document logDoc;
     LogBuilder logBuilder(logDoc.root());
@@ -2760,6 +2846,8 @@ TEST(UpdateObjectNodeTest, SetAndPopModifiersWithCommonPrefixApplySuccessfully) 
                &pathTaken,
                matchedField,
                fromReplication,
+               validateForStorage,
+               immutablePaths,
                indexData,
                &logBuilder,
                &indexesAffected,

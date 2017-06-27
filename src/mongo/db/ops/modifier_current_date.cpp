@@ -214,7 +214,8 @@ Status ModifierCurrentDate::apply() const {
 
         // createPathAt() will complete the path and attach 'elemToSet' at the end of it.
         Status s = pathsupport::createPathAt(
-            _updatePath, _preparedState->idxFound, _preparedState->elemFound, elemToSet);
+                       _updatePath, _preparedState->idxFound, _preparedState->elemFound, elemToSet)
+                       .getStatus();
         if (!s.isOK())
             return s;
     }

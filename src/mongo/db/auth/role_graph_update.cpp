@@ -186,12 +186,22 @@ Status handleOplogUpdate(OperationContext* opCtx,
     status = AuthorizationManager::getBSONForRole(roleGraph, roleToUpdate, roleDocument.root());
     if (status == ErrorCodes::RoleNotFound) {
         // The query pattern will only contain _id, no other immutable fields are present
-        status = driver.populateDocumentWithQueryFields(opCtx, queryPattern, NULL, roleDocument);
+        const FieldRef idFieldRef("_id");
+        FieldRefSet immutablePaths;
+        invariant(immutablePaths.insert(&idFieldRef));
+        status = driver.populateDocumentWithQueryFields(
+            opCtx, queryPattern, immutablePaths, roleDocument);
     }
     if (!status.isOK())
         return status;
 
-    status = driver.update(StringData(), &roleDocument);
+    // The original document can be empty because it is only needed for validation of immutable
+    // paths.
+    const BSONObj emptyOriginal;
+    const bool validateForStorage = false;
+    const FieldRefSet emptyImmutablePaths;
+    status = driver.update(
+        StringData(), emptyOriginal, &roleDocument, validateForStorage, emptyImmutablePaths);
     if (!status.isOK())
         return status;
 

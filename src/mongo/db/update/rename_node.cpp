@@ -34,6 +34,7 @@
 #include "mongo/db/update/field_checker.h"
 #include "mongo/db/update/path_creating_node.h"
 #include "mongo/db/update/path_support.h"
+#include "mongo/db/update/storage_validation.h"
 
 namespace mongo {
 
@@ -142,6 +143,8 @@ void RenameNode::apply(mutablebson::Element element,
                        FieldRef* pathTaken,
                        StringData matchedField,
                        bool fromReplication,
+                       bool validateForStorage,
+                       const FieldRefSet& immutablePaths,
                        const UpdateIndexData* indexData,
                        LogBuilder* logBuilder,
                        bool* indexesAffected,
@@ -222,10 +225,15 @@ void RenameNode::apply(mutablebson::Element element,
                      pathTaken,
                      matchedField,
                      fromReplication,
+                     validateForStorage,
+                     immutablePaths,
                      indexData,
                      logBuilder,
                      &setAffectedIndexes,
                      &setWasNoop);
+
+    auto leftSibling = fromElement.leftSibling();
+    auto rightSibling = fromElement.rightSibling();
 
     invariant(fromElement.parent().ok());
     invariantOK(fromElement.remove());
@@ -236,6 +244,34 @@ void RenameNode::apply(mutablebson::Element element,
         *indexesAffected = true;
     } else {
         // *indexedAffected remains false
+    }
+
+    if (validateForStorage) {
+
+        // Validate the left and right sibling, in case this element was part of a DBRef.
+        if (leftSibling.ok()) {
+            const bool doRecursiveCheck = false;
+            const uint32_t recursionLevel = 0;
+            storage_validation::storageValid(leftSibling, doRecursiveCheck, recursionLevel);
+        }
+
+        if (rightSibling.ok()) {
+            const bool doRecursiveCheck = false;
+            const uint32_t recursionLevel = 0;
+            storage_validation::storageValid(rightSibling, doRecursiveCheck, recursionLevel);
+        }
+    }
+
+    // Ensure we are not changing any immutable paths.
+    for (auto immutablePath = immutablePaths.begin(); immutablePath != immutablePaths.end();
+         ++immutablePath) {
+        uassert(ErrorCodes::ImmutableField,
+                str::stream() << "Unsetting the path '" << fromFieldRef.dottedField()
+                              << "' using $rename would modify the immutable field '"
+                              << (*immutablePath)->dottedField()
+                              << "'",
+                fromFieldRef.commonPrefixSize(**immutablePath) <
+                    std::min(fromFieldRef.numParts(), (*immutablePath)->numParts()));
     }
 
     // Log the $unset. The $set was already logged by SetElementNode::apply().

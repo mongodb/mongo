@@ -30,6 +30,8 @@
 
 #include "mongo/db/update/unset_node.h"
 
+#include "mongo/db/update/storage_validation.h"
+
 namespace mongo {
 
 Status UnsetNode::init(BSONElement modExpr, const CollatorInterface* collator) {
@@ -43,6 +45,8 @@ void UnsetNode::apply(mutablebson::Element element,
                       FieldRef* pathTaken,
                       StringData matchedField,
                       bool fromReplication,
+                      bool validateForStorage,
+                      const FieldRefSet& immutablePaths,
                       const UpdateIndexData* indexData,
                       LogBuilder* logBuilder,
                       bool* indexesAffected,
@@ -64,6 +68,9 @@ void UnsetNode::apply(mutablebson::Element element,
     }
 
     auto parent = element.parent();
+    auto leftSibling = element.leftSibling();
+    auto rightSibling = element.rightSibling();
+
     invariant(parent.ok());
     if (!parent.isType(BSONType::Array)) {
         invariantOK(element.remove());
@@ -71,6 +78,34 @@ void UnsetNode::apply(mutablebson::Element element,
         // Special case: An $unset on an array element sets it to null instead of removing it from
         // the array.
         invariantOK(element.setValueNull());
+    }
+
+    if (validateForStorage) {
+
+        // Validate the left and right sibling, in case this element was part of a DBRef.
+        if (leftSibling.ok()) {
+            const bool doRecursiveCheck = false;
+            const uint32_t recursionLevel = 0;
+            storage_validation::storageValid(leftSibling, doRecursiveCheck, recursionLevel);
+        }
+
+        if (rightSibling.ok()) {
+            const bool doRecursiveCheck = false;
+            const uint32_t recursionLevel = 0;
+            storage_validation::storageValid(rightSibling, doRecursiveCheck, recursionLevel);
+        }
+    }
+
+    // Ensure we are not changing any immutable paths.
+    for (auto immutablePath = immutablePaths.begin(); immutablePath != immutablePaths.end();
+         ++immutablePath) {
+        uassert(ErrorCodes::ImmutableField,
+                str::stream() << "Unsetting the path '" << pathTaken->dottedField()
+                              << "' would modify the immutable field '"
+                              << (*immutablePath)->dottedField()
+                              << "'",
+                pathTaken->commonPrefixSize(**immutablePath) <
+                    std::min(pathTaken->numParts(), (*immutablePath)->numParts()));
     }
 
     // Log the unset.

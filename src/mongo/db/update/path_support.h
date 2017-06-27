@@ -86,18 +86,18 @@ Status findLongestPrefix(const FieldRef& prefix,
                          mutablebson::Element* elemFound);
 
 /**
- * Creates the parts 'prefix[idxRoot]', 'prefix[idxRoot+1]', ...,
- * 'prefix[<numParts>-1]' under 'elemFound' and adds 'newElem' as a child of that
- * path. Returns OK, if successful, or an error code describing why not, otherwise.
+ * Creates the parts 'prefix[idxRoot]', 'prefix[idxRoot+1]', ..., 'prefix[<numParts>-1]' under
+ * 'elemFound' and adds 'newElem' as a child of that path. Returns the first element that was
+ * created along the path, if successful, or an error code describing why not, otherwise.
  *
  * createPathAt is designed to work with 'findLongestPrefix' in that it can create the
  * field parts in 'prefix' that are missing from a given document. 'elemFound' points
  * to the element in the doc that is the parent of prefix[idxRoot].
  */
-Status createPathAt(const FieldRef& prefix,
-                    size_t idxRoot,
-                    mutablebson::Element elemFound,
-                    mutablebson::Element newElem);
+StatusWith<mutablebson::Element> createPathAt(const FieldRef& prefix,
+                                              size_t idxRoot,
+                                              mutablebson::Element elemFound,
+                                              mutablebson::Element newElem);
 
 /**
  * Uses the above methods to set the given value at the specified path in a mutable

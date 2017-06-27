@@ -255,7 +255,8 @@ Status ModifierRename::apply() const {
     return pathsupport::createPathAt(_toFieldRef,
                                      tempElem == doc.end() ? 0 : tempIdx + 1,
                                      tempElem == doc.end() ? doc.root() : tempElem,
-                                     elemToSet);
+                                     elemToSet)
+        .getStatus();
 }
 
 Status ModifierRename::log(LogBuilder* logBuilder) const {

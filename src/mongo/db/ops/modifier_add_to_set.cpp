@@ -290,8 +290,10 @@ Status ModifierAddToSet::apply() const {
         }
 
         // createPathAt() will complete the path and attach 'elemToSet' at the end of it.
-        Status status = pathsupport::createPathAt(
-            _fieldRef, _preparedState->idxFound, _preparedState->elemFound, baseArray);
+        Status status =
+            pathsupport::createPathAt(
+                _fieldRef, _preparedState->idxFound, _preparedState->elemFound, baseArray)
+                .getStatus();
         if (!status.isOK()) {
             return status;
         }

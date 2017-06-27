@@ -35,9 +35,7 @@
 #include <algorithm>
 
 #include "mongo/base/status_with.h"
-#include "mongo/bson/bson_depth.h"
 #include "mongo/bson/mutable/algorithm.h"
-#include "mongo/db/bson/dotted_path_support.h"
 #include "mongo/db/concurrency/write_conflict_exception.h"
 #include "mongo/db/exec/scoped_timer.h"
 #include "mongo/db/exec/working_set_common.h"
@@ -49,6 +47,7 @@
 #include "mongo/db/s/collection_metadata.h"
 #include "mongo/db/s/collection_sharding_state.h"
 #include "mongo/db/service_context.h"
+#include "mongo/db/update/storage_validation.h"
 #include "mongo/stdx/memory.h"
 #include "mongo/util/log.h"
 #include "mongo/util/scopeguard.h"
@@ -62,415 +61,11 @@ using std::vector;
 using stdx::make_unique;
 
 namespace mb = mutablebson;
-namespace dps = ::mongo::dotted_path_support;
 
 namespace {
 
 const char idFieldName[] = "_id";
 const FieldRef idFieldRef(idFieldName);
-
-StatusWith<std::uint32_t> storageValid(const mb::Document&,
-                                       bool deep,
-                                       std::uint32_t recursionLevel);
-StatusWith<std::uint32_t> storageValid(const mb::ConstElement&,
-                                       bool deep,
-                                       std::uint32_t recursionLevel);
-StatusWith<std::uint32_t> storageValidChildren(const mb::ConstElement&,
-                                               bool deep,
-                                               std::uint32_t recursionLevel);
-
-/**
- * Validates that the MutableBSON document 'doc' is acceptable for storage in a collection. If
- * 'deep' is true, the check is performed recursively on subdocuments.
- *
- * An error is returned if the validation fails or if 'recursionLevel' exceeds the maximum allowable
- * depth. On success, an integer is returned that represents the nesting depth of this document.
- */
-StatusWith<std::uint32_t> storageValid(const mb::Document& doc,
-                                       bool deep,
-                                       std::uint32_t recursionLevel) {
-    if (recursionLevel > BSONDepth::getMaxDepthForUserStorage()) {
-        return Status(ErrorCodes::Overflow,
-                      str::stream() << "Document exceeds maximum nesting depth of "
-                                    << BSONDepth::getMaxDepthForUserStorage());
-    }
-
-    mb::ConstElement currElem = doc.root().leftChild();
-    std::uint32_t greatestDepth = recursionLevel;
-    while (currElem.ok()) {
-        if (currElem.getFieldName() == idFieldName) {
-            switch (currElem.getType()) {
-                case RegEx:
-                case Array:
-                case Undefined:
-                    return Status(ErrorCodes::InvalidIdField,
-                                  str::stream() << "The '_id' value cannot be of type "
-                                                << typeName(currElem.getType()));
-                default:
-                    break;
-            }
-        }
-
-        // Get the nesting depth of this child element.
-        auto depth = storageValid(currElem, deep, recursionLevel + 1);
-        if (!depth.isOK()) {
-            return depth;
-        }
-
-        // The depth of this document is the depth of its deepest child, so we only keep track of
-        // the maximum depth seen so far.
-        greatestDepth = std::max(greatestDepth, depth.getValue());
-        currElem = currElem.rightSibling();
-    }
-
-    return greatestDepth;
-}
-
-/**
- * Validates an element that has a field name which starts with a dollar sign ($).
- * In the case of a DBRef field ($id, $ref, [$db]) these fields may be valid in
- * the correct order/context only.
- */
-Status validateDollarPrefixElement(const mb::ConstElement elem, const bool deep) {
-    mb::ConstElement curr = elem;
-    StringData currName = elem.getFieldName();
-    LOG(5) << "validateDollarPrefixElement -- validating field '" << currName << "'";
-    // Found a $db field
-    if (currName == "$db") {
-        if (curr.getType() != String) {
-            return Status(ErrorCodes::InvalidDBRef,
-                          str::stream() << "The DBRef $db field must be a String, not a "
-                                        << typeName(curr.getType()));
-        }
-        curr = curr.leftSibling();
-
-        if (!curr.ok() || (curr.getFieldName() != "$id"))
-            return Status(ErrorCodes::InvalidDBRef,
-                          "Found $db field without a $id before it, which is invalid.");
-
-        currName = curr.getFieldName();
-    }
-
-    // Found a $id field
-    if (currName == "$id") {
-        // We don't care about the recursion level being accurate, as the validate() command will
-        // perform full validation of the updated object.
-        const uint32_t recursionLevel = 0;
-        auto depth = storageValidChildren(curr, deep, recursionLevel);
-        if (!depth.isOK()) {
-            return depth.getStatus();
-        }
-
-        curr = curr.leftSibling();
-        if (!curr.ok() || (curr.getFieldName() != "$ref")) {
-            return Status(ErrorCodes::InvalidDBRef,
-                          "Found $id field without a $ref before it, which is invalid.");
-        }
-
-        currName = curr.getFieldName();
-    }
-
-    if (currName == "$ref") {
-        if (curr.getType() != String) {
-            return Status(ErrorCodes::InvalidDBRef,
-                          str::stream() << "The DBRef $ref field must be a String, not a "
-                                        << typeName(curr.getType()));
-        }
-
-        if (!curr.rightSibling().ok() || curr.rightSibling().getFieldName() != "$id")
-            return Status(ErrorCodes::InvalidDBRef,
-                          str::stream() << "The DBRef $ref field must be "
-                                           "following by a $id field");
-    } else {
-        // not an okay, $ prefixed field name.
-        return Status(ErrorCodes::DollarPrefixedFieldName,
-                      str::stream() << "The dollar ($) prefixed field '" << elem.getFieldName()
-                                    << "' in '"
-                                    << mb::getFullName(elem)
-                                    << "' is not valid for storage.");
-    }
-
-    return Status::OK();
-}
-
-/**
- * Checks that all of the parents of the MutableBSON element 'elem' are valid for storage. Note that
- * 'elem' must be in a valid state when using this function.
- *
- * An error is returned if the validation fails, or if 'recursionLevel' exceeds the maximum
- * allowable depth. On success, an integer is returned that represents the number of steps from this
- * element to the root through ancestor nodes.
- */
-StatusWith<std::uint32_t> storageValidParents(const mb::ConstElement& elem,
-                                              std::uint32_t recursionLevel) {
-    if (recursionLevel > BSONDepth::getMaxDepthForUserStorage()) {
-        return Status(ErrorCodes::Overflow,
-                      str::stream() << "Document exceeds maximum nesting depth of "
-                                    << BSONDepth::getMaxDepthForUserStorage());
-    }
-
-    const mb::ConstElement& root = elem.getDocument().root();
-    if (elem != root) {
-        const mb::ConstElement& parent = elem.parent();
-        if (parent.ok() && parent != root) {
-            const bool doRecursiveCheck = false;
-            const uint32_t parentsRecursionLevel = 0;
-            auto height = storageValid(parent, doRecursiveCheck, parentsRecursionLevel);
-            if (height.isOK()) {
-                height = storageValidParents(parent, recursionLevel + 1);
-            }
-            return height;
-        }
-        return recursionLevel + 1;
-    }
-    return recursionLevel;
-}
-
-StatusWith<std::uint32_t> storageValid(const mb::ConstElement& elem,
-                                       const bool deep,
-                                       std::uint32_t recursionLevel) {
-    if (!elem.ok())
-        return Status(ErrorCodes::BadValue, "Invalid elements cannot be stored.");
-
-    if (recursionLevel > BSONDepth::getMaxDepthForUserStorage()) {
-        return Status(ErrorCodes::Overflow,
-                      str::stream() << "Document exceeds maximum nesting depth of "
-                                    << BSONDepth::getMaxDepthForUserStorage());
-    }
-
-    // Field names of elements inside arrays are not meaningful in mutable bson,
-    // so we do not want to validate them.
-    //
-    // TODO: Revisit how mutable handles array field names. We going to need to make
-    // this better if we ever want to support ordered updates that can alter the same
-    // element repeatedly; see SERVER-12848.
-    const mb::ConstElement& parent = elem.parent();
-    const bool childOfArray = parent.ok() ? (parent.getType() == mongo::Array) : false;
-
-    if (!childOfArray) {
-        StringData fieldName = elem.getFieldName();
-        // Cannot start with "$", unless dbref
-        if (fieldName[0] == '$') {
-            Status status = validateDollarPrefixElement(elem, deep);
-            if (!status.isOK())
-                return status;
-        }
-    }
-
-    if (deep) {
-        // Check children if there are any.
-        auto depth = storageValidChildren(elem, deep, recursionLevel);
-        if (!depth.isOK()) {
-            return depth;
-        }
-        invariant(depth.getValue() >= recursionLevel);
-        return depth.getValue();
-    }
-
-    return recursionLevel;
-}
-
-StatusWith<std::uint32_t> storageValidChildren(const mb::ConstElement& elem,
-                                               const bool deep,
-                                               std::uint32_t recursionLevel) {
-    if (!elem.hasChildren()) {
-        return recursionLevel;
-    }
-
-    std::uint32_t greatestDepth = recursionLevel;
-    mb::ConstElement curr = elem.leftChild();
-    while (curr.ok()) {
-        auto depth = storageValid(curr, deep, recursionLevel + 1);
-        if (!depth.isOK()) {
-            return depth.getStatus();
-        }
-
-        // Find the maximum depth amongst all of the children of 'elem'.
-        greatestDepth = std::max(greatestDepth, depth.getValue());
-        curr = curr.rightSibling();
-    }
-
-    return greatestDepth;
-}
-
-/**
- * This will verify that all updated fields are
- *   1.) Valid for storage (checking parent to make sure things like DBRefs are valid)
- *   2.) Compare updated immutable fields do not change values
- *
- * If updateFields is empty then it was replacement and/or we need to check all fields
- */
-inline Status validate(const BSONObj& original,
-                       const FieldRefSet& updatedFields,
-                       const mb::Document& updated,
-                       const std::vector<std::unique_ptr<FieldRef>>* immutableAndSingleValueFields,
-                       const ModifierInterface::Options& opts) {
-    LOG(3) << "update validate options -- "
-           << " updatedFields: " << updatedFields << " immutableAndSingleValueFields.size:"
-           << (immutableAndSingleValueFields ? immutableAndSingleValueFields->size() : 0)
-           << " validate:" << opts.enforceOkForStorage;
-
-    // 1.) Loop through each updated field and validate for storage
-    // and detect immutable field updates
-
-    // The set of possibly changed immutable fields -- we will need to check their vals
-    FieldRefSet changedImmutableFields;
-
-    // Check to see if there were no fields specified or if we are not validating
-    // The case if a range query, or query that didn't result in saved fields
-    if (updatedFields.empty() || !opts.enforceOkForStorage) {
-        if (opts.enforceOkForStorage) {
-            // No specific fields were updated so the whole doc must be checked
-            const bool doRecursiveCheck = true;
-            const std::uint32_t recursionLevel = 0;
-            auto documentDepth = storageValid(updated, doRecursiveCheck, recursionLevel);
-            if (!documentDepth.isOK()) {
-                return documentDepth.getStatus();
-            }
-        }
-
-        // Check all immutable fields
-        if (immutableAndSingleValueFields) {
-            changedImmutableFields.fillFrom(
-                transitional_tools_do_not_use::unspool_vector(*immutableAndSingleValueFields));
-        }
-    } else {
-        // TODO: Change impl so we don't need to create a new FieldRefSet
-        //       -- move all conflict logic into static function on FieldRefSet?
-        FieldRefSet immutableFieldRef;
-        if (immutableAndSingleValueFields) {
-            immutableFieldRef.fillFrom(
-                transitional_tools_do_not_use::unspool_vector(*immutableAndSingleValueFields));
-        }
-
-        FieldRefSet::const_iterator where = updatedFields.begin();
-        const FieldRefSet::const_iterator end = updatedFields.end();
-        for (; where != end; ++where) {
-            const FieldRef& current = **where;
-
-            // Find the updated field in the updated document.
-            mutablebson::ConstElement newElem = updated.root();
-            size_t currentPart = 0;
-            while (newElem.ok() && currentPart < current.numParts())
-                newElem = newElem[current.getPart(currentPart++)];
-
-            // newElem might be missing if $unset/$renamed-away
-            if (newElem.ok()) {
-                // Check element, and its children
-                const bool doRecursiveCheck = true;
-                const std::uint32_t recursionLevel = 0;
-                auto newElemDepth = storageValid(newElem, doRecursiveCheck, recursionLevel);
-                if (!newElemDepth.isOK()) {
-                    return newElemDepth.getStatus();
-                }
-
-                // Check parents to make sure they are valid as well.
-                auto parentsDepth = storageValidParents(newElem, recursionLevel);
-                if (!parentsDepth.isOK()) {
-                    return parentsDepth.getStatus();
-                }
-
-                // Ensure that the combined depths of both the new element and its parents do not
-                // exceed the maximum BSON depth.
-                if (newElemDepth.getValue() + parentsDepth.getValue() >
-                    BSONDepth::getMaxDepthForUserStorage()) {
-                    return {ErrorCodes::Overflow,
-                            str::stream() << "Update operation causes document to exceed maximum "
-                                             "nesting depth of "
-                                          << BSONDepth::getMaxDepthForUserStorage()};
-                }
-            }
-            // Check if the updated field conflicts with immutable fields
-            immutableFieldRef.findConflicts(&current, &changedImmutableFields);
-        }
-    }
-
-    const bool checkIdField = (updatedFields.empty() && !original.isEmpty()) ||
-        updatedFields.findConflicts(&idFieldRef, NULL);
-
-    // Add _id to fields to check since it too is immutable
-    if (checkIdField)
-        changedImmutableFields.keepShortest(&idFieldRef);
-    else if (changedImmutableFields.empty()) {
-        // Return early if nothing changed which is immutable
-        return Status::OK();
-    }
-
-    LOG(4) << "Changed immutable fields: " << changedImmutableFields;
-    // 2.) Now compare values of the changed immutable fields (to make sure they haven't)
-
-    const mutablebson::ConstElement newIdElem = updated.root()[idFieldName];
-
-    FieldRefSet::const_iterator where = changedImmutableFields.begin();
-    const FieldRefSet::const_iterator end = changedImmutableFields.end();
-    for (; where != end; ++where) {
-        const FieldRef& current = **where;
-
-        // Find the updated field in the updated document.
-        mutablebson::ConstElement newElem = updated.root();
-        size_t currentPart = 0;
-        while (newElem.ok() && currentPart < current.numParts())
-            newElem = newElem[current.getPart(currentPart++)];
-
-        if (!newElem.ok()) {
-            if (original.isEmpty()) {
-                // If the _id is missing and not required, then skip this check
-                if (!(current.dottedField() == idFieldName))
-                    return Status(ErrorCodes::NoSuchKey,
-                                  mongoutils::str::stream() << "After applying the update, the new"
-                                                            << " document was missing the '"
-                                                            << current.dottedField()
-                                                            << "' (required and immutable) field.");
-
-            } else {
-                if (current.dottedField() != idFieldName)
-                    return Status(ErrorCodes::ImmutableField,
-                                  mongoutils::str::stream()
-                                      << "After applying the update to the document with "
-                                      << newIdElem.toString()
-                                      << ", the '"
-                                      << current.dottedField()
-                                      << "' (required and immutable) field was "
-                                         "found to have been removed --"
-                                      << original);
-            }
-        } else {
-            // Find the potentially affected field in the original document.
-            const BSONElement oldElem = dps::extractElementAtPath(original, current.dottedField());
-            const BSONElement oldIdElem = original.getField(idFieldName);
-
-            // Ensure no arrays since neither _id nor shard keys can be in an array, or one.
-            mb::ConstElement currElem = newElem;
-            while (currElem.ok()) {
-                if (currElem.getType() == Array) {
-                    return Status(
-                        ErrorCodes::NotSingleValueField,
-                        mongoutils::str::stream()
-                            << "After applying the update to the document {"
-                            << (oldIdElem.ok() ? oldIdElem.toString() : newIdElem.toString())
-                            << " , ...}, the (immutable) field '"
-                            << current.dottedField()
-                            << "' was found to be an array or array descendant.");
-                }
-                currElem = currElem.parent();
-            }
-
-            // If we have both (old and new), compare them. If we just have new we are good
-            if (oldElem.ok() && newElem.compareWithBSONElement(oldElem, nullptr, false) != 0) {
-                return Status(ErrorCodes::ImmutableField,
-                              mongoutils::str::stream()
-                                  << "After applying the update to the document {"
-                                  << oldElem.toString()
-                                  << " , ...}, the (immutable) field '"
-                                  << current.dottedField()
-                                  << "' was found to have been altered to "
-                                  << newElem.toString());
-            }
-        }
-    }
-
-    return Status::OK();
-}
 
 Status ensureIdFieldIsFirst(mb::Document* doc) {
     mb::Element idElem = mb::findFirstChildNamed(doc->root(), idFieldName);
@@ -502,6 +97,31 @@ Status addObjectIDIdField(mb::Document* doc) {
         return s;
 
     return Status::OK();
+}
+
+/**
+ * Uasserts if any of the paths in 'immutablePaths' are not present in 'document', or if they are
+ * arrays or array descendants.
+ */
+void checkImmutablePathsPresent(const mb::Document& document, const FieldRefSet& immutablePaths) {
+    for (auto path = immutablePaths.begin(); path != immutablePaths.end(); ++path) {
+        auto elem = document.root();
+        for (size_t i = 0; i < (*path)->numParts(); ++i) {
+            elem = elem[(*path)->getPart(i)];
+            uassert(ErrorCodes::NoSuchKey,
+                    str::stream() << "After applying the update, the new document was missing the "
+                                     "required field '"
+                                  << (*path)->dottedField()
+                                  << "'",
+                    elem.ok());
+            uassert(
+                ErrorCodes::NotSingleValueField,
+                str::stream() << "After applying the update to the document, the required field '"
+                              << (*path)->dottedField()
+                              << "' was found to be an array or array descendant.",
+                elem.getType() != BSONType::Array);
+        }
+    }
 }
 
 /**
@@ -575,13 +195,32 @@ BSONObj UpdateStage::transformAndUpdate(const Snapshotted<BSONObj>& oldObj, Reco
 
     BSONObj logObj;
 
-    FieldRefSet updatedFields;
     bool docWasModified = false;
 
     Status status = Status::OK();
+    const bool validateForStorage = getOpCtx()->writesAreReplicated() &&
+        !request->isFromMigration() && driver->modOptions().enforceOkForStorage;
+    FieldRefSet immutablePaths;
+    if (getOpCtx()->writesAreReplicated() && !request->isFromMigration()) {
+        if (lifecycle) {
+            auto immutablePathsVector =
+                getImmutableFields(getOpCtx(), request->getNamespaceString());
+            if (immutablePathsVector) {
+                immutablePaths.fillFrom(
+                    transitional_tools_do_not_use::unspool_vector(*immutablePathsVector));
+            }
+        }
+        immutablePaths.keepShortest(&idFieldRef);
+    }
     if (!driver->needMatchDetails()) {
         // If we don't need match details, avoid doing the rematch
-        status = driver->update(StringData(), &_doc, &logObj, &updatedFields, &docWasModified);
+        status = driver->update(StringData(),
+                                oldObj.value(),
+                                &_doc,
+                                validateForStorage,
+                                immutablePaths,
+                                &logObj,
+                                &docWasModified);
     } else {
         // If there was a matched field, obtain it.
         MatchDetails matchDetails;
@@ -594,12 +233,13 @@ BSONObj UpdateStage::transformAndUpdate(const Snapshotted<BSONObj>& oldObj, Reco
         if (matchDetails.hasElemMatchKey())
             matchedField = matchDetails.elemMatchKey();
 
-        // TODO: Right now, each mod checks in 'prepare' that if it needs positional
-        // data, that a non-empty StringData() was provided. In principle, we could do
-        // that check here in an else clause to the above conditional and remove the
-        // checks from the mods.
-
-        status = driver->update(matchedField, &_doc, &logObj, &updatedFields, &docWasModified);
+        status = driver->update(matchedField,
+                                oldObj.value(),
+                                &_doc,
+                                validateForStorage,
+                                immutablePaths,
+                                &logObj,
+                                &docWasModified);
     }
 
     if (!status.isOK()) {
@@ -636,16 +276,6 @@ BSONObj UpdateStage::transformAndUpdate(const Snapshotted<BSONObj>& oldObj, Reco
     }
 
     if (docWasModified) {
-        // Verify that no immutable fields were changed and data is valid for storage.
-
-        if (!(!getOpCtx()->writesAreReplicated() || request->isFromMigration())) {
-            const std::vector<std::unique_ptr<FieldRef>>* immutableFields = nullptr;
-            if (lifecycle)
-                immutableFields = getImmutableFields(getOpCtx(), request->getNamespaceString());
-
-            uassertStatusOK(validate(
-                oldObj.value(), updatedFields, _doc, immutableFields, driver->modOptions()));
-        }
 
         // Prepare to write back the modified document
         WriteUnitOfWork wunit(getOpCtx());
@@ -748,20 +378,21 @@ Status UpdateStage::applyUpdateOpsForInsert(OperationContext* opCtx,
     driver->setLogOp(false);
     driver->setContext(ModifierInterface::ExecInfo::INSERT_CONTEXT);
 
-    const std::vector<std::unique_ptr<FieldRef>>* immutablePaths = nullptr;
-    if (!isInternalRequest)
-        immutablePaths = getImmutableFields(opCtx, ns);
+    FieldRefSet immutablePaths;
+    if (!isInternalRequest) {
+        auto immutablePathsVector = getImmutableFields(opCtx, ns);
+        if (immutablePathsVector) {
+            immutablePaths.fillFrom(
+                transitional_tools_do_not_use::unspool_vector(*immutablePathsVector));
+        }
+    }
+    immutablePaths.keepShortest(&idFieldRef);
 
     // The original document we compare changes to - immutable paths must not change
     BSONObj original;
 
     if (cq) {
-        std::vector<FieldRef*> fields;
-        if (immutablePaths) {
-            fields = transitional_tools_do_not_use::unspool_vector(*immutablePaths);
-        }
-
-        Status status = driver->populateDocumentWithQueryFields(*cq, &fields, *doc);
+        Status status = driver->populateDocumentWithQueryFields(*cq, immutablePaths, *doc);
         if (!status.isOK()) {
             return status;
         }
@@ -776,8 +407,14 @@ Status UpdateStage::applyUpdateOpsForInsert(OperationContext* opCtx,
         fassert(17352, doc->root().appendElement(idElt));
     }
 
-    // Apply the update modifications here.
-    Status updateStatus = driver->update(StringData(), doc);
+    // Apply the update modifications here. Do not validate for storage, since we will validate the
+    // entire document after the update. However, we ensure that no immutable fields are updated.
+    const bool validateForStorage = false;
+    if (isInternalRequest) {
+        immutablePaths.clear();
+    }
+    Status updateStatus =
+        driver->update(StringData(), original, doc, validateForStorage, immutablePaths);
     if (!updateStatus.isOK()) {
         return Status(updateStatus.code(), updateStatus.reason(), 16836);
     }
@@ -796,13 +433,10 @@ Status UpdateStage::applyUpdateOpsForInsert(OperationContext* opCtx,
     // that contains all the immutable keys and can be stored if it isn't coming
     // from a migration or via replication.
     if (!isInternalRequest) {
-        FieldRefSet noFields;
-        // This will only validate the modified fields if not a replacement.
-        Status validateStatus =
-            validate(original, noFields, *doc, immutablePaths, driver->modOptions());
-        if (!validateStatus.isOK()) {
-            return validateStatus;
+        if (driver->modOptions().enforceOkForStorage) {
+            storage_validation::storageValid(*doc);
         }
+        checkImmutablePathsPresent(*doc, immutablePaths);
     }
 
     BSONObj newObj = doc->getObject();

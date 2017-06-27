@@ -68,6 +68,8 @@ TEST(SetNodeTest, ApplyNoOp) {
     FieldRef pathTaken("a");
     StringData matchedField;
     auto fromReplication = false;
+    auto validateForStorage = true;
+    FieldRefSet immutablePaths;
     UpdateIndexData indexData;
     indexData.addPath("a");
     Document logDoc;
@@ -79,6 +81,8 @@ TEST(SetNodeTest, ApplyNoOp) {
                &pathTaken,
                matchedField,
                fromReplication,
+               validateForStorage,
+               immutablePaths,
                &indexData,
                &logBuilder,
                &indexesAffected,
@@ -101,6 +105,8 @@ TEST(SetNodeTest, ApplyEmptyPathToCreate) {
     FieldRef pathTaken("a");
     StringData matchedField;
     auto fromReplication = false;
+    auto validateForStorage = true;
+    FieldRefSet immutablePaths;
     UpdateIndexData indexData;
     indexData.addPath("a");
     Document logDoc;
@@ -112,6 +118,8 @@ TEST(SetNodeTest, ApplyEmptyPathToCreate) {
                &pathTaken,
                matchedField,
                fromReplication,
+               validateForStorage,
+               immutablePaths,
                &indexData,
                &logBuilder,
                &indexesAffected,
@@ -134,6 +142,8 @@ TEST(SetNodeTest, ApplyCreatePath) {
     FieldRef pathTaken("a");
     StringData matchedField;
     auto fromReplication = false;
+    auto validateForStorage = true;
+    FieldRefSet immutablePaths;
     UpdateIndexData indexData;
     indexData.addPath("a");
     Document logDoc;
@@ -145,6 +155,8 @@ TEST(SetNodeTest, ApplyCreatePath) {
                &pathTaken,
                matchedField,
                fromReplication,
+               validateForStorage,
+               immutablePaths,
                &indexData,
                &logBuilder,
                &indexesAffected,
@@ -167,6 +179,8 @@ TEST(SetNodeTest, ApplyCreatePathFromRoot) {
     FieldRef pathTaken("");
     StringData matchedField;
     auto fromReplication = false;
+    auto validateForStorage = true;
+    FieldRefSet immutablePaths;
     UpdateIndexData indexData;
     indexData.addPath("a");
     Document logDoc;
@@ -178,6 +192,8 @@ TEST(SetNodeTest, ApplyCreatePathFromRoot) {
                &pathTaken,
                matchedField,
                fromReplication,
+               validateForStorage,
+               immutablePaths,
                &indexData,
                &logBuilder,
                &indexesAffected,
@@ -200,6 +216,8 @@ TEST(SetNodeTest, ApplyPositional) {
     FieldRef pathTaken("a.1");
     StringData matchedField("1");
     auto fromReplication = false;
+    auto validateForStorage = true;
+    FieldRefSet immutablePaths;
     UpdateIndexData indexData;
     indexData.addPath("a");
     Document logDoc;
@@ -211,6 +229,8 @@ TEST(SetNodeTest, ApplyPositional) {
                &pathTaken,
                matchedField,
                fromReplication,
+               validateForStorage,
+               immutablePaths,
                &indexData,
                &logBuilder,
                &indexesAffected,
@@ -233,6 +253,8 @@ TEST(SetNodeTest, ApplyNonViablePathToCreate) {
     FieldRef pathTaken("a");
     StringData matchedField;
     auto fromReplication = false;
+    auto validateForStorage = true;
+    FieldRefSet immutablePaths;
     UpdateIndexData indexData;
     indexData.addPath("a");
     Document logDoc;
@@ -244,6 +266,8 @@ TEST(SetNodeTest, ApplyNonViablePathToCreate) {
                                            &pathTaken,
                                            matchedField,
                                            fromReplication,
+                                           validateForStorage,
+                                           immutablePaths,
                                            &indexData,
                                            &logBuilder,
                                            &indexesAffected,
@@ -264,6 +288,8 @@ TEST(SetNodeTest, ApplyNonViablePathToCreateFromReplicationIsNoOp) {
     FieldRef pathTaken("a");
     StringData matchedField;
     auto fromReplication = true;
+    auto validateForStorage = true;
+    FieldRefSet immutablePaths;
     UpdateIndexData indexData;
     indexData.addPath("a");
     Document logDoc;
@@ -275,6 +301,8 @@ TEST(SetNodeTest, ApplyNonViablePathToCreateFromReplicationIsNoOp) {
                &pathTaken,
                matchedField,
                fromReplication,
+               validateForStorage,
+               immutablePaths,
                &indexData,
                &logBuilder,
                &indexesAffected,
@@ -297,6 +325,8 @@ TEST(SetNodeTest, ApplyNoIndexDataNoLogBuilder) {
     FieldRef pathTaken("a");
     StringData matchedField;
     auto fromReplication = false;
+    auto validateForStorage = true;
+    FieldRefSet immutablePaths;
     const UpdateIndexData* indexData = nullptr;
     LogBuilder* logBuilder = nullptr;
     auto indexesAffected = false;
@@ -306,6 +336,8 @@ TEST(SetNodeTest, ApplyNoIndexDataNoLogBuilder) {
                &pathTaken,
                matchedField,
                fromReplication,
+               validateForStorage,
+               immutablePaths,
                indexData,
                logBuilder,
                &indexesAffected,
@@ -327,6 +359,8 @@ TEST(SetNodeTest, ApplyDoesNotAffectIndexes) {
     FieldRef pathTaken("a");
     StringData matchedField;
     auto fromReplication = false;
+    auto validateForStorage = true;
+    FieldRefSet immutablePaths;
     UpdateIndexData indexData;
     indexData.addPath("b");
     LogBuilder* logBuilder = nullptr;
@@ -337,6 +371,8 @@ TEST(SetNodeTest, ApplyDoesNotAffectIndexes) {
                &pathTaken,
                matchedField,
                fromReplication,
+               validateForStorage,
+               immutablePaths,
                &indexData,
                logBuilder,
                &indexesAffected,
@@ -358,6 +394,8 @@ TEST(SetNodeTest, TypeChangeIsNotANoop) {
     FieldRef pathTaken("a");
     StringData matchedField;
     auto fromReplication = false;
+    auto validateForStorage = true;
+    FieldRefSet immutablePaths;
     UpdateIndexData indexData;
     indexData.addPath("a");
     LogBuilder* logBuilder = nullptr;
@@ -368,6 +406,8 @@ TEST(SetNodeTest, TypeChangeIsNotANoop) {
                &pathTaken,
                matchedField,
                fromReplication,
+               validateForStorage,
+               immutablePaths,
                &indexData,
                logBuilder,
                &indexesAffected,
@@ -393,6 +433,8 @@ TEST(SetNodeTest, IdentityOpOnDeserializedIsNotANoOp) {
     FieldRef pathTaken("a");
     StringData matchedField;
     auto fromReplication = false;
+    auto validateForStorage = true;
+    FieldRefSet immutablePaths;
     UpdateIndexData indexData;
     indexData.addPath("a");
     LogBuilder* logBuilder = nullptr;
@@ -403,6 +445,8 @@ TEST(SetNodeTest, IdentityOpOnDeserializedIsNotANoOp) {
                &pathTaken,
                matchedField,
                fromReplication,
+               validateForStorage,
+               immutablePaths,
                &indexData,
                logBuilder,
                &indexesAffected,
@@ -424,6 +468,8 @@ TEST(SetNodeTest, ApplyEmptyDocument) {
     FieldRef pathTaken("");
     StringData matchedField;
     auto fromReplication = false;
+    auto validateForStorage = true;
+    FieldRefSet immutablePaths;
     UpdateIndexData indexData;
     indexData.addPath("a");
     LogBuilder* logBuilder = nullptr;
@@ -434,6 +480,8 @@ TEST(SetNodeTest, ApplyEmptyDocument) {
                &pathTaken,
                matchedField,
                fromReplication,
+               validateForStorage,
+               immutablePaths,
                &indexData,
                logBuilder,
                &indexesAffected,
@@ -455,6 +503,8 @@ TEST(SetNodeTest, ApplyInPlace) {
     FieldRef pathTaken("a");
     StringData matchedField;
     auto fromReplication = false;
+    auto validateForStorage = true;
+    FieldRefSet immutablePaths;
     UpdateIndexData indexData;
     indexData.addPath("a");
     LogBuilder* logBuilder = nullptr;
@@ -465,6 +515,8 @@ TEST(SetNodeTest, ApplyInPlace) {
                &pathTaken,
                matchedField,
                fromReplication,
+               validateForStorage,
+               immutablePaths,
                &indexData,
                logBuilder,
                &indexesAffected,
@@ -486,6 +538,8 @@ TEST(SetNodeTest, ApplyOverridePath) {
     FieldRef pathTaken("a");
     StringData matchedField;
     auto fromReplication = false;
+    auto validateForStorage = true;
+    FieldRefSet immutablePaths;
     UpdateIndexData indexData;
     indexData.addPath("a");
     LogBuilder* logBuilder = nullptr;
@@ -496,6 +550,8 @@ TEST(SetNodeTest, ApplyOverridePath) {
                &pathTaken,
                matchedField,
                fromReplication,
+               validateForStorage,
+               immutablePaths,
                &indexData,
                logBuilder,
                &indexesAffected,
@@ -517,6 +573,8 @@ TEST(SetNodeTest, ApplyChangeType) {
     FieldRef pathTaken("a");
     StringData matchedField;
     auto fromReplication = false;
+    auto validateForStorage = true;
+    FieldRefSet immutablePaths;
     UpdateIndexData indexData;
     indexData.addPath("a");
     LogBuilder* logBuilder = nullptr;
@@ -527,6 +585,8 @@ TEST(SetNodeTest, ApplyChangeType) {
                &pathTaken,
                matchedField,
                fromReplication,
+               validateForStorage,
+               immutablePaths,
                &indexData,
                logBuilder,
                &indexesAffected,
@@ -548,6 +608,8 @@ TEST(SetNodeTest, ApplyNewPath) {
     FieldRef pathTaken("");
     StringData matchedField;
     auto fromReplication = false;
+    auto validateForStorage = true;
+    FieldRefSet immutablePaths;
     UpdateIndexData indexData;
     indexData.addPath("a");
     LogBuilder* logBuilder = nullptr;
@@ -558,6 +620,8 @@ TEST(SetNodeTest, ApplyNewPath) {
                &pathTaken,
                matchedField,
                fromReplication,
+               validateForStorage,
+               immutablePaths,
                &indexData,
                logBuilder,
                &indexesAffected,
@@ -579,6 +643,8 @@ TEST(SetNodeTest, ApplyLog) {
     FieldRef pathTaken("a");
     StringData matchedField;
     auto fromReplication = false;
+    auto validateForStorage = true;
+    FieldRefSet immutablePaths;
     const UpdateIndexData* indexData = nullptr;
     Document logDoc;
     LogBuilder logBuilder(logDoc.root());
@@ -589,6 +655,8 @@ TEST(SetNodeTest, ApplyLog) {
                &pathTaken,
                matchedField,
                fromReplication,
+               validateForStorage,
+               immutablePaths,
                indexData,
                &logBuilder,
                &indexesAffected,
@@ -610,6 +678,8 @@ TEST(SetNodeTest, ApplyNoOpDottedPath) {
     FieldRef pathTaken("a.b");
     StringData matchedField;
     auto fromReplication = false;
+    auto validateForStorage = true;
+    FieldRefSet immutablePaths;
     UpdateIndexData indexData;
     indexData.addPath("a.b");
     LogBuilder* logBuilder = nullptr;
@@ -620,6 +690,8 @@ TEST(SetNodeTest, ApplyNoOpDottedPath) {
                &pathTaken,
                matchedField,
                fromReplication,
+               validateForStorage,
+               immutablePaths,
                &indexData,
                logBuilder,
                &indexesAffected,
@@ -641,6 +713,8 @@ TEST(SetNodeTest, TypeChangeOnDottedPathIsNotANoOp) {
     FieldRef pathTaken("a.b");
     StringData matchedField;
     auto fromReplication = false;
+    auto validateForStorage = true;
+    FieldRefSet immutablePaths;
     UpdateIndexData indexData;
     indexData.addPath("a.b");
     LogBuilder* logBuilder = nullptr;
@@ -651,6 +725,8 @@ TEST(SetNodeTest, TypeChangeOnDottedPathIsNotANoOp) {
                &pathTaken,
                matchedField,
                fromReplication,
+               validateForStorage,
+               immutablePaths,
                &indexData,
                logBuilder,
                &indexesAffected,
@@ -672,6 +748,8 @@ TEST(SetNodeTest, ApplyPathNotViable) {
     FieldRef pathTaken("a");
     StringData matchedField;
     auto fromReplication = false;
+    auto validateForStorage = true;
+    FieldRefSet immutablePaths;
     const UpdateIndexData* indexData = nullptr;
     LogBuilder* logBuilder = nullptr;
     auto indexesAffected = false;
@@ -681,6 +759,8 @@ TEST(SetNodeTest, ApplyPathNotViable) {
                                            &pathTaken,
                                            matchedField,
                                            fromReplication,
+                                           validateForStorage,
+                                           immutablePaths,
                                            indexData,
                                            logBuilder,
                                            &indexesAffected,
@@ -701,6 +781,8 @@ TEST(SetNodeTest, ApplyPathNotViableArrray) {
     FieldRef pathTaken("a");
     StringData matchedField;
     auto fromReplication = false;
+    auto validateForStorage = true;
+    FieldRefSet immutablePaths;
     const UpdateIndexData* indexData = nullptr;
     LogBuilder* logBuilder = nullptr;
     auto indexesAffected = false;
@@ -710,6 +792,8 @@ TEST(SetNodeTest, ApplyPathNotViableArrray) {
                                            &pathTaken,
                                            matchedField,
                                            fromReplication,
+                                           validateForStorage,
+                                           immutablePaths,
                                            indexData,
                                            logBuilder,
                                            &indexesAffected,
@@ -730,6 +814,8 @@ TEST(SetNodeTest, ApplyInPlaceDottedPath) {
     FieldRef pathTaken("a.b");
     StringData matchedField;
     auto fromReplication = false;
+    auto validateForStorage = true;
+    FieldRefSet immutablePaths;
     UpdateIndexData indexData;
     indexData.addPath("a.b");
     LogBuilder* logBuilder = nullptr;
@@ -740,6 +826,8 @@ TEST(SetNodeTest, ApplyInPlaceDottedPath) {
                &pathTaken,
                matchedField,
                fromReplication,
+               validateForStorage,
+               immutablePaths,
                &indexData,
                logBuilder,
                &indexesAffected,
@@ -761,6 +849,8 @@ TEST(SetNodeTest, ApplyChangeTypeDottedPath) {
     FieldRef pathTaken("a.b");
     StringData matchedField;
     auto fromReplication = false;
+    auto validateForStorage = true;
+    FieldRefSet immutablePaths;
     UpdateIndexData indexData;
     indexData.addPath("a.b");
     LogBuilder* logBuilder = nullptr;
@@ -771,6 +861,8 @@ TEST(SetNodeTest, ApplyChangeTypeDottedPath) {
                &pathTaken,
                matchedField,
                fromReplication,
+               validateForStorage,
+               immutablePaths,
                &indexData,
                logBuilder,
                &indexesAffected,
@@ -792,6 +884,8 @@ TEST(SetNodeTest, ApplyChangePath) {
     FieldRef pathTaken("a.b");
     StringData matchedField;
     auto fromReplication = false;
+    auto validateForStorage = true;
+    FieldRefSet immutablePaths;
     UpdateIndexData indexData;
     indexData.addPath("a.b");
     LogBuilder* logBuilder = nullptr;
@@ -802,6 +896,8 @@ TEST(SetNodeTest, ApplyChangePath) {
                &pathTaken,
                matchedField,
                fromReplication,
+               validateForStorage,
+               immutablePaths,
                &indexData,
                logBuilder,
                &indexesAffected,
@@ -823,6 +919,8 @@ TEST(SetNodeTest, ApplyExtendPath) {
     FieldRef pathTaken("a");
     StringData matchedField;
     auto fromReplication = false;
+    auto validateForStorage = true;
+    FieldRefSet immutablePaths;
     UpdateIndexData indexData;
     indexData.addPath("a.b");
     LogBuilder* logBuilder = nullptr;
@@ -833,6 +931,8 @@ TEST(SetNodeTest, ApplyExtendPath) {
                &pathTaken,
                matchedField,
                fromReplication,
+               validateForStorage,
+               immutablePaths,
                &indexData,
                logBuilder,
                &indexesAffected,
@@ -854,6 +954,8 @@ TEST(SetNodeTest, ApplyNewDottedPath) {
     FieldRef pathTaken("");
     StringData matchedField;
     auto fromReplication = false;
+    auto validateForStorage = true;
+    FieldRefSet immutablePaths;
     UpdateIndexData indexData;
     indexData.addPath("a.b");
     LogBuilder* logBuilder = nullptr;
@@ -864,6 +966,8 @@ TEST(SetNodeTest, ApplyNewDottedPath) {
                &pathTaken,
                matchedField,
                fromReplication,
+               validateForStorage,
+               immutablePaths,
                &indexData,
                logBuilder,
                &indexesAffected,
@@ -885,6 +989,8 @@ TEST(SetNodeTest, ApplyEmptyDoc) {
     FieldRef pathTaken("");
     StringData matchedField;
     auto fromReplication = false;
+    auto validateForStorage = true;
+    FieldRefSet immutablePaths;
     UpdateIndexData indexData;
     indexData.addPath("a.b");
     LogBuilder* logBuilder = nullptr;
@@ -895,6 +1001,8 @@ TEST(SetNodeTest, ApplyEmptyDoc) {
                &pathTaken,
                matchedField,
                fromReplication,
+               validateForStorage,
+               immutablePaths,
                &indexData,
                logBuilder,
                &indexesAffected,
@@ -916,6 +1024,8 @@ TEST(SetNodeTest, ApplyFieldWithDot) {
     FieldRef pathTaken("");
     StringData matchedField;
     auto fromReplication = false;
+    auto validateForStorage = true;
+    FieldRefSet immutablePaths;
     UpdateIndexData indexData;
     indexData.addPath("a.b");
     LogBuilder* logBuilder = nullptr;
@@ -926,6 +1036,8 @@ TEST(SetNodeTest, ApplyFieldWithDot) {
                &pathTaken,
                matchedField,
                fromReplication,
+               validateForStorage,
+               immutablePaths,
                &indexData,
                logBuilder,
                &indexesAffected,
@@ -947,6 +1059,8 @@ TEST(SetNodeTest, ApplyNoOpArrayIndex) {
     FieldRef pathTaken("a.2.b");
     StringData matchedField;
     auto fromReplication = false;
+    auto validateForStorage = true;
+    FieldRefSet immutablePaths;
     UpdateIndexData indexData;
     indexData.addPath("a.2.b");
     LogBuilder* logBuilder = nullptr;
@@ -957,6 +1071,8 @@ TEST(SetNodeTest, ApplyNoOpArrayIndex) {
                &pathTaken,
                matchedField,
                fromReplication,
+               validateForStorage,
+               immutablePaths,
                &indexData,
                logBuilder,
                &indexesAffected,
@@ -978,6 +1094,8 @@ TEST(SetNodeTest, TypeChangeInArrayIsNotANoOp) {
     FieldRef pathTaken("a.2.b");
     StringData matchedField;
     auto fromReplication = false;
+    auto validateForStorage = true;
+    FieldRefSet immutablePaths;
     UpdateIndexData indexData;
     indexData.addPath("a.2.b");
     LogBuilder* logBuilder = nullptr;
@@ -988,6 +1106,8 @@ TEST(SetNodeTest, TypeChangeInArrayIsNotANoOp) {
                &pathTaken,
                matchedField,
                fromReplication,
+               validateForStorage,
+               immutablePaths,
                &indexData,
                logBuilder,
                &indexesAffected,
@@ -1009,6 +1129,8 @@ TEST(SetNodeTest, ApplyNonViablePath) {
     FieldRef pathTaken("a");
     StringData matchedField;
     auto fromReplication = false;
+    auto validateForStorage = true;
+    FieldRefSet immutablePaths;
     const UpdateIndexData* indexData = nullptr;
     LogBuilder* logBuilder = nullptr;
     auto indexesAffected = false;
@@ -1018,6 +1140,8 @@ TEST(SetNodeTest, ApplyNonViablePath) {
                                            &pathTaken,
                                            matchedField,
                                            fromReplication,
+                                           validateForStorage,
+                                           immutablePaths,
                                            indexData,
                                            logBuilder,
                                            &indexesAffected,
@@ -1038,6 +1162,8 @@ TEST(SetNodeTest, ApplyInPlaceArrayIndex) {
     FieldRef pathTaken("a.2.b");
     StringData matchedField;
     auto fromReplication = false;
+    auto validateForStorage = true;
+    FieldRefSet immutablePaths;
     UpdateIndexData indexData;
     indexData.addPath("a.2.b");
     LogBuilder* logBuilder = nullptr;
@@ -1048,6 +1174,8 @@ TEST(SetNodeTest, ApplyInPlaceArrayIndex) {
                &pathTaken,
                matchedField,
                fromReplication,
+               validateForStorage,
+               immutablePaths,
                &indexData,
                logBuilder,
                &indexesAffected,
@@ -1069,6 +1197,8 @@ TEST(SetNodeTest, ApplyNormalArray) {
     FieldRef pathTaken("a");
     StringData matchedField;
     auto fromReplication = false;
+    auto validateForStorage = true;
+    FieldRefSet immutablePaths;
     UpdateIndexData indexData;
     indexData.addPath("a.2.b");
     LogBuilder* logBuilder = nullptr;
@@ -1079,6 +1209,8 @@ TEST(SetNodeTest, ApplyNormalArray) {
                &pathTaken,
                matchedField,
                fromReplication,
+               validateForStorage,
+               immutablePaths,
                &indexData,
                logBuilder,
                &indexesAffected,
@@ -1100,6 +1232,8 @@ TEST(SetNodeTest, ApplyPaddingArray) {
     FieldRef pathTaken("a");
     StringData matchedField;
     auto fromReplication = false;
+    auto validateForStorage = true;
+    FieldRefSet immutablePaths;
     UpdateIndexData indexData;
     indexData.addPath("a.2.b");
     LogBuilder* logBuilder = nullptr;
@@ -1110,6 +1244,8 @@ TEST(SetNodeTest, ApplyPaddingArray) {
                &pathTaken,
                matchedField,
                fromReplication,
+               validateForStorage,
+               immutablePaths,
                &indexData,
                logBuilder,
                &indexesAffected,
@@ -1131,6 +1267,8 @@ TEST(SetNodeTest, ApplyNumericObject) {
     FieldRef pathTaken("a");
     StringData matchedField;
     auto fromReplication = false;
+    auto validateForStorage = true;
+    FieldRefSet immutablePaths;
     UpdateIndexData indexData;
     indexData.addPath("a.2.b");
     LogBuilder* logBuilder = nullptr;
@@ -1141,6 +1279,8 @@ TEST(SetNodeTest, ApplyNumericObject) {
                &pathTaken,
                matchedField,
                fromReplication,
+               validateForStorage,
+               immutablePaths,
                &indexData,
                logBuilder,
                &indexesAffected,
@@ -1162,6 +1302,8 @@ TEST(SetNodeTest, ApplyNumericField) {
     FieldRef pathTaken("a.2.b");
     StringData matchedField;
     auto fromReplication = false;
+    auto validateForStorage = true;
+    FieldRefSet immutablePaths;
     UpdateIndexData indexData;
     indexData.addPath("a.2.b");
     LogBuilder* logBuilder = nullptr;
@@ -1172,6 +1314,8 @@ TEST(SetNodeTest, ApplyNumericField) {
                &pathTaken,
                matchedField,
                fromReplication,
+               validateForStorage,
+               immutablePaths,
                &indexData,
                logBuilder,
                &indexesAffected,
@@ -1193,6 +1337,8 @@ TEST(SetNodeTest, ApplyExtendNumericField) {
     FieldRef pathTaken("a.2");
     StringData matchedField;
     auto fromReplication = false;
+    auto validateForStorage = true;
+    FieldRefSet immutablePaths;
     UpdateIndexData indexData;
     indexData.addPath("a.2.b");
     LogBuilder* logBuilder = nullptr;
@@ -1203,6 +1349,8 @@ TEST(SetNodeTest, ApplyExtendNumericField) {
                &pathTaken,
                matchedField,
                fromReplication,
+               validateForStorage,
+               immutablePaths,
                &indexData,
                logBuilder,
                &indexesAffected,
@@ -1224,6 +1372,8 @@ TEST(SetNodeTest, ApplyEmptyObject) {
     FieldRef pathTaken("a");
     StringData matchedField;
     auto fromReplication = false;
+    auto validateForStorage = true;
+    FieldRefSet immutablePaths;
     UpdateIndexData indexData;
     indexData.addPath("a.2.b");
     LogBuilder* logBuilder = nullptr;
@@ -1234,6 +1384,8 @@ TEST(SetNodeTest, ApplyEmptyObject) {
                &pathTaken,
                matchedField,
                fromReplication,
+               validateForStorage,
+               immutablePaths,
                &indexData,
                logBuilder,
                &indexesAffected,
@@ -1255,6 +1407,8 @@ TEST(SetNodeTest, ApplyEmptyArray) {
     FieldRef pathTaken("a");
     StringData matchedField;
     auto fromReplication = false;
+    auto validateForStorage = true;
+    FieldRefSet immutablePaths;
     UpdateIndexData indexData;
     indexData.addPath("a.2.b");
     LogBuilder* logBuilder = nullptr;
@@ -1265,6 +1419,8 @@ TEST(SetNodeTest, ApplyEmptyArray) {
                &pathTaken,
                matchedField,
                fromReplication,
+               validateForStorage,
+               immutablePaths,
                &indexData,
                logBuilder,
                &indexesAffected,
@@ -1286,6 +1442,8 @@ TEST(SetNodeTest, ApplyLogDottedPath) {
     FieldRef pathTaken("a");
     StringData matchedField;
     auto fromReplication = false;
+    auto validateForStorage = true;
+    FieldRefSet immutablePaths;
     const UpdateIndexData* indexData = nullptr;
     Document logDoc;
     LogBuilder logBuilder(logDoc.root());
@@ -1296,6 +1454,8 @@ TEST(SetNodeTest, ApplyLogDottedPath) {
                &pathTaken,
                matchedField,
                fromReplication,
+               validateForStorage,
+               immutablePaths,
                indexData,
                &logBuilder,
                &indexesAffected,
@@ -1317,6 +1477,8 @@ TEST(SetNodeTest, LogEmptyArray) {
     FieldRef pathTaken("a");
     StringData matchedField;
     auto fromReplication = false;
+    auto validateForStorage = true;
+    FieldRefSet immutablePaths;
     const UpdateIndexData* indexData = nullptr;
     Document logDoc;
     LogBuilder logBuilder(logDoc.root());
@@ -1327,6 +1489,8 @@ TEST(SetNodeTest, LogEmptyArray) {
                &pathTaken,
                matchedField,
                fromReplication,
+               validateForStorage,
+               immutablePaths,
                indexData,
                &logBuilder,
                &indexesAffected,
@@ -1348,6 +1512,8 @@ TEST(SetNodeTest, LogEmptyObject) {
     FieldRef pathTaken("a");
     StringData matchedField;
     auto fromReplication = false;
+    auto validateForStorage = true;
+    FieldRefSet immutablePaths;
     const UpdateIndexData* indexData = nullptr;
     Document logDoc;
     LogBuilder logBuilder(logDoc.root());
@@ -1358,6 +1524,8 @@ TEST(SetNodeTest, LogEmptyObject) {
                &pathTaken,
                matchedField,
                fromReplication,
+               validateForStorage,
+               immutablePaths,
                indexData,
                &logBuilder,
                &indexesAffected,
@@ -1379,6 +1547,8 @@ TEST(SetNodeTest, ApplyNoOpComplex) {
     FieldRef pathTaken("a.1.b");
     StringData matchedField;
     auto fromReplication = false;
+    auto validateForStorage = true;
+    FieldRefSet immutablePaths;
     UpdateIndexData indexData;
     indexData.addPath("a.1.b");
     LogBuilder* logBuilder = nullptr;
@@ -1389,6 +1559,8 @@ TEST(SetNodeTest, ApplyNoOpComplex) {
                &pathTaken,
                matchedField,
                fromReplication,
+               validateForStorage,
+               immutablePaths,
                &indexData,
                logBuilder,
                &indexesAffected,
@@ -1410,6 +1582,8 @@ TEST(SetNodeTest, ApplySameStructure) {
     FieldRef pathTaken("a.1.b");
     StringData matchedField;
     auto fromReplication = false;
+    auto validateForStorage = true;
+    FieldRefSet immutablePaths;
     UpdateIndexData indexData;
     indexData.addPath("a.1.b");
     LogBuilder* logBuilder = nullptr;
@@ -1420,6 +1594,8 @@ TEST(SetNodeTest, ApplySameStructure) {
                &pathTaken,
                matchedField,
                fromReplication,
+               validateForStorage,
+               immutablePaths,
                &indexData,
                logBuilder,
                &indexesAffected,
@@ -1441,6 +1617,8 @@ TEST(SetNodeTest, NonViablePathWithoutRepl) {
     FieldRef pathTaken("a");
     StringData matchedField;
     auto fromReplication = false;
+    auto validateForStorage = true;
+    FieldRefSet immutablePaths;
     const UpdateIndexData* indexData = nullptr;
     LogBuilder* logBuilder = nullptr;
     auto indexesAffected = false;
@@ -1450,6 +1628,8 @@ TEST(SetNodeTest, NonViablePathWithoutRepl) {
                                            &pathTaken,
                                            matchedField,
                                            fromReplication,
+                                           validateForStorage,
+                                           immutablePaths,
                                            indexData,
                                            logBuilder,
                                            &indexesAffected,
@@ -1470,6 +1650,8 @@ TEST(SetNodeTest, SingleFieldFromReplication) {
     FieldRef pathTaken("a");
     StringData matchedField;
     auto fromReplication = true;
+    auto validateForStorage = true;
+    FieldRefSet immutablePaths;
     UpdateIndexData indexData;
     indexData.addPath("a.1.b");
     LogBuilder* logBuilder = nullptr;
@@ -1480,6 +1662,8 @@ TEST(SetNodeTest, SingleFieldFromReplication) {
                &pathTaken,
                matchedField,
                fromReplication,
+               validateForStorage,
+               immutablePaths,
                &indexData,
                logBuilder,
                &indexesAffected,
@@ -1501,6 +1685,8 @@ TEST(SetNodeTest, SingleFieldNoIdFromReplication) {
     FieldRef pathTaken("a");
     StringData matchedField;
     auto fromReplication = true;
+    auto validateForStorage = true;
+    FieldRefSet immutablePaths;
     UpdateIndexData indexData;
     indexData.addPath("a.1.b");
     LogBuilder* logBuilder = nullptr;
@@ -1511,6 +1697,8 @@ TEST(SetNodeTest, SingleFieldNoIdFromReplication) {
                &pathTaken,
                matchedField,
                fromReplication,
+               validateForStorage,
+               immutablePaths,
                &indexData,
                logBuilder,
                &indexesAffected,
@@ -1532,6 +1720,8 @@ TEST(SetNodeTest, NestedFieldFromReplication) {
     FieldRef pathTaken("a.a");
     StringData matchedField;
     auto fromReplication = true;
+    auto validateForStorage = true;
+    FieldRefSet immutablePaths;
     UpdateIndexData indexData;
     indexData.addPath("a.a.1.b");
     LogBuilder* logBuilder = nullptr;
@@ -1542,6 +1732,8 @@ TEST(SetNodeTest, NestedFieldFromReplication) {
                &pathTaken,
                matchedField,
                fromReplication,
+               validateForStorage,
+               immutablePaths,
                &indexData,
                logBuilder,
                &indexesAffected,
@@ -1563,6 +1755,8 @@ TEST(SetNodeTest, DoubleNestedFieldFromReplication) {
     FieldRef pathTaken("a.b.c");
     StringData matchedField;
     auto fromReplication = true;
+    auto validateForStorage = true;
+    FieldRefSet immutablePaths;
     UpdateIndexData indexData;
     indexData.addPath("a.b.c.d");
     LogBuilder* logBuilder = nullptr;
@@ -1573,6 +1767,8 @@ TEST(SetNodeTest, DoubleNestedFieldFromReplication) {
                &pathTaken,
                matchedField,
                fromReplication,
+               validateForStorage,
+               immutablePaths,
                &indexData,
                logBuilder,
                &indexesAffected,
@@ -1594,6 +1790,8 @@ TEST(SetNodeTest, NestedFieldNoIdFromReplication) {
     FieldRef pathTaken("a.a");
     StringData matchedField;
     auto fromReplication = true;
+    auto validateForStorage = true;
+    FieldRefSet immutablePaths;
     UpdateIndexData indexData;
     indexData.addPath("a.a.1.b");
     LogBuilder* logBuilder = nullptr;
@@ -1604,6 +1802,8 @@ TEST(SetNodeTest, NestedFieldNoIdFromReplication) {
                &pathTaken,
                matchedField,
                fromReplication,
+               validateForStorage,
+               immutablePaths,
                &indexData,
                logBuilder,
                &indexesAffected,
@@ -1625,6 +1825,8 @@ TEST(SetNodeTest, ReplayArrayFieldNotAppendedIntermediateFromReplication) {
     FieldRef pathTaken("a.0");
     StringData matchedField;
     auto fromReplication = true;
+    auto validateForStorage = true;
+    FieldRefSet immutablePaths;
     UpdateIndexData indexData;
     indexData.addPath("a.0.b");
     LogBuilder* logBuilder = nullptr;
@@ -1635,6 +1837,8 @@ TEST(SetNodeTest, ReplayArrayFieldNotAppendedIntermediateFromReplication) {
                &pathTaken,
                matchedField,
                fromReplication,
+               validateForStorage,
+               immutablePaths,
                &indexData,
                logBuilder,
                &indexesAffected,
@@ -1656,6 +1860,8 @@ TEST(SetNodeTest, Set6) {
     FieldRef pathTaken("r.a");
     StringData matchedField;
     auto fromReplication = false;
+    auto validateForStorage = true;
+    FieldRefSet immutablePaths;
     UpdateIndexData indexData;
     indexData.addPath("r.a");
     Document logDoc;
@@ -1667,6 +1873,8 @@ TEST(SetNodeTest, Set6) {
                &pathTaken,
                matchedField,
                fromReplication,
+               validateForStorage,
+               immutablePaths,
                &indexData,
                &logBuilder,
                &indexesAffected,
@@ -1690,6 +1898,8 @@ TEST(SetNodeTest, Set6FromRepl) {
     FieldRef pathTaken("r.a");
     StringData matchedField;
     auto fromReplication = true;
+    auto validateForStorage = true;
+    FieldRefSet immutablePaths;
     UpdateIndexData indexData;
     indexData.addPath("r.a");
     Document logDoc;
@@ -1701,6 +1911,8 @@ TEST(SetNodeTest, Set6FromRepl) {
                &pathTaken,
                matchedField,
                fromReplication,
+               validateForStorage,
+               immutablePaths,
                &indexData,
                &logBuilder,
                &indexesAffected,
@@ -1732,6 +1944,8 @@ TEST(SetNodeTest, ApplySetModToEphemeralDocument) {
     FieldRef pathTaken("x");
     StringData matchedField;
     auto fromReplication = false;
+    auto validateForStorage = true;
+    FieldRefSet immutablePaths;
     UpdateIndexData indexData;
     indexData.addPath("x");
     LogBuilder* logBuilder = nullptr;
@@ -1742,6 +1956,8 @@ TEST(SetNodeTest, ApplySetModToEphemeralDocument) {
                &pathTaken,
                matchedField,
                fromReplication,
+               validateForStorage,
+               immutablePaths,
                &indexData,
                logBuilder,
                &indexesAffected,
@@ -1750,6 +1966,676 @@ TEST(SetNodeTest, ApplySetModToEphemeralDocument) {
     ASSERT_TRUE(indexesAffected);
     ASSERT_EQUALS(fromjson("{ x : { a : 100, b : 2 } }"), doc);
     ASSERT_FALSE(doc.isInPlaceModeEnabled());
+}
+
+TEST(SetNodeTest, ApplyCannotCreateDollarPrefixedFieldInsideSetElement) {
+    auto update = fromjson("{$set: {a: {$bad: 1}}}");
+    const CollatorInterface* collator = nullptr;
+    SetNode node;
+    ASSERT_OK(node.init(update["$set"]["a"], collator));
+
+    Document doc(fromjson("{a: 5}"));
+    FieldRef pathToCreate("");
+    FieldRef pathTaken("a");
+    StringData matchedField;
+    auto fromReplication = false;
+    auto validateForStorage = true;
+    FieldRefSet immutablePaths;
+    const UpdateIndexData* indexData = nullptr;
+    LogBuilder* logBuilder = nullptr;
+    auto indexesAffected = false;
+    auto noop = false;
+    ASSERT_THROWS_CODE_AND_WHAT(
+        node.apply(doc.root()["a"],
+                   &pathToCreate,
+                   &pathTaken,
+                   matchedField,
+                   fromReplication,
+                   validateForStorage,
+                   immutablePaths,
+                   indexData,
+                   logBuilder,
+                   &indexesAffected,
+                   &noop),
+        UserException,
+        ErrorCodes::DollarPrefixedFieldName,
+        "The dollar ($) prefixed field '$bad' in 'a.$bad' is not valid for storage.");
+}
+
+TEST(SetNodeTest, ApplyCannotCreateDollarPrefixedFieldAtStartOfPath) {
+    auto update = fromjson("{$set: {'$bad.a': 1}}");
+    const CollatorInterface* collator = nullptr;
+    SetNode node;
+    ASSERT_OK(node.init(update["$set"]["$bad.a"], collator));
+
+    Document doc(fromjson("{}"));
+    FieldRef pathToCreate("$bad.a");
+    FieldRef pathTaken("");
+    StringData matchedField;
+    auto fromReplication = false;
+    auto validateForStorage = true;
+    FieldRefSet immutablePaths;
+    const UpdateIndexData* indexData = nullptr;
+    LogBuilder* logBuilder = nullptr;
+    auto indexesAffected = false;
+    auto noop = false;
+    ASSERT_THROWS_CODE_AND_WHAT(
+        node.apply(doc.root(),
+                   &pathToCreate,
+                   &pathTaken,
+                   matchedField,
+                   fromReplication,
+                   validateForStorage,
+                   immutablePaths,
+                   indexData,
+                   logBuilder,
+                   &indexesAffected,
+                   &noop),
+        UserException,
+        ErrorCodes::DollarPrefixedFieldName,
+        "The dollar ($) prefixed field '$bad' in '$bad' is not valid for storage.");
+}
+
+TEST(SetNodeTest, ApplyCannotCreateDollarPrefixedFieldInMiddleOfPath) {
+    auto update = fromjson("{$set: {'a.$bad.b': 1}}");
+    const CollatorInterface* collator = nullptr;
+    SetNode node;
+    ASSERT_OK(node.init(update["$set"]["a.$bad.b"], collator));
+
+    Document doc(fromjson("{}"));
+    FieldRef pathToCreate("a.$bad.b");
+    FieldRef pathTaken("");
+    StringData matchedField;
+    auto fromReplication = false;
+    auto validateForStorage = true;
+    FieldRefSet immutablePaths;
+    const UpdateIndexData* indexData = nullptr;
+    LogBuilder* logBuilder = nullptr;
+    auto indexesAffected = false;
+    auto noop = false;
+    ASSERT_THROWS_CODE_AND_WHAT(
+        node.apply(doc.root(),
+                   &pathToCreate,
+                   &pathTaken,
+                   matchedField,
+                   fromReplication,
+                   validateForStorage,
+                   immutablePaths,
+                   indexData,
+                   logBuilder,
+                   &indexesAffected,
+                   &noop),
+        UserException,
+        ErrorCodes::DollarPrefixedFieldName,
+        "The dollar ($) prefixed field '$bad' in 'a.$bad' is not valid for storage.");
+}
+
+TEST(SetNodeTest, ApplyCannotCreateDollarPrefixedFieldAtEndOfPath) {
+    auto update = fromjson("{$set: {'a.$bad': 1}}");
+    const CollatorInterface* collator = nullptr;
+    SetNode node;
+    ASSERT_OK(node.init(update["$set"]["a.$bad"], collator));
+
+    Document doc(fromjson("{}"));
+    FieldRef pathToCreate("a.$bad");
+    FieldRef pathTaken("");
+    StringData matchedField;
+    auto fromReplication = false;
+    auto validateForStorage = true;
+    FieldRefSet immutablePaths;
+    const UpdateIndexData* indexData = nullptr;
+    LogBuilder* logBuilder = nullptr;
+    auto indexesAffected = false;
+    auto noop = false;
+    ASSERT_THROWS_CODE_AND_WHAT(
+        node.apply(doc.root(),
+                   &pathToCreate,
+                   &pathTaken,
+                   matchedField,
+                   fromReplication,
+                   validateForStorage,
+                   immutablePaths,
+                   indexData,
+                   logBuilder,
+                   &indexesAffected,
+                   &noop),
+        UserException,
+        ErrorCodes::DollarPrefixedFieldName,
+        "The dollar ($) prefixed field '$bad' in 'a.$bad' is not valid for storage.");
+}
+
+TEST(SetNodeTest, ApplyCanCreateDollarPrefixedFieldNameWhenValidateForStorageIsFalse) {
+    auto update = fromjson("{$set: {$bad: 1}}");
+    const CollatorInterface* collator = nullptr;
+    SetNode node;
+    ASSERT_OK(node.init(update["$set"]["$bad"], collator));
+
+    Document doc(fromjson("{}"));
+    FieldRef pathToCreate("$bad");
+    FieldRef pathTaken("");
+    StringData matchedField;
+    auto fromReplication = false;
+    auto validateForStorage = false;
+    FieldRefSet immutablePaths;
+    UpdateIndexData indexData;
+    indexData.addPath("$bad");
+    Document logDoc;
+    LogBuilder logBuilder(logDoc.root());
+    auto indexesAffected = false;
+    auto noop = false;
+    node.apply(doc.root(),
+               &pathToCreate,
+               &pathTaken,
+               matchedField,
+               fromReplication,
+               validateForStorage,
+               immutablePaths,
+               &indexData,
+               &logBuilder,
+               &indexesAffected,
+               &noop);
+    ASSERT_FALSE(noop);
+    ASSERT_TRUE(indexesAffected);
+    ASSERT_EQUALS(fromjson("{$bad: 1}"), doc);
+    ASSERT_FALSE(doc.isInPlaceModeEnabled());
+    ASSERT_EQUALS(countChildren(logDoc.root()), 1u);
+    ASSERT_EQUALS(fromjson("{$set: {$bad: 1}}"), logDoc);
+}
+
+TEST(SetNodeTest, ApplyCannotOverwriteImmutablePath) {
+    auto update = fromjson("{$set: {'a.b': 1}}");
+    const CollatorInterface* collator = nullptr;
+    SetNode node;
+    ASSERT_OK(node.init(update["$set"]["a.b"], collator));
+
+    Document doc(fromjson("{a: {b: 2}}"));
+    FieldRef pathToCreate("");
+    FieldRef pathTaken("a.b");
+    StringData matchedField;
+    auto fromReplication = false;
+    auto validateForStorage = true;
+    FieldRefSet immutablePaths;
+    FieldRef path("a.b");
+    immutablePaths.insert(&path);
+    const UpdateIndexData* indexData = nullptr;
+    LogBuilder* logBuilder = nullptr;
+    auto indexesAffected = false;
+    auto noop = false;
+    ASSERT_THROWS_CODE_AND_WHAT(
+        node.apply(doc.root()["a"]["b"],
+                   &pathToCreate,
+                   &pathTaken,
+                   matchedField,
+                   fromReplication,
+                   validateForStorage,
+                   immutablePaths,
+                   indexData,
+                   logBuilder,
+                   &indexesAffected,
+                   &noop),
+        UserException,
+        ErrorCodes::ImmutableField,
+        "Updating the path 'a.b' to b: 1 would modify the immutable field 'a.b'");
+}
+
+TEST(SetNodeTest, ApplyCanPerformNoopOnImmutablePath) {
+    auto update = fromjson("{$set: {'a.b': 2}}");
+    const CollatorInterface* collator = nullptr;
+    SetNode node;
+    ASSERT_OK(node.init(update["$set"]["a.b"], collator));
+
+    Document doc(fromjson("{a: {b: 2}}"));
+    FieldRef pathToCreate("");
+    FieldRef pathTaken("a.b");
+    StringData matchedField;
+    auto fromReplication = false;
+    auto validateForStorage = true;
+    FieldRefSet immutablePaths;
+    FieldRef path("a.b");
+    immutablePaths.insert(&path);
+    UpdateIndexData indexData;
+    indexData.addPath("a");
+    Document logDoc;
+    LogBuilder logBuilder(logDoc.root());
+    auto indexesAffected = false;
+    auto noop = false;
+    node.apply(doc.root()["a"]["b"],
+               &pathToCreate,
+               &pathTaken,
+               matchedField,
+               fromReplication,
+               validateForStorage,
+               immutablePaths,
+               &indexData,
+               &logBuilder,
+               &indexesAffected,
+               &noop);
+    ASSERT_TRUE(noop);
+    ASSERT_FALSE(indexesAffected);
+    ASSERT_EQUALS(fromjson("{a: {b: 2}}"), doc);
+    ASSERT_TRUE(doc.isInPlaceModeEnabled());
+    ASSERT_EQUALS(countChildren(logDoc.root()), 0u);
+    ASSERT_EQUALS(fromjson("{}"), logDoc);
+}
+
+TEST(SetNodeTest, ApplyCannotOverwritePrefixToRemoveImmutablePath) {
+    auto update = fromjson("{$set: {a: 1}}");
+    const CollatorInterface* collator = nullptr;
+    SetNode node;
+    ASSERT_OK(node.init(update["$set"]["a"], collator));
+
+    Document doc(fromjson("{a: {b: 2}}"));
+    FieldRef pathToCreate("");
+    FieldRef pathTaken("a");
+    StringData matchedField;
+    auto fromReplication = false;
+    auto validateForStorage = true;
+    FieldRefSet immutablePaths;
+    FieldRef path("a.b");
+    immutablePaths.insert(&path);
+    const UpdateIndexData* indexData = nullptr;
+    LogBuilder* logBuilder = nullptr;
+    auto indexesAffected = false;
+    auto noop = false;
+    ASSERT_THROWS_CODE_AND_WHAT(
+        node.apply(doc.root()["a"],
+                   &pathToCreate,
+                   &pathTaken,
+                   matchedField,
+                   fromReplication,
+                   validateForStorage,
+                   immutablePaths,
+                   indexData,
+                   logBuilder,
+                   &indexesAffected,
+                   &noop),
+        UserException,
+        ErrorCodes::ImmutableField,
+        "After applying the update, the immutable field 'a.b' was found to have been removed.");
+}
+
+TEST(SetNodeTest, ApplyCannotOverwritePrefixToModifyImmutablePath) {
+    auto update = fromjson("{$set: {a: {b: 1}}}");
+    const CollatorInterface* collator = nullptr;
+    SetNode node;
+    ASSERT_OK(node.init(update["$set"]["a"], collator));
+
+    Document doc(fromjson("{a: {b: 2}}"));
+    FieldRef pathToCreate("");
+    FieldRef pathTaken("a");
+    StringData matchedField;
+    auto fromReplication = false;
+    auto validateForStorage = true;
+    FieldRefSet immutablePaths;
+    FieldRef path("a.b");
+    immutablePaths.insert(&path);
+    const UpdateIndexData* indexData = nullptr;
+    LogBuilder* logBuilder = nullptr;
+    auto indexesAffected = false;
+    auto noop = false;
+    ASSERT_THROWS_CODE_AND_WHAT(node.apply(doc.root()["a"],
+                                           &pathToCreate,
+                                           &pathTaken,
+                                           matchedField,
+                                           fromReplication,
+                                           validateForStorage,
+                                           immutablePaths,
+                                           indexData,
+                                           logBuilder,
+                                           &indexesAffected,
+                                           &noop),
+                                UserException,
+                                ErrorCodes::ImmutableField,
+                                "After applying the update, the immutable field 'a.b' was found to "
+                                "have been altered to b: 1");
+}
+
+TEST(SetNodeTest, ApplyCanPerformNoopOnPrefixOfImmutablePath) {
+    auto update = fromjson("{$set: {a: {b: 2}}}");
+    const CollatorInterface* collator = nullptr;
+    SetNode node;
+    ASSERT_OK(node.init(update["$set"]["a"], collator));
+
+    Document doc(fromjson("{a: {b: 2}}"));
+    FieldRef pathToCreate("");
+    FieldRef pathTaken("a");
+    StringData matchedField;
+    auto fromReplication = false;
+    auto validateForStorage = true;
+    FieldRefSet immutablePaths;
+    FieldRef path("a.b");
+    immutablePaths.insert(&path);
+    UpdateIndexData indexData;
+    indexData.addPath("a");
+    Document logDoc;
+    LogBuilder logBuilder(logDoc.root());
+    auto indexesAffected = false;
+    auto noop = false;
+    node.apply(doc.root()["a"],
+               &pathToCreate,
+               &pathTaken,
+               matchedField,
+               fromReplication,
+               validateForStorage,
+               immutablePaths,
+               &indexData,
+               &logBuilder,
+               &indexesAffected,
+               &noop);
+    ASSERT_TRUE(noop);
+    ASSERT_FALSE(indexesAffected);
+    ASSERT_EQUALS(fromjson("{a: {b: 2}}"), doc);
+    ASSERT_TRUE(doc.isInPlaceModeEnabled());
+    ASSERT_EQUALS(countChildren(logDoc.root()), 0u);
+    ASSERT_EQUALS(fromjson("{}"), logDoc);
+}
+
+TEST(SetNodeTest, ApplyCanOverwritePrefixToCreateImmutablePath) {
+    auto update = fromjson("{$set: {a: {b: 2}}}");
+    const CollatorInterface* collator = nullptr;
+    SetNode node;
+    ASSERT_OK(node.init(update["$set"]["a"], collator));
+
+    Document doc(fromjson("{a: 1}"));
+    FieldRef pathToCreate("");
+    FieldRef pathTaken("a");
+    StringData matchedField;
+    auto fromReplication = false;
+    auto validateForStorage = true;
+    FieldRefSet immutablePaths;
+    FieldRef path("a.b");
+    immutablePaths.insert(&path);
+    UpdateIndexData indexData;
+    indexData.addPath("a");
+    Document logDoc;
+    LogBuilder logBuilder(logDoc.root());
+    auto indexesAffected = false;
+    auto noop = false;
+    node.apply(doc.root()["a"],
+               &pathToCreate,
+               &pathTaken,
+               matchedField,
+               fromReplication,
+               validateForStorage,
+               immutablePaths,
+               &indexData,
+               &logBuilder,
+               &indexesAffected,
+               &noop);
+    ASSERT_FALSE(noop);
+    ASSERT_TRUE(indexesAffected);
+    ASSERT_EQUALS(fromjson("{a: {b: 2}}"), doc);
+    ASSERT_FALSE(doc.isInPlaceModeEnabled());
+    ASSERT_EQUALS(countChildren(logDoc.root()), 1u);
+    ASSERT_EQUALS(fromjson("{$set: {a: {b: 2}}}"), logDoc);
+}
+
+TEST(SetNodeTest, ApplyCanOverwritePrefixOfImmutablePathIfNoopOnImmutablePath) {
+    auto update = fromjson("{$set: {a: {b: 2, c: 3}}}");
+    const CollatorInterface* collator = nullptr;
+    SetNode node;
+    ASSERT_OK(node.init(update["$set"]["a"], collator));
+
+    Document doc(fromjson("{a: {b: 2}}"));
+    FieldRef pathToCreate("");
+    FieldRef pathTaken("a");
+    StringData matchedField;
+    auto fromReplication = false;
+    auto validateForStorage = true;
+    FieldRefSet immutablePaths;
+    FieldRef path("a.b");
+    immutablePaths.insert(&path);
+    UpdateIndexData indexData;
+    indexData.addPath("a");
+    Document logDoc;
+    LogBuilder logBuilder(logDoc.root());
+    auto indexesAffected = false;
+    auto noop = false;
+    node.apply(doc.root()["a"],
+               &pathToCreate,
+               &pathTaken,
+               matchedField,
+               fromReplication,
+               validateForStorage,
+               immutablePaths,
+               &indexData,
+               &logBuilder,
+               &indexesAffected,
+               &noop);
+    ASSERT_FALSE(noop);
+    ASSERT_TRUE(indexesAffected);
+    ASSERT_EQUALS(fromjson("{a: {b: 2, c: 3}}"), doc);
+    ASSERT_FALSE(doc.isInPlaceModeEnabled());
+    ASSERT_EQUALS(countChildren(logDoc.root()), 1u);
+    ASSERT_EQUALS(fromjson("{$set: {a: {b: 2, c: 3}}}"), logDoc);
+}
+
+TEST(SetNodeTest, ApplyCannotOverwriteSuffixOfImmutablePath) {
+    auto update = fromjson("{$set: {'a.b.c': 1}}");
+    const CollatorInterface* collator = nullptr;
+    SetNode node;
+    ASSERT_OK(node.init(update["$set"]["a.b.c"], collator));
+
+    Document doc(fromjson("{a: {b: {c: 2}}}"));
+    FieldRef pathToCreate("");
+    FieldRef pathTaken("a.b.c");
+    StringData matchedField;
+    auto fromReplication = false;
+    auto validateForStorage = true;
+    FieldRefSet immutablePaths;
+    FieldRef path("a.b");
+    immutablePaths.insert(&path);
+    const UpdateIndexData* indexData = nullptr;
+    LogBuilder* logBuilder = nullptr;
+    auto indexesAffected = false;
+    auto noop = false;
+    ASSERT_THROWS_CODE_AND_WHAT(
+        node.apply(doc.root()["a"]["b"]["c"],
+                   &pathToCreate,
+                   &pathTaken,
+                   matchedField,
+                   fromReplication,
+                   validateForStorage,
+                   immutablePaths,
+                   indexData,
+                   logBuilder,
+                   &indexesAffected,
+                   &noop),
+        UserException,
+        ErrorCodes::ImmutableField,
+        "Updating the path 'a.b.c' to c: 1 would modify the immutable field 'a.b'");
+}
+
+TEST(SetNodeTest, ApplyCanPerformNoopOnSuffixOfImmutablePath) {
+    auto update = fromjson("{$set: {'a.b.c': 2}}");
+    const CollatorInterface* collator = nullptr;
+    SetNode node;
+    ASSERT_OK(node.init(update["$set"]["a.b.c"], collator));
+
+    Document doc(fromjson("{a: {b: {c: 2}}}"));
+    FieldRef pathToCreate("");
+    FieldRef pathTaken("a.b.c");
+    StringData matchedField;
+    auto fromReplication = false;
+    auto validateForStorage = true;
+    FieldRefSet immutablePaths;
+    FieldRef path("a.b");
+    immutablePaths.insert(&path);
+    UpdateIndexData indexData;
+    indexData.addPath("a");
+    Document logDoc;
+    LogBuilder logBuilder(logDoc.root());
+    auto indexesAffected = false;
+    auto noop = false;
+    node.apply(doc.root()["a"]["b"]["c"],
+               &pathToCreate,
+               &pathTaken,
+               matchedField,
+               fromReplication,
+               validateForStorage,
+               immutablePaths,
+               &indexData,
+               &logBuilder,
+               &indexesAffected,
+               &noop);
+    ASSERT_TRUE(noop);
+    ASSERT_FALSE(indexesAffected);
+    ASSERT_EQUALS(fromjson("{a: {b: {c: 2}}}"), doc);
+    ASSERT_TRUE(doc.isInPlaceModeEnabled());
+    ASSERT_EQUALS(countChildren(logDoc.root()), 0u);
+    ASSERT_EQUALS(fromjson("{}"), logDoc);
+}
+
+TEST(SetNodeTest, ApplyCannotCreateFieldAtEndOfImmutablePath) {
+    auto update = fromjson("{$set: {'a.b.c': 1}}");
+    const CollatorInterface* collator = nullptr;
+    SetNode node;
+    ASSERT_OK(node.init(update["$set"]["a.b.c"], collator));
+
+    Document doc(fromjson("{a: {b: {}}}"));
+    FieldRef pathToCreate("c");
+    FieldRef pathTaken("a.b");
+    StringData matchedField;
+    auto fromReplication = false;
+    auto validateForStorage = true;
+    FieldRefSet immutablePaths;
+    FieldRef path("a.b");
+    immutablePaths.insert(&path);
+    const UpdateIndexData* indexData = nullptr;
+    LogBuilder* logBuilder = nullptr;
+    auto indexesAffected = false;
+    auto noop = false;
+    ASSERT_THROWS_CODE_AND_WHAT(
+        node.apply(doc.root()["a"]["b"],
+                   &pathToCreate,
+                   &pathTaken,
+                   matchedField,
+                   fromReplication,
+                   validateForStorage,
+                   immutablePaths,
+                   indexData,
+                   logBuilder,
+                   &indexesAffected,
+                   &noop),
+        UserException,
+        ErrorCodes::ImmutableField,
+        "Updating the path 'a.b' to b: { c: 1 } would modify the immutable field 'a.b'");
+}
+
+TEST(SetNodeTest, ApplyCannotCreateFieldBeyondEndOfImmutablePath) {
+    auto update = fromjson("{$set: {'a.b.c': 1}}");
+    const CollatorInterface* collator = nullptr;
+    SetNode node;
+    ASSERT_OK(node.init(update["$set"]["a.b.c"], collator));
+
+    Document doc(fromjson("{a: {b: {}}}"));
+    FieldRef pathToCreate("c");
+    FieldRef pathTaken("a.b");
+    StringData matchedField;
+    auto fromReplication = false;
+    auto validateForStorage = true;
+    FieldRefSet immutablePaths;
+    FieldRef path("a");
+    immutablePaths.insert(&path);
+    const UpdateIndexData* indexData = nullptr;
+    LogBuilder* logBuilder = nullptr;
+    auto indexesAffected = false;
+    auto noop = false;
+    ASSERT_THROWS_CODE_AND_WHAT(
+        node.apply(doc.root()["a"]["b"],
+                   &pathToCreate,
+                   &pathTaken,
+                   matchedField,
+                   fromReplication,
+                   validateForStorage,
+                   immutablePaths,
+                   indexData,
+                   logBuilder,
+                   &indexesAffected,
+                   &noop),
+        UserException,
+        ErrorCodes::ImmutableField,
+        "Updating the path 'a.b' to b: { c: 1 } would modify the immutable field 'a'");
+}
+
+TEST(SetNodeTest, ApplyCanCreateImmutablePath) {
+    auto update = fromjson("{$set: {'a.b': 2}}");
+    const CollatorInterface* collator = nullptr;
+    SetNode node;
+    ASSERT_OK(node.init(update["$set"]["a.b"], collator));
+
+    Document doc(fromjson("{a: {}}"));
+    FieldRef pathToCreate("b");
+    FieldRef pathTaken("a");
+    StringData matchedField;
+    auto fromReplication = false;
+    auto validateForStorage = true;
+    FieldRefSet immutablePaths;
+    FieldRef path("a.b");
+    immutablePaths.insert(&path);
+    UpdateIndexData indexData;
+    indexData.addPath("a");
+    Document logDoc;
+    LogBuilder logBuilder(logDoc.root());
+    auto indexesAffected = false;
+    auto noop = false;
+    node.apply(doc.root()["a"],
+               &pathToCreate,
+               &pathTaken,
+               matchedField,
+               fromReplication,
+               validateForStorage,
+               immutablePaths,
+               &indexData,
+               &logBuilder,
+               &indexesAffected,
+               &noop);
+    ASSERT_FALSE(noop);
+    ASSERT_TRUE(indexesAffected);
+    ASSERT_EQUALS(fromjson("{a: {b: 2}}"), doc);
+    ASSERT_FALSE(doc.isInPlaceModeEnabled());
+    ASSERT_EQUALS(countChildren(logDoc.root()), 1u);
+    ASSERT_EQUALS(fromjson("{$set: {'a.b': 2}}"), logDoc);
+}
+
+TEST(SetNodeTest, ApplyCanCreatePrefixOfImmutablePath) {
+    auto update = fromjson("{$set: {a: 2}}");
+    const CollatorInterface* collator = nullptr;
+    SetNode node;
+    ASSERT_OK(node.init(update["$set"]["a"], collator));
+
+    Document doc(fromjson("{}"));
+    FieldRef pathToCreate("a");
+    FieldRef pathTaken("");
+    StringData matchedField;
+    auto fromReplication = false;
+    auto validateForStorage = true;
+    FieldRefSet immutablePaths;
+    FieldRef path("a.b");
+    immutablePaths.insert(&path);
+    UpdateIndexData indexData;
+    indexData.addPath("a");
+    Document logDoc;
+    LogBuilder logBuilder(logDoc.root());
+    auto indexesAffected = false;
+    auto noop = false;
+    node.apply(doc.root(),
+               &pathToCreate,
+               &pathTaken,
+               matchedField,
+               fromReplication,
+               validateForStorage,
+               immutablePaths,
+               &indexData,
+               &logBuilder,
+               &indexesAffected,
+               &noop);
+    ASSERT_FALSE(noop);
+    ASSERT_TRUE(indexesAffected);
+    ASSERT_EQUALS(fromjson("{a: 2}"), doc);
+    ASSERT_FALSE(doc.isInPlaceModeEnabled());
+    ASSERT_EQUALS(countChildren(logDoc.root()), 1u);
+    ASSERT_EQUALS(fromjson("{$set: {a: 2}}"), logDoc);
 }
 
 }  // namespace

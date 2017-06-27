@@ -78,14 +78,17 @@ public:
      *
      * Returns Status::OK() if the document can be used. If there are any error or
      * conflicts along the way then those errors will be returned.
+     *
+     * If the current update is a document replacement, only the 'immutablePaths' are extracted from
+     * 'query' and used to populate 'doc'.
      */
     Status populateDocumentWithQueryFields(OperationContext* opCtx,
                                            const BSONObj& query,
-                                           const std::vector<FieldRef*>* immutablePaths,
+                                           const FieldRefSet& immutablePaths,
                                            mutablebson::Document& doc) const;
 
     Status populateDocumentWithQueryFields(const CanonicalQuery& query,
-                                           const std::vector<FieldRef*>* immutablePaths,
+                                           const FieldRefSet& immutablePaths,
                                            mutablebson::Document& doc) const;
 
     /**
@@ -95,23 +98,26 @@ public:
     BSONObj makeOplogEntryQuery(const BSONObj& doc, bool multi) const;
 
     /**
-     * Returns OK and executes '_mods' over 'doc', generating 'newObj'. If any mod is
-     * positional, use 'matchedField' (index of the array item matched). If doc allows
-     * mods to be applied in place and no index updating is involved, then the mods may
-     * be applied "in place" over 'doc'.
+     * Executes the update over 'doc'. If any modifier is positional, use 'matchedField' (index of
+     * the array item matched). If 'doc' allows the modifiers to be applied in place and no index
+     * updating is involved, then the modifiers may be applied "in place" over 'doc'.
      *
-     * If the driver's '_logOp' mode is turned on, and if 'logOpRec' is not NULL, fills in
-     * the latter with the oplog entry corresponding to the update. If '_mods' can't be
-     * applied, returns an error status with a corresponding description.
+     * If the driver's '_logOp' mode is turned on, and if 'logOpRec' is not null, fills in the
+     * latter with the oplog entry corresponding to the update. If the modifiers can't be applied,
+     * returns an error status or uasserts with a corresponding description.
      *
-     * If a non-NULL updatedField vector* is supplied,
-     * then all updated fields will be added to it.
+     * If 'validateForStorage' is true, ensures that modified elements do not violate depth or DBRef
+     * constraints. Ensures that no paths in 'immutablePaths' are modified (though they may be
+     * created, if they do not yet exist). The original document 'original' is needed for checking
+     * immutable paths for the ModifierInterface implementation.
      */
     Status update(StringData matchedField,
+                  BSONObj original,
                   mutablebson::Document* doc,
-                  BSONObj* logOpRec = NULL,
-                  FieldRefSet* updatedFields = NULL,
-                  bool* docWasModified = NULL);
+                  bool validateForStorage,
+                  const FieldRefSet& immutablePaths,
+                  BSONObj* logOpRec = nullptr,
+                  bool* docWasModified = nullptr);
 
     //
     // Accessors

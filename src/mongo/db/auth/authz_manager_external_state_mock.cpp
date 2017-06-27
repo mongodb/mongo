@@ -189,8 +189,16 @@ Status AuthzManagerExternalStateMock::updateOne(OperationContext* opCtx,
     mmb::Document document;
     if (status.isOK()) {
         document.reset(*iter, mmb::Document::kInPlaceDisabled);
+        const BSONObj emptyOriginal;
+        const bool validateForStorage = false;
+        const FieldRefSet emptyImmutablePaths;
         BSONObj logObj;
-        status = driver.update(StringData(), &document, &logObj);
+        status = driver.update(StringData(),
+                               emptyOriginal,
+                               &document,
+                               validateForStorage,
+                               emptyImmutablePaths,
+                               &logObj);
         if (!status.isOK())
             return status;
         BSONObj newObj = document.getObject().copy();
@@ -206,11 +214,21 @@ Status AuthzManagerExternalStateMock::updateOne(OperationContext* opCtx,
         if (query.hasField("_id")) {
             document.root().appendElement(query["_id"]).transitional_ignore();
         }
-        status = driver.populateDocumentWithQueryFields(opCtx, query, NULL, document);
+        const FieldRef idFieldRef("_id");
+        FieldRefSet immutablePaths;
+        invariant(immutablePaths.insert(&idFieldRef));
+        status = driver.populateDocumentWithQueryFields(opCtx, query, immutablePaths, document);
         if (!status.isOK()) {
             return status;
         }
-        status = driver.update(StringData(), &document);
+
+        // The original document can be empty because it is only needed for validation of immutable
+        // paths.
+        const BSONObj emptyOriginal;
+        const bool validateForStorage = false;
+        const FieldRefSet emptyImmutablePaths;
+        status = driver.update(
+            StringData(), emptyOriginal, &document, validateForStorage, emptyImmutablePaths);
         if (!status.isOK()) {
             return status;
         }

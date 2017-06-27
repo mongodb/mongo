@@ -136,7 +136,14 @@ BSONObj applyUpdateOperators(const BSONObj& from, const BSONObj& operators) {
     }
 
     mutablebson::Document doc(from, mutablebson::Document::kInPlaceDisabled);
-    status = driver.update(StringData(), &doc);
+
+    // The original document can be empty because it is only needed for validation of immutable
+    // paths.
+    const BSONObj emptyOriginal;
+    const bool validateForStorage = false;
+    const FieldRefSet emptyImmutablePaths;
+    status =
+        driver.update(StringData(), emptyOriginal, &doc, validateForStorage, emptyImmutablePaths);
     if (!status.isOK()) {
         uasserted(16839, status.reason());
     }

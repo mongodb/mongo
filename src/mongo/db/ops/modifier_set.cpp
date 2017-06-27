@@ -244,7 +244,8 @@ Status ModifierSet::apply() const {
 
     // createPathAt() will complete the path and attach 'elemToSet' at the end of it.
     return pathsupport::createPathAt(
-        _fieldRef, _preparedState->idxFound, _preparedState->elemFound, elemToSet);
+               _fieldRef, _preparedState->idxFound, _preparedState->elemFound, elemToSet)
+        .getStatus();
 }
 
 Status ModifierSet::log(LogBuilder* logBuilder) const {

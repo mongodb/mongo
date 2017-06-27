@@ -33,6 +33,7 @@
 #include "mongo/base/string_data.h"
 #include "mongo/bson/mutable/algorithm.h"
 #include "mongo/bson/mutable/document.h"
+#include "mongo/db/bson/dotted_path_support.h"
 #include "mongo/db/field_ref.h"
 #include "mongo/db/matcher/expression_leaf.h"
 #include "mongo/db/matcher/extensions_callback_noop.h"
@@ -41,6 +42,7 @@
 #include "mongo/db/update/log_builder.h"
 #include "mongo/db/update/modifier_table.h"
 #include "mongo/db/update/path_support.h"
+#include "mongo/db/update/storage_validation.h"
 #include "mongo/util/embedded_builder.h"
 #include "mongo/util/mongoutils/str.h"
 
@@ -240,7 +242,7 @@ inline Status UpdateDriver::addAndParse(const modifiertable::ModifierType type,
 
 Status UpdateDriver::populateDocumentWithQueryFields(OperationContext* opCtx,
                                                      const BSONObj& query,
-                                                     const vector<FieldRef*>* immutablePaths,
+                                                     const FieldRefSet& immutablePaths,
                                                      mutablebson::Document& doc) const {
     // We canonicalize the query to collapse $and/$or, and the namespace is not needed.  Also,
     // because this is for the upsert case, where we insert a new document if one was not found, the
@@ -258,26 +260,16 @@ Status UpdateDriver::populateDocumentWithQueryFields(OperationContext* opCtx,
 }
 
 Status UpdateDriver::populateDocumentWithQueryFields(const CanonicalQuery& query,
-                                                     const vector<FieldRef*>* immutablePathsPtr,
+                                                     const FieldRefSet& immutablePaths,
                                                      mutablebson::Document& doc) const {
     EqualityMatches equalities;
     Status status = Status::OK();
 
     if (isDocReplacement()) {
-        FieldRefSet pathsToExtract;
-
-        // TODO: Refactor update logic, make _id just another immutable field
-        static const FieldRef idPath("_id");
-        static const vector<FieldRef*> emptyImmutablePaths;
-        const vector<FieldRef*>& immutablePaths =
-            immutablePathsPtr ? *immutablePathsPtr : emptyImmutablePaths;
-
-        pathsToExtract.fillFrom(immutablePaths);
-        pathsToExtract.insert(&idPath);
 
         // Extract only immutable fields from replacement-style
         status =
-            pathsupport::extractFullEqualityMatches(*query.root(), pathsToExtract, &equalities);
+            pathsupport::extractFullEqualityMatches(*query.root(), immutablePaths, &equalities);
     } else {
         // Extract all fields from op-style
         status = pathsupport::extractEqualityMatches(*query.root(), &equalities);
@@ -291,22 +283,13 @@ Status UpdateDriver::populateDocumentWithQueryFields(const CanonicalQuery& query
 }
 
 Status UpdateDriver::update(StringData matchedField,
+                            BSONObj original,
                             mutablebson::Document* doc,
+                            bool validateForStorage,
+                            const FieldRefSet& immutablePaths,
                             BSONObj* logOpRec,
-                            FieldRefSet* updatedFields,
                             bool* docWasModified) {
     // TODO: assert that update() is called at most once in a !_multi case.
-
-    // Use the passed in FieldRefSet
-    FieldRefSet* targetFields = updatedFields;
-
-    // If we didn't get a FieldRefSet* from the caller, allocate storage and use
-    // the unique_ptr for lifecycle management
-    unique_ptr<FieldRefSet> targetFieldScopedPtr;
-    if (!targetFields) {
-        targetFieldScopedPtr.reset(new FieldRefSet());
-        targetFields = targetFieldScopedPtr.get();
-    }
 
     _affectIndices = (isDocReplacement() && (_indexedFields != NULL));
 
@@ -325,6 +308,8 @@ Status UpdateDriver::update(StringData matchedField,
                      &pathTaken,
                      matchedField,
                      _modOptions.fromReplication,
+                     validateForStorage,
+                     immutablePaths,
                      _indexedFields,
                      (_logOp && logOpRec) ? &logBuilder : nullptr,
                      &indexesAffected,
@@ -342,6 +327,8 @@ Status UpdateDriver::update(StringData matchedField,
         // We parsed using the old ModifierInterface implementation.
         // Ask each of the mods to type check whether they can operate over the current document
         // and, if so, to change that document accordingly.
+        FieldRefSet updatedPaths;
+
         for (vector<ModifierInterface*>::iterator it = _mods.begin(); it != _mods.end(); ++it) {
             ModifierInterface::ExecInfo execInfo;
             Status status = (*it)->prepare(doc->root(), matchedField, &execInfo);
@@ -372,7 +359,7 @@ Status UpdateDriver::update(StringData matchedField,
 
                 // Record each field being updated but check for conflicts first
                 const FieldRef* other;
-                if (!targetFields->insert(execInfo.fieldRef[i], &other)) {
+                if (!updatedPaths.insert(execInfo.fieldRef[i], &other)) {
                     return Status(ErrorCodes::ConflictingUpdateOperators,
                                   str::stream() << "Cannot update '" << other->dottedField()
                                                 << "' and '"
@@ -410,6 +397,80 @@ Status UpdateDriver::update(StringData matchedField,
                 if (!status.isOK()) {
                     return status;
                 }
+            }
+        }
+
+        // Check for BSON depth and DBRef constraint violations.
+        if (validateForStorage) {
+            if (updatedPaths.empty()) {
+
+                // In the case of full document replacement, check the whole document.
+                storage_validation::storageValid(*doc);
+            } else {
+                for (auto path = updatedPaths.begin(); path != updatedPaths.end(); ++path) {
+
+                    // Find the updated field in the updated document.
+                    auto newElem = doc->root();
+                    for (size_t i = 0; i < (*path)->numParts(); ++i) {
+                        newElem = newElem[(*path)->getPart(i)];
+                        if (!newElem.ok()) {
+                            break;
+                        }
+                    }
+
+                    // newElem might be missing if $unset/$renamed-away.
+                    if (newElem.ok()) {
+
+                        // Check parents.
+                        const std::uint32_t recursionLevel = 0;
+                        auto parentsDepth =
+                            storage_validation::storageValidParents(newElem, recursionLevel);
+
+                        // Check element and its children.
+                        const bool doRecursiveCheck = true;
+                        storage_validation::storageValid(newElem, doRecursiveCheck, parentsDepth);
+                    }
+                }
+            }
+        }
+
+        for (auto path = immutablePaths.begin(); path != immutablePaths.end(); ++path) {
+
+            if (!updatedPaths.empty() && !updatedPaths.findConflicts(*path, nullptr)) {
+                continue;
+            }
+
+            // Find the updated field in the updated document.
+            auto newElem = doc->root();
+            for (size_t i = 0; i < (*path)->numParts(); ++i) {
+                newElem = newElem[(*path)->getPart(i)];
+                if (!newElem.ok()) {
+                    break;
+                }
+                uassert(ErrorCodes::NotSingleValueField,
+                        str::stream()
+                            << "After applying the update to the document, the (immutable) field '"
+                            << (*path)->dottedField()
+                            << "' was found to be an array or array descendant.",
+                        newElem.getType() != BSONType::Array);
+            }
+
+            auto oldElem =
+                dotted_path_support::extractElementAtPath(original, (*path)->dottedField());
+
+            uassert(ErrorCodes::ImmutableField,
+                    str::stream() << "After applying the update, the '" << (*path)->dottedField()
+                                  << "' (required and immutable) field was "
+                                     "found to have been removed --"
+                                  << original,
+                    newElem.ok() || !oldElem.ok());
+            if (newElem.ok() && oldElem.ok()) {
+                uassert(ErrorCodes::ImmutableField,
+                        str::stream() << "After applying the update, the (immutable) field '"
+                                      << (*path)->dottedField()
+                                      << "' was found to have been altered to "
+                                      << newElem.toString(),
+                        newElem.compareWithBSONElement(oldElem, nullptr, false) == 0);
             }
         }
     }
