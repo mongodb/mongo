@@ -1,6 +1,30 @@
 Ticket reference tags refer to tickets in the MongoDB JIRA tracking system:
 https://jira.mongodb.org
 
+WiredTiger release 2.9.3, 2017-06-27
+------------------------------------
+
+See the upgrading documentation for details of API and behavior changes.
+
+Significant changes:
+* WT-2972       Add an interface allowing partial updates to existing values
+* WT-3063       Add an interface allowing reservation of records for read-modify-write
+* WT-3142       Add a workload generator application
+* WT-3160       Improve eviction of internal pages from idle trees
+* WT-3245       Avoid hangs on shutdown when a utility thread encounters an error
+* WT-3258       Improve visibility into thread wait time due to pages exceeding memory_page_max
+* WT-3263       Allow archive on restart/recovery if clean shutdown
+* WT-3287       Review WiredTiger internal panic checks
+* WT-3292       Review/cleanup full-barrier calls in WiredTiger
+* WT-3296       LAS table fixes/improvements
+* WT-3327       Checkpoints can hang if time runs backward
+* WT-3345       Improve rwlock scaling
+* WT-3373       Access violation due to a bug in internal page splitting
+* WT-3379       Change when pages can be split to avoid excessively slowing some operations
+
+See JIRA changelog for a full listing:
+https://jira.mongodb.org/browse/WT/fixforversion/18291
+
 WiredTiger release 2.9.2, 2017-05-25
 ------------------------------------
 
