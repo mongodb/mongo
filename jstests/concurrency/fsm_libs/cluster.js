@@ -369,7 +369,7 @@ var Cluster = function(options) {
     };
 
     this.isReplication = function isReplication() {
-        return options.replication.enabled;
+        return Cluster.isReplication(options);
     };
 
     this.shardCollection = function shardCollection() {
@@ -601,4 +601,11 @@ var Cluster = function(options) {
 Cluster.isStandalone = function isStandalone(clusterOptions) {
     return !clusterOptions.sharded.enabled && !clusterOptions.replication.enabled &&
         !clusterOptions.masterSlave;
+};
+
+/**
+ * Returns true if 'clusterOptions' represents a replica set, and returns false otherwise.
+ */
+Cluster.isReplication = function isReplication(clusterOptions) {
+    return clusterOptions.replication.enabled;
 };

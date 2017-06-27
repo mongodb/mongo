@@ -39,6 +39,17 @@ var workerThread = (function() {
                 myDB = new Mongo(args.host).getDB(args.dbName);
             }
 
+            if (Cluster.isReplication(args.clusterOptions)) {
+                // Operations that run after a "dropDatabase" command has been issued may fail with
+                // a "DatabaseDropPending" error response if they would create a new collection on
+                // that database while we're waiting for a majority of nodes in the replica set to
+                // confirm it has been dropped. We load the
+                // implicitly_retry_on_database_drop_pending.js file to make it so that the clients
+                // started by the concurrency framework automatically retry their operation in the
+                // face of this particular error response.
+                load('jstests/libs/override_methods/implicitly_retry_on_database_drop_pending.js');
+            }
+
             workloads.forEach(function(workload) {
                 load(workload);                     // for $config
                 var config = parseConfig($config);  // to normalize
