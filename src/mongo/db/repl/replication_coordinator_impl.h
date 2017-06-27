@@ -893,7 +893,8 @@ private:
      */
     void _finishReplSetReconfig(const ReplicationExecutor::CallbackArgs& cbData,
                                 const ReplicaSetConfig& newConfig,
-                                int myIndex);
+                                int myIndex,
+                                ReplicationExecutor::EventHandle finishedEvent);
 
     /**
      * Changes _rsConfigState to newState, and notify any waiters.

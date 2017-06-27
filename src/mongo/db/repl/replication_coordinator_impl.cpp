@@ -2378,12 +2378,14 @@ Status ReplicationCoordinatorImpl::processReplSetReconfig(OperationContext* txn,
         return status;
     }
 
+    auto finishEvh = uassertStatusOK(_replExecutor.makeEvent());
     const stdx::function<void(const ReplicationExecutor::CallbackArgs&)> reconfigFinishFn(
         stdx::bind(&ReplicationCoordinatorImpl::_finishReplSetReconfig,
                    this,
                    stdx::placeholders::_1,
                    newConfig,
-                   myIndex.getValue()));
+                   myIndex.getValue(),
+                   finishEvh));
 
     // If it's a force reconfig, the primary node may not be electable after the configuration
     // change.  In case we are that primary node, finish the reconfig under the global lock,
@@ -2395,14 +2397,15 @@ Status ReplicationCoordinatorImpl::processReplSetReconfig(OperationContext* txn,
     }
     fassert(18824, cbh.getStatus());
     configStateGuard.Dismiss();
-    _replExecutor.wait(cbh.getValue());
+    _replExecutor.waitForEvent(finishEvh);
     return Status::OK();
 }
 
 void ReplicationCoordinatorImpl::_finishReplSetReconfig(
     const ReplicationExecutor::CallbackArgs& cbData,
     const ReplicaSetConfig& newConfig,
-    int myIndex) {
+    int myIndex,
+    ReplicationExecutor::EventHandle finishedEvent) {
     stdx::unique_lock<stdx::mutex> lk(_mutex);
     invariant(_rsConfigState == kConfigReconfiguring);
     invariant(_rsConfig.isInitialized());
@@ -2412,12 +2415,15 @@ void ReplicationCoordinatorImpl::_finishReplSetReconfig(
     lk.unlock();
     auto evh = _resetElectionInfoOnProtocolVersionUpgrade(oldConfig, newConfig);
     if (evh) {
-        _replExecutor.onEvent(evh,
-                              [this, action](const ReplicationExecutor::CallbackArgs& cbArgs) {
-                                  _performPostMemberStateUpdateAction(action);
-                              });
+        _replExecutor.onEvent(
+            evh,
+            [this, action, finishedEvent](const ReplicationExecutor::CallbackArgs& cbArgs) {
+                _performPostMemberStateUpdateAction(action);
+                _replExecutor.signalEvent(finishedEvent);
+            });
     } else {
         _performPostMemberStateUpdateAction(action);
+        _replExecutor.signalEvent(finishedEvent);
     }
 }
 
