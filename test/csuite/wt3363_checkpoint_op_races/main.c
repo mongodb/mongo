@@ -90,7 +90,7 @@ main(int argc, char *argv[])
 	 * attempting to set the option to add the delays to checkpoints if
 	 * diagnostic mode is not enable and runs for 15 minutes.
 	 */
-	if (!testutil_enable_long_tests() || !diagnostic)
+	if (!testutil_is_flag_set("WT3363_CHECKPOINT_OP_RACES") || !diagnostic)
 		return (EXIT_SUCCESS);
 
 	opts = &_opts;

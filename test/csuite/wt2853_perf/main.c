@@ -82,7 +82,8 @@ main(int argc, char *argv[])
 	int i, nfail;
 	const char *tablename;
 
-	if (!testutil_enable_long_tests())	/* Ignore unless requested */
+	/* Ignore unless requested */
+	if (!testutil_is_flag_set("TESTUTIL_ENABLE_LONG_TESTS"))
 		return (EXIT_SUCCESS);
 
 	opts = &_opts;

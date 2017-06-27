@@ -101,7 +101,8 @@ main(int argc, char *argv[])
 	uint64_t i, id;
 	char buf[100];
 
-	if (!testutil_enable_long_tests())	/* Ignore unless requested */
+	/* Ignore unless requested */
+	if (!testutil_is_flag_set("TESTUTIL_ENABLE_LONG_TESTS"))
 		return (EXIT_SUCCESS);
 
 	opts = &_opts;

@@ -166,20 +166,22 @@ testutil_cleanup(TEST_OPTS *opts)
 }
 
 /*
- * testutil_enable_long_tests --
- *	Return if TESTUTIL_ENABLE_LONG_TESTS is set.
+ * testutil_is_flag_set --
+ *	Return if an environment variable flag is set.
  */
 bool
-testutil_enable_long_tests(void)
+testutil_is_flag_set(const char *flag)
 {
 	const char *res;
 	bool enable_long_tests;
 
-	if (__wt_getenv(NULL,
-	    "TESTUTIL_ENABLE_LONG_TESTS", &res) == WT_NOTFOUND)
+	if (__wt_getenv(NULL, flag, &res) == WT_NOTFOUND)
 		return (false);
 
-	/* Accept anything other than "TESTUTIL_ENABLE_LONG_TESTS=0". */
+	/*
+	 * This is a boolean test. So if the environment variable is set to any
+	 * value other than 0, we return success.
+	 */
 	enable_long_tests = res[0] != '0';
 
 	free((void *)res);
