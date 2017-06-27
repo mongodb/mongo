@@ -30,7 +30,7 @@
 
 #include "mongo/platform/basic.h"
 
-#include "mongo/db/session_transaction_table.h"
+#include "mongo/db/session_catalog.h"
 
 #include <boost/optional.hpp>
 
@@ -46,32 +46,36 @@ namespace mongo {
 namespace {
 
 const auto sessionTransactionTableDecoration =
-    ServiceContext::declareDecoration<boost::optional<SessionTransactionTable>>();
+    ServiceContext::declareDecoration<boost::optional<SessionCatalog>>();
+
+const auto operationSessionDecoration =
+    OperationContext::declareDecoration<boost::optional<ScopedSession>>();
 
 }  // namespace
 
-SessionTransactionTable::SessionTransactionTable(ServiceContext* serviceContext)
-    : _serviceContext(serviceContext) {}
+SessionCatalog::SessionCatalog(ServiceContext* serviceContext) : _serviceContext(serviceContext) {}
 
-void SessionTransactionTable::create(ServiceContext* service) {
+SessionCatalog::~SessionCatalog() = default;
+
+void SessionCatalog::create(ServiceContext* service) {
     auto& sessionTransactionTable = sessionTransactionTableDecoration(service);
     invariant(!sessionTransactionTable);
 
     sessionTransactionTable.emplace(service);
 }
 
-SessionTransactionTable* SessionTransactionTable::get(OperationContext* opCtx) {
+SessionCatalog* SessionCatalog::get(OperationContext* opCtx) {
     return get(opCtx->getServiceContext());
 }
 
-SessionTransactionTable* SessionTransactionTable::get(ServiceContext* service) {
+SessionCatalog* SessionCatalog::get(ServiceContext* service) {
     auto& sessionTransactionTable = sessionTransactionTableDecoration(service);
     invariant(sessionTransactionTable);
 
     return sessionTransactionTable.get_ptr();
 }
 
-void SessionTransactionTable::onStepUp(OperationContext* opCtx) {
+void SessionCatalog::onStepUp(OperationContext* opCtx) {
     DBDirectClient client(opCtx);
 
     const size_t initialExtentSize = 0;
@@ -101,28 +105,67 @@ void SessionTransactionTable::onStepUp(OperationContext* opCtx) {
                             << status.reason());
 }
 
-std::shared_ptr<SessionTxnStateHolder> SessionTransactionTable::getSessionTxnState(
-    const LogicalSessionId& sessionId) {
-    stdx::lock_guard<stdx::mutex> lk(_mutex);
-    auto sessionTxnStateIter = _txnTable.find(sessionId);
+ScopedSession SessionCatalog::checkOutSession(OperationContext* opCtx) {
+    invariant(!opCtx->lockState()->isLocked());
+    invariant(opCtx->getLogicalSessionId());
 
-    if (sessionTxnStateIter == _txnTable.end()) {
-        // TODO: consult sessions table (without network I/O). The fact that we reached this point
-        // means that the session was previously active.
+    const auto lsid = *opCtx->getLogicalSessionId();
 
-        auto txnState = stdx::make_unique<SessionTxnState>(sessionId);
-        auto newEntry = std::make_shared<SessionTxnStateHolder>(std::move(txnState));
-        _txnTable.insert(std::make_pair(sessionId, newEntry));
-        return newEntry;
+    stdx::unique_lock<stdx::mutex> ul(_mutex);
+
+    auto it = _txnTable.find(lsid);
+    if (it == _txnTable.end()) {
+        it = _txnTable.emplace(lsid, std::make_shared<SessionRuntimeInfo>(lsid)).first;
     }
 
-    auto& sessionTxnState = sessionTxnStateIter->second;
-    invariant(sessionTxnState);
-    return sessionTxnState;
+    auto sri = it->second;
+
+    // Wait until the session is no longer in use
+    opCtx->waitForConditionOrInterrupt(
+        sri->availableCondVar, ul, [sri]() { return sri->state != SessionRuntimeInfo::kInUse; });
+
+    invariant(sri->state == SessionRuntimeInfo::kAvailable);
+    sri->state = SessionRuntimeInfo::kInUse;
+
+    return ScopedSession(opCtx, std::move(sri));
 }
 
-void SessionTransactionTable::cleanupInactiveSessions(OperationContext* opCtx) {
-    // TODO: Get from active session list from session cache
+void SessionCatalog::_releaseSession(const LogicalSessionId& lsid) {
+    stdx::lock_guard<stdx::mutex> lg(_mutex);
+
+    auto it = _txnTable.find(lsid);
+    invariant(it != _txnTable.end());
+
+    auto& sri = it->second;
+    invariant(sri->state == SessionRuntimeInfo::kInUse);
+
+    sri->state = SessionRuntimeInfo::kAvailable;
+    sri->availableCondVar.notify_one();
+}
+
+OperationContextSession::OperationContextSession(OperationContext* opCtx) : _opCtx(opCtx) {
+    if (!opCtx->getLogicalSessionId()) {
+        return;
+    }
+
+    auto sessionTransactionTable = SessionCatalog::get(opCtx);
+
+    auto& operationSession = operationSessionDecoration(opCtx);
+    operationSession.emplace(sessionTransactionTable->checkOutSession(opCtx));
+}
+
+OperationContextSession::~OperationContextSession() {
+    auto& operationSession = operationSessionDecoration(_opCtx);
+    operationSession.reset();
+}
+
+Session* OperationContextSession::get(OperationContext* opCtx) {
+    auto& operationSession = operationSessionDecoration(opCtx);
+    if (operationSession) {
+        return operationSession->get();
+    }
+
+    return nullptr;
 }
 
 }  // namespace mongo

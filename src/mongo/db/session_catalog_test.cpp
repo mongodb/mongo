@@ -28,56 +28,34 @@
 
 #include "mongo/platform/basic.h"
 
+#include "mongo/db/client.h"
 #include "mongo/db/operation_context.h"
 #include "mongo/db/service_context.h"
-#include "mongo/db/session_transaction_table.h"
-#include "mongo/db/session_txn_state_holder.h"
+#include "mongo/db/service_context_d_test_fixture.h"
+#include "mongo/db/session_catalog.h"
 #include "mongo/stdx/memory.h"
+#include "mongo/unittest/unittest.h"
 
 namespace mongo {
+namespace {
 
-SessionTxnStateHolder::SessionTxnStateHolder(std::unique_ptr<SessionTxnState> txnState)
-    : _sessionId(txnState->getSessionId()), _txnState(std::move(txnState)) {}
-
-TxnStateAccessToken SessionTxnStateHolder::getTransactionState(OperationContext* opCtx) {
-    stdx::unique_lock<stdx::mutex> lk(_mutex);
-
-    while (!_txnState) {
-        opCtx->waitForConditionOrInterrupt(_txnStateAvailableCV, lk);
+class SessionCatalogTest : public ServiceContextMongoDTest {
+protected:
+    void setUp() final {
+        ServiceContextMongoDTest::setUp();
+        SessionCatalog::create(getServiceContext());
     }
+};
 
-    return TxnStateAccessToken(opCtx, this, std::move(_txnState));
+TEST_F(SessionCatalogTest, CheckoutAndReleaseSession) {
+    auto opCtx = Client::getCurrent()->makeOperationContext();
+    opCtx->setLogicalSessionId(LogicalSessionId());
+
+    auto scopedSession = SessionCatalog::get(opCtx.get())->checkOutSession(opCtx.get());
+
+    ASSERT(scopedSession.get());
+    ASSERT_EQ(*opCtx->getLogicalSessionId(), scopedSession->getSessionId());
 }
 
-void SessionTxnStateHolder::finishTxn(std::unique_ptr<SessionTxnState> txnState) {
-    invariant(txnState);
-    invariant(_sessionId == txnState->getSessionId());
-
-    stdx::lock_guard<stdx::mutex> lk(_mutex);
-    _txnState = std::move(txnState);
-    _txnStateAvailableCV.notify_all();
-}
-
-const LogicalSessionId& SessionTxnStateHolder::getSessionId() const {
-    return _sessionId;
-}
-
-TxnStateAccessToken::TxnStateAccessToken(OperationContext* opCtx,
-                                         SessionTxnStateHolder* holder,
-                                         std::unique_ptr<SessionTxnState> txnState)
-    : _opCtx(opCtx), _holder(holder), _txnState(std::move(txnState)) {
-    invariant(_opCtx);
-    invariant(_holder);
-    SessionTxnState::set(_opCtx, _txnState.get());
-}
-
-TxnStateAccessToken::~TxnStateAccessToken() {
-    SessionTxnState::set(_opCtx, nullptr);
-    _holder->finishTxn(std::move(_txnState));
-}
-
-SessionTxnState* TxnStateAccessToken::get() {
-    return _txnState.get();
-}
-
+}  // namespace
 }  // namespace mongo

@@ -74,7 +74,7 @@
 #include "mongo/db/server_options.h"
 #include "mongo/db/server_parameters.h"
 #include "mongo/db/service_context.h"
-#include "mongo/db/session_transaction_table.h"
+#include "mongo/db/session_catalog.h"
 #include "mongo/db/storage/storage_engine.h"
 #include "mongo/executor/network_connection_hook.h"
 #include "mongo/executor/network_interface.h"
@@ -802,7 +802,7 @@ void ReplicationCoordinatorExternalStateImpl::_shardingOnTransitionToPrimaryHook
         Grid::get(_service)->catalogCache()->onStepUp();
     }
 
-    SessionTransactionTable::get(_service)->onStepUp(opCtx);
+    SessionCatalog::get(_service)->onStepUp(opCtx);
 
     // There is a slight chance that some stale metadata might have been loaded before the latest
     // optime has been recovered, so throw out everything that we have up to now

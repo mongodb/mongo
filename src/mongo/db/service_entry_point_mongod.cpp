@@ -59,6 +59,7 @@
 #include "mongo/db/s/sharded_connection_info.h"
 #include "mongo/db/s/sharding_state.h"
 #include "mongo/db/server_options.h"
+#include "mongo/db/session_catalog.h"
 #include "mongo/db/stats/counters.h"
 #include "mongo/db/stats/top.h"
 #include "mongo/rpc/factory.h"
@@ -569,6 +570,8 @@ void execCommandDatabase(OperationContext* opCtx,
             Command::generateHelpResponse(opCtx, replyBuilder, *command);
             return;
         }
+
+        OperationContextSession sessionTxnState(opCtx);
 
         ImpersonationSessionGuard guard(opCtx);
         uassertStatusOK(Command::checkAuthorization(command, opCtx, dbname, request.body));

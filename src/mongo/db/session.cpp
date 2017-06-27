@@ -26,10 +26,11 @@
  *    it in the license file.
  */
 
+#define MONGO_LOG_DEFAULT_COMPONENT ::mongo::logger::LogComponent::kStorage
+
 #include "mongo/platform/basic.h"
 
-#define MONGO_LOG_DEFAULT_COMPONENT ::mongo::logger::LogComponent::kStorage
-#include "mongo/util/log.h"
+#include "mongo/db/session.h"
 
 #include <vector>
 
@@ -40,15 +41,12 @@
 #include "mongo/db/operation_context.h"
 #include "mongo/db/ops/update.h"
 #include "mongo/db/query/get_executor.h"
-#include "mongo/db/session_txn_state.h"
 #include "mongo/stdx/memory.h"
+#include "mongo/util/log.h"
 #include "mongo/util/mongoutils/str.h"
 
 namespace mongo {
-
 namespace {
-
-auto getSessionTxnState = OperationContext::declareDecoration<SessionTxnState*>();
 
 boost::optional<SessionTxnRecord> loadSessionRecord(OperationContext* opCtx,
                                                     const LogicalSessionId& sessionId) {
@@ -97,20 +95,11 @@ void updateSessionRecordTxnNum(OperationContext* opCtx,
             updateResult.numDocsModified >= 1 || !updateResult.upserted.isEmpty());
 }
 
-}  // unnamed namespace
+}  // namespace
 
-SessionTxnState* SessionTxnState::get(OperationContext* opCtx) {
-    return getSessionTxnState(opCtx);
-}
+Session::Session(LogicalSessionId sessionId) : _sessionId(std::move(sessionId)) {}
 
-void SessionTxnState::set(OperationContext* opCtx, SessionTxnState* txnState) {
-    auto& sessionTxnState = getSessionTxnState(opCtx);
-    sessionTxnState = txnState;
-}
-
-SessionTxnState::SessionTxnState(LogicalSessionId sessionId) : _sessionId(std::move(sessionId)) {}
-
-void SessionTxnState::begin(OperationContext* opCtx, const TxnNumber& txnNumber) {
+void Session::begin(OperationContext* opCtx, const TxnNumber& txnNumber) {
     invariant(!opCtx->lockState()->isLocked());
     invariant(!opCtx->lockState()->inAWriteUnitOfWork());
 
@@ -146,7 +135,7 @@ void SessionTxnState::begin(OperationContext* opCtx, const TxnNumber& txnNumber)
     }
 }
 
-void SessionTxnState::saveTxnProgress(OperationContext* opCtx, Timestamp opTimeTs) {
+void Session::saveTxnProgress(OperationContext* opCtx, Timestamp opTimeTs) {
     // Needs to be in the same write unit of work with the write for this result.
     invariant(opCtx->lockState()->inAWriteUnitOfWork());
 
@@ -178,19 +167,15 @@ void SessionTxnState::saveTxnProgress(OperationContext* opCtx, Timestamp opTimeT
     _txnRecord->setLastWriteOpTimeTs(opTimeTs);
 }
 
-const LogicalSessionId& SessionTxnState::getSessionId() const {
-    return _sessionId;
-}
-
-TxnNumber SessionTxnState::getTxnNum() const {
+TxnNumber Session::getTxnNum() const {
     return _txnRecord->getTxnNum();
 }
 
-const Timestamp& SessionTxnState::getLastWriteOpTimeTs() const {
+const Timestamp& Session::getLastWriteOpTimeTs() const {
     return _txnRecord->getLastWriteOpTimeTs();
 }
 
-TransactionHistoryIterator SessionTxnState::getWriteHistory(OperationContext* opCtx) const {
+TransactionHistoryIterator Session::getWriteHistory(OperationContext* opCtx) const {
     return TransactionHistoryIterator(getLastWriteOpTimeTs());
 }
 

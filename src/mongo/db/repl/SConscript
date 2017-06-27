@@ -1470,7 +1470,7 @@ env.Library(
         '$BUILD_DIR/mongo/db/repl/oplog_buffer_proxy',
         '$BUILD_DIR/mongo/db/s/balancer',
         '$BUILD_DIR/mongo/db/service_context',
-        '$BUILD_DIR/mongo/db/session_transactions',
+        '$BUILD_DIR/mongo/db/sessions',
         '$BUILD_DIR/mongo/db/stats/counters',
         '$BUILD_DIR/mongo/rpc/client_metadata',
         'bgsync',

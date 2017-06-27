@@ -105,7 +105,7 @@
 #include "mongo/db/service_context.h"
 #include "mongo/db/service_context_d.h"
 #include "mongo/db/service_entry_point_mongod.h"
-#include "mongo/db/session_transaction_table.h"
+#include "mongo/db/session_catalog.h"
 #include "mongo/db/startup_warnings_mongod.h"
 #include "mongo/db/stats/counters.h"
 #include "mongo/db/storage/encryption_hooks.h"
@@ -643,7 +643,7 @@ ExitCode _initAndListen(int listenPort) {
               << startupWarningsLog;
     }
 
-    SessionTransactionTable::create(globalServiceContext);
+    SessionCatalog::create(globalServiceContext);
 
     // This function may take the global lock.
     auto shardingInitialized =

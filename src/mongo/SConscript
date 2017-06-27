@@ -302,7 +302,6 @@ env.Library(
         'db/s/balancer',
         'db/serveronly',
         'db/service_context_d',
-        'db/session_transactions',
         'db/startup_warnings_mongod',
         'db/system_index',
         'db/ttl_d',

@@ -595,6 +595,7 @@ env.Library(
         'ops/write_ops_parsers',
         'rw_concern_d',
         's/sharding',
+        'sessions',
         'storage/storage_options',
     ],
 )
@@ -1324,11 +1325,10 @@ asioEnv.CppIntegrationTest(
 )
 
 env.Library(
-    target='session_transactions',
+    target='sessions',
     source=[
-        'session_transaction_table.cpp',
-        'session_txn_state.cpp',
-        'session_txn_state_holder.cpp',
+        'session.cpp',
+        'session_catalog.cpp',
         'transaction_history_iterator.cpp',
         env.Idlc('session_txn_record.idl')[0],
     ],
@@ -1343,14 +1343,15 @@ env.Library(
 )
 
 env.CppUnitTest(
-    target='session_transactions_test',
+    target='sessions_test',
     source=[
-        'session_transaction_state_test.cpp',
+        'session_catalog_test.cpp',
+        'session_test.cpp',
     ],
     LIBDEPS=[
-        'service_context_d_test_fixture',
-        'session_transactions',
         '$BUILD_DIR/mongo/db/repl/replmocks',
+        'service_context_d_test_fixture',
+        'sessions',
     ],
 )
 

@@ -39,14 +39,14 @@
 #include "mongo/db/repl/replication_coordinator_mock.h"
 #include "mongo/db/service_context.h"
 #include "mongo/db/service_context_d_test_fixture.h"
-#include "mongo/db/session_transaction_table.h"
-#include "mongo/db/session_txn_state_holder.h"
+#include "mongo/db/session_catalog.h"
 #include "mongo/stdx/memory.h"
 #include "mongo/unittest/unittest.h"
 
 namespace mongo {
+namespace {
 
-class SessionTxnStateTest : public ServiceContextMongoDTest {
+class SessionTest : public ServiceContextMongoDTest {
 public:
     void setUp() override {
         ServiceContextMongoDTest::setUp();
@@ -64,7 +64,7 @@ public:
         repl::ReplicationCoordinator::set(
             service, stdx::make_unique<repl::ReplicationCoordinatorMock>(service, replSettings));
 
-        _txnTable = stdx::make_unique<SessionTransactionTable>(nullptr);
+        _txnTable = stdx::make_unique<SessionCatalog>(nullptr);
         _txnTable->onStepUp(_opCtx.get());
     }
 
@@ -82,14 +82,14 @@ public:
 
 private:
     ServiceContext::UniqueOperationContext _opCtx;
-    std::unique_ptr<SessionTransactionTable> _txnTable;
+    std::unique_ptr<SessionCatalog> _txnTable;
 };
 
-TEST_F(SessionTxnStateTest, CanCreateNewSessionEntry) {
+TEST_F(SessionTest, CanCreateNewSessionEntry) {
     const auto sessionId = LogicalSessionId::gen();
     const TxnNumber txnNum = 20;
 
-    SessionTxnState txnState(sessionId);
+    Session txnState(sessionId);
     txnState.begin(opCtx(), txnNum);
 
     ASSERT_EQ(sessionId, txnState.getSessionId());
@@ -115,11 +115,11 @@ TEST_F(SessionTxnStateTest, CanCreateNewSessionEntry) {
     ASSERT_FALSE(cursor->more());
 }
 
-TEST_F(SessionTxnStateTest, StartingOldTxnShouldAssert) {
+TEST_F(SessionTest, StartingOldTxnShouldAssert) {
     const auto sessionId = LogicalSessionId::gen();
     const TxnNumber txnNum = 20;
 
-    SessionTxnState txnState(sessionId);
+    Session txnState(sessionId);
     txnState.begin(opCtx(), txnNum);
 
     ASSERT_THROWS(txnState.begin(opCtx(), txnNum - 1), UserException);
@@ -128,7 +128,7 @@ TEST_F(SessionTxnStateTest, StartingOldTxnShouldAssert) {
     ASSERT_TRUE(txnState.getLastWriteOpTimeTs().isNull());
 }
 
-TEST_F(SessionTxnStateTest, StartingNewSessionWithCompatibleEntryInStorage) {
+TEST_F(SessionTest, StartingNewSessionWithCompatibleEntryInStorage) {
     const auto sessionId = LogicalSessionId::gen();
     const TxnNumber txnNum = 20;
     const Timestamp origTs(985, 15);
@@ -141,7 +141,7 @@ TEST_F(SessionTxnStateTest, StartingNewSessionWithCompatibleEntryInStorage) {
     DBDirectClient client(opCtx());
     client.insert(NamespaceString::kSessionTransactionsTableNamespace.ns(), origRecord.toBSON());
 
-    SessionTxnState txnState(sessionId);
+    Session txnState(sessionId);
     txnState.begin(opCtx(), txnNum);
 
     ASSERT_EQ(sessionId, txnState.getSessionId());
@@ -167,7 +167,7 @@ TEST_F(SessionTxnStateTest, StartingNewSessionWithCompatibleEntryInStorage) {
     ASSERT_FALSE(cursor->more());
 }
 
-TEST_F(SessionTxnStateTest, StartingNewSessionWithOlderEntryInStorageShouldUpdateEntry) {
+TEST_F(SessionTest, StartingNewSessionWithOlderEntryInStorageShouldUpdateEntry) {
     const auto sessionId = LogicalSessionId::gen();
     TxnNumber txnNum = 20;
     const Timestamp origTs(985, 15);
@@ -180,7 +180,7 @@ TEST_F(SessionTxnStateTest, StartingNewSessionWithOlderEntryInStorageShouldUpdat
     DBDirectClient client(opCtx());
     client.insert(NamespaceString::kSessionTransactionsTableNamespace.ns(), origRecord.toBSON());
 
-    SessionTxnState txnState(sessionId);
+    Session txnState(sessionId);
     txnState.begin(opCtx(), ++txnNum);
 
     ASSERT_EQ(sessionId, txnState.getSessionId());
@@ -206,7 +206,7 @@ TEST_F(SessionTxnStateTest, StartingNewSessionWithOlderEntryInStorageShouldUpdat
     ASSERT_FALSE(cursor->more());
 }
 
-TEST_F(SessionTxnStateTest, StartingNewSessionWithNewerEntryInStorageShouldAssert) {
+TEST_F(SessionTest, StartingNewSessionWithNewerEntryInStorageShouldAssert) {
     const auto sessionId = LogicalSessionId::gen();
     TxnNumber txnNum = 20;
     const Timestamp origTs(985, 15);
@@ -219,7 +219,7 @@ TEST_F(SessionTxnStateTest, StartingNewSessionWithNewerEntryInStorageShouldAsser
     DBDirectClient client(opCtx());
     client.insert(NamespaceString::kSessionTransactionsTableNamespace.ns(), origRecord.toBSON());
 
-    SessionTxnState txnState(sessionId);
+    Session txnState(sessionId);
     ASSERT_THROWS(txnState.begin(opCtx(), txnNum - 1), UserException);
 
     ASSERT_EQ(sessionId, txnState.getSessionId());
@@ -245,12 +245,12 @@ TEST_F(SessionTxnStateTest, StartingNewSessionWithNewerEntryInStorageShouldAsser
     ASSERT_FALSE(cursor->more());
 }
 
-TEST_F(SessionTxnStateTest, StoreOpTime) {
+TEST_F(SessionTest, StoreOpTime) {
     const auto sessionId = LogicalSessionId::gen();
     const TxnNumber txnNum = 20;
     const Timestamp ts1(100, 42);
 
-    SessionTxnState txnState(sessionId);
+    Session txnState(sessionId);
     txnState.begin(opCtx(), txnNum);
 
     {
@@ -311,12 +311,12 @@ TEST_F(SessionTxnStateTest, StoreOpTime) {
     ASSERT_EQ(ts2, txnState.getLastWriteOpTimeTs());
 }
 
-TEST_F(SessionTxnStateTest, CanBumpTransactionIdIfNewer) {
+TEST_F(SessionTest, CanBumpTransactionIdIfNewer) {
     const auto sessionId = LogicalSessionId::gen();
     TxnNumber txnNum = 20;
     const Timestamp ts1(100, 42);
 
-    SessionTxnState txnState(sessionId);
+    Session txnState(sessionId);
     txnState.begin(opCtx(), txnNum);
 
     {
@@ -371,7 +371,7 @@ TEST_F(SessionTxnStateTest, CanBumpTransactionIdIfNewer) {
     ASSERT_TRUE(txnState.getLastWriteOpTimeTs().isNull());
 }
 
-TEST_F(SessionTxnStateTest, StartingNewSessionWithDroppedTableShouldAssert) {
+TEST_F(SessionTest, StartingNewSessionWithDroppedTableShouldAssert) {
     const auto sessionId = LogicalSessionId::gen();
     const TxnNumber txnNum = 20;
 
@@ -381,18 +381,18 @@ TEST_F(SessionTxnStateTest, StartingNewSessionWithDroppedTableShouldAssert) {
     DBDirectClient client(opCtx());
     ASSERT_TRUE(client.runCommand(ns.db().toString(), BSON("drop" << ns.coll()), dropResult));
 
-    SessionTxnState txnState(sessionId);
+    Session txnState(sessionId);
     ASSERT_THROWS(txnState.begin(opCtx(), txnNum), UserException);
 
     ASSERT_EQ(sessionId, txnState.getSessionId());
 }
 
-TEST_F(SessionTxnStateTest, SaveTxnProgressShouldAssertIfTableIsDropped) {
+TEST_F(SessionTest, SaveTxnProgressShouldAssertIfTableIsDropped) {
     const auto sessionId = LogicalSessionId::gen();
     const TxnNumber txnNum = 20;
     const Timestamp ts1(100, 42);
 
-    SessionTxnState txnState(sessionId);
+    Session txnState(sessionId);
     txnState.begin(opCtx(), txnNum);
 
     const auto& ns = NamespaceString::kSessionTransactionsTableNamespace;
@@ -407,19 +407,19 @@ TEST_F(SessionTxnStateTest, SaveTxnProgressShouldAssertIfTableIsDropped) {
     ASSERT_THROWS(txnState.saveTxnProgress(opCtx(), ts1), UserException);
 }
 
-TEST_F(SessionTxnStateTest, TwoSessionsShouldBeIndependent) {
+TEST_F(SessionTest, TwoSessionsShouldBeIndependent) {
     const auto sessionId1 = LogicalSessionId::gen();
     const TxnNumber txnNum1 = 20;
     const Timestamp ts1(1903, 42);
 
-    SessionTxnState txnState1(sessionId1);
+    Session txnState1(sessionId1);
     txnState1.begin(opCtx(), txnNum1);
 
     const auto sessionId2 = LogicalSessionId::gen();
     const TxnNumber txnNum2 = 300;
     const Timestamp ts2(671, 5);
 
-    SessionTxnState txnState2(sessionId2);
+    Session txnState2(sessionId2);
     txnState2.begin(opCtx(), txnNum2);
 
     {
@@ -472,4 +472,5 @@ TEST_F(SessionTxnStateTest, TwoSessionsShouldBeIndependent) {
     ASSERT_FALSE(cursor->more());
 }
 
+}  // namespace
 }  // namespace mongo

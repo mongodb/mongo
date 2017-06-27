@@ -29,8 +29,8 @@
 #pragma once
 
 #include <boost/optional.hpp>
-#include <map>
 
+#include "mongo/base/disallow_copying.h"
 #include "mongo/bson/timestamp.h"
 #include "mongo/db/logical_session_id.h"
 #include "mongo/db/session_txn_record_gen.h"
@@ -53,9 +53,15 @@ class OperationContext;
  * externally observable and can be really bad if enough secondaries are in this state that they
  * become primaries and start accepting writes.
  */
-class SessionTxnState {
+class Session {
+    MONGO_DISALLOW_COPYING(Session);
+
 public:
-    explicit SessionTxnState(LogicalSessionId sessionId);
+    explicit Session(LogicalSessionId sessionId);
+
+    const LogicalSessionId& getSessionId() const {
+        return _sessionId;
+    }
 
     /**
      *  Load transaction state from storage if it hasn't.
@@ -72,8 +78,6 @@ public:
      */
     void saveTxnProgress(OperationContext* opCtx, Timestamp opTime);
 
-    const LogicalSessionId& getSessionId() const;
-
     /**
      * Note: can only be called after at least one successful execution of begin().
      */
@@ -84,18 +88,9 @@ public:
      */
     const Timestamp& getLastWriteOpTimeTs() const;
 
-    /**
-     * Returns a SessionTxnState stored in the operation context.
-     */
-    static SessionTxnState* get(OperationContext* opCtx);
-
-    /**
-     * Stores a TxnStateAccessToken object to an operation context.
-     */
-    static void set(OperationContext* opCtx, SessionTxnState* txnState);
-
 private:
     const LogicalSessionId _sessionId;
+
     boost::optional<SessionTxnRecord> _txnRecord;
 };
 
