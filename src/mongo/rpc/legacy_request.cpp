@@ -52,10 +52,7 @@ OpMsgRequest opMsgRequestFromLegacyRequest(const Message& message) {
                           << ") for $cmd type ns - can only be 1 or -1",
             qm.ntoreturn == 1 || qm.ntoreturn == -1);
 
-    auto bodyAndMetadata = rpc::upconvertRequestMetadata(qm.query, qm.queryOptions);
-
-    return OpMsgRequest::fromDBAndBody(
-        ns.db(), std::move(std::get<0>(bodyAndMetadata)), std::get<1>(bodyAndMetadata));
+    return OpMsgRequest::fromDBAndBody(ns.db(), rpc::upconvertRequest(qm.query, qm.queryOptions));
 }
 
 }  // namespace rpc

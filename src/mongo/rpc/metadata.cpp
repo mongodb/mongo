@@ -119,15 +119,11 @@ void readRequestMetadata(OperationContext* opCtx, const BSONObj& metadataObj) {
     }
 }
 
-CommandAndMetadata upconvertRequestMetadata(BSONObj legacyCmdObj, int queryFlags) {
-    // We can reuse the same metadata BOB for every upconvert call, but we need to keep
-    // making new command BOBs as each metadata bob will need to remove fields. We can not use
-    // mutablebson here because the ReadPreference upconvert routine performs
-    // manipulations (replacing a root with its child) that mutablebson doesn't
-    // support.
+BSONObj upconvertRequest(BSONObj cmdObj, int queryFlags) {
+    cmdObj = cmdObj.getOwned();  // Usually this is a no-op since it is already owned.
 
     auto readPrefContainer = BSONObj();
-    const StringData firstFieldName = legacyCmdObj.firstElementFieldName();
+    const StringData firstFieldName = cmdObj.firstElementFieldName();
     if (firstFieldName == "$query" || firstFieldName == "query") {
         // Commands sent over OP_QUERY specify read preference by putting it at the top level and
         // putting the command in a nested field called either query or $query.
@@ -136,35 +132,30 @@ CommandAndMetadata upconvertRequestMetadata(BSONObj legacyCmdObj, int queryFlags
         uassert(ErrorCodes::InvalidOptions,
                 "cannot use $maxTimeMS query option with commands; use maxTimeMS command option "
                 "instead",
-                !legacyCmdObj.hasField("$maxTimeMS"));
-        readPrefContainer = legacyCmdObj;
-        legacyCmdObj = legacyCmdObj.firstElement().Obj().getOwned();
-    } else if (auto queryOptions = legacyCmdObj["$queryOptions"]) {
+                !cmdObj.hasField("$maxTimeMS"));
+
+        if (auto readPref = cmdObj["$readPreference"])
+            readPrefContainer = readPref.wrap();
+
+        cmdObj = cmdObj.firstElement().Obj().shareOwnershipWith(cmdObj);
+    } else if (auto queryOptions = cmdObj["$queryOptions"]) {
         // Mongos rewrites commands with $readPreference to put it in a field nested inside of
         // $queryOptions. Its command implementations often forward commands in that format to
         // shards. This function is responsible for rewriting it to a format that the shards
         // understand.
-        readPrefContainer = queryOptions.Obj().getOwned();
-        legacyCmdObj = legacyCmdObj.removeField("$queryOptions");
+        readPrefContainer = queryOptions.Obj().shareOwnershipWith(cmdObj);
+        cmdObj = cmdObj.removeField("$queryOptions");
     }
 
-    BSONObjBuilder metadataBob;
-    if (auto readPref = readPrefContainer["$readPreference"]) {
-        metadataBob.append(readPref);
-    } else if (queryFlags & QueryOption_SlaveOk) {
-        ReadPreferenceSetting(ReadPreference::SecondaryPreferred).toContainingBSON(&metadataBob);
+    if (!readPrefContainer.isEmpty()) {
+        cmdObj = BSONObjBuilder(std::move(cmdObj)).appendElements(readPrefContainer).obj();
+    } else if (!cmdObj.hasField("$readPreference") && (queryFlags & QueryOption_SlaveOk)) {
+        BSONObjBuilder bodyBuilder(std::move(cmdObj));
+        ReadPreferenceSetting(ReadPreference::SecondaryPreferred).toContainingBSON(&bodyBuilder);
+        cmdObj = bodyBuilder.obj();
     }
 
-    BSONObjBuilder logicalTimeCommandBob;
-    for (auto elem : legacyCmdObj) {
-        if (elem.fieldNameStringData() == LogicalTimeMetadata::fieldName()) {
-            metadataBob.append(elem);
-        } else {
-            logicalTimeCommandBob.append(elem);
-        }
-    }
-
-    return std::make_tuple(logicalTimeCommandBob.obj(), metadataBob.obj());
+    return cmdObj;
 }
 
 }  // namespace rpc

@@ -183,9 +183,9 @@ TEST(LogicalTimeMetadataTest, UpconvertPass) {
     auto commandObj = builder.done();
     BSONObjBuilder metadataBob;
     BSONObjBuilder commandBob;
-    auto converted = upconvertRequestMetadata(commandObj, 0);
-    ASSERT_BSONOBJ_EQ(BSON("aaa" << 1 << "bbb" << 1), std::get<0>(converted));
-    ASSERT_BSONOBJ_EQ(BSON("$clusterTime" << logicalTimeMetadata), std::get<1>(converted));
+    auto converted = upconvertRequest(commandObj, 0);
+    ASSERT_BSONOBJ_EQ(BSON("aaa" << 1 << "bbb" << 1 << "$clusterTime" << logicalTimeMetadata),
+                      converted);
 }
 
 }  // namespace rpc

@@ -196,12 +196,20 @@ public:
      * data this BSONObj is viewing. This can happen if this is a subobject or sibling object
      * contained in a larger buffer.
      */
-    void shareOwnershipWith(ConstSharedBuffer buffer) {
+    BSONObj& shareOwnershipWith(ConstSharedBuffer buffer) & {
         invariant(buffer);
         _ownedBuffer = buffer;
+        return *this;
     }
-    void shareOwnershipWith(const BSONObj& other) {
+    BSONObj& shareOwnershipWith(const BSONObj& other) & {
         shareOwnershipWith(other.sharedBuffer());
+        return *this;
+    }
+    BSONObj&& shareOwnershipWith(ConstSharedBuffer buffer) && {
+        return std::move(shareOwnershipWith(buffer));
+    }
+    BSONObj&& shareOwnershipWith(const BSONObj& other) && {
+        return std::move(shareOwnershipWith(other));
     }
 
     const ConstSharedBuffer& sharedBuffer() const {

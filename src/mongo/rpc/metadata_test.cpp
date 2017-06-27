@@ -42,10 +42,9 @@ using mongo::unittest::assertGet;
 
 void checkUpconvert(const BSONObj& legacyCommand,
                     const int legacyQueryFlags,
-                    const BSONObj& upconvertedCommand,
-                    const BSONObj& upconvertedMetadata) {
+                    const BSONObj& upconvertedCommand) {
 
-    auto converted = upconvertRequestMetadata(legacyCommand, legacyQueryFlags);
+    auto converted = upconvertRequest(legacyCommand, legacyQueryFlags);
     // We don't care about the order of the fields in the metadata object
     const auto sorted = [](const BSONObj& obj) {
         BSONObjIteratorSorted iter(obj);
@@ -56,8 +55,7 @@ void checkUpconvert(const BSONObj& legacyCommand,
         return bob.obj();
     };
 
-    ASSERT_BSONOBJ_EQ(upconvertedCommand, std::get<0>(converted));
-    ASSERT_BSONOBJ_EQ(sorted(upconvertedMetadata), sorted(std::get<1>(converted)));
+    ASSERT_BSONOBJ_EQ(sorted(upconvertedCommand), sorted(converted));
 }
 
 TEST(Metadata, UpconvertValidMetadata) {
@@ -67,9 +65,8 @@ TEST(Metadata, UpconvertValidMetadata) {
                                  << BSON("mode"
                                          << "secondary")),
                    mongo::QueryOption_SlaveOk,
-                   BSON("ping" << 1),
-                   BSON("$readPreference" << BSON("mode"
-                                                  << "secondary")));
+                   BSON("ping" << 1 << "$readPreference" << BSON("mode"
+                                                                 << "secondary")));
 
     // Wrapped in 'query', with readPref.
     checkUpconvert(BSON("query" << BSON("pong" << 1 << "foo"
@@ -82,14 +79,15 @@ TEST(Metadata, UpconvertValidMetadata) {
                                                 << "ny"))),
                    0,
                    BSON("pong" << 1 << "foo"
-                               << "bar"),
-                   BSON("$readPreference" << BSON("mode"
-                                                  << "primary"
-                                                  << "tags"
-                                                  << BSON("dc"
-                                                          << "ny"))));
+                               << "bar"
+                               << "$readPreference"
+                               << BSON("mode"
+                                       << "primary"
+                                       << "tags"
+                                       << BSON("dc"
+                                               << "ny"))));
     // Unwrapped, no readPref, no slaveOk
-    checkUpconvert(BSON("ping" << 1), 0, BSON("ping" << 1), BSONObj());
+    checkUpconvert(BSON("ping" << 1), 0, BSON("ping" << 1));
 
     // Readpref wrapped in $queryOptions
     checkUpconvert(BSON("pang"
@@ -102,41 +100,42 @@ TEST(Metadata, UpconvertValidMetadata) {
                                                                   << "city")))),
                    0,
                    BSON("pang"
-                        << "pong"),
-                   BSON("$readPreference" << BSON("mode"
-                                                  << "nearest"
-                                                  << "tags"
-                                                  << BSON("rack"
-                                                          << "city"))));
+                        << "pong"
+                        << "$readPreference"
+                        << BSON("mode"
+                                << "nearest"
+                                << "tags"
+                                << BSON("rack"
+                                        << "city"))));
 }
 
 TEST(Metadata, UpconvertInvalidMetadata) {
     // has $maxTimeMS option
-    ASSERT_THROWS_CODE(upconvertRequestMetadata(BSON("query" << BSON("foo"
-                                                                     << "bar")
-                                                             << "$maxTimeMS"
-                                                             << 200),
-                                                0),
+    ASSERT_THROWS_CODE(upconvertRequest(BSON("query" << BSON("foo"
+                                                             << "bar")
+                                                     << "$maxTimeMS"
+                                                     << 200),
+                                        0),
                        UserException,
                        ErrorCodes::InvalidOptions);
-    ASSERT_THROWS_CODE(upconvertRequestMetadata(BSON("$query" << BSON("foo"
-                                                                      << "bar")
-                                                              << "$maxTimeMS"
-                                                              << 200),
-                                                0),
+    ASSERT_THROWS_CODE(upconvertRequest(BSON("$query" << BSON("foo"
+                                                              << "bar")
+                                                      << "$maxTimeMS"
+                                                      << 200),
+                                        0),
                        UserException,
                        ErrorCodes::InvalidOptions);
 
     // invalid wrapped query
-    ASSERT_THROWS(upconvertRequestMetadata(BSON("$query" << 1), 0), UserException);
-    ASSERT_THROWS(upconvertRequestMetadata(BSON("$query"
-                                                << ""),
-                                           0),
+    ASSERT_THROWS(upconvertRequest(BSON("$query" << 1), 0), UserException);
+    ASSERT_THROWS(upconvertRequest(BSON("$query"
+                                        << ""),
+                                   0),
                   UserException);
-    ASSERT_THROWS(upconvertRequestMetadata(BSON("query" << 1), 0), UserException);
-    ASSERT_THROWS(upconvertRequestMetadata(BSON("query"
-                                                << ""),
-                                           0),
+    ASSERT_THROWS(upconvertRequest(BSON("query" << 1), 0), UserException);
+    ASSERT_THROWS(upconvertRequest(BSON("query"
+                                        << ""),
+                                   0),
                   UserException);
 }
 

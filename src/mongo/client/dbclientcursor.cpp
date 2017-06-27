@@ -62,23 +62,16 @@ Message assembleCommandRequest(DBClientWithCommands* cli,
                                StringData database,
                                int legacyQueryOptions,
                                BSONObj legacyQuery) {
-    BSONObj upconvertedCommand;
-    BSONObj upconvertedMetadata;
-
-    std::tie(upconvertedCommand, upconvertedMetadata) =
-        rpc::upconvertRequestMetadata(std::move(legacyQuery), legacyQueryOptions);
+    BSONObjBuilder bodyBob(rpc::upconvertRequest(std::move(legacyQuery), legacyQueryOptions));
 
     if (cli->getRequestMetadataWriter()) {
-        BSONObjBuilder metadataBob(std::move(upconvertedMetadata));
-        uassertStatusOK(cli->getRequestMetadataWriter()(
-            (haveClient() ? cc().getOperationContext() : nullptr), &metadataBob));
-        upconvertedMetadata = metadataBob.obj();
+        auto opCtx = (haveClient() ? cc().getOperationContext() : nullptr);
+        uassertStatusOK(cli->getRequestMetadataWriter()(opCtx, &bodyBob));
     }
 
-    return rpc::messageFromOpMsgRequest(
-        cli->getClientRPCProtocols(),
-        cli->getServerRPCProtocols(),
-        OpMsgRequest::fromDBAndBody(database, std::move(upconvertedCommand), upconvertedMetadata));
+    return rpc::messageFromOpMsgRequest(cli->getClientRPCProtocols(),
+                                        cli->getServerRPCProtocols(),
+                                        OpMsgRequest::fromDBAndBody(database, bodyBob.obj()));
 }
 
 }  // namespace

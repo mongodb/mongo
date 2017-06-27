@@ -56,21 +56,15 @@ BSONObj makeEmptyMetadata();
 void readRequestMetadata(OperationContext* opCtx, const BSONObj& metadataObj);
 
 /**
- * A command object and a corresponding metadata object.
- */
-using CommandAndMetadata = std::tuple<BSONObj, BSONObj>;
-
-/**
  * A legacy command object and a corresponding query flags bitfield. The legacy command object
  * may contain metadata fields, so it cannot safely be passed to a command's run method.
  */
 using LegacyCommandAndFlags = std::tuple<BSONObj, int>;
 
 /**
- * Given a legacy command object and a query flags bitfield, attempts to parse and remove
- * the metadata from the command object and construct a corresponding metadata object.
+ * Upconverts a legacy command object and a query flags bitfield. Does not add a $db field.
  */
-CommandAndMetadata upconvertRequestMetadata(BSONObj legacyCmdObj, int queryFlags);
+BSONObj upconvertRequest(BSONObj legacyCmdObj, int queryFlags);
 
 /**
  * A function type for writing request metadata. The function takes a pointer to an optional
