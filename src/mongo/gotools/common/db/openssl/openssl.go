@@ -24,8 +24,6 @@ type SSLDBConnector struct {
 // connection string, and sets up the correct function to dial the server
 // based on the ssl options passed in.
 func (self *SSLDBConnector) Configure(opts options.ToolOptions) error {
-	// create the addresses to be used to connect
-	connectionAddrs := util.CreateConnectionAddrs(opts.Host, opts.Port)
 
 	var err error
 	self.ctx, err = setupCtx(opts)
@@ -49,7 +47,6 @@ func (self *SSLDBConnector) Configure(opts options.ToolOptions) error {
 
 	// set up the dial info
 	self.dialInfo = &mgo.DialInfo{
-		Addrs:          connectionAddrs,
 		Timeout:        timeout,
 		Direct:         opts.Direct,
 		ReplicaSetName: opts.ReplicaSetName,
@@ -58,6 +55,13 @@ func (self *SSLDBConnector) Configure(opts options.ToolOptions) error {
 		Password:       opts.Auth.Password,
 		Source:         opts.GetAuthenticationDatabase(),
 		Mechanism:      opts.Auth.Mechanism,
+	}
+
+	// create or fetch the addresses to be used to connect
+	if opts.URI != nil && opts.URI.ConnectionString != "" {
+		self.dialInfo.Addrs = opts.URI.GetConnectionAddrs()
+	} else {
+		self.dialInfo.Addrs = util.CreateConnectionAddrs(opts.Host, opts.Port)
 	}
 	kerberos.AddKerberosOpts(opts, self.dialInfo)
 	return nil

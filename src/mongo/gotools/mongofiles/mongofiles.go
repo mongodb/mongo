@@ -312,7 +312,9 @@ func (mf *MongoFiles) Run(displayHost bool) (string, error) {
 
 	log.Logvf(log.DebugLow, "connected to node type: %v", nodeType)
 
-	safety, err := db.BuildWriteConcern(mf.StorageOptions.WriteConcern, nodeType)
+	safety, err := db.BuildWriteConcern(mf.StorageOptions.WriteConcern, nodeType,
+		mf.ToolOptions.URI.ParsedConnString())
+
 	if err != nil {
 		return "", fmt.Errorf("error parsing write concern: %v", err)
 	}

@@ -50,7 +50,7 @@ func main() {
 	opts := options.New(
 		"mongostat",
 		mongostat.Usage,
-		options.EnabledOptions{Connection: true, Auth: true, Namespace: false})
+		options.EnabledOptions{Connection: true, Auth: true, Namespace: false, URI: true})
 	opts.UseReadOnlyHostDescription()
 
 	// add mongostat-specific options
@@ -64,7 +64,7 @@ func main() {
 		interactiveOption.ShortName = 0
 	}
 
-	args, err := opts.Parse()
+	args, err := opts.ParseArgs(os.Args[1:])
 	if err != nil {
 		log.Logvf(log.Always, "error parsing command line options: %v", err)
 		log.Logvf(log.Always, "try 'mongostat --help' for more information")
@@ -102,7 +102,16 @@ func main() {
 		return
 	}
 
-	if opts.Auth.Username != "" && opts.Auth.Source == "" && !opts.Auth.RequiresExternalDB() {
+	// verify uri options and log them
+	opts.URI.LogUnsupportedOptions()
+
+	if opts.Auth.Username != "" && opts.GetAuthenticationDatabase() == "" && !opts.Auth.RequiresExternalDB() {
+		// add logic to have different error if using uri
+		if opts.URI != nil && opts.URI.ConnectionString != "" {
+			log.Logvf(log.Always, "authSource is required when authenticating against a non $external database")
+			os.Exit(util.ExitBadOptions)
+		}
+
 		log.Logvf(log.Always, "--authenticationDatabase is required when authenticating against a non $external database")
 		os.Exit(util.ExitBadOptions)
 	}
@@ -212,8 +221,6 @@ func main() {
 	}
 
 	opts.Direct = true
-	_, setName := util.ParseConnectionString(opts.Host)
-	opts.ReplicaSetName = setName
 	stat := &mongostat.MongoStat{
 		Options:       opts,
 		StatOptions:   statOpts,

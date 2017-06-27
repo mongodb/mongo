@@ -136,7 +136,8 @@ func (restore *MongoRestore) ParseAndValidateOptions() error {
 	}
 
 	log.Logvf(log.DebugLow, "connected to node type: %v", nodeType)
-	restore.safety, err = db.BuildWriteConcern(restore.OutputOptions.WriteConcern, nodeType)
+	restore.safety, err = db.BuildWriteConcern(restore.OutputOptions.WriteConcern, nodeType,
+		restore.ToolOptions.URI.ParsedConnString())
 	if err != nil {
 		return fmt.Errorf("error parsing write concern: %v", err)
 	}

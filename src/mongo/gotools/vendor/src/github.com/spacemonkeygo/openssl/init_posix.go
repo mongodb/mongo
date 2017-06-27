@@ -52,6 +52,7 @@ int Goopenssl_init_locks() {
 	return rc;
 }
 
+#if OPENSSL_VERSION_NUMBER < 0x10100000L
 void Goopenssl_thread_locking_callback(int mode, int n, const char *file,
 	int line) {
 	if (mode & CRYPTO_LOCK) {
@@ -60,5 +61,9 @@ void Goopenssl_thread_locking_callback(int mode, int n, const char *file,
 		pthread_mutex_unlock(&goopenssl_locks[n]);
 	}
 }
+unsigned long Goopenssl_thread_id_callback() {
+	return (unsigned long) pthread_self();
+}
+#endif
 */
 import "C"

@@ -1,12 +1,15 @@
 package db
 
 import (
-	"fmt"
+	"github.com/mongodb/mongo-tools/common/connstring"
 	"github.com/mongodb/mongo-tools/common/json"
 	"github.com/mongodb/mongo-tools/common/log"
 	"github.com/mongodb/mongo-tools/common/util"
 	"gopkg.in/mgo.v2"
+
+	"fmt"
 	"strconv"
+	"time"
 )
 
 // write concern fields
@@ -85,13 +88,54 @@ func constructWCObject(writeConcern string) (sessionSafety *mgo.Safe, err error)
 	return sessionSafety, nil
 }
 
+// constructSafetyFromConnString takes in a parsed connection string and attempts
+// to construct an mgo.Safe object from it. It returns an error if it is unable
+// to parse the write concern value.
+func constructSafetyFromConnString(cs *connstring.ConnString) (*mgo.Safe, error) {
+	safe := &mgo.Safe{}
+
+	wValue, err := strconv.Atoi(cs.W)
+	if err != nil {
+		safe.WMode = cs.W
+	} else {
+		safe.W = wValue
+		if wValue < 0 {
+			return nil, fmt.Errorf("invalid '%v' argument: %v", w, wValue)
+		}
+	}
+
+	safe.WTimeout = int(cs.WTimeout / time.Second)
+	safe.FSync = cs.FSync
+	safe.J = cs.Journal
+
+	if safe.WMode == "" && safe.W == 0 && !safe.J {
+		return nil, nil
+	}
+
+	return safe, nil
+}
+
 // BuildWriteConcern takes a string and a NodeType indicating the type of node the write concern
 // is intended to be used against, and converts the write concern string argument into an
 // mgo.Safe object that's usable on sessions for that node type.
-func BuildWriteConcern(writeConcern string, nodeType NodeType) (*mgo.Safe, error) {
-	sessionSafety, err := constructWCObject(writeConcern)
-	if err != nil {
-		return nil, err
+func BuildWriteConcern(writeConcern string, nodeType NodeType, cs *connstring.ConnString) (*mgo.Safe, error) {
+	var sessionSafety *mgo.Safe
+	var err error
+
+	if cs != nil && writeConcern != "" {
+		return nil, fmt.Errorf("cannot specify writeConcern string and connectionString object")
+	}
+
+	if cs != nil {
+		sessionSafety, err = constructSafetyFromConnString(cs)
+		if err != nil {
+			return nil, err
+		}
+	} else if writeConcern != "" {
+		sessionSafety, err = constructWCObject(writeConcern)
+		if err != nil {
+			return nil, err
+		}
 	}
 
 	if sessionSafety == nil {

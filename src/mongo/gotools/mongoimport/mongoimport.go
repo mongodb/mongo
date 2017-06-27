@@ -441,7 +441,8 @@ func (imp *MongoImport) ingestDocuments(readDocs chan bson.D) (retErr error) {
 func (imp *MongoImport) configureSession(session *mgo.Session) error {
 	// sockets to the database will never be forcibly closed
 	session.SetSocketTimeout(0)
-	sessionSafety, err := db.BuildWriteConcern(imp.IngestOptions.WriteConcern, imp.nodeType)
+	sessionSafety, err := db.BuildWriteConcern(imp.IngestOptions.WriteConcern, imp.nodeType,
+		imp.ToolOptions.ParsedConnString())
 	if err != nil {
 		return fmt.Errorf("write concern error: %v", err)
 	}

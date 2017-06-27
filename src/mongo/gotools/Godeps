@@ -6,7 +6,7 @@ github.com/smartystreets/assertions     287b4346dc4e71a038c346375a9d572453bc469b
 github.com/smartystreets/goconvey       bf58a9a1291224109919756b4dcc469c670cc7e4
 github.com/jessevdk/go-flags            97448c91aac742cbca3d020b3e769013a420a06f
 github.com/3rf/mongo-lint               3550fdcf1f43b89aaeabaa4559eaae6dc4407e42
-github.com/spacemonkeygo/openssl        5be686e264d836e7a01ca7fc7c53acdb8edbe768    github.com/10gen/openssl
+github.com/spacemonkeygo/openssl        2869e8ca1a6eb35fb727f41611fd52b55cd0f49c    github.com/10gen/openssl
 github.com/spacemonkeygo/spacelog       ae95ccc1eb0c8ce2496c43177430efd61930f7e4
 github.com/howeyc/gopass                44476384cd4721b68705e72f19e95d1a3a504370
 github.com/nsf/termbox-go               0723e7c3d0a317dea811f0fbe4d6edd81908c971

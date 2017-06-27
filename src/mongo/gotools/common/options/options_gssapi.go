@@ -8,5 +8,10 @@ func init() {
 
 func registerGSSAPIOptions(self *ToolOptions) error {
 	_, err := self.parser.AddGroup("kerberos options", "", self.Kerberos)
-	return err
+	if err != nil {
+		return err
+	}
+	self.URI.AddKnownURIParameters(KnownURIOptionsKerberos)
+	BuiltWithGSSAPI = true
+	return nil
 }

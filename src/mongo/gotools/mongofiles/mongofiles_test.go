@@ -33,6 +33,7 @@ var (
 		Connection: connection,
 		Auth:       &auth,
 		Verbosity:  &options.Verbosity{},
+		URI:        &options.URI{},
 	}
 )
 

@@ -1,53 +1,87 @@
 package db
 
 import (
+	"github.com/mongodb/mongo-tools/common/connstring"
 	. "github.com/smartystreets/goconvey/convey"
+
+	"fmt"
 	"testing"
+	"time"
 )
 
 func TestBuildWriteConcern(t *testing.T) {
-	Convey("Given a write concern string value, and a boolean indicating if the "+
-		"write concern is to be used on a replica set, on calling BuildWriteConcern...", t, func() {
-		Convey("no error should be returned if the write concern is valid", func() {
-			writeConcern, err := BuildWriteConcern(`{w:34}`, ReplSet)
-			So(err, ShouldBeNil)
-			So(writeConcern.W, ShouldEqual, 34)
-			writeConcern, err = BuildWriteConcern(`{w:"majority"}`, ReplSet)
-			So(err, ShouldBeNil)
-			So(writeConcern.WMode, ShouldEqual, "majority")
-			writeConcern, err = BuildWriteConcern(`majority`, ReplSet)
-			So(err, ShouldBeNil)
-			So(writeConcern.WMode, ShouldEqual, "majority")
-			writeConcern, err = BuildWriteConcern(`tagset`, ReplSet)
-			So(err, ShouldBeNil)
-			So(writeConcern.WMode, ShouldEqual, "tagset")
+	Convey("When building write concern object", t, func() {
+		Convey("and given a write concern string value, and a boolean indicating if the "+
+			"write concern is to be used on a replica set, on calling BuildWriteConcern...", func() {
+			Convey("no error should be returned if the write concern is valid", func() {
+				writeConcern, err := BuildWriteConcern(`{w:34}`, ReplSet, nil)
+				So(err, ShouldBeNil)
+				So(writeConcern.W, ShouldEqual, 34)
+				writeConcern, err = BuildWriteConcern(`{w:"majority"}`, ReplSet, nil)
+				So(err, ShouldBeNil)
+				So(writeConcern.WMode, ShouldEqual, "majority")
+				writeConcern, err = BuildWriteConcern(`majority`, ReplSet, nil)
+				So(err, ShouldBeNil)
+				So(writeConcern.WMode, ShouldEqual, "majority")
+				writeConcern, err = BuildWriteConcern(`tagset`, ReplSet, nil)
+				So(err, ShouldBeNil)
+				So(writeConcern.WMode, ShouldEqual, "tagset")
+			})
+			Convey("on replica sets, only a write concern of 1 or 0 should be returned", func() {
+				writeConcern, err := BuildWriteConcern(`{w:34}`, Standalone, nil)
+				So(err, ShouldBeNil)
+				So(writeConcern.W, ShouldEqual, 1)
+				writeConcern, err = BuildWriteConcern(`{w:"majority"}`, Standalone, nil)
+				So(err, ShouldBeNil)
+				So(writeConcern.W, ShouldEqual, 1)
+				writeConcern, err = BuildWriteConcern(`tagset`, Standalone, nil)
+				So(err, ShouldBeNil)
+				So(writeConcern.W, ShouldEqual, 1)
+			})
+			Convey("with a w value of 0, without j set, a nil write concern should be returned", func() {
+				writeConcern, err := BuildWriteConcern(`{w:0}`, Standalone, nil)
+				So(err, ShouldBeNil)
+				So(writeConcern, ShouldBeNil)
+			})
+			Convey("with a negative w value, an error should be returned", func() {
+				_, err := BuildWriteConcern(`{w:-1}`, ReplSet, nil)
+				So(err, ShouldNotBeNil)
+				_, err = BuildWriteConcern(`{w:-2}`, ReplSet, nil)
+				So(err, ShouldNotBeNil)
+			})
+			Convey("with a w value of 0, with j set, a non-nil write concern should be returned", func() {
+				writeConcern, err := BuildWriteConcern(`{w:0, j:true}`, Standalone, nil)
+				So(err, ShouldBeNil)
+				So(writeConcern.J, ShouldBeTrue)
+			})
 		})
-		Convey("on replica sets, only a write concern of 1 or 0 should be returned", func() {
-			writeConcern, err := BuildWriteConcern(`{w:34}`, Standalone)
-			So(err, ShouldBeNil)
-			So(writeConcern.W, ShouldEqual, 1)
-			writeConcern, err = BuildWriteConcern(`{w:"majority"}`, Standalone)
-			So(err, ShouldBeNil)
-			So(writeConcern.W, ShouldEqual, 1)
-			writeConcern, err = BuildWriteConcern(`tagset`, Standalone)
-			So(err, ShouldBeNil)
-			So(writeConcern.W, ShouldEqual, 1)
+		Convey("and given a connection string", func() {
+			Convey("with a w value of 0, without j set, a nil write concern should be returned", func() {
+				writeConcern, err := BuildWriteConcern(``, Standalone, &connstring.ConnString{W: "0"})
+				So(err, ShouldBeNil)
+				So(writeConcern, ShouldBeNil)
+			})
+			Convey("with a negative w value, an error should be returned", func() {
+				_, err := BuildWriteConcern(``, ReplSet, &connstring.ConnString{W: "-1"})
+				So(err, ShouldNotBeNil)
+				_, err = BuildWriteConcern(``, ReplSet, &connstring.ConnString{W: "-2"})
+				So(err, ShouldNotBeNil)
+			})
+			Convey("on replica sets, only a write concern of 1 or 0 should be returned", func() {
+				writeConcern, err := BuildWriteConcern(``, Standalone, &connstring.ConnString{W: "34"})
+				So(err, ShouldBeNil)
+				So(writeConcern.W, ShouldEqual, 1)
+				writeConcern, err = BuildWriteConcern(``, Standalone, &connstring.ConnString{W: "majority"})
+				So(err, ShouldBeNil)
+				So(writeConcern.W, ShouldEqual, 1)
+				writeConcern, err = BuildWriteConcern(``, Standalone, &connstring.ConnString{W: "tagset"})
+				So(err, ShouldBeNil)
+				So(writeConcern.W, ShouldEqual, 1)
+			})
 		})
-		Convey("with a w value of 0, without j set, a nil write concern should be returned", func() {
-			writeConcern, err := BuildWriteConcern(`{w:0}`, Standalone)
-			So(err, ShouldBeNil)
-			So(writeConcern, ShouldBeNil)
-		})
-		Convey("with a negative w value, an error should be returned", func() {
-			_, err := BuildWriteConcern(`{w:-1}`, ReplSet)
+		Convey("and given both, should error", func() {
+			_, err := BuildWriteConcern(`ab`, ReplSet, &connstring.ConnString{W: "-1"})
 			So(err, ShouldNotBeNil)
-			_, err = BuildWriteConcern(`{w:-2}`, ReplSet)
-			So(err, ShouldNotBeNil)
-		})
-		Convey("with a w value of 0, with j set, a non-nil write concern should be returned", func() {
-			writeConcern, err := BuildWriteConcern(`{w:0, j:true}`, Standalone)
-			So(err, ShouldBeNil)
-			So(writeConcern.J, ShouldBeTrue)
 		})
 	})
 }
@@ -159,6 +193,60 @@ func TestConstructWCObject(t *testing.T) {
 			So(writeConcern, ShouldBeNil)
 			writeConcernString = `0`
 			writeConcern, err = constructWCObject(writeConcernString)
+			So(err, ShouldBeNil)
+			So(writeConcern, ShouldBeNil)
+		})
+	})
+}
+
+func TestConstructSafetyFromConnString(t *testing.T) {
+	Convey("Given a parsed &connstring, on calling constructSafetyFromConnString...", t, func() {
+
+		Convey("non string values should be assigned to the 'WMode' "+
+			"field in their entirety", func() {
+			writeConcernString := "majority"
+			cs := &connstring.ConnString{
+				W: writeConcernString,
+			}
+			writeConcern, err := constructSafetyFromConnString(cs)
+			So(err, ShouldBeNil)
+			So(writeConcern.WMode, ShouldEqual, writeConcernString)
+		})
+
+		Convey("Int values should be assigned to the 'w' field ", func() {
+			cs := &connstring.ConnString{
+				W: "4",
+			}
+			writeConcern, err := constructSafetyFromConnString(cs)
+			So(err, ShouldBeNil)
+			So(writeConcern.W, ShouldEqual, 4)
+		})
+
+		Convey("&connstrings with valid j, wtimeout, fsync and w, should be "+
+			"assigned accordingly", func() {
+			expectedW := 3
+			expectedWTimeout := 43
+			cs := &connstring.ConnString{
+				W:        "3",
+				Journal:  true,
+				FSync:    false,
+				WTimeout: time.Second * 43,
+			}
+			writeConcern, err := constructSafetyFromConnString(cs)
+			So(err, ShouldBeNil)
+			So(writeConcern.W, ShouldEqual, expectedW)
+			So(writeConcern.J, ShouldBeTrue)
+			So(writeConcern.FSync, ShouldBeFalse)
+			So(writeConcern.WTimeout, ShouldEqual, expectedWTimeout)
+		})
+
+		Convey("Unacknowledge write concern strings should return a nil object "+
+			"if journaling is not required", func() {
+			cs := &connstring.ConnString{
+				W: "0",
+			}
+			writeConcern, err := constructSafetyFromConnString(cs)
+			fmt.Println(writeConcern)
 			So(err, ShouldBeNil)
 			So(writeConcern, ShouldBeNil)
 		})

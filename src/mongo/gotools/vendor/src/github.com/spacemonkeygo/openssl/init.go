@@ -94,16 +94,17 @@ package openssl
 #include <openssl/engine.h>
 
 extern int Goopenssl_init_locks();
+extern unsigned long Goopenssl_thread_id_callback();
 extern void Goopenssl_thread_locking_callback(int, int, const char*, int);
 
 static int Goopenssl_init_threadsafety() {
-	// Set up OPENSSL thread safety callbacks.  We only set the locking
-	// callback because the default id callback implementation is good
-	// enough for us.
+	// Set up OPENSSL thread safety callbacks.
+	// TOOLS-1694 added setting of thread id callback for compatibility with openssl 0.9.8
 	int rc = Goopenssl_init_locks();
 	if (rc == 0) {
 		CRYPTO_set_locking_callback(Goopenssl_thread_locking_callback);
 	}
+	CRYPTO_set_id_callback(Goopenssl_thread_id_callback);
 	return rc;
 }
 
