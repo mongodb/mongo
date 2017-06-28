@@ -63,7 +63,8 @@ struct QueryAndSort {
  * Subset of the shard's collections collection document that relates to refresh state.
  */
 struct RefreshState {
-    bool operator==(RefreshState& other) const;
+    bool operator==(const RefreshState& other) const;
+
     std::string toString() const;
 
     // The current epoch of the collection metadata.

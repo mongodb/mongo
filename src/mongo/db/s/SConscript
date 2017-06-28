@@ -31,16 +31,6 @@ env.Library(
 )
 
 env.Library(
-    target='version_notifications',
-    source=[
-        'version_notifications.cpp',
-    ],
-    LIBDEPS=[
-        '$BUILD_DIR/mongo/base',
-    ],
-)
-
-env.Library(
     target='sharding_task_executor',
     source=[
         'sharding_task_executor.cpp',
@@ -92,6 +82,7 @@ env.Library(
         'migration_source_manager.cpp',
         'migration_util.cpp',
         'move_timing_helper.cpp',
+        'namespace_metadata_change_notifications.cpp',
         'operation_sharding_state.cpp',
         'shard_identity_rollback_notifier.cpp',
         'shard_server_catalog_cache_loader.cpp',
@@ -121,7 +112,6 @@ env.Library(
         'shard_metadata_util',
         'sharding_task_executor',
         'type_shard_identity',
-        'version_notifications',
         #'$BUILD_DIR/mongo/db/dbhelpers', # CYCLE
         #'$BUILD_DIR/mongo/db/ops/write_ops', # CYCLE
         #'$BUILD_DIR/mongo/s/catalog/sharding_catalog_manager_impl', # CYCLE
@@ -220,16 +210,6 @@ env.Library(
 )
 
 env.CppUnitTest(
-    target='version_notifications_test',
-    source=[
-        'version_notifications_test.cpp',
-    ],
-    LIBDEPS=[
-        'version_notifications',
-    ]
-)
-
-env.CppUnitTest(
     target='migration_types_test',
     source=[
         'migration_session_id_test.cpp',
@@ -255,6 +235,7 @@ env.CppUnitTest(
     source=[
         'active_migrations_registry_test.cpp',
         'migration_chunk_cloner_source_legacy_test.cpp',
+        'namespace_metadata_change_notifications_test.cpp',
         'sharding_state_test.cpp',
     ],
     LIBDEPS=[

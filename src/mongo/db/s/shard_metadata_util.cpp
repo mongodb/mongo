@@ -72,7 +72,7 @@ QueryAndSort createShardChunkDiffQuery(const ChunkVersion& collectionVersion) {
             BSON(ChunkType::lastmod() << 1)};
 }
 
-bool RefreshState::operator==(RefreshState& other) const {
+bool RefreshState::operator==(const RefreshState& other) const {
     return (other.epoch == epoch) && (other.refreshing == refreshing) &&
         (other.lastRefreshedCollectionVersion == lastRefreshedCollectionVersion);
 }

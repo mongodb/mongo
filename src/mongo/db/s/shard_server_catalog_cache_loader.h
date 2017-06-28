@@ -28,14 +28,11 @@
 
 #pragma once
 
+#include "mongo/db/s/namespace_metadata_change_notifications.h"
 #include "mongo/s/catalog_cache_loader.h"
 #include "mongo/util/concurrency/thread_pool.h"
 
 namespace mongo {
-
-class ConfigServerCatalogCacheLoader;
-class ThreadPoolInterface;
-class VersionNotifications;
 
 /**
  * Shard implementation of the CatalogCacheLoader used by the CatalogCache. Retrieves chunk metadata
@@ -75,21 +72,6 @@ public:
     void notifyOfCollectionVersionUpdate(OperationContext* opCtx,
                                          const NamespaceString& nss,
                                          const ChunkVersion& version);
-
-    /**
-     * This function can throw a DBException if the opCtx is interrupted by stepUp/Down.
-     *
-     * Waits for the persisted collection version to be GTE to 'version', or an epoch change.
-     *
-     * If 'greaterVersion' is set, will wait for a version GT 'version', rather than GTE.
-     *
-     * Only call this function if you KNOW that a version GT or GTE WILL eventually replicate to the
-     * secondary!
-     */
-    void waitForVersion(OperationContext* opCtx,
-                        const NamespaceString& nss,
-                        const ChunkVersion& version,
-                        const bool greaterVersion);
 
     /**
      * This must be called serially, never in parallel, including waiting for the returned
@@ -323,6 +305,8 @@ private:
     // Thread pool used to load chunk metadata.
     ThreadPool _threadPool;
 
+    NamespaceMetadataChangeNotifications _namespaceNotifications;
+
     // Protects the class state below.
     stdx::mutex _mutex;
 
@@ -337,8 +321,6 @@ private:
     // Indicates whether this server is the primary or not, so that the appropriate loading action
     // can be taken.
     ReplicaSetRole _role{ReplicaSetRole::None};
-
-    std::unique_ptr<VersionNotifications> _versionNotifications;
 };
 
 }  // namespace mongo

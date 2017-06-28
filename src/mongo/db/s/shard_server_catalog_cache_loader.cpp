@@ -35,7 +35,6 @@
 #include "mongo/db/client.h"
 #include "mongo/db/operation_context.h"
 #include "mongo/db/s/shard_metadata_util.h"
-#include "mongo/db/s/version_notifications.h"
 #include "mongo/s/catalog/type_shard_collection.h"
 #include "mongo/s/catalog_cache.h"
 #include "mongo/s/config_server_catalog_cache_loader.h"
@@ -200,69 +199,13 @@ void ShardServerCatalogCacheLoader::notifyOfCollectionVersionUpdate(OperationCon
                                                                     const ChunkVersion& version) {
     Grid::get(opCtx)->catalogCache()->invalidateShardedCollection(nss);
 
-    stdx::lock_guard<stdx::mutex> lock(_mutex);
-    _versionNotifications->setAndNotifyIfNewEpochOrGTE(nss, version);
-}
-
-void ShardServerCatalogCacheLoader::waitForVersion(OperationContext* opCtx,
-                                                   const NamespaceString& nss,
-                                                   const ChunkVersion& version,
-                                                   const bool greaterVersion) {
-    stdx::unique_lock<stdx::mutex> lock(_mutex);
-
-    // Register the version we're waiting for so that we will receive updates.
-    ScopedVersionNotification notification =
-        _versionNotifications->createNotification(nss, version);
-
-    // The version we're waiting for could have arrived either before the version was registered or
-    // since the version has been registered. So we'll load the persisted version in case of the
-    // former, and check the registered version (under a mutex) for updates for the latter.
-
-    // Release the mutex for the disk read.
-    lock.unlock();
-    RefreshState refreshState = uassertStatusOK(getPersistedRefreshFlags(opCtx, nss));
-
-    // Reacquire the mutex so we can check for any registered version updates and safely start
-    // waiting without missing any updates.
-    lock.lock();
-
-    if (greaterVersion) {
-        if (refreshState.lastRefreshedCollectionVersion.epoch() != version.epoch() ||
-            refreshState.lastRefreshedCollectionVersion > version ||
-            notification.version().epoch() != version.epoch() || notification.version() > version) {
-            // The version has already arrived, no need to wait.
-            return;
-        }
-
-        if (refreshState.lastRefreshedCollectionVersion <= version) {
-            opCtx->waitForConditionOrInterrupt(*(notification.condVar()), lock, [&]() -> bool {
-                return notification.version().epoch() != version.epoch() ||
-                    notification.version() > version;
-            });
-        }
-    } else {
-        if (refreshState.lastRefreshedCollectionVersion.epoch() != version.epoch() ||
-            refreshState.lastRefreshedCollectionVersion >= version ||
-            notification.version().epoch() != version.epoch() ||
-            notification.version() >= version) {
-            // The version has already arrived, no need to wait.
-            return;
-        }
-
-        if (refreshState.lastRefreshedCollectionVersion <= version) {
-            opCtx->waitForConditionOrInterrupt(*(notification.condVar()), lock, [&]() -> bool {
-                return notification.version().epoch() != version.epoch() ||
-                    notification.version() >= version;
-            });
-        }
-    }
+    _namespaceNotifications.notifyChange(nss);
 }
 
 ShardServerCatalogCacheLoader::ShardServerCatalogCacheLoader(
     std::unique_ptr<CatalogCacheLoader> configLoader)
     : _configServerLoader(std::move(configLoader)), _threadPool(makeDefaultThreadPoolOptions()) {
     _threadPool.startup();
-    _versionNotifications = stdx::make_unique<VersionNotifications>();
 }
 
 ShardServerCatalogCacheLoader::~ShardServerCatalogCacheLoader() {
@@ -686,12 +629,19 @@ ShardServerCatalogCacheLoader::_getCompletePersistedMetadataForSecondarySinceVer
         // Keep trying to load the metadata until we get a complete view without updates being
         // concurrently applied.
         while (true) {
-            // Wait until a point when updates are not being applied to the 'nss' metadata.
-            RefreshState beginRefreshState = uassertStatusOK(getPersistedRefreshFlags(opCtx, nss));
-            while (beginRefreshState.refreshing) {
-                waitForVersion(opCtx, nss, beginRefreshState.lastRefreshedCollectionVersion, true);
-                beginRefreshState = uassertStatusOK(getPersistedRefreshFlags(opCtx, nss));
-            }
+            const auto beginRefreshState = [&]() {
+                while (true) {
+                    auto notif = _namespaceNotifications.createNotification(nss);
+
+                    auto refreshState = uassertStatusOK(getPersistedRefreshFlags(opCtx, nss));
+
+                    if (!refreshState.refreshing) {
+                        return refreshState;
+                    }
+
+                    notif.get(opCtx);
+                }
+            }();
 
             // Load the metadata.
             CollectionAndChangedChunks collAndChangedChunks =
@@ -700,10 +650,12 @@ ShardServerCatalogCacheLoader::_getCompletePersistedMetadataForSecondarySinceVer
             // Check that no updates were concurrently applied while we were loading the metadata:
             // this could cause the loaded metadata to provide an incomplete view of the chunk
             // ranges.
-            RefreshState endRefreshState = uassertStatusOK(getPersistedRefreshFlags(opCtx, nss));
+            const auto endRefreshState = uassertStatusOK(getPersistedRefreshFlags(opCtx, nss));
+
             if (beginRefreshState == endRefreshState) {
                 return collAndChangedChunks;
             }
+
             LOG(1) << "Cache loader read meatadata while updates were being applied: this"
                    << " metadata may be incomplete. Retrying. Refresh state before read: "
                    << beginRefreshState << ". Current refresh state: '" << endRefreshState << "'.";
