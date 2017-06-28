@@ -163,7 +163,7 @@ class test_txn02(wttest.WiredTigerTestCase, suite_subprocess):
             self.scenario_number % len(self.archive_list)]
         backup_conn_params = \
             'log=(enabled,file_max=%s,archive=%s)' % (self.logmax, self.archive)
-        orig_logs = fnmatch.filter(os.listdir(self.backup_dir), "*Log*")
+        orig_logs = fnmatch.filter(os.listdir(self.backup_dir), "*gerLog*")
         endcount = 2
         count = 0
         while count < endcount:
@@ -183,7 +183,7 @@ class test_txn02(wttest.WiredTigerTestCase, suite_subprocess):
         # have been archived if configured. Subsequent openings would not
         # archive because no checkpoint is written due to no modifications.
         #
-        cur_logs = fnmatch.filter(os.listdir(self.backup_dir), "*Log*")
+        cur_logs = fnmatch.filter(os.listdir(self.backup_dir), "*gerLog*")
         for o in orig_logs:
             if self.archive == 'true':
                 self.assertEqual(False, o in cur_logs)
@@ -195,7 +195,7 @@ class test_txn02(wttest.WiredTigerTestCase, suite_subprocess):
         # it does not.
         #
         self.runWt(['-h', self.backup_dir, 'printlog'], outfilename='printlog.out')
-        pr_logs = fnmatch.filter(os.listdir(self.backup_dir), "*Log*")
+        pr_logs = fnmatch.filter(os.listdir(self.backup_dir), "*gerLog*")
         self.assertEqual(cur_logs, pr_logs)
 
     def test_ops(self):

@@ -108,7 +108,7 @@ class test_compat01(wttest.WiredTigerTestCase, suite_subprocess):
         self.assertEqual(prev_lsn_count, contains)
 
     def check_log(self, reconfig):
-        orig_logs = fnmatch.filter(os.listdir('.'), "*Log*")
+        orig_logs = fnmatch.filter(os.listdir('.'), "*gerLog*")
         compat_str = self.make_compat_str(False)
         if self.current1:
             prev_lsn_logs = len(orig_logs)
