@@ -168,7 +168,7 @@
                                      "could not create view 'view2' on 'view'");
                 let hash2 = getHash();
                 assert.neq(hash1, hash2, "expected hash to change after creating new view");
-                assert.commandWorked(conn.runCommand({drop: "view2"}, "problem dropping view2"));
+                assert.commandWorked(conn.runCommand({drop: "view2"}), "problem dropping view2");
                 let hash3 = getHash();
                 assert.eq(hash1, hash3, "hash should be the same again after removing 'view2'");
             }
