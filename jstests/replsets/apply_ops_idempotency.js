@@ -18,6 +18,9 @@
         while (ops.length) {
             let cmd = {applyOps: ops};
             let res = mydb.adminCommand(cmd);
+            if (debug) {
+                printjson({applyOps: ops, res});
+            }
             // If the entire operation succeeded, we're done.
             if (res.ok == 1)
                 return res;
@@ -45,6 +48,15 @@
         let res = mydb.runCommand(cmd);
         assert.commandWorked(res, tojson(cmd));
         return res.md5;
+    }
+
+    /**
+     *  Gather collection info and dbHash results of each of the passed databases.
+     */
+    function dbInfo(dbs) {
+        return dbs.map((db) => {
+            return {name: db.getName(), info: db.getCollectionInfos(), md5: dbHash(db)};
+        });
     }
 
     var getCollections = (mydb, prefixes) => prefixes.map((prefix) => mydb[prefix]);
@@ -81,21 +93,24 @@
             assert.commandWorked(y.renameCollection(x.getName(), true));
             assert.commandWorked(z.renameCollection(y.getName()));
         },
-        renameCollectionAcrossDatabase: (mydb) => {
+        renameCollectionAcrossDatabases: (mydb) => {
             let otherdb = mydb.getSiblingDB(mydb + '_');
             let [x, y] = getCollections(mydb, ['x', 'y']);
             let [z] = getCollections(otherdb, ['z']);
             assert.writeOK(x.insert({_id: 1, x: 1}));
             assert.writeOK(y.insert({_id: 1, y: 1}));
 
-            assert.commandWorked(x.renameCollection(z.getName()));
+            assert.commandWorked(
+                mydb.adminCommand({renameCollection: x.getFullName(), to: z.getFullName()}));
             assert.writeOK(z.insert({_id: 2, x: 2}));
             assert.writeOK(x.insert({_id: 2, x: false}));
             assert.writeOK(y.insert({y: 2}));
 
-            assert.commandWorked(y.renameCollection(x.getName(), true));
-            assert.commandWorked(z.renameCollection(y.getName()));
-
+            assert.commandWorked(mydb.adminCommand(
+                {renameCollection: y.getFullName(), to: x.getFullName(), dropTarget: true}));
+            assert.commandWorked(
+                mydb.adminCommand({renameCollection: z.getFullName(), to: y.getFullName()}));
+            return [mydb, otherdb];
         },
         createIndex: (mydb) => {
             let [x, y] = getCollections(mydb, ['x', 'y']);
@@ -109,15 +124,17 @@
 
     /**
      *  Create a new uniquely named database, execute testFun and compute the dbHash. Then replay
-     *  all different suffixes of the oplog and check for the correct hash.
+     *  all different suffixes of the oplog and check for the correct hash. If testFun creates
+     *  additional databases, it should return an array with all databases to check.
      */
     function testIdempotency(primary, testFun, testName) {
         // Create a new database name, so it's easier to filter out our oplog records later.
         let dbname = (new Date()).toISOString().match(/[-0-9T]/g).join('');  // 2017-05-30T155055713
         let mydb = primary.getDB(dbname);
-        testFun(mydb);
-        let expectedMD5 = dbHash(mydb);
-        let expectedInfos = mydb.getCollectionInfos();
+
+        // Allow testFun to return the array databases to check (default is mydb).
+        let testdbs = testFun(mydb) || [mydb];
+        let expectedInfo = dbInfo(testdbs);
 
         let oplog = mydb.getSiblingDB('local').oplog.rs;
         let ops = oplog
@@ -125,26 +142,21 @@
                             {ts: 0, t: 0, h: 0, v: 0})
                       .toArray();
         assert.gt(ops.length, 0, 'Could not find any matching ops in the oplog');
-        assert.commandWorked(mydb.dropDatabase());
+        testdbs.forEach((db) => assert.commandWorked(db.dropDatabase()));
 
         if (debug) {
             print(testName + ': replaying suffixes of ' + ops.length + ' operations');
-            ops.forEach((op) => printjsononeline({op}));
+            printjson(ops);
         }
 
         for (let j = 0; j < ops.length; j++) {
             let replayOps = ops.slice(j);
             assertApplyOpsWorks(mydb, replayOps);
-            let actualMD5 = dbHash(mydb);
-            assert.eq(
-                actualMD5,
-                expectedMD5,
-                'unexpected dbHash result after replaying final ' + replayOps.length + ' ops');
-            let actualInfos = mydb.getCollectionInfos();
-            assert.eq(actualInfos,
-                      expectedInfos,
-                      'unexpected differences in collection information after replaying final ' +
-                          replayOps.length + ' ops');
+            let actualInfo = dbInfo(testdbs);
+            assert.eq(actualInfo,
+                      expectedInfo,
+                      'unexpected differences between databases after replaying final ' +
+                          replayOps.length + ' ops in test ' + testName + ": " + tojson(replayOps));
         }
     }
 

@@ -38,6 +38,7 @@
 #include "mongo/db/catalog/database.h"
 #include "mongo/db/catalog/database_holder.h"
 #include "mongo/db/catalog/document_validation.h"
+#include "mongo/db/catalog/drop_collection.h"
 #include "mongo/db/catalog/index_catalog.h"
 #include "mongo/db/catalog/index_create.h"
 #include "mongo/db/catalog/uuid_catalog.h"
@@ -55,51 +56,28 @@
 
 namespace mongo {
 namespace {
-static void dropCollection(OperationContext* opCtx, Database* db, StringData collName) {
+void dropCollection(OperationContext* opCtx, Database* db, StringData collName) {
     WriteUnitOfWork wunit(opCtx);
     if (db->dropCollection(opCtx, collName).isOK()) {
         // ignoring failure case
         wunit.commit();
     }
 }
-}  // namespace
 
-Status renameCollectionForApplyOps(OperationContext* opCtx,
-                                   const std::string& dbName,
-                                   const BSONElement& ui,
-                                   const BSONObj& cmd) {
-
-    const auto sourceNsElt = cmd.firstElement();
-    const auto targetNsElt = cmd["to"];
-    uassert(ErrorCodes::TypeMismatch,
-            "'renameCollection' must be of type String",
-            sourceNsElt.type() == BSONType::String);
-    uassert(ErrorCodes::TypeMismatch,
-            "'to' must be of type String",
-            targetNsElt.type() == BSONType::String);
-
-    NamespaceString sourceNss(sourceNsElt.valueStringData());
-    NamespaceString targetNss(targetNsElt.valueStringData());
-    if (!ui.eoo()) {
-        auto statusWithUUID = UUID::parse(ui);
-        uassertStatusOK(statusWithUUID);
-        auto uuid = statusWithUUID.getValue();
-        Collection* source = UUIDCatalog::get(opCtx).lookupCollectionByUUID(uuid);
-        uassert(ErrorCodes::NamespaceNotFound,
-                "cannot find collection with UUID " + uuid.toString(),
-                source);
-        sourceNss = source->ns();
-    }
-
-    return renameCollection(
-        opCtx, sourceNss, targetNss, cmd["dropTarget"].trueValue(), cmd["stayTemp"].trueValue());
+NamespaceString getNamespaceFromUUID(OperationContext* opCtx, const BSONElement& ui) {
+    if (ui.eoo())
+        return {};
+    auto uuid = uassertStatusOK(UUID::parse(ui));
+    Collection* source = UUIDCatalog::get(opCtx).lookupCollectionByUUID(uuid);
+    return source ? source->ns() : NamespaceString();
 }
 
-Status renameCollection(OperationContext* opCtx,
-                        const NamespaceString& source,
-                        const NamespaceString& target,
-                        bool dropTarget,
-                        bool stayTemp) {
+Status renameCollectionCommon(OperationContext* opCtx,
+                              const NamespaceString& source,
+                              const NamespaceString& target,
+                              OptionalCollectionUUID targetUUID,
+                              bool dropTarget,
+                              bool stayTemp) {
     DisableDocumentValidation validationDisabler(opCtx);
 
     Lock::GlobalWrite globalWriteLock(opCtx);
@@ -148,6 +126,18 @@ Status renameCollection(OperationContext* opCtx,
     // is sharded.
     Collection* targetColl = targetDB->getCollection(opCtx, target);
     if (targetColl) {
+        // If we already have the collection with the target UUID, we found our future selves,
+        // so nothing left to do but drop the source collection in case of cross-db renames.
+        if (targetUUID && targetUUID == targetColl->uuid()) {
+            if (source.db() == target.db())
+                return Status::OK();
+            BSONObjBuilder unusedResult;
+            return dropCollection(opCtx,
+                                  source,
+                                  unusedResult,
+                                  {},
+                                  DropCollectionSystemCollectionMode::kAllowSystemCollectionDrops);
+        }
         if (CollectionShardingState::get(opCtx, target)->getMetadata()) {
             return {ErrorCodes::IllegalOperation, "cannot rename to a sharded collection"};
         }
@@ -212,10 +202,12 @@ Status renameCollection(OperationContext* opCtx,
         // Renaming across databases will result in a new UUID, as otherwise we'd require
         // two collections with the same uuid (temporarily).
         options.temp = true;
-        if (enableCollectionUUIDs) {
+        if (targetUUID)
+            newUUID = targetUUID;
+        else if (enableCollectionUUIDs)
             newUUID = UUID::gen();
-            options.uuid = newUUID;
-        }
+
+        options.uuid = newUUID;
 
         writeConflictRetry(opCtx, "renameCollection", tmpName.ns(), [&] {
             WriteUnitOfWork wunit(opCtx);
@@ -325,5 +317,80 @@ Status renameCollection(OperationContext* opCtx,
 
     tmpCollectionDropper.Dismiss();
     return Status::OK();
+}
+}  // namespace
+
+Status renameCollection(OperationContext* opCtx,
+                        const NamespaceString& source,
+                        const NamespaceString& target,
+                        bool dropTarget,
+                        bool stayTemp) {
+    OptionalCollectionUUID noTargetUUID;
+    return renameCollectionCommon(opCtx, source, target, noTargetUUID, dropTarget, stayTemp);
+}
+
+
+Status renameCollectionForApplyOps(OperationContext* opCtx,
+                                   const std::string& dbName,
+                                   const BSONElement& ui,
+                                   const BSONObj& cmd) {
+
+    const auto sourceNsElt = cmd.firstElement();
+    const auto targetNsElt = cmd["to"];
+    const auto dropSourceElt = cmd["dropSource"];
+    uassert(ErrorCodes::TypeMismatch,
+            "'renameCollection' must be of type String",
+            sourceNsElt.type() == BSONType::String);
+    uassert(ErrorCodes::TypeMismatch,
+            "'to' must be of type String",
+            targetNsElt.type() == BSONType::String);
+
+    NamespaceString sourceNss(sourceNsElt.valueStringData());
+    NamespaceString targetNss(targetNsElt.valueStringData());
+    NamespaceString uiNss(getNamespaceFromUUID(opCtx, ui));
+    NamespaceString dropSourceNss(getNamespaceFromUUID(opCtx, dropSourceElt));
+
+    // If the UUID we're targeting already exists, rename from there no matter what.
+    // When dropSource is specified, the rename is accross databases. In that case, ui indicates
+    // the UUID of the new target collection and the dropSourceNss specifies the sourceNss.
+    if (!uiNss.isEmpty()) {
+        sourceNss = uiNss;
+        // The cross-database rename was already done and just needs a local rename, but we may
+        // still need to actually remove the source collection.
+        auto dropSourceNss = getNamespaceFromUUID(opCtx, dropSourceElt);
+        if (!dropSourceNss.isEmpty()) {
+            BSONObjBuilder unusedBuilder;
+            dropCollection(opCtx,
+                           dropSourceNss,
+                           unusedBuilder,
+                           repl::OpTime(),
+                           DropCollectionSystemCollectionMode::kAllowSystemCollectionDrops)
+                .ignore();
+        }
+    } else if (!dropSourceNss.isEmpty()) {
+        sourceNss = dropSourceNss;
+    } else {
+        // When replaying cross-database renames, both source and target collections may no longer
+        // exist. Attempting a rename anyway could result in removing a newer collection of the
+        // same name.
+        uassert(ErrorCodes::NamespaceNotFound,
+                str::stream() << "source collection (UUID "
+                              << uassertStatusOK(UUID::parse(dropSourceElt))
+                              << ") for rename to "
+                              << targetNss.ns()
+                              << " does no longer exist",
+                !dropSourceElt);
+    }
+
+    OptionalCollectionUUID targetUUID;
+    if (!ui.eoo())
+        targetUUID = uassertStatusOK(UUID::parse(ui));
+
+    return renameCollectionCommon(opCtx,
+                                  sourceNss,
+                                  targetNss,
+                                  targetUUID,
+                                  cmd["dropTarget"].trueValue(),
+                                  cmd["stayTemp"].trueValue());
 }
 }  // namespace mongo
