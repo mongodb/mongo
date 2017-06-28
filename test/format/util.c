@@ -134,7 +134,7 @@ key_gen_insert(WT_RAND_STATE *rnd, WT_ITEM *key, uint64_t keyno)
 	    "11", "12", "13", "14", "15"
 	};
 
-	key_gen_common(key, keyno, suffix[mmrand(rnd, 1, 15) - 1]);
+	key_gen_common(key, keyno, suffix[mmrand(rnd, 0, 14)]);
 }
 
 static uint32_t val_dup_data_len;	/* Length of duplicate data items */
@@ -408,8 +408,9 @@ path_setup(const char *home)
 uint32_t
 rng(WT_RAND_STATE *rnd)
 {
-	char buf[64];
-	uint32_t r;
+	u_long ulv;
+	uint32_t v;
+	char *endptr, buf[64];
 
 	/*
 	 * Threaded operations have their own RNG information, otherwise we
@@ -439,16 +440,19 @@ rng(WT_RAND_STATE *rnd)
 			testutil_die(errno, "random number log");
 		}
 
-		return ((uint32_t)strtoul(buf, NULL, 10));
+		errno = 0;
+		ulv = strtoul(buf, &endptr, 10);
+		testutil_assert(errno == 0 && endptr[0] == '\n');
+		return ((uint32_t)ulv);
 	}
 
-	r = __wt_random(rnd);
+	v = __wt_random(rnd);
 
 	/* Save and flush the random number so we're up-to-date on error. */
-	(void)fprintf(g.randfp, "%" PRIu32 "\n", r);
+	(void)fprintf(g.randfp, "%" PRIu32 "\n", v);
 	(void)fflush(g.randfp);
 
-	return (r);
+	return (v);
 }
 
 /*
