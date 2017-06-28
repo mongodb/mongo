@@ -1,5 +1,3 @@
-// expression_parser_leaf_test.cpp
-
 /**
  *    Copyright (C) 2013 10gen Inc.
  *
@@ -28,20 +26,17 @@
  *    it in the license file.
  */
 
-#define MONGO_LOG_DEFAULT_COMPONENT ::mongo::logger::LogComponent::kDefault
-
-#include "mongo/unittest/unittest.h"
-
-#include "mongo/db/matcher/expression_parser.h"
+#include "mongo/platform/basic.h"
 
 #include "mongo/db/jsobj.h"
 #include "mongo/db/json.h"
 #include "mongo/db/matcher/expression.h"
 #include "mongo/db/matcher/expression_leaf.h"
+#include "mongo/db/matcher/expression_parser.h"
 #include "mongo/db/matcher/extensions_callback_disallow_extensions.h"
 #include "mongo/db/query/collation/collator_interface_mock.h"
 #include "mongo/platform/decimal128.h"
-#include "mongo/util/log.h"
+#include "mongo/unittest/unittest.h"
 
 namespace mongo {
 
@@ -917,7 +912,6 @@ TEST(MatchExpressionParserLeafTest, Regex3) {
     const CollatorInterface* collator = nullptr;
     StatusWithMatchExpression result =
         MatchExpressionParser::parse(query, ExtensionsCallbackDisallowExtensions(), collator);
-    log() << "result: " << result.getStatus() << endl;
     ASSERT_TRUE(result.isOK());
 
     ASSERT(result.getValue()->matchesBSON(BSON("x"

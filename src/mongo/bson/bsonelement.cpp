@@ -337,6 +337,7 @@ const StringMap<BSONObj::MatchType> queryOperatorMap{
     {"_internalSchemaMinItems", BSONObj::opINTERNAL_SCHEMA_MIN_ITEMS},
     {"_internalSchemaMaxItems", BSONObj::opINTERNAL_SCHEMA_MAX_ITEMS},
     {"_internalSchemaUniqueItems", BSONObj::opINTERNAL_SCHEMA_UNIQUE_ITEMS},
+    {"_internalSchemaObjectMatch", BSONObj::opINTERNAL_SCHEMA_OBJECT_MATCH},
 };
 
 // Compares two string elements using a simple binary compare.

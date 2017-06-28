@@ -100,6 +100,7 @@ public:
         // JSON Schema expressions.
         INTERNAL_SCHEMA_MAX_ITEMS,
         INTERNAL_SCHEMA_MIN_ITEMS,
+        INTERNAL_SCHEMA_OBJECT_MATCH,
         INTERNAL_SCHEMA_UNIQUE_ITEMS,
         INTERNAL_SCHEMA_XOR,
     };

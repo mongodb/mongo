@@ -1,5 +1,3 @@
-// expression_leaf.cpp
-
 /**
  *    Copyright (C) 2013 10gen Inc.
  *
@@ -28,6 +26,8 @@
  *    it in the license file.
  */
 
+#include "mongo/platform/basic.h"
+
 #include "mongo/db/matcher/expression_leaf.h"
 
 #include <cmath>
@@ -46,28 +46,6 @@
 #include "mongo/util/mongoutils/str.h"
 
 namespace mongo {
-
-Status LeafMatchExpression::setPath(StringData path) {
-    _path = path;
-    return _elementPath.init(_path);
-}
-
-
-bool LeafMatchExpression::matches(const MatchableDocument* doc, MatchDetails* details) const {
-    MatchableDocument::IteratorHolder cursor(doc, &_elementPath);
-    while (cursor->more()) {
-        ElementIterator::Context e = cursor->next();
-        if (!matchesSingleElement(e.element()))
-            continue;
-        if (details && details->needRecord() && !e.arrayOffset().eoo()) {
-            details->setElemMatchKey(e.arrayOffset().fieldName());
-        }
-        return true;
-    }
-    return false;
-}
-
-// -------------
 
 bool ComparisonMatchExpression::equivalent(const MatchExpression* other) const {
     if (other->matchType() != matchType())

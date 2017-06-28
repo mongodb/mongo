@@ -182,6 +182,10 @@ const char* encodeMatchType(MatchExpression::MatchType mt) {
             break;
         case MatchExpression::INTERNAL_SCHEMA_XOR:
             return "internalSchemaXor";
+            break;
+        case MatchExpression::INTERNAL_SCHEMA_OBJECT_MATCH:
+            return "internalSchemaObjectMatch";
+            break;
         default:
             MONGO_UNREACHABLE;
             return "";

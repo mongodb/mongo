@@ -983,5 +983,17 @@ TEST(SerializeInternalSchema, ExpressionInternalSchemaUniqueItemsSerializesCorre
                       fromjson("{x: {$_internalSchemaUniqueItems: true}}"));
     ASSERT_BSONOBJ_EQ(*reserialized.getQuery(), serialize(reserialized.getMatchExpression()));
 }
+TEST(SerializeInternalSchema, ExpressionInternalSchemaObjectMatchSerializesCorrectly) {
+    Matcher original(fromjson("{x: {$_internalSchemaObjectMatch: {y: 1}}}"),
+                     ExtensionsCallbackDisallowExtensions(),
+                     kSimpleCollator);
+    Matcher reserialized(serialize(original.getMatchExpression()),
+                         ExtensionsCallbackDisallowExtensions(),
+                         kSimpleCollator);
+    ASSERT_BSONOBJ_EQ(*reserialized.getQuery(),
+                      fromjson("{x: {$_internalSchemaObjectMatch: {y: {$eq: 1}}}}"));
+    ASSERT_BSONOBJ_EQ(*reserialized.getQuery(), serialize(reserialized.getMatchExpression()));
+}
+
 }  // namespace
 }  // namespace mongo

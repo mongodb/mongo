@@ -38,6 +38,7 @@
 #include "mongo/db/matcher/expression_tree.h"
 #include "mongo/db/matcher/schema/expression_internal_schema_max_items.h"
 #include "mongo/db/matcher/schema/expression_internal_schema_min_items.h"
+#include "mongo/db/matcher/schema/expression_internal_schema_object_match.h"
 #include "mongo/db/matcher/schema/expression_internal_schema_unique_items.h"
 #include "mongo/db/matcher/schema/expression_internal_schema_xor.h"
 #include "mongo/db/namespace_string.h"
@@ -294,12 +295,31 @@ StatusWithMatchExpression MatchExpressionParser::_parseSubField(const BSONObj& c
             return _parseInternalSchemaSingleIntegerArgument<InternalSchemaMaxItemsMatchExpression>(
                 name, e);
         }
+
+        case BSONObj::opINTERNAL_SCHEMA_OBJECT_MATCH: {
+            if (e.type() != BSONType::Object) {
+                return Status(ErrorCodes::FailedToParse,
+                              str::stream() << "$_internalSchemaObjectMatch must be an object");
+            }
+
+            auto parsedSubObjExpr = _parse(e.Obj(), collator, topLevel);
+            if (!parsedSubObjExpr.isOK()) {
+                return parsedSubObjExpr;
+            }
+
+            auto expr = stdx::make_unique<InternalSchemaObjectMatchExpression>();
+            auto status = expr->init(std::move(parsedSubObjExpr.getValue()), name);
+            if (!status.isOK()) {
+                return status;
+            }
+            return {std::move(expr)};
+        }
+
         case BSONObj::opINTERNAL_SCHEMA_UNIQUE_ITEMS: {
             if (!e.isBoolean() || !e.boolean()) {
                 return {ErrorCodes::FailedToParse,
                         str::stream() << name << " must be a boolean of value true"};
             }
-
 
             auto expr = stdx::make_unique<InternalSchemaUniqueItemsMatchExpression>();
             auto status = expr->init(name);
