@@ -80,7 +80,6 @@ public:
     uint64_t getBytesWritten() const;
     uint64_t addBytesWritten(uint64_t bytesWrittenIncrement);
     void clearBytesWritten();
-    void randomizeBytesWritten();
 
     /**
      * Marks this chunk as jumbo. Only moves from false to true once and is used by the balancer.

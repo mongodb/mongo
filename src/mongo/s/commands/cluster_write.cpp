@@ -452,7 +452,7 @@ void updateChunkWriteStatsAndSplitIfNeeded(OperationContext* opCtx,
         // Ensure the collection gets reloaded because of the move
         Grid::get(opCtx)->catalogCache()->invalidateShardedCollection(nss);
     } catch (const DBException& ex) {
-        chunk->randomizeBytesWritten();
+        chunk->clearBytesWritten();
 
         if (ErrorCodes::isStaleShardingError(ErrorCodes::Error(ex.getCode()))) {
             log() << "Unable to auto-split chunk " << redact(chunkRange.toString()) << causedBy(ex)
