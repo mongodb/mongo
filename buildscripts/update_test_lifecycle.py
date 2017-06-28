@@ -161,9 +161,9 @@ def reliable_test(test_fr, acceptable_fr, test_runs, min_run):
     """Check for a reliable test.
 
     A test should then removed from the set of tests believed not to run reliably when it has
-    at least min_run executions with a failure percentage less than acceptable_fr.
+    less than min_run executions or has a failure percentage less than acceptable_fr.
     """
-    return test_runs >= min_run and test_fr < acceptable_fr
+    return test_runs < min_run or test_fr < acceptable_fr
 
 
 def check_fail_rates(fr_name, acceptable_fr, unacceptable_fr):
@@ -327,7 +327,7 @@ def main():
                       default="etc/test_lifecycle.yml",
                       help="Evergreen lifecycle file to update, defaults to '%default'.")
     parser.add_option("--reliableDays", dest="reliable_days",
-                      default=14,
+                      default=7,
                       type="int",
                       help="Number of days to check for reliable tests, defaults to '%default'.")
     parser.add_option("--unreliableDays", dest="unreliable_days",
