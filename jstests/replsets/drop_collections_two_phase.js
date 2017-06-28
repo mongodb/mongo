@@ -76,7 +76,7 @@
 
     // Drop the collection on the primary.
     jsTestLog("Dropping collection '" + collToDrop + "' on primary node.");
-    assert.commandWorked(primaryDB.runCommand({drop: collToDrop}, {writeConcern: {w: 1}}));
+    assert.commandWorked(primaryDB.runCommand({drop: collToDrop, writeConcern: {w: 1}}));
 
     // Make sure the collection is now in 'drop-pending' state. The collection name should be of the
     // format "system.drop.<optime>.<collectionName>", where 'optime' is the optime of the
