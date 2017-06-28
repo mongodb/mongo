@@ -136,7 +136,7 @@ using std::vector;
 
 using logger::LogComponent;
 
-static const int IndexKeyMaxSize = 1024;  // this goes away with SERVER-3372
+static const int IndexKeyMaxSize = 4096;  // this goes away with SERVER-3372
 
 std::string CompactOptions::toString() const {
     std::stringstream ss;
@@ -1108,7 +1108,7 @@ public:
 
             for (const auto& key : documentKeySet) {
                 if (key.objsize() >= IndexKeyMaxSize) {
-                    // Index keys >= 1024 bytes are not indexed.
+                    // Index keys >= 4096 bytes are not indexed.
                     _longKeys[indexNs]++;
                     continue;
                 }

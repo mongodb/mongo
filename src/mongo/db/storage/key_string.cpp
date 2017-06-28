@@ -1781,7 +1781,7 @@ void KeyString::TypeBits::resetFromBuffer(BufReader* reader) {
         _isAllZeros = false;  // it wouldn't be encoded like this if it was.
 
         _buf[0] = firstByte;
-        const uint8_t remainingBytes = getSizeByte();
+        const uint16_t remainingBytes = getSizeWord();
         memcpy(_buf + 1, reader->skip(remainingBytes), remainingBytes);
         return;
     }
@@ -1795,7 +1795,7 @@ void KeyString::TypeBits::resetFromBuffer(BufReader* reader) {
     }
 
     _isAllZeros = false;
-    setSizeByte(1);
+    setSizeWord(1);
     _buf[1] = firstByte;
 }
 
@@ -1805,10 +1805,10 @@ void KeyString::TypeBits::appendBit(uint8_t oneOrZero) {
     if (oneOrZero == 1)
         _isAllZeros = false;
 
-    const uint8_t byte = (_curBit / 8) + 1;
+    const uint16_t byte = (_curBit / 8) + 1;
     const uint8_t offsetInByte = _curBit % 8;
     if (offsetInByte == 0) {
-        setSizeByte(byte);
+        setSizeWord(byte);
         _buf[byte] = oneOrZero;  // zeros bits 1-7
     } else {
         _buf[byte] |= (oneOrZero << offsetInByte);
@@ -1867,11 +1867,11 @@ uint8_t KeyString::TypeBits::Reader::readBit() {
     if (_typeBits._isAllZeros)
         return 0;
 
-    const uint8_t byte = (_curBit / 8) + 1;
+    const uint16_t byte = (_curBit / 8) + 1;
     const uint8_t offsetInByte = _curBit % 8;
     _curBit++;
 
-    dassert(byte <= _typeBits.getSizeByte());
+    dassert(byte <= _typeBits.getSizeWord());
 
     return (_typeBits._buf[byte] & (1 << offsetInByte)) ? 1 : 0;
 }

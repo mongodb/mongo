@@ -62,8 +62,8 @@ public:
     public:
         // Sufficient bytes to encode extra type information for any BSON key that fits in 1KB.
         // The encoding format will need to change if we raise this limit.
-        static const uint8_t kMaxBytesNeeded = 127;
-        static const uint32_t kMaxKeyBytes = 1024;
+        static const uint16_t kMaxBytesNeeded = 510;
+        static const uint32_t kMaxKeyBytes = 4096;
         static const uint32_t kMaxTypeBitsPerDecimal = 17;
         static const uint32_t kBytesForTypeAndEmptyKey = 2;
         static const uint32_t kMaxDecimalsPerKey =
@@ -120,17 +120,17 @@ public:
          * packed in from low to high.
          */
         const uint8_t* getBuffer() const {
-            return getSize() == 1 ? _buf + 1 : _buf;
+            return getSize() == 1 ? _buf + 2 : _buf;
         }
         size_t getSize() const {
             if (_isAllZeros) {  // Case 2
-                dassert(_buf[1] == 0);
+                dassert(_buf[2] == 0);
                 return 1;
             }
 
-            uint8_t rawSize = getSizeByte();
+            uint16_t rawSize = getSizeWord();
             dassert(rawSize >= 1);                    // 0 should be handled as isAllZeros.
-            if (rawSize == 1 && !(_buf[1] & 0x80)) {  // Case 3
+            if (rawSize == 1 && !(_buf[2] & 0x80)) {  // Case 3
                 return 1;
             }
 
@@ -170,8 +170,8 @@ public:
         void reset() {
             _curBit = 0;
             _isAllZeros = true;
-            setSizeByte(0);
-            _buf[1] = 0;
+            setSizeWord(0);
+            _buf[2] = 0;
         }
 
         void appendString() {
@@ -235,14 +235,14 @@ public:
 
     private:
         /**
-         * size only includes data bytes, not the size byte itself.
+         * size only includes data bytes, not the size bytes itself.
          */
-        uint8_t getSizeByte() const {
-            return _buf[0] & 0x7f;
+        uint16_t getSizeWord() const {
+            return ((uint16_t*)(_buf))[0] & 0x1ff;
         }
-        void setSizeByte(uint8_t size) {
+        void setSizeWord(uint16_t size) {
             dassert(size < kMaxBytesNeeded);
-            _buf[0] = 0x80 | size;
+            ((uint16_t*)(_buf))[0] = 0x200 | size;
         }
 
         void appendBit(uint8_t oneOrZero);
@@ -254,7 +254,7 @@ public:
         // Currently whole buffer is copied in default copy methods. If they ever show up as hot
         // in profiling, we should add copy operations that only copy the parts of _buf that are
         // in use.
-        uint8_t _buf[1 /*size*/ + kMaxBytesNeeded];
+        uint8_t _buf[2 /*size*/ + kMaxBytesNeeded];
     };
 
     enum Discriminator {
