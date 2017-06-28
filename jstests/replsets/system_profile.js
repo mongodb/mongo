@@ -45,10 +45,4 @@
     assert.eq(
         op, getLatestOp(), "oplog entry created when system.profile was emptied via emptycapped");
     assert(primaryDB.system.profile.drop());
-
-    // convertToCapped
-    assert.commandWorked(primaryDB.createCollection("system.profile"));
-    assert.commandWorked(primaryDB.runCommand({convertToCapped: "system.profile", size: 1000}));
-    assert.eq(op, getLatestOp(), "oplog entry created when system.profile was convertedToCapped");
-    assert(primaryDB.system.profile.drop());
 })();

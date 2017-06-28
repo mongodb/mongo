@@ -135,12 +135,6 @@ void OpObserverNoop::onRenameCollection(OperationContext* opCtx,
 
 void OpObserverNoop::onApplyOps(OperationContext*, const std::string&, const BSONObj&) {}
 
-void OpObserverNoop::onConvertToCapped(OperationContext*,
-                                       const NamespaceString&,
-                                       OptionalCollectionUUID,
-                                       OptionalCollectionUUID,
-                                       double) {}
-
 void OpObserverNoop::onEmptyCapped(OperationContext*,
                                    const NamespaceString&,
                                    OptionalCollectionUUID) {}

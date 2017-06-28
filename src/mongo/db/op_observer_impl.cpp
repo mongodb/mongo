@@ -410,40 +410,6 @@ void OpObserverImpl::onApplyOps(OperationContext* opCtx,
     getGlobalAuthorizationManager()->logOp(opCtx, "c", cmdNss, applyOpCmd, nullptr);
 }
 
-void OpObserverImpl::onConvertToCapped(OperationContext* opCtx,
-                                       const NamespaceString& collectionName,
-                                       OptionalCollectionUUID origUUID,
-                                       OptionalCollectionUUID cappedUUID,
-                                       double size) {
-    const NamespaceString cmdNss = collectionName.getCommandNS();
-    BSONObj cmdObj = BSON("convertToCapped" << collectionName.coll() << "size" << size);
-
-    if (!collectionName.isSystemDotProfile()) {
-        // do not replicate system.profile modifications
-        repl::logOp(opCtx, "c", cmdNss, cappedUUID, cmdObj, nullptr, false);
-    }
-
-    // Evict namespace entry from the namespace/uuid cache if it exists.
-    NamespaceUUIDCache& cache = NamespaceUUIDCache::get(opCtx);
-    cache.evictNamespace(collectionName);
-    opCtx->recoveryUnit()->onRollback(
-        [&cache, collectionName]() { cache.evictNamespace(collectionName); });
-
-    // Finally update the UUID Catalog.
-    UUIDCatalog& catalog = UUIDCatalog::get(opCtx);
-    if (origUUID) {
-        catalog.onDropCollection(opCtx, origUUID.get());
-    }
-    if (cappedUUID) {
-        auto db = dbHolder().get(opCtx, collectionName.db());
-        auto newColl = db->getCollection(opCtx, collectionName);
-        invariant(newColl);
-        catalog.onRenameCollection(opCtx, newColl, cappedUUID.get());
-    }
-
-    getGlobalAuthorizationManager()->logOp(opCtx, "c", cmdNss, cmdObj, nullptr);
-}
-
 void OpObserverImpl::onEmptyCapped(OperationContext* opCtx,
                                    const NamespaceString& collectionName,
                                    OptionalCollectionUUID uuid) {

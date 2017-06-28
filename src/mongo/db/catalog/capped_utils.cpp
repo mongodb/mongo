@@ -36,9 +36,12 @@
 #include "mongo/db/background.h"
 #include "mongo/db/catalog/collection.h"
 #include "mongo/db/catalog/collection_catalog_entry.h"
+#include "mongo/db/catalog/create_collection.h"
 #include "mongo/db/catalog/database.h"
 #include "mongo/db/catalog/document_validation.h"
+#include "mongo/db/catalog/drop_collection.h"
 #include "mongo/db/catalog/index_catalog.h"
+#include "mongo/db/catalog/rename_collection.h"
 #include "mongo/db/client.h"
 #include "mongo/db/concurrency/write_conflict_exception.h"
 #include "mongo/db/curop.h"
@@ -133,7 +136,7 @@ mongo::Status mongo::cloneCollectionAsCapped(OperationContext* opCtx,
         return Status(ErrorCodes::NamespaceExists, "to collection already exists");
 
     // create new collection
-    MONGO_WRITE_CONFLICT_RETRY_LOOP_BEGIN {
+    {
         auto options = fromCollection->getCatalogEntry()->getCollectionOptions(opCtx);
         // The capped collection will get its own new unique id, as the conversion isn't reversible,
         // so it can't be rolled back.
@@ -142,15 +145,14 @@ mongo::Status mongo::cloneCollectionAsCapped(OperationContext* opCtx,
         options.cappedSize = size;
         if (temp)
             options.temp = true;
-        OldClientContext ctx(opCtx, toNss.ns());
 
-        WriteUnitOfWork wunit(opCtx);
-        Status status = userCreateNS(opCtx, ctx.db(), toNss.ns(), options.toBSON());
+        BSONObjBuilder cmd;
+        cmd.append("create", toNss.coll());
+        cmd.appendElements(options.toBSON());
+        Status status = createCollection(opCtx, toNss.db().toString(), cmd.done());
         if (!status.isOK())
             return status;
-        wunit.commit();
     }
-    MONGO_WRITE_CONFLICT_RETRY_LOOP_END(opCtx, "cloneCollectionAsCapped", fromNss.ns());
 
     Collection* toCollection = db->getCollection(opCtx, toNss);
     invariant(toCollection);  // we created above
@@ -243,69 +245,51 @@ mongo::Status mongo::convertToCapped(OperationContext* opCtx,
                                      double size) {
     StringData dbname = collectionName.db();
     StringData shortSource = collectionName.coll();
-
-    AutoGetDb autoDb(opCtx, collectionName.db(), MODE_X);
-
-    bool userInitiatedWritesAndNotPrimary = opCtx->writesAreReplicated() &&
-        !repl::getGlobalReplicationCoordinator()->canAcceptWritesFor(opCtx, collectionName);
-
-    if (userInitiatedWritesAndNotPrimary) {
-        return Status(ErrorCodes::NotMaster,
-                      str::stream() << "Not primary while converting " << collectionName.ns()
-                                    << " to a capped collection");
-    }
-
-    Database* const db = autoDb.getDb();
-    if (!db) {
-        return Status(ErrorCodes::NamespaceNotFound,
-                      str::stream() << "database " << dbname << " not found");
-    }
-
-    BackgroundOperation::assertNoBgOpInProgForDb(dbname);
-    auto opObserver = getGlobalServiceContext()->getOpObserver();
-
-    std::string shortTmpName = str::stream() << "tmp.convertToCapped." << shortSource;
-    NamespaceString longTmpName(dbname, shortTmpName);
-
-    if (auto existingTmpColl = db->getCollection(opCtx, longTmpName)) {
-        WriteUnitOfWork wunit(opCtx);
-        Status status = db->dropCollection(opCtx, longTmpName.ns());
-        if (!status.isOK())
-            return status;
-        opObserver->onDropCollection(opCtx, longTmpName, existingTmpColl->uuid());
-        wunit.commit();
-    }
+    const std::string shortTmpName = str::stream() << "tmp.convertToCapped." << shortSource;
+    const NamespaceString longTmpName(dbname, shortTmpName);
 
     {
-        repl::UnreplicatedWritesBlock uwb(opCtx);
-        Status status =
-            cloneCollectionAsCapped(opCtx, db, shortSource.toString(), shortTmpName, size, true);
+        AutoGetDb autoDb(opCtx, collectionName.db(), MODE_X);
 
-        if (!status.isOK()) {
-            return status;
+        bool userInitiatedWritesAndNotPrimary = opCtx->writesAreReplicated() &&
+            !repl::getGlobalReplicationCoordinator()->canAcceptWritesFor(opCtx, collectionName);
+
+        if (userInitiatedWritesAndNotPrimary) {
+            return Status(ErrorCodes::NotMaster,
+                          str::stream() << "Not primary while converting " << collectionName.ns()
+                                        << " to a capped collection");
         }
-    }
 
-    OptionalCollectionUUID origUUID = db->getCollection(opCtx, collectionName)->uuid();
-    OptionalCollectionUUID cappedUUID = db->getCollection(opCtx, longTmpName)->uuid();
+        Database* const db = autoDb.getDb();
+        if (!db) {
+            return Status(ErrorCodes::NamespaceNotFound,
+                          str::stream() << "database " << dbname << " not found");
+        }
 
-    {
-        WriteUnitOfWork wunit(opCtx);
-        {
-            repl::UnreplicatedWritesBlock uwb(opCtx);
-            Status status = db->dropCollection(opCtx, collectionName.ns());
+        BackgroundOperation::assertNoBgOpInProgForDb(dbname);
+
+        // If the temporary collection already exists due to an earlier aborted attempt, delete it.
+        if (db->getCollection(opCtx, longTmpName)) {
+            BSONObjBuilder unusedResult;
+            Status status =
+                dropCollection(opCtx,
+                               longTmpName,
+                               unusedResult,
+                               repl::OpTime(),
+                               DropCollectionSystemCollectionMode::kAllowSystemCollectionDrops);
             if (!status.isOK())
                 return status;
         }
 
-        Status status = db->renameCollection(opCtx, longTmpName.ns(), collectionName.ns(), false);
-        if (!status.isOK())
-            return status;
+        {
+            Status status = cloneCollectionAsCapped(
+                opCtx, db, shortSource.toString(), shortTmpName, size, true);
 
-        getGlobalServiceContext()->getOpObserver()->onConvertToCapped(
-            opCtx, collectionName, origUUID, cappedUUID, size);
-
-        wunit.commit();
+            if (!status.isOK())
+                return status;
+        }
     }
-    return Status::OK();
+
+    return renameCollection(
+        opCtx, longTmpName, collectionName, /*dropTarget*/ true, /*stayTemp*/ false);
 }
