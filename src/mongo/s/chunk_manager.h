@@ -57,6 +57,49 @@ class ChunkManager {
     MONGO_DISALLOW_COPYING(ChunkManager);
 
 public:
+    class ConstChunkIterator {
+    public:
+        ConstChunkIterator() = default;
+        explicit ConstChunkIterator(ChunkMap::const_iterator iter) : _iter{iter} {}
+
+        ConstChunkIterator& operator++() {
+            ++_iter;
+            return *this;
+        }
+        ConstChunkIterator operator++(int) {
+            return ConstChunkIterator{_iter++};
+        }
+        bool operator==(const ConstChunkIterator& other) const {
+            return _iter == other._iter;
+        }
+        bool operator!=(const ConstChunkIterator& other) const {
+            return !(*this == other);
+        }
+        const ChunkMap::mapped_type& operator*() const {
+            return _iter->second;
+        }
+
+    private:
+        ChunkMap::const_iterator _iter;
+    };
+
+    class ConstRangeOfChunks {
+    public:
+        ConstRangeOfChunks(ConstChunkIterator begin, ConstChunkIterator end)
+            : _begin{std::move(begin)}, _end{std::move(end)} {}
+
+        ConstChunkIterator begin() const {
+            return _begin;
+        }
+        ConstChunkIterator end() const {
+            return _end;
+        }
+
+    private:
+        ConstChunkIterator _begin;
+        ConstChunkIterator _end;
+    };
+
     ChunkManager(NamespaceString nss,
                  KeyPattern shardKeyPattern,
                  std::unique_ptr<CollatorInterface> defaultCollator,
@@ -95,16 +138,16 @@ public:
 
     ChunkVersion getVersion(const ShardId& shardId) const;
 
+    ConstRangeOfChunks chunks() const {
+        return {ConstChunkIterator{_chunkMap.cbegin()}, ConstChunkIterator{_chunkMap.cend()}};
+    }
+
     const ChunkMap& chunkMap() const {
         return _chunkMap;
     }
 
     int numChunks() const {
         return _chunkMap.size();
-    }
-
-    const ShardVersionMap& shardVersions() const {
-        return _chunkMapViews.shardVersions;
     }
 
     /**

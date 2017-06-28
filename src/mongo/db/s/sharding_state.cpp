@@ -493,9 +493,7 @@ ChunkVersion ShardingState::_refreshMetadata(OperationContext* opCtx, const Name
         RangeMap shardChunksMap =
             SimpleBSONObjComparator::kInstance.makeBSONObjIndexedMap<CachedChunkInfo>();
 
-        for (const auto& chunkMapEntry : cm->chunkMap()) {
-            const auto& chunk = chunkMapEntry.second;
-
+        for (const auto& chunk : cm->chunks()) {
             if (chunk->getShardId() != shardId)
                 continue;
 

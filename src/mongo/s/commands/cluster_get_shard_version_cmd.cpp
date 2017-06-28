@@ -89,8 +89,8 @@ public:
         auto routingInfo = getShardedCollection(opCtx, nss);
         const auto cm = routingInfo.cm();
 
-        for (const auto& cmEntry : cm->chunkMap()) {
-            log() << redact(cmEntry.second->toString());
+        for (const auto& chunk : cm->chunks()) {
+            log() << redact(chunk->toString());
         }
 
         cm->getVersion().addToBSON(result, "version");

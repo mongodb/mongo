@@ -620,19 +620,15 @@ public:
                     routingInfo.cm());
             auto chunkManager = routingInfo.cm();
 
-            const auto chunkMap = chunkManager->chunkMap();
-
             // 2. Move and commit each "big chunk" to a different shard.
             int i = 0;
-            for (ChunkMap::const_iterator c = chunkMap.begin(); c != chunkMap.end(); ++c, ++i) {
-                const ShardId& shardId = shardIds[i % numShards];
+            for (auto chunk : chunkManager->chunks()) {
+                const ShardId& shardId = shardIds[i++ % numShards];
                 const auto toStatus = shardRegistry->getShard(opCtx, shardId);
                 if (!toStatus.isOK()) {
                     continue;
                 }
                 const auto to = toStatus.getValue();
-
-                auto chunk = c->second;
 
                 // Can't move chunk to shard it's already on
                 if (to->getId() == chunk->getShardId()) {

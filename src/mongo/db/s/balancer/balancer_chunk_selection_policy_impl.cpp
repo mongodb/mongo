@@ -71,9 +71,7 @@ StatusWith<DistributionStatus> createCollectionDistributionStatus(
         shardToChunksMap[stat.shardId];
     }
 
-    for (const auto& entry : chunkMgr->chunkMap()) {
-        const auto& chunkEntry = entry.second;
-
+    for (const auto& chunkEntry : chunkMgr->chunks()) {
         ChunkType chunk;
         chunk.setNS(chunkMgr->getns());
         chunk.setMin(chunkEntry->getMin());

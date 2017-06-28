@@ -1768,8 +1768,7 @@ public:
                 // one big $or query, but then the sorting would not be efficient.
                 const string shardName = ShardingState::get(opCtx)->getShardName();
 
-                for (const auto& chunkEntry : cm->chunkMap()) {
-                    const auto& chunk = chunkEntry.second;
+                for (const auto& chunk : cm->chunks()) {
                     if (chunk->getShardId() == shardName) {
                         chunks.push_back(chunk);
                     }
