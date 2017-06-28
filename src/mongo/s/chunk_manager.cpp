@@ -380,14 +380,17 @@ ChunkManager::ChunkMapViews ChunkManager::_constructChunkMapViews(const OID& epo
         const BSONObj rangeMin = firstChunkInRange->getMin();
         const BSONObj rangeMax = rangeLast->second->getMax();
 
-        const auto insertResult = chunkRangeMap.insert(std::make_pair(
-            rangeMax, ShardAndChunkRange{{rangeMin, rangeMax}, firstChunkInRange->getShardId()}));
+        const auto oldSize = chunkRangeMap.size();
+        const auto insertIterator = chunkRangeMap.insert(
+            chunkRangeMap.end(),
+            std::make_pair(
+                rangeMax,
+                ShardAndChunkRange{{rangeMin, rangeMax}, firstChunkInRange->getShardId()}));
         uassert(ErrorCodes::ConflictingOperationInProgress,
                 str::stream() << "Metadata contains two chunks with the same max value "
                               << rangeMax,
-                insertResult.second);
+                oldSize + 1 == chunkRangeMap.size());
 
-        const auto& insertIterator = insertResult.first;
 
         if (insertIterator != chunkRangeMap.begin()) {
             // Make sure there are no gaps in the ranges
