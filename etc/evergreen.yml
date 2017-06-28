@@ -1035,7 +1035,7 @@ post:
     params:
       working_dir: src
       script: |
-        ${python|/opt/mongodbtoolchain/v2/bin/python2} buildscripts/combine_reports.py -m -o report.json report_reliable.json report_unreliable.json
+        ${python|/opt/mongodbtoolchain/v2/bin/python2} buildscripts/combine_reports.py -m -x -o report.json report_reliable.json report_unreliable.json
   - command: attach.results
     params:
       file_location: src/report.json

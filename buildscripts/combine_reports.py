@@ -51,6 +51,11 @@ def main():
                       dest="ignore_missing",
                       action="store_true",
                       help="Ignore any input report file that does not exist.")
+    parser.add_option("-x", "--no-report-exit",
+                      dest="report_exit",
+                      default=True,
+                      action="store_false",
+                      help="Do not exit with a non-zero code if any test in the report fails.")
 
     (options, args) = parser.parse_args()
 
@@ -78,7 +83,10 @@ def main():
     else:
         print(json.dumps(combined_report))
 
-    sys.exit(report_exit(combined_test_report))
+    if options.report_exit:
+        sys.exit(report_exit(combined_test_report))
+    else:
+        sys.exit(0)
 
 
 if __name__ == "__main__":
