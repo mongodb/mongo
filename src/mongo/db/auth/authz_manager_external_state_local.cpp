@@ -433,8 +433,8 @@ Status AuthzManagerExternalStateLocal::_initializeRoleGraph(OperationContext* op
     }
 
     if (status.isOK()) {
-        _roleGraph.swap(newRoleGraph);
-        _roleGraphState = newState;
+        _roleGraph = std::move(newRoleGraph);
+        _roleGraphState = std::move(newState);
     }
     return status;
 }

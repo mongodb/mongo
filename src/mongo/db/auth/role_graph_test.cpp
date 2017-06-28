@@ -507,47 +507,6 @@ TEST(RoleGraphTest, ReAddRole) {
     ASSERT_FALSE(privileges[0].getActions().contains(ActionType::insert));
 }
 
-// Tests copy constructor and swap functionality.
-TEST(RoleGraphTest, CopySwap) {
-    RoleName roleA("roleA", "dbA");
-    RoleName roleB("roleB", "dbB");
-    RoleName roleC("roleC", "dbC");
-
-    RoleGraph graph;
-    ASSERT_OK(graph.createRole(roleA));
-    ASSERT_OK(graph.createRole(roleB));
-    ASSERT_OK(graph.createRole(roleC));
-
-    ActionSet actions;
-    actions.addAction(ActionType::find);
-    ASSERT_OK(graph.addPrivilegeToRole(roleA, Privilege(dbAResource, actions)));
-    ASSERT_OK(graph.addPrivilegeToRole(roleB, Privilege(dbBResource, actions)));
-    ASSERT_OK(graph.addPrivilegeToRole(roleC, Privilege(dbCResource, actions)));
-
-    ASSERT_OK(graph.addRoleToRole(roleA, roleB));
-
-    // Make a copy of the graph to do further modifications on.
-    RoleGraph tempGraph(graph);
-    ASSERT_OK(tempGraph.addRoleToRole(roleB, roleC));
-    tempGraph.recomputePrivilegeData().transitional_ignore();
-
-    // Now swap the copy back with the original graph and make sure the original was updated
-    // properly.
-    swap(tempGraph, graph);
-
-    RoleNameIterator it = graph.getDirectSubordinates(roleB);
-    ASSERT_TRUE(it.more());
-    ASSERT_EQUALS(it.next().getFullName(), roleC.getFullName());
-    ASSERT_FALSE(it.more());
-
-    graph.getAllPrivileges(roleA);  // should have privileges from roleB *and* role C
-    PrivilegeVector privileges = graph.getAllPrivileges(roleA);
-    ASSERT_EQUALS(static_cast<size_t>(3), privileges.size());
-    ASSERT_EQUALS(dbAResource, privileges[0].getResourcePattern());
-    ASSERT_EQUALS(dbBResource, privileges[1].getResourcePattern());
-    ASSERT_EQUALS(dbCResource, privileges[2].getResourcePattern());
-}
-
 // Tests error handling
 TEST(RoleGraphTest, ErrorHandling) {
     RoleName roleA("roleA", "dbA");
