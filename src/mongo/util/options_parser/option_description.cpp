@@ -163,14 +163,6 @@ OptionDescription& OptionDescription::setDefault(Value defaultValue) {
         throw DBException(sb.str(), ErrorCodes::InternalError);
     }
 
-    // It doesn't make sense to set a "default value" for switch options, so disallow it here
-    if (_type == Switch) {
-        StringBuilder sb;
-        sb << "Could not register option \"" << _dottedName << "\": "
-           << "the default value of a Switch option is false and cannot be changed";
-        throw DBException(sb.str(), ErrorCodes::InternalError);
-    }
-
     _default = defaultValue;
     return *this;
 }
