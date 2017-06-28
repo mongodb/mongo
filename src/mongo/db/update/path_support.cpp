@@ -43,19 +43,6 @@ using mongoutils::str::stream;
 
 namespace {
 
-bool isNumeric(StringData str, size_t* num) {
-    size_t res = 0;
-    for (size_t i = 0; i < str.size(); ++i) {
-        if (str[i] < '0' || str[i] > '9') {
-            return false;
-        } else {
-            res = res * 10 + (str[i] - '0');
-        }
-    }
-    *num = res;
-    return true;
-}
-
 Status maybePadTo(mutablebson::Element* elemArray, size_t sizeRequired) {
     dassert(elemArray->getType() == Array);
 
@@ -81,6 +68,19 @@ Status maybePadTo(mutablebson::Element* elemArray, size_t sizeRequired) {
 }
 
 }  // unnamed namespace
+
+bool isNumericPathComponent(StringData str, size_t* num) {
+    size_t res = 0;
+    for (size_t i = 0; i < str.size(); ++i) {
+        if (str[i] < '0' || str[i] > '9') {
+            return false;
+        } else {
+            res = res * 10 + (str[i] - '0');
+        }
+    }
+    *num = res;
+    return true;
+}
 
 Status findLongestPrefix(const FieldRef& prefix,
                          mutablebson::Element root,
@@ -111,7 +111,7 @@ Status findLongestPrefix(const FieldRef& prefix,
                 break;
 
             case Array:
-                if (!isNumeric(prefixPart, &numericPart)) {
+                if (!isNumericPathComponent(prefixPart, &numericPart)) {
                     viable = false;
                 } else {
                     curr = prev[numericPart];
@@ -184,7 +184,7 @@ Status createPathAt(const FieldRef& prefix,
     bool inArray = false;
     if (elemFound.getType() == mongo::Array) {
         size_t newIdx = 0;
-        if (!isNumeric(prefix.getPart(idxFound), &newIdx)) {
+        if (!isNumericPathComponent(prefix.getPart(idxFound), &newIdx)) {
             return Status(ErrorCodes::PathNotViable,
                           str::stream() << "Cannot create field '" << prefix.getPart(idxFound)
                                         << "' in element {"

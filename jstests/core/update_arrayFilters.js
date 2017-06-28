@@ -400,23 +400,16 @@
     assert.eq(coll.findOne({_id: 0}), {_id: 0, a: [[0, 2], [1, 2]]});
 
     // $pop.
-    // TODO SERVER-28769: $pop should use the new update implementation.
     coll.drop();
+    assert.writeOK(coll.insert({_id: 0, a: [[0, 1], [1, 2]]}));
     if (db.getMongo().writeMode() === "commands") {
-        res = coll.update({_id: 0}, {$pop: {"a.$[i]": 1}}, {arrayFilters: [{i: 0}]});
-        assert.writeErrorWithCode(res, ErrorCodes.InvalidOptions);
-        assert.neq(
-            -1,
-            res.getWriteError().errmsg.indexOf("Cannot use array filters with modifier $pop"),
-            "update failed for a reason other than using array filters with $pop");
+        assert.writeOK(coll.update({_id: 0}, {$pop: {"a.$[i]": 1}}, {arrayFilters: [{i: 0}]}));
+        assert.eq({_id: 0, a: [[0], [1, 2]]}, coll.findOne());
     }
+    assert.writeOK(coll.remove({}));
     assert.writeOK(coll.insert({_id: 0, a: [[0]]}));
-    res = coll.update({_id: 0}, {$pop: {"a.$[]": 1}});
-    assert.writeErrorWithCode(res, 16837);
-    assert.neq(-1,
-               res.getWriteError().errmsg.indexOf(
-                   "cannot use the part (a of a.$[]) to traverse the element ({a: [ [ 0.0 ] ]})"),
-               "update failed for a reason other than using array updates with $pop");
+    assert.writeOK(coll.update({_id: 0}, {$pop: {"a.$[]": 1}}));
+    assert.eq({_id: 0, a: [[]]}, coll.findOne());
 
     // $pullAll.
     // TODO SERVER-28771: $pullAll should use the new update implementation.

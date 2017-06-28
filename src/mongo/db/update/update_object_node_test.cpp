@@ -132,6 +132,20 @@ TEST(UpdateObjectNodeTest, ValidAddToSetPathParsesSuccessfully) {
                                               foundIdentifiers));
 }
 
+TEST(UpdateObjectNodeTest, ValidPopPathParsesSuccessfully) {
+    auto update = fromjson("{$pop: {'a.b': 5}}");
+    const CollatorInterface* collator = nullptr;
+    std::map<StringData, std::unique_ptr<ArrayFilter>> arrayFilters;
+    std::set<std::string> foundIdentifiers;
+    UpdateObjectNode root;
+    ASSERT_OK(UpdateObjectNode::parseAndMerge(&root,
+                                              modifiertable::ModifierType::MOD_POP,
+                                              update["$pop"]["a.b"],
+                                              collator,
+                                              arrayFilters,
+                                              foundIdentifiers));
+}
+
 TEST(UpdateObjectNodeTest, MultiplePositionalElementsFailToParse) {
     auto update = fromjson("{$set: {'a.$.b.$': 5}}");
     const CollatorInterface* collator = nullptr;
@@ -2680,6 +2694,51 @@ TEST(UpdateObjectNodeTest, ApplyDoNotUseStoredMergedPositional) {
     ASSERT_TRUE(doc2.isInPlaceModeEnabled());
     ASSERT_BSONOBJ_EQ(fromjson("{$set: {'a.0.b': 5, 'a.1.c': 6, 'a.1.d': 7}}"),
                       logDoc2.getObject());
+}
+
+TEST(UpdateObjectNodeTest, SetAndPopModifiersWithCommonPrefixApplySuccessfully) {
+    auto update = fromjson("{$set: {'a.b': 5}, $pop: {'a.c': -1}}");
+    const CollatorInterface* collator = nullptr;
+    std::map<StringData, std::unique_ptr<ArrayFilter>> arrayFilters;
+    std::set<std::string> foundIdentifiers;
+    UpdateObjectNode root;
+    ASSERT_OK(UpdateObjectNode::parseAndMerge(&root,
+                                              modifiertable::ModifierType::MOD_SET,
+                                              update["$set"]["a.b"],
+                                              collator,
+                                              arrayFilters,
+                                              foundIdentifiers));
+    ASSERT_OK(UpdateObjectNode::parseAndMerge(&root,
+                                              modifiertable::ModifierType::MOD_POP,
+                                              update["$pop"]["a.c"],
+                                              collator,
+                                              arrayFilters,
+                                              foundIdentifiers));
+
+    Document doc(fromjson("{a: {b: 3, c: [1, 2, 3, 4]}}"));
+    FieldRef pathToCreate("");
+    FieldRef pathTaken("");
+    StringData matchedField;
+    auto fromReplication = false;
+    const UpdateIndexData* indexData = nullptr;
+    Document logDoc;
+    LogBuilder logBuilder(logDoc.root());
+    bool indexesAffected;
+    bool noop;
+    root.apply(doc.root(),
+               &pathToCreate,
+               &pathTaken,
+               matchedField,
+               fromReplication,
+               indexData,
+               &logBuilder,
+               &indexesAffected,
+               &noop);
+    ASSERT_FALSE(noop);
+    ASSERT_FALSE(indexesAffected);
+    ASSERT_BSONOBJ_EQ(fromjson("{a: {b: 5, c: [2, 3, 4]}}"), doc.getObject());
+    ASSERT_FALSE(doc.isInPlaceModeEnabled());
+    ASSERT_BSONOBJ_EQ(fromjson("{$set: {'a.b': 5, 'a.c': [2, 3, 4]}}"), logDoc.getObject());
 }
 
 }  // namespace

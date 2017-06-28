@@ -48,6 +48,7 @@
 #include "mongo/db/ops/modifier_unset.h"
 #include "mongo/db/update/addtoset_node.h"
 #include "mongo/db/update/arithmetic_node.h"
+#include "mongo/db/update/pop_node.h"
 #include "mongo/db/update/set_node.h"
 #include "mongo/db/update/unset_node.h"
 #include "mongo/platform/unordered_map.h"
@@ -188,6 +189,8 @@ std::unique_ptr<UpdateLeafNode> makeUpdateLeafNode(ModifierType modType) {
             return stdx::make_unique<ArithmeticNode>(ArithmeticNode::ArithmeticOp::kAdd);
         case MOD_MUL:
             return stdx::make_unique<ArithmeticNode>(ArithmeticNode::ArithmeticOp::kMultiply);
+        case MOD_POP:
+            return stdx::make_unique<PopNode>();
         case MOD_SET:
             return stdx::make_unique<SetNode>();
         case MOD_UNSET:

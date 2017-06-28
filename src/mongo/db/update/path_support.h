@@ -183,6 +183,12 @@ BSONElement findParentEqualityElement(const EqualityMatches& equalities,
  */
 Status addEqualitiesToDoc(const EqualityMatches& equalities, mutablebson::Document* doc);
 
+/**
+ * Returns true if the path component represents an array index, and returns that array index in
+ * 'num'. Otherwise, returns false.
+ */
+bool isNumericPathComponent(StringData pathComponent, size_t* num);
+
 }  // namespace pathsupport
 
 }  // namespace mongo
