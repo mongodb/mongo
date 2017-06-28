@@ -33,11 +33,11 @@
 
 namespace mongo {
 
-SessionTxnWriteHistoryIterator::SessionTxnWriteHistoryIterator(repl::OpTime startingOpTime)
-    : _nextOpTime(std::move(startingOpTime)) {}
+SessionTxnWriteHistoryIterator::SessionTxnWriteHistoryIterator(Timestamp startingOpTimeTs)
+    : _nextOpTimeTs(std::move(startingOpTimeTs)) {}
 
 bool SessionTxnWriteHistoryIterator::hasNext() const {
-    return !_nextOpTime.isNull();
+    return !_nextOpTimeTs.isNull();
 }
 
 repl::OplogEntry next(OperationContext* opCtx) {

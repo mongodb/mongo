@@ -31,9 +31,14 @@
 #include <memory>
 
 #include "mongo/base/init.h"
-#include "mongo/db/operation_context_noop.h"
+#include "mongo/db/client.h"
+#include "mongo/db/db_raii.h"
+#include "mongo/db/dbdirectclient.h"
+#include "mongo/db/operation_context.h"
 #include "mongo/db/repl/optime.h"
-#include "mongo/db/service_context_noop.h"
+#include "mongo/db/repl/replication_coordinator_mock.h"
+#include "mongo/db/service_context.h"
+#include "mongo/db/service_context_d_test_fixture.h"
 #include "mongo/db/session_transaction_table.h"
 #include "mongo/db/session_txn_state_holder.h"
 #include "mongo/stdx/memory.h"
@@ -41,32 +46,430 @@
 
 namespace mongo {
 
-TEST(SessionTxnStateHolder, Demo) {
-    SessionTransactionTable table(nullptr);
-    auto txnStateHolder = table.getSessionTxnState(LogicalSessionId::gen());
+class SessionTxnStateTest : public ServiceContextMongoDTest {
+public:
+    void setUp() override {
+        ServiceContextMongoDTest::setUp();
 
-    OperationContextNoop opCtx;
+        _opCtx = cc().makeOperationContext();
 
-    {
-        // Caller has now control of txn state and can read/write from it.
-        auto txnStateToken = txnStateHolder->getTransactionState(&opCtx);
+        // Insert code path assumes existence of repl coordinator!
+        repl::ReplSettings replSettings;
+        replSettings.setReplSetString(
+            ConnectionString::forReplicaSet("sessionTxnStateTest", {HostAndPort("a:1")})
+                .toString());
+        replSettings.setMaster(true);
 
-        auto writeHistory = txnStateToken.get()->getWriteHistory(&opCtx);
+        auto service = getServiceContext();
+        repl::ReplicationCoordinator::set(
+            service, stdx::make_unique<repl::ReplicationCoordinatorMock>(service, replSettings));
 
-        // Go over request object, and mark all statements that is in writeHistory as done.
-        // In addition, convert oplog entries into results appropriate for command.
-
-        // For every statement that is not yet 'done':
-        // Perform write op, and then store result:
-
-        // Commented out since OperationContextNoop uses LockerNoop
-        // repl::OpTime opTime;
-        // txnStateToken.get()->saveTxnProgress(&opCtx, opTime);
-
-        // Consolidate partial results into final results for command response
+        _txnTable = stdx::make_unique<SessionTransactionTable>(nullptr);
+        _txnTable->onStepUp(_opCtx.get());
     }
 
-    // Caller now releases txnStateToken, other threads can now get a chance to access it.
+    void tearDown() override {
+        // ServiceContextMongoDTest::tearDown() will try to create it's own opCtx, and it's not
+        // allowed to have 2 present per client, so destroy this one.
+        _opCtx.reset();
+
+        ServiceContextMongoDTest::tearDown();
+    }
+
+    OperationContext* opCtx() {
+        return _opCtx.get();
+    }
+
+private:
+    ServiceContext::UniqueOperationContext _opCtx;
+    std::unique_ptr<SessionTransactionTable> _txnTable;
+};
+
+TEST_F(SessionTxnStateTest, CanCreateNewSessionEntry) {
+    const auto sessionId = LogicalSessionId::gen();
+    const TxnNumber txnNum = 20;
+
+    SessionTxnState txnState(sessionId);
+    txnState.begin(opCtx(), txnNum);
+
+    ASSERT_EQ(sessionId, txnState.getSessionId());
+    ASSERT_EQ(txnNum, txnState.getTxnNum());
+    ASSERT_TRUE(txnState.getLastWriteOpTimeTs().isNull());
+
+    DBDirectClient client(opCtx());
+    Query queryAll;
+    queryAll.sort(BSON("_id" << 1));
+
+    auto cursor = client.query(NamespaceString::kSessionTransactionsTableNamespace.ns(), queryAll);
+    ASSERT_TRUE(cursor.get() != nullptr);
+
+    ASSERT_TRUE(cursor->more());
+    auto doc = cursor->next();
+    IDLParserErrorContext ctx1("CanCreateNewSessionEntry");
+    auto txnRecord = SessionTxnRecord::parse(ctx1, doc);
+
+    ASSERT_EQ(sessionId, txnRecord.getSessionId());
+    ASSERT_EQ(txnNum, txnRecord.getTxnNum());
+    ASSERT_TRUE(txnRecord.getLastWriteOpTimeTs().isNull());
+
+    ASSERT_FALSE(cursor->more());
+}
+
+TEST_F(SessionTxnStateTest, StartingOldTxnShouldAssert) {
+    const auto sessionId = LogicalSessionId::gen();
+    const TxnNumber txnNum = 20;
+
+    SessionTxnState txnState(sessionId);
+    txnState.begin(opCtx(), txnNum);
+
+    ASSERT_THROWS(txnState.begin(opCtx(), txnNum - 1), UserException);
+    ASSERT_EQ(sessionId, txnState.getSessionId());
+    ASSERT_EQ(txnNum, txnState.getTxnNum());
+    ASSERT_TRUE(txnState.getLastWriteOpTimeTs().isNull());
+}
+
+TEST_F(SessionTxnStateTest, StartingNewSessionWithCompatibleEntryInStorage) {
+    const auto sessionId = LogicalSessionId::gen();
+    const TxnNumber txnNum = 20;
+    const Timestamp origTs(985, 15);
+
+    SessionTxnRecord origRecord;
+    origRecord.setSessionId(sessionId);
+    origRecord.setTxnNum(txnNum);
+    origRecord.setLastWriteOpTimeTs(origTs);
+
+    DBDirectClient client(opCtx());
+    client.insert(NamespaceString::kSessionTransactionsTableNamespace.ns(), origRecord.toBSON());
+
+    SessionTxnState txnState(sessionId);
+    txnState.begin(opCtx(), txnNum);
+
+    ASSERT_EQ(sessionId, txnState.getSessionId());
+    ASSERT_EQ(txnNum, txnState.getTxnNum());
+    ASSERT_EQ(origTs, txnState.getLastWriteOpTimeTs());
+
+    // Confirm that nothing changed in storage.
+
+    Query queryAll;
+    queryAll.sort(BSON("_id" << 1));
+    auto cursor = client.query(NamespaceString::kSessionTransactionsTableNamespace.ns(), queryAll);
+    ASSERT_TRUE(cursor.get() != nullptr);
+
+    ASSERT_TRUE(cursor->more());
+    auto doc = cursor->next();
+    IDLParserErrorContext ctx1("StartingNewSessionWithCompatibleEntryInStorage");
+    auto txnRecord = SessionTxnRecord::parse(ctx1, doc);
+
+    ASSERT_EQ(sessionId, txnRecord.getSessionId());
+    ASSERT_EQ(txnNum, txnRecord.getTxnNum());
+    ASSERT_EQ(origTs, txnRecord.getLastWriteOpTimeTs());
+
+    ASSERT_FALSE(cursor->more());
+}
+
+TEST_F(SessionTxnStateTest, StartingNewSessionWithOlderEntryInStorageShouldUpdateEntry) {
+    const auto sessionId = LogicalSessionId::gen();
+    TxnNumber txnNum = 20;
+    const Timestamp origTs(985, 15);
+
+    SessionTxnRecord origRecord;
+    origRecord.setSessionId(sessionId);
+    origRecord.setTxnNum(txnNum);
+    origRecord.setLastWriteOpTimeTs(origTs);
+
+    DBDirectClient client(opCtx());
+    client.insert(NamespaceString::kSessionTransactionsTableNamespace.ns(), origRecord.toBSON());
+
+    SessionTxnState txnState(sessionId);
+    txnState.begin(opCtx(), ++txnNum);
+
+    ASSERT_EQ(sessionId, txnState.getSessionId());
+    ASSERT_EQ(txnNum, txnState.getTxnNum());
+    ASSERT_TRUE(txnState.getLastWriteOpTimeTs().isNull());
+
+    // Confirm that entry has new txn and ts reset to zero in storage.
+
+    Query queryAll;
+    queryAll.sort(BSON("_id" << 1));
+    auto cursor = client.query(NamespaceString::kSessionTransactionsTableNamespace.ns(), queryAll);
+    ASSERT_TRUE(cursor.get() != nullptr);
+
+    ASSERT_TRUE(cursor->more());
+    auto doc = cursor->next();
+    IDLParserErrorContext ctx1("StartingNewSessionWithOlderEntryInStorageShouldUpdateEntry");
+    auto txnRecord = SessionTxnRecord::parse(ctx1, doc);
+
+    ASSERT_EQ(sessionId, txnRecord.getSessionId());
+    ASSERT_EQ(txnNum, txnRecord.getTxnNum());
+    ASSERT_TRUE(txnRecord.getLastWriteOpTimeTs().isNull());
+
+    ASSERT_FALSE(cursor->more());
+}
+
+TEST_F(SessionTxnStateTest, StartingNewSessionWithNewerEntryInStorageShouldAssert) {
+    const auto sessionId = LogicalSessionId::gen();
+    TxnNumber txnNum = 20;
+    const Timestamp origTs(985, 15);
+
+    SessionTxnRecord origRecord;
+    origRecord.setSessionId(sessionId);
+    origRecord.setTxnNum(txnNum);
+    origRecord.setLastWriteOpTimeTs(origTs);
+
+    DBDirectClient client(opCtx());
+    client.insert(NamespaceString::kSessionTransactionsTableNamespace.ns(), origRecord.toBSON());
+
+    SessionTxnState txnState(sessionId);
+    ASSERT_THROWS(txnState.begin(opCtx(), txnNum - 1), UserException);
+
+    ASSERT_EQ(sessionId, txnState.getSessionId());
+    ASSERT_EQ(txnNum, txnState.getTxnNum());
+    ASSERT_EQ(origTs, txnState.getLastWriteOpTimeTs());
+
+    // Confirm that nothing changed in storage.
+
+    Query queryAll;
+    queryAll.sort(BSON("_id" << 1));
+    auto cursor = client.query(NamespaceString::kSessionTransactionsTableNamespace.ns(), queryAll);
+    ASSERT_TRUE(cursor.get() != nullptr);
+
+    ASSERT_TRUE(cursor->more());
+    auto doc = cursor->next();
+    IDLParserErrorContext ctx1("StartingNewSessionWithOlderEntryInStorageShouldUpdateEntry");
+    auto txnRecord = SessionTxnRecord::parse(ctx1, doc);
+
+    ASSERT_EQ(sessionId, txnRecord.getSessionId());
+    ASSERT_EQ(txnNum, txnRecord.getTxnNum());
+    ASSERT_EQ(origTs, txnRecord.getLastWriteOpTimeTs());
+
+    ASSERT_FALSE(cursor->more());
+}
+
+TEST_F(SessionTxnStateTest, StoreOpTime) {
+    const auto sessionId = LogicalSessionId::gen();
+    const TxnNumber txnNum = 20;
+    const Timestamp ts1(100, 42);
+
+    SessionTxnState txnState(sessionId);
+    txnState.begin(opCtx(), txnNum);
+
+    {
+        AutoGetCollection autoColl(opCtx(), NamespaceString("test.user"), MODE_IX);
+        WriteUnitOfWork wuow(opCtx());
+
+        txnState.saveTxnProgress(opCtx(), ts1);
+        wuow.commit();
+    }
+
+    DBDirectClient client(opCtx());
+    Query queryAll;
+    queryAll.sort(BSON("_id" << 1));
+
+    auto cursor = client.query(NamespaceString::kSessionTransactionsTableNamespace.ns(), queryAll);
+    ASSERT_TRUE(cursor.get() != nullptr);
+
+    ASSERT_TRUE(cursor->more());
+    auto doc = cursor->next();
+    IDLParserErrorContext ctx1("StoreOpTime 1");
+    auto txnRecord = SessionTxnRecord::parse(ctx1, doc);
+
+    ASSERT_EQ(sessionId, txnRecord.getSessionId());
+    ASSERT_EQ(txnNum, txnRecord.getTxnNum());
+    ASSERT_EQ(ts1, txnRecord.getLastWriteOpTimeTs());
+
+    ASSERT_FALSE(cursor->more());
+
+    ASSERT_EQ(sessionId, txnState.getSessionId());
+    ASSERT_EQ(txnNum, txnState.getTxnNum());
+    ASSERT_EQ(ts1, txnState.getLastWriteOpTimeTs());
+
+    const Timestamp ts2(200, 23);
+    {
+        AutoGetCollection autoColl(opCtx(), NamespaceString("test.user"), MODE_IX);
+        WriteUnitOfWork wuow(opCtx());
+
+        txnState.saveTxnProgress(opCtx(), ts2);
+        wuow.commit();
+    }
+
+    cursor = client.query(NamespaceString::kSessionTransactionsTableNamespace.ns(), queryAll);
+    ASSERT_TRUE(cursor.get() != nullptr);
+
+    ASSERT_TRUE(cursor->more());
+    doc = cursor->next();
+    IDLParserErrorContext ctx2("StoreOpTime 2");
+    txnRecord = SessionTxnRecord::parse(ctx2, doc);
+
+    ASSERT_EQ(sessionId, txnRecord.getSessionId());
+    ASSERT_EQ(txnNum, txnRecord.getTxnNum());
+    ASSERT_EQ(ts2, txnRecord.getLastWriteOpTimeTs());
+
+    ASSERT_FALSE(cursor->more());
+
+    ASSERT_EQ(sessionId, txnState.getSessionId());
+    ASSERT_EQ(txnNum, txnState.getTxnNum());
+    ASSERT_EQ(ts2, txnState.getLastWriteOpTimeTs());
+}
+
+TEST_F(SessionTxnStateTest, CanBumpTransactionIdIfNewer) {
+    const auto sessionId = LogicalSessionId::gen();
+    TxnNumber txnNum = 20;
+    const Timestamp ts1(100, 42);
+
+    SessionTxnState txnState(sessionId);
+    txnState.begin(opCtx(), txnNum);
+
+    {
+        AutoGetCollection autoColl(opCtx(), NamespaceString("test.user"), MODE_IX);
+        WriteUnitOfWork wuow(opCtx());
+
+        txnState.saveTxnProgress(opCtx(), ts1);
+        wuow.commit();
+    }
+
+    DBDirectClient client(opCtx());
+    Query queryAll;
+    queryAll.sort(BSON("_id" << 1));
+
+    auto cursor = client.query(NamespaceString::kSessionTransactionsTableNamespace.ns(), queryAll);
+    ASSERT_TRUE(cursor.get() != nullptr);
+
+    ASSERT_TRUE(cursor->more());
+    auto doc = cursor->next();
+    IDLParserErrorContext ctx1("CanBumpTransactionIdIfNewer 1");
+    auto txnRecord = SessionTxnRecord::parse(ctx1, doc);
+
+    ASSERT_EQ(sessionId, txnRecord.getSessionId());
+    ASSERT_EQ(txnNum, txnRecord.getTxnNum());
+    ASSERT_EQ(ts1, txnRecord.getLastWriteOpTimeTs());
+
+    ASSERT_FALSE(cursor->more());
+
+    ASSERT_EQ(sessionId, txnState.getSessionId());
+    ASSERT_EQ(txnNum, txnState.getTxnNum());
+    ASSERT_EQ(ts1, txnState.getLastWriteOpTimeTs());
+
+    // Start a new transaction on the same session.
+    txnState.begin(opCtx(), ++txnNum);
+
+    cursor = client.query(NamespaceString::kSessionTransactionsTableNamespace.ns(), queryAll);
+    ASSERT_TRUE(cursor.get() != nullptr);
+
+    ASSERT_TRUE(cursor->more());
+    doc = cursor->next();
+    IDLParserErrorContext ctx2("CanBumpTransactionIdIfNewer 2");
+    txnRecord = SessionTxnRecord::parse(ctx2, doc);
+
+    ASSERT_EQ(sessionId, txnRecord.getSessionId());
+    ASSERT_EQ(txnNum, txnRecord.getTxnNum());
+    ASSERT_TRUE(txnRecord.getLastWriteOpTimeTs().isNull());
+
+    ASSERT_FALSE(cursor->more());
+
+    ASSERT_EQ(sessionId, txnState.getSessionId());
+    ASSERT_EQ(txnNum, txnState.getTxnNum());
+    ASSERT_TRUE(txnState.getLastWriteOpTimeTs().isNull());
+}
+
+TEST_F(SessionTxnStateTest, StartingNewSessionWithDroppedTableShouldAssert) {
+    const auto sessionId = LogicalSessionId::gen();
+    const TxnNumber txnNum = 20;
+
+    const auto& ns = NamespaceString::kSessionTransactionsTableNamespace;
+
+    BSONObj dropResult;
+    DBDirectClient client(opCtx());
+    ASSERT_TRUE(client.runCommand(ns.db().toString(), BSON("drop" << ns.coll()), dropResult));
+
+    SessionTxnState txnState(sessionId);
+    ASSERT_THROWS(txnState.begin(opCtx(), txnNum), UserException);
+
+    ASSERT_EQ(sessionId, txnState.getSessionId());
+}
+
+TEST_F(SessionTxnStateTest, SaveTxnProgressShouldAssertIfTableIsDropped) {
+    const auto sessionId = LogicalSessionId::gen();
+    const TxnNumber txnNum = 20;
+    const Timestamp ts1(100, 42);
+
+    SessionTxnState txnState(sessionId);
+    txnState.begin(opCtx(), txnNum);
+
+    const auto& ns = NamespaceString::kSessionTransactionsTableNamespace;
+
+    BSONObj dropResult;
+    DBDirectClient client(opCtx());
+    ASSERT_TRUE(client.runCommand(ns.db().toString(), BSON("drop" << ns.coll()), dropResult));
+
+    AutoGetCollection autoColl(opCtx(), NamespaceString("test.user"), MODE_IX);
+    WriteUnitOfWork wuow(opCtx());
+
+    ASSERT_THROWS(txnState.saveTxnProgress(opCtx(), ts1), UserException);
+}
+
+TEST_F(SessionTxnStateTest, TwoSessionsShouldBeIndependent) {
+    const auto sessionId1 = LogicalSessionId::gen();
+    const TxnNumber txnNum1 = 20;
+    const Timestamp ts1(1903, 42);
+
+    SessionTxnState txnState1(sessionId1);
+    txnState1.begin(opCtx(), txnNum1);
+
+    const auto sessionId2 = LogicalSessionId::gen();
+    const TxnNumber txnNum2 = 300;
+    const Timestamp ts2(671, 5);
+
+    SessionTxnState txnState2(sessionId2);
+    txnState2.begin(opCtx(), txnNum2);
+
+    {
+        AutoGetCollection autoColl(opCtx(), NamespaceString("test.user"), MODE_IX);
+        WriteUnitOfWork wuow(opCtx());
+
+        txnState2.saveTxnProgress(opCtx(), ts2);
+        wuow.commit();
+    }
+
+    {
+        AutoGetCollection autoColl(opCtx(), NamespaceString("test.user"), MODE_IX);
+        WriteUnitOfWork wuow(opCtx());
+
+        txnState1.saveTxnProgress(opCtx(), ts1);
+        wuow.commit();
+    }
+
+    DBDirectClient client(opCtx());
+    Query queryAll;
+    queryAll.sort(BSON(SessionTxnRecord::kTxnNumFieldName << 1));
+
+    auto cursor = client.query(NamespaceString::kSessionTransactionsTableNamespace.ns(), queryAll);
+    ASSERT_TRUE(cursor.get() != nullptr);
+
+    ASSERT_TRUE(cursor->more());
+
+    {
+        auto doc = cursor->next();
+        IDLParserErrorContext ctx("TwoSessionsShouldBeIndependent 1");
+        auto txnRecord = SessionTxnRecord::parse(ctx, doc);
+
+        ASSERT_EQ(sessionId1, txnRecord.getSessionId());
+        ASSERT_EQ(txnNum1, txnRecord.getTxnNum());
+        ASSERT_EQ(ts1, txnRecord.getLastWriteOpTimeTs());
+    }
+
+    ASSERT_TRUE(cursor->more());
+
+    {
+        auto doc = cursor->next();
+        IDLParserErrorContext ctx("TwoSessionsShouldBeIndependent 2");
+        auto txnRecord = SessionTxnRecord::parse(ctx, doc);
+
+        ASSERT_EQ(sessionId2, txnRecord.getSessionId());
+        ASSERT_EQ(txnNum2, txnRecord.getTxnNum());
+        ASSERT_EQ(ts2, txnRecord.getLastWriteOpTimeTs());
+    }
+
+    ASSERT_FALSE(cursor->more());
 }
 
 }  // namespace mongo

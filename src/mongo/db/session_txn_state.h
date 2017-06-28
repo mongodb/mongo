@@ -31,8 +31,8 @@
 #include <boost/optional.hpp>
 #include <map>
 
+#include "mongo/bson/timestamp.h"
 #include "mongo/db/logical_session_id.h"
-#include "mongo/db/repl/optime.h"
 #include "mongo/db/session_txn_record_gen.h"
 #include "mongo/db/session_txn_write_history_iterator.h"
 
@@ -42,11 +42,19 @@ class OperationContext;
 
 /**
  * Represents the current state of this transaction.
+ *
+ * Note: this class is not thread safe. This class assumes that it is the only entity that modifies
+ * the session transaction document matching it's own sessionId.
+ *
+ * All of the modifications to underlying collection will not be replicated because there is no
+ * straightforward way to make sure that the secondaries will get the oplog entry for BOTH the
+ * actual write and the update to the sessions table in the same batch when it fetches the oplog
+ * from the sync source. This can cause the secondaries to be in an inconsistent state that is
+ * externally observable and can be really bad if enough secondaries are in this state that they
+ * become primaries and start accepting writes.
  */
 class SessionTxnState {
 public:
-    static const NamespaceString kConfigNS;
-
     explicit SessionTxnState(LogicalSessionId sessionId);
 
     /**
@@ -62,11 +70,19 @@ public:
     /**
      * Stores the result of a single write operation within this transaction.
      */
-    void saveTxnProgress(OperationContext* opCtx, repl::OpTime opTime);
+    void saveTxnProgress(OperationContext* opCtx, Timestamp opTime);
 
     const LogicalSessionId& getSessionId() const;
+
+    /**
+     * Note: can only be called after at least one successful execution of begin().
+     */
     TxnNumber getTxnNum() const;
-    const repl::OpTime& getLastWriteOpTime() const;
+
+    /**
+     * Note: can only be called after at least one successful execution of begin().
+     */
+    const Timestamp& getLastWriteOpTimeTs() const;
 
     /**
      * Returns a SessionTxnState stored in the operation context.

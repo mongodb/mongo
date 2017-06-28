@@ -1332,5 +1332,6 @@ env.CppUnitTest(
     LIBDEPS=[
         'service_context_d_test_fixture',
         'session_transactions',
+        '$BUILD_DIR/mongo/db/repl/replmocks',
     ],
 )
