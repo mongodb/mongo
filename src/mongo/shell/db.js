@@ -66,21 +66,47 @@ var DB;
         return cmdObjWithReadPref;
     };
 
-    // if someone passes i.e. runCommand("foo", {bar: "baz"}
-    // we merge it in to runCommand({foo: 1, bar: "baz"}
-    // this helper abstracts that logic.
-    DB.prototype._mergeCommandOptions = function(commandName, extraKeys) {
+    /**
+     * If someone passes i.e. runCommand("foo", {bar: "baz"}), we merge it in to
+     * runCommand({foo: 1, bar: "baz"}).
+     * If we already have a command object in the first argument, we ensure that the second
+     * argument 'extraKeys' is either null or an empty object. This prevents users from accidentally
+     * calling runCommand({foo: 1}, {bar: 1}) and expecting the final command invocation to be
+     * runCommand({foo: 1, bar: 1}).
+     * This helper abstracts that logic.
+     */
+    DB.prototype._mergeCommandOptions = function(obj, extraKeys) {
         "use strict";
+
+        if (typeof(obj) === "object") {
+            if (Object.keys(extraKeys || {}).length > 0) {
+                throw Error("Unexpected second argument to DB.runCommand(): (type: " +
+                            typeof(extraKeys) + "): " + tojson(extraKeys));
+            }
+            return obj;
+        } else if (typeof(obj) !== "string") {
+            throw Error("First argument to DB.runCommand() must be either an object or a string: " +
+                        "(type: " + typeof(obj) + "): " + tojson(obj));
+        }
+
+        var commandName = obj;
         var mergedCmdObj = {};
         mergedCmdObj[commandName] = 1;
 
-        if (typeof(extraKeys) === "object") {
+        if (!extraKeys) {
+            return mergedCmdObj;
+        } else if (typeof(extraKeys) === "object") {
             // this will traverse the prototype chain of extra, but keeping
             // to maintain legacy behavior
             for (var key in extraKeys) {
                 mergedCmdObj[key] = extraKeys[key];
             }
+        } else {
+            throw Error("Second argument to DB.runCommand(" + commandName +
+                        ") must be an object: (type: " + typeof(extraKeys) + "): " +
+                        tojson(extraKeys));
         }
+
         return mergedCmdObj;
     };
 
@@ -91,7 +117,7 @@ var DB;
 
         // Support users who call this function with a string commandName, e.g.
         // db.runReadCommand("commandName", {arg1: "value", arg2: "value"}).
-        var mergedObj = (typeof(obj) === "string") ? this._mergeCommandOptions(obj, extra) : obj;
+        var mergedObj = this._mergeCommandOptions(obj, extra);
         var cmdObjWithReadPref =
             this._attachReadPreferenceToCommand(mergedObj, this.getMongo().getReadPref());
 
@@ -115,7 +141,12 @@ var DB;
     };
 
     DB.prototype.runCommand = function(obj, extra, queryOptions) {
-        var mergedObj = (typeof(obj) === "string") ? this._mergeCommandOptions(obj, extra) : obj;
+        "use strict";
+
+        // Support users who call this function with a string commandName, e.g.
+        // db.runCommand("commandName", {arg1: "value", arg2: "value"}).
+        var mergedObj = this._mergeCommandOptions(obj, extra);
+
         // if options were passed (i.e. because they were overridden on a collection), use them.
         // Otherwise use getQueryOptions.
         var options =
