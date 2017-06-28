@@ -388,23 +388,16 @@
                "update failed for a reason other than using array updates with $currentDate");
 
     // $addToSet.
-    // TODO SERVER-28764: $addToSet should use the new update implementation.
     coll.drop();
     if (db.getMongo().writeMode() === "commands") {
-        res = coll.update({_id: 0}, {$addToSet: {"a.$[i]": ["elem"]}}, {arrayFilters: [{i: 0}]});
-        assert.writeErrorWithCode(res, ErrorCodes.InvalidOptions);
-        assert.neq(
-            -1,
-            res.getWriteError().errmsg.indexOf("Cannot use array filters with modifier $addToSet"),
-            "update failed for a reason other than using array filters with $addToSet");
+        assert.writeOK(coll.insert({_id: 0, a: [[0], [1]]}));
+        assert.writeOK(coll.update({_id: 0}, {$addToSet: {"a.$[i]": 2}}, {arrayFilters: [{i: 0}]}));
+        assert.eq(coll.findOne({_id: 0}), {_id: 0, a: [[0, 2], [1]]});
     }
-    assert.writeOK(coll.insert({_id: 0, a: [[]]}));
-    res = coll.update({_id: 0}, {$addToSet: {"a.$[]": ["elem"]}});
-    assert.writeErrorWithCode(res, 16837);
-    assert.neq(-1,
-               res.getWriteError().errmsg.indexOf(
-                   "cannot use the part (a of a.$[]) to traverse the element ({a: [ [] ]})"),
-               "update failed for a reason other than using array updates with $addToSet");
+    coll.drop();
+    assert.writeOK(coll.insert({_id: 0, a: [[0], [1]]}));
+    assert.writeOK(coll.update({_id: 0}, {$addToSet: {"a.$[]": 2}}));
+    assert.eq(coll.findOne({_id: 0}), {_id: 0, a: [[0, 2], [1, 2]]});
 
     // $pop.
     // TODO SERVER-28769: $pop should use the new update implementation.

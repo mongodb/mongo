@@ -86,7 +86,9 @@ public:
         for (auto&& child : _children) {
             child.second->setCollator(collator);
         }
-        _positionalChild->setCollator(collator);
+        if (_positionalChild) {
+            _positionalChild->setCollator(collator);
+        }
     }
 
     void apply(mutablebson::Element element,

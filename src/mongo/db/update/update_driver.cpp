@@ -453,6 +453,10 @@ void UpdateDriver::setModOptions(ModifierInterface::Options modOpts) {
 }
 
 void UpdateDriver::setCollator(const CollatorInterface* collator) {
+    if (_root) {
+        _root->setCollator(collator);
+    }
+
     for (auto&& mod : _mods) {
         mod->setCollator(collator);
     }
