@@ -43,7 +43,7 @@ enums:
             kUpdate: "u"
             kDelete: "d"
             kNoop: "n"
- 
+
 structs:
     OplogEntryBase:
         description: A document in which the server stores an oplog entry.
@@ -110,3 +110,9 @@ structs:
                                # must exist.
                 description: "Identifier of the transaction statement which generated this oplog
                               entry"
+            prevTs:
+                cpp_name: prevWriteTsInTransaction
+                type: timestamp
+                optional: true # Only for writes that are part of a transaction
+                description: "The oplog timestamp of the previous write with the same transaction."
+

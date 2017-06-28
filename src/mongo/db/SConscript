@@ -1329,13 +1329,14 @@ env.Library(
         'session_transaction_table.cpp',
         'session_txn_state.cpp',
         'session_txn_state_holder.cpp',
-        'session_txn_write_history_iterator.cpp',
+        'transaction_history_iterator.cpp',
         env.Idlc('session_txn_record.idl')[0],
     ],
     LIBDEPS=[
         '$BUILD_DIR/mongo/db/dbdirectclient',
         '$BUILD_DIR/mongo/db/logical_session_id',
         '$BUILD_DIR/mongo/db/ops/write_ops',
+        '$BUILD_DIR/mongo/db/repl/oplog_entry',
         '$BUILD_DIR/mongo/idl/idl_parser',
     ],
 )
@@ -1351,3 +1352,16 @@ env.CppUnitTest(
         '$BUILD_DIR/mongo/db/repl/replmocks',
     ],
 )
+
+env.CppUnitTest(
+    target='transaction_history_iterator_test',
+    source=[
+        'transaction_history_iterator_test.cpp',
+    ],
+    LIBDEPS=[
+        'service_context_d_test_fixture',
+        'session_transactions',
+        '$BUILD_DIR/mongo/db/repl/replmocks',
+    ],
+)
+

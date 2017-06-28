@@ -34,7 +34,7 @@
 #include "mongo/bson/timestamp.h"
 #include "mongo/db/logical_session_id.h"
 #include "mongo/db/session_txn_record_gen.h"
-#include "mongo/db/session_txn_write_history_iterator.h"
+#include "mongo/db/transaction_history_iterator.h"
 
 namespace mongo {
 
@@ -65,7 +65,7 @@ public:
     /**
      * Returns the history of writes that has happened on this transaction.
      */
-    SessionTxnWriteHistoryIterator getWriteHistory(OperationContext* opCtx) const;
+    TransactionHistoryIterator getWriteHistory(OperationContext* opCtx) const;
 
     /**
      * Stores the result of a single write operation within this transaction.

@@ -28,22 +28,52 @@
 
 #include "mongo/platform/basic.h"
 
+#include "mongo/db/dbdirectclient.h"
 #include "mongo/db/operation_context.h"
-#include "mongo/db/session_txn_write_history_iterator.h"
+#include "mongo/db/repl/oplog.h"
+#include "mongo/db/repl/oplog_entry.h"
+#include "mongo/db/transaction_history_iterator.h"
+#include "mongo/logger/redaction.h"
+#include "mongo/util/mongoutils/str.h"
 
 namespace mongo {
 
-SessionTxnWriteHistoryIterator::SessionTxnWriteHistoryIterator(Timestamp startingOpTimeTs)
+TransactionHistoryIterator::TransactionHistoryIterator(Timestamp startingOpTimeTs)
     : _nextOpTimeTs(std::move(startingOpTimeTs)) {}
 
-bool SessionTxnWriteHistoryIterator::hasNext() const {
+bool TransactionHistoryIterator::hasNext() const {
     return !_nextOpTimeTs.isNull();
 }
 
-repl::OplogEntry next(OperationContext* opCtx) {
-    // TODO: use DBDirectClient to fetch the oplog entry.
-    // assert if !hasNext().
-    return repl::OplogEntry(BSONObj());
+repl::OplogEntry TransactionHistoryIterator::next(OperationContext* opCtx) {
+    invariant(hasNext());
+
+    DBDirectClient client(opCtx);
+    // TODO: SERVER-29843 oplogReplay option might be needed to activate fast ts search.
+    auto oplogBSON =
+        client.findOne(repl::rsOplogName,
+                       BSON(repl::OplogEntryBase::kTimestampFieldName << _nextOpTimeTs),
+                       /* fieldsToReturn */ nullptr,
+                       0 /* QueryOption_OplogReplay */);
+
+    uassert(ErrorCodes::IncompleteTransactionHistory,
+            str::stream() << "oplog no longer contains the complete write history of this "
+                             "transaction, log with ts "
+                          << _nextOpTimeTs.toBSON()
+                          << " cannot be found",
+            !oplogBSON.isEmpty());
+
+    auto oplogEntry = uassertStatusOK(repl::OplogEntry::parse(oplogBSON));
+    const auto& oplogPrevTsOption = oplogEntry.getPrevWriteTsInTransaction();
+    uassert(
+        ErrorCodes::FailedToParse,
+        str::stream() << "Missing prevTs field on oplog entry of previous write in transcation: "
+                      << redact(oplogBSON),
+        oplogPrevTsOption);
+
+    _nextOpTimeTs = oplogPrevTsOption.value();
+
+    return oplogEntry;
 }
 
 }  // namespace mongo

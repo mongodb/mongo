@@ -190,8 +190,8 @@ const Timestamp& SessionTxnState::getLastWriteOpTimeTs() const {
     return _txnRecord->getLastWriteOpTimeTs();
 }
 
-SessionTxnWriteHistoryIterator SessionTxnState::getWriteHistory(OperationContext* opCtx) const {
-    return SessionTxnWriteHistoryIterator(getLastWriteOpTimeTs());
+TransactionHistoryIterator SessionTxnState::getWriteHistory(OperationContext* opCtx) const {
+    return TransactionHistoryIterator(getLastWriteOpTimeTs());
 }
 
 }  // namespace mongo

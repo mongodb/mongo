@@ -39,12 +39,12 @@ class OperationContext;
  * An iterator class that can traverse through the oplog entries that are linked via the prevTs
  * field.
  */
-class SessionTxnWriteHistoryIterator {
+class TransactionHistoryIterator {
 public:
     /**
      * Creates a new iterator starting with an oplog entry with the given start opTime.
      */
-    SessionTxnWriteHistoryIterator(Timestamp startingOpTimeTs);
+    TransactionHistoryIterator(Timestamp startingOpTimeTs);
 
     /**
      * Returns false if there are no more entries to iterate.
@@ -53,7 +53,9 @@ public:
 
     /**
      * Returns the next oplog entry.
-     * Throws if hasNext is false.
+     * Should not be called if hasNext is false.
+     * Throws if next oplog entry is in a unrecognized format or if it can't find the next oplog
+     * entry.
      */
     repl::OplogEntry next(OperationContext* opCtx);
 
