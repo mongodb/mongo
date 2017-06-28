@@ -913,6 +913,29 @@ TEST_F(RSRollbackTest, RollbackDropCollectionCommandFailsIfRBIDChangesWhileSynci
     ASSERT(rollbackSource.copyCollectionCalled);
 }
 
+TEST_F(RSRollbackTest, RollbackDropDatabaseCommand) {
+    createOplog(_opCtx.get());
+    auto commonOperation =
+        std::make_pair(BSON("ts" << Timestamp(Seconds(1), 0) << "h" << 1LL), RecordId(1));
+    auto dropDatabaseOperation =
+        std::make_pair(BSON("ts" << Timestamp(Seconds(2), 0) << "h" << 1LL << "op"
+                                 << "c"
+                                 << "ns"
+                                 << "test.$cmd"
+                                 << "o"
+                                 << BSON("dropDatabase" << 1)),
+                       RecordId(2));
+    RollbackSourceMock rollbackSource(std::unique_ptr<OplogInterface>(new OplogInterfaceMock({
+        commonOperation,
+    })));
+    ASSERT_OK(syncRollback(_opCtx.get(),
+                           OplogInterfaceMock({dropDatabaseOperation, commonOperation}),
+                           rollbackSource,
+                           {},
+                           _coordinator,
+                           _replicationProcess.get()));
+}
+
 BSONObj makeApplyOpsOplogEntry(Timestamp ts, std::initializer_list<BSONObj> ops) {
     BSONObjBuilder entry;
     entry << "ts" << ts << "h" << 1LL << "op"

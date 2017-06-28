@@ -218,9 +218,10 @@ Status rollback_internal::updateFixUpInfoFromLocalOplogEntry(FixUpInfo& fixUpInf
                 return Status::OK();
             }
             case OplogEntry::CommandType::kDropDatabase: {
-                string message = "Can't roll back drop database. Full resync will be required.";
-                severe() << message << redact(obj);
-                throw RSFatalException(message);
+                // Since we wait for all internal collection drops to be committed before recording
+                // a 'dropDatabase' oplog entry, this will always create an empty database.
+                // Creating an empty database doesn't mean anything, so we do nothing.
+                return Status::OK();
             }
             case OplogEntry::CommandType::kCollMod: {
                 const auto ns = nss.db().toString() + '.' + first.valuestr();  // -> foo.abc
