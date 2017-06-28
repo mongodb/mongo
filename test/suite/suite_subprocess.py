@@ -119,11 +119,13 @@ class suite_subprocess:
 
     # Run the wt utility.
     def runWt(self, args, infilename=None,
-        outfilename=None, errfilename=None, reopensession=True, failure=False):
+        outfilename=None, errfilename=None, closeconn=True,
+        reopensession=True, failure=False):
 
         # Close the connection to guarantee everything is flushed, and that
         # we can open it from another process.
-        self.close_conn()
+        if closeconn:
+            self.close_conn()
 
         wtoutname = outfilename or "wt.out"
         wterrname = errfilename or "wt.err"
@@ -166,5 +168,5 @@ class suite_subprocess:
             self.check_empty_file(wtoutname)
 
         # Reestablish the connection if needed
-        if reopensession:
+        if reopensession and closeconn:
             self.open_conn()

@@ -414,6 +414,7 @@ struct __wt_connection_stats {
 	int64_t lock_table_read_count;
 	int64_t lock_table_write_count;
 	int64_t log_slot_switch_busy;
+	int64_t log_force_ckpt_sleep;
 	int64_t log_bytes_payload;
 	int64_t log_bytes_written;
 	int64_t log_zero_fills;

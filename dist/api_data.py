@@ -401,6 +401,12 @@ connection_runtime_config = [
             above 0 configures periodic checkpoints''',
             min='0', max='100000'),
         ]),
+    Config('compatibility', '', r'''
+        set compatibility version of database''',
+        type='category', subconfig=[
+        Config('release', '', r'''
+            compatibility release version string'''),
+        ]),
     Config('diagnostic_timing_stress', '', r'''
         enable insertion of code that interrupts the usual timing of
         operations with a goal of uncovering race conditions and unexpected

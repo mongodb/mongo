@@ -238,6 +238,7 @@ __log_slot_new(WT_SESSION_IMPL *session)
 		/*
 		 * Rotate among the slots to lessen collisions.
 		 */
+		WT_RET(WT_SESSION_CHECK_PANIC(session));
 		for (i = 0, pool_i = log->pool_index; i < WT_SLOT_POOL;
 		    i++, pool_i++) {
 			if (pool_i >= WT_SLOT_POOL)
@@ -314,7 +315,7 @@ __log_slot_switch_internal(
 	 * because the slot could be part of an unbuffered operation.
 	 */
 	joined = WT_LOG_SLOT_JOINED(slot->slot_state);
-	if (joined == 0 && forced) {
+	if (joined == 0 && forced && !F_ISSET(log, WT_LOG_FORCE_NEWFILE)) {
 		WT_STAT_CONN_INCR(session, log_force_write_skip);
 		if (did_work != NULL)
 			*did_work = false;
@@ -393,6 +394,9 @@ __wt_log_slot_switch(WT_SESSION_IMPL *session,
 			WT_STAT_CONN_INCR(session, log_slot_switch_busy);
 			__wt_yield();
 		}
+		WT_RET(WT_SESSION_CHECK_PANIC(session));
+		if (F_ISSET(S2C(session), WT_CONN_CLOSING))
+			break;
 	} while (F_ISSET(myslot, WT_MYSLOT_CLOSE) || (retry && ret == EBUSY));
 	return (ret);
 }

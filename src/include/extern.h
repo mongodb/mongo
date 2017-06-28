@@ -267,7 +267,7 @@ extern int __wt_conn_dhandle_discard(WT_SESSION_IMPL *session) WT_GCC_FUNC_DECL_
 extern int __wt_connection_init(WT_CONNECTION_IMPL *conn) WT_GCC_FUNC_DECL_ATTRIBUTE((warn_unused_result));
 extern void __wt_connection_destroy(WT_CONNECTION_IMPL *conn);
 extern int __wt_logmgr_reconfig(WT_SESSION_IMPL *session, const char **cfg) WT_GCC_FUNC_DECL_ATTRIBUTE((warn_unused_result));
-extern int __wt_log_truncate_files( WT_SESSION_IMPL *session, WT_CURSOR *cursor, const char *cfg[]) WT_GCC_FUNC_DECL_ATTRIBUTE((warn_unused_result));
+extern int __wt_log_truncate_files(WT_SESSION_IMPL *session, WT_CURSOR *cursor, bool force) WT_GCC_FUNC_DECL_ATTRIBUTE((warn_unused_result));
 extern void __wt_log_wrlsn(WT_SESSION_IMPL *session, int *yield);
 extern int __wt_logmgr_create(WT_SESSION_IMPL *session, const char *cfg[]) WT_GCC_FUNC_DECL_ATTRIBUTE((warn_unused_result));
 extern int __wt_logmgr_open(WT_SESSION_IMPL *session) WT_GCC_FUNC_DECL_ATTRIBUTE((warn_unused_result));
@@ -371,6 +371,8 @@ extern void __wt_log_written_reset(WT_SESSION_IMPL *session);
 extern int __wt_log_get_all_files(WT_SESSION_IMPL *session, char ***filesp, u_int *countp, uint32_t *maxid, bool active_only) WT_GCC_FUNC_DECL_ATTRIBUTE((warn_unused_result));
 extern int __wt_log_extract_lognum( WT_SESSION_IMPL *session, const char *name, uint32_t *id) WT_GCC_FUNC_DECL_ATTRIBUTE((warn_unused_result));
 extern int __wt_log_reset(WT_SESSION_IMPL *session, uint32_t lognum) WT_GCC_FUNC_DECL_ATTRIBUTE((warn_unused_result));
+extern int __wt_log_fill(WT_SESSION_IMPL *session, WT_MYSLOT *myslot, bool force, WT_ITEM *record, WT_LSN *lsnp) WT_GCC_FUNC_DECL_ATTRIBUTE((warn_unused_result));
+extern int __wt_log_set_version(WT_SESSION_IMPL *session, uint16_t version, uint32_t first_rec, bool downgrade, bool live_chg, uint32_t *lognump) WT_GCC_FUNC_DECL_ATTRIBUTE((warn_unused_result));
 extern int __wt_log_acquire(WT_SESSION_IMPL *session, uint64_t recsize, WT_LOGSLOT *slot) WT_GCC_FUNC_DECL_ATTRIBUTE((warn_unused_result));
 extern int __wt_log_allocfile( WT_SESSION_IMPL *session, uint32_t lognum, const char *dest) WT_GCC_FUNC_DECL_ATTRIBUTE((warn_unused_result));
 extern int __wt_log_remove(WT_SESSION_IMPL *session, const char *file_prefix, uint32_t lognum) WT_GCC_FUNC_DECL_ATTRIBUTE((warn_unused_result));
@@ -412,6 +414,8 @@ extern int __wt_log_slot_destroy(WT_SESSION_IMPL *session) WT_GCC_FUNC_DECL_ATTR
 extern void __wt_log_slot_join(WT_SESSION_IMPL *session, uint64_t mysize, uint32_t flags, WT_MYSLOT *myslot);
 extern int64_t __wt_log_slot_release(WT_MYSLOT *myslot, int64_t size);
 extern void __wt_log_slot_free(WT_SESSION_IMPL *session, WT_LOGSLOT *slot);
+extern int __wt_log_system_record( WT_SESSION_IMPL *session, WT_FH *log_fh, WT_LSN *lsn) WT_GCC_FUNC_DECL_ATTRIBUTE((warn_unused_result));
+extern int __wt_log_recover_system(WT_SESSION_IMPL *session, const uint8_t **pp, const uint8_t *end, WT_LSN *lsnp) WT_GCC_FUNC_DECL_ATTRIBUTE((warn_unused_result));
 extern int __wt_clsm_request_switch(WT_CURSOR_LSM *clsm) WT_GCC_FUNC_DECL_ATTRIBUTE((warn_unused_result));
 extern int __wt_clsm_await_switch(WT_CURSOR_LSM *clsm) WT_GCC_FUNC_DECL_ATTRIBUTE((warn_unused_result));
 extern int __wt_clsm_init_merge( WT_CURSOR *cursor, u_int start_chunk, uint32_t start_id, u_int nchunks) WT_GCC_FUNC_DECL_ATTRIBUTE((warn_unused_result));
