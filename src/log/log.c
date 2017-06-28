@@ -50,6 +50,9 @@ __log_checksum_match(WT_SESSION_IMPL *session, WT_ITEM *buf, uint32_t reclen)
 	checksum_tmp = logrec->checksum;
 	logrec->checksum = 0;
 	checksum_calculate = __wt_checksum(logrec, reclen);
+#ifdef WORDS_BIGENDIAN
+	checksum_calculate = __wt_bswap32(checksum_calculate);
+#endif
 	logrec->checksum = checksum_tmp;
 	if (logrec->checksum != checksum_calculate)
 		return (false);
