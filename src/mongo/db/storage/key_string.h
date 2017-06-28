@@ -238,7 +238,7 @@ public:
          * size only includes data bytes, not the size bytes itself.
          */
         uint16_t getSizeWord() const {
-            return ((uint16_t*)(_buf))[0] & 0x1fe;
+            return ((uint16_t*)(_buf))[0] & 0x1ff;
         }
         void setSizeWord(uint16_t size) {
             dassert(size < kMaxBytesNeeded);
