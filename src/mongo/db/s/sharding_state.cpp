@@ -490,21 +490,7 @@ ChunkVersion ShardingState::_refreshMetadata(OperationContext* opCtx, const Name
             return nullptr;
         }
 
-        RangeMap shardChunksMap =
-            SimpleBSONObjComparator::kInstance.makeBSONObjIndexedMap<CachedChunkInfo>();
-
-        for (const auto& chunk : cm->chunks()) {
-            if (chunk->getShardId() != shardId)
-                continue;
-
-            shardChunksMap.emplace(chunk->getMin(),
-                                   CachedChunkInfo(chunk->getMax(), chunk->getLastmod()));
-        }
-
-        return stdx::make_unique<CollectionMetadata>(cm->getShardKeyPattern().toBSON(),
-                                                     cm->getVersion(),
-                                                     cm->getVersion(shardId),
-                                                     std::move(shardChunksMap));
+        return stdx::make_unique<CollectionMetadata>(cm, shardId);
     }();
 
     // Exclusive collection lock needed since we're now changing the metadata

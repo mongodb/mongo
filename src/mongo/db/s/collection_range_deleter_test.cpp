@@ -118,13 +118,19 @@ void CollectionRangeDeleterTest::setUp() {
     {
         AutoGetCollection autoColl(operationContext(), kNss, MODE_IX);
         auto collectionShardingState = CollectionShardingState::get(operationContext(), kNss);
+        const KeyPattern skPattern(kKeyPattern);
+        auto cm = ChunkManager::makeNew(
+            kNss,
+            kKeyPattern,
+            nullptr,
+            false,
+            epoch(),
+            {ChunkType(kNss,
+                       ChunkRange{skPattern.globalMin(), skPattern.globalMax()},
+                       ChunkVersion(1, 0, epoch()),
+                       ShardId("otherShard"))});
         collectionShardingState->refreshMetadata(
-            operationContext(),
-            stdx::make_unique<CollectionMetadata>(
-                kKeyPattern,
-                ChunkVersion(1, 0, epoch()),
-                ChunkVersion(0, 0, epoch()),
-                SimpleBSONObjComparator::kInstance.makeBSONObjIndexedMap<CachedChunkInfo>()));
+            operationContext(), stdx::make_unique<CollectionMetadata>(cm, ShardId("thisShard")));
     }
 }
 

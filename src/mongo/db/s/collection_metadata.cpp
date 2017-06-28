@@ -41,20 +41,22 @@
 
 namespace mongo {
 
-CollectionMetadata::CollectionMetadata(const BSONObj& keyPattern,
-                                       ChunkVersion collectionVersion,
-                                       ChunkVersion shardVersion,
-                                       RangeMap shardChunksMap)
-    : _shardKeyPattern(keyPattern),
-      _collVersion(collectionVersion),
-      _shardVersion(shardVersion),
-      _chunksMap(std::move(shardChunksMap)),
+CollectionMetadata::CollectionMetadata(std::shared_ptr<ChunkManager> cm, const ShardId& thisShardId)
+    : _cm(cm),
+      _thisShardId(thisShardId),
+      _shardVersion(_cm->getVersion(thisShardId)),
+      _chunksMap(SimpleBSONObjComparator::kInstance.makeBSONObjIndexedMap<CachedChunkInfo>()),
       _rangesMap(SimpleBSONObjComparator::kInstance.makeBSONObjIndexedMap<CachedChunkInfo>()) {
 
-    invariant(_shardKeyPattern.isValid());
-    invariant(_collVersion.epoch() == _shardVersion.epoch());
-    invariant(_collVersion.isSet());
-    invariant(_collVersion >= _shardVersion);
+    invariant(_cm->getVersion().isSet());
+    invariant(_cm->getVersion() >= _shardVersion);
+
+    for (const auto& chunk : _cm->chunks()) {
+        if (chunk->getShardId() != _thisShardId)
+            continue;
+
+        _chunksMap.emplace(chunk->getMin(), CachedChunkInfo(chunk->getMax(), chunk->getLastmod()));
+    }
 
     if (_chunksMap.empty()) {
         invariant(!_shardVersion.isSet());
@@ -104,8 +106,7 @@ void CollectionMetadata::_buildRangesMap() {
 }
 
 std::unique_ptr<CollectionMetadata> CollectionMetadata::clone() const {
-    return stdx::make_unique<CollectionMetadata>(
-        _shardKeyPattern.toBSON(), getCollVersion(), getShardVersion(), getChunks());
+    return stdx::make_unique<CollectionMetadata>(_cm, _thisShardId);
 }
 
 bool CollectionMetadata::keyBelongsToMe(const BSONObj& key) const {
@@ -193,9 +194,9 @@ bool CollectionMetadata::rangeOverlapsChunk(ChunkRange const& range) {
 }
 
 void CollectionMetadata::toBSONBasic(BSONObjBuilder& bb) const {
-    _collVersion.addToBSON(bb, "collVersion");
+    _cm->getVersion().addToBSON(bb, "collVersion");
     _shardVersion.addToBSON(bb, "shardVersion");
-    bb.append("keyPattern", _shardKeyPattern.toBSON());
+    bb.append("keyPattern", _cm->getShardKeyPattern().toBSON());
 }
 
 void CollectionMetadata::toBSONChunks(BSONArrayBuilder& bb) const {
@@ -211,7 +212,7 @@ void CollectionMetadata::toBSONChunks(BSONArrayBuilder& bb) const {
 }
 
 std::string CollectionMetadata::toStringBasic() const {
-    return str::stream() << "collection version: " << _collVersion.toString()
+    return str::stream() << "collection version: " << _cm->getVersion().toString()
                          << ", shard version: " << _shardVersion.toString();
 }
 
@@ -253,7 +254,7 @@ boost::optional<KeyRange> CollectionMetadata::getNextOrphanRange(
         }
 
         boost::optional<KeyRange> range =
-            KeyRange("", getMinKey(), maxKey, _shardKeyPattern.toBSON());
+            KeyRange("", getMinKey(), maxKey, _cm->getShardKeyPattern().toBSON());
 
         auto patchArgRange = [&range](RangeMap const& map, Its its) {
             // We know that the lookup key is not covered by a chunk or pending range, and where the
@@ -278,15 +279,15 @@ boost::optional<KeyRange> CollectionMetadata::getNextOrphanRange(
 }
 
 BSONObj CollectionMetadata::getMinKey() const {
-    return _shardKeyPattern.getKeyPattern().globalMin();
+    return _cm->getShardKeyPattern().getKeyPattern().globalMin();
 }
 
 BSONObj CollectionMetadata::getMaxKey() const {
-    return _shardKeyPattern.getKeyPattern().globalMax();
+    return _cm->getShardKeyPattern().getKeyPattern().globalMax();
 }
 
 bool CollectionMetadata::isValidKey(const BSONObj& key) const {
-    return _shardKeyPattern.isShardKey(key);
+    return _cm->getShardKeyPattern().isShardKey(key);
 }
 
 }  // namespace mongo

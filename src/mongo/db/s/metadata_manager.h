@@ -83,12 +83,6 @@ public:
      */
     void append(BSONObjBuilder* builder);
 
-    /**
-     * Returns a map to the set of chunks being migrated in.
-     */
-    RangeMap const& getReceiveMap() const {
-        return _receivingChunks;
-    }
 
     /**
      * Schedules any documents in `range` for immediate cleanup iff no running queries can depend
@@ -211,6 +205,7 @@ private:
     // data members
 
     const NamespaceString _nss;
+
     // ServiceContext from which to obtain instances of global support objects.
     ServiceContext* const _serviceContext;
 

@@ -249,6 +249,18 @@ env.CppUnitTest('request_types_test',
     ],
 )
 
+env.Library(
+    target='routing_table',
+    source=[
+        'chunk.cpp',
+        'chunk_manager.cpp',
+    ],
+    LIBDEPS=[
+        '$BUILD_DIR/mongo/db/storage/key_string',
+        'common',
+    ],
+)
+
 # This library contains sharding functionality used by both mongod and mongos
 env.Library(
     target='coreshard',
@@ -256,8 +268,6 @@ env.Library(
         'balancer_configuration.cpp',
         'catalog_cache.cpp',
         'catalog_cache_loader.cpp',
-        'chunk.cpp',
-        'chunk_manager.cpp',
         'cluster_identity_loader.cpp',
         'config_server_catalog_cache_loader.cpp',
         'config_server_client.cpp',
@@ -274,6 +284,7 @@ env.Library(
         '$BUILD_DIR/mongo/s/query/cluster_cursor_manager',
         '$BUILD_DIR/mongo/util/concurrency/thread_pool',
         'common',
+        'routing_table',
         #'client/sharding_client', # CYCLE
     ],
     LIBDEPS_TAGS=[

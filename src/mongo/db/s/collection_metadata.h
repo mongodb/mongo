@@ -31,6 +31,7 @@
 #include "mongo/db/range_arithmetic.h"
 #include "mongo/db/s/collection_range_deleter.h"
 #include "mongo/s/catalog/type_chunk.h"
+#include "mongo/s/chunk_manager.h"
 #include "mongo/s/chunk_version.h"
 #include "mongo/s/shard_key_pattern.h"
 
@@ -55,11 +56,11 @@ class CollectionMetadata {
 public:
     /**
      * The main way to construct CollectionMetadata is through MetadataLoader or clone() methods.
+     *
+     * "thisShardId" is the shard identity of this shard for purposes of answering questions like
+     * "does this key belong to this shard"?
      */
-    CollectionMetadata(const BSONObj& keyPattern,
-                       ChunkVersion collectionVersion,
-                       ChunkVersion shardVersion,
-                       RangeMap shardChunksMap);
+    CollectionMetadata(std::shared_ptr<ChunkManager> cm, const ShardId& thisShardId);
 
     ~CollectionMetadata();
 
@@ -125,7 +126,7 @@ public:
                                                  BSONObj const& lookupKey) const;
 
     ChunkVersion getCollVersion() const {
-        return _collVersion;
+        return _cm->getVersion();
     }
 
     ChunkVersion getShardVersion() const {
@@ -137,11 +138,11 @@ public:
     }
 
     const BSONObj& getKeyPattern() const {
-        return _shardKeyPattern.toBSON();
+        return _cm->getShardKeyPattern().toBSON();
     }
 
     const std::vector<std::unique_ptr<FieldRef>>& getKeyPatternFields() const {
-        return _shardKeyPattern.getKeyPatternFields();
+        return _cm->getShardKeyPattern().getKeyPatternFields();
     }
 
     BSONObj getMinKey() const;
@@ -167,6 +168,10 @@ public:
      */
     std::string toStringBasic() const;
 
+    std::shared_ptr<ChunkManager> getChunkManager() const {
+        return _cm;
+    }
+
 private:
     struct Tracker {
         uint32_t usageCounter{0};
@@ -179,12 +184,11 @@ private:
      */
     void _buildRangesMap();
 
-    // Shard key pattern for the collection
-    ShardKeyPattern _shardKeyPattern;
+    // The full routing table for the collection.
+    std::shared_ptr<ChunkManager> _cm;
 
-    // a version for this collection that identifies the collection incarnation (ie, a
-    // dropped and recreated collection with the same name would have a different version)
-    ChunkVersion _collVersion;
+    // The identity of this shard, for the purpose of answering "key belongs to me" queries.
+    ShardId _thisShardId;
 
     // highest ChunkVersion for which this metadata's information is accurate
     ChunkVersion _shardVersion;

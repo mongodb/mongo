@@ -66,9 +66,11 @@ namespace {
 using unittest::assertGet;
 
 const NamespaceString kNss("TestDB", "TestColl");
-const std::string kPattern = "X";
-const BSONObj kShardKeyPattern{BSON(kPattern << 1)};
-const std::string kShardName{"a"};
+const std::string kPattern = "key";
+const BSONObj kShardKeyPatternBSON{BSON(kPattern << 1)};
+const KeyPattern kShardKeyPattern{kShardKeyPatternBSON};
+const std::string kThisShard{"thisShard"};
+const std::string kOtherShard{"otherShard"};
 const HostAndPort dummyHost("dummy", 123);
 
 class MetadataManagerTest : public ShardingMongodTestFixture {
@@ -107,11 +109,17 @@ protected:
     static std::unique_ptr<CollectionMetadata> makeEmptyMetadata() {
         const OID epoch = OID::gen();
 
-        return stdx::make_unique<CollectionMetadata>(
-            BSON("key" << 1),
-            ChunkVersion(1, 0, epoch),
-            ChunkVersion(0, 0, epoch),
-            SimpleBSONObjComparator::kInstance.makeBSONObjIndexedMap<CachedChunkInfo>());
+        auto cm = ChunkManager::makeNew(
+            kNss,
+            kShardKeyPattern,
+            nullptr,
+            false,
+            epoch,
+            {ChunkType{kNss,
+                       ChunkRange{BSON(kPattern << MINKEY), BSON(kPattern << MAXKEY)},
+                       ChunkVersion(1, 0, epoch),
+                       kOtherShard}});
+        return stdx::make_unique<CollectionMetadata>(cm, kThisShard);
     }
 
     /**
@@ -123,30 +131,33 @@ protected:
      * chunk version is lower than the maximum one.
      */
     static std::unique_ptr<CollectionMetadata> cloneMetadataPlusChunk(
-        const CollectionMetadata& metadata,
-        const BSONObj& minKey,
-        const BSONObj& maxKey,
-        const ChunkVersion& chunkVersion) {
-        invariant(chunkVersion.isSet());
-        invariant(chunkVersion > metadata.getCollVersion());
+        const CollectionMetadata& metadata, const BSONObj& minKey, const BSONObj& maxKey) {
         invariant(minKey.woCompare(maxKey) < 0);
         invariant(!rangeMapOverlaps(metadata.getChunks(), minKey, maxKey));
 
-        auto chunksMap = metadata.getChunks();
-        chunksMap.insert(
-            std::make_pair(minKey.getOwned(), CachedChunkInfo(maxKey.getOwned(), chunkVersion)));
-
-        return stdx::make_unique<CollectionMetadata>(
-            metadata.getKeyPattern(), chunkVersion, chunkVersion, std::move(chunksMap));
+        auto cm = metadata.getChunkManager();
+        auto chunkToSplit = cm->findIntersectingChunkWithSimpleCollation(minKey);
+        ASSERT(SimpleBSONObjComparator::kInstance.evaluate(maxKey <= chunkToSplit->getMax()))
+            << "maxKey == " << maxKey
+            << " and chunkToSplit->getMax() == " << chunkToSplit->getMax();
+        auto v1 = cm->getVersion();
+        v1.incMajor();
+        auto v2 = v1;
+        v2.incMajor();
+        auto v3 = v2;
+        v3.incMajor();
+        cm = cm->makeUpdated(
+            {ChunkType{kNss, ChunkRange{chunkToSplit->getMin(), minKey}, v1, kOtherShard},
+             ChunkType{kNss, ChunkRange{minKey, maxKey}, v2, kThisShard},
+             ChunkType{kNss, ChunkRange{maxKey, chunkToSplit->getMax()}, v3, kOtherShard}});
+        return stdx::make_unique<CollectionMetadata>(cm, kThisShard);
     }
 
     CollectionMetadata* addChunk(std::shared_ptr<MetadataManager>& manager) {
         ScopedCollectionMetadata scopedMetadata1 = manager->getActiveMetadata(manager);
 
-        ChunkVersion newVersion = scopedMetadata1->getCollVersion();
-        newVersion.incMajor();
         std::unique_ptr<CollectionMetadata> cm2 = cloneMetadataPlusChunk(
-            *scopedMetadata1.getMetadata(), BSON("key" << 0), BSON("key" << 20), newVersion);
+            *scopedMetadata1.getMetadata(), BSON("key" << 0), BSON("key" << 20));
         auto cm2Ptr = cm2.get();
 
         manager->refreshActiveMetadata(std::move(cm2));
@@ -263,11 +274,8 @@ TEST_F(MetadataManagerTest, RefreshAfterSuccessfulMigrationSinglePending) {
     const ChunkRange cr1(BSON("key" << 0), BSON("key" << 10));
     ASSERT_EQ(_manager->getActiveMetadata(_manager)->getChunks().size(), 0UL);
 
-    ChunkVersion version = _manager->getActiveMetadata(_manager)->getCollVersion();
-    version.incMajor();
-
     _manager->refreshActiveMetadata(cloneMetadataPlusChunk(
-        *_manager->getActiveMetadata(_manager).getMetadata(), cr1.getMin(), cr1.getMax(), version));
+        *_manager->getActiveMetadata(_manager).getMetadata(), cr1.getMin(), cr1.getMax()));
     ASSERT_EQ(_manager->getActiveMetadata(_manager)->getChunks().size(), 1UL);
 }
 
@@ -280,27 +288,15 @@ TEST_F(MetadataManagerTest, RefreshAfterSuccessfulMigrationMultiplePending) {
     ASSERT_EQ(_manager->getActiveMetadata(_manager)->getChunks().size(), 0UL);
 
     {
-        ChunkVersion version = _manager->getActiveMetadata(_manager)->getCollVersion();
-        version.incMajor();
-
-        _manager->refreshActiveMetadata(
-            cloneMetadataPlusChunk(*_manager->getActiveMetadata(_manager).getMetadata(),
-                                   cr1.getMin(),
-                                   cr1.getMax(),
-                                   version));
+        _manager->refreshActiveMetadata(cloneMetadataPlusChunk(
+            *_manager->getActiveMetadata(_manager).getMetadata(), cr1.getMin(), cr1.getMax()));
         ASSERT_EQ(_manager->numberOfRangesToClean(), 0UL);
         ASSERT_EQ(_manager->getActiveMetadata(_manager)->getChunks().size(), 1UL);
     }
 
     {
-        ChunkVersion version = _manager->getActiveMetadata(_manager)->getCollVersion();
-        version.incMajor();
-
-        _manager->refreshActiveMetadata(
-            cloneMetadataPlusChunk(*_manager->getActiveMetadata(_manager).getMetadata(),
-                                   cr2.getMin(),
-                                   cr2.getMax(),
-                                   version));
+        _manager->refreshActiveMetadata(cloneMetadataPlusChunk(
+            *_manager->getActiveMetadata(_manager).getMetadata(), cr2.getMin(), cr2.getMax()));
         ASSERT_EQ(_manager->getActiveMetadata(_manager)->getChunks().size(), 2UL);
     }
 }
@@ -312,14 +308,10 @@ TEST_F(MetadataManagerTest, RefreshAfterNotYetCompletedMigrationMultiplePending)
     const ChunkRange cr2(BSON("key" << 30), BSON("key" << 40));
     ASSERT_EQ(_manager->getActiveMetadata(_manager)->getChunks().size(), 0UL);
 
-    ChunkVersion version = _manager->getActiveMetadata(_manager)->getCollVersion();
-    version.incMajor();
-
     _manager->refreshActiveMetadata(
         cloneMetadataPlusChunk(*_manager->getActiveMetadata(_manager).getMetadata(),
                                BSON("key" << 50),
-                               BSON("key" << 60),
-                               version));
+                               BSON("key" << 60)));
     ASSERT_EQ(_manager->getActiveMetadata(_manager)->getChunks().size(), 1UL);
 }
 
@@ -338,25 +330,21 @@ TEST_F(MetadataManagerTest, RefreshMetadataAfterDropAndRecreate) {
 
     {
         auto metadata = _manager->getActiveMetadata(_manager);
-        ChunkVersion newVersion = metadata->getCollVersion();
-        newVersion.incMajor();
-
-        _manager->refreshActiveMetadata(cloneMetadataPlusChunk(
-            *metadata.getMetadata(), BSON("key" << 0), BSON("key" << 10), newVersion));
+        _manager->refreshActiveMetadata(
+            cloneMetadataPlusChunk(*metadata.getMetadata(), BSON("key" << 0), BSON("key" << 10)));
     }
 
     // Now, pretend that the collection was dropped and recreated
     auto recreateMetadata = makeEmptyMetadata();
-    ChunkVersion newVersion = _manager->getActiveMetadata(_manager)->getCollVersion();
-    newVersion.incMajor();
-    _manager->refreshActiveMetadata(cloneMetadataPlusChunk(
-        *recreateMetadata, BSON("key" << 20), BSON("key" << 30), newVersion));
+    _manager->refreshActiveMetadata(
+        cloneMetadataPlusChunk(*recreateMetadata, BSON("key" << 20), BSON("key" << 30)));
+    ChunkVersion newVersion = _manager->getActiveMetadata(_manager)->getShardVersion();
     ASSERT_EQ(_manager->getActiveMetadata(_manager)->getChunks().size(), 1UL);
 
     const auto chunkEntry = _manager->getActiveMetadata(_manager)->getChunks().begin();
     ASSERT_BSONOBJ_EQ(BSON("key" << 20), chunkEntry->first);
     ASSERT_BSONOBJ_EQ(BSON("key" << 30), chunkEntry->second.getMaxKey());
-    ASSERT_EQ(newVersion, chunkEntry->second.getVersion());
+    ASSERT_EQ(newVersion.epoch(), chunkEntry->second.getVersion().epoch());
 }
 
 // Tests membership functions for _rangesToClean
