@@ -533,6 +533,22 @@ __wt_illegal_value(WT_SESSION_IMPL *session, const char *name)
 }
 
 /*
+ * __wt_inmem_unsupported_op --
+ *	Print a standard error message for an operation that's not supported
+ * for in-memory configurations.
+ */
+int
+__wt_inmem_unsupported_op(WT_SESSION_IMPL *session, const char *tag)
+    WT_GCC_FUNC_ATTRIBUTE((cold))
+{
+	if (F_ISSET(S2C(session), WT_CONN_IN_MEMORY))
+		WT_RET_MSG(session, ENOTSUP,
+		    "%s%snot supported for in-memory configurations",
+		    tag == NULL ? "" : tag, tag == NULL ? "" : ": ");
+	return (0);
+}
+
+/*
  * __wt_object_unsupported --
  *	Print a standard error message for an object that doesn't support a
  * particular operation.

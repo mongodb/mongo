@@ -700,6 +700,10 @@ __session_rebalance(WT_SESSION *wt_session, const char *uri, const char *config)
 
 	SESSION_API_CALL(session, rebalance, config, cfg);
 
+	/* In-memory ignores rebalance operations. */
+	if (F_ISSET(S2C(session), WT_CONN_IN_MEMORY))
+		goto err;
+
 	/* Block out checkpoints to avoid spurious EBUSY errors. */
 	WT_WITH_CHECKPOINT_LOCK(session,
 	    WT_WITH_SCHEMA_LOCK(session,
@@ -709,8 +713,7 @@ __session_rebalance(WT_SESSION *wt_session, const char *uri, const char *config)
 err:	if (ret != 0)
 		WT_STAT_CONN_INCR(session, session_table_rebalance_fail);
 	else
-		WT_STAT_CONN_INCR(session,
-		    session_table_rebalance_success);
+		WT_STAT_CONN_INCR(session, session_table_rebalance_success);
 	API_END_RET_NOTFOUND_MAP(session, ret);
 }
 
@@ -1046,10 +1049,7 @@ __session_salvage(WT_SESSION *wt_session, const char *uri, const char *config)
 
 	SESSION_API_CALL(session, salvage, config, cfg);
 
-	if (F_ISSET(S2C(session), WT_CONN_IN_MEMORY))
-		WT_ERR_MSG(session, ENOTSUP,
-		    "WT_SESSION.salvage not supported for in-memory "
-		    "configurations");
+	WT_ERR(__wt_inmem_unsupported_op(session, NULL));
 
 	/* Block out checkpoints to avoid spurious EBUSY errors. */
 	WT_WITH_CHECKPOINT_LOCK(session,
@@ -1319,6 +1319,9 @@ __session_upgrade(WT_SESSION *wt_session, const char *uri, const char *config)
 	session = (WT_SESSION_IMPL *)wt_session;
 
 	SESSION_API_CALL(session, upgrade, config, cfg);
+
+	WT_ERR(__wt_inmem_unsupported_op(session, NULL));
+
 	/* Block out checkpoints to avoid spurious EBUSY errors. */
 	WT_WITH_CHECKPOINT_LOCK(session,
 	    WT_WITH_SCHEMA_LOCK(session,
@@ -1363,10 +1366,7 @@ __session_verify(WT_SESSION *wt_session, const char *uri, const char *config)
 
 	SESSION_API_CALL(session, verify, config, cfg);
 
-	if (F_ISSET(S2C(session), WT_CONN_IN_MEMORY))
-		WT_ERR_MSG(session, ENOTSUP,
-		    "WT_SESSION.verify not supported for in-memory "
-		    "configurations");
+	WT_ERR(__wt_inmem_unsupported_op(session, NULL));
 
 	/* Block out checkpoints to avoid spurious EBUSY errors. */
 	WT_WITH_CHECKPOINT_LOCK(session,
@@ -1632,10 +1632,7 @@ __session_checkpoint(WT_SESSION *wt_session, const char *config)
 	WT_STAT_CONN_INCR(session, txn_checkpoint);
 	SESSION_API_CALL(session, checkpoint, config, cfg);
 
-	if (F_ISSET(S2C(session), WT_CONN_IN_MEMORY))
-		WT_ERR_MSG(session, ENOTSUP,
-		    "WT_SESSION.checkpoint not supported for in-memory "
-		    "configurations");
+	WT_ERR(__wt_inmem_unsupported_op(session, NULL));
 
 	/*
 	 * Checkpoints require a snapshot to write a transactionally consistent

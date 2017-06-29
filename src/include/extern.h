@@ -650,6 +650,7 @@ __wt_assert(WT_SESSION_IMPL *session,
  WT_GCC_FUNC_DECL_ATTRIBUTE((visibility("default")));
 extern int __wt_panic(WT_SESSION_IMPL *session) WT_GCC_FUNC_DECL_ATTRIBUTE((cold)) WT_GCC_FUNC_DECL_ATTRIBUTE((visibility("default"))) WT_GCC_FUNC_DECL_ATTRIBUTE((warn_unused_result));
 extern int __wt_illegal_value(WT_SESSION_IMPL *session, const char *name) WT_GCC_FUNC_DECL_ATTRIBUTE((cold)) WT_GCC_FUNC_DECL_ATTRIBUTE((visibility("default"))) WT_GCC_FUNC_DECL_ATTRIBUTE((warn_unused_result));
+extern int __wt_inmem_unsupported_op(WT_SESSION_IMPL *session, const char *tag) WT_GCC_FUNC_DECL_ATTRIBUTE((cold)) WT_GCC_FUNC_DECL_ATTRIBUTE((warn_unused_result));
 extern int __wt_object_unsupported(WT_SESSION_IMPL *session, const char *uri) WT_GCC_FUNC_DECL_ATTRIBUTE((cold)) WT_GCC_FUNC_DECL_ATTRIBUTE((warn_unused_result));
 extern int __wt_bad_object_type(WT_SESSION_IMPL *session, const char *uri) WT_GCC_FUNC_DECL_ATTRIBUTE((cold)) WT_GCC_FUNC_DECL_ATTRIBUTE((warn_unused_result));
 extern int __wt_unexpected_object_type( WT_SESSION_IMPL *session, const char *uri, const char *expect) WT_GCC_FUNC_DECL_ATTRIBUTE((cold)) WT_GCC_FUNC_DECL_ATTRIBUTE((warn_unused_result));

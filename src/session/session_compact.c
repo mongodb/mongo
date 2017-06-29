@@ -324,7 +324,7 @@ __wt_session_compact(
 	session = (WT_SESSION_IMPL *)wt_session;
 	SESSION_API_CALL(session, compact, config, cfg);
 
-	/* In-memory is already as compact as it's going to get. */
+	/* In-memory ignores compaction operations. */
 	if (F_ISSET(S2C(session), WT_CONN_IN_MEMORY))
 		goto err;
 
