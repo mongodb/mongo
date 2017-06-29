@@ -9,10 +9,8 @@ from __future__ import print_function
 
 import collections
 import copy
-import fnmatch
 import optparse
 import os
-import re
 import subprocess
 import sys
 import textwrap
@@ -22,8 +20,8 @@ import yaml
 # Get relative imports to work when the package is not installed on the PYTHONPATH.
 if __name__ == "__main__" and __package__ is None:
     sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
-from buildscripts import burn_in_tests
 from buildscripts import resmokelib
+from buildscripts.ciconfig import evergreen
 from buildscripts import test_failures as tf
 
 
@@ -49,23 +47,20 @@ def write_yaml_file(yaml_file, object):
         yaml.dump(object, fstream, default_flow_style=False)
 
 
-def get_suite_tasks_membership(evg_yaml):
+def get_suite_tasks_membership(evg_conf):
     """Return a dictionary with keys of all suites and list of associated tasks."""
-    evg = read_yaml_file(evg_yaml)
     suite_membership = collections.defaultdict(list)
-    for task in evg["tasks"]:
-        resmoke_args = burn_in_tests.get_resmoke_args(task)
-        if resmoke_args:
-            m = re.search("--suites=(?P<suite>\w+)", resmoke_args)
-            if m is not None:
-                suite_membership[m.group("suite")].append(task["name"])
+    for task in evg_conf.tasks:
+        suite = task.resmoke_suite
+        if suite:
+            suite_membership[suite].append(task.name)
     return suite_membership
 
 
-def get_test_tasks_membership(evg_yaml):
+def get_test_tasks_membership(evg_conf):
     """Return a dictionary with keys of all tests and list of associated tasks."""
     test_suites_membership = resmokelib.parser.create_test_membership_map(test_kind="js_test")
-    suite_tasks_membership = get_suite_tasks_membership(evg_yaml)
+    suite_tasks_membership = get_suite_tasks_membership(evg_conf)
     test_tasks_membership = collections.defaultdict(list)
     for test in test_suites_membership.keys():
         for suite in test_suites_membership[test]:
@@ -105,23 +100,6 @@ def create_batch_groups(test_groups, batch_size):
             batch_groups.append(test_group[:batch_size])
             test_group = test_group[batch_size:]
     return batch_groups
-
-
-def get_all_tasks(evg_yaml):
-    """Returns list of tasks from evg_yaml.
-
-       Note that tasks can be excluded in 'test_lifecycle_excluded_tasks'.
-    """
-    evg = read_yaml_file(evg_yaml)
-    all_tasks = [t["name"] for t in evg["tasks"]]
-    # The list of excluded tasks may include "Unix shell-style wildcards",
-    # i.e., 'compile*', which matches 'compile', 'compile_all'
-    excluded_glob_tasks = evg.get("test_lifecycle_excluded_tasks", [])
-    excluded_tasks = []
-    for excluded_glob_task in excluded_glob_tasks:
-        excluded_tasks.extend(fnmatch.filter(all_tasks, excluded_glob_task))
-
-    return list(set(all_tasks) - set(excluded_tasks))
 
 
 def callo(args):
@@ -346,12 +324,13 @@ def main():
             parser.print_help()
             parser.error("Missing required option")
 
+    evg_conf = evergreen.EvergreenProjectConfig(options.evergreen_yml)
     use_test_tasks_membership = False
 
     tasks = options.tasks.split(",") if options.tasks else []
     if not tasks:
         # If no tasks are specified, then the list of tasks is all.
-        tasks = get_all_tasks(options.evergreen_yml)
+        tasks = evg_conf.lifecycle_task_names
         use_test_tasks_membership = True
 
     variants = options.variants.split(",") if options.variants else []
@@ -379,7 +358,7 @@ def main():
     orig_lifecycle = read_yaml_file(options.lifecycle_file)
     lifecycle = copy.deepcopy(orig_lifecycle)
 
-    test_tasks_membership = get_test_tasks_membership(options.evergreen_yml)
+    test_tasks_membership = get_test_tasks_membership(evg_conf)
     # If no tests are specified then the list of tests is generated from the list of tasks.
     if not tests:
         tests = get_tests_from_tasks(tasks, test_tasks_membership)

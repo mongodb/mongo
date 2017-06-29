@@ -19,12 +19,15 @@ import sys
 import urlparse
 import yaml
 
-API_SERVER_DEFAULT = "http://evergreen-api.mongodb.com:8080"
 
 # Get relative imports to work when the package is not installed on the PYTHONPATH.
 if __name__ == "__main__" and __package__ is None:
     sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 from buildscripts import resmokelib
+from buildscripts.ciconfig import evergreen
+
+
+API_SERVER_DEFAULT = "http://evergreen-api.mongodb.com:8080"
 
 
 def parse_command_line():
@@ -263,69 +266,37 @@ def create_executor_list(suites, exclude_suites):
     return memberships
 
 
-def create_buildvariant_list(evergreen_file):
+def create_task_list(evergreen_conf, buildvariant, suites, exclude_tasks):
     """
-    Parses etc/evergreen.yml. Returns a list of buildvariants.
-    """
+    Finds associated tasks for the specified buildvariant and suites.
 
-    with open(evergreen_file, "r") as fstream:
-        evg = yaml.load(fstream)
-
-    return [li["name"] for li in evg["buildvariants"]]
-
-
-def get_resmoke_args(evg_task):
-    """
-    Returns the resmoke_args from a task in evergreen.
-    """
-    for command in evg_task["commands"]:
-        if ("func" in command and command["func"] == "run tests" and
-                "vars" in command and "resmoke_args" in command["vars"]):
-            return command["vars"]["resmoke_args"]
-    return None
-
-
-def create_task_list(evergreen_file, buildvariant, suites, exclude_tasks):
-    """
-    Parses etc/evergreen.yml to find associated tasks for the specified buildvariant
-    and suites. Returns a dict keyed by task_name, with executor, resmoke_args & tests, i.e.,
+    Returns a dict keyed by task_name, with executor, resmoke_args & tests, i.e.,
     {'jsCore_small_oplog':
         {'resmoke_args': '--suites=core_small_oplog --storageEngine=mmapv1',
          'tests': ['jstests/core/all2.js', 'jstests/core/all3.js']}
     }
     """
 
-    # Check if buildvariant is in the evergreen_file.
-    buildvariants = create_buildvariant_list(evergreen_file)
-    if buildvariant not in buildvariants:
-        print "Buildvariant", buildvariant, "not found in", evergreen_file
+    evg_buildvariant = evergreen_conf.get_variant(buildvariant)
+    if not evg_buildvariant:
+        print "Buildvariant", buildvariant, "not found in", evergreen_conf.path
         sys.exit(1)
-
-    with open(evergreen_file, "r") as fstream:
-        evg = yaml.load(fstream)
-
-    evg_buildvariant = next(item for item in evg["buildvariants"] if item["name"] == buildvariant)
-
-    # Find all the task names for the specified buildvariant.
-    variant_tasks = [li["name"] for li in evg_buildvariant['tasks']]
 
     # Find all the buildvariant task's resmoke_args.
     variant_task_args = {}
-    for task in [a for a in evg["tasks"] if a["name"] in set(variant_tasks) - set(exclude_tasks)]:
-        variant_task_args[task["name"]] = get_resmoke_args(task)
-
-    # Find if the buildvariant has a test_flags expansion, which will be passed onto resmoke.py.
-    test_flags = evg_buildvariant.get("expansions", {}).get("test_flags", "")
+    exclude_tasks_set = set(exclude_tasks)
+    for task in evg_buildvariant.tasks:
+        if task.name not in exclude_tasks_set:
+            # Using 'task.combined_resmoke_args' to include the variant's test_flags and
+            # allow the storage engine to be overridden.
+            variant_task_args[task.name] = task.combined_resmoke_args
 
     # Create the list of tasks to run for the specified suite.
     tasks_to_run = {}
     for suite in suites.keys():
         for task_name, task_arg in variant_task_args.items():
-            # Append the test_flags to the task arguments to match the logic in the "run tests"
-            # function. This allows the storage engine to be overridden.
-            task_arg = "{} {}".format(task_arg, test_flags)
             # Find the resmoke_args for matching suite names.
-            if (re.compile('--suites=' + suite + '(?:\s+|$)').match(task_arg)):
+            if re.compile('--suites=' + suite + '(?:\s+|$)').match(task_arg):
                 tasks_to_run[task_name] = {
                     "resmoke_args": task_arg,
                     "tests": suites[suite]
@@ -389,10 +360,13 @@ def main():
 
     # Run the executor finder.
     else:
+        # Parse the Evergreen project configuration file.
+        evergreen_conf = evergreen.EvergreenProjectConfig(values.evergreen_file)
+
         if values.buildvariant is None:
             print "Option buildVariant must be specified to find changed tests.\n", \
                   "Select from the following: \n" \
-                  "\t", "\n\t".join(sorted(create_buildvariant_list(values.evergreen_file)))
+                  "\t", "\n\t".join(sorted(evergreen_conf.variant_names))
             sys.exit(1)
 
         changed_tests = find_changed_tests(values.branch,
@@ -409,7 +383,7 @@ def main():
             sys.exit(0)
         suites = resmokelib.parser.get_suites(values, changed_tests)
         tests_by_executor = create_executor_list(suites, exclude_suites)
-        tests_by_task = create_task_list(values.evergreen_file,
+        tests_by_task = create_task_list(evergreen_conf,
                                          values.buildvariant,
                                          tests_by_executor,
                                          exclude_tasks)
