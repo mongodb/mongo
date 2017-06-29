@@ -34,6 +34,7 @@
 #include <vector>
 
 #include "mongo/db/concurrency/d_concurrency.h"
+#include "mongo/db/concurrency/global_lock_acquisition_tracker.h"
 #include "mongo/db/concurrency/lock_manager_test_help.h"
 #include "mongo/db/concurrency/write_conflict_exception.h"
 #include "mongo/stdx/functional.h"
@@ -314,6 +315,85 @@ TEST_F(DConcurrencyTestFixture, GlobalLockX_Timeout) {
 
     Lock::GlobalLock globalWriteTry(clients[1].second.get(), MODE_X, 1);
     ASSERT(!globalWriteTry.isLocked());
+}
+
+TEST_F(DConcurrencyTestFixture, GlobalLockXSetsGlobalLockTakenOnOperationContext) {
+    auto clients = makeKClientsWithLockers<MMAPV1LockerImpl>(1);
+    auto opCtx = clients[0].second.get();
+    ASSERT_FALSE(GlobalLockAcquisitionTracker::get(opCtx).getGlobalExclusiveLockTaken());
+
+    {
+        Lock::GlobalLock globalWrite(opCtx, MODE_X, 0);
+        ASSERT(globalWrite.isLocked());
+    }
+    ASSERT_TRUE(GlobalLockAcquisitionTracker::get(opCtx).getGlobalExclusiveLockTaken());
+}
+
+TEST_F(DConcurrencyTestFixture, GlobalLockIXSetsGlobalLockTakenOnOperationContext) {
+    auto clients = makeKClientsWithLockers<MMAPV1LockerImpl>(1);
+    auto opCtx = clients[0].second.get();
+    ASSERT_FALSE(GlobalLockAcquisitionTracker::get(opCtx).getGlobalExclusiveLockTaken());
+    {
+        Lock::GlobalLock globalWrite(opCtx, MODE_IX, 0);
+        ASSERT(globalWrite.isLocked());
+    }
+    ASSERT_TRUE(GlobalLockAcquisitionTracker::get(opCtx).getGlobalExclusiveLockTaken());
+}
+
+TEST_F(DConcurrencyTestFixture, GlobalLockSDoesNotSetGlobalLockTakenOnOperationContext) {
+    auto clients = makeKClientsWithLockers<MMAPV1LockerImpl>(1);
+    auto opCtx = clients[0].second.get();
+    ASSERT_FALSE(GlobalLockAcquisitionTracker::get(opCtx).getGlobalExclusiveLockTaken());
+    {
+        Lock::GlobalLock globalRead(opCtx, MODE_S, 0);
+        ASSERT(globalRead.isLocked());
+    }
+    ASSERT_FALSE(GlobalLockAcquisitionTracker::get(opCtx).getGlobalExclusiveLockTaken());
+}
+
+TEST_F(DConcurrencyTestFixture, GlobalLockISDoesNotSetGlobalLockTakenOnOperationContext) {
+    auto clients = makeKClientsWithLockers<MMAPV1LockerImpl>(1);
+    auto opCtx = clients[0].second.get();
+    ASSERT_FALSE(GlobalLockAcquisitionTracker::get(opCtx).getGlobalExclusiveLockTaken());
+    {
+        Lock::GlobalLock globalRead(opCtx, MODE_IS, 0);
+        ASSERT(globalRead.isLocked());
+    }
+    ASSERT_FALSE(GlobalLockAcquisitionTracker::get(opCtx).getGlobalExclusiveLockTaken());
+}
+
+TEST_F(DConcurrencyTestFixture, DBLockXSetsGlobalLockTakenOnOperationContext) {
+    auto clients = makeKClientsWithLockers<MMAPV1LockerImpl>(1);
+    auto opCtx = clients[0].second.get();
+    ASSERT_FALSE(GlobalLockAcquisitionTracker::get(opCtx).getGlobalExclusiveLockTaken());
+
+    { Lock::DBLock dbWrite(opCtx, "db", MODE_X); }
+    ASSERT_TRUE(GlobalLockAcquisitionTracker::get(opCtx).getGlobalExclusiveLockTaken());
+}
+
+TEST_F(DConcurrencyTestFixture, DBLockSDoesNotSetGlobalLockTakenOnOperationContext) {
+    auto clients = makeKClientsWithLockers<MMAPV1LockerImpl>(1);
+    auto opCtx = clients[0].second.get();
+    ASSERT_FALSE(GlobalLockAcquisitionTracker::get(opCtx).getGlobalExclusiveLockTaken());
+
+    { Lock::DBLock dbRead(opCtx, "db", MODE_S); }
+    ASSERT_FALSE(GlobalLockAcquisitionTracker::get(opCtx).getGlobalExclusiveLockTaken());
+}
+
+TEST_F(DConcurrencyTestFixture, GlobalLockXDoesNotSetGlobalLockTakenWhenLockAcquisitionTimesOut) {
+    auto clients = makeKClientsWithLockers<MMAPV1LockerImpl>(2);
+
+    // Take a global lock so that the next one times out.
+    Lock::GlobalLock globalWrite0(clients[0].second.get(), MODE_X, 0);
+    ASSERT(globalWrite0.isLocked());
+
+    auto opCtx = clients[1].second.get();
+    ASSERT_FALSE(GlobalLockAcquisitionTracker::get(opCtx).getGlobalExclusiveLockTaken());
+    {
+        Lock::GlobalLock globalWrite1(opCtx, MODE_X, 1);
+        ASSERT_FALSE(globalWrite1.isLocked());
+    }
+    ASSERT_FALSE(GlobalLockAcquisitionTracker::get(opCtx).getGlobalExclusiveLockTaken());
 }
 
 TEST_F(DConcurrencyTestFixture, GlobalLockS_NoTimeoutDueToGlobalLockS) {

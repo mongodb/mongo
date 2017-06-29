@@ -35,6 +35,7 @@
 #include <string>
 #include <vector>
 
+#include "mongo/db/concurrency/global_lock_acquisition_tracker.h"
 #include "mongo/db/namespace_string.h"
 #include "mongo/db/server_parameters.h"
 #include "mongo/db/service_context.h"
@@ -148,6 +149,10 @@ Lock::GlobalLock::GlobalLock(OperationContext* opCtx,
       _result(LOCK_INVALID),
       _pbwm(opCtx->lockState(), resourceIdParallelBatchWriterMode) {
     _enqueue(lockMode, timeoutMs);
+
+    if ((lockMode == LockMode::MODE_IX || lockMode == LockMode::MODE_X) && isLocked()) {
+        GlobalLockAcquisitionTracker::get(opCtx).setGlobalExclusiveLockTaken();
+    }
 }
 
 void Lock::GlobalLock::_enqueue(LockMode lockMode, unsigned timeoutMs) {
