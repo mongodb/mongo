@@ -133,6 +133,9 @@
 /* Define to 1 if you have the ANSI C header files. */
 #define STDC_HEADERS 1
 
+/* Size of a transaction timestamp in bytes */
+#define WT_TIMESTAMP_SIZE 8
+
 /* Define WORDS_BIGENDIAN to 1 if your processor stores words with the most
    significant byte first (like Motorola and SPARC, unlike Intel). */
 #if defined AC_APPLE_UNIVERSAL_BUILD
@@ -147,6 +150,9 @@
 
 /* Default alignment of buffers used for I/O */
 #define WT_BUFFER_ALIGNMENT_DEFAULT 0
+
+/* Size of a transaction timestamp in bytes */
+#define WT_TIMESTAMP_SIZE 8
 
 /* Enable large inode numbers on Mac OS X 10.5.  */
 /* #ifndef _DARWIN_USE_64_BIT_INODE */

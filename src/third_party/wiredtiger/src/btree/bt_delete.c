@@ -242,8 +242,10 @@ __wt_delete_page_skip(WT_SESSION_IMPL *session, WT_REF *ref, bool visible_all)
 		return (false);
 
 	skip = ref->page_del == NULL || (visible_all ?
-	    __wt_txn_visible_all(session, ref->page_del->txnid) :
-	    __wt_txn_visible(session, ref->page_del->txnid));
+	    __wt_txn_visible_all(session,
+		ref->page_del->txnid, WT_GET_TIMESTAMP(ref->page_del)):
+	    __wt_txn_visible(session,
+		ref->page_del->txnid, WT_GET_TIMESTAMP(ref->page_del)));
 
 	/*
 	 * The page_del structure can be freed as soon as the delete is stable:
@@ -252,7 +254,8 @@ __wt_delete_page_skip(WT_SESSION_IMPL *session, WT_REF *ref, bool visible_all)
 	 * no longer need synchronization to check the ref.
 	 */
 	if (skip && ref->page_del != NULL && (visible_all ||
-	    __wt_txn_visible_all(session, ref->page_del->txnid))) {
+	    __wt_txn_visible_all(session,
+	    ref->page_del->txnid, WT_GET_TIMESTAMP(ref->page_del)))) {
 		__wt_free(session, ref->page_del->update_list);
 		__wt_free(session, ref->page_del);
 	}

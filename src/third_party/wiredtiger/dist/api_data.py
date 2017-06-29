@@ -401,6 +401,15 @@ connection_runtime_config = [
             above 0 configures periodic checkpoints''',
             min='0', max='100000'),
         ]),
+    Config('diagnostic_timing_stress', '', r'''
+        enable insertion of code that interrupts the usual timing of
+        operations with a goal of uncovering race conditions and unexpected
+        blocking. This option is intended for use with internal stress
+        testing of WiredTiger. Only available if WiredTiger is configured
+        with --enable-diagnostic. Options are given as a list, such as
+        <code>"diagnostic_timing_stress=[checkpoint_slow]"</code>''',
+        type='list', undoc=True, choices=[
+            'checkpoint_slow']),
     Config('error_prefix', '', r'''
         prefix string for error messages'''),
     Config('eviction', '', r'''
@@ -1028,7 +1037,8 @@ methods = {
 ]),
 'WT_SESSION.strerror' : Method([]),
 'WT_SESSION.transaction_sync' : Method([
-    Config('timeout_ms', '1200000', r'''
+    Config('timeout_ms', '1200000', # !!! Must match WT_SESSION_BG_SYNC_MSEC
+        r'''
         maximum amount of time to wait for background sync to complete in
         milliseconds.  A value of zero disables the timeout and returns
         immediately''',
@@ -1077,6 +1087,9 @@ methods = {
         priority of the transaction for resolving conflicts.
         Transactions with higher values are less likely to abort''',
         min='-100', max='100'),
+    Config('read_timestamp', '', r'''
+        read using the specified timestamp, see
+        @ref transaction_timestamps'''),
     Config('snapshot', '', r'''
         use a named, in-memory snapshot, see
         @ref transaction_named_snapshots'''),
@@ -1087,6 +1100,9 @@ methods = {
 ]),
 
 'WT_SESSION.commit_transaction' : Method([
+    Config('commit_timestamp', '', r'''
+        set the commit timestamp for the current transaction, see
+        @ref transaction_timestamps'''),
     Config('sync', '', r'''
         override whether to sync log records when the transaction commits,
         inherited from ::wiredtiger_open \c transaction_sync.
@@ -1097,6 +1113,13 @@ methods = {
         \c on setting forces log records to be written to the storage device''',
         choices=['background', 'off', 'on']),
 ]),
+
+'WT_SESSION.timestamp_transaction' : Method([
+    Config('commit_timestamp', '', r'''
+        set the commit timestamp for the current transaction, see
+        @ref transaction_timestamps'''),
+]),
+
 'WT_SESSION.rollback_transaction' : Method([]),
 
 'WT_SESSION.checkpoint' : Method([
@@ -1117,6 +1140,9 @@ methods = {
     Config('name', '', r'''
         if set, specify a name for the checkpoint (note that checkpoints
         including LSM trees may not be named)'''),
+    Config('read_timestamp', '', r'''
+        if set, create the checkpoint as of the specified timestamp''',
+        undoc=True),
     Config('target', '', r'''
         if non-empty, checkpoint the list of objects''', type='list'),
 ]),
@@ -1203,6 +1229,22 @@ methods = {
 ]),
 
 'WT_CONNECTION.open_session' : Method(session_config),
+
+'WT_CONNECTION.query_timestamp' : Method([
+    Config('get', 'all_committed', r'''
+        specify which timestamp to query: \c all_committed returns the largest
+        timestamp such that all earlier timestamps have committed.  See @ref
+        transaction_timestamps''',
+        choices=['all_committed']),
+    # We also support "oldest_reader" as an internal-only choice.
+]),
+
+'WT_CONNECTION.set_timestamp' : Method([
+    Config('oldest_timestamp', '', r'''
+        future commits and queries will be no earlier than the specified
+        timestamp. Supplied values must be monotonically increasing.
+        see @ref transaction_timestamps'''),
+]),
 
 'WT_SESSION.reconfigure' : Method(session_config),
 

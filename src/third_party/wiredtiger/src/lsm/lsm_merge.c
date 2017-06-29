@@ -91,12 +91,12 @@ __lsm_merge_aggressive_update(WT_SESSION_IMPL *session, WT_LSM_TREE *lsm_tree)
 	 */
 	if (!lsm_tree->aggressive_timer_enabled) {
 		lsm_tree->aggressive_timer_enabled = true;
-		__wt_epoch(session, &lsm_tree->merge_aggressive_ts);
+		__wt_epoch(session, &lsm_tree->merge_aggressive_time);
 	}
 
 	__wt_epoch(session, &now);
 	msec_since_last_merge =
-	    WT_TIMEDIFF_MS(now, lsm_tree->merge_aggressive_ts);
+	    WT_TIMEDIFF_MS(now, lsm_tree->merge_aggressive_time);
 
 	/*
 	 * If there is no estimate for how long it's taking to fill chunks

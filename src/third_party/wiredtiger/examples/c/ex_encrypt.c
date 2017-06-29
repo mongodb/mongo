@@ -28,20 +28,7 @@
  * ex_encrypt.c
  * 	demonstrates how to use the encryption API.
  */
-#include <ctype.h>
-#include <errno.h>
-#include <inttypes.h>
-#include <stdio.h>
-#include <stdlib.h>
-#include <string.h>
-#ifndef _WIN32
-#include <unistd.h>
-#else
-#include "windows_shim.h"
-#endif
-
-#include <wiredtiger.h>
-#include <wiredtiger_ext.h>
+#include <test_util.h>
 
 #ifdef _WIN32
 /*
@@ -270,11 +257,12 @@ rotate_customize(WT_ENCRYPTOR *encryptor, WT_SESSION *session,
 	my_crypto->keyid = my_crypto->password = NULL;
 
 	/*
-	 * Stash the keyid and the (optional) secret key
-	 * from the configuration string.
+	 * Stash the keyid and the (optional) secret key from the configuration
+	 * string.
 	 */
-	if ((ret = extapi->config_get(extapi, session, encrypt_config,
-	    "keyid", &keyid)) == 0 && keyid.len != 0) {
+	error_check(extapi->config_get(
+	    extapi, session, encrypt_config, "keyid", &keyid));
+	if (keyid.len != 0) {
 		if ((my_crypto->keyid = malloc(keyid.len + 1)) == NULL) {
 			ret = errno;
 			goto err;
@@ -283,8 +271,9 @@ rotate_customize(WT_ENCRYPTOR *encryptor, WT_SESSION *session,
 		my_crypto->keyid[keyid.len] = '\0';
 	}
 
-	if ((ret = extapi->config_get(extapi, session, encrypt_config,
-	    "secretkey", &secret)) == 0 && secret.len != 0) {
+	ret = extapi->config_get(
+	    extapi, session, encrypt_config, "secretkey", &secret);
+	if (ret == 0 && secret.len != 0) {
 		if ((my_crypto->password = malloc(secret.len + 1)) == NULL) {
 			ret = errno;
 			goto err;
@@ -357,7 +346,6 @@ add_my_encryptors(WT_CONNECTION *connection)
 {
 	MY_CRYPTO *m;
 	WT_ENCRYPTOR *wt;
-	int ret;
 
 	/*
 	 * Initialize our top level encryptor.
@@ -371,9 +359,8 @@ add_my_encryptors(WT_CONNECTION *connection)
 	wt->customize = rotate_customize;
 	wt->terminate = rotate_terminate;
 	m->num_calls = 0;
-	if ((ret = connection->add_encryptor(
-	    connection, "rotn", (WT_ENCRYPTOR *)m, NULL)) != 0)
-		return (ret);
+	error_check(connection->add_encryptor(
+	    connection, "rotn", (WT_ENCRYPTOR *)m, NULL));
 
 	return (0);
 }
@@ -384,7 +371,7 @@ add_my_encryptors(WT_CONNECTION *connection)
  *	We wrote text messages into the log.  Print them.
  *	This verifies we're decrypting properly.
  */
-static int
+static void
 simple_walk_log(WT_SESSION *session)
 {
 	WT_CURSOR *cursor;
@@ -393,13 +380,14 @@ simple_walk_log(WT_SESSION *session)
 	uint32_t fileid, log_file, log_offset, opcount, optype, rectype;
 	int found, ret;
 
-	ret = session->open_cursor(session, "log:", NULL, NULL, &cursor);
+	error_check(session->open_cursor(session, "log:", NULL, NULL, &cursor));
 
 	found = 0;
 	while ((ret = cursor->next(cursor)) == 0) {
-		ret = cursor->get_key(cursor, &log_file, &log_offset, &opcount);
-		ret = cursor->get_value(cursor, &txnid,
-		    &rectype, &optype, &fileid, &logrec_key, &logrec_value);
+		error_check(cursor->get_key(
+		    cursor, &log_file, &log_offset, &opcount));
+		error_check(cursor->get_value(cursor, &txnid,
+		    &rectype, &optype, &fileid, &logrec_key, &logrec_value));
 
 		if (rectype == WT_LOGREC_MESSAGE) {
 			found = 1;
@@ -407,14 +395,13 @@ simple_walk_log(WT_SESSION *session)
 			    (char *)logrec_value.data);
 		}
 	}
-	if (ret == WT_NOTFOUND)
-		ret = 0;
-	ret = cursor->close(cursor);
+	scan_end_check(ret == WT_NOTFOUND);
+
+	error_check(cursor->close(cursor));
 	if (found == 0) {
 		fprintf(stderr, "Did not find log messages.\n");
 		exit(EXIT_FAILURE);
 	}
-	return (ret);
 }
 
 #define	MAX_KEYS	20
@@ -434,7 +421,7 @@ simple_walk_log(WT_SESSION *session)
 #define	COMP_C	"CCCCCCCCCCCCCCCCCC"
 
 int
-main(void)
+main(int argc, char *argv[])
 {
 	WT_CONNECTION *conn;
 	WT_CURSOR *c1, *c2, *nc;
@@ -443,46 +430,37 @@ main(void)
 	char keybuf[16], valbuf[16];
 	char *key1, *key2, *key3, *val1, *val2, *val3;
 
-	/*
-	 * Create a clean test directory for this run of the test program if the
-	 * environment variable isn't already set (as is done by make check).
-	 */
-	if (getenv("WIREDTIGER_HOME") == NULL) {
-		home = "WT_HOME";
-		ret = system("rm -rf WT_HOME && mkdir WT_HOME");
-	} else
-		home = NULL;
+	home = example_setup(argc, argv);
 
-	ret = wiredtiger_open(home, NULL, WT_OPEN_CONFIG_GOOD, &conn);
-
-	ret = conn->open_session(conn, NULL, NULL, &session);
+	error_check(wiredtiger_open(home, NULL, WT_OPEN_CONFIG_GOOD, &conn));
+	error_check(conn->open_session(conn, NULL, NULL, &session));
 
 	/*
 	 * Write a log record that is larger than the base 128 bytes and
 	 * also should compress well.
 	 */
-	ret = session->log_printf(session,
+	error_check(session->log_printf(session,
 	    COMP_A COMP_B COMP_C COMP_A COMP_B COMP_C
 	    COMP_A COMP_B COMP_C COMP_A COMP_B COMP_C
-	    "The quick brown fox jumps over the lazy dog ");
-	ret = simple_walk_log(session);
+	    "The quick brown fox jumps over the lazy dog "));
+	simple_walk_log(session);
 
 	/*
 	 * Create and open some encrypted and not encrypted tables.
 	 * Also use column store and compression for some tables.
 	 */
-	ret = session->create(session, "table:crypto1",
+	error_check(session->create(session, "table:crypto1",
 	    "encryption=(name=rotn,keyid=" USER1_KEYID"),"
 	    "columns=(key0,value0),"
-	    "key_format=S,value_format=S");
-	ret = session->create(session, "index:crypto1:byvalue",
+	    "key_format=S,value_format=S"));
+	error_check(session->create(session, "index:crypto1:byvalue",
 	    "encryption=(name=rotn,keyid=" USER1_KEYID"),"
-	    "columns=(value0,key0)");
-	ret = session->create(session, "table:crypto2",
+	    "columns=(value0,key0)"));
+	error_check(session->create(session, "table:crypto2",
 	    "encryption=(name=rotn,keyid=" USER2_KEYID"),"
-	    "key_format=S,value_format=S");
-	ret = session->create(session, "table:nocrypto",
-	    "key_format=S,value_format=S");
+	    "key_format=S,value_format=S"));
+	error_check(session->create(session, "table:nocrypto",
+	    "key_format=S,value_format=S"));
 
 	/*
 	 * Send in an unknown keyid.  WiredTiger will try to add in the
@@ -497,9 +475,12 @@ main(void)
 		exit(EXIT_FAILURE);
 	}
 
-	ret = session->open_cursor(session, "table:crypto1", NULL, NULL, &c1);
-	ret = session->open_cursor(session, "table:crypto2", NULL, NULL, &c2);
-	ret = session->open_cursor(session, "table:nocrypto", NULL, NULL, &nc);
+	error_check(session->open_cursor(
+	    session, "table:crypto1", NULL, NULL, &c1));
+	error_check(session->open_cursor(
+	    session, "table:crypto2", NULL, NULL, &c2));
+	error_check(session->open_cursor(
+	    session, "table:nocrypto", NULL, NULL, &nc));
 
 	/*
 	 * Insert a set of keys and values.  Insert the same data into
@@ -517,24 +498,25 @@ main(void)
 		c2->set_value(c2, valbuf);
 		nc->set_value(nc, valbuf);
 
-		ret = c1->insert(c1);
-		ret = c2->insert(c2);
-		ret = nc->insert(nc);
+		error_check(c1->insert(c1));
+		error_check(c2->insert(c2));
+		error_check(nc->insert(nc));
 		if (i % 5 == 0)
-			ret = session->log_printf(session,
-			    "Wrote %d records", i);
+			error_check(session->log_printf(
+			    session, "Wrote %d records", i));
 	}
-	ret = session->log_printf(session, "Done. Wrote %d total records", i);
+	error_check(session->log_printf(
+	    session, "Done. Wrote %d total records", i));
 
 	while (c1->next(c1) == 0) {
-		ret = c1->get_key(c1, &key1);
-		ret = c1->get_value(c1, &val1);
+		error_check(c1->get_key(c1, &key1));
+		error_check(c1->get_value(c1, &val1));
 
 		printf("Read key %s; value %s\n", key1, val1);
 	}
-	ret = simple_walk_log(session);
+	simple_walk_log(session);
 	printf("CLOSE\n");
-	ret = conn->close(conn, NULL);
+	error_check(conn->close(conn, NULL));
 
 	/*
 	 * We want to close and reopen so that we recreate the cache
@@ -542,29 +524,32 @@ main(void)
 	 */
 	printf("REOPEN and VERIFY encrypted data\n");
 
-	ret = wiredtiger_open(home, NULL, WT_OPEN_CONFIG_GOOD, &conn);
+	error_check(wiredtiger_open(home, NULL, WT_OPEN_CONFIG_GOOD, &conn));
 
-	ret = conn->open_session(conn, NULL, NULL, &session);
+	error_check(conn->open_session(conn, NULL, NULL, &session));
 	/*
 	 * Verify we can read the encrypted log after restart.
 	 */
-	ret = simple_walk_log(session);
-	ret = session->open_cursor(session, "table:crypto1", NULL, NULL, &c1);
-	ret = session->open_cursor(session, "table:crypto2", NULL, NULL, &c2);
-	ret = session->open_cursor(session, "table:nocrypto", NULL, NULL, &nc);
+	simple_walk_log(session);
+	error_check(session->open_cursor(
+	    session, "table:crypto1", NULL, NULL, &c1));
+	error_check(session->open_cursor(
+	    session, "table:crypto2", NULL, NULL, &c2));
+	error_check(session->open_cursor(
+	    session, "table:nocrypto", NULL, NULL, &nc));
 
 	/*
 	 * Read the same data from each cursor.  All should be identical.
 	 */
 	while (c1->next(c1) == 0) {
-		ret = c2->next(c2);
-		ret = nc->next(nc);
-		ret = c1->get_key(c1, &key1);
-		ret = c1->get_value(c1, &val1);
-		ret = c2->get_key(c2, &key2);
-		ret = c2->get_value(c2, &val2);
-		ret = nc->get_key(nc, &key3);
-		ret = nc->get_value(nc, &val3);
+		error_check(c2->next(c2));
+		error_check(nc->next(nc));
+		error_check(c1->get_key(c1, &key1));
+		error_check(c1->get_value(c1, &val1));
+		error_check(c2->get_key(c2, &key2));
+		error_check(c2->get_value(c2, &val2));
+		error_check(nc->get_key(nc, &key3));
+		error_check(nc->get_value(nc, &val3));
 
 		if (strcmp(key1, key2) != 0)
 			fprintf(stderr, "Key1 %s and Key2 %s do not match\n",
@@ -588,7 +573,7 @@ main(void)
 		printf("Verified key %s; value %s\n", key1, val1);
 	}
 
-	ret = conn->close(conn, NULL);
+	error_check(conn->close(conn, NULL));
 
-	return (ret == 0 ? EXIT_SUCCESS : EXIT_FAILURE);
+	return (EXIT_SUCCESS);
 }

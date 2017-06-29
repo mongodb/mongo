@@ -193,10 +193,11 @@ struct __wt_ovfl_txnc {
  * are written into a lookaside table, and restored as necessary if the page is
  * read. The key is a unique marker for the page (a file ID plus an address),
  * a counter (used to ensure the update records remain in the original order),
- * the on-page item's transaction ID (so we can discard any update records from
- * the lookaside table once the on-page item's transaction is globally visible),
- * and the page key (byte-string for row-store, record number for column-store).
- * The value is the WT_UPDATE structure's transaction ID, update size and value.
+ * the on-page item's transaction ID and timestamp (so we can discard any
+ * update records from the lookaside table once the on-page item's transaction
+ * is globally visible), and the page key (byte-string for row-store, record
+ * number for column-store).  The value is the WT_UPDATE structure's
+ * transaction ID, update size and value.
  *
  * As the key for the lookaside table is different for row- and column-store, we
  * store both key types in a WT_ITEM, building/parsing them in the code, because
@@ -207,8 +208,8 @@ struct __wt_ovfl_txnc {
  * the row-store key is relatively large.
  */
 #define	WT_LAS_FORMAT							\
-    "key_format=" WT_UNCHECKED_STRING(IuQQu)				\
-    ",value_format=" WT_UNCHECKED_STRING(QBu)
+    "key_format=" WT_UNCHECKED_STRING(IuQQuu)				\
+    ",value_format=" WT_UNCHECKED_STRING(QuBu)
 
 /*
  * WT_PAGE_MODIFY --
@@ -229,8 +230,9 @@ struct __wt_page_modify {
 	/* Avoid checking for obsolete updates during checkpoints. */
 	uint64_t obsolete_check_txn;
 
-	/* The largest transaction ID seen on the page by reconciliation. */
+	/* The largest transaction seen on the page by reconciliation. */
 	uint64_t rec_max_txn;
+	WT_DECL_TIMESTAMP(rec_max_timestamp)
 
 	/* The largest update transaction ID (approximate). */
 	uint64_t update_txn;
@@ -299,6 +301,7 @@ struct __wt_page_modify {
 			WT_INSERT *ins;
 			WT_ROW	  *rip;
 			uint64_t   onpage_txn;
+			WT_DECL_TIMESTAMP(onpage_timestamp)
 		} *supd;
 		uint32_t supd_entries;
 
@@ -716,6 +719,7 @@ struct __wt_page {
  */
 struct __wt_page_deleted {
 	uint64_t txnid;			/* Transaction ID */
+	WT_DECL_TIMESTAMP(timestamp)
 
 	WT_UPDATE **update_list;	/* List of updates for abort */
 };
@@ -906,6 +910,7 @@ struct __wt_ikey {
  */
 WT_PACKED_STRUCT_BEGIN(__wt_update)
 	uint64_t txnid;			/* transaction */
+	WT_DECL_TIMESTAMP(timestamp)
 
 	WT_UPDATE *next;		/* forward-linked list */
 
@@ -928,11 +933,12 @@ WT_PACKED_STRUCT_BEGIN(__wt_update)
 #define	WT_UPDATE_MEMSIZE(upd)						\
 	WT_ALIGN(sizeof(WT_UPDATE) + (upd)->size, 32)
 WT_PACKED_STRUCT_END
+
 /*
  * WT_UPDATE_SIZE is the expected structure size -- we verify the build to
  * ensure the compiler hasn't inserted padding.
  */
-#define	WT_UPDATE_SIZE	21
+#define	WT_UPDATE_SIZE	(21 + WT_TIMESTAMP_SIZE)
 
 /*
  * WT_INSERT --

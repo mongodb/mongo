@@ -25,34 +25,43 @@
  * ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR
  * OTHER DEALINGS IN THE SOFTWARE.
  *
- * ex_process.c
- *	This is an example demonstrating how to connect to a database from
- *	multiple processes.
+ * ex_smoke.c
+ *	A simple program you can build to prove include files and libraries
+ * are linking correctly.
  */
-#include <test_util.h>
+#include <stdlib.h>
 
-static const char *home;
+#include <wiredtiger.h>
 
 int
 main(int argc, char *argv[])
 {
 	WT_CONNECTION *conn;
-	WT_SESSION *session;
+	int ret;
 
-	home = example_setup(argc, argv);
+	(void)argc;					/* Unused variable */
 
-	/*! [processes] */
+	/*
+	 * This code deliberately doesn't use the standard test_util macros,
+	 * we don't want to link against that code to smoke-test a build.
+	 */
+	(void)system("rm -rf WT_HOME && mkdir WT_HOME");
+
 	/* Open a connection to the database, creating it if necessary. */
-	error_check(wiredtiger_open(home, NULL, "create,multiprocess", &conn));
+	if ((ret = wiredtiger_open("WT_HOME", NULL, "create", &conn)) != 0) {
+		fprintf(stderr,
+		    "%s: wiredtiger_open: %s\n",
+		    argv[0], wiredtiger_strerror(ret));
+		return (EXIT_FAILURE);
+	}
 
-	/* Open a session for the current thread's work. */
-	error_check(conn->open_session(conn, NULL, NULL, &session));
-
-	/* XXX Do some work... */
-
-	/* Note: closing the connection implicitly closes open session(s). */
-	error_check(conn->close(conn, NULL));
-	/*! [processes] */
+	/* Close the connection to the database. */
+	if ((ret = conn->close(conn, NULL)) != 0) {
+		fprintf(stderr,
+		    "%s: WT_CONNECTION.close: %s\n",
+		    argv[0], wiredtiger_strerror(ret));
+		return (EXIT_FAILURE);
+	}
 
 	return (EXIT_SUCCESS);
 }

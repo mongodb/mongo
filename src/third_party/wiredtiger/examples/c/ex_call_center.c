@@ -29,13 +29,7 @@
  *	This is an example application that demonstrates how to map a
  *	moderately complex SQL application into WiredTiger.
  */
-
-#include <inttypes.h>
-#include <stdio.h>
-#include <stdlib.h>
-#include <string.h>
-
-#include <wiredtiger.h>
+#include <test_util.h>
 
 static const char *home;
 
@@ -76,9 +70,9 @@ typedef struct {
 /*! [call-center decl] */
 
 int
-main(void)
+main(int argc, char *argv[])
 {
-	int count, exact, ret;
+	int count, exact;
 	WT_CONNECTION *conn;
 	WT_SESSION *session;
 	WT_CURSOR *cursor;
@@ -95,84 +89,70 @@ main(void)
 		{ 0, 0, 0, 0, NULL, NULL }
 	};
 
-	/*
-	 * Create a clean test directory for this run of the test program if the
-	 * environment variable isn't already set (as is done by make check).
-	 */
-	if (getenv("WIREDTIGER_HOME") == NULL) {
-		home = "WT_HOME";
-		ret = system("rm -rf WT_HOME && mkdir WT_HOME");
-	} else
-		home = NULL;
-
-	if ((ret = wiredtiger_open(home, NULL, "create", &conn)) != 0) {
-		fprintf(stderr, "Error connecting to %s: %s\n",
-		    home == NULL ? "." : home, wiredtiger_strerror(ret));
-		return (EXIT_FAILURE);
-	}
-	/* Note: further error checking omitted for clarity. */
+	home = example_setup(argc, argv);
+	error_check(wiredtiger_open(home, NULL, "create", &conn));
 
 	/*! [call-center work] */
-	ret = conn->open_session(conn, NULL, NULL, &session);
+	error_check(conn->open_session(conn, NULL, NULL, &session));
 
 	/*
 	 * Create the customers table, give names and types to the columns.
 	 * The columns will be stored in two groups: "main" and "address",
 	 * created below.
 	 */
-	ret = session->create(session, "table:customers",
+	error_check(session->create(session, "table:customers",
 	    "key_format=r,"
 	    "value_format=SSS,"
 	    "columns=(id,name,address,phone),"
-	    "colgroups=(main,address)");
+	    "colgroups=(main,address)"));
 
 	/* Create the main column group with value columns except address. */
-	ret = session->create(session,
-	    "colgroup:customers:main", "columns=(name,phone)");
+	error_check(session->create(session,
+	    "colgroup:customers:main", "columns=(name,phone)"));
 
 	/* Create the address column group with just the address. */
-	ret = session->create(session,
-	    "colgroup:customers:address", "columns=(address)");
+	error_check(session->create(session,
+	    "colgroup:customers:address", "columns=(address)"));
 
 	/* Create an index on the customer table by phone number. */
-	ret = session->create(session,
-	    "index:customers:phone", "columns=(phone)");
+	error_check(session->create(session,
+	    "index:customers:phone", "columns=(phone)"));
 
 	/* Populate the customers table with some data. */
-	ret = session->open_cursor(
-	    session, "table:customers", NULL, "append", &cursor);
+	error_check(session->open_cursor(
+	    session, "table:customers", NULL, "append", &cursor));
 	for (custp = cust_sample; custp->name != NULL; custp++) {
 		cursor->set_value(cursor,
 		    custp->name, custp->address, custp->phone);
-		ret = cursor->insert(cursor);
+		error_check(cursor->insert(cursor));
 	}
-	ret = cursor->close(cursor);
+	error_check(cursor->close(cursor));
 
 	/*
 	 * Create the calls table, give names and types to the columns.  All the
 	 * columns will be stored together, so no column groups are declared.
 	 */
-	ret = session->create(session, "table:calls",
+	error_check(session->create(session, "table:calls",
 	    "key_format=r,"
 	    "value_format=qrrSS,"
-	    "columns=(id,call_date,cust_id,emp_id,call_type,notes)");
+	    "columns=(id,call_date,cust_id,emp_id,call_type,notes)"));
 
 	/*
 	 * Create an index on the calls table with a composite key of cust_id
 	 * and call_date.
 	 */
-	ret = session->create(session, "index:calls:cust_date",
-	    "columns=(cust_id,call_date)");
+	error_check(session->create(session,
+	    "index:calls:cust_date", "columns=(cust_id,call_date)"));
 
 	/* Populate the calls table with some data. */
-	ret = session->open_cursor(
-	    session, "table:calls", NULL, "append", &cursor);
+	error_check(session->open_cursor(
+	    session, "table:calls", NULL, "append", &cursor));
 	for (callp = call_sample; callp->call_type != NULL; callp++) {
 		cursor->set_value(cursor, callp->call_date, callp->cust_id,
 		    callp->emp_id, callp->call_type, callp->notes);
-		ret = cursor->insert(cursor);
+		error_check(cursor->insert(cursor));
 	}
-	ret = cursor->close(cursor);
+	error_check(cursor->close(cursor));
 
 	/*
 	 * First query: a call arrives.  In SQL:
@@ -187,16 +167,14 @@ main(void)
 	 * Specify the columns we want: the customer ID and the name.  This
 	 * means the cursor's value format will be "rS".
 	 */
-	ret = session->open_cursor(session,
-	    "index:customers:phone(id,name)", NULL, NULL, &cursor);
+	error_check(session->open_cursor(session,
+	    "index:customers:phone(id,name)", NULL, NULL, &cursor));
 	cursor->set_key(cursor, "123-456-7890");
-	ret = cursor->search(cursor);
-	if (ret == 0) {
-		ret = cursor->get_value(cursor, &cust.id, &cust.name);
-		printf("Read customer record for %s (ID %" PRIu64 ")\n",
-		    cust.name, cust.id);
-	}
-	ret = cursor->close(cursor);
+	error_check(cursor->search(cursor));
+	error_check(cursor->get_value(cursor, &cust.id, &cust.name));
+	printf("Read customer record for %s (ID %" PRIu64 ")\n",
+	    cust.name, cust.id);
+	error_check(cursor->close(cursor));
 
 	/*
 	 * Next query: get the recent order history.  In SQL:
@@ -211,9 +189,9 @@ main(void)
 	 * all covered by the index, the primary would not have to be accessed.)
 	 * Stop after getting 3 records.
 	 */
-	ret = session->open_cursor(session,
+	error_check(session->open_cursor(session,
 	    "index:calls:cust_date(cust_id,call_type,notes)",
-	    NULL, NULL, &cursor);
+	    NULL, NULL, &cursor));
 
 	/*
 	 * The keys in the index are (cust_id,call_date) -- we want the largest
@@ -222,7 +200,7 @@ main(void)
 	 */
 	cust.id = 1;
 	cursor->set_key(cursor, cust.id + 1, 0);
-	ret = cursor->search_near(cursor, &exact);
+	error_check(cursor->search_near(cursor, &exact));
 
 	/*
 	 * If the table is empty, search_near will return WT_NOTFOUND, else the
@@ -230,20 +208,20 @@ main(void)
 	 * adjacent key if one does not.  If the positioned key is equal to or
 	 * larger than the search key, go back one.
 	 */
-	if (ret == 0 && exact >= 0)
-		ret = cursor->prev(cursor);
-	for (count = 0; ret == 0 && count < 3; ++count) {
-		ret = cursor->get_value(cursor,
-		    &call.cust_id, &call.call_type, &call.notes);
+	if (exact >= 0)
+		error_check(cursor->prev(cursor));
+	for (count = 0; count < 3; ++count) {
+		error_check(cursor->get_value(cursor,
+		    &call.cust_id, &call.call_type, &call.notes));
 		if (call.cust_id != cust.id)
 			break;
 		printf("Call record: customer %" PRIu64 " (%s: %s)\n",
 		    call.cust_id, call.call_type, call.notes);
-		ret = cursor->prev(cursor);
+		error_check(cursor->prev(cursor));
 	}
 	/*! [call-center work] */
 
-	ret = conn->close(conn, NULL);
+	error_check(conn->close(conn, NULL));
 
-	return (ret == 0 ? EXIT_SUCCESS : EXIT_FAILURE);
+	return (EXIT_SUCCESS);
 }

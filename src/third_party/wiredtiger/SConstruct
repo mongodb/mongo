@@ -513,15 +513,10 @@ Default(t)
 
 #Build the Examples
 for ex in examples:
-    if(ex in ['ex_all', 'ex_async', 'ex_encrypt', 'ex_file_system' , 'ex_thread']):
-        exp = env.Program(ex, "examples/c/" + ex + ".c", LIBS=[wtlib, shim] + wtlibs)
-        Default(exp)
-        env.Alias("check", env.SmokeTest(exp))
-    else:
-        exp = env.Program(ex, "examples/c/" + ex + ".c", LIBS=[wtdll[1]] + wtlibs)
-        Default(exp)
-        if not ex == 'ex_log':
-            env.Alias("check", env.SmokeTest(exp))
+    exp = env.Program(ex, "examples/c/" + ex + ".c", LIBS=[wtlib, shim, testutil] + wtlibs)
+    Default(exp)
+    if not ex == 'ex_log':
+	env.Alias("check", env.SmokeTest(exp))
 
 # Install Target
 #

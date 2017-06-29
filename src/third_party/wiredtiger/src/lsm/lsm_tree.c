@@ -266,7 +266,7 @@ __wt_lsm_tree_setup_chunk(
     WT_SESSION_IMPL *session, WT_LSM_TREE *lsm_tree, WT_LSM_CHUNK *chunk)
 {
 	WT_ASSERT(session, F_ISSET(session, WT_SESSION_LOCKED_SCHEMA));
-	__wt_epoch(session, &chunk->create_ts);
+	__wt_epoch(session, &chunk->create_time);
 
 	WT_RET(__wt_lsm_tree_chunk_name(
 	    session, lsm_tree, chunk->id, &chunk->uri));
@@ -497,7 +497,7 @@ __lsm_tree_open(WT_SESSION_IMPL *session,
 	lsm_tree->queue_ref = 0;
 
 	/* Set a flush timestamp as a baseline. */
-	__wt_epoch(session, &lsm_tree->last_flush_ts);
+	__wt_epoch(session, &lsm_tree->last_flush_time);
 
 	/* Now the tree is setup, make it visible to others. */
 	TAILQ_INSERT_HEAD(&conn->lsmqh, lsm_tree, q);
@@ -651,10 +651,10 @@ __wt_lsm_tree_throttle(
 		lsm_tree->ckpt_throttle =
 		    WT_MAX(WT_LSM_THROTTLE_START, 2 * lsm_tree->ckpt_throttle);
 	} else {
-		WT_ASSERT(session,
-		    WT_TIMECMP(last_chunk->create_ts, ondisk->create_ts) >= 0);
-		timediff =
-		    WT_TIMEDIFF_NS(last_chunk->create_ts, ondisk->create_ts);
+		WT_ASSERT(session, WT_TIMECMP(
+		    last_chunk->create_time, ondisk->create_time) >= 0);
+		timediff = WT_TIMEDIFF_NS(
+		    last_chunk->create_time, ondisk->create_time);
 		lsm_tree->ckpt_throttle =
 		    (in_memory - 2) * timediff / (20 * record_count);
 
@@ -704,13 +704,13 @@ __wt_lsm_tree_throttle(
 		prev_chunk = lsm_tree->chunk[lsm_tree->nchunks - 2];
 		WT_ASSERT(session, prev_chunk->generation == 0);
 		WT_ASSERT(session, WT_TIMECMP(
-		    last_chunk->create_ts, prev_chunk->create_ts) >= 0);
+		    last_chunk->create_time, prev_chunk->create_time) >= 0);
 		timediff = WT_TIMEDIFF_NS(
-		    last_chunk->create_ts, prev_chunk->create_ts);
-		WT_ASSERT(session,
-		    WT_TIMECMP(prev_chunk->create_ts, ondisk->create_ts) >= 0);
+		    last_chunk->create_time, prev_chunk->create_time);
+		WT_ASSERT(session, WT_TIMECMP(
+		    prev_chunk->create_time, ondisk->create_time) >= 0);
 		oldtime = WT_TIMEDIFF_NS(
-		    prev_chunk->create_ts, ondisk->create_ts);
+		    prev_chunk->create_time, ondisk->create_time);
 		if (timediff < 10 * oldtime)
 			lsm_tree->chunk_fill_ms =
 			    (3 * lsm_tree->chunk_fill_ms +

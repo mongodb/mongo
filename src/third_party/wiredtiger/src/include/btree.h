@@ -136,6 +136,8 @@ struct __wt_btree {
 
 	uint64_t write_gen;		/* Write generation */
 	uint64_t rec_max_txn;		/* Maximum txn seen (clean trees) */
+	WT_DECL_TIMESTAMP(rec_max_timestamp)
+
 	uint64_t checkpoint_gen;	/* Checkpoint generation */
 	volatile enum {
 		WT_CKPT_OFF, WT_CKPT_PREPARE, WT_CKPT_RUNNING

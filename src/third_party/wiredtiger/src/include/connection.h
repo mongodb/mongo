@@ -410,6 +410,12 @@ struct __wt_connection_impl {
 	int page_size;			/* OS page size for mmap alignment */
 	uint32_t verbose;
 
+	/*
+	 * Variable with flags for which subsystems the diagnostic stress timing
+	 * delays have been requested.
+	 */
+	uint32_t timing_stress_flags;
+
 #define	WT_STDERR(s)	(&S2C(s)->wt_stderr)
 #define	WT_STDOUT(s)	(&S2C(s)->wt_stdout)
 	WT_FSTREAM wt_stderr, wt_stdout;

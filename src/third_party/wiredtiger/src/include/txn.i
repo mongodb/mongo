@@ -9,6 +9,40 @@
 static inline int __wt_txn_id_check(WT_SESSION_IMPL *session);
 static inline void __wt_txn_read_last(WT_SESSION_IMPL *session);
 
+#ifdef HAVE_TIMESTAMPS
+static const wt_timestamp_t zero_timestamp;
+
+/*
+ * __wt_timestamp_cmp --
+ *	Compare two timestamps.
+ */
+static inline int
+__wt_timestamp_cmp(const uint8_t *ts1, const uint8_t *ts2)
+{
+	return (memcmp(ts1, ts2, WT_TIMESTAMP_SIZE));
+}
+
+/*
+ * __wt_timestamp_set --
+ *	Set a timestamp.
+ */
+static inline void
+__wt_timestamp_set(uint8_t *dest, const uint8_t *src)
+{
+	(void)memcpy(dest, src, WT_TIMESTAMP_SIZE);
+}
+
+/*
+ * __wt_timestamp_iszero --
+ *	Check if a timestamp is equal to the special "zero" time.
+ */
+static inline bool
+__wt_timestamp_iszero(const uint8_t *ts)
+{
+	return (memcmp(ts, zero_timestamp, WT_TIMESTAMP_SIZE) == 0);
+}
+#endif
+
 /*
  * __txn_next_op --
  *	Mark a WT_UPDATE object modified by the current transaction.
@@ -74,6 +108,13 @@ __wt_txn_modify(WT_SESSION_IMPL *session, WT_UPDATE *upd)
 	WT_RET(__txn_next_op(session, &op));
 	op->type = F_ISSET(session, WT_SESSION_LOGGING_INMEM) ?
 	    WT_TXN_OP_INMEM : WT_TXN_OP_BASIC;
+#ifdef HAVE_TIMESTAMPS
+	if (F_ISSET(txn, WT_TXN_HAS_TS_COMMIT)) {
+		__wt_timestamp_set(upd->timestamp, txn->commit_timestamp);
+		if (!F_ISSET(session, WT_SESSION_LOGGING_INMEM))
+			op->type = WT_TXN_OP_BASIC_TS;
+	}
+#endif
 	op->u.upd = upd;
 	upd->txnid = session->txn.id;
 	return (0);
@@ -119,16 +160,21 @@ __wt_txn_oldest_id(WT_SESSION_IMPL *session)
 
 	/*
 	 * Take a local copy of these IDs in case they are updated while we are
-	 * checking visibility.  The read of the transaction ID pinned by a
-	 * checkpoint needs to be carefully ordered: if a checkpoint is
-	 * starting and we have to start checking the pinned ID, we take the
-	 * minimum of it with the oldest ID, which is what we want.
+	 * checking visibility.
 	 */
 	oldest_id = txn_global->oldest_id;
 	include_checkpoint_txn = btree == NULL ||
 	    btree->checkpoint_gen != __wt_gen(session, WT_GEN_CHECKPOINT);
+	if (!include_checkpoint_txn)
+		return (oldest_id);
+
+	/*
+	 * The read of the transaction ID pinned by a checkpoint needs to be
+	 * carefully ordered: if a checkpoint is starting and we have to start
+	 * checking the pinned ID, we take the minimum of it with the oldest
+	 * ID, which is what we want.
+	 */
 	WT_READ_BARRIER();
-	checkpoint_pinned = txn_global->checkpoint_pinned;
 
 	/*
 	 * Checkpoint transactions often fall behind ordinary application
@@ -140,7 +186,8 @@ __wt_txn_oldest_id(WT_SESSION_IMPL *session)
 	 * the active checkpoint then it's safe to ignore the checkpoint ID in
 	 * the visibility check.
 	 */
-	if (!include_checkpoint_txn || checkpoint_pinned == WT_TXN_NONE ||
+	checkpoint_pinned = txn_global->checkpoint_state.pinned_id;
+	if (checkpoint_pinned == WT_TXN_NONE ||
 	    WT_TXNID_LT(oldest_id, checkpoint_pinned))
 		return (oldest_id);
 
@@ -158,13 +205,13 @@ __wt_txn_committed(WT_SESSION_IMPL *session, uint64_t id)
 }
 
 /*
- * __wt_txn_visible_all --
+ * __txn_visible_all_id --
  *	Check if a given transaction ID is "globally visible".	This is, if
  *	all sessions in the system will see the transaction ID including the
  *	ID that belongs to a running checkpoint.
  */
 static inline bool
-__wt_txn_visible_all(WT_SESSION_IMPL *session, uint64_t id)
+__txn_visible_all_id(WT_SESSION_IMPL *session, uint64_t id)
 {
 	uint64_t oldest_id;
 
@@ -174,11 +221,63 @@ __wt_txn_visible_all(WT_SESSION_IMPL *session, uint64_t id)
 }
 
 /*
- * __wt_txn_visible --
+ * __wt_txn_visible_all --
+ *	Check if a given transaction is "globally visible".	This is, if
+ *	all sessions in the system will see the transaction ID including the
+ *	ID that belongs to a running checkpoint.
+ */
+static inline bool
+__wt_txn_visible_all(
+    WT_SESSION_IMPL *session, uint64_t id, const uint8_t *timestamp)
+{
+	if (!__txn_visible_all_id(session, id))
+		return (false);
+
+#ifdef HAVE_TIMESTAMPS
+	{
+	WT_TXN_GLOBAL *txn_global = &S2C(session)->txn_global;
+	int cmp;
+
+	/* Timestamp check. */
+	if (!txn_global->has_pinned_timestamp || timestamp == NULL)
+		return (true);
+
+	__wt_readlock(session, &txn_global->rwlock);
+	cmp = __wt_timestamp_cmp(timestamp, txn_global->pinned_timestamp);
+	__wt_readunlock(session, &txn_global->rwlock);
+
+	/*
+	 * We can discard updates with timestamps less than or equal to the
+	 * pinned timestamp.  This is different to the situation for
+	 * transaction IDs, because we know that updates with timestamps are
+	 * definitely committed (and in this case, that the transaction ID is
+	 * globally visible).
+	 */
+	return (cmp <= 0);
+	}
+#else
+	WT_UNUSED(timestamp);
+	return (true);
+#endif
+}
+
+/*
+ * __wt_txn_upd_visible_all --
+ *	Is the given update visible to all (possible) readers?
+ */
+static inline bool
+__wt_txn_upd_visible_all(WT_SESSION_IMPL *session, WT_UPDATE *upd)
+{
+	return (__wt_txn_visible_all(
+	    session, upd->txnid, WT_GET_TIMESTAMP(upd)));
+}
+
+/*
+ * __txn_visible_id --
  *	Can the current transaction see the given ID?
  */
 static inline bool
-__wt_txn_visible(WT_SESSION_IMPL *session, uint64_t id)
+__txn_visible_id(WT_SESSION_IMPL *session, uint64_t id)
 {
 	WT_TXN *txn;
 	bool found;
@@ -202,7 +301,7 @@ __wt_txn_visible(WT_SESSION_IMPL *session, uint64_t id)
 	 * visible.
 	 */
 	if (!F_ISSET(txn, WT_TXN_HAS_SNAPSHOT))
-		return (__wt_txn_visible_all(session, id));
+		return (__txn_visible_all_id(session, id));
 
 	/* Transactions see their own changes. */
 	if (id == txn->id)
@@ -227,6 +326,43 @@ __wt_txn_visible(WT_SESSION_IMPL *session, uint64_t id)
 }
 
 /*
+ * __wt_txn_visible --
+ *	Can the current transaction see the given ID / timestamp?
+ */
+static inline bool
+__wt_txn_visible(
+    WT_SESSION_IMPL *session, uint64_t id, const uint8_t *timestamp)
+{
+	if (!__txn_visible_id(session, id))
+		return (false);
+
+#ifdef HAVE_TIMESTAMPS
+	{
+	WT_TXN *txn = &session->txn;
+
+	/* Timestamp check. */
+	if (!F_ISSET(txn, WT_TXN_HAS_TS_READ) || timestamp == NULL)
+		return (true);
+
+	return (memcmp(timestamp, txn->read_timestamp, WT_TIMESTAMP_SIZE) <= 0);
+	}
+#else
+	WT_UNUSED(timestamp);
+	return (true);
+#endif
+}
+
+/*
+ * __wt_txn_upd_visible --
+ *	Can the current transaction see the given update.
+ */
+static inline bool
+__wt_txn_upd_visible(WT_SESSION_IMPL *session, WT_UPDATE *upd)
+{
+	return (__wt_txn_visible(session, upd->txnid, WT_GET_TIMESTAMP(upd)));
+}
+
+/*
  * __wt_txn_read --
  *	Get the first visible update in a list (or NULL if none are visible).
  */
@@ -236,7 +372,7 @@ __wt_txn_read(WT_SESSION_IMPL *session, WT_UPDATE *upd)
 	/* Skip reserved place-holders, they're never visible. */
 	for (; upd != NULL; upd = upd->next)
 		if (upd->type != WT_UPDATE_RESERVED &&
-		    __wt_txn_visible(session, upd->txnid))
+		    __wt_txn_upd_visible(session, upd))
 			break;
 
 	return (upd);
@@ -333,9 +469,11 @@ static inline uint64_t
 __wt_txn_id_alloc(WT_SESSION_IMPL *session, bool publish)
 {
 	WT_TXN_GLOBAL *txn_global;
+	WT_TXN_STATE *txn_state;
 	uint64_t id;
 
 	txn_global = &S2C(session)->txn_global;
+	txn_state = WT_SESSION_TXN_STATE(session);
 
 	/*
 	 * Allocating transaction IDs involves several steps.
@@ -349,23 +487,22 @@ __wt_txn_id_alloc(WT_SESSION_IMPL *session, bool publish)
 	 * reader could get a snapshot that makes our changes visible before we
 	 * commit.
 	 *
-	 * Lastly, we spin to update the current ID.  This is the only place
-	 * that the current ID is updated, and it is in the same cache line as
-	 * the field we allocate from, so we should usually succeed on the
-	 * first try.
-	 *
 	 * We want the global value to lead the allocated values, so that any
 	 * allocated transaction ID eventually becomes globally visible.  When
 	 * there are no transactions running, the oldest_id will reach the
 	 * global current ID, so we want post-increment semantics.  Our atomic
 	 * add primitive does pre-increment, so adjust the result here.
+	 *
+	 * We rely on atomic reads of the current ID to create snapshots, so
+	 * for unlocked reads to be well defined, we must use an atomic
+	 * increment here.
 	 */
-	 __wt_spin_lock(session, &txn_global->id_lock);
+	__wt_spin_lock(session, &txn_global->id_lock);
 	id = txn_global->current;
 
 	if (publish) {
 		session->txn.id = id;
-		WT_PUBLISH(WT_SESSION_TXN_STATE(session)->id, id);
+		WT_PUBLISH(txn_state->id, id);
 	}
 
 	/*
@@ -422,7 +559,7 @@ __wt_txn_update_check(WT_SESSION_IMPL *session, WT_UPDATE *upd)
 
 	txn = &session->txn;
 	if (txn->isolation == WT_ISO_SNAPSHOT)
-		while (upd != NULL && !__wt_txn_visible(session, upd->txnid)) {
+		while (upd != NULL && !__wt_txn_upd_visible(session, upd)) {
 			if (upd->txnid != WT_TXN_ABORTED) {
 				WT_STAT_CONN_INCR(
 				    session, txn_update_conflict);

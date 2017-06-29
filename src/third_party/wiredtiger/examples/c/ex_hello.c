@@ -29,54 +29,28 @@
  *	This is an example demonstrating how to create and connect to a
  *	database.
  */
-
-#include <stdio.h>
-#include <stdlib.h>
-#include <string.h>
-
-#include <wiredtiger.h>
+#include <test_util.h>
 
 static const char *home;
 
 int
-main(void)
+main(int argc, char *argv[])
 {
 	WT_CONNECTION *conn;
 	WT_SESSION *session;
-	int ret;
 
-	/*
-	 * Create a clean test directory for this run of the test program if the
-	 * environment variable isn't already set (as is done by make check).
-	 */
-	if (getenv("WIREDTIGER_HOME") == NULL) {
-		home = "WT_HOME";
-		ret = system("rm -rf WT_HOME && mkdir WT_HOME");
-	} else
-		home = NULL;
+	home = example_setup(argc, argv);
 
 	/* Open a connection to the database, creating it if necessary. */
-	if ((ret = wiredtiger_open(home, NULL, "create", &conn)) != 0) {
-		fprintf(stderr, "Error connecting to %s: %s\n",
-		    home == NULL ? "." : home, wiredtiger_strerror(ret));
-		return (EXIT_FAILURE);
-	}
+	error_check(wiredtiger_open(home, NULL, "create", &conn));
 
 	/* Open a session for the current thread's work. */
-	if ((ret = conn->open_session(conn, NULL, NULL, &session)) != 0) {
-		fprintf(stderr, "Error opening a session on %s: %s\n",
-		    home == NULL ? "." : home, wiredtiger_strerror(ret));
-		return (EXIT_FAILURE);
-	}
+	error_check(conn->open_session(conn, NULL, NULL, &session));
 
 	/* Do some work... */
 
 	/* Note: closing the connection implicitly closes open session(s). */
-	if ((ret = conn->close(conn, NULL)) != 0) {
-		fprintf(stderr, "Error closing %s: %s\n",
-		    home == NULL ? "." : home, wiredtiger_strerror(ret));
-		return (EXIT_FAILURE);
-	}
+	error_check(conn->close(conn, NULL));
 
 	return (EXIT_SUCCESS);
 }

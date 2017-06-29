@@ -29,13 +29,7 @@
  *	This is an example application demonstrating how to create and access
  *	tables using a schema.
  */
-
-#include <inttypes.h>
-#include <stdio.h>
-#include <stdlib.h>
-#include <string.h>
-
-#include <wiredtiger.h>
+#include <test_util.h>
 
 static const char *home;
 
@@ -65,7 +59,7 @@ static POP_RECORD pop_data[] = {
 /*! [schema declaration] */
 
 int
-main(void)
+main(int argc, char *argv[])
 {
 	POP_RECORD *p;
 	WT_CONNECTION *conn;
@@ -77,25 +71,12 @@ main(void)
 	uint16_t year;
 	int ret;
 
-	/*
-	 * Create a clean test directory for this run of the test program if the
-	 * environment variable isn't already set (as is done by make check).
-	 */
-	if (getenv("WIREDTIGER_HOME") == NULL) {
-		home = "WT_HOME";
-		ret = system("rm -rf WT_HOME && mkdir WT_HOME");
-	} else
-		home = NULL;
+	home = example_setup(argc, argv);
 
-	if ((ret = wiredtiger_open(
-	    home, NULL, "create,statistics=(fast)", &conn)) != 0) {
-		fprintf(stderr, "Error connecting to %s: %s\n",
-		    home == NULL ? "." : home, wiredtiger_strerror(ret));
-		return (EXIT_FAILURE);
-	}
-	/* Note: error checking omitted for clarity. */
+	error_check(wiredtiger_open(
+	    home, NULL, "create,statistics=(fast)", &conn));
 
-	ret = conn->open_session(conn, NULL, NULL, &session);
+	error_check(conn->open_session(conn, NULL, NULL, &session));
 
 	/*! [Create a table with column groups] */
 	/*
@@ -104,288 +85,296 @@ main(void)
 	 * uint16_t, uint64_t).
 	 * See ::wiredtiger_struct_pack for details of the format strings.
 	 */
-	ret = session->create(session, "table:poptable",
+	error_check(session->create(session, "table:poptable",
 	    "key_format=r,"
 	    "value_format=5sHQ,"
 	    "columns=(id,country,year,population),"
-	    "colgroups=(main,population)");
+	    "colgroups=(main,population)"));
 
 	/*
 	 * Create two column groups: a primary column group with the country
 	 * code, year and population (named "main"), and a population column
 	 * group with the population by itself (named "population").
 	 */
-	ret = session->create(session,
-	    "colgroup:poptable:main", "columns=(country,year,population)");
-	ret = session->create(session,
-	    "colgroup:poptable:population", "columns=(population)");
+	error_check(session->create(session,
+	    "colgroup:poptable:main", "columns=(country,year,population)"));
+	error_check(session->create(session,
+	    "colgroup:poptable:population", "columns=(population)"));
 	/*! [Create a table with column groups] */
 
 	/*! [Create an index] */
 	/* Create an index with a simple key. */
-	ret = session->create(session,
-	    "index:poptable:country", "columns=(country)");
+	error_check(session->create(session,
+	    "index:poptable:country", "columns=(country)"));
 	/*! [Create an index] */
 
 	/*! [Create an index with a composite key] */
 	/* Create an index with a composite key (country,year). */
-	ret = session->create(session,
-	    "index:poptable:country_plus_year", "columns=(country,year)");
+	error_check(session->create(session,
+	    "index:poptable:country_plus_year", "columns=(country,year)"));
 	/*! [Create an index with a composite key] */
 
 	/*! [Create an immutable index] */
 	/* Create an immutable index. */
-	ret = session->create(session,
-	    "index:poptable:immutable_year", "columns=(year),immutable");
+	error_check(session->create(session,
+	    "index:poptable:immutable_year", "columns=(year),immutable"));
 	/*! [Create an immutable index] */
 
 	/* Insert the records into the table. */
-	ret = session->open_cursor(
-	    session, "table:poptable", NULL, "append", &cursor);
+	error_check(session->open_cursor(
+	    session, "table:poptable", NULL, "append", &cursor));
 	for (p = pop_data; p->year != 0; p++) {
 		cursor->set_value(cursor, p->country, p->year, p->population);
-		ret = cursor->insert(cursor);
+		error_check(cursor->insert(cursor));
 	}
-	ret = cursor->close(cursor);
+	error_check(cursor->close(cursor));
 
 	/* Update records in the table. */
-	ret = session->open_cursor(session,
-	    "table:poptable", NULL, NULL, &cursor);
+	error_check(session->open_cursor(session,
+	    "table:poptable", NULL, NULL, &cursor));
 	while ((ret = cursor->next(cursor)) == 0) {
-		ret = cursor->get_key(cursor, &recno);
-		ret = cursor->get_value(cursor, &country, &year, &population);
+		error_check(cursor->get_key(cursor, &recno));
+		error_check(cursor->get_value(
+		    cursor, &country, &year, &population));
 		cursor->set_value(cursor, country, year, population + 1);
-		ret = cursor->update(cursor);
+		error_check(cursor->update(cursor));
 	}
-	ret = cursor->close(cursor);
+	scan_end_check(ret == WT_NOTFOUND);
+	error_check(cursor->close(cursor));
 
 	/* List the records in the table. */
-	ret = session->open_cursor(session,
-	    "table:poptable", NULL, NULL, &cursor);
+	error_check(session->open_cursor(session,
+	    "table:poptable", NULL, NULL, &cursor));
 	while ((ret = cursor->next(cursor)) == 0) {
-		ret = cursor->get_key(cursor, &recno);
-		ret = cursor->get_value(cursor, &country, &year, &population);
+		error_check(cursor->get_key(cursor, &recno));
+		error_check(cursor->get_value(
+		    cursor, &country, &year, &population));
 		printf("ID %" PRIu64, recno);
 		printf(
 		    ": country %s, year %" PRIu16 ", population %" PRIu64 "\n",
 		    country, year, population);
 	}
-	ret = cursor->close(cursor);
+	scan_end_check(ret == WT_NOTFOUND);
+	error_check(cursor->close(cursor));
 
 	/*! [List the records in the table using raw mode.] */
 	/* List the records in the table using raw mode. */
-	ret = session->open_cursor(session,
-	    "table:poptable", NULL, "raw", &cursor);
+	error_check(session->open_cursor(session,
+	    "table:poptable", NULL, "raw", &cursor));
 	while ((ret = cursor->next(cursor)) == 0) {
 		WT_ITEM key, value;
 
-		ret = cursor->get_key(cursor, &key);
-		ret = wiredtiger_struct_unpack(session,
-		    key.data, key.size, "r", &recno);
+		error_check(cursor->get_key(cursor, &key));
+		error_check(wiredtiger_struct_unpack(
+		    session, key.data, key.size, "r", &recno));
 		printf("ID %" PRIu64, recno);
 
-		ret = cursor->get_value(cursor, &value);
-		ret = wiredtiger_struct_unpack(session,
+		error_check(cursor->get_value(cursor, &value));
+		error_check(wiredtiger_struct_unpack(session,
 		    value.data, value.size,
-		    "5sHQ", &country, &year, &population);
+		    "5sHQ", &country, &year, &population));
 		printf(
 		    ": country %s, year %" PRIu16 ", population %" PRIu64 "\n",
 		    country, year, population);
 	}
+	scan_end_check(ret == WT_NOTFOUND);
 	/*! [List the records in the table using raw mode.] */
-	ret = cursor->close(cursor);
+	error_check(cursor->close(cursor));
 
 	/*! [Read population from the primary column group] */
 	/*
 	 * Open a cursor on the main column group, and return the information
 	 * for a particular country.
 	 */
-	ret = session->open_cursor(
-	    session, "colgroup:poptable:main", NULL, NULL, &cursor);
+	error_check(session->open_cursor(
+	    session, "colgroup:poptable:main", NULL, NULL, &cursor));
 	cursor->set_key(cursor, 2);
-	if ((ret = cursor->search(cursor)) == 0) {
-		ret = cursor->get_value(cursor, &country, &year, &population);
-		printf(
-		    "ID 2: "
-		    "country %s, year %" PRIu16 ", population %" PRIu64 "\n",
-		    country, year, population);
-	}
+	error_check(cursor->search(cursor));
+	error_check(cursor->get_value(cursor, &country, &year, &population));
+	printf(
+	    "ID 2: country %s, year %" PRIu16 ", population %" PRIu64 "\n",
+	    country, year, population);
 	/*! [Read population from the primary column group] */
-	ret = cursor->close(cursor);
+	error_check(cursor->close(cursor));
 
 	/*! [Read population from the standalone column group] */
 	/*
 	 * Open a cursor on the population column group, and return the
 	 * population of a particular country.
 	 */
-	ret = session->open_cursor(session,
-	    "colgroup:poptable:population", NULL, NULL, &cursor);
+	error_check(session->open_cursor(session,
+	    "colgroup:poptable:population", NULL, NULL, &cursor));
 	cursor->set_key(cursor, 2);
-	if ((ret = cursor->search(cursor)) == 0) {
-		ret = cursor->get_value(cursor, &population);
-		printf("ID 2: population %" PRIu64 "\n", population);
-	}
+	error_check(cursor->search(cursor));
+	error_check(cursor->get_value(cursor, &population));
+	printf("ID 2: population %" PRIu64 "\n", population);
 	/*! [Read population from the standalone column group] */
-	ret = cursor->close(cursor);
+	error_check(cursor->close(cursor));
 
 	/*! [Search in a simple index] */
 	/* Search in a simple index. */
-	ret = session->open_cursor(session,
-	    "index:poptable:country", NULL, NULL, &cursor);
+	error_check(session->open_cursor(session,
+	    "index:poptable:country", NULL, NULL, &cursor));
 	cursor->set_key(cursor, "AU\0\0\0");
-	ret = cursor->search(cursor);
-	ret = cursor->get_value(cursor, &country, &year, &population);
+	error_check(cursor->search(cursor));
+	error_check(cursor->get_value(cursor, &country, &year, &population));
 	printf("AU: country %s, year %" PRIu16 ", population %" PRIu64 "\n",
 	    country, year, population);
 	/*! [Search in a simple index] */
-	ret = cursor->close(cursor);
+	error_check(cursor->close(cursor));
 
 	/*! [Search in a composite index] */
 	/* Search in a composite index. */
-	ret = session->open_cursor(session,
-	    "index:poptable:country_plus_year", NULL, NULL, &cursor);
+	error_check(session->open_cursor(session,
+	    "index:poptable:country_plus_year", NULL, NULL, &cursor));
 	cursor->set_key(cursor, "USA\0\0", (uint16_t)1900);
-	ret = cursor->search(cursor);
-	ret = cursor->get_value(cursor, &country, &year, &population);
+	error_check(cursor->search(cursor));
+	error_check(cursor->get_value(cursor, &country, &year, &population));
 	printf(
 	    "US 1900: country %s, year %" PRIu16 ", population %" PRIu64 "\n",
 	    country, year, population);
 	/*! [Search in a composite index] */
-	ret = cursor->close(cursor);
+	error_check(cursor->close(cursor));
 
 	/*! [Return a subset of values from the table] */
 	/*
 	 * Use a projection to return just the table's country and year
 	 * columns.
 	 */
-	ret = session->open_cursor(session,
-	    "table:poptable(country,year)", NULL, NULL, &cursor);
+	error_check(session->open_cursor(session,
+	    "table:poptable(country,year)", NULL, NULL, &cursor));
 	while ((ret = cursor->next(cursor)) == 0) {
-		ret = cursor->get_value(cursor, &country, &year);
+		error_check(cursor->get_value(cursor, &country, &year));
 		printf("country %s, year %" PRIu16 "\n", country, year);
 	}
 	/*! [Return a subset of values from the table] */
-	ret = cursor->close(cursor);
+	scan_end_check(ret == WT_NOTFOUND);
+	error_check(cursor->close(cursor));
 
 	/*! [Return a subset of values from the table using raw mode] */
 	/*
 	 * Use a projection to return just the table's country and year
 	 * columns, using raw mode.
 	 */
-	ret = session->open_cursor(session,
-	    "table:poptable(country,year)", NULL, "raw", &cursor);
+	error_check(session->open_cursor(session,
+	    "table:poptable(country,year)", NULL, "raw", &cursor));
 	while ((ret = cursor->next(cursor)) == 0) {
 		WT_ITEM value;
 
-		ret = cursor->get_value(cursor, &value);
-		ret = wiredtiger_struct_unpack(
-		    session, value.data, value.size, "5sH", &country, &year);
+		error_check(cursor->get_value(cursor, &value));
+		error_check(wiredtiger_struct_unpack(
+		    session, value.data, value.size, "5sH", &country, &year));
 		printf("country %s, year %" PRIu16 "\n", country, year);
 	}
+	scan_end_check(ret == WT_NOTFOUND);
 	/*! [Return a subset of values from the table using raw mode] */
-	ret = cursor->close(cursor);
+	error_check(cursor->close(cursor));
 
 	/*! [Return the table's record number key using an index] */
 	/*
 	 * Use a projection to return just the table's record number key
 	 * from an index.
 	 */
-	ret = session->open_cursor(session,
-	    "index:poptable:country_plus_year(id)", NULL, NULL, &cursor);
+	error_check(session->open_cursor(session,
+	    "index:poptable:country_plus_year(id)", NULL, NULL, &cursor));
 	while ((ret = cursor->next(cursor)) == 0) {
-		ret = cursor->get_key(cursor, &country, &year);
-		ret = cursor->get_value(cursor, &recno);
+		error_check(cursor->get_key(cursor, &country, &year));
+		error_check(cursor->get_value(cursor, &recno));
 		printf("row ID %" PRIu64 ": country %s, year %" PRIu16 "\n",
 		    recno, country, year);
 	}
+	scan_end_check(ret == WT_NOTFOUND);
 	/*! [Return the table's record number key using an index] */
-	ret = cursor->close(cursor);
+	error_check(cursor->close(cursor));
 
 	/*! [Return a subset of the value columns from an index] */
 	/*
 	 * Use a projection to return just the population column from an
 	 * index.
 	 */
-	ret = session->open_cursor(session,
+	error_check(session->open_cursor(session,
 	    "index:poptable:country_plus_year(population)",
-	    NULL, NULL, &cursor);
+	    NULL, NULL, &cursor));
 	while ((ret = cursor->next(cursor)) == 0) {
-		ret = cursor->get_key(cursor, &country, &year);
-		ret = cursor->get_value(cursor, &population);
+		error_check(cursor->get_key(cursor, &country, &year));
+		error_check(cursor->get_value(cursor, &population));
 		printf("population %" PRIu64 ": country %s, year %" PRIu16 "\n",
 		    population, country, year);
 	}
+	scan_end_check(ret == WT_NOTFOUND);
 	/*! [Return a subset of the value columns from an index] */
-	ret = cursor->close(cursor);
+	error_check(cursor->close(cursor));
 
 	/*! [Access only the index] */
 	/*
 	 * Use a projection to avoid accessing any other column groups when
 	 * using an index: supply an empty list of value columns.
 	 */
-	ret = session->open_cursor(session,
-	    "index:poptable:country_plus_year()", NULL, NULL, &cursor);
+	error_check(session->open_cursor(session,
+	    "index:poptable:country_plus_year()", NULL, NULL, &cursor));
 	while ((ret = cursor->next(cursor)) == 0) {
-		ret = cursor->get_key(cursor, &country, &year);
+		error_check(cursor->get_key(cursor, &country, &year));
 		printf("country %s, year %" PRIu16 "\n", country, year);
 	}
+	scan_end_check(ret == WT_NOTFOUND);
 	/*! [Access only the index] */
-	ret = cursor->close(cursor);
+	error_check(cursor->close(cursor));
 
 	/*! [Join cursors] */
 	/* Open cursors needed by the join. */
-	ret = session->open_cursor(session,
-	    "join:table:poptable", NULL, NULL, &join_cursor);
-	ret = session->open_cursor(session,
-	    "index:poptable:country", NULL, NULL, &country_cursor);
-	ret = session->open_cursor(session,
-	    "index:poptable:immutable_year", NULL, NULL, &year_cursor);
+	error_check(session->open_cursor(session,
+	    "join:table:poptable", NULL, NULL, &join_cursor));
+	error_check(session->open_cursor(session,
+	    "index:poptable:country", NULL, NULL, &country_cursor));
+	error_check(session->open_cursor(session,
+	    "index:poptable:immutable_year", NULL, NULL, &year_cursor));
 
 	/* select values WHERE country == "AU" AND year > 1900 */
 	country_cursor->set_key(country_cursor, "AU\0\0\0");
-	ret = country_cursor->search(country_cursor);
-	ret = session->join(session, join_cursor, country_cursor,
-	    "compare=eq,count=10");
+	error_check(country_cursor->search(country_cursor));
+	error_check(session->join(
+	    session, join_cursor, country_cursor, "compare=eq,count=10"));
 	year_cursor->set_key(year_cursor, (uint16_t)1900);
-	ret = year_cursor->search(year_cursor);
-	ret = session->join(session, join_cursor, year_cursor,
-	    "compare=gt,count=10,strategy=bloom");
+	error_check(year_cursor->search(year_cursor));
+	error_check(session->join(session,
+	    join_cursor, year_cursor, "compare=gt,count=10,strategy=bloom"));
 
 	/* List the values that are joined */
 	while ((ret = join_cursor->next(join_cursor)) == 0) {
-		ret = join_cursor->get_key(join_cursor, &recno);
-		ret = join_cursor->get_value(join_cursor, &country, &year,
-		    &population);
+		error_check(join_cursor->get_key(join_cursor, &recno));
+		error_check(join_cursor->get_value(
+		    join_cursor, &country, &year, &population));
 		printf("ID %" PRIu64, recno);
 		printf(
 		    ": country %s, year %" PRIu16 ", population %" PRIu64 "\n",
 		    country, year, population);
 	}
+	scan_end_check(ret == WT_NOTFOUND);
 	/*! [Join cursors] */
 
 	/*! [Statistics cursor join cursor] */
-	ret = session->open_cursor(session,
+	error_check(session->open_cursor(session,
 	    "statistics:join",
-	    join_cursor, NULL, &stat_cursor);
+	    join_cursor, NULL, &stat_cursor));
 	/*! [Statistics cursor join cursor] */
 
-	ret = stat_cursor->close(stat_cursor);
-	ret = join_cursor->close(join_cursor);
-	ret = year_cursor->close(year_cursor);
-	ret = country_cursor->close(country_cursor);
+	error_check(stat_cursor->close(stat_cursor));
+	error_check(join_cursor->close(join_cursor));
+	error_check(year_cursor->close(year_cursor));
+	error_check(country_cursor->close(country_cursor));
 
 	/*! [Complex join cursors] */
 	/* Open cursors needed by the join. */
-	ret = session->open_cursor(session,
-	    "join:table:poptable", NULL, NULL, &join_cursor);
-	ret = session->open_cursor(session,
-	    "join:table:poptable", NULL, NULL, &subjoin_cursor);
-	ret = session->open_cursor(session,
-	    "index:poptable:country", NULL, NULL, &country_cursor);
-	ret = session->open_cursor(session,
-	    "index:poptable:country", NULL, NULL, &country_cursor2);
-	ret = session->open_cursor(session,
-	    "index:poptable:immutable_year", NULL, NULL, &year_cursor);
+	error_check(session->open_cursor(session,
+	    "join:table:poptable", NULL, NULL, &join_cursor));
+	error_check(session->open_cursor(session,
+	    "join:table:poptable", NULL, NULL, &subjoin_cursor));
+	error_check(session->open_cursor(session,
+	    "index:poptable:country", NULL, NULL, &country_cursor));
+	error_check(session->open_cursor(session,
+	    "index:poptable:country", NULL, NULL, &country_cursor2));
+	error_check(session->open_cursor(session,
+	    "index:poptable:immutable_year", NULL, NULL, &year_cursor));
 
 	/*
 	 * select values WHERE (country == "AU" OR country == "UK")
@@ -394,40 +383,41 @@ main(void)
 	 * First, set up the join representing the country clause.
 	 */
 	country_cursor->set_key(country_cursor, "AU\0\0\0");
-	ret = country_cursor->search(country_cursor);
-	ret = session->join(session, subjoin_cursor, country_cursor,
-	    "operation=or,compare=eq,count=10");
+	error_check(country_cursor->search(country_cursor));
+	error_check(session->join(session, subjoin_cursor,
+	    country_cursor, "operation=or,compare=eq,count=10"));
 	country_cursor2->set_key(country_cursor2, "UK\0\0\0");
-	ret = country_cursor2->search(country_cursor2);
-	ret = session->join(session, subjoin_cursor, country_cursor2,
-	    "operation=or,compare=eq,count=10");
+	error_check(country_cursor2->search(country_cursor2));
+	error_check(session->join(session, subjoin_cursor,
+	    country_cursor2, "operation=or,compare=eq,count=10"));
 
 	/* Join that to the top join, and add the year clause */
-	ret = session->join(session, join_cursor, subjoin_cursor, NULL);
+	error_check(session->join(session, join_cursor, subjoin_cursor, NULL));
 	year_cursor->set_key(year_cursor, (uint16_t)1900);
-	ret = year_cursor->search(year_cursor);
-	ret = session->join(session, join_cursor, year_cursor,
-	    "compare=gt,count=10,strategy=bloom");
+	error_check(year_cursor->search(year_cursor));
+	error_check(session->join(session,
+	    join_cursor, year_cursor, "compare=gt,count=10,strategy=bloom"));
 
 	/* List the values that are joined */
 	while ((ret = join_cursor->next(join_cursor)) == 0) {
-		ret = join_cursor->get_key(join_cursor, &recno);
-		ret = join_cursor->get_value(join_cursor, &country, &year,
-		    &population);
+		error_check(join_cursor->get_key(join_cursor, &recno));
+		error_check(join_cursor->get_value(
+		    join_cursor, &country, &year, &population));
 		printf("ID %" PRIu64, recno);
 		printf(
 		    ": country %s, year %" PRIu16 ", population %" PRIu64 "\n",
 		    country, year, population);
 	}
+	scan_end_check(ret == WT_NOTFOUND);
 	/*! [Complex join cursors] */
 
-	ret = join_cursor->close(join_cursor);
-	ret = subjoin_cursor->close(subjoin_cursor);
-	ret = country_cursor->close(country_cursor);
-	ret = country_cursor2->close(country_cursor2);
-	ret = year_cursor->close(year_cursor);
+	error_check(join_cursor->close(join_cursor));
+	error_check(subjoin_cursor->close(subjoin_cursor));
+	error_check(country_cursor->close(country_cursor));
+	error_check(country_cursor2->close(country_cursor2));
+	error_check(year_cursor->close(year_cursor));
 
-	ret = conn->close(conn, NULL);
+	error_check(conn->close(conn, NULL));
 
-	return (ret == 0 ? EXIT_SUCCESS : EXIT_FAILURE);
+	return (EXIT_SUCCESS);
 }

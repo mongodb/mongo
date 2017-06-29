@@ -65,7 +65,7 @@ main(int argc, char *argv[])
 	runs = 1;
 
 	while ((ch = __wt_getopt(
-	    progname, argc, argv, "c:C:h:k:l:n:r:t:T:W:")) != EOF)
+	    progname, argc, argv, "C:c:h:k:l:n:r:sT:t:W:")) != EOF)
 		switch (ch) {
 		case 'c':
 			g.checkpoint_name = __wt_optarg;
@@ -91,6 +91,11 @@ main(int argc, char *argv[])
 			break;
 		case 'r':			/* runs */
 			runs = atoi(__wt_optarg);
+			break;
+		case 's':
+#ifdef HAVE_TIMESTAMPS
+			g.use_timestamps = true;
+#endif
 			break;
 		case 't':
 			switch (__wt_optarg[0]) {
@@ -320,19 +325,25 @@ type_to_string(table_type type)
 static int
 usage(void)
 {
+	//    progname, argc, argv, "c:C:h:k:l:n:r:t:T:W:")) != EOF)
+
 	fprintf(stderr,
 	    "usage: %s "
-	    "[-S] [-C wiredtiger-config] [-k keys] [-l log]\n\t"
-	    "[-n ops] [-c checkpoint] [-r runs] [-t f|r|v] [-W workers]\n",
+	    "[-C wiredtiger-config] [-c checkpoint] [-h home] [-k keys]\n\t"
+	    "[-l log] [-n ops] [-r runs] [-s] [-t f|r|v] [-T table-config]\n\t"
+	    "[-W workers]\n",
 	    progname);
 	fprintf(stderr, "%s",
 	    "\t-C specify wiredtiger_open configuration arguments\n"
 	    "\t-c checkpoint name to used named checkpoints\n"
+	    "\t-h set a database home directory\n"
 	    "\t-k set number of keys to load\n"
 	    "\t-l specify a log file\n"
 	    "\t-n set number of operations each thread does\n"
 	    "\t-r set number of runs (0 for continuous)\n"
+	    "\t-s enable transaction timestamps\n"
 	    "\t-t set a file type ( col | mix | row | lsm )\n"
+	    "\t-T specify a table configuration\n"
 	    "\t-W set number of worker threads\n");
 	return (EXIT_FAILURE);
 }

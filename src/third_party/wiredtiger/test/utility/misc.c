@@ -128,7 +128,7 @@ testutil_clean_work_dir(const char *dir)
  *	Delete the existing work directory, then create a new one.
  */
 void
-testutil_make_work_dir(char *dir)
+testutil_make_work_dir(const char *dir)
 {
 	size_t len;
 	int ret;
@@ -166,20 +166,22 @@ testutil_cleanup(TEST_OPTS *opts)
 }
 
 /*
- * testutil_enable_long_tests --
- *	Return if TESTUTIL_ENABLE_LONG_TESTS is set.
+ * testutil_is_flag_set --
+ *	Return if an environment variable flag is set.
  */
 bool
-testutil_enable_long_tests(void)
+testutil_is_flag_set(const char *flag)
 {
 	const char *res;
 	bool enable_long_tests;
 
-	if (__wt_getenv(NULL,
-	    "TESTUTIL_ENABLE_LONG_TESTS", &res) == WT_NOTFOUND)
+	if (__wt_getenv(NULL, flag, &res) == WT_NOTFOUND)
 		return (false);
 
-	/* Accept anything other than "TESTUTIL_ENABLE_LONG_TESTS=0". */
+	/*
+	 * This is a boolean test. So if the environment variable is set to any
+	 * value other than 0, we return success.
+	 */
 	enable_long_tests = res[0] != '0';
 
 	free((void *)res);
@@ -255,4 +257,27 @@ dstrndup(const char *str, size_t len)
 	p = dcalloc(len + 1, sizeof(char));
 	memcpy(p, str, len);
 	return (p);
+}
+
+/*
+ * example_setup --
+ *	Set the program name, create a home directory for the example programs.
+ */
+const char *
+example_setup(int argc, char * const *argv)
+{
+	const char *home;
+
+	(void)argc;					/* Unused variable */
+
+	(void)testutil_set_progname(argv);
+
+	/*
+	 * Create a clean test directory for this run of the test program if the
+	 * environment variable isn't already set (as is done by make check).
+	 */
+	if ((home = getenv("WIREDTIGER_HOME")) == NULL)
+		home = "WT_HOME";
+	testutil_make_work_dir(home);
+	return (home);
 }

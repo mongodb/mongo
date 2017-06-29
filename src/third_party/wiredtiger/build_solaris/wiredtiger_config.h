@@ -142,6 +142,9 @@
 /* Default alignment of buffers used for I/O */
 #define WT_BUFFER_ALIGNMENT_DEFAULT 0
 
+/* Size of a transaction timestamp in bytes */
+#define WT_TIMESTAMP_SIZE 8
+
 /* Number of bits in a file offset, on hosts where this is settable. */
 /* #undef _FILE_OFFSET_BITS */
 

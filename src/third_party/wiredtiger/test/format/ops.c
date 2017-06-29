@@ -405,6 +405,41 @@ snap_check(WT_CURSOR *cursor,
 }
 
 /*
+ * commit_transaction --
+ *     Commit a transaction
+ */
+static void
+commit_transaction(TINFO *tinfo, WT_SESSION *session)
+{
+	WT_CONNECTION *conn;
+	uint64_t ts;
+	char *commit_conf, config_buf[64];
+
+	conn = g.wts_conn;
+
+	if (g.c_txn_timestamps) {
+		ts = __wt_atomic_addv64(&g.timestamp, 1);
+
+		/* Periodically bump the oldest timestamp. */
+		if (ts > 100 && ts % 100 == 0) {
+			testutil_check(__wt_snprintf(
+			    config_buf, sizeof(config_buf),
+			    "oldest_timestamp=%" PRIx64, ts));
+			testutil_check(conn->set_timestamp(conn, config_buf));
+		}
+
+		testutil_check(__wt_snprintf(
+		    config_buf, sizeof(config_buf),
+		    "commit_timestamp=%" PRIx64, ts));
+		commit_conf = config_buf;
+	} else
+		commit_conf = NULL;
+
+	testutil_check(session->commit_transaction(session, commit_conf));
+	++tinfo->commit;
+}
+
+/*
  * ops --
  *     Per-thread operations.
  */
@@ -464,9 +499,7 @@ ops(void *arg)
 		 */
 		if (intxn &&
 		    (tinfo->ops == ckpt_op || tinfo->ops == session_op)) {
-			testutil_check(
-			    session->commit_transaction(session, NULL));
-			++tinfo->commit;
+			commit_transaction(tinfo, session);
 			intxn = false;
 		}
 
@@ -839,9 +872,7 @@ update_instead_of_insert:
 		 */
 		switch (rnd) {
 		case 1: case 2: case 3: case 4:			/* 40% */
-			testutil_check(
-			    session->commit_transaction(session, NULL));
-			++tinfo->commit;
+			commit_transaction(tinfo, session);
 			break;
 		case 5:						/* 10% */
 			if (0) {

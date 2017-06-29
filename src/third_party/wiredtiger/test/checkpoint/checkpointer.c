@@ -96,15 +96,19 @@ real_checkpointer(void)
 	if ((ret = g.conn->open_session(g.conn, NULL, NULL, &session)) != 0)
 		return (log_print_err("conn.open_session", ret, 1));
 
-	if (strncmp(g.checkpoint_name,
-	    "WiredTigerCheckpoint", strlen("WiredTigerCheckpoint")) == 0)
-		checkpoint_config = NULL;
-	else {
-		testutil_check(__wt_snprintf(
-		    _buf, sizeof(_buf), "name=%s", g.checkpoint_name));
-		checkpoint_config = _buf;
-	}
 	while (g.running) {
+		if (WT_PREFIX_MATCH(g.checkpoint_name, "WiredTigerCheckpoint"))
+			strcpy(_buf, "");
+		else
+			testutil_check(__wt_snprintf(
+			    _buf, sizeof(_buf), "name=%s", g.checkpoint_name));
+
+		if (g.use_timestamps && g.timestamp > 0)
+			testutil_check(__wt_snprintf(
+			    _buf + strlen(_buf), sizeof(_buf) - strlen(_buf),
+			    ",read_timestamp=%" PRIx64, g.timestamp));
+
+		checkpoint_config = strlen(_buf) > 0 ? _buf : NULL;
 		/* Execute a checkpoint */
 		if ((ret = session->checkpoint(
 		    session, checkpoint_config)) != 0)

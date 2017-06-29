@@ -1,5 +1,5 @@
 Name:		wiredtiger
-Version:	2.9.3
+Version:	3.0.0
 Release:	1%{?dist}
 Summary:	WiredTiger data storage engine
 

@@ -1,5 +1,7 @@
-LDADD = $(top_builddir)/libwiredtiger.la
+LDADD =  $(top_builddir)/test/utility/libtest_util.la
+LDADD += $(top_builddir)/libwiredtiger.la
 AM_CPPFLAGS = -I$(top_srcdir)/src/include
+AM_CPPFLAGS +=-I$(top_srcdir)/test/utility
 
 noinst_PROGRAMS = \
 	ex_access \
@@ -20,6 +22,7 @@ noinst_PROGRAMS = \
 	ex_pack \
 	ex_process \
 	ex_schema \
+	ex_smoke \
 	ex_stat \
 	ex_sync \
 	ex_thread

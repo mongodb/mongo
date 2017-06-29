@@ -142,6 +142,9 @@
 /* Default alignment of buffers used for I/O */
 #define WT_BUFFER_ALIGNMENT_DEFAULT 4096
 
+/* Size of a transaction timestamp in bytes */
+#define WT_TIMESTAMP_SIZE 8
+
 /* Enable large inode numbers on Mac OS X 10.5.  */
 #ifndef _DARWIN_USE_64_BIT_INODE
 # define _DARWIN_USE_64_BIT_INODE 1
