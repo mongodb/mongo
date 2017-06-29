@@ -557,9 +557,6 @@ public:
         return data;
     }
 
-    /** 0 == Equality, just not defined yet */
-    int getGtLtOp(int def = 0) const;
-
     /** Constructs an empty element */
     BSONElement();
 

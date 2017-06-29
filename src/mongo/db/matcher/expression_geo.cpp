@@ -31,8 +31,10 @@
 #define MONGO_LOG_DEFAULT_COMPONENT ::mongo::logger::LogComponent::kDefault
 
 #include "mongo/db/matcher/expression_geo.h"
+
 #include "mongo/bson/simple_bsonobj_comparator.h"
 #include "mongo/db/geo/geoparser.h"
+#include "mongo/db/matcher/expression_parser.h"
 #include "mongo/platform/basic.h"
 #include "mongo/util/log.h"
 #include "mongo/util/mongoutils/str.h"
@@ -59,10 +61,10 @@ Status GeoExpression::parseQuery(const BSONObj& obj) {
                       str::stream() << "can't parse extra field: " << outerIt.next());
     }
 
-    BSONObj::MatchType matchType = static_cast<BSONObj::MatchType>(queryElt.getGtLtOp());
-    if (BSONObj::opGEO_INTERSECTS == matchType) {
+    auto keyword = MatchExpressionParser::parsePathAcceptingKeyword(queryElt);
+    if (PathAcceptingKeyword::GEO_INTERSECTS == keyword) {
         predicate = GeoExpression::INTERSECT;
-    } else if (BSONObj::opWITHIN == matchType) {
+    } else if (PathAcceptingKeyword::WITHIN == keyword) {
         predicate = GeoExpression::WITHIN;
     } else {
         // eoo() or unknown query predicate.
@@ -230,8 +232,8 @@ Status GeoNearExpression::parseNewQuery(const BSONObj& obj) {
     if (!e.isABSONObj()) {
         return Status(ErrorCodes::BadValue, "geo near query argument is not an object");
     }
-    BSONObj::MatchType matchType = static_cast<BSONObj::MatchType>(e.getGtLtOp());
-    if (BSONObj::opNEAR != matchType) {
+
+    if (PathAcceptingKeyword::GEO_NEAR != MatchExpressionParser::parsePathAcceptingKeyword(e)) {
         return Status(ErrorCodes::BadValue,
                       mongoutils::str::stream() << "invalid geo near query operator: "
                                                 << e.fieldName());

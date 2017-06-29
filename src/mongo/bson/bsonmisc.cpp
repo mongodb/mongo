@@ -31,14 +31,6 @@
 
 namespace mongo {
 
-int getGtLtOp(const BSONElement& e) {
-    if (e.type() != Object)
-        return BSONObj::Equality;
-
-    BSONElement fe = e.embeddedObject().firstElement();
-    return fe.getGtLtOp();
-}
-
 bool fieldsMatch(const BSONObj& lhs, const BSONObj& rhs) {
     BSONObjIterator l(lhs);
     BSONObjIterator r(rhs);

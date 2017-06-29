@@ -36,6 +36,7 @@
 #include "mongo/db/fts/fts_element_iterator.h"
 #include "mongo/db/fts/fts_tokenizer.h"
 #include "mongo/db/fts/fts_util.h"
+#include "mongo/db/matcher/expression_parser.h"
 #include "mongo/util/mongoutils/str.h"
 #include "mongo/util/stringutils.h"
 
@@ -249,7 +250,8 @@ Status FTSSpec::getIndexPrefix(const BSONObj& query, BSONObj* out) const {
             return Status(ErrorCodes::BadValue,
                           str::stream() << "need have an equality filter on: " << extraBefore(i));
 
-        if (e.isABSONObj() && e.Obj().firstElement().getGtLtOp(-1) != -1)
+        if (e.isABSONObj() &&
+            MatchExpressionParser::parsePathAcceptingKeyword(e.Obj().firstElement()))
             return Status(ErrorCodes::BadValue,
                           str::stream() << "need have an equality filter on: " << extraBefore(i));
 

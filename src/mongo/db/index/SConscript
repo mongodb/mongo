@@ -73,6 +73,7 @@ env.CppUnitTest(
         ],
         LIBDEPS=[
             'key_generator',
+            "$BUILD_DIR/mongo/db/matcher/expressions",
             '$BUILD_DIR/mongo/db/mongohasher',
             '$BUILD_DIR/mongo/db/query/collation/collator_interface_mock',
         ],

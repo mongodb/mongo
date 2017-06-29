@@ -512,38 +512,6 @@ public:
      */
     bool valid(BSONVersion version) const;
 
-    enum MatchType {
-        Equality = 0,
-        LT = 0x1,
-        LTE = 0x3,
-        GTE = 0x6,
-        GT = 0x4,
-        opIN = 0x8,  // { x : { $in : [1,2,3] } }
-        NE = 0x9,
-        opSIZE = 0x0A,
-        opALL = 0x0B,
-        NIN = 0x0C,
-        opEXISTS = 0x0D,
-        opMOD = 0x0E,
-        opTYPE = 0x0F,
-        opREGEX = 0x10,
-        opOPTIONS = 0x11,
-        opELEM_MATCH = 0x12,
-        opNEAR = 0x13,
-        opWITHIN = 0x14,
-        opGEO_INTERSECTS = 0x16,
-        opBITS_ALL_SET = 0x17,
-        opBITS_ALL_CLEAR = 0x18,
-        opBITS_ANY_SET = 0x19,
-        opBITS_ANY_CLEAR = 0x1A,
-        opINTERNAL_SCHEMA_MIN_ITEMS = 0x1B,
-        opINTERNAL_SCHEMA_MAX_ITEMS = 0x1C,
-        opINTERNAL_SCHEMA_UNIQUE_ITEMS = 0x1D,
-        opINTERNAL_SCHEMA_OBJECT_MATCH = 0x1E,
-        opINTERNAL_SCHEMA_MIN_LENGTH = 0x1F,
-        opINTERNAL_SCHEMA_MAX_LENGTH = 0x20,
-    };
-
     /** add all elements of the object to the specified vector */
     void elems(std::vector<BSONElement>&) const;
     /** add all elements of the object to the specified list */

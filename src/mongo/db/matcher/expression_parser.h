@@ -43,12 +43,52 @@ namespace mongo {
 class CollatorInterface;
 class OperationContext;
 
+enum class PathAcceptingKeyword {
+    EQUALITY,
+    LESS_THAN,
+    LESS_THAN_OR_EQUAL,
+    GREATER_THAN_OR_EQUAL,
+    GREATER_THAN,
+    IN_EXPR,
+    NOT_EQUAL,
+    SIZE,
+    ALL,
+    NOT_IN,
+    EXISTS,
+    MOD,
+    TYPE,
+    REGEX,
+    OPTIONS,
+    ELEM_MATCH,
+    GEO_NEAR,
+    WITHIN,
+    GEO_INTERSECTS,
+    BITS_ALL_SET,
+    BITS_ALL_CLEAR,
+    BITS_ANY_SET,
+    BITS_ANY_CLEAR,
+    INTERNAL_SCHEMA_MIN_ITEMS,
+    INTERNAL_SCHEMA_MAX_ITEMS,
+    INTERNAL_SCHEMA_UNIQUE_ITEMS,
+    INTERNAL_SCHEMA_OBJECT_MATCH,
+    INTERNAL_SCHEMA_MIN_LENGTH,
+    INTERNAL_SCHEMA_MAX_LENGTH
+};
+
 class MatchExpressionParser {
 public:
     /**
      * Constant double representation of 2^63.
      */
     static const double kLongLongMaxPlusOneAsDouble;
+
+    /**
+     * Parses PathAcceptingKeyword from 'typeElem'. Returns 'defaultKeyword' if 'typeElem'
+     * doesn't represent a known type, or represents PathAcceptingKeyword::EQUALITY which is not
+     * handled by this parser (see SERVER-19565).
+     */
+    static boost::optional<PathAcceptingKeyword> parsePathAcceptingKeyword(
+        BSONElement typeElem, boost::optional<PathAcceptingKeyword> defaultKeyword = boost::none);
 
     /**
      * caller has to maintain ownership obj
@@ -167,7 +207,9 @@ private:
 
     StatusWithMatchExpression _parseType(const char* name, const BSONElement& elt);
 
-    StatusWithMatchExpression _parseGeo(const char* name, int type, const BSONObj& section);
+    StatusWithMatchExpression _parseGeo(const char* name,
+                                        PathAcceptingKeyword type,
+                                        const BSONObj& section);
 
     // arrays
 

@@ -306,42 +306,6 @@ string BSONElement::jsonString(JsonStringFormat format, bool includeFieldNames, 
 
 namespace {
 
-// Map from query operator string name to operator MatchType. Used in BSONElement::getGtLtOp().
-const StringMap<BSONObj::MatchType> queryOperatorMap{
-    // TODO: SERVER-19565 Add $eq after auditing callers.
-    {"lt", BSONObj::LT},
-    {"lte", BSONObj::LTE},
-    {"gte", BSONObj::GTE},
-    {"gt", BSONObj::GT},
-    {"in", BSONObj::opIN},
-    {"ne", BSONObj::NE},
-    {"size", BSONObj::opSIZE},
-    {"all", BSONObj::opALL},
-    {"nin", BSONObj::NIN},
-    {"exists", BSONObj::opEXISTS},
-    {"mod", BSONObj::opMOD},
-    {"type", BSONObj::opTYPE},
-    {"regex", BSONObj::opREGEX},
-    {"options", BSONObj::opOPTIONS},
-    {"elemMatch", BSONObj::opELEM_MATCH},
-    {"near", BSONObj::opNEAR},
-    {"nearSphere", BSONObj::opNEAR},
-    {"geoNear", BSONObj::opNEAR},
-    {"within", BSONObj::opWITHIN},
-    {"geoWithin", BSONObj::opWITHIN},
-    {"geoIntersects", BSONObj::opGEO_INTERSECTS},
-    {"bitsAllSet", BSONObj::opBITS_ALL_SET},
-    {"bitsAllClear", BSONObj::opBITS_ALL_CLEAR},
-    {"bitsAnySet", BSONObj::opBITS_ANY_SET},
-    {"bitsAnyClear", BSONObj::opBITS_ANY_CLEAR},
-    {"_internalSchemaMinItems", BSONObj::opINTERNAL_SCHEMA_MIN_ITEMS},
-    {"_internalSchemaMaxItems", BSONObj::opINTERNAL_SCHEMA_MAX_ITEMS},
-    {"_internalSchemaUniqueItems", BSONObj::opINTERNAL_SCHEMA_UNIQUE_ITEMS},
-    {"_internalSchemaObjectMatch", BSONObj::opINTERNAL_SCHEMA_OBJECT_MATCH},
-    {"_internalSchemaMinLength", BSONObj::opINTERNAL_SCHEMA_MIN_LENGTH},
-    {"_internalSchemaMaxLength", BSONObj::opINTERNAL_SCHEMA_MAX_LENGTH},
-};
-
 // Compares two string elements using a simple binary compare.
 int compareElementStringValues(const BSONElement& leftStr, const BSONElement& rightStr) {
     // we use memcmp as we allow zeros in UTF8 strings
@@ -356,20 +320,6 @@ int compareElementStringValues(const BSONElement& leftStr, const BSONElement& ri
 }
 
 }  // namespace
-
-int BSONElement::getGtLtOp(int def) const {
-    const char* fn = fieldName();
-    if (fn[0] == '$' && fn[1]) {
-        StringData opName = fieldNameStringData().substr(1);
-
-        StringMap<BSONObj::MatchType>::const_iterator queryOp = queryOperatorMap.find(opName);
-        if (queryOp == queryOperatorMap.end()) {
-            return def;
-        }
-        return queryOp->second;
-    }
-    return def;
-}
 
 /** transform a BSON array into a vector of BSONElements.
     we match array # positions with their vector position, and ignore

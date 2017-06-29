@@ -60,6 +60,7 @@ baseEnv.Library('base', [
                     "$BUILD_DIR/mongo/db/bson/dotted_path_support",
                     "$BUILD_DIR/mongo/db/common",
                     "$BUILD_DIR/mongo/db/fts/unicode/unicode",
+                    "$BUILD_DIR/mongo/db/matcher/expressions",
                     "$BUILD_DIR/mongo/util/md5",
                     "$BUILD_DIR/third_party/shim_stemmer",
                     ])
@@ -78,44 +79,26 @@ env.Library('ftsmongod', [
     'ftsmongod.cpp',
         ], LIBDEPS=["base","$BUILD_DIR/mongo/base"])
 
-env.CppUnitTest( "fts_basic_phrase_matcher_test", "fts_basic_phrase_matcher_test.cpp",
-                 LIBDEPS=["base"] )
-
-env.CppUnitTest( "fts_basic_tokenizer_test", "fts_basic_tokenizer_test.cpp",
-                 LIBDEPS=["base"] )
-
-env.CppUnitTest( "fts_element_iterator_test", "fts_element_iterator_test.cpp",
-                 LIBDEPS=["base"] )
-
-env.CppUnitTest( "fts_index_format_test", "fts_index_format_test.cpp",
-                 LIBDEPS=["base"] )
-
-env.CppUnitTest( "fts_language_test", "fts_language_test.cpp",
-                 LIBDEPS=["base"] )
-
-env.CppUnitTest( "fts_matcher_test", "fts_matcher_test.cpp",
-                 LIBDEPS=["base"] )
-
-env.CppUnitTest( "fts_query_impl_test", "fts_query_impl_test.cpp",
-                 LIBDEPS=["base"] )
-
-env.CppUnitTest( "fts_query_noop_test", "fts_query_noop_test.cpp",
-                 LIBDEPS=["fts_query_noop"] )
-
-env.CppUnitTest( "fts_spec_test", "fts_spec_test.cpp",
-                 LIBDEPS=["base"] )
-
-env.CppUnitTest( "fts_stemmer_test", "stemmer_test.cpp",
-                 LIBDEPS=["base"] )
-
-env.CppUnitTest( "fts_stop_words_test", "stop_words_test.cpp",
-                 LIBDEPS=["base"] )
-
-env.CppUnitTest( "fts_tokenizer_test", "tokenizer_test.cpp",
-                 LIBDEPS=["base"] )
-
-env.CppUnitTest( "fts_unicode_phrase_matcher_test", "fts_unicode_phrase_matcher_test.cpp",
-                 LIBDEPS=["base"] )
-
-env.CppUnitTest( "fts_unicode_tokenizer_test", "fts_unicode_tokenizer_test.cpp",
-                 LIBDEPS=["base"] )
+env.CppUnitTest(target='fts_test',
+                source=[
+                    "fts_basic_phrase_matcher_test.cpp",
+                    "fts_basic_tokenizer_test.cpp",
+                    "fts_element_iterator_test.cpp",
+                    "fts_index_format_test.cpp",
+                    "fts_language_test.cpp",
+                    "fts_matcher_test.cpp",
+                    "fts_query_impl_test.cpp",
+                    "fts_query_noop_test.cpp",
+                    "fts_spec_test.cpp",
+                    "fts_unicode_phrase_matcher_test.cpp",
+                    "fts_unicode_tokenizer_test.cpp",
+                    "stemmer_test.cpp",
+                    "stop_words_test.cpp",
+                    "tokenizer_test.cpp",
+                ],
+                LIBDEPS=[
+                    "$BUILD_DIR/mongo/db/fts/fts_query_noop",
+                    "$BUILD_DIR/mongo/db/matcher/expressions",
+                    "base",
+                ],
+)

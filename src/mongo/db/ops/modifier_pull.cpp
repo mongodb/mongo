@@ -109,7 +109,9 @@ Status ModifierPull::init(const BSONElement& modExpr, const Options& opts, bool*
             _exprObj = _exprElt.embeddedObject();
 
             // If not is not a query operator, then it is a primitive.
-            _matcherOnPrimitive = (_exprObj.firstElement().getGtLtOp() != 0);
+            _matcherOnPrimitive = (MatchExpressionParser::parsePathAcceptingKeyword(
+                                       _exprObj.firstElement(), PathAcceptingKeyword::EQUALITY) !=
+                                   PathAcceptingKeyword::EQUALITY);
 
             // If the object is primitive then wrap it up into an object.
             if (_matcherOnPrimitive)

@@ -30,6 +30,7 @@
 
 #include "mongo/db/matcher/expression_parser.h"
 
+#include "mongo/base/init.h"
 #include "mongo/bson/bsonmisc.h"
 #include "mongo/bson/bsonobj.h"
 #include "mongo/bson/bsonobjbuilder.h"
@@ -48,6 +49,7 @@
 #include "mongo/db/namespace_string.h"
 #include "mongo/stdx/memory.h"
 #include "mongo/util/mongoutils/str.h"
+#include "mongo/util/string_map.h"
 
 namespace {
 
@@ -107,8 +109,6 @@ StatusWithMatchExpression MatchExpressionParser::_parseSubField(const BSONObj& c
                                                                 const BSONElement& e,
                                                                 const CollatorInterface* collator,
                                                                 bool topLevel) {
-    // TODO: these should move to getGtLtOp, or its replacement
-
     if (mongoutils::str::equals("$eq", e.fieldName()))
         return _parseComparison(name, new EqualityMatchExpression(), e, collator);
 
@@ -116,25 +116,27 @@ StatusWithMatchExpression MatchExpressionParser::_parseSubField(const BSONObj& c
         return _parseNot(name, e, collator, topLevel);
     }
 
-    int x = e.getGtLtOp(-1);
-    switch (x) {
-        case -1:
-            // $where cannot be a sub-expression because it works on top-level documents only.
-            if (mongoutils::str::equals("$where", e.fieldName())) {
-                return {Status(ErrorCodes::BadValue, "$where cannot be applied to a field")};
-            }
+    auto parseExpMatchType = MatchExpressionParser::parsePathAcceptingKeyword(e);
+    if (!parseExpMatchType) {
+        // $where cannot be a sub-expression because it works on top-level documents only.
+        if (mongoutils::str::equals("$where", e.fieldName())) {
+            return {Status(ErrorCodes::BadValue, "$where cannot be applied to a field")};
+        }
 
-            return {Status(ErrorCodes::BadValue,
-                           mongoutils::str::stream() << "unknown operator: " << e.fieldName())};
-        case BSONObj::LT:
+        return {Status(ErrorCodes::BadValue,
+                       mongoutils::str::stream() << "unknown operator: " << e.fieldName())};
+    }
+
+    switch (*parseExpMatchType) {
+        case PathAcceptingKeyword::LESS_THAN:
             return _parseComparison(name, new LTMatchExpression(), e, collator);
-        case BSONObj::LTE:
+        case PathAcceptingKeyword::LESS_THAN_OR_EQUAL:
             return _parseComparison(name, new LTEMatchExpression(), e, collator);
-        case BSONObj::GT:
+        case PathAcceptingKeyword::GREATER_THAN:
             return _parseComparison(name, new GTMatchExpression(), e, collator);
-        case BSONObj::GTE:
+        case PathAcceptingKeyword::GREATER_THAN_OR_EQUAL:
             return _parseComparison(name, new GTEMatchExpression(), e, collator);
-        case BSONObj::NE: {
+        case PathAcceptingKeyword::NOT_EQUAL: {
             if (RegEx == e.type()) {
                 // Just because $ne can be rewritten as the negation of an
                 // equality does not mean that $ne of a regex is allowed. See SERVER-1705.
@@ -150,10 +152,10 @@ StatusWithMatchExpression MatchExpressionParser::_parseSubField(const BSONObj& c
                 return s2;
             return {std::move(n)};
         }
-        case BSONObj::Equality:
+        case PathAcceptingKeyword::EQUALITY:
             return _parseComparison(name, new EqualityMatchExpression(), e, collator);
 
-        case BSONObj::opIN: {
+        case PathAcceptingKeyword::IN_EXPR: {
             if (e.type() != Array)
                 return {Status(ErrorCodes::BadValue, "$in needs an array")};
             std::unique_ptr<InMatchExpression> temp = stdx::make_unique<InMatchExpression>();
@@ -166,7 +168,7 @@ StatusWithMatchExpression MatchExpressionParser::_parseSubField(const BSONObj& c
             return {std::move(temp)};
         }
 
-        case BSONObj::NIN: {
+        case PathAcceptingKeyword::NOT_IN: {
             if (e.type() != Array)
                 return {Status(ErrorCodes::BadValue, "$nin needs an array")};
             std::unique_ptr<InMatchExpression> temp = stdx::make_unique<InMatchExpression>();
@@ -185,7 +187,7 @@ StatusWithMatchExpression MatchExpressionParser::_parseSubField(const BSONObj& c
             return {std::move(temp2)};
         }
 
-        case BSONObj::opSIZE: {
+        case PathAcceptingKeyword::SIZE: {
             int size = 0;
             if (e.type() == NumberInt) {
                 size = e.numberInt();
@@ -216,7 +218,7 @@ StatusWithMatchExpression MatchExpressionParser::_parseSubField(const BSONObj& c
             return {std::move(temp)};
         }
 
-        case BSONObj::opEXISTS: {
+        case PathAcceptingKeyword::EXISTS: {
             if (e.eoo())
                 return {Status(ErrorCodes::BadValue, "$exists can't be eoo")};
             std::unique_ptr<ExistsMatchExpression> temp =
@@ -233,73 +235,74 @@ StatusWithMatchExpression MatchExpressionParser::_parseSubField(const BSONObj& c
             return {std::move(temp2)};
         }
 
-        case BSONObj::opTYPE:
+        case PathAcceptingKeyword::TYPE:
             return _parseType(name, e);
 
-        case BSONObj::opMOD:
+        case PathAcceptingKeyword::MOD:
             return _parseMOD(name, e);
 
-        case BSONObj::opOPTIONS: {
+        case PathAcceptingKeyword::OPTIONS: {
             // TODO: try to optimize this
             // we have to do this since $options can be before or after a $regex
             // but we validate here
             BSONObjIterator i(context);
             while (i.more()) {
                 BSONElement temp = i.next();
-                if (temp.getGtLtOp(-1) == BSONObj::opREGEX)
+                if (MatchExpressionParser::parsePathAcceptingKeyword(temp) ==
+                    PathAcceptingKeyword::REGEX)
                     return {nullptr};
             }
 
             return {Status(ErrorCodes::BadValue, "$options needs a $regex")};
         }
 
-        case BSONObj::opREGEX: {
+        case PathAcceptingKeyword::REGEX: {
             return _parseRegexDocument(name, context);
         }
 
-        case BSONObj::opELEM_MATCH:
+        case PathAcceptingKeyword::ELEM_MATCH:
             return _parseElemMatch(name, e, collator, topLevel);
 
-        case BSONObj::opALL:
+        case PathAcceptingKeyword::ALL:
             return _parseAll(name, e, collator, topLevel);
 
-        case BSONObj::opWITHIN:
-        case BSONObj::opGEO_INTERSECTS:
-            return _parseGeo(name, x, context);
+        case PathAcceptingKeyword::WITHIN:
+        case PathAcceptingKeyword::GEO_INTERSECTS:
+            return _parseGeo(name, *parseExpMatchType, context);
 
-        case BSONObj::opNEAR:
+        case PathAcceptingKeyword::GEO_NEAR:
             return {Status(ErrorCodes::BadValue,
                            mongoutils::str::stream() << "near must be first in: " << context)};
 
 
         // Handles bitwise query operators.
-        case BSONObj::opBITS_ALL_SET: {
+        case PathAcceptingKeyword::BITS_ALL_SET: {
             return _parseBitTest<BitsAllSetMatchExpression>(name, e);
         }
 
-        case BSONObj::opBITS_ALL_CLEAR: {
+        case PathAcceptingKeyword::BITS_ALL_CLEAR: {
             return _parseBitTest<BitsAllClearMatchExpression>(name, e);
         }
 
-        case BSONObj::opBITS_ANY_SET: {
+        case PathAcceptingKeyword::BITS_ANY_SET: {
             return _parseBitTest<BitsAnySetMatchExpression>(name, e);
         }
 
-        case BSONObj::opBITS_ANY_CLEAR: {
+        case PathAcceptingKeyword::BITS_ANY_CLEAR: {
             return _parseBitTest<BitsAnyClearMatchExpression>(name, e);
         }
 
-        case BSONObj::opINTERNAL_SCHEMA_MIN_ITEMS: {
+        case PathAcceptingKeyword::INTERNAL_SCHEMA_MIN_ITEMS: {
             return _parseInternalSchemaSingleIntegerArgument<InternalSchemaMinItemsMatchExpression>(
                 name, e);
         }
 
-        case BSONObj::opINTERNAL_SCHEMA_MAX_ITEMS: {
+        case PathAcceptingKeyword::INTERNAL_SCHEMA_MAX_ITEMS: {
             return _parseInternalSchemaSingleIntegerArgument<InternalSchemaMaxItemsMatchExpression>(
                 name, e);
         }
 
-        case BSONObj::opINTERNAL_SCHEMA_OBJECT_MATCH: {
+        case PathAcceptingKeyword::INTERNAL_SCHEMA_OBJECT_MATCH: {
             if (e.type() != BSONType::Object) {
                 return Status(ErrorCodes::FailedToParse,
                               str::stream() << "$_internalSchemaObjectMatch must be an object");
@@ -318,7 +321,7 @@ StatusWithMatchExpression MatchExpressionParser::_parseSubField(const BSONObj& c
             return {std::move(expr)};
         }
 
-        case BSONObj::opINTERNAL_SCHEMA_UNIQUE_ITEMS: {
+        case PathAcceptingKeyword::INTERNAL_SCHEMA_UNIQUE_ITEMS: {
             if (!e.isBoolean() || !e.boolean()) {
                 return {ErrorCodes::FailedToParse,
                         str::stream() << name << " must be a boolean of value true"};
@@ -332,12 +335,12 @@ StatusWithMatchExpression MatchExpressionParser::_parseSubField(const BSONObj& c
             return {std::move(expr)};
         }
 
-        case BSONObj::opINTERNAL_SCHEMA_MIN_LENGTH: {
+        case PathAcceptingKeyword::INTERNAL_SCHEMA_MIN_LENGTH: {
             return _parseInternalSchemaSingleIntegerArgument<
                 InternalSchemaMinLengthMatchExpression>(name, e);
         }
 
-        case BSONObj::opINTERNAL_SCHEMA_MAX_LENGTH: {
+        case PathAcceptingKeyword::INTERNAL_SCHEMA_MAX_LENGTH: {
             return _parseInternalSchemaSingleIntegerArgument<
                 InternalSchemaMaxLengthMatchExpression>(name, e);
         }
@@ -497,7 +500,11 @@ Status MatchExpressionParser::_parseSub(const char* name,
             if (mongoutils::str::equals(fieldName, "$near") ||
                 mongoutils::str::equals(fieldName, "$nearSphere") ||
                 mongoutils::str::equals(fieldName, "$geoNear")) {
-                StatusWithMatchExpression s = _parseGeo(name, firstElt.getGtLtOp(), sub);
+                StatusWithMatchExpression s =
+                    _parseGeo(name,
+                              *MatchExpressionParser::parsePathAcceptingKeyword(
+                                  firstElt, PathAcceptingKeyword::EQUALITY),
+                              sub);
                 if (s.isOK()) {
                     root->add(s.getValue().release());
                 }
@@ -633,8 +640,13 @@ StatusWithMatchExpression MatchExpressionParser::_parseRegexDocument(const char*
     BSONObjIterator i(doc);
     while (i.more()) {
         BSONElement e = i.next();
-        switch (e.getGtLtOp()) {
-            case BSONObj::opREGEX:
+        auto matchType = MatchExpressionParser::parsePathAcceptingKeyword(e);
+        if (!matchType) {
+            continue;
+        }
+
+        switch (*matchType) {
+            case PathAcceptingKeyword::REGEX:
                 if (e.type() == String) {
                     regex = e.String();
                 } else if (e.type() == RegEx) {
@@ -645,7 +657,7 @@ StatusWithMatchExpression MatchExpressionParser::_parseRegexDocument(const char*
                 }
 
                 break;
-            case BSONObj::opOPTIONS:
+            case PathAcceptingKeyword::OPTIONS:
                 if (e.type() != String)
                     return {Status(ErrorCodes::BadValue, "$options has to be a string")};
                 regexOptions = e.String();
@@ -885,7 +897,8 @@ StatusWithMatchExpression MatchExpressionParser::_parseAll(const char* name,
             if (!s.isOK())
                 return s;
             myAnd->add(r.release());
-        } else if (e.type() == Object && e.Obj().firstElement().getGtLtOp(-1) != -1) {
+        } else if (e.type() == Object &&
+                   MatchExpressionParser::parsePathAcceptingKeyword(e.Obj().firstElement())) {
             return {Status(ErrorCodes::BadValue, "no $ expressions in $all")};
         } else {
             std::unique_ptr<EqualityMatchExpression> x =
@@ -1096,9 +1109,9 @@ StatusWithMatchExpression MatchExpressionParser::_parseInternalSchemaSingleInteg
 }
 
 StatusWithMatchExpression MatchExpressionParser::_parseGeo(const char* name,
-                                                           int type,
+                                                           PathAcceptingKeyword type,
                                                            const BSONObj& section) {
-    if (BSONObj::opWITHIN == type || BSONObj::opGEO_INTERSECTS == type) {
+    if (PathAcceptingKeyword::WITHIN == type || PathAcceptingKeyword::GEO_INTERSECTS == type) {
         std::unique_ptr<GeoExpression> gq = stdx::make_unique<GeoExpression>(name);
         Status parseStatus = gq->parseFrom(section);
 
@@ -1112,7 +1125,7 @@ StatusWithMatchExpression MatchExpressionParser::_parseGeo(const char* name,
             return StatusWithMatchExpression(s);
         return {std::move(e)};
     } else {
-        invariant(BSONObj::opNEAR == type);
+        invariant(PathAcceptingKeyword::GEO_NEAR == type);
         std::unique_ptr<GeoNearExpression> nq = stdx::make_unique<GeoNearExpression>(name);
         Status s = nq->parseFrom(section);
         if (!s.isOK()) {
@@ -1124,5 +1137,63 @@ StatusWithMatchExpression MatchExpressionParser::_parseGeo(const char* name,
             return StatusWithMatchExpression(s);
         return {std::move(e)};
     }
+}
+
+namespace {
+// Maps from query operator string name to operator PathAcceptingKeyword.
+std::unique_ptr<StringMap<PathAcceptingKeyword>> queryOperatorMap;
+
+MONGO_INITIALIZER(MatchExpressionParser)(InitializerContext* context) {
+    queryOperatorMap =
+        stdx::make_unique<StringMap<PathAcceptingKeyword>>(StringMap<PathAcceptingKeyword>{
+            // TODO: SERVER-19565 Add $eq after auditing callers.
+            {"lt", PathAcceptingKeyword::LESS_THAN},
+            {"lte", PathAcceptingKeyword::LESS_THAN_OR_EQUAL},
+            {"gte", PathAcceptingKeyword::GREATER_THAN_OR_EQUAL},
+            {"gt", PathAcceptingKeyword::GREATER_THAN},
+            {"in", PathAcceptingKeyword::IN_EXPR},
+            {"ne", PathAcceptingKeyword::NOT_EQUAL},
+            {"size", PathAcceptingKeyword::SIZE},
+            {"all", PathAcceptingKeyword::ALL},
+            {"nin", PathAcceptingKeyword::NOT_IN},
+            {"exists", PathAcceptingKeyword::EXISTS},
+            {"mod", PathAcceptingKeyword::MOD},
+            {"type", PathAcceptingKeyword::TYPE},
+            {"regex", PathAcceptingKeyword::REGEX},
+            {"options", PathAcceptingKeyword::OPTIONS},
+            {"elemMatch", PathAcceptingKeyword::ELEM_MATCH},
+            {"near", PathAcceptingKeyword::GEO_NEAR},
+            {"nearSphere", PathAcceptingKeyword::GEO_NEAR},
+            {"geoNear", PathAcceptingKeyword::GEO_NEAR},
+            {"within", PathAcceptingKeyword::WITHIN},
+            {"geoWithin", PathAcceptingKeyword::WITHIN},
+            {"geoIntersects", PathAcceptingKeyword::GEO_INTERSECTS},
+            {"bitsAllSet", PathAcceptingKeyword::BITS_ALL_SET},
+            {"bitsAllClear", PathAcceptingKeyword::BITS_ALL_CLEAR},
+            {"bitsAnySet", PathAcceptingKeyword::BITS_ANY_SET},
+            {"bitsAnyClear", PathAcceptingKeyword::BITS_ANY_CLEAR},
+            {"_internalSchemaMinItems", PathAcceptingKeyword::INTERNAL_SCHEMA_MIN_ITEMS},
+            {"_internalSchemaMaxItems", PathAcceptingKeyword::INTERNAL_SCHEMA_MAX_ITEMS},
+            {"_internalSchemaUniqueItems", PathAcceptingKeyword::INTERNAL_SCHEMA_UNIQUE_ITEMS},
+            {"_internalSchemaObjectMatch", PathAcceptingKeyword::INTERNAL_SCHEMA_OBJECT_MATCH},
+            {"_internalSchemaMinLength", PathAcceptingKeyword::INTERNAL_SCHEMA_MIN_LENGTH},
+            {"_internalSchemaMaxLength", PathAcceptingKeyword::INTERNAL_SCHEMA_MAX_LENGTH}});
+    return Status::OK();
+}
+}  // anonymous namespace
+
+boost::optional<PathAcceptingKeyword> MatchExpressionParser::parsePathAcceptingKeyword(
+    BSONElement typeElem, boost::optional<PathAcceptingKeyword> defaultKeyword) {
+    auto fieldName = typeElem.fieldName();
+    if (fieldName[0] == '$' && fieldName[1]) {
+        auto opName = typeElem.fieldNameStringData().substr(1);
+        auto queryOp = queryOperatorMap->find(opName);
+
+        if (queryOp == queryOperatorMap->end()) {
+            return defaultKeyword;
+        }
+        return queryOp->second;
+    }
+    return defaultKeyword;
 }
 }  // namespace mongo

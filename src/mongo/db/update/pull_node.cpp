@@ -129,7 +129,8 @@ Status PullNode::init(BSONElement modExpr, const CollatorInterface* collator) {
 
     try {
         if (modExpr.type() == mongo::Object &&
-            modExpr.embeddedObject().firstElement().getGtLtOp(-1) == -1) {
+            !MatchExpressionParser::parsePathAcceptingKeyword(
+                modExpr.embeddedObject().firstElement())) {
             _matcher = stdx::make_unique<ObjectMatcher>(modExpr.embeddedObject(), collator);
         } else if (modExpr.type() == mongo::Object || modExpr.type() == mongo::RegEx) {
             _matcher = stdx::make_unique<WrappedObjectMatcher>(modExpr, collator);

@@ -75,6 +75,7 @@ env.CppUnitTest(
         'expression_parser_geo_test.cpp',
         'expression_test.cpp',
         'expression_tree_test.cpp',
+        'path_accepting_keyword_test.cpp',
         'schema/expression_internal_schema_max_items_test.cpp',
         'schema/expression_internal_schema_max_length_test.cpp',
         'schema/expression_internal_schema_min_items_test.cpp',

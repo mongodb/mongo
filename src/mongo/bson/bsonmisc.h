@@ -34,8 +34,6 @@
 
 namespace mongo {
 
-int getGtLtOp(const BSONElement& e);
-
 class BSONElementCmpWithoutField {
 public:
     /**
