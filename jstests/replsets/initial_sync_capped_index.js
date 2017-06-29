@@ -21,7 +21,12 @@
  * 9, Disable fail point on SECONDARY so the rest of the capped collection documents are cloned.
  * 8. Once initial sync completes, ensure that capped collection indexes on the SECONDARY are valid.
  *
- * This is a regression test for SERVER-29197.
+ * This is a regression test for SERVER-29197. This test does not need to be run on 3.2 initial sync
+ * since the bug described in SERVER-29197 only applies to the initial sync logic in versions >=
+ * 3.4.
+ *
+ * @tags: [requires_3dot4_initial_sync]
+ *
  */
 (function() {
     "use strict";
