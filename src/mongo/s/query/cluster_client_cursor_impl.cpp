@@ -63,17 +63,19 @@ ClusterClientCursorGuard ClusterClientCursorImpl::make(OperationContext* opCtx,
                                                        executor::TaskExecutor* executor,
                                                        ClusterClientCursorParams&& params) {
     std::unique_ptr<ClusterClientCursor> cursor(
-        new ClusterClientCursorImpl(executor, std::move(params)));
+        new ClusterClientCursorImpl(executor, std::move(params), opCtx->getLogicalSessionId()));
     return ClusterClientCursorGuard(opCtx, std::move(cursor));
 }
 
 ClusterClientCursorImpl::ClusterClientCursorImpl(executor::TaskExecutor* executor,
-                                                 ClusterClientCursorParams&& params)
-    : _params(std::move(params)), _root(buildMergerPlan(executor, &_params)) {}
+                                                 ClusterClientCursorParams&& params,
+                                                 boost::optional<LogicalSessionId> lsid)
+    : _params(std::move(params)), _root(buildMergerPlan(executor, &_params)), _lsid(lsid) {}
 
 ClusterClientCursorImpl::ClusterClientCursorImpl(std::unique_ptr<RouterStageMock> root,
-                                                 ClusterClientCursorParams&& params)
-    : _params(std::move(params)), _root(std::move(root)) {}
+                                                 ClusterClientCursorParams&& params,
+                                                 boost::optional<LogicalSessionId> lsid)
+    : _params(std::move(params)), _root(std::move(root)), _lsid(lsid) {}
 
 StatusWith<ClusterQueryResult> ClusterClientCursorImpl::next(OperationContext* opCtx) {
     // First return stashed results, if there are any.
@@ -122,6 +124,10 @@ bool ClusterClientCursorImpl::remotesExhausted() {
 
 Status ClusterClientCursorImpl::setAwaitDataTimeout(Milliseconds awaitDataTimeout) {
     return _root->setAwaitDataTimeout(awaitDataTimeout);
+}
+
+boost::optional<LogicalSessionId> ClusterClientCursorImpl::getLsid() const {
+    return _lsid;
 }
 
 std::unique_ptr<RouterExecStage> ClusterClientCursorImpl::buildMergerPlan(

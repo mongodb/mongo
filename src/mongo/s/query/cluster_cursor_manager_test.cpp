@@ -65,7 +65,8 @@ protected:
     /**
      * Allocates a mock cursor, which can be used with the 'isMockCursorKilled' method below.
      */
-    std::unique_ptr<ClusterClientCursorMock> allocateMockCursor() {
+    std::unique_ptr<ClusterClientCursorMock> allocateMockCursor(
+        boost::optional<LogicalSessionId> lsid = boost::none) {
         // Allocate a new boolean to our list to track when this cursor is killed.
         _cursorKilledFlags.push_back(false);
 
@@ -74,7 +75,8 @@ protected:
         // (std::list<>::push_back() does not invalidate references, and our list outlives the
         // manager).
         bool& killedFlag = _cursorKilledFlags.back();
-        return stdx::make_unique<ClusterClientCursorMock>([&killedFlag]() { killedFlag = true; });
+        return stdx::make_unique<ClusterClientCursorMock>(std::move(lsid),
+                                                          [&killedFlag]() { killedFlag = true; });
     }
 
     /**
@@ -362,13 +364,11 @@ TEST_F(ClusterCursorManagerTest, KillCursorWrongCursorId) {
 
 // Test that killing all mortal expired cursors correctly kills a mortal expired cursor.
 TEST_F(ClusterCursorManagerTest, KillMortalCursorsInactiveSinceBasic) {
-    getManager()
-        ->registerCursor(nullptr,
-                         allocateMockCursor(),
-                         nss,
-                         ClusterCursorManager::CursorType::NamespaceNotSharded,
-                         ClusterCursorManager::CursorLifetime::Mortal)
-        .status_with_transitional_ignore();
+    ASSERT_OK(getManager()->registerCursor(nullptr,
+                                           allocateMockCursor(),
+                                           nss,
+                                           ClusterCursorManager::CursorType::NamespaceNotSharded,
+                                           ClusterCursorManager::CursorLifetime::Mortal));
     getManager()->killMortalCursorsInactiveSince(getClockSource()->now());
     ASSERT(!isMockCursorKilled(0));
     getManager()->reapZombieCursors();
@@ -379,13 +379,11 @@ TEST_F(ClusterCursorManagerTest, KillMortalCursorsInactiveSinceBasic) {
 TEST_F(ClusterCursorManagerTest, KillMortalCursorsInactiveSinceSkipUnexpired) {
     Date_t timeBeforeCursorCreation = getClockSource()->now();
     getClockSource()->advance(Milliseconds(1));
-    getManager()
-        ->registerCursor(nullptr,
-                         allocateMockCursor(),
-                         nss,
-                         ClusterCursorManager::CursorType::NamespaceNotSharded,
-                         ClusterCursorManager::CursorLifetime::Mortal)
-        .status_with_transitional_ignore();
+    ASSERT_OK(getManager()->registerCursor(nullptr,
+                                           allocateMockCursor(),
+                                           nss,
+                                           ClusterCursorManager::CursorType::NamespaceNotSharded,
+                                           ClusterCursorManager::CursorLifetime::Mortal));
     getManager()->killMortalCursorsInactiveSince(timeBeforeCursorCreation);
     ASSERT(!isMockCursorKilled(0));
     getManager()->reapZombieCursors();
@@ -394,13 +392,11 @@ TEST_F(ClusterCursorManagerTest, KillMortalCursorsInactiveSinceSkipUnexpired) {
 
 // Test that killing all mortal expired cursors does not kill a cursor that is immortal.
 TEST_F(ClusterCursorManagerTest, KillMortalCursorsInactiveSinceSkipImmortal) {
-    getManager()
-        ->registerCursor(nullptr,
-                         allocateMockCursor(),
-                         nss,
-                         ClusterCursorManager::CursorType::NamespaceNotSharded,
-                         ClusterCursorManager::CursorLifetime::Immortal)
-        .status_with_transitional_ignore();
+    ASSERT_OK(getManager()->registerCursor(nullptr,
+                                           allocateMockCursor(),
+                                           nss,
+                                           ClusterCursorManager::CursorType::NamespaceNotSharded,
+                                           ClusterCursorManager::CursorLifetime::Immortal));
     getManager()->killMortalCursorsInactiveSince(getClockSource()->now());
     ASSERT(!isMockCursorKilled(0));
     getManager()->reapZombieCursors();
@@ -438,13 +434,12 @@ TEST_F(ClusterCursorManagerTest, KillMortalCursorsInactiveSinceMultipleCursors) 
         if (i < numKilledCursorsExpected) {
             cutoff = getClockSource()->now();
         }
-        getManager()
-            ->registerCursor(nullptr,
-                             allocateMockCursor(),
-                             nss,
-                             ClusterCursorManager::CursorType::NamespaceNotSharded,
-                             ClusterCursorManager::CursorLifetime::Mortal)
-            .status_with_transitional_ignore();
+        ASSERT_OK(
+            getManager()->registerCursor(nullptr,
+                                         allocateMockCursor(),
+                                         nss,
+                                         ClusterCursorManager::CursorType::NamespaceNotSharded,
+                                         ClusterCursorManager::CursorLifetime::Mortal));
         getClockSource()->advance(Milliseconds(1));
     }
     getManager()->killMortalCursorsInactiveSince(cutoff);
@@ -465,13 +460,12 @@ TEST_F(ClusterCursorManagerTest, KillMortalCursorsInactiveSinceMultipleCursors) 
 TEST_F(ClusterCursorManagerTest, KillAllCursors) {
     const size_t numCursors = 10;
     for (size_t i = 0; i < numCursors; ++i) {
-        getManager()
-            ->registerCursor(nullptr,
-                             allocateMockCursor(),
-                             nss,
-                             ClusterCursorManager::CursorType::NamespaceNotSharded,
-                             ClusterCursorManager::CursorLifetime::Mortal)
-            .status_with_transitional_ignore();
+        ASSERT_OK(
+            getManager()->registerCursor(nullptr,
+                                         allocateMockCursor(),
+                                         nss,
+                                         ClusterCursorManager::CursorType::NamespaceNotSharded,
+                                         ClusterCursorManager::CursorLifetime::Mortal));
     }
     getManager()->killAllCursors();
     for (size_t i = 0; i < numCursors; ++i) {
@@ -516,13 +510,11 @@ TEST_F(ClusterCursorManagerTest, ReapZombieCursorsSkipPinned) {
 // Test that reaping does not call kill() on the underlying ClusterClientCursor for cursors that
 // haven't been killed.
 TEST_F(ClusterCursorManagerTest, ReapZombieCursorsSkipNonZombies) {
-    getManager()
-        ->registerCursor(nullptr,
-                         allocateMockCursor(),
-                         nss,
-                         ClusterCursorManager::CursorType::NamespaceNotSharded,
-                         ClusterCursorManager::CursorLifetime::Mortal)
-        .status_with_transitional_ignore();
+    ASSERT_OK(getManager()->registerCursor(nullptr,
+                                           allocateMockCursor(),
+                                           nss,
+                                           ClusterCursorManager::CursorType::NamespaceNotSharded,
+                                           ClusterCursorManager::CursorLifetime::Mortal));
     ASSERT(!isMockCursorKilled(0));
     getManager()->reapZombieCursors();
     ASSERT(!isMockCursorKilled(0));
@@ -537,25 +529,21 @@ TEST_F(ClusterCursorManagerTest, StatsInitAsZero) {
 
 // Test that registering a sharded cursor updates the corresponding counter in stats().
 TEST_F(ClusterCursorManagerTest, StatsRegisterShardedCursor) {
-    getManager()
-        ->registerCursor(nullptr,
-                         allocateMockCursor(),
-                         nss,
-                         ClusterCursorManager::CursorType::NamespaceSharded,
-                         ClusterCursorManager::CursorLifetime::Mortal)
-        .status_with_transitional_ignore();
+    ASSERT_OK(getManager()->registerCursor(nullptr,
+                                           allocateMockCursor(),
+                                           nss,
+                                           ClusterCursorManager::CursorType::NamespaceSharded,
+                                           ClusterCursorManager::CursorLifetime::Mortal));
     ASSERT_EQ(1U, getManager()->stats().cursorsSharded);
 }
 
 // Test that registering a not-sharded cursor updates the corresponding counter in stats().
 TEST_F(ClusterCursorManagerTest, StatsRegisterNotShardedCursor) {
-    getManager()
-        ->registerCursor(nullptr,
-                         allocateMockCursor(),
-                         nss,
-                         ClusterCursorManager::CursorType::NamespaceNotSharded,
-                         ClusterCursorManager::CursorLifetime::Mortal)
-        .status_with_transitional_ignore();
+    ASSERT_OK(getManager()->registerCursor(nullptr,
+                                           allocateMockCursor(),
+                                           nss,
+                                           ClusterCursorManager::CursorType::NamespaceNotSharded,
+                                           ClusterCursorManager::CursorLifetime::Mortal));
     ASSERT_EQ(1U, getManager()->stats().cursorsNotSharded);
 }
 
@@ -576,25 +564,22 @@ TEST_F(ClusterCursorManagerTest, StatsPinCursor) {
 TEST_F(ClusterCursorManagerTest, StatsRegisterMultipleCursors) {
     const size_t numShardedCursors = 10;
     for (size_t i = 0; i < numShardedCursors; ++i) {
-        getManager()
-            ->registerCursor(nullptr,
-                             allocateMockCursor(),
-                             nss,
-                             ClusterCursorManager::CursorType::NamespaceSharded,
-                             ClusterCursorManager::CursorLifetime::Mortal)
-            .status_with_transitional_ignore();
+        ASSERT_OK(getManager()->registerCursor(nullptr,
+                                               allocateMockCursor(),
+                                               nss,
+                                               ClusterCursorManager::CursorType::NamespaceSharded,
+                                               ClusterCursorManager::CursorLifetime::Mortal));
         ASSERT_EQ(i + 1, getManager()->stats().cursorsSharded);
         ASSERT_EQ(0U, getManager()->stats().cursorsNotSharded);
     }
     const size_t numNotShardedCursors = 10;
     for (size_t i = 0; i < numNotShardedCursors; ++i) {
-        getManager()
-            ->registerCursor(nullptr,
-                             allocateMockCursor(),
-                             nss,
-                             ClusterCursorManager::CursorType::NamespaceNotSharded,
-                             ClusterCursorManager::CursorLifetime::Mortal)
-            .status_with_transitional_ignore();
+        ASSERT_OK(
+            getManager()->registerCursor(nullptr,
+                                         allocateMockCursor(),
+                                         nss,
+                                         ClusterCursorManager::CursorType::NamespaceNotSharded,
+                                         ClusterCursorManager::CursorLifetime::Mortal));
         ASSERT_EQ(numShardedCursors, getManager()->stats().cursorsSharded);
         ASSERT_EQ(i + 1, getManager()->stats().cursorsNotSharded);
     }
@@ -960,6 +945,190 @@ TEST_F(ClusterCursorManagerTest, CannotCheckoutCursorDuringShutdown) {
 
     ASSERT_EQUALS(ErrorCodes::ShutdownInProgress,
                   getManager()->checkOutCursor(nss, cursorId, nullptr).getStatus());
+}
+
+/**
+ * Test that a manager whose cursors do not have sessions does not return them.
+ */
+TEST_F(ClusterCursorManagerTest, CursorsWithoutSessions) {
+    // Add a cursor with no session to the cursor manager.
+    ASSERT_OK(getManager()->registerCursor(nullptr,
+                                           allocateMockCursor(),
+                                           nss,
+                                           ClusterCursorManager::CursorType::NamespaceNotSharded,
+                                           ClusterCursorManager::CursorLifetime::Mortal));
+
+    // Manager should have no active sessions.
+    LogicalSessionIdSet lsids;
+    getManager()->appendActiveSessions(&lsids);
+    ASSERT_EQ(lsids.size(), size_t(0));
+}
+
+/**
+ * Test a manager that has one cursor running inside of a session.
+ */
+TEST_F(ClusterCursorManagerTest, OneCursorWithASession) {
+    // Add a cursor with a session to the cursor manager.
+    auto lsid = LogicalSessionId::gen();
+    auto cursorId = assertGet(
+        getManager()->registerCursor(nullptr,
+                                     allocateMockCursor(lsid),
+                                     nss,
+                                     ClusterCursorManager::CursorType::NamespaceNotSharded,
+                                     ClusterCursorManager::CursorLifetime::Mortal));
+
+    // Retrieve all sessions active in manager - set should contain just lsid.
+    LogicalSessionIdSet lsids;
+    getManager()->appendActiveSessions(&lsids);
+    ASSERT_EQ(lsids.size(), size_t(1));
+    ASSERT(lsids.find(lsid) != lsids.end());
+
+    // Retrieve all cursors for this lsid - should be just ours.
+    auto cursors = getManager()->getCursorsForSession(lsid);
+    ASSERT_EQ(cursors.size(), size_t(1));
+    ASSERT(cursors.find(cursorId) != cursors.end());
+
+    // Remove the cursor from the manager.
+    ASSERT_OK(getManager()->killCursor(nss, cursorId));
+
+    // There should be no more cursor entries by session id.
+    LogicalSessionIdSet sessions;
+    getManager()->appendActiveSessions(&sessions);
+    ASSERT(sessions.empty());
+    ASSERT(getManager()->getCursorsForSession(lsid).empty());
+}
+
+/**
+ * Test getting the lsid of a cursor while it is checked out of the manager.
+ */
+TEST_F(ClusterCursorManagerTest, GetSessionIdsWhileCheckedOut) {
+    // Add a cursor with a session to the cursor manager.
+    auto lsid = LogicalSessionId::gen();
+    auto cursorId = assertGet(
+        getManager()->registerCursor(nullptr,
+                                     allocateMockCursor(lsid),
+                                     nss,
+                                     ClusterCursorManager::CursorType::NamespaceNotSharded,
+                                     ClusterCursorManager::CursorLifetime::Mortal));
+
+    // Check the cursor out, then try to append cursors, see that we get one.
+    auto res = getManager()->checkOutCursor(nss, cursorId, nullptr);
+    ASSERT(res.isOK());
+
+    auto cursors = getManager()->getCursorsForSession(lsid);
+    ASSERT_EQ(cursors.size(), size_t(1));
+}
+
+/**
+ * Test a manager with multiple cursors running inside of the same session.
+ */
+TEST_F(ClusterCursorManagerTest, MultipleCursorsWithSameSession) {
+    // Add two cursors on the same session to the cursor manager.
+    auto lsid = LogicalSessionId::gen();
+    auto cursorId1 = assertGet(
+        getManager()->registerCursor(nullptr,
+                                     allocateMockCursor(lsid),
+                                     nss,
+                                     ClusterCursorManager::CursorType::NamespaceNotSharded,
+                                     ClusterCursorManager::CursorLifetime::Mortal));
+    auto cursorId2 = assertGet(
+        getManager()->registerCursor(nullptr,
+                                     allocateMockCursor(lsid),
+                                     nss,
+                                     ClusterCursorManager::CursorType::NamespaceNotSharded,
+                                     ClusterCursorManager::CursorLifetime::Mortal));
+
+    // Retrieve all sessions - set should contain just lsid.
+    stdx::unordered_set<LogicalSessionId, LogicalSessionId::Hash> lsids;
+    getManager()->appendActiveSessions(&lsids);
+    ASSERT_EQ(lsids.size(), size_t(1));
+    ASSERT(lsids.find(lsid) != lsids.end());
+
+    // Retrieve all cursors for session - should be both cursors.
+    auto cursors = getManager()->getCursorsForSession(lsid);
+    ASSERT_EQ(cursors.size(), size_t(2));
+    ASSERT(cursors.find(cursorId1) != cursors.end());
+    ASSERT(cursors.find(cursorId2) != cursors.end());
+
+    // Remove one cursor from the manager.
+    ASSERT_OK(getManager()->killCursor(nss, cursorId1));
+
+    // Should still be able to retrieve the session.
+    lsids.clear();
+    getManager()->appendActiveSessions(&lsids);
+    ASSERT_EQ(lsids.size(), size_t(1));
+    ASSERT(lsids.find(lsid) != lsids.end());
+
+    // Should still be able to retrieve remaining cursor by session.
+    cursors = getManager()->getCursorsForSession(lsid);
+    ASSERT_EQ(cursors.size(), size_t(1));
+    ASSERT(cursors.find(cursorId2) != cursors.end());
+}
+
+/**
+ * Test a manager with multiple cursors running inside of different sessions.
+ */
+TEST_F(ClusterCursorManagerTest, MultipleCursorsMultipleSessions) {
+    auto lsid1 = LogicalSessionId::gen();
+    auto lsid2 = LogicalSessionId::gen();
+
+    // Register two cursors with different lsids, and one without.
+    CursorId cursor1 = assertGet(
+        getManager()->registerCursor(nullptr,
+                                     allocateMockCursor(lsid1),
+                                     nss,
+                                     ClusterCursorManager::CursorType::NamespaceNotSharded,
+                                     ClusterCursorManager::CursorLifetime::Mortal));
+
+    CursorId cursor2 = assertGet(
+        getManager()->registerCursor(nullptr,
+                                     allocateMockCursor(lsid2),
+                                     nss,
+                                     ClusterCursorManager::CursorType::NamespaceNotSharded,
+                                     ClusterCursorManager::CursorLifetime::Mortal));
+
+    ASSERT_OK(getManager()->registerCursor(nullptr,
+                                           allocateMockCursor(),
+                                           nss,
+                                           ClusterCursorManager::CursorType::NamespaceNotSharded,
+                                           ClusterCursorManager::CursorLifetime::Mortal));
+
+    // Retrieve all sessions - should be both lsids.
+    LogicalSessionIdSet lsids;
+    getManager()->appendActiveSessions(&lsids);
+    ASSERT_EQ(lsids.size(), size_t(2));
+    ASSERT(lsids.find(lsid1) != lsids.end());
+    ASSERT(lsids.find(lsid2) != lsids.end());
+
+    // Retrieve cursors for each session - should be just one.
+    auto cursors1 = getManager()->getCursorsForSession(lsid1);
+    ASSERT_EQ(cursors1.size(), size_t(1));
+    ASSERT(cursors1.find(cursor1) != cursors1.end());
+
+    auto cursors2 = getManager()->getCursorsForSession(lsid2);
+    ASSERT_EQ(cursors2.size(), size_t(1));
+    ASSERT(cursors2.find(cursor2) != cursors2.end());
+}
+
+/**
+ * Test a manager with many cursors running inside of different sessions.
+ */
+TEST_F(ClusterCursorManagerTest, ManyCursorsManySessions) {
+    const int count = 10000;
+    for (int i = 0; i < count; i++) {
+        auto lsid = LogicalSessionId::gen();
+        ASSERT_OK(
+            getManager()->registerCursor(nullptr,
+                                         allocateMockCursor(lsid),
+                                         nss,
+                                         ClusterCursorManager::CursorType::NamespaceNotSharded,
+                                         ClusterCursorManager::CursorLifetime::Mortal));
+    }
+
+    // Retrieve all sessions.
+    LogicalSessionIdSet lsids;
+    getManager()->appendActiveSessions(&lsids);
+    ASSERT_EQ(lsids.size(), size_t(count));
 }
 
 }  // namespace

@@ -338,6 +338,16 @@ public:
     Stats stats() const;
 
     /**
+     * Appends sessions that have open cursors in this cursor manager to the given set of lsids.
+     */
+    void appendActiveSessions(LogicalSessionIdSet* lsids) const;
+
+    /**
+     * Returns a list of all open cursors for the given session.
+     */
+    stdx::unordered_set<CursorId> getCursorsForSession(LogicalSessionId lsid) const;
+
+    /**
      * Returns the namespace associated with the given cursor id, by examining the 'namespace
      * prefix' portion of the cursor id.  A cursor with the given cursor id need not actually exist.
      * If no such namespace is associated with the 'namespace prefix' portion of the cursor id,
@@ -417,7 +427,8 @@ private:
             : _cursor(std::move(cursor)),
               _cursorType(cursorType),
               _cursorLifetime(cursorLifetime),
-              _lastActive(lastActive) {
+              _lastActive(lastActive),
+              _lsid(_cursor->getLsid()) {
             invariant(_cursor);
         }
 
@@ -446,6 +457,10 @@ private:
 
         bool isCursorOwned() const {
             return static_cast<bool>(_cursor);
+        }
+
+        boost::optional<LogicalSessionId> getLsid() const {
+            return _lsid;
         }
 
         /**
@@ -484,6 +499,7 @@ private:
         CursorType _cursorType = CursorType::NamespaceNotSharded;
         CursorLifetime _cursorLifetime = CursorLifetime::Mortal;
         Date_t _lastActive;
+        boost::optional<LogicalSessionId> _lsid;
     };
 
     /**

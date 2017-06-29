@@ -28,26 +28,46 @@
 
 #include "mongo/platform/basic.h"
 
-#include <memory>
-
-#include "mongo/db/logical_session_cache_factory_mongos.h"
-
-#include "mongo/db/server_parameters.h"
 #include "mongo/db/service_liason_mongos.h"
-#include "mongo/db/sessions_collection_mock.h"
-#include "mongo/stdx/memory.h"
+
+#include "mongo/db/service_context.h"
+#include "mongo/s/grid.h"
+#include "mongo/s/query/cluster_cursor_manager.h"
+#include "mongo/stdx/mutex.h"
+#include "mongo/util/clock_source.h"
+#include "mongo/util/periodic_runner.h"
 
 namespace mongo {
 
-std::unique_ptr<LogicalSessionCache> makeLogicalSessionCacheS() {
-    auto liason = stdx::make_unique<ServiceLiasonMongos>();
+LogicalSessionIdSet ServiceLiasonMongos::getActiveSessions() const {
+    LogicalSessionIdSet activeSessions;
 
-    // TODO SERVER-29203, replace with SessionsCollectionSharded
-    auto sessionsColl =
-        stdx::make_unique<MockSessionsCollection>(std::make_shared<MockSessionsCollectionImpl>());
+    invariant(hasGlobalServiceContext());
 
-    return stdx::make_unique<LogicalSessionCache>(
-        std::move(liason), std::move(sessionsColl), LogicalSessionCache::Options{});
+    // Append any in-use session ids from the global cluster cursor managers.
+    auto cursorManager = Grid::get(getGlobalServiceContext())->getCursorManager();
+    cursorManager->appendActiveSessions(&activeSessions);
+
+    return activeSessions;
+}
+
+void ServiceLiasonMongos::scheduleJob(PeriodicRunner::PeriodicJob job) {
+    invariant(hasGlobalServiceContext());
+    getGlobalServiceContext()->getPeriodicRunner()->scheduleJob(std::move(job));
+}
+
+void ServiceLiasonMongos::join() {
+    invariant(hasGlobalServiceContext());
+    getGlobalServiceContext()->getPeriodicRunner()->shutdown();
+}
+
+Date_t ServiceLiasonMongos::now() const {
+    invariant(hasGlobalServiceContext());
+    return getGlobalServiceContext()->getFastClockSource()->now();
+}
+
+ServiceContext* ServiceLiasonMongos::_context() {
+    return getGlobalServiceContext();
 }
 
 }  // namespace mongo

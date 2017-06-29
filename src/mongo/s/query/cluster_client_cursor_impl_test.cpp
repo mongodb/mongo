@@ -51,7 +51,8 @@ TEST(ClusterClientCursorImpl, NumReturnedSoFar) {
     }
 
     ClusterClientCursorImpl cursor(std::move(mockStage),
-                                   ClusterClientCursorParams(NamespaceString("unused"), {}));
+                                   ClusterClientCursorParams(NamespaceString("unused"), {}),
+                                   boost::none);
 
     ASSERT_EQ(cursor.getNumReturnedSoFar(), 0);
 
@@ -74,7 +75,8 @@ TEST(ClusterClientCursorImpl, QueueResult) {
     mockStage->queueResult(BSON("a" << 4));
 
     ClusterClientCursorImpl cursor(std::move(mockStage),
-                                   ClusterClientCursorParams(NamespaceString("unused"), {}));
+                                   ClusterClientCursorParams(NamespaceString("unused"), {}),
+                                   boost::none);
 
     auto firstResult = cursor.next(nullptr);
     ASSERT_OK(firstResult.getStatus());
@@ -113,7 +115,8 @@ TEST(ClusterClientCursorImpl, RemotesExhausted) {
     mockStage->markRemotesExhausted();
 
     ClusterClientCursorImpl cursor(std::move(mockStage),
-                                   ClusterClientCursorParams(NamespaceString("unused"), {}));
+                                   ClusterClientCursorParams(NamespaceString("unused"), {}),
+                                   boost::none);
     ASSERT_TRUE(cursor.remotesExhausted());
 
     auto firstResult = cursor.next(nullptr);
@@ -142,12 +145,28 @@ TEST(ClusterClientCursorImpl, ForwardsAwaitDataTimeout) {
     ASSERT_NOT_OK(mockStage->getAwaitDataTimeout().getStatus());
 
     ClusterClientCursorImpl cursor(std::move(mockStage),
-                                   ClusterClientCursorParams(NamespaceString("unused"), {}));
+                                   ClusterClientCursorParams(NamespaceString("unused"), {}),
+                                   boost::none);
     ASSERT_OK(cursor.setAwaitDataTimeout(Milliseconds(789)));
 
     auto awaitDataTimeout = mockStagePtr->getAwaitDataTimeout();
     ASSERT_OK(awaitDataTimeout.getStatus());
     ASSERT_EQ(789, durationCount<Milliseconds>(awaitDataTimeout.getValue()));
+}
+
+TEST(ClusterClientCursorImpl, LogicalSessionIdsOnCursors) {
+    // Make a cursor with no lsid
+    auto mockStage = stdx::make_unique<RouterStageMock>();
+    ClusterClientCursorParams params(NamespaceString("test"), {});
+    ClusterClientCursorImpl cursor{std::move(mockStage), std::move(params), boost::none};
+    ASSERT(!cursor.getLsid());
+
+    // Make a cursor with an lsid
+    auto mockStage2 = stdx::make_unique<RouterStageMock>();
+    ClusterClientCursorParams params2(NamespaceString("test"), {});
+    auto lsid = LogicalSessionId::gen();
+    ClusterClientCursorImpl cursor2{std::move(mockStage2), std::move(params2), lsid};
+    ASSERT(*(cursor2.getLsid()) == lsid);
 }
 
 }  // namespace

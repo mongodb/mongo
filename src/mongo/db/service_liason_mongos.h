@@ -1,5 +1,5 @@
 /**
- *    Copyright (C) 2015 MongoDB Inc.
+ *    Copyright (C) 2017 MongoDB Inc.
  *
  *    This program is free software: you can redistribute it and/or  modify
  *    it under the terms of the GNU Affero General Public License, version 3,
@@ -28,66 +28,41 @@
 
 #pragma once
 
-#include <queue>
-
-#include <boost/optional.hpp>
-
 #include "mongo/db/logical_session_id.h"
-#include "mongo/s/query/cluster_client_cursor.h"
-#include "mongo/stdx/functional.h"
+#include "mongo/db/operation_context.h"
+#include "mongo/db/service_liason.h"
+#include "mongo/util/periodic_runner.h"
+#include "mongo/util/time_support.h"
 
 namespace mongo {
 
-class ClusterClientCursorMock final : public ClusterClientCursor {
-    MONGO_DISALLOW_COPYING(ClusterClientCursorMock);
-
+/**
+ * This is the service liason to mongos for the logical session cache.
+ *
+ * This class will return active sessions for cursors stored in the
+ * global cursor manager and cursors in per-collection managers. This
+ * class will also walk the service context to find all sessions for
+ * currently-running operations on this server.
+ *
+ * Job scheduling on this class will be handled behind the scenes by a
+ * periodic runner for this mongos. The time will be returned from the
+ * system clock.
+ */
+class ServiceLiasonMongos : public ServiceLiason {
 public:
-    ClusterClientCursorMock(boost::optional<LogicalSessionId> lsid,
-                            stdx::function<void(void)> killCallback = stdx::function<void(void)>());
+    LogicalSessionIdSet getActiveSessions() const override;
 
-    ~ClusterClientCursorMock();
+    void scheduleJob(PeriodicRunner::PeriodicJob job) override;
 
-    StatusWith<ClusterQueryResult> next(OperationContext* opCtx) final;
+    void join() override;
 
-    void kill(OperationContext* opCtx) final;
+    Date_t now() const override;
 
-    bool isTailable() const final;
-
-    UserNameIterator getAuthenticatedUsers() const final;
-
-    long long getNumReturnedSoFar() const final;
-
-    void queueResult(const ClusterQueryResult& result) final;
-
-    Status setAwaitDataTimeout(Milliseconds awaitDataTimeout) final;
-
-    boost::optional<LogicalSessionId> getLsid() const final;
-
+protected:
     /**
-     * Returns true unless marked as having non-exhausted remote cursors via
-     * markRemotesNotExhausted().
+     * Returns the service context.
      */
-    bool remotesExhausted() final;
-
-    void markRemotesNotExhausted();
-
-    /**
-     * Queues an error response.
-     */
-    void queueError(Status status);
-
-private:
-    bool _killed = false;
-    bool _exhausted = false;
-    std::queue<StatusWith<ClusterQueryResult>> _resultsQueue;
-    stdx::function<void(void)> _killCallback;
-
-    // Number of returned documents.
-    long long _numReturnedSoFar = 0;
-
-    bool _remotesExhausted = true;
-
-    boost::optional<LogicalSessionId> _lsid;
+    ServiceContext* _context() override;
 };
 
 }  // namespace mongo

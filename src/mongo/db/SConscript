@@ -992,6 +992,22 @@ env.Library(
 )
 
 env.Library(
+    target='service_liason_mongos',
+    source=[
+        'service_liason_mongos.cpp',
+    ],
+    LIBDEPS=[
+        '$BUILD_DIR/mongo/db/logical_session_id',
+        '$BUILD_DIR/mongo/util/clock_sources',
+        '$BUILD_DIR/mongo/util/periodic_runner',
+        '$BUILD_DIR/mongo/s/coreshard',
+        '$BUILD_DIR/mongo/s/query/cluster_cursor_manager',
+        'service_context',
+        'service_liason',
+    ],
+)
+
+env.Library(
     target='sessions_collection',
     source=[
         'sessions_collection.cpp',
@@ -1063,7 +1079,7 @@ envWithAsio.Library(
     ],
     LIBDEPS=[
         'logical_session_cache',
-        'service_liason_mock', # TODO SERVER-29199 replace with service_liason_mongos
+        'service_liason_mongos',
         'sessions_collection_mock', # TODO SERVER-29203 replace with sessions_collection_sharded
     ],
 )

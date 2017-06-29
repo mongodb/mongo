@@ -32,6 +32,7 @@
 
 #include "mongo/db/auth/user_name.h"
 #include "mongo/db/jsobj.h"
+#include "mongo/db/logical_session_id.h"
 #include "mongo/s/query/cluster_query_result.h"
 #include "mongo/util/time_support.h"
 
@@ -114,6 +115,11 @@ public:
      * the cursor is not tailable + awaitData).
      */
     virtual Status setAwaitDataTimeout(Milliseconds awaitDataTimeout) = 0;
+
+    /**
+     * Returns the logical session id for this cursor.
+     */
+    virtual boost::optional<LogicalSessionId> getLsid() const = 0;
 };
 
 }  // namespace mongo

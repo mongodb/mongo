@@ -443,6 +443,51 @@ ClusterCursorManager::Stats ClusterCursorManager::stats() const {
     return stats;
 }
 
+void ClusterCursorManager::appendActiveSessions(LogicalSessionIdSet* lsids) const {
+    stdx::lock_guard<stdx::mutex> lk(_mutex);
+
+    for (const auto& nsContainerPair : _namespaceToContainerMap) {
+        for (const auto& cursorIdEntryPair : nsContainerPair.second.entryMap) {
+            const CursorEntry& entry = cursorIdEntryPair.second;
+
+            if (entry.getKillPending()) {
+                // Don't include sessions for killed cursors.
+                continue;
+            }
+
+            auto lsid = entry.getLsid();
+            if (lsid) {
+                lsids->insert(*lsid);
+            }
+        }
+    }
+}
+
+stdx::unordered_set<CursorId> ClusterCursorManager::getCursorsForSession(
+    LogicalSessionId lsid) const {
+    stdx::lock_guard<stdx::mutex> lk(_mutex);
+
+    stdx::unordered_set<CursorId> cursorIds;
+
+    for (auto&& nsContainerPair : _namespaceToContainerMap) {
+        for (auto&& cursorIdEntryPair : nsContainerPair.second.entryMap) {
+            const CursorEntry& entry = cursorIdEntryPair.second;
+
+            if (entry.getKillPending()) {
+                // Don't include sessions for killed cursors.
+                continue;
+            }
+
+            auto cursorLsid = entry.getLsid();
+            if (lsid == cursorLsid) {
+                cursorIds.insert(cursorIdEntryPair.first);
+            }
+        }
+    }
+
+    return cursorIds;
+}
+
 boost::optional<NamespaceString> ClusterCursorManager::getNamespaceForCursorId(
     CursorId cursorId) const {
     stdx::lock_guard<stdx::mutex> lk(_mutex);
