@@ -28,9 +28,10 @@
 
 #pragma once
 
+#include "mongo/db/repl/drop_pending_collection_reaper.h"
 #include "mongo/db/repl/replication_coordinator_mock.h"
 #include "mongo/db/repl/replication_process.h"
-#include "mongo/db/repl/storage_interface_mock.h"
+#include "mongo/db/repl/storage_interface_impl.h"
 #include "mongo/db/service_context.h"
 #include "mongo/db/service_context_d_test_fixture.h"
 #include "mongo/executor/thread_pool_task_executor_test_fixture.h"
@@ -87,10 +88,13 @@ protected:
     class ReplicationCoordinatorRollbackMock;
     ReplicationCoordinatorRollbackMock* _coordinator = nullptr;
 
-    StorageInterfaceMock _storageInterface;
+    StorageInterfaceImpl _storageInterface;
 
     // ReplicationProcess used to access consistency markers.
     std::unique_ptr<ReplicationProcess> _replicationProcess;
+
+    // DropPendingCollectionReaper used to clean up and roll back dropped collections.
+    DropPendingCollectionReaper* _dropPendingCollectionReaper = nullptr;
 };
 
 /**

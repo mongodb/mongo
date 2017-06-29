@@ -75,6 +75,9 @@ void RollbackTest::setUp() {
     auto serviceContext = _serviceContextMongoDTest.getServiceContext();
     _replicationProcess = stdx::make_unique<ReplicationProcess>(
         &_storageInterface, stdx::make_unique<ReplicationConsistencyMarkersMock>());
+    _dropPendingCollectionReaper = new DropPendingCollectionReaper(&_storageInterface);
+    DropPendingCollectionReaper::set(
+        serviceContext, std::unique_ptr<DropPendingCollectionReaper>(_dropPendingCollectionReaper));
     _coordinator = new ReplicationCoordinatorRollbackMock(serviceContext);
     ReplicationCoordinator::set(serviceContext,
                                 std::unique_ptr<ReplicationCoordinator>(_coordinator));

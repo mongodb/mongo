@@ -34,6 +34,7 @@
 #include "mongo/db/repl/optime.h"
 #include "mongo/stdx/functional.h"
 #include "mongo/util/time_support.h"
+#include "mongo/util/uuid.h"
 
 /**
  * This rollback algorithm requires featureCompatibilityVersion 3.6.
@@ -242,6 +243,12 @@ struct FixUpInfo {
     std::set<std::string> collectionsToDrop;
     std::set<std::string> collectionsToResyncData;
     std::set<std::string> collectionsToResyncMetadata;
+
+    // When collections are dropped, they are added to a list of drop-pending collections. We keep
+    // the OpTime and the namespace of the collection because the DropPendingCollectionReaper
+    // does not store the original name or UUID of the collection.
+    stdx::unordered_map<UUID, std::pair<OpTime, std::string>, UUID::Hash>
+        collectionsToRollBackPendingDrop;
 
     OpTime commonPoint;
     RecordId commonPointOurDiskloc;

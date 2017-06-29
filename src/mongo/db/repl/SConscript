@@ -405,6 +405,7 @@ env.Library(
         'rs_rollback.cpp',
     ],
     LIBDEPS=[
+        'drop_pending_collection_reaper',
         'oplog',
         'replication_process',
         'roll_back_local_operations',
@@ -450,6 +451,7 @@ env.Library(
         'replication_process',
         'replmocks',
         #'serveronly', # CYCLE
+        'storage_interface_impl',
         '$BUILD_DIR/mongo/db/service_context',
         '$BUILD_DIR/mongo/db/service_context_d_test_fixture',
         '$BUILD_DIR/mongo/executor/thread_pool_task_executor_test_fixture',

@@ -56,6 +56,7 @@
 #include "mongo/db/ops/update_request.h"
 #include "mongo/db/query/internal_plans.h"
 #include "mongo/db/repl/bgsync.h"
+#include "mongo/db/repl/drop_pending_collection_reaper.h"
 #include "mongo/db/repl/oplog.h"
 #include "mongo/db/repl/oplog_interface.h"
 #include "mongo/db/repl/replication_coordinator.h"
@@ -137,6 +138,7 @@ Status rollback_internal::updateFixUpInfoFromLocalOplogEntry(FixUpInfo& fixUpInf
 
     auto oplogEntry = OplogEntry(ourObj);
     NamespaceString nss = oplogEntry.getNamespace();
+    auto uuid = oplogEntry.getUuid();
 
     if (oplogEntry.getOpType() == OpTypeEnum::kNoop)
         return Status::OK();
@@ -194,8 +196,15 @@ Status rollback_internal::updateFixUpInfoFromLocalOplogEntry(FixUpInfo& fixUpInf
                 //        }
                 //     ...
                 // }
-                string ns = nss.db().toString() + '.' + first.valuestr();  // -> foo.abc
-                fixUpInfo.collectionsToResyncData.insert(ns);
+                // TODO: Delete this when UUIDs are enabled. (SERVER-29815)
+                if (!uuid) {
+                    string ns = nss.db().toString() + '.' + first.valuestr();
+                    fixUpInfo.collectionsToResyncData.insert(ns);
+                    return Status::OK();
+                }
+                string collName = first.valuestr();
+                fixUpInfo.collectionsToRollBackPendingDrop.emplace(
+                    *uuid, std::make_pair(oplogEntry.getOpTime(), collName));
                 return Status::OK();
             }
             case OplogEntry::CommandType::kDropIndexes: {
@@ -449,6 +458,17 @@ void syncFixUp(OperationContext* opCtx,
     checkRbidAndUpdateMinValid(opCtx, fixUpInfo.rbid, rollbackSource, replicationProcess);
 
     invariant(!fixUpInfo.commonPointOurDiskloc.isNull());
+
+    log() << "Rolling back any collections pending being dropped";
+
+    // Roll back any drop-pending collections. This must be done first so that the collection
+    // exists when we attempt to resync its metadata or insert documents into it.
+    for (const auto& collPair : fixUpInfo.collectionsToRollBackPendingDrop) {
+        const auto& optime = collPair.second.first;
+        const auto& collName = collPair.second.second;
+        DropPendingCollectionReaper::get(opCtx)->rollBackDropPendingCollection(
+            opCtx, optime, collName);
+    }
 
     // Full collection data and metadata resync.
     if (!fixUpInfo.collectionsToResyncData.empty() ||
