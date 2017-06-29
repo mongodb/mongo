@@ -192,8 +192,8 @@ SCRAMStepsResult runSteps(NativeSaslAuthenticationSession* saslServerSession,
         if (result.status != Status::OK()) {
             return result;
         }
-        std::cout << result.outcome.toString() << ": " << clientOutput << std::endl;
         interposers.execute(result.outcome, clientOutput);
+        std::cout << result.outcome.toString() << ": " << clientOutput << std::endl;
         result.outcome.next();
 
         // Server step
@@ -379,6 +379,73 @@ TEST_F(SCRAMSHA1Fixture, testSCRAM) {
     ASSERT_OK(saslClientSession->initialize());
 
     ASSERT_EQ(goalState, runSteps(saslServerSession.get(), saslClientSession.get()));
+}
+
+TEST_F(SCRAMSHA1Fixture, testSCRAMWithChannelBindingSupportedByClient) {
+    authzManagerExternalState
+        ->insertPrivilegeDocument(
+            opCtx.get(), generateSCRAMUserDocument("sajack", "sajack"), BSONObj())
+        .transitional_ignore();
+
+    saslClientSession->setParameter(NativeSaslClientSession::parameterUser, "sajack");
+    saslClientSession->setParameter(NativeSaslClientSession::parameterPassword,
+                                    createPasswordDigest("sajack", "sajack"));
+
+    ASSERT_OK(saslClientSession->initialize());
+
+    SCRAMMutators mutator;
+    mutator.setMutator(SaslTestState(SaslTestState::kClient, 1), [](std::string& clientMessage) {
+        clientMessage.replace(clientMessage.begin(), clientMessage.begin() + 1, "y");
+    });
+
+    ASSERT_EQ(goalState, runSteps(saslServerSession.get(), saslClientSession.get(), mutator));
+}
+
+TEST_F(SCRAMSHA1Fixture, testSCRAMWithChannelBindingRequiredByClient) {
+    authzManagerExternalState
+        ->insertPrivilegeDocument(
+            opCtx.get(), generateSCRAMUserDocument("sajack", "sajack"), BSONObj())
+        .transitional_ignore();
+
+    saslClientSession->setParameter(NativeSaslClientSession::parameterUser, "sajack");
+    saslClientSession->setParameter(NativeSaslClientSession::parameterPassword,
+                                    createPasswordDigest("sajack", "sajack"));
+
+    ASSERT_OK(saslClientSession->initialize());
+
+    SCRAMMutators mutator;
+    mutator.setMutator(SaslTestState(SaslTestState::kClient, 1), [](std::string& clientMessage) {
+        clientMessage.replace(clientMessage.begin(), clientMessage.begin() + 1, "p=tls-unique");
+    });
+
+    ASSERT_EQ(
+        SCRAMStepsResult(SaslTestState(SaslTestState::kServer, 1),
+                         Status(ErrorCodes::BadValue, "Server does not support channel binding")),
+        runSteps(saslServerSession.get(), saslClientSession.get(), mutator));
+}
+
+TEST_F(SCRAMSHA1Fixture, testSCRAMWithInvalidChannelBinding) {
+    authzManagerExternalState
+        ->insertPrivilegeDocument(
+            opCtx.get(), generateSCRAMUserDocument("sajack", "sajack"), BSONObj())
+        .transitional_ignore();
+
+    saslClientSession->setParameter(NativeSaslClientSession::parameterUser, "sajack");
+    saslClientSession->setParameter(NativeSaslClientSession::parameterPassword,
+                                    createPasswordDigest("sajack", "sajack"));
+
+    ASSERT_OK(saslClientSession->initialize());
+
+    SCRAMMutators mutator;
+    mutator.setMutator(SaslTestState(SaslTestState::kClient, 1), [](std::string& clientMessage) {
+        clientMessage.replace(clientMessage.begin(), clientMessage.begin() + 1, "v=illegalGarbage");
+    });
+
+    ASSERT_EQ(
+        SCRAMStepsResult(SaslTestState(SaslTestState::kServer, 1),
+                         Status(ErrorCodes::BadValue,
+                                "Incorrect SCRAM-SHA-1 client message prefix: v=illegalGarbage")),
+        runSteps(saslServerSession.get(), saslClientSession.get(), mutator));
 }
 
 TEST_F(SCRAMSHA1Fixture, testNULLInPassword) {

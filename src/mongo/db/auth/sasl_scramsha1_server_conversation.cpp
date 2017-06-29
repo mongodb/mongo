@@ -123,7 +123,11 @@ StatusWith<bool> SaslSCRAMSHA1ServerConversation::_firstStep(std::vector<string>
                 << "Incorrect number of arguments for first SCRAM-SHA-1 client message, got "
                 << input.size()
                 << " expected 4");
-    } else if (input[0] != "n") {
+    } else if (str::startsWith(input[0], "p=")) {
+        return StatusWith<bool>(ErrorCodes::BadValue,
+                                mongoutils::str::stream()
+                                    << "Server does not support channel binding");
+    } else if (input[0] != "n" && input[0] != "y") {
         return StatusWith<bool>(ErrorCodes::BadValue,
                                 mongoutils::str::stream()
                                     << "Incorrect SCRAM-SHA-1 client message prefix: "
