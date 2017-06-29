@@ -82,7 +82,6 @@ class Struct(common.SourceLocation):
         self.name = None  # type: unicode
         self.description = None  # type: unicode
         self.strict = True  # type: bool
-        self.chained_types = []  # type: List[Field]
         self.fields = []  # type: List[Field]
         super(Struct, self).__init__(file_name, line, column)
 

@@ -422,15 +422,15 @@ structs:
         description: UnitTest for chained struct with only chained types
         strict: false
         chained_types:
-            - ChainedType
-            - AnotherChainedType
+            ChainedType : ChainedType
+            AnotherChainedType : AnotherChainedType
 
     chained_struct_mixed:
         description: Chained struct with chained structs and fields
         strict: true
         chained_structs:
-            - chained_any_basic_type
-            - chained_object_basic_type
+            chained_any_basic_type : chained_any_basic_type
+            chained_object_basic_type : ChainedObjectBasicType
         fields:
             field3: string
 
@@ -438,10 +438,12 @@ structs:
         description: Chained struct with chained types, structs, and fields
         strict: false
         chained_types:
-            - ChainedType
-            - AnotherChainedType
+            ChainedType : chained_type
+            AnotherChainedType:
+                cpp_name: AnotherChainedType
         chained_structs:
-            - chained_string_basic_type
+            chained_string_basic_type:
+                cpp_name: ChainedStringBasicType
         fields:
             field3:
                 type: int

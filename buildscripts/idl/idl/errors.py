@@ -316,7 +316,7 @@ class ParserContext(object):
         """Add an error about a struct without fields."""
         self._add_node_error(node, ERROR_ID_EMPTY_FIELDS,
                              ("Struct '%s' must either have fields, chained_types, or " +
-                              " chained_structs specified but neither were found") % (name))
+                              "chained_structs specified but neither were found") % (name))
 
     def add_missing_required_field_error(self, node, node_parent, node_name):
         # type: (yaml.nodes.Node, unicode, unicode) -> None

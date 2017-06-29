@@ -803,7 +803,7 @@ class TestBinder(testcase.IDLTestcase):
                 description: foo
                 strict: false
                 chained_types:
-                    - foo1
+                    foo1: alias
         """))
 
     def test_chained_type_negative(self):
@@ -835,7 +835,7 @@ class TestBinder(testcase.IDLTestcase):
                 description: foo
                 strict: true
                 chained_types:
-                    - foo1
+                    foo1: alias
         """), idl.errors.ERROR_ID_CHAINED_NO_TYPE_STRICT)
 
         # Non-'any' type as chained type
@@ -845,19 +845,8 @@ class TestBinder(testcase.IDLTestcase):
                 description: foo
                 strict: false
                 chained_types:
-                    - string
+                    string: alias
         """), idl.errors.ERROR_ID_CHAINED_TYPE_WRONG_BSON_TYPE)
-
-        # Duplicate chained types
-        self.assert_bind_fail(test_preamble + textwrap.dedent("""
-        structs:
-            bar1:
-                description: foo
-                strict: false
-                chained_types:
-                    - foo1
-                    - foo1
-        """), idl.errors.ERROR_ID_CHAINED_DUPLICATE_FIELD)
 
         # Chaining and fields only with same name
         self.assert_bind_fail(test_preamble + textwrap.dedent("""
@@ -866,7 +855,7 @@ class TestBinder(testcase.IDLTestcase):
                 description: foo
                 strict: false
                 chained_types:
-                    - foo1
+                    foo1: alias
                 fields:
                     foo1: string
         """), idl.errors.ERROR_ID_CHAINED_DUPLICATE_FIELD)
@@ -878,7 +867,7 @@ class TestBinder(testcase.IDLTestcase):
                 description: foo
                 strict: false
                 chained_types:
-                    - foobar1
+                    foobar1: alias
                 fields:
                     foo1: string
         """), idl.errors.ERROR_ID_UNKNOWN_TYPE)
@@ -932,7 +921,7 @@ class TestBinder(testcase.IDLTestcase):
                 description: foo
                 strict: false
                 chained_types:
-                    - foo1
+                    foo1: alias
 
             chained2:
                 description: foo
@@ -948,7 +937,7 @@ class TestBinder(testcase.IDLTestcase):
                 description: foo
                 strict: true
                 chained_structs:
-                    - chained2
+                    chained2: alias
         """)))
 
         # Chaining struct's fields and explicit fields
@@ -958,7 +947,7 @@ class TestBinder(testcase.IDLTestcase):
                 description: foo
                 strict: true
                 chained_structs:
-                    - chained2
+                    chained2: alias
                 fields:
                     str1: string
         """)))
@@ -970,9 +959,9 @@ class TestBinder(testcase.IDLTestcase):
                 description: foo
                 strict: false
                 chained_types:
-                    - foo1
+                    foo1: alias
                 chained_structs:
-                    - chained2
+                    chained2: alias
                 fields:
                     str1: string
         """)))
@@ -984,7 +973,7 @@ class TestBinder(testcase.IDLTestcase):
                 description: foo
                 strict: false
                 chained_structs:
-                    - chained2
+                    chained2: alias
                 fields:
                     foo1: string
         """)))
@@ -1033,7 +1022,7 @@ class TestBinder(testcase.IDLTestcase):
                 description: foo
                 strict: true
                 chained_structs:
-                    - foobar1
+                    foobar1: alias
         """)), idl.errors.ERROR_ID_UNKNOWN_TYPE)
 
         # Type as chained struct
@@ -1043,7 +1032,7 @@ class TestBinder(testcase.IDLTestcase):
                 description: foo
                 strict: true
                 chained_structs:
-                    - foo1
+                    foo1: alias
         """)), idl.errors.ERROR_ID_CHAINED_STRUCT_NOT_FOUND)
 
         # Struct as chained type
@@ -1053,7 +1042,7 @@ class TestBinder(testcase.IDLTestcase):
                 description: foo
                 strict: false
                 chained_types:
-                    - chained
+                    chained: alias
         """)), idl.errors.ERROR_ID_CHAINED_TYPE_NOT_FOUND)
 
         # Duplicated field names across chained struct's fields and fields
@@ -1063,7 +1052,7 @@ class TestBinder(testcase.IDLTestcase):
                 description: foo
                 strict: false
                 chained_structs:
-                    - chained
+                    chained: alias
                 fields:
                     field1: string
         """)), idl.errors.ERROR_ID_CHAINED_DUPLICATE_FIELD)
@@ -1075,19 +1064,8 @@ class TestBinder(testcase.IDLTestcase):
                 description: foo
                 strict: false
                 chained_structs:
-                    - chained
-                    - chained2
-        """)), idl.errors.ERROR_ID_CHAINED_DUPLICATE_FIELD)
-
-        # Duplicate chained structs
-        self.assert_bind_fail(test_preamble + indent_text(1,
-                                                          textwrap.dedent("""
-            bar1:
-                description: foo
-                strict: true
-                chained_structs:
-                    - chained
-                    - chained
+                    chained: alias
+                    chained2: alias
         """)), idl.errors.ERROR_ID_CHAINED_DUPLICATE_FIELD)
 
         # Chained struct with strict true
@@ -1103,7 +1081,7 @@ class TestBinder(testcase.IDLTestcase):
                 description: foo
                 strict: false
                 chained_structs:
-                    - bar1
+                    bar1: alias
                 fields:
                     f1: string
 
@@ -1116,13 +1094,13 @@ class TestBinder(testcase.IDLTestcase):
                 description: foo
                 strict: false
                 chained_structs:
-                    - chained
+                    chained: alias
 
             foobar:
                 description: foo
                 strict: false
                 chained_structs:
-                    - bar1
+                    bar1: alias
                 fields:
                     f1: string
 
@@ -1135,13 +1113,13 @@ class TestBinder(testcase.IDLTestcase):
                 description: foo
                 strict: false
                 chained_types:
-                    - foo1
+                    foo1: alias
 
             foobar:
                 description: foo
                 strict: false
                 chained_structs:
-                    - bar1
+                    bar1: alias
                 fields:
                     f1: bar1
 
