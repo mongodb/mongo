@@ -399,18 +399,17 @@ std::vector<BSONElement> BSONElement::Array() const {
 int BSONElement::woCompare(const BSONElement& e,
                            bool considerFieldName,
                            const StringData::ComparatorInterface* comparator) const {
-    int lt = (int)canonicalType();
-    int rt = (int)e.canonicalType();
-    int x = lt - rt;
-    if (x != 0 && (!isNumber() || !e.isNumber()))
-        return x;
-    if (considerFieldName) {
-        x = strcmp(fieldName(), e.fieldName());
-        if (x != 0)
-            return x;
+    if (type() != e.type()) {
+        int lt = (int)canonicalType();
+        int rt = (int)e.canonicalType();
+        if (int diff = lt - rt)
+            return diff;
     }
-    x = compareElementValues(*this, e, comparator);
-    return x;
+    if (considerFieldName) {
+        if (int diff = strcmp(fieldName(), e.fieldName()))
+            return diff;
+    }
+    return compareElementValues(*this, e, comparator);
 }
 
 bool BSONElement::binaryEqual(const BSONElement& rhs) const {
