@@ -34,6 +34,7 @@
 
 #include <string>
 
+#include "mongo/db/concurrency/global_lock_acquisition_tracker.h"
 #include "mongo/db/namespace_string.h"
 #include "mongo/db/server_parameters.h"
 #include "mongo/db/service_context.h"
@@ -73,6 +74,14 @@ Lock::GlobalLock::GlobalLock(Locker* locker,
                              EnqueueOnly enqueueOnly)
     : _locker(locker), _result(LOCK_INVALID), _pbwm(locker, resourceIdParallelBatchWriterMode) {
     _enqueue(lockMode, timeoutMs);
+
+    if ((lockMode == LockMode::MODE_IX || lockMode == LockMode::MODE_X) && isLocked() &&
+        haveClient()) {
+        auto opCtx = cc().getOperationContext();
+        if (opCtx) {
+            GlobalLockAcquisitionTracker::get(opCtx).setGlobalExclusiveLockTaken();
+        }
+    }
 }
 
 void Lock::GlobalLock::_enqueue(LockMode lockMode, unsigned timeoutMs) {

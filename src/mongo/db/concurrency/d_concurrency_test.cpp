@@ -34,6 +34,7 @@
 #include <vector>
 
 #include "mongo/db/concurrency/d_concurrency.h"
+#include "mongo/db/concurrency/global_lock_acquisition_tracker.h"
 #include "mongo/db/concurrency/lock_manager_test_help.h"
 #include "mongo/db/operation_context.h"
 #include "mongo/stdx/functional.h"
@@ -112,6 +113,16 @@ makeKClientsWithLockers(int k) {
         clients.emplace_back(std::move(client), std::move(opCtx));
     }
     return clients;
+}
+
+/**
+ * Returns an operation context that has an MMAPV1 locker attached to it.
+ */
+ServiceContext::UniqueOperationContext makeMMAPOperationContext() {
+    auto opCtx = cc().makeOperationContext();
+    opCtx->releaseLockState();
+    opCtx->setLockState(stdx::make_unique<MMAPV1LockerImpl>());
+    return opCtx;
 }
 
 /**
@@ -290,6 +301,86 @@ TEST(DConcurrency, GlobalLockX_Timeout) {
         Lock::GlobalLock globalWriteTry(&lsTry, MODE_X, 1);
         ASSERT(!globalWriteTry.isLocked());
     }
+}
+
+TEST(DConcurrency, GlobalLockXSetsGlobalLockTakenOnOperationContext) {
+    Client::initThreadIfNotAlready();
+    auto opCtx = makeMMAPOperationContext();
+    ASSERT_FALSE(GlobalLockAcquisitionTracker::get(opCtx.get()).getGlobalExclusiveLockTaken());
+
+    {
+        Lock::GlobalLock globalWrite(opCtx->lockState(), MODE_X, 0);
+        ASSERT(globalWrite.isLocked());
+    }
+    ASSERT_TRUE(GlobalLockAcquisitionTracker::get(opCtx.get()).getGlobalExclusiveLockTaken());
+}
+
+TEST(DConcurrency, GlobalLockIXSetsGlobalLockTakenOnOperationContext) {
+    Client::initThreadIfNotAlready();
+    auto opCtx = makeMMAPOperationContext();
+    ASSERT_FALSE(GlobalLockAcquisitionTracker::get(opCtx.get()).getGlobalExclusiveLockTaken());
+    {
+        Lock::GlobalLock globalWrite(opCtx->lockState(), MODE_IX, 0);
+        ASSERT(globalWrite.isLocked());
+    }
+    ASSERT_TRUE(GlobalLockAcquisitionTracker::get(opCtx.get()).getGlobalExclusiveLockTaken());
+}
+
+TEST(DConcurrency, GlobalLockSDoesNotSetGlobalLockTakenOnOperationContext) {
+    Client::initThreadIfNotAlready();
+    auto opCtx = makeMMAPOperationContext();
+    ASSERT_FALSE(GlobalLockAcquisitionTracker::get(opCtx.get()).getGlobalExclusiveLockTaken());
+    {
+        Lock::GlobalLock globalRead(opCtx->lockState(), MODE_S, 0);
+        ASSERT(globalRead.isLocked());
+    }
+    ASSERT_FALSE(GlobalLockAcquisitionTracker::get(opCtx.get()).getGlobalExclusiveLockTaken());
+}
+
+TEST(DConcurrency, GlobalLockISDoesNotSetGlobalLockTakenOnOperationContext) {
+    Client::initThreadIfNotAlready();
+    auto opCtx = makeMMAPOperationContext();
+    ASSERT_FALSE(GlobalLockAcquisitionTracker::get(opCtx.get()).getGlobalExclusiveLockTaken());
+    {
+        Lock::GlobalLock globalRead(opCtx->lockState(), MODE_IS, 0);
+        ASSERT(globalRead.isLocked());
+    }
+    ASSERT_FALSE(GlobalLockAcquisitionTracker::get(opCtx.get()).getGlobalExclusiveLockTaken());
+}
+
+TEST(DConcurrency, DBLockXSetsGlobalLockTakenOnOperationContext) {
+    Client::initThreadIfNotAlready();
+    auto opCtx = makeMMAPOperationContext();
+    ASSERT_FALSE(GlobalLockAcquisitionTracker::get(opCtx.get()).getGlobalExclusiveLockTaken());
+
+    { Lock::DBLock dbWrite(opCtx->lockState(), "db", MODE_X); }
+    ASSERT_TRUE(GlobalLockAcquisitionTracker::get(opCtx.get()).getGlobalExclusiveLockTaken());
+}
+
+TEST(DConcurrency, DBLockSDoesNotSetGlobalLockTakenOnOperationContext) {
+    Client::initThreadIfNotAlready();
+    auto opCtx = makeMMAPOperationContext();
+    ASSERT_FALSE(GlobalLockAcquisitionTracker::get(opCtx.get()).getGlobalExclusiveLockTaken());
+
+    { Lock::DBLock dbRead(opCtx->lockState(), "db", MODE_S); }
+    ASSERT_FALSE(GlobalLockAcquisitionTracker::get(opCtx.get()).getGlobalExclusiveLockTaken());
+}
+
+TEST(DConcurrency, GlobalLockXDoesNotSetGlobalLockTakenWhenLockAcquisitionTimesOut) {
+    Client::initThreadIfNotAlready();
+    auto clients = makeKClientsWithLockers<MMAPV1LockerImpl>(1);
+
+    // Take a global lock so that the next one times out.
+    Lock::GlobalLock globalWrite0(clients[0].second.get()->lockState(), MODE_X, 0);
+    ASSERT(globalWrite0.isLocked());
+
+    auto opCtx = makeMMAPOperationContext();
+    ASSERT_FALSE(GlobalLockAcquisitionTracker::get(opCtx.get()).getGlobalExclusiveLockTaken());
+    {
+        Lock::GlobalLock globalWrite1(opCtx->lockState(), MODE_X, 1);
+        ASSERT_FALSE(globalWrite1.isLocked());
+    }
+    ASSERT_FALSE(GlobalLockAcquisitionTracker::get(opCtx.get()).getGlobalExclusiveLockTaken());
 }
 
 TEST(DConcurrency, GlobalLockS_NoTimeoutDueToGlobalLockS) {
