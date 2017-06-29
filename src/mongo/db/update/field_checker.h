@@ -45,6 +45,11 @@ namespace fieldchecker {
 Status isUpdatable(const FieldRef& field);
 
 /**
+ * Returns true iff 'field' is the position element (which is "$").
+ */
+bool isPositionalElement(const StringData& field);
+
+/**
  * Returns true, the position 'pos' of the first $-sign if present in 'fieldRef', and
  * how many other $-signs were found in 'count'. Otherwise return false.
  *
@@ -53,6 +58,17 @@ Status isUpdatable(const FieldRef& field);
  *   verify.
  */
 bool isPositional(const FieldRef& fieldRef, size_t* pos, size_t* count = NULL);
+
+/**
+ * Returns true iff 'field' is an array filter (matching the regular expression /\$\[.*\]/).
+ */
+bool isArrayFilterIdentifier(const StringData& field);
+
+/**
+ * Returns true if isArrayFilterIdentifier is true for any component in 'fieldRef' or returns false
+   otherwise.
+ */
+bool hasArrayFilter(const FieldRef& fieldRef);
 
 }  // namespace fieldchecker
 

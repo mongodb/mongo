@@ -60,6 +60,10 @@ Status isUpdatable(const FieldRef& field) {
     return Status::OK();
 }
 
+bool isPositionalElement(const StringData& field) {
+    return field.size() == 1 && field[0] == '$';
+}
+
 bool isPositional(const FieldRef& fieldRef, size_t* pos, size_t* count) {
     // 'count' is optional.
     size_t dummy;
@@ -71,13 +75,29 @@ bool isPositional(const FieldRef& fieldRef, size_t* pos, size_t* count) {
     size_t size = fieldRef.numParts();
     for (size_t i = 0; i < size; i++) {
         StringData fieldPart = fieldRef.getPart(i);
-        if ((fieldPart.size() == 1) && (fieldPart[0] == '$')) {
+        if (isPositionalElement(fieldPart)) {
             if (*count == 0)
                 *pos = i;
             (*count)++;
         }
     }
     return *count > 0;
+}
+
+bool isArrayFilterIdentifier(const StringData& field) {
+    return field.size() >= 3 && field[0] == '$' && field[1] == '[' &&
+        field[field.size() - 1] == ']';
+}
+
+bool hasArrayFilter(const FieldRef& fieldRef) {
+    auto size = fieldRef.numParts();
+    for (size_t i = 0; i < size; i++) {
+        auto fieldPart = fieldRef.getPart(i);
+        if (isArrayFilterIdentifier(fieldPart)) {
+            return true;
+        }
+    }
+    return false;
 }
 
 }  // namespace fieldchecker

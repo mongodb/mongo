@@ -40,15 +40,6 @@ namespace mongo {
 
 namespace {
 
-bool isPositionalElement(const std::string& field) {
-    return field.length() == 1 && field[0] == '$';
-}
-
-bool isArrayFilterIdentifier(StringData field) {
-    return field.size() >= 3 && field[0] == '$' && field[1] == '[' &&
-        field[field.size() - 1] == ']';
-}
-
 /**
  * Parses a field of the form $[<identifier>] into <identifier>. 'field' must be of the form
  * $[<identifier>]. Returns a non-ok status if 'field' is in the first position in the path or the
@@ -61,7 +52,7 @@ StatusWith<std::string> parseArrayFilterIdentifier(
     const FieldRef& fieldRef,
     const std::map<StringData, std::unique_ptr<ArrayFilter>>& arrayFilters,
     std::set<std::string>& foundIdentifiers) {
-    dassert(isArrayFilterIdentifier(field));
+    dassert(fieldchecker::isArrayFilterIdentifier(field));
 
     if (position == 0) {
         return Status(ErrorCodes::BadValue,
@@ -179,8 +170,37 @@ StatusWith<bool> UpdateObjectNode::parseAndMerge(
     const CollatorInterface* collator,
     const std::map<StringData, std::unique_ptr<ArrayFilter>>& arrayFilters,
     std::set<std::string>& foundIdentifiers) {
+    FieldRef fieldRef;
+    if (type != modifiertable::ModifierType::MOD_RENAME) {
+        // General case: Create a path in the tree according to the path specified in the field name
+        // of the "modExpr" element.
+        fieldRef.parse(modExpr.fieldNameStringData());
+    } else {
+        // Special case: For $rename modifiers, we add two nodes to the tree:
+        // 1) a ConflictPlaceholderNode at the path specified in the field name of the "modExpr"
+        //    element and
+        auto status = parseAndMerge(root,
+                                    modifiertable::ModifierType::MOD_CONFLICT_PLACEHOLDER,
+                                    modExpr,
+                                    collator,
+                                    arrayFilters,
+                                    foundIdentifiers);
+        if (!status.isOK()) {
+            return status;
+        }
+
+        // 2) a RenameNode at the path specified by the value of the "modExpr" element, which must
+        //    be a string value.
+        if (BSONType::String != modExpr.type()) {
+            return Status(ErrorCodes::BadValue,
+                          str::stream() << "The 'to' field for $rename must be a string: "
+                                        << modExpr);
+        }
+
+        fieldRef.parse(modExpr.valueStringData());
+    }
+
     // Check that the path is updatable.
-    FieldRef fieldRef(modExpr.fieldNameStringData());
     auto status = fieldchecker::isUpdatable(fieldRef);
     if (!status.isOK()) {
         return status;
@@ -225,7 +245,8 @@ StatusWith<bool> UpdateObjectNode::parseAndMerge(
     // Create UpdateInternalNodes along the path.
     UpdateInternalNode* current = static_cast<UpdateInternalNode*>(root);
     for (size_t i = 0; i < fieldRef.numParts() - 1; ++i) {
-        auto fieldIsArrayFilterIdentifier = isArrayFilterIdentifier(fieldRef.getPart(i));
+        auto fieldIsArrayFilterIdentifier =
+            fieldchecker::isArrayFilterIdentifier(fieldRef.getPart(i));
 
         std::string childName;
         if (fieldIsArrayFilterIdentifier) {
@@ -240,7 +261,8 @@ StatusWith<bool> UpdateObjectNode::parseAndMerge(
         }
 
         auto child = current->getChild(childName);
-        auto childShouldBeArrayNode = isArrayFilterIdentifier(fieldRef.getPart(i + 1));
+        auto childShouldBeArrayNode =
+            fieldchecker::isArrayFilterIdentifier(fieldRef.getPart(i + 1));
         if (child) {
             if ((childShouldBeArrayNode && child->type != UpdateNode::Type::Array) ||
                 (!childShouldBeArrayNode && child->type != UpdateNode::Type::Object)) {
@@ -265,7 +287,7 @@ StatusWith<bool> UpdateObjectNode::parseAndMerge(
 
     // Add the leaf node to the end of the path.
     auto fieldIsArrayFilterIdentifier =
-        isArrayFilterIdentifier(fieldRef.getPart(fieldRef.numParts() - 1));
+        fieldchecker::isArrayFilterIdentifier(fieldRef.getPart(fieldRef.numParts() - 1));
 
     std::string childName;
     if (fieldIsArrayFilterIdentifier) {
@@ -312,7 +334,7 @@ std::unique_ptr<UpdateNode> UpdateObjectNode::createUpdateNodeByMerging(
 }
 
 UpdateNode* UpdateObjectNode::getChild(const std::string& field) const {
-    if (isPositionalElement(field)) {
+    if (fieldchecker::isPositionalElement(field)) {
         return _positionalChild.get();
     }
 
@@ -324,7 +346,7 @@ UpdateNode* UpdateObjectNode::getChild(const std::string& field) const {
 }
 
 void UpdateObjectNode::setChild(std::string field, std::unique_ptr<UpdateNode> child) {
-    if (isPositionalElement(field)) {
+    if (fieldchecker::isPositionalElement(field)) {
         invariant(!_positionalChild);
         _positionalChild = std::move(child);
     } else {

@@ -35,6 +35,8 @@
 #include "mongo/db/json.h"
 #include "mongo/db/matcher/extensions_callback_noop.h"
 #include "mongo/db/query/collation/collator_interface_mock.h"
+#include "mongo/db/update/conflict_placeholder_node.h"
+#include "mongo/db/update/rename_node.h"
 #include "mongo/db/update/update_array_node.h"
 #include "mongo/unittest/death_test.h"
 #include "mongo/unittest/unittest.h"
@@ -88,6 +90,34 @@ TEST(UpdateObjectNodeTest, ValidMulPathParsesSuccessfully) {
                                               collator,
                                               arrayFilters,
                                               foundIdentifiers));
+}
+
+TEST(UpdateObjectNodeTest, ValidRenamePathParsesSuccessfully) {
+    auto update = fromjson("{$rename: {'a.b': 'c.d'}}");
+    const CollatorInterface* collator = nullptr;
+    std::map<StringData, std::unique_ptr<ArrayFilter>> arrayFilters;
+    std::set<std::string> foundIdentifiers;
+    UpdateObjectNode root;
+    ASSERT_OK(UpdateObjectNode::parseAndMerge(&root,
+                                              modifiertable::ModifierType::MOD_RENAME,
+                                              update["$rename"]["a.b"],
+                                              collator,
+                                              arrayFilters,
+                                              foundIdentifiers));
+
+    // There should be a ConflictPlaceHolderNode along the "a.b" path.
+    auto aChild = dynamic_cast<UpdateObjectNode*>(root.getChild("a"));
+    ASSERT(aChild);
+
+    auto bChild = dynamic_cast<ConflictPlaceholderNode*>(aChild->getChild("b"));
+    ASSERT(bChild);
+
+    // There should be a RenameNode along the "c.d" path.
+    auto cChild = dynamic_cast<UpdateObjectNode*>(root.getChild("c"));
+    ASSERT(cChild);
+
+    auto dChild = dynamic_cast<RenameNode*>(cChild->getChild("d"));
+    ASSERT(dChild);
 }
 
 TEST(UpdateObjectNodeTest, ValidSetPathParsesSuccessfully) {
@@ -2739,6 +2769,232 @@ TEST(UpdateObjectNodeTest, SetAndPopModifiersWithCommonPrefixApplySuccessfully) 
     ASSERT_BSONOBJ_EQ(fromjson("{a: {b: 5, c: [2, 3, 4]}}"), doc.getObject());
     ASSERT_FALSE(doc.isInPlaceModeEnabled());
     ASSERT_BSONOBJ_EQ(fromjson("{$set: {'a.b': 5, 'a.c': [2, 3, 4]}}"), logDoc.getObject());
+}
+
+TEST(ParseRenameTest, RenameToStringWithEmbeddedNullFails) {
+    const CollatorInterface* collator = nullptr;
+    std::map<StringData, std::unique_ptr<ArrayFilter>> arrayFilters;
+    std::set<std::string> foundIdentifiers;
+
+    {
+        const auto embeddedNull = "a\0b"_sd;
+        auto update = BSON("$rename" << BSON("a.b" << embeddedNull));
+
+        UpdateObjectNode root;
+        auto result = UpdateObjectNode::parseAndMerge(&root,
+                                                      modifiertable::ModifierType::MOD_RENAME,
+                                                      update["$rename"]["a.b"],
+                                                      collator,
+                                                      arrayFilters,
+                                                      foundIdentifiers);
+        ASSERT_NOT_OK(result);
+        ASSERT_EQ(result.getStatus().code(), ErrorCodes::BadValue);
+    }
+
+    {
+        const auto singleNullByte = "\0"_sd;
+        auto update = BSON("$rename" << BSON("a.b" << singleNullByte));
+
+        UpdateObjectNode root;
+        auto result = UpdateObjectNode::parseAndMerge(&root,
+                                                      modifiertable::ModifierType::MOD_RENAME,
+                                                      update["$rename"]["a.b"],
+                                                      collator,
+                                                      arrayFilters,
+                                                      foundIdentifiers);
+        ASSERT_NOT_OK(result);
+        ASSERT_EQ(result.getStatus().code(), ErrorCodes::BadValue);
+    }
+
+    {
+        const auto leadingNullByte = "\0bbbb"_sd;
+        auto update = BSON("$rename" << BSON("a.b" << leadingNullByte));
+
+        UpdateObjectNode root;
+        auto result = UpdateObjectNode::parseAndMerge(&root,
+                                                      modifiertable::ModifierType::MOD_RENAME,
+                                                      update["$rename"]["a.b"],
+                                                      collator,
+                                                      arrayFilters,
+                                                      foundIdentifiers);
+        ASSERT_NOT_OK(result);
+        ASSERT_EQ(result.getStatus().code(), ErrorCodes::BadValue);
+    }
+
+    {
+        const auto trailingNullByte = "bbbb\0"_sd;
+        auto update = BSON("$rename" << BSON("a.b" << trailingNullByte));
+
+        UpdateObjectNode root;
+        auto result = UpdateObjectNode::parseAndMerge(&root,
+                                                      modifiertable::ModifierType::MOD_RENAME,
+                                                      update["$rename"]["a.b"],
+                                                      collator,
+                                                      arrayFilters,
+                                                      foundIdentifiers);
+        ASSERT_NOT_OK(result);
+        ASSERT_EQ(result.getStatus().code(), ErrorCodes::BadValue);
+    }
+}
+
+TEST(ParseRenameTest, RenameToNonUpdatablePathFails) {
+    auto update = fromjson("{$rename: {'a': 'b.'}}");
+    const CollatorInterface* collator = nullptr;
+    std::map<StringData, std::unique_ptr<ArrayFilter>> arrayFilters;
+    std::set<std::string> foundIdentifiers;
+    UpdateObjectNode root;
+    auto result = UpdateObjectNode::parseAndMerge(&root,
+                                                  modifiertable::ModifierType::MOD_RENAME,
+                                                  update["$rename"]["a"],
+                                                  collator,
+                                                  arrayFilters,
+                                                  foundIdentifiers);
+    ASSERT_NOT_OK(result);
+    ASSERT_EQ(result.getStatus().code(), ErrorCodes::EmptyFieldName);
+    ASSERT_EQ(result.getStatus().reason(),
+              "The update path 'b.' contains an empty field name, which is not allowed.");
+}
+
+TEST(ParseRenameTest, RenameFromNonUpdatablePathFails) {
+    auto update = fromjson("{$rename: {'.a': 'b'}}");
+    const CollatorInterface* collator = nullptr;
+    std::map<StringData, std::unique_ptr<ArrayFilter>> arrayFilters;
+    std::set<std::string> foundIdentifiers;
+    UpdateObjectNode root;
+    auto result = UpdateObjectNode::parseAndMerge(&root,
+                                                  modifiertable::ModifierType::MOD_RENAME,
+                                                  update["$rename"][".a"],
+                                                  collator,
+                                                  arrayFilters,
+                                                  foundIdentifiers);
+    ASSERT_NOT_OK(result);
+    ASSERT_EQ(result.getStatus().code(), ErrorCodes::EmptyFieldName);
+    ASSERT_EQ(result.getStatus().reason(),
+              "The update path '.a' contains an empty field name, which is not allowed.");
+}
+
+TEST(ParseRenameTest, RenameToNonStringPathFails) {
+    auto update = fromjson("{$rename: {'a': 5}}");
+    const CollatorInterface* collator = nullptr;
+    std::map<StringData, std::unique_ptr<ArrayFilter>> arrayFilters;
+    std::set<std::string> foundIdentifiers;
+    UpdateObjectNode root;
+    auto result = UpdateObjectNode::parseAndMerge(&root,
+                                                  modifiertable::ModifierType::MOD_RENAME,
+                                                  update["$rename"]["a"],
+                                                  collator,
+                                                  arrayFilters,
+                                                  foundIdentifiers);
+    ASSERT_NOT_OK(result);
+    ASSERT_EQ(result.getStatus().code(), ErrorCodes::BadValue);
+    ASSERT_EQ(result.getStatus().reason(), "The 'to' field for $rename must be a string: a: 5");
+}
+
+/**
+ * This test, RenameUpwardFails, and RenameDownwardFails mirror similar tests in
+ * rename_node_test.cpp. They exist to make sure that UpdateObjectNode::parseAndMerge() does not
+ * observe a conflict between the RenameNode and the dummy ConflictPlaceHolderNode (generating an
+ * "Update created a conflict" error message that does not really apply to these cases) before it
+ * observes the more specific errors in RenameNode::init().
+ */
+TEST(ParseRenameTest, RenameWithSameNameFails) {
+    auto update = fromjson("{$rename: {'a': 'a'}}");
+    const CollatorInterface* collator = nullptr;
+    std::map<StringData, std::unique_ptr<ArrayFilter>> arrayFilters;
+    std::set<std::string> foundIdentifiers;
+    UpdateObjectNode root;
+    auto result = UpdateObjectNode::parseAndMerge(&root,
+                                                  modifiertable::ModifierType::MOD_RENAME,
+                                                  update["$rename"]["a"],
+                                                  collator,
+                                                  arrayFilters,
+                                                  foundIdentifiers);
+    ASSERT_NOT_OK(result);
+    ASSERT_EQ(result.getStatus().code(), ErrorCodes::BadValue);
+    ASSERT_EQ(result.getStatus().reason(),
+              "The source and target field for $rename must differ: a: \"a\"");
+}
+
+TEST(ParseRenameTest, RenameUpwardFails) {
+    auto update = fromjson("{$rename: {'b.a': 'b'}}");
+    const CollatorInterface* collator = nullptr;
+    std::map<StringData, std::unique_ptr<ArrayFilter>> arrayFilters;
+    std::set<std::string> foundIdentifiers;
+    UpdateObjectNode root;
+    auto result = UpdateObjectNode::parseAndMerge(&root,
+                                                  modifiertable::ModifierType::MOD_RENAME,
+                                                  update["$rename"]["b.a"],
+                                                  collator,
+                                                  arrayFilters,
+                                                  foundIdentifiers);
+    ASSERT_NOT_OK(result);
+    ASSERT_EQ(result.getStatus().code(), ErrorCodes::BadValue);
+    ASSERT_EQ(result.getStatus().reason(),
+              "The source and target field for $rename must not be on the same path: b.a: \"b\"");
+}
+
+TEST(ParseRenameTest, RenameDownwardFails) {
+    auto update = fromjson("{$rename: {'b': 'b.a'}}");
+    const CollatorInterface* collator = nullptr;
+    std::map<StringData, std::unique_ptr<ArrayFilter>> arrayFilters;
+    std::set<std::string> foundIdentifiers;
+    UpdateObjectNode root;
+    auto result = UpdateObjectNode::parseAndMerge(&root,
+                                                  modifiertable::ModifierType::MOD_RENAME,
+                                                  update["$rename"]["b"],
+                                                  collator,
+                                                  arrayFilters,
+                                                  foundIdentifiers);
+    ASSERT_NOT_OK(result);
+    ASSERT_EQ(result.getStatus().code(), ErrorCodes::BadValue);
+    ASSERT_EQ(result.getStatus().reason(),
+              "The source and target field for $rename must not be on the same path: b: \"b.a\"");
+}
+
+TEST(ParseRenameTest, ConflictWithRenameSourceFailsToParse) {
+    auto update = fromjson("{$set: {a: 5}, $rename: {a: 'b'}}");
+    const CollatorInterface* collator = nullptr;
+    std::map<StringData, std::unique_ptr<ArrayFilter>> arrayFilters;
+    std::set<std::string> foundIdentifiers;
+    UpdateObjectNode root;
+    ASSERT_OK(UpdateObjectNode::parseAndMerge(&root,
+                                              modifiertable::ModifierType::MOD_SET,
+                                              update["$set"]["a"],
+                                              collator,
+                                              arrayFilters,
+                                              foundIdentifiers));
+    auto result = UpdateObjectNode::parseAndMerge(&root,
+                                                  modifiertable::ModifierType::MOD_RENAME,
+                                                  update["$rename"]["a"],
+                                                  collator,
+                                                  arrayFilters,
+                                                  foundIdentifiers);
+    ASSERT_NOT_OK(result);
+    ASSERT_EQ(result.getStatus().code(), ErrorCodes::ConflictingUpdateOperators);
+    ASSERT_EQ(result.getStatus().reason(), "Updating the path 'a' would create a conflict at 'a'");
+}
+
+TEST(ParseRenameTest, ConflictWithRenameDestinationFailsToParse) {
+    auto update = fromjson("{$set: {b: 5}, $rename: {a: 'b'}}");
+    const CollatorInterface* collator = nullptr;
+    std::map<StringData, std::unique_ptr<ArrayFilter>> arrayFilters;
+    std::set<std::string> foundIdentifiers;
+    UpdateObjectNode root;
+    ASSERT_OK(UpdateObjectNode::parseAndMerge(&root,
+                                              modifiertable::ModifierType::MOD_SET,
+                                              update["$set"]["b"],
+                                              collator,
+                                              arrayFilters,
+                                              foundIdentifiers));
+    auto result = UpdateObjectNode::parseAndMerge(&root,
+                                                  modifiertable::ModifierType::MOD_RENAME,
+                                                  update["$rename"]["a"],
+                                                  collator,
+                                                  arrayFilters,
+                                                  foundIdentifiers);
+    ASSERT_NOT_OK(result);
+    ASSERT_EQ(result.getStatus().code(), ErrorCodes::ConflictingUpdateOperators);
+    ASSERT_EQ(result.getStatus().reason(), "Updating the path 'b' would create a conflict at 'b'");
 }
 
 }  // namespace
