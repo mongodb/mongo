@@ -169,11 +169,6 @@ const rpc::ReplyMetadataReader& DBClientWithCommands::getReplyMetadataReader() {
 
 std::pair<rpc::UniqueReply, DBClientWithCommands*> DBClientWithCommands::runCommandWithTarget(
     OpMsgRequest request) {
-    uassert(ErrorCodes::InvalidNamespace,
-            str::stream() << "Database name '" << request.getDatabase() << "' is not valid.",
-            NamespaceString::validDBName(request.getDatabase(),
-                                         NamespaceString::DollarInDbNameBehavior::Allow));
-
     // Make sure to reconnect if needed before building our request, since the request depends on
     // the negotiated protocol which can change due to a reconnect.
     checkConnection();

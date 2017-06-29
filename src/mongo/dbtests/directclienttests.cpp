@@ -39,6 +39,7 @@
 #include "mongo/db/json.h"
 #include "mongo/db/lasterror.h"
 #include "mongo/dbtests/dbtests.h"
+#include "mongo/rpc/get_status_from_command_result.h"
 #include "mongo/util/timer.h"
 
 namespace DirectClientTests {
@@ -124,7 +125,8 @@ public:
         BSONObj result;
         BSONObj cmdObj = BSON("count"
                               << "");
-        ASSERT_THROWS(client.runCommand("", cmdObj, result), UserException);
+        ASSERT(!client.runCommand("", cmdObj, result)) << result;
+        ASSERT_EQ(getStatusFromCommandResult(result), ErrorCodes::InvalidNamespace);
     }
 };
 

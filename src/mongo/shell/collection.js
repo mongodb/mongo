@@ -359,8 +359,8 @@ DBCollection.prototype.insert = function(obj, options, _allow_dot) {
             } else if (ex instanceof WriteCommandError) {
                 result = isMultiInsert ? ex : ex.toSingleResult();
             } else {
-                // Other exceptions thrown
-                throw Error(ex);
+                // Other exceptions rethrown as-is.
+                throw ex;
             }
         }
     } else {
