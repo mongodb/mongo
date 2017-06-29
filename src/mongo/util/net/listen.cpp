@@ -46,9 +46,7 @@
 #include "mongo/util/concurrency/idle_thread_block.h"
 #include "mongo/util/exit.h"
 #include "mongo/util/log.h"
-#include "mongo/util/net/asio_message_port.h"
 #include "mongo/util/net/message_port.h"
-#include "mongo/util/net/message_port_startup_param.h"
 #include "mongo/util/net/ssl_manager.h"
 #include "mongo/util/net/ssl_options.h"
 #include "mongo/util/scopeguard.h"
@@ -600,11 +598,7 @@ void Listener::waitUntilListening() const {
 
 void Listener::_accepted(const std::shared_ptr<Socket>& psocket, long long connectionId) {
     std::unique_ptr<AbstractMessagingPort> port;
-    if (isMessagePortImplASIO()) {
-        port = stdx::make_unique<ASIOMessagingPort>(psocket->stealSD(), psocket->remoteAddr());
-    } else {
-        port = stdx::make_unique<MessagingPort>(psocket);
-    }
+    port = stdx::make_unique<MessagingPort>(psocket);
     port->setConnectionId(connectionId);
     accepted(std::move(port));
 }

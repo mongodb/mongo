@@ -13,7 +13,7 @@ env.Library(
     ],
     LIBDEPS=[
         '$BUILD_DIR/mongo/base',
-        '$BUILD_DIR/mongo/util/net/hostandport',
+        '$BUILD_DIR/mongo/util/net/network',
     ])
 
 env.Library(target='remote_command',
@@ -23,7 +23,7 @@ env.Library(target='remote_command',
             ],
             LIBDEPS=[
                 '$BUILD_DIR/mongo/rpc/metadata',
-                '$BUILD_DIR/mongo/util/net/hostandport',
+                '$BUILD_DIR/mongo/util/net/network',
             ])
 
 env.Library(target='task_executor_interface',
@@ -81,7 +81,7 @@ env.Library(
     ],
     LIBDEPS=[
         '$BUILD_DIR/mongo/base',
-        '$BUILD_DIR/mongo/util/net/hostandport',
+        '$BUILD_DIR/mongo/util/net/network',
         'connection_pool_stats',
         'remote_command',
     ],

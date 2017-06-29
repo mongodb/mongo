@@ -264,7 +264,6 @@ env.CppUnitTest(
         '$BUILD_DIR/mongo/executor/thread_pool_task_executor_test_fixture',
         '$BUILD_DIR/mongo/s/catalog/sharding_catalog_mock',
         '$BUILD_DIR/mongo/s/coreshard',
-        '$BUILD_DIR/mongo/util/net/message_port_mock',
         '$BUILD_DIR/mongo/s/shard_server_test_fixture',
     ],
 )

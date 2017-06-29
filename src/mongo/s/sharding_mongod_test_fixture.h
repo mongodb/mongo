@@ -34,7 +34,6 @@
 #include "mongo/db/service_context_d_test_fixture.h"
 #include "mongo/executor/network_test_env.h"
 #include "mongo/unittest/unittest.h"
-#include "mongo/util/net/message_port_mock.h"
 
 namespace mongo {
 

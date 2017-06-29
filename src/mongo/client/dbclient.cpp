@@ -65,9 +65,7 @@
 #include "mongo/util/concurrency/mutex.h"
 #include "mongo/util/debug_util.h"
 #include "mongo/util/log.h"
-#include "mongo/util/net/asio_message_port.h"
 #include "mongo/util/net/message_port.h"
-#include "mongo/util/net/message_port_startup_param.h"
 #include "mongo/util/net/socket_exception.h"
 #include "mongo/util/net/ssl_manager.h"
 #include "mongo/util/net/ssl_options.h"
@@ -837,14 +835,7 @@ Status DBClientConnection::connectSocketOnly(const HostAndPort& serverAddress) {
                                     << ", address is invalid");
     }
 
-    if (isMessagePortImplASIO()) {
-        // `_so_timeout` is in seconds.
-        auto ms = representAs<int64_t>(std::floor(_so_timeout * 1000)).value_or(kMaxMillisCount);
-        _port.reset(new ASIOMessagingPort(
-            ms > kMaxMillisCount ? Milliseconds::max() : Milliseconds(ms), _logLevel));
-    } else {
-        _port.reset(new MessagingPort(_so_timeout, _logLevel));
-    }
+    _port.reset(new MessagingPort(_so_timeout, _logLevel));
 
     if (serverAddress.host().empty()) {
         return Status(ErrorCodes::InvalidOptions,

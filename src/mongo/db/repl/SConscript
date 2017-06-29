@@ -426,7 +426,6 @@ env.Library(
         '$BUILD_DIR/mongo/client/clientdriver',
         '$BUILD_DIR/mongo/db/auth/authcore',
         '$BUILD_DIR/mongo/db/auth/authorization_manager_global',
-        '$BUILD_DIR/mongo/util/net/hostandport',
         '$BUILD_DIR/mongo/util/net/network',
     ],
 )
@@ -499,7 +498,7 @@ env.Library(
         '$BUILD_DIR/mongo/db/s/sharding',
         '$BUILD_DIR/mongo/db/service_context',
         '$BUILD_DIR/mongo/executor/task_executor_interface',
-        '$BUILD_DIR/mongo/util/net/hostandport',
+        '$BUILD_DIR/mongo/util/net/network',
     ],
 )
 
@@ -815,7 +814,7 @@ env.Library(
         'replication_process',
         '$BUILD_DIR/mongo/db/namespace_string',
         '$BUILD_DIR/mongo/db/service_context',
-        '$BUILD_DIR/mongo/util/net/hostandport',
+        '$BUILD_DIR/mongo/util/net/network',
         '$BUILD_DIR/mongo/util/decorable',
     ],
 )
@@ -890,7 +889,7 @@ env.Library('replica_set_messages',
                 '$BUILD_DIR/mongo/db/common',
                 '$BUILD_DIR/mongo/db/server_options_core',
                 '$BUILD_DIR/mongo/transport/transport_layer_common',
-                '$BUILD_DIR/mongo/util/net/hostandport',
+                '$BUILD_DIR/mongo/util/net/network',
                 'optime',
                 'read_concern_args',
             ])
@@ -1069,7 +1068,7 @@ env.Library(
         '$BUILD_DIR/mongo/db/namespace_string',
         '$BUILD_DIR/mongo/executor/task_executor_interface',
         '$BUILD_DIR/mongo/rpc/metadata',
-        '$BUILD_DIR/mongo/util/net/hostandport',
+        '$BUILD_DIR/mongo/util/net/network',
     ],
 )
 
@@ -1082,7 +1081,7 @@ env.Library(
         'optime',
         '$BUILD_DIR/mongo/base',
         '$BUILD_DIR/mongo/rpc/metadata',
-        '$BUILD_DIR/mongo/util/net/hostandport',
+        '$BUILD_DIR/mongo/util/net/network',
     ],
 )
 
@@ -1315,7 +1314,7 @@ env.Library(
         'oplog_entry',
         'optime',
         'replica_set_messages',
-        '$BUILD_DIR/mongo/util/net/hostandport',
+        '$BUILD_DIR/mongo/util/net/network',
     ],
 )
 

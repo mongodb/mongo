@@ -101,7 +101,7 @@ env.Library(
         '$BUILD_DIR/mongo/s/catalog/dist_lock_catalog_interface',
         '$BUILD_DIR/mongo/s/client/sharding_client',
         '$BUILD_DIR/mongo/s/write_ops/batch_write_types',
-        '$BUILD_DIR/mongo/util/net/hostandport',
+        '$BUILD_DIR/mongo/util/net/network',
     ],
 )
 

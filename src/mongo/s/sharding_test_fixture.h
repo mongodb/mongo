@@ -34,7 +34,6 @@
 #include "mongo/executor/network_test_env.h"
 #include "mongo/transport/session.h"
 #include "mongo/unittest/unittest.h"
-#include "mongo/util/net/message_port_mock.h"
 
 namespace mongo {
 

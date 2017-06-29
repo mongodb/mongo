@@ -5,101 +5,43 @@ Import('env')
 env = env.Clone()
 
 env.Library(
-    target='hostandport',
-    source=[
-        'hostandport.cpp',
-        'sockaddr.cpp',
-    ],
-    LIBDEPS=[
-        '$BUILD_DIR/mongo/base',
-    ],
-)
-
-env.CppUnitTest(
-    target='hostandport_test',
-    source=[
-        'hostandport_test.cpp'
-    ],
-    LIBDEPS=[
-        'hostandport',
-    ],
-)
-
-env.Library(
-    target='cidr',
-    source=[
-        'cidr.cpp',
-    ],
-    LIBDEPS=[
-        '$BUILD_DIR/mongo/base',
-    ],
-)
-
-env.CppUnitTest(
-    target='cidr_test',
-    source=[
-        'cidr_test.cpp',
-    ],
-    LIBDEPS=[
-        '$BUILD_DIR/mongo/base',
-        'cidr',
-    ],
-)
-
-networkEnv = env.Clone();
-
-networkEnv.InjectThirdPartyIncludePaths(libraries=[
-    'asio',
-])
-
-networkEnv.Library(
     target='network',
     source=[
-        "asio_message_port.cpp",
-        "asio_ssl_context.cpp",
+        "cidr.cpp",
+        "hostandport.cpp",
         "hostname_canonicalization.cpp",
         "listen.cpp",
         "message.cpp",
         "message_port.cpp",
-        "message_port_startup_param.cpp",
         "op_msg.cpp",
         "sock.cpp",
-        'socket_exception.cpp',
+        "sockaddr.cpp",
+        "socket_exception.cpp",
         "socket_poll.cpp",
         "ssl_expiration.cpp",
         "ssl_manager.cpp",
         "ssl_options.cpp",
         "thread_idle_callback.cpp",
+
     ],
     LIBDEPS=[
+        '$BUILD_DIR/mongo/base',
         '$BUILD_DIR/mongo/db/auth/auth_rolename',
         '$BUILD_DIR/mongo/db/bson/dotted_path_support',
         '$BUILD_DIR/mongo/db/server_options_core',
-        '$BUILD_DIR/mongo/db/server_parameters',
         '$BUILD_DIR/mongo/util/background_job',
         '$BUILD_DIR/mongo/util/concurrency/ticketholder',
         '$BUILD_DIR/mongo/util/decorable',
         '$BUILD_DIR/mongo/util/fail_point',
         '$BUILD_DIR/mongo/util/options_parser/options_parser',
-        '$BUILD_DIR/third_party/shim_asio',
-        'cidr',
-        'hostandport',
-    ],
-)
-
-env.Library(
-    target='message_port_mock',
-    source=[
-        "message_port_mock.cpp",
-    ],
-    LIBDEPS=[
-        'network',
     ],
 )
 
 env.CppUnitTest(
-    target='sock_test',
+    target='network_test',
     source=[
+        'cidr_test.cpp',
+        'hostandport_test.cpp',
         'sock_test.cpp',
     ],
     LIBDEPS=[
