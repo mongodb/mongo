@@ -368,7 +368,7 @@ TEST(FTDCCompressor, TestNumbersCompat) {
 }
 
 // Test various date time types
-TEST(AFTDCCompressor, TestDateTimeTypes) {
+TEST(FTDCCompressor, TestDateTimeTypes) {
     TestTie c;
     for (int i = 0; i < 10; i++) {
         BSONObjBuilder builder1;
