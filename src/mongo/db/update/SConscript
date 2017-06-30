@@ -82,7 +82,7 @@ env.CppUnitTest(
         'addtoset_node_test.cpp',
         'arithmetic_node_test.cpp',
         'pop_node_test.cpp',
-        'rename_node_test',
+        'rename_node_test.cpp',
         'set_node_test.cpp',
         'unset_node_test.cpp',
         'update_array_node_test.cpp',
