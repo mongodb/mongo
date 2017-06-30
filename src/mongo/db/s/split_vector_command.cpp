@@ -26,48 +26,20 @@
  *    then also delete it in the license file.
  */
 
-#define MONGO_LOG_DEFAULT_COMPONENT ::mongo::logger::LogComponent::kSharding
-
 #include "mongo/platform/basic.h"
 
 #include <algorithm>
-#include <string>
-#include <vector>
 
-#include "mongo/bson/simple_bsonobj_comparator.h"
-#include "mongo/db/auth/action_set.h"
-#include "mongo/db/auth/action_type.h"
-#include "mongo/db/auth/authorization_manager.h"
 #include "mongo/db/auth/authorization_session.h"
-#include "mongo/db/auth/privilege.h"
-#include "mongo/db/bson/dotted_path_support.h"
-#include "mongo/db/catalog/collection.h"
 #include "mongo/db/commands.h"
-#include "mongo/db/db_raii.h"
-#include "mongo/db/dbhelpers.h"
-#include "mongo/db/exec/working_set_common.h"
-#include "mongo/db/index/index_descriptor.h"
-#include "mongo/db/keypattern.h"
-#include "mongo/db/query/internal_plans.h"
-#include "mongo/s/catalog/type_chunk.h"
-#include "mongo/util/log.h"
-#include "mongo/util/timer.h"
+#include "mongo/db/s/split_vector.h"
 
 namespace mongo {
 
-using std::unique_ptr;
-using std::set;
 using std::string;
 using std::stringstream;
-using std::vector;
 
 namespace {
-
-const int kMaxObjectPerChunk{250000};
-
-BSONObj prettyKey(const BSONObj& keyPattern, const BSONObj& key) {
-    return key.replaceFieldNames(keyPattern).clientReadable();
-}
 
 class SplitVector : public ErrmsgCommandDeprecated {
 public:
@@ -116,11 +88,6 @@ public:
                    const BSONObj& jsobj,
                    string& errmsg,
                    BSONObjBuilder& result) override {
-        //
-        // 1.a We'll parse the parameters in two steps. First, make sure the we can use the split
-        //     index to get a good approximation of the size of the chunk -- without needing to
-        //     access the actual data.
-        //
 
         const NamespaceString nss = NamespaceString(parseNs(dbname, jsobj));
         BSONObj keyPattern = jsobj.getObjectField("keyPattern");
@@ -130,8 +97,6 @@ public:
             return false;
         }
 
-        // If min and max are not provided use the "minKey" and "maxKey" for the sharding key
-        // pattern.
         BSONObj min = jsobj.getObjectField("min");
         BSONObj max = jsobj.getObjectField("max");
         if (min.isEmpty() != max.isEmpty()) {
@@ -139,242 +104,51 @@ public:
             return false;
         }
 
-        long long maxSplitPoints = 0;
+        bool force = false;
+        BSONElement forceElem = jsobj["force"];
+        if (forceElem.trueValue()) {
+            force = true;
+        }
+
+        boost::optional<long long> maxSplitPoints;
         BSONElement maxSplitPointsElem = jsobj["maxSplitPoints"];
         if (maxSplitPointsElem.isNumber()) {
             maxSplitPoints = maxSplitPointsElem.numberLong();
         }
 
-        long long maxChunkObjects = kMaxObjectPerChunk;
-        BSONElement MaxChunkObjectsElem = jsobj["maxChunkObjects"];
-        if (MaxChunkObjectsElem.isNumber()) {
-            maxChunkObjects = MaxChunkObjectsElem.numberLong();
+        boost::optional<long long> maxChunkObjects;
+        BSONElement maxChunkObjectsElem = jsobj["maxChunkObjects"];
+        if (maxChunkObjectsElem.isNumber()) {
+            maxChunkObjects = maxChunkObjectsElem.numberLong();
         }
 
-        vector<BSONObj> splitKeys;
-
-        {
-            // Get the size estimate for this namespace
-            AutoGetCollection autoColl(opCtx, nss, MODE_IS);
-
-            Collection* const collection = autoColl.getCollection();
-            if (!collection) {
-                errmsg = "ns not found";
-                return false;
-            }
-
-            // Allow multiKey based on the invariant that shard keys must be single-valued.
-            // Therefore, any multi-key index prefixed by shard key cannot be multikey over
-            // the shard key fields.
-            IndexDescriptor* idx =
-                collection->getIndexCatalog()->findShardKeyPrefixedIndex(opCtx, keyPattern, false);
-            if (idx == NULL) {
-                errmsg = (string) "couldn't find index over splitting key " +
-                    keyPattern.clientReadable().toString();
-                return false;
-            }
-            // extend min to get (min, MinKey, MinKey, ....)
-            KeyPattern kp(idx->keyPattern());
-            min = Helpers::toKeyFormat(kp.extendRangeBound(min, false));
-            if (max.isEmpty()) {
-                // if max not specified, make it (MaxKey, Maxkey, MaxKey...)
-                max = Helpers::toKeyFormat(kp.extendRangeBound(max, true));
-            } else {
-                // otherwise make it (max,MinKey,MinKey...) so that bound is non-inclusive
-                max = Helpers::toKeyFormat(kp.extendRangeBound(max, false));
-            }
-
-            const long long recCount = collection->numRecords(opCtx);
-            const long long dataSize = collection->dataSize(opCtx);
-
-            //
-            // 1.b Now that we have the size estimate, go over the remaining parameters and apply
-            //      any maximum size restrictions specified there.
-            //
-
-            // 'force'-ing a split is equivalent to having maxChunkSize be the size of the current
-            // chunk, i.e., the logic below will split that chunk in half
-            long long maxChunkSize = 0;
-            bool forceMedianSplit = false;
-            {
-                BSONElement maxSizeElem = jsobj["maxChunkSize"];
-                BSONElement forceElem = jsobj["force"];
-
-                if (forceElem.trueValue()) {
-                    forceMedianSplit = true;
-                    // This chunk size is effectively ignored if force is true
-                    maxChunkSize = dataSize;
-
-                } else if (maxSizeElem.isNumber()) {
-                    maxChunkSize = maxSizeElem.numberLong() * 1 << 20;
-
-                } else {
-                    maxSizeElem = jsobj["maxChunkSizeBytes"];
-                    if (maxSizeElem.isNumber()) {
-                        maxChunkSize = maxSizeElem.numberLong();
-                    }
-                }
-
-                // We need a maximum size for the chunk, unless we're not actually capable of
-                // finding any split points.
-                if (maxChunkSize <= 0 && recCount != 0) {
-                    errmsg =
-                        "need to specify the desired max chunk size (maxChunkSize or "
-                        "maxChunkSizeBytes)";
-                    return false;
-                }
-            }
-
-
-            // If there's not enough data for more than one chunk, no point continuing.
-            if (dataSize < maxChunkSize || recCount == 0) {
-                vector<BSONObj> emptyVector;
-                result.append("splitKeys", emptyVector);
-                return true;
-            }
-
-            log() << "request split points lookup for chunk " << nss.toString() << " "
-                  << redact(min) << " -->> " << redact(max);
-
-            // We'll use the average object size and number of object to find approximately how many
-            // keys each chunk should have. We'll split at half the maxChunkSize or maxChunkObjects,
-            // if provided.
-            const long long avgRecSize = dataSize / recCount;
-            long long keyCount = maxChunkSize / (2 * avgRecSize);
-            if (maxChunkObjects && (maxChunkObjects < keyCount)) {
-                log() << "limiting split vector to " << maxChunkObjects << " (from " << keyCount
-                      << ") objects ";
-                keyCount = maxChunkObjects;
-            }
-
-            //
-            // 2. Traverse the index and add the keyCount-th key to the result vector. If that key
-            //    appeared in the vector before, we omit it. The invariant here is that all the
-            //    instances of a given key value live in the same chunk.
-            //
-
-            Timer timer;
-            long long currCount = 0;
-            long long numChunks = 0;
-
-            auto exec = InternalPlanner::indexScan(opCtx,
-                                                   collection,
-                                                   idx,
-                                                   min,
-                                                   max,
-                                                   BoundInclusion::kIncludeStartKeyOnly,
-                                                   PlanExecutor::YIELD_AUTO,
-                                                   InternalPlanner::FORWARD);
-
-            BSONObj currKey;
-            PlanExecutor::ExecState state = exec->getNext(&currKey, NULL);
-            if (PlanExecutor::ADVANCED != state) {
-                errmsg = "can't open a cursor for splitting (desired range is possibly empty)";
-                return false;
-            }
-
-            // Use every 'keyCount'-th key as a split point. We add the initial key as a sentinel,
-            // to be removed at the end. If a key appears more times than entries allowed on a
-            // chunk, we issue a warning and split on the following key.
-            auto tooFrequentKeys = SimpleBSONObjComparator::kInstance.makeBSONObjSet();
-            splitKeys.push_back(dotted_path_support::extractElementsBasedOnTemplate(
-                prettyKey(idx->keyPattern(), currKey.getOwned()), keyPattern));
-
-            while (1) {
-                while (PlanExecutor::ADVANCED == state) {
-                    currCount++;
-
-                    if (currCount > keyCount && !forceMedianSplit) {
-                        currKey = dotted_path_support::extractElementsBasedOnTemplate(
-                            prettyKey(idx->keyPattern(), currKey.getOwned()), keyPattern);
-                        // Do not use this split key if it is the same used in the previous split
-                        // point.
-                        if (currKey.woCompare(splitKeys.back()) == 0) {
-                            tooFrequentKeys.insert(currKey.getOwned());
-                        } else {
-                            splitKeys.push_back(currKey.getOwned());
-                            currCount = 0;
-                            numChunks++;
-                            LOG(4) << "picked a split key: " << redact(currKey);
-                        }
-                    }
-
-                    // Stop if we have enough split points.
-                    if (maxSplitPoints && (numChunks >= maxSplitPoints)) {
-                        log() << "max number of requested split points reached (" << numChunks
-                              << ") before the end of chunk " << nss.toString() << " "
-                              << redact(min) << " -->> " << redact(max);
-                        break;
-                    }
-
-                    state = exec->getNext(&currKey, NULL);
-                }
-
-                if (PlanExecutor::DEAD == state || PlanExecutor::FAILURE == state) {
-                    return appendCommandStatus(
-                        result,
-                        Status(ErrorCodes::OperationFailed,
-                               str::stream() << "Executor error during splitVector command: "
-                                             << WorkingSetCommon::toStatusString(currKey)));
-                }
-
-                if (!forceMedianSplit)
-                    break;
-
-                //
-                // If we're forcing a split at the halfway point, then the first pass was just
-                // to count the keys, and we still need a second pass.
-                //
-
-                forceMedianSplit = false;
-                keyCount = currCount / 2;
-                currCount = 0;
-                log() << "splitVector doing another cycle because of force, keyCount now: "
-                      << keyCount;
-
-                exec = InternalPlanner::indexScan(opCtx,
-                                                  collection,
-                                                  idx,
-                                                  min,
-                                                  max,
-                                                  BoundInclusion::kIncludeStartKeyOnly,
-                                                  PlanExecutor::YIELD_AUTO,
-                                                  InternalPlanner::FORWARD);
-
-                state = exec->getNext(&currKey, NULL);
-            }
-
-            //
-            // 3. Format the result and issue any warnings about the data we gathered while
-            //    traversing the index
-            //
-
-            // Warn for keys that are more numerous than maxChunkSize allows.
-            for (auto it = tooFrequentKeys.cbegin(); it != tooFrequentKeys.cend(); ++it) {
-                warning() << "possible low cardinality key detected in " << nss.toString()
-                          << " - key is " << prettyKey(idx->keyPattern(), *it);
-            }
-
-            // Remove the sentinel at the beginning before returning
-            splitKeys.erase(splitKeys.begin());
-
-            if (timer.millis() > serverGlobalParams.slowMS) {
-                warning() << "Finding the split vector for " << nss.toString() << " over "
-                          << redact(keyPattern) << " keyCount: " << keyCount
-                          << " numSplits: " << splitKeys.size() << " lookedAt: " << currCount
-                          << " took " << timer.millis() << "ms";
-            }
-
-            // Warning: we are sending back an array of keys but are currently limited to
-            // 4MB work of 'result' size. This should be okay for now.
-
-            result.append("timeMillis", timer.millis());
+        boost::optional<long long> maxChunkSize;
+        BSONElement maxSizeElem = jsobj["maxChunkSize"];
+        if (maxSizeElem.isNumber()) {
+            maxChunkSize = maxSizeElem.numberLong();
         }
 
-        // Make sure splitKeys is in ascending order
-        std::sort(
-            splitKeys.begin(), splitKeys.end(), SimpleBSONObjComparator::kInstance.makeLessThan());
-        result.append("splitKeys", splitKeys);
+        boost::optional<long long> maxChunkSizeBytes;
+        maxSizeElem = jsobj["maxChunkSizeBytes"];
+        if (maxSizeElem.isNumber()) {
+            maxChunkSizeBytes = maxSizeElem.numberLong();
+        }
+
+        auto statusWithSplitKeys = splitVector(opCtx,
+                                               nss,
+                                               keyPattern,
+                                               min,
+                                               max,
+                                               force,
+                                               maxSplitPoints,
+                                               maxChunkObjects,
+                                               maxChunkSize,
+                                               maxChunkSizeBytes);
+        if (!statusWithSplitKeys.isOK()) {
+            return appendCommandStatus(result, statusWithSplitKeys.getStatus());
+        }
+
+        result.append("splitKeys", statusWithSplitKeys.getValue());
         return true;
     }
 

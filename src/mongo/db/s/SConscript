@@ -198,6 +198,7 @@ env.Library(
         'balancer',
         'collection_metadata',
         'sharding',
+        'split_vector',
     ],
 )
 
@@ -289,6 +290,26 @@ env.Library(
     ]
 )
 
+env.Library(
+    target='split_vector',
+    source=[
+    'split_vector.cpp',
+    ],
+    LIBDEPS=[
+    '$BUILD_DIR/mongo/db/bson/dotted_path_support',
+    '$BUILD_DIR/mongo/db/commands/dcommands_fcv',
+    '$BUILD_DIR/mongo/db/commands/server_status',
+    '$BUILD_DIR/mongo/db/db_raii',
+    '$BUILD_DIR/mongo/db/dbhelpers',
+    '$BUILD_DIR/mongo/db/index_d',
+    '$BUILD_DIR/mongo/db/repl/repl_coordinator_global',
+    '$BUILD_DIR/mongo/s/sharding_request_types',
+    'balancer',
+    'collection_metadata',
+    'sharding',
+    ]
+)
+
 env.CppUnitTest(
     target='chunk_size_tracker_test',
     source=[
@@ -307,5 +328,17 @@ env.CppUnitTest(
     LIBDEPS=[
         'chunk_splitter',
         '$BUILD_DIR/mongo/s/shard_server_test_fixture'
+    ]
+)
+
+env.CppUnitTest(
+    target='split_vector_test',
+    source=[
+        'split_vector_test.cpp',
+    ],
+    LIBDEPS=[
+        '$BUILD_DIR/mongo/db/dbdirectclient',
+        '$BUILD_DIR/mongo/s/shard_server_test_fixture',
+        'split_vector',
     ]
 )
