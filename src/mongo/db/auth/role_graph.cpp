@@ -43,6 +43,16 @@ namespace {
 PrivilegeVector emptyPrivilegeVector;
 }  // namespace
 
+RoleGraph::RoleGraph(){};
+RoleGraph::RoleGraph(const RoleGraph& other)
+    : _roleToSubordinates(other._roleToSubordinates),
+      _roleToIndirectSubordinates(other._roleToIndirectSubordinates),
+      _roleToMembers(other._roleToMembers),
+      _directPrivilegesForRole(other._directPrivilegesForRole),
+      _allPrivilegesForRole(other._allPrivilegesForRole),
+      _allRoles(other._allRoles) {}
+RoleGraph::~RoleGraph(){};
+
 void RoleGraph::swap(RoleGraph& other) {
     using std::swap;
     swap(this->_roleToSubordinates, other._roleToSubordinates);
@@ -51,6 +61,10 @@ void RoleGraph::swap(RoleGraph& other) {
     swap(this->_directPrivilegesForRole, other._directPrivilegesForRole);
     swap(this->_allPrivilegesForRole, other._allPrivilegesForRole);
     swap(this->_allRoles, other._allRoles);
+}
+
+void swap(RoleGraph& lhs, RoleGraph& rhs) {
+    lhs.swap(rhs);
 }
 
 bool RoleGraph::roleExists(const RoleName& role) {
