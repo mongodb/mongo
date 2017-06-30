@@ -104,7 +104,7 @@ public:
         return TransformerType::kExclusionProjection;
     }
 
-    Document serialize(boost::optional<ExplainOptions::Verbosity> explain) const final;
+    Document serializeStageOptions(boost::optional<ExplainOptions::Verbosity> explain) const final;
 
     /**
      * Parses the projection specification given by 'spec', populating internal data structures.

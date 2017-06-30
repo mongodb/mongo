@@ -76,7 +76,7 @@ void DocumentSourceSingleDocumentTransformation::doDispose() {
 
 Value DocumentSourceSingleDocumentTransformation::serialize(
     boost::optional<ExplainOptions::Verbosity> explain) const {
-    return Value(Document{{getSourceName(), _parsedTransform->serialize(explain)}});
+    return Value(Document{{getSourceName(), _parsedTransform->serializeStageOptions(explain)}});
 }
 
 Pipeline::SourceContainer::iterator DocumentSourceSingleDocumentTransformation::doOptimizeAt(

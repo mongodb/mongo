@@ -199,7 +199,7 @@ public:
     /**
      * Serialize the projection.
      */
-    Document serialize(boost::optional<ExplainOptions::Verbosity> explain) const final {
+    Document serializeStageOptions(boost::optional<ExplainOptions::Verbosity> explain) const final {
         MutableDocument output;
         if (_idExcluded) {
             output.addField("_id", Value(false));

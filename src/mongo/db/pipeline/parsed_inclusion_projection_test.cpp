@@ -138,13 +138,13 @@ TEST(InclusionProjection, ShouldSerializeToEquivalentProjection) {
         "{_id: true, a: {$add: [\"$a\", {$const: 2}]}, b: {d: true}, x: {y: {$const: 4}}}"));
 
     // Should be the same if we're serializing for explain or for internal use.
-    ASSERT_DOCUMENT_EQ(expectedSerialization, inclusion.serialize(boost::none));
+    ASSERT_DOCUMENT_EQ(expectedSerialization, inclusion.serializeStageOptions(boost::none));
     ASSERT_DOCUMENT_EQ(expectedSerialization,
-                       inclusion.serialize(ExplainOptions::Verbosity::kQueryPlanner));
+                       inclusion.serializeStageOptions(ExplainOptions::Verbosity::kQueryPlanner));
     ASSERT_DOCUMENT_EQ(expectedSerialization,
-                       inclusion.serialize(ExplainOptions::Verbosity::kExecStats));
+                       inclusion.serializeStageOptions(ExplainOptions::Verbosity::kExecStats));
     ASSERT_DOCUMENT_EQ(expectedSerialization,
-                       inclusion.serialize(ExplainOptions::Verbosity::kExecAllPlans));
+                       inclusion.serializeStageOptions(ExplainOptions::Verbosity::kExecAllPlans));
 }
 
 TEST(InclusionProjection, ShouldSerializeExplicitExclusionOfId) {
@@ -156,13 +156,13 @@ TEST(InclusionProjection, ShouldSerializeExplicitExclusionOfId) {
     auto expectedSerialization = Document{{"_id", false}, {"a", true}};
 
     // Should be the same if we're serializing for explain or for internal use.
-    ASSERT_DOCUMENT_EQ(expectedSerialization, inclusion.serialize(boost::none));
+    ASSERT_DOCUMENT_EQ(expectedSerialization, inclusion.serializeStageOptions(boost::none));
     ASSERT_DOCUMENT_EQ(expectedSerialization,
-                       inclusion.serialize(ExplainOptions::Verbosity::kQueryPlanner));
+                       inclusion.serializeStageOptions(ExplainOptions::Verbosity::kQueryPlanner));
     ASSERT_DOCUMENT_EQ(expectedSerialization,
-                       inclusion.serialize(ExplainOptions::Verbosity::kExecStats));
+                       inclusion.serializeStageOptions(ExplainOptions::Verbosity::kExecStats));
     ASSERT_DOCUMENT_EQ(expectedSerialization,
-                       inclusion.serialize(ExplainOptions::Verbosity::kExecAllPlans));
+                       inclusion.serializeStageOptions(ExplainOptions::Verbosity::kExecAllPlans));
 }
 
 
@@ -176,13 +176,13 @@ TEST(InclusionProjection, ShouldOptimizeTopLevelExpressions) {
     auto expectedSerialization = Document{{"_id", true}, {"a", Document{{"$const", 3}}}};
 
     // Should be the same if we're serializing for explain or for internal use.
-    ASSERT_DOCUMENT_EQ(expectedSerialization, inclusion.serialize(boost::none));
+    ASSERT_DOCUMENT_EQ(expectedSerialization, inclusion.serializeStageOptions(boost::none));
     ASSERT_DOCUMENT_EQ(expectedSerialization,
-                       inclusion.serialize(ExplainOptions::Verbosity::kQueryPlanner));
+                       inclusion.serializeStageOptions(ExplainOptions::Verbosity::kQueryPlanner));
     ASSERT_DOCUMENT_EQ(expectedSerialization,
-                       inclusion.serialize(ExplainOptions::Verbosity::kExecStats));
+                       inclusion.serializeStageOptions(ExplainOptions::Verbosity::kExecStats));
     ASSERT_DOCUMENT_EQ(expectedSerialization,
-                       inclusion.serialize(ExplainOptions::Verbosity::kExecAllPlans));
+                       inclusion.serializeStageOptions(ExplainOptions::Verbosity::kExecAllPlans));
 }
 
 TEST(InclusionProjection, ShouldOptimizeNestedExpressions) {
@@ -196,13 +196,13 @@ TEST(InclusionProjection, ShouldOptimizeNestedExpressions) {
         Document{{"_id", true}, {"a", Document{{"b", Document{{"$const", 3}}}}}};
 
     // Should be the same if we're serializing for explain or for internal use.
-    ASSERT_DOCUMENT_EQ(expectedSerialization, inclusion.serialize(boost::none));
+    ASSERT_DOCUMENT_EQ(expectedSerialization, inclusion.serializeStageOptions(boost::none));
     ASSERT_DOCUMENT_EQ(expectedSerialization,
-                       inclusion.serialize(ExplainOptions::Verbosity::kQueryPlanner));
+                       inclusion.serializeStageOptions(ExplainOptions::Verbosity::kQueryPlanner));
     ASSERT_DOCUMENT_EQ(expectedSerialization,
-                       inclusion.serialize(ExplainOptions::Verbosity::kExecStats));
+                       inclusion.serializeStageOptions(ExplainOptions::Verbosity::kExecStats));
     ASSERT_DOCUMENT_EQ(expectedSerialization,
-                       inclusion.serialize(ExplainOptions::Verbosity::kExecAllPlans));
+                       inclusion.serializeStageOptions(ExplainOptions::Verbosity::kExecAllPlans));
 }
 
 TEST(InclusionProjection, ShouldReportThatAllExceptIncludedFieldsAreModified) {

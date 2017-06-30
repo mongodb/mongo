@@ -80,7 +80,7 @@ public:
         _newRoot->optimize();
     }
 
-    Document serialize(boost::optional<ExplainOptions::Verbosity> explain) const final {
+    Document serializeStageOptions(boost::optional<ExplainOptions::Verbosity> explain) const final {
         return Document{{"newRoot", _newRoot->serialize(static_cast<bool>(explain))}};
     }
 

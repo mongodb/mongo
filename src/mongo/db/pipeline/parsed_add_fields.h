@@ -71,7 +71,7 @@ public:
      */
     void parse(const BSONObj& spec) final;
 
-    Document serialize(boost::optional<ExplainOptions::Verbosity> explain) const final {
+    Document serializeStageOptions(boost::optional<ExplainOptions::Verbosity> explain) const final {
         MutableDocument output;
         _root->serialize(&output, explain);
         return output.freeze();
