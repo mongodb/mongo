@@ -656,7 +656,7 @@ ExitCode _initAndListen(int listenPort) {
     if (!storageGlobalParams.readOnly) {
         logStartup(startupOpCtx.get());
 
-        startFTDC();
+        startMongoDFTDC();
 
         restartInProgressIndexesFromLastShutdown(startupOpCtx.get());
 
@@ -1030,7 +1030,7 @@ static void shutdownTask() {
 #endif
 
     // Shutdown Full-Time Data Capture
-    stopFTDC();
+    stopMongoDFTDC();
 
     if (opCtx) {
         ShardingState::get(opCtx)->shutDown(opCtx);

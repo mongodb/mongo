@@ -1,5 +1,5 @@
 /**
- * Copyright (C) 2015 MongoDB Inc.
+ * Copyright (C) 2017 MongoDB Inc.
  *
  * This program is free software: you can redistribute it and/or  modify
  * it under the terms of the GNU Affero General Public License, version 3,
@@ -28,24 +28,58 @@
 
 #pragma once
 
-#include "mongo/base/string_data.h"
+#include <string>
+
+#include "mongo/bson/bsonobjbuilder.h"
+#include "mongo/db/commands.h"
+#include "mongo/db/ftdc/collector.h"
+#include "mongo/db/ftdc/controller.h"
+#include "mongo/db/jsobj.h"
+#include "mongo/db/operation_context.h"
+#include "mongo/stdx/functional.h"
 
 namespace mongo {
 
-extern const char kFTDCInterimFile[];
-extern const char kFTDCArchiveFile[];
+/**
+ * Function that allows FTDC server components to register their own collectors as needed.
+ */
+using RegisterCollectorsFunction = stdx::function<void(FTDCController*)>;
 
-extern const char kFTDCIdField[];
-extern const char kFTDCTypeField[];
+/**
+ * Start Full Time Data Capture
+ * Starts 1 thread.
+ *
+ * See MongoD and MongoS specific functions.
+ */
+void startFTDC(boost::filesystem::path& path, RegisterCollectorsFunction registerCollectors);
 
-extern const char kFTDCDataField[];
-extern const char kFTDCDocField[];
+/**
+ * Stop Full Time Data Capture
+ *
+ * See MongoD and MongoS specific functions.
+ */
+void stopFTDC();
 
-extern const char kFTDCDocsField[];
+/**
+ * A simple FTDC Collector that runs Commands.
+ */
+class FTDCSimpleInternalCommandCollector final : public FTDCCollectorInterface {
+public:
+    FTDCSimpleInternalCommandCollector(StringData command,
+                                       StringData name,
+                                       StringData ns,
+                                       BSONObj cmdObj);
 
-extern const char kFTDCCollectStartField[];
-extern const char kFTDCCollectEndField[];
+    void collect(OperationContext* opCtx, BSONObjBuilder& builder) override;
+    std::string name() const override;
 
-constexpr StringData kFTDCDefaultDirectory = "diagnostic.data"_sd;
+private:
+    std::string _name;
+    std::string _ns;
+    BSONObj _cmdObj;
+
+    // Not owned
+    Command* _command;
+};
 
 }  // namespace mongo
