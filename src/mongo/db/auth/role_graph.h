@@ -56,6 +56,12 @@ class OperationContext;
  */
 class RoleGraph {
 public:
+    RoleGraph() = default;
+
+    // Explicitly make RoleGraph movable
+    RoleGraph(RoleGraph&&) = default;
+    RoleGraph& operator=(RoleGraph&&) = default;
+
     /**
      * Adds to "privileges" the privileges associated with the named built-in role, and returns
      * true. Returns false if "role" does not name a built-in role, and does not modify
@@ -63,10 +69,6 @@ public:
      * Privilege::addPrivilegeToPrivilegeVector.
      */
     static bool addPrivilegesForBuiltinRole(const RoleName& role, PrivilegeVector* privileges);
-
-    RoleGraph();
-    RoleGraph(const RoleGraph& other);
-    ~RoleGraph();
 
     // Built-in roles for backwards compatibility with 2.2 and prior
     static const std::string BUILTIN_ROLE_V0_READ;
@@ -309,6 +311,8 @@ private:
     std::set<RoleName> _allRoles;
 };
 
-void swap(RoleGraph& lhs, RoleGraph& rhs);
+inline void swap(RoleGraph& lhs, RoleGraph& rhs) {
+    lhs.swap(rhs);
+}
 
 }  // namespace mongo
