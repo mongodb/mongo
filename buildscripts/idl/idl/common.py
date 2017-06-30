@@ -40,12 +40,22 @@ def camel_case(name):
     return name[0:1].lower() + name[1:]
 
 
+def _escape_template_string(template):
+    # type: (unicode) -> unicode
+    """Escape the '$' in template strings unless followed by '{'."""
+    # See https://docs.python.org/2/library/string.html#template-strings
+    template = template.replace('${', '#{')
+    template = template.replace('$', '$$')
+    return template.replace('#{', '${')
+
+
 def template_format(template, template_params=None):
     # type: (unicode, Mapping[unicode,unicode]) -> unicode
     """Write a template to the stream."""
     # Ignore the types since we use unicode literals and this expects str but works fine with
     # unicode.
     # See https://docs.python.org/2/library/string.html#template-strings
+    template = _escape_template_string(template)
     return string.Template(template).substitute(template_params)  # type: ignore
 
 
@@ -55,6 +65,7 @@ def template_args(template, **kwargs):
     # Ignore the types since we use unicode literals and this expects str but works fine with
     # unicode.
     # See https://docs.python.org/2/library/string.html#template-strings
+    template = _escape_template_string(template)
     return string.Template(template).substitute(kwargs)  # type: ignore
 
 

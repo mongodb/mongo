@@ -78,6 +78,10 @@ ERROR_ID_BAD_COMMAND_NAMESPACE = "ID0041"
 ERROR_ID_FIELD_NO_COMMAND = "ID0042"
 ERROR_ID_NO_ARRAY_OF_CHAIN = "ID0043"
 ERROR_ID_ILLEGAL_FIELD_DEFAULT_AND_OPTIONAL = "ID0044"
+ERROR_ID_STRUCT_NO_DOC_SEQUENCE = "ID0045"
+ERROR_ID_NO_DOC_SEQUENCE_FOR_NON_ARRAY = "ID0046"
+ERROR_ID_NO_DOC_SEQUENCE_FOR_NON_OBJECT = "ID0047"
+ERROR_ID_COMMAND_DUPLICATES_FIELD = "ID0048"
 
 
 class IDLError(Exception):
@@ -580,6 +584,37 @@ class ParserContext(object):
         self._add_error(location, ERROR_ID_ILLEGAL_FIELD_DEFAULT_AND_OPTIONAL, (
             "Field '%s' can only be marked as optional or have a default value," + " not both.") %
                         (field_name))
+
+    def add_bad_struct_field_as_doc_sequence_error(self, location, struct_name, field_name):
+        # type: (common.SourceLocation, unicode, unicode) -> None
+        """Add an error about using a field in a struct being marked with supports_doc_sequence."""
+        # pylint: disable=invalid-name
+        self._add_error(location, ERROR_ID_STRUCT_NO_DOC_SEQUENCE,
+                        ("Field '%s' in struct '%s' cannot be used as a Command Document Sequence"
+                         " type. They are only supported in commands.") % (field_name, struct_name))
+
+    def add_bad_non_array_as_doc_sequence_error(self, location, struct_name, field_name):
+        # type: (common.SourceLocation, unicode, unicode) -> None
+        """Add an error about using a non-array type field being marked with supports_doc_sequence."""
+        # pylint: disable=invalid-name
+        self._add_error(location, ERROR_ID_NO_DOC_SEQUENCE_FOR_NON_ARRAY,
+                        ("Field '%s' in command '%s' cannot be used as a Command Document Sequence"
+                         " type since it is not an array.") % (field_name, struct_name))
+
+    def add_bad_non_object_as_doc_sequence_error(self, location, field_name):
+        # type: (common.SourceLocation, unicode) -> None
+        """Add an error about using a non-struct or BSON object for a doc sequence."""
+        # pylint: disable=invalid-name
+        self._add_error(location, ERROR_ID_NO_DOC_SEQUENCE_FOR_NON_OBJECT,
+                        ("Field '%s' cannot be used as a Command Document Sequence"
+                         " type since it is not a BSON object or struct.") % (field_name))
+
+    def add_bad_command_name_duplicates_field(self, location, command_name):
+        # type: (common.SourceLocation, unicode) -> None
+        """Add an error about a command and field having the same name."""
+        # pylint: disable=invalid-name
+        self._add_error(location, ERROR_ID_COMMAND_DUPLICATES_FIELD,
+                        ("Command '%s' cannot have the same name as a field.") % (command_name))
 
 
 def _assert_unique_error_messages():

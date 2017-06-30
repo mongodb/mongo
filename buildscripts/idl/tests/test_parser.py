@@ -33,6 +33,7 @@ else:
 
 
 class TestParser(testcase.IDLTestcase):
+    # pylint: disable=too-many-public-methods
     """Test the IDL parser only."""
 
     def test_empty(self):
@@ -884,6 +885,55 @@ class TestParser(testcase.IDLTestcase):
                     fields:
                         foo: string
             """), idl.errors.ERROR_ID_DUPLICATE_SYMBOL)
+
+    def test_command_doc_sequence_positive(self):
+        # type: () -> None
+        """Positive supports_doc_sequence test cases."""
+        # pylint: disable=invalid-name
+
+        # supports_doc_sequence can be false
+        self.assert_parse(
+            textwrap.dedent("""
+        commands:
+            foo:
+                description: foo
+                namespace: ignored
+                fields:
+                    foo:
+                        type: bar
+                        supports_doc_sequence: false 
+            """))
+
+        # supports_doc_sequence can be true
+        self.assert_parse(
+            textwrap.dedent("""
+        commands:
+            foo:
+                description: foo
+                namespace: ignored
+                fields:
+                    foo:
+                        type: bar
+                        supports_doc_sequence: true
+            """))
+
+    def test_command_doc_sequence_negative(self):
+        # type: () -> None
+        """Negative supports_doc_sequence test cases."""
+        # pylint: disable=invalid-name
+
+        # supports_doc_sequence must be a bool
+        self.assert_parse_fail(
+            textwrap.dedent("""
+        commands:
+            foo:
+                description: foo
+                namespace: ignored
+                fields:
+                    foo:
+                        type: bar
+                        supports_doc_sequence: foo
+            """), idl.errors.ERROR_ID_IS_NODE_VALID_BOOL)
 
 
 if __name__ == '__main__':

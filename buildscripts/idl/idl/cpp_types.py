@@ -171,7 +171,7 @@ class _CppTypeBasic(CppTypeBase):
 
     def get_getter_body(self, member_name):
         # type: (unicode) -> unicode
-        return common.template_args('return $member_name;', member_name=member_name)
+        return common.template_args('return ${member_name};', member_name=member_name)
 
     def get_setter_body(self, member_name):
         # type: (unicode) -> unicode
@@ -225,12 +225,12 @@ class _CppTypeView(CppTypeBase):
 
     def get_getter_body(self, member_name):
         # type: (unicode) -> unicode
-        return common.template_args('return $member_name;', member_name=member_name)
+        return common.template_args('return ${member_name};', member_name=member_name)
 
     def get_setter_body(self, member_name):
         # type: (unicode) -> unicode
         return common.template_args(
-            '$member_name = ${value};',
+            '${member_name} = ${value};',
             member_name=member_name,
             value=self.get_transform_to_storage_type("value"))
 
@@ -241,7 +241,7 @@ class _CppTypeView(CppTypeBase):
     def get_transform_to_storage_type(self, expression):
         # type: (unicode) -> Optional[unicode]
         return common.template_args(
-            '$expression.toString()',
+            '${expression}.toString()',
             expression=expression, )
 
 
@@ -283,13 +283,13 @@ class _CppTypeVector(CppTypeBase):
     def get_getter_body(self, member_name):
         # type: (unicode) -> unicode
         return common.template_args(
-            'return ConstDataRange(reinterpret_cast<const char*>($member_name.data()), $member_name.size());',
+            'return ConstDataRange(reinterpret_cast<const char*>(${member_name}.data()), ${member_name}.size());',
             member_name=member_name)
 
     def get_setter_body(self, member_name):
         # type: (unicode) -> unicode
         return common.template_args(
-            '$member_name = ${value};',
+            '${member_name} = ${value};',
             member_name=member_name,
             value=self.get_transform_to_storage_type("value"))
 
@@ -404,7 +404,7 @@ class _CppTypeArray(_CppTypeDelegating):
         # type: (unicode) -> Optional[unicode]
         if self._base.get_storage_type() != self._base.get_getter_setter_type():
             return common.template_args(
-                'transformVector($expression)',
+                'transformVector(${expression})',
                 expression=expression, )
         else:
             return None
@@ -413,7 +413,7 @@ class _CppTypeArray(_CppTypeDelegating):
         # type: (unicode) -> Optional[unicode]
         if self._base.get_storage_type() != self._base.get_getter_setter_type():
             return common.template_args(
-                'transformVector($expression)',
+                'transformVector(${expression})',
                 expression=expression, )
         else:
             return None
