@@ -231,31 +231,36 @@ void TimeZone::TimelibTZInfoDeleter::operator()(timelib_tzinfo* tzInfo) {
 
 TimeZone::TimeZone(timelib_tzinfo* tzInfo) : _tzInfo(tzInfo, TimelibTZInfoDeleter()) {}
 
-timelib_time TimeZone::getTimelibTime(Date_t date) const {
-    timelib_time time{};
+void TimeZone::TimelibTimeDeleter::operator()(timelib_time* time) {
+    timelib_time_dtor(time);
+}
+
+std::unique_ptr<timelib_time, TimeZone::TimelibTimeDeleter> TimeZone::getTimelibTime(
+    Date_t date) const {
+    std::unique_ptr<timelib_time, TimeZone::TimelibTimeDeleter> time(timelib_time_ctor());
     if (_tzInfo) {
-        timelib_set_timezone(&time, _tzInfo.get());
-        timelib_unixtime2local(&time, seconds(date));
+        timelib_set_timezone(time.get(), _tzInfo.get());
+        timelib_unixtime2local(time.get(), seconds(date));
     } else {
-        timelib_unixtime2gmt(&time, seconds(date));
+        timelib_unixtime2gmt(time.get(), seconds(date));
     }
     return time;
 }
 
 TimeZone::Iso8601DateParts TimeZone::dateIso8601Parts(Date_t date) const {
     auto time = getTimelibTime(date);
-    return Iso8601DateParts(time, date);
+    return Iso8601DateParts(*time, date);
 }
 
 TimeZone::DateParts TimeZone::dateParts(Date_t date) const {
     auto time = getTimelibTime(date);
-    return DateParts(time, date);
+    return DateParts(*time, date);
 }
 
 int TimeZone::dayOfWeek(Date_t date) const {
     auto time = getTimelibTime(date);
     // timelib_day_of_week() returns a number in the range [0,6], we want [1,7], so add one.
-    return timelib_day_of_week(time.y, time.m, time.d) + 1;
+    return timelib_day_of_week(time->y, time->m, time->d) + 1;
 }
 
 int TimeZone::week(Date_t date) const {
@@ -274,19 +279,19 @@ int TimeZone::week(Date_t date) const {
 int TimeZone::dayOfYear(Date_t date) const {
     auto time = getTimelibTime(date);
     // timelib_day_of_year() returns a number in the range [0,365], we want [1,366], so add one.
-    return timelib_day_of_year(time.y, time.m, time.d) + 1;
+    return timelib_day_of_year(time->y, time->m, time->d) + 1;
 }
 
 int TimeZone::isoDayOfWeek(Date_t date) const {
     auto time = getTimelibTime(date);
-    return timelib_iso_day_of_week(time.y, time.m, time.d);
+    return timelib_iso_day_of_week(time->y, time->m, time->d);
 }
 
 int TimeZone::isoWeek(Date_t date) const {
     auto time = getTimelibTime(date);
     long long isoWeek;
     long long isoYear;
-    timelib_isoweek_from_date(time.y, time.m, time.d, &isoWeek, &isoYear);
+    timelib_isoweek_from_date(time->y, time->m, time->d, &isoWeek, &isoYear);
     return isoWeek;
 }
 
@@ -294,7 +299,7 @@ long long TimeZone::isoYear(Date_t date) const {
     auto time = getTimelibTime(date);
     long long isoWeek;
     long long isoYear;
-    timelib_isoweek_from_date(time.y, time.m, time.d, &isoWeek, &isoYear);
+    timelib_isoweek_from_date(time->y, time->m, time->d, &isoWeek, &isoYear);
     return isoYear;
 }
 

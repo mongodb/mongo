@@ -79,6 +79,13 @@ public:
         int millisecond;
     };
 
+    /**
+     * A custom-deleter which destructs a timelib_time* when it goes out of scope.
+     */
+    struct TimelibTimeDeleter {
+        TimelibTimeDeleter() = default;
+        void operator()(timelib_time* time);
+    };
 
     explicit TimeZone(timelib_tzinfo* tzInfo);
     TimeZone() = default;
@@ -230,7 +237,7 @@ public:
     static void validateFormat(StringData format);
 
 private:
-    timelib_time getTimelibTime(Date_t) const;
+    std::unique_ptr<timelib_time, TimelibTimeDeleter> getTimelibTime(Date_t) const;
 
     /**
      * Only works with 1 <= spaces <= 4 and 0 <= number <= 9999. If spaces is less than the digit
