@@ -717,17 +717,11 @@ public:
                 new AutoGetCollectionForReadCommand(opCtx, nss));
             Collection* coll = ctx->getCollection();
 
-            auto statusWithPlanExecutor = getExecutor(opCtx,
-                                                      coll,
-                                                      std::move(cq),
-                                                      PlanExecutor::YIELD_MANUAL,
-                                                      QueryPlannerParams::NO_TABLE_SCAN);
-            if (!statusWithPlanExecutor.isOK()) {
-                uasserted(17241, "Can't get executor for query " + query.toString());
-                return false;
-            }
-
-            auto exec = std::move(statusWithPlanExecutor.getValue());
+            auto exec = uassertStatusOK(getExecutor(opCtx,
+                                                    coll,
+                                                    std::move(cq),
+                                                    PlanExecutor::YIELD_MANUAL,
+                                                    QueryPlannerParams::NO_TABLE_SCAN));
 
             BSONObj obj;
             PlanExecutor::ExecState state;

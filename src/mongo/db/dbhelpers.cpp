@@ -118,13 +118,9 @@ RecordId Helpers::findOne(OperationContext* opCtx,
     unique_ptr<CanonicalQuery> cq = std::move(statusWithCQ.getValue());
 
     size_t options = requireIndex ? QueryPlannerParams::NO_TABLE_SCAN : QueryPlannerParams::DEFAULT;
-    auto statusWithPlanExecutor =
-        getExecutor(opCtx, collection, std::move(cq), PlanExecutor::NO_YIELD, options);
-    massert(17245,
-            "Could not get executor for query " + query.toString(),
-            statusWithPlanExecutor.isOK());
+    auto exec = uassertStatusOK(
+        getExecutor(opCtx, collection, std::move(cq), PlanExecutor::NO_YIELD, options));
 
-    auto exec = std::move(statusWithPlanExecutor.getValue());
     PlanExecutor::ExecState state;
     BSONObj obj;
     RecordId loc;

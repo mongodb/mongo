@@ -163,10 +163,9 @@ public:
                 .value());
 
         // Check findOne() returning object, requiring indexed scan without index.
-        ASSERT_THROWS(Helpers::findOne(&_opCtx, _collection, query, ret, true),
-                      MsgAssertionException);
+        ASSERT_THROWS(Helpers::findOne(&_opCtx, _collection, query, ret, true), UserException);
         // Check findOne() returning location, requiring indexed scan without index.
-        ASSERT_THROWS(Helpers::findOne(&_opCtx, _collection, query, true), MsgAssertionException);
+        ASSERT_THROWS(Helpers::findOne(&_opCtx, _collection, query, true), UserException);
 
         addIndex(IndexSpec().addKey("b").unique(false));
 

@@ -1105,11 +1105,8 @@ void State::finalReduce(OperationContext* opCtx, CurOp* curOp, ProgressMeterHold
     Collection* coll = getCollectionOrUassert(opCtx, ctx->getDb(), _config.incLong);
     invariant(coll);
 
-    auto statusWithPlanExecutor = getExecutor(
-        _opCtx, coll, std::move(cq), PlanExecutor::YIELD_AUTO, QueryPlannerParams::NO_TABLE_SCAN);
-    verify(statusWithPlanExecutor.isOK());
-
-    auto exec = std::move(statusWithPlanExecutor.getValue());
+    auto exec = uassertStatusOK(getExecutor(
+        _opCtx, coll, std::move(cq), PlanExecutor::YIELD_AUTO, QueryPlannerParams::NO_TABLE_SCAN));
 
     // Make sure the PlanExecutor is destroyed while holding a collection lock.
     ON_BLOCK_EXIT([&exec, &ctx, opCtx, this] {
@@ -1483,15 +1480,8 @@ public:
                     Collection* coll = State::getCollectionOrUassert(opCtx, db, config.nss);
                     invariant(coll);
 
-                    auto statusWithPlanExecutor =
-                        getExecutor(opCtx, coll, std::move(cq), PlanExecutor::YIELD_AUTO);
-                    if (!statusWithPlanExecutor.isOK()) {
-                        uasserted(17239,
-                                  "Can't get executor for query " + config.filter.toString());
-                        return 0;
-                    }
-
-                    exec = std::move(statusWithPlanExecutor.getValue());
+                    exec = uassertStatusOK(
+                        getExecutor(opCtx, coll, std::move(cq), PlanExecutor::YIELD_AUTO));
                 }
 
                 {

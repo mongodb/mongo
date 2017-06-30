@@ -225,14 +225,8 @@ public:
         // version on initial entry into geoNear.
         auto rangePreserver = CollectionShardingState::get(opCtx, nss)->getMetadata();
 
-        auto statusWithPlanExecutor =
-            getExecutor(opCtx, collection, std::move(cq), PlanExecutor::YIELD_AUTO, 0);
-        if (!statusWithPlanExecutor.isOK()) {
-            errmsg = "can't get query executor";
-            return false;
-        }
-
-        auto exec = std::move(statusWithPlanExecutor.getValue());
+        auto exec = uassertStatusOK(
+            getExecutor(opCtx, collection, std::move(cq), PlanExecutor::YIELD_AUTO, 0));
 
         auto curOp = CurOp::get(opCtx);
         {
