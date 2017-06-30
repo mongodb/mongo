@@ -102,9 +102,6 @@ const char* encodeMatchType(MatchExpression::MatchType mt) {
         case MatchExpression::NOR:
             return "nr";
             break;
-        case MatchExpression::INTERNAL_SCHEMA_XOR:
-            return "internalSchemaXor";
-            break;
         case MatchExpression::NOT:
             return "nt";
             break;

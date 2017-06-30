@@ -55,7 +55,6 @@ public:
         // tree types
         AND,
         OR,
-        INTERNAL_SCHEMA_XOR,
 
         // array types
         ELEM_MATCH_OBJECT,
@@ -166,8 +165,7 @@ public:
      * AND, OR, NOT, NOR.
      */
     bool isLogical() const {
-        return AND == _matchType || OR == _matchType || NOT == _matchType || NOR == _matchType ||
-            INTERNAL_SCHEMA_XOR == _matchType;
+        return AND == _matchType || OR == _matchType || NOT == _matchType || NOR == _matchType;
     }
 
     /**
