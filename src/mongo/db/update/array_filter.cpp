@@ -45,42 +45,50 @@ const std::regex idRegex("^[a-z][a-zA-Z0-9]*$");
  * Finds the top-level field that 'expr' is over. The must be unique and not the empty string.
  */
 StatusWith<StringData> parseId(MatchExpression* expr) {
-    if (expr->isArray() || expr->isLeaf()) {
-        auto firstDotPos = expr->path().find('.');
-        if (firstDotPos == std::string::npos) {
-            return expr->path();
+    switch (expr->getCategory()) {
+        case MatchExpression::MatchCategory::kLeaf:
+        case MatchExpression::MatchCategory::kArrayMatching: {
+            auto firstDotPos = expr->path().find('.');
+            if (firstDotPos == std::string::npos) {
+                return expr->path();
+            }
+            return expr->path().substr(0, firstDotPos);
         }
-        return expr->path().substr(0, firstDotPos);
-    } else if (expr->isLogical()) {
-        if (expr->numChildren() == 0) {
+        case MatchExpression::MatchCategory::kLogical: {
+            if (expr->numChildren() == 0) {
+                return Status(ErrorCodes::FailedToParse,
+                              "No top-level field name found in array filter.");
+            }
+
+            StringData id;
+            for (size_t i = 0; i < expr->numChildren(); ++i) {
+                auto statusWithId = parseId(expr->getChild(i));
+                if (!statusWithId.isOK()) {
+                    return statusWithId.getStatus();
+                }
+
+                if (id == StringData()) {
+                    id = statusWithId.getValue();
+                    continue;
+                }
+
+                if (id != statusWithId.getValue()) {
+                    return Status(
+                        ErrorCodes::FailedToParse,
+                        str::stream()
+                            << "Each array filter must use a single top-level field name, found '"
+                            << id
+                            << "' and '"
+                            << statusWithId.getValue()
+                            << "'");
+                }
+            }
+            return id;
+        }
+        case MatchExpression::MatchCategory::kOther: {
             return Status(ErrorCodes::FailedToParse,
-                          "No top-level field name found in array filter.");
+                          str::stream() << "Unsupported match expression in array filter");
         }
-
-        StringData id;
-        for (size_t i = 0; i < expr->numChildren(); ++i) {
-            auto statusWithId = parseId(expr->getChild(i));
-            if (!statusWithId.isOK()) {
-                return statusWithId.getStatus();
-            }
-
-            if (id == StringData()) {
-                id = statusWithId.getValue();
-                continue;
-            }
-
-            if (id != statusWithId.getValue()) {
-                return Status(
-                    ErrorCodes::FailedToParse,
-                    str::stream()
-                        << "Each array filter must use a single top-level field name, found '"
-                        << id
-                        << "' and '"
-                        << statusWithId.getValue()
-                        << "'");
-            }
-        }
-        return id;
     }
 
     MONGO_UNREACHABLE;

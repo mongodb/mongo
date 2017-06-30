@@ -58,6 +58,10 @@ public:
 
     bool equivalent(const MatchExpression* other) const final;
 
+    MatchCategory getCategory() const final {
+        return MatchCategory::kOther;
+    }
+
 protected:
     const std::string& getCode() const {
         return _code;

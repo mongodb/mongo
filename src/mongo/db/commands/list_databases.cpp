@@ -119,7 +119,9 @@ public:
 
         vector<BSONObj> dbInfos;
 
-        bool filterNameOnly = filter && filter->isLeaf() && filter->path() == kNameField;
+        bool filterNameOnly = filter &&
+            filter->getCategory() == MatchExpression::MatchCategory::kLeaf &&
+            filter->path() == kNameField;
         intmax_t totalSize = 0;
         for (vector<string>::iterator i = dbNames.begin(); i != dbNames.end(); ++i) {
             const string& dbname = *i;

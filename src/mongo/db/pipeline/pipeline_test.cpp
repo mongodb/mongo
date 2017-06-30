@@ -928,6 +928,20 @@ TEST(PipelineOptimizationTest, MatchCannotSwapWithSortLimit) {
     assertPipelineOptimizesAndSerializesTo(inputPipe, outputPipe, inputPipe);
 }
 
+TEST(PipelineOptimizationTest, MatchOnMinItemsShouldNotMoveAcrossRename) {
+    string pipeline =
+        "[{$project: {_id: true, a: '$b'}}, "
+        "{$match: {a: {$_internalSchemaMinItems: 1}}}]";
+    assertPipelineOptimizesTo(pipeline, pipeline);
+}
+
+TEST(PipelineOptimizationTest, MatchOnMaxItemsShouldNotMoveAcrossRename) {
+    string pipeline =
+        "[{$project: {_id: true, a: '$b'}}, "
+        "{$match: {a: {$_internalSchemaMaxItems: 1}}}]";
+    assertPipelineOptimizesTo(pipeline, pipeline);
+}
+
 }  // namespace Local
 
 namespace Sharded {

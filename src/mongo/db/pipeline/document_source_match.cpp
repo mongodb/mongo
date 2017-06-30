@@ -426,9 +426,9 @@ boost::intrusive_ptr<DocumentSourceMatch> DocumentSourceMatch::descendMatchOnPat
         // Cannot call this method on a $match including a $elemMatch.
         invariant(node->matchType() != MatchExpression::ELEM_MATCH_OBJECT &&
                   node->matchType() != MatchExpression::ELEM_MATCH_VALUE);
-        // Logical nodes do not have a path, but both 'leaf' and 'array' nodes
-        // do.
-        if (node->isLogical()) {
+        // Only leaf and array match expressions have a path.
+        if (node->getCategory() != MatchExpression::MatchCategory::kLeaf &&
+            node->getCategory() != MatchExpression::MatchCategory::kArrayMatching) {
             return;
         }
 
@@ -436,11 +436,11 @@ boost::intrusive_ptr<DocumentSourceMatch> DocumentSourceMatch::descendMatchOnPat
         invariant(expression::isPathPrefixOf(descendOn, leafPath));
 
         auto newPath = leafPath.substr(descendOn.size() + 1);
-        if (node->isLeaf() && node->matchType() != MatchExpression::TYPE_OPERATOR &&
-            node->matchType() != MatchExpression::WHERE) {
+        if (node->getCategory() == MatchExpression::MatchCategory::kLeaf &&
+            node->matchType() != MatchExpression::TYPE_OPERATOR) {
             auto leafNode = static_cast<LeafMatchExpression*>(node);
             leafNode->setPath(newPath).transitional_ignore();
-        } else if (node->isArray()) {
+        } else if (node->getCategory() == MatchExpression::MatchCategory::kArrayMatching) {
             auto arrayNode = static_cast<ArrayMatchingMatchExpression*>(node);
             arrayNode->setPath(newPath).transitional_ignore();
         }

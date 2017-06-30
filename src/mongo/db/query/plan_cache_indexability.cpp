@@ -68,7 +68,7 @@ void PlanCacheIndexabilityState::processPartialIndex(const std::string& indexNam
     for (size_t i = 0; i < filterExpr->numChildren(); ++i) {
         processPartialIndex(indexName, filterExpr->getChild(i));
     }
-    if (!filterExpr->isLogical()) {
+    if (filterExpr->getCategory() != MatchExpression::MatchCategory::kLogical) {
         _pathDiscriminatorsMap[filterExpr->path()][indexName].addDiscriminator(
             [filterExpr](const MatchExpression* queryExpr) {
                 return expression::isSubsetOf(queryExpr, filterExpr);

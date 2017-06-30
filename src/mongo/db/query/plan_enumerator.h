@@ -101,7 +101,7 @@ public:
      * provided CanonicalQuery.
      *
      * Nodes in 'tree' are tagged with indices that should be used to answer the tagged nodes.
-     * Only nodes that have a field name (isLogical() == false) will be tagged.
+     * Only nodes that have a field name (getCategory() != kLogical) will be tagged.
      *
      * The output tree is a clone identical to that used to initialize the enumerator, with tags
      * added in order to indicate index usage.

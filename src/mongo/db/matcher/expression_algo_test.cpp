@@ -1100,6 +1100,42 @@ TEST(SplitMatchExpression, ShouldNotMoveSizeAcrossRename) {
     ASSERT_BSONOBJ_EQ(secondBob.obj(), fromjson("{a: {$size: 3}}"));
 }
 
+TEST(SplitMatchExpression, ShouldNotMoveMinItemsAcrossRename) {
+    BSONObj matchPredicate = fromjson("{a: {$_internalSchemaMinItems: 3}}");
+    const CollatorInterface* collator = nullptr;
+    auto matcher = MatchExpressionParser::parse(matchPredicate, ExtensionsCallbackNoop(), collator);
+    ASSERT_OK(matcher.getStatus());
+
+    StringMap<std::string> renames{{"a", "c"}};
+    std::pair<unique_ptr<MatchExpression>, unique_ptr<MatchExpression>> splitExpr =
+        expression::splitMatchExpressionBy(std::move(matcher.getValue()), {}, renames);
+
+    ASSERT_FALSE(splitExpr.first.get());
+
+    ASSERT_TRUE(splitExpr.second.get());
+    BSONObjBuilder secondBob;
+    splitExpr.second->serialize(&secondBob);
+    ASSERT_BSONOBJ_EQ(secondBob.obj(), fromjson("{a: {$_internalSchemaMinItems: 3}}"));
+}
+
+TEST(SplitMatchExpression, ShouldNotMoveMaxItemsAcrossRename) {
+    BSONObj matchPredicate = fromjson("{a: {$_internalSchemaMaxItems: 3}}");
+    const CollatorInterface* collator = nullptr;
+    auto matcher = MatchExpressionParser::parse(matchPredicate, ExtensionsCallbackNoop(), collator);
+    ASSERT_OK(matcher.getStatus());
+
+    StringMap<std::string> renames{{"a", "c"}};
+    std::pair<unique_ptr<MatchExpression>, unique_ptr<MatchExpression>> splitExpr =
+        expression::splitMatchExpressionBy(std::move(matcher.getValue()), {}, renames);
+
+    ASSERT_FALSE(splitExpr.first.get());
+
+    ASSERT_TRUE(splitExpr.second.get());
+    BSONObjBuilder secondBob;
+    splitExpr.second->serialize(&secondBob);
+    ASSERT_BSONOBJ_EQ(secondBob.obj(), fromjson("{a: {$_internalSchemaMaxItems: 3}}"));
+}
+
 TEST(MapOverMatchExpression, DoesMapOverLogicalNodes) {
     BSONObj matchPredicate = fromjson("{a: {$not: {$eq: 1}}}");
     const CollatorInterface* collator = nullptr;
@@ -1110,7 +1146,8 @@ TEST(MapOverMatchExpression, DoesMapOverLogicalNodes) {
     bool hasLogicalNode = false;
     expression::mapOver(swMatchExpression.getValue().get(),
                         [&hasLogicalNode](MatchExpression* expression, std::string path) -> void {
-                            if (expression->isLogical()) {
+                            if (expression->getCategory() ==
+                                MatchExpression::MatchCategory::kLogical) {
                                 hasLogicalNode = true;
                             }
                         });
@@ -1128,7 +1165,8 @@ TEST(MapOverMatchExpression, DoesMapOverLeafNodes) {
     bool hasLeafNode = false;
     expression::mapOver(swMatchExpression.getValue().get(),
                         [&hasLeafNode](MatchExpression* expression, std::string path) -> void {
-                            if (!expression->isLogical()) {
+                            if (expression->getCategory() !=
+                                MatchExpression::MatchCategory::kLogical) {
                                 hasLeafNode = true;
                             }
                         });

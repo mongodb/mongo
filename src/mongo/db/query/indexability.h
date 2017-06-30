@@ -59,7 +59,7 @@ public:
      * Example: a: {$elemMatch: {$gte: 1, $lte: 1}}.
      */
     static bool arrayUsesIndexOnOwnField(const MatchExpression* me) {
-        if (!me->isArray()) {
+        if (me->getCategory() != MatchExpression::MatchCategory::kArrayMatching) {
             return false;
         }
 
@@ -111,7 +111,7 @@ public:
      * Example: a: {$elemMatch: {b:1, c:1}}.
      */
     static bool arrayUsesIndexOnChildren(const MatchExpression* me) {
-        return me->isArray() && MatchExpression::ELEM_MATCH_OBJECT == me->matchType();
+        return MatchExpression::ELEM_MATCH_OBJECT == me->matchType();
     }
 
     /**

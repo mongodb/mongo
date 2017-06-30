@@ -276,11 +276,12 @@ unique_ptr<MatchExpression> createNorOfNodes(std::vector<unique_ptr<MatchExpress
 }
 
 void applyRenamesToExpression(MatchExpression* expr, const StringMap<std::string>& renames) {
-    if (expr->isArray()) {
+    if (expr->getCategory() == MatchExpression::MatchCategory::kArrayMatching ||
+        expr->getCategory() == MatchExpression::MatchCategory::kOther) {
         return;
     }
 
-    if (expr->isLeaf()) {
+    if (expr->getCategory() == MatchExpression::MatchCategory::kLeaf) {
         auto it = renames.find(expr->path());
         if (it != renames.end()) {
             LeafMatchExpression* leafExpr = checked_cast<LeafMatchExpression*>(expr);
@@ -300,7 +301,7 @@ splitMatchExpressionByWithoutRenames(unique_ptr<MatchExpression> expr,
         // 'expr' does not depend upon 'fields', so it can be completely moved.
         return {std::move(expr), nullptr};
     }
-    if (!expr->isLogical()) {
+    if (expr->getCategory() != MatchExpression::MatchCategory::kLogical) {
         // 'expr' is a leaf, and was not independent of 'fields'.
         return {nullptr, std::move(expr)};
     }
@@ -410,23 +411,28 @@ bool isSubsetOf(const MatchExpression* lhs, const MatchExpression* rhs) {
 }
 
 bool isIndependentOf(const MatchExpression& expr, const std::set<std::string>& pathSet) {
-    if (expr.isLogical()) {
-        // Any logical expression is independent of 'pathSet' if all its children are independent of
-        // 'pathSet'.
-        for (size_t i = 0; i < expr.numChildren(); i++) {
-            if (!isIndependentOf(*expr.getChild(i), pathSet)) {
-                return false;
+    switch (expr.getCategory()) {
+        case MatchExpression::MatchCategory::kLogical: {
+            // Any logical expression is independent of 'pathSet' if all its children are
+            // independent of 'pathSet'.
+            for (size_t i = 0; i < expr.numChildren(); i++) {
+                if (!isIndependentOf(*expr.getChild(i), pathSet)) {
+                    return false;
+                }
             }
+            return true;
         }
-        return true;
+        case MatchExpression::MatchCategory::kLeaf: {
+            return isLeafIndependentOf(expr.path(), pathSet);
+        }
+        // All other match expressions are never considered independent.
+        case MatchExpression::MatchCategory::kArrayMatching:
+        case MatchExpression::MatchCategory::kOther: {
+            return false;
+        }
     }
 
-    // Array match expressions are never considered independent.
-    if (expr.isArray()) {
-        return false;
-    }
-
-    return isLeafIndependentOf(expr.path(), pathSet);
+    MONGO_UNREACHABLE;
 }
 
 std::pair<unique_ptr<MatchExpression>, unique_ptr<MatchExpression>> splitMatchExpressionBy(

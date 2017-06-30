@@ -143,7 +143,7 @@ void QueryPlannerIXSelect::getFields(const MatchExpression* node,
         for (size_t i = 0; i < node->numChildren(); ++i) {
             getFields(node->getChild(i), prefix, out);
         }
-    } else if (node->isLogical()) {
+    } else if (node->getCategory() == MatchExpression::MatchCategory::kLogical) {
         for (size_t i = 0; i < node->numChildren(); ++i) {
             getFields(node->getChild(i), prefix, out);
         }
@@ -411,7 +411,7 @@ void QueryPlannerIXSelect::rateIndices(MatchExpression* node,
         for (size_t i = 0; i < node->numChildren(); ++i) {
             rateIndices(node->getChild(i), prefix, indices, collator);
         }
-    } else if (node->isLogical()) {
+    } else if (node->getCategory() == MatchExpression::MatchCategory::kLogical) {
         for (size_t i = 0; i < node->numChildren(); ++i) {
             rateIndices(node->getChild(i), prefix, indices, collator);
         }

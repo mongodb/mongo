@@ -75,8 +75,8 @@ public:
      *
      * If 'expr' is elemMatch, the index tag is affixed to a child.
      *
-     * The expression must be a predicate over one field.  That is, expr->isLeaf() or
-     * expr->isArray() must be true, and expr->isLogical() must be false.
+     * The expression must be a predicate over one field.  That is, expression category must be
+     * kLeaf or kArrayMatching.
      */
     static void translate(const MatchExpression* expr,
                           const BSONElement& elt,

@@ -62,6 +62,10 @@ public:
         return _path;
     }
 
+    MatchCategory getCategory() const final {
+        return MatchCategory::kArrayMatching;
+    }
+
 private:
     StringData _path;
     ElementPath _elementPath;

@@ -1154,7 +1154,8 @@ QuerySolutionNode* QueryPlannerAccess::buildIndexedDataAccess(const CanonicalQue
                                                               bool inArrayOperator,
                                                               const vector<IndexEntry>& indices,
                                                               const QueryPlannerParams& params) {
-    if (root->isLogical() && !Indexability::isBoundsGeneratingNot(root)) {
+    if (root->getCategory() == MatchExpression::MatchCategory::kLogical &&
+        !Indexability::isBoundsGeneratingNot(root)) {
         if (MatchExpression::AND == root->matchType()) {
             // Takes ownership of root.
             return buildIndexedAnd(query, root, inArrayOperator, indices, params);
@@ -1174,8 +1175,6 @@ QuerySolutionNode* QueryPlannerAccess::buildIndexedDataAccess(const CanonicalQue
             autoRoot.reset(root);
         }
 
-        // isArray or isLeaf is true.  Either way, it's over one field, and the bounds builder
-        // deals with it.
         if (NULL == root->getTag()) {
             // No index to use here, not in the context of logical operator, so we're SOL.
             return NULL;

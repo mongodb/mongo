@@ -89,6 +89,10 @@ public:
 
     bool equivalent(const MatchExpression* other) const;
 
+    MatchCategory getCategory() const final {
+        return MatchCategory::kLogical;
+    }
+
 protected:
     void _debugList(StringBuilder& debug, int level) const;
 
@@ -219,6 +223,10 @@ public:
 
     void resetChild(MatchExpression* newChild) {
         _exp.reset(newChild);
+    }
+
+    MatchCategory getCategory() const final {
+        return MatchCategory::kLogical;
     }
 
 private:

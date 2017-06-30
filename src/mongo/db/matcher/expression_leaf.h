@@ -73,6 +73,10 @@ public:
 
     Status setPath(StringData path);
 
+    MatchCategory getCategory() const final {
+        return MatchCategory::kLeaf;
+    }
+
 private:
     StringData _path;
     ElementPath _elementPath;
