@@ -1,6 +1,6 @@
 /**
- * Tests that mongos does not gossip logical time metadata until keys are created on the config
- * server, and that it does not block waiting for keys at startup.
+ * Tests that mongos does not gossip logical time metadata until at least one key is created on the
+ * config server, and that it does not block waiting for keys at startup.
  */
 
 (function() {
@@ -71,8 +71,10 @@
         return true;
     }, "expected mongos to eventually start signing logical times", 60 * 1000);  // 60 seconds.
 
-    assert(st.s.getDB("admin").system.keys.count() >= 2,
-           "expected there to be at least two generations of keys on the config server");
+    // There may be a delay between the creation of the first and second keys, but mongos will start
+    // signing after seeing the first key, so there is only guaranteed to be one at this point.
+    assert(st.s.getDB("admin").system.keys.count() >= 1,
+           "expected there to be at least one generation of keys on the config server");
 
     st.stop();
 })();
