@@ -170,6 +170,9 @@ private:
      */
     void doTTLForIndex(OperationContext* opCtx, BSONObj idx) {
         const NamespaceString collectionNSS(idx["ns"].String());
+        if (collectionNSS.isDropPendingNamespace()) {
+            return;
+        }
         if (!userAllowedWriteNS(collectionNSS).isOK()) {
             error() << "namespace '" << collectionNSS
                     << "' doesn't allow deletes, skipping ttl job for: " << idx;
