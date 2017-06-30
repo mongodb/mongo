@@ -32,7 +32,9 @@
 #include "mongo/bson/mutable/document.h"
 #include "mongo/bson/mutable/element.h"
 #include "mongo/bson/util/bson_extract.h"
+#include "mongo/db/auth/address_restriction.h"
 #include "mongo/db/auth/authorization_manager.h"
+#include "mongo/db/auth/restriction_set.h"
 #include "mongo/db/auth/role_graph.h"
 #include "mongo/db/auth/user_management_commands_parser.h"
 #include "mongo/db/update/update_driver.h"
@@ -49,6 +51,7 @@ struct RoleInfo {
     RoleName name;
     std::vector<RoleName> roles;
     PrivilegeVector privileges;
+    std::shared_ptr<RestrictionDocument<>> restrictions;
 };
 
 /**
@@ -114,6 +117,27 @@ Status getRoleNameFromIdField(const BSONElement& idElement, RoleName* roleName) 
 }
 
 /**
+ * Parses information about authenticationRestrictions from a BSON document
+ */
+Status parseAuthenticationRestrictions(const BSONElement& elem, RoleInfo* role) {
+    if (elem.eoo()) {
+        return Status::OK();
+    }
+
+    if (elem.type() != Array) {
+        return Status(ErrorCodes::TypeMismatch,
+                      "'authenticationRestricitons' field must be an array");
+    }
+
+    auto restrictions = parseAuthenticationRestriction(BSONArray(elem.Obj()));
+    if (!restrictions.isOK()) {
+        return restrictions.getStatus();
+    }
+    role->restrictions = std::move(restrictions.getValue());
+    return Status::OK();
+}
+
+/**
  * Parses information about a role from a BSON document.
  */
 Status parseRoleFromDocument(const BSONObj& doc, RoleInfo* role) {
@@ -138,6 +162,11 @@ Status parseRoleFromDocument(const BSONObj& doc, RoleInfo* role) {
         role->roles.push_back(possessedRoleName);
     }
 
+    status = parseAuthenticationRestrictions(doc["authenticationRestrictions"], role);
+    if (!status.isOK()) {
+        return status;
+    }
+
     BSONElement privilegesElement;
     status = bsonExtractTypedField(doc, "privileges", Array, &privilegesElement);
     if (!status.isOK())
@@ -155,7 +184,7 @@ Status handleOplogInsert(RoleGraph* roleGraph, const BSONObj& insertedObj) {
     Status status = parseRoleFromDocument(insertedObj, &role);
     if (!status.isOK())
         return status;
-    status = roleGraph->replaceRole(role.name, role.roles, role.privileges);
+    status = roleGraph->replaceRole(role.name, role.roles, role.privileges, role.restrictions);
     return status;
 }
 
@@ -210,7 +239,7 @@ Status handleOplogUpdate(OperationContext* opCtx,
     status = parseRoleFromDocument(roleDocument.getObject(), &role);
     if (!status.isOK())
         return status;
-    status = roleGraph->replaceRole(role.name, role.roles, role.privileges);
+    status = roleGraph->replaceRole(role.name, role.roles, role.privileges, role.restrictions);
 
     return status;
 }
@@ -287,7 +316,7 @@ Status RoleGraph::addRoleFromDocument(const BSONObj& doc) {
     Status status = parseRoleFromDocument(doc, &role);
     if (!status.isOK())
         return status;
-    status = replaceRole(role.name, role.roles, role.privileges);
+    status = replaceRole(role.name, role.roles, role.privileges, role.restrictions);
     return status;
 }
 

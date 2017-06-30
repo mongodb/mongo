@@ -50,6 +50,7 @@ void RoleGraph::swap(RoleGraph& other) {
     swap(this->_roleToMembers, other._roleToMembers);
     swap(this->_directPrivilegesForRole, other._directPrivilegesForRole);
     swap(this->_allPrivilegesForRole, other._allPrivilegesForRole);
+    swap(this->_directRestrictionsForRole, other._directRestrictionsForRole);
     swap(this->_allRoles, other._allRoles);
 }
 
@@ -383,9 +384,26 @@ Status RoleGraph::removeAllPrivilegesFromRole(const RoleName& role) {
     return Status::OK();
 }
 
+Status RoleGraph::replaceRestrictionsForRole(const RoleName& role,
+                                             SharedRestrictionDocument restrictions) {
+    if (!roleExists(role)) {
+        return Status(ErrorCodes::RoleNotFound,
+                      mongoutils::str::stream() << "Role: " << role.getFullName()
+                                                << " does not exist");
+    }
+    if (isBuiltinRole(role)) {
+        return Status(ErrorCodes::InvalidRoleModification,
+                      mongoutils::str::stream() << "Cannot remove restrictions from built-in role: "
+                                                << role.getFullName());
+    }
+    _directRestrictionsForRole[role] = std::move(restrictions);
+    return Status::OK();
+}
+
 Status RoleGraph::replaceRole(const RoleName& roleName,
                               const std::vector<RoleName>& roles,
-                              const PrivilegeVector& privileges) {
+                              const PrivilegeVector& privileges,
+                              SharedRestrictionDocument restrictions) {
     Status status = removeAllPrivilegesFromRole(roleName);
     if (status == ErrorCodes::RoleNotFound) {
         fassert(17168, createRole(roleName));
@@ -393,6 +411,7 @@ Status RoleGraph::replaceRole(const RoleName& roleName,
         return status;
     }
     fassert(17169, removeAllRolesFromRole(roleName));
+    fassert(40556, replaceRestrictionsForRole(roleName, restrictions));
     for (size_t i = 0; i < roles.size(); ++i) {
         const RoleName& grantedRole = roles[i];
         status = createRole(grantedRole);
