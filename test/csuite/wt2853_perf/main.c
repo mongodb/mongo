@@ -149,8 +149,8 @@ main(int argc, char *argv[])
 		insert_args[i].nthread = N_INSERT_THREAD;
 		insert_args[i].testopts = opts;
 		insert_args[i].sharedopts = sharedopts;
-		testutil_check(pthread_create(&insert_tid[i], NULL,
-		    thread_insert, (void *)&insert_args[i]));
+		testutil_check(pthread_create(
+		    &insert_tid[i], NULL, thread_insert, &insert_args[i]));
 	}
 
 	for (i = 0; i < N_GET_THREAD; ++i) {
@@ -158,8 +158,8 @@ main(int argc, char *argv[])
 		get_args[i].nthread = N_GET_THREAD;
 		get_args[i].testopts = opts;
 		get_args[i].sharedopts = sharedopts;
-		testutil_check(pthread_create(&get_tid[i], NULL,
-		    thread_get, (void *)&get_args[i]));
+		testutil_check(pthread_create(
+		    &get_tid[i], NULL, thread_get, &get_args[i]));
 	}
 
 	/*

@@ -81,8 +81,8 @@ main(int argc, char *argv[])
 	testutil_check(c->close(c));
 	cs = clock();
 	for (i = 0; i < (int)opts->nthreads; ++i) {
-		testutil_check(pthread_create(
-		    &id[i], NULL, thread_insert_race, (void *)opts));
+		testutil_check(
+		    pthread_create(&id[i], NULL, thread_insert_race, opts));
 	}
 	while (--i >= 0)
 		testutil_check(pthread_join(id[i], NULL));

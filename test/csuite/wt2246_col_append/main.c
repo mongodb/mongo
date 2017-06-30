@@ -141,8 +141,8 @@ main(int argc, char *argv[])
 	id = 0;
 	for (i = 0; i < opts->n_append_threads; ++i, ++id) {
 		printf("append: %" PRIu64 "\n", id);
-		testutil_check(pthread_create(
-		    &idlist[id], NULL, thread_append, (void *)opts));
+		testutil_check(
+		    pthread_create(&idlist[id], NULL, thread_append, opts));
 	}
 
 	for (i = 0; i < id; ++i)

@@ -73,13 +73,12 @@ main(int argc, char *argv[])
 	testutil_check(__wt_rwlock_init(NULL, &rwlock));
 	testutil_check(pthread_rwlock_init(&p_rwlock, NULL));
 
-	testutil_check(pthread_create(
-	    &dump_id, NULL, thread_dump, (void *)opts));
+	testutil_check(pthread_create(&dump_id, NULL, thread_dump, opts));
 
 	__wt_epoch(NULL, &ts);
 	for (i = 0; i < (int)opts->nthreads; ++i)
-		testutil_check(pthread_create(
-		    &id[i], NULL, thread_rwlock, (void *)opts));
+		testutil_check(
+		    pthread_create(&id[i], NULL, thread_rwlock, opts));
 
 	while (--i >= 0)
 		testutil_check(pthread_join(id[i], NULL));

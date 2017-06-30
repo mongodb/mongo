@@ -147,8 +147,8 @@ main(int argc, char *argv[])
 	testutil_check(session->close(session, NULL));
 
 	for (t = 0; t < NR_THREADS; ++t)
-		testutil_check(pthread_create(
-		    &thr[t], NULL, thread_func, (void *)opts));
+		testutil_check(
+		    pthread_create(&thr[t], NULL, thread_func, opts));
 
 	for (t = 0; t < NR_THREADS; ++t)
 		(void)pthread_join(thr[t], NULL);
