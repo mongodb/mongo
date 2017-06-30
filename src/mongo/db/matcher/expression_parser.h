@@ -65,12 +65,22 @@ public:
      * Parses a BSONElement of any numeric type into a positive long long, failing if the value
      * is any of the following:
      *
-     * - NaN
-     * - Too big or small to fit within a 64-bit signed integer.
+     * - NaN.
+     * - Negative.
      * - A floating point number which is not integral.
+     * - Too large to fit within a 64-bit signed integer.
      */
-    static StatusWith<long long> parseIntegerElementToPositiveLong(const char* name,
-                                                                   const BSONElement& elem);
+    static StatusWith<long long> parseIntegerElementToNonNegativeLong(BSONElement elem);
+
+    /**
+     * Parses a BSONElement of any numeric type into a long long, failing if the value
+     * is any of the following:
+     *
+     * - NaN.
+     * - A floating point number which is not integral.
+     * - Too large in the positive or negative direction to fit within a 64-bit signed integer.
+     */
+    static StatusWith<long long> parseIntegerElementToLong(BSONElement elem);
 
 private:
     MatchExpressionParser(const ExtensionsCallback* extensionsCallback)

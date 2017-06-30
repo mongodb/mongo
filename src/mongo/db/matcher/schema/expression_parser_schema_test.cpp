@@ -40,54 +40,6 @@ namespace mongo {
 namespace {
 
 //
-// Tests for parsing an integer BSONElement into a positive long long.
-//
-TEST(MatchExpressionParserIntegerConversionTest, FailsToParseNonIntegerTypes) {
-    BSONObj query = BSON("$_internalSchemaMinItems" << -2LL);
-    StatusWith<long long> result = MatchExpressionParser::parseIntegerElementToPositiveLong(
-        query.firstElementFieldName(), query.firstElement());
-    ASSERT_NOT_OK(result.getStatus());
-
-    query = BSON("$_internalSchemaMinItems" << MatchExpressionParser::kLongLongMaxPlusOneAsDouble);
-    result = MatchExpressionParser::parseIntegerElementToPositiveLong(query.firstElementFieldName(),
-                                                                      query.firstElement());
-    ASSERT_NOT_OK(result.getStatus());
-
-    query = BSON("$_internalSchemaMinItems"
-                 << "1");
-    result = MatchExpressionParser::parseIntegerElementToPositiveLong(query.firstElementFieldName(),
-                                                                      query.firstElement());
-    ASSERT_NOT_OK(result.getStatus());
-
-    query = BSON("$_internalSchemaMinItems" << -2.0);
-    result = MatchExpressionParser::parseIntegerElementToPositiveLong(query.firstElementFieldName(),
-                                                                      query.firstElement());
-    ASSERT_NOT_OK(result.getStatus());
-
-    query = BSON("$_internalSchemaMinItems" << 2.5);
-    result = MatchExpressionParser::parseIntegerElementToPositiveLong(query.firstElementFieldName(),
-                                                                      query.firstElement());
-    ASSERT_NOT_OK(result.getStatus());
-
-    query = BSON("$_internalSchemaMinItems" << Decimal128("2.5"));
-    result = MatchExpressionParser::parseIntegerElementToPositiveLong(query.firstElementFieldName(),
-                                                                      query.firstElement());
-    ASSERT_NOT_OK(result.getStatus());
-
-    query = BSON("$_internalSchemaMinItems" << Decimal128(Decimal128::kLargestPositive));
-    result = MatchExpressionParser::parseIntegerElementToPositiveLong(query.firstElementFieldName(),
-                                                                      query.firstElement());
-    ASSERT_NOT_OK(result.getStatus());
-}
-
-TEST(MatchExpressionParserIntegerConversionTest, FailsToParseNegativeNumbers) {
-    BSONObj query = BSON("$_internalSchemaMinItems" << -2);
-    auto result = MatchExpressionParser::parseIntegerElementToPositiveLong(
-        query.firstElementFieldName(), query.firstElement());
-    ASSERT_NOT_OK(result.getStatus());
-}
-
-//
 // Tests for parsing the $_internalSchemaMinItems expression.
 //
 TEST(MatchExpressionParserInternalSchemaMinItemsTest, CorrectlyParsesIntegerArgument) {

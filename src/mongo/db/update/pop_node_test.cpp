@@ -56,36 +56,46 @@ TEST(PopNodeTest, InitSucceedsNegativeOne) {
     ASSERT_TRUE(popNode.popFromFront());
 }
 
-TEST(PopNodeTest, InitSucceedsZero) {
+TEST(PopNodeTest, InitFailsOnePointOne) {
+    auto update = fromjson("{$pop: {a: 1.1}}");
+    const CollatorInterface* collator = nullptr;
+    PopNode popNode;
+    ASSERT_EQ(ErrorCodes::FailedToParse, popNode.init(update["$pop"]["a"], collator));
+}
+
+TEST(PopNodeTest, InitFailsZero) {
     auto update = fromjson("{$pop: {a: 0}}");
     const CollatorInterface* collator = nullptr;
     PopNode popNode;
-    ASSERT_OK(popNode.init(update["$pop"]["a"], collator));
-    ASSERT_FALSE(popNode.popFromFront());
+    ASSERT_EQ(ErrorCodes::FailedToParse, popNode.init(update["$pop"]["a"], collator));
 }
 
-TEST(PopNodeTest, InitSucceedsString) {
+TEST(PopNodeTest, InitFailsString) {
     auto update = fromjson("{$pop: {a: 'foo'}}");
     const CollatorInterface* collator = nullptr;
     PopNode popNode;
-    ASSERT_OK(popNode.init(update["$pop"]["a"], collator));
-    ASSERT_FALSE(popNode.popFromFront());
+    ASSERT_EQ(ErrorCodes::FailedToParse, popNode.init(update["$pop"]["a"], collator));
 }
 
-TEST(PopNodeTest, InitSucceedsNestedObject) {
+TEST(PopNodeTest, InitFailsNestedObject) {
     auto update = fromjson("{$pop: {a: {b: 1}}}");
     const CollatorInterface* collator = nullptr;
     PopNode popNode;
-    ASSERT_OK(popNode.init(update["$pop"]["a"], collator));
-    ASSERT_FALSE(popNode.popFromFront());
+    ASSERT_EQ(ErrorCodes::FailedToParse, popNode.init(update["$pop"]["a"], collator));
 }
 
-TEST(PopNodeTest, InitSucceedsNestedArray) {
+TEST(PopNodeTest, InitFailsNestedArray) {
     auto update = fromjson("{$pop: {a: [{b: 1}]}}");
     const CollatorInterface* collator = nullptr;
     PopNode popNode;
-    ASSERT_OK(popNode.init(update["$pop"]["a"], collator));
-    ASSERT_FALSE(popNode.popFromFront());
+    ASSERT_EQ(ErrorCodes::FailedToParse, popNode.init(update["$pop"]["a"], collator));
+}
+
+TEST(PopNodeTest, InitFailsBool) {
+    auto update = fromjson("{$pop: {a: true}}");
+    const CollatorInterface* collator = nullptr;
+    PopNode popNode;
+    ASSERT_EQ(ErrorCodes::FailedToParse, popNode.init(update["$pop"]["a"], collator));
 }
 
 TEST(PopNodeTest, NoopWhenFirstPathComponentDoesNotExist) {

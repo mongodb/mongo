@@ -163,7 +163,7 @@ TEST(UpdateObjectNodeTest, ValidAddToSetPathParsesSuccessfully) {
 }
 
 TEST(UpdateObjectNodeTest, ValidPopPathParsesSuccessfully) {
-    auto update = fromjson("{$pop: {'a.b': 5}}");
+    auto update = fromjson("{$pop: {'a.b': 1}}");
     const CollatorInterface* collator = nullptr;
     std::map<StringData, std::unique_ptr<ArrayFilter>> arrayFilters;
     std::set<std::string> foundIdentifiers;

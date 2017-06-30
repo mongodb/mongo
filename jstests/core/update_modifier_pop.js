@@ -6,6 +6,23 @@
 
     assert.writeOK(coll.insert({_id: 0}));
 
+    // $pop with value of 0 fails to parse.
+    assert.writeErrorWithCode(coll.update({_id: 0}, {$pop: {"a.b": 0}}), ErrorCodes.FailedToParse);
+
+    // $pop with value of -2 fails to parse.
+    assert.writeErrorWithCode(coll.update({_id: 0}, {$pop: {"a.b": -2}}), ErrorCodes.FailedToParse);
+
+    // $pop with value of 2.5 fails to parse.
+    assert.writeErrorWithCode(coll.update({_id: 0}, {$pop: {"a.b": 2.5}}),
+                              ErrorCodes.FailedToParse);
+
+    // $pop with value of 1.1 fails to parse.
+    assert.writeErrorWithCode(coll.update({_id: 0}, {$pop: {"a.b": 1.1}}),
+                              ErrorCodes.FailedToParse);
+
+    // $pop with a nested object fails to parse.
+    assert.writeErrorWithCode(coll.update({_id: 0}, {$pop: {a: {b: 1}}}), ErrorCodes.FailedToParse);
+
     // $pop is a no-op when the path does not exist.
     let writeRes = assert.writeOK(coll.update({_id: 0}, {$pop: {"a.b": 1}}));
     assert.eq(writeRes.nMatched, 1);

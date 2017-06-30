@@ -30,12 +30,21 @@
 
 #include "mongo/db/update/pop_node.h"
 
+#include "mongo/db/matcher/expression_parser.h"
 #include "mongo/db/update/path_support.h"
 
 namespace mongo {
 
 Status PopNode::init(BSONElement modExpr, const CollatorInterface* collator) {
-    _popFromFront = modExpr.isNumber() && modExpr.number() < 0;
+    auto popVal = MatchExpressionParser::parseIntegerElementToLong(modExpr);
+    if (!popVal.isOK()) {
+        return popVal.getStatus();
+    }
+    if (popVal.getValue() != 1LL && popVal.getValue() != -1LL) {
+        return {ErrorCodes::FailedToParse,
+                str::stream() << "$pop expects 1 or -1, found: " << popVal.getValue()};
+    }
+    _popFromFront = (popVal.getValue() == -1LL);
     return Status::OK();
 }
 

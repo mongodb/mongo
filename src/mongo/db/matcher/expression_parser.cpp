@@ -856,7 +856,7 @@ StatusWithMatchExpression MatchExpressionParser::_parseBitTest(const char* name,
         }
     } else if (e.isNumber()) {
         // Integer bitmask provided as value.
-        auto bitMask = parseIntegerElementToPositiveLong(name, e);
+        auto bitMask = parseIntegerElementToNonNegativeLong(e);
         if (!bitMask.isOK()) {
             return bitMask.getStatus();
         }
@@ -958,10 +958,24 @@ StatusWithMatchExpression expressionParserGeoCallbackDefault(const char* name,
 
 MatchExpressionParserGeoCallback expressionParserGeoCallback = expressionParserGeoCallbackDefault;
 
-StatusWith<long long> MatchExpressionParser::parseIntegerElementToPositiveLong(
-    const char* name, const BSONElement& elem) {
+StatusWith<long long> MatchExpressionParser::parseIntegerElementToNonNegativeLong(
+    BSONElement elem) {
+    auto number = parseIntegerElementToLong(elem);
+    if (!number.isOK()) {
+        return number;
+    }
+
+    if (number.getValue() < 0) {
+        return Status(ErrorCodes::FailedToParse,
+                      str::stream() << "Expected a positive number in: " << elem);
+    }
+
+    return number;
+}
+
+StatusWith<long long> MatchExpressionParser::parseIntegerElementToLong(BSONElement elem) {
     if (!elem.isNumber()) {
-        return Status(ErrorCodes::FailedToParse, str::stream() << name << " must be a number");
+        return Status(ErrorCodes::FailedToParse, str::stream() << "Expected a number in: " << elem);
     }
 
     long long number = 0;
@@ -970,7 +984,8 @@ StatusWith<long long> MatchExpressionParser::parseIntegerElementToPositiveLong(
 
         // NaN doubles are rejected.
         if (std::isnan(eDouble)) {
-            return Status(ErrorCodes::FailedToParse, str::stream() << name << " cannot take a NaN");
+            return Status(ErrorCodes::FailedToParse,
+                          str::stream() << "Expected an integer, but found NaN in: " << elem);
         }
 
         // No integral doubles that are too large to be represented as a 64 bit signed integer.
@@ -978,34 +993,26 @@ StatusWith<long long> MatchExpressionParser::parseIntegerElementToPositiveLong(
         // compared against 2^63. eDouble=2^63 would not get caught that way.
         if (eDouble >= MatchExpressionParser::kLongLongMaxPlusOneAsDouble ||
             eDouble < std::numeric_limits<long long>::min()) {
-            return Status(
-                ErrorCodes::FailedToParse,
-                str::stream() << name << " cannot be represented as a 64-bit integer: " << elem);
+            return Status(ErrorCodes::FailedToParse,
+                          str::stream() << "Cannot represent as a 64-bit integer: " << elem);
         }
 
         // This checks if elem is an integral double.
         if (eDouble != static_cast<double>(static_cast<long long>(eDouble))) {
-            return Status(
-                ErrorCodes::FailedToParse,
-                str::stream() << name << " cannot have a fractional part but received: " << elem);
+            return Status(ErrorCodes::FailedToParse,
+                          str::stream() << "Expected an integer: " << elem);
         }
 
         number = elem.numberLong();
     } else if (elem.type() == BSONType::NumberDecimal) {
-        uint32_t signalingFlags = 0;
+        uint32_t signalingFlags = Decimal128::kNoFlag;
         number = elem.numberDecimal().toLongExact(&signalingFlags);
-        if (Decimal128::hasFlag(signalingFlags, Decimal128::kInexact)) {
-            return Status(
-                ErrorCodes::FailedToParse,
-                str::stream() << name << " cannot be represented as a 64-bit integer: " << elem);
+        if (signalingFlags != Decimal128::kNoFlag) {
+            return Status(ErrorCodes::FailedToParse,
+                          str::stream() << "Cannot represent as a 64-bit integer: " << elem);
         }
     } else {
         number = elem.numberLong();
-    }
-
-    if (number < 0) {
-        return Status(ErrorCodes::FailedToParse,
-                      str::stream() << name << " cannot take a negative number");
     }
 
     return number;
@@ -1015,7 +1022,7 @@ template <class T>
 StatusWithMatchExpression MatchExpressionParser::_parseInternalSchemaSingleIntegerArgument(
     const char* name, const BSONElement& elem) const {
 
-    auto parsedInt = parseIntegerElementToPositiveLong(name, elem);
+    auto parsedInt = parseIntegerElementToNonNegativeLong(elem);
     if (!parsedInt.isOK()) {
         return parsedInt.getStatus();
     }

@@ -50,7 +50,7 @@ t.remove({});
 
 t.save({_id: 1});
 res = t.update({}, {$pop: {a: true}});
-assert.writeOK(res);
+assert.writeError(res);
 t.remove({});
 
 t.save({_id: 1});
