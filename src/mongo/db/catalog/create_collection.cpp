@@ -78,7 +78,7 @@ Status createCollection(OperationContext* opCtx,
             !options["capped"].trueValue() || options["size"].isNumber() ||
                 options.hasField("$nExtents"));
 
-    MONGO_WRITE_CONFLICT_RETRY_LOOP_BEGIN {
+    return writeConflictRetry(opCtx, "create", nss.ns(), [&] {
         Lock::DBLock dbXLock(opCtx, nss.db(), MODE_X);
         OldClientContext ctx(opCtx, nss.ns());
         if (opCtx->writesAreReplicated() &&
@@ -93,14 +93,15 @@ Status createCollection(OperationContext* opCtx,
         const bool createDefaultIndexes = true;
         status =
             userCreateNS(opCtx, ctx.db(), nss.ns(), options, kind, createDefaultIndexes, idIndex);
+
         if (!status.isOK()) {
             return status;
         }
 
         wunit.commit();
-    }
-    MONGO_WRITE_CONFLICT_RETRY_LOOP_END(opCtx, "create", nss.ns());
-    return Status::OK();
+
+        return Status::OK();
+    });
 }
 }  // namespace
 
@@ -132,72 +133,88 @@ Status createCollectionForApplyOps(OperationContext* opCtx,
     // create a database on MMAPv1, which could result in createCollection failing if the database
     // does not yet exist.
     if (ui.ok()) {
-        MONGO_WRITE_CONFLICT_RETRY_LOOP_BEGIN {
-            WriteUnitOfWork wunit(opCtx);
-            // Options need the field to be named "uuid", so parse/recreate.
-            auto uuid = uassertStatusOK(UUID::parse(ui));
-            uassert(ErrorCodes::InvalidUUID,
-                    "Invalid UUID in applyOps create command: " + uuid.toString(),
-                    uuid.isRFC4122v4());
+        // Return an optional, indicating whether we need to early return (if the collection already
+        // exists, or in case of an error).
+        using Result = boost::optional<Status>;
+        auto result =
+            writeConflictRetry(opCtx, "createCollectionForApplyOps", newCollName.ns(), [&] {
+                WriteUnitOfWork wunit(opCtx);
+                // Options need the field to be named "uuid", so parse/recreate.
+                auto uuid = uassertStatusOK(UUID::parse(ui));
+                uassert(ErrorCodes::InvalidUUID,
+                        "Invalid UUID in applyOps create command: " + uuid.toString(),
+                        uuid.isRFC4122v4());
 
-            auto& catalog = UUIDCatalog::get(opCtx);
-            auto currentName = catalog.lookupNSSByUUID(uuid);
-            OpObserver* opObserver = getGlobalServiceContext()->getOpObserver();
-            if (currentName == newCollName)
-                return Status::OK();
+                auto& catalog = UUIDCatalog::get(opCtx);
+                auto currentName = catalog.lookupNSSByUUID(uuid);
+                OpObserver* opObserver = getGlobalServiceContext()->getOpObserver();
+                if (currentName == newCollName)
+                    return Result(Status::OK());
 
-            // In the case of oplog replay, a future command may have created or renamed a
-            // collection with that same name. In that case, renaming this future collection to a
-            // random temporary name is correct: once all entries are replayed no temporary names
-            // will remain.
-            // On MMAPv1 the rename can result in index names that are too long. However this should
-            // only happen for initial sync and "resync collection" for rollback, so we can let the
-            // error propagate resulting in an abort and restart of the initial sync or result in
-            // rollback to fassert, requiring a resync of that node.
-            const bool stayTemp = true;
-            if (auto futureColl = db ? db->getCollection(opCtx, newCollName) : nullptr) {
-                auto tmpName = NamespaceString(newCollName.db(), "tmp" + UUID::gen().toString());
-                Status status =
-                    db->renameCollection(opCtx, newCollName.ns(), tmpName.ns(), stayTemp);
-                if (!status.isOK())
-                    return status;
-                opObserver->onRenameCollection(opCtx,
-                                               newCollName,
-                                               tmpName,
-                                               futureColl->uuid(),
-                                               /*dropTarget*/ false,
-                                               /*dropTargetUUID*/ {},
-                                               /*dropSourceUUID*/ {},
-                                               stayTemp);
-            }
+                // In the case of oplog replay, a future command may have created or renamed a
+                // collection with that same name. In that case, renaming this future collection to
+                // a
+                // random temporary name is correct: once all entries are replayed no temporary
+                // names
+                // will remain.
+                // On MMAPv1 the rename can result in index names that are too long. However this
+                // should
+                // only happen for initial sync and "resync collection" for rollback, so we can let
+                // the
+                // error propagate resulting in an abort and restart of the initial sync or result
+                // in
+                // rollback to fassert, requiring a resync of that node.
+                const bool stayTemp = true;
+                if (auto futureColl = db ? db->getCollection(opCtx, newCollName) : nullptr) {
+                    auto tmpName =
+                        NamespaceString(newCollName.db(), "tmp" + UUID::gen().toString());
+                    Status status =
+                        db->renameCollection(opCtx, newCollName.ns(), tmpName.ns(), stayTemp);
+                    if (!status.isOK())
+                        return Result(status);
+                    opObserver->onRenameCollection(opCtx,
+                                                   newCollName,
+                                                   tmpName,
+                                                   futureColl->uuid(),
+                                                   /*dropTarget*/ false,
+                                                   /*dropTargetUUID*/ {},
+                                                   /*dropSourceUUID*/ {},
+                                                   stayTemp);
+                }
 
-            // If the collection with the requested UUID already exists, but with a different name,
-            // just rename it to 'newCollName'.
-            if (catalog.lookupCollectionByUUID(uuid)) {
-                Status status =
-                    db->renameCollection(opCtx, currentName.ns(), newCollName.ns(), stayTemp);
-                if (!status.isOK())
-                    return status;
-                opObserver->onRenameCollection(opCtx,
-                                               currentName,
-                                               newCollName,
-                                               uuid,
-                                               /*dropTarget*/ false,
-                                               /*dropTargetUUID*/ {},
-                                               /*dropSourceUUID*/ {},
-                                               stayTemp);
+                // If the collection with the requested UUID already exists, but with a different
+                // name,
+                // just rename it to 'newCollName'.
+                if (catalog.lookupCollectionByUUID(uuid)) {
+                    Status status =
+                        db->renameCollection(opCtx, currentName.ns(), newCollName.ns(), stayTemp);
+                    if (!status.isOK())
+                        return Result(status);
+                    opObserver->onRenameCollection(opCtx,
+                                                   currentName,
+                                                   newCollName,
+                                                   uuid,
+                                                   /*dropTarget*/ false,
+                                                   /*dropTargetUUID*/ {},
+                                                   /*dropSourceUUID*/ {},
+                                                   stayTemp);
 
+                    wunit.commit();
+                    return Result(Status::OK());
+                }
+
+                // A new collection with the specific UUID must be created, so add the UUID to the
+                // creation options. Regular user collection creation commands cannot do this.
+                auto uuidObj = uuid.toBSON();
+                newCmd = cmdObj.addField(uuidObj.firstElement());
                 wunit.commit();
-                return Status::OK();
-            }
 
-            // A new collection with the specific UUID must be created, so add the UUID to the
-            // creation options. Regular user collection creation commands cannot do this.
-            auto uuidObj = uuid.toBSON();
-            newCmd = cmdObj.addField(uuidObj.firstElement());
-            wunit.commit();
+                return Result(boost::none);
+            });
+
+        if (result) {
+            return *result;
         }
-        MONGO_WRITE_CONFLICT_RETRY_LOOP_END(opCtx, "createCollectionForApplyOps", newCollName.ns());
     }
 
     return createCollection(

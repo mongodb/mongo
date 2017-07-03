@@ -118,21 +118,19 @@ void generateSystemIndexForExistingCollection(OperationContext* opCtx,
 
         MultiIndexBlock indexer(opCtx, collection);
 
-        MONGO_WRITE_CONFLICT_RETRY_LOOP_BEGIN {
+        writeConflictRetry(opCtx, "authorization index regeneration", ns.ns(), [&] {
             fassertStatusOK(40453, indexer.init(indexSpec));
-        }
-        MONGO_WRITE_CONFLICT_RETRY_LOOP_END(opCtx, "authorization index regeneration", ns.ns());
+        });
 
         fassertStatusOK(40454, indexer.insertAllDocumentsInCollection());
 
-        MONGO_WRITE_CONFLICT_RETRY_LOOP_BEGIN {
+        writeConflictRetry(opCtx, "authorization index regeneration", ns.ns(), [&] {
             WriteUnitOfWork wunit(opCtx);
 
             indexer.commit();
 
             wunit.commit();
-        }
-        MONGO_WRITE_CONFLICT_RETRY_LOOP_END(opCtx, "authorization index regeneration", ns.ns());
+        });
 
         log() << "Authorization index construction on " << ns << " is complete";
     } catch (const DBException& e) {

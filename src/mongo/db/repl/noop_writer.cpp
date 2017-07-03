@@ -167,13 +167,12 @@ void NoopWriter::_writeNoop(OperationContext* opCtx) {
             LOG(logLevel)
                 << "Writing noop to oplog as there has been no writes to this replica set in over "
                 << _writeInterval;
-            MONGO_WRITE_CONFLICT_RETRY_LOOP_BEGIN {
+            writeConflictRetry(opCtx, "writeNoop", rsOplogName, [&opCtx] {
                 WriteUnitOfWork uow(opCtx);
                 opCtx->getClient()->getServiceContext()->getOpObserver()->onOpMessage(opCtx,
                                                                                       kMsgObj);
                 uow.commit();
-            }
-            MONGO_WRITE_CONFLICT_RETRY_LOOP_END(opCtx, "writeNoop", rsOplogName);
+            });
         }
     }
 

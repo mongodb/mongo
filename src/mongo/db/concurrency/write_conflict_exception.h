@@ -36,30 +36,6 @@
 #include "mongo/db/curop.h"
 #include "mongo/util/assert_util.h"
 
-// Use of this macro is deprecated.  Prefer the writeConflictRetry template, below, instead.
-
-// clang-format off
-
-#define MONGO_WRITE_CONFLICT_RETRY_LOOP_BEGIN                           \
-    do {                                                                \
-        int WCR_attempts = 0;                                           \
-        do {                                                            \
-            try
-#define MONGO_WRITE_CONFLICT_RETRY_LOOP_END(PTXN, OPSTR, NSSTR)         \
-            catch (const ::mongo::WriteConflictException& WCR_wce) {    \
-                OperationContext const* WCR_opCtx = (PTXN);             \
-                ++CurOp::get(WCR_opCtx)->debug().writeConflicts;        \
-                WCR_wce.logAndBackoff(WCR_attempts, (OPSTR), (NSSTR));  \
-                ++WCR_attempts;                                         \
-                WCR_opCtx->recoveryUnit()->abandonSnapshot();           \
-                continue;                                               \
-            }                                                           \
-            break;                                                      \
-        } while (true);                                                 \
-    } while (false)
-
-// clang-format on
-
 namespace mongo {
 
 /**

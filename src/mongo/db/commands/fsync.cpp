@@ -366,10 +366,9 @@ void FSyncLockThread::run() {
             return;
         }
         try {
-            MONGO_WRITE_CONFLICT_RETRY_LOOP_BEGIN {
+            writeConflictRetry(&opCtx, "beginBackup", "global", [&storageEngine, &opCtx] {
                 uassertStatusOK(storageEngine->beginBackup(&opCtx));
-            }
-            MONGO_WRITE_CONFLICT_RETRY_LOOP_END(&opCtx, "beginBackup", "global");
+            });
         } catch (const DBException& e) {
             error() << "storage engine unable to begin backup : " << e.toString();
             fsyncCmd.threadStatus = e.toStatus();

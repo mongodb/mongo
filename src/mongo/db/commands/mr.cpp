@@ -368,7 +368,7 @@ Config::Config(const string& _dbname, const BSONObj& cmdObj) {
  */
 void State::dropTempCollections() {
     if (!_config.tempNamespace.isEmpty()) {
-        MONGO_WRITE_CONFLICT_RETRY_LOOP_BEGIN {
+        writeConflictRetry(_opCtx, "M/R dropTempCollections", _config.tempNamespace.ns(), [this] {
             AutoGetDb autoDb(_opCtx, _config.tempNamespace.db(), MODE_X);
             if (auto db = autoDb.getDb()) {
                 WriteUnitOfWork wunit(_opCtx);
@@ -379,9 +379,7 @@ void State::dropTempCollections() {
                 db->dropCollection(_opCtx, _config.tempNamespace.ns()).transitional_ignore();
                 wunit.commit();
             }
-        }
-        MONGO_WRITE_CONFLICT_RETRY_LOOP_END(
-            _opCtx, "M/R dropTempCollections", _config.tempNamespace.ns());
+        });
         // Always forget about temporary namespaces, so we don't cache lots of them
         ShardConnection::forgetNS(_config.tempNamespace.ns());
     }
@@ -390,16 +388,14 @@ void State::dropTempCollections() {
         // harmless, this would lead to a scary looking warning on the secondaries.
         repl::UnreplicatedWritesBlock uwb(_opCtx);
 
-        MONGO_WRITE_CONFLICT_RETRY_LOOP_BEGIN {
+        writeConflictRetry(_opCtx, "M/R dropTempCollections", _config.incLong.ns(), [this] {
             Lock::DBLock lk(_opCtx, _config.incLong.db(), MODE_X);
             if (Database* db = dbHolder().get(_opCtx, _config.incLong.ns())) {
                 WriteUnitOfWork wunit(_opCtx);
                 db->dropCollection(_opCtx, _config.incLong.ns()).transitional_ignore();
                 wunit.commit();
             }
-        }
-        MONGO_WRITE_CONFLICT_RETRY_LOOP_END(
-            _opCtx, "M/R dropTempCollections", _config.incLong.ns());
+        });
 
         ShardConnection::forgetNS(_config.incLong.ns());
     }
@@ -418,7 +414,7 @@ void State::prepTempCollection() {
         // Intentionally not replicating the inc collection to secondaries.
         repl::UnreplicatedWritesBlock uwb(_opCtx);
 
-        MONGO_WRITE_CONFLICT_RETRY_LOOP_BEGIN {
+        writeConflictRetry(_opCtx, "M/R prepTempCollection", _config.incLong.ns(), [this] {
             OldClientWriteContext incCtx(_opCtx, _config.incLong.ns());
             WriteUnitOfWork wuow(_opCtx);
             Collection* incColl = incCtx.getCollection();
@@ -450,8 +446,7 @@ void State::prepTempCollection() {
                                         << status.code());
             }
             wuow.commit();
-        }
-        MONGO_WRITE_CONFLICT_RETRY_LOOP_END(_opCtx, "M/R prepTempCollection", _config.incLong.ns());
+        });
     }
 
     CollectionOptions finalOptions;
@@ -485,7 +480,7 @@ void State::prepTempCollection() {
         }
     }
 
-    MONGO_WRITE_CONFLICT_RETRY_LOOP_BEGIN {
+    writeConflictRetry(_opCtx, "M/R prepTempCollection", _config.tempNamespace.ns(), [&] {
         // create temp collection and insert the indexes from temporary storage
         OldClientWriteContext tempCtx(_opCtx, _config.tempNamespace.ns());
         WriteUnitOfWork wuow(_opCtx);
@@ -519,9 +514,7 @@ void State::prepTempCollection() {
                 _opCtx, _config.tempNamespace, uuid, *it, false);
         }
         wuow.commit();
-    }
-    MONGO_WRITE_CONFLICT_RETRY_LOOP_END(
-        _opCtx, "M/R prepTempCollection", _config.tempNamespace.ns());
+    });
 }
 
 /**
@@ -741,7 +734,7 @@ long long State::postProcessCollectionNonAtomic(OperationContext* opCtx,
 void State::insert(const NamespaceString& nss, const BSONObj& o) {
     verify(_onDisk);
 
-    MONGO_WRITE_CONFLICT_RETRY_LOOP_BEGIN {
+    writeConflictRetry(_opCtx, "M/R insert", nss.ns(), [this, &nss, &o] {
         OldClientWriteContext ctx(_opCtx, nss.ns());
         WriteUnitOfWork wuow(_opCtx);
         uassert(ErrorCodes::PrimarySteppedDown,
@@ -766,8 +759,7 @@ void State::insert(const NamespaceString& nss, const BSONObj& o) {
         OpDebug* const nullOpDebug = nullptr;
         uassertStatusOK(coll->insertDocument(_opCtx, bo, nullOpDebug, true));
         wuow.commit();
-    }
-    MONGO_WRITE_CONFLICT_RETRY_LOOP_END(_opCtx, "M/R insert", nss.ns());
+    });
 }
 
 /**
@@ -776,7 +768,7 @@ void State::insert(const NamespaceString& nss, const BSONObj& o) {
 void State::_insertToInc(BSONObj& o) {
     verify(_onDisk);
 
-    MONGO_WRITE_CONFLICT_RETRY_LOOP_BEGIN {
+    writeConflictRetry(_opCtx, "M/R insertToInc", _config.incLong.ns(), [this, &o] {
         OldClientWriteContext ctx(_opCtx, _config.incLong.ns());
         WriteUnitOfWork wuow(_opCtx);
         Collection* coll = getCollectionOrUassert(_opCtx, ctx.db(), _config.incLong);
@@ -799,8 +791,7 @@ void State::_insertToInc(BSONObj& o) {
         OpDebug* const nullOpDebug = nullptr;
         uassertStatusOK(coll->insertDocument(_opCtx, o, nullOpDebug, true, false));
         wuow.commit();
-    }
-    MONGO_WRITE_CONFLICT_RETRY_LOOP_END(_opCtx, "M/R insertToInc", _config.incLong.ns());
+    });
 }
 
 State::State(OperationContext* opCtx, const Config& c)
@@ -1066,7 +1057,7 @@ void State::finalReduce(OperationContext* opCtx, CurOp* curOp, ProgressMeterHold
     verify(_temp->size() == 0);
     BSONObj sortKey = BSON("0" << 1);
 
-    MONGO_WRITE_CONFLICT_RETRY_LOOP_BEGIN {
+    writeConflictRetry(_opCtx, "finalReduce", _config.incLong.ns(), [&] {
         OldClientWriteContext incCtx(_opCtx, _config.incLong.ns());
         WriteUnitOfWork wuow(_opCtx);
         Collection* incColl = getCollectionOrUassert(_opCtx, incCtx.db(), _config.incLong);
@@ -1085,8 +1076,7 @@ void State::finalReduce(OperationContext* opCtx, CurOp* curOp, ProgressMeterHold
 
         verify(foundIndex);
         wuow.commit();
-    }
-    MONGO_WRITE_CONFLICT_RETRY_LOOP_END(_opCtx, "finalReduce", _config.incLong.ns());
+    });
 
     unique_ptr<AutoGetCollectionForReadCommand> ctx(
         new AutoGetCollectionForReadCommand(_opCtx, _config.incLong));

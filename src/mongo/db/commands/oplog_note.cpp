@@ -69,12 +69,11 @@ Status _performNoopWrite(OperationContext* opCtx, BSONObj msgObj, StringData not
         return {ErrorCodes::NotMaster, "Not a primary"};
     }
 
-    MONGO_WRITE_CONFLICT_RETRY_LOOP_BEGIN {
+    writeConflictRetry(opCtx, note, repl::rsOplogName, [&opCtx, &msgObj] {
         WriteUnitOfWork uow(opCtx);
         opCtx->getClient()->getServiceContext()->getOpObserver()->onOpMessage(opCtx, msgObj);
         uow.commit();
-    }
-    MONGO_WRITE_CONFLICT_RETRY_LOOP_END(opCtx, note, repl::rsOplogName);
+    });
 
     return Status::OK();
 }

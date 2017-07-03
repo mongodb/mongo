@@ -302,16 +302,14 @@ StatusWith<int> CollectionRangeDeleter::_doDeletion(OperationContext* opCtx,
         }
         invariant(PlanExecutor::ADVANCED == state);
 
-        MONGO_WRITE_CONFLICT_RETRY_LOOP_BEGIN {
+        writeConflictRetry(opCtx, "delete range", nss.ns(), [&] {
             WriteUnitOfWork wuow(opCtx);
             if (saver) {
                 saver->goingToDelete(obj).transitional_ignore();
             }
             collection->deleteDocument(opCtx, rloc, nullptr, true);
             wuow.commit();
-        }
-        MONGO_WRITE_CONFLICT_RETRY_LOOP_END(opCtx, "delete range", nss.ns());
-
+        });
     } while (++numDeleted < maxToDelete);
 
     return numDeleted;

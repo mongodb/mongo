@@ -162,7 +162,7 @@ struct Cloner::Fun {
                     str::stream() << "collection dropped during clone [" << to_collection.ns()
                                   << "]",
                     !createdCollection);
-            MONGO_WRITE_CONFLICT_RETRY_LOOP_BEGIN {
+            writeConflictRetry(opCtx, "createCollection", to_collection.ns(), [&] {
                 opCtx->checkForInterrupt();
 
                 WriteUnitOfWork wunit(opCtx);
@@ -177,8 +177,7 @@ struct Cloner::Fun {
                 verify(s.isOK());
                 wunit.commit();
                 collection = db->getCollection(opCtx, to_collection);
-            }
-            MONGO_WRITE_CONFLICT_RETRY_LOOP_END(opCtx, "createCollection", to_collection.ns());
+            });
         }
 
         const bool isSystemViewsClone = to_collection.isSystemDotViews();
@@ -258,7 +257,8 @@ struct Cloner::Fun {
 
             verify(collection);
             ++numSeen;
-            MONGO_WRITE_CONFLICT_RETRY_LOOP_BEGIN {
+
+            writeConflictRetry(opCtx, "cloner insert", to_collection.ns(), [&] {
                 opCtx->checkForInterrupt();
 
                 WriteUnitOfWork wunit(opCtx);
@@ -274,8 +274,8 @@ struct Cloner::Fun {
                 if (status.isOK()) {
                     wunit.commit();
                 }
-            }
-            MONGO_WRITE_CONFLICT_RETRY_LOOP_END(opCtx, "cloner insert", to_collection.ns());
+            });
+
             RARELY if (time(0) - saveLast > 60) {
                 log() << numSeen << " objects cloned so far from collection " << from_collection;
                 saveLast = time(0);
@@ -370,7 +370,7 @@ void Cloner::copyIndexes(OperationContext* opCtx,
 
     Collection* collection = db->getCollection(opCtx, to_collection);
     if (!collection) {
-        MONGO_WRITE_CONFLICT_RETRY_LOOP_BEGIN {
+        writeConflictRetry(opCtx, "createCollection", to_collection.ns(), [&] {
             opCtx->checkForInterrupt();
 
             WriteUnitOfWork wunit(opCtx);
@@ -387,8 +387,7 @@ void Cloner::copyIndexes(OperationContext* opCtx,
             collection = db->getCollection(opCtx, to_collection);
             invariant(collection);
             wunit.commit();
-        }
-        MONGO_WRITE_CONFLICT_RETRY_LOOP_END(opCtx, "createCollection", to_collection.ns());
+        });
     }
 
     // TODO pass the MultiIndexBlock when inserting into the collection rather than building the
@@ -469,7 +468,7 @@ bool Cloner::copyCollection(OperationContext* opCtx,
     Database* db = dbHolder().openDb(opCtx, dbname);
 
     if (shouldCreateCollection) {
-        MONGO_WRITE_CONFLICT_RETRY_LOOP_BEGIN {
+        bool result = writeConflictRetry(opCtx, "createCollection", ns, [&] {
             opCtx->checkForInterrupt();
 
             WriteUnitOfWork wunit(opCtx);
@@ -486,9 +485,14 @@ bool Cloner::copyCollection(OperationContext* opCtx,
                 // abort write unit of work
                 return false;
             }
+
             wunit.commit();
+            return true;
+        });
+
+        if (!result) {
+            return result;
         }
-        MONGO_WRITE_CONFLICT_RETRY_LOOP_END(opCtx, "createCollection", ns);
     } else {
         LOG(1) << "No collection info found for ns:" << nss.toString()
                << ", host:" << _conn->getServerAddress();
@@ -565,7 +569,7 @@ Status Cloner::createCollectionsForDb(
         const NamespaceString nss(dbName, params.collectionName);
 
         uassertStatusOK(userAllowedCreateNS(dbName, params.collectionName));
-        MONGO_WRITE_CONFLICT_RETRY_LOOP_BEGIN {
+        Status status = writeConflictRetry(opCtx, "createCollection", nss.ns(), [&] {
             opCtx->checkForInterrupt();
             WriteUnitOfWork wunit(opCtx);
 
@@ -583,9 +587,15 @@ Status Cloner::createCollectionsForDb(
             }
 
             wunit.commit();
+            return Status::OK();
+        });
+
+        // Break early if one of the creations fails.
+        if (!status.isOK()) {
+            return status;
         }
-        MONGO_WRITE_CONFLICT_RETRY_LOOP_END(opCtx, "createCollection", nss.ns());
     }
+
     return Status::OK();
 }
 

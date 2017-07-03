@@ -91,11 +91,10 @@ void ServiceContextMongoDTest::_dropAllDBs(OperationContext* opCtx) {
     AutoGetDb autoDBLocal(opCtx, "local", MODE_X);
     const auto localDB = autoDBLocal.getDb();
     if (localDB) {
-        MONGO_WRITE_CONFLICT_RETRY_LOOP_BEGIN {
+        writeConflictRetry(opCtx, "_dropAllDBs", "local", [&] {
             // Do not wrap in a WriteUnitOfWork until SERVER-17103 is addressed.
             autoDBLocal.getDb()->dropDatabase(opCtx, localDB);
-        }
-        MONGO_WRITE_CONFLICT_RETRY_LOOP_END(opCtx, "_dropAllDBs", "local");
+        });
     }
 
     // dropAllDatabasesExceptLocal() does not close empty databases. However the holder still

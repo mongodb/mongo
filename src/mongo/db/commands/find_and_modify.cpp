@@ -379,7 +379,7 @@ public:
         // Although usually the PlanExecutor handles WCE internally, it will throw WCEs when it is
         // executing a findAndModify. This is done to ensure that we can always match, modify, and
         // return the document under concurrency, if a matching document exists.
-        MONGO_WRITE_CONFLICT_RETRY_LOOP_BEGIN {
+        bool success = writeConflictRetry(opCtx, "findAndModify", nsString.ns(), [&] {
             if (args.isRemove()) {
                 DeleteRequest request(nsString);
                 const bool isExplain = false;
@@ -388,7 +388,8 @@ public:
                 ParsedDelete parsedDelete(opCtx, &request);
                 Status parsedDeleteStatus = parsedDelete.parseRequest();
                 if (!parsedDeleteStatus.isOK()) {
-                    return appendCommandStatus(result, parsedDeleteStatus);
+                    appendCommandStatus(result, parsedDeleteStatus);
+                    return false;
                 }
 
                 AutoGetOrCreateDb autoDb(opCtx, dbName, MODE_IX);
@@ -406,19 +407,22 @@ public:
 
                 Status isPrimary = checkCanAcceptWritesForDatabase(opCtx, nsString);
                 if (!isPrimary.isOK()) {
-                    return appendCommandStatus(result, isPrimary);
+                    appendCommandStatus(result, isPrimary);
+                    return false;
                 }
 
                 Collection* const collection = autoDb.getDb()->getCollection(opCtx, nsString);
                 if (!collection && autoDb.getDb()->getViewCatalog()->lookup(opCtx, nsString.ns())) {
-                    return appendCommandStatus(result,
-                                               {ErrorCodes::CommandNotSupportedOnView,
-                                                "findAndModify not supported on a view"});
+                    appendCommandStatus(result,
+                                        {ErrorCodes::CommandNotSupportedOnView,
+                                         "findAndModify not supported on a view"});
+                    return false;
                 }
                 auto statusWithPlanExecutor =
                     getExecutorDelete(opCtx, opDebug, collection, &parsedDelete);
                 if (!statusWithPlanExecutor.isOK()) {
-                    return appendCommandStatus(result, statusWithPlanExecutor.getStatus());
+                    appendCommandStatus(result, statusWithPlanExecutor.getStatus());
+                    return false;
                 }
                 const auto exec = std::move(statusWithPlanExecutor.getValue());
 
@@ -430,7 +434,8 @@ public:
                 StatusWith<boost::optional<BSONObj>> advanceStatus =
                     advanceExecutor(opCtx, exec.get(), args.isRemove());
                 if (!advanceStatus.isOK()) {
-                    return appendCommandStatus(result, advanceStatus.getStatus());
+                    appendCommandStatus(result, advanceStatus.getStatus());
+                    return false;
                 }
                 // Nothing after advancing the plan executor should throw a WriteConflictException,
                 // so the following bookkeeping with execution stats won't end up being done
@@ -464,7 +469,8 @@ public:
                 ParsedUpdate parsedUpdate(opCtx, &request);
                 Status parsedUpdateStatus = parsedUpdate.parseRequest();
                 if (!parsedUpdateStatus.isOK()) {
-                    return appendCommandStatus(result, parsedUpdateStatus);
+                    appendCommandStatus(result, parsedUpdateStatus);
+                    return false;
                 }
 
                 AutoGetOrCreateDb autoDb(opCtx, dbName, MODE_IX);
@@ -482,14 +488,16 @@ public:
 
                 Status isPrimary = checkCanAcceptWritesForDatabase(opCtx, nsString);
                 if (!isPrimary.isOK()) {
-                    return appendCommandStatus(result, isPrimary);
+                    appendCommandStatus(result, isPrimary);
+                    return false;
                 }
 
                 Collection* collection = autoDb.getDb()->getCollection(opCtx, nsString.ns());
                 if (!collection && autoDb.getDb()->getViewCatalog()->lookup(opCtx, nsString.ns())) {
-                    return appendCommandStatus(result,
-                                               {ErrorCodes::CommandNotSupportedOnView,
-                                                "findAndModify not supported on a view"});
+                    appendCommandStatus(result,
+                                        {ErrorCodes::CommandNotSupportedOnView,
+                                         "findAndModify not supported on a view"});
+                    return false;
                 }
 
                 // Create the collection if it does not exist when performing an upsert
@@ -501,7 +509,8 @@ public:
                     collection = autoDb.getDb()->getCollection(opCtx, nsString);
                     Status isPrimaryAfterRelock = checkCanAcceptWritesForDatabase(opCtx, nsString);
                     if (!isPrimaryAfterRelock.isOK()) {
-                        return appendCommandStatus(result, isPrimaryAfterRelock);
+                        appendCommandStatus(result, isPrimaryAfterRelock);
+                        return false;
                     }
 
                     if (collection) {
@@ -511,7 +520,8 @@ public:
                         Status createCollStatus =
                             userCreateNS(opCtx, autoDb.getDb(), nsString.ns(), BSONObj());
                         if (!createCollStatus.isOK()) {
-                            return appendCommandStatus(result, createCollStatus);
+                            appendCommandStatus(result, createCollStatus);
+                            return false;
                         }
                         wuow.commit();
 
@@ -523,7 +533,8 @@ public:
                 auto statusWithPlanExecutor =
                     getExecutorUpdate(opCtx, opDebug, collection, &parsedUpdate);
                 if (!statusWithPlanExecutor.isOK()) {
-                    return appendCommandStatus(result, statusWithPlanExecutor.getStatus());
+                    appendCommandStatus(result, statusWithPlanExecutor.getStatus());
+                    return false;
                 }
                 const auto exec = std::move(statusWithPlanExecutor.getValue());
 
@@ -535,7 +546,8 @@ public:
                 StatusWith<boost::optional<BSONObj>> advanceStatus =
                     advanceExecutor(opCtx, exec.get(), args.isRemove());
                 if (!advanceStatus.isOK()) {
-                    return appendCommandStatus(result, advanceStatus.getStatus());
+                    appendCommandStatus(result, advanceStatus.getStatus());
+                    return false;
                 }
                 // Nothing after advancing the plan executor should throw a WriteConflictException,
                 // so the following bookkeeping with execution stats won't end up being done
@@ -559,8 +571,12 @@ public:
                 boost::optional<BSONObj> value = advanceStatus.getValue();
                 appendCommandResponse(exec.get(), args.isRemove(), value, result);
             }
+            return true;
+        });
+
+        if (!success) {
+            return false;
         }
-        MONGO_WRITE_CONFLICT_RETRY_LOOP_END(opCtx, "findAndModify", nsString.ns());
 
         if (repl::ReplClientInfo::forClient(client).getLastOp() != lastOpAtOperationStart) {
             // If this operation has already generated a new lastOp, don't bother setting it here.

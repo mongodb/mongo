@@ -175,7 +175,7 @@ void assertCanWrite_inlock(OperationContext* opCtx, const NamespaceString& ns) {
 }
 
 void makeCollection(OperationContext* opCtx, const NamespaceString& ns) {
-    MONGO_WRITE_CONFLICT_RETRY_LOOP_BEGIN {
+    writeConflictRetry(opCtx, "implicit collection creation", ns.ns(), [&opCtx, &ns] {
         AutoGetOrCreateDb db(opCtx, ns.db(), MODE_X);
         assertCanWrite_inlock(opCtx, ns);
         if (!db.getDb()->getCollection(opCtx, ns)) {  // someone else may have beat us to it.
@@ -183,8 +183,7 @@ void makeCollection(OperationContext* opCtx, const NamespaceString& ns) {
             uassertStatusOK(userCreateNS(opCtx, db.getDb(), ns.ns(), BSONObj()));
             wuow.commit();
         }
-    }
-    MONGO_WRITE_CONFLICT_RETRY_LOOP_END(opCtx, "implicit collection creation", ns.ns());
+    });
 }
 
 /**
@@ -371,7 +370,7 @@ static bool insertBatchAndHandleErrors(OperationContext* opCtx,
     for (auto it = batch.begin(); it != batch.end(); ++it) {
         globalOpCounters.gotInsert();
         try {
-            MONGO_WRITE_CONFLICT_RETRY_LOOP_BEGIN {
+            writeConflictRetry(opCtx, "insert", wholeOp.ns.ns(), [&] {
                 try {
                     if (!collection)
                         acquireCollection();
@@ -388,8 +387,7 @@ static bool insertBatchAndHandleErrors(OperationContext* opCtx,
                     collection.reset();
                     throw;
                 }
-            }
-            MONGO_WRITE_CONFLICT_RETRY_LOOP_END(opCtx, "insert", wholeOp.ns.ns());
+            });
         } catch (const DBException& ex) {
             bool canContinue = handleError(opCtx, ex, wholeOp, out);
             if (!canContinue)

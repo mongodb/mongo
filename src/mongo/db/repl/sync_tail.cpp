@@ -313,16 +313,15 @@ Status SyncTail::syncApply(OperationContext* opCtx,
         auto opStr = isNoOp ? "syncApply_noop" : "syncApply_indexBuild";
         if (isNoOp && nss.db() == "")
             return Status::OK();
-        MONGO_WRITE_CONFLICT_RETRY_LOOP_BEGIN {
+        return writeConflictRetry(opCtx, opStr, nss.ns(), [&] {
             Lock::DBLock dbLock(opCtx, nss.db(), MODE_X);
             OldClientContext ctx(opCtx, nss.ns());
             return applyOp(ctx.db());
-        }
-        MONGO_WRITE_CONFLICT_RETRY_LOOP_END(opCtx, opStr, nss.ns());
+        });
     }
 
     if (isCrudOpType(opType)) {
-        MONGO_WRITE_CONFLICT_RETRY_LOOP_BEGIN {
+        return writeConflictRetry(opCtx, "syncApply_CRUD", nss.ns(), [&] {
             // DB lock always acquires the global lock
             std::unique_ptr<Lock::DBLock> dbLock;
             std::unique_ptr<Lock::CollectionLock> collectionLock;
@@ -357,12 +356,11 @@ Status SyncTail::syncApply(OperationContext* opCtx,
             }
 
             return applyOp(ctx->db());
-        }
-        MONGO_WRITE_CONFLICT_RETRY_LOOP_END(opCtx, "syncApply_CRUD", nss.ns());
+        });
     }
 
     if (opType[0] == 'c') {
-        MONGO_WRITE_CONFLICT_RETRY_LOOP_BEGIN {
+        return writeConflictRetry(opCtx, "syncApply_command", nss.ns(), [&] {
             // a command may need a global write lock. so we will conservatively go
             // ahead and grab one here. suboptimal. :-(
             Lock::GlobalWrite globalWriteLock(opCtx);
@@ -371,8 +369,7 @@ Status SyncTail::syncApply(OperationContext* opCtx,
             Status status = applyCommandInLock(opCtx, op, inSteadyStateReplication);
             incrementOpsAppliedStats();
             return status;
-        }
-        MONGO_WRITE_CONFLICT_RETRY_LOOP_END(opCtx, "syncApply_command", nss.ns());
+        });
     }
 
     // unknown opType
@@ -989,7 +986,7 @@ BSONObj SyncTail::getMissingDoc(OperationContext* opCtx, Database* db, const BSO
 
 bool SyncTail::shouldRetry(OperationContext* opCtx, const BSONObj& o) {
     const NamespaceString nss(o.getStringField("ns"));
-    MONGO_WRITE_CONFLICT_RETRY_LOOP_BEGIN {
+    return writeConflictRetry(opCtx, "InsertRetry", nss.ns(), [&] {
         // Take an X lock on the database in order to preclude other modifications.
         // Also, the database might not exist yet, so create it.
         AutoGetOrCreateDb autoDb(opCtx, nss.db(), MODE_X);
@@ -1024,11 +1021,7 @@ bool SyncTail::shouldRetry(OperationContext* opCtx, const BSONObj& o) {
             wunit.commit();
             return true;
         }
-    }
-    MONGO_WRITE_CONFLICT_RETRY_LOOP_END(opCtx, "InsertRetry", nss.ns());
-
-    // fixes compile errors on GCC - see SERVER-18219 for details
-    MONGO_UNREACHABLE;
+    });
 }
 
 // This free function is used by the writer threads to apply each op

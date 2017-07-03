@@ -379,17 +379,17 @@ Status ReplicationCoordinatorExternalStateImpl::initializeReplSetStorage(Operati
     try {
         createOplog(opCtx);
 
-        MONGO_WRITE_CONFLICT_RETRY_LOOP_BEGIN {
-            Lock::GlobalWrite globalWrite(opCtx);
+        writeConflictRetry(
+            opCtx, "initiate oplog entry", "local.oplog.rs", [this, &opCtx, &config] {
+                Lock::GlobalWrite globalWrite(opCtx);
 
-            WriteUnitOfWork wuow(opCtx);
-            Helpers::putSingleton(opCtx, configCollectionName, config);
-            const auto msgObj = BSON("msg"
-                                     << "initiating set");
-            _service->getOpObserver()->onOpMessage(opCtx, msgObj);
-            wuow.commit();
-        }
-        MONGO_WRITE_CONFLICT_RETRY_LOOP_END(opCtx, "initiate oplog entry", "local.oplog.rs");
+                WriteUnitOfWork wuow(opCtx);
+                Helpers::putSingleton(opCtx, configCollectionName, config);
+                const auto msgObj = BSON("msg"
+                                         << "initiating set");
+                _service->getOpObserver()->onOpMessage(opCtx, msgObj);
+                wuow.commit();
+            });
 
         FeatureCompatibilityVersion::setIfCleanStartup(opCtx, _storageInterface);
     } catch (const DBException& ex) {
@@ -420,16 +420,14 @@ OpTime ReplicationCoordinatorExternalStateImpl::onTransitionToPrimary(OperationC
     _replicationProcess->getConsistencyMarkers()->setAppliedThrough(opCtx, {});
 
     if (isV1ElectionProtocol) {
-        MONGO_WRITE_CONFLICT_RETRY_LOOP_BEGIN {
+        writeConflictRetry(opCtx, "logging transition to primary to oplog", "local.oplog.rs", [&] {
             WriteUnitOfWork wuow(opCtx);
             opCtx->getClient()->getServiceContext()->getOpObserver()->onOpMessage(
                 opCtx,
                 BSON("msg"
                      << "new primary"));
             wuow.commit();
-        }
-        MONGO_WRITE_CONFLICT_RETRY_LOOP_END(
-            opCtx, "logging transition to primary to oplog", "local.oplog.rs");
+        });
     }
     const auto opTimeToReturn = fassertStatusOK(28665, loadLastOpTime(opCtx));
 
@@ -476,7 +474,7 @@ OID ReplicationCoordinatorExternalStateImpl::ensureMe(OperationContext* opCtx) {
 StatusWith<BSONObj> ReplicationCoordinatorExternalStateImpl::loadLocalConfigDocument(
     OperationContext* opCtx) {
     try {
-        MONGO_WRITE_CONFLICT_RETRY_LOOP_BEGIN {
+        return writeConflictRetry(opCtx, "load replica set config", configCollectionName, [opCtx] {
             BSONObj config;
             if (!Helpers::getSingleton(opCtx, configCollectionName, config)) {
                 return StatusWith<BSONObj>(
@@ -485,8 +483,7 @@ StatusWith<BSONObj> ReplicationCoordinatorExternalStateImpl::loadLocalConfigDocu
                                   << configCollectionName);
             }
             return StatusWith<BSONObj>(config);
-        }
-        MONGO_WRITE_CONFLICT_RETRY_LOOP_END(opCtx, "load replica set config", configCollectionName);
+        });
     } catch (const DBException& ex) {
         return StatusWith<BSONObj>(ex.toStatus());
     }
@@ -495,12 +492,12 @@ StatusWith<BSONObj> ReplicationCoordinatorExternalStateImpl::loadLocalConfigDocu
 Status ReplicationCoordinatorExternalStateImpl::storeLocalConfigDocument(OperationContext* opCtx,
                                                                          const BSONObj& config) {
     try {
-        MONGO_WRITE_CONFLICT_RETRY_LOOP_BEGIN {
+        writeConflictRetry(opCtx, "save replica set config", configCollectionName, [&] {
             Lock::DBLock dbWriteLock(opCtx, configDatabaseName, MODE_X);
             Helpers::putSingleton(opCtx, configCollectionName, config);
-            return Status::OK();
-        }
-        MONGO_WRITE_CONFLICT_RETRY_LOOP_END(opCtx, "save replica set config", configCollectionName);
+        });
+
+        return Status::OK();
     } catch (const DBException& ex) {
         return ex.toStatus();
     }
@@ -509,18 +506,17 @@ Status ReplicationCoordinatorExternalStateImpl::storeLocalConfigDocument(Operati
 StatusWith<LastVote> ReplicationCoordinatorExternalStateImpl::loadLocalLastVoteDocument(
     OperationContext* opCtx) {
     try {
-        MONGO_WRITE_CONFLICT_RETRY_LOOP_BEGIN {
-            BSONObj lastVoteObj;
-            if (!Helpers::getSingleton(opCtx, lastVoteCollectionName, lastVoteObj)) {
-                return StatusWith<LastVote>(ErrorCodes::NoMatchingDocument,
-                                            str::stream()
-                                                << "Did not find replica set lastVote document in "
-                                                << lastVoteCollectionName);
-            }
-            return LastVote::readFromLastVote(lastVoteObj);
-        }
-        MONGO_WRITE_CONFLICT_RETRY_LOOP_END(
-            opCtx, "load replica set lastVote", lastVoteCollectionName);
+        return writeConflictRetry(
+            opCtx, "load replica set lastVote", lastVoteCollectionName, [opCtx] {
+                BSONObj lastVoteObj;
+                if (!Helpers::getSingleton(opCtx, lastVoteCollectionName, lastVoteObj)) {
+                    return StatusWith<LastVote>(
+                        ErrorCodes::NoMatchingDocument,
+                        str::stream() << "Did not find replica set lastVote document in "
+                                      << lastVoteCollectionName);
+                }
+                return LastVote::readFromLastVote(lastVoteObj);
+            });
     } catch (const DBException& ex) {
         return StatusWith<LastVote>(ex.toStatus());
     }
@@ -530,30 +526,37 @@ Status ReplicationCoordinatorExternalStateImpl::storeLocalLastVoteDocument(
     OperationContext* opCtx, const LastVote& lastVote) {
     BSONObj lastVoteObj = lastVote.toBSON();
     try {
-        MONGO_WRITE_CONFLICT_RETRY_LOOP_BEGIN {
-            Lock::DBLock dbWriteLock(opCtx, lastVoteDatabaseName, MODE_X);
+        Status status =
+            writeConflictRetry(opCtx, "save replica set lastVote", lastVoteCollectionName, [&] {
+                Lock::DBLock dbWriteLock(opCtx, lastVoteDatabaseName, MODE_X);
 
-            // If there is no last vote document, we want to store one. Otherwise, we only want to
-            // replace it if the new last vote document would have a higher term. We both check
-            // the term of the current last vote document and insert the new document under the
-            // DBLock to synchronize the two operations.
-            BSONObj result;
-            bool exists = Helpers::getSingleton(opCtx, lastVoteCollectionName, result);
-            if (!exists) {
-                Helpers::putSingleton(opCtx, lastVoteCollectionName, lastVoteObj);
-            } else {
-                StatusWith<LastVote> oldLastVoteDoc = LastVote::readFromLastVote(result);
-                if (!oldLastVoteDoc.isOK()) {
-                    return oldLastVoteDoc.getStatus();
-                }
-                if (lastVote.getTerm() > oldLastVoteDoc.getValue().getTerm()) {
+                // If there is no last vote document, we want to store one. Otherwise, we only want
+                // to replace it if the new last vote document would have a higher term. We both
+                // check the term of the current last vote document and insert the new document
+                // under the DBLock to synchronize the two operations.
+                BSONObj result;
+                bool exists = Helpers::getSingleton(opCtx, lastVoteCollectionName, result);
+                if (!exists) {
                     Helpers::putSingleton(opCtx, lastVoteCollectionName, lastVoteObj);
+                } else {
+                    StatusWith<LastVote> oldLastVoteDoc = LastVote::readFromLastVote(result);
+                    if (!oldLastVoteDoc.isOK()) {
+                        return oldLastVoteDoc.getStatus();
+                    }
+                    if (lastVote.getTerm() > oldLastVoteDoc.getValue().getTerm()) {
+                        Helpers::putSingleton(opCtx, lastVoteCollectionName, lastVoteObj);
+                    }
                 }
-            }
+
+                return Status::OK();
+            });
+
+        if (!status.isOK()) {
+            return status;
         }
-        MONGO_WRITE_CONFLICT_RETRY_LOOP_END(
-            opCtx, "save replica set lastVote", lastVoteCollectionName);
+
         opCtx->recoveryUnit()->waitUntilDurable();
+
         return Status::OK();
     } catch (const DBException& ex) {
         return ex.toStatus();

@@ -164,7 +164,7 @@ Status renameCollection(OperationContext* opCtx,
     auto sourceUUID = sourceColl->uuid();
     // If we are renaming in the same database, just rename the namespace and we're done.
     if (sourceDB == targetDB) {
-        MONGO_WRITE_CONFLICT_RETRY_LOOP_BEGIN {
+        return writeConflictRetry(opCtx, "renameCollection", target.ns(), [&] {
             WriteUnitOfWork wunit(opCtx);
             OptionalCollectionUUID dropTargetUUID;
             if (targetColl) {
@@ -192,9 +192,8 @@ Status renameCollection(OperationContext* opCtx,
                                                                            stayTemp);
 
             wunit.commit();
-        }
-        MONGO_WRITE_CONFLICT_RETRY_LOOP_END(opCtx, "renameCollection", target.ns());
-        return Status::OK();
+            return Status::OK();
+        });
     }
 
 
@@ -218,7 +217,7 @@ Status renameCollection(OperationContext* opCtx,
             options.uuid = newUUID;
         }
 
-        MONGO_WRITE_CONFLICT_RETRY_LOOP_BEGIN {
+        writeConflictRetry(opCtx, "renameCollection", tmpName.ns(), [&] {
             WriteUnitOfWork wunit(opCtx);
 
             // No logOp necessary because the entire renameCollection command is one logOp.
@@ -229,8 +228,7 @@ Status renameCollection(OperationContext* opCtx,
                                                  false);  // _id index build with others later.
 
             wunit.commit();
-        }
-        MONGO_WRITE_CONFLICT_RETRY_LOOP_END(opCtx, "renameCollection", tmpName.ns());
+        });
     }
 
     // Dismissed on success
@@ -270,7 +268,7 @@ Status renameCollection(OperationContext* opCtx,
 
             const auto obj = record->data.releaseToBson();
 
-            MONGO_WRITE_CONFLICT_RETRY_LOOP_BEGIN {
+            status = writeConflictRetry(opCtx, "renameCollection", tmpName.ns(), [&] {
                 WriteUnitOfWork wunit(opCtx);
                 // No logOp necessary because the entire renameCollection command is one logOp.
                 repl::UnreplicatedWritesBlock uwb(opCtx);
@@ -278,8 +276,12 @@ Status renameCollection(OperationContext* opCtx,
                 if (!status.isOK())
                     return status;
                 wunit.commit();
+                return Status::OK();
+            });
+
+            if (!status.isOK()) {
+                return status;
             }
-            MONGO_WRITE_CONFLICT_RETRY_LOOP_END(opCtx, "renameCollection", tmpName.ns());
         }
     }
 
@@ -290,7 +292,7 @@ Status renameCollection(OperationContext* opCtx,
 
     // Getting here means we successfully built the target copy. We now do the final
     // in-place rename and remove the source collection.
-    MONGO_WRITE_CONFLICT_RETRY_LOOP_BEGIN {
+    status = writeConflictRetry(opCtx, "renameCollection", tmpName.ns(), [&] {
         WriteUnitOfWork wunit(opCtx);
         indexer.commit();
         OptionalCollectionUUID dropTargetUUID;
@@ -311,18 +313,15 @@ Status renameCollection(OperationContext* opCtx,
         }
 
         getGlobalServiceContext()->getOpObserver()->onRenameCollection(
-            opCtx,
-            source,
-            target,
-            newUUID,
-            dropTarget,
-            dropTargetUUID,
-            /*dropSourceUUID*/ sourceUUID,
-            stayTemp);
+            opCtx, source, target, newUUID, dropTarget, dropTargetUUID, sourceUUID, stayTemp);
 
         wunit.commit();
+        return Status::OK();
+    });
+
+    if (!status.isOK()) {
+        return status;
     }
-    MONGO_WRITE_CONFLICT_RETRY_LOOP_END(opCtx, "renameCollection", tmpName.ns());
 
     tmpCollectionDropper.Dismiss();
     return Status::OK();

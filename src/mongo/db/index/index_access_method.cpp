@@ -475,7 +475,7 @@ Status IndexAccessMethod::commitBulk(OperationContext* opCtx,
 
     std::unique_ptr<SortedDataBuilderInterface> builder;
 
-    MONGO_WRITE_CONFLICT_RETRY_LOOP_BEGIN {
+    writeConflictRetry(opCtx, "setting index multikey flag", "", [&] {
         WriteUnitOfWork wunit(opCtx);
 
         if (bulk->_everGeneratedMultipleKeys || isMultikeyFromPaths(bulk->_indexMultikeyPaths)) {
@@ -484,8 +484,7 @@ Status IndexAccessMethod::commitBulk(OperationContext* opCtx,
 
         builder.reset(_newInterface->getBulkBuilder(opCtx, dupsAllowed));
         wunit.commit();
-    }
-    MONGO_WRITE_CONFLICT_RETRY_LOOP_END(opCtx, "setting index multikey flag", "");
+    });
 
     while (i->more()) {
         if (mayInterrupt) {

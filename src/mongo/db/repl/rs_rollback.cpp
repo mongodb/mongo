@@ -777,13 +777,12 @@ void syncFixUp(OperationContext* opCtx,
                                     } catch (const DBException& e) {
                                         if (e.getCode() == 13415) {
                                             // hack: need to just make cappedTruncate do this...
-                                            MONGO_WRITE_CONFLICT_RETRY_LOOP_BEGIN {
-                                                WriteUnitOfWork wunit(opCtx);
-                                                uassertStatusOK(collection->truncate(opCtx));
-                                                wunit.commit();
-                                            }
-                                            MONGO_WRITE_CONFLICT_RETRY_LOOP_END(
-                                                opCtx, "truncate", collection->ns().ns());
+                                            writeConflictRetry(
+                                                opCtx, "truncate", collection->ns().ns(), [&] {
+                                                    WriteUnitOfWork wunit(opCtx);
+                                                    uassertStatusOK(collection->truncate(opCtx));
+                                                    wunit.commit();
+                                                });
                                         } else {
                                             throw e;
                                         }

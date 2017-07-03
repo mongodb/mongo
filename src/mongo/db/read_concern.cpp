@@ -245,17 +245,14 @@ Status waitForLinearizableReadConcern(OperationContext* opCtx) {
                     "No longer primary when waiting for linearizable read concern"};
         }
 
-        MONGO_WRITE_CONFLICT_RETRY_LOOP_BEGIN {
-
+        writeConflictRetry(opCtx, "waitForLinearizableReadConcern", "local.rs.oplog", [&opCtx] {
             WriteUnitOfWork uow(opCtx);
             opCtx->getClient()->getServiceContext()->getOpObserver()->onOpMessage(
                 opCtx,
                 BSON("msg"
                      << "linearizable read"));
             uow.commit();
-        }
-        MONGO_WRITE_CONFLICT_RETRY_LOOP_END(
-            opCtx, "waitForLinearizableReadConcern", "local.rs.oplog");
+        });
     }
     WriteConcernOptions wc = WriteConcernOptions(
         WriteConcernOptions::kMajority, WriteConcernOptions::SyncMode::UNSET, 0);

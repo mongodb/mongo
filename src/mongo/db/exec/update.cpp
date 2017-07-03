@@ -476,7 +476,8 @@ void UpdateStage::doInsert() {
     if (request->isExplain()) {
         return;
     }
-    MONGO_WRITE_CONFLICT_RETRY_LOOP_BEGIN {
+
+    writeConflictRetry(getOpCtx(), "upsert", _collection->ns().ns(), [&] {
         WriteUnitOfWork wunit(getOpCtx());
         invariant(_collection);
         const bool enforceQuota = !request->isGod();
@@ -486,8 +487,7 @@ void UpdateStage::doInsert() {
         // Technically, we should save/restore state here, but since we are going to return
         // immediately after, it would just be wasted work.
         wunit.commit();
-    }
-    MONGO_WRITE_CONFLICT_RETRY_LOOP_END(getOpCtx(), "upsert", _collection->ns().ns());
+    });
 }
 
 bool UpdateStage::doneUpdating() {

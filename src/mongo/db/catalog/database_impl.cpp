@@ -764,13 +764,12 @@ void DatabaseImpl::dropDatabase(OperationContext* opCtx, Database* db) {
 
     dbHolder().close(opCtx, name, "database dropped");
 
-    MONGO_WRITE_CONFLICT_RETRY_LOOP_BEGIN {
+    writeConflictRetry(opCtx, "dropDatabase", name, [&] {
         getGlobalServiceContext()
             ->getGlobalStorageEngine()
             ->dropDatabase(opCtx, name)
             .transitional_ignore();
-    }
-    MONGO_WRITE_CONFLICT_RETRY_LOOP_END(opCtx, "dropDatabase", name);
+    });
 }
 
 namespace {
@@ -803,20 +802,19 @@ void mongo::dropAllDatabasesExceptLocalImpl(OperationContext* opCtx) {
 
     repl::getGlobalReplicationCoordinator()->dropAllSnapshots();
 
-    for (vector<string>::iterator i = n.begin(); i != n.end(); i++) {
-        if (*i != "local") {
-            MONGO_WRITE_CONFLICT_RETRY_LOOP_BEGIN {
-                Database* db = dbHolder().get(opCtx, *i);
+    for (const auto& dbName : n) {
+        if (dbName != "local") {
+            writeConflictRetry(opCtx, "dropAllDatabasesExceptLocal", dbName, [&opCtx, &dbName] {
+                Database* db = dbHolder().get(opCtx, dbName);
 
                 // This is needed since dropDatabase can't be rolled back.
                 // This is safe be replaced by "invariant(db);dropDatabase(opCtx, db);" once fixed
                 if (db == nullptr) {
-                    log() << "database disappeared after listDatabases but before drop: " << *i;
+                    log() << "database disappeared after listDatabases but before drop: " << dbName;
                 } else {
                     DatabaseImpl::dropDatabase(opCtx, db);
                 }
-            }
-            MONGO_WRITE_CONFLICT_RETRY_LOOP_END(opCtx, "dropAllDatabasesExceptLocal", *i);
+            });
         }
     }
 }

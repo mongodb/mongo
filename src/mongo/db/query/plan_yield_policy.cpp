@@ -86,8 +86,7 @@ bool PlanYieldPolicy::yield(RecordFetcher* fetcher) {
     invariant(opCtx);
     invariant(!opCtx->lockState()->inAWriteUnitOfWork());
 
-    // Can't use MONGO_WRITE_CONFLICT_RETRY_LOOP_BEGIN/END since we need to call saveState
-    // before reseting the transaction.
+    // Can't use writeConflictRetry since we need to call saveState before reseting the transaction.
     for (int attempt = 1; true; attempt++) {
         try {
             // All YIELD_AUTO plans will get here eventually when the elapsed tracker triggers

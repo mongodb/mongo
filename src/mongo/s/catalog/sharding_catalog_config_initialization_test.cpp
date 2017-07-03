@@ -221,7 +221,7 @@ TEST_F(ConfigInitializationTest, ReRunsIfDocRolledBackThenReElected) {
         auto opCtx = operationContext();
         repl::UnreplicatedWritesBlock uwb(opCtx);
         auto nss = NamespaceString(VersionType::ConfigNS);
-        MONGO_WRITE_CONFLICT_RETRY_LOOP_BEGIN {
+        writeConflictRetry(opCtx, "removeConfigDocuments", nss.ns(), [&] {
             AutoGetCollection autoColl(opCtx, nss, MODE_IX);
             auto coll = autoColl.getCollection();
             ASSERT_TRUE(coll);
@@ -236,8 +236,7 @@ TEST_F(ConfigInitializationTest, ReRunsIfDocRolledBackThenReElected) {
             }
             wuow.commit();
             ASSERT_EQUALS(0UL, coll->numRecords(opCtx));
-        }
-        MONGO_WRITE_CONFLICT_RETRY_LOOP_END(opCtx, "removeConfigDocuments", nss.ns());
+        });
     }
 
     // Verify the document was actually removed.

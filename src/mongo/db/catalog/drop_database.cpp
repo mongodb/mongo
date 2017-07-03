@@ -98,22 +98,25 @@ Status dropDatabase(OperationContext* opCtx, const std::string& dbName) {
     // collections to drop.
     repl::OpTime latestDropPendingOpTime;
 
-    MONGO_WRITE_CONFLICT_RETRY_LOOP_BEGIN {
+    using Result = boost::optional<Status>;
+    // Get an optional result--if it's there, early return; otherwise, wait for collections to drop.
+    auto result = writeConflictRetry(opCtx, "dropDatabase_collection", dbName, [&] {
         Lock::GlobalWrite lk(opCtx);
         AutoGetDb autoDB(opCtx, dbName, MODE_X);
         Database* const db = autoDB.getDb();
         if (!db) {
-            return Status(ErrorCodes::NamespaceNotFound,
-                          str::stream() << "Could not drop database " << dbName
-                                        << " because it does not exist");
+            return Result(Status(ErrorCodes::NamespaceNotFound,
+                                 str::stream() << "Could not drop database " << dbName
+                                               << " because it does not exist"));
         }
 
         bool userInitiatedWritesAndNotPrimary =
             opCtx->writesAreReplicated() && !replCoord->canAcceptWritesForDatabase(opCtx, dbName);
 
         if (userInitiatedWritesAndNotPrimary) {
-            return Status(ErrorCodes::NotMaster,
-                          str::stream() << "Not primary while dropping database " << dbName);
+            return Result(
+                Status(ErrorCodes::NotMaster,
+                       str::stream() << "Not primary while dropping database " << dbName));
         }
 
         log() << "dropDatabase " << dbName << " - starting";
@@ -145,10 +148,15 @@ Status dropDatabase(OperationContext* opCtx, const std::string& dbName) {
 
         // If there are no collection drops to wait for, we complete the drop database operation.
         if (numCollectionsToDrop == 0U && latestDropPendingOpTime.isNull()) {
-            return _finishDropDatabase(opCtx, dbName, db);
+            return Result(_finishDropDatabase(opCtx, dbName, db));
         }
+
+        return Result(boost::none);
+    });
+
+    if (result) {
+        return *result;
     }
-    MONGO_WRITE_CONFLICT_RETRY_LOOP_END(opCtx, "dropDatabase_collection", dbName);
 
     // If waitForWriteConcern() returns an error or throws an exception, we should reset the
     // drop-pending state on Database.
@@ -214,7 +222,7 @@ Status dropDatabase(OperationContext* opCtx, const std::string& dbName) {
 
     dropPendingGuardWhileAwaitingReplication.Dismiss();
 
-    MONGO_WRITE_CONFLICT_RETRY_LOOP_BEGIN {
+    return writeConflictRetry(opCtx, "dropDatabase_database", dbName, [&] {
         Lock::GlobalWrite lk(opCtx);
         AutoGetDb autoDB(opCtx, dbName, MODE_X);
         if (auto db = autoDB.getDb()) {
@@ -226,10 +234,7 @@ Status dropDatabase(OperationContext* opCtx, const std::string& dbName) {
                                     << " because it does not exist after dropping "
                                     << numCollectionsToDrop
                                     << " collection(s).");
-    }
-    MONGO_WRITE_CONFLICT_RETRY_LOOP_END(opCtx, "dropDatabase_database", dbName);
-
-    MONGO_UNREACHABLE;
+    });
 }
 
 }  // namespace mongo

@@ -837,16 +837,16 @@ void BackgroundSync::clearBuffer(OperationContext* opCtx) {
 OpTimeWithHash BackgroundSync::_readLastAppliedOpTimeWithHash(OperationContext* opCtx) {
     BSONObj oplogEntry;
     try {
-        MONGO_WRITE_CONFLICT_RETRY_LOOP_BEGIN {
+        bool success = writeConflictRetry(opCtx, "readLastAppliedHash", rsOplogName, [&] {
             Lock::DBLock lk(opCtx, "local", MODE_X);
-            bool success = Helpers::getLast(opCtx, rsOplogName.c_str(), oplogEntry);
-            if (!success) {
-                // This can happen when we are to do an initial sync.  lastHash will be set
-                // after the initial sync is complete.
-                return OpTimeWithHash(0);
-            }
+            return Helpers::getLast(opCtx, rsOplogName.c_str(), oplogEntry);
+        });
+
+        if (!success) {
+            // This can happen when we are to do an initial sync.  lastHash will be set
+            // after the initial sync is complete.
+            return OpTimeWithHash(0);
         }
-        MONGO_WRITE_CONFLICT_RETRY_LOOP_END(opCtx, "readLastAppliedHash", rsOplogName);
     } catch (const DBException& ex) {
         severe() << "Problem reading " << rsOplogName << ": " << redact(ex);
         fassertFailed(18904);

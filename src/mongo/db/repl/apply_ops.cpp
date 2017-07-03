@@ -145,7 +145,7 @@ Status _applyOps(OperationContext* opCtx,
                 return status;
         } else {
             try {
-                MONGO_WRITE_CONFLICT_RETRY_LOOP_BEGIN {
+                writeConflictRetry(opCtx, "applyOps", ns, [&] {
                     if (*opType == 'c') {
                         status = repl::applyCommand_inlock(opCtx, opObj, true);
                     } else {
@@ -181,8 +181,7 @@ Status _applyOps(OperationContext* opCtx,
                                 repl::applyOperation_inlock(opCtx, ctx.db(), opObj, alwaysUpsert);
                         }
                     }
-                }
-                MONGO_WRITE_CONFLICT_RETRY_LOOP_END(opCtx, "applyOps", ns);
+                });
             } catch (const DBException& ex) {
                 ab.append(false);
                 result->append("applied", ++(*numApplied));
@@ -288,7 +287,7 @@ mongo::Status mongo::applyOps(OperationContext* opCtx,
 
     // Perform write ops atomically
     try {
-        MONGO_WRITE_CONFLICT_RETRY_LOOP_BEGIN {
+        writeConflictRetry(opCtx, "applyOps", dbName, [&] {
             BSONObjBuilder intermediateResult;
             WriteUnitOfWork wunit(opCtx);
             numApplied = 0;
@@ -322,8 +321,7 @@ mongo::Status mongo::applyOps(OperationContext* opCtx,
             }
             wunit.commit();
             result->appendElements(intermediateResult.obj());
-        }
-        MONGO_WRITE_CONFLICT_RETRY_LOOP_END(opCtx, "applyOps", dbName);
+        });
     } catch (const DBException& ex) {
         if (ex.getCode() == ErrorCodes::NamespaceNotFound) {
             // Retry in non-atomic mode, since MMAP cannot implicitly create a new database

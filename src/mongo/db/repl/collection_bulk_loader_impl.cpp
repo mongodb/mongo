@@ -152,30 +152,37 @@ Status CollectionBulkLoaderImpl::insertDocuments(const std::vector<BSONObj>::con
             if (_secondaryIndexesBlock) {
                 indexers.push_back(_secondaryIndexesBlock.get());
             }
-            MONGO_WRITE_CONFLICT_RETRY_LOOP_BEGIN {
-                WriteUnitOfWork wunit(_opCtx.get());
-                if (!indexers.empty()) {
-                    // This flavor of insertDocument will not update any pre-existing indexes, only
-                    // the indexers passed in.
-                    const auto status = _autoColl->getCollection()->insertDocument(
-                        _opCtx.get(), *iter, indexers, false);
-                    if (!status.isOK()) {
-                        return status;
-                    }
-                } else {
-                    // For capped collections, we use regular insertDocument, which will update
-                    // pre-existing indexes.
-                    const auto status = _autoColl->getCollection()->insertDocument(
-                        _opCtx.get(), *iter, nullptr, false);
-                    if (!status.isOK()) {
-                        return status;
-                    }
-                }
 
-                wunit.commit();
+            Status status = writeConflictRetry(
+                _opCtx.get(), "CollectionBulkLoaderImpl::insertDocuments", _nss.ns(), [&] {
+                    WriteUnitOfWork wunit(_opCtx.get());
+                    if (!indexers.empty()) {
+                        // This flavor of insertDocument will not update any pre-existing indexes,
+                        // only
+                        // the indexers passed in.
+                        const auto status = _autoColl->getCollection()->insertDocument(
+                            _opCtx.get(), *iter, indexers, false);
+                        if (!status.isOK()) {
+                            return status;
+                        }
+                    } else {
+                        // For capped collections, we use regular insertDocument, which will update
+                        // pre-existing indexes.
+                        const auto status = _autoColl->getCollection()->insertDocument(
+                            _opCtx.get(), *iter, nullptr, false);
+                        if (!status.isOK()) {
+                            return status;
+                        }
+                    }
+
+                    wunit.commit();
+
+                    return Status::OK();
+                });
+
+            if (!status.isOK()) {
+                return status;
             }
-            MONGO_WRITE_CONFLICT_RETRY_LOOP_END(
-                _opCtx.get(), "CollectionBulkLoaderImpl::insertDocuments", _nss.ns());
 
             ++count;
         }
@@ -203,13 +210,11 @@ Status CollectionBulkLoaderImpl::commit() {
                                             << " duplicates on secondary index(es) even though "
                                                "MultiIndexBlock::ignoreUniqueConstraint set."};
             }
-            MONGO_WRITE_CONFLICT_RETRY_LOOP_BEGIN {
+            writeConflictRetry(_opCtx.get(), "CollectionBulkLoaderImpl::commit", _nss.ns(), [this] {
                 WriteUnitOfWork wunit(_opCtx.get());
                 _secondaryIndexesBlock->commit();
                 wunit.commit();
-            }
-            MONGO_WRITE_CONFLICT_RETRY_LOOP_END(
-                _opCtx.get(), "CollectionBulkLoaderImpl::commit", _nss.ns());
+            });
         }
 
         if (_idIndexBlock) {
@@ -222,27 +227,24 @@ Status CollectionBulkLoaderImpl::commit() {
             }
 
             for (auto&& it : dups) {
-                MONGO_WRITE_CONFLICT_RETRY_LOOP_BEGIN {
-                    WriteUnitOfWork wunit(_opCtx.get());
-                    _autoColl->getCollection()->deleteDocument(_opCtx.get(),
-                                                               it,
-                                                               nullptr /** OpDebug **/,
-                                                               false /* fromMigrate */,
-                                                               true /* noWarn */);
-                    wunit.commit();
-                }
-                MONGO_WRITE_CONFLICT_RETRY_LOOP_END(
-                    _opCtx.get(), "CollectionBulkLoaderImpl::commit", _nss.ns());
+                writeConflictRetry(
+                    _opCtx.get(), "CollectionBulkLoaderImpl::commit", _nss.ns(), [this, &it] {
+                        WriteUnitOfWork wunit(_opCtx.get());
+                        _autoColl->getCollection()->deleteDocument(_opCtx.get(),
+                                                                   it,
+                                                                   nullptr /** OpDebug **/,
+                                                                   false /* fromMigrate */,
+                                                                   true /* noWarn */);
+                        wunit.commit();
+                    });
             }
 
             // Commit _id index, without dups.
-            MONGO_WRITE_CONFLICT_RETRY_LOOP_BEGIN {
+            writeConflictRetry(_opCtx.get(), "CollectionBulkLoaderImpl::commit", _nss.ns(), [this] {
                 WriteUnitOfWork wunit(_opCtx.get());
                 _idIndexBlock->commit();
                 wunit.commit();
-            }
-            MONGO_WRITE_CONFLICT_RETRY_LOOP_END(
-                _opCtx.get(), "CollectionBulkLoaderImpl::commit", _nss.ns());
+            });
         }
         _stats.endBuildingIndexes = Date_t::now();
         LOG(2) << "Done creating indexes for ns: " << _nss.ns() << ", stats: " << _stats.toString();

@@ -267,13 +267,12 @@ public:
                 return appendCommandStatus(result, {ErrorCodes::CommandNotSupportedOnView, errmsg});
             }
 
-            MONGO_WRITE_CONFLICT_RETRY_LOOP_BEGIN {
+            writeConflictRetry(opCtx, kCommandName, ns.ns(), [&] {
                 WriteUnitOfWork wunit(opCtx);
                 collection = db->createCollection(opCtx, ns.ns(), CollectionOptions());
                 invariant(collection);
                 wunit.commit();
-            }
-            MONGO_WRITE_CONFLICT_RETRY_LOOP_END(opCtx, kCommandName, ns.ns());
+            });
             result.appendBool("createdCollectionAutomatically", true);
         }
 
@@ -321,11 +320,10 @@ public:
             }
         }
 
-        std::vector<BSONObj> indexInfoObjs;
-        MONGO_WRITE_CONFLICT_RETRY_LOOP_BEGIN {
-            indexInfoObjs = uassertStatusOK(indexer.init(specs));
-        }
-        MONGO_WRITE_CONFLICT_RETRY_LOOP_END(opCtx, kCommandName, ns.ns());
+        std::vector<BSONObj> indexInfoObjs =
+            writeConflictRetry(opCtx, kCommandName, ns.ns(), [&indexer, &specs] {
+                return uassertStatusOK(indexer.init(specs));
+            });
 
         // If we're a background index, replace exclusive db lock with an intent lock, so that
         // other readers and writers can proceed during this phase.
@@ -383,7 +381,7 @@ public:
             uassert(28552, "collection dropped during index build", db->getCollection(opCtx, ns));
         }
 
-        MONGO_WRITE_CONFLICT_RETRY_LOOP_BEGIN {
+        writeConflictRetry(opCtx, kCommandName, ns.ns(), [&] {
             WriteUnitOfWork wunit(opCtx);
 
             indexer.commit();
@@ -394,8 +392,7 @@ public:
             }
 
             wunit.commit();
-        }
-        MONGO_WRITE_CONFLICT_RETRY_LOOP_END(opCtx, kCommandName, ns.ns());
+        });
 
         result.append("numIndexesAfter", collection->getIndexCatalog()->numIndexesTotal(opCtx));
 
