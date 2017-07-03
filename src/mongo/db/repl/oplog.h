@@ -163,5 +163,13 @@ void setOplogCollectionName();
  */
 void signalOplogWaiters();
 
+/**
+ * Creates a new index in the given namespace.
+ */
+void createIndexForApplyOps(OperationContext* opCtx,
+                            const BSONObj& indexSpec,
+                            const NamespaceString& indexNss,
+                            IncrementOpsAppliedStatsFn incrementOpsAppliedStats);
+
 }  // namespace repl
 }  // namespace mongo

@@ -228,6 +228,49 @@ void setOplogCollectionName() {
     }
 }
 
+void createIndexForApplyOps(OperationContext* opCtx,
+                            const BSONObj& indexSpec,
+                            const NamespaceString& indexNss,
+                            IncrementOpsAppliedStatsFn incrementOpsAppliedStats) {
+    // Check if collection exists.
+    Database* db = dbHolder().get(opCtx, indexNss.ns());
+    auto indexCollection = db ? db->getCollection(opCtx, indexNss) : nullptr;
+    uassert(ErrorCodes::NamespaceNotFound,
+            str::stream() << "Failed to create index due to missing collection: " << indexNss.ns(),
+            indexCollection);
+
+    OpCounters* opCounters = opCtx->writesAreReplicated() ? &globalOpCounters : &replOpCounters;
+    opCounters->gotInsert();
+
+    bool relaxIndexConstraints =
+        ReplicationCoordinator::get(opCtx)->shouldRelaxIndexConstraints(opCtx, indexNss);
+    if (indexSpec["background"].trueValue()) {
+        Lock::TempRelease release(opCtx->lockState());
+        if (opCtx->lockState()->isLocked()) {
+            // If TempRelease fails, background index build will deadlock.
+            LOG(3) << "apply op: building background index " << indexSpec
+                   << " in the foreground because temp release failed";
+            IndexBuilder builder(indexSpec, relaxIndexConstraints);
+            Status status = builder.buildInForeground(opCtx, db);
+            uassertStatusOK(status);
+        } else {
+            IndexBuilder* builder = new IndexBuilder(indexSpec, relaxIndexConstraints);
+            // This spawns a new thread and returns immediately.
+            builder->go();
+            // Wait for thread to start and register itself
+            IndexBuilder::waitForBgIndexStarting();
+        }
+        opCtx->recoveryUnit()->abandonSnapshot();
+    } else {
+        IndexBuilder builder(indexSpec, relaxIndexConstraints);
+        Status status = builder.buildInForeground(opCtx, db);
+        uassertStatusOK(status);
+    }
+    if (incrementOpsAppliedStats) {
+        incrementOpsAppliedStats();
+    }
+}
+
 namespace {
 
 Collection* getLocalOplogCollection(OperationContext* opCtx,
@@ -623,49 +666,6 @@ NamespaceString parseUUIDorNs(OperationContext* opCtx,
                               const BSONElement& ui,
                               BSONObj& cmd) {
     return ui.ok() ? parseUUID(opCtx, ui) : parseNs(ns, cmd);
-}
-
-void createIndexForApplyOps(OperationContext* opCtx,
-                            const BSONObj& indexSpec,
-                            const NamespaceString& indexNss,
-                            IncrementOpsAppliedStatsFn incrementOpsAppliedStats) {
-    // Check if collection exists.
-    Database* db = dbHolder().get(opCtx, indexNss.ns());
-    auto indexCollection = db ? db->getCollection(opCtx, indexNss) : nullptr;
-    uassert(ErrorCodes::NamespaceNotFound,
-            str::stream() << "Failed to create index due to missing collection: " << indexNss.ns(),
-            indexCollection);
-
-    OpCounters* opCounters = opCtx->writesAreReplicated() ? &globalOpCounters : &replOpCounters;
-    opCounters->gotInsert();
-
-    bool relaxIndexConstraints =
-        ReplicationCoordinator::get(opCtx)->shouldRelaxIndexConstraints(opCtx, indexNss);
-    if (indexSpec["background"].trueValue()) {
-        Lock::TempRelease release(opCtx->lockState());
-        if (opCtx->lockState()->isLocked()) {
-            // If TempRelease fails, background index build will deadlock.
-            LOG(3) << "apply op: building background index " << indexSpec
-                   << " in the foreground because temp release failed";
-            IndexBuilder builder(indexSpec, relaxIndexConstraints);
-            Status status = builder.buildInForeground(opCtx, db);
-            uassertStatusOK(status);
-        } else {
-            IndexBuilder* builder = new IndexBuilder(indexSpec, relaxIndexConstraints);
-            // This spawns a new thread and returns immediately.
-            builder->go();
-            // Wait for thread to start and register itself
-            IndexBuilder::waitForBgIndexStarting();
-        }
-        opCtx->recoveryUnit()->abandonSnapshot();
-    } else {
-        IndexBuilder builder(indexSpec, relaxIndexConstraints);
-        Status status = builder.buildInForeground(opCtx, db);
-        uassertStatusOK(status);
-    }
-    if (incrementOpsAppliedStats) {
-        incrementOpsAppliedStats();
-    }
 }
 
 using OpApplyFn = stdx::function<Status(OperationContext* opCtx,
