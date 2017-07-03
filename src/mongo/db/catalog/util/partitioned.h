@@ -29,7 +29,6 @@
 #pragma once
 
 #include <algorithm>
-#include <array>
 #include <cstdlib>
 #include <iterator>
 #include <memory>
@@ -40,9 +39,7 @@
 #include "mongo/platform/atomic_word.h"
 #include "mongo/stdx/memory.h"
 #include "mongo/stdx/mutex.h"
-#include "mongo/stdx/new.h"
 #include "mongo/util/assert_util.h"
-#include "mongo/util/with_alignment.h"
 
 namespace mongo {
 
@@ -103,8 +100,6 @@ struct Partitioner {
 
 namespace partitioned_detail {
 
-using CacheAlignedMutex = CacheAligned<stdx::mutex>;
-
 template <typename Key, typename Value>
 Key getKey(const std::pair<Key, Value>& pair) {
     return std::get<0>(pair);
@@ -115,10 +110,9 @@ Key getKey(const Key& key) {
     return key;
 }
 
-template <typename T>
-inline std::vector<stdx::unique_lock<stdx::mutex>> lockAllPartitions(T& mutexes) {
+inline std::vector<stdx::unique_lock<stdx::mutex>> lockAllPartitions(
+    std::vector<stdx::mutex>& mutexes) {
     std::vector<stdx::unique_lock<stdx::mutex>> result;
-    result.reserve(mutexes.size());
     std::transform(mutexes.begin(), mutexes.end(), std::back_inserter(result), [](auto&& mutex) {
         return stdx::unique_lock<stdx::mutex>{mutex};
     });
@@ -381,14 +375,12 @@ public:
     /**
      * Constructs a partitioned version of a AssociativeContainer, with `nPartitions` partitions.
      */
-    Partitioned() = default;
+    Partitioned() : _mutexes(nPartitions), _partitions(nPartitions) {}
 
 private:
     // These two vectors parallel each other, but we keep them separate so that we can return an
     // iterator over `_partitions` from within All.
-    mutable std::array<partitioned_detail::CacheAlignedMutex, nPartitions> _mutexes;
-
-    using CacheAlignedAssociativeContainer = CacheAligned<AssociativeContainer>;
-    std::array<CacheAlignedAssociativeContainer, nPartitions> _partitions;
+    mutable std::vector<stdx::mutex> _mutexes;
+    std::vector<AssociativeContainer> _partitions;
 };
 }  // namespace mongo
