@@ -29,3 +29,5 @@ executor:
       oplogSize: 511
       set_parameters:
         enableTestCommands: 1
+        # See SERVER-30161
+        enableCollectionUUIDs: 0

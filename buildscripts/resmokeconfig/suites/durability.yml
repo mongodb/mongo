@@ -14,5 +14,7 @@ executor:
       global_vars:
         TestData:
           storageEngine: mmapv1
+          # See SERVER-30161
+          setParameters: "enableCollectionUUIDs=0"
       nodb: ''
       readMode: commands
