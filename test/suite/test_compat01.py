@@ -1,6 +1,6 @@
 #!/usr/bin/env python
 #
-# Public Domain 2014-2016 MongoDB, Inc.
+# Public Domain 2014-2017 MongoDB, Inc.
 # Public Domain 2008-2014 WiredTiger, Inc.
 #
 # This is free and unencumbered software released into the public domain.
@@ -28,7 +28,6 @@
 #
 # test_compat01.py
 # Check compatibility API
-#
 
 import fnmatch, os, shutil, sys, time
 from suite_subprocess import suite_subprocess

@@ -30,23 +30,20 @@ util_downgrade(WT_SESSION *session, WT_CONNECTION *conn, int argc, char *argv[])
 	argc -= __wt_optind;
 	argv += __wt_optind;
 
-	/* The remaining argument is the table name. */
+	/*
+	 * The release argument is required.
+	 * There should not be any more arguments.
+	 */
 	if (argc != 0 || release == NULL)
 		return (usage());
+
 	if ((ret = __wt_snprintf(config_str, sizeof(config_str),
 	    "compatibility=(release=%s)", release)) != 0)
 		return (util_err(session, ret, NULL));
 	if ((ret = conn->reconfigure(conn, config_str)) != 0)
 		return (util_err(session, ret, "conn.downgrade"));
-	else {
-		/*
-		 * Verbose configures a progress counter, move to the next
-		 * line.
-		 */
-		if (verbose)
-			printf("\n");
-	}
-	return (ret);
+
+	return (0);
 }
 
 static int

@@ -1204,8 +1204,8 @@ __rec_txn_read(WT_SESSION_IMPL *session, WT_RECONCILE *r,
 	update_mem = 0;
 	max_txn = WT_TXN_NONE;
 #ifdef HAVE_TIMESTAMPS
-	__wt_timestamp_set(max_timestamp, zero_timestamp);
-	memset(min_timestamp, 0xff, WT_TIMESTAMP_SIZE);
+	__wt_timestamp_set_zero(max_timestamp);
+	__wt_timestamp_set_inf(min_timestamp);
 #endif
 	min_txn = UINT64_MAX;
 

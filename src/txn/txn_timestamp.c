@@ -24,7 +24,7 @@ __wt_txn_parse_timestamp(WT_SESSION_IMPL *session,
 	const char *hexts;
 	char padbuf[2 * WT_TIMESTAMP_SIZE + 1];
 
-	__wt_timestamp_set(timestamp, zero_timestamp);
+	__wt_timestamp_set_zero(timestamp);
 
 	if (cval->len == 0)
 		return (0);

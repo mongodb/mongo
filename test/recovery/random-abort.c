@@ -226,15 +226,15 @@ main(int argc, char *argv[])
 	FILE *fp;
 	WT_CONNECTION *conn;
 	WT_CURSOR *cursor;
-	WT_SESSION *session;
 	WT_RAND_STATE rnd;
+	WT_SESSION *session;
+	pid_t pid;
 	uint64_t absent, count, key, last_key, middle;
 	uint32_t i, nth, timeout;
 	int ch, status, ret;
-	pid_t pid;
-	bool fatal, rand_th, rand_time, verify_only;
 	const char *working_dir;
 	char fname[64], kname[64], statname[1024];
+	bool fatal, rand_th, rand_time, verify_only;
 
 	(void)testutil_set_progname(argv);
 
@@ -299,8 +299,8 @@ main(int argc, char *argv[])
 			if (nth < MIN_TH)
 				nth = MIN_TH;
 		}
-		printf("Parent: Compatibility %d in-mem log %d\n",
-		    compat, inmem);
+		printf("Parent: Compatibility %s in-mem log %s\n",
+		    compat ? "true" : "false", inmem ? "true" : "false");
 		printf("Parent: Create %" PRIu32
 		    " threads; sleep %" PRIu32 " seconds\n", nth, timeout);
 		/*

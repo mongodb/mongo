@@ -10,8 +10,6 @@ static inline int __wt_txn_id_check(WT_SESSION_IMPL *session);
 static inline void __wt_txn_read_last(WT_SESSION_IMPL *session);
 
 #ifdef HAVE_TIMESTAMPS
-static const wt_timestamp_t zero_timestamp;
-
 /*
  * __wt_timestamp_cmp --
  *	Compare two timestamps.
@@ -39,7 +37,29 @@ __wt_timestamp_set(uint8_t *dest, const uint8_t *src)
 static inline bool
 __wt_timestamp_iszero(const uint8_t *ts)
 {
+	static const wt_timestamp_t zero_timestamp;
+
 	return (memcmp(ts, zero_timestamp, WT_TIMESTAMP_SIZE) == 0);
+}
+
+/*
+ * __wt_timestamp_set_inf --
+ *	Set a timestamp to the maximum value.
+ */
+static inline void
+__wt_timestamp_set_inf(uint8_t *ts)
+{
+	memset(ts, 0xff, WT_TIMESTAMP_SIZE);
+}
+
+/*
+ * __wt_timestamp_set_zero --
+ *	Zero out a timestamp.
+ */
+static inline void
+__wt_timestamp_set_zero(uint8_t *ts)
+{
+	memset(ts, 0x00, WT_TIMESTAMP_SIZE);
 }
 #endif
 

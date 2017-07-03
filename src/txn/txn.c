@@ -539,8 +539,7 @@ __wt_txn_release(WT_SESSION_IMPL *session)
 			 * here.
 			 */
 			WT_WRITE_BARRIER();
-			__wt_timestamp_set(
-			    txn_state->commit_timestamp, zero_timestamp);
+			__wt_timestamp_set_zero(txn_state->commit_timestamp);
 		}
 #endif
 
