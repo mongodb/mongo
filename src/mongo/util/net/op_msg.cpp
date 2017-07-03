@@ -55,6 +55,10 @@ enum class Section : uint8_t {
 }  // namespace
 
 OpMsg OpMsg::parse(const Message& message) try {
+    // It is the caller's responsibility to call the correct parser for a given message type.
+    invariant(!message.empty());
+    invariant(message.operation() == dbMsg);
+
     // TODO some validation may make more sense in the IDL parser. I've tagged them with comments.
     OpMsg msg;
     // Use a separate BufReader for the flags since the flags can change how much room we have
@@ -65,10 +69,11 @@ OpMsg OpMsg::parse(const Message& message) try {
             str::stream() << "Message contains illegal flags value: " << msg.flags,
             !containsUnknownRequiredFlags(msg.flags));
 
-    invariant(!msg.isFlagSet(kChecksumPresent));  // TODO SERVER-28679 check checksum here.
+    const bool haveChecksum = msg.isFlagSet(kChecksumPresent);
+    // TODO SERVER-28679 check checksum here if present.
 
     constexpr int kCrc32Size = 4;
-    const int checksumSize = msg.isFlagSet(kChecksumPresent) ? kCrc32Size : 0;
+    const int checksumSize = haveChecksum ? kCrc32Size : 0;
     BufReader sectionsBuf(message.singleData().data() + sizeof(msg.flags),
                           message.dataSize() - sizeof(msg.flags) - checksumSize);
     bool haveBody = false;
@@ -105,6 +110,8 @@ OpMsg OpMsg::parse(const Message& message) try {
         }
     }
 
+    uassert(40587, "OP_MSG messages must have a body", haveBody);
+
     // Detect duplicates between doc sequences and body. TODO IDL
     // Technically this is O(N*M) but N is at most 2.
     for (const auto& docSeq : msg.sequences) {
@@ -119,9 +126,9 @@ OpMsg OpMsg::parse(const Message& message) try {
 
     return msg;
 } catch (const DBException& ex) {
-    // TODO change to LOG(1).
-    log() << "invalid message: " << redact(ex) << ' '
-          << hexdump(message.singleData().view2ptr(), message.size());
+    LOG(1) << "invalid message: " << ErrorCodes::errorString(ErrorCodes::fromInt(ex.getCode()))
+           << " " << redact(ex) << " -- "
+           << redact(hexdump(message.singleData().view2ptr(), message.size()));
     throw;
 }
 

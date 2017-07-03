@@ -43,6 +43,7 @@ env.CppUnitTest(
     source=[
         'cidr_test.cpp',
         'hostandport_test.cpp',
+        'op_msg_test.cpp',
         'sock_test.cpp',
     ],
     LIBDEPS=[

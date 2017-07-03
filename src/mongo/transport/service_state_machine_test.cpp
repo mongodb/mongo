@@ -261,7 +261,7 @@ TEST_F(ServiceStateMachineFixture, TestThrowHandling) {
     _sep->setUassertInHandler();
 
     ASSERT_EQ(ServiceStateMachine::State::Ended, runPingTest());
-    ASSERT_THROWS(checkPingOk(), MsgAssertionException);
+    ASSERT(_tl->getLastSunk().empty());
     ASSERT_TRUE(_tl->ranSource());
     ASSERT_FALSE(_tl->ranSink());
 }
@@ -270,7 +270,7 @@ TEST_F(ServiceStateMachineFixture, TestSourceError) {
     _tl->setNextFailure(MockTL::Source);
 
     ASSERT_EQ(ServiceStateMachine::State::Ended, runPingTest());
-    ASSERT_THROWS(checkPingOk(), MsgAssertionException);
+    ASSERT(_tl->getLastSunk().empty());
     ASSERT_TRUE(_tl->ranSource());
     ASSERT_FALSE(_tl->ranSink());
 }
