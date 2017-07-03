@@ -35,8 +35,10 @@
 #include "mongo/db/client.h"
 #include "mongo/db/operation_context.h"
 #include "mongo/db/s/shard_metadata_util.h"
+#include "mongo/db/s/sharding_state.h"
 #include "mongo/s/catalog/type_shard_collection.h"
 #include "mongo/s/catalog_cache.h"
+#include "mongo/s/client/shard_registry.h"
 #include "mongo/s/config_server_catalog_cache_loader.h"
 #include "mongo/s/grid.h"
 #include "mongo/stdx/memory.h"
@@ -192,6 +194,44 @@ CollectionAndChangedChunks getPersistedMetadataSinceVersion(OperationContext* op
                                       std::move(changedChunks)};
 }
 
+/**
+ * Sends forceRoutingTableRefresh to the primary, to force the primary to refresh its routing table
+ * entry for 'nss' and to obtain the primary's collectionVersion for 'nss' after the refresh.
+ *
+ * Returns the primary's returned collectionVersion for 'nss', or throws on error.
+ */
+ChunkVersion forcePrimaryToRefresh(OperationContext* opCtx, const NamespaceString& nss) {
+    auto shardingState = ShardingState::get(opCtx);
+    invariant(shardingState->enabled());
+
+    auto selfShard = uassertStatusOK(
+        Grid::get(opCtx)->shardRegistry()->getShard(opCtx, shardingState->getShardName()));
+
+    auto cmdResponse = uassertStatusOK(selfShard->runCommandWithFixedRetryAttempts(
+        opCtx,
+        ReadPreferenceSetting{ReadPreference::PrimaryOnly},
+        "admin",
+        BSON("forceRoutingTableRefresh" << nss.ns()),
+        Seconds{30},
+        Shard::RetryPolicy::kIdempotent));
+    uassertStatusOK(cmdResponse.commandStatus);
+
+    return uassertStatusOK(
+        ChunkVersion::parseFromBSONWithFieldForCommands(cmdResponse.response, "collectionVersion"));
+}
+
+/**
+ * Reads the local chunk metadata to obtain the current ChunkVersion. If there is no local
+ * metadata for the namespace, returns ChunkVersion::UNSHARDED(), since only metadata for sharded
+ * collections is persisted.
+ */
+ChunkVersion getLocalVersion(OperationContext* opCtx, const NamespaceString& nss) {
+    auto swRefreshState = getPersistedRefreshFlags(opCtx, nss);
+    if (swRefreshState == ErrorCodes::NamespaceNotFound)
+        return ChunkVersion::UNSHARDED();
+    return uassertStatusOK(std::move(swRefreshState)).lastRefreshedCollectionVersion;
+}
+
 }  // namespace
 
 void ShardServerCatalogCacheLoader::notifyOfCollectionVersionUpdate(OperationContext* opCtx,
@@ -280,9 +320,74 @@ void ShardServerCatalogCacheLoader::_runSecondaryGetChunksSince(
     const NamespaceString& nss,
     const ChunkVersion& catalogCacheSinceVersion,
     stdx::function<void(OperationContext*, StatusWith<CollectionAndChangedChunks>)> callbackFn) {
+    const auto waitStatus = _forcePrimaryRefreshAndWaitForReplication(opCtx, nss);
+    if (!waitStatus.isOK()) {
+        callbackFn(opCtx, std::move(waitStatus));
+    }
+
+    // Read the local metadata.
     auto swCollAndChunks =
         _getCompletePersistedMetadataForSecondarySinceVersion(opCtx, nss, catalogCacheSinceVersion);
     callbackFn(opCtx, std::move(swCollAndChunks));
+}
+
+/**
+ * "Waiting for replication" by waiting to see a local version equal or greater to the primary's
+ * collectionVersion is not so straightforward. A few key insights:
+ *
+ * 1) ChunkVersions are ordered, so within an epoch, we can wait for a particular ChunkVersion.
+ *
+ * 2) Epochs are not ordered. If we are waiting for epochB and see epochA locally, we can't know if
+ *    the update for epochB already replicated or has yet to replicate.
+ *
+ *    To deal with this, on seeing epochA, we wait for one update. If we are now in epochB (e.g., if
+ *    epochA was UNSHARDED) we continue waiting for updates until our version meets or exceeds the
+ *    primary's. Otherwise, we throw an error. A caller can retry, which will cause us to ask the
+ *    primary for a new collectionVersion to wait for. If we were behind, we continue waiting; if we
+ *    were ahead, we now have a new target.
+ *
+ *    This only occurs if collections are being created, sharded, and dropped quickly.
+ *
+ * 3) Unsharded collections do not have epochs at all. A unique identifier for all collections,
+ *    including unsharded, will be introduced in 3.6. Until then, we cannot differentiate between
+ *    different incarnations of unsharded collections of the same name.
+ *
+ *    We do not deal with this at all. We report that we are "up to date" even if we are at an
+ *    earlier incarnation of the unsharded collection.
+ */
+Status ShardServerCatalogCacheLoader::_forcePrimaryRefreshAndWaitForReplication(
+    OperationContext* opCtx, const NamespaceString& nss) {
+    try {
+        // Start listening for metadata updates before obtaining the primary's version, in case we
+        // replicate an epoch change past the primary's version before reading locally.
+        boost::optional<NamespaceMetadataChangeNotifications::ScopedNotification> notif(
+            _namespaceNotifications.createNotification(nss));
+
+        auto primaryVersion = forcePrimaryToRefresh(opCtx, nss);
+        bool waitedForUpdate = false;
+        while (true) {
+            auto secondaryVersion = getLocalVersion(opCtx, nss);
+
+            if (secondaryVersion.hasEqualEpoch(primaryVersion) &&
+                secondaryVersion >= primaryVersion) {
+                return Status::OK();
+            }
+
+            if (waitedForUpdate) {
+                // If we still aren't in the primary's epoch, throw.
+                uassert(ErrorCodes::ConflictingOperationInProgress,
+                        "The collection has recently been dropped and recreated",
+                        secondaryVersion.epoch() == primaryVersion.epoch());
+            }
+
+            // Wait for a chunk metadata update (either ChunkVersion increment or epoch change).
+            notif->get(opCtx);
+            notif.emplace(_namespaceNotifications.createNotification(nss));
+            waitedForUpdate = true;
+        }
+    } catch (const DBException& ex) {
+        return ex.toStatus();
+    }
 }
 
 void ShardServerCatalogCacheLoader::_schedulePrimaryGetChunksSince(

@@ -200,14 +200,25 @@ private:
     typedef std::map<NamespaceString, TaskList> TaskLists;
 
     /**
-     * Retrieves chunk metadata from the shard's persisted metadata store, then passes the results
-     * to the 'callbackFn'.
+     * Forces the primary to refresh its metadata for 'nss' and waits until this node's metadata
+     * has caught up to the primary's.
+     * Then retrieves chunk metadata from this node's persisted metadata store and passes it to
+     * 'callbackFn'.
      */
     void _runSecondaryGetChunksSince(
         OperationContext* opCtx,
         const NamespaceString& nss,
         const ChunkVersion& catalogCacheSinceVersion,
         stdx::function<void(OperationContext*, StatusWith<CollectionAndChangedChunks>)> callbackFn);
+
+    /**
+     * Forces the  primary to refresh its chunk metadata for 'nss' and obtain's the primary's
+     * collectionVersion after the refresh.
+     *
+     * Then waits until it has replicated chunk metadata up to at least that collectionVersion.
+     */
+    Status _forcePrimaryRefreshAndWaitForReplication(OperationContext* opCtx,
+                                                     const NamespaceString& nss);
 
     /**
      * Refreshes chunk metadata from the config server's metadata store, and schedules maintenance
