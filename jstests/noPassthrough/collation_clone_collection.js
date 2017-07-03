@@ -16,7 +16,12 @@
 
     assert.commandWorked(sourceColl.getDB().runCommand(
         {create: sourceColl.getName(), collation: {locale: "en", strength: 2}}));
-    var sourceCollectionInfos = sourceColl.getDB().getCollectionInfos({name: sourceColl.getName()});
+    // We remove UUIDs before comparing as collection cloning results in a new UUID.
+    var sourceCollectionInfos =
+        sourceColl.getDB().getCollectionInfos({name: sourceColl.getName()}).map((collInfo) => {
+            delete collInfo.info.uuid;
+            return collInfo;
+        });
 
     assert.writeOK(sourceColl.insert({_id: "FOO"}));
     assert.writeOK(sourceColl.insert({_id: "bar"}));
@@ -44,7 +49,11 @@
         query: {_id: "foo"}
     }));
 
-    var destCollectionInfos = destColl.getDB().getCollectionInfos({name: destColl.getName()});
+    var destCollectionInfos =
+        destColl.getDB().getCollectionInfos({name: destColl.getName()}).map((collInfo) => {
+            delete collInfo.info.uuid;
+            return collInfo;
+        });
     assert.eq(sourceCollectionInfos, destCollectionInfos);
     assert.eq([{_id: "FOO"}], destColl.find({}).toArray());
 
