@@ -481,8 +481,12 @@ void UpdateStage::doInsert() {
         WriteUnitOfWork wunit(getOpCtx());
         invariant(_collection);
         const bool enforceQuota = !request->isGod();
-        uassertStatusOK(_collection->insertDocument(
-            getOpCtx(), newObj, _params.opDebug, enforceQuota, request->isFromMigration()));
+        // TODO: SERVER-28912 include StmtId
+        uassertStatusOK(_collection->insertDocument(getOpCtx(),
+                                                    InsertStatement(newObj),
+                                                    _params.opDebug,
+                                                    enforceQuota,
+                                                    request->isFromMigration()));
 
         // Technically, we should save/restore state here, but since we are going to return
         // immediately after, it would just be wasted work.

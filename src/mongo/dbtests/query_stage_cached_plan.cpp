@@ -94,7 +94,8 @@ public:
 
         const bool enforceQuota = false;
         OpDebug* const nullOpDebug = nullptr;
-        ASSERT_OK(collection->insertDocument(&_opCtx, obj, nullOpDebug, enforceQuota));
+        ASSERT_OK(
+            collection->insertDocument(&_opCtx, InsertStatement(obj), nullOpDebug, enforceQuota));
         wuow.commit();
     }
 

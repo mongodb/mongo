@@ -235,7 +235,8 @@ protected:
         OpDebug* const nullOpDebug = nullptr;
         if (o.hasField("_id")) {
             repl::UnreplicatedWritesBlock uwb(&_opCtx);
-            coll->insertDocument(&_opCtx, o, nullOpDebug, true).transitional_ignore();
+            coll->insertDocument(&_opCtx, InsertStatement(o), nullOpDebug, true)
+                .transitional_ignore();
             wunit.commit();
             return;
         }
@@ -246,7 +247,8 @@ protected:
         b.appendOID("_id", &id);
         b.appendElements(o);
         repl::UnreplicatedWritesBlock uwb(&_opCtx);
-        coll->insertDocument(&_opCtx, b.obj(), nullOpDebug, true).transitional_ignore();
+        coll->insertDocument(&_opCtx, InsertStatement(b.obj()), nullOpDebug, true)
+            .transitional_ignore();
         wunit.commit();
     }
     static BSONObj wid(const char* json) {

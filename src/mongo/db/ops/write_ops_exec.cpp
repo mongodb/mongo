@@ -300,8 +300,8 @@ WriteResult performCreateIndexes(OperationContext* opCtx, const InsertOp& wholeO
 
 void insertDocuments(OperationContext* opCtx,
                      Collection* collection,
-                     std::vector<BSONObj>::const_iterator begin,
-                     std::vector<BSONObj>::const_iterator end) {
+                     std::vector<InsertStatement>::const_iterator begin,
+                     std::vector<InsertStatement>::const_iterator end) {
     // Intentionally not using writeConflictRetry. That is handled by the caller so it can react to
     // oversized batches.
     WriteUnitOfWork wuow(opCtx);
@@ -315,7 +315,7 @@ void insertDocuments(OperationContext* opCtx,
  */
 bool insertBatchAndHandleErrors(OperationContext* opCtx,
                                 const InsertOp& wholeOp,
-                                const std::vector<BSONObj>& batch,
+                                const std::vector<InsertStatement>& batch,
                                 LastOpFixer* lastOpFixer,
                                 WriteResult* out) {
     if (batch.empty())
@@ -443,7 +443,7 @@ WriteResult performInserts(OperationContext* opCtx, const InsertOp& wholeOp) {
     out.results.reserve(wholeOp.getDocuments().size());
 
     size_t bytesInBatch = 0;
-    std::vector<BSONObj> batch;
+    std::vector<InsertStatement> batch;
     const size_t maxBatchSize = internalInsertMaxBatchSize.load();
     batch.reserve(std::min(wholeOp.getDocuments().size(), maxBatchSize));
 
@@ -455,8 +455,10 @@ WriteResult performInserts(OperationContext* opCtx, const InsertOp& wholeOp) {
             // correct order. In an ordered insert, if one of the docs ahead of us fails, we should
             // behave as-if we never got to this document.
         } else {
-            batch.push_back(fixedDoc.getValue().isEmpty() ? doc : std::move(fixedDoc.getValue()));
-            bytesInBatch += batch.back().objsize();
+            // TODO: SERVER-28912 get StmtId from request
+            batch.emplace_back(fixedDoc.getValue().isEmpty() ? doc
+                                                             : std::move(fixedDoc.getValue()));
+            bytesInBatch += batch.back().doc.objsize();
             if (!isLastDoc && batch.size() < maxBatchSize && bytesInBatch < insertVectorMaxBytes)
                 continue;  // Add more to batch before inserting.
         }

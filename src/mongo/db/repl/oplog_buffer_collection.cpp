@@ -175,7 +175,7 @@ void OplogBufferCollection::pushAllNonBlocking(OperationContext* opCtx,
         return;
     }
     size_t numDocs = std::distance(begin, end);
-    Batch docsToInsert(numDocs);
+    std::vector<InsertStatement> docsToInsert(numDocs);
     stdx::lock_guard<stdx::mutex> lk(_mutex);
     auto ts = _lastPushedTimestamp;
     auto sentinelCount = _sentinelCount;
@@ -184,7 +184,7 @@ void OplogBufferCollection::pushAllNonBlocking(OperationContext* opCtx,
         auto previousTimestamp = ts;
         std::tie(doc, ts, sentinelCount) = addIdToDocument(value, ts, sentinelCount);
         invariant(value.isEmpty() ? ts == previousTimestamp : ts > previousTimestamp);
-        return doc;
+        return InsertStatement(doc);
     });
 
     auto status = _storageInterface->insertDocuments(opCtx, _nss, docsToInsert);

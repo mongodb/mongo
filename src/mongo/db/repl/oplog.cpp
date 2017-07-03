@@ -260,7 +260,8 @@ OplogDocWriter _logOpWriter(OperationContext* opCtx,
                             bool fromMigrate,
                             OpTime optime,
                             long long hashNew,
-                            Date_t wallTime) {
+                            Date_t wallTime,
+                            StmtId statementId) {
     BSONObjBuilder b(256);
 
     b.append("ts", optime.getTimestamp());
@@ -281,6 +282,10 @@ OplogDocWriter _logOpWriter(OperationContext* opCtx,
         serverGlobalParams.featureCompatibility.version.load() !=
             ServerGlobalParams::FeatureCompatibility::Version::k34) {
         b.appendDate("wall", wallTime);
+    }
+
+    if (statementId != kUninitializedStmtId) {
+        // TODO: SERVER-28912 append stmtId to oplog entry
     }
 
     return OplogDocWriter(OplogDocWriter(b.obj(), obj));
@@ -398,20 +403,29 @@ OpTime logOp(OperationContext* opCtx,
     OplogSlot slot;
     getNextOpTime(opCtx, oplog, replCoord, replMode, 1, &slot);
 
-    auto writer = _logOpWriter(
-        opCtx, opstr, nss, uuid, obj, o2, fromMigrate, slot.opTime, slot.hash, Date_t::now());
+    // TODO: SERVER-28912 Include statementId for other ops
+    auto writer = _logOpWriter(opCtx,
+                               opstr,
+                               nss,
+                               uuid,
+                               obj,
+                               o2,
+                               fromMigrate,
+                               slot.opTime,
+                               slot.hash,
+                               Date_t::now(),
+                               kUninitializedStmtId);
     const DocWriter* basePtr = &writer;
     _logOpsInner(opCtx, nss, &basePtr, 1, oplog, replMode, slot.opTime);
     return slot.opTime;
 }
 
-void logOps(OperationContext* opCtx,
-            const char* opstr,
-            const NamespaceString& nss,
-            OptionalCollectionUUID uuid,
-            std::vector<BSONObj>::const_iterator begin,
-            std::vector<BSONObj>::const_iterator end,
-            bool fromMigrate) {
+void logInsertOps(OperationContext* opCtx,
+                  const NamespaceString& nss,
+                  OptionalCollectionUUID uuid,
+                  std::vector<InsertStatement>::const_iterator begin,
+                  std::vector<InsertStatement>::const_iterator end,
+                  bool fromMigrate) {
     invariant(begin != end);
 
     auto replCoord = ReplicationCoordinator::get(opCtx);
@@ -430,16 +444,18 @@ void logOps(OperationContext* opCtx,
     getNextOpTime(opCtx, oplog, replCoord, replMode, count, slots.get());
     auto wallTime = Date_t::now();
     for (size_t i = 0; i < count; i++) {
+        auto insertStatement = begin[i];
         writers.emplace_back(_logOpWriter(opCtx,
-                                          opstr,
+                                          "i",
                                           nss,
                                           uuid,
-                                          begin[i],
+                                          insertStatement.doc,
                                           NULL,
                                           fromMigrate,
                                           slots[i].opTime,
                                           slots[i].hash,
-                                          wallTime));
+                                          wallTime,
+                                          insertStatement.stmtId));
     }
 
     std::unique_ptr<DocWriter const* []> basePtrs(new DocWriter const*[count]);
@@ -935,9 +951,11 @@ Status applyOperation_inlock(OperationContext* opCtx,
 
         if (fieldO.type() == Array) {
             // Batched inserts.
-            std::vector<BSONObj> insertObjs;
+            std::vector<InsertStatement> insertObjs;
             for (auto elem : fieldO.Obj()) {
-                insertObjs.push_back(elem.Obj());
+                // Note: we don't care about statement ids here since the secondaries don't create
+                // their own oplog entries.
+                insertObjs.emplace_back(elem.Obj());
             }
             uassert(ErrorCodes::OperationFailed,
                     str::stream() << "Failed to apply insert due to empty array element: "
@@ -983,7 +1001,8 @@ Status applyOperation_inlock(OperationContext* opCtx,
                 WriteUnitOfWork wuow(opCtx);
                 try {
                     OpDebug* const nullOpDebug = nullptr;
-                    status = collection->insertDocument(opCtx, o, nullOpDebug, true);
+                    status =
+                        collection->insertDocument(opCtx, InsertStatement(o), nullOpDebug, true);
                 } catch (DBException dbe) {
                     status = dbe.toStatus();
                 }

@@ -91,8 +91,9 @@ public:
             const std::vector<BSONObj>& secondaryIndexSpecs)>;
     using InsertDocumentFn = stdx::function<Status(
         OperationContext* opCtx, const NamespaceString& nss, const BSONObj& doc)>;
-    using InsertDocumentsFn = stdx::function<Status(
-        OperationContext* opCtx, const NamespaceString& nss, const std::vector<BSONObj>& docs)>;
+    using InsertDocumentsFn = stdx::function<Status(OperationContext* opCtx,
+                                                    const NamespaceString& nss,
+                                                    const std::vector<InsertStatement>& docs)>;
     using DropUserDatabasesFn = stdx::function<Status(OperationContext* opCtx)>;
     using CreateOplogFn =
         stdx::function<Status(OperationContext* opCtx, const NamespaceString& nss)>;
@@ -140,7 +141,7 @@ public:
 
     Status insertDocuments(OperationContext* opCtx,
                            const NamespaceString& nss,
-                           const std::vector<BSONObj>& docs) override {
+                           const std::vector<InsertStatement>& docs) override {
         return insertDocumentsFn(opCtx, nss, docs);
     }
 
@@ -261,10 +262,11 @@ public:
         [](OperationContext* opCtx, const NamespaceString& nss, const BSONObj& doc) {
             return Status{ErrorCodes::IllegalOperation, "InsertDocumentFn not implemented."};
         };
-    InsertDocumentsFn insertDocumentsFn =
-        [](OperationContext* opCtx, const NamespaceString& nss, const std::vector<BSONObj>& docs) {
-            return Status{ErrorCodes::IllegalOperation, "InsertDocumentsFn not implemented."};
-        };
+    InsertDocumentsFn insertDocumentsFn = [](OperationContext* opCtx,
+                                             const NamespaceString& nss,
+                                             const std::vector<InsertStatement>& docs) {
+        return Status{ErrorCodes::IllegalOperation, "InsertDocumentsFn not implemented."};
+    };
     DropUserDatabasesFn dropUserDBsFn = [](OperationContext* opCtx) {
         return Status{ErrorCodes::IllegalOperation, "DropUserDatabasesFn not implemented."};
     };

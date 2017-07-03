@@ -469,12 +469,12 @@ void scheduleWritesToOplog(OperationContext* opCtx,
             opCtx->lockState()->setShouldConflictWithSecondaryBatchApplication(false);
             UnreplicatedWritesBlock uwb(opCtx);
 
-            std::vector<BSONObj> docs;
+            std::vector<InsertStatement> docs;
             docs.reserve(end - begin);
             for (size_t i = begin; i < end; i++) {
                 // Add as unowned BSON to avoid unnecessary ref-count bumps.
                 // 'ops' will outlive 'docs' so the BSON lifetime will be guaranteed.
-                docs.emplace_back(ops[i].raw.objdata());
+                docs.emplace_back(BSONObj(ops[i].raw.objdata()));
             }
 
             fassertStatusOK(40141,
@@ -1014,7 +1014,7 @@ bool SyncTail::fetchAndInsertMissingDocument(OperationContext* opCtx, const BSON
         invariant(coll);
 
         OpDebug* const nullOpDebug = nullptr;
-        Status status = coll->insertDocument(opCtx, missingObj, nullOpDebug, true);
+        Status status = coll->insertDocument(opCtx, InsertStatement(missingObj), nullOpDebug, true);
         uassert(15917,
                 str::stream() << "Failed to insert missing document: " << status.toString(),
                 status.isOK());

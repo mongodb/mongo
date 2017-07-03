@@ -115,9 +115,11 @@ public:
             ASSERT_OK(db->dropCollection(&_opCtx, _ns));
             coll = db->createCollection(&_opCtx, _ns);
 
-            ASSERT_OK(coll->insertDocument(&_opCtx, BSON("_id" << 1), nullOpDebug, true));
+            ASSERT_OK(coll->insertDocument(
+                &_opCtx, InsertStatement(BSON("_id" << 1)), nullOpDebug, true));
             id1 = coll->getCursor(&_opCtx)->next()->id;
-            ASSERT_OK(coll->insertDocument(&_opCtx, BSON("_id" << 2), nullOpDebug, true));
+            ASSERT_OK(coll->insertDocument(
+                &_opCtx, InsertStatement(BSON("_id" << 2)), nullOpDebug, true));
             wunit.commit();
         }
 
@@ -164,11 +166,11 @@ public:
             WriteUnitOfWork wunit(&_opCtx);
             ASSERT_OK(db->dropCollection(&_opCtx, _ns));
             coll = db->createCollection(&_opCtx, _ns);
-            ASSERT_OK(
-                coll->insertDocument(&_opCtx, BSON("_id" << 1 << "a" << 1), nullOpDebug, true));
+            ASSERT_OK(coll->insertDocument(
+                &_opCtx, InsertStatement(BSON("_id" << 1 << "a" << 1)), nullOpDebug, true));
             id1 = coll->getCursor(&_opCtx)->next()->id;
-            ASSERT_OK(
-                coll->insertDocument(&_opCtx, BSON("_id" << 2 << "a" << 2), nullOpDebug, true));
+            ASSERT_OK(coll->insertDocument(
+                &_opCtx, InsertStatement(BSON("_id" << 2 << "a" << 2)), nullOpDebug, true));
             wunit.commit();
         }
 
@@ -228,13 +230,13 @@ public:
             WriteUnitOfWork wunit(&_opCtx);
             ASSERT_OK(db->dropCollection(&_opCtx, _ns));
             coll = db->createCollection(&_opCtx, _ns);
-            ASSERT_OK(
-                coll->insertDocument(&_opCtx, BSON("_id" << 1 << "a" << 1), nullOpDebug, true));
+            ASSERT_OK(coll->insertDocument(
+                &_opCtx, InsertStatement(BSON("_id" << 1 << "a" << 1)), nullOpDebug, true));
             id1 = coll->getCursor(&_opCtx)->next()->id;
-            ASSERT_OK(
-                coll->insertDocument(&_opCtx, BSON("_id" << 2 << "a" << 2), nullOpDebug, true));
-            ASSERT_OK(
-                coll->insertDocument(&_opCtx, BSON("_id" << 3 << "b" << 3), nullOpDebug, true));
+            ASSERT_OK(coll->insertDocument(
+                &_opCtx, InsertStatement(BSON("_id" << 2 << "a" << 2)), nullOpDebug, true));
+            ASSERT_OK(coll->insertDocument(
+                &_opCtx, InsertStatement(BSON("_id" << 3 << "b" << 3)), nullOpDebug, true));
             wunit.commit();
         }
 
@@ -287,9 +289,11 @@ public:
             ASSERT_OK(db->dropCollection(&_opCtx, _ns));
             coll = db->createCollection(&_opCtx, _ns);
 
-            ASSERT_OK(coll->insertDocument(&_opCtx, BSON("_id" << 1), nullOpDebug, true));
+            ASSERT_OK(coll->insertDocument(
+                &_opCtx, InsertStatement(BSON("_id" << 1)), nullOpDebug, true));
             id1 = coll->getCursor(&_opCtx)->next()->id;
-            ASSERT_OK(coll->insertDocument(&_opCtx, BSON("_id" << 2), nullOpDebug, true));
+            ASSERT_OK(coll->insertDocument(
+                &_opCtx, InsertStatement(BSON("_id" << 2)), nullOpDebug, true));
             wunit.commit();
         }
 
@@ -364,10 +368,10 @@ public:
             coll = db->createCollection(&_opCtx, _ns);
 
 
-            ASSERT_OK(coll->insertDocument(&_opCtx, doc1, nullOpDebug, true));
+            ASSERT_OK(coll->insertDocument(&_opCtx, InsertStatement(doc1), nullOpDebug, true));
             id1 = coll->getCursor(&_opCtx)->next()->id;
-            ASSERT_OK(coll->insertDocument(&_opCtx, doc2, nullOpDebug, true));
-            ASSERT_OK(coll->insertDocument(&_opCtx, doc3, nullOpDebug, true));
+            ASSERT_OK(coll->insertDocument(&_opCtx, InsertStatement(doc2), nullOpDebug, true));
+            ASSERT_OK(coll->insertDocument(&_opCtx, InsertStatement(doc3), nullOpDebug, true));
             wunit.commit();
         }
 
@@ -432,13 +436,13 @@ public:
             ASSERT_OK(db->dropCollection(&_opCtx, _ns));
             coll = db->createCollection(&_opCtx, _ns);
 
-            ASSERT_OK(
-                coll->insertDocument(&_opCtx, BSON("_id" << 1 << "a" << 1), nullOpDebug, true));
+            ASSERT_OK(coll->insertDocument(
+                &_opCtx, InsertStatement(BSON("_id" << 1 << "a" << 1)), nullOpDebug, true));
             id1 = coll->getCursor(&_opCtx)->next()->id;
-            ASSERT_OK(
-                coll->insertDocument(&_opCtx, BSON("_id" << 2 << "a" << 2), nullOpDebug, true));
-            ASSERT_OK(
-                coll->insertDocument(&_opCtx, BSON("_id" << 3 << "b" << 1), nullOpDebug, true));
+            ASSERT_OK(coll->insertDocument(
+                &_opCtx, InsertStatement(BSON("_id" << 2 << "a" << 2)), nullOpDebug, true));
+            ASSERT_OK(coll->insertDocument(
+                &_opCtx, InsertStatement(BSON("_id" << 3 << "b" << 1)), nullOpDebug, true));
             wunit.commit();
         }
 
@@ -492,15 +496,18 @@ public:
             ASSERT_OK(db->dropCollection(&_opCtx, _ns));
             coll = db->createCollection(&_opCtx, _ns);
 
-            ASSERT_OK(
-                coll->insertDocument(&_opCtx, BSON("_id" << 1 << "a" << 1), nullOpDebug, true));
+            ASSERT_OK(coll->insertDocument(
+                &_opCtx, InsertStatement(BSON("_id" << 1 << "a" << 1)), nullOpDebug, true));
             id1 = coll->getCursor(&_opCtx)->next()->id;
-            ASSERT_OK(
-                coll->insertDocument(&_opCtx, BSON("_id" << 2 << "a" << 2), nullOpDebug, true));
+            ASSERT_OK(coll->insertDocument(
+                &_opCtx, InsertStatement(BSON("_id" << 2 << "a" << 2)), nullOpDebug, true));
             // Explicitly test that multi-key partial indexes containing documents that
             // don't match the filter expression are handled correctly.
             ASSERT_OK(coll->insertDocument(
-                &_opCtx, BSON("_id" << 3 << "a" << BSON_ARRAY(-1 << -2 << -3)), nullOpDebug, true));
+                &_opCtx,
+                InsertStatement(BSON("_id" << 3 << "a" << BSON_ARRAY(-1 << -2 << -3))),
+                nullOpDebug,
+                true));
             wunit.commit();
         }
 
@@ -554,8 +561,11 @@ public:
             WriteUnitOfWork wunit(&_opCtx);
             ASSERT_OK(db->dropCollection(&_opCtx, _ns));
             coll = db->createCollection(&_opCtx, _ns);
-            ASSERT_OK(coll->insertDocument(
-                &_opCtx, BSON("_id" << 1 << "x" << 1 << "a" << 2), nullOpDebug, true));
+            ASSERT_OK(
+                coll->insertDocument(&_opCtx,
+                                     InsertStatement(BSON("_id" << 1 << "x" << 1 << "a" << 2)),
+                                     nullOpDebug,
+                                     true));
             wunit.commit();
         }
 
@@ -614,17 +624,23 @@ public:
             ASSERT_OK(db->dropCollection(&_opCtx, _ns));
             coll = db->createCollection(&_opCtx, _ns);
 
-            ASSERT_OK(coll->insertDocument(
-                &_opCtx, BSON("_id" << 1 << "a" << 1 << "b" << 4), nullOpDebug, true));
+            ASSERT_OK(
+                coll->insertDocument(&_opCtx,
+                                     InsertStatement(BSON("_id" << 1 << "a" << 1 << "b" << 4)),
+                                     nullOpDebug,
+                                     true));
             id1 = coll->getCursor(&_opCtx)->next()->id;
+            ASSERT_OK(
+                coll->insertDocument(&_opCtx,
+                                     InsertStatement(BSON("_id" << 2 << "a" << 2 << "b" << 5)),
+                                     nullOpDebug,
+                                     true));
             ASSERT_OK(coll->insertDocument(
-                &_opCtx, BSON("_id" << 2 << "a" << 2 << "b" << 5), nullOpDebug, true));
-            ASSERT_OK(
-                coll->insertDocument(&_opCtx, BSON("_id" << 3 << "a" << 3), nullOpDebug, true));
-            ASSERT_OK(
-                coll->insertDocument(&_opCtx, BSON("_id" << 4 << "b" << 6), nullOpDebug, true));
-            ASSERT_OK(
-                coll->insertDocument(&_opCtx, BSON("_id" << 5 << "c" << 7), nullOpDebug, true));
+                &_opCtx, InsertStatement(BSON("_id" << 3 << "a" << 3)), nullOpDebug, true));
+            ASSERT_OK(coll->insertDocument(
+                &_opCtx, InsertStatement(BSON("_id" << 4 << "b" << 6)), nullOpDebug, true));
+            ASSERT_OK(coll->insertDocument(
+                &_opCtx, InsertStatement(BSON("_id" << 5 << "c" << 7)), nullOpDebug, true));
             wunit.commit();
         }
 
@@ -691,13 +707,13 @@ public:
             ASSERT_OK(db->dropCollection(&_opCtx, _ns));
             coll = db->createCollection(&_opCtx, _ns);
 
-            ASSERT_OK(
-                coll->insertDocument(&_opCtx, BSON("_id" << 1 << "a" << 1), nullOpDebug, true));
+            ASSERT_OK(coll->insertDocument(
+                &_opCtx, InsertStatement(BSON("_id" << 1 << "a" << 1)), nullOpDebug, true));
             id1 = coll->getCursor(&_opCtx)->next()->id;
-            ASSERT_OK(
-                coll->insertDocument(&_opCtx, BSON("_id" << 2 << "a" << 2), nullOpDebug, true));
-            ASSERT_OK(
-                coll->insertDocument(&_opCtx, BSON("_id" << 3 << "b" << 1), nullOpDebug, true));
+            ASSERT_OK(coll->insertDocument(
+                &_opCtx, InsertStatement(BSON("_id" << 2 << "a" << 2)), nullOpDebug, true));
+            ASSERT_OK(coll->insertDocument(
+                &_opCtx, InsertStatement(BSON("_id" << 3 << "b" << 1)), nullOpDebug, true));
             wunit.commit();
         }
 
@@ -756,13 +772,13 @@ public:
             ASSERT_OK(db->dropCollection(&_opCtx, _ns));
             coll = db->createCollection(&_opCtx, _ns);
 
-            ASSERT_OK(
-                coll->insertDocument(&_opCtx, BSON("_id" << 1 << "a" << 1), nullOpDebug, true));
+            ASSERT_OK(coll->insertDocument(
+                &_opCtx, InsertStatement(BSON("_id" << 1 << "a" << 1)), nullOpDebug, true));
             id1 = coll->getCursor(&_opCtx)->next()->id;
-            ASSERT_OK(
-                coll->insertDocument(&_opCtx, BSON("_id" << 2 << "a" << 2), nullOpDebug, true));
-            ASSERT_OK(
-                coll->insertDocument(&_opCtx, BSON("_id" << 3 << "b" << 1), nullOpDebug, true));
+            ASSERT_OK(coll->insertDocument(
+                &_opCtx, InsertStatement(BSON("_id" << 2 << "a" << 2)), nullOpDebug, true));
+            ASSERT_OK(coll->insertDocument(
+                &_opCtx, InsertStatement(BSON("_id" << 3 << "b" << 1)), nullOpDebug, true));
             wunit.commit();
         }
 

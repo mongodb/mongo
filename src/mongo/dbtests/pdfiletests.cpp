@@ -77,13 +77,13 @@ public:
         Collection* collection =
             _context.db()->getOrCreateCollection(&_opCtx, NamespaceString(ns()));
         OpDebug* const nullOpDebug = nullptr;
-        ASSERT(!collection->insertDocument(&_opCtx, x, nullOpDebug, true).isOK());
+        ASSERT(!collection->insertDocument(&_opCtx, InsertStatement(x), nullOpDebug, true).isOK());
 
         StatusWith<BSONObj> fixed = fixDocumentForInsert(_opCtx.getServiceContext(), x);
         ASSERT(fixed.isOK());
         x = fixed.getValue();
         ASSERT(x["_id"].type() == jstOID);
-        ASSERT(collection->insertDocument(&_opCtx, x, nullOpDebug, true).isOK());
+        ASSERT(collection->insertDocument(&_opCtx, InsertStatement(x), nullOpDebug, true).isOK());
         wunit.commit();
     }
 };

@@ -43,8 +43,8 @@ void OpObserverNoop::onCreateIndex(
 void OpObserverNoop::onInserts(OperationContext*,
                                const NamespaceString&,
                                OptionalCollectionUUID,
-                               std::vector<BSONObj>::const_iterator,
-                               std::vector<BSONObj>::const_iterator,
+                               std::vector<InsertStatement>::const_iterator,
+                               std::vector<InsertStatement>::const_iterator,
                                bool) {}
 
 void OpObserverNoop::onUpdate(OperationContext*, const OplogUpdateEntryArgs&) {}

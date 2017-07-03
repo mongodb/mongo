@@ -168,7 +168,7 @@ Status CollectionBulkLoaderImpl::insertDocuments(const std::vector<BSONObj>::con
                         // For capped collections, we use regular insertDocument, which will update
                         // pre-existing indexes.
                         const auto status = _autoColl->getCollection()->insertDocument(
-                            _opCtx.get(), *iter, nullptr, false);
+                            _opCtx.get(), InsertStatement(*iter), nullptr, false);
                         if (!status.isOK()) {
                             return status;
                         }

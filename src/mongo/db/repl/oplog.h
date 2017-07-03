@@ -34,6 +34,7 @@
 #include "mongo/base/status.h"
 #include "mongo/bson/bsonobj.h"
 #include "mongo/bson/timestamp.h"
+#include "mongo/db/catalog/collection.h"
 #include "mongo/db/catalog/collection_options.h"
 #include "mongo/db/repl/optime.h"
 #include "mongo/db/repl/replication_coordinator.h"
@@ -73,6 +74,16 @@ extern int OPLOG_VERSION;
 
 /* Log operation(s) to the local oplog
  *
+ */
+
+void logInsertOps(OperationContext* opCtx,
+                  const NamespaceString& nss,
+                  OptionalCollectionUUID uuid,
+                  std::vector<InsertStatement>::const_iterator begin,
+                  std::vector<InsertStatement>::const_iterator end,
+                  bool fromMigrate);
+
+/**
  * @param opstr
  *  "i" insert
  *  "u" update
@@ -80,17 +91,7 @@ extern int OPLOG_VERSION;
  *  "c" db cmd
  *  "n" no-op
  *  "db" declares presence of a database (ns is set to the db name + '.')
- */
-
-void logOps(OperationContext* opCtx,
-            const char* opstr,
-            const NamespaceString& nss,
-            OptionalCollectionUUID uuid,
-            std::vector<BSONObj>::const_iterator begin,
-            std::vector<BSONObj>::const_iterator end,
-            bool fromMigrate);
-
-/**
+ *
  * For 'u' records, 'obj' captures the mutation made to the object but not
  * the object itself. 'o2' captures the the criteria for the object that will be modified.
  * Returns the optime of the oplog entry written to the oplog.

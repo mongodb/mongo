@@ -70,7 +70,7 @@ public:
 
     Status insertDocuments(OperationContext* opCtx,
                            const NamespaceString& nss,
-                           const std::vector<BSONObj>& docs) override;
+                           const std::vector<InsertStatement>& docs) override;
 
     Status dropReplicatedDatabases(OperationContext* opCtx) override;
 

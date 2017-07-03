@@ -142,7 +142,8 @@ void profile(OperationContext* opCtx, NetworkOp op) {
             if (coll) {
                 WriteUnitOfWork wuow(opCtx);
                 OpDebug* const nullOpDebug = nullptr;
-                coll->insertDocument(opCtx, p, nullOpDebug, false).transitional_ignore();
+                coll->insertDocument(opCtx, InsertStatement(p), nullOpDebug, false)
+                    .transitional_ignore();
                 wuow.commit();
 
                 break;

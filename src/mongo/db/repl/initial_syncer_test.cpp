@@ -240,8 +240,9 @@ protected:
                 ++_storageInterfaceWorkDone.documentsInsertedCount;
                 return Status::OK();
             };
-        _storageInterface->insertDocumentsFn = [this](
-            OperationContext* opCtx, const NamespaceString& nss, const std::vector<BSONObj>& ops) {
+        _storageInterface->insertDocumentsFn = [this](OperationContext* opCtx,
+                                                      const NamespaceString& nss,
+                                                      const std::vector<InsertStatement>& ops) {
             LockGuard lock(_storageInterfaceWorkDoneMutex);
             _storageInterfaceWorkDone.insertedOplogEntries = true;
             ++_storageInterfaceWorkDone.oplogEntriesInserted;

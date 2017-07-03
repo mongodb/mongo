@@ -69,7 +69,7 @@ public:
     void insert(const BSONObj& doc) {
         WriteUnitOfWork wunit(&_opCtx);
         OpDebug* const nullOpDebug = nullptr;
-        ASSERT_OK(_coll->insertDocument(&_opCtx, doc, nullOpDebug, false));
+        ASSERT_OK(_coll->insertDocument(&_opCtx, InsertStatement(doc), nullOpDebug, false));
         wunit.commit();
     }
 

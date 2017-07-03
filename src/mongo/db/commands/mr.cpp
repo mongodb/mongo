@@ -757,7 +757,7 @@ void State::insert(const NamespaceString& nss, const BSONObj& o) {
 
         // TODO: Consider whether to pass OpDebug for stats tracking under SERVER-23261.
         OpDebug* const nullOpDebug = nullptr;
-        uassertStatusOK(coll->insertDocument(_opCtx, bo, nullOpDebug, true));
+        uassertStatusOK(coll->insertDocument(_opCtx, InsertStatement(bo), nullOpDebug, true));
         wuow.commit();
     });
 }
@@ -789,7 +789,7 @@ void State::_insertToInc(BSONObj& o) {
 
         // TODO: Consider whether to pass OpDebug for stats tracking under SERVER-23261.
         OpDebug* const nullOpDebug = nullptr;
-        uassertStatusOK(coll->insertDocument(_opCtx, o, nullOpDebug, true, false));
+        uassertStatusOK(coll->insertDocument(_opCtx, InsertStatement(o), nullOpDebug, true, false));
         wuow.commit();
     });
 }

@@ -265,7 +265,8 @@ struct Cloner::Fun {
 
                 BSONObj doc = tmp;
                 OpDebug* const nullOpDebug = nullptr;
-                Status status = collection->insertDocument(opCtx, doc, nullOpDebug, true);
+                Status status =
+                    collection->insertDocument(opCtx, InsertStatement(doc), nullOpDebug, true);
                 if (!status.isOK() && status.code() != ErrorCodes::DuplicateKey) {
                     error() << "error: exception cloning object in " << from_collection << ' '
                             << redact(status) << " obj:" << redact(doc);

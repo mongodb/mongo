@@ -36,6 +36,7 @@
 
 #include "mongo/base/disallow_copying.h"
 #include "mongo/base/string_data.h"
+#include "mongo/db/catalog/collection.h"
 #include "mongo/db/namespace_string.h"
 #include "mongo/db/query/index_bounds.h"
 #include "mongo/db/repl/collection_bulk_loader.h"
@@ -112,7 +113,7 @@ public:
      */
     virtual Status insertDocuments(OperationContext* opCtx,
                                    const NamespaceString& nss,
-                                   const std::vector<BSONObj>& docs) = 0;
+                                   const std::vector<InsertStatement>& docs) = 0;
 
     /**
      * Creates the initial oplog, errors if it exists.

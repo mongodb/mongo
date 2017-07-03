@@ -113,14 +113,14 @@ public:
 
             OpDebug* const nullOpDebug = nullptr;
             coll->insertDocument(&_opCtx,
-                                 BSON("_id" << 1 << "a"
-                                            << "dup"),
+                                 InsertStatement(BSON("_id" << 1 << "a"
+                                                            << "dup")),
                                  nullOpDebug,
                                  true)
                 .transitional_ignore();
             coll->insertDocument(&_opCtx,
-                                 BSON("_id" << 2 << "a"
-                                            << "dup"),
+                                 InsertStatement(BSON("_id" << 2 << "a"
+                                                            << "dup")),
                                  nullOpDebug,
                                  true)
                 .transitional_ignore();
@@ -169,14 +169,14 @@ public:
 
             OpDebug* const nullOpDebug = nullptr;
             coll->insertDocument(&_opCtx,
-                                 BSON("_id" << 1 << "a"
-                                            << "dup"),
+                                 InsertStatement(BSON("_id" << 1 << "a"
+                                                            << "dup")),
                                  nullOpDebug,
                                  true)
                 .transitional_ignore();
             coll->insertDocument(&_opCtx,
-                                 BSON("_id" << 2 << "a"
-                                            << "dup"),
+                                 InsertStatement(BSON("_id" << 2 << "a"
+                                                            << "dup")),
                                  nullOpDebug,
                                  true)
                 .transitional_ignore();
@@ -224,13 +224,13 @@ public:
 
             OpDebug* const nullOpDebug = nullptr;
             ASSERT_OK(coll->insertDocument(&_opCtx,
-                                           BSON("_id" << 1 << "a"
-                                                      << "dup"),
+                                           InsertStatement(BSON("_id" << 1 << "a"
+                                                                      << "dup")),
                                            nullOpDebug,
                                            true));
             ASSERT_OK(coll->insertDocument(&_opCtx,
-                                           BSON("_id" << 2 << "a"
-                                                      << "dup"),
+                                           InsertStatement(BSON("_id" << 2 << "a"
+                                                                      << "dup")),
                                            nullOpDebug,
                                            true));
             wunit.commit();
@@ -287,7 +287,7 @@ public:
             int32_t nDocs = 1000;
             OpDebug* const nullOpDebug = nullptr;
             for (int32_t i = 0; i < nDocs; ++i) {
-                coll->insertDocument(&_opCtx, BSON("a" << i), nullOpDebug, true)
+                coll->insertDocument(&_opCtx, InsertStatement(BSON("a" << i)), nullOpDebug, true)
                     .transitional_ignore();
             }
             wunit.commit();
@@ -323,7 +323,7 @@ public:
             int32_t nDocs = 1000;
             OpDebug* const nullOpDebug = nullptr;
             for (int32_t i = 0; i < nDocs; ++i) {
-                coll->insertDocument(&_opCtx, BSON("a" << i), nullOpDebug, true)
+                coll->insertDocument(&_opCtx, InsertStatement(BSON("a" << i)), nullOpDebug, true)
                     .transitional_ignore();
             }
             wunit.commit();
@@ -362,7 +362,7 @@ public:
             int32_t nDocs = 1000;
             OpDebug* const nullOpDebug = nullptr;
             for (int32_t i = 0; i < nDocs; ++i) {
-                coll->insertDocument(&_opCtx, BSON("_id" << i), nullOpDebug, true)
+                coll->insertDocument(&_opCtx, InsertStatement(BSON("_id" << i)), nullOpDebug, true)
                     .transitional_ignore();
             }
             wunit.commit();
@@ -401,7 +401,7 @@ public:
             int32_t nDocs = 1000;
             OpDebug* const nullOpDebug = nullptr;
             for (int32_t i = 0; i < nDocs; ++i) {
-                coll->insertDocument(&_opCtx, BSON("_id" << i), nullOpDebug, true)
+                coll->insertDocument(&_opCtx, InsertStatement(BSON("_id" << i)), nullOpDebug, true)
                     .transitional_ignore();
             }
             wunit.commit();

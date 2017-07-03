@@ -958,11 +958,12 @@ TEST_F(RSRollbackTest, RollbackApplyOpsCommand) {
         }
         ASSERT(coll);
         OpDebug* const nullOpDebug = nullptr;
-        ASSERT_OK(
-            coll->insertDocument(_opCtx.get(), BSON("_id" << 1 << "v" << 2), nullOpDebug, false));
-        ASSERT_OK(
-            coll->insertDocument(_opCtx.get(), BSON("_id" << 2 << "v" << 4), nullOpDebug, false));
-        ASSERT_OK(coll->insertDocument(_opCtx.get(), BSON("_id" << 4), nullOpDebug, false));
+        ASSERT_OK(coll->insertDocument(
+            _opCtx.get(), InsertStatement(BSON("_id" << 1 << "v" << 2)), nullOpDebug, false));
+        ASSERT_OK(coll->insertDocument(
+            _opCtx.get(), InsertStatement(BSON("_id" << 2 << "v" << 4)), nullOpDebug, false));
+        ASSERT_OK(coll->insertDocument(
+            _opCtx.get(), InsertStatement(BSON("_id" << 4)), nullOpDebug, false));
         wuow.commit();
     }
     const auto commonOperation =

@@ -133,8 +133,8 @@ public:
     }
 
     Status insertDocuments(OperationContext* opCtx,
-                           std::vector<BSONObj>::const_iterator begin,
-                           std::vector<BSONObj>::const_iterator end,
+                           std::vector<InsertStatement>::const_iterator begin,
+                           std::vector<InsertStatement>::const_iterator end,
                            OpDebug* opDebug,
                            bool enforceQuota,
                            bool fromMigrate) {
@@ -142,7 +142,7 @@ public:
     }
 
     Status insertDocument(OperationContext* opCtx,
-                          const BSONObj& doc,
+                          const InsertStatement& doc,
                           OpDebug* opDebug,
                           bool enforceQuota,
                           bool fromMigrate) {

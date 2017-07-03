@@ -218,7 +218,7 @@ void logStartup(OperationContext* opCtx) {
     invariant(collection);
 
     OpDebug* const nullOpDebug = nullptr;
-    uassertStatusOK(collection->insertDocument(opCtx, o, nullOpDebug, false));
+    uassertStatusOK(collection->insertDocument(opCtx, InsertStatement(o), nullOpDebug, false));
     wunit.commit();
 }
 

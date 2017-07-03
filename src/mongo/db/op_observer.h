@@ -31,12 +31,14 @@
 #include <string>
 
 #include "mongo/base/disallow_copying.h"
+#include "mongo/db/catalog/collection.h"
 #include "mongo/db/catalog/collection_options.h"
 #include "mongo/db/jsobj.h"
 #include "mongo/db/s/collection_sharding_state.h"
 
 namespace mongo {
 struct CollectionOptions;
+struct InsertStatement;
 class NamespaceString;
 class OperationContext;
 
@@ -87,8 +89,8 @@ public:
     virtual void onInserts(OperationContext* opCtx,
                            const NamespaceString& nss,
                            OptionalCollectionUUID uuid,
-                           std::vector<BSONObj>::const_iterator begin,
-                           std::vector<BSONObj>::const_iterator end,
+                           std::vector<InsertStatement>::const_iterator begin,
+                           std::vector<InsertStatement>::const_iterator end,
                            bool fromMigrate) = 0;
     virtual void onUpdate(OperationContext* opCtx, const OplogUpdateEntryArgs& args) = 0;
     virtual CollectionShardingState::DeleteState aboutToDelete(OperationContext* opCtx,

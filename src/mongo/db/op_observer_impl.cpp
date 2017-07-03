@@ -79,23 +79,24 @@ void OpObserverImpl::onCreateIndex(OperationContext* opCtx,
 void OpObserverImpl::onInserts(OperationContext* opCtx,
                                const NamespaceString& nss,
                                OptionalCollectionUUID uuid,
-                               std::vector<BSONObj>::const_iterator begin,
-                               std::vector<BSONObj>::const_iterator end,
+                               std::vector<InsertStatement>::const_iterator begin,
+                               std::vector<InsertStatement>::const_iterator end,
                                bool fromMigrate) {
-    repl::logOps(opCtx, "i", nss, uuid, begin, end, fromMigrate);
+    repl::logInsertOps(opCtx, nss, uuid, begin, end, fromMigrate);
 
     auto css = CollectionShardingState::get(opCtx, nss.ns());
 
     for (auto it = begin; it != end; it++) {
-        AuthorizationManager::get(opCtx->getServiceContext())->logOp(opCtx, "i", nss, *it, nullptr);
+        AuthorizationManager::get(opCtx->getServiceContext())
+            ->logOp(opCtx, "i", nss, it->doc, nullptr);
         if (!fromMigrate) {
-            css->onInsertOp(opCtx, *it);
+            css->onInsertOp(opCtx, it->doc);
         }
     }
 
     if (nss.ns() == FeatureCompatibilityVersion::kCollection) {
         for (auto it = begin; it != end; it++) {
-            FeatureCompatibilityVersion::onInsertOrUpdate(*it);
+            FeatureCompatibilityVersion::onInsertOrUpdate(it->doc);
         }
     }
 

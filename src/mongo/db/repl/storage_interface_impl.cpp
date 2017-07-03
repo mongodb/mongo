@@ -264,7 +264,7 @@ StorageInterfaceImpl::createCollectionForBulkLoading(
 Status StorageInterfaceImpl::insertDocument(OperationContext* opCtx,
                                             const NamespaceString& nss,
                                             const BSONObj& doc) {
-    return insertDocuments(opCtx, nss, {doc});
+    return insertDocuments(opCtx, nss, {InsertStatement(doc)});
 }
 
 namespace {
@@ -293,8 +293,8 @@ StatusWith<Collection*> getCollection(const AutoGetCollectionType& autoGetCollec
 
 Status insertDocumentsSingleBatch(OperationContext* opCtx,
                                   const NamespaceString& nss,
-                                  std::vector<BSONObj>::const_iterator begin,
-                                  std::vector<BSONObj>::const_iterator end) {
+                                  std::vector<InsertStatement>::const_iterator begin,
+                                  std::vector<InsertStatement>::const_iterator end) {
     AutoGetCollection autoColl(opCtx, nss, MODE_IX);
 
     auto collectionResult =
@@ -319,7 +319,7 @@ Status insertDocumentsSingleBatch(OperationContext* opCtx,
 
 Status StorageInterfaceImpl::insertDocuments(OperationContext* opCtx,
                                              const NamespaceString& nss,
-                                             const std::vector<BSONObj>& docs) {
+                                             const std::vector<InsertStatement>& docs) {
     if (docs.size() > 1U) {
         try {
             if (insertDocumentsSingleBatch(opCtx, nss, docs.cbegin(), docs.cend()).isOK()) {

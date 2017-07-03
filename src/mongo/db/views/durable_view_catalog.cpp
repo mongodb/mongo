@@ -144,8 +144,8 @@ void DurableViewCatalogImpl::upsert(OperationContext* opCtx,
     Snapshotted<BSONObj> oldView;
     if (!id.isNormal() || !systemViews->findDoc(opCtx, id, &oldView)) {
         LOG(2) << "insert view " << view << " into " << _db->getSystemViewsName();
-        uassertStatusOK(
-            systemViews->insertDocument(opCtx, view, &CurOp::get(opCtx)->debug(), enforceQuota));
+        uassertStatusOK(systemViews->insertDocument(
+            opCtx, InsertStatement(view), &CurOp::get(opCtx)->debug(), enforceQuota));
     } else {
         OplogUpdateEntryArgs args;
         args.nss = systemViewsNs;

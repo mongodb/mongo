@@ -38,9 +38,11 @@
 #include "mongo/bson/mutable/damage_vector.h"
 #include "mongo/db/catalog/coll_mod.h"
 #include "mongo/db/catalog/collection_info_cache.h"
+#include "mongo/db/catalog/collection_options.h"
 #include "mongo/db/catalog/index_catalog.h"
 #include "mongo/db/cursor_manager.h"
 #include "mongo/db/exec/collection_scan_common.h"
+#include "mongo/db/logical_session_id.h"
 #include "mongo/db/namespace_string.h"
 #include "mongo/db/op_observer.h"
 #include "mongo/db/query/collation/collator_interface.h"
@@ -62,6 +64,7 @@ class MatchExpression;
 class MultiIndexBlock;
 class OpDebug;
 class OperationContext;
+struct OplogUpdateEntryArgs;
 class RecordCursor;
 class RecordFetcher;
 class UpdateDriver;
@@ -89,6 +92,17 @@ struct CompactOptions {
 
 struct CompactStats {
     long long corruptDocuments = 0;
+};
+
+struct InsertStatement {
+public:
+    InsertStatement() = default;
+    explicit InsertStatement(BSONObj toInsert) : doc(toInsert) {}
+
+    InsertStatement(StmtId statementId, BSONObj toInsert) : stmtId(statementId), doc(toInsert) {}
+
+    StmtId stmtId = kUninitializedStmtId;
+    BSONObj doc;
 };
 
 /**
@@ -230,14 +244,14 @@ public:
                                     bool noWarn) = 0;
 
         virtual Status insertDocuments(OperationContext* opCtx,
-                                       std::vector<BSONObj>::const_iterator begin,
-                                       std::vector<BSONObj>::const_iterator end,
+                                       std::vector<InsertStatement>::const_iterator begin,
+                                       std::vector<InsertStatement>::const_iterator end,
                                        OpDebug* opDebug,
                                        bool enforceQuota,
                                        bool fromMigrate) = 0;
 
         virtual Status insertDocument(OperationContext* opCtx,
-                                      const BSONObj& doc,
+                                      const InsertStatement& doc,
                                       OpDebug* opDebug,
                                       bool enforceQuota,
                                       bool fromMigrate) = 0;
@@ -454,8 +468,8 @@ public:
      * 'opDebug' Optional argument. When not null, will be used to record operation statistics.
      */
     inline Status insertDocuments(OperationContext* const opCtx,
-                                  const std::vector<BSONObj>::const_iterator begin,
-                                  const std::vector<BSONObj>::const_iterator end,
+                                  const std::vector<InsertStatement>::const_iterator begin,
+                                  const std::vector<InsertStatement>::const_iterator end,
                                   OpDebug* const opDebug,
                                   const bool enforceQuota,
                                   const bool fromMigrate = false) {
@@ -470,7 +484,7 @@ public:
      * 'enforceQuota' If false, quotas will be ignored.
      */
     inline Status insertDocument(OperationContext* const opCtx,
-                                 const BSONObj& doc,
+                                 const InsertStatement& doc,
                                  OpDebug* const opDebug,
                                  const bool enforceQuota,
                                  const bool fromMigrate = false) {

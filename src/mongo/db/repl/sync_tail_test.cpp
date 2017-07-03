@@ -221,9 +221,10 @@ void SyncTailTest::setUp() {
     ReplicationCoordinator::set(service, stdx::make_unique<ReplicationCoordinatorMock>(service));
     auto storageInterface = stdx::make_unique<StorageInterfaceMock>();
     _storageInterface = storageInterface.get();
-    storageInterface->insertDocumentsFn = [](OperationContext*,
-                                             const NamespaceString&,
-                                             const std::vector<BSONObj>&) { return Status::OK(); };
+    storageInterface->insertDocumentsFn =
+        [](OperationContext*, const NamespaceString&, const std::vector<InsertStatement>&) {
+            return Status::OK();
+        };
     StorageInterface::set(service, std::move(storageInterface));
     DropPendingCollectionReaper::set(
         service, stdx::make_unique<DropPendingCollectionReaper>(_storageInterface));
@@ -678,9 +679,11 @@ TEST_F(SyncTailTest, MultiApplyAssignsOperationsToWriterThreadsBasedOnNamespaceH
     auto op2 = makeInsertDocumentOplogEntry({Timestamp(Seconds(2), 0), 1LL}, nss2, BSON("x" << 2));
 
     NamespaceString nssForInsert;
-    std::vector<BSONObj> operationsWrittenToOplog;
+    std::vector<InsertStatement> operationsWrittenToOplog;
     _storageInterface->insertDocumentsFn = [&mutex, &nssForInsert, &operationsWrittenToOplog](
-        OperationContext* opCtx, const NamespaceString& nss, const std::vector<BSONObj>& docs) {
+        OperationContext* opCtx,
+        const NamespaceString& nss,
+        const std::vector<InsertStatement>& docs) {
         stdx::lock_guard<stdx::mutex> lock(mutex);
         nssForInsert = nss;
         operationsWrittenToOplog = docs;
@@ -710,8 +713,8 @@ TEST_F(SyncTailTest, MultiApplyAssignsOperationsToWriterThreadsBasedOnNamespaceH
     stdx::lock_guard<stdx::mutex> lock(mutex);
     ASSERT_EQUALS(2U, operationsWrittenToOplog.size());
     ASSERT_EQUALS(NamespaceString(rsOplogName), nssForInsert);
-    ASSERT_BSONOBJ_EQ(op1.raw, operationsWrittenToOplog[0]);
-    ASSERT_BSONOBJ_EQ(op2.raw, operationsWrittenToOplog[1]);
+    ASSERT_BSONOBJ_EQ(op1.raw, operationsWrittenToOplog[0].doc);
+    ASSERT_BSONOBJ_EQ(op2.raw, operationsWrittenToOplog[1].doc);
 }
 
 TEST_F(SyncTailTest, MultiSyncApplyUsesSyncApplyToApplyOperation) {

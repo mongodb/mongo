@@ -108,7 +108,8 @@ public:
     void insert(const BSONObj& doc) {
         WriteUnitOfWork wunit(&_opCtx);
         OpDebug* const nullOpDebug = nullptr;
-        _coll->insertDocument(&_opCtx, doc, nullOpDebug, false).transitional_ignore();
+        _coll->insertDocument(&_opCtx, InsertStatement(doc), nullOpDebug, false)
+            .transitional_ignore();
         wunit.commit();
     }
 
