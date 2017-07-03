@@ -11,6 +11,8 @@ selector:
   exclude_files:
   # Skip any tests that run with auth explicitly.
   - jstests/core/**/*[aA]uth*.js
+  # Commands using UUIDs are not compatible with name-based auth
+  - jstests/core/commands_with_uuid.js
 
 executor:
   config:

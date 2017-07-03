@@ -11,11 +11,22 @@
     db.runCommand({drop: subCollName});
     assert.commandWorked(db.runCommand({create: mainCollName}));
     assert.commandWorked(db.runCommand({create: subCollName}));
+
+    // Check if UUIDs are enabled / supported.
     let collectionInfos = db.getCollectionInfos({name: mainCollName});
     let uuid = collectionInfos[0].info.uuid;
     if (uuid == null) {
         return;
     }
+
+    // No support for UUIDs on mongos.
+    const isMaster = db.runCommand("ismaster");
+    assert.commandWorked(isMaster);
+    const isMongos = (isMaster.msg === "isdbgrid");
+    if (isMongos) {
+        return;
+    }
+
     assert.commandWorked(db.runCommand({insert: mainCollName, documents: [{fooField: 'FOO'}]}));
     assert.commandWorked(db.runCommand({insert: subCollName, documents: [{fooField: 'BAR'}]}));
     // Ensure passing a UUID to find retrieves results from the correct collection.
