@@ -52,6 +52,9 @@ public:
     static void addPrivilegeToPrivilegeVector(PrivilegeVector* privileges,
                                               const Privilege& privilegeToAdd);
 
+    static void addPrivilegesToPrivilegeVector(PrivilegeVector* privileges,
+                                               const PrivilegeVector& privilegesToAdd);
+
 
     Privilege(){};
     Privilege(const ResourcePattern& resource, const ActionType& action);

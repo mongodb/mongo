@@ -32,6 +32,7 @@
 #include <memory>
 #include <vector>
 
+#include "mongo/db/auth/privilege.h"
 #include "mongo/db/namespace_string.h"
 #include "mongo/db/pipeline/aggregation_request.h"
 #include "mongo/stdx/functional.h"
@@ -85,6 +86,11 @@ public:
     virtual stdx::unordered_set<NamespaceString> getInvolvedNamespaces() const = 0;
 
     /**
+     * Returns a list of the privileges required for this stage.
+     */
+    virtual PrivilegeVector requiredPrivileges(bool isMongos) const = 0;
+
+    /**
      * Returns true if this is a $collStats stage.
      */
     virtual bool isCollStats() const {
@@ -95,6 +101,13 @@ public:
      * Returns true if this is a $changeNotification stage.
      */
     virtual bool isChangeNotification() const {
+        return false;
+    }
+
+    /**
+     * Returns true if this stage does not require an input source.
+     */
+    virtual bool isInitialSource() const {
         return false;
     }
 };
@@ -116,6 +129,10 @@ public:
     stdx::unordered_set<NamespaceString> getInvolvedNamespaces() const final {
         return stdx::unordered_set<NamespaceString>();
     }
+
+    PrivilegeVector requiredPrivileges(bool isMongos) const final {
+        return {};
+    }
 };
 
 /**
@@ -123,18 +140,24 @@ public:
  */
 class LiteParsedDocumentSourceForeignCollections : public LiteParsedDocumentSource {
 public:
-    explicit LiteParsedDocumentSourceForeignCollections(NamespaceString foreignNss)
-        : _foreignNssSet{std::move(foreignNss)} {}
+    LiteParsedDocumentSourceForeignCollections(NamespaceString foreignNss,
+                                               PrivilegeVector privileges)
+        : _foreignNssSet{std::move(foreignNss)}, _requiredPrivileges(std::move(privileges)) {}
 
-    explicit LiteParsedDocumentSourceForeignCollections(
-        stdx::unordered_set<NamespaceString> foreignNssSet)
-        : _foreignNssSet(std::move(foreignNssSet)) {}
+    LiteParsedDocumentSourceForeignCollections(stdx::unordered_set<NamespaceString> foreignNssSet,
+                                               PrivilegeVector privileges)
+        : _foreignNssSet(std::move(foreignNssSet)), _requiredPrivileges(std::move(privileges)) {}
 
     stdx::unordered_set<NamespaceString> getInvolvedNamespaces() const final {
         return {_foreignNssSet};
     }
 
+    PrivilegeVector requiredPrivileges(bool isMongos) const final {
+        return _requiredPrivileges;
+    }
+
 private:
     stdx::unordered_set<NamespaceString> _foreignNssSet;
+    PrivilegeVector _requiredPrivileges;
 };
 }  // namespace mongo

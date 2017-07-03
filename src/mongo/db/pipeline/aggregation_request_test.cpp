@@ -98,7 +98,7 @@ TEST(AggregationRequestTest, ShouldParseExplicitExplainFalseWithCursorOption) {
 
 TEST(AggregationRequestTest, ShouldParseWithSeparateQueryPlannerExplainModeArg) {
     NamespaceString nss("a.collection");
-    const BSONObj inputBson = fromjson("{pipeline: []}");
+    const BSONObj inputBson = fromjson("{pipeline: [], cursor: {}}");
     auto request = unittest::assertGet(AggregationRequest::parseFromBSON(
         nss, inputBson, ExplainOptions::Verbosity::kQueryPlanner));
     ASSERT_TRUE(request.getExplain());
@@ -236,7 +236,7 @@ TEST(AggregationRequestTest, ShouldAcceptHintAsString) {
                            << "a_1"));
 }
 
-TEST(AggregationRequestTest, ShouldNotSerializeBatchSizeOrExplainWhenExplainSet) {
+TEST(AggregationRequestTest, ShouldNotSerializeBatchSizeWhenExplainSet) {
     NamespaceString nss("a.collection");
     AggregationRequest request(nss, {});
     request.setBatchSize(10);
@@ -244,7 +244,8 @@ TEST(AggregationRequestTest, ShouldNotSerializeBatchSizeOrExplainWhenExplainSet)
 
     auto expectedSerialization =
         Document{{AggregationRequest::kCommandName, nss.coll()},
-                 {AggregationRequest::kPipelineName, Value(std::vector<Value>{})}};
+                 {AggregationRequest::kPipelineName, Value(std::vector<Value>{})},
+                 {AggregationRequest::kCursorName, Value(Document())}};
     ASSERT_DOCUMENT_EQ(request.serializeToCommandObj(), expectedSerialization);
 }
 

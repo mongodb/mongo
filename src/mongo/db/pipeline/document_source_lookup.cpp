@@ -37,7 +37,6 @@
 #include "mongo/db/pipeline/document_path_support.h"
 #include "mongo/db/pipeline/expression.h"
 #include "mongo/db/pipeline/expression_context.h"
-#include "mongo/db/pipeline/lite_parsed_pipeline.h"
 #include "mongo/db/pipeline/value.h"
 #include "mongo/stdx/memory.h"
 
@@ -117,7 +116,7 @@ DocumentSourceLookUp::DocumentSourceLookUp(NamespaceString fromNs,
     }
 }
 
-std::unique_ptr<LiteParsedDocumentSourceForeignCollections> DocumentSourceLookUp::liteParse(
+std::unique_ptr<DocumentSourceLookUp::LiteParsed> DocumentSourceLookUp::LiteParsed::parse(
     const AggregationRequest& request, const BSONElement& spec) {
     uassert(ErrorCodes::FailedToParse,
             str::stream() << "the $lookup stage specification must be an object, but found "
@@ -134,29 +133,33 @@ std::unique_ptr<LiteParsedDocumentSourceForeignCollections> DocumentSourceLookUp
                           << typeName(specObj["from"].type()),
             fromElement.type() == BSONType::String);
 
-    NamespaceString nss(request.getNamespaceString().db(), fromElement.valueStringData());
+    NamespaceString fromNss(request.getNamespaceString().db(), fromElement.valueStringData());
     uassert(ErrorCodes::InvalidNamespace,
-            str::stream() << "invalid $lookup namespace: " << nss.ns(),
-            nss.isValid());
+            str::stream() << "invalid $lookup namespace: " << fromNss.ns(),
+            fromNss.isValid());
 
     stdx::unordered_set<NamespaceString> foreignNssSet;
 
     // Recursively lite parse the nested pipeline, if one exists.
     auto pipelineElem = specObj["pipeline"];
+    boost::optional<LiteParsedPipeline> liteParsedPipeline;
     if (pipelineElem) {
         auto pipeline = uassertStatusOK(AggregationRequest::parsePipelineFromBSON(pipelineElem));
-        AggregationRequest foreignAggReq(nss, std::move(pipeline));
-        LiteParsedPipeline liteParsedPipeline(foreignAggReq);
-        auto pipelineInvolvedNamespaces = liteParsedPipeline.getInvolvedNamespaces();
+        AggregationRequest foreignAggReq(fromNss, std::move(pipeline));
+        liteParsedPipeline = LiteParsedPipeline(foreignAggReq);
+
+        auto pipelineInvolvedNamespaces = liteParsedPipeline->getInvolvedNamespaces();
         foreignNssSet.insert(pipelineInvolvedNamespaces.begin(), pipelineInvolvedNamespaces.end());
     }
 
-    foreignNssSet.insert(std::move(nss));
-    return stdx::make_unique<LiteParsedDocumentSourceForeignCollections>(std::move(foreignNssSet));
+    foreignNssSet.insert(fromNss);
+
+    return stdx::make_unique<DocumentSourceLookUp::LiteParsed>(
+        std::move(fromNss), std::move(foreignNssSet), std::move(liteParsedPipeline));
 }
 
 REGISTER_DOCUMENT_SOURCE(lookup,
-                         DocumentSourceLookUp::liteParse,
+                         DocumentSourceLookUp::LiteParsed::parse,
                          DocumentSourceLookUp::createFromBson);
 
 const char* DocumentSourceLookUp::getSourceName() const {

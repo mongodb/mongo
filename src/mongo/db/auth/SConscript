@@ -81,7 +81,9 @@ env.Library(
              '$BUILD_DIR/mongo/crypto/scramauth',
              '$BUILD_DIR/mongo/db/catalog/document_validation',
              '$BUILD_DIR/mongo/db/common',
+             '$BUILD_DIR/mongo/db/mongod_options',
              '$BUILD_DIR/mongo/db/namespace_string',
+             '$BUILD_DIR/mongo/db/pipeline/lite_parsed_document_source',
              '$BUILD_DIR/mongo/db/service_context',
              '$BUILD_DIR/mongo/db/update/update_driver',
              '$BUILD_DIR/mongo/util/md5',
@@ -262,6 +264,8 @@ env.CppUnitTest(
         'authmocks',
         'saslauth',
         'authorization_session_for_test',
+        '$BUILD_DIR/mongo/db/pipeline/document_source',
+        '$BUILD_DIR/mongo/db/service_context_d_test_fixture',
         '$BUILD_DIR/mongo/transport/transport_layer_mock',
     ]
 )

@@ -145,7 +145,8 @@
         adminDB.logout();
         assert.eq(1, testDB.auth("Alice", "pwd"));
         assert.commandFailedWithCode(
-            testDB.runCommand({aggregate: "foo", pipeline: [{$match: {_id: 0}}, {$out: "out"}]}),
+            testDB.runCommand(
+                {aggregate: "foo", pipeline: [{$match: {_id: 0}}, {$out: "out"}], cursor: {}}),
             ErrorCodes.Unauthorized,
             "user should no longer have write privileges");
         res = assert.commandWorked(testDB.runCommand({getMore: cursorId, collection: "foo"}));

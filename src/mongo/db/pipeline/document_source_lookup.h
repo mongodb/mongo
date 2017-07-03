@@ -28,10 +28,13 @@
 
 #pragma once
 
+#include <boost/optional.hpp>
+
 #include "mongo/db/pipeline/document_source.h"
 #include "mongo/db/pipeline/document_source_match.h"
 #include "mongo/db/pipeline/document_source_unwind.h"
 #include "mongo/db/pipeline/expression.h"
+#include "mongo/db/pipeline/lite_parsed_pipeline.h"
 #include "mongo/db/pipeline/lookup_set_cache.h"
 #include "mongo/db/pipeline/value_comparator.h"
 
@@ -44,8 +47,41 @@ namespace mongo {
 class DocumentSourceLookUp final : public DocumentSourceNeedsMongod,
                                    public SplittableDocumentSource {
 public:
-    static std::unique_ptr<LiteParsedDocumentSourceForeignCollections> liteParse(
-        const AggregationRequest& request, const BSONElement& spec);
+    class LiteParsed final : public LiteParsedDocumentSource {
+    public:
+        static std::unique_ptr<LiteParsed> parse(const AggregationRequest& request,
+                                                 const BSONElement& spec);
+
+        LiteParsed(NamespaceString fromNss,
+                   stdx::unordered_set<NamespaceString> foreignNssSet,
+                   boost::optional<LiteParsedPipeline> liteParsedPipeline)
+            : _fromNss{std::move(fromNss)},
+              _foreignNssSet(std::move(foreignNssSet)),
+              _liteParsedPipeline(std::move(liteParsedPipeline)) {}
+
+        stdx::unordered_set<NamespaceString> getInvolvedNamespaces() const final {
+            return {_foreignNssSet};
+        }
+
+        PrivilegeVector requiredPrivileges(bool isMongos) const final {
+            PrivilegeVector requiredPrivileges;
+            Privilege::addPrivilegeToPrivilegeVector(
+                &requiredPrivileges,
+                Privilege(ResourcePattern::forExactNamespace(_fromNss), ActionType::find));
+
+            if (_liteParsedPipeline) {
+                Privilege::addPrivilegesToPrivilegeVector(
+                    &requiredPrivileges, _liteParsedPipeline->requiredPrivileges(isMongos));
+            }
+
+            return requiredPrivileges;
+        }
+
+    private:
+        const NamespaceString _fromNss;
+        const stdx::unordered_set<NamespaceString> _foreignNssSet;
+        const boost::optional<LiteParsedPipeline> _liteParsedPipeline;
+    };
 
     GetNextResult getNext() final;
     const char* getSourceName() const final;

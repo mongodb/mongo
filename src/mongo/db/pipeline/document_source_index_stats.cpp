@@ -39,7 +39,7 @@ namespace mongo {
 using boost::intrusive_ptr;
 
 REGISTER_DOCUMENT_SOURCE(indexStats,
-                         LiteParsedDocumentSourceDefault::parse,
+                         DocumentSourceIndexStats::LiteParsed::parse,
                          DocumentSourceIndexStats::createFromBson);
 
 const char* DocumentSourceIndexStats::getSourceName() const {

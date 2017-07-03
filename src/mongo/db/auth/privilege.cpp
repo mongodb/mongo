@@ -45,6 +45,13 @@ void Privilege::addPrivilegeToPrivilegeVector(PrivilegeVector* privileges,
     privileges->push_back(privilegeToAdd);
 }
 
+void Privilege::addPrivilegesToPrivilegeVector(PrivilegeVector* privileges,
+                                               const PrivilegeVector& privilegesToAdd) {
+    for (auto&& priv : privilegesToAdd) {
+        addPrivilegeToPrivilegeVector(privileges, priv);
+    }
+}
+
 Privilege::Privilege(const ResourcePattern& resource, const ActionType& action)
     : _resource(resource) {
     _actions.addAction(action);

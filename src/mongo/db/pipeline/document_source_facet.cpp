@@ -118,12 +118,24 @@ vector<pair<string, vector<BSONObj>>> extractRawPipelines(const BSONElement& ele
 std::unique_ptr<DocumentSourceFacet::LiteParsed> DocumentSourceFacet::LiteParsed::parse(
     const AggregationRequest& request, const BSONElement& spec) {
     std::vector<LiteParsedPipeline> liteParsedPipelines;
+
     for (auto&& rawPipeline : extractRawPipelines(spec)) {
         liteParsedPipelines.emplace_back(
             AggregationRequest(request.getNamespaceString(), rawPipeline.second));
     }
-    return std::unique_ptr<DocumentSourceFacet::LiteParsed>(
-        new DocumentSourceFacet::LiteParsed(std::move(liteParsedPipelines)));
+
+    PrivilegeVector requiredPrivileges;
+    for (auto&& pipeline : liteParsedPipelines) {
+
+        // A correct isMongos flag is only required for DocumentSourceCurrentOp which is disallowed
+        // in $facet pipelines.
+        const bool unusedIsMongosFlag = false;
+        Privilege::addPrivilegesToPrivilegeVector(&requiredPrivileges,
+                                                  pipeline.requiredPrivileges(unusedIsMongosFlag));
+    }
+
+    return stdx::make_unique<DocumentSourceFacet::LiteParsed>(std::move(liteParsedPipelines),
+                                                              std::move(requiredPrivileges));
 }
 
 stdx::unordered_set<NamespaceString> DocumentSourceFacet::LiteParsed::getInvolvedNamespaces()

@@ -84,11 +84,12 @@
         db.runCommand({aggregate: "view", pipeline: [{$match: {a: {$lte: 8}}}], explain: true});
     verifyExplainResult(result, "queryPlanner");
 
-    result = db.runCommand({explain: {aggregate: "view", pipeline: [{$match: {a: {$lte: 8}}}]}});
+    result = db.runCommand(
+        {explain: {aggregate: "view", pipeline: [{$match: {a: {$lte: 8}}}], cursor: {}}});
     verifyExplainResult(result, "allPlansExecution");
     for (let verbosity of explainVerbosities) {
         result = db.runCommand({
-            explain: {aggregate: "view", pipeline: [{$match: {a: {$lte: 8}}}]},
+            explain: {aggregate: "view", pipeline: [{$match: {a: {$lte: 8}}}], cursor: {}},
             verbosity: verbosity
         });
         verifyExplainResult(result, verbosity);

@@ -48,16 +48,25 @@ DocumentSourceOut::~DocumentSourceOut() {
 
 std::unique_ptr<LiteParsedDocumentSourceForeignCollections> DocumentSourceOut::liteParse(
     const AggregationRequest& request, const BSONElement& spec) {
-    uassert(40325,
+    uassert(ErrorCodes::TypeMismatch,
             str::stream() << "$out stage requires a string argument, but found "
                           << typeName(spec.type()),
             spec.type() == BSONType::String);
 
     NamespaceString targetNss(request.getNamespaceString().db(), spec.valueStringData());
-    uassert(40326,
+    uassert(ErrorCodes::InvalidNamespace,
             str::stream() << "Invalid $out target namespace, " << targetNss.ns(),
             targetNss.isValid());
-    return stdx::make_unique<LiteParsedDocumentSourceForeignCollections>(std::move(targetNss));
+
+    ActionSet actions{ActionType::remove, ActionType::insert};
+    if (request.shouldBypassDocumentValidation()) {
+        actions.addAction(ActionType::bypassDocumentValidation);
+    }
+
+    PrivilegeVector privileges{Privilege(ResourcePattern::forExactNamespace(targetNss), actions)};
+
+    return stdx::make_unique<LiteParsedDocumentSourceForeignCollections>(std::move(targetNss),
+                                                                         std::move(privileges));
 }
 
 REGISTER_DOCUMENT_SOURCE(out, DocumentSourceOut::liteParse, DocumentSourceOut::createFromBson);

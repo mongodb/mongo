@@ -254,7 +254,6 @@ docSourceEnv.Library(
         'document_source_sort.cpp',
         'document_source_sort_by_count.cpp',
         'document_source_unwind.cpp',
-        'lite_parsed_document_source.cpp',
         ],
     LIBDEPS=[
         '$BUILD_DIR/mongo/client/clientdriver',
@@ -262,6 +261,7 @@ docSourceEnv.Library(
         '$BUILD_DIR/mongo/db/index/key_generator',
         '$BUILD_DIR/mongo/db/matcher/expression_algo',
         '$BUILD_DIR/mongo/db/matcher/expressions',
+        '$BUILD_DIR/mongo/db/pipeline/lite_parsed_document_source',
         '$BUILD_DIR/mongo/db/service_context',
         '$BUILD_DIR/mongo/db/stats/top',
         '$BUILD_DIR/mongo/db/storage/encryption_hooks',
@@ -275,6 +275,16 @@ docSourceEnv.Library(
         'granularity_rounder',
         'parsed_aggregation_projection',
     ],
+)
+
+env.Library(
+    target='lite_parsed_document_source',
+    source=[
+        'lite_parsed_document_source.cpp',
+        ],
+    LIBDEPS=[
+        'aggregation_request',
+    ]
 )
 
 env.Library(

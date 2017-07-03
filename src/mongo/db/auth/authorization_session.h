@@ -312,20 +312,6 @@ private:
     // lock on the admin database (to update out-of-date user privilege information).
     bool _isAuthorizedForPrivilege(const Privilege& privilege);
 
-    // Helper for recursively checking for privileges in an aggregation pipeline.
-    Status _addPrivilegesForPipeline(const NamespaceString& nss,
-                                     const BSONElement& pipelineElem,
-                                     bool bypassDocumentValidation,
-                                     bool isMongos,
-                                     PrivilegeVector* requiredPrivileges);
-
-    // Helper for recursively checking for privileges in an aggregation stage.
-    Status _addPrivilegesForStage(StringData db,
-                                  BSONObj stageSpec,
-                                  bool bypassDocumentValidation,
-                                  bool isMongos,
-                                  PrivilegeVector* requiredPrivileges);
-
     std::unique_ptr<AuthzSessionExternalState> _externalState;
 
     // A vector of impersonated UserNames and a vector of those users' RoleNames.

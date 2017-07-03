@@ -72,6 +72,19 @@ public:
     }
 
     /**
+     * Returns a list of the priviliges required for this pipeline.
+     */
+    PrivilegeVector requiredPrivileges(bool isMongos) const {
+        PrivilegeVector requiredPrivileges;
+        for (auto&& spec : _stageSpecs) {
+            Privilege::addPrivilegesToPrivilegeVector(&requiredPrivileges,
+                                                      spec->requiredPrivileges(isMongos));
+        }
+
+        return requiredPrivileges;
+    }
+
+    /**
      * Returns true if the pipeline begins with a $collStats stage.
      */
     bool startsWithCollStats() const {

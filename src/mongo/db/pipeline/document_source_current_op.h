@@ -34,6 +34,36 @@ namespace mongo {
 
 class DocumentSourceCurrentOp final : public DocumentSourceNeedsMongod {
 public:
+    class LiteParsed final : public LiteParsedDocumentSource {
+    public:
+        static std::unique_ptr<LiteParsed> parse(const AggregationRequest& request,
+                                                 const BSONElement& spec);
+
+        explicit LiteParsed(bool allUsers) : _allUsers(allUsers) {}
+
+        stdx::unordered_set<NamespaceString> getInvolvedNamespaces() const final {
+            return stdx::unordered_set<NamespaceString>();
+        }
+
+        PrivilegeVector requiredPrivileges(bool isMongos) const final {
+            PrivilegeVector privileges;
+
+            // In a sharded cluster, we always need the inprog privilege to run $currentOp.
+            if (isMongos || _allUsers) {
+                privileges.push_back({ResourcePattern::forClusterResource(), ActionType::inprog});
+            }
+
+            return privileges;
+        }
+
+        bool isInitialSource() const final {
+            return true;
+        }
+
+    private:
+        const bool _allUsers;
+    };
+
     using TruncationMode = MongodInterface::CurrentOpTruncateMode;
     using ConnMode = MongodInterface::CurrentOpConnectionsMode;
     using UserMode = MongodInterface::CurrentOpUserMode;

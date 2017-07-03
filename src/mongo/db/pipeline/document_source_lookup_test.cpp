@@ -160,7 +160,8 @@ TEST_F(DocumentSourceLookUpTest, LiteParsedDocumentSourceLookupContainsExpectedN
     NamespaceString nss("test.test");
     std::vector<BSONObj> pipeline;
     AggregationRequest aggRequest(nss, pipeline);
-    auto liteParsedLookup = DocumentSourceLookUp::liteParse(aggRequest, stageSpec.firstElement());
+    auto liteParsedLookup =
+        DocumentSourceLookUp::LiteParsed::parse(aggRequest, stageSpec.firstElement());
 
     auto namespaceSet = liteParsedLookup->getInvolvedNamespaces();
 

@@ -92,13 +92,9 @@ var Explainable = (function() {
         // Explainable operations.
         //
 
-        /**
-         * Adds "explain: true" to "extraOpts", and then passes through to the regular collection's
-         * aggregate helper.
-         */
         this.aggregate = function(pipeline, extraOpts) {
             if (!(pipeline instanceof Array)) {
-                // support legacy varargs form. (Also handles db.foo.aggregate())
+                // Support legacy varargs form. (Also handles db.foo.aggregate())
                 pipeline = Array.from(arguments);
                 extraOpts = {};
             }
@@ -113,6 +109,11 @@ var Explainable = (function() {
                 extraOpts.explain = true;
                 return this._collection.aggregate(pipeline, extraOpts);
             } else {
+                // The aggregate command requires a cursor field.
+                if (!extraOpts.hasOwnProperty("cursor")) {
+                    extraOpts = Object.extend(extraOpts, {cursor: {}});
+                }
+
                 let aggCmd = Object.extend(
                     {"aggregate": this._collection.getName(), "pipeline": pipeline}, extraOpts);
                 let explainCmd = {"explain": aggCmd, "verbosity": this._verbosity};

@@ -53,6 +53,11 @@ public:
         stdx::unordered_set<NamespaceString> getInvolvedNamespaces() const final {
             return stdx::unordered_set<NamespaceString>();
         }
+
+        // TODO SERVER-29138: Add required privileges.
+        PrivilegeVector requiredPrivileges(bool isMongos) const final {
+            return {};
+        }
     };
 
     class Transformation : public DocumentSourceSingleDocumentTransformation::TransformerInterface {

@@ -49,6 +49,8 @@
 #include "mongo/db/client.h"
 #include "mongo/db/jsobj.h"
 #include "mongo/db/namespace_string.h"
+#include "mongo/db/pipeline/aggregation_request.h"
+#include "mongo/db/pipeline/lite_parsed_pipeline.h"
 #include "mongo/util/assert_util.h"
 #include "mongo/util/log.h"
 #include "mongo/util/mongoutils/str.h"
@@ -74,11 +76,13 @@ Status checkAuthForCreateOrModifyView(AuthorizationSession* authzSession,
         return Status::OK();
     }
 
-    // This check ignores some invalid pipeline specifications. For example, if a user specifies a
-    // view definition with an invalid specification like {$lookup: "blah"}, the authorization check
-    // will succeed but the pipeline will fail to parse later in Command::run().
+    // This check performs some validation but it is not exhaustive and may allow for an invalid
+    // pipeline specification. In this case the authorization check will succeed but the pipeline
+    // will fail to parse later in Command::run().
     return authzSession->checkAuthForAggregate(
-        viewOnNs, BSON("aggregate" << viewOnNs.coll() << "pipeline" << viewPipeline), isMongos);
+        viewOnNs,
+        BSON("aggregate" << viewOnNs.coll() << "pipeline" << viewPipeline << "cursor" << BSONObj()),
+        isMongos);
 }
 
 /** Deleter for User*.
@@ -248,245 +252,6 @@ PrivilegeVector AuthorizationSession::getDefaultPrivileges() {
     return defaultPrivileges;
 }
 
-Status AuthorizationSession::_addPrivilegesForStage(StringData db,
-                                                    BSONObj stageSpec,
-                                                    bool bypassDocumentValidation,
-                                                    bool isMongos,
-                                                    PrivilegeVector* requiredPrivileges) {
-    StringData stageName = stageSpec.firstElementFieldName();
-    if (stageName == "$out") {
-        if (stageSpec.firstElementType() != BSONType::String) {
-            return Status(ErrorCodes::TypeMismatch,
-                          str::stream() << "The '$out' stage must be of type String, is type "
-                                        << stageSpec.firstElementType());
-        }
-
-        NamespaceString outputNs(db, stageSpec.firstElement().valueStringData());
-        if (!outputNs.isValid()) {
-            return Status(ErrorCodes::InvalidNamespace,
-                          mongoutils::str::stream() << "Invalid $out target namespace, "
-                                                    << outputNs.ns());
-        }
-
-        ActionSet actions;
-        actions.addAction(ActionType::remove);
-        actions.addAction(ActionType::insert);
-        if (bypassDocumentValidation) {
-            actions.addAction(ActionType::bypassDocumentValidation);
-        }
-        Privilege::addPrivilegeToPrivilegeVector(
-            requiredPrivileges, Privilege(ResourcePattern::forExactNamespace(outputNs), actions));
-    } else if (stageName == "$lookup") {
-        if (stageSpec.firstElementType() != BSONType::Object) {
-            return Status(ErrorCodes::FailedToParse,
-                          str::stream() << "The '$lookup' stage must be of type Object, is type "
-                                        << stageSpec.firstElementType());
-        }
-
-        auto fromElem = stageSpec.firstElement().Obj()["from"];
-        if (!fromElem) {
-            return Status(ErrorCodes::FailedToParse,
-                          "$lookup argument 'from' field must be specified");
-        }
-
-        if (fromElem.type() != BSONType::String) {
-            return Status(ErrorCodes::FailedToParse,
-                          str::stream() << "$lookup argument '" << fromElem
-                                        << "' must be a string, is type "
-                                        << fromElem.type());
-        }
-
-        NamespaceString fromNs(db, fromElem.valueStringData());
-        if (!fromNs.isValid()) {
-            return Status(ErrorCodes::InvalidNamespace,
-                          mongoutils::str::stream() << "Invalid 'from' namespace, " << fromNs.ns());
-        }
-
-        Privilege::addPrivilegeToPrivilegeVector(
-            requiredPrivileges,
-            Privilege(ResourcePattern::forExactNamespace(fromNs), ActionType::find));
-
-        auto pipelineElem = stageSpec.firstElement().Obj()["pipeline"];
-        if (pipelineElem) {
-            auto status = _addPrivilegesForPipeline(
-                fromNs, pipelineElem, bypassDocumentValidation, isMongos, requiredPrivileges);
-            if (!status.isOK()) {
-                return status;
-            }
-        }
-    } else if (stageName == "$graphLookup") {
-        if (stageSpec.firstElementType() != BSONType::Object) {
-            return Status(ErrorCodes::FailedToParse,
-                          str::stream()
-                              << "The '$graphLookup' stage must be of type Object, is type "
-                              << stageSpec.firstElementType());
-        }
-
-        auto fromElem = stageSpec.firstElement().Obj()["from"];
-        if (!fromElem) {
-            return Status(ErrorCodes::FailedToParse,
-                          "$graphLookup argument 'from' field must be specified");
-        }
-
-        if (fromElem.type() != BSONType::String) {
-            return Status(ErrorCodes::FailedToParse,
-                          str::stream() << "$graphLookup argument '" << fromElem
-                                        << "' must be a string, is type "
-                                        << fromElem.type());
-        }
-
-        NamespaceString fromNs(db, fromElem.valueStringData());
-        Privilege::addPrivilegeToPrivilegeVector(
-            requiredPrivileges,
-            Privilege(ResourcePattern::forExactNamespace(fromNs), ActionType::find));
-    } else if (stageName == "$facet") {
-        if (stageSpec.firstElementType() != BSONType::Object) {
-            return Status(ErrorCodes::FailedToParse,
-                          str::stream() << "The '$facet' stage must be of type Object, is type "
-                                        << stageSpec.firstElementType());
-        }
-
-        for (auto&& subPipeline : stageSpec.firstElement().embeddedObject()) {
-            if (subPipeline.type() != BSONType::Array) {
-                return Status(ErrorCodes::TypeMismatch,
-                              str::stream() << "The '$facet' field '" << subPipeline.fieldName()
-                                            << "' is expected to be of type Array, is type "
-                                            << subPipeline.type());
-            }
-
-            for (auto&& subPipeStageSpec : subPipeline.embeddedObject()) {
-                if (subPipeStageSpec.type() != BSONType::Object) {
-                    return Status(ErrorCodes::FailedToParse,
-                                  str::stream() << "argument '" << subPipeStageSpec
-                                                << "' must be an Object, is type "
-                                                << subPipeStageSpec.type());
-                }
-
-                auto status = _addPrivilegesForStage(db,
-                                                     subPipeStageSpec.embeddedObject(),
-                                                     bypassDocumentValidation,
-                                                     isMongos,
-                                                     requiredPrivileges);
-                if (!status.isOK()) {
-                    return status;
-                }
-            }
-        }
-    }
-
-    return Status::OK();
-}
-
-Status AuthorizationSession::_addPrivilegesForPipeline(const NamespaceString& nss,
-                                                       const BSONElement& pipelineElem,
-                                                       bool bypassDocumentValidation,
-                                                       bool isMongos,
-                                                       PrivilegeVector* requiredPrivileges) {
-    if (pipelineElem.type() != BSONType::Array) {
-        return Status(ErrorCodes::TypeMismatch, "'pipeline' must be specified as an array");
-    }
-
-    BSONObj pipeline = pipelineElem.embeddedObject();
-    if (pipeline.isEmpty()) {
-        // The pipeline is empty, so we require only the find action.
-        Privilege::addPrivilegeToPrivilegeVector(
-            requiredPrivileges,
-            Privilege(ResourcePattern::forExactNamespace(nss), ActionType::find));
-    } else {
-        if (pipeline.firstElementType() != BSONType::Object) {
-            // The pipeline contains something that's not an object.
-            return Status(ErrorCodes::TypeMismatch,
-                          "'pipeline' cannot contain non-object elements");
-        }
-
-        // We treat the first stage in the pipeline specially, as some aggregation stages that are
-        // valid initial sources have different auth requirements.
-        Privilege firstStagePrivilege;
-        BSONObj firstPipelineStage = pipeline.firstElement().embeddedObject();
-        BSONElement firstStageSpec = firstPipelineStage.firstElement();
-        if (str::equals("$indexStats", firstStageSpec.fieldName())) {
-            firstStagePrivilege =
-                Privilege(ResourcePattern::forExactNamespace(nss), ActionType::indexStats);
-        } else if (str::equals("$collStats", firstStageSpec.fieldName())) {
-            firstStagePrivilege =
-                Privilege(ResourcePattern::forExactNamespace(nss), ActionType::collStats);
-        } else if (str::equals("$currentOp", firstStageSpec.fieldName())) {
-            // Need to check the value of allUsers; if true then inprog privilege is required.
-            // {$currentOp: {idleConnections: <boolean|false>, allUsers: <boolean|false>}}
-            if (firstStageSpec.type() != BSONType::Object) {
-                return Status(
-                    ErrorCodes::TypeMismatch,
-                    str::stream()
-                        << "$currentOp options must be specified in an object, but found: "
-                        << typeName(firstStageSpec.type()));
-            }
-
-            bool allUsers = false;
-
-            // Check the spec for all fields named 'allUsers'. If any of them are 'true', we require
-            // the 'inprog' privilege. This avoids the possibility that a spec with multiple
-            // allUsers fields might allow an unauthorized user to view all operations.
-            for (auto&& elem : firstStageSpec.embeddedObject()) {
-                if (elem.fieldNameStringData() == "allUsers"_sd) {
-                    if (elem.type() != BSONType::Bool) {
-                        return Status(ErrorCodes::TypeMismatch,
-                                      str::stream()
-                                          << "The 'allUsers' parameter of the $currentOp stage "
-                                             "must be a boolean value, but found: "
-                                          << typeName(elem.type()));
-                    } else if (elem.Bool()) {
-                        allUsers = true;
-                        break;
-                    }
-                }
-            }
-
-            // In a sharded cluster, we always need the inprog privilege to run $currentOp.
-            if (isMongos || allUsers) {
-                firstStagePrivilege =
-                    Privilege(ResourcePattern::forClusterResource(), ActionType::inprog);
-            } else if (!getAuthenticatedUserNames().more()) {
-                // This connection is not authenticated, so we should return an error even though
-                // there are no privilege requirements when allUsers is false.
-                return Status(ErrorCodes::Unauthorized, "unauthorized");
-            }
-        } else {
-            // If no source requiring an alternative permission scheme is specified then default to
-            // requiring find() privileges on the given namespace.
-            firstStagePrivilege =
-                Privilege(ResourcePattern::forExactNamespace(nss), ActionType::find);
-        }
-
-        // Exit early if not authorized for the pipline's input data source. This will prevent a
-        // malicious user, who doesn't have access to the initial document source, from consuming
-        // server resources needed to parse a potentially large pipeline.
-        if (!isAuthorizedForPrivilege(firstStagePrivilege)) {
-            return Status(ErrorCodes::Unauthorized, "unauthorized");
-        }
-
-        // Add additional required privileges for each stage in the pipeline.
-        for (auto&& stageElem : pipeline) {
-            if (stageElem.type() != BSONType::Object) {
-                return Status(ErrorCodes::FailedToParse,
-                              str::stream() << "argument '" << stageElem
-                                            << "' must be an Object, is type "
-                                            << stageElem.type());
-            }
-
-            auto status = _addPrivilegesForStage(nss.db(),
-                                                 stageElem.embeddedObject(),
-                                                 bypassDocumentValidation,
-                                                 isMongos,
-                                                 requiredPrivileges);
-            if (!status.isOK()) {
-                return status;
-            }
-        }
-    }
-
-    return Status::OK();
-}
-
 Status AuthorizationSession::checkAuthForAggregate(const NamespaceString& nss,
                                                    const BSONObj& cmdObj,
                                                    bool isMongos) {
@@ -501,20 +266,59 @@ Status AuthorizationSession::checkAuthForAggregate(const NamespaceString& nss,
         return Status::OK();
     }
 
-    PrivilegeVector privileges;
-    auto status = _addPrivilegesForPipeline(nss,
-                                            cmdObj["pipeline"],
-                                            shouldBypassDocumentValidationForCommand(cmdObj),
-                                            isMongos,
-                                            &privileges);
-    if (!status.isOK()) {
-        return status;
+    // We require at least one authenticated user when running aggregate with auth enabled.
+    if (!getAuthenticatedUserNames().more()) {
+        return Status(ErrorCodes::Unauthorized, "unauthorized");
     }
 
-    if (isAuthorizedForPrivileges(privileges))
-        return Status::OK();
+    auto statusWithAggRequest = AggregationRequest::parseFromBSON(nss, cmdObj);
+    if (!statusWithAggRequest.isOK()) {
+        return statusWithAggRequest.getStatus();
+    }
+    AggregationRequest aggRequest = std::move(statusWithAggRequest.getValue());
 
-    return Status(ErrorCodes::Unauthorized, "unauthorized");
+    const auto& pipeline = aggRequest.getPipeline();
+
+    // If the aggregation pipeline is empty, confirm the user is authorized for find on 'nss'.
+    if (pipeline.empty()) {
+        if (!isAuthorizedForPrivilege(
+                Privilege(ResourcePattern::forExactNamespace(nss), ActionType::find))) {
+            return Status(ErrorCodes::Unauthorized, "unauthorized");
+        }
+
+        return Status::OK();
+    }
+
+    // Confirm the user is authorized for the pipeline's initial document source. We confirm a user
+    // is authorized incrementally rather than once for the entire pipeline. This will prevent a
+    // malicious user, who doesn't have access to the initial document source, from consuming the
+    // resources needed to parse a potentially large pipeline.
+    auto liteParsedFirstDocumentSource = LiteParsedDocumentSource::parse(aggRequest, pipeline[0]);
+    if (!liteParsedFirstDocumentSource->isInitialSource() &&
+        !isAuthorizedForPrivilege(
+            Privilege(ResourcePattern::forExactNamespace(nss), ActionType::find))) {
+        return Status(ErrorCodes::Unauthorized, "unauthorized");
+    }
+
+    // We have done the work to lite parse the first stage. Given that, we check required privileges
+    // for it using 'liteParsedFirstDocumentSource' regardless of whether is an initial source or
+    // not.
+    if (!isAuthorizedForPrivileges(liteParsedFirstDocumentSource->requiredPrivileges(isMongos))) {
+        return Status(ErrorCodes::Unauthorized, "unauthorized");
+    }
+
+    // Confirm privileges for the remainder of the pipepline. Start with the second stage as we have
+    // already authorized the first.
+    auto pipelineIter = pipeline.begin() + 1;
+
+    for (; pipelineIter != pipeline.end(); ++pipelineIter) {
+        auto liteParsedDocSource = LiteParsedDocumentSource::parse(aggRequest, *pipelineIter);
+        if (!isAuthorizedForPrivileges(liteParsedDocSource->requiredPrivileges(isMongos))) {
+            return Status(ErrorCodes::Unauthorized, "unauthorized");
+        }
+    }
+
+    return Status::OK();
 }
 
 Status AuthorizationSession::checkAuthForFind(const NamespaceString& ns, bool hasTerm) {

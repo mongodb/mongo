@@ -216,10 +216,14 @@ StatusWith<AggregationRequest> AggregationRequest::parseFromBSON(
         request.setExplain(explainVerbosity);
     }
 
-    if (!hasCursorElem && !request.getExplain()) {
+    // 'hasExplainElem' implies an aggregate command-level explain option, which does not require
+    // a cursor argument.
+    if (!hasCursorElem && !hasExplainElem) {
         return {ErrorCodes::FailedToParse,
-                str::stream() << "The '" << kCursorName
-                              << "' option is required, except for aggregation explain"};
+                str::stream()
+                    << "The '"
+                    << kCursorName
+                    << "' option is required, except for aggregate with the explain argument"};
     }
 
     if (request.getExplain() && !request.getReadConcern().isEmpty()) {
@@ -277,8 +281,9 @@ Document AggregationRequest::serializeToCommandObj() const {
          _bypassDocumentValidation ? Value(true) : Value()},
         // Only serialize a collation if one was specified.
         {kCollationName, _collation.isEmpty() ? Value() : Value(_collation)},
-        // Only serialize batchSize when explain is false.
-        {kCursorName, _explainMode ? Value() : Value(Document{{kBatchSizeName, _batchSize}})},
+        // Only serialize batchSize if not an explain, otherwise serialize an empty cursor object.
+        {kCursorName,
+         _explainMode ? Value(Document()) : Value(Document{{kBatchSizeName, _batchSize}})},
         // Only serialize a hint if one was specified.
         {kHintName, _hint.isEmpty() ? Value() : Value(_hint)},
         // Only serialize a comment if one was specified.

@@ -12,7 +12,7 @@
 
     commands.push({count: collName, query: {type: 'oak'}});
 
-    commands.push({aggregate: collName, pipeline: [{$sort: {type: 1}}]});
+    commands.push({aggregate: collName, pipeline: [{$sort: {type: 1}}], cursor: {}});
 
     commands.push({
         mapReduce: collName,
