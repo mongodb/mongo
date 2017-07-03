@@ -153,17 +153,12 @@ Status createCollectionForApplyOps(OperationContext* opCtx,
 
                 // In the case of oplog replay, a future command may have created or renamed a
                 // collection with that same name. In that case, renaming this future collection to
-                // a
-                // random temporary name is correct: once all entries are replayed no temporary
-                // names
-                // will remain.
-                // On MMAPv1 the rename can result in index names that are too long. However this
-                // should
-                // only happen for initial sync and "resync collection" for rollback, so we can let
-                // the
-                // error propagate resulting in an abort and restart of the initial sync or result
-                // in
-                // rollback to fassert, requiring a resync of that node.
+                // a random temporary name is correct: once all entries are replayed no temporary
+                // names will remain.  On MMAPv1 the rename can result in index names that are too
+                // long. However this should only happen for initial sync and "resync collection"
+                // for rollback, so we can let the error propagate resulting in an abort and restart
+                // of the initial sync or result in rollback to fassert, requiring a resync of that
+                // node.
                 const bool stayTemp = true;
                 if (auto futureColl = db ? db->getCollection(opCtx, newCollName) : nullptr) {
                     auto tmpName =
@@ -183,8 +178,7 @@ Status createCollectionForApplyOps(OperationContext* opCtx,
                 }
 
                 // If the collection with the requested UUID already exists, but with a different
-                // name,
-                // just rename it to 'newCollName'.
+                // name, just rename it to 'newCollName'.
                 if (catalog.lookupCollectionByUUID(uuid)) {
                     Status status =
                         db->renameCollection(opCtx, currentName.ns(), newCollName.ns(), stayTemp);

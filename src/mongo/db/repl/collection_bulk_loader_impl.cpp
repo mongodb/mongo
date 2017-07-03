@@ -158,8 +158,7 @@ Status CollectionBulkLoaderImpl::insertDocuments(const std::vector<BSONObj>::con
                     WriteUnitOfWork wunit(_opCtx.get());
                     if (!indexers.empty()) {
                         // This flavor of insertDocument will not update any pre-existing indexes,
-                        // only
-                        // the indexers passed in.
+                        // only the indexers passed in.
                         const auto status = _autoColl->getCollection()->insertDocument(
                             _opCtx.get(), *iter, indexers, false);
                         if (!status.isOK()) {
