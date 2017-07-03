@@ -41,6 +41,6 @@
     // Ensure passing a UUID to parallelCollectionScan retrieves results from the correct
     // collection.
     cmd = {parallelCollectionScan: uuid, numCursors: 1};
-    res = assert.commandWorked(db.runCommand(cmd, 'could not run ' + tojson(cmd)));
+    res = assert.commandWorked(db.runCommand(cmd), 'could not run ' + tojson(cmd));
     assert.eq(res.cursors[0].cursor.ns, 'test.' + mainCollName);
 }());
