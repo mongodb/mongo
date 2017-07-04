@@ -4884,6 +4884,91 @@ TEST_F(DateExpressionTest, DoesResultInNullIfGivenNullishInput) {
 
 }  // namespace DateExpressionsTest
 
+namespace ExpressionDateToStringTest {
+
+// This provides access to an ExpressionContext that has a valid ServiceContext with a
+// TimeZoneDatabase via getExpCtx(), but we'll use a different name for this test suite.
+using ExpressionDateToStringTest = AggregationContextFixture;
+
+TEST_F(ExpressionDateToStringTest, SerializesToObjectSyntax) {
+    auto expCtx = getExpCtx();
+
+    // Test that it serializes to the full format if given an object specification.
+    BSONObj spec = BSON("$dateToString" << BSON("date" << Date_t{} << "timezone"
+                                                       << "Europe/London"
+                                                       << "format"
+                                                       << "%Y-%m-%d"));
+    auto dateExp = Expression::parseExpression(expCtx, spec, expCtx->variablesParseState);
+    auto expectedSerialization =
+        Value(Document{{"$dateToString",
+                        Document{{"format", "%Y-%m-%d"_sd},
+                                 {"date", Document{{"$const", Date_t{}}}},
+                                 {"timezone", Document{{"$const", "Europe/London"_sd}}}}}});
+    ASSERT_VALUE_EQ(dateExp->serialize(true), expectedSerialization);
+    ASSERT_VALUE_EQ(dateExp->serialize(false), expectedSerialization);
+}
+
+TEST_F(ExpressionDateToStringTest, OptimizesToConstantIfAllInputsAreConstant) {
+    auto expCtx = getExpCtx();
+
+    // Test that it becomes a constant if both format and date are constant, and timezone is
+    // missing.
+    auto spec = BSON("$dateToString" << BSON("format"
+                                             << "%Y-%m-%d"
+                                             << "date"
+                                             << Date_t{}));
+    auto dateExp = Expression::parseExpression(expCtx, spec, expCtx->variablesParseState);
+    ASSERT(dynamic_cast<ExpressionConstant*>(dateExp->optimize().get()));
+
+    // Test that it becomes a constant if both format, date and timezone are provided, and are both
+    // constants.
+    spec = BSON("$dateToString" << BSON("format"
+                                        << "%Y-%m-%d"
+                                        << "date"
+                                        << Date_t{}
+                                        << "timezone"
+                                        << "Europe/Amsterdam"));
+    dateExp = Expression::parseExpression(expCtx, spec, expCtx->variablesParseState);
+    ASSERT(dynamic_cast<ExpressionConstant*>(dateExp->optimize().get()));
+
+    // Test that it becomes a constant if both format, date and timezone are provided, and are both
+    // expressions which evaluate to constants.
+    spec = BSON("$dateToString" << BSON("format"
+                                        << "%Y-%m%d"
+                                        << "date"
+                                        << BSON("$add" << BSON_ARRAY(Date_t{} << 1000))
+                                        << "timezone"
+                                        << BSON("$concat" << BSON_ARRAY("Europe"
+                                                                        << "/"
+                                                                        << "London"))));
+    dateExp = Expression::parseExpression(expCtx, spec, expCtx->variablesParseState);
+    ASSERT(dynamic_cast<ExpressionConstant*>(dateExp->optimize().get()));
+
+    // Test that it does *not* become a constant if both format, date and timezone are provided, but
+    // date is not a constant.
+    spec = BSON("$dateToString" << BSON("format"
+                                        << "%Y-%m-%d"
+                                        << "date"
+                                        << "$date"
+                                        << "timezone"
+                                        << "Europe/London"));
+    dateExp = Expression::parseExpression(expCtx, spec, expCtx->variablesParseState);
+    ASSERT_FALSE(dynamic_cast<ExpressionConstant*>(dateExp->optimize().get()));
+
+    // Test that it does *not* become a constant if both format, date and timezone are provided, but
+    // timezone is not a constant.
+    spec = BSON("$dateToString" << BSON("format"
+                                        << "%Y-%m-%d"
+                                        << "date"
+                                        << Date_t{}
+                                        << "timezone"
+                                        << "$tz"));
+    dateExp = Expression::parseExpression(expCtx, spec, expCtx->variablesParseState);
+    ASSERT_FALSE(dynamic_cast<ExpressionConstant*>(dateExp->optimize().get()));
+}
+
+}  // namespace ExpressionDateToStringTest
+
 class All : public Suite {
 public:
     All() : Suite("expression") {}

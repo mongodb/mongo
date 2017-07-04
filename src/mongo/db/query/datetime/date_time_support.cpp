@@ -303,6 +303,11 @@ long long TimeZone::isoYear(Date_t date) const {
     return isoYear;
 }
 
+Seconds TimeZone::utcOffset(Date_t date) const {
+    auto time = getTimelibTime(date);
+    return Seconds(time->z);
+}
+
 void TimeZone::validateFormat(StringData format) {
     for (auto it = format.begin(); it != format.end(); ++it) {
         if (*it != '%') {
@@ -329,6 +334,8 @@ void TimeZone::validateFormat(StringData format) {
             case 'G':
             case 'V':
             case 'u':
+            case 'z':
+            case 'Z':
                 break;
             default:
                 uasserted(18536,

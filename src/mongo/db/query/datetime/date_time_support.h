@@ -150,6 +150,11 @@ public:
     int isoWeek(Date_t) const;
 
     /**
+     * Returns the number of seconds offset from UTC.
+     */
+    Seconds utcOffset(Date_t) const;
+
+    /**
      * Converts a date object to a string according to 'format'. 'format' can be any string literal,
      * containing 0 or more format specifiers like %Y (year) or %d (day of month). Callers must pass
      * a valid format string for 'format', i.e. one that has already been passed to
@@ -222,6 +227,17 @@ public:
                     break;
                 case 'u':  // Iso day of week
                     insertPadded(os, isoDayOfWeek(date), 1);
+                    break;
+                case 'z':  // UTC offset as ±hhmm.
+                {
+                    auto offset = utcOffset(date);
+                    os << ((offset.count() < 0) ? "-" : "+");                            // sign
+                    insertPadded(os, std::abs(durationCount<Hours>(offset)), 2);         // hh
+                    insertPadded(os, std::abs(durationCount<Minutes>(offset)) % 60, 2);  // mm
+                    break;
+                }
+                case 'Z':  // UTC offset in minutes.
+                    os << durationCount<Minutes>(utcOffset(date));
                     break;
                 default:
                     // Should never happen as format is pre-validated
