@@ -36,10 +36,11 @@
 #include <utility>
 #include <vector>
 
-#include "mongo/platform/atomic_word.h"
-#include "mongo/stdx/memory.h"
+#include <boost/align/aligned_allocator.hpp>
+
 #include "mongo/stdx/mutex.h"
 #include "mongo/util/assert_util.h"
+#include "mongo/util/with_alignment.h"
 
 namespace mongo {
 
@@ -100,6 +101,8 @@ struct Partitioner {
 
 namespace partitioned_detail {
 
+using CacheAlignedMutex = CacheAligned<stdx::mutex>;
+
 template <typename Key, typename Value>
 Key getKey(const std::pair<Key, Value>& pair) {
     return std::get<0>(pair);
@@ -110,9 +113,10 @@ Key getKey(const Key& key) {
     return key;
 }
 
-inline std::vector<stdx::unique_lock<stdx::mutex>> lockAllPartitions(
-    std::vector<stdx::mutex>& mutexes) {
+template <typename T>
+inline std::vector<stdx::unique_lock<stdx::mutex>> lockAllPartitions(T& mutexes) {
     std::vector<stdx::unique_lock<stdx::mutex>> result;
+    result.reserve(mutexes.size());
     std::transform(mutexes.begin(), mutexes.end(), std::back_inserter(result), [](auto&& mutex) {
         return stdx::unique_lock<stdx::mutex>{mutex};
     });
@@ -291,6 +295,11 @@ public:
         PartitionId _id;
     };
 
+    /**
+     * Constructs a partitioned version of a AssociativeContainer, with `nPartitions` partitions.
+     */
+    Partitioned() : _mutexes(nPartitions), _partitions(nPartitions) {}
+
     Partitioned(const Partitioned&) = delete;
     Partitioned(Partitioned&&) = default;
     Partitioned& operator=(const Partitioned&) = delete;
@@ -372,15 +381,15 @@ public:
         return OnePartition{*this, id};
     }
 
-    /**
-     * Constructs a partitioned version of a AssociativeContainer, with `nPartitions` partitions.
-     */
-    Partitioned() : _mutexes(nPartitions), _partitions(nPartitions) {}
-
 private:
+    using CacheAlignedAssociativeContainer = CacheAligned<AssociativeContainer>;
+
+    template <typename T>
+    using AlignedVector = std::vector<T, boost::alignment::aligned_allocator<T>>;
+
     // These two vectors parallel each other, but we keep them separate so that we can return an
     // iterator over `_partitions` from within All.
-    mutable std::vector<stdx::mutex> _mutexes;
-    std::vector<AssociativeContainer> _partitions;
+    mutable AlignedVector<partitioned_detail::CacheAlignedMutex> _mutexes;
+    AlignedVector<CacheAlignedAssociativeContainer> _partitions;
 };
 }  // namespace mongo
