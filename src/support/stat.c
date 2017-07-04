@@ -56,7 +56,6 @@ static const char * const __stats_dsrc_desc[] = {
 	"cache: leaf pages split during eviction",
 	"cache: modified pages evicted",
 	"cache: overflow pages read into cache",
-	"cache: overflow values cached in memory",
 	"cache: page split during eviction deepened the tree",
 	"cache: page written requiring lookaside records",
 	"cache: pages read into cache",
@@ -220,7 +219,6 @@ __wt_stat_dsrc_clear_single(WT_DSRC_STATS *stats)
 	stats->cache_eviction_split_leaf = 0;
 	stats->cache_eviction_dirty = 0;
 	stats->cache_read_overflow = 0;
-	stats->cache_overflow_value = 0;
 	stats->cache_eviction_deepen = 0;
 	stats->cache_write_lookaside = 0;
 	stats->cache_read = 0;
@@ -370,7 +368,6 @@ __wt_stat_dsrc_aggregate_single(
 	to->cache_eviction_split_leaf += from->cache_eviction_split_leaf;
 	to->cache_eviction_dirty += from->cache_eviction_dirty;
 	to->cache_read_overflow += from->cache_read_overflow;
-	to->cache_overflow_value += from->cache_overflow_value;
 	to->cache_eviction_deepen += from->cache_eviction_deepen;
 	to->cache_write_lookaside += from->cache_write_lookaside;
 	to->cache_read += from->cache_read;
@@ -533,7 +530,6 @@ __wt_stat_dsrc_aggregate(
 	    WT_STAT_READ(from, cache_eviction_split_leaf);
 	to->cache_eviction_dirty += WT_STAT_READ(from, cache_eviction_dirty);
 	to->cache_read_overflow += WT_STAT_READ(from, cache_read_overflow);
-	to->cache_overflow_value += WT_STAT_READ(from, cache_overflow_value);
 	to->cache_eviction_deepen +=
 	    WT_STAT_READ(from, cache_eviction_deepen);
 	to->cache_write_lookaside +=
@@ -711,7 +707,6 @@ static const char * const __stats_connection_desc[] = {
 	"cache: modified pages evicted",
 	"cache: modified pages evicted by application threads",
 	"cache: overflow pages read into cache",
-	"cache: overflow values cached in memory",
 	"cache: page split during eviction deepened the tree",
 	"cache: page written requiring lookaside records",
 	"cache: pages currently held in the cache",
@@ -1015,7 +1010,6 @@ __wt_stat_connection_clear_single(WT_CONNECTION_STATS *stats)
 	stats->cache_eviction_dirty = 0;
 	stats->cache_eviction_app_dirty = 0;
 	stats->cache_read_overflow = 0;
-	stats->cache_overflow_value = 0;
 	stats->cache_eviction_deepen = 0;
 	stats->cache_write_lookaside = 0;
 		/* not clearing cache_pages_inuse */
@@ -1332,7 +1326,6 @@ __wt_stat_connection_aggregate(
 	to->cache_eviction_app_dirty +=
 	    WT_STAT_READ(from, cache_eviction_app_dirty);
 	to->cache_read_overflow += WT_STAT_READ(from, cache_read_overflow);
-	to->cache_overflow_value += WT_STAT_READ(from, cache_overflow_value);
 	to->cache_eviction_deepen +=
 	    WT_STAT_READ(from, cache_eviction_deepen);
 	to->cache_write_lookaside +=

@@ -336,7 +336,6 @@ struct __wt_connection_stats {
 	int64_t cache_eviction_dirty;
 	int64_t cache_eviction_app_dirty;
 	int64_t cache_read_overflow;
-	int64_t cache_overflow_value;
 	int64_t cache_eviction_deepen;
 	int64_t cache_write_lookaside;
 	int64_t cache_pages_inuse;
@@ -579,7 +578,6 @@ struct __wt_dsrc_stats {
 	int64_t cache_eviction_split_leaf;
 	int64_t cache_eviction_dirty;
 	int64_t cache_read_overflow;
-	int64_t cache_overflow_value;
 	int64_t cache_eviction_deepen;
 	int64_t cache_write_lookaside;
 	int64_t cache_read;

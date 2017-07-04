@@ -249,7 +249,8 @@ __free_page_modify(WT_SESSION_IMPL *session, WT_PAGE *page)
 
 	/* Free the overflow on-page, reuse and transaction-cache skiplists. */
 	__wt_ovfl_reuse_free(session, page);
-	__wt_ovfl_txnc_free(session, page);
+	if (mod->ovfl_track != NULL)
+		__wt_free(session, mod->ovfl_track->remove);
 	__wt_ovfl_discard_free(session, page);
 
 	__wt_free(session, page->modify->ovfl_track);
