@@ -127,13 +127,6 @@ bool DropPendingCollectionReaper::rollBackDropPendingCollection(
     log() << "Rolling back collection drop for " << pendingNss << " with drop OpTime " << opTime
           << " to namespace " << collectionNamespace;
 
-    auto status = _storageInterface->renameCollection(opCtx, pendingNss, collectionNamespace, true);
-    if (!status.isOK()) {
-        warning() << "Failed to roll back drop-pending collection " << pendingNss
-                  << " with drop OpTime " << opTime << " and rename it to namespace "
-                  << collectionNamespace << ": " << status;
-    }
-
     return true;
 }
 

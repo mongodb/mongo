@@ -252,7 +252,7 @@ TEST_F(DropPendingCollectionReaperTest,
     ASSERT_FALSE(writesAreReplicatedDuringDrop);
 }
 
-TEST_F(DropPendingCollectionReaperTest, RollBackDropPendingCollectionRenamesCollection) {
+TEST_F(DropPendingCollectionReaperTest, RollBackDropPendingCollection) {
     auto opCtx = makeOpCtx();
 
     // Generates optimes with secs: 10, 20, 30.
@@ -273,7 +273,7 @@ TEST_F(DropPendingCollectionReaperTest, RollBackDropPendingCollectionRenamesColl
     reaper.addDropPendingNamespace(opTime[1], dpns[1]);
     reaper.addDropPendingNamespace(opTime[2], dpns[2]);
 
-    // Rename at an optime not in the list returns false.
+    // Rolling back at an optime not in the list returns false.
     ASSERT_FALSE(
         reaper.rollBackDropPendingCollection(opCtx.get(), OpTime({Seconds(5), 0}, 1LL), ns[0]));
     ASSERT_EQUALS(opTime[0], *reaper.getEarliestDropOpTime());
@@ -284,27 +284,34 @@ TEST_F(DropPendingCollectionReaperTest, RollBackDropPendingCollectionRenamesColl
     ASSERT_FALSE(collectionExists(opCtx.get(), ns[1]));
     ASSERT_FALSE(collectionExists(opCtx.get(), ns[2]));
 
-    // Rename at an optime in the middle of the list renames the collection.
-    ASSERT_TRUE(
-        reaper.rollBackDropPendingCollection(opCtx.get(), OpTime({Seconds(20), 0}, 1LL), ns[1]));
-    ASSERT_EQUALS(opTime[0], *reaper.getEarliestDropOpTime());
+    // Rolling back removes the collection from the list of drop-pending namespaces
+    // but does not rename the collection.
+    ASSERT_TRUE(reaper.rollBackDropPendingCollection(opCtx.get(), opTime[0], ns[0]));
+    ASSERT_NOT_EQUALS(opTime[0], *reaper.getEarliestDropOpTime());
+    ASSERT_EQUALS(opTime[1], *reaper.getEarliestDropOpTime());
     ASSERT_TRUE(collectionExists(opCtx.get(), dpns[0]));
-    ASSERT_FALSE(collectionExists(opCtx.get(), dpns[1]));
+    ASSERT_TRUE(collectionExists(opCtx.get(), dpns[1]));
     ASSERT_TRUE(collectionExists(opCtx.get(), dpns[2]));
     ASSERT_FALSE(collectionExists(opCtx.get(), ns[0]));
-    ASSERT_TRUE(collectionExists(opCtx.get(), ns[1]));
+    ASSERT_FALSE(collectionExists(opCtx.get(), ns[1]));
     ASSERT_FALSE(collectionExists(opCtx.get(), ns[2]));
 
-    // Rename at an optime at the front of the list renames the collection.
-    ASSERT_TRUE(
-        reaper.rollBackDropPendingCollection(opCtx.get(), OpTime({Seconds(10), 0}, 1LL), ns[0]));
-    ASSERT_EQUALS(opTime[2], *reaper.getEarliestDropOpTime());
-    ASSERT_FALSE(collectionExists(opCtx.get(), dpns[0]));
-    ASSERT_FALSE(collectionExists(opCtx.get(), dpns[1]));
+    // Rolling back collection that has the same opTime as another drop-pending collection
+    // only removes a single collection from the list of drop-pending namespaces
+    NamespaceString ns4 = NamespaceString("test", "coll4");
+    NamespaceString dpns4 = ns4.makeDropPendingNamespace(opTime[1]);
+    ASSERT_OK(_storageInterface->createCollection(opCtx.get(), dpns4, {}));
+    reaper.addDropPendingNamespace(opTime[1], dpns4);
+    ASSERT_TRUE(reaper.rollBackDropPendingCollection(opCtx.get(), opTime[1], ns[1]));
+    ASSERT_EQUALS(opTime[1], *reaper.getEarliestDropOpTime());
+    ASSERT_TRUE(collectionExists(opCtx.get(), dpns[0]));
+    ASSERT_TRUE(collectionExists(opCtx.get(), dpns[1]));
     ASSERT_TRUE(collectionExists(opCtx.get(), dpns[2]));
-    ASSERT_TRUE(collectionExists(opCtx.get(), ns[0]));
-    ASSERT_TRUE(collectionExists(opCtx.get(), ns[1]));
+    ASSERT_TRUE(collectionExists(opCtx.get(), dpns4));
+    ASSERT_FALSE(collectionExists(opCtx.get(), ns[0]));
+    ASSERT_FALSE(collectionExists(opCtx.get(), ns[1]));
     ASSERT_FALSE(collectionExists(opCtx.get(), ns[2]));
+    ASSERT_FALSE(collectionExists(opCtx.get(), ns4));
 }
 
 }  // namespace
