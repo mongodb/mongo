@@ -35,8 +35,12 @@ function stopServerReplication(conn) {
     assert.commandWorked(
         conn.adminCommand({configureFailPoint: 'stopReplProducer', mode: 'alwaysOn'}), errMsg);
 
-    // Wait until the fail point is actually hit.
-    checkLog.contains(conn, 'bgsync - stopReplProducer fail point enabled');
+    // Wait until the fail point is actually hit. Don't wait if the node is the primary, because
+    // the fail point won't be hit until the node transitions from being the primary.
+    if (assert.commandWorked(conn.adminCommand('replSetGetStatus')).myState !=
+        ReplSetTest.State.PRIMARY) {
+        checkLog.contains(conn, 'bgsync - stopReplProducer fail point enabled');
+    }
 }
 
 // Stops replication at all replicaset secondaries.

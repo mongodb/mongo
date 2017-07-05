@@ -3375,7 +3375,7 @@ Status ReplicationCoordinatorImpl::stepUpIfEligible() {
                       "Step-up command is only supported by Protocol Version 1");
     }
 
-    _startElectSelfIfEligibleV1(StartElectionV1Reason::kStepUpRequest);
+    _startElectSelfIfEligibleV1(TopologyCoordinator::StartElectionReason::kStepUpRequest);
     EventHandle finishEvent;
     {
         stdx::lock_guard<stdx::mutex> lk(_mutex);

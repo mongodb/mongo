@@ -3829,6 +3829,232 @@ TEST_F(HeartbeatResponseTestV1, UpdateHeartbeatDataTermPreventsPriorityTakeover)
     ASSERT_EQUALS(2, getCurrentPrimaryIndex());
 }
 
+TEST_F(TopoCoordTest, FreshestNodeDoesCatchupTakeover) {
+    updateConfig(BSON("_id"
+                      << "rs0"
+                      << "version"
+                      << 5
+                      << "members"
+                      << BSON_ARRAY(BSON("_id" << 1 << "host"
+                                               << "host1:27017")
+                                    << BSON("_id" << 2 << "host"
+                                                  << "host2:27017")
+                                    << BSON("_id" << 3 << "host"
+                                                  << "host3:27017"))
+                      << "protocolVersion"
+                      << 1
+                      << "settings"
+
+                      << BSON("heartbeatTimeoutSecs" << 5)),
+                 0);
+
+    setSelfMemberState(MemberState::RS_SECONDARY);
+
+    OpTime currentOptime(Timestamp(200, 1), 0);
+    OpTime behindOptime(Timestamp(100, 1), 0);
+
+    // Create a mock heartbeat response to be able to compare who is the freshest node.
+    // The latest heartbeat responses are looked at for determining the latest optime
+    // and therefore freshness for catchup takeover.
+    ReplSetHeartbeatResponse hbResp = ReplSetHeartbeatResponse();
+    hbResp.setState(MemberState::RS_SECONDARY);
+    hbResp.setAppliedOpTime(currentOptime);
+    hbResp.setTerm(1);
+
+    Date_t firstRequestDate = unittest::assertGet(dateFromISOString("2014-08-29T13:00Z"));
+
+    getTopoCoord().prepareHeartbeatRequestV1(firstRequestDate, "rs0", HostAndPort("host2:27017"));
+    getTopoCoord().prepareHeartbeatRequestV1(firstRequestDate, "rs0", HostAndPort("host3:27017"));
+
+    // Set optimes so that I am the freshest node and strictly ahead of the primary.
+    getTopoCoord().getMyMemberData()->setLastAppliedOpTime(currentOptime, Date_t());
+    getTopoCoord().processHeartbeatResponse(firstRequestDate + Milliseconds(1000),
+                                            Milliseconds(999),
+                                            HostAndPort("host3:27017"),
+                                            StatusWith<ReplSetHeartbeatResponse>(hbResp));
+    hbResp.setAppliedOpTime(behindOptime);
+    hbResp.setState(MemberState::RS_PRIMARY);
+    getTopoCoord().processHeartbeatResponse(firstRequestDate + Milliseconds(1000),
+                                            Milliseconds(999),
+                                            HostAndPort("host2:27017"),
+                                            StatusWith<ReplSetHeartbeatResponse>(hbResp));
+    getTopoCoord().updateTerm(1, Date_t());
+
+    ASSERT_OK(getTopoCoord().becomeCandidateIfElectable(
+        Date_t(), TopologyCoordinator::StartElectionReason::kCatchupTakeover));
+}
+
+TEST_F(TopoCoordTest, StaleNodeDoesntDoCatchupTakeover) {
+    updateConfig(BSON("_id"
+                      << "rs0"
+                      << "version"
+                      << 5
+                      << "members"
+                      << BSON_ARRAY(BSON("_id" << 1 << "host"
+                                               << "host1:27017")
+                                    << BSON("_id" << 2 << "host"
+                                                  << "host2:27017")
+                                    << BSON("_id" << 3 << "host"
+                                                  << "host3:27017"))
+                      << "protocolVersion"
+                      << 1
+                      << "settings"
+
+                      << BSON("heartbeatTimeoutSecs" << 5)),
+                 0);
+
+    setSelfMemberState(MemberState::RS_SECONDARY);
+
+    OpTime currentOptime(Timestamp(200, 1), 0);
+    OpTime behindOptime(Timestamp(100, 1), 0);
+
+    // Create a mock heartbeat response to be able to compare who is the freshest node.
+    ReplSetHeartbeatResponse hbResp = ReplSetHeartbeatResponse();
+    hbResp.setState(MemberState::RS_SECONDARY);
+    hbResp.setAppliedOpTime(currentOptime);
+    hbResp.setTerm(1);
+
+    Date_t firstRequestDate = unittest::assertGet(dateFromISOString("2014-08-29T13:00Z"));
+
+    getTopoCoord().prepareHeartbeatRequestV1(firstRequestDate, "rs0", HostAndPort("host2:27017"));
+    getTopoCoord().prepareHeartbeatRequestV1(firstRequestDate, "rs0", HostAndPort("host3:27017"));
+
+    // Set optimes so that the other (non-primary) node is ahead of me.
+    getTopoCoord().getMyMemberData()->setLastAppliedOpTime(behindOptime, Date_t());
+    getTopoCoord().processHeartbeatResponse(firstRequestDate + Milliseconds(1000),
+                                            Milliseconds(999),
+                                            HostAndPort("host3:27017"),
+                                            StatusWith<ReplSetHeartbeatResponse>(hbResp));
+    hbResp.setAppliedOpTime(behindOptime);
+    hbResp.setState(MemberState::RS_PRIMARY);
+    getTopoCoord().processHeartbeatResponse(firstRequestDate + Milliseconds(1000),
+                                            Milliseconds(999),
+                                            HostAndPort("host2:27017"),
+                                            StatusWith<ReplSetHeartbeatResponse>(hbResp));
+    getTopoCoord().updateTerm(1, Date_t());
+
+    Status result = getTopoCoord().becomeCandidateIfElectable(
+        Date_t(), TopologyCoordinator::StartElectionReason::kCatchupTakeover);
+    ASSERT_NOT_OK(result);
+    ASSERT_STRING_CONTAINS(result.reason(),
+                           "member is either not the most up-to-date member or not ahead of the "
+                           "primary, and therefore cannot call for catchup takeover");
+}
+
+TEST_F(TopoCoordTest, NodeDoesntDoCatchupTakeoverHeartbeatSaysPrimaryCaughtUp) {
+    updateConfig(BSON("_id"
+                      << "rs0"
+                      << "version"
+                      << 5
+                      << "members"
+                      << BSON_ARRAY(BSON("_id" << 1 << "host"
+                                               << "host1:27017")
+                                    << BSON("_id" << 2 << "host"
+                                                  << "host2:27017")
+                                    << BSON("_id" << 3 << "host"
+                                                  << "host3:27017"))
+                      << "protocolVersion"
+                      << 1
+                      << "settings"
+
+                      << BSON("heartbeatTimeoutSecs" << 5)),
+                 0);
+
+    setSelfMemberState(MemberState::RS_SECONDARY);
+
+    OpTime currentOptime(Timestamp(200, 1), 0);
+
+    // Create a mock heartbeat response to be able to compare who is the freshest node.
+    ReplSetHeartbeatResponse hbResp = ReplSetHeartbeatResponse();
+    hbResp.setState(MemberState::RS_SECONDARY);
+    hbResp.setAppliedOpTime(currentOptime);
+    hbResp.setTerm(1);
+
+    Date_t firstRequestDate = unittest::assertGet(dateFromISOString("2014-08-29T13:00Z"));
+
+    getTopoCoord().prepareHeartbeatRequestV1(firstRequestDate, "rs0", HostAndPort("host2:27017"));
+    getTopoCoord().prepareHeartbeatRequestV1(firstRequestDate, "rs0", HostAndPort("host3:27017"));
+
+    // Set optimes so that the primary node is caught up with me.
+    getTopoCoord().getMyMemberData()->setLastAppliedOpTime(currentOptime, Date_t());
+    getTopoCoord().processHeartbeatResponse(firstRequestDate + Milliseconds(1000),
+                                            Milliseconds(999),
+                                            HostAndPort("host3:27017"),
+                                            StatusWith<ReplSetHeartbeatResponse>(hbResp));
+    hbResp.setState(MemberState::RS_PRIMARY);
+    getTopoCoord().processHeartbeatResponse(firstRequestDate + Milliseconds(1000),
+                                            Milliseconds(999),
+                                            HostAndPort("host2:27017"),
+                                            StatusWith<ReplSetHeartbeatResponse>(hbResp));
+    getTopoCoord().updateTerm(1, Date_t());
+
+    Status result = getTopoCoord().becomeCandidateIfElectable(
+        Date_t(), TopologyCoordinator::StartElectionReason::kCatchupTakeover);
+    ASSERT_NOT_OK(result);
+    ASSERT_STRING_CONTAINS(result.reason(),
+                           "member is either not the most up-to-date member or not ahead of the "
+                           "primary, and therefore cannot call for catchup takeover");
+}
+
+TEST_F(TopoCoordTest, NodeDoesntDoCatchupTakeoverIfTermNumbersSayPrimaryCaughtUp) {
+    updateConfig(BSON("_id"
+                      << "rs0"
+                      << "version"
+                      << 5
+                      << "members"
+                      << BSON_ARRAY(BSON("_id" << 1 << "host"
+                                               << "host1:27017")
+                                    << BSON("_id" << 2 << "host"
+                                                  << "host2:27017")
+                                    << BSON("_id" << 3 << "host"
+                                                  << "host3:27017"))
+                      << "protocolVersion"
+                      << 1
+                      << "settings"
+
+                      << BSON("heartbeatTimeoutSecs" << 5)),
+                 0);
+
+    setSelfMemberState(MemberState::RS_SECONDARY);
+
+    OpTime currentOptime(Timestamp(200, 1), 1);
+    OpTime behindOptime(Timestamp(100, 1), 0);
+
+    // Create a mock heartbeat response to be able to compare who is the freshest node.
+    ReplSetHeartbeatResponse hbResp = ReplSetHeartbeatResponse();
+    hbResp.setState(MemberState::RS_SECONDARY);
+    hbResp.setAppliedOpTime(currentOptime);
+    hbResp.setTerm(1);
+
+    Date_t firstRequestDate = unittest::assertGet(dateFromISOString("2014-08-29T13:00Z"));
+
+    getTopoCoord().prepareHeartbeatRequestV1(firstRequestDate, "rs0", HostAndPort("host2:27017"));
+    getTopoCoord().prepareHeartbeatRequestV1(firstRequestDate, "rs0", HostAndPort("host3:27017"));
+
+    // Simulates a scenario where the node hasn't received a heartbeat from the primary in a while
+    // but the primary is caught up and has written something. The node is aware of this change
+    // and as a result realizes the primary is caught up.
+    getTopoCoord().getMyMemberData()->setLastAppliedOpTime(currentOptime, Date_t());
+    getTopoCoord().processHeartbeatResponse(firstRequestDate + Milliseconds(1000),
+                                            Milliseconds(999),
+                                            HostAndPort("host3:27017"),
+                                            StatusWith<ReplSetHeartbeatResponse>(hbResp));
+    hbResp.setAppliedOpTime(behindOptime);
+    hbResp.setState(MemberState::RS_PRIMARY);
+    getTopoCoord().processHeartbeatResponse(firstRequestDate + Milliseconds(1000),
+                                            Milliseconds(999),
+                                            HostAndPort("host2:27017"),
+                                            StatusWith<ReplSetHeartbeatResponse>(hbResp));
+    getTopoCoord().updateTerm(1, Date_t());
+
+    Status result = getTopoCoord().becomeCandidateIfElectable(
+        Date_t(), TopologyCoordinator::StartElectionReason::kCatchupTakeover);
+    ASSERT_NOT_OK(result);
+    ASSERT_STRING_CONTAINS(result.reason(),
+                           "member is either not the most up-to-date member or not ahead of the "
+                           "primary, and therefore cannot call for catchup takeover");
+}
+
 TEST_F(HeartbeatResponseTestV1,
        ScheduleACatchupTakeoverWhenElectableAndReceiveHeartbeatFromPrimaryInCatchup) {
     updateConfig(BSON("_id"
@@ -3973,7 +4199,8 @@ TEST_F(HeartbeatResponseTestV1,
     ASSERT_NO_ACTION(nextAction.getAction());
     ASSERT_TRUE(TopologyCoordinator::Role::follower == getTopoCoord().getRole());
     // We are electable now.
-    ASSERT_OK(getTopoCoord().becomeCandidateIfElectable(now(), false));
+    ASSERT_OK(getTopoCoord().becomeCandidateIfElectable(
+        now(), TopologyCoordinator::StartElectionReason::kElectionTimeout));
     ASSERT_TRUE(TopologyCoordinator::Role::candidate == getTopoCoord().getRole());
 }
 
@@ -3998,7 +4225,8 @@ TEST_F(HeartbeatResponseTestV1, ScheduleElectionWhenPrimaryIsMarkedDownAndWeAreE
     ASSERT_EQUALS(-1, getCurrentPrimaryIndex());
     ASSERT_TRUE(TopologyCoordinator::Role::follower == getTopoCoord().getRole());
     // We are electable now.
-    ASSERT_OK(getTopoCoord().becomeCandidateIfElectable(now(), false));
+    ASSERT_OK(getTopoCoord().becomeCandidateIfElectable(
+        now(), TopologyCoordinator::StartElectionReason::kElectionTimeout));
     ASSERT_TRUE(TopologyCoordinator::Role::candidate == getTopoCoord().getRole());
 }
 

@@ -740,7 +740,7 @@ Status TopologyCoordinatorImpl::prepareHeartbeatResponse(Date_t now,
     const OpTime lastOpDurable = getMyLastDurableOpTime();
 
     // Are we electable
-    response->setElectable(!_getMyUnelectableReason(now, false));
+    response->setElectable(!_getMyUnelectableReason(now, StartElectionReason::kElectionTimeout));
 
     // Heartbeat status message
     response->setHbMsg(_getHbmsg(now));
@@ -1182,7 +1182,7 @@ HeartbeatResponseAction TopologyCoordinatorImpl::setMemberAsDown(Date_t now,
     MemberData& hbData = _memberData.at(memberIndex);
     hbData.setDownValues(now, "no response within election timeout period");
 
-    if (CannotSeeMajority & _getMyUnelectableReason(now, false)) {
+    if (CannotSeeMajority & _getMyUnelectableReason(now, StartElectionReason::kElectionTimeout)) {
         if (_stepDownPending) {
             return HeartbeatResponseAction::makeNoAction();
         }
@@ -1487,7 +1487,8 @@ HeartbeatResponseAction TopologyCoordinatorImpl::_updatePrimaryFromHBData(
     // If we are primary, check if we can still see majority of the set;
     // stepdown if we can't.
     if (_iAmPrimary()) {
-        if (CannotSeeMajority & _getMyUnelectableReason(now, false)) {
+        if (CannotSeeMajority &
+            _getMyUnelectableReason(now, StartElectionReason::kElectionTimeout)) {
             if (_stepDownPending) {
                 return HeartbeatResponseAction::makeNoAction();
             }
@@ -1522,7 +1523,7 @@ HeartbeatResponseAction TopologyCoordinatorImpl::_updatePrimaryFromHBData(
         LOG(2) << "TopologyCoordinatorImpl::_updatePrimaryFromHBData - " << status.reason();
         return HeartbeatResponseAction::makeNoAction();
     }
-    fassertStatusOK(28816, becomeCandidateIfElectable(now, false));
+    fassertStatusOK(28816, becomeCandidateIfElectable(now, StartElectionReason::kElectionTimeout));
     return HeartbeatResponseAction::makeElectAction();
 }
 
@@ -1536,7 +1537,8 @@ Status TopologyCoordinatorImpl::checkShouldStandForElection(Date_t now) const {
         return {ErrorCodes::NodeNotElectable, "Not standing for election again; already candidate"};
     }
 
-    const UnelectableReasonMask unelectableReason = _getMyUnelectableReason(now, false);
+    const UnelectableReasonMask unelectableReason =
+        _getMyUnelectableReason(now, StartElectionReason::kElectionTimeout);
     if (NotCloseEnoughToLatestOptime & unelectableReason) {
         return {ErrorCodes::NodeNotElectable,
                 str::stream() << "Not standing for election because "
@@ -1633,6 +1635,40 @@ bool TopologyCoordinatorImpl::_amIFreshEnoughForPriorityTakeover() const {
     }
 }
 
+bool TopologyCoordinatorImpl::_amIFreshEnoughForCatchupTakeover() const {
+
+    const OpTime latestKnownOpTime = _latestKnownOpTime();
+
+    // Rules are:
+    // - We must have the freshest optime of all the up nodes.
+    // - We must specifically have a fresher optime than the primary (can't be equal).
+    // - The term of our last applied op must be less than the current term. This ensures that no
+    // writes have happened since the most recent election and that the primary is still in
+    // catchup mode.
+
+    // There is no point to a catchup takeover if we aren't the freshest node because
+    // another node would immediately perform another catchup takeover when we become primary.
+    const OpTime ourLastOpApplied = getMyLastAppliedOpTime();
+    if (ourLastOpApplied < latestKnownOpTime) {
+        return false;
+    }
+
+    if (_currentPrimaryIndex == -1) {
+        return false;
+    }
+
+    // If we aren't ahead of the primary, there is no point to having a catchup takeover.
+    const OpTime primaryLastOpApplied = _memberData[_currentPrimaryIndex].getLastAppliedOpTime();
+
+    if (ourLastOpApplied <= primaryLastOpApplied) {
+        return false;
+    }
+
+    // If the term of our last applied op is less than the current term, the primary didn't write
+    // anything and it is still in catchup mode.
+    return ourLastOpApplied.getTerm() < _term;
+}
+
 bool TopologyCoordinatorImpl::_iAmPrimary() const {
     if (_role == Role::leader) {
         invariant(_currentPrimaryIndex == _selfIndex);
@@ -1685,7 +1721,7 @@ int TopologyCoordinatorImpl::_getHighestPriorityElectableIndex(Date_t now) const
     int maxIndex = -1;
     for (int currentIndex = 0; currentIndex < _rsConfig.getNumMembers(); currentIndex++) {
         UnelectableReasonMask reason = currentIndex == _selfIndex
-            ? _getMyUnelectableReason(now, false)
+            ? _getMyUnelectableReason(now, StartElectionReason::kElectionTimeout)
             : _getUnelectableReason(currentIndex);
         if (None == reason && _isMemberHigherPriority(currentIndex, maxIndex)) {
             maxIndex = currentIndex;
@@ -2310,7 +2346,7 @@ TopologyCoordinatorImpl::UnelectableReasonMask TopologyCoordinatorImpl::_getUnel
 }
 
 TopologyCoordinatorImpl::UnelectableReasonMask TopologyCoordinatorImpl::_getMyUnelectableReason(
-    const Date_t now, bool isPriorityTakeover) const {
+    const Date_t now, StartElectionReason reason) const {
     UnelectableReasonMask result = None;
     const OpTime lastApplied = getMyLastAppliedOpTime();
     if (lastApplied.isNull()) {
@@ -2351,8 +2387,14 @@ TopologyCoordinatorImpl::UnelectableReasonMask TopologyCoordinatorImpl::_getMyUn
     } else {
         // Election rules only for protocol version 1.
         invariant(_rsConfig.getProtocolVersion() == 1);
-        if (isPriorityTakeover && !_amIFreshEnoughForPriorityTakeover()) {
+        if (reason == StartElectionReason::kPriorityTakeover &&
+            !_amIFreshEnoughForPriorityTakeover()) {
             result |= NotCloseEnoughToLatestForPriorityTakeover;
+        }
+
+        if (reason == StartElectionReason::kCatchupTakeover &&
+            !_amIFreshEnoughForCatchupTakeover()) {
+            result |= NotFreshEnoughForCatchupTakeover;
         }
     }
     return result;
@@ -2425,6 +2467,14 @@ std::string TopologyCoordinatorImpl::_getUnelectableReasonString(
         ss << "member is not caught up enough to the most up-to-date member to call for priority "
               "takeover - must be within "
            << priorityTakeoverFreshnessWindowSeconds << " seconds";
+    }
+    if (ur & NotFreshEnoughForCatchupTakeover) {
+        if (hasWrittenToStream) {
+            ss << "; ";
+        }
+        hasWrittenToStream = true;
+        ss << "member is either not the most up-to-date member or not ahead of the primary, and "
+              "therefore cannot call for catchup takeover";
     }
     if (ur & NotInitialized) {
         if (hasWrittenToStream) {
@@ -2986,7 +3036,7 @@ void TopologyCoordinatorImpl::setPrimaryIndex(long long primaryIndex) {
 }
 
 Status TopologyCoordinatorImpl::becomeCandidateIfElectable(const Date_t now,
-                                                           bool isPriorityTakeover) {
+                                                           StartElectionReason reason) {
     if (_role == Role::leader) {
         return {ErrorCodes::NodeNotElectable, "Not standing for election again; already primary"};
     }
@@ -2995,8 +3045,7 @@ Status TopologyCoordinatorImpl::becomeCandidateIfElectable(const Date_t now,
         return {ErrorCodes::NodeNotElectable, "Not standing for election again; already candidate"};
     }
 
-    const UnelectableReasonMask unelectableReason =
-        _getMyUnelectableReason(now, isPriorityTakeover);
+    const UnelectableReasonMask unelectableReason = _getMyUnelectableReason(now, reason);
     if (unelectableReason) {
         return {ErrorCodes::NodeNotElectable,
                 str::stream() << "Not standing for election because "

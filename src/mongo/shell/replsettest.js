@@ -602,8 +602,9 @@ var ReplSetTest = function(opts) {
     };
 
     /**
-     * Blocking call, which will wait for a primary to be elected for some pre-defined timeout and
-     * if primary is available will return a connection to it. Otherwise throws an exception.
+     * Blocking call, which will wait for a primary to be elected and become master for some
+     * pre-defined timeout. If a primary is available it will return a connection to it.
+     * Otherwise throws an exception.
      */
     this.getPrimary = function(timeout) {
         timeout = timeout || self.kDefaultTimeoutMS;

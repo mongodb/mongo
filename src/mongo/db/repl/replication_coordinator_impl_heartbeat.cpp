@@ -286,7 +286,7 @@ stdx::unique_lock<stdx::mutex> ReplicationCoordinatorImpl::_handleHeartbeatRespo
                     _priorityTakeoverWhen,
                     stdx::bind(&ReplicationCoordinatorImpl::_startElectSelfIfEligibleV1,
                                this,
-                               StartElectionV1Reason::kPriorityTakeover));
+                               TopologyCoordinator::StartElectionReason::kPriorityTakeover));
             }
             break;
         }
@@ -297,11 +297,10 @@ stdx::unique_lock<stdx::mutex> ReplicationCoordinatorImpl::_handleHeartbeatRespo
                 _catchupTakeoverWhen = _replExecutor->now() + catchupTakeoverDelay;
                 log() << "Scheduling catchup takeover at " << _catchupTakeoverWhen;
                 _catchupTakeoverCbh = _scheduleWorkAt(
-                    _catchupTakeoverWhen, [this](const executor::TaskExecutor::CallbackArgs& args) {
-                        stdx::lock_guard<stdx::mutex> lock(_mutex);
-                        _cancelCatchupTakeover_inlock();
-                        log() << "Starting an election for a catchup takeover [NOOP]";
-                    });
+                    _catchupTakeoverWhen,
+                    stdx::bind(&ReplicationCoordinatorImpl::_startElectSelfIfEligibleV1,
+                               this,
+                               TopologyCoordinator::StartElectionReason::kCatchupTakeover));
             }
             break;
         }
@@ -767,10 +766,11 @@ void ReplicationCoordinatorImpl::_cancelAndRescheduleElectionTimeout_inlock() {
         _scheduleWorkAt(when,
                         stdx::bind(&ReplicationCoordinatorImpl::_startElectSelfIfEligibleV1,
                                    this,
-                                   StartElectionV1Reason::kElectionTimeout));
+                                   TopologyCoordinator::StartElectionReason::kElectionTimeout));
 }
 
-void ReplicationCoordinatorImpl::_startElectSelfIfEligibleV1(StartElectionV1Reason reason) {
+void ReplicationCoordinatorImpl::_startElectSelfIfEligibleV1(
+    TopologyCoordinator::StartElectionReason reason) {
     if (!isV1ElectionProtocol()) {
         return;
     }
@@ -788,20 +788,23 @@ void ReplicationCoordinatorImpl::_startElectSelfIfEligibleV1(StartElectionV1Reas
         }
     }
 
-    const auto status = _topCoord->becomeCandidateIfElectable(
-        _replExecutor->now(), reason == StartElectionV1Reason::kPriorityTakeover);
+    const auto status = _topCoord->becomeCandidateIfElectable(_replExecutor->now(), reason);
     if (!status.isOK()) {
         switch (reason) {
-            case StartElectionV1Reason::kElectionTimeout:
+            case TopologyCoordinator::TopologyCoordinator::StartElectionReason::kElectionTimeout:
                 log() << "Not starting an election, since we are not electable due to: "
                       << status.reason();
                 break;
-            case StartElectionV1Reason::kPriorityTakeover:
+            case TopologyCoordinator::StartElectionReason::kPriorityTakeover:
                 log() << "Not starting an election for a priority takeover, "
                       << "since we are not electable due to: " << status.reason();
                 break;
-            case StartElectionV1Reason::kStepUpRequest:
+            case TopologyCoordinator::StartElectionReason::kStepUpRequest:
                 log() << "Not starting an election for a replSetStepUp request, "
+                      << "since we are not electable due to: " << status.reason();
+                break;
+            case TopologyCoordinator::StartElectionReason::kCatchupTakeover:
+                log() << "Not starting an election for a catchup takeover, "
                       << "since we are not electable due to: " << status.reason();
                 break;
         }
@@ -809,15 +812,18 @@ void ReplicationCoordinatorImpl::_startElectSelfIfEligibleV1(StartElectionV1Reas
     }
 
     switch (reason) {
-        case StartElectionV1Reason::kElectionTimeout:
+        case TopologyCoordinator::StartElectionReason::kElectionTimeout:
             log() << "Starting an election, since we've seen no PRIMARY in the past "
                   << _rsConfig.getElectionTimeoutPeriod();
             break;
-        case StartElectionV1Reason::kPriorityTakeover:
+        case TopologyCoordinator::StartElectionReason::kPriorityTakeover:
             log() << "Starting an election for a priority takeover";
             break;
-        case StartElectionV1Reason::kStepUpRequest:
+        case TopologyCoordinator::StartElectionReason::kStepUpRequest:
             log() << "Starting an election due to step up request";
+            break;
+        case TopologyCoordinator::StartElectionReason::kCatchupTakeover:
+            log() << "Starting an election for a catchup takeover";
             break;
     }
 
