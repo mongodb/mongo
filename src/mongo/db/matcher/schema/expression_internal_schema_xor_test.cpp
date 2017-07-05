@@ -92,7 +92,7 @@ TEST(InternalSchemaXorOp, DoesNotUseElemMatchKey) {
     ASSERT_TRUE(expr.getValue()->matchesBSON(BSON("a" << 1), &details));
     ASSERT_FALSE(details.hasElemMatchKey());
     ASSERT_TRUE(expr.getValue()->matchesBSON(BSON("a" << BSON_ARRAY(1) << "b" << BSON_ARRAY(10)),
-                                        &details));
+                                             &details));
     ASSERT_FALSE(details.hasElemMatchKey());
     ASSERT_FALSE(
         expr.getValue()->matchesBSON(BSON("a" << BSON_ARRAY(3) << "b" << BSON_ARRAY(4)), &details));
