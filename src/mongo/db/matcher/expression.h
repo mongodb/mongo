@@ -100,6 +100,7 @@ public:
         // JSON Schema expressions.
         INTERNAL_SCHEMA_MIN_ITEMS,
         INTERNAL_SCHEMA_MAX_ITEMS,
+        INTERNAL_SCHEMA_XOR,
     };
 
     MatchExpression(MatchType type);
@@ -161,11 +162,21 @@ public:
      */
 
     /**
-     * Is this node a logical operator?  All of these inherit from ListOfMatchExpression.
-     * AND, OR, NOT, NOR.
+     * Returns true if this match expression node operates logically on its children.
+     * For example, the AND node is logical in that it returns true only if all of its
+     * children return true.
      */
     bool isLogical() const {
-        return AND == _matchType || OR == _matchType || NOT == _matchType || NOR == _matchType;
+        switch (_matchType) {
+            case AND:
+            case OR:
+            case NOT:
+            case NOR:
+            case INTERNAL_SCHEMA_XOR:
+                return true;
+            default:
+                return false;
+        }
     }
 
     /**

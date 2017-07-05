@@ -38,6 +38,7 @@
 #include "mongo/db/matcher/expression_tree.h"
 #include "mongo/db/matcher/schema/expression_internal_schema_max_items.h"
 #include "mongo/db/matcher/schema/expression_internal_schema_min_items.h"
+#include "mongo/db/matcher/schema/expression_internal_schema_xor.h"
 #include "mongo/db/namespace_string.h"
 #include "mongo/stdx/memory.h"
 #include "mongo/util/mongoutils/str.h"
@@ -366,6 +367,15 @@ StatusWithMatchExpression MatchExpressionParser::_parse(const BSONObj& obj,
                 eq->setCollator(str::equals("id", rest) ? collator : nullptr);
 
                 root->add(eq.release());
+            } else if (mongoutils::str::equals("_internalSchemaXor", rest)) {
+                if (e.type() != BSONType::Array)
+                    return {
+                        Status(ErrorCodes::TypeMismatch, "$_internalSchemaXor must be an array")};
+                auto xorExpr = stdx::make_unique<InternalSchemaXorMatchExpression>();
+                Status s = _parseTreeList(e.Obj(), xorExpr.get(), collator, childIsTopLevel);
+                if (!s.isOK())
+                    return s;
+                root->add(xorExpr.release());
             } else {
                 return {Status(ErrorCodes::BadValue,
                                mongoutils::str::stream() << "unknown top level operator: "
@@ -703,6 +713,7 @@ StatusWithMatchExpression MatchExpressionParser::_parseElemMatch(const char* nam
 
         isElemMatchValue = !mongoutils::str::equals("$and", elt.fieldName()) &&
             !mongoutils::str::equals("$nor", elt.fieldName()) &&
+            !mongoutils::str::equals("$_internalSchemaXor", elt.fieldName()) &&
             !mongoutils::str::equals("$or", elt.fieldName()) &&
             !mongoutils::str::equals("$where", elt.fieldName());
     }

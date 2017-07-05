@@ -36,6 +36,7 @@
 #include "mongo/db/matcher/expression_array.h"
 #include "mongo/db/matcher/expression_leaf.h"
 #include "mongo/db/matcher/expression_tree.h"
+#include "mongo/db/matcher/schema/expression_internal_schema_xor.h"
 #include "mongo/db/pipeline/dependencies.h"
 #include "mongo/db/query/collation/collation_index_key.h"
 #include "mongo/db/query/collation/collator_interface.h"
@@ -346,6 +347,7 @@ splitMatchExpressionByWithoutRenames(unique_ptr<MatchExpression> expr,
             return {createNorOfNodes(&separate), createNorOfNodes(&reliant)};
         }
         case MatchExpression::OR:
+        case MatchExpression::INTERNAL_SCHEMA_XOR:
         case MatchExpression::NOT: {
             // If we aren't independent, we can't safely split.
             return {nullptr, std::move(expr)};

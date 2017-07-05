@@ -177,6 +177,9 @@ const char* encodeMatchType(MatchExpression::MatchType mt) {
         case MatchExpression::INTERNAL_SCHEMA_MAX_ITEMS:
             return "internalSchemaMaxItems";
             break;
+        case MatchExpression::INTERNAL_SCHEMA_XOR:
+            return "internalSchemaXor";
+            break;
         default:
             MONGO_UNREACHABLE;
             return "";
