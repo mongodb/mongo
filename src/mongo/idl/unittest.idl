@@ -530,3 +530,18 @@ commands:
             objects:
                 type: array<object>
                 supports_doc_sequence: true
+
+    chained_command_type_mixed:
+        description: Chained command with chained types, structs, and fields
+        namespace: concatenate_with_db
+        strict: false
+        chained_types:
+            ChainedType : chained_type
+            AnotherChainedType:
+                cpp_name: AnotherChainedType
+        chained_structs:
+            chained_string_basic_type:
+                cpp_name: ChainedStringBasicType
+        fields:
+            field3:
+                type: int

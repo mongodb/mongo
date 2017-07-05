@@ -754,8 +754,8 @@ class _CppSourceFileWriter(_CppFileWriterBase):
 
         self._writer.write_line('%s = std::move(values);' % (_get_field_member_name(field)))
 
-    def gen_field_deserializer(self, field):
-        # type: (ast.Field) -> None
+    def gen_field_deserializer(self, field, bson_object):
+        # type: (ast.Field, unicode) -> None
         """Generate the C++ deserializer piece for a field."""
         if field.array:
             self._gen_array_deserializer(field)
@@ -767,10 +767,11 @@ class _CppSourceFileWriter(_CppFileWriterBase):
             if field.struct_type:
                 # Do not generate a new parser context, reuse the current one since we are not
                 # entering a nested document.
-                expression = '%s::parse(ctxt, bsonObject)' % (common.title_case(field.struct_type))
+                expression = '%s::parse(ctxt, %s)' % (common.title_case(field.struct_type),
+                                                      bson_object)
             else:
                 method_name = writer.get_method_name_from_qualified_method_name(field.deserializer)
-                expression = "%s(bsonObject)" % (method_name)
+                expression = "%s(%s)" % (method_name, bson_object)
 
             self._writer.write_line('%s = %s;' % (_get_field_member_name(field), expression))
         else:
@@ -848,7 +849,7 @@ class _CppSourceFileWriter(_CppFileWriterBase):
         with self._block('%s %s {' % (constructor.get_definition(), initializers_str), '}'):
             self._writer.write_line('// Used for initialization only')
 
-    def _gen_fields_deserializer_common(self, struct, body):
+    def _gen_fields_deserializer_common(self, struct, bson_object):
         # type: (ast.Struct, unicode) -> _FieldUsageCheckerBase
         """Generate the C++ code to deserialize list of fields."""
         # pylint: disable=too-many-branches
@@ -859,7 +860,7 @@ class _CppSourceFileWriter(_CppFileWriterBase):
 
         self._writer.write_empty_line()
 
-        with self._block('for (const auto& element :%s) {' % (body), '}'):
+        with self._block('for (const auto& element :%s) {' % (bson_object), '}'):
 
             self._writer.write_line('const auto fieldName = element.fieldNameStringData();')
             self._writer.write_empty_line()
@@ -895,7 +896,7 @@ class _CppSourceFileWriter(_CppFileWriterBase):
                             self._writer.write_line('%s = true;' %
                                                     (_get_has_field_member_name(field)))
 
-                        self.gen_field_deserializer(field)
+                        self.gen_field_deserializer(field, bson_object)
 
                 if first_field:
                     first_field = False
@@ -919,7 +920,7 @@ class _CppSourceFileWriter(_CppFileWriterBase):
                 continue
 
             # Simply generate deserializers since these are all 'any' types
-            self.gen_field_deserializer(field)
+            self.gen_field_deserializer(field, bson_object)
         self._writer.write_empty_line()
 
         self._writer.write_empty_line()
