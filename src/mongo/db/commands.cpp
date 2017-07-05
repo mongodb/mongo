@@ -126,11 +126,11 @@ NamespaceString Command::parseNsOrUUID(OperationContext* opCtx,
         UUIDCatalog& catalog = UUIDCatalog::get(opCtx);
         return catalog.lookupNSSByUUID(uuidRes.getValue());
     } else {
-        // Ensure collection identifier is not a Command or specialCommand
+        // Ensure collection identifier is not a Command
         const NamespaceString nss(parseNsCollectionRequired(dbname, cmdObj));
         uassert(ErrorCodes::InvalidNamespace,
                 str::stream() << "Invalid collection name specified '" << nss.ns() << "'",
-                !nss.isCommand() && !nss.isSpecialCommand());
+                nss.isNormal());
         return nss;
     }
 }

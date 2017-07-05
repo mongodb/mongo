@@ -11,7 +11,7 @@
 
     print("make sure curop, killop, and unlock fail");
 
-    var x = admin.$cmd.sys.inprog.findOne();
+    var x = admin.currentOp();
     assert(!("inprog" in x), tojson(x));
     assert.eq(x.code, errorCodeUnauthorized, tojson(x));
 

@@ -111,7 +111,7 @@ DbResponse ServiceEntryPointMongos::handleRequest(OperationContext* opCtx, const
                 dbResponse = Strategy::clientOpMsgCommand(opCtx, message);
                 break;
             case dbQuery:
-                if (nss.isCommand() || nss.isSpecialCommand()) {
+                if (nss.isCommand()) {
                     try {
                         dbResponse = Strategy::clientOpQueryCommand(opCtx, nss, &dbm);
                     } catch (const DBException& ex) {

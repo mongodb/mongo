@@ -816,61 +816,6 @@ DbResponse runCommands(OperationContext* opCtx, const Message& message) {
     return DbResponse{std::move(response)};
 }
 
-// In SERVER-7775 we reimplemented the pseudo-commands fsyncUnlock, inProg, and killOp
-// as ordinary commands. To support old clients for another release, this helper serves
-// to execute the real command from the legacy pseudo-command codepath.
-// TODO: remove after MongoDB 3.2 is released
-DbResponse receivedPseudoCommand(OperationContext* opCtx,
-                                 Client& client,
-                                 const Message& message,
-                                 StringData realCommandName) {
-    DbMessage originalDbm(message);
-
-    auto originalNToSkip = originalDbm.pullInt();
-
-    uassert(ErrorCodes::InvalidOptions,
-            str::stream() << "invalid nToSkip - expected 0, but got " << originalNToSkip,
-            originalNToSkip == 0);
-
-    auto originalNToReturn = originalDbm.pullInt();
-
-    uassert(ErrorCodes::InvalidOptions,
-            str::stream() << "invalid nToReturn - expected -1 or 1, but got " << originalNToSkip,
-            originalNToReturn == -1 || originalNToReturn == 1);
-
-    auto cmdParams = originalDbm.nextJsObj();
-
-    Message interposed;
-    // HACK:
-    // legacy pseudo-commands could run on any database. The command replacements
-    // can only run on 'admin'. To avoid breaking old shells and a multitude
-    // of third-party tools, we rewrite the namespace. As auth is checked
-    // later in Command::_checkAuthorizationImpl, we will still properly
-    // reject the request if the client is not authorized.
-    NamespaceString interposedNss("admin", "$cmd");
-
-    BSONObjBuilder cmdBob;
-    cmdBob.append(realCommandName, 1);
-    cmdBob.appendElements(cmdParams);
-    auto cmd = cmdBob.done();
-
-    BufBuilder cmdMsgBuf;
-
-    int32_t flags = DataView(message.header().data()).read<LittleEndian<int32_t>>();
-    cmdMsgBuf.appendNum(flags);
-
-    cmdMsgBuf.appendStr(interposedNss.db(), false);  // not including null byte
-    cmdMsgBuf.appendStr(".$cmd");
-    cmdMsgBuf.appendNum(0);  // ntoskip
-    cmdMsgBuf.appendNum(1);  // ntoreturn
-    cmdMsgBuf.appendBuf(cmd.objdata(), cmd.objsize());
-
-    interposed.setData(dbQuery, cmdMsgBuf.buf(), cmdMsgBuf.len());
-    interposed.header().setId(message.header().getId());
-
-    return runCommands(opCtx, interposed);
-}
-
 DbResponse receivedQuery(OperationContext* opCtx,
                          const NamespaceString& nss,
                          Client& c,
@@ -1086,20 +1031,6 @@ DbResponse ServiceEntryPointMongod::handleRequest(OperationContext* opCtx, const
         if (nsString.isCommand()) {
             isCommand = true;
             opwrite(m);
-        }
-        // TODO: remove this entire code path after 3.2. Refs SERVER-7775
-        else if (nsString.isSpecialCommand()) {
-            opwrite(m);
-
-            if (nsString.coll() == "$cmd.sys.inprog") {
-                return receivedPseudoCommand(opCtx, c, m, "currentOp");
-            }
-            if (nsString.coll() == "$cmd.sys.killop") {
-                return receivedPseudoCommand(opCtx, c, m, "killOp");
-            }
-            if (nsString.coll() == "$cmd.sys.unlock") {
-                return receivedPseudoCommand(opCtx, c, m, "fsyncUnlock");
-            }
         } else {
             opread(m);
         }

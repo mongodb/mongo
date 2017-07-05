@@ -194,9 +194,6 @@ public:
     bool isOplog() const {
         return oplog(_ns);
     }
-    bool isSpecialCommand() const {
-        return coll().startsWith("$cmd.sys");
-    }
     bool isSpecial() const {
         return special(_ns);
     }
