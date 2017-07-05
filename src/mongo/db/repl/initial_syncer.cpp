@@ -461,7 +461,7 @@ void InitialSyncer::_startInitialSyncAttemptCallback(
     LOG(2) << "Resetting sync source so a new one can be chosen for this initial sync attempt.";
     _syncSource = HostAndPort();
 
-    // Reset all optimes before a new initial sync attempt.
+    LOG(2) << "Resetting all optimes before starting this initial sync attempt.";
     _opts.resetOptimes();
     _lastApplied = {};
     _lastFetched = {};
