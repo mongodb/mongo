@@ -378,7 +378,7 @@ Status renameCollectionForApplyOps(OperationContext* opCtx,
                               << uassertStatusOK(UUID::parse(dropSourceElt))
                               << ") for rename to "
                               << targetNss.ns()
-                              << " does no longer exist",
+                              << " no longer exists",
                 !dropSourceElt);
     }
 
