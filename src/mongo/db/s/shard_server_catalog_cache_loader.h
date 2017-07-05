@@ -28,6 +28,7 @@
 
 #pragma once
 
+#include "mongo/db/operation_context_group.h"
 #include "mongo/db/s/namespace_metadata_change_notifications.h"
 #include "mongo/s/catalog_cache_loader.h"
 #include "mongo/util/concurrency/thread_pool.h"
@@ -334,6 +335,9 @@ private:
     // Indicates whether this server is the primary or not, so that the appropriate loading action
     // can be taken.
     ReplicaSetRole _role{ReplicaSetRole::None};
+
+    // The collection of operation contexts in use by all threads.
+    OperationContextGroup _contexts;
 };
 
 }  // namespace mongo
