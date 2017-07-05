@@ -95,5 +95,26 @@ TEST_F(NamespaceMetadataChangeNotificationsTest, GiveUpWaitingForNotify) {
     notifications.notifyChange(kNss);
 }
 
+TEST_F(NamespaceMetadataChangeNotificationsTest, MoveConstructionWaitForNotify) {
+    NamespaceMetadataChangeNotifications notifications;
+
+    auto scopedNotif = notifications.createNotification(kNss);
+    auto movedScopedNotif = std::move(scopedNotif);
+
+    {
+        auto opCtx = client()->makeOperationContext();
+        opCtx->setDeadlineAfterNowBy(Milliseconds{0});
+        ASSERT_THROWS_CODE(
+            movedScopedNotif.get(opCtx.get()), UserException, ErrorCodes::ExceededTimeLimit);
+    }
+
+    notifications.notifyChange(kNss);
+
+    {
+        auto opCtx = client()->makeOperationContext();
+        movedScopedNotif.get(opCtx.get());
+    }
+}
+
 }  // namespace
 }  // namespace mongo

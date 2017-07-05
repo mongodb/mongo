@@ -59,13 +59,19 @@ public:
      * out of scope, if it has not been signalled yet.
      */
     class ScopedNotification {
+        MONGO_DISALLOW_COPYING(ScopedNotification);
+
     public:
         ScopedNotification(NamespaceMetadataChangeNotifications* notifications,
                            std::shared_ptr<NotificationToken> token)
             : _notifications(notifications), _token(std::move(token)) {}
 
+        ScopedNotification(ScopedNotification&&) = default;
+
         ~ScopedNotification() {
-            _notifications->_unregisterNotificationToken(std::move(_token));
+            if (_token) {
+                _notifications->_unregisterNotificationToken(std::move(_token));
+            }
         }
 
         void get(OperationContext* opCtx) {
