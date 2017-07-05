@@ -478,7 +478,7 @@ BSONObj BSONElement::Obj() const {
     return embeddedObjectUserCheck();
 }
 
-BSONElement BSONElement::operator[](const std::string& field) const {
+BSONElement BSONElement::operator[](StringData field) const {
     BSONObj o = Obj();
     return o[field];
 }
