@@ -164,6 +164,8 @@ static int
 __log_fs_write(WT_SESSION_IMPL *session,
     WT_LOGSLOT *slot, wt_off_t offset, size_t len, const void *buf)
 {
+	WT_DECL_RET;
+
 	/*
 	 * If we're writing into a new log file and we're running in
 	 * compatibility mode to an older release, we have to wait for all
@@ -175,7 +177,10 @@ __log_fs_write(WT_SESSION_IMPL *session,
 		__log_wait_for_earlier_slot(session, slot);
 		WT_RET(__wt_log_force_sync(session, &slot->slot_release_lsn));
 	}
-	return (__wt_write(session, slot->slot_fh, offset, len, buf));
+	if ((ret = __wt_write(session, slot->slot_fh, offset, len, buf)) != 0)
+		WT_PANIC_MSG(session, ret,
+		    "%s: fatal log failure", slot->slot_fh->name);
+	return (ret);
 }
 
 /*
