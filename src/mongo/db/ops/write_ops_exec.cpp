@@ -359,8 +359,9 @@ static bool insertBatchAndHandleErrors(OperationContext* opCtx,
             curOp.debug().ninserted += batch.size();
             return true;
         }
-    } catch (const DBException& ex) {
+    } catch (const DBException&) {
         collection.reset();
+
         // Ignore this failure and behave as-if we never tried to do the combined batch insert.
         // The loop below will handle reporting any non-transient errors.
     }
