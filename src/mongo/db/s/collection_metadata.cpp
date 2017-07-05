@@ -55,7 +55,9 @@ CollectionMetadata::CollectionMetadata(std::shared_ptr<ChunkManager> cm, const S
         if (chunk->getShardId() != _thisShardId)
             continue;
 
-        _chunksMap.emplace(chunk->getMin(), CachedChunkInfo(chunk->getMax(), chunk->getLastmod()));
+        _chunksMap.emplace_hint(_chunksMap.end(),
+                                chunk->getMin(),
+                                CachedChunkInfo(chunk->getMax(), chunk->getLastmod()));
     }
 
     if (_chunksMap.empty()) {
@@ -93,7 +95,8 @@ void CollectionMetadata::_buildRangesMap() {
             continue;
         }
 
-        _rangesMap.emplace(min, CachedChunkInfo(max, ChunkVersion::IGNORED()));
+        _rangesMap.emplace_hint(
+            _rangesMap.end(), min, CachedChunkInfo(max, ChunkVersion::IGNORED()));
 
         min = currMin;
         max = currMax;
