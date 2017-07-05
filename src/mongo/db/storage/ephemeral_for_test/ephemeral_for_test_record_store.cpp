@@ -33,7 +33,6 @@
 
 #include "mongo/db/storage/ephemeral_for_test/ephemeral_for_test_record_store.h"
 
-
 #include "mongo/db/jsobj.h"
 #include "mongo/db/namespace_string.h"
 #include "mongo/db/operation_context.h"
@@ -50,9 +49,12 @@ using std::shared_ptr;
 
 class EphemeralForTestRecordStore::InsertChange : public RecoveryUnit::Change {
 public:
-    InsertChange(Data* data, RecordId loc) : _data(data), _loc(loc) {}
+    InsertChange(OperationContext* opCtx, Data* data, RecordId loc)
+        : _opCtx(opCtx), _data(data), _loc(loc) {}
     virtual void commit() {}
     virtual void rollback() {
+        stdx::lock_guard<stdx::mutex> lock(_data->recordsMutex);
+
         Records::iterator it = _data->records.find(_loc);
         if (it != _data->records.end()) {
             _data->dataSize -= it->second.size;
@@ -61,6 +63,7 @@ public:
     }
 
 private:
+    OperationContext* _opCtx;
     Data* const _data;
     const RecordId _loc;
 };
@@ -68,11 +71,16 @@ private:
 // Works for both removes and updates
 class EphemeralForTestRecordStore::RemoveChange : public RecoveryUnit::Change {
 public:
-    RemoveChange(Data* data, RecordId loc, const EphemeralForTestRecord& rec)
-        : _data(data), _loc(loc), _rec(rec) {}
+    RemoveChange(OperationContext* opCtx,
+                 Data* data,
+                 RecordId loc,
+                 const EphemeralForTestRecord& rec)
+        : _opCtx(opCtx), _data(data), _loc(loc), _rec(rec) {}
 
     virtual void commit() {}
     virtual void rollback() {
+        stdx::lock_guard<stdx::mutex> lock(_data->recordsMutex);
+
         Records::iterator it = _data->records.find(_loc);
         if (it != _data->records.end()) {
             _data->dataSize -= it->second.size;
@@ -83,6 +91,7 @@ public:
     }
 
 private:
+    OperationContext* _opCtx;
     Data* const _data;
     const RecordId _loc;
     const EphemeralForTestRecord _rec;
@@ -90,8 +99,10 @@ private:
 
 class EphemeralForTestRecordStore::TruncateChange : public RecoveryUnit::Change {
 public:
-    TruncateChange(Data* data) : _data(data), _dataSize(0) {
+    TruncateChange(OperationContext* opCtx, Data* data) : _opCtx(opCtx), _data(data), _dataSize(0) {
         using std::swap;
+
+        stdx::lock_guard<stdx::mutex> lock(_data->recordsMutex);
         swap(_dataSize, _data->dataSize);
         swap(_records, _data->records);
     }
@@ -99,11 +110,14 @@ public:
     virtual void commit() {}
     virtual void rollback() {
         using std::swap;
+
+        stdx::lock_guard<stdx::mutex> lock(_data->recordsMutex);
         swap(_dataSize, _data->dataSize);
         swap(_records, _data->records);
     }
 
 private:
+    OperationContext* _opCtx;
     Data* const _data;
     int64_t _dataSize;
     Records _records;
@@ -264,7 +278,7 @@ EphemeralForTestRecordStore::EphemeralForTestRecordStore(StringData ns,
       _cappedMaxDocs(cappedMaxDocs),
       _cappedCallback(cappedCallback),
       _data(*dataInOut ? static_cast<Data*>(dataInOut->get())
-                       : new Data(NamespaceString::oplog(ns))) {
+                       : new Data(ns, NamespaceString::oplog(ns))) {
     if (!*dataInOut) {
         dataInOut->reset(_data);  // takes ownership
     }
@@ -283,6 +297,7 @@ const char* EphemeralForTestRecordStore::name() const {
 }
 
 RecordData EphemeralForTestRecordStore::dataFor(OperationContext* txn, const RecordId& loc) const {
+    stdx::lock_guard<stdx::mutex> lock(_data->recordsMutex);
     return recordFor(loc)->toRecordData();
 }
 
@@ -311,6 +326,8 @@ EphemeralForTestRecordStore::EphemeralForTestRecord* EphemeralForTestRecordStore
 bool EphemeralForTestRecordStore::findRecord(OperationContext* txn,
                                              const RecordId& loc,
                                              RecordData* rd) const {
+    stdx::lock_guard<stdx::mutex> lock(_data->recordsMutex);
+
     Records::const_iterator it = _data->records.find(loc);
     if (it == _data->records.end()) {
         return false;
@@ -320,13 +337,19 @@ bool EphemeralForTestRecordStore::findRecord(OperationContext* txn,
 }
 
 void EphemeralForTestRecordStore::deleteRecord(OperationContext* txn, const RecordId& loc) {
+    stdx::lock_guard<stdx::mutex> lock(_data->recordsMutex);
+
+    deleteRecord_inlock(txn, loc);
+}
+
+void EphemeralForTestRecordStore::deleteRecord_inlock(OperationContext* txn, const RecordId& loc) {
     EphemeralForTestRecord* rec = recordFor(loc);
-    txn->recoveryUnit()->registerChange(new RemoveChange(_data, loc, *rec));
+    txn->recoveryUnit()->registerChange(new RemoveChange(txn, _data, loc, *rec));
     _data->dataSize -= rec->size;
     invariant(_data->records.erase(loc) == 1);
 }
 
-bool EphemeralForTestRecordStore::cappedAndNeedDelete(OperationContext* txn) const {
+bool EphemeralForTestRecordStore::cappedAndNeedDelete_inlock(OperationContext* txn) const {
     if (!_isCapped)
         return false;
 
@@ -339,8 +362,8 @@ bool EphemeralForTestRecordStore::cappedAndNeedDelete(OperationContext* txn) con
     return false;
 }
 
-void EphemeralForTestRecordStore::cappedDeleteAsNeeded(OperationContext* txn) {
-    while (cappedAndNeedDelete(txn)) {
+void EphemeralForTestRecordStore::cappedDeleteAsNeeded_inlock(OperationContext* txn) {
+    while (cappedAndNeedDelete_inlock(txn)) {
         invariant(!_data->records.empty());
 
         Records::iterator oldest = _data->records.begin();
@@ -350,7 +373,7 @@ void EphemeralForTestRecordStore::cappedDeleteAsNeeded(OperationContext* txn) {
         if (_cappedCallback)
             uassertStatusOK(_cappedCallback->aboutToDeleteCapped(txn, id, data));
 
-        deleteRecord(txn, id);
+        deleteRecord_inlock(txn, id);
     }
 }
 
@@ -376,6 +399,7 @@ StatusWith<RecordId> EphemeralForTestRecordStore::insertRecord(OperationContext*
         return StatusWith<RecordId>(ErrorCodes::BadValue, "object to insert exceeds cappedMaxSize");
     }
 
+    stdx::lock_guard<stdx::mutex> lock(_data->recordsMutex);
     EphemeralForTestRecord rec(len);
     memcpy(rec.data.get(), data, len);
 
@@ -389,11 +413,11 @@ StatusWith<RecordId> EphemeralForTestRecordStore::insertRecord(OperationContext*
         loc = allocateLoc();
     }
 
-    txn->recoveryUnit()->registerChange(new InsertChange(_data, loc));
+    txn->recoveryUnit()->registerChange(new InsertChange(txn, _data, loc));
     _data->dataSize += len;
     _data->records[loc] = rec;
 
-    cappedDeleteAsNeeded(txn);
+    cappedDeleteAsNeeded_inlock(txn);
 
     return StatusWith<RecordId>(loc);
 }
@@ -402,6 +426,8 @@ Status EphemeralForTestRecordStore::insertRecordsWithDocWriter(OperationContext*
                                                                const DocWriter* const* docs,
                                                                size_t nDocs,
                                                                RecordId* idsOut) {
+    stdx::lock_guard<stdx::mutex> lock(_data->recordsMutex);
+
     for (size_t i = 0; i < nDocs; i++) {
         const int len = docs[i]->documentSize();
         if (_isCapped && len > _cappedMaxSize) {
@@ -423,11 +449,11 @@ Status EphemeralForTestRecordStore::insertRecordsWithDocWriter(OperationContext*
             loc = allocateLoc();
         }
 
-        txn->recoveryUnit()->registerChange(new InsertChange(_data, loc));
+        txn->recoveryUnit()->registerChange(new InsertChange(txn, _data, loc));
         _data->dataSize += len;
         _data->records[loc] = rec;
 
-        cappedDeleteAsNeeded(txn);
+        cappedDeleteAsNeeded_inlock(txn);
 
         if (idsOut)
             idsOut[i] = loc;
@@ -442,6 +468,7 @@ Status EphemeralForTestRecordStore::updateRecord(OperationContext* txn,
                                                  int len,
                                                  bool enforceQuota,
                                                  UpdateNotifier* notifier) {
+    stdx::unique_lock<stdx::mutex> lock(_data->recordsMutex);
     EphemeralForTestRecord* oldRecord = recordFor(loc);
     int oldLen = oldRecord->size;
 
@@ -451,21 +478,22 @@ Status EphemeralForTestRecordStore::updateRecord(OperationContext* txn,
     if (notifier) {
         // The in-memory KV engine uses the invalidation framework (does not support
         // doc-locking), and therefore must notify that it is updating a document.
+        lock.unlock();
         Status callbackStatus = notifier->recordStoreGoingToUpdateInPlace(txn, loc);
         if (!callbackStatus.isOK()) {
             return callbackStatus;
         }
+        lock.lock();
     }
 
     EphemeralForTestRecord newRecord(len);
     memcpy(newRecord.data.get(), data, len);
 
-    txn->recoveryUnit()->registerChange(new RemoveChange(_data, loc, *oldRecord));
+    txn->recoveryUnit()->registerChange(new RemoveChange(txn, _data, loc, *oldRecord));
     _data->dataSize += len - oldLen;
     *oldRecord = newRecord;
 
-    cappedDeleteAsNeeded(txn);
-
+    cappedDeleteAsNeeded_inlock(txn);
     return Status::OK();
 }
 
@@ -479,16 +507,19 @@ StatusWith<RecordData> EphemeralForTestRecordStore::updateWithDamages(
     const RecordData& oldRec,
     const char* damageSource,
     const mutablebson::DamageVector& damages) {
+
+    stdx::lock_guard<stdx::mutex> lock(_data->recordsMutex);
+
     EphemeralForTestRecord* oldRecord = recordFor(loc);
     const int len = oldRecord->size;
 
     EphemeralForTestRecord newRecord(len);
     memcpy(newRecord.data.get(), oldRecord->data.get(), len);
 
-    txn->recoveryUnit()->registerChange(new RemoveChange(_data, loc, *oldRecord));
+    txn->recoveryUnit()->registerChange(new RemoveChange(txn, _data, loc, *oldRecord));
     *oldRecord = newRecord;
 
-    cappedDeleteAsNeeded(txn);
+    cappedDeleteAsNeeded_inlock(txn);
 
     char* root = newRecord.data.get();
     mutablebson::DamageVector::const_iterator where = damages.begin();
@@ -514,17 +545,18 @@ std::unique_ptr<SeekableRecordCursor> EphemeralForTestRecordStore::getCursor(Ope
 Status EphemeralForTestRecordStore::truncate(OperationContext* txn) {
     // Unlike other changes, TruncateChange mutates _data on construction to perform the
     // truncate
-    txn->recoveryUnit()->registerChange(new TruncateChange(_data));
+    txn->recoveryUnit()->registerChange(new TruncateChange(txn, _data));
     return Status::OK();
 }
 
 void EphemeralForTestRecordStore::temp_cappedTruncateAfter(OperationContext* txn,
                                                            RecordId end,
                                                            bool inclusive) {
+    stdx::lock_guard<stdx::mutex> lock(_data->recordsMutex);
     Records::iterator it =
         inclusive ? _data->records.lower_bound(end) : _data->records.upper_bound(end);
     while (it != _data->records.end()) {
-        txn->recoveryUnit()->registerChange(new RemoveChange(_data, it->first, it->second));
+        txn->recoveryUnit()->registerChange(new RemoveChange(txn, _data, it->first, it->second));
         _data->dataSize -= it->second.size;
         _data->records.erase(it++);
     }
@@ -535,6 +567,8 @@ Status EphemeralForTestRecordStore::validate(OperationContext* txn,
                                              ValidateAdaptor* adaptor,
                                              ValidateResults* results,
                                              BSONObjBuilder* output) {
+    stdx::lock_guard<stdx::mutex> lock(_data->recordsMutex);
+
     results->valid = true;
     if (level == kValidateFull) {
         for (Records::const_iterator it = _data->records.begin(); it != _data->records.end();
@@ -602,6 +636,7 @@ boost::optional<RecordId> EphemeralForTestRecordStore::oplogStartHack(
     if (!_data->isOplog)
         return boost::none;
 
+    stdx::lock_guard<stdx::mutex> lock(_data->recordsMutex);
     const Records& records = _data->records;
 
     if (records.empty())
