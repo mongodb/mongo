@@ -231,7 +231,8 @@ list_print_checkpoint(WT_SESSION *session, const char *key)
 		if (ci.root_size != 0) {
 			printf("\t\t" "root offset: %" PRIuMAX
 			    " (0x%" PRIxMAX ")\n",
-			    (intmax_t)ci.root_offset, (intmax_t)ci.root_offset);
+			    (uintmax_t)ci.root_offset,
+			    (uintmax_t)ci.root_offset);
 			printf("\t\t" "root size: %" PRIu32
 			    " (0x%" PRIx32 ")\n",
 			    ci.root_size, ci.root_size);

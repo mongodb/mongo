@@ -13,7 +13,7 @@
 	(s)->dhandle = (dh);						\
 	(s)->name = (s)->lastop = #h "." #n;				\
 	WT_ERR(WT_SESSION_CHECK_PANIC(s));				\
-	__wt_verbose((s), WT_VERB_API, "CALL: " #h ":" #n)
+	__wt_verbose((s), WT_VERB_API, "%s", "CALL: " #h ":" #n)
 
 #define	API_CALL_NOCONF(s, h, n, dh) do {				\
 	API_SESSION_INIT(s, h, n, dh)

@@ -621,7 +621,7 @@ err:	if (locked)
 
 		if (ret == EINTR)
 			__wt_verbose(session, WT_VERB_LSM,
-			    "Merge aborted due to close");
+			    "%s", "Merge aborted due to close");
 		else
 			__wt_verbose(session, WT_VERB_LSM,
 			    "Merge failed with %s",

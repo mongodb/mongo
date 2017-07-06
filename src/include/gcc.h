@@ -21,7 +21,7 @@
  * dist/s_prototypes to create extern.h.
  */
 #define	WT_GCC_FUNC_ATTRIBUTE(x)
-#define	WT_GCC_FUNC_DECL_ATTRIBUTE(x) __attribute__(x)
+#define	WT_GCC_FUNC_DECL_ATTRIBUTE(x)	__attribute__(x)
 
 /*
  * Atomic writes:

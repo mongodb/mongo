@@ -31,7 +31,7 @@ __log_slot_dump(WT_SESSION_IMPL *session)
 			earliest = i;
 		__wt_errx(session, "Slot %d:", i);
 		__wt_errx(session, "    State: %" PRIx64 " Flags: %" PRIx32,
-		    slot->slot_state, slot->flags);
+		    (uint64_t)slot->slot_state, slot->flags);
 		__wt_errx(session, "    Start LSN: %" PRIu32 "/%" PRIu32,
 		    slot->slot_start_lsn.l.file, slot->slot_start_lsn.l.offset);
 		__wt_errx(session, "    End  LSN: %" PRIu32 "/%" PRIu32,
@@ -173,9 +173,9 @@ retry:
 				if (WT_TIMEDIFF_SEC(now, begin) > 10) {
 					__wt_errx(session, "SLOT_CLOSE: Slot %"
 					PRIu32 " Timeout unbuffered, state 0x%"
-					PRIx64 " unbuffered %" PRIu64,
+					PRIx64 " unbuffered %" PRId64,
 					(uint32_t)(slot - &log->slot_pool[0]),
-					slot->slot_state,
+					(uint64_t)slot->slot_state,
 					slot->slot_unbuffered);
 					__log_slot_dump(session);
 					__wt_abort(session);

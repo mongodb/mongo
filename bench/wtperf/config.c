@@ -798,7 +798,7 @@ config_sanity(WTPERF *wtperf)
 			    workp->table_index >= (int32_t)opts->table_count) {
 				fprintf(stderr,
 				    "Workload table index %" PRId32
-				    " is larger than table count %" PRId32,
+				    " is larger than table count %" PRIu32,
 				    workp->table_index, opts->table_count);
 				return (EINVAL);
 			}
