@@ -293,7 +293,7 @@ stdx::unique_lock<stdx::mutex> ReplicationCoordinatorImpl::_handleHeartbeatRespo
         case HeartbeatResponseAction::CatchupTakeover: {
             // Don't schedule a catchup takeover if any takeover is already scheduled.
             if (!_catchupTakeoverCbh.isValid() && !_priorityTakeoverCbh.isValid()) {
-                Milliseconds catchupTakeoverDelay = _rsConfig.getCatchupTakeoverDelay();
+                Milliseconds catchupTakeoverDelay = _rsConfig.getCatchUpTakeoverDelay();
                 _catchupTakeoverWhen = _replExecutor->now() + catchupTakeoverDelay;
                 log() << "Scheduling catchup takeover at " << _catchupTakeoverWhen;
                 _catchupTakeoverCbh = _scheduleWorkAt(

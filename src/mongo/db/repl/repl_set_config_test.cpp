@@ -1632,29 +1632,56 @@ TEST(ReplSetConfig, GetPriorityTakeoverDelay) {
     ASSERT_EQUALS(Milliseconds(1000), configB.getPriorityTakeoverDelay(4));
 }
 
-TEST(ReplSetConfig, GetCatchupTakeoverDelay) {
-    ReplSetConfig configA;
-    ASSERT_OK(configA.initialize(BSON("_id"
-                                      << "rs0"
-                                      << "version"
-                                      << 1
-                                      << "members"
-                                      << BSON_ARRAY(BSON("_id" << 0 << "host"
-                                                               << "localhost:12345"
-                                                               << "priority"
-                                                               << 1)
-                                                    << BSON("_id" << 1 << "host"
-                                                                  << "localhost:54321"
-                                                                  << "priority"
-                                                                  << 2)
-                                                    << BSON("_id" << 2 << "host"
-                                                                  << "localhost:5321"
-                                                                  << "priority"
-                                                                  << 3))
-                                      << "settings"
-                                      << BSON("electionTimeoutMillis" << 1000))));
-    ASSERT_OK(configA.validate());
-    ASSERT_EQUALS(Milliseconds(30000), configA.getCatchupTakeoverDelay());
+TEST(ReplSetConfig, GetCatchUpTakeoverDelay) {
+    ReplSetConfig config;
+    ASSERT_OK(config.initialize(BSON("_id"
+                                     << "rs0"
+                                     << "version"
+                                     << 1
+                                     << "members"
+                                     << BSON_ARRAY(BSON("_id" << 0 << "host"
+                                                              << "localhost:12345"))
+                                     << "settings"
+                                     << BSON("catchUpTakeoverDelayMillis" << 5000))));
+    ASSERT_OK(config.validate());
+    ASSERT_EQUALS(Milliseconds(5000), config.getCatchUpTakeoverDelay());
+
+    Status status = config.initialize(BSON("_id"
+                                           << "rs0"
+                                           << "version"
+                                           << 1
+                                           << "members"
+                                           << BSON_ARRAY(BSON("_id" << 0 << "host"
+                                                                    << "localhost:12345"))
+                                           << "settings"
+                                           << BSON("catchUpTakeoverDelayMillis" << -5000)));
+    ASSERT_EQUALS(ErrorCodes::BadValue, status);
+    ASSERT_STRING_CONTAINS(
+        status.reason(),
+        "catch-up takeover delay must be -1 (no catch-up takeover) or greater than or equal to 0");
+}
+
+TEST(ReplSetConfig, GetCatchUpTakeoverDelayDefault) {
+    ReplSetConfig config;
+    ASSERT_OK(config.initialize(BSON("_id"
+                                     << "rs0"
+                                     << "version"
+                                     << 1
+                                     << "members"
+                                     << BSON_ARRAY(BSON("_id" << 0 << "host"
+                                                              << "localhost:12345"
+                                                              << "priority"
+                                                              << 1)
+                                                   << BSON("_id" << 1 << "host"
+                                                                 << "localhost:54321"
+                                                                 << "priority"
+                                                                 << 2)
+                                                   << BSON("_id" << 2 << "host"
+                                                                 << "localhost:5321"
+                                                                 << "priority"
+                                                                 << 3)))));
+    ASSERT_OK(config.validate());
+    ASSERT_EQUALS(Milliseconds(30000), config.getCatchUpTakeoverDelay());
 }
 
 TEST(ReplSetConfig, ConfirmDefaultValuesOfAndAbilityToSetWriteConcernMajorityJournalDefault) {

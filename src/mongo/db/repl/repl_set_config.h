@@ -60,13 +60,15 @@ public:
     static const size_t kMaxMembers = 50;
     static const size_t kMaxVotingMembers = 7;
     static const Milliseconds kInfiniteCatchUpTimeout;
+    static const Milliseconds kCatchUpDisabled;
+    static const Milliseconds kCatchUpTakeoverDisabled;
 
     static const Milliseconds kDefaultElectionTimeoutPeriod;
     static const Milliseconds kDefaultHeartbeatInterval;
     static const Seconds kDefaultHeartbeatTimeoutPeriod;
     static const Milliseconds kDefaultCatchUpTimeoutPeriod;
     static const bool kDefaultChainingAllowed;
-    static const Milliseconds kDefaultCatchupTakeoverDelay;
+    static const Milliseconds kDefaultCatchUpTakeoverDelay;
 
     /**
      * Initializes this ReplSetConfig from the contents of "cfg".
@@ -345,7 +347,9 @@ public:
      * Returns the duration to wait before running for election when this node
      * sees that it is more caught up than the current primary.
      */
-    Milliseconds getCatchupTakeoverDelay() const;
+    Milliseconds getCatchUpTakeoverDelay() const {
+        return _catchUpTakeoverDelay;
+    }
 
 private:
     /**
@@ -391,6 +395,7 @@ private:
     Milliseconds _heartbeatInterval = kDefaultHeartbeatInterval;
     Seconds _heartbeatTimeoutPeriod = kDefaultHeartbeatTimeoutPeriod;
     Milliseconds _catchUpTimeoutPeriod = kDefaultCatchUpTimeoutPeriod;
+    Milliseconds _catchUpTakeoverDelay = kDefaultCatchUpTakeoverDelay;
     bool _chainingAllowed = kDefaultChainingAllowed;
     bool _writeConcernMajorityJournalDefault = false;
     int _majorityVoteCount = 0;

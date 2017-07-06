@@ -922,6 +922,48 @@ private:
     }
 };
 
+TEST_F(TakeoverTest, DoesntScheduleCatchupTakeoverIfCatchupDisabledButTakeoverDelaySet) {
+    BSONObj configObj = BSON("_id"
+                             << "mySet"
+                             << "version"
+                             << 1
+                             << "members"
+                             << BSON_ARRAY(BSON("_id" << 1 << "host"
+                                                      << "node1:12345")
+                                           << BSON("_id" << 2 << "host"
+                                                         << "node2:12345")
+                                           << BSON("_id" << 3 << "host"
+                                                         << "node3:12345"))
+                             << "protocolVersion"
+                             << 1
+                             << "settings"
+                             << BSON("catchUpTimeoutMillis" << 0 << "catchUpTakeoverDelay"
+                                                            << 10000));
+    assertStartSuccess(configObj, HostAndPort("node1", 12345));
+    ReplSetConfig config = assertMakeRSConfig(configObj);
+
+    auto replCoord = getReplCoord();
+    auto now = getNet()->now();
+
+    OperationContextNoop opCtx;
+    OpTime currentOptime(Timestamp(200, 1), 0);
+    replCoord->setMyLastAppliedOpTime(currentOptime);
+    replCoord->setMyLastDurableOpTime(currentOptime);
+    OpTime behindOptime(Timestamp(100, 1), 0);
+    ASSERT_EQUALS(ErrorCodes::StaleTerm, replCoord->updateTerm(&opCtx, 1));
+
+    // Make sure we're secondary and that no catchup takeover has been scheduled yet.
+    ASSERT_OK(replCoord->setFollowerMode(MemberState::RS_SECONDARY));
+    ASSERT_FALSE(replCoord->getCatchupTakeover_forTest());
+
+    // Mock a first round of heartbeat responses, which should give us enough
+    // information to know that we are fresher than the current primary.
+    now = respondToHeartbeatsUntil(config, now, HostAndPort("node2", 12345), behindOptime);
+
+    // Make sure that the catchup takeover was not scheduled.
+    ASSERT_FALSE(replCoord->getCatchupTakeover_forTest());
+}
+
 TEST_F(TakeoverTest, SchedulesCatchupTakeoverIfNodeIsFresherThanCurrentPrimary) {
     BSONObj configObj = BSON("_id"
                              << "mySet"
@@ -962,7 +1004,7 @@ TEST_F(TakeoverTest, SchedulesCatchupTakeoverIfNodeIsFresherThanCurrentPrimary) 
     ASSERT(replCoord->getCatchupTakeover_forTest());
     auto catchupTakeoverTime = replCoord->getCatchupTakeover_forTest().get();
     Milliseconds catchupTakeoverDelay = catchupTakeoverTime - now;
-    ASSERT_EQUALS(config.getCatchupTakeoverDelay(), catchupTakeoverDelay);
+    ASSERT_EQUALS(config.getCatchUpTakeoverDelay(), catchupTakeoverDelay);
 }
 
 TEST_F(TakeoverTest, SchedulesCatchupTakeoverIfBothTakeoversAnOption) {
@@ -1008,7 +1050,7 @@ TEST_F(TakeoverTest, SchedulesCatchupTakeoverIfBothTakeoversAnOption) {
     ASSERT_FALSE(replCoord->getPriorityTakeover_forTest());
     auto catchupTakeoverTime = replCoord->getCatchupTakeover_forTest().get();
     Milliseconds catchupTakeoverDelay = catchupTakeoverTime - now;
-    ASSERT_EQUALS(config.getCatchupTakeoverDelay(), catchupTakeoverDelay);
+    ASSERT_EQUALS(config.getCatchUpTakeoverDelay(), catchupTakeoverDelay);
 }
 
 TEST_F(TakeoverTest, CatchupTakeoverNotScheduledTwice) {
@@ -1053,7 +1095,7 @@ TEST_F(TakeoverTest, CatchupTakeoverNotScheduledTwice) {
         replCoord->getCatchupTakeoverCbh_forTest();
     auto catchupTakeoverTime = replCoord->getCatchupTakeover_forTest().get();
     Milliseconds catchupTakeoverDelay = catchupTakeoverTime - now;
-    ASSERT_EQUALS(config.getCatchupTakeoverDelay(), catchupTakeoverDelay);
+    ASSERT_EQUALS(config.getCatchUpTakeoverDelay(), catchupTakeoverDelay);
 
     // Mock another round of heartbeat responses
     now = respondToHeartbeatsUntil(
@@ -1106,7 +1148,7 @@ TEST_F(TakeoverTest, CatchupAndPriorityTakeoverNotScheduledAtSameTime) {
     ASSERT(replCoord->getCatchupTakeover_forTest());
     auto catchupTakeoverTime = replCoord->getCatchupTakeover_forTest().get();
     Milliseconds catchupTakeoverDelay = catchupTakeoverTime - now;
-    ASSERT_EQUALS(config.getCatchupTakeoverDelay(), catchupTakeoverDelay);
+    ASSERT_EQUALS(config.getCatchUpTakeoverDelay(), catchupTakeoverDelay);
 
     // Mock another heartbeat where the primary is now up to date
     now = respondToHeartbeatsUntil(
@@ -1164,7 +1206,7 @@ TEST_F(TakeoverTest, CatchupTakeoverCallbackCanceledIfElectionTimeoutRuns) {
     ASSERT(replCoord->getCatchupTakeover_forTest());
     auto catchupTakeoverTime = replCoord->getCatchupTakeover_forTest().get();
     Milliseconds catchupTakeoverDelay = catchupTakeoverTime - now;
-    ASSERT_EQUALS(config.getCatchupTakeoverDelay(), catchupTakeoverDelay);
+    ASSERT_EQUALS(config.getCatchUpTakeoverDelay(), catchupTakeoverDelay);
 
     // Fast forward clock to after electionTimeout and black hole all
     // heartbeat requests to make sure the election timeout runs.
@@ -1234,7 +1276,7 @@ TEST_F(TakeoverTest, CatchupTakeoverCanceledIfTransitionToRollback) {
     ASSERT(replCoord->getCatchupTakeover_forTest());
     auto catchupTakeoverTime = replCoord->getCatchupTakeover_forTest().get();
     Milliseconds catchupTakeoverDelay = catchupTakeoverTime - now;
-    ASSERT_EQUALS(config.getCatchupTakeoverDelay(), catchupTakeoverDelay);
+    ASSERT_EQUALS(config.getCatchUpTakeoverDelay(), catchupTakeoverDelay);
 
     // Transitioning to rollback state should cancel the takeover
     ASSERT_OK(replCoord->setFollowerMode(MemberState::RS_ROLLBACK));
@@ -1288,7 +1330,7 @@ TEST_F(TakeoverTest, CatchupTakeoverElectionIsANoop) {
     ASSERT(replCoord->getCatchupTakeover_forTest());
     auto catchupTakeoverTime = replCoord->getCatchupTakeover_forTest().get();
     Milliseconds catchupTakeoverDelay = catchupTakeoverTime - now;
-    ASSERT_EQUALS(config.getCatchupTakeoverDelay(), catchupTakeoverDelay);
+    ASSERT_EQUALS(config.getCatchUpTakeoverDelay(), catchupTakeoverDelay);
 
     startCapturingLogMessages();
     now = respondToHeartbeatsUntil(config, catchupTakeoverTime, primaryHostAndPort, behindOptime);

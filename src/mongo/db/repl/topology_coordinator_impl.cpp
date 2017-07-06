@@ -1309,8 +1309,12 @@ HeartbeatResponseAction TopologyCoordinatorImpl::_updatePrimaryFromHBDataV1(
     // the remote primary will become aware of that election eventually and step down.
     if (_memberData.at(primaryIndex).getTerm() == _term && updatedConfigIndex == primaryIndex) {
 
-        if (_memberData.at(primaryIndex).getLastAppliedOpTime() <
-            _memberData.at(_selfIndex).getLastAppliedOpTime()) {
+        // Don't schedule catchup takeover if catchup takeover or primary catchup is disabled.
+        bool catchupTakeoverDisabled =
+            ReplSetConfig::kCatchUpDisabled == _rsConfig.getCatchUpTimeoutPeriod() ||
+            ReplSetConfig::kCatchUpTakeoverDisabled == _rsConfig.getCatchUpTakeoverDelay();
+        if (!catchupTakeoverDisabled && (_memberData.at(primaryIndex).getLastAppliedOpTime() <
+                                         _memberData.at(_selfIndex).getLastAppliedOpTime())) {
             LOG(2) << "I can take over the primary due to fresher data."
                    << " Current primary index: " << primaryIndex << " in term "
                    << _memberData.at(primaryIndex).getTerm() << "."

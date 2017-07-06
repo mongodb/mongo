@@ -2524,7 +2524,7 @@ void ReplicationCoordinatorImpl::CatchupState::start_inlock() {
     auto catchupTimeout = _repl->_rsConfig.getCatchUpTimeoutPeriod();
 
     // When catchUpTimeoutMillis is 0, we skip doing catchup entirely.
-    if (catchupTimeout == Milliseconds::zero()) {
+    if (catchupTimeout == ReplSetConfig::kCatchUpDisabled) {
         log() << "Skipping primary catchup since the catchup timeout is 0.";
         abort_inlock();
         return;
