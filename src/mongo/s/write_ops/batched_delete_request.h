@@ -57,7 +57,6 @@ public:
     // Field names and types in the batched delete command type.
     static const BSONField<std::string> collName;
     static const BSONField<std::vector<BatchedDeleteDocument*>> deletes;
-    static const BSONField<BSONObj> writeConcern;
     static const BSONField<bool> ordered;
 
     //
@@ -80,22 +79,14 @@ public:
     void setNS(NamespaceString ns);
     const NamespaceString& getNS() const;
 
-    void setDeletes(const std::vector<BatchedDeleteDocument*>& deletes);
-
     /**
      * deletes ownership is transferred to here.
      */
     void addToDeletes(BatchedDeleteDocument* deletes);
     void unsetDeletes();
-    bool isDeletesSet() const;
     std::size_t sizeDeletes() const;
     const std::vector<BatchedDeleteDocument*>& getDeletes() const;
     const BatchedDeleteDocument* getDeletesAt(std::size_t pos) const;
-
-    void setWriteConcern(const BSONObj& writeConcern);
-    void unsetWriteConcern();
-    bool isWriteConcernSet() const;
-    const BSONObj& getWriteConcern() const;
 
     void setOrdered(bool ordered);
     void unsetOrdered();
@@ -121,10 +112,6 @@ private:
     // (M)  array of individual deletes
     std::vector<BatchedDeleteDocument*> _deletes;
     bool _isDeletesSet;
-
-    // (O)  to be issued after the batch applied
-    BSONObj _writeConcern;
-    bool _isWriteConcernSet;
 
     // (O)  whether batch is issued in parallel or not
     bool _ordered;

@@ -42,7 +42,6 @@ using mongoutils::str::stream;
 const std::string BatchedInsertRequest::BATCHED_INSERT_REQUEST = "insert";
 const BSONField<std::string> BatchedInsertRequest::collName("insert");
 const BSONField<std::vector<BSONObj>> BatchedInsertRequest::documents("documents");
-const BSONField<BSONObj> BatchedInsertRequest::writeConcern("writeConcern");
 const BSONField<bool> BatchedInsertRequest::ordered("ordered", true);
 
 BatchedInsertRequest::BatchedInsertRequest() {
@@ -84,9 +83,6 @@ BSONObj BatchedInsertRequest::toBSON() const {
         documentsBuilder.done();
     }
 
-    if (_isWriteConcernSet)
-        builder.append(writeConcern(), _writeConcern);
-
     if (_isOrderedSet)
         builder.append(ordered(), _ordered);
 
@@ -127,8 +123,6 @@ void BatchedInsertRequest::parseRequest(const OpMsgRequest& request) {
             extractField(documents, &_documents, &_isDocumentsSet);
             if (_documents.size() >= 1)
                 extractIndexNSS(_documents.at(0), &_targetNSS);
-        } else if (fieldName == writeConcern()) {
-            extractField(writeConcern, &_writeConcern, &_isWriteConcernSet);
         } else if (fieldName == ordered()) {
             extractField(ordered, &_ordered, &_isOrderedSet);
         } else if (fieldName == bypassDocumentValidationCommandOption()) {
@@ -161,9 +155,6 @@ void BatchedInsertRequest::clear() {
     _documents.clear();
     _isDocumentsSet = false;
 
-    _writeConcern = BSONObj();
-    _isWriteConcernSet = false;
-
     _ordered = false;
     _isOrderedSet = false;
 
@@ -182,9 +173,6 @@ void BatchedInsertRequest::cloneTo(BatchedInsertRequest* other) const {
         other->addToDocuments(*it);
     }
     other->_isDocumentsSet = _isDocumentsSet;
-
-    other->_writeConcern = _writeConcern;
-    other->_isWriteConcernSet = _isWriteConcernSet;
 
     other->_ordered = _ordered;
     other->_isOrderedSet = _isOrderedSet;
@@ -218,10 +206,6 @@ void BatchedInsertRequest::addToDocuments(const BSONObj& documents) {
         extractIndexNSS(_documents.at(0), &_targetNSS);
 }
 
-bool BatchedInsertRequest::isDocumentsSet() const {
-    return _isDocumentsSet;
-}
-
 size_t BatchedInsertRequest::sizeDocuments() const {
     return _documents.size();
 }
@@ -241,24 +225,6 @@ void BatchedInsertRequest::setDocumentAt(size_t pos, const BSONObj& doc) {
     dassert(_isDocumentsSet);
     dassert(_documents.size() > pos);
     _documents[pos] = doc;
-}
-
-void BatchedInsertRequest::setWriteConcern(const BSONObj& writeConcern) {
-    _writeConcern = writeConcern.getOwned();
-    _isWriteConcernSet = true;
-}
-
-void BatchedInsertRequest::unsetWriteConcern() {
-    _isWriteConcernSet = false;
-}
-
-bool BatchedInsertRequest::isWriteConcernSet() const {
-    return _isWriteConcernSet;
-}
-
-const BSONObj& BatchedInsertRequest::getWriteConcern() const {
-    dassert(_isWriteConcernSet);
-    return _writeConcern;
 }
 
 void BatchedInsertRequest::setOrdered(bool ordered) {

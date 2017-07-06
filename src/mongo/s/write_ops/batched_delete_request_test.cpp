@@ -49,7 +49,6 @@ TEST(BatchedDeleteRequest, Basic) {
 
     BSONObj origDeleteRequestObj = BSON(
         BatchedDeleteRequest::collName("test") << BatchedDeleteRequest::deletes() << deleteArray
-                                               << BatchedDeleteRequest::writeConcern(BSON("w" << 1))
                                                << BatchedDeleteRequest::ordered(true));
 
     string errMsg;

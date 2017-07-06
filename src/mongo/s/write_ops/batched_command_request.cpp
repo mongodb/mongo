@@ -38,6 +38,8 @@ namespace mongo {
 
 const size_t BatchedCommandRequest::kMaxWriteBatchSize = 1000;
 
+const BSONField<BSONObj> writeConcern("writeConcern");
+
 BatchedCommandRequest::BatchedCommandRequest(BatchType batchType) : _batchType(batchType) {
     switch (getBatchType()) {
         case BatchedCommandRequest::BatchType_Insert:
@@ -156,6 +158,10 @@ BSONObj BatchedCommandRequest::toBSON() const {
         _shardVersion.get().appendForCommands(&builder);
     }
 
+    if (_writeConcern) {
+        builder.append(writeConcern(), *_writeConcern);
+    }
+
     // Append the transaction info
     _txnInfo.serialize(&builder);
 
@@ -181,7 +187,12 @@ void BatchedCommandRequest::parseRequest(const OpMsgRequest& request) {
     // Now parse out the chunk version and optime.
     auto chunkVersion = ChunkVersion::parseFromBSONForCommands(request.body);
     if (chunkVersion != ErrorCodes::NoSuchKey) {
-        _shardVersion = uassertStatusOK(chunkVersion);
+        setShardVersion(uassertStatusOK(std::move(chunkVersion)));
+    }
+
+    auto writeConcernField = request.body[writeConcern.name()];
+    if (!writeConcernField.eoo()) {
+        setWriteConcern(writeConcernField.Obj());
     }
 
     // Parse the command's transaction info and do extra validation not done by the parser
@@ -220,19 +231,16 @@ std::size_t BatchedCommandRequest::sizeWriteOps() const {
 }
 
 void BatchedCommandRequest::setWriteConcern(const BSONObj& writeConcern) {
-    INVOKE(setWriteConcern, writeConcern);
-}
-
-void BatchedCommandRequest::unsetWriteConcern() {
-    INVOKE(unsetWriteConcern);
+    _writeConcern = writeConcern.getOwned();
 }
 
 bool BatchedCommandRequest::isWriteConcernSet() const {
-    INVOKE(isWriteConcernSet);
+    return _writeConcern.is_initialized();
 }
 
 const BSONObj& BatchedCommandRequest::getWriteConcern() const {
-    INVOKE(getWriteConcern);
+    invariant(_writeConcern);
+    return *_writeConcern;
 }
 
 void BatchedCommandRequest::setOrdered(bool continueOnError) {
@@ -301,7 +309,12 @@ BatchedCommandRequest* BatchedCommandRequest::cloneWithIds(
     }
 
     // Command request owns idRequest
-    return new BatchedCommandRequest(idRequest.release());
+    auto clonedCmdRequest = new BatchedCommandRequest(idRequest.release());
+    if (origCmdRequest.isWriteConcernSet()) {
+        clonedCmdRequest->setWriteConcern(origCmdRequest.getWriteConcern());
+    }
+
+    return clonedCmdRequest;
 }
 
 bool BatchedCommandRequest::containsNoIDUpsert(const BatchedCommandRequest& request) {

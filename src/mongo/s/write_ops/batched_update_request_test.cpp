@@ -55,7 +55,6 @@ TEST(BatchedUpdateRequest, Basic) {
 
     BSONObj origUpdateRequestObj = BSON(
         BatchedUpdateRequest::collName("test") << BatchedUpdateRequest::updates() << updateArray
-                                               << BatchedUpdateRequest::writeConcern(BSON("w" << 1))
                                                << BatchedUpdateRequest::ordered(true));
 
     for (auto docSeq : {false, true}) {

@@ -87,12 +87,12 @@ TEST(BatchedCommandRequest, InsertWithShardVersion) {
 TEST(BatchedCommandRequest, InsertCloneWithId) {
     auto insertRequest = stdx::make_unique<BatchedInsertRequest>();
     insertRequest->setOrdered(true);
-    insertRequest->setWriteConcern(BSON("w" << 2));
     insertRequest->addToDocuments(BSON("x" << 4));
     insertRequest->setShouldBypassValidation(true);
 
     BatchedCommandRequest batchedRequest(insertRequest.release());
     batchedRequest.setNS(NamespaceString("xyz.abc"));
+    batchedRequest.setWriteConcern(BSON("w" << 2));
 
     std::unique_ptr<BatchedCommandRequest> clonedRequest(
         BatchedCommandRequest::cloneWithIds(batchedRequest));

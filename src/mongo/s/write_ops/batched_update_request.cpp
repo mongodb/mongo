@@ -43,7 +43,6 @@ using mongoutils::str::stream;
 const std::string BatchedUpdateRequest::BATCHED_UPDATE_REQUEST = "update";
 const BSONField<std::string> BatchedUpdateRequest::collName("update");
 const BSONField<std::vector<BatchedUpdateDocument*>> BatchedUpdateRequest::updates("updates");
-const BSONField<BSONObj> BatchedUpdateRequest::writeConcern("writeConcern");
 const BSONField<bool> BatchedUpdateRequest::ordered("ordered", true);
 
 BatchedUpdateRequest::BatchedUpdateRequest() {
@@ -91,9 +90,6 @@ BSONObj BatchedUpdateRequest::toBSON() const {
         updatesBuilder.done();
     }
 
-    if (_isWriteConcernSet)
-        builder.append(writeConcern(), _writeConcern);
-
     if (_isOrderedSet)
         builder.append(ordered(), _ordered);
 
@@ -127,8 +123,6 @@ void BatchedUpdateRequest::parseRequest(const OpMsgRequest& request) {
                     _ns.isValid());
         } else if (fieldName == updates.name()) {
             extractField(updates, &_updates, &_isUpdatesSet);
-        } else if (fieldName == writeConcern.name()) {
-            extractField(writeConcern, &_writeConcern, &_isWriteConcernSet);
         } else if (fieldName == ordered.name()) {
             extractField(ordered, &_ordered, &_isOrderedSet);
         } else if (fieldName == bypassDocumentValidationCommandOption()) {
@@ -166,9 +160,6 @@ void BatchedUpdateRequest::clear() {
 
     unsetUpdates();
 
-    _writeConcern = BSONObj();
-    _isWriteConcernSet = false;
-
     _ordered = false;
     _isOrderedSet = false;
 
@@ -189,18 +180,6 @@ const NamespaceString& BatchedUpdateRequest::getNS() const {
     return _ns;
 }
 
-void BatchedUpdateRequest::setUpdates(const std::vector<BatchedUpdateDocument*>& updates) {
-    unsetUpdates();
-    for (std::vector<BatchedUpdateDocument*>::const_iterator it = updates.begin();
-         it != updates.end();
-         ++it) {
-        unique_ptr<BatchedUpdateDocument> tempBatchUpdateDocument(new BatchedUpdateDocument);
-        (*it)->cloneTo(tempBatchUpdateDocument.get());
-        addToUpdates(tempBatchUpdateDocument.release());
-    }
-    _isUpdatesSet = updates.size() > 0;
-}
-
 void BatchedUpdateRequest::addToUpdates(BatchedUpdateDocument* updates) {
     _updates.push_back(updates);
     _isUpdatesSet = true;
@@ -213,10 +192,6 @@ void BatchedUpdateRequest::unsetUpdates() {
     }
     _updates.clear();
     _isUpdatesSet = false;
-}
-
-bool BatchedUpdateRequest::isUpdatesSet() const {
-    return _isUpdatesSet;
 }
 
 size_t BatchedUpdateRequest::sizeUpdates() const {
@@ -232,24 +207,6 @@ const BatchedUpdateDocument* BatchedUpdateRequest::getUpdatesAt(size_t pos) cons
     dassert(_isUpdatesSet);
     dassert(_updates.size() > pos);
     return _updates.at(pos);
-}
-
-void BatchedUpdateRequest::setWriteConcern(const BSONObj& writeConcern) {
-    _writeConcern = writeConcern.getOwned();
-    _isWriteConcernSet = true;
-}
-
-void BatchedUpdateRequest::unsetWriteConcern() {
-    _isWriteConcernSet = false;
-}
-
-bool BatchedUpdateRequest::isWriteConcernSet() const {
-    return _isWriteConcernSet;
-}
-
-const BSONObj& BatchedUpdateRequest::getWriteConcern() const {
-    dassert(_isWriteConcernSet);
-    return _writeConcern;
 }
 
 void BatchedUpdateRequest::setOrdered(bool ordered) {

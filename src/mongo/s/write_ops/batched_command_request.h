@@ -116,7 +116,6 @@ public:
     std::size_t sizeWriteOps() const;
 
     void setWriteConcern(const BSONObj& writeConcern);
-    void unsetWriteConcern();
     bool isWriteConcernSet() const;
     const BSONObj& getWriteConcern() const;
 
@@ -193,14 +192,16 @@ public:
 private:
     BatchType _batchType;
 
-    boost::optional<ChunkVersion> _shardVersion;
-
     std::unique_ptr<BatchedInsertRequest> _insertReq;
     std::unique_ptr<BatchedUpdateRequest> _updateReq;
     std::unique_ptr<BatchedDeleteRequest> _deleteReq;
 
     // If this write is retriable, contains information about the retriability of the write
     WriteOpTxnInfo _txnInfo;
+
+    boost::optional<ChunkVersion> _shardVersion;
+
+    boost::optional<BSONObj> _writeConcern;
 };
 
 /**

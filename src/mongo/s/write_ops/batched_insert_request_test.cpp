@@ -48,7 +48,6 @@ TEST(BatchedInsertRequest, Basic) {
 
     BSONObj origInsertRequestObj = BSON(
         BatchedInsertRequest::collName("test") << BatchedInsertRequest::documents() << insertArray
-                                               << BatchedInsertRequest::writeConcern(BSON("w" << 1))
                                                << BatchedInsertRequest::ordered(true));
 
     for (auto docSeq : {false, true}) {

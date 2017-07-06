@@ -42,7 +42,6 @@ using mongoutils::str::stream;
 const std::string BatchedDeleteRequest::BATCHED_DELETE_REQUEST = "delete";
 const BSONField<std::string> BatchedDeleteRequest::collName("delete");
 const BSONField<std::vector<BatchedDeleteDocument*>> BatchedDeleteRequest::deletes("deletes");
-const BSONField<BSONObj> BatchedDeleteRequest::writeConcern("writeConcern");
 const BSONField<bool> BatchedDeleteRequest::ordered("ordered", true);
 
 BatchedDeleteRequest::BatchedDeleteRequest() {
@@ -90,9 +89,6 @@ BSONObj BatchedDeleteRequest::toBSON() const {
         deletesBuilder.done();
     }
 
-    if (_isWriteConcernSet)
-        builder.append(writeConcern(), _writeConcern);
-
     if (_isOrderedSet)
         builder.append(ordered(), _ordered);
 
@@ -123,8 +119,6 @@ void BatchedDeleteRequest::parseRequest(const OpMsgRequest& request) {
                     _ns.isValid());
         } else if (fieldName == deletes.name()) {
             extractField(deletes, &_deletes, &_isDeletesSet);
-        } else if (fieldName == writeConcern.name()) {
-            extractField(writeConcern, &_writeConcern, &_isWriteConcernSet);
         } else if (fieldName == ordered.name()) {
             extractField(ordered, &_ordered, &_isOrderedSet);
         } else if (!Command::isGenericArgument(fieldName)) {
@@ -160,9 +154,6 @@ void BatchedDeleteRequest::clear() {
 
     unsetDeletes();
 
-    _writeConcern = BSONObj();
-    _isWriteConcernSet = false;
-
     _ordered = false;
     _isOrderedSet = false;
 }
@@ -181,17 +172,6 @@ const NamespaceString& BatchedDeleteRequest::getNS() const {
     return _ns;
 }
 
-void BatchedDeleteRequest::setDeletes(const std::vector<BatchedDeleteDocument*>& deletes) {
-    for (std::vector<BatchedDeleteDocument*>::const_iterator it = deletes.begin();
-         it != deletes.end();
-         ++it) {
-        unique_ptr<BatchedDeleteDocument> tempBatchDeleteDocument(new BatchedDeleteDocument);
-        (*it)->cloneTo(tempBatchDeleteDocument.get());
-        addToDeletes(tempBatchDeleteDocument.release());
-    }
-    _isDeletesSet = deletes.size() > 0;
-}
-
 void BatchedDeleteRequest::addToDeletes(BatchedDeleteDocument* deletes) {
     _deletes.push_back(deletes);
     _isDeletesSet = true;
@@ -204,10 +184,6 @@ void BatchedDeleteRequest::unsetDeletes() {
     }
     _deletes.clear();
     _isDeletesSet = false;
-}
-
-bool BatchedDeleteRequest::isDeletesSet() const {
-    return _isDeletesSet;
 }
 
 size_t BatchedDeleteRequest::sizeDeletes() const {
@@ -223,24 +199,6 @@ const BatchedDeleteDocument* BatchedDeleteRequest::getDeletesAt(size_t pos) cons
     dassert(_isDeletesSet);
     dassert(_deletes.size() > pos);
     return _deletes.at(pos);
-}
-
-void BatchedDeleteRequest::setWriteConcern(const BSONObj& writeConcern) {
-    _writeConcern = writeConcern.getOwned();
-    _isWriteConcernSet = true;
-}
-
-void BatchedDeleteRequest::unsetWriteConcern() {
-    _isWriteConcernSet = false;
-}
-
-bool BatchedDeleteRequest::isWriteConcernSet() const {
-    return _isWriteConcernSet;
-}
-
-const BSONObj& BatchedDeleteRequest::getWriteConcern() const {
-    dassert(_isWriteConcernSet);
-    return _writeConcern;
 }
 
 void BatchedDeleteRequest::setOrdered(bool ordered) {
