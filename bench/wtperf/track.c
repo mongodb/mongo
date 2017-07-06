@@ -42,8 +42,8 @@ sum_pop_ops(WTPERF *wtperf)
 	opts = wtperf->opts;
 	total = 0;
 
-	for (i = 0, thread = wtperf->popthreads;
-	    thread != NULL && i < opts->populate_threads; ++i, ++thread)
+	thread = wtperf->popthreads;
+	for (i = 0; i < opts->populate_threads; ++i, ++thread)
 		total += thread->insert.ops;
 	return (total);
 }
@@ -62,8 +62,8 @@ sum_ckpt_ops(WTPERF *wtperf)
 	opts = wtperf->opts;
 	total = 0;
 
-	for (i = 0, thread = wtperf->ckptthreads;
-	    thread != NULL && i < opts->checkpoint_threads; ++i, ++thread)
+	thread = wtperf->ckptthreads;
+	for (i = 0; i < opts->checkpoint_threads; ++i, ++thread)
 		total += thread->ckpt.ops;
 	return (total);
 }
@@ -89,7 +89,7 @@ sum_ops(WTPERF *wtperf, size_t field_offset)
 		thread = wtperf->popthreads;
 		th_cnt = opts->populate_threads;
 	}
-	for (i = 0; thread != NULL && i < th_cnt; ++i, ++thread)
+	for (i = 0; i < th_cnt; ++i, ++thread)
 		total += ((TRACK *)((uint8_t *)thread + field_offset))->ops;
 
 	return (total);
@@ -143,7 +143,7 @@ latency_op(WTPERF *wtperf,
 		thread = wtperf->popthreads;
 		th_cnt = opts->populate_threads;
 	}
-	for (i = 0; thread != NULL && i < th_cnt; ++i, ++thread) {
+	for (i = 0; i < th_cnt; ++i, ++thread) {
 		track = (TRACK *)((uint8_t *)thread + field_offset);
 		tmp = track->latency_ops;
 		ops += tmp - track->last_latency_ops;
@@ -246,8 +246,8 @@ sum_latency(WTPERF *wtperf, size_t field_offset, TRACK *total)
 
 	memset(total, 0, sizeof(*total));
 
-	for (i = 0, thread = wtperf->workers;
-	    thread != NULL && i < wtperf->workers_cnt; ++i, ++thread) {
+	thread = wtperf->workers;
+	for (i = 0; i < wtperf->workers_cnt; ++i, ++thread) {
 		trk = (TRACK *)((uint8_t *)thread + field_offset);
 
 		for (j = 0; j < ELEMENTS(trk->us); ++j) {

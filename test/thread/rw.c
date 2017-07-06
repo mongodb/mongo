@@ -347,6 +347,6 @@ print_stats(u_int nthreads)
 
 	s = run_info;
 	for (id = 0; id < nthreads; ++id, ++s)
-		printf("%3d: read %6d, remove %6d, update %6d\n",
+		printf("%3u: read %6d, remove %6d, update %6d\n",
 		    id, s->reads, s->remove, s->update);
 }

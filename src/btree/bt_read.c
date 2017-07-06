@@ -710,7 +710,7 @@ __btree_verbose_lookaside_read(WT_SESSION_IMPL *session)
 		if (__wt_atomic_casv64(&conn->las_verb_gen_read,
 			ckpt_gen_last, ckpt_gen_current)) {
 			__wt_verbose(session, WT_VERB_LOOKASIDE,
-			    "Read from lookaside file triggered.");
+			    "%s", "Read from lookaside file triggered.");
 		}
 	}
 #else

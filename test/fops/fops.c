@@ -161,7 +161,7 @@ print_stats(u_int nthreads)
 	s = run_stats;
 	for (id = 0; id < nthreads; ++id, ++s)
 		printf(
-		    "%2d:"
+		    "%2u:"
 		    "\t" "bulk %3d, checkpoint %3d, create %3d, cursor %3d,\n"
 		    "\t" "drop %3d, rebalance %3d, upgrade %3d, verify %3d\n",
 		    id, s->bulk + s->bulk_unique, s->ckpt,

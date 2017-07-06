@@ -305,12 +305,14 @@ __wt_evict_thread_run(WT_SESSION_IMPL *session, WT_THREAD *thread)
 			    F_ISSET(thread, WT_THREAD_RUN))
 				__wt_yield();
 		else {
-			__wt_verbose(session, WT_VERB_EVICTSERVER, "sleeping");
+			__wt_verbose(session,
+			    WT_VERB_EVICTSERVER, "%s", "sleeping");
 
 			/* Don't rely on signals: check periodically. */
 			__wt_cond_auto_wait(session,
 			    cache->evict_cond, did_work, NULL);
-			__wt_verbose(session, WT_VERB_EVICTSERVER, "waking");
+			__wt_verbose(session,
+			    WT_VERB_EVICTSERVER, "%s", "waking");
 		}
 	} else
 		WT_ERR(__evict_lru_pages(session, false));
@@ -351,8 +353,8 @@ __wt_evict_thread_stop(WT_SESSION_IMPL *session, WT_THREAD *thread)
 	 */
 	WT_ASSERT(session, F_ISSET(conn, WT_CONN_CLOSING | WT_CONN_RECOVERING));
 
-	__wt_verbose(
-	    session, WT_VERB_EVICTSERVER, "cache eviction thread exiting");
+	__wt_verbose(session,
+	    WT_VERB_EVICTSERVER, "%s", "cache eviction thread exiting");
 
 	if (0) {
 err:		WT_PANIC_MSG(session, ret, "cache eviction thread error");
@@ -515,7 +517,7 @@ __wt_evict_destroy(WT_SESSION_IMPL *session)
 	__wt_evict_server_wake(session);
 
 	__wt_verbose(
-	    session, WT_VERB_EVICTSERVER, "waiting for helper threads");
+	    session, WT_VERB_EVICTSERVER, "%s", "waiting for helper threads");
 
 	/*
 	 * We call the destroy function still holding the write lock.
@@ -740,7 +742,7 @@ __evict_pass(WT_SESSION_IMPL *session)
 
 			WT_STAT_CONN_INCR(session, cache_eviction_slow);
 			__wt_verbose(session, WT_VERB_EVICTSERVER,
-			    "unable to reach eviction goal");
+			    "%s", "unable to reach eviction goal");
 			break;
 		} else {
 			if (cache->evict_aggressive_score > 0) {
@@ -1106,8 +1108,8 @@ __evict_tune_workers(WT_SESSION_IMPL *session)
 			    &conn->evict_threads, false);
 			WT_STAT_CONN_INCR(session,
 			    cache_eviction_worker_created);
-			__wt_verbose(session, WT_VERB_EVICTSERVER,
-			    "added worker thread");
+			__wt_verbose(session,
+			    WT_VERB_EVICTSERVER, "%s", "added worker thread");
 		}
 		conn->evict_tune_last_action_time = current_time;
 	}

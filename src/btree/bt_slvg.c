@@ -1885,6 +1885,8 @@ __slvg_row_build_leaf(
 	uint32_t i, skip_start, skip_stop;
 	int cmp;
 
+	WT_UNUSED(ss);					/* !HAVE_VERBOSE */
+
 	btree = S2BT(session);
 	page = NULL;
 
