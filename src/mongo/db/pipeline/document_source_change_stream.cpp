@@ -31,6 +31,7 @@
 #include "mongo/db/pipeline/document_source_change_stream.h"
 
 #include "mongo/bson/simple_bsonelement_comparator.h"
+#include "mongo/db/bson/bson_helper.h"
 #include "mongo/db/catalog/uuid_catalog.h"
 #include "mongo/db/pipeline/close_change_stream_exception.h"
 #include "mongo/db/pipeline/document_source_check_resume_token.h"
@@ -201,28 +202,24 @@ BSONObj DocumentSourceChangeStream::buildMatchFilter(const NamespaceString& nss,
     auto dropDatabase = BSON("o.dropDatabase" << 1);
     auto dropCollection = BSON("o.drop" << nss.coll());
     auto renameCollection = BSON("o.renameCollection" << target);
-    // Commands that are on target db and one of the above.
+    // 1.1) Commands that are on target db and one of the above.
     auto commandsOnTargetDb =
-        BSON("ns" << nss.getCommandNS().ns() << "$or"
-                  << BSON_ARRAY(dropDatabase << dropCollection << renameCollection));
-
-    // 2) Supported commands that have arbitrary db namespaces in "ns" field.
+        BSON("ns" << nss.getCommandNS().ns() << OR(dropDatabase, dropCollection, renameCollection));
+    // 1.2) Supported commands that have arbitrary db namespaces in "ns" field.
     auto renameDropTarget = BSON("o.to" << target);
+    // All supported commands that are either (1.1) or (1.2).
+    BSONObj commandMatch = BSON("op"
+                                << "c"
+                                << OR(commandsOnTargetDb, renameDropTarget));
 
-    // 3) All supported commands that are either (1) or (2).
-    auto commandMatch = BSON("op"
-                             << "c"
-                             << "$or"
-                             << BSON_ARRAY(commandsOnTargetDb << renameDropTarget));
-
-    // 4) Normal CRUD ops on the target collection.
+    // 2) Normal CRUD ops on the target collection.
     auto opMatch = BSON("ns" << target);
 
-    // Match oplog entries after "start" and are either (3) supported commands or (4) CRUD ops,
+    // Match oplog entries after "start" and are either (1) supported commands or (2) CRUD ops,
     // excepting those tagged "fromMigrate".
     // Include the resume token, if resuming, so we can verify it was still present in the oplog.
     return BSON("$and" << BSON_ARRAY(BSON("ts" << (isResume ? GTE : GT) << startFrom)
-                                     << BSON("$or" << BSON_ARRAY(opMatch << commandMatch))
+                                     << BSON(OR(opMatch, commandMatch))
                                      << BSON("fromMigrate" << NE << true)));
 }
 

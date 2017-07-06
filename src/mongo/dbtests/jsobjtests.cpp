@@ -39,6 +39,7 @@
 #include "mongo/bson/bsonobj_comparator.h"
 #include "mongo/bson/simple_bsonelement_comparator.h"
 #include "mongo/bson/util/builder.h"
+#include "mongo/db/bson/bson_helper.h"
 #include "mongo/db/bson/dotted_path_support.h"
 #include "mongo/db/jsobj.h"
 #include "mongo/db/json.h"
@@ -1544,10 +1545,10 @@ class LabelishOr : public LabelBase {
                                                 << "p")));
     }
     BSONObj actual() {
-        return OR(BSON("a" << GT << 1 << LTE << "x"),
-                  BSON("b" << NE << 1 << NE << "f" << NE << 22.3),
-                  BSON("x"
-                       << "p"));
+        return BSON(OR(BSON("a" << GT << 1 << LTE << "x"),
+                       BSON("b" << NE << 1 << NE << "f" << NE << 22.3),
+                       BSON("x"
+                            << "p")));
     }
 };
 

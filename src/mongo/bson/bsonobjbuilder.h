@@ -1009,29 +1009,6 @@ inline BSONFieldValue<BSONObj> BSONField<T>::query(const char* q, const T& t) co
     return BSONFieldValue<BSONObj>(_name, b.obj());
 }
 
-// $or helper: OR(BSON("x" << GT << 7), BSON("y" << LT 6));
-inline BSONObj OR(const BSONObj& a, const BSONObj& b) {
-    return BSON("$or" << BSON_ARRAY(a << b));
-}
-inline BSONObj OR(const BSONObj& a, const BSONObj& b, const BSONObj& c) {
-    return BSON("$or" << BSON_ARRAY(a << b << c));
-}
-inline BSONObj OR(const BSONObj& a, const BSONObj& b, const BSONObj& c, const BSONObj& d) {
-    return BSON("$or" << BSON_ARRAY(a << b << c << d));
-}
-inline BSONObj OR(
-    const BSONObj& a, const BSONObj& b, const BSONObj& c, const BSONObj& d, const BSONObj& e) {
-    return BSON("$or" << BSON_ARRAY(a << b << c << d << e));
-}
-inline BSONObj OR(const BSONObj& a,
-                  const BSONObj& b,
-                  const BSONObj& c,
-                  const BSONObj& d,
-                  const BSONObj& e,
-                  const BSONObj& f) {
-    return BSON("$or" << BSON_ARRAY(a << b << c << d << e << f));
-}
-
 inline BSONObjBuilder& BSONObjBuilderValueStream::operator<<(const DateNowLabeler& id) {
     _builder->appendDate(_fieldName, jsTime());
     _fieldName = StringData();
