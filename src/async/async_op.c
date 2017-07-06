@@ -7,7 +7,6 @@
  */
 
 #include "wt_internal.h"
-
 /*
  * __async_get_key --
  *	WT_ASYNC_OP->get_key implementation for op handles.

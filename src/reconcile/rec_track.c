@@ -36,9 +36,6 @@ __ovfl_discard_verbose(
 	WT_CELL_UNPACK *unpack, _unpack;
 	WT_DECL_ITEM(tmp);
 
-	WT_UNUSED(page);				/* !HAVE_VERBOSE */
-	WT_UNUSED(tag);					/* !HAVE_VERBOSE */
-
 	WT_RET(__wt_scr_alloc(session, 512, &tmp));
 
 	unpack = &_unpack;
@@ -172,10 +169,6 @@ __ovfl_reuse_verbose(WT_SESSION_IMPL *session,
 {
 	WT_DECL_ITEM(tmp);
 
-	WT_UNUSED(page);				/* !HAVE_VERBOSE */
-	WT_UNUSED(reuse);				/* !HAVE_VERBOSE */
-	WT_UNUSED(tag);					/* !HAVE_VERBOSE */
-
 	WT_RET(__wt_scr_alloc(session, 64, &tmp));
 
 	__wt_verbose(session, WT_VERB_OVERFLOW,
@@ -189,8 +182,7 @@ __ovfl_reuse_verbose(WT_SESSION_IMPL *session,
 	    F_ISSET(reuse, WT_OVFL_REUSE_INUSE) &&
 	    F_ISSET(reuse, WT_OVFL_REUSE_JUST_ADDED) ? ", " : "",
 	    F_ISSET(reuse, WT_OVFL_REUSE_JUST_ADDED) ? "just-added" : "",
-	    (int)WT_MIN(reuse->value_size, 40),
-	    (char *)WT_OVFL_REUSE_VALUE(reuse));
+	    WT_MIN(reuse->value_size, 40), (char *)WT_OVFL_REUSE_VALUE(reuse));
 
 	__wt_scr_free(session, &tmp);
 	return (0);

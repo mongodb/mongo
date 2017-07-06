@@ -31,14 +31,14 @@
 int
 main(void)
 {
-	uint64_t ncalls, r, r2, s;
-	uint8_t buf[WT_INTPACK64_MAXSIZE], *p;
 	const uint8_t *cp;
+	uint8_t buf[10], *p;
+	uint64_t ncalls, r, r2, s;
 	int i;
 
-	memset(buf, 0xff, sizeof(buf));	/* -Werror=maybe-uninitialized */
+	ncalls = 0;
 
-	for (ncalls = 0, i = 0; i < 10000000; i++) {
+	for (i = 0; i < 10000000; i++) {
 		for (s = 0; s < 50; s += 5) {
 			++ncalls;
 			r = 1ULL << s;
@@ -60,11 +60,14 @@ main(void)
 			cp = buf;
 			memmove(&r2, cp, sizeof(r2));
 #endif
-			testutil_assert(r == r2);
+			if (r != r2) {
+				fprintf(stderr, "mismatch!\n");
+				break;
+			}
 		}
 	}
 
-	printf("Number of calls: %" PRIu64 "\n", ncalls);
+	printf("Number of calls: %llu\n", (unsigned long long)ncalls);
 
 	return (0);
 }

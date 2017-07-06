@@ -235,8 +235,8 @@ __txn_op_apply(
 	return (0);
 
 err:	__wt_err(session, ret,
-	    "operation apply failed during recovery: operation type %"
-	    PRIu32 " at LSN %" PRIu32 "/%" PRIu32,
+	    "operation apply failed during recovery: operation type %d "
+	    "at LSN %" PRIu32 "/%" PRIu32,
 	    optype, lsnp->l.file, lsnp->l.offset);
 	return (ret);
 }

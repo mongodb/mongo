@@ -937,7 +937,7 @@ __log_server(void *arg)
 					    session, &log->log_archive_lock);
 					WT_ERR(ret);
 				} else
-					__wt_verbose(session, WT_VERB_LOG, "%s",
+					__wt_verbose(session, WT_VERB_LOG,
 					    "log_archive: Blocked due to open "
 					    "log cursor holding archive lock");
 			}

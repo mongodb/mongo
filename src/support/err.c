@@ -361,22 +361,6 @@ __wt_ext_err_printf(
 }
 
 /*
- * __wt_verbose_worker --
- * 	Verbose message.
- */
-void
-__wt_verbose_worker(WT_SESSION_IMPL *session, const char *fmt, ...)
-    WT_GCC_FUNC_ATTRIBUTE((format (printf, 2, 3)))
-    WT_GCC_FUNC_ATTRIBUTE((cold))
-{
-	va_list ap;
-
-	va_start(ap, fmt);
-	WT_IGNORE_RET(__wt_eventv(session, true, 0, NULL, 0, fmt, ap));
-	va_end(ap);
-}
-
-/*
  * info_msg --
  * 	Informational message.
  */

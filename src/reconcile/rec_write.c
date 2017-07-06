@@ -5032,7 +5032,7 @@ __rec_row_int(WT_SESSION_IMPL *session, WT_RECONCILE *r, WT_PAGE *page)
 	cell = NULL;
 	key_onpage_ovfl = false;
 
-	WT_RET(__rec_split_init(session, r, page, 0, btree->maxintlpage));
+	WT_RET(__rec_split_init(session, r, page, 0ULL, btree->maxintlpage));
 
 	/*
 	 * Ideally, we'd never store the 0th key on row-store internal pages
@@ -5314,7 +5314,7 @@ __rec_row_leaf(WT_SESSION_IMPL *session,
 	key = &r->k;
 	val = &r->v;
 
-	WT_RET(__rec_split_init(session, r, page, 0, btree->maxleafpage));
+	WT_RET(__rec_split_init(session, r, page, 0ULL, btree->maxleafpage));
 
 	/*
 	 * Write any K/V pairs inserted into the page before the first from-disk
