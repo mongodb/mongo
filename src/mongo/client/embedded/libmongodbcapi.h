@@ -54,7 +54,7 @@ typedef enum {
 *
 * @return A pointer to a db handle or null on error
 */
-libmongodbcapi_db* libmongodbcapi_db_new(int argc, const char** argv, const char** envp);
+libmongodbcapi_db* libmongodbcapi_db_new(int argc, char** argv, char** envp);
 
 /**
 * Shuts down the database

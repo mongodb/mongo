@@ -525,6 +525,17 @@ bool hasGlobalServiceContext();
 ServiceContext* getGlobalServiceContext();
 
 /**
+ * Warning - This function is temporary. Do not introduce new uses of this API.
+ *
+ * Returns the singleton ServiceContext for this server process.
+ *
+ * Waits until there is a valid global ServiceContext.
+ *
+ * Caller does not own pointer.
+ */
+ServiceContext* waitAndGetGlobalServiceContext();
+
+/**
  * Sets the global ServiceContext.  If 'serviceContext' is NULL, un-sets and deletes
  * the current global ServiceContext.
  *
