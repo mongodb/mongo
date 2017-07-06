@@ -531,8 +531,14 @@ ops(void *arg)
 			 */
 			if (!SINGLETHREADED && !DATASOURCE("lsm") &&
 			    ckpt_available && mmrand(&tinfo->rnd, 1, 10) == 1) {
-				testutil_check(session->open_cursor(session,
-				    g.uri, NULL, ckpt_name, &cursor));
+				/*
+				 * open_cursor can return EBUSY if concurrent
+				 * with a metadata operation, retry.
+				 */
+				while ((ret = session->open_cursor(session,
+				    g.uri, NULL, ckpt_name, &cursor)) == EBUSY)
+					__wt_yield();
+				testutil_check(ret);
 
 				/* Pick the next session/cursor close/open. */
 				session_op += 250;
@@ -543,9 +549,13 @@ ops(void *arg)
 				/*
 				 * Configure "append", in the case of column
 				 * stores, we append when inserting new rows.
+				 * open_cursor can return EBUSY if concurrent
+				 * with a metadata operation, retry.
 				 */
-				testutil_check(session->open_cursor(
-				    session, g.uri, NULL, "append", &cursor));
+				while ((ret = session->open_cursor(session,
+				    g.uri, NULL, "append", &cursor)) == EBUSY)
+					__wt_yield();
+				testutil_check(ret);
 
 				/* Pick the next session/cursor close/open. */
 				session_op += mmrand(&tinfo->rnd, 100, 5000);
@@ -930,8 +940,14 @@ wts_read_scan(void)
 
 	/* Open a session and cursor pair. */
 	testutil_check(conn->open_session(conn, NULL, NULL, &session));
-	testutil_check(
-	    session->open_cursor(session, g.uri, NULL, NULL, &cursor));
+	/*
+	 * open_cursor can return EBUSY if concurrent with a metadata
+	 * operation, retry in that case.
+	 */
+	while ((ret = session->open_cursor(
+	    session, g.uri, NULL, NULL, &cursor)) == EBUSY)
+		__wt_yield();
+	testutil_check(ret);
 
 	/* Check a random subset of the records using the key. */
 	for (last_keyno = keyno = 0; keyno < g.key_cnt;) {

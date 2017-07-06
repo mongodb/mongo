@@ -38,8 +38,12 @@ import wttest
 
 class test_cursor07(wttest.WiredTigerTestCase, suite_subprocess):
     logmax = "100K"
-    tablename = 'test_cursor07'
-    uri = 'table:' + tablename
+    tablename1 = 'test_cursor07_log'
+    tablename2 = 'test_cursor07_nolog'
+    tablename3 = 'test_cursor07_nologtxn'
+    uri1 = 'table:' + tablename1
+    uri2 = 'table:' + tablename2
+    uri3 = 'table:' + tablename3
     #  A large number of keys will force a log file change which will
     # test that scenario for log cursors.
     nkeys = 7000
@@ -56,17 +60,34 @@ class test_cursor07(wttest.WiredTigerTestCase, suite_subprocess):
     def test_log_cursor(self):
         # print "Creating %s with config '%s'" % (self.uri, self.create_params)
         create_params = 'key_format=i,value_format=S'
-        self.session.create(self.uri, create_params)
-        c = self.session.open_cursor(self.uri, None)
+        create_nolog_params = 'key_format=i,value_format=S,log=(enabled=false)'
+        self.session.create(self.uri1, create_params)
+        c1 = self.session.open_cursor(self.uri1, None)
+        self.session.create(self.uri2, create_nolog_params)
+        c2 = self.session.open_cursor(self.uri2, None)
+        self.session.create(self.uri3, create_nolog_params)
+        c3 = self.session.open_cursor(self.uri3, None)
 
         # A binary value.
         value = u'\u0001\u0002abcd\u0003\u0004'
+        value_nolog = u'\u0001\u0002dcba\u0003\u0004'
+
+        # We want to test both adding data to a table that is not logged
+        # that is part of the same transaction as a table that is logged
+        # as well as in its own transaction.
+        self.session.begin_transaction()
+        for k in range(self.nkeys):
+            c1[k] = value
+            c3[k] = value_nolog
+        self.session.commit_transaction()
+        c1.close()
+        c3.close()
 
         self.session.begin_transaction()
         for k in range(self.nkeys):
-            c[k] = value
+            c2[k] = value_nolog
         self.session.commit_transaction()
-        c.close()
+        c2.close()
 
         if self.reopen:
             self.reopen_conn()
@@ -82,6 +103,7 @@ class test_cursor07(wttest.WiredTigerTestCase, suite_subprocess):
             try:
                 if value in str(values[5]):   # logrec_value
                     count += 1
+                self.assertFalse(value2 in str(values[5]))
             except:
                 pass
         c.close()

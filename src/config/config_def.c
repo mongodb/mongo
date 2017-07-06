@@ -188,11 +188,20 @@ static const WT_CONFIG_CHECK confchk_WT_CURSOR_reconfigure[] = {
 	{ NULL, NULL, NULL, NULL, NULL, 0 }
 };
 
+static const WT_CONFIG_CHECK
+    confchk_WT_SESSION_create_log_subconfigs[] = {
+	{ "enabled", "boolean", NULL, NULL, NULL, 0 },
+	{ NULL, NULL, NULL, NULL, NULL, 0 }
+};
+
 static const WT_CONFIG_CHECK confchk_WT_SESSION_alter[] = {
 	{ "access_pattern_hint", "string",
 	    NULL, "choices=[\"none\",\"random\",\"sequential\"]",
 	    NULL, 0 },
 	{ "cache_resident", "boolean", NULL, NULL, NULL, 0 },
+	{ "log", "category",
+	    NULL, NULL,
+	    confchk_WT_SESSION_create_log_subconfigs, 1 },
 	{ NULL, NULL, NULL, NULL, NULL, 0 }
 };
 
@@ -235,12 +244,6 @@ static const WT_CONFIG_CHECK
     confchk_WT_SESSION_create_encryption_subconfigs[] = {
 	{ "keyid", "string", NULL, NULL, NULL, 0 },
 	{ "name", "string", NULL, NULL, NULL, 0 },
-	{ NULL, NULL, NULL, NULL, NULL, 0 }
-};
-
-static const WT_CONFIG_CHECK
-    confchk_WT_SESSION_create_log_subconfigs[] = {
-	{ "enabled", "boolean", NULL, NULL, NULL, 0 },
 	{ NULL, NULL, NULL, NULL, NULL, 0 }
 };
 
@@ -1150,8 +1153,8 @@ static const WT_CONFIG_ENTRY config_entries[] = {
 	  confchk_WT_CURSOR_reconfigure, 2
 	},
 	{ "WT_SESSION.alter",
-	  "access_pattern_hint=none,cache_resident=false",
-	  confchk_WT_SESSION_alter, 2
+	  "access_pattern_hint=none,cache_resident=false,log=(enabled=true)",
+	  confchk_WT_SESSION_alter, 3
 	},
 	{ "WT_SESSION.begin_transaction",
 	  "isolation=,name=,priority=0,read_timestamp=,snapshot=,sync=",

@@ -58,8 +58,14 @@ wts_load(void)
 	if (g.c_reverse)
 		is_bulk = false;
 
-	testutil_check(session->open_cursor(session, g.uri, NULL,
-	    is_bulk ? "bulk,append" : NULL, &cursor));
+	/*
+	 * open_cursor can return EBUSY if concurrent with a metadata
+	 * operation, retry in that case.
+	 */
+	while ((ret = session->open_cursor(session, g.uri, NULL,
+	    is_bulk ? "bulk,append" : NULL, &cursor)) == EBUSY)
+		__wt_yield();
+	testutil_check(ret);
 
 	/* Set up the key/value buffers. */
 	key_gen_setup(&key);

@@ -1915,66 +1915,31 @@ __wt_log_scan(WT_SESSION_IMPL *session, WT_LSN *lsnp, uint32_t flags,
 	if (func == NULL)
 		return (0);
 
+	if (LF_ISSET(WT_LOGSCAN_RECOVER))
+		__wt_verbose(session, WT_VERB_LOG,
+		    "__wt_log_scan truncating to %" PRIu32 "/%" PRIu32,
+		    log->trunc_lsn.l.file, log->trunc_lsn.l.offset);
+
+	if (lsnp != NULL &&
+	    LF_ISSET(WT_LOGSCAN_FIRST|WT_LOGSCAN_FROM_CKP))
+		WT_RET_MSG(session, WT_ERROR,
+		    "choose either a start LSN or a start flag");
+	/*
+	 * Set up the allocation size, starting and ending LSNs.  The values
+	 * for those depend on whether logging is currently enabled or not.
+	 */
+	lastlog = 0;
 	if (log != NULL) {
 		allocsize = log->allocsize;
-
-		if (lsnp == NULL) {
-			if (LF_ISSET(WT_LOGSCAN_FIRST))
-				start_lsn = log->first_lsn;
-			else if (LF_ISSET(WT_LOGSCAN_FROM_CKP))
-				start_lsn = log->ckpt_lsn;
-			else
-				return (WT_ERROR);	/* Illegal usage */
-		} else {
-			if (LF_ISSET(WT_LOGSCAN_FIRST|WT_LOGSCAN_FROM_CKP))
-				WT_RET_MSG(session, WT_ERROR,
-			    "choose either a start LSN or a start flag");
-
-			/*
-			 * Offsets must be on allocation boundaries.
-			 * An invalid LSN from a user should just return
-			 * WT_NOTFOUND.  It is not an error.  But if it is
-			 * from recovery, we expect valid LSNs so give more
-			 * information about that.
-			 */
-			if (lsnp->l.offset % allocsize != 0) {
-				if (LF_ISSET(WT_LOGSCAN_RECOVER))
-					WT_RET_MSG(session, WT_NOTFOUND,
-					    "__wt_log_scan unaligned LSN %"
-					    PRIu32 "/%" PRIu32,
-					    lsnp->l.file, lsnp->l.offset);
-				else
-					return (WT_NOTFOUND);
-			}
-			/*
-			 * If the file is in the future it doesn't exist.
-			 * An invalid LSN from a user should just return
-			 * WT_NOTFOUND.  It is not an error.  But if it is
-			 * from recovery, we expect valid LSNs so give more
-			 * information about that.
-			 */
-			if (lsnp->l.file > log->fileid) {
-				if (LF_ISSET(WT_LOGSCAN_RECOVER))
-					WT_RET_MSG(session, WT_NOTFOUND,
-					    "__wt_log_scan LSN %" PRIu32 "/%"
-					    PRIu32
-					    " larger than biggest log file %"
-					    PRIu32, lsnp->l.file,
-					    lsnp->l.offset, log->fileid);
-				else
-					return (WT_NOTFOUND);
-			}
-
-			/*
-			 * Log cursors may not know the starting LSN.  If an
-			 * LSN is passed in that it is equal to the smallest
-			 * LSN, start from the beginning of the log.
-			 */
-			start_lsn = *lsnp;
-			if (WT_IS_INIT_LSN(&start_lsn))
-				start_lsn = log->first_lsn;
-		}
 		end_lsn = log->alloc_lsn;
+		start_lsn = log->first_lsn;
+		if (lsnp == NULL) {
+			if (LF_ISSET(WT_LOGSCAN_FROM_CKP))
+				start_lsn = log->ckpt_lsn;
+			else if (!LF_ISSET(WT_LOGSCAN_FIRST))
+				return (WT_ERROR);	/* Illegal usage */
+		}
+		lastlog = log->fileid;
 	} else {
 		/*
 		 * If logging is not configured, we can still print out the log
@@ -1987,7 +1952,6 @@ __wt_log_scan(WT_SESSION_IMPL *session, WT_LSN *lsnp, uint32_t flags,
 		 * a multiple of this.
 		 */
 		allocsize = WT_LOG_ALIGN;
-		lastlog = 0;
 		firstlog = UINT32_MAX;
 		WT_RET(__log_get_files(session,
 		    WT_LOG_FILENAME, &logfiles, &logcount));
@@ -2003,6 +1967,47 @@ __wt_log_scan(WT_SESSION_IMPL *session, WT_LSN *lsnp, uint32_t flags,
 		WT_SET_LSN(&end_lsn, lastlog, 0);
 		WT_ERR(
 		    __wt_fs_directory_list_free(session, &logfiles, logcount));
+	}
+	if (lsnp != NULL) {
+		/*
+		 * Offsets must be on allocation boundaries.
+		 * An invalid LSN from a user should just return
+		 * WT_NOTFOUND.  It is not an error.  But if it is
+		 * from recovery, we expect valid LSNs so give more
+		 * information about that.
+		 */
+		if (lsnp->l.offset % allocsize != 0) {
+			if (LF_ISSET(WT_LOGSCAN_RECOVER))
+				WT_ERR_MSG(session, WT_NOTFOUND,
+				    "__wt_log_scan unaligned LSN %"
+				    PRIu32 "/%" PRIu32,
+				    lsnp->l.file, lsnp->l.offset);
+			else
+				return (WT_NOTFOUND);
+		}
+		/*
+		 * If the file is in the future it doesn't exist.
+		 * An invalid LSN from a user should just return
+		 * WT_NOTFOUND.  It is not an error.  But if it is
+		 * from recovery, we expect valid LSNs so give more
+		 * information about that.
+		 */
+		if (lsnp->l.file > lastlog) {
+			if (LF_ISSET(WT_LOGSCAN_RECOVER))
+				WT_ERR_MSG(session, WT_NOTFOUND,
+				    "__wt_log_scan LSN %" PRIu32 "/%" PRIu32
+				    " larger than biggest log file %" PRIu32,
+				    lsnp->l.file, lsnp->l.offset, lastlog);
+			else
+				return (WT_NOTFOUND);
+		}
+		/*
+		 * Log cursors may not know the starting LSN.  If an
+		 * LSN is passed in that it is equal to the smallest
+		 * LSN, start from the beginning of the log.
+		 */
+		if (!WT_IS_INIT_LSN(lsnp))
+			start_lsn = *lsnp;
 	}
 	WT_ERR(__log_open_verify(session,
 	    start_lsn.l.file, &log_fh, &prev_lsn, NULL));

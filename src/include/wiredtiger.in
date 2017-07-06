@@ -921,6 +921,12 @@ struct __wt_session {
 	 * cache.  Not compatible with LSM tables; see @ref
 	 * tuning_cache_resident for more information., a boolean flag; default
 	 * \c false.}
+	 * @config{log = (, the transaction log configuration for this object.
+	 * Only valid if log is enabled in ::wiredtiger_open., a set of related
+	 * configuration options defined below.}
+	 * @config{&nbsp;&nbsp;&nbsp;&nbsp;enabled, if false\, this object has
+	 * checkpoint-level durability., a boolean flag; default \c true.}
+	 * @config{ ),,}
 	 * @configend
 	 * @errors
 	 */

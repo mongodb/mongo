@@ -303,7 +303,6 @@ __curlog_close(WT_CURSOR *cursor)
 	cl = (WT_CURSOR_LOG *)cursor;
 	conn = S2C(session);
 
-	WT_ASSERT(session, FLD_ISSET(conn->log_flags, WT_CONN_LOG_ENABLED));
 	if (F_ISSET(cl, WT_CURLOG_ARCHIVE_LOCK))
 		__wt_readunlock(session, &conn->log->log_archive_lock);
 
@@ -355,9 +354,6 @@ __wt_curlog_open(WT_SESSION_IMPL *session,
 
 	WT_STATIC_ASSERT(offsetof(WT_CURSOR_LOG, iface) == 0);
 	conn = S2C(session);
-	if (!FLD_ISSET(conn->log_flags, WT_CONN_LOG_ENABLED))
-		WT_RET_MSG(session, EINVAL,
-		    "Cannot open a log cursor without logging enabled");
 
 	log = conn->log;
 	cl = NULL;
@@ -378,15 +374,17 @@ __wt_curlog_open(WT_SESSION_IMPL *session,
 
 	WT_ERR(__wt_cursor_init(cursor, uri, NULL, cfg, cursorp));
 
-	/*
-	 * The user may be trying to read a log record they just wrote.
-	 * Log records may be buffered, so force out any now.
-	 */
-	WT_ERR(__wt_log_force_write(session, 1, NULL));
+	if (log != NULL) {
+		/*
+		 * The user may be trying to read a log record they just wrote.
+		 * Log records may be buffered, so force out any now.
+		 */
+		WT_ERR(__wt_log_force_write(session, 1, NULL));
 
-	/* Log cursors block archiving. */
-	__wt_readlock(session, &log->log_archive_lock);
-	F_SET(cl, WT_CURLOG_ARCHIVE_LOCK);
+		/* Log cursors block archiving. */
+		__wt_readlock(session, &log->log_archive_lock);
+		F_SET(cl, WT_CURLOG_ARCHIVE_LOCK);
+	}
 
 	if (0) {
 err:		WT_TRET(__curlog_close(cursor));

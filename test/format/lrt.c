@@ -59,8 +59,14 @@ lrt(void *arg)
 	/* Open a session and cursor. */
 	conn = g.wts_conn;
 	testutil_check(conn->open_session(conn, NULL, NULL, &session));
-	testutil_check(session->open_cursor(
-	    session, g.uri, NULL, NULL, &cursor));
+	/*
+	 * open_cursor can return EBUSY if concurrent with a metadata
+	 * operation, retry in that case.
+	 */
+	while ((ret = session->open_cursor(
+	    session, g.uri, NULL, NULL, &cursor)) == EBUSY)
+		__wt_yield();
+	testutil_check(ret);
 
 	for (pinned = 0;;) {
 		if (pinned) {

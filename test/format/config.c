@@ -414,6 +414,8 @@ config_in_memory_check(void)
 		return;
 
 	/* Turn off a lot of stuff. */
+	if (!config_is_perm("alter"))
+		config_single("alter=off", 0);
 	if (!config_is_perm("backups"))
 		config_single("backups=off", 0);
 	if (!config_is_perm("checkpoints"))
