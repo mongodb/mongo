@@ -929,8 +929,11 @@ inline Status checkX509_STORE_error() {
 Status importCertStoreToX509_STORE(const wchar_t* storeName,
                                    DWORD storeLocation,
                                    X509_STORE* verifyStore) {
-    HCERTSTORE systemStore = CertOpenStore(
-        CERT_STORE_PROV_SYSTEM_W, 0, NULL, storeLocation, const_cast<LPWSTR>(storeName));
+    HCERTSTORE systemStore = CertOpenStore(CERT_STORE_PROV_SYSTEM_W,
+                                           0,
+                                           NULL,
+                                           storeLocation | CERT_STORE_READONLY_FLAG,
+                                           const_cast<LPWSTR>(storeName));
     if (systemStore == NULL) {
         return {ErrorCodes::InvalidSSLConfiguration,
                 str::stream() << "error opening system CA store: " << errnoWithDescription()};
