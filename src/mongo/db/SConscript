@@ -1361,9 +1361,9 @@ env.CppUnitTest(
         'transaction_history_iterator_test.cpp',
     ],
     LIBDEPS=[
-        'service_context_d_test_fixture',
-        'session_transactions',
         '$BUILD_DIR/mongo/db/repl/replmocks',
+        'service_context_d_test_fixture',
+        'sessions',
     ],
 )
 
