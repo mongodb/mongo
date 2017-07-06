@@ -81,7 +81,7 @@ __txn_global_query_timestamp(
 	WT_CONNECTION_IMPL *conn;
 	WT_CONFIG_ITEM cval;
 	WT_TXN_GLOBAL *txn_global;
-	WT_TXN_STATE *s;
+	WT_TXN_STATE *txn_state;
 	uint32_t i, session_cnt;
 
 	conn = S2C(session);
@@ -94,12 +94,15 @@ __txn_global_query_timestamp(
 		__wt_readlock(session, &txn_global->rwlock);
 		__wt_timestamp_set(ts, txn_global->commit_timestamp);
 		WT_ORDERED_READ(session_cnt, conn->session_cnt);
-		for (i = 0, s = txn_global->states; i < session_cnt; i++, s++) {
-			if (s->id == WT_TXN_NONE ||
-			    __wt_timestamp_iszero(s->commit_timestamp))
+		for (i = 0, txn_state = txn_global->states; i < session_cnt;
+		    i++, txn_state++) {
+			if (txn_state->id == WT_TXN_NONE ||
+			    __wt_timestamp_iszero(txn_state->commit_timestamp))
 				continue;
-			if (__wt_timestamp_cmp(s->commit_timestamp, ts) < 0)
-				__wt_timestamp_set(ts, s->commit_timestamp);
+			if (__wt_timestamp_cmp(
+			    txn_state->commit_timestamp, ts) < 0)
+				__wt_timestamp_set(
+				    ts, txn_state->commit_timestamp);
 		}
 		__wt_readunlock(session, &txn_global->rwlock);
 	} else if (WT_STRING_MATCH("oldest_reader", cval.str, cval.len)) {
@@ -108,18 +111,21 @@ __txn_global_query_timestamp(
 		__wt_readlock(session, &txn_global->rwlock);
 		__wt_timestamp_set(ts, txn_global->oldest_timestamp);
 		/* Look at running checkpoints. */
-		s = &txn_global->checkpoint_state;
-		if (s->pinned_id != WT_TXN_NONE &&
-		    !__wt_timestamp_iszero(s->read_timestamp) &&
-		    __wt_timestamp_cmp(s->read_timestamp, ts) < 0)
-			__wt_timestamp_set(ts, s->read_timestamp);
+		txn_state = &txn_global->checkpoint_state;
+		if (txn_state->pinned_id != WT_TXN_NONE &&
+		    !__wt_timestamp_iszero(txn_state->read_timestamp) &&
+		    __wt_timestamp_cmp(txn_state->read_timestamp, ts) < 0)
+			__wt_timestamp_set(ts, txn_state->read_timestamp);
 		WT_ORDERED_READ(session_cnt, conn->session_cnt);
-		for (i = 0, s = txn_global->states; i < session_cnt; i++, s++) {
-			if (s->pinned_id == WT_TXN_NONE ||
-			    __wt_timestamp_iszero(s->read_timestamp))
+		for (i = 0, txn_state = txn_global->states; i < session_cnt;
+		    i++, txn_state++) {
+			if (txn_state->pinned_id == WT_TXN_NONE ||
+			    __wt_timestamp_iszero(txn_state->read_timestamp))
 				continue;
-			if (__wt_timestamp_cmp(s->read_timestamp, ts) < 0)
-				__wt_timestamp_set(ts, s->read_timestamp);
+			if (__wt_timestamp_cmp(
+			    txn_state->read_timestamp, ts) < 0)
+				__wt_timestamp_set(
+				    ts, txn_state->read_timestamp);
 		}
 		__wt_readunlock(session, &txn_global->rwlock);
 	} else

@@ -446,17 +446,19 @@ __wt_txn_config(WT_SESSION_IMPL *session, const char *cfg[])
 
 		WT_RET(__wt_txn_parse_timestamp(
 		    session, "read", txn->read_timestamp, &cval));
-		__wt_readlock(session, &txn_global->rwlock);
+		__wt_writelock(session, &txn_global->rwlock);
 		__wt_timestamp_set(
 		    oldest_timestamp, txn_global->oldest_timestamp);
-		__wt_readunlock(session, &txn_global->rwlock);
 		if (__wt_timestamp_cmp(
-		    txn->read_timestamp, oldest_timestamp) < 0)
+		    txn->read_timestamp, oldest_timestamp) < 0) {
+			__wt_writeunlock(session, &txn_global->rwlock);
 			WT_RET_MSG(session, EINVAL,
 			    "read timestamp %.*s older than oldest timestamp",
 			    (int)cval.len, cval.str);
+		}
 		__wt_timestamp_set(
 		    txn_state->read_timestamp, txn->read_timestamp);
+		__wt_writeunlock(session, &txn_global->rwlock);
 		F_SET(txn, WT_TXN_HAS_TS_READ);
 		txn->isolation = WT_ISO_SNAPSHOT;
 #else
@@ -530,6 +532,7 @@ __wt_txn_release(WT_SESSION_IMPL *session)
 
 		WT_ASSERT(session, txn_state->id != WT_TXN_NONE &&
 		    txn->id != WT_TXN_NONE);
+		__wt_writelock(session, &txn_global->rwlock);
 		WT_PUBLISH(txn_state->id, WT_TXN_NONE);
 #ifdef HAVE_TIMESTAMPS
 		if (F_ISSET(txn, WT_TXN_HAS_TS_COMMIT)) {
@@ -542,6 +545,7 @@ __wt_txn_release(WT_SESSION_IMPL *session)
 			__wt_timestamp_set_zero(txn_state->commit_timestamp);
 		}
 #endif
+		__wt_writeunlock(session, &txn_global->rwlock);
 
 		txn->id = WT_TXN_NONE;
 	}
