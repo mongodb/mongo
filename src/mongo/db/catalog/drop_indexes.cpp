@@ -119,6 +119,16 @@ Status wrappedRun(OperationContext* opCtx,
             return Status(ErrorCodes::InvalidOptions, "cannot drop _id index");
         }
 
+        if (desc->indexName() == "*") {
+            // Dropping an index named '*' results in an drop-index oplog entry with a name of '*',
+            // which in 3.6 and later is interpreted by replication as meaning "drop all indexes on
+            // this collection".
+            return Status(ErrorCodes::InvalidOptions,
+                          "cannot drop an index named '*' by key pattern.  You must drop the "
+                          "entire collection, drop all indexes on the collection by using an index "
+                          "name of '*', or downgrade to 3.4 to drop only this index.");
+        }
+
         Status s = indexCatalog->dropIndex(opCtx, desc);
         if (!s.isOK()) {
             return s;

@@ -116,6 +116,11 @@ StatusWith<std::vector<BSONObj>> parseAndValidateIndexSpecs(
                             str::stream() << "The index name '_id_' is reserved for the _id index, "
                                              "which must have key pattern {_id: 1}, found "
                                           << indexSpec[IndexDescriptor::kKeyPatternFieldName]};
+                } else if (indexSpec[IndexDescriptor::kIndexNameFieldName].String() == "*"_sd) {
+                    // An index named '*' cannot be dropped on its own, because a dropIndex oplog
+                    // entry with a '*' as an index name means "drop all indexes in this
+                    // collection".  We disallow creation of such indexes to avoid this conflict.
+                    return {ErrorCodes::BadValue, "The index name '*' is not valid."};
                 }
 
                 indexSpecs.push_back(std::move(indexSpec));

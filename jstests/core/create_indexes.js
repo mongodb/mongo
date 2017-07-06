@@ -152,4 +152,8 @@
                        {indexes: [{key: {e: 1}, name: 'e_1', 'v': 1, 'invalidField': 1}]});
     assert.commandFailedWithCode(res, ErrorCodes.InvalidIndexSpecificationOption);
 
+    // Test that index creation fails with an index named '*'.
+    res = t.runCommand('createIndexes', {indexes: [{key: {star: 1}, name: '*'}]});
+    assert.commandFailedWithCode(res, ErrorCodes.BadValue);
+
 }());
