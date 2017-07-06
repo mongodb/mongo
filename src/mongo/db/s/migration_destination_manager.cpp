@@ -145,10 +145,14 @@ bool opReplicatedEnough(OperationContext* opCtx,
                         const repl::OpTime& lastOpApplied,
                         const WriteConcernOptions& writeConcern) {
     WriteConcernResult writeConcernResult;
+    writeConcernResult.wTimedOut = false;
 
-    Status waitForMajorityWriteConcernStatus =
+    Status majorityStatus =
         waitForWriteConcern(opCtx, lastOpApplied, kMajorityWriteConcern, &writeConcernResult);
-    if (!waitForMajorityWriteConcernStatus.isOK()) {
+    if (!majorityStatus.isOK()) {
+        if (!writeConcernResult.wTimedOut) {
+            uassertStatusOK(majorityStatus);
+        }
         return false;
     }
 
@@ -156,13 +160,16 @@ bool opReplicatedEnough(OperationContext* opCtx,
     // write concerns in case the user's write concern is stronger than majority
     WriteConcernOptions userWriteConcern(writeConcern);
     userWriteConcern.wTimeout = -1;
+    writeConcernResult.wTimedOut = false;
 
-    Status waitForUserWriteConcernStatus =
+    Status userStatus =
         waitForWriteConcern(opCtx, lastOpApplied, userWriteConcern, &writeConcernResult);
-    if (!waitForUserWriteConcernStatus.isOK()) {
+    if (!userStatus.isOK()) {
+        if (!writeConcernResult.wTimedOut) {
+            uassertStatusOK(userStatus);
+        }
         return false;
     }
-
     return true;
 }
 
