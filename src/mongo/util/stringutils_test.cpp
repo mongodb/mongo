@@ -36,7 +36,7 @@ namespace mongo {
 
 using std::string;
 
-TEST(Comparison, Basic) {
+TEST(StringUtilsTest, Basic) {
     //
     // Basic version comparison tests with different version string types
     //
@@ -58,7 +58,7 @@ TEST(Comparison, Basic) {
     ASSERT(versionCmp("1.2.3-pre", "1.2.3") < 0);
 }
 
-TEST(LexNumCmp, Simple1) {
+TEST(StringUtilsTest, Simple1) {
     ASSERT_EQUALS(0, LexNumCmp::cmp("a.b.c", "a.b.c", false));
 }
 
@@ -69,7 +69,7 @@ void assertCmp(int expected, StringData s1, StringData s2, bool lexOnly = false)
     ASSERT_EQUALS(expected < 0, cmp(s1, s2));
 }
 
-TEST(LexNumCmp, Simple2) {
+TEST(StringUtilsTest, Simple2) {
     ASSERT(!isdigit((char)255));
 
     assertCmp(0, "a", "a");
@@ -163,14 +163,14 @@ TEST(LexNumCmp, Simple2) {
     assertCmp(0, "ac.t", "ac.t");
 }
 
-TEST(LexNumCmp, LexOnly) {
+TEST(StringUtilsTest, LexOnly) {
     assertCmp(-1, "0", "00", true);
     assertCmp(1, "1", "01", true);
     assertCmp(-1, "1", "11", true);
     assertCmp(1, "2", "11", true);
 }
 
-TEST(LexNumCmp, Substring1) {
+TEST(StringUtilsTest, Substring1) {
     assertCmp(0, "1234", "1234", false);
     assertCmp(0, StringData("1234"), StringData("1234"), false);
     assertCmp(0, StringData("1234", 4), StringData("1234", 4), false);
@@ -180,7 +180,7 @@ TEST(LexNumCmp, Substring1) {
     assertCmp(0, StringData("0001", 3), StringData("0000", 3), false);
 }
 
-TEST(IntegerToHex, VariousConversions) {
+TEST(StringUtilsTest, VariousConversions) {
     ASSERT_EQUALS(std::string("0"), integerToHex(0));
     ASSERT_EQUALS(std::string("1"), integerToHex(1));
     ASSERT_EQUALS(std::string("1337"), integerToHex(0x1337));
@@ -193,4 +193,74 @@ TEST(IntegerToHex, VariousConversions) {
     ASSERT_EQUALS(std::string("8000000000000000"),
                   integerToHex(std::numeric_limits<long long>::min()));
 }
+
+TEST(StringUtilsTest, CanParseZero) {
+    boost::optional<size_t> result = parseUnsignedBase10Integer("0");
+    ASSERT(result && *result == 0);
 }
+
+TEST(StringUtilsTest, CanParseDoubleZero) {
+    boost::optional<size_t> result = parseUnsignedBase10Integer("00");
+    ASSERT(result && *result == 0);
+}
+
+TEST(StringUtilsTest, PositivePrefixFailsToParse) {
+    boost::optional<size_t> result = parseUnsignedBase10Integer("+0");
+    ASSERT(!result);
+}
+
+TEST(StringUtilsTest, NegativePrefixFailsToParse) {
+    boost::optional<size_t> result = parseUnsignedBase10Integer("-0");
+    ASSERT(!result);
+}
+
+TEST(StringUtilsTest, CanParseIntValue) {
+    boost::optional<size_t> result = parseUnsignedBase10Integer("10");
+    ASSERT(result && *result == 10);
+}
+
+TEST(StringUtilsTest, CanParseIntValueWithLeadingZeros) {
+    boost::optional<size_t> result = parseUnsignedBase10Integer("0010");
+    ASSERT(result && *result == 10);
+}
+
+TEST(StringUtilsTest, TrailingLetterFailsToParse) {
+    boost::optional<size_t> result = parseUnsignedBase10Integer("5a");
+    ASSERT(!result);
+}
+
+TEST(StringUtilsTest, LeadingLetterFailsToParse) {
+    boost::optional<size_t> result = parseUnsignedBase10Integer("a5");
+    ASSERT(!result);
+}
+
+TEST(StringUtilsTest, LetterWithinNumberFailsToParse) {
+    boost::optional<size_t> result = parseUnsignedBase10Integer("5a5");
+    ASSERT(!result);
+}
+
+TEST(StringUtilsTest, HexStringFailsToParse) {
+    boost::optional<size_t> result = parseUnsignedBase10Integer("0xfeed");
+    ASSERT(!result);
+}
+
+TEST(StringUtilsTest, BinaryStringFailsToParse) {
+    boost::optional<size_t> result = parseUnsignedBase10Integer("0b11010010");
+    ASSERT(!result);
+}
+
+TEST(StringUtilsTest, LeadingWhitespaceFailsToParse) {
+    boost::optional<size_t> result = parseUnsignedBase10Integer(" 10");
+    ASSERT(!result);
+}
+
+TEST(StringUtilsTest, TrailingWhitespaceFailsToParse) {
+    boost::optional<size_t> result = parseUnsignedBase10Integer("10 ");
+    ASSERT(!result);
+}
+
+TEST(StringUtilsTest, WhitespaceWithinNumberFailsToParse) {
+    boost::optional<size_t> result = parseUnsignedBase10Integer(" 10");
+    ASSERT(!result);
+}
+}  // namespace mongo

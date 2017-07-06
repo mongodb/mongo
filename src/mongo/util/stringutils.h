@@ -31,6 +31,7 @@
 
 #include <ctype.h>
 
+#include <boost/optional.hpp>
 #include <memory>
 #include <string>
 #include <vector>
@@ -104,5 +105,12 @@ int versionCmp(const StringData rhs, const StringData lhs);
  * goes to "\\t". If `escape_slash` is true, then "/" goes to "\\/".
  */
 std::string escape(StringData s, bool escape_slash = false);
+
+/**
+ * Converts 'integer' from a base-10 string to a size_t value or returns boost::none if 'integer'
+ * is not a valid base-10 string. A valid string is not allowed to have anything but decimal
+ * numerals, not even a +/- prefix or leading/trailing whitespace.
+ */
+boost::optional<size_t> parseUnsignedBase10Integer(StringData integer);
 
 }  // namespace mongo

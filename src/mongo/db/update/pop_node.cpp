@@ -32,6 +32,7 @@
 
 #include "mongo/db/matcher/expression_parser.h"
 #include "mongo/db/update/path_support.h"
+#include "mongo/util/stringutils.h"
 
 namespace mongo {
 
@@ -82,9 +83,8 @@ void PopNode::apply(mutablebson::Element element,
             return;
         }
 
-        size_t arrayIndex;
         if (element.getType() == BSONType::Array &&
-            pathsupport::isNumericPathComponent(pathToCreate->getPart(0), &arrayIndex)) {
+            parseUnsignedBase10Integer(pathToCreate->getPart(0))) {
             *noop = true;
             return;
         }

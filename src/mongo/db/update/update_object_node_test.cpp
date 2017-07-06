@@ -2810,6 +2810,155 @@ TEST(UpdateObjectNodeTest, ApplyDoNotUseStoredMergedPositional) {
                       logDoc2.getObject());
 }
 
+/**
+ * The leading zero case is interesting, because if we try to look up an array element by the index
+ * string, a leading zero will cause the lookup to fail. That is, even if 'element' is an array,
+ * element["02"] will not find the element with subscript 2.
+ */
+TEST(UpdateObjectNodeTest, ApplyToArrayByIndexWithLeadingZero) {
+    auto setUpdate = fromjson("{$set: {'a.02': 2}}");
+    const CollatorInterface* collator = nullptr;
+    std::map<StringData, std::unique_ptr<ArrayFilter>> arrayFilters;
+    std::set<std::string> foundIdentifiers;
+    UpdateObjectNode root;
+    ASSERT_OK(UpdateObjectNode::parseAndMerge(&root,
+                                              modifiertable::ModifierType::MOD_SET,
+                                              setUpdate["$set"]["a.02"],
+                                              collator,
+                                              arrayFilters,
+                                              foundIdentifiers));
+
+    Document doc(fromjson("{a: [0, 0, 0, 0, 0]}"));
+    FieldRef pathToCreate("");
+    FieldRef pathTaken("");
+    StringData matchedField;
+    auto fromReplication = false;
+    auto validateForStorage = true;
+    FieldRefSet immutablePaths;
+    UpdateIndexData indexData;
+    indexData.addPath("a");
+    Document logDoc;
+    LogBuilder logBuilder(logDoc.root());
+    auto indexesAffected = false;
+    auto noop = false;
+    root.apply(doc.root(),
+               &pathToCreate,
+               &pathTaken,
+               matchedField,
+               fromReplication,
+               validateForStorage,
+               immutablePaths,
+               &indexData,
+               &logBuilder,
+               &indexesAffected,
+               &noop);
+    ASSERT_TRUE(indexesAffected);
+    ASSERT_FALSE(noop);
+    ASSERT_BSONOBJ_EQ(fromjson("{a: [0, 0, 2, 0, 0]}"), doc.getObject());
+    ASSERT_TRUE(doc.isInPlaceModeEnabled());
+    ASSERT_BSONOBJ_EQ(fromjson("{$set: {'a.02': 2}}"), logDoc.getObject());
+}
+
+/**
+ * This test mimics a failure we saw in SERVER-29762. The failure occurred when the 'a.10' update
+   (which was applied first) padded the empty array to have 10 elements, but the new padding
+   elements did not have field names to match their array indexes. As a result, the 'a.2' update
+   failed.
+ */
+TEST(UpdateObjectNodeTest, ApplyMultipleArrayUpdates) {
+    auto setUpdate = fromjson("{$set: {'a.2': 2, 'a.10': 10}}");
+    const CollatorInterface* collator = nullptr;
+    std::map<StringData, std::unique_ptr<ArrayFilter>> arrayFilters;
+    std::set<std::string> foundIdentifiers;
+    UpdateObjectNode root;
+    ASSERT_OK(UpdateObjectNode::parseAndMerge(&root,
+                                              modifiertable::ModifierType::MOD_SET,
+                                              setUpdate["$set"]["a.2"],
+                                              collator,
+                                              arrayFilters,
+                                              foundIdentifiers));
+    ASSERT_OK(UpdateObjectNode::parseAndMerge(&root,
+                                              modifiertable::ModifierType::MOD_SET,
+                                              setUpdate["$set"]["a.10"],
+                                              collator,
+                                              arrayFilters,
+                                              foundIdentifiers));
+
+    Document doc(fromjson("{a: []}"));
+    FieldRef pathToCreate("");
+    FieldRef pathTaken("");
+    StringData matchedField;
+    auto fromReplication = false;
+    auto validateForStorage = true;
+    FieldRefSet immutablePaths;
+    UpdateIndexData indexData;
+    indexData.addPath("a");
+    Document logDoc;
+    LogBuilder logBuilder(logDoc.root());
+    auto indexesAffected = false;
+    auto noop = false;
+    root.apply(doc.root(),
+               &pathToCreate,
+               &pathTaken,
+               matchedField,
+               fromReplication,
+               validateForStorage,
+               immutablePaths,
+               &indexData,
+               &logBuilder,
+               &indexesAffected,
+               &noop);
+    ASSERT_TRUE(indexesAffected);
+    ASSERT_FALSE(noop);
+    ASSERT_BSONOBJ_EQ(
+        fromjson("{a: [null, null, 2, null, null, null, null, null, null, null, 10]}"),
+        doc.getObject());
+    ASSERT_FALSE(doc.isInPlaceModeEnabled());
+    ASSERT_BSONOBJ_EQ(fromjson("{$set: {'a.10': 10, 'a.2': 2}}"), logDoc.getObject());
+}
+
+TEST(UpdateObjectNodeTest, ApplyUpdateToNonViablePathInArray) {
+    auto setUpdate = fromjson("{$set: {'a.b': 3}}");
+    const CollatorInterface* collator = nullptr;
+    std::map<StringData, std::unique_ptr<ArrayFilter>> arrayFilters;
+    std::set<std::string> foundIdentifiers;
+    UpdateObjectNode root;
+    ASSERT_OK(UpdateObjectNode::parseAndMerge(&root,
+                                              modifiertable::ModifierType::MOD_SET,
+                                              setUpdate["$set"]["a.b"],
+                                              collator,
+                                              arrayFilters,
+                                              foundIdentifiers));
+
+    Document doc(fromjson("{a: [{b: 1}, {b: 2}]}"));
+    FieldRef pathToCreate("");
+    FieldRef pathTaken("");
+    StringData matchedField;
+    auto fromReplication = false;
+    auto validateForStorage = true;
+    FieldRefSet immutablePaths;
+    UpdateIndexData indexData;
+    indexData.addPath("a");
+    Document logDoc;
+    LogBuilder logBuilder(logDoc.root());
+    auto indexesAffected = false;
+    auto noop = false;
+    ASSERT_THROWS_CODE_AND_WHAT(root.apply(doc.root(),
+                                           &pathToCreate,
+                                           &pathTaken,
+                                           matchedField,
+                                           fromReplication,
+                                           validateForStorage,
+                                           immutablePaths,
+                                           &indexData,
+                                           &logBuilder,
+                                           &indexesAffected,
+                                           &noop),
+                                UserException,
+                                ErrorCodes::PathNotViable,
+                                "Cannot create field 'b' in element {a: [ { b: 1 }, { b: 2 } ]}");
+}
+
 TEST(UpdateObjectNodeTest, SetAndPopModifiersWithCommonPrefixApplySuccessfully) {
     auto update = fromjson("{$set: {'a.b': 5}, $pop: {'a.c': -1}}");
     const CollatorInterface* collator = nullptr;

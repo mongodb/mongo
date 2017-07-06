@@ -35,6 +35,7 @@
 #include "mongo/db/update/update_array_node.h"
 #include "mongo/db/update/update_leaf_node.h"
 #include "mongo/stdx/memory.h"
+#include "mongo/util/stringutils.h"
 
 namespace mongo {
 
@@ -98,14 +99,38 @@ void applyChild(const UpdateNode& child,
                 bool* indexesAffected,
                 bool* noop) {
 
-    auto childElement = *element;
     auto pathTakenSizeBefore = pathTaken->numParts();
 
-    // If 'field' exists in 'element', append 'field' to the end of 'pathTaken' and advance
-    // 'childElement'. Otherwise, append 'field' to the end of 'pathToCreate'.
-    if (pathToCreate->empty() && (childElement = (*element)[field]).ok()) {
+    // A non-ok value for childElement will indicate that we need to append 'field' to the
+    // 'pathToCreate' FieldRef.
+    auto childElement = element->getDocument().end();
+    invariant(!childElement.ok());
+    if (!pathToCreate->empty()) {
+        // We're already traversing a path with elements that don't exist yet, so we will definitely
+        // need to append.
+    } else if (element->getType() == BSONType::Object) {
+        childElement = element->findFirstChildNamed(field);
+    } else if (element->getType() == BSONType::Array) {
+        boost::optional<size_t> indexFromField = parseUnsignedBase10Integer(field);
+        if (indexFromField) {
+            childElement = element->findNthChild(*indexFromField);
+        } else {
+            // We're trying to traverse an array element, but the path specifies a name instead of
+            // an index. We append the name to 'pathToCreate' for now, even though we know we won't
+            // be able to create it. If the update eventually needs to create the path,
+            // pathsupport::createPathAt() will provide a sensible PathNotViable UserError.
+        }
+    }
+
+    if (childElement.ok()) {
+        // The path we've traversed so far already exists in our document, and 'childElement'
+        // represents the Element indicated by the 'field' name or index, which we indicate by
+        // updating the 'pathTaken' FieldRef.
         pathTaken->appendPart(field);
     } else {
+        // We are traversing path components that do not exist in our document. Any update modifier
+        // that creates new path components (i.e., any PathCreatingNode update nodes) will need to
+        // create this component, so we append it to the 'pathToCreate' FieldRef.
         childElement = *element;
         pathToCreate->appendPart(field);
     }
