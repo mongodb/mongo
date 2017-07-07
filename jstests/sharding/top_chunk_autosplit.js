@@ -4,7 +4,9 @@ function shardSetup(shardConfig, dbName, collName) {
 
     // Set the balancer mode to only balance on autoSplit
     assert.writeOK(st.s.getDB('config').settings.update(
-        {_id: 'balancer'}, {'$unset': {stopped: ''}, '$set': {mode: 'autoSplitOnly'}}));
+        {_id: 'balancer'},
+        {'$unset': {stopped: ''}, '$set': {mode: 'autoSplitOnly'}},
+        {writeConcern: {w: 'majority'}}));
     return st;
 }
 
