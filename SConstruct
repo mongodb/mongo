@@ -67,10 +67,11 @@ var.Add('CPPPATH', 'C Preprocessor include path', [
 ])
 
 var.Add('CFLAGS', 'C Compiler Flags', [
-    "/wd4090", # Ignore warning about mismatched const qualifiers
-    "/wd4996", # Ignore deprecated functions
     "/W3", # Warning level 3
     "/WX", # Warnings are fatal
+    "/wd4090", # Ignore warning about mismatched const qualifiers
+    "/wd4996", # Ignore deprecated functions
+    "/we4100", # Complain about unreferenced format parameter
     "/Z7", # Generate debugging symbols
     "/TC", # Compile as C code
     #"/Od", # Disable optimization
@@ -337,6 +338,7 @@ if GetOption("lang-python"):
             ])
     # Ignore warnings in swig-generated code.
     pythonEnv['CFLAGS'].remove("/WX")
+    pythonEnv['CFLAGS'].remove("/we4100")
 
     swiglib = pythonEnv.SharedLibrary('_wiredtiger',
                       [ 'lang\python\wiredtiger.i'],
