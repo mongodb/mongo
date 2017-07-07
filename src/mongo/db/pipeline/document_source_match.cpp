@@ -275,6 +275,7 @@ Document redactSafePortionDollarOps(BSONObj expr) {
             case BSONObj::opGEO_INTERSECTS:
             case BSONObj::opINTERNAL_SCHEMA_MIN_ITEMS:
             case BSONObj::opINTERNAL_SCHEMA_MAX_ITEMS:
+            case BSONObj::opINTERNAL_SCHEMA_UNIQUE_ITEMS:
                 continue;
         }
     }

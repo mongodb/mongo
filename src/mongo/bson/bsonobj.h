@@ -530,6 +530,7 @@ public:
         opBITS_ANY_CLEAR = 0x1A,
         opINTERNAL_SCHEMA_MIN_ITEMS = 0x1B,
         opINTERNAL_SCHEMA_MAX_ITEMS = 0x1C,
+        opINTERNAL_SCHEMA_UNIQUE_ITEMS = 0x1D,
     };
 
     /** add all elements of the object to the specified vector */

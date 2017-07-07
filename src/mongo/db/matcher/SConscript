@@ -46,6 +46,7 @@ env.Library(
         'matchable.cpp',
         'matcher.cpp',
         'schema/expression_internal_schema_num_array_items.cpp',
+        'schema/expression_internal_schema_unique_items.cpp',
         'schema/expression_internal_schema_xor.cpp',
     ],
     LIBDEPS=[
@@ -68,6 +69,7 @@ env.CppUnitTest(
         'expression_tree_test.cpp',
         'schema/expression_internal_schema_max_items_test.cpp',
         'schema/expression_internal_schema_min_items_test.cpp',
+        'schema/expression_internal_schema_unique_items_test.cpp',
         'schema/expression_internal_schema_xor_test.cpp',
     ],
     LIBDEPS=[

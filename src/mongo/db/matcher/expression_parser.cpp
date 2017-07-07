@@ -38,6 +38,7 @@
 #include "mongo/db/matcher/expression_tree.h"
 #include "mongo/db/matcher/schema/expression_internal_schema_max_items.h"
 #include "mongo/db/matcher/schema/expression_internal_schema_min_items.h"
+#include "mongo/db/matcher/schema/expression_internal_schema_unique_items.h"
 #include "mongo/db/matcher/schema/expression_internal_schema_xor.h"
 #include "mongo/db/namespace_string.h"
 #include "mongo/stdx/memory.h"
@@ -292,6 +293,20 @@ StatusWithMatchExpression MatchExpressionParser::_parseSubField(const BSONObj& c
         case BSONObj::opINTERNAL_SCHEMA_MAX_ITEMS: {
             return _parseInternalSchemaSingleIntegerArgument<InternalSchemaMaxItemsMatchExpression>(
                 name, e);
+        }
+        case BSONObj::opINTERNAL_SCHEMA_UNIQUE_ITEMS: {
+            if (!e.isBoolean() || !e.boolean()) {
+                return {ErrorCodes::FailedToParse,
+                        str::stream() << name << " must be a boolean of value true"};
+            }
+
+
+            auto expr = stdx::make_unique<InternalSchemaUniqueItemsMatchExpression>();
+            auto status = expr->init(name);
+            if (!status.isOK()) {
+                return status;
+            }
+            return {std::move(expr)};
         }
     }
 
