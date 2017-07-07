@@ -71,7 +71,15 @@ Status renameCollection(OperationContext* txn,
     DisableDocumentValidation validationDisabler(txn);
 
     ScopedTransaction transaction(txn, MODE_X);
-    Lock::GlobalWrite globalWriteLock(txn->lockState());
+    boost::optional<Lock::GlobalWrite> globalWriteLock;
+    boost::optional<Lock::DBLock> dbWriteLock;
+
+    // If the rename is known not to be a cross-database rename, just a database lock suffices.
+    if (source.db() == target.db())
+        dbWriteLock.emplace(txn->lockState(), source.db(), MODE_X);
+    else
+        globalWriteLock.emplace(txn->lockState());
+
     // We stay in source context the whole time. This is mostly to set the CurOp namespace.
     OldClientContext ctx(txn, source.ns());
 
