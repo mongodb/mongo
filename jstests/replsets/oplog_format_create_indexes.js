@@ -7,33 +7,55 @@
 
     load("jstests/libs/get_index_helpers.js");
 
-    var rst = new ReplSetTest({nodes: 1});
+    const rst = new ReplSetTest({nodes: 1});
     rst.startSet();
     rst.initiate();
 
-    var primary = rst.getPrimary();
+    const primary = rst.getPrimary();
 
-    var testDB = primary.getDB("test");
-    var oplogColl = primary.getDB("local").oplog.rs;
+    const testDB = primary.getDB("test");
+    const oplogColl = primary.getDB("local").oplog.rs;
 
     function testOplogEntryContainsIndexInfoObj(coll, keyPattern, indexOptions) {
         assert.commandWorked(coll.createIndex(keyPattern, indexOptions));
-        var allIndexes = coll.getIndexes();
-        var indexSpec = GetIndexHelpers.findByKeyPattern(allIndexes, keyPattern);
+        const allIndexes = coll.getIndexes();
+        const indexSpec = GetIndexHelpers.findByKeyPattern(allIndexes, keyPattern);
+
         assert.neq(
             null,
             indexSpec,
             "Index with key pattern " + tojson(keyPattern) + " not found: " + tojson(allIndexes));
 
-        var indexCreationOplogQuery = {op: "i", ns: testDB.system.indexes.getFullName()};
-        var allOplogEntries = oplogColl.find(indexCreationOplogQuery).toArray();
-        var found = allOplogEntries.filter(function(entry) {
-            return bsonWoCompare(entry.o, indexSpec) === 0;
+        // Find either the old-style insert into system.indexes index creations, or new-style
+        // createIndexes command entries.
+        const indexCreationOplogQuery = {
+            $or: [
+                {op: "i", ns: testDB.system.indexes.getFullName()},
+                {op: "c", ns: testDB.getName() + ".$cmd", "o.createIndexes": coll.getName()}
+            ]
+        };
+
+        const allOplogEntries = oplogColl.find(indexCreationOplogQuery).toArray();
+
+        // Preserve the JSON version of the originals, as we're going to delete fields.
+        const allOplogEntriesJson = tojson(allOplogEntries);
+        const indexSpecJson = tojson(indexSpec);
+
+        // Because of differences between the new and old oplog entries for createIndexes,
+        // treat the namespace part separately and compare entries without ns field.
+        const indexSpecNs = indexSpec.ns;
+        delete indexSpec.ns;
+        const found = allOplogEntries.filter((entry) => {
+            const entryNs = entry.o.ns || testDB.getName() + "." + entry.o.createIndexes;
+            const entrySpec = entry.o;
+            delete entrySpec.ns;
+            delete entrySpec.createIndexes;
+            return indexSpecNs === entryNs && bsonWoCompare(indexSpec, entrySpec) === 0;
         });
         assert.eq(1,
                   found.length,
-                  "Failed to find full index specification " + tojson(indexSpec) +
-                      " in any oplog entry from index creation: " + tojson(allOplogEntries));
+                  "Failed to find full index specification " + indexSpecJson +
+                      " in any oplog entry from index creation: " + allOplogEntriesJson);
 
         assert.commandWorked(coll.dropIndex(keyPattern));
     }
