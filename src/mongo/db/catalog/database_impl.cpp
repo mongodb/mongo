@@ -219,8 +219,10 @@ Collection* DatabaseImpl::_getOrCreateCollectionInstance(OperationContext* opCtx
     invariant(rs.get());  // if cce exists, so should this
 
     // Not registering AddCollectionChange since this is for collections that already exist.
-    Collection* c = new Collection(opCtx, nss.ns(), uuid, cce.release(), rs.release(), _dbEntry);
-    return c;
+    Collection* coll = new Collection(opCtx, nss.ns(), uuid, cce.release(), rs.release(), _dbEntry);
+    if (uuid)
+        UUIDCatalog::get(opCtx).registerUUIDCatalogEntry(uuid.get(), coll);
+    return coll;
 }
 
 DatabaseImpl::DatabaseImpl(Database* const this_,

@@ -74,6 +74,9 @@ public:
      */
     void onCloseDatabase(Database* db);
 
+    void registerUUIDCatalogEntry(CollectionUUID uuid, Collection* coll);
+    Collection* removeUUIDCatalogEntry(CollectionUUID uuid);
+
     /* This function gets the Collection* pointer that corresponds to
      * CollectionUUID uuid. The required locks should be obtained prior
      * to calling this function, or else the found Collection pointer
@@ -90,9 +93,6 @@ public:
 private:
     mutable mongo::stdx::mutex _catalogLock;
     mongo::stdx::unordered_map<CollectionUUID, Collection*, CollectionUUID::Hash> _catalog;
-
-    void _registerUUIDCatalogEntry(CollectionUUID uuid, Collection* coll);
-    Collection* _removeUUIDCatalogEntry(CollectionUUID uuid);
 };
 
 }  // namespace mongo

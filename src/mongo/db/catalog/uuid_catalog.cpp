@@ -52,24 +52,24 @@ UUIDCatalog& UUIDCatalog::get(OperationContext* opCtx) {
 void UUIDCatalog::onCreateCollection(OperationContext* opCtx,
                                      Collection* coll,
                                      CollectionUUID uuid) {
-    _registerUUIDCatalogEntry(uuid, coll);
-    opCtx->recoveryUnit()->onRollback([this, uuid] { _removeUUIDCatalogEntry(uuid); });
+    registerUUIDCatalogEntry(uuid, coll);
+    opCtx->recoveryUnit()->onRollback([this, uuid] { removeUUIDCatalogEntry(uuid); });
 }
 
 void UUIDCatalog::onDropCollection(OperationContext* opCtx, CollectionUUID uuid) {
-    Collection* foundColl = _removeUUIDCatalogEntry(uuid);
+    Collection* foundColl = removeUUIDCatalogEntry(uuid);
     opCtx->recoveryUnit()->onRollback(
-        [this, foundColl, uuid] { _registerUUIDCatalogEntry(uuid, foundColl); });
+        [this, foundColl, uuid] { registerUUIDCatalogEntry(uuid, foundColl); });
 }
 
 void UUIDCatalog::onRenameCollection(OperationContext* opCtx,
                                      Collection* newColl,
                                      CollectionUUID uuid) {
-    Collection* oldColl = _removeUUIDCatalogEntry(uuid);
-    _registerUUIDCatalogEntry(uuid, newColl);
+    Collection* oldColl = removeUUIDCatalogEntry(uuid);
+    registerUUIDCatalogEntry(uuid, newColl);
     opCtx->recoveryUnit()->onRollback([this, oldColl, uuid] {
-        _removeUUIDCatalogEntry(uuid);
-        _registerUUIDCatalogEntry(uuid, oldColl);
+        removeUUIDCatalogEntry(uuid);
+        registerUUIDCatalogEntry(uuid, oldColl);
     });
 }
 
@@ -78,7 +78,7 @@ void UUIDCatalog::onCloseDatabase(Database* db) {
         if (coll->uuid()) {
             // While the collection does not actually get dropped, we're going to destroy the
             // Collection object, so for purposes of the UUIDCatalog it looks the same.
-            _removeUUIDCatalogEntry(coll->uuid().get());
+            removeUUIDCatalogEntry(coll->uuid().get());
         }
     }
 }
@@ -96,16 +96,16 @@ NamespaceString UUIDCatalog::lookupNSSByUUID(CollectionUUID uuid) const {
     return foundIt == _catalog.end() ? NamespaceString() : coll->ns();
 }
 
-void UUIDCatalog::_registerUUIDCatalogEntry(CollectionUUID uuid, Collection* coll) {
+void UUIDCatalog::registerUUIDCatalogEntry(CollectionUUID uuid, Collection* coll) {
     stdx::lock_guard<stdx::mutex> lock(_catalogLock);
-    if (coll) {
+    if (coll && !_catalog.count(uuid)) {
         std::pair<CollectionUUID, Collection*> entry = std::make_pair(uuid, coll);
         LOG(2) << "registering collection " << coll->ns() << " with UUID " << uuid.toString();
         invariant(_catalog.insert(entry).second == true);
     }
 }
 
-Collection* UUIDCatalog::_removeUUIDCatalogEntry(CollectionUUID uuid) {
+Collection* UUIDCatalog::removeUUIDCatalogEntry(CollectionUUID uuid) {
     stdx::lock_guard<stdx::mutex> lock(_catalogLock);
     auto foundIt = _catalog.find(uuid);
     if (foundIt == _catalog.end())
