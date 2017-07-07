@@ -207,6 +207,22 @@ size_t getCodePointLength(char charByte) {
 }
 }  // namespace
 
+/* ------------------------- Register Date Expressions ----------------------------- */
+
+REGISTER_EXPRESSION(dayOfMonth, ExpressionDayOfMonth::parse);
+REGISTER_EXPRESSION(dayOfWeek, ExpressionDayOfWeek::parse);
+REGISTER_EXPRESSION(dayOfYear, ExpressionDayOfYear::parse);
+REGISTER_EXPRESSION(hour, ExpressionHour::parse);
+REGISTER_EXPRESSION(isoDayOfWeek, ExpressionIsoDayOfWeek::parse);
+REGISTER_EXPRESSION(isoWeek, ExpressionIsoWeek::parse);
+REGISTER_EXPRESSION(isoWeekYear, ExpressionIsoWeekYear::parse);
+REGISTER_EXPRESSION(millisecond, ExpressionMillisecond::parse);
+REGISTER_EXPRESSION(minute, ExpressionMinute::parse);
+REGISTER_EXPRESSION(month, ExpressionMonth::parse);
+REGISTER_EXPRESSION(second, ExpressionSecond::parse);
+REGISTER_EXPRESSION(week, ExpressionWeek::parse);
+REGISTER_EXPRESSION(year, ExpressionYear::parse);
+
 /* ----------------------- ExpressionAbs ---------------------------- */
 
 Value ExpressionAbs::evaluateNumericArg(const Value& numericArg) const {
@@ -920,14 +936,14 @@ intrusive_ptr<Expression> ExpressionConstant::parse(
 
 
 intrusive_ptr<ExpressionConstant> ExpressionConstant::create(
-    const intrusive_ptr<ExpressionContext>& expCtx, const Value& pValue) {
-    intrusive_ptr<ExpressionConstant> pEC(new ExpressionConstant(expCtx, pValue));
+    const intrusive_ptr<ExpressionContext>& expCtx, const Value& value) {
+    intrusive_ptr<ExpressionConstant> pEC(new ExpressionConstant(expCtx, value));
     return pEC;
 }
 
 ExpressionConstant::ExpressionConstant(const boost::intrusive_ptr<ExpressionContext>& expCtx,
-                                       const Value& pTheValue)
-    : Expression(expCtx), pValue(pTheValue) {}
+                                       const Value& value)
+    : Expression(expCtx), _value(value) {}
 
 
 intrusive_ptr<Expression> ExpressionConstant::optimize() {
@@ -940,11 +956,11 @@ void ExpressionConstant::addDependencies(DepsTracker* deps) const {
 }
 
 Value ExpressionConstant::evaluate(const Document& root) const {
-    return pValue;
+    return _value;
 }
 
 Value ExpressionConstant::serialize(bool explain) const {
-    return serializeConstant(pValue);
+    return serializeConstant(_value);
 }
 
 REGISTER_EXPRESSION(const, ExpressionConstant::parse);
@@ -958,10 +974,6 @@ const char* ExpressionConstant::getOpName() const {
 /* Helper functions also shared with ExpressionDateToParts */
 
 namespace {
-
-bool isNullOrConstant(intrusive_ptr<Expression> exp) {
-    return !exp || dynamic_cast<ExpressionConstant*>(exp.get());
-}
 
 boost::optional<TimeZone> makeTimeZone(const TimeZoneDatabase* tzdb,
                                        const Document& root,
@@ -1130,11 +1142,17 @@ intrusive_ptr<Expression> ExpressionDateFromParts::optimize() {
         _timeZone = _timeZone->optimize();
     }
 
-    if (isNullOrConstant(_year) && isNullOrConstant(_month) && isNullOrConstant(_day) &&
-        isNullOrConstant(_hour) && isNullOrConstant(_minute) && isNullOrConstant(_second) &&
-        isNullOrConstant(_milliseconds) && isNullOrConstant(_isoYear) &&
-        isNullOrConstant(_isoWeekYear) && isNullOrConstant(_isoDayOfWeek) &&
-        isNullOrConstant(_timeZone)) {
+    if (ExpressionConstant::allNullOrConstant({_year,
+                                               _month,
+                                               _day,
+                                               _hour,
+                                               _minute,
+                                               _second,
+                                               _milliseconds,
+                                               _isoYear,
+                                               _isoWeekYear,
+                                               _isoDayOfWeek,
+                                               _timeZone})) {
         // Everything is a constant, so we can turn into a constant.
         return ExpressionConstant::create(getExpressionContext(), evaluate(Document{}));
     }
@@ -1353,8 +1371,7 @@ intrusive_ptr<Expression> ExpressionDateToParts::optimize() {
         _iso8601 = _iso8601->optimize();
     }
 
-    if (dynamic_cast<ExpressionConstant*>(_date.get()) && isNullOrConstant(_iso8601) &&
-        isNullOrConstant(_timeZone)) {
+    if (ExpressionConstant::allNullOrConstant({_date, _iso8601, _timeZone})) {
         // Everything is a constant, so we can turn into a constant.
         return ExpressionConstant::create(getExpressionContext(), evaluate(Document{}));
     }
@@ -1509,42 +1526,6 @@ Value ExpressionDateToString::evaluate(const Document& root) const {
 
 void ExpressionDateToString::addDependencies(DepsTracker* deps) const {
     _date->addDependencies(deps);
-}
-
-/* ---------------------- ExpressionDayOfMonth ------------------------- */
-
-Value ExpressionDayOfMonth::evaluate(const Document& root) const {
-    Value date(vpOperand[0]->evaluate(root));
-    return Value(TimeZoneDatabase::utcZone().dateParts(date.coerceToDate()).dayOfMonth);
-}
-
-REGISTER_EXPRESSION(dayOfMonth, ExpressionDayOfMonth::parse);
-const char* ExpressionDayOfMonth::getOpName() const {
-    return "$dayOfMonth";
-}
-
-/* ------------------------- ExpressionDayOfWeek ----------------------------- */
-
-Value ExpressionDayOfWeek::evaluate(const Document& root) const {
-    Value date(vpOperand[0]->evaluate(root));
-    return Value(TimeZoneDatabase::utcZone().dayOfWeek(date.coerceToDate()));
-}
-
-REGISTER_EXPRESSION(dayOfWeek, ExpressionDayOfWeek::parse);
-const char* ExpressionDayOfWeek::getOpName() const {
-    return "$dayOfWeek";
-}
-
-/* ------------------------- ExpressionDayOfYear ----------------------------- */
-
-Value ExpressionDayOfYear::evaluate(const Document& root) const {
-    Value date(vpOperand[0]->evaluate(root));
-    return Value(TimeZoneDatabase::utcZone().dayOfYear(date.coerceToDate()));
-}
-
-REGISTER_EXPRESSION(dayOfYear, ExpressionDayOfYear::parse);
-const char* ExpressionDayOfYear::getOpName() const {
-    return "$dayOfYear";
 }
 
 /* ----------------------- ExpressionDivide ---------------------------- */
@@ -2249,30 +2230,6 @@ void ExpressionMeta::addDependencies(DepsTracker* deps) const {
     }
 }
 
-/* ------------------------- ExpressionMillisecond ----------------------------- */
-
-Value ExpressionMillisecond::evaluate(const Document& root) const {
-    auto date = vpOperand[0]->evaluate(root).coerceToDate();
-    return Value(TimeZoneDatabase::utcZone().dateParts(date).millisecond);
-}
-
-REGISTER_EXPRESSION(millisecond, ExpressionMillisecond::parse);
-const char* ExpressionMillisecond::getOpName() const {
-    return "$millisecond";
-}
-
-/* ------------------------- ExpressionMinute -------------------------- */
-
-Value ExpressionMinute::evaluate(const Document& root) const {
-    Value date(vpOperand[0]->evaluate(root));
-    return Value(TimeZoneDatabase::utcZone().dateParts(date.coerceToDate()).minute);
-}
-
-REGISTER_EXPRESSION(minute, ExpressionMinute::parse);
-const char* ExpressionMinute::getOpName() const {
-    return "$minute";
-}
-
 /* ----------------------- ExpressionMod ---------------------------- */
 
 Value ExpressionMod::evaluate(const Document& root) const {
@@ -2328,18 +2285,6 @@ Value ExpressionMod::evaluate(const Document& root) const {
 REGISTER_EXPRESSION(mod, ExpressionMod::parse);
 const char* ExpressionMod::getOpName() const {
     return "$mod";
-}
-
-/* ------------------------ ExpressionMonth ----------------------------- */
-
-Value ExpressionMonth::evaluate(const Document& root) const {
-    auto date = vpOperand[0]->evaluate(root).coerceToDate();
-    return Value(TimeZoneDatabase::utcZone().dateParts(date).month);
-}
-
-REGISTER_EXPRESSION(month, ExpressionMonth::parse);
-const char* ExpressionMonth::getOpName() const {
-    return "$month";
 }
 
 /* ------------------------- ExpressionMultiply ----------------------------- */
@@ -2403,18 +2348,6 @@ Value ExpressionMultiply::evaluate(const Document& root) const {
 REGISTER_EXPRESSION(multiply, ExpressionMultiply::parse);
 const char* ExpressionMultiply::getOpName() const {
     return "$multiply";
-}
-
-/* ------------------------- ExpressionHour ----------------------------- */
-
-Value ExpressionHour::evaluate(const Document& root) const {
-    auto date = vpOperand[0]->evaluate(root).coerceToDate();
-    return Value(TimeZoneDatabase::utcZone().dateParts(date).hour);
-}
-
-REGISTER_EXPRESSION(hour, ExpressionHour::parse);
-const char* ExpressionHour::getOpName() const {
-    return "$hour";
 }
 
 /* ----------------------- ExpressionIfNull ---------------------------- */
@@ -3304,18 +3237,6 @@ Value ExpressionReverseArray::evaluate(const Document& root) const {
 REGISTER_EXPRESSION(reverseArray, ExpressionReverseArray::parse);
 const char* ExpressionReverseArray::getOpName() const {
     return "$reverseArray";
-}
-
-/* ------------------------- ExpressionSecond ----------------------------- */
-
-Value ExpressionSecond::evaluate(const Document& root) const {
-    auto date = vpOperand[0]->evaluate(root).coerceToDate();
-    return Value(TimeZoneDatabase::utcZone().dateParts(date).second);
-}
-
-REGISTER_EXPRESSION(second, ExpressionSecond::parse);
-const char* ExpressionSecond::getOpName() const {
-    return "$second";
 }
 
 namespace {
@@ -4217,66 +4138,6 @@ Value ExpressionType::evaluate(const Document& root) const {
 REGISTER_EXPRESSION(type, ExpressionType::parse);
 const char* ExpressionType::getOpName() const {
     return "$type";
-}
-
-/* ------------------------- ExpressionWeek ----------------------------- */
-
-Value ExpressionWeek::evaluate(const Document& root) const {
-    auto date = vpOperand[0]->evaluate(root).coerceToDate();
-    return Value(TimeZoneDatabase::utcZone().week(date));
-}
-
-REGISTER_EXPRESSION(week, ExpressionWeek::parse);
-const char* ExpressionWeek::getOpName() const {
-    return "$week";
-}
-
-/* ------------------------- ExpressionIsoDayOfWeek --------------------- */
-
-Value ExpressionIsoDayOfWeek::evaluate(const Document& root) const {
-    Value date(vpOperand[0]->evaluate(root));
-    return Value(TimeZoneDatabase::utcZone().isoDayOfWeek(date.coerceToDate()));
-}
-
-REGISTER_EXPRESSION(isoDayOfWeek, ExpressionIsoDayOfWeek::parse);
-const char* ExpressionIsoDayOfWeek::getOpName() const {
-    return "$isoDayOfWeek";
-}
-
-/* ------------------------- ExpressionIsoWeekYear ---------------------- */
-
-Value ExpressionIsoWeekYear::evaluate(const Document& root) const {
-    Value date(vpOperand[0]->evaluate(root));
-    return Value(TimeZoneDatabase::utcZone().isoYear(date.coerceToDate()));
-}
-
-REGISTER_EXPRESSION(isoWeekYear, ExpressionIsoWeekYear::parse);
-const char* ExpressionIsoWeekYear::getOpName() const {
-    return "$isoWeekYear";
-}
-
-/* ------------------------- ExpressionIsoWeek -------------------------- */
-
-Value ExpressionIsoWeek::evaluate(const Document& root) const {
-    Value date(vpOperand[0]->evaluate(root));
-    return Value(TimeZoneDatabase::utcZone().isoWeek(date.coerceToDate()));
-}
-
-REGISTER_EXPRESSION(isoWeek, ExpressionIsoWeek::parse);
-const char* ExpressionIsoWeek::getOpName() const {
-    return "$isoWeek";
-}
-
-/* ------------------------- ExpressionYear ----------------------------- */
-
-Value ExpressionYear::evaluate(const Document& root) const {
-    Value date(vpOperand[0]->evaluate(root));
-    return Value(TimeZoneDatabase::utcZone().dateParts(date.coerceToDate()).year);
-}
-
-REGISTER_EXPRESSION(year, ExpressionYear::parse);
-const char* ExpressionYear::getOpName() const {
-    return "$year";
 }
 
 /* -------------------------- ExpressionZip ------------------------------ */
