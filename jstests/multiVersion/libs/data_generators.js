@@ -74,6 +74,12 @@ function DataGenerator() {
             text += base64Chars.charAt((seed + (i % 10)) % base64Chars.length);
         }
 
+        if ((text.length % 4) == 1) {
+            // Special case to avoid winding up with three terminating '=' chars
+            // which would be invalid base64 data
+            text += "A==";
+        }
+
         while ((text.length % 4) != 0) {
             text += "=";
         }

@@ -1280,13 +1280,7 @@ bool JParse::isHexString(StringData str) const {
 
 bool JParse::isBase64String(StringData str) const {
     MONGO_JSON_DEBUG("str: " << str);
-    std::size_t i;
-    for (i = 0; i < str.size(); i++) {
-        if (!match(str[i], base64::chars)) {
-            return false;
-        }
-    }
-    return true;
+    return base64::validate(str);
 }
 
 bool JParse::isArray() {

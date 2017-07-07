@@ -29,50 +29,13 @@
 
 #pragma once
 
-#include <iosfwd>
-#include <memory>
+#include <sstream>
 #include <string>
 
-#include "mongo/util/assert_util.h"
+#include "mongo/base/string_data.h"
 
 namespace mongo {
 namespace base64 {
-
-class Alphabet {
-public:
-    Alphabet()
-                : encode((unsigned char*)
-                         "ABCDEFGHIJKLMNOPQRSTUVWXYZ"
-                         "abcdefghijklmnopqrstuvwxyz"
-                         "0123456789"
-                         "+/")
-                , decode(new unsigned char[257]) {
-        memset(decode.get(), 0, 256);
-        for (int i = 0; i < 64; i++) {
-            decode[encode[i]] = i;
-        }
-
-        test();
-    }
-    void test() {
-        verify(strlen((char*)encode) == 64);
-        for (int i = 0; i < 26; i++)
-            verify(encode[i] == toupper(encode[i + 26]));
-    }
-
-    char e(int x) {
-        return encode[x & 0x3f];
-    }
-
-private:
-    const unsigned char* encode;
-
-public:
-    std::unique_ptr<unsigned char[]> decode;
-};
-
-extern Alphabet alphabet;
-
 
 void encode(std::stringstream& ss, const char* data, int size);
 std::string encode(const char* data, int size);
@@ -81,8 +44,7 @@ std::string encode(const std::string& s);
 void decode(std::stringstream& ss, const std::string& s);
 std::string decode(const std::string& s);
 
-extern const char* chars;
+bool validate(StringData);
 
-void testAlphabet();
-}
-}
+}  // namespace base64
+}  // namespace mongo
