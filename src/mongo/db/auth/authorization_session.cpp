@@ -497,10 +497,10 @@ Status AuthorizationSession::checkAuthForFind(const NamespaceString& ns, bool ha
 Status AuthorizationSession::checkAuthForGetMore(const NamespaceString& ns,
                                                  long long cursorID,
                                                  bool hasTerm) {
-    // "ns" can be in one of three formats: "listCollections" format, "listIndexes" format, and
-    // normal format.
+    // "ns" can be in one of several formats: "listCollections" format, "listIndexes" format,
+    // "collectionless aggregation" format, and normal format.
     if (ns.isListCollectionsCursorNS()) {
-        // "ns" is of the form "<db>.$cmd.listCollections".  Check if we can perform the
+        // "ns" is of the form "<db>.$cmd.listCollections". Check if we can perform the
         // listCollections action on the database resource for "<db>".
         if (!isAuthorizedToListCollections(ns.db())) {
             return Status(ErrorCodes::Unauthorized,
@@ -508,12 +508,21 @@ Status AuthorizationSession::checkAuthForGetMore(const NamespaceString& ns,
                                         << ns.ns());
         }
     } else if (ns.isListIndexesCursorNS()) {
-        // "ns" is of the form "<db>.$cmd.listIndexes.<coll>".  Check if we can perform the
+        // "ns" is of the form "<db>.$cmd.listIndexes.<coll>". Check if we can perform the
         // listIndexes action on the "<db>.<coll>" namespace.
         NamespaceString targetNS = ns.getTargetNSForListIndexes();
         if (!isAuthorizedForActionsOnNamespace(targetNS, ActionType::listIndexes)) {
             return Status(ErrorCodes::Unauthorized,
                           str::stream() << "not authorized for listIndexes getMore on " << ns.ns());
+        }
+    } else if (ns.isCollectionlessAggregateNS()) {
+        // "ns" is of the form "<db>.$cmd.aggregate". We don't have access to the parameters of the
+        // original command at this point, but since users can only getMore their own cursors we
+        // verify that a user either is authenticated or does not need to be.
+        if (!_externalState->shouldIgnoreAuthChecks() && !getAuthenticatedUserNames().more()) {
+            return Status(ErrorCodes::Unauthorized,
+                          str::stream() << "not authorized for collectionless aggregate getMore on "
+                                        << ns.db());
         }
     } else {
         // "ns" is a regular namespace string.  Check if we can perform the find action on it.

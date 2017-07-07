@@ -58,8 +58,8 @@
             privileges: [{resource: {cluster: true}, actions: ["inprog"]}]
         }));
 
-        assert.commandWorked(adminDB.runCommand(
-            {createUser: "user_inprog", pwd: "pwd", roles: ["role_inprog", "readAnyDatabase"]}));
+        assert.commandWorked(
+            adminDB.runCommand({createUser: "user_inprog", pwd: "pwd", roles: ["role_inprog"]}));
 
         assert.commandWorked(adminDB.runCommand(
             {createUser: "user_no_inprog", pwd: "pwd", roles: ["readAnyDatabase"]}));
@@ -79,9 +79,9 @@
     st.ensurePrimaryShard(clusterTestDB.getName(), shardRS.name);
 
     // Run a command on the specified database and return a cursor over the result.
-    function cmdCursor(inputDB, cmd) {
-        return new DBCommandCursor(inputDB.getMongo(),
-                                   assert.commandWorked(inputDB.runCommand(cmd)));
+    function cmdCursor(inputDB, cmd, batchSize) {
+        return new DBCommandCursor(
+            inputDB.getMongo(), assert.commandWorked(inputDB.runCommand(cmd)), batchSize);
     }
 
     // Restarts a replica set with additional parameters, and optionally re-authenticates.
@@ -152,8 +152,40 @@
         awaitShell();
     }
 
-    // Runs a suite of tests for behaviour that is common to both the replica set and cluster
-    // levels.
+    function getCollectionNameFromFullNamespace(ns) {
+        return ns.split(/\.(.+)/)[1];
+    }
+
+    // Generic function for running getMore on a $currentOp aggregation cursor and returning the
+    // command response.
+    function getMoreTest({conn, showAllUsers, getMoreBatchSize}) {
+        // Ensure that there are some other connections present so that the result set is larger
+        // than 1 $currentOp entry.
+        const otherConns = [new Mongo(conn.host), new Mongo(conn.host)];
+
+        // Log the other connections in as user_no_inprog so that they will show up for user_inprog
+        // with {allUsers: true} and user_no_inprog with {allUsers: false}.
+        for (let otherConn of otherConns) {
+            assert(otherConn.getDB("admin").auth("user_no_inprog", "pwd"));
+        }
+
+        const connAdminDB = conn.getDB("admin");
+
+        const aggCmdRes = assert.commandWorked(connAdminDB.runCommand({
+            aggregate: 1,
+            pipeline: [{$currentOp: {allUsers: showAllUsers, idleConnections: true}}],
+            cursor: {batchSize: 0}
+        }));
+        assert.neq(aggCmdRes.cursor.id, 0);
+
+        return connAdminDB.runCommand({
+            getMore: aggCmdRes.cursor.id,
+            collection: getCollectionNameFromFullNamespace(aggCmdRes.cursor.ns),
+            batchSize: (getMoreBatchSize || 100)
+        });
+    }
+
+    // Runs a suite of tests for behaviour common to both the replica set and cluster levels.
     function runCommonTests(conn) {
         const testDB = conn.getDB(jsTestName());
         const adminDB = conn.getDB("admin");
@@ -182,11 +214,24 @@
                 {aggregate: 1, pipeline: [{$currentOp: {allUsers: true}}], cursor: {}}),
             ErrorCodes.Unauthorized);
 
+        // Test that {aggregate: 1} fails when the first stage in the pipeline is not $currentOp.
+        assert.commandFailedWithCode(
+            adminDB.runCommand({aggregate: 1, pipeline: [{$match: {}}], cursor: {}}),
+            ErrorCodes.InvalidNamespace);
+
         //
         // Authenticate as user_inprog.
         //
         assert(adminDB.logout());
         assert(adminDB.auth("user_inprog", "pwd"));
+
+        // Test that $currentOp fails when it is not the first stage in the pipeline. We use two
+        // $currentOp stages since any other stage in the initial position will trip the {aggregate:
+        // 1} namespace check.
+        assert.commandFailedWithCode(
+            adminDB.runCommand(
+                {aggregate: 1, pipeline: [{$currentOp: {}}, {$currentOp: {}}], cursor: {}}),
+            ErrorCodes.BadValue);
 
         // Test that $currentOp fails when run as {aggregate: 1} on a database other than admin.
         assert.commandFailedWithCode(
@@ -205,19 +250,6 @@
             assert.commandWorked(
                 adminDB.runCommand({aggregate: one, pipeline: [{$currentOp: {}}], cursor: {}}));
         }
-
-        // Test that {aggregate: 1} fails when the first stage in the pipeline is not $currentOp.
-        assert.commandFailedWithCode(
-            adminDB.runCommand({aggregate: 1, pipeline: [{$match: {}}], cursor: {}}),
-            ErrorCodes.InvalidNamespace);
-
-        // Test that $currentOp fails when it is not the first stage in the pipeline. We use two
-        // $currentOp stages since any other stage in the initial position will trip the {aggregate:
-        // 1} namespace check.
-        assert.commandFailedWithCode(
-            adminDB.runCommand(
-                {aggregate: 1, pipeline: [{$currentOp: {}}, {$currentOp: {}}], cursor: {}}),
-            ErrorCodes.BadValue);
 
         // Test that $currentOp with {allUsers: true} succeeds for a user with the "inprog"
         // privilege.
@@ -323,6 +355,24 @@
         } else {
             assert.eq(explainPlan.stages, expectedStages);
         }
+
+        // Test that a user with the inprog privilege can run getMore on a $currentOp aggregation
+        // cursor which they created with {allUsers: true}.
+        let getMoreCmdRes = assert.commandWorked(
+            getMoreTest({conn: conn, showAllUsers: true, getMoreBatchSize: 1}));
+
+        // Test that a user without the inprog privilege cannot run getMore on a $currentOp
+        // aggregation cursor created by a user with {allUsers: true}.
+        assert(adminDB.logout());
+        assert(adminDB.auth("user_no_inprog", "pwd"));
+
+        assert.neq(getMoreCmdRes.cursor.id, 0);
+        assert.commandFailedWithCode(adminDB.runCommand({
+            getMore: getMoreCmdRes.cursor.id,
+            collection: getCollectionNameFromFullNamespace(getMoreCmdRes.cursor.ns),
+            batchSize: 100
+        }),
+                                     ErrorCodes.Unauthorized);
     }
 
     runCommonTests(shardConn);
@@ -380,7 +430,7 @@
                       5);
         },
         conn: shardConn,
-        username: "user_no_inprog",
+        username: "admin",
         password: "pwd"
     });
 
@@ -411,7 +461,7 @@
                       5);
         },
         conn: shardConn,
-        username: "user_inprog",
+        username: "admin",
         password: "pwd"
     });
 
@@ -436,6 +486,10 @@
               0);
 
     waitForParallelShell(shardConn, awaitShell);
+
+    // Test that a user without the inprog privilege can run getMore on a $currentOp cursor which
+    // they created with {allUsers: false}.
+    assert.commandWorked(getMoreTest({conn: shardConn, showAllUsers: false}));
 
     // Test that the allUsers parameter is ignored when authentication is disabled.
     restartReplSet(shardRS, {shardsvr: null, keyFile: null});
@@ -462,6 +516,9 @@
     const aggAllUsersFalse = cmdCursor(shardAdminDB, aggCmd).toArray();
 
     assert.eq(aggAllUsersFalse, aggAllUsersTrue);
+
+    // Test that a user can run getMore on a $currentOp cursor when authentication is disabled.
+    assert.commandWorked(getMoreTest({conn: shardConn, showAllUsers: true}));
 
     // Test that the host field is present and the shard field is absent when run on mongoD.
     assert.eq(cmdCursor(shardAdminDB, {
