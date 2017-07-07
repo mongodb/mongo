@@ -202,7 +202,7 @@ class TestGroupExecutor(object):
         success = True
         for job in self._jobs:
             try:
-                if not job.fixture.teardown():
+                if not job.fixture.teardown(finished=True):
                     self.logger.warn("Teardown of %s was not successful.", job.fixture)
                     success = False
             except:
