@@ -86,6 +86,7 @@ var TagsTest = function(options) {
                 {
                   _id: 3,
                   host: nodes[3],
+                  priority: 0,
                   tags: {
                       server: '3',
                       dc: 'sf',
@@ -96,6 +97,7 @@ var TagsTest = function(options) {
                 {
                   _id: 4,
                   host: nodes[4],
+                  priority: 0,
                   tags: {
                       server: '4',
                       dc: 'sf',
