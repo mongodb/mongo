@@ -32,53 +32,18 @@
 
 #include "mongo/util/base64.h"
 
-#include "mongo/util/assert_util.h"
-
-#include <array>
+#include <sstream>
 
 namespace mongo {
 
-using std::begin;
-using std::end;
 using std::string;
 using std::stringstream;
 
-namespace {
-constexpr unsigned char kInvalid = -1;
+namespace base64 {
 
-const class Alphabet {
-public:
-    Alphabet() {
-        decode.fill(kInvalid);
-        for (size_t i = 0; i < encode.size(); ++i) {
-            decode[encode[i]] = i;
-        }
-    }
+Alphabet alphabet;
 
-    unsigned char e(std::uint8_t x) const {
-        return encode[x & 0x3f];
-    }
-
-    std::uint8_t d(unsigned char x) const {
-        auto const c = decode[x];
-        uassert(40533, "Invalid base64 character", c != kInvalid);
-        return c;
-    }
-
-    bool valid(unsigned char x) const {
-        return decode[x] != kInvalid;
-    }
-
-private:
-    StringData encode{
-        "ABCDEFGHIJKLMNOPQRSTUVWXYZ"
-        "abcdefghijklmnopqrstuvwxyz"
-        "0123456789+/"};
-    std::array<unsigned char, 256> decode;
-} alphabet;
-}  // namespace
-
-void base64::encode(stringstream& ss, const char* data, int size) {
+void encode(stringstream& ss, const char* data, int size) {
     for (int i = 0; i < size; i += 3) {
         int left = size - i;
         const unsigned char* start = (const unsigned char*)data + i;
@@ -117,59 +82,51 @@ void base64::encode(stringstream& ss, const char* data, int size) {
 }
 
 
-string base64::encode(const char* data, int size) {
+string encode(const char* data, int size) {
     stringstream ss;
     encode(ss, data, size);
     return ss.str();
 }
 
-string base64::encode(const string& s) {
+string encode(const string& s) {
     return encode(s.c_str(), s.size());
 }
 
 
-void base64::decode(stringstream& ss, const string& s) {
+void decode(stringstream& ss, const string& s) {
     uassert(10270, "invalid base64", s.size() % 4 == 0);
-    auto const data = reinterpret_cast<const unsigned char*>(s.c_str());
-    auto const size = s.size();
-    bool done = false;
+    const unsigned char* data = (const unsigned char*)s.c_str();
+    int size = s.size();
 
-    for (size_t i = 0; i < size; i += 4) {
-        uassert(
-            40534, "Invalid Base64 stream. Additional data following terminating sequence.", !done);
-        auto const start = data + i;
-        done = (start[2] == '=') || (start[3] == '=');
+    unsigned char buf[3];
+    for (int i = 0; i < size; i += 4) {
+        const unsigned char* start = data + i;
+        buf[0] =
+            ((alphabet.decode[start[0]] << 2) & 0xFC) | ((alphabet.decode[start[1]] >> 4) & 0x3);
+        buf[1] =
+            ((alphabet.decode[start[1]] << 4) & 0xF0) | ((alphabet.decode[start[2]] >> 2) & 0xF);
+        buf[2] = ((alphabet.decode[start[2]] << 6) & 0xC0) | ((alphabet.decode[start[3]] & 0x3F));
 
-        ss << (char)(((alphabet.d(start[0]) << 2) & 0xFC) | ((alphabet.d(start[1]) >> 4) & 0x3));
-        if (start[2] != '=') {
-            ss << (char)(((alphabet.d(start[1]) << 4) & 0xF0) |
-                         ((alphabet.d(start[2]) >> 2) & 0xF));
-            if (!done) {
-                ss << (char)(((alphabet.d(start[2]) << 6) & 0xC0) |
-                             ((alphabet.d(start[3]) & 0x3F)));
+        int len = 3;
+        if (start[3] == '=') {
+            len = 2;
+            if (start[2] == '=') {
+                len = 1;
             }
         }
+        ss.write((const char*)buf, len);
     }
 }
 
-string base64::decode(const string& s) {
+string decode(const string& s) {
     stringstream ss;
     decode(ss, s);
     return ss.str();
 }
 
-bool base64::validate(const StringData s) {
-    if (s.size() % 4) {
-        return false;
-    }
-    if (s.empty()) {
-        return true;
-    }
-
-    auto const unwindTerminator = [](auto it) { return (*(it - 1) == '=') ? (it - 1) : it; };
-    auto const e = unwindTerminator(unwindTerminator(end(s)));
-
-    return e == std::find_if(begin(s), e, [](const char ch) { return !alphabet.valid(ch); });
+const char* chars =
+    "ABCDEFGHIJKLMNOPQRSTUVWXYZ"
+    "abcdefghijklmnopqrstuvwxyz"
+    "0123456789+/=";
 }
-
-}  // namespace mongo
+}
