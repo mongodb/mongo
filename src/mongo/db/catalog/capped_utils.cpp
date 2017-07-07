@@ -229,8 +229,8 @@ mongo::Status mongo::cloneCollectionAsCapped(OperationContext* opCtx,
             retries++;  // logAndBackoff expects this to be 1 on first call.
             wce.logAndBackoff(retries, "cloneCollectionAsCapped", fromNss.ns());
 
-            // Can't use WRITE_CONFLICT_RETRY_LOOP macros since we need to save/restore exec
-            // around call to abandonSnapshot.
+            // Can't use writeConflictRetry since we need to save/restore exec around call to
+            // abandonSnapshot.
             exec->saveState();
             opCtx->recoveryUnit()->abandonSnapshot();
             exec->restoreState();  // Handles any WCEs internally.

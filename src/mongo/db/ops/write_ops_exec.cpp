@@ -302,8 +302,8 @@ void insertDocuments(OperationContext* opCtx,
                      Collection* collection,
                      std::vector<BSONObj>::const_iterator begin,
                      std::vector<BSONObj>::const_iterator end) {
-    // Intentionally not using a WRITE_CONFLICT_RETRY_LOOP. That is handled by the caller so it can
-    // react to oversized batches.
+    // Intentionally not using writeConflictRetry. That is handled by the caller so it can react to
+    // oversized batches.
     WriteUnitOfWork wuow(opCtx);
     uassertStatusOK(collection->insertDocuments(
         opCtx, begin, end, &CurOp::get(opCtx)->debug(), /*enforceQuota*/ true));
