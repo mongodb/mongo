@@ -140,12 +140,12 @@ public:
 
     void _sleepInReadLock(mongo::OperationContext* opCtx, long long millis) {
         Lock::GlobalRead lk(opCtx);
-        sleepmillis(millis);
+        opCtx->sleepFor(Milliseconds(millis));
     }
 
     void _sleepInWriteLock(mongo::OperationContext* opCtx, long long millis) {
         Lock::GlobalWrite lk(opCtx);
-        sleepmillis(millis);
+        opCtx->sleepFor(Milliseconds(millis));
     }
 
     CmdSleep() : Command("sleep") {}
@@ -182,7 +182,7 @@ public:
 
             std::string lock(cmdObj.getStringField("lock"));
             if (lock == "none") {
-                sleepmillis(millis);
+                opCtx->sleepFor(Milliseconds(millis));
             } else if (lock == "w") {
                 _sleepInWriteLock(opCtx, millis);
             } else {

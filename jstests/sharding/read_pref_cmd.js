@@ -178,12 +178,27 @@ var testReadPreference = function(conn, hostList, isMongos, mode, tagSets, secEx
             formatProfileQuery({aggregate: 'mrIn'}));
 
     // Test $currentOp aggregation stage.
-    let curOpComment = 'agg_currentOp_' + ObjectId();
+    if (!isMongos) {
+        let curOpComment = 'agg_currentOp_' + ObjectId();
 
-    cmdTest({aggregate: 1, pipeline: [{$currentOp: {}}], comment: curOpComment, cursor: {}},
-            true,
-            formatProfileQuery({comment: curOpComment}),
-            "admin");
+        // A $currentOp without any foreign namespaces takes no collection locks and will not be
+        // profiled, so we add a dummy $lookup stage to force an entry in system.profile.
+        cmdTest({
+            aggregate: 1,
+            pipeline: [
+                {$currentOp: {}},
+                {
+                  $lookup:
+                      {from: "dummy", localField: "dummy", foreignField: "dummy", as: "dummy"}
+                }
+            ],
+            comment: curOpComment,
+            cursor: {}
+        },
+                true,
+                formatProfileQuery({comment: curOpComment}),
+                "admin");
+    }
 };
 
 /**

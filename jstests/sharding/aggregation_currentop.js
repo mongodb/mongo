@@ -125,21 +125,24 @@
 
         const connAdminDB = conn.getDB("admin");
 
+        let curOpResult;
+
         assert.soon(
             function() {
-                return cmdCursor(connAdminDB, {
-                           aggregate: 1,
-                           pipeline: [{$currentOp: curOpOpts}, {$match: currentOpAggFilter}],
-                           cursor: {}
-                       }).itcount() === 1;
+                curOpResult = cmdCursor(connAdminDB, {
+                                  aggregate: 1,
+                                  pipeline: [{$currentOp: curOpOpts}, {$match: currentOpAggFilter}],
+                                  cursor: {}
+                              }).toArray();
+
+                return curOpResult.length === 1;
             },
             function() {
-                const curOps = cmdCursor(
-                    connAdminDB, {aggregate: 1, pipeline: [{$currentOp: curOpOpts}], cursor: {}});
-
                 return "Failed to find operation " + tojson(currentOpAggFilter) +
-                    " in $currentOp output: " + tojson(curOps.toArray());
+                    " in $currentOp output: " + tojson(curOpResult);
             });
+
+        return curOpResult[0];
     }
 
     function waitForParallelShell(conn, awaitShell) {
@@ -478,4 +481,17 @@
         shardAdminDB.runCommand(
             {aggregate: 1, pipeline: [{$currentOp: {}}], fromRouter: true, cursor: {}}),
         40465);
+
+    // Test that $currentOp can run while the mongoD is write-locked.
+    awaitShell = startParallelShell(function() {
+        assert.commandFailedWithCode(db.adminCommand({sleep: 1, lock: "w", secs: 300}),
+                                     ErrorCodes.Interrupted);
+    }, shardConn.port);
+
+    const op = assertCurrentOpHasSingleMatchingEntry(
+        {conn: shardConn, currentOpAggFilter: {"command.sleep": 1, active: true}});
+
+    assert.commandWorked(shardAdminDB.killOp(op.opid));
+
+    awaitShell();
 })();
