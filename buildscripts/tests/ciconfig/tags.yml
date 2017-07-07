@@ -1,0 +1,15 @@
+# Comment
+selector:
+  js_test:
+    jstests/core/example.js:
+    - tag1
+    - tag2
+    - tag3
+    jstests/core/all*.js:
+    - tag3
+    - tag4
+  cpp_unit_test:
+    build/**/auth/*:
+    - tag1
+    build/*:
+  db_test:

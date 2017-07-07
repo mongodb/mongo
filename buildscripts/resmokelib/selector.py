@@ -19,18 +19,7 @@ from . import errors
 from . import utils
 from .utils import globstar
 from .utils import jscomment
-
-
-def _get_file_tags(pathname):
-    """
-    Attempts to read a YAML configuration from 'pathname' that describes
-    the associations of files to tags.
-    """
-
-    if pathname is None:
-        return {}
-
-    return utils.load_yaml_file(pathname).pop("selector")
+from ..ciconfig import tags as _tags
 
 
 def _parse_tag_file(test_kind):
@@ -38,13 +27,16 @@ def _parse_tag_file(test_kind):
     Parse the tag file and return a dict of tagged tests, with the key the filename and
     a list of tags, i.e., {'file1.js': ['tag1', 'tag2'], 'file2.js': ['tag2', 'tag3']}
     """
-    file_tag_selector = _get_file_tags(config.TAG_FILE)
+    if config.TAG_FILE:
+        tags_conf = _tags.TagsConfig(config.TAG_FILE)
+        tagged_roots = tags_conf.get_test_patterns(test_kind)
+    else:
+        tagged_roots = []
     tagged_tests = collections.defaultdict(list)
-    tagged_roots = utils.default_if_none(file_tag_selector.get(test_kind, None), [])
     for tagged_root in tagged_roots:
         # Multiple tests could be returned for a set of tags.
         tests = globstar.iglob(tagged_root)
-        test_tags = tagged_roots[tagged_root]
+        test_tags = tags_conf.get_tags(test_kind, tagged_root)
         for test in tests:
             # A test could have a tag in more than one place, due to wildcards in the selector.
             tagged_tests[test].extend(test_tags)
