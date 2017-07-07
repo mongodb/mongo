@@ -76,6 +76,7 @@
 #include "mongo/s/chunk_version.h"
 #include "mongo/stdx/memory.h"
 #include "mongo/util/log.h"
+#include "mongo/util/time_support.h"
 
 namespace mongo {
 
@@ -220,7 +221,8 @@ public:
     }
 
     std::vector<BSONObj> getCurrentOps(CurrentOpConnectionsMode connMode,
-                                       CurrentOpUserMode userMode) const {
+                                       CurrentOpUserMode userMode,
+                                       CurrentOpTruncateMode truncateMode) const {
         AuthorizationSession* ctxAuth = AuthorizationSession::get(_ctx->opCtx->getClient());
 
         const std::string hostName = getHostNameCachedAndPort();
@@ -268,13 +270,19 @@ public:
 
             // Fill out the rest of the BSONObj with opCtx specific details.
             infoBuilder.appendBool("active", static_cast<bool>(clientOpCtx));
+            infoBuilder.append(
+                "currentOpTime",
+                _ctx->opCtx->getServiceContext()->getPreciseClockSource()->now().toString());
+
             if (clientOpCtx) {
                 infoBuilder.append("opid", clientOpCtx->getOpID());
                 if (clientOpCtx->isKillPending()) {
                     infoBuilder.append("killPending", true);
                 }
 
-                CurOp::get(clientOpCtx)->reportState(&infoBuilder);
+                CurOp::get(clientOpCtx)
+                    ->reportState(&infoBuilder,
+                                  (truncateMode == CurrentOpTruncateMode::kTruncateOps));
 
                 Locker::LockerInfo lockerInfo;
                 clientOpCtx->lockState()->getLockerInfo(&lockerInfo);

@@ -34,13 +34,15 @@ namespace mongo {
 
 class DocumentSourceCurrentOp final : public DocumentSourceNeedsMongod {
 public:
+    using TruncationMode = MongodInterface::CurrentOpTruncateMode;
     using ConnMode = MongodInterface::CurrentOpConnectionsMode;
     using UserMode = MongodInterface::CurrentOpUserMode;
 
     static boost::intrusive_ptr<DocumentSourceCurrentOp> create(
         const boost::intrusive_ptr<ExpressionContext>& pExpCtx,
         ConnMode includeIdleConnections = ConnMode::kExcludeIdle,
-        UserMode includeOpsFromAllUsers = UserMode::kExcludeOthers);
+        UserMode includeOpsFromAllUsers = UserMode::kExcludeOthers,
+        TruncationMode truncateOps = TruncationMode::kNoTruncation);
 
     GetNextResult getNext() final;
 
@@ -56,13 +58,16 @@ public:
 private:
     DocumentSourceCurrentOp(const boost::intrusive_ptr<ExpressionContext>& pExpCtx,
                             ConnMode includeIdleConnections = ConnMode::kExcludeIdle,
-                            UserMode includeOpsFromAllUsers = UserMode::kExcludeOthers)
+                            UserMode includeOpsFromAllUsers = UserMode::kExcludeOthers,
+                            TruncationMode truncateOps = TruncationMode::kNoTruncation)
         : DocumentSourceNeedsMongod(pExpCtx),
           _includeIdleConnections(includeIdleConnections),
-          _includeOpsFromAllUsers(includeOpsFromAllUsers) {}
+          _includeOpsFromAllUsers(includeOpsFromAllUsers),
+          _truncateOps(truncateOps) {}
 
     ConnMode _includeIdleConnections = ConnMode::kExcludeIdle;
     UserMode _includeOpsFromAllUsers = UserMode::kExcludeOthers;
+    TruncationMode _truncateOps = TruncationMode::kNoTruncation;
 
     std::string _shardName;
 

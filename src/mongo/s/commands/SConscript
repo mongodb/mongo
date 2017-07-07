@@ -15,6 +15,7 @@ env.Library(
         '$BUILD_DIR/mongo/db/commands',
         '$BUILD_DIR/mongo/s/client/sharding_client',
         '$BUILD_DIR/mongo/db/commands/killcursors_common',
+        '$BUILD_DIR/mongo/db/commands/current_op_common',
         '$BUILD_DIR/mongo/s/async_requests_sender',
         '$BUILD_DIR/mongo/s/client/parallel',
         '$BUILD_DIR/mongo/s/coreshard',

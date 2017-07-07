@@ -555,6 +555,7 @@ public:
     public:
         enum class CurrentOpConnectionsMode { kIncludeIdle, kExcludeIdle };
         enum class CurrentOpUserMode { kIncludeAll, kExcludeOthers };
+        enum class CurrentOpTruncateMode { kNoTruncation, kTruncateOps };
 
         virtual ~MongodInterface(){};
 
@@ -637,7 +638,8 @@ public:
          * operations.
          */
         virtual std::vector<BSONObj> getCurrentOps(CurrentOpConnectionsMode connMode,
-                                                   CurrentOpUserMode userMode) const = 0;
+                                                   CurrentOpUserMode userMode,
+                                                   CurrentOpTruncateMode) const = 0;
 
         /**
          * Returns the name of the local shard if sharding is enabled, or an empty string.

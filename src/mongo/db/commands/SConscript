@@ -202,9 +202,10 @@ env.Library(
         '$BUILD_DIR/mongo/s/client/parallel',
         'apply_ops_cmd_common',
         'core',
+        'current_op_common',
         'dcommands_fcv',
         'dcommands_fsync',
-        'killcursors_common',
+        'killcursors_common'
     ],
 )
 
@@ -219,6 +220,20 @@ env.Library(
         '$BUILD_DIR/mongo/db/auth/authorization_manager_global',
         '$BUILD_DIR/mongo/db/query/command_request_response',
     ],
+)
+
+env.Library(
+    target='current_op_common',
+    source=[
+        'current_op_common.cpp'
+    ],
+    LIBDEPS=[
+        '$BUILD_DIR/mongo/db/commands',
+        '$BUILD_DIR/mongo/db/namespace_string',
+        '$BUILD_DIR/mongo/db/pipeline/aggregation_request',
+        '$BUILD_DIR/mongo/db/query/command_request_response',
+        '$BUILD_DIR/mongo/db/service_context',
+    ]
 )
 
 env.Library(

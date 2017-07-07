@@ -298,48 +298,40 @@ Command::ReadWriteType CurOp::getReadWriteType() const {
 namespace {
 
 /**
- * Used by callers of appendAsObjOrString to indicate whether a comment parameter may be present and
- * should be retained upon truncation.
- */
-enum class TruncationMode { kNoComment, kIncludeComment };
-
-/**
  * Appends {<name>: obj} to the provided builder.  If obj is greater than maxSize, appends a string
  * summary of obj as { <name>: { $truncated: "obj" } }. If a comment parameter is present, add it to
  * the truncation object.
  */
 void appendAsObjOrString(StringData name,
                          const BSONObj& obj,
-                         size_t maxSize,
-                         BSONObjBuilder* builder,
-                         TruncationMode truncateBehavior = TruncationMode::kNoComment) {
-    if (static_cast<size_t>(obj.objsize()) <= maxSize) {
+                         const boost::optional<size_t> maxSize,
+                         BSONObjBuilder* builder) {
+    if (!maxSize || static_cast<size_t>(obj.objsize()) <= *maxSize) {
         builder->append(name, obj);
     } else {
         // Generate an abbreviated serialization for the object, by passing false as the
         // "full" argument to obj.toString().
         std::string objToString = obj.toString();
-        if (objToString.size() > maxSize) {
+        if (objToString.size() > *maxSize) {
             // objToString is still too long, so we append to the builder a truncated form
             // of objToString concatenated with "...".  Instead of creating a new string
             // temporary, mutate objToString to do this (we know that we can mutate
             // characters in objToString up to and including objToString[maxSize]).
-            objToString[maxSize - 3] = '.';
-            objToString[maxSize - 2] = '.';
-            objToString[maxSize - 1] = '.';
+            objToString[*maxSize - 3] = '.';
+            objToString[*maxSize - 2] = '.';
+            objToString[*maxSize - 1] = '.';
         }
 
-        StringData truncation = StringData(objToString).substr(0, maxSize);
+        StringData truncation = StringData(objToString).substr(0, *maxSize);
 
-        // Append the truncated representation of the object to the builder. If this is an operation
-        // which supports a comment parameter and one is present, write it to the object alongside
-        // the truncated op. This object will appear as {$truncated: "{find: \"collection\", filter:
-        // {x: 1, ...", comment: "comment text" }
+        // Append the truncated representation of the object to the builder. If a comment parameter
+        // is present, write it to the object alongside the truncated op. This object will appear as
+        // {$truncated: "{find: \"collection\", filter: {x: 1, ...", comment: "comment text" }
         BSONObjBuilder truncatedBuilder(builder->subobjStart(name));
         truncatedBuilder.append("$truncated", truncation);
 
-        if (truncateBehavior == TruncationMode::kIncludeComment && obj["comment"]) {
-            truncatedBuilder.append(obj["comment"]);
+        if (auto comment = obj["comment"]) {
+            truncatedBuilder.append(comment);
         }
 
         truncatedBuilder.doneFast();
@@ -347,7 +339,7 @@ void appendAsObjOrString(StringData name,
 }
 }  // namespace
 
-void CurOp::reportState(BSONObjBuilder* builder) {
+void CurOp::reportState(BSONObjBuilder* builder, bool truncateOps) {
     if (_start) {
         builder->append("secs_running", durationCount<Seconds>(elapsedTimeTotal()));
         builder->append("microsecs_running", durationCount<Microseconds>(elapsedTimeTotal()));
@@ -356,10 +348,11 @@ void CurOp::reportState(BSONObjBuilder* builder) {
     builder->append("op", logicalOpToString(_logicalOp));
     builder->append("ns", _ns);
 
-    // When currentOp is run, it returns a single response object containing all current
-    // operations. This request will fail if the response exceeds the 16MB document limit. We limit
-    // query object size here to reduce the risk of exceeding.
-    const size_t maxQuerySize = 1000;
+    // When the currentOp command is run, it returns a single response object containing all current
+    // operations; this request will fail if the response exceeds the 16MB document limit. By
+    // contrast, the $currentOp aggregation stage does not have this restriction. If 'truncateOps'
+    // is true, limit the size of each op to 1000 bytes. Otherwise, do not truncate.
+    const boost::optional<size_t> maxQuerySize{truncateOps, 1000};
 
     if (!_command && _networkOp == dbQuery) {
         // This is a legacy OP_QUERY. We upconvert the "query" field of the currentOp output to look
@@ -374,23 +367,13 @@ void CurOp::reportState(BSONObjBuilder* builder) {
             "command",
             upconvertQueryEntry(_opDescription, NamespaceString(_ns), ntoreturn, ntoskip),
             maxQuerySize,
-            builder,
-            TruncationMode::kIncludeComment);
+            builder);
     } else {
-        appendAsObjOrString(
-            "command",
-            _opDescription,
-            maxQuerySize,
-            builder,
-            (_isCommand ? TruncationMode::kIncludeComment : TruncationMode::kNoComment));
+        appendAsObjOrString("command", _opDescription, maxQuerySize, builder);
     }
 
     if (!_originatingCommand.isEmpty()) {
-        appendAsObjOrString("originatingCommand",
-                            _originatingCommand,
-                            maxQuerySize,
-                            builder,
-                            TruncationMode::kIncludeComment);
+        appendAsObjOrString("originatingCommand", _originatingCommand, maxQuerySize, builder);
     }
 
     if (!_planSummary.empty()) {
@@ -573,24 +556,14 @@ void OpDebug::append(const CurOp& curop,
         appendAsObjOrString("command",
                             upconvertQueryEntry(curop.opDescription(), nss, ntoreturn, ntoskip),
                             maxElementSize,
-                            &b,
-                            TruncationMode::kIncludeComment);
+                            &b);
     } else if (curop.haveOpDescription()) {
-        appendAsObjOrString(
-            "command",
-            curop.opDescription(),
-            maxElementSize,
-            &b,
-            (iscommand ? TruncationMode::kIncludeComment : TruncationMode::kNoComment));
+        appendAsObjOrString("command", curop.opDescription(), maxElementSize, &b);
     }
 
     auto originatingCommand = curop.originatingCommand();
     if (!originatingCommand.isEmpty()) {
-        appendAsObjOrString("originatingCommand",
-                            originatingCommand,
-                            maxElementSize,
-                            &b,
-                            TruncationMode::kIncludeComment);
+        appendAsObjOrString("originatingCommand", originatingCommand, maxElementSize, &b);
     }
 
     OPDEBUG_APPEND_NUMBER(cursorid);

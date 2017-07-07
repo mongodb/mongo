@@ -41,6 +41,7 @@ class KillCursorsCmdBase : public Command {
 public:
     KillCursorsCmdBase() : Command("killCursors") {}
 
+    virtual ~KillCursorsCmdBase() {}
 
     virtual bool supportsWriteConcern(const BSONObj& cmd) const override {
         return false;

@@ -1,12 +1,15 @@
 /**
  * Tests that the $currentOp aggregation stage behaves as expected. Specifically:
- * - It must be the fist stage in the pipeline.
+ * - It must be the first stage in the pipeline.
  * - It can only be run on admin, and the "aggregate" field must be 1.
  * - Only active connections are shown unless {idleConnections: true} is specified.
  * - A user without the inprog privilege can see their own ops, but no-one else's.
  * - A user with the inprog privilege can see all ops.
  * - Non-local readConcerns are rejected.
  * - Collation rules are respected.
+ *
+ * Also verifies that the aggregation-backed currentOp command obeys the same rules, where
+ * applicable.
  *
  * This test requires replica set configuration and user credentials to persist across a restart.
  * @tags: [requires_persistence]
@@ -78,12 +81,6 @@
 
     st.ensurePrimaryShard(clusterTestDB.getName(), shardRS.name);
 
-    // Run a command on the specified database and return a cursor over the result.
-    function cmdCursor(inputDB, cmd, batchSize) {
-        return new DBCommandCursor(
-            inputDB.getMongo(), assert.commandWorked(inputDB.runCommand(cmd)), batchSize);
-    }
-
     // Restarts a replica set with additional parameters, and optionally re-authenticates.
     function restartReplSet(replSet, newOpts, user, pwd) {
         const numNodes = replSet.nodeList().length;
@@ -129,11 +126,9 @@
 
         assert.soon(
             function() {
-                curOpResult = cmdCursor(connAdminDB, {
-                                  aggregate: 1,
-                                  pipeline: [{$currentOp: curOpOpts}, {$match: currentOpAggFilter}],
-                                  cursor: {}
-                              }).toArray();
+                curOpResult =
+                    connAdminDB.aggregate([{$currentOp: curOpOpts}, {$match: currentOpAggFilter}])
+                        .toArray();
 
                 return curOpResult.length === 1;
             },
@@ -201,6 +196,10 @@
                 {aggregate: 1, pipeline: [{$currentOp: {allUsers: false}}], cursor: {}}),
             ErrorCodes.Unauthorized);
 
+        // Test that an unauthenticated connection cannot run the currentOp command even with
+        // {$ownOps: true}.
+        assert.commandFailedWithCode(adminDB.currentOp({$ownOps: true}), ErrorCodes.Unauthorized);
+
         //
         // Authenticate as user_no_inprog.
         //
@@ -213,6 +212,10 @@
             adminDB.runCommand(
                 {aggregate: 1, pipeline: [{$currentOp: {allUsers: true}}], cursor: {}}),
             ErrorCodes.Unauthorized);
+
+        // Test that the currentOp command fails with {ownOps: false} for a user without the
+        // "inprog" privilege.
+        assert.commandFailedWithCode(adminDB.currentOp({$ownOps: false}), ErrorCodes.Unauthorized);
 
         // Test that {aggregate: 1} fails when the first stage in the pipeline is not $currentOp.
         assert.commandFailedWithCode(
@@ -233,28 +236,41 @@
                 {aggregate: 1, pipeline: [{$currentOp: {}}, {$currentOp: {}}], cursor: {}}),
             ErrorCodes.BadValue);
 
-        // Test that $currentOp fails when run as {aggregate: 1} on a database other than admin.
-        assert.commandFailedWithCode(
-            testDB.runCommand({aggregate: 1, pipeline: [{$currentOp: {}}], cursor: {}}),
-            ErrorCodes.InvalidNamespace);
-
         // Test that $currentOp fails when run on admin without {aggregate: 1}.
         assert.commandFailedWithCode(
             adminDB.runCommand({aggregate: "collname", pipeline: [{$currentOp: {}}], cursor: {}}),
             ErrorCodes.InvalidNamespace);
 
-        // Test that $currentOp accepts all numeric types.
+        // Test that $currentOp fails when run as {aggregate: 1} on a database other than admin.
+        assert.commandFailedWithCode(
+            testDB.runCommand({aggregate: 1, pipeline: [{$currentOp: {}}], cursor: {}}),
+            ErrorCodes.InvalidNamespace);
+
+        // Test that the currentOp command fails when run directly on a database other than admin.
+        assert.commandFailedWithCode(testDB.runCommand({currentOp: 1}), ErrorCodes.Unauthorized);
+
+        // Test that the currentOp command helper succeeds when run on a database other than admin.
+        // This is because the currentOp shell helper redirects the command to the admin database.
+        assert.commandWorked(testDB.currentOp());
+
+        // Test that $currentOp and the currentOp command accept all numeric types.
         const ones = [1, 1.0, NumberInt(1), NumberLong(1), NumberDecimal(1)];
 
         for (let one of ones) {
             assert.commandWorked(
                 adminDB.runCommand({aggregate: one, pipeline: [{$currentOp: {}}], cursor: {}}));
+
+            assert.commandWorked(adminDB.runCommand({currentOp: one, $ownOps: true}));
         }
 
         // Test that $currentOp with {allUsers: true} succeeds for a user with the "inprog"
         // privilege.
         assert.commandWorked(adminDB.runCommand(
             {aggregate: 1, pipeline: [{$currentOp: {allUsers: true}}], cursor: {}}));
+
+        // Test that the currentOp command with {$ownOps: false} succeeds for a user with the
+        // "inprog" privilege.
+        assert.commandWorked(adminDB.currentOp({$ownOps: false}));
 
         // Test that $currentOp succeeds if local readConcern is specified.
         assert.commandWorked(adminDB.runCommand({
@@ -276,60 +292,61 @@
         // Test that {idleConnections: false} returns only active connections.
         const idleConn = new Mongo(conn.host);
 
-        assert.eq(cmdCursor(adminDB, {
-                      aggregate: 1,
-                      pipeline: [
+        assert.eq(adminDB
+                      .aggregate([
                           {$currentOp: {allUsers: true, idleConnections: false}},
-                          {$match: {"active": false}}
-                      ],
-                      cursor: {}
-                  }).itcount(),
+                          {$match: {active: false}}
+                      ])
+                      .itcount(),
                   0);
 
+        // Test that the currentOp command with {$all: false} returns only active connections.
+        assert.eq(adminDB.currentOp({$ownOps: false, $all: false, active: false}).inprog.length, 0);
+
         // Test that {idleConnections: true} returns inactive connections.
-        assert.gte(cmdCursor(adminDB, {
-                       aggregate: 1,
-                       pipeline: [
+        assert.gte(adminDB
+                       .aggregate([
                            {$currentOp: {allUsers: true, idleConnections: true}},
                            {$match: {active: false}}
-                       ],
-                       cursor: {}
-                   }).itcount(),
+                       ])
+                       .itcount(),
                    1);
+
+        // Test that the currentOp command with {$all: true} returns inactive connections.
+        assert.gte(adminDB.currentOp({$ownOps: false, $all: true, active: false}).inprog.length, 1);
 
         // Test that collation rules apply to matches on $currentOp output.
         const matchField = (isMongos ? "originatingCommand.comment" : "command.comment");
         const numExpectedMatches = (isMongos ? 3 : 1);
 
         assert.eq(
-            cmdCursor(adminDB, {
-                aggregate: 1,
-                pipeline: [{$currentOp: {}}, {$match: {[matchField]: "AGG_currént_op_COLLATION"}}],
-                collation: {locale: "en_US", strength: 1},  // Case and diacritic insensitive.
-                comment: "agg_current_op_collation",
-                cursor: {}
-            }).itcount(),
+            adminDB
+                .aggregate(
+                    [{$currentOp: {}}, {$match: {[matchField]: "AGG_currént_op_COLLATION"}}],
+                    {
+                      collation: {locale: "en_US", strength: 1},  // Case and diacritic insensitive.
+                      comment: "agg_current_op_collation"
+                    })
+                .itcount(),
             numExpectedMatches);
 
         // Test that $currentOp output can be processed by $facet subpipelines.
-        assert.eq(cmdCursor(adminDB, {
-                      aggregate: 1,
-                      pipeline: [
-                          {$currentOp: {}},
-                          {
-                            $facet: {
-                                testFacet: [
-                                    {$match: {[matchField]: "agg_current_op_facets"}},
-                                    {$count: "count"}
-                                ]
-                            }
-                          },
-                          {$unwind: "$testFacet"},
-                          {$replaceRoot: {newRoot: "$testFacet"}}
-                      ],
-                      comment: "agg_current_op_facets",
-                      cursor: {}
-                  })
+        assert.eq(adminDB
+                      .aggregate(
+                          [
+                            {$currentOp: {}},
+                            {
+                              $facet: {
+                                  testFacet: [
+                                      {$match: {[matchField]: "agg_current_op_facets"}},
+                                      {$count: "count"}
+                                  ]
+                              }
+                            },
+                            {$unwind: "$testFacet"},
+                            {$replaceRoot: {newRoot: "$testFacet"}}
+                          ],
+                          {comment: "agg_current_op_facets"})
                       .next()
                       .count,
                   numExpectedMatches);
@@ -342,8 +359,10 @@
             explain: true
         }));
 
-        const expectedStages =
-            [{$currentOp: {idleConnections: true, allUsers: false}}, {$match: {desc: "test"}}];
+        const expectedStages = [
+            {$currentOp: {idleConnections: true, allUsers: false, truncateOps: false}},
+            {$match: {desc: "test"}}
+        ];
 
         if (isMongos) {
             assert.eq(explainPlan.splitPipeline.shardsPart, expectedStages);
@@ -392,20 +411,23 @@
             {aggregate: 1, pipeline: [{$currentOp: {allUsers: false}}], cursor: {}}),
         ErrorCodes.Unauthorized);
 
+    // Test that a user without the inprog privilege cannot run the currentOp command via mongoS
+    // even if $ownOps is true.
+    assert.commandFailedWithCode(clusterAdminDB.currentOp({$ownOps: true}),
+                                 ErrorCodes.Unauthorized);
+
     // Test that a $currentOp pipeline returns results from all shards, and includes both the shard
     // and host names.
     assert(clusterAdminDB.logout());
     assert(clusterAdminDB.auth("user_inprog", "pwd"));
 
-    assert.eq(cmdCursor(clusterAdminDB, {
-                  aggregate: 1,
-                  pipeline: [
+    assert.eq(clusterAdminDB
+                  .aggregate([
                       {$currentOp: {allUsers: true, idleConnections: true}},
                       {$group: {_id: {shard: "$shard", host: "$host"}}},
                       {$sort: {_id: 1}}
-                  ],
-                  cursor: {}
-              }).toArray(),
+                  ])
+                  .toArray(),
               [
                 {_id: {shard: "aggregation_currentop-rs0", host: st.rs0.getPrimary().host}},
                 {_id: {shard: "aggregation_currentop-rs1", host: st.rs1.getPrimary().host}},
@@ -437,6 +459,13 @@
     assertCurrentOpHasSingleMatchingEntry(
         {conn: shardConn, currentOpAggFilter: {"command.comment": "agg_current_op_allusers_test"}});
 
+    // Test that the currentOp command can see another user's operations with {$ownOps: false}.
+    assert.eq(
+        shardAdminDB.currentOp({$ownOps: false, "command.comment": "agg_current_op_allusers_test"})
+            .inprog.length,
+        1);
+
+    // Allow the op to complete.
     waitForParallelShell(shardConn, awaitShell);
 
     // Test that $currentOp succeeds with {allUsers: false} for a user without the "inprog"
@@ -446,6 +475,10 @@
 
     assert.commandWorked(shardAdminDB.runCommand(
         {aggregate: 1, pipeline: [{$currentOp: {allUsers: false}}], cursor: {}}));
+
+    // Test that the currentOp command succeeds with {$ownOps: true} for a user without the "inprog"
+    // privilege when run on a mongoD.
+    assert.commandWorked(shardAdminDB.currentOp({$ownOps: true}));
 
     // Test that a user without the inprog privilege cannot see another user's operations.
     // Temporarily log in as 'user_inprog' to validate that the op is present in $currentOp output.
@@ -475,15 +508,20 @@
     assert(shardAdminDB.logout());
     assert(shardAdminDB.auth("user_no_inprog", "pwd"));
 
-    assert.eq(cmdCursor(shardAdminDB, {
-                  aggregate: 1,
-                  pipeline: [
+    assert.eq(shardAdminDB
+                  .aggregate([
                       {$currentOp: {allUsers: false}},
                       {$match: {"command.comment": "agg_current_op_allusers_test"}}
-                  ],
-                  cursor: {}
-              }).itcount(),
+                  ])
+                  .itcount(),
               0);
+
+    // Test that a user without the inprog privilege cannot see another user's operations via the
+    // currentOp command.
+    assert.eq(
+        shardAdminDB.currentOp({$ownOps: true, "command.comment": "agg_current_op_allusers_test"})
+            .inprog.length,
+        0);
 
     waitForParallelShell(shardConn, awaitShell);
 
@@ -498,37 +536,33 @@
     const otherConn = new Mongo(shardConn.host);
 
     // Verify that $currentOp displays all operations when auth is disabled regardless of the
-    // allUsers parameter, by checking that the output is the same in both cases. We project
-    // static fields from each operation so that a thread which becomes active between the two
-    // aggregations is still comparable across the output of both.
-    let aggCmd = {
-        aggregate: 1,
-        pipeline: [
-            {$currentOp: {allUsers: true, idleConnections: true}},
-            {$project: {desc: 1, threadId: 1, connectionId: 1, appName: 1}},
-            {$sort: {threadId: 1}}
-        ],
-        cursor: {}
-    };
+    // allUsers parameter, by confirming that we can see non-client system operations when
+    // {allUsers: false} is specified.
+    assert.gte(shardAdminDB
+                   .aggregate([
+                       {$currentOp: {allUsers: false, idleConnections: true}},
+                       {$match: {connectionId: {$exists: false}}}
+                   ])
+                   .itcount(),
+               1);
 
-    const aggAllUsersTrue = cmdCursor(shardAdminDB, aggCmd).toArray();
-    aggCmd.pipeline[0].$currentOp.allUsers = false;
-    const aggAllUsersFalse = cmdCursor(shardAdminDB, aggCmd).toArray();
-
-    assert.eq(aggAllUsersFalse, aggAllUsersTrue);
+    // Verify that the currentOp command displays all operations when auth is disabled regardless of
+    // the $ownOps parameter, by confirming that we can see non-client system operations when
+    // {$ownOps: true} is specified.
+    assert.gte(shardAdminDB.currentOp({$ownOps: true, $all: true, connectionId: {$exists: false}})
+                   .inprog.length,
+               1);
 
     // Test that a user can run getMore on a $currentOp cursor when authentication is disabled.
     assert.commandWorked(getMoreTest({conn: shardConn, showAllUsers: true}));
 
     // Test that the host field is present and the shard field is absent when run on mongoD.
-    assert.eq(cmdCursor(shardAdminDB, {
-                  aggregate: 1,
-                  pipeline: [
+    assert.eq(shardAdminDB
+                  .aggregate([
                       {$currentOp: {allUsers: true, idleConnections: true}},
                       {$group: {_id: {shard: "$shard", host: "$host"}}}
-                  ],
-                  cursor: {}
-              }).toArray(),
+                  ])
+                  .toArray(),
               [
                 {_id: {host: shardConn.host}},
               ]);
@@ -538,6 +572,34 @@
         shardAdminDB.runCommand(
             {aggregate: 1, pipeline: [{$currentOp: {}}], fromRouter: true, cursor: {}}),
         40465);
+
+    // Test that an operation which is at the BSON user size limit does not throw an error when the
+    // currentOp metadata is added to the output document.
+    const bsonUserSizeLimit = assert.commandWorked(shardAdminDB.isMaster()).maxBsonObjectSize;
+
+    let aggPipeline = [
+        {$currentOp: {}},
+        {
+          $match: {
+              $or: [
+                  {
+                    "command.comment": "agg_current_op_bson_limit_test",
+                    "command.$truncated": {$exists: false}
+                  },
+                  {padding: ""}
+              ]
+          }
+        }
+    ];
+
+    aggPipeline[1].$match.$or[1].padding =
+        "a".repeat(bsonUserSizeLimit - Object.bsonsize(aggPipeline));
+
+    assert.eq(Object.bsonsize(aggPipeline), bsonUserSizeLimit);
+
+    assert.eq(
+        shardAdminDB.aggregate(aggPipeline, {comment: "agg_current_op_bson_limit_test"}).itcount(),
+        1);
 
     // Test that $currentOp can run while the mongoD is write-locked.
     awaitShell = startParallelShell(function() {

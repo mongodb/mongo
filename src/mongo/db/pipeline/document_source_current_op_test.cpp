@@ -65,7 +65,8 @@ public:
     MockMongodImplementation(bool hasShardName = true) : _hasShardName(hasShardName) {}
 
     std::vector<BSONObj> getCurrentOps(CurrentOpConnectionsMode connMode,
-                                       CurrentOpUserMode userMode) const {
+                                       CurrentOpUserMode userMode,
+                                       CurrentOpTruncateMode truncateMode) const {
         return _ops;
     }
 
@@ -119,6 +120,13 @@ TEST_F(DocumentSourceCurrentOpTest, ShouldFailToParseAllUsersIfNotBoolean) {
                        ErrorCodes::FailedToParse);
 }
 
+TEST_F(DocumentSourceCurrentOpTest, ShouldFailToParseTruncateOpsIfNotBoolean) {
+    const auto specObj = fromjson("{$currentOp:{truncateOps:1}}");
+    ASSERT_THROWS_CODE(DocumentSourceCurrentOp::createFromBson(specObj.firstElement(), getExpCtx()),
+                       UserException,
+                       ErrorCodes::FailedToParse);
+}
+
 TEST_F(DocumentSourceCurrentOpTest, ShouldFailToParseIfUnrecognisedParameterSpecified) {
     const auto specObj = fromjson("{$currentOp:{foo:true}}");
     ASSERT_THROWS_CODE(DocumentSourceCurrentOp::createFromBson(specObj.firstElement(), getExpCtx()),
@@ -127,7 +135,8 @@ TEST_F(DocumentSourceCurrentOpTest, ShouldFailToParseIfUnrecognisedParameterSpec
 }
 
 TEST_F(DocumentSourceCurrentOpTest, ShouldParseAndSerializeTrueOptionalArguments) {
-    const auto specObj = fromjson("{$currentOp:{idleConnections:true, allUsers:true}}");
+    const auto specObj =
+        fromjson("{$currentOp:{idleConnections:true, allUsers:true, truncateOps:true}}");
 
     const auto parsed =
         DocumentSourceCurrentOp::createFromBson(specObj.firstElement(), getExpCtx());
@@ -135,21 +144,24 @@ TEST_F(DocumentSourceCurrentOpTest, ShouldParseAndSerializeTrueOptionalArguments
     const auto currentOp = static_cast<DocumentSourceCurrentOp*>(parsed.get());
 
     const auto expectedOutput =
-        Document{{"$currentOp", Document{{"idleConnections", true}, {"allUsers", true}}}};
+        Document{{"$currentOp",
+                  Document{{"idleConnections", true}, {"allUsers", true}, {"truncateOps", true}}}};
 
     ASSERT_DOCUMENT_EQ(currentOp->serialize().getDocument(), expectedOutput);
 }
 
 TEST_F(DocumentSourceCurrentOpTest, ShouldParseAndSerializeFalseOptionalArguments) {
-    const auto specObj = fromjson("{$currentOp:{idleConnections:false, allUsers:false}}");
+    const auto specObj =
+        fromjson("{$currentOp:{idleConnections:false, allUsers:false, truncateOps:false}}");
 
     const auto parsed =
         DocumentSourceCurrentOp::createFromBson(specObj.firstElement(), getExpCtx());
 
     const auto currentOp = static_cast<DocumentSourceCurrentOp*>(parsed.get());
 
-    const auto expectedOutput =
-        Document{{"$currentOp", Document{{"idleConnections", false}, {"allUsers", false}}}};
+    const auto expectedOutput = Document{
+        {"$currentOp",
+         Document{{"idleConnections", false}, {"allUsers", false}, {"truncateOps", false}}}};
 
     ASSERT_DOCUMENT_EQ(currentOp->serialize().getDocument(), expectedOutput);
 }
@@ -162,8 +174,9 @@ TEST_F(DocumentSourceCurrentOpTest, ShouldSerializeOmittedOptionalArgumentsAsDef
 
     const auto currentOp = static_cast<DocumentSourceCurrentOp*>(parsed.get());
 
-    const auto expectedOutput =
-        Document{{"$currentOp", Document{{"idleConnections", false}, {"allUsers", false}}}};
+    const auto expectedOutput = Document{
+        {"$currentOp",
+         Document{{"idleConnections", false}, {"allUsers", false}, {"truncateOps", false}}}};
 
     ASSERT_DOCUMENT_EQ(currentOp->serialize().getDocument(), expectedOutput);
 }

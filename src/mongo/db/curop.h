@@ -382,12 +382,14 @@ public:
     Command::ReadWriteType getReadWriteType() const;
 
     /**
-     * Appends information about this CurOp to "builder".
+     * Appends information about this CurOp to "builder". If "truncateOps" is true, appends a string
+     * summary of any objects which exceed the threshold size. If truncateOps is false, append the
+     * entire object.
      *
      * If called from a thread other than the one executing the operation associated with this
      * CurOp, it is necessary to lock the associated Client object before executing this method.
      */
-    void reportState(BSONObjBuilder* builder);
+    void reportState(BSONObjBuilder* builder, bool truncateOps = false);
 
     /**
      * Sets the message and the progress meter for this CurOp.

@@ -26,49 +26,30 @@
  *    then also delete it in the license file.
  */
 
-#define MONGO_LOG_DEFAULT_COMPONENT ::mongo::logger::LogComponent::kCommand
-
 #include "mongo/platform/basic.h"
+
+#include "mongo/db/commands/current_op_common.h"
 
 #include <tuple>
 #include <vector>
 
-#include "mongo/client/connpool.h"
 #include "mongo/db/auth/action_type.h"
 #include "mongo/db/auth/authorization_session.h"
-#include "mongo/db/commands.h"
-#include "mongo/db/jsobj.h"
-#include "mongo/s/client/shard_registry.h"
-#include "mongo/s/commands/cluster_commands_helpers.h"
-#include "mongo/s/commands/strategy.h"
-#include "mongo/s/grid.h"
-#include "mongo/util/log.h"
-#include "mongo/util/mongoutils/str.h"
+#include "mongo/db/client.h"
+#include "mongo/db/pipeline/document.h"
+#include "mongo/s/commands/cluster_aggregate.h"
 
 namespace mongo {
 namespace {
 
-const char kInprogFieldName[] = "inprog";
-const char kOpIdFieldName[] = "opid";
-const char kClientFieldName[] = "client";
-// awkward underscores used to make this visually distinct from kClientFieldName
-const char kClient_S_FieldName[] = "client_s";
-const char kCommandName[] = "currentOp";
+class ClusterCurrentOpCommand final : public CurrentOpCommandBase {
+    MONGO_DISALLOW_COPYING(ClusterCurrentOpCommand);
 
-class ClusterCurrentOpCommand : public Command {
 public:
-    ClusterCurrentOpCommand() : Command(kCommandName) {}
-
-    bool slaveOk() const override {
-        return true;
-    }
-
-    bool adminOnly() const final {
-        return true;
-    }
+    ClusterCurrentOpCommand() = default;
 
     Status checkAuthForCommand(Client* client,
-                               const std::string& dbname,
+                               const std::string& dbName,
                                const BSONObj& cmdObj) final {
         bool isAuthorized = AuthorizationSession::get(client)->isAuthorizedForActionsOnResource(
             ResourcePattern::forClusterResource(), ActionType::inprog);
@@ -76,103 +57,37 @@ public:
         return isAuthorized ? Status::OK() : Status(ErrorCodes::Unauthorized, "Unauthorized");
     }
 
-    virtual bool supportsWriteConcern(const BSONObj& cmd) const override {
-        return false;
+private:
+    virtual void modifyPipeline(std::vector<BSONObj>* pipeline) const final {
+        BSONObjBuilder sortBuilder;
+
+        BSONObjBuilder sortSpecBuilder(sortBuilder.subobjStart("$sort"));
+        sortSpecBuilder.append("shard", 1);
+        sortSpecBuilder.doneFast();
+
+        pipeline->push_back(sortBuilder.obj());
     }
 
-    bool run(OperationContext* opCtx,
-             const std::string& dbName,
-             const BSONObj& cmdObj,
-             std::string& errmsg,
-             BSONObjBuilder& output) override {
-        auto shardResponses =
-            uassertStatusOK(scatterGather(opCtx,
-                                          dbName,
-                                          boost::none,
-                                          filterCommandRequestForPassthrough(cmdObj),
-                                          ReadPreferenceSetting::get(opCtx),
-                                          ShardTargetingPolicy::BroadcastToAllShards));
-        if (!appendRawResponses(opCtx, &errmsg, &output, shardResponses)) {
-            return false;
+    virtual StatusWith<CursorResponse> runAggregation(
+        OperationContext* opCtx, const AggregationRequest& request) const final {
+        auto aggCmdObj = request.serializeToCommandObj().toBson();
+        auto nss = request.getNamespaceString();
+
+        BSONObjBuilder responseBuilder;
+
+        auto status = ClusterAggregate::runAggregate(opCtx,
+                                                     ClusterAggregate::Namespaces{nss, nss},
+                                                     request,
+                                                     std::move(aggCmdObj),
+                                                     &responseBuilder);
+
+        if (!status.isOK()) {
+            return status;
         }
-        aggregateResults(shardResponses, output);
-        return true;
-    }
 
-    void aggregateResults(const std::vector<AsyncRequestsSender::Response>& responses,
-                          BSONObjBuilder& output) {
-        // Each shard responds with a document containing an array of subdocuments.
-        // Each subdocument represents an operation running on that shard.
-        // We merge the responses into a single document containg an array
-        // of the operations from all shards.
+        appendCommandStatus(responseBuilder, Status::OK());
 
-        // There are two modifications we make.
-        // 1) we prepend the shardid (with a colon separator) to the opid of each operation.
-        // This allows users to pass the value of the opid field directly to killOp.
-
-        // 2) we change the field name of "client" to "client_s". This is because each
-        // client is actually a mongos.
-
-        // TODO: failpoint for a shard response being invalid.
-
-        // Error handling - we maintain the same behavior as legacy currentOp/inprog
-        // that is, if any shard replies with an invalid response (i.e. it does not
-        // contain a field 'inprog' that is an array), we ignore it.
-        //
-        // If there is a lower level error (i.e. the command fails, network error, etc)
-        // RunOnAllShardsCommand will handle returning an error to the user.
-        BSONArrayBuilder aggregatedOpsBab(output.subarrayStart(kInprogFieldName));
-
-        for (const auto& response : responses) {
-            invariant(response.swResponse.getStatus().isOK());
-            BSONObj shardResponseObj = std::move(response.swResponse.getValue().data);
-
-            auto shardOps = shardResponseObj[kInprogFieldName];
-
-            // legacy behavior
-            if (!shardOps.isABSONObj()) {
-                warning() << "invalid currentOp response from shard " << response.shardId
-                          << ", got: " << redact(shardOps);
-                continue;
-            }
-
-            for (auto&& shardOp : shardOps.Obj()) {
-                BSONObjBuilder modifiedShardOpBob;
-
-                // maintain legacy behavior
-                // but log it first
-                if (!shardOp.isABSONObj()) {
-                    warning() << "invalid currentOp response from shard " << response.shardId
-                              << ", got: " << redact(shardOp);
-                    continue;
-                }
-
-                for (auto&& shardOpElement : shardOp.Obj()) {
-                    auto fieldName = shardOpElement.fieldNameStringData();
-                    if (fieldName == kOpIdFieldName) {
-                        uassert(28630,
-                                str::stream() << "expected numeric opid from currentOp response"
-                                              << " from shard "
-                                              << response.shardId
-                                              << ", got: "
-                                              << shardOpElement,
-                                shardOpElement.isNumber());
-
-                        modifiedShardOpBob.append(kOpIdFieldName,
-                                                  str::stream() << response.shardId << ":"
-                                                                << shardOpElement.numberInt());
-                    } else if (fieldName == kClientFieldName) {
-                        modifiedShardOpBob.appendAs(shardOpElement, kClient_S_FieldName);
-                    } else {
-                        modifiedShardOpBob.append(shardOpElement);
-                    }
-                }
-                modifiedShardOpBob.done();
-                // append the modified document to the output array
-                aggregatedOpsBab.append(modifiedShardOpBob.obj());
-            }
-        }
-        aggregatedOpsBab.done();
+        return CursorResponse::parseFromBSON(responseBuilder.obj());
     }
 
 } clusterCurrentOpCmd;

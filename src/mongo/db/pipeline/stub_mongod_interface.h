@@ -98,7 +98,8 @@ public:
     }
 
     std::vector<BSONObj> getCurrentOps(CurrentOpConnectionsMode connMode,
-                                       CurrentOpUserMode userMode) const override {
+                                       CurrentOpUserMode userMode,
+                                       CurrentOpTruncateMode truncateMode) const override {
         MONGO_UNREACHABLE;
     }
 
