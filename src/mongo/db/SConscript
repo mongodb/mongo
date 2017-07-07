@@ -132,6 +132,7 @@ env.Library(
         "dbmessage.cpp",
     ],
     LIBDEPS=[
+        '$BUILD_DIR/mongo/db/server_options_core',
         '$BUILD_DIR/mongo/transport/transport_layer_common',
         '$BUILD_DIR/mongo/util/net/network',
     ]
@@ -362,6 +363,7 @@ env.Clone().InjectModule("enterprise").Library(
     LIBDEPS=[
         '$BUILD_DIR/mongo/base',
         '$BUILD_DIR/mongo/util/cmdline_utils/cmdline_utils',
+        '$BUILD_DIR/mongo/util/fail_point',
         '$BUILD_DIR/mongo/transport/message_compressor',
         # The dependency on network is a temporary crutch that should go away once the
         # networking library has separate options

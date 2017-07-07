@@ -14,24 +14,25 @@ env.Library(
         "message.cpp",
         "message_port.cpp",
         "op_msg.cpp",
+        "private/socket_poll.cpp",
+        "private/ssl_expiration.cpp",
         "sock.cpp",
         "sockaddr.cpp",
         "socket_exception.cpp",
-        "socket_poll.cpp",
-        "ssl_expiration.cpp",
         "ssl_manager.cpp",
         "ssl_options.cpp",
         "thread_idle_callback.cpp",
-
     ],
     LIBDEPS=[
         '$BUILD_DIR/mongo/base',
         '$BUILD_DIR/mongo/db/auth/auth_rolename',
+        '$BUILD_DIR/mongo/util/concurrency/ticketholder',
+        '$BUILD_DIR/mongo/util/decorable',
+    ],
+    LIBDEPS_PRIVATE=[
         '$BUILD_DIR/mongo/db/bson/dotted_path_support',
         '$BUILD_DIR/mongo/db/server_options_core',
         '$BUILD_DIR/mongo/util/background_job',
-        '$BUILD_DIR/mongo/util/concurrency/ticketholder',
-        '$BUILD_DIR/mongo/util/decorable',
         '$BUILD_DIR/mongo/util/fail_point',
         '$BUILD_DIR/mongo/util/options_parser/options_parser',
     ],
@@ -45,6 +46,7 @@ env.CppUnitTest(
         'sock_test.cpp',
     ],
     LIBDEPS=[
+        '$BUILD_DIR/mongo/util/fail_point',
         'network',
     ],
 )

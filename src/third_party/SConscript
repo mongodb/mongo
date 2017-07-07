@@ -123,8 +123,8 @@ else:
     pcreEnv.InjectThirdPartyIncludePaths(libraries=['pcre'])
     pcreEnv.SConscript('pcre' + pcreSuffix + '/SConscript', exports={ 'env' : pcreEnv })
     pcreEnv = pcreEnv.Clone(
-        LIBDEPS=[
-            ('pcre' + pcreSuffix + '/pcrecpp', libdeps.dependency.Interface),
+        LIBDEPS_INTERFACE=[
+            'pcre' + pcreSuffix + '/pcrecpp',
         ])
 
 pcreEnv.Library(
@@ -153,12 +153,12 @@ else:
     boostEnv.InjectThirdPartyIncludePaths(libraries=['boost'])
     boostEnv.SConscript(boostDirectory + '/SConscript', exports={ 'env' : boostEnv })
     boostEnv = boostEnv.Clone(
-        LIBDEPS=[
-            (boostDirectory + '/boost_program_options', libdeps.dependency.Interface),
-            (boostDirectory + '/boost_filesystem', libdeps.dependency.Interface),
-            (boostDirectory + '/boost_thread', libdeps.dependency.Interface),
-            (boostDirectory + '/boost_system', libdeps.dependency.Interface),
-            (boostDirectory + '/boost_iostreams', libdeps.dependency.Interface),
+        LIBDEPS_INTERFACE=[
+            boostDirectory + '/boost_program_options',
+            boostDirectory + '/boost_filesystem',
+            boostDirectory + '/boost_thread',
+            boostDirectory + '/boost_system',
+            boostDirectory + '/boost_iostreams',
         ])
 
 boostEnv.Library(
@@ -179,8 +179,8 @@ else:
     snappyEnv.InjectMongoIncludePaths()
     snappyEnv.SConscript('snappy' + snappySuffix + '/SConscript', exports={ 'env' : snappyEnv })
     snappyEnv = snappyEnv.Clone(
-        LIBDEPS=[
-            ('snappy' + snappySuffix + '/snappy',  libdeps.dependency.Interface),
+        LIBDEPS_INTERFACE=[
+            'snappy' + snappySuffix + '/snappy',
         ])
 
 snappyEnv.Library(
@@ -199,8 +199,8 @@ else:
     zlibEnv.InjectThirdPartyIncludePaths(libraries=['zlib'])
     zlibEnv.SConscript('zlib' + zlibSuffix + '/SConscript', exports={ 'env' : zlibEnv })
     zlibEnv = zlibEnv.Clone(
-        LIBDEPS=[
-            ('zlib' + zlibSuffix + '/zlib', libdeps.dependency.Interface),
+        LIBDEPS_INTERFACE=[
+            'zlib' + zlibSuffix + '/zlib',
         ])
 
 zlibEnv.Library(
@@ -213,9 +213,9 @@ if usemozjs:
     mozjsEnv = env.Clone()
     mozjsEnv.SConscript('mozjs' + mozjsSuffix + '/SConscript', exports={'env' : mozjsEnv })
     mozjsEnv = mozjsEnv.Clone(
-        LIBDEPS=[
-            ('mozjs' + mozjsSuffix + '/mozjs', libdeps.dependency.Interface),
-            ('shim_zlib', libdeps.dependency.Interface),
+        LIBDEPS_INTERFACE=[
+            'mozjs' + mozjsSuffix + '/mozjs',
+            'shim_zlib',
         ])
 
     mozjsEnv.Library(
@@ -236,8 +236,8 @@ if (gperftoolsEnv['MONGO_ALLOCATOR'] == "tcmalloc"):
         gperftoolsEnv.InjectThirdPartyIncludePaths(libraries=['gperftools'])
         gperftoolsEnv.SConscript('gperftools' + gperftoolsSuffix + '/SConscript', exports={ 'env' : gperftoolsEnv })
         gperftoolsEnv = gperftoolsEnv.Clone(
-            LIBDEPS=[
-                ('gperftools' + gperftoolsSuffix + '/tcmalloc_minimal', libdeps.dependency.Interface),
+            LIBDEPS_INTERFACE=[
+                'gperftools' + gperftoolsSuffix + '/tcmalloc_minimal',
             ])
 
 gperftoolsEnv.Library(
@@ -257,8 +257,8 @@ else:
     stemmerEnv.InjectThirdPartyIncludePaths(libraries=['stemmer'])
     stemmerEnv.SConscript('libstemmer_c/SConscript', exports={ 'env' : stemmerEnv })
     stemmerEnv = stemmerEnv.Clone(
-        LIBDEPS=[
-             ('libstemmer_c/stemmer', libdeps.dependency.Interface),
+        LIBDEPS_INTERFACE=[
+             'libstemmer_c/stemmer',
         ])
 
 stemmerEnv.Library(
@@ -278,8 +278,8 @@ else:
     yamlEnv.InjectThirdPartyIncludePaths(libraries=['yaml', 'boost'])
     yamlEnv.SConscript('yaml-cpp' + yamlSuffix + '/SConscript', exports={ 'env' : yamlEnv })
     yamlEnv = yamlEnv.Clone(
-        LIBDEPS=[
-            ('yaml-cpp' + yamlSuffix + '/yaml', libdeps.dependency.Interface),
+        LIBDEPS_INTERFACE=[
+            'yaml-cpp' + yamlSuffix + '/yaml',
         ])
 
 yamlEnv.Library(
@@ -294,8 +294,8 @@ if env.TargetOSIs('solaris'):
     tzEnv.InjectThirdPartyIncludePaths(libraries=['tz'])
     tzEnv.SConscript('tz/SConscript', exports={ 'env' : tzEnv })
     tzEnv = tzEnv.Clone(
-        LIBDEPS=[
-            ('tz/tz', libdeps.dependency.Interface),
+        LIBDEPS_INTERFACE=[
+            'tz/tz',
         ])
 
 tzEnv.Library(
@@ -309,8 +309,8 @@ timelibEnv = env.Clone();
 timelibEnv.InjectThirdPartyIncludePaths(libraries=['timelib'])
 timelibEnv.SConscript('timelib' + timelibSuffix + '/SConscript', exports={ 'env' : timelibEnv })
 timelibEnv = timelibEnv.Clone(
-    LIBDEPS=[
-        ('timelib' + timelibSuffix + '/timelib', libdeps.dependency.Interface),
+    LIBDEPS_INTERFACE=[
+        'timelib' + timelibSuffix + '/timelib',
     ])
 
 timelibEnv.Library(
@@ -330,8 +330,8 @@ if wiredtiger:
         wiredtigerEnv.InjectThirdPartyIncludePaths(libraries=['wiredtiger'])
         wiredtigerEnv.SConscript('wiredtiger/SConscript', exports={ 'env' : wiredtigerEnv })
         wiredtigerEnv = wiredtigerEnv.Clone(
-            LIBDEPS=[
-                 ('wiredtiger/wiredtiger', libdeps.dependency.Interface),
+            LIBDEPS_INTERFACE=[
+                 'wiredtiger/wiredtiger',
             ])
 
     wiredtigerEnv.Library(
@@ -350,8 +350,8 @@ else:
     asioEnv.InjectThirdPartyIncludePaths(libraries=['asio'])
     asioEnv.SConscript('asio-master/SConscript', exports={ 'env' : asioEnv })
     asioEnv = asioEnv.Clone(
-        LIBDEPS=[
-            ('asio-master/asio', libdeps.dependency.Interface),
+        LIBDEPS_INTERFACE=[
+            'asio-master/asio',
         ])
 
 asioEnv.Library(
@@ -370,8 +370,8 @@ else:
     intelDecimal128Env.InjectThirdPartyIncludePaths(libraries=['intel_decimal128'])
     intelDecimal128Env.SConscript('IntelRDFPMathLib20U1/SConscript', exports={ 'env' : intelDecimal128Env })
     intelDecimal128Env = intelDecimal128Env.Clone(
-	LIBDEPS=[
-	    ('IntelRDFPMathLib20U1/intel_decimal128', libdeps.dependency.Interface),
+	LIBDEPS_INTERFACE=[
+	    'IntelRDFPMathLib20U1/intel_decimal128',
 	])
 
 intelDecimal128Env.Library(
@@ -392,8 +392,8 @@ else:
     icuEnv.InjectThirdPartyIncludePaths(libraries=['icu'])
     icuEnv.SConscript('icu4c' + icuSuffix + '/source/SConscript', exports={ 'env' : icuEnv })
     icuEnv = icuEnv.Clone(
-        LIBDEPS=[
-            ('icu4c' + icuSuffix + '/source/icu_i18n', libdeps.dependency.Interface),
+        LIBDEPS_INTERFACE=[
+            'icu4c' + icuSuffix + '/source/icu_i18n',
         ])
 
 icuEnv.Library(

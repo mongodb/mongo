@@ -30,7 +30,7 @@
 
 #include "mongo/base/init.h"
 #include "mongo/util/assert_util.h"
-#include "mongo/util/net/socket_poll.h"
+#include "mongo/util/net/private/socket_poll.h"
 
 namespace mongo {
 

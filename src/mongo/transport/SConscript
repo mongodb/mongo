@@ -62,6 +62,7 @@ tlEnv.Library(
         '$BUILD_DIR/mongo/db/auth/authentication_restriction',
         '$BUILD_DIR/third_party/shim_asio',
         '$BUILD_DIR/mongo/base/system_error',
+        '$BUILD_DIR/mongo/db/server_options_core',
         '$BUILD_DIR/mongo/db/service_context',
         '$BUILD_DIR/mongo/db/stats/counters',
     ],
@@ -86,6 +87,7 @@ env.Library(
     ],
     LIBDEPS=[
         '$BUILD_DIR/mongo/db/auth/authentication_restriction',
+        '$BUILD_DIR/mongo/db/server_options_core',
         "$BUILD_DIR/mongo/db/service_context",
         '$BUILD_DIR/mongo/db/stats/counters',
         "$BUILD_DIR/mongo/util/processinfo",

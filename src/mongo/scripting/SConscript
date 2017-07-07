@@ -147,9 +147,11 @@ if usemozjs:
         LIBDEPS=[
             'bson_template_evaluator',
             'scripting_common',
-            ('$BUILD_DIR/third_party/shim_mozjs', libdeps.dependency.Private),
             '$BUILD_DIR/mongo/shell/mongojs',
             '$BUILD_DIR/mongo/db/service_context',
+        ],
+        LIBDEPS_PRIVATE=[
+            '$BUILD_DIR/third_party/shim_mozjs',
         ],
     )
 else:

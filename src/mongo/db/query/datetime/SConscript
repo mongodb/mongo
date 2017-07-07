@@ -24,6 +24,7 @@ timeZoneEnv.Library(
     ],
     LIBDEPS=[
         'date_time_support',
+        '$BUILD_DIR/mongo/db/server_options_core',
         '$BUILD_DIR/third_party/shim_timelib',
     ]
 )

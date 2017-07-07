@@ -61,8 +61,8 @@
 #include "mongo/util/log.h"
 #include "mongo/util/mongoutils/str.h"
 #include "mongo/util/net/message.h"
+#include "mongo/util/net/private/socket_poll.h"
 #include "mongo/util/net/socket_exception.h"
-#include "mongo/util/net/socket_poll.h"
 #include "mongo/util/net/ssl_manager.h"
 #include "mongo/util/quick_exit.h"
 

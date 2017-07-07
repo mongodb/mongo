@@ -113,6 +113,7 @@ env.Library(
         '$BUILD_DIR/mongo/base',
         '$BUILD_DIR/mongo/db/common',
         '$BUILD_DIR/mongo/db/ops/update',
+        '$BUILD_DIR/mongo/db/server_options_core',
         '$BUILD_DIR/mongo/db/query/query_planner',
         'update',
     ],

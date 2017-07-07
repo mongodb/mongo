@@ -63,15 +63,10 @@ missing_syslibdep = 'MISSING_LIBDEP_'
 class dependency(object):
     Public, Private, Interface = range(3)
 
-    def __init__(self, value, dynamic):
-        if isinstance(value, tuple):
-            self.target_node = value[0]
-            # All dependencies are public if we are not in dynamic mode.
-            self.dependency_type = value[1] if dynamic else dependency.Public
-        else:
-            # Dependency edges are public by default
-            self.target_node = value
-            self.dependency_type = dependency.Public
+    def __init__(self, value, dynamic, deptype):
+        self.target_node = value
+        # In static mode, all dependencies are public
+        self.dependency_type = deptype if dynamic else dependency.Public
 
 class DependencyCycleError(SCons.Errors.UserError):
     """Exception representing a cycle discovered in library dependencies."""
@@ -225,10 +220,6 @@ def __append_direct_libdeps(node, prereq_nodes):
         node.attributes.libdeps_direct = []
     node.attributes.libdeps_direct.extend(prereq_nodes)
 
-def __normalize_libdeps(libdeps, dynamic):
-    """Promote all entries in the libdeps list to the dependency type"""
-    return [dependency(l, dynamic) for l in libdeps if l is not None]
-
 def libdeps_emitter(target, source, env):
     """SCons emitter that takes values from the LIBDEPS environment variable and
     converts them to File node objects, binding correct path information into
@@ -253,7 +244,10 @@ def libdeps_emitter(target, source, env):
     prog_builder = env['BUILDERS']['Program']
     prog_node_factory = prog_builder.target_factory or env.File
 
-    prereqs = __normalize_libdeps(env.get(libdeps_env_var, []), dynamic=False)
+    prereqs = [dependency(l, False, dependency.Public) for l in env.get(libdeps_env_var, [])]
+    prereqs.extend(dependency(l, False, dependency.Interface) for l in env.get(libdeps_env_var + '_INTERFACE', []))
+    prereqs.extend(dependency(l, False, dependency.Private) for l in env.get(libdeps_env_var + '_PRIVATE', []))
+
     for prereq in prereqs:
         prereqWithIxes = SCons.Util.adjustixes(
             prereq.target_node, lib_builder.get_prefix(env), lib_builder.get_suffix(env))
@@ -270,7 +264,7 @@ def libdeps_emitter(target, source, env):
         dependentWithIxes = SCons.Util.adjustixes(
             dependent, lib_builder.get_prefix(env), lib_builder.get_suffix(env))
         dependentNode = lib_node_factory(dependentWithIxes)
-        __append_direct_libdeps(dependentNode, [dependency(target[0], dependency.Public)])
+        __append_direct_libdeps(dependentNode, [dependency(target[0], False, dependency.Public)])
 
     for dependent in env.get('PROGDEPS_DEPENDENTS', []):
         if dependent is None:
@@ -278,7 +272,7 @@ def libdeps_emitter(target, source, env):
         dependentWithIxes = SCons.Util.adjustixes(
             dependent, prog_builder.get_prefix(env), prog_builder.get_suffix(env))
         dependentNode = prog_node_factory(dependentWithIxes)
-        __append_direct_libdeps(dependentNode, [dependency(target[0], dependency.Public)])
+        __append_direct_libdeps(dependentNode, [dependency(target[0], False, dependency.Public)])
 
     return target, source
 
@@ -306,7 +300,10 @@ def shlibdeps_emitter(target, source, env):
     prog_builder = env['BUILDERS']['Program']
     prog_node_factory = prog_builder.target_factory or env.File
 
-    prereqs = __normalize_libdeps(env.get(libdeps_env_var, []), dynamic=True)
+    prereqs = [dependency(l, True, dependency.Public) for l in env.get(libdeps_env_var, [])]
+    prereqs.extend(dependency(l, True, dependency.Interface) for l in env.get(libdeps_env_var + '_INTERFACE', []))
+    prereqs.extend(dependency(l, True, dependency.Private) for l in env.get(libdeps_env_var + '_PRIVATE', []))
+
     for prereq in prereqs:
         prereqWithIxes = SCons.Util.adjustixes(
             prereq.target_node, lib_builder.get_prefix(env), lib_builder.get_suffix(env))
@@ -323,7 +320,7 @@ def shlibdeps_emitter(target, source, env):
         dependentWithIxes = SCons.Util.adjustixes(
             dependent, lib_builder.get_prefix(env), lib_builder.get_suffix(env))
         dependentNode = lib_node_factory(dependentWithIxes)
-        __append_direct_libdeps(dependentNode, [dependency(target[0], dependency.Private)])
+        __append_direct_libdeps(dependentNode, [dependency(target[0], True, dependency.Public)])
 
     for dependent in env.get('PROGDEPS_DEPENDENTS', []):
         if dependent is None:
@@ -331,7 +328,7 @@ def shlibdeps_emitter(target, source, env):
         dependentWithIxes = SCons.Util.adjustixes(
             dependent, prog_builder.get_prefix(env), prog_builder.get_suffix(env))
         dependentNode = prog_node_factory(dependentWithIxes)
-        __append_direct_libdeps(dependentNode, [dependency(target[0], dependency.Private)])
+        __append_direct_libdeps(dependentNode, [dependency(target[0], True, dependency.Public)])
 
     return target, source
 

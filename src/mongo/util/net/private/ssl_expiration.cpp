@@ -27,7 +27,7 @@
 
 #define MONGO_LOG_DEFAULT_COMPONENT ::mongo::logger::LogComponent::kControl
 
-#include "mongo/util/net/ssl_expiration.h"
+#include "mongo/util/net/private/ssl_expiration.h"
 
 #include <string>
 

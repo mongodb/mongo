@@ -76,6 +76,7 @@ env.Library(
     ],
     LIBDEPS=[
         '$BUILD_DIR/mongo/client/read_preference',
+        '$BUILD_DIR/mongo/db/server_options_core',
         '$BUILD_DIR/mongo/util/net/network',
     ],
 )
@@ -105,6 +106,7 @@ env.Library(
         'reply_builder_interface.cpp',
     ],
     LIBDEPS=[
+        '$BUILD_DIR/mongo/db/server_options_core',
         '$BUILD_DIR/mongo/util/net/network',
     ],
 )
