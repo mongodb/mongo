@@ -28,9 +28,9 @@
 
 #pragma once
 
-#include <memory>
-
 #include "mongo/db/repl/optime.h"
+#include "mongo/stdx/functional.h"
+#include "mongo/stdx/memory.h"
 #include "mongo/stdx/mutex.h"
 
 namespace mongo {
@@ -38,13 +38,13 @@ namespace mongo {
 class BalancerConfiguration;
 class CatalogCache;
 class ShardingCatalogClient;
-class ShardingCatalogManager;
 class ClusterCursorManager;
 class OperationContext;
 class ServiceContext;
 class ShardRegistry;
 
 namespace executor {
+struct ConnectionPoolStats;
 class NetworkInterface;
 class TaskExecutorPool;
 }  // namespace executor
@@ -57,6 +57,8 @@ class Grid {
 public:
     Grid();
     ~Grid();
+
+    using CustomConnectionPoolStatsFn = stdx::function<void(executor::ConnectionPoolStats* stats)>;
 
     /**
      * Retrieves the instance of Grid associated with the current service/operation context.
@@ -72,13 +74,20 @@ public:
      *       state using clearForUnitTests.
      */
     void init(std::unique_ptr<ShardingCatalogClient> catalogClient,
-              std::unique_ptr<ShardingCatalogManager> catalogManager,
               std::unique_ptr<CatalogCache> catalogCache,
               std::unique_ptr<ShardRegistry> shardRegistry,
               std::unique_ptr<ClusterCursorManager> cursorManager,
               std::unique_ptr<BalancerConfiguration> balancerConfig,
               std::unique_ptr<executor::TaskExecutorPool> executorPool,
               executor::NetworkInterface* network);
+
+    /**
+     * If the instance as which this sharding component is running (config/shard/mongos) uses
+     * additional connection pools other than the default, this function will be present and can be
+     * used to obtain statistics about them. Otherwise, the value will be unset.
+     */
+    CustomConnectionPoolStatsFn getCustomConnectionPoolStatsFn() const;
+    void setCustomConnectionPoolStatsFn(CustomConnectionPoolStatsFn statsFn);
 
     /**
      * Deprecated. This is only used on mongos, and once addShard is solely handled by the configs,
@@ -94,12 +103,8 @@ public:
      */
     void setAllowLocalHost(bool allow);
 
-    ShardingCatalogClient* catalogClient() {
+    ShardingCatalogClient* catalogClient() const {
         return _catalogClient.get();
-    }
-
-    ShardingCatalogManager* catalogManager() {
-        return _catalogManager.get();
     }
 
     CatalogCache* catalogCache() const {
@@ -114,7 +119,7 @@ public:
         return _cursorManager.get();
     }
 
-    executor::TaskExecutorPool* getExecutorPool() {
+    executor::TaskExecutorPool* getExecutorPool() const {
         return _executorPool.get();
     }
 
@@ -153,7 +158,6 @@ public:
 
 private:
     std::unique_ptr<ShardingCatalogClient> _catalogClient;
-    std::unique_ptr<ShardingCatalogManager> _catalogManager;
     std::unique_ptr<CatalogCache> _catalogCache;
     std::unique_ptr<ShardRegistry> _shardRegistry;
     std::unique_ptr<ClusterCursorManager> _cursorManager;
@@ -166,6 +170,8 @@ private:
     // Network interface being used by the fixed executor in _executorPool.  Used for asking
     // questions about the network configuration, such as getting the current server's hostname.
     executor::NetworkInterface* _network{nullptr};
+
+    CustomConnectionPoolStatsFn _customConnectionPoolStatsFn;
 
     // Protects _configOpTime.
     mutable stdx::mutex _mutex;

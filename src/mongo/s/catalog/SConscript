@@ -137,22 +137,22 @@ env.Library(
 )
 
 env.Library(
-    target='sharding_catalog_manager_impl',
+    target='sharding_catalog_manager',
     source=[
         'sharding_catalog_manager_chunk_operations_impl.cpp',
         'sharding_catalog_manager_collection_operations_impl.cpp',
-        'sharding_catalog_manager_impl.cpp',
+        'sharding_catalog_manager.cpp',
         'sharding_catalog_manager_shard_operations_impl.cpp',
         'sharding_catalog_manager_zone_operations_impl.cpp',
     ],
     LIBDEPS=[
+        '$BUILD_DIR/mongo/db/commands/dcommands_fcv',
         '$BUILD_DIR/mongo/db/db_raii',
         '$BUILD_DIR/mongo/db/repl/read_concern_args',
+        '$BUILD_DIR/mongo/db/s/balancer',
         '$BUILD_DIR/mongo/executor/network_interface',
         '$BUILD_DIR/mongo/s/client/sharding_client',
         '$BUILD_DIR/mongo/s/coreshard',
-        '$BUILD_DIR/mongo/db/commands/dcommands_fcv',
-        '$BUILD_DIR/mongo/db/s/balancer',
     ],
 )
 

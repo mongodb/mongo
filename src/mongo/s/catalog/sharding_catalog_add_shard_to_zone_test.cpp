@@ -50,7 +50,8 @@ TEST_F(AddShardToZoneTest, AddSingleZoneToExistingShardShouldSucceed) {
 
     setupShards({shard}).transitional_ignore();
 
-    ASSERT_OK(catalogManager()->addShardToZone(operationContext(), shard.getName(), "z"));
+    ASSERT_OK(ShardingCatalogManager::get(operationContext())
+                  ->addShardToZone(operationContext(), shard.getName(), "z"));
     auto shardDocStatus = getShardDoc(operationContext(), shard.getName());
     ASSERT_OK(shardDocStatus.getStatus());
 
@@ -68,7 +69,8 @@ TEST_F(AddShardToZoneTest, AddZoneToShardWithSameTagShouldSucceed) {
 
     setupShards({shard}).transitional_ignore();
 
-    ASSERT_OK(catalogManager()->addShardToZone(operationContext(), shard.getName(), "x"));
+    ASSERT_OK(ShardingCatalogManager::get(operationContext())
+                  ->addShardToZone(operationContext(), shard.getName(), "x"));
 
     auto shardDocStatus = getShardDoc(operationContext(), shard.getName());
     ASSERT_OK(shardDocStatus.getStatus());
@@ -88,7 +90,8 @@ TEST_F(AddShardToZoneTest, AddZoneToShardWithNewTagShouldAppend) {
 
     setupShards({shard}).transitional_ignore();
 
-    ASSERT_OK(catalogManager()->addShardToZone(operationContext(), shard.getName(), "y"));
+    ASSERT_OK(ShardingCatalogManager::get(operationContext())
+                  ->addShardToZone(operationContext(), shard.getName(), "y"));
 
     auto shardDocStatus = getShardDoc(operationContext(), shard.getName());
     ASSERT_OK(shardDocStatus.getStatus());
@@ -107,7 +110,8 @@ TEST_F(AddShardToZoneTest, AddSingleZoneToNonExistingShardShouldFail) {
 
     setupShards({shard}).transitional_ignore();
 
-    auto status = catalogManager()->addShardToZone(operationContext(), "b", "z");
+    auto status = ShardingCatalogManager::get(operationContext())
+                      ->addShardToZone(operationContext(), "b", "z");
     ASSERT_EQ(ErrorCodes::ShardNotFound, status);
 }
 

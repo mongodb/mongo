@@ -69,7 +69,6 @@
 #include "mongo/rpc/metadata/egress_metadata_hook_list.h"
 #include "mongo/s/balancer_configuration.h"
 #include "mongo/s/catalog/sharding_catalog_client.h"
-#include "mongo/s/catalog/sharding_catalog_manager.h"
 #include "mongo/s/catalog_cache.h"
 #include "mongo/s/client/shard_connection.h"
 #include "mongo/s/client/shard_factory.h"
@@ -222,9 +221,6 @@ static Status initializeSharding(OperationContext* opCtx) {
                 stdx::make_unique<rpc::LogicalTimeMetadataHook>(opCtx->getServiceContext()));
             hookList->addHook(stdx::make_unique<rpc::ShardingEgressMetadataHookForMongos>());
             return hookList;
-        },
-        [](ShardingCatalogClient* catalogClient, std::unique_ptr<executor::TaskExecutor> executor) {
-            return nullptr;  // Only config servers get a real ShardingCatalogManager.
         });
 
     if (!status.isOK()) {

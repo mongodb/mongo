@@ -113,12 +113,12 @@ env.Library(
         'shard_metadata_util',
         'sharding_task_executor',
         'type_shard_identity',
-        #'$BUILD_DIR/mongo/db/dbhelpers', # CYCLE
-        #'$BUILD_DIR/mongo/db/ops/write_ops', # CYCLE
-        #'$BUILD_DIR/mongo/s/catalog/sharding_catalog_manager_impl', # CYCLE
-        #'$BUILD_DIR/mongo/db/query/query', # CYCLE
         #'$BUILD_DIR/mongo/db/catalog/catalog', # CYCLE
         #'$BUILD_DIR/mongo/db/db_raii', # CYCLE
+        #'$BUILD_DIR/mongo/db/dbhelpers', # CYCLE
+        #'$BUILD_DIR/mongo/db/ops/write_ops', # CYCLE
+        #'$BUILD_DIR/mongo/db/query/query', # CYCLE
+        #'$BUILD_DIR/mongo/s/catalog/sharding_catalog_manager', # CYCLE
     ],
     LIBDEPS_TAGS=[
         # TODO(ADAM, 2017-01-06): See `CYCLE` tags above
@@ -204,6 +204,7 @@ env.Library(
         '$BUILD_DIR/mongo/db/dbhelpers',
         '$BUILD_DIR/mongo/db/index_d',
         '$BUILD_DIR/mongo/db/repl/repl_coordinator_global',
+        '$BUILD_DIR/mongo/s/catalog/sharding_catalog_manager',
         '$BUILD_DIR/mongo/s/commands/shared_cluster_commands',
         '$BUILD_DIR/mongo/s/sharding_request_types',
         'balancer',
@@ -255,8 +256,8 @@ env.CppUnitTest(
     source=[
         'collection_metadata_test.cpp',
         'collection_range_deleter_test.cpp',
-        'metadata_manager_test.cpp',
         'collection_sharding_state_test.cpp',
+        'metadata_manager_test.cpp',
     ],
     LIBDEPS=[
         '$BUILD_DIR/mongo/client/remote_command_targeter_mock',
@@ -264,8 +265,6 @@ env.CppUnitTest(
         '$BUILD_DIR/mongo/db/serveronly',
         '$BUILD_DIR/mongo/executor/network_test_env',
         '$BUILD_DIR/mongo/executor/thread_pool_task_executor_test_fixture',
-        '$BUILD_DIR/mongo/s/catalog/sharding_catalog_mock',
-        '$BUILD_DIR/mongo/s/coreshard',
         '$BUILD_DIR/mongo/s/shard_server_test_fixture',
     ],
 )

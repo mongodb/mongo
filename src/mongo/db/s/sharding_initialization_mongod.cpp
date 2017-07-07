@@ -43,7 +43,7 @@
 #include "mongo/db/server_options.h"
 #include "mongo/executor/task_executor.h"
 #include "mongo/rpc/metadata/egress_metadata_hook_list.h"
-#include "mongo/s/catalog/sharding_catalog_manager_impl.h"
+#include "mongo/s/catalog/sharding_catalog_manager.h"
 #include "mongo/s/catalog_cache.h"
 #include "mongo/s/client/shard_factory.h"
 #include "mongo/s/client/shard_local.h"
@@ -103,15 +103,7 @@ Status initializeGlobalShardingStateForMongod(OperationContext* opCtx,
                 stdx::make_unique<rpc::LogicalTimeMetadataHook>(opCtx->getServiceContext()));
             hookList->addHook(stdx::make_unique<rpc::ShardingEgressMetadataHookForMongod>());
             return hookList;
-        },
-        [](ShardingCatalogClient* catalogClient, std::unique_ptr<executor::TaskExecutor> executor)
-            -> std::unique_ptr<ShardingCatalogManager> {
-                if (serverGlobalParams.clusterRole == ClusterRole::ConfigServer) {
-                    return stdx::make_unique<ShardingCatalogManagerImpl>(std::move(executor));
-                } else {
-                    return nullptr;  // Only config servers get a real ShardingCatalogManager
-                }
-            });
+        });
 }
 
 }  // namespace mongo

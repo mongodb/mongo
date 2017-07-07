@@ -108,7 +108,7 @@ public:
         auto parsedRequest = uassertStatusOK(SplitChunkRequest::parseFromConfigCommand(cmdObj));
 
         Status splitChunkResult =
-            Grid::get(opCtx)->catalogManager()->commitChunkSplit(opCtx,
+            ShardingCatalogManager::get(opCtx)->commitChunkSplit(opCtx,
                                                                  parsedRequest.getNamespace(),
                                                                  parsedRequest.getEpoch(),
                                                                  parsedRequest.getChunkRange(),

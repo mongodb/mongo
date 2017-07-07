@@ -743,7 +743,7 @@ void ReplicationCoordinatorExternalStateImpl::_shardingOnTransitionToPrimaryHook
     fassertStatusOK(40107, status);
 
     if (serverGlobalParams.clusterRole == ClusterRole::ConfigServer) {
-        status = Grid::get(opCtx)->catalogManager()->initializeConfigDatabaseIfNeeded(opCtx);
+        status = ShardingCatalogManager::get(opCtx)->initializeConfigDatabaseIfNeeded(opCtx);
         if (!status.isOK() && status != ErrorCodes::AlreadyInitialized) {
             if (ErrorCodes::isShutdownError(status.code())) {
                 // Don't fassert if we're mid-shutdown, let the shutdown happen gracefully.

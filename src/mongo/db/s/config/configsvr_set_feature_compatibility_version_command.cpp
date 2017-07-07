@@ -110,7 +110,7 @@ public:
         }
 
         // Forward to all shards.
-        uassertStatusOK(Grid::get(opCtx)->catalogManager()->setFeatureCompatibilityVersionOnShards(
+        uassertStatusOK(ShardingCatalogManager::get(opCtx)->setFeatureCompatibilityVersionOnShards(
             opCtx, version));
 
         // On success, set featureCompatibilityVersion on self.

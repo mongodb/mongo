@@ -30,9 +30,8 @@
 
 #include "mongo/platform/basic.h"
 
-#include "mongo/s/catalog/sharding_catalog_manager_impl.h"
+#include "mongo/s/catalog/sharding_catalog_manager.h"
 
-#include "mongo/base/status_with.h"
 #include "mongo/db/commands/feature_compatibility_version.h"
 #include "mongo/db/operation_context.h"
 #include "mongo/db/s/balancer/type_migration.h"
@@ -54,39 +53,78 @@ namespace {
 
 const WriteConcernOptions kNoWaitWriteConcern(1, WriteConcernOptions::SyncMode::UNSET, Seconds(0));
 
+// This value is initialized only if the node is running as a config server
+const auto getShardingCatalogManager =
+    ServiceContext::declareDecoration<boost::optional<ShardingCatalogManager>>();
+
 }  // namespace
 
-ShardingCatalogManagerImpl::ShardingCatalogManagerImpl(
-    std::unique_ptr<executor::TaskExecutor> addShardExecutor)
-    : _executorForAddShard(std::move(addShardExecutor)),
+void ShardingCatalogManager::create(ServiceContext* serviceContext,
+                                    std::unique_ptr<executor::TaskExecutor> addShardExecutor) {
+    auto& shardingCatalogManager = getShardingCatalogManager(serviceContext);
+    invariant(!shardingCatalogManager);
+
+    shardingCatalogManager.emplace(serviceContext, std::move(addShardExecutor));
+}
+
+void ShardingCatalogManager::clearForTests(ServiceContext* serviceContext) {
+    auto& shardingCatalogManager = getShardingCatalogManager(serviceContext);
+    invariant(shardingCatalogManager);
+
+    shardingCatalogManager.reset();
+}
+
+ShardingCatalogManager* ShardingCatalogManager::get(ServiceContext* serviceContext) {
+    auto& shardingCatalogManager = getShardingCatalogManager(serviceContext);
+    invariant(shardingCatalogManager);
+
+    return shardingCatalogManager.get_ptr();
+}
+
+ShardingCatalogManager* ShardingCatalogManager::get(OperationContext* operationContext) {
+    return get(operationContext->getServiceContext());
+}
+
+ShardingCatalogManager::ShardingCatalogManager(
+    ServiceContext* serviceContext, std::unique_ptr<executor::TaskExecutor> addShardExecutor)
+    : _serviceContext(serviceContext),
+      _executorForAddShard(std::move(addShardExecutor)),
       _kZoneOpLock("zoneOpLock"),
       _kChunkOpLock("chunkOpLock"),
-      _kShardMembershipLock("shardMembershipLock") {}
+      _kShardMembershipLock("shardMembershipLock") {
+    startup();
+}
 
-ShardingCatalogManagerImpl::~ShardingCatalogManagerImpl() = default;
+ShardingCatalogManager::~ShardingCatalogManager() {
+    shutDown();
+}
 
-Status ShardingCatalogManagerImpl::startup() {
+void ShardingCatalogManager::startup() {
     stdx::lock_guard<stdx::mutex> lk(_mutex);
     if (_started) {
-        return Status::OK();
+        return;
     }
     _started = true;
     _executorForAddShard->startup();
-    return Status::OK();
+
+    Grid::get(_serviceContext)
+        ->setCustomConnectionPoolStatsFn(
+            [this](executor::ConnectionPoolStats* stats) { appendConnectionStats(stats); });
 }
 
-void ShardingCatalogManagerImpl::shutDown(OperationContext* opCtx) {
-    LOG(1) << "ShardingCatalogManagerImpl::shutDown() called.";
+void ShardingCatalogManager::shutDown() {
     {
         stdx::lock_guard<stdx::mutex> lk(_mutex);
         _inShutdown = true;
     }
 
+    Grid::get(_serviceContext)->setCustomConnectionPoolStatsFn(nullptr);
+
     _executorForAddShard->shutdown();
     _executorForAddShard->join();
 }
 
-Status ShardingCatalogManagerImpl::initializeConfigDatabaseIfNeeded(OperationContext* opCtx) {
+Status ShardingCatalogManager::initializeConfigDatabaseIfNeeded(OperationContext* opCtx) {
     {
         stdx::lock_guard<stdx::mutex> lk(_mutex);
         if (_configInitialized) {
@@ -114,12 +152,12 @@ Status ShardingCatalogManagerImpl::initializeConfigDatabaseIfNeeded(OperationCon
     return Status::OK();
 }
 
-void ShardingCatalogManagerImpl::discardCachedConfigDatabaseInitializationState() {
+void ShardingCatalogManager::discardCachedConfigDatabaseInitializationState() {
     stdx::lock_guard<stdx::mutex> lk(_mutex);
     _configInitialized = false;
 }
 
-Status ShardingCatalogManagerImpl::_initConfigVersion(OperationContext* opCtx) {
+Status ShardingCatalogManager::_initConfigVersion(OperationContext* opCtx) {
     const auto catalogClient = Grid::get(opCtx)->catalogClient();
 
     auto versionStatus =
@@ -168,7 +206,7 @@ Status ShardingCatalogManagerImpl::_initConfigVersion(OperationContext* opCtx) {
     return Status::OK();
 }
 
-Status ShardingCatalogManagerImpl::_initConfigIndexes(OperationContext* opCtx) {
+Status ShardingCatalogManager::_initConfigIndexes(OperationContext* opCtx) {
     const bool unique = true;
     auto configShard = Grid::get(opCtx)->shardRegistry()->getConfigShard();
 
@@ -274,8 +312,8 @@ Status ShardingCatalogManagerImpl::_initConfigIndexes(OperationContext* opCtx) {
     return Status::OK();
 }
 
-Status ShardingCatalogManagerImpl::setFeatureCompatibilityVersionOnShards(
-    OperationContext* opCtx, const std::string& version) {
+Status ShardingCatalogManager::setFeatureCompatibilityVersionOnShards(OperationContext* opCtx,
+                                                                      const std::string& version) {
 
     // No shards should be added until we have forwarded featureCompatibilityVersion to all shards.
     Lock::SharedLock lk(opCtx->lockState(), _kShardMembershipLock);

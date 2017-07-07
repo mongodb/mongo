@@ -86,14 +86,14 @@ TEST_F(CommitChunkMigrate, CheckCorrectOpsCommandWithCtl) {
     ChunkType const& chunk0cref = chunk0;
     ChunkType const& chunk1cref = chunk1;
 
-    StatusWith<BSONObj> resultBSON =
-        catalogManager()->commitChunkMigration(operationContext(),
-                                               NamespaceString(chunk0.getNS()),
-                                               chunk0cref,
-                                               chunk1cref,
-                                               origVersion.epoch(),
-                                               ShardId(shard0.getName()),
-                                               ShardId(shard1.getName()));
+    StatusWith<BSONObj> resultBSON = ShardingCatalogManager::get(operationContext())
+                                         ->commitChunkMigration(operationContext(),
+                                                                NamespaceString(chunk0.getNS()),
+                                                                chunk0cref,
+                                                                chunk1cref,
+                                                                origVersion.epoch(),
+                                                                ShardId(shard0.getName()),
+                                                                ShardId(shard1.getName()));
 
     ASSERT_OK(resultBSON.getStatus());
 
@@ -147,14 +147,14 @@ TEST_F(CommitChunkMigrate, CheckCorrectOpsCommandNoCtl) {
 
     setupChunks({chunk0}).transitional_ignore();
 
-    StatusWith<BSONObj> resultBSON =
-        catalogManager()->commitChunkMigration(operationContext(),
-                                               NamespaceString(chunk0.getNS()),
-                                               chunk0,
-                                               boost::none,
-                                               origVersion.epoch(),
-                                               ShardId(shard0.getName()),
-                                               ShardId(shard1.getName()));
+    StatusWith<BSONObj> resultBSON = ShardingCatalogManager::get(operationContext())
+                                         ->commitChunkMigration(operationContext(),
+                                                                NamespaceString(chunk0.getNS()),
+                                                                chunk0,
+                                                                boost::none,
+                                                                origVersion.epoch(),
+                                                                ShardId(shard0.getName()),
+                                                                ShardId(shard1.getName()));
 
     ASSERT_OK(resultBSON.getStatus());
 
@@ -212,14 +212,14 @@ TEST_F(CommitChunkMigrate, RejectWrongCollectionEpoch0) {
 
     setupChunks({chunk0, chunk1}).transitional_ignore();
 
-    StatusWith<BSONObj> resultBSON =
-        catalogManager()->commitChunkMigration(operationContext(),
-                                               NamespaceString(chunk0.getNS()),
-                                               chunk0,
-                                               chunk1,
-                                               OID::gen(),
-                                               ShardId(shard0.getName()),
-                                               ShardId(shard1.getName()));
+    StatusWith<BSONObj> resultBSON = ShardingCatalogManager::get(operationContext())
+                                         ->commitChunkMigration(operationContext(),
+                                                                NamespaceString(chunk0.getNS()),
+                                                                chunk0,
+                                                                chunk1,
+                                                                OID::gen(),
+                                                                ShardId(shard0.getName()),
+                                                                ShardId(shard1.getName()));
 
     ASSERT_EQ(ErrorCodes::StaleEpoch, resultBSON.getStatus());
 }
@@ -265,14 +265,14 @@ TEST_F(CommitChunkMigrate, RejectWrongCollectionEpoch1) {
     // get version from the control chunk this time
     setupChunks({chunk1, chunk0}).transitional_ignore();
 
-    StatusWith<BSONObj> resultBSON =
-        catalogManager()->commitChunkMigration(operationContext(),
-                                               NamespaceString(chunk0.getNS()),
-                                               chunk0,
-                                               chunk1,
-                                               origVersion.epoch(),
-                                               ShardId(shard0.getName()),
-                                               ShardId(shard1.getName()));
+    StatusWith<BSONObj> resultBSON = ShardingCatalogManager::get(operationContext())
+                                         ->commitChunkMigration(operationContext(),
+                                                                NamespaceString(chunk0.getNS()),
+                                                                chunk0,
+                                                                chunk1,
+                                                                origVersion.epoch(),
+                                                                ShardId(shard0.getName()),
+                                                                ShardId(shard1.getName()));
 
     ASSERT_EQ(ErrorCodes::StaleEpoch, resultBSON.getStatus());
 }
@@ -316,14 +316,14 @@ TEST_F(CommitChunkMigrate, RejectChunkMissing0) {
 
     setupChunks({chunk1}).transitional_ignore();
 
-    StatusWith<BSONObj> resultBSON =
-        catalogManager()->commitChunkMigration(operationContext(),
-                                               NamespaceString(chunk0.getNS()),
-                                               chunk0,
-                                               chunk1,
-                                               origVersion.epoch(),
-                                               ShardId(shard0.getName()),
-                                               ShardId(shard1.getName()));
+    StatusWith<BSONObj> resultBSON = ShardingCatalogManager::get(operationContext())
+                                         ->commitChunkMigration(operationContext(),
+                                                                NamespaceString(chunk0.getNS()),
+                                                                chunk0,
+                                                                chunk1,
+                                                                origVersion.epoch(),
+                                                                ShardId(shard0.getName()),
+                                                                ShardId(shard1.getName()));
 
     ASSERT_EQ(40165, resultBSON.getStatus().code());
 }
@@ -367,14 +367,14 @@ TEST_F(CommitChunkMigrate, RejectChunkMissing1) {
 
     setupChunks({chunk0}).transitional_ignore();
 
-    StatusWith<BSONObj> resultBSON =
-        catalogManager()->commitChunkMigration(operationContext(),
-                                               NamespaceString(chunk0.getNS()),
-                                               chunk0,
-                                               chunk1,
-                                               origVersion.epoch(),
-                                               ShardId(shard0.getName()),
-                                               ShardId(shard1.getName()));
+    StatusWith<BSONObj> resultBSON = ShardingCatalogManager::get(operationContext())
+                                         ->commitChunkMigration(operationContext(),
+                                                                NamespaceString(chunk0.getNS()),
+                                                                chunk0,
+                                                                chunk1,
+                                                                origVersion.epoch(),
+                                                                ShardId(shard0.getName()),
+                                                                ShardId(shard1.getName()));
 
     ASSERT_EQ(40165, resultBSON.getStatus().code());
 }

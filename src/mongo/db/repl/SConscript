@@ -1476,6 +1476,7 @@ env.Library(
         '$BUILD_DIR/mongo/db/sessions',
         '$BUILD_DIR/mongo/db/stats/counters',
         '$BUILD_DIR/mongo/rpc/client_metadata',
+        '$BUILD_DIR/mongo/s/catalog/sharding_catalog_manager',
         'bgsync',
         'drop_pending_collection_reaper',
         'oplog_buffer_collection',

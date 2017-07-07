@@ -30,7 +30,7 @@
 
 #include "mongo/platform/basic.h"
 
-#include "mongo/s/catalog/sharding_catalog_manager_impl.h"
+#include "mongo/s/catalog/sharding_catalog_manager.h"
 
 #include <iomanip>
 #include <set>
@@ -214,13 +214,13 @@ void checkForExistingChunks(OperationContext* opCtx, const string& ns) {
 
 }  // namespace
 
-void ShardingCatalogManagerImpl::shardCollection(OperationContext* opCtx,
-                                                 const string& ns,
-                                                 const ShardKeyPattern& fieldsAndOrder,
-                                                 const BSONObj& defaultCollation,
-                                                 bool unique,
-                                                 const vector<BSONObj>& initPoints,
-                                                 const bool distributeInitialChunks) {
+void ShardingCatalogManager::shardCollection(OperationContext* opCtx,
+                                             const string& ns,
+                                             const ShardKeyPattern& fieldsAndOrder,
+                                             const BSONObj& defaultCollation,
+                                             bool unique,
+                                             const vector<BSONObj>& initPoints,
+                                             const bool distributeInitialChunks) {
     const auto catalogClient = Grid::get(opCtx)->catalogClient();
     const auto shardRegistry = Grid::get(opCtx)->shardRegistry();
 

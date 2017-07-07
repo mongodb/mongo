@@ -30,7 +30,7 @@
 
 #include "mongo/platform/basic.h"
 
-#include "mongo/s/catalog/sharding_catalog_manager_impl.h"
+#include "mongo/s/catalog/sharding_catalog_manager.h"
 
 #include "mongo/base/status_with.h"
 #include "mongo/client/read_preference.h"
@@ -172,9 +172,9 @@ StatusWith<ChunkRange> includeFullShardKey(OperationContext* opCtx,
 
 }  // namespace
 
-Status ShardingCatalogManagerImpl::addShardToZone(OperationContext* opCtx,
-                                                  const std::string& shardName,
-                                                  const std::string& zoneName) {
+Status ShardingCatalogManager::addShardToZone(OperationContext* opCtx,
+                                              const std::string& shardName,
+                                              const std::string& zoneName) {
     Lock::ExclusiveLock lk(opCtx->lockState(), _kZoneOpLock);
 
     auto updateStatus = Grid::get(opCtx)->catalogClient()->updateConfigDocument(
@@ -197,9 +197,9 @@ Status ShardingCatalogManagerImpl::addShardToZone(OperationContext* opCtx,
     return Status::OK();
 }
 
-Status ShardingCatalogManagerImpl::removeShardFromZone(OperationContext* opCtx,
-                                                       const std::string& shardName,
-                                                       const std::string& zoneName) {
+Status ShardingCatalogManager::removeShardFromZone(OperationContext* opCtx,
+                                                   const std::string& shardName,
+                                                   const std::string& zoneName) {
     Lock::ExclusiveLock lk(opCtx->lockState(), _kZoneOpLock);
 
     auto configShard = Grid::get(opCtx)->shardRegistry()->getConfigShard();
@@ -309,10 +309,10 @@ Status ShardingCatalogManagerImpl::removeShardFromZone(OperationContext* opCtx,
 }
 
 
-Status ShardingCatalogManagerImpl::assignKeyRangeToZone(OperationContext* opCtx,
-                                                        const NamespaceString& ns,
-                                                        const ChunkRange& givenRange,
-                                                        const std::string& zoneName) {
+Status ShardingCatalogManager::assignKeyRangeToZone(OperationContext* opCtx,
+                                                    const NamespaceString& ns,
+                                                    const ChunkRange& givenRange,
+                                                    const std::string& zoneName) {
     Lock::ExclusiveLock lk(opCtx->lockState(), _kZoneOpLock);
 
     auto configServer = Grid::get(opCtx)->shardRegistry()->getConfigShard();
@@ -372,9 +372,9 @@ Status ShardingCatalogManagerImpl::assignKeyRangeToZone(OperationContext* opCtx,
     return Status::OK();
 }
 
-Status ShardingCatalogManagerImpl::removeKeyRangeFromZone(OperationContext* opCtx,
-                                                          const NamespaceString& ns,
-                                                          const ChunkRange& range) {
+Status ShardingCatalogManager::removeKeyRangeFromZone(OperationContext* opCtx,
+                                                      const NamespaceString& ns,
+                                                      const ChunkRange& range) {
     Lock::ExclusiveLock lk(opCtx->lockState(), _kZoneOpLock);
 
     auto configServer = Grid::get(opCtx)->shardRegistry()->getConfigShard();

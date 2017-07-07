@@ -159,8 +159,8 @@ StatusWith<OID> extractElectionId(const BSONObj& responseObj) {
 
 }  // unnamed namespace
 
-DistLockCatalogImpl::DistLockCatalogImpl(ShardRegistry* shardRegistry)
-    : _client(shardRegistry), _lockPingNS(LockpingsType::ConfigNS), _locksNS(LocksType::ConfigNS) {}
+DistLockCatalogImpl::DistLockCatalogImpl()
+    : _lockPingNS(LockpingsType::ConfigNS), _locksNS(LocksType::ConfigNS) {}
 
 DistLockCatalogImpl::~DistLockCatalogImpl() = default;
 
@@ -199,7 +199,8 @@ Status DistLockCatalogImpl::ping(OperationContext* opCtx, StringData processID, 
     request.setUpsert(true);
     request.setWriteConcern(kMajorityWriteConcern);
 
-    auto resultStatus = _client->getConfigShard()->runCommandWithFixedRetryAttempts(
+    auto const shardRegistry = Grid::get(opCtx)->shardRegistry();
+    auto resultStatus = shardRegistry->getConfigShard()->runCommandWithFixedRetryAttempts(
         opCtx,
         ReadPreferenceSetting{ReadPreference::PrimaryOnly},
         _locksNS.db().toString(),
@@ -236,7 +237,8 @@ StatusWith<LocksType> DistLockCatalogImpl::grabLock(OperationContext* opCtx,
     request.setShouldReturnNew(true);
     request.setWriteConcern(writeConcern);
 
-    auto resultStatus = _client->getConfigShard()->runCommandWithFixedRetryAttempts(
+    auto const shardRegistry = Grid::get(opCtx)->shardRegistry();
+    auto resultStatus = shardRegistry->getConfigShard()->runCommandWithFixedRetryAttempts(
         opCtx,
         ReadPreferenceSetting{ReadPreference::PrimaryOnly},
         _locksNS.db().toString(),
@@ -293,7 +295,8 @@ StatusWith<LocksType> DistLockCatalogImpl::overtakeLock(OperationContext* opCtx,
     request.setShouldReturnNew(true);
     request.setWriteConcern(kMajorityWriteConcern);
 
-    auto resultStatus = _client->getConfigShard()->runCommandWithFixedRetryAttempts(
+    auto const shardRegistry = Grid::get(opCtx)->shardRegistry();
+    auto resultStatus = shardRegistry->getConfigShard()->runCommandWithFixedRetryAttempts(
         opCtx,
         ReadPreferenceSetting{ReadPreference::PrimaryOnly},
         _locksNS.db().toString(),
@@ -338,7 +341,8 @@ Status DistLockCatalogImpl::unlock(OperationContext* opCtx,
 }
 
 Status DistLockCatalogImpl::_unlock(OperationContext* opCtx, const FindAndModifyRequest& request) {
-    auto resultStatus = _client->getConfigShard()->runCommandWithFixedRetryAttempts(
+    auto const shardRegistry = Grid::get(opCtx)->shardRegistry();
+    auto resultStatus = shardRegistry->getConfigShard()->runCommandWithFixedRetryAttempts(
         opCtx,
         ReadPreferenceSetting{ReadPreference::PrimaryOnly},
         _locksNS.db().toString(),
@@ -373,7 +377,8 @@ Status DistLockCatalogImpl::unlockAll(OperationContext* opCtx, const std::string
 
     BSONObj cmdObj = request.toBSON();
 
-    auto response = _client->getConfigShard()->runCommandWithFixedRetryAttempts(
+    auto const shardRegistry = Grid::get(opCtx)->shardRegistry();
+    auto response = shardRegistry->getConfigShard()->runCommandWithFixedRetryAttempts(
         opCtx,
         ReadPreferenceSetting{ReadPreference::PrimaryOnly},
         _locksNS.db().toString(),
@@ -405,7 +410,8 @@ Status DistLockCatalogImpl::unlockAll(OperationContext* opCtx, const std::string
 
 StatusWith<DistLockCatalog::ServerInfo> DistLockCatalogImpl::getServerInfo(
     OperationContext* opCtx) {
-    auto resultStatus = _client->getConfigShard()->runCommandWithFixedRetryAttempts(
+    auto const shardRegistry = Grid::get(opCtx)->shardRegistry();
+    auto resultStatus = shardRegistry->getConfigShard()->runCommandWithFixedRetryAttempts(
         opCtx,
         kReadPref,
         "admin",
@@ -497,7 +503,8 @@ Status DistLockCatalogImpl::stopPing(OperationContext* opCtx, StringData process
         FindAndModifyRequest::makeRemove(_lockPingNS, BSON(LockpingsType::process() << processId));
     request.setWriteConcern(kMajorityWriteConcern);
 
-    auto resultStatus = _client->getConfigShard()->runCommandWithFixedRetryAttempts(
+    auto const shardRegistry = Grid::get(opCtx)->shardRegistry();
+    auto resultStatus = shardRegistry->getConfigShard()->runCommandWithFixedRetryAttempts(
         opCtx,
         ReadPreferenceSetting{ReadPreference::PrimaryOnly},
         _locksNS.db().toString(),
@@ -516,7 +523,8 @@ StatusWith<vector<BSONObj>> DistLockCatalogImpl::_findOnConfig(
     const BSONObj& query,
     const BSONObj& sort,
     boost::optional<long long> limit) {
-    auto result = _client->getConfigShard()->exhaustiveFindOnConfig(
+    auto const shardRegistry = Grid::get(opCtx)->shardRegistry();
+    auto result = shardRegistry->getConfigShard()->exhaustiveFindOnConfig(
         opCtx, readPref, repl::ReadConcernLevel::kMajorityReadConcern, nss, query, sort, limit);
     if (!result.isOK()) {
         return result.getStatus();

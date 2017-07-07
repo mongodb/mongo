@@ -117,7 +117,7 @@ public:
                            parsedRequest.hasMaxSize() ? parsedRequest.getMaxSize()
                                                       : kMaxSizeMBDefault);
 
-        StatusWith<string> addShardResult = Grid::get(opCtx)->catalogManager()->addShard(
+        StatusWith<string> addShardResult = ShardingCatalogManager::get(opCtx)->addShard(
             opCtx,
             parsedRequest.hasName() ? &parsedRequest.getName() : nullptr,
             parsedRequest.getConnString(),

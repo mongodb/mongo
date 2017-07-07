@@ -41,56 +41,48 @@
 namespace mongo {
 
 class FindAndModifyRequest;
-class NamespaceString;
-class ShardRegistry;
-struct HostAndPort;
 struct ReadPreferenceSetting;
 
 class DistLockCatalogImpl final : public DistLockCatalog {
 public:
-    DistLockCatalogImpl(ShardRegistry* shardRegistry);
+    DistLockCatalogImpl();
+    ~DistLockCatalogImpl();
 
-    virtual ~DistLockCatalogImpl();
+    StatusWith<LockpingsType> getPing(OperationContext* opCtx, StringData processID) override;
 
-    virtual StatusWith<LockpingsType> getPing(OperationContext* opCtx,
-                                              StringData processID) override;
+    Status ping(OperationContext* opCtx, StringData processID, Date_t ping) override;
 
-    virtual Status ping(OperationContext* opCtx, StringData processID, Date_t ping) override;
+    StatusWith<LocksType> grabLock(OperationContext* opCtx,
+                                   StringData lockID,
+                                   const OID& lockSessionID,
+                                   StringData who,
+                                   StringData processId,
+                                   Date_t time,
+                                   StringData why,
+                                   const WriteConcernOptions& writeConcern) override;
 
-    virtual StatusWith<LocksType> grabLock(OperationContext* opCtx,
-                                           StringData lockID,
-                                           const OID& lockSessionID,
-                                           StringData who,
-                                           StringData processId,
-                                           Date_t time,
-                                           StringData why,
-                                           const WriteConcernOptions& writeConcern) override;
+    StatusWith<LocksType> overtakeLock(OperationContext* opCtx,
+                                       StringData lockID,
+                                       const OID& lockSessionID,
+                                       const OID& currentHolderTS,
+                                       StringData who,
+                                       StringData processId,
+                                       Date_t time,
+                                       StringData why) override;
 
-    virtual StatusWith<LocksType> overtakeLock(OperationContext* opCtx,
-                                               StringData lockID,
-                                               const OID& lockSessionID,
-                                               const OID& currentHolderTS,
-                                               StringData who,
-                                               StringData processId,
-                                               Date_t time,
-                                               StringData why) override;
+    Status unlock(OperationContext* opCtx, const OID& lockSessionID) override;
 
-    virtual Status unlock(OperationContext* opCtx, const OID& lockSessionID) override;
+    Status unlock(OperationContext* opCtx, const OID& lockSessionID, StringData name) override;
 
-    virtual Status unlock(OperationContext* opCtx,
-                          const OID& lockSessionID,
-                          StringData name) override;
+    Status unlockAll(OperationContext* opCtx, const std::string& processID) override;
 
-    virtual Status unlockAll(OperationContext* opCtx, const std::string& processID) override;
+    StatusWith<ServerInfo> getServerInfo(OperationContext* opCtx) override;
 
-    virtual StatusWith<ServerInfo> getServerInfo(OperationContext* opCtx) override;
+    StatusWith<LocksType> getLockByTS(OperationContext* opCtx, const OID& lockSessionID) override;
 
-    virtual StatusWith<LocksType> getLockByTS(OperationContext* opCtx,
-                                              const OID& lockSessionID) override;
+    StatusWith<LocksType> getLockByName(OperationContext* opCtx, StringData name) override;
 
-    virtual StatusWith<LocksType> getLockByName(OperationContext* opCtx, StringData name) override;
-
-    virtual Status stopPing(OperationContext* opCtx, StringData processId) override;
+    Status stopPing(OperationContext* opCtx, StringData processId) override;
 
 private:
     Status _unlock(OperationContext* opCtx, const FindAndModifyRequest& request);
@@ -101,8 +93,6 @@ private:
                                                    const BSONObj& query,
                                                    const BSONObj& sort,
                                                    boost::optional<long long> limit);
-
-    ShardRegistry* _client;
 
     // These are not static to avoid initialization order fiasco.
     const NamespaceString _lockPingNS;

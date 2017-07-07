@@ -38,7 +38,6 @@
 #include "mongo/executor/task_executor_pool.h"
 #include "mongo/s/balancer_configuration.h"
 #include "mongo/s/catalog/sharding_catalog_client.h"
-#include "mongo/s/catalog/sharding_catalog_manager.h"
 #include "mongo/s/catalog_cache.h"
 #include "mongo/s/client/shard_factory.h"
 #include "mongo/s/client/shard_registry.h"
@@ -64,7 +63,6 @@ Grid* Grid::get(OperationContext* operationContext) {
 }
 
 void Grid::init(std::unique_ptr<ShardingCatalogClient> catalogClient,
-                std::unique_ptr<ShardingCatalogManager> catalogManager,
                 std::unique_ptr<CatalogCache> catalogCache,
                 std::unique_ptr<ShardRegistry> shardRegistry,
                 std::unique_ptr<ClusterCursorManager> cursorManager,
@@ -72,7 +70,6 @@ void Grid::init(std::unique_ptr<ShardingCatalogClient> catalogClient,
                 std::unique_ptr<executor::TaskExecutorPool> executorPool,
                 executor::NetworkInterface* network) {
     invariant(!_catalogClient);
-    invariant(!_catalogManager);
     invariant(!_catalogCache);
     invariant(!_shardRegistry);
     invariant(!_cursorManager);
@@ -81,7 +78,6 @@ void Grid::init(std::unique_ptr<ShardingCatalogClient> catalogClient,
     invariant(!_network);
 
     _catalogClient = std::move(catalogClient);
-    _catalogManager = std::move(catalogManager);
     _catalogCache = std::move(catalogCache);
     _shardRegistry = std::move(shardRegistry);
     _cursorManager = std::move(cursorManager);
@@ -90,6 +86,17 @@ void Grid::init(std::unique_ptr<ShardingCatalogClient> catalogClient,
     _network = network;
 
     _shardRegistry->init();
+}
+
+Grid::CustomConnectionPoolStatsFn Grid::getCustomConnectionPoolStatsFn() const {
+    stdx::lock_guard<stdx::mutex> lk(_mutex);
+    return _customConnectionPoolStatsFn;
+}
+
+void Grid::setCustomConnectionPoolStatsFn(CustomConnectionPoolStatsFn statsFn) {
+    stdx::lock_guard<stdx::mutex> lk(_mutex);
+    invariant(!_customConnectionPoolStatsFn || !statsFn);
+    _customConnectionPoolStatsFn = std::move(statsFn);
 }
 
 bool Grid::allowLocalHost() const {
@@ -117,7 +124,6 @@ void Grid::advanceConfigOpTime(repl::OpTime opTime) {
 }
 
 void Grid::clearForUnitTests() {
-    _catalogManager.reset();
     _catalogClient.reset();
     _catalogCache.reset();
     _shardRegistry.reset();

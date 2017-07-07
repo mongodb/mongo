@@ -30,7 +30,7 @@
 
 #include "mongo/platform/basic.h"
 
-#include "mongo/s/catalog/sharding_catalog_manager_impl.h"
+#include "mongo/s/catalog/sharding_catalog_manager.h"
 
 #include <iomanip>
 #include <set>
@@ -43,7 +43,6 @@
 #include "mongo/client/replica_set_monitor.h"
 #include "mongo/db/client.h"
 #include "mongo/db/commands/feature_compatibility_version.h"
-#include "mongo/db/commands/feature_compatibility_version_command_parser.h"
 #include "mongo/db/db_raii.h"
 #include "mongo/db/namespace_string.h"
 #include "mongo/db/operation_context.h"
@@ -129,7 +128,7 @@ StatusWith<std::string> generateNewShardName(OperationContext* opCtx) {
 
 }  // namespace
 
-StatusWith<Shard::CommandResponse> ShardingCatalogManagerImpl::_runCommandForAddShard(
+StatusWith<Shard::CommandResponse> ShardingCatalogManager::_runCommandForAddShard(
     OperationContext* opCtx,
     RemoteCommandTargeter* targeter,
     const std::string& dbName,
@@ -200,7 +199,7 @@ StatusWith<Shard::CommandResponse> ShardingCatalogManagerImpl::_runCommandForAdd
                                   std::move(writeConcernStatus));
 }
 
-StatusWith<boost::optional<ShardType>> ShardingCatalogManagerImpl::_checkIfShardExists(
+StatusWith<boost::optional<ShardType>> ShardingCatalogManager::_checkIfShardExists(
     OperationContext* opCtx,
     const ConnectionString& proposedShardConnectionString,
     const std::string* proposedShardName,
@@ -295,7 +294,7 @@ StatusWith<boost::optional<ShardType>> ShardingCatalogManagerImpl::_checkIfShard
     return {boost::none};
 }
 
-StatusWith<ShardType> ShardingCatalogManagerImpl::_validateHostAsShard(
+StatusWith<ShardType> ShardingCatalogManager::_validateHostAsShard(
     OperationContext* opCtx,
     std::shared_ptr<RemoteCommandTargeter> targeter,
     const std::string* shardProposedName,
@@ -481,7 +480,7 @@ StatusWith<ShardType> ShardingCatalogManagerImpl::_validateHostAsShard(
     return shard;
 }
 
-StatusWith<std::vector<std::string>> ShardingCatalogManagerImpl::_getDBNamesListFromShard(
+StatusWith<std::vector<std::string>> ShardingCatalogManager::_getDBNamesListFromShard(
     OperationContext* opCtx, std::shared_ptr<RemoteCommandTargeter> targeter) {
 
     auto swCommandResponse = _runCommandForAddShard(
@@ -511,7 +510,7 @@ StatusWith<std::vector<std::string>> ShardingCatalogManagerImpl::_getDBNamesList
     return dbNames;
 }
 
-StatusWith<std::string> ShardingCatalogManagerImpl::addShard(
+StatusWith<std::string> ShardingCatalogManager::addShard(
     OperationContext* opCtx,
     const std::string* shardProposedName,
     const ConnectionString& shardConnectionString,
@@ -702,12 +701,12 @@ StatusWith<std::string> ShardingCatalogManagerImpl::addShard(
     return shardType.getName();
 }
 
-void ShardingCatalogManagerImpl::appendConnectionStats(executor::ConnectionPoolStats* stats) {
+void ShardingCatalogManager::appendConnectionStats(executor::ConnectionPoolStats* stats) {
     _executorForAddShard->appendConnectionStats(stats);
 }
 
-BSONObj ShardingCatalogManagerImpl::createShardIdentityUpsertForAddShard(
-    OperationContext* opCtx, const std::string& shardName) {
+BSONObj ShardingCatalogManager::createShardIdentityUpsertForAddShard(OperationContext* opCtx,
+                                                                     const std::string& shardName) {
     std::unique_ptr<BatchedUpdateDocument> updateDoc(new BatchedUpdateDocument());
 
     BSONObjBuilder query;

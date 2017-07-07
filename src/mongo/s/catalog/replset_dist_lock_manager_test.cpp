@@ -129,7 +129,7 @@ protected:
         ShardingMongodTestFixture::tearDown();
     }
 
-    std::unique_ptr<DistLockCatalog> makeDistLockCatalog(ShardRegistry* shardRegistry) override {
+    std::unique_ptr<DistLockCatalog> makeDistLockCatalog() override {
         return stdx::make_unique<DistLockCatalogMock>();
     }
 

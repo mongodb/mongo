@@ -98,7 +98,7 @@ public:
 
         auto parsedRequest = uassertStatusOK(AddShardToZoneRequest::parseFromConfigCommand(cmdObj));
 
-        uassertStatusOK(Grid::get(opCtx)->catalogManager()->addShardToZone(
+        uassertStatusOK(ShardingCatalogManager::get(opCtx)->addShardToZone(
             opCtx, parsedRequest.getShardName(), parsedRequest.getZoneName()));
 
         return true;

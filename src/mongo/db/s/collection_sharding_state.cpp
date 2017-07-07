@@ -351,8 +351,7 @@ void CollectionShardingState::onDeleteOp(OperationContext* opCtx,
                 uasserted(40302, "cannot delete config.version document while in --configsvr mode");
             } else {
                 // Throw out any cached information related to the cluster ID.
-                Grid::get(opCtx)
-                    ->catalogManager()
+                ShardingCatalogManager::get(opCtx)
                     ->discardCachedConfigDatabaseInitializationState();
                 ClusterIdentityLoader::get(opCtx)->discardCachedClusterId();
             }
@@ -389,8 +388,7 @@ void CollectionShardingState::onDropCollection(OperationContext* opCtx,
                 uasserted(40303, "cannot drop config.version document while in --configsvr mode");
             } else {
                 // Throw out any cached information related to the cluster ID.
-                Grid::get(opCtx)
-                    ->catalogManager()
+                ShardingCatalogManager::get(opCtx)
                     ->discardCachedConfigDatabaseInitializationState();
                 ClusterIdentityLoader::get(opCtx)->discardCachedClusterId();
             }

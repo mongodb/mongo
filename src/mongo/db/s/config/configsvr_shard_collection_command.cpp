@@ -174,7 +174,7 @@ public:
             IDLParserErrorContext("ConfigsvrShardCollection"), cmdObj);
 
         auto const catalogClient = Grid::get(opCtx)->catalogClient();
-        auto const catalogManager = Grid::get(opCtx)->catalogManager();
+        auto const catalogManager = ShardingCatalogManager::get(opCtx);
         auto const shardRegistry = Grid::get(opCtx)->shardRegistry();
         auto const catalogCache = Grid::get(opCtx)->catalogCache();
 

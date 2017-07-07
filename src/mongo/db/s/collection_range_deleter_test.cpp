@@ -44,9 +44,6 @@
 #include "mongo/db/s/collection_sharding_state.h"
 #include "mongo/db/s/sharding_state.h"
 #include "mongo/db/service_context_d_test_fixture.h"
-#include "mongo/s/catalog/dist_lock_catalog_impl.h"
-#include "mongo/s/catalog/dist_lock_manager_mock.h"
-#include "mongo/s/catalog/sharding_catalog_client_mock.h"
 #include "mongo/s/chunk_version.h"
 #include "mongo/s/client/shard_registry.h"
 #include "mongo/s/sharding_mongod_test_fixture.h"
@@ -68,13 +65,15 @@ public:
     using Deletion = CollectionRangeDeleter::Deletion;
 
 protected:
-    auto next(CollectionRangeDeleter& rangeDeleter, int maxToDelete) -> boost::optional<Date_t> {
+    boost::optional<Date_t> next(CollectionRangeDeleter& rangeDeleter, int maxToDelete) {
         return CollectionRangeDeleter::cleanUpNextRange(
             operationContext(), kNss, epoch(), maxToDelete, &rangeDeleter);
     }
+
     std::shared_ptr<RemoteCommandTargeterMock> configTargeter() {
         return RemoteCommandTargeterMock::get(shardRegistry()->getConfigShard()->getTargeter());
     }
+
     OID const& epoch() {
         return _epoch;
     }
@@ -82,21 +81,6 @@ protected:
 private:
     void setUp() override;
     void tearDown() override;
-
-    std::unique_ptr<DistLockCatalog> makeDistLockCatalog(ShardRegistry* shardRegistry) override {
-        invariant(shardRegistry);
-        return stdx::make_unique<DistLockCatalogImpl>(shardRegistry);
-    }
-
-    std::unique_ptr<DistLockManager> makeDistLockManager(
-        std::unique_ptr<DistLockCatalog> distLockCatalog) override {
-        return stdx::make_unique<DistLockManagerMock>(std::move(distLockCatalog));
-    }
-
-    std::unique_ptr<ShardingCatalogClient> makeShardingCatalogClient(
-        std::unique_ptr<DistLockManager> distLockManager) override {
-        return stdx::make_unique<ShardingCatalogClientMock>(std::move(distLockManager));
-    }
 
     OID _epoch;
 };

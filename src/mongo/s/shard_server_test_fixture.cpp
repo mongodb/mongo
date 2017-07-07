@@ -90,9 +90,7 @@ void ShardServerTestFixture::setUp() {
 }
 
 
-std::unique_ptr<DistLockCatalog> ShardServerTestFixture::makeDistLockCatalog(
-    ShardRegistry* shardRegistry) {
-    invariant(shardRegistry);
+std::unique_ptr<DistLockCatalog> ShardServerTestFixture::makeDistLockCatalog() {
     return stdx::make_unique<DistLockCatalogMock>();
 }
 

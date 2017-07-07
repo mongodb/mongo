@@ -30,6 +30,8 @@
 
 #include "mongo/db/s/metadata_manager.h"
 
+#include <boost/optional.hpp>
+
 #include "mongo/bson/bsonobjbuilder.h"
 #include "mongo/client/remote_command_targeter_mock.h"
 #include "mongo/db/client.h"
@@ -46,9 +48,6 @@
 #include "mongo/db/service_context.h"
 #include "mongo/db/service_context_d_test_fixture.h"
 #include "mongo/executor/task_executor.h"
-#include "mongo/s/catalog/dist_lock_catalog_impl.h"
-#include "mongo/s/catalog/dist_lock_manager_mock.h"
-#include "mongo/s/catalog/sharding_catalog_client_mock.h"
 #include "mongo/s/catalog/type_chunk.h"
 #include "mongo/s/client/shard_registry.h"
 #include "mongo/s/sharding_mongod_test_fixture.h"
@@ -56,9 +55,6 @@
 #include "mongo/stdx/memory.h"
 #include "mongo/unittest/unittest.h"
 #include "mongo/util/assert_util.h"
-
-
-#include <boost/optional.hpp>
 
 namespace mongo {
 namespace {
@@ -89,21 +85,6 @@ protected:
         configTargeter()->setFindHostReturnValue(dummyHost);
 
         _manager = std::make_shared<MetadataManager>(getServiceContext(), kNss, executor());
-    }
-
-    std::unique_ptr<DistLockCatalog> makeDistLockCatalog(ShardRegistry* shardRegistry) override {
-        invariant(shardRegistry);
-        return stdx::make_unique<DistLockCatalogImpl>(shardRegistry);
-    }
-
-    std::unique_ptr<DistLockManager> makeDistLockManager(
-        std::unique_ptr<DistLockCatalog> distLockCatalog) override {
-        return stdx::make_unique<DistLockManagerMock>(std::move(distLockCatalog));
-    }
-
-    std::unique_ptr<ShardingCatalogClient> makeShardingCatalogClient(
-        std::unique_ptr<DistLockManager> distLockManager) override {
-        return stdx::make_unique<ShardingCatalogClientMock>(std::move(distLockManager));
     }
 
     static std::unique_ptr<CollectionMetadata> makeEmptyMetadata() {

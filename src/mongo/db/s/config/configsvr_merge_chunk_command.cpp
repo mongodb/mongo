@@ -110,7 +110,7 @@ public:
         auto parsedRequest = uassertStatusOK(MergeChunkRequest::parseFromConfigCommand(cmdObj));
 
         Status mergeChunkResult =
-            Grid::get(opCtx)->catalogManager()->commitChunkMerge(opCtx,
+            ShardingCatalogManager::get(opCtx)->commitChunkMerge(opCtx,
                                                                  parsedRequest.getNamespace(),
                                                                  parsedRequest.getEpoch(),
                                                                  parsedRequest.getChunkBoundaries(),

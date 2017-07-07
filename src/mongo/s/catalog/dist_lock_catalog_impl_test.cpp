@@ -95,9 +95,8 @@ protected:
         configTargeter()->setFindHostReturnValue(dummyHost);
     }
 
-    std::unique_ptr<DistLockCatalog> makeDistLockCatalog(ShardRegistry* shardRegistry) override {
-        invariant(shardRegistry);
-        return stdx::make_unique<DistLockCatalogImpl>(shardRegistry);
+    std::unique_ptr<DistLockCatalog> makeDistLockCatalog() override {
+        return stdx::make_unique<DistLockCatalogImpl>();
     }
 
     std::unique_ptr<DistLockManager> makeDistLockManager(

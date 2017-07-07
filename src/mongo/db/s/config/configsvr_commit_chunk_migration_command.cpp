@@ -127,7 +127,7 @@ public:
         auto commitRequest =
             uassertStatusOK(CommitChunkMigrationRequest::createFromCommand(nss, cmdObj));
 
-        StatusWith<BSONObj> response = Grid::get(opCtx)->catalogManager()->commitChunkMigration(
+        StatusWith<BSONObj> response = ShardingCatalogManager::get(opCtx)->commitChunkMigration(
             opCtx,
             nss,
             commitRequest.getMigratedChunk(),

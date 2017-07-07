@@ -30,7 +30,7 @@
 
 #include "mongo/platform/basic.h"
 
-#include "mongo/s/catalog/sharding_catalog_manager_impl.h"
+#include "mongo/s/catalog/sharding_catalog_manager.h"
 
 #include "mongo/base/status_with.h"
 #include "mongo/bson/bsonobjbuilder.h"
@@ -228,12 +228,12 @@ BSONObj makeCommitChunkApplyOpsCommand(const NamespaceString& nss,
 
 }  // namespace
 
-Status ShardingCatalogManagerImpl::commitChunkSplit(OperationContext* opCtx,
-                                                    const NamespaceString& ns,
-                                                    const OID& requestEpoch,
-                                                    const ChunkRange& range,
-                                                    const std::vector<BSONObj>& splitPoints,
-                                                    const std::string& shardName) {
+Status ShardingCatalogManager::commitChunkSplit(OperationContext* opCtx,
+                                                const NamespaceString& ns,
+                                                const OID& requestEpoch,
+                                                const ChunkRange& range,
+                                                const std::vector<BSONObj>& splitPoints,
+                                                const std::string& shardName) {
     // Take _kChunkOpLock in exclusive mode to prevent concurrent chunk splits, merges, and
     // migrations
     // TODO(SERVER-25359): Replace with a collection-specific lock map to allow splits/merges/
@@ -419,11 +419,11 @@ Status ShardingCatalogManagerImpl::commitChunkSplit(OperationContext* opCtx,
     return applyOpsStatus;
 }
 
-Status ShardingCatalogManagerImpl::commitChunkMerge(OperationContext* opCtx,
-                                                    const NamespaceString& ns,
-                                                    const OID& requestEpoch,
-                                                    const std::vector<BSONObj>& chunkBoundaries,
-                                                    const std::string& shardName) {
+Status ShardingCatalogManager::commitChunkMerge(OperationContext* opCtx,
+                                                const NamespaceString& ns,
+                                                const OID& requestEpoch,
+                                                const std::vector<BSONObj>& chunkBoundaries,
+                                                const std::string& shardName) {
     // This method must never be called with empty chunks to merge
     invariant(!chunkBoundaries.empty());
 
@@ -527,7 +527,7 @@ Status ShardingCatalogManagerImpl::commitChunkMerge(OperationContext* opCtx,
     return applyOpsStatus;
 }
 
-StatusWith<BSONObj> ShardingCatalogManagerImpl::commitChunkMigration(
+StatusWith<BSONObj> ShardingCatalogManager::commitChunkMigration(
     OperationContext* opCtx,
     const NamespaceString& nss,
     const ChunkType& migratedChunk,

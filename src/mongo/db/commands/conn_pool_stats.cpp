@@ -37,13 +37,9 @@
 #include "mongo/db/commands.h"
 #include "mongo/db/repl/replication_coordinator.h"
 #include "mongo/db/repl/replication_coordinator_global.h"
-#include "mongo/db/s/sharding_state.h"
-#include "mongo/db/server_options.h"
 #include "mongo/executor/connection_pool_stats.h"
 #include "mongo/executor/network_interface_factory.h"
 #include "mongo/executor/task_executor_pool.h"
-#include "mongo/s/catalog/sharding_catalog_manager.h"
-#include "mongo/s/client/shard_registry.h"
 #include "mongo/s/grid.h"
 
 namespace mongo {
@@ -84,18 +80,24 @@ public:
         result.appendNumber("numClientConnections", DBClientConnection::getNumConnections());
         result.appendNumber("numAScopedConnections", AScopedConnection::getNumConnections());
 
-        // Replication connections, if we have them.
-        auto const replCoord = repl::ReplicationCoordinator::get(opCtx);
-        if (replCoord && replCoord->isReplEnabled()) {
-            replCoord->appendConnectionStats(&stats);
+        // Replication connections, if we have any
+        {
+            auto const replCoord = repl::ReplicationCoordinator::get(opCtx);
+            if (replCoord && replCoord->isReplEnabled()) {
+                replCoord->appendConnectionStats(&stats);
+            }
         }
 
-        // Sharding connections, if we have any.
-        auto const grid = Grid::get(opCtx);
-        if (grid->getExecutorPool()) {
-            grid->getExecutorPool()->appendConnectionStats(&stats);
-            if (serverGlobalParams.clusterRole == ClusterRole::ConfigServer) {
-                grid->catalogManager()->appendConnectionStats(&stats);
+        // Sharding connections, if we have any
+        {
+            auto const grid = Grid::get(opCtx);
+            if (grid->getExecutorPool()) {
+                grid->getExecutorPool()->appendConnectionStats(&stats);
+            }
+
+            auto const customConnPoolStatsFn = grid->getCustomConnectionPoolStatsFn();
+            if (customConnPoolStatsFn) {
+                customConnPoolStatsFn(&stats);
             }
         }
 

@@ -308,6 +308,7 @@ env.Library(
         'db/ttl_d',
         'executor/network_interface_factory',
         'rpc/rpc',
+        's/catalog/sharding_catalog_manager',
         's/commands/shared_cluster_commands',
         'transport/service_entry_point',
         'transport/transport_layer_manager',

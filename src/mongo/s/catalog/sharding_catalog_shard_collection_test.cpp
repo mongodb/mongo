@@ -43,7 +43,7 @@
 #include "mongo/executor/task_executor.h"
 #include "mongo/rpc/metadata/tracking_metadata.h"
 #include "mongo/s/catalog/dist_lock_catalog_impl.h"
-#include "mongo/s/catalog/sharding_catalog_manager_impl.h"
+#include "mongo/s/catalog/sharding_catalog_manager.h"
 #include "mongo/s/catalog/type_changelog.h"
 #include "mongo/s/catalog/type_chunk.h"
 #include "mongo/s/catalog/type_collection.h"
@@ -128,13 +128,14 @@ TEST_F(ShardCollectionTest, distLockFails) {
 
     ShardKeyPattern keyPattern(BSON("_id" << 1));
     BSONObj defaultCollation;
-    ASSERT_THROWS_CODE(catalogManager()->shardCollection(operationContext(),
-                                                         nss.ns(),
-                                                         keyPattern,
-                                                         defaultCollation,
-                                                         false,
-                                                         vector<BSONObj>{},
-                                                         false),
+    ASSERT_THROWS_CODE(ShardingCatalogManager::get(operationContext())
+                           ->shardCollection(operationContext(),
+                                             nss.ns(),
+                                             keyPattern,
+                                             defaultCollation,
+                                             false,
+                                             vector<BSONObj>{},
+                                             false),
                        UserException,
                        ErrorCodes::LockBusy);
 }
@@ -162,13 +163,14 @@ TEST_F(ShardCollectionTest, anotherMongosSharding) {
     ShardKeyPattern shardKeyPattern(BSON("_id" << 1));
     BSONObj defaultCollation;
 
-    ASSERT_THROWS_CODE(catalogManager()->shardCollection(operationContext(),
-                                                         nss.ns(),
-                                                         shardKeyPattern,
-                                                         defaultCollation,
-                                                         false,
-                                                         vector<BSONObj>{},
-                                                         false),
+    ASSERT_THROWS_CODE(ShardingCatalogManager::get(operationContext())
+                           ->shardCollection(operationContext(),
+                                             nss.ns(),
+                                             shardKeyPattern,
+                                             defaultCollation,
+                                             false,
+                                             vector<BSONObj>{},
+                                             false),
                        UserException,
                        ErrorCodes::ManualInterventionRequired);
 }
@@ -200,13 +202,14 @@ TEST_F(ShardCollectionTest, noInitialChunksOrData) {
         ON_BLOCK_EXIT([&] { Client::destroy(); });
         Client::initThreadIfNotAlready("Test");
         auto opCtx = cc().makeOperationContext();
-        catalogManager()->shardCollection(opCtx.get(),
-                                          nss.ns(),
-                                          shardKeyPattern,
-                                          defaultCollation,
-                                          false,
-                                          vector<BSONObj>{},
-                                          false);
+        ShardingCatalogManager::get(operationContext())
+            ->shardCollection(opCtx.get(),
+                              nss.ns(),
+                              shardKeyPattern,
+                              defaultCollation,
+                              false,
+                              vector<BSONObj>{},
+                              false);
     });
 
     // Report that no documents exist for the given collection on the primary shard
@@ -327,14 +330,14 @@ TEST_F(ShardCollectionTest, withInitialChunks) {
         ON_BLOCK_EXIT([&] { Client::destroy(); });
         Client::initThreadIfNotAlready("Test");
         auto opCtx = cc().makeOperationContext();
-        catalogManager()->shardCollection(
-            opCtx.get(),
-            ns,
-            keyPattern,
-            defaultCollation,
-            true,
-            vector<BSONObj>{splitPoint0, splitPoint1, splitPoint2, splitPoint3},
-            true);
+        ShardingCatalogManager::get(operationContext())
+            ->shardCollection(opCtx.get(),
+                              ns,
+                              keyPattern,
+                              defaultCollation,
+                              true,
+                              vector<BSONObj>{splitPoint0, splitPoint1, splitPoint2, splitPoint3},
+                              true);
     });
 
     // Expect the set shard version for that namespace
@@ -425,8 +428,9 @@ TEST_F(ShardCollectionTest, withInitialData) {
         ON_BLOCK_EXIT([&] { Client::destroy(); });
         Client::initThreadIfNotAlready("Test");
         auto opCtx = cc().makeOperationContext();
-        catalogManager()->shardCollection(
-            opCtx.get(), ns, keyPattern, defaultCollation, false, vector<BSONObj>{}, false);
+        ShardingCatalogManager::get(operationContext())
+            ->shardCollection(
+                opCtx.get(), ns, keyPattern, defaultCollation, false, vector<BSONObj>{}, false);
     });
 
     // Report that documents exist for the given collection on the primary shard, so that calling

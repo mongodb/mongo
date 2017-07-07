@@ -107,10 +107,10 @@ public:
         }
 
         if (parsedRequest.isRemove()) {
-            uassertStatusOK(Grid::get(opCtx)->catalogManager()->removeKeyRangeFromZone(
+            uassertStatusOK(ShardingCatalogManager::get(opCtx)->removeKeyRangeFromZone(
                 opCtx, parsedRequest.getNS(), parsedRequest.getRange()));
         } else {
-            uassertStatusOK(Grid::get(opCtx)->catalogManager()->assignKeyRangeToZone(
+            uassertStatusOK(ShardingCatalogManager::get(opCtx)->assignKeyRangeToZone(
                 opCtx, parsedRequest.getNS(), parsedRequest.getRange(), zoneName));
         }
 

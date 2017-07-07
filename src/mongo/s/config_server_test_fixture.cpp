@@ -56,7 +56,7 @@
 #include "mongo/s/catalog/dist_lock_catalog_impl.h"
 #include "mongo/s/catalog/replset_dist_lock_manager.h"
 #include "mongo/s/catalog/sharding_catalog_client_impl.h"
-#include "mongo/s/catalog/sharding_catalog_manager_impl.h"
+#include "mongo/s/catalog/sharding_catalog_manager.h"
 #include "mongo/s/catalog/type_changelog.h"
 #include "mongo/s/catalog/type_chunk.h"
 #include "mongo/s/catalog/type_collection.h"
@@ -101,19 +101,38 @@ ConfigServerTestFixture::~ConfigServerTestFixture() = default;
 
 void ConfigServerTestFixture::setUp() {
     ShardingMongodTestFixture::setUp();
+
     // TODO: SERVER-26919 set the flag on the mock repl coordinator just for the window where it
     // actually needs to bypass the op observer.
     replicationCoordinator()->alwaysAllowWrites(true);
 
     // Initialize sharding components as a config server.
     serverGlobalParams.clusterRole = ClusterRole::ConfigServer;
+
+    {
+        // The catalog manager requires a special executor used for operations during addShard.
+        auto specialNet(stdx::make_unique<executor::NetworkInterfaceMock>());
+        _mockNetworkForAddShard = specialNet.get();
+
+        auto specialExec = makeThreadPoolTestExecutor(std::move(specialNet));
+        _executorForAddShard = specialExec.get();
+        _addShardNetworkTestEnv =
+            stdx::make_unique<NetworkTestEnv>(specialExec.get(), _mockNetworkForAddShard);
+
+        ShardingCatalogManager::create(getServiceContext(), std::move(specialExec));
+    }
+
     uassertStatusOK(initializeGlobalShardingStateForMongodForTest(ConnectionString::forLocal()));
 }
 
-std::unique_ptr<DistLockCatalog> ConfigServerTestFixture::makeDistLockCatalog(
-    ShardRegistry* shardRegistry) {
-    invariant(shardRegistry);
-    return stdx::make_unique<DistLockCatalogImpl>(shardRegistry);
+void ConfigServerTestFixture::tearDown() {
+    ShardingCatalogManager::clearForTests(getServiceContext());
+
+    ShardingMongodTestFixture::tearDown();
+}
+
+std::unique_ptr<DistLockCatalog> ConfigServerTestFixture::makeDistLockCatalog() {
+    return stdx::make_unique<DistLockCatalogImpl>();
 }
 
 std::unique_ptr<DistLockManager> ConfigServerTestFixture::makeDistLockManager(
@@ -131,21 +150,6 @@ std::unique_ptr<ShardingCatalogClient> ConfigServerTestFixture::makeShardingCata
     std::unique_ptr<DistLockManager> distLockManager) {
     invariant(distLockManager);
     return stdx::make_unique<ShardingCatalogClientImpl>(std::move(distLockManager));
-}
-
-std::unique_ptr<ShardingCatalogManager> ConfigServerTestFixture::makeShardingCatalogManager(
-    ShardingCatalogClient* catalogClient) {
-    invariant(catalogClient);
-
-    // The catalog manager requires a special executor used for operations during addShard.
-    auto specialNet(stdx::make_unique<executor::NetworkInterfaceMock>());
-    _mockNetworkForAddShard = specialNet.get();
-    auto specialExec = makeThreadPoolTestExecutor(std::move(specialNet));
-    _executorForAddShard = specialExec.get();
-    _addShardNetworkTestEnv =
-        stdx::make_unique<NetworkTestEnv>(specialExec.get(), _mockNetworkForAddShard);
-
-    return stdx::make_unique<ShardingCatalogManagerImpl>(std::move(specialExec));
 }
 
 std::unique_ptr<CatalogCacheLoader> ConfigServerTestFixture::makeCatalogCacheLoader() {

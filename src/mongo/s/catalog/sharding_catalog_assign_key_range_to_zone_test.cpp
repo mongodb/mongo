@@ -120,18 +120,18 @@ public:
 
 TEST_F(AssignKeyRangeToZoneTestFixture, BasicAssignKeyRange) {
     const ChunkRange newRange(BSON("x" << 0), BSON("x" << 10));
-    ASSERT_OK(catalogManager()->assignKeyRangeToZone(
-        operationContext(), shardedNS(), newRange, zoneName()));
+    ASSERT_OK(ShardingCatalogManager::get(operationContext())
+                  ->assignKeyRangeToZone(operationContext(), shardedNS(), newRange, zoneName()));
 
     assertOnlyZone(shardedNS(), newRange, zoneName());
 }
 
 TEST_F(AssignKeyRangeToZoneTestFixture, AssignKeyRangeOnUnshardedCollShouldFail) {
-    auto status =
-        catalogManager()->assignKeyRangeToZone(operationContext(),
-                                               NamespaceString("unsharded.coll"),
-                                               ChunkRange(BSON("x" << 0), BSON("x" << 10)),
-                                               zoneName());
+    auto status = ShardingCatalogManager::get(operationContext())
+                      ->assignKeyRangeToZone(operationContext(),
+                                             NamespaceString("unsharded.coll"),
+                                             ChunkRange(BSON("x" << 0), BSON("x" << 10)),
+                                             zoneName());
     ASSERT_EQ(ErrorCodes::NamespaceNotSharded, status);
 
     assertNoZoneDoc();
@@ -149,35 +149,43 @@ TEST_F(AssignKeyRangeToZoneTestFixture, AssignKeyRangeOnDroppedShardedCollShould
                                        NamespaceString(CollectionType::ConfigNS),
                                        unshardedCollection.toBSON()));
 
-    auto status = catalogManager()->assignKeyRangeToZone(
-        operationContext(), ns, ChunkRange(BSON("x" << 0), BSON("x" << 10)), zoneName());
+    auto status =
+        ShardingCatalogManager::get(operationContext())
+            ->assignKeyRangeToZone(
+                operationContext(), ns, ChunkRange(BSON("x" << 0), BSON("x" << 10)), zoneName());
     ASSERT_EQ(ErrorCodes::NamespaceNotSharded, status);
 
     assertNoZoneDoc();
 }
 
 TEST_F(AssignKeyRangeToZoneTestFixture, AssignKeyRangeNonExistingZoneShouldFail) {
-    auto status =
-        catalogManager()->assignKeyRangeToZone(operationContext(),
-                                               shardedNS(),
-                                               ChunkRange(BSON("x" << 0), BSON("x" << 10)),
-                                               zoneName() + "y");
+    auto status = ShardingCatalogManager::get(operationContext())
+                      ->assignKeyRangeToZone(operationContext(),
+                                             shardedNS(),
+                                             ChunkRange(BSON("x" << 0), BSON("x" << 10)),
+                                             zoneName() + "y");
     ASSERT_EQ(ErrorCodes::ZoneNotFound, status);
 
     assertNoZoneDoc();
 }
 
 TEST_F(AssignKeyRangeToZoneTestFixture, MinWithInvalidShardKeyShouldFail) {
-    auto status = catalogManager()->assignKeyRangeToZone(
-        operationContext(), shardedNS(), ChunkRange(BSON("a" << 0), BSON("x" << 10)), zoneName());
+    auto status = ShardingCatalogManager::get(operationContext())
+                      ->assignKeyRangeToZone(operationContext(),
+                                             shardedNS(),
+                                             ChunkRange(BSON("a" << 0), BSON("x" << 10)),
+                                             zoneName());
     ASSERT_EQ(ErrorCodes::ShardKeyNotFound, status);
 
     assertNoZoneDoc();
 }
 
 TEST_F(AssignKeyRangeToZoneTestFixture, MaxWithInvalidShardKeyShouldFail) {
-    auto status = catalogManager()->assignKeyRangeToZone(
-        operationContext(), shardedNS(), ChunkRange(BSON("x" << 0), BSON("y" << 10)), zoneName());
+    auto status = ShardingCatalogManager::get(operationContext())
+                      ->assignKeyRangeToZone(operationContext(),
+                                             shardedNS(),
+                                             ChunkRange(BSON("x" << 0), BSON("y" << 10)),
+                                             zoneName());
     ASSERT_EQ(ErrorCodes::ShardKeyNotFound, status);
 
     assertNoZoneDoc();
@@ -194,7 +202,8 @@ TEST_F(AssignKeyRangeToZoneTestFixture, MinThatIsAShardKeyPrefixShouldConvertToF
         operationContext(), NamespaceString(CollectionType::ConfigNS), shardedCollection.toBSON()));
 
     const ChunkRange newRange(BSON("x" << 0), BSON("x" << 10 << "y" << 10));
-    ASSERT_OK(catalogManager()->assignKeyRangeToZone(operationContext(), ns, newRange, zoneName()));
+    ASSERT_OK(ShardingCatalogManager::get(operationContext())
+                  ->assignKeyRangeToZone(operationContext(), ns, newRange, zoneName()));
 
     const ChunkRange fullRange(fromjson("{ x: 0, y: { $minKey: 1 }}"),
                                BSON("x" << 10 << "y" << 10));
@@ -212,40 +221,44 @@ TEST_F(AssignKeyRangeToZoneTestFixture, MaxThatIsAShardKeyPrefixShouldConvertToF
         operationContext(), NamespaceString(CollectionType::ConfigNS), shardedCollection.toBSON()));
 
     const ChunkRange newRange(BSON("x" << 0 << "y" << 0), BSON("x" << 10));
-    ASSERT_OK(catalogManager()->assignKeyRangeToZone(operationContext(), ns, newRange, zoneName()));
+    ASSERT_OK(ShardingCatalogManager::get(operationContext())
+                  ->assignKeyRangeToZone(operationContext(), ns, newRange, zoneName()));
 
     const ChunkRange fullRange(BSON("x" << 0 << "y" << 0), fromjson("{ x: 10, y: { $minKey: 1 }}"));
     assertOnlyZone(ns, fullRange, zoneName());
 }
 
 TEST_F(AssignKeyRangeToZoneTestFixture, MinThatIsNotAShardKeyPrefixShouldFail) {
-    auto status = catalogManager()->assignKeyRangeToZone(
-        operationContext(),
-        shardedNS(),
-        ChunkRange(BSON("x" << 0 << "y" << 0), BSON("x" << 10)),
-        zoneName());
+    auto status =
+        ShardingCatalogManager::get(operationContext())
+            ->assignKeyRangeToZone(operationContext(),
+                                   shardedNS(),
+                                   ChunkRange(BSON("x" << 0 << "y" << 0), BSON("x" << 10)),
+                                   zoneName());
     ASSERT_EQ(ErrorCodes::ShardKeyNotFound, status);
 
     assertNoZoneDoc();
 }
 
 TEST_F(AssignKeyRangeToZoneTestFixture, MaxThatIsNotAShardKeyPrefixShouldFail) {
-    auto status = catalogManager()->assignKeyRangeToZone(
-        operationContext(),
-        shardedNS(),
-        ChunkRange(BSON("x" << 0), BSON("x" << 10 << "y" << 10)),
-        zoneName());
+    auto status =
+        ShardingCatalogManager::get(operationContext())
+            ->assignKeyRangeToZone(operationContext(),
+                                   shardedNS(),
+                                   ChunkRange(BSON("x" << 0), BSON("x" << 10 << "y" << 10)),
+                                   zoneName());
     ASSERT_EQ(ErrorCodes::ShardKeyNotFound, status);
 
     assertNoZoneDoc();
 }
 
 TEST_F(AssignKeyRangeToZoneTestFixture, MinMaxThatIsNotAShardKeyPrefixShouldFail) {
-    auto status = catalogManager()->assignKeyRangeToZone(
-        operationContext(),
-        shardedNS(),
-        ChunkRange(BSON("x" << 0 << "y" << 0), BSON("x" << 10 << "y" << 10)),
-        zoneName());
+    auto status = ShardingCatalogManager::get(operationContext())
+                      ->assignKeyRangeToZone(
+                          operationContext(),
+                          shardedNS(),
+                          ChunkRange(BSON("x" << 0 << "y" << 0), BSON("x" << 10 << "y" << 10)),
+                          zoneName());
     ASSERT_EQ(ErrorCodes::ShardKeyNotFound, status);
 
     assertNoZoneDoc();
@@ -262,7 +275,8 @@ TEST_F(AssignKeyRangeToZoneTestFixture, MinMaxThatIsAShardKeyPrefixShouldSucceed
         operationContext(), NamespaceString(CollectionType::ConfigNS), shardedCollection.toBSON()));
 
     const ChunkRange newRange(BSON("x" << 0 << "y" << 0), BSON("x" << 10 << "y" << 10));
-    ASSERT_OK(catalogManager()->assignKeyRangeToZone(operationContext(), ns, newRange, zoneName()));
+    ASSERT_OK(ShardingCatalogManager::get(operationContext())
+                  ->assignKeyRangeToZone(operationContext(), ns, newRange, zoneName()));
 
     assertOnlyZone(ns, newRange, zoneName());
 }
@@ -275,8 +289,9 @@ public:
     void setUp() override {
         AssignKeyRangeToZoneTestFixture::setUp();
 
-        ASSERT_OK(catalogManager()->assignKeyRangeToZone(
-            operationContext(), shardedNS(), getExistingRange(), zoneName()));
+        ASSERT_OK(ShardingCatalogManager::get(operationContext())
+                      ->assignKeyRangeToZone(
+                          operationContext(), shardedNS(), getExistingRange(), zoneName()));
     }
 
     ChunkRange getExistingRange() {
@@ -291,8 +306,11 @@ public:
  *           0123456789
  */
 TEST_F(AssignKeyRangeWithOneRangeFixture, NewMaxAlignsWithExistingMinShouldSucceed) {
-    ASSERT_OK(catalogManager()->assignKeyRangeToZone(
-        operationContext(), shardedNS(), ChunkRange(BSON("x" << 2), BSON("x" << 4)), zoneName()));
+    ASSERT_OK(ShardingCatalogManager::get(operationContext())
+                  ->assignKeyRangeToZone(operationContext(),
+                                         shardedNS(),
+                                         ChunkRange(BSON("x" << 2), BSON("x" << 4)),
+                                         zoneName()));
 
     {
         auto findStatus = findOneOnConfigCollection(
@@ -333,8 +351,11 @@ TEST_F(AssignKeyRangeWithOneRangeFixture, NewMaxAlignsWithExistingMinShouldSucce
  *           0123456789
  */
 TEST_F(AssignKeyRangeWithOneRangeFixture, NewMaxOverlappingExistingShouldFail) {
-    auto status = catalogManager()->assignKeyRangeToZone(
-        operationContext(), shardedNS(), ChunkRange(BSON("x" << 3), BSON("x" << 5)), zoneName());
+    auto status = ShardingCatalogManager::get(operationContext())
+                      ->assignKeyRangeToZone(operationContext(),
+                                             shardedNS(),
+                                             ChunkRange(BSON("x" << 3), BSON("x" << 5)),
+                                             zoneName());
     ASSERT_EQ(ErrorCodes::RangeOverlapConflict, status);
 
     assertOnlyZone(shardedNS(), getExistingRange(), zoneName());
@@ -346,8 +367,11 @@ TEST_F(AssignKeyRangeWithOneRangeFixture, NewMaxOverlappingExistingShouldFail) {
  *           0123456789
  */
 TEST_F(AssignKeyRangeWithOneRangeFixture, NewRangeOverlappingInsideExistingShouldFail) {
-    auto status = catalogManager()->assignKeyRangeToZone(
-        operationContext(), shardedNS(), ChunkRange(BSON("x" << 5), BSON("x" << 7)), zoneName());
+    auto status = ShardingCatalogManager::get(operationContext())
+                      ->assignKeyRangeToZone(operationContext(),
+                                             shardedNS(),
+                                             ChunkRange(BSON("x" << 5), BSON("x" << 7)),
+                                             zoneName());
     ASSERT_EQ(ErrorCodes::RangeOverlapConflict, status);
 
     assertOnlyZone(shardedNS(), getExistingRange(), zoneName());
@@ -367,10 +391,11 @@ TEST_F(AssignKeyRangeWithOneRangeFixture, NewRangeOverlappingWithDifferentNSShou
     ASSERT_OK(insertToConfigCollection(
         operationContext(), NamespaceString(CollectionType::ConfigNS), shardedCollection.toBSON()));
 
-    ASSERT_OK(catalogManager()->assignKeyRangeToZone(operationContext(),
-                                                     shardedCollection.getNs(),
-                                                     ChunkRange(BSON("x" << 5), BSON("x" << 7)),
-                                                     zoneName()));
+    ASSERT_OK(ShardingCatalogManager::get(operationContext())
+                  ->assignKeyRangeToZone(operationContext(),
+                                         shardedCollection.getNs(),
+                                         ChunkRange(BSON("x" << 5), BSON("x" << 7)),
+                                         zoneName()));
 
     {
         const auto existingRange = getExistingRange();
@@ -410,8 +435,9 @@ TEST_F(AssignKeyRangeWithOneRangeFixture, NewRangeOverlappingWithDifferentNSShou
  *           0123456789
  */
 TEST_F(AssignKeyRangeWithOneRangeFixture, NewRangeEquivalentToExistingOneShouldBeNoOp) {
-    ASSERT_OK(catalogManager()->assignKeyRangeToZone(
-        operationContext(), shardedNS(), getExistingRange(), zoneName()));
+    ASSERT_OK(ShardingCatalogManager::get(operationContext())
+                  ->assignKeyRangeToZone(
+                      operationContext(), shardedNS(), getExistingRange(), zoneName()));
 
     assertOnlyZone(shardedNS(), getExistingRange(), zoneName());
 }
@@ -431,8 +457,9 @@ TEST_F(AssignKeyRangeWithOneRangeFixture,
     ASSERT_OK(insertToConfigCollection(
         operationContext(), NamespaceString(ShardType::ConfigNS), shard.toBSON()));
 
-    auto status = catalogManager()->assignKeyRangeToZone(
-        operationContext(), shardedNS(), getExistingRange(), "y");
+    auto status =
+        ShardingCatalogManager::get(operationContext())
+            ->assignKeyRangeToZone(operationContext(), shardedNS(), getExistingRange(), "y");
     ASSERT_EQ(ErrorCodes::RangeOverlapConflict, status);
 
     assertOnlyZone(shardedNS(), getExistingRange(), zoneName());
@@ -444,8 +471,11 @@ TEST_F(AssignKeyRangeWithOneRangeFixture,
  *           0123456789
  */
 TEST_F(AssignKeyRangeWithOneRangeFixture, NewMinOverlappingExistingShouldFail) {
-    auto status = catalogManager()->assignKeyRangeToZone(
-        operationContext(), shardedNS(), ChunkRange(BSON("x" << 7), BSON("x" << 9)), zoneName());
+    auto status = ShardingCatalogManager::get(operationContext())
+                      ->assignKeyRangeToZone(operationContext(),
+                                             shardedNS(),
+                                             ChunkRange(BSON("x" << 7), BSON("x" << 9)),
+                                             zoneName());
     ASSERT_EQ(ErrorCodes::RangeOverlapConflict, status);
 
     assertOnlyZone(shardedNS(), getExistingRange(), zoneName());
@@ -457,8 +487,11 @@ TEST_F(AssignKeyRangeWithOneRangeFixture, NewMinOverlappingExistingShouldFail) {
  *           0123456789
  */
 TEST_F(AssignKeyRangeWithOneRangeFixture, NewMinAlignsWithExistingMaxShouldSucceed) {
-    ASSERT_OK(catalogManager()->assignKeyRangeToZone(
-        operationContext(), shardedNS(), ChunkRange(BSON("x" << 8), BSON("x" << 10)), zoneName()));
+    ASSERT_OK(ShardingCatalogManager::get(operationContext())
+                  ->assignKeyRangeToZone(operationContext(),
+                                         shardedNS(),
+                                         ChunkRange(BSON("x" << 8), BSON("x" << 10)),
+                                         zoneName()));
 
     {
         const auto existingRange = getExistingRange();
@@ -499,8 +532,11 @@ TEST_F(AssignKeyRangeWithOneRangeFixture, NewMinAlignsWithExistingMaxShouldSucce
  *           0123456789
  */
 TEST_F(AssignKeyRangeWithOneRangeFixture, NewRangeIsSuperSetOfExistingShouldFail) {
-    auto status = catalogManager()->assignKeyRangeToZone(
-        operationContext(), shardedNS(), ChunkRange(BSON("x" << 3), BSON("x" << 9)), zoneName());
+    auto status = ShardingCatalogManager::get(operationContext())
+                      ->assignKeyRangeToZone(operationContext(),
+                                             shardedNS(),
+                                             ChunkRange(BSON("x" << 3), BSON("x" << 9)),
+                                             zoneName());
 
     ASSERT_EQ(ErrorCodes::RangeOverlapConflict, status);
 
@@ -523,24 +559,27 @@ TEST_F(AssignKeyRangeWithOneRangeFixture, AssignWithExistingOveralpShouldFail) {
     ASSERT_OK(insertToConfigCollection(
         operationContext(), NamespaceString(TagsType::ConfigNS), tagDoc.toBSON()));
 
-    auto status = catalogManager()->assignKeyRangeToZone(
-        operationContext(), shardedNS(), ChunkRange(BSON("x" << 0), BSON("x" << 1)), zoneName());
+    auto status = ShardingCatalogManager::get(operationContext())
+                      ->assignKeyRangeToZone(operationContext(),
+                                             shardedNS(),
+                                             ChunkRange(BSON("x" << 0), BSON("x" << 1)),
+                                             zoneName());
 
     ASSERT_EQ(ErrorCodes::RangeOverlapConflict, status);
 }
 
 TEST_F(AssignKeyRangeWithOneRangeFixture, BasicRemoveKeyRange) {
-    ASSERT_OK(catalogManager()->removeKeyRangeFromZone(
-        operationContext(), shardedNS(), getExistingRange()));
+    ASSERT_OK(ShardingCatalogManager::get(operationContext())
+                  ->removeKeyRangeFromZone(operationContext(), shardedNS(), getExistingRange()));
 
     assertNoZoneDoc();
 }
 
 TEST_F(AssignKeyRangeWithOneRangeFixture, RemoveKeyRangeOnUnshardedCollShouldFail) {
-    auto status =
-        catalogManager()->removeKeyRangeFromZone(operationContext(),
-                                                 NamespaceString("unsharded.coll"),
-                                                 ChunkRange(BSON("x" << 0), BSON("x" << 10)));
+    auto status = ShardingCatalogManager::get(operationContext())
+                      ->removeKeyRangeFromZone(operationContext(),
+                                               NamespaceString("unsharded.coll"),
+                                               ChunkRange(BSON("x" << 0), BSON("x" << 10)));
     ASSERT_EQ(ErrorCodes::NamespaceNotSharded, status);
 
     assertOnlyZone(shardedNS(), getExistingRange(), zoneName());
@@ -558,24 +597,29 @@ TEST_F(AssignKeyRangeWithOneRangeFixture, RemoveKeyRangeOnDroppedShardedCollShou
                                        NamespaceString(CollectionType::ConfigNS),
                                        unshardedCollection.toBSON()));
 
-    auto status = catalogManager()->removeKeyRangeFromZone(
-        operationContext(), ns, ChunkRange(BSON("x" << 0), BSON("x" << 10)));
+    auto status = ShardingCatalogManager::get(operationContext())
+                      ->removeKeyRangeFromZone(
+                          operationContext(), ns, ChunkRange(BSON("x" << 0), BSON("x" << 10)));
     ASSERT_EQ(ErrorCodes::NamespaceNotSharded, status);
 
     assertOnlyZone(shardedNS(), getExistingRange(), zoneName());
 }
 
 TEST_F(AssignKeyRangeWithOneRangeFixture, RemoveWithInvalidMinShardKeyShouldFail) {
-    auto status = catalogManager()->removeKeyRangeFromZone(
-        operationContext(), shardedNS(), ChunkRange(BSON("a" << 0), BSON("x" << 10)));
+    auto status = ShardingCatalogManager::get(operationContext())
+                      ->removeKeyRangeFromZone(operationContext(),
+                                               shardedNS(),
+                                               ChunkRange(BSON("a" << 0), BSON("x" << 10)));
     ASSERT_EQ(ErrorCodes::ShardKeyNotFound, status);
 
     assertOnlyZone(shardedNS(), getExistingRange(), zoneName());
 }
 
 TEST_F(AssignKeyRangeWithOneRangeFixture, RemoveWithInvalidMaxShardKeyShouldFail) {
-    auto status = catalogManager()->removeKeyRangeFromZone(
-        operationContext(), shardedNS(), ChunkRange(BSON("x" << 0), BSON("y" << 10)));
+    auto status = ShardingCatalogManager::get(operationContext())
+                      ->removeKeyRangeFromZone(operationContext(),
+                                               shardedNS(),
+                                               ChunkRange(BSON("x" << 0), BSON("y" << 10)));
     ASSERT_EQ(ErrorCodes::ShardKeyNotFound, status);
 
     assertOnlyZone(shardedNS(), getExistingRange(), zoneName());
@@ -593,11 +637,13 @@ TEST_F(AssignKeyRangeWithOneRangeFixture, RemoveThatIsOnlyMinPrefixOfExistingSho
 
     const ChunkRange existingRange(fromjson("{ x: 0, y: { $minKey: 1 }}"),
                                    BSON("x" << 10 << "y" << 10));
-    ASSERT_OK(
-        catalogManager()->assignKeyRangeToZone(operationContext(), ns, existingRange, zoneName()));
+    ASSERT_OK(ShardingCatalogManager::get(operationContext())
+                  ->assignKeyRangeToZone(operationContext(), ns, existingRange, zoneName()));
 
-    ASSERT_OK(catalogManager()->removeKeyRangeFromZone(
-        operationContext(), ns, ChunkRange(BSON("x" << 0), BSON("x" << 10 << "y" << 10))));
+    ASSERT_OK(
+        ShardingCatalogManager::get(operationContext())
+            ->removeKeyRangeFromZone(
+                operationContext(), ns, ChunkRange(BSON("x" << 0), BSON("x" << 10 << "y" << 10))));
 
     {
         auto findStatus = findOneOnConfigCollection(operationContext(),
@@ -645,11 +691,13 @@ TEST_F(AssignKeyRangeWithOneRangeFixture, RemoveThatIsOnlyMaxPrefixOfExistingSho
 
     const ChunkRange existingRange(BSON("x" << 0 << "y" << 0),
                                    fromjson("{ x: 10, y: { $minKey: 1 }}"));
-    ASSERT_OK(
-        catalogManager()->assignKeyRangeToZone(operationContext(), ns, existingRange, zoneName()));
+    ASSERT_OK(ShardingCatalogManager::get(operationContext())
+                  ->assignKeyRangeToZone(operationContext(), ns, existingRange, zoneName()));
 
-    ASSERT_OK(catalogManager()->removeKeyRangeFromZone(
-        operationContext(), ns, ChunkRange(BSON("x" << 0 << "y" << 0), BSON("x" << 10))));
+    ASSERT_OK(
+        ShardingCatalogManager::get(operationContext())
+            ->removeKeyRangeFromZone(
+                operationContext(), ns, ChunkRange(BSON("x" << 0 << "y" << 0), BSON("x" << 10))));
 
     {
         auto findStatus = findOneOnConfigCollection(operationContext(),

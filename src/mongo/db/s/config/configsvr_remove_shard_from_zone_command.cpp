@@ -99,7 +99,7 @@ public:
         auto parsedRequest =
             uassertStatusOK(RemoveShardFromZoneRequest::parseFromConfigCommand(cmdObj));
 
-        uassertStatusOK(Grid::get(opCtx)->catalogManager()->removeShardFromZone(
+        uassertStatusOK(ShardingCatalogManager::get(opCtx)->removeShardFromZone(
             opCtx, parsedRequest.getShardName(), parsedRequest.getZoneName()));
 
         return true;

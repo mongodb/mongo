@@ -70,7 +70,7 @@ protected:
     /**
      * Creates a DistLockCatalogMock.
      */
-    std::unique_ptr<DistLockCatalog> makeDistLockCatalog(ShardRegistry* shardRegistry) override;
+    std::unique_ptr<DistLockCatalog> makeDistLockCatalog() override;
 
     /**
      * Creates a DistLockManagerMock.
