@@ -28,6 +28,7 @@ def getAllSourceFiles( arr=None , prefix="." ):
           or x.startswith( "mongodb-" )
           or x.startswith( "debian" )
           or x.startswith( "mongo-cxx-driver" )
+          or x.startswith( "sqlite" )
           or 'gotools' in x ):
             continue
 
