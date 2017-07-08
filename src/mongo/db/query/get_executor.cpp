@@ -696,8 +696,8 @@ StatusWith<unique_ptr<PlanExecutor, PlanExecutor::Deleter>> getExecutorDelete(
 
     const NamespaceString& nss(request->getNamespaceString());
     if (!request->isGod()) {
-        if (nss.isSystem()) {
-            uassert(12050, "cannot delete from system namespace", legalClientSystemNS(nss.ns()));
+        if (nss.isSystem() && opCtx->lockState()->shouldConflictWithSecondaryBatchApplication()) {
+            uassert(12050, "cannot delete from system namespace", nss.isLegalClientSystemNS());
         }
         if (nss.isVirtualized()) {
             log() << "cannot delete from a virtual collection: " << nss;
@@ -824,33 +824,21 @@ StatusWith<unique_ptr<PlanExecutor, PlanExecutor::Deleter>> getExecutorDelete(
 // Update
 //
 
-namespace {
-
-// TODO: Make this a function on NamespaceString, or make it cleaner.
-inline void validateUpdate(const char* ns, const BSONObj& updateobj, const BSONObj& patternOrig) {
-    uassert(10155, "cannot update reserved $ collection", strchr(ns, '$') == 0);
-    if (strstr(ns, ".system.")) {
-        /* dm: it's very important that system.indexes is never updated as IndexDetails
-           has pointers into it */
-        uassert(10156,
-                str::stream() << "cannot update system collection: " << ns << " q: " << patternOrig
-                              << " u: "
-                              << updateobj,
-                legalClientSystemNS(ns));
-    }
-}
-
-}  // namespace
-
 StatusWith<unique_ptr<PlanExecutor, PlanExecutor::Deleter>> getExecutorUpdate(
     OperationContext* opCtx, OpDebug* opDebug, Collection* collection, ParsedUpdate* parsedUpdate) {
     const UpdateRequest* request = parsedUpdate->getRequest();
     UpdateDriver* driver = parsedUpdate->getDriver();
 
-    const NamespaceString& nsString = request->getNamespaceString();
+    const NamespaceString& nss = request->getNamespaceString();
     UpdateLifecycle* lifecycle = request->getLifecycle();
 
-    validateUpdate(nsString.ns().c_str(), request->getUpdates(), request->getQuery());
+    if (nss.isSystem() && opCtx->lockState()->shouldConflictWithSecondaryBatchApplication()) {
+        uassert(10156, "cannot update a system namespace", nss.isLegalClientSystemNS());
+    }
+    if (nss.isVirtualized()) {
+        log() << "cannot update a virtual collection: " << nss;
+        uasserted(10155, "cannot update a virtual collection");
+    }
 
     // If there is no collection and this is an upsert, callers are supposed to create
     // the collection prior to calling this method. Explain, however, will never do
@@ -870,11 +858,11 @@ StatusWith<unique_ptr<PlanExecutor, PlanExecutor::Deleter>> getExecutorUpdate(
     // writes on a secondary. If this is an update to a secondary from the replication system,
     // however, then we make an exception and let the write proceed.
     bool userInitiatedWritesAndNotPrimary = opCtx->writesAreReplicated() &&
-        !repl::getGlobalReplicationCoordinator()->canAcceptWritesFor(opCtx, nsString);
+        !repl::getGlobalReplicationCoordinator()->canAcceptWritesFor(opCtx, nss);
 
     if (userInitiatedWritesAndNotPrimary) {
         return Status(ErrorCodes::PrimarySteppedDown,
-                      str::stream() << "Not primary while performing update on " << nsString.ns());
+                      str::stream() << "Not primary while performing update on " << nss.ns());
     }
 
     if (lifecycle) {
@@ -896,12 +884,11 @@ StatusWith<unique_ptr<PlanExecutor, PlanExecutor::Deleter>> getExecutorUpdate(
             // Treat collections that do not exist as empty collections. Note that the explain
             // reporting machinery always assumes that the root stage for an update operation is
             // an UpdateStage, so in this case we put an UpdateStage on top of an EOFStage.
-            LOG(2) << "Collection " << nsString.ns() << " does not exist."
+            LOG(2) << "Collection " << nss.ns() << " does not exist."
                    << " Using EOF stage: " << redact(unparsedQuery);
             auto updateStage = make_unique<UpdateStage>(
                 opCtx, updateStageParams, ws.get(), collection, new EOFStage(opCtx));
-            return PlanExecutor::make(
-                opCtx, std::move(ws), std::move(updateStage), nsString, policy);
+            return PlanExecutor::make(opCtx, std::move(ws), std::move(updateStage), nss, policy);
         }
 
         const IndexDescriptor* descriptor = collection->getIndexCatalog()->findIdIndex(opCtx);
@@ -957,13 +944,8 @@ StatusWith<unique_ptr<PlanExecutor, PlanExecutor::Deleter>> getExecutorUpdate(
         // is invalid to use a positional projection because the query expression need not
         // match the array element after the update has been applied.
         const bool allowPositional = request->shouldReturnOldDocs();
-        StatusWith<unique_ptr<PlanStage>> projStatus = applyProjection(opCtx,
-                                                                       nsString,
-                                                                       cq.get(),
-                                                                       request->getProj(),
-                                                                       allowPositional,
-                                                                       ws.get(),
-                                                                       std::move(root));
+        StatusWith<unique_ptr<PlanStage>> projStatus = applyProjection(
+            opCtx, nss, cq.get(), request->getProj(), allowPositional, ws.get(), std::move(root));
         if (!projStatus.isOK()) {
             return projStatus.getStatus();
         }

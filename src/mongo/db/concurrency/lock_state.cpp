@@ -505,6 +505,8 @@ bool LockerImpl<IsForMMAPV1>::isCollectionLockedForMode(StringData ns, LockMode 
     const ResourceId resIdDb(RESOURCE_DATABASE, nss.db());
 
     LockMode dbMode = getLockMode(resIdDb);
+    if (!shouldConflictWithSecondaryBatchApplication())
+        return true;
 
     switch (dbMode) {
         case MODE_NONE:
