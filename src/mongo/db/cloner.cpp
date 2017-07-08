@@ -539,7 +539,7 @@ StatusWith<std::vector<BSONObj>> Cloner::filterCollectionsForClone(
         const NamespaceString ns(opts.fromDB, collectionName.c_str());
 
         if (ns.isSystem()) {
-            if (legalClientSystemNS(ns.ns()) == 0) {
+            if (!ns.isLegalClientSystemNS()) {
                 LOG(2) << "\t\t not cloning because system collection";
                 continue;
             }
