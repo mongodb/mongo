@@ -178,12 +178,6 @@ void CatalogCache::notifyOfCollectionVersionUpdate(OperationContext* opCtx,
     _cacheLoader->notifyOfCollectionVersionUpdate(opCtx, nss, version);
 }
 
-Status CatalogCache::waitForCollectionVersion(OperationContext* opCtx,
-                                              const NamespaceString& nss,
-                                              const ChunkVersion& version) {
-    return _cacheLoader->waitForCollectionVersion(opCtx, nss, version);
-}
-
 StatusWith<CachedDatabaseInfo> CatalogCache::getDatabase(OperationContext* opCtx,
                                                          StringData dbName) {
     try {
