@@ -274,6 +274,8 @@ struct FixUpInfo {
      * to be dropped, or fully resynced.
      */
     void removeRedundantOperations();
+
+    void addIndexToDrop(const NamespaceString& nss, const DocID& doc);
 };
 
 // Indicates that rollback cannot complete and the server must abort.

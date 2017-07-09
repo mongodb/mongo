@@ -126,6 +126,33 @@ void FixUpInfo::removeRedundantOperations() {
     }
 }
 
+void FixUpInfo::addIndexToDrop(const NamespaceString& nss, const DocID& doc) {
+    BSONObj obj = doc.ownedObj.getObjectField("o");
+    if (!nss.isValid()) {
+        severe() << "Invalid collection namespace in createIndexes operation, document: "
+                 << redact(doc.ownedObj);
+        throw RSFatalException(
+            str::stream() << "Invalid collection namespace in createIndexes operation, namespace: "
+                          << doc.ns);
+    }
+    string indexName;
+    Status status = bsonExtractStringField(obj, "name", &indexName);
+    if (!status.isOK()) {
+        severe() << "Missing index name in createIndexes operation, document: "
+                 << redact(doc.ownedObj);
+        throw RSFatalException("Missing index name in createIndexes operation.");
+    }
+    using ValueType = multimap<string, string>::value_type;
+    ValueType pairToInsert = std::make_pair(nss.ns(), indexName);
+    auto lowerBound = indexesToDrop.lower_bound(nss.ns());
+    auto upperBound = indexesToDrop.upper_bound(nss.ns());
+    auto matcher = [pairToInsert](const ValueType& pair) { return pair == pairToInsert; };
+    if (!std::count_if(lowerBound, upperBound, matcher)) {
+        indexesToDrop.insert(pairToInsert);
+    }
+}
+
+
 Status rollback_internal_no_uuid::updateFixUpInfoFromLocalOplogEntry(FixUpInfo& fixUpInfo,
                                                                      const BSONObj& ourObj) {
 
@@ -190,6 +217,25 @@ Status rollback_internal_no_uuid::updateFixUpInfoFromLocalOplogEntry(FixUpInfo& 
 
             string ns = nss.db().toString() + '.' + first.valuestr();  // -> foo.abc
             fixUpInfo.collectionsToDrop.insert(ns);
+            return Status::OK();
+        } else if (cmdname == "createIndexes") {
+            // Create indexes operation
+            // {
+            //     ts: ...,
+            //     h: ...,
+            //     op: "c",
+            //     ns: "foo.$cmd",
+            //     o: {
+            //            createIndexes: "abc",
+            //            v : 2,
+            //            key : {
+            //                      z : 1
+            //                  },
+            //            name : "z_1"
+            //        }
+            //     ...
+            // }
+            fixUpInfo.addIndexToDrop(NamespaceString(nss.db(), first.valuestr()), doc);
             return Status::OK();
         } else if (cmdname == "drop") {
             // Drop collection operation
@@ -309,29 +355,7 @@ Status rollback_internal_no_uuid::updateFixUpInfoFromLocalOplogEntry(FixUpInfo& 
             throw RSFatalException("Missing collection namespace in system.indexes operation.");
         }
         NamespaceString objNss(objNs);
-        if (!objNss.isValid()) {
-            severe() << "Invalid collection namespace in system.indexes operation, document: "
-                     << redact(doc.ownedObj);
-            throw RSFatalException(
-                str::stream()
-                << "Invalid collection namespace in system.indexes operation, namespace: "
-                << doc.ns);
-        }
-        string indexName;
-        status = bsonExtractStringField(obj, "name", &indexName);
-        if (!status.isOK()) {
-            severe() << "Missing index name in system.indexes operation, document: "
-                     << redact(doc.ownedObj);
-            throw RSFatalException("Missing index name in system.indexes operation.");
-        }
-        using ValueType = multimap<string, string>::value_type;
-        ValueType pairToInsert = std::make_pair(objNs, indexName);
-        auto lowerBound = fixUpInfo.indexesToDrop.lower_bound(objNs);
-        auto upperBound = fixUpInfo.indexesToDrop.upper_bound(objNs);
-        auto matcher = [pairToInsert](const ValueType& pair) { return pair == pairToInsert; };
-        if (!std::count_if(lowerBound, upperBound, matcher)) {
-            fixUpInfo.indexesToDrop.insert(pairToInsert);
-        }
+        fixUpInfo.addIndexToDrop(objNss, doc);
         return Status::OK();
     }
 
