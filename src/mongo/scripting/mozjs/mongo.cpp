@@ -115,13 +115,16 @@ void setCursor(MozJSImplScope* scope,
 
 void setCursorHandle(MozJSImplScope* scope,
                      JS::HandleObject target,
+                     NamespaceString ns,
                      long long cursorId,
                      JS::CallArgs& args) {
     auto client =
         static_cast<std::shared_ptr<DBClientBase>*>(JS_GetPrivate(args.thisv().toObjectOrNull()));
 
     // Copy the client shared pointer to up the refcount.
-    JS_SetPrivate(target, scope->trackedNew<CursorHandleInfo::CursorTracker>(cursorId, *client));
+    JS_SetPrivate(
+        target,
+        scope->trackedNew<CursorHandleInfo::CursorTracker>(std::move(ns), cursorId, *client));
 }
 
 void setHiddenMongo(JSContext* cx,
@@ -518,19 +521,21 @@ void MongoBase::Functions::cursorFromId::call(JSContext* cx, JS::CallArgs args) 
 void MongoBase::Functions::cursorHandleFromId::call(JSContext* cx, JS::CallArgs args) {
     auto scope = getScope(cx);
 
-    if (args.length() != 1) {
-        uasserted(ErrorCodes::BadValue, "cursorHandleFromId needs 1 arg");
-    }
-    if (!scope->getProto<NumberLongInfo>().instanceOf(args.get(0))) {
-        uasserted(ErrorCodes::BadValue, "1st arg must be a NumberLong");
+    if (args.length() != 2) {
+        uasserted(ErrorCodes::BadValue, "cursorHandleFromId needs 2 args");
     }
 
-    long long cursorId = NumberLongInfo::ToNumberLong(cx, args.get(0));
+    if (!scope->getProto<NumberLongInfo>().instanceOf(args.get(1))) {
+        uasserted(ErrorCodes::BadValue, "2nd arg must be a NumberLong");
+    }
+
+    std::string ns = ValueWriter(cx, args.get(0)).toString();
+    long long cursorId = NumberLongInfo::ToNumberLong(cx, args.get(1));
 
     JS::RootedObject c(cx);
     scope->getProto<CursorHandleInfo>().newObject(&c);
 
-    setCursorHandle(scope, c, cursorId, args);
+    setCursorHandle(scope, c, NamespaceString(ns), cursorId, args);
 
     args.rval().setObjectOrNull(c);
 }

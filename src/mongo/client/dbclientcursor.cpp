@@ -475,12 +475,14 @@ DBClientCursor::~DBClientCursor() {
 void DBClientCursor::kill() {
     DESTRUCTOR_GUARD({
         if (cursorId && _ownCursor && !globalInShutdownDeprecated()) {
+            auto toSend = makeKillCursorsMessage(cursorId);
             if (_client && !_connectionHasPendingReplies) {
-                _client->killCursor(cursorId);
+                _client->say(toSend);
             } else {
+                // Use a side connection to send the kill cursor request.
                 verify(_scopedHost.size() || (_client && _connectionHasPendingReplies));
                 ScopedDbConnection conn(_client ? _client->getServerAddress() : _scopedHost);
-                conn->killCursor(cursorId);
+                conn->say(toSend);
                 conn.done();
             }
         }

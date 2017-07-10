@@ -716,7 +716,7 @@ function DBCommandCursor(mongo, cmdResult, batchSize) {
         if (cmdResult.cursor.id) {
             // Note that setting this._cursorid to 0 should be accompanied by
             // this._cursorHandle.zeroCursorId().
-            this._cursorHandle = mongo.cursorHandleFromId(cmdResult.cursor.id);
+            this._cursorHandle = mongo.cursorHandleFromId(cmdResult.cursor.ns, cmdResult.cursor.id);
         }
     } else {
         this._cursor = mongo.cursorFromId(cmdResult.cursor.ns, cmdResult.cursor.id, batchSize);

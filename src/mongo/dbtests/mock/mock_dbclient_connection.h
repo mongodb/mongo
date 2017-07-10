@@ -112,7 +112,7 @@ public:
     // Unsupported methods (these are pure virtuals in the base class)
     //
 
-    void killCursor(long long cursorID);
+    void killCursor(const NamespaceString& ns, long long cursorID);
     bool call(mongo::Message& toSend,
               mongo::Message& response,
               bool assertOk,

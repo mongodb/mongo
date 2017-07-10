@@ -59,10 +59,11 @@ struct CursorHandleInfo : public BaseInfo {
      * in global shutdown). So we have to manage object lifetimes in C++ land.
      */
     struct CursorTracker {
-        CursorTracker(long long curId, std::shared_ptr<DBClientBase> client)
-            : client(std::move(client)), cursorId(curId) {}
+        CursorTracker(NamespaceString ns, long long curId, std::shared_ptr<DBClientBase> client)
+            : client(std::move(client)), ns(std::move(ns)), cursorId(curId) {}
 
         std::shared_ptr<DBClientBase> client;
+        NamespaceString ns;
         long long cursorId;
     };
 };

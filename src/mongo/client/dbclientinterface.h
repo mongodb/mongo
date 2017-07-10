@@ -734,7 +734,7 @@ public:
      */
     virtual bool isStillConnected() = 0;
 
-    virtual void killCursor(long long cursorID);
+    virtual void killCursor(const NamespaceString& ns, long long cursorID);
 
     virtual ConnectionString::ConnectionType type() const = 0;
 

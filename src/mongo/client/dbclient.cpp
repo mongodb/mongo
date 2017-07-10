@@ -49,6 +49,7 @@
 #include "mongo/db/commands.h"
 #include "mongo/db/json.h"
 #include "mongo/db/namespace_string.h"
+#include "mongo/db/query/killcursors_request.h"
 #include "mongo/db/server_options.h"
 #include "mongo/db/wire_version.h"
 #include "mongo/executor/remote_command_request.h"
@@ -1102,9 +1103,9 @@ void DBClientBase::update(const string& ns, Query query, BSONObj obj, int flags)
            flags & UpdateOption_Multi);
 }
 
-void DBClientBase::killCursor(long long cursorId) {
-    auto msg = makeKillCursorsMessage(cursorId);
-    say(msg);
+void DBClientBase::killCursor(const NamespaceString& ns, long long cursorId) {
+    // Ignoring reply to match fire-and-forget OP_KILLCURSORS behavior.
+    runCommand(OpMsgRequest::fromDBAndBody(ns.db(), KillCursorsRequest(ns, {cursorId}).toBSON()));
 }
 
 list<BSONObj> DBClientBase::getIndexSpecs(const string& ns, int options) {

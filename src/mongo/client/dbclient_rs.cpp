@@ -617,7 +617,7 @@ BSONObj DBClientReplicaSet::findOne(const string& ns,
     return checkMaster()->findOne(ns, query, fieldsToReturn, queryOptions);
 }
 
-void DBClientReplicaSet::killCursor(long long cursorID) {
+void DBClientReplicaSet::killCursor(const NamespaceString& ns, long long cursorID) {
     // we should never call killCursor on a replica set connection
     // since we don't know which server it belongs to
     // can't assume master because of slave ok

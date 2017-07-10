@@ -158,7 +158,7 @@ void MockDBClientConnection::remove(const string& ns, Query query, int flags) {
     _remoteServer->remove(ns, query, flags);
 }
 
-void MockDBClientConnection::killCursor(long long cursorID) {
+void MockDBClientConnection::killCursor(const NamespaceString& ns, long long cursorID) {
     verify(false);  // unimplemented
 }
 
