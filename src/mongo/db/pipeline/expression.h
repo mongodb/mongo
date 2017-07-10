@@ -549,6 +549,7 @@ public:
             } else {
                 // It's an object specifying the date and timezone options like {date: <date>,
                 // timezone: <timezone>}.
+                auto opName = operatorElem.fieldNameStringData();
                 for (const auto& subElem : operatorElem.embeddedObject()) {
                     auto argName = subElem.fieldNameStringData();
                     if (argName == "date"_sd) {
@@ -558,13 +559,16 @@ public:
                         dateExpression->_timeZone =
                             Expression::parseOperand(expCtx, subElem, variablesParseState);
                     } else {
-                        auto opName = operatorElem.fieldNameStringData();
                         uasserted(40535,
                                   str::stream() << "unrecognized option to " << opName << ": \""
                                                 << argName
                                                 << "\"");
                     }
                 }
+                uassert(40539,
+                        str::stream() << "missing 'date' argument to " << opName << ", provided: "
+                                      << operatorElem,
+                        dateExpression->_date);
             }
             return dateExpression;
         } else if (operatorElem.type() == BSONType::Array) {

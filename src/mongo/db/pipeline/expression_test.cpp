@@ -4624,6 +4624,16 @@ TEST_F(DateExpressionTest, ParsingRejectsUnrecognizedFieldsInObjectSpecification
     }
 }
 
+TEST_F(DateExpressionTest, ParsingRejectsEmptyObjectSpecification) {
+    auto expCtx = getExpCtx();
+    for (auto&& expName : dateExpressions) {
+        BSONObj spec = BSON(expName << BSONObj());
+        ASSERT_THROWS_CODE(Expression::parseExpression(expCtx, spec, expCtx->variablesParseState),
+                           UserException,
+                           40539);
+    }
+}
+
 TEST_F(DateExpressionTest, RejectsEmptyArray) {
     auto expCtx = getExpCtx();
     for (auto&& expName : dateExpressions) {
