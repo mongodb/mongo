@@ -291,6 +291,17 @@ env.Library(
     ]
 )
 
+env.Library(
+    target='chunk_splitter',
+    source=[
+        'chunk_splitter.cpp',
+    ],
+    LIBDEPS=[
+        '$BUILD_DIR/mongo/util/concurrency/thread_pool',
+        '$BUILD_DIR/mongo/db/service_context',
+    ]
+)
+
 env.CppUnitTest(
     target='chunk_size_tracker_test',
     source=[
@@ -298,5 +309,16 @@ env.CppUnitTest(
     ],
     LIBDEPS=[
         'chunk_size_tracker'
+    ]
+)
+
+env.CppUnitTest(
+    target='chunk_splitter_test',
+    source=[
+        'chunk_splitter_test.cpp'
+    ],
+    LIBDEPS=[
+        'chunk_splitter',
+        '$BUILD_DIR/mongo/s/shard_server_test_fixture'
     ]
 )
