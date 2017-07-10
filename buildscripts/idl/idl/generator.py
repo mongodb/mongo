@@ -111,8 +111,8 @@ class _FieldUsageCheckerBase(object):
         self._fields = []  # type: List[ast.Field]
 
     @abstractmethod
-    def add_store(self):
-        # type: () -> None
+    def add_store(self, field_name):
+        # type: (unicode) -> None
         """Create the C++ field store initialization code."""
         pass
 
@@ -144,11 +144,11 @@ class _SlowFieldUsageChecker(_FieldUsageCheckerBase):
 
         self._writer.write_line('std::set<StringData> usedFields;')
 
-    def add_store(self):
-        # type: () -> None
-        self._writer.write_line('auto push_result = usedFields.insert(fieldName);')
+    def add_store(self, field_name):
+        # type: (unicode) -> None
+        self._writer.write_line('auto push_result = usedFields.insert(%s);' % (field_name))
         with writer.IndentedScopedBlock(self._writer, 'if (push_result.second == false) {', '}'):
-            self._writer.write_line('ctxt.throwDuplicateField(element);')
+            self._writer.write_line('ctxt.throwDuplicateField(%s);' % (field_name))
 
     def add(self, field, bson_element_variable):
         # type: (ast.Field, unicode) -> None
@@ -200,8 +200,8 @@ class _FastFieldUsageChecker(_FieldUsageCheckerBase):
                                     (_gen_field_usage_constant(field), bit_id))
             bit_id += 1
 
-    def add_store(self):
-        # type: () -> None
+    def add_store(self, field_name):
+        # type: (unicode) -> None
         """Create the C++ field store initialization code."""
         pass
 
@@ -875,7 +875,7 @@ class _CppSourceFileWriter(_CppFileWriterBase):
                     self._writer.write_line('firstFieldFound = true;')
                     self._writer.write_line('continue;')
 
-            field_usage_check.add_store()
+            field_usage_check.add_store("fieldName")
             self._writer.write_empty_line()
 
             first_field = True
@@ -989,6 +989,9 @@ class _CppSourceFileWriter(_CppFileWriterBase):
                 [field for field in struct.fields if field.supports_doc_sequence])
             if has_doc_sequence:
                 with self._block('for (auto&& sequence : request.sequences) {', '}'):
+                    field_usage_check.add_store("sequence.name")
+                    self._writer.write_empty_line()
+
                     first_field = True
                     for field in struct.fields:
                         # Only parse document sequence fields here

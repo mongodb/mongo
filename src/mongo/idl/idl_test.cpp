@@ -1718,15 +1718,15 @@ TEST(IDLDocSequence, TestMissingDB) {
 }
 
 // Positive: Test a command read and written to OpMsgRequest with content in DocumentSequence works
-TEST(IDLDocSequence, TestDocSequence) {
+template <typename TestT>
+void TestDocSequence(StringData name) {
     IDLParserErrorContext ctxt("root");
 
-    auto testTempDoc = BSON("DocSequenceCommand"
-                            << "coll1"
-                            << "field1"
-                            << 3
-                            << "field2"
-                            << "five");
+    auto testTempDoc = BSON(name << "coll1"
+                                 << "field1"
+                                 << 3
+                                 << "field2"
+                                 << "five");
 
     OpMsgRequest request = OpMsgRequest::fromDBAndBody("db", testTempDoc);
     request.sequences.push_back({"structs",
@@ -1736,7 +1736,7 @@ TEST(IDLDocSequence, TestDocSequence) {
                                        << "world")}});
     request.sequences.push_back({"objects", {BSON("foo" << 1)}});
 
-    auto testStruct = DocSequenceCommand::parse(ctxt, request);
+    auto testStruct = TestT::parse(ctxt, request);
     ASSERT_EQUALS(testStruct.getField1(), 3);
     ASSERT_EQUALS(testStruct.getField2(), "five");
     ASSERT_EQUALS(testStruct.getNamespace(), NamespaceString("db.coll1"));
@@ -1746,16 +1746,22 @@ TEST(IDLDocSequence, TestDocSequence) {
     ASSERT_EQUALS("world", testStruct.getStructs()[1].getValue());
 }
 
+// Positive: Test a command read and written to OpMsgRequest with content in DocumentSequence works
+TEST(IDLDocSequence, TestDocSequence) {
+    TestDocSequence<DocSequenceCommand>("DocSequenceCommand");
+    TestDocSequence<DocSequenceCommandNonStrict>("DocSequenceCommandNonStrict");
+}
+
 // Negative: Bad Doc Sequences
-TEST(IDLDocSequence, TestBadDocSequences) {
+template <typename TestT>
+void TestBadDocSequences(StringData name, bool extraFieldAllowed) {
     IDLParserErrorContext ctxt("root");
 
-    auto testTempDoc = BSON("DocSequenceCommand"
-                            << "coll1"
-                            << "field1"
-                            << 3
-                            << "field2"
-                            << "five");
+    auto testTempDoc = BSON(name << "coll1"
+                                 << "field1"
+                                 << 3
+                                 << "field2"
+                                 << "five");
 
     // Negative: Duplicate fields in doc sequence
     {
@@ -1767,7 +1773,7 @@ TEST(IDLDocSequence, TestBadDocSequences) {
                                            << "world")}});
         request.sequences.push_back({"structs", {BSON("foo" << 1)}});
 
-        ASSERT_THROWS(DocSequenceCommand::parse(ctxt, request), UserException);
+        ASSERT_THROWS(TestT::parse(ctxt, request), UserException);
     }
 
     // Negative: Extra field in document sequence
@@ -1781,7 +1787,11 @@ TEST(IDLDocSequence, TestBadDocSequences) {
         request.sequences.push_back({"objects", {BSON("foo" << 1)}});
         request.sequences.push_back({"extra", {BSON("foo" << 1)}});
 
-        ASSERT_THROWS(DocSequenceCommand::parse(ctxt, request), UserException);
+        if (!extraFieldAllowed) {
+            ASSERT_THROWS(TestT::parse(ctxt, request), UserException);
+        } else {
+            /*void*/ TestT::parse(ctxt, request);
+        }
     }
 
     // Negative: Missing field in both document sequence and body
@@ -1789,7 +1799,7 @@ TEST(IDLDocSequence, TestBadDocSequences) {
         OpMsgRequest request = OpMsgRequest::fromDBAndBody("db", testTempDoc);
         request.sequences.push_back({"objects", {BSON("foo" << 1)}});
 
-        ASSERT_THROWS(DocSequenceCommand::parse(ctxt, request), UserException);
+        ASSERT_THROWS(TestT::parse(ctxt, request), UserException);
     }
 
     // Negative: Missing field in both document sequence and body
@@ -1800,6 +1810,64 @@ TEST(IDLDocSequence, TestBadDocSequences) {
                                            << "hello"),
                                       BSON("value"
                                            << "world")}});
+
+        ASSERT_THROWS(TestT::parse(ctxt, request), UserException);
+    }
+}
+
+// Negative: Bad Doc Sequences
+TEST(IDLDocSequence, TestBadDocSequences) {
+    TestBadDocSequences<DocSequenceCommand>("DocSequenceCommand", false);
+    TestBadDocSequences<DocSequenceCommandNonStrict>("DocSequenceCommandNonStrict", true);
+}
+
+// Negative: Duplicate field across body and document sequence
+template <typename TestT>
+void TestDuplicateDocSequences(StringData name) {
+    IDLParserErrorContext ctxt("root");
+
+    // Negative: Duplicate fields in doc sequence and body
+    {
+        auto testTempDoc = BSON(name << "coll1"
+                                     << "field1"
+                                     << 3
+                                     << "field2"
+                                     << "five"
+                                     << "structs"
+                                     << BSON_ARRAY(BSON("value"
+                                                        << "hello")
+                                                   << BSON("value"
+                                                           << "world"))
+                                     << "objects"
+                                     << BSON_ARRAY(BSON("foo" << 1)));
+
+        OpMsgRequest request = OpMsgRequest::fromDBAndBody("db", testTempDoc);
+        request.sequences.push_back({"structs",
+                                     {BSON("value"
+                                           << "hello"),
+                                      BSON("value"
+                                           << "world")}});
+
+        ASSERT_THROWS(DocSequenceCommand::parse(ctxt, request), UserException);
+    }
+
+    // Negative: Duplicate fields in doc sequence and body
+    {
+        auto testTempDoc = BSON(name << "coll1"
+                                     << "field1"
+                                     << 3
+                                     << "field2"
+                                     << "five"
+                                     << "structs"
+                                     << BSON_ARRAY(BSON("value"
+                                                        << "hello")
+                                                   << BSON("value"
+                                                           << "world"))
+                                     << "objects"
+                                     << BSON_ARRAY(BSON("foo" << 1)));
+
+        OpMsgRequest request = OpMsgRequest::fromDBAndBody("db", testTempDoc);
+        request.sequences.push_back({"objects", {BSON("foo" << 1)}});
 
         ASSERT_THROWS(DocSequenceCommand::parse(ctxt, request), UserException);
     }
@@ -1807,55 +1875,8 @@ TEST(IDLDocSequence, TestBadDocSequences) {
 
 // Negative: Duplicate field across body and document sequence
 TEST(IDLDocSequence, TestDuplicateDocSequences) {
-    IDLParserErrorContext ctxt("root");
-
-    // Negative: Duplicate fields in doc sequence and body
-    {
-        auto testTempDoc = BSON("DocSequenceCommand"
-                                << "coll1"
-                                << "field1"
-                                << 3
-                                << "field2"
-                                << "five"
-                                << "structs"
-                                << BSON_ARRAY(BSON("value"
-                                                   << "hello")
-                                              << BSON("value"
-                                                      << "world"))
-                                << "objects"
-                                << BSON_ARRAY(BSON("foo" << 1)));
-
-        OpMsgRequest request = OpMsgRequest::fromDBAndBody("db", testTempDoc);
-        request.sequences.push_back({"structs",
-                                     {BSON("value"
-                                           << "hello"),
-                                      BSON("value"
-                                           << "world")}});
-
-        ASSERT_THROWS(DocSequenceCommand::parse(ctxt, request), UserException);
-    }
-
-    // Negative: Duplicate fields in doc sequence and body
-    {
-        auto testTempDoc = BSON("DocSequenceCommand"
-                                << "coll1"
-                                << "field1"
-                                << 3
-                                << "field2"
-                                << "five"
-                                << "structs"
-                                << BSON_ARRAY(BSON("value"
-                                                   << "hello")
-                                              << BSON("value"
-                                                      << "world"))
-                                << "objects"
-                                << BSON_ARRAY(BSON("foo" << 1)));
-
-        OpMsgRequest request = OpMsgRequest::fromDBAndBody("db", testTempDoc);
-        request.sequences.push_back({"objects", {BSON("foo" << 1)}});
-
-        ASSERT_THROWS(DocSequenceCommand::parse(ctxt, request), UserException);
-    }
+    TestDuplicateDocSequences<DocSequenceCommand>("DocSequenceCommand");
+    TestDuplicateDocSequences<DocSequenceCommandNonStrict>("DocSequenceCommandNonStrict");
 }
 
 // Positive: Test empty document sequence
@@ -2015,7 +2036,8 @@ TEST(IDLDocSequence, TestNonStrict) {
         request.sequences.push_back({"objects", {BSON("foo" << 1)}});
         request.sequences.push_back({"extra", {BSON("foo" << 1)}});
 
-        ASSERT_THROWS(DocSequenceCommandNonStrict::parse(ctxt, request), UserException);
+        auto testStruct = DocSequenceCommandNonStrict::parse(ctxt, request);
+        ASSERT_EQUALS(2UL, testStruct.getStructs().size());
     }
 
     // Positive: Extra field in body
@@ -2037,7 +2059,8 @@ TEST(IDLDocSequence, TestNonStrict) {
                                            << "world")}});
         request.sequences.push_back({"objects", {BSON("foo" << 1)}});
 
-        ASSERT_THROWS(DocSequenceCommandNonStrict::parse(ctxt, request), UserException);
+        auto testStruct = DocSequenceCommandNonStrict::parse(ctxt, request);
+        ASSERT_EQUALS(2UL, testStruct.getStructs().size());
     }
 }
 
