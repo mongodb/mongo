@@ -48,6 +48,7 @@
 #include "mongo/db/ops/modifier_unset.h"
 #include "mongo/db/update/addtoset_node.h"
 #include "mongo/db/update/arithmetic_node.h"
+#include "mongo/db/update/bit_node.h"
 #include "mongo/db/update/conflict_placeholder_node.h"
 #include "mongo/db/update/pop_node.h"
 #include "mongo/db/update/rename_node.h"
@@ -187,6 +188,8 @@ std::unique_ptr<UpdateLeafNode> makeUpdateLeafNode(ModifierType modType) {
     switch (modType) {
         case MOD_ADD_TO_SET:
             return stdx::make_unique<AddToSetNode>();
+        case MOD_BIT:
+            return stdx::make_unique<BitNode>();
         case MOD_CONFLICT_PLACEHOLDER:
             return stdx::make_unique<ConflictPlaceholderNode>();
         case MOD_INC:

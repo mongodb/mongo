@@ -26,35 +26,42 @@
  * then also delete it in the license file.
  */
 
-#include "mongo/platform/basic.h"
+#pragma once
 
-#include "mongo/db/update/set_node.h"
-
-#include "mongo/db/update/path_support.h"
+#include "mongo/db/update/path_creating_node.h"
+#include "mongo/stdx/memory.h"
 
 namespace mongo {
 
-Status SetNode::init(BSONElement modExpr, const CollatorInterface* collator) {
-    invariant(modExpr.ok());
+/**
+ * Represents the application of a $bit to the value at the end of a path.
+ */
+class BitNode : public PathCreatingNode {
+public:
+    Status init(BSONElement modExpr, const CollatorInterface* collator) final;
 
-    _val = modExpr;
-
-    return Status::OK();
-}
-
-void SetNode::updateExistingElement(mutablebson::Element* element, bool* noop) const {
-    // If 'element' is deserialized, then element.getValue() will be EOO, which will never equal
-    // _val.
-    if (element->getValue().binaryEqualValues(_val)) {
-        *noop = true;
-    } else {
-        *noop = false;
-        invariantOK(element->setValueBSONElement(_val));
+    std::unique_ptr<UpdateNode> clone() const final {
+        return stdx::make_unique<BitNode>(*this);
     }
-}
 
-void SetNode::setValueForNewElement(mutablebson::Element* element) const {
-    invariantOK(element->setValueBSONElement(_val));
-}
+    void setCollator(const CollatorInterface* collator) final {}
+
+protected:
+    void updateExistingElement(mutablebson::Element* element, bool* noop) const final;
+    void setValueForNewElement(mutablebson::Element* element) const final;
+
+private:
+    /**
+     * Applies each op in "_opList" to "value" and returns the result.
+     */
+    SafeNum applyOpList(SafeNum value) const;
+
+    struct BitwiseOp {
+        SafeNum (SafeNum::*bitOperator)(const SafeNum&) const;
+        SafeNum operand;
+    };
+
+    std::vector<BitwiseOp> _opList;
+};
 
 }  // namespace mongo

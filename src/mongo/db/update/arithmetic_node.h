@@ -40,7 +40,7 @@ class ArithmeticNode : public PathCreatingNode {
 public:
     enum class ArithmeticOp { kAdd, kMultiply };
 
-    ArithmeticNode(ArithmeticOp op) : _op(op) {}
+    explicit ArithmeticNode(ArithmeticOp op) : _op(op) {}
 
     Status init(BSONElement modExpr, const CollatorInterface* collator) final;
 

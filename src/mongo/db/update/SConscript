@@ -58,6 +58,7 @@ env.Library(
     source=[
         'addtoset_node.cpp',
         'arithmetic_node.cpp',
+        'bit_node.cpp',
         'modifier_table.cpp',
         'path_creating_node.cpp',
         'pop_node.cpp',
@@ -82,6 +83,7 @@ env.CppUnitTest(
     source=[
         'addtoset_node_test.cpp',
         'arithmetic_node_test.cpp',
+        'bit_node_test.cpp',
         'pop_node_test.cpp',
         'rename_node_test.cpp',
         'set_node_test.cpp',

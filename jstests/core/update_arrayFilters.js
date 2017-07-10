@@ -497,24 +497,17 @@
                "update failed for a reason other than using array updates with $push");
 
     // $bit.
-    // TODO SERVER-28765: $bit should use the new update implementation.
     coll.drop();
+    assert.writeOK(coll.insert({_id: 0, a: [NumberInt(0), NumberInt(2)]}));
     if (db.getMongo().writeMode() === "commands") {
-        res = coll.update(
-            {_id: 0}, {$bit: {"a.$[i]": {or: NumberInt(10)}}}, {arrayFilters: [{i: 0}]});
-        assert.writeErrorWithCode(res, ErrorCodes.InvalidOptions);
-        assert.neq(
-            -1,
-            res.getWriteError().errmsg.indexOf("Cannot use array filters with modifier $bit"),
-            "update failed for a reason other than using array filters with $bit");
+        assert.writeOK(coll.update(
+            {_id: 0}, {$bit: {"a.$[i]": {or: NumberInt(10)}}}, {arrayFilters: [{i: 0}]}));
+        assert.eq({_id: 0, a: [NumberInt(10), NumberInt(2)]}, coll.findOne());
     }
-    assert.writeOK(coll.insert({_id: 0, a: [0]}));
-    res = coll.update({_id: 0}, {$bit: {"a.$[]": {or: NumberInt(10)}}});
-    assert.writeErrorWithCode(res, 16837);
-    assert.neq(-1,
-               res.getWriteError().errmsg.indexOf(
-                   "cannot use the part (a of a.$[]) to traverse the element ({a: [ 0.0 ]})"),
-               "update failed for a reason other than using array updates with $bit");
+    assert.writeOK(coll.remove({}));
+    assert.writeOK(coll.insert({_id: 0, a: [NumberInt(0), NumberInt(2)]}));
+    assert.writeOK(coll.update({_id: 0}, {$bit: {"a.$[]": {or: NumberInt(10)}}}));
+    assert.eq({_id: 0, a: [NumberInt(10), NumberInt(10)]}, coll.findOne());
 
     //
     // Multi update tests.
