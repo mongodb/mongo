@@ -337,6 +337,7 @@ void MongoBase::Functions::insert::call(JSContext* cx, JS::CallArgs args) {
         return ValueWriter(cx, value).toBSON();
     };
 
+    Message toSend;
     if (args.get(1).isObject()) {
         bool isArray;
 
@@ -366,13 +367,16 @@ void MongoBase::Functions::insert::call(JSContext* cx, JS::CallArgs args) {
             if (!foundElement)
                 uasserted(ErrorCodes::BadValue, "attempted to insert an empty array");
 
-            conn->insert(ns, bos, flags);
+            toSend = makeInsertMessage(ns, bos.data(), bos.size(), flags);
         } else {
-            conn->insert(ns, addId(args.get(1)));
+            toSend = makeInsertMessage(ns, addId(args.get(1)));
         }
     } else {
-        conn->insert(ns, addId(args.get(1)));
+        toSend = makeInsertMessage(ns, addId(args.get(1)));
     }
+
+    invariant(!toSend.empty());
+    conn->say(toSend);
 
     args.rval().setUndefined();
 }
@@ -399,7 +403,8 @@ void MongoBase::Functions::remove::call(JSContext* cx, JS::CallArgs args) {
         justOne = args.get(2).toBoolean();
     }
 
-    conn->remove(ns, bson, justOne);
+    auto toSend = makeRemoveMessage(ns, bson, justOne ? RemoveOption_JustOne : 0);
+    conn->say(toSend);
     args.rval().setUndefined();
 }
 
@@ -427,7 +432,9 @@ void MongoBase::Functions::update::call(JSContext* cx, JS::CallArgs args) {
     bool upsert = args.length() > 3 && args.get(3).isBoolean() && args.get(3).toBoolean();
     bool multi = args.length() > 4 && args.get(4).isBoolean() && args.get(4).toBoolean();
 
-    conn->update(ns, q1, o1, upsert, multi);
+    auto toSend = makeUpdateMessage(
+        ns, q1, o1, (upsert ? UpdateOption_Upsert : 0) | (multi ? UpdateOption_Multi : 0));
+    conn->say(toSend);
     args.rval().setUndefined();
 }
 

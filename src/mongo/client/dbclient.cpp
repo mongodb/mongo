@@ -1057,33 +1057,49 @@ unsigned long long DBClientConnection::query(stdx::function<void(DBClientCursorB
 }
 
 void DBClientBase::insert(const string& ns, BSONObj obj, int flags) {
-    auto msg = makeInsertMessage(ns, obj, flags);
-    say(msg);
+    insert(ns, std::vector<BSONObj>{obj}, flags);
 }
 
-// TODO: Merge with other insert implementation?
 void DBClientBase::insert(const string& ns, const vector<BSONObj>& v, int flags) {
-    auto msg = makeInsertMessage(ns, v.data(), v.size(), flags);
-    say(msg);
+    bool ordered = !(flags & InsertOption_ContinueOnError);
+    auto nss = NamespaceString(ns);
+    auto request =
+        OpMsgRequest::fromDBAndBody(nss.db(), BSON("insert" << nss.coll() << "ordered" << ordered));
+    request.sequences.push_back({"documents", v});
+
+    // Ignoring reply to match fire-and-forget OP_INSERT behavior.
+    runCommand(std::move(request));
 }
 
 void DBClientBase::remove(const string& ns, Query obj, int flags) {
-    auto msg = makeRemoveMessage(ns, obj.obj, flags);
-    say(msg);
+    int limit = (flags & RemoveOption_JustOne) ? 1 : 0;
+    auto nss = NamespaceString(ns);
+
+    auto request = OpMsgRequest::fromDBAndBody(nss.db(), BSON("delete" << nss.coll()));
+    request.sequences.push_back({"deletes", {BSON("q" << obj.obj << "limit" << limit)}});
+
+    // Ignoring reply to match fire-and-forget OP_REMOVE behavior.
+    runCommand(std::move(request));
 }
 
 void DBClientBase::update(const string& ns, Query query, BSONObj obj, bool upsert, bool multi) {
-    int flags = 0;
-    if (upsert)
-        flags |= UpdateOption_Upsert;
-    if (multi)
-        flags |= UpdateOption_Multi;
-    update(ns, query, obj, flags);
+    auto nss = NamespaceString(ns);
+
+    auto request = OpMsgRequest::fromDBAndBody(nss.db(), BSON("update" << nss.coll()));
+    request.sequences.push_back(
+        {"updates",
+         {BSON("q" << query.obj << "u" << obj << "upsert" << upsert << "multi" << multi)}});
+
+    // Ignoring reply to match fire-and-forget OP_UPDATE behavior.
+    runCommand(std::move(request));
 }
 
 void DBClientBase::update(const string& ns, Query query, BSONObj obj, int flags) {
-    auto msg = makeUpdateMessage(ns, query.obj, obj, flags);
-    say(msg);
+    update(ns,
+           std::move(query),
+           std::move(obj),
+           flags & UpdateOption_Upsert,
+           flags & UpdateOption_Multi);
 }
 
 void DBClientBase::killCursor(long long cursorId) {

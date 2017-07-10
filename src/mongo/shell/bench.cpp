@@ -916,7 +916,13 @@ void BenchRunWorker::generateLoadOnConnection(DBClientBase* conn) {
                                                  builder.done(),
                                                  result);
                             } else {
-                                conn->update(op.ns, query, update, op.upsert, op.multi);
+                                auto toSend =
+                                    makeUpdateMessage(op.ns,
+                                                      query,
+                                                      update,
+                                                      (op.upsert ? UpdateOption_Upsert : 0) |
+                                                          (op.multi ? UpdateOption_Multi : 0));
+                                conn->say(toSend);
                                 if (op.safe)
                                     result = conn->getLastErrorDetailed();
                             }
@@ -972,17 +978,20 @@ void BenchRunWorker::generateLoadOnConnection(DBClientBase* conn) {
                                                  builder.done(),
                                                  result);
                             } else {
+                                std::vector<BSONObj> insertArray;
                                 if (op.isDocAnArray) {
-                                    std::vector<BSONObj> insertArray;
                                     for (const auto& element : op.doc) {
                                         BSONObj e = fixQuery(element.Obj(), bsonTemplateEvaluator);
                                         insertArray.push_back(e);
                                     }
-                                    conn->insert(op.ns, insertArray);
                                 } else {
-                                    insertDoc = fixQuery(op.doc, bsonTemplateEvaluator);
-                                    conn->insert(op.ns, insertDoc);
+                                    insertArray.push_back(fixQuery(op.doc, bsonTemplateEvaluator));
                                 }
+
+                                auto toSend = makeInsertMessage(
+                                    op.ns, insertArray.data(), insertArray.size());
+                                conn->say(toSend);
+
                                 if (op.safe)
                                     result = conn->getLastErrorDetailed();
                             }
@@ -1029,7 +1038,9 @@ void BenchRunWorker::generateLoadOnConnection(DBClientBase* conn) {
                                                  builder.done(),
                                                  result);
                             } else {
-                                conn->remove(op.ns, predicate, !op.multi);
+                                auto toSend = makeRemoveMessage(
+                                    op.ns, predicate, op.multi ? 0 : RemoveOption_JustOne);
+                                conn->say(toSend);
                                 if (op.safe)
                                     result = conn->getLastErrorDetailed();
                             }

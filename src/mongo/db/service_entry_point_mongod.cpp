@@ -153,6 +153,7 @@ void generateLegacyQueryErrorResponse(const AssertionException* exception,
 }
 
 void registerError(OperationContext* opCtx, const DBException& exception) {
+    LastError::get(opCtx->getClient()).setLastError(exception.getCode(), exception.getInfo().msg);
     CurOp::get(opCtx)->debug().exceptionInfo = exception.getInfo();
 }
 

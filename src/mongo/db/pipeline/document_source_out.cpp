@@ -30,6 +30,7 @@
 
 #include "mongo/db/pipeline/document_source_out.h"
 
+#include "mongo/db/ops/write_ops.h"
 #include "mongo/stdx/memory.h"
 #include "mongo/util/destructor_guard.h"
 
@@ -169,7 +170,8 @@ DocumentSource::GetNextResult DocumentSourceOut::getNext() {
         BSONObj toInsert = nextInput.releaseDocument().toBson();
 
         bufferedBytes += toInsert.objsize();
-        if (!bufferedObjects.empty() && bufferedBytes > BSONObjMaxUserSize) {
+        if (!bufferedObjects.empty() && (bufferedBytes > BSONObjMaxUserSize ||
+                                         bufferedObjects.size() >= write_ops::kMaxWriteBatchSize)) {
             spill(bufferedObjects);
             bufferedObjects.clear();
             bufferedBytes = toInsert.objsize();
