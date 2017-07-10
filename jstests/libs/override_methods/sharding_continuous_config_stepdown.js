@@ -290,7 +290,7 @@ tracking: {verbosity: 0} }";
                 }
 
                 if (cmdName === "shardCollection" || cmdName === "shardcollection") {
-                    const ns = cmdObj.shardCollection;
+                    const ns = cmdObj[cmdName];
 
                     print(
                         "shardCollection command " + tojson(cmdObj) + " failed after " +
