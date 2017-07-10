@@ -84,7 +84,12 @@ main(int argc, char *argv[])
 	 * diagnostic mode is not enable and runs for 15 minutes.
 	 */
 #if !defined(HAVE_DIAGNOSTIC)
-	return (EXIT_SUCCESS);
+	/*
+	 * Put the return in a conditional, otherwise some compilers will
+	 * complain that code beyond the return is unreachable.
+	 */
+	if (true)
+		return (EXIT_SUCCESS);
 #endif
 	if (!testutil_is_flag_set("WT3363_CHECKPOINT_OP_RACES"))
 		return (EXIT_SUCCESS);
