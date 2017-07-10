@@ -58,7 +58,7 @@ using std::string;
 using std::vector;
 
 namespace {
-Message assembleCommandRequest(DBClientWithCommands* cli,
+Message assembleCommandRequest(DBClientBase* cli,
                                StringData database,
                                int legacyQueryOptions,
                                BSONObj legacyQuery) {

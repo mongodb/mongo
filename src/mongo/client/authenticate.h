@@ -38,7 +38,6 @@
 
 namespace mongo {
 
-class DBClientWithCommands;
 class BSONObj;
 
 namespace auth {

@@ -36,7 +36,7 @@
 namespace mongo {
 
 class Scope;
-class DBClientWithCommands;
+class DBClientBase;
 
 namespace shell_utils {
 
@@ -48,7 +48,7 @@ void RecordMyLocation(const char* _argv0);
 void installShellUtils(Scope& scope);
 
 void initScope(Scope& scope);
-void onConnect(DBClientWithCommands& c);
+void onConnect(DBClientBase& c);
 
 const char* getUserDir();
 
@@ -71,7 +71,7 @@ private:
 class ConnectionRegistry {
 public:
     ConnectionRegistry();
-    void registerConnection(DBClientWithCommands& client);
+    void registerConnection(DBClientBase& client);
     void killOperationsOnAllConnections(bool withPrompt) const;
 
 private:

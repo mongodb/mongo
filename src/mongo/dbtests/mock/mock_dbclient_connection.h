@@ -64,9 +64,8 @@ public:
         return connect(host.toString().c_str(), applicationName, errmsg);
     }
 
-    using DBClientWithCommands::runCommandWithTarget;
-    std::pair<rpc::UniqueReply, DBClientWithCommands*> runCommandWithTarget(
-        OpMsgRequest request) override;
+    using DBClientBase::runCommandWithTarget;
+    std::pair<rpc::UniqueReply, DBClientBase*> runCommandWithTarget(OpMsgRequest request) override;
 
     std::unique_ptr<mongo::DBClientCursor> query(const std::string& ns,
                                                  mongo::Query query = mongo::Query(),

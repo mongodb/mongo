@@ -46,7 +46,7 @@ class NetworkConnectionHook;
 /**
  * Represents a pool of connections to a MongoDB server. The pool is synchronized internally
  * and its methods can be called from multiple threads, however once a connection is obtained
- * it should only be used from one thread in accordance with the rules of DBClientInterface.
+ * it should only be used from one thread in accordance with the rules of DBClientBase.
  */
 class ConnectionPool {
     MONGO_DISALLOW_COPYING(ConnectionPool);

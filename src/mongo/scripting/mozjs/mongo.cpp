@@ -125,8 +125,8 @@ void setCursorHandle(MozJSImplScope* scope,
 }
 
 void setHiddenMongo(JSContext* cx,
-                    DBClientWithCommands* resPtr,
-                    DBClientWithCommands* origConn,
+                    DBClientBase* resPtr,
+                    DBClientBase* origConn,
                     JS::CallArgs& args) {
     ObjectWrapper o(cx, args.rval());
     // If the connection that ran the command is the same as conn, then we set a hidden "_mongo"
@@ -545,7 +545,7 @@ void MongoBase::Functions::copyDatabaseWithSCRAM::call(JSContext* cx, JS::CallAr
     std::string password = ValueWriter(cx, args.get(4)).toString();
     bool slaveOk = ValueWriter(cx, args.get(5)).toBoolean();
 
-    std::string hashedPwd = DBClientWithCommands::createPasswordDigest(user, password);
+    std::string hashedPwd = DBClientBase::createPasswordDigest(user, password);
 
     std::unique_ptr<SaslClientSession> session(new NativeSaslClientSession());
 

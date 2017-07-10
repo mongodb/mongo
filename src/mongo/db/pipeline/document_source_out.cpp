@@ -137,7 +137,7 @@ void DocumentSourceOut::initialize() {
                               << indexBson
                               << " error: "
                               << err,
-                DBClientWithCommands::getLastErrorString(err).empty());
+                DBClientBase::getLastErrorString(err).empty());
     }
     _initialized = true;
 }
@@ -146,7 +146,7 @@ void DocumentSourceOut::spill(const vector<BSONObj>& toInsert) {
     BSONObj err = _mongod->insert(_tempNs, toInsert);
     uassert(16996,
             str::stream() << "insert for $out failed: " << err,
-            DBClientWithCommands::getLastErrorString(err).empty());
+            DBClientBase::getLastErrorString(err).empty());
 }
 
 DocumentSource::GetNextResult DocumentSourceOut::getNext() {

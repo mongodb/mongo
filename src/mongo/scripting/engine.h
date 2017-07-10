@@ -38,7 +38,6 @@ typedef unsigned long long ScriptingFunction;
 typedef BSONObj (*NativeFunction)(const BSONObj& args, void* data);
 typedef std::map<std::string, ScriptingFunction> FunctionCacheMap;
 
-class DBClientWithCommands;
 class DBClientBase;
 class OperationContext;
 
@@ -264,10 +263,10 @@ public:
     void setScopeInitCallback(void (*func)(Scope&)) {
         _scopeInitCallback = func;
     }
-    static void setConnectCallback(void (*func)(DBClientWithCommands&)) {
+    static void setConnectCallback(void (*func)(DBClientBase&)) {
         _connectCallback = func;
     }
-    static void runConnectCallback(DBClientWithCommands& c) {
+    static void runConnectCallback(DBClientBase& c) {
         if (_connectCallback)
             _connectCallback(c);
     }
@@ -285,7 +284,7 @@ protected:
     void (*_scopeInitCallback)(Scope&);
 
 private:
-    static void (*_connectCallback)(DBClientWithCommands&);
+    static void (*_connectCallback)(DBClientBase&);
 };
 
 void installGlobalUtils(Scope& scope);

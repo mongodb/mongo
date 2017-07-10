@@ -111,16 +111,16 @@ AtomicInt64 DBClientBase::ConnectionIdSequence;
 
 /* --- dbclientcommands --- */
 
-bool DBClientWithCommands::isOk(const BSONObj& o) {
+bool DBClientBase::isOk(const BSONObj& o) {
     return o["ok"].trueValue();
 }
 
-bool DBClientWithCommands::isNotMasterErrorString(const BSONElement& e) {
+bool DBClientBase::isNotMasterErrorString(const BSONElement& e) {
     return e.type() == String && str::contains(e.valuestr(), "not master");
 }
 
 
-enum QueryOptions DBClientWithCommands::availableOptions() {
+enum QueryOptions DBClientBase::availableOptions() {
     if (!_haveCachedAvailableOptions) {
         _cachedAvailableOptions = _lookupAvailableOptions();
         _haveCachedAvailableOptions = true;
@@ -128,7 +128,7 @@ enum QueryOptions DBClientWithCommands::availableOptions() {
     return _cachedAvailableOptions;
 }
 
-enum QueryOptions DBClientWithCommands::_lookupAvailableOptions() {
+enum QueryOptions DBClientBase::_lookupAvailableOptions() {
     BSONObj ret;
     if (runCommand("admin", BSON("availablequeryoptions" << 1), ret)) {
         return QueryOptions(ret.getIntField("options"));
@@ -136,39 +136,39 @@ enum QueryOptions DBClientWithCommands::_lookupAvailableOptions() {
     return QueryOptions(0);
 }
 
-rpc::ProtocolSet DBClientWithCommands::getClientRPCProtocols() const {
+rpc::ProtocolSet DBClientBase::getClientRPCProtocols() const {
     return _clientRPCProtocols;
 }
 
-rpc::ProtocolSet DBClientWithCommands::getServerRPCProtocols() const {
+rpc::ProtocolSet DBClientBase::getServerRPCProtocols() const {
     return _serverRPCProtocols;
 }
 
-void DBClientWithCommands::setClientRPCProtocols(rpc::ProtocolSet protocols) {
+void DBClientBase::setClientRPCProtocols(rpc::ProtocolSet protocols) {
     _clientRPCProtocols = std::move(protocols);
 }
 
-void DBClientWithCommands::_setServerRPCProtocols(rpc::ProtocolSet protocols) {
+void DBClientBase::_setServerRPCProtocols(rpc::ProtocolSet protocols) {
     _serverRPCProtocols = std::move(protocols);
 }
 
-void DBClientWithCommands::setRequestMetadataWriter(rpc::RequestMetadataWriter writer) {
+void DBClientBase::setRequestMetadataWriter(rpc::RequestMetadataWriter writer) {
     _metadataWriter = std::move(writer);
 }
 
-const rpc::RequestMetadataWriter& DBClientWithCommands::getRequestMetadataWriter() {
+const rpc::RequestMetadataWriter& DBClientBase::getRequestMetadataWriter() {
     return _metadataWriter;
 }
 
-void DBClientWithCommands::setReplyMetadataReader(rpc::ReplyMetadataReader reader) {
+void DBClientBase::setReplyMetadataReader(rpc::ReplyMetadataReader reader) {
     _metadataReader = std::move(reader);
 }
 
-const rpc::ReplyMetadataReader& DBClientWithCommands::getReplyMetadataReader() {
+const rpc::ReplyMetadataReader& DBClientBase::getReplyMetadataReader() {
     return _metadataReader;
 }
 
-std::pair<rpc::UniqueReply, DBClientWithCommands*> DBClientWithCommands::runCommandWithTarget(
+std::pair<rpc::UniqueReply, DBClientBase*> DBClientBase::runCommandWithTarget(
     OpMsgRequest request) {
     // Make sure to reconnect if needed before building our request, since the request depends on
     // the negotiated protocol which can change due to a reconnect.
@@ -226,8 +226,10 @@ std::pair<rpc::UniqueReply, DBClientWithCommands*> DBClientWithCommands::runComm
     return {rpc::UniqueReply(std::move(replyMsg), std::move(commandReply)), this};
 }
 
-std::tuple<bool, DBClientWithCommands*> DBClientWithCommands::runCommandWithTarget(
-    const string& dbname, BSONObj cmd, BSONObj& info, int options) {
+std::tuple<bool, DBClientBase*> DBClientBase::runCommandWithTarget(const string& dbname,
+                                                                   BSONObj cmd,
+                                                                   BSONObj& info,
+                                                                   int options) {
     // TODO: This will be downconverted immediately if the underlying
     // requestBuilder is a legacyRequest builder. Not sure what the best
     // way to get around that is without breaking the abstraction.
@@ -237,10 +239,7 @@ std::tuple<bool, DBClientWithCommands*> DBClientWithCommands::runCommandWithTarg
     return std::make_tuple(isOk(info), result.second);
 }
 
-bool DBClientWithCommands::runCommand(const string& dbname,
-                                      BSONObj cmd,
-                                      BSONObj& info,
-                                      int options) {
+bool DBClientBase::runCommand(const string& dbname, BSONObj cmd, BSONObj& info, int options) {
     auto res = runCommandWithTarget(dbname, std::move(cmd), info, options);
     return std::get<0>(res);
 }
@@ -249,9 +248,7 @@ bool DBClientWithCommands::runCommand(const string& dbname,
 /* note - we build a bson obj here -- for something that is super common like getlasterror you
           should have that object prebuilt as that would be faster.
 */
-bool DBClientWithCommands::simpleCommand(const string& dbname,
-                                         BSONObj* info,
-                                         const string& command) {
+bool DBClientBase::simpleCommand(const string& dbname, BSONObj* info, const string& command) {
     BSONObj o;
     if (info == 0)
         info = &o;
@@ -260,12 +257,12 @@ bool DBClientWithCommands::simpleCommand(const string& dbname,
     return runCommand(dbname, b.done(), *info);
 }
 
-bool DBClientWithCommands::runPseudoCommand(StringData db,
-                                            StringData realCommandName,
-                                            StringData pseudoCommandCol,
-                                            const BSONObj& cmdArgs,
-                                            BSONObj& info,
-                                            int options) {
+bool DBClientBase::runPseudoCommand(StringData db,
+                                    StringData realCommandName,
+                                    StringData pseudoCommandCol,
+                                    const BSONObj& cmdArgs,
+                                    BSONObj& info,
+                                    int options) {
     BSONObjBuilder bob;
     bob.append(realCommandName, 1);
     bob.appendElements(cmdArgs);
@@ -293,7 +290,7 @@ bool DBClientWithCommands::runPseudoCommand(StringData db,
     return success;
 }
 
-unsigned long long DBClientWithCommands::count(
+unsigned long long DBClientBase::count(
     const string& myns, const BSONObj& query, int options, int limit, int skip) {
     BSONObj cmd = _countCmd(myns, query, options, limit, skip);
     BSONObj res;
@@ -302,7 +299,7 @@ unsigned long long DBClientWithCommands::count(
     return res["n"].numberLong();
 }
 
-BSONObj DBClientWithCommands::_countCmd(
+BSONObj DBClientBase::_countCmd(
     const string& myns, const BSONObj& query, int options, int limit, int skip) {
     NamespaceString ns(myns);
     BSONObjBuilder b;
@@ -315,11 +312,11 @@ BSONObj DBClientWithCommands::_countCmd(
     return b.obj();
 }
 
-BSONObj DBClientWithCommands::getLastErrorDetailed(bool fsync, bool j, int w, int wtimeout) {
+BSONObj DBClientBase::getLastErrorDetailed(bool fsync, bool j, int w, int wtimeout) {
     return getLastErrorDetailed("admin", fsync, j, w, wtimeout);
 }
 
-BSONObj DBClientWithCommands::getLastErrorDetailed(
+BSONObj DBClientBase::getLastErrorDetailed(
     const std::string& db, bool fsync, bool j, int w, int wtimeout) {
     BSONObj info;
     BSONObjBuilder b;
@@ -344,17 +341,16 @@ BSONObj DBClientWithCommands::getLastErrorDetailed(
     return info;
 }
 
-string DBClientWithCommands::getLastError(bool fsync, bool j, int w, int wtimeout) {
+string DBClientBase::getLastError(bool fsync, bool j, int w, int wtimeout) {
     return getLastError("admin", fsync, j, w, wtimeout);
 }
 
-string DBClientWithCommands::getLastError(
-    const std::string& db, bool fsync, bool j, int w, int wtimeout) {
+string DBClientBase::getLastError(const std::string& db, bool fsync, bool j, int w, int wtimeout) {
     BSONObj info = getLastErrorDetailed(db, fsync, j, w, wtimeout);
     return getLastErrorString(info);
 }
 
-string DBClientWithCommands::getLastErrorString(const BSONObj& info) {
+string DBClientBase::getLastErrorString(const BSONObj& info) {
     if (info["ok"].trueValue()) {
         BSONElement e = info["err"];
         if (e.eoo())
@@ -375,14 +371,13 @@ string DBClientWithCommands::getLastErrorString(const BSONObj& info) {
 
 const BSONObj getpreverrorcmdobj = fromjson("{getpreverror:1}");
 
-BSONObj DBClientWithCommands::getPrevError() {
+BSONObj DBClientBase::getPrevError() {
     BSONObj info;
     runCommand("admin", getpreverrorcmdobj, info);
     return info;
 }
 
-string DBClientWithCommands::createPasswordDigest(const string& username,
-                                                  const string& clearTextPassword) {
+string DBClientBase::createPasswordDigest(const string& username, const string& clearTextPassword) {
     return mongo::createPasswordDigest(username, clearTextPassword);
 }
 
@@ -391,7 +386,7 @@ class ScopedMetadataWriterRemover {
     MONGO_DISALLOW_COPYING(ScopedMetadataWriterRemover);
 
 public:
-    ScopedMetadataWriterRemover(DBClientWithCommands* cli)
+    ScopedMetadataWriterRemover(DBClientBase* cli)
         : _cli(cli), _oldWriter(cli->getRequestMetadataWriter()) {
         _cli->setRequestMetadataWriter(rpc::RequestMetadataWriter{});
     }
@@ -400,12 +395,12 @@ public:
     }
 
 private:
-    DBClientWithCommands* const _cli;
+    DBClientBase* const _cli;
     rpc::RequestMetadataWriter _oldWriter;
 };
 }  // namespace
 
-void DBClientWithCommands::_auth(const BSONObj& params) {
+void DBClientBase::_auth(const BSONObj& params) {
     ScopedMetadataWriterRemover remover{this};
 
     // We will only have a client name if SSL is enabled
@@ -441,7 +436,7 @@ void DBClientWithCommands::_auth(const BSONObj& params) {
         });
 }
 
-bool DBClientWithCommands::authenticateInternalUser() {
+bool DBClientBase::authenticateInternalUser() {
     if (!isInternalAuthSet()) {
         if (!serverGlobalParams.quiet.load()) {
             log() << "ERROR: No authentication parameters set for internal user";
@@ -461,15 +456,15 @@ bool DBClientWithCommands::authenticateInternalUser() {
     }
 }
 
-void DBClientWithCommands::auth(const BSONObj& params) {
+void DBClientBase::auth(const BSONObj& params) {
     _auth(params);
 }
 
-bool DBClientWithCommands::auth(const string& dbname,
-                                const string& username,
-                                const string& password_text,
-                                string& errmsg,
-                                bool digestPassword) {
+bool DBClientBase::auth(const string& dbname,
+                        const string& username,
+                        const string& password_text,
+                        string& errmsg,
+                        bool digestPassword) {
     try {
         const auto authParams =
             auth::buildAuthParams(dbname, username, password_text, digestPassword);
@@ -483,13 +478,13 @@ bool DBClientWithCommands::auth(const string& dbname,
     }
 }
 
-void DBClientWithCommands::logout(const string& dbname, BSONObj& info) {
+void DBClientBase::logout(const string& dbname, BSONObj& info) {
     runCommand(dbname, BSON("logout" << 1), info);
 }
 
 BSONObj ismastercmdobj = fromjson("{\"ismaster\":1}");
 
-bool DBClientWithCommands::isMaster(bool& isMaster, BSONObj* info) {
+bool DBClientBase::isMaster(bool& isMaster, BSONObj* info) {
     BSONObj o;
     if (info == 0)
         info = &o;
@@ -498,7 +493,7 @@ bool DBClientWithCommands::isMaster(bool& isMaster, BSONObj* info) {
     return ok;
 }
 
-bool DBClientWithCommands::createCollection(
+bool DBClientBase::createCollection(
     const string& ns, long long size, bool capped, int max, BSONObj* info) {
     verify(!capped || size);
     BSONObj o;
@@ -516,10 +511,10 @@ bool DBClientWithCommands::createCollection(
     return runCommand(db.c_str(), b.done(), *info);
 }
 
-bool DBClientWithCommands::copyDatabase(const string& fromdb,
-                                        const string& todb,
-                                        const string& fromhost,
-                                        BSONObj* info) {
+bool DBClientBase::copyDatabase(const string& fromdb,
+                                const string& todb,
+                                const string& fromhost,
+                                BSONObj* info) {
     BSONObj o;
     if (info == 0)
         info = &o;
@@ -531,11 +526,11 @@ bool DBClientWithCommands::copyDatabase(const string& fromdb,
     return runCommand("admin", b.done(), *info);
 }
 
-bool DBClientWithCommands::eval(const string& dbname,
-                                const string& jscode,
-                                BSONObj& info,
-                                BSONElement& retValue,
-                                BSONObj* args) {
+bool DBClientBase::eval(const string& dbname,
+                        const string& jscode,
+                        BSONObj& info,
+                        BSONElement& retValue,
+                        BSONObj* args) {
     BSONObjBuilder b;
     b.appendCode("$eval", jscode);
     if (args)
@@ -546,13 +541,13 @@ bool DBClientWithCommands::eval(const string& dbname,
     return ok;
 }
 
-bool DBClientWithCommands::eval(const string& dbname, const string& jscode) {
+bool DBClientBase::eval(const string& dbname, const string& jscode) {
     BSONObj info;
     BSONElement retValue;
     return eval(dbname, jscode, info, retValue);
 }
 
-list<BSONObj> DBClientWithCommands::getCollectionInfos(const string& db, const BSONObj& filter) {
+list<BSONObj> DBClientBase::getCollectionInfos(const string& db, const BSONObj& filter) {
     list<BSONObj> infos;
 
     BSONObj res;
@@ -586,7 +581,7 @@ list<BSONObj> DBClientWithCommands::getCollectionInfos(const string& db, const B
     uasserted(18630, str::stream() << "listCollections failed: " << res);
 }
 
-bool DBClientWithCommands::exists(const string& ns) {
+bool DBClientBase::exists(const string& ns) {
     BSONObj filter = BSON("name" << nsToCollectionSubstring(ns));
     list<BSONObj> results = getCollectionInfos(nsToDatabase(ns), filter);
     return !results.empty();
@@ -608,13 +603,13 @@ void DBClientConnection::_auth(const BSONObj& params) {
 /** query N objects from the database into an array.  makes sense mostly when you want a small
  * number of results.  if a huge number, use query() and iterate the cursor.
  */
-void DBClientInterface::findN(vector<BSONObj>& out,
-                              const string& ns,
-                              Query query,
-                              int nToReturn,
-                              int nToSkip,
-                              const BSONObj* fieldsToReturn,
-                              int queryOptions) {
+void DBClientBase::findN(vector<BSONObj>& out,
+                         const string& ns,
+                         Query query,
+                         int nToReturn,
+                         int nToSkip,
+                         const BSONObj* fieldsToReturn,
+                         int queryOptions) {
     out.reserve(nToReturn);
 
     unique_ptr<DBClientCursor> c =
@@ -641,10 +636,10 @@ void DBClientInterface::findN(vector<BSONObj>& out,
     }
 }
 
-BSONObj DBClientInterface::findOne(const string& ns,
-                                   const Query& query,
-                                   const BSONObj* fieldsToReturn,
-                                   int queryOptions) {
+BSONObj DBClientBase::findOne(const string& ns,
+                              const Query& query,
+                              const BSONObj* fieldsToReturn,
+                              int queryOptions) {
     vector<BSONObj> v;
     findN(v, ns, query, 1, 0, fieldsToReturn, queryOptions);
     return v.empty() ? BSONObj() : v[0];
@@ -881,10 +876,9 @@ void DBClientConnection::logout(const string& dbname, BSONObj& info) {
     runCommand(dbname, BSON("logout" << 1), info);
 }
 
-std::pair<rpc::UniqueReply, DBClientWithCommands*> DBClientConnection::runCommandWithTarget(
+std::pair<rpc::UniqueReply, DBClientBase*> DBClientConnection::runCommandWithTarget(
     OpMsgRequest request) {
-
-    auto out = DBClientWithCommands::runCommandWithTarget(std::move(request));
+    auto out = DBClientBase::runCommandWithTarget(std::move(request));
     if (!_parentReplSetName.empty()) {
         const auto replyBody = out.first->getCommandReply();
         if (!isOk(replyBody)) {
@@ -1097,7 +1091,7 @@ void DBClientBase::killCursor(long long cursorId) {
     say(msg);
 }
 
-list<BSONObj> DBClientWithCommands::getIndexSpecs(const string& ns, int options) {
+list<BSONObj> DBClientBase::getIndexSpecs(const string& ns, int options) {
     list<BSONObj> specs;
 
     BSONObj cmd = BSON("listIndexes" << nsToCollectionSubstring(ns) << "cursor" << BSONObj());
@@ -1131,12 +1125,12 @@ list<BSONObj> DBClientWithCommands::getIndexSpecs(const string& ns, int options)
 }
 
 
-void DBClientWithCommands::dropIndex(const string& ns, BSONObj keys) {
+void DBClientBase::dropIndex(const string& ns, BSONObj keys) {
     dropIndex(ns, genIndexName(keys));
 }
 
 
-void DBClientWithCommands::dropIndex(const string& ns, const string& indexName) {
+void DBClientBase::dropIndex(const string& ns, const string& indexName) {
     BSONObj info;
     if (!runCommand(nsToDatabase(ns),
                     BSON("deleteIndexes" << nsToCollectionSubstring(ns) << "index" << indexName),
@@ -1146,7 +1140,7 @@ void DBClientWithCommands::dropIndex(const string& ns, const string& indexName) 
     }
 }
 
-void DBClientWithCommands::dropIndexes(const string& ns) {
+void DBClientBase::dropIndexes(const string& ns) {
     BSONObj info;
     uassert(10008,
             "dropIndexes failed",
@@ -1156,7 +1150,7 @@ void DBClientWithCommands::dropIndexes(const string& ns) {
                        info));
 }
 
-void DBClientWithCommands::reIndex(const string& ns) {
+void DBClientBase::reIndex(const string& ns) {
     BSONObj info;
     uassert(18908,
             str::stream() << "reIndex failed: " << info,
@@ -1164,7 +1158,7 @@ void DBClientWithCommands::reIndex(const string& ns) {
 }
 
 
-string DBClientWithCommands::genIndexName(const BSONObj& keys) {
+string DBClientBase::genIndexName(const BSONObj& keys) {
     stringstream ss;
 
     bool first = 1;
@@ -1185,7 +1179,7 @@ string DBClientWithCommands::genIndexName(const BSONObj& keys) {
     return ss.str();
 }
 
-void DBClientWithCommands::createIndex(StringData ns, const IndexSpec& descriptor) {
+void DBClientBase::createIndex(StringData ns, const IndexSpec& descriptor) {
     const BSONObj descriptorObj = descriptor.toBSON();
 
     BSONObjBuilder command;

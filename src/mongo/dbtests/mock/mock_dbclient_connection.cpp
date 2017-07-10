@@ -60,7 +60,7 @@ bool MockDBClientConnection::connect(const char* hostName,
     return false;
 }
 
-std::pair<rpc::UniqueReply, DBClientWithCommands*> MockDBClientConnection::runCommandWithTarget(
+std::pair<rpc::UniqueReply, DBClientBase*> MockDBClientConnection::runCommandWithTarget(
     OpMsgRequest request) {
 
     checkConnection();

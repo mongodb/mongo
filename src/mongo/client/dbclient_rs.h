@@ -186,9 +186,8 @@ public:
         return true;
     }
 
-    using DBClientWithCommands::runCommandWithTarget;
-    std::pair<rpc::UniqueReply, DBClientWithCommands*> runCommandWithTarget(
-        OpMsgRequest request) final;
+    using DBClientBase::runCommandWithTarget;
+    std::pair<rpc::UniqueReply, DBClientBase*> runCommandWithTarget(OpMsgRequest request) final;
 
     void setRequestMetadataWriter(rpc::RequestMetadataWriter writer) final;
 

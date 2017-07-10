@@ -164,35 +164,19 @@ std::string nsGetDB(const std::string& ns);
 std::string nsGetCollection(const std::string& ns);
 
 /**
-   The interface that any db connection should implement
+ abstract class that implements the core db operations
  */
-class DBClientInterface {
-    MONGO_DISALLOW_COPYING(DBClientInterface);
+class DBClientBase {
+    MONGO_DISALLOW_COPYING(DBClientBase);
 
 public:
-    virtual std::unique_ptr<DBClientCursor> query(const std::string& ns,
-                                                  Query query,
-                                                  int nToReturn = 0,
-                                                  int nToSkip = 0,
-                                                  const BSONObj* fieldsToReturn = 0,
-                                                  int queryOptions = 0,
-                                                  int batchSize = 0) = 0;
+    DBClientBase()
+        : _logLevel(logger::LogSeverity::Log()),
+          _connectionId(ConnectionIdSequence.fetchAndAdd(1)),
+          _cachedAvailableOptions((enum QueryOptions)0),
+          _haveCachedAvailableOptions(false) {}
 
-    virtual void insert(const std::string& ns, BSONObj obj, int flags = 0) = 0;
-
-    virtual void insert(const std::string& ns, const std::vector<BSONObj>& v, int flags = 0) = 0;
-
-    virtual void remove(const std::string& ns, Query query, int flags) = 0;
-
-    virtual void update(const std::string& ns,
-                        Query query,
-                        BSONObj obj,
-                        bool upsert = false,
-                        bool multi = false) = 0;
-
-    virtual void update(const std::string& ns, Query query, BSONObj obj, int flags) = 0;
-
-    virtual ~DBClientInterface() {}
+    virtual ~DBClientBase() {}
 
     /**
        @return a single object that matches the query.  if none do, then the object is empty
@@ -215,30 +199,6 @@ public:
                int queryOptions = 0);
 
     virtual std::string getServerAddress() const = 0;
-
-    /** don't use this - called automatically by DBClientCursor for you */
-    virtual std::unique_ptr<DBClientCursor> getMore(const std::string& ns,
-                                                    long long cursorId,
-                                                    int nToReturn = 0,
-                                                    int options = 0) = 0;
-
-protected:
-    DBClientInterface() = default;
-};
-
-/**
-   DB "commands"
-   Basically just invocations of connection.$cmd.findOne({...});
-*/
-class DBClientWithCommands : public DBClientInterface {
-public:
-    /** controls how chatty the client is about network errors & such.  See log.h */
-    logger::LogSeverity _logLevel;
-
-    DBClientWithCommands()
-        : _logLevel(logger::LogSeverity::Log()),
-          _cachedAvailableOptions((enum QueryOptions)0),
-          _haveCachedAvailableOptions(false) {}
 
     /** helper function.  run a simple command where the command expression is simply
           { command : 1 }
@@ -316,8 +276,7 @@ public:
     /**
      * Runs the specified command request.
      */
-    virtual std::pair<rpc::UniqueReply, DBClientWithCommands*> runCommandWithTarget(
-        OpMsgRequest request);
+    virtual std::pair<rpc::UniqueReply, DBClientBase*> runCommandWithTarget(OpMsgRequest request);
 
     /**
      * Runs the specified command request. This thin wrapper just unwraps the reply and ignores the
@@ -349,10 +308,10 @@ public:
      *
      * This is used in the shell so that cursors can send getMore through the correct connection.
      */
-    std::tuple<bool, DBClientWithCommands*> runCommandWithTarget(const std::string& dbname,
-                                                                 BSONObj cmd,
-                                                                 BSONObj& info,
-                                                                 int options = 0);
+    std::tuple<bool, DBClientBase*> runCommandWithTarget(const std::string& dbname,
+                                                         BSONObj cmd,
+                                                         BSONObj& info,
+                                                         int options = 0);
 
     /**
     * Authenticates to another cluster member using appropriate authentication data.
@@ -684,63 +643,7 @@ public:
      */
     virtual void checkConnection() {}
 
-protected:
-    /** if the result of a command is ok*/
-    bool isOk(const BSONObj&);
-
-    /** if the element contains a not master error */
-    bool isNotMasterErrorString(const BSONElement& e);
-
-    BSONObj _countCmd(
-        const std::string& ns, const BSONObj& query, int options, int limit, int skip);
-
-    /**
-     * Look up the options available on this client.  Caches the answer from
-     * _lookupAvailableOptions(), below.
-     */
-    QueryOptions availableOptions();
-
-    virtual QueryOptions _lookupAvailableOptions();
-
-    virtual void _auth(const BSONObj& params);
-
-    // should be set by subclasses during connection.
-    void _setServerRPCProtocols(rpc::ProtocolSet serverProtocols);
-
-private:
-    /**
-     * The rpc protocols this client supports.
-     *
-     */
-    rpc::ProtocolSet _clientRPCProtocols{rpc::supports::kAll};
-
-    /**
-     * The rpc protocol the remote server(s) support. We support 'opQueryOnly' by default unless
-     * we detect support for OP_COMMAND at connection time.
-     */
-    rpc::ProtocolSet _serverRPCProtocols{rpc::supports::kOpQueryOnly};
-
-    rpc::RequestMetadataWriter _metadataWriter;
-    rpc::ReplyMetadataReader _metadataReader;
-
-    enum QueryOptions _cachedAvailableOptions;
-    bool _haveCachedAvailableOptions;
-};
-
-/**
- abstract class that implements the core db operations
- */
-class DBClientBase : public DBClientWithCommands {
-protected:
-    static AtomicInt64 ConnectionIdSequence;
-    long long _connectionId;  // unique connection id for this connection
-
-public:
     static const uint64_t INVALID_SOCK_CREATION_TIME;
-
-    DBClientBase() {
-        _connectionId = ConnectionIdSequence.fetchAndAdd(1);
-    }
 
     long long getConnectionId() const {
         return _connectionId;
@@ -843,6 +746,53 @@ public:
 
     virtual void reset() {}
 
+protected:
+    /** if the result of a command is ok*/
+    bool isOk(const BSONObj&);
+
+    /** if the element contains a not master error */
+    bool isNotMasterErrorString(const BSONElement& e);
+
+    BSONObj _countCmd(
+        const std::string& ns, const BSONObj& query, int options, int limit, int skip);
+
+    /**
+     * Look up the options available on this client.  Caches the answer from
+     * _lookupAvailableOptions(), below.
+     */
+    QueryOptions availableOptions();
+
+    virtual QueryOptions _lookupAvailableOptions();
+
+    virtual void _auth(const BSONObj& params);
+
+    // should be set by subclasses during connection.
+    void _setServerRPCProtocols(rpc::ProtocolSet serverProtocols);
+
+    /** controls how chatty the client is about network errors & such.  See log.h */
+    const logger::LogSeverity _logLevel;
+
+    static AtomicInt64 ConnectionIdSequence;
+    long long _connectionId;  // unique connection id for this connection
+
+private:
+    /**
+     * The rpc protocols this client supports.
+     *
+     */
+    rpc::ProtocolSet _clientRPCProtocols{rpc::supports::kAll};
+
+    /**
+     * The rpc protocol the remote server(s) support. We support 'opQueryOnly' by default unless
+     * we detect support for OP_COMMAND at connection time.
+     */
+    rpc::ProtocolSet _serverRPCProtocols{rpc::supports::kOpQueryOnly};
+
+    rpc::RequestMetadataWriter _metadataWriter;
+    rpc::ReplyMetadataReader _metadataReader;
+
+    enum QueryOptions _cachedAvailableOptions;
+    bool _haveCachedAvailableOptions;
 };  // DBClientBase
 
 /**
@@ -947,9 +897,8 @@ public:
                                      const BSONObj* fieldsToReturn,
                                      int queryOptions);
 
-    using DBClientWithCommands::runCommandWithTarget;
-    std::pair<rpc::UniqueReply, DBClientWithCommands*> runCommandWithTarget(
-        OpMsgRequest request) override;
+    using DBClientBase::runCommandWithTarget;
+    std::pair<rpc::UniqueReply, DBClientBase*> runCommandWithTarget(OpMsgRequest request) override;
 
     /**
        @return true if this connection is currently in a failed state.  When autoreconnect is on,

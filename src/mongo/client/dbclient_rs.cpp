@@ -186,7 +186,7 @@ void DBClientReplicaSet::setRequestMetadataWriter(rpc::RequestMetadataWriter wri
     if (_lastSlaveOkConn.get()) {
         _lastSlaveOkConn->setRequestMetadataWriter(writer);
     }
-    DBClientWithCommands::setRequestMetadataWriter(std::move(writer));
+    DBClientBase::setRequestMetadataWriter(std::move(writer));
 }
 
 void DBClientReplicaSet::setReplyMetadataReader(rpc::ReplyMetadataReader reader) {
@@ -197,7 +197,7 @@ void DBClientReplicaSet::setReplyMetadataReader(rpc::ReplyMetadataReader reader)
     if (_lastSlaveOkConn.get()) {
         _lastSlaveOkConn->setReplyMetadataReader(reader);
     }
-    DBClientWithCommands::setReplyMetadataReader(std::move(reader));
+    DBClientBase::setReplyMetadataReader(std::move(reader));
 }
 
 int DBClientReplicaSet::getMinWireVersion() {
@@ -901,7 +901,7 @@ void DBClientReplicaSet::checkResponse(const std::vector<BSONObj>& batch,
     }
 }
 
-std::pair<rpc::UniqueReply, DBClientWithCommands*> DBClientReplicaSet::runCommandWithTarget(
+std::pair<rpc::UniqueReply, DBClientBase*> DBClientReplicaSet::runCommandWithTarget(
     OpMsgRequest request) {
     // This overload exists so we can parse out the read preference and then use server
     // selection directly without having to re-parse the raw message.

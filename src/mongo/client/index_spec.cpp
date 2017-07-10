@@ -233,7 +233,7 @@ BSONObj IndexSpec::toBSON() const {
 void IndexSpec::_rename() {
     if (!_dynamicName)
         return;
-    _name = DBClientWithCommands::genIndexName(_keys.asTempObj());
+    _name = DBClientBase::genIndexName(_keys.asTempObj());
 }
 
 }  // namespace mongo
