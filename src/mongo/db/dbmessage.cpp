@@ -139,6 +139,77 @@ T DbMessage::readAndAdvance() {
     return t;
 }
 
+namespace {
+template <typename Func>
+Message makeMessage(NetworkOp op, Func&& bodyBuilder) {
+    BufBuilder b;
+    b.skip(sizeof(MSGHEADER::Layout));
+
+    bodyBuilder(b);
+
+    const int size = b.len();
+    auto out = Message(b.release());
+    out.header().setOperation(op);
+    out.header().setLen(size);
+    return out;
+}
+}
+
+Message makeInsertMessage(StringData ns, const BSONObj* objs, size_t count, int flags) {
+    return makeMessage(dbInsert, [&](BufBuilder& b) {
+        int reservedFlags = 0;
+        if (flags & InsertOption_ContinueOnError)
+            reservedFlags |= InsertOption_ContinueOnError;
+
+        b.appendNum(reservedFlags);
+        b.appendStr(ns);
+
+        for (size_t i = 0; i < count; i++) {
+            objs[i].appendSelfToBufBuilder(b);
+        }
+    });
+}
+
+Message makeUpdateMessage(StringData ns, BSONObj query, BSONObj update, int flags) {
+    return makeMessage(dbUpdate, [&](BufBuilder& b) {
+        const int reservedFlags = 0;
+        b.appendNum(reservedFlags);
+        b.appendStr(ns);
+        b.appendNum(flags);
+
+        query.appendSelfToBufBuilder(b);
+        update.appendSelfToBufBuilder(b);
+    });
+}
+
+Message makeRemoveMessage(StringData ns, BSONObj query, int flags) {
+    return makeMessage(dbDelete, [&](BufBuilder& b) {
+        const int reservedFlags = 0;
+        b.appendNum(reservedFlags);
+        b.appendStr(ns);
+        b.appendNum(flags);
+
+        query.appendSelfToBufBuilder(b);
+    });
+}
+
+Message makeKillCursorsMessage(long long cursorId) {
+    return makeMessage(dbKillCursors, [&](BufBuilder& b) {
+        b.appendNum((int)0);  // reserved
+        b.appendNum((int)1);  // number
+        b.appendNum(cursorId);
+    });
+}
+
+Message makeGetMoreMessage(StringData ns, long long cursorId, int nToReturn, int flags) {
+    return makeMessage(dbGetMore, [&](BufBuilder& b) {
+        b.appendNum(flags);
+        b.appendStr(ns);
+        b.appendNum(nToReturn);
+        b.appendNum(cursorId);
+    });
+}
+
 OpQueryReplyBuilder::OpQueryReplyBuilder() : _buffer(32768) {
     _buffer.skip(sizeof(QueryResult::Value));
 }

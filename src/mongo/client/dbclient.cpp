@@ -31,6 +31,8 @@
 
 #include "mongo/platform/basic.h"
 
+#include "mongo/client/dbclientinterface.h"
+
 #include <algorithm>
 #include <utility>
 
@@ -40,7 +42,6 @@
 #include "mongo/client/authenticate.h"
 #include "mongo/client/constants.h"
 #include "mongo/client/dbclientcursor.h"
-#include "mongo/client/dbclientinterface.h"
 #include "mongo/client/replica_set_monitor.h"
 #include "mongo/config.h"
 #include "mongo/db/auth/internal_user_auth.h"
@@ -1062,55 +1063,19 @@ unsigned long long DBClientConnection::query(stdx::function<void(DBClientCursorB
 }
 
 void DBClientBase::insert(const string& ns, BSONObj obj, int flags) {
-    BufBuilder b;
-
-    int reservedFlags = 0;
-    if (flags & InsertOption_ContinueOnError)
-        reservedFlags |= Reserved_InsertOption_ContinueOnError;
-
-    b.appendNum(reservedFlags);
-    b.appendStr(ns);
-    obj.appendSelfToBufBuilder(b);
-
-    Message toSend;
-    toSend.setData(dbInsert, b.buf(), b.len());
-
-    say(toSend);
+    auto msg = makeInsertMessage(ns, obj, flags);
+    say(msg);
 }
 
 // TODO: Merge with other insert implementation?
 void DBClientBase::insert(const string& ns, const vector<BSONObj>& v, int flags) {
-    BufBuilder b;
-
-    int reservedFlags = 0;
-    if (flags & InsertOption_ContinueOnError)
-        reservedFlags |= Reserved_InsertOption_ContinueOnError;
-
-    b.appendNum(reservedFlags);
-    b.appendStr(ns);
-    for (vector<BSONObj>::const_iterator i = v.begin(); i != v.end(); ++i)
-        i->appendSelfToBufBuilder(b);
-
-    Message toSend;
-    toSend.setData(dbInsert, b.buf(), b.len());
-
-    say(toSend);
+    auto msg = makeInsertMessage(ns, v.data(), v.size(), flags);
+    say(msg);
 }
 
 void DBClientBase::remove(const string& ns, Query obj, int flags) {
-    BufBuilder b;
-
-    const int reservedFlags = 0;
-    b.appendNum(reservedFlags);
-    b.appendStr(ns);
-    b.appendNum(flags);
-
-    obj.obj.appendSelfToBufBuilder(b);
-
-    Message toSend;
-    toSend.setData(dbDelete, b.buf(), b.len());
-
-    say(toSend);
+    auto msg = makeRemoveMessage(ns, obj.obj, flags);
+    say(msg);
 }
 
 void DBClientBase::update(const string& ns, Query query, BSONObj obj, bool upsert, bool multi) {
@@ -1123,31 +1088,13 @@ void DBClientBase::update(const string& ns, Query query, BSONObj obj, bool upser
 }
 
 void DBClientBase::update(const string& ns, Query query, BSONObj obj, int flags) {
-    BufBuilder b;
-
-    const int reservedFlags = 0;
-    b.appendNum(reservedFlags);
-    b.appendStr(ns);
-    b.appendNum(flags);
-
-    query.obj.appendSelfToBufBuilder(b);
-    obj.appendSelfToBufBuilder(b);
-
-    Message toSend;
-    toSend.setData(dbUpdate, b.buf(), b.len());
-
-    say(toSend);
+    auto msg = makeUpdateMessage(ns, query.obj, obj, flags);
+    say(msg);
 }
 
 void DBClientBase::killCursor(long long cursorId) {
-    StackBufBuilder b;
-    b.appendNum((int)0);  // reserved
-    b.appendNum((int)1);  // number
-    b.appendNum(cursorId);
-
-    Message m;
-    m.setData(dbKillCursors, b.buf(), b.len());
-    say(m);
+    auto msg = makeKillCursorsMessage(cursorId);
+    say(msg);
 }
 
 list<BSONObj> DBClientWithCommands::getIndexSpecs(const string& ns, int options) {

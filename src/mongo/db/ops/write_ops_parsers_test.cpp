@@ -28,9 +28,10 @@
 
 #include "mongo/platform/basic.h"
 
-#include "mongo/client/dbclientinterface.h"
 #include "mongo/db/catalog/document_validation.h"
+#include "mongo/db/dbmessage.h"
 #include "mongo/db/ops/write_ops.h"
+#include "mongo/db/ops/write_ops_parsers.h"
 #include "mongo/db/ops/write_ops_parsers_test_helpers.h"
 #include "mongo/unittest/unittest.h"
 
@@ -316,59 +317,13 @@ TEST(CommandWriteOpsParsers, RemoveErrorsWithBadLimit) {
     }
 }
 
-namespace {
-/**
- * A mock DBClient that just captures the Message that is sent for legacy writes.
- */
-class MyMockDBClient final : public DBClientBase {
-public:
-    Message message;  // The last message sent.
-
-    void say(Message& toSend, bool isRetry = false, std::string* actualServer = nullptr) {
-        message = std::move(toSend);
-    }
-
-    // The rest of these are just filling out the pure-virtual parts of the interface.
-    bool lazySupported() const {
-        return false;
-    }
-    std::string getServerAddress() const {
-        return "";
-    }
-    std::string toString() const {
-        return "";
-    }
-    bool call(Message& toSend, Message& response, bool assertOk, std::string* actualServer) {
-        invariant(!"call() not implemented");
-    }
-    virtual int getMinWireVersion() {
-        return 0;
-    }
-    virtual int getMaxWireVersion() {
-        return 0;
-    }
-    virtual bool isFailed() const {
-        return false;
-    }
-    virtual bool isStillConnected() {
-        return true;
-    }
-    virtual double getSoTimeout() const {
-        return 0;
-    }
-    virtual ConnectionString::ConnectionType type() const {
-        return ConnectionString::MASTER;
-    }
-};
-}  // namespace
-
 TEST(LegacyWriteOpsParsers, SingleInsert) {
     const std::string ns = "test.foo";
     const BSONObj obj = BSON("x" << 1);
     for (bool continueOnError : {false, true}) {
-        MyMockDBClient client;
-        client.insert(ns, obj, continueOnError ? InsertOption_ContinueOnError : 0);
-        const auto op = InsertOp::parseLegacy(client.message);
+        auto message =
+            makeInsertMessage(ns, obj, continueOnError ? InsertOption_ContinueOnError : 0);
+        const auto op = InsertOp::parseLegacy(message);
         ASSERT_EQ(op.getNamespace().ns(), ns);
         ASSERT(!op.getWriteCommandBase().getBypassDocumentValidation());
         ASSERT_EQ(!op.getWriteCommandBase().getOrdered(), continueOnError);
@@ -380,11 +335,11 @@ TEST(LegacyWriteOpsParsers, SingleInsert) {
 TEST(LegacyWriteOpsParsers, EmptyMultiInsertFails) {
     const std::string ns = "test.foo";
     for (bool continueOnError : {false, true}) {
-        MyMockDBClient client;
-        client.insert(
-            ns, std::vector<BSONObj>{}, continueOnError ? InsertOption_ContinueOnError : 0);
+        auto objs = std::vector<BSONObj>{};
+        auto message = makeInsertMessage(
+            ns, objs.data(), objs.size(), (continueOnError ? InsertOption_ContinueOnError : 0));
         ASSERT_THROWS_CODE(
-            InsertOp::parseLegacy(client.message), UserException, ErrorCodes::InvalidLength);
+            InsertOp::parseLegacy(message), UserException, ErrorCodes::InvalidLength);
     }
 }
 
@@ -393,9 +348,10 @@ TEST(LegacyWriteOpsParsers, RealMultiInsert) {
     const BSONObj obj0 = BSON("x" << 0);
     const BSONObj obj1 = BSON("x" << 1);
     for (bool continueOnError : {false, true}) {
-        MyMockDBClient client;
-        client.insert(ns, {obj0, obj1}, continueOnError ? InsertOption_ContinueOnError : 0);
-        const auto op = InsertOp::parseLegacy(client.message);
+        auto objs = std::vector<BSONObj>{obj0, obj1};
+        auto message = makeInsertMessage(
+            ns, objs.data(), objs.size(), continueOnError ? InsertOption_ContinueOnError : 0);
+        const auto op = InsertOp::parseLegacy(message);
         ASSERT_EQ(op.getNamespace().ns(), ns);
         ASSERT(!op.getWriteCommandBase().getBypassDocumentValidation());
         ASSERT_EQ(!op.getWriteCommandBase().getOrdered(), continueOnError);
@@ -411,9 +367,12 @@ TEST(LegacyWriteOpsParsers, Update) {
     const BSONObj update = BSON("$inc" << BSON("x" << 1));
     for (bool upsert : {false, true}) {
         for (bool multi : {false, true}) {
-            MyMockDBClient client;
-            client.update(ns, query, update, upsert, multi);
-            const auto op = UpdateOp::parseLegacy(client.message);
+            auto message = makeUpdateMessage(ns,
+                                             query,
+                                             update,
+                                             (upsert ? UpdateOption_Upsert : 0) |
+                                                 (multi ? UpdateOption_Multi : 0));
+            const auto op = UpdateOp::parseLegacy(message);
             ASSERT_EQ(op.getNamespace().ns(), ns);
             ASSERT(!op.getWriteCommandBase().getBypassDocumentValidation());
             ASSERT_EQ(op.getWriteCommandBase().getOrdered(), true);
@@ -430,9 +389,8 @@ TEST(LegacyWriteOpsParsers, Remove) {
     const std::string ns = "test.foo";
     const BSONObj query = BSON("x" << 1);
     for (bool multi : {false, true}) {
-        MyMockDBClient client;
-        client.remove(ns, query, multi ? 0 : RemoveOption_JustOne);
-        const auto op = DeleteOp::parseLegacy(client.message);
+        auto message = makeRemoveMessage(ns, query, (multi ? 0 : RemoveOption_JustOne));
+        const auto op = DeleteOp::parseLegacy(message);
         ASSERT_EQ(op.getNamespace().ns(), ns);
         ASSERT(!op.getWriteCommandBase().getBypassDocumentValidation());
         ASSERT_EQ(op.getWriteCommandBase().getOrdered(), true);

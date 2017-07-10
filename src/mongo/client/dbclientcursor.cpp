@@ -110,12 +110,7 @@ void DBClientCursor::_assembleInit(Message& toSend) {
         return;
     }
     // Assemble a legacy getMore request.
-    BufBuilder b;
-    b.appendNum(opts);
-    b.appendStr(ns);
-    b.appendNum(nToReturn);
-    b.appendNum(cursorId);
-    toSend.setData(dbGetMore, b.buf(), b.len());
+    toSend = makeGetMoreMessage(ns, cursorId, nToReturn, opts);
 }
 
 bool DBClientCursor::init() {
@@ -174,14 +169,8 @@ void DBClientCursor::requestMore() {
         nToReturn -= batch.objs.size();
         verify(nToReturn > 0);
     }
-    BufBuilder b;
-    b.appendNum(opts);
-    b.appendStr(ns);
-    b.appendNum(nextBatchSize());
-    b.appendNum(cursorId);
 
-    Message toSend;
-    toSend.setData(dbGetMore, b.buf(), b.len());
+    Message toSend = makeGetMoreMessage(ns, cursorId, nextBatchSize(), opts);
     Message response;
 
     if (_client) {
