@@ -34,8 +34,10 @@
 
     // Enable the failpoint, remove all keys, and restart the config servers with the failpoint
     // still enabled to guarantee there are no keys.
-    assert.commandWorked(st.configRS.getPrimary().adminCommand(
-        {"configureFailPoint": "disableKeyGeneration", "mode": "alwaysOn"}));
+    for (let i = 0; i < st.configRS.nodes.length; i++) {
+        assert.commandWorked(st.configRS.nodes[i].adminCommand(
+            {"configureFailPoint": "disableKeyGeneration", "mode": "alwaysOn"}));
+    }
     let res =
         st.configRS.getPrimary().getDB("admin").system.keys.remove({purpose: "SigningClusterTime"});
     assert(res.nRemoved >= 2);
@@ -62,8 +64,10 @@
     }, [], "expected mongos to not return logical time metadata");
 
     // Disable the failpoint.
-    assert.commandWorked(st.configRS.getPrimary().adminCommand(
-        {"configureFailPoint": "disableKeyGeneration", "mode": "off"}));
+    for (let i = 0; i < st.configRS.nodes.length; i++) {
+        assert.commandWorked(st.configRS.nodes[i].adminCommand(
+            {"configureFailPoint": "disableKeyGeneration", "mode": "off"}));
+    }
 
     // Eventually mongos will discover the new keys, and start signing logical times.
     assert.soonNoExcept(function() {

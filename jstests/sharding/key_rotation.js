@@ -36,8 +36,10 @@
     jsTestLog("Verify manual key rotation.");
 
     // Pause key generation on the config server primary.
-    st.configRS.getPrimary().getDB("admin").runCommand(
-        {configureFailPoint: "disableKeyGeneration", mode: "alwaysOn"});
+    for (let i = 0; i < st.configRS.nodes.length; i++) {
+        st.configRS.nodes[i].adminCommand(
+            {configureFailPoint: "disableKeyGeneration", mode: "alwaysOn"});
+    }
 
     // Delete all existing keys.
     res =
@@ -74,8 +76,10 @@
     }, [], "expected the mongos not to return logical time or operation time");
 
     // Resume key generation.
-    st.configRS.getPrimary().getDB("admin").runCommand(
-        {configureFailPoint: "disableKeyGeneration", mode: "off"});
+    for (let i = 0; i < st.configRS.nodes.length; i++) {
+        st.configRS.getPrimary().adminCommand(
+            {configureFailPoint: "disableKeyGeneration", mode: "off"});
+    }
 
     // Wait for config server primary to create new keys.
     assert.soonNoExcept(function() {
