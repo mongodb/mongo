@@ -29,6 +29,7 @@
 #pragma once
 
 #include "mongo/db/namespace_string.h"
+#include "mongo/stdx/functional.h"
 
 namespace mongo {
 
@@ -47,9 +48,11 @@ public:
      * switch to another thread, and then reacquires all locks.
      *
      * If in a nested context (eg DBDirectClient), does nothing.
+     *
+     * The whileYieldingFn will be executed after unlocking the locks and before re-acquiring them.
      */
     static void yieldAllLocks(OperationContext* opCtx,
-                              RecordFetcher* fetcher,
+                              stdx::function<void()> whileYieldingFn,
                               const NamespaceString& planExecNS);
 };
 

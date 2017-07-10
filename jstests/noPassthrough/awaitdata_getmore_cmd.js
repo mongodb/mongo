@@ -28,8 +28,13 @@
     cmdRes = db.runCommand({find: collName, tailable: true, awaitData: true});
     assert.commandFailed(cmdRes);
 
-    // Create a capped collection with 10 documents.
+    // With a non-existent collection, should succeed but return no data and a closed cursor.
     coll.drop();
+    cmdRes = assert.commandWorked(db.runCommand({find: collName, tailable: true}));
+    assert.eq(cmdRes.cursor.id, NumberLong(0));
+    assert.eq(cmdRes.cursor.firstBatch.length, 0);
+
+    // Create a capped collection with 10 documents.
     assert.commandWorked(db.createCollection(collName, {capped: true, size: 2048}));
     for (var i = 0; i < 10; i++) {
         assert.writeOK(coll.insert({a: i}));
@@ -123,4 +128,47 @@
     }
     assert.gte((new Date()) - now, 2000);
 
+    // Test filtered inserts while writing to a capped collection.
+    // Find with a filter which doesn't match any documents in the collection.
+    cmdRes = assert.commandWorked(db.runCommand(
+        {find: collName, batchSize: 2, filter: {x: 1}, awaitData: true, tailable: true}));
+    assert.gt(cmdRes.cursor.id, NumberLong(0));
+    assert.eq(cmdRes.cursor.ns, coll.getFullName());
+    assert.eq(cmdRes.cursor.firstBatch.length, 0);
+
+    // getMore should time out if we insert a non-matching document.
+    let insertshell = startParallelShell(function() {
+        assert.soon(function() {
+            return db.currentOp({op: "getmore", "command.collection": "await_data"})
+                       .inprog.length == 1;
+        });
+        assert.writeOK(db.await_data.insert({x: 0}));
+    }, mongo.port);
+
+    now = new Date();
+    cmdRes = db.runCommand({getMore: cmdRes.cursor.id, collection: collName, maxTimeMS: 4000});
+    assert.commandWorked(cmdRes);
+    assert.gt(cmdRes.cursor.id, NumberLong(0));
+    assert.eq(cmdRes.cursor.ns, coll.getFullName());
+    assert.eq(cmdRes.cursor.nextBatch.length, 0);
+    assert.gte((new Date()) - now,
+               4000,
+               "Insert not matching filter caused awaitData getMore to return prematurely.");
+    insertshell();
+
+    // getMore should succeed if we insert a non-matching document followed by a matching one.
+    insertshell = startParallelShell(function() {
+        assert.writeOK(db.await_data.insert({x: 0}));
+        assert.writeOK(db.await_data.insert({_id: "match", x: 1}));
+        jsTestLog("Written");
+    }, mongo.port);
+
+    cmdRes =
+        db.runCommand({getMore: cmdRes.cursor.id, collection: collName, maxTimeMS: 5 * 60 * 1000});
+    assert.commandWorked(cmdRes);
+    assert.gt(cmdRes.cursor.id, NumberLong(0));
+    assert.eq(cmdRes.cursor.ns, coll.getFullName());
+    assert.eq(cmdRes.cursor.nextBatch.length, 1);
+    assert.docEq(cmdRes.cursor.nextBatch[0], {_id: "match", x: 1});
+    insertshell();
 })();
