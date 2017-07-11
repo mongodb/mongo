@@ -511,16 +511,21 @@ Status DatabaseImpl::dropCollectionEvenIfSystem(OperationContext* opCtx,
         }
     }
 
-    // Check if drop-pending namespace is too long for the index names in the collection.
     auto dpns = fullns.makeDropPendingNamespace(dropOpTime);
-    auto status =
-        dpns.checkLengthForRename(collection->getIndexCatalog()->getLongestIndexNameLength(opCtx));
-    if (!status.isOK()) {
-        log() << "dropCollection: " << fullns
-              << " - cannot proceed with collection rename for pending-drop: " << status
-              << ". Dropping collection immediately.";
-        fassertStatusOK(40463, _finishDropCollection(opCtx, fullns, collection));
-        return Status::OK();
+
+    // MMAPv1 requires that index namespaces are subject to the same length constraints as indexes
+    // in collections that are not in a drop-pending state. Therefore, we check if the drop-pending
+    // namespace is too long for the index names in the collection.
+    if (opCtx->getServiceContext()->getGlobalStorageEngine()->isMmapV1()) {
+        auto status = dpns.checkLengthForRename(
+            collection->getIndexCatalog()->getLongestIndexNameLength(opCtx));
+        if (!status.isOK()) {
+            log() << "dropCollection: " << fullns
+                  << " - cannot proceed with collection rename for pending-drop: " << status
+                  << ". Dropping collection immediately.";
+            fassertStatusOK(40463, _finishDropCollection(opCtx, fullns, collection));
+            return Status::OK();
+        }
     }
 
     // Rename collection using drop-pending namespace generated from drop optime.

@@ -590,12 +590,17 @@ Status IndexCatalogImpl::_isSpecOk(OperationContext* opCtx, const BSONObj& spec)
     if (name.empty())
         return Status(ErrorCodes::CannotCreateIndex, "index name cannot be empty");
 
-    const std::string indexNamespace = IndexDescriptor::makeIndexNamespace(nss.ns(), name);
-    if (indexNamespace.length() > NamespaceString::MaxNsLen)
-        return Status(ErrorCodes::CannotCreateIndex,
-                      str::stream() << "namespace name generated from index name \""
-                                    << indexNamespace
-                                    << "\" is too long (127 byte max)");
+    // Drop pending collections are internal to the server and will not be exported to another
+    // storage engine. The indexes contained in these collections are not subject to the same
+    // namespace length constraints as the ones in created by users.
+    if (!nss.isDropPendingNamespace()) {
+        auto indexNamespace = IndexDescriptor::makeIndexNamespace(nss.ns(), name);
+        if (indexNamespace.length() > NamespaceString::MaxNsLen)
+            return Status(ErrorCodes::CannotCreateIndex,
+                          str::stream() << "namespace name generated from index name \""
+                                        << indexNamespace
+                                        << "\" is too long (127 byte max)");
+    }
 
     const BSONObj key = spec.getObjectField("key");
     const Status keyStatus = index_key_validate::validateKeyPattern(key, indexVersion);
