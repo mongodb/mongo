@@ -216,9 +216,11 @@ private:
      * collectionVersion after the refresh.
      *
      * Then waits until it has replicated chunk metadata up to at least that collectionVersion.
+     *
+     * Throws on error.
      */
-    Status _forcePrimaryRefreshAndWaitForReplication(OperationContext* opCtx,
-                                                     const NamespaceString& nss);
+    void _forcePrimaryRefreshAndWaitForReplication(OperationContext* opCtx,
+                                                   const NamespaceString& nss);
 
     /**
      * Refreshes chunk metadata from the config server's metadata store, and schedules maintenance

@@ -320,10 +320,7 @@ void ShardServerCatalogCacheLoader::_runSecondaryGetChunksSince(
     const NamespaceString& nss,
     const ChunkVersion& catalogCacheSinceVersion,
     stdx::function<void(OperationContext*, StatusWith<CollectionAndChangedChunks>)> callbackFn) {
-    const auto waitStatus = _forcePrimaryRefreshAndWaitForReplication(opCtx, nss);
-    if (!waitStatus.isOK()) {
-        callbackFn(opCtx, std::move(waitStatus));
-    }
+    _forcePrimaryRefreshAndWaitForReplication(opCtx, nss);
 
     // Read the local metadata.
     auto swCollAndChunks =
@@ -355,38 +352,34 @@ void ShardServerCatalogCacheLoader::_runSecondaryGetChunksSince(
  *    We do not deal with this at all. We report that we are "up to date" even if we are at an
  *    earlier incarnation of the unsharded collection.
  */
-Status ShardServerCatalogCacheLoader::_forcePrimaryRefreshAndWaitForReplication(
+void ShardServerCatalogCacheLoader::_forcePrimaryRefreshAndWaitForReplication(
     OperationContext* opCtx, const NamespaceString& nss) {
-    try {
-        // Start listening for metadata updates before obtaining the primary's version, in case we
-        // replicate an epoch change past the primary's version before reading locally.
-        boost::optional<NamespaceMetadataChangeNotifications::ScopedNotification> notif(
-            _namespaceNotifications.createNotification(nss));
+    // Start listening for metadata updates before obtaining the primary's version, in case we
+    // replicate an epoch change past the primary's version before reading locally.
+    boost::optional<NamespaceMetadataChangeNotifications::ScopedNotification> notif(
+        _namespaceNotifications.createNotification(nss));
 
-        auto primaryVersion = forcePrimaryToRefresh(opCtx, nss);
-        bool waitedForUpdate = false;
-        while (true) {
-            auto secondaryVersion = getLocalVersion(opCtx, nss);
+    auto primaryVersion = forcePrimaryToRefresh(opCtx, nss);
 
-            if (secondaryVersion.hasEqualEpoch(primaryVersion) &&
-                secondaryVersion >= primaryVersion) {
-                return Status::OK();
-            }
+    bool waitedForUpdate = false;
+    while (true) {
+        auto secondaryVersion = getLocalVersion(opCtx, nss);
 
-            if (waitedForUpdate) {
-                // If we still aren't in the primary's epoch, throw.
-                uassert(ErrorCodes::ConflictingOperationInProgress,
-                        "The collection has recently been dropped and recreated",
-                        secondaryVersion.epoch() == primaryVersion.epoch());
-            }
-
-            // Wait for a chunk metadata update (either ChunkVersion increment or epoch change).
-            notif->get(opCtx);
-            notif.emplace(_namespaceNotifications.createNotification(nss));
-            waitedForUpdate = true;
+        if (secondaryVersion.hasEqualEpoch(primaryVersion) && secondaryVersion >= primaryVersion) {
+            return;
         }
-    } catch (const DBException& ex) {
-        return ex.toStatus();
+
+        if (waitedForUpdate) {
+            // If we still aren't in the primary's epoch, throw.
+            uassert(ErrorCodes::ConflictingOperationInProgress,
+                    "The collection has recently been dropped and recreated",
+                    secondaryVersion.epoch() == primaryVersion.epoch());
+        }
+
+        // Wait for a chunk metadata update (either ChunkVersion increment or epoch change).
+        notif->get(opCtx);
+        notif.emplace(_namespaceNotifications.createNotification(nss));
+        waitedForUpdate = true;
     }
 }
 
