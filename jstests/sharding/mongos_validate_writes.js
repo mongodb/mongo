@@ -69,7 +69,7 @@
     coll.ensureIndex({e: 1});
     // Deletes need to be across two shards to trigger an error - this is probably an exceptional
     // case
-    assert.commandWorked(admin.runCommand({movePrimary: coll.getDB() + "", to: "shard0000"}));
+    st.ensurePrimaryShard(coll.getDB().getName(), 'shard0000');
     assert.commandWorked(admin.runCommand({shardCollection: coll + "", key: {e: 1}}));
     assert.commandWorked(admin.runCommand({split: coll + "", middle: {e: 0}}));
     assert.commandWorked(admin.runCommand({moveChunk: coll + "", find: {e: 0}, to: "shard0001"}));
