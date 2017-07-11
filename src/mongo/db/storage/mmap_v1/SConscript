@@ -16,6 +16,13 @@ env.Library(
 )
 
 env.Library(
+    target='mmap_v1_options',
+    source=[
+        'mmap_v1_options.cpp',
+    ],
+)
+
+env.Library(
     target = 'storage_mmapv1',
     source = [ "aligned_builder.cpp",
                "catalog/hashtab.cpp",
@@ -52,6 +59,7 @@ env.Library(
         'logfile',
         'compress',
         'paths',
+        'mmap_v1_options',
         '$BUILD_DIR/mongo/db/catalog/collection_options',
         '$BUILD_DIR/mongo/db/catalog/database',
         '$BUILD_DIR/mongo/db/catalog/database_holder',

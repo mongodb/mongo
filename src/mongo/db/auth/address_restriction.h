@@ -75,36 +75,10 @@ public:
     /**
      * Construct an AddressRestriction based on several human readable subnet specs
      */
-    explicit AddressRestriction(const std::vector<StringData>& ranges) {
+    explicit AddressRestriction(const std::vector<std::string>& ranges) {
         for (auto const& range : ranges) {
             _ranges.emplace_back(range);
         }
-    }
-
-    /**
-     * If the given BSONElement represents a valid CIDR range,
-     * constructs and returns the AddressRestriction.
-     * Otherwise returns an error.
-     */
-    static StatusWith<AddressRestriction<T>> parse(BSONElement from) noexcept {
-        auto cidr = CIDR::parse(from);
-        if (cidr.isOK()) {
-            return AddressRestriction<T>(std::move(cidr.getValue()));
-        }
-        return cidr.getStatus();
-    }
-
-    /**
-     * If the given string represents a valid CIDR range,
-     * constructs and returns the AddressRestriction.
-     * Otherwise returns an error.
-     */
-    static StatusWith<AddressRestriction<T>> parse(StringData from) noexcept {
-        auto cidr = CIDR::parse(from);
-        if (cidr.isOK()) {
-            return AddressRestriction<T>(std::move(cidr.getValue()));
-        }
-        return cidr.getStatus();
     }
 
     /**

@@ -28,6 +28,8 @@
 
 #pragma once
 
+#include <boost/optional.hpp>
+
 #include "mongo/base/status.h"
 #include "mongo/db/repl/repl_settings.h"
 #include "mongo/db/server_options.h"
@@ -45,9 +47,9 @@ class Environment;
 namespace moe = mongo::optionenvironment;
 
 struct MongodGlobalParams {
-    bool scriptingEnabled;  // --noscripting
+    bool scriptingEnabled = true;  // --noscripting
 
-    MongodGlobalParams() : scriptingEnabled(true) {}
+    boost::optional<std::vector<std::string>> whitelistedClusterNetwork;
 };
 
 extern MongodGlobalParams mongodGlobalParams;

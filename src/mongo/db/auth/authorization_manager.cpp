@@ -43,6 +43,7 @@
 #include "mongo/bson/util/bson_extract.h"
 #include "mongo/crypto/mechanism_scram.h"
 #include "mongo/db/auth/action_set.h"
+#include "mongo/db/auth/address_restriction.h"
 #include "mongo/db/auth/authorization_session.h"
 #include "mongo/db/auth/authz_manager_external_state.h"
 #include "mongo/db/auth/privilege.h"
@@ -53,6 +54,7 @@
 #include "mongo/db/auth/user_name.h"
 #include "mongo/db/auth/user_name_hash.h"
 #include "mongo/db/jsobj.h"
+#include "mongo/db/mongod_options.h"
 #include "mongo/platform/compiler.h"
 #include "mongo/platform/unordered_map.h"
 #include "mongo/stdx/memory.h"
@@ -63,14 +65,17 @@
 
 namespace mongo {
 
+using std::begin;
+using std::end;
 using std::endl;
+using std::back_inserter;
 using std::string;
 using std::vector;
 
 AuthInfo internalSecurity;
 
-MONGO_INITIALIZER_WITH_PREREQUISITES(SetupInternalSecurityUser, MONGO_NO_PREREQUISITES)
-(InitializerContext* context) {
+MONGO_INITIALIZER_WITH_PREREQUISITES(SetupInternalSecurityUser, ("EndStartupOptionStorage"))
+(InitializerContext* const context) try {
     User* user = new User(UserName("__system", "local"));
 
     user->incrementRefCount();  // Pin this user so the ref count never drops below 1.
@@ -79,9 +84,26 @@ MONGO_INITIALIZER_WITH_PREREQUISITES(SetupInternalSecurityUser, MONGO_NO_PREREQU
     PrivilegeVector privileges;
     RoleGraph::generateUniversalPrivileges(&privileges);
     user->addPrivileges(privileges);
+
+    if (mongodGlobalParams.whitelistedClusterNetwork) {
+        const auto& whitelist = *mongodGlobalParams.whitelistedClusterNetwork;
+
+        auto restriction = stdx::make_unique<ClientSourceRestriction>(whitelist);
+        auto restrictionSet = stdx::make_unique<RestrictionSet<>>(std::move(restriction));
+        auto restrictionDocument =
+            stdx::make_unique<RestrictionDocument<>>(std::move(restrictionSet));
+
+        RestrictionDocuments clusterWhiteList(std::move(restrictionDocument));
+
+        user->setRestrictions(std::move(clusterWhiteList));
+    }
+
+
     internalSecurity.user = user;
 
     return Status::OK();
+} catch (...) {
+    return exceptionToStatus();
 }
 
 const std::string AuthorizationManager::USER_NAME_FIELD_NAME = "user";
@@ -581,7 +603,7 @@ Status AuthorizationManager::_fetchUserV2(OperationContext* opCtx,
 
     // Put the new user into an unique_ptr temporarily in case there's an error while
     // initializing the user.
-    std::unique_ptr<User> user(new User(userName));
+    auto user = stdx::make_unique<User>(userName);
 
     status = _initializeUserFromPrivilegeDocument(user.get(), userObj);
     if (!status.isOK()) {

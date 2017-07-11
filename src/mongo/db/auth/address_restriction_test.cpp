@@ -71,7 +71,7 @@ TEST(AddressRestrictionTest, toAndFromStringSingle) {
 
 TEST(AddressRestrictionTest, toAndFromStringVector) {
     const struct {
-        std::vector<StringData> input;
+        std::vector<std::string> input;
         std::string output;
     } tests[] = {
         {{"127.0.0.1", "169.254.0.0/16", "::1"},
@@ -101,7 +101,7 @@ TEST(AddressRestrictionTest, toAndFromStringVector) {
 TEST(AddressRestrictionTest, contains) {
     enableIPv6(true);
     const struct {
-        std::vector<StringData> range;
+        std::vector<std::string> range;
         std::string address;
         bool valid;
     } contains[] = {

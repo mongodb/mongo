@@ -54,6 +54,11 @@ public:
         noexcept(Sequence<Pointer<T>>(std::move(std::declval<Sequence<Pointer<T>>>()))))
         : _restrictions(std::move(restrictions)) {}
 
+    template <typename U>
+    explicit RestrictionSetAny(std::unique_ptr<U> restriction) {
+        _restrictions.push_back(std::move(restriction));
+    }
+
     Status validate(const RestrictionEnvironment& environment) const final {
         if (_restrictions.empty()) {
             return Status::OK();
@@ -96,6 +101,17 @@ public:
     RestrictionSetAll() = default;
     explicit RestrictionSetAll(Sequence<Pointer<T>> restrictions)
         : _restrictions(std::move(restrictions)) {}
+
+    template <typename U>
+    explicit RestrictionSetAll(std::unique_ptr<U> restriction) {
+        _restrictions.push_back(std::move(restriction));
+    }
+
+    template <typename R>
+    explicit RestrictionSetAll(const R& restriction) {
+        static_assert(std::is_base_of<Restriction, R>::value, "Must pass a Restriction type.");
+        _restrictions.push_back(stdx::make_unique<R>(restriction));
+    }
 
     Status validate(const RestrictionEnvironment& environment) const final {
         for (const Pointer<T>& restriction : _restrictions) {

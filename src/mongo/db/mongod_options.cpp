@@ -50,6 +50,7 @@
 #include "mongo/util/mongoutils/str.h"
 #include "mongo/util/net/ssl_options.h"
 #include "mongo/util/options_parser/startup_options.h"
+#include "mongo/util/stringutils.h"
 #include "mongo/util/version.h"
 
 namespace mongo {
@@ -98,6 +99,15 @@ Status addMongodOptions(moe::OptionSection* options) {
     general_options.addOptionChaining("auth", "auth", moe::Switch, "run with security")
         .setSources(moe::SourceAllLegacy)
         .incompatibleWith("noauth");
+
+    // IP Whitelisting Options
+    general_options
+        .addOptionChaining("security.clusterIpSourceWhitelist",
+                           "clusterIpSourceWhitelist",
+                           moe::StringVector,
+                           "Network CIDR specification of permitted origin for `__system` access.")
+        .composing();
+
 
     // Way to enable or disable auth in JSON Config
     general_options
@@ -1046,6 +1056,19 @@ Status storeMongodOptions(const moe::Environment& params) {
     if (params.count("security.javascriptEnabled")) {
         mongodGlobalParams.scriptingEnabled = params["security.javascriptEnabled"].as<bool>();
     }
+
+    if (params.count("security.clusterIpSourceWhitelist")) {
+        mongodGlobalParams.whitelistedClusterNetwork = std::vector<std::string>();
+        for (const std::string& whitelistEntry :
+             params["security.clusterIpSourceWhitelist"].as<std::vector<std::string>>()) {
+            std::vector<std::string> intermediates;
+            splitStringDelim(whitelistEntry, &intermediates, ',');
+            std::copy(intermediates.begin(),
+                      intermediates.end(),
+                      std::back_inserter(*mongodGlobalParams.whitelistedClusterNetwork));
+        }
+    }
+
     if (params.count("storage.mmapv1.preallocDataFiles")) {
         mmapv1GlobalOptions.prealloc = params["storage.mmapv1.preallocDataFiles"].as<bool>();
         cout << "note: noprealloc may hurt performance in many applications" << endl;
