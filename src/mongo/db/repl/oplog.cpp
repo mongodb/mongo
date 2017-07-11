@@ -245,6 +245,35 @@ Collection* getLocalOplogCollection(OperationContext* opCtx,
     return _localOplogCollection;
 }
 
+/**
+ * Attaches the session information of a write to an oplog entry if it exists.
+ */
+void appendSessionInfo(OperationContext* opCtx, BSONObjBuilder* builder, StmtId statementId) {
+    auto txnNum = opCtx->getTxnNumber();
+
+    if (!txnNum) {
+        return;
+    }
+
+    auto logicalSessionId = opCtx->getLogicalSessionId();
+    invariant(logicalSessionId);
+
+    // Note: certain operations, like implicit collection creation will not have a stmtId.
+    if (statementId == kUninitializedStmtId) {
+        return;
+    }
+
+    Logical_session_id lsid;
+    lsid.setId(logicalSessionId->getId());
+
+    OperationSessionInfo sessionInfo;
+    sessionInfo.setSessionId(lsid);
+    sessionInfo.setTxnNumber(txnNum);
+    sessionInfo.serialize(builder);
+
+    builder->append(OplogEntryBase::kStatementIdFieldName, statementId);
+}
+
 OplogDocWriter _logOpWriter(OperationContext* opCtx,
                             const char* opstr,
                             const NamespaceString& nss,
@@ -280,9 +309,7 @@ OplogDocWriter _logOpWriter(OperationContext* opCtx,
         b.appendDate("wall", wallTime);
     }
 
-    if (statementId != kUninitializedStmtId) {
-        // TODO: SERVER-28912 append stmtId to oplog entry
-    }
+    appendSessionInfo(opCtx, &b, statementId);
 
     return OplogDocWriter(OplogDocWriter(b.obj(), obj));
 }

@@ -53,6 +53,7 @@
 #include "mongo/db/ops/update_lifecycle_impl.h"
 #include "mongo/db/ops/update_request.h"
 #include "mongo/db/ops/write_ops_exec.h"
+#include "mongo/db/ops/write_ops_gen.h"
 #include "mongo/db/query/get_executor.h"
 #include "mongo/db/query/plan_summary_stats.h"
 #include "mongo/db/query/query_knobs.h"
@@ -437,6 +438,7 @@ WriteResult performInserts(OperationContext* opCtx, const write_ops::Insert& who
     WriteResult out;
     out.results.reserve(wholeOp.getDocuments().size());
 
+    size_t stmtIdIndex = 0;
     size_t bytesInBatch = 0;
     std::vector<InsertStatement> batch;
     const size_t maxBatchSize = internalInsertMaxBatchSize.load();
@@ -450,9 +452,11 @@ WriteResult performInserts(OperationContext* opCtx, const write_ops::Insert& who
             // correct order. In an ordered insert, if one of the docs ahead of us fails, we should
             // behave as-if we never got to this document.
         } else {
-            // TODO: SERVER-28912 get StmtId from request
-            batch.emplace_back(fixedDoc.getValue().isEmpty() ? doc
-                                                             : std::move(fixedDoc.getValue()));
+            const StmtId stmtId = opCtx->getTxnNumber()
+                ? write_ops::getStmtIdForWriteAt(wholeOp, stmtIdIndex++)
+                : kUninitializedStmtId;
+            BSONObj toInsert = fixedDoc.getValue().isEmpty() ? doc : std::move(fixedDoc.getValue());
+            batch.emplace_back(stmtId, toInsert);
             bytesInBatch += batch.back().doc.objsize();
             if (!isLastDoc && batch.size() < maxBatchSize && bytesInBatch < insertVectorMaxBytes)
                 continue;  // Add more to batch before inserting.

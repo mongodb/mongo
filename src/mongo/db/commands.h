@@ -477,6 +477,8 @@ public:
             arg == "shardVersion" ||        //
             arg == "tracking_info" ||       //
             arg == "writeConcern" ||        //
+            arg == "lsid" ||                //
+            arg == "txnNumber" ||           //
             false;  // These comments tell clang-format to keep this line-oriented.
     }
 
