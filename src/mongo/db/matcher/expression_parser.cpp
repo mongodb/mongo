@@ -34,6 +34,7 @@
 #include "mongo/bson/bsonobj.h"
 #include "mongo/bson/bsonobjbuilder.h"
 #include "mongo/db/matcher/expression_array.h"
+#include "mongo/db/matcher/expression_geo.h"
 #include "mongo/db/matcher/expression_leaf.h"
 #include "mongo/db/matcher/expression_tree.h"
 #include "mongo/db/matcher/schema/expression_internal_schema_max_items.h"
@@ -264,7 +265,7 @@ StatusWithMatchExpression MatchExpressionParser::_parseSubField(const BSONObj& c
 
         case BSONObj::opWITHIN:
         case BSONObj::opGEO_INTERSECTS:
-            return expressionParserGeoCallback(name, x, context);
+            return _parseGeo(name, x, context);
 
         case BSONObj::opNEAR:
             return {Status(ErrorCodes::BadValue,
@@ -496,8 +497,7 @@ Status MatchExpressionParser::_parseSub(const char* name,
             if (mongoutils::str::equals(fieldName, "$near") ||
                 mongoutils::str::equals(fieldName, "$nearSphere") ||
                 mongoutils::str::equals(fieldName, "$geoNear")) {
-                StatusWithMatchExpression s =
-                    expressionParserGeoCallback(name, firstElt.getGtLtOp(), sub);
+                StatusWithMatchExpression s = _parseGeo(name, firstElt.getGtLtOp(), sub);
                 if (s.isOK()) {
                     root->add(s.getValue().release());
                 }
@@ -1017,15 +1017,6 @@ StatusWith<std::vector<uint32_t>> MatchExpressionParser::_parseBitPositionsArray
     return bitPositions;
 }
 
-// Geo
-StatusWithMatchExpression expressionParserGeoCallbackDefault(const char* name,
-                                                             int type,
-                                                             const BSONObj& section) {
-    return {Status(ErrorCodes::BadValue, "geo not linked in")};
-}
-
-MatchExpressionParserGeoCallback expressionParserGeoCallback = expressionParserGeoCallbackDefault;
-
 StatusWith<long long> MatchExpressionParser::parseIntegerElementToNonNegativeLong(
     BSONElement elem) {
     auto number = parseIntegerElementToLong(elem);
@@ -1102,5 +1093,36 @@ StatusWithMatchExpression MatchExpressionParser::_parseInternalSchemaSingleInteg
     }
 
     return {std::move(matchExpression)};
+}
+
+StatusWithMatchExpression MatchExpressionParser::_parseGeo(const char* name,
+                                                           int type,
+                                                           const BSONObj& section) {
+    if (BSONObj::opWITHIN == type || BSONObj::opGEO_INTERSECTS == type) {
+        std::unique_ptr<GeoExpression> gq = stdx::make_unique<GeoExpression>(name);
+        Status parseStatus = gq->parseFrom(section);
+
+        if (!parseStatus.isOK())
+            return StatusWithMatchExpression(parseStatus);
+
+        std::unique_ptr<GeoMatchExpression> e = stdx::make_unique<GeoMatchExpression>();
+
+        Status s = e->init(name, gq.release(), section);
+        if (!s.isOK())
+            return StatusWithMatchExpression(s);
+        return {std::move(e)};
+    } else {
+        invariant(BSONObj::opNEAR == type);
+        std::unique_ptr<GeoNearExpression> nq = stdx::make_unique<GeoNearExpression>(name);
+        Status s = nq->parseFrom(section);
+        if (!s.isOK()) {
+            return StatusWithMatchExpression(s);
+        }
+        std::unique_ptr<GeoNearMatchExpression> e = stdx::make_unique<GeoNearMatchExpression>();
+        s = e->init(name, nq.release(), section);
+        if (!s.isOK())
+            return StatusWithMatchExpression(s);
+        return {std::move(e)};
+    }
 }
 }  // namespace mongo

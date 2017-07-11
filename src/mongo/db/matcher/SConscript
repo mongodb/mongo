@@ -31,6 +31,7 @@ env.Library(
     source=[
         'expression.cpp',
         'expression_array.cpp',
+        'expression_geo.cpp',
         'expression_leaf.cpp',
         'expression_parser.cpp',
         'expression_parser_tree.cpp',
@@ -57,6 +58,8 @@ env.Library(
         '$BUILD_DIR/mongo/bson/util/bson_extract',
         '$BUILD_DIR/mongo/db/common',
         '$BUILD_DIR/mongo/db/fts/fts_query_noop',
+        '$BUILD_DIR/mongo/db/geo/geometry',
+        '$BUILD_DIR/mongo/db/geo/geoparser',
         '$BUILD_DIR/mongo/db/query/collation/collator_interface',
         '$BUILD_DIR/third_party/shim_pcrecpp',
         'path',
@@ -67,7 +70,9 @@ env.CppUnitTest(
     target='expression_test',
     source=[
         'expression_array_test.cpp',
+        'expression_geo_test.cpp',
         'expression_leaf_test.cpp',
+        'expression_parser_geo_test.cpp',
         'expression_test.cpp',
         'expression_tree_test.cpp',
         'schema/expression_internal_schema_max_items_test.cpp',
@@ -122,30 +127,6 @@ env.CppUnitTest(
 )
 
 env.Library(
-    target='expressions_geo',
-    source=[
-        'expression_geo.cpp',
-        'expression_parser_geo.cpp',
-    ],
-    LIBDEPS=[
-        '$BUILD_DIR/mongo/db/geo/geometry',
-        '$BUILD_DIR/mongo/db/geo/geoparser',
-        'expressions',
-    ],
-)
-
-env.CppUnitTest(
-    target='expression_geo_test',
-    source=[
-        'expression_geo_test.cpp',
-        'expression_parser_geo_test.cpp',
-    ],
-    LIBDEPS=[
-        'expressions_geo',
-    ],
-)
-
-env.Library(
     target='expressions_mongod_only',
     source=[
         'extensions_callback_real.cpp',
@@ -172,6 +153,5 @@ env.CppUnitTest(
     ],
     LIBDEPS=[
         'expressions',
-        'expressions_geo',
     ],
 )

@@ -167,6 +167,8 @@ private:
 
     StatusWithMatchExpression _parseType(const char* name, const BSONElement& elt);
 
+    StatusWithMatchExpression _parseGeo(const char* name, int type, const BSONObj& section);
+
     // arrays
 
     StatusWithMatchExpression _parseElemMatch(const char* name,
@@ -214,9 +216,4 @@ private:
     // as long as the parser is active.
     const ExtensionsCallback* _extensionsCallback;
 };
-
-typedef stdx::function<StatusWithMatchExpression(
-    const char* name, int type, const BSONObj& section)>
-    MatchExpressionParserGeoCallback;
-extern MatchExpressionParserGeoCallback expressionParserGeoCallback;
-}
+}  // namespace mongo
