@@ -33,7 +33,6 @@
 #include "mongo/bson/mutable/algorithm.h"
 #include "mongo/bson/mutable/mutable_bson_test_utils.h"
 #include "mongo/db/json.h"
-#include "mongo/db/matcher/extensions_callback_noop.h"
 #include "mongo/db/update/update_object_node.h"
 #include "mongo/unittest/death_test.h"
 #include "mongo/unittest/unittest.h"
@@ -49,8 +48,7 @@ TEST(UpdateArrayNodeTest, ApplyCreatePathFails) {
     auto arrayFilter = fromjson("{i: 0}");
     const CollatorInterface* collator = nullptr;
     std::map<StringData, std::unique_ptr<ArrayFilter>> arrayFilters;
-    arrayFilters["i"] =
-        uassertStatusOK(ArrayFilter::parse(arrayFilter, ExtensionsCallbackNoop(), collator));
+    arrayFilters["i"] = uassertStatusOK(ArrayFilter::parse(arrayFilter, collator));
     std::set<std::string> foundIdentifiers;
     UpdateObjectNode root;
     ASSERT_OK(UpdateObjectNode::parseAndMerge(&root,
@@ -95,8 +93,7 @@ TEST(UpdateArrayNodeTest, ApplyToNonArrayFails) {
     auto arrayFilter = fromjson("{i: 0}");
     const CollatorInterface* collator = nullptr;
     std::map<StringData, std::unique_ptr<ArrayFilter>> arrayFilters;
-    arrayFilters["i"] =
-        uassertStatusOK(ArrayFilter::parse(arrayFilter, ExtensionsCallbackNoop(), collator));
+    arrayFilters["i"] = uassertStatusOK(ArrayFilter::parse(arrayFilter, collator));
     std::set<std::string> foundIdentifiers;
     UpdateObjectNode root;
     ASSERT_OK(UpdateObjectNode::parseAndMerge(&root,
@@ -140,8 +137,7 @@ TEST(UpdateArrayNodeTest, UpdateIsAppliedToAllMatchingElements) {
     auto arrayFilter = fromjson("{i: 0}");
     const CollatorInterface* collator = nullptr;
     std::map<StringData, std::unique_ptr<ArrayFilter>> arrayFilters;
-    arrayFilters["i"] =
-        uassertStatusOK(ArrayFilter::parse(arrayFilter, ExtensionsCallbackNoop(), collator));
+    arrayFilters["i"] = uassertStatusOK(ArrayFilter::parse(arrayFilter, collator));
     std::set<std::string> foundIdentifiers;
     UpdateObjectNode root;
     ASSERT_OK(UpdateObjectNode::parseAndMerge(&root,
@@ -189,8 +185,7 @@ DEATH_TEST(UpdateArrayNodeTest,
     auto arrayFilter = fromjson("{'i.c': 0}");
     const CollatorInterface* collator = nullptr;
     std::map<StringData, std::unique_ptr<ArrayFilter>> arrayFilters;
-    arrayFilters["i"] =
-        uassertStatusOK(ArrayFilter::parse(arrayFilter, ExtensionsCallbackNoop(), collator));
+    arrayFilters["i"] = uassertStatusOK(ArrayFilter::parse(arrayFilter, collator));
     std::set<std::string> foundIdentifiers;
     UpdateObjectNode root;
     ASSERT_OK(UpdateObjectNode::parseAndMerge(&root,
@@ -279,12 +274,9 @@ TEST(UpdateArrayNodeTest, ApplyMultipleUpdatesToArrayElement) {
     auto arrayFilterK = fromjson("{'k.d': 0}");
     const CollatorInterface* collator = nullptr;
     std::map<StringData, std::unique_ptr<ArrayFilter>> arrayFilters;
-    arrayFilters["i"] =
-        uassertStatusOK(ArrayFilter::parse(arrayFilterI, ExtensionsCallbackNoop(), collator));
-    arrayFilters["j"] =
-        uassertStatusOK(ArrayFilter::parse(arrayFilterJ, ExtensionsCallbackNoop(), collator));
-    arrayFilters["k"] =
-        uassertStatusOK(ArrayFilter::parse(arrayFilterK, ExtensionsCallbackNoop(), collator));
+    arrayFilters["i"] = uassertStatusOK(ArrayFilter::parse(arrayFilterI, collator));
+    arrayFilters["j"] = uassertStatusOK(ArrayFilter::parse(arrayFilterJ, collator));
+    arrayFilters["k"] = uassertStatusOK(ArrayFilter::parse(arrayFilterK, collator));
     std::set<std::string> foundIdentifiers;
     UpdateObjectNode root;
     ASSERT_OK(UpdateObjectNode::parseAndMerge(&root,
@@ -343,10 +335,8 @@ TEST(UpdateArrayNodeTest, ApplyMultipleUpdatesToArrayElementsUsingMergedChildren
     auto arrayFilterJ = fromjson("{'j.c': 0}");
     const CollatorInterface* collator = nullptr;
     std::map<StringData, std::unique_ptr<ArrayFilter>> arrayFilters;
-    arrayFilters["i"] =
-        uassertStatusOK(ArrayFilter::parse(arrayFilterI, ExtensionsCallbackNoop(), collator));
-    arrayFilters["j"] =
-        uassertStatusOK(ArrayFilter::parse(arrayFilterJ, ExtensionsCallbackNoop(), collator));
+    arrayFilters["i"] = uassertStatusOK(ArrayFilter::parse(arrayFilterI, collator));
+    arrayFilters["j"] = uassertStatusOK(ArrayFilter::parse(arrayFilterJ, collator));
     std::set<std::string> foundIdentifiers;
     UpdateObjectNode root;
     ASSERT_OK(UpdateObjectNode::parseAndMerge(&root,
@@ -400,12 +390,9 @@ TEST(UpdateArrayNodeTest, ApplyMultipleUpdatesToArrayElementsWithoutMergedChildr
     auto arrayFilterK = fromjson("{'k.d': 0}");
     const CollatorInterface* collator = nullptr;
     std::map<StringData, std::unique_ptr<ArrayFilter>> arrayFilters;
-    arrayFilters["i"] =
-        uassertStatusOK(ArrayFilter::parse(arrayFilterI, ExtensionsCallbackNoop(), collator));
-    arrayFilters["j"] =
-        uassertStatusOK(ArrayFilter::parse(arrayFilterJ, ExtensionsCallbackNoop(), collator));
-    arrayFilters["k"] =
-        uassertStatusOK(ArrayFilter::parse(arrayFilterK, ExtensionsCallbackNoop(), collator));
+    arrayFilters["i"] = uassertStatusOK(ArrayFilter::parse(arrayFilterI, collator));
+    arrayFilters["j"] = uassertStatusOK(ArrayFilter::parse(arrayFilterJ, collator));
+    arrayFilters["k"] = uassertStatusOK(ArrayFilter::parse(arrayFilterK, collator));
     std::set<std::string> foundIdentifiers;
     UpdateObjectNode root;
     ASSERT_OK(UpdateObjectNode::parseAndMerge(&root,
@@ -516,14 +503,10 @@ TEST(UpdateArrayNodeTest, ApplyNestedArrayUpdates) {
     auto arrayFilterL = fromjson("{'l.d': 0}");
     const CollatorInterface* collator = nullptr;
     std::map<StringData, std::unique_ptr<ArrayFilter>> arrayFilters;
-    arrayFilters["i"] =
-        uassertStatusOK(ArrayFilter::parse(arrayFilterI, ExtensionsCallbackNoop(), collator));
-    arrayFilters["j"] =
-        uassertStatusOK(ArrayFilter::parse(arrayFilterJ, ExtensionsCallbackNoop(), collator));
-    arrayFilters["k"] =
-        uassertStatusOK(ArrayFilter::parse(arrayFilterK, ExtensionsCallbackNoop(), collator));
-    arrayFilters["l"] =
-        uassertStatusOK(ArrayFilter::parse(arrayFilterL, ExtensionsCallbackNoop(), collator));
+    arrayFilters["i"] = uassertStatusOK(ArrayFilter::parse(arrayFilterI, collator));
+    arrayFilters["j"] = uassertStatusOK(ArrayFilter::parse(arrayFilterJ, collator));
+    arrayFilters["k"] = uassertStatusOK(ArrayFilter::parse(arrayFilterK, collator));
+    arrayFilters["l"] = uassertStatusOK(ArrayFilter::parse(arrayFilterL, collator));
     std::set<std::string> foundIdentifiers;
     UpdateObjectNode root;
     ASSERT_OK(UpdateObjectNode::parseAndMerge(&root,
@@ -576,10 +559,8 @@ TEST(UpdateArrayNodeTest, ApplyUpdatesWithMergeConflictToArrayElementFails) {
     auto arrayFilterJ = fromjson("{'j': 0}");
     const CollatorInterface* collator = nullptr;
     std::map<StringData, std::unique_ptr<ArrayFilter>> arrayFilters;
-    arrayFilters["i"] =
-        uassertStatusOK(ArrayFilter::parse(arrayFilterI, ExtensionsCallbackNoop(), collator));
-    arrayFilters["j"] =
-        uassertStatusOK(ArrayFilter::parse(arrayFilterJ, ExtensionsCallbackNoop(), collator));
+    arrayFilters["i"] = uassertStatusOK(ArrayFilter::parse(arrayFilterI, collator));
+    arrayFilters["j"] = uassertStatusOK(ArrayFilter::parse(arrayFilterJ, collator));
     std::set<std::string> foundIdentifiers;
     UpdateObjectNode root;
     ASSERT_OK(UpdateObjectNode::parseAndMerge(&root,
@@ -630,10 +611,8 @@ TEST(UpdateArrayNodeTest, ApplyUpdatesWithEmptyIdentifiersWithMergeConflictToArr
     auto arrayFilterJ = fromjson("{'j': 0}");
     const CollatorInterface* collator = nullptr;
     std::map<StringData, std::unique_ptr<ArrayFilter>> arrayFilters;
-    arrayFilters["i"] =
-        uassertStatusOK(ArrayFilter::parse(arrayFilterI, ExtensionsCallbackNoop(), collator));
-    arrayFilters["j"] =
-        uassertStatusOK(ArrayFilter::parse(arrayFilterJ, ExtensionsCallbackNoop(), collator));
+    arrayFilters["i"] = uassertStatusOK(ArrayFilter::parse(arrayFilterI, collator));
+    arrayFilters["j"] = uassertStatusOK(ArrayFilter::parse(arrayFilterJ, collator));
     std::set<std::string> foundIdentifiers;
     UpdateObjectNode root;
     ASSERT_OK(UpdateObjectNode::parseAndMerge(&root,
@@ -686,14 +665,10 @@ TEST(UpdateArrayNodeTest, ApplyNestedArrayUpdatesWithMergeConflictFails) {
     auto arrayFilterL = fromjson("{l: 0}");
     const CollatorInterface* collator = nullptr;
     std::map<StringData, std::unique_ptr<ArrayFilter>> arrayFilters;
-    arrayFilters["i"] =
-        uassertStatusOK(ArrayFilter::parse(arrayFilterI, ExtensionsCallbackNoop(), collator));
-    arrayFilters["j"] =
-        uassertStatusOK(ArrayFilter::parse(arrayFilterJ, ExtensionsCallbackNoop(), collator));
-    arrayFilters["k"] =
-        uassertStatusOK(ArrayFilter::parse(arrayFilterK, ExtensionsCallbackNoop(), collator));
-    arrayFilters["l"] =
-        uassertStatusOK(ArrayFilter::parse(arrayFilterL, ExtensionsCallbackNoop(), collator));
+    arrayFilters["i"] = uassertStatusOK(ArrayFilter::parse(arrayFilterI, collator));
+    arrayFilters["j"] = uassertStatusOK(ArrayFilter::parse(arrayFilterJ, collator));
+    arrayFilters["k"] = uassertStatusOK(ArrayFilter::parse(arrayFilterK, collator));
+    arrayFilters["l"] = uassertStatusOK(ArrayFilter::parse(arrayFilterL, collator));
     std::set<std::string> foundIdentifiers;
     UpdateObjectNode root;
     ASSERT_OK(UpdateObjectNode::parseAndMerge(&root,
@@ -743,8 +718,7 @@ TEST(UpdateArrayNodeTest, NoArrayElementsMatch) {
     auto arrayFilter = fromjson("{'i': 0}");
     const CollatorInterface* collator = nullptr;
     std::map<StringData, std::unique_ptr<ArrayFilter>> arrayFilters;
-    arrayFilters["i"] =
-        uassertStatusOK(ArrayFilter::parse(arrayFilter, ExtensionsCallbackNoop(), collator));
+    arrayFilters["i"] = uassertStatusOK(ArrayFilter::parse(arrayFilter, collator));
     std::set<std::string> foundIdentifiers;
     UpdateObjectNode root;
     ASSERT_OK(UpdateObjectNode::parseAndMerge(&root,
@@ -790,8 +764,7 @@ TEST(UpdateArrayNodeTest, UpdatesToAllArrayElementsAreNoops) {
     auto arrayFilter = fromjson("{'i': 0}");
     const CollatorInterface* collator = nullptr;
     std::map<StringData, std::unique_ptr<ArrayFilter>> arrayFilters;
-    arrayFilters["i"] =
-        uassertStatusOK(ArrayFilter::parse(arrayFilter, ExtensionsCallbackNoop(), collator));
+    arrayFilters["i"] = uassertStatusOK(ArrayFilter::parse(arrayFilter, collator));
     std::set<std::string> foundIdentifiers;
     UpdateObjectNode root;
     ASSERT_OK(UpdateObjectNode::parseAndMerge(&root,
@@ -837,8 +810,7 @@ TEST(UpdateArrayNodeTest, NoArrayElementAffectsIndexes) {
     auto arrayFilter = fromjson("{'i.c': 0}");
     const CollatorInterface* collator = nullptr;
     std::map<StringData, std::unique_ptr<ArrayFilter>> arrayFilters;
-    arrayFilters["i"] =
-        uassertStatusOK(ArrayFilter::parse(arrayFilter, ExtensionsCallbackNoop(), collator));
+    arrayFilters["i"] = uassertStatusOK(ArrayFilter::parse(arrayFilter, collator));
     std::set<std::string> foundIdentifiers;
     UpdateObjectNode root;
     ASSERT_OK(UpdateObjectNode::parseAndMerge(&root,
@@ -884,8 +856,7 @@ TEST(UpdateArrayNodeTest, WhenOneElementIsMatchedLogElementUpdateDirectly) {
     auto arrayFilter = fromjson("{'i.c': 0}");
     const CollatorInterface* collator = nullptr;
     std::map<StringData, std::unique_ptr<ArrayFilter>> arrayFilters;
-    arrayFilters["i"] =
-        uassertStatusOK(ArrayFilter::parse(arrayFilter, ExtensionsCallbackNoop(), collator));
+    arrayFilters["i"] = uassertStatusOK(ArrayFilter::parse(arrayFilter, collator));
     std::set<std::string> foundIdentifiers;
     UpdateObjectNode root;
     ASSERT_OK(UpdateObjectNode::parseAndMerge(&root,
@@ -931,8 +902,7 @@ TEST(UpdateArrayNodeTest, WhenOneElementIsModifiedLogElement) {
     auto arrayFilter = fromjson("{'i.c': 0}");
     const CollatorInterface* collator = nullptr;
     std::map<StringData, std::unique_ptr<ArrayFilter>> arrayFilters;
-    arrayFilters["i"] =
-        uassertStatusOK(ArrayFilter::parse(arrayFilter, ExtensionsCallbackNoop(), collator));
+    arrayFilters["i"] = uassertStatusOK(ArrayFilter::parse(arrayFilter, collator));
     std::set<std::string> foundIdentifiers;
     UpdateObjectNode root;
     ASSERT_OK(UpdateObjectNode::parseAndMerge(&root,
@@ -1022,8 +992,7 @@ TEST(UpdateArrayNodeTest, ApplyPositionalInsideArrayUpdate) {
     auto arrayFilter = fromjson("{'i.c': 0}");
     const CollatorInterface* collator = nullptr;
     std::map<StringData, std::unique_ptr<ArrayFilter>> arrayFilters;
-    arrayFilters["i"] =
-        uassertStatusOK(ArrayFilter::parse(arrayFilter, ExtensionsCallbackNoop(), collator));
+    arrayFilters["i"] = uassertStatusOK(ArrayFilter::parse(arrayFilter, collator));
     std::set<std::string> foundIdentifiers;
     UpdateObjectNode root;
     ASSERT_OK(UpdateObjectNode::parseAndMerge(&root,
@@ -1069,8 +1038,7 @@ TEST(UpdateArrayNodeTest, ApplyArrayUpdateFromReplication) {
     auto arrayFilter = fromjson("{'i': 0}");
     const CollatorInterface* collator = nullptr;
     std::map<StringData, std::unique_ptr<ArrayFilter>> arrayFilters;
-    arrayFilters["i"] =
-        uassertStatusOK(ArrayFilter::parse(arrayFilter, ExtensionsCallbackNoop(), collator));
+    arrayFilters["i"] = uassertStatusOK(ArrayFilter::parse(arrayFilter, collator));
     std::set<std::string> foundIdentifiers;
     UpdateObjectNode root;
     ASSERT_OK(UpdateObjectNode::parseAndMerge(&root,
@@ -1116,8 +1084,7 @@ TEST(UpdateArrayNodeTest, ApplyArrayUpdateNotFromReplication) {
     auto arrayFilter = fromjson("{'i': 0}");
     const CollatorInterface* collator = nullptr;
     std::map<StringData, std::unique_ptr<ArrayFilter>> arrayFilters;
-    arrayFilters["i"] =
-        uassertStatusOK(ArrayFilter::parse(arrayFilter, ExtensionsCallbackNoop(), collator));
+    arrayFilters["i"] = uassertStatusOK(ArrayFilter::parse(arrayFilter, collator));
     std::set<std::string> foundIdentifiers;
     UpdateObjectNode root;
     ASSERT_OK(UpdateObjectNode::parseAndMerge(&root,
@@ -1161,8 +1128,7 @@ TEST(UpdateArrayNodeTest, ApplyArrayUpdateWithoutLogBuilderOrIndexData) {
     auto arrayFilter = fromjson("{'i': 0}");
     const CollatorInterface* collator = nullptr;
     std::map<StringData, std::unique_ptr<ArrayFilter>> arrayFilters;
-    arrayFilters["i"] =
-        uassertStatusOK(ArrayFilter::parse(arrayFilter, ExtensionsCallbackNoop(), collator));
+    arrayFilters["i"] = uassertStatusOK(ArrayFilter::parse(arrayFilter, collator));
     std::set<std::string> foundIdentifiers;
     UpdateObjectNode root;
     ASSERT_OK(UpdateObjectNode::parseAndMerge(&root,

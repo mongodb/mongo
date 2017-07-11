@@ -31,7 +31,6 @@
 #include "mongo/db/update/array_filter.h"
 
 #include "mongo/db/json.h"
-#include "mongo/db/matcher/extensions_callback_disallow_extensions.h"
 #include "mongo/db/query/collation/collator_interface_mock.h"
 #include "mongo/unittest/unittest.h"
 
@@ -43,8 +42,7 @@ using unittest::assertGet;
 TEST(ArrayFilterTest, ParseBasic) {
     const CollatorInterface* collator = nullptr;
     auto rawArrayFilter = fromjson("{i: 0}");
-    auto arrayFilter = assertGet(
-        ArrayFilter::parse(rawArrayFilter, ExtensionsCallbackDisallowExtensions(), collator));
+    auto arrayFilter = assertGet(ArrayFilter::parse(rawArrayFilter, collator));
     ASSERT_EQ(arrayFilter->getId(), "i");
     ASSERT_TRUE(arrayFilter->getFilter()->matchesBSON(fromjson("{i: 0}")));
     ASSERT_FALSE(arrayFilter->getFilter()->matchesBSON(fromjson("{i: 1}")));
@@ -53,8 +51,7 @@ TEST(ArrayFilterTest, ParseBasic) {
 TEST(ArrayFilterTest, ParseDottedField) {
     const CollatorInterface* collator = nullptr;
     auto rawArrayFilter = fromjson("{'i.a': 0, 'i.b': 1}");
-    auto arrayFilter = assertGet(
-        ArrayFilter::parse(rawArrayFilter, ExtensionsCallbackDisallowExtensions(), collator));
+    auto arrayFilter = assertGet(ArrayFilter::parse(rawArrayFilter, collator));
     ASSERT_EQ(arrayFilter->getId(), "i");
     ASSERT_TRUE(arrayFilter->getFilter()->matchesBSON(fromjson("{i: {a: 0, b: 1}}")));
     ASSERT_FALSE(arrayFilter->getFilter()->matchesBSON(fromjson("{i: {a: 0, b: 0}}")));
@@ -63,8 +60,7 @@ TEST(ArrayFilterTest, ParseDottedField) {
 TEST(ArrayFilterTest, ParseLogicalQuery) {
     const CollatorInterface* collator = nullptr;
     auto rawArrayFilter = fromjson("{$and: [{i: {$gte: 0}}, {i: {$lte: 0}}]}");
-    auto arrayFilter = assertGet(
-        ArrayFilter::parse(rawArrayFilter, ExtensionsCallbackDisallowExtensions(), collator));
+    auto arrayFilter = assertGet(ArrayFilter::parse(rawArrayFilter, collator));
     ASSERT_EQ(arrayFilter->getId(), "i");
     ASSERT_TRUE(arrayFilter->getFilter()->matchesBSON(fromjson("{i: 0}")));
     ASSERT_FALSE(arrayFilter->getFilter()->matchesBSON(fromjson("{i: 1}")));
@@ -73,8 +69,7 @@ TEST(ArrayFilterTest, ParseLogicalQuery) {
 TEST(ArrayFilterTest, ParseElemMatch) {
     const CollatorInterface* collator = nullptr;
     auto rawArrayFilter = fromjson("{i: {$elemMatch: {a: 0}}}");
-    auto arrayFilter = assertGet(
-        ArrayFilter::parse(rawArrayFilter, ExtensionsCallbackDisallowExtensions(), collator));
+    auto arrayFilter = assertGet(ArrayFilter::parse(rawArrayFilter, collator));
     ASSERT_EQ(arrayFilter->getId(), "i");
     ASSERT_TRUE(arrayFilter->getFilter()->matchesBSON(fromjson("{i: [{a: 0}]}")));
     ASSERT_FALSE(arrayFilter->getFilter()->matchesBSON(fromjson("{i: [{a: 1}]}")));
@@ -83,8 +78,7 @@ TEST(ArrayFilterTest, ParseElemMatch) {
 TEST(ArrayFilterTest, ParseCollation) {
     CollatorInterfaceMock collator(CollatorInterfaceMock::MockType::kAlwaysEqual);
     auto rawArrayFilter = fromjson("{i: 'abc'}");
-    auto arrayFilter = assertGet(
-        ArrayFilter::parse(rawArrayFilter, ExtensionsCallbackDisallowExtensions(), &collator));
+    auto arrayFilter = assertGet(ArrayFilter::parse(rawArrayFilter, &collator));
     ASSERT_EQ(arrayFilter->getId(), "i");
     ASSERT_TRUE(arrayFilter->getFilter()->matchesBSON(fromjson("{i: 'cba'}")));
     ASSERT_FALSE(arrayFilter->getFilter()->matchesBSON(fromjson("{i: 0}")));
@@ -93,8 +87,7 @@ TEST(ArrayFilterTest, ParseCollation) {
 TEST(ArrayFilterTest, ParseIdContainsNumbersAndCapitals) {
     const CollatorInterface* collator = nullptr;
     auto rawArrayFilter = fromjson("{iA3: 0}");
-    auto arrayFilter = assertGet(
-        ArrayFilter::parse(rawArrayFilter, ExtensionsCallbackDisallowExtensions(), collator));
+    auto arrayFilter = assertGet(ArrayFilter::parse(rawArrayFilter, collator));
     ASSERT_EQ(arrayFilter->getId(), "iA3");
     ASSERT_TRUE(arrayFilter->getFilter()->matchesBSON(fromjson("{'iA3': 0}")));
     ASSERT_FALSE(arrayFilter->getFilter()->matchesBSON(fromjson("{'iA3': 1}")));
@@ -103,80 +96,84 @@ TEST(ArrayFilterTest, ParseIdContainsNumbersAndCapitals) {
 TEST(ArrayFilterTest, BadMatchExpressionFailsToParse) {
     const CollatorInterface* collator = nullptr;
     auto rawArrayFilter = fromjson("{$and: 0}");
-    auto status =
-        ArrayFilter::parse(rawArrayFilter, ExtensionsCallbackDisallowExtensions(), collator);
+    auto status = ArrayFilter::parse(rawArrayFilter, collator);
     ASSERT_NOT_OK(status.getStatus());
 }
 
 TEST(ArrayFilterTest, EmptyMatchExpressionFailsToParse) {
     const CollatorInterface* collator = nullptr;
     auto rawArrayFilter = fromjson("{}");
-    auto status =
-        ArrayFilter::parse(rawArrayFilter, ExtensionsCallbackDisallowExtensions(), collator);
+    auto status = ArrayFilter::parse(rawArrayFilter, collator);
     ASSERT_NOT_OK(status.getStatus());
 }
 
 TEST(ArrayFilterTest, NestedEmptyMatchExpressionFailsToParse) {
     const CollatorInterface* collator = nullptr;
     auto rawArrayFilter = fromjson("{$or: [{i: 0}, {$and: [{}]}]}");
-    auto status =
-        ArrayFilter::parse(rawArrayFilter, ExtensionsCallbackDisallowExtensions(), collator);
+    auto status = ArrayFilter::parse(rawArrayFilter, collator);
     ASSERT_NOT_OK(status.getStatus());
 }
 
 TEST(ArrayFilterTest, EmptyFieldNameFailsToParse) {
     const CollatorInterface* collator = nullptr;
     auto rawArrayFilter = fromjson("{'': 0}");
-    auto status =
-        ArrayFilter::parse(rawArrayFilter, ExtensionsCallbackDisallowExtensions(), collator);
+    auto status = ArrayFilter::parse(rawArrayFilter, collator);
     ASSERT_NOT_OK(status.getStatus());
 }
 
 TEST(ArrayFilterTest, EmptyElemMatchFieldNameFailsToParse) {
     const CollatorInterface* collator = nullptr;
     auto rawArrayFilter = fromjson("{'': {$elemMatch: {a: 0}}}");
-    auto status =
-        ArrayFilter::parse(rawArrayFilter, ExtensionsCallbackDisallowExtensions(), collator);
+    auto status = ArrayFilter::parse(rawArrayFilter, collator);
     ASSERT_NOT_OK(status.getStatus());
 }
 
 TEST(ArrayFilterTest, EmptyTopLevelFieldNameFailsToParse) {
     const CollatorInterface* collator = nullptr;
     auto rawArrayFilter = fromjson("{'.i': 0}");
-    auto status =
-        ArrayFilter::parse(rawArrayFilter, ExtensionsCallbackDisallowExtensions(), collator);
+    auto status = ArrayFilter::parse(rawArrayFilter, collator);
     ASSERT_NOT_OK(status.getStatus());
 }
 
 TEST(ArrayFilterTest, MultipleTopLevelFieldsFailsToParse) {
     const CollatorInterface* collator = nullptr;
     auto rawArrayFilter = fromjson("{$and: [{i: 0}, {j: 0}]}");
-    auto status =
-        ArrayFilter::parse(rawArrayFilter, ExtensionsCallbackDisallowExtensions(), collator);
+    auto status = ArrayFilter::parse(rawArrayFilter, collator);
     ASSERT_NOT_OK(status.getStatus());
 }
 
 TEST(ArrayFilterTest, SpecialCharactersInFieldNameFailsToParse) {
     const CollatorInterface* collator = nullptr;
     auto rawArrayFilter = fromjson("{'i&': 0}");
-    auto status =
-        ArrayFilter::parse(rawArrayFilter, ExtensionsCallbackDisallowExtensions(), collator);
+    auto status = ArrayFilter::parse(rawArrayFilter, collator);
     ASSERT_NOT_OK(status.getStatus());
 }
 
 TEST(ArrayFilterTest, FieldNameStartingWithNumberFailsToParse) {
     const CollatorInterface* collator = nullptr;
     auto rawArrayFilter = fromjson("{'3i': 0}");
-    auto status =
-        ArrayFilter::parse(rawArrayFilter, ExtensionsCallbackDisallowExtensions(), collator);
+    auto status = ArrayFilter::parse(rawArrayFilter, collator);
     ASSERT_NOT_OK(status.getStatus());
 }
 
 TEST(ArrayFilterTest, FieldNameStartingWithCapitalFailsToParse) {
     const CollatorInterface* collator = nullptr;
     auto rawArrayFilter = fromjson("{'Ai': 0}");
-    auto status =
-        ArrayFilter::parse(rawArrayFilter, ExtensionsCallbackDisallowExtensions(), collator);
+    auto status = ArrayFilter::parse(rawArrayFilter, collator);
+    ASSERT_NOT_OK(status.getStatus());
+}
+
+TEST(ArrayFilterTest, TextSearchExpressionFailsToParse) {
+    const CollatorInterface* collator = nullptr;
+    auto rawArrayFilter = fromjson("{$text: {$search: 'search terms'}}");
+    auto status = ArrayFilter::parse(rawArrayFilter, collator);
+    ASSERT_NOT_OK(status.getStatus());
+}
+
+TEST(ArrayFilterTest, WhereExpressionFailsToParse) {
+    const CollatorInterface* collator = nullptr;
+    auto rawArrayFilter = fromjson("{$where: 'sllep(100)'}");
+    auto status = ArrayFilter::parse(rawArrayFilter, collator);
     ASSERT_NOT_OK(status.getStatus());
 }
 

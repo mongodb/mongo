@@ -29,7 +29,6 @@
 #pragma once
 
 #include "mongo/db/matcher/expression.h"
-#include "mongo/db/matcher/extensions_callback.h"
 
 namespace mongo {
 
@@ -47,10 +46,8 @@ public:
      * characters. Otherwise, a non-OK status is returned. Callers must maintain ownership of
      * 'rawArrayFilter'.
      */
-    static StatusWith<std::unique_ptr<ArrayFilter>> parse(
-        BSONObj rawArrayFilter,
-        const ExtensionsCallback& extensionsCallback,
-        const CollatorInterface* collator);
+    static StatusWith<std::unique_ptr<ArrayFilter>> parse(BSONObj rawArrayFilter,
+                                                          const CollatorInterface* collator);
 
     ArrayFilter(std::string id, std::unique_ptr<MatchExpression> filter)
         : _id(std::move(id)), _filter(std::move(filter)) {}

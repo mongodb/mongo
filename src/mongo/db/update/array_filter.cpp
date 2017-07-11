@@ -33,6 +33,7 @@
 #include <regex>
 
 #include "mongo/db/matcher/expression_parser.h"
+#include "mongo/db/matcher/extensions_callback_disallow_extensions.h"
 
 namespace mongo {
 
@@ -97,12 +98,10 @@ StatusWith<StringData> parseId(MatchExpression* expr) {
 }  // namespace
 
 // static
-StatusWith<std::unique_ptr<ArrayFilter>> ArrayFilter::parse(
-    BSONObj rawArrayFilter,
-    const ExtensionsCallback& extensionsCallback,
-    const CollatorInterface* collator) {
-    StatusWithMatchExpression statusWithFilter =
-        MatchExpressionParser::parse(rawArrayFilter, extensionsCallback, collator);
+StatusWith<std::unique_ptr<ArrayFilter>> ArrayFilter::parse(BSONObj rawArrayFilter,
+                                                            const CollatorInterface* collator) {
+    StatusWithMatchExpression statusWithFilter = MatchExpressionParser::parse(
+        rawArrayFilter, ExtensionsCallbackDisallowExtensions(), collator);
     if (!statusWithFilter.isOK()) {
         return statusWithFilter.getStatus();
     }

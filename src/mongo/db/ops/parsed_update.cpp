@@ -137,8 +137,6 @@ Status ParsedUpdate::parseUpdate() {
 }
 
 Status ParsedUpdate::parseArrayFilters() {
-    const ExtensionsCallbackReal extensionsCallback(_opCtx, &_request->getNamespaceString());
-
     if (!_request->getArrayFilters().empty() &&
         serverGlobalParams.featureCompatibility.version.load() ==
             ServerGlobalParams::FeatureCompatibility::Version::k34) {
@@ -148,8 +146,7 @@ Status ParsedUpdate::parseArrayFilters() {
     }
 
     for (auto rawArrayFilter : _request->getArrayFilters()) {
-        auto arrayFilterStatus =
-            ArrayFilter::parse(rawArrayFilter, extensionsCallback, _collator.get());
+        auto arrayFilterStatus = ArrayFilter::parse(rawArrayFilter, _collator.get());
         if (!arrayFilterStatus.isOK()) {
             return arrayFilterStatus.getStatus();
         }
