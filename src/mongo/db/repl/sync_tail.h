@@ -202,12 +202,15 @@ public:
     /**
      * Fetch a single document referenced in the operation from the sync source.
      */
-    virtual BSONObj getMissingDoc(OperationContext* opCtx, Database* db, const BSONObj& o);
+    virtual BSONObj getMissingDoc(OperationContext* opCtx, const BSONObj& o);
 
     /**
-     * If applyOperation_inlock should be called again after an update fails.
+     * If an update fails, fetches the missing document and inserts it into the local collection.
+     *
+     * Returns true if the document was fetched and inserted successfully.
      */
-    virtual bool shouldRetry(OperationContext* opCtx, const BSONObj& o);
+    virtual bool fetchAndInsertMissingDocument(OperationContext* opCtx, const BSONObj& o);
+
     void setHostname(const std::string& hostname);
 
     /**

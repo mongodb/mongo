@@ -915,16 +915,9 @@ OldThreadPool* SyncTail::getWriterPool() {
     return _writerPool.get();
 }
 
-BSONObj SyncTail::getMissingDoc(OperationContext* opCtx, Database* db, const BSONObj& o) {
+BSONObj SyncTail::getMissingDoc(OperationContext* opCtx, const BSONObj& o) {
     OplogReader missingObjReader;  // why are we using OplogReader to run a non-oplog query?
     const char* ns = o.getStringField("ns");
-
-    // capped collections
-    Collection* collection = db->getCollection(opCtx, ns);
-    if (collection && collection->isCapped()) {
-        log() << "missing doc, but this is okay for a capped collection (" << ns << ")";
-        return BSONObj();
-    }
 
     if (MONGO_FAIL_POINT(initialSyncHangBeforeGettingMissingDocument)) {
         log() << "initial sync - initialSyncHangBeforeGettingMissingDocument fail point enabled. "
@@ -984,43 +977,52 @@ BSONObj SyncTail::getMissingDoc(OperationContext* opCtx, Database* db, const BSO
                 str::stream() << "Can no longer connect to initial sync source: " << _hostname);
 }
 
-bool SyncTail::shouldRetry(OperationContext* opCtx, const BSONObj& o) {
+bool SyncTail::fetchAndInsertMissingDocument(OperationContext* opCtx, const BSONObj& o) {
     const NamespaceString nss(o.getStringField("ns"));
-    return writeConflictRetry(opCtx, "InsertRetry", nss.ns(), [&] {
+
+    {
+        // If the document is in a capped collection then it's okay for it to be missing.
+        AutoGetCollectionForRead autoColl(opCtx, nss);
+        Collection* const collection = autoColl.getCollection();
+        if (collection && collection->isCapped()) {
+            log() << "Not fetching missing document in capped collection (" << nss << ")";
+            return false;
+        }
+    }
+
+    log() << "Fetching missing document: " << redact(o);
+    BSONObj missingObj = getMissingDoc(opCtx, o);
+
+    if (missingObj.isEmpty()) {
+        log() << "Missing document not found on source; presumably deleted later in oplog. o first "
+                 "field: "
+              << o.getObjectField("o").firstElementFieldName()
+              << ", o2: " << redact(o.getObjectField("o2"));
+
+        return false;
+    }
+
+    return writeConflictRetry(opCtx, "fetchAndInsertMissingDocument", nss.ns(), [&] {
         // Take an X lock on the database in order to preclude other modifications.
         // Also, the database might not exist yet, so create it.
         AutoGetOrCreateDb autoDb(opCtx, nss.db(), MODE_X);
         Database* const db = autoDb.getDb();
 
-        // we don't have the object yet, which is possible on initial sync.  get it.
-        log() << "adding missing object" << endl;  // rare enough we can log
+        WriteUnitOfWork wunit(opCtx);
 
-        BSONObj missingObj = getMissingDoc(opCtx, db, o);
+        Collection* const coll = db->getOrCreateCollection(opCtx, nss);
+        invariant(coll);
 
-        if (missingObj.isEmpty()) {
-            log() << "missing object not found on source."
-                     " presumably deleted later in oplog";
-            log() << "o2: " << redact(o.getObjectField("o2"));
-            log() << "o firstfield: " << o.getObjectField("o").firstElementFieldName();
+        OpDebug* const nullOpDebug = nullptr;
+        Status status = coll->insertDocument(opCtx, missingObj, nullOpDebug, true);
+        uassert(15917,
+                str::stream() << "Failed to insert missing document: " << status.toString(),
+                status.isOK());
 
-            return false;
-        } else {
-            WriteUnitOfWork wunit(opCtx);
+        LOG(1) << "Inserted missing document: " << redact(missingObj);
 
-            Collection* const coll = db->getOrCreateCollection(opCtx, nss);
-            invariant(coll);
-
-            OpDebug* const nullOpDebug = nullptr;
-            Status status = coll->insertDocument(opCtx, missingObj, nullOpDebug, true);
-            uassert(15917,
-                    str::stream() << "failed to insert missing doc: " << status.toString(),
-                    status.isOK());
-
-            LOG(1) << "inserted missing doc: " << redact(missingObj);
-
-            wunit.commit();
-            return true;
-        }
+        wunit.commit();
+        return true;
     });
 }
 
@@ -1175,28 +1177,19 @@ Status multiInitialSyncApply_noAbort(OperationContext* opCtx,
         try {
             const Status s = SyncTail::syncApply(opCtx, entry.raw, inSteadyStateReplication);
             if (!s.isOK()) {
-                // Don't retry on commands.
-                if (entry.isCommand()) {
-                    error() << "Error applying command (" << redact(entry.raw)
-                            << "): " << redact(s);
+                // In initial sync, update operations can cause documents to be missed during
+                // collection cloning. As a result, it is possible that a document that we need to
+                // update is not present locally. In that case we fetch the document from the
+                // sync source.
+                if (s != ErrorCodes::UpdateOperationFailed) {
+                    error() << "Error applying operation: " << redact(s) << " ("
+                            << redact(entry.raw) << ")";
                     return s;
                 }
 
                 // We might need to fetch the missing docs from the sync source.
                 fetchCount->fetchAndAdd(1);
-                if (st->shouldRetry(opCtx, entry.raw)) {
-                    const Status s2 =
-                        SyncTail::syncApply(opCtx, entry.raw, inSteadyStateReplication);
-                    if (!s2.isOK()) {
-                        severe() << "Error applying operation (" << redact(entry.raw)
-                                 << "): " << redact(s2);
-                        return s2;
-                    }
-                }
-
-                // If shouldRetry() returns false, fall through.
-                // This can happen if the document that was moved and missed by Cloner
-                // subsequently got deleted and no longer exists on the Sync Target at all
+                st->fetchAndInsertMissingDocument(opCtx, entry.raw);
             }
         } catch (const DBException& e) {
             // SERVER-24927 If we have a NamespaceNotFound exception, then this document will be

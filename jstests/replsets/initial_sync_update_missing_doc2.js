@@ -48,7 +48,7 @@
         {configureFailPoint: 'initialSyncHangBeforeCopyingDatabases', mode: 'off'}));
 
     checkLog.contains(secondary, 'update of non-mod failed');
-    checkLog.contains(secondary, 'adding missing object');
+    checkLog.contains(secondary, 'Fetching missing document');
 
     checkLog.contains(
         secondary, 'initial sync - initialSyncHangBeforeGettingMissingDocument fail point enabled');
@@ -64,7 +64,7 @@
     assert.commandWorked(secondary.getDB('admin').runCommand(
         {configureFailPoint: 'initialSyncHangBeforeGettingMissingDocument', mode: 'off'}));
 
-    checkLog.contains(secondary, 'inserted missing doc:');
+    checkLog.contains(secondary, 'Inserted missing document');
     secondary.getDB('test').setLogLevel(0, 'replication');
 
     checkLog.contains(secondary, 'initial sync done');

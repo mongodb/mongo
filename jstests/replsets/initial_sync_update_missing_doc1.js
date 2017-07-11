@@ -48,10 +48,9 @@
         {configureFailPoint: 'initialSyncHangBeforeCopyingDatabases', mode: 'off'}));
 
     checkLog.contains(secondary, 'update of non-mod failed');
-    checkLog.contains(secondary, 'adding missing object');
+    checkLog.contains(secondary, 'Fetching missing document');
     checkLog.contains(
         secondary, 'initial sync - initialSyncHangBeforeGettingMissingDocument fail point enabled');
-
     var res = assert.commandWorked(secondary.adminCommand({replSetGetStatus: 1, initialSync: 1}));
     assert.eq(res.initialSyncStatus.fetchedMissingDocs, 0);
     var firstOplogEnd = res.initialSyncStatus.initialSyncOplogEnd;
@@ -62,7 +61,7 @@
     assert.commandWorked(secondary.getDB('admin').runCommand(
         {configureFailPoint: 'initialSyncHangBeforeGettingMissingDocument', mode: 'off'}));
     checkLog.contains(secondary,
-                      'missing object not found on source. presumably deleted later in oplog');
+                      'Missing document not found on source; presumably deleted later in oplog.');
     checkLog.contains(secondary, 'initial sync done');
 
     replSet.awaitReplication();
