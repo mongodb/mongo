@@ -248,46 +248,44 @@ mongo::Status mongo::convertToCapped(OperationContext* opCtx,
     const std::string shortTmpName = str::stream() << "tmp.convertToCapped." << shortSource;
     const NamespaceString longTmpName(dbname, shortTmpName);
 
+    AutoGetDb autoDb(opCtx, collectionName.db(), MODE_X);
+
+    bool userInitiatedWritesAndNotPrimary = opCtx->writesAreReplicated() &&
+        !repl::getGlobalReplicationCoordinator()->canAcceptWritesFor(opCtx, collectionName);
+
+    if (userInitiatedWritesAndNotPrimary) {
+        return Status(ErrorCodes::NotMaster,
+                      str::stream() << "Not primary while converting " << collectionName.ns()
+                                    << " to a capped collection");
+    }
+
+    Database* const db = autoDb.getDb();
+    if (!db) {
+        return Status(ErrorCodes::NamespaceNotFound,
+                      str::stream() << "database " << dbname << " not found");
+    }
+
+    BackgroundOperation::assertNoBgOpInProgForDb(dbname);
+
+    // If the temporary collection already exists due to an earlier aborted attempt, delete it.
+    if (db->getCollection(opCtx, longTmpName)) {
+        BSONObjBuilder unusedResult;
+        Status status =
+            dropCollection(opCtx,
+                           longTmpName,
+                           unusedResult,
+                           repl::OpTime(),
+                           DropCollectionSystemCollectionMode::kAllowSystemCollectionDrops);
+        if (!status.isOK())
+            return status;
+    }
+
     {
-        AutoGetDb autoDb(opCtx, collectionName.db(), MODE_X);
+        Status status =
+            cloneCollectionAsCapped(opCtx, db, shortSource.toString(), shortTmpName, size, true);
 
-        bool userInitiatedWritesAndNotPrimary = opCtx->writesAreReplicated() &&
-            !repl::getGlobalReplicationCoordinator()->canAcceptWritesFor(opCtx, collectionName);
-
-        if (userInitiatedWritesAndNotPrimary) {
-            return Status(ErrorCodes::NotMaster,
-                          str::stream() << "Not primary while converting " << collectionName.ns()
-                                        << " to a capped collection");
-        }
-
-        Database* const db = autoDb.getDb();
-        if (!db) {
-            return Status(ErrorCodes::NamespaceNotFound,
-                          str::stream() << "database " << dbname << " not found");
-        }
-
-        BackgroundOperation::assertNoBgOpInProgForDb(dbname);
-
-        // If the temporary collection already exists due to an earlier aborted attempt, delete it.
-        if (db->getCollection(opCtx, longTmpName)) {
-            BSONObjBuilder unusedResult;
-            Status status =
-                dropCollection(opCtx,
-                               longTmpName,
-                               unusedResult,
-                               repl::OpTime(),
-                               DropCollectionSystemCollectionMode::kAllowSystemCollectionDrops);
-            if (!status.isOK())
-                return status;
-        }
-
-        {
-            Status status = cloneCollectionAsCapped(
-                opCtx, db, shortSource.toString(), shortTmpName, size, true);
-
-            if (!status.isOK())
-                return status;
-        }
+        if (!status.isOK())
+            return status;
     }
 
     return renameCollection(
