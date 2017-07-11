@@ -35,6 +35,7 @@
 
 #include "mongo/base/status.h"
 #include "mongo/bson/bsonobj.h"
+#include "mongo/db/storage/snapshot_name.h"
 #include "mongo/util/mongoutils/str.h"
 
 namespace mongo {
@@ -279,6 +280,43 @@ public:
      * system about journaled write progress.
      */
     virtual void setJournalListener(JournalListener* jl) = 0;
+
+    /**
+     * Returns whether the storage engine supports "recover to stable timestamp". Returns false
+     * if the storage engine supports the "recover to stable timestamp" feature but does not have
+     * a stable timestamp, or if for some reason the storage engine is unable to recover to the
+     * last provided stable timestamp.
+     */
+    virtual bool supportsRecoverToStableTimestamp() const {
+        return false;
+    }
+
+    /**
+     * Recovers the storage engine state to the last stable timestamp. "Stable" in this case
+     * refers to a timestamp that is guaranteed to never be rolled back. The stable timestamp
+     * used should be one provided by StorageEngine::setStableTimestamp().
+     *
+     * The "local" database is exempt and should not roll back any state except for
+     * "local.replset.minvalid" and "local.replset.checkpointTimestamp" which must roll back to
+     * the last stable timestamp.
+     *
+     * fasserts if StorageEngine::supportsRecoverToStableTimestamp() would return false.
+     */
+    virtual Status recoverToStableTimestamp() {
+        fassertFailed(40547);
+    }
+
+    /**
+     * Sets the highest timestamp at which the storage engine is allowed to take a checkpoint.
+     * This timestamp can never decrease, and thus should be a timestamp that can never roll back.
+     */
+    virtual void setStableTimestamp(SnapshotName snapshotName) {}
+
+    /**
+     * Tells the storage engine the timestamp of the data at startup. This is necessary because
+     * timestamps are not persisted in the storage layer.
+     */
+    virtual void setInitialDataTimestamp(SnapshotName snapshotName) {}
 
 protected:
     /**
