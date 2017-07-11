@@ -201,11 +201,13 @@ Status addMongodOptions(moe::OptionSection* options) {
         .setSources(moe::SourceAll)
         .hidden();
 
-    storage_options.addOptionChaining("storage.groupCollections",
-                                      "groupCollections",
-                                      moe::Switch,
-                                      "group collections - if true the storage engine may group "
-                                      "collections within a database into a shared record store.");
+    storage_options
+        .addOptionChaining("storage.groupCollections",
+                           "groupCollections",
+                           moe::Switch,
+                           "group collections - if true the storage engine may group "
+                           "collections within a database into a shared record store.")
+        .hidden();
 
     general_options
         .addOptionChaining("noIndexBuildRetry",
