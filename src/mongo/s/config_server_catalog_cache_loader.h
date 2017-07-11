@@ -47,9 +47,6 @@ public:
     void notifyOfCollectionVersionUpdate(OperationContext* opCtx,
                                          const NamespaceString& nss,
                                          const ChunkVersion& version) override;
-    Status waitForCollectionVersion(OperationContext* opCtx,
-                                    const NamespaceString& nss,
-                                    const ChunkVersion& version) override;
 
     std::shared_ptr<Notification<void>> getChunksSince(
         const NamespaceString& nss,

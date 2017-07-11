@@ -242,28 +242,6 @@ void ShardServerCatalogCacheLoader::notifyOfCollectionVersionUpdate(OperationCon
     _namespaceNotifications.notifyChange(nss);
 }
 
-Status ShardServerCatalogCacheLoader::waitForCollectionVersion(OperationContext* opCtx,
-                                                               const NamespaceString& nss,
-                                                               const ChunkVersion& version) {
-    invariant(!opCtx->lockState()->isLocked());
-    while (true) {
-        auto scopedNotification = _namespaceNotifications.createNotification(nss);
-
-        auto swRefreshState = getPersistedRefreshFlags(opCtx, nss);
-        if (!swRefreshState.isOK()) {
-            return swRefreshState.getStatus();
-        }
-        RefreshState refreshState = swRefreshState.getValue();
-
-        if (refreshState.lastRefreshedCollectionVersion.epoch() != version.epoch() ||
-            refreshState.lastRefreshedCollectionVersion >= version) {
-            return Status::OK();
-        }
-
-        scopedNotification.get(opCtx);
-    }
-}
-
 ShardServerCatalogCacheLoader::ShardServerCatalogCacheLoader(
     std::unique_ptr<CatalogCacheLoader> configLoader)
     : _configServerLoader(std::move(configLoader)), _threadPool(makeDefaultThreadPoolOptions()) {

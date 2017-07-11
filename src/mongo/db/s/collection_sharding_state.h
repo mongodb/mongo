@@ -142,8 +142,8 @@ public:
      * is added to permit (most) dependent queries on secondaries to complete, too.
      *
      * Call result.waitStatus(opCtx) to wait for the deletion to complete or fail. If that succeeds,
-     * waitForClean can be called to ensure no other deletions are pending for the range. Call
-     * result.abandon(), instead of waitStatus, to ignore the outcome.
+     * call waitForClean to ensure no other deletions are pending for the range. Call
+     * result.abandon(), instead, to ignore the outcome.
      */
     enum CleanWhen { kNow, kDelayed };
     auto cleanUpRange(ChunkRange const& range, CleanWhen) -> CleanupNotification;

@@ -71,19 +71,7 @@ public:
      */
     void notifyOfCollectionVersionUpdate(OperationContext* opCtx,
                                          const NamespaceString& nss,
-                                         const ChunkVersion& version) override;
-
-    /**
-     * This function can throw a DBException if the opCtx is interrupted. A lock must not be held
-     * when calling this because it would prevent using the latest snapshot and actually seeing the
-     * change after it arrives.
-     *
-     * See CatalogCache::waitForCollectionVersion for function details: it's a passthrough function
-     * to give external access to this function, and so it is the interface.
-     */
-    Status waitForCollectionVersion(OperationContext* opCtx,
-                                    const NamespaceString& nss,
-                                    const ChunkVersion& version) override;
+                                         const ChunkVersion& version);
 
     /**
      * This must be called serially, never in parallel, including waiting for the returned
