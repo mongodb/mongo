@@ -10,19 +10,25 @@ capi = env.Library(
         'libmongodbcapi.cpp',
     ],
     LIBDEPS=[
-        '$BUILD_DIR/mongo/base', 
+        '$BUILD_DIR/mongo/base',
+        '$BUILD_DIR/mongo/mongodmain',
+        '$BUILD_DIR/mongo/transport/transport_layer_mock',
+        '$BUILD_DIR/mongo/util/net/network',
     ]
 )
 
-env.Alias( 'embedded_capi', capi)
+env.Alias('embedded_capi', capi)
 
-env.CppUnitTest(
+capiTest = env.Program(
     target='mongo_embedded_capi_test',
     source=[
         'libmongodbcapi_test.cpp',
     ],
     LIBDEPS=[
-        '$BUILD_DIR/mongo/base', 
+        '$BUILD_DIR/mongo/base',
+        '$BUILD_DIR/mongo/unittest/unittest',
         'mongo_embedded_capi',
     ],
 )
+
+env.RegisterUnitTest(capiTest[0])

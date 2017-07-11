@@ -1179,7 +1179,7 @@ Status storeMongodOptions(const moe::Environment& params) {
             }
         }
     } else {
-        if (serverGlobalParams.port <= 0 || serverGlobalParams.port > 65535) {
+        if (serverGlobalParams.port < 0 || serverGlobalParams.port > 65535) {
             return Status(ErrorCodes::BadValue, "bad --port number");
         }
     }
