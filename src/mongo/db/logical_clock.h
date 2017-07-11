@@ -84,7 +84,7 @@ public:
 
 private:
     /**
-     * Rate limiter for advancing logical time. Rejects newTime if its seconds value is more than
+     * Rate limiter for advancing cluster time. Rejects newTime if its seconds value is more than
      * kMaxAcceptableLogicalClockDriftSecs seconds ahead of this node's wall clock.
      */
     Status _passesRateLimiter_inlock(LogicalTime newTime);

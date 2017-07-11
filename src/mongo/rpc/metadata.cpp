@@ -95,10 +95,10 @@ void readRequestMetadata(OperationContext* opCtx, const BSONObj& metadataObj) {
             uassertStatusOK(rpc::LogicalTimeMetadata::readFromMetadata(logicalTimeElem));
 
         auto& signedTime = logicalTimeMetadata.getSignedTime();
-        // LogicalTimeMetadata is default constructed if no logical time metadata was sent, so a
+        // LogicalTimeMetadata is default constructed if no cluster time metadata was sent, so a
         // default constructed SignedLogicalTime should be ignored.
         if (signedTime.getTime() != LogicalTime::kUninitialized) {
-            // Logical times are only sent by sharding aware mongod servers, so this point is only
+            // Cluster times are only sent by sharding aware mongod servers, so this point is only
             // reached in sharded clusters.
             if (serverGlobalParams.featureCompatibility.version.load() !=
                 ServerGlobalParams::FeatureCompatibility::Version::k34) {

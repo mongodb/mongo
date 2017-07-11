@@ -42,8 +42,8 @@ class KeysCollectionDocument;
 class KeysCollectionManager;
 
 /**
- * This is responsible for signing logical times that can be used to sent to other servers and
- * verifying signatures of signed logical times.
+ * This is responsible for signing cluster times that can be used to sent to other servers and
+ * verifying signatures of signed cluster times.
  */
 class LogicalTimeValidator {
 public:
@@ -92,7 +92,7 @@ public:
     static bool isAuthorizedToAdvanceClock(OperationContext* opCtx);
 
     /**
-     * Returns true if the server should gossip, sign, and validate logical times. False until there
+     * Returns true if the server should gossip, sign, and validate cluster times. False until there
      * are keys in the config server.
      */
     bool shouldGossipLogicalTime();

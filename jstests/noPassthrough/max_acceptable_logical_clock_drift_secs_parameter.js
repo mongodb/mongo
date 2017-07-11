@@ -1,6 +1,6 @@
 /**
  * Tests what values are accepted for the maxAcceptableLogicalClockDriftSecs startup parameter, and
- * that servers in a sharded clusters reject logical times more than
+ * that servers in a sharded clusters reject cluster times more than
  * maxAcceptableLogicalClockDriftSecs ahead of their wall clocks.
  */
 (function() {
@@ -43,15 +43,15 @@
     });
     let testDB = st.s.getDB("test");
 
-    // Contact cluster to get initial logical time.
+    // Contact cluster to get initial cluster time.
     let res = assert.commandWorked(testDB.runCommand({isMaster: 1}));
-    let lt = res.$logicalTime;
+    let lt = res.$clusterTime;
 
-    // Try to advance logical time by more than the max acceptable drift, which should fail the rate
+    // Try to advance cluster time by more than the max acceptable drift, which should fail the rate
     // limiter.
     let tooFarTime = Object.assign(
         lt, {clusterTime: new Timestamp(lt.clusterTime.getTime() + (maxDriftValue * 2), 0)});
-    assert.commandFailedWithCode(testDB.runCommand({isMaster: 1, $logicalTime: tooFarTime}),
+    assert.commandFailedWithCode(testDB.runCommand({isMaster: 1, $clusterTime: tooFarTime}),
                                  ErrorCodes.ClusterTimeFailsRateLimiter,
                                  "expected command to not pass the rate limiter");
 

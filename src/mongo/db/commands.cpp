@@ -379,7 +379,7 @@ void Command::filterCommandReplyForPassthrough(const BSONObj& cmdObj, BSONObjBui
         const auto name = elem.fieldNameStringData();
         if (name == "$configServerState" ||  //
             name == "$gleStats" ||           //
-            name == "$logicalTime" ||        //
+            name == "$clusterTime" ||        //
             name == "$oplogQueryData" ||     //
             name == "$replData" ||           //
             name == "operationTime") {

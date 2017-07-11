@@ -69,9 +69,9 @@ BSONObj buildMetadata() {
         metadataGle.append("electionId", OID("5592bee00d21e3aa796e185e"));
     }
 
-    // For now we don't need a real $logicalTime and just ensure that it just round trips whatever
-    // is there. If that ever changes, we will need to construct a real $logicalTime here.
-    metadataTop.append("$logicalTime", BSON("bogus" << true));
+    // For now we don't need a real $clusterTime and just ensure that it just round trips whatever
+    // is there. If that ever changes, we will need to construct a real $clusterTime here.
+    metadataTop.append("$clusterTime", BSON("bogus" << true));
     return metadataTop.obj();
 }
 

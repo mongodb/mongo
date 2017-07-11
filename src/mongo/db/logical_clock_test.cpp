@@ -103,7 +103,7 @@ TEST_F(LogicalClockTest, advanceClusterTime) {
     ASSERT_TRUE(t1 == getClock()->getClusterTime());
 }
 
-// Verify rate limiter rejects logical times whose seconds values are too far ahead.
+// Verify rate limiter rejects cluster times whose seconds values are too far ahead.
 TEST_F(LogicalClockTest, RateLimiterRejectsLogicalTimesTooFarAhead) {
     setMockClockSourceTime(Date_t::fromMillisSinceEpoch(10 * 1000));
 
@@ -148,7 +148,7 @@ TEST_F(LogicalClockTest, WritesToOplogAdvanceClusterTime) {
 // Tests the scenario where an admin incorrectly sets the wall clock more than
 // maxAcceptableLogicalClockDriftSecs in the past at startup, and cluster time is initialized to
 // the incorrect past time, then the admin resets the clock to the current time. In this case,
-// logical time can be advanced through metadata as long as the new time isn't
+// cluster time can be advanced through metadata as long as the new time isn't
 // maxAcceptableLogicalClockDriftSecs ahead of the correct current wall clock time, since the rate
 // limiter compares new times to the wall clock, not the cluster time.
 TEST_F(LogicalClockTest, WallClockSetTooFarInPast) {
@@ -180,7 +180,7 @@ TEST_F(LogicalClockTest, WallClockSetTooFarInPast) {
 
 // Tests the scenario where an admin incorrectly sets the wall clock more than
 // maxAcceptableLogicalClockDriftSecs in the future and a write is accepted, advancing cluster
-// time, then the admin resets the clock to the current time. In this case, logical time cannot be
+// time, then the admin resets the clock to the current time. In this case, cluster time cannot be
 // advanced through metadata unless the drift parameter is increased.
 TEST_F(LogicalClockTest, WallClockSetTooFarInFuture) {
     auto oneDay = Seconds(24 * 60 * 60);
@@ -206,7 +206,7 @@ TEST_F(LogicalClockTest, WallClockSetTooFarInFuture) {
     // Verify that maxAcceptableLogicalClockDriftSecs parameter has to be increased to advance
     // cluster time through metadata.
     auto nextTime = getClock()->getClusterTime();
-    nextTime.addTicks(1);  // The next lowest logical time.
+    nextTime.addTicks(1);  // The next lowest cluster time.
 
     ASSERT_EQ(ErrorCodes::ClusterTimeFailsRateLimiter, getClock()->advanceClusterTime(nextTime));
 
@@ -308,11 +308,11 @@ TEST_F(LogicalClockTest, ReserveTicksBehaviorWhenWallClockNearMaxTime) {
     ASSERT_TRUE(getClock()->getClusterTime() == buildLogicalTime(1, 1));
 }
 
-// Verify the clock rejects logical times greater than the max allowed time.
+// Verify the clock rejects cluster times greater than the max allowed time.
 TEST_F(LogicalClockTest, RejectsLogicalTimesGreaterThanMaxTime) {
     unsigned maxVal = LogicalClock::kMaxSignedInt;
 
-    // A logical time can be greater than the maximum value allowed because the signed integer
+    // A cluster time can be greater than the maximum value allowed because the signed integer
     // maximum is used for legacy compatibility, but these fields are stored as unsigned integers.
     auto beyondMaxTime = buildLogicalTime(maxVal + 1, maxVal + 1);
 

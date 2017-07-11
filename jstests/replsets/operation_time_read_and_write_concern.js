@@ -24,7 +24,7 @@
     var collectionName = "foo";
 
     // readConcern level majority:
-    // operationTime is the logical time of the last committed op in the oplog.
+    // operationTime is the cluster time of the last committed op in the oplog.
     jsTestLog("Testing operationTime for readConcern level majority with afterClusterTime.");
     var majorityDoc = {_id: 10, x: 1};
     var localDoc = {_id: 15, x: 2};
@@ -55,7 +55,7 @@
     assert.eq(majorityReadOperationTime,
               majorityWriteOperationTime,
               "the operationTime of the majority read, " + majorityReadOperationTime +
-                  ", should be the logical time of the last committed op in the oplog, " +
+                  ", should be the cluster time of the last committed op in the oplog, " +
                   majorityWriteOperationTime);
 
     // Validate that after replication, the local write data is now returned by the same query.
@@ -77,7 +77,7 @@
     assert.eq(secondMajorityReadOperationTime,
               localWriteOperationTime,
               "the operationTime of the second majority read, " + secondMajorityReadOperationTime +
-                  ", should be the logical time of the replicated local write, " +
+                  ", should be the cluster time of the replicated local write, " +
                   localWriteOperationTime);
 
     // readConcern level linearizable is not currently supported.
@@ -92,7 +92,7 @@
         "linearizable reads with afterClusterTime are not supported and should not be allowed");
 
     // writeConcern level majority:
-    // operationTime is the logical time of the write if it succeeds, or of the previous successful
+    // operationTime is the cluster time of the write if it succeeds, or of the previous successful
     // write at the time the write was determined to have failed, or a no-op.
     jsTestLog("Testing operationTime for writeConcern level majority.");
     var successfulDoc = {_id: 1000, y: 1};
@@ -113,7 +113,7 @@
         failedWriteOperationTime,
         majorityWriteOperationTime,
         "the operationTime of the failed majority write, " + failedWriteOperationTime +
-            ", should be the logical time of the last successful write at the time it failed, " +
+            ", should be the cluster time of the last successful write at the time it failed, " +
             majorityWriteOperationTime);
 
     replTest.stopSet();

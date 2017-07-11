@@ -10,7 +10,7 @@
     function logicalTimeCanBeProcessed(db) {
         const increment = 5000;
 
-        let initialTime = db.runCommand({isMaster: 1}).$logicalTime;
+        let initialTime = db.runCommand({isMaster: 1}).$clusterTime;
         if (!initialTime) {
             return false;
         }
@@ -20,8 +20,8 @@
             {clusterTime: Timestamp(initialTime.clusterTime.getTime() + increment, 0)});
         let returnedTime = rst.getPrimary()
                                .getDB("test")
-                               .runCommand({isMaster: 1, $logicalTime: laterTime})
-                               .$logicalTime;
+                               .runCommand({isMaster: 1, $clusterTime: laterTime})
+                               .$clusterTime;
 
         // Use a range to allow for unrelated activity advancing cluster time.
         return (returnedTime.clusterTime.getTime() - initialTime.clusterTime.getTime()) >=
@@ -64,14 +64,14 @@
     assert.commandWorked(rst.getPrimary().getDB("test").runCommand(
         {find: "foo", readConcern: {level: "majority", afterClusterTime: Timestamp(1, 1)}}));
 
-    // Verify logical time can be processed by shards and the config servers.
+    // Verify cluster time can be processed by shards and the config servers.
     assert(logicalTimeCanBeProcessed(rst.getPrimary().getDB("test")));
     assert(logicalTimeCanBeProcessed(st.configRS.getPrimary().getDB("test")));
 
     // Set featureCompatibilityVersion to 3.4
     assert.commandWorked(st.s.adminCommand({setFeatureCompatibilityVersion: "3.4"}));
 
-    // Verify logical time cannot be processed by shards and the config servers now.
+    // Verify cluster time cannot be processed by shards and the config servers now.
     assert(!logicalTimeCanBeProcessed(rst.getPrimary().getDB("test")));
     assert(!logicalTimeCanBeProcessed(st.configRS.getPrimary().getDB("test")));
 
@@ -89,7 +89,7 @@
     // setFeatureCompatibilityVersion can only be run on the admin database on mongos.
     assert.commandWorked(st.s.adminCommand({setFeatureCompatibilityVersion: "3.6"}));
 
-    // Verify logical time can be processed by shards and the config servers again.
+    // Verify cluster time can be processed by shards and the config servers again.
     assert(logicalTimeCanBeProcessed(rst.getPrimary().getDB("test")));
     assert(logicalTimeCanBeProcessed(st.configRS.getPrimary().getDB("test")));
 

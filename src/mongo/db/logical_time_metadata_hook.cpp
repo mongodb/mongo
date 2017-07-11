@@ -64,7 +64,7 @@ Status LogicalTimeMetadataHook::readReplyMetadata(StringData replySource,
 
     auto& signedTime = parseStatus.getValue().getSignedTime();
 
-    // LogicalTimeMetadata is default constructed if no logical time metadata was sent, so a
+    // LogicalTimeMetadata is default constructed if no cluster time metadata was sent, so a
     // default constructed SignedLogicalTime should be ignored.
     if (signedTime.getTime() == LogicalTime::kUninitialized) {
         return Status::OK();

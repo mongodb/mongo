@@ -35,7 +35,7 @@
 
     st.s.getDB("test").runCommand({insert: "foo", documents: [{_id: 1, x: 1}]});
 
-    // Both logical and operation times are returned, and logical times are signed by mongos. Mongos
+    // Both logical and operation times are returned, and cluster times are signed by mongos. Mongos
     // doesn't wait for keys at startup, so retry.
     assert.soonNoExcept(function() {
         assertContainsLogicalAndOperationTime(st.s.getDB("test").runCommand({isMaster: 1}),
@@ -51,7 +51,7 @@
     // Change featureCompatibilityVersion to 3.4.
     assert.commandWorked(st.s.adminCommand({setFeatureCompatibilityVersion: "3.4"}));
 
-    // Mongos still signs logical times, because they are held in memory.
+    // Mongos still signs cluster times, because they are held in memory.
     assertContainsLogicalAndOperationTime(st.s.getDB("test").runCommand({isMaster: 1}),
                                           {initialized: true, signed: true});
 
@@ -73,7 +73,7 @@
     st.upgradeCluster("last-stable", {upgradeConfigs: false, upgradeShards: false});
     st.restartMongoses();
 
-    // Mongos should no longer return operation or logical times.
+    // Mongos should no longer return operation or cluster times.
     assertDoesNotContainLogicalOrOperationTime(st.s.getDB("test").runCommand({isMaster: 1}));
 
     // Downgrade shards next.

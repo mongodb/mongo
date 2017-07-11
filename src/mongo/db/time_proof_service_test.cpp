@@ -40,7 +40,7 @@ using TimeProof = TimeProofService::TimeProof;
 
 const TimeProofService::Key key = {};
 
-// Verifies logical time with proof signed with the correct key.
+// Verifies cluster time with proof signed with the correct key.
 TEST(TimeProofService, VerifyLogicalTimeWithValidProof) {
     TimeProofService timeProofService;
 
@@ -50,7 +50,7 @@ TEST(TimeProofService, VerifyLogicalTimeWithValidProof) {
     ASSERT_OK(timeProofService.checkProof(time, proof, key));
 }
 
-// Fails for logical time with proof signed with an invalid key.
+// Fails for cluster time with proof signed with an invalid key.
 TEST(TimeProofService, LogicalTimeWithMismatchingProofShouldFail) {
     TimeProofService timeProofService;
 

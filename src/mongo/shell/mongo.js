@@ -160,7 +160,7 @@ Mongo.prototype._gossipLogicalTime = function(obj) {
     obj = Object.assign({}, obj);
     const clusterTime = this.getClusterTime();
     if (clusterTime) {
-        obj["$logicalTime"] = clusterTime;
+        obj["$clusterTime"] = clusterTime;
     }
     return obj;
 };
@@ -173,8 +173,8 @@ Mongo.prototype._setLogicalTimeFromReply = function(res) {
     if (res.hasOwnProperty("operationTime")) {
         this.setOperationTime(res["operationTime"]);
     }
-    if (res.hasOwnProperty("$logicalTime")) {
-        this.setClusterTime(res["$logicalTime"]);
+    if (res.hasOwnProperty("$clusterTime")) {
+        this.setClusterTime(res["$clusterTime"]);
     }
 };
 

@@ -510,7 +510,7 @@ public:
             arg == "$queryOptions" ||       //
             arg == "$readPreference" ||     //
             arg == "$replData" ||           //
-            arg == "$logicalTime" ||        //
+            arg == "$clusterTime" ||        //
             arg == "maxTimeMS" ||           //
             arg == "readConcern" ||         //
             arg == "shardVersion" ||        //

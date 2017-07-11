@@ -20,7 +20,7 @@ function assertDoesNotContainLogicalOrOperationTime(res) {
 }
 
 function assertDoesNotContainLogicalTime(res) {
-    assert.eq(res.$logicalTime, undefined);
+    assert.eq(res.$clusterTime, undefined);
 }
 
 function assertDoesNotContainOperationTime(res) {
@@ -33,25 +33,25 @@ function assertContainsLogicalAndOperationTime(res, opts) {
 }
 
 function assertContainsLogicalTime(res, opts) {
-    assert.hasFields(res, ["$logicalTime"]);
-    assert.hasFields(res.$logicalTime, ["clusterTime", "signature"]);
-    assert.hasFields(res.$logicalTime.signature, ["hash", "keyId"]);
+    assert.hasFields(res, ["$clusterTime"]);
+    assert.hasFields(res.$clusterTime, ["clusterTime", "signature"]);
+    assert.hasFields(res.$clusterTime.signature, ["hash", "keyId"]);
 
     if (opts.signed !== undefined) {
-        // Signed logical times have a keyId greater than 0.
+        // Signed cluster times have a keyId greater than 0.
         if (opts.signed) {
-            assert(res.$logicalTime.signature.keyId > NumberLong(0));
+            assert(res.$clusterTime.signature.keyId > NumberLong(0));
         } else {
-            assert.eq(res.$logicalTime.signature.keyId, NumberLong(0));
+            assert.eq(res.$clusterTime.signature.keyId, NumberLong(0));
         }
     }
 
     if (opts.initialized !== undefined) {
         // Initialized operation times are greater than a null timestamp.
         if (opts.initialized) {
-            assert.eq(bsonWoCompare(res.$logicalTime.clusterTime, Timestamp(0, 0)), 1);
+            assert.eq(bsonWoCompare(res.$clusterTime.clusterTime, Timestamp(0, 0)), 1);
         } else {
-            assert.eq(bsonWoCompare(res.$logicalTime.clusterTime, Timestamp(0, 0)), 0);
+            assert.eq(bsonWoCompare(res.$clusterTime.clusterTime, Timestamp(0, 0)), 0);
         }
     }
 }

@@ -1,31 +1,31 @@
 /**
- * Verifies mismatching logical time objects are rejected by a sharded cluster when auth is on. In
+ * Verifies mismatching cluster time objects are rejected by a sharded cluster when auth is on. In
  * noPassthrough because auth is manually set.
  */
 (function() {
     "use strict";
 
-    // Given a valid logical time object, returns one with the same signature, but a mismatching
+    // Given a valid cluster time object, returns one with the same signature, but a mismatching
     // cluster time.
     function mismatchingLogicalTime(lt) {
         return Object.merge(lt, {clusterTime: Timestamp(lt.clusterTime.getTime() + 100, 0)});
     }
 
     function assertRejectsMismatchingLogicalTime(db) {
-        let validTime = db.runCommand({isMaster: 1}).$logicalTime;
+        let validTime = db.runCommand({isMaster: 1}).$clusterTime;
         let mismatchingTime = mismatchingLogicalTime(validTime);
 
         assert.commandFailedWithCode(
-            db.runCommand({isMaster: 1, $logicalTime: mismatchingTime}),
+            db.runCommand({isMaster: 1, $clusterTime: mismatchingTime}),
             ErrorCodes.TimeProofMismatch,
-            "expected command with mismatching logical time and signature to be rejected");
+            "expected command with mismatching cluster time and signature to be rejected");
     }
 
     function assertAcceptsValidLogicalTime(db) {
-        let validTime = db.runCommand({isMaster: 1}).$logicalTime;
+        let validTime = db.runCommand({isMaster: 1}).$clusterTime;
         assert.commandWorked(
-            testDB.runCommand({isMaster: 1, $logicalTime: validTime}),
-            "expected command with valid logical time and signature to be accepted");
+            testDB.runCommand({isMaster: 1, $clusterTime: validTime}),
+            "expected command with valid cluster time and signature to be accepted");
     }
 
     // Start the sharding test with auth on.
@@ -48,7 +48,7 @@
 
     const testDB = st.s.getDB("test");
 
-    // Unsharded collections reject mismatching logical times and accept valid ones.
+    // Unsharded collections reject mismatching cluster times and accept valid ones.
     assertRejectsMismatchingLogicalTime(testDB);
     assertAcceptsValidLogicalTime(testDB);
 
@@ -57,7 +57,7 @@
     assert.commandWorked(
         testDB.adminCommand({shardCollection: testDB.foo.getFullName(), key: {_id: 1}}));
 
-    // Sharded collections reject mismatching logical times and accept valid ones.
+    // Sharded collections reject mismatching cluster times and accept valid ones.
     assertRejectsMismatchingLogicalTime(testDB);
     assertAcceptsValidLogicalTime(testDB);
 

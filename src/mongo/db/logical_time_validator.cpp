@@ -85,7 +85,7 @@ SignedLogicalTime LogicalTimeValidator::_getProof(const KeysCollectionDocument& 
     auto key = keyDoc.getKey();
 
     // Compare and calculate HMAC inside mutex to prevent multiple threads computing HMAC for the
-    // same logical time.
+    // same cluster time.
     stdx::lock_guard<stdx::mutex> lk(_mutex);
     // Note: _lastSeenValidTime will initially not have a proof set.
     if (newTime == _lastSeenValidTime.getTime() && _lastSeenValidTime.getProof()) {
@@ -149,8 +149,8 @@ Status LogicalTimeValidator::validate(OperationContext* opCtx, const SignedLogic
     const auto& key = keyStatus.getValue().getKey();
 
     const auto newProof = newTime.getProof();
-    // Logical time is only sent if a server's clock can verify and sign logical times, so any
-    // received logical times should have proofs.
+    // Cluster time is only sent if a server's clock can verify and sign cluster times, so any
+    // received cluster times should have proofs.
     invariant(newProof);
 
     auto res = _timeProofService.checkProof(newTime.getTime(), newProof.get(), key);

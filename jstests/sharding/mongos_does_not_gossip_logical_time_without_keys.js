@@ -1,5 +1,5 @@
 /**
- * Tests that mongos does not gossip logical time metadata until at least one key is created on the
+ * Tests that mongos does not gossip cluster time metadata until at least one key is created on the
  * config server, and that it does not block waiting for keys at startup.
  */
 
@@ -10,19 +10,19 @@
     load("jstests/multiVersion/libs/multi_cluster.js");  // For restartMongoses.
 
     function assertContainsValidLogicalTime(res) {
-        assert.hasFields(res, ["$logicalTime"]);
-        assert.hasFields(res.$logicalTime, ["signature", "clusterTime"]);
+        assert.hasFields(res, ["$clusterTime"]);
+        assert.hasFields(res.$clusterTime, ["signature", "clusterTime"]);
         // clusterTime must be greater than the uninitialzed value.
-        assert.eq(bsonWoCompare(res.$logicalTime.clusterTime, Timestamp(0, 0)), 1);
-        assert.hasFields(res.$logicalTime.signature, ["hash", "keyId"]);
+        assert.eq(bsonWoCompare(res.$clusterTime.clusterTime, Timestamp(0, 0)), 1);
+        assert.hasFields(res.$clusterTime.signature, ["hash", "keyId"]);
         // The signature must have been signed by a key with a valid generation.
-        assert(res.$logicalTime.signature.keyId > NumberLong(0));
+        assert(res.$clusterTime.signature.keyId > NumberLong(0));
     }
 
     let st = new ShardingTest({shards: {rs0: {nodes: 2}}});
 
     // Verify there are keys in the config server eventually, since mongos doesn't block for keys at
-    // startup, and that once there are, mongos sends $logicalTime with a signature in responses.
+    // startup, and that once there are, mongos sends $clusterTime with a signature in responses.
     assert.soonNoExcept(function() {
         assert(st.s.getDB("admin").system.keys.count() >= 2);
 
@@ -30,7 +30,7 @@
         assertContainsValidLogicalTime(res);
 
         return true;
-    }, "expected keys to be created and for mongos to send signed logical times");
+    }, "expected keys to be created and for mongos to send signed cluster times");
 
     // Enable the failpoint, remove all keys, and restart the config servers with the failpoint
     // still enabled to guarantee there are no keys.
@@ -57,11 +57,11 @@
     // Mongos should restart with no problems.
     st.restartMongoses();
 
-    // There should be no logical time metadata in mongos responses.
+    // There should be no cluster time metadata in mongos responses.
     res = assert.commandWorked(st.s.getDB("test").runCommand({isMaster: 1}));
     assert.throws(function() {
         assertContainsValidLogicalTime(res);
-    }, [], "expected mongos to not return logical time metadata");
+    }, [], "expected mongos to not return cluster time metadata");
 
     // Disable the failpoint.
     for (let i = 0; i < st.configRS.nodes.length; i++) {
@@ -69,11 +69,11 @@
             {"configureFailPoint": "disableKeyGeneration", "mode": "off"}));
     }
 
-    // Eventually mongos will discover the new keys, and start signing logical times.
+    // Eventually mongos will discover the new keys, and start signing cluster times.
     assert.soonNoExcept(function() {
         assertContainsValidLogicalTime(st.s.getDB("test").runCommand({isMaster: 1}));
         return true;
-    }, "expected mongos to eventually start signing logical times", 60 * 1000);  // 60 seconds.
+    }, "expected mongos to eventually start signing cluster times", 60 * 1000);  // 60 seconds.
 
     // There may be a delay between the creation of the first and second keys, but mongos will start
     // signing after seeing the first key, so there is only guaranteed to be one at this point.

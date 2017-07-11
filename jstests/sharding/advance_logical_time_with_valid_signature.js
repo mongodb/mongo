@@ -1,5 +1,5 @@
 /**
- * Tests that the mongo shell can use a logical time with a valid signature to advance a server's
+ * Tests that the mongo shell can use a cluster time with a valid signature to advance a server's
  * cluster time.
  */
 (function() {
@@ -26,16 +26,16 @@
     // Get logicalTime metadata from the connected mongos's response and send it in an isMaster
     // command to the disconnected mongos. isMaster does not require mongos to contact any other
     // servers, so the command should succeed.
-    let lt = res.$logicalTime;
+    let lt = res.$clusterTime;
     res = assert.commandWorked(
-        disconnectedDB.runCommand({isMaster: 1, $logicalTime: lt}),
-        "expected the disconnected mongos to accept logical time: " + tojson(lt));
+        disconnectedDB.runCommand({isMaster: 1, $clusterTime: lt}),
+        "expected the disconnected mongos to accept cluster time: " + tojson(lt));
 
-    // Verify logical time response from the disconnected mongos matches what was passed.
+    // Verify cluster time response from the disconnected mongos matches what was passed.
     assert.eq(lt,
-              res.$logicalTime,
-              "expected the disconnected mongos to send logical time: " + tojson(lt) +
-                  ", received: " + tojson(res.$logicalTime));
+              res.$clusterTime,
+              "expected the disconnected mongos to send cluster time: " + tojson(lt) +
+                  ", received: " + tojson(res.$clusterTime));
 
     st.stop();
 })();

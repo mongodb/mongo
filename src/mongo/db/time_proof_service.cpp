@@ -75,7 +75,7 @@ TimeProofService::TimeProof TimeProofService::getProof(LogicalTime time, const K
 Status TimeProofService::checkProof(LogicalTime time, const TimeProof& proof, const Key& key) {
     auto myProof = getProof(time, key);
     if (myProof != proof) {
-        return Status(ErrorCodes::TimeProofMismatch, "Proof does not match the logical time");
+        return Status(ErrorCodes::TimeProofMismatch, "Proof does not match the cluster time");
     }
     return Status::OK();
 }

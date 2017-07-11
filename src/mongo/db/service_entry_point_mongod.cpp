@@ -260,7 +260,7 @@ void appendReplyMetadata(OperationContext* opCtx,
             if (serverGlobalParams.featureCompatibility.version.load() ==
                 ServerGlobalParams::FeatureCompatibility::Version::k36) {
                 if (LogicalTimeValidator::isAuthorizedToAdvanceClock(opCtx)) {
-                    // No need to sign logical times for internal clients.
+                    // No need to sign cluster times for internal clients.
                     SignedLogicalTime currentTime(LogicalClock::get(opCtx)->getClusterTime(),
                                                   TimeProofService::TimeProof(),
                                                   0);
@@ -328,7 +328,7 @@ void _waitForWriteConcernAndAddToCommandResponse(OperationContext* opCtx,
 
 /**
  * For replica set members it returns the last known op time from opCtx. Otherwise will return
- * uninitialized logical time.
+ * uninitialized cluster time.
  */
 LogicalTime getClientOperationTime(OperationContext* opCtx) {
     repl::ReplicationCoordinator* replCoord =
@@ -346,7 +346,7 @@ LogicalTime getClientOperationTime(OperationContext* opCtx) {
 /**
  * Returns the proper operationTime for a command. To construct the operationTime for replica set
  * members, it uses the last optime in the oplog for writes, last committed optime for majority
- * reads, and the last applied optime for every other read. An uninitialized logical time is
+ * reads, and the last applied optime for every other read. An uninitialized cluster time is
  * returned for non replica set members.
  */
 LogicalTime computeOperationTime(OperationContext* opCtx,

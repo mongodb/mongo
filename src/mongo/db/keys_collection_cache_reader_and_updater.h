@@ -39,7 +39,7 @@ class ShardingCatalogClient;
 
 /**
  * Keeps a local cache of the keys with the ability to refresh. The refresh method also makes sure
- * that there will be valid keys available to sign the current logical time and there will be
+ * that there will be valid keys available to sign the current cluster time and there will be
  * another key ready after the current key expires.
  *
  * Assumptions and limitations:

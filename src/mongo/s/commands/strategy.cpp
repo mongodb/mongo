@@ -128,7 +128,7 @@ Status processCommandMetadata(OperationContext* opCtx, const BSONObj& cmdObj) {
 void appendRequiredFieldsToResponse(OperationContext* opCtx, BSONObjBuilder* responseBuilder) {
     auto validator = LogicalTimeValidator::get(opCtx);
     if (validator->shouldGossipLogicalTime()) {
-        // Add $logicalTime.
+        // Add $clusterTime.
         auto currentTime =
             validator->signLogicalTime(opCtx, LogicalClock::get(opCtx)->getClusterTime());
         rpc::LogicalTimeMetadata(currentTime).writeToMetadata(responseBuilder);

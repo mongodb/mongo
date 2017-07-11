@@ -36,7 +36,7 @@
 namespace mongo {
 
 /**
- * The TimeProofService holds the key used by mongod and mongos processes to verify logical times
+ * The TimeProofService holds the key used by mongod and mongos processes to verify cluster times
  * and contains the logic to generate this key. As a performance optimization to avoid expensive
  * signature generation the class also holds the cache.
  */

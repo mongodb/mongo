@@ -1,6 +1,6 @@
 /**
  * Tests upgrading a cluster with two shards and two mongos servers from last stable to current
- * version, verifying the behavior of $logicalTime metadata and afterClusterTime commands throughout
+ * version, verifying the behavior of $clusterTime metadata and afterClusterTime commands throughout
  * the process.
  */
 (function() {
@@ -96,7 +96,7 @@
     assertAfterClusterTimeReadFails(st.rs0.getPrimary().getDB("test"), "foo");
     assertAfterClusterTimeReadFails(st.rs1.getPrimary().getDB("test"), "foo");
 
-    // Neither mongos returns logical time or operation time, because there are no keys in the
+    // Neither mongos returns cluster time or operation time, because there are no keys in the
     // config server, since feature compatibility version is still 3.4.
     assertDoesNotContainLogicalOrOperationTime(st.s0.getDB("test").runCommand({isMaster: 1}));
     assertDoesNotContainLogicalOrOperationTime(st.s1.getDB("test").runCommand({isMaster: 1}));
@@ -112,7 +112,7 @@
     // Set feature compatibility version to 3.6 on one mongos.
     assert.commandWorked(st.s0.getDB("admin").runCommand({setFeatureCompatibilityVersion: "3.6"}));
 
-    // Now shards and config servers return dummy signed logical times and operation times.
+    // Now shards and config servers return dummy signed cluster times and operation times.
     assertContainsLogicalAndOperationTime(
         st.rs0.getPrimary().getDB("test").runCommand({isMaster: 1}),
         {initialized: true, signed: false});
@@ -124,7 +124,7 @@
         {initialized: true, signed: false});
 
     // Once the config primary creates keys, both mongos servers discover them and start returning
-    // signed logical times.
+    // signed cluster times.
     assert.soonNoExcept(function() {
         assertContainsLogicalAndOperationTime(st.s0.getDB("test").runCommand({isMaster: 1}),
                                               {initialized: true, signed: true});
