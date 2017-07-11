@@ -1328,10 +1328,16 @@ intrusive_ptr<Expression> ExpressionDateFromString::parse(
             expr.type() == BSONType::Object);
 
     BSONElement dateStringElem;
+    BSONElement timeZoneElem;
+
     const BSONObj args = expr.embeddedObject();
     for (auto&& arg : args) {
-        if (arg.fieldNameStringData() == "dateString"_sd) {
+        auto field = arg.fieldNameStringData();
+
+        if (field == "dateString"_sd) {
             dateStringElem = arg;
+        } else if (field == "timezone"_sd) {
+            timeZoneElem = arg;
         } else {
             uasserted(40541,
                       str::stream() << "Unrecognized argument to $dateFromString: "
@@ -1341,17 +1347,25 @@ intrusive_ptr<Expression> ExpressionDateFromString::parse(
 
     uassert(40542, "Missing 'dateString' parameter to $dateFromString", dateStringElem);
 
-    return new ExpressionDateFromString(expCtx, parseOperand(expCtx, dateStringElem, vps));
+    return new ExpressionDateFromString(expCtx,
+                                        parseOperand(expCtx, dateStringElem, vps),
+                                        timeZoneElem ? parseOperand(expCtx, timeZoneElem, vps)
+                                                     : nullptr);
 }
 
 ExpressionDateFromString::ExpressionDateFromString(
-    const boost::intrusive_ptr<ExpressionContext>& expCtx, intrusive_ptr<Expression> dateString)
-    : Expression(expCtx), _dateString(dateString) {}
+    const boost::intrusive_ptr<ExpressionContext>& expCtx,
+    intrusive_ptr<Expression> dateString,
+    intrusive_ptr<Expression> timeZone)
+    : Expression(expCtx), _dateString(dateString), _timeZone(timeZone) {}
 
 intrusive_ptr<Expression> ExpressionDateFromString::optimize() {
     _dateString = _dateString->optimize();
+    if (_timeZone) {
+        _timeZone = _timeZone->optimize();
+    }
 
-    if (dynamic_cast<ExpressionConstant*>(_dateString.get())) {
+    if (ExpressionConstant::allNullOrConstant({_dateString, _timeZone})) {
         // Everything is a constant, so we can turn into a constant.
         return ExpressionConstant::create(getExpressionContext(), evaluate(Document{}));
     }
@@ -1360,13 +1374,18 @@ intrusive_ptr<Expression> ExpressionDateFromString::optimize() {
 
 Value ExpressionDateFromString::serialize(bool explain) const {
     return Value(
-        Document{{"$dateFromString", Document{{"dateString", _dateString->serialize(explain)}}}});
+        Document{{"$dateFromString",
+                  Document{{"dateString", _dateString->serialize(explain)},
+                           {"timezone", _timeZone ? _timeZone->serialize(explain) : Value()}}}});
 }
 
 Value ExpressionDateFromString::evaluate(const Document& root) const {
     const Value dateString = _dateString->evaluate(root);
 
-    if (dateString.nullish()) {
+    auto timeZone = makeTimeZone(
+        TimeZoneDatabase::get(getExpressionContext()->opCtx->getServiceContext()), root, _timeZone);
+
+    if (!timeZone || dateString.nullish()) {
         return Value(BSONNULL);
     }
 
@@ -1380,11 +1399,14 @@ Value ExpressionDateFromString::evaluate(const Document& root) const {
 
     auto tzdb = TimeZoneDatabase::get(getExpressionContext()->opCtx->getServiceContext());
 
-    return Value(tzdb->fromString(dateTimeString));
+    return Value(tzdb->fromString(dateTimeString, timeZone));
 }
 
 void ExpressionDateFromString::addDependencies(DepsTracker* deps) const {
     _dateString->addDependencies(deps);
+    if (_timeZone) {
+        _timeZone->addDependencies(deps);
+    }
 }
 
 /* ---------------------- ExpressionDateToParts ----------------------- */

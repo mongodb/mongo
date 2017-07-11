@@ -4988,10 +4988,25 @@ TEST_F(ExpressionDateFromStringTest, SerializesToObjectSyntax) {
 
     ASSERT_VALUE_EQ(dateExp->serialize(true), expectedSerialization);
     ASSERT_VALUE_EQ(dateExp->serialize(false), expectedSerialization);
+
+    // Test that it serializes to the full format if given an object specification.
+    spec = BSON("$dateFromString" << BSON("dateString"
+                                          << "2017-07-04T13:06:44Z"
+                                          << "timezone"
+                                          << "Europe/London"));
+    dateExp = Expression::parseExpression(expCtx, spec, expCtx->variablesParseState);
+    expectedSerialization =
+        Value(Document{{"$dateFromString",
+                        Document{{"dateString", Document{{"$const", "2017-07-04T13:06:44Z"_sd}}},
+                                 {"timezone", Document{{"$const", "Europe/London"_sd}}}}}});
+
+    ASSERT_VALUE_EQ(dateExp->serialize(true), expectedSerialization);
+    ASSERT_VALUE_EQ(dateExp->serialize(false), expectedSerialization);
 }
 
 TEST_F(ExpressionDateFromStringTest, OptimizesToConstantIfAllInputsAreConstant) {
     auto expCtx = getExpCtx();
+    // Test that it becomes a constant with just the dateString.
     auto spec = BSON("$dateFromString" << BSON("dateString"
                                                << "2017-07-04T13:09:57Z"));
     auto dateExp = Expression::parseExpression(expCtx, spec, expCtx->variablesParseState);
@@ -5000,11 +5015,89 @@ TEST_F(ExpressionDateFromStringTest, OptimizesToConstantIfAllInputsAreConstant) 
     Date_t dateVal = Date_t::fromMillisSinceEpoch(1499173797000);
     ASSERT_VALUE_EQ(Value(dateVal), dateExp->evaluate(Document{}));
 
+    // Test that it becomes a constant with the dateString and timezone being a constant.
+    spec = BSON("$dateFromString" << BSON("dateString"
+                                          << "2017-07-04T13:09:57"
+                                          << "timezone"
+                                          << "Europe/London"));
+    dateExp = Expression::parseExpression(expCtx, spec, expCtx->variablesParseState);
+    ASSERT(dynamic_cast<ExpressionConstant*>(dateExp->optimize().get()));
+
+    dateVal = Date_t::fromMillisSinceEpoch(1499170197000);
+    ASSERT_VALUE_EQ(Value(dateVal), dateExp->evaluate(Document{}));
+
     // Test that it does *not* become a constant if dateString is not a constant.
     spec = BSON("$dateFromString" << BSON("dateString"
                                           << "$date"));
     dateExp = Expression::parseExpression(expCtx, spec, expCtx->variablesParseState);
     ASSERT_FALSE(dynamic_cast<ExpressionConstant*>(dateExp->optimize().get()));
+
+    // Test that it does *not* become a constant if timezone is not a constant.
+    spec = BSON("$dateFromString" << BSON("dateString"
+                                          << "2017-07-04T13:09:57Z"
+                                          << "timezone"
+                                          << "$tz"));
+    dateExp = Expression::parseExpression(expCtx, spec, expCtx->variablesParseState);
+    ASSERT_FALSE(dynamic_cast<ExpressionConstant*>(dateExp->optimize().get()));
+}
+
+TEST_F(ExpressionDateFromStringTest, RejectsUnparsableString) {
+    auto expCtx = getExpCtx();
+
+    auto spec = BSON("$dateFromString" << BSON("dateString"
+                                               << "60.Monday1770/06:59"));
+    auto dateExp = Expression::parseExpression(expCtx, spec, expCtx->variablesParseState);
+    ASSERT_THROWS_CODE(dateExp->evaluate({}), UserException, 40553);
+}
+
+TEST_F(ExpressionDateFromStringTest, RejectsTimeZoneInString) {
+    auto expCtx = getExpCtx();
+
+    auto spec = BSON("$dateFromString" << BSON("dateString"
+                                               << "2017-07-13T10:02:57 Europe/London"));
+    auto dateExp = Expression::parseExpression(expCtx, spec, expCtx->variablesParseState);
+    ASSERT_THROWS_CODE(dateExp->evaluate({}), UserException, 40553);
+
+    spec = BSON("$dateFromString" << BSON("dateString"
+                                          << "July 4, 2017 Europe/London"));
+    dateExp = Expression::parseExpression(expCtx, spec, expCtx->variablesParseState);
+    ASSERT_THROWS_CODE(dateExp->evaluate({}), UserException, 40553);
+}
+
+TEST_F(ExpressionDateFromStringTest, RejectsTimeZoneInStringAndArgument) {
+    auto expCtx = getExpCtx();
+
+    // Test with "Z" and timezone
+    auto spec = BSON("$dateFromString" << BSON("dateString"
+                                               << "2017-07-14T15:24:38Z"
+                                               << "timezone"
+                                               << "Europe/London"));
+    auto dateExp = Expression::parseExpression(expCtx, spec, expCtx->variablesParseState);
+    ASSERT_THROWS_CODE(dateExp->evaluate({}), UserException, 40551);
+
+    // Test with timezone abbreviation and timezone
+    spec = BSON("$dateFromString" << BSON("dateString"
+                                          << "2017-07-14T15:24:38 PDT"
+                                          << "timezone"
+                                          << "Europe/London"));
+    dateExp = Expression::parseExpression(expCtx, spec, expCtx->variablesParseState);
+    ASSERT_THROWS_CODE(dateExp->evaluate({}), UserException, 40551);
+
+    // Test with GMT offset and timezone
+    spec = BSON("$dateFromString" << BSON("dateString"
+                                          << "2017-07-14T15:24:38+02:00"
+                                          << "timezone"
+                                          << "Europe/London"));
+    dateExp = Expression::parseExpression(expCtx, spec, expCtx->variablesParseState);
+    ASSERT_THROWS_CODE(dateExp->evaluate({}), UserException, 40554);
+
+    // Test with GMT offset and GMT timezone
+    spec = BSON("$dateFromString" << BSON("dateString"
+                                          << "2017-07-14 -0400"
+                                          << "timezone"
+                                          << "GMT"));
+    dateExp = Expression::parseExpression(expCtx, spec, expCtx->variablesParseState);
+    ASSERT_THROWS_CODE(dateExp->evaluate({}), UserException, 40554);
 }
 
 }  // namespace ExpressionDateFromStringTest

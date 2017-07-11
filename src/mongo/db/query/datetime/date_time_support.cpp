@@ -92,6 +92,11 @@ void TimeZoneDatabase::TimeZoneDBDeleter::operator()(timelib_tzdb* timeZoneDatab
     }
 }
 
+void TimeZoneDatabase::TimelibErrorContainerDeleter::operator()(
+    timelib_error_container* errorContainer) {
+    timelib_error_container_dtor(errorContainer);
+}
+
 void TimeZoneDatabase::loadTimeZoneInfo(
     std::unique_ptr<timelib_tzdb, TimeZoneDBDeleter> timeZoneDatabase) {
     invariant(timeZoneDatabase);
@@ -113,6 +118,7 @@ void TimeZoneDatabase::loadTimeZoneInfo(
                                << "\": "
                                << timelib_get_error_message(errorCode)});
         }
+
         invariant(errorCode == TIMELIB_ERROR_NO_ERROR);
         _timeZones[entry.id] = TimeZone{tzInfo};
     }
@@ -128,22 +134,59 @@ static timelib_tzinfo* timezonedatabase_gettzinfowrapper(char* tz_id,
     return nullptr;
 }
 
-Date_t TimeZoneDatabase::fromString(StringData dateString) const {
-    std::unique_ptr<timelib_time, TimeZone::TimelibTimeDeleter> t(
+Date_t TimeZoneDatabase::fromString(StringData dateString, boost::optional<TimeZone> tz) const {
+    std::unique_ptr<timelib_error_container, TimeZoneDatabase::TimelibErrorContainerDeleter>
+        errors{};
+    timelib_error_container* rawErrors;
+
+    std::unique_ptr<timelib_time, TimeZone::TimelibTimeDeleter> parsedTime(
         timelib_strtotime(const_cast<char*>(dateString.toString().c_str()),
                           dateString.size(),
-                          nullptr,
+                          &rawErrors,
                           _timeZoneDatabase.get(),
                           timezonedatabase_gettzinfowrapper));
+    errors.reset(rawErrors);
 
-    // If the time portion is fully missing, initialize to 0. This allows for the '%Y-%m-%d' format
-    // to be passed too, which is what the BI connector may request
-    if (t->h == TIMELIB_UNSET && t->i == TIMELIB_UNSET && t->s == TIMELIB_UNSET) {
-        t->h = t->i = t->s = t->us = 0;
+    // If the parsed string has a warning or error, throw an error.
+    if (errors->warning_count || errors->error_count) {
+        StringBuilder sb;
+
+        sb << "Error parsing date string '" << dateString << "'";
+
+        for (int i = 0; i < errors->error_count; ++i) {
+            auto error = errors->error_messages[i];
+
+            sb << "; " << error.position << ": ";
+            // We need to override the error message for unknown time zone identifiers, as we never
+            // make them available. We also change the error code to signal this is a different
+            // error than a normal parse error.
+            if (error.error_code == TIMELIB_ERR_TZID_NOT_FOUND) {
+                sb << "passing a time zone identifier as part of the string is not allowed";
+            } else {
+                sb << error.message;
+            }
+            sb << " '" << error.character << "'";
+        }
+
+        for (int i = 0; i < errors->warning_count; ++i) {
+            sb << "; " << errors->warning_messages[i].position << ": "
+               << errors->warning_messages[i].message << " '"
+               << errors->warning_messages[i].character << "'";
+        }
+
+        uasserted(40553, sb.str());
     }
 
-    if (t->y == TIMELIB_UNSET || t->m == TIMELIB_UNSET || t->d == TIMELIB_UNSET ||
-        t->h == TIMELIB_UNSET || t->i == TIMELIB_UNSET || t->s == TIMELIB_UNSET) {
+    // If the time portion is fully missing, initialize to 0. This allows for the '%Y-%m-%d' format
+    // to be passed too.
+    if (parsedTime->h == TIMELIB_UNSET && parsedTime->i == TIMELIB_UNSET &&
+        parsedTime->s == TIMELIB_UNSET) {
+        parsedTime->h = parsedTime->i = parsedTime->s = parsedTime->us = 0;
+    }
+
+    if (parsedTime->y == TIMELIB_UNSET || parsedTime->m == TIMELIB_UNSET ||
+        parsedTime->d == TIMELIB_UNSET || parsedTime->h == TIMELIB_UNSET ||
+        parsedTime->i == TIMELIB_UNSET || parsedTime->s == TIMELIB_UNSET) {
         uasserted(40545,
                   str::stream()
                       << "an incomplete date/time string has been found, with elements missing: \""
@@ -151,11 +194,43 @@ Date_t TimeZoneDatabase::fromString(StringData dateString) const {
                       << "\"");
     }
 
-    timelib_update_ts(t.get(), nullptr);
-    timelib_unixtime2local(t.get(), t->sse);
+    if (tz && !tz->isUtcZone()) {
+        switch (parsedTime->zone_type) {
+            case 0:
+                // Do nothing, as this indicates there is no associated time zone information.
+                break;
+            case 1:
+                uasserted(40554,
+                          "you cannot pass in a date/time string with GMT "
+                          "offset together with a timezone argument");
+                break;
+            case 2:
+                uasserted(
+                    40551,
+                    str::stream()
+                        << "you cannot pass in a date/time string with time zone information ('"
+                        << parsedTime.get()->tz_abbr
+                        << "') together with a timezone argument");
+                break;
+            default:  // should technically not be possible to reach
+                uasserted(40552,
+                          "you cannot pass in a date/time string with "
+                          "time zone information and a timezone argument "
+                          "at the same time");
+                break;
+        }
+
+        // _tzInfo, although private, can be accessed because TimeZoneDatabase is a friend of
+        // TimeZone.
+        timelib_update_ts(parsedTime.get(), tz->_tzInfo.get());
+    } else {
+        timelib_update_ts(parsedTime.get(), nullptr);
+    }
+
+    timelib_unixtime2local(parsedTime.get(), parsedTime->sse);
 
     return Date_t::fromMillisSinceEpoch(
-        durationCount<Milliseconds>(Seconds(t->sse) + Microseconds(t->us)));
+        durationCount<Milliseconds>(Seconds(parsedTime->sse) + Microseconds(parsedTime->us)));
 }
 
 TimeZone TimeZoneDatabase::getTimeZone(StringData timeZoneId) const {
@@ -170,28 +245,28 @@ TimeZone TimeZoneDatabase::getTimeZone(StringData timeZoneId) const {
 
 Date_t TimeZone::createFromDateParts(
     int year, int month, int day, int hour, int minute, int second, int millisecond) const {
-    auto t = timelib_time_ctor();
+    auto newTime = timelib_time_ctor();
 
-    t->y = year;
-    t->m = month;
-    t->d = day;
-    t->h = hour;
-    t->i = minute;
-    t->s = second;
-    t->us = durationCount<Microseconds>(Milliseconds(millisecond));
+    newTime->y = year;
+    newTime->m = month;
+    newTime->d = day;
+    newTime->h = hour;
+    newTime->i = minute;
+    newTime->s = second;
+    newTime->us = durationCount<Microseconds>(Milliseconds(millisecond));
 
     if (_tzInfo) {
-        timelib_update_ts(t, _tzInfo.get());
-        timelib_set_timezone(t, _tzInfo.get());
+        timelib_update_ts(newTime, _tzInfo.get());
+        timelib_set_timezone(newTime, _tzInfo.get());
     } else {
-        timelib_update_ts(t, nullptr);
+        timelib_update_ts(newTime, nullptr);
     }
-    timelib_unixtime2gmt(t, t->sse);
+    timelib_unixtime2gmt(newTime, newTime->sse);
 
     auto returnValue = Date_t::fromMillisSinceEpoch(
-        durationCount<Milliseconds>(Seconds(t->sse) + Microseconds(t->us)));
+        durationCount<Milliseconds>(Seconds(newTime->sse) + Microseconds(newTime->us)));
 
-    timelib_time_dtor(t);
+    timelib_time_dtor(newTime);
 
     return returnValue;
 }
@@ -203,26 +278,27 @@ Date_t TimeZone::createFromIso8601DateParts(int isoYear,
                                             int minute,
                                             int second,
                                             int millisecond) const {
-    auto t = timelib_time_ctor();
+    auto newTime = timelib_time_ctor();
 
-    timelib_date_from_isodate(isoYear, isoWeekYear, isoDayOfWeek, &t->y, &t->m, &t->d);
-    t->h = hour;
-    t->i = minute;
-    t->s = second;
-    t->us = durationCount<Microseconds>(Milliseconds(millisecond));
+    timelib_date_from_isodate(
+        isoYear, isoWeekYear, isoDayOfWeek, &newTime->y, &newTime->m, &newTime->d);
+    newTime->h = hour;
+    newTime->i = minute;
+    newTime->s = second;
+    newTime->us = durationCount<Microseconds>(Milliseconds(millisecond));
 
     if (_tzInfo) {
-        timelib_update_ts(t, _tzInfo.get());
-        timelib_set_timezone(t, _tzInfo.get());
+        timelib_update_ts(newTime, _tzInfo.get());
+        timelib_set_timezone(newTime, _tzInfo.get());
     } else {
-        timelib_update_ts(t, nullptr);
+        timelib_update_ts(newTime, nullptr);
     }
-    timelib_unixtime2gmt(t, t->sse);
+    timelib_unixtime2gmt(newTime, newTime->sse);
 
     auto returnValue = Date_t::fromMillisSinceEpoch(
-        durationCount<Milliseconds>(Seconds(t->sse) + Microseconds(t->us)));
+        durationCount<Milliseconds>(Seconds(newTime->sse) + Microseconds(newTime->us)));
 
-    timelib_time_dtor(t);
+    timelib_time_dtor(newTime);
 
     return returnValue;
 }

@@ -842,9 +842,11 @@ public:
 
 private:
     ExpressionDateFromString(const boost::intrusive_ptr<ExpressionContext>& expCtx,
-                             boost::intrusive_ptr<Expression> dateString);
+                             boost::intrusive_ptr<Expression> dateString,
+                             boost::intrusive_ptr<Expression> timeZone);
 
     boost::intrusive_ptr<Expression> _dateString;
+    boost::intrusive_ptr<Expression> _timeZone;
 };
 
 class ExpressionDateFromParts final : public Expression {

@@ -36,6 +36,7 @@
 #include "mongo/util/string_map.h"
 #include "mongo/util/time_support.h"
 
+struct timelib_error_container;
 struct timelib_time;
 struct _timelib_tzdb;
 struct timelib_tzinfo;
@@ -48,6 +49,8 @@ namespace mongo {
  * for the hour, minute, or second of a date, even when given the same date.
  */
 class TimeZone {
+    friend class TimeZoneDatabase;
+
 public:
     /**
      * A struct with member variables describing the different parts of the date.
@@ -121,6 +124,13 @@ public:
      * part of 2014 by the ISO standard.
      */
     long long isoYear(Date_t) const;
+
+    /**
+     * Returns whether this is the zone representing UTC.
+     */
+    bool isUtcZone() const {
+        return _tzInfo == nullptr;
+    }
 
     /**
      * Returns the weekday number, ranging from 1 (for Sunday) to 7 (for Saturday).
@@ -308,6 +318,14 @@ public:
     };
 
     /**
+     * A custom-deleter which destructs a timelib_error_container* when it goes out of scope.
+     */
+    struct TimelibErrorContainerDeleter {
+        TimelibErrorContainerDeleter() = default;
+        void operator()(timelib_error_container* errorContainer);
+    };
+
+    /**
      * Returns the TimeZoneDatabase object associated with the specified service context.
      */
     static const TimeZoneDatabase* get(ServiceContext* serviceContext);
@@ -319,9 +337,21 @@ public:
                     std::unique_ptr<TimeZoneDatabase> timeZoneDatabase);
 
     /**
-     * Use the timezone database to create a Date_t from a string.
+     * Constructs a Date_t from a string description of a date.
+     *
+     * 'dateString' may contain time zone information if the information is simply an offset from
+     * UTC, in which case the returned Date_t will be adjusted accordingly.
+     *
+     * Throws a UserException if any of the following occur:
+     *  * The string cannot be parsed into a date.
+     *  * The string specifies a time zone that is not simply an offset from UTC, like
+     *    in the string "July 4, 2017 America/New_York".
+     *  * 'tz' is provided, but 'dateString' specifies a timezone, like 'Z' in the
+     *    string '2017-07-04T00:00:00Z'.
+     *  * 'tz' is provided, but 'dateString' specifies an offset from UTC, like '-0400'
+     *    in the string '2017-07-04 -0400'.
      */
-    Date_t fromString(StringData dateString) const;
+    Date_t fromString(StringData dateString, boost::optional<TimeZone> tz) const;
 
     /**
      * Returns a TimeZone object representing the UTC time zone.
