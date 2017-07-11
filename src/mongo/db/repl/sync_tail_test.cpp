@@ -91,19 +91,19 @@ protected:
 class SyncTailWithLocalDocumentFetcher : public SyncTail {
 public:
     SyncTailWithLocalDocumentFetcher(const BSONObj& document);
-    BSONObj getMissingDoc(OperationContext* txn, Database* db, const BSONObj& o) override;
+    BSONObj getMissingDoc(OperationContext* txn, const BSONObj& o) override;
 
 private:
     BSONObj _document;
 };
 
 /**
- * Testing-only SyncTail that checks the operation context in shouldRetry().
+ * Testing-only SyncTail that checks the operation context in fetchAndInsertMissingDocument().
  */
 class SyncTailWithOperationContextChecker : public SyncTail {
 public:
     SyncTailWithOperationContextChecker();
-    bool shouldRetry(OperationContext* txn, const BSONObj& o) override;
+    bool fetchAndInsertMissingDocument(OperationContext* txn, const BSONObj& o) override;
 };
 
 void SyncTailTest::setUp() {
@@ -142,16 +142,15 @@ void SyncTailTest::tearDown() {
 SyncTailWithLocalDocumentFetcher::SyncTailWithLocalDocumentFetcher(const BSONObj& document)
     : SyncTail(nullptr, SyncTail::MultiSyncApplyFunc(), nullptr), _document(document) {}
 
-BSONObj SyncTailWithLocalDocumentFetcher::getMissingDoc(OperationContext*,
-                                                        Database*,
-                                                        const BSONObj&) {
+BSONObj SyncTailWithLocalDocumentFetcher::getMissingDoc(OperationContext*, const BSONObj&) {
     return _document;
 }
 
 SyncTailWithOperationContextChecker::SyncTailWithOperationContextChecker()
     : SyncTail(nullptr, SyncTail::MultiSyncApplyFunc(), nullptr) {}
 
-bool SyncTailWithOperationContextChecker::shouldRetry(OperationContext* txn, const BSONObj&) {
+bool SyncTailWithOperationContextChecker::fetchAndInsertMissingDocument(OperationContext* txn,
+                                                                        const BSONObj&) {
     ASSERT_FALSE(txn->writesAreReplicated());
     ASSERT_FALSE(txn->lockState()->shouldConflictWithSecondaryBatchApplication());
     ASSERT_TRUE(documentValidationDisabled(txn));
@@ -869,8 +868,7 @@ TEST_F(SyncTailTest, MultiInitialSyncApplyDisablesDocumentValidationWhileApplyin
     ASSERT_EQUALS(fetchCount.load(), 1U);
 }
 
-TEST_F(SyncTailTest,
-       MultiInitialSyncApplyDoesNotRetryFailedUpdateIfDocumentIsMissingFromSyncSource) {
+TEST_F(SyncTailTest, MultiInitialSyncApplyIgnoresUpdateOperationIfDocumentIsMissingFromSyncSource) {
     BSONObj emptyDoc;
     SyncTailWithLocalDocumentFetcher syncTail(emptyDoc);
     NamespaceString nss("local." + _agent.getSuiteName() + "_" + _agent.getTestName());
@@ -938,10 +936,11 @@ TEST_F(SyncTailTest, MultiInitialSyncApplySkipsIndexCreationOnNamespaceNotFound)
     ASSERT_FALSE(AutoGetCollectionForRead(_opCtx.get(), badNss).getCollection());
 }
 
-TEST_F(SyncTailTest, MultiInitialSyncApplyRetriesFailedUpdateIfDocumentIsAvailableFromSyncSource) {
+TEST_F(SyncTailTest,
+       MultiInitialSyncApplyFetchesMissingDocumentIfDocumentIsAvailableFromSyncSource) {
     SyncTailWithLocalDocumentFetcher syncTail(BSON("_id" << 0 << "x" << 1));
     NamespaceString nss("local." + _agent.getSuiteName() + "_" + _agent.getTestName());
-    auto updatedDocument = BSON("_id" << 0 << "x" << 2);
+    auto updatedDocument = BSON("_id" << 0 << "x" << 1);
     auto op = makeUpdateDocumentOplogEntry(
         {Timestamp(Seconds(1), 0), 1LL}, nss, BSON("_id" << 0), updatedDocument);
     MultiApplier::OperationPtrs ops = {&op};
@@ -956,35 +955,6 @@ TEST_F(SyncTailTest, MultiInitialSyncApplyRetriesFailedUpdateIfDocumentIsAvailab
     auto iter = collectionReader.makeIterator();
     ASSERT_BSONOBJ_EQ(updatedDocument, unittest::assertGet(iter->next()).first);
     ASSERT_EQUALS(ErrorCodes::CollectionIsEmpty, iter->next().getStatus());
-}
-
-TEST_F(SyncTailTest, MultiInitialSyncApplyPassesThroughSyncApplyErrorAfterFailingToRetryBadOp) {
-    SyncTailWithLocalDocumentFetcher syncTail(BSON("_id" << 0 << "x" << 1));
-    NamespaceString nss("local." + _agent.getSuiteName() + "_" + _agent.getTestName());
-    OplogEntry op(BSON("op"
-                       << "x"
-                       << "ns"
-                       << nss.ns()));
-    MultiApplier::OperationPtrs ops = {&op};
-    AtomicUInt32 fetchCount(0);
-    ASSERT_EQUALS(ErrorCodes::BadValue,
-                  multiInitialSyncApply_noAbort(_opCtx.get(), &ops, &syncTail, &fetchCount));
-    ASSERT_EQUALS(fetchCount.load(), 1U);
-}
-
-TEST_F(SyncTailTest, MultiInitialSyncApplyPassesThroughShouldSyncTailRetryError) {
-    SyncTail syncTail(nullptr, SyncTail::MultiSyncApplyFunc(), nullptr);
-    NamespaceString nss("local." + _agent.getSuiteName() + "_" + _agent.getTestName());
-    auto op = makeUpdateDocumentOplogEntry(
-        {Timestamp(Seconds(1), 0), 1LL}, nss, BSON("_id" << 0), BSON("_id" << 0 << "x" << 2));
-    ASSERT_THROWS_CODE(syncTail.shouldRetry(_opCtx.get(), op.raw),
-                       mongo::UserException,
-                       ErrorCodes::FailedToParse);
-    MultiApplier::OperationPtrs ops = {&op};
-    AtomicUInt32 fetchCount(0);
-    ASSERT_EQUALS(ErrorCodes::FailedToParse,
-                  multiInitialSyncApply_noAbort(_opCtx.get(), &ops, &syncTail, &fetchCount));
-    ASSERT_EQUALS(fetchCount.load(), 1U);
 }
 
 class IdempotencyTest : public SyncTailTest {

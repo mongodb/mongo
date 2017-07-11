@@ -645,15 +645,7 @@ bool ReplSource::handleDuplicateDbName(OperationContext* txn,
 void ReplSource::applyCommand(OperationContext* txn, const BSONObj& op) {
     try {
         Status status = applyCommand_inlock(txn, op, true);
-        if (!status.isOK()) {
-            SyncTail sync(nullptr, SyncTail::MultiSyncApplyFunc());
-            sync.setHostname(hostName);
-            if (sync.shouldRetry(txn, op)) {
-                uassert(28639,
-                        "Failure retrying initial sync update",
-                        applyCommand_inlock(txn, op, true).isOK());
-            }
-        }
+        uassert(28639, "Failure applying initial sync command", status.isOK());
     } catch (UserException& e) {
         log() << "sync: caught user assertion " << redact(e) << " while applying op: " << redact(op)
               << endl;
@@ -669,13 +661,17 @@ void ReplSource::applyOperation(OperationContext* txn, Database* db, const BSONO
     try {
         Status status = applyOperation_inlock(txn, db, op);
         if (!status.isOK()) {
+            uassert(15914,
+                    "Failure applying initial sync operation",
+                    status == ErrorCodes::UpdateOperationFailed);
+
+            // In initial sync, update operations can cause documents to be missed during
+            // collection cloning. As a result, it is possible that a document that we need to
+            // update is not present locally. In that case we fetch the document from the
+            // sync source.
             SyncTail sync(nullptr, SyncTail::MultiSyncApplyFunc());
             sync.setHostname(hostName);
-            if (sync.shouldRetry(txn, op)) {
-                uassert(15914,
-                        "Failure retrying initial sync update",
-                        applyOperation_inlock(txn, db, op).isOK());
-            }
+            sync.fetchAndInsertMissingDocument(txn, op);
         }
     } catch (UserException& e) {
         log() << "sync: caught user assertion " << redact(e) << " while applying op: " << redact(op)

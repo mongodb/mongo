@@ -1381,7 +1381,7 @@ public:
     bool returnEmpty;
     SyncTest() : SyncTail(nullptr, SyncTail::MultiSyncApplyFunc()), returnEmpty(false) {}
     virtual ~SyncTest() {}
-    virtual BSONObj getMissingDoc(OperationContext* txn, Database* db, const BSONObj& o) {
+    virtual BSONObj getMissingDoc(OperationContext* txn, const BSONObj& o) {
         if (returnEmpty) {
             BSONObj o;
             return o;
@@ -1393,7 +1393,7 @@ public:
     }
 };
 
-class ShouldRetry : public Base {
+class FetchAndInsertMissingDocument : public Base {
 public:
     void run() {
         bool threw = false;
@@ -1414,7 +1414,7 @@ public:
             badSource.setHostname("localhost:123");
 
             OldClientContext ctx(&_txn, ns());
-            badSource.getMissingDoc(&_txn, ctx.db(), o);
+            badSource.getMissingDoc(&_txn, o);
         } catch (DBException&) {
             threw = true;
         }
@@ -1422,7 +1422,7 @@ public:
 
         // now this should succeed
         SyncTest t;
-        verify(t.shouldRetry(&_txn, o));
+        verify(t.fetchAndInsertMissingDocument(&_txn, o));
         verify(!_client
                     .findOne(ns(),
                              BSON("_id"
@@ -1431,7 +1431,7 @@ public:
 
         // force it not to find an obj
         t.returnEmpty = true;
-        verify(!t.shouldRetry(&_txn, o));
+        verify(!t.fetchAndInsertMissingDocument(&_txn, o));
     }
 };
 
@@ -1498,7 +1498,7 @@ public:
         add<DeleteOpIsIdBased>();
         add<DatabaseIgnorerBasic>();
         add<DatabaseIgnorerUpdate>();
-        add<ShouldRetry>();
+        add<FetchAndInsertMissingDocument>();
     }
 };
 
