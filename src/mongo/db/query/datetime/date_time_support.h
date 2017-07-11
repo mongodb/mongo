@@ -303,11 +303,6 @@ public:
                     std::unique_ptr<TimeZoneDatabase> timeZoneDatabase);
 
     /**
-     * Use the timezone database to create a Date_t from a string.
-     */
-    Date_t fromString(StringData dateString) const;
-
-    /**
      * Returns a TimeZone object representing the UTC time zone.
      */
     static TimeZone utcZone();
