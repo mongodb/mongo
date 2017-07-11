@@ -49,7 +49,7 @@ void ServiceEntryPointImpl::startSession(transport::SessionHandle session) {
     const auto& localAddr = session->local().sockAddr();
     invariant(remoteAddr && localAddr);
     auto restrictionEnvironment =
-        stdx::make_unique<RestrictionEnvironment>(*localAddr, *remoteAddr);
+        stdx::make_unique<RestrictionEnvironment>(*remoteAddr, *localAddr);
     RestrictionEnvironment::set(session, std::move(restrictionEnvironment));
 
     // Pass ownership of the transport::SessionHandle into our worker thread. When this
