@@ -43,10 +43,10 @@
 #include "mongo/db/matcher/schema/expression_internal_schema_object_match.h"
 #include "mongo/db/matcher/schema/expression_internal_schema_unique_items.h"
 #include "mongo/db/matcher/schema/expression_internal_schema_xor.h"
+#include "mongo/db/matcher/schema/json_schema_parser.h"
 #include "mongo/db/namespace_string.h"
 #include "mongo/stdx/memory.h"
 #include "mongo/util/mongoutils/str.h"
-
 
 namespace {
 
@@ -423,6 +423,12 @@ StatusWithMatchExpression MatchExpressionParser::_parse(const BSONObj& obj,
                 if (!s.isOK())
                     return s;
                 root->add(xorExpr.release());
+            } else if (mongoutils::str::equals("jsonSchema", rest)) {
+                if (e.type() != BSONType::Object) {
+                    return {Status(ErrorCodes::TypeMismatch, "$jsonSchema must be an object")};
+                }
+
+                return JSONSchemaParser::parse(e.Obj());
             } else {
                 return {Status(ErrorCodes::BadValue,
                                mongoutils::str::stream() << "unknown top level operator: "
@@ -686,53 +692,68 @@ Status MatchExpressionParser::_parseInExpression(InMatchExpression* inExpression
     return Status::OK();
 }
 
+StatusWith<std::unique_ptr<TypeMatchExpression>> MatchExpressionParser::parseTypeFromAlias(
+    StringData path, StringData typeAlias) {
+    auto typeExpr = stdx::make_unique<TypeMatchExpression>();
+
+    TypeMatchExpression::Type type;
+
+    if (typeAlias == TypeMatchExpression::kMatchesAllNumbersAlias) {
+        type.allNumbers = true;
+        Status status = typeExpr->init(path, type);
+        if (!status.isOK()) {
+            return status;
+        }
+        return {std::move(typeExpr)};
+    }
+
+    auto it = TypeMatchExpression::typeAliasMap.find(typeAlias.toString());
+    if (it == TypeMatchExpression::typeAliasMap.end()) {
+        return Status(ErrorCodes::BadValue,
+                      str::stream() << "Unknown string alias for $type: " << typeAlias);
+    }
+
+    type.bsonType = it->second;
+    Status status = typeExpr->init(path, type);
+    if (!status.isOK()) {
+        return status;
+    }
+    return {std::move(typeExpr)};
+}
+
 StatusWithMatchExpression MatchExpressionParser::_parseType(const char* name,
                                                             const BSONElement& elt) {
     if (!elt.isNumber() && elt.type() != BSONType::String) {
         return Status(ErrorCodes::TypeMismatch, "argument to $type is not a number or a string");
     }
 
-    std::unique_ptr<TypeMatchExpression> temp = stdx::make_unique<TypeMatchExpression>();
-
-    int typeInt;
-
-    // The element can be a number (the BSON type number) or a string representing the name
-    // of the type.
-    if (elt.isNumber()) {
-        typeInt = elt.numberInt();
-        if (elt.type() != NumberInt && typeInt != elt.number()) {
-            typeInt = -1;
-        }
-    } else {
-        invariant(elt.type() == BSONType::String);
-        std::string typeAlias = elt.str();
-
-        // If typeAlias is 'number', initialize as matching against all number types.
-        if (typeAlias == TypeMatchExpression::kMatchesAllNumbersAlias) {
-            Status s = temp->initAsMatchingAllNumbers(name);
-            if (!s.isOK()) {
-                return s;
-            }
-            return {std::move(temp)};
+    if (elt.type() == BSONType::String) {
+        auto typeExpr = parseTypeFromAlias(name, elt.valueStringData());
+        if (!typeExpr.isOK()) {
+            return typeExpr.getStatus();
         }
 
-        // Search the string-int map for the typeAlias (case-sensitive).
-        stdx::unordered_map<std::string, BSONType>::const_iterator it =
-            TypeMatchExpression::typeAliasMap.find(typeAlias);
-        if (it == TypeMatchExpression::typeAliasMap.end()) {
-            std::stringstream ss;
-            ss << "unknown string alias for $type: " << typeAlias;
-            return Status(ErrorCodes::BadValue, ss.str());
-        }
-        typeInt = it->second;
+        return {std::move(typeExpr.getValue())};
     }
 
-    Status s = temp->initWithBSONType(name, typeInt);
-    if (!s.isOK()) {
-        return s;
+    invariant(elt.isNumber());
+    int typeInt = elt.numberInt();
+    if (elt.type() != BSONType::NumberInt && typeInt != elt.number()) {
+        typeInt = -1;
     }
 
-    return {std::move(temp)};
+    if (!isValidBSONType(typeInt)) {
+        return Status(ErrorCodes::BadValue,
+                      str::stream() << "Invalid numerical $type code: " << typeInt);
+    }
+
+    auto typeExpr = stdx::make_unique<TypeMatchExpression>();
+    auto status = typeExpr->init(name, static_cast<BSONType>(typeInt));
+    if (!status.isOK()) {
+        return status;
+    }
+
+    return {std::move(typeExpr)};
 }
 
 StatusWithMatchExpression MatchExpressionParser::_parseElemMatch(const char* name,

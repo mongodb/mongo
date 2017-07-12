@@ -418,27 +418,17 @@ const stdx::unordered_map<std::string, BSONType> TypeMatchExpression::typeAliasM
     {typeName(MaxKey), MaxKey},
     {typeName(MinKey), MinKey}};
 
-Status TypeMatchExpression::initWithBSONType(StringData path, int type) {
-    if (!isValidBSONType(type)) {
-        return Status(ErrorCodes::BadValue,
-                      str::stream() << "Invalid numerical $type code: " << type);
-    }
-
-    _type = static_cast<BSONType>(type);
-    return setPath(path);
-}
-
-Status TypeMatchExpression::initAsMatchingAllNumbers(StringData path) {
-    _matchesAllNumbers = true;
+Status TypeMatchExpression::init(StringData path, Type type) {
+    _type = std::move(type);
     return setPath(path);
 }
 
 bool TypeMatchExpression::matchesSingleElement(const BSONElement& e) const {
-    if (_matchesAllNumbers) {
+    if (_type.allNumbers) {
         return e.isNumber();
     }
 
-    return e.type() == _type;
+    return e.type() == _type.bsonType;
 }
 
 void TypeMatchExpression::debugString(StringBuilder& debug, int level) const {
@@ -447,7 +437,7 @@ void TypeMatchExpression::debugString(StringBuilder& debug, int level) const {
     if (matchesAllNumbers()) {
         debug << kMatchesAllNumbersAlias;
     } else {
-        debug << _type;
+        debug << _type.bsonType;
     }
 
     MatchExpression::TagData* td = getTag();
@@ -462,7 +452,7 @@ void TypeMatchExpression::serialize(BSONObjBuilder* out) const {
     if (matchesAllNumbers()) {
         out->append(path(), BSON("$type" << kMatchesAllNumbersAlias));
     } else {
-        out->append(path(), BSON("$type" << _type));
+        out->append(path(), BSON("$type" << _type.bsonType));
     }
 }
 
@@ -476,11 +466,11 @@ bool TypeMatchExpression::equivalent(const MatchExpression* other) const {
         return false;
     }
 
-    if (_matchesAllNumbers) {
-        return realOther->_matchesAllNumbers;
+    if (_type.allNumbers) {
+        return realOther->_type.allNumbers;
     }
 
-    return _type == realOther->_type;
+    return _type.bsonType == realOther->_type.bsonType;
 }
 
 

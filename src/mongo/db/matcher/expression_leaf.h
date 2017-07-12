@@ -367,27 +367,25 @@ public:
     static const std::string kMatchesAllNumbersAlias;
     static const stdx::unordered_map<std::string, BSONType> typeAliasMap;
 
+    /**
+     * Represents either a particular BSON type, or the "number" type, which is an alias for all
+     * numeric BSON types.
+     */
+    struct Type {
+        Type() = default;
+        /* implicit */ Type(BSONType bsonType) : bsonType(bsonType) {}
+
+        bool allNumbers = false;
+        BSONType bsonType = BSONType::EOO;
+    };
+
     TypeMatchExpression() : LeafMatchExpression(TYPE_OPERATOR) {}
 
-    /**
-     * Initialize as matching against a specific BSONType.
-     *
-     * Returns a non-OK status if 'type' cannot be converted to a valid BSONType.
-     */
-    Status initWithBSONType(StringData path, int type);
-
-    /**
-     * Initialize as matching against all number types (NumberDouble, NumberLong, and NumberInt).
-     */
-    Status initAsMatchingAllNumbers(StringData path);
+    Status init(StringData path, Type type);
 
     std::unique_ptr<MatchExpression> shallowClone() const override {
         std::unique_ptr<TypeMatchExpression> e = stdx::make_unique<TypeMatchExpression>();
-        if (_matchesAllNumbers) {
-            invariantOK(e->initAsMatchingAllNumbers(path()));
-        } else {
-            invariantOK(e->initWithBSONType(path(), _type));
-        }
+        invariantOK(e->init(path(), _type));
         if (getTag()) {
             e->setTag(getTag()->clone());
         }
@@ -402,10 +400,11 @@ public:
 
     bool equivalent(const MatchExpression* other) const override;
 
-    /**
-     * What is the type we're matching against?
-     */
-    BSONType getType() const {
+    BSONType getBSONType() const {
+        return _type.bsonType;
+    }
+
+    Type getType() const {
         return _type;
     }
 
@@ -414,14 +413,13 @@ public:
      * Defaults to false. If this is true, _type is EOO.
      */
     bool matchesAllNumbers() const {
-        return _matchesAllNumbers;
+        return _type.allNumbers;
     }
 
 private:
     bool _matches(StringData path, const MatchableDocument* doc, MatchDetails* details = 0) const;
 
-    bool _matchesAllNumbers = false;
-    BSONType _type = BSONType::EOO;
+    Type _type;
 };
 
 /**

@@ -82,6 +82,13 @@ public:
      */
     static StatusWith<long long> parseIntegerElementToLong(BSONElement elem);
 
+    /**
+     * Given a path over which to match, and a type alias (e.g. "long", "number", or "object"),
+     * returns the corresponding $type match expression node.
+     */
+    static StatusWith<std::unique_ptr<TypeMatchExpression>> parseTypeFromAlias(
+        StringData path, StringData typeAlias);
+
 private:
     MatchExpressionParser(const ExtensionsCallback* extensionsCallback)
         : _extensionsCallback(extensionsCallback) {}
@@ -202,10 +209,6 @@ private:
     template <class T>
     StatusWithMatchExpression _parseInternalSchemaSingleIntegerArgument(
         const char* name, const BSONElement& elem) const;
-
-
-    // The maximum allowed depth of a query tree. Just to guard against stack overflow.
-    static const int kMaximumTreeDepth;
 
     // Performs parsing for the match extensions. We do not own this pointer - it has to live
     // as long as the parser is active.

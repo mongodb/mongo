@@ -520,7 +520,7 @@ void IndexBoundsBuilder::translate(const MatchExpression* expr,
     } else if (MatchExpression::TYPE_OPERATOR == expr->matchType()) {
         const TypeMatchExpression* tme = static_cast<const TypeMatchExpression*>(expr);
 
-        if (tme->getType() == BSONType::Array) {
+        if (tme->getBSONType() == BSONType::Array) {
             // We have $type:"array". Since arrays are indexed by creating a key for each element,
             // we have to fetch all indexed documents and check whether the full document contains
             // an array.
@@ -531,7 +531,7 @@ void IndexBoundsBuilder::translate(const MatchExpression* expr,
 
         // If we are matching all numbers, we just use the bounds for NumberInt, as these bounds
         // also include all NumberDouble and NumberLong values.
-        BSONType type = tme->matchesAllNumbers() ? BSONType::NumberInt : tme->getType();
+        BSONType type = tme->matchesAllNumbers() ? BSONType::NumberInt : tme->getBSONType();
         BSONObjBuilder bob;
         bob.appendMinForType("", type);
         bob.appendMaxForType("", type);

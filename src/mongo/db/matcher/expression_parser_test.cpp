@@ -192,6 +192,29 @@ TEST(MatchExpressionParserTest, ParseIntegerElementToLongAcceptsThree) {
     ASSERT_EQ(result.getValue(), 3LL);
 }
 
+TEST(MatchExpressionParserTest, ParseTypeFromAliasCanParseNumberAlias) {
+    auto result = MatchExpressionParser::parseTypeFromAlias("a", "number");
+    ASSERT_OK(result.getStatus());
+    ASSERT_EQ(result.getValue()->path(), "a");
+    ASSERT_TRUE(result.getValue()->getType().allNumbers);
+    ASSERT_TRUE(result.getValue()->matchesAllNumbers());
+}
+
+TEST(MatchExpressionParserTest, ParseTypeFromAliasCanParseLongAlias) {
+    auto result = MatchExpressionParser::parseTypeFromAlias("a", "long");
+    ASSERT_OK(result.getStatus());
+    ASSERT_EQ(result.getValue()->path(), "a");
+    ASSERT_FALSE(result.getValue()->getType().allNumbers);
+    ASSERT_FALSE(result.getValue()->matchesAllNumbers());
+    ASSERT_EQ(result.getValue()->getType().bsonType, BSONType::NumberLong);
+    ASSERT_EQ(result.getValue()->getBSONType(), BSONType::NumberLong);
+}
+
+TEST(MatchExpressionParserTest, ParseTypeFromAliasFailsToParseUnknownAlias) {
+    auto result = MatchExpressionParser::parseTypeFromAlias("a", "unknown");
+    ASSERT_NOT_OK(result.getStatus());
+}
+
 StatusWith<int> fib(int n) {
     if (n < 0)
         return StatusWith<int>(ErrorCodes::BadValue, "paramter to fib has to be >= 0");

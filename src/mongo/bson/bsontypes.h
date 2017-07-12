@@ -123,6 +123,18 @@ std::ostream& operator<<(std::ostream& stream, BSONType type);
  */
 bool isValidBSONType(int type);
 
+inline bool isNumericBSONType(BSONType type) {
+    switch (type) {
+        case NumberDouble:
+        case NumberInt:
+        case NumberLong:
+        case NumberDecimal:
+            return true;
+        default:
+            return false;
+    }
+}
+
 /* subtypes of BinData.
    bdtCustom and above are ones that the JS compiler understands, but are
    opaque to the database.
