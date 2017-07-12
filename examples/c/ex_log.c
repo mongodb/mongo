@@ -269,7 +269,7 @@ main(int argc, char *argv[])
 	WT_CURSOR *cursor;
 	WT_SESSION *session;
 	int count_min, i, record_count;
-	char cmd_buf[256], k[16], v[16];
+	char cmd_buf[256], k[32], v[32];
 
 	(void)argc;                                     /* Unused variable */
 	(void)testutil_set_progname(argv);

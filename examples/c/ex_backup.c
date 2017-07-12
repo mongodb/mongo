@@ -48,7 +48,7 @@ static int
 compare_backups(int i)
 {
 	int ret;
-	char buf[1024], msg[8];
+	char buf[1024], msg[32];
 
 	/*
 	 * We run 'wt dump' on both the full backup directory and the
@@ -83,7 +83,7 @@ compare_backups(int i)
 	    full_out, i, incr_out, i);
 	ret = system(buf);
 	if (i == 0)
-		(void)strncpy(msg, "MAIN", sizeof(msg));
+		(void)snprintf(msg, sizeof(msg), "%s", "MAIN");
 	else
 		(void)snprintf(msg, sizeof(msg), "%d", i);
 	printf(

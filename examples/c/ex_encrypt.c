@@ -427,7 +427,7 @@ main(int argc, char *argv[])
 	WT_CURSOR *c1, *c2, *nc;
 	WT_SESSION *session;
 	int i, ret;
-	char keybuf[16], valbuf[16];
+	char keybuf[32], valbuf[32];
 	char *key1, *key2, *key3, *val1, *val2, *val3;
 
 	home = example_setup(argc, argv);
