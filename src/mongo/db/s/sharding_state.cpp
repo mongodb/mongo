@@ -160,7 +160,7 @@ void ShardingState::shutDown(OperationContext* opCtx) {
     stdx::unique_lock<stdx::mutex> lk(_mutex);
     if (enabled()) {
         grid.getExecutorPool()->shutdownAndJoin();
-        grid.catalogClient(opCtx)->shutDown(opCtx);
+        grid.catalogClient()->shutDown(opCtx);
     }
 }
 

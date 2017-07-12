@@ -166,7 +166,7 @@ public:
         }
 
         // Get information for config and admin dbs from the config servers.
-        auto catalogClient = grid.catalogClient(opCtx);
+        auto catalogClient = grid.catalogClient();
         auto appendStatus = catalogClient->appendInfoForConfigServerDatabases(
             opCtx, filterCommandRequestForPassthrough(cmdObj), &dbListBuilder);
         dbListBuilder.doneFast();

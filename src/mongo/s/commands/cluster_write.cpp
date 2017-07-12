@@ -247,7 +247,7 @@ void ClusterWriter::write(OperationContext* opCtx,
 
     // Config writes and shard writes are done differently
     if (nss.db() == NamespaceString::kConfigDb || nss.db() == NamespaceString::kAdminDb) {
-        Grid::get(opCtx)->catalogClient(opCtx)->writeConfigServerDirect(opCtx, *request, response);
+        Grid::get(opCtx)->catalogClient()->writeConfigServerDirect(opCtx, *request, response);
     } else {
         TargeterStats targeterStats;
 
@@ -407,7 +407,7 @@ void updateChunkWriteStatsAndSplitIfNeeded(OperationContext* opCtx,
                 return false;
 
             auto collStatus =
-                Grid::get(opCtx)->catalogClient(opCtx)->getCollection(opCtx, manager->getns());
+                Grid::get(opCtx)->catalogClient()->getCollection(opCtx, manager->getns());
             if (!collStatus.isOK()) {
                 log() << "Auto-split for " << nss << " failed to load collection metadata"
                       << causedBy(redact(collStatus.getStatus()));

@@ -123,14 +123,14 @@ ShardingCatalogClientImpl::ShardingCatalogClientImpl(
 
 ShardingCatalogClientImpl::~ShardingCatalogClientImpl() = default;
 
-Status ShardingCatalogClientImpl::startup() {
+void ShardingCatalogClientImpl::startup() {
     stdx::lock_guard<stdx::mutex> lk(_mutex);
     if (_started) {
-        return Status::OK();
+        return;
     }
+
     _started = true;
     _distLockManager->startUp();
-    return Status::OK();
 }
 
 void ShardingCatalogClientImpl::shutDown(OperationContext* opCtx) {

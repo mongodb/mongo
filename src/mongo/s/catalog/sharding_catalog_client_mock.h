@@ -41,7 +41,7 @@ public:
     ShardingCatalogClientMock(std::unique_ptr<DistLockManager> distLockManager);
     ~ShardingCatalogClientMock();
 
-    Status startup() override;
+    void startup() override;
 
     void shutDown(OperationContext* opCtx) override;
 

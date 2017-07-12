@@ -65,7 +65,7 @@ protected:
 
         auto clockSource = stdx::make_unique<ClockSourceMock>();
         operationContext()->getServiceContext()->setFastClockSource(std::move(clockSource));
-        auto catalogClient = Grid::get(operationContext())->catalogClient(operationContext());
+        auto catalogClient = Grid::get(operationContext())->catalogClient();
 
         const LogicalTime currentTime(LogicalTime(Timestamp(1, 0)));
         LogicalClock::get(operationContext())->setClusterTimeFromTrustedSource(currentTime);

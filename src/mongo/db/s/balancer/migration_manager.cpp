@@ -220,7 +220,7 @@ void MigrationManager::startRecoveryAndAcquireDistLocks(OperationContext* opCtx)
         _abandonActiveMigrationsAndEnableManager(opCtx);
     });
 
-    auto distLockManager = Grid::get(opCtx)->catalogClient(opCtx)->getDistLockManager();
+    auto distLockManager = Grid::get(opCtx)->catalogClient()->getDistLockManager();
 
     // Load the active migrations from the config.migrations collection.
     auto statusWithMigrationsQueryResponse =
@@ -358,7 +358,7 @@ void MigrationManager::finishRecovery(OperationContext* opCtx,
 
         // If no migrations were scheduled for this namespace, free the dist lock
         if (!scheduledMigrations) {
-            Grid::get(opCtx)->catalogClient(opCtx)->getDistLockManager()->unlock(
+            Grid::get(opCtx)->catalogClient()->getDistLockManager()->unlock(
                 opCtx, _lockSessionID, nss.ns());
         }
     }
@@ -489,7 +489,7 @@ void MigrationManager::_schedule_inlock(OperationContext* opCtx,
 
         // Acquire the collection distributed lock (blocking call)
         auto statusWithDistLockHandle =
-            Grid::get(opCtx)->catalogClient(opCtx)->getDistLockManager()->lockWithSessionID(
+            Grid::get(opCtx)->catalogClient()->getDistLockManager()->lockWithSessionID(
                 opCtx,
                 nss.ns(),
                 whyMessage,
@@ -554,7 +554,7 @@ void MigrationManager::_complete_inlock(OperationContext* opCtx,
     migrations->erase(itMigration);
 
     if (migrations->empty()) {
-        Grid::get(opCtx)->catalogClient(opCtx)->getDistLockManager()->unlock(
+        Grid::get(opCtx)->catalogClient()->getDistLockManager()->unlock(
             opCtx, _lockSessionID, nss.ns());
         _activeMigrations.erase(it);
         _checkDrained_inlock();
@@ -587,7 +587,7 @@ void MigrationManager::_abandonActiveMigrationsAndEnableManager(OperationContext
     }
     invariant(_state == State::kRecovering);
 
-    auto catalogClient = Grid::get(opCtx)->catalogClient(opCtx);
+    auto catalogClient = Grid::get(opCtx)->catalogClient();
 
     // Unlock all balancer distlocks we aren't using anymore.
     auto distLockManager = catalogClient->getDistLockManager();

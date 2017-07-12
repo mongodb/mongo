@@ -64,7 +64,7 @@ ScopedMigrationRequest::~ScopedMigrationRequest() {
     // okay.
     BSONObj migrationDocumentIdentifier =
         BSON(MigrationType::ns(_nss.ns()) << MigrationType::min(_minKey));
-    Status result = grid.catalogClient(_opCtx)->removeConfigDocuments(
+    Status result = Grid::get(_opCtx)->catalogClient()->removeConfigDocuments(
         _opCtx, MigrationType::ConfigNS, migrationDocumentIdentifier, kMajorityWriteConcern);
 
     if (!result.isOK()) {
@@ -98,7 +98,7 @@ StatusWith<ScopedMigrationRequest> ScopedMigrationRequest::writeMigration(
     const MigrationType migrationType(migrateInfo, waitForDelete);
 
     for (int retry = 0; retry < kDuplicateKeyErrorMaxRetries; ++retry) {
-        Status result = grid.catalogClient(opCtx)->insertConfigDocument(
+        Status result = grid.catalogClient()->insertConfigDocument(
             opCtx, MigrationType::ConfigNS, migrationType.toBSON(), kMajorityWriteConcern);
 
         if (result == ErrorCodes::DuplicateKey) {
@@ -190,7 +190,7 @@ Status ScopedMigrationRequest::tryToRemoveMigration() {
     invariant(_opCtx);
     BSONObj migrationDocumentIdentifier =
         BSON(MigrationType::ns(_nss.ns()) << MigrationType::min(_minKey));
-    Status status = grid.catalogClient(_opCtx)->removeConfigDocuments(
+    Status status = Grid::get(_opCtx)->catalogClient()->removeConfigDocuments(
         _opCtx, MigrationType::ConfigNS, migrationDocumentIdentifier, kMajorityWriteConcern);
     if (status.isOK()) {
         // Don't try to do a no-op remove in the destructor.

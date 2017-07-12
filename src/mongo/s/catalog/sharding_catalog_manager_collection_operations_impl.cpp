@@ -167,7 +167,7 @@ ChunkVersion createFirstChunks(OperationContext* opCtx,
         chunk.setShard(shardIds[i % shardIds.size()]);
         chunk.setVersion(version);
 
-        uassertStatusOK(Grid::get(opCtx)->catalogClient(opCtx)->insertConfigDocument(
+        uassertStatusOK(Grid::get(opCtx)->catalogClient()->insertConfigDocument(
             opCtx,
             ChunkType::ConfigNS,
             chunk.toConfigBSON(),
@@ -221,7 +221,7 @@ void ShardingCatalogManagerImpl::shardCollection(OperationContext* opCtx,
                                                  bool unique,
                                                  const vector<BSONObj>& initPoints,
                                                  const bool distributeInitialChunks) {
-    const auto catalogClient = Grid::get(opCtx)->catalogClient(opCtx);
+    const auto catalogClient = Grid::get(opCtx)->catalogClient();
     const auto shardRegistry = Grid::get(opCtx)->shardRegistry();
 
     // Lock the collection globally so that no other mongos can try to shard or drop the collection

@@ -206,7 +206,7 @@ StatusWith<boost::optional<ShardType>> ShardingCatalogManagerImpl::_checkIfShard
     const std::string* proposedShardName,
     long long proposedShardMaxSize) {
     // Check whether any host in the connection is already part of the cluster.
-    const auto existingShards = Grid::get(opCtx)->catalogClient(opCtx)->getAllShards(
+    const auto existingShards = Grid::get(opCtx)->catalogClient()->getAllShards(
         opCtx, repl::ReadConcernLevel::kLocalReadConcern);
     if (!existingShards.isOK()) {
         return Status(existingShards.getStatus().code(),
@@ -587,7 +587,7 @@ StatusWith<std::string> ShardingCatalogManagerImpl::addShard(
     }
 
     for (const auto& dbName : dbNamesStatus.getValue()) {
-        auto dbt = Grid::get(opCtx)->catalogClient(opCtx)->getDatabase(opCtx, dbName);
+        auto dbt = Grid::get(opCtx)->catalogClient()->getDatabase(opCtx, dbName);
         if (dbt.isOK()) {
             const auto& dbDoc = dbt.getValue().value;
             return Status(ErrorCodes::OperationFailed,
@@ -655,7 +655,7 @@ StatusWith<std::string> ShardingCatalogManagerImpl::addShard(
 
     log() << "going to insert new entry for shard into config.shards: " << shardType.toString();
 
-    Status result = Grid::get(opCtx)->catalogClient(opCtx)->insertConfigDocument(
+    Status result = Grid::get(opCtx)->catalogClient()->insertConfigDocument(
         opCtx,
         ShardType::ConfigNS,
         shardType.toBSON(),
@@ -672,7 +672,7 @@ StatusWith<std::string> ShardingCatalogManagerImpl::addShard(
         dbt.setPrimary(shardType.getName());
         dbt.setSharded(false);
 
-        Status status = Grid::get(opCtx)->catalogClient(opCtx)->updateDatabase(opCtx, dbName, dbt);
+        Status status = Grid::get(opCtx)->catalogClient()->updateDatabase(opCtx, dbName, dbt);
         if (!status.isOK()) {
             log() << "adding shard " << shardConnectionString.toString()
                   << " even though could not add database " << dbName;
@@ -685,7 +685,7 @@ StatusWith<std::string> ShardingCatalogManagerImpl::addShard(
     shardDetails.append("host", shardConnectionString.toString());
 
     Grid::get(opCtx)
-        ->catalogClient(opCtx)
+        ->catalogClient()
         ->logChange(
             opCtx, "addShard", "", shardDetails.obj(), ShardingCatalogClient::kMajorityWriteConcern)
         .transitional_ignore();

@@ -104,7 +104,7 @@ public:
             return false;
         }
 
-        uassertStatusOK(Grid::get(opCtx)->catalogClient(opCtx)->enableSharding(opCtx, dbname));
+        uassertStatusOK(Grid::get(opCtx)->catalogClient()->enableSharding(opCtx, dbname));
         audit::logEnableSharding(Client::getCurrent(), dbname);
 
         // Make sure to force update of any stale metadata

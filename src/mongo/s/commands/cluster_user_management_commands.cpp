@@ -91,7 +91,7 @@ public:
              const BSONObj& cmdObj,
              string& errmsg,
              BSONObjBuilder& result) {
-        return Grid::get(opCtx)->catalogClient(opCtx)->runUserManagementWriteCommand(
+        return Grid::get(opCtx)->catalogClient()->runUserManagementWriteCommand(
             opCtx, getName(), dbname, filterCommandRequestForPassthrough(cmdObj), &result);
     }
 
@@ -134,7 +134,7 @@ public:
         if (!status.isOK()) {
             return appendCommandStatus(result, status);
         }
-        const bool ok = Grid::get(opCtx)->catalogClient(opCtx)->runUserManagementWriteCommand(
+        const bool ok = Grid::get(opCtx)->catalogClient()->runUserManagementWriteCommand(
             opCtx, getName(), dbname, filterCommandRequestForPassthrough(cmdObj), &result);
 
         AuthorizationManager* authzManager = getGlobalAuthorizationManager();
@@ -183,7 +183,7 @@ public:
         if (!status.isOK()) {
             return appendCommandStatus(result, status);
         }
-        const bool ok = Grid::get(opCtx)->catalogClient(opCtx)->runUserManagementWriteCommand(
+        const bool ok = Grid::get(opCtx)->catalogClient()->runUserManagementWriteCommand(
             opCtx, getName(), dbname, filterCommandRequestForPassthrough(cmdObj), &result);
 
         AuthorizationManager* authzManager = getGlobalAuthorizationManager();
@@ -223,7 +223,7 @@ public:
              const BSONObj& cmdObj,
              string& errmsg,
              BSONObjBuilder& result) {
-        const bool ok = Grid::get(opCtx)->catalogClient(opCtx)->runUserManagementWriteCommand(
+        const bool ok = Grid::get(opCtx)->catalogClient()->runUserManagementWriteCommand(
             opCtx, getName(), dbname, filterCommandRequestForPassthrough(cmdObj), &result);
 
         AuthorizationManager* authzManager = getGlobalAuthorizationManager();
@@ -270,7 +270,7 @@ public:
         if (!status.isOK()) {
             return appendCommandStatus(result, status);
         }
-        const bool ok = Grid::get(opCtx)->catalogClient(opCtx)->runUserManagementWriteCommand(
+        const bool ok = Grid::get(opCtx)->catalogClient()->runUserManagementWriteCommand(
             opCtx, getName(), dbname, filterCommandRequestForPassthrough(cmdObj), &result);
 
         AuthorizationManager* authzManager = getGlobalAuthorizationManager();
@@ -317,7 +317,7 @@ public:
         if (!status.isOK()) {
             return appendCommandStatus(result, status);
         }
-        const bool ok = Grid::get(opCtx)->catalogClient(opCtx)->runUserManagementWriteCommand(
+        const bool ok = Grid::get(opCtx)->catalogClient()->runUserManagementWriteCommand(
             opCtx, getName(), dbname, filterCommandRequestForPassthrough(cmdObj), &result);
 
         AuthorizationManager* authzManager = getGlobalAuthorizationManager();
@@ -361,7 +361,7 @@ public:
              const BSONObj& cmdObj,
              string& errmsg,
              BSONObjBuilder& result) {
-        return Grid::get(opCtx)->catalogClient(opCtx)->runUserManagementReadCommand(
+        return Grid::get(opCtx)->catalogClient()->runUserManagementReadCommand(
             opCtx, dbname, filterCommandRequestForPassthrough(cmdObj), &result);
     }
 
@@ -395,7 +395,7 @@ public:
              const BSONObj& cmdObj,
              string& errmsg,
              BSONObjBuilder& result) {
-        return Grid::get(opCtx)->catalogClient(opCtx)->runUserManagementWriteCommand(
+        return Grid::get(opCtx)->catalogClient()->runUserManagementWriteCommand(
             opCtx, getName(), dbname, filterCommandRequestForPassthrough(cmdObj), &result);
     }
 
@@ -429,7 +429,7 @@ public:
              const BSONObj& cmdObj,
              string& errmsg,
              BSONObjBuilder& result) {
-        const bool ok = Grid::get(opCtx)->catalogClient(opCtx)->runUserManagementWriteCommand(
+        const bool ok = Grid::get(opCtx)->catalogClient()->runUserManagementWriteCommand(
             opCtx, getName(), dbname, filterCommandRequestForPassthrough(cmdObj), &result);
 
         AuthorizationManager* authzManager = getGlobalAuthorizationManager();
@@ -469,7 +469,7 @@ public:
              const BSONObj& cmdObj,
              string& errmsg,
              BSONObjBuilder& result) {
-        const bool ok = Grid::get(opCtx)->catalogClient(opCtx)->runUserManagementWriteCommand(
+        const bool ok = Grid::get(opCtx)->catalogClient()->runUserManagementWriteCommand(
             opCtx, getName(), dbname, filterCommandRequestForPassthrough(cmdObj), &result);
 
         AuthorizationManager* authzManager = getGlobalAuthorizationManager();
@@ -509,7 +509,7 @@ public:
              const BSONObj& cmdObj,
              string& errmsg,
              BSONObjBuilder& result) {
-        const bool ok = Grid::get(opCtx)->catalogClient(opCtx)->runUserManagementWriteCommand(
+        const bool ok = Grid::get(opCtx)->catalogClient()->runUserManagementWriteCommand(
             opCtx, getName(), dbname, filterCommandRequestForPassthrough(cmdObj), &result);
 
         AuthorizationManager* authzManager = getGlobalAuthorizationManager();
@@ -549,7 +549,7 @@ public:
              const BSONObj& cmdObj,
              string& errmsg,
              BSONObjBuilder& result) {
-        const bool ok = Grid::get(opCtx)->catalogClient(opCtx)->runUserManagementWriteCommand(
+        const bool ok = Grid::get(opCtx)->catalogClient()->runUserManagementWriteCommand(
             opCtx, getName(), dbname, filterCommandRequestForPassthrough(cmdObj), &result);
 
         AuthorizationManager* authzManager = getGlobalAuthorizationManager();
@@ -589,7 +589,7 @@ public:
              const BSONObj& cmdObj,
              string& errmsg,
              BSONObjBuilder& result) {
-        const bool ok = Grid::get(opCtx)->catalogClient(opCtx)->runUserManagementWriteCommand(
+        const bool ok = Grid::get(opCtx)->catalogClient()->runUserManagementWriteCommand(
             opCtx, getName(), dbname, filterCommandRequestForPassthrough(cmdObj), &result);
 
         AuthorizationManager* authzManager = getGlobalAuthorizationManager();
@@ -632,7 +632,7 @@ public:
              const BSONObj& cmdObj,
              string& errmsg,
              BSONObjBuilder& result) {
-        const bool ok = Grid::get(opCtx)->catalogClient(opCtx)->runUserManagementWriteCommand(
+        const bool ok = Grid::get(opCtx)->catalogClient()->runUserManagementWriteCommand(
             opCtx, getName(), dbname, filterCommandRequestForPassthrough(cmdObj), &result);
 
         AuthorizationManager* authzManager = getGlobalAuthorizationManager();
@@ -676,7 +676,7 @@ public:
              const BSONObj& cmdObj,
              string& errmsg,
              BSONObjBuilder& result) {
-        const bool ok = Grid::get(opCtx)->catalogClient(opCtx)->runUserManagementWriteCommand(
+        const bool ok = Grid::get(opCtx)->catalogClient()->runUserManagementWriteCommand(
             opCtx, getName(), dbname, filterCommandRequestForPassthrough(cmdObj), &result);
 
         AuthorizationManager* authzManager = getGlobalAuthorizationManager();
@@ -720,7 +720,7 @@ public:
              const BSONObj& cmdObj,
              string& errmsg,
              BSONObjBuilder& result) {
-        return Grid::get(opCtx)->catalogClient(opCtx)->runUserManagementReadCommand(
+        return Grid::get(opCtx)->catalogClient()->runUserManagementReadCommand(
             opCtx, dbname, filterCommandRequestForPassthrough(cmdObj), &result);
     }
 
@@ -808,7 +808,7 @@ public:
              const BSONObj& cmdObj,
              string& errmsg,
              BSONObjBuilder& result) {
-        return Grid::get(opCtx)->catalogClient(opCtx)->runUserManagementWriteCommand(
+        return Grid::get(opCtx)->catalogClient()->runUserManagementWriteCommand(
             opCtx, getName(), dbname, filterCommandRequestForPassthrough(cmdObj), &result);
     }
 
@@ -898,7 +898,7 @@ public:
              string& errmsg,
              BSONObjBuilder& result) {
         // Run the authSchemaUpgrade command on the config servers
-        if (!Grid::get(opCtx)->catalogClient(opCtx)->runUserManagementWriteCommand(
+        if (!Grid::get(opCtx)->catalogClient()->runUserManagementWriteCommand(
                 opCtx, getName(), dbname, filterCommandRequestForPassthrough(cmdObj), &result)) {
             return false;
         }

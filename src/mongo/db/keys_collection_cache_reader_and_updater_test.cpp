@@ -69,7 +69,7 @@ protected:
 };
 
 TEST_F(CacheUpdaterTest, ShouldCreate2KeysFromEmpty) {
-    auto catalogClient = Grid::get(operationContext())->catalogClient(operationContext());
+    auto catalogClient = Grid::get(operationContext())->catalogClient();
     KeysCollectionCacheReaderAndUpdater updater("dummy", catalogClient, Seconds(5));
 
     const LogicalTime currentTime(LogicalTime(Timestamp(100, 2)));
@@ -103,7 +103,7 @@ TEST_F(CacheUpdaterTest, ShouldCreate2KeysFromEmpty) {
 }
 
 TEST_F(CacheUpdaterTest, ShouldPropagateWriteError) {
-    auto catalogClient = Grid::get(operationContext())->catalogClient(operationContext());
+    auto catalogClient = Grid::get(operationContext())->catalogClient();
     KeysCollectionCacheReaderAndUpdater updater("dummy", catalogClient, Seconds(5));
 
     const LogicalTime currentTime(LogicalTime(Timestamp(100, 2)));
@@ -116,7 +116,7 @@ TEST_F(CacheUpdaterTest, ShouldPropagateWriteError) {
 }
 
 TEST_F(CacheUpdaterTest, ShouldCreateAnotherKeyIfOnlyOneKeyExists) {
-    auto catalogClient = Grid::get(operationContext())->catalogClient(operationContext());
+    auto catalogClient = Grid::get(operationContext())->catalogClient();
     KeysCollectionCacheReaderAndUpdater updater("dummy", catalogClient, Seconds(5));
 
     LogicalClock::get(operationContext())
@@ -171,7 +171,7 @@ TEST_F(CacheUpdaterTest, ShouldCreateAnotherKeyIfOnlyOneKeyExists) {
 }
 
 TEST_F(CacheUpdaterTest, ShouldCreateAnotherKeyIfNoValidKeyAfterCurrent) {
-    auto catalogClient = Grid::get(operationContext())->catalogClient(operationContext());
+    auto catalogClient = Grid::get(operationContext())->catalogClient();
     KeysCollectionCacheReaderAndUpdater updater("dummy", catalogClient, Seconds(5));
 
     LogicalClock::get(operationContext())
@@ -263,7 +263,7 @@ TEST_F(CacheUpdaterTest, ShouldCreateAnotherKeyIfNoValidKeyAfterCurrent) {
 }
 
 TEST_F(CacheUpdaterTest, ShouldCreate2KeysIfAllKeysAreExpired) {
-    auto catalogClient = Grid::get(operationContext())->catalogClient(operationContext());
+    auto catalogClient = Grid::get(operationContext())->catalogClient();
     KeysCollectionCacheReaderAndUpdater updater("dummy", catalogClient, Seconds(5));
 
     LogicalClock::get(operationContext())
@@ -368,7 +368,7 @@ TEST_F(CacheUpdaterTest, ShouldCreate2KeysIfAllKeysAreExpired) {
 }
 
 TEST_F(CacheUpdaterTest, ShouldNotCreateNewKeyIfThereAre2UnexpiredKeys) {
-    auto catalogClient = Grid::get(operationContext())->catalogClient(operationContext());
+    auto catalogClient = Grid::get(operationContext())->catalogClient();
     KeysCollectionCacheReaderAndUpdater updater("dummy", catalogClient, Seconds(5));
 
     LogicalClock::get(operationContext())
@@ -435,7 +435,7 @@ TEST_F(CacheUpdaterTest, ShouldNotCreateNewKeyIfThereAre2UnexpiredKeys) {
 }
 
 TEST_F(CacheUpdaterTest, ShouldNotCreateKeysWithDisableKeyGenerationFailPoint) {
-    auto catalogClient = Grid::get(operationContext())->catalogClient(operationContext());
+    auto catalogClient = Grid::get(operationContext())->catalogClient();
     KeysCollectionCacheReaderAndUpdater updater("dummy", catalogClient, Seconds(5));
 
     const LogicalTime currentTime(LogicalTime(Timestamp(100, 0)));
@@ -457,7 +457,7 @@ TEST_F(CacheUpdaterTest, ShouldNotCreateNewKeysInFeatureCompatiblityVersion34) {
     serverGlobalParams.featureCompatibility.version.store(
         ServerGlobalParams::FeatureCompatibility::Version::k34);
 
-    auto catalogClient = Grid::get(operationContext())->catalogClient(operationContext());
+    auto catalogClient = Grid::get(operationContext())->catalogClient();
     KeysCollectionCacheReaderAndUpdater updater("dummy", catalogClient, Seconds(5));
 
     const LogicalTime currentTime(LogicalTime(Timestamp(100, 0)));

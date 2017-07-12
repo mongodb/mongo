@@ -465,9 +465,8 @@ public:
             auto chunkSizes = SimpleBSONObjComparator::kInstance.makeBSONObjIndexedMap<int>();
             {
                 // Take distributed lock to prevent split / migration.
-                auto scopedDistLock =
-                    Grid::get(opCtx)->catalogClient(opCtx)->getDistLockManager()->lock(
-                        opCtx, outputCollNss.ns(), "mr-post-process", kNoDistLockTimeout);
+                auto scopedDistLock = Grid::get(opCtx)->catalogClient()->getDistLockManager()->lock(
+                    opCtx, outputCollNss.ns(), "mr-post-process", kNoDistLockTimeout);
                 if (!scopedDistLock.isOK()) {
                     return appendCommandStatus(result, scopedDistLock.getStatus());
                 }
@@ -609,7 +608,7 @@ private:
     static CachedCollectionRoutingInfo createShardedOutputCollection(OperationContext* opCtx,
                                                                      const NamespaceString& nss,
                                                                      const BSONObjSet& splitPts) {
-        auto const catalogClient = Grid::get(opCtx)->catalogClient(opCtx);
+        auto const catalogClient = Grid::get(opCtx)->catalogClient();
         auto const catalogCache = Grid::get(opCtx)->catalogCache();
 
         // Enable sharding on the output db

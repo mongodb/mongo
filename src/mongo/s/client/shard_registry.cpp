@@ -346,7 +346,7 @@ void ShardRegistry::replicaSetChangeConfigServerUpdateHook(const std::string& se
 
         auto status =
             Grid::get(opCtx.get())
-                ->catalogClient(opCtx.get())
+                ->catalogClient()
                 ->updateConfigDocument(opCtx.get(),
                                        ShardType::ConfigNS,
                                        BSON(ShardType::name(s->getId().toString())),
@@ -371,8 +371,8 @@ ShardRegistryData::ShardRegistryData(OperationContext* opCtx, ShardFactory* shar
 }
 
 void ShardRegistryData::_init(OperationContext* opCtx, ShardFactory* shardFactory) {
-    auto shardsStatus = grid.catalogClient(opCtx)->getAllShards(
-        opCtx, repl::ReadConcernLevel::kMajorityReadConcern);
+    auto shardsStatus =
+        grid.catalogClient()->getAllShards(opCtx, repl::ReadConcernLevel::kMajorityReadConcern);
 
     if (!shardsStatus.isOK()) {
         uasserted(shardsStatus.getStatus().code(),

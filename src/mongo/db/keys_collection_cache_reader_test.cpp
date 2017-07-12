@@ -41,7 +41,7 @@ namespace mongo {
 using CacheReaderTest = ConfigServerTestFixture;
 
 TEST_F(CacheReaderTest, ErrorsIfCacheIsEmpty) {
-    auto catalogClient = Grid::get(operationContext())->catalogClient(operationContext());
+    auto catalogClient = Grid::get(operationContext())->catalogClient();
     KeysCollectionCacheReader reader("test", catalogClient);
     auto status = reader.getKey(LogicalTime(Timestamp(1, 0))).getStatus();
     ASSERT_EQ(ErrorCodes::KeyNotFound, status.code());
@@ -49,7 +49,7 @@ TEST_F(CacheReaderTest, ErrorsIfCacheIsEmpty) {
 }
 
 TEST_F(CacheReaderTest, RefreshErrorsIfCacheIsEmpty) {
-    auto catalogClient = Grid::get(operationContext())->catalogClient(operationContext());
+    auto catalogClient = Grid::get(operationContext())->catalogClient();
     KeysCollectionCacheReader reader("test", catalogClient);
     auto status = reader.refresh(operationContext()).getStatus();
     ASSERT_EQ(ErrorCodes::KeyNotFound, status.code());
@@ -57,7 +57,7 @@ TEST_F(CacheReaderTest, RefreshErrorsIfCacheIsEmpty) {
 }
 
 TEST_F(CacheReaderTest, GetKeyShouldReturnCorrectKeyAfterRefresh) {
-    auto catalogClient = Grid::get(operationContext())->catalogClient(operationContext());
+    auto catalogClient = Grid::get(operationContext())->catalogClient();
     KeysCollectionCacheReader reader("test", catalogClient);
 
     KeysCollectionDocument origKey1(
@@ -89,7 +89,7 @@ TEST_F(CacheReaderTest, GetKeyShouldReturnCorrectKeyAfterRefresh) {
 }
 
 TEST_F(CacheReaderTest, GetKeyShouldReturnErrorIfNoKeyIsValidForGivenTime) {
-    auto catalogClient = Grid::get(operationContext())->catalogClient(operationContext());
+    auto catalogClient = Grid::get(operationContext())->catalogClient();
     KeysCollectionCacheReader reader("test", catalogClient);
 
     KeysCollectionDocument origKey1(
@@ -113,7 +113,7 @@ TEST_F(CacheReaderTest, GetKeyShouldReturnErrorIfNoKeyIsValidForGivenTime) {
 }
 
 TEST_F(CacheReaderTest, GetKeyShouldReturnOldestKeyPossible) {
-    auto catalogClient = Grid::get(operationContext())->catalogClient(operationContext());
+    auto catalogClient = Grid::get(operationContext())->catalogClient();
     KeysCollectionCacheReader reader("test", catalogClient);
 
     KeysCollectionDocument origKey0(
@@ -155,7 +155,7 @@ TEST_F(CacheReaderTest, GetKeyShouldReturnOldestKeyPossible) {
 }
 
 TEST_F(CacheReaderTest, RefreshShouldNotGetKeysForOtherPurpose) {
-    auto catalogClient = Grid::get(operationContext())->catalogClient(operationContext());
+    auto catalogClient = Grid::get(operationContext())->catalogClient();
     KeysCollectionCacheReader reader("test", catalogClient);
 
     KeysCollectionDocument origKey0(
@@ -200,7 +200,7 @@ TEST_F(CacheReaderTest, RefreshShouldNotGetKeysForOtherPurpose) {
 }
 
 TEST_F(CacheReaderTest, RefreshCanIncrementallyGetNewKeys) {
-    auto catalogClient = Grid::get(operationContext())->catalogClient(operationContext());
+    auto catalogClient = Grid::get(operationContext())->catalogClient();
     KeysCollectionCacheReader reader("test", catalogClient);
 
     KeysCollectionDocument origKey0(

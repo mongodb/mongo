@@ -82,7 +82,8 @@ MoveTimingHelper::~MoveTimingHelper() {
             _b.append("errmsg", *_cmdErrmsg);
         }
 
-        grid.catalogClient(_opCtx)
+        Grid::get(_opCtx)
+            ->catalogClient()
             ->logChange(_opCtx,
                         str::stream() << "moveChunk." << _where,
                         _ns,

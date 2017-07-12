@@ -49,11 +49,10 @@ ShardingCatalogClientMock::ShardingCatalogClientMock(
 
 ShardingCatalogClientMock::~ShardingCatalogClientMock() = default;
 
-Status ShardingCatalogClientMock::startup() {
+void ShardingCatalogClientMock::startup() {
     if (_distLockManager) {
         _distLockManager->startUp();
     }
-    return Status::OK();
 }
 
 void ShardingCatalogClientMock::shutDown(OperationContext* opCtx) {

@@ -94,18 +94,10 @@ public:
      */
     void setAllowLocalHost(bool allow);
 
-    /**
-     * Returns a pointer to a ShardingCatalogClient to use for accessing catalog data stored on the
-     * config servers.
-     */
-    ShardingCatalogClient* catalogClient(OperationContext* opCtx) {
+    ShardingCatalogClient* catalogClient() {
         return _catalogClient.get();
     }
 
-    /**
-     * Returns a pointer to a ShardingCatalogManager to use for manipulating catalog data stored on
-     * the config servers.
-     */
     ShardingCatalogManager* catalogManager() {
         return _catalogManager.get();
     }

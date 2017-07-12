@@ -73,8 +73,8 @@ public:
                      const BSONObj& cmdObj,
                      std::string& errmsg,
                      BSONObjBuilder& result) {
-        auto shardsStatus = grid.catalogClient(opCtx)->getAllShards(
-            opCtx, repl::ReadConcernLevel::kMajorityReadConcern);
+        auto shardsStatus =
+            grid.catalogClient()->getAllShards(opCtx, repl::ReadConcernLevel::kMajorityReadConcern);
         if (!shardsStatus.isOK()) {
             return appendCommandStatus(result, shardsStatus.getStatus());
         }

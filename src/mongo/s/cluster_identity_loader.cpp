@@ -95,7 +95,7 @@ Status ClusterIdentityLoader::loadClusterId(OperationContext* opCtx,
 
 StatusWith<OID> ClusterIdentityLoader::_fetchClusterIdFromConfig(
     OperationContext* opCtx, const repl::ReadConcernLevel& readConcernLevel) {
-    auto catalogClient = Grid::get(opCtx)->catalogClient(opCtx);
+    auto catalogClient = Grid::get(opCtx)->catalogClient();
     auto loadResult = catalogClient->getConfigVersion(opCtx, readConcernLevel);
     if (!loadResult.isOK()) {
         return Status(loadResult.getStatus().code(),

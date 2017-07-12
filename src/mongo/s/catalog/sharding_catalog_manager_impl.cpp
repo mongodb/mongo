@@ -120,7 +120,7 @@ void ShardingCatalogManagerImpl::discardCachedConfigDatabaseInitializationState(
 }
 
 Status ShardingCatalogManagerImpl::_initConfigVersion(OperationContext* opCtx) {
-    const auto catalogClient = Grid::get(opCtx)->catalogClient(opCtx);
+    const auto catalogClient = Grid::get(opCtx)->catalogClient();
 
     auto versionStatus =
         catalogClient->getConfigVersion(opCtx, repl::ReadConcernLevel::kLocalReadConcern);

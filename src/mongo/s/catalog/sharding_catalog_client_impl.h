@@ -66,7 +66,7 @@ public:
      * Safe to call multiple times as long as the calls are externally synchronized to be
      * non-overlapping.
      */
-    Status startup() override;
+    void startup() override;
 
     void shutDown(OperationContext* opCtx) override;
 

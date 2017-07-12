@@ -304,11 +304,8 @@ Status ShardingMongodTestFixture::initializeGlobalShardingStateForMongodForTest(
 
     // Note: ShardRegistry::startup() is not called because it starts a task executor with a self-
     // rescheduling task to reload the ShardRegistry over the network.
-    if (Grid::get(operationContext())->catalogClient(operationContext())) {
-        auto status = Grid::get(operationContext())->catalogClient(operationContext())->startup();
-        if (!status.isOK()) {
-            return status;
-        }
+    if (Grid::get(operationContext())->catalogClient()) {
+        Grid::get(operationContext())->catalogClient()->startup();
     }
 
     if (Grid::get(operationContext())->catalogManager()) {
@@ -332,10 +329,8 @@ void ShardingMongodTestFixture::tearDown() {
         Grid::get(operationContext())->catalogManager()->shutDown(operationContext());
     }
 
-    if (Grid::get(operationContext())->catalogClient(operationContext())) {
-        Grid::get(operationContext())
-            ->catalogClient(operationContext())
-            ->shutDown(operationContext());
+    if (Grid::get(operationContext())->catalogClient()) {
+        Grid::get(operationContext())->catalogClient()->shutDown(operationContext());
     }
 
     Grid::get(operationContext())->clearForUnitTests();
@@ -347,8 +342,8 @@ void ShardingMongodTestFixture::tearDown() {
 }
 
 ShardingCatalogClient* ShardingMongodTestFixture::catalogClient() const {
-    invariant(Grid::get(operationContext())->catalogClient(operationContext()));
-    return Grid::get(operationContext())->catalogClient(operationContext());
+    invariant(Grid::get(operationContext())->catalogClient());
+    return Grid::get(operationContext())->catalogClient();
 }
 
 ShardingCatalogManager* ShardingMongodTestFixture::catalogManager() const {

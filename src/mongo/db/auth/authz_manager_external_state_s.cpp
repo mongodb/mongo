@@ -100,7 +100,7 @@ Status AuthzManagerExternalStateMongos::getStoredAuthorizationVersion(OperationC
     // that runs this command
     BSONObj getParameterCmd = BSON("getParameter" << 1 << authSchemaVersionServerParameter << 1);
     BSONObjBuilder builder;
-    const bool ok = Grid::get(opCtx)->catalogClient(opCtx)->runUserManagementReadCommand(
+    const bool ok = Grid::get(opCtx)->catalogClient()->runUserManagementReadCommand(
         opCtx, "admin", getParameterCmd, &builder);
     BSONObj cmdResult = builder.obj();
     if (!ok) {
@@ -130,7 +130,7 @@ Status AuthzManagerExternalStateMongos::getUserDescription(OperationContext* opC
                              << "showCredentials"
                              << true);
         BSONObjBuilder builder;
-        const bool ok = Grid::get(opCtx)->catalogClient(opCtx)->runUserManagementReadCommand(
+        const bool ok = Grid::get(opCtx)->catalogClient()->runUserManagementReadCommand(
             opCtx, "admin", usersInfoCmd, &builder);
         BSONObj cmdResult = builder.obj();
         if (!ok) {
@@ -169,7 +169,7 @@ Status AuthzManagerExternalStateMongos::getUserDescription(OperationContext* opC
                                                 << "asUserFragment");
 
         BSONObjBuilder cmdResultBuilder;
-        const bool cmdOk = Grid::get(opCtx)->catalogClient(opCtx)->runUserManagementReadCommand(
+        const bool cmdOk = Grid::get(opCtx)->catalogClient()->runUserManagementReadCommand(
             opCtx, "admin", rolesInfoCmd, &cmdResultBuilder);
         BSONObj cmdResult = cmdResultBuilder.obj();
         if (!cmdOk || !cmdResult["userFragment"].ok()) {
@@ -217,7 +217,7 @@ Status AuthzManagerExternalStateMongos::getRoleDescription(OperationContext* opC
     addShowPrivilegesToBuilder(&rolesInfoCmd, showPrivileges);
 
     BSONObjBuilder builder;
-    const bool ok = Grid::get(opCtx)->catalogClient(opCtx)->runUserManagementReadCommand(
+    const bool ok = Grid::get(opCtx)->catalogClient()->runUserManagementReadCommand(
         opCtx, "admin", rolesInfoCmd.obj(), &builder);
     BSONObj cmdResult = builder.obj();
     if (!ok) {
@@ -257,7 +257,7 @@ Status AuthzManagerExternalStateMongos::getRolesDescription(OperationContext* op
     addShowPrivilegesToBuilder(&rolesInfoCmd, showPrivileges);
 
     BSONObjBuilder builder;
-    const bool ok = Grid::get(opCtx)->catalogClient(opCtx)->runUserManagementReadCommand(
+    const bool ok = Grid::get(opCtx)->catalogClient()->runUserManagementReadCommand(
         opCtx, "admin", rolesInfoCmd.obj(), &builder);
     BSONObj cmdResult = builder.obj();
     if (!ok) {
@@ -283,7 +283,7 @@ Status AuthzManagerExternalStateMongos::getRoleDescriptionsForDB(OperationContex
     addShowPrivilegesToBuilder(&rolesInfoCmd, showPrivileges);
 
     BSONObjBuilder builder;
-    const bool ok = Grid::get(opCtx)->catalogClient(opCtx)->runUserManagementReadCommand(
+    const bool ok = Grid::get(opCtx)->catalogClient()->runUserManagementReadCommand(
         opCtx, dbname, rolesInfoCmd.obj(), &builder);
     BSONObj cmdResult = builder.obj();
     if (!ok) {
@@ -300,7 +300,7 @@ Status AuthzManagerExternalStateMongos::getRoleDescriptionsForDB(OperationContex
 bool AuthzManagerExternalStateMongos::hasAnyPrivilegeDocuments(OperationContext* opCtx) {
     BSONObj usersInfoCmd = BSON("usersInfo" << 1);
     BSONObjBuilder userBuilder;
-    bool ok = Grid::get(opCtx)->catalogClient(opCtx)->runUserManagementReadCommand(
+    bool ok = Grid::get(opCtx)->catalogClient()->runUserManagementReadCommand(
         opCtx, "admin", usersInfoCmd, &userBuilder);
     if (!ok) {
         // If we were unable to complete the query,
@@ -318,7 +318,7 @@ bool AuthzManagerExternalStateMongos::hasAnyPrivilegeDocuments(OperationContext*
 
     BSONObj rolesInfoCmd = BSON("rolesInfo" << 1);
     BSONObjBuilder roleBuilder;
-    ok = Grid::get(opCtx)->catalogClient(opCtx)->runUserManagementReadCommand(
+    ok = Grid::get(opCtx)->catalogClient()->runUserManagementReadCommand(
         opCtx, "admin", rolesInfoCmd, &roleBuilder);
     if (!ok) {
         return true;

@@ -312,7 +312,7 @@ std::shared_ptr<CatalogCache::DatabaseInfoEntry> CatalogCache::_getDatabase(Oper
         return it->second;
     }
 
-    const auto catalogClient = Grid::get(opCtx)->catalogClient(opCtx);
+    const auto catalogClient = Grid::get(opCtx)->catalogClient();
 
     const auto dbNameCopy = dbName.toString();
 

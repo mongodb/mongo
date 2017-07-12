@@ -82,7 +82,7 @@ public:
                 "have to pass 1 as db parameter",
                 cmdObj.firstElement().isNumber() && cmdObj.firstElement().number() == 1);
 
-        auto const catalogClient = Grid::get(opCtx)->catalogClient(opCtx);
+        auto const catalogClient = Grid::get(opCtx)->catalogClient();
 
         // Lock the database globally to prevent conflicts with simultaneous database
         // creation/modification.

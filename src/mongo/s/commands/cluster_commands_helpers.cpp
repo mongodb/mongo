@@ -409,7 +409,7 @@ std::vector<NamespaceString> getAllShardedCollectionsForDb(OperationContext* opC
     const auto dbNameStr = dbName.toString();
 
     std::vector<CollectionType> collectionsOnConfig;
-    uassertStatusOK(Grid::get(opCtx)->catalogClient(opCtx)->getCollections(
+    uassertStatusOK(Grid::get(opCtx)->catalogClient()->getCollections(
         opCtx, &dbNameStr, &collectionsOnConfig, nullptr));
 
     std::vector<NamespaceString> collectionsToReturn;
@@ -438,7 +438,7 @@ StatusWith<CachedDatabaseInfo> createShardDatabase(OperationContext* opCtx, Stri
     auto dbStatus = Grid::get(opCtx)->catalogCache()->getDatabase(opCtx, dbName);
     if (dbStatus == ErrorCodes::NamespaceNotFound) {
         auto createDbStatus =
-            Grid::get(opCtx)->catalogClient(opCtx)->createDatabase(opCtx, dbName.toString());
+            Grid::get(opCtx)->catalogClient()->createDatabase(opCtx, dbName.toString());
         if (createDbStatus.isOK() || createDbStatus == ErrorCodes::NamespaceExists) {
             dbStatus = Grid::get(opCtx)->catalogCache()->getDatabase(opCtx, dbName);
         } else {

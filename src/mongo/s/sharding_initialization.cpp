@@ -210,7 +210,7 @@ Status initializeGlobalShardingState(OperationContext* opCtx,
         makeTaskExecutor(executor::makeNetworkInterface("AddShard-TaskExecutor")));
     auto rawCatalogManager = catalogManager.get();
 
-    auto grid = Grid::get(opCtx);
+    auto const grid = Grid::get(opCtx);
     grid->init(
         std::move(catalogClient),
         std::move(catalogManager),
@@ -221,24 +221,21 @@ Status initializeGlobalShardingState(OperationContext* opCtx,
         std::move(executorPool),
         networkPtr);
 
-    // must be started once the grid is initialized
+    // The shard registry must be started once the grid is initialized
     grid->shardRegistry()->startup(opCtx);
 
-    auto status = rawCatalogClient->startup();
-    if (!status.isOK()) {
-        return status;
-    }
+    grid->catalogClient()->startup();
 
     if (serverGlobalParams.clusterRole == ClusterRole::ConfigServer) {
         // Only config servers get a ShardingCatalogManager.
-        status = rawCatalogManager->startup();
+        Status status = rawCatalogManager->startup();
         if (!status.isOK()) {
             return status;
         }
     }
 
     auto keyManager = stdx::make_unique<KeysCollectionManager>(
-        kKeyManagerPurposeString, grid->catalogClient(opCtx), Seconds(KeysRotationIntervalSec));
+        kKeyManagerPurposeString, grid->catalogClient(), Seconds(KeysRotationIntervalSec));
     keyManager->startMonitoring(opCtx->getServiceContext());
 
     LogicalTimeValidator::set(opCtx->getServiceContext(),

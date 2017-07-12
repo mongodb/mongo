@@ -99,7 +99,7 @@ public:
         }
         const auto s = shardStatus.getValue();
 
-        auto catalogClient = grid.catalogClient(opCtx);
+        auto catalogClient = grid.catalogClient();
         StatusWith<ShardDrainingStatus> removeShardResult =
             catalogClient->removeShard(opCtx, s->getId());
         if (!removeShardResult.isOK()) {

@@ -778,7 +778,7 @@ void ReplicationCoordinatorExternalStateImpl::_shardingOnTransitionToPrimaryHook
         }
 
         // Free any leftover locks from previous instantiations.
-        auto distLockManager = Grid::get(opCtx)->catalogClient(opCtx)->getDistLockManager();
+        auto distLockManager = Grid::get(opCtx)->catalogClient()->getDistLockManager();
         distLockManager->unlockAll(opCtx, distLockManager->getProcessID());
 
         // If this is a config server node becoming a primary, start the balancer

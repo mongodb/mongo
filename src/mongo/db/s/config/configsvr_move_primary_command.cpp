@@ -128,7 +128,7 @@ public:
                  str::stream() << "Can't move primary for " << dbname << " database"});
         }
 
-        auto const catalogClient = Grid::get(opCtx)->catalogClient(opCtx);
+        auto const catalogClient = Grid::get(opCtx)->catalogClient();
         auto const catalogCache = Grid::get(opCtx)->catalogCache();
         auto const shardRegistry = Grid::get(opCtx)->shardRegistry();
 

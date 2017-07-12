@@ -64,7 +64,7 @@ protected:
 
         auto clockSource = stdx::make_unique<ClockSourceMock>();
         operationContext()->getServiceContext()->setFastClockSource(std::move(clockSource));
-        auto catalogClient = Grid::get(operationContext())->catalogClient(operationContext());
+        auto catalogClient = Grid::get(operationContext())->catalogClient();
         _keyManager = stdx::make_unique<KeysCollectionManager>("dummy", catalogClient, Seconds(1));
     }
 

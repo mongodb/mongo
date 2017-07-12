@@ -148,7 +148,7 @@ void ShardingTestFixture::setUp() {
     std::unique_ptr<ShardingCatalogClientImpl> catalogClient(
         stdx::make_unique<ShardingCatalogClientImpl>(std::move(uniqueDistLockManager)));
     _catalogClient = catalogClient.get();
-    catalogClient->startup().transitional_ignore();
+    catalogClient->startup();
 
     ConnectionString configCS = ConnectionString::forReplicaSet(
         "configRS", {HostAndPort{"TestHost1"}, HostAndPort{"TestHost2"}});
@@ -199,7 +199,7 @@ void ShardingTestFixture::setUp() {
 
 void ShardingTestFixture::tearDown() {
     Grid::get(operationContext())->getExecutorPool()->shutdownAndJoin();
-    Grid::get(operationContext())->catalogClient(_opCtx.get())->shutDown(_opCtx.get());
+    Grid::get(operationContext())->catalogClient()->shutDown(_opCtx.get());
     Grid::get(operationContext())->clearForUnitTests();
 
     _transportSession.reset();
@@ -213,7 +213,7 @@ void ShardingTestFixture::shutdownExecutor() {
 }
 
 ShardingCatalogClient* ShardingTestFixture::catalogClient() const {
-    return Grid::get(operationContext())->catalogClient(_opCtx.get());
+    return Grid::get(operationContext())->catalogClient();
 }
 
 ShardingCatalogClientImpl* ShardingTestFixture::getCatalogClient() const {

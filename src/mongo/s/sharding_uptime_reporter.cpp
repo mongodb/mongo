@@ -71,7 +71,7 @@ void reportStatus(OperationContext* opCtx,
 
     try {
         Grid::get(opCtx)
-            ->catalogClient(opCtx)
+            ->catalogClient()
             ->updateConfigDocument(opCtx,
                                    MongosType::ConfigNS,
                                    BSON(MongosType::name(instanceId)),

@@ -388,7 +388,7 @@ void Balancer::_mainThread() {
                     roundDetails.setSucceeded(static_cast<int>(candidateChunks.size()),
                                               _balancedLastTime);
 
-                    shardingContext->catalogClient(opCtx.get())
+                    shardingContext->catalogClient()
                         ->logAction(opCtx.get(), "balancer.round", "", roundDetails.toBSON())
                         .transitional_ignore();
                 }
@@ -408,7 +408,7 @@ void Balancer::_mainThread() {
             // This round failed, tell the world!
             roundDetails.setFailed(e.what());
 
-            shardingContext->catalogClient(opCtx.get())
+            shardingContext->catalogClient()
                 ->logAction(opCtx.get(), "balancer.round", "", roundDetails.toBSON())
                 .transitional_ignore();
 
@@ -651,7 +651,7 @@ void Balancer::_splitOrMarkJumbo(OperationContext* opCtx,
 
         const std::string chunkName = ChunkType::genID(nss.ns(), chunk->getMin());
 
-        auto status = Grid::get(opCtx)->catalogClient(opCtx)->updateConfigDocument(
+        auto status = Grid::get(opCtx)->catalogClient()->updateConfigDocument(
             opCtx,
             ChunkType::ConfigNS,
             BSON(ChunkType::name(chunkName)),

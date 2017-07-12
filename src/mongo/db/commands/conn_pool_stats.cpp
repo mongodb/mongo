@@ -47,6 +47,7 @@
 #include "mongo/s/grid.h"
 
 namespace mongo {
+namespace {
 
 class PoolStats final : public Command {
 public:
@@ -56,8 +57,11 @@ public:
         help << "stats about connections between servers in a replica set or sharded cluster.";
     }
 
+    bool slaveOk() const override {
+        return true;
+    }
 
-    virtual bool supportsWriteConcern(const BSONObj& cmd) const override {
+    bool supportsWriteConcern(const BSONObj& cmd) const override {
         return false;
     }
 
@@ -70,9 +74,9 @@ public:
     }
 
     bool run(OperationContext* opCtx,
-             const std::string&,
-             const mongo::BSONObj&,
-             std::string&,
+             const std::string& db,
+             const mongo::BSONObj& cmdObj,
+             std::string& errmsg,
              mongo::BSONObjBuilder& result) override {
         executor::ConnectionPoolStats stats{};
 
@@ -82,14 +86,14 @@ public:
         result.appendNumber("numAScopedConnections", AScopedConnection::getNumConnections());
 
         // Replication connections, if we have them.
-        auto replCoord = repl::ReplicationCoordinator::get(opCtx);
+        auto const replCoord = repl::ReplicationCoordinator::get(opCtx);
         if (replCoord && replCoord->isReplEnabled()) {
             replCoord->appendConnectionStats(&stats);
         }
 
         // Sharding connections, if we have any.
-        auto grid = Grid::get(opCtx);
-        if (grid->shardRegistry()) {
+        auto const grid = Grid::get(opCtx);
+        if (grid->getExecutorPool()) {
             grid->getExecutorPool()->appendConnectionStats(&stats);
             if (serverGlobalParams.clusterRole == ClusterRole::ConfigServer) {
                 grid->catalogManager()->appendConnectionStats(&stats);
@@ -107,10 +111,7 @@ public:
         return true;
     }
 
-    bool slaveOk() const override {
-        return true;
-    }
-
 } poolStatsCmd;
 
+}  // namespace
 }  // namespace mongo

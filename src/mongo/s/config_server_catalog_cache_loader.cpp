@@ -90,7 +90,7 @@ QueryAndSort createConfigDiffQuery(const NamespaceString& nss, ChunkVersion coll
 CollectionAndChangedChunks getChangedChunks(OperationContext* opCtx,
                                             const NamespaceString& nss,
                                             ChunkVersion sinceVersion) {
-    const auto catalogClient = Grid::get(opCtx)->catalogClient(opCtx);
+    const auto catalogClient = Grid::get(opCtx)->catalogClient();
 
     // Decide whether to do a full or partial load based on the state of the collection
     const auto coll = uassertStatusOK(catalogClient->getCollection(opCtx, nss.ns())).value;
@@ -109,14 +109,14 @@ CollectionAndChangedChunks getChangedChunks(OperationContext* opCtx,
     // Query the chunks which have changed
     std::vector<ChunkType> changedChunks;
     repl::OpTime opTime;
-    uassertStatusOK(Grid::get(opCtx)->catalogClient(opCtx)->getChunks(
-        opCtx,
-        diffQuery.query,
-        diffQuery.sort,
-        boost::none,
-        &changedChunks,
-        &opTime,
-        repl::ReadConcernLevel::kMajorityReadConcern));
+    uassertStatusOK(
+        Grid::get(opCtx)->catalogClient()->getChunks(opCtx,
+                                                     diffQuery.query,
+                                                     diffQuery.sort,
+                                                     boost::none,
+                                                     &changedChunks,
+                                                     &opTime,
+                                                     repl::ReadConcernLevel::kMajorityReadConcern));
 
     uassert(ErrorCodes::ConflictingOperationInProgress,
             "No chunks were found for the collection",

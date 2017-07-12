@@ -368,7 +368,7 @@ Status ShardingCatalogManagerImpl::commitChunkSplit(OperationContext* opCtx,
     }
 
     // apply the batch of updates to remote and local metadata
-    Status applyOpsStatus = Grid::get(opCtx)->catalogClient(opCtx)->applyChunkOpsDeprecated(
+    Status applyOpsStatus = Grid::get(opCtx)->catalogClient()->applyChunkOpsDeprecated(
         opCtx,
         updates.arr(),
         preCond.arr(),
@@ -394,7 +394,7 @@ Status ShardingCatalogManagerImpl::commitChunkSplit(OperationContext* opCtx,
         appendShortVersion(&logDetail.subobjStart("right"), newChunks[1]);
 
         Grid::get(opCtx)
-            ->catalogClient(opCtx)
+            ->catalogClient()
             ->logChange(opCtx, "split", ns.ns(), logDetail.obj(), WriteConcernOptions())
             .transitional_ignore();
     } else {
@@ -410,7 +410,7 @@ Status ShardingCatalogManagerImpl::commitChunkSplit(OperationContext* opCtx,
             appendShortVersion(&chunkDetail.subobjStart("chunk"), newChunks[i]);
 
             Grid::get(opCtx)
-                ->catalogClient(opCtx)
+                ->catalogClient()
                 ->logChange(opCtx, "multi-split", ns.ns(), chunkDetail.obj(), WriteConcernOptions())
                 .transitional_ignore();
         }
@@ -496,7 +496,7 @@ Status ShardingCatalogManagerImpl::commitChunkMerge(OperationContext* opCtx,
     auto preCond = buildMergeChunksApplyOpsPrecond(chunksToMerge, collVersion);
 
     // apply the batch of updates to remote and local metadata
-    Status applyOpsStatus = Grid::get(opCtx)->catalogClient(opCtx)->applyChunkOpsDeprecated(
+    Status applyOpsStatus = Grid::get(opCtx)->catalogClient()->applyChunkOpsDeprecated(
         opCtx,
         updates,
         preCond,
@@ -520,7 +520,7 @@ Status ShardingCatalogManagerImpl::commitChunkMerge(OperationContext* opCtx,
     mergeVersion.addToBSON(logDetail, "mergedVersion");
 
     Grid::get(opCtx)
-        ->catalogClient(opCtx)
+        ->catalogClient()
         ->logChange(opCtx, "merge", ns.ns(), logDetail.obj(), WriteConcernOptions())
         .transitional_ignore();
 
