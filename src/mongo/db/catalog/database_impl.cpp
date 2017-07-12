@@ -44,6 +44,7 @@
 #include "mongo/db/catalog/collection_options.h"
 #include "mongo/db/catalog/database_catalog_entry.h"
 #include "mongo/db/catalog/database_holder.h"
+#include "mongo/db/catalog/drop_indexes.h"
 #include "mongo/db/catalog/namespace_uuid_cache.h"
 #include "mongo/db/catalog/uuid_catalog.h"
 #include "mongo/db/clientcursor.h"
@@ -515,18 +516,36 @@ Status DatabaseImpl::dropCollectionEvenIfSystem(OperationContext* opCtx,
 
     // MMAPv1 requires that index namespaces are subject to the same length constraints as indexes
     // in collections that are not in a drop-pending state. Therefore, we check if the drop-pending
-    // namespace is too long for the index names in the collection.
+    // namespace is too long for any index names in the collection.
     if (opCtx->getServiceContext()->getGlobalStorageEngine()->isMmapV1()) {
-        auto status = dpns.checkLengthForRename(
-            collection->getIndexCatalog()->getLongestIndexNameLength(opCtx));
-        if (!status.isOK()) {
-            log() << "dropCollection: " << fullns
-                  << " - cannot proceed with collection rename for pending-drop: " << status
-                  << ". Dropping collection immediately.";
-            fassertStatusOK(40463, _finishDropCollection(opCtx, fullns, collection));
-            return Status::OK();
+
+        // Compile a list of any indexes that would become too long following the drop-pending
+        // rename. In the case that this collection drop gets rolled back, this will incur a
+        // performance hit, since those indexes will have to be rebuilt from scratch, but data
+        // integrity is maintained.
+        std::vector<IndexDescriptor*> indexesToDrop;
+        auto indexIter = collection->getIndexCatalog()->getIndexIterator(opCtx, true);
+
+        // Determine which index names are too long.
+        while (indexIter.more()) {
+            auto index = indexIter.next();
+            auto status = dpns.checkLengthForRename(index->indexName().size());
+            if (!status.isOK()) {
+                indexesToDrop.push_back(index);
+            }
+        }
+
+        // Drop the offending indexes.
+        for (auto&& index : indexesToDrop) {
+            log() << "dropCollection: " << fullns << " - index namespace '"
+                  << index->indexNamespace()
+                  << "' would be too long after drop-pending rename. Dropping index immediately.";
+            fassertStatusOK(40463, collection->getIndexCatalog()->dropIndex(opCtx, index));
+            opObserver->onDropIndex(
+                opCtx, fullns, collection->uuid(), index->indexName(), index->infoObj());
         }
     }
+
 
     // Rename collection using drop-pending namespace generated from drop optime.
     const bool stayTemp = true;

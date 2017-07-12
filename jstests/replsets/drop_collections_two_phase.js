@@ -24,6 +24,16 @@
         return res.cursor.firstBatch;
     }
 
+    // Return a list of all indexes for a given collection. Use 'args' as the
+    // 'listIndexes' command arguments.
+    function listIndexes(database, coll, args) {
+        var args = args || {};
+        var failMsg = "'listIndexes' command failed";
+        var listIndexesCmd = {listIndexes: coll};
+        var res = assert.commandWorked(database.runCommand(listIndexesCmd, args), failMsg);
+        return res.cursor.firstBatch;
+    }
+
     // Return a list of all collection names in a given database.
     function listCollectionNames(database, args) {
         return listCollections(database, args).map(c => c.name);
@@ -60,20 +70,19 @@
     primaryDB.createCollection(collToDrop);
     replTest.awaitReplication();
 
-    // Two phase collection should handle long index names gracefully.
-    // MMAP imposes a hard limit on index namespaces so we have to drop indexes that are too long
-    // to store on disk after renaming the collection. See SERVER-29747.
-    // Other storage engines should allow the implicit index renames to proceed because these
-    // renamed indexes are internal and will not be visible to users (no risk of being exported to
-    // another storage engine).
-    // TODO: remove storage engine check when SERVER-29474 is completed.
-    var storageEngine = jsTest.options().storageEngine;
-    if (storageEngine !== 'mmapv1') {
-        var coll = primaryDB.getCollection(collToDrop);
-        var maxNsLength = 127;
-        var indexName = ''.pad(maxNsLength - (coll.getFullName() + '.$').length, true, 'a');
-        assert.commandWorked(coll.ensureIndex({a: 1}, {name: indexName}));
-    }
+    // Two phase collection drops should handle long index names gracefully. MMAPv1 imposes a hard
+    // limit on index namespaces so we have to drop indexes that are too long to store on disk after
+    // renaming the collection (see SERVER-29747). Other storage engines should allow the implicit
+    // index renames to proceed because these renamed indexes are internal and will not be visible
+    // to users (no risk of being exported to another storage engine).
+    var coll = primaryDB.getCollection(collToDrop);
+    var maxNsLength = 127;
+    var longIndexName = ''.pad(maxNsLength - (coll.getFullName() + '.$').length, true, 'a');
+    var shortIndexName = "short_name";
+
+    // Create one index with a "too long" name, and one with a name of acceptable size.
+    assert.commandWorked(coll.ensureIndex({a: 1}, {name: longIndexName}));
+    assert.commandWorked(coll.ensureIndex({b: 1}, {name: shortIndexName}));
 
     // Pause application on secondary so that commit point doesn't advance, meaning that a dropped
     // collection on the primary will remain in 'drop-pending' state.
@@ -100,8 +109,8 @@
     var pendingDropRegex = new RegExp("system\.drop\..*\." + collToDrop + "$");
 
     collections = listCollections(primaryDB, {includePendingDrops: true});
-    collection = collections.find(c => pendingDropRegex.test(c.name));
-    assert(collection,
+    var droppedCollection = collections.find(c => pendingDropRegex.test(c.name));
+    assert(droppedCollection,
            "Collection was not found in the 'system.drop' namespace. Full collection list: " +
                tojson(collections));
 
@@ -115,6 +124,15 @@
 
     // Save the dbHash while drop is in 'pending' state.
     var dropPendingDbHash = getDbHash(primaryDB);
+
+    // Check that, on MMAPv1, indexes that would violate the namespace length constraints after
+    // rename were dropped.
+    var storageEngine = jsTest.options().storageEngine;
+    if (storageEngine === 'mmapv1') {
+        var indexes = listIndexes(primaryDB, droppedCollection.name);
+        assert(indexes.find(idx => idx.name === shortIndexName));
+        assert.eq(undefined, indexes.find(idx => idx.name === longIndexName));
+    }
 
     /**
      * DROP COLLECTION COMMIT PHASE
