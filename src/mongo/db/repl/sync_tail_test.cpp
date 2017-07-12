@@ -215,7 +215,7 @@ TEST_F(SyncTailTest, SyncApplyNoOpApplyOpThrowsException) {
 }
 
 TEST_F(SyncTailTest, SyncApplyInsertDocumentDatabaseMissing) {
-    _testSyncApplyInsertDocument(MODE_X);
+    _testSyncApplyInsertDocument(ErrorCodes::NamespaceNotFound);
 }
 
 TEST_F(SyncTailTest, SyncApplyInsertDocumentCollectionMissing) {
@@ -226,7 +226,10 @@ TEST_F(SyncTailTest, SyncApplyInsertDocumentCollectionMissing) {
         ASSERT_TRUE(db);
         ASSERT_TRUE(justCreated);
     }
-    _testSyncApplyInsertDocument(MODE_X);
+    // Even though the collection doesn't exist, this is handled in the actual application function,
+    // which in the case of this test just ignores such errors. This tests mostly that we don't
+    // implicitly create the collection and lock the database in MODE_X.
+    _testSyncApplyInsertDocument(ErrorCodes::OK);
 }
 
 TEST_F(SyncTailTest, SyncApplyInsertDocumentCollectionExists) {
@@ -239,7 +242,30 @@ TEST_F(SyncTailTest, SyncApplyInsertDocumentCollectionExists) {
         Collection* collection = db->createCollection(_opCtx.get(), "test.t");
         ASSERT_TRUE(collection);
     }
-    _testSyncApplyInsertDocument(MODE_IX);
+    _testSyncApplyInsertDocument(ErrorCodes::OK);
+}
+
+TEST_F(SyncTailTest, SyncApplyInsertDocumentCollectionLockedByUUID) {
+    CollectionOptions options;
+    options.uuid = UUID::gen();
+    {
+        Lock::GlobalWrite globalLock(_opCtx.get());
+        bool justCreated;
+        Database* db = dbHolder().openDb(_opCtx.get(), "test", &justCreated);
+        ASSERT_TRUE(db);
+        ASSERT_TRUE(justCreated);
+        Collection* collection = db->createCollection(_opCtx.get(), "test.t", options);
+        ASSERT_TRUE(collection);
+    }
+
+    // Test that the collection to lock is determined by the UUID and not the 'ns' field.
+    const BSONObj op = BSON("op"
+                            << "i"
+                            << "ns"
+                            << "test.othername"
+                            << "ui"
+                            << options.uuid.get());
+    _testSyncApplyInsertDocument(ErrorCodes::OK, &op);
 }
 
 TEST_F(SyncTailTest, SyncApplyIndexBuild) {
@@ -825,7 +851,8 @@ TEST_F(SyncTailTest, MultiSyncApplyFallsBackOnApplyingInsertsIndividuallyWhenGro
 
 TEST_F(SyncTailTest, MultiInitialSyncApplyDisablesDocumentValidationWhileApplyingOperations) {
     SyncTailWithOperationContextChecker syncTail;
-    NamespaceString nss("local." + _agent.getSuiteName() + "_" + _agent.getTestName());
+    NamespaceString nss("test.t");
+    createCollection(_opCtx.get(), nss, {});
     auto op = makeUpdateDocumentOplogEntry(
         {Timestamp(Seconds(1), 0), 1LL}, nss, BSON("_id" << 0), BSON("_id" << 0 << "x" << 2));
     MultiApplier::OperationPtrs ops = {&op};
@@ -837,7 +864,14 @@ TEST_F(SyncTailTest, MultiInitialSyncApplyDisablesDocumentValidationWhileApplyin
 TEST_F(SyncTailTest, MultiInitialSyncApplyIgnoresUpdateOperationIfDocumentIsMissingFromSyncSource) {
     BSONObj emptyDoc;
     SyncTailWithLocalDocumentFetcher syncTail(emptyDoc);
-    NamespaceString nss("local." + _agent.getSuiteName() + "_" + _agent.getTestName());
+    NamespaceString nss("test.t");
+    {
+        Lock::GlobalWrite globalLock(_opCtx.get());
+        bool justCreated = false;
+        Database* db = dbHolder().openDb(_opCtx.get(), nss.db(), &justCreated);
+        ASSERT_TRUE(db);
+        ASSERT_TRUE(justCreated);
+    }
     auto op = makeUpdateDocumentOplogEntry(
         {Timestamp(Seconds(1), 0), 1LL}, nss, BSON("_id" << 0), BSON("_id" << 0 << "x" << 2));
     MultiApplier::OperationPtrs ops = {&op};
@@ -905,7 +939,8 @@ TEST_F(SyncTailTest, MultiInitialSyncApplySkipsIndexCreationOnNamespaceNotFound)
 TEST_F(SyncTailTest,
        MultiInitialSyncApplyFetchesMissingDocumentIfDocumentIsAvailableFromSyncSource) {
     SyncTailWithLocalDocumentFetcher syncTail(BSON("_id" << 0 << "x" << 1));
-    NamespaceString nss("local." + _agent.getSuiteName() + "_" + _agent.getTestName());
+    NamespaceString nss("test.t");
+    createCollection(_opCtx.get(), nss, {});
     auto updatedDocument = BSON("_id" << 0 << "x" << 1);
     auto op = makeUpdateDocumentOplogEntry(
         {Timestamp(Seconds(1), 0), 1LL}, nss, BSON("_id" << 0), updatedDocument);
@@ -1138,12 +1173,17 @@ TEST_F(IdempotencyTest, TextIndexDocumentHasUnknownLanguage) {
 TEST_F(IdempotencyTest, CreateCollectionWithValidation) {
     ASSERT_OK(
         ReplicationCoordinator::get(_opCtx.get())->setFollowerMode(MemberState::RS_RECOVERING));
+    const BSONObj uuidObj = UUID::gen().toBSON();
 
-    auto runOpsAndValidate = [this]() {
+    auto runOpsAndValidate = [this, uuidObj]() {
         auto options1 = fromjson("{'validator' : {'phone' : {'$type' : 'string' } } }");
         auto createColl1 = makeCreateCollectionOplogEntry(nextOpTime(), nss, options1);
         auto dropColl = makeCommandOplogEntry(nextOpTime(), nss, BSON("drop" << nss.coll()));
         auto options2 = fromjson("{'validator' : {'phone' : {'$type' : 'number' } } }");
+        // The first collection will be dropped, so won't affect final validation. However, the
+        // final collection should have the correct UUID.
+        options2 = options2.addField(uuidObj.firstElement());
+
         auto createColl2 = makeCreateCollectionOplogEntry(nextOpTime(), nss, options2);
 
         auto ops = {createColl1, dropColl, createColl2};
@@ -1161,8 +1201,9 @@ TEST_F(IdempotencyTest, CreateCollectionWithValidation) {
 TEST_F(IdempotencyTest, CreateCollectionWithCollation) {
     ASSERT_OK(getGlobalReplicationCoordinator()->setFollowerMode(MemberState::RS_RECOVERING));
     ASSERT_OK(runOp(createCollection()));
+    CollectionUUID uuid = UUID::gen();
 
-    auto runOpsAndValidate = [this]() {
+    auto runOpsAndValidate = [this, uuid]() {
         auto insertOp1 = insert(fromjson("{ _id: 'foo' }"));
         auto insertOp2 = insert(fromjson("{ _id: 'Foo', x: 1 }"));
         auto updateOp = update("foo", BSON("$set" << BSON("x" << 2)));
@@ -1186,7 +1227,9 @@ TEST_F(IdempotencyTest, CreateCollectionWithCollation) {
                                                 << "backwards"
                                                 << false
                                                 << "version"
-                                                << "57.1"));
+                                                << "57.1")
+                                        << "uuid"
+                                        << uuid);
         auto createColl = makeCreateCollectionOplogEntry(nextOpTime(), nss, options);
 
         auto ops = {insertOp1, insertOp2, updateOp, dropColl, createColl};
@@ -1213,10 +1256,11 @@ TEST_F(IdempotencyTest, CreateCollectionWithIdIndex) {
     auto createColl1 = makeCreateCollectionOplogEntry(nextOpTime(), nss, options1);
     ASSERT_OK(runOp(createColl1));
 
-    auto runOpsAndValidate = [this]() {
+    CollectionUUID uuid = UUID::gen();
+    auto runOpsAndValidate = [this, uuid]() {
         auto insertOp = insert(BSON("_id" << Decimal128(1)));
         auto dropColl = makeCommandOplogEntry(nextOpTime(), nss, BSON("drop" << nss.coll()));
-        auto createColl2 = createCollection();
+        auto createColl2 = createCollection(uuid);
 
         auto ops = {insertOp, dropColl, createColl2};
         ASSERT_OK(runOps(ops));

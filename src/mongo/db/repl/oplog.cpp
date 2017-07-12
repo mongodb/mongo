@@ -897,14 +897,16 @@ Status applyOperation_inlock(OperationContext* opCtx,
     Collection* collection = nullptr;
     if (fieldUI) {
         UUIDCatalog& catalog = UUIDCatalog::get(opCtx);
-        auto uuid = UUID::parse(fieldUI);
-        uassertStatusOK(uuid);
-        collection = catalog.lookupCollectionByUUID(uuid.getValue());
-        if (collection) {
-            requestNss = collection->ns();
-            dassert(opCtx->lockState()->isCollectionLockedForMode(
-                requestNss.ns(), supportsDocLocking() ? MODE_IX : MODE_X));
-        }
+        auto uuid = uassertStatusOK(UUID::parse(fieldUI));
+        collection = catalog.lookupCollectionByUUID(uuid);
+        uassert(ErrorCodes::NamespaceNotFound,
+                str::stream() << "Failed to apply operation due to missing collection (" << uuid
+                              << "): "
+                              << redact(op.toString()),
+                collection);
+        requestNss = collection->ns();
+        dassert(opCtx->lockState()->isCollectionLockedForMode(
+            requestNss.ns(), supportsDocLocking() ? MODE_IX : MODE_X));
     } else {
         uassert(ErrorCodes::InvalidNamespace,
                 "'ns' must be of type String",

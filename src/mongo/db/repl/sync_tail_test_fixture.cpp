@@ -82,11 +82,12 @@ void SyncTailTest::tearDown() {
     ServiceContextMongoDTest::tearDown();
 }
 
-void SyncTailTest::_testSyncApplyInsertDocument(LockMode expectedMode) {
-    const BSONObj op = BSON("op"
-                            << "i"
-                            << "ns"
-                            << "test.t");
+void SyncTailTest::_testSyncApplyInsertDocument(ErrorCodes::Error expectedError,
+                                                const BSONObj* explicitOp) {
+    const BSONObj op = explicitOp ? *explicitOp : BSON("op"
+                                                       << "i"
+                                                       << "ns"
+                                                       << "test.t");
     bool applyOpCalled = false;
     SyncTail::ApplyOperationInLockFn applyOp = [&](OperationContext* opCtx,
                                                    Database* db,
@@ -95,8 +96,9 @@ void SyncTailTest::_testSyncApplyInsertDocument(LockMode expectedMode) {
                                                    stdx::function<void()>) {
         applyOpCalled = true;
         ASSERT_TRUE(opCtx);
-        ASSERT_TRUE(opCtx->lockState()->isDbLockedForMode("test", expectedMode));
-        ASSERT_TRUE(opCtx->lockState()->isCollectionLockedForMode("test.t", expectedMode));
+        ASSERT_TRUE(opCtx->lockState()->isDbLockedForMode("test", MODE_IX));
+        ASSERT_FALSE(opCtx->lockState()->isDbLockedForMode("test", MODE_X));
+        ASSERT_TRUE(opCtx->lockState()->isCollectionLockedForMode("test.t", MODE_IX));
         ASSERT_FALSE(opCtx->writesAreReplicated());
         ASSERT_TRUE(documentValidationDisabled(opCtx));
         ASSERT_TRUE(db);
@@ -106,8 +108,9 @@ void SyncTailTest::_testSyncApplyInsertDocument(LockMode expectedMode) {
     };
     ASSERT_TRUE(_opCtx->writesAreReplicated());
     ASSERT_FALSE(documentValidationDisabled(_opCtx.get()));
-    ASSERT_OK(SyncTail::syncApply(_opCtx.get(), op, true, applyOp, failedApplyCommand, _incOps));
-    ASSERT_TRUE(applyOpCalled);
+    ASSERT_EQ(SyncTail::syncApply(_opCtx.get(), op, true, applyOp, failedApplyCommand, _incOps),
+              expectedError);
+    ASSERT_EQ(applyOpCalled, expectedError == ErrorCodes::OK);
 }
 
 Status failedApplyCommand(OperationContext* opCtx, const BSONObj& theOperation, bool) {

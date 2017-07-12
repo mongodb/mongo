@@ -230,8 +230,8 @@ void IdempotencyTest::testOpsAreIdempotent(std::initializer_list<OplogEntry> ops
     ASSERT_EQUALS(state, validate());
 }
 
-OplogEntry IdempotencyTest::createCollection() {
-    return makeCreateCollectionOplogEntry(nextOpTime(), nss);
+OplogEntry IdempotencyTest::createCollection(CollectionUUID uuid) {
+    return makeCreateCollectionOplogEntry(nextOpTime(), nss, BSON("uuid" << uuid));
 }
 
 OplogEntry IdempotencyTest::insert(const BSONObj& obj) {
