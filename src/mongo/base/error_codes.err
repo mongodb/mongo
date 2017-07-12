@@ -216,6 +216,8 @@ error_code("DatabaseDropPending", 215)
 error_code("ElectionInProgress", 216)
 error_code("IncompleteTransactionHistory", 217);
 error_code("UpdateOperationFailed", 218)
+error_code("FTDCPathNotSet", 219)
+error_code("FTDCPathAlreadySet", 220)
 
 # Error codes 4000-8999 are reserved.
 

@@ -2756,7 +2756,6 @@ var authCommandsLib = {
         {
           testname: "getDiagnosticData",
           command: {getDiagnosticData: 1},
-          skipSharded: true,
           testcases: [
               {
                 runOnDb: adminDbName,
@@ -2765,6 +2764,10 @@ var authCommandsLib = {
                     {resource: {cluster: true}, actions: ["serverStatus"]},
                     {resource: {cluster: true}, actions: ["replSetGetStatus"]},
                     {resource: {db: "local", collection: "oplog.rs"}, actions: ["collStats"]},
+                    {
+                      resource: {cluster: true},
+                      actions: ["connPoolStats"]
+                    },  // Only needed against mongos
                 ]
               },
               {runOnDb: firstDbName, roles: {}},

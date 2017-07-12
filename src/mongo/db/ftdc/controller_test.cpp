@@ -254,7 +254,7 @@ TEST(FTDCControllerTest, TestStartAsDisabled) {
 
     ASSERT_EQUALS(files0.size(), 0UL);
 
-    c.setEnabled(true);
+    ASSERT_OK(c.setEnabled(true));
 
     c1Ptr->setSignalOnCount(50);
 

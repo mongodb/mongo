@@ -50,6 +50,7 @@
 #include "mongo/db/auth/authz_manager_external_state_s.h"
 #include "mongo/db/auth/user_cache_invalidator_job.h"
 #include "mongo/db/client.h"
+#include "mongo/db/ftdc/ftdc_mongos.h"
 #include "mongo/db/initialize_server_global_state.h"
 #include "mongo/db/lasterror.h"
 #include "mongo/db/log_process_details.h"
@@ -174,6 +175,9 @@ static void cleanupTask() {
         if (auto catalog = Grid::get(opCtx)->catalogClient(opCtx)) {
             catalog->shutDown(opCtx);
         }
+
+        // Shutdown Full-Time Data Capture
+        stopMongoSFTDC();
     }
 
     audit::logShutdown(Client::getCurrent());
@@ -253,6 +257,8 @@ static ExitCode runMongosServer() {
 
     auto sep = stdx::make_unique<ServiceEntryPointMongos>(getGlobalServiceContext());
     getGlobalServiceContext()->setServiceEntryPoint(std::move(sep));
+
+    startMongoSFTDC();
 
     auto tl = transport::TransportLayerManager::createWithConfig(&serverGlobalParams,
                                                                  getGlobalServiceContext());

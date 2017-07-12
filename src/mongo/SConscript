@@ -363,6 +363,7 @@ env.Install(
             'db/commands/core',
             'db/commands/server_status',
             'db/conn_pool_options',
+            'db/ftdc/ftdc_mongos',
             'db/logical_time_metadata_hook',
             'db/mongodandmongos',
             'db/server_options',

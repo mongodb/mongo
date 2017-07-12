@@ -67,6 +67,28 @@ public:
     Status checkAuthForCommand(Client* client,
                                const std::string& dbname,
                                const BSONObj& cmdObj) override {
+
+        if (!AuthorizationSession::get(client)->isAuthorizedForActionsOnResource(
+                ResourcePattern::forClusterResource(), ActionType::serverStatus)) {
+            return Status(ErrorCodes::Unauthorized, "Unauthorized");
+        }
+
+        if (!AuthorizationSession::get(client)->isAuthorizedForActionsOnResource(
+                ResourcePattern::forClusterResource(), ActionType::replSetGetStatus)) {
+            return Status(ErrorCodes::Unauthorized, "Unauthorized");
+        }
+
+        if (!AuthorizationSession::get(client)->isAuthorizedForActionsOnResource(
+                ResourcePattern::forClusterResource(), ActionType::connPoolStats)) {
+            return Status(ErrorCodes::Unauthorized, "Unauthorized");
+        }
+
+        if (!AuthorizationSession::get(client)->isAuthorizedForActionsOnResource(
+                ResourcePattern::forExactNamespace(NamespaceString("local", "oplog.rs")),
+                ActionType::collStats)) {
+            return Status(ErrorCodes::Unauthorized, "Unauthorized");
+        }
+
         return Status::OK();
     }
 
@@ -76,9 +98,11 @@ public:
              std::string& errmsg,
              BSONObjBuilder& result) override {
 
-        errmsg = "getDiagnosticData not allowed through mongos";
+        result.append(
+            "data",
+            FTDCController::get(opCtx->getServiceContext())->getMostRecentPeriodicDocument());
 
-        return false;
+        return true;
     }
 };
 

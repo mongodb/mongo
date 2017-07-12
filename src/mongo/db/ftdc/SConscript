@@ -70,6 +70,16 @@ env.Library(
     ],
 )
 
+env.Library(
+    target='ftdc_mongos',
+    source=[
+        'ftdc_mongos.cpp',
+    ],
+    LIBDEPS_PRIVATE=[
+        'ftdc_server'
+    ],
+)
+
 env.CppUnitTest(
     target='ftdc_test',
     source=[

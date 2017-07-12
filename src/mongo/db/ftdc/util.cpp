@@ -103,6 +103,19 @@ Date_t roundTime(Date_t now, Milliseconds period) {
     return Date_t::fromMillisSinceEpoch(next_time);
 }
 
+boost::filesystem::path getMongoSPath(const boost::filesystem::path& logFile) {
+    auto base = logFile;
+
+    // Keep stripping file extensions until we are only left with the file name
+    while (base.has_extension()) {
+        auto full_path = base.generic_string();
+        base = full_path.substr(0, full_path.size() - base.extension().size());
+    }
+
+    base += "." + kFTDCDefaultDirectory.toString();
+    return base;
+}
+
 }  // namespace FTDCUtil
 
 

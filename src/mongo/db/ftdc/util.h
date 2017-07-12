@@ -190,6 +190,11 @@ boost::filesystem::path getInterimTempFile(const boost::filesystem::path& file);
  */
 Date_t roundTime(Date_t now, Milliseconds period);
 
+/**
+ * Get the storage path for MongoS from the log file path.
+ */
+boost::filesystem::path getMongoSPath(const boost::filesystem::path& logFile);
+
 }  // namespace FTDCUtil
 
 }  // namespace mongo
