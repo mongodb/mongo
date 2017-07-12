@@ -50,8 +50,12 @@ public:
         return _outputSorts;
     }
     Value serialize(boost::optional<ExplainOptions::Verbosity> explain = boost::none) const final;
-    InitialSourceType getInitialSourceType() const final {
-        return InitialSourceType::kInitialSource;
+
+    StageConstraints constraints() const final {
+        StageConstraints constraints;
+        constraints.requiredPosition = StageConstraints::PositionRequirement::kFirst;
+        constraints.requiresInputDocSource = false;
+        return constraints;
     }
 
     void detachFromOperationContext() final;

@@ -99,13 +99,6 @@ vector<pair<string, vector<BSONObj>>> extractRawPipelines(const BSONElement& ele
                                   << ": "
                                   << subPipeElem,
                     subPipeElem.type() == BSONType::Object);
-            auto stageName = subPipeElem.Obj().firstElementFieldName();
-            uassert(
-                40331,
-                str::stream() << "specified stage is not allowed to be used within a $facet stage: "
-                              << subPipeElem,
-                !str::equals(stageName, "$out") && !str::equals(stageName, "$facet"));
-
             rawPipeline.push_back(subPipeElem.embeddedObject());
         }
 
@@ -244,16 +237,22 @@ void DocumentSourceFacet::doReattachToOperationContext(OperationContext* opCtx) 
     }
 }
 
-bool DocumentSourceFacet::needsPrimaryShard() const {
-    // Currently we don't split $facet to have a merger part and a shards part (see SERVER-24154).
-    // This means that if any stage in any of the $facet pipelines requires the primary shard, then
-    // the entire $facet must happen on the merger, and the merger must be the primary shard.
+DocumentSource::StageConstraints DocumentSourceFacet::constraints() const {
+    StageConstraints constraints;
+    constraints.isAllowedInsideFacetStage = false;  // Disallow nested $facets.
+
     for (auto&& facet : _facets) {
-        if (facet.pipeline->needsPrimaryShardMerger()) {
-            return true;
+        for (auto&& nestedStage : facet.pipeline->getSources()) {
+            if (nestedStage->constraints().mustRunOnPrimaryShardIfSharded) {
+                // Currently we don't split $facet to have a merger part and a shards part (see
+                // SERVER-24154). This means that if any stage in any of the $facet pipelines
+                // requires the primary shard, then the entire $facet must happen on the merger, and
+                // the merger must be the primary shard.
+                constraints.mustRunOnPrimaryShardIfSharded = true;
+            }
         }
     }
-    return false;
+    return constraints;
 }
 
 DocumentSource::GetDepsReturn DocumentSourceFacet::getDependencies(DepsTracker* deps) const {

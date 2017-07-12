@@ -219,20 +219,15 @@ Status ClusterAggregate::runAggregate(OperationContext* opCtx,
     mergeCtx->inRouter = true;
     // explicitly *not* setting mergeCtx->tempDir
 
-    // Parse and optimize the pipeline specification.
-    auto pipeline = Pipeline::parse(request.getPipeline(), mergeCtx);
-    if (!pipeline.isOK()) {
-        return pipeline.getStatus();
-    }
-
-    pipeline.getValue()->optimizePipeline();
+    auto pipeline = uassertStatusOK(Pipeline::parse(request.getPipeline(), mergeCtx));
+    pipeline->optimizePipeline();
 
     // If the first $match stage is an exact match on the shard key (with a simple collation or no
     // string matching), we only have to send it to one shard, so send the command to that shard.
     const bool singleShard = !namespaces.executionNss.isCollectionlessAggregateNS() && [&]() {
         invariant(chunkMgr);
 
-        BSONObj firstMatchQuery = pipeline.getValue()->getInitialQuery();
+        BSONObj firstMatchQuery = pipeline->getInitialQuery();
         BSONObj shardKeyMatches = uassertStatusOK(
             chunkMgr->getShardKeyPattern().extractShardKeyFromQuery(opCtx, firstMatchQuery));
 
@@ -250,7 +245,7 @@ Status ClusterAggregate::runAggregate(OperationContext* opCtx,
 
     // Don't need to split pipeline if the first $match is an exact match on shard key, unless
     // there is a stage that needs to be run on the primary shard.
-    const bool needPrimaryShardMerger = pipeline.getValue()->needsPrimaryShardMerger();
+    const bool needPrimaryShardMerger = pipeline->needsPrimaryShardMerger();
     const bool needSplit = !singleShard || needPrimaryShardMerger;
 
     // Split the pipeline into pieces for mongod(s) and this mongos. It is illegal to use 'pipeline'
@@ -258,10 +253,10 @@ Status ClusterAggregate::runAggregate(OperationContext* opCtx,
     std::unique_ptr<Pipeline, Pipeline::Deleter> pipelineForTargetedShards;
     std::unique_ptr<Pipeline, Pipeline::Deleter> pipelineForMergingShard;
     if (needSplit) {
-        pipelineForTargetedShards = pipeline.getValue()->splitForSharded();
-        pipelineForMergingShard = std::move(pipeline.getValue());
+        pipelineForTargetedShards = pipeline->splitForSharded();
+        pipelineForMergingShard = std::move(pipeline);
     } else {
-        pipelineForTargetedShards = std::move(pipeline.getValue());
+        pipelineForTargetedShards = std::move(pipeline);
     }
 
     // Create the command for the shards. The 'fromRouter' field means produce output to be

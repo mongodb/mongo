@@ -46,8 +46,10 @@ public:
      */
     GetModPathsReturn getModifiedPaths() const final;
 
-    bool canSwapWithMatch() const final {
-        return true;
+    StageConstraints constraints() const final {
+        StageConstraints constraints;
+        constraints.canSwapWithMatch = true;
+        return constraints;
     }
 
     GetDepsReturn getDependencies(DepsTracker* deps) const final;

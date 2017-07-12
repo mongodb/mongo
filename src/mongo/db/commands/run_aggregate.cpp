@@ -400,15 +400,10 @@ Status runAggregate(OperationContext* opCtx,
             expCtx->tailableMode = ExpressionContext::TailableMode::kTailableAndAwaitData;
         }
 
-        // Parse the pipeline.
-        auto statusWithPipeline = Pipeline::parse(request.getPipeline(), expCtx);
-        if (!statusWithPipeline.isOK()) {
-            return statusWithPipeline.getStatus();
-        }
-        auto pipeline = std::move(statusWithPipeline.getValue());
+        auto pipeline = uassertStatusOK(Pipeline::parse(request.getPipeline(), expCtx));
 
-        // Check that the view's collation matches the collation of any views involved
-        // in the pipeline.
+        // Check that the view's collation matches the collation of any views involved in the
+        // pipeline.
         if (!pipelineInvolvedNamespaces.empty()) {
             invariant(ctx);
             auto pipelineCollationStatus = collatorCompatibleWithPipeline(

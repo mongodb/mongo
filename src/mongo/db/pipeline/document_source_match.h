@@ -37,17 +37,20 @@
 
 namespace mongo {
 
-class DocumentSourceMatch final : public DocumentSource {
+class DocumentSourceMatch : public DocumentSource {
 public:
-    // virtuals from DocumentSource
+    virtual ~DocumentSourceMatch() = default;
+
     GetNextResult getNext() final;
-    const char* getSourceName() const final;
-    Value serialize(boost::optional<ExplainOptions::Verbosity> explain = boost::none) const final;
     boost::intrusive_ptr<DocumentSource> optimize() final;
     BSONObjSet getOutputSorts() final {
         return pSource ? pSource->getOutputSorts()
                        : SimpleBSONObjComparator::kInstance.makeBSONObjSet();
     }
+
+    const char* getSourceName() const override;
+    Value serialize(
+        boost::optional<ExplainOptions::Verbosity> explain = boost::none) const override;
 
     /**
      * Attempts to combine with any subsequent $match stages, joining the query objects with a
@@ -141,10 +144,11 @@ public:
         const std::string& path,
         const boost::intrusive_ptr<ExpressionContext>& expCtx);
 
-private:
+protected:
     DocumentSourceMatch(const BSONObj& query,
                         const boost::intrusive_ptr<ExpressionContext>& pExpCtx);
 
+private:
     void addDependencies(DepsTracker* deps) const;
 
     std::unique_ptr<MatchExpression> _expression;

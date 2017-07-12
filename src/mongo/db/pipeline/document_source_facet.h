@@ -135,7 +135,7 @@ public:
     void doInjectMongodInterface(std::shared_ptr<MongodInterface> mongod) final;
     void doDetachFromOperationContext() final;
     void doReattachToOperationContext(OperationContext* opCtx) final;
-    bool needsPrimaryShard() const final;
+    StageConstraints constraints() const final;
 
 protected:
     void doDispose() final;
