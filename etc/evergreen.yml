@@ -1130,7 +1130,7 @@ post:
       working_dir: src
       script: |
         # For Jepsen tasks, archive the mongod log files.
-        if [ -d jepsen ]; then
+        if [ ${distro_id} = "ubuntu1404-jepsen" ]; then
           # Copy mongod.log & stdout.log from each LXC host for archive purposes. Note that
           # stdout.log is also generated as a result of starting mongod.
           # The logs can reside in 1 of 2 places:
