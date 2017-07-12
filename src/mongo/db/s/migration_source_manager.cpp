@@ -404,20 +404,6 @@ Status MigrationSourceManager::commitChunkMetadataOnConfig(OperationContext* opC
         // Migration succeeded
         log() << "Migration succeeded and updated collection version to "
               << refreshedMetadata->getCollVersion();
-
-        // Schedule clearing out orphaned documents when they are no longer in active use.
-        const auto orphans = ChunkRange(_args.getMinKey(), _args.getMaxKey());
-        auto const now = CollectionShardingState::kNow, later = CollectionShardingState::kDelayed;
-        auto whenToClean = _args.getWaitForDelete() ? now : later;
-
-        auto notification = css->cleanUpRange(orphans, whenToClean);
-        if (notification.ready() && !notification.waitStatus(opCtx).isOK()) {
-            // if it fails immediately, report that and continue.
-            warning() << "Failed to initiate cleanup of " << getNss().ns() << " orphan range "
-                      << redact(orphans.toString()) << ": "
-                      << redact(notification.waitStatus(opCtx).reason());
-        }
-        notification.abandon();
     } else {
         AutoGetCollection autoColl(opCtx, getNss(), MODE_IX, MODE_X);
 
