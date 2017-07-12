@@ -33,9 +33,12 @@
 #include "mongo/bson/bsonmisc.h"
 #include "mongo/db/auth/restriction.h"
 #include "mongo/db/auth/restriction_environment.h"
+#include "mongo/db/auth/restriction_set.h"
 #include "mongo/util/net/cidr.h"
 
+#include <memory>
 #include <string>
+#include <vector>
 
 namespace mongo {
 
@@ -75,17 +78,42 @@ public:
     /**
      * Construct an AddressRestriction based on several human readable subnet specs
      */
-    explicit AddressRestriction(const std::vector<std::string>& ranges) {
+    template <typename StringType>
+    explicit AddressRestriction(const std::vector<StringType>& ranges) {
         for (auto const& range : ranges) {
             _ranges.emplace_back(range);
         }
     }
 
     /**
+     * If the given BSONElement represents a valid CIDR range, constructs and returns the
+     * AddressRestriction. Otherwise returns an error.
+     */
+    static StatusWith<AddressRestriction<T>> parse(BSONElement from) {
+        auto cidr = CIDR::parse(from);
+        if (!cidr.isOK()) {
+            return cidr.getStatus();
+        }
+        return AddressRestriction<T>(std::move(cidr.getValue()));
+    }
+
+    /**
+     * If the given string represents a valid CIDR range, constructs and returns the
+     * AddressRestriction. Otherwise returns an error.
+     */
+    static StatusWith<AddressRestriction<T>> parse(StringData from) {
+        auto cidr = CIDR::parse(from);
+        if (!cidr.isOK()) {
+            return cidr.getStatus();
+        }
+        return AddressRestriction<T>(std::move(cidr.getValue()));
+    }
+
+    /**
      * Returns true if the Environment's client/server's address
      * satisfies this restriction set.
      */
-    Status validate(const RestrictionEnvironment& environment) const noexcept override {
+    Status validate(const RestrictionEnvironment& environment) const override {
         auto const addr = T::addr(environment);
         if (!addr.isIP()) {
             std::ostringstream s;
@@ -107,7 +135,7 @@ public:
     }
 
     /**
-     * Append to builder as string element with the human-readable CIDR range.
+     * Append to builder an array element with the human-readable CIDR ranges.
      */
     void appendToBuilder(BSONObjBuilder* builder) const {
         BSONArrayBuilder b;
@@ -149,6 +177,12 @@ using ClientSourceRestriction =
     address_restriction_detail::AddressRestriction<address_restriction_detail::ClientSource>;
 using ServerAddressRestriction =
     address_restriction_detail::AddressRestriction<address_restriction_detail::ServerAddress>;
+
+/**
+ * Parse a set of clientSource, serverAddress, or both
+ * and return a RestrictionSet on success.
+ */
+StatusWith<RestrictionSet<>> parseAddressRestrictionSet(const BSONObj& obj);
 
 template <>
 inline BSONObjBuilder& BSONObjBuilderValueStream::operator<<<ClientSourceRestriction>(

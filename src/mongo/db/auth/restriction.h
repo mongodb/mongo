@@ -57,9 +57,13 @@ public:
     }
 
     friend StringBuilder& operator<<(StringBuilder& sb, const Restriction& r) {
+        return sb << r.toString();
+    }
+
+    std::string toString() const {
         std::ostringstream oss;
-        oss << r;
-        return sb << oss.str();
+        oss << *this;
+        return oss.str();
     }
 
 private:

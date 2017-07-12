@@ -48,7 +48,7 @@ TEST(AddressRestrictionTest, toAndFromStringSingle) {
         {"169.254.0.0/16", "169.254.0.0/16"},
         {"fe80::/10", "fe80::/10"},
     };
-    for (auto const& p : strings) {
+    for (const auto& p : strings) {
         {
             const ClientSourceRestriction csr(p.input);
             std::ostringstream actual;
@@ -77,7 +77,7 @@ TEST(AddressRestrictionTest, toAndFromStringVector) {
         {{"127.0.0.1", "169.254.0.0/16", "::1"},
          "[\"127.0.0.1/32\", \"169.254.0.0/16\", \"::1/128\"]"},
     };
-    for (auto const& p : tests) {
+    for (const auto& p : tests) {
         {
             const ClientSourceRestriction csr(p.input);
             std::ostringstream actual;
@@ -222,6 +222,105 @@ TEST(AddressRestrictionTest, contains) {
         const ServerAddressRestriction sar(p.range);
         ASSERT_EQ(sar.validate(res).isOK(), p.valid);
         ASSERT_FALSE(sar.validate(rec).isOK());
+    }
+}
+
+TEST(AddressRestrictionTest, parseFail) {
+    const BSONObj
+        tests[] =
+            {
+                BSON("unknownField"
+                     << ""),
+                BSON("clientSource"
+                     << "1.2.3.4.5"),
+                BSON("clientSource"
+                     << "1.2.3.4"
+                     << "unknownField"
+                     << ""),
+                BSON("clientSource"
+                     << "1.2.3.4"
+                     << "clientSource"
+                     << "2.3.4.5"),
+            };
+    for (const auto& t : tests) {
+        ASSERT_FALSE(parseAddressRestrictionSet(t).isOK());
+    }
+}
+
+TEST(AddressRestrictionTest, parseAndMatch) {
+    const struct {
+        // Restriction
+        std::vector<std::string> clientSource;
+        std::vector<std::string> serverAddress;
+        // Environment
+        std::string client;
+        std::string server;
+        // Should pass validation check
+        bool valid;
+    } tests[] = {
+        {{"127.0.0.0/8"}, {"127.0.0.0/8"}, "127.0.0.1", "127.0.0.1", true},
+        {{"127.0.0.0/8"}, {"127.0.0.0/8"}, "127.0.0.1", "169.254.1.2", false},
+        {{"127.0.0.0/8"}, {"127.0.0.0/8"}, "169.254.3.4", "127.0.0.1", false},
+        {{"127.0.0.0/8"}, {"127.0.0.0/8"}, "169.254.12.34", "169.254.56.78", false},
+
+        {{"127.0.0.0/8"}, {}, "127.0.0.1", "169.254.5.6", true},
+        {{"127.0.0.0/8"}, {}, "127.0.0.1", "127.0.0.1", true},
+        {{"127.0.0.0/8"}, {}, "169.254.7.8", "127.0.0.1", false},
+        {{"127.0.0.0/8"}, {}, "169.254.9.10", "169.254.11.12", false},
+
+        {{}, {"127.0.0.0/8"}, "127.0.0.1", "169.254.5.6", false},
+        {{}, {"127.0.0.0/8"}, "127.0.0.1", "127.0.0.1", true},
+        {{}, {"127.0.0.0/8"}, "169.254.7.8", "127.0.0.1", true},
+        {{}, {"127.0.0.0/8"}, "169.254.9.10", "169.254.11.12", false},
+
+        {{"::/0"}, {"::/0"}, "127.0.0.1", "127.0.0.1", false},
+        {{"0.0.0.0/0"}, {"0.0.0.0/0"}, "::1", "::1", false},
+
+        {{"::1"}, {"::1"}, "::1", "::1", true},
+        {{"::1"}, {"::1"}, "::2", "::1", false},
+        {{"::1"}, {"::1"}, "::1", "::2", false},
+        {{"::1"}, {"::1"}, "::2", "::2", false},
+
+        {{"fe80::/10"}, {}, "fe80::dead:beef", "::1", true},
+        {{"fe80::/10"}, {}, "fe80::dead:beef", "::ffff:127.0.0.1", true},
+        {{"fe80::/10"}, {}, "fe80::dead:beef", "127.0.0.1", true},
+        {{"fe80::/10"}, {}, "fe80::dead:beef", "fe80::ba5e:ba11", true},
+
+        {{"fe80::/10"}, {}, "fec0::dead:beef", "fe80::1", false},
+        {{"fe80::/10"}, {}, "fec0::dead:beef", "fe80::1", false},
+        {{"fe80::/10"}, {}, "fec0::dead:beef", "fe80::1", false},
+        {{"fe80::/10"}, {}, "fec0::dead:beef", "fe80::1", false},
+
+        {{}, {"fe80::/10"}, "::1", "fe80::dead:beef", true},
+        {{}, {"fe80::/10"}, "::ffff:127.0.0.1", "fe80::dead:beef", true},
+        {{}, {"fe80::/10"}, "127.0.0.1", "fe80::dead:beef", true},
+        {{}, {"fe80::/10"}, "fe80::ba5e:ba11", "fe80::dead:beef", true},
+
+        {{"127.0.0.1/8", "::1"}, {"169.254.0.0/16", "fe80::/10"}, "::1", "fe80::1", true},
+        {{"127.0.0.1/8", "::1"}, {"169.254.0.0/16", "fe80::/10"}, "127.0.0.1", "169.254.0.1", true},
+        {{"127.0.0.1/8", "::1"}, {"169.254.0.0/16", "fe80::/10"}, "::1", "169.254.0.1", true},
+        {{"127.0.0.1/8", "::1"}, {"169.254.0.0/16", "fe80::/10"}, "127.0.0.1", "fe80::1", true},
+
+        {{"127.0.0.1/8", "::1"}, {"169.254.0.0/16", "fe80::/10"}, "::2", "fe80::1", false},
+        {{"127.0.0.1/8", "::1"}, {"169.254.0.0/16", "fe80::/10"}, "10.0.0.1", "169.254.0.1", false},
+        {{"127.0.0.1/8", "::1"}, {"169.254.0.0/16", "fe80::/10"}, "::1", "192.168.0.1", false},
+        {{"127.0.0.1/8", "::1"}, {"169.254.0.0/16", "fe80::/10"}, "127.0.0.1", "fec0::1", false},
+    };
+    for (const auto& t : tests) {
+        BSONObjBuilder b;
+        if (!t.clientSource.empty()) {
+            b.append("clientSource", t.clientSource);
+        }
+        if (!t.serverAddress.empty()) {
+            b.append("serverAddress", t.serverAddress);
+        }
+        const auto doc = b.obj();
+        const auto setwith = parseAddressRestrictionSet(doc);
+        ASSERT_OK(setwith);
+
+        const RestrictionEnvironment env(SockAddr(t.client, 1024, AF_UNSPEC),
+                                         SockAddr(t.server, 1025, AF_UNSPEC));
+        ASSERT_EQ(setwith.getValue().validate(env).isOK(), t.valid);
     }
 }
 

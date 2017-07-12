@@ -29,15 +29,36 @@
 #include "mongo/platform/basic.h"
 
 #include "mongo/db/auth/address_restriction.h"
+#include "mongo/db/auth/address_restriction_gen.h"
+#include "mongo/stdx/memory.h"
 
-namespace mongo {
-namespace address_restriction_detail {
+constexpr mongo::StringData mongo::address_restriction_detail::ClientSource::label;
+constexpr mongo::StringData mongo::address_restriction_detail::ClientSource::field;
 
-constexpr StringData ClientSource::label;
-constexpr StringData ClientSource::field;
+constexpr mongo::StringData mongo::address_restriction_detail::ServerAddress::label;
+constexpr mongo::StringData mongo::address_restriction_detail::ServerAddress::field;
 
-constexpr StringData ServerAddress::label;
-constexpr StringData ServerAddress::field;
+mongo::StatusWith<mongo::RestrictionSet<>> mongo::parseAddressRestrictionSet(
+    const BSONObj& obj) try {
+    IDLParserErrorContext ctx("address restriction");
+    const auto ar = Address_restriction::parse(ctx, obj);
+    std::vector<std::unique_ptr<Restriction>> vec;
 
-}  // address_restriction_detail
-}  // mongo
+    const boost::optional<std::vector<StringData>>& client = ar.getClientSource();
+    if (client) {
+        vec.push_back(stdx::make_unique<ClientSourceRestriction>(client.get()));
+    }
+
+    const boost::optional<std::vector<StringData>>& server = ar.getServerAddress();
+    if (server) {
+        vec.push_back(stdx::make_unique<ServerAddressRestriction>(server.get()));
+    }
+
+    if (vec.empty()) {
+        return Status(ErrorCodes::CollectionIsEmpty,
+                      "At least one of 'clientSource' or 'serverAddress' must be set");
+    }
+    return RestrictionSet<>(std::move(vec));
+} catch (const DBException& e) {
+    return Status(ErrorCodes::BadValue, e.what());
+}
