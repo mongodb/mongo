@@ -534,6 +534,9 @@ Mongo.prototype.unsetWriteConcern = function() {
  * Sets the operationTime.
  */
 Mongo.prototype.setOperationTime = function(operationTime) {
+    if (operationTime === Timestamp(0, 0)) {
+        throw Error("Attempt to set an uninitiated operationTime");
+    }
     if (this._operationTime === undefined || this._operationTime === null ||
         (typeof operationTime === "object" &&
          bsonWoCompare(operationTime, this._operationTime) === 1)) {
