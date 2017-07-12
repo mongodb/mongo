@@ -569,6 +569,91 @@ TEST_F(AuthorizationSessionTest, UseOldUserInfoInFaceOfConnectivityProblems) {
         authzSession->isAuthorizedForActionsOnResource(testFooCollResource, ActionType::insert));
 }
 
+TEST_F(AuthorizationSessionTest, AcquireUserObtainsAndValidatesAuthenticationRestrictions) {
+    ASSERT_OK(managerState->insertPrivilegeDocument(
+        _opCtx.get(),
+        BSON("user"
+             << "spencer"
+             << "db"
+             << "test"
+             << "credentials"
+             << BSON("MONGODB-CR"
+                     << "a")
+             << "roles"
+             << BSON_ARRAY(BSON("role"
+                                << "readWrite"
+                                << "db"
+                                << "test"))
+             << "authenticationRestrictions"
+             << BSON_ARRAY(BSON("clientSource" << BSON_ARRAY("192.168.0.0/24"
+                                                             << "192.168.2.10")
+                                               << "serverAddress"
+                                               << BSON_ARRAY("192.168.0.2"))
+                           << BSON("clientSource" << BSON_ARRAY("2001:DB8::1") << "serverAddress"
+                                                  << BSON_ARRAY("2001:DB8::2"))
+                           << BSON("clientSource" << BSON_ARRAY("127.0.0.1"
+                                                                << "::1")
+                                                  << "serverAddress"
+                                                  << BSON_ARRAY("127.0.0.1"
+                                                                << "::1")))),
+        BSONObj()));
+
+
+    auto assertWorks = [this](StringData clientSource, StringData serverAddress) {
+        RestrictionEnvironment::set(
+            session,
+            stdx::make_unique<RestrictionEnvironment>(SockAddr(clientSource, 5555, AF_UNSPEC),
+                                                      SockAddr(serverAddress, 27017, AF_UNSPEC)));
+        ASSERT_OK(authzSession->addAndAuthorizeUser(_opCtx.get(), UserName("spencer", "test")));
+    };
+
+    auto assertFails = [this](StringData clientSource, StringData serverAddress) {
+        RestrictionEnvironment::set(
+            session,
+            stdx::make_unique<RestrictionEnvironment>(SockAddr(clientSource, 5555, AF_UNSPEC),
+                                                      SockAddr(serverAddress, 27017, AF_UNSPEC)));
+        ASSERT_NOT_OK(authzSession->addAndAuthorizeUser(_opCtx.get(), UserName("spencer", "test")));
+    };
+
+    // The empty RestrictionEnvironment will cause addAndAuthorizeUser to fail.
+    ASSERT_NOT_OK(authzSession->addAndAuthorizeUser(_opCtx.get(), UserName("spencer", "test")));
+
+    // A clientSource from the 192.168.0.0/24 block will succeed in connecting to a server
+    // listening on 192.168.0.2.
+    assertWorks("192.168.0.6", "192.168.0.2");
+    assertWorks("192.168.0.12", "192.168.0.2");
+
+    // A client connecting from the explicitly whitelisted addresses can connect to a
+    // server listening on 192.168.0.2
+    assertWorks("192.168.2.10", "192.168.0.2");
+
+    // A client from either of these sources must connect to the server via the serverAddress
+    // expressed in the restriction.
+    assertFails("192.168.0.12", "127.0.0.1");
+    assertFails("192.168.2.10", "127.0.0.1");
+    assertFails("192.168.0.12", "192.168.1.3");
+    assertFails("192.168.2.10", "192.168.1.3");
+
+    // A client outside of these two sources cannot connect to the server.
+    assertFails("192.168.1.12", "192.168.0.2");
+    assertFails("192.168.1.10", "192.168.0.2");
+
+
+    // An IPv6 client from the correct address may use the IPv6 restriction to connect to the
+    // server.
+    assertWorks("2001:DB8::1", "2001:DB8::2");
+    assertFails("2001:DB8::1", "2001:DB8::3");
+    assertFails("2001:DB8::2", "2001:DB8::1");
+
+    // A localhost client can connect to a localhost server, using the second addressRestriction
+    assertWorks("127.0.0.1", "127.0.0.1");
+    assertWorks("::1", "::1");
+    assertWorks("::1", "127.0.0.1");  // Silly case
+    assertWorks("127.0.0.1", "::1");  // Silly case
+    assertFails("192.168.0.6", "127.0.0.1");
+    assertFails("127.0.0.1", "192.168.0.2");
+}
+
 TEST_F(AuthorizationSessionTest, CheckAuthForAggregateFailsIfPipelineIsNotAnArray) {
     BSONObj cmdObjIntPipeline = BSON("aggregate" << testFooNss.coll() << "pipeline" << 7);
     ASSERT_EQ(ErrorCodes::TypeMismatch,
