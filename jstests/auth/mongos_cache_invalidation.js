@@ -61,7 +61,7 @@ db3.auth('spencer', 'pwd');
  * At this point we have 3 handles to the "test" database, each of which are on connections to
  * different mongoses.  "db1", "db2", and "db3" are all auth'd as spencer@test and will be used
  * to verify that user and role data changes get propaged to their mongoses.
- * "db2" is connected to a mongos with a 10 second user cache invalidation interval,
+ * "db2" is connected to a mongos with a 5 second user cache invalidation interval,
  * while "db3" is connected to a mongos with a 10 minute cache invalidation interval.
  */
 
@@ -202,12 +202,9 @@ db3.auth('spencer', 'pwd');
     assert.commandFailedWithCode(db1.foo.runCommand("collStats"), authzErrorCode);
 
     // s1/db2 should update its cache in 10 seconds.
-    assert.soon(
-        function() {
-            return db2.foo.runCommand("collStats").code == authzErrorCode;
-        },
-        "Mongos did not update its user cache after 10 seconds",
-        6 * 1000);  // Give an extra 1 second to avoid races
+    assert.soon(function() {
+        return db2.foo.runCommand("collStats").code == authzErrorCode;
+    }, "Mongos did not update its user cache after 10 seconds", 10 * 1000);
 
     // We manually invalidate the cache on s2/db3.
     db3.adminCommand("invalidateUserCache");
