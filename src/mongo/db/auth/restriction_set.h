@@ -49,9 +49,12 @@ class RestrictionSetAny : public Restriction {
                   "RestrictionSets must contain restrictions");
 
 public:
+    using element_type = T;
+    using pointer_type = Pointer<element_type>;
+    using sequence_type = Sequence<pointer_type>;
+
     RestrictionSetAny() = default;
-    explicit RestrictionSetAny(Sequence<Pointer<T>> restrictions) noexcept(
-        noexcept(Sequence<Pointer<T>>(std::move(std::declval<Sequence<Pointer<T>>>()))))
+    explicit RestrictionSetAny(sequence_type restrictions)
         : _restrictions(std::move(restrictions)) {}
 
     template <typename U>
@@ -63,7 +66,7 @@ public:
         if (_restrictions.empty()) {
             return Status::OK();
         }
-        for (const Pointer<T>& restriction : _restrictions) {
+        for (const pointer_type& restriction : _restrictions) {
             Status status = restriction->validate(environment);
             if (status.isOK()) {
                 return status;
@@ -76,7 +79,7 @@ public:
 private:
     void serialize(std::ostream& os) const override final {
         os << "{anyOf: [";
-        for (const Pointer<T>& restriction : _restrictions) {
+        for (const pointer_type& restriction : _restrictions) {
             if (restriction.get() != _restrictions.front().get()) {
                 os << ", ";
             }
@@ -85,7 +88,7 @@ private:
         os << "]}";
     }
 
-    Sequence<Pointer<T>> _restrictions;
+    sequence_type _restrictions;
 };
 
 // Represents a set of restrictions which may be attached to a user or role. This set of is met by
@@ -98,8 +101,12 @@ class RestrictionSetAll : public Restriction {
                   "RestrictionSets must contain restrictions");
 
 public:
+    using element_type = T;
+    using pointer_type = Pointer<element_type>;
+    using sequence_type = Sequence<pointer_type>;
+
     RestrictionSetAll() = default;
-    explicit RestrictionSetAll(Sequence<Pointer<T>> restrictions)
+    explicit RestrictionSetAll(sequence_type restrictions)
         : _restrictions(std::move(restrictions)) {}
 
     template <typename U>
@@ -114,7 +121,7 @@ public:
     }
 
     Status validate(const RestrictionEnvironment& environment) const final {
-        for (const Pointer<T>& restriction : _restrictions) {
+        for (const pointer_type& restriction : _restrictions) {
             Status status = restriction->validate(environment);
             if (!status.isOK()) {
                 return Status(ErrorCodes::AuthenticationRestrictionUnmet,
@@ -128,7 +135,7 @@ public:
 private:
     void serialize(std::ostream& os) const final {
         os << "{allOf: [";
-        for (const Pointer<T>& restriction : _restrictions) {
+        for (const pointer_type& restriction : _restrictions) {
             if (restriction.get() != _restrictions.front().get()) {
                 os << ", ";
             }
@@ -137,7 +144,7 @@ private:
         os << "]}";
     }
 
-    Sequence<Pointer<T>> _restrictions;
+    sequence_type _restrictions;
 };
 }  // namespace detail
 
@@ -157,6 +164,7 @@ template <template <typename...> class Pointer = std::unique_ptr,
 using RestrictionDocumentsSequence =
     detail::RestrictionSetAll<RestrictionDocument<>, Pointer, Sequence>;
 
+using SharedRestrictionDocument = std::shared_ptr<RestrictionDocument<>>;
 using RestrictionDocuments = RestrictionDocumentsSequence<std::shared_ptr, std::vector>;
 
 }  // namespace mongo

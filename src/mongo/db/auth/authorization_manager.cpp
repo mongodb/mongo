@@ -439,6 +439,10 @@ Status AuthorizationManager::_initializeUserFromPrivilegeDocument(User* user,
     if (!status.isOK()) {
         return status;
     }
+    status = parser.initializeAuthenticationRestrictionsFromUserDocument(privDoc, user);
+    if (!status.isOK()) {
+        return status;
+    }
 
     return Status::OK();
 }

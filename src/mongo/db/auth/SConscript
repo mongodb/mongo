@@ -94,7 +94,6 @@ env.Library(
         '$BUILD_DIR/mongo/util/net/network',
     ],
 )
-
 env.Library('authcommon',
             ['internal_user_auth.cpp'],
             LIBDEPS=[

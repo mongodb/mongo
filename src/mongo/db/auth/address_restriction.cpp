@@ -62,3 +62,32 @@ mongo::StatusWith<mongo::RestrictionSet<>> mongo::parseAddressRestrictionSet(
 } catch (const DBException& e) {
     return Status(ErrorCodes::BadValue, e.what());
 }
+
+mongo::StatusWith<mongo::SharedRestrictionDocument> mongo::parseAuthenticationRestriction(
+    const BSONArray& arr) {
+    static_assert(
+        std::is_same<std::shared_ptr<RestrictionDocument<>>, SharedRestrictionDocument>::value,
+        "SharedRestrictionDocument expected to be a shared_ptr to a RestrictionDocument<>");
+    using document_type = SharedRestrictionDocument::element_type;
+    static_assert(std::is_same<document_type::pointer_type,
+                               std::unique_ptr<document_type::element_type>>::value,
+                  "SharedRestrictionDocument expected to contain a sequence of unique_ptrs");
+
+    document_type::sequence_type doc;
+    for (const auto& elem : arr) {
+        if (elem.type() != Object) {
+            return Status(ErrorCodes::UnsupportedFormat,
+                          "restriction array sub-documents must be address restriction objects");
+        }
+
+        auto restriction = parseAddressRestrictionSet(elem.Obj());
+        if (!restriction.isOK()) {
+            return restriction.getStatus();
+        }
+
+        doc.emplace_back(
+            stdx::make_unique<document_type::element_type>(std::move(restriction.getValue())));
+    }
+
+    return std::make_shared<document_type>(std::move(doc));
+}

@@ -184,6 +184,12 @@ using ServerAddressRestriction =
  */
 StatusWith<RestrictionSet<>> parseAddressRestrictionSet(const BSONObj& obj);
 
+/**
+ * Parse a BSON representation of an array of RestrictionSet<AddressRestriction<T>>s
+ * and return a SharedRestrictionDocument on success.
+ */
+StatusWith<SharedRestrictionDocument> parseAuthenticationRestriction(const BSONArray& arr);
+
 template <>
 inline BSONObjBuilder& BSONObjBuilderValueStream::operator<<<ClientSourceRestriction>(
     ClientSourceRestriction value) {
