@@ -175,10 +175,12 @@ DocumentSource::GetNextResult DocumentSourceMergeCursors::getNext() {
 }
 
 void DocumentSourceMergeCursors::doDispose() {
-    // Note it is an error to call done() on a connection before consuming the response from a
-    // request. Therefore it is an error to call dispose() if there are any outstanding connections
-    // which have not received a reply.
     for (auto&& cursorAndConn : _cursors) {
+        // Note it is an error to call done() on a connection before consuming the reply from a
+        // request.
+        if (cursorAndConn->cursor.connectionHasPendingReplies()) {
+            continue;
+        }
         cursorAndConn->cursor.kill();
         cursorAndConn->connection.done();
     }

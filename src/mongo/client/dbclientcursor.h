@@ -210,6 +210,19 @@ public:
      */
     void kill();
 
+    /**
+     * Returns true if the connection this cursor is using has pending replies.
+     *
+     * If true, you should not try to use the connection for any other purpose or return it to a
+     * pool.
+     *
+     * This can happen if either initLazy() was called without initLazyFinish() or an exhaust query
+     * was started but not completed.
+     */
+    bool connectionHasPendingReplies() const {
+        return _connectionHasPendingReplies;
+    }
+
 private:
     DBClientCursor(DBClientBase* client,
                    const std::string& ns,
