@@ -42,12 +42,20 @@
 #include "mongo/db/namespace_string.h"
 #include "mongo/db/operation_context.h"
 #include "mongo/db/repl/oplog.h"
+#include "mongo/db/repl/replication_coordinator_global.h"
 #include "mongo/db/s/collection_sharding_state.h"
 #include "mongo/db/server_options.h"
 #include "mongo/db/views/durable_view_catalog.h"
 #include "mongo/scripting/engine.h"
 
 namespace mongo {
+namespace {
+// Return whether we're a master using master-slave replication.
+bool isMasterSlave() {
+    return repl::getGlobalReplicationCoordinator()->getReplicationMode() ==
+        repl::ReplicationCoordinator::modeMasterSlave;
+}
+}  // namespace
 
 void OpObserverImpl::onCreateIndex(OperationContext* opCtx,
                                    const NamespaceString& nss,
@@ -55,7 +63,7 @@ void OpObserverImpl::onCreateIndex(OperationContext* opCtx,
                                    BSONObj indexDoc,
                                    bool fromMigrate) {
     NamespaceString systemIndexes{nss.getSystemIndexesCollection()};
-    if (uuid) {
+    if (uuid && !isMasterSlave()) {
         BSONObjBuilder builder;
         builder.append("createIndexes", nss.coll());
 
@@ -365,12 +373,12 @@ void OpObserverImpl::onRenameCollection(OperationContext* opCtx,
     builder.append("renameCollection", fromCollection.ns());
     builder.append("to", toCollection.ns());
     builder.append("stayTemp", stayTemp);
-    if (dropTargetUUID && enableCollectionUUIDs) {
+    if (dropTargetUUID && enableCollectionUUIDs && !isMasterSlave()) {
         dropTargetUUID->appendToBuilder(&builder, "dropTarget");
     } else {
         builder.append("dropTarget", dropTarget);
     }
-    if (dropSourceUUID && enableCollectionUUIDs) {
+    if (dropSourceUUID && enableCollectionUUIDs && !isMasterSlave()) {
         dropSourceUUID->appendToBuilder(&builder, "dropSource");
     }
     BSONObj cmdObj = builder.done();

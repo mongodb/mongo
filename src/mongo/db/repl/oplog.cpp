@@ -271,7 +271,9 @@ OplogDocWriter _logOpWriter(OperationContext* opCtx,
     b.append("v", OplogEntry::kOplogVersion);
     b.append("op", opstr);
     b.append("ns", nss.ns());
-    if (uuid)
+    if (uuid &&
+        repl::getGlobalReplicationCoordinator()->getReplicationMode() !=
+            repl::ReplicationCoordinator::modeMasterSlave)
         uuid->appendToBuilder(&b, "ui");
     if (fromMigrate)
         b.appendBool("fromMigrate", true);
