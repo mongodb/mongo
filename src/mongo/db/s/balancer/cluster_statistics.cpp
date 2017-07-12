@@ -60,14 +60,6 @@ bool ClusterStatistics::ShardStatistics::isSizeMaxed() const {
     return currSizeMB >= maxSizeMB;
 }
 
-bool ClusterStatistics::ShardStatistics::isSizeExceeded() const {
-    if (!maxSizeMB || !currSizeMB) {
-        return false;
-    }
-
-    return currSizeMB > maxSizeMB;
-}
-
 BSONObj ClusterStatistics::ShardStatistics::toBSON() const {
     BSONObjBuilder builder;
     builder.append("id", shardId.toString());

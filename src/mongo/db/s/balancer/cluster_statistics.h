@@ -71,12 +71,6 @@ public:
         bool isSizeMaxed() const;
 
         /**
-         * Returns true if a shard must be relieved (if possible) of some of the chunks it hosts
-         * because it has exceeded its per-shard data size limit.
-         */
-        bool isSizeExceeded() const;
-
-        /**
          * Returns BSON representation of this shard's statistics, for reporting purposes.
          */
         BSONObj toBSON() const;
