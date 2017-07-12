@@ -89,7 +89,7 @@ public:
         ASSERT_TRUE(coll != nullptr);
 
         auto status = coll->insertDocument(opCtx(),
-                                           newOplog.toBSON(),
+                                           InsertStatement(newOplog.toBSON()),
                                            &CurOp::get(opCtx())->debug(),
                                            /* enforceQuota */ false,
                                            /* fromMigrate */ false);
