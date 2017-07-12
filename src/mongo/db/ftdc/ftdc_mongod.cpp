@@ -66,7 +66,7 @@ void startMongoDFTDC() {
     boost::filesystem::path dir(storageGlobalParams.dbpath);
     dir /= kFTDCDefaultDirectory.toString();
 
-    startFTDC(dir, registerMongoDCollectors);
+    startFTDC(dir, FTDCStartMode::kStart, registerMongoDCollectors);
 }
 
 void stopMongoDFTDC() {

@@ -341,6 +341,7 @@ env.Install(
         LIBDEPS=[
             'db/conn_pool_options',
             'db/commands/core',
+            'db/ftdc/ftdc_mongos',
             'db/mongodandmongos',
             's/client/sharding_connection_hook',
             's/commands/cluster_commands',

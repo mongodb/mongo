@@ -74,7 +74,7 @@ public:
     virtual Status validate(const bool& potentialNewValue) {
         auto controller = getGlobalFTDCController();
         if (controller) {
-            controller->setEnabled(potentialNewValue);
+            return controller->setEnabled(potentialNewValue);
         }
 
         return Status::OK();
@@ -272,9 +272,14 @@ std::string FTDCSimpleInternalCommandCollector::name() const {
 // Note: This must be run before the server parameters are parsed during startup
 // so that the FTDCController is initialized.
 //
-void startFTDC(boost::filesystem::path& path, RegisterCollectorsFunction registerCollectors) {
+void startFTDC(boost::filesystem::path& path,
+               FTDCStartMode startupMode,
+               RegisterCollectorsFunction registerCollectors) {
     FTDCConfig config;
     config.period = Milliseconds(localPeriodMillis.load());
+    // Only enable FTDC if our caller says to enable FTDC, MongoS may not have a valid path to write
+    // files to so update the diagnosticDataCollectionEnabled set parameter to reflect that.
+    localEnabledFlag.store(startupMode == FTDCStartMode::kStart && localEnabledFlag.load());
     config.enabled = localEnabledFlag.load();
     config.maxFileSizeBytes = localMaxFileSizeMB.load() * 1024 * 1024;
     config.maxDirectorySizeBytes = localMaxDirectorySizeMB.load() * 1024 * 1024;

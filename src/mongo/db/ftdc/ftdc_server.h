@@ -46,12 +46,30 @@ namespace mongo {
 using RegisterCollectorsFunction = stdx::function<void(FTDCController*)>;
 
 /**
+ * An enum that decides whether FTDC will startup as part of startup or if its deferred to later.
+ */
+enum class FTDCStartMode {
+
+    /**
+     * Skip starting FTDC since it missing a file storage location.
+     */
+    kSkipStart,
+
+    /**
+     * Start FTDC because it has a path to store files.
+     */
+    kStart,
+};
+
+/**
  * Start Full Time Data Capture
  * Starts 1 thread.
  *
  * See MongoD and MongoS specific functions.
  */
-void startFTDC(boost::filesystem::path& path, RegisterCollectorsFunction registerCollectors);
+void startFTDC(boost::filesystem::path& path,
+               FTDCStartMode startupMode,
+               RegisterCollectorsFunction registerCollectors);
 
 /**
  * Stop Full Time Data Capture
