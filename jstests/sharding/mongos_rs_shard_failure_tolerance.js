@@ -39,6 +39,18 @@
     assert.commandWorked(admin.runCommand(
         {moveChunk: collSharded.toString(), find: {_id: 0}, to: st.shard1.shardName}));
 
+    // Secondaries do not refresh their in-memory routing table until a request with a higher
+    // version is received, and refreshing requires communication with the primary to obtain the
+    // newest version. Read from the secondaries once before taking down primaries to ensure they
+    // have loaded the routing table into memory.
+    // TODO SERVER-30148: replace this with calls to awaitReplication() on each shard owning data
+    // for the sharded collection once secondaries refresh proactively.
+    var mongosSetupConn = new Mongo(mongos.host);
+    mongosSetupConn.setReadPref("secondary");
+    assert(!mongosSetupConn.getCollection(collSharded.toString()).find({}).hasNext());
+
+    gc();  // Clean up connections
+
     st.printShardingStatus();
 
     //

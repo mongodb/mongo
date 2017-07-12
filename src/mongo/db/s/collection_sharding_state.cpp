@@ -458,11 +458,6 @@ bool CollectionShardingState::_checkShardVersionOk(OperationContext* opCtx,
                                                    ChunkVersion* actualShardVersion) {
     Client* client = opCtx->getClient();
 
-    if (!repl::ReplicationCoordinator::get(opCtx)->canAcceptWritesForDatabase(opCtx, _nss.db())) {
-        // Right now connections to secondaries aren't versioned at all.
-        return true;
-    }
-
     auto& oss = OperationShardingState::get(opCtx);
 
     // If there is a version attached to the OperationContext, use it as the received version.

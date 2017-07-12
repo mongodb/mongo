@@ -150,7 +150,8 @@
             "ns": coll.getFullName(),
             "command.aggregate": coll.getName(),
             "command.comment": "agg_readPref",
-            "command.pipeline.$mergeCursors": {"$exists": false}
+            "command.pipeline.$mergeCursors": {"$exists": false},
+            "nreturned": {"$exists": true}
         });
 
         // Find
@@ -163,7 +164,8 @@
             "ns": coll.getFullName(),
             "command.aggregate": coll.getName(),
             "command.comment": "find_readPref",
-            "command.pipeline.$mergeCursors": {"$exists": false}
+            "command.pipeline.$mergeCursors": {"$exists": false},
+            "nreturned": {"$exists": true}
         });
 
         // Count
@@ -176,7 +178,8 @@
             "ns": coll.getFullName(),
             "command.aggregate": coll.getName(),
             "command.comment": "count_readPref",
-            "command.pipeline.$mergeCursors": {"$exists": false}
+            "command.pipeline.$mergeCursors": {"$exists": false},
+            "nreturned": {"$exists": true}
         });
 
         // Distinct
@@ -189,7 +192,8 @@
             "ns": coll.getFullName(),
             "command.aggregate": coll.getName(),
             "command.comment": "distinct_readPref",
-            "command.pipeline.$mergeCursors": {"$exists": false}
+            "command.pipeline.$mergeCursors": {"$exists": false},
+            "nreturned": {"$exists": true}
         });
 
         assert.commandWorked(shardSecondary.setProfilingLevel(0));

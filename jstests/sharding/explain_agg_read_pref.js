@@ -4,7 +4,7 @@
 (function() {
     "use strict";
 
-    load("jstests/libs/profiler.js");  // For profilerHasSingleMatchingEntryOrThrow.
+    load("jstests/libs/profiler.js");  // For profilerHasMatchingEntryOrThrow.
 
     const st = new ShardingTest({
         name: "agg_explain_readPref",
@@ -81,7 +81,12 @@
                 // Look for an operation without an exception, since the shard throws a stale config
                 // exception if the shard or mongos has stale routing metadata, and the operation
                 // gets retried.
-                profilerHasSingleMatchingEntryOrThrow(target, {
+                // Note, we look for *at least one* (not exactly one) matching entry: Mongos cancels
+                // requests to all shards on receiving a stale version error from any shard.
+                // However, the requests may have reached the other shards before they are canceled.
+                // If the other shards were already fresh, they will re-receive the request in the
+                // next attempt, meaning the request can show up more than once in the profiler.
+                profilerHasMatchingEntryOrThrow(target, {
                     "ns": coll.getFullName(),
                     "command.explain.aggregate": coll.getName(),
                     "command.explain.comment": comment,
@@ -109,7 +114,12 @@
                 // Look for an operation without an exception, since the shard throws a stale config
                 // exception if the shard or mongos has stale routing metadata, and the operation
                 // gets retried.
-                profilerHasSingleMatchingEntryOrThrow(target, {
+                // Note, we look for *at least one* (not exactly one) matching entry: Mongos cancels
+                // requests to all shards on receiving a stale version error from any shard.
+                // However, the requests may have reached the other shards before they are canceled.
+                // If the other shards were already fresh, they will re-receive the request in the
+                // next attempt, meaning the request can show up more than once in the profiler.
+                profilerHasMatchingEntryOrThrow(target, {
                     "ns": coll.getFullName(),
                     "command.explain.aggregate": coll.getName(),
                     "command.explain.comment": comment,

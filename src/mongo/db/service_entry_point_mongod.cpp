@@ -653,9 +653,8 @@ void execCommandDatabase(OperationContext* opCtx,
             opCtx->setDeadlineAfterNowBy(Milliseconds{maxTimeMS});
         }
 
-        // Operations are only versioned against the primary. We also make sure not to redo shard
-        // version handling if this command was issued via the direct client.
-        if (iAmPrimary && !opCtx->getClient()->isInDirectClient()) {
+        // We do not redo shard version handling if this command was issued via the direct client.
+        if (!opCtx->getClient()->isInDirectClient()) {
             // Handle a shard version that may have been sent along with the command.
             auto commandNS = NamespaceString(command->parseNs(dbname, request.body));
             auto& oss = OperationShardingState::get(opCtx);

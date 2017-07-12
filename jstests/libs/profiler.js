@@ -25,11 +25,20 @@ function getProfilerProtocolStringForCommand(conn) {
     doassert(`Unknown prototocol string ${protocols}`);
 }
 
-// Throws an assertion if the profiler does not contain exactly one entry matching <filter>.
+// Throws an assertion if the profiler does not contain *exactly one* entry matching <filter>.
 // Optional arguments <errorMsgFilter> and <errorMsgProj> limit profiler output if this asserts.
 function profilerHasSingleMatchingEntryOrThrow(inputDb, filter, errorMsgFilter, errorMsgProj) {
     assert.eq(inputDb.system.profile.find(filter).itcount(),
               1,
               "Expected exactly one op matching: " + tojson(filter) + " in profiler " +
                   tojson(inputDb.system.profile.find(errorMsgFilter, errorMsgProj).toArray()));
+}
+
+// Throws an assertion if the profiler does not contain *at least one* entry matching <filter>.
+// Optional arguments <errorMsgFilter> and <errorMsgProj> limit profiler output if this asserts.
+function profilerHasMatchingEntryOrThrow(inputDb, filter, errorMsgFilter, errorMsgProj) {
+    assert.gte(inputDb.system.profile.find(filter).itcount(),
+               1,
+               "Expected at least one op matching: " + tojson(filter) + " in profiler " +
+                   tojson(inputDb.system.profile.find(errorMsgFilter, errorMsgProj).toArray()));
 }
