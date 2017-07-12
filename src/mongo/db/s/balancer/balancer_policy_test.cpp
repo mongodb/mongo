@@ -408,22 +408,36 @@ TEST(BalancerPolicy, NoBalancingDueToAllNodesEitherDrainingOrMaxedOut) {
     ASSERT(migrations.empty());
 }
 
-TEST(BalancerPolicy, BalancerMovesChunksOffSizeMaxedShards) {
+TEST(BalancerPolicy, BalancerRespectsMaxShardSizeOnlyBalanceToNonMaxed) {
     // Note that maxSize of shard0 is 1, and it is therefore overloaded with currSize = 3. Other
     // shards have maxSize = 0 = unset. Even though the overloaded shard has the least number of
     // less chunks, we shouldn't move chunks to that shard.
     auto cluster = generateCluster(
         {{ShardStatistics(kShardId0, 1, 3, false, emptyTagSet, emptyShardVersion), 2},
-         {ShardStatistics(kShardId1, kNoMaxSize, 4, false, emptyTagSet, emptyShardVersion), 4},
-         {ShardStatistics(kShardId2, kNoMaxSize, 6, false, emptyTagSet, emptyShardVersion), 6}});
+         {ShardStatistics(kShardId1, kNoMaxSize, 5, false, emptyTagSet, emptyShardVersion), 5},
+         {ShardStatistics(kShardId2, kNoMaxSize, 10, false, emptyTagSet, emptyShardVersion), 10}});
 
     const auto migrations(BalancerPolicy::balance(
         cluster.first, DistributionStatus(kNamespace, cluster.second), false));
     ASSERT_EQ(1U, migrations.size());
-    ASSERT_EQ(kShardId0, migrations[0].from);
+    ASSERT_EQ(kShardId2, migrations[0].from);
     ASSERT_EQ(kShardId1, migrations[0].to);
-    ASSERT_BSONOBJ_EQ(cluster.second[kShardId0][0].getMin(), migrations[0].minKey);
-    ASSERT_BSONOBJ_EQ(cluster.second[kShardId0][0].getMax(), migrations[0].maxKey);
+    ASSERT_BSONOBJ_EQ(cluster.second[kShardId2][0].getMin(), migrations[0].minKey);
+    ASSERT_BSONOBJ_EQ(cluster.second[kShardId2][0].getMax(), migrations[0].maxKey);
+}
+
+TEST(BalancerPolicy, BalancerRespectsMaxShardSizeWhenAllBalanced) {
+    // Note that maxSize of shard0 is 1, and it is therefore overloaded with currSize = 4. Other
+    // shards have maxSize = 0 = unset. We check that being over the maxSize is NOT equivalent to
+    // draining, we don't want to empty shards for no other reason than they are over this limit.
+    auto cluster = generateCluster(
+        {{ShardStatistics(kShardId0, 1, 4, false, emptyTagSet, emptyShardVersion), 4},
+         {ShardStatistics(kShardId1, kNoMaxSize, 4, false, emptyTagSet, emptyShardVersion), 4},
+         {ShardStatistics(kShardId2, kNoMaxSize, 4, false, emptyTagSet, emptyShardVersion), 4}});
+
+    const auto migrations(BalancerPolicy::balance(
+        cluster.first, DistributionStatus(kNamespace, cluster.second), false));
+    ASSERT(migrations.empty());
 }
 
 TEST(BalancerPolicy, BalancerRespectsTagsWhenDraining) {
