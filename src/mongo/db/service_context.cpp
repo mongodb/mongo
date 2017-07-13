@@ -46,8 +46,6 @@ namespace mongo {
 namespace {
 
 ServiceContext* globalServiceContext = nullptr;
-stdx::mutex globalServiceContextMutex;
-stdx::condition_variable globalServiceContextCV;
 
 }  // namespace
 
@@ -60,23 +58,10 @@ ServiceContext* getGlobalServiceContext() {
     return globalServiceContext;
 }
 
-ServiceContext* waitAndGetGlobalServiceContext() {
-    stdx::unique_lock<stdx::mutex> lk(globalServiceContextMutex);
-    globalServiceContextCV.wait(lk, [] { return globalServiceContext; });
-    fassert(40549, globalServiceContext);
-    return globalServiceContext;
-}
-
 void setGlobalServiceContext(std::unique_ptr<ServiceContext>&& serviceContext) {
     fassert(17509, serviceContext.get());
 
     delete globalServiceContext;
-
-    stdx::lock_guard<stdx::mutex> lk(globalServiceContextMutex);
-
-    if (!globalServiceContext) {
-        globalServiceContextCV.notify_all();
-    }
 
     globalServiceContext = serviceContext.release();
 }
