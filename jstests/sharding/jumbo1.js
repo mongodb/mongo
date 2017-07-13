@@ -44,7 +44,7 @@
         print("diff: " + d);
         s.printShardingStatus(true);
         return d < 5;
-    }, "balance didn't happen", 1000 * 60 * 5, 5000);
+    }, "balance didn't happen", 1000 * 60 * 10, 5000);
 
     // Check that the jumbo chunk did not move, which shouldn't be possible.
     var jumboChunk =
