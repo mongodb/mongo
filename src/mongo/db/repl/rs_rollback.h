@@ -240,9 +240,11 @@ struct FixUpInfo {
     std::multimap<std::string, std::string> indexesToDrop;
 
     // Namespaces of collections that need to be dropped or resynced from the sync source.
-    std::set<std::string> collectionsToDrop;
     std::set<std::string> collectionsToResyncData;
     std::set<std::string> collectionsToResyncMetadata;
+
+    // UUIDs of collections that need to be dropped.
+    stdx::unordered_set<UUID, UUID::Hash> collectionsToDrop;
 
     // When collections are dropped, they are added to a list of drop-pending collections. We keep
     // the OpTime and the namespace of the collection because the DropPendingCollectionReaper

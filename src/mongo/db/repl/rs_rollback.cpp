@@ -44,6 +44,7 @@
 #include "mongo/db/catalog/collection.h"
 #include "mongo/db/catalog/collection_catalog_entry.h"
 #include "mongo/db/catalog/document_validation.h"
+#include "mongo/db/catalog/uuid_catalog.h"
 #include "mongo/db/client.h"
 #include "mongo/db/commands.h"
 #include "mongo/db/concurrency/write_conflict_exception.h"
@@ -112,20 +113,23 @@ void FixUpInfo::removeAllDocsToRefetchFor(const std::string& collection) {
                         docsToRefetch.upper_bound(DocID::maxFor(collection.c_str())));
 }
 
+// TODO: This function will not be fully functional until the entire
+// rollback via refetch for non-WT project is complete. See SERVER-30171.
 void FixUpInfo::removeRedundantOperations() {
     // These loops and their bodies can be done in any order. The final result of the FixUpInfo
     // members will be the same.
-    for (const auto& collection : collectionsToDrop) {
-        removeAllDocsToRefetchFor(collection);
-        indexesToDrop.erase(collection);
-        collectionsToResyncMetadata.erase(collection);
-    }
+
+    //    for (const auto& collection : collectionsToDrop) {
+    //        removeAllDocsToRefetchFor(collection);
+    //        indexesToDrop.erase(collection);
+    //        collectionsToResyncMetadata.erase(collection);
+    //    }
 
     for (const auto& collection : collectionsToResyncData) {
         removeAllDocsToRefetchFor(collection);
         indexesToDrop.erase(collection);
         collectionsToResyncMetadata.erase(collection);
-        collectionsToDrop.erase(collection);
+        // collectionsToDrop.erase(collection);
     }
 }
 
@@ -205,8 +209,7 @@ Status rollback_internal::updateFixUpInfoFromLocalOplogEntry(FixUpInfo& fixUpInf
                 //     ...
                 // }
 
-                string ns = nss.db().toString() + '.' + first.valuestr();  // -> foo.abc
-                fixUpInfo.collectionsToDrop.insert(ns);
+                fixUpInfo.collectionsToDrop.insert(*uuid);
                 return Status::OK();
             }
             case OplogEntry::CommandType::kDrop: {
@@ -607,29 +610,31 @@ void syncFixUp(OperationContext* opCtx,
     log() << "Dropping collections to roll back create operations";
 
     // Drops collections before updating individual documents.
-    for (set<string>::iterator it = fixUpInfo.collectionsToDrop.begin();
-         it != fixUpInfo.collectionsToDrop.end();
+    for (auto it = fixUpInfo.collectionsToDrop.begin(); it != fixUpInfo.collectionsToDrop.end();
          it++) {
-        log() << "Dropping collection: " << *it;
 
-        invariant(!fixUpInfo.indexesToDrop.count(*it));
+        // TODO: This invariant will be uncommented once the rollback via refetch for non-WT
+        // project is complete. See SERVER-30171.
+        // invariant(!fixUpInfo.indexesToDrop.count(*it));
 
-        const NamespaceString nss(*it);
+        Collection* collection = UUIDCatalog::get(opCtx).lookupCollectionByUUID(*it);
+        NamespaceString nss = collection->ns();
+
         Lock::DBLock dbLock(opCtx, nss.db(), MODE_X);
-        Database* db = dbHolder().get(opCtx, nsToDatabaseSubstring(*it));
+        Database* db = dbHolder().get(opCtx, nss.db());
         if (db) {
-            Helpers::RemoveSaver removeSaver("rollback", "", *it);
+            Helpers::RemoveSaver removeSaver("rollback", "", nss.ns());
 
             // Performs a collection scan and writes all documents in the collection to disk
             // in order to keep an archive of items that were rolled back.
             auto exec = InternalPlanner::collectionScan(
-                opCtx, *it, db->getCollection(opCtx, *it), PlanExecutor::YIELD_AUTO);
+                opCtx, nss.toString(), collection, PlanExecutor::YIELD_AUTO);
             BSONObj curObj;
             PlanExecutor::ExecState execState;
             while (PlanExecutor::ADVANCED == (execState = exec->getNext(&curObj, NULL))) {
                 auto status = removeSaver.goingToDelete(curObj);
                 if (!status.isOK()) {
-                    severe() << "Rolling back createCollection on " << *it
+                    severe() << "Rolling back createCollection on " << nss
                              << " failed to write document to remove saver file: "
                              << redact(status);
                     throw RSFatalException(
@@ -649,12 +654,12 @@ void syncFixUp(OperationContext* opCtx,
                 if (execState == PlanExecutor::FAILURE &&
                     WorkingSetCommon::isValidStatusMemberObject(curObj)) {
                     Status errorStatus = WorkingSetCommon::getMemberObjectStatus(curObj);
-                    severe() << "Rolling back createCollection on " << *it << " failed with "
+                    severe() << "Rolling back createCollection on " << nss << " failed with "
                              << redact(errorStatus) << ". A full resync is necessary.";
                     throw RSFatalException(
                         "Rolling back createCollection failed. A full resync is necessary.");
                 } else {
-                    severe() << "Rolling back createCollection on " << *it
+                    severe() << "Rolling back createCollection on " << nss
                              << " failed. A full resync is necessary.";
                     throw RSFatalException(
                         "Rolling back createCollection failed. A full resync is necessary.");
@@ -662,8 +667,14 @@ void syncFixUp(OperationContext* opCtx,
             }
 
             WriteUnitOfWork wunit(opCtx);
+
+            // We permanently drop the collection rather than 2-phase drop the collection
+            // here. By not passing in an opTime to dropCollectionEvenIfSystem() the collection
+            // is immediately dropped.
             fassertStatusOK(40504, db->dropCollectionEvenIfSystem(opCtx, nss));
             wunit.commit();
+
+            log() << "Dropped collection with UUID: " << *it << " and nss: " << nss;
         }
     }
 
@@ -722,7 +733,10 @@ void syncFixUp(OperationContext* opCtx,
         // while rolling back createCollection operations.
         const auto& ns = nsAndGoodVersionsByDocID.first;
         unique_ptr<Helpers::RemoveSaver> removeSaver;
-        invariant(!fixUpInfo.collectionsToDrop.count(ns));
+
+        // TODO: This invariant will be uncommented once the
+        // rollback via refetch for non-WT project is complete. See SERVER-30171
+        // invariant(!fixUpInfo.collectionsToDrop.count(ns));
         removeSaver.reset(new Helpers::RemoveSaver("rollback", "", ns));
 
         const auto& goodVersionsByDocID = nsAndGoodVersionsByDocID.second;

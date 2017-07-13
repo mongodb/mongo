@@ -9047,7 +9047,7 @@ buildvariants:
     # nest curly braces inside. The curly braces "{}" need their own quotes to protect them from
     # being interpreted by bash.
     test_flags: >
-      --mongodSetParameters='{rollbackMethod: rollbackViaRefetch}'
+      --mongodSetParameters='{rollbackMethod: rollbackViaRefetchNoUUID}'
     compile_flags: --ssl MONGO_DISTMOD=rhel62 -j$(grep -c ^processor /proc/cpuinfo) --variables-files=etc/scons/mongodbtoolchain_gcc.vars CPPPATH="/opt/basis/rlp/rlp/include /opt/basis/rlp/utilities/include" --use-basis-tech-rosette-linguistics-platform=on
     num_jobs_available: $(grep -c ^processor /proc/cpuinfo)
     use_scons_cache: true
