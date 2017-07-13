@@ -34,6 +34,7 @@
 #include "mongo/db/json.h"
 #include "mongo/db/logical_session_id.h"
 #include "mongo/db/operation_context.h"
+#include "mongo/db/operation_context_group.h"
 #include "mongo/db/service_context.h"
 #include "mongo/db/service_context_noop.h"
 #include "mongo/stdx/future.h"
@@ -168,6 +169,80 @@ TEST(OperationContextTest, InitializeOperationSessionInfo_SessionIdAndTransactio
 
     ASSERT(opCtx->getTxnNumber());
     ASSERT_EQ(100, *opCtx->getTxnNumber());
+}
+
+TEST(OperationContextTest, OpCtxGroup) {
+    OperationContextGroup group1;
+    ASSERT_TRUE(group1.isEmpty());
+    {
+        auto serviceCtx1 = stdx::make_unique<ServiceContextNoop>();
+        auto client1 = serviceCtx1->makeClient("OperationContextTest1");
+        auto opCtx1 = group1.makeOperationContext(*client1);
+        ASSERT_FALSE(group1.isEmpty());
+
+        auto serviceCtx2 = stdx::make_unique<ServiceContextNoop>();
+        auto client2 = serviceCtx2->makeClient("OperationContextTest2");
+        {
+            auto opCtx2 = group1.makeOperationContext(*client2);
+            opCtx1.discard();
+            ASSERT_FALSE(group1.isEmpty());
+        }
+        ASSERT_TRUE(group1.isEmpty());
+
+        auto opCtx3 = group1.makeOperationContext(*client1);
+        auto opCtx4 = group1.makeOperationContext(*client2);
+        ASSERT_TRUE(opCtx3->checkForInterruptNoAssert().isOK());    // use member op->
+        ASSERT_TRUE((*opCtx4).checkForInterruptNoAssert().isOK());  // use conversion to OC*
+        group1.interrupt(ErrorCodes::InternalError);
+        ASSERT_FALSE(opCtx3->checkForInterruptNoAssert().isOK());
+        ASSERT_FALSE((*opCtx4).checkForInterruptNoAssert().isOK());
+
+        auto serviceCtx3 = stdx::make_unique<ServiceContextNoop>();
+        auto client3 = serviceCtx3->makeClient("OperationContextTest3");
+        auto opCtx5 = group1.makeOperationContext(*client3);
+        ASSERT_FALSE(opCtx5->checkForInterruptNoAssert().isOK());  // interrupt is sticky
+    }
+    ASSERT_TRUE(group1.isEmpty());
+
+    {
+        group1.resetInterrupt();
+        auto serviceCtx1 = stdx::make_unique<ServiceContextNoop>();
+        auto client1 = serviceCtx1->makeClient("OperationContextTest3");
+        auto opCtx1 = group1.makeOperationContext(*client1);
+        ASSERT_TRUE(opCtx1->checkForInterruptNoAssert().isOK());  // interrupt unstuck
+    }
+
+    OperationContextGroup group2;
+    {
+        auto serviceCtx = stdx::make_unique<ServiceContextNoop>();
+        auto client = serviceCtx->makeClient("OperationContextTest1");
+        auto opCtx2 = group2.adopt(client->makeOperationContext());
+        ASSERT_FALSE(group2.isEmpty());
+        ASSERT_TRUE(opCtx2->checkForInterruptNoAssert().isOK());
+        group2.interrupt(ErrorCodes::InternalError);
+        ASSERT_FALSE(opCtx2->checkForInterruptNoAssert().isOK());
+        opCtx2.discard();
+        ASSERT(opCtx2.opCtx() == nullptr);
+        ASSERT_TRUE(group2.isEmpty());
+    }
+
+    OperationContextGroup group3;
+    OperationContextGroup group4;
+    {
+        auto serviceCtx = stdx::make_unique<ServiceContextNoop>();
+        auto client3 = serviceCtx->makeClient("OperationContextTest3");
+        auto opCtx3 = group3.makeOperationContext(*client3);
+        auto p3 = opCtx3.opCtx();
+        auto opCtx4 = group4.take(std::move(opCtx3));
+        ASSERT_EQ(p3, opCtx4.opCtx());
+        ASSERT(opCtx3.opCtx() == nullptr);
+        ASSERT_TRUE(group3.isEmpty());
+        ASSERT_FALSE(group4.isEmpty());
+        group3.interrupt(ErrorCodes::InternalError);
+        ASSERT_TRUE(opCtx4->checkForInterruptNoAssert().isOK());
+        group4.interrupt(ErrorCodes::InternalError);
+        ASSERT_FALSE(opCtx4->checkForInterruptNoAssert().isOK());
+    }
 }
 
 class OperationDeadlineTests : public unittest::Test {

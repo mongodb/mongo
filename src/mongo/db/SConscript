@@ -445,6 +445,7 @@ env.Library(
         'operation_context.cpp',
         'service_context.cpp',
         'service_context_noop.cpp',
+        'operation_context_group.cpp'
     ],
     LIBDEPS=[
         '$BUILD_DIR/mongo/util/clock_sources',
