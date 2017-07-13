@@ -131,6 +131,11 @@ bool ShardingState::enabled() const {
     return _getInitializationState() == InitializationState::kInitialized;
 }
 
+void ShardingState::setEnabledForTest(const std::string& shardName) {
+    _setInitializationState(InitializationState::kInitialized);
+    _shardName = shardName;
+}
+
 Status ShardingState::canAcceptShardedCommands() const {
     if (serverGlobalParams.clusterRole != ClusterRole::ShardServer) {
         return {ErrorCodes::NoShardingEnabled,

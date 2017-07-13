@@ -96,6 +96,12 @@ public:
     bool enabled() const;
 
     /**
+     * Force-sets the initialization state to InitializationState::kInitialized, for testing
+     * purposes. Note that this function should ONLY be used for testing purposes.
+     */
+    void setEnabledForTest(const std::string& shardName);
+
+    /**
      * Returns Status::OK if the ShardingState is enabled; if not, returns an error describing
      * whether the ShardingState is just not yet initialized, or if this shard is not running with
      * --shardsvr at all.

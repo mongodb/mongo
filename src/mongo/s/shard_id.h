@@ -81,7 +81,7 @@ public:
     int compare(const ShardId& other) const;
 
     /**
-     *  Returns true if _shardId is empty. Subject to include more validations in the future.
+     *  Returns true if _shardId is not empty. Subject to include more validations in the future.
      */
     bool isValid() const;
 
