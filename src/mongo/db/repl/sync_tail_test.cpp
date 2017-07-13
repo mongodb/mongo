@@ -838,7 +838,7 @@ TEST_F(SyncTailTest, MultiSyncApplyGroupsInsertOperationByNamespaceBeforeApplyin
     ASSERT_BSONOBJ_EQ(insertOp2b.getObject(), group2[1].Obj());
 }
 
-TEST_F(SyncTailTest, MultiSyncApplyUsesLimitWhenGroupingInsertOperation) {
+TEST_F(SyncTailTest, MultiSyncApplyLimitsBatchCountWhenGroupingInsertOperation) {
     int seconds = 0;
     auto makeOp = [&seconds](const NamespaceString& nss) {
         return makeInsertDocumentOplogEntry(
@@ -887,6 +887,138 @@ TEST_F(SyncTailTest, MultiSyncApplyUsesLimitWhenGroupingInsertOperation) {
 
     // (limit + 1)-th insert operations should not be included in group of first (limit) inserts.
     ASSERT_BSONOBJ_EQ(insertOps.back().raw, operationsApplied[2]);
+}
+
+// Create an 'insert' oplog operation of an approximate size in bytes. The '_id' of the oplog entry
+// and its optime in seconds are given by the 'id' argument.
+OplogEntry makeSizedInsertOp(const NamespaceString& nss, int size, int id) {
+    return makeInsertDocumentOplogEntry({Timestamp(Seconds(id), 0), 1LL},
+                                        nss,
+                                        BSON("_id" << id << "data" << std::string(size, '*')));
+};
+
+TEST_F(SyncTailTest, MultiSyncApplyLimitsBatchSizeWhenGroupingInsertOperations) {
+
+    int seconds = 0;
+    NamespaceString nss("test." + _agent.getSuiteName() + "_" + _agent.getTestName());
+    auto createOp = makeCreateCollectionOplogEntry({Timestamp(Seconds(seconds++), 0), 1LL}, nss);
+
+    // Create a sequence of insert ops that are too large to fit in one group.
+    int maxBatchSize = insertVectorMaxBytes;
+    int opsPerBatch = 3;
+    int opSize = maxBatchSize / opsPerBatch - 500;  // Leave some room for other oplog fields.
+
+    // Create the insert ops.
+    MultiApplier::Operations insertOps;
+    int numOps = 4;
+    for (int i = 0; i < numOps; i++) {
+        insertOps.push_back(makeSizedInsertOp(nss, opSize, seconds++));
+    }
+
+    MultiApplier::Operations operationsToApply;
+    operationsToApply.push_back(createOp);
+    std::copy(insertOps.begin(), insertOps.end(), std::back_inserter(operationsToApply));
+
+    MultiApplier::OperationPtrs ops;
+    for (auto&& op : operationsToApply) {
+        ops.push_back(&op);
+    }
+
+    std::vector<BSONObj> operationsApplied;
+    auto syncApply = [&operationsApplied](OperationContext*, const BSONObj& op, bool) {
+        operationsApplied.push_back(op.copy());
+        return Status::OK();
+    };
+
+    // Apply the ops.
+    ASSERT_OK(multiSyncApply_noAbort(_opCtx.get(), &ops, syncApply));
+
+    // Applied ops should be as follows:
+    // [ {create}, INSERT_GROUP{insert 1, insert 2, insert 3}, {insert 4} ]
+    ASSERT_EQ(3U, operationsApplied.size());
+    auto groupedInsertOp = operationsApplied[1];
+    ASSERT_EQUALS(BSONType::Array, groupedInsertOp["o"].type());
+    // Make sure the insert group was created correctly.
+    for (int i = 0; i < opsPerBatch; ++i) {
+        auto groupedInsertOpArray = groupedInsertOp["o"].Array();
+        ASSERT_BSONOBJ_EQ(insertOps[i].getObject(), groupedInsertOpArray[i].Obj());
+    }
+
+    // Check that the last op was applied individually.
+    ASSERT_BSONOBJ_EQ(insertOps[3].raw, operationsApplied[2]);
+}
+
+TEST_F(SyncTailTest, MultiSyncApplyAppliesOpIndividuallyWhenOpIndividuallyExceedsBatchSize) {
+
+    int seconds = 0;
+    NamespaceString nss("test." + _agent.getSuiteName() + "_" + _agent.getTestName());
+    auto createOp = makeCreateCollectionOplogEntry({Timestamp(Seconds(seconds++), 0), 1LL}, nss);
+
+    int maxBatchSize = insertVectorMaxBytes;
+    // Create an insert op that exceeds the maximum batch size by itself.
+    auto insertOpLarge = makeSizedInsertOp(nss, maxBatchSize, seconds++);
+    auto insertOpSmall = makeSizedInsertOp(nss, 100, seconds++);
+
+    MultiApplier::Operations operationsToApply = {createOp, insertOpLarge, insertOpSmall};
+
+    MultiApplier::OperationPtrs ops;
+    for (auto&& op : operationsToApply) {
+        ops.push_back(&op);
+    }
+
+    std::vector<BSONObj> operationsApplied;
+    auto syncApply = [&operationsApplied](OperationContext*, const BSONObj& op, bool) {
+        operationsApplied.push_back(op.copy());
+        return Status::OK();
+    };
+
+    // Apply the ops.
+    ASSERT_OK(multiSyncApply_noAbort(_opCtx.get(), &ops, syncApply));
+
+    // Applied ops should be as follows:
+    // [ {create}, {large insert} {small insert} ]
+    ASSERT_EQ(operationsToApply.size(), operationsApplied.size());
+    ASSERT_BSONOBJ_EQ(createOp.raw, operationsApplied[0]);
+    ASSERT_BSONOBJ_EQ(insertOpLarge.raw, operationsApplied[1]);
+    ASSERT_BSONOBJ_EQ(insertOpSmall.raw, operationsApplied[2]);
+}
+
+TEST_F(SyncTailTest, MultiSyncApplyAppliesInsertOpsIndividuallyWhenUnableToCreateGroupByNamespace) {
+
+    int seconds = 0;
+    auto makeOp = [&seconds](const NamespaceString& nss) {
+        return makeInsertDocumentOplogEntry(
+            {Timestamp(Seconds(seconds), 0), 1LL}, nss, BSON("_id" << seconds++));
+    };
+
+    auto testNs = "test." + _agent.getSuiteName() + "_" + _agent.getTestName();
+
+    // Create a sequence of 3 'insert' ops that can't be grouped because they are from different
+    // namespaces.
+    MultiApplier::Operations operationsToApply = {makeOp(NamespaceString(testNs + "_1")),
+                                                  makeOp(NamespaceString(testNs + "_2")),
+                                                  makeOp(NamespaceString(testNs + "_3"))};
+
+    std::vector<BSONObj> operationsApplied;
+    auto syncApply = [&operationsApplied](OperationContext*, const BSONObj& op, bool) {
+        operationsApplied.push_back(op.copy());
+        return Status::OK();
+    };
+
+    MultiApplier::OperationPtrs ops;
+    for (auto&& op : operationsToApply) {
+        ops.push_back(&op);
+    }
+
+    // Apply the ops.
+    ASSERT_OK(multiSyncApply_noAbort(_opCtx.get(), &ops, syncApply));
+
+    // Applied ops should be as follows i.e. no insert grouping:
+    // [{insert 1}, {insert 2}, {insert 3}]
+    ASSERT_EQ(operationsToApply.size(), operationsApplied.size());
+    for (std::size_t i = 0; i < operationsToApply.size(); i++) {
+        ASSERT_BSONOBJ_EQ(operationsToApply[i].raw, operationsApplied[i]);
+    }
 }
 
 TEST_F(SyncTailTest, MultiSyncApplyFallsBackOnApplyingInsertsIndividuallyWhenGroupedInsertFails) {

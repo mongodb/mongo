@@ -1043,9 +1043,11 @@ Status multiSyncApply_noAbort(OperationContext* opCtx,
     UnreplicatedWritesBlock uwb(opCtx);
     DisableDocumentValidation validationDisabler(opCtx);
 
-    // allow us to get through the magic barrier
+    // Allow us to get through the magic barrier.
     opCtx->lockState()->setShouldConflictWithSecondaryBatchApplication(false);
 
+    // Sort the oplog entries by namespace, so that entries from the same namespace will be next to
+    // each other in the list.
     if (oplogEntryPointers->size() > 1) {
         std::stable_sort(oplogEntryPointers->begin(),
                          oplogEntryPointers->end(),
@@ -1064,26 +1066,56 @@ Status multiSyncApply_noAbort(OperationContext* opCtx,
     for (auto oplogEntriesIterator = oplogEntryPointers->begin();
          oplogEntriesIterator != oplogEntryPointers->end();
          ++oplogEntriesIterator) {
+
         auto entry = *oplogEntriesIterator;
+
+        // Attempt to group 'insert' ops if possible.
         if (entry->getOpType() == OpTypeEnum::kInsert && !entry->isForCappedCollection &&
             oplogEntriesIterator > doNotGroupBeforePoint) {
-            // Attempt to group inserts if possible.
+
             std::vector<BSONObj> toInsert;
-            int batchSize = 0;
-            int batchCount = 0;
+
+            auto maxBatchSize = insertVectorMaxBytes;
+            auto maxBatchCount = 64;
+
+            // Make sure to include the first op in the batch size.
+            int batchSize = (*oplogEntriesIterator)->getObject().objsize();
+            int batchCount = 1;
+            auto batchNamespace = entry->getNamespace();
+
+            /**
+             * Search for the op that delimits this insert batch, and save its position
+             * in endOfGroupableOpsIterator. For example, given the following list of oplog
+             * entries with a sequence of groupable inserts:
+             *
+             *                S--------------E
+             *       u, u, u, i, i, i, i, i, d, d
+             *
+             *       S: start of insert group
+             *       E: end of groupable ops
+             *
+             * E is the position of endOfGroupableOpsIterator. i.e. endOfGroupableOpsIterator
+             * will point to the first op that *can't* be added to the current insert group.
+             */
             auto endOfGroupableOpsIterator = std::find_if(
                 oplogEntriesIterator + 1,
                 oplogEntryPointers->end(),
-                [&](const OplogEntry* nextEntry) {
-                    return nextEntry->getOpType() != OpTypeEnum::kInsert ||  // Must be an insert.
-                        nextEntry->getNamespace() !=
-                        entry->getNamespace() ||  // Must be the same namespace.
-                        // Must not create too large an object.
-                        (batchSize += nextEntry->getObject().objsize()) > insertVectorMaxBytes ||
-                        ++batchCount >= 64;  // Or have too many entries.
+                [&](const OplogEntry* nextEntry) -> bool {
+                    auto opNamespace = nextEntry->getNamespace();
+                    batchSize += nextEntry->getObject().objsize();
+                    batchCount += 1;
+
+                    // Only add the op to this batch if it passes the criteria.
+                    return nextEntry->getOpType() != OpTypeEnum::kInsert  // Must be an insert.
+                        || opNamespace != batchNamespace  // Must be in the same namespace.
+                        || batchSize > maxBatchSize       // Must not create too large an object.
+                        || batchCount > maxBatchCount;    // Limit number of ops in a single group.
                 });
 
-            if (endOfGroupableOpsIterator != oplogEntriesIterator + 1) {
+            // See if we were able to create a group that contains more than a single op.
+            bool isGroup = (endOfGroupableOpsIterator > oplogEntriesIterator + 1);
+
+            if (isGroup) {
                 // Since we found more than one document, create grouped insert of many docs.
                 BSONObjBuilder groupedInsertBuilder;
                 // Generate an op object of all elements except for "o", since we need to
@@ -1094,7 +1126,7 @@ Status multiSyncApply_noAbort(OperationContext* opCtx,
                     }
                 }
 
-                // Populate the "o" field with all the groupable inserts.
+                // Populate the "o" field with an array of all the grouped inserts.
                 BSONArrayBuilder insertArrayBuilder(groupedInsertBuilder.subarrayStart("o"));
                 for (auto groupingIterator = oplogEntriesIterator;
                      groupingIterator != endOfGroupableOpsIterator;
@@ -1124,8 +1156,8 @@ Status multiSyncApply_noAbort(OperationContext* opCtx,
             }
         }
 
+        // If we didn't create a group, try to apply the op individually.
         try {
-            // Apply an individual (non-grouped) op.
             const Status status = syncApply(opCtx, entry->raw, inSteadyStateReplication);
 
             if (!status.isOK()) {
