@@ -176,7 +176,7 @@ typedef struct timelib_tzinfo
 typedef struct timelib_rel_time {
 	timelib_sll y, m, d; /* Years, Months and Days */
 	timelib_sll h, i, s; /* Hours, mInutes and Seconds */
-	double      f;       /* Fraction */
+	timelib_sll us;      /* Microseconds */
 
 	int weekday; /* Stores the day in 'next monday' */
 	int weekday_behavior; /* 0: the current day should *not* be counted when advancing forwards; 1: the current day *should* be counted */
@@ -204,8 +204,8 @@ typedef struct timelib_time_offset {
 typedef struct timelib_time {
 	timelib_sll      y, m, d;     /* Year, Month, Day */
 	timelib_sll      h, i, s;     /* Hour, mInute, Second */
-	double           f;           /* Fraction */
-	int              z;           /* GMT offset in minutes */
+	timelib_sll      us;          /* Microseconds */
+	int              z;           /* UTC offset in seconds */
 	char            *tz_abbr;     /* Timezone abbreviation (display only) */
 	timelib_tzinfo  *tz_info;     /* Timezone structure */
 	signed int       dst;         /* Flag if we were parsing a DST zone */
@@ -229,7 +229,47 @@ typedef struct timelib_abbr_info {
 	int          dst;
 } timelib_abbr_info;
 
+#define TIMELIB_WARN_MASK                      0x1ff
+#define TIMELIB_ERR_MASK                       0x2ff
+
+#define TIMELIB_WARN_DOUBLE_TZ                 0x101
+#define TIMELIB_WARN_INVALID_TIME              0x102
+#define TIMELIB_WARN_INVALID_DATE              0x103
+#define TIMELIB_WARN_TRAILING_DATA             0x11a
+
+#define TIMELIB_ERR_DOUBLE_TZ                  0x201
+#define TIMELIB_ERR_TZID_NOT_FOUND             0x202
+#define TIMELIB_ERR_DOUBLE_TIME                0x203
+#define TIMELIB_ERR_DOUBLE_DATE                0x204
+#define TIMELIB_ERR_UNEXPECTED_CHARACTER       0x205
+#define TIMELIB_ERR_EMPTY_STRING               0x206
+#define TIMELIB_ERR_UNEXPECTED_DATA            0x207
+#define TIMELIB_ERR_NO_TEXTUAL_DAY             0x208
+#define TIMELIB_ERR_NO_TWO_DIGIT_DAY           0x209
+#define TIMELIB_ERR_NO_THREE_DIGIT_DAY_OF_YEAR 0x20a
+#define TIMELIB_ERR_NO_TWO_DIGIT_MONTH         0x20b
+#define TIMELIB_ERR_NO_TEXTUAL_MONTH           0x20c
+#define TIMELIB_ERR_NO_TWO_DIGIT_YEAR          0x20d
+#define TIMELIB_ERR_NO_FOUR_DIGIT_YEAR         0x20e
+#define TIMELIB_ERR_NO_TWO_DIGIT_HOUR          0x20f
+#define TIMELIB_ERR_HOUR_LARGER_THAN_12        0x210
+#define TIMELIB_ERR_MERIDIAN_BEFORE_HOUR       0x211
+#define TIMELIB_ERR_NO_MERIDIAN                0x212
+#define TIMELIB_ERR_NO_TWO_DIGIT_MINUTE        0x213
+#define TIMELIB_ERR_NO_TWO_DIGIT_SECOND        0x214
+#define TIMELIB_ERR_NO_SIX_DIGIT_MICROSECOND   0x215
+#define TIMELIB_ERR_NO_SEP_SYMBOL              0x216
+#define TIMELIB_ERR_EXPECTED_ESCAPE_CHAR       0x217
+#define TIMELIB_ERR_NO_ESCAPED_CHAR            0x218
+#define TIMELIB_ERR_WRONG_FORMAT_SEP           0x219
+#define TIMELIB_ERR_TRAILING_DATA              0x21a
+#define TIMELIB_ERR_DATA_MISSING               0x21b
+
+
+
+
 typedef struct timelib_error_message {
+	int         error_code;
 	int         position;
 	char        character;
 	char       *message;

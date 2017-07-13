@@ -385,7 +385,7 @@ void timelib_strtointerval(char *s, size_t len,
 	in.begin->h = TIMELIB_UNSET;
 	in.begin->i = TIMELIB_UNSET;
 	in.begin->s = TIMELIB_UNSET;
-	in.begin->f = 0;
+	in.begin->us = 0;
 	in.begin->z = 0;
 	in.begin->dst = 0;
 	in.begin->is_localtime = 0;
@@ -398,7 +398,7 @@ void timelib_strtointerval(char *s, size_t len,
 	in.end->h = TIMELIB_UNSET;
 	in.end->i = TIMELIB_UNSET;
 	in.end->s = TIMELIB_UNSET;
-	in.end->f = 0;
+	in.end->us = 0;
 	in.end->z = 0;
 	in.end->dst = 0;
 	in.end->is_localtime = 0;

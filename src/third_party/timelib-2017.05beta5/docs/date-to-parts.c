@@ -23,11 +23,11 @@
  */
 
 /*
- * Example that shows how to convert a date/time in its parts, to a 
- * Unix timestamp.
+ * Example that shows how to convert a string and TZ identifier to its parts,
+ * in both normal and ISO week date parts.
  *
  * Compile with:
- * gcc -ggdb3 -o date-from-parts date-from-parts.c ../timelib.a -lm
+ * gcc -ggdb3 -o date-to-parts date-to-parts.c ../timelib.a -lm
  */
 
 #include <stdio.h>
@@ -39,14 +39,14 @@ struct {
 	/* cache *tz_cache; */
 } global;
 
-int create_cache(timelib_tzdb *db)
+void create_cache(timelib_tzdb *db)
 {
 	global.db = db;
 
 	/* Loop over all the entries and store in tz_cache */
 }
 
-int cleanup_cache()
+void cleanup_cache()
 {
 	if (global.db != timelib_builtin_db()) {
 		timelib_zoneinfo_dtor(global.db);
@@ -70,13 +70,8 @@ timelib_tzinfo *cached_fetch_tzinfo(char *tz_id)
 
 int main(void)
 {
-	timelib_sll ty = 2017;
-	timelib_sll tm = 6;
-	timelib_sll td = 6;
-	timelib_sll th = 12;
-	timelib_sll ti = 50;
-	timelib_sll ts = 58;
-	char           *tz_id = "America/New_York";
+	char           *dt_string  = "2017-06-05T11:30:09.123Z";
+	char           *tz_id      = "Europe/London";
 	timelib_time   *t;
 	timelib_tzinfo *tzi;
 	timelib_error_container *errors;
@@ -85,13 +80,16 @@ int main(void)
 
 	tzi = cached_fetch_tzinfo(tz_id);
 
-	t = timelib_time_ctor();
-	t->y = ty; t->m = tm; t->d = td;
-	t->h = th; t->i = ti; t->s = ts;
-
+	/* Convert string to timelib_time, and hence its consitituent parts */
+	t = timelib_strtotime(
+		dt_string, strlen(dt_string),
+		&errors,
+		global.db,
+		cached_tzfile_wrapper
+	);
 	timelib_update_ts(t, tzi);
 	timelib_set_timezone(t, tzi);
-	timelib_unixtime2gmt(t, t->sse); /* Note it says gmt in the function name */
+	timelib_unixtime2local(t, t->sse);
 
 
 #define LLABS(y) (y < 0 ? (y * -1) : y)
@@ -103,19 +101,32 @@ int main(void)
 			t->y < 0 ? "-" : "", LLABS(t->y),
 			t->m, t->d, t->h, t->i, t->s
 		);
-		if (t->f > +0.0) {
-			printf(" %.6f", t->f);
+		if (t->us > 0) {
+			printf(".%03lld", (t->us / 1000));
 		}
 		printf("\n");
 	}
 
 
-	/* Show Unix timestamp */
+	/* Show parts ISO */
 	{
-		printf("Timestamp: %lld\n", t->sse);
+		timelib_sll iso_year, iso_week, iso_dow;
+
+		timelib_isodate_from_date(t->y, t->m, t->d, &iso_year, &iso_week, &iso_dow);
+		printf(
+			"%s%04lldW%02lldD%02lld %02lld:%02lld:%02lld",
+			iso_year < 0 ? "-" : "", LLABS(iso_year),
+			iso_week, iso_dow,
+			t->h, t->i, t->s
+		);
+		if (t->us > 0) {
+			printf(".%03lld", (t->us / 1000));
+		}
+		printf("\n");
 	}
 
-
+	timelib_error_container_dtor(errors);
+	timelib_tzinfo_dtor(tzi);
 	timelib_time_dtor(t);
 
 	cleanup_cache();

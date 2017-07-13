@@ -39,14 +39,14 @@ struct {
 	/* cache *tz_cache; */
 } global;
 
-int create_cache(timelib_tzdb *db)
+void create_cache(timelib_tzdb *db)
 {
 	global.db = db;
 
 	/* Loop over all the entries and store in tz_cache */
 }
 
-int cleanup_cache()
+void cleanup_cache()
 {
 	if (global.db != timelib_builtin_db()) {
 		timelib_zoneinfo_dtor(global.db);
@@ -68,35 +68,27 @@ timelib_tzinfo *cached_fetch_tzinfo(char *tz_id)
 	return cached_tzfile_wrapper(tz_id, global.db, &dummy_error);
 }
 
-int main(int argc, char *argv[])
+int main(void)
 {
-	timelib_sll ty;
-	timelib_sll tw;
-	timelib_sll td;
+	timelib_sll ty = 2017;
+	timelib_sll tm = 6;
+	timelib_sll td = 6;
 	timelib_sll th = 12;
 	timelib_sll ti = 50;
 	timelib_sll ts = 58;
+	timelib_sll tus = 713 * 1000;
 	char           *tz_id = "America/New_York";
 	timelib_time   *t;
 	timelib_tzinfo *tzi;
-	timelib_error_container *errors;
-	
-	if (argc < 4) {
-		printf("Usage:\n\tdate-from-iso-parts isoyear isoweek isoday\n\tExample: ./date-from-iso-parts 2017 23 2\n\n");
-		exit(-1);
-	}
-	
-	ty = atoll(argv[1]);
-	tw = atoll(argv[2]);
-	td = atoll(argv[3]);
 
 	create_cache((timelib_tzdb*) timelib_builtin_db());
 
 	tzi = cached_fetch_tzinfo(tz_id);
 
 	t = timelib_time_ctor();
-	timelib_date_from_isodate(ty, tw, td, &t->y, &t->m, &t->d);
+	t->y = ty; t->m = tm; t->d = td;
 	t->h = th; t->i = ti; t->s = ts;
+	t->us = tus;
 
 	timelib_update_ts(t, tzi);
 	timelib_set_timezone(t, tzi);
@@ -112,8 +104,8 @@ int main(int argc, char *argv[])
 			t->y < 0 ? "-" : "", LLABS(t->y),
 			t->m, t->d, t->h, t->i, t->s
 		);
-		if (t->f > +0.0) {
-			printf(" %.6f", t->f);
+		if (t->us > 0) {
+			printf(".%06lld", t->us);
 		}
 		printf("\n");
 	}
@@ -125,6 +117,7 @@ int main(int argc, char *argv[])
 	}
 
 
+	timelib_tzinfo_dtor(tzi);
 	timelib_time_dtor(t);
 
 	cleanup_cache();

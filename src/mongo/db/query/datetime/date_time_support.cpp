@@ -139,7 +139,7 @@ Date_t TimeZoneDatabase::fromString(StringData dateString) const {
     // If the time portion is fully missing, initialize to 0. This allows for the '%Y-%m-%d' format
     // to be passed too, which is what the BI connector may request
     if (t->h == TIMELIB_UNSET && t->i == TIMELIB_UNSET && t->s == TIMELIB_UNSET) {
-        t->h = t->i = t->s = t->f = 0;
+        t->h = t->i = t->s = t->us = 0;
     }
 
     if (t->y == TIMELIB_UNSET || t->m == TIMELIB_UNSET || t->d == TIMELIB_UNSET ||
@@ -154,8 +154,8 @@ Date_t TimeZoneDatabase::fromString(StringData dateString) const {
     timelib_update_ts(t.get(), nullptr);
     timelib_unixtime2local(t.get(), t->sse);
 
-    return Date_t::fromMillisSinceEpoch((static_cast<double>(t->sse) + static_cast<double>(t->f)) *
-                                        1000);
+    return Date_t::fromMillisSinceEpoch(
+        durationCount<Milliseconds>(Seconds(t->sse) + Microseconds(t->us)));
 }
 
 TimeZone TimeZoneDatabase::getTimeZone(StringData timeZoneId) const {
@@ -178,7 +178,7 @@ Date_t TimeZone::createFromDateParts(
     t->h = hour;
     t->i = minute;
     t->s = second;
-    t->f = millisecond / 1000.0;
+    t->us = durationCount<Microseconds>(Milliseconds(millisecond));
 
     if (_tzInfo) {
         timelib_update_ts(t, _tzInfo.get());
@@ -188,7 +188,8 @@ Date_t TimeZone::createFromDateParts(
     }
     timelib_unixtime2gmt(t, t->sse);
 
-    auto returnValue = Date_t::fromMillisSinceEpoch((t->f + t->sse) * 1000);
+    auto returnValue = Date_t::fromMillisSinceEpoch(
+        durationCount<Milliseconds>(Seconds(t->sse) + Microseconds(t->us)));
 
     timelib_time_dtor(t);
 
@@ -208,7 +209,7 @@ Date_t TimeZone::createFromIso8601DateParts(int isoYear,
     t->h = hour;
     t->i = minute;
     t->s = second;
-    t->f = millisecond / 1000.0;
+    t->us = durationCount<Microseconds>(Milliseconds(millisecond));
 
     if (_tzInfo) {
         timelib_update_ts(t, _tzInfo.get());
@@ -218,7 +219,8 @@ Date_t TimeZone::createFromIso8601DateParts(int isoYear,
     }
     timelib_unixtime2gmt(t, t->sse);
 
-    auto returnValue = Date_t::fromMillisSinceEpoch((t->f + t->sse) * 1000);
+    auto returnValue = Date_t::fromMillisSinceEpoch(
+        durationCount<Milliseconds>(Seconds(t->sse) + Microseconds(t->us)));
 
     timelib_time_dtor(t);
 
