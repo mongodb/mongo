@@ -52,8 +52,10 @@ boost::optional<SessionTxnRecord> loadSessionRecord(OperationContext* opCtx,
                                                     const LogicalSessionId& sessionId) {
     DBDirectClient client(opCtx);
     Query sessionQuery(BSON(SessionTxnRecord::kSessionIdFieldName << sessionId.toBSON()));
-    auto result =
-        client.findOne(NamespaceString::kSessionTransactionsTableNamespace.ns(), sessionQuery);
+    auto result = client.findOne(NamespaceString::kSessionTransactionsTableNamespace.ns(),
+                                 sessionQuery,
+                                 nullptr,
+                                 DBClientCursor::QueryOptionLocal_forceOpQuery);  // SERVER-30318
 
     if (result.isEmpty()) {
         return boost::none;

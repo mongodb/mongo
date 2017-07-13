@@ -289,6 +289,9 @@ void MongoBase::Functions::find::call(JSContext* cx, JS::CallArgs args) {
     int batchSize = ValueWriter(cx, args.get(5)).toInt32();
     int options = ValueWriter(cx, args.get(6)).toInt32();
 
+    // The shell only calls this method when it wants to test OP_QUERY.
+    options |= DBClientCursor::QueryOptionLocal_forceOpQuery;
+
     std::unique_ptr<DBClientCursor> cursor(
         conn->query(ns, q, nToReturn, nToSkip, haveFields ? &fields : NULL, options, batchSize));
     if (!cursor.get()) {
@@ -505,7 +508,9 @@ void MongoBase::Functions::cursorFromId::call(JSContext* cx, JS::CallArgs args) 
 
     long long cursorId = NumberLongInfo::ToNumberLong(cx, args.get(1));
 
-    auto cursor = stdx::make_unique<DBClientCursor>(conn, ns, cursorId, 0, 0);
+    // The shell only calls this method when it wants to test OP_GETMORE.
+    auto cursor = stdx::make_unique<DBClientCursor>(
+        conn, ns, cursorId, 0, DBClientCursor::QueryOptionLocal_forceOpQuery);
 
     if (args.get(2).isNumber())
         cursor->setBatchSize(ValueWriter(cx, args.get(2)).toInt32());

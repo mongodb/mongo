@@ -33,7 +33,7 @@
 
 namespace mongo {
 
-class DBClientMockCursor : public DBClientCursorInterface {
+class DBClientMockCursor {
 public:
     DBClientMockCursor(const BSONArray& mockCollection) : _iter(mockCollection) {}
     virtual ~DBClientMockCursor() {}

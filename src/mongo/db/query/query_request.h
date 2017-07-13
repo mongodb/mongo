@@ -404,12 +404,12 @@ public:
     /**
      * Parse the provided legacy query object and parameters to construct a QueryRequest.
      */
-    static StatusWith<std::unique_ptr<QueryRequest>> fromLegacyQueryForTest(NamespaceString nss,
-                                                                            const BSONObj& queryObj,
-                                                                            const BSONObj& proj,
-                                                                            int ntoskip,
-                                                                            int ntoreturn,
-                                                                            int queryOptions);
+    static StatusWith<std::unique_ptr<QueryRequest>> fromLegacyQuery(NamespaceString nss,
+                                                                     const BSONObj& queryObj,
+                                                                     const BSONObj& proj,
+                                                                     int ntoskip,
+                                                                     int ntoreturn,
+                                                                     int queryOptions);
 
 private:
     Status init(int ntoskip,

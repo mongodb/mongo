@@ -198,11 +198,6 @@ public:
                     opCtx, *nssForCurOp, Top::LockType::NotLocked, dbProfilingLevel);
             }
         } else {
-            // getMore commands are always unversioned, so prevent AutoGetCollectionForRead from
-            // checking the shard version.
-            OperationShardingState::get(opCtx).setShardVersion(request.nss,
-                                                               ChunkVersion::IGNORED());
-
             readLock.emplace(opCtx, request.nss);
             const int doNotChangeProfilingLevel = 0;
             statsTracker.emplace(opCtx,
@@ -398,12 +393,6 @@ public:
              BSONObjBuilder& result) override {
         // Counted as a getMore, not as a command.
         globalOpCounters.gotGetMore();
-
-        if (opCtx->getClient()->isInDirectClient()) {
-            return appendCommandStatus(
-                result,
-                Status(ErrorCodes::IllegalOperation, "Cannot run getMore command from eval()"));
-        }
 
         StatusWith<GetMoreRequest> parsedRequest = GetMoreRequest::parseFromBSON(dbname, cmdObj);
         if (!parsedRequest.isOK()) {

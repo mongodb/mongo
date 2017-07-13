@@ -227,12 +227,6 @@ public:
         // Although it is a command, a find command gets counted as a query.
         globalOpCounters.gotQuery();
 
-        if (opCtx->getClient()->isInDirectClient()) {
-            return appendCommandStatus(
-                result,
-                Status(ErrorCodes::IllegalOperation, "Cannot run find command from eval()"));
-        }
-
         // Parse the command BSON to a QueryRequest.
         const bool isExplain = false;
         auto qrStatus = QueryRequest::makeFromFindCommand(nss, cmdObj, isExplain);

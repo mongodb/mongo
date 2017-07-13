@@ -54,7 +54,8 @@ repl::OplogEntry TransactionHistoryIterator::next(OperationContext* opCtx) {
         client.findOne(NamespaceString::kRsOplogNamespace.ns(),
                        BSON(repl::OplogEntryBase::kTimestampFieldName << _nextOpTimeTs),
                        /* fieldsToReturn */ nullptr,
-                       0 /* QueryOption_OplogReplay */);
+                       DBClientCursor::QueryOptionLocal_forceOpQuery  // SERVER-30318
+                       /* QueryOption_OplogReplay */);
 
     uassert(ErrorCodes::IncompleteTransactionHistory,
             str::stream() << "oplog no longer contains the complete write history of this "

@@ -137,11 +137,8 @@ public:
         OperationContext& opCtx = *opCtxPtr;
         DBDirectClient client(&opCtx);
 
-        unique_ptr<DBClientCursor> cursor = client.query("", Query(), 1);
-        ASSERT(cursor->more());
-        BSONObj result = cursor->next().getOwned();
-        ASSERT(result.hasField("$err"));
-        ASSERT_EQUALS(result["code"].Int(), ErrorCodes::InvalidNamespace);
+        ASSERT_THROWS_CODE(
+            client.query("", Query(), 1)->nextSafe(), UserException, ErrorCodes::InvalidNamespace);
     }
 };
 
@@ -152,11 +149,8 @@ public:
         OperationContext& opCtx = *opCtxPtr;
         DBDirectClient client(&opCtx);
 
-        unique_ptr<DBClientCursor> cursor = client.getMore("", 1, 1);
-        ASSERT(cursor->more());
-        BSONObj result = cursor->next().getOwned();
-        ASSERT(result.hasField("$err"));
-        ASSERT_EQUALS(result["code"].Int(), ErrorCodes::InvalidNamespace);
+        ASSERT_THROWS_CODE(
+            client.getMore("", 1, 1)->nextSafe(), UserException, ErrorCodes::InvalidNamespace);
     }
 };
 

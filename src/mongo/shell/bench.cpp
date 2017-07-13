@@ -746,7 +746,10 @@ void BenchRunWorker::generateLoadOnConnection(DBClientBase* conn) {
                             runQueryWithReadCommands(conn, std::move(qr), &result);
                         } else {
                             BenchRunEventTrace _bret(&stats.findOneCounter);
-                            result = conn->findOne(op.ns, fixedQuery);
+                            result = conn->findOne(op.ns,
+                                                   fixedQuery,
+                                                   nullptr,
+                                                   DBClientCursor::QueryOptionLocal_forceOpQuery);
                         }
 
                         if (op.useCheck) {
@@ -858,17 +861,22 @@ void BenchRunWorker::generateLoadOnConnection(DBClientBase* conn) {
                                 BenchRunEventTrace _bret(&stats.queryCounter);
                                 stdx::function<void(const BSONObj&)> castedDoNothing(doNothing);
                                 count = conn->query(
-                                    castedDoNothing, op.ns, fixedQuery, &op.projection, op.options);
+                                    castedDoNothing,
+                                    op.ns,
+                                    fixedQuery,
+                                    &op.projection,
+                                    op.options | DBClientCursor::QueryOptionLocal_forceOpQuery);
                             } else {
                                 BenchRunEventTrace _bret(&stats.queryCounter);
                                 unique_ptr<DBClientCursor> cursor;
-                                cursor = conn->query(op.ns,
-                                                     fixedQuery,
-                                                     op.limit,
-                                                     op.skip,
-                                                     &op.projection,
-                                                     op.options,
-                                                     op.batchSize);
+                                cursor = conn->query(
+                                    op.ns,
+                                    fixedQuery,
+                                    op.limit,
+                                    op.skip,
+                                    &op.projection,
+                                    op.options | DBClientCursor::QueryOptionLocal_forceOpQuery,
+                                    op.batchSize);
                                 count = cursor->itcount();
                             }
                         }

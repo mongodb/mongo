@@ -340,6 +340,8 @@ enum QueryOptions {
      */
     QueryOption_PartialResults = 1 << 7,
 
+    // DBClientCursor reserves flag 1 << 30 to force the use of OP_QUERY.
+
     QueryOption_AllSupported = QueryOption_CursorTailable | QueryOption_SlaveOk |
         QueryOption_OplogReplay | QueryOption_NoCursorTimeout | QueryOption_AwaitData |
         QueryOption_Exhaust | QueryOption_PartialResults,

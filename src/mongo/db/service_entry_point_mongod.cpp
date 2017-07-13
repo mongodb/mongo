@@ -592,7 +592,7 @@ void execCommandDatabase(OperationContext* opCtx,
             repl::ReplicationCoordinator::get(opCtx->getClient()->getServiceContext());
         const bool iAmPrimary = replCoord->canAcceptWritesForDatabase_UNSAFE(opCtx, dbname);
 
-        {
+        if (!opCtx->getClient()->isInDirectClient()) {
             bool commandCanRunOnSecondary = command->slaveOk();
 
             bool commandIsOverriddenToRunOnSecondary =

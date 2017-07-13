@@ -155,6 +155,10 @@ public:
         return _batch;
     }
 
+    std::vector<BSONObj> releaseBatch() {
+        return std::move(_batch);
+    }
+
     boost::optional<long long> getNumReturnedSoFar() const {
         return _numReturnedSoFar;
     }

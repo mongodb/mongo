@@ -295,8 +295,7 @@ public:
 };
 
 /**
- * An exception triggered during a get more request destroys the ClientCursor used by the get
- * more, preventing further iteration of the cursor in subsequent get mores.
+ * Setting killAllOperations causes further getmores to fail.
  */
 class GetMoreKillOp : public ClientBase {
 public:
@@ -313,7 +312,6 @@ public:
 
         // Create a cursor on the collection, with a batch size of 200.
         unique_ptr<DBClientCursor> cursor = _client.query(ns, "", 0, 0, 0, 0, 200);
-        CursorId cursorId = cursor->getCursorId();
 
         // Count 500 results, spanning a few batches of documents.
         for (int i = 0; i < 500; ++i) {
@@ -324,23 +322,16 @@ public:
         // Set the killop kill all flag, forcing the next get more to fail with a kill op
         // exception.
         getGlobalServiceContext()->setKillAllOperations();
-        while (cursor->more()) {
-            cursor->next();
-        }
+        ASSERT_THROWS_CODE(([&] {
+                               while (cursor->more()) {
+                                   cursor->next();
+                               }
+                           }()),
+                           UserException,
+                           ErrorCodes::InterruptedAtShutdown);
 
         // Revert the killop kill all flag.
         getGlobalServiceContext()->unsetKillAllOperations();
-
-        // Check that the cursor has been removed.
-        {
-            AutoGetCollectionForReadCommand ctx(&_opCtx, NamespaceString(ns));
-            ASSERT(0 == ctx.getCollection()->getCursorManager()->numCursors());
-        }
-
-        ASSERT_FALSE(CursorManager::eraseCursorGlobal(&_opCtx, cursorId));
-
-        // Check that a subsequent get more fails with the cursor removed.
-        ASSERT_THROWS(_client.getMore(ns, cursorId), UserException);
     }
 };
 
@@ -376,8 +367,10 @@ public:
 
         // Send a get more with a namespace that is incorrect ('spoofed') for this cursor id.
         // This is the invalaid get more request described in the comment preceding this class.
-        _client.getMore("unittests.querytests.GetMoreInvalidRequest_WRONG_NAMESPACE_FOR_CURSOR",
-                        cursor->getCursorId());
+        ASSERT_THROWS(
+            _client.getMore("unittests.querytests.GetMoreInvalidRequest_WRONG_NAMESPACE_FOR_CURSOR",
+                            cursor->getCursorId()),
+            UserException);
 
         // Check that the cursor still exists
         {
@@ -486,9 +479,7 @@ public:
         insert(ns, BSON("a" << 3));
 
         // We have overwritten the previous cursor position and should encounter a dead cursor.
-        if (c->more()) {
-            ASSERT_THROWS(c->nextSafe(), AssertionException);
-        }
+        ASSERT_THROWS(c->more() ? c->nextSafe() : BSONObj(), AssertionException);
     }
 };
 
@@ -512,9 +503,7 @@ public:
         insert(ns, BSON("a" << 4));
 
         // We have overwritten the previous cursor position and should encounter a dead cursor.
-        if (c->more()) {
-            ASSERT_THROWS(c->nextSafe(), AssertionException);
-        }
+        ASSERT_THROWS(c->more() ? c->nextSafe() : BSONObj(), AssertionException);
     }
 };
 
@@ -550,9 +539,8 @@ public:
     void run() {
         const char* ns = "unittests.querytests.TailCappedOnly";
         _client.insert(ns, BSONObj());
-        unique_ptr<DBClientCursor> c =
-            _client.query(ns, BSONObj(), 0, 0, 0, QueryOption_CursorTailable);
-        ASSERT(c->isDead());
+        ASSERT_THROWS(_client.query(ns, BSONObj(), 0, 0, 0, QueryOption_CursorTailable),
+                      UserException);
     }
 };
 
@@ -687,7 +675,8 @@ public:
                           0,
                           0,
                           0,
-                          QueryOption_OplogReplay | QueryOption_CursorTailable);
+                          QueryOption_OplogReplay | QueryOption_CursorTailable |
+                              DBClientCursor::QueryOptionLocal_forceOpQuery);
         ASSERT(c->more());
         ASSERT_EQUALS(two, c->next()["ts"].Date());
         long long cursorId = c->getCursorId();
@@ -1348,9 +1337,12 @@ public:
             insertNext();
         }
 
-        while (c->more()) {
-            c->next();
-        }
+        ASSERT_THROWS(([&] {
+                          while (c->more()) {
+                              c->nextSafe();
+                          }
+                      }()),
+                      UserException);
     }
 
     void insertNext() {

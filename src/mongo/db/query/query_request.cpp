@@ -726,12 +726,12 @@ StatusWith<unique_ptr<QueryRequest>> QueryRequest::fromLegacyQueryMessage(const 
     return std::move(qr);
 }
 
-StatusWith<unique_ptr<QueryRequest>> QueryRequest::fromLegacyQueryForTest(NamespaceString nss,
-                                                                          const BSONObj& queryObj,
-                                                                          const BSONObj& proj,
-                                                                          int ntoskip,
-                                                                          int ntoreturn,
-                                                                          int queryOptions) {
+StatusWith<unique_ptr<QueryRequest>> QueryRequest::fromLegacyQuery(NamespaceString nss,
+                                                                   const BSONObj& queryObj,
+                                                                   const BSONObj& proj,
+                                                                   int ntoskip,
+                                                                   int ntoreturn,
+                                                                   int queryOptions) {
     auto qr = stdx::make_unique<QueryRequest>(nss);
 
     Status status = qr->init(ntoskip, ntoreturn, queryOptions, queryObj, proj, true);

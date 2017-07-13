@@ -32,6 +32,7 @@
 #include <boost/optional.hpp>
 #include <boost/optional/optional_io.hpp>
 
+#include "mongo/db/dbmessage.h"
 #include "mongo/db/json.h"
 #include "mongo/db/namespace_string.h"
 #include "mongo/db/pipeline/aggregation_request.h"
@@ -1336,10 +1337,11 @@ TEST(QueryRequestTest, ParseFromLegacyObjMetaOpComment) {
         "$comment: {b: 2, c: {d: 'ParseFromLegacyObjMetaOpComment'}}}");
     const NamespaceString nss("test.testns");
     unique_ptr<QueryRequest> qr(
-        assertGet(QueryRequest::fromLegacyQueryForTest(nss, queryObj, BSONObj(), 0, 0, 0)));
+        assertGet(QueryRequest::fromLegacyQuery(nss, queryObj, BSONObj(), 0, 0, 0)));
 
     // Ensure that legacy comment meta-operator is parsed to a string comment
     ASSERT_EQ(qr->getComment(), "{ b: 2, c: { d: \"ParseFromLegacyObjMetaOpComment\" } }");
+    ASSERT_BSONOBJ_EQ(qr->getFilter(), fromjson("{a: 1}"));
 }
 
 TEST(QueryRequestTest, ParseFromLegacyStringMetaOpComment) {
@@ -1348,9 +1350,72 @@ TEST(QueryRequestTest, ParseFromLegacyStringMetaOpComment) {
         "$comment: 'ParseFromLegacyStringMetaOpComment'}");
     const NamespaceString nss("test.testns");
     unique_ptr<QueryRequest> qr(
-        assertGet(QueryRequest::fromLegacyQueryForTest(nss, queryObj, BSONObj(), 0, 0, 0)));
+        assertGet(QueryRequest::fromLegacyQuery(nss, queryObj, BSONObj(), 0, 0, 0)));
 
     ASSERT_EQ(qr->getComment(), "ParseFromLegacyStringMetaOpComment");
+    ASSERT_BSONOBJ_EQ(qr->getFilter(), fromjson("{a: 1}"));
+}
+
+TEST(QueryRequestTest, ParseFromLegacyQuery) {
+    const auto kSkip = 1;
+    const auto kNToReturn = 2;
+
+    BSONObj queryObj = fromjson(R"({
+            query: {query: 1},
+            orderby: {sort: 1},
+            $hint: {hint: 1},
+            $explain: false,
+            $min: {x: 'min'},
+            $max: {x: 'max'},
+            $maxScan: 7
+         })");
+    const NamespaceString nss("test.testns");
+    unique_ptr<QueryRequest> qr(assertGet(QueryRequest::fromLegacyQuery(
+        nss, queryObj, BSON("proj" << 1), kSkip, kNToReturn, QueryOption_Exhaust)));
+
+    ASSERT_EQ(qr->nss(), nss);
+    ASSERT_BSONOBJ_EQ(qr->getFilter(), fromjson("{query: 1}"));
+    ASSERT_BSONOBJ_EQ(qr->getProj(), fromjson("{proj: 1}"));
+    ASSERT_BSONOBJ_EQ(qr->getSort(), fromjson("{sort: 1}"));
+    ASSERT_BSONOBJ_EQ(qr->getHint(), fromjson("{hint: 1}"));
+    ASSERT_BSONOBJ_EQ(qr->getMin(), fromjson("{x: 'min'}"));
+    ASSERT_BSONOBJ_EQ(qr->getMax(), fromjson("{x: 'max'}"));
+    ASSERT_EQ(qr->getSkip(), boost::optional<long long>(kSkip));
+    ASSERT_EQ(qr->getNToReturn(), boost::optional<long long>(kNToReturn));
+    ASSERT_EQ(qr->wantMore(), true);
+    ASSERT_EQ(qr->isExplain(), false);
+    ASSERT_EQ(qr->getMaxScan(), 7);
+    ASSERT_EQ(qr->isSlaveOk(), false);
+    ASSERT_EQ(qr->isOplogReplay(), false);
+    ASSERT_EQ(qr->isNoCursorTimeout(), false);
+    ASSERT_EQ(qr->isAwaitData(), false);
+    ASSERT_EQ(qr->isExhaust(), true);
+    ASSERT_EQ(qr->isAllowPartialResults(), false);
+    ASSERT_EQ(qr->getOptions(), QueryOption_Exhaust);
+}
+
+TEST(QueryRequestTest, ParseFromLegacyQueryUnwrapped) {
+    BSONObj queryObj = fromjson(R"({
+            foo: 1
+         })");
+    const NamespaceString nss("test.testns");
+    unique_ptr<QueryRequest> qr(assertGet(
+        QueryRequest::fromLegacyQuery(nss, queryObj, BSONObj(), 0, 0, QueryOption_Exhaust)));
+
+    ASSERT_EQ(qr->nss(), nss);
+    ASSERT_BSONOBJ_EQ(qr->getFilter(), fromjson("{foo: 1}"));
+}
+
+TEST(QueryRequestTest, ParseFromLegacyQueryTooNegativeNToReturn) {
+    BSONObj queryObj = fromjson(R"({
+            foo: 1
+         })");
+    const NamespaceString nss("test.testns");
+
+    ASSERT_NOT_OK(
+        QueryRequest::fromLegacyQuery(
+            nss, queryObj, BSONObj(), 0, std::numeric_limits<int>::min(), QueryOption_Exhaust)
+            .getStatus());
 }
 
 }  // namespace mongo
