@@ -54,6 +54,7 @@
 #include "mongo/s/catalog/sharding_catalog_client.h"
 #include "mongo/s/catalog_cache.h"
 #include "mongo/s/client/shard_registry.h"
+#include "mongo/s/commands/cluster_commands_helpers.h"
 #include "mongo/s/commands/cluster_write.h"
 #include "mongo/s/config_server_client.h"
 #include "mongo/s/grid.h"
@@ -129,10 +130,16 @@ public:
             opCtx,
             ReadPreferenceSetting(ReadPreference::PrimaryOnly),
             "admin",
-            configShardCollRequest.toBSON(),
+            Command::appendPassthroughFields(cmdObj, configShardCollRequest.toBSON()),
             Shard::RetryPolicy::kIdempotent));
 
         uassertStatusOK(cmdResponse.commandStatus);
+
+        if (!cmdResponse.writeConcernStatus.isOK()) {
+            appendWriteConcernErrorToCmdResponse(
+                configShard->getId(), cmdResponse.response["writeConcernError"], result);
+        }
+
         return true;
     }
 
