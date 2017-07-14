@@ -534,7 +534,7 @@ void ThreadRunner::op_create_all(Operation *op, size_t &keysize,
   size_t &valuesize) {
     tint_t tint;
 
-    op->size_check();
+    op->create_all();
     if (op->_optype != Operation::OP_NONE) {
         op->kv_compute_max(true);
         if (OP_HAS_VALUE(op))
@@ -579,6 +579,7 @@ uint64_t ThreadRunner::op_get_key_recno(Operation *op, tint_t tint) {
     uint64_t recno_count;
     uint32_t rand;
 
+    (void)op;
     recno_count = _icontext->_recno[tint];
     if (recno_count == 0)
         // The file has no entries, returning 0 forces a WT_NOTFOUND return.
@@ -590,13 +591,15 @@ uint64_t ThreadRunner::op_get_key_recno(Operation *op, tint_t tint) {
 int ThreadRunner::op_run(Operation *op) {
     Track *track;
     tint_t tint = op->_table._internal->_tint;
-    WT_CURSOR *cursor = _cursors[tint];
+    WT_CURSOR *cursor;
     WT_DECL_RET;
     uint64_t recno;
-    bool measure_latency;
+    bool measure_latency, own_cursor;
 
-    recno = 0;
     track = NULL;
+    cursor = NULL;
+    recno = 0;
+    own_cursor = false;
     if (_throttle != NULL) {
         if (_throttle_ops >= _throttle_limit && !_in_transaction) {
             WT_ERR(_throttle->throttle(_throttle_ops,
@@ -636,6 +639,13 @@ int ThreadRunner::op_run(Operation *op) {
         recno = 0;
         break;
     }
+    if ((op->_flags & WORKGEN_OP_REOPEN) != 0 &&
+      op->_optype != Operation::OP_NONE) {
+        WT_ERR(_session->open_cursor(_session, op->_table._uri.c_str(), NULL,
+          NULL, &cursor));
+        own_cursor = true;
+    } else
+        cursor = _cursors[tint];
 
     measure_latency = track != NULL && track->ops != 0 &&
       track->track_latency() &&
@@ -676,6 +686,7 @@ int ThreadRunner::op_run(Operation *op) {
             ASSERT(false);
         }
         if (ret != 0) {
+            ASSERT(ret == WT_NOTFOUND);
             track = &_stats.not_found;
             ret = 0;  // WT_NOTFOUND allowed.
         }
@@ -694,6 +705,8 @@ int ThreadRunner::op_run(Operation *op) {
               i != op->_group->end(); i++)
                 WT_ERR(op_run(&*i));
 err:
+    if (own_cursor)
+        WT_TRET(cursor->close(cursor));
     if (op->_transaction != NULL) {
         if (ret != 0 || op->_transaction->_rollback)
             WT_TRET(_session->rollback_transaction(_session, NULL));
@@ -716,8 +729,8 @@ Throttle::Throttle(ThreadRunner &runner, double throttle,
     _burst(throttle_burst), _next_div(), _ops_delta(0), _ops_prev(0),
     _ops_per_div(0), _ms_per_div(0), _started(false) {
     ts_clear(_next_div);
-    _ms_per_div = ceill(1000.0 / THROTTLE_PER_SEC);
-    _ops_per_div = ceill(_throttle / THROTTLE_PER_SEC);
+    _ms_per_div = (uint64_t)ceill(1000.0 / THROTTLE_PER_SEC);
+    _ops_per_div = (uint64_t)ceill(_throttle / THROTTLE_PER_SEC);
 }
 
 Throttle::~Throttle() {}
@@ -835,36 +848,37 @@ void Thread::describe(std::ostream &os) const {
 }
 
 Operation::Operation() :
-    _optype(OP_NONE), _table(), _key(), _value(), _transaction(NULL),
-    _group(NULL), _repeatgroup(0),
+    _optype(OP_NONE), _table(), _key(), _value(), _config(), _transaction(NULL),
+    _group(NULL), _repeatgroup(0), _flags(0),
     _keysize(0), _valuesize(0), _keymax(0), _valuemax(0) {
 }
 
 Operation::Operation(OpType optype, Table table, Key key, Value value) :
-    _optype(optype), _table(table), _key(key), _value(value),
-    _transaction(NULL), _group(NULL), _repeatgroup(0),
+    _optype(optype), _table(table), _key(key), _value(value), _config(),
+    _transaction(NULL), _group(NULL), _repeatgroup(0), _flags(0),
     _keysize(0), _valuesize(0), _keymax(0), _valuemax(0) {
     size_check();
 }
 
 Operation::Operation(OpType optype, Table table, Key key) :
-    _optype(optype), _table(table), _key(key), _value(), _transaction(NULL),
-    _group(NULL), _repeatgroup(0),
+    _optype(optype), _table(table), _key(key), _value(), _config(),
+    _transaction(NULL), _group(NULL), _repeatgroup(0), _flags(0),
     _keysize(0), _valuesize(0), _keymax(0), _valuemax(0) {
     size_check();
 }
 
 Operation::Operation(OpType optype, Table table) :
-    _optype(optype), _table(table), _key(), _value(), _transaction(NULL),
-    _group(NULL), _repeatgroup(0),
+    _optype(optype), _table(table), _key(), _value(), _config(),
+    _transaction(NULL), _group(NULL), _repeatgroup(0), _flags(0),
     _keysize(0), _valuesize(0), _keymax(0), _valuemax(0) {
     size_check();
 }
 
 Operation::Operation(const Operation &other) :
     _optype(other._optype), _table(other._table), _key(other._key),
-    _value(other._value), _transaction(other._transaction),
-    _group(other._group), _repeatgroup(other._repeatgroup),
+    _value(other._value), _config(other._config),
+    _transaction(other._transaction), _group(other._group),
+    _repeatgroup(other._repeatgroup), _flags(other._flags),
     _keysize(other._keysize), _valuesize(other._valuesize),
     _keymax(other._keymax), _valuemax(other._valuemax) {
     // Creation and destruction of _group and _transaction is managed
@@ -890,6 +904,18 @@ Operation& Operation::operator=(const Operation &other) {
     return (*this);
 }
 
+void Operation::create_all() {
+    size_check();
+
+    _flags = 0;
+    if (!_config.empty()) {
+        if (_config == "reopen")
+            _flags |= WORKGEN_OP_REOPEN;
+        else
+            THROW("operation has illegal config: \"" << _config << "\"");
+    }
+}
+
 void Operation::describe(std::ostream &os) const {
     os << "Operation: " << _optype;
     if (_optype != OP_NONE) {
@@ -897,9 +923,10 @@ void Operation::describe(std::ostream &os) const {
         os << ", "; _key.describe(os);
         os << ", "; _value.describe(os);
     }
-    if (_transaction != NULL) {
+    if (!_config.empty())
+        os << ", '" << _config;
+    if (_transaction != NULL)
         os << ", ["; _transaction->describe(os); os << "]";
-    }
     if (_group != NULL) {
         os << ", group[" << _repeatgroup << "]: {";
         bool first = true;
@@ -1648,4 +1675,4 @@ int WorkloadRunner::run_all() {
     return (ret);
 }
 
-};
+}
