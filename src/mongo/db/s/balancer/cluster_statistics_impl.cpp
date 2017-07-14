@@ -117,9 +117,16 @@ StatusWith<vector<ShardStatistics>> ClusterStatisticsImpl::getStats(OperationCon
     vector<ShardStatistics> stats;
 
     for (const auto& shard : shards) {
-        auto shardSizeStatus = shardutil::retrieveTotalShardSize(opCtx, shard.getName());
+        const auto shardSizeStatus = [&]() -> StatusWith<long long> {
+            if (!shard.getMaxSizeMB()) {
+                return 0;
+            }
+
+            return shardutil::retrieveTotalShardSize(opCtx, shard.getName());
+        }();
+
         if (!shardSizeStatus.isOK()) {
-            const Status& status = shardSizeStatus.getStatus();
+            const auto& status = shardSizeStatus.getStatus();
 
             return {status.code(),
                     str::stream() << "Unable to obtain shard utilization information for "

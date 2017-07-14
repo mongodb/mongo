@@ -78,10 +78,10 @@ public:
         // The id of the shard for which this statistic applies
         ShardId shardId;
 
-        // The maximum size allowed for the shard
+        // The maximum storage size allowed for the shard. Zero means no maximum specified.
         uint64_t maxSizeMB{0};
 
-        // The current size of the shard
+        // The current storage size of the shard.
         uint64_t currSizeMB{0};
 
         // Whether the shard is in draining mode
