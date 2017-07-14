@@ -592,6 +592,11 @@ Status MigrationChunkClonerSourceLegacy::_storeCurrentLocs(OperationContext* txn
     RecordId recordId;
     PlanExecutor::ExecState state;
     while (PlanExecutor::ADVANCED == (state = exec->getNext(&obj, &recordId))) {
+        Status interruptStatus = txn->checkForInterruptNoAssert();
+        if (!interruptStatus.isOK()) {
+            return interruptStatus;
+        }
+
         if (!isLargeChunk) {
             stdx::lock_guard<stdx::mutex> lk(_mutex);
             _cloneLocs.insert(recordId);
