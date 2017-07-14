@@ -28,7 +28,7 @@
     replTest.stop(2);
 
     // 1 should eventually be master
-    replTest.waitForState(nodes[1], ReplSetTest.State.PRIMARY, 60000);
+    replTest.waitForState(nodes[1], ReplSetTest.State.PRIMARY);
 
     // do some writes on 1
     var master = replTest.getPrimary();
