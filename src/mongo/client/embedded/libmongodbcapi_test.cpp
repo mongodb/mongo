@@ -31,14 +31,25 @@
 
 #include <set>
 
+#include "mongo/stdx/memory.h"
+#include "mongo/unittest/temp_dir.h"
 #include "mongo/unittest/unittest.h"
+#include "mongo/util/quick_exit.h"
+#include "mongo/util/signal_handlers_synchronous.h"
 
 namespace {
+
+std::unique_ptr<mongo::unittest::TempDir> globalTempDir;
 
 class MongodbCAPITest : public mongo::unittest::Test {
 protected:
     void setUp() {
-        db = libmongodbcapi_db_new(0, nullptr, nullptr);
+        if (!globalTempDir) {
+            globalTempDir = mongo::stdx::make_unique<mongo::unittest::TempDir>("embedded_mongo");
+        }
+        const char* argv[] = {
+            "mongo_embedded_capi_test", "--port", "0", "--dbpath", globalTempDir->path().c_str()};
+        db = libmongodbcapi_db_new(5, argv, nullptr);
         ASSERT(db != nullptr);
     }
 
@@ -180,3 +191,15 @@ TEST_F(MongodbCAPITest, CreateMultipleDBs) {
     ASSERT_EQUALS(libmongodbcapi_get_last_error(), LIBMONGODB_CAPI_ERROR_UNKNOWN);
 }
 }  // namespace
+
+// Define main function as an entry to these tests.
+// These test functions cannot use the main() defined for unittests because they
+// call runGlobalInitializers(). The embedded C API calls mongoDbMain() which
+// calls runGlobalInitializers().
+int main(int argc, char** argv, char** envp) {
+    ::mongo::clearSignalMask();
+    ::mongo::setupSynchronousSignalHandlers();
+    auto result = ::mongo::unittest::Suite::run(std::vector<std::string>(), "", 1);
+    globalTempDir.reset();
+    mongo::quickExit(result);
+}

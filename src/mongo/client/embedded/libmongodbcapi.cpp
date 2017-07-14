@@ -29,12 +29,21 @@
 #include "mongo/client/embedded/libmongodbcapi.h"
 
 #include <exception>
+#include <thread>
 #include <unordered_map>
 #include <vector>
 
+#include "mongo/db/client.h"
+#include "mongo/db/dbmain.h"
+#include "mongo/db/service_context.h"
 #include "mongo/stdx/memory.h"
 #include "mongo/stdx/unordered_map.h"
+#include "mongo/transport/service_entry_point.h"
+#include "mongo/transport/transport_layer_mock.h"
 #include "mongo/util/assert_util.h"
+#include "mongo/util/net/message.h"
+#include "mongo/util/scopeguard.h"
+#include "mongo/util/shared_buffer.h"
 
 struct libmongodbcapi_db {
     libmongodbcapi_db() = default;
@@ -42,9 +51,16 @@ struct libmongodbcapi_db {
     libmongodbcapi_db(const libmongodbcapi_db&) = delete;
     libmongodbcapi_db& operator=(const libmongodbcapi_db&) = delete;
 
-    void* db_sc = nullptr;
+    mongo::ServiceContext* serviceContext = nullptr;
+    mongo::stdx::thread mongodThread;
     mongo::stdx::unordered_map<libmongodbcapi_client*, std::unique_ptr<libmongodbcapi_client>>
         open_clients;
+    std::unique_ptr<mongo::transport::TransportLayerMock> transportLayer;
+
+    std::vector<std::unique_ptr<char[]>> argvStorage;
+    std::vector<char*> argvPointers;
+    std::vector<std::unique_ptr<char[]>> envpStorage;
+    std::vector<char*> envpPointers;
 };
 struct libmongodbcapi_client {
     libmongodbcapi_client(libmongodbcapi_db* db) : parent_db(db) {}
@@ -55,6 +71,8 @@ struct libmongodbcapi_client {
     void* client_handle = nullptr;
     std::vector<unsigned char> output;
     libmongodbcapi_db* parent_db = nullptr;
+    mongo::ServiceContext::UniqueClient client;
+    mongo::DbResponse response;
 };
 
 namespace mongo {
@@ -62,6 +80,7 @@ namespace {
 
 libmongodbcapi_db* global_db = nullptr;
 thread_local int last_error = LIBMONGODB_CAPI_ERROR_SUCCESS;
+bool run_setup = false;
 
 libmongodbcapi_db* db_new(int argc, const char** argv, const char** envp) noexcept try {
     last_error = LIBMONGODB_CAPI_ERROR_SUCCESS;
@@ -69,6 +88,49 @@ libmongodbcapi_db* db_new(int argc, const char** argv, const char** envp) noexce
         throw std::runtime_error("DB already exists");
     }
     global_db = new libmongodbcapi_db;
+
+    if (!run_setup) {
+        // iterate over argv and copy them to argvStorage
+        for (int i = 0; i < argc; i++) {
+            // allocate space for the null terminator
+            auto s = mongo::stdx::make_unique<char[]>(std::strlen(argv[i]) + 1);
+            // copy the string + null terminator
+            std::strncpy(s.get(), argv[i], std::strlen(argv[i]) + 1);
+            global_db->argvPointers.push_back(s.get());
+            global_db->argvStorage.push_back(std::move(s));
+        }
+        global_db->argvPointers.push_back(nullptr);
+
+        // iterate over envp and copy them to envpStorage
+        while (envp != nullptr && *envp != nullptr) {
+            auto s = mongo::stdx::make_unique<char[]>(std::strlen(*envp) + 1);
+            std::strncpy(s.get(), *envp, std::strlen(*envp) + 1);
+            global_db->envpPointers.push_back(s.get());
+            global_db->envpStorage.push_back(std::move(s));
+            envp++;
+        }
+        global_db->envpPointers.push_back(nullptr);
+
+        // call mongoDbMain() in a new thread because it currently does not terminate
+        global_db->mongodThread = stdx::thread([=] {
+            mongoDbMain(argc, global_db->argvPointers.data(), global_db->envpPointers.data());
+        });
+        global_db->mongodThread.detach();
+
+        // wait until the global service context is not null
+        global_db->serviceContext = waitAndGetGlobalServiceContext();
+
+        // block until the global service context is initialized
+        global_db->serviceContext->waitForStartupComplete();
+
+        run_setup = true;
+    } else {
+        // wait until the global service context is not null
+        global_db->serviceContext = waitAndGetGlobalServiceContext();
+    }
+    // creating mock transport layer
+    global_db->transportLayer = stdx::make_unique<transport::TransportLayerMock>();
+
     return global_db;
 } catch (const std::exception& e) {
     last_error = LIBMONGODB_CAPI_ERROR_UNKNOWN;
@@ -94,6 +156,10 @@ libmongodbcapi_client* client_new(libmongodbcapi_db* db) noexcept try {
     auto new_client = stdx::make_unique<libmongodbcapi_client>(db);
     libmongodbcapi_client* rv = new_client.get();
     db->open_clients.insert(std::make_pair(rv, std::move(new_client)));
+
+    auto session = global_db->transportLayer->createSession();
+    rv->client = global_db->serviceContext->makeClient("embedded", std::move(session));
+
     last_error = LIBMONGODB_CAPI_ERROR_SUCCESS;
     return rv;
 } catch (const std::exception& e) {
@@ -113,8 +179,25 @@ int client_wire_protocol_rpc(libmongodbcapi_client* client,
                              const void* input,
                              size_t input_size,
                              void** output,
-                             size_t* output_size) noexcept {
+                             size_t* output_size) noexcept try {
+    mongo::Client::setCurrent(std::move(client->client));
+    const auto guard = mongo::MakeGuard([&] { client->client = mongo::Client::releaseCurrent(); });
+
+    auto opCtx = cc().makeOperationContext();
+    auto sep = client->parent_db->serviceContext->getServiceEntryPoint();
+
+    auto sb = SharedBuffer::allocate(input_size);
+    memcpy(sb.get(), input, input_size);
+
+    Message msg(std::move(sb));
+
+    client->response = sep->handleRequest(opCtx.get(), msg);
+    *output_size = client->response.response.size();
+    *output = (void*)client->response.response.buf();
+
     return LIBMONGODB_CAPI_ERROR_SUCCESS;
+} catch (const std::exception& e) {
+    return LIBMONGODB_CAPI_ERROR_UNKNOWN;
 }
 
 int get_last_capi_error() noexcept {
