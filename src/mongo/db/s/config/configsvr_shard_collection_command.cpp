@@ -191,6 +191,12 @@ public:
         catalogCache->invalidateShardedCollection(nss);
         auto routingInfo = uassertStatusOK(catalogCache->getCollectionRoutingInfo(opCtx, nss));
 
+        if (shardCollRequest.getKey().isEmpty()) {
+            return appendCommandStatus(
+                result,
+                {ErrorCodes::InvalidOptions, str::stream() << "Cannot have an empty shard key"});
+        }
+
         // If the collection is already sharded, fail if the options in this request do not match
         // the options the collection was originally sharded with.
         if (routingInfo.cm()) {
