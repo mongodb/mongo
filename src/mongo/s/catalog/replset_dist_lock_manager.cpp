@@ -345,7 +345,7 @@ StatusWith<DistLockHandle> ReplSetDistLockManager::lockWithSessionID(OperationCo
             invariant(status != ErrorCodes::LockStateChangeFailed);
 
             LOG(1)
-                << "Failed to retry acqusition of distributed lock. No more attempts will be made"
+                << "Failed to retry acquisition of distributed lock. No more attempts will be made"
                 << causedBy(redact(status));
         }
 
