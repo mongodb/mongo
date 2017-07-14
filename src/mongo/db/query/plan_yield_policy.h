@@ -30,6 +30,7 @@
 
 #include "mongo/db/catalog/collection.h"
 #include "mongo/db/query/plan_executor.h"
+#include "mongo/stdx/functional.h"
 #include "mongo/util/elapsed_tracker.h"
 
 namespace mongo {
@@ -72,6 +73,12 @@ public:
      * if the executor got killed during yield.
      */
     bool yield(RecordFetcher* fetcher = NULL);
+
+    /**
+     * More generic version of yield() above.  This version calls 'beforeYieldingFn' immediately
+     * before locks are yielded (if they are), and 'whileYieldingFn' before locks are restored.
+     */
+    bool yield(stdx::function<void()> beforeYieldingFn, stdx::function<void()> whileYieldingFn);
 
     /**
      * All calls to shouldYield() will return true until the next call to yield.

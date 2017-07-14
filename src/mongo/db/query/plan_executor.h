@@ -51,6 +51,23 @@ struct PlanStageStats;
 class WorkingSet;
 
 /**
+ * If true, when no results are available from a plan, then instead of returning immediately, the
+ * system should wait up to the length of the operation deadline for data to be inserted which
+ * causes results to become available.
+ */
+extern const OperationContext::Decoration<bool> shouldWaitForInserts;
+
+/**
+ * If a getMore command specified a lastKnownCommittedOpTime (as secondaries do), we want to stop
+ * waiting for new data as soon as the committed op time changes.
+ *
+ * 'clientsLastKnownCommittedOpTime' represents the time passed to the getMore command.
+ * If the replication coordinator ever reports a higher committed op time, we should stop waiting
+ * for inserts and return immediately to speed up the propagation of commit level changes.
+ */
+extern const OperationContext::Decoration<repl::OpTime> clientsLastKnownCommittedOpTime;
+
+/**
  * A PlanExecutor is the abstraction that knows how to crank a tree of stages into execution.
  * The executor is usually part of a larger abstraction that is interacting with the cache
  * and/or the query optimizer.
@@ -425,6 +442,16 @@ public:
     }
 
 private:
+    // Returns true if the PlanExecutor should wait for data to be inserted, which is when a getMore
+    // is called on a tailable and awaitData cursor on a capped collection.  Returns false if an EOF
+    // should be returned immediately.
+    bool shouldWaitForInserts();
+
+    // Yields locks and waits for inserts to the collection.  Returns true if there may be new
+    // inserts, false if there is a timeout or an interrupt.  If this planExecutor cannot yield,
+    // returns true immediately.
+    bool waitForInserts();
+
     ExecState getNextImpl(Snapshotted<BSONObj>* objOut, RecordId* dlOut);
 
     /**

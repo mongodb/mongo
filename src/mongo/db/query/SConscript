@@ -81,6 +81,7 @@ env.Library(
         '$BUILD_DIR/mongo/db/catalog/index_catalog_entry',
         "$BUILD_DIR/mongo/db/curop",
         "$BUILD_DIR/mongo/db/exec/exec",
+        "$BUILD_DIR/mongo/db/repl/repl_coordinator_interface",
         "$BUILD_DIR/mongo/db/s/sharding",
         "$BUILD_DIR/mongo/db/storage/oplog_hack",
         "$BUILD_DIR/mongo/util/elapsed_tracker",

@@ -94,12 +94,10 @@ vector<intrusive_ptr<DocumentSource>> DocumentSourceChangeNotification::createFr
             !expCtx->getCollator());
 
     BSONObj matchObj = buildMatch(elem, expCtx->ns);
-    BSONObj sortObj = BSON("$sort" << BSON("ts" << -1));
 
     auto matchSource = DocumentSourceMatch::createFromBson(matchObj.firstElement(), expCtx);
-    auto sortSource = DocumentSourceSort::createFromBson(sortObj.firstElement(), expCtx);
     auto transformSource = createTransformationStage(expCtx);
-    return {matchSource, sortSource, transformSource};
+    return {matchSource, transformSource};
 }
 
 intrusive_ptr<DocumentSource> DocumentSourceChangeNotification::createTransformationStage(

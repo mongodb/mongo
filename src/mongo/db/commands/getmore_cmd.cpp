@@ -47,6 +47,7 @@
 #include "mongo/db/query/find.h"
 #include "mongo/db/query/find_common.h"
 #include "mongo/db/query/getmore_request.h"
+#include "mongo/db/query/plan_executor.h"
 #include "mongo/db/query/plan_summary_stats.h"
 #include "mongo/db/repl/oplog.h"
 #include "mongo/db/repl/replication_coordinator_global.h"
@@ -269,11 +270,6 @@ public:
         // Validation related to awaitData.
         if (isCursorAwaitData(cursor)) {
             invariant(isCursorTailable(cursor));
-
-            if (CursorManager::isGloballyManagedCursor(request.cursorid)) {
-                Status status(ErrorCodes::BadValue, "awaitData cannot be set on this cursor");
-                return appendCommandStatus(result, status);
-            }
         }
 
         if (request.awaitDataTimeout && !isCursorAwaitData(cursor)) {
@@ -322,21 +318,6 @@ public:
             }
         }
 
-        uint64_t notifierVersion = 0;
-        std::shared_ptr<CappedInsertNotifier> notifier;
-        if (isCursorAwaitData(cursor)) {
-            invariant(readLock->getCollection()->isCapped());
-            // Retrieve the notifier which we will wait on until new data arrives. We make sure
-            // to do this in the lock because once we drop the lock it is possible for the
-            // collection to become invalid. The notifier itself will outlive the collection if
-            // the collection is dropped, as we keep a shared_ptr to it.
-            notifier = readLock->getCollection()->getCappedInsertNotifier();
-
-            // Must get the version before we call generateBatch in case a write comes in after
-            // that call and before we call wait on the notifier.
-            notifierVersion = notifier->getVersion();
-        }
-
         CursorId respondWithId = 0;
         CursorResponseBuilder nextBatch(/*isInitialResponse*/ false, &result);
         BSONObj obj;
@@ -352,46 +333,16 @@ public:
         PlanSummaryStats preExecutionStats;
         Explain::getSummaryStats(*exec, &preExecutionStats);
 
-        Status batchStatus = generateBatch(cursor, request, &nextBatch, &state, &numResults);
-        if (!batchStatus.isOK()) {
-            return appendCommandStatus(result, batchStatus);
+        // Mark this as an AwaitData operation if appropriate.
+        if (isCursorAwaitData(cursor)) {
+            if (request.lastKnownCommittedOpTime)
+                clientsLastKnownCommittedOpTime(opCtx) = request.lastKnownCommittedOpTime.get();
+            shouldWaitForInserts(opCtx) = true;
         }
 
-        // If this is an await data cursor, and we hit EOF without generating any results, then
-        // we block waiting for new data to arrive.
-        if (isCursorAwaitData(cursor) && state == PlanExecutor::IS_EOF && numResults == 0) {
-            auto replCoord = repl::ReplicationCoordinator::get(opCtx);
-            // Return immediately if we need to update the commit time.
-            if (!request.lastKnownCommittedOpTime ||
-                (request.lastKnownCommittedOpTime == replCoord->getLastCommittedOpTime())) {
-                // Retrieve the notifier which we will wait on until new data arrives. We make sure
-                // to do this in the lock because once we drop the lock it is possible for the
-                // collection to become invalid. The notifier itself will outlive the collection if
-                // the collection is dropped, as we keep a shared_ptr to it.
-                auto notifier = readLock->getCollection()->getCappedInsertNotifier();
-
-                // Save the PlanExecutor and drop our locks.
-                exec->saveState();
-                readLock.reset();
-
-                // Block waiting for data. Time spent blocking is not counted towards the total
-                // operation latency.
-                curOp->pauseTimer();
-                const auto timeout = opCtx->getRemainingMaxTimeMicros();
-                notifier->wait(notifierVersion, timeout);
-                notifier.reset();
-                curOp->resumeTimer();
-
-                readLock.emplace(opCtx, request.nss);
-                exec->restoreState();
-
-                // We woke up because either the timed_wait expired, or there was more data. Either
-                // way, attempt to generate another batch of results.
-                batchStatus = generateBatch(cursor, request, &nextBatch, &state, &numResults);
-                if (!batchStatus.isOK()) {
-                    return appendCommandStatus(result, batchStatus);
-                }
-            }
+        Status batchStatus = generateBatch(opCtx, cursor, request, &nextBatch, &state, &numResults);
+        if (!batchStatus.isOK()) {
+            return appendCommandStatus(result, batchStatus);
         }
 
         PlanSummaryStats postExecutionStats;
@@ -472,7 +423,8 @@ public:
      * Returns an OK status if the batch was successfully generated, and a non-OK status if the
      * PlanExecutor encounters a failure.
      */
-    Status generateBatch(ClientCursor* cursor,
+    Status generateBatch(OperationContext* opCtx,
+                         ClientCursor* cursor,
                          const GetMoreRequest& request,
                          CursorResponseBuilder* nextBatch,
                          PlanExecutor::ExecState* state,
@@ -494,6 +446,8 @@ public:
                     break;
                 }
 
+                // As soon as we get a result, this operation no longer waits.
+                shouldWaitForInserts(opCtx) = false;
                 // Add result to output buffer.
                 nextBatch->append(obj);
                 (*numResults)++;

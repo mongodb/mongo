@@ -99,8 +99,10 @@ bool handleCursorCommand(OperationContext* opCtx,
         // do it when batchSize is 0 since that indicates a desire for a fast return.
         PlanExecutor::ExecState state;
         if ((state = cursor->getExecutor()->getNext(&next, nullptr)) == PlanExecutor::IS_EOF) {
-            // make it an obvious error to use cursor or executor after this point
-            cursor = nullptr;
+            if (!cursor->isTailable()) {
+                // make it an obvious error to use cursor or executor after this point
+                cursor = nullptr;
+            }
             break;
         }
 
@@ -393,6 +395,10 @@ Status runAggregate(OperationContext* opCtx,
                                   uassertStatusOK(resolveInvolvedNamespaces(opCtx, request))));
         expCtx->tempDir = storageGlobalParams.dbpath + "/_tmp";
 
+        if (liteParsedPipeline.startsWithChangeNotification()) {
+            expCtx->tailableMode = ExpressionContext::TailableMode::kTailableAndAwaitData;
+        }
+
         // Parse the pipeline.
         auto statusWithPipeline = Pipeline::parse(request.getPipeline(), expCtx);
         if (!statusWithPipeline.isOK()) {
@@ -451,13 +457,20 @@ Status runAggregate(OperationContext* opCtx,
     // cursor manager. The global cursor manager does not deliver invalidations or kill
     // notifications; the underlying PlanExecutor(s) used by the pipeline will be receiving
     // invalidations and kill notifications themselves, not the cursor we create here.
-    auto pin = CursorManager::getGlobalCursorManager()->registerCursor(
-        opCtx,
-        {std::move(exec),
-         origNss,
-         AuthorizationSession::get(opCtx->getClient())->getAuthenticatedUserNames(),
-         opCtx->recoveryUnit()->isReadingFromMajorityCommittedSnapshot(),
-         cmdObj});
+    ClientCursorParams cursorParams(
+        std::move(exec),
+        origNss,
+        AuthorizationSession::get(opCtx->getClient())->getAuthenticatedUserNames(),
+        opCtx->recoveryUnit()->isReadingFromMajorityCommittedSnapshot(),
+        cmdObj);
+    if (expCtx->tailableMode == ExpressionContext::TailableMode::kTailableAndAwaitData) {
+        cursorParams.setTailable(true);
+        cursorParams.setAwaitData(true);
+    }
+
+    auto pin =
+        CursorManager::getGlobalCursorManager()->registerCursor(opCtx, std::move(cursorParams));
+
     ScopeGuard cursorFreer = MakeGuard(&ClientCursorPin::deleteUnderlying, &pin);
 
     // If both explain and cursor are specified, explain wins.
