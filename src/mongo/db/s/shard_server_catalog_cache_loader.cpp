@@ -645,7 +645,15 @@ void ShardServerCatalogCacheLoader::_runTasks(const NamespaceString& nss) {
     try {
         taskFinished = _updatePersistedMetadata(context.opCtx(), nss);
     } catch (const DBException& ex) {
-        log() << redact(ex.toStatus());
+        // This thread must stop if we are shutting down.
+        Status exceptionStatus = ex.toStatus();
+        if (ErrorCodes::isShutdownError(exceptionStatus.code())) {
+            log() << "Failed to persist chunk metadata update for collection '" << nss
+                  << "' due to shutdown.";
+            return;
+        }
+
+        log() << redact(exceptionStatus);
     }
 
     stdx::lock_guard<stdx::mutex> lock(_mutex);
@@ -664,7 +672,6 @@ void ShardServerCatalogCacheLoader::_runTasks(const NamespaceString& nss) {
                   << " task for namespace '" << nss << "' due to '" << redact(status)
                   << "'. Clearing task list so that scheduling will be attempted by the next"
                   << " caller to refresh this namespace.";
-            stdx::lock_guard<stdx::mutex> lock(_mutex);
             _taskLists.erase(nss);
         }
     } else {
@@ -693,11 +700,11 @@ bool ShardServerCatalogCacheLoader::_updatePersistedMetadata(OperationContext* o
     if (task.dropped) {
         // The namespace was dropped. The persisted metadata for the collection must be cleared.
         Status status = dropChunksAndDeleteCollectionsEntry(opCtx, nss);
-        uassert(ErrorCodes::OperationFailed,
+        uassert(status.code(),
                 str::stream() << "Failed to clear persisted chunk metadata for collection '"
                               << nss.ns()
                               << "' due to '"
-                              << status.toString()
+                              << status.reason()
                               << "'. Will be retried.",
                 status.isOK());
 
@@ -714,11 +721,11 @@ bool ShardServerCatalogCacheLoader::_updatePersistedMetadata(OperationContext* o
     if (persistedMaxVersion.isSet() &&
         persistedMaxVersion.epoch() != task.maxQueryVersion.epoch()) {
         Status status = dropChunksAndDeleteCollectionsEntry(opCtx, nss);
-        uassert(ErrorCodes::OperationFailed,
+        uassert(status.code(),
                 str::stream() << "Failed to clear persisted chunk metadata for collection '"
                               << nss.ns()
                               << "' due to '"
-                              << status.toString()
+                              << status.reason()
                               << "'. Will be retried.",
                 status.isOK());
     }
@@ -730,7 +737,7 @@ bool ShardServerCatalogCacheLoader::_updatePersistedMetadata(OperationContext* o
         // chunk metadata: clearing the persisted metadata will be handled then.
         return true;
     }
-    uassert(ErrorCodes::OperationFailed,
+    uassert(status.code(),
             str::stream() << "Failed to update the persisted chunk metadata for collection '"
                           << nss.ns()
                           << "' from '"
@@ -738,7 +745,7 @@ bool ShardServerCatalogCacheLoader::_updatePersistedMetadata(OperationContext* o
                           << "' to '"
                           << task.maxQueryVersion.toString()
                           << "' due to '"
-                          << status.toString()
+                          << status.reason()
                           << "'. Will be retried.",
             status.isOK());
 
