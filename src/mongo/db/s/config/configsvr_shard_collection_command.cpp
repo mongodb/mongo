@@ -197,42 +197,18 @@ public:
                 {ErrorCodes::InvalidOptions, str::stream() << "Cannot have an empty shard key"});
         }
 
-        // If the collection is already sharded, fail if the options in this request do not match
-        // the options the collection was originally sharded with.
-        if (routingInfo.cm()) {
-            auto existingColl =
-                uassertStatusOK(catalogClient->getCollection(opCtx, nss.ns())).value;
-
-            CollectionType requestedOptions;
-            requestedOptions.setNs(nss);
-            requestedOptions.setKeyPattern(KeyPattern(shardCollRequest.getKey()));
-            if (shardCollRequest.getCollation()) {
-                requestedOptions.setDefaultCollation(*shardCollRequest.getCollation());
-            }
-            requestedOptions.setUnique(shardCollRequest.getUnique());
-
-            uassert(ErrorCodes::AlreadyInitialized,
-                    str::stream() << "sharding already enabled for collection " << nss.ns()
-                                  << " with options "
-                                  << existingColl.toString(),
-                    requestedOptions.hasSameOptions(existingColl));
-
-            // If the options do match, we can immediately return success.
-            return true;
-        }
-
         auto proposedKey(shardCollRequest.getKey().getOwned());
-        ShardKeyPattern proposedKeyPattern(proposedKey);
-        if (!proposedKeyPattern.isValid()) {
+        ShardKeyPattern shardKeyPattern(proposedKey);
+        if (!shardKeyPattern.isValid()) {
             return appendCommandStatus(result,
                                        {ErrorCodes::InvalidOptions,
                                         str::stream() << "Unsupported shard key pattern "
-                                                      << proposedKeyPattern.toString()
+                                                      << shardKeyPattern.toString()
                                                       << ". Pattern must either be a single hashed "
                                                          "field, or a list of ascending fields"});
         }
 
-        bool isHashedShardKey = proposedKeyPattern.isHashedPattern();
+        bool isHashedShardKey = shardKeyPattern.isHashedPattern();
         bool careAboutUnique = shardCollRequest.getUnique();
 
         if (isHashedShardKey && careAboutUnique) {
@@ -369,6 +345,28 @@ public:
             }
         }
 
+        // If the collection is already sharded, fail if the deduced options in this request do not
+        // match the options the collection was originally sharded with.
+        if (routingInfo.cm()) {
+            auto existingColl =
+                uassertStatusOK(catalogClient->getCollection(opCtx, nss.ns())).value;
+
+            CollectionType requestedOptions;
+            requestedOptions.setNs(nss);
+            requestedOptions.setKeyPattern(KeyPattern(proposedKey));
+            requestedOptions.setDefaultCollation(defaultCollation);
+            requestedOptions.setUnique(careAboutUnique);
+
+            uassert(ErrorCodes::AlreadyInitialized,
+                    str::stream() << "sharding already enabled for collection " << nss.ns()
+                                  << " with options "
+                                  << existingColl.toString(),
+                    requestedOptions.hasSameOptions(existingColl));
+
+            // If the options do match, we can immediately return success.
+            return true;
+        }
+
         // The proposed shard key must be validated against the set of existing indexes.
         // In particular, we must ensure the following constraints
         //
@@ -398,12 +396,11 @@ public:
         std::list<BSONObj> indexes = conn->getIndexSpecs(nss.ns());
 
         // 1.  Verify consistency with existing unique indexes
-        ShardKeyPattern proposedShardKey(proposedKey);
 
         for (const auto& idx : indexes) {
             BSONObj currentKey = idx["key"].embeddedObject();
             bool isUnique = idx["unique"].trueValue();
-            if (isUnique && !proposedShardKey.isUniqueIndexCompatible(currentKey)) {
+            if (isUnique && !shardKeyPattern.isUniqueIndexCompatible(currentKey)) {
                 return appendCommandStatus(
                     result,
                     {ErrorCodes::InvalidOptions,
@@ -606,7 +603,7 @@ public:
         }
         catalogManager->shardCollection(opCtx,
                                         nss.ns(),
-                                        proposedShardKey,
+                                        shardKeyPattern,
                                         defaultCollation,
                                         careAboutUnique,
                                         initSplits,

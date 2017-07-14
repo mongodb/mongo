@@ -81,16 +81,21 @@
     assert.commandFailed(
         mongos.adminCommand({shardCollection: kDbName + '.foo', key: {aKey: "hahahashed"}}));
 
+    //
+    // Test shardCollection's idempotency
+    //
+
     // Succeed if a collection is already sharded with the same options.
     assert.commandWorked(mongos.adminCommand({shardCollection: kDbName + '.foo', key: {_id: 1}}));
     assert.commandWorked(mongos.adminCommand({shardCollection: kDbName + '.foo', key: {_id: 1}}));
+    // Specifying the simple collation or not specifying a collation should be equivalent, because
+    // if no collation is specified, the collection default collation is used.
+    assert.commandWorked(mongos.adminCommand(
+        {shardCollection: kDbName + '.foo', key: {_id: 1}, collation: {locale: 'simple'}}));
 
     // Fail if the collection is already sharded with different options.
     // different shard key
     assert.commandFailed(mongos.adminCommand({shardCollection: kDbName + '.foo', key: {x: 1}}));
-    // different collation
-    assert.commandFailed(mongos.adminCommand(
-        {shardCollection: kDbName + '.foo', key: {_id: 1}, collation: {locale: "simple"}}));
     // different 'unique'
     assert.commandFailed(
         mongos.adminCommand({shardCollection: kDbName + '.foo', key: {_id: 1}, unique: true}));
