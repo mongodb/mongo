@@ -71,19 +71,7 @@ void PlanYieldPolicy::resetTimer() {
     _elapsedTracker.resetLastTime();
 }
 
-bool PlanYieldPolicy::yield(RecordFetcher* recordFetcher) {
-    invariant(_planYielding);
-    if (recordFetcher) {
-        OperationContext* opCtx = _planYielding->getOpCtx();
-        return yield([recordFetcher, opCtx] { recordFetcher->setup(opCtx); },
-                     [recordFetcher] { recordFetcher->fetch(); });
-    } else {
-        return yield(nullptr, nullptr);
-    }
-}
-
-bool PlanYieldPolicy::yield(stdx::function<void()> beforeYieldingFn,
-                            stdx::function<void()> whileYieldingFn) {
+bool PlanYieldPolicy::yield(RecordFetcher* fetcher) {
     invariant(_planYielding);
     invariant(canAutoYield());
 
@@ -119,9 +107,7 @@ bool PlanYieldPolicy::yield(stdx::function<void()> beforeYieldingFn,
                 opCtx->recoveryUnit()->abandonSnapshot();
             } else {
                 // Release and reacquire locks.
-                if (beforeYieldingFn)
-                    beforeYieldingFn();
-                QueryYield::yieldAllLocks(opCtx, whileYieldingFn, _planYielding->nss());
+                QueryYield::yieldAllLocks(opCtx, fetcher, _planYielding->nss());
             }
 
             return _planYielding->restoreStateWithoutRetrying();

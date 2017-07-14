@@ -364,11 +364,6 @@ Message getMore(OperationContext* opCtx,
         if (cc->isReadCommitted())
             uassertStatusOK(opCtx->recoveryUnit()->setReadFromMajorityCommittedSnapshot());
 
-        uassert(40548,
-                "OP_GET_MORE operations are not supported on tailable aggregations. Only clients "
-                "which support the getMore command can be used on tailable aggregations.",
-                readLock || !isCursorAwaitData(cc));
-
         // If the operation that spawned this cursor had a time limit set, apply leftover
         // time to this getmore.
         if (cc->getLeftoverMaxTimeMicros() < Microseconds::max()) {

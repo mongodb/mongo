@@ -58,8 +58,6 @@ public:
         std::vector<BSONObj> pipeline;
     };
 
-    enum class TailableMode { kNormal, kTailableAndAwaitData };
-
     /**
      * Constructs an ExpressionContext to be used for Pipeline parsing and evaluation.
      * 'resolvedNamespaces' maps collection names (not full namespaces) to ResolvedNamespaces.
@@ -103,13 +101,6 @@ public:
         return it->second;
     };
 
-    /**
-     * Convenience call that returns true if the tailableMode indicate a tailable query.
-     */
-    bool isTailable() const {
-        return tailableMode == ExpressionContext::TailableMode::kTailableAndAwaitData;
-    }
-
     // The explain verbosity requested by the user, or boost::none if no explain was requested.
     boost::optional<ExplainOptions::Verbosity> explain;
 
@@ -129,8 +120,6 @@ public:
 
     Variables variables;
     VariablesParseState variablesParseState;
-
-    TailableMode tailableMode = TailableMode::kNormal;
 
 protected:
     static const int kInterruptCheckPeriod = 128;

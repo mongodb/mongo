@@ -94,15 +94,14 @@ public:
     }
 };
 
-TEST_F(ChangeNotificationStageTest, StagesGeneratedCorrectly) {
+TEST_F(ChangeNotificationStageTest, Basic) {
     const auto spec = fromjson("{$changeNotification: {}}");
 
     vector<intrusive_ptr<DocumentSource>> result =
         DocumentSourceChangeNotification::createFromBson(spec.firstElement(), getExpCtx());
 
-    ASSERT_EQUALS(result.size(), 2UL);
+    ASSERT_EQUALS(result.size(), 3UL);
     ASSERT_EQUALS(string(result[0]->getSourceName()), "$match");
-    ASSERT_EQUALS(string(result[1]->getSourceName()), "$changeNotification");
 
     // TODO: Check explain result.
 }

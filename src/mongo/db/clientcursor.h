@@ -71,20 +71,6 @@ struct ClientCursorParams {
         }
     }
 
-    void setTailable(bool tailable) {
-        if (tailable)
-            queryOptions |= QueryOption_CursorTailable;
-        else
-            queryOptions &= ~QueryOption_CursorTailable;
-    }
-
-    void setAwaitData(bool awaitData) {
-        if (awaitData)
-            queryOptions |= QueryOption_AwaitData;
-        else
-            queryOptions &= ~QueryOption_AwaitData;
-    }
-
     std::unique_ptr<PlanExecutor, PlanExecutor::Deleter> exec;
     const NamespaceString nss;
     std::vector<UserName> authenticatedUsers;
@@ -141,21 +127,8 @@ public:
         return _exec.get();
     }
 
-    /**
-     * Returns the query options bitmask.  If you'd like to know if the cursor is tailable or
-     * awaitData, prefer using the specific methods isTailable() and isAwaitData() over using this
-     * method.
-     */
     int queryOptions() const {
         return _queryOptions;
-    }
-
-    bool isTailable() const {
-        return _queryOptions & QueryOption_CursorTailable;
-    }
-
-    bool isAwaitData() const {
-        return _queryOptions & QueryOption_AwaitData;
     }
 
     const BSONObj& getOriginatingCommandObj() const {

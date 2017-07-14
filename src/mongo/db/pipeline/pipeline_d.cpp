@@ -392,14 +392,6 @@ StatusWith<std::unique_ptr<PlanExecutor, PlanExecutor::Deleter>> attemptToGetExe
     const AggregationRequest* aggRequest,
     const size_t plannerOpts) {
     auto qr = stdx::make_unique<QueryRequest>(nss);
-    switch (pExpCtx->tailableMode) {
-        case ExpressionContext::TailableMode::kNormal:
-            break;
-        case ExpressionContext::TailableMode::kTailableAndAwaitData:
-            qr->setTailable(true);
-            qr->setAwaitData(true);
-            break;
-    }
     qr->setFilter(queryObj);
     qr->setProj(projectionObj);
     qr->setSort(sortObj);

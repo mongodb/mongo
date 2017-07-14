@@ -25,6 +25,7 @@
  *    exception statement from all source files in the program, then also delete
  *    it in the license file.
  */
+
 #include "mongo/platform/basic.h"
 
 #include "mongo/db/query/query_yield.h"
@@ -45,17 +46,22 @@ MONGO_FP_DECLARE(setYieldAllLocksWait);
 
 // static
 void QueryYield::yieldAllLocks(OperationContext* opCtx,
-                               stdx::function<void()> whileYieldingFn,
+                               RecordFetcher* fetcher,
                                const NamespaceString& planExecNS) {
     // Things have to happen here in a specific order:
-    //   * Release lock mgr locks
-    //   * Go to sleep
-    //   * Call the whileYieldingFn
-    //   * Reacquire lock mgr locks
+    //   1) Tell the RecordFetcher to do any setup which needs to happen inside locks
+    //   2) Release lock mgr locks
+    //   3) Go to sleep
+    //   4) Touch the record we're yielding on, if there is one (RecordFetcher::fetch)
+    //   5) Reacquire lock mgr locks
 
     Locker* locker = opCtx->lockState();
 
     Locker::LockSnapshot snapshot;
+
+    if (fetcher) {
+        fetcher->setup(opCtx);
+    }
 
     // Nothing was unlocked, just return, yielding is pointless.
     if (!locker->saveLockStateAndUnlock(&snapshot)) {
@@ -79,8 +85,8 @@ void QueryYield::yieldAllLocks(OperationContext* opCtx,
         }
     }
 
-    if (whileYieldingFn) {
-        whileYieldingFn();
+    if (fetcher) {
+        fetcher->fetch();
     }
 
     locker->restoreLockState(snapshot);

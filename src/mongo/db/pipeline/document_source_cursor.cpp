@@ -31,6 +31,7 @@
 #include "mongo/db/pipeline/document_source_cursor.h"
 
 #include "mongo/db/catalog/collection.h"
+#include "mongo/db/curop.h"
 #include "mongo/db/db_raii.h"
 #include "mongo/db/exec/working_set_common.h"
 #include "mongo/db/pipeline/document.h"
@@ -98,20 +99,11 @@ void DocumentSourceCursor::loadBatch() {
 
                 memUsageBytes += _currentBatch.back().getApproximateSize();
 
-                // As long as we're waiting for inserts, we shouldn't do any batching at this level
-                // we need the whole pipeline to see each document to see if we should stop waiting.
-                if (shouldWaitForInserts(pExpCtx->opCtx) ||
-                    memUsageBytes > internalDocumentSourceCursorBatchSizeBytes.load()) {
+                if (memUsageBytes > internalDocumentSourceCursorBatchSizeBytes.load()) {
                     // End this batch and prepare PlanExecutor for yielding.
                     _exec->saveState();
                     return;
                 }
-            }
-            // Special case for tailable cursor -- EOF doesn't preclude more results, so keep
-            // the PlanExecutor alive.
-            if (state == PlanExecutor::IS_EOF && pExpCtx->isTailable()) {
-                _exec->saveState();
-                return;
             }
         }
     }
