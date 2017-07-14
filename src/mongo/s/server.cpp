@@ -246,8 +246,6 @@ static ExitCode runMongosServer() {
 
     getGlobalServiceContext()->setServiceEntryPoint(std::move(sep));
 
-    startMongoSFTDC();
-
     auto transportLayer = stdx::make_unique<transport::TransportLayerLegacy>(opts, sepPtr);
     auto res = transportLayer->setup();
     if (!res.isOK()) {
@@ -298,6 +296,8 @@ static ExitCode runMongosServer() {
         stdx::thread web(stdx::bind(&webServerListenThread, dbWebServer));
         web.detach();
     }
+
+    startMongoSFTDC();
 
     Status status = getGlobalAuthorizationManager()->initialize(NULL);
     if (!status.isOK()) {
