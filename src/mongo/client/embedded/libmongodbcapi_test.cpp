@@ -31,10 +31,14 @@
 
 #include <set>
 
+#include "mongo/bson/bsonobjbuilder.h"
 #include "mongo/stdx/memory.h"
 #include "mongo/unittest/temp_dir.h"
 #include "mongo/unittest/unittest.h"
+#include "mongo/util/net/message.h"
+#include "mongo/util/net/op_msg.h"
 #include "mongo/util/quick_exit.h"
+#include "mongo/util/shared_buffer.h"
 #include "mongo/util/signal_handlers_synchronous.h"
 
 namespace {
@@ -114,6 +118,41 @@ TEST_F(MongodbCAPITest, DBPump) {
     libmongodbcapi_db* db = getDB();
     int err = libmongodbcapi_db_pump(db);
     ASSERT_EQUALS(err, LIBMONGODB_CAPI_ERROR_SUCCESS);
+}
+
+TEST_F(MongodbCAPITest, IsMaster) {
+    // create the client object
+    libmongodbcapi_client* client = createClient();
+
+    // craft the isMaster message
+    mongo::BSONObjBuilder bsonObjBuilder;
+    bsonObjBuilder.append("isMaster", 1);
+    auto inputOpMsg = mongo::OpMsgRequest::fromDBAndBody("admin", bsonObjBuilder.obj());
+    auto inputMessage = inputOpMsg.serialize();
+
+
+    // declare the output size and pointer
+    void* output;
+    size_t output_size;
+
+    // call the wire protocol
+    int err = libmongodbcapi_db_client_wire_protocol_rpc(
+        client, inputMessage.buf(), inputMessage.size(), &output, &output_size);
+    ASSERT_EQUALS(err, LIBMONGODB_CAPI_ERROR_SUCCESS);
+
+    // convert the shared buffer to a mongo::message and ensure that it is valid
+    auto sb = mongo::SharedBuffer::allocate(output_size);
+    memcpy(sb.get(), output, output_size);
+    mongo::Message outputMessage(std::move(sb));
+    ASSERT(outputMessage.size() > 0);
+    ASSERT(outputMessage.operation() == inputMessage.operation());
+
+    // convert the message into an OpMessage to examine its BSON
+    auto outputOpMsg = mongo::OpMsg::parseOwned(outputMessage);
+    ASSERT(outputOpMsg.body.valid(mongo::BSONVersion::kLatest));
+    ASSERT(outputOpMsg.body.getBoolField("ismaster"));
+
+    destroyClient(client);
 }
 
 TEST_F(MongodbCAPITest, SendMessages) {
