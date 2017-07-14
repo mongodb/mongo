@@ -257,8 +257,6 @@ static ExitCode runMongosServer() {
     auto sep = stdx::make_unique<ServiceEntryPointMongos>(getGlobalServiceContext());
     getGlobalServiceContext()->setServiceEntryPoint(std::move(sep));
 
-    startMongoSFTDC();
-
     auto tl = transport::TransportLayerManager::createWithConfig(&serverGlobalParams,
                                                                  getGlobalServiceContext());
     auto res = tl->setup();
@@ -318,6 +316,8 @@ static ExitCode runMongosServer() {
             ->refreshAndCheck(opCtx.get())
             .transitional_ignore();
     }
+
+    startMongoSFTDC();
 
     Status status = getGlobalAuthorizationManager()->initialize(NULL);
     if (!status.isOK()) {
