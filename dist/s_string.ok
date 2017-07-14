@@ -412,6 +412,7 @@ WiredTigerInit
 WiredTigerLAS
 WiredTigerLog
 WiredTigerPreplog
+WiredTigerTables
 WiredTigerTmplog
 WiredTigerTxn
 WithSeeds
