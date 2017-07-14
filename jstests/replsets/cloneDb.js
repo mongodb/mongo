@@ -43,6 +43,9 @@
         jsTest.log("Create view on replica set");
         assert.commandWorked(masterDB.runCommand({create: testViewName, viewOn: testColName}));
 
+        // Make sure all writes have replicated to secondary.
+        replTest.awaitReplication();
+
         jsTest.log("Clone db from replica set to standalone server");
         standaloneDB.cloneDatabase(replTest.getURL());
         assert.eq(numDocs,
