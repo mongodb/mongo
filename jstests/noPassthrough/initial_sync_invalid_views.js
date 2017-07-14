@@ -27,6 +27,7 @@
 
     // Add a secondary node but make it hang before copying databases.
     let secondary = replSet.add({setParameter: secondaryParams});
+    replSet.nodeOptions.n1 = {rsConfig: {priority: 0}};
     secondary.setSlaveOk();
 
     assert.commandWorked(secondary.getDB('admin').runCommand(
