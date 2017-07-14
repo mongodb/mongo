@@ -61,11 +61,8 @@ public:
        also, the Message data will go out of scope on the subsequent recv call.
     */
     bool recv(Message& m) override;
-    void reply(Message& received, Message& response, int32_t responseToMsgId) override;
-    void reply(Message& received, Message& response) override;
-    bool call(Message& toSend, Message& response) override;
+    bool call(const Message& toSend, Message& response) override;
 
-    void say(Message& toSend, int responseTo = 0) override;
     void say(const Message& toSend) override;
 
     unsigned remotePort() const override {

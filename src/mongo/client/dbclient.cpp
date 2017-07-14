@@ -1232,6 +1232,8 @@ DBClientConnection::DBClientConnection(bool _autoReconnect,
 void DBClientConnection::say(Message& toSend, bool isRetry, string* actualServer) {
     checkConnection();
     try {
+        toSend.header().setId(nextMessageId());
+        toSend.header().setResponseToMsgId(0);
         auto swm = _compressorManager.compressMessage(toSend);
         uassertStatusOK(swm.getStatus());
         port().say(swm.getValue());
@@ -1266,6 +1268,8 @@ bool DBClientConnection::call(Message& toSend,
     */
     checkConnection();
     try {
+        toSend.header().setId(nextMessageId());
+        toSend.header().setResponseToMsgId(0);
         auto swm = _compressorManager.compressMessage(toSend);
         uassertStatusOK(swm.getStatus());
 

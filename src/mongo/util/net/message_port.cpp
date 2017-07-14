@@ -182,15 +182,7 @@ bool MessagingPort::recv(Message& m) {
     }
 }
 
-void MessagingPort::reply(Message& received, Message& response) {
-    say(/*received.from, */ response, received.header().getId());
-}
-
-void MessagingPort::reply(Message& received, Message& response, int32_t responseToMsgId) {
-    say(/*received.from, */ response, responseToMsgId);
-}
-
-bool MessagingPort::call(Message& toSend, Message& response) {
+bool MessagingPort::call(const Message& toSend, Message& response) {
     say(toSend);
     bool success = recv(response);
     if (success) {
@@ -201,14 +193,6 @@ bool MessagingPort::call(Message& toSend, Message& response) {
         }
     }
     return success;
-}
-
-void MessagingPort::say(Message& toSend, int responseTo) {
-    invariant(!toSend.empty());
-    toSend.header().setId(nextMessageId());
-    toSend.header().setResponseToMsgId(responseTo);
-
-    return say(const_cast<const Message&>(toSend));
 }
 
 void MessagingPort::say(const Message& toSend) {

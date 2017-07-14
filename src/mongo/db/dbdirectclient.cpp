@@ -123,6 +123,8 @@ QueryOptions DBDirectClient::_lookupAvailableOptions() {
 
 namespace {
 DbResponse loopbackBuildResponse(OperationContext* const opCtx, Message& toSend) {
+    toSend.header().setId(nextMessageId());
+    toSend.header().setResponseToMsgId(0);
     return opCtx->getServiceContext()->getServiceEntryPoint()->handleRequest(opCtx, toSend);
 }
 }  // namespace

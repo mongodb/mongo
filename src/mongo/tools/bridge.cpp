@@ -166,8 +166,6 @@ public:
                 }
                 receivingFirstMessage = false;
 
-                int requestId = request.header().getId();
-
                 // Handle a message intended to configure the mongobridge and return a response.
                 // The 'request' is consumed by the mongobridge and does not get forwarded to
                 // 'dest'.
@@ -182,7 +180,9 @@ public:
                     auto cmdResponse = replyBuilder->setCommandReply(std::move(commandReply))
                                            .setMetadata(metadata)
                                            .done();
-                    _mp->say(cmdResponse, requestId);
+                    cmdResponse.header().setId(nextMessageId());
+                    cmdResponse.header().setResponseToMsgId(request.header().getId());
+                    _mp->say(cmdResponse);
                     continue;
                 }
 
@@ -251,7 +251,7 @@ public:
                         break;
                     }
 
-                    _mp->say(response, requestId);
+                    _mp->say(response);
 
                     // If 'exhaust' is true, then instead of trying to receive another message from
                     // '_mp', receive messages from 'dest' until it returns a cursor id of zero.
@@ -277,13 +277,13 @@ public:
                         if (qr.getCursorId()) {
                             response.reset();
                             dest.port().recv(response);
-                            _mp->say(response, requestId);
+                            _mp->say(response);
                         } else {
                             exhaust = false;
                         }
                     }
                 } else {
-                    dest.port().say(request, requestId);
+                    dest.port().say(request);
                 }
             } catch (const DBException& ex) {
                 error() << "Caught DBException in Forwarder: " << ex << ", end connection "

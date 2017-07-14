@@ -71,23 +71,12 @@ public:
     /**
      * Sends a message and waits for a response. This is equivalent to calling `say` then `recv`.
      */
-    virtual bool call(Message& toSend, Message& response) = 0;
+    virtual bool call(const Message& toSend, Message& response) = 0;
 
     /**
      * Reads the next message from the socket.
      */
     virtual bool recv(Message& m) = 0;
-
-    /**
-     * Sends a message as a reply to a received message.
-     */
-    virtual void reply(Message& received, Message& response, int32_t responseToMsgId) = 0;
-    virtual void reply(Message& received, Message& response) = 0;
-
-    /**
-     * Sends the message.
-     */
-    virtual void say(Message& toSend, int responseTo) = 0;
 
     /**
      * Sends the message (does not set headers).
