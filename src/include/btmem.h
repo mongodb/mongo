@@ -620,6 +620,7 @@ struct __wt_page {
 
 	/* This is the 64 byte boundary, try to keep hot fields above here. */
 
+	uint64_t cache_create_gen;	/* Page create timestamp */
 	uint64_t evict_pass_gen;	/* Eviction pass generation */
 };
 

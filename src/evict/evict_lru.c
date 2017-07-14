@@ -781,6 +781,7 @@ __evict_clear_walk(WT_SESSION_IMPL *session)
 		return (0);
 
 	WT_STAT_CONN_INCR(session, cache_eviction_walks_abandoned);
+	WT_STAT_DATA_INCR(session, cache_eviction_walks_abandoned);
 
 	/*
 	 * Clear evict_ref before releasing it in case that forces eviction (we
@@ -1670,6 +1671,32 @@ __evict_walk_file(WT_SESSION_IMPL *session,
 	if (F_ISSET(session->dhandle, WT_DHANDLE_DEAD) ||
 	    target_pages > remaining_slots)
 		target_pages = remaining_slots;
+
+	/*
+	 * These statistics generate a histogram of the number of pages targeted
+	 * for eviction each round. The range of values here start at
+	 * MIN_PAGES_PER_TREE as this is the smallest number of pages we can
+	 * target, unless there are fewer slots available. The aim is to cover
+	 * the likely ranges of target pages in as few statistics as possible to
+	 * reduce the overall overhead.
+	 */
+	if (target_pages < MIN_PAGES_PER_TREE) {
+		WT_STAT_CONN_INCR(session, cache_eviction_target_page_lt10);
+		WT_STAT_DATA_INCR(session, cache_eviction_target_page_lt10);
+	} else if (target_pages < 32) {
+		WT_STAT_CONN_INCR(session, cache_eviction_target_page_lt32);
+		WT_STAT_DATA_INCR(session, cache_eviction_target_page_lt32);
+	} else if (target_pages < 64) {
+		WT_STAT_CONN_INCR(session, cache_eviction_target_page_lt64);
+		WT_STAT_DATA_INCR(session, cache_eviction_target_page_lt64);
+	} else if (target_pages < 128) {
+		WT_STAT_CONN_INCR(session, cache_eviction_target_page_lt128);
+		WT_STAT_DATA_INCR(session, cache_eviction_target_page_lt128);
+	} else {
+		WT_STAT_CONN_INCR(session, cache_eviction_target_page_ge128);
+		WT_STAT_DATA_INCR(session, cache_eviction_target_page_ge128);
+	}
+
 	end = start + target_pages;
 
 	/*
@@ -1681,6 +1708,14 @@ __evict_walk_file(WT_SESSION_IMPL *session,
 	if (F_ISSET(cache, WT_CACHE_EVICT_DIRTY) &&
 	    !F_ISSET(cache, WT_CACHE_EVICT_CLEAN))
 		min_pages *= 10;
+
+	if (btree->evict_ref == NULL) {
+		WT_STAT_CONN_INCR(session, cache_eviction_walk_from_root);
+		WT_STAT_DATA_INCR(session, cache_eviction_walk_from_root);
+	} else {
+		WT_STAT_CONN_INCR(session, cache_eviction_walk_saved_pos);
+		WT_STAT_DATA_INCR(session, cache_eviction_walk_saved_pos);
+	}
 
 	walk_flags =
 	    WT_READ_CACHE | WT_READ_NO_EVICT | WT_READ_NO_GEN | WT_READ_NO_WAIT;
@@ -1752,12 +1787,37 @@ __evict_walk_file(WT_SESSION_IMPL *session,
 			btree->evict_start_type =
 			    (btree->evict_start_type + 1) %
 			    WT_EVICT_WALK_START_NUM;
+			/*
+			 * We differentiate the reasons we gave up on this walk
+			 * and increment the stats accordingly.
+			 */
+			if (pages_queued == 0) {
+				WT_STAT_CONN_INCR(session,
+				    cache_eviction_walks_gave_up_no_targets);
+				WT_STAT_DATA_INCR(session,
+				    cache_eviction_walks_gave_up_no_targets);
+			} else {
+				WT_STAT_CONN_INCR(session,
+				    cache_eviction_walks_gave_up_ratio);
+				WT_STAT_DATA_INCR(session,
+				    cache_eviction_walks_gave_up_ratio);
+			}
 			break;
 		}
 
 		if (ref == NULL) {
-			if (++restarts == 2)
+			WT_STAT_CONN_INCR(
+			    session, cache_eviction_walks_ended);
+			WT_STAT_DATA_INCR(
+			    session, cache_eviction_walks_ended);
+
+			if (++restarts == 2) {
+				WT_STAT_CONN_INCR(
+				    session, cache_eviction_walks_stopped);
+				WT_STAT_DATA_INCR(
+				    session, cache_eviction_walks_stopped);
 				break;
+			}
 			WT_STAT_CONN_INCR(
 			    session, cache_eviction_walks_started);
 			continue;
@@ -1911,6 +1971,9 @@ fast:		/* If the page can't be evicted, give up. */
 
 	WT_STAT_CONN_INCRV(session, cache_eviction_walk, refs_walked);
 	WT_STAT_CONN_INCRV(session, cache_eviction_pages_seen, pages_seen);
+	WT_STAT_DATA_INCRV(session, cache_eviction_pages_seen, pages_seen);
+	WT_STAT_CONN_INCRV(session, cache_eviction_walk_passes, 1);
+	WT_STAT_DATA_INCRV(session, cache_eviction_walk_passes, 1);
 
 	return (0);
 }
