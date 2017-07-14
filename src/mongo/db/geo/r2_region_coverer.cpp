@@ -68,13 +68,15 @@ R2RegionCoverer::R2RegionCoverer(GeoHashConverter* hashConverter)
 R2RegionCoverer::~R2RegionCoverer() {}
 
 void R2RegionCoverer::setMinLevel(unsigned int minLevel) {
+    dassert(minLevel >= 0);
     dassert(minLevel <= GeoHash::kMaxBits);
-    _minLevel = min(GeoHash::kMaxBits, minLevel);
+    _minLevel = max(0u, min(GeoHash::kMaxBits, minLevel));
 }
 
 void R2RegionCoverer::setMaxLevel(unsigned int maxLevel) {
+    dassert(maxLevel >= 0);
     dassert(maxLevel <= GeoHash::kMaxBits);
-    _maxLevel = min(GeoHash::kMaxBits, maxLevel);
+    _maxLevel = max(0u, min(GeoHash::kMaxBits, maxLevel));
 }
 
 void R2RegionCoverer::setMaxCells(int maxCells) {

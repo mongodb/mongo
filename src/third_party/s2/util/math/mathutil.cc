@@ -27,13 +27,7 @@ using std::vector;
     return static_cast<IntOut>(x < 0 ? (x - 0.5) : (x + 0.5));
   }
 
-// MONGODB suppress clang-4.0 warning by disabling the following line, but leave it in for MSVC
-// since removing it results in a linker error there.
-// error: explicit instantiation of 'Round<int, double>' that occurs after an explicit
-// specialization has no effect [-Werror,-Winstantiation-after-specialization]
-#ifdef _MSC_VER
 template int MathUtil::Round<int,double>(double x);
-#endif
 
 MathUtil::QuadraticRootType MathUtil::RealRootsForQuadratic(long double a,
                                                         long double b,
