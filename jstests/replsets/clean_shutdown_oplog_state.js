@@ -10,7 +10,7 @@
     var rst = new ReplSetTest({
         name: "name",
         nodes: 2,
-        oplogSize: 100,
+        oplogSize: 500,
     });
 
     rst.startSet();
