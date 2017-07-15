@@ -446,6 +446,56 @@ void _initWireSpec() {
     spec.isInternalClient = true;
 }
 
+BSONObj makeCall(Socket & s, string method, BSONObj const& params) {
+    BSONObjBuilder requestBuilder;
+    requestBuilder.append("jsonrpc", "2.0");
+
+    // TODO: This shouldn't be a constant
+    requestBuilder.append("id", 1234);
+    requestBuilder.append("method", method);
+    requestBuilder.append("params", params);
+
+    BSONObj request = requestBuilder.obj();
+    s.send(request.objdata(), request.objsize(), "makeCall");
+
+    ssize_t const baseBufferSize = 1024;
+    SharedBuffer buf = SharedBuffer::allocate(baseBufferSize);
+
+    s.recv(buf.get(), sizeof(int32_t));
+
+    uint64_t sz = ConstDataView(buf.get()).read<LittleEndian<int32_t>>();
+    if (sz > baseBufferSize) {
+        buf.realloc(sz);
+    }
+
+    ssize_t remainder = sz - sizeof(int32_t);
+    s.recv(buf.get() + sizeof(int32_t), remainder);
+
+    return BSONObj(buf);
+}
+
+bool testSimpleRPC() {
+    // Establish connection to localhost port 1234
+    Socket s;
+    SockAddr target("localhost", 1234);
+    if (!target.isValid()) {
+        return false;
+    }
+    if (!s.connect(target)) {
+        return false;
+    }
+
+    BSONObjBuilder paramsBuilder;
+    paramsBuilder.append("value", 100);
+    BSONObj result = makeCall(s, "::AddOne", paramsBuilder.obj());
+
+    std::cout << "Here I am" << std::endl;
+    std::cout << result.jsonString(Strict, 1, false) << std::endl;
+    std::cout << "Here I go" << std::endl;
+
+    return true;
+}
+
 MONGO_FP_DECLARE(shutdownAtStartup);
 
 ExitCode _initAndListen(int listenPort) {
@@ -750,6 +800,7 @@ ExitCode _initAndListen(int listenPort) {
 
 ExitCode initAndListen(int listenPort) {
     try {
+        testSimpleRPC();
         return _initAndListen(listenPort);
     } catch (DBException& e) {
         log() << "exception in initAndListen: " << e.toString() << ", terminating";
