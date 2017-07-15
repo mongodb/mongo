@@ -62,6 +62,11 @@ public:
     // yet joined the cluster, all in protocol version 1.
     static const long long kInitialTerm = 0;
 
+    /**
+     * Returns maximum OpTime value.
+     */
+    static OpTime max();
+
     // Default OpTime, also the smallest one.
     OpTime() : _timestamp(Timestamp(0, 0)), _term(kUninitializedTerm) {}
     OpTime(Timestamp ts, long long term) : _timestamp(std::move(ts)), _term(term) {}

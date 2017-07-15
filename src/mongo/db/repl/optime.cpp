@@ -26,6 +26,7 @@
  *    it in the license file.
  */
 
+#include <limits>
 #include <ostream>
 #include <sstream>
 #include <string>
@@ -40,6 +41,11 @@ namespace repl {
 
 const char OpTime::kTimestampFieldName[] = "ts";
 const char OpTime::kTermFieldName[] = "t";
+
+// static
+OpTime OpTime::max() {
+    return OpTime(Timestamp::max(), std::numeric_limits<decltype(OpTime::_term)>::max());
+}
 
 void OpTime::append(BSONObjBuilder* builder, const std::string& subObjName) const {
     BSONObjBuilder opTimeBuilder(builder->subobjStart(subObjName));
