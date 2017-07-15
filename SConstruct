@@ -620,6 +620,19 @@ env_vars.Add('HOST_ARCH',
     converter=variable_arch_converter,
     default=None)
 
+env_vars.Add('ICECC',
+    help='Tell SCons where icecream icecc tool is')
+
+env_vars.Add('ICERUN',
+    help='Tell SCons where icecream icerun tool is')
+
+env_vars.Add('ICECC_CREATE_ENV',
+    help='Tell SCons where icecc-create-env tool is',
+    default='buildscripts/icecc_create_env')
+
+env_vars.Add('ICECC_SCHEDULER',
+    help='Tell ICECC where the sceduler daemon is running')
+
 env_vars.Add('LIBPATH',
     help='Adds paths to the linker search path',
     converter=variable_shlex_converter)
@@ -3015,6 +3028,9 @@ def doConfigure(myenv):
     return conf.Finish()
 
 env = doConfigure( env )
+
+# Now that we are done with configure checks, enable icecream, if available.
+env.Tool('icecream')
 
 # If the flags in the environment are configured for -gsplit-dwarf,
 # inject the necessary emitter.
