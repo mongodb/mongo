@@ -830,7 +830,7 @@ Status StorageInterfaceImpl::deleteByFilter(OperationContext* opCtx,
     request.setMulti(true);
     request.setYieldPolicy(PlanExecutor::NO_YIELD);
 
-    // This disables the isLegalClientSystemNS() check in getExecutorDelete() which is used to
+    // This disables the legalClientSystemNS() check in getExecutorDelete() which is used to
     // disallow client deletes from unrecognized system collections.
     request.setGod();
 

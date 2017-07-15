@@ -79,6 +79,33 @@ constexpr auto dropPendingNSPrefix = "system.drop."_sd;
 
 }  // namespace
 
+bool legalClientSystemNS(StringData ns) {
+    if (ns == "local.system.replset")
+        return true;
+
+    if (ns.find(".system.users") != string::npos)
+        return true;
+
+    if (ns == "admin.system.roles")
+        return true;
+    if (ns == kServerConfiguration)
+        return true;
+    if (ns == kLogicalTimeKeysCollection)
+        return true;
+    if (ns == "admin.system.new_users")
+        return true;
+    if (ns == "admin.system.backup_users")
+        return true;
+
+    if (ns.find(".system.js") != string::npos)
+        return true;
+
+    if (nsToCollectionSubstring(ns) == NamespaceString::kSystemDotViewsCollectionName)
+        return true;
+
+    return false;
+}
+
 constexpr StringData NamespaceString::kAdminDb;
 constexpr StringData NamespaceString::kLocalDb;
 constexpr StringData NamespaceString::kConfigDb;
@@ -100,33 +127,6 @@ bool NamespaceString::isListIndexesCursorNS() const {
 
 bool NamespaceString::isCollectionlessAggregateNS() const {
     return coll() == collectionlessAggregateCursorCol;
-}
-
-bool NamespaceString::isLegalClientSystemNS() const {
-    if (db() == "admin") {
-        if (ns() == "admin.system.roles")
-            return true;
-        if (ns() == kServerConfiguration)
-            return true;
-        if (ns() == kLogicalTimeKeysCollection)
-            return true;
-        if (ns() == "admin.system.new_users")
-            return true;
-        if (ns() == "admin.system.backup_users")
-            return true;
-    }
-    if (ns() == "local.system.replset")
-        return true;
-
-    if (coll() == "system.users")
-        return true;
-    if (coll() == "system.js")
-        return true;
-
-    if (coll() == kSystemDotViewsCollectionName)
-        return true;
-
-    return false;
 }
 
 NamespaceString NamespaceString::makeListCollectionsNSS(StringData dbName) {
