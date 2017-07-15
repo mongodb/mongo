@@ -969,6 +969,13 @@ static void shutdownTask() {
     _diaglog.flush();
 
     if (opCtx) {
+        if (serverGlobalParams.featureCompatibility.version.load() ==
+            ServerGlobalParams::FeatureCompatibility::Version::k34) {
+            log(LogComponent::kReplication) << "shutdown: removing all drop-pending collections...";
+            repl::DropPendingCollectionReaper::get(opCtx)->dropCollectionsOlderThan(
+                opCtx, repl::OpTime::max());
+        }
+
         // This can wait a long time while we drain the secondary's apply queue, especially if it is
         // building an index.
         repl::ReplicationCoordinator::get(opCtx)->shutdown(opCtx);

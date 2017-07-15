@@ -1,6 +1,6 @@
 /**
- * Test to ensure that drop pending collections are not dropped upon clean shutdown under FCV 3.4
- * and FCV 3.6.
+ * Test to ensure that drop pending collections are dropped upon clean shutdown under FCV 3.4 but
+ * retained under FCV 3.6.
  *
  * This test does not work with non-persistent storage engines because it checks for the presence of
  * drop-pending collections across server restarts.
@@ -119,15 +119,15 @@
     replTest.initiate();
     replTest.awaitReplication();
 
-    // Restart primary node under FCV 3.4. Drop-pending collection should be present after node
+    // Restart primary node under FCV 3.4. Drop-pending collection should not be present after node
     // comes back up.
     var dbName = "test";
     var collToDrop34 = "collectionToDrop34";
     restartPrimaryWithDropPendingCollection("3.4", replTest, dbName, collToDrop34);
     var primary = replTest.getPrimary();
     var primaryDB = primary.getDB(dbName);
-    assert(containsDropPendingCollection(primaryDB, collToDrop34),
-           "Collection was removed on clean shutdown when FCV is 3.4.");
+    assert(!containsDropPendingCollection(primaryDB, collToDrop34),
+           "Collection was not removed on clean shutdown when FCV is 3.4.");
 
     // Restart primary node under FCV 3.6. Drop-pending collection should be present after node
     // comes back up.
