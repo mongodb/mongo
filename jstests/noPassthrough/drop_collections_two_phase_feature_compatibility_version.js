@@ -1,6 +1,10 @@
 /**
  * Test to ensure that drop pending collections are not dropped upon clean shutdown under FCV 3.4
  * and FCV 3.6.
+ *
+ * This test does not work with non-persistent storage engines because it checks for the presence of
+ * drop-pending collections across server restarts.
+ * @tags: [requires_persistence]
  */
 
 (function() {
