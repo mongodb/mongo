@@ -4,7 +4,12 @@
 (function() {
     'use strict';
 
-    var s = new ShardingTest({name: "auto1", shards: 2, mongos: 1, other: {enableAutoSplit: true}});
+    var s = new ShardingTest({
+        name: "auto1",
+        shards: 2,
+        mongos: 1,
+        other: {enableAutoSplit: true, chunkSize: 10},
+    });
 
     assert.commandWorked(s.s0.adminCommand({enablesharding: "test"}));
     s.ensurePrimaryShard('test', 'shard0001');

@@ -95,6 +95,8 @@ selector:
     # TODO (SERVER-27379): Cannot create views when featureCompatibilityVersion is 3.2.
     # Unblacklist when the featureCompatibilityVersion is 3.4 or higher.
     - jstests/sharding/views.js
+    # SERVER-20392: Reenable when backported to 3.4 and released as last-stable.
+    - jstests/sharding/shard_existing_coll_chunk_count.js
 
 executor:
   js_test:

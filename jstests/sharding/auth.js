@@ -38,7 +38,7 @@
         name: "auth",
         mongos: 1,
         shards: 0,
-        other: {keyFile: "jstests/libs/key1", chunkSize: 1, enableAutoSplit: true},
+        other: {keyFile: "jstests/libs/key1", chunkSize: 1, enableAutoSplit: false},
     });
 
     if (s.getDB('admin').runCommand('buildInfo').bits < 64) {
@@ -167,6 +167,7 @@
     s.getDB("test").foo.remove({});
 
     var num = 10000;
+    assert.commandWorked(s.s.adminCommand({split: "test.foo", middle: {x: num / 2}}));
     var bulk = s.getDB("test").foo.initializeUnorderedBulkOp();
     for (i = 0; i < num; i++) {
         bulk.insert(
