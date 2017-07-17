@@ -68,7 +68,6 @@ selector:
   - jstests/core/eval7.js # db.eval() used
   - jstests/core/eval9.js # db.eval() used
   - jstests/core/evala.js # db.eval() used
-  - jstests/core/evalc.js # db.eval() used
   - jstests/core/evald.js # db.eval() used
   - jstests/core/evale.js # db.eval() used
   - jstests/core/evalg.js # db.eval() used
