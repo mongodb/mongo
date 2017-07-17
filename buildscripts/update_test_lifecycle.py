@@ -23,6 +23,7 @@ if __name__ == "__main__" and __package__ is None:
     sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
 from buildscripts import resmokelib
+from buildscripts.resmokelib.utils import globstar
 from buildscripts import test_failures as tf
 from buildscripts.ciconfig import evergreen as ci_evergreen
 from buildscripts.ciconfig import tags as ci_tags
@@ -219,6 +220,9 @@ def update_lifecycle(lifecycle, report, method_test, add_tags, fail_rate, min_ru
 
 
 def compare_tags(tag_a, tag_b):
+    """Compare two tags and return 1, -1 or 0 if 'tag_a' is superior, inferior or
+    equal to 'tag_b'.
+    """
     return cmp(tag_a.split("|"), tag_b.split("|"))
 
 
@@ -322,6 +326,49 @@ def update_tags(lifecycle, config, report):
                          False,
                          rates.acceptable,
                          config.reliable_min_runs)
+
+
+def _split_tag(tag):
+    """Split a tag into its components.
+
+    Return a tuple containing task, variant, distro. The values are None if absent from the tag.
+    If the tag is invalid, the return value is (None, None, None).
+    """
+    elements = tag.split("|")
+    length = len(elements)
+    if elements[0] != "unreliable" or length < 2 or length > 4:
+        return None, None, None
+    # fillout the array
+    elements.extend([None] * (4 - length))
+    # return as a tuple
+    return tuple(elements[1:])
+
+
+def _is_tag_still_relevant(evg_conf, tag):
+    """Indicate if a tag still corresponds to a valid task/variant/distro combination."""
+    task, variant, distro = _split_tag(tag)
+    if not task or task not in evg_conf.task_names:
+        return False
+    if variant:
+        variant_conf = evg_conf.get_variant(variant)
+        if not variant_conf or task not in variant_conf.task_names:
+            return False
+        if distro and distro not in variant_conf.distros:
+            return False
+    return True
+
+
+def cleanup_tags(lifecycle, evg_conf):
+    """Remove the tags that do not correspond to a valid test/task/variant/distro combination."""
+    for test_kind in lifecycle.get_test_kinds():
+        for test_pattern in lifecycle.get_test_patterns(test_kind):
+            if not globstar.glob(test_pattern):
+                # The pattern does not match any file in the repository.
+                lifecycle.remove_test_pattern(test_kind, test_pattern)
+                continue
+            for tag in lifecycle.get_tags(test_kind, test_pattern):
+                if not _is_tag_still_relevant(evg_conf, tag):
+                    lifecycle.remove_tag(test_kind, test_pattern, tag)
 
 
 def main():
@@ -543,11 +590,15 @@ def main():
         report = tf.Report(history_data)
         update_tags(lifecycle, config, report)
 
+    # Remove tags that are no longer relevant
+    cleanup_tags(lifecycle, evg_conf)
+
     # We write the 'lifecycle' tag configuration to the 'options.lifecycle_file' file only if there
     # have been changes to the tags. In particular, we avoid modifying the file when only the header
     # comment for the YAML file would change.
     if lifecycle.is_modified():
         write_yaml_file(options.tag_file, lifecycle)
+
 
 if __name__ == "__main__":
     main()

@@ -55,9 +55,10 @@ class TestEvergreenProjectConfig(unittest.TestCase):
         self.assertEqual("osx-108", variant.name)
 
     def test_list_distro_names(self):
-        self.assertEqual(2, len(self.conf.distro_names))
+        self.assertEqual(3, len(self.conf.distro_names))
         self.assertIn("localtestdistro", self.conf.distro_names)
         self.assertIn("ubuntu1404-test", self.conf.distro_names)
+        self.assertIn("pdp-11", self.conf.distro_names)
 
 
 class TestTask(unittest.TestCase):
@@ -144,6 +145,13 @@ class TestVariant(unittest.TestCase):
 
         variant_osx = self.conf.get_variant("osx-108")
         self.assertEqual(["localtestdistro"], variant_osx.run_on)
+
+    def test_distro_names(self):
+        variant_ubuntu = self.conf.get_variant("ubuntu")
+        self.assertEqual(set(["ubuntu1404-test", "pdp-11"]), variant_ubuntu.distro_names)
+
+        variant_osx = self.conf.get_variant("osx-108")
+        self.assertEqual(set(["localtestdistro"]), variant_osx.distro_names)
 
     def test_test_flags(self):
         variant_ubuntu = self.conf.get_variant("ubuntu")

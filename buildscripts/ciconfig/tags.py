@@ -86,6 +86,13 @@ class TagsConfig(object):
         if not tags:
             del patterns[test_pattern]
 
+    def remove_test_pattern(self, test_kind, test_pattern):
+        """Remove a test pattern."""
+        patterns = self._conf.get(test_kind)
+        if not patterns or test_pattern not in patterns:
+            return
+        del patterns[test_pattern]
+
     def is_modified(self):
         """Return True if the tags have been modified, False otherwise."""
         return self._conf != self._conf_copy

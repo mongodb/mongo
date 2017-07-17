@@ -146,3 +146,5 @@ buildvariants:
   - name: failing_test
   - name: timeout_test
   - name: resmoke_task
+    distros:
+      - pdp-11

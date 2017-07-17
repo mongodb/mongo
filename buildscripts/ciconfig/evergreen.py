@@ -25,9 +25,7 @@ class EvergreenProjectConfig(object):
         self._variants_by_name = {variant.name: variant for variant in self.variants}
         self.distro_names = set()
         for variant in self.variants:
-            self.distro_names.update(variant.run_on)
-            for vtask in variant.tasks:
-                self.distro_names.update(vtask.run_on)
+            self.distro_names.update(variant.distro_names)
 
     @property
     def task_names(self):
@@ -110,6 +108,9 @@ class Variant(object):
         run_on = self.run_on
         self.tasks = [VariantTask(task_map.get(t["name"]), t.get("distros", run_on), self)
                       for t in conf_dict["tasks"]]
+        self.distro_names = set(run_on)
+        for task in self.tasks:
+            self.distro_names.update(task.run_on)
 
     @property
     def name(self):

@@ -128,6 +128,13 @@ class TestTagsConfig(unittest.TestCase):
         patterns = self.conf.get_test_patterns(test_kind)
         self.assertNotIn(test_pattern, patterns)
 
+    def test_remove_pattern(self):
+        test_kind = "js_test"
+        test_pattern = "jstests/core/example.js"
+        self.assertIn(test_pattern, self.conf.get_test_patterns(test_kind))
+        self.conf.remove_test_pattern(test_kind, test_pattern)
+        self.assertNotIn(test_pattern, self.conf.get_test_patterns(test_kind))
+
     def test_tag_order(self):
         test_kind = "js_test"
         test_pattern = "jstests/core/example.js"
