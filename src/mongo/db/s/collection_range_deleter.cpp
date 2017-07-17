@@ -307,7 +307,7 @@ StatusWith<int> CollectionRangeDeleter::_doDeletion(OperationContext* opCtx,
             if (saver) {
                 saver->goingToDelete(obj).transitional_ignore();
             }
-            collection->deleteDocument(opCtx, rloc, nullptr, true);
+            collection->deleteDocument(opCtx, kUninitializedStmtId, rloc, nullptr, true);
             wuow.commit();
         });
     } while (++numDeleted < maxToDelete);

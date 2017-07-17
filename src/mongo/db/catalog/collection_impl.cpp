@@ -541,8 +541,12 @@ Status CollectionImpl::aboutToDeleteCapped(OperationContext* opCtx,
     return Status::OK();
 }
 
-void CollectionImpl::deleteDocument(
-    OperationContext* opCtx, const RecordId& loc, OpDebug* opDebug, bool fromMigrate, bool noWarn) {
+void CollectionImpl::deleteDocument(OperationContext* opCtx,
+                                    StmtId stmtId,
+                                    const RecordId& loc,
+                                    OpDebug* opDebug,
+                                    bool fromMigrate,
+                                    bool noWarn) {
     if (isCapped()) {
         log() << "failing remove on a capped ns " << _ns;
         uasserted(10089, "cannot remove from a capped collection");
@@ -566,7 +570,7 @@ void CollectionImpl::deleteDocument(
     _recordStore->deleteRecord(opCtx, loc);
 
     getGlobalServiceContext()->getOpObserver()->onDelete(
-        opCtx, ns(), uuid(), std::move(deleteState), fromMigrate);
+        opCtx, ns(), uuid(), stmtId, std::move(deleteState), fromMigrate);
 }
 
 Counter64 moveCounter;

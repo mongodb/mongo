@@ -55,6 +55,8 @@ struct OplogUpdateEntryArgs {
 
     OptionalCollectionUUID uuid;
 
+    StmtId stmtId = kUninitializedStmtId;
+
     // Fully updated document with damages (update modifiers) applied.
     BSONObj updatedDoc;
 
@@ -108,6 +110,7 @@ public:
     virtual void onDelete(OperationContext* opCtx,
                           const NamespaceString& nss,
                           OptionalCollectionUUID uuid,
+                          StmtId stmtId,
                           CollectionShardingState::DeleteState deleteState,
                           bool fromMigrate) = 0;
     virtual void onOpMessage(OperationContext* opCtx, const BSONObj& msgObj) = 0;

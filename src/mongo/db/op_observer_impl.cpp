@@ -71,9 +71,17 @@ void OpObserverImpl::onCreateIndex(OperationContext* opCtx,
             if (e.fieldNameStringData() != "ns"_sd)
                 builder.append(e);
         }
-        repl::logOp(opCtx, "c", nss.getCommandNS(), uuid, builder.done(), nullptr, fromMigrate);
+        repl::logOp(opCtx,
+                    "c",
+                    nss.getCommandNS(),
+                    uuid,
+                    builder.done(),
+                    nullptr,
+                    fromMigrate,
+                    kUninitializedStmtId);
     } else {
-        repl::logOp(opCtx, "i", systemIndexes, {}, indexDoc, nullptr, fromMigrate);
+        repl::logOp(
+            opCtx, "i", systemIndexes, {}, indexDoc, nullptr, fromMigrate, kUninitializedStmtId);
     }
     AuthorizationManager::get(opCtx->getServiceContext())
         ->logOp(opCtx, "i", systemIndexes, indexDoc, nullptr);
@@ -122,7 +130,14 @@ void OpObserverImpl::onUpdate(OperationContext* opCtx, const OplogUpdateEntryArg
         return;
     }
 
-    repl::logOp(opCtx, "u", args.nss, args.uuid, args.update, &args.criteria, args.fromMigrate);
+    repl::logOp(opCtx,
+                "u",
+                args.nss,
+                args.uuid,
+                args.update,
+                &args.criteria,
+                args.fromMigrate,
+                args.stmtId);
     AuthorizationManager::get(opCtx->getServiceContext())
         ->logOp(opCtx, "u", args.nss, args.update, &args.criteria);
 
@@ -162,12 +177,13 @@ CollectionShardingState::DeleteState OpObserverImpl::aboutToDelete(OperationCont
 void OpObserverImpl::onDelete(OperationContext* opCtx,
                               const NamespaceString& nss,
                               OptionalCollectionUUID uuid,
+                              StmtId stmtId,
                               CollectionShardingState::DeleteState deleteState,
                               bool fromMigrate) {
     if (deleteState.idDoc.isEmpty())
         return;
 
-    repl::logOp(opCtx, "d", nss, uuid, deleteState.idDoc, nullptr, fromMigrate);
+    repl::logOp(opCtx, "d", nss, uuid, deleteState.idDoc, nullptr, fromMigrate, stmtId);
     AuthorizationManager::get(opCtx->getServiceContext())
         ->logOp(opCtx, "d", nss, deleteState.idDoc, nullptr);
 
@@ -188,7 +204,7 @@ void OpObserverImpl::onDelete(OperationContext* opCtx,
 }
 
 void OpObserverImpl::onOpMessage(OperationContext* opCtx, const BSONObj& msgObj) {
-    repl::logOp(opCtx, "n", {}, {}, msgObj, nullptr, false);
+    repl::logOp(opCtx, "n", {}, {}, msgObj, nullptr, false, kUninitializedStmtId);
 }
 
 void OpObserverImpl::onCreateCollection(OperationContext* opCtx,
@@ -220,7 +236,7 @@ void OpObserverImpl::onCreateCollection(OperationContext* opCtx,
 
     if (!collectionName.isSystemDotProfile()) {
         // do not replicate system.profile modifications
-        repl::logOp(opCtx, "c", dbName, options.uuid, cmdObj, nullptr, false);
+        repl::logOp(opCtx, "c", dbName, options.uuid, cmdObj, nullptr, false, kUninitializedStmtId);
     }
 
     getGlobalAuthorizationManager()->logOp(opCtx, "c", dbName, cmdObj, nullptr);
@@ -290,7 +306,7 @@ void OpObserverImpl::onCollMod(OperationContext* opCtx,
 
     if (!nss.isSystemDotProfile()) {
         // do not replicate system.profile modifications
-        repl::logOp(opCtx, "c", cmdNss, uuid, cmdObj, &o2Obj, false);
+        repl::logOp(opCtx, "c", cmdNss, uuid, cmdObj, &o2Obj, false, kUninitializedStmtId);
     }
 
     getGlobalAuthorizationManager()->logOp(opCtx, "c", cmdNss, cmdObj, nullptr);
@@ -300,7 +316,7 @@ void OpObserverImpl::onDropDatabase(OperationContext* opCtx, const std::string& 
     BSONObj cmdObj = BSON("dropDatabase" << 1);
     const NamespaceString cmdNss{dbName, "$cmd"};
 
-    repl::logOp(opCtx, "c", cmdNss, {}, cmdObj, nullptr, false);
+    repl::logOp(opCtx, "c", cmdNss, {}, cmdObj, nullptr, false, kUninitializedStmtId);
 
     if (dbName == FeatureCompatibilityVersion::kDatabase) {
         FeatureCompatibilityVersion::onDropCollection();
@@ -320,7 +336,8 @@ repl::OpTime OpObserverImpl::onDropCollection(OperationContext* opCtx,
     repl::OpTime dropOpTime;
     if (!collectionName.isSystemDotProfile()) {
         // do not replicate system.profile modifications
-        dropOpTime = repl::logOp(opCtx, "c", dbName, uuid, cmdObj, nullptr, false);
+        dropOpTime =
+            repl::logOp(opCtx, "c", dbName, uuid, cmdObj, nullptr, false, kUninitializedStmtId);
     }
 
     if (collectionName.coll() == DurableViewCatalog::viewsCollectionName()) {
@@ -355,7 +372,7 @@ void OpObserverImpl::onDropIndex(OperationContext* opCtx,
                                  const BSONObj& indexInfo) {
     BSONObj cmdObj = BSON("dropIndexes" << nss.coll() << "index" << indexName);
     auto commandNS = nss.getCommandNS();
-    repl::logOp(opCtx, "c", commandNS, uuid, cmdObj, &indexInfo, false);
+    repl::logOp(opCtx, "c", commandNS, uuid, cmdObj, &indexInfo, false, kUninitializedStmtId);
 
     getGlobalAuthorizationManager()->logOp(opCtx, "c", commandNS, cmdObj, &indexInfo);
 }
@@ -383,7 +400,7 @@ void OpObserverImpl::onRenameCollection(OperationContext* opCtx,
     }
     BSONObj cmdObj = builder.done();
 
-    repl::logOp(opCtx, "c", cmdNss, uuid, cmdObj, nullptr, false);
+    repl::logOp(opCtx, "c", cmdNss, uuid, cmdObj, nullptr, false, kUninitializedStmtId);
     if (fromCollection.coll() == DurableViewCatalog::viewsCollectionName() ||
         toCollection.coll() == DurableViewCatalog::viewsCollectionName()) {
         DurableViewCatalog::onExternalChange(
@@ -414,7 +431,7 @@ void OpObserverImpl::onApplyOps(OperationContext* opCtx,
                                 const std::string& dbName,
                                 const BSONObj& applyOpCmd) {
     const NamespaceString cmdNss{dbName, "$cmd"};
-    repl::logOp(opCtx, "c", cmdNss, {}, applyOpCmd, nullptr, false);
+    repl::logOp(opCtx, "c", cmdNss, {}, applyOpCmd, nullptr, false, kUninitializedStmtId);
 
     getGlobalAuthorizationManager()->logOp(opCtx, "c", cmdNss, applyOpCmd, nullptr);
 }
@@ -427,7 +444,7 @@ void OpObserverImpl::onEmptyCapped(OperationContext* opCtx,
 
     if (!collectionName.isSystemDotProfile()) {
         // do not replicate system.profile modifications
-        repl::logOp(opCtx, "c", cmdNss, uuid, cmdObj, nullptr, false);
+        repl::logOp(opCtx, "c", cmdNss, uuid, cmdObj, nullptr, false, kUninitializedStmtId);
     }
 
     getGlobalAuthorizationManager()->logOp(opCtx, "c", cmdNss, cmdObj, nullptr);

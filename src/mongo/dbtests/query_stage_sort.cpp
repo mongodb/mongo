@@ -461,7 +461,7 @@ public:
         set<RecordId>::iterator it = recordIds.begin();
         {
             WriteUnitOfWork wuow(&_opCtx);
-            coll->deleteDocument(&_opCtx, *it++, nullOpDebug);
+            coll->deleteDocument(&_opCtx, kUninitializedStmtId, *it++, nullOpDebug);
             wuow.commit();
         }
         exec->restoreState();
@@ -477,7 +477,7 @@ public:
         while (it != recordIds.end()) {
             {
                 WriteUnitOfWork wuow(&_opCtx);
-                coll->deleteDocument(&_opCtx, *it++, nullOpDebug);
+                coll->deleteDocument(&_opCtx, kUninitializedStmtId, *it++, nullOpDebug);
                 wuow.commit();
             }
         }

@@ -57,6 +57,7 @@ public:
     void onDelete(OperationContext* opCtx,
                   const NamespaceString& nss,
                   OptionalCollectionUUID uuid,
+                  StmtId stmtId,
                   CollectionShardingState::DeleteState deleteState,
                   bool fromMigrate) override;
     void onOpMessage(OperationContext* opCtx, const BSONObj& msgObj) override;

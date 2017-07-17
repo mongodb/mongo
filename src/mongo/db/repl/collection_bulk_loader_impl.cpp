@@ -230,6 +230,7 @@ Status CollectionBulkLoaderImpl::commit() {
                     _opCtx.get(), "CollectionBulkLoaderImpl::commit", _nss.ns(), [this, &it] {
                         WriteUnitOfWork wunit(_opCtx.get());
                         _autoColl->getCollection()->deleteDocument(_opCtx.get(),
+                                                                   kUninitializedStmtId,
                                                                    it,
                                                                    nullptr /** OpDebug **/,
                                                                    false /* fromMigrate */,

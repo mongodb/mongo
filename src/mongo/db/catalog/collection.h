@@ -238,6 +238,7 @@ public:
             OperationContext* opCtx) const = 0;
 
         virtual void deleteDocument(OperationContext* opCtx,
+                                    StmtId stmtId,
                                     const RecordId& loc,
                                     OpDebug* opDebug,
                                     bool fromMigrate,
@@ -453,11 +454,12 @@ public:
      * will not be logged.
      */
     inline void deleteDocument(OperationContext* const opCtx,
+                               StmtId stmtId,
                                const RecordId& loc,
                                OpDebug* const opDebug,
                                const bool fromMigrate = false,
                                const bool noWarn = false) {
-        return this->_impl().deleteDocument(opCtx, loc, opDebug, fromMigrate, noWarn);
+        return this->_impl().deleteDocument(opCtx, stmtId, loc, opDebug, fromMigrate, noWarn);
     }
 
     /*

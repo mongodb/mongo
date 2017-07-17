@@ -291,6 +291,7 @@ BSONObj UpdateStage::transformAndUpdate(const Snapshotted<BSONObj>& oldObj, Reco
                 BSONObj idQuery = driver->makeOplogEntryQuery(newObj, request->isMulti());
                 OplogUpdateEntryArgs args;
                 args.nss = _collection->ns();
+                args.stmtId = request->getStmtId();
                 args.update = logObj;
                 args.criteria = idQuery;
                 args.fromMigrate = request->isFromMigration();
@@ -321,6 +322,7 @@ BSONObj UpdateStage::transformAndUpdate(const Snapshotted<BSONObj>& oldObj, Reco
                 OplogUpdateEntryArgs args;
                 args.nss = _collection->ns();
                 args.uuid = _collection->uuid();
+                args.stmtId = request->getStmtId();
                 args.update = logObj;
                 args.criteria = idQuery;
                 args.fromMigrate = request->isFromMigration();
@@ -481,9 +483,8 @@ void UpdateStage::doInsert() {
         WriteUnitOfWork wunit(getOpCtx());
         invariant(_collection);
         const bool enforceQuota = !request->isGod();
-        // TODO: SERVER-28912 include StmtId
         uassertStatusOK(_collection->insertDocument(getOpCtx(),
-                                                    InsertStatement(newObj),
+                                                    InsertStatement(request->getStmtId(), newObj),
                                                     _params.opDebug,
                                                     enforceQuota,
                                                     request->isFromMigration()));

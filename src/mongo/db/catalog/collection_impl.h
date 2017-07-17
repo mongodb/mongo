@@ -127,6 +127,8 @@ public:
     /**
      * Deletes the document with the given RecordId from the collection.
      *
+     * 'stmtId' the statement id for this delete operation. Pass in kUninitializedStmtId if not
+     * applicable.
      * 'fromMigrate' indicates whether the delete was induced by a chunk migration, and
      * so should be ignored by the user as an internal maintenance operation and not a
      * real delete.
@@ -137,6 +139,7 @@ public:
      * will not be logged.
      */
     void deleteDocument(OperationContext* opCtx,
+                        StmtId stmtId,
                         const RecordId& loc,
                         OpDebug* opDebug,
                         bool fromMigrate = false,

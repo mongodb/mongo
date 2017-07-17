@@ -58,6 +58,7 @@ CollectionShardingState::DeleteState OpObserverNoop::aboutToDelete(OperationCont
 void OpObserverNoop::onDelete(OperationContext*,
                               const NamespaceString&,
                               OptionalCollectionUUID,
+                              StmtId stmtId,
                               CollectionShardingState::DeleteState,
                               bool) {}
 

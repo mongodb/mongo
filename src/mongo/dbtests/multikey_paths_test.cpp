@@ -349,7 +349,7 @@ TEST_F(MultikeyPathsTest, PathsNotUpdatedOnDocumentDelete) {
         {
             WriteUnitOfWork wuow(_opCtx.get());
             OpDebug* const nullOpDebug = nullptr;
-            collection->deleteDocument(_opCtx.get(), record->id, nullOpDebug);
+            collection->deleteDocument(_opCtx.get(), kUninitializedStmtId, record->id, nullOpDebug);
             wuow.commit();
         }
     }

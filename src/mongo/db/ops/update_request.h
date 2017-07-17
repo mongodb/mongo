@@ -30,6 +30,7 @@
 
 #include "mongo/db/curop.h"
 #include "mongo/db/jsobj.h"
+#include "mongo/db/logical_session_id.h"
 #include "mongo/db/namespace_string.h"
 #include "mongo/db/query/explain.h"
 #include "mongo/util/mongoutils/str.h"
@@ -193,6 +194,14 @@ public:
         return _yieldPolicy;
     }
 
+    inline void setStmtId(StmtId stmtId) {
+        _stmtId = std::move(stmtId);
+    }
+
+    inline StmtId getStmtId() const {
+        return _stmtId;
+    }
+
     const std::string toString() const {
         StringBuilder builder;
         builder << " query: " << _query;
@@ -200,6 +209,7 @@ public:
         builder << " sort: " << _sort;
         builder << " collation: " << _collation;
         builder << " updates: " << _updates;
+        builder << " stmtId: " << _stmtId;
 
         builder << " arrayFilters: [";
         bool first = true;
@@ -240,6 +250,9 @@ private:
 
     // Filters to specify which array elements should be updated.
     std::vector<BSONObj> _arrayFilters;
+
+    // The statement id of this request.
+    StmtId _stmtId = kUninitializedStmtId;
 
     // Flags controlling the update.
 

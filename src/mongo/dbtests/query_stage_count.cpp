@@ -116,7 +116,7 @@ public:
     void remove(const RecordId& recordId) {
         WriteUnitOfWork wunit(&_opCtx);
         OpDebug* const nullOpDebug = nullptr;
-        _coll->deleteDocument(&_opCtx, recordId, nullOpDebug);
+        _coll->deleteDocument(&_opCtx, kUninitializedStmtId, recordId, nullOpDebug);
         wunit.commit();
     }
 

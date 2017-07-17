@@ -177,6 +177,6 @@ void DurableViewCatalogImpl::remove(OperationContext* opCtx, const NamespaceStri
         return;
 
     LOG(2) << "remove view " << name << " from " << _db->getSystemViewsName();
-    systemViews->deleteDocument(opCtx, id, &CurOp::get(opCtx)->debug());
+    systemViews->deleteDocument(opCtx, kUninitializedStmtId, id, &CurOp::get(opCtx)->debug());
 }
 }  // namespace mongo

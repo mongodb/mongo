@@ -414,7 +414,8 @@ OpTime logOp(OperationContext* opCtx,
              OptionalCollectionUUID uuid,
              const BSONObj& obj,
              const BSONObj* o2,
-             bool fromMigrate) {
+             bool fromMigrate,
+             StmtId statementId) {
     auto replCoord = ReplicationCoordinator::get(opCtx);
     if (replCoord->isOplogDisabledFor(opCtx, nss)) {
         return {};
@@ -427,7 +428,6 @@ OpTime logOp(OperationContext* opCtx,
     OplogSlot slot;
     getNextOpTime(opCtx, oplog, replCoord, replMode, 1, &slot);
 
-    // TODO: SERVER-28912 Include statementId for other ops
     auto writer = _logOpWriter(opCtx,
                                opstr,
                                nss,
@@ -438,7 +438,7 @@ OpTime logOp(OperationContext* opCtx,
                                slot.opTime,
                                slot.hash,
                                Date_t::now(),
-                               kUninitializedStmtId);
+                               statementId);
     const DocWriter* basePtr = &writer;
     _logOpsInner(opCtx, nss, &basePtr, 1, oplog, replMode, slot.opTime);
     return slot.opTime;

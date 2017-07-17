@@ -241,7 +241,7 @@ TEST_F(ConfigInitializationTest, ReRunsIfDocRolledBackThenReElected) {
             }
             mongo::WriteUnitOfWork wuow(opCtx);
             for (auto recordId : recordIds) {
-                coll->deleteDocument(opCtx, recordId, nullptr);
+                coll->deleteDocument(opCtx, kUninitializedStmtId, recordId, nullptr);
             }
             wuow.commit();
             ASSERT_EQUALS(0UL, coll->numRecords(opCtx));

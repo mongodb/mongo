@@ -725,6 +725,7 @@ StatusWith<unique_ptr<PlanExecutor, PlanExecutor::Deleter>> getExecutorDelete(
     deleteStageParams.returnDeleted = request->shouldReturnDeleted();
     deleteStageParams.sort = request->getSort();
     deleteStageParams.opDebug = opDebug;
+    deleteStageParams.stmtId = request->getStmtId();
 
     unique_ptr<WorkingSet> ws = make_unique<WorkingSet>();
     const PlanExecutor::YieldPolicy policy = parsedDelete->yieldPolicy();

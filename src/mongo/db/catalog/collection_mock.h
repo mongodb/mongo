@@ -125,6 +125,7 @@ public:
     }
 
     void deleteDocument(OperationContext* opCtx,
+                        StmtId stmtId,
                         const RecordId& loc,
                         OpDebug* opDebug,
                         bool fromMigrate,
