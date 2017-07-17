@@ -317,60 +317,6 @@ StatusWith<ShardId> ShardingCatalogClientImpl::_selectShardForNewDatabase(
     return candidateShardId;
 }
 
-Status ShardingCatalogClientImpl::enableSharding(OperationContext* opCtx,
-                                                 const std::string& dbName) {
-    invariant(nsIsDbOnly(dbName));
-
-    if (dbName == NamespaceString::kConfigDb || dbName == NamespaceString::kAdminDb) {
-        return {
-            ErrorCodes::IllegalOperation,
-            str::stream() << "Enabling sharding on system configuration databases is not allowed"};
-    }
-
-    // Lock the database globally to prevent conflicts with simultaneous database
-    // creation/modification.
-    auto scopedDistLock = getDistLockManager()->lock(
-        opCtx, dbName, "enableSharding", DistLockManager::kDefaultLockTimeout);
-    if (!scopedDistLock.isOK()) {
-        return scopedDistLock.getStatus();
-    }
-
-    // Check for case sensitivity violations
-    DatabaseType db;
-
-    Status status = _checkDbDoesNotExist(opCtx, dbName, &db);
-    if (status.isOK()) {
-        // Database does not exist, create a new entry
-        auto newShardIdStatus =
-            _selectShardForNewDatabase(opCtx, Grid::get(opCtx)->shardRegistry());
-        if (!newShardIdStatus.isOK()) {
-            return newShardIdStatus.getStatus();
-        }
-
-        const ShardId& newShardId = newShardIdStatus.getValue();
-
-        log() << "Placing [" << dbName << "] on: " << newShardId;
-
-        db.setName(dbName);
-        db.setPrimary(newShardId);
-        db.setSharded(true);
-    } else if (status.code() == ErrorCodes::NamespaceExists) {
-        if (db.getSharded()) {
-            return Status(ErrorCodes::AlreadyInitialized,
-                          str::stream() << "sharding already enabled for database " << dbName);
-        }
-
-        // Database exists, so just update it
-        db.setSharded(true);
-    } else {
-        return status;
-    }
-
-    log() << "Enabling sharding for database [" << dbName << "] in config db";
-
-    return updateDatabase(opCtx, dbName, db);
-}
-
 Status ShardingCatalogClientImpl::_log(OperationContext* opCtx,
                                        const StringData& logCollName,
                                        const std::string& what,

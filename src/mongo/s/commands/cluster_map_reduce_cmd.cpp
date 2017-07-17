@@ -608,11 +608,16 @@ private:
     static CachedCollectionRoutingInfo createShardedOutputCollection(OperationContext* opCtx,
                                                                      const NamespaceString& nss,
                                                                      const BSONObjSet& splitPts) {
-        auto const catalogClient = Grid::get(opCtx)->catalogClient();
         auto const catalogCache = Grid::get(opCtx)->catalogCache();
 
         // Enable sharding on the output db
-        Status status = catalogClient->enableSharding(opCtx, nss.db().toString());
+        auto status =
+            Grid::get(opCtx)->shardRegistry()->getConfigShard()->runCommandWithFixedRetryAttempts(
+                opCtx,
+                ReadPreferenceSetting(ReadPreference::PrimaryOnly),
+                "admin",
+                BSON("_configsvrEnableSharding" << nss.db().toString()),
+                Shard::RetryPolicy::kIdempotent);
 
         // If the database has sharding already enabled, we can ignore the error
         if (status.isOK()) {

@@ -56,6 +56,7 @@ class DatabaseType;
 class LogicalTime;
 class NamespaceString;
 class OperationContext;
+class ShardingCatalogManager;
 class ShardKeyPattern;
 class ShardRegistry;
 class ShardType;
@@ -93,6 +94,13 @@ enum ShardDrainingStatus {
 class ShardingCatalogClient {
     MONGO_DISALLOW_COPYING(ShardingCatalogClient);
 
+    // Allows ShardingCatalogManager to access _checkDbDoesNotExist
+    // TODO: move _checkDbDoesNotExist to ShardingCatalogManager when
+    // ShardingCatalogClient::createDatabaseCommand, the other caller of this function,
+    // is moved into ShardingCatalogManager.
+    // SERVER-30022.
+    friend class ShardingCatalogManager;
+
 public:
     // Constant to use for configuration data majority writes
     static const WriteConcernOptions kMajorityWriteConcern;
@@ -110,18 +118,6 @@ public:
      * Performs necessary cleanup when shutting down cleanly.
      */
     virtual void shutDown(OperationContext* opCtx) = 0;
-
-    /**
-     * Creates a new database or updates the sharding status for an existing one. Cannot be
-     * used for the admin/config/local DBs, which should not be created or sharded manually
-     * anyways.
-     *
-     * Returns Status::OK on success or any error code indicating the failure. These are some
-     * of the known failures:
-     *  - DatabaseDifferCase - database already exists, but with a different case
-     *  - ShardNotFound - could not find a shard to place the DB on
-     */
-    virtual Status enableSharding(OperationContext* opCtx, const std::string& dbName) = 0;
 
     /**
      * Tries to remove a shard. To completely remove a shard from a sharded cluster,
@@ -424,6 +420,21 @@ public:
 
 protected:
     ShardingCatalogClient() = default;
+
+private:
+    /**
+     * Checks that the given database name doesn't already exist in the config.databases
+     * collection, including under different casing. Optional db can be passed and will
+     * be set with the database details if the given dbName exists.
+     *
+     * Returns OK status if the db does not exist.
+     * Some known errors include:
+     *  NamespaceExists if it exists with the same casing
+     *  DatabaseDifferCase if it exists under different casing.
+     */
+    virtual Status _checkDbDoesNotExist(OperationContext* opCtx,
+                                        const std::string& dbName,
+                                        DatabaseType* db) = 0;
 };
 
 }  // namespace mongo

@@ -226,4 +226,10 @@ StatusWith<std::vector<KeysCollectionDocument>> ShardingCatalogClientMock::getNe
     return {ErrorCodes::InternalError, "Method not implemented"};
 }
 
+Status ShardingCatalogClientMock::_checkDbDoesNotExist(OperationContext* opCtx,
+                                                       const string& dbName,
+                                                       DatabaseType* db) {
+    return {ErrorCodes::InternalError, "Method not implemented"};
+}
+
 }  // namespace mongo

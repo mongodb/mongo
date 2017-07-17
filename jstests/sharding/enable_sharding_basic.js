@@ -9,11 +9,11 @@
 
     var mongos = st.s0;
 
-    // enableSharing can run only on mongos.
+    // enableSharding can run only on mongos.
     assert.commandFailedWithCode(st.d0.getDB('admin').runCommand({enableSharding: 'db'}),
                                  ErrorCodes.CommandNotFound);
 
-    // enableSharing can run only against the admin database.
+    // enableSharding can run only against the admin database.
     assert.commandFailedWithCode(mongos.getDB('test').runCommand({enableSharding: 'db'}),
                                  ErrorCodes.Unauthorized);
 
@@ -37,9 +37,8 @@
     assert.commandFailed(mongos.adminCommand({enableSharding: 'a.b'}));
     assert.commandFailed(mongos.adminCommand({enableSharding: ''}));
 
-    // Can't shard already sharded database.
-    assert.commandFailedWithCode(mongos.adminCommand({enableSharding: 'db'}),
-                                 ErrorCodes.AlreadyInitialized);
+    // Attempting to shard already sharded database returns success.
+    assert.commandWorked(mongos.adminCommand({enableSharding: 'db'}));
     assert.eq(mongos.getDB('config').databases.findOne({_id: 'db'}).partitioned, true);
 
     // Verify config.databases metadata.

@@ -48,6 +48,14 @@ class TaskExecutor;
  * Implements the catalog client for reading from replica set config servers.
  */
 class ShardingCatalogClientImpl final : public ShardingCatalogClient {
+
+    // Allows ShardingCatalogManager to access _selectShardForNewDatabase
+    // TODO: move _selectShardForNewDatabase to ShardingCatalogManager, when
+    // ShardingCatalogClient::createDatabaseCommand, the other caller of this function,
+    // is moved into ShardingCatalogManager.
+    // SERVER-30022.
+    friend class ShardingCatalogManager;
+
 public:
     /*
      * Updates (or if "upsert" is true, creates) catalog data for the sharded collection "collNs" by
@@ -69,8 +77,6 @@ public:
     void startup() override;
 
     void shutDown(OperationContext* opCtx) override;
-
-    Status enableSharding(OperationContext* opCtx, const std::string& dbName) override;
 
     Status updateDatabase(OperationContext* opCtx,
                           const std::string& dbName,
@@ -190,6 +196,10 @@ public:
         repl::ReadConcernLevel readConcernLevel) override;
 
 private:
+    Status _checkDbDoesNotExist(OperationContext* opCtx,
+                                const std::string& dbName,
+                                DatabaseType* db) override;
+
     /**
      * Selects an optimal shard on which to place a newly created database from the set of
      * available shards. Will return ShardNotFound if shard could not be found.
@@ -215,20 +225,6 @@ private:
                                                   const BSONObj& update,
                                                   bool upsert,
                                                   const WriteConcernOptions& writeConcern);
-
-    /**
-     * Checks that the given database name doesn't already exist in the config.databases
-     * collection, including under different casing. Optional db can be passed and will
-     * be set with the database details if the given dbName exists.
-     *
-     * Returns OK status if the db does not exist.
-     * Some known errors include:
-     *  NamespaceExists if it exists with the same casing
-     *  DatabaseDifferCase if it exists under different casing.
-     */
-    Status _checkDbDoesNotExist(OperationContext* opCtx,
-                                const std::string& dbName,
-                                DatabaseType* db);
 
     /**
      * Creates the specified collection name in the config database.

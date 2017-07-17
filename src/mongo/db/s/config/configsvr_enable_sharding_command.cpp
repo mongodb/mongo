@@ -1,5 +1,5 @@
 /**
- *    Copyright (C) 2015 MongoDB Inc.
+ *    Copyright (C) 2017 MongoDB Inc.
  *
  *    This program is free software: you can redistribute it and/or  modify
  *    it under the terms of the GNU Affero General Public License, version 3,
@@ -30,53 +30,59 @@
 
 #include "mongo/platform/basic.h"
 
+#include <set>
+
 #include "mongo/db/audit.h"
 #include "mongo/db/auth/action_set.h"
 #include "mongo/db/auth/action_type.h"
-#include "mongo/db/auth/authorization_manager.h"
 #include "mongo/db/auth/authorization_session.h"
 #include "mongo/db/client.h"
 #include "mongo/db/commands.h"
-#include "mongo/s/catalog/sharding_catalog_client.h"
+#include "mongo/db/operation_context.h"
+#include "mongo/s/catalog/sharding_catalog_manager.h"
+#include "mongo/s/catalog/type_database.h"
 #include "mongo/s/catalog_cache.h"
-#include "mongo/s/client/shard_registry.h"
-#include "mongo/s/commands/cluster_commands_helpers.h"
 #include "mongo/s/grid.h"
 #include "mongo/util/log.h"
 #include "mongo/util/scopeguard.h"
 
 namespace mongo {
+
+using std::shared_ptr;
+using std::set;
+using std::string;
+
 namespace {
 
-class EnableShardingCmd : public ErrmsgCommandDeprecated {
+/**
+ * Internal sharding command run on config servers to enable sharding on a database.
+ */
+class ConfigSvrEnableShardingCommand : public BasicCommand {
 public:
-    EnableShardingCmd() : ErrmsgCommandDeprecated("enableSharding", "enablesharding") {}
+    ConfigSvrEnableShardingCommand() : BasicCommand("_configsvrEnableSharding") {}
 
     virtual bool slaveOk() const {
-        return true;
+        return false;
     }
 
     virtual bool adminOnly() const {
         return true;
     }
 
-
     virtual bool supportsWriteConcern(const BSONObj& cmd) const override {
-        return false;
+        return true;
     }
 
-    virtual void help(std::stringstream& help) const {
-        help << "Enable sharding for a database. "
-             << "(Use 'shardcollection' command afterwards.)\n"
-             << "  { enablesharding : \"<dbname>\" }\n";
+    virtual void help(std::stringstream& help) const override {
+        help << "Internal command, which is exported by the sharding config server. Do not call "
+                "directly. Enable sharding on a database.";
     }
 
     virtual Status checkAuthForCommand(Client* client,
                                        const std::string& dbname,
-                                       const BSONObj& cmdObj) {
+                                       const BSONObj& cmdObj) override {
         if (!AuthorizationSession::get(client)->isAuthorizedForActionsOnResource(
-                ResourcePattern::forDatabaseName(parseNs(dbname, cmdObj)),
-                ActionType::enableSharding)) {
+                ResourcePattern::forDatabaseName(parseNs(dbname, cmdObj)), ActionType::internal)) {
             return Status(ErrorCodes::Unauthorized, "Unauthorized");
         }
 
@@ -87,35 +93,42 @@ public:
         return cmdObj.firstElement().str();
     }
 
-    virtual bool errmsgRun(OperationContext* opCtx,
-                           const std::string& dbname_unused,
-                           const BSONObj& cmdObj,
-                           std::string& errmsg,
-                           BSONObjBuilder& result) {
-        const std::string db = parseNs("", cmdObj);
+    bool run(OperationContext* opCtx,
+             const std::string& dbname_unused,
+             const BSONObj& cmdObj,
+             BSONObjBuilder& result) {
 
-        // Invalidate the routing table cache entry for this database so that we reload the
-        // collection the next time it's accessed, even if we receive a failure, e.g. NetworkError.
-        ON_BLOCK_EXIT([opCtx, db] { Grid::get(opCtx)->catalogCache()->purgeDatabase(db); });
-
-        auto configShard = Grid::get(opCtx)->shardRegistry()->getConfigShard();
-        auto cmdResponseStatus = uassertStatusOK(configShard->runCommandWithFixedRetryAttempts(
-            opCtx,
-            ReadPreferenceSetting(ReadPreference::PrimaryOnly),
-            "admin",
-            Command::appendPassthroughFields(cmdObj, BSON("_configsvrEnableSharding" << db)),
-            Shard::RetryPolicy::kIdempotent));
-        uassertStatusOK(cmdResponseStatus.commandStatus);
-
-        if (!cmdResponseStatus.writeConcernStatus.isOK()) {
-            appendWriteConcernErrorToCmdResponse(
-                configShard->getId(), cmdResponseStatus.response["writeConcernError"], result);
+        if (serverGlobalParams.clusterRole != ClusterRole::ConfigServer) {
+            return appendCommandStatus(
+                result,
+                Status(ErrorCodes::IllegalOperation,
+                       "_configsvrEnableSharding can only be run on config servers"));
         }
+
+        const std::string dbname = parseNs("", cmdObj);
+
+        uassert(
+            ErrorCodes::InvalidNamespace,
+            str::stream() << "invalid db name specified: " << dbname,
+            NamespaceString::validDBName(dbname, NamespaceString::DollarInDbNameBehavior::Allow));
+
+        if (dbname == NamespaceString::kAdminDb || dbname == NamespaceString::kConfigDb ||
+            dbname == NamespaceString::kLocalDb) {
+            return appendCommandStatus(result,
+                                       {ErrorCodes::InvalidOptions,
+                                        str::stream() << "can't shard " + dbname + " database"});
+        }
+
+        // Make sure to force update of any stale metadata
+        ON_BLOCK_EXIT([opCtx, dbname] { Grid::get(opCtx)->catalogCache()->purgeDatabase(dbname); });
+
+        uassertStatusOK(ShardingCatalogManager::get(opCtx)->enableSharding(opCtx, dbname));
+        audit::logEnableSharding(Client::getCurrent(), dbname);
 
         return true;
     }
 
-} clusterEnableShardingCmd;
+} configsvrEnableShardingCmd;
 
 }  // namespace
 }  // namespace mongo

@@ -175,6 +175,23 @@ public:
                                              const ShardId& toShard);
 
     //
+    // Database Operations
+    //
+
+    /**
+     * Creates a new database or updates the sharding status for an existing one. Cannot be
+     * used for the admin/config/local DBs, which should not be created or sharded manually
+     * anyways.
+     *
+     * Returns Status::OK on success or any error code indicating the failure. These are some
+     * of the known failures:
+     *  - DatabaseDifferCase - database already exists, but with a different case
+     *  - ShardNotFound - could not find a shard to place the DB on
+     */
+    Status enableSharding(OperationContext* opCtx, const std::string& dbName);
+
+
+    //
     // Collection Operations
     //
 

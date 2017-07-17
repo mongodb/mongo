@@ -158,6 +158,10 @@ public:
 
 private:
     std::unique_ptr<DistLockManager> _distLockManager;
+
+    Status _checkDbDoesNotExist(OperationContext* opCtx,
+                                const std::string& dbName,
+                                DatabaseType* db) override;
 };
 
 }  // namespace mongo
