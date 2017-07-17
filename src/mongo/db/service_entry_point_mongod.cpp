@@ -38,6 +38,7 @@
 #include "mongo/db/client.h"
 #include "mongo/db/commands.h"
 #include "mongo/db/commands/fsync.h"
+#include "mongo/db/concurrency/global_lock_acquisition_tracker.h"
 #include "mongo/db/curop.h"
 #include "mongo/db/curop_metrics.h"
 #include "mongo/db/cursor_manager.h"
@@ -53,6 +54,7 @@
 #include "mongo/db/ops/write_ops_exec.h"
 #include "mongo/db/query/find.h"
 #include "mongo/db/read_concern.h"
+#include "mongo/db/repl/optime.h"
 #include "mongo/db/repl/repl_client_info.h"
 #include "mongo/db/repl/replication_coordinator_global.h"
 #include "mongo/db/s/operation_sharding_state.h"
@@ -307,13 +309,21 @@ StatusWith<repl::ReadConcernArgs> _extractReadConcern(const BSONObj& cmdObj,
 
 void _waitForWriteConcernAndAddToCommandResponse(OperationContext* opCtx,
                                                  const std::string& commandName,
+                                                 const repl::OpTime& lastOpBeforeRun,
                                                  BSONObjBuilder* commandResponseBuilder) {
+    auto lastOpAfterRun = repl::ReplClientInfo::forClient(opCtx->getClient()).getLastOp();
+
+    // Ensures that if we tried to do a write, we wait for write concern, even if that write was
+    // a noop.
+    if ((lastOpAfterRun == lastOpBeforeRun) &&
+        GlobalLockAcquisitionTracker::get(opCtx).getGlobalExclusiveLockTaken()) {
+        repl::ReplClientInfo::forClient(opCtx->getClient()).setLastOpToSystemLastOpTime(opCtx);
+        lastOpAfterRun = repl::ReplClientInfo::forClient(opCtx->getClient()).getLastOp();
+    }
+
     WriteConcernResult res;
     auto waitForWCStatus =
-        waitForWriteConcern(opCtx,
-                            repl::ReplClientInfo::forClient(opCtx->getClient()).getLastOp(),
-                            opCtx->getWriteConcern(),
-                            &res);
+        waitForWriteConcern(opCtx, lastOpAfterRun, opCtx->getWriteConcern(), &res);
     Command::appendCommandWCStatus(*commandResponseBuilder, waitForWCStatus, res);
 
     // SERVER-22421: This code is to ensure error response backwards compatibility with the
@@ -446,13 +456,15 @@ bool runCommandImpl(OperationContext* opCtx,
             return result;
         }
 
+        auto lastOpBeforeRun = repl::ReplClientInfo::forClient(opCtx->getClient()).getLastOp();
+
         // Change the write concern while running the command.
         const auto oldWC = opCtx->getWriteConcern();
         ON_BLOCK_EXIT([&] { opCtx->setWriteConcern(oldWC); });
         opCtx->setWriteConcern(wcResult.getValue());
         ON_BLOCK_EXIT([&] {
             _waitForWriteConcernAndAddToCommandResponse(
-                opCtx, command->getName(), &inPlaceReplyBob);
+                opCtx, command->getName(), lastOpBeforeRun, &inPlaceReplyBob);
         });
 
         result = command->enhancedRun(opCtx, request, inPlaceReplyBob);
