@@ -31,8 +31,6 @@
 #include "mongo/db/update/pop_node.h"
 
 #include "mongo/db/matcher/expression_parser.h"
-#include "mongo/db/update/path_support.h"
-#include "mongo/util/stringutils.h"
 
 namespace mongo {
 
@@ -70,33 +68,13 @@ void PopNode::apply(mutablebson::Element element,
     }
 
     if (!pathToCreate->empty()) {
-        // There were path components which we could not traverse. If 'element' is a nested object
-        // which does not contain 'pathToCreate', then this is a no-op (e.g. {$pop: {"a.b.c": 1}}
-        // for document {a: {b: {}}}).
-        //
-        // If the element is an array, but the numeric path does not exist, then this is also a
-        // no-op (e.g. {$pop: {"a.2.b": 1}} for document {a: [{b: 0}, {b: 1}]}).
-        //
-        // Otherwise, this the path contains a blocking leaf or array element, which is an error.
-        if (element.getType() == BSONType::Object) {
-            *noop = true;
-            return;
-        }
+        // There were path components we could not traverse. We treat this as a no-op, unless it
+        // would have been impossible to create those elements, which we check with
+        // checkViability().
+        UpdateLeafNode::checkViability(element, *pathToCreate, *pathTaken);
 
-        if (element.getType() == BSONType::Array &&
-            parseUnsignedBase10Integer(pathToCreate->getPart(0))) {
-            *noop = true;
-            return;
-        }
-
-        uasserted(ErrorCodes::PathNotViable,
-                  str::stream() << "Cannot use the part (" << pathToCreate->getPart(0) << ") of ("
-                                << pathTaken->dottedField()
-                                << "."
-                                << pathToCreate->dottedField()
-                                << ") to traverse the element ({"
-                                << element.toString()
-                                << "})");
+        *noop = true;
+        return;
     }
 
     invariant(!pathTaken->empty());

@@ -52,6 +52,20 @@ public:
      * multiple documents.
      */
     virtual Status init(BSONElement modExpr, const CollatorInterface* collator) = 0;
+
+    /* Check if it would be possible to create the path at 'pathToCreate' but don't actually create
+     * it. If 'element' is not an embedded object or array (e.g., we are trying to create path
+     * "a.b.c" in the document {a: 1}) or 'element' is an array but the first component in
+     * 'pathToCreate' is not an array index (e.g., the path "a.b.c" in the document
+     * {a: [{b: 1}, {b: 2}]}), then this function throws a UserException with
+     * ErrorCode::PathNotViable. Otherwise, this function is a no-op.
+     *
+     * With the exception of $unset, update modifiers that do not create nonexistent paths ($pop,
+     * $pull, $pullAll) still generate an error when it is not possible to create the path.
+     */
+    static void checkViability(mutablebson::Element element,
+                               const FieldRef& pathToCreate,
+                               const FieldRef& pathTaken);
 };
 
 }  // namespace mongo
