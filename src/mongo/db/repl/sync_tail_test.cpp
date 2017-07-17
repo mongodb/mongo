@@ -1,5 +1,5 @@
 /**
- *    Copyright 2015 MongoDB Inc.
+ *    Copyright 2015 (C) MongoDB Inc.
  *
  *    This program is free software: you can redistribute it and/or  modify
  *    it under the terms of the GNU Affero General Public License, version 3,
@@ -48,6 +48,7 @@
 #include "mongo/db/query/internal_plans.h"
 #include "mongo/db/repl/bgsync.h"
 #include "mongo/db/repl/drop_pending_collection_reaper.h"
+#include "mongo/db/repl/idempotency_test_fixture.h"
 #include "mongo/db/repl/oplog.h"
 #include "mongo/db/repl/oplog_interface_local.h"
 #include "mongo/db/repl/replication_consistency_markers_mock.h"
@@ -65,133 +66,9 @@
 #include "mongo/util/md5.hpp"
 #include "mongo/util/string_map.h"
 
+namespace mongo {
+namespace repl {
 namespace {
-
-using namespace mongo;
-using namespace mongo::repl;
-
-struct CollectionState {
-    CollectionState() = default;
-    CollectionState(CollectionOptions collectionOptions_,
-                    BSONObjSet indexSpecs_,
-                    std::string dataHash_)
-        : collectionOptions(std::move(collectionOptions_)),
-          indexSpecs(std::move(indexSpecs_)),
-          dataHash(std::move(dataHash_)),
-          exists(true){};
-
-    /**
-     * Compares BSON objects (BSONObj) in two sets of BSON objects (BSONObjSet) to see if the two
-     * sets are equivalent.
-     *
-     * Two sets are equivalent if and only if their sizes are the same and all of their elements
-     * that share the same index position are also equivalent in value.
-     */
-    bool cmpIndexSpecs(const BSONObjSet& otherSpecs) const {
-        if (indexSpecs.size() != otherSpecs.size()) {
-            return false;
-        }
-
-        auto thisIt = this->indexSpecs.begin();
-        auto otherIt = otherSpecs.begin();
-
-        // thisIt and otherIt cannot possibly be out of sync in terms of progression through
-        // their respective sets because we ensured earlier that their sizes are equal and we
-        // increment both by 1 on each iteration. We can avoid checking both iterator positions and
-        // only check one (thisIt).
-        for (; thisIt != this->indexSpecs.end(); ++thisIt, ++otherIt) {
-            // Since these are ordered sets, we expect that in the case of equivalent index specs,
-            // each copy will be in the same order in both sets, therefore each loop step should be
-            // true.
-
-            if (!thisIt->binaryEqual(*otherIt)) {
-                return false;
-            }
-        }
-
-        return true;
-    }
-
-    /**
-     * Returns a std::string representation of the CollectionState struct of which this is a member
-     * function. Returns out its representation in the form:
-     *
-     * Collection options: {...}; Index options: [...]; MD5 hash: <md5 digest string>
-     */
-    std::string toString() const {
-        if (!this->exists) {
-            return "Collection does not exist.";
-        }
-
-        BSONObj collectionOptionsBSON = this->collectionOptions.toBSON();
-        StringBuilder sb;
-        sb << "Collection options: " << collectionOptionsBSON.toString() << "; ";
-
-        sb << "Index specs: [ ";
-        bool firstIter = true;
-        for (auto indexSpec : this->indexSpecs) {
-            if (!firstIter) {
-                sb << ", ";
-            } else {
-                firstIter = false;
-            }
-            sb << indexSpec.toString();
-        }
-        sb << " ]; ";
-
-        sb << "MD5 Hash: ";
-        // Be more explicit about CollectionState structs without a supplied MD5 hash string.
-        sb << (this->dataHash.length() != 0 ? this->dataHash : "No hash");
-        return sb.str();
-    }
-
-    const CollectionOptions collectionOptions = CollectionOptions();
-    const BSONObjSet indexSpecs = SimpleBSONObjComparator::kInstance.makeBSONObjSet();
-    const std::string dataHash = "";
-    const bool exists = false;
-};
-
-bool operator==(const CollectionState& lhs, const CollectionState& rhs) {
-    if (!lhs.exists || !rhs.exists) {
-        return lhs.exists == rhs.exists;
-    }
-
-    BSONObj lhsCollectionOptionsBSON = lhs.collectionOptions.toBSON();
-    BSONObj rhsCollectionOptionsBSON = rhs.collectionOptions.toBSON();
-    // Since collection options uses deferred comparison, we opt to binary compare its BSON
-    // representations.
-    bool collectionOptionsEqual = lhsCollectionOptionsBSON.binaryEqual(rhsCollectionOptionsBSON);
-    bool indexSpecsEqual = lhs.cmpIndexSpecs(rhs.indexSpecs);
-    bool dataHashEqual = lhs.dataHash == rhs.dataHash;
-    bool existsEqual = lhs.exists == rhs.exists;
-    return collectionOptionsEqual && indexSpecsEqual && dataHashEqual && existsEqual;
-}
-
-std::ostream& operator<<(std::ostream& stream, const CollectionState& state) {
-    return stream << state.toString();
-}
-
-const auto kCollectionDoesNotExist = CollectionState();
-
-class SyncTailTest : public ServiceContextMongoDTest {
-protected:
-    void _testSyncApplyInsertDocument(LockMode expectedMode);
-    ServiceContext::UniqueOperationContext _opCtx;
-    unsigned int _opsApplied;
-    SyncTail::ApplyOperationInLockFn _applyOp;
-    SyncTail::ApplyCommandInLockFn _applyCmd;
-    SyncTail::IncrementOpsAppliedStatsFn _incOps;
-    StorageInterfaceMock* _storageInterface = nullptr;
-    ReplicationProcess* _replicationProcess = nullptr;
-
-    // Implements the MultiApplier::ApplyOperationFn interface and does nothing.
-    static Status noopApplyOperationFn(MultiApplier::OperationPtrs*) {
-        return Status::OK();
-    }
-
-    void setUp() override;
-    void tearDown() override;
-};
 
 /**
  * Testing-only SyncTail that returns user-provided "document" for getMissingDoc().
@@ -213,47 +90,6 @@ public:
     SyncTailWithOperationContextChecker();
     bool fetchAndInsertMissingDocument(OperationContext* opCtx, const BSONObj& o) override;
 };
-
-void SyncTailTest::setUp() {
-    ServiceContextMongoDTest::setUp();
-
-    auto service = getServiceContext();
-    ReplicationCoordinator::set(service, stdx::make_unique<ReplicationCoordinatorMock>(service));
-    auto storageInterface = stdx::make_unique<StorageInterfaceMock>();
-    _storageInterface = storageInterface.get();
-    storageInterface->insertDocumentsFn =
-        [](OperationContext*, const NamespaceString&, const std::vector<InsertStatement>&) {
-            return Status::OK();
-        };
-    StorageInterface::set(service, std::move(storageInterface));
-    DropPendingCollectionReaper::set(
-        service, stdx::make_unique<DropPendingCollectionReaper>(_storageInterface));
-
-    _replicationProcess = new ReplicationProcess(
-        _storageInterface, stdx::make_unique<ReplicationConsistencyMarkersMock>());
-    ReplicationProcess::set(cc().getServiceContext(),
-                            std::unique_ptr<ReplicationProcess>(_replicationProcess));
-
-
-    _opCtx = cc().makeOperationContext();
-    _opsApplied = 0;
-    _applyOp = [](OperationContext* opCtx,
-                  Database* db,
-                  const BSONObj& op,
-                  bool inSteadyStateReplication,
-                  stdx::function<void()>) { return Status::OK(); };
-    _applyCmd = [](OperationContext* opCtx, const BSONObj& op, bool) { return Status::OK(); };
-    _incOps = [this]() { _opsApplied++; };
-}
-
-void SyncTailTest::tearDown() {
-    auto service = getServiceContext();
-    _opCtx.reset();
-    ReplicationProcess::set(service, {});
-    DropPendingCollectionReaper::set(service, {});
-    StorageInterface::set(service, {});
-    ServiceContextMongoDTest::tearDown();
-}
 
 SyncTailWithLocalDocumentFetcher::SyncTailWithLocalDocumentFetcher(const BSONObj& document)
     : SyncTail(nullptr, SyncTail::MultiSyncApplyFunc(), nullptr), _document(document) {}
@@ -301,67 +137,6 @@ void createCollection(OperationContext* opCtx,
         ASSERT_TRUE(coll);
         wuow.commit();
     });
-}
-
-/**
- * Creates a command oplog entry with given optime and namespace.
- */
-OplogEntry makeCommandOplogEntry(OpTime opTime,
-                                 const NamespaceString& nss,
-                                 const BSONObj& command) {
-    return OplogEntry(opTime, 1LL, OpTypeEnum::kCommand, nss.getCommandNS(), 2, command);
-}
-
-/**
- * Creates a create collection oplog entry with given optime.
- */
-OplogEntry makeCreateCollectionOplogEntry(OpTime opTime,
-                                          const NamespaceString& nss = NamespaceString("test.t"),
-                                          const BSONObj& options = BSONObj()) {
-    BSONObjBuilder bob;
-    bob.append("create", nss.coll());
-    bob.appendElements(options);
-    return makeCommandOplogEntry(opTime, nss, bob.obj());
-}
-
-/**
- * Creates an insert oplog entry with given optime and namespace.
- */
-OplogEntry makeInsertDocumentOplogEntry(OpTime opTime,
-                                        const NamespaceString& nss,
-                                        const BSONObj& documentToInsert) {
-    return OplogEntry(opTime, 1LL, OpTypeEnum::kInsert, nss, documentToInsert);
-}
-
-/**
- * Creates an update oplog entry with given optime and namespace.
- */
-OplogEntry makeUpdateDocumentOplogEntry(OpTime opTime,
-                                        const NamespaceString& nss,
-                                        const BSONObj& documentToUpdate,
-                                        const BSONObj& updatedDocument) {
-    return OplogEntry(opTime, 1LL, OpTypeEnum::kUpdate, nss, updatedDocument, documentToUpdate);
-}
-
-/**
- * Creates an index creation entry with given optime and namespace.
- */
-OplogEntry makeCreateIndexOplogEntry(OpTime opTime,
-                                     const NamespaceString& nss,
-                                     const std::string& indexName,
-                                     const BSONObj& keyPattern) {
-    BSONObjBuilder indexInfoBob;
-    indexInfoBob.append("v", 2);
-    indexInfoBob.append("key", keyPattern);
-    indexInfoBob.append("name", indexName);
-    indexInfoBob.append("ns", nss.ns());
-    return makeInsertDocumentOplogEntry(
-        opTime, NamespaceString(nss.getSystemIndexesCollection()), indexInfoBob.obj());
-}
-
-Status failedApplyCommand(OperationContext* opCtx, const BSONObj& theOperation, bool) {
-    FAIL("applyCommand unexpectedly invoked.");
-    return Status::OK();
 }
 
 TEST_F(SyncTailTest, SyncApplyNoNamespaceBadOp) {
@@ -437,34 +212,6 @@ TEST_F(SyncTailTest, SyncApplyNoOpApplyOpThrowsException) {
     };
     ASSERT_OK(SyncTail::syncApply(_opCtx.get(), op, false, applyOp, failedApplyCommand, _incOps));
     ASSERT_EQUALS(5, applyOpCalled);
-}
-
-void SyncTailTest::_testSyncApplyInsertDocument(LockMode expectedMode) {
-    const BSONObj op = BSON("op"
-                            << "i"
-                            << "ns"
-                            << "test.t");
-    bool applyOpCalled = false;
-    SyncTail::ApplyOperationInLockFn applyOp = [&](OperationContext* opCtx,
-                                                   Database* db,
-                                                   const BSONObj& theOperation,
-                                                   bool inSteadyStateReplication,
-                                                   stdx::function<void()>) {
-        applyOpCalled = true;
-        ASSERT_TRUE(opCtx);
-        ASSERT_TRUE(opCtx->lockState()->isDbLockedForMode("test", expectedMode));
-        ASSERT_TRUE(opCtx->lockState()->isCollectionLockedForMode("test.t", expectedMode));
-        ASSERT_FALSE(opCtx->writesAreReplicated());
-        ASSERT_TRUE(documentValidationDisabled(opCtx));
-        ASSERT_TRUE(db);
-        ASSERT_BSONOBJ_EQ(op, theOperation);
-        ASSERT_TRUE(inSteadyStateReplication);
-        return Status::OK();
-    };
-    ASSERT_TRUE(_opCtx->writesAreReplicated());
-    ASSERT_FALSE(documentValidationDisabled(_opCtx.get()));
-    ASSERT_OK(SyncTail::syncApply(_opCtx.get(), op, true, applyOp, failedApplyCommand, _incOps));
-    ASSERT_TRUE(applyOpCalled);
 }
 
 TEST_F(SyncTailTest, SyncApplyInsertDocumentDatabaseMissing) {
@@ -1176,130 +923,6 @@ TEST_F(SyncTailTest,
     ASSERT_EQUALS(ErrorCodes::CollectionIsEmpty, iter->next().getStatus());
 }
 
-class IdempotencyTest : public SyncTailTest {
-protected:
-    OplogEntry createCollection();
-    OplogEntry insert(const BSONObj& obj);
-    template <class IdType>
-    OplogEntry update(IdType _id, const BSONObj& obj);
-    OplogEntry buildIndex(const BSONObj& indexSpec, const BSONObj& options = BSONObj());
-    OplogEntry dropIndex(const std::string& indexName);
-    OpTime nextOpTime() {
-        static long long lastSecond = 1;
-        return OpTime(Timestamp(Seconds(lastSecond++), 0), 1LL);
-    }
-    Status runOp(const OplogEntry& entry);
-    Status runOps(std::initializer_list<OplogEntry> ops);
-    // Validate data and indexes. Return the MD5 hash of the documents ordered by _id.
-    CollectionState validate();
-
-    NamespaceString nss{"test.foo"};
-    NamespaceString nssIndex{"test.system.indexes"};
-};
-
-Status IdempotencyTest::runOp(const OplogEntry& op) {
-    return runOps({op});
-}
-
-Status IdempotencyTest::runOps(std::initializer_list<OplogEntry> ops) {
-    SyncTail syncTail(nullptr, SyncTail::MultiSyncApplyFunc(), nullptr);
-    MultiApplier::OperationPtrs opsPtrs;
-    for (auto& op : ops) {
-        opsPtrs.push_back(&op);
-    }
-    AtomicUInt32 fetchCount(0);
-    return multiInitialSyncApply_noAbort(_opCtx.get(), &opsPtrs, &syncTail, &fetchCount);
-}
-
-OplogEntry IdempotencyTest::createCollection() {
-    return makeCreateCollectionOplogEntry(nextOpTime(), nss);
-}
-
-OplogEntry IdempotencyTest::insert(const BSONObj& obj) {
-    return makeInsertDocumentOplogEntry(nextOpTime(), nss, obj);
-}
-
-template <class IdType>
-OplogEntry IdempotencyTest::update(IdType id, const BSONObj& obj) {
-    return makeUpdateDocumentOplogEntry(nextOpTime(), nss, BSON("_id" << id), obj);
-}
-
-OplogEntry IdempotencyTest::buildIndex(const BSONObj& indexSpec, const BSONObj& options) {
-    BSONObjBuilder bob;
-    bob.append("v", 2);
-    bob.append("key", indexSpec);
-    bob.append("name", std::string(indexSpec.firstElementFieldName()) + "_index");
-    bob.append("ns", nss.ns());
-    bob.appendElementsUnique(options);
-    return makeInsertDocumentOplogEntry(nextOpTime(), nssIndex, bob.obj());
-}
-
-OplogEntry IdempotencyTest::dropIndex(const std::string& indexName) {
-    auto cmd = BSON("deleteIndexes" << nss.coll() << "index" << indexName);
-    return makeCommandOplogEntry(nextOpTime(), nss, cmd);
-}
-
-CollectionState IdempotencyTest::validate() {
-    // We check that a given operation will not resolve the same NamespaceString to different UUIDs,
-    // make sure to use a new operation here.
-    _opCtx.reset();
-    _opCtx = cc().makeOperationContext();
-
-    AutoGetCollectionForReadCommand autoColl(_opCtx.get(), nss);
-    auto collection = autoColl.getCollection();
-
-    if (!collection) {
-        // Return a mostly default initialized CollectionState struct with exists set to false to
-        // indicate an unfound Collection (or a view).
-        return kCollectionDoesNotExist;
-    }
-    ValidateResults validateResults;
-    BSONObjBuilder bob;
-
-    ASSERT_OK(collection->validate(_opCtx.get(), kValidateFull, &validateResults, &bob));
-    ASSERT_TRUE(validateResults.valid);
-
-    IndexDescriptor* desc = collection->getIndexCatalog()->findIdIndex(_opCtx.get());
-    ASSERT_TRUE(desc);
-    auto exec = InternalPlanner::indexScan(_opCtx.get(),
-                                           collection,
-                                           desc,
-                                           BSONObj(),
-                                           BSONObj(),
-                                           BoundInclusion::kIncludeStartKeyOnly,
-                                           PlanExecutor::NO_YIELD,
-                                           InternalPlanner::FORWARD,
-                                           InternalPlanner::IXSCAN_FETCH);
-    ASSERT(NULL != exec.get());
-    md5_state_t st;
-    md5_init(&st);
-
-    PlanExecutor::ExecState state;
-    BSONObj c;
-    while (PlanExecutor::ADVANCED == (state = exec->getNext(&c, NULL))) {
-        md5_append(&st, (const md5_byte_t*)c.objdata(), c.objsize());
-    }
-    ASSERT_EQUALS(PlanExecutor::IS_EOF, state);
-    md5digest d;
-    md5_finish(&st, d);
-    std::string dataHash = digestToString(d);
-
-    auto collectionCatalog = collection->getCatalogEntry();
-    auto collectionOptions = collectionCatalog->getCollectionOptions(_opCtx.get());
-    collectionOptions.uuid.reset();
-    std::vector<std::string> allIndexes;
-    BSONObjSet indexSpecs = SimpleBSONObjComparator::kInstance.makeBSONObjSet();
-    collectionCatalog->getAllIndexes(_opCtx.get(), &allIndexes);
-    for (auto const& index : allIndexes) {
-        indexSpecs.insert(collectionCatalog->getIndexSpec(_opCtx.get(), index));
-    }
-    ASSERT_EQUALS(indexSpecs.size(), allIndexes.size());
-
-    CollectionState collectionState(collectionOptions, indexSpecs, dataHash);
-
-    return collectionState;
-}
-
 TEST_F(IdempotencyTest, Geo2dsphereIndexFailedOnUpdate) {
     ASSERT_OK(
         ReplicationCoordinator::get(_opCtx.get())->setFollowerMode(MemberState::RS_RECOVERING));
@@ -1734,3 +1357,5 @@ TEST_F(IdempotencyTest, ResyncOnRenameCollection) {
 }
 
 }  // namespace
+}  // namespace repl
+}  // namespace mongo

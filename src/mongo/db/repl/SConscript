@@ -569,17 +569,39 @@ env.Library(
     ],
 )
 
+env.Library(
+    target='idempotency_test_fixture',
+    source=[
+        'idempotency_test_fixture.cpp',
+    ],
+    LIBDEPS=[
+        'sync_tail_test_fixture'
+    ],
+)
+
+env.Library(
+    target='sync_tail_test_fixture',
+    source=[
+        'sync_tail_test_fixture.cpp',
+    ],
+    LIBDEPS=[
+        'replication_process',
+        'replmocks',
+        'sync_tail',
+        '$BUILD_DIR/mongo/db/catalog/document_validation',
+        '$BUILD_DIR/mongo/db/service_context_d_test_fixture',
+    ],
+)
+
 env.CppUnitTest(
     target='sync_tail_test',
     source=[
         'sync_tail_test.cpp',
     ],
     LIBDEPS=[
+        'idempotency_test_fixture',
         'oplog_interface_local',
-        'replication_process',
-        'replmocks',
-        'sync_tail',
-        '$BUILD_DIR/mongo/db/service_context_d_test_fixture',
+        'sync_tail_test_fixture',
     ],
 )
 
