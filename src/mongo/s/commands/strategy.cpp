@@ -34,7 +34,6 @@
 
 #include "mongo/base/data_cursor.h"
 #include "mongo/base/init.h"
-#include "mongo/base/owned_pointer_vector.h"
 #include "mongo/base/status.h"
 #include "mongo/bson/util/bson_extract.h"
 #include "mongo/bson/util/builder.h"
@@ -42,12 +41,12 @@
 #include "mongo/db/auth/action_type.h"
 #include "mongo/db/auth/authorization_session.h"
 #include "mongo/db/commands.h"
-#include "mongo/db/lasterror.h"
 #include "mongo/db/logical_clock.h"
 #include "mongo/db/logical_time_validator.h"
 #include "mongo/db/matcher/extensions_callback_noop.h"
 #include "mongo/db/namespace_string.h"
 #include "mongo/db/operation_time_tracker.h"
+#include "mongo/db/ops/write_ops.h"
 #include "mongo/db/query/find_common.h"
 #include "mongo/db/query/getmore_request.h"
 #include "mongo/db/query/query_request.h"
@@ -66,9 +65,6 @@
 #include "mongo/s/query/cluster_cursor_manager.h"
 #include "mongo/s/query/cluster_find.h"
 #include "mongo/s/stale_exception.h"
-#include "mongo/s/write_ops/batch_upconvert.h"
-#include "mongo/s/write_ops/batched_command_request.h"
-#include "mongo/s/write_ops/batched_command_response.h"
 #include "mongo/util/log.h"
 #include "mongo/util/mongoutils/str.h"
 #include "mongo/util/net/op_msg.h"
@@ -316,6 +312,7 @@ void runCommand(OperationContext* opCtx, const OpMsgRequest& request, BSONObjBui
         MONGO_UNREACHABLE;
     }
 }
+
 }  // namespace
 
 DbResponse Strategy::queryOp(OperationContext* opCtx, const NamespaceString& nss, DbMessage* dbm) {
@@ -612,49 +609,25 @@ void Strategy::killCursors(OperationContext* opCtx, DbMessage* dbm) {
 }
 
 void Strategy::writeOp(OperationContext* opCtx, DbMessage* dbm) {
-    std::vector<std::unique_ptr<BatchedCommandRequest>> commandRequests;
+    runCommand(opCtx,
+               [&]() {
+                   const auto& msg = dbm->msg();
 
-    msgToBatchRequests(dbm->msg(), &commandRequests);
-
-    auto& clientLastError = LastError::get(opCtx->getClient());
-
-    for (auto it = commandRequests.begin(); it != commandRequests.end(); ++it) {
-        // Multiple commands registered to last error as multiple requests
-        if (it != commandRequests.begin()) {
-            clientLastError.startRequest();
-        }
-
-        BatchedCommandRequest* const commandRequest = it->get();
-
-        BatchedCommandResponse commandResponse;
-
-        {
-            // Disable the last error object for the duration of the write cmd
-            LastError::Disabled disableLastError(&clientLastError);
-
-            // Adjust namespace for command
-            const NamespaceString& fullNS(commandRequest->getNS());
-
-            BSONObjBuilder builder;
-            runAgainstRegistered(
-                opCtx, OpMsgRequest::fromDBAndBody(fullNS.db(), commandRequest->toBSON()), builder);
-
-            bool parsed = commandResponse.parseBSON(builder.done(), nullptr);
-            (void)parsed;  // for compile
-            dassert(parsed && commandResponse.isValid(nullptr));
-        }
-
-        // Populate the lastError object based on the write response
-        clientLastError.reset();
-
-        const bool hadError =
-            batchErrorToLastError(*commandRequest, commandResponse, &clientLastError);
-
-        // Check if this is an ordered batch and we had an error which should stop processing
-        if (commandRequest->getOrdered() && hadError) {
-            break;
-        }
-    }
+                   switch (msg.operation()) {
+                       case dbInsert: {
+                           return InsertOp::parseLegacy(msg).serialize({});
+                       }
+                       case dbUpdate: {
+                           return UpdateOp::parseLegacy(msg).serialize({});
+                       }
+                       case dbDelete: {
+                           return DeleteOp::parseLegacy(msg).serialize({});
+                       }
+                       default:
+                           MONGO_UNREACHABLE;
+                   }
+               }(),
+               BSONObjBuilder());
 }
 
 Status Strategy::explainFind(OperationContext* opCtx,

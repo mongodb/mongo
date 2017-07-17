@@ -45,7 +45,6 @@ env.Library(
 env.Library(
     target='cluster_write_op_conversion',
     source=[
-        'batch_upconvert.cpp',
         'batch_downconvert.cpp',
     ],
     LIBDEPS=[
@@ -88,7 +87,6 @@ env.CppUnitTest(
 env.CppUnitTest(
     target='cluster_write_op_conversion_test',
     source=[
-        'batch_upconvert_test.cpp',
         'batch_downconvert_test.cpp',
     ],
     LIBDEPS=[

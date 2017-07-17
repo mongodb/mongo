@@ -43,18 +43,78 @@
 #include "mongo/s/commands/cluster_explain.h"
 #include "mongo/s/commands/cluster_write.h"
 #include "mongo/s/grid.h"
-#include "mongo/s/write_ops/batch_upconvert.h"
 #include "mongo/s/write_ops/batched_command_request.h"
 #include "mongo/s/write_ops/batched_command_response.h"
 #include "mongo/util/timer.h"
 
 namespace mongo {
-
-using std::string;
-using std::stringstream;
-using std::vector;
-
 namespace {
+
+bool batchErrorToLastError(const BatchedCommandRequest& request,
+                           const BatchedCommandResponse& response,
+                           LastError* error) {
+    std::unique_ptr<WriteErrorDetail> commandError;
+    WriteErrorDetail* lastBatchError = NULL;
+
+    if (!response.getOk()) {
+        // Command-level error, all writes failed
+        commandError.reset(new WriteErrorDetail);
+        commandError->setErrCode(response.getErrCode());
+        commandError->setErrMessage(response.getErrMessage());
+
+        lastBatchError = commandError.get();
+    } else if (response.isErrDetailsSet()) {
+        // The last error in the batch is always reported - this matches expected COE semantics for
+        // insert batches. For updates and deletes, error is only reported if the error was on the
+        // last item.
+        const bool lastOpErrored = response.getErrDetails().back()->getIndex() ==
+            static_cast<int>(request.sizeWriteOps() - 1);
+        if (request.getBatchType() == BatchedCommandRequest::BatchType_Insert || lastOpErrored) {
+            lastBatchError = response.getErrDetails().back();
+        }
+    } else {
+        // We don't care about write concern errors, these happen in legacy mode in GLE.
+    }
+
+    // Record an error if one exists
+    if (lastBatchError) {
+        const auto& errMsg = lastBatchError->getErrMessage();
+        error->setLastError(lastBatchError->getErrCode(),
+                            errMsg.empty() ? "see code for details" : errMsg.c_str());
+        return true;
+    }
+
+    // Record write stats otherwise
+    //
+    // NOTE: For multi-write batches, our semantics change a little because we don't have
+    // un-aggregated "n" stats
+    if (request.getBatchType() == BatchedCommandRequest::BatchType_Update) {
+        BSONObj upsertedId;
+        if (response.isUpsertDetailsSet()) {
+            // Only report the very last item's upserted id if applicable
+            if (response.getUpsertDetails().back()->getIndex() + 1 ==
+                static_cast<int>(request.sizeWriteOps())) {
+                upsertedId = response.getUpsertDetails().back()->getUpsertedID();
+            }
+        }
+
+        const int numUpserted = response.isUpsertDetailsSet() ? response.sizeUpsertDetails() : 0;
+        const int numMatched = response.getN() - numUpserted;
+        dassert(numMatched >= 0);
+
+        // Wrap upserted id in "upserted" field
+        BSONObj leUpsertedId;
+        if (!upsertedId.isEmpty()) {
+            leUpsertedId = upsertedId.firstElement().wrap(kUpsertedFieldName);
+        }
+
+        error->recordUpdate(numMatched > 0, response.getN(), leUpsertedId);
+    } else if (request.getBatchType() == BatchedCommandRequest::BatchType_Delete) {
+        error->recordDelete(response.getN());
+    }
+
+    return false;
+}
 
 /**
  * Base class for mongos write commands.  Cluster write commands support batch writes and write
@@ -67,12 +127,12 @@ class ClusterWriteCmd : public Command {
 public:
     virtual ~ClusterWriteCmd() {}
 
-    virtual bool slaveOk() const {
+    bool slaveOk() const final {
         return false;
     }
 
 
-    virtual bool supportsWriteConcern(const BSONObj& cmd) const override {
+    bool supportsWriteConcern(const BSONObj& cmd) const final {
         return true;
     }
 
@@ -88,11 +148,11 @@ public:
         return status;
     }
 
-    virtual Status explain(OperationContext* opCtx,
-                           const std::string& dbname,
-                           const BSONObj& cmdObj,
-                           ExplainOptions::Verbosity verbosity,
-                           BSONObjBuilder* out) const {
+    Status explain(OperationContext* opCtx,
+                   const std::string& dbname,
+                   const BSONObj& cmdObj,
+                   ExplainOptions::Verbosity verbosity,
+                   BSONObjBuilder* out) const final {
         BatchedCommandRequest batchedRequest(_writeType);
         OpMsgRequest request;
         request.body = cmdObj;
@@ -111,7 +171,7 @@ public:
 
         // Target the command to the shards based on the singleton batch item.
         BatchItemRef targetingBatchItem(&batchedRequest, 0);
-        vector<Strategy::CommandResult> shardResults;
+        std::vector<Strategy::CommandResult> shardResults;
         Status status =
             _commandOpWrite(opCtx, dbname, explainCmd, targetingBatchItem, &shardResults);
         if (!status.isOK()) {
@@ -210,7 +270,7 @@ private:
         if (!status.isOK())
             return status;
 
-        vector<std::unique_ptr<ShardEndpoint>> endpoints;
+        std::vector<std::unique_ptr<ShardEndpoint>> endpoints;
 
         if (targetingBatchItem.getOpType() == BatchedCommandRequest::BatchType_Insert) {
             ShardEndpoint* endpoint;
@@ -283,12 +343,11 @@ private:
     }
 };
 
-
 class ClusterCmdInsert : public ClusterWriteCmd {
 public:
     ClusterCmdInsert() : ClusterWriteCmd("insert", BatchedCommandRequest::BatchType_Insert) {}
 
-    void help(stringstream& help) const {
+    void help(std::stringstream& help) const {
         help << "insert documents";
     }
 
@@ -298,7 +357,7 @@ class ClusterCmdUpdate : public ClusterWriteCmd {
 public:
     ClusterCmdUpdate() : ClusterWriteCmd("update", BatchedCommandRequest::BatchType_Update) {}
 
-    void help(stringstream& help) const {
+    void help(std::stringstream& help) const {
         help << "update documents";
     }
 
@@ -308,7 +367,7 @@ class ClusterCmdDelete : public ClusterWriteCmd {
 public:
     ClusterCmdDelete() : ClusterWriteCmd("delete", BatchedCommandRequest::BatchType_Delete) {}
 
-    void help(stringstream& help) const {
+    void help(std::stringstream& help) const {
         help << "delete documents";
     }
 

@@ -451,8 +451,8 @@ void BatchWriteOp::buildBatchRequest(const TargetedWriteBatch& targetedBatch,
         if (_clientRequest.isVerboseWC()) {
             request->setWriteConcern(_clientRequest.getWriteConcern());
         } else {
-            // Mongos needs to send to the shard with w > 0 so it will be able to
-            // see the writeErrors.
+            // Mongos needs to send to the shard with w > 0 so it will be able to see the
+            // writeErrors
             request->setWriteConcern(upgradeWriteConcern(_clientRequest.getWriteConcern()));
         }
     }
