@@ -41,6 +41,9 @@ class BSONObj;
  */
 class Chunk {
 public:
+    // Test whether we should split once data * kSplitTestFactor > chunkSize (approximately)
+    const uint64_t kSplitTestFactor = 5;
+
     explicit Chunk(const ChunkType& from);
 
     const BSONObj& getMin() const {
@@ -80,6 +83,8 @@ public:
     uint64_t getBytesWritten() const;
     uint64_t addBytesWritten(uint64_t bytesWrittenIncrement);
     void clearBytesWritten();
+
+    bool shouldSplit(uint64_t desiredChunkSize, bool minIsInf, bool maxIsInf) const;
 
     /**
      * Marks this chunk as jumbo. Only moves from false to true once and is used by the balancer.

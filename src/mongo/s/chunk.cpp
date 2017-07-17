@@ -62,6 +62,17 @@ void Chunk::clearBytesWritten() {
     _dataWritten = 0;
 }
 
+bool Chunk::shouldSplit(uint64_t desiredChunkSize, bool minIsInf, bool maxIsInf) const {
+    // If this chunk is at either end of the range, trigger auto-split at 10% less data written in
+    // order to trigger the top-chunk optimization.
+    const uint64_t splitThreshold = (minIsInf || maxIsInf)
+        ? static_cast<uint64_t>((double)desiredChunkSize * 0.9)
+        : desiredChunkSize;
+
+    // Check if there are enough estimated bytes written to warrant a split
+    return _dataWritten >= splitThreshold / kSplitTestFactor;
+}
+
 std::string Chunk::toString() const {
     return str::stream() << ChunkType::shard() << ": " << _shardId << ", " << ChunkType::lastmod()
                          << ": " << _lastmod.toString() << ", " << _range.toString();
