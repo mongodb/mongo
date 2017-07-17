@@ -54,6 +54,7 @@
 #include "mongo/db/ops/update_request.h"
 #include "mongo/db/ops/write_ops_exec.h"
 #include "mongo/db/ops/write_ops_gen.h"
+#include "mongo/db/ops/write_ops_retryability.h"
 #include "mongo/db/query/get_executor.h"
 #include "mongo/db/query/plan_summary_stats.h"
 #include "mongo/db/query/query_knobs.h"
@@ -61,6 +62,7 @@
 #include "mongo/db/repl/replication_coordinator.h"
 #include "mongo/db/s/collection_sharding_state.h"
 #include "mongo/db/s/sharding_state.h"
+#include "mongo/db/session_catalog.h"
 #include "mongo/db/stats/counters.h"
 #include "mongo/db/stats/top.h"
 #include "mongo/db/write_concern.h"
@@ -450,6 +452,8 @@ WriteResult performInserts(OperationContext* opCtx, const write_ops::Insert& who
     const size_t maxBatchSize = internalInsertMaxBatchSize.load();
     batch.reserve(std::min(wholeOp.getDocuments().size(), maxBatchSize));
 
+    auto session = OperationContextSession::get(opCtx);
+
     for (auto&& doc : wholeOp.getDocuments()) {
         const bool isLastDoc = (&doc == &wholeOp.getDocuments().back());
         auto fixedDoc = fixDocumentForInsert(opCtx->getServiceContext(), doc);
@@ -458,8 +462,16 @@ WriteResult performInserts(OperationContext* opCtx, const write_ops::Insert& who
             // correct order. In an ordered insert, if one of the docs ahead of us fails, we should
             // behave as-if we never got to this document.
         } else {
+            auto stmtId = getStmtIdForWriteOp(opCtx, wholeOp, stmtIdIndex++);
+            if (session) {
+                if (auto entry = session->checkStatementExecuted(opCtx, stmtId)) {
+                    out.results.emplace_back(parseOplogEntryForInsert(*entry));
+                    continue;
+                }
+            }
+
             BSONObj toInsert = fixedDoc.getValue().isEmpty() ? doc : std::move(fixedDoc.getValue());
-            batch.emplace_back(getStmtIdForWriteOp(opCtx, wholeOp, stmtIdIndex++), toInsert);
+            batch.emplace_back(stmtId, toInsert);
             bytesInBatch += batch.back().doc.objsize();
             if (!isLastDoc && batch.size() < maxBatchSize && bytesInBatch < insertVectorMaxBytes)
                 continue;  // Add more to batch before inserting.
@@ -590,7 +602,18 @@ WriteResult performUpdates(OperationContext* opCtx, const write_ops::Update& who
     size_t stmtIdIndex = 0;
     WriteResult out;
     out.results.reserve(wholeOp.getUpdates().size());
+
+    auto session = OperationContextSession::get(opCtx);
+
     for (auto&& singleOp : wholeOp.getUpdates()) {
+        auto stmtId = getStmtIdForWriteOp(opCtx, wholeOp, stmtIdIndex);
+        if (session) {
+            if (auto entry = session->checkStatementExecuted(opCtx, stmtId)) {
+                out.results.emplace_back(parseOplogEntryForUpdate(*entry));
+                continue;
+            }
+        }
+
         // TODO: don't create nested CurOp for legacy writes.
         // Add Command pointer to the nested CurOp.
         auto& parentCurOp = *CurOp::get(opCtx);
@@ -604,10 +627,7 @@ WriteResult performUpdates(OperationContext* opCtx, const write_ops::Update& who
         try {
             lastOpFixer.startingOp();
             out.results.emplace_back(
-                performSingleUpdateOp(opCtx,
-                                      wholeOp.getNamespace(),
-                                      getStmtIdForWriteOp(opCtx, wholeOp, stmtIdIndex++),
-                                      singleOp));
+                performSingleUpdateOp(opCtx, wholeOp.getNamespace(), stmtId, singleOp));
             lastOpFixer.finishedOpSuccessfully();
         } catch (const DBException& ex) {
             const bool canContinue =
@@ -706,7 +726,18 @@ WriteResult performDeletes(OperationContext* opCtx, const write_ops::Delete& who
     size_t stmtIdIndex = 0;
     WriteResult out;
     out.results.reserve(wholeOp.getDeletes().size());
+
+    auto session = OperationContextSession::get(opCtx);
+
     for (auto&& singleOp : wholeOp.getDeletes()) {
+        auto stmtId = getStmtIdForWriteOp(opCtx, wholeOp, stmtIdIndex++);
+        if (session) {
+            if (auto entry = session->checkStatementExecuted(opCtx, stmtId)) {
+                out.results.emplace_back(parseOplogEntryForDelete(*entry));
+                continue;
+            }
+        }
+
         // TODO: don't create nested CurOp for legacy writes.
         // Add Command pointer to the nested CurOp.
         auto& parentCurOp = *CurOp::get(opCtx);
@@ -720,10 +751,7 @@ WriteResult performDeletes(OperationContext* opCtx, const write_ops::Delete& who
         try {
             lastOpFixer.startingOp();
             out.results.emplace_back(
-                performSingleDeleteOp(opCtx,
-                                      wholeOp.getNamespace(),
-                                      getStmtIdForWriteOp(opCtx, wholeOp, stmtIdIndex++),
-                                      singleOp));
+                performSingleDeleteOp(opCtx, wholeOp.getNamespace(), stmtId, singleOp));
             lastOpFixer.finishedOpSuccessfully();
         } catch (const DBException& ex) {
             const bool canContinue =
