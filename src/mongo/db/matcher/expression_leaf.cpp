@@ -181,7 +181,7 @@ void ComparisonMatchExpression::debugString(StringBuilder& debug, int level) con
 }
 
 void ComparisonMatchExpression::serialize(BSONObjBuilder* out) const {
-    string opString = "";
+    std::string opString = "";
     switch (matchType()) {
         case LT:
             opString = "$lt";
@@ -826,7 +826,7 @@ void BitTestMatchExpression::debugString(StringBuilder& debug, int level) const 
 }
 
 void BitTestMatchExpression::serialize(BSONObjBuilder* out) const {
-    string opString = "";
+    std::string opString = "";
 
     switch (matchType()) {
         case BITS_ALL_SET:
