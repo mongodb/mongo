@@ -132,7 +132,7 @@ public:
     // ---- callback pieces -------
 
     virtual void say(Message& toSend, bool isRetry = false, std::string* actualServer = 0);
-    virtual bool recv(Message& toRecv);
+    virtual bool recv(Message& toRecv, int lastRequestId);
     virtual void checkResponse(const std::vector<BSONObj>& batch,
                                bool networkError,
                                bool* retry = NULL,

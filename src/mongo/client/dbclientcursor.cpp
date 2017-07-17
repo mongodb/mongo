@@ -114,6 +114,7 @@ void DBClientCursor::_assembleInit(Message& toSend) {
 }
 
 bool DBClientCursor::init() {
+    invariant(!_connectionHasPendingReplies);
     Message toSend;
     _assembleInit(toSend);
     verify(_client);
@@ -139,11 +140,15 @@ void DBClientCursor::initLazy(bool isRetry) {
     Message toSend;
     _assembleInit(toSend);
     _client->say(toSend, isRetry, &_originalHost);
+    _lastRequestId = toSend.header().getId();
+    _connectionHasPendingReplies = true;
 }
 
 bool DBClientCursor::initLazyFinish(bool& retry) {
+    invariant(_connectionHasPendingReplies);
     Message reply;
-    bool recvd = _client->recv(reply);
+    bool recvd = _client->recv(reply, _lastRequestId);
+    _connectionHasPendingReplies = false;
 
     // If we get a bad response, return false
     if (!recvd || reply.empty()) {
@@ -163,6 +168,7 @@ bool DBClientCursor::initLazyFinish(bool& retry) {
 }
 
 void DBClientCursor::requestMore() {
+    invariant(!_connectionHasPendingReplies);
     verify(cursorId && batch.pos == batch.objs.size());
 
     if (haveLimit) {
@@ -193,7 +199,7 @@ void DBClientCursor::exhaustReceiveMore() {
     verify(!haveLimit);
     Message response;
     verify(_client);
-    if (!_client->recv(response)) {
+    if (!_client->recv(response, _lastRequestId)) {
         uasserted(16465, "recv failed while exhausting cursor");
     }
     dataReceived(response);
@@ -257,6 +263,13 @@ void DBClientCursor::dataReceived(const Message& reply, bool& retry, string& hos
         // only set initially: we don't want to kill it on end of data
         // if it's a tailable cursor
         cursorId = qr.getCursorId();
+    }
+
+    if (opts & QueryOption_Exhaust) {
+        // With exhaust mode, each reply after the first claims to be a reply to the previous one
+        // rather than the initial request.
+        _connectionHasPendingReplies = (cursorId != 0);
+        _lastRequestId = reply.header().getId();
     }
 
     batch.pos = 0;
@@ -460,20 +473,18 @@ DBClientCursor::~DBClientCursor() {
 }
 
 void DBClientCursor::kill() {
-    DESTRUCTOR_GUARD(
-
+    DESTRUCTOR_GUARD({
         if (cursorId && _ownCursor && !globalInShutdownDeprecated()) {
-            if (_client) {
+            if (_client && !_connectionHasPendingReplies) {
                 _client->killCursor(cursorId);
             } else {
-                verify(_scopedHost.size());
-                ScopedDbConnection conn(_scopedHost);
+                verify(_scopedHost.size() || (_client && _connectionHasPendingReplies));
+                ScopedDbConnection conn(_client ? _client->getServerAddress() : _scopedHost);
                 conn->killCursor(cursorId);
                 conn.done();
             }
         }
-
-        );
+    });
 
     // Mark this cursor as dead since we can't do any getMores.
     cursorId = 0;

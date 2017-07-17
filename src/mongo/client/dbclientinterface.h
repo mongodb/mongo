@@ -227,7 +227,7 @@ public:
                      std::string* actualServer = nullptr) = 0;
 
     /* used by QueryOption_Exhaust.  To use that your subclass must implement this. */
-    virtual bool recv(Message& m) {
+    virtual bool recv(Message& m, int lastRequestId) {
         verify(false);
         return false;
     }
@@ -948,7 +948,7 @@ public:
     }
 
     virtual void say(Message& toSend, bool isRetry = false, std::string* actualServer = 0);
-    virtual bool recv(Message& m);
+    virtual bool recv(Message& m, int lastRequestId);
     virtual void checkResponse(const std::vector<BSONObj>& batch,
                                bool networkError,
                                bool* retry = NULL,

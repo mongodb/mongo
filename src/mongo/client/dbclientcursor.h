@@ -248,6 +248,8 @@ private:
     std::string _lazyHost;
     bool wasError;
     BSONVersion _enabledBSONVersion;
+    bool _connectionHasPendingReplies = false;
+    int _lastRequestId = 0;
 
     void dataReceived(const Message& reply) {
         bool retry;

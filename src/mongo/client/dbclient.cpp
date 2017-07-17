@@ -1243,11 +1243,15 @@ void DBClientConnection::say(Message& toSend, bool isRetry, string* actualServer
     }
 }
 
-bool DBClientConnection::recv(Message& m) {
+bool DBClientConnection::recv(Message& m, int lastRequestId) {
     if (!port().recv(m)) {
         _failed = true;
         return false;
     }
+
+    uassert(40570,
+            "Response ID did not match the sent message ID.",
+            m.header().getResponseToMsgId() == lastRequestId);
 
     if (m.operation() == dbCompressed) {
         auto swm = _compressorManager.decompressMessage(m);
