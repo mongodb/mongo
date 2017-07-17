@@ -45,10 +45,74 @@ TEST(GetTimeZone, DoesReturnKnownTimeZone) {
     kDefaultTimeZoneDatabase.getTimeZone("Australia/Sydney");
 }
 
+TEST(GetTimeZone, DoesParseHourOnlyOffset) {
+    auto date = Date_t::fromMillisSinceEpoch(1500371861000LL);
+
+    auto zone = kDefaultTimeZoneDatabase.getTimeZone("+02");
+    ASSERT_EQ(durationCount<Hours>(zone.utcOffset(date)), 2);
+
+    zone = kDefaultTimeZoneDatabase.getTimeZone("-02");
+    ASSERT_EQ(durationCount<Hours>(zone.utcOffset(date)), -2);
+
+    zone = kDefaultTimeZoneDatabase.getTimeZone("+00");
+    ASSERT_EQ(durationCount<Seconds>(zone.utcOffset(date)), 0);
+
+    zone = kDefaultTimeZoneDatabase.getTimeZone("-00");
+    ASSERT_EQ(durationCount<Seconds>(zone.utcOffset(date)), 0);
+}
+
+TEST(GetTimeZone, DoesParseHourMinuteOffset) {
+    auto date = Date_t::fromMillisSinceEpoch(1500371861000LL);
+
+    auto zone = kDefaultTimeZoneDatabase.getTimeZone("+0200");
+    ASSERT_EQ(durationCount<Hours>(zone.utcOffset(date)), 2);
+
+    zone = kDefaultTimeZoneDatabase.getTimeZone("-0200");
+    ASSERT_EQ(durationCount<Hours>(zone.utcOffset(date)), -2);
+
+    zone = kDefaultTimeZoneDatabase.getTimeZone("+0245");
+    ASSERT_EQ(durationCount<Minutes>(zone.utcOffset(date)), 165);
+
+    zone = kDefaultTimeZoneDatabase.getTimeZone("-0245");
+    ASSERT_EQ(durationCount<Minutes>(zone.utcOffset(date)), -165);
+}
+
+TEST(GetTimeZone, DoesParseHourMinuteOffsetWithColon) {
+    auto date = Date_t::fromMillisSinceEpoch(1500371861000LL);
+
+    auto zone = kDefaultTimeZoneDatabase.getTimeZone("+12:00");
+    ASSERT_EQ(durationCount<Hours>(zone.utcOffset(date)), 12);
+
+    zone = kDefaultTimeZoneDatabase.getTimeZone("-11:00");
+    ASSERT_EQ(durationCount<Hours>(zone.utcOffset(date)), -11);
+
+    zone = kDefaultTimeZoneDatabase.getTimeZone("+09:27");
+    ASSERT_EQ(durationCount<Minutes>(zone.utcOffset(date)), 567);
+
+    zone = kDefaultTimeZoneDatabase.getTimeZone("-00:37");
+    ASSERT_EQ(durationCount<Minutes>(zone.utcOffset(date)), -37);
+}
+
 TEST(GetTimeZone, DoesNotReturnUnknownTimeZone) {
     ASSERT_THROWS_CODE(kDefaultTimeZoneDatabase.getTimeZone("The moon"), UserException, 40485);
     ASSERT_THROWS_CODE(kDefaultTimeZoneDatabase.getTimeZone("xyz"), UserException, 40485);
     ASSERT_THROWS_CODE(kDefaultTimeZoneDatabase.getTimeZone("Jupiter"), UserException, 40485);
+}
+
+TEST(GetTimeZone, ThrowsUserExceptionIfGivenUnparsableUtcOffset) {
+    ASSERT_THROWS_CODE(kDefaultTimeZoneDatabase.getTimeZone("123"), UserException, 40485);
+    ASSERT_THROWS_CODE(kDefaultTimeZoneDatabase.getTimeZone("1234"), UserException, 40485);
+    ASSERT_THROWS_CODE(kDefaultTimeZoneDatabase.getTimeZone("12345"), UserException, 40485);
+    ASSERT_THROWS_CODE(kDefaultTimeZoneDatabase.getTimeZone("-123"), UserException, 40485);
+    ASSERT_THROWS_CODE(kDefaultTimeZoneDatabase.getTimeZone("-12*34"), UserException, 40485);
+    ASSERT_THROWS_CODE(kDefaultTimeZoneDatabase.getTimeZone("-1:23"), UserException, 40485);
+    ASSERT_THROWS_CODE(kDefaultTimeZoneDatabase.getTimeZone("-12:3"), UserException, 40485);
+    ASSERT_THROWS_CODE(kDefaultTimeZoneDatabase.getTimeZone("+123"), UserException, 40485);
+    ASSERT_THROWS_CODE(kDefaultTimeZoneDatabase.getTimeZone("+12*34"), UserException, 40485);
+    ASSERT_THROWS_CODE(kDefaultTimeZoneDatabase.getTimeZone("+1:23"), UserException, 40485);
+    ASSERT_THROWS_CODE(kDefaultTimeZoneDatabase.getTimeZone("+12:3"), UserException, 40485);
+    ASSERT_THROWS_CODE(kDefaultTimeZoneDatabase.getTimeZone("+0x4"), UserException, 40485);
+    ASSERT_THROWS_CODE(kDefaultTimeZoneDatabase.getTimeZone("-0xa0"), UserException, 40485);
 }
 
 TEST(UTCTimeBeforeEpoch, DoesExtractDateParts) {
@@ -70,6 +134,21 @@ TEST(NewYorkTimeBeforeEpoch, DoesExtractDateParts) {
     // 1969-12-30T13:42:23.211Z.
     auto date = Date_t::fromMillisSinceEpoch(-123456789LL);
     auto dateParts = newYorkZone.dateParts(date);
+    ASSERT_EQ(dateParts.year, 1969);
+    ASSERT_EQ(dateParts.month, 12);
+    ASSERT_EQ(dateParts.dayOfMonth, 30);
+    ASSERT_EQ(dateParts.hour, 8);
+    ASSERT_EQ(dateParts.minute, 42);
+    ASSERT_EQ(dateParts.second, 23);
+    ASSERT_EQ(dateParts.millisecond, 211);
+}
+
+TEST(UtcOffsetBeforeEpoch, DoesExtractDateParts) {
+    auto utcOffsetZone = kDefaultTimeZoneDatabase.getTimeZone("-05:00");
+
+    // 1969-12-30T13:42:23.211Z.
+    auto date = Date_t::fromMillisSinceEpoch(-123456789LL);
+    auto dateParts = utcOffsetZone.dateParts(date);
     ASSERT_EQ(dateParts.year, 1969);
     ASSERT_EQ(dateParts.month, 12);
     ASSERT_EQ(dateParts.dayOfMonth, 30);
@@ -243,6 +322,24 @@ TEST(NewYorkTimeBeforeEpoch, DoesComputeWeek) {
     // 1966-01-01T00:00:00.000Z (Saturday).
     date = Date_t::fromMillisSinceEpoch(-126230400000LL);
     ASSERT_EQ(newYorkZone.week(date), 52);
+}
+
+TEST(UTCTimeBeforeEpoch, DoesComputeUtcOffset) {
+    // Sunday, December 28, 1969.
+    auto date = Date_t::fromMillisSinceEpoch(-345600000LL);
+    ASSERT_EQ(durationCount<Seconds>(TimeZoneDatabase::utcZone().utcOffset(date)), 0);
+}
+
+TEST(NewYorkTimeBeforeEpoch, DoesComputeUtcOffset) {
+    auto newYorkZone = kDefaultTimeZoneDatabase.getTimeZone("America/New_York");
+
+    // 1969-06-29T00:00:00.000Z (Sunday).
+    auto date = Date_t::fromMillisSinceEpoch(-16070400000LL);
+    ASSERT_EQ(durationCount<Hours>(newYorkZone.utcOffset(date)), -4);
+
+    // 1966-01-01T00:00:00.000Z (Saturday).
+    date = Date_t::fromMillisSinceEpoch(-126230400000LL);
+    ASSERT_EQ(durationCount<Hours>(newYorkZone.utcOffset(date)), -5);
 }
 
 TEST(UTCTimeBeforeEpoch, DoesComputeISOWeek) {
@@ -434,6 +531,20 @@ TEST(NewYorkTimeAtEpoch, DoesComputeWeek) {
     // 1970-1-1T00:00:00.000Z
     auto date = Date_t::fromMillisSinceEpoch(0);
     ASSERT_EQ(newYorkZone.week(date), 52);
+}
+
+TEST(UTCTimeAtEpoch, DoesComputeUtcOffset) {
+    // Thursday, January 1, 1970.
+    auto date = Date_t::fromMillisSinceEpoch(0);
+    ASSERT_EQ(durationCount<Seconds>(TimeZoneDatabase::utcZone().utcOffset(date)), 0);
+}
+
+TEST(NewYorkTimeAtEpoch, DoesComputeUtcOffset) {
+    auto newYorkZone = kDefaultTimeZoneDatabase.getTimeZone("America/New_York");
+
+    // 1970-1-1T00:00:00.000Z
+    auto date = Date_t::fromMillisSinceEpoch(0);
+    ASSERT_EQ(durationCount<Hours>(newYorkZone.utcOffset(date)), -5);
 }
 
 TEST(UTCTimeAtEpoch, DoesComputeISOWeek) {
@@ -717,6 +828,24 @@ TEST(NewYorkTimeAfterEpoch, DoesComputeWeek) {
     ASSERT_EQ(newYorkZone.week(date), 53);
 }
 
+TEST(UTCTimeAfterEpoch, DoesComputeUtcOffset) {
+    // Tuesday, June 6, 2017.
+    auto date = Date_t::fromMillisSinceEpoch(1496777923000LL);
+    ASSERT_EQ(durationCount<Seconds>(TimeZoneDatabase::utcZone().utcOffset(date)), 0);
+}
+
+TEST(NewYorkTimeAfterEpoch, DoesComputeUtcOffset) {
+    auto newYorkZone = kDefaultTimeZoneDatabase.getTimeZone("America/New_York");
+
+    // Tuesday, June 6, 2017.
+    auto date = Date_t::fromMillisSinceEpoch(1496777923000LL);
+    ASSERT_EQ(durationCount<Hours>(newYorkZone.utcOffset(date)), -4);
+
+    // 2005-01-01T00:00:00.00Z (Saturday).
+    date = Date_t::fromMillisSinceEpoch(1104537600000LL);
+    ASSERT_EQ(durationCount<Hours>(newYorkZone.utcOffset(date)), -5);
+}
+
 TEST(UTCTimeAfterEpoch, DoesComputeISOWeek) {
     // Tuesday, June 6, 2017.
     auto date = Date_t::fromMillisSinceEpoch(1496777923000LL);
@@ -765,6 +894,18 @@ TEST(NewYorkTimeAfterEpoch, DoesFormatDate) {
                                      "isoWeek: %V, isoDayOfWeek: %u, percent: %%",
                                      date),
               "2017/06/06 15:38:43:234, dayOfYear: 157, dayOfWeek: 3, week: 23, isoYear: 2017, "
+              "isoWeek: 23, isoDayOfWeek: 2, percent: %");
+}
+
+TEST(UTCOffsetAfterEpoch, DoesFormatDate) {
+    // 2017-06-06T19:38:43:234Z (Tuesday).
+    auto date = Date_t::fromMillisSinceEpoch(1496777923234LL);
+    auto offsetSpec = kDefaultTimeZoneDatabase.getTimeZone("+02:30");
+    ASSERT_EQ(offsetSpec.formatDate("%Y/%m/%d %H:%M:%S:%L, dayOfYear: %j, "
+                                    "dayOfWeek: %w, week: %U, isoYear: %G, "
+                                    "isoWeek: %V, isoDayOfWeek: %u, percent: %%",
+                                    date),
+              "2017/06/06 22:08:43:234, dayOfYear: 157, dayOfWeek: 3, week: 23, isoYear: 2017, "
               "isoWeek: 23, isoDayOfWeek: 2, percent: %");
 }
 
@@ -823,5 +964,6 @@ TEST(DateFormat, ThrowsUserExceptionIfGivenDateAfterYear9999) {
     ASSERT_THROWS_CODE(
         TimeZoneDatabase::utcZone().formatDate("%Y", Date_t::max()), UserException, 18537);
 }
+
 }  // namespace
 }  // namespace mongo

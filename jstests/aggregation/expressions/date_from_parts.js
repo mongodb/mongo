@@ -188,6 +188,70 @@ load("jstests/aggregation/extras/utils.js");  // For assertErrorCode
            '$project': {
                date: {
                    '$dateFromParts': {
+                       timezone: "+02:00",
+                       year: 2017,
+                       month: 6,
+                       day: 23,
+                       hour: 14,
+                       minute: 27,
+                       second: 37,
+                       milliseconds: 742
+                   }
+               }
+           }
+        }],
+        [{
+           '$project': {
+               date: {
+                   '$dateFromParts': {
+                       timezone: "-02",
+                       year: 2017,
+                       month: 6,
+                       day: 23,
+                       hour: 10,
+                       minute: 27,
+                       second: 37,
+                       milliseconds: 742
+                   }
+               }
+           }
+        }],
+        [{
+           '$project': {
+               date: {
+                   '$dateFromParts': {
+                       timezone: "+02:00",
+                       year: 2017,
+                       month: 6,
+                       day: 23,
+                       hour: 14,
+                       minute: 27,
+                       second: 37,
+                       milliseconds: 742
+                   }
+               }
+           }
+        }],
+        [{
+           '$project': {
+               date: {
+                   '$dateFromParts': {
+                       timezone: "+04:15",
+                       year: 2017,
+                       month: 6,
+                       day: 23,
+                       hour: 16,
+                       minute: 42,
+                       second: 37,
+                       milliseconds: 742
+                   }
+               }
+           }
+        }],
+        [{
+           '$project': {
+               date: {
+                   '$dateFromParts': {
                        timezone: "$timezone",
                        year: 2017,
                        month: 6,
@@ -579,6 +643,106 @@ load("jstests/aggregation/extras/utils.js");  // For assertErrorCode
                 }
             ])
             .toArray());
+
+    /* --------------------------------------------------------------------------------------- */
+
+    coll.drop();
+
+    assert.writeOK(coll.insert([
+        {
+          _id: 0,
+          year: NumberDecimal("2017"),
+          month: 6.0,
+          day: NumberInt(19),
+          hour: NumberLong(15),
+          minute: NumberDecimal(1),
+          second: 51,
+          milliseconds: 551
+        },
+    ]));
+
+    var tests = [
+        {expected: ISODate("2017-06-19T19:01:51.551Z"), tz: "-04:00"},
+        {expected: ISODate("2017-06-19T12:01:51.551Z"), tz: "+03"},
+        {expected: ISODate("2017-06-19T18:21:51.551Z"), tz: "-0320"},
+        {expected: ISODate("2017-06-19T19:01:51.551Z"), tz: "America/New_York"},
+        {expected: ISODate("2017-06-19T13:01:51.551Z"), tz: "Europe/Amsterdam"},
+    ];
+
+    tests.forEach(function(test) {
+        assert.eq(
+            [
+              {_id: 0, date: test.expected},
+            ],
+            coll.aggregate([{
+                    $project: {
+                        date: {
+                            "$dateFromParts": {
+                                year: "$year",
+                                month: "$month",
+                                day: "$day",
+                                hour: "$hour",
+                                minute: "$minute",
+                                second: "$second",
+                                milliseconds: "$milliseconds",
+                                timezone: test.tz
+                            }
+                        }
+                    }
+                }])
+                .toArray(),
+            tojson(test));
+    });
+
+    /* --------------------------------------------------------------------------------------- */
+
+    coll.drop();
+
+    assert.writeOK(coll.insert([
+        {
+          _id: 0,
+          isoYear: NumberDecimal("2017"),
+          isoWeekYear: 25.0,
+          isoDayOfWeek: NumberInt(1),
+          hour: NumberLong(15),
+          minute: NumberDecimal(1),
+          second: 51,
+          milliseconds: 551
+        },
+    ]));
+
+    var tests = [
+        {expected: ISODate("2017-06-19T19:01:51.551Z"), tz: "-04:00"},
+        {expected: ISODate("2017-06-19T12:01:51.551Z"), tz: "+03"},
+        {expected: ISODate("2017-06-19T18:21:51.551Z"), tz: "-0320"},
+        {expected: ISODate("2017-06-19T19:01:51.551Z"), tz: "America/New_York"},
+        {expected: ISODate("2017-06-19T13:01:51.551Z"), tz: "Europe/Amsterdam"},
+    ];
+
+    tests.forEach(function(test) {
+        assert.eq(
+            [
+              {_id: 0, date: test.expected},
+            ],
+            coll.aggregate([{
+                    $project: {
+                        date: {
+                            "$dateFromParts": {
+                                isoYear: "$isoYear",
+                                isoWeekYear: "$isoWeekYear",
+                                isoDayOfWeek: "$isoDayOfWeek",
+                                hour: "$hour",
+                                minute: "$minute",
+                                second: "$second",
+                                milliseconds: "$milliseconds",
+                                timezone: test.tz
+                            }
+                        }
+                    }
+                }])
+                .toArray(),
+            tojson(test));
+    });
 
     /* --------------------------------------------------------------------------------------- */
 

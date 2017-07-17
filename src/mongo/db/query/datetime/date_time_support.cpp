@@ -233,19 +233,74 @@ Date_t TimeZoneDatabase::fromString(StringData dateString, boost::optional<TimeZ
         durationCount<Milliseconds>(Seconds(parsedTime->sse) + Microseconds(parsedTime->us)));
 }
 
+boost::optional<Seconds> TimeZoneDatabase::parseUtcOffset(StringData offsetSpec) const {
+    // Needs to start with either '+' or '-'.
+    if (!offsetSpec.empty() && (offsetSpec[0] == '+' || offsetSpec[0] == '-')) {
+        auto bias = offsetSpec[0] == '+' ? 1 : -1;
+
+        // ±HH
+        if (offsetSpec.size() == 3 && isdigit(offsetSpec[1]) && isdigit(offsetSpec[2])) {
+            int offset;
+            if (parseNumberFromStringWithBase(offsetSpec.substr(1, 2), 10, &offset).isOK()) {
+                return Seconds(bias * 60 * offset);
+            }
+            return boost::none;
+        }
+
+        // ±HHMM
+        if (offsetSpec.size() == 5 && isdigit(offsetSpec[1]) && isdigit(offsetSpec[2]) &&
+            isdigit(offsetSpec[3]) && isdigit(offsetSpec[4])) {
+            int offset;
+            if (parseNumberFromStringWithBase(offsetSpec.substr(1, 4), 10, &offset).isOK()) {
+                return Seconds(bias * (60 * ((offset / 100L)) + (offset % 100)));
+            }
+            return boost::none;
+        }
+
+        // ±HH:MM
+        if (offsetSpec.size() == 6 && isdigit(offsetSpec[1]) && isdigit(offsetSpec[2]) &&
+            offsetSpec[3] == ':' && isdigit(offsetSpec[4]) && isdigit(offsetSpec[5])) {
+            int hourOffset, minuteOffset;
+            if (!parseNumberFromStringWithBase(offsetSpec.substr(1, 2), 10, &hourOffset).isOK()) {
+                return boost::none;
+            }
+            if (!parseNumberFromStringWithBase(offsetSpec.substr(4, 2), 10, &minuteOffset).isOK()) {
+                return boost::none;
+            }
+            return Seconds(bias * ((60 * hourOffset) + minuteOffset));
+        }
+    }
+    return boost::none;
+}
+
 TimeZone TimeZoneDatabase::getTimeZone(StringData timeZoneId) const {
     auto tz = _timeZones.find(timeZoneId);
     if (tz != _timeZones.end()) {
         return tz->second;
     }
 
+    // Check for a possible UTC offset
+    if (auto UtcOffset = parseUtcOffset(timeZoneId)) {
+        return TimeZone(*UtcOffset);
+    }
+
     uasserted(40485,
               str::stream() << "unrecognized time zone identifier: \"" << timeZoneId << "\"");
 }
 
+void TimeZone::adjustTimeZone(timelib_time* t) const {
+    if (_tzInfo) {
+        timelib_set_timezone(t, _tzInfo.get());
+    } else if (durationCount<Seconds>(_utcOffset)) {
+        timelib_set_timezone_from_offset(t, -durationCount<Seconds>(_utcOffset));
+    }
+    timelib_update_ts(t, nullptr);
+    timelib_update_from_sse(t);
+}
+
 Date_t TimeZone::createFromDateParts(
     int year, int month, int day, int hour, int minute, int second, int millisecond) const {
-    auto newTime = timelib_time_ctor();
+    std::unique_ptr<timelib_time, TimeZone::TimelibTimeDeleter> newTime(timelib_time_ctor());
 
     newTime->y = year;
     newTime->m = month;
@@ -255,18 +310,10 @@ Date_t TimeZone::createFromDateParts(
     newTime->s = second;
     newTime->us = durationCount<Microseconds>(Milliseconds(millisecond));
 
-    if (_tzInfo) {
-        timelib_update_ts(newTime, _tzInfo.get());
-        timelib_set_timezone(newTime, _tzInfo.get());
-    } else {
-        timelib_update_ts(newTime, nullptr);
-    }
-    timelib_unixtime2gmt(newTime, newTime->sse);
+    adjustTimeZone(newTime.get());
 
     auto returnValue = Date_t::fromMillisSinceEpoch(
         durationCount<Milliseconds>(Seconds(newTime->sse) + Microseconds(newTime->us)));
-
-    timelib_time_dtor(newTime);
 
     return returnValue;
 }
@@ -278,7 +325,7 @@ Date_t TimeZone::createFromIso8601DateParts(int isoYear,
                                             int minute,
                                             int second,
                                             int millisecond) const {
-    auto newTime = timelib_time_ctor();
+    std::unique_ptr<timelib_time, TimeZone::TimelibTimeDeleter> newTime(timelib_time_ctor());
 
     timelib_date_from_isodate(
         isoYear, isoWeekYear, isoDayOfWeek, &newTime->y, &newTime->m, &newTime->d);
@@ -287,18 +334,10 @@ Date_t TimeZone::createFromIso8601DateParts(int isoYear,
     newTime->s = second;
     newTime->us = durationCount<Microseconds>(Milliseconds(millisecond));
 
-    if (_tzInfo) {
-        timelib_update_ts(newTime, _tzInfo.get());
-        timelib_set_timezone(newTime, _tzInfo.get());
-    } else {
-        timelib_update_ts(newTime, nullptr);
-    }
-    timelib_unixtime2gmt(newTime, newTime->sse);
+    adjustTimeZone(newTime.get());
 
     auto returnValue = Date_t::fromMillisSinceEpoch(
         durationCount<Milliseconds>(Seconds(newTime->sse) + Microseconds(newTime->us)));
-
-    timelib_time_dtor(newTime);
 
     return returnValue;
 }
@@ -343,7 +382,10 @@ void TimeZone::TimelibTZInfoDeleter::operator()(timelib_tzinfo* tzInfo) {
     }
 }
 
-TimeZone::TimeZone(timelib_tzinfo* tzInfo) : _tzInfo(tzInfo, TimelibTZInfoDeleter()) {}
+TimeZone::TimeZone(timelib_tzinfo* tzInfo)
+    : _tzInfo(tzInfo, TimelibTZInfoDeleter()), _utcOffset(0) {}
+
+TimeZone::TimeZone(Seconds utcOffsetSeconds) : _tzInfo(nullptr), _utcOffset(utcOffsetSeconds) {}
 
 void TimeZone::TimelibTimeDeleter::operator()(timelib_time* time) {
     timelib_time_dtor(time);
@@ -352,12 +394,11 @@ void TimeZone::TimelibTimeDeleter::operator()(timelib_time* time) {
 std::unique_ptr<timelib_time, TimeZone::TimelibTimeDeleter> TimeZone::getTimelibTime(
     Date_t date) const {
     std::unique_ptr<timelib_time, TimeZone::TimelibTimeDeleter> time(timelib_time_ctor());
-    if (_tzInfo) {
-        timelib_set_timezone(time.get(), _tzInfo.get());
-        timelib_unixtime2local(time.get(), seconds(date));
-    } else {
-        timelib_unixtime2gmt(time.get(), seconds(date));
-    }
+
+    timelib_unixtime2gmt(time.get(), seconds(date));
+    adjustTimeZone(time.get());
+    timelib_unixtime2local(time.get(), seconds(date));
+
     return time;
 }
 
@@ -419,6 +460,13 @@ long long TimeZone::isoYear(Date_t date) const {
 
 Seconds TimeZone::utcOffset(Date_t date) const {
     auto time = getTimelibTime(date);
+
+    // This is required because timelib stores a time with an UTC offset as minutes west, and we
+    // want seconds east here.
+    if (!_tzInfo && durationCount<Seconds>(_utcOffset)) {
+        return duration_cast<Seconds>(Minutes(-time->z));
+    }
+
     return Seconds(time->z);
 }
 

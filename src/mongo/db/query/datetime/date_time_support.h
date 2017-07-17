@@ -91,6 +91,7 @@ public:
     };
 
     explicit TimeZone(timelib_tzinfo* tzInfo);
+    explicit TimeZone(Seconds utcOffsetSeconds);
     TimeZone() = default;
 
     /**
@@ -296,8 +297,17 @@ private:
         void operator()(timelib_tzinfo* tzInfo);
     };
 
-    // null if this TimeZone represents the default UTC TimeZone.
+    /**
+     * Helper function to apply tzInfo and utcOffset information to the constructed timelib_time*
+     * value.
+     */
+    void adjustTimeZone(timelib_time* t) const;
+
+    // null if this TimeZone represents the default UTC time zone, or a UTC-offset time zone
     std::shared_ptr<timelib_tzinfo> _tzInfo;
+
+    // represents the UTC offset in seconds if _tzInfo is null and it is not 0
+    Seconds _utcOffset{0};
 };
 
 /**
@@ -381,6 +391,12 @@ private:
      * 'timeZoneDatabase'.
      */
     void loadTimeZoneInfo(std::unique_ptr<_timelib_tzdb, TimeZoneDBDeleter> timeZoneDatabase);
+
+    /**
+     * Tries to find a UTC offset in 'offsetSpec' in an ISO8601 format (±HH, ±HHMM, or ±HH:MM) and
+     * returns it as an offset to UTC in seconds.
+     */
+    boost::optional<Seconds> parseUtcOffset(StringData offsetSpec) const;
 
     // A map from the time zone name to the struct describing the timezone. These are pre-populated
     // at startup to avoid reading the source files repeatedly.
