@@ -72,6 +72,10 @@ if (typeof _threadInject != "undefined") {
         this._add("t.remove( " + tojson(obj) + " )");
     };
 
+    EventGenerator.prototype.addCurrentOp = function() {
+        this._add("db.currentOp()");
+    };
+
     EventGenerator.prototype.addUpdate = function(objOld, objNew) {
         this._add("t.update( " + tojson(objOld) + ", " + tojson(objNew) + " )");
     };
@@ -101,7 +105,11 @@ if (typeof _threadInject != "undefined") {
         var collectionName = args.shift();
         var host = args.shift();
         var m = new Mongo(host);
-        var t = m.getDB("test")[collectionName];
+
+        // We define 'db' and 't' as local variables so that calling eval() on the stringified
+        // JavaScript expression 'args[i][1]' can take advantage of using them.
+        var db = m.getDB("test");
+        var t = db[collectionName];
         for (var i in args) {
             sleep(args[i][0]);
             eval(args[i][1]);
