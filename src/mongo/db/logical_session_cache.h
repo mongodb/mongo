@@ -146,7 +146,7 @@ public:
      * this call will return an error.
      */
     StatusWith<SignedLogicalSessionId> signLsid(OperationContext* opCtx,
-                                                const LogicalSessionId& id,
+                                                LogicalSessionId* id,
                                                 boost::optional<OID> userId);
 
     /**

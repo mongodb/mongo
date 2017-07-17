@@ -63,7 +63,7 @@ KeysCollectionManagerZero kKeysCollectionManagerZero{"HMAC"};
 ServiceLiason::~ServiceLiason() = default;
 
 StatusWith<SignedLogicalSessionId> ServiceLiason::signLsid(OperationContext* opCtx,
-                                                           const LogicalSessionId& lsid,
+                                                           LogicalSessionId* lsid,
                                                            boost::optional<OID> userId) {
     auto& keyManager = kKeysCollectionManagerZero;
 
@@ -75,7 +75,7 @@ StatusWith<SignedLogicalSessionId> ServiceLiason::signLsid(OperationContext* opC
 
     SignedLogicalSessionId signedLsid;
     signedLsid.setUserId(std::move(userId));
-    signedLsid.setLsid(lsid);
+    signedLsid.setLsid(*lsid);
 
     auto keyDoc = res.getValue();
     signedLsid.setKeyId(keyDoc.getKeyId());

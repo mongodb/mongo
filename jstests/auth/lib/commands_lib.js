@@ -4454,12 +4454,6 @@ var authCommandsLib = {
               {runOnDb: adminDbName, roles: {__system: 1}, expectFail: true},
           ]
         },
-        {
-          testname: "startSession",
-          command: {startSession: 1},
-          privileges: [{resource: {cluster: true}, actions: ["startSession"]}],
-          testcases: [{runOnDb: adminDbName, roles: roles_all}],
-        },
     ],
 
     /************* SHARED TEST LOGIC ****************/
