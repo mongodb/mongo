@@ -109,7 +109,6 @@ using std::vector;
 using IndexVersion = IndexDescriptor::IndexVersion;
 
 namespace repl {
-std::string rsOplogName = "local.oplog.rs";
 std::string masterSlaveOplogName = "local.oplog.$main";
 
 MONGO_FP_DECLARE(disableSnapshotting);
@@ -228,7 +227,7 @@ private:
 void setOplogCollectionName() {
     if (getGlobalReplicationCoordinator()->getReplicationMode() ==
         ReplicationCoordinator::modeReplSet) {
-        _oplogCollectionName = rsOplogName;
+        _oplogCollectionName = NamespaceString::kRsOplogNamespace.ns();
     } else {
         _oplogCollectionName = masterSlaveOplogName;
     }
@@ -296,14 +295,15 @@ OplogDocWriter _logOpWriter(OperationContext* opCtx,
 
 // Truncates the oplog after and including the "truncateTimestamp" entry.
 void truncateOplogTo(OperationContext* opCtx, Timestamp truncateTimestamp) {
-    const NamespaceString oplogNss(rsOplogName);
+    const NamespaceString oplogNss(NamespaceString::kRsOplogNamespace);
     AutoGetDb autoDb(opCtx, oplogNss.db(), MODE_IX);
     Lock::CollectionLock oplogCollectionLoc(opCtx->lockState(), oplogNss.ns(), MODE_X);
     Collection* oplogCollection = autoDb.getDb()->getCollection(opCtx, oplogNss);
     if (!oplogCollection) {
         fassertFailedWithStatusNoTrace(
             34418,
-            Status(ErrorCodes::NamespaceNotFound, str::stream() << "Can't find " << rsOplogName));
+            Status(ErrorCodes::NamespaceNotFound,
+                   str::stream() << "Can't find " << NamespaceString::kRsOplogNamespace.ns()));
     }
 
     // Scan through oplog in reverse, from latest entry to first, to find the truncateTimestamp.
@@ -1401,7 +1401,8 @@ void SnapshotThread::run() {
 
             auto opTimeOfSnapshot = OpTime();
             {
-                AutoGetCollectionForReadCommand oplog(opCtx.get(), NamespaceString(rsOplogName));
+                AutoGetCollectionForReadCommand oplog(opCtx.get(),
+                                                      NamespaceString::kRsOplogNamespace);
                 invariant(oplog.getCollection());
                 // Read the latest op from the oplog.
                 auto cursor = oplog.getCollection()->getCursor(opCtx.get(), /*forward*/ false);

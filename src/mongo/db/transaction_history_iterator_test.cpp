@@ -35,6 +35,7 @@
 #include "mongo/db/curop.h"
 #include "mongo/db/db_raii.h"
 #include "mongo/db/dbdirectclient.h"
+#include "mongo/db/namespace_string.h"
 #include "mongo/db/operation_context.h"
 #include "mongo/db/repl/oplog.h"
 #include "mongo/db/repl/oplog_entry.h"
@@ -68,7 +69,8 @@ public:
 
         // Note: internal code does not allow implicit creation of non-capped oplog collection.
         DBDirectClient client(opCtx());
-        ASSERT_TRUE(client.createCollection(repl::rsOplogName, 1024 * 1024, true));
+        ASSERT_TRUE(
+            client.createCollection(NamespaceString::kRsOplogNamespace.ns(), 1024 * 1024, true));
     }
 
     void tearDown() override {
@@ -84,7 +86,7 @@ public:
      * fixDocumentForInsert.
      */
     void insertOplogEntry(const repl::OplogEntry newOplog) {
-        AutoGetCollection autoColl(opCtx(), NamespaceString(repl::rsOplogName), MODE_IX);
+        AutoGetCollection autoColl(opCtx(), NamespaceString::kRsOplogNamespace, MODE_IX);
         auto coll = autoColl.getCollection();
         ASSERT_TRUE(coll != nullptr);
 

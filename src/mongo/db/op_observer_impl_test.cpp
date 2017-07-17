@@ -65,7 +65,7 @@ private:
 protected:
     // Assert that oplog only has a single entry and return that oplog entry.
     BSONObj getSingleOplogEntry(OperationContext* opCtx) {
-        repl::OplogInterfaceLocal oplogInterface(opCtx, repl::rsOplogName);
+        repl::OplogInterfaceLocal oplogInterface(opCtx, NamespaceString::kRsOplogNamespace.ns());
         auto oplogIter = oplogInterface.makeIterator();
         auto opEntry = unittest::assertGet(oplogIter->next());
         ASSERT_EQUALS(ErrorCodes::CollectionIsEmpty, oplogIter->next().getStatus());

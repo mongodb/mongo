@@ -200,7 +200,7 @@ public:
 
         const std::string& oplogNS =
             replCoord->getReplicationMode() == ReplicationCoordinator::modeReplSet
-            ? rsOplogName
+            ? NamespaceString::kRsOplogNamespace.ns()
             : masterSlaveOplogName;
         BSONObj o;
         uassert(17347,

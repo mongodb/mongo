@@ -476,7 +476,7 @@ void scheduleWritesToOplog(OperationContext* opCtx,
 
             fassertStatusOK(40141,
                             StorageInterface::get(opCtx)->insertDocuments(
-                                opCtx, NamespaceString(rsOplogName), docs));
+                                opCtx, NamespaceString::kRsOplogNamespace, docs));
         };
     };
 
@@ -684,9 +684,9 @@ private:
         OperationContext& opCtx = *opCtxPtr;
         const auto replCoord = ReplicationCoordinator::get(&opCtx);
         const auto fastClockSource = opCtx.getServiceContext()->getFastClockSource();
-        const auto oplogMaxSize = fassertStatusOK(
-            40301,
-            StorageInterface::get(&opCtx)->getOplogMaxSize(&opCtx, NamespaceString(rsOplogName)));
+        const auto oplogMaxSize = fassertStatusOK(40301,
+                                                  StorageInterface::get(&opCtx)->getOplogMaxSize(
+                                                      &opCtx, NamespaceString::kRsOplogNamespace));
 
         // Batches are limited to 10% of the oplog.
         BatchLimits batchLimits;

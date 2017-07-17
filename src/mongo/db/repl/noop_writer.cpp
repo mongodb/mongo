@@ -34,6 +34,7 @@
 #include "mongo/db/concurrency/d_concurrency.h"
 #include "mongo/db/concurrency/write_conflict_exception.h"
 #include "mongo/db/curop.h"
+#include "mongo/db/namespace_string.h"
 #include "mongo/db/op_observer.h"
 #include "mongo/db/repl/noop_writer.h"
 #include "mongo/db/repl/oplog.h"
@@ -167,12 +168,13 @@ void NoopWriter::_writeNoop(OperationContext* opCtx) {
             LOG(logLevel)
                 << "Writing noop to oplog as there has been no writes to this replica set in over "
                 << _writeInterval;
-            writeConflictRetry(opCtx, "writeNoop", rsOplogName, [&opCtx] {
-                WriteUnitOfWork uow(opCtx);
-                opCtx->getClient()->getServiceContext()->getOpObserver()->onOpMessage(opCtx,
-                                                                                      kMsgObj);
-                uow.commit();
-            });
+            writeConflictRetry(
+                opCtx, "writeNoop", NamespaceString::kRsOplogNamespace.ns(), [&opCtx] {
+                    WriteUnitOfWork uow(opCtx);
+                    opCtx->getClient()->getServiceContext()->getOpObserver()->onOpMessage(opCtx,
+                                                                                          kMsgObj);
+                    uow.commit();
+                });
         }
     }
 

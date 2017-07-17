@@ -451,7 +451,7 @@ void BackgroundSync::_produce(OperationContext* opCtx) {
             _replicationCoordinatorExternalState->getTaskExecutor(),
             OpTimeWithHash(lastHashFetched, lastOpTimeFetched),
             source,
-            NamespaceString(rsOplogName),
+            NamespaceString::kRsOplogNamespace,
             _replCoord->getConfig(),
             _replicationCoordinatorExternalState->getOplogFetcherMaxFetcherRestarts(),
             syncSourceResp.rbid,
@@ -644,7 +644,7 @@ void BackgroundSync::_runRollback(OperationContext* opCtx,
         }
     }
 
-    OplogInterfaceLocal localOplog(opCtx, rsOplogName);
+    OplogInterfaceLocal localOplog(opCtx, NamespaceString::kRsOplogNamespace.ns());
 
     // TODO: We will have to check what storage engine is being used eventually, since
     // "rollback to a checkpoint" only works on certain storage engines that have this
@@ -707,7 +707,7 @@ void BackgroundSync::_runRollback(OperationContext* opCtx,
                 executor,
                 &localOplog,
                 source,
-                NamespaceString(rsOplogName),
+                NamespaceString::kRsOplogNamespace,
                 _replicationCoordinatorExternalState->getOplogFetcherMaxFetcherRestarts(),
                 requiredRBID,
                 _replCoord,
@@ -758,7 +758,8 @@ void BackgroundSync::_fallBackOnRollbackViaRefetch(OperationContext* opCtx,
         return connection->get();
     };
 
-    RollbackSourceImpl rollbackSource(getConnection, source, rsOplogName);
+    RollbackSourceImpl rollbackSource(
+        getConnection, source, NamespaceString::kRsOplogNamespace.ns());
 
     if (useUUID) {
         rollback(opCtx, *localOplog, rollbackSource, requiredRBID, _replCoord, _replicationProcess);
@@ -837,10 +838,12 @@ void BackgroundSync::clearBuffer(OperationContext* opCtx) {
 OpTimeWithHash BackgroundSync::_readLastAppliedOpTimeWithHash(OperationContext* opCtx) {
     BSONObj oplogEntry;
     try {
-        bool success = writeConflictRetry(opCtx, "readLastAppliedHash", rsOplogName, [&] {
-            Lock::DBLock lk(opCtx, "local", MODE_X);
-            return Helpers::getLast(opCtx, rsOplogName.c_str(), oplogEntry);
-        });
+        bool success = writeConflictRetry(
+            opCtx, "readLastAppliedHash", NamespaceString::kRsOplogNamespace.ns(), [&] {
+                Lock::DBLock lk(opCtx, "local", MODE_X);
+                return Helpers::getLast(
+                    opCtx, NamespaceString::kRsOplogNamespace.ns().c_str(), oplogEntry);
+            });
 
         if (!success) {
             // This can happen when we are to do an initial sync.  lastHash will be set
@@ -848,15 +851,16 @@ OpTimeWithHash BackgroundSync::_readLastAppliedOpTimeWithHash(OperationContext* 
             return OpTimeWithHash(0);
         }
     } catch (const DBException& ex) {
-        severe() << "Problem reading " << rsOplogName << ": " << redact(ex);
+        severe() << "Problem reading " << NamespaceString::kRsOplogNamespace.ns() << ": "
+                 << redact(ex);
         fassertFailed(18904);
     }
     long long hash;
     auto status = bsonExtractIntegerField(oplogEntry, kHashFieldName, &hash);
     if (!status.isOK()) {
-        severe() << "Most recent entry in " << rsOplogName << " is missing or has invalid \""
-                 << kHashFieldName << "\" field. Oplog entry: " << redact(oplogEntry) << ": "
-                 << redact(status);
+        severe() << "Most recent entry in " << NamespaceString::kRsOplogNamespace.ns()
+                 << " is missing or has invalid \"" << kHashFieldName
+                 << "\" field. Oplog entry: " << redact(oplogEntry) << ": " << redact(status);
         fassertFailed(18902);
     }
     OplogEntry parsedEntry(oplogEntry);

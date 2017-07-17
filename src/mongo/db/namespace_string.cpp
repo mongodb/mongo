@@ -88,6 +88,7 @@ constexpr StringData NamespaceString::kShardConfigCollectionsCollectionName;
 const NamespaceString NamespaceString::kServerConfigurationNamespace(kServerConfiguration);
 const NamespaceString NamespaceString::kSessionTransactionsTableNamespace(
     NamespaceString::kConfigDb, "transactions");
+const NamespaceString NamespaceString::kRsOplogNamespace(NamespaceString::kLocalDb, "oplog.rs");
 
 bool NamespaceString::isListCollectionsCursorNS() const {
     return coll() == listCollectionsCursorCol;

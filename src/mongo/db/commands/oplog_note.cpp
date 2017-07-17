@@ -41,6 +41,7 @@
 #include "mongo/db/concurrency/write_conflict_exception.h"
 #include "mongo/db/curop.h"
 #include "mongo/db/jsobj.h"
+#include "mongo/db/namespace_string.h"
 #include "mongo/db/op_observer.h"
 #include "mongo/db/operation_context.h"
 #include "mongo/db/repl/oplog.h"
@@ -69,7 +70,7 @@ Status _performNoopWrite(OperationContext* opCtx, BSONObj msgObj, StringData not
         return {ErrorCodes::NotMaster, "Not a primary"};
     }
 
-    writeConflictRetry(opCtx, note, repl::rsOplogName, [&opCtx, &msgObj] {
+    writeConflictRetry(opCtx, note, NamespaceString::kRsOplogNamespace.ns(), [&opCtx, &msgObj] {
         WriteUnitOfWork uow(opCtx);
         opCtx->getClient()->getServiceContext()->getOpObserver()->onOpMessage(opCtx, msgObj);
         uow.commit();

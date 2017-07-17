@@ -616,7 +616,7 @@ void ReplicationCoordinatorExternalStateImpl::cleanUpLastApplyBatch(OperationCon
           << topOfOplog << " (inclusive).";
 
     DBDirectClient db(opCtx);
-    auto cursor = db.query(rsOplogName,
+    auto cursor = db.query(NamespaceString::kRsOplogNamespace.ns(),
                            QUERY("ts" << BSON("$gte" << appliedThrough.getTimestamp())),
                            /*batchSize*/ 0,
                            /*skip*/ 0,
@@ -661,15 +661,16 @@ StatusWith<OpTime> ReplicationCoordinatorExternalStateImpl::loadLastOpTime(
         }
 
         BSONObj oplogEntry;
-        if (!Helpers::getLast(opCtx, rsOplogName.c_str(), oplogEntry)) {
+        if (!Helpers::getLast(opCtx, NamespaceString::kRsOplogNamespace.ns().c_str(), oplogEntry)) {
             return StatusWith<OpTime>(ErrorCodes::NoMatchingDocument,
                                       str::stream() << "Did not find any entries in "
-                                                    << rsOplogName);
+                                                    << NamespaceString::kRsOplogNamespace.ns());
         }
         BSONElement tsElement = oplogEntry[tsFieldName];
         if (tsElement.eoo()) {
             return StatusWith<OpTime>(ErrorCodes::NoSuchKey,
-                                      str::stream() << "Most recent entry in " << rsOplogName
+                                      str::stream() << "Most recent entry in "
+                                                    << NamespaceString::kRsOplogNamespace.ns()
                                                     << " missing \""
                                                     << tsFieldName
                                                     << "\" field");
@@ -678,7 +679,7 @@ StatusWith<OpTime> ReplicationCoordinatorExternalStateImpl::loadLastOpTime(
             return StatusWith<OpTime>(ErrorCodes::TypeMismatch,
                                       str::stream() << "Expected type of \"" << tsFieldName
                                                     << "\" in most recent "
-                                                    << rsOplogName
+                                                    << NamespaceString::kRsOplogNamespace.ns()
                                                     << " entry to have type Timestamp, but found "
                                                     << typeName(tsElement.type()));
         }

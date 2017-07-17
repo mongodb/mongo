@@ -41,6 +41,7 @@
 #include "mongo/db/db_raii.h"
 #include "mongo/db/exec/pipeline_proxy.h"
 #include "mongo/db/exec/working_set_common.h"
+#include "mongo/db/namespace_string.h"
 #include "mongo/db/pipeline/accumulator.h"
 #include "mongo/db/pipeline/document.h"
 #include "mongo/db/pipeline/document_source.h"
@@ -295,7 +296,7 @@ Status runAggregate(OperationContext* opCtx,
     {
         const LiteParsedPipeline liteParsedPipeline(request);
         if (liteParsedPipeline.startsWithChangeNotification()) {
-            nss = NamespaceString(repl::rsOplogName);
+            nss = NamespaceString::kRsOplogNamespace;
         }
 
         const auto& pipelineInvolvedNamespaces = liteParsedPipeline.getInvolvedNamespaces();
@@ -325,7 +326,7 @@ Status runAggregate(OperationContext* opCtx,
         // collection.  (The lock must be released because recursively acquiring locks on the
         // database will prohibit yielding.)
         if (ctx && ctx->getView() && !liteParsedPipeline.startsWithCollStats()) {
-            invariant(nss != repl::rsOplogName);
+            invariant(nss != NamespaceString::kRsOplogNamespace);
             invariant(!nss.isCollectionlessAggregateNS());
             // Check that the default collation of 'view' is compatible with the operation's
             // collation. The check is skipped if the 'request' has the empty collation, which

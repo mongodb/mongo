@@ -292,7 +292,7 @@ unsigned long long checkIfReplMissingFromCommandLine(OperationContext* opCtx) {
  * Caller must lock DB before calling this function.
  */
 void checkForCappedOplog(OperationContext* opCtx, Database* db) {
-    const NamespaceString oplogNss(repl::rsOplogName);
+    const NamespaceString oplogNss(NamespaceString::kRsOplogNamespace);
     invariant(opCtx->lockState()->isDbLockedForMode(oplogNss.db(), MODE_IS));
     Collection* oplogCollection = db->getCollection(opCtx, oplogNss);
     if (oplogCollection && !oplogCollection->isCapped()) {

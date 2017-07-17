@@ -1426,9 +1426,9 @@ env.Library(
     LIBDEPS=[
         '$BUILD_DIR/mongo/db/dbdirectclient',
         '$BUILD_DIR/mongo/db/logical_session_id',
+        '$BUILD_DIR/mongo/db/namespace_string',
         '$BUILD_DIR/mongo/db/ops/write_ops',
         '$BUILD_DIR/mongo/db/repl/oplog_entry',
-        '$BUILD_DIR/mongo/db/repl/oplog',
         '$BUILD_DIR/mongo/idl/idl_parser',
     ],
 )

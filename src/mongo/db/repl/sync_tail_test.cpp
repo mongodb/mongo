@@ -485,7 +485,7 @@ TEST_F(SyncTailTest, MultiApplyAssignsOperationsToWriterThreadsBasedOnNamespaceH
     // Check ops in oplog.
     stdx::lock_guard<stdx::mutex> lock(mutex);
     ASSERT_EQUALS(2U, operationsWrittenToOplog.size());
-    ASSERT_EQUALS(NamespaceString(rsOplogName), nssForInsert);
+    ASSERT_EQUALS(NamespaceString::kRsOplogNamespace, nssForInsert);
     ASSERT_BSONOBJ_EQ(op1.raw, operationsWrittenToOplog[0].doc);
     ASSERT_BSONOBJ_EQ(op2.raw, operationsWrittenToOplog[1].doc);
 }

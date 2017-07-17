@@ -29,8 +29,8 @@
 #include "mongo/platform/basic.h"
 
 #include "mongo/db/dbdirectclient.h"
+#include "mongo/db/namespace_string.h"
 #include "mongo/db/operation_context.h"
-#include "mongo/db/repl/oplog.h"
 #include "mongo/db/repl/oplog_entry.h"
 #include "mongo/db/transaction_history_iterator.h"
 #include "mongo/logger/redaction.h"
@@ -51,7 +51,7 @@ repl::OplogEntry TransactionHistoryIterator::next(OperationContext* opCtx) {
     DBDirectClient client(opCtx);
     // TODO: SERVER-29843 oplogReplay option might be needed to activate fast ts search.
     auto oplogBSON =
-        client.findOne(repl::rsOplogName,
+        client.findOne(NamespaceString::kRsOplogNamespace.ns(),
                        BSON(repl::OplogEntryBase::kTimestampFieldName << _nextOpTimeTs),
                        /* fieldsToReturn */ nullptr,
                        0 /* QueryOption_OplogReplay */);

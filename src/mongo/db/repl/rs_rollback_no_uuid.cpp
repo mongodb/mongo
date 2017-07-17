@@ -843,15 +843,16 @@ void syncFixUp(OperationContext* opCtx,
 
     // Cleans up the oplog.
     {
-        const NamespaceString oplogNss(rsOplogName);
+        const NamespaceString oplogNss(NamespaceString::kRsOplogNamespace);
         Lock::DBLock oplogDbLock(opCtx, oplogNss.db(), MODE_IX);
         Lock::CollectionLock oplogCollectionLoc(opCtx->lockState(), oplogNss.ns(), MODE_X);
-        OldClientContext ctx(opCtx, rsOplogName);
+        OldClientContext ctx(opCtx, oplogNss.ns());
         Collection* oplogCollection = ctx.db()->getCollection(opCtx, oplogNss);
         if (!oplogCollection) {
-            fassertFailedWithStatusNoTrace(13423,
-                                           Status(ErrorCodes::UnrecoverableRollbackError,
-                                                  str::stream() << "Can't find " << rsOplogName));
+            fassertFailedWithStatusNoTrace(
+                13423,
+                Status(ErrorCodes::UnrecoverableRollbackError,
+                       str::stream() << "Can't find " << NamespaceString::kRsOplogNamespace.ns()));
         }
         // TODO: fatal error if this throws?
         oplogCollection->cappedTruncateAfter(opCtx, fixUpInfo.commonPointOurDiskloc, false);

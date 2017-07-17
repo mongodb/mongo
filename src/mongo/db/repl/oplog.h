@@ -67,7 +67,6 @@ void createOplog(OperationContext* opCtx, const std::string& oplogCollectionName
  */
 void createOplog(OperationContext* opCtx);
 
-extern std::string rsOplogName;
 extern std::string masterSlaveOplogName;
 
 extern int OPLOG_VERSION;

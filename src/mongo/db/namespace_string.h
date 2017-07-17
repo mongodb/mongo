@@ -77,6 +77,9 @@ public:
     // Namespace for storing the transaction information for each session
     static const NamespaceString kSessionTransactionsTableNamespace;
 
+    // Namespace of the the oplog collection.
+    static const NamespaceString kRsOplogNamespace;
+
     /**
      * Constructs an empty NamespaceString.
      */
