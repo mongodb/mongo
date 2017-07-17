@@ -47,6 +47,7 @@
 #include "mongo/db/audit.h"
 #include "mongo/db/auth/action_set.h"
 #include "mongo/db/auth/action_type.h"
+#include "mongo/db/auth/address_restriction.h"
 #include "mongo/db/auth/authorization_manager.h"
 #include "mongo/db/auth/authorization_manager_global.h"
 #include "mongo/db/auth/authorization_session.h"
@@ -695,9 +696,15 @@ public:
         }
         credentialsBuilder.done();
 
+        if (args.authenticationRestrictions && !args.authenticationRestrictions->isEmpty()) {
+            credentialsBuilder.append("authenticationRestrictions",
+                                      *args.authenticationRestrictions);
+        }
+
         if (args.hasCustomData) {
             userObjBuilder.append("customData", args.customData);
         }
+
         userObjBuilder.append("roles", rolesVectorToBSONArray(args.roles));
 
         BSONObj userObj = userObjBuilder.obj();

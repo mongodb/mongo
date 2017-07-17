@@ -37,6 +37,7 @@
 #include "mongo/db/auth/authorization_manager.h"
 #include "mongo/db/auth/user_document_parser.h"
 #include "mongo/db/operation_context.h"
+#include "mongo/db/server_options.h"
 #include "mongo/util/log.h"
 #include "mongo/util/mongoutils/str.h"
 
@@ -252,6 +253,13 @@ Status AuthzManagerExternalStateLocal::_getUserDocument(OperationContext* opCtx,
         status =
             Status(ErrorCodes::UserNotFound,
                    mongoutils::str::stream() << "Could not find user " << userName.getFullName());
+    } else if ((*userDoc)["authenticationRestrictions"] &&
+               serverGlobalParams.featureCompatibility.version.load() <
+                   ServerGlobalParams::FeatureCompatibility::Version::k36) {
+        // Mongos isn't able to evaluate whether documents are valid under the current
+        // featureCompatibilityVersion. We must make the decision before it sees them.
+        status = Status(ErrorCodes::UnsupportedFormat,
+                        "'authenticationRestrictions' requires 3.6 feature compatibility version");
     }
     return status;
 }

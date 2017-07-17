@@ -42,6 +42,7 @@
 #include "mongo/db/json.h"
 #include "mongo/db/namespace_string.h"
 #include "mongo/db/operation_context.h"
+#include "mongo/db/server_options.h"
 #include "mongo/db/service_context_noop.h"
 #include "mongo/stdx/memory.h"
 #include "mongo/transport/session.h"
@@ -92,6 +93,8 @@ public:
     std::unique_ptr<AuthorizationSessionForTest> authzSession;
 
     void setUp() {
+        serverGlobalParams.featureCompatibility.version.store(
+            ServerGlobalParams::FeatureCompatibility::Version::k36);
         session = transportLayer.createSession();
         client = serviceContext.makeClient("testClient", session);
         RestrictionEnvironment::set(
@@ -567,6 +570,82 @@ TEST_F(AuthorizationSessionTest, UseOldUserInfoInFaceOfConnectivityProblems) {
         authzSession->isAuthorizedForActionsOnResource(testFooCollResource, ActionType::find));
     ASSERT_FALSE(
         authzSession->isAuthorizedForActionsOnResource(testFooCollResource, ActionType::insert));
+}
+
+TEST_F(AuthorizationSessionTest, AcquireUserFailsWithOldFeatureCompatibilityVersion) {
+    ASSERT_OK(managerState->insertPrivilegeDocument(_opCtx.get(),
+                                                    BSON("user"
+                                                         << "spencer"
+                                                         << "db"
+                                                         << "test"
+                                                         << "credentials"
+                                                         << BSON("MONGODB-CR"
+                                                                 << "a")
+                                                         << "roles"
+                                                         << BSON_ARRAY(BSON("role"
+                                                                            << "readWrite"
+                                                                            << "db"
+                                                                            << "test"))
+                                                         << "authenticationRestrictions"
+                                                         << BSON_ARRAY(BSON(
+                                                                "clientSource"
+                                                                << BSON_ARRAY("192.168.0.0/24"
+                                                                              << "192.168.2.10")
+                                                                << "serverAddress"
+                                                                << BSON_ARRAY("192.168.0.2")))),
+                                                    BSONObj()));
+
+    serverGlobalParams.featureCompatibility.version.store(
+        ServerGlobalParams::FeatureCompatibility::Version::k34);
+
+    RestrictionEnvironment::set(
+        session,
+        stdx::make_unique<RestrictionEnvironment>(SockAddr("192.168.0.6", 5555, AF_UNSPEC),
+                                                  SockAddr("192.168.0.2", 5555, AF_UNSPEC)));
+
+    ASSERT_NOT_OK(authzSession->addAndAuthorizeUser(_opCtx.get(), UserName("spencer", "test")));
+}
+
+TEST_F(AuthorizationSessionTest, RefreshRemovesRestrictedUsersDuringFeatureCompatibilityDowngrade) {
+    ASSERT_OK(managerState->insertPrivilegeDocument(
+        _opCtx.get(),
+        BSON("user"
+             << "spencer"
+             << "db"
+             << "test"
+             << "credentials"
+             << BSON("MONGODB-CR"
+                     << "a")
+             << "roles"
+             << BSON_ARRAY(BSON("role"
+                                << "readWrite"
+                                << "db"
+                                << "test"))
+             << "authenticationRestrictions"
+             << BSON_ARRAY(BSON("clientSource" << BSON_ARRAY("192.168.0.0/24") << "serverAddress"
+                                               << BSON_ARRAY("192.168.0.2")))),
+        BSONObj()));
+
+    RestrictionEnvironment::set(
+        session,
+        stdx::make_unique<RestrictionEnvironment>(SockAddr("192.168.0.6", 5555, AF_UNSPEC),
+                                                  SockAddr("192.168.0.2", 5555, AF_UNSPEC)));
+
+    ASSERT_OK(authzSession->addAndAuthorizeUser(_opCtx.get(), UserName("spencer", "test")));
+
+    serverGlobalParams.featureCompatibility.version.store(
+        ServerGlobalParams::FeatureCompatibility::Version::k34);
+
+    ASSERT_TRUE(authzSession->lookupUser(UserName("spencer", "test")));
+    ASSERT_TRUE(
+        authzSession->isAuthorizedForActionsOnResource(testFooCollResource, ActionType::find));
+
+    authzManager->invalidateUserCache();
+    authzSession->startRequest(_opCtx.get());
+
+    ASSERT_FALSE(authzSession->lookupUser(UserName("spencer", "test")));
+    ASSERT_FALSE(
+        authzSession->isAuthorizedForActionsOnResource(testFooCollResource, ActionType::find));
 }
 
 TEST_F(AuthorizationSessionTest, AcquireUserObtainsAndValidatesAuthenticationRestrictions) {

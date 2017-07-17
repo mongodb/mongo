@@ -52,6 +52,7 @@ struct CreateOrUpdateUserArgs {
     BSONObj customData;
     bool hasRoles;
     std::vector<RoleName> roles;
+    boost::optional<BSONArray> authenticationRestrictions;
 
     CreateOrUpdateUserArgs() : hasHashedPassword(false), hasCustomData(false), hasRoles(false) {}
 };

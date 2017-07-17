@@ -38,6 +38,7 @@
 #include "mongo/db/auth/authorization_manager.h"
 #include "mongo/db/auth/user_document_parser.h"
 #include "mongo/db/jsobj.h"
+#include "mongo/db/server_options.h"
 #include "mongo/unittest/unittest.h"
 #include "mongo/util/net/sock.h"
 
@@ -231,6 +232,8 @@ public:
     V2UserDocumentParser v2parser;
 
     void setUp() {
+        serverGlobalParams.featureCompatibility.version.store(
+            ServerGlobalParams::FeatureCompatibility::Version::k36);
         user.reset(new User(UserName("spencer", "test")));
         adminUser.reset(new User(UserName("admin", "admin")));
     }
@@ -610,6 +613,19 @@ TEST_F(V2UserDocumentParsing, V2RoleExtraction) {
     ASSERT_FALSE(roles.more());
 }
 
+TEST_F(V2UserDocumentParsing,
+       V2AuthenticationRestrictionsExtractioniFailsOnOldFeatureCompatibilityVersion) {
+    serverGlobalParams.featureCompatibility.version.store(
+        ServerGlobalParams::FeatureCompatibility::Version::k34);
+    Status status = v2parser.initializeAuthenticationRestrictionsFromUserDocument(
+        BSON("user"
+             << "spencer"
+             << "authenticationRestrictions"
+             << BSON_ARRAY(BSON("clientSource" << BSON_ARRAY("::1")))),
+        user.get());
+    ASSERT_EQ(ErrorCodes::UnsupportedFormat, status.code());
+}
+
 TEST_F(V2UserDocumentParsing, V2AuthenticationRestrictionsExtraction) {
     const auto emptyArray = BSONArrayBuilder().arr();
     const auto emptyObj = BSONObjBuilder().obj();
@@ -688,6 +704,8 @@ TEST_F(V2UserDocumentParsing, V2AuthenticationRestrictionsExtraction) {
 }
 
 TEST_F(V2UserDocumentParsing, V2AuthenticationRestrictionsExtractionAndRetreival) {
+    serverGlobalParams.featureCompatibility.version.store(
+        ServerGlobalParams::FeatureCompatibility::Version::k36);
     enableIPv6(true);
     ASSERT_OK(v2parser.initializeAuthenticationRestrictionsFromUserDocument(
         BSON("user"

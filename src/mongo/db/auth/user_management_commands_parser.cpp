@@ -191,6 +191,7 @@ Status parseCreateOrUpdateUserCommands(const BSONObj& cmdObj,
     validFieldNames.insert("digestPassword");
     validFieldNames.insert("pwd");
     validFieldNames.insert("roles");
+    validFieldNames.insert("authenticationRestrictions");
 
     Status status = _checkNoExtraFields(cmdObj, cmdName, validFieldNames);
     if (!status.isOK()) {
@@ -246,6 +247,16 @@ Status parseCreateOrUpdateUserCommands(const BSONObj& cmdObj,
         }
         parsedArgs->customData = element.Obj();
         parsedArgs->hasCustomData = true;
+    }
+
+    // Parse authentication restrictions
+    if (cmdObj.hasField("authenticationRestrictions")) {
+        BSONElement element = cmdObj["authenticationRestrictions"];
+        if (element.type() != Array) {
+            return Status(ErrorCodes::BadValue, "authenticationRestrictions must be an array");
+        }
+        parsedArgs->authenticationRestrictions =
+            BSONArray(cmdObj["authenticationRestrictions"].Obj());
     }
 
     // Parse roles

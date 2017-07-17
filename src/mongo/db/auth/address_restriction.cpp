@@ -30,6 +30,7 @@
 
 #include "mongo/db/auth/address_restriction.h"
 #include "mongo/db/auth/address_restriction_gen.h"
+#include "mongo/db/server_options.h"
 #include "mongo/stdx/memory.h"
 
 constexpr mongo::StringData mongo::address_restriction_detail::ClientSource::label;
@@ -72,6 +73,12 @@ mongo::StatusWith<mongo::SharedRestrictionDocument> mongo::parseAuthenticationRe
     static_assert(std::is_same<document_type::pointer_type,
                                std::unique_ptr<document_type::element_type>>::value,
                   "SharedRestrictionDocument expected to contain a sequence of unique_ptrs");
+
+    if (serverGlobalParams.featureCompatibility.version.load() <
+        ServerGlobalParams::FeatureCompatibility::Version::k36) {
+        return Status(ErrorCodes::UnsupportedFormat,
+                      "'authenticationRestrictions' requires 3.6 feature compatibility version");
+    }
 
     document_type::sequence_type doc;
     for (const auto& elem : arr) {

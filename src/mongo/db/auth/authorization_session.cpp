@@ -1022,6 +1022,15 @@ void AuthorizationSession::_refreshUserInfoAsNeeded(OperationContext* opCtx) {
                           << " from session cache of user information.";
                     continue;  // No need to advance "it" in this case.
                 }
+                case ErrorCodes::UnsupportedFormat: {
+                    // An auth subsystem has explicitly indicated a failure.
+                    fassert(40555, _authenticatedUsers.removeAt(it) == user);
+                    authMan.releaseUser(user);
+                    log() << "Removed user " << name
+                          << " from session cache of user information because of refresh failure:"
+                          << " '" << status << "'.";
+                    continue;  // No need to advance "it" in this case.
+                }
                 default:
                     // Unrecognized error; assume that it's transient, and continue working with the
                     // out-of-date privilege data.
