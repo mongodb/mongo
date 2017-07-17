@@ -42,7 +42,6 @@
 #include "mongo/executor/network_interface_mock.h"
 #include "mongo/executor/task_executor.h"
 #include "mongo/rpc/metadata/tracking_metadata.h"
-#include "mongo/s/catalog/dist_lock_catalog_impl.h"
 #include "mongo/s/catalog/sharding_catalog_manager.h"
 #include "mongo/s/catalog/type_changelog.h"
 #include "mongo/s/catalog/type_chunk.h"
@@ -111,34 +110,6 @@ private:
     const ConnectionString configCS{ConnectionString::forReplicaSet("configReplSet", {configHost})};
     const HostAndPort clientHost{"clientHost1"};
 };
-
-TEST_F(ShardCollectionTest, distLockFails) {
-    auto nss = NamespaceString("test.foo");
-
-    // Manually take the distlock on the collection so that shardCollection gets a conflict.
-    ASSERT_OK(distLockCatalog()
-                  ->grabLock(operationContext(),
-                             nss.ns(),
-                             OID::gen(),
-                             "dummyWho",
-                             "dummyProcessId",
-                             Date_t::now(),
-                             "dummyReason")
-                  .getStatus());
-
-    ShardKeyPattern keyPattern(BSON("_id" << 1));
-    BSONObj defaultCollation;
-    ASSERT_THROWS_CODE(ShardingCatalogManager::get(operationContext())
-                           ->shardCollection(operationContext(),
-                                             nss.ns(),
-                                             keyPattern,
-                                             defaultCollation,
-                                             false,
-                                             vector<BSONObj>{},
-                                             false),
-                       UserException,
-                       ErrorCodes::LockBusy);
-}
 
 TEST_F(ShardCollectionTest, anotherMongosSharding) {
     const auto nss = NamespaceString("db1.foo");

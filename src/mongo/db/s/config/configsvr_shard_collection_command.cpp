@@ -178,6 +178,12 @@ public:
         auto const shardRegistry = Grid::get(opCtx)->shardRegistry();
         auto const catalogCache = Grid::get(opCtx)->catalogCache();
 
+        // Lock the collection to prevent older mongos instances from trying to shard or drop it at
+        // the same time
+        boost::optional<DistLockManager::ScopedDistLock> scopedDistLock(
+            uassertStatusOK(catalogClient->getDistLockManager()->lock(
+                opCtx, nss.ns(), "shardCollection", DistLockManager::kDefaultLockTimeout)));
+
         // Ensure sharding is allowed on the database
         auto dbType = uassertStatusOK(catalogClient->getDatabase(opCtx, nss.db().toString())).value;
         uassert(ErrorCodes::IllegalOperation,
@@ -597,10 +603,9 @@ public:
         // were specified in the request, i.e., by mapReduce. Otherwise, all the initial chunks are
         // placed on the primary shard, and may be distributed across shards through migrations
         // (below) if using a hashed shard key.
-        bool distributeInitialChunks = false;
-        if (shardCollRequest.getInitialSplitPoints()) {
-            distributeInitialChunks = true;
-        }
+        const bool distributeInitialChunks =
+            shardCollRequest.getInitialSplitPoints().is_initialized();
+
         catalogManager->shardCollection(opCtx,
                                         nss.ns(),
                                         shardKeyPattern,
@@ -609,7 +614,12 @@ public:
                                         initSplits,
                                         distributeInitialChunks);
 
+        // Free the collection dist lock in order to allow the initial splits and moves below to
+        // proceed
+        scopedDistLock.reset();
+
         result << "collectionsharded" << nss.ns();
+
         // Make sure the cached metadata for the collection knows that we are now sharded
         catalogCache->invalidateShardedCollection(nss);
 
@@ -620,6 +630,7 @@ public:
                     "Collection was successfully written as sharded but got dropped before it "
                     "could be evenly distributed",
                     routingInfo.cm());
+
             auto chunkManager = routingInfo.cm();
 
             // 2. Move and commit each "big chunk" to a different shard.
@@ -714,6 +725,7 @@ public:
                 }
             }
         }
+
         return true;
     }
 

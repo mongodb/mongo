@@ -224,12 +224,6 @@ void ShardingCatalogManager::shardCollection(OperationContext* opCtx,
     const auto catalogClient = Grid::get(opCtx)->catalogClient();
     const auto shardRegistry = Grid::get(opCtx)->shardRegistry();
 
-    // Lock the collection globally so that no other mongos can try to shard or drop the collection
-    // at the same time. Store the returned ScopedDistLock in a local variable so that the lock is
-    // held for the duration of this function.
-    auto scopedDistLock = uassertStatusOK(catalogClient->getDistLockManager()->lock(
-        opCtx, ns, "shardCollection", DistLockManager::kDefaultLockTimeout));
-
     auto dbEntry = uassertStatusOK(catalogClient->getDatabase(opCtx, nsToDatabase(ns))).value;
     auto dbPrimaryShardId = dbEntry.getPrimary();
     const auto primaryShard = uassertStatusOK(shardRegistry->getShard(opCtx, dbPrimaryShardId));
