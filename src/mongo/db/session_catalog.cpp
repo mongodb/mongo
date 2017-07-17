@@ -162,6 +162,10 @@ OperationContextSession::OperationContextSession(OperationContext* opCtx) : _opC
 
     auto& operationSession = operationSessionDecoration(opCtx);
     operationSession.emplace(sessionTransactionTable->checkOutSession(opCtx));
+
+    if (opCtx->getTxnNumber()) {
+        operationSession->get()->begin(opCtx, opCtx->getTxnNumber().get());
+    }
 }
 
 OperationContextSession::~OperationContextSession() {
