@@ -162,6 +162,17 @@ public:
         }
 
         uassertStatusOK(status);
+
+        if (moveChunkRequest.getWaitForDelete()) {
+            // Ensure we capture the latest opTime in the system, since range deletion happens
+            // asynchronously with a different OperationContext. This must be done after the above
+            // join, because each caller must set the opTime to wait for writeConcern for on its own
+            // OperationContext.
+            // TODO (SERVER-30183): If this moveChunk joined an active moveChunk that did not have
+            // waitForDelete=true, the captured opTime may not reflect all the deletes.
+            repl::ReplClientInfo::forClient(opCtx->getClient()).setLastOpToSystemLastOpTime(opCtx);
+        }
+
         return true;
     }
 
@@ -268,10 +279,6 @@ private:
         } else if (moveChunkRequest.getWaitForDelete()) {
             log() << "Waiting for cleanup of " << nss.ns() << " range " << redact(range.toString());
             uassertStatusOK(notification.waitStatus(opCtx));
-
-            // Ensure that wait for write concern for the chunk cleanup will include the deletes
-            // performed by the range deleter thread.
-            repl::ReplClientInfo::forClient(opCtx->getClient()).setLastOpToSystemLastOpTime(opCtx);
         } else {
             log() << "Leaving cleanup of " << nss.ns() << " range " << redact(range.toString())
                   << " to complete in background";
