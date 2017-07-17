@@ -28,7 +28,7 @@ def _parse_tag_file(test_kind):
     a list of tags, i.e., {'file1.js': ['tag1', 'tag2'], 'file2.js': ['tag2', 'tag3']}
     """
     if config.TAG_FILE:
-        tags_conf = _tags.TagsConfig(config.TAG_FILE)
+        tags_conf = _tags.TagsConfig.from_file(config.TAG_FILE)
         tagged_roots = tags_conf.get_test_patterns(test_kind)
     else:
         tagged_roots = []

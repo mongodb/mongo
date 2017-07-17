@@ -1,4 +1,5 @@
 """Module to access and modify tag configuration files used by resmoke."""
+
 from __future__ import absolute_import
 from __future__ import print_function
 
@@ -11,7 +12,7 @@ import yaml
 
 # Setup to preserve order in yaml.dump, see https://stackoverflow.com/a/8661021
 def _represent_dict_order(self, data):
-    return self.represent_mapping('tag:yaml.org,2002:map', data.items())
+    return self.represent_mapping("tag:yaml.org,2002:map", data.items())
 
 yaml.add_representer(collections.OrderedDict, _represent_dict_order)
 # End setup
@@ -20,16 +21,37 @@ yaml.add_representer(collections.OrderedDict, _represent_dict_order)
 class TagsConfig(object):
     """Represent a test tag configuration file."""
 
-    def __init__(self, filename, cmp_func=None):
-        """Initialize a TagsConfig from a file.
+    def __init__(self, raw, cmp_func=None):
+        """Initialize a TagsConfig from a dict representing the associations between tests and tags.
 
         'cmp_func' can be used to specify a comparison function that will be used when sorting tags.
         """
-        with open(filename, "r") as fstream:
-            self.raw = yaml.safe_load(fstream)
+
+        self.raw = raw
         self._conf = self.raw["selector"]
         self._conf_copy = copy.deepcopy(self._conf)
         self._cmp_func = cmp_func
+
+    @classmethod
+    def from_file(cls, filename, **kwargs):
+        """Return a TagsConfig from a file containing the associations between tests and tags.
+
+        See TagsConfig.__init__() for the keyword arguments that can be specified.
+        """
+
+        with open(filename, "r") as fstream:
+            raw = yaml.safe_load(fstream)
+
+        return cls(raw, **kwargs)
+
+    @classmethod
+    def from_dict(cls, raw, **kwargs):
+        """Return a TagsConfig from a dict representing the associations between tests and tags.
+
+        See TagsConfig.__init__() for the keyword arguments that can be specified.
+        """
+
+        return cls(copy.deepcopy(raw), **kwargs)
 
     def get_test_kinds(self):
         """List the test kinds."""
@@ -75,9 +97,14 @@ class TagsConfig(object):
         """
         with open(filename, "w") as fstream:
             if preamble:
-                print(textwrap.fill(preamble, width=100, initial_indent="# ",
+                print(textwrap.fill(preamble,
+                                    width=100,
+                                    initial_indent="# ",
                                     subsequent_indent="# "),
                       file=fstream)
+
+            # We use yaml.safe_dump() in order avoid having strings being written to the file as
+            # "!!python/unicode ..." and instead have them written as plain 'str' instances.
             yaml.safe_dump(self.raw, fstream, default_flow_style=False)
 
 

@@ -15,12 +15,12 @@ class TestTagsConfig(unittest.TestCase):
     """Unit tests for the TagsConfig class."""
 
     def setUp(self):
-        self.conf = _tags.TagsConfig(TEST_FILE_PATH)
+        self.conf = _tags.TagsConfig.from_file(TEST_FILE_PATH)
 
     def test_invalid_path(self):
         invalid_path = "non_existing_file"
         with self.assertRaises(IOError):
-            _tags.TagsConfig(invalid_path)
+            _tags.TagsConfig.from_file(invalid_path)
 
     def test_list_test_kinds(self):
         test_kinds = self.conf.get_test_kinds()
@@ -151,7 +151,7 @@ class TestTagsConfig(unittest.TestCase):
 
         def custom_cmp(tag_a, tag_b):
             return cmp(tag_a.split("|"), tag_b.split("|"))
-        conf = _tags.TagsConfig(TEST_FILE_PATH, cmp_func=custom_cmp)
+        conf = _tags.TagsConfig.from_file(TEST_FILE_PATH, cmp_func=custom_cmp)
         tags = conf.get_tags(test_kind, test_pattern)
 
         self.assertEqual(["tag1", "tag2", "tag3"], tags)
