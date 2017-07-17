@@ -132,7 +132,8 @@ void logCreateUser(Client* client,
                    const UserName& username,
                    bool password,
                    const BSONObj* customData,
-                   const std::vector<RoleName>& roles);
+                   const std::vector<RoleName>& roles,
+                   const boost::optional<BSONArray>& restrictions);
 
 /**
  * Logs the result of a dropUser command.
@@ -151,7 +152,8 @@ void logUpdateUser(Client* client,
                    const UserName& username,
                    bool password,
                    const BSONObj* customData,
-                   const std::vector<RoleName>* roles);
+                   const std::vector<RoleName>* roles,
+                   const boost::optional<BSONArray>& restrictions);
 
 /**
  * Logs the result of a grantRolesToUser command.
@@ -173,7 +175,8 @@ void logRevokeRolesFromUser(Client* client,
 void logCreateRole(Client* client,
                    const RoleName& role,
                    const std::vector<RoleName>& roles,
-                   const PrivilegeVector& privileges);
+                   const PrivilegeVector& privileges,
+                   const boost::optional<BSONArray>& restrictions);
 
 /**
  * Logs the result of a updateRole command.
@@ -181,7 +184,8 @@ void logCreateRole(Client* client,
 void logUpdateRole(Client* client,
                    const RoleName& role,
                    const std::vector<RoleName>* roles,
-                   const PrivilegeVector* privileges);
+                   const PrivilegeVector* privileges,
+                   const boost::optional<BSONArray>& restrictions);
 
 /**
  * Logs the result of a dropRole command.

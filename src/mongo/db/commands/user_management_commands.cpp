@@ -738,7 +738,8 @@ public:
                              args.userName,
                              args.hasHashedPassword,
                              args.hasCustomData ? &args.customData : NULL,
-                             args.roles);
+                             args.roles,
+                             args.authenticationRestrictions);
         status = insertPrivilegeDocument(opCtx, userObj);
         return appendCommandStatus(result, status);
     }
@@ -877,7 +878,8 @@ public:
                              args.userName,
                              args.hasHashedPassword,
                              args.hasCustomData ? &args.customData : NULL,
-                             args.hasRoles ? &args.roles : NULL);
+                             args.hasRoles ? &args.roles : NULL,
+                             args.authenticationRestrictions);
 
         status = updatePrivilegeDocument(opCtx, args.userName, updateDocumentBuilder.done());
         // Must invalidate even on bad status - what if the write succeeded but the GLE failed?
@@ -1383,7 +1385,11 @@ public:
             return appendCommandStatus(result, status);
         }
 
-        audit::logCreateRole(Client::getCurrent(), args.roleName, args.roles, args.privileges);
+        audit::logCreateRole(Client::getCurrent(),
+                             args.roleName,
+                             args.roles,
+                             args.privileges,
+                             args.authenticationRestrictions);
 
         status = insertRoleDocument(opCtx, roleObjBuilder.done());
         return appendCommandStatus(result, status);
@@ -1487,8 +1493,9 @@ public:
 
         audit::logUpdateRole(Client::getCurrent(),
                              args.roleName,
-                             args.hasRoles ? &args.roles : NULL,
-                             args.hasPrivileges ? &args.privileges : NULL);
+                             args.hasRoles ? &args.roles : nullptr,
+                             args.hasPrivileges ? &args.privileges : nullptr,
+                             args.authenticationRestrictions);
 
         const auto updateSet = updateSetBuilder.obj();
         const auto updateUnset = updateUnsetBuilder.obj();
@@ -2454,18 +2461,28 @@ public:
             customData = userObj["customData"].Obj();
         }
 
+        boost::optional<BSONArray> authenticationRestrictions;
+        if (userObj.hasField("authenticationRestrictions")) {
+            auto r = getRawAuthenticationRestrictions(
+                BSONArray(userObj["authenticationRestrictions"].Obj()));
+            uassertStatusOK(r);
+            authenticationRestrictions = r.getValue();
+        }
+
         if (create) {
             audit::logCreateUser(Client::getCurrent(),
                                  userName,
                                  userObj["credentials"].Obj().hasField("MONGODB-CR"),
                                  userObj.hasField("customData") ? &customData : NULL,
-                                 roles);
+                                 roles,
+                                 authenticationRestrictions);
         } else {
             audit::logUpdateUser(Client::getCurrent(),
                                  userName,
                                  userObj["credentials"].Obj().hasField("MONGODB-CR"),
                                  userObj.hasField("customData") ? &customData : NULL,
-                                 &roles);
+                                 &roles,
+                                 authenticationRestrictions);
         }
     }
 
@@ -2480,10 +2497,21 @@ public:
             BSONArray(roleObj["roles"].Obj()), roleName.getDB(), &roles));
         uassertStatusOK(auth::parseAndValidatePrivilegeArray(BSONArray(roleObj["privileges"].Obj()),
                                                              &privileges));
+
+        boost::optional<BSONArray> authenticationRestrictions;
+        if (roleObj.hasField("authenticationRestrictions")) {
+            auto r = getRawAuthenticationRestrictions(
+                BSONArray(roleObj["authenticationRestrictions"].Obj()));
+            uassertStatusOK(r);
+            authenticationRestrictions = r.getValue();
+        }
+
         if (create) {
-            audit::logCreateRole(Client::getCurrent(), roleName, roles, privileges);
+            audit::logCreateRole(
+                Client::getCurrent(), roleName, roles, privileges, authenticationRestrictions);
         } else {
-            audit::logUpdateRole(Client::getCurrent(), roleName, &roles, &privileges);
+            audit::logUpdateRole(
+                Client::getCurrent(), roleName, &roles, &privileges, authenticationRestrictions);
         }
     }
 
