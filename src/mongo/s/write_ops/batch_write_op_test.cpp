@@ -32,7 +32,6 @@
 #include "mongo/db/operation_context_noop.h"
 #include "mongo/s/write_ops/batch_write_op.h"
 #include "mongo/s/write_ops/batched_command_request.h"
-#include "mongo/s/write_ops/batched_delete_document.h"
 #include "mongo/s/write_ops/mock_ns_targeter.h"
 #include "mongo/s/write_ops/write_error_detail.h"
 #include "mongo/unittest/unittest.h"
@@ -1624,123 +1623,6 @@ TEST(WriteOpLimitTests, OneBigOneSmall) {
     ASSERT_OK(batchOp.targetBatch(targeter, false, &targeted));
     ASSERT_EQUALS(targeted.size(), 1u);
     ASSERT_EQUALS(targeted.begin()->second->getWrites().size(), 1u);
-
-    batchOp.noteBatchResponse(*targeted.begin()->second, response, NULL);
-    ASSERT(batchOp.isFinished());
-}
-
-TEST(WriteOpLimitTests, TooManyOps) {
-    //
-    // Batch of 1002 documents
-    //
-
-    OperationContextNoop opCtx;
-    NamespaceString nss("foo.bar");
-    ShardEndpoint endpoint(ShardId("shard"), ChunkVersion::IGNORED());
-    MockNSTargeter targeter;
-    initTargeterFullRange(nss, endpoint, &targeter);
-
-    BatchedCommandRequest request(BatchedCommandRequest::BatchType_Delete);
-    request.setNS(nss);
-
-    // Add 2 more than the maximum to the batch
-    for (size_t i = 0; i < BatchedCommandRequest::kMaxWriteBatchSize + 2u; ++i) {
-        request.getDeleteRequest()->addToDeletes(buildDelete(BSON("x" << 2), 0));
-    }
-
-    BatchWriteOp batchOp(&opCtx, request);
-
-    OwnedPointerMap<ShardId, TargetedWriteBatch> targetedOwned;
-    std::map<ShardId, TargetedWriteBatch*>& targeted = targetedOwned.mutableMap();
-    ASSERT_OK(batchOp.targetBatch(targeter, false, &targeted));
-    ASSERT_EQUALS(targeted.size(), 1u);
-    ASSERT_EQUALS(targeted.begin()->second->getWrites().size(), 1000u);
-
-    BatchedCommandResponse response;
-    buildResponse(1, &response);
-
-    batchOp.noteBatchResponse(*targeted.begin()->second, response, NULL);
-    ASSERT(!batchOp.isFinished());
-
-    targetedOwned.clear();
-
-    ASSERT_OK(batchOp.targetBatch(targeter, false, &targeted));
-    ASSERT_EQUALS(targeted.size(), 1u);
-    ASSERT_EQUALS(targeted.begin()->second->getWrites().size(), 2u);
-
-    batchOp.noteBatchResponse(*targeted.begin()->second, response, NULL);
-    ASSERT(batchOp.isFinished());
-}
-
-TEST(WriteOpLimitTests, UpdateOverheadIncluded) {
-    //
-    // Tests that the overhead of the extra fields in an update x 1000 is included in our size
-    // calculation
-    //
-
-    OperationContextNoop opCtx;
-    NamespaceString nss("foo.bar");
-    ShardEndpoint endpoint(ShardId("shard"), ChunkVersion::IGNORED());
-    MockNSTargeter targeter;
-    initTargeterFullRange(nss, endpoint, &targeter);
-
-    int updateDataBytes =
-        BSONObjMaxUserSize / static_cast<int>(BatchedCommandRequest::kMaxWriteBatchSize);
-
-    std::string dataString(updateDataBytes -
-                               BSON("x" << 1 << "data"
-                                        << "")
-                                   .objsize(),
-                           'x');
-
-    BatchedCommandRequest request(BatchedCommandRequest::BatchType_Update);
-    request.setNS(nss);
-
-    // Add the maximum number of updates
-    int estSizeBytes = 0;
-    for (size_t i = 0; i < BatchedCommandRequest::kMaxWriteBatchSize; ++i) {
-        BatchedUpdateDocument* updateDoc = new BatchedUpdateDocument;
-        updateDoc->setQuery(BSON("x" << 1 << "data" << dataString));
-        updateDoc->setUpdateExpr(BSONObj());
-        updateDoc->setMulti(false);
-        updateDoc->setUpsert(false);
-        request.getUpdateRequest()->addToUpdates(updateDoc);
-        estSizeBytes += updateDoc->toBSON().objsize();
-    }
-
-    ASSERT_GREATER_THAN(estSizeBytes, BSONObjMaxInternalSize);
-
-    BatchWriteOp batchOp(&opCtx, request);
-
-    OwnedPointerMap<ShardId, TargetedWriteBatch> targetedOwned;
-    std::map<ShardId, TargetedWriteBatch*>& targeted = targetedOwned.mutableMap();
-    ASSERT_OK(batchOp.targetBatch(targeter, false, &targeted));
-    ASSERT_EQUALS(targeted.size(), 1u);
-    ASSERT_LESS_THAN(targeted.begin()->second->getWrites().size(), 1000u);
-
-    {
-        BatchedCommandRequest childRequest(BatchedCommandRequest::BatchType_Update);
-        batchOp.buildBatchRequest(*targeted.begin()->second, &childRequest);
-        ASSERT_LESS_THAN(childRequest.toBSON().objsize(), BSONObjMaxInternalSize);
-    }
-
-    BatchedCommandResponse response;
-    buildResponse(1, &response);
-
-    batchOp.noteBatchResponse(*targeted.begin()->second, response, NULL);
-    ASSERT(!batchOp.isFinished());
-
-    targetedOwned.clear();
-
-    ASSERT_OK(batchOp.targetBatch(targeter, false, &targeted));
-    ASSERT_EQUALS(targeted.size(), 1u);
-    ASSERT_LESS_THAN(targeted.begin()->second->getWrites().size(), 1000u);
-
-    {
-        BatchedCommandRequest childRequest(BatchedCommandRequest::BatchType_Update);
-        batchOp.buildBatchRequest(*targeted.begin()->second, &childRequest);
-        ASSERT_LESS_THAN(childRequest.toBSON().objsize(), BSONObjMaxInternalSize);
-    }
 
     batchOp.noteBatchResponse(*targeted.begin()->second, response, NULL);
     ASSERT(batchOp.isFinished());

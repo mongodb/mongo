@@ -209,32 +209,6 @@ void ClusterWriter::write(OperationContext* opCtx,
     const BatchedCommandRequest* request = idRequest ? idRequest.get() : &origRequest;
 
     const NamespaceString& nss = request->getNS();
-    if (!nss.isValid()) {
-        toBatchError(Status(ErrorCodes::InvalidNamespace, nss.ns() + " is not a valid namespace"),
-                     response);
-        return;
-    }
-
-    if (!NamespaceString::validCollectionName(nss.coll())) {
-        toBatchError(
-            Status(ErrorCodes::BadValue, str::stream() << "invalid collection name " << nss.coll()),
-            response);
-        return;
-    }
-
-    if (request->sizeWriteOps() == 0u) {
-        toBatchError(Status(ErrorCodes::InvalidLength, "no write ops were included in the batch"),
-                     response);
-        return;
-    }
-
-    if (request->sizeWriteOps() > BatchedCommandRequest::kMaxWriteBatchSize) {
-        toBatchError(Status(ErrorCodes::InvalidLength,
-                            str::stream() << "exceeded maximum write batch size of "
-                                          << BatchedCommandRequest::kMaxWriteBatchSize),
-                     response);
-        return;
-    }
 
     std::string errMsg;
     if (request->isInsertIndexRequest() && !request->isValidIndexRequest(&errMsg)) {

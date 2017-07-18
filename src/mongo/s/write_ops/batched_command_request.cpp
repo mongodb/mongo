@@ -37,8 +37,6 @@
 
 namespace mongo {
 
-const size_t BatchedCommandRequest::kMaxWriteBatchSize = 1000;
-
 const BSONField<BSONObj> writeConcern("writeConcern");
 
 BatchedCommandRequest::BatchedCommandRequest(BatchType batchType) : _batchType(batchType) {

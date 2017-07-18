@@ -41,6 +41,7 @@
 #include "mongo/db/jsobj.h"
 #include "mongo/db/lasterror.h"
 #include "mongo/db/namespace_string.h"
+#include "mongo/db/ops/write_ops.h"
 #include "mongo/db/query/internal_plans.h"
 #include "mongo/db/repl/is_master_response.h"
 #include "mongo/db/repl/master_slave.h"
@@ -56,7 +57,6 @@
 #include "mongo/executor/network_interface.h"
 #include "mongo/rpc/metadata/client_metadata.h"
 #include "mongo/rpc/metadata/client_metadata_ismaster.h"
-#include "mongo/s/write_ops/batched_command_request.h"
 #include "mongo/util/map_util.h"
 
 namespace mongo {
@@ -353,7 +353,7 @@ public:
 
         result.appendNumber("maxBsonObjectSize", BSONObjMaxUserSize);
         result.appendNumber("maxMessageSizeBytes", MaxMessageSizeBytes);
-        result.appendNumber("maxWriteBatchSize", BatchedCommandRequest::kMaxWriteBatchSize);
+        result.appendNumber("maxWriteBatchSize", write_ops::kMaxWriteBatchSize);
         result.appendDate("localTime", jsTime());
         result.append("maxWireVersion", WireSpec::instance().incoming.maxWireVersion);
 

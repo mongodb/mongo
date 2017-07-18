@@ -38,8 +38,7 @@
 #include "mongo/db/namespace_string.h"
 #include "mongo/s/chunk_version.h"
 #include "mongo/s/shard_id.h"
-#include "mongo/s/write_ops/batched_delete_document.h"
-#include "mongo/s/write_ops/batched_update_document.h"
+#include "mongo/s/write_ops/batched_command_request.h"
 
 namespace mongo {
 

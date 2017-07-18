@@ -127,7 +127,7 @@ bool wouldMakeBatchesTooBig(const std::vector<TargetedWrite*>& writes,
 
         const BatchSize& batchSize = seenIt->second;
 
-        if (batchSize.numOps >= static_cast<int>(BatchedCommandRequest::kMaxWriteBatchSize)) {
+        if (batchSize.numOps >= static_cast<int>(write_ops::kMaxWriteBatchSize)) {
             // Too many items in batch
             return true;
         }

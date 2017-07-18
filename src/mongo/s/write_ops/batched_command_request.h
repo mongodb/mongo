@@ -50,9 +50,6 @@ class NamespaceString;
  */
 class BatchedCommandRequest {
 public:
-    // Maximum number of write ops supported per batch
-    static const size_t kMaxWriteBatchSize;
-
     enum BatchType { BatchType_Insert, BatchType_Update, BatchType_Delete, BatchType_Unknown };
 
     BatchedCommandRequest(BatchType batchType);

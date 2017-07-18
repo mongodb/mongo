@@ -46,20 +46,15 @@ using write_ops::DeleteOpEntry;
 
 namespace {
 
-// The specified limit to the number of operations that can be included in a single write command.
-// This is an attempt to avoid a large number of errors resulting in a reply that exceeds 16MB. It
-// doesn't fully ensure that goal, but it reduces the probability of it happening. This limit should
-// not be used if the protocol changes to avoid the 16MB limit on reply size.
-const size_t kMaxWriteBatchSize = 1000;
-
 template <class T>
 void checkOpCountForCommand(const T& op, size_t numOps) {
     uassert(ErrorCodes::InvalidLength,
-            str::stream() << "Write batch sizes must be between 1 and " << kMaxWriteBatchSize
+            str::stream() << "Write batch sizes must be between 1 and "
+                          << write_ops::kMaxWriteBatchSize
                           << ". Got "
                           << numOps
                           << " operations.",
-            numOps != 0 && numOps <= kMaxWriteBatchSize);
+            numOps != 0 && numOps <= write_ops::kMaxWriteBatchSize);
 
     const auto& stmtIds = op.getWriteCommandBase().getStmtIds();
     uassert(ErrorCodes::InvalidLength,
