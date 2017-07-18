@@ -223,6 +223,13 @@ Status IdempotencyTest::runOps(std::initializer_list<OplogEntry> ops) {
     return multiInitialSyncApply_noAbort(_opCtx.get(), &opsPtrs, &syncTail, &fetchCount);
 }
 
+void IdempotencyTest::testOpsAreIdempotent(std::initializer_list<OplogEntry> ops) {
+    ASSERT_OK(runOps(ops));
+    auto state = validate();
+    ASSERT_OK(runOps(ops));
+    ASSERT_EQUALS(state, validate());
+}
+
 OplogEntry IdempotencyTest::createCollection() {
     return makeCreateCollectionOplogEntry(nextOpTime(), nss);
 }

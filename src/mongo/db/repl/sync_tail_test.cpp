@@ -932,11 +932,7 @@ TEST_F(IdempotencyTest, Geo2dsphereIndexFailedOnUpdate) {
     auto indexOp = buildIndex(fromjson("{loc: '2dsphere'}"), BSON("2dsphereIndexVersion" << 3));
 
     auto ops = {insertOp, updateOp, indexOp};
-
-    ASSERT_OK(runOps(ops));
-    auto state = validate();
-    ASSERT_OK(runOps(ops));
-    ASSERT_EQUALS(state, validate());
+    testOpsAreIdempotent(ops);
 
     ASSERT_OK(ReplicationCoordinator::get(_opCtx.get())->setFollowerMode(MemberState::RS_PRIMARY));
     auto status = runOps(ops);
@@ -952,11 +948,7 @@ TEST_F(IdempotencyTest, Geo2dsphereIndexFailedOnIndexing) {
     auto insertOp = insert(fromjson("{_id: 1, loc: 'hi'}"));
 
     auto ops = {indexOp, dropIndexOp, insertOp};
-
-    ASSERT_OK(runOps(ops));
-    auto state = validate();
-    ASSERT_OK(runOps(ops));
-    ASSERT_EQUALS(state, validate());
+    testOpsAreIdempotent(ops);
 
     ASSERT_OK(ReplicationCoordinator::get(_opCtx.get())->setFollowerMode(MemberState::RS_PRIMARY));
     auto status = runOps(ops);
@@ -972,11 +964,7 @@ TEST_F(IdempotencyTest, Geo2dIndex) {
     auto indexOp = buildIndex(fromjson("{loc: '2d'}"));
 
     auto ops = {insertOp, updateOp, indexOp};
-
-    ASSERT_OK(runOps(ops));
-    auto state = validate();
-    ASSERT_OK(runOps(ops));
-    ASSERT_EQUALS(state, validate());
+    testOpsAreIdempotent(ops);
 
     ASSERT_OK(ReplicationCoordinator::get(_opCtx.get())->setFollowerMode(MemberState::RS_PRIMARY));
     auto status = runOps(ops);
@@ -993,11 +981,7 @@ TEST_F(IdempotencyTest, UniqueKeyIndex) {
     auto indexOp = buildIndex(fromjson("{x: 1}"), fromjson("{unique: true}"));
 
     auto ops = {insertOp, updateOp, insertOp2, indexOp};
-
-    ASSERT_OK(runOps(ops));
-    auto state = validate();
-    ASSERT_OK(runOps(ops));
-    ASSERT_EQUALS(state, validate());
+    testOpsAreIdempotent(ops);
 
     ASSERT_OK(ReplicationCoordinator::get(_opCtx.get())->setFollowerMode(MemberState::RS_PRIMARY));
     auto status = runOps(ops);
@@ -1017,11 +1001,7 @@ TEST_F(IdempotencyTest, ParallelArrayError) {
     auto indexOp = buildIndex(fromjson("{x: 1, y: 1}"));
 
     auto ops = {updateOp1, updateOp2, updateOp3, indexOp};
-
-    ASSERT_OK(runOps(ops));
-    auto state = validate();
-    ASSERT_OK(runOps(ops));
-    ASSERT_EQUALS(state, validate());
+    testOpsAreIdempotent(ops);
 
     ASSERT_OK(ReplicationCoordinator::get(_opCtx.get())->setFollowerMode(MemberState::RS_PRIMARY));
     auto status = runOps(ops);
@@ -1044,11 +1024,7 @@ TEST_F(IdempotencyTest, IndexKeyTooLongError) {
     auto indexOp = buildIndex(fromjson("{x: 1, y: 1}"));
 
     auto ops = {updateOp1, updateOp2, updateOp3, indexOp};
-
-    ASSERT_OK(runOps(ops));
-    auto state = validate();
-    ASSERT_OK(runOps(ops));
-    ASSERT_EQUALS(state, validate());
+    testOpsAreIdempotent(ops);
 
     ASSERT_OK(ReplicationCoordinator::get(_opCtx.get())->setFollowerMode(MemberState::RS_PRIMARY));
     auto status = runOps(ops);
@@ -1067,11 +1043,7 @@ TEST_F(IdempotencyTest, IndexWithDifferentOptions) {
     auto indexOp2 = buildIndex(fromjson("{x: 'text'}"), fromjson("{default_language: 'english'}"));
 
     auto ops = {indexOp1, dropIndexOp, indexOp2};
-
-    ASSERT_OK(runOps(ops));
-    auto state = validate();
-    ASSERT_OK(runOps(ops));
-    ASSERT_EQUALS(state, validate());
+    testOpsAreIdempotent(ops);
 
     ASSERT_OK(ReplicationCoordinator::get(_opCtx.get())->setFollowerMode(MemberState::RS_PRIMARY));
     auto status = runOps(ops);
@@ -1088,11 +1060,7 @@ TEST_F(IdempotencyTest, TextIndexDocumentHasNonStringLanguageField) {
     auto indexOp = buildIndex(fromjson("{x: 'text'}"), BSONObj());
 
     auto ops = {insertOp, updateOp, indexOp};
-
-    ASSERT_OK(runOps(ops));
-    auto state = validate();
-    ASSERT_OK(runOps(ops));
-    ASSERT_EQUALS(state, validate());
+    testOpsAreIdempotent(ops);
 
     ASSERT_OK(ReplicationCoordinator::get(_opCtx.get())->setFollowerMode(MemberState::RS_PRIMARY));
     auto status = runOps(ops);
@@ -1109,11 +1077,7 @@ TEST_F(IdempotencyTest, InsertDocumentWithNonStringLanguageFieldWhenTextIndexExi
     auto insertOp = insert(fromjson("{_id: 1, x: 'words to index', language: 1}"));
 
     auto ops = {indexOp, dropIndexOp, insertOp};
-
-    ASSERT_OK(runOps(ops));
-    auto state = validate();
-    ASSERT_OK(runOps(ops));
-    ASSERT_EQUALS(state, validate());
+    testOpsAreIdempotent(ops);
 
     ASSERT_OK(ReplicationCoordinator::get(_opCtx.get())->setFollowerMode(MemberState::RS_PRIMARY));
     auto status = runOps(ops);
@@ -1130,11 +1094,7 @@ TEST_F(IdempotencyTest, TextIndexDocumentHasNonStringLanguageOverrideField) {
     auto indexOp = buildIndex(fromjson("{x: 'text'}"), fromjson("{language_override: 'y'}"));
 
     auto ops = {insertOp, updateOp, indexOp};
-
-    ASSERT_OK(runOps(ops));
-    auto state = validate();
-    ASSERT_OK(runOps(ops));
-    ASSERT_EQUALS(state, validate());
+    testOpsAreIdempotent(ops);
 
     ASSERT_OK(ReplicationCoordinator::get(_opCtx.get())->setFollowerMode(MemberState::RS_PRIMARY));
     auto status = runOps(ops);
@@ -1151,11 +1111,7 @@ TEST_F(IdempotencyTest, InsertDocumentWithNonStringLanguageOverrideFieldWhenText
     auto insertOp = insert(fromjson("{_id: 1, x: 'words to index', y: 1}"));
 
     auto ops = {indexOp, dropIndexOp, insertOp};
-
-    ASSERT_OK(runOps(ops));
-    auto state = validate();
-    ASSERT_OK(runOps(ops));
-    ASSERT_EQUALS(state, validate());
+    testOpsAreIdempotent(ops);
 
     ASSERT_OK(ReplicationCoordinator::get(_opCtx.get())->setFollowerMode(MemberState::RS_PRIMARY));
     auto status = runOps(ops);
@@ -1172,11 +1128,7 @@ TEST_F(IdempotencyTest, TextIndexDocumentHasUnknownLanguage) {
     auto indexOp = buildIndex(fromjson("{x: 'text'}"), BSONObj());
 
     auto ops = {insertOp, updateOp, indexOp};
-
-    ASSERT_OK(runOps(ops));
-    auto state = validate();
-    ASSERT_OK(runOps(ops));
-    ASSERT_EQUALS(state, validate());
+    testOpsAreIdempotent(ops);
 
     ASSERT_OK(ReplicationCoordinator::get(_opCtx.get())->setFollowerMode(MemberState::RS_PRIMARY));
     auto status = runOps(ops);
@@ -1195,7 +1147,6 @@ TEST_F(IdempotencyTest, CreateCollectionWithValidation) {
         auto createColl2 = makeCreateCollectionOplogEntry(nextOpTime(), nss, options2);
 
         auto ops = {createColl1, dropColl, createColl2};
-
         ASSERT_OK(runOps(ops));
         auto state = validate();
 
@@ -1239,7 +1190,6 @@ TEST_F(IdempotencyTest, CreateCollectionWithCollation) {
         auto createColl = makeCreateCollectionOplogEntry(nextOpTime(), nss, options);
 
         auto ops = {insertOp1, insertOp2, updateOp, dropColl, createColl};
-
         ASSERT_OK(runOps(ops));
         auto state = validate();
 
@@ -1269,7 +1219,6 @@ TEST_F(IdempotencyTest, CreateCollectionWithIdIndex) {
         auto createColl2 = createCollection();
 
         auto ops = {insertOp, dropColl, createColl2};
-
         ASSERT_OK(runOps(ops));
         auto state = validate();
 
@@ -1297,11 +1246,7 @@ TEST_F(IdempotencyTest, CreateCollectionWithView) {
     auto dropColl = makeCommandOplogEntry(nextOpTime(), nss, BSON("drop" << nss.coll()));
 
     auto ops = {insertViewOp, dropColl};
-
-    ASSERT_OK(runOps(ops));
-    auto state = validate();
-    ASSERT_OK(runOps(ops));
-    ASSERT_EQUALS(state, validate());
+    testOpsAreIdempotent(ops);
 }
 
 TEST_F(IdempotencyTest, CollModNamespaceNotFound) {
@@ -1316,11 +1261,7 @@ TEST_F(IdempotencyTest, CollModNamespaceNotFound) {
     auto dropCollOp = makeCommandOplogEntry(nextOpTime(), nss, BSON("drop" << nss.coll()));
 
     auto ops = {collModOp, dropCollOp};
-
-    ASSERT_OK(runOps(ops));
-    auto state = validate();
-    ASSERT_OK(runOps(ops));
-    ASSERT_EQUALS(state, validate());
+    testOpsAreIdempotent(ops);
 }
 
 TEST_F(IdempotencyTest, CollModIndexNotFound) {
@@ -1335,11 +1276,7 @@ TEST_F(IdempotencyTest, CollModIndexNotFound) {
     auto dropIndexOp = dropIndex("createdAt_index");
 
     auto ops = {collModOp, dropIndexOp};
-
-    ASSERT_OK(runOps(ops));
-    auto state = validate();
-    ASSERT_OK(runOps(ops));
-    ASSERT_EQUALS(state, validate());
+    testOpsAreIdempotent(ops);
 }
 
 TEST_F(IdempotencyTest, ResyncOnRenameCollection) {

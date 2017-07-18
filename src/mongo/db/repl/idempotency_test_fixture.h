@@ -91,6 +91,11 @@ protected:
     }
     Status runOp(const OplogEntry& entry);
     Status runOps(std::initializer_list<OplogEntry> ops);
+    /**
+     * This method returns true if running the list of operations a single time is equivalent to
+     * running them two times. It returns false otherwise.
+     */
+    void testOpsAreIdempotent(std::initializer_list<OplogEntry> ops);
 
     /**
      * Validate data and indexes. Return the MD5 hash of the documents ordered by _id.
