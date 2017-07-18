@@ -834,13 +834,19 @@ class _CppSourceFileWriter(_CppFileWriterBase):
 
         initializers = ['_%s(std::move(%s))' % (arg.name, arg.name) for arg in constructor.args]
 
+        initializes_db_name = False
         if [arg for arg in constructor.args if arg.name == 'nss']:
-            initializers += ['_dbName(nss.db().toString())']
+            initializers.append('_dbName(nss.db().toString())')
+            initializes_db_name = True
 
         initializers += [
             '%s(false)' % _get_has_field_member_name(field) for field in struct.fields
-            if _is_required_serializer_field(field)
+            if _is_required_serializer_field(field) and not (field.name == "$db" and
+                                                             initializes_db_name)
         ]
+
+        if initializes_db_name:
+            initializers.append('_hasDbName(true)')
 
         initializers_str = ''
         if initializers:

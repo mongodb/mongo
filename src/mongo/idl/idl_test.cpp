@@ -1569,11 +1569,11 @@ TEST(IDLCommand, TestIgnore) {
     auto testDoc = BSON("BasicIgnoredCommand" << 1 << "field1" << 3 << "field2"
                                               << "five");
 
-    auto testStruct = BasicIgnoredCommand::parse(ctxt, makeOMR(testDoc));
+    auto testDocWithDB = appendDB(testDoc, "admin");
+
+    auto testStruct = BasicIgnoredCommand::parse(ctxt, makeOMR(testDocWithDB));
     ASSERT_EQUALS(testStruct.getField1(), 3);
     ASSERT_EQUALS(testStruct.getField2(), "five");
-
-    auto testDocWithDB = appendDB(testDoc, "admin");
 
     // Positive: Test we can roundtrip from the just parsed document
     {
@@ -1590,6 +1590,7 @@ TEST(IDLCommand, TestIgnore) {
         BasicIgnoredCommand one_new;
         one_new.setField1(3);
         one_new.setField2("five");
+        one_new.setDbName("admin");
         OpMsgRequest reply = one_new.serialize(BSONObj());
 
         ASSERT_BSONOBJ_EQ(testDocWithDB, reply.body);
@@ -1687,7 +1688,7 @@ TEST(IDLDocSequence, TestBasic) {
     }
 }
 
-// Positive: Test a OpMsgRequest read without $db
+// Negative: Test a OpMsgRequest read without $db
 TEST(IDLDocSequence, TestMissingDB) {
     IDLParserErrorContext ctxt("root");
 
@@ -1706,15 +1707,7 @@ TEST(IDLDocSequence, TestMissingDB) {
     OpMsgRequest request;
     request.body = testTempDoc;
 
-    auto testStruct = DocSequenceCommand::parse(ctxt, request);
-    ASSERT_EQUALS(testStruct.getField1(), 3);
-    ASSERT_EQUALS(testStruct.getField2(), "five");
-    ASSERT_EQUALS(testStruct.getNamespace(), NamespaceString("admin.coll1"));
-
-    ASSERT_EQUALS(1UL, testStruct.getStructs().size());
-    ASSERT_EQUALS("hello", testStruct.getStructs()[0].getValue());
-
-    assert_same_types<decltype(testStruct.getNamespace()), const NamespaceString&>();
+    ASSERT_THROWS(DocSequenceCommand::parse(ctxt, request), UserException);
 }
 
 // Positive: Test a command read and written to OpMsgRequest with content in DocumentSequence works

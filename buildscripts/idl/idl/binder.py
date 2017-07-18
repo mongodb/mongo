@@ -298,7 +298,6 @@ def _inject_hidden_command_fields(command):
     db_field = syntax.Field(command.file_name, command.line, command.column)
     db_field.name = "$db"
     db_field.type = "string"  # This comes from basic_types.idl
-    db_field.default = 'IDLParserErrorContext::kOpMsgDollarDBDefault.toString()'  # Default to admin database
     db_field.cpp_name = "dbName"
     db_field.serialize_op_msg_request_only = True
 

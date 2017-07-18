@@ -124,7 +124,7 @@ struct OpMsgRequest : public OpMsg {
     StringData getDatabase() const {
         if (auto elem = body["$db"])
             return elem.checkAndGetStringData();
-        return "admin";
+        uasserted(40571, "OP_MSG requests require a $db argument");
     }
 
     StringData getCommandName() const {
