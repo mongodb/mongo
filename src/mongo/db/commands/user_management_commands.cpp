@@ -1422,7 +1422,7 @@ public:
             return appendCommandStatus(result, status);
         }
 
-        if (!args.hasPrivileges && !args.hasRoles) {
+        if (!args.hasPrivileges && !args.hasRoles && !args.authenticationRestrictions) {
             return appendCommandStatus(
                 result,
                 Status(ErrorCodes::BadValue,
@@ -1430,6 +1430,7 @@ public:
         }
 
         BSONObjBuilder updateSetBuilder;
+        BSONObjBuilder updateUnsetBuilder;
 
         if (args.hasPrivileges) {
             BSONArray privileges;
@@ -1442,6 +1443,15 @@ public:
 
         if (args.hasRoles) {
             updateSetBuilder.append("roles", rolesVectorToBSONArray(args.roles));
+        }
+
+        if (args.authenticationRestrictions) {
+            if (args.authenticationRestrictions->isEmpty()) {
+                updateUnsetBuilder.append("authenticationRestrictions", "");
+            } else {
+                updateSetBuilder.append("authenticationRestrictions",
+                                        args.authenticationRestrictions.get());
+            }
         }
 
         ServiceContext* serviceContext = opCtx->getClient()->getServiceContext();
@@ -1479,7 +1489,17 @@ public:
                              args.hasRoles ? &args.roles : NULL,
                              args.hasPrivileges ? &args.privileges : NULL);
 
-        status = updateRoleDocument(opCtx, args.roleName, BSON("$set" << updateSetBuilder.done()));
+        const auto updateSet = updateSetBuilder.obj();
+        const auto updateUnset = updateUnsetBuilder.obj();
+        BSONObjBuilder updateDocumentBuilder;
+        if (!updateSet.isEmpty()) {
+            updateDocumentBuilder.append("$set", updateSet);
+        }
+        if (!updateUnset.isEmpty()) {
+            updateDocumentBuilder.append("$unset", updateUnset);
+        }
+
+        status = updateRoleDocument(opCtx, args.roleName, updateDocumentBuilder.obj());
         // Must invalidate even on bad status - what if the write succeeded but the GLE failed?
         authzManager->invalidateUserCache();
         return appendCommandStatus(result, status);

@@ -62,6 +62,22 @@
                     .includes("authenticationRestrictions"));
 
         print(
+            "When a client updates a role's authenticationRestrictions to be empty, the operation succeeds, and removes the authenticationRestrictions field");
+        assert.commandWorked(admin.runCommand({createRole: "role5", roles: [], privileges: []}));
+        assert.commandWorked(
+            admin.runCommand({updateRole: "role5", authenticationRestrictions: []}));
+        assert(!Object.keys(admin.system.roles.findOne({role: "role5"}))
+                    .includes("authenticationRestrictions"));
+        assert.commandWorked(admin.runCommand(
+            {updateRole: "role5", authenticationRestrictions: [{clientSource: ["127.0.0.1"]}]}));
+        assert(Object.keys(admin.system.roles.findOne({role: "role5"}))
+                   .includes("authenticationRestrictions"));
+        assert.commandWorked(
+            admin.runCommand({updateRole: "role5", authenticationRestrictions: []}));
+        assert(!Object.keys(admin.system.roles.findOne({role: "role5"}))
+                    .includes("authenticationRestrictions"));
+
+        print(
             "When a client creates roles, it may use clientSource and serverAddress authenticationRestrictions");
         assert.commandWorked(admin.runCommand({
             createRole: "role6",
@@ -135,6 +151,46 @@
         print(
             "When a client on the external interface authenticates to a user with {clientSource: \"127.0.0.1\", serverAddress: \"127.0.0.1\"}, it will fail");
         assert(!externalDb.auth("user8", "user"));
+
+        print("=== Invalidation tests");
+        print(
+            "When a client removes all authenticationRestrictions from a role, authentication will succeed");
+        assert.commandWorked(admin.runCommand({
+            createRole: "role11",
+            roles: [],
+            privileges: [],
+            authenticationRestrictions:
+                [{clientSource: ["127.0.0.1"], serverAddress: ["127.0.0.1"]}]
+        }));
+        assert.commandWorked(
+            admin.runCommand({createUser: "user11", pwd: "user", roles: ["role11"]}));
+        assert(!externalDb.auth("user11", "user"));
+        assert.commandWorked(
+            admin.runCommand({updateRole: "role11", authenticationRestrictions: []}));
+        assert(externalDb.auth("user11", "user"));
+
+        print(
+            "When a client sets authenticationRestrictions on a role, authorization privileges are revoked");
+        assert.commandWorked(admin.runCommand({
+            createRole: "role12",
+            roles: [],
+            privileges: [{resource: {db: "test", collection: "foo"}, actions: ["find"]}],
+            authenticationRestrictions: [{clientSource: ["127.0.0.1"]}]
+        }));
+        assert.commandWorked(
+            admin.runCommand({createUser: "user12", pwd: "user", roles: ["role12"]}));
+        assert(db.auth("user12", "user"));
+        assert.commandWorked(db.getSiblingDB("test").runCommand({find: "foo", batchSize: 0}));
+        sleepUntilUserDataPropagated();
+        assert(eventualDb.auth("user12", "user"));
+        assert.commandWorked(
+            eventualDb.getSiblingDB("test").runCommand({find: "foo", batchSize: 0}));
+        assert.commandWorked(admin.runCommand(
+            {updateRole: "role12", authenticationRestrictions: [{clientSource: ["192.168.2.0"]}]}));
+        assert.commandFailed(db.getSiblingDB("test").runCommand({find: "foo", batchSize: 0}));
+        sleepUntilUserDataRefreshed();
+        assert.commandFailed(
+            eventualDb.getSiblingDB("test").runCommand({find: "foo", batchSize: 0}));
 
         print(
             "When a client downgrades featureCompatibilityVersion, roles with featureCompatibilityVersions become unusable.");
