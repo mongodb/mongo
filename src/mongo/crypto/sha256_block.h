@@ -26,12 +26,31 @@
  * then also delete it in the license file.
  */
 
-#include "mongo/platform/basic.h"
+#pragma once
 
-#include "mongo/crypto/sha1_block.h"
+#include "mongo/crypto/sha_block.h"
+
+#include "mongo/util/make_array_type.h"
 
 namespace mongo {
 
-constexpr StringData SHA1BlockTraits::name;
+/**
+ * A Traits type for adapting SHABlock to sha256 hashes.
+ */
+struct SHA256BlockTraits {
+    using HashType = MakeArrayType<std::uint8_t, 32, SHA256BlockTraits>;
+
+    static constexpr StringData name = "SHA256Block"_sd;
+
+    static HashType computeHash(std::initializer_list<ConstDataRange> input);
+
+    static void computeHmac(const uint8_t* key,
+                            size_t keyLen,
+                            const uint8_t* input,
+                            size_t inputLen,
+                            HashType* const output);
+};
+
+using SHA256Block = SHABlock<SHA256BlockTraits>;
 
 }  // namespace mongo

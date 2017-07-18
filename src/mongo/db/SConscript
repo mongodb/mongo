@@ -1111,7 +1111,7 @@ env.Library(
         'time_proof_service.cpp',
     ],
     LIBDEPS=[
-        '$BUILD_DIR/mongo/crypto/sha1_block_${MONGO_CRYPTO}',
+        '$BUILD_DIR/mongo/crypto/sha_block_${MONGO_CRYPTO}',
         'logical_time',
     ],
 )

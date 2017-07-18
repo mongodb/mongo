@@ -1,129 +1,56 @@
 /**
-*    Copyright (C) 2017 MongoDB Inc.
-*
-*    This program is free software: you can redistribute it and/or  modify
-*    it under the terms of the GNU Affero General Public License, version 3,
-*    as published by the Free Software Foundation.
-*
-*    This program is distributed in the hope that it will be useful,
-*    but WITHOUT ANY WARRANTY; without even the implied warranty of
-*    MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-*    GNU Affero General Public License for more details.
-*
-*    You should have received a copy of the GNU Affero General Public License
-*    along with this program.  If not, see <http://www.gnu.org/licenses/>.
-*
-*    As a special exception, the copyright holders give permission to link the
-*    code of portions of this program with the OpenSSL library under certain
-*    conditions as described in each individual source file and distribute
-*    linked combinations including the program with the OpenSSL library. You
-*    must comply with the GNU Affero General Public License in all respects for
-*    all of the code used other than as permitted herein. If you modify file(s)
-*    with this exception, you may extend this exception to your version of the
-*    file(s), but you are not obligated to do so. If you do not wish to do so,
-*    delete this exception statement from your version. If you delete this
-*    exception statement from all source files in the program, then also delete
-*    it in the license file.
-*/
+ * Copyright (C) 2017 MongoDB Inc.
+ *
+ * This program is free software: you can redistribute it and/or  modify
+ * it under the terms of the GNU Affero General Public License, version 3,
+ * as published by the Free Software Foundation.
+ *
+ * This program is distributed in the hope that it will be useful,
+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+ * GNU Affero General Public License for more details.
+ *
+ * You should have received a copy of the GNU Affero General Public License
+ * along with this program.  If not, see <http://www.gnu.org/licenses/>.
+ *
+ * As a special exception, the copyright holders give permission to link the
+ * code of portions of this program with the OpenSSL library under certain
+ * conditions as described in each individual source file and distribute
+ * linked combinations including the program with the OpenSSL library. You
+ * must comply with the GNU Affero General Public License in all respects
+ * for all of the code used other than as permitted herein. If you modify
+ * file(s) with this exception, you may extend this exception to your
+ * version of the file(s), but you are not obligated to do so. If you do not
+ * wish to do so, delete this exception statement from your version. If you
+ * delete this exception statement from all source files in the program,
+ * then also delete it in the license file.
+ */
 
 #pragma once
 
-#include <array>
-#include <cstddef>
-#include <string>
-#include <vector>
+#include "mongo/crypto/sha_block.h"
 
-#include "mongo/base/data_range.h"
-#include "mongo/base/status_with.h"
+#include "mongo/util/make_array_type.h"
 
 namespace mongo {
 
-struct BSONBinData;
-class BSONObjBuilder;
-
 /**
- * Data structure with fixed sized byte array that can be used as HMAC key or result of a SHA1
- * computation.
+ * A Traits type for adapting SHABlock to sha256 hashes.
  */
-class SHA1Block {
-public:
-    static constexpr size_t kHashLength = 20;
-    using HashType = std::array<std::uint8_t, kHashLength>;
+struct SHA1BlockTraits {
+    using HashType = MakeArrayType<std::uint8_t, 20, SHA1BlockTraits>;
 
-    SHA1Block() = default;
-    SHA1Block(HashType rawHash);
-    static StatusWith<SHA1Block> fromBuffer(const uint8_t* input, size_t inputLen);
+    static constexpr StringData name = "SHA1Block"_sd;
 
-    /**
-     * Computes a SHA-1 hash of 'input'.
-     */
-    static SHA1Block computeHash(const uint8_t* input, size_t inputLen);
+    static HashType computeHash(std::initializer_list<ConstDataRange> input);
 
-    /**
-     * Computes a HMAC SHA-1 keyed hash of 'input' using the key 'key'
-     */
-    static SHA1Block computeHmac(const uint8_t* key,
-                                 size_t keyLen,
-                                 const uint8_t* input,
-                                 size_t inputLen) {
-        SHA1Block output;
-        SHA1Block::computeHmac(key, keyLen, input, inputLen, &output);
-        return output;
-    }
-
-    /**
-     * Computes a HMAC SHA-1 keyed hash of 'input' using the key 'key'. Writes the results into
-     * a pre-allocated SHA1Block. This lets us allocate SHA1Blocks with the SecureAllocator.
-     */
     static void computeHmac(const uint8_t* key,
                             size_t keyLen,
                             const uint8_t* input,
                             size_t inputLen,
-                            SHA1Block* const output);
-
-    const uint8_t* data() const& {
-        return _hash.data();
-    }
-
-    uint8_t* data() const&& = delete;
-
-    ConstDataRange toCDR() const {
-        return ConstDataRange(reinterpret_cast<const char*>(_hash.data()), kHashLength);
-    }
-
-    size_t size() const {
-        return _hash.size();
-    }
-
-    /**
-     * Make a new SHA1Block from a BSON BinData value.
-     */
-    static StatusWith<SHA1Block> fromBinData(const BSONBinData& binData);
-
-    /**
-     * Make a new SHA1Block from a vector of bytes representing bindata. For IDL.
-     */
-    static SHA1Block fromBinData(std::vector<unsigned char> bytes);
-
-    /**
-     * Append this to a builder using the given name as a BSON BinData type value.
-     */
-    void appendAsBinData(BSONObjBuilder& builder, StringData fieldName) const;
-
-    /**
-     * Do a bitwise xor against another SHA1Block and replace the current contents of this block
-     * with the result.
-     */
-    void xorInline(const SHA1Block& other);
-
-    std::string toString() const;
-    bool operator==(const SHA1Block& other) const;
-    bool operator!=(const SHA1Block& other) const;
-
-private:
-    HashType _hash;
+                            HashType* const output);
 };
 
-std::ostream& operator<<(std::ostream& os, const SHA1Block& sha1);
+using SHA1Block = SHABlock<SHA1BlockTraits>;
 
 }  // namespace mongo

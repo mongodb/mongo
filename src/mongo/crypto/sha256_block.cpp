@@ -28,10 +28,10 @@
 
 #include "mongo/platform/basic.h"
 
-#include "mongo/crypto/sha1_block.h"
+#include "mongo/crypto/sha256_block.h"
 
 namespace mongo {
 
-constexpr StringData SHA1BlockTraits::name;
+constexpr StringData SHA256BlockTraits::name;
 
 }  // namespace mongo

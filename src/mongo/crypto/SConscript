@@ -4,15 +4,6 @@ Import("env")
 
 env = env.Clone()
 
-env.SConscript(
-    dirs=[
-        'tom',
-    ],
-    exports=[
-        'env',
-    ],
-)
-
 env.Library('sha1_block',
     source=[
         'sha1_block.cpp'
@@ -22,24 +13,42 @@ env.Library('sha1_block',
         '$BUILD_DIR/mongo/util/secure_compare_memory',
     ])
 
-env.Library(
-    target='sha1_block_tom',
+env.Library('sha256_block',
     source=[
-        'sha1_block_tom.cpp'
+        'sha256_block.cpp'
     ],
     LIBDEPS=[
-            '$BUILD_DIR/mongo/base',
-            'sha1_block',
-            'tom/tomcrypt'
+        '$BUILD_DIR/mongo/base',
+        '$BUILD_DIR/mongo/util/secure_compare_memory',
     ])
 
-env.Library('sha1_block_openssl',
+if "tom" in env["MONGO_CRYPTO"]:
+    tomEnv = env.Clone();
+    tomEnv.InjectThirdPartyIncludePaths(libraries=['tomcrypt'])
+
+    tomEnv.Library(
+        target='sha_block_tom',
+        source=[
+            'sha_block_tom.cpp'
+        ],
+        LIBDEPS=[
+            '$BUILD_DIR/mongo/base',
+            'sha1_block',
+            'sha256_block',
+        ],
+        LIBDEPS_PRIVATE=[
+            '$BUILD_DIR/third_party/shim_tomcrypt',
+        ]
+    )
+
+env.Library('sha_block_openssl',
     source=[
-        'sha1_block_openssl.cpp'
+        'sha_block_openssl.cpp'
     ],
     LIBDEPS=[
         '$BUILD_DIR/mongo/base',
         'sha1_block',
+        'sha256_block',
     ])
 
 env.Library('scramauth',
@@ -48,8 +57,12 @@ env.Library('scramauth',
                      '$BUILD_DIR/mongo/base/secure_allocator',
                      '$BUILD_DIR/mongo/util/secure_compare_memory',
                      '$BUILD_DIR/mongo/util/secure_zero_memory',
-                     'sha1_block_${MONGO_CRYPTO}'])
+                     'sha_block_${MONGO_CRYPTO}'])
 
 env.CppUnitTest('sha1_block_test',
                 ['sha1_block_test.cpp'],
-                LIBDEPS=['sha1_block_${MONGO_CRYPTO}'])
+                LIBDEPS=['sha_block_${MONGO_CRYPTO}'])
+
+env.CppUnitTest('sha256_block_test',
+                ['sha256_block_test.cpp'],
+                LIBDEPS=['sha_block_${MONGO_CRYPTO}'])

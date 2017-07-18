@@ -14,6 +14,7 @@ yamlSuffix = '-0.5.3'
 icuSuffix = '-57.1'
 gperftoolsSuffix = '-2.5'
 timelibSuffix = '-2017.05beta5'
+tomcryptSuffix = '-1.18.0-rc2'
 
 thirdPartyIncludePathList = [
     ('s2', '#/src/third_party/s2'),
@@ -56,6 +57,12 @@ if True:
                    '#/src/third_party/mozjs' + mozjsSuffix + '/mongo_sources',
                    '#/src/third_party/mozjs' + mozjsSuffix + '/platform/' + env["TARGET_ARCH"] + "/" + env["TARGET_OS"] + "/include",
         ]))
+
+if "tom" in env["MONGO_CRYPTO"]:
+    thirdPartyIncludePathList.append(
+        ('tomcrypt', ['#/src/third_party/tomcrypt' + tomcryptSuffix + '/src/headers',
+    ]))
+
 
 if not use_system_version_of_library('stemmer'):
     thirdPartyIncludePathList.append(
@@ -222,6 +229,20 @@ if usemozjs:
         target="shim_mozjs",
         source=[
             'shim_mozjs.cpp',
+        ])
+
+if "tom" in env["MONGO_CRYPTO"]:
+    tomcryptEnv = env.Clone()
+    tomcryptEnv.SConscript('tomcrypt' + tomcryptSuffix + '/SConscript', exports={'env' : tomcryptEnv })
+    tomcryptEnv = tomcryptEnv.Clone(
+        LIBDEPS_INTERFACE=[
+            'tomcrypt' + tomcryptSuffix + '/tomcrypt',
+        ])
+
+    tomcryptEnv.Library(
+        target="shim_tomcrypt",
+        source=[
+            'shim_tomcrypt.cpp',
         ])
 
 gperftoolsEnv = env
