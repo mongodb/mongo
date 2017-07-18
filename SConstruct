@@ -2989,6 +2989,13 @@ def doConfigure(myenv):
         if conf.CheckExtendedAlignment(size):
             conf.env.SetConfigHeaderDefine("MONGO_CONFIG_MAX_EXTENDED_ALIGNMENT", size)
             break
+ 
+    conf.env['MONGO_HAVE_LIBMONGOC'] = conf.CheckLibWithHeader(
+            ["mongoc-1.0"],
+            ["mongoc.h"],
+            "C",
+            "mongoc_get_major_version();",
+            autoadd=False )
 
     # ask each module to configure itself and the build environment.
     moduleconfig.configure_modules(mongo_modules, conf)
