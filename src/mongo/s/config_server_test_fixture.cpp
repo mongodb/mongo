@@ -41,6 +41,7 @@
 #include "mongo/db/db_raii.h"
 #include "mongo/db/namespace_string.h"
 #include "mongo/db/op_observer.h"
+#include "mongo/db/ops/write_ops.h"
 #include "mongo/db/query/cursor_response.h"
 #include "mongo/db/query/query_request.h"
 #include "mongo/db/repl/oplog.h"
@@ -73,7 +74,6 @@
 #include "mongo/s/query/cluster_cursor_manager.h"
 #include "mongo/s/set_shard_version_request.h"
 #include "mongo/s/shard_id.h"
-#include "mongo/s/write_ops/batched_command_request.h"
 #include "mongo/s/write_ops/batched_command_response.h"
 #include "mongo/stdx/memory.h"
 #include "mongo/util/clock_source_mock.h"
@@ -196,21 +196,16 @@ std::shared_ptr<Shard> ConfigServerTestFixture::getConfigShard() const {
 Status ConfigServerTestFixture::insertToConfigCollection(OperationContext* opCtx,
                                                          const NamespaceString& ns,
                                                          const BSONObj& doc) {
-    auto insert(stdx::make_unique<BatchedInsertRequest>());
-    insert->addToDocuments(doc);
-
-    BatchedCommandRequest request(insert.release());
-    request.setNS(ns);
-
-    auto config = getConfigShard();
-    invariant(config);
-
-    auto insertResponse = config->runCommand(opCtx,
-                                             kReadPref,
-                                             ns.db().toString(),
-                                             request.toBSON(),
-                                             Shard::kDefaultConfigCommandTimeout,
-                                             Shard::RetryPolicy::kNoRetry);
+    auto insertResponse = getConfigShard()->runCommand(opCtx,
+                                                       kReadPref,
+                                                       ns.db().toString(),
+                                                       [&]() {
+                                                           write_ops::Insert insertOp(ns);
+                                                           insertOp.setDocuments({doc});
+                                                           return insertOp.toBSON({});
+                                                       }(),
+                                                       Shard::kDefaultConfigCommandTimeout,
+                                                       Shard::RetryPolicy::kNoRetry);
 
     BatchedCommandResponse batchResponse;
     auto status = Shard::CommandResponse::processBatchWriteResponse(insertResponse, &batchResponse);

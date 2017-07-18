@@ -35,6 +35,7 @@
 
 #include "mongo/client/remote_command_targeter_mock.h"
 #include "mongo/db/commands.h"
+#include "mongo/db/ops/write_ops.h"
 #include "mongo/executor/network_interface_mock.h"
 #include "mongo/executor/task_executor.h"
 #include "mongo/rpc/metadata/repl_set_metadata.h"
@@ -45,7 +46,6 @@
 #include "mongo/s/catalog/type_database.h"
 #include "mongo/s/catalog/type_shard.h"
 #include "mongo/s/client/shard_registry.h"
-#include "mongo/s/write_ops/batched_command_request.h"
 #include "mongo/s/write_ops/batched_command_response.h"
 #include "mongo/stdx/chrono.h"
 #include "mongo/stdx/future.h"
@@ -158,18 +158,18 @@ TEST_F(RemoveShardTest, RemoveShardStartDraining) {
         ASSERT_BSONOBJ_EQ(BSON(rpc::kReplSetMetadataFieldName << 1),
                           rpc::TrackingMetadata::removeTrackingData(request.metadata));
 
-        BatchedUpdateRequest actualBatchedUpdate;
-        actualBatchedUpdate.parseRequest(
-            OpMsgRequest::fromDBAndBody(request.dbname, request.cmdObj));
-        ASSERT_EQUALS(ShardType::ConfigNS, actualBatchedUpdate.getNS().ns());
-        auto updates = actualBatchedUpdate.getUpdates();
-        ASSERT_EQUALS(1U, updates.size());
-        auto update = updates.front();
+        const auto opMsgRequest = OpMsgRequest::fromDBAndBody(request.dbname, request.cmdObj);
+        const auto updateOp = UpdateOp::parse(opMsgRequest);
+        ASSERT_EQUALS(ShardType::ConfigNS, updateOp.getNamespace().ns());
 
-        ASSERT_FALSE(update->getUpsert());
-        ASSERT_FALSE(update->getMulti());
-        ASSERT_BSONOBJ_EQ(BSON(ShardType::name() << shardName), update->getQuery());
-        ASSERT_BSONOBJ_EQ(BSON("$set" << BSON(ShardType::draining(true))), update->getUpdateExpr());
+        const auto& updates = updateOp.getUpdates();
+        ASSERT_EQUALS(1U, updates.size());
+
+        const auto& update = updates.front();
+        ASSERT(!update.getUpsert());
+        ASSERT(!update.getMulti());
+        ASSERT_BSONOBJ_EQ(BSON(ShardType::name() << shardName), update.getQ());
+        ASSERT_BSONOBJ_EQ(BSON("$set" << BSON(ShardType::draining(true))), update.getU());
 
         BatchedCommandResponse response;
         response.setOk(true);
@@ -329,21 +329,21 @@ TEST_F(RemoveShardTest, RemoveShardCompletion) {
     // Respond to request to remove shard entry.
     onCommand([&](const RemoteCommandRequest& request) {
         ASSERT_EQUALS(configHost, request.target);
-        ASSERT_EQUALS("config", request.dbname);
+        ASSERT_EQUALS(NamespaceString::kConfigDb, request.dbname);
 
         ASSERT_BSONOBJ_EQ(BSON(rpc::kReplSetMetadataFieldName << 1),
                           rpc::TrackingMetadata::removeTrackingData(request.metadata));
 
-        BatchedDeleteRequest actualBatchedDelete;
-        actualBatchedDelete.parseRequest(
-            OpMsgRequest::fromDBAndBody(request.dbname, request.cmdObj));
-        ASSERT_EQUALS(ShardType::ConfigNS, actualBatchedDelete.getNS().ns());
-        auto deletes = actualBatchedDelete.getDeletes();
-        ASSERT_EQUALS(1U, deletes.size());
-        auto deleteOp = deletes.front();
+        const auto opMsgRequest = OpMsgRequest::fromDBAndBody(request.dbname, request.cmdObj);
+        const auto deleteOp = DeleteOp::parse(opMsgRequest);
+        ASSERT_EQUALS(ShardType::ConfigNS, deleteOp.getNamespace().ns());
 
-        ASSERT_EQUALS(0, deleteOp->getLimit());
-        ASSERT_BSONOBJ_EQ(BSON(ShardType::name() << shardName), deleteOp->getQuery());
+        const auto& deletes = deleteOp.getDeletes();
+        ASSERT_EQUALS(1U, deletes.size());
+
+        const auto& deleteEntry = deletes.front();
+        ASSERT(deleteEntry.getMulti());
+        ASSERT_BSONOBJ_EQ(BSON(ShardType::name() << shardName), deleteEntry.getQ());
 
         BatchedCommandResponse response;
         response.setOk(true);

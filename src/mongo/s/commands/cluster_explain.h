@@ -33,7 +33,6 @@
 #include "mongo/db/query/explain_options.h"
 #include "mongo/s/async_requests_sender.h"
 #include "mongo/s/commands/strategy.h"
-#include "mongo/s/write_ops/batched_command_request.h"
 
 namespace mongo {
 

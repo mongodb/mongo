@@ -37,6 +37,7 @@
 #include "mongo/client/remote_command_targeter_mock.h"
 #include "mongo/db/client.h"
 #include "mongo/db/commands.h"
+#include "mongo/db/ops/write_ops.h"
 #include "mongo/db/write_concern.h"
 #include "mongo/executor/network_interface_mock.h"
 #include "mongo/executor/task_executor.h"
@@ -51,7 +52,6 @@
 #include "mongo/s/catalog/type_shard.h"
 #include "mongo/s/client/shard_registry.h"
 #include "mongo/s/grid.h"
-#include "mongo/s/write_ops/batched_command_request.h"
 #include "mongo/s/write_ops/batched_command_response.h"
 #include "mongo/stdx/future.h"
 #include "mongo/stdx/memory.h"
@@ -274,10 +274,9 @@ TEST_F(InsertRetryTest, DuplicateKeyErrorAfterWriteConcernFailureMatch) {
     });
 
     onCommand([&](const RemoteCommandRequest& request) {
-        BatchedInsertRequest actualBatchedInsert;
-        actualBatchedInsert.parseRequest(
-            OpMsgRequest::fromDBAndBody(request.dbname, request.cmdObj));
-        ASSERT_EQUALS(kTestNamespace.ns(), actualBatchedInsert.getNS().ns());
+        const auto opMsgRequest = OpMsgRequest::fromDBAndBody(request.dbname, request.cmdObj);
+        const auto insertOp = InsertOp::parse(opMsgRequest);
+        ASSERT_EQUALS(kTestNamespace.ns(), insertOp.getNamespace().ns());
 
         BatchedCommandResponse response;
         response.setOk(true);
@@ -336,10 +335,9 @@ TEST_F(UpdateRetryTest, Success) {
     });
 
     onCommand([&](const RemoteCommandRequest& request) {
-        BatchedUpdateRequest actualBatchedUpdate;
-        actualBatchedUpdate.parseRequest(
-            OpMsgRequest::fromDBAndBody(request.dbname, request.cmdObj));
-        ASSERT_EQUALS(kTestNamespace.ns(), actualBatchedUpdate.getNS().ns());
+        const auto opMsgRequest = OpMsgRequest::fromDBAndBody(request.dbname, request.cmdObj);
+        const auto updateOp = UpdateOp::parse(opMsgRequest);
+        ASSERT_EQUALS(kTestNamespace.ns(), updateOp.getNamespace().ns());
 
         BatchedCommandResponse response;
         response.setOk(true);
@@ -448,10 +446,9 @@ TEST_F(UpdateRetryTest, NotMasterOnceSuccessAfterRetry) {
     });
 
     onCommand([&](const RemoteCommandRequest& request) {
-        BatchedUpdateRequest actualBatchedUpdate;
-        actualBatchedUpdate.parseRequest(
-            OpMsgRequest::fromDBAndBody(request.dbname, request.cmdObj));
-        ASSERT_EQUALS(kTestNamespace.ns(), actualBatchedUpdate.getNS().ns());
+        const auto opMsgRequest = OpMsgRequest::fromDBAndBody(request.dbname, request.cmdObj);
+        const auto updateOp = UpdateOp::parse(opMsgRequest);
+        ASSERT_EQUALS(kTestNamespace.ns(), updateOp.getNamespace().ns());
 
         BatchedCommandResponse response;
         response.setOk(true);
@@ -483,10 +480,9 @@ TEST_F(UpdateRetryTest, OperationInterruptedDueToPrimaryStepDown) {
     });
 
     onCommand([&](const RemoteCommandRequest& request) {
-        BatchedUpdateRequest actualBatchedUpdate;
-        actualBatchedUpdate.parseRequest(
-            OpMsgRequest::fromDBAndBody(request.dbname, request.cmdObj));
-        ASSERT_EQUALS(kTestNamespace.ns(), actualBatchedUpdate.getNS().ns());
+        const auto opMsgRequest = OpMsgRequest::fromDBAndBody(request.dbname, request.cmdObj);
+        const auto updateOp = UpdateOp::parse(opMsgRequest);
+        ASSERT_EQUALS(kTestNamespace.ns(), updateOp.getNamespace().ns());
 
         BatchedCommandResponse response;
 
@@ -500,10 +496,9 @@ TEST_F(UpdateRetryTest, OperationInterruptedDueToPrimaryStepDown) {
     });
 
     onCommand([&](const RemoteCommandRequest& request) {
-        BatchedUpdateRequest actualBatchedUpdate;
-        actualBatchedUpdate.parseRequest(
-            OpMsgRequest::fromDBAndBody(request.dbname, request.cmdObj));
-        ASSERT_EQUALS(kTestNamespace.ns(), actualBatchedUpdate.getNS().ns());
+        const auto opMsgRequest = OpMsgRequest::fromDBAndBody(request.dbname, request.cmdObj);
+        const auto updateOp = UpdateOp::parse(opMsgRequest);
+        ASSERT_EQUALS(kTestNamespace.ns(), updateOp.getNamespace().ns());
 
         BatchedCommandResponse response;
         response.setOk(true);
@@ -535,10 +530,9 @@ TEST_F(UpdateRetryTest, WriteConcernFailure) {
     });
 
     onCommand([&](const RemoteCommandRequest& request) {
-        BatchedUpdateRequest actualBatchedUpdate;
-        actualBatchedUpdate.parseRequest(
-            OpMsgRequest::fromDBAndBody(request.dbname, request.cmdObj));
-        ASSERT_EQUALS(kTestNamespace.ns(), actualBatchedUpdate.getNS().ns());
+        const auto opMsgRequest = OpMsgRequest::fromDBAndBody(request.dbname, request.cmdObj);
+        const auto updateOp = UpdateOp::parse(opMsgRequest);
+        ASSERT_EQUALS(kTestNamespace.ns(), updateOp.getNamespace().ns());
 
         BatchedCommandResponse response;
         response.setOk(true);
@@ -561,10 +555,9 @@ TEST_F(UpdateRetryTest, WriteConcernFailure) {
     });
 
     onCommand([&](const RemoteCommandRequest& request) {
-        BatchedUpdateRequest actualBatchedUpdate;
-        actualBatchedUpdate.parseRequest(
-            OpMsgRequest::fromDBAndBody(request.dbname, request.cmdObj));
-        ASSERT_EQUALS(kTestNamespace.ns(), actualBatchedUpdate.getNS().ns());
+        const auto opMsgRequest = OpMsgRequest::fromDBAndBody(request.dbname, request.cmdObj);
+        const auto updateOp = UpdateOp::parse(opMsgRequest);
+        ASSERT_EQUALS(kTestNamespace.ns(), updateOp.getNamespace().ns());
 
         BatchedCommandResponse response;
         response.setOk(true);

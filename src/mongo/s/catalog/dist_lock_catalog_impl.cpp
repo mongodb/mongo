@@ -49,7 +49,6 @@
 #include "mongo/s/grid.h"
 #include "mongo/s/write_ops/batched_command_request.h"
 #include "mongo/s/write_ops/batched_command_response.h"
-#include "mongo/s/write_ops/batched_update_request.h"
 #include "mongo/util/time_support.h"
 
 namespace mongo {

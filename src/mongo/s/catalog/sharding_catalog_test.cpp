@@ -35,6 +35,7 @@
 #include "mongo/bson/json.h"
 #include "mongo/client/remote_command_targeter_mock.h"
 #include "mongo/db/commands.h"
+#include "mongo/db/ops/write_ops.h"
 #include "mongo/db/query/query_request.h"
 #include "mongo/db/repl/read_concern_args.h"
 #include "mongo/executor/network_interface_mock.h"
@@ -53,8 +54,6 @@
 #include "mongo/s/chunk_version.h"
 #include "mongo/s/client/shard_registry.h"
 #include "mongo/s/write_ops/batched_command_response.h"
-#include "mongo/s/write_ops/batched_insert_request.h"
-#include "mongo/s/write_ops/batched_update_request.h"
 #include "mongo/stdx/future.h"
 #include "mongo/util/log.h"
 #include "mongo/util/time_support.h"
@@ -1121,18 +1120,18 @@ TEST_F(ShardingCatalogClientTest, UpdateDatabase) {
         ASSERT_BSONOBJ_EQ(BSON(rpc::kReplSetMetadataFieldName << 1),
                           rpc::TrackingMetadata::removeTrackingData(request.metadata));
 
-        BatchedUpdateRequest actualBatchedUpdate;
-        actualBatchedUpdate.parseRequest(
-            OpMsgRequest::fromDBAndBody(request.dbname, request.cmdObj));
-        ASSERT_EQUALS(DatabaseType::ConfigNS, actualBatchedUpdate.getNS().ns());
-        auto updates = actualBatchedUpdate.getUpdates();
-        ASSERT_EQUALS(1U, updates.size());
-        auto update = updates.front();
+        const auto opMsgRequest = OpMsgRequest::fromDBAndBody(request.dbname, request.cmdObj);
+        const auto updateOp = UpdateOp::parse(opMsgRequest);
+        ASSERT_EQUALS(DatabaseType::ConfigNS, updateOp.getNamespace().ns());
 
-        ASSERT_TRUE(update->getUpsert());
-        ASSERT_FALSE(update->getMulti());
-        ASSERT_BSONOBJ_EQ(update->getQuery(), BSON(DatabaseType::name(dbt.getName())));
-        ASSERT_BSONOBJ_EQ(update->getUpdateExpr(), dbt.toBSON());
+        const auto& updates = updateOp.getUpdates();
+        ASSERT_EQUALS(1U, updates.size());
+
+        const auto& update = updates.front();
+        ASSERT(update.getUpsert());
+        ASSERT(!update.getMulti());
+        ASSERT_BSONOBJ_EQ(update.getQ(), BSON(DatabaseType::name(dbt.getName())));
+        ASSERT_BSONOBJ_EQ(update.getU(), dbt.toBSON());
 
         BatchedCommandResponse response;
         response.setOk(true);
@@ -1431,14 +1430,14 @@ TEST_F(ShardingCatalogClientTest, createDatabaseSuccess) {
         ASSERT_BSONOBJ_EQ(BSON(rpc::kReplSetMetadataFieldName << 1),
                           rpc::TrackingMetadata::removeTrackingData(request.metadata));
 
-        BatchedInsertRequest actualBatchedInsert;
-        actualBatchedInsert.parseRequest(
-            OpMsgRequest::fromDBAndBody(request.dbname, request.cmdObj));
-        ASSERT_EQUALS(DatabaseType::ConfigNS, actualBatchedInsert.getNS().ns());
-        auto inserts = actualBatchedInsert.getDocuments();
-        ASSERT_EQUALS(1U, inserts.size());
-        auto insert = inserts.front();
+        const auto opMsgRequest = OpMsgRequest::fromDBAndBody(request.dbname, request.cmdObj);
+        const auto insertOp = InsertOp::parse(opMsgRequest);
+        ASSERT_EQUALS(DatabaseType::ConfigNS, insertOp.getNamespace().ns());
 
+        const auto& inserts = insertOp.getDocuments();
+        ASSERT_EQUALS(1U, inserts.size());
+
+        const auto& insert = inserts.front();
         DatabaseType expectedDb;
         expectedDb.setName(dbname);
         expectedDb.setPrimary(
@@ -1718,14 +1717,14 @@ TEST_F(ShardingCatalogClientTest, createDatabaseDuplicateKeyOnInsert) {
         ASSERT_BSONOBJ_EQ(BSON(rpc::kReplSetMetadataFieldName << 1),
                           rpc::TrackingMetadata::removeTrackingData(request.metadata));
 
-        BatchedInsertRequest actualBatchedInsert;
-        actualBatchedInsert.parseRequest(
-            OpMsgRequest::fromDBAndBody(request.dbname, request.cmdObj));
-        ASSERT_EQUALS(DatabaseType::ConfigNS, actualBatchedInsert.getNS().ns());
-        auto inserts = actualBatchedInsert.getDocuments();
-        ASSERT_EQUALS(1U, inserts.size());
-        auto insert = inserts.front();
+        const auto opMsgRequest = OpMsgRequest::fromDBAndBody(request.dbname, request.cmdObj);
+        const auto insertOp = InsertOp::parse(opMsgRequest);
+        ASSERT_EQUALS(DatabaseType::ConfigNS, insertOp.getNamespace().ns());
 
+        const auto& inserts = insertOp.getDocuments();
+        ASSERT_EQUALS(1U, inserts.size());
+
+        const auto& insert = inserts.front();
         DatabaseType expectedDb;
         expectedDb.setName(dbname);
         expectedDb.setPrimary(

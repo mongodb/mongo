@@ -42,7 +42,6 @@
 #include "mongo/s/catalog/type_shard.h"
 #include "mongo/s/chunk_version.h"
 #include "mongo/s/client/shard_registry.h"
-#include "mongo/s/write_ops/batched_update_request.h"
 #include "mongo/util/time_support.h"
 
 namespace mongo {

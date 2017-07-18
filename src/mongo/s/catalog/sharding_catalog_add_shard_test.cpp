@@ -36,6 +36,7 @@
 #include "mongo/client/remote_command_targeter_factory_mock.h"
 #include "mongo/client/remote_command_targeter_mock.h"
 #include "mongo/db/commands.h"
+#include "mongo/db/ops/write_ops.h"
 #include "mongo/db/repl/replication_coordinator_mock.h"
 #include "mongo/db/s/type_shard_identity.h"
 #include "mongo/s/catalog/config_server_version.h"
@@ -47,11 +48,7 @@
 #include "mongo/s/client/shard_registry.h"
 #include "mongo/s/cluster_identity_loader.h"
 #include "mongo/s/config_server_test_fixture.h"
-#include "mongo/s/write_ops/batched_command_request.h"
 #include "mongo/s/write_ops/batched_command_response.h"
-#include "mongo/s/write_ops/batched_insert_request.h"
-#include "mongo/s/write_ops/batched_update_document.h"
-#include "mongo/s/write_ops/batched_update_request.h"
 #include "mongo/util/fail_point_service.h"
 #include "mongo/util/log.h"
 #include "mongo/util/scopeguard.h"
@@ -147,13 +144,11 @@ protected:
             ShardingCatalogManager::get(operationContext())
                 ->createShardIdentityUpsertForAddShard(operationContext(), expectedShardName);
 
-        // Get the BatchedUpdateRequest from the upsert command.
-        BatchedCommandRequest request(BatchedCommandRequest::BatchType::BatchType_Update);
-        request.parseRequest(OpMsgRequest::fromDBAndBody("admin", upsertCmdObj));
-
+        const auto opMsgRequest =
+            OpMsgRequest::fromDBAndBody(NamespaceString::kAdminDb, upsertCmdObj);
         expectUpdatesReturnSuccess(expectedHost,
                                    NamespaceString(NamespaceString::kServerConfigurationNamespace),
-                                   request.getUpdateRequest());
+                                   UpdateOp::parse(opMsgRequest));
     }
 
     void expectShardIdentityUpsertReturnFailure(const HostAndPort& expectedHost,
@@ -164,13 +159,11 @@ protected:
             ShardingCatalogManager::get(operationContext())
                 ->createShardIdentityUpsertForAddShard(operationContext(), expectedShardName);
 
-        // Get the BatchedUpdateRequest from the upsert command.
-        BatchedCommandRequest request(BatchedCommandRequest::BatchType::BatchType_Update);
-        request.parseRequest(OpMsgRequest::fromDBAndBody("admin", upsertCmdObj));
-
+        const auto opMsgRequest =
+            OpMsgRequest::fromDBAndBody(NamespaceString::kAdminDb, upsertCmdObj);
         expectUpdatesReturnFailure(expectedHost,
                                    NamespaceString(NamespaceString::kServerConfigurationNamespace),
-                                   request.getUpdateRequest(),
+                                   UpdateOp::parse(opMsgRequest),
                                    statusToReturn);
     }
 
@@ -180,24 +173,19 @@ protected:
      */
     void expectUpdatesReturnSuccess(const HostAndPort& expectedHost,
                                     const NamespaceString& expectedNss,
-                                    BatchedUpdateRequest* expectedBatchedUpdates) {
+                                    const write_ops::Update& expectedUpdateOp) {
         onCommandForAddShard([&](const RemoteCommandRequest& request) {
-
             ASSERT_EQUALS(expectedHost, request.target);
 
             // Check that the db name in the request matches the expected db name.
             ASSERT_EQUALS(expectedNss.db(), request.dbname);
 
-            BatchedUpdateRequest actualBatchedUpdates;
-            actualBatchedUpdates.parseRequest(
-                OpMsgRequest::fromDBAndBody(request.dbname, request.cmdObj));
+            const auto opMsgRequest = OpMsgRequest::fromDBAndBody(request.dbname, request.cmdObj);
+            const auto updateOp = UpdateOp::parse(opMsgRequest);
+            ASSERT_EQUALS(expectedNss, expectedUpdateOp.getNamespace());
 
-            // Check that the db and collection names in the BatchedUpdateRequest match the
-            // expected.
-            ASSERT_EQUALS(expectedNss, actualBatchedUpdates.getNS());
-
-            auto expectedUpdates = expectedBatchedUpdates->getUpdates();
-            auto actualUpdates = actualBatchedUpdates.getUpdates();
+            const auto& expectedUpdates = expectedUpdateOp.getUpdates();
+            const auto& actualUpdates = updateOp.getUpdates();
 
             ASSERT_EQUALS(expectedUpdates.size(), actualUpdates.size());
 
@@ -205,10 +193,10 @@ protected:
             auto itActual = actualUpdates.begin();
 
             for (; itActual != actualUpdates.end(); itActual++, itExpected++) {
-                ASSERT_EQ((*itExpected)->getUpsert(), (*itActual)->getUpsert());
-                ASSERT_EQ((*itExpected)->getMulti(), (*itActual)->getMulti());
-                ASSERT_BSONOBJ_EQ((*itExpected)->getQuery(), (*itActual)->getQuery());
-                ASSERT_BSONOBJ_EQ((*itExpected)->getUpdateExpr(), (*itActual)->getUpdateExpr());
+                ASSERT_EQ(itExpected->getUpsert(), itActual->getUpsert());
+                ASSERT_EQ(itExpected->getMulti(), itActual->getMulti());
+                ASSERT_BSONOBJ_EQ(itExpected->getQ(), itActual->getQ());
+                ASSERT_BSONOBJ_EQ(itExpected->getU(), itActual->getU());
             }
 
             BatchedCommandResponse response;
@@ -225,25 +213,20 @@ protected:
      */
     void expectUpdatesReturnFailure(const HostAndPort& expectedHost,
                                     const NamespaceString& expectedNss,
-                                    BatchedUpdateRequest* expectedBatchedUpdates,
+                                    const write_ops::Update& expectedUpdateOp,
                                     const Status& statusToReturn) {
         onCommandForAddShard([&](const RemoteCommandRequest& request) {
-
             ASSERT_EQUALS(expectedHost, request.target);
 
             // Check that the db name in the request matches the expected db name.
             ASSERT_EQUALS(expectedNss.db(), request.dbname);
 
-            BatchedUpdateRequest actualBatchedUpdates;
-            actualBatchedUpdates.parseRequest(
-                OpMsgRequest::fromDBAndBody(request.dbname, request.cmdObj));
+            const auto opMsgRequest = OpMsgRequest::fromDBAndBody(request.dbname, request.cmdObj);
+            const auto updateOp = UpdateOp::parse(opMsgRequest);
+            ASSERT_EQUALS(expectedNss, expectedUpdateOp.getNamespace());
 
-            // Check that the db and collection names in the BatchedUpdateRequest match the
-            // expected.
-            ASSERT_EQUALS(expectedNss, actualBatchedUpdates.getNS());
-
-            auto expectedUpdates = expectedBatchedUpdates->getUpdates();
-            auto actualUpdates = actualBatchedUpdates.getUpdates();
+            const auto& expectedUpdates = expectedUpdateOp.getUpdates();
+            const auto& actualUpdates = updateOp.getUpdates();
 
             ASSERT_EQUALS(expectedUpdates.size(), actualUpdates.size());
 
@@ -251,10 +234,10 @@ protected:
             auto itActual = actualUpdates.begin();
 
             for (; itActual != actualUpdates.end(); itActual++, itExpected++) {
-                ASSERT_EQ((*itExpected)->getUpsert(), (*itActual)->getUpsert());
-                ASSERT_EQ((*itExpected)->getMulti(), (*itActual)->getMulti());
-                ASSERT_BSONOBJ_EQ((*itExpected)->getQuery(), (*itActual)->getQuery());
-                ASSERT_BSONOBJ_EQ((*itExpected)->getUpdateExpr(), (*itActual)->getUpdateExpr());
+                ASSERT_EQ(itExpected->getUpsert(), itActual->getUpsert());
+                ASSERT_EQ(itExpected->getMulti(), itActual->getMulti());
+                ASSERT_BSONOBJ_EQ(itExpected->getQ(), itActual->getQ());
+                ASSERT_BSONOBJ_EQ(itExpected->getU(), itActual->getU());
             }
 
             return statusToReturn;

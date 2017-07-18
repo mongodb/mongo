@@ -39,8 +39,6 @@
 #include "mongo/s/catalog/sharding_catalog_client_impl.h"
 #include "mongo/s/catalog/sharding_catalog_test_fixture.h"
 #include "mongo/s/client/shard_registry.h"
-#include "mongo/s/write_ops/batched_command_request.h"
-#include "mongo/s/write_ops/batched_command_response.h"
 #include "mongo/stdx/chrono.h"
 #include "mongo/stdx/future.h"
 #include "mongo/util/log.h"
