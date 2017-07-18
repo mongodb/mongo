@@ -44,6 +44,7 @@
 #include "mongo/db/s/collection_sharding_state.h"
 #include "mongo/db/s/sharding_state.h"
 #include "mongo/db/service_context_d_test_fixture.h"
+#include "mongo/s/balancer_configuration.h"
 #include "mongo/s/chunk_version.h"
 #include "mongo/s/client/shard_registry.h"
 #include "mongo/s/sharding_mongod_test_fixture.h"
@@ -76,6 +77,10 @@ protected:
 
     OID const& epoch() {
         return _epoch;
+    }
+
+    virtual std::unique_ptr<BalancerConfiguration> makeBalancerConfiguration() override {
+        return stdx::make_unique<BalancerConfiguration>();
     }
 
 private:

@@ -43,6 +43,7 @@ namespace mongo {
 // How long to wait before starting cleanup of an emigrated chunk range.
 extern AtomicInt32 orphanCleanupDelaySecs;
 
+class BalancerConfiguration;
 class BSONObj;
 struct ChunkVersion;
 class CollectionMetadata;
@@ -284,6 +285,23 @@ private:
                               std::string* errmsg,
                               ChunkVersion* expectedShardVersion,
                               ChunkVersion* actualShardVersion);
+
+    /**
+     * If the collection is sharded, finds the chunk that contains the specified document, and
+     * increments the size tracked for that chunk by the specified amount of data written, in
+     * bytes. Returns the number of total bytes on that chunk, after the data is written.
+     */
+    uint64_t _incrementChunkOnInsertOrUpdate(OperationContext* opCtx,
+                                             const BSONObj& document,
+                                             long dataWritten);
+
+    /**
+     * Returns true if the total number of bytes on the specified chunk nears the max size of
+     * a shard.
+     */
+    bool _shouldSplitChunk(OperationContext* opCtx,
+                           const ShardKeyPattern& shardKeyPattern,
+                           const Chunk& chunk);
 
     // Namespace this state belongs to.
     const NamespaceString _nss;

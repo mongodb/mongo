@@ -49,6 +49,7 @@
 #include "mongo/db/server_options.h"
 #include "mongo/db/server_parameters.h"
 #include "mongo/db/service_context.h"
+#include "mongo/s/balancer_configuration.h"
 #include "mongo/s/catalog/sharding_catalog_manager.h"
 #include "mongo/s/catalog/type_config_version.h"
 #include "mongo/s/catalog/type_shard.h"
@@ -282,15 +283,21 @@ bool CollectionShardingState::isDocumentInMigratingChunk(OperationContext* opCtx
 void CollectionShardingState::onInsertOp(OperationContext* opCtx, const BSONObj& insertedDoc) {
     dassert(opCtx->lockState()->isCollectionLockedForMode(_nss.ns(), MODE_IX));
 
-    if (serverGlobalParams.clusterRole == ClusterRole::ShardServer &&
-        _nss == NamespaceString::kServerConfigurationNamespace) {
-        if (auto idElem = insertedDoc["_id"]) {
-            if (idElem.str() == ShardIdentityType::IdName) {
-                auto shardIdentityDoc = uassertStatusOK(ShardIdentityType::fromBSON(insertedDoc));
-                uassertStatusOK(shardIdentityDoc.validate());
-                opCtx->recoveryUnit()->registerChange(
-                    new ShardIdentityLogOpHandler(opCtx, std::move(shardIdentityDoc)));
+    if (serverGlobalParams.clusterRole == ClusterRole::ShardServer) {
+        if (_nss == NamespaceString::kServerConfigurationNamespace) {
+            if (auto idElem = insertedDoc["_id"]) {
+                if (idElem.str() == ShardIdentityType::IdName) {
+                    auto shardIdentityDoc =
+                        uassertStatusOK(ShardIdentityType::fromBSON(insertedDoc));
+                    uassertStatusOK(shardIdentityDoc.validate());
+                    opCtx->recoveryUnit()->registerChange(
+                        new ShardIdentityLogOpHandler(opCtx, std::move(shardIdentityDoc)));
+                }
             }
+        }
+
+        if (ShardingState::get(opCtx)->enabled()) {
+            _incrementChunkOnInsertOrUpdate(opCtx, insertedDoc, insertedDoc.objsize());
         }
     }
 
@@ -307,9 +314,15 @@ void CollectionShardingState::onUpdateOp(OperationContext* opCtx,
                                          const BSONObj& updatedDoc) {
     dassert(opCtx->lockState()->isCollectionLockedForMode(_nss.ns(), MODE_IX));
 
-    if (serverGlobalParams.clusterRole == ClusterRole::ShardServer &&
-        _nss == NamespaceString::kShardConfigCollectionsCollectionName) {
-        _onConfigRefreshCompleteInvalidateCachedMetadataAndNotify(opCtx, query, update, updatedDoc);
+    if (serverGlobalParams.clusterRole == ClusterRole::ShardServer) {
+        if (_nss == NamespaceString::kShardConfigCollectionsCollectionName) {
+            _onConfigRefreshCompleteInvalidateCachedMetadataAndNotify(
+                opCtx, query, update, updatedDoc);
+        }
+
+        if (ShardingState::get(opCtx)->enabled()) {
+            _incrementChunkOnInsertOrUpdate(opCtx, updatedDoc, update.objsize());
+        }
     }
 
     checkShardVersionOrThrow(opCtx);
@@ -536,6 +549,60 @@ bool CollectionShardingState::_checkShardVersionOk(OperationContext* opCtx,
 
     // Those are all the reasons the versions can mismatch
     MONGO_UNREACHABLE;
+}
+
+uint64_t CollectionShardingState::_incrementChunkOnInsertOrUpdate(OperationContext* opCtx,
+                                                                  const BSONObj& document,
+                                                                  long dataWritten) {
+
+    // Here, get the collection metadata and check if it exists. If it doesn't exist, then the
+    // collection is not sharded, and we can simply return -1.
+    ScopedCollectionMetadata metadata = getMetadata();
+    if (!metadata) {
+        return -1;
+    }
+
+    std::shared_ptr<ChunkManager> cm = metadata->getChunkManager();
+    const ShardKeyPattern& shardKeyPattern = cm->getShardKeyPattern();
+
+    // Each inserted/updated document should contain the shard key. The only instance in which a
+    // document could not contain a shard key is if the insert/update is performed through mongod
+    // explicitly, as opposed to first routed through mongos.
+    BSONObj shardKey = shardKeyPattern.extractShardKeyFromDoc(document);
+    if (shardKey.woCompare(BSONObj()) == 0) {
+        warning() << "inserting document " << document.toString() << " without shard key pattern "
+                  << shardKeyPattern << " into a sharded collection";
+        return -1;
+    }
+
+    // Use the shard key to locate the chunk into which the document was updated, and increment the
+    // number of bytes tracked for the chunk. Note that we can assume the simple collation, because
+    // shard keys do not support non-simple collations.
+    std::shared_ptr<Chunk> chunk = cm->findIntersectingChunkWithSimpleCollation(shardKey);
+    invariant(chunk);
+    chunk->addBytesWritten(dataWritten);
+
+    // If the chunk becomes too large, then we call the ChunkSplitter to schedule a split. Then, we
+    // reset the tracking for that chunk to 0.
+    if (_shouldSplitChunk(opCtx, shardKeyPattern, *chunk)) {
+        // TODO: call ChunkSplitter here
+        chunk->clearBytesWritten();
+    }
+    return chunk->getBytesWritten();
+}
+
+bool CollectionShardingState::_shouldSplitChunk(OperationContext* opCtx,
+                                                const ShardKeyPattern& shardKeyPattern,
+                                                const Chunk& chunk) {
+
+    const auto balancerConfig = Grid::get(opCtx)->getBalancerConfiguration();
+    invariant(balancerConfig);
+
+    const KeyPattern keyPattern = shardKeyPattern.getKeyPattern();
+    const bool minIsInf = (0 == keyPattern.globalMin().woCompare(chunk.getMin()));
+    const bool maxIsInf = (0 == keyPattern.globalMax().woCompare(chunk.getMax()));
+
+    return chunk.shouldSplit(balancerConfig->getMaxChunkSizeBytes(), minIsInf, maxIsInf);
 }
 
 }  // namespace mongo
