@@ -69,6 +69,9 @@ public:
     void copyCollectionFromRemote(OperationContext* opCtx,
                                   const NamespaceString& nss) const override;
 
+    StatusWith<BSONObj> getCollectionInfoByUUID(const std::string& db,
+                                                const UUID& uuid) const override;
+
     StatusWith<BSONObj> getCollectionInfo(const NamespaceString& nss) const override;
 
 private:

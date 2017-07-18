@@ -74,6 +74,8 @@ public:
     BSONObj findOne(const NamespaceString& nss, const BSONObj& filter) const override;
     void copyCollectionFromRemote(OperationContext* opCtx,
                                   const NamespaceString& nss) const override;
+    StatusWith<BSONObj> getCollectionInfoByUUID(const std::string& db,
+                                                const UUID& uuid) const override;
     StatusWith<BSONObj> getCollectionInfo(const NamespaceString& nss) const override;
 
 private:
@@ -109,6 +111,11 @@ BSONObj RollbackSourceMock::findOne(const NamespaceString& nss, const BSONObj& f
 
 void RollbackSourceMock::copyCollectionFromRemote(OperationContext* opCtx,
                                                   const NamespaceString& nss) const {}
+
+StatusWith<BSONObj> RollbackSourceMock::getCollectionInfoByUUID(const std::string& db,
+                                                                const UUID& uuid) const {
+    return BSON("info" << BSON("uuid" << uuid) << "options" << BSONObj());
+}
 
 StatusWith<BSONObj> RollbackSourceMock::getCollectionInfo(const NamespaceString& nss) const {
     return BSON("name" << nss.ns() << "options" << BSONObj());

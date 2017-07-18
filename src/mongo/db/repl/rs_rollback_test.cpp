@@ -75,6 +75,8 @@ public:
     BSONObj findOne(const NamespaceString& nss, const BSONObj& filter) const override;
     void copyCollectionFromRemote(OperationContext* opCtx,
                                   const NamespaceString& nss) const override;
+    StatusWith<BSONObj> getCollectionInfoByUUID(const std::string& db,
+                                                const UUID& uuid) const override;
     StatusWith<BSONObj> getCollectionInfo(const NamespaceString& nss) const override;
 
 private:
@@ -114,6 +116,12 @@ void RollbackSourceMock::copyCollectionFromRemote(OperationContext* opCtx,
 StatusWith<BSONObj> RollbackSourceMock::getCollectionInfo(const NamespaceString& nss) const {
     return BSON("name" << nss.ns() << "options" << BSONObj());
 }
+
+StatusWith<BSONObj> RollbackSourceMock::getCollectionInfoByUUID(const std::string& db,
+                                                                const UUID& uuid) const {
+    return BSON("info" << BSON("uuid" << uuid) << "options" << BSONObj());
+}
+
 
 class RSRollbackTest : public RollbackTest {
 private:
@@ -910,7 +918,8 @@ TEST_F(RSRollbackTest, RollbackCollModCommandFailsIfRBIDChangesWhileSyncingColle
         int getRollbackId() const override {
             return getCollectionInfoCalled ? 1 : 0;
         }
-        StatusWith<BSONObj> getCollectionInfo(const NamespaceString& nss) const override {
+        StatusWith<BSONObj> getCollectionInfoByUUID(const std::string& db,
+                                                    const UUID& uuid) const override {
             getCollectionInfoCalled = true;
             return BSONObj();
         }
@@ -1193,9 +1202,9 @@ TEST_F(RSRollbackTest, RollbackCollectionModificationCommand) {
     public:
         RollbackSourceLocal(std::unique_ptr<OplogInterface> oplog)
             : RollbackSourceMock(std::move(oplog)), called(false) {}
-        StatusWith<BSONObj> getCollectionInfo(const NamespaceString& nss) const {
+        StatusWith<BSONObj> getCollectionInfoByUUID(const std::string& db, const UUID& uuid) const {
             called = true;
-            return RollbackSourceMock::getCollectionInfo(nss);
+            return RollbackSourceMock::getCollectionInfoByUUID(db, uuid);
         }
         mutable bool called;
     };
@@ -1242,8 +1251,8 @@ TEST_F(RSRollbackTest, RollbackCollectionModificationCommandInvalidCollectionOpt
     public:
         RollbackSourceLocal(std::unique_ptr<OplogInterface> oplog)
             : RollbackSourceMock(std::move(oplog)) {}
-        StatusWith<BSONObj> getCollectionInfo(const NamespaceString& nss) const {
-            return BSON("name" << nss.ns() << "options" << 12345);
+        StatusWith<BSONObj> getCollectionInfoByUUID(const std::string& db, const UUID& uuid) const {
+            return BSON("info" << BSON("uuid" << uuid) << "options" << 12345);
         }
     };
     RollbackSourceLocal rollbackSource(std::unique_ptr<OplogInterface>(new OplogInterfaceMock({

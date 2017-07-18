@@ -128,7 +128,7 @@ void FixUpInfo::removeRedundantOperations() {
     for (const auto& collection : collectionsToResyncData) {
         removeAllDocsToRefetchFor(collection);
         // indexesToDrop.erase(collection);
-        collectionsToResyncMetadata.erase(collection);
+        // collectionsToResyncMetadata.erase(collection);
         // collectionsToDrop.erase(collection);
     }
 }
@@ -367,7 +367,6 @@ Status rollback_internal::updateFixUpInfoFromLocalOplogEntry(FixUpInfo& fixUpInf
                 return Status::OK();
             }
             case OplogEntry::CommandType::kCollMod: {
-                const auto ns = nss.db().toString() + '.' + first.valuestr();  // -> foo.abc
                 for (auto field : obj) {
                     // Example collMod obj
                     // o:{
@@ -388,7 +387,7 @@ Status rollback_internal::updateFixUpInfoFromLocalOplogEntry(FixUpInfo& fixUpInf
                     if (modification == "validator" || modification == "validationAction" ||
                         modification == "validationLevel" || modification == "usePowerOf2Sizes" ||
                         modification == "noPadding") {
-                        fixUpInfo.collectionsToResyncMetadata.insert(ns);
+                        fixUpInfo.collectionsToResyncMetadata.insert(*uuid);
                         continue;
                     }
                     // Some collMod fields cannot be rolled back, such as the index field.
@@ -691,7 +690,7 @@ void syncFixUp(OperationContext* opCtx,
             // TODO: This invariant will be uncommented once the
             // rollback via refetch for non-WT project is complete. See SERVER-30171.
             // invariant(!fixUpInfo.indexesToDrop.count(ns));
-            invariant(!fixUpInfo.collectionsToResyncMetadata.count(ns));
+            // invariant(!fixUpInfo.collectionsToResyncMetadata.count(ns));
 
             const NamespaceString nss(ns);
 
@@ -707,20 +706,26 @@ void syncFixUp(OperationContext* opCtx,
             rollbackSource.copyCollectionFromRemote(opCtx, nss);
         }
 
-        // Retrieves collections from the sync source in order to obtain
-        // the collection flags needed to roll back collMod operations.
-        for (const string& ns : fixUpInfo.collectionsToResyncMetadata) {
-            log() << "Resyncing collection metadata, namespace: " << ns;
+        // Retrieves collections from the sync source in order to obtain the collection
+        // flags needed to roll back collMod operations. We roll back collMod operations
+        // after create/renameCollection/drop commands in order to ensure that the
+        // collections that we want to change actually exist. For example, if a collMod
+        // occurs and then the collection is dropped. If we do not first re-create the
+        // collection, we will not be able to retrieve the collection's catalog entries.
+        for (auto uuid : fixUpInfo.collectionsToResyncMetadata) {
+            log() << "Resyncing collection metadata, uuid: " << uuid;
 
-            const NamespaceString nss(ns);
+            Collection* collection = UUIDCatalog::get(opCtx).lookupCollectionByUUID(uuid);
+            invariant(collection);
+            NamespaceString nss = collection->ns();
+
             Lock::DBLock dbLock(opCtx, nss.db(), MODE_X);
             auto db = dbHolder().openDb(opCtx, nss.db().toString());
             invariant(db);
-            auto collection = db->getCollection(opCtx, nss);
-            invariant(collection);
+
             auto cce = collection->getCatalogEntry();
 
-            auto infoResult = rollbackSource.getCollectionInfo(nss);
+            auto infoResult = rollbackSource.getCollectionInfoByUUID(nss.db().toString(), uuid);
 
             if (!infoResult.isOK()) {
                 // The collection was dropped by the sync source so we can't correctly change it
@@ -728,8 +733,8 @@ void syncFixUp(OperationContext* opCtx,
                 // is rolled back upstream and we restart, we expect to still have the
                 // collection.
 
-                log() << ns << " not found on remote host, so we do not roll back collmod "
-                               "operation. Instead, we will drop the collection soon.";
+                log() << nss.ns() << " not found on remote host, so we do not roll back collmod "
+                                     "operation. Instead, we will drop the collection soon.";
                 continue;
             }
 

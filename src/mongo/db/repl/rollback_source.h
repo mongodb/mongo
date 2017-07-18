@@ -32,6 +32,7 @@
 #include "mongo/base/status_with.h"
 #include "mongo/db/jsobj.h"
 #include "mongo/util/net/hostandport.h"
+#include "mongo/util/uuid.h"
 
 namespace mongo {
 
@@ -86,7 +87,15 @@ public:
                                           const NamespaceString& nss) const = 0;
 
     /**
-     * Returns collection info.
+     * Finds and returns collection info using the UUID.
+     */
+    virtual StatusWith<BSONObj> getCollectionInfoByUUID(const std::string& db,
+                                                        const UUID& uuid) const = 0;
+
+    /**
+     * Finds and returns collection info using the namespace.
+     * TODO: After MongoDB 3.6 is released, we will remove this function as it is only
+     * necessary for rollback with no uuid oplogs. See SERVER-29766.
      */
     virtual StatusWith<BSONObj> getCollectionInfo(const NamespaceString& nss) const = 0;
 };

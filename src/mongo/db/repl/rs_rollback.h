@@ -238,7 +238,6 @@ struct FixUpInfo {
 
     // Namespaces of collections that need to be dropped or resynced from the sync source.
     std::set<std::string> collectionsToResyncData;
-    std::set<std::string> collectionsToResyncMetadata;
 
     // UUIDs of collections that need to be dropped.
     stdx::unordered_set<UUID, UUID::Hash> collectionsToDrop;
@@ -249,6 +248,9 @@ struct FixUpInfo {
 
     // Key is the UUID of the collection. Value is a map from indexName to indexSpec for the index.
     stdx::unordered_map<UUID, std::map<std::string, BSONObj>, UUID::Hash> indexesToCreate;
+
+    // UUIDs of collections that need to have their metadata resynced from the sync source.
+    stdx::unordered_set<UUID, UUID::Hash> collectionsToResyncMetadata;
 
     // When collections are dropped, they are added to a list of drop-pending collections. We keep
     // the OpTime and the namespace of the collection because the DropPendingCollectionReaper
