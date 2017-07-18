@@ -49,6 +49,7 @@
 #include "mongo/db/update/addtoset_node.h"
 #include "mongo/db/update/arithmetic_node.h"
 #include "mongo/db/update/bit_node.h"
+#include "mongo/db/update/compare_node.h"
 #include "mongo/db/update/conflict_placeholder_node.h"
 #include "mongo/db/update/pop_node.h"
 #include "mongo/db/update/pull_node.h"
@@ -195,6 +196,10 @@ std::unique_ptr<UpdateLeafNode> makeUpdateLeafNode(ModifierType modType) {
             return stdx::make_unique<ConflictPlaceholderNode>();
         case MOD_INC:
             return stdx::make_unique<ArithmeticNode>(ArithmeticNode::ArithmeticOp::kAdd);
+        case MOD_MAX:
+            return stdx::make_unique<CompareNode>(CompareNode::CompareMode::kMax);
+        case MOD_MIN:
+            return stdx::make_unique<CompareNode>(CompareNode::CompareMode::kMin);
         case MOD_MUL:
             return stdx::make_unique<ArithmeticNode>(ArithmeticNode::ArithmeticOp::kMultiply);
         case MOD_POP:

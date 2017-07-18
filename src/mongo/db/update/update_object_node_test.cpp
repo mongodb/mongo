@@ -176,6 +176,34 @@ TEST(UpdateObjectNodeTest, ValidPopPathParsesSuccessfully) {
                                               foundIdentifiers));
 }
 
+TEST(UpdateObjectNodeTest, ValidMaxPathParsesSuccessfully) {
+    auto update = fromjson("{$max: {'a.b': 1}}");
+    const CollatorInterface* collator = nullptr;
+    std::map<StringData, std::unique_ptr<ArrayFilter>> arrayFilters;
+    std::set<std::string> foundIdentifiers;
+    UpdateObjectNode root;
+    ASSERT_OK(UpdateObjectNode::parseAndMerge(&root,
+                                              modifiertable::ModifierType::MOD_MAX,
+                                              update["$max"]["a.b"],
+                                              collator,
+                                              arrayFilters,
+                                              foundIdentifiers));
+}
+
+TEST(UpdateObjectNodeTest, ValidMinPathParsesSuccessfully) {
+    auto update = fromjson("{$min: {'a.b': 1}}");
+    const CollatorInterface* collator = nullptr;
+    std::map<StringData, std::unique_ptr<ArrayFilter>> arrayFilters;
+    std::set<std::string> foundIdentifiers;
+    UpdateObjectNode root;
+    ASSERT_OK(UpdateObjectNode::parseAndMerge(&root,
+                                              modifiertable::ModifierType::MOD_MIN,
+                                              update["$min"]["a.b"],
+                                              collator,
+                                              arrayFilters,
+                                              foundIdentifiers));
+}
+
 TEST(UpdateObjectNodeTest, MultiplePositionalElementsFailToParse) {
     auto update = fromjson("{$set: {'a.$.b.$': 5}}");
     const CollatorInterface* collator = nullptr;
