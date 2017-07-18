@@ -26,14 +26,15 @@
  *    it in the license file.
  */
 
+#define MONGO_LOG_DEFAULT_COMPONENT ::mongo::logger::LogComponent::kSharding
+
 #include "mongo/platform/basic.h"
 
 #include "mongo/db/s/chunk_splitter.h"
 
 #include "mongo/db/client.h"
-#include "mongo/db/namespace_string.h"
-#include "mongo/db/operation_context.h"
-#include "mongo/s/catalog/type_chunk.h"
+#include "mongo/util/assert_util.h"
+#include "mongo/util/log.h"
 
 namespace mongo {
 namespace {
@@ -56,7 +57,7 @@ ThreadPool::Options makeDefaultThreadPoolOptions() {
 
 }  // namespace
 
-ChunkSplitter::ChunkSplitter() : _threadPool(makeDefaultThreadPoolOptions()) {
+ChunkSplitter::ChunkSplitter() : _isPrimary(false), _threadPool(makeDefaultThreadPoolOptions()) {
     _threadPool.startup();
 }
 
@@ -65,10 +66,56 @@ ChunkSplitter::~ChunkSplitter() {
     _threadPool.join();
 }
 
-bool ChunkSplitter::trySplitting(OperationContext* opCtx,
-                                 const NamespaceString& nss,
-                                 const ChunkRange& chunkRange) {
-    return false;
+void ChunkSplitter::setReplicaSetMode(bool isPrimary) {
+    stdx::lock_guard<stdx::mutex> scopedLock(_mutex);
+    _isPrimary = isPrimary;
+}
+
+void ChunkSplitter::initiateChunkSplitter() {
+    stdx::lock_guard<stdx::mutex> scopedLock(_mutex);
+    if (_isPrimary) {
+        return;
+    }
+    _isPrimary = true;
+
+    log() << "The ChunkSplitter has started and will accept autosplit tasks. Any tasks that did not"
+          << " have time to drain the last time this node was a primary shall be run.";
+}
+
+void ChunkSplitter::interruptChunkSplitter() {
+    stdx::lock_guard<stdx::mutex> scopedLock(_mutex);
+    if (!_isPrimary) {
+        return;
+    }
+    _isPrimary = false;
+
+    log() << "The ChunkSplitter has stopped and will no longer run autosplit tasks. Any autosplit "
+          << "tasks that have already started will be allowed to finish.";
+}
+
+void ChunkSplitter::trySplitting(const NamespaceString& nss,
+                                 const BSONObj& min,
+                                 const BSONObj& max) {
+    if (!_isPrimary) {
+        return;
+    }
+
+    uassertStatusOK(
+        _threadPool.schedule([ this, nss, min, max ]() noexcept { _runAutosplit(nss, min, max); }));
+}
+
+void ChunkSplitter::_runAutosplit(const NamespaceString& nss,
+                                  const BSONObj& min,
+                                  const BSONObj& max) {
+    if (!_isPrimary) {
+        return;
+    }
+
+    try {
+        // TODO SERVER-30020
+    } catch (const std::exception& e) {
+        log() << "caught exception while splitting chunk: " << redact(e.what());
+    }
 }
 
 }  // namespace mongo

@@ -35,6 +35,7 @@
 #include "mongo/bson/oid.h"
 #include "mongo/db/namespace_string.h"
 #include "mongo/db/s/active_migrations_registry.h"
+#include "mongo/db/s/chunk_splitter.h"
 #include "mongo/db/s/collection_range_deleter.h"
 #include "mongo/db/s/migration_destination_manager.h"
 #include "mongo/executor/task_executor.h"
@@ -141,6 +142,18 @@ public:
     Status updateConfigServerOpTimeFromMetadata(OperationContext* opCtx);
 
     CollectionShardingState* getNS(const std::string& ns, OperationContext* opCtx);
+
+    /**
+     * Should be invoked when the shard server primary enters the 'PRIMARY' state.
+     * Sets up the ChunkSplitter to begin accepting split requests.
+     */
+    void initiateChunkSplitter();
+
+    /**
+     * Should be invoked when this node which is currently serving as a 'PRIMARY' steps down.
+     * Sets the state of the ChunkSplitter so that it will no longer accept split requests.
+     */
+    void interruptChunkSplitter();
 
     /**
      * Iterates through all known sharded collections and marks them (in memory only) as not sharded
@@ -310,6 +323,9 @@ private:
 
     // Tracks the active move chunk operations running on this shard
     ActiveMigrationsRegistry _activeMigrationsRegistry;
+
+    // Handles asynchronous auto-splitting of chunks
+    std::unique_ptr<ChunkSplitter> _chunkSplitter;
 
     // Protects state below
     stdx::mutex _mutex;

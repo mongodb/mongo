@@ -32,27 +32,55 @@
 
 namespace mongo {
 
-class ChunkRange;
 class NamespaceString;
-class OperationContext;
-class ThreadPool;
 
 /**
  * Handles asynchronous auto-splitting of chunks.
  */
 class ChunkSplitter {
+    MONGO_DISALLOW_COPYING(ChunkSplitter);
+
 public:
     ChunkSplitter();
     ~ChunkSplitter();
 
     /**
-     * Schedules an autosplit task. Returns whether or not the task was successfully scheduled.
+     * Sets the mode of the ChunkSplitter to either primary or secondary.
+     * The ChunkSplitter is only active when primary.
      */
-    bool trySplitting(OperationContext* opCtx,
-                      const NamespaceString& nss,
-                      const ChunkRange& chunkRange);
+    void setReplicaSetMode(bool isPrimary);
+
+    /**
+     * Invoked when the shard server primary enters the 'PRIMARY' state to set up the ChunkSplitter
+     * to begin accepting split requests.
+     */
+    void initiateChunkSplitter();
+
+    /**
+     * Invoked when this node which is currently serving as a 'PRIMARY' steps down.
+     *
+     * This method might be called multiple times in succession, which is what happens as a result
+     * of incomplete transition to primary so it is resilient to that.
+     */
+    void interruptChunkSplitter();
+
+    /**
+     * Schedules an autosplit task. This function throws on scheduling failure.
+     */
+    void trySplitting(const NamespaceString& nss, const BSONObj& min, const BSONObj& max);
 
 private:
+    /**
+     * Determines if the specified chunk should be split and then performs any necessary split.
+     */
+    void _runAutosplit(const NamespaceString& nss, const BSONObj& min, const BSONObj& max);
+
+    // Protects the state below.
+    stdx::mutex _mutex;
+
+    // The ChunkSplitter is only active on a primary node.
+    bool _isPrimary;
+
     // Thread pool for parallelizing splits.
     ThreadPool _threadPool;
 };

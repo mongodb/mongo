@@ -712,6 +712,7 @@ void ReplicationCoordinatorExternalStateImpl::shardingOnStepDownHook() {
         Balancer::get(_service)->interruptBalancer();
     } else if (ShardingState::get(_service)->enabled()) {
         invariant(serverGlobalParams.clusterRole == ClusterRole::ShardServer);
+        ShardingState::get(_service)->interruptChunkSplitter();
         Grid::get(_service)->catalogCache()->onStepDown();
     }
 
@@ -801,6 +802,7 @@ void ReplicationCoordinatorExternalStateImpl::_shardingOnTransitionToPrimaryHook
         }
 
         Grid::get(_service)->catalogCache()->onStepUp();
+        ShardingState::get(_service)->initiateChunkSplitter();
     }
 
     SessionCatalog::get(_service)->onStepUp(opCtx);
