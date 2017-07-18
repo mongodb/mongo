@@ -69,9 +69,11 @@ public:
     static void set(ServiceContext* service,
                     std::unique_ptr<DropPendingCollectionReaper> storageInterface);
 
-    // Container type for drop-pending namespaces. We use a map so that we can order the namespaces
-    // by drop optime.
-    using DropPendingNamespaces = std::map<OpTime, NamespaceString>;
+    // Container type for drop-pending namespaces. We use a multimap so that we can order the
+    // namespaces by drop optime. Additionally, it is possible for certain user operations (such
+    // as renameCollection across databases) to generate more than one drop-pending namespace for
+    // the same drop optime.
+    using DropPendingNamespaces = std::multimap<OpTime, NamespaceString>;
 
     explicit DropPendingCollectionReaper(StorageInterface* storageInterface);
     virtual ~DropPendingCollectionReaper() = default;

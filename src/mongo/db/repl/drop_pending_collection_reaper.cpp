@@ -32,6 +32,7 @@
 
 #include "mongo/db/repl/drop_pending_collection_reaper.h"
 
+#include <algorithm>
 #include <utility>
 
 #include "mongo/db/client.h"
@@ -77,13 +78,17 @@ void DropPendingCollectionReaper::addDropPendingNamespace(
     const OpTime& dropOpTime, const NamespaceString& dropPendingNamespace) {
     invariant(dropPendingNamespace.isDropPendingNamespace());
     stdx::lock_guard<stdx::mutex> lock(_mutex);
-    auto insertResult =
+    const auto equalRange = _dropPendingNamespaces.equal_range(dropOpTime);
+    const auto& lowerBound = equalRange.first;
+    const auto& upperBound = equalRange.second;
+    auto matcher = [&dropPendingNamespace](const auto& pair) {
+        return pair.second == dropPendingNamespace;
+    };
+    if (std::find_if(lowerBound, upperBound, matcher) == upperBound) {
         _dropPendingNamespaces.insert(std::make_pair(dropOpTime, dropPendingNamespace));
-    if (!insertResult.second) {
+    } else {
         severe() << "Failed to add drop-pending collection " << dropPendingNamespace
-                 << " with drop optime " << dropOpTime
-                 << ". There is already an existing collection " << insertResult.first->second
-                 << " with the same drop optime.";
+                 << " with drop optime " << dropOpTime << ": duplicate optime and namespace pair.";
         fassertFailedNoTrace(40448);
     }
 }

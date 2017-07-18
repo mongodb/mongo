@@ -107,15 +107,36 @@ TEST_F(DropPendingCollectionReaperTest, AddDropPendingNamespaceAcceptsNullDropOp
     ASSERT_EQUALS(nullDropOpTime, *reaper.getEarliestDropOpTime());
 }
 
+TEST_F(DropPendingCollectionReaperTest,
+       AddDropPendingNamespaceWithDuplicateDropOpTimeButDifferentNamespace) {
+    StorageInterfaceMock storageInterfaceMock;
+    std::size_t numCollectionsDropped = 0U;
+    storageInterfaceMock.dropCollFn = [&](OperationContext*, const NamespaceString&) {
+        numCollectionsDropped++;
+        return Status::OK();
+    };
+    DropPendingCollectionReaper reaper(&storageInterfaceMock);
+
+    OpTime opTime({Seconds(100), 0}, 1LL);
+    auto dpns = NamespaceString("test.foo").makeDropPendingNamespace(opTime);
+    reaper.addDropPendingNamespace(opTime, dpns);
+    reaper.addDropPendingNamespace(opTime,
+                                   NamespaceString("test.bar").makeDropPendingNamespace(opTime));
+
+    // Drop all collections managed by reaper and confirm number of drops.
+    auto opCtx = makeOpCtx();
+    reaper.dropCollectionsOlderThan(opCtx.get(), opTime);
+    ASSERT_EQUALS(2U, numCollectionsDropped);
+}
+
 DEATH_TEST_F(DropPendingCollectionReaperTest,
-             AddDropPendingNamespaceTerminatesOnDuplicateDropOpTime,
+             AddDropPendingNamespaceTerminatesOnDuplicateDropOpTimeAndNamespace,
              "Failed to add drop-pending collection") {
     OpTime opTime({Seconds(100), 0}, 1LL);
     auto dpns = NamespaceString("test.foo").makeDropPendingNamespace(opTime);
     DropPendingCollectionReaper reaper(_storageInterface.get());
     reaper.addDropPendingNamespace(opTime, dpns);
-    reaper.addDropPendingNamespace(opTime,
-                                   NamespaceString("test.bar").makeDropPendingNamespace(opTime));
+    reaper.addDropPendingNamespace(opTime, dpns);
 }
 
 TEST_F(DropPendingCollectionReaperTest,
