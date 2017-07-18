@@ -150,12 +150,10 @@ BSONObj BatchedCommandRequest::toBSON() const {
         }
     }());
 
-    // Append the base command configuration
     _writeCommandBase.serialize(&builder);
 
-    // Append the shard version
     if (_shardVersion) {
-        _shardVersion.get().appendForCommands(&builder);
+        _shardVersion->appendForCommands(&builder);
     }
 
     if (_writeConcern) {
@@ -166,6 +164,9 @@ BSONObj BatchedCommandRequest::toBSON() const {
 }
 
 void BatchedCommandRequest::parseRequest(const OpMsgRequest& request) {
+    _writeCommandBase =
+        write_ops::WriteCommandBase::parse(IDLParserErrorContext("WriteOpTxnInfo"), request.body);
+
     switch (getBatchType()) {
         case BatchedCommandRequest::BatchType_Insert:
             _insertReq->parseRequest(request);
@@ -180,7 +181,6 @@ void BatchedCommandRequest::parseRequest(const OpMsgRequest& request) {
             MONGO_UNREACHABLE;
     }
 
-    // Now parse out the chunk version and optime.
     auto chunkVersion = ChunkVersion::parseFromBSONForCommands(request.body);
     if (chunkVersion != ErrorCodes::NoSuchKey) {
         setShardVersion(uassertStatusOK(std::move(chunkVersion)));
@@ -190,18 +190,6 @@ void BatchedCommandRequest::parseRequest(const OpMsgRequest& request) {
     if (!writeConcernField.eoo()) {
         setWriteConcern(writeConcernField.Obj());
     }
-
-    // Parse the command's transaction info and do extra validation not done by the parser
-    _writeCommandBase =
-        write_ops::WriteCommandBase::parse(IDLParserErrorContext("WriteOpTxnInfo"), request.body);
-
-    const auto& stmtIds = _writeCommandBase.getStmtIds();
-    uassert(ErrorCodes::BadValue,
-            str::stream() << "The size of the statement ids array (" << stmtIds->size()
-                          << ") does not match the number of operations ("
-                          << sizeWriteOps()
-                          << ")",
-            !stmtIds || stmtIds->size() == sizeWriteOps());
 }
 
 std::string BatchedCommandRequest::toString() const {
@@ -240,20 +228,12 @@ const BSONObj& BatchedCommandRequest::getWriteConcern() const {
     return *_writeConcern;
 }
 
-void BatchedCommandRequest::setOrdered(bool ordered) {
-    _writeCommandBase.setOrdered(ordered);
+const write_ops::WriteCommandBase& BatchedCommandRequest::getWriteCommandBase() const {
+    return _writeCommandBase;
 }
 
-bool BatchedCommandRequest::getOrdered() const {
-    return _writeCommandBase.getOrdered();
-}
-
-void BatchedCommandRequest::setShouldBypassValidation(bool newVal) {
-    _writeCommandBase.setBypassDocumentValidation(newVal);
-}
-
-bool BatchedCommandRequest::shouldBypassValidation() const {
-    return _writeCommandBase.getBypassDocumentValidation();
+void BatchedCommandRequest::setWriteCommandBase(write_ops::WriteCommandBase writeCommandBase) {
+    _writeCommandBase = std::move(writeCommandBase);
 }
 
 /**
@@ -307,16 +287,6 @@ BatchedCommandRequest* BatchedCommandRequest::cloneWithIds(
     }
 
     return clonedCmdRequest.release();
-}
-
-const boost::optional<std::vector<std::int32_t>> BatchedCommandRequest::getStmtIds() const& {
-    return _writeCommandBase.getStmtIds();
-}
-
-void BatchedCommandRequest::setStmtIds(boost::optional<std::vector<std::int32_t>> value) {
-    invariant(!value || value->size() == sizeWriteOps());
-
-    _writeCommandBase.setStmtIds(std::move(value));
 }
 
 }  // namespace mongo

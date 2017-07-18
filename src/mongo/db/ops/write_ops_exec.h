@@ -71,8 +71,8 @@ struct WriteResult {
  * exception being thrown from these functions. Callers are responsible for managing LastError in
  * that case. This should generally be combined with LastError handling from parse failures.
  */
-WriteResult performInserts(OperationContext* opCtx, const InsertOp& op);
-WriteResult performUpdates(OperationContext* opCtx, const UpdateOp& op);
-WriteResult performDeletes(OperationContext* opCtx, const DeleteOp& op);
+WriteResult performInserts(OperationContext* opCtx, const write_ops::Insert& op);
+WriteResult performUpdates(OperationContext* opCtx, const write_ops::Update& op);
+WriteResult performDeletes(OperationContext* opCtx, const write_ops::Delete& op);
 
 }  // namespace mongo

@@ -56,8 +56,12 @@ TEST(BatchedInsertRequest, Basic) {
 TEST(BatchedInsertRequest, GenIDAll) {
     BatchedCommandRequest cmdRequest(BatchedCommandRequest::BatchType_Insert);
     cmdRequest.setNS(NamespaceString("foo.bar"));
-    cmdRequest.setOrdered(false);
-    cmdRequest.setShouldBypassValidation(true);
+    {
+        write_ops::WriteCommandBase writeCommandBase;
+        writeCommandBase.setOrdered(false);
+        writeCommandBase.setBypassDocumentValidation(true);
+        cmdRequest.setWriteCommandBase(std::move(writeCommandBase));
+    }
     cmdRequest.setWriteConcern(BSON("w"
                                     << "majority"
                                     << "wtimeout"
@@ -71,8 +75,10 @@ TEST(BatchedInsertRequest, GenIDAll) {
         BatchedCommandRequest::cloneWithIds(cmdRequest));
     ASSERT(idCmdRequest.get());
     ASSERT_EQUALS(cmdRequest.getNS().ns(), idCmdRequest->getNS().ns());
-    ASSERT_EQUALS(cmdRequest.getOrdered(), idCmdRequest->getOrdered());
-    ASSERT_EQUALS(cmdRequest.shouldBypassValidation(), idCmdRequest->shouldBypassValidation());
+    ASSERT_EQUALS(cmdRequest.getWriteCommandBase().getOrdered(),
+                  idCmdRequest->getWriteCommandBase().getOrdered());
+    ASSERT_EQUALS(cmdRequest.getWriteCommandBase().getBypassDocumentValidation(),
+                  idCmdRequest->getWriteCommandBase().getBypassDocumentValidation());
     ASSERT_BSONOBJ_EQ(cmdRequest.getWriteConcern(), idCmdRequest->getWriteConcern());
 
     auto* const idRequest = idCmdRequest->getInsertRequest();

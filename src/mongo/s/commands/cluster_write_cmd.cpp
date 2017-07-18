@@ -207,7 +207,8 @@ public:
 
         if (!response.getOk()) {
             numAttempts = 0;
-        } else if (batchedRequest.getOrdered() && response.isErrDetailsSet()) {
+        } else if (batchedRequest.getWriteCommandBase().getOrdered() &&
+                   response.isErrDetailsSet()) {
             // Add one failed attempt
             numAttempts = response.getErrDetailsAt(0)->getIndex() + 1;
         } else {

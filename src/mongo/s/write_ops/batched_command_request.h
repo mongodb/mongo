@@ -30,7 +30,6 @@
 
 #include <boost/optional.hpp>
 
-#include "mongo/base/disallow_copying.h"
 #include "mongo/db/ops/write_ops.h"
 #include "mongo/s/chunk_version.h"
 #include "mongo/s/write_ops/batched_delete_request.h"
@@ -50,8 +49,6 @@ class NamespaceString;
  * wrapped request object once constructed.
  */
 class BatchedCommandRequest {
-    MONGO_DISALLOW_COPYING(BatchedCommandRequest);
-
 public:
     // Maximum number of write ops supported per batch
     static const size_t kMaxWriteBatchSize;
@@ -118,9 +115,6 @@ public:
     bool isWriteConcernSet() const;
     const BSONObj& getWriteConcern() const;
 
-    void setOrdered(bool ordered);
-    bool getOrdered() const;
-
     void setShardVersion(ChunkVersion shardVersion) {
         _shardVersion = std::move(shardVersion);
     }
@@ -133,15 +127,8 @@ public:
         return _shardVersion.get();
     }
 
-    const write_ops::WriteCommandBase& getWriteCommandBase() const {
-        return _writeCommandBase;
-    }
-
-    const boost::optional<std::vector<std::int32_t>> getStmtIds() const&;
-    void setStmtIds(boost::optional<std::vector<std::int32_t>> value);
-
-    void setShouldBypassValidation(bool newVal);
-    bool shouldBypassValidation() const;
+    const write_ops::WriteCommandBase& getWriteCommandBase() const;
+    void setWriteCommandBase(write_ops::WriteCommandBase writeCommandBase);
 
     //
     // Helpers for batch pre-processing

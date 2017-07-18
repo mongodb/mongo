@@ -24,8 +24,6 @@
     // Test that both shard and hostname are present for $collStats results on a sharded cluster.
     const st = new ShardingTest({name: jsTestName(), shards: 2});
 
-    st.stopBalancer();
-
     testDB = st.s.getDB(jsTestName());
     testColl = testDB.test;
 

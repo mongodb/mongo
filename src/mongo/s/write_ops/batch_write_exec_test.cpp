@@ -178,7 +178,11 @@ TEST_F(BatchWriteExecTest, SingleOp) {
 
     BatchedCommandRequest request(BatchedCommandRequest::BatchType_Insert);
     request.setNS(nss);
-    request.setOrdered(false);
+    {
+        write_ops::WriteCommandBase writeCommandBase;
+        writeCommandBase.setOrdered(false);
+        request.setWriteCommandBase(std::move(writeCommandBase));
+    }
     request.setWriteConcern(BSONObj());
     // Do single-target, single doc batch write op
     auto objToInsert = BSON("x" << 1);
@@ -210,7 +214,11 @@ TEST_F(BatchWriteExecTest, SingleOpError) {
 
     BatchedCommandRequest request(BatchedCommandRequest::BatchType_Insert);
     request.setNS(nss);
-    request.setOrdered(false);
+    {
+        write_ops::WriteCommandBase writeCommandBase;
+        writeCommandBase.setOrdered(false);
+        request.setWriteCommandBase(std::move(writeCommandBase));
+    }
     request.setWriteConcern(BSONObj());
     // Do single-target, single doc batch write op
     auto objToInsert = BSON("x" << 1);
@@ -268,7 +276,11 @@ TEST_F(BatchWriteExecTest, StaleOp) {
     // Insert request
     BatchedCommandRequest request(BatchedCommandRequest::BatchType_Insert);
     request.setNS(nss);
-    request.setOrdered(false);
+    {
+        write_ops::WriteCommandBase writeCommandBase;
+        writeCommandBase.setOrdered(false);
+        request.setWriteCommandBase(std::move(writeCommandBase));
+    }
     request.setWriteConcern(BSONObj());
     // Do single-target, single doc batch write op
     auto objToInsert = BSON("x" << 1);
@@ -299,7 +311,11 @@ TEST_F(BatchWriteExecTest, MultiStaleOp) {
     // Insert request
     BatchedCommandRequest request(BatchedCommandRequest::BatchType_Insert);
     request.setNS(nss);
-    request.setOrdered(false);
+    {
+        write_ops::WriteCommandBase writeCommandBase;
+        writeCommandBase.setOrdered(false);
+        request.setWriteCommandBase(std::move(writeCommandBase));
+    }
     request.setWriteConcern(BSONObj());
     // Do single-target, single doc batch write op
     auto objToInsert = BSON("x" << 1);
@@ -336,7 +352,11 @@ TEST_F(BatchWriteExecTest, TooManyStaleOp) {
     // Insert request
     BatchedCommandRequest request(BatchedCommandRequest::BatchType_Insert);
     request.setNS(nss);
-    request.setOrdered(false);
+    {
+        write_ops::WriteCommandBase writeCommandBase;
+        writeCommandBase.setOrdered(false);
+        request.setWriteCommandBase(std::move(writeCommandBase));
+    }
     request.setWriteConcern(BSONObj());
     // Do single-target, single doc batch write ops
     auto objToInsert1 = BSON("x" << 1);

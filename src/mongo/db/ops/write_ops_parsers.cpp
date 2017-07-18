@@ -38,6 +38,9 @@
 
 namespace mongo {
 
+using write_ops::Insert;
+using write_ops::Update;
+using write_ops::Delete;
 using write_ops::UpdateOpEntry;
 using write_ops::DeleteOpEntry;
 
@@ -96,7 +99,7 @@ int32_t getStmtIdForWriteAt(const WriteCommandBase& writeCommandBase, size_t wri
 
 }  // namespace write_ops
 
-InsertOp InsertOp::parse(const OpMsgRequest& request) {
+write_ops::Insert InsertOp::parse(const OpMsgRequest& request) {
     auto insertOp = Insert::parse(IDLParserErrorContext("insert"), request);
 
     if (insertOp.getNamespace().isSystemDotIndexes()) {
@@ -107,13 +110,13 @@ InsertOp InsertOp::parse(const OpMsgRequest& request) {
     }
 
     checkOpCountForCommand(insertOp, insertOp.getDocuments().size());
-    return {std::move(insertOp)};
+    return insertOp;
 }
 
-InsertOp InsertOp::parseLegacy(const Message& msgRaw) {
+write_ops::Insert InsertOp::parseLegacy(const Message& msgRaw) {
     DbMessage msg(msgRaw);
 
-    InsertOp op(NamespaceString(msg.getns()));
+    Insert op(NamespaceString(msg.getns()));
 
     {
         write_ops::WriteCommandBase writeCommandBase;
@@ -136,17 +139,17 @@ InsertOp InsertOp::parseLegacy(const Message& msgRaw) {
     return op;
 }
 
-UpdateOp UpdateOp::parse(const OpMsgRequest& request) {
+write_ops::Update UpdateOp::parse(const OpMsgRequest& request) {
     auto updateOp = Update::parse(IDLParserErrorContext("update"), request);
 
     checkOpCountForCommand(updateOp, updateOp.getUpdates().size());
-    return {std::move(updateOp)};
+    return updateOp;
 }
 
-UpdateOp UpdateOp::parseLegacy(const Message& msgRaw) {
+write_ops::Update UpdateOp::parseLegacy(const Message& msgRaw) {
     DbMessage msg(msgRaw);
 
-    UpdateOp op(NamespaceString(msg.getns()));
+    Update op(NamespaceString(msg.getns()));
 
     {
         write_ops::WriteCommandBase writeCommandBase;
@@ -173,17 +176,17 @@ UpdateOp UpdateOp::parseLegacy(const Message& msgRaw) {
     return op;
 }
 
-DeleteOp DeleteOp::parse(const OpMsgRequest& request) {
+write_ops::Delete DeleteOp::parse(const OpMsgRequest& request) {
     auto deleteOp = Delete::parse(IDLParserErrorContext("delete"), request);
 
     checkOpCountForCommand(deleteOp, deleteOp.getDeletes().size());
-    return {std::move(deleteOp)};
+    return deleteOp;
 }
 
-DeleteOp DeleteOp::parseLegacy(const Message& msgRaw) {
+write_ops::Delete DeleteOp::parseLegacy(const Message& msgRaw) {
     DbMessage msg(msgRaw);
 
-    DeleteOp op(NamespaceString(msg.getns()));
+    Delete op(NamespaceString(msg.getns()));
 
     {
         write_ops::WriteCommandBase writeCommandBase;

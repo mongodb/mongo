@@ -267,7 +267,7 @@ SingleWriteResult createIndex(OperationContext* opCtx,
     return result;
 }
 
-WriteResult performCreateIndexes(OperationContext* opCtx, const InsertOp& wholeOp) {
+WriteResult performCreateIndexes(OperationContext* opCtx, const write_ops::Insert& wholeOp) {
     // Currently this creates each index independently. We could pass multiple indexes to
     // createIndexes, but there is a lot of complexity involved in doing it correctly. For one
     // thing, createIndexes only takes indexes to a single collection, but this batch could include
@@ -309,7 +309,7 @@ void insertDocuments(OperationContext* opCtx,
  * Returns true if caller should try to insert more documents. Does nothing else if batch is empty.
  */
 bool insertBatchAndHandleErrors(OperationContext* opCtx,
-                                const InsertOp& wholeOp,
+                                const write_ops::Insert& wholeOp,
                                 const std::vector<InsertStatement>& batch,
                                 LastOpFixer* lastOpFixer,
                                 WriteResult* out) {
@@ -398,7 +398,7 @@ bool insertBatchAndHandleErrors(OperationContext* opCtx,
 
 }  // namespace
 
-WriteResult performInserts(OperationContext* opCtx, const InsertOp& wholeOp) {
+WriteResult performInserts(OperationContext* opCtx, const write_ops::Insert& wholeOp) {
     invariant(!opCtx->lockState()->inAWriteUnitOfWork());  // Does own retries.
     auto& curOp = *CurOp::get(opCtx);
     ON_BLOCK_EXIT([&] {
@@ -570,7 +570,7 @@ static SingleWriteResult performSingleUpdateOp(OperationContext* opCtx,
     return result;
 }
 
-WriteResult performUpdates(OperationContext* opCtx, const UpdateOp& wholeOp) {
+WriteResult performUpdates(OperationContext* opCtx, const write_ops::Update& wholeOp) {
     invariant(!opCtx->lockState()->inAWriteUnitOfWork());  // Does own retries.
     uassertStatusOK(userAllowedWriteNS(wholeOp.getNamespace()));
 
@@ -680,7 +680,7 @@ static SingleWriteResult performSingleDeleteOp(OperationContext* opCtx,
     return result;
 }
 
-WriteResult performDeletes(OperationContext* opCtx, const DeleteOp& wholeOp) {
+WriteResult performDeletes(OperationContext* opCtx, const write_ops::Delete& wholeOp) {
     invariant(!opCtx->lockState()->inAWriteUnitOfWork());  // Does own retries.
     uassertStatusOK(userAllowedWriteNS(wholeOp.getNamespace()));
 

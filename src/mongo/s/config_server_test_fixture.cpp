@@ -114,18 +114,23 @@ void ConfigServerTestFixture::setUp() {
         auto specialNet(stdx::make_unique<executor::NetworkInterfaceMock>());
         _mockNetworkForAddShard = specialNet.get();
 
-        auto specialExec = makeThreadPoolTestExecutor(std::move(specialNet));
+        auto specialExec(makeThreadPoolTestExecutor(std::move(specialNet)));
         _executorForAddShard = specialExec.get();
-        _addShardNetworkTestEnv =
-            stdx::make_unique<NetworkTestEnv>(specialExec.get(), _mockNetworkForAddShard);
 
         ShardingCatalogManager::create(getServiceContext(), std::move(specialExec));
     }
+
+    _addShardNetworkTestEnv =
+        stdx::make_unique<NetworkTestEnv>(_executorForAddShard, _mockNetworkForAddShard);
 
     uassertStatusOK(initializeGlobalShardingStateForMongodForTest(ConnectionString::forLocal()));
 }
 
 void ConfigServerTestFixture::tearDown() {
+    _addShardNetworkTestEnv = nullptr;
+    _executorForAddShard = nullptr;
+    _mockNetworkForAddShard = nullptr;
+
     ShardingCatalogManager::clearForTests(getServiceContext());
 
     ShardingMongodTestFixture::tearDown();

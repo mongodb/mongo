@@ -34,37 +34,22 @@
 
 namespace mongo {
 
-class InsertOp : public write_ops::Insert {
+class InsertOp {
 public:
-    using Insert::Insert;
-
-    static InsertOp parse(const OpMsgRequest& request);
-    static InsertOp parseLegacy(const Message& msg);
-
-private:
-    InsertOp(Insert&& other) : Insert(other) {}
+    static write_ops::Insert parse(const OpMsgRequest& request);
+    static write_ops::Insert parseLegacy(const Message& msg);
 };
 
-class UpdateOp : public write_ops::Update {
+class UpdateOp {
 public:
-    using Update::Update;
-
-    static UpdateOp parse(const OpMsgRequest& request);
-    static UpdateOp parseLegacy(const Message& msg);
-
-private:
-    UpdateOp(Update&& other) : Update(other) {}
+    static write_ops::Update parse(const OpMsgRequest& request);
+    static write_ops::Update parseLegacy(const Message& msg);
 };
 
-class DeleteOp : public write_ops::Delete {
+class DeleteOp {
 public:
-    using Delete::Delete;
-
-    static DeleteOp parse(const OpMsgRequest& request);
-    static DeleteOp parseLegacy(const Message& msg);
-
-private:
-    DeleteOp(Delete&& other) : Delete(other) {}
+    static write_ops::Delete parse(const OpMsgRequest& request);
+    static write_ops::Delete parseLegacy(const Message& msg);
 };
 
 namespace write_ops {
