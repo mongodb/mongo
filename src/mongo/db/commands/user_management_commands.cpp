@@ -178,8 +178,7 @@ Status checkOkayToGrantRolesToRole(OperationContext* opCtx,
         }
 
         BSONObj roleToAddDoc;
-        Status status = authzManager->getRoleDescription(
-            opCtx, roleToAdd, PrivilegeFormat::kOmit, &roleToAddDoc);
+        Status status = authzManager->getRoleDescription(opCtx, roleToAdd, &roleToAddDoc);
         if (status == ErrorCodes::RoleNotFound) {
             return Status(ErrorCodes::RoleNotFound,
                           "Cannot grant nonexistent role " + roleToAdd.toString());
@@ -728,8 +727,7 @@ public:
         // Role existence has to be checked after acquiring the update lock
         for (size_t i = 0; i < args.roles.size(); ++i) {
             BSONObj ignored;
-            status = authzManager->getRoleDescription(
-                opCtx, args.roles[i], PrivilegeFormat::kOmit, &ignored);
+            status = authzManager->getRoleDescription(opCtx, args.roles[i], &ignored);
             if (!status.isOK()) {
                 return appendCommandStatus(result, status);
             }
@@ -867,8 +865,7 @@ public:
         if (args.hasRoles) {
             for (size_t i = 0; i < args.roles.size(); ++i) {
                 BSONObj ignored;
-                status = authzManager->getRoleDescription(
-                    opCtx, args.roles[i], PrivilegeFormat::kOmit, &ignored);
+                status = authzManager->getRoleDescription(opCtx, args.roles[i], &ignored);
                 if (!status.isOK()) {
                     return appendCommandStatus(result, status);
                 }
@@ -1069,8 +1066,7 @@ public:
         for (vector<RoleName>::iterator it = roles.begin(); it != roles.end(); ++it) {
             RoleName& roleName = *it;
             BSONObj roleDoc;
-            status =
-                authzManager->getRoleDescription(opCtx, roleName, PrivilegeFormat::kOmit, &roleDoc);
+            status = authzManager->getRoleDescription(opCtx, roleName, &roleDoc);
             if (!status.isOK()) {
                 return appendCommandStatus(result, status);
             }
@@ -1142,8 +1138,7 @@ public:
         for (vector<RoleName>::iterator it = roles.begin(); it != roles.end(); ++it) {
             RoleName& roleName = *it;
             BSONObj roleDoc;
-            status =
-                authzManager->getRoleDescription(opCtx, roleName, PrivilegeFormat::kOmit, &roleDoc);
+            status = authzManager->getRoleDescription(opCtx, roleName, &roleDoc);
             if (!status.isOK()) {
                 return appendCommandStatus(result, status);
             }
@@ -1455,8 +1450,7 @@ public:
 
         // Role existence has to be checked after acquiring the update lock
         BSONObj ignored;
-        status = authzManager->getRoleDescription(
-            opCtx, args.roleName, PrivilegeFormat::kOmit, &ignored);
+        status = authzManager->getRoleDescription(opCtx, args.roleName, &ignored);
         if (!status.isOK()) {
             return appendCommandStatus(result, status);
         }
@@ -1545,8 +1539,11 @@ public:
         }
 
         BSONObj roleDoc;
-        status = authzManager->getRoleDescription(
-            opCtx, roleName, PrivilegeFormat::kShowSeparate, &roleDoc);
+        status = authzManager->getRoleDescription(opCtx,
+                                                  roleName,
+                                                  PrivilegeFormat::kShowSeparate,
+                                                  AuthenticationRestrictionsFormat::kOmit,
+                                                  &roleDoc);
         if (!status.isOK()) {
             return appendCommandStatus(result, status);
         }
@@ -1646,8 +1643,11 @@ public:
         }
 
         BSONObj roleDoc;
-        status = authzManager->getRoleDescription(
-            opCtx, roleName, PrivilegeFormat::kShowSeparate, &roleDoc);
+        status = authzManager->getRoleDescription(opCtx,
+                                                  roleName,
+                                                  PrivilegeFormat::kShowSeparate,
+                                                  AuthenticationRestrictionsFormat::kOmit,
+                                                  &roleDoc);
         if (!status.isOK()) {
             return appendCommandStatus(result, status);
         }
@@ -1757,8 +1757,7 @@ public:
 
         // Role existence has to be checked after acquiring the update lock
         BSONObj roleDoc;
-        status =
-            authzManager->getRoleDescription(opCtx, roleName, PrivilegeFormat::kOmit, &roleDoc);
+        status = authzManager->getRoleDescription(opCtx, roleName, &roleDoc);
         if (!status.isOK()) {
             return appendCommandStatus(result, status);
         }
@@ -1846,8 +1845,7 @@ public:
         }
 
         BSONObj roleDoc;
-        status =
-            authzManager->getRoleDescription(opCtx, roleName, PrivilegeFormat::kOmit, &roleDoc);
+        status = authzManager->getRoleDescription(opCtx, roleName, &roleDoc);
         if (!status.isOK()) {
             return appendCommandStatus(result, status);
         }
@@ -1932,8 +1930,7 @@ public:
         }
 
         BSONObj roleDoc;
-        status =
-            authzManager->getRoleDescription(opCtx, roleName, PrivilegeFormat::kOmit, &roleDoc);
+        status = authzManager->getRoleDescription(opCtx, roleName, &roleDoc);
         if (!status.isOK()) {
             return appendCommandStatus(result, status);
         }
@@ -2217,7 +2214,12 @@ public:
         if (args.allForDB) {
             std::vector<BSONObj> rolesDocs;
             status = getGlobalAuthorizationManager()->getRoleDescriptionsForDB(
-                opCtx, dbname, args.privilegeFormat, args.showBuiltinRoles, &rolesDocs);
+                opCtx,
+                dbname,
+                args.privilegeFormat,
+                args.authenticationRestrictionsFormat,
+                args.showBuiltinRoles,
+                &rolesDocs);
             if (!status.isOK()) {
                 return appendCommandStatus(result, status);
             }
@@ -2236,7 +2238,11 @@ public:
         } else {
             BSONObj roleDetails;
             status = getGlobalAuthorizationManager()->getRolesDescription(
-                opCtx, args.roleNames, args.privilegeFormat, &roleDetails);
+                opCtx,
+                args.roleNames,
+                args.privilegeFormat,
+                args.authenticationRestrictionsFormat,
+                &roleDetails);
             if (!status.isOK()) {
                 return appendCommandStatus(result, status);
             }

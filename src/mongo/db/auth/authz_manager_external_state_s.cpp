@@ -67,13 +67,15 @@ std::string rolesFieldName(PrivilegeFormat showPrivileges) {
 /**
  * Attches a string representation of a PrivilegeFormat to the provided BSONObjBuilder.
  */
-void addShowPrivilegesToBuilder(BSONObjBuilder* builder, PrivilegeFormat showPrivileges) {
-    if (showPrivileges == PrivilegeFormat::kShowSeparate) {
-        builder->append("showPrivileges", true);
-    } else if (showPrivileges == PrivilegeFormat::kShowAsUserFragment) {
+void addShowToBuilder(BSONObjBuilder* builder,
+                      PrivilegeFormat showPrivileges,
+                      AuthenticationRestrictionsFormat showRestrictions) {
+    if (showPrivileges == PrivilegeFormat::kShowAsUserFragment) {
         builder->append("showPrivileges", "asUserfragment");
     } else {
-        builder->append("showPrivileges", false);
+        builder->append("showPrivileges", showPrivileges == PrivilegeFormat::kShowSeparate);
+        builder->append("showAuthenticationRestrictions",
+                        showRestrictions == AuthenticationRestrictionsFormat::kShow);
     }
 }
 
@@ -204,17 +206,19 @@ Status AuthzManagerExternalStateMongos::getUserDescription(OperationContext* opC
     }
 }
 
-Status AuthzManagerExternalStateMongos::getRoleDescription(OperationContext* opCtx,
-                                                           const RoleName& roleName,
-                                                           PrivilegeFormat showPrivileges,
-                                                           BSONObj* result) {
+Status AuthzManagerExternalStateMongos::getRoleDescription(
+    OperationContext* opCtx,
+    const RoleName& roleName,
+    PrivilegeFormat showPrivileges,
+    AuthenticationRestrictionsFormat showRestrictions,
+    BSONObj* result) {
     BSONObjBuilder rolesInfoCmd;
     rolesInfoCmd.append("rolesInfo",
                         BSON_ARRAY(BSON(AuthorizationManager::ROLE_NAME_FIELD_NAME
                                         << roleName.getRole()
                                         << AuthorizationManager::ROLE_DB_FIELD_NAME
                                         << roleName.getDB())));
-    addShowPrivilegesToBuilder(&rolesInfoCmd, showPrivileges);
+    addShowToBuilder(&rolesInfoCmd, showPrivileges, showRestrictions);
 
     BSONObjBuilder builder;
     const bool ok = Grid::get(opCtx)->catalogClient()->runUserManagementReadCommand(
@@ -239,10 +243,12 @@ Status AuthzManagerExternalStateMongos::getRoleDescription(OperationContext* opC
     *result = foundRoles[0].Obj().getOwned();
     return Status::OK();
 }
-Status AuthzManagerExternalStateMongos::getRolesDescription(OperationContext* opCtx,
-                                                            const std::vector<RoleName>& roles,
-                                                            PrivilegeFormat showPrivileges,
-                                                            BSONObj* result) {
+Status AuthzManagerExternalStateMongos::getRolesDescription(
+    OperationContext* opCtx,
+    const std::vector<RoleName>& roles,
+    PrivilegeFormat showPrivileges,
+    AuthenticationRestrictionsFormat showRestrictions,
+    BSONObj* result) {
     BSONArrayBuilder rolesInfoCmdArray;
 
     for (const RoleName& roleName : roles) {
@@ -254,7 +260,7 @@ Status AuthzManagerExternalStateMongos::getRolesDescription(OperationContext* op
 
     BSONObjBuilder rolesInfoCmd;
     rolesInfoCmd.append("rolesInfo", rolesInfoCmdArray.arr());
-    addShowPrivilegesToBuilder(&rolesInfoCmd, showPrivileges);
+    addShowToBuilder(&rolesInfoCmd, showPrivileges, showRestrictions);
 
     BSONObjBuilder builder;
     const bool ok = Grid::get(opCtx)->catalogClient()->runUserManagementReadCommand(
@@ -273,14 +279,16 @@ Status AuthzManagerExternalStateMongos::getRolesDescription(OperationContext* op
 
     return Status::OK();
 }
-Status AuthzManagerExternalStateMongos::getRoleDescriptionsForDB(OperationContext* opCtx,
-                                                                 const std::string dbname,
-                                                                 PrivilegeFormat showPrivileges,
-                                                                 bool showBuiltinRoles,
-                                                                 std::vector<BSONObj>* result) {
+Status AuthzManagerExternalStateMongos::getRoleDescriptionsForDB(
+    OperationContext* opCtx,
+    const std::string& dbname,
+    PrivilegeFormat showPrivileges,
+    AuthenticationRestrictionsFormat showRestrictions,
+    bool showBuiltinRoles,
+    std::vector<BSONObj>* result) {
     BSONObjBuilder rolesInfoCmd;
     rolesInfoCmd << "rolesInfo" << 1 << "showBuiltinRoles" << showBuiltinRoles;
-    addShowPrivilegesToBuilder(&rolesInfoCmd, showPrivileges);
+    addShowToBuilder(&rolesInfoCmd, showPrivileges, showRestrictions);
 
     BSONObjBuilder builder;
     const bool ok = Grid::get(opCtx)->catalogClient()->runUserManagementReadCommand(

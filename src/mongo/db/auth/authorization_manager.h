@@ -68,6 +68,14 @@ struct AuthInfo {
 extern AuthInfo internalSecurity;  // set at startup and not changed after initialization.
 
 /**
+ * How user management functions should structure the BSON representation of privileges and roles.
+ */
+enum class AuthenticationRestrictionsFormat {
+    kOmit,  // AuthenticationRestrictions should not be included in the BSON representation.
+    kShow,  // AuthenticationRestrictions should be included in the BSON representation.
+};
+
+/**
  * Contains server/cluster-wide information about Authorization.
  */
 class AuthorizationManager {
@@ -239,7 +247,16 @@ public:
     Status getRoleDescription(OperationContext* opCtx,
                               const RoleName& roleName,
                               PrivilegeFormat privilegeFormat,
+                              AuthenticationRestrictionsFormat,
                               BSONObj* result);
+
+    /**
+     * Convenience wrapper for getRoleDescription() defaulting formats to kOmit.
+     */
+    Status getRoleDescription(OperationContext* ctx, const RoleName& roleName, BSONObj* result) {
+        return getRoleDescription(
+            ctx, roleName, PrivilegeFormat::kOmit, AuthenticationRestrictionsFormat::kOmit, result);
+    }
 
     /**
      * Delegates method call to the underlying AuthzManagerExternalState.
@@ -247,6 +264,7 @@ public:
     Status getRolesDescription(OperationContext* opCtx,
                                const std::vector<RoleName>& roleName,
                                PrivilegeFormat privilegeFormat,
+                               AuthenticationRestrictionsFormat,
                                BSONObj* result);
 
     /**
@@ -255,6 +273,7 @@ public:
     Status getRoleDescriptionsForDB(OperationContext* opCtx,
                                     const std::string dbname,
                                     PrivilegeFormat privilegeFormat,
+                                    AuthenticationRestrictionsFormat,
                                     bool showBuiltinRoles,
                                     std::vector<BSONObj>* result);
 

@@ -55,25 +55,28 @@ class AuthzManagerExternalStateLocal : public AuthzManagerExternalState {
 public:
     virtual ~AuthzManagerExternalStateLocal() = default;
 
-    virtual Status initialize(OperationContext* opCtx);
+    Status initialize(OperationContext* opCtx) override;
 
-    virtual Status getStoredAuthorizationVersion(OperationContext* opCtx, int* outVersion);
-    virtual Status getUserDescription(OperationContext* opCtx,
-                                      const UserName& userName,
-                                      BSONObj* result);
-    virtual Status getRoleDescription(OperationContext* opCtx,
-                                      const RoleName& roleName,
-                                      PrivilegeFormat showPrivileges,
-                                      BSONObj* result);
-    virtual Status getRolesDescription(OperationContext* opCtx,
-                                       const std::vector<RoleName>& roles,
-                                       PrivilegeFormat showPrivileges,
-                                       BSONObj* result);
-    virtual Status getRoleDescriptionsForDB(OperationContext* opCtx,
-                                            const std::string dbname,
-                                            PrivilegeFormat showPrivileges,
-                                            bool showBuiltinRoles,
-                                            std::vector<BSONObj>* result);
+    Status getStoredAuthorizationVersion(OperationContext* opCtx, int* outVersion) override;
+    Status getUserDescription(OperationContext* opCtx,
+                              const UserName& userName,
+                              BSONObj* result) override;
+    Status getRoleDescription(OperationContext* opCtx,
+                              const RoleName& roleName,
+                              PrivilegeFormat showPrivileges,
+                              AuthenticationRestrictionsFormat,
+                              BSONObj* result) override;
+    Status getRolesDescription(OperationContext* opCtx,
+                               const std::vector<RoleName>& roles,
+                               PrivilegeFormat showPrivileges,
+                               AuthenticationRestrictionsFormat,
+                               BSONObj* result) override;
+    Status getRoleDescriptionsForDB(OperationContext* opCtx,
+                                    const std::string& dbname,
+                                    PrivilegeFormat showPrivileges,
+                                    AuthenticationRestrictionsFormat,
+                                    bool showBuiltinRoles,
+                                    std::vector<BSONObj>* result) override;
 
     bool hasAnyPrivilegeDocuments(OperationContext* opCtx) override;
 
@@ -139,6 +142,7 @@ private:
 
     Status _getRoleDescription_inlock(const RoleName& roleName,
                                       PrivilegeFormat showPrivileges,
+                                      AuthenticationRestrictionsFormat showRestrictions,
                                       BSONObj* result);
     /**
      * Eventually consistent, in-memory representation of all roles in the system (both

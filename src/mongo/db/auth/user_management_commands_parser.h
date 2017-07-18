@@ -34,6 +34,7 @@
 #include "mongo/base/disallow_copying.h"
 #include "mongo/base/status.h"
 #include "mongo/base/string_data.h"
+#include "mongo/db/auth/authorization_manager.h"
 #include "mongo/db/auth/privilege.h"
 #include "mongo/db/auth/privilege_format.h"
 #include "mongo/db/auth/role_name.h"
@@ -114,11 +115,11 @@ Status parseUsersInfoCommand(const BSONObj& cmdObj, StringData dbname, UsersInfo
 
 struct RolesInfoArgs {
     std::vector<RoleName> roleNames;
-    bool allForDB;
-    PrivilegeFormat privilegeFormat;
-    bool showBuiltinRoles;
-    RolesInfoArgs()
-        : allForDB(false), privilegeFormat(PrivilegeFormat::kOmit), showBuiltinRoles(false) {}
+    bool allForDB = false;
+    PrivilegeFormat privilegeFormat = PrivilegeFormat::kOmit;
+    AuthenticationRestrictionsFormat authenticationRestrictionsFormat =
+        AuthenticationRestrictionsFormat::kOmit;
+    bool showBuiltinRoles = false;
 };
 
 /**
@@ -129,12 +130,10 @@ Status parseRolesInfoCommand(const BSONObj& cmdObj, StringData dbname, RolesInfo
 
 struct CreateOrUpdateRoleArgs {
     RoleName roleName;
-    bool hasRoles;
+    bool hasRoles = false;
     std::vector<RoleName> roles;
-    bool hasPrivileges;
+    bool hasPrivileges = false;
     PrivilegeVector privileges;
-
-    CreateOrUpdateRoleArgs() : hasRoles(false), hasPrivileges(false) {}
 };
 
 /**

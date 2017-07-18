@@ -367,6 +367,7 @@ Status parseRolesInfoCommand(const BSONObj& cmdObj, StringData dbname, RolesInfo
     unordered_set<std::string> validFieldNames;
     validFieldNames.insert("rolesInfo");
     validFieldNames.insert("showPrivileges");
+    validFieldNames.insert("showAuthenticationRestrictions");
     validFieldNames.insert("showBuiltinRoles");
 
     Status status = _checkNoExtraFields(cmdObj, "rolesInfo", validFieldNames);
@@ -409,6 +410,24 @@ Status parseRolesInfoCommand(const BSONObj& cmdObj, StringData dbname, RolesInfo
                       str::stream() << "Failed to parse 'showPrivileges'. 'showPrivileges' should "
                                        "either be a boolean or the string 'asUserFragment', given: "
                                     << showPrivileges.toString());
+    }
+
+    const auto showAuthenticationRestrictions = cmdObj["showAuthenticationRestrictions"];
+    if (showAuthenticationRestrictions.eoo()) {
+        parsedArgs->authenticationRestrictionsFormat = AuthenticationRestrictionsFormat::kOmit;
+    } else if (parsedArgs->privilegeFormat == PrivilegeFormat::kShowAsUserFragment) {
+        return Status(
+            ErrorCodes::UnsupportedFormat,
+            "showAuthenticationRestrictions may not be used with showPrivileges='asUserFragment'");
+    } else {
+        bool show;
+        status = bsonExtractBooleanField(cmdObj, "showAuthenticationRestrictions", &show);
+        if (!status.isOK()) {
+            return status;
+        }
+        parsedArgs->authenticationRestrictionsFormat = show
+            ? AuthenticationRestrictionsFormat::kShow
+            : AuthenticationRestrictionsFormat::kOmit;
     }
 
     status = bsonExtractBooleanFieldWithDefault(

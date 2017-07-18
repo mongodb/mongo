@@ -60,6 +60,8 @@ const std::string MONGODB_CR_CREDENTIAL_FIELD_NAME = "MONGODB-CR";
 const std::string SCRAM_CREDENTIAL_FIELD_NAME = "SCRAM-SHA-1";
 const std::string MONGODB_EXTERNAL_CREDENTIAL_FIELD_NAME = "external";
 constexpr StringData AUTHENTICATION_RESTRICTIONS_FIELD_NAME = "authenticationRestrictions"_sd;
+constexpr StringData INHERITED_AUTHENTICATION_RESTRICTIONS_FIELD_NAME =
+    "inheritedAuthenticationRestrictions"_sd;
 
 inline Status _badValue(const char* reason, int location) {
     return Status(ErrorCodes::BadValue, reason, location);
@@ -453,25 +455,53 @@ Status V2UserDocumentParser::parseRoleVector(const BSONArray& rolesArray,
 
 Status V2UserDocumentParser::initializeAuthenticationRestrictionsFromUserDocument(
     const BSONObj& privDoc, User* user) const {
+    RestrictionDocuments::sequence_type restrictionVector;
+
+    // Restrictions on the user
     const auto authenticationRestrictions = privDoc[AUTHENTICATION_RESTRICTIONS_FIELD_NAME];
-    if (authenticationRestrictions.eoo()) {
-        return Status::OK();
+    if (!authenticationRestrictions.eoo()) {
+        if (authenticationRestrictions.type() != Array) {
+            return Status(ErrorCodes::UnsupportedFormat,
+                          "'authenticationRestrictions' field must be an array");
+        }
+
+        auto restrictions =
+            parseAuthenticationRestriction(BSONArray(authenticationRestrictions.Obj()));
+        if (!restrictions.isOK()) {
+            return restrictions.getStatus();
+        }
+
+        restrictionVector.push_back(restrictions.getValue());
     }
 
-    if (authenticationRestrictions.type() != Array) {
-        return Status(ErrorCodes::UnsupportedFormat,
-                      "'authenticationRestrictions' field must be an array");
+    // Restrictions from roles
+    const auto inherited = privDoc[INHERITED_AUTHENTICATION_RESTRICTIONS_FIELD_NAME];
+    if (!inherited.eoo()) {
+        if (inherited.type() != Array) {
+            return Status(ErrorCodes::UnsupportedFormat,
+                          "'inheritedAuthenticationRestrictions' field must be an array");
+        }
+
+        for (const auto& roleRestriction : BSONArray(inherited.Obj())) {
+            if (roleRestriction.type() != Array) {
+                return Status(ErrorCodes::UnsupportedFormat,
+                              "'inheritedAuthenticationRestrictions' sub-fields must be arrays");
+            }
+
+            auto roleRestrictionDoc =
+                parseAuthenticationRestriction(BSONArray(roleRestriction.Obj()));
+            if (!roleRestrictionDoc.isOK()) {
+                return roleRestrictionDoc.getStatus();
+            }
+
+            restrictionVector.push_back(roleRestrictionDoc.getValue());
+        }
     }
 
-    auto restrictions = parseAuthenticationRestriction(BSONArray(authenticationRestrictions.Obj()));
-    if (!restrictions.isOK()) {
-        return restrictions.getStatus();
+    if (user) {
+        user->setRestrictions(RestrictionDocuments(restrictionVector));
     }
 
-    if (user != nullptr) {
-        user->setRestrictions(
-            RestrictionDocuments(RestrictionDocuments::sequence_type{restrictions.getValue()}));
-    }
     return Status::OK();
 }
 

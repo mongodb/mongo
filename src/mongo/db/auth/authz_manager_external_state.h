@@ -34,6 +34,7 @@
 
 #include "mongo/base/disallow_copying.h"
 #include "mongo/base/status.h"
+#include "mongo/db/auth/authorization_manager.h"
 #include "mongo/db/auth/privilege_format.h"
 #include "mongo/db/auth/role_name.h"
 #include "mongo/db/auth/user.h"
@@ -43,7 +44,6 @@
 
 namespace mongo {
 
-class AuthorizationManager;
 class AuthzSessionExternalState;
 class OperationContext;
 
@@ -112,6 +112,7 @@ public:
     virtual Status getRoleDescription(OperationContext* opCtx,
                                       const RoleName& roleName,
                                       PrivilegeFormat showPrivileges,
+                                      AuthenticationRestrictionsFormat,
                                       BSONObj* result) = 0;
 
     /**
@@ -130,6 +131,7 @@ public:
     virtual Status getRolesDescription(OperationContext* opCtx,
                                        const std::vector<RoleName>& roles,
                                        PrivilegeFormat showPrivileges,
+                                       AuthenticationRestrictionsFormat,
                                        BSONObj* result) = 0;
 
     /**
@@ -145,8 +147,9 @@ public:
      * contain a "warnings" array, with std::string messages describing inconsistencies.
      */
     virtual Status getRoleDescriptionsForDB(OperationContext* opCtx,
-                                            const std::string dbname,
+                                            const std::string& dbname,
                                             PrivilegeFormat showPrivileges,
+                                            AuthenticationRestrictionsFormat,
                                             bool showBuiltinRoles,
                                             std::vector<BSONObj>* result) = 0;
 
