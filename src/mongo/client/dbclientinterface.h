@@ -198,6 +198,14 @@ public:
                const BSONObj* fieldsToReturn = 0,
                int queryOptions = 0);
 
+    /**
+     * @return a single object that matches the filter within the collection specified by the UUID.
+     * If the command fails, an assertion error is thrown. Otherwise, if no document matches
+     * the query, an empty BSONObj is returned.
+     * @throws AssertionException
+     */
+    virtual BSONObj findOneByUUID(const std::string& db, UUID uuid, const BSONObj& filter);
+
     virtual std::string getServerAddress() const = 0;
 
     /** helper function.  run a simple command where the command expression is simply

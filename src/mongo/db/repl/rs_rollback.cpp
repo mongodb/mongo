@@ -93,7 +93,7 @@ namespace repl {
 using namespace rollback_internal;
 
 bool DocID::operator<(const DocID& other) const {
-    int comp = strcmp(ns, other.ns);
+    int comp = uuid.toString().compare(other.uuid.toString());
     if (comp < 0)
         return true;
     if (comp > 0)
@@ -110,28 +110,18 @@ bool DocID::operator==(const DocID& other) const {
     return !(*this < other || other < *this);
 }
 
-void FixUpInfo::removeAllDocsToRefetchFor(const std::string& collection) {
-    docsToRefetch.erase(docsToRefetch.lower_bound(DocID::minFor(collection.c_str())),
-                        docsToRefetch.upper_bound(DocID::maxFor(collection.c_str())));
+void FixUpInfo::removeAllDocsToRefetchFor(UUID collectionUUID) {
+    docsToRefetch.erase(docsToRefetch.lower_bound(DocID::minFor(collectionUUID)),
+                        docsToRefetch.upper_bound(DocID::maxFor(collectionUUID)));
 }
 
-// TODO: This function will not be fully functional until the entire
-// rollback via refetch for non-WT project is complete. See SERVER-30171.
 void FixUpInfo::removeRedundantOperations() {
-    // These loops and their bodies can be done in any order. The final result of the FixUpInfo
-    // members will be the same.
-
-    //    for (const auto& collection : collectionsToDrop) {
-    //        removeAllDocsToRefetchFor(collection);
-    //        indexesToDrop.erase(collection);
-    //        collectionsToResyncMetadata.erase(collection);
-    //    }
-
-    for (const auto& collection : collectionsToResyncData) {
-        removeAllDocsToRefetchFor(collection);
-        // indexesToDrop.erase(collection);
-        // collectionsToResyncMetadata.erase(collection);
-        // collectionsToDrop.erase(collection);
+    for (const auto& collectionUUID : collectionsToDrop) {
+        removeAllDocsToRefetchFor(collectionUUID);
+        indexesToDrop.erase(collectionUUID);
+        indexesToCreate.erase(collectionUUID);
+        collectionsToRename.erase(collectionUUID);
+        collectionsToResyncMetadata.erase(collectionUUID);
     }
 }
 
@@ -240,9 +230,9 @@ Status rollback_internal::updateFixUpInfoFromLocalOplogEntry(FixUpInfo& fixUpInf
     if (oplogEntry.getOpType() == OpTypeEnum::kNoop)
         return Status::OK();
 
-    DocID doc;
-    doc.ownedObj = oplogEntry.raw;
-    doc.ns = oplogEntry.raw.getStringField("ns");
+    // If we are inserting/updating/deleting a document in the oplog entry, we will update
+    // the doc._id field when we actually insert the docID into the docsToRefetch set.
+    DocID doc = DocID(oplogEntry.raw, BSONElement(), *uuid);
 
     if (oplogEntry.getNamespace().isEmpty()) {
         throw RSFatalException(str::stream() << "Local op on rollback has no ns: "
@@ -266,18 +256,19 @@ Status rollback_internal::updateFixUpInfoFromLocalOplogEntry(FixUpInfo& fixUpInf
         invariant(sessionId);
         invariant(oplogEntry.getStatementId());
 
-        DocID txnDoc;
-        BSONObjBuilder txnBob;
-        txnBob.append("_id", sessionId->toBSON());
-        txnDoc.ownedObj = txnBob.obj();
-        txnDoc._id = txnDoc.ownedObj.firstElement();
-        // TODO: SERVER-29667
+        // TODO: SERVER-30076
         // Once collection uuids replace namespace strings for rollback, this will need to be
-        // changed to the uuid of the session transaction table collection.
-        txnDoc.ns = NamespaceString::kSessionTransactionsTableNamespace.ns().c_str();
-
-        fixUpInfo.docsToRefetch.insert(txnDoc);
-        fixUpInfo.refetchTransactionDocs = true;
+        // changed to the uuid of the session transaction table collection. Need to add
+        // txnDoc.uuid with the proper uuid.
+        //        DocID txnDoc;
+        //        BSONObjBuilder txnBob;
+        //        txnBob.append("_id", sessionId->toBSON());
+        //        txnDoc.ownedObj = txnBob.obj();
+        //        txnDoc._id = txnDoc.ownedObj.firstElement();
+        //        txnDoc.ns = NamespaceString::kSessionTransactionsTableNamespace.ns().c_str();
+        //
+        //        fixUpInfo.docsToRefetch.insert(txnDoc);
+        //        fixUpInfo.refetchTransactionDocs = true;
     }
 
     if (oplogEntry.getOpType() == OpTypeEnum::kCommand) {
@@ -350,7 +341,7 @@ Status rollback_internal::updateFixUpInfoFromLocalOplogEntry(FixUpInfo& fixUpInf
                         "Missing index name in dropIndexes operation on rollback.");
                 }
 
-                BSONObj obj2 = *(oplogEntry.getObject2());
+                BSONObj obj2 = oplogEntry.getObject2().get().getOwned();
 
                 // Inserts the index name and the index spec of the index to be created into the map
                 // of index name and index specs that need to be created for the given collection.
@@ -434,14 +425,14 @@ Status rollback_internal::updateFixUpInfoFromLocalOplogEntry(FixUpInfo& fixUpInf
                     }
                 }
 
-                // Checks if the renameColl ection is a cross-database rename. If the dropSource
+                // Checks if the renameCollection is a cross-database rename. If the dropSource
                 // field is present in the oplog entry then the renameCollection must be a
                 // cross-database rename. The field will be absent in renames in the same
                 // database.
                 auto dropSource = obj.getField("dropSource");
                 if (!dropSource.eoo()) {
                     return fixUpInfo.recordCrossDatabaseRenameRollbackInfo(
-                        dropSource, obj, nss, *uuid, oplogEntry.getOpTime());
+                        dropSource, obj, NamespaceString(ns), *uuid, oplogEntry.getOpTime());
                 }
 
                 RenameCollectionInfo info;
@@ -571,11 +562,10 @@ Status rollback_internal::updateFixUpInfoFromLocalOplogEntry(FixUpInfo& fixUpInf
 
     doc._id = oplogEntry.getIdElement();
     if (doc._id.eoo()) {
-        std::string message = str::stream() << "Cannot roll back op with no _id. ns: " << doc.ns;
+        std::string message = str::stream() << "Cannot roll back op with no _id. ns: " << nss.ns();
         severe() << message << ", document: " << redact(oplogEntry.toBSON());
         throw RSFatalException(message);
     }
-
     fixUpInfo.docsToRefetch.insert(doc);
     return Status::OK();
 }
@@ -659,8 +649,9 @@ void dropIndex(OperationContext* opCtx,
  */
 void rollbackCreateIndexes(OperationContext* opCtx, UUID uuid, std::set<std::string> indexNames) {
 
-    Collection* collection = UUIDCatalog::get(opCtx).lookupCollectionByUUID(uuid);
     NamespaceString nss = UUIDCatalog::get(opCtx).lookupNSSByUUID(uuid);
+    Lock::DBLock dbLock(opCtx, nss.db(), MODE_X);
+    Collection* collection = UUIDCatalog::get(opCtx).lookupCollectionByUUID(uuid);
 
     // If we cannot find the collection, we skip over dropping the index.
     if (!collection) {
@@ -668,8 +659,6 @@ void rollbackCreateIndexes(OperationContext* opCtx, UUID uuid, std::set<std::str
                << " in UUID catalog during roll back of a createIndexes command.";
         return;
     }
-
-    Lock::DBLock dbLock(opCtx, nss.db(), MODE_X);
 
     // If we cannot find the index catalog, we skip over dropping the index.
     auto indexCatalog = collection->getIndexCatalog();
@@ -696,9 +685,9 @@ void rollbackDropIndexes(OperationContext* opCtx,
                          UUID uuid,
                          std::map<std::string, BSONObj> indexNames) {
 
-    Collection* collection = UUIDCatalog::get(opCtx).lookupCollectionByUUID(uuid);
     NamespaceString nss = UUIDCatalog::get(opCtx).lookupNSSByUUID(uuid);
-
+    Lock::DBLock dbLock(opCtx, nss.db(), MODE_X);
+    Collection* collection = UUIDCatalog::get(opCtx).lookupCollectionByUUID(uuid);
     // If we cannot find the collection, we skip over dropping the index.
     if (!collection) {
         LOG(2) << "Cannot find the collection with uuid: " << uuid.toString()
@@ -706,18 +695,18 @@ void rollbackDropIndexes(OperationContext* opCtx,
         return;
     }
 
-    Lock::DBLock dbLock(opCtx, nss.db(), MODE_X);
-
     for (auto itIndex = indexNames.begin(); itIndex != indexNames.end(); itIndex++) {
+
         const string indexName = itIndex->first;
         BSONObj indexSpec = itIndex->second;
-
         // We replace the namespace field because it is possible that a
         // renameCollection command has occurred, changing the namespace of the
         // collection from what it initially was during the creation of this index.
         BSONObjBuilder updatedNss;
         updatedNss.append("ns", nss.ns());
-        indexSpec.addField(updatedNss.obj().firstElement());
+
+        BSONObj updatedNssObj = updatedNss.obj();
+        indexSpec.addField(updatedNssObj.firstElement());
 
         createIndexForApplyOps(opCtx, indexSpec, nss, {});
 
@@ -871,6 +860,9 @@ void rollbackRenameCollection(OperationContext* opCtx, UUID uuid, RenameCollecti
         severe() << "Unable to roll back renameCollection command: " << status.toString();
         throw RSFatalException("Unable to rollback renameCollection command");
     }
+
+    log() << "Renamed collection from " << info.renameFrom.ns() << "to " << info.renameTo.ns()
+          << " with uuid: " << uuid;
 }
 
 void syncFixUp(OperationContext* opCtx,
@@ -880,8 +872,9 @@ void syncFixUp(OperationContext* opCtx,
                ReplicationProcess* replicationProcess) {
     unsigned long long totalSize = 0;
 
-    // namespace -> doc id -> doc
-    map<string, map<DocID, BSONObj>> goodVersions;
+    // UUID -> doc id -> doc
+    stdx::unordered_map<UUID, std::map<DocID, BSONObj>, UUID::Hash> goodVersions;
+    auto& catalog = UUIDCatalog::get(opCtx);
 
     // Fetches all the goodVersions of each document from the current sync source.
     unsigned long long numFetched = 0;
@@ -891,11 +884,15 @@ void syncFixUp(OperationContext* opCtx,
     for (auto&& doc : fixUpInfo.docsToRefetch) {
         invariant(!doc._id.eoo());  // This is checked when we insert to the set.
 
+        UUID uuid = doc.uuid;
+        NamespaceString nss = catalog.lookupNSSByUUID(uuid);
+
         try {
-            LOG(2) << "Refetching document, namespace: " << doc.ns << ", _id: " << redact(doc._id);
+            LOG(2) << "Refetching document, namespace: " << nss.toString()
+                   << ", _id: " << redact(doc._id);
             // TODO : Slow. Lots of round trips.
             numFetched++;
-            BSONObj good = rollbackSource.findOne(NamespaceString(doc.ns), doc._id.wrap());
+            BSONObj good = rollbackSource.findOneByUUID(nss.db().toString(), uuid, doc._id.wrap());
             totalSize += good.objsize();
 
             // Checks that the total amount of data that needs to be refetched is at most
@@ -906,7 +903,8 @@ void syncFixUp(OperationContext* opCtx,
             }
 
             // Note good might be empty, indicating we should delete it.
-            goodVersions[doc.ns][doc] = good;
+            goodVersions[uuid].insert(std::pair<DocID, BSONObj>(doc, good));
+
         } catch (const DBException& ex) {
             // If the collection turned into a view, we might get an error trying to
             // refetch documents, but these errors should be ignored, as we'll be creating
@@ -914,7 +912,7 @@ void syncFixUp(OperationContext* opCtx,
             if (ex.getCode() == ErrorCodes::CommandNotSupportedOnView)
                 continue;
 
-            log() << "Rollback couldn't re-get from ns: " << doc.ns << " _id: " << redact(doc._id)
+            log() << "Rollback couldn't re-fetch from uuid: " << uuid << " _id: " << redact(doc._id)
                   << ' ' << numFetched << '/' << fixUpInfo.docsToRefetch.size() << ": "
                   << redact(ex);
             throw;
@@ -937,16 +935,20 @@ void syncFixUp(OperationContext* opCtx,
     // when undoing renameCollection operations.
     for (auto uuid : fixUpInfo.collectionsToDrop) {
 
-        // TODO: This invariant will be uncommented once the rollback via refetch for non-WT
-        // project is complete. See SERVER-30171.
-        // invariant(!fixUpInfo.indexesToDrop.count(uuid));
+        // Checks that if the collection is going to be dropped, all commands that
+        // were done on the collection to be dropped were removed during the function
+        // call to removeRedundantOperations().
+        invariant(!fixUpInfo.indexesToDrop.count(uuid));
+        invariant(!fixUpInfo.indexesToCreate.count(uuid));
+        invariant(!fixUpInfo.collectionsToRename.count(uuid));
+        invariant(!fixUpInfo.collectionsToResyncMetadata.count(uuid));
 
-        Collection* collection = UUIDCatalog::get(opCtx).lookupCollectionByUUID(uuid);
         NamespaceString nss = UUIDCatalog::get(opCtx).lookupNSSByUUID(uuid);
-
         AutoGetDb dbLock(opCtx, nss.db(), MODE_X);
+
         Database* db = dbLock.getDb();
         if (db) {
+            Collection* collection = UUIDCatalog::get(opCtx).lookupCollectionByUUID(uuid);
             dropCollection(opCtx, nss, collection, db);
             log() << "Dropped collection with UUID: " << uuid << " and nss: " << nss;
         }
@@ -977,32 +979,7 @@ void syncFixUp(OperationContext* opCtx,
     }
 
     // Full collection data and metadata resync.
-    if (!fixUpInfo.collectionsToResyncData.empty() ||
-        !fixUpInfo.collectionsToResyncMetadata.empty()) {
-
-        // Reloads the collection data from the sync source in order
-        // to roll back a drop/dropIndexes/renameCollection operation.
-        for (const string& ns : fixUpInfo.collectionsToResyncData) {
-            log() << "Resyncing collection, namespace: " << ns;
-
-            // TODO: This invariant will be uncommented once the
-            // rollback via refetch for non-WT project is complete. See SERVER-30171.
-            // invariant(!fixUpInfo.indexesToDrop.count(ns));
-            // invariant(!fixUpInfo.collectionsToResyncMetadata.count(ns));
-
-            const NamespaceString nss(ns);
-
-            {
-                Lock::DBLock dbLock(opCtx, nss.db(), MODE_X);
-                Database* db = dbHolder().openDb(opCtx, nss.db().toString());
-                invariant(db);
-                WriteUnitOfWork wunit(opCtx);
-                fassertStatusOK(40505, db->dropCollectionEvenIfSystem(opCtx, nss));
-                wunit.commit();
-            }
-
-            rollbackSource.copyCollectionFromRemote(opCtx, nss);
-        }
+    if (!fixUpInfo.collectionsToResyncMetadata.empty()) {
 
         // Retrieves collections from the sync source in order to obtain the collection
         // flags needed to roll back collMod operations. We roll back collMod operations
@@ -1013,13 +990,15 @@ void syncFixUp(OperationContext* opCtx,
         for (auto uuid : fixUpInfo.collectionsToResyncMetadata) {
             log() << "Resyncing collection metadata, uuid: " << uuid;
 
-            Collection* collection = UUIDCatalog::get(opCtx).lookupCollectionByUUID(uuid);
-            invariant(collection);
-            NamespaceString nss = collection->ns();
+            NamespaceString nss = UUIDCatalog::get(opCtx).lookupNSSByUUID(uuid);
 
             Lock::DBLock dbLock(opCtx, nss.db(), MODE_X);
+
             auto db = dbHolder().openDb(opCtx, nss.db().toString());
             invariant(db);
+
+            Collection* collection = UUIDCatalog::get(opCtx).lookupCollectionByUUID(uuid);
+            invariant(collection);
 
             auto cce = collection->getCatalogEntry();
 
@@ -1115,7 +1094,7 @@ void syncFixUp(OperationContext* opCtx,
     for (auto it = fixUpInfo.indexesToDrop.begin(); it != fixUpInfo.indexesToDrop.end(); it++) {
 
         UUID uuid = it->first;
-        auto indexNames = it->second;
+        std::set<std::string> indexNames = it->second;
 
         rollbackCreateIndexes(opCtx, uuid, indexNames);
     }
@@ -1125,7 +1104,7 @@ void syncFixUp(OperationContext* opCtx,
     for (auto it = fixUpInfo.indexesToCreate.begin(); it != fixUpInfo.indexesToCreate.end(); it++) {
 
         UUID uuid = it->first;
-        auto indexNames = it->second;
+        std::map<std::string, BSONObj> indexNames = it->second;
 
         rollbackDropIndexes(opCtx, uuid, indexNames);
     }
@@ -1140,13 +1119,14 @@ void syncFixUp(OperationContext* opCtx,
 
         // Keeps an archive of items rolled back if the collection has not been dropped
         // while rolling back createCollection operations.
-        const auto& ns = nsAndGoodVersionsByDocID.first;
-        unique_ptr<Helpers::RemoveSaver> removeSaver;
 
-        // TODO: This invariant will be uncommented once the
-        // rollback via refetch for non-WT project is complete. See SERVER-30171
-        // invariant(!fixUpInfo.collectionsToDrop.count(ns));
-        removeSaver.reset(new Helpers::RemoveSaver("rollback", "", ns));
+        const auto& uuid = nsAndGoodVersionsByDocID.first;
+        unique_ptr<Helpers::RemoveSaver> removeSaver;
+        invariant(!fixUpInfo.collectionsToDrop.count(uuid));
+
+        NamespaceString nss = catalog.lookupNSSByUUID(uuid);
+
+        removeSaver.reset(new Helpers::RemoveSaver("rollback", "", nss.ns()));
 
         const auto& goodVersionsByDocID = nsAndGoodVersionsByDocID.second;
         for (const auto& idAndDoc : goodVersionsByDocID) {
@@ -1160,15 +1140,12 @@ void syncFixUp(OperationContext* opCtx,
             const DocID& doc = idAndDoc.first;
             BSONObj pattern = doc._id.wrap();  // { _id : ... }
             try {
-                verify(doc.ns && *doc.ns);
-                invariant(!fixUpInfo.collectionsToResyncData.count(doc.ns));
 
                 // TODO: Lots of overhead in context. This can be faster.
                 const NamespaceString docNss(doc.ns);
                 Lock::DBLock docDbLock(opCtx, docNss.db(), MODE_X);
-                OldClientContext ctx(opCtx, doc.ns);
-
-                Collection* collection = ctx.db()->getCollection(opCtx, docNss);
+                OldClientContext ctx(opCtx, doc.ns.toString());
+                Collection* collection = catalog.lookupCollectionByUUID(uuid);
 
                 // Adds the doc to our rollback file if the collection was not dropped while
                 // rolling back createCollection operations. Does not log an error when
@@ -1182,16 +1159,16 @@ void syncFixUp(OperationContext* opCtx,
                     if (found) {
                         auto status = removeSaver->goingToDelete(obj);
                         if (!status.isOK()) {
-                            severe() << "Rollback cannot write document in namespace " << doc.ns
+                            severe() << "Rollback cannot write document in namespace " << nss.ns()
                                      << " to archive file: " << redact(status);
                             throw RSFatalException(str::stream()
                                                    << "Rollback cannot write document in namespace "
-                                                   << doc.ns
+                                                   << nss.ns()
                                                    << " to archive file.");
                         }
                     } else {
                         error() << "Rollback cannot find object: " << pattern << " in namespace "
-                                << doc.ns;
+                                << nss.ns();
                     }
                 }
 
@@ -1215,7 +1192,7 @@ void syncFixUp(OperationContext* opCtx,
                                 const auto findOneStart = clock->now();
                                 RecordId loc = Helpers::findOne(opCtx, collection, pattern, false);
                                 if (clock->now() - findOneStart > Milliseconds(200))
-                                    warning() << "Roll back slow no _id index for " << doc.ns
+                                    warning() << "Roll back slow no _id index for " << nss.ns()
                                               << " perhaps?";
                                 // Would be faster but requires index:
                                 // RecordId loc = Helpers::findById(nsd, pattern);
@@ -1242,7 +1219,7 @@ void syncFixUp(OperationContext* opCtx,
                                 // eventually.
 
                                 warning() << "Ignoring failure to roll back change to capped "
-                                          << "collection " << doc.ns << " with _id "
+                                          << "collection " << nss.ns() << " with _id "
                                           << redact(idAndDoc.first._id.toString(
                                                  /*includeFieldName*/ false))
                                           << ": " << redact(e);
@@ -1250,7 +1227,7 @@ void syncFixUp(OperationContext* opCtx,
                         } else {
                             deleteObjects(opCtx,
                                           collection,
-                                          docNss,
+                                          nss,
                                           pattern,
                                           true,   // justOne
                                           true);  // god
@@ -1260,19 +1237,19 @@ void syncFixUp(OperationContext* opCtx,
                     // TODO faster...
                     updates++;
 
-                    UpdateRequest request(docNss);
+                    UpdateRequest request(nss);
 
                     request.setQuery(pattern);
                     request.setUpdates(idAndDoc.second);
                     request.setGod();
                     request.setUpsert();
-                    UpdateLifecycleImpl updateLifecycle(docNss);
+                    UpdateLifecycleImpl updateLifecycle(nss);
                     request.setLifecycle(&updateLifecycle);
 
                     update(opCtx, ctx.db(), request);
                 }
             } catch (const DBException& e) {
-                log() << "Exception in rollback ns:" << doc.ns << ' ' << pattern.toString() << ' '
+                log() << "Exception in rollback ns:" << nss.ns() << ' ' << pattern.toString() << ' '
                       << redact(e) << " ndeletes:" << deletes;
                 throw;
             }

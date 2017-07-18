@@ -76,9 +76,16 @@ public:
     virtual BSONObj getLastOperation() const = 0;
 
     /**
-     * Fetch a single document from the sync source.
+     * Fetch a single document from the sync source using the namespace.
      */
     virtual BSONObj findOne(const NamespaceString& nss, const BSONObj& filter) const = 0;
+
+    /**
+     * Fetch a single document from the sync source using the UUID.
+     */
+    virtual BSONObj findOneByUUID(const std::string& db,
+                                  UUID uuid,
+                                  const BSONObj& filter) const = 0;
 
     /**
      * Clones a single collection from the sync source.

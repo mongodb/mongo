@@ -651,6 +651,37 @@ BSONObj DBClientBase::findOne(const string& ns,
     return v.empty() ? BSONObj() : v[0];
 }
 
+BSONObj DBClientBase::findOneByUUID(const std::string& db, UUID uuid, const BSONObj& filter) {
+    list<BSONObj> results;
+    BSONObj res;
+
+    BSONObjBuilder cmdBuilder;
+    uuid.appendToBuilder(&cmdBuilder, "find");
+    cmdBuilder.append("filter", filter);
+    cmdBuilder.append("limit", 1);
+    cmdBuilder.append("singleBatch", true);
+
+    BSONObj cmd = cmdBuilder.obj();
+
+    if (runCommand(db, cmd, res, QueryOption_SlaveOk)) {
+        BSONObj cursorObj = res.getObjectField("cursor");
+        BSONObj docs = cursorObj.getObjectField("firstBatch");
+        BSONObjIterator it(docs);
+        while (it.more()) {
+            BSONElement e = it.next();
+            results.push_back(e.Obj().getOwned());
+        }
+        invariant(results.size() <= 1);
+        if (results.empty()) {
+            return BSONObj();
+        }
+        return results.front();
+    }
+    uasserted(
+        40586,
+        str::stream() << "find command using UUID failed. Command: " << cmd << " Result: " << res);
+}
+
 namespace {
 
 /**

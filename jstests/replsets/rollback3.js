@@ -115,6 +115,8 @@ load("jstests/replsets/rslib.js");
     b.oldname.renameCollection("newname");
     b.newname.renameCollection("fooname");
     assert(b.fooname.find().itcount() > 0, "count rename");
+    // create an index - verify that it is removed
+    b.fooname.ensureIndex({q: 1});
     // test roll back (drop) a whole database
     var abc = b.getSisterDB("abc");
     assert.writeOK(abc.foo.insert({x: 1}));

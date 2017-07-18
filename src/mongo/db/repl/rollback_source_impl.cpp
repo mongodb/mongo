@@ -73,6 +73,12 @@ BSONObj RollbackSourceImpl::findOne(const NamespaceString& nss, const BSONObj& f
     return _getConnection()->findOne(nss.toString(), filter, NULL, QueryOption_SlaveOk).getOwned();
 }
 
+BSONObj RollbackSourceImpl::findOneByUUID(const std::string& db,
+                                          UUID uuid,
+                                          const BSONObj& filter) const {
+    return _getConnection()->findOneByUUID(db, uuid, filter);
+}
+
 void RollbackSourceImpl::copyCollectionFromRemote(OperationContext* opCtx,
                                                   const NamespaceString& nss) const {
     std::string errmsg;
@@ -92,8 +98,7 @@ void RollbackSourceImpl::copyCollectionFromRemote(OperationContext* opCtx,
 
 StatusWith<BSONObj> RollbackSourceImpl::getCollectionInfoByUUID(const std::string& db,
                                                                 const UUID& uuid) const {
-    std::list<BSONObj> info =
-        _getConnection()->getCollectionInfos(db, BSON("options.uuid" << uuid));
+    std::list<BSONObj> info = _getConnection()->getCollectionInfos(db, BSON("info.uuid" << uuid));
     if (info.empty()) {
         return StatusWith<BSONObj>(ErrorCodes::NoSuchKey,
                                    str::stream()

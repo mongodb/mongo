@@ -215,19 +215,24 @@ namespace rollback_internal {
 
 struct DocID {
     BSONObj ownedObj;
-    const char* ns;
+    StringData ns;
     BSONElement _id;
+    UUID uuid;
+
+    DocID(BSONObj obj, BSONElement id, UUID ui)
+        : ownedObj(obj), ns(obj.getStringField("ns")), _id(id), uuid(ui) {}
+
     bool operator<(const DocID& other) const;
     bool operator==(const DocID& other) const;
 
-    static DocID minFor(const char* ns) {
+    static DocID minFor(UUID uuid) {
         auto obj = BSON("" << MINKEY);
-        return {obj, ns, obj.firstElement()};
+        return DocID(obj, obj.firstElement(), uuid);
     }
 
-    static DocID maxFor(const char* ns) {
+    static DocID maxFor(UUID uuid) {
         auto obj = BSON("" << MAXKEY);
-        return {obj, ns, obj.firstElement()};
+        return DocID(obj, obj.firstElement(), uuid);
     }
 };
 
@@ -244,9 +249,6 @@ struct FixUpInfo {
     // Note this is a set -- if there are many $inc's on a single document we need to roll back,
     // we only need to refetch it once.
     std::set<DocID> docsToRefetch;
-
-    // Namespaces of collections that need to be resynced from the sync source.
-    std::set<std::string> collectionsToResyncData;
 
     // UUID of collections that need to be dropped.
     stdx::unordered_set<UUID, UUID::Hash> collectionsToDrop;
@@ -293,7 +295,7 @@ struct FixUpInfo {
      * Removes all documents in the docsToRefetch set that are in
      * the collection passed into the function.
      */
-    void removeAllDocsToRefetchFor(const std::string& collection);
+    void removeAllDocsToRefetchFor(UUID uuid);
 
     /**
      * Removes any redundant operations that may have happened during

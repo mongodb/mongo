@@ -27,8 +27,6 @@
 
     var skip = true;
 
-    // TODO: After rollback with UUID's is implemented, remove this.
-    // See ticket PM-843.
     if (skip) {
         jsTestLog("Skipping until safe rollback project is complete.");
         return;
@@ -96,6 +94,7 @@
     conns[1].reconnect(conns[2]);
 
     jsTestLog("Waiting for the 'upstream node' to become the new primary.");
+    waitForState(downstream, ReplSetTest.State.SECONDARY);
     waitForState(upstream, ReplSetTest.State.PRIMARY);
     assert.eq(upstream, replTest.getPrimary());
 
