@@ -1024,6 +1024,28 @@ functions:
         kitchen destroy "${packager_distro}" || true
         test "$verified" = "true"
 
+  "fetch test_lifecycle.yml":
+  - command: shell.exec
+    type: test
+    params:
+      working_dir: src
+      script: |
+        set -o verbose
+
+        ${python|/opt/mongodbtoolchain/v2/bin/python2} buildscripts/fetch_test_lifecycle.py \
+            --metadataRepo git@github.com:mongodb/mongo-test-metadata.git \
+            --lifecycleFile etc/test_lifecycle.yml \
+            --referencesFile references.yml \
+            --destinationFile etc/test_lifecycle.yml \
+            --revision ${revision} \
+            ${project}
+        exit_code=$?
+        if [ ${fail_task_on_error|false} = true ]; then
+          exit $exit_code
+        else
+          exit 0
+        fi
+
 pre:
   - func: "kill processes"
   - func: "cleanup environment"
@@ -1513,6 +1535,11 @@ tasks:
           find . -mindepth 3 ! -name "mongo${exe}" -type f -exec rm {} \; # delete bin/* except bin/mongo
           ${python|/opt/mongodbtoolchain/v2/bin/python2} ../buildscripts/make_archive.py -o mongodb-shell.${ext|tgz} $(find mongodb-* -type f)
           cd ..
+
+    - func: "fetch test_lifecycle.yml"
+      vars:
+        # Do not fail the task if we fail to fetch the test_lifecycle.yml file
+        fail_task_on_error: false
 
     - command: archive.targz_pack
       params:
@@ -3860,6 +3887,16 @@ tasks:
             #MD5 for debugsymbols
             - {'source': {'path': '${push_path}-STAGE/${push_name}/mongodb-${push_name}-${push_arch}-debugsymbols-${suffix}-${task_id}.${ext|tgz}.md5', 'bucket': 'build-push-testing'},
                'destination': {'path': '${push_path}/mongodb-${push_name}-${push_arch}-debugsymbols-${suffix}.${ext|tgz}.md5', 'bucket': '${push_bucket}'}}
+
+- name: fetch_test_lifecycle
+  depends_on: []
+  commands:
+  - *git_get_project
+  - func: "fetch test_lifecycle.yml"
+    vars:
+      # This task is meant to fail if there is an error while fetching test_lifecycle.yml since
+      # the compile task won't fail.
+      fail_task_on_error: true
 
 - name: update_test_lifecycle
   exec_timeout_secs: 21600 # 6 hour timeout for the task overall
@@ -9383,3 +9420,6 @@ buildvariants:
   stepback: false
   tasks:
   - name: update_test_lifecycle
+  - name: fetch_test_lifecycle
+    distros:
+    - rhel62-small
