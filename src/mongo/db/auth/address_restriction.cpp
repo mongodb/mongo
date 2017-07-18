@@ -43,7 +43,7 @@ mongo::StatusWith<mongo::RestrictionSet<>> mongo::parseAddressRestrictionSet(
     const BSONObj& obj) try {
     IDLParserErrorContext ctx("address restriction");
     const auto ar = Address_restriction::parse(ctx, obj);
-    std::vector<std::unique_ptr<Restriction>> vec;
+    std::vector<std::unique_ptr<NamedRestriction>> vec;
 
     const boost::optional<std::vector<StringData>>& client = ar.getClientSource();
     if (client) {

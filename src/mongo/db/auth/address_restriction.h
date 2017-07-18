@@ -61,7 +61,7 @@ struct ServerAddress {
 
 // Represents a restriction based on client or server address
 template <typename T>
-class AddressRestriction : public Restriction {
+class AddressRestriction : public NamedRestriction {
 public:
     /**
      * Construct an empty AddressRestriction.
@@ -137,7 +137,7 @@ public:
     /**
      * Append to builder an array element with the human-readable CIDR ranges.
      */
-    void appendToBuilder(BSONObjBuilder* builder) const {
+    void appendToBuilder(BSONObjBuilder* builder) const override {
         BSONArrayBuilder b;
         for (auto const& range : _ranges) {
             b.append(range.toString());

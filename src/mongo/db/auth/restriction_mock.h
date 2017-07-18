@@ -34,7 +34,7 @@
 
 namespace mongo {
 
-class RestrictionMock : public Restriction {
+class RestrictionMock : public UnnamedRestriction {
 public:
     explicit RestrictionMock(bool shouldPass) : _shouldPass(shouldPass) {}
 
@@ -47,11 +47,42 @@ public:
                       "Mock restriction forced to be unmet");
     }
 
+    virtual void appendToBuilder(BSONArrayBuilder* builder) const {
+        builder->append(_shouldPass);
+    }
+
 private:
     void serialize(std::ostream& os) const final {
         os << "{Mock: " << (_shouldPass ? "alwaysMet" : "alwaysUnmet") << "}";
     }
 
+    const bool _shouldPass;
+};
+
+class NamedRestrictionMock : public NamedRestriction {
+public:
+    NamedRestrictionMock(const std::string& name, bool shouldPass)
+        : _name(name), _shouldPass(shouldPass) {}
+
+    Status validate(const RestrictionEnvironment& environment) const final {
+        if (_shouldPass) {
+            return Status::OK();
+        }
+
+        return Status(ErrorCodes::AuthenticationRestrictionUnmet,
+                      "Mock restriction forced to be unmet");
+    }
+
+    virtual void appendToBuilder(BSONObjBuilder* builder) const final {
+        builder->append(_name, _shouldPass);
+    }
+
+private:
+    void serialize(std::ostream& os) const final {
+        os << "{" << _name << ": " << (_shouldPass ? "alwaysMet" : "alwaysUnmet") << "}";
+    }
+
+    const std::string _name;
     const bool _shouldPass;
 };
 

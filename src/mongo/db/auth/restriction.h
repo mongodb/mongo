@@ -42,10 +42,13 @@ namespace mongo {
 // restriction, must be able to meet it. There are potentially many different 'types' of
 // restriction. Their evaluation logic is implemented in child classes which conform to this
 // interface.
+template <typename S>
 class Restriction {
 public:
-    virtual ~Restriction();
+    using serialization_type = S;
+
     Restriction() = default;
+    virtual ~Restriction() = default;
 
     // Returns True if the restriction is met by the RestrictionEnvironment.
     // Implemented by child classes.
@@ -66,9 +69,31 @@ public:
         return oss.str();
     }
 
+    virtual void appendToBuilder(typename serialization_type::bson_builder_type* builder) const = 0;
+
 private:
     // Stringifies the Restriction.
     virtual void serialize(std::ostream& os) const = 0;
 };
+
+namespace restriction_detail {
+struct NamedRestrictionImpl {
+    using bson_type = BSONObj;
+    using bson_builder_type = BSONObjBuilder;
+    static bson_type finalize(bson_builder_type* builder) {
+        return builder->obj();
+    }
+};
+struct UnnamedRestrictionImpl {
+    using bson_type = BSONArray;
+    using bson_builder_type = BSONArrayBuilder;
+    static bson_type finalize(bson_builder_type* builder) {
+        return builder->arr();
+    }
+};
+}  // namespace restriction_detail
+
+using NamedRestriction = Restriction<restriction_detail::NamedRestrictionImpl>;
+using UnnamedRestriction = Restriction<restriction_detail::UnnamedRestrictionImpl>;
 
 }  // namespace mongo
