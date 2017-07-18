@@ -43,6 +43,7 @@
 #include "mongo/db/cursor_manager.h"
 #include "mongo/db/db_raii.h"
 #include "mongo/db/exec/working_set_common.h"
+#include "mongo/db/pipeline/close_change_stream_exception.h"
 #include "mongo/db/query/cursor_response.h"
 #include "mongo/db/query/find.h"
 #include "mongo/db/query/find_common.h"
@@ -446,6 +447,10 @@ public:
                 nextBatch->append(obj);
                 (*numResults)++;
             }
+        } catch (const CloseChangeStreamException& ex) {
+            // FAILURE state will make getMore command close the cursor even if it's tailable.
+            *state = PlanExecutor::FAILURE;
+            return Status::OK();
         } catch (const UserException& except) {
             if (isAwaitData && except.getCode() == ErrorCodes::ExceededTimeLimit) {
                 // We ignore exceptions from interrupt points due to max time expiry for

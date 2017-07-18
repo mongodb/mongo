@@ -31,6 +31,7 @@
 #include "mongo/db/pipeline/document_source_change_notification.h"
 
 #include "mongo/bson/simple_bsonelement_comparator.h"
+#include "mongo/db/pipeline/close_change_stream_exception.h"
 #include "mongo/db/pipeline/document_source_check_resume_token.h"
 #include "mongo/db/pipeline/document_source_limit.h"
 #include "mongo/db/pipeline/document_source_lookup_change_post_image.h"
@@ -116,6 +117,77 @@ private:
     DocumentSourceOplogMatch(BSONObj filter, const intrusive_ptr<ExpressionContext>& expCtx)
         : DocumentSourceMatch(std::move(filter), expCtx) {}
 };
+
+void checkValueType(const Value v, const StringData filedName, BSONType expectedType) {
+    uassert(40532,
+            str::stream() << "Entry field \"" << filedName << "\" should be "
+                          << typeName(expectedType)
+                          << ", found: "
+                          << typeName(v.getType()),
+            (v.getType() == expectedType));
+}
+
+/**
+ * This stage is used internally for change notifications to close cursor after returning
+ * "invalidate" entries.
+ * It is not intended to be created by the user.
+ */
+class DocumentSourceCloseCursor final : public DocumentSource {
+public:
+    GetNextResult getNext() final;
+
+    const char* getSourceName() const final {
+        // This is used in error reporting.
+        return "$changeNotification";
+    }
+
+    Value serialize(boost::optional<ExplainOptions::Verbosity> explain = boost::none) const final {
+        // This stage is created by the DocumentSourceChangeNotification stage, so serializing it
+        // here would result in it being created twice.
+        return Value();
+    }
+
+    static boost::intrusive_ptr<DocumentSourceCloseCursor> create(
+        const boost::intrusive_ptr<ExpressionContext>& expCtx) {
+        return new DocumentSourceCloseCursor(expCtx);
+    }
+
+private:
+    /**
+     * Use the create static method to create a DocumentSourceCheckResumeToken.
+     */
+    DocumentSourceCloseCursor(const boost::intrusive_ptr<ExpressionContext>& expCtx)
+        : DocumentSource(expCtx) {}
+
+    bool _shouldCloseCursor = false;
+};
+
+DocumentSource::GetNextResult DocumentSourceCloseCursor::getNext() {
+    pExpCtx->checkForInterrupt();
+
+    // Close cursor if we have returned an invalidate entry.
+    if (_shouldCloseCursor) {
+        throw CloseChangeStreamException();
+    }
+
+    auto nextInput = pSource->getNext();
+    if (!nextInput.isAdvanced())
+        return nextInput;
+
+    auto doc = nextInput.getDocument();
+    const auto& kOperationTypeField = DocumentSourceChangeNotification::kOperationTypeField;
+    checkValueType(doc[kOperationTypeField], kOperationTypeField, BSONType::String);
+    if (doc[kOperationTypeField].getString() ==
+        DocumentSourceChangeNotification::kInvalidateOpType) {
+        // Pass the invalidation forward, so that it can be included in the results, or
+        // filtered/transformed by further stages in the pipeline, then throw an exception
+        // to close the cursor on the next call to getNext().
+        _shouldCloseCursor = true;
+    }
+
+    return nextInput;
+}
+
 }  // namespace
 
 BSONObj DocumentSourceChangeNotification::buildMatchFilter(const NamespaceString& nss,
@@ -193,6 +265,8 @@ list<intrusive_ptr<DocumentSource>> DocumentSourceChangeNotification::createFrom
     if (resumeStage) {
         stages.push_back(resumeStage);
     }
+    auto closeCursorSource = DocumentSourceCloseCursor::create(expCtx);
+    stages.push_back(closeCursorSource);
     if (shouldLookupPostImage) {
         stages.push_back(DocumentSourceLookupChangePostImage::create(expCtx));
     }
@@ -204,17 +278,6 @@ intrusive_ptr<DocumentSource> DocumentSourceChangeNotification::createTransforma
     return intrusive_ptr<DocumentSource>(new DocumentSourceSingleDocumentTransformation(
         expCtx, stdx::make_unique<Transformation>(changeNotificationSpec), kStageName.toString()));
 }
-
-namespace {
-void checkValueType(Value v, StringData filedName, BSONType expectedType) {
-    uassert(40532,
-            str::stream() << "Oplog entry field \"" << filedName << "\" should be "
-                          << typeName(expectedType)
-                          << ", found: "
-                          << typeName(v.getType()),
-            (v.getType() == expectedType));
-}
-}  // namespace
 
 Document DocumentSourceChangeNotification::Transformation::applyTransformation(
     const Document& input) {

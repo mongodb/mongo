@@ -34,6 +34,7 @@
 #include "mongo/bson/bsonobj.h"
 #include "mongo/bson/json.h"
 #include "mongo/db/pipeline/aggregation_context_fixture.h"
+#include "mongo/db/pipeline/close_change_stream_exception.h"
 #include "mongo/db/pipeline/document.h"
 #include "mongo/db/pipeline/document_source_change_notification.h"
 #include "mongo/db/pipeline/document_source_limit.h"
@@ -77,20 +78,8 @@ public:
     }
 
     void checkTransformation(const OplogEntry& entry, const boost::optional<Document> expectedDoc) {
-        const auto spec = fromjson("{$changeNotification: {}}");
-        list<intrusive_ptr<DocumentSource>> result =
-            DSChangeNotification::createFromBson(spec.firstElement(), getExpCtx());
-
-        auto match = dynamic_cast<DocumentSourceMatch*>(result.front().get());
-        ASSERT(match);
-        auto mock = DocumentSourceMock::create(D(entry.toBSON()));
-        match->setSource(mock.get());
-
-        // Check the oplog entry is transformed correctly.
-        auto transform = result.back().get();
-        ASSERT(transform);
-        ASSERT_EQ(string(transform->getSourceName()), DSChangeNotification::kStageName);
-        transform->setSource(match);
+        vector<intrusive_ptr<DocumentSource>> stages = makeStages(entry);
+        auto transform = stages[2].get();
 
         auto next = transform->getNext();
         // Match stage should pass the doc down if expectedDoc is given.
@@ -98,6 +87,37 @@ public:
         if (expectedDoc) {
             ASSERT_DOCUMENT_EQ(next.releaseDocument(), *expectedDoc);
         }
+    }
+
+    /**
+     * Returns a list of stages expanded from a $changeNotification specification, starting with a
+     * DocumentSourceMock which contains a single document representing 'entry'.
+     */
+    vector<intrusive_ptr<DocumentSource>> makeStages(const OplogEntry& entry) {
+        const auto spec = fromjson("{$changeNotification: {}}");
+        list<intrusive_ptr<DocumentSource>> result =
+            DSChangeNotification::createFromBson(spec.firstElement(), getExpCtx());
+        vector<intrusive_ptr<DocumentSource>> stages(std::begin(result), std::end(result));
+
+        auto match = dynamic_cast<DocumentSourceMatch*>(stages[0].get());
+        ASSERT(match);
+        auto mock = DocumentSourceMock::create(D(entry.toBSON()));
+        match->setSource(mock.get());
+
+        // Check the oplog entry is transformed correctly.
+        auto transform = stages[1].get();
+        ASSERT(transform);
+        ASSERT_EQ(string(transform->getSourceName()), DSChangeNotification::kStageName);
+        transform->setSource(match);
+
+        auto closeCursor = stages.back().get();
+        ASSERT(closeCursor);
+        closeCursor->setSource(transform);
+
+        // Include the mock stage in the "stages" so it won't get destroyed outside the function
+        // scope.
+        stages.insert(stages.begin(), mock);
+        return stages;
     }
 
     OplogEntry createCommand(const BSONObj& oField) {
@@ -153,11 +173,12 @@ TEST_F(ChangeNotificationStageTest, StagesGeneratedCorrectly) {
 
     list<intrusive_ptr<DocumentSource>> result =
         DSChangeNotification::createFromBson(spec.firstElement(), getExpCtx());
-
-    ASSERT_EQUALS(result.size(), 2UL);
-    ASSERT_TRUE(dynamic_cast<DocumentSourceMatch*>(result.front().get()));
-    ASSERT_EQUALS(string(result.front()->getSourceName()), DSChangeNotification::kStageName);
-    ASSERT_EQUALS(string(result.back()->getSourceName()), DSChangeNotification::kStageName);
+    vector<intrusive_ptr<DocumentSource>> stages(std::begin(result), std::end(result));
+    ASSERT_EQUALS(stages.size(), 3UL);
+    ASSERT_TRUE(dynamic_cast<DocumentSourceMatch*>(stages.front().get()));
+    ASSERT_EQUALS(string(stages[0]->getSourceName()), DSChangeNotification::kStageName);
+    ASSERT_EQUALS(string(stages[1]->getSourceName()), DSChangeNotification::kStageName);
+    ASSERT_EQUALS(string(stages[2]->getSourceName()), DSChangeNotification::kStageName);
 
     // TODO: Check explain result.
 }
@@ -295,9 +316,10 @@ TEST_F(ChangeNotificationStageTest, TransformationShouldBeAbleToReParseSerialize
     auto expCtx = getExpCtx();
 
     auto originalSpec = BSON(DSChangeNotification::kStageName << BSONObj());
-    auto allStages = DSChangeNotification::createFromBson(originalSpec.firstElement(), expCtx);
-    ASSERT_EQ(allStages.size(), 2UL);
-    auto stage = allStages.back();
+    auto result = DSChangeNotification::createFromBson(originalSpec.firstElement(), expCtx);
+    vector<intrusive_ptr<DocumentSource>> allStages(std::begin(result), std::end(result));
+    ASSERT_EQ(allStages.size(), 3UL);
+    auto stage = allStages[1];
     ASSERT(dynamic_cast<DocumentSourceSingleDocumentTransformation*>(stage.get()));
 
     //
@@ -322,6 +344,37 @@ TEST_F(ChangeNotificationStageTest, TransformationShouldBeAbleToReParseSerialize
 
     ASSERT_EQ(newSerialization.size(), 1UL);
     ASSERT_VALUE_EQ(newSerialization[0], serialization[0]);
+}
+
+TEST_F(ChangeNotificationStageTest, CloseCursorOnInvalidateEntries) {
+    OplogEntry dropColl = createCommand(BSON("drop" << nss.coll()));
+    auto stages = makeStages(dropColl);
+    auto closeCursor = stages.back();
+
+    Document expectedInvalidate{
+        {DSChangeNotification::kIdField, D{{"ts", ts}, {"ns", nss.getCommandNS().ns()}}},
+        {DSChangeNotification::kOperationTypeField, DSChangeNotification::kInvalidateOpType},
+        {DSChangeNotification::kFullDocumentField, BSONNULL},
+    };
+
+    auto next = closeCursor->getNext();
+    // Transform into invalidate entry.
+    ASSERT_DOCUMENT_EQ(next.releaseDocument(), expectedInvalidate);
+    // Then throw an exception on the next call of getNext().
+    ASSERT_THROWS_CODE(
+        closeCursor->getNext(), CloseChangeStreamException, ErrorCodes::CloseChangeStream);
+}
+
+TEST_F(ChangeNotificationStageTest, CloseCursorEvenIfInvalidateEntriesGetFilteredOut) {
+    OplogEntry dropColl = createCommand(BSON("drop" << nss.coll()));
+    auto stages = makeStages(dropColl);
+    auto closeCursor = stages.back();
+    // Add a match stage after change stream to filter out the invalidate entries.
+    auto match = DocumentSourceMatch::create(fromjson("{operationType: 'insert'}"), getExpCtx());
+    match->setSource(closeCursor.get());
+
+    // Throw an exception on the call of getNext().
+    ASSERT_THROWS_CODE(match->getNext(), CloseChangeStreamException, ErrorCodes::CloseChangeStream);
 }
 
 }  // namespace

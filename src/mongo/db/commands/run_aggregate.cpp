@@ -43,6 +43,7 @@
 #include "mongo/db/exec/working_set_common.h"
 #include "mongo/db/namespace_string.h"
 #include "mongo/db/pipeline/accumulator.h"
+#include "mongo/db/pipeline/close_change_stream_exception.h"
 #include "mongo/db/pipeline/document.h"
 #include "mongo/db/pipeline/document_source.h"
 #include "mongo/db/pipeline/expression.h"
@@ -99,7 +100,18 @@ bool handleCursorCommand(OperationContext* opCtx,
         // The initial getNext() on a PipelineProxyStage may be very expensive so we don't
         // do it when batchSize is 0 since that indicates a desire for a fast return.
         PlanExecutor::ExecState state;
-        if ((state = cursor->getExecutor()->getNext(&next, nullptr)) == PlanExecutor::IS_EOF) {
+
+        try {
+            state = cursor->getExecutor()->getNext(&next, nullptr);
+        } catch (const CloseChangeStreamException& ex) {
+            // This exception is thrown when a $changeNotification stage encounters an event
+            // that invalidates the cursor. We should close the cursor and return without
+            // error.
+            cursor = nullptr;
+            break;
+        }
+
+        if (state == PlanExecutor::IS_EOF) {
             if (!cursor->isTailable()) {
                 // make it an obvious error to use cursor or executor after this point
                 cursor = nullptr;
