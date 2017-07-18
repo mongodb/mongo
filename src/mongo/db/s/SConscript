@@ -20,18 +20,6 @@ env.Library(
 )
 
 env.Library(
-    target='shard_metadata_util',
-    source=[
-        'shard_metadata_util.cpp',
-    ],
-    LIBDEPS=[
-        '$BUILD_DIR/mongo/client/clientdriver',
-        '$BUILD_DIR/mongo/db/dbdirectclient',
-        '$BUILD_DIR/mongo/s/common',
-    ],
-)
-
-env.Library(
     target='sharding_task_executor',
     source=[
         'sharding_task_executor.cpp',
@@ -86,6 +74,7 @@ env.Library(
         'namespace_metadata_change_notifications.cpp',
         'operation_sharding_state.cpp',
         'shard_identity_rollback_notifier.cpp',
+        'shard_metadata_util.cpp',
         'shard_server_catalog_cache_loader.cpp',
         'sharded_connection_info.cpp',
         'sharding_egress_metadata_hook_for_mongod.cpp',
@@ -110,7 +99,6 @@ env.Library(
         '$BUILD_DIR/mongo/util/elapsed_tracker',
         'collection_metadata',
         'migration_types',
-        'shard_metadata_util',
         'sharding_task_executor',
         'type_shard_identity',
         #'$BUILD_DIR/mongo/db/catalog/catalog', # CYCLE
@@ -276,7 +264,7 @@ env.CppUnitTest(
     ],
     LIBDEPS=[
         '$BUILD_DIR/mongo/s/shard_server_test_fixture',
-        'shard_metadata_util',
+        'sharding',
     ],
 )
 

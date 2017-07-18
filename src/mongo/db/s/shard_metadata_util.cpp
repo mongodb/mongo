@@ -276,6 +276,10 @@ Status updateShardChunks(OperationContext* opCtx,
     try {
         DBDirectClient client(opCtx);
 
+        // This may be the first update, so the first opportunity to create an index.
+        // If the index already exists, this is a no-op.
+        client.createIndex(chunkMetadataNss.ns(), BSON(ChunkType::lastmod() << 1));
+
         /**
          * Here are examples of the operations that can happen on the config server to update
          * the config.chunks collection. 'chunks' only includes the chunks that result from the
