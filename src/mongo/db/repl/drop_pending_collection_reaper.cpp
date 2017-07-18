@@ -97,36 +97,6 @@ boost::optional<OpTime> DropPendingCollectionReaper::getEarliestDropOpTime() {
     return it->first;
 }
 
-bool DropPendingCollectionReaper::dropCollectionAtOpTime(OperationContext* opCtx,
-                                                         const OpTime& opTime) {
-    // Every node cleans up its own drop-pending collections. We should never replicate these drops
-    // because these are internal operations.
-    UnreplicatedWritesBlock uwb(opCtx);
-
-    NamespaceString pendingNss;
-    {
-        stdx::lock_guard<stdx::mutex> lock(_mutex);
-        auto pendingNssIt = _dropPendingNamespaces.find(opTime);
-        if (pendingNssIt == _dropPendingNamespaces.end()) {
-            warning() << "Cannot find drop-pending namespace at OpTime " << opTime << " to drop.";
-            return false;
-        }
-
-        pendingNss = pendingNssIt->second;
-        _dropPendingNamespaces.erase(opTime);
-    }
-
-    log() << "Completing collection drop for " << pendingNss << " with drop OpTime " << opTime;
-
-    auto status = _storageInterface->dropCollection(opCtx, pendingNss);
-    if (!status.isOK()) {
-        warning() << "Failed to remove drop-pending collection " << pendingNss
-                  << " with drop OpTime " << opTime << ": " << status;
-    }
-
-    return true;
-}
-
 bool DropPendingCollectionReaper::rollBackDropPendingCollection(OperationContext* opCtx,
                                                                 const OpTime& opTime,
                                                                 StringData collName) {
