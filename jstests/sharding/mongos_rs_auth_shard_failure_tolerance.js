@@ -74,6 +74,7 @@ function authDBUsers(conn) {
 // TODO SERVER-30148: replace this with calls to awaitReplication() on each shard owning data for
 // the sharded collection once secondaries refresh proactively.
 var mongosSetupConn = new Mongo(mongos.host);
+authDBUsers(mongosSetupConn);
 mongosSetupConn.setReadPref("secondary");
 assert(!mongosSetupConn.getCollection(collSharded.toString()).find({}).hasNext());
 
