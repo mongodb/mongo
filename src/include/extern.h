@@ -791,3 +791,7 @@ extern int __wt_txn_global_query_timestamp( WT_SESSION_IMPL *session, char *hex_
 extern int __wt_txn_update_pinned_timestamp(WT_SESSION_IMPL *session) WT_GCC_FUNC_DECL_ATTRIBUTE((warn_unused_result));
 extern int __wt_txn_global_set_timestamp(WT_SESSION_IMPL *session, const char *cfg[]) WT_GCC_FUNC_DECL_ATTRIBUTE((warn_unused_result));
 extern int __wt_txn_set_timestamp(WT_SESSION_IMPL *session, const char *cfg[]) WT_GCC_FUNC_DECL_ATTRIBUTE((warn_unused_result));
+extern void __wt_txn_set_commit_timestamp(WT_SESSION_IMPL *session);
+extern void __wt_txn_clear_commit_timestamp(WT_SESSION_IMPL *session);
+extern void __wt_txn_set_read_timestamp(WT_SESSION_IMPL *session);
+extern void __wt_txn_clear_read_timestamp(WT_SESSION_IMPL *session);
