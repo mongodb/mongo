@@ -148,7 +148,8 @@ var ReplSetTest = function(opts) {
      * Returns 'true' if the test has been configured to run without journaling enabled.
      */
     function _isRunningWithoutJournaling() {
-        return jsTestOptions().noJournal || jsTestOptions().storageEngine == 'inMemory' ||
+        return self.nojournal || jsTestOptions().noJournal ||
+            jsTestOptions().storageEngine == 'inMemory' ||
             jsTestOptions().storageEngine == 'ephemeralForTest';
     }
 
@@ -326,6 +327,12 @@ var ReplSetTest = function(opts) {
         var replSetStatus =
             assert.commandWorked(conn.getDB("admin").runCommand({replSetGetStatus: 1}));
 
+        // Older servers in multiversion suites do not return an 'optimes' array, so we use
+        // the only OpTime they provide.
+        if (!replSetStatus.optimes) {
+            return _getLastOpTime(conn);
+        }
+
         var opTimeType = "durableOpTime";
         if (_isRunningWithoutJournaling()) {
             opTimeType = "appliedOpTime";
@@ -468,6 +475,9 @@ var ReplSetTest = function(opts) {
 
         if (options && options.keyFile) {
             self.keyFile = options.keyFile;
+        }
+        if (options && options.nojournal != undefined) {
+            self.nojournal = true;
         }
 
         var nodes = [];
@@ -822,7 +832,12 @@ var ReplSetTest = function(opts) {
      * Calls awaitReplication() which requires all connections in 'nodes' to be authenticated.
      */
     this.stepUp = function(node) {
-        this.awaitReplication();
+        var secondaryOpTimeType = ReplSetTest.OpTimeType.LAST_DURABLE;
+        if (_isRunningWithoutJournaling()) {
+            secondaryOpTimeType = ReplSetTest.OpTimeType.LAST_APPLIED;
+        }
+
+        this.awaitReplication(ReplSetTest.kDefaultTimeoutMS, secondaryOpTimeType);
         this.awaitNodesAgreeOnPrimary();
         if (this.getPrimary() === node) {
             return;
@@ -843,7 +858,7 @@ var ReplSetTest = function(opts) {
                     print("Caught exception while stepping down node '" + tojson(node.host) +
                           "': " + tojson(ex));
                 }
-                this.awaitReplication();
+                this.awaitReplication(ReplSetTest.kDefaultTimeoutMS, secondaryOpTimeType);
                 this.awaitNodesAgreeOnPrimary();
             }
 

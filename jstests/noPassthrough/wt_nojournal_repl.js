@@ -35,11 +35,10 @@ if (jsTest.options().storageEngine && jsTest.options().storageEngine !== "wiredT
         nodes: 3,
         oplogSize: 2,
         nodeOptions: {
-            nojournal: "",
             storageEngine: "wiredTiger",
         }
     });
-    var nodes = replTest.startSet();
+    var nodes = replTest.startSet({nojournal: ""});
 
     // make sure node 0 becomes primary initially
     var config = replTest.getReplSetConfig();
