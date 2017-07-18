@@ -441,21 +441,25 @@ __wt_txn_config(WT_SESSION_IMPL *session, const char *cfg[])
 	if (cval.len > 0) {
 #ifdef HAVE_TIMESTAMPS
 		WT_TXN_GLOBAL *txn_global = &S2C(session)->txn_global;
+		WT_TXN_STATE *txn_state = WT_SESSION_TXN_STATE(session);
 		wt_timestamp_t oldest_timestamp;
 
 		WT_RET(__wt_txn_parse_timestamp(
 		    session, "read", txn->read_timestamp, &cval));
-		__wt_readlock(session, &txn_global->rwlock);
+		__wt_writelock(session, &txn_global->rwlock);
 		__wt_timestamp_set(
 		    oldest_timestamp, txn_global->oldest_timestamp);
-		__wt_readunlock(session, &txn_global->rwlock);
 		if (__wt_timestamp_cmp(
-		    txn->read_timestamp, oldest_timestamp) < 0)
+		    txn->read_timestamp, oldest_timestamp) < 0) {
+			__wt_writeunlock(session, &txn_global->rwlock);
 			WT_RET_MSG(session, EINVAL,
 			    "read timestamp %.*s older than oldest timestamp",
 			    (int)cval.len, cval.str);
-
-		__wt_txn_set_read_timestamp(session);
+		}
+		__wt_timestamp_set(
+		    txn_state->read_timestamp, txn->read_timestamp);
+		__wt_writeunlock(session, &txn_global->rwlock);
+		F_SET(txn, WT_TXN_HAS_TS_READ);
 		txn->isolation = WT_ISO_SNAPSHOT;
 #else
 		WT_RET_MSG(session, EINVAL, "read_timestamp requires a "
@@ -528,11 +532,20 @@ __wt_txn_release(WT_SESSION_IMPL *session)
 
 		WT_ASSERT(session, txn_state->id != WT_TXN_NONE &&
 		    txn->id != WT_TXN_NONE);
+		__wt_writelock(session, &txn_global->rwlock);
 		WT_PUBLISH(txn_state->id, WT_TXN_NONE);
 #ifdef HAVE_TIMESTAMPS
-		__wt_txn_clear_commit_timestamp(session);
-		__wt_txn_clear_read_timestamp(session);
+		if (F_ISSET(txn, WT_TXN_HAS_TS_COMMIT)) {
+			/*
+			 * We rely on a non-zero ID to protect our published
+			 * commit timestamp.  Otherwise we would need a lock
+			 * here.
+			 */
+			WT_WRITE_BARRIER();
+			__wt_timestamp_set_zero(txn_state->commit_timestamp);
+		}
 #endif
+		__wt_writeunlock(session, &txn_global->rwlock);
 
 		txn->id = WT_TXN_NONE;
 	}
@@ -568,6 +581,7 @@ __wt_txn_commit(WT_SESSION_IMPL *session, const char *cfg[])
 	WT_TXN_OP *op;
 #ifdef HAVE_TIMESTAMPS
 	WT_TXN_GLOBAL *txn_global = &S2C(session)->txn_global;
+	WT_TXN_STATE *txn_state = WT_SESSION_TXN_STATE(session);
 	wt_timestamp_t prev_commit_timestamp;
 	bool update_timestamp;
 #endif
@@ -590,7 +604,13 @@ __wt_txn_commit(WT_SESSION_IMPL *session, const char *cfg[])
 #ifdef HAVE_TIMESTAMPS
 		WT_ERR(__wt_txn_parse_timestamp(
 		    session, "commit", txn->commit_timestamp, &cval));
-		__wt_txn_set_commit_timestamp(session);
+		if (!F_ISSET(txn, WT_TXN_HAS_TS_COMMIT)) {
+			__wt_writelock(session, &txn_global->rwlock);
+			__wt_timestamp_set(txn_state->commit_timestamp,
+			    txn->commit_timestamp);
+			__wt_writeunlock(session, &txn_global->rwlock);
+			F_SET(txn, WT_TXN_HAS_TS_COMMIT);
+		}
 #else
 		WT_ERR_MSG(session, EINVAL, "commit_timestamp requires a "
 		    "version of WiredTiger built with timestamp support");
@@ -927,14 +947,8 @@ __wt_txn_global_init(WT_SESSION_IMPL *session, const char *cfg[])
 	WT_RET(__wt_spin_init(
 	    session, &txn_global->id_lock, "transaction id lock"));
 	WT_RET(__wt_rwlock_init(session, &txn_global->rwlock));
-
-	WT_RET(__wt_rwlock_init(session, &txn_global->commit_timestamp_rwlock));
-	TAILQ_INIT(&txn_global->commit_timestamph);
-
-	WT_RET(__wt_rwlock_init(session, &txn_global->read_timestamp_rwlock));
-	TAILQ_INIT(&txn_global->read_timestamph);
-
 	WT_RET(__wt_rwlock_init(session, &txn_global->nsnap_rwlock));
+
 	txn_global->nsnap_oldest_id = WT_TXN_NONE;
 	TAILQ_INIT(&txn_global->nsnaph);
 
@@ -965,8 +979,6 @@ __wt_txn_global_destroy(WT_SESSION_IMPL *session)
 
 	__wt_spin_destroy(session, &txn_global->id_lock);
 	__wt_rwlock_destroy(session, &txn_global->rwlock);
-	__wt_rwlock_destroy(session, &txn_global->commit_timestamp_rwlock);
-	__wt_rwlock_destroy(session, &txn_global->read_timestamp_rwlock);
 	__wt_rwlock_destroy(session, &txn_global->nsnap_rwlock);
 	__wt_free(session, txn_global->states);
 }
