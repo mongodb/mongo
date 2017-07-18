@@ -100,16 +100,16 @@ public:
 
     /**
      * Renames the drop-pending namespace at the specified optime back to the provided name.
-     * There can only be one matching collection because optimes uniquely identify oplog entries.
+     * There can only be one matching collection per database and at most two entries per optime
+     * (due to renameCollection across databases).
      * We cannot reconstruct the original namespace so we must get it passed in. It accepts the
-     * collection name, not a fully qualified namespace. The database name is taken from the
-     * existing collection.
+     * fully qualified namespace so that we can locate the correct entry by optime and database.
      * This function also removes the entry from '_dropPendingNamespaces'.
      * This function returns false if there is no drop-pending collection at the specified optime.
      */
     bool rollBackDropPendingCollection(OperationContext* opCtx,
                                        const OpTime& opTime,
-                                       StringData collName);
+                                       const NamespaceString& collectionNamespace);
 
 private:
     // All member variables are labeled with one of the following codes indicating the

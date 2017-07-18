@@ -102,36 +102,36 @@ boost::optional<OpTime> DropPendingCollectionReaper::getEarliestDropOpTime() {
     return it->first;
 }
 
-bool DropPendingCollectionReaper::rollBackDropPendingCollection(OperationContext* opCtx,
-                                                                const OpTime& opTime,
-                                                                StringData collName) {
-    // Every node cleans up its own drop-pending collections. We should never replicate these
+bool DropPendingCollectionReaper::rollBackDropPendingCollection(
+    OperationContext* opCtx, const OpTime& opTime, const NamespaceString& collectionNamespace) {
     // renames because these are internal operations.
     UnreplicatedWritesBlock uwb(opCtx);
 
-    NamespaceString pendingNss;
+    const auto pendingNss = collectionNamespace.makeDropPendingNamespace(opTime);
     {
         stdx::lock_guard<stdx::mutex> lock(_mutex);
-        auto pendingNssIt = _dropPendingNamespaces.find(opTime);
-        if (pendingNssIt == _dropPendingNamespaces.end()) {
+        const auto equalRange = _dropPendingNamespaces.equal_range(opTime);
+        const auto& lowerBound = equalRange.first;
+        const auto& upperBound = equalRange.second;
+        auto matcher = [&pendingNss](const auto& pair) { return pair.second == pendingNss; };
+        auto it = std::find_if(lowerBound, upperBound, matcher);
+        if (it == upperBound) {
             warning() << "Cannot find drop-pending namespace at OpTime " << opTime
-                      << " for collection " << collName << " to roll back.";
+                      << " for collection " << collectionNamespace << " to roll back.";
             return false;
         }
 
-        pendingNss = pendingNssIt->second;
-        _dropPendingNamespaces.erase(opTime);
+        _dropPendingNamespaces.erase(it);
     }
 
-    NamespaceString newNss(pendingNss.db(), collName);
     log() << "Rolling back collection drop for " << pendingNss << " with drop OpTime " << opTime
-          << " to namespace " << newNss;
+          << " to namespace " << collectionNamespace;
 
-    auto status = _storageInterface->renameCollection(opCtx, pendingNss, newNss, true);
+    auto status = _storageInterface->renameCollection(opCtx, pendingNss, collectionNamespace, true);
     if (!status.isOK()) {
         warning() << "Failed to roll back drop-pending collection " << pendingNss
-                  << " with drop OpTime " << opTime << " and rename it to namespace " << newNss
-                  << ": " << status;
+                  << " with drop OpTime " << opTime << " and rename it to namespace "
+                  << collectionNamespace << ": " << status;
     }
 
     return true;

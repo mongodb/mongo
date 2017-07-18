@@ -30,6 +30,7 @@
 
 #include "mongo/base/status.h"
 #include "mongo/db/jsobj.h"
+#include "mongo/db/namespace_string.h"
 #include "mongo/db/record_id.h"
 #include "mongo/db/repl/optime.h"
 #include "mongo/stdx/functional.h"
@@ -120,7 +121,6 @@
 namespace mongo {
 
 class DBClientConnection;
-class NamespaceString;
 class OperationContext;
 
 namespace repl {
@@ -249,7 +249,7 @@ struct FixUpInfo {
     // When collections are dropped, they are added to a list of drop-pending collections. We keep
     // the OpTime and the namespace of the collection because the DropPendingCollectionReaper
     // does not store the original name or UUID of the collection.
-    stdx::unordered_map<UUID, std::pair<OpTime, std::string>, UUID::Hash>
+    stdx::unordered_map<UUID, std::pair<OpTime, NamespaceString>, UUID::Hash>
         collectionsToRollBackPendingDrop;
 
     // True if rollback requires re-fetching documents in the session transaction table. If true,
