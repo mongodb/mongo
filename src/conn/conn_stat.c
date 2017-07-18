@@ -237,7 +237,7 @@ __statlog_print_header(WT_SESSION_IMPL *session)
 	/*
 	 * This flag is required in order to generate correct JSON when printing
 	 * out stats for individual tables. When we are about to print the first
-	 * table's stats we must print out the WiredTigerTables header once
+	 * table's stats we must print out the wiredTigerTables header once
 	 * only and add a correct closing brace when we finish the tables
 	 * section. To do this we maintain a flag variable to note when we have
 	 * printed the first table. Unfortunately, the mechanism which we use
@@ -255,7 +255,7 @@ __statlog_print_header(WT_SESSION_IMPL *session)
 
 /*
  * __statlog_print_table_name --
- *	Write the header for the WiredTigerTables section of statistics if
+ *	Write the header for the wiredTigerTables section of statistics if
  *	running in JSON mode and the header has not been written this round,
  *	then print the name of the table.
  */
@@ -272,13 +272,13 @@ __statlog_print_table_name(
 	 */
 	if (conn_stats) {
 		WT_RET(__wt_fprintf(
-		    session, conn->stat_fs, ",\"WiredTiger\":{"));
+		    session, conn->stat_fs, ",\"wiredTiger\":{"));
 		return (0);
 	}
 
 	/*
 	 * If this is the first table we are printing stats for print the header
-	 * for the WiredTigerTables section. Otherwise print a comma as this
+	 * for the wiredTigerTables section. Otherwise print a comma as this
 	 * is a subsequent table.
 	 */
 	if (conn->stat_json_tables)
@@ -286,7 +286,7 @@ __statlog_print_table_name(
 	else  {
 		conn->stat_json_tables = true;
 		WT_RET(__wt_fprintf(session,
-		    conn->stat_fs,",\"WiredTigerTables\":{"));
+		    conn->stat_fs,",\"wiredTigerTables\":{"));
 	}
 	WT_RET(__wt_fprintf(session, conn->stat_fs, "\"%s\":{", name));
 	return (0);

@@ -101,8 +101,8 @@ class test_stat_log02(wttest.WiredTigerTestCase):
         has_tables = False
         for line in f:
             data = json.loads(line)
-            if "WiredTigerTables" in data:
-                if "file:foo.wt" in data["WiredTigerTables"]:
+            if "wiredTigerTables" in data:
+                if "file:foo.wt" in data["wiredTigerTables"]:
                     has_tables = True
 
         self.assertTrue(has_tables)
