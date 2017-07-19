@@ -65,7 +65,9 @@ public:
      * early if one of hooks returned a non OK status and return it. Note that metadataBob should
      * not be used if Status is not OK as the contents can be partial.
      */
-    Status readReplyMetadata(StringData replySource, const BSONObj& metadataObj) override;
+    Status readReplyMetadata(OperationContext* opCtx,
+                             StringData replySource,
+                             const BSONObj& metadataObj) override;
 
 private:
     std::vector<std::unique_ptr<EgressMetadataHook>> _hooks;

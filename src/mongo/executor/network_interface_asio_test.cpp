@@ -1001,7 +1001,9 @@ public:
         return Status::OK();
     }
 
-    Status readReplyMetadata(StringData replySource, const BSONObj& metadataObj) override {
+    Status readReplyMetadata(OperationContext* opCtx,
+                             StringData replySource,
+                             const BSONObj& metadataObj) override {
         *_gotReplyMetadata = (metadataObj["baz"].str() == "garply");
         return Status::OK();
     }

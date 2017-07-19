@@ -65,7 +65,9 @@ public:
      * Reads metadata from an incoming command reply. This method must not throw or block on
      * database or network operations and can be called by multiple concurrent threads.
      */
-    virtual Status readReplyMetadata(StringData replySource, const BSONObj& metadataObj) = 0;
+    virtual Status readReplyMetadata(OperationContext* opCtx,
+                                     StringData replySource,
+                                     const BSONObj& metadataObj) = 0;
 
 protected:
     EgressMetadataHook() = default;

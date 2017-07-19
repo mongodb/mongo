@@ -62,7 +62,8 @@ Status ShardingEgressMetadataHook::writeRequestMetadata(OperationContext* opCtx,
     }
 }
 
-Status ShardingEgressMetadataHook::readReplyMetadata(StringData replySource,
+Status ShardingEgressMetadataHook::readReplyMetadata(OperationContext* opCtx,
+                                                     StringData replySource,
                                                      const BSONObj& metadataObj) {
     try {
         _saveGLEStats(metadataObj, replySource);

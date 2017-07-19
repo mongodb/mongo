@@ -48,7 +48,9 @@ class ShardingEgressMetadataHook : public rpc::EgressMetadataHook {
 public:
     virtual ~ShardingEgressMetadataHook() = default;
 
-    Status readReplyMetadata(StringData replySource, const BSONObj& metadataObj) override;
+    Status readReplyMetadata(OperationContext* opCtx,
+                             StringData replySource,
+                             const BSONObj& metadataObj) override;
     Status writeRequestMetadata(OperationContext* opCtx, BSONObjBuilder* metadataBob) override;
 
 protected:

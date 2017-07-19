@@ -43,7 +43,6 @@ class OperationTimeTracker {
 public:
     // Decorate OperationContext with OperationTimeTracker instance.
     static std::shared_ptr<OperationTimeTracker> get(OperationContext* ctx);
-    static void set(OperationContext* opCtx, std::shared_ptr<OperationTimeTracker> tracker);
 
     /*
      * Return the latest operationTime.

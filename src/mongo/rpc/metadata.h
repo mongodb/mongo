@@ -84,8 +84,8 @@ using RequestMetadataWriter =
  *
  * TODO: would it be a layering violation if this hook took an OperationContext* ?
  */
-using ReplyMetadataReader =
-    stdx::function<Status(const BSONObj& replyMetadata, StringData sourceHost)>;
+using ReplyMetadataReader = stdx::function<Status(
+    OperationContext* opCtx, const BSONObj& replyMetadata, StringData sourceHost)>;
 
 }  // namespace rpc
 }  // namespace mongo

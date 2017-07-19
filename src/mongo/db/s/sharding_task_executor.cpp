@@ -109,10 +109,6 @@ StatusWith<TaskExecutor::CallbackHandle> ShardingTaskExecutor::scheduleRemoteCom
     }
 
     std::shared_ptr<OperationTimeTracker> timeTracker = OperationTimeTracker::get(request.opCtx);
-    if (!timeTracker) {  // install the time tracker on the opCtx
-        timeTracker = std::make_shared<OperationTimeTracker>();
-        OperationTimeTracker::set(request.opCtx, timeTracker);
-    }
 
     auto clusterGLE = ClusterLastErrorInfo::get(request.opCtx->getClient());
 

@@ -160,6 +160,7 @@ ResponseStatus decodeRPC(Message* received,
         if (metadataHook) {
             auto listenStatus = callNoexcept(*metadataHook,
                                              &rpc::EgressMetadataHook::readReplyMetadata,
+                                             nullptr,  // adding operationTime is handled via lambda
                                              source.toString(),
                                              replyMetadata);
             if (!listenStatus.isOK()) {

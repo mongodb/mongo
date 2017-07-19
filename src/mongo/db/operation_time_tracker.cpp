@@ -33,18 +33,20 @@
 
 namespace mongo {
 namespace {
-auto getOperationTimeTracker =
-    OperationContext::declareDecoration<std::shared_ptr<OperationTimeTracker>>();
+struct OperationTimeTrackerHolder {
+    OperationTimeTrackerHolder() : opTimeTracker(std::make_shared<OperationTimeTracker>()) {}
+    static const OperationContext::Decoration<OperationTimeTrackerHolder> get;
+    std::shared_ptr<OperationTimeTracker> opTimeTracker;
+};
+
+const OperationContext::Decoration<OperationTimeTrackerHolder> OperationTimeTrackerHolder::get =
+    OperationContext::declareDecoration<OperationTimeTrackerHolder>();
 }
 
 std::shared_ptr<OperationTimeTracker> OperationTimeTracker::get(OperationContext* opCtx) {
-    return getOperationTimeTracker(opCtx);
-}
-
-void OperationTimeTracker::set(OperationContext* opCtx,
-                               std::shared_ptr<OperationTimeTracker> trackerArg) {
-    auto& tracker = getOperationTimeTracker(opCtx);
-    tracker = std::move(trackerArg);
+    auto timeTrackerHolder = OperationTimeTrackerHolder::get(opCtx);
+    invariant(timeTrackerHolder.opTimeTracker);
+    return timeTrackerHolder.opTimeTracker;
 }
 
 LogicalTime OperationTimeTracker::getMaxOperationTime() const {

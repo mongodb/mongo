@@ -176,10 +176,10 @@ std::pair<rpc::UniqueReply, DBClientWithCommands*> DBClientWithCommands::runComm
     // call() oddly takes this by pointer, so we need to put it on the stack.
     auto host = getServerAddress();
 
+    auto opCtx = haveClient() ? cc().getOperationContext() : nullptr;
     if (_metadataWriter) {
         BSONObjBuilder metadataBob(std::move(request.body));
-        uassertStatusOK(
-            _metadataWriter((haveClient() ? cc().getOperationContext() : nullptr), &metadataBob));
+        uassertStatusOK(_metadataWriter(opCtx, &metadataBob));
         request.body = metadataBob.obj();
     }
 
@@ -213,7 +213,7 @@ std::pair<rpc::UniqueReply, DBClientWithCommands*> DBClientWithCommands::runComm
             rpc::protocolForMessage(requestMsg) == commandReply->getProtocol());
 
     if (_metadataReader) {
-        uassertStatusOK(_metadataReader(commandReply->getMetadata(), host));
+        uassertStatusOK(_metadataReader(opCtx, commandReply->getMetadata(), host));
     }
 
     if (ErrorCodes::SendStaleConfig ==

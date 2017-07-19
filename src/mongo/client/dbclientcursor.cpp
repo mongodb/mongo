@@ -228,9 +228,10 @@ void DBClientCursor::commandDataReceived(const Message& reply) {
         wasError = true;
     }
 
+    auto opCtx = haveClient() ? cc().getOperationContext() : nullptr;
     if (_client->getReplyMetadataReader()) {
-        uassertStatusOK(_client->getReplyMetadataReader()(commandReply->getMetadata(),
-                                                          _client->getServerAddress()));
+        uassertStatusOK(_client->getReplyMetadataReader()(
+            opCtx, commandReply->getMetadata(), _client->getServerAddress()));
     }
 
     batch.objs.push_back(commandReply->getCommandReply().getOwned());

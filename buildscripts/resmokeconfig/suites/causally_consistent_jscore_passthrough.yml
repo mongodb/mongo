@@ -4,9 +4,6 @@ selector:
   roots:
   - jstests/core/**/*.js
   exclude_files:
-  # TODO SERVER-29700: findAndModify returns an operationTime prior to when its write took place.
-  - jstests/core/find_and_modify_*.js
-  - jstests/core/update_find_and_modify_id.js
   # The following tests fail because a certain command or functionality is not supported on
   # mongos. This command or functionality is placed in a comment next to the failing test.
   - jstests/core/apitest_db.js  # profiling.

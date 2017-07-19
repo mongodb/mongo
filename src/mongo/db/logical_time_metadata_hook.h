@@ -50,7 +50,9 @@ public:
 
     Status writeRequestMetadata(OperationContext* opCtx, BSONObjBuilder* metadataBob) override;
 
-    Status readReplyMetadata(StringData replySource, const BSONObj& metadataObj) override;
+    Status readReplyMetadata(OperationContext* opCtx,
+                             StringData replySource,
+                             const BSONObj& metadataObj) override;
 
 private:
     ServiceContext* _service;

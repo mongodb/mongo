@@ -130,11 +130,9 @@ void appendRequiredFieldsToResponse(OperationContext* opCtx, BSONObjBuilder* res
         rpc::LogicalTimeMetadata(currentTime).writeToMetadata(responseBuilder);
 
         // Add operationTime.
-        if (auto tracker = OperationTimeTracker::get(opCtx)) {
-            auto operationTime = OperationTimeTracker::get(opCtx)->getMaxOperationTime();
-            if (operationTime != LogicalTime::kUninitialized) {
-                responseBuilder->append(kOperationTime, operationTime.asTimestamp());
-            }
+        auto operationTime = OperationTimeTracker::get(opCtx)->getMaxOperationTime();
+        if (operationTime != LogicalTime::kUninitialized) {
+            responseBuilder->append(kOperationTime, operationTime.asTimestamp());
         } else if (currentTime.getTime() != LogicalTime::kUninitialized) {
             // If we don't know the actual operation time, use the cluster time instead. This is
             // safe but not optimal because we can always return a later operation time than actual.
