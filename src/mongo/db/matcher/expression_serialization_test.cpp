@@ -1014,27 +1014,6 @@ TEST(SerializeInternalSchema, ExpressionInternalSchemaMaxLengthSerializesCorrect
                          ExtensionsCallbackDisallowExtensions(),
                          kSimpleCollator);
     ASSERT_BSONOBJ_EQ(*reserialized.getQuery(), fromjson("{x: {$_internalSchemaMaxLength: 1}}"));
-}
-
-TEST(SerializeInternalSchema, ExpressionInternalSchemaMinPropertiesSerializesCorrectly) {
-    const CollatorInterface* collator = nullptr;
-    Matcher original(fromjson("{$_internalSchemaMinProperties: 1}"),
-                     ExtensionsCallbackDisallowExtensions(),
-                     collator);
-    Matcher reserialized(
-        serialize(original.getMatchExpression()), ExtensionsCallbackDisallowExtensions(), collator);
-    ASSERT_BSONOBJ_EQ(*reserialized.getQuery(), fromjson("{$_internalSchemaMinProperties: 1}"));
-    ASSERT_BSONOBJ_EQ(*reserialized.getQuery(), serialize(reserialized.getMatchExpression()));
-}
-
-TEST(SerializeInternalSchema, ExpressionInternalSchemaMaxPropertiesSerializesCorrectly) {
-    const CollatorInterface* collator = nullptr;
-    Matcher original(fromjson("{$_internalSchemaMaxProperties: 1}"),
-                     ExtensionsCallbackDisallowExtensions(),
-                     collator);
-    Matcher reserialized(
-        serialize(original.getMatchExpression()), ExtensionsCallbackDisallowExtensions(), collator);
-    ASSERT_BSONOBJ_EQ(*reserialized.getQuery(), fromjson("{$_internalSchemaMaxProperties: 1}"));
     ASSERT_BSONOBJ_EQ(*reserialized.getQuery(), serialize(reserialized.getMatchExpression()));
 }
 

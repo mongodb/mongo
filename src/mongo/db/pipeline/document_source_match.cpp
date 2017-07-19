@@ -279,8 +279,6 @@ Document redactSafePortionDollarOps(BSONObj expr) {
             case BSONObj::opINTERNAL_SCHEMA_OBJECT_MATCH:
             case BSONObj::opINTERNAL_SCHEMA_MIN_LENGTH:
             case BSONObj::opINTERNAL_SCHEMA_MAX_LENGTH:
-            case BSONObj::opINTERNAL_SCHEMA_MIN_PROPERTIES:
-            case BSONObj::opINTERNAL_SCHEMA_MAX_PROPERTIES:
                 continue;
         }
     }

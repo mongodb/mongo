@@ -210,18 +210,6 @@ private:
     StatusWithMatchExpression _parseInternalSchemaSingleIntegerArgument(
         const char* name, const BSONElement& elem) const;
 
-    /**
-     * Same as the  _parseInternalSchemaSingleIntegerArgument function, but for top-level
-     * operators which don't have paths.
-     */
-    template <class T>
-    StatusWithMatchExpression _parseTopLevelInternalSchemaSingleIntegerArgument(
-        const BSONElement& elem) const;
-
-
-    // The maximum allowed depth of a query tree. Just to guard against stack overflow.
-    static const int kMaximumTreeDepth;
-
     // Performs parsing for the match extensions. We do not own this pointer - it has to live
     // as long as the parser is active.
     const ExtensionsCallback* _extensionsCallback;
