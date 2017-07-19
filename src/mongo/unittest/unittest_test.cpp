@@ -51,14 +51,11 @@ bool containsPattern(const std::string& pattern, const std::string& value) {
 #define ASSERT_TEST_FAILS(TEST_STMT) \
     ASSERT_THROWS(TEST_STMT, mongo::unittest::TestAssertionFailureException)
 
-#define ASSERT_TEST_FAILS_MATCH(TEST_STMT, PATTERN)                                        \
-    ASSERT_THROWS_PRED(                                                                    \
-        TEST_STMT,                                                                         \
-        mongo::unittest::TestAssertionFailureException,                                    \
-        stdx::bind(containsPattern,                                                        \
-                   PATTERN,                                                                \
-                   stdx::bind(&mongo::unittest::TestAssertionFailureException::getMessage, \
-                              stdx::placeholders::_1)))
+#define ASSERT_TEST_FAILS_MATCH(TEST_STMT, PATTERN)                                       \
+    ASSERT_THROWS_WITH_CHECK(                                                             \
+        TEST_STMT, mongo::unittest::TestAssertionFailureException, ([&](const auto& ex) { \
+            ASSERT_STRING_CONTAINS(ex.getMessage(), (PATTERN));                           \
+        }))
 
 TEST(UnitTestSelfTest, DoNothing) {}
 
