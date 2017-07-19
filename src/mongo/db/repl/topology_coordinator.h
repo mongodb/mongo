@@ -587,6 +587,11 @@ public:
      */
     virtual void setPrimaryIndex(long long primaryIndex) = 0;
 
+    /**
+     * Returns the current primary index.
+     */
+    virtual int getCurrentPrimaryIndex() const = 0;
+
     enum StartElectionReason {
         kElectionTimeout,
         kPriorityTakeover,

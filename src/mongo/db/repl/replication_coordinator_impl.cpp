@@ -2504,7 +2504,7 @@ void ReplicationCoordinatorImpl::_performPostMemberStateUpdateAction(
         case kActionStartSingleNodeElection:
             // In protocol version 1, single node replset will run an election instead of
             // kActionWinElection as in protocol version 0.
-            _startElectSelfV1();
+            _startElectSelfV1(TopologyCoordinator::StartElectionReason::kElectionTimeout);
             break;
         default:
             severe() << "Unknown post member state update action " << static_cast<int>(action);

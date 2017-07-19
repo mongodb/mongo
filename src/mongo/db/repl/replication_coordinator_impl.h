@@ -848,8 +848,8 @@ private:
      *      _onVoteRequestComplete()
      */
     void _startElectSelf_inlock();
-    void _startElectSelfV1_inlock();
-    void _startElectSelfV1();
+    void _startElectSelfV1_inlock(TopologyCoordinator::StartElectionReason reason);
+    void _startElectSelfV1(TopologyCoordinator::StartElectionReason reason);
 
     /**
      * Callback called when the FreshnessChecker has completed; checks the results and

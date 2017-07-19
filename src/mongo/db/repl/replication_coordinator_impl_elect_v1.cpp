@@ -85,12 +85,14 @@ public:
 };
 
 
-void ReplicationCoordinatorImpl::_startElectSelfV1() {
+void ReplicationCoordinatorImpl::_startElectSelfV1(
+    TopologyCoordinator::StartElectionReason reason) {
     stdx::lock_guard<stdx::mutex> lk(_mutex);
-    _startElectSelfV1_inlock();
+    _startElectSelfV1_inlock(reason);
 }
 
-void ReplicationCoordinatorImpl::_startElectSelfV1_inlock() {
+void ReplicationCoordinatorImpl::_startElectSelfV1_inlock(
+    TopologyCoordinator::StartElectionReason reason) {
     invariant(!_voteRequester);
     invariant(!_freshnessChecker);
 
@@ -138,13 +140,20 @@ void ReplicationCoordinatorImpl::_startElectSelfV1_inlock() {
     _voteRequester.reset(new VoteRequester);
 
     long long term = _topCoord->getTerm();
+    int primaryIndex = -1;
+
+    // Only set primaryIndex if the primary's vote is required during the dry run.
+    if (reason == TopologyCoordinator::StartElectionReason::kCatchupTakeover) {
+        primaryIndex = _topCoord->getCurrentPrimaryIndex();
+    }
     StatusWith<executor::TaskExecutor::EventHandle> nextPhaseEvh =
         _voteRequester->start(_replExecutor.get(),
                               _rsConfig,
                               _selfIndex,
                               _topCoord->getTerm(),
                               true,  // dry run
-                              lastOpTime);
+                              lastOpTime,
+                              primaryIndex);
     if (nextPhaseEvh.getStatus() == ErrorCodes::ShutdownInProgress) {
         return;
     }
@@ -174,6 +183,9 @@ void ReplicationCoordinatorImpl::_onDryRunComplete(long long originalTerm) {
         return;
     } else if (endResult == VoteRequester::Result::kStaleTerm) {
         log() << "not running for primary, we have been superceded already";
+        return;
+    } else if (endResult == VoteRequester::Result::kPrimaryRespondedNo) {
+        log() << "not running for primary, the current primary responded no in the dry run";
         return;
     } else if (endResult != VoteRequester::Result::kSuccessfullyElected) {
         log() << "not running for primary, we received an unexpected problem";
@@ -241,7 +253,7 @@ void ReplicationCoordinatorImpl::_startVoteRequester_inlock(long long newTerm) {
 
     _voteRequester.reset(new VoteRequester);
     StatusWith<executor::TaskExecutor::EventHandle> nextPhaseEvh = _voteRequester->start(
-        _replExecutor.get(), _rsConfig, _selfIndex, _topCoord->getTerm(), false, lastOpTime);
+        _replExecutor.get(), _rsConfig, _selfIndex, _topCoord->getTerm(), false, lastOpTime, -1);
     if (nextPhaseEvh.getStatus() == ErrorCodes::ShutdownInProgress) {
         return;
     }
@@ -264,6 +276,7 @@ void ReplicationCoordinatorImpl::_onVoteRequestComplete(long long originalTerm) 
     }
 
     const VoteRequester::Result endResult = _voteRequester->getResult();
+    invariant(endResult != VoteRequester::Result::kPrimaryRespondedNo);
 
     switch (endResult) {
         case VoteRequester::Result::kInsufficientVotes:
@@ -275,6 +288,10 @@ void ReplicationCoordinatorImpl::_onVoteRequestComplete(long long originalTerm) 
         case VoteRequester::Result::kSuccessfullyElected:
             log() << "election succeeded, assuming primary role in term " << _topCoord->getTerm();
             break;
+        case VoteRequester::Result::kPrimaryRespondedNo:
+            // This is impossible because we would only require the primary's
+            // vote during a dry run.
+            invariant(false);
     }
 
     // Mark all nodes that responded to our vote request as up to avoid immediately

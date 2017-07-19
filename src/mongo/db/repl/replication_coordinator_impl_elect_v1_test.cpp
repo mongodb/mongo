@@ -1372,6 +1372,116 @@ TEST_F(TakeoverTest, SuccessfulCatchupTakeover) {
                               lastVoteExpected);
 }
 
+TEST_F(TakeoverTest, CatchupTakeoverDryRunFailsPrimarySaysNo) {
+    startCapturingLogMessages();
+    BSONObj configObj = BSON("_id"
+                             << "mySet"
+                             << "version"
+                             << 1
+                             << "members"
+                             << BSON_ARRAY(BSON("_id" << 1 << "host"
+                                                      << "node1:12345")
+                                           << BSON("_id" << 2 << "host"
+                                                         << "node2:12345")
+                                           << BSON("_id" << 3 << "host"
+                                                         << "node3:12345")
+                                           << BSON("_id" << 4 << "host"
+                                                         << "node4:12345")
+                                           << BSON("_id" << 5 << "host"
+                                                         << "node5:12345"))
+                             << "protocolVersion"
+                             << 1);
+    assertStartSuccess(configObj, HostAndPort("node1", 12345));
+    ReplSetConfig config = assertMakeRSConfig(configObj);
+    HostAndPort primaryHostAndPort("node2", 12345);
+
+    auto replCoord = getReplCoord();
+    auto now = getNet()->now();
+
+    OperationContextNoop opCtx;
+    OpTime currentOptime(Timestamp(100, 5000), 0);
+    OpTime behindOptime(Timestamp(100, 4000), 0);
+
+    replCoord->setMyLastAppliedOpTime(currentOptime);
+    replCoord->setMyLastDurableOpTime(currentOptime);
+
+    // Update the term so that the current term is ahead of the term of
+    // the last applied op time. This means that the primary is still in
+    // catchup mode since it hasn't written anything this term.
+    ASSERT_EQUALS(ErrorCodes::StaleTerm, replCoord->updateTerm(&opCtx, replCoord->getTerm() + 1));
+
+    // Make sure we're secondary and that no takeover has been scheduled.
+    ASSERT_OK(replCoord->setFollowerMode(MemberState::RS_SECONDARY));
+    ASSERT_FALSE(replCoord->getCatchupTakeover_forTest());
+
+    // Mock a first round of heartbeat responses.
+    now = respondToHeartbeatsUntil(config, now, primaryHostAndPort, behindOptime);
+
+    // Make sure that the catchup takeover has actually been scheduled and at the
+    // correct time.
+    ASSERT(replCoord->getCatchupTakeover_forTest());
+    auto catchupTakeoverTime = replCoord->getCatchupTakeover_forTest().get();
+    Milliseconds catchupTakeoverDelay = catchupTakeoverTime - now;
+    ASSERT_EQUALS(config.getCatchUpTakeoverDelay(), catchupTakeoverDelay);
+
+    // The catchup takeover will be scheduled at a time later than one election
+    // timeout after our initial heartbeat responses, so mock a few rounds of
+    // heartbeat responses to prevent a normal election timeout.
+    now = respondToHeartbeatsUntil(
+        config, catchupTakeoverTime, HostAndPort("node2", 12345), behindOptime);
+
+    ASSERT_EQUALS(1, countLogLinesContaining("Starting an election for a catchup takeover"));
+
+    // Simulate a dry run where the primary has caught up and is now ahead of the
+    // node trying to do the catchup takeover. All the secondary nodes respond
+    // first so that it tests that we require the primary vote even when we've
+    // received a majority of the votes. Then the primary responds no to the vote
+    // request and as a result the dry run fails.
+    int voteRequests = 0;
+    int votesExpected = config.getNumMembers() - 1;
+    NetworkInterfaceMock* net = getNet();
+    net->enterNetwork();
+    NetworkInterfaceMock::NetworkOperationIterator noi_primary;
+    Date_t until = net->now() + Seconds(1);
+    while (voteRequests < votesExpected) {
+        unittest::log() << "request: " << voteRequests << " expected: " << votesExpected;
+        const NetworkInterfaceMock::NetworkOperationIterator noi = net->getNextReadyRequest();
+        const RemoteCommandRequest& request = noi->getRequest();
+        log() << request.target.toString() << " processing " << request.cmdObj;
+        if (request.cmdObj.firstElement().fieldNameStringData() != "replSetRequestVotes") {
+            net->blackHole(noi);
+        } else {
+            bool voteGranted = request.target != primaryHostAndPort;
+            net->scheduleResponse(
+                noi,
+                until,
+                makeResponseStatus(BSON("ok" << 1 << "term" << 1 << "voteGranted" << voteGranted
+                                             << "reason"
+                                             << "")));
+            voteRequests++;
+        }
+        net->runReadyNetworkOperations();
+    }
+
+    while (net->now() < until) {
+        net->runUntil(until);
+        if (net->hasReadyRequests()) {
+            const NetworkInterfaceMock::NetworkOperationIterator noi = net->getNextReadyRequest();
+            net->blackHole(noi);
+        }
+    }
+    net->exitNetwork();
+
+    getReplCoord()->waitForElectionDryRunFinish_forTest();
+    stopCapturingLogMessages();
+
+    // Make sure an election wasn't called for and that we are still secondary.
+    ASSERT_EQUALS(1,
+                  countLogLinesContaining(
+                      "not running for primary, the current primary responded no in the dry run"));
+    ASSERT(replCoord->getMemberState().secondary());
+}
+
 TEST_F(TakeoverTest, PrimaryCatchesUpBeforeCatchupTakeover) {
     BSONObj configObj = BSON("_id"
                              << "mySet"
