@@ -113,6 +113,9 @@ private:
      * metadata for a specific collection.
      */
     struct Task {
+        MONGO_DISALLOW_COPYING(Task);
+        Task(Task&&) = default;
+
         /**
          * Initializes a task for either dropping or updating the persisted metadata for the
          * associated collection. Which type of task is determined by the Status of
@@ -308,7 +311,7 @@ private:
      *
      * Only run on the shard primary.
      */
-    bool _updatePersistedMetadata(OperationContext* opCtx, const NamespaceString& nss);
+    void _updatePersistedMetadata(OperationContext* opCtx, const NamespaceString& nss);
 
     /**
      * Attempt to read the collection and chunk metadata since version 'sinceVersion' from the shard
