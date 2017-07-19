@@ -61,6 +61,7 @@ env.Library(
         'array_culling_node.cpp',
         'bit_node.cpp',
         'compare_node.cpp',
+        'current_date_node.cpp',
         'modifier_table.cpp',
         'path_creating_node.cpp',
         'pop_node.cpp',
@@ -90,6 +91,7 @@ env.CppUnitTest(
         'arithmetic_node_test.cpp',
         'bit_node_test.cpp',
         'compare_node_test.cpp',
+        'current_date_node_test.cpp',
         'pop_node_test.cpp',
         'pull_node_test.cpp',
         'pullall_node_test.cpp',
@@ -101,7 +103,9 @@ env.CppUnitTest(
     ],
     LIBDEPS=[
         '$BUILD_DIR/mongo/bson/mutable/mutable_bson_test_utils',
+        '$BUILD_DIR/mongo/db/logical_clock',
         '$BUILD_DIR/mongo/db/query/collation/collator_interface_mock',
+        '$BUILD_DIR/mongo/db/service_context_noop_init',
         'update',
     ],
 )

@@ -362,23 +362,19 @@
     assert.eq(coll.findOne({_id: 0}), {_id: 0, a: [{b: 0, c: 1}, {b: 0, c: 0}, {b: 1, c: 0}]});
 
     // $currentDate.
-    // TODO SERVER-28766: $currentDate should use the new update implementation.
     coll.drop();
+    assert.writeOK(coll.insert({_id: 0, a: [0, 1]}));
     if (db.getMongo().writeMode() === "commands") {
-        res = coll.update({_id: 0}, {$currentDate: {"a.$[i]": true}}, {arrayFilters: [{i: 0}]});
-        assert.writeErrorWithCode(res, ErrorCodes.InvalidOptions);
-        assert.neq(-1,
-                   res.getWriteError().errmsg.indexOf(
-                       "Cannot use array filters with modifier $currentDate"),
-                   "update failed for a reason other than using array filters with $currentDate");
+        assert.writeOK(
+            coll.update({_id: 0}, {$currentDate: {"a.$[i]": true}}, {arrayFilters: [{i: 0}]}));
+        let doc = coll.findOne({_id: 0});
+        assert(doc.a[0].constructor == Date, tojson(doc));
+        assert.eq(doc.a[1], 1, printjson(doc));
     }
-    assert.writeOK(coll.insert({_id: 0, a: [0]}));
-    res = coll.update({_id: 0}, {$currentDate: {"a.$[]": true}});
-    assert.writeErrorWithCode(res, 16837);
-    assert.neq(-1,
-               res.getWriteError().errmsg.indexOf(
-                   "cannot use the part (a of a.$[]) to traverse the element ({a: [ 0.0 ]})"),
-               "update failed for a reason other than using array updates with $currentDate");
+    assert.writeOK(coll.update({_id: 0}, {$currentDate: {"a.$[]": true}}));
+    let doc = coll.findOne({_id: 0});
+    assert(doc.a[0].constructor == Date, tojson(doc));
+    assert(doc.a[1].constructor == Date, tojson(doc));
 
     // $addToSet.
     coll.drop();
