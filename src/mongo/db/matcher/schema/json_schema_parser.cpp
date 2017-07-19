@@ -40,7 +40,10 @@ namespace mongo {
 
 namespace {
 // JSON Schema keyword constants.
+constexpr StringData kSchemaExclusiveMaximumKeyword = "exclusiveMaximum"_sd;
+constexpr StringData kSchemaExclusiveMinimumKeyword = "exclusiveMinimum"_sd;
 constexpr StringData kSchemaMaximumKeyword = "maximum"_sd;
+constexpr StringData kSchemaMinimumKeyword = "minimum"_sd;
 constexpr StringData kSchemaPropertiesKeyword = "properties"_sd;
 constexpr StringData kSchemaTypeKeyword = "type"_sd;
 
@@ -108,7 +111,8 @@ StatusWith<std::unique_ptr<TypeMatchExpression>> parseType(StringData path, BSON
 
 StatusWithMatchExpression parseMaximum(StringData path,
                                        BSONElement maximum,
-                                       TypeMatchExpression* typeExpr) {
+                                       TypeMatchExpression* typeExpr,
+                                       bool isExclusiveMaximum) {
     if (!maximum.isNumber()) {
         return {Status(ErrorCodes::TypeMismatch,
                        str::stream() << "$jsonSchema keyword '" << kSchemaMaximumKeyword
@@ -116,14 +120,19 @@ StatusWithMatchExpression parseMaximum(StringData path,
     }
 
     if (path.empty()) {
-        // This restriction has no affect in a top-level schema, since we only store objects.
+        // This restriction has no effect in a top-level schema, since we only store objects.
         //
         // TODO SERVER-30028: Make this use an explicit "always matches" expression.
         return {stdx::make_unique<AndMatchExpression>()};
     }
 
-    auto lteExpr = stdx::make_unique<LTEMatchExpression>();
-    auto status = lteExpr->init(path, maximum);
+    std::unique_ptr<ComparisonMatchExpression> expr;
+    if (isExclusiveMaximum) {
+        expr = stdx::make_unique<LTMatchExpression>();
+    } else {
+        expr = stdx::make_unique<LTEMatchExpression>();
+    }
+    auto status = expr->init(path, maximum);
     if (!status.isOK()) {
         return status;
     }
@@ -131,9 +140,42 @@ StatusWithMatchExpression parseMaximum(StringData path,
     // We use Number as a stand-in for all numeric restrictions.
     TypeMatchExpression::Type restrictionType;
     restrictionType.allNumbers = true;
-    return makeRestriction(restrictionType, std::move(lteExpr), typeExpr);
+    return makeRestriction(restrictionType, std::move(expr), typeExpr);
 }
 
+StatusWithMatchExpression parseMinimum(StringData path,
+                                       BSONElement minimum,
+                                       TypeMatchExpression* typeExpr,
+                                       bool isExclusiveMinimum) {
+    if (!minimum.isNumber()) {
+        return {Status(ErrorCodes::TypeMismatch,
+                       str::stream() << "$jsonSchema keyword '" << kSchemaMinimumKeyword
+                                     << "' must be a number")};
+    }
+
+    if (path.empty()) {
+        // This restriction has no effect in a top-level schema, since we only store objects.
+        //
+        // TODO SERVER-30028: Make this use an explicit "always matches" expression.
+        return {stdx::make_unique<AndMatchExpression>()};
+    }
+
+    std::unique_ptr<ComparisonMatchExpression> expr;
+    if (isExclusiveMinimum) {
+        expr = stdx::make_unique<GTMatchExpression>();
+    } else {
+        expr = stdx::make_unique<GTEMatchExpression>();
+    }
+    auto status = expr->init(path, minimum);
+    if (!status.isOK()) {
+        return status;
+    }
+
+    // We use Number as a stand-in for all numeric restrictions.
+    TypeMatchExpression::Type restrictionType;
+    restrictionType.allNumbers = true;
+    return makeRestriction(restrictionType, std::move(expr), typeExpr);
+}
 }  // namespace
 
 StatusWithMatchExpression JSONSchemaParser::_parseProperties(StringData path,
@@ -180,8 +222,12 @@ StatusWithMatchExpression JSONSchemaParser::_parseProperties(StringData path,
 StatusWithMatchExpression JSONSchemaParser::_parse(StringData path, BSONObj schema) {
     // Map from JSON Schema keyword to the corresponding element from 'schema', or to an empty
     // BSONElement if the JSON Schema keyword is not specified.
-    StringMap<BSONElement> keywordMap{
-        {kSchemaTypeKeyword, {}}, {kSchemaPropertiesKeyword, {}}, {kSchemaMaximumKeyword, {}}};
+    StringMap<BSONElement> keywordMap{{kSchemaTypeKeyword, {}},
+                                      {kSchemaPropertiesKeyword, {}},
+                                      {kSchemaMaximumKeyword, {}},
+                                      {kSchemaMinimumKeyword, {}},
+                                      {kSchemaExclusiveMaximumKeyword, {}},
+                                      {kSchemaExclusiveMinimumKeyword, {}}};
 
     for (auto&& elt : schema) {
         auto it = keywordMap.find(elt.fieldNameStringData());
@@ -216,11 +262,57 @@ StatusWithMatchExpression JSONSchemaParser::_parse(StringData path, BSONObj sche
     }
 
     if (auto maximumElt = keywordMap[kSchemaMaximumKeyword]) {
-        auto maxExpr = parseMaximum(path, maximumElt, typeExpr.getValue().get());
+        bool isExclusiveMaximum = false;
+        if (auto exclusiveMaximumElt = keywordMap[kSchemaExclusiveMaximumKeyword]) {
+            if (!exclusiveMaximumElt.isBoolean()) {
+                return {Status(ErrorCodes::TypeMismatch,
+                               str::stream() << "$jsonSchema keyword '"
+                                             << kSchemaExclusiveMaximumKeyword
+                                             << "' must be a boolean")};
+            } else {
+                isExclusiveMaximum = exclusiveMaximumElt.boolean();
+            }
+        }
+        auto maxExpr =
+            parseMaximum(path, maximumElt, typeExpr.getValue().get(), isExclusiveMaximum);
         if (!maxExpr.isOK()) {
             return maxExpr;
         }
         andExpr->add(maxExpr.getValue().release());
+    } else if (auto exclusiveMaximumElt = keywordMap[kSchemaExclusiveMaximumKeyword]) {
+        // If "exclusiveMaximum" is present, "maximum" must also be present.
+        return {Status(ErrorCodes::FailedToParse,
+                       str::stream() << "$jsonSchema keyword '" << kSchemaMaximumKeyword
+                                     << "' must be a present if "
+                                     << kSchemaExclusiveMaximumKeyword
+                                     << " is present")};
+    }
+
+    if (auto minimumElt = keywordMap[kSchemaMinimumKeyword]) {
+        bool isExclusiveMinimum = false;
+        if (auto exclusiveMinimumElt = keywordMap[kSchemaExclusiveMinimumKeyword]) {
+            if (!exclusiveMinimumElt.isBoolean()) {
+                return {Status(ErrorCodes::TypeMismatch,
+                               str::stream() << "$jsonSchema keyword '"
+                                             << kSchemaExclusiveMinimumKeyword
+                                             << "' must be a boolean")};
+            } else {
+                isExclusiveMinimum = exclusiveMinimumElt.boolean();
+            }
+        }
+        auto minExpr =
+            parseMinimum(path, minimumElt, typeExpr.getValue().get(), isExclusiveMinimum);
+        if (!minExpr.isOK()) {
+            return minExpr;
+        }
+        andExpr->add(minExpr.getValue().release());
+    } else if (auto exclusiveMinimumElt = keywordMap[kSchemaExclusiveMinimumKeyword]) {
+        // If "exclusiveMinimum" is present, "minimum" must also be present.
+        return {Status(ErrorCodes::FailedToParse,
+                       str::stream() << "$jsonSchema keyword '" << kSchemaMinimumKeyword
+                                     << "' must be a present if "
+                                     << kSchemaExclusiveMinimumKeyword
+                                     << " is present")};
     }
 
     if (path.empty() && typeExpr.getValue() &&

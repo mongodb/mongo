@@ -65,12 +65,6 @@ TEST(JSONSchemaParserTest, FailsToParseIfParticularPropertyIsNotAnObject) {
     ASSERT_EQ(result.getStatus(), ErrorCodes::TypeMismatch);
 }
 
-TEST(JSONSchemaParserTest, FailsToParseIfMaximumIsNotANumber) {
-    BSONObj schema = fromjson("{maximum: 'foo'}");
-    auto result = JSONSchemaParser::parse(schema);
-    ASSERT_EQ(result.getStatus(), ErrorCodes::TypeMismatch);
-}
-
 TEST(JSONSchemaParserTest, FailsToParseIfKeywordIsDuplicated) {
     BSONObj schema = BSON("type"
                           << "object"
@@ -174,6 +168,135 @@ TEST(JSONSchemaParserTest, MaximumTranslatesCorrectlyWithNoType) {
         builder.obj(),
         fromjson("{$and: [{$and: [{$and: ["
                  "{$or: [{$nor: [{num: {$type: 'number'}}]}, {num: {$lte: 0}}]}]}]}]}"));
+}
+
+TEST(JSONSchemaParserTest, MaximumTranslatesCorrectlyWithExclusiveMaximumTrue) {
+    BSONObj schema = fromjson(
+        "{properties: {num: {type: 'long', maximum: 0, exclusiveMaximum: true}}, type: 'object'}");
+    auto result = JSONSchemaParser::parse(schema);
+    ASSERT_OK(result.getStatus());
+    BSONObjBuilder builder;
+    result.getValue()->serialize(&builder);
+    ASSERT_BSONOBJ_EQ(
+        builder.obj(),
+        fromjson("{$and: [{$and: [{$and: [{num: {$lt: 0}}, {num: {$type: 18}}]}]}]}"));
+}
+
+TEST(JSONSchemaParserTest, MaximumTranslatesCorrectlyWithExclusiveMaximumFalse) {
+    BSONObj schema = fromjson(
+        "{properties: {num: {type: 'long', maximum: 0, exclusiveMaximum: false}}, type: 'object'}");
+    auto result = JSONSchemaParser::parse(schema);
+    ASSERT_OK(result.getStatus());
+    BSONObjBuilder builder;
+    result.getValue()->serialize(&builder);
+    ASSERT_BSONOBJ_EQ(
+        builder.obj(),
+        fromjson("{$and: [{$and: [{$and: [{num: {$lte: 0}}, {num: {$type: 18}}]}]}]}"));
+}
+
+TEST(JSONSchemaParserTest, FailsToParseIfMaximumIsNotANumber) {
+    BSONObj schema = fromjson("{maximum: 'foo'}");
+    auto result = JSONSchemaParser::parse(schema);
+    ASSERT_EQ(result.getStatus(), ErrorCodes::TypeMismatch);
+}
+
+TEST(JSONSchemaParserTest, FailsToParseIfExclusiveMaximumIsPresentButMaximumIsNot) {
+    BSONObj schema = fromjson("{exclusiveMaximum: true}");
+    auto result = JSONSchemaParser::parse(schema);
+    ASSERT_EQ(result.getStatus(), ErrorCodes::FailedToParse);
+}
+
+TEST(JSONSchemaParserTest, FailsToParseIfExclusiveMaximumIsNotABoolean) {
+    BSONObj schema = fromjson("{maximum: 5, exclusiveMaximum: 'foo'}");
+    auto result = JSONSchemaParser::parse(schema);
+    ASSERT_EQ(result.getStatus(), ErrorCodes::TypeMismatch);
+}
+
+TEST(JSONSchemaParserTest, MinimumTranslatesCorrectlyWithTypeNumber) {
+    BSONObj schema = fromjson("{properties: {num: {type: 'number', minimum: 0}}, type: 'object'}");
+    auto result = JSONSchemaParser::parse(schema);
+    ASSERT_OK(result.getStatus());
+    BSONObjBuilder builder;
+    result.getValue()->serialize(&builder);
+    ASSERT_BSONOBJ_EQ(
+        builder.obj(),
+        fromjson("{$and: [{$and: [{$and: [{num: {$gte: 0}}, {num: {$type: 'number'}}]}]}]}"));
+}
+
+TEST(JSONSchemaParserTest, MinimumTranslatesCorrectlyWithTypeLong) {
+    BSONObj schema = fromjson("{properties: {num: {type: 'long', minimum: 0}}, type: 'object'}");
+    auto result = JSONSchemaParser::parse(schema);
+    ASSERT_OK(result.getStatus());
+    BSONObjBuilder builder;
+    result.getValue()->serialize(&builder);
+    ASSERT_BSONOBJ_EQ(
+        builder.obj(),
+        fromjson("{$and: [{$and: [{$and: [{num: {$gte: 0}}, {num: {$type: 18}}]}]}]}"));
+}
+
+TEST(JSONSchemaParserTest, MinimumTranslatesCorrectlyWithTypeString) {
+    BSONObj schema = fromjson("{properties: {num: {type: 'string', minimum: 0}}, type: 'object'}");
+    auto result = JSONSchemaParser::parse(schema);
+    ASSERT_OK(result.getStatus());
+    BSONObjBuilder builder;
+    result.getValue()->serialize(&builder);
+    ASSERT_BSONOBJ_EQ(builder.obj(),
+                      fromjson("{$and: [{$and: [{$and: [{}, {num: {$type: 2}}]}]}]}"));
+}
+
+TEST(JSONSchemaParserTest, MinimumTranslatesCorrectlyWithNoType) {
+    BSONObj schema = fromjson("{properties: {num: {minimum: 0}}}");
+    auto result = JSONSchemaParser::parse(schema);
+    ASSERT_OK(result.getStatus());
+    BSONObjBuilder builder;
+    result.getValue()->serialize(&builder);
+    ASSERT_BSONOBJ_EQ(
+        builder.obj(),
+        fromjson("{$and: [{$and: [{$and: ["
+                 "{$or: [{$nor: [{num: {$type: 'number'}}]}, {num: {$gte: 0}}]}]}]}]}"));
+}
+
+TEST(JSONSchemaParserTest, MinimumTranslatesCorrectlyWithExclusiveMinimumTrue) {
+    BSONObj schema = fromjson(
+        "{properties: {num: {type: 'long', minimum: 0, exclusiveMinimum: true}}, type: 'object'}");
+    auto result = JSONSchemaParser::parse(schema);
+    ASSERT_OK(result.getStatus());
+    BSONObjBuilder builder;
+    result.getValue()->serialize(&builder);
+    ASSERT_BSONOBJ_EQ(
+        builder.obj(),
+        fromjson("{$and: [{$and: [{$and: [{num: {$gt: 0}}, {num: {$type: 18}}]}]}]}"));
+}
+
+TEST(JSONSchemaParserTest, MinimumTranslatesCorrectlyWithExclusiveMinimumFalse) {
+    BSONObj schema = fromjson(
+        "{properties: {num: {type: 'long', minimum: 0, exclusiveMinimum: false}}, type: 'object'}");
+    auto result = JSONSchemaParser::parse(schema);
+    ASSERT_OK(result.getStatus());
+    BSONObjBuilder builder;
+    result.getValue()->serialize(&builder);
+    ASSERT_BSONOBJ_EQ(
+        builder.obj(),
+        fromjson("{$and: [{$and: [{$and: [{num: {$gte: 0}}, {num: {$type: 18}}]}]}]}"));
+}
+
+TEST(JSONSchemaParserTest, FailsToParseIfMinimumIsNotANumber) {
+    BSONObj schema = fromjson("{minimum: 'foo'}");
+    auto result = JSONSchemaParser::parse(schema);
+    ASSERT_EQ(result.getStatus(), ErrorCodes::TypeMismatch);
+}
+
+
+TEST(JSONSchemaParserTest, FailsToParseIfExclusiveMinimumIsPresentButMinimumIsNot) {
+    BSONObj schema = fromjson("{exclusiveMinimum: true}");
+    auto result = JSONSchemaParser::parse(schema);
+    ASSERT_EQ(result.getStatus(), ErrorCodes::FailedToParse);
+}
+
+TEST(JSONSchemaParserTest, FailsToParseIfExclusiveMinimumIsNotABoolean) {
+    BSONObj schema = fromjson("{minimum: 5, exclusiveMinimum: 'foo'}");
+    auto result = JSONSchemaParser::parse(schema);
+    ASSERT_EQ(result.getStatus(), ErrorCodes::TypeMismatch);
 }
 
 }  // namespace
