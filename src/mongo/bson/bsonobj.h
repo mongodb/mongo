@@ -542,6 +542,8 @@ public:
         opINTERNAL_SCHEMA_OBJECT_MATCH = 0x1E,
         opINTERNAL_SCHEMA_MIN_LENGTH = 0x1F,
         opINTERNAL_SCHEMA_MAX_LENGTH = 0x20,
+        opINTERNAL_SCHEMA_MIN_PROPERTIES = 0x21,
+        opINTERNAL_SCHEMA_MAX_PROPERTIES = 0x22,
     };
 
     /** add all elements of the object to the specified vector */

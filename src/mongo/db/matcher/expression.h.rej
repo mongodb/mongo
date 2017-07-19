@@ -1,0 +1,17 @@
+***************
+*** 100,105 ****
+          // JSON Schema expressions.
+          INTERNAL_SCHEMA_MIN_ITEMS,
+          INTERNAL_SCHEMA_MAX_ITEMS,
+          INTERNAL_SCHEMA_XOR,
+      };
+  
+--- 100,107 ----
+          // JSON Schema expressions.
+          INTERNAL_SCHEMA_MIN_ITEMS,
+          INTERNAL_SCHEMA_MAX_ITEMS,
++         INTERNAL_SCHEMA_MIN_PROPERTIES,
++         INTERNAL_SCHEMA_MAX_PROPERTIES,
+          INTERNAL_SCHEMA_XOR,
+      };
+  

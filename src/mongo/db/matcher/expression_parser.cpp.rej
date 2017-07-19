@@ -1,0 +1,51 @@
+***************
+*** 37,43 ****
+  #include "mongo/db/matcher/expression_leaf.h"
+  #include "mongo/db/matcher/expression_tree.h"
+  #include "mongo/db/matcher/schema/expression_internal_schema_max_items.h"
+  #include "mongo/db/matcher/schema/expression_internal_schema_min_items.h"
+  #include "mongo/db/matcher/schema/expression_internal_schema_xor.h"
+  #include "mongo/db/namespace_string.h"
+  #include "mongo/stdx/memory.h"
+--- 37,45 ----
+  #include "mongo/db/matcher/expression_leaf.h"
+  #include "mongo/db/matcher/expression_tree.h"
+  #include "mongo/db/matcher/schema/expression_internal_schema_max_items.h"
++ #include "mongo/db/matcher/schema/expression_internal_schema_max_properties.h"
+  #include "mongo/db/matcher/schema/expression_internal_schema_min_items.h"
++ #include "mongo/db/matcher/schema/expression_internal_schema_min_properties.h"
+  #include "mongo/db/matcher/schema/expression_internal_schema_xor.h"
+  #include "mongo/db/namespace_string.h"
+  #include "mongo/stdx/memory.h"
+***************
+*** 423,434 ****
+                  if (!s.isOK())
+                      return s;
+                  root->add(xorExpr.release());
+              } else {
+                  return {Status(ErrorCodes::BadValue,
+                                 mongoutils::str::stream() << "unknown top level operator: "
+                                                           << e.fieldName())};
+              }
+- 
+              continue;
+          }
+  
+--- 424,440 ----
+                  if (!s.isOK())
+                      return s;
+                  root->add(xorExpr.release());
++             } else if (mongoutils::str::equals("_internalSchemaMinProperties", rest)) {
++                 return _parseTopLevelInternalSchemaSingleIntegerArgument<
++                     InternalSchemaMinPropertiesMatchExpression>(e);
++             } else if (mongoutils::str::equals("_internalSchemaMaxProperties", rest)) {
++                 return _parseTopLevelInternalSchemaSingleIntegerArgument<
++                     InternalSchemaMaxPropertiesMatchExpression>(e);
+              } else {
+                  return {Status(ErrorCodes::BadValue,
+                                 mongoutils::str::stream() << "unknown top level operator: "
+                                                           << e.fieldName())};
+              }
+              continue;
+          }
+  

@@ -1,0 +1,33 @@
+***************
+*** 47,52 ****
+          'matcher.cpp',
+          'schema/expression_internal_schema_num_array_items.cpp',
+          'schema/expression_internal_schema_xor.cpp',
+      ],
+      LIBDEPS=[
+          '$BUILD_DIR/mongo/base',
+--- 47,53 ----
+          'matcher.cpp',
+          'schema/expression_internal_schema_num_array_items.cpp',
+          'schema/expression_internal_schema_xor.cpp',
++         'schema/expression_internal_schema_num_properties.cpp',
+      ],
+      LIBDEPS=[
+          '$BUILD_DIR/mongo/base',
+***************
+*** 68,73 ****
+          'expression_tree_test.cpp',
+          'schema/expression_internal_schema_max_items_test.cpp',
+          'schema/expression_internal_schema_min_items_test.cpp',
+          'schema/expression_internal_schema_xor_test.cpp',
+      ],
+      LIBDEPS=[
+--- 69,76 ----
+          'expression_tree_test.cpp',
+          'schema/expression_internal_schema_max_items_test.cpp',
+          'schema/expression_internal_schema_min_items_test.cpp',
++         'schema/expression_internal_schema_min_properties_test.cpp',
++         'schema/expression_internal_schema_max_properties_test.cpp',
+          'schema/expression_internal_schema_xor_test.cpp',
+      ],
+      LIBDEPS=[
