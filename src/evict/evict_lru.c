@@ -941,6 +941,13 @@ __evict_tune_workers(WT_SESSION_IMPL *session)
 	conn = S2C(session);
 	cache = conn->cache;
 
+	/*
+	 * If we have a fixed number of eviction threads, there is no value in
+	 * calculating if we should do any tuning.
+	 */
+       if (conn->evict_threads_max == conn->evict_threads_min)
+		return (0);
+
 	WT_ASSERT(session, conn->evict_threads.threads[0]->session == session);
 	pgs_evicted_cur = pgs_evicted_persec_cur = 0;
 
