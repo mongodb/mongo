@@ -866,6 +866,16 @@ functions:
         mkdir -p snmpconf
         cp -f src/mongo/db/modules/enterprise/docs/mongod.conf.master snmpconf/mongod.conf
 
+  "do watchdog setup" :
+    command: shell.exec
+    params:
+      working_dir: src
+      script: |
+        set -o errexit
+        set -o verbose
+
+        bash src/mongo/db/modules/enterprise/jstests/watchdog/charybdefs_setup.sh
+
   "cleanup environment" :
     command: shell.exec
     params:
@@ -1065,6 +1075,19 @@ post:
           cat oom.txt
         else
           echo "No OOM (Out of memory) killed processes detected"
+        fi
+
+  # Cleanup after the watchdog FUSE testing
+  - command: shell.exec
+    params:
+      working_dir: src
+      script: |
+        if [ -d /data/thrift ]; then
+          rm -rf /data/thrift
+        fi
+
+        if [ -d /data/charybdefs ]; then
+          rm -rf /data/charybdefs
         fi
 
   # Gather and archive FTDC data.
@@ -3275,6 +3298,26 @@ tasks:
     vars:
       resmoke_args: --suites=causally_consistent_jscore_passthrough_auth --storageEngine=wiredTiger
       run_multiple_jobs: true
+
+- <<: *task_template
+  name: watchdog
+  commands:
+  - func: "do setup"
+  - func: "do watchdog setup"
+  - func: "run tests"
+    vars:
+      resmoke_args: --suites=watchdog --storageEngine=mmapv1
+      run_multiple_jobs: false
+
+- <<: *task_template
+  name: watchdog_WT
+  commands:
+  - func: "do setup"
+  - func: "do watchdog setup"
+  - func: "run tests"
+    vars:
+      resmoke_args: --suites=watchdog --storageEngine=wiredTiger
+      run_multiple_jobs: false
 
 - name: idl_tests
   depends_on:
@@ -7134,6 +7177,8 @@ buildvariants:
   - name: snmp_WT
   - name: ssl
   - name: sslSpecial
+  - name: watchdog
+  - name: watchdog_WT
   - name: package
     distros:
     - ubuntu1604-packer
@@ -8990,6 +9035,8 @@ buildvariants:
   - name: dbtest_WT
   - name: jsCore
   - name: jsCore_WT
+  - name: watchdog
+  - name: watchdog_WT
 
 - name: ubuntu1604-debug-aubsan-async
   display_name: "~ {A,UB}SAN Enterprise SSL Ubuntu 16.04 async"
