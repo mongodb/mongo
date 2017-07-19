@@ -1,0 +1,10 @@
+# wtperf options file: btree with updates, in memory. The goal here is to
+# have a workload that uses a lot of transaction IDs, so stresses the ID
+# allocation/release code performance.
+conn_config="cache_size=5G"
+table_config="type=file"
+icount=5000000
+report_interval=5
+run_time=120
+populate_threads=1
+threads=((count=16,updates=1))
