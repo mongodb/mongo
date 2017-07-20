@@ -45,7 +45,9 @@ typedef struct {
 	uint64_t orig_btree_checkpoint_gen;
 	uint64_t orig_txn_checkpoint_gen;
 
-	/* Track the page's maximum transaction ID. */
+	/* Track the oldest transaction running when reconciliation starts. */
+	uint64_t last_running;
+
 	uint64_t max_txn;
 
 	/* Track if all updates were skipped. */
@@ -849,6 +851,16 @@ __rec_write_init(WT_SESSION_IMPL *session,
 	WT_ORDERED_READ(r->orig_write_gen, page->modify->write_gen);
 
 	/*
+	 * Cache the oldest running transaction ID.  This is used to check
+	 * whether updates seen by reconciliation have committed.  We keep a
+	 * cached copy to avoid races where a concurrent transaction could
+	 * abort while reconciliation is examining its updates.  This way, any
+	 * transaction running when reconciliation starts is considered
+	 * uncommitted.
+	 */
+	WT_ORDERED_READ(r->last_running, S2C(session)->txn_global.last_running);
+
+	/*
 	 * Lookaside table eviction is configured when eviction gets aggressive,
 	 * adjust the flags for cases we don't support.
 	 */
@@ -1159,11 +1171,13 @@ __rec_txn_read(WT_SESSION_IMPL *session, WT_RECONCILE *r,
 			 * When reconciling for eviction, track whether any
 			 * uncommitted updates are found.
 			 */
-			if (__wt_txn_committed(session, txnid)) {
-				if (*updp == NULL)
-					*updp = upd;
-			} else
+			if (WT_TXNID_LE(r->last_running, txnid)) {
 				skipped = true;
+				continue;
+			}
+
+			if (*updp == NULL)
+				*updp = upd;
 		} else {
 			/*
 			 * Checkpoint can only write updates visible as of its
