@@ -244,10 +244,17 @@ public:
         return 0;
     }
 
+    void setStableTimestamp(OperationContext* opCtx, SnapshotName snapshotName) override {
+        return;
+    }
+
+    void setInitialDataTimestamp(OperationContext* opCtx, SnapshotName snapshotName) override {
+        return;
+    }
+
     Status isAdminDbValid(OperationContext* opCtx) override {
         return isAdminDbValidFn(opCtx);
     };
-
 
     // Testing functions.
     CreateCollectionForBulkFn createCollectionForBulkFn =

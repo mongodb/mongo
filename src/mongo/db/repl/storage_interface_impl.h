@@ -134,6 +134,10 @@ public:
     StatusWith<StorageInterface::CollectionCount> getCollectionCount(
         OperationContext* opCtx, const NamespaceString& nss) override;
 
+    void setStableTimestamp(OperationContext* opCtx, SnapshotName snapshotName) override;
+
+    void setInitialDataTimestamp(OperationContext* opCtx, SnapshotName snapshotName) override;
+
     /**
      * Checks that the "admin" database contains a supported version of the auth data schema.
      */

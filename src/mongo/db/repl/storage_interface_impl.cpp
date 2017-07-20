@@ -894,6 +894,15 @@ StatusWith<StorageInterface::CollectionCount> StorageInterfaceImpl::getCollectio
     return collection->numRecords(opCtx);
 }
 
+void StorageInterfaceImpl::setStableTimestamp(OperationContext* opCtx, SnapshotName snapshotName) {
+    opCtx->getServiceContext()->getGlobalStorageEngine()->setStableTimestamp(snapshotName);
+}
+
+void StorageInterfaceImpl::setInitialDataTimestamp(OperationContext* opCtx,
+                                                   SnapshotName snapshotName) {
+    opCtx->getServiceContext()->getGlobalStorageEngine()->setInitialDataTimestamp(snapshotName);
+}
+
 Status StorageInterfaceImpl::isAdminDbValid(OperationContext* opCtx) {
     AutoGetDb autoDB(opCtx, "admin", MODE_X);
     auto adminDb = autoDB.getDb();
