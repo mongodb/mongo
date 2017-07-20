@@ -40,6 +40,20 @@ env.Library(
 )
 
 env.Library(
+    target='health_log',
+    source=[
+        "health_log.cpp",
+        env.Idlc("health_log.idl")[0],
+    ],
+    LIBDEPS=[
+        "$BUILD_DIR/mongo/base",
+        "$BUILD_DIR/mongo/db/concurrency/deferred_writer",
+        "$BUILD_DIR/mongo/db/service_context",
+        "$BUILD_DIR/mongo/idl/idl_parser",
+    ],
+);
+
+env.Library(
     target='index_key_validate',
     source=[
         "index_key_validate.cpp",
@@ -205,6 +219,7 @@ env.Library(
         'collection_options',
         'database',
         'database_holder',
+        'health_log',
         'index_catalog',
         'index_catalog_entry',
         'index_create',

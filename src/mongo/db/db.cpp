@@ -53,6 +53,7 @@
 #include "mongo/db/catalog/database.h"
 #include "mongo/db/catalog/database_catalog_entry.h"
 #include "mongo/db/catalog/database_holder.h"
+#include "mongo/db/catalog/health_log.h"
 #include "mongo/db/catalog/index_catalog.h"
 #include "mongo/db/catalog/index_key_validate.h"
 #include "mongo/db/client.h"
@@ -600,6 +601,9 @@ ExitCode _initAndListen(int listenPort) {
         exitCleanly(EXIT_CLEAN);
     }
 
+    // Start up health log writer thread.
+    HealthLog::get(startupOpCtx.get()).startup();
+
     uassertStatusOK(getGlobalAuthorizationManager()->initialize(startupOpCtx.get()));
 
     /* this is for security on certain platforms (nonce generation) */
@@ -1076,6 +1080,8 @@ static void shutdownTask() {
     if (opCtx) {
         ShardingState::get(opCtx)->shutDown(opCtx);
     }
+
+    HealthLog::get(serviceContext).shutdown();
 
     // We should always be able to acquire the global lock at shutdown.
     //
