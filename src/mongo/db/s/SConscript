@@ -116,7 +116,7 @@ env.Library(
         #'$BUILD_DIR/mongo/db/catalog/catalog', # CYCLE
         #'$BUILD_DIR/mongo/db/db_raii', # CYCLE
         #'$BUILD_DIR/mongo/db/dbhelpers', # CYCLE
-        #'$BUILD_DIR/mongo/db/ops/write_ops', # CYCLE
+        #'$BUILD_DIR/mongo/db/write_ops', # CYCLE
         #'$BUILD_DIR/mongo/db/query/query', # CYCLE
         #'$BUILD_DIR/mongo/s/catalog/sharding_catalog_manager', # CYCLE
     ],

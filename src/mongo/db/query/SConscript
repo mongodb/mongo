@@ -87,7 +87,7 @@ env.Library(
         "$BUILD_DIR/mongo/util/elapsed_tracker",
         "$BUILD_DIR/mongo/db/matcher/expressions_mongod_only",
         #'$BUILD_DIR/mongo/db/clientcursor', # CYCLE
-        #'$BUILD_DIR/mongo/db/ops/write_ops', # CYCLE
+        #'$BUILD_DIR/mongo/db/write_ops', # CYCLE
         #'$BUILD_DIR/mongo/db/catalog/catalog', # CYCLE
     ],
     LIBDEPS_TAGS=[

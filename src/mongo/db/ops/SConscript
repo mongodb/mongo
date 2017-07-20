@@ -205,31 +205,3 @@ env.CppIntegrationTest(
         '$BUILD_DIR/mongo/util/version_impl',
     ],
 )
-
-env.Library(
-    target="write_ops",
-    source=[
-        "delete.cpp",
-        "insert.cpp",
-        "parsed_delete.cpp",
-        "parsed_update.cpp",
-        "update.cpp",
-        "update_lifecycle_impl.cpp",
-        "update_result.cpp",
-        "write_ops_exec.cpp",
-        env.Idlc('single_write_result.idl')[0],
-    ],
-    LIBDEPS=[
-        '$BUILD_DIR/mongo/base',
-        '$BUILD_DIR/mongo/db/catalog/collection_info_cache',
-        '$BUILD_DIR/mongo/db/concurrency/lock_manager',
-        '$BUILD_DIR/mongo/db/matcher/expressions_mongod_only',
-        '$BUILD_DIR/mongo/db/query/query',
-        '$BUILD_DIR/mongo/db/repl/repl_coordinator_impl',
-        '$BUILD_DIR/mongo/db/service_context',
-        '$BUILD_DIR/mongo/db/update/array_filter',
-        '$BUILD_DIR/mongo/db/update/update_driver',
-        '$BUILD_DIR/mongo/db/introspect',
-        '$BUILD_DIR/mongo/db/curop_metrics',
-    ],
-)

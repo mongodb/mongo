@@ -104,7 +104,7 @@ env.Library(
         "$BUILD_DIR/mongo/s/common",
         '$BUILD_DIR/third_party/s2/s2',
         '$BUILD_DIR/mongo/db/query/query_common',
-        #'$BUILD_DIR/mongo/db/ops/write_ops', # CYCLE
+        #'$BUILD_DIR/mongo/db/write_ops', # CYCLE
         #'$BUILD_DIR/mongo/db/index/index_access_methods', # CYCLE
         #'$BUILD_DIR/mongo/db/matcher/expressions_mongod_only', # CYCLE
         #'$BUILD_DIR/mongo/db/s/sharding', # CYCLE

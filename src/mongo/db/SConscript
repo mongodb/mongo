@@ -562,7 +562,7 @@ env.Library(
     LIBDEPS=[
         'db_raii',
         'index/index_access_methods',
-        'ops/write_ops',
+        'write_ops',
     ],
 )
 
@@ -594,11 +594,10 @@ env.Library(
         'curop_metrics',
         'diag_log',
         'lasterror',
-        'ops/write_ops',
+        'write_ops',
         'ops/write_ops_parsers',
         'rw_concern_d',
         's/sharding',
-        'sessions',
         'storage/storage_options',
     ],
 )
@@ -648,7 +647,7 @@ env.Library(
     ],
     LIBDEPS=[
         'dbdirectclient',
-        'ops/write_ops',
+        'write_ops',
         'repl/isself',
         '$BUILD_DIR/mongo/base',
         '$BUILD_DIR/mongo/db/catalog/index_create',
@@ -744,7 +743,7 @@ env.Library(
     LIBDEPS=[
         "commands/dcommands_fsync",
         "db_raii",
-        "ops/write_ops",
+        "write_ops",
         "query/query",
         "ttl_collection_cache",
     ],
@@ -823,7 +822,7 @@ env.Library(
         "introspect",
         "matcher/expressions_mongod_only",
         "op_observer_d",
-        "ops/write_ops",
+        "write_ops",
         "ops/write_ops_parsers",
         "pipeline/aggregation",
         "pipeline/serveronly",
@@ -1416,19 +1415,38 @@ asioEnv.CppIntegrationTest(
 )
 
 env.Library(
-    target='sessions',
+    target='write_ops',
     source=[
+        'ops/delete.cpp',
+        'ops/insert.cpp',
+        'ops/parsed_delete.cpp',
+        'ops/parsed_update.cpp',
+        'ops/update.cpp',
+        'ops/update_lifecycle_impl.cpp',
+        'ops/update_result.cpp',
+        'ops/write_ops_exec.cpp',
         'session.cpp',
         'session_catalog.cpp',
         'transaction_history_iterator.cpp',
+        env.Idlc('ops/single_write_result.idl')[0],
         env.Idlc('session_txn_record.idl')[0],
     ],
     LIBDEPS=[
+        '$BUILD_DIR/mongo/base',
+        '$BUILD_DIR/mongo/db/catalog/collection_info_cache',
+        '$BUILD_DIR/mongo/db/concurrency/lock_manager',
+        '$BUILD_DIR/mongo/db/curop_metrics',
         '$BUILD_DIR/mongo/db/dbdirectclient',
+        '$BUILD_DIR/mongo/db/introspect',
         '$BUILD_DIR/mongo/db/logical_session_id',
+        '$BUILD_DIR/mongo/db/matcher/expressions_mongod_only',
         '$BUILD_DIR/mongo/db/namespace_string',
-        '$BUILD_DIR/mongo/db/ops/write_ops',
+        '$BUILD_DIR/mongo/db/query/query',
         '$BUILD_DIR/mongo/db/repl/oplog_entry',
+        '$BUILD_DIR/mongo/db/repl/repl_coordinator_impl',
+        '$BUILD_DIR/mongo/db/service_context',
+        '$BUILD_DIR/mongo/db/update/array_filter',
+        '$BUILD_DIR/mongo/db/update/update_driver',
         '$BUILD_DIR/mongo/idl/idl_parser',
     ],
 )
@@ -1442,7 +1460,7 @@ env.CppUnitTest(
     LIBDEPS=[
         '$BUILD_DIR/mongo/db/repl/replmocks',
         'service_context_d_test_fixture',
-        'sessions',
+        'write_ops',
     ],
 )
 
@@ -1454,7 +1472,7 @@ env.CppUnitTest(
     LIBDEPS=[
         '$BUILD_DIR/mongo/db/repl/replmocks',
         'service_context_d_test_fixture',
-        'sessions',
+        'write_ops',
     ],
 )
 
