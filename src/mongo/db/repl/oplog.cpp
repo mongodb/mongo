@@ -144,11 +144,6 @@ struct OplogSlot {
  * Allocates an optime for a new entry in the oplog, and updates the replication coordinator to
  * reflect that new optime.  Returns the new optime and the correct value of the "h" field for
  * the new oplog entry.
- *
- * NOTE: From the time this function returns to the time that the new oplog entry is written
- * to the storage system, all errors must be considered fatal.  This is because the this
- * function registers the new optime with the storage system and the replication coordinator,
- * and provides no facility to revert those registrations on rollback.
  */
 void getNextOpTime(OperationContext* opCtx,
                    Collection* oplog,
