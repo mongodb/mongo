@@ -43,6 +43,7 @@ const char kMaxChunkSizeBytes[] = "maxChunkSizeBytes";
 const char kToShardId[] = "toShard";
 const char kSecondaryThrottle[] = "secondaryThrottle";
 const char kWaitForDelete[] = "waitForDelete";
+const char kWaitForDeleteDeprecated[] = "_waitForDelete";
 
 const WriteConcernOptions kMajorityWriteConcernNoTimeout(WriteConcernOptions::kMajority,
                                                          WriteConcernOptions::SyncMode::UNSET,
@@ -89,6 +90,15 @@ StatusWith<BalanceChunkRequest> BalanceChunkRequest::parseFromConfigCommand(cons
     {
         Status status =
             bsonExtractBooleanFieldWithDefault(obj, kWaitForDelete, false, &request._waitForDelete);
+        if (!status.isOK()) {
+            return status;
+        }
+    }
+
+    // Check for the deprecated name '_waitForDelete' 'waitForDelete' was false.
+    if (!request._waitForDelete) {
+        Status status = bsonExtractBooleanFieldWithDefault(
+            obj, kWaitForDeleteDeprecated, false, &request._waitForDelete);
         if (!status.isOK()) {
             return status;
         }

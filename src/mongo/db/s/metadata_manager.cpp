@@ -42,6 +42,7 @@
 #include "mongo/db/s/sharding_state.h"
 #include "mongo/stdx/memory.h"
 #include "mongo/util/assert_util.h"
+#include "mongo/util/fail_point_service.h"
 #include "mongo/util/log.h"
 #include "mongo/util/time_support.h"
 
@@ -108,6 +109,8 @@
 //  new entries are pushed onto the back, popped off the front.
 
 namespace mongo {
+
+MONGO_FP_DECLARE(suspendRangeDeletion);
 
 using TaskExecutor = executor::TaskExecutor;
 using CallbackArgs = TaskExecutor::CallbackArgs;
@@ -374,6 +377,9 @@ void scheduleCleanup(executor::TaskExecutor* executor,
     LOG(1) << "Scheduling cleanup on " << nss.ns() << " at " << when;
     std::ignore = executor->scheduleWorkAt(
         when, [ executor, nss = std::move(nss), epoch = std::move(epoch) ](auto&) {
+            while (MONGO_FAIL_POINT(suspendRangeDeletion)) {
+                sleep(1);
+            }
             const int maxToDelete = std::max(int(internalQueryExecYieldIterations.load()), 1);
             Client::initThreadIfNotAlready("Collection Range Deleter");
             auto UniqueOpCtx = Client::getCurrent()->makeOperationContext();

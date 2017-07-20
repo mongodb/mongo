@@ -15,6 +15,7 @@
  *            identify the operation in the system profiler.
  * - checkResults: A function that asserts whether the command should succeed or fail. If the
  *                 command is expected to succeed, the function should assert the expected results.
+ *                 *when the range has not been deleted from the donor.*
  * - behavior: Must be one of "unshardedOnly", "unversioned", or "versioned". Determines what
  *             checks the test performs against the system profilers of the secondaries.
  */
@@ -28,22 +29,24 @@
     let nss = db + "." + coll;
 
     // Given a command, build its expected shape in the system profiler.
-    let buildCommandProfile = function(command) {
+    let buildCommandProfile =
+        function(command) {
         let commandProfile = {ns: nss};
         for (let key in command) {
             commandProfile["command." + key] = command[key];
         }
         return commandProfile;
-    };
+    }
 
     // Check that a test case is well-formed.
-    let validateTestCase = function(test) {
+    let validateTestCase =
+        function(test) {
         assert(test.setUp && typeof(test.setUp) === "function");
         assert(test.command && typeof(test.command) === "object");
         assert(test.checkResults && typeof(test.checkResults) === "function");
         assert(test.behavior === "unshardedOnly" || test.behavior === "unversioned" ||
                test.behavior === "versioned");
-    };
+    }
 
     let testCases = {
         _configsvrAddShard: {skip: "primary only"},
@@ -60,9 +63,9 @@
         _configsvrShardCollection: {skip: "primary only"},
         _configsvrSetFeatureCompatibilityVersion: {skip: "primary only"},
         _configsvrUpdateZoneKeyRange: {skip: "primary only"},
-        _getUserCacheGeneration: {skip: "no user data returned"},
-        _hashBSONElement: {skip: "no user data returned"},
-        _isSelf: {skip: "no user data returned"},
+        _getUserCacheGeneration: {skip: "does not return user data"},
+        _hashBSONElement: {skip: "does not return user data"},
+        _isSelf: {skip: "does not return user data"},
         _mergeAuthzCollections: {skip: "primary only"},
         _migrateClone: {skip: "primary only"},
         _recvChunkAbort: {skip: "primary only"},
@@ -87,26 +90,26 @@
         appendOplogNote: {skip: "primary only"},
         applyOps: {skip: "primary only"},
         authSchemaUpgrade: {skip: "primary only"},
-        authenticate: {skip: "no user data returned"},
-        availableQueryOptions: {skip: "no user data returned"},
+        authenticate: {skip: "does not return user data"},
+        availableQueryOptions: {skip: "does not return user data"},
         balancerStart: {skip: "primary only"},
         balancerStatus: {skip: "primary only"},
         balancerStop: {skip: "primary only"},
-        buildInfo: {skip: "no user data returned"},
+        buildInfo: {skip: "does not return user data"},
         captrunc: {skip: "primary only"},
         checkShardingIndex: {skip: "primary only"},
         cleanupOrphaned: {skip: "primary only"},
-        clearLog: {skip: "no user data returned"},
+        clearLog: {skip: "does not return user data"},
         clone: {skip: "primary only"},
         cloneCollection: {skip: "primary only"},
         cloneCollectionAsCapped: {skip: "primary only"},
         collMod: {skip: "primary only"},
-        collStats: {skip: "no user data returned"},
-        compact: {skip: "no user data returned"},
-        configureFailPoint: {skip: "no user data returned"},
-        connPoolStats: {skip: "no user data returned"},
-        connPoolSync: {skip: "no user data returned"},
-        connectionStatus: {skip: "no user data returned"},
+        collStats: {skip: "does not return user data"},
+        compact: {skip: "does not return user data"},
+        configureFailPoint: {skip: "does not return user data"},
+        connPoolStats: {skip: "does not return user data"},
+        connPoolSync: {skip: "does not return user data"},
+        connectionStatus: {skip: "does not return user data"},
         convertToCapped: {skip: "primary only"},
         copydb: {skip: "primary only"},
         copydbgetnonce: {skip: "primary only"},
@@ -123,17 +126,17 @@
             },
             behavior: "versioned"
         },
-        cpuload: {skip: "no user data returned"},
+        cpuload: {skip: "does not return user data"},
         create: {skip: "primary only"},
         createIndexes: {skip: "primary only"},
         createRole: {skip: "primary only"},
         createUser: {skip: "primary only"},
-        currentOp: {skip: "no user data returned"},
-        dataSize: {skip: "no user data returned"},
-        dbHash: {skip: "no user data returned"},
-        dbStats: {skip: "no user data returned"},
+        currentOp: {skip: "does not return user data"},
+        dataSize: {skip: "does not return user data"},
+        dbHash: {skip: "does not return user data"},
+        dbStats: {skip: "does not return user data"},
         delete: {skip: "primary only"},
-        diagLogging: {skip: "no user data returned"},
+        diagLogging: {skip: "does not return user data"},
         distinct: {
             setUp: function(mongosConn) {
                 assert.writeOK(mongosConn.getCollection(nss).insert({x: 1}));
@@ -142,12 +145,12 @@
             command: {distinct: coll, key: "x"},
             checkResults: function(res) {
                 assert.commandWorked(res);
-                // Expect the command not to find any results, since the chunk moved.
-                assert.eq(0, res.values.length, tojson(res));
+                // Expect the command to return correct results, since it will read orphaned data.
+                assert.eq(1, res.values.length, tojson(res));
             },
             behavior: "unversioned"
         },
-        driverOIDTest: {skip: "no user data returned"},
+        driverOIDTest: {skip: "does not return user data"},
         drop: {skip: "primary only"},
         dropAllRolesFromDatabase: {skip: "primary only"},
         dropAllUsersFromDatabase: {skip: "primary only"},
@@ -159,8 +162,8 @@
         enableSharding: {skip: "primary only"},
         eval: {skip: "primary only"},
         explain: {skip: "TODO SERVER-30068"},
-        features: {skip: "no user data returned"},
-        filemd5: {skip: "no user data returned"},
+        features: {skip: "does not return user data"},
+        filemd5: {skip: "does not return user data"},
         find: {
             setUp: function(mongosConn) {
                 assert.writeOK(mongosConn.getCollection(nss).insert({x: 1}));
@@ -174,11 +177,11 @@
             behavior: "versioned"
         },
         findAndModify: {skip: "primary only"},
-        flushRouterConfig: {skip: "no user data returned"},
-        forceerror: {skip: "no user data returned"},
-        forceRoutingTableRefresh: {skip: "no user data returned"},
-        fsync: {skip: "no user data returned"},
-        fsyncUnlock: {skip: "no user data returned"},
+        flushRouterConfig: {skip: "does not return user data"},
+        forceerror: {skip: "does not return user data"},
+        forceRoutingTableRefresh: {skip: "does not return user data"},
+        fsync: {skip: "does not return user data"},
+        fsyncUnlock: {skip: "does not return user data"},
         geoNear: {
             setUp: function(mongosConn) {
                 assert.commandWorked(mongosConn.getCollection(nss).runCommand(
@@ -188,22 +191,22 @@
             command: {geoNear: coll, near: [1, 1]},
             checkResults: function(res) {
                 assert.commandWorked(res);
-                // Expect the command not to find any results, since the chunk moved.
-                assert.eq(0, res.results.length, res);
+                // Expect the command to return correct results, since it will read orphaned data.
+                assert.eq(1, res.results.length, res);
             },
             behavior: "unversioned"
         },
         geoSearch: {skip: "not supported in mongos"},
-        getCmdLineOpts: {skip: "no user data returned"},
-        getDiagnosticData: {skip: "no user data returned"},
+        getCmdLineOpts: {skip: "does not return user data"},
+        getDiagnosticData: {skip: "does not return user data"},
         getLastError: {skip: "primary only"},
-        getLog: {skip: "no user data returned"},
+        getLog: {skip: "does not return user data"},
         getMore: {skip: "shard version already established"},
-        getParameter: {skip: "no user data returned"},
-        getPrevError: {skip: "no user data returned"},
-        getShardMap: {skip: "no user data returned"},
+        getParameter: {skip: "does not return user data"},
+        getPrevError: {skip: "does not return user data"},
+        getShardMap: {skip: "does not return user data"},
         getShardVersion: {skip: "primary only"},
-        getnonce: {skip: "no user data returned"},
+        getnonce: {skip: "does not return user data"},
         godinsert: {skip: "for testing only"},
         grantPrivilegesToRole: {skip: "primary only"},
         grantRolesToRole: {skip: "primary only"},
@@ -222,64 +225,64 @@
             },
             behavior: "unshardedOnly"
         },
-        handshake: {skip: "no user data returned"},
-        hostInfo: {skip: "no user data returned"},
+        handshake: {skip: "does not return user data"},
+        hostInfo: {skip: "does not return user data"},
         insert: {skip: "primary only"},
-        invalidateUserCache: {skip: "no user data returned"},
-        isdbgrid: {skip: "no user data returned"},
-        isMaster: {skip: "no user data returned"},
-        journalLatencyTest: {skip: "no user data returned"},
-        killCursors: {skip: "no user data returned"},
-        killOp: {skip: "no user data returned"},
+        invalidateUserCache: {skip: "does not return user data"},
+        isdbgrid: {skip: "does not return user data"},
+        isMaster: {skip: "does not return user data"},
+        journalLatencyTest: {skip: "does not return user data"},
+        killCursors: {skip: "does not return user data"},
+        killOp: {skip: "does not return user data"},
         listCollections: {skip: "primary only"},
-        listCommands: {skip: "no user data returned"},
+        listCommands: {skip: "does not return user data"},
         listDatabases: {skip: "primary only"},
         listIndexes: {skip: "primary only"},
-        listShards: {skip: "no user data returned"},
+        listShards: {skip: "does not return user data"},
         lockInfo: {skip: "primary only"},
         logApplicationMessage: {skip: "primary only"},
-        logRotate: {skip: "no user data returned"},
-        logout: {skip: "no user data returned"},
-        makeSnapshot: {skip: "no user data returned"},
+        logRotate: {skip: "does not return user data"},
+        logout: {skip: "does not return user data"},
+        makeSnapshot: {skip: "does not return user data"},
         mapReduce: {skip: "TODO SERVER-30068"},
         mergeChunks: {skip: "primary only"},
         moveChunk: {skip: "primary only"},
         movePrimary: {skip: "primary only"},
-        netstat: {skip: "no user data returned"},
+        netstat: {skip: "does not return user data"},
         parallelCollectionScan: {skip: "is an internal command"},
-        ping: {skip: "no user data returned"},
-        planCacheClear: {skip: "no user data returned"},
-        planCacheClearFilters: {skip: "no user data returned"},
-        planCacheListFilters: {skip: "no user data returned"},
-        planCacheListPlans: {skip: "no user data returned"},
-        planCacheListQueryShapes: {skip: "no user data returned"},
-        planCacheSetFilter: {skip: "no user data returned"},
+        ping: {skip: "does not return user data"},
+        planCacheClear: {skip: "does not return user data"},
+        planCacheClearFilters: {skip: "does not return user data"},
+        planCacheListFilters: {skip: "does not return user data"},
+        planCacheListPlans: {skip: "does not return user data"},
+        planCacheListQueryShapes: {skip: "does not return user data"},
+        planCacheSetFilter: {skip: "does not return user data"},
         profile: {skip: "primary only"},
-        reIndex: {skip: "no user data returned"},
+        reIndex: {skip: "does not return user data"},
         removeShard: {skip: "primary only"},
         removeShardFromZone: {skip: "primary only"},
         renameCollection: {skip: "primary only"},
-        repairCursor: {skip: "no user data returned"},
-        repairDatabase: {skip: "no user data returned"},
-        replSetAbortPrimaryCatchUp: {skip: "no user data returned"},
-        replSetElect: {skip: "no user data returned"},
-        replSetFreeze: {skip: "no user data returned"},
-        replSetFresh: {skip: "no user data returned"},
-        replSetGetConfig: {skip: "no user data returned"},
-        replSetGetRBID: {skip: "no user data returned"},
-        replSetGetStatus: {skip: "no user data returned"},
-        replSetHeartbeat: {skip: "no user data returned"},
-        replSetInitiate: {skip: "no user data returned"},
-        replSetMaintenance: {skip: "no user data returned"},
-        replSetReconfig: {skip: "no user data returned"},
-        replSetRequestVotes: {skip: "no user data returned"},
-        replSetStepDown: {skip: "no user data returned"},
-        replSetStepUp: {skip: "no user data returned"},
-        replSetSyncFrom: {skip: "no user data returned"},
-        replSetTest: {skip: "no user data returned"},
-        replSetUpdatePosition: {skip: "no user data returned"},
-        replSetResizeOplog: {skip: "no user data returned"},
-        resetError: {skip: "no user data returned"},
+        repairCursor: {skip: "does not return user data"},
+        repairDatabase: {skip: "does not return user data"},
+        replSetAbortPrimaryCatchUp: {skip: "does not return user data"},
+        replSetElect: {skip: "does not return user data"},
+        replSetFreeze: {skip: "does not return user data"},
+        replSetFresh: {skip: "does not return user data"},
+        replSetGetConfig: {skip: "does not return user data"},
+        replSetGetRBID: {skip: "does not return user data"},
+        replSetGetStatus: {skip: "does not return user data"},
+        replSetHeartbeat: {skip: "does not return user data"},
+        replSetInitiate: {skip: "does not return user data"},
+        replSetMaintenance: {skip: "does not return user data"},
+        replSetReconfig: {skip: "does not return user data"},
+        replSetRequestVotes: {skip: "does not return user data"},
+        replSetStepDown: {skip: "does not return user data"},
+        replSetStepUp: {skip: "does not return user data"},
+        replSetSyncFrom: {skip: "does not return user data"},
+        replSetTest: {skip: "does not return user data"},
+        replSetUpdatePosition: {skip: "does not return user data"},
+        replSetResizeOplog: {skip: "does not return user data"},
+        resetError: {skip: "does not return user data"},
         resync: {skip: "primary only"},
         revokePrivilegesFromRole: {skip: "primary only"},
         revokeRolesFromRole: {skip: "primary only"},
@@ -287,37 +290,38 @@
         rolesInfo: {skip: "primary only"},
         saslContinue: {skip: "primary only"},
         saslStart: {skip: "primary only"},
-        serverStatus: {skip: "no user data returned"},
-        setCommittedSnapshot: {skip: "no user data returned"},
+        serverStatus: {skip: "does not return user data"},
+        setCommittedSnapshot: {skip: "does not return user data"},
         setFeatureCompatibilityVersion: {skip: "primary only"},
-        setParameter: {skip: "no user data returned"},
-        setShardVersion: {skip: "no user data returned"},
+        setParameter: {skip: "does not return user data"},
+        setShardVersion: {skip: "does not return user data"},
         shardCollection: {skip: "primary only"},
-        shardConnPoolStats: {skip: "no user data returned"},
-        shardingState: {skip: "no user data returned"},
-        shutdown: {skip: "no user data returned"},
-        sleep: {skip: "no user data returned"},
+        shardConnPoolStats: {skip: "does not return user data"},
+        shardingState: {skip: "does not return user data"},
+        shutdown: {skip: "does not return user data"},
+        sleep: {skip: "does not return user data"},
         split: {skip: "primary only"},
         splitChunk: {skip: "primary only"},
         splitVector: {skip: "primary only"},
         stageDebug: {skip: "primary only"},
-        startSession: {skip: "no user data returned"},
-        top: {skip: "no user data returned"},
-        touch: {skip: "no user data returned"},
-        unsetSharding: {skip: "no user data returned"},
+        startSession: {skip: "does not return user data"},
+        top: {skip: "does not return user data"},
+        touch: {skip: "does not return user data"},
+        unsetSharding: {skip: "does not return user data"},
         update: {skip: "primary only"},
         updateRole: {skip: "primary only"},
         updateUser: {skip: "primary only"},
         updateZoneKeyRange: {skip: "primary only"},
         usersInfo: {skip: "primary only"},
-        validate: {skip: "no user data returned"},
-        whatsmyuri: {skip: "no user data returned"}
+        validate: {skip: "does not return user data"},
+        whatsmyuri: {skip: "does not return user data"}
     };
 
     // Set the secondaries to priority 0 and votes 0 to prevent the primaries from stepping down.
     let rsOpts = {nodes: [{rsConfig: {votes: 1}}, {rsConfig: {priority: 0, votes: 0}}]};
     let st = new ShardingTest({mongos: 2, shards: {rs0: rsOpts, rs1: rsOpts}});
 
+    let donorShardPrimary = st.rs0.getPrimary();
     let donorShardSecondary = st.rs0.getSecondary();
     let recipientShardSecondary = st.rs1.getSecondary();
 
@@ -341,7 +345,7 @@
                "coverage failure: must define a safe secondary reads test for " + command);
 
         if (test.skip !== undefined) {
-            print("skipping " + test.command + ": " + test.skip);
+            print("skipping " + command + ": " + test.skip);
             continue;
         }
         validateTestCase(test);
@@ -357,12 +361,15 @@
         // Do any test-specific setup.
         test.setUp(staleMongos);
 
+        // Suspend range deletion on the donor shard.
+        donorShardPrimary.adminCommand(
+            {configureFailPoint: 'suspendRangeDeletion', mode: 'alwaysOn'});
+
         // Do a moveChunk from the fresh mongos to make the other mongos stale.
         assert.commandWorked(freshMongos.adminCommand({
             moveChunk: nss,
             find: {x: 0},
             to: st.shard1.shardName,
-            waitForDelete: true,
         }));
 
         let res = staleMongos.getDB(db).runCommand(
