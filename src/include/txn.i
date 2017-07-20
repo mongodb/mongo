@@ -215,16 +215,6 @@ __wt_txn_oldest_id(WT_SESSION_IMPL *session)
 }
 
 /*
- * __wt_txn_committed --
- *	Return if a transaction has been committed.
- */
-static inline bool
-__wt_txn_committed(WT_SESSION_IMPL *session, uint64_t id)
-{
-	return (WT_TXNID_LT(id, S2C(session)->txn_global.last_running));
-}
-
-/*
  * __txn_visible_all_id --
  *	Check if a given transaction ID is "globally visible".	This is, if
  *	all sessions in the system will see the transaction ID including the

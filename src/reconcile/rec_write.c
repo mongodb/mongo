@@ -58,6 +58,9 @@ typedef struct {
 	uint64_t orig_btree_checkpoint_gen;
 	uint64_t orig_txn_checkpoint_gen;
 
+	/* Track the oldest transaction running when reconciliation starts. */
+	uint64_t last_running;
+
 	/* Track the page's maximum transaction. */
 	uint64_t max_txn;
 	WT_DECL_TIMESTAMP(max_timestamp)
@@ -905,6 +908,16 @@ __rec_write_init(WT_SESSION_IMPL *session,
 	WT_ORDERED_READ(r->orig_write_gen, page->modify->write_gen);
 
 	/*
+	 * Cache the oldest running transaction ID.  This is used to check
+	 * whether updates seen by reconciliation have committed.  We keep a
+	 * cached copy to avoid races where a concurrent transaction could
+	 * abort while reconciliation is examining its updates.  This way, any
+	 * transaction running when reconciliation starts is considered
+	 * uncommitted.
+	 */
+	WT_ORDERED_READ(r->last_running, S2C(session)->txn_global.last_running);
+
+	/*
 	 * Lookaside table eviction is configured when eviction gets aggressive,
 	 * adjust the flags for cases we don't support.
 	 */
@@ -1231,36 +1244,42 @@ __rec_txn_read(WT_SESSION_IMPL *session, WT_RECONCILE *r,
 			if (WT_TXNID_LT(txnid, min_txn))
 				min_txn = txnid;
 
+			/*
+			 * Find the first update we can use.
+			 *
+			 * Check whether the update was committed before
+			 * reconciliation started.  The global commit point can
+			 * move forward during reconciliation so we use a
+			 * cached copy to avoid races when a concurrent
+			 * transaction commits or rolls back while we are
+			 * examining its updates.
+			 *
+			 * Lookaside eviction can cope with any committed
+			 * update.  Other eviction modes check that the maximum
+			 * transaction ID and timestamp seen are stable.
+			 *
+			 * When reconciling for eviction, track whether any
+			 * uncommitted updates are found.
+			 */
+			if (WT_TXNID_LE(r->last_running, txnid)) {
+				skipped = true;
+				continue;
+			}
+
+			if (*updp == NULL)
+				*updp = upd;
 #ifdef HAVE_TIMESTAMPS
-			/* Similarly for the oldest timestamp. */
+			/* Track min/max timestamps. */
+			if (__wt_timestamp_cmp(
+			    max_timestamp, upd->timestamp) < 0)
+				__wt_timestamp_set(
+				    max_timestamp, upd->timestamp);
+
 			if (__wt_timestamp_cmp(
 			    min_timestamp, upd->timestamp) > 0)
 				__wt_timestamp_set(
 				    min_timestamp, upd->timestamp);
 #endif
-
-			/*
-			 * Find the first update we can use.
-			 *
-			 * Eviction can write any committed update.
-			 *
-			 * When reconciling for eviction, track whether any
-			 * uncommitted updates are found.
-			 *
-			 * When reconciling for eviction, track the memory held
-			 * by the update chain.
-			 */
-			if (__wt_txn_committed(session, txnid)) {
-				if (*updp == NULL)
-					*updp = upd;
-#ifdef HAVE_TIMESTAMPS
-				if (__wt_timestamp_cmp(
-				    max_timestamp, upd->timestamp) < 0)
-					__wt_timestamp_set(
-					    max_timestamp, upd->timestamp);
-#endif
-			} else
-				skipped = true;
 		}
 	} else
 		for (upd = upd_list; upd != NULL; upd = upd->next) {
@@ -1290,8 +1309,8 @@ __rec_txn_read(WT_SESSION_IMPL *session, WT_RECONCILE *r,
 		}
 
 	/* Reconciliation should never see a reserved update. */
-	WT_ASSERT(session,
-	    *updp == NULL || (*updp)->type != WT_UPDATE_RESERVED);
+	WT_ASSERT(session, (upd = *updp) == NULL ||
+	    (upd->txnid != WT_TXN_ABORTED && upd->type != WT_UPDATE_RESERVED));
 
 	r->update_mem_all += update_mem;
 
