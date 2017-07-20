@@ -132,8 +132,13 @@ mongo::Status mongo::cloneCollectionAsCapped(OperationContext* opCtx,
                       str::stream() << "source collection " << fromNss.ns() << " does not exist");
     }
 
-    if (db->getCollection(opCtx, toNss))
-        return Status(ErrorCodes::NamespaceExists, "to collection already exists");
+    if (db->getCollection(opCtx, toNss)) {
+        return Status(ErrorCodes::NamespaceExists,
+                      str::stream() << "cloneCollectionAsCapped failed - destination collection "
+                                    << toNss.ns()
+                                    << " already exists. source collection: "
+                                    << fromNss.ns());
+    }
 
     // create new collection
     {
