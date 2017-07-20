@@ -29,24 +29,22 @@
     let nss = db + "." + coll;
 
     // Given a command, build its expected shape in the system profiler.
-    let buildCommandProfile =
-        function(command) {
+    let buildCommandProfile = function(command) {
         let commandProfile = {ns: nss};
         for (let key in command) {
             commandProfile["command." + key] = command[key];
         }
         return commandProfile;
-    }
+    };
 
     // Check that a test case is well-formed.
-    let validateTestCase =
-        function(test) {
+    let validateTestCase = function(test) {
         assert(test.setUp && typeof(test.setUp) === "function");
         assert(test.command && typeof(test.command) === "object");
         assert(test.checkResults && typeof(test.checkResults) === "function");
         assert(test.behavior === "unshardedOnly" || test.behavior === "unversioned" ||
                test.behavior === "versioned");
-    }
+    };
 
     let testCases = {
         _configsvrAddShard: {skip: "primary only"},
