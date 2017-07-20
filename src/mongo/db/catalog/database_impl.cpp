@@ -672,7 +672,10 @@ Collection* DatabaseImpl::getOrCreateCollection(OperationContext* opCtx,
 void DatabaseImpl::_checkCanCreateCollection(OperationContext* opCtx,
                                              const NamespaceString& nss,
                                              const CollectionOptions& options) {
-    massert(17399, "collection already exists", getCollection(opCtx, nss) == nullptr);
+    massert(17399,
+            str::stream() << "Cannot create collection " << nss.ns()
+                          << " - collection already exists.",
+            getCollection(opCtx, nss) == nullptr);
     massertNamespaceNotIndex(nss.ns(), "createCollection");
 
     uassert(14037,
