@@ -96,8 +96,7 @@ Status _applyOps(OperationContext* opCtx,
                  const BSONObj& applyOpCmd,
                  BSONObjBuilder* result,
                  int* numApplied) {
-    dassert(opCtx->lockState()->isLockHeldForMode(
-        ResourceId(RESOURCE_GLOBAL, ResourceId::SINGLETON_GLOBAL), MODE_X));
+    invariant(opCtx->lockState()->isW());
 
     BSONObj ops = applyOpCmd.firstElement().Obj();
 
@@ -261,12 +260,11 @@ Status preconditionOK(OperationContext* opCtx, const BSONObj& applyOpCmd, BSONOb
     return Status::OK();
 }
 }  // namespace
-}  // namespace mongo
 
-mongo::Status mongo::applyOps(OperationContext* opCtx,
-                              const std::string& dbName,
-                              const BSONObj& applyOpCmd,
-                              BSONObjBuilder* result) {
+Status applyOps(OperationContext* opCtx,
+                const std::string& dbName,
+                const BSONObj& applyOpCmd,
+                BSONObjBuilder* result) {
     Lock::GlobalWrite globalWriteLock(opCtx);
 
     bool userInitiatedWritesAndNotPrimary = opCtx->writesAreReplicated() &&
@@ -342,3 +340,5 @@ mongo::Status mongo::applyOps(OperationContext* opCtx,
 
     return Status::OK();
 }
+
+}  // namespace mongo

@@ -30,7 +30,6 @@ env.Library(
         'cluster_add_shard_cmd.cpp',
         'cluster_add_shard_to_zone_cmd.cpp',
         'cluster_aggregate.cpp',
-        'cluster_apply_ops_cmd.cpp',
         'cluster_available_query_options_cmd.cpp',
         'cluster_compact_cmd.cpp',
         'cluster_control_balancer_cmd.cpp',
@@ -84,7 +83,6 @@ env.Library(
     ],
     LIBDEPS=[
         '$BUILD_DIR/mongo/db/auth/authmongos',
-        '$BUILD_DIR/mongo/db/commands/apply_ops_cmd_common',
         '$BUILD_DIR/mongo/db/commands/killcursors_common',
         '$BUILD_DIR/mongo/db/ftdc/ftdc_server',
         '$BUILD_DIR/mongo/db/commands/write_commands_common',
