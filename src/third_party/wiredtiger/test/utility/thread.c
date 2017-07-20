@@ -34,7 +34,7 @@
  * One thread (the first thread created by an application) checks for a
  * terminating condition after each insert.
  */
-void *
+WT_THREAD_RET
 thread_append(void *arg)
 {
 	TEST_OPTS *opts;
@@ -70,75 +70,7 @@ thread_append(void *arg)
 		}
 	}
 
-	return (NULL);
-}
-
-/*
- * Append into a row store table.
- */
-void *
-thread_insert_append(void *arg)
-{
-	TEST_OPTS *opts;
-	WT_CONNECTION *conn;
-	WT_CURSOR *cursor;
-	WT_SESSION *session;
-	uint64_t i;
-	char kbuf[64];
-
-	opts = (TEST_OPTS *)arg;
-	conn = opts->conn;
-
-	testutil_check(conn->open_session(conn, NULL, NULL, &session));
-	testutil_check(session->open_cursor(
-	    session, opts->uri, NULL, NULL, &cursor));
-
-	for (i = 0; i < opts->nrecords; ++i) {
-		testutil_check(__wt_snprintf(
-		    kbuf, sizeof(kbuf), "%010d KEY------", (int)i));
-		cursor->set_key(cursor, kbuf);
-		cursor->set_value(cursor, "========== VALUE =======");
-		testutil_check(cursor->insert(cursor));
-		if (i % 100000 == 0) {
-			printf("insert: %" PRIu64 "\r", i);
-			fflush(stdout);
-		}
-	}
-	printf("\n");
-
-	opts->running = false;
-
-	return (NULL);
-}
-
-/*
- * Repeatedly walk backwards through the records in a table.
- */
-void *
-thread_prev(void *arg)
-{
-	TEST_OPTS *opts;
-	WT_CURSOR *cursor;
-	WT_SESSION *session;
-	int ret;
-
-	opts = (TEST_OPTS *)arg;
-	ret = 0;
-
-	testutil_check(
-	    opts->conn->open_session(opts->conn, NULL, NULL, &session));
-	testutil_check(
-	    session->open_cursor(session, opts->uri, NULL, NULL, &cursor));
-	while (opts->running) {
-		while (opts->running && (ret = cursor->prev(cursor)) == 0)
-			;
-		if (ret == WT_NOTFOUND)
-			ret = 0;
-		testutil_check(ret);
-	}
-
-	testutil_check(session->close(session, NULL));
-	return (NULL);
+	return (WT_THREAD_RET_VALUE);
 }
 
 /*
@@ -198,7 +130,7 @@ handle_op_message(WT_EVENT_HANDLER *handler,
 /*
  * Create a table and open a bulk cursor on it.
  */
-void *
+void
 op_bulk(void *arg)
 {
 	TEST_OPTS *opts;
@@ -228,14 +160,12 @@ op_bulk(void *arg)
 
 	testutil_check(session->close(session, NULL));
 	args->thread_counter++;
-
-	return (NULL);
 }
 
 /*
  * Create a guaranteed unique table and open and close a bulk cursor on it.
  */
-void *
+void
 op_bulk_unique(void *arg)
 {
 	TEST_OPTS *opts;
@@ -286,14 +216,12 @@ op_bulk_unique(void *arg)
 
 	testutil_check(session->close(session, NULL));
 	args->thread_counter++;
-
-	return (NULL);
 }
 
 /*
  * Open and close cursor on a table.
  */
-void *
+void
 op_cursor(void *arg)
 {
 	TEST_OPTS *opts;
@@ -317,14 +245,12 @@ op_cursor(void *arg)
 
 	testutil_check(session->close(session, NULL));
 	args->thread_counter++;
-
-	return (NULL);
 }
 
 /*
  * Create a table.
  */
-void *
+void
 op_create(void *arg)
 {
 	TEST_OPTS *opts;
@@ -344,14 +270,12 @@ op_create(void *arg)
 
 	testutil_check(session->close(session, NULL));
 	args->thread_counter++;
-
-	return (NULL);
 }
 
 /*
  * Create and drop a unique guaranteed table.
  */
-void *
+void
 op_create_unique(void *arg)
 {
 	TEST_OPTS *opts;
@@ -389,14 +313,12 @@ op_create_unique(void *arg)
 
 	testutil_check(session->close(session, NULL));
 	args->thread_counter++;
-
-	return (NULL);
 }
 
 /*
  * Drop a table.
  */
-void *
+void
 op_drop(void *arg)
 {
 	TEST_PER_THREAD_OPTS *args;
@@ -419,6 +341,4 @@ op_drop(void *arg)
 
 	testutil_check(session->close(session, NULL));
 	args->thread_counter++;
-
-	return (NULL);
 }

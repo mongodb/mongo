@@ -1,6 +1,29 @@
 /*! @page upgrading Upgrading WiredTiger applications
 
-@section version_293 Upgrading to Version 2.9.3
+@section version_300 Upgrading to Version 3.0.0
+<dl>
+
+<dt>WiredTiger on-disk log file format change</dt>
+<dd>
+The WiredTiger on-disk file format for write-ahead log files has changed
+to include a new internal system log record.
+</dd>
+
+<dt>Addition of compatibility configuration setting</dt>
+<dd>
+There is now a compatibility setting that allows the user to upgrade or
+downgrade the log files generated so that they can be run with an older
+release.
+</dd>
+
+<dt>Cached overflow record statistics</dt>
+<dd>
+The \c cache_overflow_value ("overflow values cached in memory") statistic
+has been removed, it no longer has any meaning.
+</dd>
+
+</dl><hr>
+@section version_292 Upgrading to Version 2.9.2
 <dl>
 
 <dt>Logging subsystem statistics</dt>
@@ -12,11 +35,7 @@ are no longer present.  They were duplicates of \c log_writes and
 been added.
 </dd>
 
-</dl><hr>
-@section version_292 Upgrading to Version 2.9.2
-<dl>
-
-<dt>WiredTiger utility now supports truncate</dt>
+<dt>WiredTiger Utility now supports truncate</dt>
 <dd>
 The WiredTiger utility \c wt can now \c truncate objects, removing all
 contents from the specified object.

@@ -40,6 +40,114 @@ __logmgr_sync_cfg(WT_SESSION_IMPL *session, const char **cfg)
 }
 
 /*
+ * __logmgr_force_ckpt --
+ *	Force a checkpoint out, waiting for the checkpoint LSN in the log
+ *	is up to the given log number.
+ */
+static int
+__logmgr_force_ckpt(WT_SESSION_IMPL *session, uint32_t lognum)
+{
+	WT_CONNECTION_IMPL *conn;
+	WT_LOG *log;
+	WT_SESSION_IMPL *tmp_session;
+	int yield;
+
+	conn = S2C(session);
+	log = conn->log;
+	yield = 0;
+	WT_RET(__wt_open_internal_session(conn,
+	    "compatibility-reconfig", true, 0, &tmp_session));
+	while (log->ckpt_lsn.l.file < lognum) {
+		/*
+		 * Force a checkpoint to be written in the new log file and
+		 * force the archiving of all previous log files.  We do the
+		 * checkpoint in the loop because the checkpoint LSN in the
+		 * log record could still reflect the previous log file in
+		 * cases such as the write LSN has not yet advanced into the
+		 * new log file due to another group of threads still in
+		 * progress with their slot copies or writes.
+		 */
+		WT_RET(tmp_session->iface.checkpoint(
+		    &tmp_session->iface, "force=1"));
+		WT_RET(WT_SESSION_CHECK_PANIC(tmp_session));
+		/*
+		 * Only sleep in the rare case that we had to come through
+		 * this loop more than once.
+		 */
+		if (yield++) {
+			WT_STAT_CONN_INCR(session, log_force_ckpt_sleep);
+			__wt_sleep(0, WT_THOUSAND);
+		}
+	}
+	WT_RET(tmp_session->iface.close(&tmp_session->iface, NULL));
+	return (0);
+}
+
+/*
+ * __logmgr_version --
+ *	Set up the versions in the log manager.
+ */
+static int
+__logmgr_version(WT_SESSION_IMPL *session, bool reconfig)
+{
+	WT_CONNECTION_IMPL *conn;
+	WT_LOG *log;
+	bool downgrade;
+	uint32_t first_record, lognum;
+	uint16_t new_version;
+
+	conn = S2C(session);
+	log = conn->log;
+	if (log == NULL)
+		return (0);
+
+	/*
+	 * Set the log file format versions based on compatibility versions
+	 * set in the connection.  We must set this before we call log_open
+	 * to open or create a log file.
+	 *
+	 * Since the log version changed at a major release number we only need
+	 * to check the major number, not the minor number in the compatibility
+	 * setting.
+	 */
+	if (conn->compat_major < WT_LOG_V2) {
+		new_version = 1;
+		first_record = WT_LOG_END_HEADER;
+		downgrade = true;
+	} else {
+		new_version = WT_LOG_VERSION;
+		first_record = WT_LOG_END_HEADER + log->allocsize;
+		downgrade = false;
+	}
+
+	/*
+	 * If the version is the same, there is nothing to do.
+	 */
+	if (log->log_version == new_version)
+		return (0);
+	/*
+	 * If we are reconfiguring and at a new version we need to force
+	 * the log file to advance so that we write out a log file at the
+	 * correct version.  When we are downgrading we must force a checkpoint
+	 * and finally archive, even if disabled, so that all new version log
+	 * files are gone.
+	 *
+	 * All of the version changes must be handled with locks on reconfigure
+	 * because other threads may be changing log files, using pre-allocated
+	 * files.
+	 */
+	/*
+	 * Set the version.  If it is a live change the logging subsystem will
+	 * do other work as well to move to a new log file.
+	 */
+	WT_RET(__wt_log_set_version(session, new_version,
+	    first_record, downgrade, reconfig, &lognum));
+	if (reconfig && FLD_ISSET(conn->log_flags, WT_CONN_LOG_DOWNGRADED))
+		WT_RET(__logmgr_force_ckpt(session, lognum));
+	return (0);
+}
+
+/*
  * __logmgr_config --
  *	Parse and setup the logging server options.
  */
@@ -187,7 +295,8 @@ __wt_logmgr_reconfig(WT_SESSION_IMPL *session, const char **cfg)
 {
 	bool dummy;
 
-	return (__logmgr_config(session, cfg, &dummy, true));
+	WT_RET(__logmgr_config(session, cfg, &dummy, true));
+	return (__logmgr_version(session, true));
 }
 
 /*
@@ -329,19 +438,17 @@ err:		__wt_err(session, ret, "log pre-alloc server error");
  *	currently running.
  */
 int
-__wt_log_truncate_files(
-    WT_SESSION_IMPL *session, WT_CURSOR *cursor, const char *cfg[])
+__wt_log_truncate_files(WT_SESSION_IMPL *session, WT_CURSOR *cursor, bool force)
 {
 	WT_CONNECTION_IMPL *conn;
 	WT_DECL_RET;
 	WT_LOG *log;
 	uint32_t backup_file;
 
-	WT_UNUSED(cfg);
 	conn = S2C(session);
 	if (!FLD_ISSET(conn->log_flags, WT_CONN_LOG_ENABLED))
 		return (0);
-	if (F_ISSET(conn, WT_CONN_SERVER_LOG) &&
+	if (!force && F_ISSET(conn, WT_CONN_SERVER_LOG) &&
 	    FLD_ISSET(conn->log_flags, WT_CONN_LOG_ARCHIVE))
 		WT_RET_MSG(session, EINVAL,
 		    "Attempt to archive manually while a server is running");
@@ -349,8 +456,10 @@ __wt_log_truncate_files(
 	log = conn->log;
 
 	backup_file = 0;
-	if (cursor != NULL)
+	if (cursor != NULL) {
+		WT_ASSERT(session, force == false);
 		backup_file = WT_CURSOR_BACKUP_ID(cursor);
+	}
 	WT_ASSERT(session, backup_file <= log->alloc_lsn.l.file);
 	__wt_verbose(session, WT_VERB_LOG,
 	    "log_truncate_files: Archive once up to %" PRIu32, backup_file);
@@ -828,7 +937,7 @@ __log_server(void *arg)
 					    session, &log->log_archive_lock);
 					WT_ERR(ret);
 				} else
-					__wt_verbose(session, WT_VERB_LOG,
+					__wt_verbose(session, WT_VERB_LOG, "%s",
 					    "log_archive: Blocked due to open "
 					    "log cursor holding archive lock");
 			}
@@ -875,6 +984,7 @@ __wt_logmgr_create(WT_SESSION_IMPL *session, const char *cfg[])
 	WT_RET(__wt_calloc_one(session, &conn->log));
 	log = conn->log;
 	WT_RET(__wt_spin_init(session, &log->log_lock, "log"));
+	WT_RET(__wt_spin_init(session, &log->log_fs_lock, "log files"));
 	WT_RET(__wt_spin_init(session, &log->log_slot_lock, "log slot"));
 	WT_RET(__wt_spin_init(session, &log->log_sync_lock, "log sync"));
 	WT_RET(__wt_spin_init(session, &log->log_writelsn_lock,
@@ -898,6 +1008,8 @@ __wt_logmgr_create(WT_SESSION_IMPL *session, const char *cfg[])
 	WT_INIT_LSN(&log->write_lsn);
 	WT_INIT_LSN(&log->write_start_lsn);
 	log->fileid = 0;
+	WT_RET(__logmgr_version(session, false));
+
 	WT_RET(__wt_cond_alloc(session, "log sync", &log->log_sync_cond));
 	WT_RET(__wt_cond_alloc(session, "log write", &log->log_write_cond));
 	WT_RET(__wt_log_open(session));
@@ -1050,6 +1162,7 @@ __wt_logmgr_destroy(WT_SESSION_IMPL *session)
 	__wt_cond_destroy(session, &conn->log->log_write_cond);
 	__wt_rwlock_destroy(session, &conn->log->log_archive_lock);
 	__wt_spin_destroy(session, &conn->log->log_lock);
+	__wt_spin_destroy(session, &conn->log->log_fs_lock);
 	__wt_spin_destroy(session, &conn->log->log_slot_lock);
 	__wt_spin_destroy(session, &conn->log->log_sync_lock);
 	__wt_spin_destroy(session, &conn->log->log_writelsn_lock);

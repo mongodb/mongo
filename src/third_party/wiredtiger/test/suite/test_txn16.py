@@ -82,14 +82,14 @@ class test_txn16(wttest.WiredTigerTestCase, suite_subprocess):
         loop = 0
         # Record original log files.  There should never be overlap
         # with these even after they're removed.
-        orig_logs = fnmatch.filter(os.listdir(homedir), "*Log*")
+        orig_logs = fnmatch.filter(os.listdir(homedir), "*gerLog*")
         while loop < 3:
             # Reopen with logging on to run recovery first time
             on_conn = self.wiredtiger_open(homedir, self.conn_on)
             on_conn.close()
             if loop > 0:
                 # Get current log files.
-                cur_logs = fnmatch.filter(os.listdir(homedir), "*Log*")
+                cur_logs = fnmatch.filter(os.listdir(homedir), "*gerLog*")
                 scur = set(cur_logs)
                 sorig = set(orig_logs)
                 # There should never be overlap with the log files that
@@ -106,7 +106,7 @@ class test_txn16(wttest.WiredTigerTestCase, suite_subprocess):
                 last_logs = cur_logs
             loop += 1
             # Remove all log files before opening without logging.
-            cur_logs = fnmatch.filter(os.listdir(homedir), "*Log*")
+            cur_logs = fnmatch.filter(os.listdir(homedir), "*gerLog*")
             for l in cur_logs:
                 path=homedir + "/" + l
                 os.remove(path)

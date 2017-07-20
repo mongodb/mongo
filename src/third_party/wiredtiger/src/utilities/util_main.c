@@ -41,6 +41,7 @@ usage(void)
 	    "\t" "compact\t  compact an object\n"
 	    "\t" "copyright copyright information\n"
 	    "\t" "create\t  create an object\n"
+	    "\t" "downgrade\t  downgrade an database\n"
 	    "\t" "drop\t  drop an object\n"
 	    "\t" "dump\t  dump an object\n"
 	    "\t" "list\t  list database objects\n"
@@ -66,7 +67,8 @@ main(int argc, char *argv[])
 	WT_SESSION *session;
 	size_t len;
 	int ch, major_v, minor_v, tret, (*func)(WT_SESSION *, int, char *[]);
-	bool logoff, recover;
+	int (*cfunc)(WT_SESSION *, WT_CONNECTION *, int, char *[]);
+	bool logoff, needconn, recover;
 	char *p, *secretkey;
 	const char *cmd_config, *config, *p1, *p2, *p3, *rec_config;
 
@@ -79,6 +81,8 @@ main(int argc, char *argv[])
 	else
 		++progname;
 	command = "";
+
+	needconn = false;
 
 	/* Check the version against the library build. */
 	(void)wiredtiger_version(&major_v, & minor_v, NULL);
@@ -156,6 +160,7 @@ main(int argc, char *argv[])
 	__wt_optreset = __wt_optind = 1;
 
 	func = NULL;
+	cfunc = NULL;
 	switch (command[0]) {
 	case 'a':
 		if (strcmp(command, "alter") == 0)
@@ -177,7 +182,10 @@ main(int argc, char *argv[])
 		}
 		break;
 	case 'd':
-		if (strcmp(command, "drop") == 0)
+		if (strcmp(command, "downgrade") == 0) {
+			cfunc = util_downgrade;
+			needconn = true;
+		} else if (strcmp(command, "drop") == 0)
 			func = util_drop;
 		else if (strcmp(command, "dump") == 0)
 			func = util_dump;
@@ -234,7 +242,7 @@ main(int argc, char *argv[])
 	default:
 		break;
 	}
-	if (func == NULL) {
+	if (func == NULL && cfunc == NULL) {
 		usage();
 		goto err;
 	}
@@ -278,7 +286,10 @@ main(int argc, char *argv[])
 	}
 
 	/* Call the function. */
-	ret = func(session, argc, argv);
+	if (needconn)
+		ret = cfunc(session, conn, argc, argv);
+	else
+		ret = func(session, argc, argv);
 
 	if (0) {
 err:		ret = 1;

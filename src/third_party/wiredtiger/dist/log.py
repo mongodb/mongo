@@ -10,6 +10,8 @@ tmp_file = '__tmp'
 # Map log record types to:
 # (C type, pack type, printf format, printf arg(s), list of setup functions)
 field_types = {
+    'WT_LSN' : ('WT_LSN *', 'II', '%" PRIu32 "%" PRIu32 "',
+        'arg->l.file, arg->l.offset', [ '' ]),
     'string' : ('const char *', 'S', '%s', 'arg', [ '' ]),
     'item' : ('WT_ITEM *', 'u', '%s', 'escaped',
         [ 'WT_ERR(__logrec_make_json_str(session, &escaped, &arg));',

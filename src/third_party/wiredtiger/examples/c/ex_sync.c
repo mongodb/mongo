@@ -43,7 +43,7 @@ main(int argc, char *argv[])
 	WT_CURSOR *cursor;
 	WT_SESSION *session;
 	int i, record_count, ret;
-	char k[16], v[16];
+	char k[32], v[32];
 	const char *conf;
 
 	home = example_setup(argc, argv);

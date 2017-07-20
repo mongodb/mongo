@@ -625,6 +625,7 @@ __checkpoint_prepare(WT_SESSION_IMPL *session, const char *cfg[])
 	 */
 	__wt_writelock(session, &txn_global->rwlock);
 	txn_global->checkpoint_state = *txn_state;
+	txn_global->checkpoint_txn = txn;
 	txn_global->checkpoint_state.pinned_id = WT_MIN(txn->id, txn->snap_min);
 
 	/*
@@ -645,6 +646,15 @@ __checkpoint_prepare(WT_SESSION_IMPL *session, const char *cfg[])
 	txn_state->id = txn_state->pinned_id =
 	    txn_state->metadata_pinned = WT_TXN_NONE;
 	__wt_writeunlock(session, &txn_global->rwlock);
+
+#ifdef HAVE_TIMESTAMPS
+	/*
+	 * Now that the checkpoint transaction is published, clear it from the
+	 * regular lists.
+	 */
+	__wt_txn_clear_commit_timestamp(session);
+	__wt_txn_clear_read_timestamp(session);
+#endif
 
 	/*
 	 * Get a list of handles we want to flush; for named checkpoints this

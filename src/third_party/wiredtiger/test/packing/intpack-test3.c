@@ -35,7 +35,7 @@ void
 test_value(int64_t val)
 {
 	const uint8_t *cp;
-	uint8_t buf[10], *p;
+	uint8_t buf[WT_INTPACK64_MAXSIZE], *p;
 	int64_t sinput, soutput;
 	uint64_t uinput, uoutput;
 	size_t used_len;
@@ -50,8 +50,8 @@ test_value(int64_t val)
 	testutil_check(__wt_vunpack_int(&cp, used_len, &soutput));
 	/* Ensure we got the correct value back */
 	if (sinput != soutput) {
-		fprintf(stderr, "mismatch %" PRIu64 ", %" PRIu64 "\n",
-		    sinput, soutput);
+		fprintf(stderr,
+		    "mismatch %" PRId64 ", %" PRId64 "\n", sinput, soutput);
 		abort();
 	}
 	/* Ensure that decoding used the correct amount of buffer */
@@ -74,8 +74,8 @@ test_value(int64_t val)
 	testutil_check(__wt_vunpack_uint(&cp, sizeof(buf), &uoutput));
 	/* Ensure we got the correct value back */
 	if (sinput != soutput) {
-		fprintf(stderr, "mismatch %" PRIu64 ", %" PRIu64 "\n",
-		    sinput, soutput);
+		fprintf(stderr,
+		    "mismatch %" PRId64 ", %" PRId64 "\n", sinput, soutput);
 		abort();
 	}
 	/* Ensure that decoding used the correct amount of buffer */

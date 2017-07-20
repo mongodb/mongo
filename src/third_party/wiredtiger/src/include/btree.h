@@ -165,24 +165,25 @@ struct __wt_btree {
 	WT_SPINLOCK	flush_lock;	/* Lock to flush the tree's pages */
 
 	/* Flags values up to 0xff are reserved for WT_DHANDLE_* */
-#define	WT_BTREE_BULK		0x000100 /* Bulk-load handle */
-#define	WT_BTREE_CLOSED		0x000200 /* Handle closed */
-#define	WT_BTREE_IGNORE_CACHE	0x000400 /* Cache-resident object */
-#define	WT_BTREE_IN_MEMORY	0x000800 /* Cache-resident object */
-#define	WT_BTREE_LOOKASIDE	0x001000 /* Look-aside table */
-#define	WT_BTREE_NO_CHECKPOINT	0x002000 /* Disable checkpoints */
-#define	WT_BTREE_NO_LOGGING	0x004000 /* Disable logging */
-#define	WT_BTREE_REBALANCE	0x008000 /* Handle is for rebalance */
-#define	WT_BTREE_SALVAGE	0x010000 /* Handle is for salvage */
-#define	WT_BTREE_SKIP_CKPT	0x020000 /* Handle skipped checkpoint */
-#define	WT_BTREE_UPGRADE	0x040000 /* Handle is for upgrade */
-#define	WT_BTREE_VERIFY		0x080000 /* Handle is for verify */
+#define	WT_BTREE_ALTER		0x000100 /* Handle is for alter */
+#define	WT_BTREE_BULK		0x000200 /* Bulk-load handle */
+#define	WT_BTREE_CLOSED		0x000400 /* Handle closed */
+#define	WT_BTREE_IGNORE_CACHE	0x000800 /* Cache-resident object */
+#define	WT_BTREE_IN_MEMORY	0x001000 /* Cache-resident object */
+#define	WT_BTREE_LOOKASIDE	0x002000 /* Look-aside table */
+#define	WT_BTREE_NO_CHECKPOINT	0x004000 /* Disable checkpoints */
+#define	WT_BTREE_NO_LOGGING	0x008000 /* Disable logging */
+#define	WT_BTREE_REBALANCE	0x010000 /* Handle is for rebalance */
+#define	WT_BTREE_SALVAGE	0x020000 /* Handle is for salvage */
+#define	WT_BTREE_SKIP_CKPT	0x040000 /* Handle skipped checkpoint */
+#define	WT_BTREE_UPGRADE	0x080000 /* Handle is for upgrade */
+#define	WT_BTREE_VERIFY		0x100000 /* Handle is for verify */
 	uint32_t flags;
 };
 
 /* Flags that make a btree handle special (not for normal use). */
 #define	WT_BTREE_SPECIAL_FLAGS	 					\
-	(WT_BTREE_BULK | WT_BTREE_REBALANCE |				\
+	(WT_BTREE_ALTER | WT_BTREE_BULK | WT_BTREE_REBALANCE |		\
 	WT_BTREE_SALVAGE | WT_BTREE_UPGRADE | WT_BTREE_VERIFY)
 
 /*

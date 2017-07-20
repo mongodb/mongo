@@ -372,8 +372,8 @@ __wt_conn_cache_pool_destroy(WT_SESSION_IMPL *session)
 	}
 
 	if (!F_ISSET(cp, WT_CACHE_POOL_ACTIVE)) {
-		__wt_verbose(
-		    session, WT_VERB_SHARED_CACHE, "Destroying cache pool");
+		__wt_verbose(session,
+		    WT_VERB_SHARED_CACHE, "%s", "Destroying cache pool");
 		__wt_spin_lock(session, &__wt_process.spinlock);
 		/*
 		 * We have been holding the pool lock - no connections could
@@ -401,7 +401,7 @@ __wt_conn_cache_pool_destroy(WT_SESSION_IMPL *session)
 		/* Notify other participants if we were managing */
 		if (FLD_ISSET(cache->pool_flags, WT_CACHE_POOL_MANAGER)) {
 			cp->pool_managed = 0;
-			__wt_verbose(session, WT_VERB_SHARED_CACHE,
+			__wt_verbose(session, WT_VERB_SHARED_CACHE, "%s",
 			    "Shutting down shared cache manager connection");
 		}
 	}
@@ -585,8 +585,8 @@ __cache_pool_adjust(WT_SESSION_IMPL *session,
 
 	if (WT_VERBOSE_ISSET(session, WT_VERB_SHARED_CACHE)) {
 		__wt_verbose(session,
-		    WT_VERB_SHARED_CACHE, "Cache pool distribution: ");
-		__wt_verbose(session, WT_VERB_SHARED_CACHE,
+		    WT_VERB_SHARED_CACHE, "%s", "Cache pool distribution: ");
+		__wt_verbose(session, WT_VERB_SHARED_CACHE, "%s",
 		    "\t" "cache (MB), pressure, skips, busy, %% full:");
 	}
 
@@ -731,7 +731,7 @@ __cache_pool_adjust(WT_SESSION_IMPL *session,
 				cp->currently_used -= adjustment;
 			}
 			__wt_verbose(session, WT_VERB_SHARED_CACHE,
-			    "Allocated %s%" PRId64 " to %s",
+			    "Allocated %s%" PRIu64 " to %s",
 			    grow ? "" : "-", adjustment, entry->home);
 
 			/*
@@ -778,7 +778,7 @@ __wt_cache_pool_server(void *arg)
 		if (__wt_atomic_cas8(&cp->pool_managed, 0, 1)) {
 			FLD_SET(cache->pool_flags, WT_CACHE_POOL_MANAGER);
 			__wt_verbose(session, WT_VERB_SHARED_CACHE,
-			    "Cache pool switched manager thread");
+			    "%s", "Cache pool switched manager thread");
 		}
 
 		/*

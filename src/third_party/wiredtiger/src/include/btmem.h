@@ -162,32 +162,6 @@ struct __wt_ovfl_reuse {
 };
 
 /*
- * Overflow tracking for cached values: When a page is reconciled, we write new
- * K/V overflow items, and discard previous underlying blocks.  If there's a
- * transaction in the system that needs to read the previous value, we have to
- * cache the old value until no running transaction needs it.
- */
-struct __wt_ovfl_txnc {
-	uint64_t current;		/* Maximum transaction ID at store */
-
-	uint32_t value_offset;		/* Overflow value offset */
-	uint32_t value_size;		/* Overflow value size */
-	uint8_t  addr_offset;		/* Overflow addr offset */
-	uint8_t  addr_size;		/* Overflow addr size */
-
-	/*
-	 * The untyped address immediately follows the WT_OVFL_TXNC
-	 * structure, the untyped value immediately follows the address.
-	 */
-#define	WT_OVFL_TXNC_ADDR(p)						\
-	((void *)((uint8_t *)(p) + (p)->addr_offset))
-#define	WT_OVFL_TXNC_VALUE(p)						\
-	((void *)((uint8_t *)(p) + (p)->value_offset))
-
-	WT_OVFL_TXNC *next[0];		/* Forward-linked skip list */
-};
-
-/*
  * Lookaside table support: when a page is being reconciled for eviction and has
  * updates that might be required by earlier readers in the system, the updates
  * are written into a lookaside table, and restored as necessary if the page is
@@ -403,18 +377,20 @@ struct __wt_page_modify {
 		WT_OVFL_REUSE	*ovfl_reuse[WT_SKIP_MAXDEPTH];
 
 		/*
-		 * Overflow value address/byte-string pairs cached until no
-		 * running transaction will possibly read them.
-		 */
-		WT_OVFL_TXNC	*ovfl_txnc[WT_SKIP_MAXDEPTH];
-
-		/*
 		 * Overflow key/value addresses to be discarded from the block
 		 * manager after reconciliation completes successfully.
 		 */
 		WT_CELL **discard;
 		size_t	  discard_entries;
 		size_t	  discard_allocated;
+
+		/* Cached overflow value cell/update address pairs. */
+		struct {
+			WT_CELL   *cell;
+			WT_UPDATE *upd;
+		} *remove;
+		size_t	 remove_allocated;
+		uint32_t remove_next;
 	} *ovfl_track;
 
 #define	WT_PAGE_LOCK(s, p) 						\
@@ -644,6 +620,7 @@ struct __wt_page {
 
 	/* This is the 64 byte boundary, try to keep hot fields above here. */
 
+	uint64_t cache_create_gen;	/* Page create timestamp */
 	uint64_t evict_pass_gen;	/* Eviction pass generation */
 };
 
@@ -920,6 +897,10 @@ WT_PACKED_STRUCT_BEGIN(__wt_update)
 #define	WT_UPDATE_DELETED	1
 #define	WT_UPDATE_RESERVED	2
 	uint8_t type;			/* type (one byte to conserve memory) */
+
+	/* The update includes a complete value. */
+#define	WT_UPDATE_DATA_VALUE(upd)					\
+	((upd)->type == WT_UPDATE_STANDARD || (upd)->type == WT_UPDATE_DELETED)
 
 	/* The untyped value immediately follows the WT_UPDATE structure. */
 #define	WT_UPDATE_DATA(upd)						\

@@ -116,6 +116,12 @@ __wt_gen_drain(WT_SESSION_IMPL *session, int which, uint64_t generation)
 			if (v == 0 || v >= generation)
 				break;
 
+			/* If we're waiting on ourselves, we're deadlocked. */
+			if (session == s) {
+				WT_ASSERT(session, session != s);
+				WT_IGNORE_RET(__wt_panic(session));
+			}
+
 			/*
 			 * The pause count is cumulative, quit spinning if it's
 			 * not doing us any good, that can happen in generations

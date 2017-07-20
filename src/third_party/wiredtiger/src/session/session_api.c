@@ -149,6 +149,10 @@ __session_alter(WT_SESSION *wt_session, const char *uri, const char *config)
 
 	SESSION_API_CALL(session, alter, config, cfg);
 
+	/* In-memory ignores alter operations. */
+	if (F_ISSET(S2C(session), WT_CONN_IN_MEMORY))
+		goto err;
+
 	/* Disallow objects in the WiredTiger name space. */
 	WT_ERR(__wt_str_name_check(session, uri));
 
@@ -161,8 +165,9 @@ __session_alter(WT_SESSION *wt_session, const char *uri, const char *config)
 	cfg[1] = NULL;
 	WT_WITH_CHECKPOINT_LOCK(session,
 	    WT_WITH_SCHEMA_LOCK(session,
-		WT_WITH_TABLE_WRITE_LOCK(session,
-		    ret = __wt_schema_alter(session, uri, cfg))));
+		ret = __wt_schema_worker(session, uri, __wt_alter, NULL, cfg,
+		WT_BTREE_ALTER |
+		WT_DHANDLE_DISCARD_FORCE | WT_DHANDLE_EXCLUSIVE)));
 
 err:	if (ret != 0)
 		WT_STAT_CONN_INCR(session, session_table_alter_fail);
@@ -700,6 +705,10 @@ __session_rebalance(WT_SESSION *wt_session, const char *uri, const char *config)
 
 	SESSION_API_CALL(session, rebalance, config, cfg);
 
+	/* In-memory ignores rebalance operations. */
+	if (F_ISSET(S2C(session), WT_CONN_IN_MEMORY))
+		goto err;
+
 	/* Block out checkpoints to avoid spurious EBUSY errors. */
 	WT_WITH_CHECKPOINT_LOCK(session,
 	    WT_WITH_SCHEMA_LOCK(session,
@@ -709,8 +718,7 @@ __session_rebalance(WT_SESSION *wt_session, const char *uri, const char *config)
 err:	if (ret != 0)
 		WT_STAT_CONN_INCR(session, session_table_rebalance_fail);
 	else
-		WT_STAT_CONN_INCR(session,
-		    session_table_rebalance_success);
+		WT_STAT_CONN_INCR(session, session_table_rebalance_success);
 	API_END_RET_NOTFOUND_MAP(session, ret);
 }
 
@@ -1046,10 +1054,7 @@ __session_salvage(WT_SESSION *wt_session, const char *uri, const char *config)
 
 	SESSION_API_CALL(session, salvage, config, cfg);
 
-	if (F_ISSET(S2C(session), WT_CONN_IN_MEMORY))
-		WT_ERR_MSG(session, ENOTSUP,
-		    "WT_SESSION.salvage not supported for in-memory "
-		    "configurations");
+	WT_ERR(__wt_inmem_unsupported_op(session, NULL));
 
 	/* Block out checkpoints to avoid spurious EBUSY errors. */
 	WT_WITH_CHECKPOINT_LOCK(session,
@@ -1258,7 +1263,7 @@ __session_truncate(WT_SESSION *wt_session,
 				WT_ERR_MSG(session, EINVAL,
 				    "the truncate method should not specify any"
 				    "target after the log: URI prefix");
-			WT_ERR(__wt_log_truncate_files(session, start, cfg));
+			WT_ERR(__wt_log_truncate_files(session, start, false));
 		} else if (WT_PREFIX_MATCH(uri, "file:"))
 			WT_ERR(__wt_session_range_truncate(
 			    session, uri, start, stop));
@@ -1319,6 +1324,9 @@ __session_upgrade(WT_SESSION *wt_session, const char *uri, const char *config)
 	session = (WT_SESSION_IMPL *)wt_session;
 
 	SESSION_API_CALL(session, upgrade, config, cfg);
+
+	WT_ERR(__wt_inmem_unsupported_op(session, NULL));
+
 	/* Block out checkpoints to avoid spurious EBUSY errors. */
 	WT_WITH_CHECKPOINT_LOCK(session,
 	    WT_WITH_SCHEMA_LOCK(session,
@@ -1363,10 +1371,7 @@ __session_verify(WT_SESSION *wt_session, const char *uri, const char *config)
 
 	SESSION_API_CALL(session, verify, config, cfg);
 
-	if (F_ISSET(S2C(session), WT_CONN_IN_MEMORY))
-		WT_ERR_MSG(session, ENOTSUP,
-		    "WT_SESSION.verify not supported for in-memory "
-		    "configurations");
+	WT_ERR(__wt_inmem_unsupported_op(session, NULL));
 
 	/* Block out checkpoints to avoid spurious EBUSY errors. */
 	WT_WITH_CHECKPOINT_LOCK(session,
@@ -1632,10 +1637,7 @@ __session_checkpoint(WT_SESSION *wt_session, const char *config)
 	WT_STAT_CONN_INCR(session, txn_checkpoint);
 	SESSION_API_CALL(session, checkpoint, config, cfg);
 
-	if (F_ISSET(S2C(session), WT_CONN_IN_MEMORY))
-		WT_ERR_MSG(session, ENOTSUP,
-		    "WT_SESSION.checkpoint not supported for in-memory "
-		    "configurations");
+	WT_ERR(__wt_inmem_unsupported_op(session, NULL));
 
 	/*
 	 * Checkpoints require a snapshot to write a transactionally consistent
@@ -1826,7 +1828,7 @@ __open_session(WT_CONNECTION_IMPL *conn,
 	if (i == conn->session_size)
 		WT_ERR_MSG(session, ENOMEM,
 		    "only configured to support %" PRIu32 " sessions"
-		    " (including %" PRIu32 " additional internal sessions)",
+		    " (including %d additional internal sessions)",
 		    conn->session_size, WT_EXTRA_INTERNAL_SESSIONS);
 
 	/*

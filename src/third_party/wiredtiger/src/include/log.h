@@ -42,7 +42,7 @@ union __wt_lsn {
 #define	WT_ZERO_LSN(l)	WT_SET_LSN((l), 0, 0)
 
 /*
- * Initialize LSN is (1,0).  We only need to shift the 1 for comparison.
+ * Test for initial LSN.  We only need to shift the 1 for comparison.
  */
 #define	WT_IS_INIT_LSN(l)	((l)->file_offset == ((uint64_t)1 << 32))
 /*
@@ -52,6 +52,10 @@ union __wt_lsn {
 #define	WT_IS_MAX_LSN(lsn)						\
 	((lsn)->l.file == UINT32_MAX &&					\
 	 ((lsn)->l.offset == INT32_MAX || (lsn)->l.offset == UINT32_MAX))
+/*
+ * Test for zero LSN.
+ */
+#define	WT_IS_ZERO_LSN(l)	((l)->file_offset == 0)
 
 /*
  * Both of the macros below need to change if the content of __wt_lsn
@@ -198,10 +202,11 @@ struct __wt_myslot {
 	uint32_t flags;			/* Flags */
 };
 
-#define	WT_LOG_FIRST_RECORD	log->allocsize
+#define	WT_LOG_END_HEADER	log->allocsize
 
 struct __wt_log {
 	uint32_t	allocsize;	/* Allocation alignment size */
+	uint32_t	first_record;	/* Offset of first record in file */
 	wt_off_t	log_written;	/* Amount of log written this period */
 	/*
 	 * Log file information
@@ -214,6 +219,8 @@ struct __wt_log {
 	WT_FH           *log_dir_fh;	/* Log directory file handle */
 	WT_FH           *log_close_fh;	/* Logging file handle to close */
 	WT_LSN		 log_close_lsn;	/* LSN needed to close */
+
+	uint16_t	 log_version;	/* Version of log file */
 
 	/*
 	 * System LSNs
@@ -232,6 +239,7 @@ struct __wt_log {
 	 * Synchronization resources
 	 */
 	WT_SPINLOCK      log_lock;      /* Locked: Logging fields */
+	WT_SPINLOCK      log_fs_lock;   /* Locked: tmp, prep and log files */
 	WT_SPINLOCK      log_slot_lock; /* Locked: Consolidation array */
 	WT_SPINLOCK      log_sync_lock; /* Locked: Single-thread fsync */
 	WT_SPINLOCK      log_writelsn_lock; /* Locked: write LSN */
@@ -261,8 +269,9 @@ struct __wt_log {
 	uint64_t	 write_calls;		/* Calls to log_write */
 #endif
 
-#define	WT_LOG_OPENED		0x01	/* Log subsystem successfully open */
-#define	WT_LOG_TRUNCATE_NOTSUP	0x02	/* File system truncate not supported */
+#define	WT_LOG_FORCE_NEWFILE	0x01	/* Force switch to new log file */
+#define	WT_LOG_OPENED		0x02	/* Log subsystem successfully open */
+#define	WT_LOG_TRUNCATE_NOTSUP	0x04	/* File system truncate not supported */
 	uint32_t	flags;
 };
 
@@ -303,12 +312,22 @@ __wt_log_record_byteswap(WT_LOG_RECORD *record)
 struct __wt_log_desc {
 #define	WT_LOG_MAGIC		0x101064
 	uint32_t	log_magic;	/* 00-03: Magic number */
-#define	WT_LOG_MAJOR_VERSION	1
-	uint16_t	majorv;		/* 04-05: Major version */
-#define	WT_LOG_MINOR_VERSION	0
-	uint16_t	minorv;		/* 06-07: Minor version */
+#define	WT_LOG_VERSION	2
+	uint16_t	version;	/* 04-05: Log version */
+	uint16_t	unused;		/* 06-07: Unused */
 	uint64_t	log_size;	/* 08-15: Log file size */
 };
+/*
+ * This is the log version that introduced the system record.
+ */
+#define	WT_LOG_VERSION_SYSTEM	2
+
+/*
+ * WiredTiger release version where log format version changed.
+ * We only have to check the major version for now.  It is minor
+ * version 0 once release numbers move on.
+ */
+#define	WT_LOG_V2	3
 
 /*
  * __wt_log_desc_byteswap --
@@ -320,8 +339,8 @@ __wt_log_desc_byteswap(WT_LOG_DESC *desc)
 {
 #ifdef	WORDS_BIGENDIAN
 	desc->log_magic = __wt_bswap32(desc->log_magic);
-	desc->majorv = __wt_bswap16(desc->majorv);
-	desc->minorv = __wt_bswap16(desc->minorv);
+	desc->version = __wt_bswap16(desc->version);
+	desc->unused = __wt_bswap16(desc->unused);
 	desc->log_size = __wt_bswap64(desc->log_size);
 #else
 	WT_UNUSED(desc);

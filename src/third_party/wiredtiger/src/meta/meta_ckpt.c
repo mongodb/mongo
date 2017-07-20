@@ -429,7 +429,7 @@ __wt_meta_ckptlist_set(WT_SESSION_IMPL *session,
 		}
 		if (strcmp(ckpt->name, WT_CHECKPOINT) == 0)
 			WT_ERR(__wt_buf_catfmt(session, buf,
-			    "%s%s.%" PRId64 "=(addr=\"%.*s\",order=%" PRIu64
+			    "%s%s.%" PRId64 "=(addr=\"%.*s\",order=%" PRId64
 			    ",time=%" PRIuMAX ",size=%" PRIu64
 			    ",write_gen=%" PRIu64 ")",
 			    sep, ckpt->name, ckpt->order,
@@ -438,7 +438,7 @@ __wt_meta_ckptlist_set(WT_SESSION_IMPL *session,
 			    ckpt->write_gen));
 		else
 			WT_ERR(__wt_buf_catfmt(session, buf,
-			    "%s%s=(addr=\"%.*s\",order=%" PRIu64
+			    "%s%s=(addr=\"%.*s\",order=%" PRId64
 			    ",time=%" PRIuMAX ",size=%" PRIu64
 			    ",write_gen=%" PRIu64 ")",
 			    sep, ckpt->name,

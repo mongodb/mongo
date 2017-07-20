@@ -134,7 +134,7 @@ key_gen_insert(WT_RAND_STATE *rnd, WT_ITEM *key, uint64_t keyno)
 	    "11", "12", "13", "14", "15"
 	};
 
-	key_gen_common(key, keyno, suffix[mmrand(rnd, 1, 15) - 1]);
+	key_gen_common(key, keyno, suffix[mmrand(rnd, 0, 14)]);
 }
 
 static uint32_t val_dup_data_len;	/* Length of duplicate data items */
@@ -408,8 +408,9 @@ path_setup(const char *home)
 uint32_t
 rng(WT_RAND_STATE *rnd)
 {
-	char buf[64];
-	uint32_t r;
+	u_long ulv;
+	uint32_t v;
+	char *endptr, buf[64];
 
 	/*
 	 * Threaded operations have their own RNG information, otherwise we
@@ -439,16 +440,19 @@ rng(WT_RAND_STATE *rnd)
 			testutil_die(errno, "random number log");
 		}
 
-		return ((uint32_t)strtoul(buf, NULL, 10));
+		errno = 0;
+		ulv = strtoul(buf, &endptr, 10);
+		testutil_assert(errno == 0 && endptr[0] == '\n');
+		return ((uint32_t)ulv);
 	}
 
-	r = __wt_random(rnd);
+	v = __wt_random(rnd);
 
 	/* Save and flush the random number so we're up-to-date on error. */
-	(void)fprintf(g.randfp, "%" PRIu32 "\n", r);
+	(void)fprintf(g.randfp, "%" PRIu32 "\n", v);
 	(void)fflush(g.randfp);
 
-	return (r);
+	return (v);
 }
 
 /*
@@ -476,6 +480,7 @@ WT_THREAD_RET
 alter(void *arg)
 {
 	WT_CONNECTION *conn;
+	WT_DECL_RET;
 	WT_SESSION *session;
 	u_int period;
 	bool access_value;
@@ -501,8 +506,12 @@ alter(void *arg)
 		    "access_pattern_hint=%s",
 		    access_value ? "random" : "none"));
 		access_value = !access_value;
-		if (session->alter(session, g.uri, buf) != 0)
-			break;
+		/*
+		 * Alter can return EBUSY if concurrent with other operations.
+		 */
+		while ((ret = session->alter(session, g.uri, buf)) != 0 &&
+		    ret != EBUSY)
+			testutil_die(ret, "session.alter");
 		while (period > 0 && !g.workers_finished) {
 			--period;
 			sleep(1);
@@ -510,5 +519,47 @@ alter(void *arg)
 	}
 
 	testutil_check(session->close(session, NULL));
+	return (WT_THREAD_RET_VALUE);
+}
+
+#define	COMPATSTR_V1	"compatibility=(release=2.6)"
+#define	COMPATSTR_V2	"compatibility=(release=3.0)"
+
+/*
+ * compat --
+ *	Periodically reconfigure the compatibility option.
+ */
+WT_THREAD_RET
+compat(void *arg)
+{
+	WT_CONNECTION *conn;
+	WT_DECL_RET;
+	u_int count, period;
+	const char *str;
+
+	(void)(arg);
+
+	conn = g.wts_conn;
+	str = NULL;
+	/*
+	 * Perform compatibility swaps at somewhere under 10 seconds (so we
+	 * get at least one done), and then at 7 second intervals.
+	 */
+	for (period = mmrand(NULL, 1, 10), count = 0;; ++count, period = 7) {
+		if (count % 2 == 0)
+			str = COMPATSTR_V1;
+		else
+			str = COMPATSTR_V2;
+		if ((ret = conn->reconfigure(conn, str)) != 0)
+			testutil_die(ret, "conn.reconfigure");
+
+		/* Sleep for short periods so we don't make the run wait. */
+		while (period > 0 && !g.workers_finished) {
+			--period;
+			sleep(1);
+		}
+		if (g.workers_finished)
+			break;
+	}
 	return (WT_THREAD_RET_VALUE);
 }

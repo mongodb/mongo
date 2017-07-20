@@ -235,8 +235,8 @@ __txn_op_apply(
 	return (0);
 
 err:	__wt_err(session, ret,
-	    "operation apply failed during recovery: operation type %d "
-	    "at LSN %" PRIu32 "/%" PRIu32,
+	    "operation apply failed during recovery: operation type %"
+	    PRIu32 " at LSN %" PRIu32 "/%" PRIu32,
 	    optype, lsnp->l.file, lsnp->l.offset);
 	return (ret);
 }
@@ -588,7 +588,6 @@ __wt_txn_recover(WT_SESSION_IMPL *session)
 	 * LSN and archiving.
 	 */
 ckpt:	WT_ERR(session->iface.checkpoint(&session->iface, "force=1"));
-
 done:	FLD_SET(conn->log_flags, WT_CONN_LOG_RECOVER_DONE);
 err:	WT_TRET(__recovery_free(&r));
 	__wt_free(session, config);

@@ -41,9 +41,9 @@
  * any operation taking longer than 1/2 the delay time, we abort dumping a core
  * file which can be used to determine what operation was blocked.
  */
-void* do_checkpoints(void *);
-void* do_ops(void *);
-void* monitor(void *);
+static WT_THREAD_RET do_checkpoints(void *);
+static WT_THREAD_RET do_ops(void *);
+static WT_THREAD_RET monitor(void *);
 
 /*
  * Time delay to introduce into checkpoints in seconds. Should be at-least
@@ -51,8 +51,8 @@ void* monitor(void *);
  * this is set to 10 seconds and we expect no single operation to take longer
  * than 5 seconds.
  */
-#define	MAX_EXECUTION_TIME 10
-#define	N_THREADS 10
+#define	MAX_EXECUTION_TIME	10
+#define	N_THREADS		10
 
 /*
  * Number of seconds to execute for. Initially set to 15 minutes, as we need to
@@ -60,7 +60,7 @@ void* monitor(void *);
  * testing 5 minutes was enough to reproduce the issue, so we run for 3x that
  * here to ensure we reproduce before declaring success.
  */
-#define	RUNTIME 900.0
+#define	RUNTIME	900.0
 
 static WT_EVENT_HANDLER event_handler = {
 	handle_op_error,
@@ -72,17 +72,10 @@ static WT_EVENT_HANDLER event_handler = {
 int
 main(int argc, char *argv[])
 {
-	TEST_PER_THREAD_OPTS thread_args[N_THREADS];
 	TEST_OPTS *opts, _opts;
+	TEST_PER_THREAD_OPTS thread_args[N_THREADS];
 	pthread_t ckpt_thread, mon_thread, threads[N_THREADS];
 	int i;
-	bool diagnostic;
-
-#ifdef HAVE_DIAGNOSTIC
-	diagnostic = true;
-#else
-	diagnostic = false;
-#endif
 
 	/*
 	 * This test should not run unless we have compiled with diagnostic
@@ -90,7 +83,15 @@ main(int argc, char *argv[])
 	 * attempting to set the option to add the delays to checkpoints if
 	 * diagnostic mode is not enable and runs for 15 minutes.
 	 */
-	if (!testutil_is_flag_set("WT3363_CHECKPOINT_OP_RACES") || !diagnostic)
+#if !defined(HAVE_DIAGNOSTIC)
+	/*
+	 * Put the return in a conditional, otherwise some compilers will
+	 * complain that code beyond the return is unreachable.
+	 */
+	if (true)
+		return (EXIT_SUCCESS);
+#endif
+	if (!testutil_is_flag_set("WT3363_CHECKPOINT_OP_RACES"))
 		return (EXIT_SUCCESS);
 
 	opts = &_opts;
@@ -105,14 +106,14 @@ main(int argc, char *argv[])
 	    &opts->conn));
 
 	testutil_check(pthread_create(
-	    &ckpt_thread, NULL, do_checkpoints, (void *)opts));
+	    &ckpt_thread, NULL, do_checkpoints, opts));
 
 	for (i = 0; i < N_THREADS; ++i) {
 		thread_args[i].testopts = opts;
 		thread_args[i].thread_counter = 0;
 		thread_args[i].threadnum = i;
 		testutil_check(pthread_create(
-		    &threads[i], NULL, do_ops, (void *)&thread_args[i]));
+		    &threads[i], NULL, do_ops, &thread_args[i]));
 	}
 
 	/*
@@ -120,8 +121,7 @@ main(int argc, char *argv[])
 	 * This thread will need to monitor each threads counter to track if it
 	 * is stuck.
 	 */
-	testutil_check(
-	    pthread_create(&mon_thread, NULL, monitor, &thread_args));
+	testutil_check(pthread_create(&mon_thread, NULL, monitor, thread_args));
 
 	for (i = 0; i < N_THREADS; ++i)
 		testutil_check(pthread_join(threads[i], NULL));
@@ -139,7 +139,7 @@ main(int argc, char *argv[])
 /*
  * Function for repeatedly running checkpoint operations.
  */
-void *
+static WT_THREAD_RET
 do_checkpoints(void *_opts)
 {
 	TEST_OPTS *opts;
@@ -159,7 +159,7 @@ do_checkpoints(void *_opts)
 			if (ret != EBUSY && ret != ENOENT)
 				testutil_die(ret, "session.checkpoint");
 
-		 testutil_check(session->close(session, NULL));
+		testutil_check(session->close(session, NULL));
 
 		/*
 		 * A short sleep to let operations process and avoid back to
@@ -169,21 +169,21 @@ do_checkpoints(void *_opts)
 		(void)time(&now);
 	}
 
-	return (NULL);
+	return (WT_THREAD_RET_VALUE);
 }
 
 /*
  * Function to monitor running operations and abort to dump core in the event
  * that we catch an operation running long.
  */
-void *
+static WT_THREAD_RET
 monitor(void *args)
 {
 	TEST_PER_THREAD_OPTS *thread_args;
 	time_t now, start;
 	int ctr, i, last_ops[N_THREADS];
 
-	thread_args = (TEST_PER_THREAD_OPTS*)args;
+	thread_args = (TEST_PER_THREAD_OPTS *)args;
 
 	(void)time(&start);
 	(void)time(&now);
@@ -191,13 +191,12 @@ monitor(void *args)
 	memset(last_ops, 0, sizeof(int) + N_THREADS);
 
 	while (difftime(now, start) < RUNTIME) {
-
 		/*
 		 * Checkpoints will run for slightly over MAX_EXECUTION_TIME.
 		 * MAX_EXECUTION_TIME should always be long enough that we can
 		 * complete any single operation in 1/2 that time.
 		 */
-		sleep(MAX_EXECUTION_TIME/2);
+		sleep(MAX_EXECUTION_TIME / 2);
 
 		for (i = 0; i < N_THREADS; i++) {
 			ctr = thread_args[i].thread_counter;
@@ -217,20 +216,20 @@ monitor(void *args)
 			else {
 				printf("Thread %d had a task running"
 				    " for more than %d seconds\n",
-				    i, MAX_EXECUTION_TIME/2);
+				    i, MAX_EXECUTION_TIME / 2);
 				abort();
 			}
 		}
 		(void)time(&now);
 	}
 
-	return (NULL);
+	return (WT_THREAD_RET_VALUE);
 }
 
 /*
  * Worker thread. Executes random operations from the set of 6.
  */
-void *
+static WT_THREAD_RET
 do_ops(void *args)
 {
 	WT_RAND_STATE rnd;
@@ -242,27 +241,27 @@ do_ops(void *args)
 
 	while (difftime(now, start) < RUNTIME) {
 		switch (__wt_random(&rnd) % 6) {
-			case 0:
-				op_bulk(args);
-				break;
-			case 1:
-				op_create(args);
-				break;
-			case 2:
-				op_cursor(args);
-				break;
-			case 3:
-				op_drop(args);
-				break;
-			case 4:
-				op_bulk_unique(args);
-				break;
-			case 5:
-				op_create_unique(args);
-				break;
+		case 0:
+			op_bulk(args);
+			break;
+		case 1:
+			op_create(args);
+			break;
+		case 2:
+			op_cursor(args);
+			break;
+		case 3:
+			op_drop(args);
+			break;
+		case 4:
+			op_bulk_unique(args);
+			break;
+		case 5:
+			op_create_unique(args);
+			break;
 		}
 		(void)time(&now);
 	}
 
-	return (NULL);
+	return (WT_THREAD_RET_VALUE);
 }

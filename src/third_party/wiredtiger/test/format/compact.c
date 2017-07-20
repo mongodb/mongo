@@ -63,8 +63,12 @@ compact(void *arg)
 		if (g.workers_finished)
 			break;
 
-		if ((ret = session->compact(
-		    session, g.uri, NULL)) != 0 && ret != WT_ROLLBACK)
+		/*
+		 * Compact can return EBUSY if concurrent with alter.
+		 */
+		while ((ret = session->compact(session, g.uri, NULL)) == EBUSY)
+			__wt_yield();
+		if (ret != 0 && ret != WT_ROLLBACK)
 			testutil_die(ret, "session.compact");
 	}
 

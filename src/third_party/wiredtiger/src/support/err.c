@@ -361,6 +361,22 @@ __wt_ext_err_printf(
 }
 
 /*
+ * __wt_verbose_worker --
+ * 	Verbose message.
+ */
+void
+__wt_verbose_worker(WT_SESSION_IMPL *session, const char *fmt, ...)
+    WT_GCC_FUNC_ATTRIBUTE((format (printf, 2, 3)))
+    WT_GCC_FUNC_ATTRIBUTE((cold))
+{
+	va_list ap;
+
+	va_start(ap, fmt);
+	WT_IGNORE_RET(__wt_eventv(session, true, 0, NULL, 0, fmt, ap));
+	va_end(ap);
+}
+
+/*
  * info_msg --
  * 	Informational message.
  */
@@ -530,6 +546,22 @@ __wt_illegal_value(WT_SESSION_IMPL *session, const char *name)
 	    "encountered an illegal file format or internal value");
 
 	return (__wt_panic(session));
+}
+
+/*
+ * __wt_inmem_unsupported_op --
+ *	Print a standard error message for an operation that's not supported
+ * for in-memory configurations.
+ */
+int
+__wt_inmem_unsupported_op(WT_SESSION_IMPL *session, const char *tag)
+    WT_GCC_FUNC_ATTRIBUTE((cold))
+{
+	if (F_ISSET(S2C(session), WT_CONN_IN_MEMORY))
+		WT_RET_MSG(session, ENOTSUP,
+		    "%s%snot supported for in-memory configurations",
+		    tag == NULL ? "" : tag, tag == NULL ? "" : ": ");
+	return (0);
 }
 
 /*

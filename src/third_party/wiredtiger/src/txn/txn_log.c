@@ -425,7 +425,8 @@ __wt_txn_checkpoint_log(
 		 * metadata LSN and we do not want to archive in that case.
 		 */
 		if (!conn->hot_backup &&
-		    !FLD_ISSET(conn->log_flags, WT_CONN_LOG_RECOVER_DIRTY) &&
+		    (!FLD_ISSET(conn->log_flags, WT_CONN_LOG_RECOVER_DIRTY) ||
+		    FLD_ISSET(conn->log_flags, WT_CONN_LOG_FORCE_DOWNGRADE)) &&
 		    txn->full_ckpt)
 			__wt_log_ckpt(session, ckpt_lsn);
 
@@ -588,6 +589,16 @@ __txn_printlog(WT_SESSION_IMPL *session,
 		    "    \"type\" : \"message\",\n"));
 		WT_RET(__wt_fprintf(session, WT_STDOUT(session),
 		    "    \"message\" : \"%s\"\n", msg));
+		break;
+
+	case WT_LOGREC_SYSTEM:
+		WT_RET(__wt_struct_unpack(session, p, WT_PTRDIFF(end, p),
+		    WT_UNCHECKED_STRING(II), &lsnfile, &lsnoffset));
+		WT_RET(__wt_fprintf(session, WT_STDOUT(session),
+		    "    \"type\" : \"system\",\n"));
+		WT_RET(__wt_fprintf(session, WT_STDOUT(session),
+		    "    \"prev_lsn\" : [%" PRIu32 ",%" PRIu32 "]\n",
+		    lsnfile, lsnoffset));
 		break;
 	}
 

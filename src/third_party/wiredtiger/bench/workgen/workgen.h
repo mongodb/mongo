@@ -33,6 +33,7 @@
 namespace workgen {
 
 struct ContextInternal;
+struct OperationInternal;
 struct TableInternal;
 struct Thread;
 struct Transaction;
@@ -245,11 +246,15 @@ struct Operation {
     Table _table;
     Key _key;
     Value _value;
+    std::string _config;
     Transaction *_transaction;
     std::vector<Operation> *_group;
     int _repeatgroup;
 
 #ifndef SWIG
+#define	WORKGEN_OP_REOPEN		0x0001 // reopen cursor for each op
+    uint32_t _flags;
+
     int _keysize;    // derived from Key._size and Table.options.key_size
     int _valuesize;
     uint64_t _keymax;
@@ -266,6 +271,7 @@ struct Operation {
     void describe(std::ostream &os) const;
 #ifndef SWIG
     Operation& operator=(const Operation &other);
+    void create_all();
     void get_static_counts(Stats &stats, int multiplier);
     void kv_compute_max(bool);
     void kv_gen(bool, uint64_t, char *) const;
@@ -408,4 +414,4 @@ struct Workload {
     int run(WT_CONNECTION *conn);
 };
 
-};
+}

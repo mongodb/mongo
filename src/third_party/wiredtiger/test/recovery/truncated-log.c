@@ -90,14 +90,17 @@ write_and_read_new(WT_SESSION *session)
 		    &optype, &fileid, &logrec_key, &logrec_value)) != 0)
 			testutil_die(errno, "get_value");
 		/*
-		 * We should never see a record from log file 2.  We wrote
+		 * We should never see a record from us in log file 2.  We wrote
 		 * a record there, but then the record in log file 1 was
 		 * truncated to be a partial record, ending the log there.
 		 * So everything after that, including everything in log
 		 * file 2, is invalid until we get to log file 3 which is where
 		 * the post-recovery records will be written.
+		 * The one exception in log file two is the system record for
+		 * the previous log file's LSN.  Although it is written by the
+		 * system, we do walk it when using a cursor.
 		 */
-		if (log_file == 2)
+		if (log_file == 2 && rectype != WT_LOGREC_SYSTEM)
 			testutil_die(EINVAL, "Found LSN in Log 2");
 #if 0
 		printf("LSN [%" PRIu32 "][%" PRIu32 "].%" PRIu32
@@ -348,9 +351,10 @@ main(int argc, char *argv[])
 	/*
 	 * The max key in the saved file is the key we truncated, but the
 	 * key space starts at 0 and we're counting the records here, so we
-	 * expect the max key number of records.
+	 * expect the max key number of records.  Add one for the system
+	 * record for the previous LSN that the cursor will see too.
 	 */
-	if (count > max_key) {
+	if (count > (max_key + 1)) {
 		printf("expected %" PRIu32 " records found %" PRIu32 "\n",
 		    max_key, count);
 		return (EXIT_FAILURE);

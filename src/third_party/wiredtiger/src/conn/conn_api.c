@@ -190,6 +190,45 @@ __wt_conn_remove_collator(WT_SESSION_IMPL *session)
 }
 
 /*
+ * __conn_compat_config --
+ *	Configure compatibility version.
+ */
+static int
+__conn_compat_config(WT_SESSION_IMPL *session, const char **cfg)
+{
+	WT_CONFIG_ITEM cval;
+	WT_CONNECTION_IMPL *conn;
+	uint16_t patch;
+
+	conn = S2C(session);
+	WT_RET(__wt_config_gets(session, cfg,
+	    "compatibility.release", &cval));
+	if (cval.len != 0) {
+		/*
+		 * Accept either a major.minor release string or a
+		 * major.minor.patch release string.  We ignore the patch
+		 * value, but allow it in the string.
+		 */
+		if (sscanf(cval.str, "%" SCNu16 ".%" SCNu16,
+		    &conn->compat_major, &conn->compat_minor) != 2 &&
+		    sscanf(cval.str, "%" SCNu16 ".%" SCNu16 ".%" SCNu16,
+		    &conn->compat_major, &conn->compat_minor, &patch) != 3)
+			WT_RET_MSG(session,
+			    EINVAL, "illegal compatibility release");
+		if (conn->compat_major > WIREDTIGER_VERSION_MAJOR)
+			WT_RET_MSG(session, EINVAL, "unknown major version");
+		if (conn->compat_major == WIREDTIGER_VERSION_MAJOR &&
+		    conn->compat_minor > WIREDTIGER_VERSION_MINOR)
+			WT_RET_MSG(session,
+			    EINVAL, "illegal compatibility version");
+	} else {
+		conn->compat_major = WIREDTIGER_VERSION_MAJOR;
+		conn->compat_minor = WIREDTIGER_VERSION_MINOR;
+	}
+	return (0);
+}
+
+/*
  * __compressor_confchk --
  *	Validate the compressor.
  */
@@ -1134,6 +1173,7 @@ __conn_reconfigure(WT_CONNECTION *wt_conn, const char *config)
 	cfg[1] = config;
 
 	/* Second, reconfigure the system. */
+	WT_ERR(__conn_compat_config(session, cfg));
 	WT_ERR(__conn_statistics_config(session, cfg));
 	WT_ERR(__wt_async_reconfig(session, cfg));
 	WT_ERR(__wt_cache_config(session, true, cfg));
@@ -2018,6 +2058,7 @@ __conn_write_base_config(WT_SESSION_IMPL *session, const char *cfg[])
 	 * merge the rest to be written.
 	 */
 	WT_ERR(__wt_config_merge(session, cfg + 1,
+	    "compatibility=(release=),"
 	    "config_base=,"
 	    "create=,"
 	    "encryption=(secretkey=),"
@@ -2285,6 +2326,11 @@ wiredtiger_open(const char *home, WT_EVENT_HANDLER *event_handler,
 	 * extension is to configure a file system).
 	 */
 	WT_ERR(__conn_load_extensions(session, cfg, true));
+
+	/*
+	 * Set compatibility versions early so that any subsystem sees it.
+	 */
+	WT_ERR(__conn_compat_config(session, cfg));
 
 	/*
 	 * If the application didn't configure its own file system, configure

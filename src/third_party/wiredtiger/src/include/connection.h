@@ -184,6 +184,9 @@ struct __wt_connection_impl {
 	const char *error_prefix;	/* Database error prefix */
 	int is_new;			/* Connection created database */
 
+	uint16_t compat_major;		/* Compatibility major version */
+	uint16_t compat_minor;		/* Compatibility minor version */
+
 	WT_EXTENSION_API extension_api;	/* Extension API */
 
 					/* Configuration */
@@ -302,18 +305,22 @@ struct __wt_connection_impl {
 	WT_CONDVAR	*stat_cond;	/* Statistics log wait mutex */
 	const char	*stat_format;	/* Statistics log timestamp format */
 	WT_FSTREAM	*stat_fs;	/* Statistics log stream */
+	/* Statistics log json table printing state flag */
+	bool		 stat_json_tables;
 	char		*stat_path;	/* Statistics log path format */
 	char	       **stat_sources;	/* Statistics log list of objects */
 	const char	*stat_stamp;	/* Statistics log entry timestamp */
 	uint64_t	 stat_usecs;	/* Statistics log period */
 
-#define	WT_CONN_LOG_ARCHIVE		0x01	/* Archive is enabled */
-#define	WT_CONN_LOG_ENABLED		0x02	/* Logging is enabled */
-#define	WT_CONN_LOG_EXISTED		0x04	/* Log files found */
-#define	WT_CONN_LOG_RECOVER_DIRTY	0x08	/* Recovering unclean */
-#define	WT_CONN_LOG_RECOVER_DONE	0x10	/* Recovery completed */
-#define	WT_CONN_LOG_RECOVER_ERR		0x20	/* Error if recovery required */
-#define	WT_CONN_LOG_ZERO_FILL		0x40	/* Manually zero files */
+#define	WT_CONN_LOG_ARCHIVE		0x001	/* Archive is enabled */
+#define	WT_CONN_LOG_DOWNGRADED		0x002	/* Running older version */
+#define	WT_CONN_LOG_ENABLED		0x004	/* Logging is enabled */
+#define	WT_CONN_LOG_EXISTED		0x008	/* Log files found */
+#define	WT_CONN_LOG_FORCE_DOWNGRADE	0x010	/* Force downgrade */
+#define	WT_CONN_LOG_RECOVER_DIRTY	0x020	/* Recovering unclean */
+#define	WT_CONN_LOG_RECOVER_DONE	0x040	/* Recovery completed */
+#define	WT_CONN_LOG_RECOVER_ERR		0x080	/* Error if recovery required */
+#define	WT_CONN_LOG_ZERO_FILL		0x100	/* Manually zero files */
 	uint32_t	 log_flags;	/* Global logging configuration */
 	WT_CONDVAR	*log_cond;	/* Log server wait mutex */
 	WT_SESSION_IMPL *log_session;	/* Log server session */

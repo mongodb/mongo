@@ -100,9 +100,9 @@ class test_reconfig02(wttest.WiredTigerTestCase):
         c.close()
         # Close and reopen connection to write a checkpoint, move to the
         # next log file and verify that archive did not run.
-        orig_logs = fnmatch.filter(os.listdir('.'), "*Log*")
+        orig_logs = fnmatch.filter(os.listdir('.'), "*gerLog*")
         self.reopen_conn()
-        cur_logs = fnmatch.filter(os.listdir('.'), "*Log*")
+        cur_logs = fnmatch.filter(os.listdir('.'), "*gerLog*")
         for o in orig_logs:
             self.assertEqual(True, o in cur_logs)
 
@@ -111,7 +111,7 @@ class test_reconfig02(wttest.WiredTigerTestCase):
         self.conn.reconfigure("log=(archive=true)")
         self.session.checkpoint("force")
         time.sleep(2)
-        cur_logs = fnmatch.filter(os.listdir('.'), "*Log*")
+        cur_logs = fnmatch.filter(os.listdir('.'), "*gerLog*")
         for o in orig_logs:
             self.assertEqual(False, o in cur_logs)
 

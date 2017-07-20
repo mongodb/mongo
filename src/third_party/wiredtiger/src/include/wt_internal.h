@@ -250,8 +250,6 @@ struct __wt_ovfl_reuse;
     typedef struct __wt_ovfl_reuse WT_OVFL_REUSE;
 struct __wt_ovfl_track;
     typedef struct __wt_ovfl_track WT_OVFL_TRACK;
-struct __wt_ovfl_txnc;
-    typedef struct __wt_ovfl_txnc WT_OVFL_TXNC;
 struct __wt_page;
     typedef struct __wt_page WT_PAGE;
 struct __wt_page_deleted;

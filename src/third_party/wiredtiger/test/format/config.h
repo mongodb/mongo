@@ -117,6 +117,10 @@ static CONFIG c[] = {
 	  "if compaction is running",				/* 10% */
 	  C_BOOL, 10, 0, 0, &g.c_compact, NULL },
 
+	{ "compatibility",
+	  "log file compatibility (none | v1 | v2 )",
+	  C_IGNORE|C_STRING, 0, 0, 0, NULL, &g.c_compat },
+
 	{ "compression",
 	  "type of compression " COMPRESSION_LIST,
 	  C_IGNORE|C_STRING, 0, 0, 0, NULL, &g.c_compression },

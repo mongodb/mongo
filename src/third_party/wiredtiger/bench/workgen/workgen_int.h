@@ -203,4 +203,4 @@ private:
     WorkloadRunner& operator=(const WorkloadRunner &other); // disallowed
 };
 
-};
+}

@@ -18,7 +18,6 @@ AC_DEFUN([AM_GCC_WARNINGS], [
 	w="$w -Wjump-misses-init"
 	w="$w -Wmissing-declarations"
 	w="$w -Wmissing-field-initializers"
-	w="$w -Wmissing-parameter-type"
 	w="$w -Wmissing-prototypes"
 	w="$w -Wnested-externs"
 	w="$w -Wold-style-definition"
@@ -33,7 +32,6 @@ AC_DEFUN([AM_GCC_WARNINGS], [
 	w="$w -Wundef"
 	w="$w -Wuninitialized"
 	w="$w -Wunreachable-code"
-	w="$w -Wunsafe-loop-optimizations"
 	w="$w -Wunused"
 	w="$w -Wwrite-strings"
 
@@ -48,10 +46,33 @@ AC_DEFUN([AM_GCC_WARNINGS], [
 	#	Additional warning messages.
 	case "$1" in
 	[*4.7.[0-9]*])					# gcc4.7
-		w="$w -Wno-c11-extensions";;
+		w="$w -Wno-c11-extensions"
+		w="$w -Wunsafe-loop-optimizations";;
 	[*6.[0-9].[0-9]*])				# gcc6.X
 		w="$w -Wduplicated-cond"
-		w="$w -Wmisleading-indentation";;
+		w="$w -Wformat-signedness"
+		w="$w -Wjump-misses-init"
+		w="$w -Wlogical-op"
+		w="$w -Wredundant-decls"
+		w="$w -Wunsafe-loop-optimizations"
+		w="$w -Wunused-const-variable=2"
+		w="$w -Wunused-macros"
+		w="$w -Wvariadic-macros";;
+	[*7.[0-9].[0-9]*])				# gcc7.X
+		w="$w -Walloca"
+		w="$w -Walloc-zero"
+		w="$w -Wduplicated-branches"
+		w="$w -Wduplicated-cond"
+		w="$w -Wformat-overflow=2"
+		w="$w -Wformat-signedness"
+		w="$w -Wformat-truncation=2"
+		w="$w -Wjump-misses-init"
+		w="$w -Wlogical-op"
+		w="$w -Wredundant-decls"
+		w="$w -Wrestrict"
+		w="$w -Wunused-const-variable=2"
+		w="$w -Wunused-macros"
+		w="$w -Wvariadic-macros";;
 	esac
 
 	wt_cv_strict_warnings="$w"

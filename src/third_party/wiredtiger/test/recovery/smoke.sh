@@ -6,4 +6,6 @@ set -e
 
 $TEST_WRAPPER ./random-abort -t 10 -T 5
 $TEST_WRAPPER ./random-abort -m -t 10 -T 5
+$TEST_WRAPPER ./random-abort -C -t 10 -T 5
+$TEST_WRAPPER ./random-abort -C -m -t 10 -T 5
 $TEST_WRAPPER ./truncated-log

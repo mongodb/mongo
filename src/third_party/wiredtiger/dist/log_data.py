@@ -40,6 +40,10 @@ rectypes = [
 
     # Debugging message in the log
     LogRecordType('message', 'message', [('string', 'message')]),
+
+    # System record
+    LogRecordType('system', 'system', [
+        ('WT_LSN','prev_lsn'), ('item', 'unused')]),
 ]
 
 class LogOperationType:
