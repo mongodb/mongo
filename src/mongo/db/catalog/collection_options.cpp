@@ -37,7 +37,7 @@
 
 namespace mongo {
 
-bool enableCollectionUUIDs = true;
+bool enableCollectionUUIDs = false;
 ExportedServerParameter<bool, ServerParameterType::kStartupOnly> enableCollectionUUIDsParameter(
     ServerParameterSet::getGlobal(), "enableCollectionUUIDs", &enableCollectionUUIDs);
 

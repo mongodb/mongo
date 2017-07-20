@@ -27,9 +27,6 @@ executor:
           authMechanism: SCRAM-SHA-1
           keyFile: *keyFile
           keyFileData: *keyFileData
-          # See SERVER-30161
-          setParameters: "enableCollectionUUIDs=0"
-
       authenticationDatabase: local
       authenticationMechanism: SCRAM-SHA-1
       password: *keyFileData
