@@ -35,7 +35,7 @@
             commandProfile["command." + key] = command[key];
         }
         return commandProfile;
-    }
+    };
 
     // Check that a test case is well-formed.
     let validateTestCase =
@@ -45,7 +45,7 @@
         assert(test.checkResults && typeof(test.checkResults) === "function");
         assert(test.behavior === "unshardedOnly" || test.behavior === "unversioned" ||
                test.behavior === "versioned");
-    }
+    };
 
     let testCases = {
         _configsvrAddShard: {skip: "primary only"},
