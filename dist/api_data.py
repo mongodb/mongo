@@ -891,7 +891,7 @@ methods = {
         not available immediately''',
         type='boolean', undoc=True),
     Config('remove_files', 'true', r'''
-        should the underlying files be removed?''',
+        if the underlying files should be removed''',
         type='boolean'),
 ]),
 
