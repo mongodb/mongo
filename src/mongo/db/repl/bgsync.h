@@ -175,6 +175,15 @@ private:
                       StorageInterface* storageInterface);
 
     /**
+     * Executes a rollback with the recover to checkpoint algorithm. This is the default rollback
+     * algorithm.
+     */
+    void _runRollbackViaRecoverToCheckpoint(const HostAndPort& source,
+                                            int requiredRBID,
+                                            OplogInterface* localOplog,
+                                            StorageInterface* storageInterface);
+
+    /**
      * Executes a rollback via refetch in either rs_rollback.cpp or rs_rollback_no_uuid.cpp
      *
      * We fall back on the rollback via refetch algorithm when:
