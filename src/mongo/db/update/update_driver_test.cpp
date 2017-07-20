@@ -53,7 +53,7 @@ using mongoutils::str::stream;
 TEST(Parse, Normal) {
     UpdateDriver::Options opts;
     UpdateDriver driver(opts);
-    std::map<StringData, std::unique_ptr<ArrayFilter>> arrayFilters;
+    std::map<StringData, std::unique_ptr<ExpressionWithPlaceholder>> arrayFilters;
     ASSERT_OK(driver.parse(fromjson("{$set:{a:1}}"), arrayFilters));
     ASSERT_EQUALS(driver.numMods(), 1U);
     ASSERT_FALSE(driver.isDocReplacement());
@@ -62,7 +62,7 @@ TEST(Parse, Normal) {
 TEST(Parse, MultiMods) {
     UpdateDriver::Options opts;
     UpdateDriver driver(opts);
-    std::map<StringData, std::unique_ptr<ArrayFilter>> arrayFilters;
+    std::map<StringData, std::unique_ptr<ExpressionWithPlaceholder>> arrayFilters;
     ASSERT_OK(driver.parse(fromjson("{$set:{a:1, b:1}}"), arrayFilters));
     ASSERT_EQUALS(driver.numMods(), 2U);
     ASSERT_FALSE(driver.isDocReplacement());
@@ -71,7 +71,7 @@ TEST(Parse, MultiMods) {
 TEST(Parse, MixingMods) {
     UpdateDriver::Options opts;
     UpdateDriver driver(opts);
-    std::map<StringData, std::unique_ptr<ArrayFilter>> arrayFilters;
+    std::map<StringData, std::unique_ptr<ExpressionWithPlaceholder>> arrayFilters;
     ASSERT_OK(driver.parse(fromjson("{$set:{a:1}, $unset:{b:1}}"), arrayFilters));
     ASSERT_EQUALS(driver.numMods(), 2U);
     ASSERT_FALSE(driver.isDocReplacement());
@@ -80,7 +80,7 @@ TEST(Parse, MixingMods) {
 TEST(Parse, ObjectReplacment) {
     UpdateDriver::Options opts;
     UpdateDriver driver(opts);
-    std::map<StringData, std::unique_ptr<ArrayFilter>> arrayFilters;
+    std::map<StringData, std::unique_ptr<ExpressionWithPlaceholder>> arrayFilters;
     ASSERT_OK(driver.parse(fromjson("{obj: \"obj replacement\"}"), arrayFilters));
     ASSERT_TRUE(driver.isDocReplacement());
 }
@@ -88,7 +88,7 @@ TEST(Parse, ObjectReplacment) {
 TEST(Parse, EmptyMod) {
     UpdateDriver::Options opts;
     UpdateDriver driver(opts);
-    std::map<StringData, std::unique_ptr<ArrayFilter>> arrayFilters;
+    std::map<StringData, std::unique_ptr<ExpressionWithPlaceholder>> arrayFilters;
     ASSERT_THROWS_CODE_AND_WHAT(
         driver.parse(fromjson("{$set:{}}"), arrayFilters).transitional_ignore(),
         UserException,
@@ -99,7 +99,7 @@ TEST(Parse, EmptyMod) {
 TEST(Parse, WrongMod) {
     UpdateDriver::Options opts;
     UpdateDriver driver(opts);
-    std::map<StringData, std::unique_ptr<ArrayFilter>> arrayFilters;
+    std::map<StringData, std::unique_ptr<ExpressionWithPlaceholder>> arrayFilters;
     ASSERT_THROWS_CODE_AND_WHAT(
         driver.parse(fromjson("{$xyz:{a:1}}"), arrayFilters).transitional_ignore(),
         UserException,
@@ -110,7 +110,7 @@ TEST(Parse, WrongMod) {
 TEST(Parse, WrongType) {
     UpdateDriver::Options opts;
     UpdateDriver driver(opts);
-    std::map<StringData, std::unique_ptr<ArrayFilter>> arrayFilters;
+    std::map<StringData, std::unique_ptr<ExpressionWithPlaceholder>> arrayFilters;
     ASSERT_THROWS_CODE_AND_WHAT(
         driver.parse(fromjson("{$set:[{a:1}]}"), arrayFilters).transitional_ignore(),
         UserException,
@@ -122,7 +122,7 @@ TEST(Parse, WrongType) {
 TEST(Parse, ModsWithLaterObjReplacement) {
     UpdateDriver::Options opts;
     UpdateDriver driver(opts);
-    std::map<StringData, std::unique_ptr<ArrayFilter>> arrayFilters;
+    std::map<StringData, std::unique_ptr<ExpressionWithPlaceholder>> arrayFilters;
     ASSERT_THROWS_CODE_AND_WHAT(
         driver.parse(fromjson("{$set:{a:1}, obj: \"obj replacement\"}"), arrayFilters)
             .transitional_ignore(),
@@ -134,7 +134,7 @@ TEST(Parse, ModsWithLaterObjReplacement) {
 TEST(Parse, PushAll) {
     UpdateDriver::Options opts;
     UpdateDriver driver(opts);
-    std::map<StringData, std::unique_ptr<ArrayFilter>> arrayFilters;
+    std::map<StringData, std::unique_ptr<ExpressionWithPlaceholder>> arrayFilters;
     ASSERT_OK(driver.parse(fromjson("{$pushAll:{a:[1,2,3]}}"), arrayFilters));
     ASSERT_EQUALS(driver.numMods(), 1U);
     ASSERT_FALSE(driver.isDocReplacement());
@@ -143,7 +143,7 @@ TEST(Parse, PushAll) {
 TEST(Parse, SetOnInsert) {
     UpdateDriver::Options opts;
     UpdateDriver driver(opts);
-    std::map<StringData, std::unique_ptr<ArrayFilter>> arrayFilters;
+    std::map<StringData, std::unique_ptr<ExpressionWithPlaceholder>> arrayFilters;
     ASSERT_OK(driver.parse(fromjson("{$setOnInsert:{a:1}}"), arrayFilters));
     ASSERT_EQUALS(driver.numMods(), 1U);
     ASSERT_FALSE(driver.isDocReplacement());
@@ -154,7 +154,7 @@ TEST(Collator, SetCollationUpdatesModifierInterfaces) {
     BSONObj updateDocument = fromjson("{$max: {a: 'abd'}}");
     UpdateDriver::Options opts;
     UpdateDriver driver(opts);
-    std::map<StringData, std::unique_ptr<ArrayFilter>> arrayFilters;
+    std::map<StringData, std::unique_ptr<ExpressionWithPlaceholder>> arrayFilters;
 
     ASSERT_OK(driver.parse(updateDocument, arrayFilters));
     ASSERT_EQUALS(driver.numMods(), 1U);
@@ -214,7 +214,7 @@ public:
 private:
     QueryTestServiceContext _serviceContext;
     ServiceContext::UniqueOperationContext _opCtx;
-    std::map<StringData, std::unique_ptr<ArrayFilter>> _arrayFilters;
+    std::map<StringData, std::unique_ptr<ExpressionWithPlaceholder>> _arrayFilters;
     std::unique_ptr<UpdateDriver> _driverOps;
     std::unique_ptr<UpdateDriver> _driverRepl;
     Document _doc;

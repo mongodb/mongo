@@ -49,7 +49,7 @@ using mongo::mutablebson::Element;
 TEST(UpdateObjectNodeTest, InvalidPathFailsToParse) {
     auto update = fromjson("{$set: {'': 5}}");
     const CollatorInterface* collator = nullptr;
-    std::map<StringData, std::unique_ptr<ArrayFilter>> arrayFilters;
+    std::map<StringData, std::unique_ptr<ExpressionWithPlaceholder>> arrayFilters;
     std::set<std::string> foundIdentifiers;
     UpdateObjectNode root;
     auto result = UpdateObjectNode::parseAndMerge(&root,
@@ -66,7 +66,7 @@ TEST(UpdateObjectNodeTest, InvalidPathFailsToParse) {
 TEST(UpdateObjectNodeTest, ValidIncPathParsesSuccessfully) {
     auto update = fromjson("{$inc: {'a.b': 5}}");
     const CollatorInterface* collator = nullptr;
-    std::map<StringData, std::unique_ptr<ArrayFilter>> arrayFilters;
+    std::map<StringData, std::unique_ptr<ExpressionWithPlaceholder>> arrayFilters;
     std::set<std::string> foundIdentifiers;
     UpdateObjectNode root;
     ASSERT_OK(UpdateObjectNode::parseAndMerge(&root,
@@ -80,7 +80,7 @@ TEST(UpdateObjectNodeTest, ValidIncPathParsesSuccessfully) {
 TEST(UpdateObjectNodeTest, ValidMulPathParsesSuccessfully) {
     auto update = fromjson("{$mul: {'a.b': 5}}");
     const CollatorInterface* collator = nullptr;
-    std::map<StringData, std::unique_ptr<ArrayFilter>> arrayFilters;
+    std::map<StringData, std::unique_ptr<ExpressionWithPlaceholder>> arrayFilters;
     std::set<std::string> foundIdentifiers;
     UpdateObjectNode root;
     ASSERT_OK(UpdateObjectNode::parseAndMerge(&root,
@@ -94,7 +94,7 @@ TEST(UpdateObjectNodeTest, ValidMulPathParsesSuccessfully) {
 TEST(UpdateObjectNodeTest, ValidRenamePathParsesSuccessfully) {
     auto update = fromjson("{$rename: {'a.b': 'c.d'}}");
     const CollatorInterface* collator = nullptr;
-    std::map<StringData, std::unique_ptr<ArrayFilter>> arrayFilters;
+    std::map<StringData, std::unique_ptr<ExpressionWithPlaceholder>> arrayFilters;
     std::set<std::string> foundIdentifiers;
     UpdateObjectNode root;
     ASSERT_OK(UpdateObjectNode::parseAndMerge(&root,
@@ -122,7 +122,7 @@ TEST(UpdateObjectNodeTest, ValidRenamePathParsesSuccessfully) {
 TEST(UpdateObjectNodeTest, ValidSetPathParsesSuccessfully) {
     auto update = fromjson("{$set: {'a.b': 5}}");
     const CollatorInterface* collator = nullptr;
-    std::map<StringData, std::unique_ptr<ArrayFilter>> arrayFilters;
+    std::map<StringData, std::unique_ptr<ExpressionWithPlaceholder>> arrayFilters;
     std::set<std::string> foundIdentifiers;
     UpdateObjectNode root;
     ASSERT_OK(UpdateObjectNode::parseAndMerge(&root,
@@ -136,7 +136,7 @@ TEST(UpdateObjectNodeTest, ValidSetPathParsesSuccessfully) {
 TEST(UpdateObjectNodeTest, ValidUnsetPathParsesSuccessfully) {
     auto update = fromjson("{$unset: {'a.b': 5}}");
     const CollatorInterface* collator = nullptr;
-    std::map<StringData, std::unique_ptr<ArrayFilter>> arrayFilters;
+    std::map<StringData, std::unique_ptr<ExpressionWithPlaceholder>> arrayFilters;
     std::set<std::string> foundIdentifiers;
     UpdateObjectNode root;
     ASSERT_OK(UpdateObjectNode::parseAndMerge(&root,
@@ -150,7 +150,7 @@ TEST(UpdateObjectNodeTest, ValidUnsetPathParsesSuccessfully) {
 TEST(UpdateObjectNodeTest, ValidAddToSetPathParsesSuccessfully) {
     auto update = fromjson("{$addToSet: {'a.b': 5}}");
     const CollatorInterface* collator = nullptr;
-    std::map<StringData, std::unique_ptr<ArrayFilter>> arrayFilters;
+    std::map<StringData, std::unique_ptr<ExpressionWithPlaceholder>> arrayFilters;
     std::set<std::string> foundIdentifiers;
     UpdateObjectNode root;
     ASSERT_OK(UpdateObjectNode::parseAndMerge(&root,
@@ -164,7 +164,7 @@ TEST(UpdateObjectNodeTest, ValidAddToSetPathParsesSuccessfully) {
 TEST(UpdateObjectNodeTest, ValidPopPathParsesSuccessfully) {
     auto update = fromjson("{$pop: {'a.b': 1}}");
     const CollatorInterface* collator = nullptr;
-    std::map<StringData, std::unique_ptr<ArrayFilter>> arrayFilters;
+    std::map<StringData, std::unique_ptr<ExpressionWithPlaceholder>> arrayFilters;
     std::set<std::string> foundIdentifiers;
     UpdateObjectNode root;
     ASSERT_OK(UpdateObjectNode::parseAndMerge(&root,
@@ -178,7 +178,7 @@ TEST(UpdateObjectNodeTest, ValidPopPathParsesSuccessfully) {
 TEST(UpdateObjectNodeTest, ValidMaxPathParsesSuccessfully) {
     auto update = fromjson("{$max: {'a.b': 1}}");
     const CollatorInterface* collator = nullptr;
-    std::map<StringData, std::unique_ptr<ArrayFilter>> arrayFilters;
+    std::map<StringData, std::unique_ptr<ExpressionWithPlaceholder>> arrayFilters;
     std::set<std::string> foundIdentifiers;
     UpdateObjectNode root;
     ASSERT_OK(UpdateObjectNode::parseAndMerge(&root,
@@ -192,7 +192,7 @@ TEST(UpdateObjectNodeTest, ValidMaxPathParsesSuccessfully) {
 TEST(UpdateObjectNodeTest, ValidMinPathParsesSuccessfully) {
     auto update = fromjson("{$min: {'a.b': 1}}");
     const CollatorInterface* collator = nullptr;
-    std::map<StringData, std::unique_ptr<ArrayFilter>> arrayFilters;
+    std::map<StringData, std::unique_ptr<ExpressionWithPlaceholder>> arrayFilters;
     std::set<std::string> foundIdentifiers;
     UpdateObjectNode root;
     ASSERT_OK(UpdateObjectNode::parseAndMerge(&root,
@@ -206,7 +206,7 @@ TEST(UpdateObjectNodeTest, ValidMinPathParsesSuccessfully) {
 TEST(UpdateObjectNodeTest, ValidCurrentDatePathParsesSuccessfully) {
     auto update = fromjson("{$currentDate: {'a.b': true}}");
     const CollatorInterface* collator = nullptr;
-    std::map<StringData, std::unique_ptr<ArrayFilter>> arrayFilters;
+    std::map<StringData, std::unique_ptr<ExpressionWithPlaceholder>> arrayFilters;
     std::set<std::string> foundIdentifiers;
     UpdateObjectNode root;
     ASSERT_OK(UpdateObjectNode::parseAndMerge(&root,
@@ -220,7 +220,7 @@ TEST(UpdateObjectNodeTest, ValidCurrentDatePathParsesSuccessfully) {
 TEST(UpdateObjectNodeTest, MultiplePositionalElementsFailToParse) {
     auto update = fromjson("{$set: {'a.$.b.$': 5}}");
     const CollatorInterface* collator = nullptr;
-    std::map<StringData, std::unique_ptr<ArrayFilter>> arrayFilters;
+    std::map<StringData, std::unique_ptr<ExpressionWithPlaceholder>> arrayFilters;
     std::set<std::string> foundIdentifiers;
     UpdateObjectNode root;
     auto result = UpdateObjectNode::parseAndMerge(&root,
@@ -238,7 +238,7 @@ TEST(UpdateObjectNodeTest, MultiplePositionalElementsFailToParse) {
 TEST(UpdateObjectNodeTest, ParsingSetsPositionalTrue) {
     auto update = fromjson("{$set: {'a.$.b': 5}}");
     const CollatorInterface* collator = nullptr;
-    std::map<StringData, std::unique_ptr<ArrayFilter>> arrayFilters;
+    std::map<StringData, std::unique_ptr<ExpressionWithPlaceholder>> arrayFilters;
     std::set<std::string> foundIdentifiers;
     UpdateObjectNode root;
     auto result = UpdateObjectNode::parseAndMerge(&root,
@@ -254,7 +254,7 @@ TEST(UpdateObjectNodeTest, ParsingSetsPositionalTrue) {
 TEST(UpdateObjectNodeTest, ParsingSetsPositionalFalse) {
     auto update = fromjson("{$set: {'a.b': 5}}");
     const CollatorInterface* collator = nullptr;
-    std::map<StringData, std::unique_ptr<ArrayFilter>> arrayFilters;
+    std::map<StringData, std::unique_ptr<ExpressionWithPlaceholder>> arrayFilters;
     std::set<std::string> foundIdentifiers;
     UpdateObjectNode root;
     auto result = UpdateObjectNode::parseAndMerge(&root,
@@ -270,7 +270,7 @@ TEST(UpdateObjectNodeTest, ParsingSetsPositionalFalse) {
 TEST(UpdateObjectNodeTest, PositionalElementFirstPositionFailsToParse) {
     auto update = fromjson("{$set: {'$': 5}}");
     const CollatorInterface* collator = nullptr;
-    std::map<StringData, std::unique_ptr<ArrayFilter>> arrayFilters;
+    std::map<StringData, std::unique_ptr<ExpressionWithPlaceholder>> arrayFilters;
     std::set<std::string> foundIdentifiers;
     UpdateObjectNode root;
     auto result = UpdateObjectNode::parseAndMerge(&root,
@@ -289,7 +289,7 @@ TEST(UpdateObjectNodeTest, PositionalElementFirstPositionFailsToParse) {
 TEST(UpdateObjectNodeTest, PushFailsToParse) {
     auto update = fromjson("{$push: {a: 5}}");
     const CollatorInterface* collator = nullptr;
-    std::map<StringData, std::unique_ptr<ArrayFilter>> arrayFilters;
+    std::map<StringData, std::unique_ptr<ExpressionWithPlaceholder>> arrayFilters;
     std::set<std::string> foundIdentifiers;
     UpdateObjectNode root;
     auto result = UpdateObjectNode::parseAndMerge(&root,
@@ -306,7 +306,7 @@ TEST(UpdateObjectNodeTest, PushFailsToParse) {
 TEST(UpdateObjectNodeTest, TwoModifiersOnSameFieldFailToParse) {
     auto update = fromjson("{$set: {a: 5}}");
     const CollatorInterface* collator = nullptr;
-    std::map<StringData, std::unique_ptr<ArrayFilter>> arrayFilters;
+    std::map<StringData, std::unique_ptr<ExpressionWithPlaceholder>> arrayFilters;
     std::set<std::string> foundIdentifiers;
     UpdateObjectNode root;
     ASSERT_OK(UpdateObjectNode::parseAndMerge(&root,
@@ -329,7 +329,7 @@ TEST(UpdateObjectNodeTest, TwoModifiersOnSameFieldFailToParse) {
 TEST(UpdateObjectNodeTest, TwoModifiersOnDifferentFieldsParseSuccessfully) {
     auto update = fromjson("{$set: {a: 5, b: 6}}");
     const CollatorInterface* collator = nullptr;
-    std::map<StringData, std::unique_ptr<ArrayFilter>> arrayFilters;
+    std::map<StringData, std::unique_ptr<ExpressionWithPlaceholder>> arrayFilters;
     std::set<std::string> foundIdentifiers;
     UpdateObjectNode root;
     ASSERT_OK(UpdateObjectNode::parseAndMerge(&root,
@@ -349,7 +349,7 @@ TEST(UpdateObjectNodeTest, TwoModifiersOnDifferentFieldsParseSuccessfully) {
 TEST(UpdateObjectNodeTest, TwoModifiersWithSameDottedPathFailToParse) {
     auto update = fromjson("{$set: {'a.b': 5}}");
     const CollatorInterface* collator = nullptr;
-    std::map<StringData, std::unique_ptr<ArrayFilter>> arrayFilters;
+    std::map<StringData, std::unique_ptr<ExpressionWithPlaceholder>> arrayFilters;
     std::set<std::string> foundIdentifiers;
     UpdateObjectNode root;
     ASSERT_OK(UpdateObjectNode::parseAndMerge(&root,
@@ -373,7 +373,7 @@ TEST(UpdateObjectNodeTest, TwoModifiersWithSameDottedPathFailToParse) {
 TEST(UpdateObjectNodeTest, FirstModifierPrefixOfSecondFailToParse) {
     auto update = fromjson("{$set: {a: 5, 'a.b': 6}}");
     const CollatorInterface* collator = nullptr;
-    std::map<StringData, std::unique_ptr<ArrayFilter>> arrayFilters;
+    std::map<StringData, std::unique_ptr<ExpressionWithPlaceholder>> arrayFilters;
     std::set<std::string> foundIdentifiers;
     UpdateObjectNode root;
     ASSERT_OK(UpdateObjectNode::parseAndMerge(&root,
@@ -397,7 +397,7 @@ TEST(UpdateObjectNodeTest, FirstModifierPrefixOfSecondFailToParse) {
 TEST(UpdateObjectNodeTest, FirstModifierDottedPrefixOfSecondFailsToParse) {
     auto update = fromjson("{$set: {'a.b': 5, 'a.b.c': 6}}");
     const CollatorInterface* collator = nullptr;
-    std::map<StringData, std::unique_ptr<ArrayFilter>> arrayFilters;
+    std::map<StringData, std::unique_ptr<ExpressionWithPlaceholder>> arrayFilters;
     std::set<std::string> foundIdentifiers;
     UpdateObjectNode root;
     ASSERT_OK(UpdateObjectNode::parseAndMerge(&root,
@@ -421,7 +421,7 @@ TEST(UpdateObjectNodeTest, FirstModifierDottedPrefixOfSecondFailsToParse) {
 TEST(UpdateObjectNodeTest, SecondModifierPrefixOfFirstFailsToParse) {
     auto update = fromjson("{$set: {'a.b': 5, a: 6}}");
     const CollatorInterface* collator = nullptr;
-    std::map<StringData, std::unique_ptr<ArrayFilter>> arrayFilters;
+    std::map<StringData, std::unique_ptr<ExpressionWithPlaceholder>> arrayFilters;
     std::set<std::string> foundIdentifiers;
     UpdateObjectNode root;
     ASSERT_OK(UpdateObjectNode::parseAndMerge(&root,
@@ -444,7 +444,7 @@ TEST(UpdateObjectNodeTest, SecondModifierPrefixOfFirstFailsToParse) {
 TEST(UpdateObjectNodeTest, SecondModifierDottedPrefixOfFirstFailsToParse) {
     auto update = fromjson("{$set: {'a.b.c': 5, 'a.b': 6}}");
     const CollatorInterface* collator = nullptr;
-    std::map<StringData, std::unique_ptr<ArrayFilter>> arrayFilters;
+    std::map<StringData, std::unique_ptr<ExpressionWithPlaceholder>> arrayFilters;
     std::set<std::string> foundIdentifiers;
     UpdateObjectNode root;
     ASSERT_OK(UpdateObjectNode::parseAndMerge(&root,
@@ -468,7 +468,7 @@ TEST(UpdateObjectNodeTest, SecondModifierDottedPrefixOfFirstFailsToParse) {
 TEST(UpdateObjectNodeTest, ModifiersWithCommonPrefixParseSuccessfully) {
     auto update = fromjson("{$set: {'a.b': 5, 'a.c': 6}}");
     const CollatorInterface* collator = nullptr;
-    std::map<StringData, std::unique_ptr<ArrayFilter>> arrayFilters;
+    std::map<StringData, std::unique_ptr<ExpressionWithPlaceholder>> arrayFilters;
     std::set<std::string> foundIdentifiers;
     UpdateObjectNode root;
     ASSERT_OK(UpdateObjectNode::parseAndMerge(&root,
@@ -488,7 +488,7 @@ TEST(UpdateObjectNodeTest, ModifiersWithCommonPrefixParseSuccessfully) {
 TEST(UpdateObjectNodeTest, ModifiersWithCommonDottedPrefixParseSuccessfully) {
     auto update = fromjson("{$set: {'a.b.c': 5, 'a.b.d': 6}}");
     const CollatorInterface* collator = nullptr;
-    std::map<StringData, std::unique_ptr<ArrayFilter>> arrayFilters;
+    std::map<StringData, std::unique_ptr<ExpressionWithPlaceholder>> arrayFilters;
     std::set<std::string> foundIdentifiers;
     UpdateObjectNode root;
     ASSERT_OK(UpdateObjectNode::parseAndMerge(&root,
@@ -508,7 +508,7 @@ TEST(UpdateObjectNodeTest, ModifiersWithCommonDottedPrefixParseSuccessfully) {
 TEST(UpdateObjectNodeTest, ModifiersWithCommonPrefixDottedSuffixParseSuccessfully) {
     auto update = fromjson("{$set: {'a.b.c': 5, 'a.d.e': 6}}");
     const CollatorInterface* collator = nullptr;
-    std::map<StringData, std::unique_ptr<ArrayFilter>> arrayFilters;
+    std::map<StringData, std::unique_ptr<ExpressionWithPlaceholder>> arrayFilters;
     std::set<std::string> foundIdentifiers;
     UpdateObjectNode root;
     ASSERT_OK(UpdateObjectNode::parseAndMerge(&root,
@@ -528,7 +528,7 @@ TEST(UpdateObjectNodeTest, ModifiersWithCommonPrefixDottedSuffixParseSuccessfull
 TEST(UpdateObjectNodeTest, TwoModifiersOnSamePositionalFieldFailToParse) {
     auto update = fromjson("{$set: {'a.$': 5}}");
     const CollatorInterface* collator = nullptr;
-    std::map<StringData, std::unique_ptr<ArrayFilter>> arrayFilters;
+    std::map<StringData, std::unique_ptr<ExpressionWithPlaceholder>> arrayFilters;
     std::set<std::string> foundIdentifiers;
     UpdateObjectNode root;
     ASSERT_OK(UpdateObjectNode::parseAndMerge(&root,
@@ -552,7 +552,7 @@ TEST(UpdateObjectNodeTest, TwoModifiersOnSamePositionalFieldFailToParse) {
 TEST(UpdateObjectNodeTest, PositionalFieldsWithDifferentPrefixesParseSuccessfully) {
     auto update = fromjson("{$set: {'a.$': 5, 'b.$': 6}}");
     const CollatorInterface* collator = nullptr;
-    std::map<StringData, std::unique_ptr<ArrayFilter>> arrayFilters;
+    std::map<StringData, std::unique_ptr<ExpressionWithPlaceholder>> arrayFilters;
     std::set<std::string> foundIdentifiers;
     UpdateObjectNode root;
     ASSERT_OK(UpdateObjectNode::parseAndMerge(&root,
@@ -572,7 +572,7 @@ TEST(UpdateObjectNodeTest, PositionalFieldsWithDifferentPrefixesParseSuccessfull
 TEST(UpdateObjectNodeTest, PositionalAndNonpositionalFieldWithCommonPrefixParseSuccessfully) {
     auto update = fromjson("{$set: {'a.$': 5, 'a.0': 6}}");
     const CollatorInterface* collator = nullptr;
-    std::map<StringData, std::unique_ptr<ArrayFilter>> arrayFilters;
+    std::map<StringData, std::unique_ptr<ExpressionWithPlaceholder>> arrayFilters;
     std::set<std::string> foundIdentifiers;
     UpdateObjectNode root;
     ASSERT_OK(UpdateObjectNode::parseAndMerge(&root,
@@ -592,7 +592,7 @@ TEST(UpdateObjectNodeTest, PositionalAndNonpositionalFieldWithCommonPrefixParseS
 TEST(UpdateObjectNodeTest, TwoModifiersWithSamePositionalDottedPathFailToParse) {
     auto update = fromjson("{$set: {'a.$.b': 5}}");
     const CollatorInterface* collator = nullptr;
-    std::map<StringData, std::unique_ptr<ArrayFilter>> arrayFilters;
+    std::map<StringData, std::unique_ptr<ExpressionWithPlaceholder>> arrayFilters;
     std::set<std::string> foundIdentifiers;
     UpdateObjectNode root;
     ASSERT_OK(UpdateObjectNode::parseAndMerge(&root,
@@ -616,7 +616,7 @@ TEST(UpdateObjectNodeTest, TwoModifiersWithSamePositionalDottedPathFailToParse) 
 TEST(UpdateObjectNodeTest, FirstModifierPositionalPrefixOfSecondFailsToParse) {
     auto update = fromjson("{$set: {'a.$': 5, 'a.$.b': 6}}");
     const CollatorInterface* collator = nullptr;
-    std::map<StringData, std::unique_ptr<ArrayFilter>> arrayFilters;
+    std::map<StringData, std::unique_ptr<ExpressionWithPlaceholder>> arrayFilters;
     std::set<std::string> foundIdentifiers;
     UpdateObjectNode root;
     ASSERT_OK(UpdateObjectNode::parseAndMerge(&root,
@@ -640,7 +640,7 @@ TEST(UpdateObjectNodeTest, FirstModifierPositionalPrefixOfSecondFailsToParse) {
 TEST(UpdateObjectNodeTest, SecondModifierPositionalPrefixOfFirstFailsToParse) {
     auto update = fromjson("{$set: {'a.$.b': 5, 'a.$': 6}}");
     const CollatorInterface* collator = nullptr;
-    std::map<StringData, std::unique_ptr<ArrayFilter>> arrayFilters;
+    std::map<StringData, std::unique_ptr<ExpressionWithPlaceholder>> arrayFilters;
     std::set<std::string> foundIdentifiers;
     UpdateObjectNode root;
     ASSERT_OK(UpdateObjectNode::parseAndMerge(&root,
@@ -664,7 +664,7 @@ TEST(UpdateObjectNodeTest, SecondModifierPositionalPrefixOfFirstFailsToParse) {
 TEST(UpdateObjectNodeTest, FirstModifierFieldPrefixOfSecondParsesSuccessfully) {
     auto update = fromjson("{$set: {'a': 5, 'ab': 6}}");
     const CollatorInterface* collator = nullptr;
-    std::map<StringData, std::unique_ptr<ArrayFilter>> arrayFilters;
+    std::map<StringData, std::unique_ptr<ExpressionWithPlaceholder>> arrayFilters;
     std::set<std::string> foundIdentifiers;
     UpdateObjectNode root;
     ASSERT_OK(UpdateObjectNode::parseAndMerge(&root,
@@ -684,7 +684,7 @@ TEST(UpdateObjectNodeTest, FirstModifierFieldPrefixOfSecondParsesSuccessfully) {
 TEST(UpdateObjectNodeTest, SecondModifierFieldPrefixOfSecondParsesSuccessfully) {
     auto update = fromjson("{$set: {'ab': 5, 'a': 6}}");
     const CollatorInterface* collator = nullptr;
-    std::map<StringData, std::unique_ptr<ArrayFilter>> arrayFilters;
+    std::map<StringData, std::unique_ptr<ExpressionWithPlaceholder>> arrayFilters;
     std::set<std::string> foundIdentifiers;
     UpdateObjectNode root;
     ASSERT_OK(UpdateObjectNode::parseAndMerge(&root,
@@ -704,7 +704,7 @@ TEST(UpdateObjectNodeTest, SecondModifierFieldPrefixOfSecondParsesSuccessfully) 
 TEST(UpdateObjectNodeTest, IdentifierWithoutArrayFilterFailsToParse) {
     auto update = fromjson("{$set: {'a.$[i]': 5}}");
     const CollatorInterface* collator = nullptr;
-    std::map<StringData, std::unique_ptr<ArrayFilter>> arrayFilters;
+    std::map<StringData, std::unique_ptr<ExpressionWithPlaceholder>> arrayFilters;
     std::set<std::string> foundIdentifiers;
     UpdateObjectNode root;
     auto result = UpdateObjectNode::parseAndMerge(&root,
@@ -722,7 +722,7 @@ TEST(UpdateObjectNodeTest, IdentifierWithoutArrayFilterFailsToParse) {
 TEST(UpdateObjectNodeTest, IdentifierInMiddleOfPathWithoutArrayFilterFailsToParse) {
     auto update = fromjson("{$set: {'a.$[i].b': 5}}");
     const CollatorInterface* collator = nullptr;
-    std::map<StringData, std::unique_ptr<ArrayFilter>> arrayFilters;
+    std::map<StringData, std::unique_ptr<ExpressionWithPlaceholder>> arrayFilters;
     std::set<std::string> foundIdentifiers;
     UpdateObjectNode root;
     auto result = UpdateObjectNode::parseAndMerge(&root,
@@ -740,7 +740,7 @@ TEST(UpdateObjectNodeTest, IdentifierInMiddleOfPathWithoutArrayFilterFailsToPars
 TEST(UpdateObjectNodeTest, EmptyIdentifierParsesSuccessfully) {
     auto update = fromjson("{$set: {'a.$[]': 5}}");
     const CollatorInterface* collator = nullptr;
-    std::map<StringData, std::unique_ptr<ArrayFilter>> arrayFilters;
+    std::map<StringData, std::unique_ptr<ExpressionWithPlaceholder>> arrayFilters;
     std::set<std::string> foundIdentifiers;
     UpdateObjectNode root;
     ASSERT_OK(UpdateObjectNode::parseAndMerge(&root,
@@ -755,7 +755,7 @@ TEST(UpdateObjectNodeTest, EmptyIdentifierParsesSuccessfully) {
 TEST(UpdateObjectNodeTest, EmptyIdentifierInMiddleOfPathParsesSuccessfully) {
     auto update = fromjson("{$set: {'a.$[].b': 5}}");
     const CollatorInterface* collator = nullptr;
-    std::map<StringData, std::unique_ptr<ArrayFilter>> arrayFilters;
+    std::map<StringData, std::unique_ptr<ExpressionWithPlaceholder>> arrayFilters;
     std::set<std::string> foundIdentifiers;
     UpdateObjectNode root;
     ASSERT_OK(UpdateObjectNode::parseAndMerge(&root,
@@ -771,8 +771,8 @@ TEST(UpdateObjectNodeTest, IdentifierWithArrayFilterParsesSuccessfully) {
     auto update = fromjson("{$set: {'a.$[i]': 5}}");
     auto arrayFilter = fromjson("{i: 0}");
     const CollatorInterface* collator = nullptr;
-    std::map<StringData, std::unique_ptr<ArrayFilter>> arrayFilters;
-    arrayFilters["i"] = uassertStatusOK(ArrayFilter::parse(arrayFilter, collator));
+    std::map<StringData, std::unique_ptr<ExpressionWithPlaceholder>> arrayFilters;
+    arrayFilters["i"] = uassertStatusOK(ExpressionWithPlaceholder::parse(arrayFilter, collator));
     std::set<std::string> foundIdentifiers;
     UpdateObjectNode root;
     ASSERT_OK(UpdateObjectNode::parseAndMerge(&root,
@@ -789,8 +789,8 @@ TEST(UpdateObjectNodeTest, IdentifierWithArrayFilterInMiddleOfPathParsesSuccessf
     auto update = fromjson("{$set: {'a.$[i].b': 5}}");
     auto arrayFilter = fromjson("{i: 0}");
     const CollatorInterface* collator = nullptr;
-    std::map<StringData, std::unique_ptr<ArrayFilter>> arrayFilters;
-    arrayFilters["i"] = uassertStatusOK(ArrayFilter::parse(arrayFilter, collator));
+    std::map<StringData, std::unique_ptr<ExpressionWithPlaceholder>> arrayFilters;
+    arrayFilters["i"] = uassertStatusOK(ExpressionWithPlaceholder::parse(arrayFilter, collator));
     std::set<std::string> foundIdentifiers;
     UpdateObjectNode root;
     ASSERT_OK(UpdateObjectNode::parseAndMerge(&root,
@@ -807,8 +807,8 @@ TEST(UpdateObjectNodeTest, IdentifierInFirstPositionFailsToParse) {
     auto update = fromjson("{$set: {'$[i]': 5}}");
     auto arrayFilter = fromjson("{i: 0}");
     const CollatorInterface* collator = nullptr;
-    std::map<StringData, std::unique_ptr<ArrayFilter>> arrayFilters;
-    arrayFilters["i"] = uassertStatusOK(ArrayFilter::parse(arrayFilter, collator));
+    std::map<StringData, std::unique_ptr<ExpressionWithPlaceholder>> arrayFilters;
+    arrayFilters["i"] = uassertStatusOK(ExpressionWithPlaceholder::parse(arrayFilter, collator));
     std::set<std::string> foundIdentifiers;
     UpdateObjectNode root;
     auto result = UpdateObjectNode::parseAndMerge(&root,
@@ -828,8 +828,8 @@ TEST(UpdateObjectNodeTest, IdentifierInFirstPositionWithSuffixFailsToParse) {
     auto update = fromjson("{$set: {'$[i].a': 5}}");
     auto arrayFilter = fromjson("{i: 0}");
     const CollatorInterface* collator = nullptr;
-    std::map<StringData, std::unique_ptr<ArrayFilter>> arrayFilters;
-    arrayFilters["i"] = uassertStatusOK(ArrayFilter::parse(arrayFilter, collator));
+    std::map<StringData, std::unique_ptr<ExpressionWithPlaceholder>> arrayFilters;
+    arrayFilters["i"] = uassertStatusOK(ExpressionWithPlaceholder::parse(arrayFilter, collator));
     std::set<std::string> foundIdentifiers;
     UpdateObjectNode root;
     auto result = UpdateObjectNode::parseAndMerge(&root,
@@ -849,8 +849,8 @@ TEST(UpdateObjectNodeTest, CreateObjectNodeInSamePositionAsArrayNodeFailsToParse
     auto update = fromjson("{$set: {'a.$[i]': 5, 'a.0': 6}}");
     auto arrayFilter = fromjson("{i: 0}");
     const CollatorInterface* collator = nullptr;
-    std::map<StringData, std::unique_ptr<ArrayFilter>> arrayFilters;
-    arrayFilters["i"] = uassertStatusOK(ArrayFilter::parse(arrayFilter, collator));
+    std::map<StringData, std::unique_ptr<ExpressionWithPlaceholder>> arrayFilters;
+    arrayFilters["i"] = uassertStatusOK(ExpressionWithPlaceholder::parse(arrayFilter, collator));
     std::set<std::string> foundIdentifiers;
     UpdateObjectNode root;
     ASSERT_OK(UpdateObjectNode::parseAndMerge(&root,
@@ -877,8 +877,8 @@ TEST(UpdateObjectNodeTest, CreateArrayNodeInSamePositionAsObjectNodeFailsToParse
     auto update = fromjson("{$set: {'a.0': 5, 'a.$[i]': 6}}");
     auto arrayFilter = fromjson("{i: 0}");
     const CollatorInterface* collator = nullptr;
-    std::map<StringData, std::unique_ptr<ArrayFilter>> arrayFilters;
-    arrayFilters["i"] = uassertStatusOK(ArrayFilter::parse(arrayFilter, collator));
+    std::map<StringData, std::unique_ptr<ExpressionWithPlaceholder>> arrayFilters;
+    arrayFilters["i"] = uassertStatusOK(ExpressionWithPlaceholder::parse(arrayFilter, collator));
     std::set<std::string> foundIdentifiers;
     UpdateObjectNode root;
     ASSERT_OK(UpdateObjectNode::parseAndMerge(&root,
@@ -903,8 +903,8 @@ TEST(UpdateObjectNodeTest, CreateLeafNodeInSamePositionAsArrayNodeFailsToParse) 
     auto update = fromjson("{$set: {'a.$[i]': 5, a: 6}}");
     auto arrayFilter = fromjson("{i: 0}");
     const CollatorInterface* collator = nullptr;
-    std::map<StringData, std::unique_ptr<ArrayFilter>> arrayFilters;
-    arrayFilters["i"] = uassertStatusOK(ArrayFilter::parse(arrayFilter, collator));
+    std::map<StringData, std::unique_ptr<ExpressionWithPlaceholder>> arrayFilters;
+    arrayFilters["i"] = uassertStatusOK(ExpressionWithPlaceholder::parse(arrayFilter, collator));
     std::set<std::string> foundIdentifiers;
     UpdateObjectNode root;
     ASSERT_OK(UpdateObjectNode::parseAndMerge(&root,
@@ -930,8 +930,8 @@ TEST(UpdateObjectNodeTest, CreateArrayNodeInSamePositionAsLeafNodeFailsToParse) 
     auto update = fromjson("{$set: {a: 5, 'a.$[i]': 6}}");
     auto arrayFilter = fromjson("{i: 0}");
     const CollatorInterface* collator = nullptr;
-    std::map<StringData, std::unique_ptr<ArrayFilter>> arrayFilters;
-    arrayFilters["i"] = uassertStatusOK(ArrayFilter::parse(arrayFilter, collator));
+    std::map<StringData, std::unique_ptr<ExpressionWithPlaceholder>> arrayFilters;
+    arrayFilters["i"] = uassertStatusOK(ExpressionWithPlaceholder::parse(arrayFilter, collator));
     std::set<std::string> foundIdentifiers;
     UpdateObjectNode root;
     ASSERT_OK(UpdateObjectNode::parseAndMerge(&root,
@@ -957,9 +957,9 @@ TEST(UpdateObjectNodeTest, CreateTwoChildrenOfArrayNodeParsesSuccessfully) {
     auto arrayFilterI = fromjson("{i: 0}");
     auto arrayFilterJ = fromjson("{j: 0}");
     const CollatorInterface* collator = nullptr;
-    std::map<StringData, std::unique_ptr<ArrayFilter>> arrayFilters;
-    arrayFilters["i"] = uassertStatusOK(ArrayFilter::parse(arrayFilterI, collator));
-    arrayFilters["j"] = uassertStatusOK(ArrayFilter::parse(arrayFilterJ, collator));
+    std::map<StringData, std::unique_ptr<ExpressionWithPlaceholder>> arrayFilters;
+    arrayFilters["i"] = uassertStatusOK(ExpressionWithPlaceholder::parse(arrayFilterI, collator));
+    arrayFilters["j"] = uassertStatusOK(ExpressionWithPlaceholder::parse(arrayFilterJ, collator));
     std::set<std::string> foundIdentifiers;
     UpdateObjectNode root;
     ASSERT_OK(UpdateObjectNode::parseAndMerge(&root,
@@ -986,8 +986,8 @@ TEST(UpdateObjectNodeTest, ConflictAtArrayNodeChildFailsToParse) {
     auto update2 = fromjson("{$set: {'a.$[i]': 6}}");
     auto arrayFilterI = fromjson("{i: 0}");
     const CollatorInterface* collator = nullptr;
-    std::map<StringData, std::unique_ptr<ArrayFilter>> arrayFilters;
-    arrayFilters["i"] = uassertStatusOK(ArrayFilter::parse(arrayFilterI, collator));
+    std::map<StringData, std::unique_ptr<ExpressionWithPlaceholder>> arrayFilters;
+    arrayFilters["i"] = uassertStatusOK(ExpressionWithPlaceholder::parse(arrayFilterI, collator));
     std::set<std::string> foundIdentifiers;
     UpdateObjectNode root;
     ASSERT_OK(UpdateObjectNode::parseAndMerge(&root,
@@ -1014,8 +1014,8 @@ TEST(UpdateObjectNodeTest, ConflictThroughArrayNodeChildFailsToParse) {
     auto update = fromjson("{$set: {'a.$[i].b': 5, 'a.$[i].b.c': 6}}");
     auto arrayFilterI = fromjson("{i: 0}");
     const CollatorInterface* collator = nullptr;
-    std::map<StringData, std::unique_ptr<ArrayFilter>> arrayFilters;
-    arrayFilters["i"] = uassertStatusOK(ArrayFilter::parse(arrayFilterI, collator));
+    std::map<StringData, std::unique_ptr<ExpressionWithPlaceholder>> arrayFilters;
+    arrayFilters["i"] = uassertStatusOK(ExpressionWithPlaceholder::parse(arrayFilterI, collator));
     std::set<std::string> foundIdentifiers;
     UpdateObjectNode root;
     ASSERT_OK(UpdateObjectNode::parseAndMerge(&root,
@@ -1043,9 +1043,9 @@ TEST(UpdateObjectNodeTest, NoConflictDueToDifferentArrayNodeChildrenParsesSucces
     auto arrayFilterI = fromjson("{i: 0}");
     auto arrayFilterJ = fromjson("{j: 0}");
     const CollatorInterface* collator = nullptr;
-    std::map<StringData, std::unique_ptr<ArrayFilter>> arrayFilters;
-    arrayFilters["i"] = uassertStatusOK(ArrayFilter::parse(arrayFilterI, collator));
-    arrayFilters["j"] = uassertStatusOK(ArrayFilter::parse(arrayFilterJ, collator));
+    std::map<StringData, std::unique_ptr<ExpressionWithPlaceholder>> arrayFilters;
+    arrayFilters["i"] = uassertStatusOK(ExpressionWithPlaceholder::parse(arrayFilterI, collator));
+    arrayFilters["j"] = uassertStatusOK(ExpressionWithPlaceholder::parse(arrayFilterJ, collator));
     std::set<std::string> foundIdentifiers;
     UpdateObjectNode root;
     ASSERT_OK(UpdateObjectNode::parseAndMerge(&root,
@@ -1072,9 +1072,9 @@ TEST(UpdateObjectNodeTest, MultipleArrayNodesAlongPathParsesSuccessfully) {
     auto arrayFilterI = fromjson("{i: 0}");
     auto arrayFilterJ = fromjson("{j: 0}");
     const CollatorInterface* collator = nullptr;
-    std::map<StringData, std::unique_ptr<ArrayFilter>> arrayFilters;
-    arrayFilters["i"] = uassertStatusOK(ArrayFilter::parse(arrayFilterI, collator));
-    arrayFilters["j"] = uassertStatusOK(ArrayFilter::parse(arrayFilterJ, collator));
+    std::map<StringData, std::unique_ptr<ExpressionWithPlaceholder>> arrayFilters;
+    arrayFilters["i"] = uassertStatusOK(ExpressionWithPlaceholder::parse(arrayFilterI, collator));
+    arrayFilters["j"] = uassertStatusOK(ExpressionWithPlaceholder::parse(arrayFilterJ, collator));
     std::set<std::string> foundIdentifiers;
     UpdateObjectNode root;
     ASSERT_OK(UpdateObjectNode::parseAndMerge(&root,
@@ -1111,7 +1111,7 @@ TEST(UpdateObjectNodeTest, DistinctFieldsMergeCorrectly) {
     auto setUpdate2 = fromjson("{$set: {'ab': 6}}");
     FieldRef fakeFieldRef("root");
     const CollatorInterface* collator = nullptr;
-    std::map<StringData, std::unique_ptr<ArrayFilter>> arrayFilters;
+    std::map<StringData, std::unique_ptr<ExpressionWithPlaceholder>> arrayFilters;
     std::set<std::string> foundIdentifiers;
     UpdateObjectNode setRoot1, setRoot2;
     ASSERT_OK(UpdateObjectNode::parseAndMerge(&setRoot1,
@@ -1141,7 +1141,7 @@ TEST(UpdateObjectNodeTest, NestedMergeSucceeds) {
     auto setUpdate2 = fromjson("{$set: {'a.d': 6}}");
     FieldRef fakeFieldRef("root");
     const CollatorInterface* collator = nullptr;
-    std::map<StringData, std::unique_ptr<ArrayFilter>> arrayFilters;
+    std::map<StringData, std::unique_ptr<ExpressionWithPlaceholder>> arrayFilters;
     std::set<std::string> foundIdentifiers;
     UpdateObjectNode setRoot1, setRoot2;
     ASSERT_OK(UpdateObjectNode::parseAndMerge(&setRoot1,
@@ -1177,7 +1177,7 @@ TEST(UpdateObjectNodeTest, DoublyNestedMergeSucceeds) {
     auto setUpdate2 = fromjson("{$set: {'a.b.d': 6}}");
     FieldRef fakeFieldRef("root");
     const CollatorInterface* collator = nullptr;
-    std::map<StringData, std::unique_ptr<ArrayFilter>> arrayFilters;
+    std::map<StringData, std::unique_ptr<ExpressionWithPlaceholder>> arrayFilters;
     std::set<std::string> foundIdentifiers;
     UpdateObjectNode setRoot1, setRoot2;
     ASSERT_OK(UpdateObjectNode::parseAndMerge(&setRoot1,
@@ -1219,7 +1219,7 @@ TEST(UpdateObjectNodeTest, FieldAndPositionalMergeCorrectly) {
     auto setUpdate2 = fromjson("{$set: {'a.$': 6}}");
     FieldRef fakeFieldRef("root");
     const CollatorInterface* collator = nullptr;
-    std::map<StringData, std::unique_ptr<ArrayFilter>> arrayFilters;
+    std::map<StringData, std::unique_ptr<ExpressionWithPlaceholder>> arrayFilters;
     std::set<std::string> foundIdentifiers;
     UpdateObjectNode setRoot1, setRoot2;
     ASSERT_OK(UpdateObjectNode::parseAndMerge(&setRoot1,
@@ -1256,7 +1256,7 @@ TEST(UpdateObjectNodeTest, MergeThroughPositionalSucceeds) {
     auto setUpdate2 = fromjson("{$set: {'a.$.c': 6}}");
     FieldRef fakeFieldRef("root");
     const CollatorInterface* collator = nullptr;
-    std::map<StringData, std::unique_ptr<ArrayFilter>> arrayFilters;
+    std::map<StringData, std::unique_ptr<ExpressionWithPlaceholder>> arrayFilters;
     std::set<std::string> foundIdentifiers;
     UpdateObjectNode setRoot1, setRoot2;
     ASSERT_OK(UpdateObjectNode::parseAndMerge(&setRoot1,
@@ -1298,7 +1298,7 @@ TEST(UpdateObjectNodeTest, TopLevelConflictFails) {
     auto setUpdate2 = fromjson("{$set: {'a': 6}}");
     FieldRef fakeFieldRef("root");
     const CollatorInterface* collator = nullptr;
-    std::map<StringData, std::unique_ptr<ArrayFilter>> arrayFilters;
+    std::map<StringData, std::unique_ptr<ExpressionWithPlaceholder>> arrayFilters;
     std::set<std::string> foundIdentifiers;
     UpdateObjectNode setRoot1, setRoot2;
     ASSERT_OK(UpdateObjectNode::parseAndMerge(&setRoot1,
@@ -1327,7 +1327,7 @@ TEST(UpdateObjectNodeTest, NestedConflictFails) {
     auto setUpdate2 = fromjson("{$set: {'a.b': 6}}");
     FieldRef fakeFieldRef("root");
     const CollatorInterface* collator = nullptr;
-    std::map<StringData, std::unique_ptr<ArrayFilter>> arrayFilters;
+    std::map<StringData, std::unique_ptr<ExpressionWithPlaceholder>> arrayFilters;
     std::set<std::string> foundIdentifiers;
     UpdateObjectNode setRoot1, setRoot2;
     ASSERT_OK(UpdateObjectNode::parseAndMerge(&setRoot1,
@@ -1356,7 +1356,7 @@ TEST(UpdateObjectNodeTest, LeftPrefixMergeFails) {
     auto setUpdate2 = fromjson("{$set: {'a.b.c': 6}}");
     FieldRef fakeFieldRef("root");
     const CollatorInterface* collator = nullptr;
-    std::map<StringData, std::unique_ptr<ArrayFilter>> arrayFilters;
+    std::map<StringData, std::unique_ptr<ExpressionWithPlaceholder>> arrayFilters;
     std::set<std::string> foundIdentifiers;
     UpdateObjectNode setRoot1, setRoot2;
     ASSERT_OK(UpdateObjectNode::parseAndMerge(&setRoot1,
@@ -1385,7 +1385,7 @@ TEST(UpdateObjectNodeTest, RightPrefixMergeFails) {
     auto setUpdate2 = fromjson("{$set: {'a.b': 6}}");
     FieldRef fakeFieldRef("root");
     const CollatorInterface* collator = nullptr;
-    std::map<StringData, std::unique_ptr<ArrayFilter>> arrayFilters;
+    std::map<StringData, std::unique_ptr<ExpressionWithPlaceholder>> arrayFilters;
     std::set<std::string> foundIdentifiers;
     UpdateObjectNode setRoot1, setRoot2;
     ASSERT_OK(UpdateObjectNode::parseAndMerge(&setRoot1,
@@ -1414,7 +1414,7 @@ TEST(UpdateObjectNodeTest, LeftPrefixMergeThroughPositionalFails) {
     auto setUpdate2 = fromjson("{$set: {'a.$.c.d': 6}}");
     FieldRef fakeFieldRef("root");
     const CollatorInterface* collator = nullptr;
-    std::map<StringData, std::unique_ptr<ArrayFilter>> arrayFilters;
+    std::map<StringData, std::unique_ptr<ExpressionWithPlaceholder>> arrayFilters;
     std::set<std::string> foundIdentifiers;
     UpdateObjectNode setRoot1, setRoot2;
     ASSERT_OK(UpdateObjectNode::parseAndMerge(&setRoot1,
@@ -1443,7 +1443,7 @@ TEST(UpdateObjectNodeTest, RightPrefixMergeThroughPositionalFails) {
     auto setUpdate2 = fromjson("{$set: {'a.$.c': 6}}");
     FieldRef fakeFieldRef("root");
     const CollatorInterface* collator = nullptr;
-    std::map<StringData, std::unique_ptr<ArrayFilter>> arrayFilters;
+    std::map<StringData, std::unique_ptr<ExpressionWithPlaceholder>> arrayFilters;
     std::set<std::string> foundIdentifiers;
     UpdateObjectNode setRoot1, setRoot2;
     ASSERT_OK(UpdateObjectNode::parseAndMerge(&setRoot1,
@@ -1472,7 +1472,7 @@ TEST(UpdateObjectNodeTest, MergeWithConflictingPositionalFails) {
     auto setUpdate2 = fromjson("{$set: {'a.$': 6}}");
     FieldRef fakeFieldRef("root");
     const CollatorInterface* collator = nullptr;
-    std::map<StringData, std::unique_ptr<ArrayFilter>> arrayFilters;
+    std::map<StringData, std::unique_ptr<ExpressionWithPlaceholder>> arrayFilters;
     std::set<std::string> foundIdentifiers;
     UpdateObjectNode setRoot1, setRoot2;
     ASSERT_OK(UpdateObjectNode::parseAndMerge(&setRoot1,
@@ -1504,11 +1504,11 @@ DEATH_TEST(UpdateObjectNodeTest,
     FieldRef fakeFieldRef("root");
     const CollatorInterface* collator = nullptr;
     auto arrayFilterI = fromjson("{i: 0}");
-    std::map<StringData, std::unique_ptr<ArrayFilter>> arrayFilters1;
-    arrayFilters1["i"] = uassertStatusOK(ArrayFilter::parse(arrayFilterI, collator));
+    std::map<StringData, std::unique_ptr<ExpressionWithPlaceholder>> arrayFilters1;
+    arrayFilters1["i"] = uassertStatusOK(ExpressionWithPlaceholder::parse(arrayFilterI, collator));
     auto arrayFilterJ = fromjson("{j: 0}");
-    std::map<StringData, std::unique_ptr<ArrayFilter>> arrayFilters2;
-    arrayFilters2["j"] = uassertStatusOK(ArrayFilter::parse(arrayFilterJ, collator));
+    std::map<StringData, std::unique_ptr<ExpressionWithPlaceholder>> arrayFilters2;
+    arrayFilters2["j"] = uassertStatusOK(ExpressionWithPlaceholder::parse(arrayFilterJ, collator));
     std::set<std::string> foundIdentifiers;
     UpdateObjectNode setRoot1, setRoot2;
     ASSERT_OK(UpdateObjectNode::parseAndMerge(&setRoot1,
@@ -1533,8 +1533,8 @@ TEST(UpdateObjectNodeTest, MergingArrayNodeWithObjectNodeFails) {
     FieldRef fakeFieldRef("root");
     const CollatorInterface* collator = nullptr;
     auto arrayFilter = fromjson("{i: 0}");
-    std::map<StringData, std::unique_ptr<ArrayFilter>> arrayFilters;
-    arrayFilters["i"] = uassertStatusOK(ArrayFilter::parse(arrayFilter, collator));
+    std::map<StringData, std::unique_ptr<ExpressionWithPlaceholder>> arrayFilters;
+    arrayFilters["i"] = uassertStatusOK(ExpressionWithPlaceholder::parse(arrayFilter, collator));
     std::set<std::string> foundIdentifiers;
     UpdateObjectNode setRoot1, setRoot2;
     ASSERT_OK(UpdateObjectNode::parseAndMerge(&setRoot1,
@@ -1564,8 +1564,8 @@ TEST(UpdateObjectNodeTest, MergingArrayNodeWithLeafNodeFails) {
     FieldRef fakeFieldRef("root");
     const CollatorInterface* collator = nullptr;
     auto arrayFilter = fromjson("{i: 0}");
-    std::map<StringData, std::unique_ptr<ArrayFilter>> arrayFilters;
-    arrayFilters["i"] = uassertStatusOK(ArrayFilter::parse(arrayFilter, collator));
+    std::map<StringData, std::unique_ptr<ExpressionWithPlaceholder>> arrayFilters;
+    arrayFilters["i"] = uassertStatusOK(ExpressionWithPlaceholder::parse(arrayFilter, collator));
     std::set<std::string> foundIdentifiers;
     UpdateObjectNode setRoot1, setRoot2;
     ASSERT_OK(UpdateObjectNode::parseAndMerge(&setRoot1,
@@ -1596,9 +1596,9 @@ TEST(UpdateObjectNodeTest, MergingTwoArrayNodesSucceeds) {
     const CollatorInterface* collator = nullptr;
     auto arrayFilterI = fromjson("{i: 0}");
     auto arrayFilterJ = fromjson("{j: 0}");
-    std::map<StringData, std::unique_ptr<ArrayFilter>> arrayFilters;
-    arrayFilters["i"] = uassertStatusOK(ArrayFilter::parse(arrayFilterI, collator));
-    arrayFilters["j"] = uassertStatusOK(ArrayFilter::parse(arrayFilterJ, collator));
+    std::map<StringData, std::unique_ptr<ExpressionWithPlaceholder>> arrayFilters;
+    arrayFilters["i"] = uassertStatusOK(ExpressionWithPlaceholder::parse(arrayFilterI, collator));
+    arrayFilters["j"] = uassertStatusOK(ExpressionWithPlaceholder::parse(arrayFilterJ, collator));
     std::set<std::string> foundIdentifiers;
     UpdateObjectNode setRoot1, setRoot2;
     ASSERT_OK(UpdateObjectNode::parseAndMerge(&setRoot1,
@@ -1635,8 +1635,8 @@ TEST(UpdateObjectNodeTest, MergeConflictThroughArrayNodesFails) {
     FieldRef fakeFieldRef("root");
     const CollatorInterface* collator = nullptr;
     auto arrayFilter = fromjson("{i: 0}");
-    std::map<StringData, std::unique_ptr<ArrayFilter>> arrayFilters;
-    arrayFilters["i"] = uassertStatusOK(ArrayFilter::parse(arrayFilter, collator));
+    std::map<StringData, std::unique_ptr<ExpressionWithPlaceholder>> arrayFilters;
+    arrayFilters["i"] = uassertStatusOK(ExpressionWithPlaceholder::parse(arrayFilter, collator));
     std::set<std::string> foundIdentifiers;
     UpdateObjectNode setRoot1, setRoot2;
     ASSERT_OK(UpdateObjectNode::parseAndMerge(&setRoot1,
@@ -1666,8 +1666,8 @@ TEST(UpdateObjectNodeTest, NoMergeConflictThroughArrayNodesSucceeds) {
     FieldRef fakeFieldRef("root");
     const CollatorInterface* collator = nullptr;
     auto arrayFilter = fromjson("{i: 0}");
-    std::map<StringData, std::unique_ptr<ArrayFilter>> arrayFilters;
-    arrayFilters["i"] = uassertStatusOK(ArrayFilter::parse(arrayFilter, collator));
+    std::map<StringData, std::unique_ptr<ExpressionWithPlaceholder>> arrayFilters;
+    arrayFilters["i"] = uassertStatusOK(ExpressionWithPlaceholder::parse(arrayFilter, collator));
     std::set<std::string> foundIdentifiers;
     UpdateObjectNode setRoot1, setRoot2;
     ASSERT_OK(UpdateObjectNode::parseAndMerge(&setRoot1,
@@ -1707,7 +1707,7 @@ TEST(UpdateObjectNodeTest, NoMergeConflictThroughArrayNodesSucceeds) {
 TEST(UpdateObjectNodeTest, ApplyCreateField) {
     auto setUpdate = fromjson("{$set: {b: 6}}");
     const CollatorInterface* collator = nullptr;
-    std::map<StringData, std::unique_ptr<ArrayFilter>> arrayFilters;
+    std::map<StringData, std::unique_ptr<ExpressionWithPlaceholder>> arrayFilters;
     std::set<std::string> foundIdentifiers;
     UpdateObjectNode root;
     ASSERT_OK(UpdateObjectNode::parseAndMerge(&root,
@@ -1751,7 +1751,7 @@ TEST(UpdateObjectNodeTest, ApplyCreateField) {
 TEST(UpdateObjectNodeTest, ApplyExistingField) {
     auto setUpdate = fromjson("{$set: {a: 6}}");
     const CollatorInterface* collator = nullptr;
-    std::map<StringData, std::unique_ptr<ArrayFilter>> arrayFilters;
+    std::map<StringData, std::unique_ptr<ExpressionWithPlaceholder>> arrayFilters;
     std::set<std::string> foundIdentifiers;
     UpdateObjectNode root;
     ASSERT_OK(UpdateObjectNode::parseAndMerge(&root,
@@ -1795,7 +1795,7 @@ TEST(UpdateObjectNodeTest, ApplyExistingField) {
 TEST(UpdateObjectNodeTest, ApplyExistingAndNonexistingFields) {
     auto setUpdate = fromjson("{$set: {a: 5, b: 6, c: 7, d: 8}}");
     const CollatorInterface* collator = nullptr;
-    std::map<StringData, std::unique_ptr<ArrayFilter>> arrayFilters;
+    std::map<StringData, std::unique_ptr<ExpressionWithPlaceholder>> arrayFilters;
     std::set<std::string> foundIdentifiers;
     UpdateObjectNode root;
     ASSERT_OK(UpdateObjectNode::parseAndMerge(&root,
@@ -1857,7 +1857,7 @@ TEST(UpdateObjectNodeTest, ApplyExistingAndNonexistingFields) {
 TEST(UpdateObjectNodeTest, ApplyExistingNestedPaths) {
     auto setUpdate = fromjson("{$set: {'a.b': 6, 'a.c': 7, 'b.d': 8, 'b.e': 9}}");
     const CollatorInterface* collator = nullptr;
-    std::map<StringData, std::unique_ptr<ArrayFilter>> arrayFilters;
+    std::map<StringData, std::unique_ptr<ExpressionWithPlaceholder>> arrayFilters;
     std::set<std::string> foundIdentifiers;
     UpdateObjectNode root;
     ASSERT_OK(UpdateObjectNode::parseAndMerge(&root,
@@ -1920,7 +1920,7 @@ TEST(UpdateObjectNodeTest, ApplyExistingNestedPaths) {
 TEST(UpdateObjectNodeTest, ApplyCreateNestedPaths) {
     auto setUpdate = fromjson("{$set: {'a.b': 6, 'a.c': 7, 'b.d': 8, 'b.e': 9}}");
     const CollatorInterface* collator = nullptr;
-    std::map<StringData, std::unique_ptr<ArrayFilter>> arrayFilters;
+    std::map<StringData, std::unique_ptr<ExpressionWithPlaceholder>> arrayFilters;
     std::set<std::string> foundIdentifiers;
     UpdateObjectNode root;
     ASSERT_OK(UpdateObjectNode::parseAndMerge(&root,
@@ -1983,7 +1983,7 @@ TEST(UpdateObjectNodeTest, ApplyCreateNestedPaths) {
 TEST(UpdateObjectNodeTest, ApplyCreateDeeplyNestedPaths) {
     auto setUpdate = fromjson("{$set: {'a.b.c.d': 6, 'a.b.c.e': 7, 'a.f': 8}}");
     const CollatorInterface* collator = nullptr;
-    std::map<StringData, std::unique_ptr<ArrayFilter>> arrayFilters;
+    std::map<StringData, std::unique_ptr<ExpressionWithPlaceholder>> arrayFilters;
     std::set<std::string> foundIdentifiers;
     UpdateObjectNode root;
     ASSERT_OK(UpdateObjectNode::parseAndMerge(&root,
@@ -2040,7 +2040,7 @@ TEST(UpdateObjectNodeTest, ApplyCreateDeeplyNestedPaths) {
 TEST(UpdateObjectNodeTest, ChildrenShouldBeAppliedInAlphabeticalOrder) {
     auto setUpdate = fromjson("{$set: {a: 5, d: 6, c: 7, b: 8, z: 9}}");
     const CollatorInterface* collator = nullptr;
-    std::map<StringData, std::unique_ptr<ArrayFilter>> arrayFilters;
+    std::map<StringData, std::unique_ptr<ExpressionWithPlaceholder>> arrayFilters;
     std::set<std::string> foundIdentifiers;
     UpdateObjectNode root;
     ASSERT_OK(UpdateObjectNode::parseAndMerge(&root,
@@ -2108,7 +2108,7 @@ TEST(UpdateObjectNodeTest, ChildrenShouldBeAppliedInAlphabeticalOrder) {
 TEST(UpdateObjectNodeTest, CollatorShouldNotAffectUpdateOrder) {
     auto setUpdate = fromjson("{$set: {abc: 5, cba: 6}}");
     CollatorInterfaceMock collator(CollatorInterfaceMock::MockType::kReverseString);
-    std::map<StringData, std::unique_ptr<ArrayFilter>> arrayFilters;
+    std::map<StringData, std::unique_ptr<ExpressionWithPlaceholder>> arrayFilters;
     std::set<std::string> foundIdentifiers;
     UpdateObjectNode root;
     ASSERT_OK(UpdateObjectNode::parseAndMerge(&root,
@@ -2158,7 +2158,7 @@ TEST(UpdateObjectNodeTest, CollatorShouldNotAffectUpdateOrder) {
 TEST(UpdateObjectNodeTest, ApplyNoop) {
     auto setUpdate = fromjson("{$set: {a: 5, b: 6, c: 7}}");
     const CollatorInterface* collator = nullptr;
-    std::map<StringData, std::unique_ptr<ArrayFilter>> arrayFilters;
+    std::map<StringData, std::unique_ptr<ExpressionWithPlaceholder>> arrayFilters;
     std::set<std::string> foundIdentifiers;
     UpdateObjectNode root;
     ASSERT_OK(UpdateObjectNode::parseAndMerge(&root,
@@ -2216,7 +2216,7 @@ TEST(UpdateObjectNodeTest, ApplyNoop) {
 TEST(UpdateObjectNodeTest, ApplySomeChildrenNoops) {
     auto setUpdate = fromjson("{$set: {a: 5, b: 6, c: 7}}");
     const CollatorInterface* collator = nullptr;
-    std::map<StringData, std::unique_ptr<ArrayFilter>> arrayFilters;
+    std::map<StringData, std::unique_ptr<ExpressionWithPlaceholder>> arrayFilters;
     std::set<std::string> foundIdentifiers;
     UpdateObjectNode root;
     ASSERT_OK(UpdateObjectNode::parseAndMerge(&root,
@@ -2274,7 +2274,7 @@ TEST(UpdateObjectNodeTest, ApplySomeChildrenNoops) {
 TEST(UpdateObjectNodeTest, ApplyBlockingElement) {
     auto setUpdate = fromjson("{$set: {'a.b': 5}}");
     const CollatorInterface* collator = nullptr;
-    std::map<StringData, std::unique_ptr<ArrayFilter>> arrayFilters;
+    std::map<StringData, std::unique_ptr<ExpressionWithPlaceholder>> arrayFilters;
     std::set<std::string> foundIdentifiers;
     UpdateObjectNode root;
     ASSERT_OK(UpdateObjectNode::parseAndMerge(&root,
@@ -2316,7 +2316,7 @@ TEST(UpdateObjectNodeTest, ApplyBlockingElement) {
 TEST(UpdateObjectNodeTest, ApplyBlockingElementFromReplication) {
     auto setUpdate = fromjson("{$set: {'a.b': 5, b: 6}}");
     const CollatorInterface* collator = nullptr;
-    std::map<StringData, std::unique_ptr<ArrayFilter>> arrayFilters;
+    std::map<StringData, std::unique_ptr<ExpressionWithPlaceholder>> arrayFilters;
     std::set<std::string> foundIdentifiers;
     UpdateObjectNode root;
     ASSERT_OK(UpdateObjectNode::parseAndMerge(&root,
@@ -2366,7 +2366,7 @@ TEST(UpdateObjectNodeTest, ApplyBlockingElementFromReplication) {
 TEST(UpdateObjectNodeTest, ApplyPositionalMissingMatchedField) {
     auto setUpdate = fromjson("{$set: {'a.$': 5}}");
     const CollatorInterface* collator = nullptr;
-    std::map<StringData, std::unique_ptr<ArrayFilter>> arrayFilters;
+    std::map<StringData, std::unique_ptr<ExpressionWithPlaceholder>> arrayFilters;
     std::set<std::string> foundIdentifiers;
     UpdateObjectNode root;
     ASSERT_OK(UpdateObjectNode::parseAndMerge(&root,
@@ -2409,7 +2409,7 @@ TEST(UpdateObjectNodeTest, ApplyPositionalMissingMatchedField) {
 TEST(UpdateObjectNodeTest, ApplyMergePositionalChild) {
     auto setUpdate = fromjson("{$set: {'a.0.b': 5, 'a.$.c': 6}}");
     const CollatorInterface* collator = nullptr;
-    std::map<StringData, std::unique_ptr<ArrayFilter>> arrayFilters;
+    std::map<StringData, std::unique_ptr<ExpressionWithPlaceholder>> arrayFilters;
     std::set<std::string> foundIdentifiers;
     UpdateObjectNode root;
     ASSERT_OK(UpdateObjectNode::parseAndMerge(&root,
@@ -2459,7 +2459,7 @@ TEST(UpdateObjectNodeTest, ApplyMergePositionalChild) {
 TEST(UpdateObjectNodeTest, ApplyOrderMergedPositionalChild) {
     auto setUpdate = fromjson("{$set: {'a.2': 5, 'a.1.b': 6, 'a.0': 7, 'a.$.c': 8}}");
     const CollatorInterface* collator = nullptr;
-    std::map<StringData, std::unique_ptr<ArrayFilter>> arrayFilters;
+    std::map<StringData, std::unique_ptr<ExpressionWithPlaceholder>> arrayFilters;
     std::set<std::string> foundIdentifiers;
     UpdateObjectNode root;
     ASSERT_OK(UpdateObjectNode::parseAndMerge(&root,
@@ -2522,7 +2522,7 @@ TEST(UpdateObjectNodeTest, ApplyOrderMergedPositionalChild) {
 TEST(UpdateObjectNodeTest, ApplyMergeConflictWithPositionalChild) {
     auto setUpdate = fromjson("{$set: {'a.0': 5, 'a.$': 6}}");
     const CollatorInterface* collator = nullptr;
-    std::map<StringData, std::unique_ptr<ArrayFilter>> arrayFilters;
+    std::map<StringData, std::unique_ptr<ExpressionWithPlaceholder>> arrayFilters;
     std::set<std::string> foundIdentifiers;
     UpdateObjectNode root;
     ASSERT_OK(UpdateObjectNode::parseAndMerge(&root,
@@ -2570,7 +2570,7 @@ TEST(UpdateObjectNodeTest, ApplyMergeConflictWithPositionalChild) {
 TEST(UpdateObjectNodeTest, ApplyDoNotMergePositionalChild) {
     auto setUpdate = fromjson("{$set: {'a.0': 5, 'a.2': 6, 'a.$': 7}}");
     const CollatorInterface* collator = nullptr;
-    std::map<StringData, std::unique_ptr<ArrayFilter>> arrayFilters;
+    std::map<StringData, std::unique_ptr<ExpressionWithPlaceholder>> arrayFilters;
     std::set<std::string> foundIdentifiers;
     UpdateObjectNode root;
     ASSERT_OK(UpdateObjectNode::parseAndMerge(&root,
@@ -2626,7 +2626,7 @@ TEST(UpdateObjectNodeTest, ApplyDoNotMergePositionalChild) {
 TEST(UpdateObjectNodeTest, ApplyPositionalChildLast) {
     auto setUpdate = fromjson("{$set: {'a.$': 5, 'a.0': 6, 'a.1': 7}}");
     const CollatorInterface* collator = nullptr;
-    std::map<StringData, std::unique_ptr<ArrayFilter>> arrayFilters;
+    std::map<StringData, std::unique_ptr<ExpressionWithPlaceholder>> arrayFilters;
     std::set<std::string> foundIdentifiers;
     UpdateObjectNode root;
     ASSERT_OK(UpdateObjectNode::parseAndMerge(&root,
@@ -2682,7 +2682,7 @@ TEST(UpdateObjectNodeTest, ApplyPositionalChildLast) {
 TEST(UpdateObjectNodeTest, ApplyUseStoredMergedPositional) {
     auto setUpdate = fromjson("{$set: {'a.0.b': 5, 'a.$.c': 6}}");
     const CollatorInterface* collator = nullptr;
-    std::map<StringData, std::unique_ptr<ArrayFilter>> arrayFilters;
+    std::map<StringData, std::unique_ptr<ExpressionWithPlaceholder>> arrayFilters;
     std::set<std::string> foundIdentifiers;
     UpdateObjectNode root;
     ASSERT_OK(UpdateObjectNode::parseAndMerge(&root,
@@ -2752,7 +2752,7 @@ TEST(UpdateObjectNodeTest, ApplyUseStoredMergedPositional) {
 TEST(UpdateObjectNodeTest, ApplyDoNotUseStoredMergedPositional) {
     auto setUpdate = fromjson("{$set: {'a.0.b': 5, 'a.$.c': 6, 'a.1.d': 7}}");
     const CollatorInterface* collator = nullptr;
-    std::map<StringData, std::unique_ptr<ArrayFilter>> arrayFilters;
+    std::map<StringData, std::unique_ptr<ExpressionWithPlaceholder>> arrayFilters;
     std::set<std::string> foundIdentifiers;
     UpdateObjectNode root;
     ASSERT_OK(UpdateObjectNode::parseAndMerge(&root,
@@ -2835,7 +2835,7 @@ TEST(UpdateObjectNodeTest, ApplyDoNotUseStoredMergedPositional) {
 TEST(UpdateObjectNodeTest, ApplyToArrayByIndexWithLeadingZero) {
     auto setUpdate = fromjson("{$set: {'a.02': 2}}");
     const CollatorInterface* collator = nullptr;
-    std::map<StringData, std::unique_ptr<ArrayFilter>> arrayFilters;
+    std::map<StringData, std::unique_ptr<ExpressionWithPlaceholder>> arrayFilters;
     std::set<std::string> foundIdentifiers;
     UpdateObjectNode root;
     ASSERT_OK(UpdateObjectNode::parseAndMerge(&root,
@@ -2885,7 +2885,7 @@ TEST(UpdateObjectNodeTest, ApplyToArrayByIndexWithLeadingZero) {
 TEST(UpdateObjectNodeTest, ApplyMultipleArrayUpdates) {
     auto setUpdate = fromjson("{$set: {'a.2': 2, 'a.10': 10}}");
     const CollatorInterface* collator = nullptr;
-    std::map<StringData, std::unique_ptr<ArrayFilter>> arrayFilters;
+    std::map<StringData, std::unique_ptr<ExpressionWithPlaceholder>> arrayFilters;
     std::set<std::string> foundIdentifiers;
     UpdateObjectNode root;
     ASSERT_OK(UpdateObjectNode::parseAndMerge(&root,
@@ -2937,7 +2937,7 @@ TEST(UpdateObjectNodeTest, ApplyMultipleArrayUpdates) {
 TEST(UpdateObjectNodeTest, ApplyUpdateToNonViablePathInArray) {
     auto setUpdate = fromjson("{$set: {'a.b': 3}}");
     const CollatorInterface* collator = nullptr;
-    std::map<StringData, std::unique_ptr<ArrayFilter>> arrayFilters;
+    std::map<StringData, std::unique_ptr<ExpressionWithPlaceholder>> arrayFilters;
     std::set<std::string> foundIdentifiers;
     UpdateObjectNode root;
     ASSERT_OK(UpdateObjectNode::parseAndMerge(&root,
@@ -2979,7 +2979,7 @@ TEST(UpdateObjectNodeTest, ApplyUpdateToNonViablePathInArray) {
 TEST(UpdateObjectNodeTest, SetAndPopModifiersWithCommonPrefixApplySuccessfully) {
     auto update = fromjson("{$set: {'a.b': 5}, $pop: {'a.c': -1}}");
     const CollatorInterface* collator = nullptr;
-    std::map<StringData, std::unique_ptr<ArrayFilter>> arrayFilters;
+    std::map<StringData, std::unique_ptr<ExpressionWithPlaceholder>> arrayFilters;
     std::set<std::string> foundIdentifiers;
     UpdateObjectNode root;
     ASSERT_OK(UpdateObjectNode::parseAndMerge(&root,
@@ -3027,7 +3027,7 @@ TEST(UpdateObjectNodeTest, SetAndPopModifiersWithCommonPrefixApplySuccessfully) 
 
 TEST(ParseRenameTest, RenameToStringWithEmbeddedNullFails) {
     const CollatorInterface* collator = nullptr;
-    std::map<StringData, std::unique_ptr<ArrayFilter>> arrayFilters;
+    std::map<StringData, std::unique_ptr<ExpressionWithPlaceholder>> arrayFilters;
     std::set<std::string> foundIdentifiers;
 
     {
@@ -3094,7 +3094,7 @@ TEST(ParseRenameTest, RenameToStringWithEmbeddedNullFails) {
 TEST(ParseRenameTest, RenameToNonUpdatablePathFails) {
     auto update = fromjson("{$rename: {'a': 'b.'}}");
     const CollatorInterface* collator = nullptr;
-    std::map<StringData, std::unique_ptr<ArrayFilter>> arrayFilters;
+    std::map<StringData, std::unique_ptr<ExpressionWithPlaceholder>> arrayFilters;
     std::set<std::string> foundIdentifiers;
     UpdateObjectNode root;
     auto result = UpdateObjectNode::parseAndMerge(&root,
@@ -3112,7 +3112,7 @@ TEST(ParseRenameTest, RenameToNonUpdatablePathFails) {
 TEST(ParseRenameTest, RenameFromNonUpdatablePathFails) {
     auto update = fromjson("{$rename: {'.a': 'b'}}");
     const CollatorInterface* collator = nullptr;
-    std::map<StringData, std::unique_ptr<ArrayFilter>> arrayFilters;
+    std::map<StringData, std::unique_ptr<ExpressionWithPlaceholder>> arrayFilters;
     std::set<std::string> foundIdentifiers;
     UpdateObjectNode root;
     auto result = UpdateObjectNode::parseAndMerge(&root,
@@ -3130,7 +3130,7 @@ TEST(ParseRenameTest, RenameFromNonUpdatablePathFails) {
 TEST(ParseRenameTest, RenameToNonStringPathFails) {
     auto update = fromjson("{$rename: {'a': 5}}");
     const CollatorInterface* collator = nullptr;
-    std::map<StringData, std::unique_ptr<ArrayFilter>> arrayFilters;
+    std::map<StringData, std::unique_ptr<ExpressionWithPlaceholder>> arrayFilters;
     std::set<std::string> foundIdentifiers;
     UpdateObjectNode root;
     auto result = UpdateObjectNode::parseAndMerge(&root,
@@ -3154,7 +3154,7 @@ TEST(ParseRenameTest, RenameToNonStringPathFails) {
 TEST(ParseRenameTest, RenameWithSameNameFails) {
     auto update = fromjson("{$rename: {'a': 'a'}}");
     const CollatorInterface* collator = nullptr;
-    std::map<StringData, std::unique_ptr<ArrayFilter>> arrayFilters;
+    std::map<StringData, std::unique_ptr<ExpressionWithPlaceholder>> arrayFilters;
     std::set<std::string> foundIdentifiers;
     UpdateObjectNode root;
     auto result = UpdateObjectNode::parseAndMerge(&root,
@@ -3172,7 +3172,7 @@ TEST(ParseRenameTest, RenameWithSameNameFails) {
 TEST(ParseRenameTest, RenameUpwardFails) {
     auto update = fromjson("{$rename: {'b.a': 'b'}}");
     const CollatorInterface* collator = nullptr;
-    std::map<StringData, std::unique_ptr<ArrayFilter>> arrayFilters;
+    std::map<StringData, std::unique_ptr<ExpressionWithPlaceholder>> arrayFilters;
     std::set<std::string> foundIdentifiers;
     UpdateObjectNode root;
     auto result = UpdateObjectNode::parseAndMerge(&root,
@@ -3190,7 +3190,7 @@ TEST(ParseRenameTest, RenameUpwardFails) {
 TEST(ParseRenameTest, RenameDownwardFails) {
     auto update = fromjson("{$rename: {'b': 'b.a'}}");
     const CollatorInterface* collator = nullptr;
-    std::map<StringData, std::unique_ptr<ArrayFilter>> arrayFilters;
+    std::map<StringData, std::unique_ptr<ExpressionWithPlaceholder>> arrayFilters;
     std::set<std::string> foundIdentifiers;
     UpdateObjectNode root;
     auto result = UpdateObjectNode::parseAndMerge(&root,
@@ -3208,7 +3208,7 @@ TEST(ParseRenameTest, RenameDownwardFails) {
 TEST(ParseRenameTest, ConflictWithRenameSourceFailsToParse) {
     auto update = fromjson("{$set: {a: 5}, $rename: {a: 'b'}}");
     const CollatorInterface* collator = nullptr;
-    std::map<StringData, std::unique_ptr<ArrayFilter>> arrayFilters;
+    std::map<StringData, std::unique_ptr<ExpressionWithPlaceholder>> arrayFilters;
     std::set<std::string> foundIdentifiers;
     UpdateObjectNode root;
     ASSERT_OK(UpdateObjectNode::parseAndMerge(&root,
@@ -3231,7 +3231,7 @@ TEST(ParseRenameTest, ConflictWithRenameSourceFailsToParse) {
 TEST(ParseRenameTest, ConflictWithRenameDestinationFailsToParse) {
     auto update = fromjson("{$set: {b: 5}, $rename: {a: 'b'}}");
     const CollatorInterface* collator = nullptr;
-    std::map<StringData, std::unique_ptr<ArrayFilter>> arrayFilters;
+    std::map<StringData, std::unique_ptr<ExpressionWithPlaceholder>> arrayFilters;
     std::set<std::string> foundIdentifiers;
     UpdateObjectNode root;
     ASSERT_OK(UpdateObjectNode::parseAndMerge(&root,

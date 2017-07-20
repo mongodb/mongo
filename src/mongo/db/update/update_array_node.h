@@ -32,7 +32,7 @@
 #include <string>
 
 #include "mongo/base/clonable_ptr.h"
-#include "mongo/db/update/array_filter.h"
+#include "mongo/db/matcher/expression_with_placeholder.h"
 #include "mongo/db/update/update_internal_node.h"
 #include "mongo/stdx/memory.h"
 
@@ -58,7 +58,8 @@ public:
                                                                  const UpdateArrayNode& rightNode,
                                                                  FieldRef* pathTaken);
 
-    UpdateArrayNode(const std::map<StringData, std::unique_ptr<ArrayFilter>>& arrayFilters)
+    UpdateArrayNode(
+        const std::map<StringData, std::unique_ptr<ExpressionWithPlaceholder>>& arrayFilters)
         : UpdateInternalNode(Type::Array), _arrayFilters(arrayFilters) {}
 
     std::unique_ptr<UpdateNode> clone() const final {
@@ -88,7 +89,7 @@ public:
     void setChild(std::string field, std::unique_ptr<UpdateNode> child) final;
 
 private:
-    const std::map<StringData, std::unique_ptr<ArrayFilter>>& _arrayFilters;
+    const std::map<StringData, std::unique_ptr<ExpressionWithPlaceholder>>& _arrayFilters;
     std::map<std::string, clonable_ptr<UpdateNode>> _children;
 
     // When calling apply() causes us to merge elements of '_children', we store the result of the

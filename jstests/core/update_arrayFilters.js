@@ -639,7 +639,7 @@
         assert.neq(
             -1,
             res.getWriteError().errmsg.indexOf(
-                "The top-level field name in an array filter must be an alphanumeric string beginning with a lowercase letter, found 'I'"),
+                "Error parsing array filter: The top-level field name must be an alphanumeric string beginning with a lowercase letter, found 'I'"),
             "update failed for a reason other than bad array filter identifier");
 
         assert.writeOK(coll.insert({_id: 0, a: [0], b: [{j: 0}]}));

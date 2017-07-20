@@ -51,7 +51,7 @@ StatusWith<std::string> parseArrayFilterIdentifier(
     StringData field,
     size_t position,
     const FieldRef& fieldRef,
-    const std::map<StringData, std::unique_ptr<ArrayFilter>>& arrayFilters,
+    const std::map<StringData, std::unique_ptr<ExpressionWithPlaceholder>>& arrayFilters,
     std::set<std::string>& foundIdentifiers) {
     dassert(fieldchecker::isArrayFilterIdentifier(field));
 
@@ -197,7 +197,7 @@ StatusWith<bool> UpdateObjectNode::parseAndMerge(
     modifiertable::ModifierType type,
     BSONElement modExpr,
     const CollatorInterface* collator,
-    const std::map<StringData, std::unique_ptr<ArrayFilter>>& arrayFilters,
+    const std::map<StringData, std::unique_ptr<ExpressionWithPlaceholder>>& arrayFilters,
     std::set<std::string>& foundIdentifiers) {
     FieldRef fieldRef;
     if (type != modifiertable::ModifierType::MOD_RENAME) {

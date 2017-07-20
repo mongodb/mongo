@@ -30,9 +30,9 @@
 
 #include "mongo/base/disallow_copying.h"
 #include "mongo/base/status.h"
+#include "mongo/db/matcher/expression_with_placeholder.h"
 #include "mongo/db/query/collation/collator_interface.h"
 #include "mongo/db/query/plan_executor.h"
-#include "mongo/db/update/array_filter.h"
 #include "mongo/db/update/update_driver.h"
 
 namespace mongo {
@@ -153,7 +153,7 @@ private:
     std::unique_ptr<CollatorInterface> _collator;
 
     // The array filters for the parsed update. Owned here.
-    std::map<StringData, std::unique_ptr<ArrayFilter>> _arrayFilters;
+    std::map<StringData, std::unique_ptr<ExpressionWithPlaceholder>> _arrayFilters;
 
     // Driver for processing updates on matched documents.
     UpdateDriver _driver;

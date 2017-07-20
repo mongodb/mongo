@@ -64,9 +64,10 @@ public:
      * 'arrayFilters' is non-empty. Uasserts or returns a non-ok status if 'updateExpr' fails to
      * parse.
      */
-    Status parse(const BSONObj& updateExpr,
-                 const std::map<StringData, std::unique_ptr<ArrayFilter>>& arrayFilters,
-                 const bool multi = false);
+    Status parse(
+        const BSONObj& updateExpr,
+        const std::map<StringData, std::unique_ptr<ExpressionWithPlaceholder>>& arrayFilters,
+        const bool multi = false);
 
     /**
      * Fills in document with any fields in the query which are valid.

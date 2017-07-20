@@ -146,20 +146,22 @@ Status ParsedUpdate::parseArrayFilters() {
     }
 
     for (auto rawArrayFilter : _request->getArrayFilters()) {
-        auto arrayFilterStatus = ArrayFilter::parse(rawArrayFilter, _collator.get());
+        auto arrayFilterStatus = ExpressionWithPlaceholder::parse(rawArrayFilter, _collator.get());
         if (!arrayFilterStatus.isOK()) {
-            return arrayFilterStatus.getStatus();
+            return Status(arrayFilterStatus.getStatus().code(),
+                          str::stream() << "Error parsing array filter: "
+                                        << arrayFilterStatus.getStatus().reason());
         }
         auto arrayFilter = std::move(arrayFilterStatus.getValue());
 
-        if (_arrayFilters.find(arrayFilter->getId()) != _arrayFilters.end()) {
+        if (_arrayFilters.find(arrayFilter->getPlaceholder()) != _arrayFilters.end()) {
             return Status(ErrorCodes::FailedToParse,
                           str::stream()
                               << "Found multiple array filters with the same top-level field name "
-                              << arrayFilter->getId());
+                              << arrayFilter->getPlaceholder());
         }
 
-        _arrayFilters[arrayFilter->getId()] = std::move(arrayFilter);
+        _arrayFilters[arrayFilter->getPlaceholder()] = std::move(arrayFilter);
     }
 
     return Status::OK();

@@ -33,7 +33,7 @@
 
 #include "mongo/base/clonable_ptr.h"
 #include "mongo/bson/bsonelement.h"
-#include "mongo/db/update/array_filter.h"
+#include "mongo/db/matcher/expression_with_placeholder.h"
 #include "mongo/db/update/modifier_table.h"
 #include "mongo/db/update/update_internal_node.h"
 #include "mongo/stdx/memory.h"
@@ -61,7 +61,7 @@ public:
         modifiertable::ModifierType type,
         BSONElement modExpr,
         const CollatorInterface* collator,
-        const std::map<StringData, std::unique_ptr<ArrayFilter>>& arrayFilters,
+        const std::map<StringData, std::unique_ptr<ExpressionWithPlaceholder>>& arrayFilters,
         std::set<std::string>& foundIdentifiers);
 
     /**

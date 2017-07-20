@@ -209,7 +209,7 @@ public:
             request.setQuery(query);
             request.setUpdates(updates);
 
-            const std::map<StringData, std::unique_ptr<ArrayFilter>> arrayFilters;
+            const std::map<StringData, std::unique_ptr<ExpressionWithPlaceholder>> arrayFilters;
 
             ASSERT_OK(driver.parse(request.getUpdates(), arrayFilters, request.isMulti()));
 
@@ -282,7 +282,7 @@ public:
             request.setQuery(query);
             request.setUpdates(updates);
 
-            const std::map<StringData, std::unique_ptr<ArrayFilter>> arrayFilters;
+            const std::map<StringData, std::unique_ptr<ExpressionWithPlaceholder>> arrayFilters;
 
             ASSERT_OK(driver.parse(request.getUpdates(), arrayFilters, request.isMulti()));
 
@@ -397,7 +397,7 @@ public:
         request.setReturnDocs(UpdateRequest::RETURN_OLD);
         request.setLifecycle(&updateLifecycle);
 
-        const std::map<StringData, std::unique_ptr<ArrayFilter>> arrayFilters;
+        const std::map<StringData, std::unique_ptr<ExpressionWithPlaceholder>> arrayFilters;
 
         ASSERT_OK(driver.parse(request.getUpdates(), arrayFilters, request.isMulti()));
 
@@ -487,7 +487,7 @@ public:
         request.setReturnDocs(UpdateRequest::RETURN_NEW);
         request.setLifecycle(&updateLifecycle);
 
-        const std::map<StringData, std::unique_ptr<ArrayFilter>> arrayFilters;
+        const std::map<StringData, std::unique_ptr<ExpressionWithPlaceholder>> arrayFilters;
 
         ASSERT_OK(driver.parse(request.getUpdates(), arrayFilters, request.isMulti()));
 
@@ -567,7 +567,7 @@ public:
         request.setMulti(false);
         request.setLifecycle(&updateLifecycle);
 
-        const std::map<StringData, std::unique_ptr<ArrayFilter>> arrayFilters;
+        const std::map<StringData, std::unique_ptr<ExpressionWithPlaceholder>> arrayFilters;
 
         ASSERT_OK(driver.parse(request.getUpdates(), arrayFilters, request.isMulti()));
 

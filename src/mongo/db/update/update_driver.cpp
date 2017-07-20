@@ -90,7 +90,7 @@ StatusWith<bool> parseUpdateExpression(
     BSONObj updateExpr,
     UpdateObjectNode* root,
     const CollatorInterface* collator,
-    const std::map<StringData, std::unique_ptr<ArrayFilter>>& arrayFilters) {
+    const std::map<StringData, std::unique_ptr<ExpressionWithPlaceholder>>& arrayFilters) {
     bool positional = false;
     std::set<std::string> foundIdentifiers;
     for (auto&& mod : updateExpr) {
@@ -144,9 +144,10 @@ UpdateDriver::~UpdateDriver() {
     clear();
 }
 
-Status UpdateDriver::parse(const BSONObj& updateExpr,
-                           const std::map<StringData, std::unique_ptr<ArrayFilter>>& arrayFilters,
-                           const bool multi) {
+Status UpdateDriver::parse(
+    const BSONObj& updateExpr,
+    const std::map<StringData, std::unique_ptr<ExpressionWithPlaceholder>>& arrayFilters,
+    const bool multi) {
     clear();
 
     // Check if the update expression is a full object replacement.

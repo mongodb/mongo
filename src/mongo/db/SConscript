@@ -1446,7 +1446,6 @@ env.Library(
         '$BUILD_DIR/mongo/db/repl/oplog_entry',
         '$BUILD_DIR/mongo/db/repl/repl_coordinator_impl',
         '$BUILD_DIR/mongo/db/service_context',
-        '$BUILD_DIR/mongo/db/update/array_filter',
         '$BUILD_DIR/mongo/db/update/update_driver',
         '$BUILD_DIR/mongo/idl/idl_parser',
     ],

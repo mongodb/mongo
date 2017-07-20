@@ -28,24 +28,20 @@
 
 #include "mongo/platform/basic.h"
 
-#include "mongo/db/update/array_filter.h"
+#include "mongo/db/matcher/expression_with_placeholder.h"
 
 #include <regex>
 
-#include "mongo/db/matcher/expression_parser.h"
 #include "mongo/db/matcher/extensions_callback_disallow_extensions.h"
 
 namespace mongo {
 
 namespace {
 
-// The array filter must begin with a lowercase letter and contain no special characters.
-const std::regex idRegex("^[a-z][a-zA-Z0-9]*$");
-
 /**
- * Finds the top-level field that 'expr' is over. The must be unique and not the empty string.
- */
-StatusWith<StringData> parseId(MatchExpression* expr) {
+* Finds the top-level field that 'expr' is over. This must be unique and not the empty string.
+*/
+StatusWith<StringData> parseTopLevelFieldName(MatchExpression* expr) {
     switch (expr->getCategory()) {
         case MatchExpression::MatchCategory::kLeaf:
         case MatchExpression::MatchCategory::kArrayMatching: {
@@ -57,38 +53,37 @@ StatusWith<StringData> parseId(MatchExpression* expr) {
         }
         case MatchExpression::MatchCategory::kLogical: {
             if (expr->numChildren() == 0) {
-                return Status(ErrorCodes::FailedToParse,
-                              "No top-level field name found in array filter.");
+                return Status(ErrorCodes::FailedToParse, "No top-level field name found.");
             }
 
-            StringData id;
+            StringData placeholder;
             for (size_t i = 0; i < expr->numChildren(); ++i) {
-                auto statusWithId = parseId(expr->getChild(i));
+                auto statusWithId = parseTopLevelFieldName(expr->getChild(i));
                 if (!statusWithId.isOK()) {
                     return statusWithId.getStatus();
                 }
 
-                if (id == StringData()) {
-                    id = statusWithId.getValue();
+                if (placeholder == StringData()) {
+                    placeholder = statusWithId.getValue();
                     continue;
                 }
 
-                if (id != statusWithId.getValue()) {
+                if (placeholder != statusWithId.getValue()) {
                     return Status(
                         ErrorCodes::FailedToParse,
                         str::stream()
                             << "Each array filter must use a single top-level field name, found '"
-                            << id
+                            << placeholder
                             << "' and '"
                             << statusWithId.getValue()
                             << "'");
                 }
             }
-            return id;
+            return placeholder;
         }
         case MatchExpression::MatchCategory::kOther: {
             return Status(ErrorCodes::FailedToParse,
-                          str::stream() << "Unsupported match expression in array filter");
+                          str::stream() << "Match expression does not support placeholders.");
         }
     }
 
@@ -97,32 +92,36 @@ StatusWith<StringData> parseId(MatchExpression* expr) {
 
 }  // namespace
 
+// The placeholder must begin with a lowercase letter and contain no special characters.
+const std::regex ExpressionWithPlaceholder::placeholderRegex("^[a-z][a-zA-Z0-9]*$");
+
 // static
-StatusWith<std::unique_ptr<ArrayFilter>> ArrayFilter::parse(BSONObj rawArrayFilter,
-                                                            const CollatorInterface* collator) {
-    StatusWithMatchExpression statusWithFilter = MatchExpressionParser::parse(
-        rawArrayFilter, ExtensionsCallbackDisallowExtensions(), collator);
+StatusWith<std::unique_ptr<ExpressionWithPlaceholder>> ExpressionWithPlaceholder::parse(
+    BSONObj rawFilter, const CollatorInterface* collator) {
+    StatusWithMatchExpression statusWithFilter =
+        MatchExpressionParser::parse(rawFilter, ExtensionsCallbackDisallowExtensions(), collator);
+
     if (!statusWithFilter.isOK()) {
         return statusWithFilter.getStatus();
     }
     auto filter = std::move(statusWithFilter.getValue());
 
-    auto statusWithId = parseId(filter.get());
+    auto statusWithId = parseTopLevelFieldName(filter.get());
     if (!statusWithId.isOK()) {
         return statusWithId.getStatus();
     }
-    auto id = statusWithId.getValue().toString();
-    if (!std::regex_match(id, idRegex)) {
+    auto placeholder = statusWithId.getValue().toString();
+    if (!std::regex_match(placeholder, placeholderRegex)) {
         return Status(ErrorCodes::BadValue,
-                      str::stream()
-                          << "The top-level field name in an array filter must be an alphanumeric "
-                             "string beginning with a lowercase letter, found '"
-                          << id
-                          << "'");
+                      str::stream() << "The top-level field name must be an alphanumeric "
+                                       "string beginning with a lowercase letter, found '"
+                                    << placeholder
+                                    << "'");
     }
 
-    auto arrayFilter = stdx::make_unique<ArrayFilter>(std::move(id), std::move(filter));
-    return {std::move(arrayFilter)};
+    auto exprWithPlaceholder =
+        stdx::make_unique<ExpressionWithPlaceholder>(std::move(placeholder), std::move(filter));
+    return {std::move(exprWithPlaceholder)};
 }
 
 }  // namespace mongo

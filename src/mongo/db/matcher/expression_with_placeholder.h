@@ -28,32 +28,35 @@
 
 #pragma once
 
-#include "mongo/db/matcher/expression.h"
+#include <regex>
+
+#include "mongo/db/matcher/expression_parser.h"
 
 namespace mongo {
 
 /**
- * A filter specifying which array elements an update modifier should apply to. For example, the
- * array filter with id "i" and filter {i: 0} specifies that an update {$set: {"a.$[i]"}} should
- * only apply to elements of "a" which are equal to 0.
+ * Container for a parsed MatchExpression and top-level field name that it's over.
+ * For example, {"i.a": 0, "i.b": 1} is a filter with a single top-level field name "i".
  */
-class ArrayFilter {
+class ExpressionWithPlaceholder {
 
 public:
+    static const std::regex placeholderRegex;
+
     /**
-     * Parses 'rawArrayFilter' to an ArrayFilter. This succeeds if 'rawArrayFilter' is a filter over
-     * a single top-level field, which begins with a lowercase letter and contains no special
-     * characters. Otherwise, a non-OK status is returned. Callers must maintain ownership of
-     * 'rawArrayFilter'.
+     * Parses 'rawFilter' to an ExpressionWithPlaceholder. This succeeds if 'rawFilter' is a
+     * filter over a single top-level field, which begins with a lowercase letter and contains
+     * no special characters. Otherwise, a non-OK status is returned. Callers must maintain
+     * ownership of 'rawFilter'.
      */
-    static StatusWith<std::unique_ptr<ArrayFilter>> parse(BSONObj rawArrayFilter,
-                                                          const CollatorInterface* collator);
+    static StatusWith<std::unique_ptr<ExpressionWithPlaceholder>> parse(
+        BSONObj rawFilter, const CollatorInterface* collator);
 
-    ArrayFilter(std::string id, std::unique_ptr<MatchExpression> filter)
-        : _id(std::move(id)), _filter(std::move(filter)) {}
+    ExpressionWithPlaceholder(std::string placeholder, std::unique_ptr<MatchExpression> filter)
+        : _placeholder(std::move(placeholder)), _filter(std::move(filter)) {}
 
-    StringData getId() const {
-        return _id;
+    StringData getPlaceholder() const {
+        return _placeholder;
     }
 
     MatchExpression* getFilter() const {
@@ -62,7 +65,7 @@ public:
 
 private:
     // The top-level field that _filter is over.
-    const std::string _id;
+    const std::string _placeholder;
     const std::unique_ptr<MatchExpression> _filter;
 };
 
