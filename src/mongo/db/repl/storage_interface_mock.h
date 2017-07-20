@@ -244,13 +244,13 @@ public:
         return 0;
     }
 
-    void setStableTimestamp(OperationContext* opCtx, SnapshotName snapshotName) override {
-        return;
-    }
+    void setStableTimestamp(OperationContext* opCtx, SnapshotName snapshotName) override;
 
-    void setInitialDataTimestamp(OperationContext* opCtx, SnapshotName snapshotName) override {
-        return;
-    }
+    void setInitialDataTimestamp(OperationContext* opCtx, SnapshotName snapshotName) override;
+
+    SnapshotName getStableTimestamp() const;
+
+    SnapshotName getInitialDataTimestamp() const;
 
     Status isAdminDbValid(OperationContext* opCtx) override {
         return isAdminDbValidFn(opCtx);
@@ -310,9 +310,11 @@ public:
     };
 
 private:
-    mutable stdx::mutex _rbidMutex;
+    mutable stdx::mutex _mutex;
     int _rbid;
     bool _rbidInitialized = false;
+    SnapshotName _stableTimestamp = SnapshotName::min();
+    SnapshotName _initialDataTimestamp = SnapshotName::min();
 };
 
 }  // namespace repl

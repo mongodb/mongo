@@ -40,7 +40,7 @@ namespace mongo {
 namespace repl {
 
 StatusWith<int> StorageInterfaceMock::getRollbackID(OperationContext* opCtx) {
-    stdx::lock_guard<stdx::mutex> lock(_rbidMutex);
+    stdx::lock_guard<stdx::mutex> lock(_mutex);
     if (!_rbidInitialized) {
         return Status(ErrorCodes::NamespaceNotFound, "Rollback ID not initialized");
     }
@@ -48,7 +48,7 @@ StatusWith<int> StorageInterfaceMock::getRollbackID(OperationContext* opCtx) {
 }
 
 Status StorageInterfaceMock::initializeRollbackID(OperationContext* opCtx) {
-    stdx::lock_guard<stdx::mutex> lock(_rbidMutex);
+    stdx::lock_guard<stdx::mutex> lock(_mutex);
     if (_rbidInitialized) {
         return Status(ErrorCodes::NamespaceExists, "Rollback ID already initialized");
     }
@@ -60,13 +60,35 @@ Status StorageInterfaceMock::initializeRollbackID(OperationContext* opCtx) {
 }
 
 Status StorageInterfaceMock::incrementRollbackID(OperationContext* opCtx) {
-    stdx::lock_guard<stdx::mutex> lock(_rbidMutex);
+    stdx::lock_guard<stdx::mutex> lock(_mutex);
     if (!_rbidInitialized) {
         return Status(ErrorCodes::NamespaceNotFound, "Rollback ID not initialized");
     }
     _rbid++;
     return Status::OK();
 }
+
+void StorageInterfaceMock::setStableTimestamp(OperationContext* opCtx, SnapshotName snapshotName) {
+    stdx::lock_guard<stdx::mutex> lock(_mutex);
+    _stableTimestamp = snapshotName;
+}
+
+void StorageInterfaceMock::setInitialDataTimestamp(OperationContext* opCtx,
+                                                   SnapshotName snapshotName) {
+    stdx::lock_guard<stdx::mutex> lock(_mutex);
+    _initialDataTimestamp = snapshotName;
+}
+
+SnapshotName StorageInterfaceMock::getStableTimestamp() const {
+    stdx::lock_guard<stdx::mutex> lock(_mutex);
+    return _stableTimestamp;
+}
+
+SnapshotName StorageInterfaceMock::getInitialDataTimestamp() const {
+    stdx::lock_guard<stdx::mutex> lock(_mutex);
+    return _initialDataTimestamp;
+}
+
 Status CollectionBulkLoaderMock::init(const std::vector<BSONObj>& secondaryIndexSpecs) {
     LOG(1) << "CollectionBulkLoaderMock::init called";
     stats->initCalled = true;
