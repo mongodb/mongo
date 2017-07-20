@@ -186,6 +186,12 @@ Status ClusterAggregate::runAggregate(OperationContext* opCtx,
     // command on an unsharded collection.
     StringMap<ExpressionContext::ResolvedNamespace> resolvedNamespaces;
     LiteParsedPipeline liteParsedPipeline(request);
+
+    // TODO SERVER-29141 support $changeNotification on mongos.
+    uassert(40567,
+            "$changeNotification is not yet supported on mongos",
+            !liteParsedPipeline.hasChangeNotification());
+
     for (auto&& nss : liteParsedPipeline.getInvolvedNamespaces()) {
         const auto resolvedNsRoutingInfo =
             uassertStatusOK(catalogCache->getCollectionRoutingInfo(opCtx, nss));

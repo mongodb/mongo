@@ -3,7 +3,6 @@
  * aggregate command's pipeline inside a $facet stage, then appends an $unwind stage. This will
  * yield the same results, but stress the logic of the $facet stage.
  */
-
 (function() {
     'use strict';
 
@@ -21,7 +20,6 @@
         // possibly an invalid one without a pipeline.
         if (typeof cmdObj !== 'object' || cmdObj === null || !cmdObj.hasOwnProperty('aggregate') ||
             !cmdObj.hasOwnProperty('pipeline') || !Array.isArray(cmdObj.pipeline)) {
-            print('Not wrapping invalid pipeline in a $facet stage');
             return originalRunCommand.apply(this, arguments);
         }
 
@@ -34,6 +32,7 @@
         }
 
         const stagesDisallowedInsideFacet = [
+            '$changeNotification',
             '$collStats',
             '$facet',
             '$geoNear',

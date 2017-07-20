@@ -1,6 +1,4 @@
 // Basic $changeNotification tests.
-// @tags: [do_not_wrap_aggregations_in_facets]
-
 (function() {
     "use strict";
 
