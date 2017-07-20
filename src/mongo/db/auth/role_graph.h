@@ -138,6 +138,16 @@ public:
     }
 
     /**
+     * Returns a vector of all restriction documents that the given role contains.
+     * This includes both the restrictions set on this role directly,
+     * as well as any restrictions inherited from the role's subordinate roles.
+     */
+    const std::vector<SharedRestrictionDocument>& getAllAuthenticationRestrictions(
+        const RoleName& role) {
+        return _allRestrictionsForRole[role];
+    }
+
+    /**
      * Returns whether or not the given role exists in the role graph.  Will implicitly
      * add the role to the graph if it is a built-in role and isn't already in the graph.
      */
@@ -324,6 +334,9 @@ private:
 
     // Maps a role name to a restriction document.
     using RestrictionDocumentMap = stdx::unordered_map<RoleName, SharedRestrictionDocument>;
+    // Maps a role name to all restriction documents from self and subordinates.
+    using RestrictionDocumentsMap =
+        stdx::unordered_map<RoleName, std::vector<SharedRestrictionDocument>>;
 
     EdgeSet _roleToSubordinates;
     unordered_map<RoleName, unordered_set<RoleName>> _roleToIndirectSubordinates;
@@ -331,6 +344,7 @@ private:
     RolePrivilegeMap _directPrivilegesForRole;
     RolePrivilegeMap _allPrivilegesForRole;
     RestrictionDocumentMap _directRestrictionsForRole;
+    RestrictionDocumentsMap _allRestrictionsForRole;
     std::set<RoleName> _allRoles;
 };
 

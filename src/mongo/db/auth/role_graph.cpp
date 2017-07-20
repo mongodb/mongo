@@ -51,6 +51,7 @@ void RoleGraph::swap(RoleGraph& other) {
     swap(this->_directPrivilegesForRole, other._directPrivilegesForRole);
     swap(this->_allPrivilegesForRole, other._allPrivilegesForRole);
     swap(this->_directRestrictionsForRole, other._directRestrictionsForRole);
+    swap(this->_allRestrictionsForRole, other._allRestrictionsForRole);
     swap(this->_allRoles, other._allRoles);
 }
 
@@ -514,36 +515,40 @@ Status RoleGraph::_recomputePrivilegeDataHelper(const RoleName& startingRole,
         unordered_set<RoleName>& currentRoleIndirectRoles =
             _roleToIndirectSubordinates[currentRole];
         currentRoleIndirectRoles.clear();
-        for (std::vector<RoleName>::const_iterator it = currentRoleDirectRoles.begin();
-             it != currentRoleDirectRoles.end();
-             ++it) {
-            currentRoleIndirectRoles.insert(*it);
+        for (const auto& role : currentRoleDirectRoles) {
+            currentRoleIndirectRoles.insert(role);
+        }
+
+        // Also clear the "all restrictions" to rebuild in loop
+        auto& currentRoleAllRestrictions = _allRestrictionsForRole[currentRole];
+        currentRoleAllRestrictions.clear();
+        auto& currentRoleDirectRestrictions = _directRestrictionsForRole[currentRole];
+        if (currentRoleDirectRestrictions) {
+            currentRoleAllRestrictions.push_back(currentRoleDirectRestrictions);
         }
 
         // Recursively add children's privileges to current role's "all privileges" vector, and
         // children's roles to current roles's "indirect roles" vector.
-        for (std::vector<RoleName>::const_iterator roleIt = currentRoleDirectRoles.begin();
-             roleIt != currentRoleDirectRoles.end();
-             ++roleIt) {
+        for (const auto& childRole : currentRoleDirectRoles) {
             // At this point, we already know that the "all privilege" set for the child is
             // correct, so add those privileges to our "all privilege" set.
-            const RoleName& childRole = *roleIt;
 
-            const PrivilegeVector& childsPrivileges = _allPrivilegesForRole[childRole];
-            for (PrivilegeVector::const_iterator privIt = childsPrivileges.begin();
-                 privIt != childsPrivileges.end();
-                 ++privIt) {
-                Privilege::addPrivilegeToPrivilegeVector(&currentRoleAllPrivileges, *privIt);
+            for (const auto& priv : _allPrivilegesForRole[childRole]) {
+                Privilege::addPrivilegeToPrivilegeVector(&currentRoleAllPrivileges, priv);
             }
 
             // We also know that the "indirect roles" for the child is also correct, so we can
             // add those roles to our "indirect roles" set.
-            const unordered_set<RoleName>& childsRoles = _roleToIndirectSubordinates[childRole];
-            for (unordered_set<RoleName>::const_iterator childsRoleIt = childsRoles.begin();
-                 childsRoleIt != childsRoles.end();
-                 ++childsRoleIt) {
-                currentRoleIndirectRoles.insert(*childsRoleIt);
-            }
+            const auto& childAllRolesToIndirectSubordinates =
+                _roleToIndirectSubordinates[childRole];
+            currentRoleIndirectRoles.insert(childAllRolesToIndirectSubordinates.begin(),
+                                            childAllRolesToIndirectSubordinates.end());
+
+            // Similarly, "indirect restrictions" are ready to append
+            const auto& childAllRestrictionsForRole = _allRestrictionsForRole[childRole];
+            currentRoleAllRestrictions.insert(currentRoleAllRestrictions.end(),
+                                              childAllRestrictionsForRole.begin(),
+                                              childAllRestrictionsForRole.end());
         }
 
         visitedRoles.insert(currentRole);
