@@ -140,18 +140,20 @@ __wt_conn_dhandle_find(
  *	Sync and close the underlying btree handle.
  */
 int
-__wt_conn_btree_sync_and_close(WT_SESSION_IMPL *session, bool final, bool force)
+__wt_conn_btree_sync_and_close(
+    WT_SESSION_IMPL *session, bool final, bool mark_dead)
 {
 	WT_BM *bm;
 	WT_BTREE *btree;
+	WT_CONNECTION_IMPL *conn;
 	WT_DATA_HANDLE *dhandle;
 	WT_DECL_RET;
-	bool marked_dead, no_schema_lock;
+	bool discard, marked_dead, no_schema_lock;
 
+	conn = S2C(session);
 	btree = S2BT(session);
 	bm = btree->bm;
 	dhandle = session->dhandle;
-	marked_dead = false;
 
 	if (!F_ISSET(dhandle, WT_DHANDLE_OPEN))
 		return (0);
@@ -180,45 +182,90 @@ __wt_conn_btree_sync_and_close(WT_SESSION_IMPL *session, bool final, bool force)
 	 */
 	__wt_spin_lock(session, &dhandle->close_lock);
 
-	/*
-	 * The close can fail if an update cannot be written, return the EBUSY
-	 * error to our caller for eventual retry.
-	 *
-	 * If we are forcing the close, just mark the handle dead and the tree
-	 * will be discarded later.  Don't do this for memory-mapped trees: we
-	 * have to close the file handle to allow the file to be removed, but
-	 * memory mapped trees contain pointers into memory that will become
-	 * invalid if the mapping is closed.
-	 */
+	/* Reset the tree's eviction priority (if any). */
+	__wt_evict_priority_clear(session);
+
+	discard = marked_dead = false;
 	if (!F_ISSET(btree,
 	    WT_BTREE_SALVAGE | WT_BTREE_UPGRADE | WT_BTREE_VERIFY)) {
-		if (force && (bm == NULL || !bm->is_mapped(bm, session))) {
-			F_SET(session->dhandle, WT_DHANDLE_DEAD);
+		/*
+		 * If the handle is already marked dead, we're just here to
+		 * discard it.
+		 */
+		if (F_ISSET(dhandle, WT_DHANDLE_DEAD))
+			discard = true;
+
+		/*
+		 * Mark the handle dead (letting the tree be discarded later) if
+		 * it's not already marked dead, our caller allows it, it's not
+		 * a final close, and it's not a memory-mapped tree. (We can't
+		 * mark memory-mapped tree handles dead because we close the
+		 * underlying file handle to allow the file to be removed and
+		 * memory-mapped trees contain pointers into memory that become
+		 * invalid if the mapping is closed.)
+		 */
+		if (!discard && mark_dead && !final &&
+		    (bm == NULL || !bm->is_mapped(bm, session)))
 			marked_dead = true;
 
-			/* Reset the tree's eviction priority (if any). */
-			__wt_evict_priority_clear(session);
-		}
-		if (!marked_dead || final) {
-			if ((ret = __wt_checkpoint_close(
-			    session, final)) == EBUSY)
-				WT_ERR(ret);
-			else
-				WT_TRET(ret);
+		/*
+		 * Flush dirty data from any durable trees we couldn't mark
+		 * dead.  That involves writing a checkpoint, which can fail if
+		 * an update cannot be written, causing the close to fail: if
+		 * not the final close, return the EBUSY error to our caller
+		 * for eventual retry.
+		 *
+		 * We can't discard non-durable trees yet: first we have to
+		 * close the underlying btree handle, then we can mark the
+		 * data handle dead.
+		 */
+		if (!discard && !marked_dead) {
+			if (F_ISSET(conn, WT_CONN_IN_MEMORY) ||
+			    F_ISSET(btree, WT_BTREE_NO_CHECKPOINT))
+				discard = true;
+			else {
+				WT_TRET(__wt_checkpoint_close(session, final));
+				if (!final && ret == EBUSY)
+					WT_ERR(ret);
+			}
 		}
 	}
 
+	/* Discard the underlying btree handle. */
 	WT_TRET(__wt_btree_close(session));
 	F_CLR(btree, WT_BTREE_SPECIAL_FLAGS);
 
 	/*
-	 * If we marked a handle dead it will be closed by sweep, via
-	 * another call to sync and close.
+	 * If marking the handle dead, do so after closing the underlying btree.
+	 * (Don't do it before that, the block manager asserts there are never
+	 * two references to a block manager object, and re-opening the handle
+	 * can succeed once we mark this handle dead.)
+	 *
+	 * Check discard too, code we call to clear the cache expects the data
+	 * handle dead flag to be set when discarding modified pages.
+	 */
+	if (marked_dead || discard)
+		F_SET(dhandle, WT_DHANDLE_DEAD);
+
+	/*
+	 * Discard from cache any trees not marked dead in this call (that is,
+	 * including trees previously marked dead). Done after marking the data
+	 * handle dead for a couple reasons: first, we don't need to hold an
+	 * exclusive handle to do it, second, code we call to clear the cache
+	 * expects the data handle dead flag to be set when discarding modified
+	 * pages.
+	 */
+	if (discard)
+		WT_TRET(__wt_cache_op(session, WT_SYNC_DISCARD));
+
+	/*
+	 * If we marked a handle dead it will be closed by sweep, via another
+	 * call to this function. Otherwise, we're done with this handle.
 	 */
 	if (!marked_dead) {
 		F_CLR(dhandle, WT_DHANDLE_OPEN);
 		if (dhandle->checkpoint == NULL)
-			--S2C(session)->open_btree_count;
+			--conn->open_btree_count;
 	}
 	WT_ASSERT(session,
 	    F_ISSET(dhandle, WT_DHANDLE_DEAD) ||
@@ -326,7 +373,7 @@ __wt_conn_btree_open(
 	 * If the handle is already open, it has to be closed so it can be
 	 * reopened with a new configuration.
 	 *
-	 * This call can return EBUSY if there's an update in the object that's
+	 * This call can return EBUSY if there's an update in the tree that's
 	 * not yet globally visible. That's not a problem because it can only
 	 * happen when we're switching from a normal handle to a "special" one,
 	 * so we're returning EBUSY to an attempt to verify or do other special
@@ -486,7 +533,7 @@ err:	WT_DHANDLE_RELEASE(dhandle);
  */
 static int
 __conn_dhandle_close_one(WT_SESSION_IMPL *session,
-    const char *uri, const char *checkpoint, bool force)
+    const char *uri, const char *checkpoint, bool mark_dead)
 {
 	WT_DECL_RET;
 
@@ -506,7 +553,7 @@ __conn_dhandle_close_one(WT_SESSION_IMPL *session,
 	 */
 	if (F_ISSET(session->dhandle, WT_DHANDLE_OPEN)) {
 		__wt_meta_track_sub_on(session);
-		ret = __wt_conn_btree_sync_and_close(session, false, force);
+		ret = __wt_conn_btree_sync_and_close(session, false, mark_dead);
 
 		/*
 		 * If the close succeeded, drop any locks it acquired.  If
@@ -530,7 +577,7 @@ __conn_dhandle_close_one(WT_SESSION_IMPL *session,
  */
 int
 __wt_conn_dhandle_close_all(
-    WT_SESSION_IMPL *session, const char *uri, bool force)
+    WT_SESSION_IMPL *session, const char *uri, bool mark_dead)
 {
 	WT_CONNECTION_IMPL *conn;
 	WT_DATA_HANDLE *dhandle;
@@ -548,7 +595,7 @@ __wt_conn_dhandle_close_all(
 	 * locking the live handle to fail fast if the tree is busy (e.g., with
 	 * cursors open or in a checkpoint).
 	 */
-	WT_ERR(__conn_dhandle_close_one(session, uri, NULL, force));
+	WT_ERR(__conn_dhandle_close_one(session, uri, NULL, mark_dead));
 
 	bucket = __wt_hash_city64(uri, strlen(uri)) % WT_HASH_ARRAY_SIZE;
 	TAILQ_FOREACH(dhandle, &conn->dhhash[bucket], hashq) {
@@ -558,7 +605,7 @@ __wt_conn_dhandle_close_all(
 			continue;
 
 		WT_ERR(__conn_dhandle_close_one(
-		    session, dhandle->name, dhandle->checkpoint, force));
+		    session, dhandle->name, dhandle->checkpoint, mark_dead));
 	}
 
 err:	session->dhandle = NULL;
@@ -600,7 +647,7 @@ __conn_dhandle_remove(WT_SESSION_IMPL *session, bool final)
  */
 int
 __wt_conn_dhandle_discard_single(
-    WT_SESSION_IMPL *session, bool final, bool force)
+    WT_SESSION_IMPL *session, bool final, bool mark_dead)
 {
 	WT_DATA_HANDLE *dhandle;
 	WT_DECL_RET;
@@ -610,7 +657,8 @@ __wt_conn_dhandle_discard_single(
 	dhandle = session->dhandle;
 
 	if (F_ISSET(dhandle, WT_DHANDLE_OPEN)) {
-		tret = __wt_conn_btree_sync_and_close(session, final, force);
+		tret =
+		    __wt_conn_btree_sync_and_close(session, final, mark_dead);
 		if (final && tret != 0) {
 			__wt_err(session, tret,
 			    "Final close of %s failed", dhandle->name);
@@ -679,7 +727,7 @@ restart:
 
 		WT_WITH_DHANDLE(session, dhandle,
 		    WT_TRET(__wt_conn_dhandle_discard_single(
-		    session, true, F_ISSET(conn, WT_CONN_IN_MEMORY))));
+		    session, true, false)));
 		goto restart;
 	}
 
@@ -705,7 +753,7 @@ restart:
 	WT_TAILQ_SAFE_REMOVE_BEGIN(dhandle, &conn->dhqh, q, dhandle_tmp) {
 		WT_WITH_DHANDLE(session, dhandle,
 		    WT_TRET(__wt_conn_dhandle_discard_single(
-		    session, true, F_ISSET(conn, WT_CONN_IN_MEMORY))));
+		    session, true, false)));
 	} WT_TAILQ_SAFE_REMOVE_END
 
 	return (ret);

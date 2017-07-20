@@ -487,7 +487,7 @@ __lsm_discard_handle(
 	WT_RET(__wt_session_get_btree(session, uri, checkpoint, NULL,
 	    WT_DHANDLE_EXCLUSIVE | WT_DHANDLE_LOCK_ONLY));
 
-	F_SET(session->dhandle, WT_DHANDLE_DISCARD_FORCE);
+	F_SET(session->dhandle, WT_DHANDLE_DISCARD_KILL);
 	return (__wt_session_release_btree(session));
 }
 
