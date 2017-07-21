@@ -171,6 +171,9 @@ const char* encodeMatchType(MatchExpression::MatchType mt) {
         case MatchExpression::BITS_ANY_CLEAR:
             return "yc";
             break;
+        case MatchExpression::INTERNAL_SCHEMA_COND:
+            return "internalSchemaCond";
+            break;
         case MatchExpression::INTERNAL_SCHEMA_MIN_ITEMS:
             return "internalSchemaMinItems";
             break;

@@ -423,5 +423,63 @@ TEST(MatchExpressionParserSchemaTest, MaxLengthFailsToParseNonIntegerArguments) 
     ASSERT_NOT_OK(expr.getStatus());
 }
 
+TEST(MatchExpressionParserSchemaTest, CondFailsToParseNonObjectArguments) {
+    auto queryWithInteger = fromjson("{$_internalSchemaCond: [1, {foo: 'bar'}, {baz: 7}]}");
+    ASSERT_EQ(ErrorCodes::FailedToParse,
+              MatchExpressionParser::parse(
+                  queryWithInteger, ExtensionsCallbackDisallowExtensions(), kSimpleCollator)
+                  .getStatus());
+
+
+    auto queryWithArray = fromjson("{$_internalSchemaCond: [{foo: 'bar'}, [{qux: 3}], {baz: 7}]}");
+    ASSERT_EQ(ErrorCodes::FailedToParse,
+              MatchExpressionParser::parse(
+                  queryWithArray, ExtensionsCallbackDisallowExtensions(), kSimpleCollator)
+                  .getStatus());
+
+    auto queryWithString = fromjson("{$_internalSchemaCond: [{foo: 'bar'}, {baz: 7}, 'blah']}");
+    ASSERT_EQ(ErrorCodes::FailedToParse,
+              MatchExpressionParser::parse(
+                  queryWithString, ExtensionsCallbackDisallowExtensions(), kSimpleCollator)
+                  .getStatus());
+}
+
+TEST(MatchExpressionParserSchemaTest, CondFailsToParseIfNotExactlyThreeArguments) {
+    auto queryNoArguments = fromjson("{$_internalSchemaCond: []}");
+    ASSERT_EQ(ErrorCodes::FailedToParse,
+              MatchExpressionParser::parse(
+                  queryNoArguments, ExtensionsCallbackDisallowExtensions(), kSimpleCollator)
+                  .getStatus());
+
+    auto queryOneArgument = fromjson("{$_internalSchemaCond: [{height: 171}]}");
+    ASSERT_EQ(ErrorCodes::FailedToParse,
+              MatchExpressionParser::parse(
+                  queryOneArgument, ExtensionsCallbackDisallowExtensions(), kSimpleCollator)
+                  .getStatus());
+
+    auto queryFourArguments = fromjson(
+        "{$_internalSchemaCond: [{make: 'lamborghini'}, {model: 'ghost'}, {color: 'celadon'}, "
+        "{used: false}]}");
+    ASSERT_EQ(ErrorCodes::FailedToParse,
+              MatchExpressionParser::parse(
+                  queryFourArguments, ExtensionsCallbackDisallowExtensions(), kSimpleCollator)
+                  .getStatus());
+}
+
+TEST(MatchExpressionParserSchemaTest, CondParsesThreeMatchExpresssions) {
+    auto query = fromjson(
+        "{$_internalSchemaCond: [{climate: 'rainy'}, {clothing: 'jacket'}, {clothing: 'shirt'}]}");
+    auto expr = MatchExpressionParser::parse(
+        query, ExtensionsCallbackDisallowExtensions(), kSimpleCollator);
+    ASSERT_OK(expr.getStatus());
+
+    ASSERT_TRUE(expr.getValue()->matchesBSON(
+        fromjson("{climate: 'rainy', clothing: ['jacket', 'umbrella']}")));
+    ASSERT_TRUE(expr.getValue()->matchesBSON(
+        fromjson("{climate: 'sunny', clothing: ['shirt', 'shorts']}")));
+    ASSERT_FALSE(
+        expr.getValue()->matchesBSON(fromjson("{climate: 'rainy', clothing: ['poncho']}")));
+    ASSERT_FALSE(expr.getValue()->matchesBSON(fromjson("{clothing: ['jacket']}")));
+}
 }  // namespace
 }  // namespace mongo

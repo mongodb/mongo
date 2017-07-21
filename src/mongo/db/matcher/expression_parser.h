@@ -247,6 +247,13 @@ private:
     StatusWith<std::vector<uint32_t>> _parseBitPositionsArray(const BSONObj& theArray);
 
     /**
+     * Parses a MatchExpression which takes a fixed-size array of MatchExpressions as arguments.
+     */
+    template <class T>
+    StatusWithMatchExpression _parseInternalSchemaFixedArityArgument(
+        StringData name, const BSONElement& elem, const CollatorInterface* collator);
+
+    /**
      * Parses the given BSONElement into a single integer argument and creates a MatchExpression
      * of type 'T' that gets initialized with the resulting integer.
      */

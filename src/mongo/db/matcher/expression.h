@@ -98,6 +98,7 @@ public:
         INTERNAL_2D_POINT_IN_ANNULUS,
 
         // JSON Schema expressions.
+        INTERNAL_SCHEMA_COND,
         INTERNAL_SCHEMA_MAX_ITEMS,
         INTERNAL_SCHEMA_MIN_ITEMS,
         INTERNAL_SCHEMA_OBJECT_MATCH,

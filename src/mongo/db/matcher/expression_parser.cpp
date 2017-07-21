@@ -38,6 +38,7 @@
 #include "mongo/db/matcher/expression_geo.h"
 #include "mongo/db/matcher/expression_leaf.h"
 #include "mongo/db/matcher/expression_tree.h"
+#include "mongo/db/matcher/schema/expression_internal_schema_cond.h"
 #include "mongo/db/matcher/schema/expression_internal_schema_max_items.h"
 #include "mongo/db/matcher/schema/expression_internal_schema_max_length.h"
 #include "mongo/db/matcher/schema/expression_internal_schema_min_items.h"
@@ -418,6 +419,15 @@ StatusWithMatchExpression MatchExpressionParser::_parse(const BSONObj& obj,
                 eq->setCollator(str::equals("id", rest) ? collator : nullptr);
 
                 root->add(eq.release());
+            } else if (mongoutils::str::equals("_internalSchemaCond", rest)) {
+                auto condExpr =
+                    _parseInternalSchemaFixedArityArgument<InternalSchemaCondMatchExpression>(
+                        InternalSchemaCondMatchExpression::kName, e, collator);
+                if (!condExpr.isOK()) {
+                    return condExpr.getStatus();
+                }
+                root->add(condExpr.getValue().release());
+
             } else if (mongoutils::str::equals("_internalSchemaXor", rest)) {
                 if (e.type() != BSONType::Array)
                     return {
@@ -1088,6 +1098,50 @@ StatusWith<long long> MatchExpressionParser::parseIntegerElementToLong(BSONEleme
     }
 
     return number;
+}
+
+template <class T>
+StatusWithMatchExpression MatchExpressionParser::_parseInternalSchemaFixedArityArgument(
+    StringData name, const BSONElement& input, const CollatorInterface* collator) {
+    constexpr auto arity = T::arity();
+    if (input.type() != BSONType::Array) {
+        return {ErrorCodes::FailedToParse,
+                str::stream() << name << " must be an array of " << arity << " MatchExpressions"};
+    }
+
+    auto inputObj = input.embeddedObject();
+    if (static_cast<size_t>(inputObj.nFields()) != arity) {
+        return {ErrorCodes::FailedToParse,
+                str::stream() << name << " requires exactly " << arity
+                              << " MatchExpressions, but got "
+                              << inputObj.nFields()};
+    }
+
+    // Fill out 'expressions' with all of the parsed subexpressions contained in the array, tracking
+    // our location in the array with 'position'.
+    std::array<std::unique_ptr<MatchExpression>, arity> expressions;
+    auto position = expressions.begin();
+
+    for (auto&& elem : inputObj) {
+        if (elem.type() != BSONType::Object) {
+            return {ErrorCodes::FailedToParse,
+                    str::stream() << name
+                                  << " must be an array of objects, but found an element of type "
+                                  << elem.type()};
+        }
+
+        const bool isTopLevel = false;
+        auto subexpr = _parse(elem.embeddedObject(), collator, isTopLevel);
+        if (!subexpr.isOK()) {
+            return subexpr.getStatus();
+        }
+        *position = std::move(subexpr.getValue());
+        ++position;
+    }
+
+    auto parsedExpression = stdx::make_unique<T>();
+    parsedExpression->init(std::move(expressions));
+    return {std::move(parsedExpression)};
 }
 
 template <class T>

@@ -1017,5 +1017,18 @@ TEST(SerializeInternalSchema, ExpressionInternalSchemaMaxLengthSerializesCorrect
     ASSERT_BSONOBJ_EQ(*reserialized.getQuery(), serialize(reserialized.getMatchExpression()));
 }
 
+TEST(SerializeInternalSchema, ExpressionInternalSchemaCondSerializesCorrectly) {
+    Matcher original(fromjson("{$_internalSchemaCond: [{a: 1}, {b: 2}, {c: 3}]}}"),
+                     ExtensionsCallbackDisallowExtensions(),
+                     kSimpleCollator);
+    Matcher reserialized(serialize(original.getMatchExpression()),
+                         ExtensionsCallbackDisallowExtensions(),
+                         kSimpleCollator);
+    BSONObjBuilder builder;
+    ASSERT_BSONOBJ_EQ(
+        *reserialized.getQuery(),
+        fromjson("{$_internalSchemaCond: [{a: {$eq: 1}}, {b: {$eq: 2}}, {c: {$eq: 3}}]}}"));
+    ASSERT_BSONOBJ_EQ(*reserialized.getQuery(), serialize(reserialized.getMatchExpression()));
+}
 }  // namespace
 }  // namespace mongo
