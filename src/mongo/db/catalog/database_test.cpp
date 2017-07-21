@@ -28,6 +28,8 @@
 
 #include "mongo/platform/basic.h"
 
+#include <pcrecpp.h>
+
 #include "mongo/bson/util/builder.h"
 #include "mongo/db/catalog/index_create.h"
 #include "mongo/db/client.h"
@@ -397,4 +399,99 @@ TEST_F(DatabaseTest,
     _testDropCollectionThrowsExceptionIfThereAreIndexesInProgress(_opCtx.get(), _nss);
 }
 
+TEST_F(DatabaseTest,
+       MakeUniqueCollectionNamespaceReturnsFailedToParseIfModelDoesNotContainPercentSign) {
+    writeConflictRetry(_opCtx.get(), "testMakeUniqueCollectionNamespace", _nss.ns(), [this] {
+        AutoGetOrCreateDb autoDb(_opCtx.get(), _nss.db(), MODE_X);
+        auto db = autoDb.getDb();
+        ASSERT_TRUE(db);
+        ASSERT_EQUALS(
+            ErrorCodes::FailedToParse,
+            db->makeUniqueCollectionNamespace(_opCtx.get(), "CollectionModelWithoutPercentSign"));
+
+        // Generated namespace has to satisfy namespace length constraints so we will reject
+        // any collection model where the first substituted percent sign will not be in the
+        // generated namespace. See NamespaceString::MaxNsCollectionLen.
+        auto dbPrefix = _nss.db() + ".";
+        auto modelTooLong =
+            (StringBuilder() << dbPrefix
+                             << std::string('x',
+                                            NamespaceString::MaxNsCollectionLen - dbPrefix.size())
+                             << "%")
+                .str();
+        ASSERT_EQUALS(ErrorCodes::FailedToParse,
+                      db->makeUniqueCollectionNamespace(_opCtx.get(), modelTooLong));
+    });
+}
+
+TEST_F(DatabaseTest, MakeUniqueCollectionNamespaceReplacesPercentSignsWithRandomCharacters) {
+    writeConflictRetry(_opCtx.get(), "testMakeUniqueCollectionNamespace", _nss.ns(), [this] {
+        AutoGetOrCreateDb autoDb(_opCtx.get(), _nss.db(), MODE_X);
+        auto db = autoDb.getDb();
+        ASSERT_TRUE(db);
+
+        auto model = "tmp%%%%"_sd;
+        pcrecpp::RE re(_nss.db() + "\\.tmp[0-9A-Za-z][0-9A-Za-z][0-9A-Za-z][0-9A-Za-z]");
+
+        auto nss1 = unittest::assertGet(db->makeUniqueCollectionNamespace(_opCtx.get(), model));
+        if (!re.FullMatch(nss1.ns())) {
+            FAIL((StringBuilder() << "First generated namespace \"" << nss1.ns()
+                                  << "\" does not match reqular expression \""
+                                  << re.pattern()
+                                  << "\"")
+                     .str());
+        }
+
+        // Create collection using generated namespace so that makeUniqueCollectionNamespace() will
+        // not return the same namespace the next time. This is because we check the existing
+        // collections in the database for collisions while generating the namespace.
+        {
+            WriteUnitOfWork wuow(_opCtx.get());
+            ASSERT_TRUE(db->createCollection(_opCtx.get(), nss1.ns()));
+            wuow.commit();
+        }
+
+        auto nss2 = unittest::assertGet(db->makeUniqueCollectionNamespace(_opCtx.get(), model));
+        if (!re.FullMatch(nss2.ns())) {
+            FAIL((StringBuilder() << "Second generated namespace \"" << nss2.ns()
+                                  << "\" does not match reqular expression \""
+                                  << re.pattern()
+                                  << "\"")
+                     .str());
+        }
+
+        // Second generated namespace should not collide with the first because a collection with
+        // name matching nss1 now exists.
+        ASSERT_NOT_EQUALS(nss1, nss2);
+    });
+}
+
+TEST_F(
+    DatabaseTest,
+    MakeUniqueCollectionNamespaceReturnsNamespaceExistsIfGeneratedNamesMatchExistingCollections) {
+    writeConflictRetry(_opCtx.get(), "testMakeUniqueCollectionNamespace", _nss.ns(), [this] {
+        AutoGetOrCreateDb autoDb(_opCtx.get(), _nss.db(), MODE_X);
+        auto db = autoDb.getDb();
+        ASSERT_TRUE(db);
+
+        auto model = "tmp%"_sd;
+
+        // Create all possible collections matching model with single percent sign.
+        const auto charsToChooseFrom =
+            "0123456789"
+            "ABCDEFGHIJKLMNOPQRSTUVWXYZ"
+            "abcdefghijklmnopqrstuvwxyz"_sd;
+        for (const auto c : charsToChooseFrom) {
+            NamespaceString nss(_nss.db(), model.substr(0, model.find('%')) + std::string(1U, c));
+            WriteUnitOfWork wuow(_opCtx.get());
+            ASSERT_TRUE(db->createCollection(_opCtx.get(), nss.ns()));
+            wuow.commit();
+        }
+
+        // makeUniqueCollectionNamespace() returns NamespaceExists because it will not be able to
+        // generate a namespace that will not collide with an existings collection.
+        ASSERT_EQUALS(ErrorCodes::NamespaceExists,
+                      db->makeUniqueCollectionNamespace(_opCtx.get(), model));
+    });
+}
 }  // namespace

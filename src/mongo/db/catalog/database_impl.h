@@ -50,6 +50,7 @@ class DatabaseCatalogEntry;
 class IndexCatalog;
 class NamespaceDetails;
 class OperationContext;
+class PseudoRandom;
 
 /**
  * Represents a logical database containing Collections.
@@ -223,6 +224,9 @@ public:
         return _viewsName;
     }
 
+    StatusWith<NamespaceString> makeUniqueCollectionNamespace(OperationContext* opCtx,
+                                                              StringData collectionNameModel) final;
+
     inline CollectionMap& collections() final {
         return _collections;
     }
@@ -285,6 +289,12 @@ private:
     // collections may be created in this Database.
     // This variable may only be read/written while the database is locked in MODE_X.
     bool _dropPending = false;
+
+    // Random number generator used to create unique collection namespaces suitable for temporary
+    // collections.
+    // Lazily created on first call to makeUniqueCollectionNamespace().
+    // This variable may only be read/written while the database is locked in MODE_X.
+    std::unique_ptr<PseudoRandom> _uniqueCollectionNamespacePseudoRandom;
 
     CollectionMap _collections;
 

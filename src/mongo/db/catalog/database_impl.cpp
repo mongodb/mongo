@@ -67,6 +67,8 @@
 #include "mongo/db/storage/storage_options.h"
 #include "mongo/db/system_index.h"
 #include "mongo/db/views/view_catalog.h"
+#include "mongo/platform/random.h"
+#include "mongo/stdx/memory.h"
 #include "mongo/util/assert_util.h"
 #include "mongo/util/log.h"
 
@@ -808,6 +810,69 @@ void DatabaseImpl::dropDatabase(OperationContext* opCtx, Database* db) {
             ->dropDatabase(opCtx, name)
             .transitional_ignore();
     });
+}
+
+StatusWith<NamespaceString> DatabaseImpl::makeUniqueCollectionNamespace(
+    OperationContext* opCtx, StringData collectionNameModel) {
+    invariant(opCtx->lockState()->isDbLockedForMode(name(), MODE_X));
+
+    // There must be at least one percent sign within the first MaxNsCollectionLen characters of the
+    // generated namespace after accounting for the database name prefix and dot separator:
+    //     <db>.<truncated collection model name>
+    auto maxModelLength = NamespaceString::MaxNsCollectionLen - (_name.length() + 1);
+    auto model = collectionNameModel.substr(0, maxModelLength);
+    auto numPercentSign = std::count(model.begin(), model.end(), '%');
+    if (numPercentSign == 0) {
+        return Status(ErrorCodes::FailedToParse,
+                      str::stream() << "Cannot generate collection name for temporary collection: "
+                                       "model for collection name "
+                                    << collectionNameModel
+                                    << " must contain at least one percent sign within first "
+                                    << maxModelLength
+                                    << " characters.");
+    }
+
+    if (!_uniqueCollectionNamespacePseudoRandom) {
+        Timestamp ts;
+        _uniqueCollectionNamespacePseudoRandom =
+            stdx::make_unique<PseudoRandom>(Date_t::now().asInt64());
+    }
+
+    const auto charsToChooseFrom =
+        "0123456789"
+        "ABCDEFGHIJKLMNOPQRSTUVWXYZ"
+        "abcdefghijklmnopqrstuvwxyz"_sd;
+    invariant((10U + 26U * 2) == charsToChooseFrom.size());
+
+    auto replacePercentSign = [&, this](const auto& c) {
+        if (c != '%') {
+            return c;
+        }
+        auto i = _uniqueCollectionNamespacePseudoRandom->nextInt32(charsToChooseFrom.size());
+        return charsToChooseFrom[i];
+    };
+
+    auto numGenerationAttempts = numPercentSign * charsToChooseFrom.size() * 100U;
+    for (decltype(numGenerationAttempts) i = 0; i < numGenerationAttempts; ++i) {
+        auto collectionName = model.toString();
+        std::transform(collectionName.begin(),
+                       collectionName.end(),
+                       collectionName.begin(),
+                       replacePercentSign);
+
+        NamespaceString nss(_name, collectionName);
+        if (!getCollection(opCtx, nss)) {
+            return nss;
+        }
+    }
+
+    return Status(
+        ErrorCodes::NamespaceExists,
+        str::stream() << "Cannot generate collection name for temporary collection with model "
+                      << collectionNameModel
+                      << " after "
+                      << numGenerationAttempts
+                      << " attempts due to namespace conflicts with existing collections.");
 }
 
 namespace {

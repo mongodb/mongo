@@ -116,6 +116,9 @@ public:
 
         virtual const std::string& getSystemViewsName() const = 0;
 
+        virtual StatusWith<NamespaceString> makeUniqueCollectionNamespace(
+            OperationContext* opCtx, StringData collectionNameModel) = 0;
+
         virtual CollectionMap& collections() = 0;
         virtual const CollectionMap& collections() const = 0;
     };
@@ -350,6 +353,21 @@ public:
 
     inline const std::string& getSystemViewsName() const {
         return this->_impl().getSystemViewsName();
+    }
+
+    /**
+     * Generates a collection namespace suitable for creating a temporary collection.
+     * The namespace is based on a model that replaces each percent sign in 'collectionNameModel' by
+     * a random character in the range [0-9A-Za-z].
+     * Returns FailedToParse if 'collectionNameModel' does not contain any percent signs.
+     * Returns NamespaceExists if we are unable to generate a collection name that does not conflict
+     * with an existing collection in this database.
+     *
+     * The database must be locked in MODE_X when calling this function.
+     */
+    inline StatusWith<NamespaceString> makeUniqueCollectionNamespace(
+        OperationContext* opCtx, StringData collectionNameModel) {
+        return this->_impl().makeUniqueCollectionNamespace(opCtx, collectionNameModel);
     }
 
 private:
