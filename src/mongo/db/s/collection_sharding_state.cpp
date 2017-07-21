@@ -54,6 +54,7 @@
 #include "mongo/s/catalog/type_config_version.h"
 #include "mongo/s/catalog/type_shard.h"
 #include "mongo/s/catalog/type_shard_collection.h"
+#include "mongo/s/catalog_cache.h"
 #include "mongo/s/catalog_cache_loader.h"
 #include "mongo/s/chunk_version.h"
 #include "mongo/s/cluster_identity_loader.h"
@@ -94,14 +95,12 @@ private:
  */
 class CollectionVersionLogOpHandler final : public RecoveryUnit::Change {
 public:
-    CollectionVersionLogOpHandler(OperationContext* opCtx,
-                                  const NamespaceString& nss,
-                                  const ChunkVersion& updatedVersion)
-        : _opCtx(opCtx), _nss(nss), _updatedVersion(updatedVersion) {}
+    CollectionVersionLogOpHandler(OperationContext* opCtx, const NamespaceString& nss)
+        : _opCtx(opCtx), _nss(nss) {}
 
     void commit() override {
-        CatalogCacheLoader::get(_opCtx).notifyOfCollectionVersionUpdate(
-            _opCtx, _nss, _updatedVersion);
+        Grid::get(_opCtx)->catalogCache()->invalidateShardedCollection(_nss);
+        CatalogCacheLoader::get(_opCtx).notifyOfCollectionVersionUpdate(_nss);
     }
 
     void rollback() override {}
@@ -109,7 +108,6 @@ public:
 private:
     OperationContext* _opCtx;
     const NamespaceString _nss;
-    const ChunkVersion _updatedVersion;
 };
 
 }  // unnamed namespace
@@ -432,22 +430,8 @@ void CollectionShardingState::_onConfigRefreshCompleteInvalidateCachedMetadataAn
     // If 'lastRefreshedCollectionVersion' is present, then a refresh completed and the catalog
     // cache must be invalidated and the catalog cache loader notified of the new version.
     if (setField.hasField(ShardCollectionType::lastRefreshedCollectionVersion.name())) {
-        // Get the version epoch from the 'updatedDoc', since it didn't get updated and won't be
-        // in 'update'.
-        BSONElement oidElem;
-        fassert(40513,
-                bsonExtractTypedField(
-                    updatedDoc, ShardCollectionType::epoch(), BSONType::jstOID, &oidElem));
-
-        // Get the new collection version.
-        auto statusWithLastRefreshedChunkVersion = ChunkVersion::parseFromBSONWithFieldAndSetEpoch(
-            updatedDoc, ShardCollectionType::lastRefreshedCollectionVersion(), oidElem.OID());
-        fassert(40514, statusWithLastRefreshedChunkVersion.isOK());
-
         opCtx->recoveryUnit()->registerChange(
-            new CollectionVersionLogOpHandler(opCtx,
-                                              NamespaceString(refreshCollection),
-                                              statusWithLastRefreshedChunkVersion.getValue()));
+            new CollectionVersionLogOpHandler(opCtx, NamespaceString(refreshCollection)));
     }
 }
 
@@ -461,8 +445,8 @@ void CollectionShardingState::_onConfigDeleteInvalidateCachedMetadataAndNotify(
     fassertStatusOK(
         40479, bsonExtractStringField(query, ShardCollectionType::uuid.name(), &deletedCollection));
 
-    opCtx->recoveryUnit()->registerChange(new CollectionVersionLogOpHandler(
-        opCtx, NamespaceString(deletedCollection), ChunkVersion::UNSHARDED()));
+    opCtx->recoveryUnit()->registerChange(
+        new CollectionVersionLogOpHandler(opCtx, NamespaceString(deletedCollection)));
 }
 
 bool CollectionShardingState::_checkShardVersionOk(OperationContext* opCtx,

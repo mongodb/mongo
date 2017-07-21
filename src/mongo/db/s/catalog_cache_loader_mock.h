@@ -29,19 +29,23 @@
 #pragma once
 
 #include "mongo/s/catalog_cache_loader.h"
-#include "mongo/s/config_server_catalog_cache_loader.h"
+#include "mongo/util/concurrency/thread_pool.h"
 
 namespace mongo {
 
 /**
- * Contains a ConfigServerCatalogCacheLoader for remote metadata loading. Inactive functions simply
- * return, rather than invariant, so this class can be plugged into the shard server for read-only
- * mode, where persistence should not be attempted.
+ * Mocks the metadata refresh results with settable return values. The purpose of this class is to
+ * facilitate testing of classes that use a CatalogCacheLoader.
  */
-class ReadOnlyCatalogCacheLoader final : public CatalogCacheLoader {
+class CatalogCacheLoaderMock final : public CatalogCacheLoader {
+    MONGO_DISALLOW_COPYING(CatalogCacheLoaderMock);
+
 public:
+    CatalogCacheLoaderMock();
+    ~CatalogCacheLoaderMock();
+
     /**
-     * These functions do nothing and simply return.
+     * These functions should never be called. They trigger invariants if called.
      */
     void initializeReplicaSetRole(bool isPrimary) override;
     void onStepDown() override;
@@ -57,8 +61,28 @@ public:
         stdx::function<void(OperationContext*, StatusWith<CollectionAndChangedChunks>)> callbackFn)
         override;
 
+    /**
+     * Sets the mocked collection entry result that getChunksSince will use to construct its return
+     * value.
+     */
+    void setCollectionRefreshReturnValue(StatusWith<CollectionType> statusWithCollectionType);
+
+    /**
+     * Sets the mocked chunk results that getChunksSince will use to construct its return value.
+     */
+    void setChunkRefreshReturnValue(StatusWith<std::vector<ChunkType>> statusWithChunks);
+
 private:
-    ConfigServerCatalogCacheLoader _configServerLoader;
+    // These variables hold the mocked chunks and collection entry results used to construct the
+    // return value of getChunksSince above.
+    StatusWith<CollectionType> _swCollectionReturnValue{Status(
+        ErrorCodes::InternalError, "config loader mock collection response is uninitialized")};
+
+    StatusWith<std::vector<ChunkType>> _swChunksReturnValue{
+        Status(ErrorCodes::InternalError, "config loader mock chunks response is uninitialized")};
+
+    // Thread pool on which to mock load chunk metadata.
+    ThreadPool _threadPool;
 };
 
 }  // namespace mongo

@@ -51,6 +51,15 @@ public:
     ~ShardServerCatalogCacheLoader();
 
     /**
+     * For testing use only.
+     *
+     * Currently this only sets a boolean such that after metadata updates the notification system
+     * is signaled internally, rather than depending on the OpObservers which are not connectted for
+     * unit testing.
+     */
+    void setForTesting();
+
+    /**
      * Initializes internal state so that the loader behaves as a primary or secondary. This can
      * only be called once, when the sharding state is initialized.
      */
@@ -70,9 +79,7 @@ public:
      * Sets any notifications waiting for this version to arrive and invalidates the catalog cache's
      * chunk metadata for collection 'nss' so that the next caller provokes a refresh.
      */
-    void notifyOfCollectionVersionUpdate(OperationContext* opCtx,
-                                         const NamespaceString& nss,
-                                         const ChunkVersion& version) override;
+    void notifyOfCollectionVersionUpdate(const NamespaceString& nss) override;
 
     /**
      * Waits for the persisted collection version to be gte to 'version', or an epoch change. Only
@@ -355,6 +362,9 @@ private:
 
     // The collection of operation contexts in use by all threads.
     OperationContextGroup _contexts;
+
+    // Gates additional actions needed when testing.
+    bool _testing{false};
 };
 
 }  // namespace mongo

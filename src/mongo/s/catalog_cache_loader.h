@@ -102,9 +102,7 @@ public:
     /**
      * Notifies the loader that the persisted collection version for 'nss' has been updated.
      */
-    virtual void notifyOfCollectionVersionUpdate(OperationContext* opCtx,
-                                                 const NamespaceString& nss,
-                                                 const ChunkVersion& version) = 0;
+    virtual void notifyOfCollectionVersionUpdate(const NamespaceString& nss) = 0;
 
     /**
      * Waits for the persisted collection version to be GTE to 'version', or an epoch change.

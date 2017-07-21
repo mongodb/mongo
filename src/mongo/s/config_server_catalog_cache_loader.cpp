@@ -153,9 +153,7 @@ void ConfigServerCatalogCacheLoader::onStepUp() {
     MONGO_UNREACHABLE;
 }
 
-void ConfigServerCatalogCacheLoader::notifyOfCollectionVersionUpdate(OperationContext* opCtx,
-                                                                     const NamespaceString& nss,
-                                                                     const ChunkVersion& version) {
+void ConfigServerCatalogCacheLoader::notifyOfCollectionVersionUpdate(const NamespaceString& nss) {
     MONGO_UNREACHABLE;
 }
 

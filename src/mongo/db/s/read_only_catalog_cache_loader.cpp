@@ -48,9 +48,7 @@ void ReadOnlyCatalogCacheLoader::onStepUp() {
     return;
 }
 
-void ReadOnlyCatalogCacheLoader::notifyOfCollectionVersionUpdate(OperationContext* opCtx,
-                                                                 const NamespaceString& nss,
-                                                                 const ChunkVersion& version) {
+void ReadOnlyCatalogCacheLoader::notifyOfCollectionVersionUpdate(const NamespaceString& nss) {
     return;
 }
 

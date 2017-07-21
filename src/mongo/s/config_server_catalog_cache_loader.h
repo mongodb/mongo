@@ -44,9 +44,7 @@ public:
     void initializeReplicaSetRole(bool isPrimary) override;
     void onStepDown() override;
     void onStepUp() override;
-    void notifyOfCollectionVersionUpdate(OperationContext* opCtx,
-                                         const NamespaceString& nss,
-                                         const ChunkVersion& version) override;
+    void notifyOfCollectionVersionUpdate(const NamespaceString& nss) override;
     Status waitForCollectionVersion(OperationContext* opCtx,
                                     const NamespaceString& nss,
                                     const ChunkVersion& version) override;

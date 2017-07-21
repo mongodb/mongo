@@ -38,7 +38,6 @@
 #include "mongo/db/s/shard_metadata_util.h"
 #include "mongo/db/s/sharding_state.h"
 #include "mongo/s/catalog/type_shard_collection.h"
-#include "mongo/s/catalog_cache.h"
 #include "mongo/s/client/shard_registry.h"
 #include "mongo/s/grid.h"
 #include "mongo/stdx/memory.h"
@@ -286,11 +285,11 @@ ShardServerCatalogCacheLoader::~ShardServerCatalogCacheLoader() {
     invariant(_contexts.isEmpty());
 }
 
-void ShardServerCatalogCacheLoader::notifyOfCollectionVersionUpdate(OperationContext* opCtx,
-                                                                    const NamespaceString& nss,
-                                                                    const ChunkVersion& version) {
-    Grid::get(opCtx)->catalogCache()->invalidateShardedCollection(nss);
+void ShardServerCatalogCacheLoader::setForTesting() {
+    _testing = true;
+}
 
+void ShardServerCatalogCacheLoader::notifyOfCollectionVersionUpdate(const NamespaceString& nss) {
     _namespaceNotifications.notifyChange(nss);
 }
 
@@ -505,7 +504,6 @@ void ShardServerCatalogCacheLoader::_schedulePrimaryGetChunksSince(
                 }
             }
 
-
             if (swCollectionAndChangedChunks.isOK()) {
                 log() << "Cache loader remotely refreshed for collection " << nss
                       << " from collection version " << maxLoaderVersion
@@ -581,15 +579,15 @@ StatusWith<CollectionAndChangedChunks> ShardServerCatalogCacheLoader::_getLoader
     if (!tasksAreEnqueued) {
         // There are no tasks in the queue. Return the persisted metadata.
         return persisted;
-    } else if (enqueued.changedChunks.empty() || enqueued.epoch != persisted.epoch) {
-        // There is a task queue and either:
-        // - nothing was returned, which means the last task enqueued is a drop task.
+    } else if (persisted.changedChunks.empty() || enqueued.changedChunks.empty() ||
+               enqueued.epoch != persisted.epoch) {
+        // There is a task queue and:
+        // - nothing is persisted.
+        // - nothing was returned from enqueued, which means the last task enqueued is a drop task.
         // - the epoch changed in the enqueued metadata, which means there's a drop operation
         //   enqueued somewhere.
-        // Either way, the persisted metadata is out-dated. Return enqueued results.
-        return enqueued;
-    } else if (persisted.changedChunks.empty()) {
-        // Nothing is persisted. Return enqueued results.
+        // Whichever the cause, the persisted metadata is out-dated/non-existent. Return enqueued
+        // results.
         return enqueued;
     } else {
         // There can be overlap between persisted and enqueued metadata because enqueued work can
@@ -697,6 +695,10 @@ void ShardServerCatalogCacheLoader::_runTasks(const NamespaceString& nss) {
     // If task completed successfully, remove it from work queue
     if (taskFinished) {
         _taskLists[nss].removeActiveTask();
+    }
+
+    if (_testing) {
+        notifyOfCollectionVersionUpdate(nss);
     }
 
     // Schedule more work if there is any
@@ -912,9 +914,22 @@ CollectionAndChangedChunks ShardServerCatalogCacheLoader::TaskList::getEnqueuedM
                 // the chunks vector. This will be either reset by the next task with a total reload
                 // with a new epoch, or cause the original getChunksSince caller to throw out the
                 // results and refresh again.
+
+                // Make sure we do not append a duplicate chunk. The diff query is GTE, so there can
+                // be duplicates of the same exact versioned chunk across tasks. This is no problem
+                // for our diff application algorithms, but it can return unpredictable numbers of
+                // chunks for testing purposes. Eliminate unpredicatable duplicates for testing
+                // stability.
+                auto taskCollectionAndChangedChunksIt =
+                    task.collectionAndChangedChunks->changedChunks.begin();
+                if (collAndChunks.changedChunks.back().getVersion() ==
+                    task.collectionAndChangedChunks->changedChunks.front().getVersion()) {
+                    ++taskCollectionAndChangedChunksIt;
+                }
+
                 collAndChunks.changedChunks.insert(
                     collAndChunks.changedChunks.end(),
-                    task.collectionAndChangedChunks->changedChunks.begin(),
+                    taskCollectionAndChangedChunksIt,
                     task.collectionAndChangedChunks->changedChunks.end());
             }
         }
