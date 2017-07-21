@@ -47,6 +47,7 @@
 #include "mongo/db/repl/replication_coordinator_global.h"
 #include "mongo/db/s/collection_sharding_state.h"
 #include "mongo/db/server_options.h"
+#include "mongo/db/session_catalog.h"
 #include "mongo/db/views/durable_view_catalog.h"
 #include "mongo/scripting/engine.h"
 #include "mongo/util/assert_util.h"
@@ -58,6 +59,21 @@ bool isMasterSlave() {
     return repl::getGlobalReplicationCoordinator()->getReplicationMode() ==
         repl::ReplicationCoordinator::modeMasterSlave;
 }
+
+/**
+ * Updates the session state with the operation timestamp if there is an active one in the
+ * operation context.
+ */
+void updateSessionProgress(OperationContext* opCtx, const repl::OpTime& lastTxnWriteOpTime) {
+    if (auto session = OperationContextSession::get(opCtx)) {
+        auto lastWriteTs = lastTxnWriteOpTime.getTimestamp();
+        if (!lastWriteTs.isNull()) {
+            // Update session only if a new oplog entry was actually created.
+            session->saveTxnProgress(opCtx, lastWriteTs);
+        }
+    }
+}
+
 }  // namespace
 
 void OpObserverImpl::onCreateIndex(OperationContext* opCtx,
@@ -101,7 +117,7 @@ void OpObserverImpl::onInserts(OperationContext* opCtx,
                                std::vector<InsertStatement>::const_iterator begin,
                                std::vector<InsertStatement>::const_iterator end,
                                bool fromMigrate) {
-    repl::logInsertOps(opCtx, nss, uuid, begin, end, fromMigrate);
+    auto opTime = repl::logInsertOps(opCtx, nss, uuid, begin, end, fromMigrate);
 
     auto css = CollectionShardingState::get(opCtx, nss.ns());
 
@@ -125,6 +141,8 @@ void OpObserverImpl::onInserts(OperationContext* opCtx,
     if (nss.coll() == DurableViewCatalog::viewsCollectionName()) {
         DurableViewCatalog::onExternalChange(opCtx, nss);
     }
+
+    updateSessionProgress(opCtx, opTime);
 }
 
 void OpObserverImpl::onUpdate(OperationContext* opCtx, const OplogUpdateEntryArgs& args) {
@@ -133,14 +151,14 @@ void OpObserverImpl::onUpdate(OperationContext* opCtx, const OplogUpdateEntryArg
         return;
     }
 
-    repl::logOp(opCtx,
-                "u",
-                args.nss,
-                args.uuid,
-                args.update,
-                &args.criteria,
-                args.fromMigrate,
-                args.stmtId);
+    auto opTime = repl::logOp(opCtx,
+                              "u",
+                              args.nss,
+                              args.uuid,
+                              args.update,
+                              &args.criteria,
+                              args.fromMigrate,
+                              args.stmtId);
     AuthorizationManager::get(opCtx->getServiceContext())
         ->logOp(opCtx, "u", args.nss, args.update, &args.criteria);
 
@@ -160,6 +178,8 @@ void OpObserverImpl::onUpdate(OperationContext* opCtx, const OplogUpdateEntryArg
     if (args.nss.ns() == FeatureCompatibilityVersion::kCollection) {
         FeatureCompatibilityVersion::onInsertOrUpdate(opCtx, args.updatedDoc);
     }
+
+    updateSessionProgress(opCtx, opTime);
 }
 
 CollectionShardingState::DeleteState OpObserverImpl::aboutToDelete(OperationContext* opCtx,
@@ -186,7 +206,8 @@ void OpObserverImpl::onDelete(OperationContext* opCtx,
     if (deleteState.idDoc.isEmpty())
         return;
 
-    repl::logOp(opCtx, "d", nss, uuid, deleteState.idDoc, nullptr, fromMigrate, stmtId);
+    auto opTime =
+        repl::logOp(opCtx, "d", nss, uuid, deleteState.idDoc, nullptr, fromMigrate, stmtId);
     AuthorizationManager::get(opCtx->getServiceContext())
         ->logOp(opCtx, "d", nss, deleteState.idDoc, nullptr);
 
@@ -204,6 +225,8 @@ void OpObserverImpl::onDelete(OperationContext* opCtx,
     if (nss.ns() == FeatureCompatibilityVersion::kCollection) {
         FeatureCompatibilityVersion::onDelete(opCtx, deleteState.idDoc);
     }
+
+    updateSessionProgress(opCtx, opTime);
 }
 
 void OpObserverImpl::onOpMessage(OperationContext* opCtx, const BSONObj& msgObj) {

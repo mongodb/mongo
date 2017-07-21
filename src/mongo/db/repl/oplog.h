@@ -71,16 +71,16 @@ extern std::string masterSlaveOplogName;
 
 extern int OPLOG_VERSION;
 
-/* Log operation(s) to the local oplog
- *
+/**
+ * Log insert(s) to the local oplog.
+ * Returns the OpTime of the last insert.
  */
-
-void logInsertOps(OperationContext* opCtx,
-                  const NamespaceString& nss,
-                  OptionalCollectionUUID uuid,
-                  std::vector<InsertStatement>::const_iterator begin,
-                  std::vector<InsertStatement>::const_iterator end,
-                  bool fromMigrate);
+OpTime logInsertOps(OperationContext* opCtx,
+                    const NamespaceString& nss,
+                    OptionalCollectionUUID uuid,
+                    std::vector<InsertStatement>::const_iterator begin,
+                    std::vector<InsertStatement>::const_iterator end,
+                    bool fromMigrate);
 
 /**
  * @param opstr

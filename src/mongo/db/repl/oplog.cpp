@@ -83,6 +83,7 @@
 #include "mongo/db/server_options.h"
 #include "mongo/db/server_parameters.h"
 #include "mongo/db/service_context.h"
+#include "mongo/db/session_catalog.h"
 #include "mongo/db/stats/counters.h"
 #include "mongo/db/storage/storage_engine.h"
 #include "mongo/db/storage/storage_options.h"
@@ -291,7 +292,10 @@ Collection* getLocalOplogCollection(OperationContext* opCtx,
 /**
  * Attaches the session information of a write to an oplog entry if it exists.
  */
-void appendSessionInfo(OperationContext* opCtx, BSONObjBuilder* builder, StmtId statementId) {
+void appendSessionInfo(OperationContext* opCtx,
+                       BSONObjBuilder* builder,
+                       StmtId statementId,
+                       const Timestamp& prevTs) {
     auto txnNum = opCtx->getTxnNumber();
 
     if (!txnNum) {
@@ -312,6 +316,10 @@ void appendSessionInfo(OperationContext* opCtx, BSONObjBuilder* builder, StmtId 
     sessionInfo.serialize(builder);
 
     builder->append(OplogEntryBase::kStatementIdFieldName, statementId);
+
+    auto session = OperationContextSession::get(opCtx);
+    invariant(session);
+    builder->append(OplogEntryBase::kPrevWriteTsInTransactionFieldName, prevTs);
 }
 
 OplogDocWriter _logOpWriter(OperationContext* opCtx,
@@ -324,7 +332,8 @@ OplogDocWriter _logOpWriter(OperationContext* opCtx,
                             OpTime optime,
                             long long hashNew,
                             Date_t wallTime,
-                            StmtId statementId) {
+                            StmtId statementId,
+                            const Timestamp& prevTs) {
     BSONObjBuilder b(256);
 
     b.append("ts", optime.getTimestamp());
@@ -349,7 +358,7 @@ OplogDocWriter _logOpWriter(OperationContext* opCtx,
         b.appendDate("wall", wallTime);
     }
 
-    appendSessionInfo(opCtx, &b, statementId);
+    appendSessionInfo(opCtx, &b, statementId, prevTs);
 
     return OplogDocWriter(OplogDocWriter(b.obj(), obj));
 }
@@ -458,6 +467,7 @@ OpTime logOp(OperationContext* opCtx,
              StmtId statementId) {
     auto replCoord = ReplicationCoordinator::get(opCtx);
     if (replCoord->isOplogDisabledFor(opCtx, nss)) {
+        invariant(statementId == kUninitializedStmtId);
         return {};
     }
 
@@ -467,6 +477,11 @@ OpTime logOp(OperationContext* opCtx,
     auto replMode = replCoord->getReplicationMode();
     OplogSlot slot;
     getNextOpTime(opCtx, oplog, replCoord, replMode, 1, &slot);
+
+    Timestamp prevTs;
+    if (auto session = OperationContextSession::get(opCtx)) {
+        prevTs = session->getLastWriteOpTimeTs();
+    }
 
     auto writer = _logOpWriter(opCtx,
                                opstr,
@@ -478,23 +493,25 @@ OpTime logOp(OperationContext* opCtx,
                                slot.opTime,
                                slot.hash,
                                Date_t::now(),
-                               statementId);
+                               statementId,
+                               prevTs);
     const DocWriter* basePtr = &writer;
     _logOpsInner(opCtx, nss, &basePtr, 1, oplog, replMode, slot.opTime);
     return slot.opTime;
 }
 
-void logInsertOps(OperationContext* opCtx,
-                  const NamespaceString& nss,
-                  OptionalCollectionUUID uuid,
-                  std::vector<InsertStatement>::const_iterator begin,
-                  std::vector<InsertStatement>::const_iterator end,
-                  bool fromMigrate) {
+repl::OpTime logInsertOps(OperationContext* opCtx,
+                          const NamespaceString& nss,
+                          OptionalCollectionUUID uuid,
+                          std::vector<InsertStatement>::const_iterator begin,
+                          std::vector<InsertStatement>::const_iterator end,
+                          bool fromMigrate) {
     invariant(begin != end);
 
     auto replCoord = ReplicationCoordinator::get(opCtx);
     if (replCoord->isOplogDisabledFor(opCtx, nss)) {
-        return;
+        invariant(begin->stmtId == kUninitializedStmtId);
+        return {};
     }
 
     const size_t count = end - begin;
@@ -507,6 +524,12 @@ void logInsertOps(OperationContext* opCtx,
     auto replMode = replCoord->getReplicationMode();
     getNextOpTime(opCtx, oplog, replCoord, replMode, count, slots.get());
     auto wallTime = Date_t::now();
+
+    Timestamp prevTs;
+    if (auto session = OperationContextSession::get(opCtx)) {
+        prevTs = session->getLastWriteOpTimeTs();
+    }
+
     for (size_t i = 0; i < count; i++) {
         auto insertStatement = begin[i];
         writers.emplace_back(_logOpWriter(opCtx,
@@ -519,7 +542,9 @@ void logInsertOps(OperationContext* opCtx,
                                           slots[i].opTime,
                                           slots[i].hash,
                                           wallTime,
-                                          insertStatement.stmtId));
+                                          insertStatement.stmtId,
+                                          prevTs));
+        prevTs = slots[i].opTime.getTimestamp();
     }
 
     std::unique_ptr<DocWriter const* []> basePtrs(new DocWriter const*[count]);
@@ -527,6 +552,8 @@ void logInsertOps(OperationContext* opCtx,
         basePtrs[i] = &writers[i];
     }
     _logOpsInner(opCtx, nss, basePtrs.get(), count, oplog, replMode, slots[count - 1].opTime);
+
+    return slots[count - 1].opTime;
 }
 
 namespace {

@@ -1,11 +1,32 @@
 /**
  * Test that the oplog entries will contain the correct logical session id, transaction number and
- * statement id after executing a write command.
+ * statement id after executing a write command. Also tests that the session table is properly
+ * updated after the write operations.
  */
 (function() {
     "use strict";
 
-    var checkOplog = function(mainConn, priConn) {
+    var checkOplog = function(oplog, lsid, uid, txnNum, stmtId, prevTs) {
+        assert(oplog != null);
+        assert(oplog.lsid != null);
+        assert.eq(lsid, oplog.lsid.id);
+        assert.eq(uid, oplog.lsid.uid);
+        assert.eq(txnNum, oplog.txnNumber);
+        assert.eq(stmtId, oplog.stmtId);
+        assert.eq(prevTs.getTime(), oplog.prevTs.getTime());
+        assert.eq(prevTs.getInc(), oplog.prevTs.getInc());
+    };
+
+    var checkSessionCatalog = function(conn, sessionId, uid, txnNum, expectedTs) {
+        var coll = conn.getDB('config').transactions;
+        var sessionDoc = coll.findOne({'_id': { id: sessionId, uid: uid }});
+
+        assert.eq(txnNum, sessionDoc.txnNum);
+        assert.eq(expectedTs.getTime(), sessionDoc.lastWriteOpTimeTs.getTime());
+        assert.eq(expectedTs.getInc(), sessionDoc.lastWriteOpTimeTs.getInc());
+    };
+
+    var runTests = function(mainConn, priConn) {
         var lsid = UUID();
         var uid = function() {
             var user = mainConn.getDB("admin")
@@ -35,20 +56,12 @@
         var oplog = priConn.getDB('local').oplog.rs;
 
         var firstDoc = oplog.findOne({ns: 'test.user', 'o._id': 10});
-        assert(firstDoc != null);
-        assert(firstDoc.lsid != null);
-        assert.eq(lsid, firstDoc.lsid.id);
-        assert.eq(uid, firstDoc.lsid.uid);
-        assert.eq(NumberLong(34), firstDoc.txnNumber);
-        assert.eq(0, firstDoc.stmtId);
+        checkOplog(firstDoc, lsid, uid, NumberLong(34), 0, Timestamp(0, 0));
 
         var secondDoc = oplog.findOne({ns: 'test.user', 'o._id': 30});
-        assert(secondDoc != null);
-        assert(secondDoc.lsid != null);
-        assert.eq(lsid, secondDoc.lsid.id);
-        assert.eq(uid, firstDoc.lsid.uid);
-        assert.eq(NumberLong(34), secondDoc.txnNumber);
-        assert.eq(1, secondDoc.stmtId);
+        checkOplog(secondDoc, lsid, uid, NumberLong(34), 1, firstDoc.ts);
+
+        checkSessionCatalog(priConn, lsid, uid, NumberLong(34), secondDoc.ts);
 
         ////////////////////////////////////////////////////////////////////////
         // Test update command
@@ -68,28 +81,15 @@
         assert.commandWorked(mainConn.getDB('test').runCommand(cmd));
 
         firstDoc = oplog.findOne({ns: 'test.user', op: 'u', 'o2._id': 10});
-        assert(firstDoc != null);
-        assert(firstDoc.lsid != null);
-        assert.eq(lsid, firstDoc.lsid.id);
-        assert.eq(uid, firstDoc.lsid.uid);
-        assert.eq(NumberLong(35), firstDoc.txnNumber);
-        assert.eq(0, firstDoc.stmtId);
+        checkOplog(firstDoc, lsid, uid, NumberLong(35), 0, Timestamp(0, 0));
 
         secondDoc = oplog.findOne({ns: 'test.user', op: 'i', 'o._id': 20});
-        assert(secondDoc != null);
-        assert(secondDoc.lsid != null);
-        assert.eq(lsid, secondDoc.lsid.id);
-        assert.eq(uid, firstDoc.lsid.uid);
-        assert.eq(NumberLong(35), secondDoc.txnNumber);
-        assert.eq(1, secondDoc.stmtId);
+        checkOplog(secondDoc, lsid, uid, NumberLong(35), 1, firstDoc.ts);
 
         var thirdDoc = oplog.findOne({ns: 'test.user', op: 'u', 'o2._id': 30});
-        assert(thirdDoc != null);
-        assert(thirdDoc.lsid != null);
-        assert.eq(lsid, thirdDoc.lsid.id);
-        assert.eq(uid, firstDoc.lsid.uid);
-        assert.eq(NumberLong(35), thirdDoc.txnNumber);
-        assert.eq(2, thirdDoc.stmtId);
+        checkOplog(thirdDoc, lsid, uid, NumberLong(35), 2, secondDoc.ts);
+
+        checkSessionCatalog(priConn, lsid, uid, NumberLong(35), thirdDoc.ts);
 
         ////////////////////////////////////////////////////////////////////////
         // Test delete command
@@ -105,20 +105,12 @@
         assert.commandWorked(mainConn.getDB('test').runCommand(cmd));
 
         firstDoc = oplog.findOne({ns: 'test.user', op: 'd', 'o._id': 10});
-        assert(firstDoc != null);
-        assert(firstDoc.lsid != null);
-        assert.eq(lsid, firstDoc.lsid.id);
-        assert.eq(uid, firstDoc.lsid.uid);
-        assert.eq(NumberLong(36), firstDoc.txnNumber);
-        assert.eq(0, firstDoc.stmtId);
+        checkOplog(firstDoc, lsid, uid, NumberLong(36), 0, Timestamp(0, 0));
 
         secondDoc = oplog.findOne({ns: 'test.user', op: 'd', 'o._id': 20});
-        assert(secondDoc != null);
-        assert(secondDoc.lsid != null);
-        assert.eq(lsid, secondDoc.lsid.id);
-        assert.eq(uid, firstDoc.lsid.uid);
-        assert.eq(NumberLong(36), secondDoc.txnNumber);
-        assert.eq(1, secondDoc.stmtId);
+        checkOplog(secondDoc, lsid, uid, NumberLong(36), 1, firstDoc.ts);
+
+        checkSessionCatalog(priConn, lsid, uid, NumberLong(36), secondDoc.ts);
     };
 
     var replTest = new ReplSetTest({nodes: 1});
@@ -127,13 +119,13 @@
 
     var priConn = replTest.getPrimary();
 
-    checkOplog(priConn, priConn);
+    runTests(priConn, priConn);
 
     replTest.stopSet();
 
     var st = new ShardingTest({shards: {rs0: {nodes: 1}}});
 
-    checkOplog(st.s, st.rs0.getPrimary());
+    runTests(st.s, st.rs0.getPrimary());
 
     st.stop();
 
