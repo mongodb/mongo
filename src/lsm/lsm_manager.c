@@ -291,8 +291,10 @@ __wt_lsm_manager_destroy(WT_SESSION_IMPL *session)
 	    manager->lsm_workers == 0);
 	if (manager->lsm_workers > 0) {
 		/* Wait for the main LSM manager thread to finish. */
-		while (!F_ISSET(manager, WT_LSM_MANAGER_SHUTDOWN))
+		while (!F_ISSET(manager, WT_LSM_MANAGER_SHUTDOWN)) {
+			WT_STAT_CONN_INCR(session, conn_close_blocked_lsm);
 			__wt_yield();
+		}
 
 		/* Clean up open LSM handles. */
 		ret = __wt_lsm_tree_close_all(session);

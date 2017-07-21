@@ -235,6 +235,7 @@ __wt_session_lock_dhandle(
 		lock_busy = true;
 
 		/* Give other threads a chance to make progress. */
+		WT_STAT_CONN_INCR(session, dhandle_lock_blocked);
 		__wt_yield();
 	}
 }

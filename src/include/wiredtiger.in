@@ -5045,74 +5045,96 @@ extern int wiredtiger_extension_terminate(WT_CONNECTION *connection);
 #define	WT_STAT_CONN_APPLICATION_EVICT_TIME		1243
 /*! thread-yield: application thread time waiting for cache (usecs) */
 #define	WT_STAT_CONN_APPLICATION_CACHE_TIME		1244
+/*!
+ * thread-yield: connection close blocked waiting for transaction state
+ * stabilization
+ */
+#define	WT_STAT_CONN_TXN_RELEASE_BLOCKED		1245
+/*! thread-yield: connection close yielded for lsm manager shutdown */
+#define	WT_STAT_CONN_CONN_CLOSE_BLOCKED_LSM		1246
+/*! thread-yield: data handle lock yielded */
+#define	WT_STAT_CONN_DHANDLE_LOCK_BLOCKED		1247
+/*! thread-yield: log server sync yielded for log write */
+#define	WT_STAT_CONN_LOG_SERVER_SYNC_BLOCKED		1248
 /*! thread-yield: page acquire busy blocked */
-#define	WT_STAT_CONN_PAGE_BUSY_BLOCKED			1245
+#define	WT_STAT_CONN_PAGE_BUSY_BLOCKED			1249
 /*! thread-yield: page acquire eviction blocked */
-#define	WT_STAT_CONN_PAGE_FORCIBLE_EVICT_BLOCKED	1246
+#define	WT_STAT_CONN_PAGE_FORCIBLE_EVICT_BLOCKED	1250
 /*! thread-yield: page acquire locked blocked */
-#define	WT_STAT_CONN_PAGE_LOCKED_BLOCKED		1247
+#define	WT_STAT_CONN_PAGE_LOCKED_BLOCKED		1251
 /*! thread-yield: page acquire read blocked */
-#define	WT_STAT_CONN_PAGE_READ_BLOCKED			1248
+#define	WT_STAT_CONN_PAGE_READ_BLOCKED			1252
 /*! thread-yield: page acquire time sleeping (usecs) */
-#define	WT_STAT_CONN_PAGE_SLEEP				1249
+#define	WT_STAT_CONN_PAGE_SLEEP				1253
+/*! thread-yield: page delete rollback yielded for instantiation */
+#define	WT_STAT_CONN_PAGE_DEL_ROLLBACK_BLOCKED		1254
+/*! thread-yield: page reconciliation yielded due to child modification */
+#define	WT_STAT_CONN_CHILD_MODIFY_BLOCKED_PAGE		1255
+/*! thread-yield: reference for page index and slot yielded */
+#define	WT_STAT_CONN_PAGE_INDEX_SLOT_BLOCKED		1256
+/*!
+ * thread-yield: tree descend one level yielded for split page index
+ * update
+ */
+#define	WT_STAT_CONN_TREE_DESCEND_BLOCKED		1257
 /*! transaction: number of named snapshots created */
-#define	WT_STAT_CONN_TXN_SNAPSHOTS_CREATED		1250
+#define	WT_STAT_CONN_TXN_SNAPSHOTS_CREATED		1258
 /*! transaction: number of named snapshots dropped */
-#define	WT_STAT_CONN_TXN_SNAPSHOTS_DROPPED		1251
+#define	WT_STAT_CONN_TXN_SNAPSHOTS_DROPPED		1259
 /*! transaction: transaction begins */
-#define	WT_STAT_CONN_TXN_BEGIN				1252
+#define	WT_STAT_CONN_TXN_BEGIN				1260
 /*! transaction: transaction checkpoint currently running */
-#define	WT_STAT_CONN_TXN_CHECKPOINT_RUNNING		1253
+#define	WT_STAT_CONN_TXN_CHECKPOINT_RUNNING		1261
 /*! transaction: transaction checkpoint generation */
-#define	WT_STAT_CONN_TXN_CHECKPOINT_GENERATION		1254
+#define	WT_STAT_CONN_TXN_CHECKPOINT_GENERATION		1262
 /*! transaction: transaction checkpoint max time (msecs) */
-#define	WT_STAT_CONN_TXN_CHECKPOINT_TIME_MAX		1255
+#define	WT_STAT_CONN_TXN_CHECKPOINT_TIME_MAX		1263
 /*! transaction: transaction checkpoint min time (msecs) */
-#define	WT_STAT_CONN_TXN_CHECKPOINT_TIME_MIN		1256
+#define	WT_STAT_CONN_TXN_CHECKPOINT_TIME_MIN		1264
 /*! transaction: transaction checkpoint most recent time (msecs) */
-#define	WT_STAT_CONN_TXN_CHECKPOINT_TIME_RECENT		1257
+#define	WT_STAT_CONN_TXN_CHECKPOINT_TIME_RECENT		1265
 /*! transaction: transaction checkpoint scrub dirty target */
-#define	WT_STAT_CONN_TXN_CHECKPOINT_SCRUB_TARGET	1258
+#define	WT_STAT_CONN_TXN_CHECKPOINT_SCRUB_TARGET	1266
 /*! transaction: transaction checkpoint scrub time (msecs) */
-#define	WT_STAT_CONN_TXN_CHECKPOINT_SCRUB_TIME		1259
+#define	WT_STAT_CONN_TXN_CHECKPOINT_SCRUB_TIME		1267
 /*! transaction: transaction checkpoint total time (msecs) */
-#define	WT_STAT_CONN_TXN_CHECKPOINT_TIME_TOTAL		1260
+#define	WT_STAT_CONN_TXN_CHECKPOINT_TIME_TOTAL		1268
 /*! transaction: transaction checkpoints */
-#define	WT_STAT_CONN_TXN_CHECKPOINT			1261
+#define	WT_STAT_CONN_TXN_CHECKPOINT			1269
 /*!
  * transaction: transaction checkpoints skipped because database was
  * clean
  */
-#define	WT_STAT_CONN_TXN_CHECKPOINT_SKIPPED		1262
+#define	WT_STAT_CONN_TXN_CHECKPOINT_SKIPPED		1270
 /*! transaction: transaction failures due to cache overflow */
-#define	WT_STAT_CONN_TXN_FAIL_CACHE			1263
+#define	WT_STAT_CONN_TXN_FAIL_CACHE			1271
 /*!
  * transaction: transaction fsync calls for checkpoint after allocating
  * the transaction ID
  */
-#define	WT_STAT_CONN_TXN_CHECKPOINT_FSYNC_POST		1264
+#define	WT_STAT_CONN_TXN_CHECKPOINT_FSYNC_POST		1272
 /*!
  * transaction: transaction fsync duration for checkpoint after
  * allocating the transaction ID (usecs)
  */
-#define	WT_STAT_CONN_TXN_CHECKPOINT_FSYNC_POST_DURATION	1265
+#define	WT_STAT_CONN_TXN_CHECKPOINT_FSYNC_POST_DURATION	1273
 /*! transaction: transaction range of IDs currently pinned */
-#define	WT_STAT_CONN_TXN_PINNED_RANGE			1266
+#define	WT_STAT_CONN_TXN_PINNED_RANGE			1274
 /*! transaction: transaction range of IDs currently pinned by a checkpoint */
-#define	WT_STAT_CONN_TXN_PINNED_CHECKPOINT_RANGE	1267
+#define	WT_STAT_CONN_TXN_PINNED_CHECKPOINT_RANGE	1275
 /*!
  * transaction: transaction range of IDs currently pinned by named
  * snapshots
  */
-#define	WT_STAT_CONN_TXN_PINNED_SNAPSHOT_RANGE		1268
+#define	WT_STAT_CONN_TXN_PINNED_SNAPSHOT_RANGE		1276
 /*! transaction: transaction sync calls */
-#define	WT_STAT_CONN_TXN_SYNC				1269
+#define	WT_STAT_CONN_TXN_SYNC				1277
 /*! transaction: transactions committed */
-#define	WT_STAT_CONN_TXN_COMMIT				1270
+#define	WT_STAT_CONN_TXN_COMMIT				1278
 /*! transaction: transactions rolled back */
-#define	WT_STAT_CONN_TXN_ROLLBACK			1271
+#define	WT_STAT_CONN_TXN_ROLLBACK			1279
 /*! transaction: update conflicts */
-#define	WT_STAT_CONN_TXN_UPDATE_CONFLICT		1272
+#define	WT_STAT_CONN_TXN_UPDATE_CONFLICT		1280
 
 /*!
  * @}
