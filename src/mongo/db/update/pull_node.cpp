@@ -40,7 +40,7 @@ namespace mongo {
  * The ObjectMatcher is used when the $pull condition is specified as an object and the first field
  * of that object is not an operator (like $gt).
  */
-class PullNode::ObjectMatcher : public PullNode::ElementMatcher {
+class PullNode::ObjectMatcher final : public PullNode::ElementMatcher {
 public:
     ObjectMatcher(BSONObj matchCondition, const CollatorInterface* collator)
         : _matchExpr(
@@ -51,7 +51,7 @@ public:
         return stdx::make_unique<ObjectMatcher>(*this);
     }
 
-    bool match(mutablebson::ConstElement element) final {
+    bool match(const mutablebson::ConstElement& element) final {
         if (element.getType() == mongo::Object) {
             return _matchExpr->matchesBSON(element.getValueObject());
         } else {
@@ -74,7 +74,7 @@ private:
  * empty object so that we are comparing the MatchCondition and the array element at the same level.
  * This hack allows us to use a MatchExpression to check a BSONElement.
  */
-class PullNode::WrappedObjectMatcher : public PullNode::ElementMatcher {
+class PullNode::WrappedObjectMatcher final : public PullNode::ElementMatcher {
 public:
     WrappedObjectMatcher(BSONElement matchCondition, const CollatorInterface* collator)
         : _matchExpr(matchCondition.wrap(""),
@@ -85,7 +85,7 @@ public:
         return stdx::make_unique<WrappedObjectMatcher>(*this);
     }
 
-    bool match(mutablebson::ConstElement element) final {
+    bool match(const mutablebson::ConstElement& element) final {
         BSONObj candidate = element.getValue().wrap("");
         return _matchExpr->matchesBSON(candidate);
     }
@@ -102,7 +102,7 @@ private:
  * The EqualityMatcher is used when the condition is a primitive value or an array value. We require
  * an exact match.
  */
-class PullNode::EqualityMatcher : public PullNode::ElementMatcher {
+class PullNode::EqualityMatcher final : public PullNode::ElementMatcher {
 public:
     EqualityMatcher(BSONElement modExpr, const CollatorInterface* collator)
         : _modExpr(modExpr), _collator(collator) {}
@@ -111,7 +111,7 @@ public:
         return stdx::make_unique<EqualityMatcher>(*this);
     }
 
-    bool match(mutablebson::ConstElement element) final {
+    bool match(const mutablebson::ConstElement& element) final {
         return (element.compareWithBSONElement(_modExpr, _collator, false) == 0);
     }
 
@@ -142,74 +142,6 @@ Status PullNode::init(BSONElement modExpr, const CollatorInterface* collator) {
     }
 
     return Status::OK();
-}
-
-void PullNode::apply(mutablebson::Element element,
-                     FieldRef* pathToCreate,
-                     FieldRef* pathTaken,
-                     StringData matchedField,
-                     bool fromReplication,
-                     bool validateForStorage,
-                     const FieldRefSet& immutablePaths,
-                     const UpdateIndexData* indexData,
-                     LogBuilder* logBuilder,
-                     bool* indexesAffected,
-                     bool* noop) const {
-    *indexesAffected = false;
-    *noop = false;
-
-    if (!pathToCreate->empty()) {
-        // There were path components we could not traverse. We treat this as a no-op, unless it
-        // would have been impossible to create those elements, which we check with
-        // checkViability().
-        UpdateLeafNode::checkViability(element, *pathToCreate, *pathTaken);
-
-        *noop = true;
-        return;
-    }
-
-    // This operation only applies to arrays
-    uassert(ErrorCodes::BadValue,
-            "Cannot apply $pull to a non-array value",
-            element.getType() == mongo::Array);
-
-    size_t numRemoved = 0;
-    auto cursor = element.leftChild();
-    while (cursor.ok()) {
-        // Make sure to get the next array element now, because if we remove the 'cursor' element,
-        // the rightSibling pointer will be invalidated.
-        auto nextElement = cursor.rightSibling();
-        if (_matcher->match(cursor)) {
-            invariantOK(cursor.remove());
-            numRemoved++;
-        }
-        cursor = nextElement;
-    }
-
-    if (numRemoved == 0) {
-        *noop = true;
-        return;  // Skip the index check and logging steps.
-    }
-
-    // Determine if indexes are affected.
-    if (indexData && indexData->mightBeIndexed(pathTaken->dottedField())) {
-        *indexesAffected = true;
-    }
-
-    if (logBuilder) {
-        auto& doc = logBuilder->getDocument();
-        auto logElement = doc.makeElementArray(pathTaken->dottedField());
-
-        for (auto cursor = element.leftChild(); cursor.ok(); cursor = cursor.rightSibling()) {
-            dassert(cursor.hasValue());
-
-            auto copy = doc.makeElementWithNewFieldName(StringData(), cursor.getValue());
-            uassert(ErrorCodes::InternalError, "could not create copy element", copy.ok());
-            uassertStatusOK(logElement.pushBack(copy));
-        }
-
-        uassertStatusOK(logBuilder->addToSets(logElement));
-    }
 }
 
 }  // namespace mongo

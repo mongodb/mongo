@@ -53,6 +53,7 @@
 #include "mongo/db/update/conflict_placeholder_node.h"
 #include "mongo/db/update/pop_node.h"
 #include "mongo/db/update/pull_node.h"
+#include "mongo/db/update/pullall_node.h"
 #include "mongo/db/update/rename_node.h"
 #include "mongo/db/update/set_node.h"
 #include "mongo/db/update/unset_node.h"
@@ -206,6 +207,8 @@ std::unique_ptr<UpdateLeafNode> makeUpdateLeafNode(ModifierType modType) {
             return stdx::make_unique<PopNode>();
         case MOD_PULL:
             return stdx::make_unique<PullNode>();
+        case MOD_PULL_ALL:
+            return stdx::make_unique<PullAllNode>();
         case MOD_RENAME:
             return stdx::make_unique<RenameNode>();
         case MOD_SET:

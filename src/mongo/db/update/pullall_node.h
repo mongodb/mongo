@@ -34,24 +34,26 @@
 namespace mongo {
 
 /**
- * Represents the application of a $pull to the value at the end of a path.
+ * Represents the application of a $pullAll to the value at the end of a path.
  *
- * The $pull update modifier updates an array by removing all values that match the supplied
- * condition. If the value passed to the $pull modifier is a primitive value or array, then only
- * exact matches are removed.
+ * The $pullAll update modifier updates an array by removing any array elements that are an exact
+ * match for one of the supplied values.
  */
-class PullNode final : public ArrayCullingNode {
+
+class PullAllNode final : public ArrayCullingNode {
 public:
     Status init(BSONElement modExpr, const CollatorInterface* collator) final;
 
     std::unique_ptr<UpdateNode> clone() const final {
-        return stdx::make_unique<PullNode>(*this);
+        return stdx::make_unique<PullAllNode>(*this);
     }
 
 private:
-    class ObjectMatcher;
-    class WrappedObjectMatcher;
-    class EqualityMatcher;
+    /**
+     * An implementation of ArrayCullingNode::ElementMatcher whose match() function returns true iff
+     * its input element is exactly equal to any element from a set of candidate elements.
+     */
+    class SetMatcher;
 };
 
 }  // namespace mongo

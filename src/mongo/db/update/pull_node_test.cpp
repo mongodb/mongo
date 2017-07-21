@@ -1139,6 +1139,42 @@ TEST(PullNodeTest, ApplyPullWithObjectValueToArrayWithNonObjectValue) {
     ASSERT_EQUALS(fromjson("{$set: {a: [2]}}"), logDoc);
 }
 
+TEST(PullNodeTest, CannotModifyImmutableField) {
+    auto update = fromjson("{$pull: {'_id.a': 1}}");
+    const CollatorInterface* collator = nullptr;
+    PullNode node;
+    ASSERT_OK(node.init(update["$pull"]["_id.a"], collator));
+
+    Document doc(fromjson("{_id: {a: [0, 1, 2]}}"));
+    FieldRef pathToCreate("");
+    FieldRef pathTaken("_id.a");
+    StringData matchedField;
+    auto fromReplication = false;
+    auto validateForStorage = true;
+    FieldRefSet immutablePaths;
+    FieldRef path("_id");
+    immutablePaths.insert(&path);
+    UpdateIndexData* indexData = nullptr;
+    LogBuilder* logBuilder = nullptr;
+    auto indexesAffected = false;
+    auto noop = false;
+    ASSERT_THROWS_CODE_AND_WHAT(
+        node.apply(doc.root()["_id"]["a"],
+                   &pathToCreate,
+                   &pathTaken,
+                   matchedField,
+                   fromReplication,
+                   validateForStorage,
+                   immutablePaths,
+                   indexData,
+                   logBuilder,
+                   &indexesAffected,
+                   &noop),
+        UserException,
+        ErrorCodes::ImmutableField,
+        "Performing an update on the path '_id.a' would modify the immutable field '_id'");
+}
+
 TEST(PullNodeTest, SERVER_3988) {
     auto update = fromjson("{$pull: {y: /yz/}}");
     const CollatorInterface* collator = nullptr;
