@@ -778,7 +778,8 @@ public:
             return appendCommandStatus(result, status);
         }
 
-        if (!args.hasHashedPassword && !args.hasCustomData && !args.hasRoles) {
+        if (!args.hasHashedPassword && !args.hasCustomData && !args.hasRoles &&
+            !args.authenticationRestrictions) {
             return appendCommandStatus(
                 result,
                 Status(ErrorCodes::BadValue,
@@ -794,6 +795,7 @@ public:
         }
 
         BSONObjBuilder updateSetBuilder;
+        BSONObjBuilder updateUnsetBuilder;
         if (args.hasHashedPassword) {
             BSONObjBuilder credentialsBuilder(updateSetBuilder.subobjStart("credentials"));
 
@@ -814,11 +816,38 @@ public:
             }
             credentialsBuilder.done();
         }
+
         if (args.hasCustomData) {
             updateSetBuilder.append("customData", args.customData);
         }
+
+        if (args.authenticationRestrictions) {
+            if (args.authenticationRestrictions->isEmpty()) {
+                updateUnsetBuilder.append("authenticationRestrictions", "");
+            } else {
+                auto swParsedRestrictions =
+                    parseAuthenticationRestriction(*args.authenticationRestrictions);
+                if (!swParsedRestrictions.isOK()) {
+                    return appendCommandStatus(result, swParsedRestrictions.getStatus());
+                }
+
+                updateSetBuilder.append("authenticationRestrictions",
+                                        *args.authenticationRestrictions);
+            }
+        }
+
         if (args.hasRoles) {
             updateSetBuilder.append("roles", rolesVectorToBSONArray(args.roles));
+        }
+
+        BSONObj updateSet = updateSetBuilder.done();
+        BSONObj updateUnset = updateUnsetBuilder.done();
+        BSONObjBuilder updateDocumentBuilder;
+        if (!updateSet.isEmpty()) {
+            updateDocumentBuilder << "$set" << updateSet;
+        }
+        if (!updateUnset.isEmpty()) {
+            updateDocumentBuilder << "$unset" << updateUnset;
         }
 
         ServiceContext* serviceContext = opCtx->getClient()->getServiceContext();
@@ -829,7 +858,6 @@ public:
         if (!status.isOK()) {
             return appendCommandStatus(result, status);
         }
-
 
         // Role existence has to be checked after acquiring the update lock
         if (args.hasRoles) {
@@ -849,8 +877,7 @@ public:
                              args.hasCustomData ? &args.customData : NULL,
                              args.hasRoles ? &args.roles : NULL);
 
-        status =
-            updatePrivilegeDocument(opCtx, args.userName, BSON("$set" << updateSetBuilder.done()));
+        status = updatePrivilegeDocument(opCtx, args.userName, updateDocumentBuilder.done());
         // Must invalidate even on bad status - what if the write succeeded but the GLE failed?
         authzManager->invalidateUserByName(args.userName);
         return appendCommandStatus(result, status);
