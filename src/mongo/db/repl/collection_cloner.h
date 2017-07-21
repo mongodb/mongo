@@ -69,6 +69,7 @@ public:
     /**
      * Callback completion guard for CollectionCloner.
      */
+    using RemoteCommandCallbackArgs = executor::TaskExecutor::RemoteCommandCallbackArgs;
     using OnCompletionGuard = CallbackCompletionGuard<Status>;
 
     struct Stats {
@@ -111,7 +112,8 @@ public:
                      const CollectionOptions& options,
                      const CallbackFn& onCompletion,
                      StorageInterface* storageInterface,
-                     const int batchSize);
+                     const int batchSize,
+                     const int maxNumClonerCursors);
 
     virtual ~CollectionCloner();
 
@@ -146,6 +148,14 @@ public:
      */
     void setScheduleDbWorkFn_forTest(const ScheduleDbWorkFn& scheduleDbWorkFn);
 
+    /**
+     * Returns the documents currently stored in the '_documents' buffer that is intended
+     * to be inserted through the collection loader.
+     *
+     * For testing only.
+     */
+    std::vector<BSONObj> getDocumentsToInsert_forTest();
+
 private:
     bool _isActive_inlock() const;
 
@@ -173,14 +183,6 @@ private:
                               BSONObjBuilder* getMoreBob);
 
     /**
-     * Read collection documents from find result.
-     */
-    void _findCallback(const StatusWith<Fetcher::QueryResponse>& fetchResult,
-                       Fetcher::NextAction* nextAction,
-                       BSONObjBuilder* getMoreBob,
-                       std::shared_ptr<OnCompletionGuard> onCompletionGuard);
-
-    /**
      * Request storage interface to create collection.
      *
      * Called multiple times if there are more than one batch of responses from listIndexes
@@ -192,13 +194,59 @@ private:
     void _beginCollectionCallback(const executor::TaskExecutor::CallbackArgs& callbackData);
 
     /**
-     * Called multiple times if there are more than one batch of documents from the fetcher.
+     * The possible command types that can be used to establish the initial cursors on the
+     * remote collection.
+     */
+    enum EstablishCursorsCommand { Find, ParallelCollScan };
+
+    /**
+     * Parses the cursor responses from the 'find' or 'parallelCollectionScan' command
+     * and passes them into the 'AsyncResultsMerger'.
+     */
+    void _establishCollectionCursorsCallback(const RemoteCommandCallbackArgs& rcbd,
+                                             EstablishCursorsCommand cursorCommand);
+
+    /**
+     * Parses the response from a 'parallelCollectionScan' command into a vector of cursor
+     * elements.
+     */
+    StatusWith<std::vector<BSONElement>> _parseParallelCollectionScanResponse(BSONObj resp);
+
+    /**
+     * Takes a cursors buffer and parses the 'parallelCollectionScan' response into cursor
+     * responses that are pushed onto the buffer.
+     */
+    Status _parseCursorResponse(BSONObj response,
+                                std::vector<CursorResponse>* cursors,
+                                EstablishCursorsCommand cursorCommand);
+
+    /**
+     * Calls to get the next event from the 'AsyncResultsMerger'. This schedules
+     * '_handleAsyncResultsCallback' to be run when the event is signaled successfully.
+     */
+    Status _scheduleNextARMResultsCallback(std::shared_ptr<OnCompletionGuard> onCompletionGuard);
+
+    /**
+     * Runs for each time a new batch of documents can be retrieved from the 'AsyncResultsMerger'.
+     * Buffers the documents retrieved for insertion and schedules a '_insertDocumentsCallback'
+     * to insert the contents of the buffer.
+     */
+    void _handleARMResultsCallback(const executor::TaskExecutor::CallbackArgs& cbd,
+                                   std::shared_ptr<OnCompletionGuard> onCompletionGuard);
+
+    /**
+     * Pull all ready results from the ARM into a buffer to be inserted.
+     */
+    Status _bufferNextBatchFromArm();
+
+    /**
+     * Called whenever there is a new batch of documents ready from the 'AsyncResultsMerger'.
      * On the last batch, 'lastBatch' will be true.
      *
      * Each document returned will be inserted via the storage interfaceRequest storage
      * interface.
      */
-    void _insertDocumentsCallback(const executor::TaskExecutor::CallbackArgs& callbackData,
+    void _insertDocumentsCallback(const executor::TaskExecutor::CallbackArgs& cbd,
                                   bool lastBatch,
                                   std::shared_ptr<OnCompletionGuard> onCompletionGuard);
 
@@ -231,18 +279,30 @@ private:
     StorageInterface* _storageInterface;  // (R) Not owned by us.
     RemoteCommandRetryScheduler _countScheduler;  // (S)
     Fetcher _listIndexesFetcher;                  // (S)
-    std::unique_ptr<Fetcher> _findFetcher;        // (M)
     std::vector<BSONObj> _indexSpecs;             // (M)
     BSONObj _idIndexSpec;                         // (M)
-    std::vector<BSONObj> _documents;              // (M) Documents read from fetcher to insert.
-    TaskRunner _dbWorkTaskRunner;                 // (R)
+    std::vector<BSONObj>
+        _documentsToInsert;        // (M) Documents read from 'AsyncResultsMerger' to insert.
+    TaskRunner _dbWorkTaskRunner;  // (R)
     ScheduleDbWorkFn
         _scheduleDbWorkFn;         // (RT) Function for scheduling database work using the executor.
     Stats _stats;                  // (M) stats for this instance.
     ProgressMeter _progressMeter;  // (M) progress meter for this instance.
-    const int _batchSize;
+    const int _collectionCloningBatchSize;  // (R) The size of the batches of documents returned in
+                                            // collection cloning.
 
-    AsyncResultsMerger _arm;
+    // (R) The maximum number of cursors to use in the collection cloning process.
+    const int _maxNumClonerCursors;
+    // (M) Component responsible for fetching the documents from the collection cloner cursor(s).
+    std::unique_ptr<AsyncResultsMerger> _arm;
+    // (R) The cursor parameters used by the 'AsyncResultsMerger'.
+    std::unique_ptr<ClusterClientCursorParams> _clusterClientCursorParams;
+
+    // (M) The event handle for the 'kill' event of the 'AsyncResultsMerger'.
+    executor::TaskExecutor::EventHandle _killArmHandle;
+
+    // (M) Scheduler used to establish the initial cursor or set of cursors.
+    std::unique_ptr<RemoteCommandRetryScheduler> _establishCollectionCursorsScheduler;
 
     // State transitions:
     // PreStart --> Running --> ShuttingDown --> Complete

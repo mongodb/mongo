@@ -84,7 +84,7 @@
     replTest.add();
 
     var secondary = replTest.getSecondary();
-    var collectionClonerFailPoint = "initialSyncHangCollectionClonerAfterInitialFind";
+    var collectionClonerFailPoint = "initialSyncHangCollectionClonerAfterHandlingBatchResponse";
 
     // Make the collection cloner pause after its initial 'find' response on the capped collection.
     var nss = dbName + "." + cappedCollName;
@@ -98,7 +98,8 @@
 
     jsTestLog("Waiting for the initial 'find' response of capped collection cloner to complete.");
     checkLog.contains(
-        secondary, "initialSyncHangCollectionClonerAfterInitialFind fail point enabled for " + nss);
+        secondary,
+        "initialSyncHangCollectionClonerAfterHandlingBatchResponse fail point enabled for " + nss);
 
     // Append documents to the capped collection so that the SECONDARY will clone these
     // additional documents.

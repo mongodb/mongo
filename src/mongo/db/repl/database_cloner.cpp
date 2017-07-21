@@ -68,6 +68,9 @@ MONGO_EXPORT_STARTUP_SERVER_PARAMETER(collectionClonerBatchSize, int, defaultBat
 // The number of attempts for the listCollections commands.
 MONGO_EXPORT_SERVER_PARAMETER(numInitialSyncListCollectionsAttempts, int, 3);
 
+// The number of cursors to use in the collection cloning process.
+MONGO_EXPORT_SERVER_PARAMETER(maxNumInitialSyncCollectionClonerCursors, int, 1);
+
 /**
  * Default listCollections predicate.
  */
@@ -364,7 +367,8 @@ void DatabaseCloner::_listCollectionsCallback(const StatusWith<Fetcher::QueryRes
                 stdx::bind(
                     &DatabaseCloner::_collectionClonerCallback, this, stdx::placeholders::_1, nss),
                 _storageInterface,
-                collectionClonerBatchSize);
+                collectionClonerBatchSize,
+                maxNumInitialSyncCollectionClonerCursors.load());
         } catch (const UserException& ex) {
             _finishCallback_inlock(lk, ex.toStatus());
             return;

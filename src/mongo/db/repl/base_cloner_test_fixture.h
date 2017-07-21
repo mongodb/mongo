@@ -76,6 +76,8 @@ public:
 
     static BSONObj createCursorResponse(CursorId cursorId, const BSONArray& docs);
 
+    static BSONObj createFinalCursorResponse(const BSONArray& docs);
+
     /**
      * Creates a listCollections response with given array of index specs.
      */
