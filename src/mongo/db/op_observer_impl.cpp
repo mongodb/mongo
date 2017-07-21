@@ -80,7 +80,7 @@ void OpObserverImpl::onInserts(OperationContext* txn,
 
     if (nss.ns() == FeatureCompatibilityVersion::kCollection) {
         for (auto it = begin; it != end; it++) {
-            FeatureCompatibilityVersion::onInsertOrUpdate(*it);
+            FeatureCompatibilityVersion::onInsertOrUpdate(txn, *it);
         }
     }
 
@@ -119,7 +119,7 @@ void OpObserverImpl::onUpdate(OperationContext* txn, const OplogUpdateEntryArgs&
     }
 
     if (args.ns == FeatureCompatibilityVersion::kCollection) {
-        FeatureCompatibilityVersion::onInsertOrUpdate(args.updatedDoc);
+        FeatureCompatibilityVersion::onInsertOrUpdate(txn, args.updatedDoc);
     }
 }
 
@@ -162,7 +162,7 @@ void OpObserverImpl::onDelete(OperationContext* txn,
         DurableViewCatalog::onExternalChange(txn, ns);
     }
     if (ns.ns() == FeatureCompatibilityVersion::kCollection) {
-        FeatureCompatibilityVersion::onDelete(deleteState.idDoc);
+        FeatureCompatibilityVersion::onDelete(txn, deleteState.idDoc);
     }
 }
 
@@ -221,7 +221,7 @@ void OpObserverImpl::onDropDatabase(OperationContext* txn, const std::string& db
     repl::logOp(txn, "c", dbName.c_str(), cmdObj, nullptr, false);
 
     if (NamespaceString(dbName).db() == FeatureCompatibilityVersion::kDatabase) {
-        FeatureCompatibilityVersion::onDropCollection();
+        FeatureCompatibilityVersion::onDropCollection(txn);
     }
 
     getGlobalAuthorizationManager()->logOp(txn, "c", dbName.c_str(), cmdObj, nullptr);
@@ -243,7 +243,7 @@ void OpObserverImpl::onDropCollection(OperationContext* txn,
     }
 
     if (collectionName.ns() == FeatureCompatibilityVersion::kCollection) {
-        FeatureCompatibilityVersion::onDropCollection();
+        FeatureCompatibilityVersion::onDropCollection(txn);
     }
 
     getGlobalAuthorizationManager()->logOp(txn, "c", dbName.c_str(), cmdObj, nullptr);
