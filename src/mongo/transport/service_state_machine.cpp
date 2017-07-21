@@ -209,6 +209,11 @@ void ServiceStateMachine::sourceCallback(Status status) {
 
     if (status.isOK()) {
         _state.store(State::Process);
+
+        // Since we know that we're going to process a message, call scheduleNext() immediately
+        // to schedule the call to processMessage() on the serviceExecutor (or just unwind the
+        // stack)
+        return scheduleNext();
     } else if (ErrorCodes::isInterruption(status.code()) ||
                ErrorCodes::isNetworkError(status.code())) {
         LOG(2) << "Session from " << remote << " encountered a network error during SourceMessage";
@@ -223,6 +228,8 @@ void ServiceStateMachine::sourceCallback(Status status) {
         _state.store(State::EndSession);
     }
 
+    // There was an error receiving a message from the client and we've already printed the error
+    // so call runNextInGuard() to clean up the session without waiting.
     runNextInGuard(guard);
 }
 
@@ -239,22 +246,24 @@ void ServiceStateMachine::sinkCallback(Status status) {
 
     invariant(state() == State::SinkWait);
 
+    // If there was an error sinking the message to the client, then we should print an error and
+    // end the session. No need to unwind the stack, so this will runNextInGuard() and return.
+    //
+    // Otherwise, update the current state depending on whether we're in exhaust or not, and call
+    // scheduleNext() to unwind the stack and do the next step.
     if (!status.isOK()) {
         log() << "Error sending response to client: " << status << ". Ending connection from "
               << session()->remote() << " (connection id: " << session()->id() << ")";
         _state.store(State::EndSession);
+        return runNextInGuard(guard);
     } else if (inExhaust) {
         _state.store(State::Process);
     } else {
         _state.store(State::Source);
     }
 
-    // If the session ended, then runNext to clean it up
-    if (state() == State::EndSession) {
-        runNextInGuard(guard);
-    } else {  // Otherwise scheduleNext to unwind the stack and run the next step later
-        scheduleNext();
-    }
+    // Call scheduleNext() to unwind the stack and run next step
+    scheduleNext();
 }
 
 void ServiceStateMachine::processMessage() {

@@ -144,13 +144,19 @@ void TransportLayerASIO::ASIOSinkTicket::fillImpl() {
 }
 
 void TransportLayerASIO::ASIOTicket::finishFill(Status status) {
+    // We want to make sure that a Ticket can only be filled once; filling a ticket invalidates it.
+    // So we check that the _fillCallback is set, then move it out of the ticket and into a local
+    // variable, and then call that. It's illegal to interact with the ticket after calling the
+    // fillCallback, so we have to move it out of _fillCallback so there are no writes to any
+    // variables in ASIOTicket after it gets called.
     invariant(_fillCallback);
-    _fillCallback(status);
-    _fillCallback = TicketCallback{};
+    auto fillCallback = std::move(_fillCallback);
+    fillCallback(status);
 }
 
 void TransportLayerASIO::ASIOTicket::fill(bool sync, TicketCallback&& cb) {
     _fillSync = sync;
+    dassert(!_fillCallback);
     _fillCallback = std::move(cb);
     fillImpl();
 }

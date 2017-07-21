@@ -28,6 +28,8 @@
 
 #pragma once
 
+#include <utility>
+
 #include "mongo/base/system_error.h"
 #include "mongo/config.h"
 #include "mongo/transport/asio_utils.h"
@@ -155,7 +157,8 @@ public:
     void read(bool sync, const MutableBufferSequence& buffers, CompleteHandler&& handler) {
 #ifdef MONGO_CONFIG_SSL
         if (_sslSocket) {
-            return opportunisticRead(sync, *_sslSocket, buffers, std::move(handler));
+            return opportunisticRead(
+                sync, *_sslSocket, buffers, std::forward<CompleteHandler>(handler));
         } else if (!_ranHandshake) {
             invariant(asio::buffer_size(buffers) >= sizeof(MSGHEADER::Value));
             auto postHandshakeCb = [this, sync, buffers, handler](Status status, bool needsRead) {
@@ -172,22 +175,22 @@ public:
             };
 
             auto handshakeRecvCb =
-                [ this, postHandshakeCb = std::move(postHandshakeCb), sync, buffers, handler ](
+                [ this, postHandshakeCb = std::move(postHandshakeCb), sync, buffers ](
                     const std::error_code& ec, size_t size) {
                 _ranHandshake = true;
                 if (ec) {
-                    handler(ec, size);
+                    postHandshakeCb(errorCodeToStatus(ec), size);
                     return;
                 }
 
-                maybeHandshakeSSL(sync, buffers, postHandshakeCb);
+                maybeHandshakeSSL(sync, buffers, std::move(postHandshakeCb));
             };
 
             opportunisticRead(sync, _socket, buffers, std::move(handshakeRecvCb));
         } else {
 
 #endif
-            opportunisticRead(sync, _socket, buffers, handler);
+            opportunisticRead(sync, _socket, buffers, std::forward<CompleteHandler>(handler));
 #ifdef MONGO_CONFIG_SSL
         }
 #endif
@@ -197,10 +200,10 @@ public:
     void write(bool sync, const ConstBufferSequence& buffers, CompleteHandler&& handler) {
 #ifdef MONGO_CONFIG_SSL
         if (_sslSocket) {
-            opportunisticWrite(sync, *_sslSocket, buffers, handler);
+            opportunisticWrite(sync, *_sslSocket, buffers, std::forward<CompleteHandler>(handler));
         } else {
 #endif
-            opportunisticWrite(sync, _socket, buffers, handler);
+            opportunisticWrite(sync, _socket, buffers, std::forward<CompleteHandler>(handler));
 #ifdef MONGO_CONFIG_SSL
         }
 #endif
@@ -222,7 +225,7 @@ private:
             if (size > 0) {
                 asyncBuffers += size;
             }
-            asio::async_read(stream, asyncBuffers, std::move(handler));
+            asio::async_read(stream, asyncBuffers, std::forward<CompleteHandler>(handler));
         } else {
             handler(ec, size);
         }
@@ -243,7 +246,7 @@ private:
             if (size > 0) {
                 asyncBuffers += size;
             }
-            asio::async_write(stream, asyncBuffers, std::move(handler));
+            asio::async_write(stream, asyncBuffers, std::forward<CompleteHandler>(handler));
         } else {
             handler(ec, size);
         }
@@ -273,7 +276,8 @@ private:
 
             _sslSocket.emplace(std::move(_socket), *_tl->_sslContext);
 
-            auto handshakeCompleteCb = [&](const std::error_code& ec, size_t size) {
+            auto handshakeCompleteCb = [ this, onComplete = std::move(onComplete) ](
+                const std::error_code& ec, size_t size) {
                 auto& sslPeerInfo = SSLPeerInfo::forSession(shared_from_this());
 
                 if (!ec && sslPeerInfo.subjectName.empty()) {
