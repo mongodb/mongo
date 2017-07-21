@@ -378,7 +378,7 @@ void scheduleCleanup(executor::TaskExecutor* executor,
     std::ignore = executor->scheduleWorkAt(
         when, [ executor, nss = std::move(nss), epoch = std::move(epoch) ](auto&) {
             while (MONGO_FAIL_POINT(suspendRangeDeletion)) {
-                sleep(1);
+                sleepsecs(1);
             }
             const int maxToDelete = std::max(int(internalQueryExecYieldIterations.load()), 1);
             Client::initThreadIfNotAlready("Collection Range Deleter");
