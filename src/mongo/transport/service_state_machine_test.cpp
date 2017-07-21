@@ -283,4 +283,28 @@ TEST_F(ServiceStateMachineFixture, TestSinkError) {
     ASSERT_TRUE(_tl->ranSink());
 }
 
+// This test checks that after the SSM has been cleaned up, the SessionHandle that it passed
+// into the Client doesn't have any dangling shared_ptr copies.
+TEST_F(ServiceStateMachineFixture, TestSessionCleanupOnDestroy) {
+    // Set a cleanup hook so we know that the cleanup hook actually gets run when the session
+    // is destroyed
+    bool hookRan = false;
+    _ssm->setCleanupHook([&hookRan] { hookRan = true; });
+
+    // Do a regular ping test so that all the processMessage/sinkMessage code gets exercised
+    ASSERT_EQ(ServiceStateMachine::State::Source, runPingTest());
+
+    // Set the next run up to fail on source (like a disconnected client) and run it
+    _tl->setNextFailure(MockTL::Source);
+    _ssm->runNext();
+    ASSERT_EQ(ServiceStateMachine::State::Ended, _ssm->state());
+
+    // Check that after the failure and the session getting cleaned up that the SessionHandle
+    // only has one use (our copy in _sessionHandle)
+    ASSERT_EQ(_ssm.use_count(), 1);
+
+    // Make sure the cleanup hook actually ran.
+    ASSERT_TRUE(hookRan);
+}
+
 }  // namespace mongo

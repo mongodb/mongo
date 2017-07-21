@@ -100,32 +100,13 @@ void ServiceEntryPointImpl::startSession(transport::SessionHandle session) {
 }
 
 void ServiceEntryPointImpl::endAllSessions(transport::Session::TagMask tags) {
-    SSMList connsToEnd;
-
     // While holding the _sesionsMutex, loop over all the current connections, and if their tags
-    // do not match the requested tags to skip, create a copy of their shared_ptr and place it in
-    // connsToEnd.
-    //
-    // This will ensure that sessions to be ended will live at least long enough for us to call
-    // their terminate() function, even if they've already ended because of an i/o error.
+    // do not match the requested tags to skip, terminate the session.
     {
         stdx::unique_lock<decltype(_sessionsMutex)> lk(_sessionsMutex);
         for (auto& ssm : _sessions) {
-            if (ssm->session()->getTags() & tags) {
-                log() << "Skip closing connection for connection # " << ssm->session()->id();
-            } else {
-                connsToEnd.emplace_back(ssm);
-            }
+            ssm->terminateIfTagsDontMatch(tags);
         }
-    }
-
-    // Loop through all the connections we marked for ending and call terminate on them. They will
-    // then remove themselves from _sessions whenever they transition to the next state.
-    //
-    // If they've already ended, then this is a noop, and the SSM will be destroyed when connsToEnd
-    // goes out of scope.
-    for (auto& ssm : connsToEnd) {
-        ssm->terminate();
     }
 }
 

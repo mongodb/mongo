@@ -113,20 +113,16 @@ public:
     State state();
 
     /*
-     * Terminates the associated transport Session, and requests that the next call to runNext
-     * should end the session. If the session has already ended, this does nothing.
+     * Terminates the associated transport Session if its tags don't match the supplied tags.
+     *
+     * This will not block on the session terminating cleaning itself up, it returns immediately.
      */
-    void terminate();
+    void terminateIfTagsDontMatch(transport::Session::TagMask tags);
 
     /*
      * Sets a function to be called after the session is ended
      */
     void setCleanupHook(stdx::function<void()> hook);
-
-    /*
-     * Gets the transport::Session associated with this connection
-     */
-    const transport::SessionHandle& session() const;
 
 private:
     /*
@@ -141,7 +137,7 @@ private:
      * callbacks to run.
      */
     template <typename Executor, typename Func>
-    void maybeScheduleFunc(Executor* svcExec, Func&& func) {
+    void _maybeScheduleFunc(Executor* svcExec, Func&& func) {
         if (svcExec) {
             uassertStatusOK(svcExec->schedule(
                 [ func = std::move(func), anchor = shared_from_this() ] { func(); }));
@@ -149,11 +145,16 @@ private:
     }
 
     template <typename Func>
-    void scheduleFunc(Func&& func) {
+    void _scheduleFunc(Func&& func) {
         auto svcExec = _serviceContext->getServiceExecutor();
         invariant(svcExec);
-        maybeScheduleFunc(svcExec, func);
+        _maybeScheduleFunc(svcExec, func);
     }
+
+    /*
+     * Gets the transport::Session associated with this connection
+     */
+    const transport::SessionHandle& _session() const;
 
     /*
      * This is the actual implementation of runNext() that gets called after the ThreadGuard
@@ -161,24 +162,24 @@ private:
      * runNext() and already own a ThreadGuard, they should call this with that guard as the
      * argument.
      */
-    void runNextInGuard(ThreadGuard& guard);
+    void _runNextInGuard(ThreadGuard& guard);
 
     /*
      * This function actually calls into the database and processes a request. It's broken out
      * into its own inline function for better readability.
      */
-    inline void processMessage();
+    inline void _processMessage(ThreadGuard& guard);
 
     /*
      * These get called by the TransportLayer when requested network I/O has completed.
      */
-    void sourceCallback(Status status);
-    void sinkCallback(Status status);
+    void _sourceCallback(Status status);
+    void _sinkCallback(Status status);
 
     /*
      * Releases all the resources associated with the session and call the cleanupHook.
      */
-    void cleanupSession();
+    void _cleanupSession(ThreadGuard& guard);
 
     AtomicWord<State> _state{State::Created};
 
@@ -186,6 +187,8 @@ private:
     bool _sync;
 
     ServiceContext* const _serviceContext;
+
+    transport::SessionHandle _sessionHandle;
     ServiceContext::UniqueClient _dbClient;
     const Client* _dbClientPtr;
     const std::string _threadName;
