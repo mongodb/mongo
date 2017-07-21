@@ -12,8 +12,8 @@ import os.path
 import stat
 
 from . import process as _process
-from .. import utils
 from .. import config
+from .. import utils
 
 
 def mongod_program(logger, executable=None, process_kwargs=None, **kwargs):
@@ -203,8 +203,22 @@ def mongo_shell_program(logger, executable=None, filename=None, process_kwargs=N
     if config.SHELL_WRITE_MODE is not None:
         kwargs["writeMode"] = config.SHELL_WRITE_MODE
 
+    if config.SHELL_CONN_STRING is not None:
+        # The --host and --port options are ignored by the mongo shell when an explicit connection
+        # string is specified. We remove these options to avoid any ambiguity with what server the
+        # logged mongo shell invocation will connect to.
+        if "port" in kwargs:
+            kwargs.pop("port")
+
+        if "host" in kwargs:
+            kwargs.pop("host")
+
     # Apply the rest of the command line arguments.
     _apply_kwargs(args, kwargs)
+
+
+    if config.SHELL_CONN_STRING is not None:
+        args.append(config.SHELL_CONN_STRING)
 
     # Have the mongos shell run the specified file.
     args.append(filename)
@@ -253,6 +267,7 @@ def dbtest_program(logger, executable=None, suites=None, process_kwargs=None, **
 
     return generic_program(logger, args, process_kwargs=process_kwargs, **kwargs)
 
+
 def generic_program(logger, args, process_kwargs=None, **kwargs):
     """
     Returns a Process instance that starts an arbitrary executable with
@@ -288,6 +303,7 @@ def _format_test_data_set_parameters(set_parameters):
             raise TypeError("Non-scalar setParameter values are not currently supported.")
         params.append("%s=%s" % (param_name, param_value))
     return ",".join(params)
+
 
 def _apply_set_parameters(args, set_parameter):
     """

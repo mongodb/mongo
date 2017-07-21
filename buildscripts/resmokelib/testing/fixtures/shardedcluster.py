@@ -180,11 +180,14 @@ class ShardedClusterFixture(interface.Fixture):
                 all(shard.is_running() for shard in self.shards) and
                 self.mongos is not None and self.mongos.is_running())
 
-    def get_connection_string(self):
+    def get_internal_connection_string(self):
         if self.mongos is None:
-            raise ValueError("Must call setup() before calling get_connection_string()")
+            raise ValueError("Must call setup() before calling get_internal_connection_string()")
 
         return "%s:%d" % (socket.gethostname(), self.mongos.port)
+
+    def get_driver_connection_url(self):
+        return "mongodb://" + self.get_internal_connection_string()
 
     def _new_configsvr(self):
         """
@@ -283,7 +286,7 @@ class ShardedClusterFixture(interface.Fixture):
         for more details.
         """
 
-        connection_string = shard.get_connection_string()
+        connection_string = shard.get_internal_connection_string()
         self.logger.info("Adding %s as a shard..." % (connection_string))
         client.admin.command({"addShard": "%s" % (connection_string)})
 

@@ -147,8 +147,11 @@ class MongoDFixture(interface.Fixture):
     def is_running(self):
         return self.mongod is not None and self.mongod.poll() is None
 
-    def get_connection_string(self):
+    def get_internal_connection_string(self):
         if self.mongod is None:
-            raise ValueError("Must call setup() before calling get_connection_string()")
+            raise ValueError("Must call setup() before calling get_internal_connection_string()")
 
         return "%s:%d" % (socket.gethostname(), self.port)
+
+    def get_driver_connection_url(self):
+        return "mongodb://" + self.get_internal_connection_string()

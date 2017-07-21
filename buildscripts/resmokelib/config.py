@@ -49,6 +49,8 @@ DEFAULTS = {
     "mongosSetParameters": None,
     "nojournal": False,
     "numClientsPerFixture": 1,
+    "shellPort": None,
+    "shellConnString": None,
     "repeat": 1,
     "reportFailureStatus": "fail",
     "reportFile": None,
@@ -144,6 +146,10 @@ REPORT_FILE = None
 
 # IF set, then mongod/mongos's started by resmoke.py will use the specified service executor
 SERVICE_EXECUTOR = None
+
+# If set, resmoke will override the default fixture and connect to the fixture specified by this
+# connection string instead.
+SHELL_CONN_STRING = None
 
 # If set, then mongo shells started by resmoke.py will use the specified read mode.
 SHELL_READ_MODE = None

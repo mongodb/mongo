@@ -40,6 +40,8 @@ DEST_TO_CONFIG = {
     "report_file": "reportFile",
     "seed": "seed",
     "service_executor": "serviceExecutor",
+    "shell_conn_string": "shellConnString",
+    "shell_port": "shellPort",
     "shell_read_mode": "shellReadMode",
     "shell_write_mode": "shellWriteMode",
     "shuffle": "shuffle",
@@ -160,6 +162,18 @@ def parse_command_line():
                       help=("Enable or disable preallocation of journal files for all mongod"
                             " processes. Defaults to %default."))
 
+    parser.add_option("--shellConnString", dest="shell_conn_string",
+                      metavar="CONN_STRING",
+                      help="Override the default fixture and connect to an existing MongoDB"
+                           " cluster instead. This is useful for connecting to a MongoDB"
+                           " deployment started outside of resmoke.py including one running in a"
+                           " debugger.")
+
+    parser.add_option("--shellPort", dest="shell_port", metavar="PORT",
+                      help="Convenience form of --shellConnString for connecting to an"
+                           " existing MongoDB cluster with the URL mongodb://localhost:[PORT]."
+                           " This is useful for connecting to a server running in a debugger.")
+
     parser.add_option("--repeat", type="int", dest="repeat", metavar="N",
                       help="Repeat the given suite(s) N times, or until one fails.")
 
@@ -238,7 +252,24 @@ def parse_command_line():
                         shuffle="auto",
                         stagger_jobs="off")
 
-    return parser.parse_args()
+    options, args = parser.parse_args()
+
+    validate_options(parser, options, args)
+
+    return options, args
+
+def validate_options(parser, options, args):
+    """
+    Do preliminary validation on the options and error on any invalid options.
+    """
+
+    if options.shell_port is not None and options.shell_conn_string is not None:
+        parser.error("Cannot specify both `shellPort` and `shellConnString`")
+
+    if options.executor_file:
+        parser.error("--executor is superceded by --suites; specify --suites={} {} to run the"
+                     "test(s) under those suite configuration(s)"
+                     .format(options.executor_file, " ".join(args)))
 
 
 def get_logging_config(values):
@@ -301,6 +332,15 @@ def update_config_vars(values):
     else:
         _config.SHUFFLE = shuffle == "on"
 
+    conn_string = config.pop("shellConnString")
+    port = config.pop("shellPort")
+
+    if port is not None:
+        conn_string = "mongodb://localhost:" + port
+
+    if conn_string is not None:
+        _config.SHELL_CONN_STRING = conn_string
+
     if config:
         raise optparse.OptionValueError("Unknown option(s): %s" % (config.keys()))
 
@@ -337,11 +377,6 @@ def create_test_membership_map(fail_on_missing_selector=False, test_kind=None):
 
 
 def get_suites(values, args):
-    if values.executor_file:
-        raise optparse.OptionError(
-            "superceded by --suites; specify --suites={} {} to run the test(s) under those suite"
-            " configuration(s)".format(values.executor_file, " ".join(args)), "--executor")
-
     suite_roots = None
     if args:
         # Do not change the execution order of the tests passed as args, unless a tag option is

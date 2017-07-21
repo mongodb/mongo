@@ -96,7 +96,7 @@ class ReplicaSetFixture(interface.ReplFixture):
         # Initiate the replica set.
         members = []
         for (i, node) in enumerate(self.nodes):
-            member_info = {"_id": i, "host": node.get_connection_string()}
+            member_info = {"_id": i, "host": node.get_internal_connection_string()}
             if i > 0:
                 member_info["priority"] = 0
                 if i >= 7 or not self.voting_secondaries:
@@ -106,7 +106,7 @@ class ReplicaSetFixture(interface.ReplFixture):
             members.append(member_info)
         if self.initial_sync_node:
             members.append({"_id": self.initial_sync_node_idx,
-                            "host": self.initial_sync_node.get_connection_string(),
+                            "host": self.initial_sync_node.get_internal_connection_string(),
                             "priority": 0,
                             "hidden": 1,
                             "votes": 0})
@@ -285,11 +285,21 @@ class ReplicaSetFixture(interface.ReplFixture):
 
         return self.logger.new_fixture_node_logger(node_name)
 
-    def get_connection_string(self):
+    def get_internal_connection_string(self):
         if self.replset_name is None:
-            raise ValueError("Must call setup() before calling get_connection_string()")
+            raise ValueError("Must call setup() before calling get_internal_connection_string()")
 
-        conn_strs = [node.get_connection_string() for node in self.nodes]
+        conn_strs = [node.get_internal_connection_string() for node in self.nodes]
         if self.initial_sync_node:
-            conn_strs.append(self.initial_sync_node.get_connection_string())
+            conn_strs.append(self.initial_sync_node.get_internal_connection_string())
         return self.replset_name + "/" + ",".join(conn_strs)
+
+    def get_driver_connection_url(self):
+        if self.replset_name is None:
+            raise ValueError("Must call setup() before calling get_driver_connection_url()")
+
+        conn_strs = [node.get_internal_connection_string() for node in self.nodes]
+        if self.initial_sync_node:
+            conn_strs.append(self.initial_sync_node.get_internal_connection_string())
+
+        return "mongodb://" + ",".join(conn_strs) + "/?replicaSet=" + self.replset_name

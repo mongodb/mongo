@@ -14,7 +14,6 @@ from . import report as _report
 from . import testcases
 from .. import config as _config
 from .. import errors
-from .. import logging
 from .. import utils
 from ..utils import queue as _queue
 
@@ -40,7 +39,13 @@ class TestSuiteExecutor(object):
         """
         self.logger = exec_logger
 
-        self.fixture_config = fixture
+        if _config.SHELL_CONN_STRING is not None:
+            # Specifying the shellConnString command line option should override the fixture
+            # specified in the YAML configuration to be the no-op fixture.
+            self.fixture_config = {"class": fixtures.NOOP_FIXTURE_CLASS}
+        else:
+            self.fixture_config = fixture
+
         self.hooks_config = utils.default_if_none(hooks, [])
         self.test_config = utils.default_if_none(config, {})
 

@@ -161,3 +161,9 @@ class MasterSlaveFixture(interface.ReplFixture):
         mongod_options["source"] = "%s:%d" % (socket.gethostname(), self.port)
         mongod_options["dbpath"] = os.path.join(self._dbpath_prefix, "slave")
         return self._new_mongod(mongod_logger, mongod_options)
+
+    def get_internal_connection_string(self):
+        return self.master.get_internal_connection_string()
+
+    def get_driver_connection_url(self):
+        return self.master.get_driver_connection_url()

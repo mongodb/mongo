@@ -53,8 +53,8 @@ def _execute_suite(suite):
         logger.info("Skipping %ss, no tests to run", suite.test_kind)
         return True
 
-    suite_config = suite.get_executor_config()
-    executor = resmokelib.testing.executor.TestSuiteExecutor(logger, suite, **suite_config)
+    executor_config = suite.get_executor_config()
+    executor = resmokelib.testing.executor.TestSuiteExecutor(logger, suite, **executor_config)
 
     try:
         executor.run()

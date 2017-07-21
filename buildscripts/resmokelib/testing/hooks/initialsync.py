@@ -13,6 +13,7 @@ import pymongo.errors
 
 from . import cleanup
 from . import jsfile
+from ..fixtures import replicaset
 from ... import errors
 from ... import utils
 
@@ -35,6 +36,10 @@ class BackgroundInitialSync(jsfile.JsCustomBehavior):
     DEFAULT_N = cleanup.CleanEveryN.DEFAULT_N
 
     def __init__(self, hook_logger, fixture, use_resync=False, n=DEFAULT_N, shell_options=None):
+        if not isinstance(fixture, replicaset.ReplicaSetFixture):
+            raise ValueError("`fixture` must be an instance of ReplicaSetFixture, not {}".format(
+                fixture.__class__.__name__))
+
         description = "Background Initial Sync"
         js_filename = os.path.join("jstests", "hooks", "run_initial_sync_node_validation.js")
         jsfile.JsCustomBehavior.__init__(self, hook_logger, fixture, js_filename,
@@ -134,6 +139,10 @@ class IntermediateInitialSync(jsfile.JsCustomBehavior):
     DEFAULT_N = cleanup.CleanEveryN.DEFAULT_N
 
     def __init__(self, hook_logger, fixture, use_resync=False, n=DEFAULT_N):
+        if not isinstance(fixture, replicaset.ReplicaSetFixture):
+            raise ValueError("`fixture` must be an instance of ReplicaSetFixture, not {}".format(
+                fixture.__class__.__name__))
+
         description = "Intermediate Initial Sync"
         js_filename = os.path.join("jstests", "hooks", "run_initial_sync_node_validation.js")
         jsfile.JsCustomBehavior.__init__(self, hook_logger, fixture, js_filename, description)

@@ -32,7 +32,7 @@ class CPPIntegrationTestCase(interface.TestCase):
     def configure(self, fixture, *args, **kwargs):
         interface.TestCase.configure(self, fixture, *args, **kwargs)
 
-        self.program_options["connectionString"] = self.fixture.get_connection_string()
+        self.program_options["connectionString"] = self.fixture.get_internal_connection_string()
 
     def run_test(self):
         try:
