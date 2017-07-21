@@ -1357,6 +1357,11 @@ public:
 
         roleObjBuilder.append("roles", rolesVectorToBSONArray(args.roles));
 
+        if (args.authenticationRestrictions && !args.authenticationRestrictions->isEmpty()) {
+            roleObjBuilder.append("authenticationRestrictions",
+                                  args.authenticationRestrictions.get());
+        }
+
         ServiceContext* serviceContext = opCtx->getClient()->getServiceContext();
         stdx::lock_guard<stdx::mutex> lk(getAuthzDataMutex(serviceContext));
 

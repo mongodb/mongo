@@ -134,6 +134,7 @@ struct CreateOrUpdateRoleArgs {
     std::vector<RoleName> roles;
     bool hasPrivileges = false;
     PrivilegeVector privileges;
+    boost::optional<BSONArray> authenticationRestrictions;
 };
 
 /**

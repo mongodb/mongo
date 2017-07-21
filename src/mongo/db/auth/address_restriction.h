@@ -190,6 +190,13 @@ StatusWith<RestrictionSet<>> parseAddressRestrictionSet(const BSONObj& obj);
  */
 StatusWith<SharedRestrictionDocument> parseAuthenticationRestriction(const BSONArray& arr);
 
+/**
+ * Parse and validate a BSONArray containing AuthenticationRestrictions
+ * and return a new BSONArray representing a sanitized portion thereof.
+ */
+StatusWith<BSONArray> getRawAuthenticationRestrictions(const BSONArray& arr) noexcept;
+
+
 template <>
 inline BSONObjBuilder& BSONObjBuilderValueStream::operator<<<ClientSourceRestriction>(
     ClientSourceRestriction value) {

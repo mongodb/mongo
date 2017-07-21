@@ -37,6 +37,7 @@
 #include "mongo/base/status.h"
 #include "mongo/bson/util/bson_extract.h"
 #include "mongo/db/auth/action_type.h"
+#include "mongo/db/auth/address_restriction.h"
 #include "mongo/db/auth/authorization_manager.h"
 #include "mongo/db/auth/privilege.h"
 #include "mongo/db/auth/privilege_parser.h"
@@ -489,6 +490,7 @@ Status parseCreateOrUpdateRoleCommands(const BSONObj& cmdObj,
     validFieldNames.insert(cmdName.toString());
     validFieldNames.insert("privileges");
     validFieldNames.insert("roles");
+    validFieldNames.insert("authenticationRestrictions");
 
     Status status = _checkNoExtraFields(cmdObj, cmdName, validFieldNames);
     if (!status.isOK()) {
@@ -536,6 +538,22 @@ Status parseCreateOrUpdateRoleCommands(const BSONObj& cmdObj,
         }
         parsedArgs->hasRoles = true;
     }
+
+    // Parse restrictions
+    if (cmdObj.hasField("authenticationRestrictions")) {
+        BSONElement restrictionsElement;
+        status = bsonExtractTypedField(
+            cmdObj, "authenticationRestrictions", Array, &restrictionsElement);
+        if (!status.isOK()) {
+            return status;
+        }
+        auto restrictions = getRawAuthenticationRestrictions(BSONArray(restrictionsElement.Obj()));
+        if (!restrictions.isOK()) {
+            return restrictions.getStatus();
+        }
+        parsedArgs->authenticationRestrictions = restrictions.getValue();
+    }
+
     return Status::OK();
 }
 
