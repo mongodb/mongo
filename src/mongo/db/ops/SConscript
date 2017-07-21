@@ -12,7 +12,6 @@ env.Library(
         'modifier_compare.cpp',
         'modifier_current_date.cpp',
         'modifier_inc.cpp',
-        'modifier_object_replace.cpp',
         'modifier_pop.cpp',
         'modifier_pull.cpp',
         'modifier_pull_all.cpp',
@@ -75,17 +74,6 @@ env.CppUnitTest(
     source='modifier_inc_test.cpp',
     LIBDEPS=[
         '$BUILD_DIR/mongo/bson/mutable/mutable_bson_test_utils',
-        'update',
-    ],
-)
-
-env.CppUnitTest(
-    target='modifier_object_replace_test',
-    source='modifier_object_replace_test.cpp',
-    LIBDEPS=[
-        '$BUILD_DIR/mongo/bson/mutable/mutable_bson_test_utils',
-        '$BUILD_DIR/mongo/db/service_context_noop_init',
-        '$BUILD_DIR/mongo/db/logical_clock',
         'update',
     ],
 )

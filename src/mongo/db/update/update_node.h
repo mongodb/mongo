@@ -59,7 +59,7 @@ class FieldRef;
  */
 class UpdateNode {
 public:
-    enum class Type { Object, Array, Leaf };
+    enum class Type { Object, Array, Leaf, Replacement };
 
     explicit UpdateNode(Type type) : type(type) {}
     virtual ~UpdateNode() = default;

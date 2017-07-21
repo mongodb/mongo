@@ -174,7 +174,7 @@ private:
 
     // The root of the UpdateNode tree. If the featureCompatibilityVersion is 3.6, the update
     // expression is parsed into '_root'.
-    std::unique_ptr<UpdateObjectNode> _root;
+    std::unique_ptr<UpdateNode> _root;
 
     // Collection of update mod instances. Owned here. If the featureCompatibilityVersion is 3.4,
     // the update expression is parsed into '_mods'.
