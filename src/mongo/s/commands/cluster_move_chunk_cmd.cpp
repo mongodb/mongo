@@ -193,7 +193,8 @@ public:
                                                     to->getId(),
                                                     maxChunkSizeBytes,
                                                     secondaryThrottle,
-                                                    cmdObj["_waitForDelete"].trueValue()));
+                                                    cmdObj["_waitForDelete"].trueValue() ||
+                                                        cmdObj["waitForDelete"].trueValue()));
 
         Grid::get(opCtx)->catalogCache()->onStaleConfigError(std::move(routingInfo));
 
