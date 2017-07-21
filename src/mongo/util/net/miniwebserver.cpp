@@ -47,6 +47,7 @@ namespace mongo {
 using std::shared_ptr;
 using std::stringstream;
 using std::vector;
+using std::string;
 
 MiniWebServer::MiniWebServer(const string& name, const string& ip, int port, ServiceContext* ctx)
     : Listener(name, ip, port, ctx, false, false) {}

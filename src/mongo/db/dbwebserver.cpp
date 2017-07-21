@@ -67,6 +67,7 @@ namespace mongo {
 using std::map;
 using std::stringstream;
 using std::vector;
+using std::string;
 
 using namespace html;
 
