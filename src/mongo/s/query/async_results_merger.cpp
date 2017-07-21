@@ -334,7 +334,6 @@ StatusWith<executor::TaskExecutor::EventHandle> AsyncResultsMerger::nextEvent(
     // the new event right away to propagate the fact that the previous event had been signaled to
     // the new event.
     signalCurrentEventIfReady_inlock();
-
     return eventToReturn;
 }
 
@@ -398,22 +397,11 @@ void AsyncResultsMerger::handleBatchResponse(
 
     // Early return from this point on signal anyone waiting on an event, if ready() is true.
     ScopeGuard signaller = MakeGuard(&AsyncResultsMerger::signalCurrentEventIfReady_inlock, this);
-
     StatusWith<CursorResponse> cursorResponseStatus(
         cbData.response.isOK() ? parseCursorResponse(cbData.response.data, remote)
                                : cbData.response.status);
-
     if (!cursorResponseStatus.isOK()) {
-        auto shard = remote.getShard();
-        if (!shard) {
-            remote.status = Status(cursorResponseStatus.getStatus().code(),
-                                   str::stream() << "Could not find shard containing host "
-                                                 << remote.getTargetHost().toString());
-        } else {
-            shard->updateReplSetMonitor(remote.getTargetHost(), cursorResponseStatus.getStatus());
-            remote.status = cursorResponseStatus.getStatus();
-        }
-
+        remote.status = cursorResponseStatus.getStatus();
         // Unreachable host errors are swallowed if the 'allowPartialResults' option is set. We
         // remove the unreachable host entirely from consideration by marking it as exhausted.
         if (_params->isAllowPartialResults) {
