@@ -1030,5 +1030,28 @@ TEST(SerializeInternalSchema, ExpressionInternalSchemaCondSerializesCorrectly) {
         fromjson("{$_internalSchemaCond: [{a: {$eq: 1}}, {b: {$eq: 2}}, {c: {$eq: 3}}]}}"));
     ASSERT_BSONOBJ_EQ(*reserialized.getQuery(), serialize(reserialized.getMatchExpression()));
 }
+
+TEST(SerializeInternalSchema, ExpressionInternalSchemaMinPropertiesSerializesCorrectly) {
+    const CollatorInterface* collator = nullptr;
+    Matcher original(fromjson("{$_internalSchemaMinProperties: 1}"),
+                     ExtensionsCallbackDisallowExtensions(),
+                     collator);
+    Matcher reserialized(
+        serialize(original.getMatchExpression()), ExtensionsCallbackDisallowExtensions(), collator);
+    ASSERT_BSONOBJ_EQ(*reserialized.getQuery(), fromjson("{$_internalSchemaMinProperties: 1}"));
+    ASSERT_BSONOBJ_EQ(*reserialized.getQuery(), serialize(reserialized.getMatchExpression()));
+}
+
+TEST(SerializeInternalSchema, ExpressionInternalSchemaMaxPropertiesSerializesCorrectly) {
+    const CollatorInterface* collator = nullptr;
+    Matcher original(fromjson("{$_internalSchemaMaxProperties: 1}"),
+                     ExtensionsCallbackDisallowExtensions(),
+                     collator);
+    Matcher reserialized(
+        serialize(original.getMatchExpression()), ExtensionsCallbackDisallowExtensions(), collator);
+    ASSERT_BSONOBJ_EQ(*reserialized.getQuery(), fromjson("{$_internalSchemaMaxProperties: 1}"));
+    ASSERT_BSONOBJ_EQ(*reserialized.getQuery(), serialize(reserialized.getMatchExpression()));
+}
+
 }  // namespace
 }  // namespace mongo

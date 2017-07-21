@@ -41,8 +41,10 @@
 #include "mongo/db/matcher/schema/expression_internal_schema_cond.h"
 #include "mongo/db/matcher/schema/expression_internal_schema_max_items.h"
 #include "mongo/db/matcher/schema/expression_internal_schema_max_length.h"
+#include "mongo/db/matcher/schema/expression_internal_schema_max_properties.h"
 #include "mongo/db/matcher/schema/expression_internal_schema_min_items.h"
 #include "mongo/db/matcher/schema/expression_internal_schema_min_length.h"
+#include "mongo/db/matcher/schema/expression_internal_schema_min_properties.h"
 #include "mongo/db/matcher/schema/expression_internal_schema_object_match.h"
 #include "mongo/db/matcher/schema/expression_internal_schema_unique_items.h"
 #include "mongo/db/matcher/schema/expression_internal_schema_xor.h"
@@ -346,7 +348,6 @@ StatusWithMatchExpression MatchExpressionParser::_parseSubField(const BSONObj& c
                 InternalSchemaMaxLengthMatchExpression>(name, e);
         }
     }
-
     return {Status(ErrorCodes::BadValue,
                    mongoutils::str::stream() << "not handled: " << e.fieldName())};
 }
@@ -437,11 +438,16 @@ StatusWithMatchExpression MatchExpressionParser::_parse(const BSONObj& obj,
                 if (!s.isOK())
                     return s;
                 root->add(xorExpr.release());
+            } else if (mongoutils::str::equals("_internalSchemaMinProperties", rest)) {
+                return _parseTopLevelInternalSchemaSingleIntegerArgument<
+                    InternalSchemaMinPropertiesMatchExpression>(e);
+            } else if (mongoutils::str::equals("_internalSchemaMaxProperties", rest)) {
+                return _parseTopLevelInternalSchemaSingleIntegerArgument<
+                    InternalSchemaMaxPropertiesMatchExpression>(e);
             } else if (mongoutils::str::equals("jsonSchema", rest)) {
                 if (e.type() != BSONType::Object) {
                     return {Status(ErrorCodes::TypeMismatch, "$jsonSchema must be an object")};
                 }
-
                 return JSONSchemaParser::parse(e.Obj());
             } else {
                 return {Status(ErrorCodes::BadValue,
@@ -805,7 +811,9 @@ StatusWithMatchExpression MatchExpressionParser::_parseElemMatch(const char* nam
             !mongoutils::str::equals("$nor", elt.fieldName()) &&
             !mongoutils::str::equals("$_internalSchemaXor", elt.fieldName()) &&
             !mongoutils::str::equals("$or", elt.fieldName()) &&
-            !mongoutils::str::equals("$where", elt.fieldName());
+            !mongoutils::str::equals("$where", elt.fieldName()) &&
+            !mongoutils::str::equals("$_internalSchemaMinProperties", elt.fieldName()) &&
+            !mongoutils::str::equals("$_internalSchemaMaxProperties", elt.fieldName());
     }
 
     if (isElemMatchValue) {
@@ -1147,7 +1155,6 @@ StatusWithMatchExpression MatchExpressionParser::_parseInternalSchemaFixedArityA
 template <class T>
 StatusWithMatchExpression MatchExpressionParser::_parseInternalSchemaSingleIntegerArgument(
     const char* name, const BSONElement& elem) const {
-
     auto parsedInt = parseIntegerElementToNonNegativeLong(elem);
     if (!parsedInt.isOK()) {
         return parsedInt.getStatus();
@@ -1159,6 +1166,21 @@ StatusWithMatchExpression MatchExpressionParser::_parseInternalSchemaSingleInteg
         return status;
     }
 
+    return {std::move(matchExpression)};
+}
+
+template <class T>
+StatusWithMatchExpression MatchExpressionParser::_parseTopLevelInternalSchemaSingleIntegerArgument(
+    const BSONElement& elem) const {
+    auto parsedInt = parseIntegerElementToNonNegativeLong(elem);
+    if (!parsedInt.isOK()) {
+        return parsedInt.getStatus();
+    }
+    auto matchExpression = stdx::make_unique<T>();
+    auto status = matchExpression->init(parsedInt.getValue());
+    if (!status.isOK()) {
+        return status;
+    }
     return {std::move(matchExpression)};
 }
 
