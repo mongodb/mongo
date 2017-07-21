@@ -1576,7 +1576,7 @@ __rec_child_modify(WT_SESSION_IMPL *session,
 	 * not reserved for our exclusive use, there are other page states that
 	 * must be considered.
 	 */
-	for (;; __wt_yield())
+	for (;; __wt_yield()) {
 		switch (r->tested_ref_state = ref->state) {
 		case WT_REF_DISK:
 			/* On disk, not modified by definition. */
@@ -1687,6 +1687,8 @@ __rec_child_modify(WT_SESSION_IMPL *session,
 
 		WT_ILLEGAL_VALUE(session);
 		}
+		WT_STAT_CONN_INCR(session, child_modify_blocked_page);
+	}
 
 in_memory:
 	/*

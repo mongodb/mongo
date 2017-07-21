@@ -91,6 +91,7 @@ __wt_connection_close(WT_CONNECTION_IMPL *conn)
 		if (txn_global->oldest_id == txn_global->current &&
 		    txn_global->metadata_pinned == txn_global->current)
 			break;
+		WT_STAT_CONN_INCR(session, txn_release_blocked);
 		__wt_yield();
 	}
 
