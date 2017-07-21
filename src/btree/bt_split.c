@@ -31,6 +31,26 @@ typedef enum {
 } WT_SPLIT_ERROR_PHASE;
 
 /*
+ * __page_split_timing_stress --
+ *  Optionally add delay to simulate the race conditions in
+ *  page split for debug purposes. The purpose is to uncover
+ *  the race conditions in page split.
+ */
+static void
+__page_split_timing_stress(WT_SESSION_IMPL *session)
+{
+	WT_CONNECTION_IMPL *conn;
+
+	conn = S2C(session);
+
+	/* We only want to sleep when page split race flag is set. */
+	if (FLD_ISSET(conn->timing_stress_flags,
+	    WT_TIMING_STRESS_PAGE_SPLIT_RACE))
+		__wt_sleep(0, WT_THOUSAND);
+
+}
+
+/*
  * __split_safe_free --
  *	Free a buffer if we can be sure no thread is accessing it, or schedule
  *	it to be freed otherwise.
@@ -1166,6 +1186,7 @@ __split_internal_lock_worker(WT_SESSION_IMPL *session,
 	for (;;) {
 		parent = ref->home;
 
+		__page_split_timing_stress(session);
 		/*
 		 * The page will be marked dirty, and we can only lock a page
 		 * with a modify structure.

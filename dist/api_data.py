@@ -407,15 +407,6 @@ connection_runtime_config = [
         Config('release', '', r'''
             compatibility release version string'''),
         ]),
-    Config('diagnostic_timing_stress', '', r'''
-        enable insertion of code that interrupts the usual timing of
-        operations with a goal of uncovering race conditions and unexpected
-        blocking. This option is intended for use with internal stress
-        testing of WiredTiger. Only available if WiredTiger is configured
-        with --enable-diagnostic. Options are given as a list, such as
-        <code>"diagnostic_timing_stress=[checkpoint_slow]"</code>''',
-        type='list', undoc=True, choices=[
-            'checkpoint_slow']),
     Config('error_prefix', '', r'''
         prefix string for error messages'''),
     Config('eviction', '', r'''
@@ -529,6 +520,15 @@ connection_runtime_config = [
         @ref statistics for more information''',
         type='list',
         choices=['all', 'cache_walk', 'fast', 'none', 'clear', 'tree_walk']),
+    Config('timing_stress_for_test', '', r'''
+        enable code that interrupts the usual timing of operations with a
+        goal of uncovering race conditions and unexpected blocking.
+        This option is intended for use with internal stress
+        testing of WiredTiger. Options are given as a list, such as
+        <code>"timing_stress_for_test=[checkpoint_slow,
+            page_split_race]"</code>''',
+        type='list', undoc=True, choices=[
+            'checkpoint_slow', 'page_split_race']),
     Config('verbose', '', r'''
         enable messages for various events. Only available if WiredTiger
         is configured with --enable-verbose. Options are given as a

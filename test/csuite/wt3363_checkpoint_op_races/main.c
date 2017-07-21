@@ -78,19 +78,9 @@ main(int argc, char *argv[])
 	int i;
 
 	/*
-	 * This test should not run unless we have compiled with diagnostic
-	 * support and the long tests flag is set. The test will fail when
-	 * attempting to set the option to add the delays to checkpoints if
-	 * diagnostic mode is not enable and runs for 15 minutes.
+	 * This test should not run unless long tests flag is set. The test
+	 * runs for 15 minutes.
 	 */
-#if !defined(HAVE_DIAGNOSTIC)
-	/*
-	 * Put the return in a conditional, otherwise some compilers will
-	 * complain that code beyond the return is unreachable.
-	 */
-	if (true)
-		return (EXIT_SUCCESS);
-#endif
 	if (!testutil_is_flag_set("WT3363_CHECKPOINT_OP_RACES"))
 		return (EXIT_SUCCESS);
 
@@ -102,7 +92,7 @@ main(int argc, char *argv[])
 	testutil_make_work_dir(opts->home);
 
 	testutil_check(wiredtiger_open(opts->home, &event_handler,
-	    "create,cache_size=1G,diagnostic_timing_stress=[checkpoint_slow]",
+	    "create,cache_size=1G,timing_stress_for_test=[checkpoint_slow]",
 	    &opts->conn));
 
 	testutil_check(pthread_create(
