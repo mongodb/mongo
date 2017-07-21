@@ -32,7 +32,8 @@ selector:
   - jstests/sharding/mongos_does_not_gossip_logical_time_without_keys.js
   - jstests/sharding/key_rotation.js
   - jstests/sharding/advance_logical_time_with_valid_signature.js
-  - jstests/sharding/safe_secondary_reads.js
+  - jstests/sharding/safe_secondary_reads_single_migration_suspend_range_deletion.js
+  - jstests/sharding/safe_secondary_reads_single_migration_waitForDelete.js
   - jstests/sharding/secondary_shard_versioning.js
   # New feature in v3.6 mongo shell.
   - jstests/sharding/causal_consistency_shell_support.js
