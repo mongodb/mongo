@@ -213,7 +213,7 @@ public:
 
 class CmdIsMaster : public BasicCommand {
 public:
-    virtual bool requiresAuth() {
+    bool requiresAuth() const override {
         return false;
     }
     virtual bool slaveOk() const {

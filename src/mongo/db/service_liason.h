@@ -29,7 +29,6 @@
 #pragma once
 
 #include "mongo/db/logical_session_id.h"
-#include "mongo/db/signed_logical_session_id.h"
 #include "mongo/stdx/functional.h"
 #include "mongo/util/periodic_runner.h"
 #include "mongo/util/time_support.h"
@@ -76,21 +75,6 @@ public:
      * Return the current time.
      */
     virtual Date_t now() const = 0;
-
-    /**
-     * Generates and sets a signature for the fields in this LogicalSessionId.
-     *
-     * If this method is not able to acquire a key to perform the signature
-     * this call will return an error.
-     */
-    StatusWith<SignedLogicalSessionId> signLsid(OperationContext* opCtx,
-                                                const LogicalSessionId& lsid,
-                                                boost::optional<OID> userId);
-
-    /**
-     * Validates that this LogicalSessionId was signed with the correct key.
-     */
-    Status validateLsid(OperationContext* opCtx, const SignedLogicalSessionId& id);
 
 protected:
     /**

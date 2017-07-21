@@ -306,11 +306,8 @@ void appendSessionInfo(OperationContext* opCtx, BSONObjBuilder* builder, StmtId 
         return;
     }
 
-    Logical_session_id lsid;
-    lsid.setId(logicalSessionId->getId());
-
     OperationSessionInfo sessionInfo;
-    sessionInfo.setSessionId(lsid);
+    sessionInfo.setSessionId(*logicalSessionId);
     sessionInfo.setTxnNumber(txnNum);
     sessionInfo.serialize(builder);
 

@@ -65,8 +65,7 @@ void MockSessionsCollectionImpl::clearHooks() {
     _remove = stdx::bind(&MockSessionsCollectionImpl::_removeRecords, this, stdx::placeholders::_1);
 }
 
-StatusWith<LogicalSessionRecord> MockSessionsCollectionImpl::fetchRecord(
-    SignedLogicalSessionId id) {
+StatusWith<LogicalSessionRecord> MockSessionsCollectionImpl::fetchRecord(LogicalSessionId id) {
     return _fetch(std::move(id));
 }
 
@@ -84,7 +83,7 @@ void MockSessionsCollectionImpl::removeRecords(LogicalSessionIdSet sessions) {
 
 void MockSessionsCollectionImpl::add(LogicalSessionRecord record) {
     stdx::unique_lock<stdx::mutex> lk(_mutex);
-    _sessions.insert({record.getSignedLsid().getLsid(), std::move(record)});
+    _sessions.insert({record.getId(), std::move(record)});
 }
 
 void MockSessionsCollectionImpl::remove(LogicalSessionId lsid) {
@@ -106,12 +105,11 @@ const MockSessionsCollectionImpl::SessionMap& MockSessionsCollectionImpl::sessio
     return _sessions;
 }
 
-StatusWith<LogicalSessionRecord> MockSessionsCollectionImpl::_fetchRecord(
-    SignedLogicalSessionId id) {
+StatusWith<LogicalSessionRecord> MockSessionsCollectionImpl::_fetchRecord(LogicalSessionId id) {
     stdx::unique_lock<stdx::mutex> lk(_mutex);
 
     // If we do not have this record, return an error
-    auto it = _sessions.find(id.getLsid());
+    auto it = _sessions.find(id);
     if (it == _sessions.end()) {
         return {ErrorCodes::NoSuchSession, "No matching record in the sessions collection"};
     }
@@ -121,7 +119,7 @@ StatusWith<LogicalSessionRecord> MockSessionsCollectionImpl::_fetchRecord(
 
 Status MockSessionsCollectionImpl::_insertRecord(LogicalSessionRecord record) {
     stdx::unique_lock<stdx::mutex> lk(_mutex);
-    auto res = _sessions.insert({record.getSignedLsid().getLsid(), std::move(record)});
+    auto res = _sessions.insert({record.getId(), std::move(record)});
 
     // We should never try to insert the same record twice. In theory this could
     // happen because of a UUID conflict.

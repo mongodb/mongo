@@ -148,6 +148,11 @@ public:
     virtual bool shouldAffectCommandCounter() const = 0;
 
     /**
+     * Return true if the command requires auth.
+    */
+    virtual bool requiresAuth() const = 0;
+
+    /**
      * Generates help text for this command.
      */
     virtual void help(std::stringstream& help) const = 0;
@@ -299,6 +304,10 @@ public:
     }
 
     bool shouldAffectCommandCounter() const override {
+        return true;
+    }
+
+    bool requiresAuth() const override {
         return true;
     }
 

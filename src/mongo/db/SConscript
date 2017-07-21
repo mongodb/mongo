@@ -206,6 +206,7 @@ env.CppUnitTest(
     ],
     LIBDEPS=[
         'logical_session_id',
+        'logical_session_id_helpers',
         'service_context',
         '$BUILD_DIR/mongo/db/auth/authorization_manager_mock_init',
         '$BUILD_DIR/mongo/db/service_context_noop_init',
@@ -873,9 +874,23 @@ env.Library(
         env.Idlc('logical_session_id.idl')[0],
     ],
     LIBDEPS=[
+        '$BUILD_DIR/mongo/base',
+        '$BUILD_DIR/mongo/crypto/sha256_block',
+        '$BUILD_DIR/mongo/crypto/sha_block_${MONGO_CRYPTO}',
         '$BUILD_DIR/mongo/idl/idl_parser',
         '$BUILD_DIR/mongo/util/uuid',
-        '$BUILD_DIR/mongo/base',
+    ],
+)
+
+env.Library(
+    target='logical_session_id_helpers',
+    source=[
+        'logical_session_id_helpers.cpp',
+    ],
+    LIBDEPS=[
+        'logical_session_id',
+        'logical_session_cache',
+        '$BUILD_DIR/mongo/db/auth/authcore',
     ],
 )
 
@@ -886,60 +901,13 @@ env.CppUnitTest(
     ],
     LIBDEPS=[
         '$BUILD_DIR/mongo/base',
-        'logical_session_id'
-    ],
-)
-
-env.Library(
-    target='signed_logical_session_id',
-    source=[
-        'signed_logical_session_id.cpp',
-        env.Idlc('signed_logical_session_id.idl')[0],
-    ],
-    LIBDEPS=[
-        '$BUILD_DIR/mongo/base',
-        '$BUILD_DIR/mongo/crypto/sha1_block',
-        '$BUILD_DIR/mongo/idl/idl_parser',
-        '$BUILD_DIR/mongo/util/uuid',
-        'logical_session_id'
-    ],
-)
-
-env.CppUnitTest(
-    target='signed_logical_session_id_test',
-    source=[
-        'signed_logical_session_id_test.cpp',
-    ],
-    LIBDEPS=[
-        '$BUILD_DIR/mongo/base',
-        'signed_logical_session_id',
-    ],
-)
-
-env.Library(
-    target='logical_session_record',
-    source=[
-        'logical_session_record.cpp',
-        env.Idlc('logical_session_record.idl')[0],
-    ],
-    LIBDEPS=[
-        '$BUILD_DIR/mongo/base',
-        '$BUILD_DIR/mongo/db/auth/user_name',
-        '$BUILD_DIR/mongo/idl/idl_parser',
+        '$BUILD_DIR/mongo/db/service_context_noop_init',
+        '$BUILD_DIR/mongo/transport/transport_layer_mock',
+        '$BUILD_DIR/mongo/db/auth/authcore',
+        '$BUILD_DIR/mongo/db/auth/authmocks',
+        '$BUILD_DIR/mongo/db/auth/authorization_session_for_test',
         'logical_session_id',
-        'signed_logical_session_id',
-    ],
-)
-
-env.CppUnitTest(
-    target='logical_session_record_test',
-    source=[
-        'logical_session_record_test.cpp',
-    ],
-    LIBDEPS=[
-        '$BUILD_DIR/mongo/base',
-        'logical_session_id',
-        'logical_session_record',
+        'logical_session_id_helpers',
     ],
 )
 
@@ -954,7 +922,6 @@ env.Library(
         'keys_collection_manager',
         'keys_collection_manager_zero',
         'logical_clock',
-        'signed_logical_session_id',
     ],
 )
 
@@ -1032,7 +999,6 @@ env.Library(
     ],
     LIBDEPS=[
         'logical_session_id',
-        'logical_session_record',
         'sessions_collection',
         'server_parameters',
         'service_liason',
@@ -1050,10 +1016,10 @@ envWithAsio.CppUnitTest(
         'keys_collection_manager',
         'keys_collection_document',
         'logical_clock',
+        'logical_session_id_helpers',
         'logical_session_cache',
         'service_liason_mock',
         'sessions_collection_mock',
-        'signed_logical_session_id',
     ],
 )
 

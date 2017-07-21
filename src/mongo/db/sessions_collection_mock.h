@@ -29,7 +29,6 @@
 #pragma once
 
 #include "mongo/db/logical_session_id.h"
-#include "mongo/db/logical_session_record.h"
 #include "mongo/db/sessions_collection.h"
 #include "mongo/stdx/functional.h"
 #include "mongo/stdx/mutex.h"
@@ -55,11 +54,11 @@ namespace mongo {
 class MockSessionsCollectionImpl {
 public:
     using SessionMap =
-        stdx::unordered_map<LogicalSessionId, LogicalSessionRecord, LogicalSessionId::Hash>;
+        stdx::unordered_map<LogicalSessionId, LogicalSessionRecord, LogicalSessionIdHash>;
 
     MockSessionsCollectionImpl();
 
-    using FetchHook = stdx::function<StatusWith<LogicalSessionRecord>(SignedLogicalSessionId)>;
+    using FetchHook = stdx::function<StatusWith<LogicalSessionRecord>(LogicalSessionId)>;
     using InsertHook = stdx::function<Status(LogicalSessionRecord)>;
     using RefreshHook = stdx::function<LogicalSessionIdSet(LogicalSessionIdSet)>;
     using RemoveHook = stdx::function<void(LogicalSessionIdSet)>;
@@ -74,7 +73,7 @@ public:
     void clearHooks();
 
     // Forwarding methods from the MockSessionsCollection
-    StatusWith<LogicalSessionRecord> fetchRecord(SignedLogicalSessionId id);
+    StatusWith<LogicalSessionRecord> fetchRecord(LogicalSessionId id);
     Status insertRecord(LogicalSessionRecord record);
     LogicalSessionIdSet refreshSessions(LogicalSessionIdSet sessions);
     void removeRecords(LogicalSessionIdSet sessions);
@@ -88,7 +87,7 @@ public:
 
 private:
     // Default implementations, may be overridden with custom hooks.
-    StatusWith<LogicalSessionRecord> _fetchRecord(SignedLogicalSessionId id);
+    StatusWith<LogicalSessionRecord> _fetchRecord(LogicalSessionId id);
     Status _insertRecord(LogicalSessionRecord record);
     LogicalSessionIdSet _refreshSessions(LogicalSessionIdSet sessions);
     void _removeRecords(LogicalSessionIdSet sessions);
@@ -112,7 +111,7 @@ public:
     explicit MockSessionsCollection(std::shared_ptr<MockSessionsCollectionImpl> impl)
         : _impl(std::move(impl)) {}
 
-    StatusWith<LogicalSessionRecord> fetchRecord(SignedLogicalSessionId id) override {
+    StatusWith<LogicalSessionRecord> fetchRecord(LogicalSessionId id) override {
         return _impl->fetchRecord(std::move(id));
     }
 

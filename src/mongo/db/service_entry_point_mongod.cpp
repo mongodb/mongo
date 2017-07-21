@@ -49,6 +49,7 @@
 #include "mongo/db/lasterror.h"
 #include "mongo/db/logical_clock.h"
 #include "mongo/db/logical_session_id.h"
+#include "mongo/db/logical_session_id_helpers.h"
 #include "mongo/db/logical_time_validator.h"
 #include "mongo/db/ops/write_ops.h"
 #include "mongo/db/ops/write_ops_exec.h"
@@ -539,7 +540,7 @@ void execCommandDatabase(OperationContext* opCtx,
         rpc::readRequestMetadata(opCtx, request.body);
         rpc::TrackingMetadata::get(opCtx).initWithOperName(command->getName());
 
-        initializeOperationSessionInfo(opCtx, request.body);
+        initializeOperationSessionInfo(opCtx, request.body, command->requiresAuth());
 
         std::string dbname = request.getDatabase().toString();
         uassert(

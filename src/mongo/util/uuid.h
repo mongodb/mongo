@@ -54,7 +54,9 @@ class UUID {
 
     // Make the IDL generated parser a friend
     friend class One_UUID;
-    friend class Logical_session_id;
+    friend class LogicalSessionId;
+    friend class LogicalSessionToClient;
+    friend class LogicalSessionFromClient;
     friend class repl::OplogEntryBase;
 
 public:

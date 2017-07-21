@@ -129,7 +129,7 @@ private:
 
     using SessionRuntimeInfoMap = stdx::unordered_map<LogicalSessionId,
                                                       std::shared_ptr<SessionRuntimeInfo>,
-                                                      LogicalSessionId::Hash>;
+                                                      LogicalSessionIdHash>;
 
     /**
      * Returns a session, previously clecked out through 'checkoutSession', available again.

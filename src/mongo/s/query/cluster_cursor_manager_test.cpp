@@ -969,7 +969,7 @@ TEST_F(ClusterCursorManagerTest, CursorsWithoutSessions) {
  */
 TEST_F(ClusterCursorManagerTest, OneCursorWithASession) {
     // Add a cursor with a session to the cursor manager.
-    auto lsid = LogicalSessionId::gen();
+    auto lsid = makeLogicalSessionIdForTest();
     auto cursorId = assertGet(
         getManager()->registerCursor(nullptr,
                                      allocateMockCursor(lsid),
@@ -1003,7 +1003,7 @@ TEST_F(ClusterCursorManagerTest, OneCursorWithASession) {
  */
 TEST_F(ClusterCursorManagerTest, GetSessionIdsWhileCheckedOut) {
     // Add a cursor with a session to the cursor manager.
-    auto lsid = LogicalSessionId::gen();
+    auto lsid = makeLogicalSessionIdForTest();
     auto cursorId = assertGet(
         getManager()->registerCursor(nullptr,
                                      allocateMockCursor(lsid),
@@ -1024,7 +1024,7 @@ TEST_F(ClusterCursorManagerTest, GetSessionIdsWhileCheckedOut) {
  */
 TEST_F(ClusterCursorManagerTest, MultipleCursorsWithSameSession) {
     // Add two cursors on the same session to the cursor manager.
-    auto lsid = LogicalSessionId::gen();
+    auto lsid = makeLogicalSessionIdForTest();
     auto cursorId1 = assertGet(
         getManager()->registerCursor(nullptr,
                                      allocateMockCursor(lsid),
@@ -1039,7 +1039,7 @@ TEST_F(ClusterCursorManagerTest, MultipleCursorsWithSameSession) {
                                      ClusterCursorManager::CursorLifetime::Mortal));
 
     // Retrieve all sessions - set should contain just lsid.
-    stdx::unordered_set<LogicalSessionId, LogicalSessionId::Hash> lsids;
+    stdx::unordered_set<LogicalSessionId, LogicalSessionIdHash> lsids;
     getManager()->appendActiveSessions(&lsids);
     ASSERT_EQ(lsids.size(), size_t(1));
     ASSERT(lsids.find(lsid) != lsids.end());
@@ -1069,8 +1069,8 @@ TEST_F(ClusterCursorManagerTest, MultipleCursorsWithSameSession) {
  * Test a manager with multiple cursors running inside of different sessions.
  */
 TEST_F(ClusterCursorManagerTest, MultipleCursorsMultipleSessions) {
-    auto lsid1 = LogicalSessionId::gen();
-    auto lsid2 = LogicalSessionId::gen();
+    auto lsid1 = makeLogicalSessionIdForTest();
+    auto lsid2 = makeLogicalSessionIdForTest();
 
     // Register two cursors with different lsids, and one without.
     CursorId cursor1 = assertGet(
@@ -1116,7 +1116,7 @@ TEST_F(ClusterCursorManagerTest, MultipleCursorsMultipleSessions) {
 TEST_F(ClusterCursorManagerTest, ManyCursorsManySessions) {
     const int count = 10000;
     for (int i = 0; i < count; i++) {
-        auto lsid = LogicalSessionId::gen();
+        auto lsid = makeLogicalSessionIdForTest();
         ASSERT_OK(
             getManager()->registerCursor(nullptr,
                                          allocateMockCursor(lsid),

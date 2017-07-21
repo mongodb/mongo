@@ -1405,8 +1405,8 @@ DEATH_TEST_F(RSRollbackTest, LocalEntryWithTxnNumberWithoutStmtIdIsFatal, "invar
     const auto txnNumber = BSON("txnNumber" << 1LL);
     const auto noSessionIdOrStmtId = validOplogEntry.addField(txnNumber.firstElement());
 
-    const auto uuid = UUID::gen();
-    const auto sessionId = BSON("lsid" << BSON("id" << uuid.toBSON()));
+    const auto lsid = makeLogicalSessionIdForTest();
+    const auto sessionId = BSON("lsid" << lsid.toBSON());
     const auto noStmtId = noSessionIdOrStmtId.addField(sessionId.firstElement());
     ASSERT_THROWS(updateFixUpInfoFromLocalOplogEntry(fui, noStmtId).transitional_ignore(),
                   RSFatalException);
@@ -1442,7 +1442,7 @@ TEST(RSRollbackTest, LocalEntryWithTxnNumberAddsTransactionTableDocToBeRefetched
                   << "stmtId"
                   << 1
                   << "lsid"
-                  << BSON("id" << UUID::gen().toBSON()));
+                  << makeLogicalSessionIdForTest().toBSON());
     ASSERT_OK(updateFixUpInfoFromLocalOplogEntry(fui, entryWithTxnNumber));
 
     // If txnNumber is present, the session transactions table document corresponding to the oplog

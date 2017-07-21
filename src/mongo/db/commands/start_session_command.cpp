@@ -39,7 +39,7 @@
 #include "mongo/db/jsobj.h"
 #include "mongo/db/logical_session_cache.h"
 #include "mongo/db/logical_session_id.h"
-#include "mongo/db/logical_session_record.h"
+#include "mongo/db/logical_session_id_helpers.h"
 #include "mongo/db/operation_context.h"
 #include "mongo/db/stats/top.h"
 
@@ -79,57 +79,30 @@ public:
                      const BSONObj& cmdObj,
                      BSONObjBuilder& result) override {
 
-        boost::optional<OID> uid;
         auto client = opCtx->getClient();
-
         ServiceContext* serviceContext = client->getServiceContext();
-        if (AuthorizationManager::get(serviceContext)->isAuthEnabled()) {
 
-            UserName userName;
+        boost::optional<LogicalSessionId> lsid;
 
-            auto authzSession = AuthorizationSession::get(client);
-            auto userNameItr = authzSession->getAuthenticatedUserNames();
-            if (userNameItr.more()) {
-                userName = userNameItr.next();
-                if (userNameItr.more()) {
-                    return appendCommandStatus(
-                        result,
-                        Status(ErrorCodes::Unauthorized,
-                               "must only be authenticated as exactly one user "
-                               "to create a logical session"));
-                }
-            } else {
-                return appendCommandStatus(result,
-                                           Status(ErrorCodes::Unauthorized,
-                                                  "must only be authenticated as exactly one user "
-                                                  "to create a logical session"));
-            }
+        try {
+            lsid = makeLogicalSessionId(opCtx);
+        } catch (...) {
+            auto status = exceptionToStatus();
 
-            User* user = authzSession->lookupUser(userName);
-            invariant(user);
-            uid = user->getID();
+            return appendCommandStatus(result, status);
         }
 
         auto lsCache = LogicalSessionCache::get(serviceContext);
 
-        auto statusWithSlsid = lsCache->signLsid(opCtx, LogicalSessionId::gen(), uid);
-        if (!statusWithSlsid.isOK()) {
-            return appendCommandStatus(result, statusWithSlsid.getStatus());
-        }
-        auto slsid = statusWithSlsid.getValue();
-        auto lsRecord = LogicalSessionRecord::makeAuthoritativeRecord(
-            slsid, serviceContext->getFastClockSource()->now());
-        Status startSessionStatus = lsCache->startSession(std::move(slsid));
+        Status startSessionStatus = lsCache->startSession(lsid.get());
 
-        appendCommandStatus(result, startSessionStatus);
-
-        if (startSessionStatus.isOK()) {
-            result.append("id", lsRecord.toBSON());
-            result.append("timeoutMinutes", localLogicalSessionTimeoutMinutes);
-            return true;
+        if (!startSessionStatus.isOK()) {
+            return appendCommandStatus(result, startSessionStatus);
         }
 
-        return false;
+        makeLogicalSessionToClient(lsid.get()).serialize(&result);
+
+        return true;
     }
 } startSessionCommand;
 

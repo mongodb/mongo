@@ -32,7 +32,7 @@
 #include "mongo/db/auth/user_name.h"
 #include "mongo/db/logical_session_cache.h"
 #include "mongo/db/logical_session_id.h"
-#include "mongo/db/logical_session_record.h"
+#include "mongo/db/logical_session_id_helpers.h"
 #include "mongo/db/service_liason_mock.h"
 #include "mongo/db/sessions_collection_mock.h"
 #include "mongo/stdx/future.h"
@@ -97,128 +97,127 @@ private:
 
 // Test that session cache fetches new records from the sessions collection
 TEST_F(LogicalSessionCacheTest, CacheFetchesNewRecords) {
-    auto signedLsid = SignedLogicalSessionId::gen();
+    auto lsid = makeLogicalSessionIdForTest();
 
     // When the record is not present (and not in the sessions collection) returns an error
-    auto res = cache()->fetchAndPromote(signedLsid);
+    auto res = cache()->fetchAndPromote(lsid);
     ASSERT(!res.isOK());
 
     // When the record is not present (but is in the sessions collection) returns it
-    sessions()->add(LogicalSessionRecord::makeAuthoritativeRecord(signedLsid, service()->now()));
-    res = cache()->fetchAndPromote(signedLsid);
+    sessions()->add(makeLogicalSessionRecord(lsid, service()->now()));
+    res = cache()->fetchAndPromote(lsid);
     ASSERT(res.isOK());
 
     // When the record is present in the cache, returns it
-    sessions()->setFetchHook([](SignedLogicalSessionId id) -> StatusWith<LogicalSessionRecord> {
+    sessions()->setFetchHook([](LogicalSessionId id) -> StatusWith<LogicalSessionRecord> {
         // We should not be querying the sessions collection on the next call
         ASSERT(false);
         return {ErrorCodes::NoSuchSession, "no such session"};
     });
 
-    res = cache()->fetchAndPromote(signedLsid);
+    res = cache()->fetchAndPromote(lsid);
     ASSERT(res.isOK());
 }
 
 // Test that the getFromCache method does not make calls to the sessions collection
 TEST_F(LogicalSessionCacheTest, TestCacheHitsOnly) {
-    auto signedLsid = SignedLogicalSessionId::gen();
+    auto lsid = makeLogicalSessionIdForTest();
 
     // When the record is not present (and not in the sessions collection), returns an error
-    auto res = cache()->promote(signedLsid);
+    auto res = cache()->promote(lsid);
     ASSERT(!res.isOK());
 
     // When the record is not present (but is in the sessions collection), returns an error
-    sessions()->add(LogicalSessionRecord::makeAuthoritativeRecord(signedLsid, service()->now()));
-    res = cache()->promote(signedLsid);
+    sessions()->add(makeLogicalSessionRecord(lsid, service()->now()));
+    res = cache()->promote(lsid);
     ASSERT(!res.isOK());
 
     // When the record is present, returns the owner
-    cache()->fetchAndPromote(signedLsid).transitional_ignore();
-    res = cache()->promote(signedLsid);
+    cache()->fetchAndPromote(lsid).transitional_ignore();
+    res = cache()->promote(lsid);
     ASSERT(res.isOK());
 }
 
 // Test that fetching from the cache updates the lastUse date of records
 TEST_F(LogicalSessionCacheTest, FetchUpdatesLastUse) {
-    auto signedLsid = SignedLogicalSessionId::gen();
+    auto lsid = makeLogicalSessionIdForTest();
 
     auto start = service()->now();
 
     // Insert the record into the sessions collection with 'start'
-    sessions()->add(LogicalSessionRecord::makeAuthoritativeRecord(signedLsid, start));
+    sessions()->add(makeLogicalSessionRecord(lsid, start));
 
     // Fast forward time and fetch
     service()->fastForward(Milliseconds(500));
     ASSERT(start != service()->now());
-    auto res = cache()->fetchAndPromote(signedLsid);
+    auto res = cache()->fetchAndPromote(lsid);
     ASSERT(res.isOK());
 
     // Now that we fetched, lifetime of session should be extended
     service()->fastForward(kSessionTimeout - Milliseconds(500));
-    res = cache()->fetchAndPromote(signedLsid);
+    res = cache()->fetchAndPromote(lsid);
     ASSERT(res.isOK());
 
     // We fetched again, so lifetime extended again
     service()->fastForward(kSessionTimeout - Milliseconds(10));
-    res = cache()->fetchAndPromote(signedLsid);
+    res = cache()->fetchAndPromote(lsid);
     ASSERT(res.isOK());
 
     // Fast forward and hit-only fetch
     service()->fastForward(kSessionTimeout - Milliseconds(10));
-    res = cache()->promote(signedLsid);
+    res = cache()->promote(lsid);
     ASSERT(res.isOK());
 
     // Lifetime extended again
     service()->fastForward(Milliseconds(11));
-    res = cache()->promote(signedLsid);
+    res = cache()->promote(lsid);
     ASSERT(res.isOK());
 
     // Let record expire, we should not be able to get it from the cache
     service()->fastForward(kSessionTimeout + Milliseconds(1));
-    res = cache()->promote(signedLsid);
+    res = cache()->promote(lsid);
     ASSERT(!res.isOK());
 }
 
 // Test the startSession method
 TEST_F(LogicalSessionCacheTest, StartSession) {
-    auto signedLsid = SignedLogicalSessionId::gen();
+    auto lsid = makeLogicalSessionIdForTest();
 
     // Test starting a new session
-    auto res = cache()->startSession(signedLsid);
+    auto res = cache()->startSession(lsid);
     ASSERT(res.isOK());
-    ASSERT(sessions()->has(signedLsid.getLsid()));
+    ASSERT(sessions()->has(lsid));
 
     // Try to start a session that is already in the sessions collection and our
     // local cache, should fail
-    res = cache()->startSession(signedLsid);
+    res = cache()->startSession(lsid);
     ASSERT(!res.isOK());
 
     // Try to start a session that is already in the sessions collection but
     // is not in our local cache, should fail
-    auto record2 = LogicalSessionRecord::makeAuthoritativeRecord(SignedLogicalSessionId::gen(),
-                                                                 service()->now());
-    auto signedLsid2 = record2.getSignedLsid();
+    auto record2 = makeLogicalSessionRecord(makeLogicalSessionIdForTest(), service()->now());
+    auto lsid2 = record2.getId();
     sessions()->add(std::move(record2));
-    res = cache()->startSession(signedLsid2);
+    res = cache()->startSession(lsid2);
     ASSERT(!res.isOK());
 
     // Try to start a session that has expired from our cache, and is no
     // longer in the sessions collection, should succeed
     service()->fastForward(Milliseconds(kSessionTimeout.count() + 5));
-    sessions()->remove(signedLsid.getLsid());
-    ASSERT(!sessions()->has(signedLsid.getLsid()));
-    res = cache()->startSession(signedLsid);
+    sessions()->remove(lsid);
+    ASSERT(!sessions()->has(lsid));
+    res = cache()->startSession(lsid);
     ASSERT(res.isOK());
-    ASSERT(sessions()->has(signedLsid.getLsid()));
+    ASSERT(sessions()->has(lsid));
 }
 
 // Test that records in the cache are properly refreshed until they expire
 TEST_F(LogicalSessionCacheTest, CacheRefreshesOwnRecords) {
     // Insert two records into the cache
-    auto signedLsid1 = SignedLogicalSessionId::gen();
-    auto signedLsid2 = SignedLogicalSessionId::gen();
-    cache()->startSession(signedLsid1).transitional_ignore();
-    cache()->startSession(signedLsid2).transitional_ignore();
+    auto lsid1 = makeLogicalSessionIdForTest();
+    auto lsid2 = makeLogicalSessionIdForTest();
+    cache()->startSession(lsid1).transitional_ignore();
+    cache()->startSession(lsid2).transitional_ignore();
 
     stdx::promise<int> hitRefresh;
     auto refreshFuture = hitRefresh.get_future();
@@ -241,7 +240,7 @@ TEST_F(LogicalSessionCacheTest, CacheRefreshesOwnRecords) {
     auto refresh2Future = refresh2.get_future();
 
     // Use one of the records
-    auto res = cache()->fetchAndPromote(signedLsid1);
+    auto res = cache()->fetchAndPromote(lsid1);
     ASSERT(res.isOK());
 
     // Advance time so that one record expires
@@ -258,25 +257,25 @@ TEST_F(LogicalSessionCacheTest, CacheRefreshesOwnRecords) {
 
     service()->fastForward(kSessionTimeout - kForceRefresh + Milliseconds(1));
     refresh2Future.wait();
-    ASSERT_EQ(refresh2Future.get(), signedLsid1.getLsid());
+    ASSERT_EQ(refresh2Future.get(), lsid1);
 }
 
 // Test that cache deletes records that fail to refresh
 TEST_F(LogicalSessionCacheTest, CacheDeletesRecordsThatFailToRefresh) {
     // Put two sessions into the cache
-    auto signedLsid1 = SignedLogicalSessionId::gen();
-    auto signedLsid2 = SignedLogicalSessionId::gen();
-    cache()->startSession(signedLsid1).transitional_ignore();
-    cache()->startSession(signedLsid2).transitional_ignore();
+    auto lsid1 = makeLogicalSessionIdForTest();
+    auto lsid2 = makeLogicalSessionIdForTest();
+    cache()->startSession(lsid1).transitional_ignore();
+    cache()->startSession(lsid2).transitional_ignore();
 
     stdx::promise<void> hitRefresh;
     auto refreshFuture = hitRefresh.get_future();
 
     // Record 1 fails to refresh
-    sessions()->setRefreshHook([&hitRefresh, &signedLsid1](LogicalSessionIdSet sessions) {
+    sessions()->setRefreshHook([&hitRefresh, &lsid1](LogicalSessionIdSet sessions) {
         ASSERT_EQ(sessions.size(), size_t(2));
         hitRefresh.set_value();
-        return LogicalSessionIdSet{signedLsid1.getLsid()};
+        return LogicalSessionIdSet{lsid1};
     });
 
     // Force a refresh
@@ -284,71 +283,71 @@ TEST_F(LogicalSessionCacheTest, CacheDeletesRecordsThatFailToRefresh) {
     refreshFuture.wait();
 
     // Ensure that one record is still there and the other is gone
-    auto res = cache()->promote(signedLsid1);
+    auto res = cache()->promote(lsid1);
     ASSERT(!res.isOK());
-    res = cache()->promote(signedLsid2);
+    res = cache()->promote(lsid2);
     ASSERT(res.isOK());
 }
 
 // Test that we don't remove records that fail to refresh if they are active on the service
 TEST_F(LogicalSessionCacheTest, KeepActiveSessionAliveEvenIfRefreshFails) {
     // Put two sessions into the cache, one into the service
-    auto signedLsid1 = SignedLogicalSessionId::gen();
-    auto signedLsid2 = SignedLogicalSessionId::gen();
-    cache()->startSession(signedLsid1).transitional_ignore();
-    service()->add(signedLsid1.getLsid());
-    cache()->startSession(signedLsid2).transitional_ignore();
+    auto lsid1 = makeLogicalSessionIdForTest();
+    auto lsid2 = makeLogicalSessionIdForTest();
+    cache()->startSession(lsid1).transitional_ignore();
+    service()->add(lsid1);
+    cache()->startSession(lsid2).transitional_ignore();
 
     stdx::promise<void> hitRefresh;
     auto refreshFuture = hitRefresh.get_future();
 
     // SignedLsid 1 fails to refresh
-    sessions()->setRefreshHook([&hitRefresh, &signedLsid1](LogicalSessionIdSet sessions) {
+    sessions()->setRefreshHook([&hitRefresh, &lsid1](LogicalSessionIdSet sessions) {
         ASSERT_EQ(sessions.size(), size_t(2));
         hitRefresh.set_value();
-        return LogicalSessionIdSet{signedLsid1.getLsid()};
+        return LogicalSessionIdSet{lsid1};
     });
 
     // Force a refresh
     service()->fastForward(kForceRefresh);
     refreshFuture.wait();
 
-    // Ensure that both signedLsids are still there
-    auto res = cache()->promote(signedLsid1);
+    // Ensure that both lsids are still there
+    auto res = cache()->promote(lsid1);
     ASSERT(res.isOK());
-    res = cache()->promote(signedLsid2);
+    res = cache()->promote(lsid2);
     ASSERT(res.isOK());
 }
 
-// Test that session cache properly expires signedLsids after 30 minutes of no use
+// Test that session cache properly expires lsids after 30 minutes of no use
 TEST_F(LogicalSessionCacheTest, BasicSessionExpiration) {
-    // Insert a signedLsid
-    auto signedLsid = SignedLogicalSessionId::gen();
-    cache()->startSession(signedLsid).transitional_ignore();
-    auto res = cache()->promote(signedLsid);
+    // Insert a lsid
+    auto lsid = makeLogicalSessionIdForTest();
+    cache()->startSession(lsid).transitional_ignore();
+    auto res = cache()->promote(lsid);
     ASSERT(res.isOK());
 
     // Force it to expire
     service()->fastForward(Milliseconds(kSessionTimeout.count() + 5));
 
     // Check that it is no longer in the cache
-    res = cache()->promote(signedLsid);
+    res = cache()->promote(lsid);
     ASSERT(!res.isOK());
 }
 
 // Test that we keep refreshing sessions that are active on the service
 TEST_F(LogicalSessionCacheTest, LongRunningQueriesAreRefreshed) {
-    auto signedLsid = SignedLogicalSessionId::gen();
+    auto lsid = makeLogicalSessionIdForTest();
 
-    // Insert one active signedLsid on the service, none in the cache
-    service()->add(signedLsid.getLsid());
+    // Insert one active lsid on the service, none in the cache
+    service()->add(lsid);
 
     stdx::mutex mutex;
     stdx::condition_variable cv;
     int count = 0;
 
-    sessions()->setRefreshHook([&cv, &mutex, &count, &signedLsid](LogicalSessionIdSet sessions) {
-        ASSERT_EQ(*(sessions.begin()), signedLsid.getLsid());
+    sessions()->setRefreshHook([&cv, &mutex, &count, &lsid](LogicalSessionIdSet sessions) {
+        ASSERT_EQ(*(sessions.begin()), lsid);
         {
             stdx::unique_lock<stdx::mutex> lk(mutex);
             count++;
@@ -378,7 +377,7 @@ TEST_F(LogicalSessionCacheTest, LongRunningQueriesAreRefreshed) {
     // Wait until the next job has been scheduled
     waitUntilRefreshScheduled();
 
-    // Force another refresh, check that it refreshes that active signedLsid again
+    // Force another refresh, check that it refreshes that active lsid again
     service()->fastForward(kForceRefresh);
     {
         stdx::unique_lock<stdx::mutex> lk(mutex);
@@ -386,18 +385,18 @@ TEST_F(LogicalSessionCacheTest, LongRunningQueriesAreRefreshed) {
     }
 }
 
-// Test that the set of signedLsids we refresh is a sum of cached + active signedLsids
+// Test that the set of lsids we refresh is a sum of cached + active lsids
 TEST_F(LogicalSessionCacheTest, RefreshCachedAndServiceSignedLsidsTogether) {
     // Put one session into the cache, one into the service
-    auto signedLsid1 = SignedLogicalSessionId::gen();
-    service()->add(signedLsid1.getLsid());
-    auto signedLsid2 = SignedLogicalSessionId::gen();
-    cache()->startSession(signedLsid2).transitional_ignore();
+    auto lsid1 = makeLogicalSessionIdForTest();
+    service()->add(lsid1);
+    auto lsid2 = makeLogicalSessionIdForTest();
+    cache()->startSession(lsid2).transitional_ignore();
 
     stdx::promise<void> hitRefresh;
     auto refreshFuture = hitRefresh.get_future();
 
-    // Both signedLsids refresh
+    // Both lsids refresh
     sessions()->setRefreshHook([&hitRefresh](LogicalSessionIdSet sessions) {
         ASSERT_EQ(sessions.size(), size_t(2));
         hitRefresh.set_value();
@@ -409,18 +408,18 @@ TEST_F(LogicalSessionCacheTest, RefreshCachedAndServiceSignedLsidsTogether) {
     refreshFuture.wait();
 }
 
-// Test large sets of cache-only session signedLsids
+// Test large sets of cache-only session lsids
 TEST_F(LogicalSessionCacheTest, ManySignedLsidsInCacheRefresh) {
     int count = LogicalSessionCache::kLogicalSessionCacheDefaultCapacity;
     for (int i = 0; i < count; i++) {
-        auto signedLsid = SignedLogicalSessionId::gen();
-        cache()->startSession(signedLsid).transitional_ignore();
+        auto lsid = makeLogicalSessionIdForTest();
+        cache()->startSession(lsid).transitional_ignore();
     }
 
     stdx::promise<void> hitRefresh;
     auto refreshFuture = hitRefresh.get_future();
 
-    // Check that all signedLsids refresh
+    // Check that all lsids refresh
     sessions()->setRefreshHook([&hitRefresh, &count](LogicalSessionIdSet sessions) {
         ASSERT_EQ(sessions.size(), size_t(count));
         hitRefresh.set_value();
@@ -432,18 +431,18 @@ TEST_F(LogicalSessionCacheTest, ManySignedLsidsInCacheRefresh) {
     refreshFuture.wait();
 }
 
-// Test larger sets of service-only session signedLsids
+// Test larger sets of service-only session lsids
 TEST_F(LogicalSessionCacheTest, ManyLongRunningSessionsRefresh) {
     int count = LogicalSessionCache::kLogicalSessionCacheDefaultCapacity;
     for (int i = 0; i < count; i++) {
-        auto lsid = LogicalSessionId::gen();
+        auto lsid = makeLogicalSessionIdForTest();
         service()->add(lsid);
     }
 
     stdx::promise<void> hitRefresh;
     auto refreshFuture = hitRefresh.get_future();
 
-    // Check that all signedLsids refresh
+    // Check that all lsids refresh
     sessions()->setRefreshHook([&hitRefresh, &count](LogicalSessionIdSet sessions) {
         ASSERT_EQ(sessions.size(), size_t(count));
         hitRefresh.set_value();
@@ -459,10 +458,10 @@ TEST_F(LogicalSessionCacheTest, ManyLongRunningSessionsRefresh) {
 TEST_F(LogicalSessionCacheTest, ManySessionsRefreshComboDeluxe) {
     int count = LogicalSessionCache::kLogicalSessionCacheDefaultCapacity;
     for (int i = 0; i < count; i++) {
-        auto lsid = LogicalSessionId::gen();
+        auto lsid = makeLogicalSessionIdForTest();
         service()->add(lsid);
 
-        auto lsid2 = SignedLogicalSessionId::gen();
+        auto lsid2 = makeLogicalSessionIdForTest();
         cache()->startSession(lsid2).transitional_ignore();
     }
 
@@ -471,7 +470,7 @@ TEST_F(LogicalSessionCacheTest, ManySessionsRefreshComboDeluxe) {
     int refreshes = 0;
     int nRefreshed = 0;
 
-    // Check that all signedLsids refresh successfully
+    // Check that all lsids refresh successfully
     sessions()->setRefreshHook(
         [&refreshes, &mutex, &cv, &nRefreshed](LogicalSessionIdSet sessions) {
             {
@@ -531,7 +530,7 @@ TEST_F(LogicalSessionCacheTest, ManySessionsRefreshComboDeluxe) {
         cv.wait(lk, [&refreshes] { return refreshes == 3; });
     }
 
-    // Since all but one signedLsid failed to refresh, third set should just have one signedLsid
+    // Since all but one lsid failed to refresh, third set should just have one lsid
     ASSERT_EQ(nRefreshed, 1);
 }
 

@@ -547,14 +547,4 @@ private:
     const bool _shouldReplicateWrites;
 };
 }  // namespace repl
-
-/**
- * Parses the session information from the body of a request and installs it on the current
- * operation context. Must only be called once per operation and should be done right in the
- * beginning.
- *
- * Throws if the sessionId/txnNumber combination is not properly formatted.
- */
-void initializeOperationSessionInfo(OperationContext* opCtx, const BSONObj& requestBody);
-
 }  // namespace mongo

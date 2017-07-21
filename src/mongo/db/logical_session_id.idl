@@ -24,15 +24,9 @@ global:
 
 imports:
   - "mongo/idl/basic_types.idl"
+  - "mongo/crypto/sha256_block.idl"
 
 types:
-
-  UUIDIDL:
-    description: "IDL representation of the UUID type"
-    bson_serialization_type: object
-    cpp_type: "mongo::UUID"
-    deserializer: "mongo::UUID::parse"
-    serializer: "mongo::UUID::toBSON"
 
   TxnNumber:
     description: "A strictly-increasing per-session counter, which indicates to which transaction
@@ -50,18 +44,56 @@ types:
 
 structs:
 
-  logical_session_id:
+  LogicalSessionId:
     description: "A struct representing a LogicalSessionId"
     strict: true
     fields:
-      id: UUIDIDL
+      id: uuid
+      uid: sha256Block
+
+  LogicalSessionToClient:
+    description: "A struct representing a LogicalSessionId to external clients"
+    strict: true
+    fields:
+      id: uuid
+      timeoutMinutes: int
+
+  LogicalSessionRecord:
+    description: "A struct representing a LogicalSessionRecord"
+    strict: true
+    fields:
+      id: LogicalSessionId
+      lastUse: date
+
+  LogicalSessionFromClient:
+    description: "A struct representing a LogicalSessionId from external clients"
+    strict: true
+    fields:
+      id: uuid
+      uid:
+        type: sha256Block
+        optional: true
 
   OperationSessionInfo:
+    description: "Parser for serializing sessionId/txnNumber combination"
+    strict: false
+    fields:
+      lsid:
+        type: LogicalSessionId
+        cpp_name: sessionId
+        optional: true
+      txnNumber:
+        description: "The transaction number relative to the session in which a particular write
+                      operation executes."
+        type: TxnNumber
+        optional: true
+
+  OperationSessionInfoFromClient:
     description: "Parser for pulling out the sessionId/txnNumber combination from commands"
     strict: false
     fields:
       lsid:
-        type: logical_session_id
+        type: LogicalSessionFromClient
         cpp_name: sessionId
         optional: true
       txnNumber:

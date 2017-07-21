@@ -39,7 +39,7 @@ class CmdShutdown : public BasicCommand {
 public:
     CmdShutdown() : BasicCommand("shutdown") {}
 
-    virtual bool requiresAuth() {
+    bool requiresAuth() const override {
         return true;
     }
     virtual bool adminOnly() const {

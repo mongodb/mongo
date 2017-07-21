@@ -42,6 +42,7 @@
 #include "mongo/db/auth/authorization_session.h"
 #include "mongo/db/commands.h"
 #include "mongo/db/logical_clock.h"
+#include "mongo/db/logical_session_id_helpers.h"
 #include "mongo/db/logical_time_validator.h"
 #include "mongo/db/matcher/extensions_callback_noop.h"
 #include "mongo/db/namespace_string.h"
@@ -256,12 +257,12 @@ void runAgainstRegistered(OperationContext* opCtx,
         return;
     }
 
+    initializeOperationSessionInfo(opCtx, request.body, c->requiresAuth());
+
     execCommandClient(opCtx, c, request, anObjBuilder);
 }
 
 void runCommand(OperationContext* opCtx, const OpMsgRequest& request, BSONObjBuilder&& builder) {
-    initializeOperationSessionInfo(opCtx, request.body);
-
     // Handle command option maxTimeMS.
     uassert(ErrorCodes::InvalidOptions,
             "no such command option $maxTimeMs; use maxTimeMS instead",

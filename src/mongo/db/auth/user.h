@@ -32,6 +32,7 @@
 
 #include "mongo/base/disallow_copying.h"
 #include "mongo/bson/oid.h"
+#include "mongo/crypto/sha256_block.h"
 #include "mongo/db/auth/privilege.h"
 #include "mongo/db/auth/resource_pattern.h"
 #include "mongo/db/auth/restriction_set.h"
@@ -93,6 +94,11 @@ public:
     const boost::optional<OID>& getID() const;
 
     /**
+     * Returns a digest of the user's identity
+     */
+    const SHA256Block& getDigest() const;
+
+    /**
      * Returns an iterator over the names of the user's direct roles
      */
     RoleNameIterator getRoles() const;
@@ -136,11 +142,6 @@ public:
      * only caller of this.
      */
     uint32_t getRefCount() const;
-
-    /**
-     * Clones this user into a new, valid User object with refcount of 0.
-     */
-    User* clone() const;
 
     // Mutators below.  Mutation functions should *only* be called by the AuthorizationManager
 
@@ -236,6 +237,9 @@ private:
     // upgrade path from 3.4 to 3.6. When comparing User documents' generations, we consider
     // an unset _id field to be a distinct value that will fail to compare to any other id value.
     boost::optional<OID> _id;
+
+    // Digest of the full username
+    SHA256Block _digest;
 
     // Maps resource name to privilege on that resource
     ResourcePrivilegeMap _privileges;

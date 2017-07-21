@@ -35,14 +35,6 @@ imports:
     - "mongo/idl/basic_types.idl"
     - "mongo/db/logical_session_id.idl"
 
-types:
-    LogicalSessionId:
-        description: "Logical_session_id"
-        bson_serialization_type: object
-        cpp_type: "mongo::LogicalSessionId"
-        deserializer: "mongo::LogicalSessionId::parse"
-        serializer: "mongo::LogicalSessionId::toBSON"
-
 structs:
     sessionTxnRecord:
         description: "A document used for storing session transaction states."

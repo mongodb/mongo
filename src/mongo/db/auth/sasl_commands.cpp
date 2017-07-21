@@ -85,7 +85,7 @@ public:
     virtual bool slaveOk() const {
         return true;
     }
-    virtual bool requiresAuth() {
+    bool requiresAuth() const override {
         return false;
     }
 };
@@ -111,7 +111,7 @@ public:
     virtual bool slaveOk() const {
         return true;
     }
-    virtual bool requiresAuth() {
+    bool requiresAuth() const override {
         return false;
     }
 };

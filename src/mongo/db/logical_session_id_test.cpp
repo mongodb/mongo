@@ -30,56 +30,225 @@
 
 #include <string>
 
-#include "mongo/bson/bsonmisc.h"
-#include "mongo/bson/bsonobj.h"
-#include "mongo/bson/bsonobjbuilder.h"
-#include "mongo/bson/bsontypes.h"
 #include "mongo/db/logical_session_id.h"
+
+#include "mongo/db/auth/action_set.h"
+#include "mongo/db/auth/action_type.h"
+#include "mongo/db/auth/authorization_manager.h"
+#include "mongo/db/auth/authorization_session.h"
+#include "mongo/db/auth/authorization_session_for_test.h"
+#include "mongo/db/auth/authz_manager_external_state_mock.h"
+#include "mongo/db/auth/authz_session_external_state_mock.h"
+#include "mongo/db/auth/user.h"
+#include "mongo/db/jsobj.h"
+#include "mongo/db/logical_session_id_helpers.h"
+#include "mongo/db/operation_context_noop.h"
+#include "mongo/db/server_options.h"
+#include "mongo/db/service_context_noop.h"
+#include "mongo/transport/session.h"
+#include "mongo/transport/transport_layer_mock.h"
 #include "mongo/unittest/unittest.h"
-#include "mongo/util/uuid.h"
 
 namespace mongo {
 namespace {
 
-TEST(LogicalSessionIdTest, ToAndFromStringTest) {
-    // Round-trip a UUID string
-    auto uuid = UUID::gen();
-    auto uuidString = uuid.toString();
+class LogicalSessionIdTest : public ::mongo::unittest::Test {
+public:
+    AuthzManagerExternalStateMock* managerState;
+    transport::TransportLayerMock transportLayer;
+    transport::SessionHandle session;
+    ServiceContextNoop serviceContext;
+    ServiceContext::UniqueClient client;
+    ServiceContext::UniqueOperationContext _opCtx;
+    AuthzSessionExternalStateMock* sessionState;
+    AuthorizationManager* authzManager;
+    AuthorizationSessionForTest* authzSession;
 
-    auto res = LogicalSessionId::parse(uuidString);
-    ASSERT(res.isOK());
+    void setUp() {
+        serverGlobalParams.featureCompatibility.version.store(
+            ServerGlobalParams::FeatureCompatibility::Version::k36);
+        session = transportLayer.createSession();
+        client = serviceContext.makeClient("testClient", session);
+        RestrictionEnvironment::set(
+            session, stdx::make_unique<RestrictionEnvironment>(SockAddr(), SockAddr()));
+        _opCtx = client->makeOperationContext();
+        auto localManagerState = stdx::make_unique<AuthzManagerExternalStateMock>();
+        managerState = localManagerState.get();
+        managerState->setAuthzVersion(AuthorizationManager::schemaVersion26Final);
+        auto uniqueAuthzManager =
+            stdx::make_unique<AuthorizationManager>(std::move(localManagerState));
+        authzManager = uniqueAuthzManager.get();
+        AuthorizationManager::set(&serviceContext, std::move(uniqueAuthzManager));
+        auto localSessionState = stdx::make_unique<AuthzSessionExternalStateMock>(authzManager);
+        sessionState = localSessionState.get();
 
-    auto lsidString = res.getValue().toString();
-    ASSERT_EQUALS(uuidString, lsidString);
+        auto localauthzSession =
+            stdx::make_unique<AuthorizationSessionForTest>(std::move(localSessionState));
+        authzSession = localauthzSession.get();
 
-    // Test with a bad string
-    res = LogicalSessionId::parse("not a session id!");
-    ASSERT(!res.isOK());
+        AuthorizationSession::set(client.get(), std::move(localauthzSession));
+        authzManager->setAuthEnabled(true);
+    }
+
+    User* addSimpleUser(UserName un) {
+        ASSERT_OK(managerState->insertPrivilegeDocument(
+            _opCtx.get(),
+            BSON("user" << un.getUser() << "db" << un.getDB() << "credentials" << BSON("MONGODB-CR"
+                                                                                       << "a")
+                        << "roles"
+                        << BSON_ARRAY(BSON("role"
+                                           << "readWrite"
+                                           << "db"
+                                           << "test"))),
+            BSONObj()));
+        ASSERT_OK(authzSession->addAndAuthorizeUser(_opCtx.get(), un));
+        return authzSession->lookupUser(un);
+    }
+
+    User* addClusterUser(UserName un) {
+        ASSERT_OK(managerState->insertPrivilegeDocument(
+            _opCtx.get(),
+            BSON("user" << un.getUser() << "db" << un.getDB() << "credentials" << BSON("MONGODB-CR"
+                                                                                       << "a")
+                        << "roles"
+                        << BSON_ARRAY(BSON("role"
+                                           << "__system"
+                                           << "db"
+                                           << "admin"))),
+            BSONObj()));
+        ASSERT_OK(authzSession->addAndAuthorizeUser(_opCtx.get(), un));
+        return authzSession->lookupUser(un);
+    }
+};
+
+TEST_F(LogicalSessionIdTest, ConstructorFromClientWithoutPassedUid) {
+    auto id = UUID::gen();
+    User* user = addSimpleUser(UserName("simple", "test"));
+
+    LogicalSessionFromClient req;
+    req.setId(id);
+
+    LogicalSessionId lsid = makeLogicalSessionId(req, _opCtx.get());
+    ASSERT_EQ(lsid.getId(), id);
+    ASSERT_EQ(lsid.getUid(), user->getDigest());
 }
 
-TEST(LogicalSessionIdTest, FromBSONTest) {
-    auto uuid = UUID::gen();
+TEST_F(LogicalSessionIdTest, ConstructorFromClientWithoutPassedUidAndWithoutAuthedUser) {
+    auto id = UUID::gen();
 
-    BSONObjBuilder b;
-    b.append("id", uuid.toBSON());
-    auto bson = b.done();
+    LogicalSessionFromClient req;
+    req.setId(id);
 
-    auto lsid = LogicalSessionId::parse(bson);
-    ASSERT_EQUALS(lsid.toString(), uuid.toString());
+    ASSERT_THROWS(makeLogicalSessionId(req, _opCtx.get()), UserException);
+}
 
-    // Dump back to BSON, make sure we get the same thing
-    auto bsonDump = lsid.toBSON();
-    ASSERT_EQ(bsonDump.woCompare(bson), 0);
+TEST_F(LogicalSessionIdTest, ConstructorFromClientWithPassedUidWithPermissions) {
+    auto id = UUID::gen();
+    auto uid = SHA256Block{};
+    addClusterUser(UserName("cluster", "test"));
 
-    // Try parsing mal-formatted bson objs
-    ASSERT_THROWS(LogicalSessionId::parse(BSON("hi"
-                                               << "there")),
-                  UserException);
+    LogicalSessionFromClient req;
+    req.setId(id);
+    req.setUid(uid);
 
-    ASSERT_THROWS(LogicalSessionId::parse(BSON("id"
-                                               << "not a session id!")),
-                  UserException);
-    ASSERT_THROWS(LogicalSessionId::parse(BSON("id" << 14)), UserException);
+    LogicalSessionId lsid = makeLogicalSessionId(req, _opCtx.get());
+
+    ASSERT_EQ(lsid.getId(), id);
+    ASSERT_EQ(lsid.getUid(), uid);
+}
+
+TEST_F(LogicalSessionIdTest, ConstructorFromClientWithPassedUidWithoutAuthedUser) {
+    auto id = UUID::gen();
+    auto uid = SHA256Block{};
+
+    LogicalSessionFromClient req;
+    req.setId(id);
+    req.setUid(uid);
+
+    ASSERT_THROWS(makeLogicalSessionId(req, _opCtx.get()), UserException);
+}
+
+TEST_F(LogicalSessionIdTest, ConstructorFromClientWithPassedUidWithoutPermissions) {
+    auto id = UUID::gen();
+    auto uid = SHA256Block{};
+    addSimpleUser(UserName("simple", "test"));
+
+    LogicalSessionFromClient req;
+    req.setId(id);
+    req.setUid(uid);
+
+    ASSERT_THROWS(makeLogicalSessionId(req, _opCtx.get()), UserException);
+}
+
+TEST_F(LogicalSessionIdTest, GenWithUser) {
+    User* user = addSimpleUser(UserName("simple", "test"));
+    auto lsid = makeLogicalSessionId(_opCtx.get());
+
+    ASSERT_EQ(lsid.getUid(), user->getDigest());
+}
+
+TEST_F(LogicalSessionIdTest, GenWithMultipleAuthedUsers) {
+    addSimpleUser(UserName("simple", "test"));
+    addSimpleUser(UserName("simple", "test2"));
+
+    ASSERT_THROWS(makeLogicalSessionId(_opCtx.get()), UserException);
+}
+
+TEST_F(LogicalSessionIdTest, GenWithoutAuthedUser) {
+    ASSERT_THROWS(makeLogicalSessionId(_opCtx.get()), UserException);
+}
+
+TEST_F(LogicalSessionIdTest, InitializeOperationSessionInfo_NoSessionIdNoTransactionNumber) {
+    addSimpleUser(UserName("simple", "test"));
+    initializeOperationSessionInfo(_opCtx.get(), BSON("TestCmd" << 1), true);
+
+    ASSERT(!_opCtx->getLogicalSessionId());
+    ASSERT(!_opCtx->getTxnNumber());
+}
+
+TEST_F(LogicalSessionIdTest, InitializeOperationSessionInfo_SessionIdNoTransactionNumber) {
+    addSimpleUser(UserName("simple", "test"));
+    LogicalSessionFromClient lsid{};
+    lsid.setId(UUID::gen());
+
+    initializeOperationSessionInfo(_opCtx.get(),
+                                   BSON("TestCmd" << 1 << "lsid" << lsid.toBSON() << "OtherField"
+                                                  << "TestField"),
+                                   true);
+
+    ASSERT(_opCtx->getLogicalSessionId());
+    ASSERT_EQ(lsid.getId(), _opCtx->getLogicalSessionId()->getId());
+
+    ASSERT(!_opCtx->getTxnNumber());
+}
+
+TEST_F(LogicalSessionIdTest, InitializeOperationSessionInfo_MissingSessionIdWithTransactionNumber) {
+    addSimpleUser(UserName("simple", "test"));
+    ASSERT_THROWS_CODE(
+        initializeOperationSessionInfo(_opCtx.get(),
+                                       BSON("TestCmd" << 1 << "txnNumber" << 100LL << "OtherField"
+                                                      << "TestField"),
+                                       true),
+        UserException,
+        ErrorCodes::IllegalOperation);
+}
+
+TEST_F(LogicalSessionIdTest, InitializeOperationSessionInfo_SessionIdAndTransactionNumber) {
+    addSimpleUser(UserName("simple", "test"));
+    LogicalSessionFromClient lsid;
+    lsid.setId(UUID::gen());
+
+    initializeOperationSessionInfo(
+        _opCtx.get(),
+        BSON("TestCmd" << 1 << "lsid" << lsid.toBSON() << "txnNumber" << 100LL << "OtherField"
+                       << "TestField"),
+        true);
+
+    ASSERT(_opCtx->getLogicalSessionId());
+    ASSERT_EQ(lsid.getId(), _opCtx->getLogicalSessionId()->getId());
+
+    ASSERT(_opCtx->getTxnNumber());
+    ASSERT_EQ(100, *_opCtx->getTxnNumber());
 }
 
 }  // namespace

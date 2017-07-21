@@ -393,25 +393,4 @@ Date_t OperationContext::getExpirationDateForWaitForValue(Milliseconds waitFor) 
     return getServiceContext()->getPreciseClockSource()->now() + waitFor;
 }
 
-void initializeOperationSessionInfo(OperationContext* opCtx, const BSONObj& requestBody) {
-    auto osi =
-        OperationSessionInfo::parse(IDLParserErrorContext("OperationSessionInfo"), requestBody);
-
-    if (osi.getSessionId()) {
-        auto lsid = *osi.getSessionId();
-        opCtx->setLogicalSessionId(LogicalSessionId(std::move(lsid)));
-    }
-
-    if (osi.getTxnNumber()) {
-        uassert(ErrorCodes::IllegalOperation,
-                "Transaction number requires a sessionId to be specified",
-                opCtx->getLogicalSessionId());
-        uassert(ErrorCodes::BadValue,
-                "Transaction number cannot be negative",
-                *osi.getTxnNumber() >= 0);
-
-        opCtx->setTxnNumber(*osi.getTxnNumber());
-    }
-}
-
 }  // namespace mongo

@@ -111,7 +111,7 @@ private:
 };
 
 TEST_F(SessionTest, CanCreateNewSessionEntry) {
-    const auto sessionId = LogicalSessionId::gen();
+    const auto sessionId = makeLogicalSessionIdForTest();
     const TxnNumber txnNum = 20;
 
     Session txnState(sessionId);
@@ -141,7 +141,7 @@ TEST_F(SessionTest, CanCreateNewSessionEntry) {
 }
 
 TEST_F(SessionTest, StartingOldTxnShouldAssert) {
-    const auto sessionId = LogicalSessionId::gen();
+    const auto sessionId = makeLogicalSessionIdForTest();
     const TxnNumber txnNum = 20;
 
     Session txnState(sessionId);
@@ -154,7 +154,7 @@ TEST_F(SessionTest, StartingOldTxnShouldAssert) {
 }
 
 TEST_F(SessionTest, StartingNewSessionWithCompatibleEntryInStorage) {
-    const auto sessionId = LogicalSessionId::gen();
+    const auto sessionId = makeLogicalSessionIdForTest();
     const TxnNumber txnNum = 20;
     const Timestamp origTs(985, 15);
 
@@ -193,7 +193,7 @@ TEST_F(SessionTest, StartingNewSessionWithCompatibleEntryInStorage) {
 }
 
 TEST_F(SessionTest, StartingNewSessionWithOlderEntryInStorageShouldUpdateEntry) {
-    const auto sessionId = LogicalSessionId::gen();
+    const auto sessionId = makeLogicalSessionIdForTest();
     TxnNumber txnNum = 20;
     const Timestamp origTs(985, 15);
 
@@ -232,7 +232,7 @@ TEST_F(SessionTest, StartingNewSessionWithOlderEntryInStorageShouldUpdateEntry) 
 }
 
 TEST_F(SessionTest, StartingNewSessionWithNewerEntryInStorageShouldAssert) {
-    const auto sessionId = LogicalSessionId::gen();
+    const auto sessionId = makeLogicalSessionIdForTest();
     TxnNumber txnNum = 20;
     const Timestamp origTs(985, 15);
 
@@ -271,7 +271,7 @@ TEST_F(SessionTest, StartingNewSessionWithNewerEntryInStorageShouldAssert) {
 }
 
 TEST_F(SessionTest, StoreOpTime) {
-    const auto sessionId = LogicalSessionId::gen();
+    const auto sessionId = makeLogicalSessionIdForTest();
     const TxnNumber txnNum = 20;
     const Timestamp ts1(100, 42);
 
@@ -337,7 +337,7 @@ TEST_F(SessionTest, StoreOpTime) {
 }
 
 TEST_F(SessionTest, CanBumpTransactionIdIfNewer) {
-    const auto sessionId = LogicalSessionId::gen();
+    const auto sessionId = makeLogicalSessionIdForTest();
     TxnNumber txnNum = 20;
     const Timestamp ts1(100, 42);
 
@@ -397,7 +397,7 @@ TEST_F(SessionTest, CanBumpTransactionIdIfNewer) {
 }
 
 TEST_F(SessionTest, StartingNewSessionWithDroppedTableShouldAssert) {
-    const auto sessionId = LogicalSessionId::gen();
+    const auto sessionId = makeLogicalSessionIdForTest();
     const TxnNumber txnNum = 20;
 
     const auto& ns = NamespaceString::kSessionTransactionsTableNamespace;
@@ -413,7 +413,7 @@ TEST_F(SessionTest, StartingNewSessionWithDroppedTableShouldAssert) {
 }
 
 TEST_F(SessionTest, SaveTxnProgressShouldAssertIfTableIsDropped) {
-    const auto sessionId = LogicalSessionId::gen();
+    const auto sessionId = makeLogicalSessionIdForTest();
     const TxnNumber txnNum = 20;
     const Timestamp ts1(100, 42);
 
@@ -433,14 +433,14 @@ TEST_F(SessionTest, SaveTxnProgressShouldAssertIfTableIsDropped) {
 }
 
 TEST_F(SessionTest, TwoSessionsShouldBeIndependent) {
-    const auto sessionId1 = LogicalSessionId::gen();
+    const auto sessionId1 = makeLogicalSessionIdForTest();
     const TxnNumber txnNum1 = 20;
     const Timestamp ts1(1903, 42);
 
     Session txnState1(sessionId1);
     txnState1.begin(opCtx(), txnNum1);
 
-    const auto sessionId2 = LogicalSessionId::gen();
+    const auto sessionId2 = makeLogicalSessionIdForTest();
     const TxnNumber txnNum2 = 300;
     const Timestamp ts2(671, 5);
 
@@ -498,7 +498,7 @@ TEST_F(SessionTest, TwoSessionsShouldBeIndependent) {
 }
 
 TEST_F(SessionTest, CheckStatementExecuted) {
-    const auto sessionId = LogicalSessionId::gen();
+    const auto sessionId = makeLogicalSessionIdForTest();
     const TxnNumber txnNum = 20;
     const StmtId stmtId = 5;
 

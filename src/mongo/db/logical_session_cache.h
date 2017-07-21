@@ -30,10 +30,8 @@
 
 #include "mongo/base/status_with.h"
 #include "mongo/db/logical_session_id.h"
-#include "mongo/db/logical_session_record.h"
 #include "mongo/db/service_liason.h"
 #include "mongo/db/sessions_collection.h"
-#include "mongo/db/signed_logical_session_id.h"
 #include "mongo/db/time_proof_service.h"
 #include "mongo/platform/atomic_word.h"
 #include "mongo/stdx/thread.h"
@@ -120,7 +118,7 @@ public:
      *
      * This method does not issue networking calls.
      */
-    Status promote(SignedLogicalSessionId lsid);
+    Status promote(LogicalSessionId lsid);
 
     /**
      * If the cache contains a record for this LogicalSessionId, promotes it.
@@ -129,7 +127,7 @@ public:
      *
      * This method may issue networking calls.
      */
-    Status fetchAndPromote(SignedLogicalSessionId lsid);
+    Status fetchAndPromote(LogicalSessionId lsid);
 
     /**
      * Inserts a new authoritative session record into the cache. This method will
@@ -137,22 +135,7 @@ public:
      * should only be used when starting new sessions and should not be used to
      * insert records for existing sessions.
      */
-    Status startSession(SignedLogicalSessionId lsid);
-
-    /**
-     * Generates and sets a signature for the fields in this LogicalSessionId.
-     *
-     * If this method is not able to acquire a key to perform the signature
-     * this call will return an error.
-     */
-    StatusWith<SignedLogicalSessionId> signLsid(OperationContext* opCtx,
-                                                const LogicalSessionId& id,
-                                                boost::optional<OID> userId);
-
-    /**
-     * Validates that this LogicalSessionId was signed with the correct key.
-     */
-    Status validateLsid(OperationContext* opCtx, const SignedLogicalSessionId& lsid);
+    Status startSession(LogicalSessionId lsid);
 
     /**
      * Removes all local records in this cache. Does not remove the corresponding
@@ -184,7 +167,7 @@ private:
     std::unique_ptr<SessionsCollection> _sessionsColl;
 
     stdx::mutex _cacheMutex;
-    LRUCache<LogicalSessionId, LogicalSessionRecord, LogicalSessionId::Hash> _cache;
+    LRUCache<LogicalSessionId, LogicalSessionRecord, LogicalSessionIdHash> _cache;
 };
 
 }  // namespace mongo

@@ -31,48 +31,18 @@
 #include "mongo/db/logical_session_id.h"
 
 #include "mongo/bson/bsonobjbuilder.h"
+#include "mongo/db/logical_session_cache.h"
 #include "mongo/util/assert_util.h"
 
 namespace mongo {
 
-LogicalSessionId::LogicalSessionId() : LogicalSessionId(UUID::gen()) {}
-
-LogicalSessionId::LogicalSessionId(Logical_session_id&& lsid) {
-    static_cast<Logical_session_id&>(*this) = lsid;
-}
-
-LogicalSessionId::LogicalSessionId(UUID id) {
-    setId(std::move(id));
-}
-
-LogicalSessionId LogicalSessionId::gen() {
-    return {UUID::gen()};
-}
-
-StatusWith<LogicalSessionId> LogicalSessionId::parse(const std::string& s) {
-    auto res = UUID::parse(s);
-    if (!res.isOK()) {
-        return res.getStatus();
-    }
-
-    return LogicalSessionId{std::move(res.getValue())};
-}
-
-LogicalSessionId LogicalSessionId::parse(const BSONObj& doc) {
-    IDLParserErrorContext ctx("logical session id");
+LogicalSessionId makeLogicalSessionIdForTest() {
     LogicalSessionId lsid;
-    lsid.parseProtected(ctx, doc);
+
+    lsid.setId(UUID::gen());
+    lsid.setUid(SHA256Block::computeHash({}));
+
     return lsid;
-}
-
-BSONObj LogicalSessionId::toBSON() const {
-    BSONObjBuilder builder;
-    serialize(&builder);
-    return builder.obj();
-}
-
-std::string LogicalSessionId::toString() const {
-    return getId().toString();
 }
 
 }  // namespace mongo

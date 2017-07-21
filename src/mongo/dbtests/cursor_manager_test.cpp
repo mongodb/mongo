@@ -441,7 +441,7 @@ TEST_F(CursorManagerTestCustomOpCtx, LogicalSessionIdOnOperationCtxTest) {
 
     // Cursors created on an op ctx with a session id have a session id.
     {
-        auto lsid = LogicalSessionId::gen();
+        auto lsid = makeLogicalSessionIdForTest();
         auto opCtx2 = _queryServiceContext->makeOperationContext(lsid);
         auto pinned2 = makeCursor(opCtx2.get());
 
@@ -469,7 +469,7 @@ TEST_F(CursorManagerTestCustomOpCtx, CursorsWithoutSessions) {
  */
 TEST_F(CursorManagerTestCustomOpCtx, OneCursorWithASession) {
     // Add a cursor with a session to the cursor manager.
-    auto lsid = LogicalSessionId::gen();
+    auto lsid = makeLogicalSessionIdForTest();
     auto opCtx = _queryServiceContext->makeOperationContext(lsid);
     auto pinned = makeCursor(opCtx.get());
 
@@ -501,7 +501,7 @@ TEST_F(CursorManagerTestCustomOpCtx, OneCursorWithASession) {
  */
 TEST_F(CursorManagerTestCustomOpCtx, MultipleCursorsWithSameSession) {
     // Add two cursors on the same session to the cursor manager.
-    auto lsid = LogicalSessionId::gen();
+    auto lsid = makeLogicalSessionIdForTest();
     auto opCtx = _queryServiceContext->makeOperationContext(lsid);
     auto pinned = makeCursor(opCtx.get());
     auto pinned2 = makeCursor(opCtx.get());
@@ -510,7 +510,7 @@ TEST_F(CursorManagerTestCustomOpCtx, MultipleCursorsWithSameSession) {
     auto cursorId2 = pinned2.getCursor()->cursorid();
 
     // Retrieve all sessions - set should contain just lsid.
-    stdx::unordered_set<LogicalSessionId, LogicalSessionId::Hash> lsids;
+    stdx::unordered_set<LogicalSessionId, LogicalSessionIdHash> lsids;
     useCursorManager()->appendActiveSessions(&lsids);
     ASSERT_EQ(lsids.size(), size_t(1));
     ASSERT(lsids.find(lsid) != lsids.end());
@@ -541,8 +541,8 @@ TEST_F(CursorManagerTestCustomOpCtx, MultipleCursorsWithSameSession) {
  * Test a manager with multiple cursors running inside of different sessions.
  */
 TEST_F(CursorManagerTestCustomOpCtx, MultipleCursorsMultipleSessions) {
-    auto lsid1 = LogicalSessionId::gen();
-    auto lsid2 = LogicalSessionId::gen();
+    auto lsid1 = makeLogicalSessionIdForTest();
+    auto lsid2 = makeLogicalSessionIdForTest();
 
     CursorId cursor1;
     CursorId cursor2;

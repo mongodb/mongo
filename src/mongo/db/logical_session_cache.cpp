@@ -32,6 +32,7 @@
 
 #include "mongo/db/logical_session_cache.h"
 
+#include "mongo/db/logical_session_id.h"
 #include "mongo/db/operation_context.h"
 #include "mongo/db/server_parameters.h"
 #include "mongo/db/service_context.h"
@@ -99,15 +100,15 @@ LogicalSessionCache::~LogicalSessionCache() {
     }
 }
 
-Status LogicalSessionCache::fetchAndPromote(SignedLogicalSessionId slsid) {
+Status LogicalSessionCache::fetchAndPromote(LogicalSessionId lsid) {
     // Search our local cache first
-    auto promoteRes = promote(slsid);
+    auto promoteRes = promote(lsid);
     if (promoteRes.isOK()) {
         return promoteRes;
     }
 
     // Cache miss, must fetch from the sessions collection.
-    auto res = _sessionsColl->fetchRecord(slsid);
+    auto res = _sessionsColl->fetchRecord(lsid);
 
     // If we got a valid record, add it to our cache.
     if (res.isOK()) {
@@ -124,9 +125,9 @@ Status LogicalSessionCache::fetchAndPromote(SignedLogicalSessionId slsid) {
     return res.getStatus();
 }
 
-Status LogicalSessionCache::promote(SignedLogicalSessionId slsid) {
+Status LogicalSessionCache::promote(LogicalSessionId lsid) {
     stdx::unique_lock<stdx::mutex> lk(_cacheMutex);
-    auto it = _cache.find(slsid.getLsid());
+    auto it = _cache.find(lsid);
     if (it == _cache.end()) {
         return {ErrorCodes::NoSuchSession, "no matching session record found in the cache"};
     }
@@ -142,14 +143,14 @@ Status LogicalSessionCache::promote(SignedLogicalSessionId slsid) {
     return Status::OK();
 }
 
-Status LogicalSessionCache::startSession(SignedLogicalSessionId slsid) {
-    // Make sure the timestamp makes sense
-    auto authoritativeRecord =
-        LogicalSessionRecord::makeAuthoritativeRecord(slsid, _service->now());
+Status LogicalSessionCache::startSession(LogicalSessionId lsid) {
+    LogicalSessionRecord lsr;
+    lsr.setId(lsid);
+    lsr.setLastUse(_service->now());
 
     // Attempt to insert into the sessions collection first. This collection enforces
     // unique session ids, so it will act as concurrency control for us.
-    auto res = _sessionsColl->insertRecord(authoritativeRecord);
+    auto res = _sessionsColl->insertRecord(lsr);
     if (!res.isOK()) {
         return res;
     }
@@ -158,9 +159,9 @@ Status LogicalSessionCache::startSession(SignedLogicalSessionId slsid) {
     // conflicting record is not dead and is not equal to our record, an interloper
     // may have ended this session and then created a new one with the same id.
     // In this case, return a failure.
-    auto oldRecord = _addToCache(authoritativeRecord);
+    auto oldRecord = _addToCache(lsr);
     if (oldRecord) {
-        if (*oldRecord != authoritativeRecord) {
+        if (*oldRecord != lsr) {
             if (!_isDead(*oldRecord, _service->now())) {
                 return {ErrorCodes::DuplicateSession, "session with this id already exists"};
             }
@@ -168,17 +169,6 @@ Status LogicalSessionCache::startSession(SignedLogicalSessionId slsid) {
     }
 
     return Status::OK();
-}
-
-StatusWith<SignedLogicalSessionId> LogicalSessionCache::signLsid(OperationContext* opCtx,
-                                                                 const LogicalSessionId& id,
-                                                                 boost::optional<OID> userId) {
-    return _service->signLsid(opCtx, id, std::move(userId));
-}
-
-Status LogicalSessionCache::validateLsid(OperationContext* opCtx,
-                                         const SignedLogicalSessionId& slsid) {
-    return _service->validateLsid(opCtx, slsid);
 }
 
 void LogicalSessionCache::_refresh() {
@@ -201,9 +191,9 @@ void LogicalSessionCache::_refresh() {
     for (auto& it : cacheCopy) {
         auto record = it.second;
         if (!_isDead(record, now)) {
-            activeSessions.insert(record.getSignedLsid().getLsid());
+            activeSessions.insert(LogicalSessionId{record.getId()});
         } else {
-            deadSessions.insert(record.getSignedLsid().getLsid());
+            deadSessions.insert(LogicalSessionId{record.getId()});
         }
     }
 
@@ -260,7 +250,7 @@ bool LogicalSessionCache::_isDead(const LogicalSessionRecord& record, Date_t now
 boost::optional<LogicalSessionRecord> LogicalSessionCache::_addToCache(
     LogicalSessionRecord record) {
     stdx::unique_lock<stdx::mutex> lk(_cacheMutex);
-    return _cache.add(record.getSignedLsid().getLsid(), std::move(record));
+    return _cache.add(record.getId(), std::move(record));
 }
 
 }  // namespace mongo

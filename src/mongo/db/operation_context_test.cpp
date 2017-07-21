@@ -89,7 +89,7 @@ TEST(OperationContextTest, SessionIdNoTransactionNumber) {
     auto client = serviceCtx->makeClient("OperationContextTest");
     auto opCtx = client->makeOperationContext();
 
-    const auto lsid = assertGet(LogicalSessionId::parse("00000000-abab-4000-8000-000000000000"));
+    const auto lsid = makeLogicalSessionIdForTest();
     opCtx->setLogicalSessionId(lsid);
 
     ASSERT(opCtx->getLogicalSessionId());
@@ -103,72 +103,12 @@ TEST(OperationContextTest, SessionIdAndTransactionNumber) {
     auto client = serviceCtx->makeClient("OperationContextTest");
     auto opCtx = client->makeOperationContext();
 
-    const auto lsid = assertGet(LogicalSessionId::parse("00000000-abab-4000-8000-000000000000"));
+    const auto lsid = makeLogicalSessionIdForTest();
     opCtx->setLogicalSessionId(lsid);
     opCtx->setTxnNumber(5);
 
     ASSERT(opCtx->getTxnNumber());
     ASSERT_EQUALS(5, *opCtx->getTxnNumber());
-}
-
-TEST(OperationContextTest, InitializeOperationSessionInfo_NoSessionIdNoTransactionNumber) {
-    auto serviceCtx = stdx::make_unique<ServiceContextNoop>();
-    auto client = serviceCtx->makeClient("OperationContextTest");
-    auto opCtx = client->makeOperationContext();
-
-    initializeOperationSessionInfo(opCtx.get(), BSON("TestCmd" << 1));
-
-    ASSERT(!opCtx->getLogicalSessionId());
-    ASSERT(!opCtx->getTxnNumber());
-}
-
-TEST(OperationContextTest, InitializeOperationSessionInfo_SessionIdNoTransactionNumber) {
-    auto serviceCtx = stdx::make_unique<ServiceContextNoop>();
-    auto client = serviceCtx->makeClient("OperationContextTest");
-    auto opCtx = client->makeOperationContext();
-
-    LogicalSessionId lsid;
-
-    initializeOperationSessionInfo(opCtx.get(),
-                                   BSON("TestCmd" << 1 << "lsid" << lsid.toBSON() << "OtherField"
-                                                  << "TestField"));
-
-    ASSERT(opCtx->getLogicalSessionId());
-    ASSERT_EQ(lsid, *opCtx->getLogicalSessionId());
-
-    ASSERT(!opCtx->getTxnNumber());
-}
-
-TEST(OperationContextTest, InitializeOperationSessionInfo_MissingSessionIdWithTransactionNumber) {
-    auto serviceCtx = stdx::make_unique<ServiceContextNoop>();
-    auto client = serviceCtx->makeClient("OperationContextTest");
-    auto opCtx = client->makeOperationContext();
-
-    ASSERT_THROWS_CODE(
-        initializeOperationSessionInfo(opCtx.get(),
-                                       BSON("TestCmd" << 1 << "txnNumber" << 100LL << "OtherField"
-                                                      << "TestField")),
-        UserException,
-        ErrorCodes::IllegalOperation);
-}
-
-TEST(OperationContextTest, InitializeOperationSessionInfo_SessionIdAndTransactionNumber) {
-    auto serviceCtx = stdx::make_unique<ServiceContextNoop>();
-    auto client = serviceCtx->makeClient("OperationContextTest");
-    auto opCtx = client->makeOperationContext();
-
-    LogicalSessionId lsid;
-
-    initializeOperationSessionInfo(
-        opCtx.get(),
-        BSON("TestCmd" << 1 << "lsid" << lsid.toBSON() << "txnNumber" << 100LL << "OtherField"
-                       << "TestField"));
-
-    ASSERT(opCtx->getLogicalSessionId());
-    ASSERT_EQ(lsid, *opCtx->getLogicalSessionId());
-
-    ASSERT(opCtx->getTxnNumber());
-    ASSERT_EQ(100, *opCtx->getTxnNumber());
 }
 
 TEST(OperationContextTest, OpCtxGroup) {
