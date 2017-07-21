@@ -115,7 +115,7 @@ void OpObserverImpl::onInserts(OperationContext* opCtx,
 
     if (nss.ns() == FeatureCompatibilityVersion::kCollection) {
         for (auto it = begin; it != end; it++) {
-            FeatureCompatibilityVersion::onInsertOrUpdate(it->doc);
+            FeatureCompatibilityVersion::onInsertOrUpdate(opCtx, it->doc);
         }
     }
 
@@ -158,7 +158,7 @@ void OpObserverImpl::onUpdate(OperationContext* opCtx, const OplogUpdateEntryArg
     }
 
     if (args.nss.ns() == FeatureCompatibilityVersion::kCollection) {
-        FeatureCompatibilityVersion::onInsertOrUpdate(args.updatedDoc);
+        FeatureCompatibilityVersion::onInsertOrUpdate(opCtx, args.updatedDoc);
     }
 }
 
@@ -202,7 +202,7 @@ void OpObserverImpl::onDelete(OperationContext* opCtx,
         DurableViewCatalog::onExternalChange(opCtx, nss);
     }
     if (nss.ns() == FeatureCompatibilityVersion::kCollection) {
-        FeatureCompatibilityVersion::onDelete(deleteState.idDoc);
+        FeatureCompatibilityVersion::onDelete(opCtx, deleteState.idDoc);
     }
 }
 
@@ -342,7 +342,7 @@ void OpObserverImpl::onDropDatabase(OperationContext* opCtx, const std::string& 
     repl::logOp(opCtx, "c", cmdNss, {}, cmdObj, nullptr, false, kUninitializedStmtId);
 
     if (dbName == FeatureCompatibilityVersion::kDatabase) {
-        FeatureCompatibilityVersion::onDropCollection();
+        FeatureCompatibilityVersion::onDropCollection(opCtx);
     }
 
     NamespaceUUIDCache::get(opCtx).evictNamespacesInDatabase(dbName);
@@ -368,7 +368,7 @@ repl::OpTime OpObserverImpl::onDropCollection(OperationContext* opCtx,
     }
 
     if (collectionName.ns() == FeatureCompatibilityVersion::kCollection) {
-        FeatureCompatibilityVersion::onDropCollection();
+        FeatureCompatibilityVersion::onDropCollection(opCtx);
     }
 
     getGlobalAuthorizationManager()->logOp(opCtx, "c", dbName, cmdObj, nullptr);

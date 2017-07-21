@@ -88,21 +88,22 @@ public:
 
     /**
      * Examines a document inserted or updated in admin.system.version. If it is the
-     * featureCompatibilityVersion document, validates the document and updates the server
-     * parameter.
+     * featureCompatibilityVersion document, validates the document and on commit, updates
+     * the server parameter.
      */
-    static void onInsertOrUpdate(const BSONObj& doc);
+    static void onInsertOrUpdate(OperationContext* opCtx, const BSONObj& doc);
 
     /**
      * Examines the _id of a document removed from admin.system.version. If it is the
-     * featureCompatibilityVersion document, resets the server parameter to its default value.
+     * featureCompatibilityVersion document, resets the server parameter to its default value
+     * on commit.
      */
-    static void onDelete(const BSONObj& doc);
+    static void onDelete(OperationContext* opCtx, const BSONObj& doc);
 
     /**
-     * Resets the server parameter to its default value.
+     * Resets the server parameter to its default value on commit.
      */
-    static void onDropCollection();
+    static void onDropCollection(OperationContext* opCtx);
 };
 
 }  // namespace mongo

@@ -189,12 +189,6 @@ void FeatureCompatibilityVersion::set(OperationContext* opCtx, StringData versio
             transport::Session::kLatestVersionInternalClientKeepOpen |
             transport::Session::kExternalClientKeepOpen);
     }
-
-    // Update the value of the featureCompatibilityVersion server parameter.
-    serverGlobalParams.featureCompatibility.version.store(
-        version == FeatureCompatibilityVersionCommandParser::kVersion36
-            ? ServerGlobalParams::FeatureCompatibility::Version::k36
-            : ServerGlobalParams::FeatureCompatibility::Version::k34);
 }
 
 void FeatureCompatibilityVersion::setIfCleanStartup(OperationContext* opCtx,
@@ -229,21 +223,17 @@ void FeatureCompatibilityVersion::setIfCleanStartup(OperationContext* opCtx,
         }
 
         // We then insert the featureCompatibilityVersion document into the "admin.system.version"
-        // collection.
+        // collection. The server parameter will be updated on commit by the op observer.
         uassertStatusOK(storageInterface->insertDocument(
             opCtx,
             nss,
             BSON("_id" << FeatureCompatibilityVersion::kParameterName
                        << FeatureCompatibilityVersion::kVersionField
                        << FeatureCompatibilityVersionCommandParser::kVersion36)));
-
-        // We then update the value of the featureCompatibilityVersion server parameter.
-        serverGlobalParams.featureCompatibility.version.store(
-            ServerGlobalParams::FeatureCompatibility::Version::k36);
     }
 }
 
-void FeatureCompatibilityVersion::onInsertOrUpdate(const BSONObj& doc) {
+void FeatureCompatibilityVersion::onInsertOrUpdate(OperationContext* opCtx, const BSONObj& doc) {
     auto idElement = doc["_id"];
     if (idElement.type() != BSONType::String ||
         idElement.String() != FeatureCompatibilityVersion::kParameterName) {
@@ -251,14 +241,15 @@ void FeatureCompatibilityVersion::onInsertOrUpdate(const BSONObj& doc) {
     }
     auto newVersion = uassertStatusOK(FeatureCompatibilityVersion::parse(doc));
     log() << "setting featureCompatibilityVersion to " << toString(newVersion);
-    serverGlobalParams.featureCompatibility.version.store(newVersion);
-
-    serverGlobalParams.featureCompatibility.isSchemaVersion36.store(
-        serverGlobalParams.featureCompatibility.version.load() ==
-        ServerGlobalParams::FeatureCompatibility::Version::k36);
+    opCtx->recoveryUnit()->onCommit([newVersion]() {
+        serverGlobalParams.featureCompatibility.version.store(newVersion);
+        serverGlobalParams.featureCompatibility.isSchemaVersion36.store(
+            serverGlobalParams.featureCompatibility.version.load() ==
+            ServerGlobalParams::FeatureCompatibility::Version::k36);
+    });
 }
 
-void FeatureCompatibilityVersion::onDelete(const BSONObj& doc) {
+void FeatureCompatibilityVersion::onDelete(OperationContext* opCtx, const BSONObj& doc) {
     auto idElement = doc["_id"];
     if (idElement.type() != BSONType::String ||
         idElement.String() != FeatureCompatibilityVersion::kParameterName) {
@@ -266,15 +257,21 @@ void FeatureCompatibilityVersion::onDelete(const BSONObj& doc) {
     }
     log() << "setting featureCompatibilityVersion to "
           << FeatureCompatibilityVersionCommandParser::kVersion34;
-    serverGlobalParams.featureCompatibility.version.store(
-        ServerGlobalParams::FeatureCompatibility::Version::k34);
+    opCtx->recoveryUnit()->onCommit([]() {
+        serverGlobalParams.featureCompatibility.version.store(
+            ServerGlobalParams::FeatureCompatibility::Version::k34);
+        serverGlobalParams.featureCompatibility.isSchemaVersion36.store(false);
+    });
 }
 
-void FeatureCompatibilityVersion::onDropCollection() {
+void FeatureCompatibilityVersion::onDropCollection(OperationContext* opCtx) {
     log() << "setting featureCompatibilityVersion to "
           << FeatureCompatibilityVersionCommandParser::kVersion34;
-    serverGlobalParams.featureCompatibility.version.store(
-        ServerGlobalParams::FeatureCompatibility::Version::k34);
+    opCtx->recoveryUnit()->onCommit([]() {
+        serverGlobalParams.featureCompatibility.version.store(
+            ServerGlobalParams::FeatureCompatibility::Version::k34);
+        serverGlobalParams.featureCompatibility.isSchemaVersion36.store(false);
+    });
 }
 
 /**
