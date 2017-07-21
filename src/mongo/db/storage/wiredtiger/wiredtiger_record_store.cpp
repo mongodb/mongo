@@ -1257,7 +1257,6 @@ Status WiredTigerRecordStore::updateRecord(OperationContext* opCtx,
         return {ErrorCodes::IllegalOperation, "Cannot change the size of a document in the oplog"};
     }
 
-    setKey(c, id);
     WiredTigerItem value(data, len);
     c->set_value(c, value.Get());
     ret = WT_OP_CHECK(c->insert(c));
