@@ -1122,7 +1122,7 @@ StatusWithMatchExpression MatchExpressionParser::_parseInternalSchemaFixedArityA
     std::array<std::unique_ptr<MatchExpression>, arity> expressions;
     auto position = expressions.begin();
 
-    for (auto&& elem : inputObj) {
+    for (const auto& elem : inputObj) {
         if (elem.type() != BSONType::Object) {
             return {ErrorCodes::FailedToParse,
                     str::stream() << name
