@@ -314,7 +314,7 @@ __wt_txn_set_commit_timestamp(WT_SESSION_IMPL *session)
 	txn = &session->txn;
 	txn_global = &S2C(session)->txn_global;
 
-	if (F_ISSET(txn, WT_TXN_HAS_TS_COMMIT))
+	if (F_ISSET(txn, WT_TXN_PUBLIC_TS_COMMIT))
 		return;
 
 	__wt_writelock(session, &txn_global->commit_timestamp_rwlock);
@@ -330,7 +330,7 @@ __wt_txn_set_commit_timestamp(WT_SESSION_IMPL *session)
 		TAILQ_INSERT_AFTER(&txn_global->commit_timestamph,
 		    prev, txn, commit_timestampq);
 	__wt_writeunlock(session, &txn_global->commit_timestamp_rwlock);
-	F_SET(txn, WT_TXN_HAS_TS_COMMIT);
+	F_SET(txn, WT_TXN_HAS_TS_COMMIT | WT_TXN_PUBLIC_TS_COMMIT);
 }
 
 /*
@@ -346,12 +346,13 @@ __wt_txn_clear_commit_timestamp(WT_SESSION_IMPL *session)
 	txn = &session->txn;
 	txn_global = &S2C(session)->txn_global;
 
-	if (!F_ISSET(txn, WT_TXN_HAS_TS_COMMIT))
+	if (!F_ISSET(txn, WT_TXN_PUBLIC_TS_COMMIT))
 		return;
 
 	__wt_writelock(session, &txn_global->commit_timestamp_rwlock);
 	TAILQ_REMOVE(&txn_global->commit_timestamph, txn, commit_timestampq);
 	__wt_writeunlock(session, &txn_global->commit_timestamp_rwlock);
+	F_CLR(txn, WT_TXN_PUBLIC_TS_COMMIT);
 }
 
 /*
@@ -367,7 +368,7 @@ __wt_txn_set_read_timestamp(WT_SESSION_IMPL *session)
 	txn = &session->txn;
 	txn_global = &S2C(session)->txn_global;
 
-	if (F_ISSET(txn, WT_TXN_HAS_TS_READ))
+	if (F_ISSET(txn, WT_TXN_PUBLIC_TS_READ))
 		return;
 
 	__wt_writelock(session, &txn_global->read_timestamp_rwlock);
@@ -383,7 +384,7 @@ __wt_txn_set_read_timestamp(WT_SESSION_IMPL *session)
 		TAILQ_INSERT_AFTER(
 		    &txn_global->read_timestamph, prev, txn, read_timestampq);
 	__wt_writeunlock(session, &txn_global->read_timestamp_rwlock);
-	F_SET(txn, WT_TXN_HAS_TS_READ);
+	F_SET(txn, WT_TXN_HAS_TS_READ | WT_TXN_PUBLIC_TS_READ);
 }
 
 /*
@@ -399,12 +400,12 @@ __wt_txn_clear_read_timestamp(WT_SESSION_IMPL *session)
 	txn = &session->txn;
 	txn_global = &S2C(session)->txn_global;
 
-	if (!F_ISSET(txn, WT_TXN_HAS_TS_READ))
+	if (!F_ISSET(txn, WT_TXN_PUBLIC_TS_READ))
 		return;
 
 	__wt_writelock(session, &txn_global->read_timestamp_rwlock);
 	TAILQ_REMOVE(&txn_global->read_timestamph, txn, read_timestampq);
 	__wt_writeunlock(session, &txn_global->read_timestamp_rwlock);
-	F_CLR(txn, WT_TXN_HAS_TS_READ);
+	F_CLR(txn, WT_TXN_PUBLIC_TS_READ);
 }
 #endif

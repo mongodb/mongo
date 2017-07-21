@@ -230,8 +230,10 @@ struct __wt_txn {
 #define	WT_TXN_HAS_TS_COMMIT	0x010
 #define	WT_TXN_HAS_TS_READ	0x020
 #define	WT_TXN_NAMED_SNAPSHOT	0x040
-#define	WT_TXN_READONLY		0x080
-#define	WT_TXN_RUNNING		0x100
-#define	WT_TXN_SYNC_SET		0x200
+#define	WT_TXN_PUBLIC_TS_COMMIT	0x080
+#define	WT_TXN_PUBLIC_TS_READ	0x100
+#define	WT_TXN_READONLY		0x200
+#define	WT_TXN_RUNNING		0x400
+#define	WT_TXN_SYNC_SET		0x800
 	uint32_t flags;
 };
