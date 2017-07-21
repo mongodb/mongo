@@ -42,6 +42,7 @@
 #include "mongo/db/repl/optime.h"
 #include "mongo/db/repl/sync_tail_test_fixture.h"
 #include "mongo/util/duration.h"
+#include "mongo/util/uuid.h"
 
 namespace mongo {
 namespace repl {
