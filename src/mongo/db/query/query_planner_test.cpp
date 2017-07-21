@@ -34,6 +34,7 @@
 
 #include "mongo/db/jsobj.h"
 #include "mongo/db/json.h"
+#include "mongo/db/matcher/expression_always_boolean.h"
 #include "mongo/db/matcher/extensions_callback_disallow_extensions.h"
 #include "mongo/db/query/collation/collator_interface_mock.h"
 #include "mongo/db/query/query_planner.h"
@@ -5407,7 +5408,7 @@ TEST_F(QueryPlannerTest, EmptyQueryWithProjectionUsesCollscanIfIndexIsSparse) {
 
 TEST_F(QueryPlannerTest, EmptyQueryWithProjectionUsesCollscanIfIndexIsPartial) {
     params.options = QueryPlannerParams::GENERATE_COVERED_IXSCANS;
-    FalseMatchExpression matchExpr("foo"_sd);
+    AlwaysFalseMatchExpression matchExpr;
     addIndex(BSON("a" << 1), &matchExpr);
     runQueryAsCommand(fromjson("{find: 'testns', projection: {_id: 0, a: 1}}"));
     assertNumSolutions(1);

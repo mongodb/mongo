@@ -29,6 +29,7 @@
 #include "mongo/db/query/parsed_projection.h"
 
 #include "mongo/db/json.h"
+#include "mongo/db/matcher/expression_always_boolean.h"
 #include "mongo/db/matcher/expression_parser.h"
 #include "mongo/db/matcher/extensions_callback_disallow_extensions.h"
 #include "mongo/unittest/unittest.h"
@@ -185,7 +186,7 @@ TEST(ParsedProjectionTest, ValidPositionalOperatorProjections) {
 // to achieve the same effect.
 // Projection parser should handle this the same way as an empty path.
 TEST(ParsedProjectionTest, InvalidPositionalProjectionDefaultPathMatchExpression) {
-    unique_ptr<MatchExpression> queryMatchExpr(new FalseMatchExpression(""));
+    unique_ptr<MatchExpression> queryMatchExpr(new AlwaysFalseMatchExpression());
     ASSERT(NULL == queryMatchExpr->path().rawData());
 
     ParsedProjection* out = NULL;

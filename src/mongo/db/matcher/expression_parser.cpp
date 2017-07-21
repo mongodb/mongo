@@ -34,6 +34,7 @@
 #include "mongo/bson/bsonmisc.h"
 #include "mongo/bson/bsonobj.h"
 #include "mongo/bson/bsonobjbuilder.h"
+#include "mongo/db/matcher/expression_always_boolean.h"
 #include "mongo/db/matcher/expression_array.h"
 #include "mongo/db/matcher/expression_geo.h"
 #include "mongo/db/matcher/expression_leaf.h"
@@ -449,6 +450,30 @@ StatusWithMatchExpression MatchExpressionParser::_parse(const BSONObj& obj,
                     return {Status(ErrorCodes::TypeMismatch, "$jsonSchema must be an object")};
                 }
                 return JSONSchemaParser::parse(e.Obj());
+            } else if (mongoutils::str::equals("alwaysFalse", rest)) {
+                auto statusWithLong = MatchExpressionParser::parseIntegerElementToLong(e);
+                if (!statusWithLong.isOK()) {
+                    return statusWithLong.getStatus();
+                }
+
+                if (statusWithLong.getValue() != 1) {
+                    return {Status(ErrorCodes::FailedToParse,
+                                   "$alwaysFalse must be an integer value of 1")};
+                }
+
+                return {stdx::make_unique<AlwaysFalseMatchExpression>()};
+            } else if (mongoutils::str::equals("alwaysTrue", rest)) {
+                auto statusWithLong = MatchExpressionParser::parseIntegerElementToLong(e);
+                if (!statusWithLong.isOK()) {
+                    return statusWithLong.getStatus();
+                }
+
+                if (statusWithLong.getValue() != 1) {
+                    return {Status(ErrorCodes::FailedToParse,
+                                   "$alwaysTrue must be an integer value of 1")};
+                }
+
+                return {stdx::make_unique<AlwaysTrueMatchExpression>()};
             } else {
                 return {Status(ErrorCodes::BadValue,
                                mongoutils::str::stream() << "unknown top level operator: "
@@ -930,7 +955,7 @@ StatusWithMatchExpression MatchExpressionParser::_parseAll(const char* name,
     }
 
     if (myAnd->numChildren() == 0) {
-        return {stdx::make_unique<FalseMatchExpression>(name)};
+        return {stdx::make_unique<AlwaysFalseMatchExpression>()};
     }
 
     return {std::move(myAnd)};

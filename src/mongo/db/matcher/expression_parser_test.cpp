@@ -249,4 +249,72 @@ TEST(StatusWithTest, Fib1) {
     ASSERT(x.isOK());
     ASSERT(3 == x.getValue());
 }
+
+TEST(MatchExpressionParserTest, AlwaysFalseFailsToParseNonOneArguments) {
+    auto queryIntArgument = BSON("$alwaysFalse" << 0);
+    auto expr = MatchExpressionParser::parse(
+        queryIntArgument, ExtensionsCallbackDisallowExtensions(), nullptr);
+    ASSERT_EQ(expr.getStatus(), ErrorCodes::FailedToParse);
+
+    auto queryStringArgument = BSON("$alwaysFalse"
+                                    << "");
+    expr = MatchExpressionParser::parse(
+        queryStringArgument, ExtensionsCallbackDisallowExtensions(), nullptr);
+    ASSERT_EQ(expr.getStatus(), ErrorCodes::FailedToParse);
+
+    auto queryDoubleArgument = BSON("$alwaysFalse" << 1.1);
+    expr = MatchExpressionParser::parse(
+        queryDoubleArgument, ExtensionsCallbackDisallowExtensions(), nullptr);
+    ASSERT_EQ(expr.getStatus(), ErrorCodes::FailedToParse);
+
+    auto queryFalseArgument = BSON("$alwaysFalse" << true);
+    expr = MatchExpressionParser::parse(
+        queryFalseArgument, ExtensionsCallbackDisallowExtensions(), nullptr);
+    ASSERT_EQ(expr.getStatus(), ErrorCodes::FailedToParse);
+}
+
+TEST(MatchExpressionParserTest, AlwaysFalseParsesIntegerArgument) {
+    auto query = BSON("$alwaysFalse" << 1);
+    auto expr =
+        MatchExpressionParser::parse(query, ExtensionsCallbackDisallowExtensions(), nullptr);
+    ASSERT_OK(expr.getStatus());
+
+    ASSERT_FALSE(expr.getValue()->matchesBSON(fromjson("{}")));
+    ASSERT_FALSE(expr.getValue()->matchesBSON(fromjson("{x: 1}")));
+    ASSERT_FALSE(expr.getValue()->matchesBSON(fromjson("{x: 'blah'}")));
+}
+
+TEST(MatchExpressionParserTest, AlwaysTrueFailsToParseNonOneArguments) {
+    auto queryIntArgument = BSON("$alwaysTrue" << 0);
+    auto expr = MatchExpressionParser::parse(
+        queryIntArgument, ExtensionsCallbackDisallowExtensions(), nullptr);
+    ASSERT_EQ(expr.getStatus(), ErrorCodes::FailedToParse);
+
+    auto queryStringArgument = BSON("$alwaysTrue"
+                                    << "");
+    expr = MatchExpressionParser::parse(
+        queryStringArgument, ExtensionsCallbackDisallowExtensions(), nullptr);
+    ASSERT_EQ(expr.getStatus(), ErrorCodes::FailedToParse);
+
+    auto queryDoubleArgument = BSON("$alwaysTrue" << 1.1);
+    expr = MatchExpressionParser::parse(
+        queryDoubleArgument, ExtensionsCallbackDisallowExtensions(), nullptr);
+    ASSERT_EQ(expr.getStatus(), ErrorCodes::FailedToParse);
+
+    auto queryFalseArgument = BSON("$alwaysTrue" << true);
+    expr = MatchExpressionParser::parse(
+        queryFalseArgument, ExtensionsCallbackDisallowExtensions(), nullptr);
+    ASSERT_EQ(expr.getStatus(), ErrorCodes::FailedToParse);
+}
+
+TEST(MatchExpressionParserTest, AlwaysTrueParsesIntegerArgument) {
+    auto query = BSON("$alwaysTrue" << 1);
+    auto expr =
+        MatchExpressionParser::parse(query, ExtensionsCallbackDisallowExtensions(), nullptr);
+    ASSERT_OK(expr.getStatus());
+
+    ASSERT_TRUE(expr.getValue()->matchesBSON(fromjson("{}")));
+    ASSERT_TRUE(expr.getValue()->matchesBSON(fromjson("{x: 1}")));
+    ASSERT_TRUE(expr.getValue()->matchesBSON(fromjson("{x: 'blah'}")));
+}
 }

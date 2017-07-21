@@ -112,8 +112,7 @@ TEST(JSONSchemaParserTest, TopLevelNonObjectTypeTranslatesCorrectly) {
     ASSERT_OK(result.getStatus());
     BSONObjBuilder builder;
     result.getValue()->serialize(&builder);
-    // TODO SERVER-30028: Serialize to a new internal "always false" expression.
-    ASSERT_BSONOBJ_EQ(builder.obj(), fromjson("{'': {$all: []}}"));
+    ASSERT_BSONOBJ_EQ(builder.obj(), fromjson("{$alwaysFalse: 1}"));
 }
 
 TEST(JSONSchemaParserTest, TypeNumberTranslatesCorrectly) {
@@ -154,8 +153,9 @@ TEST(JSONSchemaParserTest, MaximumTranslatesCorrectlyWithTypeString) {
     ASSERT_OK(result.getStatus());
     BSONObjBuilder builder;
     result.getValue()->serialize(&builder);
-    ASSERT_BSONOBJ_EQ(builder.obj(),
-                      fromjson("{$and: [{$and: [{$and: [{}, {num: {$type: 2}}]}]}]}"));
+    ASSERT_BSONOBJ_EQ(
+        builder.obj(),
+        fromjson("{$and: [{$and: [{$and: [{$alwaysTrue: 1}, {num: {$type: 2}}]}]}]}"));
 }
 
 TEST(JSONSchemaParserTest, MaximumTranslatesCorrectlyWithNoType) {
@@ -240,8 +240,9 @@ TEST(JSONSchemaParserTest, MinimumTranslatesCorrectlyWithTypeString) {
     ASSERT_OK(result.getStatus());
     BSONObjBuilder builder;
     result.getValue()->serialize(&builder);
-    ASSERT_BSONOBJ_EQ(builder.obj(),
-                      fromjson("{$and: [{$and: [{$and: [{}, {num: {$type: 2}}]}]}]}"));
+    ASSERT_BSONOBJ_EQ(
+        builder.obj(),
+        fromjson("{$and: [{$and: [{$and: [{$alwaysTrue: 1}, {num: {$type: 2}}]}]}]}"));
 }
 
 TEST(JSONSchemaParserTest, MinimumTranslatesCorrectlyWithNoType) {

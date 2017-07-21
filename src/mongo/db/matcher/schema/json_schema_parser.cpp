@@ -31,6 +31,7 @@
 #include "mongo/db/matcher/schema/json_schema_parser.h"
 
 #include "mongo/bson/bsontypes.h"
+#include "mongo/db/matcher/expression_always_boolean.h"
 #include "mongo/db/matcher/expression_parser.h"
 #include "mongo/db/matcher/schema/expression_internal_schema_object_match.h"
 #include "mongo/stdx/memory.h"
@@ -76,9 +77,7 @@ std::unique_ptr<MatchExpression> makeRestriction(TypeMatchExpression::Type restr
         } else {
             // This restriction doesn't take any effect, since the type of the schema is different
             // from the type to which this retriction applies.
-            //
-            // TODO SERVER-30028: Make this use an explicit "always matches" expression.
-            return stdx::make_unique<AndMatchExpression>();
+            return stdx::make_unique<AlwaysTrueMatchExpression>();
         }
     }
 
@@ -121,9 +120,7 @@ StatusWithMatchExpression parseMaximum(StringData path,
 
     if (path.empty()) {
         // This restriction has no effect in a top-level schema, since we only store objects.
-        //
-        // TODO SERVER-30028: Make this use an explicit "always matches" expression.
-        return {stdx::make_unique<AndMatchExpression>()};
+        return {stdx::make_unique<AlwaysTrueMatchExpression>()};
     }
 
     std::unique_ptr<ComparisonMatchExpression> expr;
@@ -155,9 +152,7 @@ StatusWithMatchExpression parseMinimum(StringData path,
 
     if (path.empty()) {
         // This restriction has no effect in a top-level schema, since we only store objects.
-        //
-        // TODO SERVER-30028: Make this use an explicit "always matches" expression.
-        return {stdx::make_unique<AndMatchExpression>()};
+        return {stdx::make_unique<AlwaysTrueMatchExpression>()};
     }
 
     std::unique_ptr<ComparisonMatchExpression> expr;
@@ -319,7 +314,7 @@ StatusWithMatchExpression JSONSchemaParser::_parse(StringData path, BSONObj sche
         typeExpr.getValue()->getBSONType() != BSONType::Object) {
         // This is a top-level schema which requires that the type is something other than
         // "object". Since we only know how to store objects, this schema matches nothing.
-        return {stdx::make_unique<FalseMatchExpression>(StringData{})};
+        return {stdx::make_unique<AlwaysFalseMatchExpression>()};
     }
 
     if (!path.empty() && typeExpr.getValue()) {

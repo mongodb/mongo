@@ -153,6 +153,9 @@ const char* encodeMatchType(MatchExpression::MatchType mt) {
         case MatchExpression::ALWAYS_FALSE:
             return "af";
             break;
+        case MatchExpression::ALWAYS_TRUE:
+            return "at";
+            break;
         case MatchExpression::GEO_NEAR:
             return "gn";
             break;

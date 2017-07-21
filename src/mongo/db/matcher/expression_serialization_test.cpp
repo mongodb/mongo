@@ -238,7 +238,7 @@ TEST(SerializeBasic, ExpressionAllWithEmptyArraySerializesCorrectly) {
     Matcher original(fromjson("{x: {$all: []}}"), ExtensionsCallbackNoop(), kSimpleCollator);
     Matcher reserialized(
         serialize(original.getMatchExpression()), ExtensionsCallbackNoop(), kSimpleCollator);
-    ASSERT_BSONOBJ_EQ(*reserialized.getQuery(), fromjson("{x: {$all: []}}"));
+    ASSERT_BSONOBJ_EQ(*reserialized.getQuery(), fromjson("{$alwaysFalse: 1}"));
     ASSERT_BSONOBJ_EQ(*reserialized.getQuery(), serialize(reserialized.getMatchExpression()));
 
     BSONObj obj = fromjson("{x: [1, 2, 3]}");
@@ -947,6 +947,26 @@ TEST(SerializeBasic, ExpressionTextWithDefaultLanguageSerializesCorrectly) {
     ASSERT_BSONOBJ_EQ(*reserialized.getQuery(),
                       fromjson("{$text: {$search: 'a', $language: '', $caseSensitive: false, "
                                "$diacriticSensitive: false}}"));
+    ASSERT_BSONOBJ_EQ(*reserialized.getQuery(), serialize(reserialized.getMatchExpression()));
+}
+
+TEST(SerializeBasic, ExpressionAlwaysTrueSerializesCorrectly) {
+    Matcher original(
+        fromjson("{$alwaysTrue: 1}"), ExtensionsCallbackDisallowExtensions(), kSimpleCollator);
+    Matcher reserialized(serialize(original.getMatchExpression()),
+                         ExtensionsCallbackDisallowExtensions(),
+                         kSimpleCollator);
+    ASSERT_BSONOBJ_EQ(*reserialized.getQuery(), fromjson("{$alwaysTrue: 1}"));
+    ASSERT_BSONOBJ_EQ(*reserialized.getQuery(), serialize(reserialized.getMatchExpression()));
+}
+
+TEST(SerializeBasic, ExpressionAlwaysFalseSerializesCorrectly) {
+    Matcher original(
+        fromjson("{$alwaysFalse: 1}"), ExtensionsCallbackDisallowExtensions(), kSimpleCollator);
+    Matcher reserialized(serialize(original.getMatchExpression()),
+                         ExtensionsCallbackDisallowExtensions(),
+                         kSimpleCollator);
+    ASSERT_BSONOBJ_EQ(*reserialized.getQuery(), fromjson("{$alwaysFalse: 1}"));
     ASSERT_BSONOBJ_EQ(*reserialized.getQuery(), serialize(reserialized.getMatchExpression()));
 }
 

@@ -72,6 +72,7 @@ env.CppUnitTest(
     target='expression_test',
     source=[
         'expression_array_test.cpp',
+        'expression_always_boolean_test.cpp',
         'expression_geo_test.cpp',
         'expression_leaf_test.cpp',
         'expression_parser_geo_test.cpp',
