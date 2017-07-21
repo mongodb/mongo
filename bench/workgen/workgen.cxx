@@ -925,8 +925,11 @@ void Operation::describe(std::ostream &os) const {
     }
     if (!_config.empty())
         os << ", '" << _config;
-    if (_transaction != NULL)
-        os << ", ["; _transaction->describe(os); os << "]";
+    if (_transaction != NULL) {
+        os << ", [";
+        _transaction->describe(os);
+        os << "]";
+    }
     if (_group != NULL) {
         os << ", group[" << _repeatgroup << "]: {";
         bool first = true;
