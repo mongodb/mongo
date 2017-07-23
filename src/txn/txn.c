@@ -444,13 +444,13 @@ __wt_txn_config(WT_SESSION_IMPL *session, const char *cfg[])
 		wt_timestamp_t oldest_timestamp;
 
 		WT_RET(__wt_txn_parse_timestamp(
-		    session, "read", txn->read_timestamp, &cval));
+		    session, "read", &txn->read_timestamp, &cval));
 		__wt_readlock(session, &txn_global->rwlock);
 		__wt_timestamp_set(
-		    oldest_timestamp, txn_global->oldest_timestamp);
+		    &oldest_timestamp, &txn_global->oldest_timestamp);
 		__wt_readunlock(session, &txn_global->rwlock);
 		if (__wt_timestamp_cmp(
-		    txn->read_timestamp, oldest_timestamp) < 0)
+		    &txn->read_timestamp, &oldest_timestamp) < 0)
 			WT_RET_MSG(session, EINVAL,
 			    "read timestamp %.*s older than oldest timestamp",
 			    (int)cval.len, cval.str);
@@ -590,7 +590,7 @@ __wt_txn_commit(WT_SESSION_IMPL *session, const char *cfg[])
 	if (cval.len != 0) {
 #ifdef HAVE_TIMESTAMPS
 		WT_ERR(__wt_txn_parse_timestamp(
-		    session, "commit", txn->commit_timestamp, &cval));
+		    session, "commit", &txn->commit_timestamp, &cval));
 		__wt_txn_set_commit_timestamp(session);
 #else
 		WT_ERR_MSG(session, EINVAL, "commit_timestamp requires a "
@@ -686,8 +686,8 @@ __wt_txn_commit(WT_SESSION_IMPL *session, const char *cfg[])
 #ifdef HAVE_TIMESTAMPS
 			if (F_ISSET(txn, WT_TXN_HAS_TS_COMMIT) &&
 			    op->type != WT_TXN_OP_BASIC_TS)
-				__wt_timestamp_set(op->u.upd->timestamp,
-				    txn->commit_timestamp);
+				__wt_timestamp_set(&op->u.upd->timestamp,
+				    &txn->commit_timestamp);
 #endif
 			break;
 
@@ -695,8 +695,8 @@ __wt_txn_commit(WT_SESSION_IMPL *session, const char *cfg[])
 #ifdef HAVE_TIMESTAMPS
 			if (F_ISSET(txn, WT_TXN_HAS_TS_COMMIT))
 				__wt_timestamp_set(
-				    op->u.ref->page_del->timestamp,
-				    txn->commit_timestamp);
+				    &op->u.ref->page_del->timestamp,
+				    &txn->commit_timestamp);
 #endif
 			break;
 
@@ -728,10 +728,10 @@ __wt_txn_commit(WT_SESSION_IMPL *session, const char *cfg[])
 	if (update_timestamp) {
 		__wt_readlock(session, &txn_global->rwlock);
 		__wt_timestamp_set(
-		    prev_commit_timestamp, txn_global->commit_timestamp);
+		    &prev_commit_timestamp, &txn_global->commit_timestamp);
 		__wt_readunlock(session, &txn_global->rwlock);
 		update_timestamp = __wt_timestamp_cmp(
-		    txn->commit_timestamp, prev_commit_timestamp) > 0;
+		    &txn->commit_timestamp, &prev_commit_timestamp) > 0;
 	}
 
 	/*
@@ -740,10 +740,10 @@ __wt_txn_commit(WT_SESSION_IMPL *session, const char *cfg[])
 	 */
 	if (update_timestamp) {
 		__wt_writelock(session, &txn_global->rwlock);
-		if (__wt_timestamp_cmp(txn->commit_timestamp,
-		    txn_global->commit_timestamp) > 0) {
-			__wt_timestamp_set(txn_global->commit_timestamp,
-			    txn->commit_timestamp);
+		if (__wt_timestamp_cmp(&txn->commit_timestamp,
+		    &txn_global->commit_timestamp) > 0) {
+			__wt_timestamp_set(&txn_global->commit_timestamp,
+			    &txn->commit_timestamp);
 			txn_global->has_commit_timestamp = true;
 		}
 		__wt_writeunlock(session, &txn_global->rwlock);
@@ -1008,7 +1008,7 @@ __wt_txn_global_shutdown(WT_SESSION_IMPL *session)
 	 * Now that all transactions have completed, no timestamps should be
 	 * pinned.
 	 */
-	memset(txn_global->pinned_timestamp, 0xff, WT_TIMESTAMP_SIZE);
+	__wt_timestamp_set_inf(&txn_global->pinned_timestamp);
 #endif
 
 	return (ret);

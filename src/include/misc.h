@@ -251,21 +251,27 @@
 
 /* Timestamp type and helper macros. */
 #if WT_TIMESTAMP_SIZE > 0
-#define	HAVE_TIMESTAMPS 1
+#define	HAVE_TIMESTAMPS
 #else
-#undef HAVE_TIMESTAMPS
+#undef	HAVE_TIMESTAMPS
 #endif
 
 #ifdef HAVE_TIMESTAMPS
-#define	WT_TIMESTAMP(x) (x)
-typedef uint8_t wt_timestamp_t[WT_TIMESTAMP_SIZE];
-#define	WT_DECL_TIMESTAMP(x) wt_timestamp_t x;
+struct __wt_timestamp_t {
+#if WT_TIMESTAMP_SIZE == 8
+	uint64_t val;
 #else
-#define	WT_TIMESTAMP(x) (NULL)
+	uint8_t ts[WT_TIMESTAMP_SIZE];
+#endif
+};
+typedef struct __wt_timestamp_t wt_timestamp_t;
+#define	WT_DECL_TIMESTAMP(x)	wt_timestamp_t x;
+#define	WT_TIMESTAMP_NULL(x)	(x)
+#else
+typedef void wt_timestamp_t;
+#define	WT_TIMESTAMP_NULL(x)	(NULL)
 #define	WT_DECL_TIMESTAMP(x)
 #endif
-
-#define	WT_GET_TIMESTAMP(x) WT_TIMESTAMP((x)->timestamp)
 
 /*
  * In diagnostic mode we track the locations from which hazard pointers and

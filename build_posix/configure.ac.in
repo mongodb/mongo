@@ -75,7 +75,7 @@ AC_SUBST(AM_LIBTOOLFLAGS)
 # WiredTiger uses anonymous unions to pad structures. It's part of C11, but
 # some compilers require -std=c11 to support them. Turn on that flag for any
 # compiler that supports it, except for Solaris, where gcc -std=c11 makes
-# some none-C11 prototypes unavailable.
+# some non-C11 prototypes unavailable.
 if test "$wt_cv_solaris" = "no"; then
 	AX_CHECK_COMPILE_FLAG([-std=c11], [AM_CFLAGS="$AM_CFLAGS -std=c11"])
 fi

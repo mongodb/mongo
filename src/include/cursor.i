@@ -442,7 +442,7 @@ value:
 	 * (if any) is visible.
 	 */
 	if (upd != NULL) {
-		vb->data = WT_UPDATE_DATA(upd);
+		vb->data = upd->data;
 		vb->size = upd->size;
 		return (0);
 	}

@@ -74,7 +74,7 @@ __txn_op_log(WT_SESSION_IMPL *session,
 	cursor = &cbt->iface;
 
 	upd = op->u.upd;
-	value.data = WT_UPDATE_DATA(upd);
+	value.data = upd->data;
 	value.size = upd->size;
 
 	/*

@@ -1682,7 +1682,7 @@ __wt_checkpoint_close(WT_SESSION_IMPL *session, bool final)
 		WT_RET(__wt_txn_update_oldest(
 		    session, WT_TXN_OLDEST_STRICT | WT_TXN_OLDEST_WAIT));
 		return (__wt_txn_visible_all(session, btree->rec_max_txn,
-		    WT_TIMESTAMP(btree->rec_max_timestamp)) ?
+		    WT_TIMESTAMP_NULL(&btree->rec_max_timestamp)) ?
 		    __wt_cache_op(session, WT_SYNC_DISCARD) : EBUSY);
 	}
 

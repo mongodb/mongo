@@ -885,9 +885,11 @@ struct __wt_ikey {
  * is done for an entry, WT_UPDATE structures are formed into a forward-linked
  * list.
  */
-WT_PACKED_STRUCT_BEGIN(__wt_update)
-	volatile uint64_t txnid;			/* Transaction ID */
-	WT_DECL_TIMESTAMP(timestamp)
+struct __wt_update {
+	volatile uint64_t txnid;	/* transaction ID */
+#if WT_TIMESTAMP_SIZE == 8
+	WT_DECL_TIMESTAMP(timestamp)	/* aligned uint64_t timestamp */
+#endif
 
 	WT_UPDATE *next;		/* forward-linked list */
 
@@ -898,13 +900,20 @@ WT_PACKED_STRUCT_BEGIN(__wt_update)
 #define	WT_UPDATE_RESERVED	2
 	uint8_t type;			/* type (one byte to conserve memory) */
 
-	/* The update includes a complete value. */
+	/* If the update includes a complete value. */
 #define	WT_UPDATE_DATA_VALUE(upd)					\
 	((upd)->type == WT_UPDATE_STANDARD || (upd)->type == WT_UPDATE_DELETED)
 
-	/* The untyped value immediately follows the WT_UPDATE structure. */
-#define	WT_UPDATE_DATA(upd)						\
-	((void *)((uint8_t *)(upd) + sizeof(WT_UPDATE)))
+#if WT_TIMESTAMP_SIZE != 8
+	WT_DECL_TIMESTAMP(timestamp)	/* unaligned uint8_t array timestamp */
+#endif
+
+	/*
+	 * Zero or more bytes of value (the payload) immediately follows the
+	 * WT_UPDATE structure.  We use a C99 flexible array member which has
+	 * the semantics we want.
+	 */
+	uint8_t data[];			/* start of the data */
 
 	/*
 	 * The memory size of an update: include some padding because this is
@@ -912,12 +921,12 @@ WT_PACKED_STRUCT_BEGIN(__wt_update)
 	 * cache overhead calculation.
 	 */
 #define	WT_UPDATE_MEMSIZE(upd)						\
-	WT_ALIGN(sizeof(WT_UPDATE) + (upd)->size, 32)
-WT_PACKED_STRUCT_END
+	WT_ALIGN(WT_UPDATE_SIZE + (upd)->size, 32)
+};
 
 /*
- * WT_UPDATE_SIZE is the expected structure size -- we verify the build to
- * ensure the compiler hasn't inserted padding.
+ * WT_UPDATE_SIZE is the expected structure size excluding the payload data --
+ * we verify the build to ensure the compiler hasn't inserted padding.
  */
 #define	WT_UPDATE_SIZE	(21 + WT_TIMESTAMP_SIZE)
 

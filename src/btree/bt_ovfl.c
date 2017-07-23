@@ -78,7 +78,7 @@ __wt_ovfl_read(WT_SESSION_IMPL *session,
 				break;
 			}
 		WT_ASSERT(session, i < track->remove_next);
-		store->data = WT_UPDATE_DATA(upd);
+		store->data = upd->data;
 		store->size = upd->size;
 	} else
 		ret = __ovfl_read(session, unpack->data, unpack->size, store);

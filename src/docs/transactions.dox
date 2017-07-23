@@ -164,7 +164,7 @@ timestamp size is 8 bytes (i.e., 64 bits).  Setting a size of zero disables
 transaction timestamp functionality.
 
 Applications can assign explicit commit timestamps to transactions, then read
-"as of" a timestamp.  Timestamps and are communicated to WiredTiger using a
+"as of" a timestamp.  Timestamps are communicated to WiredTiger using a
 lower case hexadecimal encoding, so the encoded value can be twice as long as
 the raw timestamp value.
 

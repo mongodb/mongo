@@ -786,7 +786,7 @@ extern int __wt_txn_named_snapshot_get(WT_SESSION_IMPL *session, WT_CONFIG_ITEM 
 extern int __wt_txn_named_snapshot_config(WT_SESSION_IMPL *session, const char *cfg[], bool *has_create, bool *has_drops) WT_GCC_FUNC_DECL_ATTRIBUTE((warn_unused_result));
 extern void __wt_txn_named_snapshot_destroy(WT_SESSION_IMPL *session);
 extern int __wt_txn_recover(WT_SESSION_IMPL *session) WT_GCC_FUNC_DECL_ATTRIBUTE((warn_unused_result));
-extern int __wt_txn_parse_timestamp(WT_SESSION_IMPL *session, const char *name, uint8_t *timestamp, WT_CONFIG_ITEM *cval) WT_GCC_FUNC_DECL_ATTRIBUTE((warn_unused_result));
+extern int __wt_txn_parse_timestamp(WT_SESSION_IMPL *session, const char *name, wt_timestamp_t *timestamp, WT_CONFIG_ITEM *cval) WT_GCC_FUNC_DECL_ATTRIBUTE((warn_unused_result));
 extern int __wt_txn_global_query_timestamp( WT_SESSION_IMPL *session, char *hex_timestamp, const char *cfg[]) WT_GCC_FUNC_DECL_ATTRIBUTE((warn_unused_result));
 extern int __wt_txn_update_pinned_timestamp(WT_SESSION_IMPL *session) WT_GCC_FUNC_DECL_ATTRIBUTE((warn_unused_result));
 extern int __wt_txn_global_set_timestamp(WT_SESSION_IMPL *session, const char *cfg[]) WT_GCC_FUNC_DECL_ATTRIBUTE((warn_unused_result));

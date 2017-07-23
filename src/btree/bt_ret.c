@@ -95,7 +95,7 @@ __value_return(WT_SESSION_IMPL *session, WT_CURSOR_BTREE *cbt, WT_UPDATE *upd)
 
 	/* If the cursor references a WT_UPDATE item, return it. */
 	if (upd != NULL) {
-		cursor->value.data = WT_UPDATE_DATA(upd);
+		cursor->value.data = upd->data;
 		cursor->value.size = upd->size;
 		return (0);
 	}

@@ -207,7 +207,7 @@ __cursor_fix_append_prev(WT_CURSOR_BTREE *cbt, bool newpage)
 		cbt->v = 0;
 		val->data = &cbt->v;
 	} else
-		val->data = WT_UPDATE_DATA(upd);
+		val->data = upd->data;
 	val->size = 1;
 	return (0);
 }
@@ -256,7 +256,7 @@ new_page:
 		cbt->v = __bit_getv_recno(cbt->ref, cbt->recno, btree->bitcnt);
 		val->data = &cbt->v;
 	} else
-		val->data = WT_UPDATE_DATA(upd);
+		val->data = upd->data;
 	val->size = 1;
 	return (0);
 }
@@ -293,7 +293,7 @@ new_page:	if (cbt->ins == NULL)
 				++cbt->page_deleted_count;
 			continue;
 		}
-		val->data = WT_UPDATE_DATA(upd);
+		val->data = upd->data;
 		val->size = upd->size;
 		return (0);
 	}
@@ -358,7 +358,7 @@ new_page:	if (cbt->recno < cbt->ref->ref_recno)
 				continue;
 			}
 
-			val->data = WT_UPDATE_DATA(upd);
+			val->data = upd->data;
 			val->size = upd->size;
 			return (0);
 		}
@@ -489,7 +489,7 @@ new_insert:	if ((ins = cbt->ins) != NULL) {
 			}
 			key->data = WT_INSERT_KEY(ins);
 			key->size = WT_INSERT_KEY_SIZE(ins);
-			val->data = WT_UPDATE_DATA(upd);
+			val->data = upd->data;
 			val->size = upd->size;
 			return (0);
 		}

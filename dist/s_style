@@ -56,6 +56,11 @@ else
 		cat $t
 	fi
 
+	if grep 'sizeof(WT_UPDATE)' $f > $t; then
+		echo "$f: Use WT_UPDATE_SIZE rather than sizeof(WT_UPDATE)"
+		cat $t
+	fi
+
 	if ! expr "$f" : 'src/include/queue\.h' > /dev/null &&
 	    egrep 'STAILQ_|SLIST_|\bLIST_' $f ; then
 		echo "$f: use TAILQ for all lists"
