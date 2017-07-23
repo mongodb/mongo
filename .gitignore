@@ -54,6 +54,7 @@ build_posix/wt
 tags
 
 # Documentation
+/dist/plantuml.jar
 /docs/
 /src/docs/changelog.md
 /src/docs/doxygen.log

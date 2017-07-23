@@ -1,0 +1,58 @@
+#! /bin/sh
+# Usage: ./s_docs_plantuml [-d|Auto download plantuml if doesn't exist in dist/]
+# This script checks for the existence of plantuml jar file (optionally
+# downloading it from sourceforge) and then generates uml images from the
+# plantuml templates embedded in the documentation.
+# Run this script after adding new plantuml templates to generate a fresh set of
+# uml images. All new images generated should be commited with the code.
+# For easy prototyping, following link can be used to generate these images
+# online:
+# http://www.plantuml.com/plantuml
+
+PLANTUML_URL="https://downloads.sourceforge.net/project/plantuml/plantuml.jar?r=&ts=1499750156&use_mirror=nchc"
+
+# We require java which may not be installed.
+type java > /dev/null 2>&1 || {
+	echo 'skipped: java not found'
+	exit 0
+}
+
+download_plantuml=0
+while :
+	do case "$1" in
+	-d)	# Download plantuml if not already there
+		download_plantuml=1
+		shift;;
+	*)
+		break;;
+	esac
+done
+
+# plantuml is needed, check if already downloaded, else download if suggested
+# by an argument
+test -f "../dist/plantuml.jar" || {
+	echo 'dist/plantuml.jar not found. '
+	if [ $download_plantuml -eq 1 ]
+	then
+		echo 'Downloading plantuml:'
+		wget $PLANTUML_URL -O ../dist/plantuml.jar
+	else
+		echo 'plantuml can be downloaded from:'
+		echo 'https://sourceforge.net/projects/plantuml/files/plantuml.jar/download'
+		echo 'To download automatically pass -d argument to the script'
+		exit 1
+	fi
+}
+
+# Check plantuml works as expected
+java -jar ../dist/plantuml.jar -testdot > /dev/null || {
+	echo 'error: plantuml installation check failed'
+	exit 1
+}
+
+# Generate PlantUML docs. This command looks for plantuml template code embedded
+# in files at /src/docs/ with doc or dox extension.
+echo 'Generating plantuml images .. '
+mkdir -p ../docs/images/plantuml_gen_img
+java  -Djava.awt.headless=true -jar ../dist/plantuml.jar -o ../docs/images/plantuml_gen_img "../src/docs/**.(doc|dox)" &&
+    echo 'Done'

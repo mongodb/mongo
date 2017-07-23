@@ -15,6 +15,7 @@ Coverity
 Coverity's
 DB's
 DBTs
+DHANDLE
 DONTNEED
 Datastore
 DbCursor
@@ -185,6 +186,8 @@ desc
 destructor
 destructors
 dev
+devdoc
+dhandle
 disjunction
 disjunctions
 distclean
@@ -208,6 +211,7 @@ endcond
 endian
 endif
 endinternal
+enduml
 english
 env
 eof
@@ -317,6 +321,7 @@ memalloc
 memfree
 memp
 metadata
+metatracking
 minkey
 mixin
 mixins
@@ -375,6 +380,7 @@ perf
 petabyte
 pget
 php
+plantuml
 png
 posix
 pre
@@ -440,6 +446,7 @@ sql
 src
 ssd
 startsync
+startuml
 statlog
 stderr
 str
