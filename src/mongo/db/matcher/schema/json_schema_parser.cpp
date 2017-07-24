@@ -279,7 +279,7 @@ StatusWithMatchExpression JSONSchemaParser::_parse(StringData path, BSONObj sche
             return maxExpr;
         }
         andExpr->add(maxExpr.getValue().release());
-    } else if (auto exclusiveMaximumElt = keywordMap[kSchemaExclusiveMaximumKeyword]) {
+    } else if (keywordMap[kSchemaExclusiveMaximumKeyword]) {
         // If "exclusiveMaximum" is present, "maximum" must also be present.
         return {Status(ErrorCodes::FailedToParse,
                        str::stream() << "$jsonSchema keyword '" << kSchemaMaximumKeyword
@@ -306,7 +306,7 @@ StatusWithMatchExpression JSONSchemaParser::_parse(StringData path, BSONObj sche
             return minExpr;
         }
         andExpr->add(minExpr.getValue().release());
-    } else if (auto exclusiveMinimumElt = keywordMap[kSchemaExclusiveMinimumKeyword]) {
+    } else if (keywordMap[kSchemaExclusiveMinimumKeyword]) {
         // If "exclusiveMinimum" is present, "minimum" must also be present.
         return {Status(ErrorCodes::FailedToParse,
                        str::stream() << "$jsonSchema keyword '" << kSchemaMinimumKeyword
