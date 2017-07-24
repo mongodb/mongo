@@ -586,5 +586,45 @@ TEST(MatchExpressionParserSchemaTest, MatchArrayIndexParsesSuccessfully) {
     ASSERT_FALSE(matchArrayIndex.getValue()->matchesBSON(fromjson("{foo: [2, 'blah']}")));
     ASSERT_FALSE(matchArrayIndex.getValue()->matchesBSON(fromjson("{foo: [{x: 'baz'}]}")));
 }
+
+TEST(InternalSchemaAllElemMatchFromIndexMatchExpression, FailsToParseWithNegativeIndex) {
+    BSONObj matchPredicate =
+        fromjson("{$_internalSchemaAllElemMatchFromIndex: [-2, {a: { $lt: 0 }}]}");
+    auto expr = MatchExpressionParser::parse(
+        matchPredicate, ExtensionsCallbackDisallowExtensions(), kSimpleCollator);
+    ASSERT_NOT_OK(expr.getStatus());
+}
+
+TEST(InternalSchemaAllElemMatchFromIndexMatchExpression, FailsToParseWithNonObjectExpression) {
+    BSONObj matchPredicate = fromjson("{$_internalSchemaAllElemMatchFromIndex: [-2, 4]}");
+    auto expr = MatchExpressionParser::parse(
+        matchPredicate, ExtensionsCallbackDisallowExtensions(), kSimpleCollator);
+    ASSERT_NOT_OK(expr.getStatus());
+}
+
+TEST(InternalSchemaAllElemMatchFromIndexMatchExpression, FailsToParseWithInvalidExpression) {
+    BSONObj matchPredicate =
+        fromjson("{$_internalSchemaAllElemMatchFromIndex: [-2, {$fakeExpression: 4}]}");
+    auto expr = MatchExpressionParser::parse(
+        matchPredicate, ExtensionsCallbackDisallowExtensions(), kSimpleCollator);
+    ASSERT_NOT_OK(expr.getStatus());
+}
+
+TEST(InternalSchemaAllElemMatchFromIndexMatchExpression, FailsToParseWithEmptyArray) {
+    BSONObj matchPredicate = fromjson("{$_internalSchemaAllElemMatchFromIndex: []}");
+    auto expr = MatchExpressionParser::parse(
+        matchPredicate, ExtensionsCallbackDisallowExtensions(), kSimpleCollator);
+    ASSERT_NOT_OK(expr.getStatus());
+}
+
+TEST(InternalSchemaAllElemMatchFromIndexMatchExpression, ParsesCorreclyWithValidInput) {
+    auto query = fromjson("{a: {$_internalSchemaAllElemMatchFromIndex: [2, {a: { $lt: 4 }}]}}");
+    auto expr = MatchExpressionParser::parse(
+        query, ExtensionsCallbackDisallowExtensions(), kSimpleCollator);
+    ASSERT_OK(expr.getStatus());
+
+    ASSERT_TRUE(expr.getValue()->matchesBSON(fromjson("{a: [5, 3, 3, 3, 3, 3]}")));
+    ASSERT_FALSE(expr.getValue()->matchesBSON(fromjson("{a: [3, 3, 3, 5, 3, 3]}")));
+}
 }  // namespace
 }  // namespace mongo

@@ -27,6 +27,7 @@
  *    exception statement from all source files in the program, then also delete
  *    it in the license file.
  */
+#include "mongo/platform/basic.h"
 
 #include "mongo/db/matcher/expression_parser.h"
 
@@ -40,6 +41,7 @@
 #include "mongo/db/matcher/expression_leaf.h"
 #include "mongo/db/matcher/expression_tree.h"
 #include "mongo/db/matcher/expression_with_placeholder.h"
+#include "mongo/db/matcher/schema/expression_internal_schema_all_elem_match_from_index.h"
 #include "mongo/db/matcher/schema/expression_internal_schema_cond.h"
 #include "mongo/db/matcher/schema/expression_internal_schema_fmod.h"
 #include "mongo/db/matcher/schema/expression_internal_schema_match_array_index.h"
@@ -372,6 +374,63 @@ StatusWithMatchExpression MatchExpressionParser::_parseSubField(
 
         case PathAcceptingKeyword::INTERNAL_SCHEMA_MATCH_ARRAY_INDEX: {
             return _parseInternalSchemaMatchArrayIndex(name, e, collator);
+        }
+
+        case PathAcceptingKeyword::INTERNAL_SCHEMA_ALL_ELEM_MATCH_FROM_INDEX: {
+            if (e.type() != BSONType::Array) {
+                return Status(ErrorCodes::FailedToParse,
+                              str::stream()
+                                  << InternalSchemaAllElemMatchFromIndexMatchExpression::kName
+                                  << " must be an array");
+            }
+            auto elemMatchObj = e.embeddedObject();
+            auto iter = elemMatchObj.begin();
+            if (!iter.more()) {
+                return Status(ErrorCodes::FailedToParse,
+                              str::stream()
+                                  << InternalSchemaAllElemMatchFromIndexMatchExpression::kName
+                                  << " must be an array of size 2");
+            }
+            auto first = iter.next();
+            auto parsedIndex = parseIntegerElementToNonNegativeLong(first);
+            if (!parsedIndex.isOK()) {
+                return Status(ErrorCodes::TypeMismatch,
+                              str::stream()
+                                  << "first element of "
+                                  << InternalSchemaAllElemMatchFromIndexMatchExpression::kName
+                                  << " must be a non-negative integer");
+            }
+            if (!iter.more()) {
+                return Status(ErrorCodes::FailedToParse,
+                              str::stream()
+                                  << InternalSchemaAllElemMatchFromIndexMatchExpression::kName
+                                  << " must be an array of size 2");
+            }
+            auto second = iter.next();
+            if (iter.more()) {
+                return Status(ErrorCodes::FailedToParse,
+                              str::stream()
+                                  << InternalSchemaAllElemMatchFromIndexMatchExpression::kName
+                                  << " has too many elements, must be an array of size 2");
+            }
+            if (second.type() != BSONType::Object) {
+                return Status(ErrorCodes::TypeMismatch,
+                              str::stream()
+                                  << "second element of "
+                                  << InternalSchemaAllElemMatchFromIndexMatchExpression::kName
+                                  << "must be an object");
+            }
+            StatusWithMatchExpression query =
+                _parse(second.embeddedObject(), collator, expCtx, topLevel);
+            if (!query.isOK()) {
+                return query.getStatus();
+            }
+            auto expr = stdx::make_unique<InternalSchemaAllElemMatchFromIndexMatchExpression>();
+            auto status = expr->init(name, parsedIndex.getValue(), std::move(query.getValue()));
+            if (!status.isOK()) {
+                return status;
+            }
+            return {std::move(expr)};
         }
     }
     return {Status(ErrorCodes::BadValue,
@@ -1456,6 +1515,8 @@ MONGO_INITIALIZER(MatchExpressionParser)(InitializerContext* context) {
             {"bitsAllClear", PathAcceptingKeyword::BITS_ALL_CLEAR},
             {"bitsAnySet", PathAcceptingKeyword::BITS_ANY_SET},
             {"bitsAnyClear", PathAcceptingKeyword::BITS_ANY_CLEAR},
+            {"_internalSchemaAllElemMatchFromIndex",
+             PathAcceptingKeyword::INTERNAL_SCHEMA_ALL_ELEM_MATCH_FROM_INDEX},
             {"_internalSchemaFmod", PathAcceptingKeyword::INTERNAL_SCHEMA_FMOD},
             {"_internalSchemaMinItems", PathAcceptingKeyword::INTERNAL_SCHEMA_MIN_ITEMS},
             {"_internalSchemaMaxItems", PathAcceptingKeyword::INTERNAL_SCHEMA_MAX_ITEMS},
