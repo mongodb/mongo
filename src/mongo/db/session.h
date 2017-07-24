@@ -88,12 +88,6 @@ public:
      */
     const Timestamp& getLastWriteOpTimeTs() const;
 
-    /**
-     * Returns the oplog entry with the given statementId, if it exists.
-     */
-    boost::optional<repl::OplogEntry> checkStatementExecuted(OperationContext* opCtx,
-                                                             StmtId stmtId);
-
 private:
     const LogicalSessionId _sessionId;
 

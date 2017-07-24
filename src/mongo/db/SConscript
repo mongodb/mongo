@@ -1425,7 +1425,6 @@ env.Library(
         'ops/update_lifecycle_impl.cpp',
         'ops/update_result.cpp',
         'ops/write_ops_exec.cpp',
-        'ops/write_ops_retryability.cpp',
         'session.cpp',
         'session_catalog.cpp',
         'transaction_history_iterator.cpp',

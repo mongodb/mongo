@@ -179,21 +179,4 @@ TransactionHistoryIterator Session::getWriteHistory(OperationContext* opCtx) con
     return TransactionHistoryIterator(getLastWriteOpTimeTs());
 }
 
-boost::optional<repl::OplogEntry> Session::checkStatementExecuted(OperationContext* opCtx,
-                                                                  StmtId stmtId) {
-    if (!opCtx->getTxnNumber()) {
-        return boost::none;
-    }
-
-    auto it = getWriteHistory(opCtx);
-    while (it.hasNext()) {
-        auto entry = it.next(opCtx);
-        if (entry.getStatementId() == stmtId) {
-            return entry;
-        }
-    }
-
-    return boost::none;
-}
-
 }  // namespace mongo
