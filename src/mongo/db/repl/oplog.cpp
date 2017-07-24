@@ -825,11 +825,7 @@ Status applyOperation_inlock(OperationContext* txn,
         Status status{ErrorCodes::NotYetInitialized, ""};
         {
             WriteUnitOfWork wuow(txn);
-            try {
-                status = collection->insertDocument(txn, o, true);
-            } catch (DBException dbe) {
-                status = dbe.toStatus();
-            }
+            status = collection->insertDocument(txn, o, true);
             if (status.isOK()) {
                 wuow.commit();
             }
