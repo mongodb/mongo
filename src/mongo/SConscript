@@ -315,6 +315,7 @@ env.Library(
         'util/clock_sources',
         'util/fail_point',
         'util/ntservice',
+        'util/options_parser/options_parser_init',
         'util/periodic_runner_factory',
         'util/version_impl',
     ],
