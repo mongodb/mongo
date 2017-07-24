@@ -28,7 +28,8 @@ def open_or_use_stdout(filename):
         yield sys.stdout
         return
 
-    fp = open(filename, "w")
+    line_buffered = 1
+    fp = open(filename, "w", line_buffered)
     try:
         yield fp
     finally:
@@ -80,16 +81,25 @@ def main():
             sys_res_dict["mem_avail"] = sys_info["vmstat"]["available"]
             ps_info = res_json["ps_info"]
             for process in ps_info:
-                sys_res_dict["pid"] = process["pid"]
-                sys_res_dict["ppid"] = process["parentPid"]
-                sys_res_dict["numThreads"] = process["numThreads"]
-                sys_res_dict["command"] = process.get("command", "")
-                sys_res_dict["cpu_user"] = process["cpu"]["user"]
-                sys_res_dict["cpu_sys"] = process["cpu"]["system"]
-                sys_res_dict["io_write"] = process["io"]["writeBytes"]
-                sys_res_dict["io_read"] = process["io"]["readBytes"]
-                sys_res_dict["mem_used"] = process["mem"]["rss"]
+                try:
+                    sys_res_dict["pid"] = process["pid"]
+                    sys_res_dict["ppid"] = process["parentPid"]
+                    sys_res_dict["num_threads"] = process["numThreads"]
+                    sys_res_dict["command"] = process.get("command", "")
+                    sys_res_dict["cpu_user"] = process["cpu"]["user"]
+                    sys_res_dict["cpu_sys"] = process["cpu"]["system"]
+                    sys_res_dict["io_write"] = process["io"]["writeBytes"]
+                    sys_res_dict["io_read"] = process["io"]["readBytes"]
+                    sys_res_dict["mem_used"] = process["mem"]["rss"]
+                except KeyError:
+                    # KeyError may occur as a result of file missing from /proc, likely due to
+                    # process exiting.
+                    continue
+
                 print(dumps(sys_res_dict, sort_keys=True), file=fp)
+
+                # Flush internal buffers associated with file to disk.
+                os.fsync(fp.fileno())
             time.sleep(options.interval)
 
 if __name__ == "__main__":
