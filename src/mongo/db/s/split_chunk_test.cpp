@@ -211,7 +211,7 @@ void SplitChunkTest::emptyResponse() {
     onFindCommand([&](const RemoteCommandRequest& request) { return std::vector<BSONObj>(); });
 }
 
-TEST_F(SplitChunkTest, ValidHashedKeyPatternSplitKeys) {
+TEST_F(SplitChunkTest, HashedKeyPatternNumberLongSplitKeys) {
 
     BSONObj keyPatternObj = BSON("foo"
                                  << "hashed");
@@ -261,7 +261,7 @@ TEST_F(SplitChunkTest, ValidHashedKeyPatternSplitKeys) {
     future.timed_get(kFutureTimeout);
 }
 
-TEST_F(SplitChunkTest, InvalidHashedKeyPatternSplitKeys) {
+TEST_F(SplitChunkTest, HashedKeyPatternIntegerSplitKeys) {
 
     BSONObj keyPatternObj = BSON("foo"
                                  << "hashed");
@@ -270,13 +270,98 @@ TEST_F(SplitChunkTest, InvalidHashedKeyPatternSplitKeys) {
 
     // Build a vector of valid split keys, which contains values that may not necessarily be able
     // to be converted to NumberLong types.
-    std::vector<BSONObj> invalidSplitKeys{BSON("foo" << (long long)20),
-                                          BSON("foo" << 512),
+    std::vector<BSONObj> invalidSplitKeys{
+        BSON("foo" << -1), BSON("foo" << 0), BSON("foo" << 1), BSON("foo" << 42)};
+
+    // Force-set the sharding state to enabled with the _shardId, for testing purposes.
+    ShardingState::get(operationContext())->setEnabledForTest(_shardId.toString());
+
+    expectLock();
+
+    // Call the splitChunk function asynchronously on a different thread, so that we do not block,
+    // and so we can construct the mock responses to requests made by splitChunk below.
+    auto future = launchAsync([&] {
+        auto statusWithOptionalChunkRange = splitChunk(operationContext(),
+                                                       _nss,
+                                                       keyPatternObj,
+                                                       _chunkRanges[1],
+                                                       invalidSplitKeys,
+                                                       _shardId.toString(),
+                                                       _epoch);
+        ASSERT_EQUALS(ErrorCodes::CannotSplit, statusWithOptionalChunkRange.getStatus());
+    });
+
+    // Here, we mock responses to the requests made by the splitChunk operation. The requests first
+    // do a find on the databases, then a find on all collections in the database we are looking
+    // for. Next, filter by the specific collection, and find the relevant chunks and shards.
+    dbResponse();
+    collResponse();
+    collResponse();
+    chunkResponse();
+    shardResponse();
+
+    future.timed_get(kFutureTimeout);
+}
+
+TEST_F(SplitChunkTest, HashedKeyPatternDoubleSplitKeys) {
+
+    BSONObj keyPatternObj = BSON("foo"
+                                 << "hashed");
+    _coll.setKeyPattern(BSON("_id"
+                             << "hashed"));
+
+    // Build a vector of valid split keys, which contains values that may not necessarily be able
+    // to be converted to NumberLong types.
+    std::vector<BSONObj> invalidSplitKeys{
+        BSON("foo" << 47.21230129), BSON("foo" << 1.0), BSON("foo" << 0.0), BSON("foo" << -0.001)};
+
+    // Force-set the sharding state to enabled with the _shardId, for testing purposes.
+    ShardingState::get(operationContext())->setEnabledForTest(_shardId.toString());
+
+    expectLock();
+
+    // Call the splitChunk function asynchronously on a different thread, so that we do not block,
+    // and so we can construct the mock responses to requests made by splitChunk below.
+    auto future = launchAsync([&] {
+        auto statusWithOptionalChunkRange = splitChunk(operationContext(),
+                                                       _nss,
+                                                       keyPatternObj,
+                                                       _chunkRanges[1],
+                                                       invalidSplitKeys,
+                                                       _shardId.toString(),
+                                                       _epoch);
+        ASSERT_EQUALS(ErrorCodes::CannotSplit, statusWithOptionalChunkRange.getStatus());
+    });
+
+    // Here, we mock responses to the requests made by the splitChunk operation. The requests first
+    // do a find on the databases, then a find on all collections in the database we are looking
+    // for. Next, filter by the specific collection, and find the relevant chunks and shards.
+    dbResponse();
+    collResponse();
+    collResponse();
+    chunkResponse();
+    shardResponse();
+
+    future.timed_get(kFutureTimeout);
+}
+
+TEST_F(SplitChunkTest, HashedKeyPatternStringSplitKeys) {
+
+    BSONObj keyPatternObj = BSON("foo"
+                                 << "hashed");
+    _coll.setKeyPattern(BSON("_id"
+                             << "hashed"));
+
+    // Build a vector of valid split keys, which contains values that may not necessarily be able
+    // to be converted to NumberLong types.
+    std::vector<BSONObj> invalidSplitKeys{BSON("foo"
+                                               << "@&(9@*88+_241(/.*@8uuDU@(9];a;s;]3"),
                                           BSON("foo"
-                                               << "hello"),
+                                               << "string"),
                                           BSON("foo"
-                                               << ""),
-                                          BSON("foo" << 3.1415926535)};
+                                               << "14.13289"),
+                                          BSON("foo"
+                                               << "")};
 
     // Force-set the sharding state to enabled with the _shardId, for testing purposes.
     ShardingState::get(operationContext())->setEnabledForTest(_shardId.toString());
