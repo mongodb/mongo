@@ -44,6 +44,7 @@
 #include "mongo/db/concurrency/write_conflict_exception.h"
 #include "mongo/db/curop.h"
 #include "mongo/db/db_raii.h"
+#include "mongo/db/dbdirectclient.h"
 #include "mongo/db/jsobj.h"
 #include "mongo/db/query/internal_plans.h"
 #include "mongo/db/repl/bgsync.h"
@@ -60,10 +61,12 @@
 #include "mongo/db/repl/sync_tail.h"
 #include "mongo/db/service_context.h"
 #include "mongo/db/service_context_d_test_fixture.h"
+#include "mongo/db/session_catalog.h"
 #include "mongo/stdx/mutex.h"
 #include "mongo/unittest/unittest.h"
 #include "mongo/util/concurrency/old_thread_pool.h"
 #include "mongo/util/md5.hpp"
+#include "mongo/util/scopeguard.h"
 #include "mongo/util/string_map.h"
 
 namespace mongo {
@@ -488,6 +491,91 @@ TEST_F(SyncTailTest, MultiApplyAssignsOperationsToWriterThreadsBasedOnNamespaceH
     ASSERT_EQUALS(NamespaceString::kRsOplogNamespace, nssForInsert);
     ASSERT_BSONOBJ_EQ(op1.raw, operationsWrittenToOplog[0].doc);
     ASSERT_BSONOBJ_EQ(op2.raw, operationsWrittenToOplog[1].doc);
+}
+
+TEST_F(SyncTailTest, MultiApplyUpdatesTheTransactionTable) {
+    // Set up the transactions collection, which can only be done by the primary.
+    ASSERT_OK(ReplicationCoordinator::get(_opCtx.get())->setFollowerMode(MemberState::RS_PRIMARY));
+    SessionCatalog::create(_opCtx->getServiceContext());
+    SessionCatalog::get(_opCtx->getServiceContext())->onStepUp(_opCtx.get());
+    ON_BLOCK_EXIT([&] { SessionCatalog::reset_forTest(_opCtx->getServiceContext()); });
+    ASSERT_OK(
+        ReplicationCoordinator::get(_opCtx.get())->setFollowerMode(MemberState::RS_SECONDARY));
+
+    // Entries with a session id and a txnNumber update the transaction table.
+    auto lsidSingle = makeLogicalSessionIdForTest();
+    auto opSingle = makeInsertDocumentOplogEntry(
+        {Timestamp(Seconds(1), 0), 1LL}, NamespaceString("test.0"), BSON("x" << 1));
+    appendSessionTransactionInfo(opSingle, lsidSingle, 5LL, 0);
+
+    // For entries with the same session, the entry with a larger txnNumber is saved.
+    auto lsidDiffTxn = makeLogicalSessionIdForTest();
+    auto opDiffTxnSmaller = makeInsertDocumentOplogEntry(
+        {Timestamp(Seconds(2), 0), 1LL}, NamespaceString("test.1"), BSON("x" << 0));
+    appendSessionTransactionInfo(opDiffTxnSmaller, lsidDiffTxn, 10LL, 1);
+    auto opDiffTxnLarger = makeInsertDocumentOplogEntry(
+        {Timestamp(Seconds(3), 0), 1LL}, NamespaceString("test.1"), BSON("x" << 1));
+    appendSessionTransactionInfo(opDiffTxnLarger, lsidDiffTxn, 20LL, 1);
+
+    // For entries with the same session and txnNumber, the later optime is saved.
+    auto lsidSameTxn = makeLogicalSessionIdForTest();
+    auto opSameTxnLater = makeInsertDocumentOplogEntry(
+        {Timestamp(Seconds(6), 0), 1LL}, NamespaceString("test.2"), BSON("x" << 0));
+    appendSessionTransactionInfo(opSameTxnLater, lsidSameTxn, 30LL, 0);
+    auto opSameTxnSooner = makeInsertDocumentOplogEntry(
+        {Timestamp(Seconds(5), 0), 1LL}, NamespaceString("test.2"), BSON("x" << 1));
+    appendSessionTransactionInfo(opSameTxnSooner, lsidSameTxn, 30LL, 1);
+
+    // Entries with a session id but no txnNumber do not lead to updates.
+    auto lsidNoTxn = makeLogicalSessionIdForTest();
+    auto opNoTxn = makeInsertDocumentOplogEntry(
+        {Timestamp(Seconds(7), 0), 1LL}, NamespaceString("test.3"), BSON("x" << 0));
+    auto info = opNoTxn.getOperationSessionInfo();
+    info.setSessionId(lsidNoTxn);
+    opNoTxn.setOperationSessionInfo(info);
+
+    // Apply the batch and verify the transaction collection was properly updated for each scenario.
+    auto writerPool = SyncTail::makeWriterPool();
+    ASSERT_OK(multiApply(
+        _opCtx.get(),
+        writerPool.get(),
+        {opSingle, opDiffTxnSmaller, opDiffTxnLarger, opSameTxnLater, opSameTxnSooner, opNoTxn},
+        noopApplyOperationFn));
+
+    DBDirectClient client(_opCtx.get());
+
+    // The txnNum and optime of the only write were saved.
+    auto resultSingle =
+        client.findOne(NamespaceString::kSessionTransactionsTableNamespace.ns(),
+                       BSON(SessionTxnRecord::kSessionIdFieldName << lsidSingle.toBSON()));
+    ASSERT_TRUE(!resultSingle.isEmpty());
+    ASSERT_EQ(resultSingle[SessionTxnRecord::kTxnNumFieldName].numberLong(), 5LL);
+    ASSERT_EQ(resultSingle[SessionTxnRecord::kLastWriteOpTimeTsFieldName].timestamp(),
+              Timestamp(Seconds(1), 0));
+
+    // The txnNum and optime of the write with the larger txnNum were saved.
+    auto resultDiffTxn =
+        client.findOne(NamespaceString::kSessionTransactionsTableNamespace.ns(),
+                       BSON(SessionTxnRecord::kSessionIdFieldName << lsidDiffTxn.toBSON()));
+    ASSERT_TRUE(!resultDiffTxn.isEmpty());
+    ASSERT_EQ(resultDiffTxn[SessionTxnRecord::kTxnNumFieldName].numberLong(), 20LL);
+    ASSERT_EQ(resultDiffTxn[SessionTxnRecord::kLastWriteOpTimeTsFieldName].timestamp(),
+              Timestamp(Seconds(3), 0));
+
+    // The txnNum and optime of the write with the later optime were saved.
+    auto resultSameTxn =
+        client.findOne(NamespaceString::kSessionTransactionsTableNamespace.ns(),
+                       BSON(SessionTxnRecord::kSessionIdFieldName << lsidSameTxn.toBSON()));
+    ASSERT_TRUE(!resultSameTxn.isEmpty());
+    ASSERT_EQ(resultSameTxn[SessionTxnRecord::kTxnNumFieldName].numberLong(), 30LL);
+    ASSERT_EQ(resultSameTxn[SessionTxnRecord::kLastWriteOpTimeTsFieldName].timestamp(),
+              Timestamp(Seconds(6), 0));
+
+    // There is no entry for the write with no txnNumber.
+    auto resultNoTxn =
+        client.findOne(NamespaceString::kSessionTransactionsTableNamespace.ns(),
+                       BSON(SessionTxnRecord::kSessionIdFieldName << lsidNoTxn.toBSON()));
+    ASSERT_TRUE(resultNoTxn.isEmpty());
 }
 
 TEST_F(SyncTailTest, MultiSyncApplyUsesSyncApplyToApplyOperation) {

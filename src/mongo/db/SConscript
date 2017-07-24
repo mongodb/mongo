@@ -1393,6 +1393,7 @@ env.Library(
         'ops/write_ops_retryability.cpp',
         'session.cpp',
         'session_catalog.cpp',
+        'session_txn_record.cpp',
         'transaction_history_iterator.cpp',
         env.Idlc('ops/single_write_result.idl')[0],
         env.Idlc('session_txn_record.idl')[0],

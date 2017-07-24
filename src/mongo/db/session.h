@@ -33,7 +33,7 @@
 #include "mongo/base/disallow_copying.h"
 #include "mongo/bson/timestamp.h"
 #include "mongo/db/logical_session_id.h"
-#include "mongo/db/session_txn_record_gen.h"
+#include "mongo/db/session_txn_record.h"
 #include "mongo/db/transaction_history_iterator.h"
 
 namespace mongo {
@@ -62,6 +62,18 @@ public:
     const LogicalSessionId& getSessionId() const {
         return _sessionId;
     }
+
+    /**
+     * Update the txnNum and lastWriteOpTimeTs of the session record. Will create a new entry if the
+     * record with corresponding sessionId does not exist.
+     *
+     * Outside callers should use saveTxnProgress instead of this when running as primary and
+     * serving a user request.
+     */
+    static void updateSessionRecord(OperationContext* opCtx,
+                                    const LogicalSessionId& sessionId,
+                                    const TxnNumber& txnNum,
+                                    const Timestamp& ts);
 
     /**
      *  Load transaction state from storage if it hasn't.

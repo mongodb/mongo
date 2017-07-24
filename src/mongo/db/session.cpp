@@ -63,15 +63,15 @@ boost::optional<SessionTxnRecord> loadSessionRecord(OperationContext* opCtx,
     return SessionTxnRecord::parse(ctx, result);
 }
 
-/**
- * Update the txnNum of the session record. Will create a new entry if the record with
- * corresponding sessionId does not exist.
- */
-void updateSessionRecordTxnNum(OperationContext* opCtx,
-                               const LogicalSessionId& sessionId,
-                               const TxnNumber& txnNum) {
+}  // namespace
+
+Session::Session(LogicalSessionId sessionId) : _sessionId(std::move(sessionId)) {}
+
+void Session::updateSessionRecord(OperationContext* opCtx,
+                                  const LogicalSessionId& sessionId,
+                                  const TxnNumber& txnNum,
+                                  const Timestamp& ts) {
     repl::UnreplicatedWritesBlock doNotReplicateWrites(opCtx);
-    Timestamp zeroTs;
 
     AutoGetCollection autoColl(opCtx, NamespaceString::kSessionTransactionsTableNamespace, MODE_IX);
     uassert(40526,
@@ -86,7 +86,7 @@ void updateSessionRecordTxnNum(OperationContext* opCtx,
     updateRequest.setUpdates(BSON("$set" << BSON(SessionTxnRecord::kTxnNumFieldName
                                                  << txnNum
                                                  << SessionTxnRecord::kLastWriteOpTimeTsFieldName
-                                                 << zeroTs)));
+                                                 << ts)));
     updateRequest.setUpsert(true);
 
     auto updateResult = update(opCtx, autoColl.getDb(), updateRequest);
@@ -94,10 +94,6 @@ void updateSessionRecordTxnNum(OperationContext* opCtx,
             str::stream() << "Failed to update transaction progress for session " << sessionId,
             updateResult.numDocsModified >= 1 || !updateResult.upserted.isEmpty());
 }
-
-}  // namespace
-
-Session::Session(LogicalSessionId sessionId) : _sessionId(std::move(sessionId)) {}
 
 void Session::begin(OperationContext* opCtx, const TxnNumber& txnNumber) {
     invariant(!opCtx->lockState()->isLocked());
@@ -109,7 +105,7 @@ void Session::begin(OperationContext* opCtx, const TxnNumber& txnNumber) {
         // Previous read failed to retrieve the txn record, which means it does not exist yet,
         // so create a new entry.
         if (!_txnRecord) {
-            updateSessionRecordTxnNum(opCtx, _sessionId, txnNumber);
+            updateSessionRecord(opCtx, _sessionId, txnNumber, Timestamp());
 
             _txnRecord.emplace();
             _txnRecord->setSessionId(_sessionId);
@@ -129,7 +125,7 @@ void Session::begin(OperationContext* opCtx, const TxnNumber& txnNumber) {
             _txnRecord->getTxnNum() <= txnNumber);
 
     if (txnNumber > _txnRecord->getTxnNum()) {
-        updateSessionRecordTxnNum(opCtx, _sessionId, txnNumber);
+        updateSessionRecord(opCtx, _sessionId, txnNumber, Timestamp());
         _txnRecord->setTxnNum(txnNumber);
         _txnRecord->setLastWriteOpTimeTs(Timestamp());
     }

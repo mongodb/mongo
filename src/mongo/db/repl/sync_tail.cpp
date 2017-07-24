@@ -52,6 +52,7 @@
 #include "mongo/db/concurrency/write_conflict_exception.h"
 #include "mongo/db/curop.h"
 #include "mongo/db/db_raii.h"
+#include "mongo/db/logical_session_id.h"
 #include "mongo/db/namespace_string.h"
 #include "mongo/db/prefetch.h"
 #include "mongo/db/query/query_knobs.h"
@@ -67,6 +68,8 @@
 #include "mongo/db/repl/storage_interface.h"
 #include "mongo/db/server_parameters.h"
 #include "mongo/db/service_context.h"
+#include "mongo/db/session.h"
+#include "mongo/db/session_txn_record.h"
 #include "mongo/db/stats/timer_stats.h"
 #include "mongo/stdx/memory.h"
 #include "mongo/util/exit.h"
@@ -504,6 +507,57 @@ void scheduleWritesToOplog(OperationContext* opCtx,
         size_t begin = thread * numOpsPerThread;
         size_t end = (thread == numOplogThreads - 1) ? ops.size() : begin + numOpsPerThread;
         threadPool->schedule(makeOplogWriterForRange(begin, end));
+    }
+}
+
+using SessionRecordMap =
+    stdx::unordered_map<LogicalSessionId, SessionTxnRecord, LogicalSessionIdHash>;
+
+// Returns a map of the "latest" transaction table records for each logical session id present in
+// the given operations. Each record represents the final state of the transaction table entry for
+// that session id after the operations are applied.
+SessionRecordMap computeLatestTransactionTableRecords(const MultiApplier::Operations& ops) {
+    SessionRecordMap latestRecords;
+    for (const auto& op : ops) {
+        auto sessionInfo = op.getOperationSessionInfo();
+        if (!sessionInfo.getTxnNumber()) {
+            continue;
+        }
+
+        invariant(sessionInfo.getSessionId());
+        LogicalSessionId lsid(*sessionInfo.getSessionId());
+
+        auto txnNumber = *sessionInfo.getTxnNumber();
+        auto opTimeTs = op.getOpTime().getTimestamp();
+
+        auto it = latestRecords.find(lsid);
+        if (it != latestRecords.end()) {
+            auto record = makeSessionTxnRecord(lsid, txnNumber, opTimeTs);
+            if (record > it->second) {
+                latestRecords[lsid] = std::move(record);
+            }
+        } else {
+            latestRecords.emplace(lsid, makeSessionTxnRecord(lsid, txnNumber, opTimeTs));
+        }
+    }
+    return latestRecords;
+}
+
+void scheduleTxnTableUpdates(OperationContext* opCtx,
+                             OldThreadPool* threadPool,
+                             const SessionRecordMap& latestRecords) {
+    for (const auto& it : latestRecords) {
+        auto& record = it.second;
+
+        threadPool->schedule([&record]() {
+            initializeWriterThread();
+            const auto opCtxHolder = cc().makeOperationContext();
+            const auto opCtx = opCtxHolder.get();
+            opCtx->lockState()->setShouldConflictWithSecondaryBatchApplication(false);
+
+            Session::updateSessionRecord(
+                opCtx, record.getSessionId(), record.getTxnNum(), record.getLastWriteOpTimeTs());
+        });
     }
 }
 
@@ -1278,6 +1332,7 @@ StatusWith<OpTime> multiApply(OperationContext* opCtx,
                 "attempting to replicate ops while primary"};
     }
 
+    auto latestTxnRecords = computeLatestTransactionTableRecords(ops);
     std::vector<Status> statusVector(workerPool->getNumThreads(), Status::OK());
     {
         // We must wait for the all work we've dispatched to complete before leaving this block
@@ -1298,6 +1353,10 @@ StatusWith<OpTime> multiApply(OperationContext* opCtx,
         consistencyMarkers->setMinValidToAtLeast(opCtx, ops.back().getOpTime());
 
         applyOps(writerVectors, workerPool, applyOperation, &statusVector);
+        workerPool->join();
+
+        // Update the transaction table to point to the latest oplog entries for each session id.
+        scheduleTxnTableUpdates(opCtx, workerPool, latestTxnRecords);
     }
 
     // If any of the statuses is not ok, return error.

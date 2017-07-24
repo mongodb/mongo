@@ -37,6 +37,7 @@
 #include "mongo/bson/simple_bsonobj_comparator.h"
 #include "mongo/bson/timestamp.h"
 #include "mongo/db/catalog/collection_options.h"
+#include "mongo/db/logical_session_id.h"
 #include "mongo/db/namespace_string.h"
 #include "mongo/db/repl/oplog_entry.h"
 #include "mongo/db/repl/optime.h"
@@ -127,6 +128,11 @@ OplogEntry makeCreateIndexOplogEntry(OpTime opTime,
                                      const BSONObj& keyPattern);
 
 OplogEntry makeCommandOplogEntry(OpTime opTime, const NamespaceString& nss, const BSONObj& command);
+
+void appendSessionTransactionInfo(OplogEntry& entry,
+                                  LogicalSessionId lsid,
+                                  TxnNumber txnNum,
+                                  StmtId stmtId);
 
 }  // namespace repl
 }  // namespace mongo

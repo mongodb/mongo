@@ -544,6 +544,7 @@ env.Library(
         '$BUILD_DIR/mongo/db/prefetch',
         '$BUILD_DIR/mongo/db/stats/timer_stats',
         '$BUILD_DIR/mongo/db/storage/storage_options',
+        '$BUILD_DIR/mongo/db/write_ops',
         '$BUILD_DIR/mongo/util/concurrency/thread_pool',
         '$BUILD_DIR/mongo/util/net/network',
         'oplog_entry',
@@ -583,6 +584,7 @@ env.CppUnitTest(
         'sync_tail_test.cpp',
     ],
     LIBDEPS=[
+        '$BUILD_DIR/mongo/db/dbdirectclient',
         'idempotency_test_fixture',
         'oplog_interface_local',
         'sync_tail_test_fixture',

@@ -44,6 +44,7 @@
 #include "mongo/db/curop.h"
 #include "mongo/db/db_raii.h"
 #include "mongo/db/jsobj.h"
+#include "mongo/db/logical_session_id.h"
 #include "mongo/db/query/internal_plans.h"
 #include "mongo/db/repl/bgsync.h"
 #include "mongo/db/repl/drop_pending_collection_reaper.h"
@@ -207,6 +208,17 @@ OplogEntry makeCreateIndexOplogEntry(OpTime opTime,
     indexInfoBob.append("ns", nss.ns());
     return makeInsertDocumentOplogEntry(
         opTime, NamespaceString(nss.getSystemIndexesCollection()), indexInfoBob.obj());
+}
+
+void appendSessionTransactionInfo(OplogEntry& entry,
+                                  LogicalSessionId lsid,
+                                  TxnNumber txnNum,
+                                  StmtId stmtId) {
+    auto info = entry.getOperationSessionInfo();
+    info.setSessionId(lsid);
+    info.setTxnNumber(txnNum);
+    entry.setOperationSessionInfo(std::move(info));
+    entry.setStatementId(stmtId);
 }
 
 Status IdempotencyTest::runOp(const OplogEntry& op) {
