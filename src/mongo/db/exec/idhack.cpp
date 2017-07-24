@@ -160,7 +160,7 @@ PlanStage::StageState IDHackStage::doWork(WorkingSetID* out) {
         }
 
         return advance(id, member, out);
-    } catch (const WriteConflictException& wce) {
+    } catch (const WriteConflictException&) {
         // Restart at the beginning on retry.
         _recordCursor.reset();
         if (id != WorkingSet::INVALID_ID)

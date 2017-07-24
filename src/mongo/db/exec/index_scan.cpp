@@ -146,7 +146,7 @@ PlanStage::StageState IndexScan::doWork(WorkingSetID* out) {
             case HIT_END:
                 return PlanStage::IS_EOF;
         }
-    } catch (const WriteConflictException& wce) {
+    } catch (const WriteConflictException&) {
         *out = WorkingSet::INVALID_ID;
         return PlanStage::NEED_YIELD;
     }

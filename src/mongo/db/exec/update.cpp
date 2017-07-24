@@ -612,7 +612,7 @@ PlanStage::StageState UpdateStage::doWork(WorkingSetID* out) {
         try {
             docStillMatches = write_stage_common::ensureStillMatches(
                 _collection, getOpCtx(), _ws, id, _params.canonicalQuery);
-        } catch (const WriteConflictException& wce) {
+        } catch (const WriteConflictException&) {
             // There was a problem trying to detect if the document still exists, so retry.
             memberFreer.Dismiss();
             return prepareToRetryWSM(id, out);
@@ -635,7 +635,7 @@ PlanStage::StageState UpdateStage::doWork(WorkingSetID* out) {
         WorkingSetCommon::prepareForSnapshotChange(_ws);
         try {
             child()->saveState();
-        } catch (const WriteConflictException& wce) {
+        } catch (const WriteConflictException&) {
             std::terminate();
         }
 
@@ -649,7 +649,7 @@ PlanStage::StageState UpdateStage::doWork(WorkingSetID* out) {
         try {
             // Do the update, get us the new version of the doc.
             newObj = transformAndUpdate(member->obj, recordId);
-        } catch (const WriteConflictException& wce) {
+        } catch (const WriteConflictException&) {
             memberFreer.Dismiss();  // Keep this member around so we can retry updating it.
             return prepareToRetryWSM(id, out);
         }
@@ -676,7 +676,7 @@ PlanStage::StageState UpdateStage::doWork(WorkingSetID* out) {
         // state outside of the WritUnitOfWork.
         try {
             child()->restoreState();
-        } catch (const WriteConflictException& wce) {
+        } catch (const WriteConflictException&) {
             // Note we don't need to retry updating anything in this case since the update
             // already was committed. However, we still need to return the updated document
             // (if it was requested).

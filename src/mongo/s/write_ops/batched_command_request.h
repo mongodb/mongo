@@ -90,9 +90,8 @@ public:
 
     // Index creation is also an insert, but a weird one.
     bool isInsertIndexRequest() const;
-    bool isValidIndexRequest(std::string* errMsg) const;
 
-    const NamespaceString& getTargetingNSS() const;
+    NamespaceString getTargetingNSS() const;
 
     //
     // individual field accessors

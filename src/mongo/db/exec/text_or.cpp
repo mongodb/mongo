@@ -165,7 +165,7 @@ PlanStage::StageState TextOrStage::initStage(WorkingSetID* out) {
         _recordCursor = _index->getCollection()->getCursor(getOpCtx());
         _internalState = State::kReadingTerms;
         return PlanStage::NEED_TIME;
-    } catch (const WriteConflictException& wce) {
+    } catch (const WriteConflictException&) {
         invariant(_internalState == State::kInit);
         _recordCursor.reset();
         return PlanStage::NEED_YIELD;
@@ -355,7 +355,7 @@ PlanStage::StageState TextOrStage::addTerm(WorkingSetID wsid, WorkingSetID* out)
                                            wsid,
                                            _recordCursor);
                 shouldKeep = _filter->matches(&tdoc);
-            } catch (const WriteConflictException& wce) {
+            } catch (const WriteConflictException&) {
                 // Ensure that the BSONObj underlying the WorkingSetMember is owned because it may
                 // be freed when we yield.
                 wsm->makeObjOwnedIfNeeded();
@@ -380,7 +380,7 @@ PlanStage::StageState TextOrStage::addTerm(WorkingSetID wsid, WorkingSetID* out)
             try {
                 shouldKeep = WorkingSetCommon::fetch(getOpCtx(), _ws, wsid, _recordCursor);
                 ++_specificStats.fetches;
-            } catch (const WriteConflictException& wce) {
+            } catch (const WriteConflictException&) {
                 wsm->makeObjOwnedIfNeeded();
                 _idRetrying = wsid;
                 *out = WorkingSet::INVALID_ID;

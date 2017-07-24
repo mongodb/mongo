@@ -78,7 +78,7 @@ PlanStage::StageState MultiIteratorStage::doWork(WorkingSetID* out) {
                 break;
             _iterators.pop_back();
         }
-    } catch (const WriteConflictException& wce) {
+    } catch (const WriteConflictException&) {
         // If _advance throws a WCE we shouldn't have moved.
         invariant(!_iterators.empty());
         *out = WorkingSet::INVALID_ID;

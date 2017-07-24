@@ -147,7 +147,7 @@ PlanStage::StageState CollectionScan::doWork(WorkingSetID* out) {
 
             record = _cursor->next();
         }
-    } catch (const WriteConflictException& wce) {
+    } catch (const WriteConflictException&) {
         // Leave us in a state to try again next time.
         if (needToMakeCursor)
             _cursor.reset();

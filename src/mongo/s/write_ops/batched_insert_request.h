@@ -71,12 +71,6 @@ public:
     void setNS(NamespaceString collName);
     const NamespaceString& getNS() const;
 
-    /**
-     * Returns the ns for the index being created. Valid only if this is a index
-     * insert request.
-     */
-    const NamespaceString& getIndexTargetingNS() const;
-
     void addToDocuments(const BSONObj& documents);
     std::size_t sizeDocuments() const;
     const std::vector<BSONObj>& getDocuments() const;
@@ -93,9 +87,6 @@ private:
     // (M)  array of documents to be inserted
     std::vector<BSONObj> _documents;
     bool _isDocumentsSet;
-
-    // (O)  cached copied of target ns
-    NamespaceString _targetNSS;
 };
 
 }  // namespace mongo

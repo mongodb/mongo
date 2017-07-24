@@ -177,7 +177,7 @@ PlanStage::StageState DeleteStage::doWork(WorkingSetID* out) {
     try {
         docStillMatches = write_stage_common::ensureStillMatches(
             _collection, getOpCtx(), _ws, id, _params.canonicalQuery);
-    } catch (const WriteConflictException& wce) {
+    } catch (const WriteConflictException&) {
         // There was a problem trying to detect if the document still exists, so retry.
         memberFreer.Dismiss();
         return prepareToRetryWSM(id, out);
@@ -207,7 +207,7 @@ PlanStage::StageState DeleteStage::doWork(WorkingSetID* out) {
     WorkingSetCommon::prepareForSnapshotChange(_ws);
     try {
         child()->saveState();
-    } catch (const WriteConflictException& wce) {
+    } catch (const WriteConflictException&) {
         std::terminate();
     }
 
@@ -218,7 +218,7 @@ PlanStage::StageState DeleteStage::doWork(WorkingSetID* out) {
             _collection->deleteDocument(
                 getOpCtx(), _params.stmtId, recordId, _params.opDebug, _params.fromMigrate);
             wunit.commit();
-        } catch (const WriteConflictException& wce) {
+        } catch (const WriteConflictException&) {
             memberFreer.Dismiss();  // Keep this member around so we can retry deleting it.
             return prepareToRetryWSM(id, out);
         }
@@ -237,7 +237,7 @@ PlanStage::StageState DeleteStage::doWork(WorkingSetID* out) {
     // outside of the WriteUnitOfWork.
     try {
         child()->restoreState();
-    } catch (const WriteConflictException& wce) {
+    } catch (const WriteConflictException&) {
         // Note we don't need to retry anything in this case since the delete already was committed.
         // However, we still need to return the deleted document (if it was requested).
         if (_params.returnDeleted) {

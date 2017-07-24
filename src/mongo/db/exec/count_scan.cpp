@@ -114,7 +114,7 @@ PlanStage::StageState CountScan::doWork(WorkingSetID* out) {
         } else {
             entry = _cursor->next(kWantLoc);
         }
-    } catch (const WriteConflictException& wce) {
+    } catch (const WriteConflictException&) {
         if (needInit) {
             // Release our cursor and try again next time.
             _cursor.reset();

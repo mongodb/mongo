@@ -80,7 +80,7 @@ PlanStage::StageState OplogStart::doWork(WorkingSetID* out) {
         try {
             // If this throws WCE, it leave us in a state were the next call to work will retry.
             switchToExtentHopping();
-        } catch (const WriteConflictException& wce) {
+        } catch (const WriteConflictException&) {
             _subIterators.clear();
             *out = WorkingSet::INVALID_ID;
             return NEED_YIELD;
@@ -113,7 +113,7 @@ PlanStage::StageState OplogStart::workExtentHopping(WorkingSetID* out) {
                 return PlanStage::ADVANCED;
             }
         }
-    } catch (const WriteConflictException& wce) {
+    } catch (const WriteConflictException&) {
         *out = WorkingSet::INVALID_ID;
         return PlanStage::NEED_YIELD;
     }

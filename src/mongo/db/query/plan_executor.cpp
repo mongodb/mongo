@@ -325,7 +325,7 @@ void PlanExecutor::saveState() {
 bool PlanExecutor::restoreState() {
     try {
         return restoreStateWithoutRetrying();
-    } catch (const WriteConflictException& wce) {
+    } catch (const WriteConflictException&) {
         if (!_yieldPolicy->canAutoYield())
             throw;
 

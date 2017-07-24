@@ -110,7 +110,7 @@ bool PlanYieldPolicy::yield(stdx::function<void()> beforeYieldingFn,
 
             try {
                 _planYielding->saveState();
-            } catch (const WriteConflictException& wce) {
+            } catch (const WriteConflictException&) {
                 invariant(!"WriteConflictException not allowed in saveState");
             }
 
@@ -125,7 +125,7 @@ bool PlanYieldPolicy::yield(stdx::function<void()> beforeYieldingFn,
             }
 
             return _planYielding->restoreStateWithoutRetrying();
-        } catch (const WriteConflictException& wce) {
+        } catch (const WriteConflictException&) {
             CurOp::get(opCtx)->debug().writeConflicts++;
             WriteConflictException::logAndBackoff(
                 attempt, "plan execution restoreState", _planYielding->nss().ns());

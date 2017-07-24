@@ -34,14 +34,6 @@
 #include "mongo/util/mongoutils/str.h"
 
 namespace mongo {
-namespace {
-
-void extractIndexNSS(const BSONObj& indexDesc, NamespaceString* indexNSS) {
-    *indexNSS = NamespaceString(indexDesc["ns"].str());
-}
-
-}  // namespace
-
 
 const BSONField<std::string> BatchedInsertRequest::collName("insert");
 const BSONField<std::vector<BSONObj>> BatchedInsertRequest::documents("documents");
@@ -100,16 +92,11 @@ void BatchedInsertRequest::parseRequest(const OpMsgRequest& request) {
         _documents.push_back(documentEntry.getOwned());
     }
 
-    if (_documents.size() >= 1) {
-        extractIndexNSS(_documents.at(0), &_targetNSS);
-    }
-
     _isDocumentsSet = true;
 }
 
 void BatchedInsertRequest::clear() {
     _ns = NamespaceString();
-    _targetNSS = NamespaceString();
     _isNSSet = false;
 
     _documents.clear();
@@ -120,7 +107,6 @@ void BatchedInsertRequest::cloneTo(BatchedInsertRequest* other) const {
     other->clear();
 
     other->_ns = _ns;
-    other->_targetNSS = _targetNSS;
     other->_isNSSet = _isNSSet;
 
     for (std::vector<BSONObj>::const_iterator it = _documents.begin(); it != _documents.end();
@@ -144,17 +130,9 @@ const NamespaceString& BatchedInsertRequest::getNS() const {
     return _ns;
 }
 
-const NamespaceString& BatchedInsertRequest::getIndexTargetingNS() const {
-    return _targetNSS;
-}
-
 void BatchedInsertRequest::addToDocuments(const BSONObj& documents) {
     _documents.push_back(documents);
     _isDocumentsSet = true;
-
-    if (_documents.size() == 1) {
-        extractIndexNSS(_documents.at(0), &_targetNSS);
-    }
 }
 
 size_t BatchedInsertRequest::sizeDocuments() const {

@@ -81,7 +81,7 @@ PlanStage::StageState DistinctScan::doWork(WorkingSetID* out) {
         if (!_cursor)
             _cursor = _iam->newCursor(getOpCtx(), _params.direction == 1);
         kv = _cursor->seek(_seekPoint);
-    } catch (const WriteConflictException& wce) {
+    } catch (const WriteConflictException&) {
         *out = WorkingSet::INVALID_ID;
         return PlanStage::NEED_YIELD;
     }
