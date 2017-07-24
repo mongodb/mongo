@@ -70,19 +70,24 @@ std::unique_ptr<MatchExpression> makeRestriction(TypeMatchExpression::Type restr
             (statedType->matchesAllNumbers() || isNumericBSONType(statedType->getBSONType()));
         const bool bsonTypesMatch = restrictionType.bsonType == statedType->getBSONType();
 
-        if (bothNumeric || bsonTypesMatch) {
-            // This restriction applies only to the type that is already being enforced. We return
-            // the restriction unmodified.
-            return restrictionExpr;
-        } else {
+        if (!bothNumeric && !bsonTypesMatch) {
             // This restriction doesn't take any effect, since the type of the schema is different
             // from the type to which this retriction applies.
             return stdx::make_unique<AlwaysTrueMatchExpression>();
         }
     }
 
-    invariant(!statedType);
-
+    // Generate and return the following expression tree:
+    //
+    //      OR
+    //    /   /
+    //  NOT  <restrictionExpr>
+    //  /
+    // TYPE
+    //  <restrictionType>
+    //
+    // We need to do this because restriction keywords do not apply when a field is either not
+    // present or of a different type.
     auto typeExprForNot = stdx::make_unique<TypeMatchExpression>();
     invariantOK(typeExprForNot->init(restrictionExpr->path(), restrictionType));
 
@@ -90,6 +95,36 @@ std::unique_ptr<MatchExpression> makeRestriction(TypeMatchExpression::Type restr
     auto orExpr = stdx::make_unique<OrMatchExpression>();
     orExpr->add(notExpr.release());
     orExpr->add(restrictionExpr.release());
+
+    return std::move(orExpr);
+}
+
+/**
+ * Constructs and returns the following expression tree:
+ *     OR
+ *    /  \
+ *  NOT   <typeExpr>
+ *  /
+ * EXISTS
+ *  <typeExpr field>
+ *
+ * This is needed because the JSON Schema 'type' keyword only applies if the corresponding field is
+ * present.
+ *
+ * 'typeExpr' must be non-null and must have a non-empty path.
+ */
+std::unique_ptr<MatchExpression> makeTypeRestriction(
+    std::unique_ptr<TypeMatchExpression> typeExpr) {
+    invariant(typeExpr);
+    invariant(!typeExpr->path().empty());
+
+    auto existsExpr = stdx::make_unique<ExistsMatchExpression>();
+    invariantOK(existsExpr->init(typeExpr->path()));
+
+    auto notExpr = stdx::make_unique<NotMatchExpression>(existsExpr.release());
+    auto orExpr = stdx::make_unique<OrMatchExpression>();
+    orExpr->add(notExpr.release());
+    orExpr->add(typeExpr.release());
 
     return std::move(orExpr);
 }
@@ -318,7 +353,7 @@ StatusWithMatchExpression JSONSchemaParser::_parse(StringData path, BSONObj sche
     }
 
     if (!path.empty() && typeExpr.getValue()) {
-        andExpr->add(typeExpr.getValue().release());
+        andExpr->add(makeTypeRestriction(std::move(typeExpr.getValue())).release());
     }
     return {std::move(andExpr)};
 }

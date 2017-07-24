@@ -102,8 +102,9 @@ TEST(JSONSchemaParserTest, NestedTypeObjectTranslatesCorrectly) {
     ASSERT_BSONOBJ_EQ(
         builder.obj(),
         fromjson("{$and: [{$and: [{$and: ["
-                 "{a: {$_internalSchemaObjectMatch: {$and: [{$and:[{b: {$type:2}}]}]}}},"
-                 "{a: {$type: 3}}]}]}]}"));
+                 "{$or: [{$nor: [{a: {$type: 3}}]}, {a: {$_internalSchemaObjectMatch:"
+                 "{$and: [{$and:[{$or: [{$nor: [{b: {$exists: true}}]}, {b: {$type: 2}}]}]}]}}}]},"
+                 "{$or: [{$nor: [{a: {$exists: true}}]}, {a: {$type: 3}}]}]}]}]}"));
 }
 
 TEST(JSONSchemaParserTest, TopLevelNonObjectTypeTranslatesCorrectly) {
@@ -121,8 +122,10 @@ TEST(JSONSchemaParserTest, TypeNumberTranslatesCorrectly) {
     ASSERT_OK(result.getStatus());
     BSONObjBuilder builder;
     result.getValue()->serialize(&builder);
-    ASSERT_BSONOBJ_EQ(builder.obj(),
-                      fromjson("{$and: [{$and: [{$and: [{num: {$type: 'number'}}]}]}]}"));
+    ASSERT_BSONOBJ_EQ(
+        builder.obj(),
+        fromjson("{$and: [{$and: [{$and: ["
+                 "{$or: [{$nor: [{num: {$exists: true}}]}, {num: {$type: 'number'}}]}]}]}]}"));
 }
 
 TEST(JSONSchemaParserTest, MaximumTranslatesCorrectlyWithTypeNumber) {
@@ -131,9 +134,11 @@ TEST(JSONSchemaParserTest, MaximumTranslatesCorrectlyWithTypeNumber) {
     ASSERT_OK(result.getStatus());
     BSONObjBuilder builder;
     result.getValue()->serialize(&builder);
-    ASSERT_BSONOBJ_EQ(
-        builder.obj(),
-        fromjson("{$and: [{$and: [{$and: [{num: {$lte: 0}}, {num: {$type: 'number'}}]}]}]}"));
+    ASSERT_BSONOBJ_EQ(builder.obj(),
+                      fromjson("{$and: [{$and: [{$and: ["
+                               "{$or: [{$nor: [{num: {$type: 'number'}}]}, {num: {$lte: 0}}]},"
+                               "{$or: [{$nor: [{num: {$exists: true}}]}, {num: {$type: 'number'}}]}"
+                               "]}]}]}"));
 }
 
 TEST(JSONSchemaParserTest, MaximumTranslatesCorrectlyWithTypeLong) {
@@ -142,9 +147,11 @@ TEST(JSONSchemaParserTest, MaximumTranslatesCorrectlyWithTypeLong) {
     ASSERT_OK(result.getStatus());
     BSONObjBuilder builder;
     result.getValue()->serialize(&builder);
-    ASSERT_BSONOBJ_EQ(
-        builder.obj(),
-        fromjson("{$and: [{$and: [{$and: [{num: {$lte: 0}}, {num: {$type: 18}}]}]}]}"));
+    ASSERT_BSONOBJ_EQ(builder.obj(),
+                      fromjson("{$and: [{$and: [{$and: ["
+                               "{$or: [{$nor: [{num: {$type: 'number'}}]}, {num: {$lte: 0}}]},"
+                               "{$or: [{$nor: [{num: {$exists: true}}]}, {num: {$type: 18}}]}"
+                               "]}]}]}"));
 }
 
 TEST(JSONSchemaParserTest, MaximumTranslatesCorrectlyWithTypeString) {
@@ -153,9 +160,10 @@ TEST(JSONSchemaParserTest, MaximumTranslatesCorrectlyWithTypeString) {
     ASSERT_OK(result.getStatus());
     BSONObjBuilder builder;
     result.getValue()->serialize(&builder);
-    ASSERT_BSONOBJ_EQ(
-        builder.obj(),
-        fromjson("{$and: [{$and: [{$and: [{$alwaysTrue: 1}, {num: {$type: 2}}]}]}]}"));
+    ASSERT_BSONOBJ_EQ(builder.obj(),
+                      fromjson("{$and: [{$and: [{$and: [{$alwaysTrue: 1},"
+                               "{$or: [{$nor: [{num: {$exists: true}}]}, {num: {$type: 2}}]}"
+                               "]}]}]}"));
 }
 
 TEST(JSONSchemaParserTest, MaximumTranslatesCorrectlyWithNoType) {
@@ -177,9 +185,11 @@ TEST(JSONSchemaParserTest, MaximumTranslatesCorrectlyWithExclusiveMaximumTrue) {
     ASSERT_OK(result.getStatus());
     BSONObjBuilder builder;
     result.getValue()->serialize(&builder);
-    ASSERT_BSONOBJ_EQ(
-        builder.obj(),
-        fromjson("{$and: [{$and: [{$and: [{num: {$lt: 0}}, {num: {$type: 18}}]}]}]}"));
+    ASSERT_BSONOBJ_EQ(builder.obj(),
+                      fromjson("{$and: [{$and: [{$and: ["
+                               "{$or: [{$nor: [{num: {$type: 'number'}}]}, {num: {$lt: 0}}]},"
+                               "{$or: [{$nor: [{num: {$exists: true}}]}, {num: {$type: 18}}]}"
+                               "]}]}]}"));
 }
 
 TEST(JSONSchemaParserTest, MaximumTranslatesCorrectlyWithExclusiveMaximumFalse) {
@@ -189,9 +199,11 @@ TEST(JSONSchemaParserTest, MaximumTranslatesCorrectlyWithExclusiveMaximumFalse) 
     ASSERT_OK(result.getStatus());
     BSONObjBuilder builder;
     result.getValue()->serialize(&builder);
-    ASSERT_BSONOBJ_EQ(
-        builder.obj(),
-        fromjson("{$and: [{$and: [{$and: [{num: {$lte: 0}}, {num: {$type: 18}}]}]}]}"));
+    ASSERT_BSONOBJ_EQ(builder.obj(),
+                      fromjson("{$and: [{$and: [{$and: ["
+                               "{$or: [{$nor: [{num: {$type: 'number'}}]}, {num: {$lte: 0}}]},"
+                               "{$or: [{$nor: [{num: {$exists: true}}]}, {num: {$type: 18}}]}"
+                               "]}]}]}"));
 }
 
 TEST(JSONSchemaParserTest, FailsToParseIfMaximumIsNotANumber) {
@@ -218,9 +230,11 @@ TEST(JSONSchemaParserTest, MinimumTranslatesCorrectlyWithTypeNumber) {
     ASSERT_OK(result.getStatus());
     BSONObjBuilder builder;
     result.getValue()->serialize(&builder);
-    ASSERT_BSONOBJ_EQ(
-        builder.obj(),
-        fromjson("{$and: [{$and: [{$and: [{num: {$gte: 0}}, {num: {$type: 'number'}}]}]}]}"));
+    ASSERT_BSONOBJ_EQ(builder.obj(),
+                      fromjson("{$and: [{$and: [{$and: ["
+                               "{$or: [{$nor: [{num: {$type: 'number'}}]}, {num: {$gte: 0}}]},"
+                               "{$or: [{$nor: [{num: {$exists: true}}]}, {num: {$type: 'number'}}]}"
+                               "]}]}]}"));
 }
 
 TEST(JSONSchemaParserTest, MinimumTranslatesCorrectlyWithTypeLong) {
@@ -229,9 +243,11 @@ TEST(JSONSchemaParserTest, MinimumTranslatesCorrectlyWithTypeLong) {
     ASSERT_OK(result.getStatus());
     BSONObjBuilder builder;
     result.getValue()->serialize(&builder);
-    ASSERT_BSONOBJ_EQ(
-        builder.obj(),
-        fromjson("{$and: [{$and: [{$and: [{num: {$gte: 0}}, {num: {$type: 18}}]}]}]}"));
+    ASSERT_BSONOBJ_EQ(builder.obj(),
+                      fromjson("{$and: [{$and: [{$and: ["
+                               "{$or: [{$nor: [{num: {$type: 'number'}}]}, {num: {$gte: 0}}]},"
+                               "{$or: [{$nor: [{num: {$exists: true}}]}, {num: {$type: 18}}]}"
+                               "]}]}]}"));
 }
 
 TEST(JSONSchemaParserTest, MinimumTranslatesCorrectlyWithTypeString) {
@@ -240,9 +256,10 @@ TEST(JSONSchemaParserTest, MinimumTranslatesCorrectlyWithTypeString) {
     ASSERT_OK(result.getStatus());
     BSONObjBuilder builder;
     result.getValue()->serialize(&builder);
-    ASSERT_BSONOBJ_EQ(
-        builder.obj(),
-        fromjson("{$and: [{$and: [{$and: [{$alwaysTrue: 1}, {num: {$type: 2}}]}]}]}"));
+    ASSERT_BSONOBJ_EQ(builder.obj(),
+                      fromjson("{$and: [{$and: [{$and: [{$alwaysTrue: 1},"
+                               "{$or: [{$nor: [{num: {$exists: true}}]}, {num: {$type: 2}}]}"
+                               "]}]}]}"));
 }
 
 TEST(JSONSchemaParserTest, MinimumTranslatesCorrectlyWithNoType) {
@@ -264,9 +281,11 @@ TEST(JSONSchemaParserTest, MinimumTranslatesCorrectlyWithExclusiveMinimumTrue) {
     ASSERT_OK(result.getStatus());
     BSONObjBuilder builder;
     result.getValue()->serialize(&builder);
-    ASSERT_BSONOBJ_EQ(
-        builder.obj(),
-        fromjson("{$and: [{$and: [{$and: [{num: {$gt: 0}}, {num: {$type: 18}}]}]}]}"));
+    ASSERT_BSONOBJ_EQ(builder.obj(),
+                      fromjson("{$and: [{$and: [{$and: ["
+                               "{$or: [{$nor: [{num: {$type: 'number'}}]}, {num: {$gt: 0}}]},"
+                               "{$or: [{$nor: [{num: {$exists: true}}]}, {num: {$type: 18}}]}"
+                               "]}]}]}"));
 }
 
 TEST(JSONSchemaParserTest, MinimumTranslatesCorrectlyWithExclusiveMinimumFalse) {
@@ -276,9 +295,11 @@ TEST(JSONSchemaParserTest, MinimumTranslatesCorrectlyWithExclusiveMinimumFalse) 
     ASSERT_OK(result.getStatus());
     BSONObjBuilder builder;
     result.getValue()->serialize(&builder);
-    ASSERT_BSONOBJ_EQ(
-        builder.obj(),
-        fromjson("{$and: [{$and: [{$and: [{num: {$gte: 0}}, {num: {$type: 18}}]}]}]}"));
+    ASSERT_BSONOBJ_EQ(builder.obj(),
+                      fromjson("{$and: [{$and: [{$and: ["
+                               "{$or: [{$nor: [{num: {$type: 'number'}}]}, {num: {$gte: 0}}]},"
+                               "{$or: [{$nor: [{num: {$exists: true}}]}, {num: {$type: 18}}]}"
+                               "]}]}]}"));
 }
 
 TEST(JSONSchemaParserTest, FailsToParseIfMinimumIsNotANumber) {
