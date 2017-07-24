@@ -220,6 +220,7 @@ error_code("FTDCPathNotSet", 219)
 error_code("FTDCPathAlreadySet", 220)
 error_code("IndexModified", 221)
 error_code("CloseChangeStream", 222)
+error_code("IllegalOpMsgFlag", 223)
 
 # Error codes 4000-8999 are reserved.
 
@@ -257,3 +258,6 @@ error_class("WriteConcernError", ["WriteConcernFailed",
                                   "UnknownReplWriteConcern",
                                   "CannotSatisfyWriteConcern"])
 error_class("ShutdownError", ["ShutdownInProgress", "InterruptedAtShutdown"])
+
+#TODO SERVER-28679 add checksum failure.
+error_class("ConnectionFatalMessageParseError", ["IllegalOpMsgFlag"])

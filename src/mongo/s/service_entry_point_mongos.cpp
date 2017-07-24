@@ -70,7 +70,9 @@ DbResponse ServiceEntryPointMongos::handleRequest(OperationContext* opCtx, const
     // connection
     uassert(ErrorCodes::IllegalOperation,
             str::stream() << "Message type " << op << " is not supported.",
-            isSupportedNetworkOp(op) && op != dbCommand && op != dbCommandReply);
+            isSupportedRequestNetworkOp(op) &&
+                op != dbCommand &&    // mongos never implemented OP_COMMAND ingress support.
+                op != dbCompressed);  // Decompression should be handled above us.
 
     // Start a new LastError session. Any exceptions thrown from here onwards will be returned
     // to the caller (if the type of the message permits it).
@@ -80,8 +82,15 @@ DbResponse ServiceEntryPointMongos::handleRequest(OperationContext* opCtx, const
     }
     ClusterLastErrorInfo::get(client)->newRequest();
     LastError::get(client).startRequest();
+    AuthorizationSession::get(opCtx->getClient())->startRequest(opCtx);
 
     DbMessage dbm(message);
+
+    // This is before the try block since it handles all exceptions that should not cause the
+    // connection to close.
+    if (op == dbMsg || (op == dbQuery && NamespaceString(dbm.getns()).isCommand())) {
+        return Strategy::clientCommand(opCtx, message);
+    }
 
     NamespaceString nss;
     DbResponse dbResponse;
@@ -98,37 +107,33 @@ DbResponse ServiceEntryPointMongos::handleRequest(OperationContext* opCtx, const
                     nss.db() != NamespaceString::kLocalDb);
         }
 
-        AuthorizationSession::get(opCtx->getClient())->startRequest(opCtx);
 
         LOG(3) << "Request::process begin ns: " << nss << " msg id: " << msgId
                << " op: " << networkOpToString(op);
 
         switch (op) {
-            case dbMsg:
-                dbResponse = Strategy::clientOpMsgCommand(opCtx, message);
-                break;
             case dbQuery:
-                if (nss.isCommand()) {
-                    try {
-                        dbResponse = Strategy::clientOpQueryCommand(opCtx, nss, &dbm);
-                    } catch (const DBException& ex) {
-                        BSONObjBuilder bob;
-                        Command::appendCommandStatus(bob, ex.toStatus());
-                        dbResponse = replyToQuery(bob.done());
-                    }
-                } else {
-                    dbResponse = Strategy::queryOp(opCtx, nss, &dbm);
-                }
+                // Commands are handled above through Strategy::clientCommand().
+                invariant(!nss.isCommand());
+                dbResponse = Strategy::queryOp(opCtx, nss, &dbm);
                 break;
+
             case dbGetMore:
                 dbResponse = Strategy::getMore(opCtx, nss, &dbm);
                 break;
+
             case dbKillCursors:
                 Strategy::killCursors(opCtx, &dbm);  // No Response.
                 break;
-            default:
+
+            case dbInsert:
+            case dbUpdate:
+            case dbDelete:
                 Strategy::writeOp(opCtx, &dbm);  // No Response.
                 break;
+
+            default:
+                MONGO_UNREACHABLE;
         }
 
         LOG(3) << "Request::process end ns: " << nss << " msg id: " << msgId

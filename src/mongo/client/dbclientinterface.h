@@ -756,6 +756,13 @@ public:
 
     virtual bool isMongos() const = 0;
 
+    /**
+     * Parses command replies and runs them through the metadata reader.
+     * This is virtual and non-const to allow subclasses to act on failures.
+     */
+    virtual rpc::UniqueReply parseCommandReplyMessage(const std::string& host,
+                                                      const Message& replyMsg);
+
 protected:
     /** if the result of a command is ok*/
     bool isOk(const BSONObj&);
@@ -909,6 +916,9 @@ public:
 
     using DBClientBase::runCommandWithTarget;
     std::pair<rpc::UniqueReply, DBClientBase*> runCommandWithTarget(OpMsgRequest request) override;
+
+    rpc::UniqueReply parseCommandReplyMessage(const std::string& host,
+                                              const Message& replyMsg) override;
 
     /**
        @return true if this connection is currently in a failed state.  When autoreconnect is on,

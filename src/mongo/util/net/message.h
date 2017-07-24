@@ -61,9 +61,8 @@ enum NetworkOp : int32_t {
     dbMsg = 2013,
 };
 
-inline bool isSupportedNetworkOp(NetworkOp op) {
+inline bool isSupportedRequestNetworkOp(NetworkOp op) {
     switch (op) {
-        case opReply:
         case dbUpdate:
         case dbInsert:
         case dbQuery:
@@ -71,10 +70,11 @@ inline bool isSupportedNetworkOp(NetworkOp op) {
         case dbDelete:
         case dbKillCursors:
         case dbCommand:
-        case dbCommandReply:
         case dbCompressed:
         case dbMsg:
             return true;
+        case dbCommandReply:
+        case opReply:
         default:
             return false;
     }

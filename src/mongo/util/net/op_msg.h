@@ -44,6 +44,33 @@ struct OpMsg {
         std::vector<BSONObj> objs;
     };
 
+    static constexpr uint32_t kChecksumPresent = 1 << 0;
+    static constexpr uint32_t kMoreToCome = 1 << 1;
+
+    /**
+     * Returns the unvalidated flags for the given message if it is an OP_MSG message.
+     * Returns 0 for other message kinds since they are the equivalent of no flags set.
+     * Throws if the message is too small to hold flags.
+     */
+    static uint32_t flags(const Message& message);
+    static bool isFlagSet(const Message& message, uint32_t flag) {
+        return flags(message) & flag;
+    }
+
+    /**
+     * Replaces the flags in message with the supplied flags.
+     * Only legal on an otherwise valid OP_MSG message.
+     */
+    static void replaceFlags(Message* message, uint32_t flags);
+
+    /**
+     * Adds flag to the list of set flags in message.
+     * Only legal on an otherwise valid OP_MSG message.
+     */
+    static void setFlag(Message* message, uint32_t flag) {
+        replaceFlags(message, flags(*message) | flag);
+    }
+
     /**
      * Parses and returns an OpMsg containing unowned BSON.
      */
@@ -77,20 +104,6 @@ struct OpMsg {
         return it == sequences.end() ? nullptr : &*it;
     }
 
-    // "Mandatory" flags
-    static constexpr uint32_t kChecksumPresent = 1 << 0;
-    static constexpr uint32_t kMoreToCome = 1 << 1;
-
-    // "Optional" flags
-    static constexpr uint32_t kExhaustAllowed = 1 << 16;
-
-    static constexpr uint32_t kAllKnownFlags = kChecksumPresent | kMoreToCome | kExhaustAllowed;
-
-    bool isFlagSet(uint32_t flag) const {
-        return flags & flag;
-    }
-
-    uint32_t flags = 0;
     BSONObj body;
     std::vector<DocumentSequence> sequences;
 };
@@ -181,14 +194,6 @@ public:
         resumeBody().appendElements(body);
     }
 
-
-    /**
-     * The OP_MSG flags can be modified at any time prior to calling finish().
-     */
-    uint32_t& flags() {
-        return _flags;
-    }
-
     /**
      * Finish building and return a Message ready to give to the networking layer for transmission.
      * It is illegal to call any methods on this object after calling this.
@@ -203,7 +208,6 @@ public:
 
         _buf.reset();
         skipHeaderAndFlags();
-        _flags = 0;
         _bodyStart = 0;
         _state = kEmpty;
         _openBuilder = false;
@@ -229,12 +233,12 @@ private:
     void finishDocumentStream(DocSequenceBuilder* docSequenceBuilder);
 
     void skipHeaderAndFlags() {
-        _buf.skip(sizeof(MSGHEADER::Layout) + sizeof(_flags));  // These are filled in by finish().
+        _buf.skip(sizeof(MSGHEADER::Layout));  // This is filled in by finish().
+        _buf.appendNum(uint32_t(0));           // flags (currently always 0).
     }
 
     // When adding members, remember to update reset().
     BufBuilder _buf;
-    uint32_t _flags = 0;
     int _bodyStart = 0;
     State _state = kEmpty;
     bool _openBuilder = false;

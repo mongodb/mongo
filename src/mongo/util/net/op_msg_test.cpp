@@ -517,6 +517,29 @@ TEST_F(OpMsgParser, FailsIfNoRoomForFlags) {
     ASSERT_THROWS_CODE((OpMsgBytes{'\0', '\0'}.parse()), AssertionException, ErrorCodes::Overflow);
     ASSERT_THROWS_CODE(
         (OpMsgBytes{'\0', '\0', '\0'}.parse()), AssertionException, ErrorCodes::Overflow);
+
+    ASSERT_THROWS_CODE(OpMsg::flags(OpMsgBytes{}.done()), AssertionException, ErrorCodes::Overflow);
+    ASSERT_THROWS_CODE(
+        OpMsg::flags(OpMsgBytes{'\0'}.done()), AssertionException, ErrorCodes::Overflow);
+    ASSERT_THROWS_CODE(
+        OpMsg::flags(OpMsgBytes{'\0', '\0'}.done()), AssertionException, ErrorCodes::Overflow);
+    ASSERT_THROWS_CODE(OpMsg::flags(OpMsgBytes{'\0', '\0', '\0'}.done()),
+                       AssertionException,
+                       ErrorCodes::Overflow);
+}
+
+TEST_F(OpMsgParser, FlagExtractionWorks) {
+    ASSERT_EQ(OpMsg::flags(OpMsgBytes{0u}.done()), 0u);    // All clear.
+    ASSERT_EQ(OpMsg::flags(OpMsgBytes{~0u}.done()), ~0u);  // All set.
+
+    for (auto i = uint32_t(0); i < 32u; i++) {
+        const auto flags = uint32_t(1) << i;
+        ASSERT_EQ(OpMsg::flags(OpMsgBytes{flags}.done()), flags) << flags;
+        ASSERT(OpMsg::isFlagSet(OpMsgBytes{flags}.done(), flags)) << flags;
+        ASSERT(!OpMsg::isFlagSet(OpMsgBytes{~flags}.done(), flags)) << flags;
+        ASSERT(!OpMsg::isFlagSet(OpMsgBytes{0u}.done(), flags)) << flags;
+        ASSERT(OpMsg::isFlagSet(OpMsgBytes{~0u}.done(), flags)) << flags;
+    }
 }
 
 TEST_F(OpMsgParser, FailsWithUnknownRequiredFlags) {
@@ -529,7 +552,10 @@ TEST_F(OpMsgParser, FailsWithUnknownRequiredFlags) {
             fromjson("{ping: 1}"),
         };
 
-        ASSERT_THROWS_CODE(msg.parse(), AssertionException, 40429);
+        ASSERT_THROWS_WITH_CHECK(msg.parse(), AssertionException, [](const DBException& ex) {
+            ASSERT_EQ(ex.toStatus().code(), ErrorCodes::IllegalOpMsgFlag);
+            ASSERT(ErrorCodes::isConnectionFatalMessageParseError(ex.toStatus().code()));
+        });
     }
 }
 
@@ -708,7 +734,6 @@ TEST(OpMsgSerializer, BodyAndInPlaceSequenceInPlaceWithReset) {
 
     builder.beginBody().append("pong", 1);
 
-
     testSerializer(builder.finish(),
                    OpMsgBytes{
                        kNoFlags,  //
@@ -722,6 +747,59 @@ TEST(OpMsgSerializer, BodyAndInPlaceSequenceInPlaceWithReset) {
                        kBodySection,
                        fromjson("{pong: 1}"),
                    });
+}
+
+TEST(OpMsgSerializer, ReplaceFlagsWorks) {
+    {
+        auto msg = OpMsgBytes{~0u}.done();
+        OpMsg::replaceFlags(&msg, 0u);
+        ASSERT_EQ(OpMsg::flags(msg), 0u);
+    }
+    {
+        auto msg = OpMsgBytes{0u}.done();
+        OpMsg::replaceFlags(&msg, ~0u);
+        ASSERT_EQ(OpMsg::flags(msg), ~0u);
+    }
+
+    for (auto i = uint32_t(0); i < 32u; i++) {
+        auto flags = uint32_t(1) << i;
+        {
+            auto msg = OpMsgBytes{0u}.done();
+            OpMsg::replaceFlags(&msg, flags);
+            ASSERT_EQ(OpMsg::flags(msg), flags) << flags;
+        }
+        {
+            auto msg = OpMsgBytes{~0u}.done();
+            OpMsg::replaceFlags(&msg, flags);
+            ASSERT_EQ(OpMsg::flags(msg), flags) << flags;
+        }
+        {
+            auto msg = OpMsgBytes{~flags}.done();
+            OpMsg::replaceFlags(&msg, flags);
+            ASSERT_EQ(OpMsg::flags(msg), flags) << flags;
+        }
+    }
+}
+
+TEST(OpMsgSerializer, SetFlagWorks) {
+    for (auto i = uint32_t(0); i < 32u; i++) {
+        auto flags = uint32_t(1) << i;
+        {
+            auto msg = OpMsgBytes{0u}.done();
+            OpMsg::setFlag(&msg, flags);
+            ASSERT_EQ(OpMsg::flags(msg), flags) << flags;
+        }
+        {
+            auto msg = OpMsgBytes{~0u}.done();
+            OpMsg::setFlag(&msg, flags);
+            ASSERT_EQ(OpMsg::flags(msg), ~0u) << flags;
+        }
+        {
+            auto msg = OpMsgBytes{~flags}.done();
+            OpMsg::setFlag(&msg, flags);
+            ASSERT_EQ(OpMsg::flags(msg), ~0u) << flags;
+        }
+    }
 }
 
 TEST(OpMsgRequest, GetDatabaseWorks) {

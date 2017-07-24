@@ -1,5 +1,5 @@
 /**
- *    Copyright (C) 2015 MongoDB Inc.
+ *    Copyright (C) 2017 MongoDB Inc.
  *
  *    This program is free software: you can redistribute it and/or  modify
  *    it under the terms of the GNU Affero General Public License, version 3,
@@ -28,42 +28,40 @@
 
 #include "mongo/platform/basic.h"
 
-#include <utility>
-
 #include "mongo/client/dbclientinterface.h"
-#include "mongo/db/dbmessage.h"
-#include "mongo/rpc/legacy_request.h"
-#include "mongo/rpc/metadata.h"
-#include "mongo/util/assert_util.h"
+#include "mongo/rpc/get_status_from_command_result.h"
+#include "mongo/unittest/integration_test.h"
+#include "mongo/unittest/unittest.h"
+#include "mongo/util/net/op_msg.h"
 
 namespace mongo {
-namespace rpc {
 
-OpMsgRequest opMsgRequestFromLegacyRequest(const Message& message) {
-    DbMessage dbm(message);
-    QueryMessage qm(dbm);
-    NamespaceString ns(qm.ns);
+TEST(OpMsg, UnknownRequiredFlagClosesConnection) {
+    std::string errMsg;
+    auto conn = std::unique_ptr<DBClientBase>(
+        unittest::getFixtureConnectionString().connect("integration_test", errMsg));
+    uassert(ErrorCodes::SocketException, errMsg, conn);
 
-    if (qm.queryOptions & QueryOption_Exhaust) {
-        uasserted(18527,
-                  str::stream() << "The 'exhaust' OP_QUERY flag is invalid for commands: "
-                                << ns.ns()
-                                << " "
-                                << qm.query.toString());
-    }
+    auto request = OpMsgRequest::fromDBAndBody("admin", BSON("ping" << 1)).serialize();
+    OpMsg::setFlag(&request, 1u << 15);  // This should be the last required flag to be assigned.
 
-    uassert(40473,
-            str::stream() << "Trying to handle namespace " << qm.ns << " as a command",
-            ns.isCommand());
-
-    uassert(16979,
-            str::stream() << "Bad numberToReturn (" << qm.ntoreturn
-                          << ") for $cmd type ns - can only be 1 or -1",
-            qm.ntoreturn == 1 || qm.ntoreturn == -1);
-
-    return rpc::upconvertRequest(
-        ns.db(), qm.query.shareOwnershipWith(message.sharedBuffer()), qm.queryOptions);
+    Message reply;
+    ASSERT(!conn->call(request, reply, /*assertOK*/ false));
 }
 
-}  // namespace rpc
+TEST(OpMsg, UnknownOptionalFlagIsIgnored) {
+    std::string errMsg;
+    auto conn = std::unique_ptr<DBClientBase>(
+        unittest::getFixtureConnectionString().connect("integration_test", errMsg));
+    uassert(ErrorCodes::SocketException, errMsg, conn);
+
+    auto request = OpMsgRequest::fromDBAndBody("admin", BSON("ping" << 1)).serialize();
+    OpMsg::setFlag(&request, 1u << 31);  // This should be the last optional flag to be assigned.
+
+    Message reply;
+    ASSERT(conn->call(request, reply));
+    uassertStatusOK(getStatusFromCommandResult(
+        conn->parseCommandReplyMessage(conn->getServerAddress(), reply)->getCommandReply()));
+}
+
 }  // namespace mongo

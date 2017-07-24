@@ -251,7 +251,7 @@ BSONObj DBClientCursor::commandDataReceived(const Message& reply) {
     int op = reply.operation();
     invariant(op == opReply || op == dbCommandReply || op == dbMsg);
 
-    auto commandReply = rpc::makeReply(&reply);
+    auto commandReply = _client->parseCommandReplyMessage(_client->getServerAddress(), reply);
     auto commandStatus = getStatusFromCommandResult(commandReply->getCommandReply());
 
     if (ErrorCodes::SendStaleConfig == commandStatus) {

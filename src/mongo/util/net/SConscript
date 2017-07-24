@@ -51,3 +51,15 @@ env.CppUnitTest(
         'network',
     ],
 )
+
+env.CppIntegrationTest(
+    target='op_msg_integration_test',
+    source=[
+        'op_msg_integration_test.cpp',
+    ],
+    LIBDEPS=[
+        'network',
+        '$BUILD_DIR/mongo/client/clientdriver',
+        '$BUILD_DIR/mongo/util/version_impl',
+    ],
+)

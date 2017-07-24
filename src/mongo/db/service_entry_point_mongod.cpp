@@ -762,61 +762,66 @@ void curOpCommandSetup(OperationContext* opCtx, const OpMsgRequest& request) {
 
 DbResponse runCommands(OperationContext* opCtx, const Message& message) {
     auto replyBuilder = rpc::makeReplyBuilder(rpc::protocolForMessage(message));
+    [&] {
+        OpMsgRequest request;
+        try {  // Parse.
+            request = rpc::opMsgRequestFromAnyProtocol(message);
+        } catch (const DBException& ex) {
+            // If this error needs to fail the connection, propagate it out.
+            if (ErrorCodes::isConnectionFatalMessageParseError(ex.code()))
+                throw;
 
-    // TODO SERVER-28964 If this parsing the request fails we reply to an invalid request which
-    // isn't always safe. Unfortunately tests currently rely on this. Figure out what to do
-    // (probably throw a special exception type like ConnectionFatalMessageParseError).
-    bool canReply = true;
-    auto curOp = CurOp::get(opCtx);
-    boost::optional<OpMsgRequest> request;
-    try {
-        request.emplace(rpc::opMsgRequestFromAnyProtocol(message));  // Request is validated here.
-        canReply = !request->isFlagSet(OpMsg::kMoreToCome);
+            // Otherwise, reply with the parse error. This is useful for cases where parsing fails
+            // due to user-supplied input, such as the document too deep error. Since we failed
+            // during parsing, we can't log anything about the command.
+            LOG(1) << "assertion while parsing command: " << ex.toString();
+            _generateErrorResponse(opCtx, replyBuilder.get(), ex, rpc::makeEmptyMetadata());
 
-        curOpCommandSetup(opCtx, *request);
-
-        Command* c = nullptr;
-        // In the absence of a Command object, no redaction is possible. Therefore
-        // to avoid displaying potentially sensitive information in the logs,
-        // we restrict the log message to the name of the unrecognized command.
-        // However, the complete command object will still be echoed to the client.
-        if (!(c = Command::findCommand(request->getCommandName()))) {
-            Command::unknownCommands.increment();
-            std::string msg = str::stream() << "no such command: '" << request->getCommandName()
-                                            << "'";
-            LOG(2) << msg;
-            uasserted(ErrorCodes::CommandNotFound,
-                      str::stream() << msg << ", bad cmd: '" << redact(request->body) << "'");
+            return;  // From lambda. Don't try executing if parsing failed.
         }
 
-        LOG(2) << "run command " << request->getDatabase() << ".$cmd" << ' '
-               << c->getRedactedCopyForLogging(request->body);
+        try {  // Execute.
+            curOpCommandSetup(opCtx, request);
 
-        {
-            // Try to set this as early as possible, as soon as we have figured out the command.
-            stdx::lock_guard<Client> lk(*opCtx->getClient());
-            curOp->setLogicalOp_inlock(c->getLogicalOp());
+            Command* c = nullptr;
+            // In the absence of a Command object, no redaction is possible. Therefore
+            // to avoid displaying potentially sensitive information in the logs,
+            // we restrict the log message to the name of the unrecognized command.
+            // However, the complete command object will still be echoed to the client.
+            if (!(c = Command::findCommand(request.getCommandName()))) {
+                Command::unknownCommands.increment();
+                std::string msg = str::stream() << "no such command: '" << request.getCommandName()
+                                                << "'";
+                LOG(2) << msg;
+                uasserted(ErrorCodes::CommandNotFound,
+                          str::stream() << msg << ", bad cmd: '" << redact(request.body) << "'");
+            }
+
+            LOG(2) << "run command " << request.getDatabase() << ".$cmd" << ' '
+                   << c->getRedactedCopyForLogging(request.body);
+
+            {
+                // Try to set this as early as possible, as soon as we have figured out the command.
+                stdx::lock_guard<Client> lk(*opCtx->getClient());
+                CurOp::get(opCtx)->setLogicalOp_inlock(c->getLogicalOp());
+            }
+
+            execCommandDatabase(opCtx, c, request, replyBuilder.get());
+        } catch (const DBException& ex) {
+            LOG(1) << "assertion while executing command '" << request.getCommandName() << "' "
+                   << "on database '" << request.getDatabase() << "': " << ex.toString();
+
+            _generateErrorResponse(opCtx, replyBuilder.get(), ex, rpc::makeEmptyMetadata());
         }
+    }();
 
-        execCommandDatabase(opCtx, c, *request, replyBuilder.get());
-    } catch (const DBException& ex) {
-        if (request) {
-            LOG(1) << "assertion while executing command '" << request->getCommandName() << "' "
-                   << "on database '" << request->getDatabase() << "': " << ex.toString();
-        } else {
-            // We failed during parsing so we can't log anything about the command.
-            LOG(1) << "assertion while executing command: " << ex.toString();
-        }
-
-        _generateErrorResponse(opCtx, replyBuilder.get(), ex, rpc::makeEmptyMetadata());
-    }
-
-    if (!canReply) {
-        return {};
+    if (OpMsg::isFlagSet(message, OpMsg::kMoreToCome)) {
+        // TODO SERVER-28510 throw to close connection if we failed with a not master error.
+        return {};  // Don't reply.
     }
 
     auto response = replyBuilder->done();
-    curOp->debug().responseLength = response.header().dataLen();
+    CurOp::get(opCtx)->debug().responseLength = response.header().dataLen();
 
     // TODO exhaust
     return DbResponse{std::move(response)};

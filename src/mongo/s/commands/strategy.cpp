@@ -53,6 +53,7 @@
 #include "mongo/db/query/query_request.h"
 #include "mongo/db/stats/counters.h"
 #include "mongo/db/views/resolved_view.h"
+#include "mongo/rpc/factory.h"
 #include "mongo/rpc/get_status_from_command_result.h"
 #include "mongo/rpc/metadata/logical_time_metadata.h"
 #include "mongo/rpc/metadata/tracking_metadata.h"
@@ -402,53 +403,48 @@ DbResponse Strategy::queryOp(OperationContext* opCtx, const NamespaceString& nss
                                          cursorId.getValue())};
 }
 
-DbResponse Strategy::clientOpQueryCommand(OperationContext* opCtx,
-                                          NamespaceString nss,
-                                          DbMessage* dbm) {
-    const QueryMessage q(*dbm);
+DbResponse Strategy::clientCommand(OperationContext* opCtx, const Message& m) {
+    auto reply = rpc::makeReplyBuilder(rpc::protocolForMessage(m));
 
-    LOG(3) << "command: " << nss << " " << redact(q.query) << " ntoreturn: " << q.ntoreturn
-           << " options: " << q.queryOptions;
+    [&] {
+        OpMsgRequest request;
+        std::string db;
+        try {  // Parse.
+            request = rpc::opMsgRequestFromAnyProtocol(m);
+            db = request.getDatabase().toString();
+        } catch (const DBException& ex) {
+            // If this error needs to fail the connection, propagate it out.
+            if (ErrorCodes::isConnectionFatalMessageParseError(ex.code()))
+                throw;
 
-    if (q.queryOptions & QueryOption_Exhaust) {
-        uasserted(18527,
-                  str::stream() << "The 'exhaust' query option is invalid for mongos commands: "
-                                << nss.ns()
-                                << " "
-                                << q.query.toString());
+            LOG(1) << "Exception thrown while parsing command " << causedBy(redact(ex));
+            reply->reset();
+            auto bob = reply->getInPlaceReplyBuilder(0);
+            Command::appendCommandStatus(bob, ex.toStatus());
+
+            return;  // From lambda. Don't try executing if parsing failed.
+        }
+
+        try {  // Execute.
+            LOG(3) << "Command begin db: " << db << " msg id: " << m.header().getId();
+            runCommand(opCtx, request, reply->getInPlaceReplyBuilder(0));
+            LOG(3) << "Command end db: " << db << " msg id: " << m.header().getId();
+        } catch (const DBException& ex) {
+            LOG(1) << "Exception thrown while processing command on " << db
+                   << " msg id: " << m.header().getId() << causedBy(redact(ex));
+
+            reply->reset();
+            auto bob = reply->getInPlaceReplyBuilder(0);
+            Command::appendCommandStatus(bob, ex.toStatus());
+        }
+    }();
+
+    if (OpMsg::isFlagSet(m, OpMsg::kMoreToCome)) {
+        return {};  // Don't reply.
     }
 
-    uassert(16978,
-            str::stream() << "Bad numberToReturn (" << q.ntoreturn
-                          << ") for $cmd type ns - can only be 1 or -1",
-            q.ntoreturn == 1 || q.ntoreturn == -1);
-
-    const auto request = rpc::upconvertRequest(nss.db(), q.query, q.queryOptions);
-    OpQueryReplyBuilder reply;
-    runCommand(opCtx, request, BSONObjBuilder(reply.bufBuilderForResults()));
-    return DbResponse{reply.toCommandReply()};
-}
-
-DbResponse Strategy::clientOpMsgCommand(OperationContext* opCtx, const Message& m) {
-    // TODO SERVER-28964 If this parsing the request fails we reply to an invalid request which
-    // isn't always safe. Unfortunately tests currently rely on this. Figure out what to do
-    // (probably throw a special exception type like ConnectionFatalMessageParseError).
-    bool canReply = true;
-    OpMsgBuilder reply;
-    try {
-        const auto request = OpMsgRequest::parse(m);
-        canReply = !request.isFlagSet(OpMsg::kMoreToCome);
-        runCommand(opCtx, request, reply.beginBody());
-    } catch (const DBException& ex) {
-        reply.reset();
-        auto bob = reply.beginBody();
-        Command::appendCommandStatus(bob, ex.toStatus());
-    }
-
-    if (!canReply)
-        return {};
-
-    return DbResponse{reply.finish()};
+    reply->setMetadata(BSONObj());  // mongos doesn't use metadata but the API requires this call.
+    return DbResponse{reply->done()};
 }
 
 void Strategy::commandOp(OperationContext* opCtx,

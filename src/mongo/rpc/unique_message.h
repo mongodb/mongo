@@ -46,7 +46,7 @@ class UniqueMessage {
     MONGO_DISALLOW_COPYING(UniqueMessage);
 
 public:
-    UniqueMessage(Message&& message, std::unique_ptr<MessageViewType> view)
+    UniqueMessage(Message message, std::unique_ptr<MessageViewType> view)
         : _message{std::move(message)}, _view{std::move(view)} {}
 
     UniqueMessage(UniqueMessage&&) = default;

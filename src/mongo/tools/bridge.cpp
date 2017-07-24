@@ -138,7 +138,7 @@ public:
 
                 uassert(ErrorCodes::IllegalOperation,
                         str::stream() << "Unsupported network op " << request.operation(),
-                        isSupportedNetworkOp(request.operation()));
+                        isSupportedRequestNetworkOp(request.operation()));
 
                 if (request.operation() == dbCompressed) {
                     auto swm = compressorManager.decompressMessage(request);

@@ -32,6 +32,7 @@
 
 #include "mongo/util/net/op_msg.h"
 
+#include <bitset>
 #include <set>
 
 #include "mongo/base/data_type_endian.h"
@@ -43,40 +44,59 @@
 
 namespace mongo {
 namespace {
+
+auto kAllSupportedFlags = OpMsg::kChecksumPresent | OpMsg::kMoreToCome;
+
 bool containsUnknownRequiredFlags(uint32_t flags) {
-    const uint32_t kRequiredFlagMask = 0xffff;
-    return uint32_t(flags & ~OpMsg::kAllKnownFlags & kRequiredFlagMask);
+    const uint32_t kRequiredFlagMask = 0xffff;  // Low 2 bytes are required, high 2 are optional.
+    return (flags & ~kAllSupportedFlags & kRequiredFlagMask) != 0;
 }
 
 enum class Section : uint8_t {
     kBody = 0,
     kDocSequence = 1,
 };
+
 }  // namespace
+
+uint32_t OpMsg::flags(const Message& message) {
+    if (message.operation() != dbMsg)
+        return 0;  // Other command protocols are the same as no flags set.
+
+    return BufReader(message.singleData().data(), message.dataSize())
+        .read<LittleEndian<uint32_t>>();
+}
+
+void OpMsg::replaceFlags(Message* message, uint32_t flags) {
+    invariant(!message->empty());
+    invariant(message->operation() == dbMsg);
+    invariant(message->dataSize() >= static_cast<int>(sizeof(uint32_t)));
+
+    DataView(message->singleData().data()).write<LittleEndian<uint32_t>>(flags);
+}
 
 OpMsg OpMsg::parse(const Message& message) try {
     // It is the caller's responsibility to call the correct parser for a given message type.
     invariant(!message.empty());
     invariant(message.operation() == dbMsg);
 
-    // TODO some validation may make more sense in the IDL parser. I've tagged them with comments.
-    OpMsg msg;
-    // Use a separate BufReader for the flags since the flags can change how much room we have
-    // for sections.
-    msg.flags =
-        BufReader(message.singleData().data(), message.dataSize()).read<LittleEndian<uint32_t>>();
-    uassert(40429,
-            str::stream() << "Message contains illegal flags value: " << msg.flags,
-            !containsUnknownRequiredFlags(msg.flags));
-
-    const bool haveChecksum = msg.isFlagSet(kChecksumPresent);
-    // TODO SERVER-28679 check checksum here if present.
+    const uint32_t flags = OpMsg::flags(message);
+    uassert(ErrorCodes::IllegalOpMsgFlag,
+            str::stream() << "Message contains illegal flags value: Ob"
+                          << std::bitset<32>(flags).to_string(),
+            !containsUnknownRequiredFlags(flags));
 
     constexpr int kCrc32Size = 4;
+    const bool haveChecksum = flags & kChecksumPresent;
     const int checksumSize = haveChecksum ? kCrc32Size : 0;
-    BufReader sectionsBuf(message.singleData().data() + sizeof(msg.flags),
-                          message.dataSize() - sizeof(msg.flags) - checksumSize);
+
+    // The sections begin after the flags and before the checksum (if present).
+    BufReader sectionsBuf(message.singleData().data() + sizeof(flags),
+                          message.dataSize() - sizeof(flags) - checksumSize);
+
+    // TODO some validation may make more sense in the IDL parser. I've tagged them with comments.
     bool haveBody = false;
+    OpMsg msg;
     while (!sectionsBuf.atEof()) {
         const auto sectionKind = sectionsBuf.read<Section>();
         switch (sectionKind) {
@@ -140,7 +160,6 @@ Message OpMsg::serialize() const {
         }
     }
     builder.beginBody().appendElements(body);
-    builder.flags() = flags;
     return builder.finish();
 }
 
@@ -211,18 +230,6 @@ Message OpMsgBuilder::finish() {
     invariant(_bodyStart);
     invariant(!_openBuilder);
     _state = kDone;
-
-    // TODO figure out where checksums should be calculated. It needs to be *after* we set the
-    // messageID and replyTo fields in the header, which is currently done deep in the network
-    // stack. That will either need to move closer to here, or the checksumming will need to be
-    // done there.
-    invariant(!(_flags & OpMsg::kChecksumPresent));  // TODO SERVER-28679 compute checksum.
-
-    // If this fails, it means some internal user set an invalid flag.
-    invariant(!containsUnknownRequiredFlags(_flags));
-
-    DataView(_buf.buf())
-        .write<LittleEndian<uint32_t>>(_flags, /*offset=*/sizeof(MSGHEADER::Layout));
 
     const auto size = _buf.len();
     MSGHEADER::View header(_buf.buf());

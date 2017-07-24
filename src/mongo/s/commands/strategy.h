@@ -81,10 +81,7 @@ public:
      * Catches StaleConfigException errors and retries the command automatically after refreshing
      * the metadata for the failing namespace.
      */
-    static DbResponse clientOpMsgCommand(OperationContext* opCtx, const Message& message);
-    static DbResponse clientOpQueryCommand(OperationContext* opCtx,
-                                           NamespaceString nss,
-                                           DbMessage* dbm);
+    static DbResponse clientCommand(OperationContext* opCtx, const Message& message);
 
     /**
      * Helper to run an explain of a find operation on the shards. Fills 'out' with the result of
