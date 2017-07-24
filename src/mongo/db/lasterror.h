@@ -50,9 +50,14 @@ public:
     void reset(bool valid = false);
 
     /**
-     * when db receives a message/request, call this
+     * when db receives a top level message/request, call this
      */
-    void startRequest();
+    void startTopLevelRequest();
+
+    /**
+     * when DBDirectClient receives a message/request, call this
+     */
+    void startDirectClientRequest();
 
     /**
      * Disables error recording for the current operation.
@@ -86,6 +91,10 @@ public:
         return _nPrev;
     }
 
+    bool hadNotMasterError() const {
+        return _hadNotMasterError;
+    }
+
     class Disabled {
     public:
         explicit Disabled(LastError* le) : _le(le), _prev(le->_disabled) {
@@ -115,6 +124,7 @@ private:
     int _nPrev = 1;
     bool _valid = false;
     bool _disabled = false;
+    bool _hadNotMasterError = false;
 };
 
 }  // namespace mongo

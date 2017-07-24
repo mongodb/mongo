@@ -518,6 +518,10 @@ bool runCommandImpl(OperationContext* opCtx,
     return result;
 }
 
+// When active, we won't check if we are master in command dispatch. Activate this if you want to
+// test failing during command execution.
+MONGO_FP_DECLARE(skipCheckingForNotMasterInCommandDispatch);
+
 /**
  * Executes a command after stripping metadata, performing authorization checks,
  * handling audit impersonation, and (potentially) setting maintenance mode. This method
@@ -595,7 +599,9 @@ void execCommandDatabase(OperationContext* opCtx,
             repl::ReplicationCoordinator::get(opCtx->getClient()->getServiceContext());
         const bool iAmPrimary = replCoord->canAcceptWritesForDatabase_UNSAFE(opCtx, dbname);
 
-        if (!opCtx->getClient()->isInDirectClient()) {
+        if (!opCtx->getClient()->isInDirectClient() &&
+            !MONGO_FAIL_POINT(skipCheckingForNotMasterInCommandDispatch)) {
+
             bool commandCanRunOnSecondary = command->slaveOk();
 
             bool commandIsOverriddenToRunOnSecondary =
@@ -816,7 +822,11 @@ DbResponse runCommands(OperationContext* opCtx, const Message& message) {
     }();
 
     if (OpMsg::isFlagSet(message, OpMsg::kMoreToCome)) {
-        // TODO SERVER-28510 throw to close connection if we failed with a not master error.
+        // Close the connection to get client to go through server selection again.
+        uassert(ErrorCodes::NotMaster,
+                "Not-master error during fire-and-forget command processing",
+                !LastError::get(opCtx->getClient()).hadNotMasterError());
+
         return {};  // Don't reply.
     }
 
@@ -1029,7 +1039,7 @@ DbResponse ServiceEntryPointMongod::handleRequest(OperationContext* opCtx, const
     if (c.isInDirectClient()) {
         invariant(!opCtx->lockState()->inAWriteUnitOfWork());
     } else {
-        LastError::get(c).startRequest();
+        LastError::get(c).startTopLevelRequest();
         AuthorizationSession::get(c)->startRequest(opCtx);
 
         // We should not be holding any locks at this point

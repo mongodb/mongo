@@ -250,7 +250,17 @@ error_class("Interruption", ["Interrupted",
                              "InterruptedAtShutdown",
                              "InterruptedDueToReplStateChange",
                              "ExceededTimeLimit"])
-error_class("NotMasterError", ["NotMaster", "NotMasterNoSlaveOk"])
+
+# isNotMasterError() includes all codes that indicate that the node that received the request was
+# not master at some point during command processing, regardless of whether some write may have
+# happened. If you care about whether a write could have happened, check for individual codes.
+error_class("NotMasterError", [
+    "NotMaster",
+    "NotMasterNoSlaveOk",
+    "NotMasterOrSecondary",
+    "InterruptedDueToReplStateChange",
+    "PrimarySteppedDown",
+    ])
 error_class("StaleShardingError",
             ["RecvStaleConfig", "SendStaleConfig", "StaleShardVersion", "StaleEpoch"])
 error_class("WriteConcernError", ["WriteConcernFailed",

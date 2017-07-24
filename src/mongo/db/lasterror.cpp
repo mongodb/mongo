@@ -52,6 +52,9 @@ void LastError::setLastError(int code, std::string msg) {
     reset(true);
     _code = code;
     _msg = std::move(msg);
+
+    if (ErrorCodes::isNotMasterError(ErrorCodes::fromInt(_code)))
+        _hadNotMasterError = true;
 }
 
 void LastError::recordUpdate(bool updateObjects, long long nObjects, BSONObj upsertedId) {
@@ -107,7 +110,13 @@ void LastError::disable() {
     _nPrev--;  // caller is a command that shouldn't count as an operation
 }
 
-void LastError::startRequest() {
+void LastError::startTopLevelRequest() {
+    _disabled = false;
+    ++_nPrev;
+    _hadNotMasterError = false;
+}
+
+void LastError::startDirectClientRequest() {
     _disabled = false;
     ++_nPrev;
 }

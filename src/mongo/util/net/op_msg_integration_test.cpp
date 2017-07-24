@@ -33,6 +33,8 @@
 #include "mongo/unittest/integration_test.h"
 #include "mongo/unittest/unittest.h"
 #include "mongo/util/net/op_msg.h"
+#include "mongo/util/scopeguard.h"
+
 
 namespace mongo {
 
@@ -62,6 +64,105 @@ TEST(OpMsg, UnknownOptionalFlagIsIgnored) {
     ASSERT(conn->call(request, reply));
     uassertStatusOK(getStatusFromCommandResult(
         conn->parseCommandReplyMessage(conn->getServerAddress(), reply)->getCommandReply()));
+}
+
+TEST(OpMsg, FireAndForgetInsertWorks) {
+    std::string errMsg;
+    auto conn = std::unique_ptr<DBClientBase>(
+        unittest::getFixtureConnectionString().connect("integration_test", errMsg));
+    uassert(ErrorCodes::SocketException, errMsg, conn);
+
+    conn->dropCollection("test.collection");
+
+    conn->runFireAndForgetCommand(OpMsgRequest::fromDBAndBody("test", fromjson(R"({
+        insert: "collection",
+        writeConcern: {w: 0},
+        documents: [
+            {a: 1}
+        ]
+    })")));
+
+    ASSERT_EQ(conn->count("test.collection"), 1u);
+}
+
+TEST(OpMsg, CloseConnectionOnFireAndForgetNotMasterError) {
+    const auto connStr = unittest::getFixtureConnectionString();
+
+    // This test only works against a replica set.
+    if (connStr.type() != ConnectionString::SET) {
+        return;
+    }
+
+    bool foundSecondary = false;
+    for (auto host : connStr.getServers()) {
+        DBClientConnection conn;
+        uassertStatusOK(conn.connect(host, "integration_test"));
+        bool isMaster;
+        ASSERT(conn.isMaster(isMaster));
+        if (isMaster)
+            continue;
+        foundSecondary = true;
+
+        auto request = OpMsgRequest::fromDBAndBody("test", fromjson(R"({
+            insert: "collection",
+            writeConcern: {w: 0},
+            documents: [
+                {a: 1}
+            ]
+        })")).serialize();
+
+        // Round-trip command fails with NotMaster error. Note that this failure is in command
+        // dispatch which ignores w:0.
+        Message reply;
+        ASSERT(conn.call(request, reply, /*assertOK*/ true, nullptr));
+        ASSERT_EQ(
+            getStatusFromCommandResult(
+                conn.parseCommandReplyMessage(conn.getServerAddress(), reply)->getCommandReply()),
+            ErrorCodes::NotMaster);
+
+        // Fire-and-forget closes connection when it sees that error. Note that this is using call()
+        // rather than say() so that we get an error back when the connection is closed. Normally
+        // using call() if kMoreToCome set results in blocking forever.
+        OpMsg::setFlag(&request, OpMsg::kMoreToCome);
+        ASSERT(!conn.call(request, reply, /*assertOK*/ false, nullptr));
+
+        uassertStatusOK(conn.connect(host, "integration_test"));  // Reconnect.
+
+        // Disable eager checking of master to simulate a stepdown occurring after the check. This
+        // should respect w:0.
+        BSONObj output;
+        ASSERT(conn.runCommand("admin",
+                               fromjson(R"({
+                                   configureFailPoint: 'skipCheckingForNotMasterInCommandDispatch',
+                                   mode: 'alwaysOn'
+                               })"),
+                               output))
+            << output;
+        ON_BLOCK_EXIT([&] {
+            ASSERT(conn.runCommand("admin",
+                                   fromjson(R"({
+                                          configureFailPoint:
+                                              'skipCheckingForNotMasterInCommandDispatch',
+                                          mode: 'off'
+                                      })"),
+                                   output))
+                << output;
+        });
+
+
+        // Round-trip command claims to succeed due to w:0.
+        OpMsg::replaceFlags(&request, 0);
+        ASSERT(conn.call(request, reply, /*assertOK*/ true, nullptr));
+        ASSERT_OK(getStatusFromCommandResult(
+            conn.parseCommandReplyMessage(conn.getServerAddress(), reply)->getCommandReply()));
+
+        // Fire-and-forget should still close connection.
+        OpMsg::setFlag(&request, OpMsg::kMoreToCome);
+        ASSERT(!conn.call(request, reply, /*assertOK*/ false, nullptr));
+
+        break;
+    }
+    ASSERT(foundSecondary);
 }
 
 }  // namespace mongo

@@ -123,6 +123,10 @@ QueryOptions DBDirectClient::_lookupAvailableOptions() {
 
 namespace {
 DbResponse loopbackBuildResponse(OperationContext* const opCtx, Message& toSend) {
+    DirectClientScope directClientScope(opCtx);
+    LastError::get(opCtx->getClient()).startDirectClientRequest();
+    CurOp curOp(opCtx);
+
     toSend.header().setId(nextMessageId());
     toSend.header().setResponseToMsgId(0);
     return opCtx->getServiceContext()->getServiceEntryPoint()->handleRequest(opCtx, toSend);
@@ -130,10 +134,6 @@ DbResponse loopbackBuildResponse(OperationContext* const opCtx, Message& toSend)
 }  // namespace
 
 bool DBDirectClient::call(Message& toSend, Message& response, bool assertOk, string* actualServer) {
-    DirectClientScope directClientScope(_opCtx);
-    LastError::get(_opCtx->getClient()).startRequest();
-
-    CurOp curOp(_opCtx);
     auto dbResponse = loopbackBuildResponse(_opCtx, toSend);
     invariant(!dbResponse.response.empty());
     response = std::move(dbResponse.response);
@@ -142,10 +142,6 @@ bool DBDirectClient::call(Message& toSend, Message& response, bool assertOk, str
 }
 
 void DBDirectClient::say(Message& toSend, bool isRetry, string* actualServer) {
-    DirectClientScope directClientScope(_opCtx);
-    LastError::get(_opCtx->getClient()).startRequest();
-
-    CurOp curOp(_opCtx);
     auto dbResponse = loopbackBuildResponse(_opCtx, toSend);
     invariant(dbResponse.response.empty());
 }
