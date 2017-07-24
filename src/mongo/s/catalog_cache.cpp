@@ -111,35 +111,32 @@ std::shared_ptr<ChunkManager> refreshCollectionRoutingInfo(
 
 }  // namespace
 
-CatalogCache::CatalogCache() : _cacheLoader(stdx::make_unique<ConfigServerCatalogCacheLoader>()) {}
-
-CatalogCache::CatalogCache(std::unique_ptr<CatalogCacheLoader> cacheLoader)
-    : _cacheLoader(std::move(cacheLoader)) {}
+CatalogCache::CatalogCache(CatalogCacheLoader& cacheLoader) : _cacheLoader(cacheLoader) {}
 
 CatalogCache::~CatalogCache() = default;
 
 void CatalogCache::initializeReplicaSetRole(bool isPrimary) {
-    _cacheLoader->initializeReplicaSetRole(isPrimary);
+    _cacheLoader.initializeReplicaSetRole(isPrimary);
 }
 
 void CatalogCache::onStepDown() {
-    _cacheLoader->onStepDown();
+    _cacheLoader.onStepDown();
 }
 
 void CatalogCache::onStepUp() {
-    _cacheLoader->onStepUp();
+    _cacheLoader.onStepUp();
 }
 
 void CatalogCache::notifyOfCollectionVersionUpdate(OperationContext* opCtx,
                                                    const NamespaceString& nss,
                                                    const ChunkVersion& version) {
-    _cacheLoader->notifyOfCollectionVersionUpdate(opCtx, nss, version);
+    _cacheLoader.notifyOfCollectionVersionUpdate(opCtx, nss, version);
 }
 
 Status CatalogCache::waitForCollectionVersion(OperationContext* opCtx,
                                               const NamespaceString& nss,
                                               const ChunkVersion& version) {
-    return _cacheLoader->waitForCollectionVersion(opCtx, nss, version);
+    return _cacheLoader.waitForCollectionVersion(opCtx, nss, version);
 }
 
 StatusWith<CachedDatabaseInfo> CatalogCache::getDatabase(OperationContext* opCtx,
@@ -419,7 +416,7 @@ void CatalogCache::_scheduleCollectionRefresh_inlock(
           << startingCollectionVersion;
 
     try {
-        _cacheLoader->getChunksSince(nss, startingCollectionVersion, refreshCallback);
+        _cacheLoader.getChunksSince(nss, startingCollectionVersion, refreshCallback);
     } catch (const DBException& ex) {
         const auto status = ex.toStatus();
 

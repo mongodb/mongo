@@ -36,6 +36,7 @@
 #include "mongo/s/catalog/type_chunk.h"
 #include "mongo/s/catalog/type_collection.h"
 #include "mongo/s/chunk_version.h"
+#include "mongo/stdx/memory.h"
 #include "mongo/util/concurrency/notification.h"
 
 namespace mongo {
@@ -50,6 +51,16 @@ class OperationContext;
 class CatalogCacheLoader {
 public:
     virtual ~CatalogCacheLoader() = default;
+
+    /**
+     * Stores a loader on the specified service context. May only be called once for the lifetime of
+     * the service context.
+     */
+    static void set(ServiceContext* serviceContext, std::unique_ptr<CatalogCacheLoader> loader);
+
+    static CatalogCacheLoader& get(ServiceContext* serviceContext);
+    static CatalogCacheLoader& get(OperationContext* opCtx);
+
 
     /**
      * Used as a return value for getChunksSince.
@@ -119,6 +130,12 @@ public:
         ChunkVersion version,
         stdx::function<void(OperationContext*, StatusWith<CollectionAndChangedChunks>)>
             callbackFn) = 0;
+
+    /**
+     * Only used for unit-tests, clears a previously-created catalog cache loader from the specified
+     * service context, so that 'create' can be called again.
+     */
+    static void clearForTests(ServiceContext* serviceContext);
 
 protected:
     CatalogCacheLoader() = default;

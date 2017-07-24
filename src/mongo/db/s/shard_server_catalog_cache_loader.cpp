@@ -40,15 +40,15 @@
 #include "mongo/s/catalog/type_shard_collection.h"
 #include "mongo/s/catalog_cache.h"
 #include "mongo/s/client/shard_registry.h"
-#include "mongo/s/config_server_catalog_cache_loader.h"
 #include "mongo/s/grid.h"
 #include "mongo/stdx/memory.h"
 #include "mongo/util/log.h"
 
 namespace mongo {
 
-using CollectionAndChangedChunks = CatalogCacheLoader::CollectionAndChangedChunks;
 using namespace shardmetadatautil;
+
+using CollectionAndChangedChunks = CatalogCacheLoader::CollectionAndChangedChunks;
 
 namespace {
 
@@ -234,6 +234,20 @@ ChunkVersion getLocalVersion(OperationContext* opCtx, const NamespaceString& nss
 
 }  // namespace
 
+ShardServerCatalogCacheLoader::ShardServerCatalogCacheLoader(
+    std::unique_ptr<CatalogCacheLoader> configServerLoader)
+    : _configServerLoader(std::move(configServerLoader)),
+      _threadPool(makeDefaultThreadPoolOptions()) {
+    _threadPool.startup();
+}
+
+ShardServerCatalogCacheLoader::~ShardServerCatalogCacheLoader() {
+    _contexts.interrupt(ErrorCodes::InterruptedAtShutdown);
+    _threadPool.shutdown();
+    _threadPool.join();
+    invariant(_contexts.isEmpty());
+}
+
 void ShardServerCatalogCacheLoader::notifyOfCollectionVersionUpdate(OperationContext* opCtx,
                                                                     const NamespaceString& nss,
                                                                     const ChunkVersion& version) {
@@ -262,19 +276,6 @@ Status ShardServerCatalogCacheLoader::waitForCollectionVersion(OperationContext*
 
         scopedNotification.get(opCtx);
     }
-}
-
-ShardServerCatalogCacheLoader::ShardServerCatalogCacheLoader(
-    std::unique_ptr<CatalogCacheLoader> configLoader)
-    : _configServerLoader(std::move(configLoader)), _threadPool(makeDefaultThreadPoolOptions()) {
-    _threadPool.startup();
-}
-
-ShardServerCatalogCacheLoader::~ShardServerCatalogCacheLoader() {
-    _contexts.interrupt(ErrorCodes::InterruptedAtShutdown);
-    _threadPool.shutdown();
-    _threadPool.join();
-    invariant(_contexts.isEmpty());
 }
 
 void ShardServerCatalogCacheLoader::initializeReplicaSetRole(bool isPrimary) {

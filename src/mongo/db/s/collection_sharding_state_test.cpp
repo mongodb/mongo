@@ -40,10 +40,6 @@
 namespace mongo {
 namespace {
 
-/**
- * Uses the ShardServerTestFixture that sets up the ShardServerCatalogCacheLoader on the
- * CatalogCache and has a real Locker class (as opposed to LockerNoop) for locking.
- */
 class CollShardingStateTest : public ShardServerTestFixture {
 public:
     void setUp() override {

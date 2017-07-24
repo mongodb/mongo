@@ -76,6 +76,11 @@ protected:
 
         // When sharding initialization is triggered, initialize sharding state as a shard server.
         serverGlobalParams.clusterRole = ClusterRole::ShardServer;
+
+        CatalogCacheLoader::set(getServiceContext(),
+                                stdx::make_unique<ShardServerCatalogCacheLoader>(
+                                    stdx::make_unique<ConfigServerCatalogCacheLoader>()));
+
         _shardingState.setGlobalInitMethodForTest([&](OperationContext* opCtx,
                                                       const ConnectionString& configConnStr,
                                                       StringData distLockProcessId) {
@@ -106,6 +111,8 @@ protected:
         // ShardingState initialize can modify ReplicaSetMonitor state.
         ReplicaSetMonitor::cleanup();
 
+        CatalogCacheLoader::clearForTests(getServiceContext());
+
         ShardingMongodTestFixture::tearDown();
     }
 
@@ -120,15 +127,8 @@ protected:
         return stdx::make_unique<ShardingCatalogClientImpl>(std::move(distLockManager));
     }
 
-    std::unique_ptr<CatalogCacheLoader> makeCatalogCacheLoader() {
-        return stdx::make_unique<ShardServerCatalogCacheLoader>(
-            stdx::make_unique<ConfigServerCatalogCacheLoader>());
-    }
-
-    std::unique_ptr<CatalogCache> makeCatalogCache(
-        std::unique_ptr<CatalogCacheLoader> catalogCacheLoader) {
-        invariant(catalogCacheLoader);
-        return stdx::make_unique<CatalogCache>(std::move(catalogCacheLoader));
+    std::unique_ptr<CatalogCache> makeCatalogCache() override {
+        return stdx::make_unique<CatalogCache>(CatalogCacheLoader::get(getServiceContext()));
     }
 
 private:

@@ -45,9 +45,11 @@
 #include "mongo/rpc/metadata/egress_metadata_hook_list.h"
 #include "mongo/s/catalog/sharding_catalog_manager.h"
 #include "mongo/s/catalog_cache.h"
+#include "mongo/s/catalog_cache_loader.h"
 #include "mongo/s/client/shard_factory.h"
 #include "mongo/s/client/shard_local.h"
 #include "mongo/s/client/shard_remote.h"
+#include "mongo/s/config_server_catalog_cache_loader.h"
 #include "mongo/s/sharding_initialization.h"
 #include "mongo/stdx/memory.h"
 
@@ -85,18 +87,21 @@ Status initializeGlobalShardingStateForMongod(OperationContext* opCtx,
     auto shardFactory =
         stdx::make_unique<ShardFactory>(std::move(buildersMap), std::move(targeterFactory));
 
-    std::unique_ptr<CatalogCache> catalogCache =
-        (serverGlobalParams.clusterRole == ClusterRole::ConfigServer)
-        ? stdx::make_unique<CatalogCache>()
-        : stdx::make_unique<CatalogCache>(stdx::make_unique<ShardServerCatalogCacheLoader>(
-              stdx::make_unique<ConfigServerCatalogCacheLoader>()));
+    if (serverGlobalParams.clusterRole == ClusterRole::ShardServer) {
+        CatalogCacheLoader::set(opCtx->getServiceContext(),
+                                stdx::make_unique<ShardServerCatalogCacheLoader>(
+                                    stdx::make_unique<ConfigServerCatalogCacheLoader>()));
+    } else {
+        CatalogCacheLoader::set(opCtx->getServiceContext(),
+                                stdx::make_unique<ConfigServerCatalogCacheLoader>());
+    }
 
     return initializeGlobalShardingState(
         opCtx,
         configCS,
         distLockProcessId,
         std::move(shardFactory),
-        std::move(catalogCache),
+        stdx::make_unique<CatalogCache>(CatalogCacheLoader::get(opCtx)),
         [opCtx] {
             auto hookList = stdx::make_unique<rpc::EgressMetadataHookList>();
             hookList->addHook(

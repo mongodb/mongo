@@ -67,6 +67,8 @@ protected:
      */
     void setUp() override;
 
+    void tearDown() override;
+
     /**
      * Creates a DistLockCatalogMock.
      */
@@ -84,13 +86,7 @@ protected:
     std::unique_ptr<ShardingCatalogClient> makeShardingCatalogClient(
         std::unique_ptr<DistLockManager> distLockManager) override;
 
-    /**
-     * Creates a ShardServerCatalogCacheLoader.
-     */
-    std::unique_ptr<CatalogCacheLoader> makeCatalogCacheLoader();
-
-    std::unique_ptr<CatalogCache> makeCatalogCache(
-        std::unique_ptr<CatalogCacheLoader> catalogCacheLoader);
+    std::unique_ptr<CatalogCache> makeCatalogCache() override;
 };
 
 }  // namespace mongo

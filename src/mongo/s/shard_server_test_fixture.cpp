@@ -38,6 +38,7 @@
 #include "mongo/s/catalog/dist_lock_manager_mock.h"
 #include "mongo/s/catalog/sharding_catalog_client_impl.h"
 #include "mongo/s/catalog_cache.h"
+#include "mongo/s/config_server_catalog_cache_loader.h"
 #include "mongo/stdx/memory.h"
 
 namespace mongo {
@@ -81,6 +82,11 @@ void ShardServerTestFixture::setUp() {
 
     // Initialize sharding components as a shard server.
     serverGlobalParams.clusterRole = ClusterRole::ShardServer;
+
+    CatalogCacheLoader::set(getServiceContext(),
+                            stdx::make_unique<ShardServerCatalogCacheLoader>(
+                                stdx::make_unique<ConfigServerCatalogCacheLoader>()));
+
     uassertStatusOK(
         initializeGlobalShardingStateForMongodForTest(ConnectionString(kConfigHostAndPort)));
 
@@ -89,6 +95,11 @@ void ShardServerTestFixture::setUp() {
     configTargeterMock()->setFindHostReturnValue(kConfigHostAndPort);
 }
 
+void ShardServerTestFixture::tearDown() {
+    CatalogCacheLoader::clearForTests(getServiceContext());
+
+    ShardingMongodTestFixture::tearDown();
+}
 
 std::unique_ptr<DistLockCatalog> ShardServerTestFixture::makeDistLockCatalog() {
     return stdx::make_unique<DistLockCatalogMock>();
@@ -106,15 +117,8 @@ std::unique_ptr<ShardingCatalogClient> ShardServerTestFixture::makeShardingCatal
     return stdx::make_unique<ShardingCatalogClientImpl>(std::move(distLockManager));
 }
 
-std::unique_ptr<CatalogCacheLoader> ShardServerTestFixture::makeCatalogCacheLoader() {
-    return stdx::make_unique<ShardServerCatalogCacheLoader>(
-        stdx::make_unique<ConfigServerCatalogCacheLoader>());
-}
-
-std::unique_ptr<CatalogCache> ShardServerTestFixture::makeCatalogCache(
-    std::unique_ptr<CatalogCacheLoader> catalogCacheLoader) {
-    invariant(catalogCacheLoader);
-    return stdx::make_unique<CatalogCache>(std::move(catalogCacheLoader));
+std::unique_ptr<CatalogCache> ShardServerTestFixture::makeCatalogCache() {
+    return stdx::make_unique<CatalogCache>(CatalogCacheLoader::get(getServiceContext()));
 }
 
 }  // namespace mongo

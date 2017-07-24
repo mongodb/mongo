@@ -123,6 +123,9 @@ void ConfigServerTestFixture::setUp() {
     _addShardNetworkTestEnv =
         stdx::make_unique<NetworkTestEnv>(_executorForAddShard, _mockNetworkForAddShard);
 
+    CatalogCacheLoader::set(getServiceContext(),
+                            stdx::make_unique<ConfigServerCatalogCacheLoader>());
+
     uassertStatusOK(initializeGlobalShardingStateForMongodForTest(ConnectionString::forLocal()));
 }
 
@@ -132,6 +135,8 @@ void ConfigServerTestFixture::tearDown() {
     _mockNetworkForAddShard = nullptr;
 
     ShardingCatalogManager::clearForTests(getServiceContext());
+
+    CatalogCacheLoader::clearForTests(getServiceContext());
 
     ShardingMongodTestFixture::tearDown();
 }
@@ -157,14 +162,8 @@ std::unique_ptr<ShardingCatalogClient> ConfigServerTestFixture::makeShardingCata
     return stdx::make_unique<ShardingCatalogClientImpl>(std::move(distLockManager));
 }
 
-std::unique_ptr<CatalogCacheLoader> ConfigServerTestFixture::makeCatalogCacheLoader() {
-    return stdx::make_unique<ConfigServerCatalogCacheLoader>();
-}
-
-std::unique_ptr<CatalogCache> ConfigServerTestFixture::makeCatalogCache(
-    std::unique_ptr<CatalogCacheLoader> catalogCacheLoader) {
-    invariant(catalogCacheLoader);
-    return stdx::make_unique<CatalogCache>(std::move(catalogCacheLoader));
+std::unique_ptr<CatalogCache> ConfigServerTestFixture::makeCatalogCache() {
+    return stdx::make_unique<CatalogCache>(CatalogCacheLoader::get(getServiceContext()));
 }
 
 std::unique_ptr<BalancerConfiguration> ConfigServerTestFixture::makeBalancerConfiguration() {

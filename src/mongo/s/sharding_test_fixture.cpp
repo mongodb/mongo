@@ -61,6 +61,7 @@
 #include "mongo/s/client/shard_factory.h"
 #include "mongo/s/client/shard_registry.h"
 #include "mongo/s/client/shard_remote.h"
+#include "mongo/s/config_server_catalog_cache_loader.h"
 #include "mongo/s/grid.h"
 #include "mongo/s/query/cluster_cursor_manager.h"
 #include "mongo/s/set_shard_version_request.h"
@@ -185,11 +186,13 @@ void ShardingTestFixture::setUp() {
     auto shardRegistry(stdx::make_unique<ShardRegistry>(std::move(shardFactory), configCS));
     executorPool->startup();
 
+    CatalogCacheLoader::set(serviceContext(), stdx::make_unique<ConfigServerCatalogCacheLoader>());
+
     // For now initialize the global grid object. All sharding objects will be accessible from there
     // until we get rid of it.
     Grid::get(operationContext())
         ->init(std::move(catalogClient),
-               stdx::make_unique<CatalogCache>(),
+               stdx::make_unique<CatalogCache>(CatalogCacheLoader::get(serviceContext())),
                std::move(shardRegistry),
                stdx::make_unique<ClusterCursorManager>(serviceContext()->getPreciseClockSource()),
                stdx::make_unique<BalancerConfiguration>(),
@@ -198,6 +201,8 @@ void ShardingTestFixture::setUp() {
 }
 
 void ShardingTestFixture::tearDown() {
+    CatalogCacheLoader::clearForTests(serviceContext());
+
     Grid::get(operationContext())->getExecutorPool()->shutdownAndJoin();
     Grid::get(operationContext())->catalogClient()->shutDown(_opCtx.get());
     Grid::get(operationContext())->clearForUnitTests();

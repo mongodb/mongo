@@ -75,6 +75,7 @@
 #include "mongo/s/client/shard_registry.h"
 #include "mongo/s/client/shard_remote.h"
 #include "mongo/s/client/sharding_connection_hook.h"
+#include "mongo/s/config_server_catalog_cache_loader.h"
 #include "mongo/s/grid.h"
 #include "mongo/s/is_mongos.h"
 #include "mongo/s/mongos_options.h"
@@ -158,8 +159,9 @@ static void cleanupTask() {
             }
         }
 
-        // Validator shutdown must be called after setKillAllOperations is called. Otherwise, this
-        // can deadlock.
+        // Perform all shutdown operations after setKillAllOperations is called in order to ensure
+        // that any pending threads are about to terminate
+
         if (auto validator = LogicalTimeValidator::get(serviceContext)) {
             validator->shutDown();
         }
@@ -167,9 +169,11 @@ static void cleanupTask() {
         if (auto cursorManager = Grid::get(opCtx)->getCursorManager()) {
             cursorManager->shutdown();
         }
+
         if (auto pool = Grid::get(opCtx)->getExecutorPool()) {
             pool->shutdownAndJoin();
         }
+
         if (auto catalog = Grid::get(opCtx)->catalogClient()) {
             catalog->shutDown(opCtx);
         }
@@ -209,12 +213,15 @@ static Status initializeSharding(OperationContext* opCtx) {
     auto shardFactory =
         stdx::make_unique<ShardFactory>(std::move(buildersMap), std::move(targeterFactory));
 
+    CatalogCacheLoader::set(opCtx->getServiceContext(),
+                            stdx::make_unique<ConfigServerCatalogCacheLoader>());
+
     Status status = initializeGlobalShardingState(
         opCtx,
         mongosGlobalParams.configdbs,
         generateDistLockProcessId(opCtx),
         std::move(shardFactory),
-        stdx::make_unique<CatalogCache>(),
+        stdx::make_unique<CatalogCache>(CatalogCacheLoader::get(opCtx)),
         [opCtx]() {
             auto hookList = stdx::make_unique<rpc::EgressMetadataHookList>();
             hookList->addHook(
@@ -453,6 +460,7 @@ static ExitCode initService() {
 #endif
 
 namespace {
+
 std::unique_ptr<AuthzManagerExternalState> createAuthzManagerExternalStateMongos() {
     return stdx::make_unique<AuthzManagerExternalStateMongos>();
 }

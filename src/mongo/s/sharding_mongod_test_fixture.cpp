@@ -236,12 +236,7 @@ std::unique_ptr<ShardingCatalogClient> ShardingMongodTestFixture::makeShardingCa
     return nullptr;
 }
 
-std::unique_ptr<CatalogCacheLoader> ShardingMongodTestFixture::makeCatalogCacheLoader() {
-    return nullptr;
-}
-
-std::unique_ptr<CatalogCache> ShardingMongodTestFixture::makeCatalogCache(
-    std::unique_ptr<CatalogCacheLoader> catalogCacheLoader) {
+std::unique_ptr<CatalogCache> ShardingMongodTestFixture::makeCatalogCache() {
     return nullptr;
 }
 
@@ -274,7 +269,7 @@ Status ShardingMongodTestFixture::initializeGlobalShardingStateForMongodForTest(
 
     auto const grid = Grid::get(operationContext());
     grid->init(makeShardingCatalogClient(std::move(distLockManagerPtr)),
-               makeCatalogCache(makeCatalogCacheLoader()),
+               makeCatalogCache(),
                makeShardRegistry(configConnStr),
                makeClusterCursorManager(),
                makeBalancerConfiguration(),

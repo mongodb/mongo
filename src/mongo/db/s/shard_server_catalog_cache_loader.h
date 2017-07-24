@@ -47,7 +47,7 @@ class ShardServerCatalogCacheLoader : public CatalogCacheLoader {
     MONGO_DISALLOW_COPYING(ShardServerCatalogCacheLoader);
 
 public:
-    ShardServerCatalogCacheLoader(std::unique_ptr<CatalogCacheLoader> configLoader);
+    ShardServerCatalogCacheLoader(std::unique_ptr<CatalogCacheLoader> configServerLoader);
     ~ShardServerCatalogCacheLoader();
 
     /**

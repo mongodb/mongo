@@ -676,6 +676,7 @@ ExitCode _initAndListen(int listenPort) {
             }
         } else if (serverGlobalParams.clusterRole == ClusterRole::ConfigServer) {
             ShardedConnectionInfo::addHook(startupOpCtx->getServiceContext());
+
             uassertStatusOK(
                 initializeGlobalShardingStateForMongod(startupOpCtx.get(),
                                                        ConnectionString::forLocal(),
@@ -688,7 +689,7 @@ ExitCode _initAndListen(int listenPort) {
                 makeShardingTaskExecutor(executor::makeNetworkInterface("AddShard-TaskExecutor")));
         }
 
-        repl::getGlobalReplicationCoordinator()->startup(startupOpCtx.get());
+        repl::ReplicationCoordinator::get(startupOpCtx.get())->startup(startupOpCtx.get());
 
         const unsigned long long missingRepl =
             checkIfReplMissingFromCommandLine(startupOpCtx.get());
@@ -1005,7 +1006,8 @@ static void shutdownTask() {
     }
 
     ReplicaSetMonitor::shutdown();
-    if (auto sr = grid.shardRegistry()) {  // TODO: race: sr is a naked pointer
+
+    if (auto sr = Grid::get(opCtx)->shardRegistry()) {
         sr->shutdown();
     }
 

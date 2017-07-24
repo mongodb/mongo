@@ -31,6 +31,12 @@
 #include "mongo/s/catalog_cache_loader.h"
 
 namespace mongo {
+namespace {
+
+const auto catalogCacheLoaderDecoration =
+    ServiceContext::declareDecoration<std::unique_ptr<CatalogCacheLoader>>();
+
+}  // namespace
 
 CatalogCacheLoader::CollectionAndChangedChunks::CollectionAndChangedChunks() = default;
 
@@ -45,5 +51,31 @@ CatalogCacheLoader::CollectionAndChangedChunks::CollectionAndChangedChunks(
       defaultCollation(collDefaultCollation),
       shardKeyIsUnique(collShardKeyIsUnique),
       changedChunks(chunks) {}
+
+void CatalogCacheLoader::set(ServiceContext* serviceContext,
+                             std::unique_ptr<CatalogCacheLoader> loader) {
+    auto& catalogCacheLoader = catalogCacheLoaderDecoration(serviceContext);
+    invariant(!catalogCacheLoader);
+
+    catalogCacheLoader = std::move(loader);
+}
+
+void CatalogCacheLoader::clearForTests(ServiceContext* serviceContext) {
+    auto& catalogCacheLoader = catalogCacheLoaderDecoration(serviceContext);
+    invariant(catalogCacheLoader);
+
+    catalogCacheLoader.reset();
+}
+
+CatalogCacheLoader& CatalogCacheLoader::get(ServiceContext* serviceContext) {
+    auto& catalogCacheLoader = catalogCacheLoaderDecoration(serviceContext);
+    invariant(catalogCacheLoader);
+
+    return *catalogCacheLoader;
+}
+
+CatalogCacheLoader& CatalogCacheLoader::get(OperationContext* opCtx) {
+    return get(opCtx->getServiceContext());
+}
 
 }  // namespace mongo
