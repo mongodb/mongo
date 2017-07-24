@@ -15,6 +15,12 @@ selector:
                                                              # secondaryThrottle is not set.
   - jstests/aggregation/sources/facet/use_cases.js # Cannot specify write concern when
                                                    # secondaryThrottle is not set.
+
+  # TODO (SERVER-29127) The CappedInsertNotifier wakes up the change stream's collection scan before
+  # it can see the new insert, so it will immediately see EOF and go back to sleep. This will cause
+  # the test to fail, since it is expecting an insert to immediately wake up the change stream and
+  # return the new result.
+  - jstests/aggregation/sources/changeNotification/only_wake_getmore_for_relevant_changes.js
   - jstests/aggregation/testSlave.js # Majority read on secondary requires afterOpTime.
   - jstests/aggregation/sources/out/*.js # Cannot specify write concern when secondaryThrottle is not set.
 
