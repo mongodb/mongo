@@ -645,8 +645,9 @@ ChunkVersion ShardingState::_refreshMetadata(OperationContext* txn, const Namesp
             if (chunk->getShardId() != shardId)
                 continue;
 
-            shardChunksMap.emplace(chunk->getMin(),
-                                   CachedChunkInfo(chunk->getMax(), chunk->getLastmod()));
+            shardChunksMap.emplace_hint(shardChunksMap.end(),
+                                        chunk->getMin(),
+                                        CachedChunkInfo(chunk->getMax(), chunk->getLastmod()));
         }
 
         return stdx::make_unique<CollectionMetadata>(cm->getShardKeyPattern().toBSON(),

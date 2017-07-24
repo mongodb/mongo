@@ -84,7 +84,8 @@ CollectionMetadata::CollectionMetadata(const BSONObj& keyPattern,
             continue;
         }
 
-        _rangesMap.emplace(min, CachedChunkInfo(max, ChunkVersion::IGNORED()));
+        _rangesMap.emplace_hint(
+            _rangesMap.end(), min, CachedChunkInfo(max, ChunkVersion::IGNORED()));
 
         min = currMin;
         max = currMax;
@@ -93,7 +94,7 @@ CollectionMetadata::CollectionMetadata(const BSONObj& keyPattern,
     invariant(!min.isEmpty());
     invariant(!max.isEmpty());
 
-    _rangesMap.emplace(min, CachedChunkInfo(max, ChunkVersion::IGNORED()));
+    _rangesMap.emplace_hint(_rangesMap.end(), min, CachedChunkInfo(max, ChunkVersion::IGNORED()));
 }
 
 CollectionMetadata::~CollectionMetadata() = default;
