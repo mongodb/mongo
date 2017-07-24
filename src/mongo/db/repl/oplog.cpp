@@ -838,7 +838,6 @@ Status applyOperation_inlock(OperationContext* txn,
             // 2. If okay, commit
             // 3. If not, do upsert (and commit)
             // 4. If both !Ok, return status
-            Status status{ErrorCodes::NotYetInitialized, ""};
 
             // We cannot rely on a DuplicateKey error if we'repart of a larger transaction, because
             // that would require the transaction to abort. So instead, use upsert in that case.
@@ -846,12 +845,8 @@ Status applyOperation_inlock(OperationContext* txn,
 
             if (!needToDoUpsert) {
                 WriteUnitOfWork wuow(txn);
-                try {
-                    OpDebug* const nullOpDebug = nullptr;
-                    status = collection->insertDocument(txn, o, nullOpDebug, true);
-                } catch (DBException dbe) {
-                    status = dbe.toStatus();
-                }
+                OpDebug* const nullOpDebug = nullptr;
+                auto status = collection->insertDocument(txn, o, nullOpDebug, true);
                 if (status.isOK()) {
                     wuow.commit();
                 } else if (status == ErrorCodes::DuplicateKey) {
