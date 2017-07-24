@@ -333,15 +333,14 @@ Status SyncTail::syncApply(OperationContext* opCtx,
                     return statusWithUUID.getStatus();
                 // We may be replaying operations on a collection that was renamed since. If so,
                 // it must have been in the same database or it would have gotten a new UUID.
+                // Need to throw instead of returning a status for it to be properly ignored.
                 actualNss = UUIDCatalog::get(opCtx).lookupNSSByUUID(statusWithUUID.getValue());
-                if (actualNss.isEmpty()) {
-                    return Status(ErrorCodes::NamespaceNotFound,
-                                  str::stream()
-                                      << "Failed to apply operation due to missing collection ("
+                uassert(ErrorCodes::NamespaceNotFound,
+                        str::stream() << "Failed to apply operation due to missing collection ("
                                       << statusWithUUID.getValue()
                                       << "): "
-                                      << redact(op.toString()));
-                }
+                                      << redact(op.toString()),
+                        !actualNss.isEmpty());
                 dassert(actualNss.db() == nss.db());
             }
             Lock::CollectionLock collLock(opCtx->lockState(), actualNss.ns(), MODE_IX);
