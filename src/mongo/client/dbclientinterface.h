@@ -294,6 +294,13 @@ public:
         return runCommandWithTarget(std::move(request)).first;
     }
 
+    /**
+     * Runs the specified command request in fire-and-forget mode and returns the connection that
+     * the command was actually sent on. If the connection doesn't support OP_MSG, the request will
+     * be run as a normal two-way command and the reply will be ignored after parsing.
+     */
+    virtual DBClientBase* runFireAndForgetCommand(OpMsgRequest request);
+
     /** Run a database command.  Database commands are represented as BSON objects.  Common database
         commands have prebuilt helper functions -- see below.  If a helper is not available you can
         directly call runCommand.

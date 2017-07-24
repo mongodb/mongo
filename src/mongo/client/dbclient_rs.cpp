@@ -901,6 +901,13 @@ void DBClientReplicaSet::checkResponse(const std::vector<BSONObj>& batch,
     }
 }
 
+DBClientBase* DBClientReplicaSet::runFireAndForgetCommand(OpMsgRequest request) {
+    // Assume all fire-and-forget commands should go to the primary node. It is currently used
+    // for writes which need to go to the primary and for killCursors which should be sent to a
+    // specific host rather than through DBClientReplicaSet.
+    return checkMaster()->runFireAndForgetCommand(std::move(request));
+}
+
 std::pair<rpc::UniqueReply, DBClientBase*> DBClientReplicaSet::runCommandWithTarget(
     OpMsgRequest request) {
     // This overload exists so we can parse out the read preference and then use server

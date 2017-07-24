@@ -188,6 +188,31 @@ rpc::UniqueReply DBClientBase::parseCommandReplyMessage(const std::string& host,
     return rpc::UniqueReply(replyMsg, std::move(commandReply));
 }
 
+DBClientBase* DBClientBase::runFireAndForgetCommand(OpMsgRequest request) {
+    // Make sure to reconnect if needed before building our request, since the request depends on
+    // the negotiated protocol which can change due to a reconnect.
+    checkConnection();
+
+    if (uassertStatusOK(rpc::negotiate(getClientRPCProtocols(), getServerRPCProtocols())) !=
+        rpc::Protocol::kOpMsg) {
+        // Other protocols don't support fire-and-forget. Downgrade to two-way command and throw
+        // away reply.
+        return runCommandWithTarget(request).second;
+    }
+
+    if (_metadataWriter) {
+        BSONObjBuilder metadataBob(std::move(request.body));
+        uassertStatusOK(
+            _metadataWriter((haveClient() ? cc().getOperationContext() : nullptr), &metadataBob));
+        request.body = metadataBob.obj();
+    }
+
+    auto requestMsg = request.serialize();
+    OpMsg::setFlag(&requestMsg, OpMsg::kMoreToCome);
+    say(requestMsg);
+    return this;
+}
+
 std::pair<rpc::UniqueReply, DBClientBase*> DBClientBase::runCommandWithTarget(
     OpMsgRequest request) {
     // Make sure to reconnect if needed before building our request, since the request depends on
@@ -1138,8 +1163,7 @@ void DBClientBase::insert(const string& ns, const vector<BSONObj>& v, int flags)
         OpMsgRequest::fromDBAndBody(nss.db(), BSON("insert" << nss.coll() << "ordered" << ordered));
     request.sequences.push_back({"documents", v});
 
-    // Ignoring reply to match fire-and-forget OP_INSERT behavior.
-    runCommand(std::move(request));
+    runFireAndForgetCommand(std::move(request));
 }
 
 void DBClientBase::remove(const string& ns, Query obj, int flags) {
@@ -1149,8 +1173,7 @@ void DBClientBase::remove(const string& ns, Query obj, int flags) {
     auto request = OpMsgRequest::fromDBAndBody(nss.db(), BSON("delete" << nss.coll()));
     request.sequences.push_back({"deletes", {BSON("q" << obj.obj << "limit" << limit)}});
 
-    // Ignoring reply to match fire-and-forget OP_REMOVE behavior.
-    runCommand(std::move(request));
+    runFireAndForgetCommand(std::move(request));
 }
 
 void DBClientBase::update(const string& ns, Query query, BSONObj obj, bool upsert, bool multi) {
@@ -1161,8 +1184,7 @@ void DBClientBase::update(const string& ns, Query query, BSONObj obj, bool upser
         {"updates",
          {BSON("q" << query.obj << "u" << obj << "upsert" << upsert << "multi" << multi)}});
 
-    // Ignoring reply to match fire-and-forget OP_UPDATE behavior.
-    runCommand(std::move(request));
+    runFireAndForgetCommand(std::move(request));
 }
 
 void DBClientBase::update(const string& ns, Query query, BSONObj obj, int flags) {
@@ -1174,8 +1196,8 @@ void DBClientBase::update(const string& ns, Query query, BSONObj obj, int flags)
 }
 
 void DBClientBase::killCursor(const NamespaceString& ns, long long cursorId) {
-    // Ignoring reply to match fire-and-forget OP_KILLCURSORS behavior.
-    runCommand(OpMsgRequest::fromDBAndBody(ns.db(), KillCursorsRequest(ns, {cursorId}).toBSON()));
+    runFireAndForgetCommand(
+        OpMsgRequest::fromDBAndBody(ns.db(), KillCursorsRequest(ns, {cursorId}).toBSON()));
 }
 
 list<BSONObj> DBClientBase::getIndexSpecs(const string& ns, int options) {
