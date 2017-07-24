@@ -476,7 +476,7 @@
                                   commandProfile));
             }
         }
-    }
+    };
 
     // Set the secondaries to priority 0 and votes 0 to prevent the primaries from stepping down.
     let rsOpts = {nodes: [{rsConfig: {votes: 1}}, {rsConfig: {priority: 0, votes: 0}}]};
