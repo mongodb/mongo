@@ -303,16 +303,6 @@ env.CppUnitTest(
 )
 
 env.Library(
-    target='chunk_size_tracker',
-    source=[
-        'chunk_size_tracker.cpp',
-    ],
-    LIBDEPS=[
-        '$BUILD_DIR/mongo/base'
-    ]
-)
-
-env.Library(
     target='chunk_splitter',
     source=[
         'chunk_splitter.cpp',
@@ -340,16 +330,6 @@ env.Library(
     'balancer',
     'collection_metadata',
     'sharding',
-    ]
-)
-
-env.CppUnitTest(
-    target='chunk_size_tracker_test',
-    source=[
-        'chunk_size_tracker_test.cpp'
-    ],
-    LIBDEPS=[
-        'chunk_size_tracker'
     ]
 )
 
