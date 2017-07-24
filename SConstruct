@@ -463,7 +463,7 @@ try:
         version_data = json.load(version_fp)
 
     if 'version' not in version_data:
-        print "version.json does not contain a version string"
+        print("version.json does not contain a version string")
         Exit(1)
     if 'githash' not in version_data:
         version_data['githash'] = utils.getGitVersion()
@@ -471,7 +471,7 @@ try:
 except IOError as e:
     # If the file error wasn't because the file is missing, error out
     if e.errno != errno.ENOENT:
-        print "Error opening version.json: {0}".format(e.strerror)
+        print("Error opening version.json: {0}".format(e.strerror))
         Exit(1)
 
     version_data = {
@@ -480,7 +480,7 @@ except IOError as e:
     }
 
 except ValueError as e:
-    print "Error decoding version.json: {0}".format(e)
+    print("Error decoding version.json: {0}".format(e))
     Exit(1)
 
 # Setup the command-line variables
@@ -551,7 +551,7 @@ def variable_distsrc_converter(val):
 
 variables_files = variable_shlex_converter(get_option('variables-files'))
 for file in variables_files:
-    print "Using variable customization file %s" % file
+    print("Using variable customization file %s" % file)
 
 env_vars = Variables(
     files=variables_files,
@@ -560,7 +560,7 @@ env_vars = Variables(
 
 sconsflags = os.environ.get('SCONSFLAGS', None)
 if sconsflags:
-    print "Using SCONSFLAGS environment variable arguments: %s" % sconsflags
+    print("Using SCONSFLAGS environment variable arguments: %s" % sconsflags)
 
 env_vars.Add('ABIDW',
     help="Configures the path to the 'abidw' (a libabigail) utility")
@@ -877,12 +877,12 @@ env.AddMethod(mongo_platform.env_os_is_wrapper, 'TargetOSIs')
 env.AddMethod(mongo_platform.env_get_os_name_wrapper, 'GetTargetOSName')
 
 def fatal_error(env, msg, *args):
-    print msg.format(*args)
+    print(msg.format(*args))
     Exit(1)
 
 def conf_error(env, msg, *args):
-    print msg.format(*args)
-    print "See {0} for details".format(env.File('$CONFIGURELOG').abspath)
+    print(msg.format(*args))
+    print("See {0} for details".format(env.File('$CONFIGURELOG').abspath))
     Exit(1)
 
 env.AddMethod(fatal_error, 'FatalError')
@@ -901,7 +901,7 @@ else:
 env.AddMethod(lambda env: env['VERBOSE'], 'Verbose')
 
 if has_option('variables-help'):
-    print env_vars.GenerateHelpText(env)
+    print(env_vars.GenerateHelpText(env))
     Exit(0)
 
 unknown_vars = env_vars.UnknownVariables()
@@ -1109,7 +1109,7 @@ else:
     env['TARGET_ARCH'] = detected_processor
 
 if env['TARGET_OS'] not in os_macros:
-    print "No special config for [{0}] which probably means it won't work".format(env['TARGET_OS'])
+    print("No special config for [{0}] which probably means it won't work".format(env['TARGET_OS']))
 elif not detectConf.CheckForOS(env['TARGET_OS']):
     env.ConfError("TARGET_OS ({0}) is not supported by compiler", env['TARGET_OS'])
 
