@@ -67,9 +67,21 @@ public:
  * other than WriteConflictException.  For each time f throws a WriteConflictException, logs the
  * error, waits a spell, cleans up, and then tries f again.  Imposes no upper limit on the number
  * of times to re-try f, so any required timeout behavior must be enforced within f.
+ *
+ * If we are already in a WriteUnitOfWork, we assume that we are being called within a
+ * WriteConflictException retry loop up the call stack. Hence, this retry loop is reduced to an
+ * invocation of the argument function f without any exception handling and retry logic.
  */
 template <typename F>
 auto writeConflictRetry(OperationContext* opCtx, StringData opStr, StringData ns, F&& f) {
+    invariant(opCtx);
+    invariant(opCtx->lockState());
+    invariant(opCtx->recoveryUnit());
+
+    if (opCtx->lockState()->inAWriteUnitOfWork()) {
+        return f();
+    }
+
     int attempts = 0;
     while (true) {
         try {

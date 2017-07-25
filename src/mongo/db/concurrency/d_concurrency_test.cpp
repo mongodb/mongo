@@ -164,7 +164,47 @@ private:
 
 
 TEST_F(DConcurrencyTestFixture, WriteConflictRetryInstantiatesOK) {
-    writeConflictRetry(nullptr, "", "", [] {});
+    auto opCtx = makeOpCtx();
+    opCtx->setLockState(stdx::make_unique<MMAPV1LockerImpl>());
+    writeConflictRetry(opCtx.get(), "", "", [] {});
+}
+
+TEST_F(DConcurrencyTestFixture, WriteConflictRetryRetriesFunctionOnWriteConflictException) {
+    auto opCtx = makeOpCtx();
+    opCtx->setLockState(stdx::make_unique<MMAPV1LockerImpl>());
+    auto&& opDebug = CurOp::get(opCtx.get())->debug();
+    ASSERT_EQUALS(0LL, opDebug.writeConflicts);
+    ASSERT_EQUALS(100, writeConflictRetry(opCtx.get(), "", "", [&opDebug] {
+                      if (opDebug.writeConflicts == 0LL) {
+                          throw WriteConflictException();
+                      }
+                      return 100;
+                  }));
+    ASSERT_EQUALS(1LL, opDebug.writeConflicts);
+}
+
+TEST_F(DConcurrencyTestFixture, WriteConflictRetryPropagatesNonWriteConflictException) {
+    auto opCtx = makeOpCtx();
+    opCtx->setLockState(stdx::make_unique<MMAPV1LockerImpl>());
+    ASSERT_THROWS_CODE(writeConflictRetry(opCtx.get(),
+                                          "",
+                                          "",
+                                          [] {
+                                              uassert(ErrorCodes::OperationFailed, "", false);
+                                              MONGO_UNREACHABLE;
+                                          }),
+                       AssertionException,
+                       ErrorCodes::OperationFailed);
+}
+
+TEST_F(DConcurrencyTestFixture,
+       WriteConflictRetryPropagatesWriteConflictExceptionIfAlreadyInAWriteUnitOfWork) {
+    auto opCtx = makeOpCtx();
+    opCtx->setLockState(stdx::make_unique<MMAPV1LockerImpl>());
+    Lock::GlobalWrite globalWrite(opCtx.get());
+    WriteUnitOfWork wuow(opCtx.get());
+    ASSERT_THROWS(writeConflictRetry(opCtx.get(), "", "", [] { throw WriteConflictException(); }),
+                  WriteConflictException);
 }
 
 TEST_F(DConcurrencyTestFixture, ResourceMutex) {
