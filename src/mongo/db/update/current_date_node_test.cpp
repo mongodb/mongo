@@ -41,7 +41,6 @@ namespace mongo {
 namespace {
 
 using CurrentDateNodeTest = UpdateNodeTest;
-using mongo::mutablebson::Document;
 using mongo::mutablebson::Element;
 using mongo::mutablebson::countChildren;
 
@@ -128,7 +127,7 @@ TEST_F(CurrentDateNodeTest, ApplyTrue) {
     CurrentDateNode node;
     ASSERT_OK(node.init(update["$currentDate"]["a"], collator));
 
-    Document doc(fromjson("{a: 0}"));
+    mutablebson::Document doc(fromjson("{a: 0}"));
     setPathTaken("a");
     addIndexedPath("a");
     auto result = node.apply(getApplyParams(doc.root()["a"]));
@@ -152,7 +151,7 @@ TEST_F(CurrentDateNodeTest, ApplyFalse) {
     CurrentDateNode node;
     ASSERT_OK(node.init(update["$currentDate"]["a"], collator));
 
-    Document doc(fromjson("{a: 0}"));
+    mutablebson::Document doc(fromjson("{a: 0}"));
     setPathTaken("a");
     addIndexedPath("a");
     auto result = node.apply(getApplyParams(doc.root()["a"]));
@@ -176,7 +175,7 @@ TEST_F(CurrentDateNodeTest, ApplyDate) {
     CurrentDateNode node;
     ASSERT_OK(node.init(update["$currentDate"]["a"], collator));
 
-    Document doc(fromjson("{a: 0}"));
+    mutablebson::Document doc(fromjson("{a: 0}"));
     setPathTaken("a");
     addIndexedPath("a");
     auto result = node.apply(getApplyParams(doc.root()["a"]));
@@ -200,7 +199,7 @@ TEST_F(CurrentDateNodeTest, ApplyTimestamp) {
     CurrentDateNode node;
     ASSERT_OK(node.init(update["$currentDate"]["a"], collator));
 
-    Document doc(fromjson("{a: 0}"));
+    mutablebson::Document doc(fromjson("{a: 0}"));
     setPathTaken("a");
     addIndexedPath("a");
     auto result = node.apply(getApplyParams(doc.root()["a"]));
@@ -224,7 +223,7 @@ TEST_F(CurrentDateNodeTest, ApplyFieldDoesNotExist) {
     CurrentDateNode node;
     ASSERT_OK(node.init(update["$currentDate"]["a"], collator));
 
-    Document doc(fromjson("{}"));
+    mutablebson::Document doc(fromjson("{}"));
     setPathToCreate("a");
     addIndexedPath("a");
     auto result = node.apply(getApplyParams(doc.root()));
@@ -248,7 +247,7 @@ TEST_F(CurrentDateNodeTest, ApplyIndexesNotAffected) {
     CurrentDateNode node;
     ASSERT_OK(node.init(update["$currentDate"]["a"], collator));
 
-    Document doc(fromjson("{a: 0}"));
+    mutablebson::Document doc(fromjson("{a: 0}"));
     setPathTaken("a");
     addIndexedPath("b");
     auto result = node.apply(getApplyParams(doc.root()["a"]));
@@ -272,7 +271,7 @@ TEST_F(CurrentDateNodeTest, ApplyNoIndexDataOrLogBuilder) {
     CurrentDateNode node;
     ASSERT_OK(node.init(update["$currentDate"]["a"], collator));
 
-    Document doc(fromjson("{a: 0}"));
+    mutablebson::Document doc(fromjson("{a: 0}"));
     setPathTaken("a");
     setLogBuilderToNull();
     auto result = node.apply(getApplyParams(doc.root()["a"]));

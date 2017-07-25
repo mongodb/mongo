@@ -64,6 +64,10 @@ public:
     static void uassertValidNameForUserWrite(StringData varName);
     static void uassertValidNameForUserRead(StringData varName);
 
+    static bool isUserDefinedVariable(Variables::Id id) {
+        return id >= 0;
+    }
+
     // Ids for builtin variables.
     static constexpr Variables::Id kRootId = Id(-1);
     static constexpr Variables::Id kRemoveId = Id(-2);
@@ -82,6 +86,20 @@ public:
      * special ROOT variable, then we return 'root' in Value form.
      */
     Value getValue(Variables::Id id, const Document& root) const;
+
+    /**
+     * Gets the value of a user-defined variable. Should only be called when we know 'id' represents
+     * a user-defined variable.
+     */
+    Value getUserDefinedValue(Variables::Id id) const;
+
+    /**
+     * Returns whether a value for 'id' has been stored in this Variables instance.
+     */
+    bool hasUserDefinedValue(Variables::Id id) const {
+        invariant(isUserDefinedVariable(id));
+        return _valueList.size() > static_cast<size_t>(id);
+    }
 
     /**
      * Returns Document() for non-document values, but otherwise identical to getValue(). If the

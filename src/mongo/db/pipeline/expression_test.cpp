@@ -2190,16 +2190,47 @@ public:
     }
 };
 
-/** No optimization is performed. */
-class Optimize {
-public:
-    void run() {
-        intrusive_ptr<ExpressionContextForTest> expCtx(new ExpressionContextForTest());
-        intrusive_ptr<Expression> expression = ExpressionFieldPath::create(expCtx, "a");
-        // An attempt to optimize returns the Expression itself.
-        ASSERT_EQUALS(expression, expression->optimize());
-    }
+TEST(FieldPath, NoOptimizationOnNormalPath) {
+    intrusive_ptr<ExpressionContextForTest> expCtx(new ExpressionContextForTest());
+    intrusive_ptr<Expression> expression = ExpressionFieldPath::create(expCtx, "a");
+    // An attempt to optimize returns the Expression itself.
+    ASSERT_EQUALS(expression, expression->optimize());
 };
+
+TEST(FieldPath, OptimizeOnVariableWithConstantValue) {
+    intrusive_ptr<ExpressionContextForTest> expCtx(new ExpressionContextForTest());
+    auto varId = expCtx->variablesParseState.defineVariable("userVar");
+    expCtx->variables.setValue(varId, Value(123));
+
+    auto expr = ExpressionFieldPath::parse(expCtx, "$$userVar", expCtx->variablesParseState);
+    ASSERT_TRUE(dynamic_cast<ExpressionFieldPath*>(expr.get()));
+
+    auto optimizedExpr = expr->optimize();
+    ASSERT_TRUE(dynamic_cast<ExpressionConstant*>(optimizedExpr.get()));
+}
+
+TEST(FieldPath, NoOptimizationOnVariableWithNoValue) {
+    intrusive_ptr<ExpressionContextForTest> expCtx(new ExpressionContextForTest());
+    expCtx->variablesParseState.defineVariable("userVar");
+
+    auto expr = ExpressionFieldPath::parse(expCtx, "$$userVar", expCtx->variablesParseState);
+    ASSERT_TRUE(dynamic_cast<ExpressionFieldPath*>(expr.get()));
+
+    auto optimizedExpr = expr->optimize();
+    ASSERT_FALSE(dynamic_cast<ExpressionConstant*>(optimizedExpr.get()));
+}
+
+TEST(FieldPath, NoOptimizationOnVariableWithMissingValue) {
+    intrusive_ptr<ExpressionContextForTest> expCtx(new ExpressionContextForTest());
+    auto varId = expCtx->variablesParseState.defineVariable("userVar");
+    expCtx->variables.setValue(varId, Value());
+
+    auto expr = ExpressionFieldPath::parse(expCtx, "$$userVar", expCtx->variablesParseState);
+    ASSERT_TRUE(dynamic_cast<ExpressionFieldPath*>(expr.get()));
+
+    auto optimizedExpr = expr->optimize();
+    ASSERT_FALSE(dynamic_cast<ExpressionConstant*>(optimizedExpr.get()));
+}
 
 /** The field path itself is a dependency. */
 class Dependencies {
@@ -5254,7 +5285,6 @@ public:
         add<Constant::AddToBsonArray>();
 
         add<FieldPath::Invalid>();
-        add<FieldPath::Optimize>();
         add<FieldPath::Dependencies>();
         add<FieldPath::Missing>();
         add<FieldPath::Present>();

@@ -34,6 +34,7 @@
 #include "mongo/db/matcher/expression_leaf.h"
 #include "mongo/db/matcher/expression_parser.h"
 #include "mongo/db/matcher/extensions_callback_disallow_extensions.h"
+#include "mongo/db/pipeline/expression_context_for_test.h"
 #include "mongo/db/query/collation/collator_interface_mock.h"
 #include "mongo/platform/decimal128.h"
 #include "mongo/unittest/unittest.h"
@@ -49,7 +50,7 @@ TEST(MatchExpressionParserLeafTest, NullCollation) {
     const CollatorInterface* collator = nullptr;
     StatusWithMatchExpression result =
         MatchExpressionParser::parse(query, ExtensionsCallbackDisallowExtensions(), collator);
-    ASSERT_TRUE(result.isOK());
+    ASSERT_OK(result.getStatus());
     ASSERT_EQUALS(MatchExpression::EQ, result.getValue()->matchType());
     EqualityMatchExpression* match = static_cast<EqualityMatchExpression*>(result.getValue().get());
     ASSERT_TRUE(match->getCollator() == collator);
@@ -62,10 +63,61 @@ TEST(MatchExpressionParserLeafTest, Collation) {
     CollatorInterfaceMock collator(CollatorInterfaceMock::MockType::kAlwaysEqual);
     StatusWithMatchExpression result =
         MatchExpressionParser::parse(query, ExtensionsCallbackDisallowExtensions(), &collator);
-    ASSERT_TRUE(result.isOK());
+    ASSERT_OK(result.getStatus());
     ASSERT_EQUALS(MatchExpression::EQ, result.getValue()->matchType());
     EqualityMatchExpression* match = static_cast<EqualityMatchExpression*>(result.getValue().get());
     ASSERT_TRUE(match->getCollator() == &collator);
+}
+
+TEST(MatchExpressionParserLeafTest, ConstantExpr) {
+    boost::intrusive_ptr<ExpressionContextForTest> expCtx(new ExpressionContextForTest());
+    const CollatorInterface* collator = nullptr;
+
+    BSONObj query = BSON("x" << BSON("$expr"
+                                     << "$$userVar"));
+
+    auto varId = expCtx->variablesParseState.defineVariable("userVar");
+    expCtx->variables.setValue(varId, Value(123));
+
+    auto result = MatchExpressionParser::parse(
+        query, ExtensionsCallbackDisallowExtensions(), collator, expCtx);
+
+    ASSERT_OK(result.getStatus());
+    ASSERT_EQUALS(MatchExpression::EQ, result.getValue()->matchType());
+
+    auto expr = result.getValue().get();
+
+    BSONObj match = BSON("x" << 123);
+    BSONObj notMatch = BSON("x" << 321);
+
+    ASSERT_TRUE(expr->matchesBSON(match));
+    ASSERT_FALSE(expr->matchesBSON(notMatch));
+}
+
+TEST(MatchExpressionParserLeafTest, ConstantExprFailsWithMissingVariable) {
+    boost::intrusive_ptr<ExpressionContextForTest> expCtx(new ExpressionContextForTest());
+    const CollatorInterface* collator = nullptr;
+
+    BSONObj query = BSON("x" << BSON("$expr"
+                                     << "$$userVar"));
+
+    ASSERT_THROWS_CODE(auto sw = MatchExpressionParser::parse(
+                           query, ExtensionsCallbackDisallowExtensions(), collator, expCtx),
+                       UserException,
+                       17276);
+}
+
+TEST(MatchExpressionParserLeafTest, ConstantExprFailsWithMissingExpressionContext) {
+    boost::intrusive_ptr<ExpressionContextForTest> nullExpCtx;
+    const CollatorInterface* collator = nullptr;
+
+    BSONObj query = BSON("x" << BSON("$expr"
+                                     << "$$userVar"));
+
+    auto result = MatchExpressionParser::parse(
+        query, ExtensionsCallbackDisallowExtensions(), collator, nullExpCtx);
+
+    ASSERT_NOT_OK(result.getStatus());
 }
 
 TEST(MatchExpressionParserLeafTest, SimpleEQ2) {
@@ -73,7 +125,7 @@ TEST(MatchExpressionParserLeafTest, SimpleEQ2) {
     const CollatorInterface* collator = nullptr;
     StatusWithMatchExpression result =
         MatchExpressionParser::parse(query, ExtensionsCallbackDisallowExtensions(), collator);
-    ASSERT_TRUE(result.isOK());
+    ASSERT_OK(result.getStatus());
 
     ASSERT(!result.getValue()->matchesBSON(BSON("x" << 1)));
     ASSERT(result.getValue()->matchesBSON(BSON("x" << 2)));
@@ -85,7 +137,7 @@ TEST(MatchExpressionParserLeafTest, SimpleEQUndefined) {
     const CollatorInterface* collator = nullptr;
     StatusWithMatchExpression result =
         MatchExpressionParser::parse(query, ExtensionsCallbackDisallowExtensions(), collator);
-    ASSERT_FALSE(result.isOK());
+    ASSERT_NOT_OK(result.getStatus());
 }
 
 TEST(MatchExpressionParserLeafTest, EQNullCollation) {
@@ -94,7 +146,7 @@ TEST(MatchExpressionParserLeafTest, EQNullCollation) {
     const CollatorInterface* collator = nullptr;
     StatusWithMatchExpression result =
         MatchExpressionParser::parse(query, ExtensionsCallbackDisallowExtensions(), collator);
-    ASSERT_TRUE(result.isOK());
+    ASSERT_OK(result.getStatus());
     ASSERT_EQUALS(MatchExpression::EQ, result.getValue()->matchType());
     EqualityMatchExpression* match = static_cast<EqualityMatchExpression*>(result.getValue().get());
     ASSERT_TRUE(match->getCollator() == collator);
@@ -107,10 +159,35 @@ TEST(MatchExpressionParserLeafTest, EQCollation) {
     CollatorInterfaceMock collator(CollatorInterfaceMock::MockType::kAlwaysEqual);
     StatusWithMatchExpression result =
         MatchExpressionParser::parse(query, ExtensionsCallbackDisallowExtensions(), &collator);
-    ASSERT_TRUE(result.isOK());
+    ASSERT_OK(result.getStatus());
     ASSERT_EQUALS(MatchExpression::EQ, result.getValue()->matchType());
     EqualityMatchExpression* match = static_cast<EqualityMatchExpression*>(result.getValue().get());
     ASSERT_TRUE(match->getCollator() == &collator);
+}
+
+TEST(MatchExpressionParserLeafTest, EQConstantExpr) {
+    boost::intrusive_ptr<ExpressionContextForTest> expCtx(new ExpressionContextForTest());
+    const CollatorInterface* collator = nullptr;
+
+    BSONObj query = BSON("x" << BSON("$eq" << BSON("$expr"
+                                                   << "$$userVar")));
+
+    auto varId = expCtx->variablesParseState.defineVariable("userVar");
+    expCtx->variables.setValue(varId, Value(123));
+
+    auto result = MatchExpressionParser::parse(
+        query, ExtensionsCallbackDisallowExtensions(), collator, expCtx);
+
+    ASSERT_OK(result.getStatus());
+    ASSERT_EQUALS(MatchExpression::EQ, result.getValue()->matchType());
+
+    auto expr = result.getValue().get();
+
+    BSONObj match = BSON("x" << 123);
+    BSONObj notMatch = BSON("x" << 321);
+
+    ASSERT_TRUE(expr->matchesBSON(match));
+    ASSERT_FALSE(expr->matchesBSON(notMatch));
 }
 
 TEST(MatchExpressionParserLeafTest, SimpleGT1) {
@@ -118,7 +195,7 @@ TEST(MatchExpressionParserLeafTest, SimpleGT1) {
     const CollatorInterface* collator = nullptr;
     StatusWithMatchExpression result =
         MatchExpressionParser::parse(query, ExtensionsCallbackDisallowExtensions(), collator);
-    ASSERT_TRUE(result.isOK());
+    ASSERT_OK(result.getStatus());
 
     ASSERT(!result.getValue()->matchesBSON(BSON("x" << 2)));
     ASSERT(result.getValue()->matchesBSON(BSON("x" << 3)));
@@ -130,7 +207,7 @@ TEST(MatchExpressionParserLeafTest, GTNullCollation) {
     const CollatorInterface* collator = nullptr;
     StatusWithMatchExpression result =
         MatchExpressionParser::parse(query, ExtensionsCallbackDisallowExtensions(), collator);
-    ASSERT_TRUE(result.isOK());
+    ASSERT_OK(result.getStatus());
     ASSERT_EQUALS(MatchExpression::GT, result.getValue()->matchType());
     GTMatchExpression* match = static_cast<GTMatchExpression*>(result.getValue().get());
     ASSERT_TRUE(match->getCollator() == collator);
@@ -143,10 +220,35 @@ TEST(MatchExpressionParserLeafTest, GTCollation) {
     CollatorInterfaceMock collator(CollatorInterfaceMock::MockType::kReverseString);
     StatusWithMatchExpression result =
         MatchExpressionParser::parse(query, ExtensionsCallbackDisallowExtensions(), &collator);
-    ASSERT_TRUE(result.isOK());
+    ASSERT_OK(result.getStatus());
     ASSERT_EQUALS(MatchExpression::GT, result.getValue()->matchType());
     GTMatchExpression* match = static_cast<GTMatchExpression*>(result.getValue().get());
     ASSERT_TRUE(match->getCollator() == &collator);
+}
+
+TEST(MatchExpressionParserLeafTest, GTConstantExpr) {
+    boost::intrusive_ptr<ExpressionContextForTest> expCtx(new ExpressionContextForTest());
+    const CollatorInterface* collator = nullptr;
+
+    BSONObj query = BSON("x" << BSON("$gt" << BSON("$expr"
+                                                   << "$$userVar")));
+
+    auto varId = expCtx->variablesParseState.defineVariable("userVar");
+    expCtx->variables.setValue(varId, Value(123));
+
+    auto result = MatchExpressionParser::parse(
+        query, ExtensionsCallbackDisallowExtensions(), collator, expCtx);
+
+    ASSERT_OK(result.getStatus());
+    ASSERT_EQUALS(MatchExpression::GT, result.getValue()->matchType());
+
+    auto expr = result.getValue().get();
+
+    BSONObj match = BSON("x" << 500);
+    BSONObj notMatch = BSON("x" << 0);
+
+    ASSERT_TRUE(expr->matchesBSON(match));
+    ASSERT_FALSE(expr->matchesBSON(notMatch));
 }
 
 TEST(MatchExpressionParserLeafTest, SimpleLT1) {
@@ -154,7 +256,7 @@ TEST(MatchExpressionParserLeafTest, SimpleLT1) {
     const CollatorInterface* collator = nullptr;
     StatusWithMatchExpression result =
         MatchExpressionParser::parse(query, ExtensionsCallbackDisallowExtensions(), collator);
-    ASSERT_TRUE(result.isOK());
+    ASSERT_OK(result.getStatus());
 
     ASSERT(result.getValue()->matchesBSON(BSON("x" << 1)));
     ASSERT(!result.getValue()->matchesBSON(BSON("x" << 2)));
@@ -167,7 +269,7 @@ TEST(MatchExpressionParserLeafTest, LTNullCollation) {
     const CollatorInterface* collator = nullptr;
     StatusWithMatchExpression result =
         MatchExpressionParser::parse(query, ExtensionsCallbackDisallowExtensions(), collator);
-    ASSERT_TRUE(result.isOK());
+    ASSERT_OK(result.getStatus());
     ASSERT_EQUALS(MatchExpression::LT, result.getValue()->matchType());
     LTMatchExpression* match = static_cast<LTMatchExpression*>(result.getValue().get());
     ASSERT_TRUE(match->getCollator() == collator);
@@ -180,10 +282,35 @@ TEST(MatchExpressionParserLeafTest, LTCollation) {
     CollatorInterfaceMock collator(CollatorInterfaceMock::MockType::kReverseString);
     StatusWithMatchExpression result =
         MatchExpressionParser::parse(query, ExtensionsCallbackDisallowExtensions(), &collator);
-    ASSERT_TRUE(result.isOK());
+    ASSERT_OK(result.getStatus());
     ASSERT_EQUALS(MatchExpression::LT, result.getValue()->matchType());
     LTMatchExpression* match = static_cast<LTMatchExpression*>(result.getValue().get());
     ASSERT_TRUE(match->getCollator() == &collator);
+}
+
+TEST(MatchExpressionParserLeafTest, LTConstantExpr) {
+    boost::intrusive_ptr<ExpressionContextForTest> expCtx(new ExpressionContextForTest());
+    const CollatorInterface* collator = nullptr;
+
+    BSONObj query = BSON("x" << BSON("$lt" << BSON("$expr"
+                                                   << "$$userVar")));
+
+    auto varId = expCtx->variablesParseState.defineVariable("userVar");
+    expCtx->variables.setValue(varId, Value(123));
+
+    auto result = MatchExpressionParser::parse(
+        query, ExtensionsCallbackDisallowExtensions(), collator, expCtx);
+
+    ASSERT_OK(result.getStatus());
+    ASSERT_EQUALS(MatchExpression::LT, result.getValue()->matchType());
+
+    auto expr = result.getValue().get();
+
+    BSONObj match = BSON("x" << 0);
+    BSONObj notMatch = BSON("x" << 500);
+
+    ASSERT_TRUE(expr->matchesBSON(match));
+    ASSERT_FALSE(expr->matchesBSON(notMatch));
 }
 
 TEST(MatchExpressionParserLeafTest, SimpleGTE1) {
@@ -191,7 +318,7 @@ TEST(MatchExpressionParserLeafTest, SimpleGTE1) {
     const CollatorInterface* collator = nullptr;
     StatusWithMatchExpression result =
         MatchExpressionParser::parse(query, ExtensionsCallbackDisallowExtensions(), collator);
-    ASSERT_TRUE(result.isOK());
+    ASSERT_OK(result.getStatus());
 
     ASSERT(!result.getValue()->matchesBSON(BSON("x" << 1)));
     ASSERT(result.getValue()->matchesBSON(BSON("x" << 2)));
@@ -204,7 +331,7 @@ TEST(MatchExpressionParserLeafTest, GTENullCollation) {
     const CollatorInterface* collator = nullptr;
     StatusWithMatchExpression result =
         MatchExpressionParser::parse(query, ExtensionsCallbackDisallowExtensions(), collator);
-    ASSERT_TRUE(result.isOK());
+    ASSERT_OK(result.getStatus());
     ASSERT_EQUALS(MatchExpression::GTE, result.getValue()->matchType());
     GTEMatchExpression* match = static_cast<GTEMatchExpression*>(result.getValue().get());
     ASSERT_TRUE(match->getCollator() == collator);
@@ -217,10 +344,37 @@ TEST(MatchExpressionParserLeafTest, GTECollation) {
     CollatorInterfaceMock collator(CollatorInterfaceMock::MockType::kReverseString);
     StatusWithMatchExpression result =
         MatchExpressionParser::parse(query, ExtensionsCallbackDisallowExtensions(), &collator);
-    ASSERT_TRUE(result.isOK());
+    ASSERT_OK(result.getStatus());
     ASSERT_EQUALS(MatchExpression::GTE, result.getValue()->matchType());
     GTEMatchExpression* match = static_cast<GTEMatchExpression*>(result.getValue().get());
     ASSERT_TRUE(match->getCollator() == &collator);
+}
+
+TEST(MatchExpressionParserLeafTest, GTEConstantExpr) {
+    boost::intrusive_ptr<ExpressionContextForTest> expCtx(new ExpressionContextForTest());
+    const CollatorInterface* collator = nullptr;
+
+    BSONObj query = BSON("x" << BSON("$gte" << BSON("$expr"
+                                                    << "$$userVar")));
+
+    auto varId = expCtx->variablesParseState.defineVariable("userVar");
+    expCtx->variables.setValue(varId, Value(123));
+
+    auto result = MatchExpressionParser::parse(
+        query, ExtensionsCallbackDisallowExtensions(), collator, expCtx);
+
+    ASSERT_OK(result.getStatus());
+    ASSERT_EQUALS(MatchExpression::GTE, result.getValue()->matchType());
+
+    auto expr = result.getValue().get();
+
+    BSONObj matchEq = BSON("x" << 123);
+    BSONObj matchGt = BSON("x" << 500);
+    BSONObj notMatch = BSON("x" << 0);
+
+    ASSERT_TRUE(expr->matchesBSON(matchEq));
+    ASSERT_TRUE(expr->matchesBSON(matchGt));
+    ASSERT_FALSE(expr->matchesBSON(notMatch));
 }
 
 TEST(MatchExpressionParserLeafTest, SimpleLTE1) {
@@ -228,7 +382,7 @@ TEST(MatchExpressionParserLeafTest, SimpleLTE1) {
     const CollatorInterface* collator = nullptr;
     StatusWithMatchExpression result =
         MatchExpressionParser::parse(query, ExtensionsCallbackDisallowExtensions(), collator);
-    ASSERT_TRUE(result.isOK());
+    ASSERT_OK(result.getStatus());
 
     ASSERT(result.getValue()->matchesBSON(BSON("x" << 1)));
     ASSERT(result.getValue()->matchesBSON(BSON("x" << 2)));
@@ -241,7 +395,7 @@ TEST(MatchExpressionParserLeafTest, LTENullCollation) {
     const CollatorInterface* collator = nullptr;
     StatusWithMatchExpression result =
         MatchExpressionParser::parse(query, ExtensionsCallbackDisallowExtensions(), collator);
-    ASSERT_TRUE(result.isOK());
+    ASSERT_OK(result.getStatus());
     ASSERT_EQUALS(MatchExpression::LTE, result.getValue()->matchType());
     LTEMatchExpression* match = static_cast<LTEMatchExpression*>(result.getValue().get());
     ASSERT_TRUE(match->getCollator() == collator);
@@ -254,10 +408,37 @@ TEST(MatchExpressionParserLeafTest, LTECollation) {
     CollatorInterfaceMock collator(CollatorInterfaceMock::MockType::kReverseString);
     StatusWithMatchExpression result =
         MatchExpressionParser::parse(query, ExtensionsCallbackDisallowExtensions(), &collator);
-    ASSERT_TRUE(result.isOK());
+    ASSERT_OK(result.getStatus());
     ASSERT_EQUALS(MatchExpression::LTE, result.getValue()->matchType());
     LTEMatchExpression* match = static_cast<LTEMatchExpression*>(result.getValue().get());
     ASSERT_TRUE(match->getCollator() == &collator);
+}
+
+TEST(MatchExpressionParserLeafTest, LTEConstantExpr) {
+    boost::intrusive_ptr<ExpressionContextForTest> expCtx(new ExpressionContextForTest());
+    const CollatorInterface* collator = nullptr;
+
+    BSONObj query = BSON("x" << BSON("$lte" << BSON("$expr"
+                                                    << "$$userVar")));
+
+    auto varId = expCtx->variablesParseState.defineVariable("userVar");
+    expCtx->variables.setValue(varId, Value(123));
+
+    auto result = MatchExpressionParser::parse(
+        query, ExtensionsCallbackDisallowExtensions(), collator, expCtx);
+
+    ASSERT_OK(result.getStatus());
+    ASSERT_EQUALS(MatchExpression::LTE, result.getValue()->matchType());
+
+    auto expr = result.getValue().get();
+
+    BSONObj matchEq = BSON("x" << 123);
+    BSONObj matchLt = BSON("x" << 0);
+    BSONObj notMatch = BSON("x" << 500);
+
+    ASSERT_TRUE(expr->matchesBSON(matchEq));
+    ASSERT_TRUE(expr->matchesBSON(matchLt));
+    ASSERT_FALSE(expr->matchesBSON(notMatch));
 }
 
 TEST(MatchExpressionParserLeafTest, SimpleNE1) {
@@ -265,7 +446,7 @@ TEST(MatchExpressionParserLeafTest, SimpleNE1) {
     const CollatorInterface* collator = nullptr;
     StatusWithMatchExpression result =
         MatchExpressionParser::parse(query, ExtensionsCallbackDisallowExtensions(), collator);
-    ASSERT_TRUE(result.isOK());
+    ASSERT_OK(result.getStatus());
 
     ASSERT(result.getValue()->matchesBSON(BSON("x" << 1)));
     ASSERT(!result.getValue()->matchesBSON(BSON("x" << 2)));
@@ -278,7 +459,7 @@ TEST(MatchExpressionParserLeafTest, NENullCollation) {
     const CollatorInterface* collator = nullptr;
     StatusWithMatchExpression result =
         MatchExpressionParser::parse(query, ExtensionsCallbackDisallowExtensions(), collator);
-    ASSERT_TRUE(result.isOK());
+    ASSERT_OK(result.getStatus());
     ASSERT_EQUALS(MatchExpression::NOT, result.getValue()->matchType());
     MatchExpression* child = result.getValue()->getChild(0);
     ASSERT_EQUALS(MatchExpression::EQ, child->matchType());
@@ -293,7 +474,7 @@ TEST(MatchExpressionParserLeafTest, NECollation) {
     CollatorInterfaceMock collator(CollatorInterfaceMock::MockType::kAlwaysEqual);
     StatusWithMatchExpression result =
         MatchExpressionParser::parse(query, ExtensionsCallbackDisallowExtensions(), &collator);
-    ASSERT_TRUE(result.isOK());
+    ASSERT_OK(result.getStatus());
     ASSERT_EQUALS(MatchExpression::NOT, result.getValue()->matchType());
     MatchExpression* child = result.getValue()->getChild(0);
     ASSERT_EQUALS(MatchExpression::EQ, child->matchType());
@@ -301,32 +482,57 @@ TEST(MatchExpressionParserLeafTest, NECollation) {
     ASSERT_TRUE(eqMatch->getCollator() == &collator);
 }
 
+TEST(MatchExpressionParserLeafTest, NEConstantExpr) {
+    boost::intrusive_ptr<ExpressionContextForTest> expCtx(new ExpressionContextForTest());
+    const CollatorInterface* collator = nullptr;
+
+    BSONObj query = BSON("x" << BSON("$ne" << BSON("$expr"
+                                                   << "$$userVar")));
+
+    auto varId = expCtx->variablesParseState.defineVariable("userVar");
+    expCtx->variables.setValue(varId, Value(123));
+
+    auto result = MatchExpressionParser::parse(
+        query, ExtensionsCallbackDisallowExtensions(), collator, expCtx);
+
+    ASSERT_OK(result.getStatus());
+    ASSERT_EQUALS(MatchExpression::NOT, result.getValue()->matchType());
+
+    auto expr = result.getValue().get();
+
+    BSONObj match = BSON("x" << 0);
+    BSONObj notMatch = BSON("x" << 123);
+
+    ASSERT_TRUE(expr->matchesBSON(match));
+    ASSERT_FALSE(expr->matchesBSON(notMatch));
+}
+
 TEST(MatchExpressionParserLeafTest, SimpleModBad1) {
     BSONObj query = BSON("x" << BSON("$mod" << BSON_ARRAY(3 << 2)));
     const CollatorInterface* collator = nullptr;
     StatusWithMatchExpression result =
         MatchExpressionParser::parse(query, ExtensionsCallbackDisallowExtensions(), collator);
-    ASSERT_TRUE(result.isOK());
+    ASSERT_OK(result.getStatus());
 
     query = BSON("x" << BSON("$mod" << BSON_ARRAY(3)));
     result = MatchExpressionParser::parse(query, ExtensionsCallbackDisallowExtensions(), collator);
-    ASSERT_TRUE(!result.isOK());
+    ASSERT_NOT_OK(result.getStatus());
 
     query = BSON("x" << BSON("$mod" << BSON_ARRAY(3 << 2 << 4)));
     result = MatchExpressionParser::parse(query, ExtensionsCallbackDisallowExtensions(), collator);
-    ASSERT_TRUE(!result.isOK());
+    ASSERT_NOT_OK(result.getStatus());
 
     query = BSON("x" << BSON("$mod" << BSON_ARRAY("q" << 2)));
     result = MatchExpressionParser::parse(query, ExtensionsCallbackDisallowExtensions(), collator);
-    ASSERT_TRUE(!result.isOK());
+    ASSERT_NOT_OK(result.getStatus());
 
     query = BSON("x" << BSON("$mod" << 3));
     result = MatchExpressionParser::parse(query, ExtensionsCallbackDisallowExtensions(), collator);
-    ASSERT_TRUE(!result.isOK());
+    ASSERT_NOT_OK(result.getStatus());
 
     query = BSON("x" << BSON("$mod" << BSON("a" << 1 << "b" << 2)));
     result = MatchExpressionParser::parse(query, ExtensionsCallbackDisallowExtensions(), collator);
-    ASSERT_TRUE(!result.isOK());
+    ASSERT_NOT_OK(result.getStatus());
 }
 
 TEST(MatchExpressionParserLeafTest, SimpleMod1) {
@@ -334,7 +540,7 @@ TEST(MatchExpressionParserLeafTest, SimpleMod1) {
     const CollatorInterface* collator = nullptr;
     StatusWithMatchExpression result =
         MatchExpressionParser::parse(query, ExtensionsCallbackDisallowExtensions(), collator);
-    ASSERT_TRUE(result.isOK());
+    ASSERT_OK(result.getStatus());
 
     ASSERT(result.getValue()->matchesBSON(BSON("x" << 5)));
     ASSERT(!result.getValue()->matchesBSON(BSON("x" << 4)));
@@ -346,7 +552,7 @@ TEST(MatchExpressionParserLeafTest, SimpleModNotNumber) {
     const CollatorInterface* collator = nullptr;
     StatusWithMatchExpression result =
         MatchExpressionParser::parse(query, ExtensionsCallbackDisallowExtensions(), collator);
-    ASSERT_TRUE(result.isOK());
+    ASSERT_OK(result.getStatus());
 
     ASSERT(result.getValue()->matchesBSON(BSON("x" << 2)));
     ASSERT(result.getValue()->matchesBSON(BSON("x" << 4)));
@@ -355,13 +561,29 @@ TEST(MatchExpressionParserLeafTest, SimpleModNotNumber) {
                                                 << "a")));
 }
 
+TEST(MatchExpressionParserLeafTest, ModConstantExprFails) {
+    boost::intrusive_ptr<ExpressionContextForTest> expCtx(new ExpressionContextForTest());
+    const CollatorInterface* collator = nullptr;
+
+    BSONObj query = BSON("x" << BSON("$mod" << BSON("$expr"
+                                                    << "$$userVar")));
+
+    auto varId = expCtx->variablesParseState.defineVariable("userVar");
+    expCtx->variables.setValue(varId, Value(BSON_ARRAY(10 << 2)));
+
+    auto result = MatchExpressionParser::parse(
+        query, ExtensionsCallbackDisallowExtensions(), collator, expCtx);
+    ASSERT_NOT_OK(result.getStatus());
+    ASSERT_EQ(result.getStatus().code(), ErrorCodes::BadValue);
+}
+
 TEST(MatchExpressionParserLeafTest, IdCollation) {
     BSONObj query = BSON("$id"
                          << "string");
     const CollatorInterface* collator = nullptr;
     StatusWithMatchExpression result =
         MatchExpressionParser::parse(query, ExtensionsCallbackDisallowExtensions(), collator);
-    ASSERT_TRUE(result.isOK());
+    ASSERT_OK(result.getStatus());
     ASSERT_EQUALS(MatchExpression::EQ, result.getValue()->matchType());
     EqualityMatchExpression* match = static_cast<EqualityMatchExpression*>(result.getValue().get());
     ASSERT_TRUE(match->getCollator() == collator);
@@ -373,10 +595,27 @@ TEST(MatchExpressionParserLeafTest, IdNullCollation) {
     CollatorInterfaceMock collator(CollatorInterfaceMock::MockType::kAlwaysEqual);
     StatusWithMatchExpression result =
         MatchExpressionParser::parse(query, ExtensionsCallbackDisallowExtensions(), &collator);
-    ASSERT_TRUE(result.isOK());
+    ASSERT_OK(result.getStatus());
     ASSERT_EQUALS(MatchExpression::EQ, result.getValue()->matchType());
     EqualityMatchExpression* match = static_cast<EqualityMatchExpression*>(result.getValue().get());
     ASSERT_TRUE(match->getCollator() == &collator);
+}
+
+TEST(MatchExpressionParserLeafTest, IdConstantExpr) {
+    boost::intrusive_ptr<ExpressionContextForTest> expCtx(new ExpressionContextForTest());
+    const CollatorInterface* collator = nullptr;
+
+    BSONObj query = BSON("$id" << BSON("$expr"
+                                       << "$$userVar"));
+
+    auto varId = expCtx->variablesParseState.defineVariable("userVar");
+    expCtx->variables.setValue(varId, Value(123));
+
+    auto result = MatchExpressionParser::parse(
+        query, ExtensionsCallbackDisallowExtensions(), collator, expCtx);
+    ASSERT_OK(result.getStatus());
+
+    ASSERT_EQUALS(MatchExpression::EQ, result.getValue()->matchType());
 }
 
 TEST(MatchExpressionParserLeafTest, RefCollation) {
@@ -385,10 +624,27 @@ TEST(MatchExpressionParserLeafTest, RefCollation) {
     CollatorInterfaceMock collator(CollatorInterfaceMock::MockType::kAlwaysEqual);
     StatusWithMatchExpression result =
         MatchExpressionParser::parse(query, ExtensionsCallbackDisallowExtensions(), &collator);
-    ASSERT_TRUE(result.isOK());
+    ASSERT_OK(result.getStatus());
     ASSERT_EQUALS(MatchExpression::EQ, result.getValue()->matchType());
     EqualityMatchExpression* match = static_cast<EqualityMatchExpression*>(result.getValue().get());
     ASSERT_TRUE(match->getCollator() == nullptr);
+}
+
+TEST(MatchExpressionParserLeafTest, RefConstantExpr) {
+    boost::intrusive_ptr<ExpressionContextForTest> expCtx(new ExpressionContextForTest());
+    const CollatorInterface* collator = nullptr;
+
+    BSONObj query = BSON("$ref" << BSON("$expr"
+                                        << "$$userVar"));
+
+    auto varId = expCtx->variablesParseState.defineVariable("userVar");
+    expCtx->variables.setValue(varId, Value(std::string("colName")));
+
+    auto result = MatchExpressionParser::parse(
+        query, ExtensionsCallbackDisallowExtensions(), collator, expCtx);
+    ASSERT_OK(result.getStatus());
+
+    ASSERT_EQUALS(MatchExpression::EQ, result.getValue()->matchType());
 }
 
 TEST(MatchExpressionParserLeafTest, DbCollation) {
@@ -397,10 +653,27 @@ TEST(MatchExpressionParserLeafTest, DbCollation) {
     CollatorInterfaceMock collator(CollatorInterfaceMock::MockType::kAlwaysEqual);
     StatusWithMatchExpression result =
         MatchExpressionParser::parse(query, ExtensionsCallbackDisallowExtensions(), &collator);
-    ASSERT_TRUE(result.isOK());
+    ASSERT_OK(result.getStatus());
     ASSERT_EQUALS(MatchExpression::EQ, result.getValue()->matchType());
     EqualityMatchExpression* match = static_cast<EqualityMatchExpression*>(result.getValue().get());
     ASSERT_TRUE(match->getCollator() == nullptr);
+}
+
+TEST(MatchExpressionParserLeafTest, DbConstantExpr) {
+    boost::intrusive_ptr<ExpressionContextForTest> expCtx(new ExpressionContextForTest());
+    const CollatorInterface* collator = nullptr;
+
+    BSONObj query = BSON("$db" << BSON("$expr"
+                                       << "$$userVar"));
+
+    auto varId = expCtx->variablesParseState.defineVariable("userVar");
+    expCtx->variables.setValue(varId, Value(std::string("dbName")));
+
+    auto result = MatchExpressionParser::parse(
+        query, ExtensionsCallbackDisallowExtensions(), collator, expCtx);
+    ASSERT_OK(result.getStatus());
+
+    ASSERT_EQUALS(MatchExpression::EQ, result.getValue()->matchType());
 }
 
 TEST(MatchExpressionParserLeafTest, SimpleIN1) {
@@ -408,7 +681,7 @@ TEST(MatchExpressionParserLeafTest, SimpleIN1) {
     const CollatorInterface* collator = nullptr;
     StatusWithMatchExpression result =
         MatchExpressionParser::parse(query, ExtensionsCallbackDisallowExtensions(), collator);
-    ASSERT_TRUE(result.isOK());
+    ASSERT_OK(result.getStatus());
 
     ASSERT(!result.getValue()->matchesBSON(BSON("x" << 1)));
     ASSERT(result.getValue()->matchesBSON(BSON("x" << 2)));
@@ -420,7 +693,7 @@ TEST(MatchExpressionParserLeafTest, INNullCollation) {
     const CollatorInterface* collator = nullptr;
     StatusWithMatchExpression result =
         MatchExpressionParser::parse(query, ExtensionsCallbackDisallowExtensions(), collator);
-    ASSERT_TRUE(result.isOK());
+    ASSERT_OK(result.getStatus());
     ASSERT_EQUALS(MatchExpression::MATCH_IN, result.getValue()->matchType());
     InMatchExpression* match = static_cast<InMatchExpression*>(result.getValue().get());
     ASSERT_TRUE(match->getCollator() == collator);
@@ -431,10 +704,37 @@ TEST(MatchExpressionParserLeafTest, INCollation) {
     CollatorInterfaceMock collator(CollatorInterfaceMock::MockType::kAlwaysEqual);
     StatusWithMatchExpression result =
         MatchExpressionParser::parse(query, ExtensionsCallbackDisallowExtensions(), &collator);
-    ASSERT_TRUE(result.isOK());
+    ASSERT_OK(result.getStatus());
     ASSERT_EQUALS(MatchExpression::MATCH_IN, result.getValue()->matchType());
     InMatchExpression* match = static_cast<InMatchExpression*>(result.getValue().get());
     ASSERT_TRUE(match->getCollator() == &collator);
+}
+
+TEST(MatchExpressionParserLeafTest, INConstantExprFails) {
+    CollatorInterfaceMock collator(CollatorInterfaceMock::MockType::kAlwaysEqual);
+    boost::intrusive_ptr<ExpressionContextForTest> expCtx(new ExpressionContextForTest());
+
+    // $expr represents entire $in array.
+    BSONObj query = BSON("x" << BSON("$in" << BSON("$expr"
+                                                   << "userVar")));
+    auto varId = expCtx->variablesParseState.defineVariable("userVar");
+    expCtx->variables.setValue(varId, Value(BSON_ARRAY(1 << 2)));
+
+    StatusWithMatchExpression result = MatchExpressionParser::parse(
+        query, ExtensionsCallbackDisallowExtensions(), &collator, expCtx);
+    ASSERT_NOT_OK(result.getStatus());
+    ASSERT_EQ(result.getStatus().code(), ErrorCodes::BadValue);
+
+    // $expr represents a single element of the $in array.
+    query = BSON("x" << BSON("$in" << BSON_ARRAY(1 << BSON("$expr"
+                                                           << "userVar"))));
+    varId = expCtx->variablesParseState.defineVariable("userVar");
+    expCtx->variables.setValue(varId, Value(123));
+
+    result = MatchExpressionParser::parse(
+        query, ExtensionsCallbackDisallowExtensions(), &collator, expCtx);
+    ASSERT_NOT_OK(result.getStatus());
+    ASSERT_EQ(result.getStatus().code(), ErrorCodes::BadValue);
 }
 
 TEST(MatchExpressionParserLeafTest, INSingleDBRef) {
@@ -448,7 +748,7 @@ TEST(MatchExpressionParserLeafTest, INSingleDBRef) {
     const CollatorInterface* collator = nullptr;
     StatusWithMatchExpression result =
         MatchExpressionParser::parse(query, ExtensionsCallbackDisallowExtensions(), collator);
-    ASSERT_TRUE(result.isOK());
+    ASSERT_OK(result.getStatus());
 
     OID oidx = OID::gen();
     ASSERT(!result.getValue()->matchesBSON(BSON("x" << BSON("$ref"
@@ -531,7 +831,7 @@ TEST(MatchExpressionParserLeafTest, INMultipleDBRef) {
     const CollatorInterface* collator = nullptr;
     StatusWithMatchExpression result =
         MatchExpressionParser::parse(query, ExtensionsCallbackDisallowExtensions(), collator);
-    ASSERT_TRUE(result.isOK());
+    ASSERT_OK(result.getStatus());
 
     OID oidx = OID::gen();
     ASSERT(!result.getValue()->matchesBSON(BSON("x" << BSON("$ref"
@@ -673,7 +973,7 @@ TEST(MatchExpressionParserLeafTest, INDBRefWithOptionalField1) {
     const CollatorInterface* collator = nullptr;
     StatusWithMatchExpression result =
         MatchExpressionParser::parse(query, ExtensionsCallbackDisallowExtensions(), collator);
-    ASSERT_TRUE(result.isOK());
+    ASSERT_OK(result.getStatus());
 
     OID oidx = OID::gen();
     ASSERT(!result.getValue()->matchesBSON(BSON("x" << BSON("$ref"
@@ -717,14 +1017,14 @@ TEST(MatchExpressionParserLeafTest, INInvalidDBRefs) {
                                                       << "$foo"
                                                       << 1))));
     result = MatchExpressionParser::parse(query, ExtensionsCallbackDisallowExtensions(), collator);
-    ASSERT_FALSE(result.isOK());
+    ASSERT_NOT_OK(result.getStatus());
 
     OID oid = OID::gen();
 
     // missing $ref field
     query = BSON("x" << BSON("$in" << BSON_ARRAY(BSON("$id" << oid << "foo" << 3))));
     result = MatchExpressionParser::parse(query, ExtensionsCallbackDisallowExtensions(), collator);
-    ASSERT_FALSE(result.isOK());
+    ASSERT_NOT_OK(result.getStatus());
 
     // missing $id and $ref field
     query = BSON("x" << BSON("$in" << BSON_ARRAY(BSON("$db"
@@ -732,7 +1032,7 @@ TEST(MatchExpressionParserLeafTest, INInvalidDBRefs) {
                                                       << "foo"
                                                       << 3))));
     result = MatchExpressionParser::parse(query, ExtensionsCallbackDisallowExtensions(), collator);
-    ASSERT_FALSE(result.isOK());
+    ASSERT_NOT_OK(result.getStatus());
 }
 
 TEST(MatchExpressionParserLeafTest, INExpressionDocument) {
@@ -740,7 +1040,7 @@ TEST(MatchExpressionParserLeafTest, INExpressionDocument) {
     const CollatorInterface* collator = nullptr;
     StatusWithMatchExpression result =
         MatchExpressionParser::parse(query, ExtensionsCallbackDisallowExtensions(), collator);
-    ASSERT_FALSE(result.isOK());
+    ASSERT_NOT_OK(result.getStatus());
 }
 
 TEST(MatchExpressionParserLeafTest, INNotArray) {
@@ -748,7 +1048,7 @@ TEST(MatchExpressionParserLeafTest, INNotArray) {
     const CollatorInterface* collator = nullptr;
     StatusWithMatchExpression result =
         MatchExpressionParser::parse(query, ExtensionsCallbackDisallowExtensions(), collator);
-    ASSERT_FALSE(result.isOK());
+    ASSERT_NOT_OK(result.getStatus());
 }
 
 TEST(MatchExpressionParserLeafTest, INUndefined) {
@@ -756,7 +1056,7 @@ TEST(MatchExpressionParserLeafTest, INUndefined) {
     const CollatorInterface* collator = nullptr;
     StatusWithMatchExpression result =
         MatchExpressionParser::parse(query, ExtensionsCallbackDisallowExtensions(), collator);
-    ASSERT_FALSE(result.isOK());
+    ASSERT_NOT_OK(result.getStatus());
 }
 
 TEST(MatchExpressionParserLeafTest, INNotElemMatch) {
@@ -764,7 +1064,7 @@ TEST(MatchExpressionParserLeafTest, INNotElemMatch) {
     const CollatorInterface* collator = nullptr;
     StatusWithMatchExpression result =
         MatchExpressionParser::parse(query, ExtensionsCallbackDisallowExtensions(), collator);
-    ASSERT_FALSE(result.isOK());
+    ASSERT_NOT_OK(result.getStatus());
 }
 
 TEST(MatchExpressionParserLeafTest, INRegexTooLong) {
@@ -777,7 +1077,7 @@ TEST(MatchExpressionParserLeafTest, INRegexTooLong) {
     const CollatorInterface* collator = nullptr;
     StatusWithMatchExpression result =
         MatchExpressionParser::parse(query, ExtensionsCallbackDisallowExtensions(), collator);
-    ASSERT_FALSE(result.isOK());
+    ASSERT_NOT_OK(result.getStatus());
 }
 
 TEST(MatchExpressionParserLeafTest, INRegexTooLong2) {
@@ -786,7 +1086,7 @@ TEST(MatchExpressionParserLeafTest, INRegexTooLong2) {
     const CollatorInterface* collator = nullptr;
     StatusWithMatchExpression result =
         MatchExpressionParser::parse(query, ExtensionsCallbackDisallowExtensions(), collator);
-    ASSERT_FALSE(result.isOK());
+    ASSERT_NOT_OK(result.getStatus());
 }
 
 TEST(MatchExpressionParserLeafTest, INRegexStuff) {
@@ -801,7 +1101,7 @@ TEST(MatchExpressionParserLeafTest, INRegexStuff) {
     const CollatorInterface* collator = nullptr;
     StatusWithMatchExpression result =
         MatchExpressionParser::parse(query, ExtensionsCallbackDisallowExtensions(), collator);
-    ASSERT_TRUE(result.isOK());
+    ASSERT_OK(result.getStatus());
 
     BSONObj matchFirst = BSON("a"
                               << "ax");
@@ -828,7 +1128,7 @@ TEST(MatchExpressionParserLeafTest, SimpleNIN1) {
     const CollatorInterface* collator = nullptr;
     StatusWithMatchExpression result =
         MatchExpressionParser::parse(query, ExtensionsCallbackDisallowExtensions(), collator);
-    ASSERT_TRUE(result.isOK());
+    ASSERT_OK(result.getStatus());
 
     ASSERT(result.getValue()->matchesBSON(BSON("x" << 1)));
     ASSERT(!result.getValue()->matchesBSON(BSON("x" << 2)));
@@ -840,7 +1140,7 @@ TEST(MatchExpressionParserLeafTest, NINNotArray) {
     const CollatorInterface* collator = nullptr;
     StatusWithMatchExpression result =
         MatchExpressionParser::parse(query, ExtensionsCallbackDisallowExtensions(), collator);
-    ASSERT_FALSE(result.isOK());
+    ASSERT_NOT_OK(result.getStatus());
 }
 
 TEST(MatchExpressionParserLeafTest, NINNullCollation) {
@@ -848,7 +1148,7 @@ TEST(MatchExpressionParserLeafTest, NINNullCollation) {
     const CollatorInterface* collator = nullptr;
     StatusWithMatchExpression result =
         MatchExpressionParser::parse(query, ExtensionsCallbackDisallowExtensions(), collator);
-    ASSERT_TRUE(result.isOK());
+    ASSERT_OK(result.getStatus());
     ASSERT_EQUALS(MatchExpression::NOT, result.getValue()->matchType());
     MatchExpression* child = result.getValue()->getChild(0);
     ASSERT_EQUALS(MatchExpression::MATCH_IN, child->matchType());
@@ -861,12 +1161,39 @@ TEST(MatchExpressionParserLeafTest, NINCollation) {
     CollatorInterfaceMock collator(CollatorInterfaceMock::MockType::kAlwaysEqual);
     StatusWithMatchExpression result =
         MatchExpressionParser::parse(query, ExtensionsCallbackDisallowExtensions(), &collator);
-    ASSERT_TRUE(result.isOK());
+    ASSERT_OK(result.getStatus());
     ASSERT_EQUALS(MatchExpression::NOT, result.getValue()->matchType());
     MatchExpression* child = result.getValue()->getChild(0);
     ASSERT_EQUALS(MatchExpression::MATCH_IN, child->matchType());
     InMatchExpression* inMatch = static_cast<InMatchExpression*>(child);
     ASSERT_TRUE(inMatch->getCollator() == &collator);
+}
+
+TEST(MatchExpressionParserLeafTest, NINConstantExprFails) {
+    CollatorInterfaceMock collator(CollatorInterfaceMock::MockType::kAlwaysEqual);
+    boost::intrusive_ptr<ExpressionContextForTest> expCtx(new ExpressionContextForTest());
+
+    // $expr represents entire $in array.
+    BSONObj query = BSON("x" << BSON("$nin" << BSON("$expr"
+                                                    << "userVar")));
+    auto varId = expCtx->variablesParseState.defineVariable("userVar");
+    expCtx->variables.setValue(varId, Value(BSON_ARRAY(1 << 2)));
+
+    StatusWithMatchExpression result = MatchExpressionParser::parse(
+        query, ExtensionsCallbackDisallowExtensions(), &collator, expCtx);
+    ASSERT_NOT_OK(result.getStatus());
+    ASSERT_EQ(result.getStatus().code(), ErrorCodes::BadValue);
+
+    // $expr represents a single element of the $in array.
+    query = BSON("x" << BSON("$nin" << BSON_ARRAY(1 << BSON("$expr"
+                                                            << "userVar"))));
+    varId = expCtx->variablesParseState.defineVariable("userVar");
+    expCtx->variables.setValue(varId, Value(123));
+
+    result = MatchExpressionParser::parse(
+        query, ExtensionsCallbackDisallowExtensions(), &collator, expCtx);
+    ASSERT_NOT_OK(result.getStatus());
+    ASSERT_EQ(result.getStatus().code(), ErrorCodes::BadValue);
 }
 
 TEST(MatchExpressionParserLeafTest, Regex1) {
@@ -876,7 +1203,7 @@ TEST(MatchExpressionParserLeafTest, Regex1) {
     const CollatorInterface* collator = nullptr;
     StatusWithMatchExpression result =
         MatchExpressionParser::parse(query, ExtensionsCallbackDisallowExtensions(), collator);
-    ASSERT_TRUE(result.isOK());
+    ASSERT_OK(result.getStatus());
 
     ASSERT(result.getValue()->matchesBSON(BSON("x"
                                                << "abc")));
@@ -894,7 +1221,7 @@ TEST(MatchExpressionParserLeafTest, Regex2) {
     const CollatorInterface* collator = nullptr;
     StatusWithMatchExpression result =
         MatchExpressionParser::parse(query, ExtensionsCallbackDisallowExtensions(), collator);
-    ASSERT_TRUE(result.isOK());
+    ASSERT_OK(result.getStatus());
 
     ASSERT(result.getValue()->matchesBSON(BSON("x"
                                                << "abc")));
@@ -912,7 +1239,7 @@ TEST(MatchExpressionParserLeafTest, Regex3) {
     const CollatorInterface* collator = nullptr;
     StatusWithMatchExpression result =
         MatchExpressionParser::parse(query, ExtensionsCallbackDisallowExtensions(), collator);
-    ASSERT_TRUE(result.isOK());
+    ASSERT_OK(result.getStatus());
 
     ASSERT(result.getValue()->matchesBSON(BSON("x"
                                                << "abc")));
@@ -931,26 +1258,26 @@ TEST(MatchExpressionParserLeafTest, RegexBad) {
     const CollatorInterface* collator = nullptr;
     StatusWithMatchExpression result =
         MatchExpressionParser::parse(query, ExtensionsCallbackDisallowExtensions(), collator);
-    ASSERT_FALSE(result.isOK());
+    ASSERT_NOT_OK(result.getStatus());
 
     // $regex does not with numbers
     query = BSON("x" << BSON("$regex" << 123));
     result = MatchExpressionParser::parse(query, ExtensionsCallbackDisallowExtensions(), collator);
-    ASSERT_FALSE(result.isOK());
+    ASSERT_NOT_OK(result.getStatus());
 
     query = BSON("x" << BSON("$regex" << BSON_ARRAY("abc")));
     result = MatchExpressionParser::parse(query, ExtensionsCallbackDisallowExtensions(), collator);
-    ASSERT_FALSE(result.isOK());
+    ASSERT_NOT_OK(result.getStatus());
 
     query = BSON("x" << BSON("$optionas"
                              << "i"));
     result = MatchExpressionParser::parse(query, ExtensionsCallbackDisallowExtensions(), collator);
-    ASSERT_FALSE(result.isOK());
+    ASSERT_NOT_OK(result.getStatus());
 
     query = BSON("x" << BSON("$options"
                              << "i"));
     result = MatchExpressionParser::parse(query, ExtensionsCallbackDisallowExtensions(), collator);
-    ASSERT_FALSE(result.isOK());
+    ASSERT_NOT_OK(result.getStatus());
 }
 
 TEST(MatchExpressionParserLeafTest, RegexEmbeddedNULByte) {
@@ -959,12 +1286,40 @@ TEST(MatchExpressionParserLeafTest, RegexEmbeddedNULByte) {
     const CollatorInterface* collator = nullptr;
     StatusWithMatchExpression result =
         MatchExpressionParser::parse(query, ExtensionsCallbackDisallowExtensions(), collator);
-    ASSERT_TRUE(result.isOK());
+    ASSERT_OK(result.getStatus());
 
     const auto value = "a\0b"_sd;
     ASSERT(result.getValue()->matchesBSON(BSON("x" << value)));
     ASSERT(!result.getValue()->matchesBSON(BSON("x"
                                                 << "a")));
+}
+
+TEST(MatchExpressionParserLeafTest, RegexWithConstantExprFails) {
+    boost::intrusive_ptr<ExpressionContextForTest> expCtx(new ExpressionContextForTest());
+    const CollatorInterface* collator = nullptr;
+
+    BSONObj query = BSON("x" << BSON("$options" << BSON("$expr"
+                                                        << "userVar")
+                                                << "$regex"
+                                                << "abc"));
+    auto varId = expCtx->variablesParseState.defineVariable("userVar");
+    expCtx->variables.setValue(varId, Value(std::string("i")));
+
+    StatusWithMatchExpression result =
+        MatchExpressionParser::parse(query, ExtensionsCallbackDisallowExtensions(), collator);
+    ASSERT_NOT_OK(result.getStatus());
+
+
+    query = BSON("x" << BSON("$options"
+                             << "i"
+                             << "$regex"
+                             << BSON("$expr"
+                                     << "userVar")));
+    varId = expCtx->variablesParseState.defineVariable("userVar");
+    expCtx->variables.setValue(varId, Value(std::string("abc")));
+
+    result = MatchExpressionParser::parse(query, ExtensionsCallbackDisallowExtensions(), collator);
+    ASSERT_NOT_OK(result.getStatus());
 }
 
 TEST(MatchExpressionParserLeafTest, ExistsYes1) {
@@ -974,7 +1329,7 @@ TEST(MatchExpressionParserLeafTest, ExistsYes1) {
     const CollatorInterface* collator = nullptr;
     StatusWithMatchExpression result =
         MatchExpressionParser::parse(query, ExtensionsCallbackDisallowExtensions(), collator);
-    ASSERT_TRUE(result.isOK());
+    ASSERT_OK(result.getStatus());
 
     ASSERT(result.getValue()->matchesBSON(BSON("x"
                                                << "abc")));
@@ -989,7 +1344,7 @@ TEST(MatchExpressionParserLeafTest, ExistsNO1) {
     const CollatorInterface* collator = nullptr;
     StatusWithMatchExpression result =
         MatchExpressionParser::parse(query, ExtensionsCallbackDisallowExtensions(), collator);
-    ASSERT_TRUE(result.isOK());
+    ASSERT_OK(result.getStatus());
 
     ASSERT(!result.getValue()->matchesBSON(BSON("x"
                                                 << "abc")));
@@ -1002,7 +1357,7 @@ TEST(MatchExpressionParserLeafTest, Type1) {
     const CollatorInterface* collator = nullptr;
     StatusWithMatchExpression result =
         MatchExpressionParser::parse(query, ExtensionsCallbackDisallowExtensions(), collator);
-    ASSERT_TRUE(result.isOK());
+    ASSERT_OK(result.getStatus());
 
     ASSERT(result.getValue()->matchesBSON(BSON("x"
                                                << "abc")));
@@ -1014,7 +1369,7 @@ TEST(MatchExpressionParserLeafTest, Type2) {
     const CollatorInterface* collator = nullptr;
     StatusWithMatchExpression result =
         MatchExpressionParser::parse(query, ExtensionsCallbackDisallowExtensions(), collator);
-    ASSERT_TRUE(result.isOK());
+    ASSERT_OK(result.getStatus());
 
     ASSERT(result.getValue()->matchesBSON(BSON("x" << 5.3)));
     ASSERT(!result.getValue()->matchesBSON(BSON("x" << 5)));
@@ -1025,7 +1380,7 @@ TEST(MatchExpressionParserLeafTest, TypeDoubleOperator) {
     const CollatorInterface* collator = nullptr;
     StatusWithMatchExpression result =
         MatchExpressionParser::parse(query, ExtensionsCallbackDisallowExtensions(), collator);
-    ASSERT_TRUE(result.isOK());
+    ASSERT_OK(result.getStatus());
 
     ASSERT(!result.getValue()->matchesBSON(BSON("x" << 5.3)));
     ASSERT(!result.getValue()->matchesBSON(BSON("x" << 5)));
@@ -1036,7 +1391,7 @@ TEST(MatchExpressionParserLeafTest, TypeDecimalOperator) {
     const CollatorInterface* collator = nullptr;
     StatusWithMatchExpression result =
         MatchExpressionParser::parse(query, ExtensionsCallbackDisallowExtensions(), collator);
-    ASSERT_TRUE(result.isOK());
+    ASSERT_OK(result.getStatus());
 
     ASSERT_FALSE(result.getValue()->matchesBSON(BSON("x" << 5.3)));
     ASSERT_TRUE(result.getValue()->matchesBSON(BSON("x" << mongo::Decimal128("1"))));
@@ -1047,7 +1402,7 @@ TEST(MatchExpressionParserLeafTest, TypeNull) {
     const CollatorInterface* collator = nullptr;
     StatusWithMatchExpression result =
         MatchExpressionParser::parse(query, ExtensionsCallbackDisallowExtensions(), collator);
-    ASSERT_TRUE(result.isOK());
+    ASSERT_OK(result.getStatus());
 
     ASSERT(!result.getValue()->matchesBSON(BSONObj()));
     ASSERT(!result.getValue()->matchesBSON(BSON("x" << 5)));
@@ -1071,7 +1426,7 @@ TEST(MatchExpressionParserLeafTest, TypeBad) {
     const CollatorInterface* collator = nullptr;
     StatusWithMatchExpression result =
         MatchExpressionParser::parse(query, ExtensionsCallbackDisallowExtensions(), collator);
-    ASSERT_FALSE(result.isOK());
+    ASSERT_NOT_OK(result.getStatus());
 }
 
 TEST(MatchExpressionParserLeafTest, TypeBadString) {
@@ -1262,6 +1617,20 @@ TEST(MatchExpressionParserLeafTest, ValidTypeCodesParseSuccessfully) {
         auto typeExpression = static_cast<TypeMatchExpression*>(expression.getValue().get());
         ASSERT_EQ(type, typeExpression->getBSONType());
     }
+}
+
+TEST(MatchExpressionParserLeafTest, TypeWithConstantExprFails) {
+    boost::intrusive_ptr<ExpressionContextForTest> expCtx(new ExpressionContextForTest());
+    const CollatorInterface* collator = nullptr;
+
+    BSONObj query = BSON("x" << BSON("$type" << BSON("$expr"
+                                                     << "userVar")));
+    auto varId = expCtx->variablesParseState.defineVariable("userVar");
+    expCtx->variables.setValue(varId, Value(static_cast<int>(BSONType::NumberDouble)));
+
+    StatusWithMatchExpression result =
+        MatchExpressionParser::parse(query, ExtensionsCallbackDisallowExtensions(), collator);
+    ASSERT_NOT_OK(result.getStatus());
 }
 
 TEST(MatchExpressionParserTest, BitTestMatchExpressionValidMask) {
@@ -1947,4 +2316,36 @@ TEST(MatchExpressionParserTest, BitTestMatchExpressionInvalidArrayValue) {
             collator)
             .getStatus());
 }
+
+TEST(MatchExpressionParserLeafTest, BitTestWithConstantExprFails) {
+    boost::intrusive_ptr<ExpressionContextForTest> expCtx(new ExpressionContextForTest());
+    const CollatorInterface* collator = nullptr;
+
+    auto varId = expCtx->variablesParseState.defineVariable("userVar");
+    expCtx->variables.setValue(varId, Value(BSON_ARRAY(1 << 5)));
+
+    ASSERT_NOT_OK(MatchExpressionParser::parse(fromjson("{a: {$bitsAllSet: [{$expr: 'userVar'}]}}"),
+                                               ExtensionsCallbackDisallowExtensions(),
+                                               collator,
+                                               expCtx)
+                      .getStatus());
+
+    ASSERT_NOT_OK(MatchExpressionParser::parse(fromjson("{a: {$bitsAnySet: {$expr: 'userVar'}}}"),
+                                               ExtensionsCallbackDisallowExtensions(),
+                                               collator,
+                                               expCtx)
+                      .getStatus());
+
+    ASSERT_NOT_OK(MatchExpressionParser::parse(fromjson("{a: {$bitsAllClear: {$expr: 'userVar'}}}"),
+                                               ExtensionsCallbackDisallowExtensions(),
+                                               collator,
+                                               expCtx)
+                      .getStatus());
+
+    ASSERT_NOT_OK(MatchExpressionParser::parse(fromjson("{a: {$bitsAnyClear: {$expr: 'userVar'}}}"),
+                                               ExtensionsCallbackDisallowExtensions(),
+                                               collator,
+                                               expCtx)
+                      .getStatus());
 }
+}  // namespace mongo

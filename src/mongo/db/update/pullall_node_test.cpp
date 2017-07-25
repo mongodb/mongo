@@ -42,7 +42,6 @@ namespace mongo {
 namespace {
 
 using PullAllNodeTest = UpdateNodeTest;
-using mongo::mutablebson::Document;
 using mongo::mutablebson::Element;
 using mongo::mutablebson::countChildren;
 
@@ -88,7 +87,7 @@ TEST_F(PullAllNodeTest, TargetNotFound) {
     PullAllNode node;
     ASSERT_OK(node.init(update["$pullAll"]["b"], collator));
 
-    Document doc(fromjson("{a: [1, 'a', {r: 1, b: 2}]}"));
+    mutablebson::Document doc(fromjson("{a: [1, 'a', {r: 1, b: 2}]}"));
     setPathToCreate("b");
     addIndexedPath("a");
     auto result = node.apply(getApplyParams(doc.root()));
@@ -105,7 +104,7 @@ TEST_F(PullAllNodeTest, TargetArrayElementNotFound) {
     PullAllNode node;
     ASSERT_OK(node.init(update["$pullAll"]["a.2"], collator));
 
-    Document doc(fromjson("{a: [1, 2]}"));
+    mutablebson::Document doc(fromjson("{a: [1, 2]}"));
     setPathToCreate("2");
     setPathTaken("a");
     addIndexedPath("a");
@@ -123,7 +122,7 @@ TEST_F(PullAllNodeTest, ApplyToNonArrayFails) {
     PullAllNode node;
     ASSERT_OK(node.init(update["$pullAll"]["a.0"], collator));
 
-    Document doc(fromjson("{a: [1, 2]}"));
+    mutablebson::Document doc(fromjson("{a: [1, 2]}"));
     setPathTaken("a.0");
     addIndexedPath("a");
     ASSERT_THROWS_CODE_AND_WHAT(node.apply(getApplyParams(doc.root()["a"][0])),
@@ -138,7 +137,7 @@ TEST_F(PullAllNodeTest, ApplyWithSingleNumber) {
     PullAllNode node;
     ASSERT_OK(node.init(update["$pullAll"]["a"], collator));
 
-    Document doc(fromjson("{a: [1, 'a', {r: 1, b: 2}]}"));
+    mutablebson::Document doc(fromjson("{a: [1, 'a', {r: 1, b: 2}]}"));
     setPathTaken("a");
     addIndexedPath("a");
     auto result = node.apply(getApplyParams(doc.root()["a"]));
@@ -155,7 +154,7 @@ TEST_F(PullAllNodeTest, ApplyNoIndexDataNoLogBuilder) {
     PullAllNode node;
     ASSERT_OK(node.init(update["$pullAll"]["a"], collator));
 
-    Document doc(fromjson("{a: [1, 'a', {r: 1, b: 2}]}"));
+    mutablebson::Document doc(fromjson("{a: [1, 'a', {r: 1, b: 2}]}"));
     setPathTaken("a");
     setLogBuilderToNull();
     auto result = node.apply(getApplyParams(doc.root()["a"]));
@@ -171,7 +170,7 @@ TEST_F(PullAllNodeTest, ApplyWithElementNotPresentInArray) {
     PullAllNode node;
     ASSERT_OK(node.init(update["$pullAll"]["a"], collator));
 
-    Document doc(fromjson("{a: [1, 'a', {r: 1, b: 2}]}"));
+    mutablebson::Document doc(fromjson("{a: [1, 'a', {r: 1, b: 2}]}"));
     setPathTaken("a");
     addIndexedPath("a");
     auto result = node.apply(getApplyParams(doc.root()["a"]));
@@ -188,7 +187,7 @@ TEST_F(PullAllNodeTest, ApplyWithWithTwoElements) {
     PullAllNode node;
     ASSERT_OK(node.init(update["$pullAll"]["a"], collator));
 
-    Document doc(fromjson("{a: [1, 'a', {r: 1, b: 2}]}"));
+    mutablebson::Document doc(fromjson("{a: [1, 'a', {r: 1, b: 2}]}"));
     setPathTaken("a");
     addIndexedPath("a");
     auto result = node.apply(getApplyParams(doc.root()["a"]));
@@ -205,7 +204,7 @@ TEST_F(PullAllNodeTest, ApplyWithAllArrayElements) {
     PullAllNode node;
     ASSERT_OK(node.init(update["$pullAll"]["a"], collator));
 
-    Document doc(fromjson("{a: [1, 'a', {r: 1, b: 2}]}"));
+    mutablebson::Document doc(fromjson("{a: [1, 'a', {r: 1, b: 2}]}"));
     setPathTaken("a");
     addIndexedPath("a");
     auto result = node.apply(getApplyParams(doc.root()["a"]));
@@ -222,7 +221,7 @@ TEST_F(PullAllNodeTest, ApplyWithAllArrayElementsButOutOfOrder) {
     PullAllNode node;
     ASSERT_OK(node.init(update["$pullAll"]["a"], collator));
 
-    Document doc(fromjson("{a: [1, 'a', {r: 1, b: 2}]}"));
+    mutablebson::Document doc(fromjson("{a: [1, 'a', {r: 1, b: 2}]}"));
     setPathTaken("a");
     addIndexedPath("a");
     auto result = node.apply(getApplyParams(doc.root()["a"]));
@@ -239,7 +238,7 @@ TEST_F(PullAllNodeTest, ApplyWithAllArrayElementsAndThenSome) {
     PullAllNode node;
     ASSERT_OK(node.init(update["$pullAll"]["a"], collator));
 
-    Document doc(fromjson("{a: [1, 'a', {r: 1, b: 2}]}"));
+    mutablebson::Document doc(fromjson("{a: [1, 'a', {r: 1, b: 2}]}"));
     setPathTaken("a");
     addIndexedPath("a");
     auto result = node.apply(getApplyParams(doc.root()["a"]));
@@ -256,7 +255,7 @@ TEST_F(PullAllNodeTest, ApplyWithCollator) {
     PullAllNode node;
     ASSERT_OK(node.init(update["$pullAll"]["a"], &collator));
 
-    Document doc(fromjson("{a: ['foo', 'bar', 'baz']}"));
+    mutablebson::Document doc(fromjson("{a: ['foo', 'bar', 'baz']}"));
     setPathTaken("a");
     addIndexedPath("a");
     auto result = node.apply(getApplyParams(doc.root()["a"]));
@@ -274,7 +273,7 @@ TEST_F(PullAllNodeTest, ApplyAfterSetCollator) {
     ASSERT_OK(node.init(update["$pullAll"]["a"], collator));
 
     // First without a collator.
-    Document doc(fromjson("{a: ['foo', 'bar', 'baz']}"));
+    mutablebson::Document doc(fromjson("{a: ['foo', 'bar', 'baz']}"));
     setPathTaken("a");
     auto result = node.apply(getApplyParams(doc.root()["a"]));
     ASSERT_TRUE(result.noop);
@@ -284,7 +283,7 @@ TEST_F(PullAllNodeTest, ApplyAfterSetCollator) {
     // Now with a collator.
     CollatorInterfaceMock mockCollator(CollatorInterfaceMock::MockType::kToLowerString);
     node.setCollator(&mockCollator);
-    Document doc2(fromjson("{a: ['foo', 'bar', 'baz']}"));
+    mutablebson::Document doc2(fromjson("{a: ['foo', 'bar', 'baz']}"));
     resetApplyParams();
     setPathTaken("a");
     result = node.apply(getApplyParams(doc2.root()["a"]));

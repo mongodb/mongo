@@ -66,6 +66,7 @@ env.Library(
         '$BUILD_DIR/mongo/db/geo/geometry',
         '$BUILD_DIR/mongo/db/geo/geoparser',
         '$BUILD_DIR/mongo/db/query/collation/collator_interface',
+        '$BUILD_DIR/mongo/db/pipeline/expression',
         '$BUILD_DIR/third_party/shim_pcrecpp',
         'path',
     ],

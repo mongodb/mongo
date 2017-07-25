@@ -35,6 +35,7 @@
 #include "mongo/db/matcher/expression.h"
 #include "mongo/db/matcher/expression_leaf.h"
 #include "mongo/db/matcher/expression_parser.h"
+#include "mongo/db/pipeline/aggregation_context_fixture.h"
 #include "mongo/db/query/collation/collator_interface_mock.h"
 
 namespace mongo {
@@ -96,10 +97,31 @@ TEST(EqOp, MatchesElement) {
     ASSERT(eq.equivalent(&eq));
 }
 
+TEST(EqOp, ConstantAggExprMatchesElement) {
+    BSONObj operand = BSON("a" << BSON("$expr"
+                                       << "$$userVar"));
+    BSONObj match = BSON("a" << 5);
+    BSONObj notMatch = BSON("a" << 6);
+
+    const boost::intrusive_ptr<ExpressionContextForTest> expCtx(new ExpressionContextForTest());
+    auto varId = expCtx->variablesParseState.defineVariable("userVar");
+    expCtx->variables.setValue(varId, Value(5));
+    auto expr = Expression::parseOperand(
+        expCtx, operand.firstElement()["$expr"], expCtx->variablesParseState);
+    expr = expr->optimize();
+
+    EqualityMatchExpression eq;
+    ASSERT_OK(eq.init("a", expr));
+    ASSERT(eq.matchesSingleElement(match.firstElement()));
+    ASSERT_FALSE(eq.matchesSingleElement(notMatch.firstElement()));
+
+    ASSERT(eq.equivalent(&eq));
+}
+
 TEST(EqOp, InvalidEooOperand) {
     BSONObj operand;
     EqualityMatchExpression eq;
-    ASSERT(!eq.init("", operand.firstElement()).isOK());
+    ASSERT_FALSE(eq.init("", operand.firstElement()).isOK());
 }
 
 TEST(EqOp, MatchesScalar) {
@@ -418,6 +440,27 @@ TEST(LtOp, ElemMatchKey) {
     ASSERT_EQUALS("1", details.elemMatchKey());
 }
 
+TEST(LtOp, ConstantAggExprMatchesElement) {
+    BSONObj operand = BSON("a" << BSON("$lt" << BSON("$expr"
+                                                     << "$$userVar")));
+    BSONObj match = BSON("a" << 5);
+    BSONObj notMatch = BSON("a" << 10);
+
+    const boost::intrusive_ptr<ExpressionContextForTest> expCtx(new ExpressionContextForTest());
+    auto varId = expCtx->variablesParseState.defineVariable("userVar");
+    expCtx->variables.setValue(varId, Value(6));
+    auto expr = Expression::parseOperand(
+        expCtx, operand.firstElement()["$lt"]["$expr"], expCtx->variablesParseState);
+    expr = expr->optimize();
+
+    LTMatchExpression lt;
+    ASSERT_OK(lt.init("a", expr));
+    ASSERT(lt.matchesSingleElement(match.firstElement()));
+    ASSERT_FALSE(lt.matchesSingleElement(notMatch.firstElement()));
+
+    ASSERT(lt.equivalent(&lt));
+}
+
 /**
    TEST( LtOp, MatchesIndexKeyScalar ) {
    BSONObj operand = BSON( "$lt" << 6 );
@@ -481,6 +524,27 @@ TEST(LteOp, MatchesElement) {
     ASSERT(lte.matchesSingleElement(equalMatch.firstElement()));
     ASSERT(!lte.matchesSingleElement(notMatch.firstElement()));
     ASSERT(!lte.matchesSingleElement(notMatchWrongType.firstElement()));
+}
+
+TEST(LteOp, ConstantAggExprMatchesElement) {
+    BSONObj operand = BSON("a" << BSON("$lte" << BSON("$expr"
+                                                      << "$$userVar")));
+    BSONObj match = BSON("a" << 5);
+    BSONObj notMatch = BSON("a" << 10);
+
+    const boost::intrusive_ptr<ExpressionContextForTest> expCtx(new ExpressionContextForTest());
+    auto varId = expCtx->variablesParseState.defineVariable("userVar");
+    expCtx->variables.setValue(varId, Value(6));
+    auto expr = Expression::parseOperand(
+        expCtx, operand.firstElement()["$lte"]["$expr"], expCtx->variablesParseState);
+    expr = expr->optimize();
+
+    LTEMatchExpression lte;
+    ASSERT_OK(lte.init("a", expr));
+    ASSERT(lte.matchesSingleElement(match.firstElement()));
+    ASSERT_FALSE(lte.matchesSingleElement(notMatch.firstElement()));
+
+    ASSERT(lte.equivalent(&lte));
 }
 
 TEST(LteOp, InvalidEooOperand) {
@@ -737,6 +801,27 @@ TEST(GtOp, ElemMatchKey) {
     ASSERT_EQUALS("1", details.elemMatchKey());
 }
 
+TEST(GtOp, ConstantAggExprMatchesElement) {
+    BSONObj operand = BSON("a" << BSON("$gt" << BSON("$expr"
+                                                     << "$$userVar")));
+    BSONObj match = BSON("a" << 10);
+    BSONObj notMatch = BSON("a" << 0);
+
+    const boost::intrusive_ptr<ExpressionContextForTest> expCtx(new ExpressionContextForTest());
+    auto varId = expCtx->variablesParseState.defineVariable("userVar");
+    expCtx->variables.setValue(varId, Value(5));
+    auto expr = Expression::parseOperand(
+        expCtx, operand.firstElement()["$gt"]["$expr"], expCtx->variablesParseState);
+    expr = expr->optimize();
+
+    GTMatchExpression gt;
+    ASSERT_OK(gt.init("a", expr));
+    ASSERT(gt.matchesSingleElement(match.firstElement()));
+    ASSERT_FALSE(gt.matchesSingleElement(notMatch.firstElement()));
+
+    ASSERT(gt.equivalent(&gt));
+}
+
 /**
    TEST( GtOp, MatchesIndexKeyScalar ) {
    BSONObj operand = BSON( "$gt" << 6 );
@@ -895,6 +980,27 @@ TEST(GteOp, ElemMatchKey) {
     ASSERT(gte.matchesBSON(BSON("a" << BSON_ARRAY(2 << 6 << 5)), &details));
     ASSERT(details.hasElemMatchKey());
     ASSERT_EQUALS("1", details.elemMatchKey());
+}
+
+TEST(GteOp, ConstantAggExprMatchesElement) {
+    BSONObj operand = BSON("a" << BSON("$gte" << BSON("$expr"
+                                                      << "$$userVar")));
+    BSONObj match = BSON("a" << 10);
+    BSONObj notMatch = BSON("a" << 0);
+
+    const boost::intrusive_ptr<ExpressionContextForTest> expCtx(new ExpressionContextForTest());
+    auto varId = expCtx->variablesParseState.defineVariable("userVar");
+    expCtx->variables.setValue(varId, Value(5));
+    auto expr = Expression::parseOperand(
+        expCtx, operand.firstElement()["$gte"]["$expr"], expCtx->variablesParseState);
+    expr = expr->optimize();
+
+    GTEMatchExpression gte;
+    ASSERT_OK(gte.init("a", expr));
+    ASSERT(gte.matchesSingleElement(match.firstElement()));
+    ASSERT_FALSE(gte.matchesSingleElement(notMatch.firstElement()));
+
+    ASSERT(gte.equivalent(&gte));
 }
 
 TEST(RegexMatchExpression, MatchesElementExact) {

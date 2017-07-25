@@ -40,7 +40,6 @@
 namespace mongo {
 namespace {
 
-using mongo::mutablebson::Document;
 using mongo::mutablebson::Element;
 using mongo::mutablebson::sortChildren;
 
@@ -75,7 +74,7 @@ public:
     }
 
 private:
-    Document _doc;
+    mutablebson::Document _doc;
     BSONObj _objs[3];
     size_t _size;
 };

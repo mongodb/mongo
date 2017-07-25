@@ -42,7 +42,6 @@ namespace mongo {
 namespace {
 
 using CompareNodeTest = UpdateNodeTest;
-using mongo::mutablebson::Document;
 using mongo::mutablebson::Element;
 using mongo::mutablebson::countChildren;
 
@@ -59,7 +58,7 @@ TEST_F(CompareNodeTest, ApplyMaxSameNumber) {
     CompareNode node(CompareNode::CompareMode::kMax);
     ASSERT_OK(node.init(update["$max"]["a"], collator));
 
-    Document doc(fromjson("{a: 1}"));
+    mutablebson::Document doc(fromjson("{a: 1}"));
     setPathTaken("a");
     addIndexedPath("a");
     auto result = node.apply(getApplyParams(doc.root()["a"]));
@@ -76,7 +75,7 @@ TEST_F(CompareNodeTest, ApplyMinSameNumber) {
     CompareNode node(CompareNode::CompareMode::kMin);
     ASSERT_OK(node.init(update["$min"]["a"], collator));
 
-    Document doc(fromjson("{a: 1}"));
+    mutablebson::Document doc(fromjson("{a: 1}"));
     setPathTaken("a");
     addIndexedPath("a");
     auto result = node.apply(getApplyParams(doc.root()["a"]));
@@ -93,7 +92,7 @@ TEST_F(CompareNodeTest, ApplyMaxNumberIsLess) {
     CompareNode node(CompareNode::CompareMode::kMax);
     ASSERT_OK(node.init(update["$max"]["a"], collator));
 
-    Document doc(fromjson("{a: 1}"));
+    mutablebson::Document doc(fromjson("{a: 1}"));
     setPathTaken("a");
     addIndexedPath("a");
     auto result = node.apply(getApplyParams(doc.root()["a"]));
@@ -110,7 +109,7 @@ TEST_F(CompareNodeTest, ApplyMinNumberIsMore) {
     CompareNode node(CompareNode::CompareMode::kMin);
     ASSERT_OK(node.init(update["$min"]["a"], collator));
 
-    Document doc(fromjson("{a: 1}"));
+    mutablebson::Document doc(fromjson("{a: 1}"));
     setPathTaken("a");
     addIndexedPath("a");
     auto result = node.apply(getApplyParams(doc.root()["a"]));
@@ -127,7 +126,7 @@ TEST_F(CompareNodeTest, ApplyMaxSameValInt) {
     CompareNode node(CompareNode::CompareMode::kMax);
     ASSERT_OK(node.init(update["$max"]["a"], collator));
 
-    Document doc(fromjson("{a: 1.0}"));
+    mutablebson::Document doc(fromjson("{a: 1.0}"));
     setPathTaken("a");
     addIndexedPath("a");
     auto result = node.apply(getApplyParams(doc.root()["a"]));
@@ -144,7 +143,7 @@ TEST_F(CompareNodeTest, ApplyMaxSameValIntZero) {
     CompareNode node(CompareNode::CompareMode::kMax);
     ASSERT_OK(node.init(update["$max"]["a"], collator));
 
-    Document doc(fromjson("{a: 0.0}"));
+    mutablebson::Document doc(fromjson("{a: 0.0}"));
     setPathTaken("a");
     addIndexedPath("a");
     auto result = node.apply(getApplyParams(doc.root()["a"]));
@@ -161,7 +160,7 @@ TEST_F(CompareNodeTest, ApplyMinSameValIntZero) {
     CompareNode node(CompareNode::CompareMode::kMin);
     ASSERT_OK(node.init(update["$min"]["a"], collator));
 
-    Document doc(fromjson("{a: 0.0}"));
+    mutablebson::Document doc(fromjson("{a: 0.0}"));
     setPathTaken("a");
     addIndexedPath("a");
     auto result = node.apply(getApplyParams(doc.root()["a"]));
@@ -178,7 +177,7 @@ TEST_F(CompareNodeTest, ApplyMissingFieldMinNumber) {
     CompareNode node(CompareNode::CompareMode::kMin);
     ASSERT_OK(node.init(update["$min"]["a"], collator));
 
-    Document doc(fromjson("{}"));
+    mutablebson::Document doc(fromjson("{}"));
     setPathToCreate("a");
     addIndexedPath("a");
     auto result = node.apply(getApplyParams(doc.root()));
@@ -195,7 +194,7 @@ TEST_F(CompareNodeTest, ApplyExistingNumberMinNumber) {
     CompareNode node(CompareNode::CompareMode::kMin);
     ASSERT_OK(node.init(update["$min"]["a"], collator));
 
-    Document doc(fromjson("{a: 1}"));
+    mutablebson::Document doc(fromjson("{a: 1}"));
     setPathTaken("a");
     addIndexedPath("a");
     auto result = node.apply(getApplyParams(doc.root()["a"]));
@@ -212,7 +211,7 @@ TEST_F(CompareNodeTest, ApplyMissingFieldMaxNumber) {
     CompareNode node(CompareNode::CompareMode::kMax);
     ASSERT_OK(node.init(update["$max"]["a"], collator));
 
-    Document doc(fromjson("{}"));
+    mutablebson::Document doc(fromjson("{}"));
     setPathToCreate("a");
     addIndexedPath("a");
     auto result = node.apply(getApplyParams(doc.root()));
@@ -229,7 +228,7 @@ TEST_F(CompareNodeTest, ApplyExistingNumberMaxNumber) {
     CompareNode node(CompareNode::CompareMode::kMax);
     ASSERT_OK(node.init(update["$max"]["a"], collator));
 
-    Document doc(fromjson("{a: 1}"));
+    mutablebson::Document doc(fromjson("{a: 1}"));
     setPathTaken("a");
     addIndexedPath("a");
     auto result = node.apply(getApplyParams(doc.root()["a"]));
@@ -246,7 +245,7 @@ TEST_F(CompareNodeTest, ApplyExistingDateMaxDate) {
     CompareNode node(CompareNode::CompareMode::kMax);
     ASSERT_OK(node.init(update["$max"]["a"], collator));
 
-    Document doc(fromjson("{a: {$date: 0}}"));
+    mutablebson::Document doc(fromjson("{a: {$date: 0}}"));
     setPathTaken("a");
     addIndexedPath("a");
     auto result = node.apply(getApplyParams(doc.root()["a"]));
@@ -263,7 +262,7 @@ TEST_F(CompareNodeTest, ApplyExistingEmbeddedDocMaxDoc) {
     CompareNode node(CompareNode::CompareMode::kMax);
     ASSERT_OK(node.init(update["$max"]["a"], collator));
 
-    Document doc(fromjson("{a: {b: 2}}"));
+    mutablebson::Document doc(fromjson("{a: {b: 2}}"));
     setPathTaken("a");
     addIndexedPath("a");
     auto result = node.apply(getApplyParams(doc.root()["a"]));
@@ -280,7 +279,7 @@ TEST_F(CompareNodeTest, ApplyExistingEmbeddedDocMaxNumber) {
     CompareNode node(CompareNode::CompareMode::kMax);
     ASSERT_OK(node.init(update["$max"]["a"], collator));
 
-    Document doc(fromjson("{a: {b: 2}}"));
+    mutablebson::Document doc(fromjson("{a: {b: 2}}"));
     setPathTaken("a");
     addIndexedPath("a");
     auto result = node.apply(getApplyParams(doc.root()["a"]));
@@ -297,7 +296,7 @@ TEST_F(CompareNodeTest, ApplyMinRespectsCollation) {
     CompareNode node(CompareNode::CompareMode::kMin);
     ASSERT_OK(node.init(update["$min"]["a"], &collator));
 
-    Document doc(fromjson("{a: 'cbc'}"));
+    mutablebson::Document doc(fromjson("{a: 'cbc'}"));
     setPathTaken("a");
     addIndexedPath("a");
     auto result = node.apply(getApplyParams(doc.root()["a"]));
@@ -318,7 +317,7 @@ TEST_F(CompareNodeTest, ApplyMinRespectsCollationFromSetCollator) {
         CollatorInterfaceMock::MockType::kReverseString);
     node.setCollator(&reverseStringCollator);
 
-    Document doc(fromjson("{a: 'cbc'}"));
+    mutablebson::Document doc(fromjson("{a: 'cbc'}"));
     setPathTaken("a");
     addIndexedPath("a");
     auto result = node.apply(getApplyParams(doc.root()["a"]));
@@ -339,7 +338,7 @@ TEST_F(CompareNodeTest, ApplyMaxRespectsCollationFromSetCollator) {
         CollatorInterfaceMock::MockType::kReverseString);
     node.setCollator(&reverseStringCollator);
 
-    Document doc(fromjson("{a: 'cbc'}"));
+    mutablebson::Document doc(fromjson("{a: 'cbc'}"));
     setPathTaken("a");
     addIndexedPath("a");
     auto result = node.apply(getApplyParams(doc.root()["a"]));
@@ -377,7 +376,7 @@ TEST_F(CompareNodeTest, ApplyIndexesNotAffected) {
     CompareNode node(CompareNode::CompareMode::kMax);
     ASSERT_OK(node.init(update["$max"]["a"], collator));
 
-    Document doc(fromjson("{a: 0}"));
+    mutablebson::Document doc(fromjson("{a: 0}"));
     setPathTaken("a");
     addIndexedPath("b");
     auto result = node.apply(getApplyParams(doc.root()["a"]));
@@ -394,7 +393,7 @@ TEST_F(CompareNodeTest, ApplyNoIndexDataOrLogBuilder) {
     CompareNode node(CompareNode::CompareMode::kMax);
     ASSERT_OK(node.init(update["$max"]["a"], collator));
 
-    Document doc(fromjson("{a: 0}"));
+    mutablebson::Document doc(fromjson("{a: 0}"));
     setPathTaken("a");
     setLogBuilderToNull();
     auto result = node.apply(getApplyParams(doc.root()["a"]));

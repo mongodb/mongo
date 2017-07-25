@@ -463,7 +463,7 @@ load("jstests/aggregation/extras/utils.js");  // For assertErrorCode.
         assert.writeOK(from.insert({_id: 2}));
         assert.writeOK(from.insert({_id: 3}));
 
-        // Basic non-equi theta join.
+        // Basic non-equi theta join via $project.
         pipeline = [
             {
               $lookup: {
@@ -492,6 +492,90 @@ load("jstests/aggregation/extras/utils.js");  // For assertErrorCode.
                   }
               ]
             }
+        ];
+        testPipeline(pipeline, expectedResults, coll);
+
+        // Basic non-equi theta join via $match.
+        pipeline = [
+            {
+              $lookup: {
+                  let : {var1: "$_id"},
+                  pipeline: [
+                      {$match: {_id: {$lt: {$expr: "$$var1"}}}},
+                  ],
+                  from: "from",
+                  as: "c",
+              }
+            },
+        ];
+
+        expectedResults = [
+            {"_id": 1, x: 1, "c": []},
+            {"_id": 2, x: 2, "c": [{"_id": 1}]},
+            {
+              "_id": 3,
+              x: 3,
+              "c": [
+                  {"_id": 1},
+                  {
+                    "_id": 2,
+                  }
+              ]
+            }
+        ];
+        testPipeline(pipeline, expectedResults, coll);
+
+        // Multi-level join using $match.
+        pipeline = [
+            {
+              $lookup: {
+                  let : {var1: "$_id"},
+                  pipeline: [
+                      {$match: {_id: {$eq: {$expr: "$$var1"}}}},
+                      {
+                        $lookup: {
+                            let : {var2: "$_id"},
+                            pipeline: [
+                                {$match: {_id: {$gt: {$expr: "$$var2"}}}},
+                            ],
+                            from: "from",
+                            as: "d"
+                        }
+                      },
+                  ],
+                  from: "from",
+                  as: "c",
+              }
+            },
+        ];
+
+        expectedResults = [
+            {"_id": 1, "x": 1, "c": [{"_id": 1, "d": [{"_id": 2}, {"_id": 3}]}]},
+            {"_id": 2, "x": 2, "c": [{"_id": 2, "d": [{"_id": 3}]}]},
+            {"_id": 3, "x": 3, "c": [{"_id": 3, "d": []}]}
+        ];
+        testPipeline(pipeline, expectedResults, coll);
+
+        // Equijoin with $match that can't be delegated to the query subsystem.
+        pipeline = [
+            {
+              $lookup: {
+                  let : {var1: "$x"},
+                  pipeline: [
+                      {$addFields: {newField: 2}},
+                      {$match: {newField: {$expr: "$$var1"}}},
+                      {$project: {newField: 0}}
+                  ],
+                  from: "from",
+                  as: "c",
+              }
+            },
+        ];
+
+        expectedResults = [
+            {"_id": 1, "x": 1, "c": []},
+            {"_id": 2, "x": 2, "c": [{"_id": 1}, {"_id": 2}, {"_id": 3}]},
+            {"_id": 3, "x": 3, "c": []}
         ];
         testPipeline(pipeline, expectedResults, coll);
 

@@ -35,6 +35,7 @@
 #include "mongo/db/matcher/expression.h"
 #include "mongo/db/matcher/expression_geo.h"
 #include "mongo/db/matcher/extensions_callback_disallow_extensions.h"
+#include "mongo/db/pipeline/aggregation_context_fixture.h"
 
 namespace mongo {
 
@@ -51,6 +52,19 @@ TEST(MatchExpressionParserGeo, WithinBox) {
     ASSERT(result.getValue()->matchesBSON(fromjson("{a: [5,5]}")));
     ASSERT(result.getValue()->matchesBSON(fromjson("{a: [5,5.1]}")));
     ASSERT(result.getValue()->matchesBSON(fromjson("{a: {x: 5, y:5.1}}")));
+}
+
+TEST(MatchExpressionParserGeo, RejectsExprAsGeometry) {
+    const boost::intrusive_ptr<ExpressionContextForTest> expCtx(new ExpressionContextForTest());
+    auto varId = expCtx->variablesParseState.defineVariable("userVar");
+    expCtx->variables.setValue(varId, Value(fromjson("{type: 'Point', coordinates:[0,0]}}")));
+
+    BSONObj query = fromjson("{a:{$geoIntersects:{$geometry: {$expr: '$$userVar'} }}}");
+
+    const CollatorInterface* collator = nullptr;
+    StatusWithMatchExpression result =
+        MatchExpressionParser::parse(query, ExtensionsCallbackDisallowExtensions(), collator);
+    ASSERT_NOT_OK(result.getStatus());
 }
 
 TEST(MatchExpressionParserGeoNear, ParseNear) {

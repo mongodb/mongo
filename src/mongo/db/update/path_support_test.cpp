@@ -56,9 +56,9 @@
 namespace {
 
 using namespace mongo;
-using namespace mutablebson;
 using namespace pathsupport;
 using mongoutils::str::stream;
+using mutablebson::Element;
 using std::unique_ptr;
 using std::string;
 
@@ -66,7 +66,7 @@ class EmptyDoc : public mongo::unittest::Test {
 public:
     EmptyDoc() : _doc() {}
 
-    Document& doc() {
+    mutablebson::Document& doc() {
         return _doc;
     }
 
@@ -83,7 +83,7 @@ public:
     }
 
 private:
-    Document _doc;
+    mutablebson::Document _doc;
     FieldRef _field;
 };
 
@@ -137,7 +137,7 @@ public:
         ASSERT_OK(root().appendInt("a", 1));
     }
 
-    Document& doc() {
+    mutablebson::Document& doc() {
         return _doc;
     }
 
@@ -153,7 +153,7 @@ public:
     }
 
 private:
-    Document _doc;
+    mutablebson::Document _doc;
     FieldRef _field;
 };
 
@@ -248,7 +248,7 @@ public:
         ASSERT_OK(root().pushBack(elemA));
     }
 
-    Document& doc() {
+    mutablebson::Document& doc() {
         return _doc;
     }
 
@@ -264,7 +264,7 @@ public:
     }
 
 private:
-    Document _doc;
+    mutablebson::Document _doc;
     FieldRef _field;
 };
 
@@ -363,7 +363,7 @@ public:
         ASSERT_OK(root().pushBack(elemB));
     }
 
-    Document& doc() {
+    mutablebson::Document& doc() {
         return _doc;
     }
 
@@ -380,7 +380,7 @@ public:
     }
 
 private:
-    Document _doc;
+    mutablebson::Document _doc;
     FieldRef _field;
 };
 

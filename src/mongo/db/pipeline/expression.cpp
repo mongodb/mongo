@@ -1832,6 +1832,14 @@ intrusive_ptr<Expression> ExpressionFieldPath::optimize() {
         return ExpressionConstant::create(getExpressionContext(), Value());
     }
 
+    if (Variables::isUserDefinedVariable(_variable) &&
+        getExpressionContext()->variables.hasUserDefinedValue(_variable)) {
+        const auto val = getExpressionContext()->variables.getUserDefinedValue(_variable);
+        if (!val.missing()) {
+            return ExpressionConstant::create(getExpressionContext(), val);
+        }
+    }
+
     return intrusive_ptr<Expression>(this);
 }
 

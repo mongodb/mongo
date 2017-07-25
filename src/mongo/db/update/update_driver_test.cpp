@@ -47,7 +47,6 @@
 namespace mongo {
 namespace {
 
-using mongo::mutablebson::Document;
 using mongoutils::str::stream;
 
 TEST(Parse, Normal) {
@@ -163,7 +162,7 @@ TEST(Collator, SetCollationUpdatesModifierInterfaces) {
     const bool validateForStorage = true;
     const FieldRefSet emptyImmutablePaths;
     bool modified = false;
-    Document doc(fromjson("{a: 'cba'}"));
+    mutablebson::Document doc(fromjson("{a: 'cba'}"));
     driver.setCollator(&collator);
     driver
         .update(StringData(),
@@ -195,7 +194,7 @@ public:
         _opCtx = _serviceContext.makeOperationContext();
     }
 
-    Document& doc() {
+    mutablebson::Document& doc() {
         return _doc;
     }
 
@@ -217,7 +216,7 @@ private:
     std::map<StringData, std::unique_ptr<ExpressionWithPlaceholder>> _arrayFilters;
     std::unique_ptr<UpdateDriver> _driverOps;
     std::unique_ptr<UpdateDriver> _driverRepl;
-    Document _doc;
+    mutablebson::Document _doc;
 };
 
 // Make name nicer to report

@@ -41,7 +41,6 @@ namespace mongo {
 namespace {
 
 using BitNodeTest = UpdateNodeTest;
-using mongo::mutablebson::Document;
 using mongo::mutablebson::Element;
 using mongo::mutablebson::countChildren;
 
@@ -156,7 +155,7 @@ TEST_F(BitNodeTest, ApplyAndLogEmptyDocumentAnd) {
     BitNode node;
     ASSERT_OK(node.init(update["$bit"]["a"], collator));
 
-    Document doc(fromjson("{}"));
+    mutablebson::Document doc(fromjson("{}"));
     setPathToCreate("a");
     auto result = node.apply(getApplyParams(doc.root()));
     ASSERT_FALSE(result.noop);
@@ -171,7 +170,7 @@ TEST_F(BitNodeTest, ApplyAndLogEmptyDocumentOr) {
     BitNode node;
     ASSERT_OK(node.init(update["$bit"]["a"], collator));
 
-    Document doc(fromjson("{}"));
+    mutablebson::Document doc(fromjson("{}"));
     setPathToCreate("a");
     auto result = node.apply(getApplyParams(doc.root()));
     ASSERT_FALSE(result.noop);
@@ -186,7 +185,7 @@ TEST_F(BitNodeTest, ApplyAndLogEmptyDocumentXor) {
     BitNode node;
     ASSERT_OK(node.init(update["$bit"]["a"], collator));
 
-    Document doc(fromjson("{}"));
+    mutablebson::Document doc(fromjson("{}"));
     setPathToCreate("a");
     auto result = node.apply(getApplyParams(doc.root()));
     ASSERT_FALSE(result.noop);
@@ -201,7 +200,7 @@ TEST_F(BitNodeTest, ApplyAndLogSimpleDocumentAnd) {
     BitNode node;
     ASSERT_OK(node.init(update["$bit"]["a"], collator));
 
-    Document doc(BSON("a" << 0b0101));
+    mutablebson::Document doc(BSON("a" << 0b0101));
     setPathTaken("a");
     auto result = node.apply(getApplyParams(doc.root()["a"]));
     ASSERT_FALSE(result.noop);
@@ -216,7 +215,7 @@ TEST_F(BitNodeTest, ApplyAndLogSimpleDocumentOr) {
     BitNode node;
     ASSERT_OK(node.init(update["$bit"]["a"], collator));
 
-    Document doc(BSON("a" << 0b0101));
+    mutablebson::Document doc(BSON("a" << 0b0101));
     setPathTaken("a");
     auto result = node.apply(getApplyParams(doc.root()["a"]));
     ASSERT_FALSE(result.noop);
@@ -231,7 +230,7 @@ TEST_F(BitNodeTest, ApplyAndLogSimpleDocumentXor) {
     BitNode node;
     ASSERT_OK(node.init(update["$bit"]["a"], collator));
 
-    Document doc(BSON("a" << 0b0101));
+    mutablebson::Document doc(BSON("a" << 0b0101));
     setPathTaken("a");
     auto result = node.apply(getApplyParams(doc.root()["a"]));
     ASSERT_FALSE(result.noop);
@@ -246,7 +245,7 @@ TEST_F(BitNodeTest, ApplyShouldReportNoOp) {
     BitNode node;
     ASSERT_OK(node.init(update["$bit"]["a"], collator));
 
-    Document doc(BSON("a" << 1));
+    mutablebson::Document doc(BSON("a" << 1));
     setPathTaken("a");
     auto result = node.apply(getApplyParams(doc.root()["a"]));
     ASSERT_TRUE(result.noop);
@@ -266,7 +265,7 @@ TEST_F(BitNodeTest, ApplyMultipleBitOps) {
     BitNode node;
     ASSERT_OK(node.init(update["$bit"]["a"], collator));
 
-    Document doc(BSON("a" << 0b1111111100000000));
+    mutablebson::Document doc(BSON("a" << 0b1111111100000000));
     setPathTaken("a");
     auto result = node.apply(getApplyParams(doc.root()["a"]));
     ASSERT_FALSE(result.noop);
@@ -281,7 +280,7 @@ TEST_F(BitNodeTest, ApplyRepeatedBitOps) {
     BitNode node;
     ASSERT_OK(node.init(update["$bit"]["a"], collator));
 
-    Document doc(BSON("a" << 0b11110000));
+    mutablebson::Document doc(BSON("a" << 0b11110000));
     setPathTaken("a");
     auto result = node.apply(getApplyParams(doc.root()["a"]));
     ASSERT_FALSE(result.noop);

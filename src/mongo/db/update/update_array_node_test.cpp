@@ -42,7 +42,6 @@ namespace mongo {
 namespace {
 
 using UpdateArrayNodeTest = UpdateNodeTest;
-using mongo::mutablebson::Document;
 using mongo::mutablebson::Element;
 
 TEST_F(UpdateArrayNodeTest, ApplyCreatePathFails) {
@@ -60,7 +59,7 @@ TEST_F(UpdateArrayNodeTest, ApplyCreatePathFails) {
                                               arrayFilters,
                                               foundIdentifiers));
 
-    Document doc(fromjson("{a: {}}"));
+    mutablebson::Document doc(fromjson("{a: {}}"));
     addIndexedPath("a");
     ASSERT_THROWS_CODE_AND_WHAT(
         root.apply(getApplyParams(doc.root())),
@@ -84,7 +83,7 @@ TEST_F(UpdateArrayNodeTest, ApplyToNonArrayFails) {
                                               arrayFilters,
                                               foundIdentifiers));
 
-    Document doc(fromjson("{a: {}}"));
+    mutablebson::Document doc(fromjson("{a: {}}"));
     addIndexedPath("a");
     ASSERT_THROWS_CODE_AND_WHAT(root.apply(getApplyParams(doc.root())),
                                 UserException,
@@ -107,7 +106,7 @@ TEST_F(UpdateArrayNodeTest, UpdateIsAppliedToAllMatchingElements) {
                                               arrayFilters,
                                               foundIdentifiers));
 
-    Document doc(fromjson("{a: [0, 1, 0]}"));
+    mutablebson::Document doc(fromjson("{a: [0, 1, 0]}"));
     addIndexedPath("a");
     auto result = root.apply(getApplyParams(doc.root()));
     ASSERT_TRUE(result.indexesAffected);
@@ -134,7 +133,7 @@ DEATH_TEST_F(UpdateArrayNodeTest,
                                               arrayFilters,
                                               foundIdentifiers));
 
-    Document doc(fromjson("{a: [{c: 0}, {c: 0}, {c: 1}]}"));
+    mutablebson::Document doc(fromjson("{a: [{c: 0}, {c: 0}, {c: 1}]}"));
     doc.root()["a"]["1"]["c"].setValueInt(1).transitional_ignore();
     doc.root()["a"]["2"]["c"].setValueInt(0).transitional_ignore();
     addIndexedPath("a");
@@ -154,7 +153,7 @@ TEST_F(UpdateArrayNodeTest, UpdateForEmptyIdentifierIsAppliedToAllArrayElements)
                                               arrayFilters,
                                               foundIdentifiers));
 
-    Document doc(fromjson("{a: [0, 0, 0]}"));
+    mutablebson::Document doc(fromjson("{a: [0, 0, 0]}"));
     addIndexedPath("a");
     auto result = root.apply(getApplyParams(doc.root()));
     ASSERT_TRUE(result.indexesAffected);
@@ -195,7 +194,7 @@ TEST_F(UpdateArrayNodeTest, ApplyMultipleUpdatesToArrayElement) {
                                               arrayFilters,
                                               foundIdentifiers));
 
-    Document doc(fromjson("{a: [{b: 0, c: 0, d: 0}]}"));
+    mutablebson::Document doc(fromjson("{a: [{b: 0, c: 0, d: 0}]}"));
     addIndexedPath("a");
     auto result = root.apply(getApplyParams(doc.root()));
     ASSERT_TRUE(result.indexesAffected);
@@ -228,7 +227,7 @@ TEST_F(UpdateArrayNodeTest, ApplyMultipleUpdatesToArrayElementsUsingMergedChildr
                                               arrayFilters,
                                               foundIdentifiers));
 
-    Document doc(fromjson("{a: [{b: 0, c: 0}, {b: 0, c: 0}]}"));
+    mutablebson::Document doc(fromjson("{a: [{b: 0, c: 0}, {b: 0, c: 0}]}"));
     addIndexedPath("a");
     auto result = root.apply(getApplyParams(doc.root()));
     ASSERT_TRUE(result.indexesAffected);
@@ -269,7 +268,7 @@ TEST_F(UpdateArrayNodeTest, ApplyMultipleUpdatesToArrayElementsWithoutMergedChil
                                               arrayFilters,
                                               foundIdentifiers));
 
-    Document doc(fromjson("{a: [{b: 0, c: 0, d: 1}, {b: 1, c: 0, d: 0}]}"));
+    mutablebson::Document doc(fromjson("{a: [{b: 0, c: 0, d: 1}, {b: 1, c: 0, d: 0}]}"));
     addIndexedPath("a");
     auto result = root.apply(getApplyParams(doc.root()));
     ASSERT_TRUE(result.indexesAffected);
@@ -298,7 +297,7 @@ TEST_F(UpdateArrayNodeTest, ApplyMultipleUpdatesToArrayElementWithEmptyIdentifie
                                               arrayFilters,
                                               foundIdentifiers));
 
-    Document doc(fromjson("{a: [{b: 0, c: 0}]}"));
+    mutablebson::Document doc(fromjson("{a: [{b: 0, c: 0}]}"));
     addIndexedPath("a");
     auto result = root.apply(getApplyParams(doc.root()));
     ASSERT_TRUE(result.indexesAffected);
@@ -335,7 +334,7 @@ TEST_F(UpdateArrayNodeTest, ApplyNestedArrayUpdates) {
                                               arrayFilters,
                                               foundIdentifiers));
 
-    Document doc(fromjson("{a: [{x: 0, b: [{c: 0, d: 0}]}]}"));
+    mutablebson::Document doc(fromjson("{a: [{x: 0, b: [{c: 0, d: 0}]}]}"));
     addIndexedPath("a");
     auto result = root.apply(getApplyParams(doc.root()));
     ASSERT_TRUE(result.indexesAffected);
@@ -368,7 +367,7 @@ TEST_F(UpdateArrayNodeTest, ApplyUpdatesWithMergeConflictToArrayElementFails) {
                                               arrayFilters,
                                               foundIdentifiers));
 
-    Document doc(fromjson("{a: [0]}"));
+    mutablebson::Document doc(fromjson("{a: [0]}"));
     addIndexedPath("a");
     ASSERT_THROWS_CODE_AND_WHAT(root.apply(getApplyParams(doc.root())),
                                 UserException,
@@ -399,7 +398,7 @@ TEST_F(UpdateArrayNodeTest, ApplyUpdatesWithEmptyIdentifiersWithMergeConflictToA
                                               arrayFilters,
                                               foundIdentifiers));
 
-    Document doc(fromjson("{a: [{b: [0]}]}"));
+    mutablebson::Document doc(fromjson("{a: [{b: [0]}]}"));
     addIndexedPath("a");
     ASSERT_THROWS_CODE_AND_WHAT(root.apply(getApplyParams(doc.root())),
                                 UserException,
@@ -434,7 +433,7 @@ TEST_F(UpdateArrayNodeTest, ApplyNestedArrayUpdatesWithMergeConflictFails) {
                                               arrayFilters,
                                               foundIdentifiers));
 
-    Document doc(fromjson("{a: [{b: [0], c: 0}]}"));
+    mutablebson::Document doc(fromjson("{a: [{b: [0], c: 0}]}"));
     addIndexedPath("a");
     ASSERT_THROWS_CODE_AND_WHAT(root.apply(getApplyParams(doc.root())),
                                 UserException,
@@ -457,7 +456,7 @@ TEST_F(UpdateArrayNodeTest, NoArrayElementsMatch) {
                                               arrayFilters,
                                               foundIdentifiers));
 
-    Document doc(fromjson("{a: [2, 2, 2]}"));
+    mutablebson::Document doc(fromjson("{a: [2, 2, 2]}"));
     addIndexedPath("a");
     auto result = root.apply(getApplyParams(doc.root()));
     ASSERT_FALSE(result.indexesAffected);
@@ -482,7 +481,7 @@ TEST_F(UpdateArrayNodeTest, UpdatesToAllArrayElementsAreNoops) {
                                               arrayFilters,
                                               foundIdentifiers));
 
-    Document doc(fromjson("{a: [1, 1, 1]}"));
+    mutablebson::Document doc(fromjson("{a: [1, 1, 1]}"));
     addIndexedPath("a");
     auto result = root.apply(getApplyParams(doc.root()));
     ASSERT_FALSE(result.indexesAffected);
@@ -507,7 +506,7 @@ TEST_F(UpdateArrayNodeTest, NoArrayElementAffectsIndexes) {
                                               arrayFilters,
                                               foundIdentifiers));
 
-    Document doc(fromjson("{a: [{c: 0}, {c: 0}, {c: 0}]}"));
+    mutablebson::Document doc(fromjson("{a: [{c: 0}, {c: 0}, {c: 0}]}"));
     addIndexedPath("a.c");
     auto result = root.apply(getApplyParams(doc.root()));
     ASSERT_FALSE(result.indexesAffected);
@@ -532,7 +531,7 @@ TEST_F(UpdateArrayNodeTest, WhenOneElementIsMatchedLogElementUpdateDirectly) {
                                               arrayFilters,
                                               foundIdentifiers));
 
-    Document doc(fromjson("{a: [{c: 1}, {c: 0}, {c: 1}]}"));
+    mutablebson::Document doc(fromjson("{a: [{c: 1}, {c: 0}, {c: 1}]}"));
     addIndexedPath("a");
     auto result = root.apply(getApplyParams(doc.root()));
     ASSERT_TRUE(result.indexesAffected);
@@ -557,7 +556,7 @@ TEST_F(UpdateArrayNodeTest, WhenOneElementIsModifiedLogElement) {
                                               arrayFilters,
                                               foundIdentifiers));
 
-    Document doc(fromjson("{a: [{c: 0, b: 0}, {c: 0}, {c: 1}]}"));
+    mutablebson::Document doc(fromjson("{a: [{c: 0, b: 0}, {c: 0}, {c: 1}]}"));
     addIndexedPath("a");
     auto result = root.apply(getApplyParams(doc.root()));
     ASSERT_TRUE(result.indexesAffected);
@@ -580,7 +579,7 @@ TEST_F(UpdateArrayNodeTest, ArrayUpdateOnEmptyArrayIsANoop) {
                                               arrayFilters,
                                               foundIdentifiers));
 
-    Document doc(fromjson("{a: []}"));
+    mutablebson::Document doc(fromjson("{a: []}"));
     addIndexedPath("a");
     auto result = root.apply(getApplyParams(doc.root()));
     ASSERT_FALSE(result.indexesAffected);
@@ -605,7 +604,7 @@ TEST_F(UpdateArrayNodeTest, ApplyPositionalInsideArrayUpdate) {
                                               arrayFilters,
                                               foundIdentifiers));
 
-    Document doc(fromjson("{a: [{b: [0, 0], c: 0}]}"));
+    mutablebson::Document doc(fromjson("{a: [{b: [0, 0], c: 0}]}"));
     addIndexedPath("a");
     setMatchedField("1");
     auto result = root.apply(getApplyParams(doc.root()));
@@ -631,7 +630,7 @@ TEST_F(UpdateArrayNodeTest, ApplyArrayUpdateFromReplication) {
                                               arrayFilters,
                                               foundIdentifiers));
 
-    Document doc(fromjson("{a: [0]}"));
+    mutablebson::Document doc(fromjson("{a: [0]}"));
     addIndexedPath("a");
     setFromReplication(true);
     auto result = root.apply(getApplyParams(doc.root()));
@@ -657,7 +656,7 @@ TEST_F(UpdateArrayNodeTest, ApplyArrayUpdateNotFromReplication) {
                                               arrayFilters,
                                               foundIdentifiers));
 
-    Document doc(fromjson("{a: [0]}"));
+    mutablebson::Document doc(fromjson("{a: [0]}"));
     addIndexedPath("a");
     ASSERT_THROWS_CODE_AND_WHAT(root.apply(getApplyParams(doc.root())),
                                 UserException,
@@ -680,7 +679,7 @@ TEST_F(UpdateArrayNodeTest, ApplyArrayUpdateWithoutLogBuilderOrIndexData) {
                                               arrayFilters,
                                               foundIdentifiers));
 
-    Document doc(fromjson("{a: [0]}"));
+    mutablebson::Document doc(fromjson("{a: [0]}"));
     setLogBuilderToNull();
     auto result = root.apply(getApplyParams(doc.root()));
     ASSERT_FALSE(result.indexesAffected);

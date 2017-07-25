@@ -59,18 +59,15 @@ bool ComparisonMatchExpression::equivalent(const MatchExpression* other) const {
 
     const StringData::ComparatorInterface* stringComparator = nullptr;
     BSONElementComparator eltCmp(BSONElementComparator::FieldNamesMode::kIgnore, stringComparator);
-    return path() == realOther->path() && eltCmp.evaluate(_rhs == realOther->_rhs);
+    return path() == realOther->path() && eltCmp.evaluate(_rhsElem == realOther->_rhsElem);
 }
 
-
-Status ComparisonMatchExpression::init(StringData path, const BSONElement& rhs) {
-    _rhs = rhs;
-
-    if (rhs.eoo()) {
+Status ComparisonMatchExpression::_validate() {
+    if (!_rhsElem) {
         return Status(ErrorCodes::BadValue, "need a real operand");
     }
 
-    if (rhs.type() == Undefined) {
+    if (_rhsElem.type() == BSONType::Undefined) {
         return Status(ErrorCodes::BadValue, "cannot compare to undefined");
     }
 
@@ -85,31 +82,59 @@ Status ComparisonMatchExpression::init(StringData path, const BSONElement& rhs) 
             return Status(ErrorCodes::BadValue, "bad match type for ComparisonMatchExpression");
     }
 
+    return Status::OK();
+}
+
+Status ComparisonMatchExpression::init(StringData path,
+                                       const boost::intrusive_ptr<Expression>& rhsExpr) {
+    auto exprConstant = dynamic_cast<ExpressionConstant*>(rhsExpr.get());
+    if (exprConstant) {
+        BSONObjBuilder bob;
+        bob << path << exprConstant->getValue();
+        _resolvedRhsExpr = bob.obj();
+        _rhsElem = _resolvedRhsExpr.firstElement();
+    } else {
+        return Status(ErrorCodes::BadValue, "$expr does not yet handle non-constant expressions");
+    }
+
+    auto status = _validate();
+    if (!status.isOK()) {
+        return status;
+    }
+
     return setPath(path);
 }
 
+Status ComparisonMatchExpression::init(StringData path, const BSONElement& rhs) {
+    _rhsElem = rhs;
+
+    auto status = _validate();
+    if (!status.isOK()) {
+        return status;
+    }
+
+    return setPath(path);
+}
 
 bool ComparisonMatchExpression::matchesSingleElement(const BSONElement& e,
                                                      MatchDetails* details) const {
-
-    if (e.canonicalType() != _rhs.canonicalType()) {
+    if (e.canonicalType() != _rhsElem.canonicalType()) {
         // some special cases
         //  jstNULL and undefined are treated the same
-        if (e.canonicalType() + _rhs.canonicalType() == 5) {
+        if (e.canonicalType() + _rhsElem.canonicalType() == 5) {
             return matchType() == EQ || matchType() == LTE || matchType() == GTE;
         }
 
-        if (_rhs.type() == MaxKey || _rhs.type() == MinKey) {
+        if (_rhsElem.type() == MaxKey || _rhsElem.type() == MinKey) {
             return matchType() != EQ;
         }
-
         return false;
     }
 
     // Special case handling for NaN. NaN is equal to NaN but
     // otherwise always compares to false.
-    if (std::isnan(e.numberDouble()) || std::isnan(_rhs.numberDouble())) {
-        bool bothNaN = std::isnan(e.numberDouble()) && std::isnan(_rhs.numberDouble());
+    if (std::isnan(e.numberDouble()) || std::isnan(_rhsElem.numberDouble())) {
+        bool bothNaN = std::isnan(e.numberDouble()) && std::isnan(_rhsElem.numberDouble());
         switch (matchType()) {
             case LT:
                 return false;
@@ -128,7 +153,7 @@ bool ComparisonMatchExpression::matchesSingleElement(const BSONElement& e,
         }
     }
 
-    int x = compareElementValues(e, _rhs, _collator);
+    int x = compareElementValues(e, _rhsElem, _collator);
 
     switch (matchType()) {
         case LT:
@@ -170,7 +195,7 @@ void ComparisonMatchExpression::debugString(StringBuilder& debug, int level) con
         default:
             invariant(false);
     }
-    debug << " " << _rhs.toString(false);
+    debug << " " << _rhsElem.toString(false);
 
     MatchExpression::TagData* td = getTag();
     if (NULL != td) {
@@ -203,7 +228,7 @@ void ComparisonMatchExpression::serialize(BSONObjBuilder* out) const {
             invariant(false);
     }
 
-    out->append(path(), BSON(opString << _rhs));
+    out->append(path(), BSON(opString << _rhsElem));
 }
 
 // ---------------
@@ -398,27 +423,27 @@ bool ExistsMatchExpression::equivalent(const MatchExpression* other) const {
 const std::string TypeMatchExpression::kMatchesAllNumbersAlias = "number";
 
 const stdx::unordered_map<std::string, BSONType> TypeMatchExpression::typeAliasMap = {
-    {typeName(NumberDouble), NumberDouble},
-    {typeName(String), String},
-    {typeName(Object), Object},
-    {typeName(Array), Array},
-    {typeName(BinData), BinData},
-    {typeName(Undefined), Undefined},
-    {typeName(jstOID), jstOID},
-    {typeName(Bool), Bool},
-    {typeName(Date), Date},
-    {typeName(jstNULL), jstNULL},
-    {typeName(RegEx), RegEx},
-    {typeName(DBRef), DBRef},
-    {typeName(Code), Code},
-    {typeName(Symbol), Symbol},
-    {typeName(CodeWScope), CodeWScope},
-    {typeName(NumberInt), NumberInt},
-    {typeName(bsonTimestamp), bsonTimestamp},
-    {typeName(NumberLong), NumberLong},
-    {typeName(NumberDecimal), NumberDecimal},
-    {typeName(MaxKey), MaxKey},
-    {typeName(MinKey), MinKey}};
+    {typeName(BSONType::NumberDouble), BSONType::NumberDouble},
+    {typeName(BSONType::String), BSONType::String},
+    {typeName(BSONType::Object), BSONType::Object},
+    {typeName(BSONType::Array), BSONType::Array},
+    {typeName(BSONType::BinData), BSONType::BinData},
+    {typeName(BSONType::Undefined), BSONType::Undefined},
+    {typeName(BSONType::jstOID), BSONType::jstOID},
+    {typeName(BSONType::Bool), BSONType::Bool},
+    {typeName(BSONType::Date), BSONType::Date},
+    {typeName(BSONType::jstNULL), BSONType::jstNULL},
+    {typeName(BSONType::RegEx), BSONType::RegEx},
+    {typeName(BSONType::DBRef), BSONType::DBRef},
+    {typeName(BSONType::Code), BSONType::Code},
+    {typeName(BSONType::Symbol), BSONType::Symbol},
+    {typeName(BSONType::CodeWScope), BSONType::CodeWScope},
+    {typeName(BSONType::NumberInt), BSONType::NumberInt},
+    {typeName(BSONType::bsonTimestamp), BSONType::bsonTimestamp},
+    {typeName(BSONType::NumberLong), BSONType::NumberLong},
+    {typeName(BSONType::NumberDecimal), BSONType::NumberDecimal},
+    {typeName(BSONType::MaxKey), BSONType::MaxKey},
+    {typeName(BSONType::MinKey), BSONType::MinKey}};
 
 Status TypeMatchExpression::init(StringData path, Type type) {
     _type = std::move(type);

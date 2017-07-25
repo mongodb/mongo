@@ -109,6 +109,15 @@ void Variables::setValue(Id id, const Value& value) {
     _valueList[id] = value;
 }
 
+Value Variables::getUserDefinedValue(Variables::Id id) const {
+    invariant(isUserDefinedVariable(id));
+
+    uassert(40434,
+            str::stream() << "Requesting Variables::getValue with an out of range id: " << id,
+            static_cast<size_t>(id) < _valueList.size());
+    return _valueList[id];
+}
+
 Value Variables::getValue(Id id, const Document& root) const {
     if (id < 0) {
         // This is a reserved id for a builtin variable.
@@ -122,10 +131,7 @@ Value Variables::getValue(Id id, const Document& root) const {
         }
     }
 
-    uassert(40434,
-            str::stream() << "Requesting Variables::getValue with an out of range id: " << id,
-            static_cast<size_t>(id) < _valueList.size());
-    return _valueList[id];
+    return getUserDefinedValue(id);
 }
 
 Document Variables::getDocument(Id id, const Document& root) const {

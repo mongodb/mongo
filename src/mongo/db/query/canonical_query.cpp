@@ -102,21 +102,26 @@ bool matchExpressionLessThan(const MatchExpression* lhs, const MatchExpression* 
 
 // static
 StatusWith<std::unique_ptr<CanonicalQuery>> CanonicalQuery::canonicalize(
-    OperationContext* opCtx, const QueryMessage& qm, const ExtensionsCallback& extensionsCallback) {
+    OperationContext* opCtx,
+    const QueryMessage& qm,
+    const ExtensionsCallback& extensionsCallback,
+    const boost::intrusive_ptr<ExpressionContext>& expCtx) {
     // Make QueryRequest.
     auto qrStatus = QueryRequest::fromLegacyQueryMessage(qm);
     if (!qrStatus.isOK()) {
         return qrStatus.getStatus();
     }
 
-    return CanonicalQuery::canonicalize(opCtx, std::move(qrStatus.getValue()), extensionsCallback);
+    return CanonicalQuery::canonicalize(
+        opCtx, std::move(qrStatus.getValue()), extensionsCallback, expCtx);
 }
 
 // static
 StatusWith<std::unique_ptr<CanonicalQuery>> CanonicalQuery::canonicalize(
     OperationContext* opCtx,
     std::unique_ptr<QueryRequest> qr,
-    const ExtensionsCallback& extensionsCallback) {
+    const ExtensionsCallback& extensionsCallback,
+    const boost::intrusive_ptr<ExpressionContext>& expCtx) {
     auto qrStatus = qr->validate();
     if (!qrStatus.isOK()) {
         return qrStatus;
@@ -134,7 +139,7 @@ StatusWith<std::unique_ptr<CanonicalQuery>> CanonicalQuery::canonicalize(
 
     // Make MatchExpression.
     StatusWithMatchExpression statusWithMatcher =
-        MatchExpressionParser::parse(qr->getFilter(), extensionsCallback, collator.get());
+        MatchExpressionParser::parse(qr->getFilter(), extensionsCallback, collator.get(), expCtx);
     if (!statusWithMatcher.isOK()) {
         return statusWithMatcher.getStatus();
     }

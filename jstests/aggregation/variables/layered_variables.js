@@ -53,5 +53,6 @@
 
     assert.eq(
         {_id: 1, has_permissions: 1, my_array: [2, 3], a: 1, b: 6, c: [2, 3], d: 3000, e: [3, 4]},
-        res.cursor.firstBatch[0]);
+        res.cursor.firstBatch[0],
+        tojson(res));
 })();

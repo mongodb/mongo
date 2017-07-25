@@ -52,6 +52,7 @@ public:
     static const bool kDiacriticSensitiveDefault;
 
     TextMatchExpressionBase();
+    virtual ~TextMatchExpressionBase() {}
 
     /**
      * Returns a reference to the parsed text query that this TextMatchExpressionBase owns.

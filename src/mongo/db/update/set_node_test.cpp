@@ -41,7 +41,6 @@ namespace mongo {
 namespace {
 
 using SetNodeTest = UpdateNodeTest;
-using mongo::mutablebson::Document;
 using mongo::mutablebson::Element;
 using mongo::mutablebson::countChildren;
 
@@ -65,7 +64,7 @@ TEST_F(SetNodeTest, ApplyNoOp) {
     SetNode node;
     ASSERT_OK(node.init(update["$set"]["a"], collator));
 
-    Document doc(fromjson("{a: 5}"));
+    mutablebson::Document doc(fromjson("{a: 5}"));
     setPathTaken("a");
     addIndexedPath("a");
     auto result = node.apply(getApplyParams(doc.root()["a"]));
@@ -82,7 +81,7 @@ TEST_F(SetNodeTest, ApplyEmptyPathToCreate) {
     SetNode node;
     ASSERT_OK(node.init(update["$set"]["a"], collator));
 
-    Document doc(fromjson("{a: 5}"));
+    mutablebson::Document doc(fromjson("{a: 5}"));
     setPathTaken("a");
     addIndexedPath("a");
     auto result = node.apply(getApplyParams(doc.root()["a"]));
@@ -99,7 +98,7 @@ TEST_F(SetNodeTest, ApplyCreatePath) {
     SetNode node;
     ASSERT_OK(node.init(update["$set"]["a.b.c"], collator));
 
-    Document doc(fromjson("{a: {d: 5}}"));
+    mutablebson::Document doc(fromjson("{a: {d: 5}}"));
     setPathToCreate("b.c");
     setPathTaken("a");
     addIndexedPath("a");
@@ -117,7 +116,7 @@ TEST_F(SetNodeTest, ApplyCreatePathFromRoot) {
     SetNode node;
     ASSERT_OK(node.init(update["$set"]["a.b"], collator));
 
-    Document doc(fromjson("{c: 5}"));
+    mutablebson::Document doc(fromjson("{c: 5}"));
     setPathToCreate("a.b");
     addIndexedPath("a");
     auto result = node.apply(getApplyParams(doc.root()));
@@ -134,7 +133,7 @@ TEST_F(SetNodeTest, ApplyPositional) {
     SetNode node;
     ASSERT_OK(node.init(update["$set"]["a.$"], collator));
 
-    Document doc(fromjson("{a: [0, 1, 2]}"));
+    mutablebson::Document doc(fromjson("{a: [0, 1, 2]}"));
     setPathTaken("a.1");
     setMatchedField("1");
     addIndexedPath("a");
@@ -152,7 +151,7 @@ TEST_F(SetNodeTest, ApplyNonViablePathToCreate) {
     SetNode node;
     ASSERT_OK(node.init(update["$set"]["a.b"], collator));
 
-    Document doc(fromjson("{a: 5}"));
+    mutablebson::Document doc(fromjson("{a: 5}"));
     setPathToCreate("b");
     setPathTaken("a");
     addIndexedPath("a");
@@ -168,7 +167,7 @@ TEST_F(SetNodeTest, ApplyNonViablePathToCreateFromReplicationIsNoOp) {
     SetNode node;
     ASSERT_OK(node.init(update["$set"]["a.b"], collator));
 
-    Document doc(fromjson("{a: 5}"));
+    mutablebson::Document doc(fromjson("{a: 5}"));
     setPathToCreate("b");
     setPathTaken("a");
     addIndexedPath("a");
@@ -187,7 +186,7 @@ TEST_F(SetNodeTest, ApplyNoIndexDataNoLogBuilder) {
     SetNode node;
     ASSERT_OK(node.init(update["$set"]["a"], collator));
 
-    Document doc(fromjson("{a: 5}"));
+    mutablebson::Document doc(fromjson("{a: 5}"));
     setPathTaken("a");
     setLogBuilderToNull();
     auto result = node.apply(getApplyParams(doc.root()["a"]));
@@ -203,7 +202,7 @@ TEST_F(SetNodeTest, ApplyDoesNotAffectIndexes) {
     SetNode node;
     ASSERT_OK(node.init(update["$set"]["a"], collator));
 
-    Document doc(fromjson("{a: 5}"));
+    mutablebson::Document doc(fromjson("{a: 5}"));
     setPathTaken("a");
     addIndexedPath("b");
     auto result = node.apply(getApplyParams(doc.root()["a"]));
@@ -219,7 +218,7 @@ TEST_F(SetNodeTest, TypeChangeIsNotANoop) {
     SetNode node;
     ASSERT_OK(node.init(update["$set"]["a"], collator));
 
-    Document doc(fromjson("{a: NumberInt(2)}"));
+    mutablebson::Document doc(fromjson("{a: NumberInt(2)}"));
     setPathTaken("a");
     addIndexedPath("a");
     auto result = node.apply(getApplyParams(doc.root()["a"]));
@@ -236,7 +235,7 @@ TEST_F(SetNodeTest, IdentityOpOnDeserializedIsNotANoOp) {
     SetNode node;
     ASSERT_OK(node.init(update["$set"]["a"], collator));
 
-    Document doc(fromjson("{a: { b: NumberInt(0)}}"));
+    mutablebson::Document doc(fromjson("{a: { b: NumberInt(0)}}"));
     // Apply a mutation to the document that will make it non-serialized.
     doc.root()["a"]["b"].setValueInt(2).transitional_ignore();
 
@@ -255,7 +254,7 @@ TEST_F(SetNodeTest, ApplyEmptyDocument) {
     SetNode node;
     ASSERT_OK(node.init(update["$set"]["a"], collator));
 
-    Document doc(fromjson("{}"));
+    mutablebson::Document doc(fromjson("{}"));
     setPathToCreate("a");
     addIndexedPath("a");
     auto result = node.apply(getApplyParams(doc.root()));
@@ -271,7 +270,7 @@ TEST_F(SetNodeTest, ApplyInPlace) {
     SetNode node;
     ASSERT_OK(node.init(update["$set"]["a"], collator));
 
-    Document doc(fromjson("{a: 1}"));
+    mutablebson::Document doc(fromjson("{a: 1}"));
     setPathTaken("a");
     addIndexedPath("a");
     auto result = node.apply(getApplyParams(doc.root()["a"]));
@@ -287,7 +286,7 @@ TEST_F(SetNodeTest, ApplyOverridePath) {
     SetNode node;
     ASSERT_OK(node.init(update["$set"]["a"], collator));
 
-    Document doc(fromjson("{a: {b: 1}}"));
+    mutablebson::Document doc(fromjson("{a: {b: 1}}"));
     setPathTaken("a");
     addIndexedPath("a");
     auto result = node.apply(getApplyParams(doc.root()["a"]));
@@ -303,7 +302,7 @@ TEST_F(SetNodeTest, ApplyChangeType) {
     SetNode node;
     ASSERT_OK(node.init(update["$set"]["a"], collator));
 
-    Document doc(fromjson("{a: 'str'}"));
+    mutablebson::Document doc(fromjson("{a: 'str'}"));
     setPathTaken("a");
     addIndexedPath("a");
     auto result = node.apply(getApplyParams(doc.root()["a"]));
@@ -319,7 +318,7 @@ TEST_F(SetNodeTest, ApplyNewPath) {
     SetNode node;
     ASSERT_OK(node.init(update["$set"]["a"], collator));
 
-    Document doc(fromjson("{b: 1}"));
+    mutablebson::Document doc(fromjson("{b: 1}"));
     setPathToCreate("a");
     addIndexedPath("a");
     auto result = node.apply(getApplyParams(doc.root()));
@@ -335,7 +334,7 @@ TEST_F(SetNodeTest, ApplyLog) {
     SetNode node;
     ASSERT_OK(node.init(update["$set"]["a"], collator));
 
-    Document doc(fromjson("{a: 1}"));
+    mutablebson::Document doc(fromjson("{a: 1}"));
     setPathTaken("a");
     node.apply(getApplyParams(doc.root()["a"]));
     ASSERT_EQUALS(fromjson("{a: 2}"), doc);
@@ -350,7 +349,7 @@ TEST_F(SetNodeTest, ApplyNoOpDottedPath) {
     SetNode node;
     ASSERT_OK(node.init(update["$set"]["a.b"], collator));
 
-    Document doc(fromjson("{a: {b: 2}}"));
+    mutablebson::Document doc(fromjson("{a: {b: 2}}"));
     setPathTaken("a.b");
     addIndexedPath("a.b");
     auto result = node.apply(getApplyParams(doc.root()["a"]["b"]));
@@ -366,7 +365,7 @@ TEST_F(SetNodeTest, TypeChangeOnDottedPathIsNotANoOp) {
     SetNode node;
     ASSERT_OK(node.init(update["$set"]["a.b"], collator));
 
-    Document doc(fromjson("{a: {b: NumberLong(2)}}"));
+    mutablebson::Document doc(fromjson("{a: {b: NumberLong(2)}}"));
     setPathTaken("a.b");
     addIndexedPath("a.b");
     auto result = node.apply(getApplyParams(doc.root()["a"]["b"]));
@@ -382,7 +381,7 @@ TEST_F(SetNodeTest, ApplyPathNotViable) {
     SetNode node;
     ASSERT_OK(node.init(update["$set"]["a.b"], collator));
 
-    Document doc(fromjson("{a:1}"));
+    mutablebson::Document doc(fromjson("{a:1}"));
     setPathToCreate("b");
     setPathTaken("a");
     ASSERT_THROWS_CODE_AND_WHAT(node.apply(getApplyParams(doc.root()["a"])),
@@ -397,7 +396,7 @@ TEST_F(SetNodeTest, ApplyPathNotViableArrray) {
     SetNode node;
     ASSERT_OK(node.init(update["$set"]["a.b"], collator));
 
-    Document doc(fromjson("{a:[{b:1}]}"));
+    mutablebson::Document doc(fromjson("{a:[{b:1}]}"));
     setPathToCreate("b");
     setPathTaken("a");
     ASSERT_THROWS_CODE_AND_WHAT(node.apply(getApplyParams(doc.root()["a"])),
@@ -412,7 +411,7 @@ TEST_F(SetNodeTest, ApplyInPlaceDottedPath) {
     SetNode node;
     ASSERT_OK(node.init(update["$set"]["a.b"], collator));
 
-    Document doc(fromjson("{a: {b: 1}}"));
+    mutablebson::Document doc(fromjson("{a: {b: 1}}"));
     setPathTaken("a.b");
     addIndexedPath("a.b");
     auto result = node.apply(getApplyParams(doc.root()["a"]["b"]));
@@ -428,7 +427,7 @@ TEST_F(SetNodeTest, ApplyChangeTypeDottedPath) {
     SetNode node;
     ASSERT_OK(node.init(update["$set"]["a.b"], collator));
 
-    Document doc(fromjson("{a: {b: 'str'}}"));
+    mutablebson::Document doc(fromjson("{a: {b: 'str'}}"));
     setPathTaken("a.b");
     addIndexedPath("a.b");
     auto result = node.apply(getApplyParams(doc.root()["a"]["b"]));
@@ -444,7 +443,7 @@ TEST_F(SetNodeTest, ApplyChangePath) {
     SetNode node;
     ASSERT_OK(node.init(update["$set"]["a.b"], collator));
 
-    Document doc(fromjson("{a: {b: {c: 1}}}"));
+    mutablebson::Document doc(fromjson("{a: {b: {c: 1}}}"));
     setPathTaken("a.b");
     addIndexedPath("a.b");
     auto result = node.apply(getApplyParams(doc.root()["a"]["b"]));
@@ -460,7 +459,7 @@ TEST_F(SetNodeTest, ApplyExtendPath) {
     SetNode node;
     ASSERT_OK(node.init(update["$set"]["a.b"], collator));
 
-    Document doc(fromjson("{a: {c: 1}}"));
+    mutablebson::Document doc(fromjson("{a: {c: 1}}"));
     setPathToCreate("b");
     setPathTaken("a");
     addIndexedPath("a.b");
@@ -477,7 +476,7 @@ TEST_F(SetNodeTest, ApplyNewDottedPath) {
     SetNode node;
     ASSERT_OK(node.init(update["$set"]["a.b"], collator));
 
-    Document doc(fromjson("{c: 1}"));
+    mutablebson::Document doc(fromjson("{c: 1}"));
     setPathToCreate("a.b");
     addIndexedPath("a.b");
     auto result = node.apply(getApplyParams(doc.root()));
@@ -493,7 +492,7 @@ TEST_F(SetNodeTest, ApplyEmptyDoc) {
     SetNode node;
     ASSERT_OK(node.init(update["$set"]["a.b"], collator));
 
-    Document doc(fromjson("{}"));
+    mutablebson::Document doc(fromjson("{}"));
     setPathToCreate("a.b");
     addIndexedPath("a.b");
     auto result = node.apply(getApplyParams(doc.root()));
@@ -509,7 +508,7 @@ TEST_F(SetNodeTest, ApplyFieldWithDot) {
     SetNode node;
     ASSERT_OK(node.init(update["$set"]["a.b"], collator));
 
-    Document doc(fromjson("{'a.b':4}"));
+    mutablebson::Document doc(fromjson("{'a.b':4}"));
     setPathToCreate("a.b");
     addIndexedPath("a.b");
     auto result = node.apply(getApplyParams(doc.root()));
@@ -525,7 +524,7 @@ TEST_F(SetNodeTest, ApplyNoOpArrayIndex) {
     SetNode node;
     ASSERT_OK(node.init(update["$set"]["a.2.b"], collator));
 
-    Document doc(fromjson("{a: [{b: 0},{b: 1},{b: 2}]}"));
+    mutablebson::Document doc(fromjson("{a: [{b: 0},{b: 1},{b: 2}]}"));
     setPathTaken("a.2.b");
     addIndexedPath("a.2.b");
     auto result = node.apply(getApplyParams(doc.root()["a"]["2"]["b"]));
@@ -541,7 +540,7 @@ TEST_F(SetNodeTest, TypeChangeInArrayIsNotANoOp) {
     SetNode node;
     ASSERT_OK(node.init(update["$set"]["a.2.b"], collator));
 
-    Document doc(fromjson("{a: [{b: 0},{b: 1},{b: 2.0}]}"));
+    mutablebson::Document doc(fromjson("{a: [{b: 0},{b: 1},{b: 2.0}]}"));
     setPathTaken("a.2.b");
     addIndexedPath("a.2.b");
     auto result = node.apply(getApplyParams(doc.root()["a"]["2"]["b"]));
@@ -557,7 +556,7 @@ TEST_F(SetNodeTest, ApplyNonViablePath) {
     SetNode node;
     ASSERT_OK(node.init(update["$set"]["a.2.b"], collator));
 
-    Document doc(fromjson("{a: 0}"));
+    mutablebson::Document doc(fromjson("{a: 0}"));
     setPathToCreate("2.b");
     setPathTaken("a");
     ASSERT_THROWS_CODE_AND_WHAT(node.apply(getApplyParams(doc.root()["a"])),
@@ -572,7 +571,7 @@ TEST_F(SetNodeTest, ApplyInPlaceArrayIndex) {
     SetNode node;
     ASSERT_OK(node.init(update["$set"]["a.2.b"], collator));
 
-    Document doc(fromjson("{a: [{b: 0},{b: 1},{b: 1}]}"));
+    mutablebson::Document doc(fromjson("{a: [{b: 0},{b: 1},{b: 1}]}"));
     setPathTaken("a.2.b");
     addIndexedPath("a.2.b");
     auto result = node.apply(getApplyParams(doc.root()["a"]["2"]["b"]));
@@ -588,7 +587,7 @@ TEST_F(SetNodeTest, ApplyNormalArray) {
     SetNode node;
     ASSERT_OK(node.init(update["$set"]["a.2.b"], collator));
 
-    Document doc(fromjson("{a: [{b: 0},{b: 1}]}"));
+    mutablebson::Document doc(fromjson("{a: [{b: 0},{b: 1}]}"));
     setPathToCreate("2.b");
     setPathTaken("a");
     addIndexedPath("a.2.b");
@@ -605,7 +604,7 @@ TEST_F(SetNodeTest, ApplyPaddingArray) {
     SetNode node;
     ASSERT_OK(node.init(update["$set"]["a.2.b"], collator));
 
-    Document doc(fromjson("{a: [{b: 0}]}"));
+    mutablebson::Document doc(fromjson("{a: [{b: 0}]}"));
     setPathToCreate("2.b");
     setPathTaken("a");
     addIndexedPath("a.2.b");
@@ -622,7 +621,7 @@ TEST_F(SetNodeTest, ApplyNumericObject) {
     SetNode node;
     ASSERT_OK(node.init(update["$set"]["a.2.b"], collator));
 
-    Document doc(fromjson("{a: {b: 0}}"));
+    mutablebson::Document doc(fromjson("{a: {b: 0}}"));
     setPathToCreate("2.b");
     setPathTaken("a");
     addIndexedPath("a.2.b");
@@ -639,7 +638,7 @@ TEST_F(SetNodeTest, ApplyNumericField) {
     SetNode node;
     ASSERT_OK(node.init(update["$set"]["a.2.b"], collator));
 
-    Document doc(fromjson("{a: {'2': {b: 1}}}"));
+    mutablebson::Document doc(fromjson("{a: {'2': {b: 1}}}"));
     setPathTaken("a.2.b");
     addIndexedPath("a.2.b");
     auto result = node.apply(getApplyParams(doc.root()["a"]["2"]["b"]));
@@ -655,7 +654,7 @@ TEST_F(SetNodeTest, ApplyExtendNumericField) {
     SetNode node;
     ASSERT_OK(node.init(update["$set"]["a.2.b"], collator));
 
-    Document doc(fromjson("{a: {'2': {c: 1}}}"));
+    mutablebson::Document doc(fromjson("{a: {'2': {c: 1}}}"));
     setPathToCreate("b");
     setPathTaken("a.2");
     addIndexedPath("a.2.b");
@@ -672,7 +671,7 @@ TEST_F(SetNodeTest, ApplyEmptyObject) {
     SetNode node;
     ASSERT_OK(node.init(update["$set"]["a.2.b"], collator));
 
-    Document doc(fromjson("{a: {}}"));
+    mutablebson::Document doc(fromjson("{a: {}}"));
     setPathToCreate("2.b");
     setPathTaken("a");
     addIndexedPath("a.2.b");
@@ -689,7 +688,7 @@ TEST_F(SetNodeTest, ApplyEmptyArray) {
     SetNode node;
     ASSERT_OK(node.init(update["$set"]["a.2.b"], collator));
 
-    Document doc(fromjson("{a: []}"));
+    mutablebson::Document doc(fromjson("{a: []}"));
     setPathToCreate("2.b");
     setPathTaken("a");
     addIndexedPath("a.2.b");
@@ -706,7 +705,7 @@ TEST_F(SetNodeTest, ApplyLogDottedPath) {
     SetNode node;
     ASSERT_OK(node.init(update["$set"]["a.2.b"], collator));
 
-    Document doc(fromjson("{a: [{b:0}, {b:1}]}"));
+    mutablebson::Document doc(fromjson("{a: [{b:0}, {b:1}]}"));
     setPathToCreate("2.b");
     setPathTaken("a");
     node.apply(getApplyParams(doc.root()["a"]));
@@ -722,7 +721,7 @@ TEST_F(SetNodeTest, LogEmptyArray) {
     SetNode node;
     ASSERT_OK(node.init(update["$set"]["a.2.b"], collator));
 
-    Document doc(fromjson("{a: []}"));
+    mutablebson::Document doc(fromjson("{a: []}"));
     setPathToCreate("2.b");
     setPathTaken("a");
     node.apply(getApplyParams(doc.root()["a"]));
@@ -738,7 +737,7 @@ TEST_F(SetNodeTest, LogEmptyObject) {
     SetNode node;
     ASSERT_OK(node.init(update["$set"]["a.2.b"], collator));
 
-    Document doc(fromjson("{a: {}}"));
+    mutablebson::Document doc(fromjson("{a: {}}"));
     setPathToCreate("2.b");
     setPathTaken("a");
     node.apply(getApplyParams(doc.root()["a"]));
@@ -754,7 +753,7 @@ TEST_F(SetNodeTest, ApplyNoOpComplex) {
     SetNode node;
     ASSERT_OK(node.init(update["$set"]["a.1.b"], collator));
 
-    Document doc(fromjson("{a: [{b: {c: 0, d: 0}}, {b: {c: 1, d: 1}}]}}"));
+    mutablebson::Document doc(fromjson("{a: [{b: {c: 0, d: 0}}, {b: {c: 1, d: 1}}]}}"));
     setPathTaken("a.1.b");
     addIndexedPath("a.1.b");
     auto result = node.apply(getApplyParams(doc.root()["a"]["1"]["b"]));
@@ -770,7 +769,7 @@ TEST_F(SetNodeTest, ApplySameStructure) {
     SetNode node;
     ASSERT_OK(node.init(update["$set"]["a.1.b"], collator));
 
-    Document doc(fromjson("{a: [{b: {c: 0, d: 0}}, {b: {c: 1, xxx: 1}}]}}"));
+    mutablebson::Document doc(fromjson("{a: [{b: {c: 0, d: 0}}, {b: {c: 1, xxx: 1}}]}}"));
     setPathTaken("a.1.b");
     addIndexedPath("a.1.b");
     auto result = node.apply(getApplyParams(doc.root()["a"]["1"]["b"]));
@@ -786,7 +785,7 @@ TEST_F(SetNodeTest, NonViablePathWithoutRepl) {
     SetNode node;
     ASSERT_OK(node.init(update["$set"]["a.1.b"], collator));
 
-    Document doc(fromjson("{a: 1}"));
+    mutablebson::Document doc(fromjson("{a: 1}"));
     setPathToCreate("1.b");
     setPathTaken("a");
     ASSERT_THROWS_CODE_AND_WHAT(node.apply(getApplyParams(doc.root()["a"])),
@@ -801,7 +800,7 @@ TEST_F(SetNodeTest, SingleFieldFromReplication) {
     SetNode node;
     ASSERT_OK(node.init(update["$set"]["a.1.b"], collator));
 
-    Document doc(fromjson("{_id:1, a: 1}"));
+    mutablebson::Document doc(fromjson("{_id:1, a: 1}"));
     setPathToCreate("1.b");
     setPathTaken("a");
     addIndexedPath("a.1.b");
@@ -819,7 +818,7 @@ TEST_F(SetNodeTest, SingleFieldNoIdFromReplication) {
     SetNode node;
     ASSERT_OK(node.init(update["$set"]["a.1.b"], collator));
 
-    Document doc(fromjson("{a: 1}"));
+    mutablebson::Document doc(fromjson("{a: 1}"));
     setPathToCreate("1.b");
     setPathTaken("a");
     addIndexedPath("a.1.b");
@@ -837,7 +836,7 @@ TEST_F(SetNodeTest, NestedFieldFromReplication) {
     SetNode node;
     ASSERT_OK(node.init(update["$set"]["a.a.1.b"], collator));
 
-    Document doc(fromjson("{_id:1, a: {a: 1}}"));
+    mutablebson::Document doc(fromjson("{_id:1, a: {a: 1}}"));
     setPathToCreate("1.b");
     setPathTaken("a.a");
     addIndexedPath("a.a.1.b");
@@ -855,7 +854,7 @@ TEST_F(SetNodeTest, DoubleNestedFieldFromReplication) {
     SetNode node;
     ASSERT_OK(node.init(update["$set"]["a.b.c.d"], collator));
 
-    Document doc(fromjson("{_id:1, a: {b: {c: 1}}}"));
+    mutablebson::Document doc(fromjson("{_id:1, a: {b: {c: 1}}}"));
     setPathToCreate("d");
     setPathTaken("a.b.c");
     addIndexedPath("a.b.c.d");
@@ -873,7 +872,7 @@ TEST_F(SetNodeTest, NestedFieldNoIdFromReplication) {
     SetNode node;
     ASSERT_OK(node.init(update["$set"]["a.a.1.b"], collator));
 
-    Document doc(fromjson("{a: {a: 1}}"));
+    mutablebson::Document doc(fromjson("{a: {a: 1}}"));
     setPathToCreate("1.b");
     setPathTaken("a.a");
     addIndexedPath("a.a.1.b");
@@ -891,7 +890,7 @@ TEST_F(SetNodeTest, ReplayArrayFieldNotAppendedIntermediateFromReplication) {
     SetNode node;
     ASSERT_OK(node.init(update["$set"]["a.0.b"], collator));
 
-    Document doc(fromjson("{_id: 0, a: [1, {b: [1]}]}"));
+    mutablebson::Document doc(fromjson("{_id: 0, a: [1, {b: [1]}]}"));
     setPathToCreate("b");
     setPathTaken("a.0");
     addIndexedPath("a.1.b");
@@ -909,7 +908,7 @@ TEST_F(SetNodeTest, Set6) {
     SetNode node;
     ASSERT_OK(node.init(update["$set"]["r.a"], collator));
 
-    Document doc(fromjson("{_id: 1, r: {a:1, b:2}}"));
+    mutablebson::Document doc(fromjson("{_id: 1, r: {a:1, b:2}}"));
     setPathTaken("r.a");
     addIndexedPath("r.a");
     auto result = node.apply(getApplyParams(doc.root()["r"]["a"]));
@@ -927,7 +926,7 @@ TEST_F(SetNodeTest, Set6FromRepl) {
     SetNode node;
     ASSERT_OK(node.init(update["$set"]["r.a"], collator));
 
-    Document doc(fromjson("{_id: 1, r: {a:1, b:2}}"));
+    mutablebson::Document doc(fromjson("{_id: 1, r: {a:1, b:2}}"));
     setPathTaken("r.a");
     addIndexedPath("r.a");
     setFromReplication(true);
@@ -949,7 +948,7 @@ TEST_F(SetNodeTest, ApplySetModToEphemeralDocument) {
     SetNode node;
     ASSERT_OK(node.init(update["$set"]["x"], collator));
 
-    Document doc;
+    mutablebson::Document doc;
     Element x = doc.makeElementObject("x");
     doc.root().pushBack(x).transitional_ignore();
     Element a = doc.makeElementInt("a", 100);
@@ -970,7 +969,7 @@ TEST_F(SetNodeTest, ApplyCannotCreateDollarPrefixedFieldInsideSetElement) {
     SetNode node;
     ASSERT_OK(node.init(update["$set"]["a"], collator));
 
-    Document doc(fromjson("{a: 5}"));
+    mutablebson::Document doc(fromjson("{a: 5}"));
     setPathTaken("a");
     ASSERT_THROWS_CODE_AND_WHAT(
         node.apply(getApplyParams(doc.root()["a"])),
@@ -985,7 +984,7 @@ TEST_F(SetNodeTest, ApplyCannotCreateDollarPrefixedFieldAtStartOfPath) {
     SetNode node;
     ASSERT_OK(node.init(update["$set"]["$bad.a"], collator));
 
-    Document doc(fromjson("{}"));
+    mutablebson::Document doc(fromjson("{}"));
     setPathToCreate("$bad.a");
     ASSERT_THROWS_CODE_AND_WHAT(
         node.apply(getApplyParams(doc.root())),
@@ -1000,7 +999,7 @@ TEST_F(SetNodeTest, ApplyCannotCreateDollarPrefixedFieldInMiddleOfPath) {
     SetNode node;
     ASSERT_OK(node.init(update["$set"]["a.$bad.b"], collator));
 
-    Document doc(fromjson("{}"));
+    mutablebson::Document doc(fromjson("{}"));
     setPathToCreate("a.$bad.b");
     ASSERT_THROWS_CODE_AND_WHAT(
         node.apply(getApplyParams(doc.root())),
@@ -1015,7 +1014,7 @@ TEST_F(SetNodeTest, ApplyCannotCreateDollarPrefixedFieldAtEndOfPath) {
     SetNode node;
     ASSERT_OK(node.init(update["$set"]["a.$bad"], collator));
 
-    Document doc(fromjson("{}"));
+    mutablebson::Document doc(fromjson("{}"));
     setPathToCreate("a.$bad");
     ASSERT_THROWS_CODE_AND_WHAT(
         node.apply(getApplyParams(doc.root())),
@@ -1030,7 +1029,7 @@ TEST_F(SetNodeTest, ApplyCanCreateDollarPrefixedFieldNameWhenValidateForStorageI
     SetNode node;
     ASSERT_OK(node.init(update["$set"]["$bad"], collator));
 
-    Document doc(fromjson("{}"));
+    mutablebson::Document doc(fromjson("{}"));
     setPathToCreate("$bad");
     addIndexedPath("$bad");
     setValidateForStorage(false);
@@ -1049,7 +1048,7 @@ TEST_F(SetNodeTest, ApplyCannotOverwriteImmutablePath) {
     SetNode node;
     ASSERT_OK(node.init(update["$set"]["a.b"], collator));
 
-    Document doc(fromjson("{a: {b: 2}}"));
+    mutablebson::Document doc(fromjson("{a: {b: 2}}"));
     setPathTaken("a.b");
     addImmutablePath("a.b");
     ASSERT_THROWS_CODE_AND_WHAT(
@@ -1065,7 +1064,7 @@ TEST_F(SetNodeTest, ApplyCanPerformNoopOnImmutablePath) {
     SetNode node;
     ASSERT_OK(node.init(update["$set"]["a.b"], collator));
 
-    Document doc(fromjson("{a: {b: 2}}"));
+    mutablebson::Document doc(fromjson("{a: {b: 2}}"));
     setPathTaken("a.b");
     addImmutablePath("a.b");
     addIndexedPath("a");
@@ -1084,7 +1083,7 @@ TEST_F(SetNodeTest, ApplyCannotOverwritePrefixToRemoveImmutablePath) {
     SetNode node;
     ASSERT_OK(node.init(update["$set"]["a"], collator));
 
-    Document doc(fromjson("{a: {b: 2}}"));
+    mutablebson::Document doc(fromjson("{a: {b: 2}}"));
     setPathTaken("a");
     addImmutablePath("a.b");
     ASSERT_THROWS_CODE_AND_WHAT(
@@ -1100,7 +1099,7 @@ TEST_F(SetNodeTest, ApplyCannotOverwritePrefixToModifyImmutablePath) {
     SetNode node;
     ASSERT_OK(node.init(update["$set"]["a"], collator));
 
-    Document doc(fromjson("{a: {b: 2}}"));
+    mutablebson::Document doc(fromjson("{a: {b: 2}}"));
     setPathTaken("a");
     addImmutablePath("a.b");
     ASSERT_THROWS_CODE_AND_WHAT(node.apply(getApplyParams(doc.root()["a"])),
@@ -1116,7 +1115,7 @@ TEST_F(SetNodeTest, ApplyCanPerformNoopOnPrefixOfImmutablePath) {
     SetNode node;
     ASSERT_OK(node.init(update["$set"]["a"], collator));
 
-    Document doc(fromjson("{a: {b: 2}}"));
+    mutablebson::Document doc(fromjson("{a: {b: 2}}"));
     setPathTaken("a");
     addImmutablePath("a.b");
     addIndexedPath("a");
@@ -1135,7 +1134,7 @@ TEST_F(SetNodeTest, ApplyCanOverwritePrefixToCreateImmutablePath) {
     SetNode node;
     ASSERT_OK(node.init(update["$set"]["a"], collator));
 
-    Document doc(fromjson("{a: 1}"));
+    mutablebson::Document doc(fromjson("{a: 1}"));
     setPathTaken("a");
     addImmutablePath("a.b");
     addIndexedPath("a");
@@ -1154,7 +1153,7 @@ TEST_F(SetNodeTest, ApplyCanOverwritePrefixOfImmutablePathIfNoopOnImmutablePath)
     SetNode node;
     ASSERT_OK(node.init(update["$set"]["a"], collator));
 
-    Document doc(fromjson("{a: {b: 2}}"));
+    mutablebson::Document doc(fromjson("{a: {b: 2}}"));
     setPathTaken("a");
     addImmutablePath("a.b");
     addIndexedPath("a");
@@ -1173,7 +1172,7 @@ TEST_F(SetNodeTest, ApplyCannotOverwriteSuffixOfImmutablePath) {
     SetNode node;
     ASSERT_OK(node.init(update["$set"]["a.b.c"], collator));
 
-    Document doc(fromjson("{a: {b: {c: 2}}}"));
+    mutablebson::Document doc(fromjson("{a: {b: {c: 2}}}"));
     setPathTaken("a.b.c");
     addImmutablePath("a.b");
     ASSERT_THROWS_CODE_AND_WHAT(
@@ -1189,7 +1188,7 @@ TEST_F(SetNodeTest, ApplyCanPerformNoopOnSuffixOfImmutablePath) {
     SetNode node;
     ASSERT_OK(node.init(update["$set"]["a.b.c"], collator));
 
-    Document doc(fromjson("{a: {b: {c: 2}}}"));
+    mutablebson::Document doc(fromjson("{a: {b: {c: 2}}}"));
     setPathTaken("a.b.c");
     addImmutablePath("a.b");
     addIndexedPath("a");
@@ -1208,7 +1207,7 @@ TEST_F(SetNodeTest, ApplyCannotCreateFieldAtEndOfImmutablePath) {
     SetNode node;
     ASSERT_OK(node.init(update["$set"]["a.b.c"], collator));
 
-    Document doc(fromjson("{a: {b: {}}}"));
+    mutablebson::Document doc(fromjson("{a: {b: {}}}"));
     setPathToCreate("c");
     setPathTaken("a.b");
     addImmutablePath("a.b");
@@ -1225,7 +1224,7 @@ TEST_F(SetNodeTest, ApplyCannotCreateFieldBeyondEndOfImmutablePath) {
     SetNode node;
     ASSERT_OK(node.init(update["$set"]["a.b.c"], collator));
 
-    Document doc(fromjson("{a: {b: {}}}"));
+    mutablebson::Document doc(fromjson("{a: {b: {}}}"));
     setPathToCreate("c");
     setPathTaken("a.b");
     addImmutablePath("a");
@@ -1242,7 +1241,7 @@ TEST_F(SetNodeTest, ApplyCanCreateImmutablePath) {
     SetNode node;
     ASSERT_OK(node.init(update["$set"]["a.b"], collator));
 
-    Document doc(fromjson("{a: {}}"));
+    mutablebson::Document doc(fromjson("{a: {}}"));
     setPathToCreate("b");
     setPathTaken("a");
     addImmutablePath("a.b");
@@ -1262,7 +1261,7 @@ TEST_F(SetNodeTest, ApplyCanCreatePrefixOfImmutablePath) {
     SetNode node;
     ASSERT_OK(node.init(update["$set"]["a"], collator));
 
-    Document doc(fromjson("{}"));
+    mutablebson::Document doc(fromjson("{}"));
     setPathToCreate("a");
     addImmutablePath("a.b");
     addIndexedPath("a");
@@ -1281,7 +1280,7 @@ TEST_F(SetNodeTest, ApplySetOnInsertIsNoopWhenInsertIsFalse) {
     SetNode node(UpdateNode::Context::kInsertOnly);
     ASSERT_OK(node.init(update["$setOnInsert"]["a"], collator));
 
-    Document doc(fromjson("{}"));
+    mutablebson::Document doc(fromjson("{}"));
     setPathToCreate("a");
     addIndexedPath("a");
     auto result = node.apply(getApplyParams(doc.root()));
@@ -1298,7 +1297,7 @@ TEST_F(SetNodeTest, ApplySetOnInsertIsAppliedWhenInsertIsTrue) {
     SetNode node(UpdateNode::Context::kInsertOnly);
     ASSERT_OK(node.init(update["$setOnInsert"]["a"], collator));
 
-    Document doc(fromjson("{}"));
+    mutablebson::Document doc(fromjson("{}"));
     setPathToCreate("a");
     setInsert(true);
     addIndexedPath("a");
@@ -1316,7 +1315,7 @@ TEST_F(SetNodeTest, ApplySetOnInsertExistingPath) {
     SetNode node(UpdateNode::Context::kInsertOnly);
     ASSERT_OK(node.init(update["$setOnInsert"]["a"], collator));
 
-    Document doc(fromjson("{a: 1}"));
+    mutablebson::Document doc(fromjson("{a: 1}"));
     setPathTaken("a");
     setInsert(true);
     addIndexedPath("a");

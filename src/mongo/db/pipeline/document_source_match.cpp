@@ -359,8 +359,8 @@ bool DocumentSourceMatch::isTextQuery(const BSONObj& query) {
 void DocumentSourceMatch::joinMatchWith(intrusive_ptr<DocumentSourceMatch> other) {
     _predicate = BSON("$and" << BSON_ARRAY(_predicate << other->getQuery()));
 
-    StatusWithMatchExpression status = uassertStatusOK(
-        MatchExpressionParser::parse(_predicate, ExtensionsCallbackNoop(), pExpCtx->getCollator()));
+    StatusWithMatchExpression status = uassertStatusOK(MatchExpressionParser::parse(
+        _predicate, ExtensionsCallbackNoop(), pExpCtx->getCollator(), pExpCtx));
     _expression = std::move(status.getValue());
     _dependencies = DepsTracker(_dependencies.getMetadataAvailable());
     getDependencies(&_dependencies);
@@ -506,8 +506,8 @@ void DocumentSourceMatch::addDependencies(DepsTracker* deps) const {
 DocumentSourceMatch::DocumentSourceMatch(const BSONObj& query,
                                          const intrusive_ptr<ExpressionContext>& pExpCtx)
     : DocumentSource(pExpCtx), _predicate(query.getOwned()), _isTextQuery(isTextQuery(query)) {
-    StatusWithMatchExpression status = uassertStatusOK(
-        MatchExpressionParser::parse(_predicate, ExtensionsCallbackNoop(), pExpCtx->getCollator()));
+    StatusWithMatchExpression status = uassertStatusOK(MatchExpressionParser::parse(
+        _predicate, ExtensionsCallbackNoop(), pExpCtx->getCollator(), pExpCtx));
 
     _expression = std::move(status.getValue());
     getDependencies(&_dependencies);

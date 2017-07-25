@@ -48,26 +48,28 @@ public:
      * query (which will never be NULL).  If parsing fails, returns an error Status.
      *
      * 'opCtx' must point to a valid OperationContext, but 'opCtx' does not need to outlive the
-     * returned
-     * CanonicalQuery.
+     * returned CanonicalQuery.
      *
      * Used for legacy find through the OP_QUERY message.
      */
     static StatusWith<std::unique_ptr<CanonicalQuery>> canonicalize(
         OperationContext* opCtx,
         const QueryMessage& qm,
-        const ExtensionsCallback& extensionsCallback);
+        const ExtensionsCallback& extensionsCallback,
+        const boost::intrusive_ptr<ExpressionContext>& expCtx = nullptr);
 
     /**
      * If parsing succeeds, returns a std::unique_ptr<CanonicalQuery> representing the parsed
      * query (which will never be NULL).  If parsing fails, returns an error Status.
      *
      * 'opCtx' must point to a valid OperationContext, but 'opCtx' does not need to outlive the
-     * returned
-     *  CanonicalQuery.
+     * returned CanonicalQuery.
      */
     static StatusWith<std::unique_ptr<CanonicalQuery>> canonicalize(
-        OperationContext* opCtx, std::unique_ptr<QueryRequest> qr, const ExtensionsCallback&);
+        OperationContext* opCtx,
+        std::unique_ptr<QueryRequest> qr,
+        const ExtensionsCallback&,
+        const boost::intrusive_ptr<ExpressionContext>& expCtx = nullptr);
 
     /**
      * For testing or for internal clients to use.

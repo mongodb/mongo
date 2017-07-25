@@ -31,7 +31,6 @@
 
 namespace mongo {
 
-using mutablebson::Document;
 using mutablebson::Element;
 namespace str = mongoutils::str;
 
@@ -49,7 +48,7 @@ inline Status LogBuilder::addToSection(Element newElt, Element* section, const c
                           "LogBuilder: Invalid attempt to add a $set/$unset entry"
                           "to a log with an existing object replacement");
 
-        Document& doc = _logRoot.getDocument();
+        mutablebson::Document& doc = _logRoot.getDocument();
 
         // We should not already have an element with the section name under the root.
         dassert(_logRoot[sectionName] == doc.end());

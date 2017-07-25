@@ -86,6 +86,15 @@ TEST_F(ExtensionsCallbackRealTest, TextNoIndex) {
     ASSERT_EQ(ErrorCodes::IndexNotFound, result.getStatus());
 }
 
+TEST_F(ExtensionsCallbackRealTest, TextRejectsExpr) {
+    BSONObj query = fromjson("{$text: {$expr: '$$userVar'}}");
+    StatusWithMatchExpression result =
+        ExtensionsCallbackReal(&_opCtx, &_nss).parseText(query.firstElement());
+
+    ASSERT_NOT_OK(result.getStatus());
+    ASSERT_EQ(ErrorCodes::NoSuchKey, result.getStatus());
+}
+
 TEST_F(ExtensionsCallbackRealTest, TextBasic) {
     ASSERT_OK(dbtests::createIndex(&_opCtx,
                                    _nss.ns(),

@@ -41,7 +41,6 @@ namespace mongo {
 namespace {
 
 using ArithmeticNodeTest = UpdateNodeTest;
-using mongo::mutablebson::Document;
 using mongo::mutablebson::Element;
 using mongo::mutablebson::countChildren;
 
@@ -116,7 +115,7 @@ TEST_F(ArithmeticNodeTest, ApplyIncNoOp) {
     ArithmeticNode node(ArithmeticNode::ArithmeticOp::kAdd);
     ASSERT_OK(node.init(update["$inc"]["a"], collator));
 
-    Document doc(fromjson("{a: 5}"));
+    mutablebson::Document doc(fromjson("{a: 5}"));
     setPathTaken("a");
     addIndexedPath("a");
     auto result = node.apply(getApplyParams(doc.root()["a"]));
@@ -133,7 +132,7 @@ TEST_F(ArithmeticNodeTest, ApplyMulNoOp) {
     ArithmeticNode node(ArithmeticNode::ArithmeticOp::kMultiply);
     ASSERT_OK(node.init(update["$mul"]["a"], collator));
 
-    Document doc(fromjson("{a: 5}"));
+    mutablebson::Document doc(fromjson("{a: 5}"));
     setPathTaken("a");
     addIndexedPath("a");
     auto result = node.apply(getApplyParams(doc.root()["a"]));
@@ -150,7 +149,7 @@ TEST_F(ArithmeticNodeTest, ApplyRoundingNoOp) {
     ArithmeticNode node(ArithmeticNode::ArithmeticOp::kAdd);
     ASSERT_OK(node.init(update["$inc"]["a"], collator));
 
-    Document doc(fromjson("{a: 6.022e23}"));
+    mutablebson::Document doc(fromjson("{a: 6.022e23}"));
     setPathTaken("a");
     addIndexedPath("a");
     auto result = node.apply(getApplyParams(doc.root()["a"]));
@@ -167,7 +166,7 @@ TEST_F(ArithmeticNodeTest, ApplyEmptyPathToCreate) {
     ArithmeticNode node(ArithmeticNode::ArithmeticOp::kAdd);
     ASSERT_OK(node.init(update["$inc"]["a"], collator));
 
-    Document doc(fromjson("{a: 5}"));
+    mutablebson::Document doc(fromjson("{a: 5}"));
     setPathTaken("a");
     addIndexedPath("a");
     auto result = node.apply(getApplyParams(doc.root()["a"]));
@@ -184,7 +183,7 @@ TEST_F(ArithmeticNodeTest, ApplyCreatePath) {
     ArithmeticNode node(ArithmeticNode::ArithmeticOp::kAdd);
     ASSERT_OK(node.init(update["$inc"]["a.b.c"], collator));
 
-    Document doc(fromjson("{a: {d: 5}}"));
+    mutablebson::Document doc(fromjson("{a: {d: 5}}"));
     setPathToCreate("b.c");
     setPathTaken("a");
     addIndexedPath("a");
@@ -202,7 +201,7 @@ TEST_F(ArithmeticNodeTest, ApplyExtendPath) {
     ArithmeticNode node(ArithmeticNode::ArithmeticOp::kAdd);
     ASSERT_OK(node.init(update["$inc"]["a.b"], collator));
 
-    Document doc(fromjson("{a: {c: 1}}"));
+    mutablebson::Document doc(fromjson("{a: {c: 1}}"));
     setPathToCreate("b");
     setPathTaken("a");
     addIndexedPath("a.b");
@@ -219,7 +218,7 @@ TEST_F(ArithmeticNodeTest, ApplyCreatePathFromRoot) {
     ArithmeticNode node(ArithmeticNode::ArithmeticOp::kAdd);
     ASSERT_OK(node.init(update["$inc"]["a.b"], collator));
 
-    Document doc(fromjson("{c: 5}"));
+    mutablebson::Document doc(fromjson("{c: 5}"));
     setPathToCreate("a.b");
     addIndexedPath("a");
     auto result = node.apply(getApplyParams(doc.root()));
@@ -236,7 +235,7 @@ TEST_F(ArithmeticNodeTest, ApplyPositional) {
     ArithmeticNode node(ArithmeticNode::ArithmeticOp::kAdd);
     ASSERT_OK(node.init(update["$inc"]["a.$"], collator));
 
-    Document doc(fromjson("{a: [0, 1, 2]}"));
+    mutablebson::Document doc(fromjson("{a: [0, 1, 2]}"));
     setPathTaken("a.1");
     setMatchedField("1");
     addIndexedPath("a");
@@ -254,7 +253,7 @@ TEST_F(ArithmeticNodeTest, ApplyNonViablePathToInc) {
     ArithmeticNode node(ArithmeticNode::ArithmeticOp::kAdd);
     ASSERT_OK(node.init(update["$inc"]["a.b"], collator));
 
-    Document doc(fromjson("{a: 5}"));
+    mutablebson::Document doc(fromjson("{a: 5}"));
     setPathToCreate("b");
     setPathTaken("a");
     addIndexedPath("a");
@@ -270,7 +269,7 @@ TEST_F(ArithmeticNodeTest, ApplyNonViablePathToCreateFromReplicationIsNoOp) {
     ArithmeticNode node(ArithmeticNode::ArithmeticOp::kAdd);
     ASSERT_OK(node.init(update["$inc"]["a.b"], collator));
 
-    Document doc(fromjson("{a: 5}"));
+    mutablebson::Document doc(fromjson("{a: 5}"));
     setPathToCreate("b");
     setPathTaken("a");
     addIndexedPath("a");
@@ -289,7 +288,7 @@ TEST_F(ArithmeticNodeTest, ApplyNoIndexDataNoLogBuilder) {
     ArithmeticNode node(ArithmeticNode::ArithmeticOp::kAdd);
     ASSERT_OK(node.init(update["$inc"]["a"], collator));
 
-    Document doc(fromjson("{a: 5}"));
+    mutablebson::Document doc(fromjson("{a: 5}"));
     setPathTaken("a");
     setLogBuilderToNull();
     auto result = node.apply(getApplyParams(doc.root()["a"]));
@@ -305,7 +304,7 @@ TEST_F(ArithmeticNodeTest, ApplyDoesNotAffectIndexes) {
     ArithmeticNode node(ArithmeticNode::ArithmeticOp::kAdd);
     ASSERT_OK(node.init(update["$inc"]["a"], collator));
 
-    Document doc(fromjson("{a: 5}"));
+    mutablebson::Document doc(fromjson("{a: 5}"));
     setPathTaken("a");
     addIndexedPath("b");
     auto result = node.apply(getApplyParams(doc.root()["a"]));
@@ -321,7 +320,7 @@ TEST_F(ArithmeticNodeTest, IncTypePromotionIsNotANoOp) {
     ArithmeticNode node(ArithmeticNode::ArithmeticOp::kAdd);
     ASSERT_OK(node.init(update["$inc"]["a"], collator));
 
-    Document doc(fromjson("{a: NumberInt(2)}"));
+    mutablebson::Document doc(fromjson("{a: NumberInt(2)}"));
     setPathTaken("a");
     addIndexedPath("a");
     auto result = node.apply(getApplyParams(doc.root()["a"]));
@@ -337,7 +336,7 @@ TEST_F(ArithmeticNodeTest, MulTypePromotionIsNotANoOp) {
     ArithmeticNode node(ArithmeticNode::ArithmeticOp::kMultiply);
     ASSERT_OK(node.init(update["$mul"]["a"], collator));
 
-    Document doc(fromjson("{a: NumberInt(2)}"));
+    mutablebson::Document doc(fromjson("{a: NumberInt(2)}"));
     setPathTaken("a");
     addIndexedPath("a");
     auto result = node.apply(getApplyParams(doc.root()["a"]));
@@ -353,7 +352,7 @@ TEST_F(ArithmeticNodeTest, TypePromotionFromIntToDecimalIsNotANoOp) {
     ArithmeticNode node(ArithmeticNode::ArithmeticOp::kAdd);
     ASSERT_OK(node.init(update["$inc"]["a"], collator));
 
-    Document doc(fromjson("{a: NumberInt(5)}"));
+    mutablebson::Document doc(fromjson("{a: NumberInt(5)}"));
     setPathTaken("a");
     addIndexedPath("a");
     auto result = node.apply(getApplyParams(doc.root()["a"]));
@@ -370,7 +369,7 @@ TEST_F(ArithmeticNodeTest, TypePromotionFromLongToDecimalIsNotANoOp) {
     ArithmeticNode node(ArithmeticNode::ArithmeticOp::kAdd);
     ASSERT_OK(node.init(update["$inc"]["a"], collator));
 
-    Document doc(fromjson("{a: NumberLong(5)}"));
+    mutablebson::Document doc(fromjson("{a: NumberLong(5)}"));
     setPathTaken("a");
     addIndexedPath("a");
     auto result = node.apply(getApplyParams(doc.root()["a"]));
@@ -387,7 +386,7 @@ TEST_F(ArithmeticNodeTest, TypePromotionFromDoubleToDecimalIsNotANoOp) {
     ArithmeticNode node(ArithmeticNode::ArithmeticOp::kAdd);
     ASSERT_OK(node.init(update["$inc"]["a"], collator));
 
-    Document doc(fromjson("{a: 5.25}"));
+    mutablebson::Document doc(fromjson("{a: 5.25}"));
     setPathTaken("a");
     addIndexedPath("a");
     auto result = node.apply(getApplyParams(doc.root()["a"]));
@@ -404,7 +403,7 @@ TEST_F(ArithmeticNodeTest, ApplyPromoteToFloatingPoint) {
     ArithmeticNode node(ArithmeticNode::ArithmeticOp::kAdd);
     ASSERT_OK(node.init(update["$inc"]["a"], collator));
 
-    Document doc(fromjson("{a: NumberLong(1)}"));
+    mutablebson::Document doc(fromjson("{a: NumberLong(1)}"));
     setPathTaken("a");
     addIndexedPath("a");
     auto result = node.apply(getApplyParams(doc.root()["a"]));
@@ -420,7 +419,7 @@ TEST_F(ArithmeticNodeTest, IncrementedDecimalStaysDecimal) {
     ArithmeticNode node(ArithmeticNode::ArithmeticOp::kAdd);
     ASSERT_OK(node.init(update["$inc"]["a"], collator));
 
-    Document doc(fromjson("{a: NumberDecimal(\"6.25\")}"));
+    mutablebson::Document doc(fromjson("{a: NumberDecimal(\"6.25\")}"));
     setPathTaken("a");
     addIndexedPath("a");
     auto result = node.apply(getApplyParams(doc.root()["a"]));
@@ -438,7 +437,7 @@ TEST_F(ArithmeticNodeTest, OverflowIntToLong) {
     ASSERT_OK(node.init(update["$inc"]["a"], collator));
 
     const int initialValue = std::numeric_limits<int>::max();
-    Document doc(BSON("a" << initialValue));
+    mutablebson::Document doc(BSON("a" << initialValue));
     ASSERT_EQUALS(mongo::NumberInt, doc.root()["a"].getType());
     setPathTaken("a");
     addIndexedPath("a");
@@ -457,7 +456,7 @@ TEST_F(ArithmeticNodeTest, UnderflowIntToLong) {
     ASSERT_OK(node.init(update["$inc"]["a"], collator));
 
     const int initialValue = std::numeric_limits<int>::min();
-    Document doc(BSON("a" << initialValue));
+    mutablebson::Document doc(BSON("a" << initialValue));
     ASSERT_EQUALS(mongo::NumberInt, doc.root()["a"].getType());
     setPathTaken("a");
     addIndexedPath("a");
@@ -475,8 +474,8 @@ TEST_F(ArithmeticNodeTest, IncModeCanBeReused) {
     ArithmeticNode node(ArithmeticNode::ArithmeticOp::kAdd);
     ASSERT_OK(node.init(update["$inc"]["a"], collator));
 
-    Document doc1(fromjson("{a: 1}"));
-    Document doc2(fromjson("{a: 2}"));
+    mutablebson::Document doc1(fromjson("{a: 1}"));
+    mutablebson::Document doc2(fromjson("{a: 2}"));
     setPathTaken("a");
     addIndexedPath("a");
     auto result = node.apply(getApplyParams(doc1.root()["a"]));
@@ -501,7 +500,7 @@ TEST_F(ArithmeticNodeTest, CreatedNumberHasSameTypeAsInc) {
     ArithmeticNode node(ArithmeticNode::ArithmeticOp::kAdd);
     ASSERT_OK(node.init(update["$inc"]["a"], collator));
 
-    Document doc(fromjson("{b: 6}"));
+    mutablebson::Document doc(fromjson("{b: 6}"));
     setPathToCreate("a");
     addIndexedPath("a");
     auto result = node.apply(getApplyParams(doc.root()));
@@ -517,7 +516,7 @@ TEST_F(ArithmeticNodeTest, CreatedNumberHasSameTypeAsMul) {
     ArithmeticNode node(ArithmeticNode::ArithmeticOp::kMultiply);
     ASSERT_OK(node.init(update["$mul"]["a"], collator));
 
-    Document doc(fromjson("{b: 6}"));
+    mutablebson::Document doc(fromjson("{b: 6}"));
     setPathToCreate("a");
     addIndexedPath("a");
     auto result = node.apply(getApplyParams(doc.root()));
@@ -533,7 +532,7 @@ TEST_F(ArithmeticNodeTest, ApplyEmptyDocument) {
     ArithmeticNode node(ArithmeticNode::ArithmeticOp::kAdd);
     ASSERT_OK(node.init(update["$inc"]["a"], collator));
 
-    Document doc(fromjson("{}"));
+    mutablebson::Document doc(fromjson("{}"));
     setPathToCreate("a");
     addIndexedPath("a");
     auto result = node.apply(getApplyParams(doc.root()));
@@ -549,7 +548,7 @@ TEST_F(ArithmeticNodeTest, ApplyIncToObjectFails) {
     ArithmeticNode node(ArithmeticNode::ArithmeticOp::kAdd);
     ASSERT_OK(node.init(update["$inc"]["a"], collator));
 
-    Document doc(fromjson("{_id: 'test_object', a: {b: 1}}"));
+    mutablebson::Document doc(fromjson("{_id: 'test_object', a: {b: 1}}"));
     setPathTaken("a");
     addIndexedPath("a");
     ASSERT_THROWS_CODE_AND_WHAT(node.apply(getApplyParams(doc.root()["a"])),
@@ -565,7 +564,7 @@ TEST_F(ArithmeticNodeTest, ApplyIncToArrayFails) {
     ArithmeticNode node(ArithmeticNode::ArithmeticOp::kAdd);
     ASSERT_OK(node.init(update["$inc"]["a"], collator));
 
-    Document doc(fromjson("{_id: 'test_object', a: []}"));
+    mutablebson::Document doc(fromjson("{_id: 'test_object', a: []}"));
     setPathTaken("a");
     addIndexedPath("a");
     ASSERT_THROWS_CODE_AND_WHAT(node.apply(getApplyParams(doc.root()["a"])),
@@ -581,7 +580,7 @@ TEST_F(ArithmeticNodeTest, ApplyIncToStringFails) {
     ArithmeticNode node(ArithmeticNode::ArithmeticOp::kAdd);
     ASSERT_OK(node.init(update["$inc"]["a"], collator));
 
-    Document doc(fromjson("{_id: 'test_object', a: \"foo\"}"));
+    mutablebson::Document doc(fromjson("{_id: 'test_object', a: \"foo\"}"));
     setPathTaken("a");
     addIndexedPath("a");
     ASSERT_THROWS_CODE_AND_WHAT(node.apply(getApplyParams(doc.root()["a"])),
@@ -597,7 +596,7 @@ TEST_F(ArithmeticNodeTest, ApplyNewPath) {
     ArithmeticNode node(ArithmeticNode::ArithmeticOp::kAdd);
     ASSERT_OK(node.init(update["$inc"]["a"], collator));
 
-    Document doc(fromjson("{b: 1}"));
+    mutablebson::Document doc(fromjson("{b: 1}"));
     setPathToCreate("a");
     addIndexedPath("a");
     auto result = node.apply(getApplyParams(doc.root()));
@@ -613,7 +612,7 @@ TEST_F(ArithmeticNodeTest, ApplyEmptyIndexData) {
     ArithmeticNode node(ArithmeticNode::ArithmeticOp::kAdd);
     ASSERT_OK(node.init(update["$inc"]["a"], collator));
 
-    Document doc(fromjson("{a: 1}"));
+    mutablebson::Document doc(fromjson("{a: 1}"));
     setPathTaken("a");
     node.apply(getApplyParams(doc.root()["a"]));
     ASSERT_EQUALS(fromjson("{a: 3}"), doc);
@@ -628,7 +627,7 @@ TEST_F(ArithmeticNodeTest, ApplyNoOpDottedPath) {
     ArithmeticNode node(ArithmeticNode::ArithmeticOp::kAdd);
     ASSERT_OK(node.init(update["$inc"]["a.b"], collator));
 
-    Document doc(fromjson("{a: {b: 2}}"));
+    mutablebson::Document doc(fromjson("{a: {b: 2}}"));
     setPathTaken("a.b");
     addIndexedPath("a.b");
     auto result = node.apply(getApplyParams(doc.root()["a"]["b"]));
@@ -644,7 +643,7 @@ TEST_F(ArithmeticNodeTest, TypePromotionOnDottedPathIsNotANoOp) {
     ArithmeticNode node(ArithmeticNode::ArithmeticOp::kAdd);
     ASSERT_OK(node.init(update["$inc"]["a.b"], collator));
 
-    Document doc(fromjson("{a: {b: NumberInt(2)}}"));
+    mutablebson::Document doc(fromjson("{a: {b: NumberInt(2)}}"));
     setPathTaken("a.b");
     addIndexedPath("a.b");
     auto result = node.apply(getApplyParams(doc.root()["a"]["b"]));
@@ -660,7 +659,7 @@ TEST_F(ArithmeticNodeTest, ApplyPathNotViableArray) {
     ArithmeticNode node(ArithmeticNode::ArithmeticOp::kAdd);
     ASSERT_OK(node.init(update["$inc"]["a.b"], collator));
 
-    Document doc(fromjson("{a:[{b:1}]}"));
+    mutablebson::Document doc(fromjson("{a:[{b:1}]}"));
     setPathToCreate("b");
     setPathTaken("a");
     ASSERT_THROWS_CODE_AND_WHAT(node.apply(getApplyParams(doc.root()["a"])),
@@ -675,7 +674,7 @@ TEST_F(ArithmeticNodeTest, ApplyInPlaceDottedPath) {
     ArithmeticNode node(ArithmeticNode::ArithmeticOp::kAdd);
     ASSERT_OK(node.init(update["$inc"]["a.b"], collator));
 
-    Document doc(fromjson("{a: {b: 1}}"));
+    mutablebson::Document doc(fromjson("{a: {b: 1}}"));
     setPathTaken("a.b");
     addIndexedPath("a.b");
     auto result = node.apply(getApplyParams(doc.root()["a"]["b"]));
@@ -691,7 +690,7 @@ TEST_F(ArithmeticNodeTest, ApplyPromotionDottedPath) {
     ArithmeticNode node(ArithmeticNode::ArithmeticOp::kAdd);
     ASSERT_OK(node.init(update["$inc"]["a.b"], collator));
 
-    Document doc(fromjson("{a: {b: NumberInt(3)}}"));
+    mutablebson::Document doc(fromjson("{a: {b: NumberInt(3)}}"));
     setPathTaken("a.b");
     addIndexedPath("a.b");
     auto result = node.apply(getApplyParams(doc.root()["a"]["b"]));
@@ -707,7 +706,7 @@ TEST_F(ArithmeticNodeTest, ApplyDottedPathEmptyDoc) {
     ArithmeticNode node(ArithmeticNode::ArithmeticOp::kAdd);
     ASSERT_OK(node.init(update["$inc"]["a.b"], collator));
 
-    Document doc(fromjson("{}"));
+    mutablebson::Document doc(fromjson("{}"));
     setPathToCreate("a.b");
     addIndexedPath("a.b");
     auto result = node.apply(getApplyParams(doc.root()));
@@ -723,7 +722,7 @@ TEST_F(ArithmeticNodeTest, ApplyFieldWithDot) {
     ArithmeticNode node(ArithmeticNode::ArithmeticOp::kAdd);
     ASSERT_OK(node.init(update["$inc"]["a.b"], collator));
 
-    Document doc(fromjson("{'a.b':4}"));
+    mutablebson::Document doc(fromjson("{'a.b':4}"));
     setPathToCreate("a.b");
     addIndexedPath("a.b");
     auto result = node.apply(getApplyParams(doc.root()));
@@ -739,7 +738,7 @@ TEST_F(ArithmeticNodeTest, ApplyNoOpArrayIndex) {
     ArithmeticNode node(ArithmeticNode::ArithmeticOp::kAdd);
     ASSERT_OK(node.init(update["$inc"]["a.2.b"], collator));
 
-    Document doc(fromjson("{a: [{b: 0},{b: 1},{b: 2}]}"));
+    mutablebson::Document doc(fromjson("{a: [{b: 0},{b: 1},{b: 2}]}"));
     setPathTaken("a.2.b");
     addIndexedPath("a");
     auto result = node.apply(getApplyParams(doc.root()["a"]["2"]["b"]));
@@ -755,7 +754,8 @@ TEST_F(ArithmeticNodeTest, TypePromotionInArrayIsNotANoOp) {
     ArithmeticNode node(ArithmeticNode::ArithmeticOp::kAdd);
     ASSERT_OK(node.init(update["$set"]["a.2.b"], collator));
 
-    Document doc(fromjson("{a: [{b: NumberInt(0)},{b: NumberInt(1)},{b: NumberInt(2)}]}"));
+    mutablebson::Document doc(
+        fromjson("{a: [{b: NumberInt(0)},{b: NumberInt(1)},{b: NumberInt(2)}]}"));
     setPathTaken("a.2.b");
     addIndexedPath("a");
     auto result = node.apply(getApplyParams(doc.root()["a"]["2"]["b"]));
@@ -771,7 +771,7 @@ TEST_F(ArithmeticNodeTest, ApplyNonViablePathThroughArray) {
     ArithmeticNode node(ArithmeticNode::ArithmeticOp::kAdd);
     ASSERT_OK(node.init(update["$inc"]["a.2.b"], collator));
 
-    Document doc(fromjson("{a: 0}"));
+    mutablebson::Document doc(fromjson("{a: 0}"));
     setPathToCreate("2.b");
     setPathTaken("a");
     ASSERT_THROWS_CODE_AND_WHAT(node.apply(getApplyParams(doc.root()["a"])),
@@ -786,7 +786,7 @@ TEST_F(ArithmeticNodeTest, ApplyInPlaceArrayIndex) {
     ArithmeticNode node(ArithmeticNode::ArithmeticOp::kAdd);
     ASSERT_OK(node.init(update["$inc"]["a.2.b"], collator));
 
-    Document doc(fromjson("{a: [{b: 0},{b: 1},{b: 1}]}"));
+    mutablebson::Document doc(fromjson("{a: [{b: 0},{b: 1},{b: 1}]}"));
     setPathTaken("a.2.b");
     addIndexedPath("a");
     auto result = node.apply(getApplyParams(doc.root()["a"]["2"]["b"]));
@@ -802,7 +802,7 @@ TEST_F(ArithmeticNodeTest, ApplyAppendArray) {
     ArithmeticNode node(ArithmeticNode::ArithmeticOp::kAdd);
     ASSERT_OK(node.init(update["$inc"]["a.2.b"], collator));
 
-    Document doc(fromjson("{a: [{b: 0},{b: 1}]}"));
+    mutablebson::Document doc(fromjson("{a: [{b: 0},{b: 1}]}"));
     setPathToCreate("2.b");
     setPathTaken("a");
     addIndexedPath("a");
@@ -819,7 +819,7 @@ TEST_F(ArithmeticNodeTest, ApplyPaddingArray) {
     ArithmeticNode node(ArithmeticNode::ArithmeticOp::kAdd);
     ASSERT_OK(node.init(update["$inc"]["a.2.b"], collator));
 
-    Document doc(fromjson("{a: [{b: 0}]}"));
+    mutablebson::Document doc(fromjson("{a: [{b: 0}]}"));
     setPathToCreate("2.b");
     setPathTaken("a");
     addIndexedPath("a");
@@ -836,7 +836,7 @@ TEST_F(ArithmeticNodeTest, ApplyNumericObject) {
     ArithmeticNode node(ArithmeticNode::ArithmeticOp::kAdd);
     ASSERT_OK(node.init(update["$inc"]["a.2.b"], collator));
 
-    Document doc(fromjson("{a: {b: 0}}"));
+    mutablebson::Document doc(fromjson("{a: {b: 0}}"));
     setPathToCreate("2.b");
     setPathTaken("a");
     addIndexedPath("a");
@@ -853,7 +853,7 @@ TEST_F(ArithmeticNodeTest, ApplyNumericField) {
     ArithmeticNode node(ArithmeticNode::ArithmeticOp::kAdd);
     ASSERT_OK(node.init(update["$inc"]["a.2.b"], collator));
 
-    Document doc(fromjson("{a: {'2': {b: 1}}}"));
+    mutablebson::Document doc(fromjson("{a: {'2': {b: 1}}}"));
     setPathTaken("a.2.b");
     addIndexedPath("a");
     auto result = node.apply(getApplyParams(doc.root()["a"]["2"]["b"]));
@@ -869,7 +869,7 @@ TEST_F(ArithmeticNodeTest, ApplyExtendNumericField) {
     ArithmeticNode node(ArithmeticNode::ArithmeticOp::kAdd);
     ASSERT_OK(node.init(update["$inc"]["a.2.b"], collator));
 
-    Document doc(fromjson("{a: {'2': {c: 1}}}"));
+    mutablebson::Document doc(fromjson("{a: {'2': {c: 1}}}"));
     setPathToCreate("b");
     setPathTaken("a.2");
     addIndexedPath("a");
@@ -886,7 +886,7 @@ TEST_F(ArithmeticNodeTest, ApplyNumericFieldToEmptyObject) {
     ArithmeticNode node(ArithmeticNode::ArithmeticOp::kAdd);
     ASSERT_OK(node.init(update["$set"]["a.2.b"], collator));
 
-    Document doc(fromjson("{a: {}}"));
+    mutablebson::Document doc(fromjson("{a: {}}"));
     setPathToCreate("2.b");
     setPathTaken("a");
     addIndexedPath("a");
@@ -903,7 +903,7 @@ TEST_F(ArithmeticNodeTest, ApplyEmptyArray) {
     ArithmeticNode node(ArithmeticNode::ArithmeticOp::kAdd);
     ASSERT_OK(node.init(update["$set"]["a.2.b"], collator));
 
-    Document doc(fromjson("{a: []}"));
+    mutablebson::Document doc(fromjson("{a: []}"));
     setPathToCreate("2.b");
     setPathTaken("a");
     addIndexedPath("a");
@@ -920,7 +920,7 @@ TEST_F(ArithmeticNodeTest, ApplyLogDottedPath) {
     ArithmeticNode node(ArithmeticNode::ArithmeticOp::kAdd);
     ASSERT_OK(node.init(update["$inc"]["a.2.b"], collator));
 
-    Document doc(fromjson("{a: [{b:0}, {b:1}]}"));
+    mutablebson::Document doc(fromjson("{a: [{b:0}, {b:1}]}"));
     setPathToCreate("2.b");
     setPathTaken("a");
     node.apply(getApplyParams(doc.root()["a"]));
@@ -936,7 +936,7 @@ TEST_F(ArithmeticNodeTest, LogEmptyArray) {
     ArithmeticNode node(ArithmeticNode::ArithmeticOp::kAdd);
     ASSERT_OK(node.init(update["$inc"]["a.2.b"], collator));
 
-    Document doc(fromjson("{a: []}"));
+    mutablebson::Document doc(fromjson("{a: []}"));
     setPathToCreate("2.b");
     setPathTaken("a");
     node.apply(getApplyParams(doc.root()["a"]));
@@ -952,7 +952,7 @@ TEST_F(ArithmeticNodeTest, LogEmptyObject) {
     ArithmeticNode node(ArithmeticNode::ArithmeticOp::kAdd);
     ASSERT_OK(node.init(update["$inc"]["a.2.b"], collator));
 
-    Document doc(fromjson("{a: {}}"));
+    mutablebson::Document doc(fromjson("{a: {}}"));
     setPathToCreate("2.b");
     setPathTaken("a");
     node.apply(getApplyParams(doc.root()["a"]));
@@ -968,7 +968,7 @@ TEST_F(ArithmeticNodeTest, ApplyDeserializedDocNotNoOp) {
     ArithmeticNode node(ArithmeticNode::ArithmeticOp::kMultiply);
     ASSERT_OK(node.init(update["$mul"]["b"], collator));
 
-    Document doc(fromjson("{a: 1}"));
+    mutablebson::Document doc(fromjson("{a: 1}"));
     // De-serialize the int.
     doc.root()["a"].setValueInt(1).transitional_ignore();
 
@@ -987,7 +987,7 @@ TEST_F(ArithmeticNodeTest, ApplyToDeserializedDocNoOp) {
     ArithmeticNode node(ArithmeticNode::ArithmeticOp::kMultiply);
     ASSERT_OK(node.init(update["$mul"]["a"], collator));
 
-    Document doc(fromjson("{a: 1}"));
+    mutablebson::Document doc(fromjson("{a: 1}"));
     // De-serialize the int.
     doc.root()["a"].setValueInt(2).transitional_ignore();
 
@@ -1006,7 +1006,7 @@ TEST_F(ArithmeticNodeTest, ApplyToDeserializedDocNestedNoop) {
     ArithmeticNode node(ArithmeticNode::ArithmeticOp::kMultiply);
     ASSERT_OK(node.init(update["$mul"]["a.b"], collator));
 
-    Document doc{BSONObj()};
+    mutablebson::Document doc{BSONObj()};
     // De-serialize the int.
     doc.root().appendObject("a", BSON("b" << static_cast<int>(1))).transitional_ignore();
 
@@ -1025,7 +1025,7 @@ TEST_F(ArithmeticNodeTest, ApplyToDeserializedDocNestedNotNoop) {
     ArithmeticNode node(ArithmeticNode::ArithmeticOp::kMultiply);
     ASSERT_OK(node.init(update["$mul"]["a.b"], collator));
 
-    Document doc{BSONObj()};
+    mutablebson::Document doc{BSONObj()};
     // De-serialize the int.
     doc.root().appendObject("a", BSON("b" << static_cast<int>(1))).transitional_ignore();
 

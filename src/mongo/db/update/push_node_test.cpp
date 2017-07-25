@@ -42,7 +42,6 @@ namespace mongo {
 namespace {
 
 using PushNodeTest = UpdateNodeTest;
-using mongo::mutablebson::Document;
 using mongo::mutablebson::Element;
 using mongo::mutablebson::countChildren;
 
@@ -262,7 +261,7 @@ TEST_F(PushNodeTest, ApplyToNonArrayFails) {
     PushNode node;
     ASSERT_OK(node.init(update["$push"]["a"], collator));
 
-    Document doc(fromjson("{_id: 'test_object', a: 1}"));
+    mutablebson::Document doc(fromjson("{_id: 'test_object', a: 1}"));
     setPathTaken("a");
     addIndexedPath("a");
     ASSERT_THROWS_CODE_AND_WHAT(
@@ -278,7 +277,7 @@ TEST_F(PushNodeTest, ApplyToEmptyArray) {
     PushNode node;
     ASSERT_OK(node.init(update["$push"]["a"], collator));
 
-    Document doc(fromjson("{a: []}"));
+    mutablebson::Document doc(fromjson("{a: []}"));
     setPathTaken("a");
     addIndexedPath("a");
     auto result = node.apply(getApplyParams(doc.root()["a"]));
@@ -295,7 +294,7 @@ TEST_F(PushNodeTest, ApplyToEmptyDocument) {
     PushNode node;
     ASSERT_OK(node.init(update["$push"]["a"], collator));
 
-    Document doc(fromjson("{}"));
+    mutablebson::Document doc(fromjson("{}"));
     setPathToCreate("a");
     addIndexedPath("a");
     auto result = node.apply(getApplyParams(doc.root()));
@@ -312,7 +311,7 @@ TEST_F(PushNodeTest, ApplyToArrayWithOneElement) {
     PushNode node;
     ASSERT_OK(node.init(update["$push"]["a"], collator));
 
-    Document doc(fromjson("{a: [0]}"));
+    mutablebson::Document doc(fromjson("{a: [0]}"));
     setPathTaken("a");
     addIndexedPath("a");
     auto result = node.apply(getApplyParams(doc.root()["a"]));
@@ -329,7 +328,7 @@ TEST_F(PushNodeTest, ApplyToDottedPathElement) {
     PushNode node;
     ASSERT_OK(node.init(update["$push"]["choices.first.votes"], collator));
 
-    Document doc(
+    mutablebson::Document doc(
         fromjson("{_id : 1 , "
                  " question : 'a', "
                  " choices: {first: { choice: 'b'}, "
@@ -357,7 +356,7 @@ TEST_F(PushNodeTest, ApplySimpleEachToEmptyArray) {
     PushNode node;
     ASSERT_OK(node.init(update["$push"]["a"], collator));
 
-    Document doc(fromjson("{a: []}"));
+    mutablebson::Document doc(fromjson("{a: []}"));
     setPathTaken("a");
     addIndexedPath("a");
     auto result = node.apply(getApplyParams(doc.root()["a"]));
@@ -374,7 +373,7 @@ TEST_F(PushNodeTest, ApplySimpleEachToEmptyDocument) {
     PushNode node;
     ASSERT_OK(node.init(update["$push"]["a"], collator));
 
-    Document doc(fromjson("{}"));
+    mutablebson::Document doc(fromjson("{}"));
     setPathToCreate("a");
     addIndexedPath("a");
     auto result = node.apply(getApplyParams(doc.root()));
@@ -391,7 +390,7 @@ TEST_F(PushNodeTest, ApplyMultipleEachToEmptyDocument) {
     PushNode node;
     ASSERT_OK(node.init(update["$push"]["a"], collator));
 
-    Document doc(fromjson("{}"));
+    mutablebson::Document doc(fromjson("{}"));
     setPathToCreate("a");
     addIndexedPath("a");
     auto result = node.apply(getApplyParams(doc.root()));
@@ -408,7 +407,7 @@ TEST_F(PushNodeTest, ApplySimpleEachToArrayWithOneElement) {
     PushNode node;
     ASSERT_OK(node.init(update["$push"]["a"], collator));
 
-    Document doc(fromjson("{a: [0]}"));
+    mutablebson::Document doc(fromjson("{a: [0]}"));
     setPathTaken("a");
     addIndexedPath("a");
     auto result = node.apply(getApplyParams(doc.root()["a"]));
@@ -425,7 +424,7 @@ TEST_F(PushNodeTest, ApplyMultipleEachToArrayWithOneElement) {
     PushNode node;
     ASSERT_OK(node.init(update["$push"]["a"], collator));
 
-    Document doc(fromjson("{a: [0]}"));
+    mutablebson::Document doc(fromjson("{a: [0]}"));
     setPathTaken("a");
     addIndexedPath("a");
     auto result = node.apply(getApplyParams(doc.root()["a"]));
@@ -442,7 +441,7 @@ TEST_F(PushNodeTest, ApplyEmptyEachToEmptyArray) {
     PushNode node;
     ASSERT_OK(node.init(update["$push"]["a"], collator));
 
-    Document doc(fromjson("{a: []}"));
+    mutablebson::Document doc(fromjson("{a: []}"));
     setPathTaken("a");
     addIndexedPath("a");
     auto result = node.apply(getApplyParams(doc.root()["a"]));
@@ -459,7 +458,7 @@ TEST_F(PushNodeTest, ApplyEmptyEachToEmptyDocument) {
     PushNode node;
     ASSERT_OK(node.init(update["$push"]["a"], collator));
 
-    Document doc(fromjson("{}"));
+    mutablebson::Document doc(fromjson("{}"));
     setPathToCreate("a");
     addIndexedPath("a");
     auto result = node.apply(getApplyParams(doc.root()));
@@ -476,7 +475,7 @@ TEST_F(PushNodeTest, ApplyEmptyEachToArrayWithOneElement) {
     PushNode node;
     ASSERT_OK(node.init(update["$push"]["a"], collator));
 
-    Document doc(fromjson("{a: [0]}"));
+    mutablebson::Document doc(fromjson("{a: [0]}"));
     setPathTaken("a");
     addIndexedPath("a");
     auto result = node.apply(getApplyParams(doc.root()["a"]));
@@ -493,7 +492,7 @@ TEST_F(PushNodeTest, ApplyToArrayWithSlice) {
     PushNode node;
     ASSERT_OK(node.init(update["$push"]["a"], collator));
 
-    Document doc(fromjson("{a: [3]}"));
+    mutablebson::Document doc(fromjson("{a: [3]}"));
     setPathTaken("a");
     addIndexedPath("a");
     auto result = node.apply(getApplyParams(doc.root()["a"]));
@@ -510,7 +509,7 @@ TEST_F(PushNodeTest, ApplyWithNumericSort) {
     PushNode node;
     ASSERT_OK(node.init(update["$push"]["a"], collator));
 
-    Document doc(fromjson("{a: [3]}"));
+    mutablebson::Document doc(fromjson("{a: [3]}"));
     setPathTaken("a");
     addIndexedPath("a");
     auto result = node.apply(getApplyParams(doc.root()["a"]));
@@ -527,7 +526,7 @@ TEST_F(PushNodeTest, ApplyWithReverseNumericSort) {
     PushNode node;
     ASSERT_OK(node.init(update["$push"]["a"], collator));
 
-    Document doc(fromjson("{a: [3]}"));
+    mutablebson::Document doc(fromjson("{a: [3]}"));
     setPathTaken("a");
     addIndexedPath("a");
     auto result = node.apply(getApplyParams(doc.root()["a"]));
@@ -544,7 +543,7 @@ TEST_F(PushNodeTest, ApplyWithMixedSort) {
     PushNode node;
     ASSERT_OK(node.init(update["$push"]["a"], collator));
 
-    Document doc(fromjson("{a: [3, 't', {b: 1}, {a: 1}]}"));
+    mutablebson::Document doc(fromjson("{a: [3, 't', {b: 1}, {a: 1}]}"));
     setPathTaken("a");
     addIndexedPath("a");
     auto result = node.apply(getApplyParams(doc.root()["a"]));
@@ -561,7 +560,7 @@ TEST_F(PushNodeTest, ApplyWithReverseMixedSort) {
     PushNode node;
     ASSERT_OK(node.init(update["$push"]["a"], collator));
 
-    Document doc(fromjson("{a: [3, 't', {b: 1}, {a: 1}]}"));
+    mutablebson::Document doc(fromjson("{a: [3, 't', {b: 1}, {a: 1}]}"));
     setPathTaken("a");
     addIndexedPath("a");
     auto result = node.apply(getApplyParams(doc.root()["a"]));
@@ -578,7 +577,7 @@ TEST_F(PushNodeTest, ApplyWithEmbeddedFieldSort) {
     PushNode node;
     ASSERT_OK(node.init(update["$push"]["a"], collator));
 
-    Document doc(fromjson("{a: [3, 't', {b: 1}, {a: 1}]}"));
+    mutablebson::Document doc(fromjson("{a: [3, 't', {b: 1}, {a: 1}]}"));
     setPathTaken("a");
     addIndexedPath("a");
     auto result = node.apply(getApplyParams(doc.root()["a"]));
@@ -595,7 +594,7 @@ TEST_F(PushNodeTest, ApplySortWithCollator) {
     PushNode node;
     ASSERT_OK(node.init(update["$push"]["a"], &collator));
 
-    Document doc(fromjson("{a: ['dd', 'fc', 'gb']}"));
+    mutablebson::Document doc(fromjson("{a: ['dd', 'fc', 'gb']}"));
     setPathTaken("a");
     addIndexedPath("a");
     auto result = node.apply(getApplyParams(doc.root()["a"]));
@@ -612,7 +611,7 @@ TEST_F(PushNodeTest, ApplySortAfterSetCollator) {
     PushNode node;
     ASSERT_OK(node.init(update["$push"]["a"], collator));
 
-    Document doc(fromjson("{a: ['dd', 'fc', 'gb']}"));
+    mutablebson::Document doc(fromjson("{a: ['dd', 'fc', 'gb']}"));
     setPathTaken("a");
     setLogBuilderToNull();
     auto result = node.apply(getApplyParams(doc.root()["a"]));
@@ -623,7 +622,7 @@ TEST_F(PushNodeTest, ApplySortAfterSetCollator) {
     // Now with a collator.
     CollatorInterfaceMock mockCollator(CollatorInterfaceMock::MockType::kReverseString);
     node.setCollator(&mockCollator);
-    Document doc2(fromjson("{a: ['dd', 'fc', 'gb']}"));
+    mutablebson::Document doc2(fromjson("{a: ['dd', 'fc', 'gb']}"));
     result = node.apply(getApplyParams(doc2.root()["a"]));
     ASSERT_FALSE(result.noop);
     ASSERT_EQUALS(fromjson("{a: ['ha', 'gb', 'fc', 'dd']}"), doc2);
@@ -634,7 +633,7 @@ TEST_F(PushNodeTest, ApplySortAfterSetCollator) {
 // prints out the modifier when it observes a failure, which will help with diagnosis.
 void checkDocumentAndResult(BSONObj updateModifier,
                             BSONObj expectedDocument,
-                            const Document& actualDocument,
+                            const mutablebson::Document& actualDocument,
                             UpdateNode::ApplyResult applyResult) {
     if (expectedDocument == actualDocument && !applyResult.noop && !applyResult.indexesAffected) {
         // Check succeeded.
@@ -671,7 +670,7 @@ TEST_F(PushNodeTest, ApplyToEmptyArrayWithSliceValues) {
         PushNode node;
         ASSERT_OK(node.init(update["$push"]["a"], collator));
 
-        Document doc(fromjson("{a: []}"));
+        mutablebson::Document doc(fromjson("{a: []}"));
         setPathTaken("a");
         setLogBuilderToNull();
         auto result = node.apply(getApplyParams(doc.root()["a"]));
@@ -703,7 +702,7 @@ TEST_F(PushNodeTest, ApplyToPopulatedArrayWithSliceValues) {
         PushNode node;
         ASSERT_OK(node.init(update["$push"]["a"], collator));
 
-        Document doc(fromjson("{a: [2, 3]}"));
+        mutablebson::Document doc(fromjson("{a: [2, 3]}"));
         setPathTaken("a");
         setLogBuilderToNull();
         auto result = node.apply(getApplyParams(doc.root()["a"]));
@@ -804,7 +803,7 @@ TEST_F(PushNodeTest, ApplyToPopulatedArrayWithSortAndSliceValues) {
         PushNode node;
         ASSERT_OK(node.init(update["$push"]["a"], collator));
 
-        Document doc(fromjson("{a: [{a: 2, b: 3}, {a: 3, b: 1}]}"));
+        mutablebson::Document doc(fromjson("{a: [{a: 2, b: 3}, {a: 3, b: 1}]}"));
         setPathTaken("a");
         setLogBuilderToNull();
         auto result = node.apply(getApplyParams(doc.root()["a"]));
@@ -818,7 +817,7 @@ TEST_F(PushNodeTest, ApplyToEmptyArrayWithPositionZero) {
     PushNode node;
     ASSERT_OK(node.init(update["$push"]["a"], collator));
 
-    Document doc(fromjson("{a: []}"));
+    mutablebson::Document doc(fromjson("{a: []}"));
     setPathTaken("a");
     addIndexedPath("a");
     auto result = node.apply(getApplyParams(doc.root()["a"]));
@@ -835,7 +834,7 @@ TEST_F(PushNodeTest, ApplyToEmptyArrayWithPositionOne) {
     PushNode node;
     ASSERT_OK(node.init(update["$push"]["a"], collator));
 
-    Document doc(fromjson("{a: []}"));
+    mutablebson::Document doc(fromjson("{a: []}"));
     setPathTaken("a");
     addIndexedPath("a");
     auto result = node.apply(getApplyParams(doc.root()["a"]));
@@ -852,7 +851,7 @@ TEST_F(PushNodeTest, ApplyToEmptyArrayWithLargePosition) {
     PushNode node;
     ASSERT_OK(node.init(update["$push"]["a"], collator));
 
-    Document doc(fromjson("{a: []}"));
+    mutablebson::Document doc(fromjson("{a: []}"));
     setPathTaken("a");
     addIndexedPath("a");
     auto result = node.apply(getApplyParams(doc.root()["a"]));
@@ -869,7 +868,7 @@ TEST_F(PushNodeTest, ApplyToSingletonArrayWithPositionZero) {
     PushNode node;
     ASSERT_OK(node.init(update["$push"]["a"], collator));
 
-    Document doc(fromjson("{a: [0]}"));
+    mutablebson::Document doc(fromjson("{a: [0]}"));
     setPathTaken("a");
     addIndexedPath("a");
     auto result = node.apply(getApplyParams(doc.root()["a"]));
@@ -886,7 +885,7 @@ TEST_F(PushNodeTest, ApplyToSingletonArrayWithLargePosition) {
     PushNode node;
     ASSERT_OK(node.init(update["$push"]["a"], collator));
 
-    Document doc(fromjson("{a: [0]}"));
+    mutablebson::Document doc(fromjson("{a: [0]}"));
     setPathTaken("a");
     addIndexedPath("a");
     auto result = node.apply(getApplyParams(doc.root()["a"]));
@@ -903,7 +902,7 @@ TEST_F(PushNodeTest, ApplyToEmptyArrayWithNegativePosition) {
     PushNode node;
     ASSERT_OK(node.init(update["$push"]["a"], collator));
 
-    Document doc(fromjson("{a: []}"));
+    mutablebson::Document doc(fromjson("{a: []}"));
     setPathTaken("a");
     addIndexedPath("a");
     auto result = node.apply(getApplyParams(doc.root()["a"]));
@@ -920,7 +919,7 @@ TEST_F(PushNodeTest, ApplyToSingletonArrayWithNegativePosition) {
     PushNode node;
     ASSERT_OK(node.init(update["$push"]["a"], collator));
 
-    Document doc(fromjson("{a: [0]}"));
+    mutablebson::Document doc(fromjson("{a: [0]}"));
     setPathTaken("a");
     addIndexedPath("a");
     auto result = node.apply(getApplyParams(doc.root()["a"]));
@@ -937,7 +936,7 @@ TEST_F(PushNodeTest, ApplyToPopulatedArrayWithNegativePosition) {
     PushNode node;
     ASSERT_OK(node.init(update["$push"]["a"], collator));
 
-    Document doc(fromjson("{a: [0, 1, 2, 3, 4]}"));
+    mutablebson::Document doc(fromjson("{a: [0, 1, 2, 3, 4]}"));
     setPathTaken("a");
     addIndexedPath("a");
     auto result = node.apply(getApplyParams(doc.root()["a"]));
@@ -954,7 +953,7 @@ TEST_F(PushNodeTest, ApplyToPopulatedArrayWithOutOfBoundsNegativePosition) {
     PushNode node;
     ASSERT_OK(node.init(update["$push"]["a"], collator));
 
-    Document doc(fromjson("{a: [0, 1, 2, 3, 4]}"));
+    mutablebson::Document doc(fromjson("{a: [0, 1, 2, 3, 4]}"));
     setPathTaken("a");
     addIndexedPath("a");
     auto result = node.apply(getApplyParams(doc.root()["a"]));
@@ -971,7 +970,7 @@ TEST_F(PushNodeTest, ApplyMultipleElementsPushWithNegativePosition) {
     PushNode node;
     ASSERT_OK(node.init(update["$push"]["a"], collator));
 
-    Document doc(fromjson("{a: [0, 1, 2, 3, 4]}"));
+    mutablebson::Document doc(fromjson("{a: [0, 1, 2, 3, 4]}"));
     setPathTaken("a");
     addIndexedPath("a");
     auto result = node.apply(getApplyParams(doc.root()["a"]));
