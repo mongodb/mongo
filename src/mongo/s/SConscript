@@ -109,6 +109,7 @@ env.Library(
 env.Library(
     target='sharding_request_types',
     source=[
+        env.Idlc('request_types/create_database.idl')[0],
         env.Idlc('request_types/move_primary.idl')[0],
         env.Idlc('request_types/shard_collection.idl')[0],
     ],

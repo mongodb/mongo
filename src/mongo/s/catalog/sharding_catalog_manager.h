@@ -33,8 +33,10 @@
 #include "mongo/db/concurrency/d_concurrency.h"
 #include "mongo/executor/task_executor.h"
 #include "mongo/s/catalog/type_chunk.h"
+#include "mongo/s/catalog/type_database.h"
 #include "mongo/s/catalog/type_shard.h"
 #include "mongo/s/client/shard.h"
+#include "mongo/s/client/shard_registry.h"
 #include "mongo/s/shard_key_pattern.h"
 #include "mongo/stdx/mutex.h"
 
@@ -178,6 +180,20 @@ public:
     //
     // Database Operations
     //
+
+    /**
+     * Creates a new database entry for the specified database name in the configuration
+     * metadata and sets the specified shard as primary.
+     *
+     * @param dbName name of the database (case sensitive)
+     *
+     * Returns Status::OK on success or any error code indicating the failure. These are some
+     * of the known failures:
+     *  - NamespaceExists - database already exists
+     *  - DatabaseDifferCase - database already exists, but with a different case
+     *  - ShardNotFound - could not find a shard to place the DB on
+     */
+    Status createDatabase(OperationContext* opCtx, const std::string& dbName);
 
     /**
      * Creates a new database or updates the sharding status for an existing one. Cannot be
@@ -341,6 +357,27 @@ private:
                                                               RemoteCommandTargeter* targeter,
                                                               const std::string& dbName,
                                                               const BSONObj& cmdObj);
+
+    /**
+     * Checks that the given database name doesn't already exist in the config.databases
+     * collection, including under different casing. Optional db can be passed and will
+     * be set with the database details if the given dbName exists.
+     *
+     * Returns OK status if the db does not exist.
+     * Some known errors include:
+     *  NamespaceExists if it exists with the same casing
+     *  DatabaseDifferCase if it exists under different casing.
+     */
+    Status _checkDbDoesNotExist(OperationContext* opCtx,
+                                const std::string& dbName,
+                                DatabaseType* db);
+
+    /**
+     * Selects an optimal shard on which to place a newly created database from the set of
+     * available shards. Will return ShardNotFound if shard could not be found.
+     */
+    static StatusWith<ShardId> _selectShardForNewDatabase(OperationContext* opCtx,
+                                                          ShardRegistry* shardRegistry);
 
     // The owning service context
     ServiceContext* const _serviceContext;

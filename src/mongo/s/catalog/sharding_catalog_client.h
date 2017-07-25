@@ -94,11 +94,7 @@ enum ShardDrainingStatus {
 class ShardingCatalogClient {
     MONGO_DISALLOW_COPYING(ShardingCatalogClient);
 
-    // Allows ShardingCatalogManager to access _checkDbDoesNotExist
-    // TODO: move _checkDbDoesNotExist to ShardingCatalogManager when
-    // ShardingCatalogClient::createDatabaseCommand, the other caller of this function,
-    // is moved into ShardingCatalogManager.
-    // SERVER-30022.
+    // Allows ShardingCatalogManager to access _exhaustiveFindOnConfig
     friend class ShardingCatalogManager;
 
 public:
@@ -344,20 +340,6 @@ public:
                                          BatchedCommandResponse* response) = 0;
 
     /**
-     * Creates a new database entry for the specified database name in the configuration
-     * metadata and sets the specified shard as primary.
-     *
-     * @param dbName name of the database (case sensitive)
-     *
-     * Returns Status::OK on success or any error code indicating the failure. These are some
-     * of the known failures:
-     *  - NamespaceExists - database already exists
-     *  - DatabaseDifferCase - database already exists, but with a different case
-     *  - ShardNotFound - could not find a shard to place the DB on
-     */
-    virtual Status createDatabase(OperationContext* opCtx, const std::string& dbName) = 0;
-
-    /**
      * Directly inserts a document in the specified namespace on the config server. The document
      * must have an _id index. Must only be used for insertions in the 'config' database.
      *
@@ -422,19 +404,14 @@ protected:
     ShardingCatalogClient() = default;
 
 private:
-    /**
-     * Checks that the given database name doesn't already exist in the config.databases
-     * collection, including under different casing. Optional db can be passed and will
-     * be set with the database details if the given dbName exists.
-     *
-     * Returns OK status if the db does not exist.
-     * Some known errors include:
-     *  NamespaceExists if it exists with the same casing
-     *  DatabaseDifferCase if it exists under different casing.
-     */
-    virtual Status _checkDbDoesNotExist(OperationContext* opCtx,
-                                        const std::string& dbName,
-                                        DatabaseType* db) = 0;
+    virtual StatusWith<repl::OpTimeWith<std::vector<BSONObj>>> _exhaustiveFindOnConfig(
+        OperationContext* opCtx,
+        const ReadPreferenceSetting& readPref,
+        const repl::ReadConcernLevel& readConcern,
+        const NamespaceString& nss,
+        const BSONObj& query,
+        const BSONObj& sort,
+        boost::optional<long long> limit) = 0;
 };
 
 }  // namespace mongo

@@ -159,9 +159,14 @@ public:
 private:
     std::unique_ptr<DistLockManager> _distLockManager;
 
-    Status _checkDbDoesNotExist(OperationContext* opCtx,
-                                const std::string& dbName,
-                                DatabaseType* db) override;
+    StatusWith<repl::OpTimeWith<std::vector<BSONObj>>> _exhaustiveFindOnConfig(
+        OperationContext* opCtx,
+        const ReadPreferenceSetting& readPref,
+        const repl::ReadConcernLevel& readConcern,
+        const NamespaceString& nss,
+        const BSONObj& query,
+        const BSONObj& sort,
+        boost::optional<long long> limit) override;
 };
 
 }  // namespace mongo

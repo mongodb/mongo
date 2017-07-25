@@ -33,6 +33,7 @@
 #include "mongo/s/catalog/sharding_catalog_manager.h"
 
 #include <iomanip>
+#include <pcrecpp.h>
 #include <set>
 
 #include "mongo/base/status_with.h"
@@ -61,6 +62,7 @@
 #include "mongo/s/client/shard_registry.h"
 #include "mongo/s/cluster_identity_loader.h"
 #include "mongo/s/grid.h"
+#include "mongo/s/shard_util.h"
 #include "mongo/s/write_ops/batched_command_request.h"
 #include "mongo/s/write_ops/batched_command_response.h"
 #include "mongo/util/fail_point_service.h"
@@ -70,6 +72,8 @@
 
 namespace mongo {
 namespace {
+
+using std::vector;
 
 using CallbackHandle = executor::TaskExecutor::CallbackHandle;
 using CallbackArgs = executor::TaskExecutor::CallbackArgs;
@@ -730,6 +734,45 @@ BSONObj ShardingCatalogManager::createShardIdentityUpsertForAddShard(OperationCo
     request.setWriteConcern(ShardingCatalogClient::kMajorityWriteConcern.toBSON());
 
     return request.toBSON();
+}
+
+// static
+StatusWith<ShardId> ShardingCatalogManager::_selectShardForNewDatabase(
+    OperationContext* opCtx, ShardRegistry* shardRegistry) {
+    vector<ShardId> allShardIds;
+
+    shardRegistry->getAllShardIds(&allShardIds);
+    if (allShardIds.empty()) {
+        shardRegistry->reload(opCtx);
+        shardRegistry->getAllShardIds(&allShardIds);
+
+        if (allShardIds.empty()) {
+            return Status(ErrorCodes::ShardNotFound, "No shards found");
+        }
+    }
+
+    ShardId candidateShardId = allShardIds[0];
+
+    auto candidateSizeStatus = shardutil::retrieveTotalShardSize(opCtx, candidateShardId);
+    if (!candidateSizeStatus.isOK()) {
+        return candidateSizeStatus.getStatus();
+    }
+
+    for (size_t i = 1; i < allShardIds.size(); i++) {
+        const ShardId shardId = allShardIds[i];
+
+        const auto sizeStatus = shardutil::retrieveTotalShardSize(opCtx, shardId);
+        if (!sizeStatus.isOK()) {
+            return sizeStatus.getStatus();
+        }
+
+        if (sizeStatus.getValue() < candidateSizeStatus.getValue()) {
+            candidateSizeStatus = sizeStatus;
+            candidateShardId = shardId;
+        }
+    }
+
+    return candidateShardId;
 }
 
 }  // namespace mongo

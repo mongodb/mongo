@@ -45,6 +45,7 @@
 #include "mongo/s/client/shard_registry.h"
 #include "mongo/s/client/version_manager.h"
 #include "mongo/s/grid.h"
+#include "mongo/s/request_types/create_database_gen.h"
 #include "mongo/s/shard_id.h"
 #include "mongo/s/stale_exception.h"
 #include "mongo/util/log.h"
@@ -437,8 +438,20 @@ CachedCollectionRoutingInfo getShardedCollection(OperationContext* opCtx,
 StatusWith<CachedDatabaseInfo> createShardDatabase(OperationContext* opCtx, StringData dbName) {
     auto dbStatus = Grid::get(opCtx)->catalogCache()->getDatabase(opCtx, dbName);
     if (dbStatus == ErrorCodes::NamespaceNotFound) {
+        ConfigsvrCreateDatabase configCreateDatabaseRequest;
+        configCreateDatabaseRequest.set_configsvrCreateDatabase(dbName);
+
+        auto configShard = Grid::get(opCtx)->shardRegistry()->getConfigShard();
+
         auto createDbStatus =
-            Grid::get(opCtx)->catalogClient()->createDatabase(opCtx, dbName.toString());
+            uassertStatusOK(configShard->runCommandWithFixedRetryAttempts(
+                                opCtx,
+                                ReadPreferenceSetting(ReadPreference::PrimaryOnly),
+                                "admin",
+                                configCreateDatabaseRequest.toBSON(),
+                                Shard::RetryPolicy::kIdempotent))
+                .commandStatus;
+
         if (createDbStatus.isOK() || createDbStatus == ErrorCodes::NamespaceExists) {
             dbStatus = Grid::get(opCtx)->catalogCache()->getDatabase(opCtx, dbName);
         } else {

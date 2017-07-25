@@ -186,52 +186,6 @@ Status ShardingCatalogClientImpl::updateDatabase(OperationContext* opCtx,
     return Status::OK();
 }
 
-Status ShardingCatalogClientImpl::createDatabase(OperationContext* opCtx,
-                                                 const std::string& dbName) {
-    invariant(nsIsDbOnly(dbName));
-
-    // The admin and config databases should never be explicitly created. They "just exist",
-    // i.e. getDatabase will always return an entry for them.
-    invariant(dbName != "admin");
-    invariant(dbName != "config");
-
-    // Lock the database globally to prevent conflicts with simultaneous database creation.
-    auto scopedDistLock = getDistLockManager()->lock(
-        opCtx, dbName, "createDatabase", DistLockManager::kDefaultLockTimeout);
-    if (!scopedDistLock.isOK()) {
-        return scopedDistLock.getStatus();
-    }
-
-    // check for case sensitivity violations
-    Status status = _checkDbDoesNotExist(opCtx, dbName, nullptr);
-    if (!status.isOK()) {
-        return status;
-    }
-
-    // Database does not exist, pick a shard and create a new entry
-    auto newShardIdStatus = _selectShardForNewDatabase(opCtx, Grid::get(opCtx)->shardRegistry());
-    if (!newShardIdStatus.isOK()) {
-        return newShardIdStatus.getStatus();
-    }
-
-    const ShardId& newShardId = newShardIdStatus.getValue();
-
-    log() << "Placing [" << dbName << "] on: " << newShardId;
-
-    DatabaseType db;
-    db.setName(dbName);
-    db.setPrimary(newShardId);
-    db.setSharded(false);
-
-    status = insertConfigDocument(
-        opCtx, DatabaseType::ConfigNS, db.toBSON(), ShardingCatalogClient::kMajorityWriteConcern);
-    if (status.code() == ErrorCodes::DuplicateKey) {
-        return Status(ErrorCodes::NamespaceExists, "database " + dbName + " already exists");
-    }
-
-    return status;
-}
-
 Status ShardingCatalogClientImpl::logAction(OperationContext* opCtx,
                                             const std::string& what,
                                             const std::string& ns,
@@ -276,45 +230,6 @@ Status ShardingCatalogClientImpl::logChange(OperationContext* opCtx,
     }
 
     return _log(opCtx, kChangeLogCollectionName, what, ns, detail, writeConcern);
-}
-
-// static
-StatusWith<ShardId> ShardingCatalogClientImpl::_selectShardForNewDatabase(
-    OperationContext* opCtx, ShardRegistry* shardRegistry) {
-    vector<ShardId> allShardIds;
-
-    shardRegistry->getAllShardIds(&allShardIds);
-    if (allShardIds.empty()) {
-        shardRegistry->reload(opCtx);
-        shardRegistry->getAllShardIds(&allShardIds);
-
-        if (allShardIds.empty()) {
-            return Status(ErrorCodes::ShardNotFound, "No shards found");
-        }
-    }
-
-    ShardId candidateShardId = allShardIds[0];
-
-    auto candidateSizeStatus = shardutil::retrieveTotalShardSize(opCtx, candidateShardId);
-    if (!candidateSizeStatus.isOK()) {
-        return candidateSizeStatus.getStatus();
-    }
-
-    for (size_t i = 1; i < allShardIds.size(); i++) {
-        const ShardId shardId = allShardIds[i];
-
-        const auto sizeStatus = shardutil::retrieveTotalShardSize(opCtx, shardId);
-        if (!sizeStatus.isOK()) {
-            return sizeStatus.getStatus();
-        }
-
-        if (sizeStatus.getValue() < candidateSizeStatus.getValue()) {
-            candidateSizeStatus = sizeStatus;
-            candidateShardId = shardId;
-        }
-    }
-
-    return candidateShardId;
 }
 
 Status ShardingCatalogClientImpl::_log(OperationContext* opCtx,
@@ -1388,53 +1303,6 @@ Status ShardingCatalogClientImpl::removeConfigDocuments(OperationContext* opCtx,
     return response.toStatus();
 }
 
-Status ShardingCatalogClientImpl::_checkDbDoesNotExist(OperationContext* opCtx,
-                                                       const string& dbName,
-                                                       DatabaseType* db) {
-    BSONObjBuilder queryBuilder;
-    queryBuilder.appendRegex(
-        DatabaseType::name(), (string) "^" + pcrecpp::RE::QuoteMeta(dbName) + "$", "i");
-
-    auto findStatus = _exhaustiveFindOnConfig(opCtx,
-                                              kConfigReadSelector,
-                                              repl::ReadConcernLevel::kMajorityReadConcern,
-                                              NamespaceString(DatabaseType::ConfigNS),
-                                              queryBuilder.obj(),
-                                              BSONObj(),
-                                              1);
-    if (!findStatus.isOK()) {
-        return findStatus.getStatus();
-    }
-
-    const auto& docs = findStatus.getValue().value;
-    if (docs.empty()) {
-        return Status::OK();
-    }
-
-    BSONObj dbObj = docs.front();
-    std::string actualDbName = dbObj[DatabaseType::name()].String();
-    if (actualDbName == dbName) {
-        if (db) {
-            auto parseDBStatus = DatabaseType::fromBSON(dbObj);
-            if (!parseDBStatus.isOK()) {
-                return parseDBStatus.getStatus();
-            }
-
-            *db = parseDBStatus.getValue();
-        }
-
-        return Status(ErrorCodes::NamespaceExists,
-                      str::stream() << "database " << dbName << " already exists");
-    }
-
-    return Status(ErrorCodes::DatabaseDifferCase,
-                  str::stream() << "can't have 2 databases that just differ on case "
-                                << " have: "
-                                << actualDbName
-                                << " want to add: "
-                                << dbName);
-}
-
 Status ShardingCatalogClientImpl::_createCappedConfigCollection(
     OperationContext* opCtx,
     StringData collName,
@@ -1509,7 +1377,7 @@ StatusWith<long long> ShardingCatalogClientImpl::_runCountCommandOnConfig(Operat
 StatusWith<repl::OpTimeWith<vector<BSONObj>>> ShardingCatalogClientImpl::_exhaustiveFindOnConfig(
     OperationContext* opCtx,
     const ReadPreferenceSetting& readPref,
-    repl::ReadConcernLevel readConcern,
+    const repl::ReadConcernLevel& readConcern,
     const NamespaceString& nss,
     const BSONObj& query,
     const BSONObj& sort,

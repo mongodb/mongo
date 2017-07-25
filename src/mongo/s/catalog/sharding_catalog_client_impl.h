@@ -49,13 +49,6 @@ class TaskExecutor;
  */
 class ShardingCatalogClientImpl final : public ShardingCatalogClient {
 
-    // Allows ShardingCatalogManager to access _selectShardForNewDatabase
-    // TODO: move _selectShardForNewDatabase to ShardingCatalogManager, when
-    // ShardingCatalogClient::createDatabaseCommand, the other caller of this function,
-    // is moved into ShardingCatalogManager.
-    // SERVER-30022.
-    friend class ShardingCatalogManager;
-
 public:
     /*
      * Updates (or if "upsert" is true, creates) catalog data for the sharded collection "collNs" by
@@ -81,8 +74,6 @@ public:
     Status updateDatabase(OperationContext* opCtx,
                           const std::string& dbName,
                           const DatabaseType& db) override;
-
-    Status createDatabase(OperationContext* opCtx, const std::string& dbName) override;
 
     Status logAction(OperationContext* opCtx,
                      const std::string& what,
@@ -196,17 +187,6 @@ public:
         repl::ReadConcernLevel readConcernLevel) override;
 
 private:
-    Status _checkDbDoesNotExist(OperationContext* opCtx,
-                                const std::string& dbName,
-                                DatabaseType* db) override;
-
-    /**
-     * Selects an optimal shard on which to place a newly created database from the set of
-     * available shards. Will return ShardNotFound if shard could not be found.
-     */
-    static StatusWith<ShardId> _selectShardForNewDatabase(OperationContext* opCtx,
-                                                          ShardRegistry* shardRegistry);
-
     /**
      * Updates a single document in the specified namespace on the config server. The document must
      * have an _id index. Must only be used for updates to the 'config' database.
@@ -245,11 +225,11 @@ private:
     StatusWith<repl::OpTimeWith<std::vector<BSONObj>>> _exhaustiveFindOnConfig(
         OperationContext* opCtx,
         const ReadPreferenceSetting& readPref,
-        repl::ReadConcernLevel readConcern,
+        const repl::ReadConcernLevel& readConcern,
         const NamespaceString& nss,
         const BSONObj& query,
         const BSONObj& sort,
-        boost::optional<long long> limit);
+        boost::optional<long long> limit) override;
 
     /**
      * Appends a read committed read concern to the request object.

@@ -226,9 +226,14 @@ StatusWith<std::vector<KeysCollectionDocument>> ShardingCatalogClientMock::getNe
     return {ErrorCodes::InternalError, "Method not implemented"};
 }
 
-Status ShardingCatalogClientMock::_checkDbDoesNotExist(OperationContext* opCtx,
-                                                       const string& dbName,
-                                                       DatabaseType* db) {
+StatusWith<repl::OpTimeWith<std::vector<BSONObj>>>
+ShardingCatalogClientMock::_exhaustiveFindOnConfig(OperationContext* opCtx,
+                                                   const ReadPreferenceSetting& readPref,
+                                                   const repl::ReadConcernLevel& readConcern,
+                                                   const NamespaceString& nss,
+                                                   const BSONObj& query,
+                                                   const BSONObj& sort,
+                                                   boost::optional<long long> limit) {
     return {ErrorCodes::InternalError, "Method not implemented"};
 }
 
