@@ -90,6 +90,7 @@ bool setExhaustMessage(Message* m, const DbResponse& dbresponse) {
 }  // namespace
 
 using transport::TransportLayer;
+using transport::ServiceExecutor;
 
 /*
  * This class wraps up the logic for swapping/unswapping the Client during runNext().
@@ -162,6 +163,12 @@ public:
         return _okayToRunNext;
     }
 
+    // Returns whether the thread guard is the owner of the SSM's state or not. Callers can use this
+    // to determine whether their callchain is recursive.
+    bool isOwner() const {
+        return _haveTakenOwnership;
+    }
+
 private:
     ServiceStateMachine* _ssm;
     bool _haveTakenOwnership;
@@ -200,7 +207,8 @@ void ServiceStateMachine::_sourceCallback(Status status) {
     // runNext() so that this thread can do other useful work with its timeslice instead of going
     // to sleep while waiting for the SSM to be released.
     if (!guard) {
-        return _scheduleFunc([this, status] { _sourceCallback(status); });
+        return _scheduleFunc([this, status] { _sourceCallback(status); },
+                             ServiceExecutor::DeferredTask);
     }
 
     // Make sure we just called sourceMessage();
@@ -213,7 +221,12 @@ void ServiceStateMachine::_sourceCallback(Status status) {
         // Since we know that we're going to process a message, call scheduleNext() immediately
         // to schedule the call to processMessage() on the serviceExecutor (or just unwind the
         // stack)
-        return scheduleNext();
+
+        // If this callback doesn't own the ThreadGuard, then we're being called recursively,
+        // and the executor shouldn't start a new thread to process the message - it can use this
+        // one just after this returns.
+        auto flags = guard.isOwner() ? ServiceExecutor::EmptyFlags : ServiceExecutor::DeferredTask;
+        return scheduleNext(flags);
     } else if (ErrorCodes::isInterruption(status.code()) ||
                ErrorCodes::isNetworkError(status.code())) {
         LOG(2) << "Session from " << remote << " encountered a network error during SourceMessage";
@@ -241,7 +254,8 @@ void ServiceStateMachine::_sinkCallback(Status status) {
     // runNext() so that this thread can do other useful work with its timeslice instead of going
     // to sleep while waiting for the SSM to be released.
     if (!guard) {
-        return _scheduleFunc([this, status] { _sinkCallback(status); });
+        return _scheduleFunc([this, status] { _sinkCallback(status); },
+                             ServiceExecutor::DeferredTask);
     }
 
     invariant(state() == State::SinkWait);
@@ -266,7 +280,11 @@ void ServiceStateMachine::_sinkCallback(Status status) {
     if (state() == State::EndSession) {
         _runNextInGuard(guard);
     } else {  // Otherwise scheduleNext to unwind the stack and run the next step later
-        scheduleNext();
+        // If this callback doesn't own the ThreadGuard, then we're being called recursively,
+        // and the executor shouldn't start a new thread to process the message - it can use this
+        // one just after this returns.
+        auto flags = guard.isOwner() ? ServiceExecutor::EmptyFlags : ServiceExecutor::DeferredTask;
+        return scheduleNext(flags);
     }
 }
 
@@ -337,7 +355,7 @@ void ServiceStateMachine::_processMessage(ThreadGuard& guard) {
     } else {
         _state.store(State::Source);
         _inMessage.reset();
-        return scheduleNext();
+        return scheduleNext(ServiceExecutor::DeferredTask);
     }
 }
 
@@ -349,7 +367,7 @@ void ServiceStateMachine::runNext() {
     // runNext() so that this thread can do other useful work with its timeslice instead of going
     // to sleep while waiting for the SSM to be released.
     if (!guard) {
-        return scheduleNext();
+        return scheduleNext(ServiceExecutor::DeferredTask);
     }
     return _runNextInGuard(guard);
 }
@@ -420,8 +438,8 @@ void ServiceStateMachine::_runNextInGuard(ThreadGuard& guard) {
     _cleanupSession(guard);
 }
 
-void ServiceStateMachine::scheduleNext() {
-    _maybeScheduleFunc(_serviceContext->getServiceExecutor(), [this] { runNext(); });
+void ServiceStateMachine::scheduleNext(ServiceExecutor::ScheduleFlags flags) {
+    _maybeScheduleFunc(_serviceContext->getServiceExecutor(), [this] { runNext(); }, flags);
 }
 
 void ServiceStateMachine::terminateIfTagsDontMatch(transport::Session::TagMask tags) {

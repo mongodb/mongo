@@ -1058,7 +1058,7 @@ var MongoRunner, _startMongod, startMongoProgram, runMongoProgram, startMongoPro
             if (jsTest.options().serviceExecutor &&
                 (!programVersion || (parseInt(programVersion.split(".")[0]) >= 3 &&
                                      parseInt(programVersion.split(".")[1]) >= 5))) {
-                if (!argArrayContains("serviceExecutor")) {
+                if (!argArrayContains("--serviceExecutor")) {
                     argArray.push(...["--serviceExecutor", jsTest.options().serviceExecutor]);
                 }
             }

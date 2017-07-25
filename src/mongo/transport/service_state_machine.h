@@ -37,10 +37,11 @@
 #include "mongo/stdx/memory.h"
 #include "mongo/stdx/mutex.h"
 #include "mongo/stdx/thread.h"
+#include "mongo/transport/service_entry_point.h"
+#include "mongo/transport/service_executor.h"
 #include "mongo/transport/session.h"
 
 namespace mongo {
-class ServiceEntryPoint;
 
 /*
  * The ServiceStateMachine holds the state of a single client connection and represents the
@@ -105,7 +106,8 @@ public:
      * It is guaranteed to unwind the stack, and not call runNext() recursively, but is not
      * guaranteed that runNext() will run after this returns.
      */
-    void scheduleNext();
+    void scheduleNext(
+        transport::ServiceExecutor::ScheduleFlags flags = transport::ServiceExecutor::EmptyFlags);
 
     /*
      * Gets the current state of connection for testing/diagnostic purposes.
@@ -137,18 +139,20 @@ private:
      * callbacks to run.
      */
     template <typename Executor, typename Func>
-    void _maybeScheduleFunc(Executor* svcExec, Func&& func) {
+    void _maybeScheduleFunc(Executor* svcExec,
+                            Func&& func,
+                            transport::ServiceExecutor::ScheduleFlags flags) {
         if (svcExec) {
             uassertStatusOK(svcExec->schedule(
-                [ func = std::move(func), anchor = shared_from_this() ] { func(); }));
+                [ func = std::move(func), anchor = shared_from_this() ] { func(); }, flags));
         }
     }
 
     template <typename Func>
-    void _scheduleFunc(Func&& func) {
+    void _scheduleFunc(Func&& func, transport::ServiceExecutor::ScheduleFlags flags) {
         auto svcExec = _serviceContext->getServiceExecutor();
         invariant(svcExec);
-        _maybeScheduleFunc(svcExec, func);
+        _maybeScheduleFunc(svcExec, func, flags);
     }
 
     /*

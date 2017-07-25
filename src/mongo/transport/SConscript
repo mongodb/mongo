@@ -29,19 +29,6 @@ env.Library(
 )
 
 env.Library(
-    target='transport_layer_manager',
-    source=[
-        'transport_layer_manager.cpp',
-    ],
-    LIBDEPS=[
-        'transport_layer',
-    ],
-    LIBDEPS_PRIVATE=[
-        'service_executor',
-    ],
-)
-
-env.Library(
     target='transport_layer_mock',
     source=[
         'transport_layer_mock.cpp',
@@ -53,6 +40,21 @@ env.Library(
 
 tlEnv = env.Clone()
 tlEnv.InjectThirdPartyIncludePaths(libraries=['asio'])
+
+tlEnv.Library(
+    target='transport_layer_manager',
+    source=[
+        'transport_layer_manager.cpp',
+    ],
+    LIBDEPS=[
+        'transport_layer',
+    ],
+    LIBDEPS_PRIVATE=[
+        'service_executor',
+        '$BUILD_DIR/third_party/shim_asio',
+    ],
+)
+
 tlEnv.Library(
     target='transport_layer',
     source=[
@@ -67,6 +69,8 @@ tlEnv.Library(
         '$BUILD_DIR/mongo/db/server_options_core',
         '$BUILD_DIR/mongo/db/service_context',
         '$BUILD_DIR/mongo/db/stats/counters',
+    ],
+    LIBDEPS_PRIVATE=[
         '$BUILD_DIR/third_party/shim_asio',
     ],
 )
@@ -74,14 +78,27 @@ tlEnv.Library(
 tlEnv.Library(
     target='service_executor',
     source=[
-        'service_executor_base.cpp',
-        'service_executor_fixed.cpp',
+        'service_executor_adaptive.cpp',
     ],
     LIBDEPS=[
         '$BUILD_DIR/mongo/db/service_context',
     ],
     LIBDEPS_PRIVATE=[
         "$BUILD_DIR/mongo/util/processinfo",
+        '$BUILD_DIR/third_party/shim_asio',
+    ],
+)
+
+tlEnv.CppUnitTest(
+    target='service_executor_adaptive_test',
+    source=[
+        'service_executor_adaptive_test.cpp',
+    ],
+    LIBDEPS=[
+        'service_executor',
+        '$BUILD_DIR/mongo/db/service_context',
+        '$BUILD_DIR/mongo/unittest/unittest',
+        '$BUILD_DIR/mongo/util/clock_source_mock',
         '$BUILD_DIR/third_party/shim_asio',
     ],
 )

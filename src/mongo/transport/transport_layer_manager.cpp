@@ -34,7 +34,7 @@
 #include "mongo/db/server_options.h"
 #include "mongo/db/service_context.h"
 #include "mongo/stdx/memory.h"
-#include "mongo/transport/service_executor_fixed.h"
+#include "mongo/transport/service_executor_adaptive.h"
 #include "mongo/transport/session.h"
 #include "mongo/transport/transport_layer_asio.h"
 #include "mongo/transport/transport_layer_legacy.h"
@@ -154,9 +154,9 @@ std::unique_ptr<TransportLayer> TransportLayerManager::createWithConfig(
 
         auto transportLayerASIO = stdx::make_unique<transport::TransportLayerASIO>(opts, sep);
 
-        if (config->serviceExecutor == "fixedForTesting") {
-            ctx->setServiceExecutor(
-                stdx::make_unique<ServiceExecutorFixed>(ctx, transportLayerASIO->getIOContext()));
+        if (config->serviceExecutor == "adaptive") {
+            ctx->setServiceExecutor(stdx::make_unique<ServiceExecutorAdaptive>(
+                ctx, transportLayerASIO->getIOContext()));
         }
         transportLayer = std::move(transportLayerASIO);
     } else if (serverGlobalParams.transportLayer == "legacy") {

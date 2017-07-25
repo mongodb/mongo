@@ -40,7 +40,7 @@
 #include "mongo/stdx/functional.h"
 #include "mongo/stdx/memory.h"
 #include "mongo/stdx/mutex.h"
-#include "mongo/transport/service_executor_base.h"
+#include "mongo/transport/service_executor.h"
 #include "mongo/transport/session.h"
 #include "mongo/util/clock_source.h"
 #include "mongo/util/decorable.h"

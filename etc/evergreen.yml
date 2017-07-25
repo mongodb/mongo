@@ -2435,15 +2435,6 @@ tasks:
       run_multiple_jobs: true
 
 - <<: *task_template
-  name: jsCore_async
-  commands:
-  - func: "do setup"
-  - func: "run tests"
-    vars:
-      resmoke_args: --suites=core --storageEngine=wiredTiger --serviceExecutor=fixedForTesting
-      run_multiple_jobs: true
-
-- <<: *task_template
   name: jsCore_inMem
   commands:
   - func: "do setup"
@@ -2920,16 +2911,6 @@ tasks:
       resmoke_args: --suites=parallel --storageEngine=wiredTiger
 
 - <<: *task_template
-  name: parallel_async
-  depends_on:
-  - name: jsCore_async
-  commands:
-  - func: "do setup"
-  - func: "run tests"
-    vars:
-      resmoke_args: --suites=parallel --storageEngine=wiredTiger --serviceExecutor=fixedForTesting
-
-- <<: *task_template
   name: parallel_compatibility
   depends_on:
   - name: jsCore_compatibility
@@ -3265,30 +3246,12 @@ tasks:
       run_multiple_jobs: true
 
 - <<: *task_template
-  name: ssl_async
-  commands:
-  - func: "do setup"
-  - func: "run tests"
-    vars:
-      resmoke_args: --suites=ssl --serviceExecutor=fixedForTesting
-      run_multiple_jobs: true
-
-- <<: *task_template
   name: sslSpecial
   commands:
   - func: "do setup"
   - func: "run tests"
     vars:
       resmoke_args: --suites=ssl_special
-      run_multiple_jobs: true
-
-- <<: *task_template
-  name: sslSpecial_async
-  commands:
-  - func: "do setup"
-  - func: "run tests"
-    vars:
-      resmoke_args: --suites=ssl_special --serviceExecutor=fixedForTesting
       run_multiple_jobs: true
 
 - <<: *task_template
@@ -5609,11 +5572,12 @@ buildvariants:
     num_jobs_available: $(grep -c ^processor /proc/cpuinfo)
     ext: zip
     use_scons_cache: true
+    test_flags: --serviceExecutor=adaptive
   tasks:
   - name: compile
     distros:
     - windows-64-vs2015-large
-  - name: jsCore_async
+  - name: jsCore
 
 - name: enterprise-windows-64-2k8-inmem
   display_name: Enterprise Windows 2008R2 (inMemory)
@@ -9287,12 +9251,137 @@ buildvariants:
     num_jobs_available: $(($(grep -c ^processor /proc/cpuinfo) / 3)) # Avoid starting too many mongod's under {A,UB}SAN build.
     build_mongoreplay: false
     hang_analyzer_dump_core: false
+    test_flags: --serviceExecutor=adaptive
   tasks:
   - name: compile
-  - name: jsCore_async
-  - name: parallel_async
-  - name: ssl_async
-  - name: sslSpecial_async
+  - name: compile_all
+  - name: aggregation
+  - name: aggregation_WT
+  - name: aggregation_WT_ese
+  - name: aggregation_auth
+  - name: aggregation_facet_unwind_passthrough_WT
+  - name: aggregation_read_concern_majority_passthrough_WT
+  - name: aggregation_sharded_collections_passthrough_WT
+# TODO Put back when SERVER-30471 is done
+#  - name: audit
+#  - name: audit_WT
+#  - name: auth
+#  - name: auth_WT
+#  - name: auth_audit
+#  - name: auth_audit_WT
+  - name: bulk_gle_passthrough
+  - name: bulk_gle_passthrough_WT
+  - name: causally_consistent_jscore_passthrough_WT
+  - name: causally_consistent_jscore_passthrough_auth_WT
+  - name: concurrency
+  - name: concurrency_WT
+  - name: concurrency_replication
+  - name: concurrency_replication_WT
+  - name: concurrency_sharded
+  - name: concurrency_sharded_WT
+  - name: concurrency_simultaneous
+  - name: concurrency_simultaneous_WT
+  - name: dbtest
+  - name: dbtest_WT
+  - name: disk
+  - name: disk_WT
+  - name: dur_jscore_passthrough
+  - name: durability
+  - name: ese_WT
+  - name: failpoints
+  - name: failpoints_auth
+  - name: gle_auth
+  - name: gle_auth_WT
+  - name: gle_auth_basics_passthrough
+  - name: gle_auth_basics_passthrough_WT
+  - name: gle_auth_basics_passthrough_write_cmd
+  - name: gle_auth_basics_passthrough_write_cmd_WT
+  - name: gle_auth_write_cmd
+  - name: gle_auth_write_cmd_WT
+  - name: integration_tests_replset
+  - name: integration_tests_sharded
+  - name: integration_tests_standalone
+  - name: jsCore
+  - name: jsCore_WT
+  - name: jsCore_WT_ese
+  - name: jsCore_inMem
+  - name: jsCore_auth
+  - name: jsCore_compatibility
+  - name: jsCore_compatibility_WT
+  - name: jsCore_decimal
+  - name: jsCore_decimal_WT
+  - name: jsCore_minimum_batch_size_WT
+  - name: jsCore_op_query
+  - name: jsCore_op_query_WT
+  - name: mmap
+  - name: mongosTest
+  - name: multiversion
+  - name: multiversion_auth
+  - name: multiversion_WT
+  - name: multiversion_multistorage_engine
+  - name: noPassthrough
+  - name: noPassthroughWithMongod
+  - name: noPassthroughWithMongod_WT
+  - name: noPassthrough_WT
+  - name: parallel
+  - name: parallel_WT
+  - name: parallel_compatibility
+  - name: parallel_compatibility_WT
+  - name: read_concern_linearizable_passthrough
+  - name: read_concern_linearizable_passthrough_WT
+  - name: read_concern_majority_passthrough_WT
+  - name: read_only
+  - name: read_only_WT
+  - name: read_only_sharded
+  - name: read_only_sharded_WT
+# TODO Put back when SERVER-30471 is done
+#  - name: replica_sets
+#  - name: replica_sets_WT
+#  - name: replica_sets_WT_ese
+#  - name: replica_sets_auth
+#  - name: replica_sets_pv0
+  - name: replica_sets_jscore_passthrough
+  - name: replica_sets_jscore_passthrough_WT
+  - name: replica_sets_initsync_jscore_passthrough
+  - name: replica_sets_initsync_jscore_passthrough_WT
+  - name: replica_sets_initsync_static_jscore_passthrough
+  - name: replica_sets_initsync_static_jscore_passthrough_WT
+  - name: replica_sets_resync_static_jscore_passthrough
+  - name: replica_sets_resync_static_jscore_passthrough_WT
+  - name: replica_sets_kill_secondaries_jscore_passthrough_WT
+  - name: master_slave
+  - name: master_slave_WT
+  - name: master_slave_auth
+  - name: master_slave_jscore_passthrough
+  - name: master_slave_jscore_passthrough_WT
+  - name: sasl
+  - name: sharded_collections_jscore_passthrough
+  - name: sharded_collections_jscore_passthrough_WT
+  - name: sharding
+  - name: sharding_WT
+  - name: sharding_WT_ese
+  - name: sharding_auth
+  - name: sharding_auth_audit_WT
+  - name: sharding_gle_auth_basics_passthrough
+  - name: sharding_gle_auth_basics_passthrough_WT
+  - name: sharding_gle_auth_basics_passthrough_write_cmd
+  - name: sharding_gle_auth_basics_passthrough_write_cmd_WT
+  - name: sharding_last_stable_mongos_and_mixed_shards
+  - name: sharding_jscore_passthrough
+  - name: sharding_jscore_passthrough_WT
+  - name: sharding_jscore_op_query_passthrough_WT
+  - name: sharding_jscore_passthrough_wire_ops_WT
+  - name: sharding_op_query_WT
+  - name: slow1
+  - name: slow1_WT
+  - name: serial_run
+  - name: serial_run_WT
+  - name: snmp
+  - name: snmp_WT
+  - name: ssl
+  - name: sslSpecial
+  - name: tool
+  - name: tool_WT
 
 - name: enterprise-ubuntu-dynamic-1604-64-bit
   display_name: "* Shared Library Enterprise Ubuntu 16.04"

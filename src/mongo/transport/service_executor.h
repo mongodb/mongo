@@ -45,6 +45,10 @@ class ServiceExecutor {
 public:
     virtual ~ServiceExecutor() = default;
     using Task = stdx::function<void()>;
+    enum ScheduleFlags {
+        EmptyFlags = 0,
+        DeferredTask = 1,
+    };
 
     /*
      * Starts the ServiceExecutor. This may create threads even if no tasks are scheduled.
@@ -56,8 +60,11 @@ public:
      *
      * This is guaranteed to unwind the stack before running the task, although the task may be
      * run later in the same thread.
+     *
+     * If defer is true, then the executor may defer execution of this Task until an available
+     * thread is available.
      */
-    virtual Status schedule(Task task) = 0;
+    virtual Status schedule(Task task, ScheduleFlags flags) = 0;
 
     /*
      * Stops and joins the ServiceExecutor. Any outstanding tasks will not be executed, and any
