@@ -288,7 +288,7 @@ public:
         // Since appendVertexNeighbors(level, output) requires level < hash.getBits(),
         // we have to start to find documents at most GeoHash::kMaxBits - 1. Thus the finest
         // search area is 16 * finest cell area at GeoHash::kMaxBits.
-        _currentLevel = std::max(0u, hashParams.bits - 1u);
+        _currentLevel = std::max(0, hashParams.bits - 1);
     }
 
     PlanStage::StageState work(OperationContext* opCtx,

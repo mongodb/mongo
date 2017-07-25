@@ -1993,6 +1993,12 @@ def doConfigure(myenv):
         # is a problem at least for the S2 headers.
         AddToCXXFLAGSIfSupported(myenv, "-Wno-undefined-var-template")
 
+        # This warning was added in clang-4.0, but it warns about code that is required on some
+        # platforms. Since the warning just states that 'explicit instantiation of [a template] that
+        # occurs after an explicit specialization has no effect', it is harmless on platforms where
+        # it isn't required
+        AddToCXXFLAGSIfSupported(myenv, "-Wno-instantiation-after-specialization")
+
         # Check if we can set "-Wnon-virtual-dtor" when "-Werror" is set. The only time we can't set it is on
         # clang 3.4, where a class with virtual function(s) and a non-virtual destructor throws a warning when
         # it shouldn't.
