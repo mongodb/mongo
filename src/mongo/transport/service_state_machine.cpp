@@ -361,8 +361,10 @@ void ServiceStateMachine::runNextInGuard(ThreadGuard& guard) {
                 auto ticket = session()->sourceMessage(&_inMessage);
                 _state.store(State::SourceWait);
                 if (_sync) {
-                    MONGO_IDLE_THREAD_BLOCK;
-                    sourceCallback(session()->getTransportLayer()->wait(std::move(ticket)));
+                    sourceCallback([&] {
+                        MONGO_IDLE_THREAD_BLOCK;
+                        return session()->getTransportLayer()->wait(std::move(ticket));
+                    }());
                 } else {
                     session()->getTransportLayer()->asyncWait(
                         std::move(ticket), [this](Status status) { sourceCallback(status); });
