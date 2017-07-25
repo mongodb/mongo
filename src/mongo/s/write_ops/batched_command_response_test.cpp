@@ -33,6 +33,7 @@
 #include "mongo/db/jsobj.h"
 #include "mongo/s/write_ops/batched_command_response.h"
 #include "mongo/s/write_ops/write_error_detail.h"
+#include "mongo/stdx/memory.h"
 #include "mongo/unittest/unittest.h"
 
 namespace mongo {
@@ -75,6 +76,69 @@ TEST(BatchedCommandResponse, Basic) {
     BSONObj genResponseObj = response.toBSON();
     ASSERT_EQUALS(0, genResponseObj.woCompare(origResponseObj)) << "parsed: " << genResponseObj
                                                                 << " original: " << origResponseObj;
+}
+
+TEST(BatchedCommandResponse, TooManySmallErrors) {
+    BatchedCommandResponse response;
+
+    const auto bigstr = std::string(1024, 'x');
+
+    for (int i = 0; i < 100'000; i++) {
+        auto errDetail = stdx::make_unique<WriteErrorDetail>();
+        errDetail->setIndex(i);
+        errDetail->setErrCode(ErrorCodes::BadValue);
+        errDetail->setErrMessage(bigstr);
+        response.addToErrDetails(errDetail.release());
+    }
+
+    const auto bson = response.toBSON();
+    ASSERT_LT(bson.objsize(), BSONObjMaxUserSize);
+    const auto errDetails = bson["writeErrors"].Array();
+    ASSERT_EQ(errDetails.size(), 100'000u);
+
+    for (int i = 0; i < 100'000; i++) {
+        auto errDetail = errDetails[i].Obj();
+        ASSERT_EQ(errDetail["index"].Int(), i);
+        ASSERT_EQ(errDetail["code"].Int(), ErrorCodes::BadValue);
+
+        if (i < 1024) {
+            ASSERT_EQ(errDetail["errmsg"].String(), bigstr) << i;
+        } else {
+            ASSERT_EQ(errDetail["errmsg"].String(), ""_sd) << i;
+        }
+    }
+}
+
+TEST(BatchedCommandResponse, TooManyBigErrors) {
+    BatchedCommandResponse response;
+
+    const auto bigstr = std::string(2'000'000, 'x');
+    const auto smallstr = std::string(10, 'x');
+
+    for (int i = 0; i < 100'000; i++) {
+        auto errDetail = stdx::make_unique<WriteErrorDetail>();
+        errDetail->setIndex(i);
+        errDetail->setErrCode(ErrorCodes::BadValue);
+        errDetail->setErrMessage(i < 10 ? bigstr : smallstr);  // Don't waste too much RAM.
+        response.addToErrDetails(errDetail.release());
+    }
+
+    const auto bson = response.toBSON();
+    ASSERT_LT(bson.objsize(), BSONObjMaxUserSize);
+    const auto errDetails = bson["writeErrors"].Array();
+    ASSERT_EQ(errDetails.size(), 100'000u);
+
+    for (int i = 0; i < 100'000; i++) {
+        auto errDetail = errDetails[i].Obj();
+        ASSERT_EQ(errDetail["index"].Int(), i);
+        ASSERT_EQ(errDetail["code"].Int(), ErrorCodes::BadValue);
+
+        if (i < 2) {
+            ASSERT_EQ(errDetail["errmsg"].String(), bigstr) << i;
+        } else {
+            ASSERT_EQ(errDetail["errmsg"].String(), ""_sd) << i;
+        }
+    }
 }
 
 }  // namespace

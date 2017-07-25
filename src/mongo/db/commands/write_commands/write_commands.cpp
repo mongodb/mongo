@@ -106,6 +106,18 @@ void serializeReply(OperationContext* opCtx,
     BSONSizeTracker upsertInfoSizeTracker;
     BSONSizeTracker errorsSizeTracker;
 
+    auto errorMessage = [&, errorSize = size_t(0) ](StringData rawMessage) mutable {
+        // Start truncating error messages once both of these limits are exceeded.
+        constexpr size_t kErrorSizeTruncationMin = 1024 * 1024;
+        constexpr size_t kErrorCountTruncationMin = 2;
+        if (errorSize >= kErrorSizeTruncationMin && errors.size() >= kErrorCountTruncationMin) {
+            return ""_sd;
+        }
+
+        errorSize += rawMessage.size();
+        return rawMessage;
+    };
+
     for (size_t i = 0; i < result.results.size(); i++) {
         if (result.results[i].isOK()) {
             const auto& opResult = result.results[i].getValue();
@@ -126,7 +138,7 @@ void serializeReply(OperationContext* opCtx,
         BSONObjBuilder error(errorsSizeTracker);
         error.append("index", int(i));
         error.append("code", int(status.code()));
-        error.append("errmsg", status.reason());
+        error.append("errmsg", errorMessage(status.reason()));
         errors.push_back(error.obj());
     }
 
@@ -139,7 +151,7 @@ void serializeReply(OperationContext* opCtx,
             BSONObjBuilder error(errorsSizeTracker);
             error.append("index", i);
             error.append("code", int(ErrorCodes::StaleShardVersion));  // Different from exception!
-            error.append("errmsg", result.staleConfigException->getInfo().msg);
+            error.append("errmsg", errorMessage(result.staleConfigException->getInfo().msg));
             {
                 BSONObjBuilder errInfo(error.subobjStart("errInfo"));
                 result.staleConfigException->getVersionWanted().addToBSON(errInfo, "vWanted");

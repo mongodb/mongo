@@ -117,12 +117,36 @@ BSONObj BatchedCommandResponse::toBSON() const {
         builder.appendOID(electionId(), const_cast<OID*>(&_electionId));
 
     if (_writeErrorDetails.get()) {
+        auto errorMessage =
+            [ errorCount = size_t(0), errorSize = size_t(0) ](StringData rawMessage) mutable {
+            // Start truncating error messages once both of these limits are exceeded.
+            constexpr size_t kErrorSizeTruncationMin = 1024 * 1024;
+            constexpr size_t kErrorCountTruncationMin = 2;
+            if (errorSize >= kErrorSizeTruncationMin && errorCount >= kErrorCountTruncationMin) {
+                return ""_sd;
+            }
+
+            errorCount++;
+            errorSize += rawMessage.size();
+            return rawMessage;
+        };
+
         BSONArrayBuilder errDetailsBuilder(builder.subarrayStart(writeErrors()));
-        for (std::vector<WriteErrorDetail*>::const_iterator it = _writeErrorDetails->begin();
-             it != _writeErrorDetails->end();
-             ++it) {
-            BSONObj errDetailsDocument = (*it)->toBSON();
-            errDetailsBuilder.append(errDetailsDocument);
+        for (auto&& writeError : *_writeErrorDetails) {
+            BSONObjBuilder errDetailsDocument(errDetailsBuilder.subobjStart());
+
+            if (writeError->isIndexSet())
+                builder.append(WriteErrorDetail::index(), writeError->getIndex());
+
+            if (writeError->isErrCodeSet())
+                builder.append(WriteErrorDetail::errCode(), writeError->getErrCode());
+
+            if (writeError->isErrInfoSet())
+                builder.append(WriteErrorDetail::errInfo(), writeError->getErrInfo());
+
+            if (writeError->isErrMessageSet())
+                builder.append(WriteErrorDetail::errMessage(),
+                               errorMessage(writeError->getErrMessage()));
         }
         errDetailsBuilder.done();
     }

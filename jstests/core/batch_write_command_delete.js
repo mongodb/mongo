@@ -16,7 +16,7 @@ var request;
 var result;
 var batch;
 
-var maxWriteBatchSize = 1000;
+var maxWriteBatchSize = db.isMaster().maxWriteBatchSize;
 
 function resultOK(result) {
     return result.ok && !('code' in result) && !('errmsg' in result) && !('errInfo' in result) &&
@@ -118,10 +118,12 @@ assert.eq(0, coll.count());
 // Large batch under the size threshold should delete successfully
 coll.remove({});
 batch = [];
+var insertBatch = coll.initializeUnorderedBulkOp();
 for (var i = 0; i < maxWriteBatchSize; ++i) {
-    coll.insert({a: i});
-    batch.push({q: {a: i}, limit: 0});
+    insertBatch.insert({_id: i});
+    batch.push({q: {_id: i}, limit: 0});
 }
+assert.writeOK(insertBatch.execute());
 request = {
     delete: coll.getName(),
     deletes: batch,
@@ -137,10 +139,12 @@ assert.eq(0, coll.count());
 // Large batch above the size threshold should fail to delete
 coll.remove({});
 batch = [];
+var insertBatch = coll.initializeUnorderedBulkOp();
 for (var i = 0; i < maxWriteBatchSize + 1; ++i) {
-    coll.insert({a: i});
-    batch.push({q: {a: i}, limit: 0});
+    insertBatch.insert({_id: i});
+    batch.push({q: {_id: i}, limit: 0});
 }
+assert.writeOK(insertBatch.execute());
 request = {
     delete: coll.getName(),
     deletes: batch,

@@ -17,7 +17,7 @@ var request;
 var result;
 var batch;
 
-var maxWriteBatchSize = 1000;
+var maxWriteBatchSize = db.isMaster().maxWriteBatchSize;
 
 function resultOK(result) {
     return result.ok && !('code' in result) && !('errmsg' in result) && !('errInfo' in result) &&
