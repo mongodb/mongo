@@ -28,159 +28,146 @@
 
 #include "mongo/db/audit.h"
 
-#if MONGO_ENTERPRISE_VERSION
-#define MONGO_AUDIT_STUB ;
-#else
-#define MONGO_AUDIT_STUB \
-    {}
+#if !MONGO_ENTERPRISE_VERSION
+
+void mongo::audit::logAuthentication(Client* client,
+                                     StringData mechanism,
+                                     const UserName& user,
+                                     ErrorCodes::Error result) {}
+
+void mongo::audit::logCommandAuthzCheck(Client* client,
+                                        const OpMsgRequest& cmdObj,
+                                        CommandInterface* command,
+                                        ErrorCodes::Error result) {}
+
+void mongo::audit::logDeleteAuthzCheck(Client* client,
+                                       const NamespaceString& ns,
+                                       const BSONObj& pattern,
+                                       ErrorCodes::Error result) {}
+
+void mongo::audit::logGetMoreAuthzCheck(Client* client,
+                                        const NamespaceString& ns,
+                                        long long cursorId,
+                                        ErrorCodes::Error result) {}
+
+void mongo::audit::logInsertAuthzCheck(Client* client,
+                                       const NamespaceString& ns,
+                                       const BSONObj& insertedObj,
+                                       ErrorCodes::Error result) {}
+
+void mongo::audit::logKillCursorsAuthzCheck(Client* client,
+                                            const NamespaceString& ns,
+                                            long long cursorId,
+                                            ErrorCodes::Error result) {}
+
+void mongo::audit::logQueryAuthzCheck(Client* client,
+                                      const NamespaceString& ns,
+                                      const BSONObj& query,
+                                      ErrorCodes::Error result) {}
+
+void mongo::audit::logUpdateAuthzCheck(Client* client,
+                                       const NamespaceString& ns,
+                                       const BSONObj& query,
+                                       const BSONObj& updateObj,
+                                       bool isUpsert,
+                                       bool isMulti,
+                                       ErrorCodes::Error result) {}
+
+void mongo::audit::logCreateUser(Client* client,
+                                 const UserName& username,
+                                 bool password,
+                                 const BSONObj* customData,
+                                 const std::vector<RoleName>& roles) {}
+
+void mongo::audit::logDropUser(Client* client, const UserName& username) {}
+
+void mongo::audit::logDropAllUsersFromDatabase(Client* client, StringData dbname) {}
+
+void mongo::audit::logUpdateUser(Client* client,
+                                 const UserName& username,
+                                 bool password,
+                                 const BSONObj* customData,
+                                 const std::vector<RoleName>* roles) {}
+
+void mongo::audit::logGrantRolesToUser(Client* client,
+                                       const UserName& username,
+                                       const std::vector<RoleName>& roles) {}
+
+void mongo::audit::logRevokeRolesFromUser(Client* client,
+                                          const UserName& username,
+                                          const std::vector<RoleName>& roles) {}
+
+void mongo::audit::logCreateRole(Client* client,
+                                 const RoleName& role,
+                                 const std::vector<RoleName>& roles,
+                                 const PrivilegeVector& privileges) {}
+
+void mongo::audit::logUpdateRole(Client* client,
+                                 const RoleName& role,
+                                 const std::vector<RoleName>* roles,
+                                 const PrivilegeVector* privileges) {}
+
+void mongo::audit::logDropRole(Client* client, const RoleName& role) {}
+
+void mongo::audit::logDropAllRolesFromDatabase(Client* client, StringData dbname) {}
+
+void mongo::audit::logGrantRolesToRole(Client* client,
+                                       const RoleName& role,
+                                       const std::vector<RoleName>& roles) {}
+
+void mongo::audit::logRevokeRolesFromRole(Client* client,
+                                          const RoleName& role,
+                                          const std::vector<RoleName>& roles) {}
+
+void mongo::audit::logGrantPrivilegesToRole(Client* client,
+                                            const RoleName& role,
+                                            const PrivilegeVector& privileges) {}
+
+void mongo::audit::logRevokePrivilegesFromRole(Client* client,
+                                               const RoleName& role,
+                                               const PrivilegeVector& privileges) {}
+
+void mongo::audit::logReplSetReconfig(Client* client,
+                                      const BSONObj* oldConfig,
+                                      const BSONObj* newConfig) {}
+
+void mongo::audit::logApplicationMessage(Client* client, StringData msg) {}
+
+void mongo::audit::logShutdown(Client* client) {}
+
+void mongo::audit::logCreateIndex(Client* client,
+                                  const BSONObj* indexSpec,
+                                  StringData indexname,
+                                  StringData nsname) {}
+
+void mongo::audit::logCreateCollection(Client* client, StringData nsname) {}
+
+void mongo::audit::logCreateDatabase(Client* client, StringData dbname) {}
+
+
+void mongo::audit::logDropIndex(Client* client, StringData indexname, StringData nsname) {}
+
+void mongo::audit::logDropCollection(Client* client, StringData nsname) {}
+
+void mongo::audit::logDropDatabase(Client* client, StringData dbname) {}
+
+void mongo::audit::logRenameCollection(Client* client, StringData source, StringData target) {}
+
+void mongo::audit::logEnableSharding(Client* client, StringData dbname) {}
+
+void mongo::audit::logAddShard(Client* client,
+                               StringData name,
+                               const std::string& servers,
+                               long long maxSize) {}
+
+void mongo::audit::logRemoveShard(Client* client, StringData shardname) {}
+
+void mongo::audit::logShardCollection(Client* client,
+                                      StringData ns,
+                                      const BSONObj& keyPattern,
+                                      bool unique) {}
+
+void mongo::audit::writeImpersonatedUsersToMetadata(OperationContext* opCtx,
+                                                    BSONObjBuilder* metadata) {}
+
 #endif
-
-namespace mongo {
-namespace audit {
-
-void logAuthentication(Client* client,
-                       StringData mechanism,
-                       const UserName& user,
-                       ErrorCodes::Error result) MONGO_AUDIT_STUB
-
-    void logCommandAuthzCheck(Client* client,
-                              const OpMsgRequest& cmdObj,
-                              CommandInterface* command,
-                              ErrorCodes::Error result) MONGO_AUDIT_STUB
-
-    void logDeleteAuthzCheck(Client* client,
-                             const NamespaceString& ns,
-                             const BSONObj& pattern,
-                             ErrorCodes::Error result) MONGO_AUDIT_STUB
-
-    void logGetMoreAuthzCheck(Client* client,
-                              const NamespaceString& ns,
-                              long long cursorId,
-                              ErrorCodes::Error result) MONGO_AUDIT_STUB
-
-    void logInsertAuthzCheck(Client* client,
-                             const NamespaceString& ns,
-                             const BSONObj& insertedObj,
-                             ErrorCodes::Error result) MONGO_AUDIT_STUB
-
-    void logKillCursorsAuthzCheck(Client* client,
-                                  const NamespaceString& ns,
-                                  long long cursorId,
-                                  ErrorCodes::Error result) MONGO_AUDIT_STUB
-
-    void logQueryAuthzCheck(Client* client,
-                            const NamespaceString& ns,
-                            const BSONObj& query,
-                            ErrorCodes::Error result) MONGO_AUDIT_STUB
-
-    void logUpdateAuthzCheck(Client* client,
-                             const NamespaceString& ns,
-                             const BSONObj& query,
-                             const BSONObj& updateObj,
-                             bool isUpsert,
-                             bool isMulti,
-                             ErrorCodes::Error result) MONGO_AUDIT_STUB
-
-    void logCreateUser(Client* client,
-                       const UserName& username,
-                       bool password,
-                       const BSONObj* customData,
-                       const std::vector<RoleName>& roles) MONGO_AUDIT_STUB
-
-    void logDropUser(Client* client, const UserName& username) MONGO_AUDIT_STUB
-
-    void logDropAllUsersFromDatabase(Client* client, StringData dbname) MONGO_AUDIT_STUB
-
-    void logUpdateUser(Client* client,
-                       const UserName& username,
-                       bool password,
-                       const BSONObj* customData,
-                       const std::vector<RoleName>* roles) MONGO_AUDIT_STUB
-
-    void logGrantRolesToUser(Client* client,
-                             const UserName& username,
-                             const std::vector<RoleName>& roles) MONGO_AUDIT_STUB
-
-    void logRevokeRolesFromUser(Client* client,
-                                const UserName& username,
-                                const std::vector<RoleName>& roles) MONGO_AUDIT_STUB
-
-    void logCreateRole(Client* client,
-                       const RoleName& role,
-                       const std::vector<RoleName>& roles,
-                       const PrivilegeVector& privileges) MONGO_AUDIT_STUB
-
-    void logUpdateRole(Client* client,
-                       const RoleName& role,
-                       const std::vector<RoleName>* roles,
-                       const PrivilegeVector* privileges) MONGO_AUDIT_STUB
-
-    void logDropRole(Client* client, const RoleName& role) MONGO_AUDIT_STUB
-
-    void logDropAllRolesFromDatabase(Client* client, StringData dbname) MONGO_AUDIT_STUB
-
-    void logGrantRolesToRole(Client* client,
-                             const RoleName& role,
-                             const std::vector<RoleName>& roles) MONGO_AUDIT_STUB
-
-    void logRevokeRolesFromRole(Client* client,
-                                const RoleName& role,
-                                const std::vector<RoleName>& roles) MONGO_AUDIT_STUB
-
-    void logGrantPrivilegesToRole(Client* client,
-                                  const RoleName& role,
-                                  const PrivilegeVector& privileges) MONGO_AUDIT_STUB
-
-    void logRevokePrivilegesFromRole(Client* client,
-                                     const RoleName& role,
-                                     const PrivilegeVector& privileges) MONGO_AUDIT_STUB
-
-    void logReplSetReconfig(Client* client,
-                            const BSONObj* oldConfig,
-                            const BSONObj* newConfig) MONGO_AUDIT_STUB
-
-    void logApplicationMessage(Client* client, StringData msg) MONGO_AUDIT_STUB
-
-    void logShutdown(Client* client) MONGO_AUDIT_STUB
-
-    void logCreateIndex(Client* client,
-                        const BSONObj* indexSpec,
-                        StringData indexname,
-                        StringData nsname) MONGO_AUDIT_STUB
-
-    void logCreateCollection(Client* client, StringData nsname) MONGO_AUDIT_STUB
-
-    void logCreateDatabase(Client* client, StringData dbname) MONGO_AUDIT_STUB
-
-
-    void logDropIndex(Client* client, StringData indexname, StringData nsname) MONGO_AUDIT_STUB
-
-    void logDropCollection(Client* client, StringData nsname) MONGO_AUDIT_STUB
-
-    void logDropDatabase(Client* client, StringData dbname) MONGO_AUDIT_STUB
-
-    void logRenameCollection(Client* client, StringData source, StringData target) MONGO_AUDIT_STUB
-
-    void logEnableSharding(Client* client, StringData dbname) MONGO_AUDIT_STUB
-
-    void logAddShard(Client* client, StringData name, const std::string& servers, long long maxSize)
-        MONGO_AUDIT_STUB
-
-    void logRemoveShard(Client* client, StringData shardname) MONGO_AUDIT_STUB
-
-    void logShardCollection(Client* client, StringData ns, const BSONObj& keyPattern, bool unique)
-        MONGO_AUDIT_STUB
-
-    void writeImpersonatedUsersToMetadata(OperationContext* opCtx,
-                                          BSONObjBuilder* metadata) MONGO_AUDIT_STUB
-
-    void parseAndRemoveImpersonatedUsersField(BSONObj cmdObj,
-                                              std::vector<UserName>* parsedUserNames,
-                                              bool* fieldIsPresent) MONGO_AUDIT_STUB
-
-    void parseAndRemoveImpersonatedRolesField(BSONObj cmdObj,
-                                              std::vector<RoleName>* parsedRoleNames,
-                                              bool* fieldIsPresent) MONGO_AUDIT_STUB
-
-}  // namespace audit
-}  // namespace mongo
