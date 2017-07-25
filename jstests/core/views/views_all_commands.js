@@ -69,6 +69,7 @@
         _configsvrEnableSharding: {skip: isAnInternalCommand},
         _configsvrMoveChunk: {skip: isAnInternalCommand},
         _configsvrMovePrimary: {skip: isAnInternalCommand},
+        _configsvrRemoveShard: {skip: isAnInternalCommand},
         _configsvrRemoveShardFromZone: {skip: isAnInternalCommand},
         _configsvrShardCollection: {skip: isAnInternalCommand},
         _configsvrSetFeatureCompatibilityVersion: {skip: isAnInternalCommand},
