@@ -750,14 +750,18 @@ void SyncTail::oplogApplication(ReplicationCoordinator* replCoord) {
         OperationContext& opCtx = *opCtxPtr;
 
         // For pausing replication in tests.
-        while (MONGO_FAIL_POINT(rsSyncApplyStop)) {
-            // Tests should not trigger clean shutdown while that failpoint is active. If we
-            // think we need this, we need to think hard about what the behavior should be.
-            if (_networkQueue->inShutdown()) {
-                severe() << "Turn off rsSyncApplyStop before attempting clean shutdown";
-                fassertFailedNoTrace(40304);
+        if (MONGO_FAIL_POINT(rsSyncApplyStop)) {
+            log() << "sync tail - rsSyncApplyStop fail point enabled. Blocking until fail point is "
+                     "disabled.";
+            while (MONGO_FAIL_POINT(rsSyncApplyStop)) {
+                // Tests should not trigger clean shutdown while that failpoint is active. If we
+                // think we need this, we need to think hard about what the behavior should be.
+                if (_networkQueue->inShutdown()) {
+                    severe() << "Turn off rsSyncApplyStop before attempting clean shutdown";
+                    fassertFailedNoTrace(40304);
+                }
+                sleepmillis(10);
             }
-            sleepmillis(10);
         }
 
         tryToGoLiveAsASecondary(&opCtx, replCoord);
