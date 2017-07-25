@@ -139,12 +139,12 @@ env.Library(
 env.Library(
     target='sharding_catalog_manager',
     source=[
-        'sharding_catalog_manager_chunk_operations_impl.cpp',
-        'sharding_catalog_manager_collection_operations_impl.cpp',
+        'sharding_catalog_manager_chunk_operations.cpp',
+        'sharding_catalog_manager_collection_operations.cpp',
         'sharding_catalog_manager.cpp',
-        'sharding_catalog_manager_database_operations_impl.cpp',
-        'sharding_catalog_manager_shard_operations_impl.cpp',
-        'sharding_catalog_manager_zone_operations_impl.cpp',
+        'sharding_catalog_manager_database_operations.cpp',
+        'sharding_catalog_manager_shard_operations.cpp',
+        'sharding_catalog_manager_zone_operations.cpp',
     ],
     LIBDEPS=[
         '$BUILD_DIR/mongo/db/commands/dcommands_fcv',
