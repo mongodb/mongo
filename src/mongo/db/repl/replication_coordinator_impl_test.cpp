@@ -53,6 +53,7 @@
 #include "mongo/db/repl/replication_coordinator_external_state_mock.h"
 #include "mongo/db/repl/replication_coordinator_impl.h"
 #include "mongo/db/repl/replication_coordinator_test_fixture.h"
+#include "mongo/db/repl/storage_interface_mock.h"
 #include "mongo/db/repl/topology_coordinator_impl.h"
 #include "mongo/db/repl/update_position_args.h"
 #include "mongo/db/server_options.h"
@@ -381,6 +382,9 @@ TEST_F(ReplCoordTest, InitiateSucceedsWhenQuorumCheckPasses) {
     hbArgs.setSenderHost(HostAndPort("node1", 12345));
     hbArgs.setSenderId(0);
 
+    auto appliedTS = Timestamp(3, 3);
+    getReplCoord()->setMyLastAppliedOpTime(OpTime(appliedTS, 1));
+
     Status status(ErrorCodes::InternalError, "Not set");
     stdx::thread prsiThread(stdx::bind(doReplSetInitiate, getReplCoord(), &status));
     const Date_t startDate = getNet()->now();
@@ -401,6 +405,9 @@ TEST_F(ReplCoordTest, InitiateSucceedsWhenQuorumCheckPasses) {
     prsiThread.join();
     ASSERT_OK(status);
     ASSERT_EQUALS(ReplicationCoordinator::modeReplSet, getReplCoord()->getReplicationMode());
+
+    ASSERT_EQUALS(getStorageInterface()->getInitialDataTimestamp().asU64(),
+                  SnapshotName(appliedTS.asULL()).asU64());
 }
 
 TEST_F(ReplCoordTest,

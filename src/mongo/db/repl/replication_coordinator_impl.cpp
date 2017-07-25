@@ -2303,9 +2303,16 @@ Status ReplicationCoordinatorImpl::processReplSetInitiate(OperationContext* opCt
         return status;
     }
 
+    auto lastAppliedOpTime = getMyLastAppliedOpTime();
+
     // Since the JournalListener has not yet been set up, we must manually set our
     // durableOpTime.
-    setMyLastDurableOpTime(getMyLastAppliedOpTime());
+    setMyLastDurableOpTime(lastAppliedOpTime);
+
+    // Sets the initial data timestamp on the storage engine so it can assign a timestamp
+    // to data on disk. We do this after writing the "initiating set" oplog entry.
+    auto initialDataTS = SnapshotName(lastAppliedOpTime.getTimestamp().asULL());
+    _storage->setInitialDataTimestamp(opCtx, initialDataTS);
 
     _finishReplSetInitiate(newConfig, myIndex.getValue());
 

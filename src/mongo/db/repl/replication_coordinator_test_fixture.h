@@ -112,6 +112,13 @@ protected:
     }
 
     /**
+     * Gets the storage interface.
+     */
+    StorageInterfaceMock* getStorageInterface() {
+        return _storageInterface;
+    }
+
+    /**
      * Gets the topology coordinator used by the replication coordinator under test.
      */
     TopologyCoordinatorImpl& getTopoCoord() {
@@ -267,6 +274,8 @@ private:
     ReplicationCoordinatorExternalStateMock* _externalState = nullptr;
     // Owned by ReplicationCoordinatorImpl
     executor::TaskExecutor* _replExec = nullptr;
+    // Owned by the ServiceContext
+    StorageInterfaceMock* _storageInterface = nullptr;
 
     ReplSettings _settings;
     bool _callShutdown = false;

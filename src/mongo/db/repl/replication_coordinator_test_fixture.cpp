@@ -121,14 +121,14 @@ void ReplCoordTest::init() {
     invariant(!_callShutdown);
 
     auto service = getGlobalServiceContext();
-    StorageInterface* storageInterface = new StorageInterfaceMock();
-    StorageInterface::set(service, std::unique_ptr<StorageInterface>(storageInterface));
-    ASSERT_TRUE(storageInterface == StorageInterface::get(service));
+    _storageInterface = new StorageInterfaceMock();
+    StorageInterface::set(service, std::unique_ptr<StorageInterface>(_storageInterface));
+    ASSERT_TRUE(_storageInterface == StorageInterface::get(service));
 
     ReplicationProcess::set(
         service,
         stdx::make_unique<ReplicationProcess>(
-            storageInterface, stdx::make_unique<ReplicationConsistencyMarkersMock>()));
+            _storageInterface, stdx::make_unique<ReplicationConsistencyMarkersMock>()));
     auto replicationProcess = ReplicationProcess::get(service);
 
     // PRNG seed for tests.
@@ -156,7 +156,7 @@ void ReplCoordTest::init() {
                                                           std::move(replExec),
                                                           std::move(topo),
                                                           replicationProcess,
-                                                          storageInterface,
+                                                          _storageInterface,
                                                           seed);
     service->setFastClockSource(stdx::make_unique<executor::NetworkInterfaceMockClockSource>(_net));
     service->setPreciseClockSource(
