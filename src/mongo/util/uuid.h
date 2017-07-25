@@ -57,6 +57,7 @@ class UUID {
     friend class One_UUID;
     friend class LogicalSessionId;
     friend class LogicalSessionToClient;
+    friend class LogicalSessionIdToClient;
     friend class LogicalSessionFromClient;
     friend class repl::OplogEntryBase;
 

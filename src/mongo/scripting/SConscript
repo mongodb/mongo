@@ -139,10 +139,12 @@ if usemozjs:
             'mozjs/PosixNSPR.cpp',
             'mozjs/proxyscope.cpp',
             'mozjs/regexp.cpp',
+            'mozjs/session.cpp',
             'mozjs/timestamp.cpp',
             'mozjs/uri.cpp',
             'mozjs/valuereader.cpp',
             'mozjs/valuewriter.cpp',
+            env.Idlc('mozjs/end_sessions.idl')[0],
         ],
         LIBDEPS=[
             'bson_template_evaluator',

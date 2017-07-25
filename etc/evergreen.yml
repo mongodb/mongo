@@ -3375,6 +3375,17 @@ tasks:
       run_multiple_jobs: true
 
 - <<: *task_template
+  name: session_jscore_passthrough_WT
+  depends_on:
+  - name: jsCore_WT
+  commands:
+  - func: "do setup"
+  - func: "run tests"
+    vars:
+      resmoke_args: --suites=session_jscore_passthrough --storageEngine=wiredTiger
+      run_multiple_jobs: true
+
+- <<: *task_template
   name: causally_consistent_jscore_passthrough_auth_WT
   depends_on:
   - name: jsCore_WT
@@ -5413,6 +5424,7 @@ buildvariants:
   - name: noPassthrough_WT
   - name: noPassthroughWithMongod
   - name: noPassthroughWithMongod_WT
+  - name: session_jscore_passthrough_WT
   - name: bulk_gle_passthrough
   - name: bulk_gle_passthrough_WT
   - name: parallel
@@ -5920,6 +5932,7 @@ buildvariants:
   - name: replica_sets_kill_secondaries_jscore_passthrough_WT
   - name: serial_run
   - name: serial_run_WT
+  - name: session_jscore_passthrough_WT
   - name: sharded_collections_jscore_passthrough
   - name: sharded_collections_jscore_passthrough_WT
   - name: sharding_gle_auth_basics_passthrough
@@ -6213,6 +6226,7 @@ buildvariants:
   - name: parallel_compatibility
   - name: parallel_compatibility_WT
   - name: read_concern_linearizable_passthrough
+  - name: session_jscore_passthrough_WT
     distros:
     - rhel62-large
   - name: read_concern_linearizable_passthrough_WT
@@ -8555,6 +8569,7 @@ buildvariants:
   - name: master_slave_jscore_passthrough
   - name: rlp
   - name: sasl
+  - name: session_jscore_passthrough_WT
   - name: sharded_collections_jscore_passthrough
   - name: sharding
   - name: sharding_auth
@@ -9020,6 +9035,7 @@ buildvariants:
   - name: master_slave_jscore_passthrough
   - name: master_slave_jscore_passthrough_WT
   - name: sasl
+  - name: session_jscore_passthrough_WT
   - name: sharded_collections_jscore_passthrough
   - name: sharded_collections_jscore_passthrough_WT
   - name: sharding
@@ -9200,6 +9216,7 @@ buildvariants:
   - name: master_slave_jscore_passthrough
   - name: master_slave_jscore_passthrough_WT
   - name: sasl
+  - name: session_jscore_passthrough_WT
   - name: sharded_collections_jscore_passthrough
   - name: sharded_collections_jscore_passthrough_WT
   - name: sharding

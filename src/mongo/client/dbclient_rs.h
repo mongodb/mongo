@@ -217,6 +217,10 @@ public:
      */
     virtual void reset();
 
+    bool isMongos() const override {
+        return false;
+    }
+
     /**
      * @bool setting if true, DBClientReplicaSet connections will make sure that secondary
      *    connections are authenticated and log them before returning them to the pool.

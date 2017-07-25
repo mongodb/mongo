@@ -1,0 +1,21 @@
+test_kind: js_test
+
+selector:
+  roots:
+  - jstests/core/**/*.js
+
+executor:
+  config:
+    shell_options:
+      eval: load("jstests/libs/override_methods/enable_sessions.js")
+      readMode: commands
+  hooks:
+  - class: ValidateCollections
+  - class: CleanEveryN
+    n: 20
+  fixture:
+    class: MongoDFixture
+    mongod_options:
+      bind_ip_all: ''
+      set_parameters:
+        enableTestCommands: 1

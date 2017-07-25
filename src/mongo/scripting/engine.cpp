@@ -300,6 +300,7 @@ extern const JSFile explain_query;
 extern const JSFile explainable;
 extern const JSFile mongo;
 extern const JSFile mr;
+extern const JSFile session;
 extern const JSFile query;
 extern const JSFile utils;
 extern const JSFile utils_sh;
@@ -315,6 +316,7 @@ void Scope::execCoreFiles() {
     execSetup(JSFiles::db);
     execSetup(JSFiles::mongo);
     execSetup(JSFiles::mr);
+    execSetup(JSFiles::session);
     execSetup(JSFiles::query);
     execSetup(JSFiles::bulk_api);
     execSetup(JSFiles::error_codes);

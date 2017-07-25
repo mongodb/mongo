@@ -563,23 +563,6 @@ Mongo.prototype.getOperationTime = function() {
     return this._operationTime;
 };
 
-/**
- * Sets the clusterTime.
- */
-Mongo.prototype.setClusterTime = function(logicalTimeObj) {
-    if (typeof logicalTimeObj === "object" && logicalTimeObj.hasOwnProperty("clusterTime") &&
-        (this._clusterTime === undefined || this._clusterTime === null ||
-         bsonWoCompare(logicalTimeObj.clusterTime, this._clusterTime.clusterTime) === 1)) {
-        this._clusterTime = logicalTimeObj;
-    }
-};
-
-/**
- * Gets the clusterTime or null if unset.
- */
-Mongo.prototype.getClusterTime = function() {
-    if (this._clusterTime === undefined) {
-        return null;
-    }
-    return this._clusterTime;
+Mongo.prototype.startSession = function(opts) {
+    return new DriverSession(this, opts);
 };

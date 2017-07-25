@@ -51,11 +51,17 @@ structs:
       id: uuid
       uid: sha256Block
 
-  LogicalSessionToClient:
+  LogicalSessionIdToClient:
     description: "A struct representing a LogicalSessionId to external clients"
     strict: true
     fields:
       id: uuid
+
+  LogicalSessionToClient:
+    description: "A struct representing a LogicalSession reply to external clients"
+    strict: true
+    fields:
+      id: LogicalSessionIdToClient
       timeoutMinutes: int
 
   LogicalSessionRecord:

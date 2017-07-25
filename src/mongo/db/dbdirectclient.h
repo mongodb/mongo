@@ -96,6 +96,10 @@ public:
     int getMinWireVersion() final;
     int getMaxWireVersion() final;
 
+    bool isMongos() const final {
+        return false;
+    }
+
 private:
     OperationContext* _opCtx;
 };

@@ -62,12 +62,18 @@ struct MongoBase : public BaseInfo {
         MONGO_DECLARE_JS_FUNCTION(update);
         MONGO_DECLARE_JS_FUNCTION(getMinWireVersion);
         MONGO_DECLARE_JS_FUNCTION(getMaxWireVersion);
+        MONGO_DECLARE_JS_FUNCTION(getClusterTime);
+        MONGO_DECLARE_JS_FUNCTION(setClusterTime);
+        MONGO_DECLARE_JS_FUNCTION(_startSession);
     };
 
-    static const JSFunctionSpec methods[19];
+    static const JSFunctionSpec methods[22];
 
     static const char* const className;
     static const unsigned classFlags = JSCLASS_HAS_PRIVATE;
+
+    static BSONObj getClusterTime();
+    static void setClusterTime(const BSONObj& newTime);
 };
 
 /**

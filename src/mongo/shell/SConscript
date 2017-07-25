@@ -19,16 +19,17 @@ js_header = env.JSHeader(
         "collection.js",
         "crud_api.js",
         "db.js",
-        "explain_query.js",
-        "explainable.js",
         "error_codes.js",
+        "explainable.js",
+        "explain_query.js",
         "mongo.js",
         "mr.js",
         "query.js",
+        "session.js",
         "types.js",
+        "utils_auth.js",
         "utils.js",
         "utils_sh.js",
-        "utils_auth.js",
     ]
 )
 

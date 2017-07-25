@@ -746,6 +746,8 @@ public:
 
     virtual void reset() {}
 
+    virtual bool isMongos() const = 0;
+
 protected:
     /** if the result of a command is ok*/
     bool isOk(const BSONObj&);
@@ -988,9 +990,14 @@ public:
             _checkConnection();
     }
 
+    bool isMongos() const override {
+        return _isMongos;
+    }
+
 protected:
     int _minWireVersion{0};
     int _maxWireVersion{0};
+    bool _isMongos = false;
 
     virtual void _auth(const BSONObj& params);
 

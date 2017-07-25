@@ -38,6 +38,7 @@
 
 #include "mongo/base/status.h"
 #include "mongo/base/status_with.h"
+#include "mongo/bson/util/bson_extract.h"
 #include "mongo/bson/util/builder.h"
 #include "mongo/client/authenticate.h"
 #include "mongo/client/constants.h"
@@ -772,6 +773,19 @@ Status DBClientConnection::connect(const HostAndPort& serverAddress, StringData 
     auto swProtocolSet = rpc::parseProtocolSetFromIsMasterReply(swIsMasterReply.data);
     if (!swProtocolSet.isOK()) {
         return swProtocolSet.getStatus();
+    }
+
+    {
+        std::string msgField;
+        auto msgFieldExtractStatus = bsonExtractStringField(swIsMasterReply.data, "msg", &msgField);
+
+        if (msgFieldExtractStatus == ErrorCodes::NoSuchKey) {
+            _isMongos = false;
+        } else if (!msgFieldExtractStatus.isOK()) {
+            return msgFieldExtractStatus;
+        } else {
+            _isMongos = (msgField == "isdbgrid");
+        }
     }
 
     auto validateStatus =

@@ -428,6 +428,7 @@ MozJSImplScope::MozJSImplScope(MozJSScriptEngine* engine)
       _objectProto(_context),
       _oidProto(_context),
       _regExpProto(_context),
+      _sessionProto(_context),
       _timestampProto(_context),
       _uriProto(_context) {
     kCurrentScope = this;
@@ -869,6 +870,7 @@ void MozJSImplScope::installDBAccess() {
     _dbProto.install(_global);
     _dbQueryProto.install(_global);
     _dbCollectionProto.install(_global);
+    _sessionProto.install(_global);
 }
 
 void MozJSImplScope::installFork() {

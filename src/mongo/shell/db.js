@@ -17,7 +17,11 @@ var DB;
     };
 
     DB.prototype.getSiblingDB = function(name) {
-        return this.getMongo().getDB(name);
+        if (this.getSession()) {
+            return this.getSession().getDatabase(name);
+        } else {
+            return this.getMongo().getDB(name);
+        }
     };
 
     DB.prototype.getSisterDB = DB.prototype.getSiblingDB;
@@ -135,9 +139,18 @@ var DB;
         return this.runCommand(cmdObjWithReadPref, null, options);
     };
 
+    DB.prototype._attachSessionInfo = function(obj) {
+        var withSessionInfo = Object.extend({}, obj);
+        if (this._session) {
+            withSessionInfo.lsid = this._session._serverSession._id;
+        }
+
+        return withSessionInfo;
+    };
+
     // runCommand uses this impl to actually execute the command
     DB.prototype._runCommandImpl = function(name, obj, options) {
-        return this.getMongo().runCommand(name, obj, options);
+        return this.getMongo().runCommand(name, this._attachSessionInfo(obj), options);
     };
 
     DB.prototype.runCommand = function(obj, extra, queryOptions) {
@@ -167,7 +180,8 @@ var DB;
     };
 
     DB.prototype.runCommandWithMetadata = function(commandArgs, metadata) {
-        return this.getMongo().runCommandWithMetadata(this._name, metadata, commandArgs);
+        return this.getMongo().runCommandWithMetadata(
+            this._name, metadata, this._attachSessionInfo(commandArgs));
     };
 
     DB.prototype._dbCommand = DB.prototype.runCommand;
@@ -1827,6 +1841,10 @@ var DB;
 
     DB.prototype.setLogLevel = function(logLevel, component) {
         return this.getMongo().setLogLevel(logLevel, component);
+    };
+
+    DB.prototype.getSession = function() {
+        return this._session;
     };
 
 }());
