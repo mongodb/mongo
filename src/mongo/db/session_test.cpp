@@ -67,8 +67,9 @@ public:
         repl::ReplicationCoordinator::set(
             service, stdx::make_unique<repl::ReplicationCoordinatorMock>(service, replSettings));
 
-        _txnTable = stdx::make_unique<SessionCatalog>(nullptr);
-        _txnTable->onStepUp(_opCtx.get());
+        SessionCatalog::reset_forTest(service);
+        SessionCatalog::create(service);
+        SessionCatalog::get(service)->onStepUp(_opCtx.get());
 
         // Note: internal code does not allow implicit creation of non-capped oplog collection.
         DBDirectClient client(opCtx());
@@ -107,7 +108,6 @@ public:
 
 private:
     ServiceContext::UniqueOperationContext _opCtx;
-    std::unique_ptr<SessionCatalog> _txnTable;
 };
 
 TEST_F(SessionTest, CanCreateNewSessionEntry) {
