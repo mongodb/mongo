@@ -19,7 +19,7 @@
 
     var checkSessionCatalog = function(conn, sessionId, uid, txnNum, expectedTs) {
         var coll = conn.getDB('config').transactions;
-        var sessionDoc = coll.findOne({'_id': { id: sessionId, uid: uid }});
+        var sessionDoc = coll.findOne({'_id': {id: sessionId, uid: uid}});
 
         assert.eq(txnNum, sessionDoc.txnNum);
         assert.eq(expectedTs.getTime(), sessionDoc.lastWriteOpTimeTs.getTime());
