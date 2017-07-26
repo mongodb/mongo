@@ -83,7 +83,7 @@ StatusWith<UUID> UUID::parse(const std::string& s) {
 
 UUID UUID::parse(const BSONObj& obj) {
     auto res = parse(obj.getField("uuid"));
-    invariant(res.isOK());
+    uassert(40566, res.getStatus().reason(), res.isOK());
     return res.getValue();
 }
 
