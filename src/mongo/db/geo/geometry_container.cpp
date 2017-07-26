@@ -448,6 +448,21 @@ bool GeometryContainer::contains(const S2Polyline& otherLine) const {
         return _polygon->bigPolygon->Contains(otherLine);
     }
 
+    if (NULL != _cap && (_cap->crs == SPHERE)) {
+        // If any of the points are not contained within the S2Cap region
+        // we can stop iterating over the other points to save time.
+        bool allContained = true;
+        for (int i = 0; i < otherLine.num_vertices(); ++i) {
+            if (!_cap->cap.Contains(otherLine.vertex(i))) {
+                allContained = false;
+                break;
+            }
+        }
+        if (allContained == true) {
+            return true;
+        }
+    }
+
     if (NULL != _multiPolygon) {
         const vector<S2Polygon*>& polys = _multiPolygon->polygons.vector();
         for (size_t i = 0; i < polys.size(); ++i) {
@@ -491,6 +506,12 @@ bool GeometryContainer::contains(const S2Polygon& otherPolygon) const {
 
     if (NULL != _polygon && NULL != _polygon->bigPolygon) {
         return _polygon->bigPolygon->Contains(otherPolygon);
+    }
+
+    if (NULL != _cap && (_cap->crs == SPHERE)) {
+        if (_cap->cap.GetRectBound().Contains(otherPolygon.GetRectBound())) {
+            return true;
+        }
     }
 
     if (NULL != _multiPolygon) {
