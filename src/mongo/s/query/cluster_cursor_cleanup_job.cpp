@@ -64,7 +64,9 @@ std::string ClusterCursorCleanupJob::name() const {
 
 void ClusterCursorCleanupJob::run() {
     Client::initThread(name().c_str());
-    ClusterCursorManager* manager = grid.getCursorManager();
+
+    auto* const client = Client::getCurrent();
+    auto* const manager = Grid::get(client->getServiceContext())->getCursorManager();
     invariant(manager);
 
     while (!globalInShutdownDeprecated()) {

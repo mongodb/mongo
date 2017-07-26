@@ -107,17 +107,23 @@ void ShardedConnectionInfo::addHook(ServiceContext* service) {
     log() << "first cluster operation detected, adding sharding hook to enable versioning "
              "and authentication to remote servers";
 
-    auto unshardedHookList = stdx::make_unique<rpc::EgressMetadataHookList>();
-    unshardedHookList->addHook(stdx::make_unique<rpc::LogicalTimeMetadataHook>(service));
-    unshardedHookList->addHook(stdx::make_unique<rpc::ShardingEgressMetadataHookForMongod>());
+    {
+        auto unshardedHookList = stdx::make_unique<rpc::EgressMetadataHookList>();
+        unshardedHookList->addHook(stdx::make_unique<rpc::LogicalTimeMetadataHook>(service));
+        unshardedHookList->addHook(
+            stdx::make_unique<rpc::ShardingEgressMetadataHookForMongod>(service));
 
-    globalConnPool.addHook(new ShardingConnectionHook(false, std::move(unshardedHookList)));
+        globalConnPool.addHook(new ShardingConnectionHook(false, std::move(unshardedHookList)));
+    }
 
-    auto shardedHookList = stdx::make_unique<rpc::EgressMetadataHookList>();
-    shardedHookList->addHook(stdx::make_unique<rpc::LogicalTimeMetadataHook>(service));
-    shardedHookList->addHook(stdx::make_unique<rpc::ShardingEgressMetadataHookForMongod>());
+    {
+        auto shardedHookList = stdx::make_unique<rpc::EgressMetadataHookList>();
+        shardedHookList->addHook(stdx::make_unique<rpc::LogicalTimeMetadataHook>(service));
+        shardedHookList->addHook(
+            stdx::make_unique<rpc::ShardingEgressMetadataHookForMongod>(service));
 
-    shardConnectionPool.addHook(new ShardingConnectionHook(true, std::move(shardedHookList)));
+        shardConnectionPool.addHook(new ShardingConnectionHook(true, std::move(shardedHookList)));
+    }
 
     alreadyAddedHook.store(1);
 }

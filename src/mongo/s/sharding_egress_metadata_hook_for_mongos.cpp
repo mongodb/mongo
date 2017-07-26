@@ -78,7 +78,7 @@ void ShardingEgressMetadataHookForMongos::_saveGLEStats(const BSONObj& metadata,
 }
 
 repl::OpTime ShardingEgressMetadataHookForMongos::_getConfigServerOpTime() {
-    return grid.configOpTime();
+    return Grid::get(_serviceContext)->configOpTime();
 }
 
 }  // namespace rpc

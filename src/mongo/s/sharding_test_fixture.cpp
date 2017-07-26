@@ -80,7 +80,6 @@ using executor::NetworkTestEnv;
 using executor::RemoteCommandRequest;
 using executor::RemoteCommandResponse;
 using executor::ShardingTaskExecutor;
-using rpc::ShardingEgressMetadataHookForMongos;
 using unittest::assertGet;
 
 using std::string;
@@ -124,14 +123,16 @@ void ShardingTestFixture::setUp() {
 
     // Set up executor pool used for most operations.
     auto fixedNet = stdx::make_unique<executor::NetworkInterfaceMock>();
-    fixedNet->setEgressMetadataHook(stdx::make_unique<ShardingEgressMetadataHookForMongos>());
+    fixedNet->setEgressMetadataHook(
+        stdx::make_unique<rpc::ShardingEgressMetadataHookForMongos>(serviceContext()));
     _mockNetwork = fixedNet.get();
     auto fixedExec = makeShardingTestExecutor(std::move(fixedNet));
     _networkTestEnv = stdx::make_unique<NetworkTestEnv>(fixedExec.get(), _mockNetwork);
     _executor = fixedExec.get();
 
     auto netForPool = stdx::make_unique<executor::NetworkInterfaceMock>();
-    netForPool->setEgressMetadataHook(stdx::make_unique<ShardingEgressMetadataHookForMongos>());
+    netForPool->setEgressMetadataHook(
+        stdx::make_unique<rpc::ShardingEgressMetadataHookForMongos>(serviceContext()));
     auto _mockNetworkForPool = netForPool.get();
     auto execForPool = makeShardingTestExecutor(std::move(netForPool));
     _networkTestEnvForPool =

@@ -28,17 +28,12 @@
 
 #pragma once
 
-#include <memory>
-
 #include "mongo/base/string_data.h"
 #include "mongo/db/repl/optime.h"
 #include "mongo/rpc/metadata/metadata_hook.h"
 #include "mongo/s/client/shard.h"
 
 namespace mongo {
-
-class Shard;
-
 namespace rpc {
 
 /**
@@ -46,6 +41,7 @@ namespace rpc {
  */
 class ShardingEgressMetadataHook : public rpc::EgressMetadataHook {
 public:
+    ShardingEgressMetadataHook(ServiceContext* serviceContext);
     virtual ~ShardingEgressMetadataHook() = default;
 
     Status readReplyMetadata(OperationContext* opCtx,
@@ -75,6 +71,8 @@ protected:
      * metadata in the response object from running a command.
      */
     virtual Status _advanceConfigOptimeFromShard(ShardId shardId, const BSONObj& metadataObj);
+
+    ServiceContext* const _serviceContext;
 };
 
 }  // namespace rpc
