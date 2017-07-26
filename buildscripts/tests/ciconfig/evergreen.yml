@@ -148,9 +148,3 @@ buildvariants:
   - name: resmoke_task
     distros:
       - pdp-11
-- name: debian
-  display_name: Debian
-  run_on:
-  - debian-stretch
-  tasks:
-  - name: resmoke_task
