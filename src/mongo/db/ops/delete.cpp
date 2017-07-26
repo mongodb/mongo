@@ -55,18 +55,10 @@ long long deleteObjects(OperationContext* opCtx,
     ParsedDelete parsedDelete(opCtx, &request);
     uassertStatusOK(parsedDelete.parseRequest());
 
-    auto client = opCtx->getClient();
-    auto lastOpAtOperationStart = repl::ReplClientInfo::forClient(client).getLastOp();
-
     auto exec = uassertStatusOK(
         getExecutorDelete(opCtx, &CurOp::get(opCtx)->debug(), collection, &parsedDelete));
 
     uassertStatusOK(exec->executePlan());
-
-    // No-ops need to reset lastOp in the client, for write concern.
-    if (repl::ReplClientInfo::forClient(client).getLastOp() == lastOpAtOperationStart) {
-        repl::ReplClientInfo::forClient(client).setLastOpToSystemLastOpTime(opCtx);
-    }
 
     return DeleteStage::getNumDeleted(*exec);
 }

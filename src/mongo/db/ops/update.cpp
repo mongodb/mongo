@@ -63,19 +63,8 @@ UpdateResult update(OperationContext* opCtx, Database* db, const UpdateRequest& 
     // Explain should never use this helper.
     invariant(!request.isExplain());
 
-    auto client = opCtx->getClient();
-    auto lastOpAtOperationStart = repl::ReplClientInfo::forClient(client).getLastOp();
-    ScopeGuard lastOpSetterGuard = MakeObjGuard(repl::ReplClientInfo::forClient(client),
-                                                &repl::ReplClientInfo::setLastOpToSystemLastOpTime,
-                                                opCtx);
-
     const NamespaceString& nsString = request.getNamespaceString();
     Collection* collection = db->getCollection(opCtx, nsString);
-
-    // If this is the local database, don't set last op.
-    if (db->name() == "local") {
-        lastOpSetterGuard.Dismiss();
-    }
 
     // The update stage does not create its own collection.  As such, if the update is
     // an upsert, create the collection that the update stage inserts into beforehand.
@@ -113,12 +102,6 @@ UpdateResult update(OperationContext* opCtx, Database* db, const UpdateRequest& 
     auto exec = uassertStatusOK(getExecutorUpdate(opCtx, nullOpDebug, collection, &parsedUpdate));
 
     uassertStatusOK(exec->executePlan());
-    if (repl::ReplClientInfo::forClient(client).getLastOp() != lastOpAtOperationStart) {
-        // If this operation has already generated a new lastOp, don't bother setting it here.
-        // No-op updates will not generate a new lastOp, so we still need the guard to fire in that
-        // case.
-        lastOpSetterGuard.Dismiss();
-    }
 
     const UpdateStats* updateStats = UpdateStage::getUpdateStats(exec.get());
 

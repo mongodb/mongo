@@ -48,6 +48,20 @@
     // }
     var commands = [];
 
+    commands.push({
+        req: {applyOps: [{op: "i", ns: coll.getFullName(), o: {_id: 1}}]},
+        setupFunc: function() {
+            assert.writeOK(coll.insert({_id: 1}));
+        },
+        confirmFunc: function(res) {
+            assert.commandWorked(res);
+            assert.eq(res.applied, 1);
+            assert.eq(res.results[0], true);
+            assert.eq(coll.find().itcount(), 1);
+            assert.eq(coll.count({_id: 1}), 1);
+        }
+    });
+
     // 'update' where the document to update does not exist.
     commands.push({
         req: {update: collName, updates: [{q: {a: 1}, u: {b: 2}}]},

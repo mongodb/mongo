@@ -291,12 +291,6 @@ public:
         const int numIndexesBefore = collection->getIndexCatalog()->numIndexesTotal(opCtx);
         result.append("numIndexesBefore", numIndexesBefore);
 
-        auto client = opCtx->getClient();
-        ScopeGuard lastOpSetterGuard =
-            MakeObjGuard(repl::ReplClientInfo::forClient(client),
-                         &repl::ReplClientInfo::setLastOpToSystemLastOpTime,
-                         opCtx);
-
         MultiIndexBlock indexer(opCtx, collection);
         indexer.allowBackgroundBuilding();
         indexer.allowInterruption();
@@ -400,8 +394,6 @@ public:
         });
 
         result.append("numIndexesAfter", collection->getIndexCatalog()->numIndexesTotal(opCtx));
-
-        lastOpSetterGuard.Dismiss();
 
         return true;
     }

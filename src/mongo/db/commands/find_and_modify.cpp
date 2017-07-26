@@ -360,18 +360,6 @@ public:
         if (shouldBypassDocumentValidationForCommand(cmdObj))
             maybeDisableValidation.emplace(opCtx);
 
-        auto client = opCtx->getClient();
-        auto lastOpAtOperationStart = repl::ReplClientInfo::forClient(client).getLastOp();
-        ScopeGuard lastOpSetterGuard =
-            MakeObjGuard(repl::ReplClientInfo::forClient(client),
-                         &repl::ReplClientInfo::setLastOpToSystemLastOpTime,
-                         opCtx);
-
-        // If this is the local database, don't set last op.
-        if (dbName == "local") {
-            lastOpSetterGuard.Dismiss();
-        }
-
         auto curOp = CurOp::get(opCtx);
         OpDebug* opDebug = &curOp->debug();
 
@@ -575,13 +563,6 @@ public:
 
         if (!success) {
             return false;
-        }
-
-        if (repl::ReplClientInfo::forClient(client).getLastOp() != lastOpAtOperationStart) {
-            // If this operation has already generated a new lastOp, don't bother setting it here.
-            // No-op updates will not generate a new lastOp, so we still need the guard to fire in
-            // that case.
-            lastOpSetterGuard.Dismiss();
         }
 
         return true;

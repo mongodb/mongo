@@ -287,21 +287,16 @@ public:
             }
         }
 
-        auto client = opCtx->getClient();
-        auto lastOpAtOperationStart = repl::ReplClientInfo::forClient(client).getLastOp();
-        ScopeGuard lastOpSetterGuard =
-            MakeObjGuard(repl::ReplClientInfo::forClient(client),
-                         &repl::ReplClientInfo::setLastOpToSystemLastOpTime,
-                         opCtx);
-
+        // TODO (SERVER-30217): When a write concern is provided to the applyOps command, we
+        // normally wait on the OpTime of whichever operation successfully completed last. This is
+        // erroneous, however, if the last operation in the array happens to be a write no-op and
+        // thus isn’t assigned an OpTime. Let the second to last operation in the applyOps be write
+        // A, the last operation in applyOps be write B. Let B do a no-op write and let the
+        // operation that caused B to be a no-op be C. If C has an OpTime after A but before B,
+        // then we won’t wait for C to be replicated and it could be rolled back, even though B
+        // was acknowledged. To fix this, we should wait for replication of the node’s last applied
+        // OpTime if the last write operation was a no-op write.
         auto applyOpsStatus = appendCommandStatus(result, applyOps(opCtx, dbname, cmdObj, &result));
-
-        if (repl::ReplClientInfo::forClient(client).getLastOp() != lastOpAtOperationStart) {
-            // If this operation has already generated a new lastOp, don't bother setting it
-            // here. No-op applyOps will not generate a new lastOp, so we still need the guard to
-            // fire in that case.
-            lastOpSetterGuard.Dismiss();
-        }
 
         return applyOpsStatus;
     }
