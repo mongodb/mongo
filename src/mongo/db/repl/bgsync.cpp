@@ -44,6 +44,7 @@
 #include "mongo/db/repl/data_replicator_external_state_impl.h"
 #include "mongo/db/repl/oplog.h"
 #include "mongo/db/repl/oplog_interface_local.h"
+#include "mongo/db/repl/oplog_interface_remote.h"
 #include "mongo/db/repl/replication_coordinator_global.h"
 #include "mongo/db/repl/replication_coordinator_impl.h"
 #include "mongo/db/repl/replication_process.h"
@@ -646,6 +647,17 @@ void BackgroundSync::_runRollback(OperationContext* opCtx,
 
     OplogInterfaceLocal localOplog(opCtx, NamespaceString::kRsOplogNamespace.ns());
 
+    const int messagingPortTags = 0;
+    ConnectionPool connectionPool(messagingPortTags);
+    std::unique_ptr<ConnectionPool::ConnectionPtr> connection;
+    auto getConnection = [&connection, &connectionPool, source]() -> DBClientBase* {
+        if (!connection.get()) {
+            connection.reset(new ConnectionPool::ConnectionPtr(
+                &connectionPool, source, Date_t::now(), kRollbackOplogSocketTimeout));
+        };
+        return connection->get();
+    };
+
     StorageEngine* engine = opCtx->getServiceContext()->getGlobalStorageEngine();
     bool supportsCheckpointRollback = engine->supportsRecoverToStableTimestamp();
     if (supportsCheckpointRollback && rollbackMethod == kRollbackToCheckpoint) {
@@ -654,7 +666,8 @@ void BackgroundSync::_runRollback(OperationContext* opCtx,
         // compatibility version (FCV). If the user specifies a different rollback method,
         // we will fall back to that.
         log() << "Rollback using 'roll back to a checkpoint' algorithm.";
-        _runRollbackViaRecoverToCheckpoint(source, requiredRBID, &localOplog, storageInterface);
+        _runRollbackViaRecoverToCheckpoint(
+            opCtx, source, &localOplog, storageInterface, getConnection);
 
     } else if (rollbackMethod != kRollbackViaRefetchNoUUID &&
                (serverGlobalParams.featureCompatibility.version.load() ==
@@ -671,7 +684,8 @@ void BackgroundSync::_runRollback(OperationContext* opCtx,
             log() << "Rollback falling back on 'rollback via refetch' due to startup "
                      "server parameter.";
         }
-        _fallBackOnRollbackViaRefetch(opCtx, source, requiredRBID, &localOplog, true);
+        _fallBackOnRollbackViaRefetch(
+            opCtx, source, requiredRBID, &localOplog, true, getConnection);
     } else {
         if (rollbackMethod == kRollbackToCheckpoint) {
             invariant(!supportsCheckpointRollback);
@@ -691,7 +705,8 @@ void BackgroundSync::_runRollback(OperationContext* opCtx,
             log() << "Rollback falling back on 'rollback via refetch' without UUID support due to "
                      "startup server parameter.";
         }
-        _fallBackOnRollbackViaRefetch(opCtx, source, requiredRBID, &localOplog, false);
+        _fallBackOnRollbackViaRefetch(
+            opCtx, source, requiredRBID, &localOplog, false, getConnection);
     }
 
     // Reset the producer to clear the sync source and the last optime fetched.
@@ -699,69 +714,40 @@ void BackgroundSync::_runRollback(OperationContext* opCtx,
     startProducerIfStopped();
 }
 
-void BackgroundSync::_runRollbackViaRecoverToCheckpoint(const HostAndPort& source,
-                                                        int requiredRBID,
-                                                        OplogInterface* localOplog,
-                                                        StorageInterface* storageInterface) {
-    AbstractAsyncComponent* rollback;
-    StatusWith<OpTime> onRollbackShutdownResult =
-        Status(ErrorCodes::InternalError, "Rollback failed but didn’t return an error message");
-    try {
-        auto executor = _replicationCoordinatorExternalState->getTaskExecutor();
-        auto onRollbackShutdownCallbackFn = [&onRollbackShutdownResult](
-            const StatusWith<OpTime>& lastApplied) noexcept {
-            onRollbackShutdownResult = lastApplied;
-        };
+void BackgroundSync::_runRollbackViaRecoverToCheckpoint(
+    OperationContext* opCtx,
+    const HostAndPort& source,
+    OplogInterface* localOplog,
+    StorageInterface* storageInterface,
+    OplogInterfaceRemote::GetConnectionFn getConnection) {
 
+    OplogInterfaceRemote remoteOplog(getConnection, NamespaceString::kRsOplogNamespace.ns());
+
+    {
         stdx::lock_guard<stdx::mutex> lock(_mutex);
         if (_state != ProducerState::Running) {
             return;
         }
-        _rollback = stdx::make_unique<RollbackImpl>(
-            executor,
-            localOplog,
-            source,
-            NamespaceString::kRsOplogNamespace,
-            _replicationCoordinatorExternalState->getOplogFetcherMaxFetcherRestarts(),
-            requiredRBID,
-            _replCoord,
-            storageInterface,
-            onRollbackShutdownCallbackFn);
-        rollback = _rollback.get();
-    } catch (...) {
-        fassertFailedWithStatus(40401, exceptionToStatus());
     }
 
+    _rollback = stdx::make_unique<RollbackImpl>(localOplog, &remoteOplog, _replCoord);
+
     log() << "Scheduling rollback (sync source: " << source << ")";
-    auto scheduleStatus = rollback->startup();
-    if (!scheduleStatus.isOK()) {
-        warning() << "Unable to schedule rollback: " << scheduleStatus;
+    auto status = _rollback->runRollback(opCtx);
+    if (status.isOK()) {
+        log() << "Rollback successful.";
     } else {
-        rollback->join();
-        auto status = onRollbackShutdownResult.getStatus();
-        if (status.isOK()) {
-            log() << "Rollback successful. Last applied optime: "
-                  << onRollbackShutdownResult.getValue();
-        } else {
-            warning() << "Rollback failed with error: " << status;
-        }
+        warning() << "Rollback failed with error: " << status;
     }
 }
-void BackgroundSync::_fallBackOnRollbackViaRefetch(OperationContext* opCtx,
-                                                   const HostAndPort& source,
-                                                   int requiredRBID,
-                                                   OplogInterface* localOplog,
-                                                   bool useUUID) {
-    const int messagingPortTags = 0;
-    ConnectionPool connectionPool(messagingPortTags);
-    std::unique_ptr<ConnectionPool::ConnectionPtr> connection;
-    auto getConnection = [&connection, &connectionPool, source]() -> DBClientBase* {
-        if (!connection.get()) {
-            connection.reset(new ConnectionPool::ConnectionPtr(
-                &connectionPool, source, Date_t::now(), kRollbackOplogSocketTimeout));
-        };
-        return connection->get();
-    };
+
+void BackgroundSync::_fallBackOnRollbackViaRefetch(
+    OperationContext* opCtx,
+    const HostAndPort& source,
+    int requiredRBID,
+    OplogInterface* localOplog,
+    bool useUUID,
+    OplogInterfaceRemote::GetConnectionFn getConnection) {
 
     RollbackSourceImpl rollbackSource(
         getConnection, source, NamespaceString::kRsOplogNamespace.ns());

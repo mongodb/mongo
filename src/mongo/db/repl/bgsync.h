@@ -36,6 +36,7 @@
 #include "mongo/db/repl/data_replicator_external_state.h"
 #include "mongo/db/repl/oplog_buffer.h"
 #include "mongo/db/repl/oplog_fetcher.h"
+#include "mongo/db/repl/oplog_interface_remote.h"
 #include "mongo/db/repl/optime.h"
 #include "mongo/db/repl/rollback_impl.h"
 #include "mongo/db/repl/sync_source_resolver.h"
@@ -178,10 +179,11 @@ private:
      * Executes a rollback with the recover to checkpoint algorithm. This is the default rollback
      * algorithm.
      */
-    void _runRollbackViaRecoverToCheckpoint(const HostAndPort& source,
-                                            int requiredRBID,
+    void _runRollbackViaRecoverToCheckpoint(OperationContext* opCtx,
+                                            const HostAndPort& source,
                                             OplogInterface* localOplog,
-                                            StorageInterface* storageInterface);
+                                            StorageInterface* storageInterface,
+                                            OplogInterfaceRemote::GetConnectionFn getConnection);
 
     /**
      * Executes a rollback via refetch in either rs_rollback.cpp or rs_rollback_no_uuid.cpp
@@ -189,10 +191,7 @@ private:
      * We fall back on the rollback via refetch algorithm when:
      * 1)  the server parameter "rollbackMethod" is set to "rollbackViaRefetch" or
      *     "rollbackViaRefetchNoUUID"; or
-     * 2)  the current rollback algorithm in RollbackImpl determines that it cannot handle certain
-     *     operations (either in the local or remote oplog) and returns an
-     *     IncompatibleRollbackAlgorithm error; or
-     * 3)  the storage engine does not support "rollback to a checkpoint."
+     * 2)  the storage engine does not support "rollback to a checkpoint."
      *
      * Must be called from _runRollback() which ensures that all the conditions for entering
      * rollback have been met.
@@ -201,7 +200,8 @@ private:
                                        const HostAndPort& source,
                                        int requiredRBID,
                                        OplogInterface* localOplog,
-                                       bool useUUID);
+                                       bool useUUID,
+                                       OplogInterfaceRemote::GetConnectionFn getConnection);
 
     // restart syncing
     void start(OperationContext* opCtx);
@@ -268,7 +268,7 @@ private:
     // Current rollback process. If this component is active, we are currently reverting local
     // operations in the local oplog in order to bring this server to a consistent state relative
     // to the sync source.
-    std::unique_ptr<RollbackImpl> _rollback;
+    std::unique_ptr<RollbackImpl> _rollback;  // (PR)
 };
 
 

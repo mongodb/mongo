@@ -28,16 +28,9 @@
 
 #pragma once
 
-#include <memory>
-
 #include "mongo/base/status_with.h"
-#include "mongo/db/repl/abstract_async_component.h"
-#include "mongo/db/repl/optime.h"
 #include "mongo/db/repl/rollback.h"
-#include "mongo/db/repl/rollback_common_point_resolver.h"
-#include "mongo/executor/task_executor.h"
 #include "mongo/stdx/functional.h"
-#include "mongo/util/net/hostandport.h"
 
 namespace mongo {
 
@@ -47,7 +40,6 @@ namespace repl {
 
 class OplogInterface;
 class ReplicationCoordinator;
-class StorageInterface;
 
 /**
  * During steady state replication, it is possible to find the local server in a state where it
@@ -63,123 +55,102 @@ class StorageInterface;
  *
  * In the example 'e', 'f', and 'g' are getting rolled back, 'h' is what's getting rolled forward.
  *
- * This class models the logic necessary to perform this 'rollback' procedure in two phases:
+ * This class performs 'rollback' via the storage engine's 'recover to a stable timestamp'
+ * machinery. This class runs synchronously on the caller's thread.
  *
- * 1) Information needed to perform the rollback is first read from the sync source and stored
- *    locally. The user-visible server state (all databases except for the 'local' database) is not
- *    changed during this information gathering phase.
+ * Order of actions:
+ *   1. Transition to ROLLBACK
+ *   2. Find the common point between the local and remote oplogs.
+ *       a. Keep track of what is rolled back to provide a summary to the user
+ *       b. Write rolled back documents to 'Rollback Files'
+ *   3. Increment the Rollback ID (RBID)
+ *   4. Write the common point as the 'OplogTruncateAfterPoint'
+ *   5. Tell the storage engine to recover to the last stable timestamp
+ *   6. Call recovery code
+ *       a. Truncate the oplog at the common point
+ *       b. Apply all oplog entries to the end of oplog.
+ *   7. Check the shard identity document for roll back
+ *   8. Clear the in-memory transaction table
+ *   9. Transition to SECONDARY
  *
- * 2) After the first phase is completed, we read the persisted rollback information during the
- *    second phase and logically undo the local operations to the common point before apply the
- *    remote operations ('h' in the example above) forward until we reach a consistent point
- *    (relative to the sync source).
+ * If the node crashes while in rollback and the storage engine has not recovered to the last
+ * stable timestamp yet, then rollback will simply restart against the new sync source upon restart.
+ * If the node crashes after the storage engine has recovered to the last stable timestamp,
+ * then the normal startup recovery code will run and finish the rollback process.
+ *
+ * If the sync source rolls back while we're searching for a common point, the connection should
+ * get closed and finding the common point should fail.
+ *
  */
-class RollbackImpl : public AbstractAsyncComponent, public Rollback {
+class RollbackImpl : public Rollback {
 public:
     /**
-     * Implementation of RollbackCommonPointResolver::Listener used by this class.
+     * A class with functions that get called throughout rollback. These can be overridden to
+     * instrument this class for diagnostics and testing.
      */
-    class Listener;
+    class Listener {
+    public:
+        virtual ~Listener() = default;
+
+        /**
+         *  Function called after we transition to ROLLBACK.
+         */
+        virtual void onTransitionToRollback() {}
+
+        /**
+         *  Function called after we find the common point.
+         */
+        virtual void onCommonPointFound(Timestamp commonPoint) {}
+    };
 
     /**
-     * This constructor is used to create a RollbackImpl instance that will run the entire
-     * rollback algorithm. This is called during steady state replication when we determine that we
-     * have to roll back after processing the first batch of oplog entries from the sync source.
-     *
-     * To resume an interrupted rollback process at startup, the caller has to use the
-     * ReplicationCoordinator to transition the member state to ROLLBACK and invoke
-     * readLocalRollbackInfoAndApplyUntilConsistentWithSyncSource() directly.
+     * Creates a RollbackImpl instance that will run the entire rollback algorithm. This is
+     * called during steady state replication when we determine that we have to roll back after
+     * processing the first batch of oplog entries from the sync source.
      */
-    RollbackImpl(executor::TaskExecutor* executor,
-                 OplogInterface* localOplog,
-                 const HostAndPort& syncSource,
-                 const NamespaceString& remoteOplogNss,
-                 std::size_t maxFetcherRestarts,
-                 int requiredRollbackId,
+    RollbackImpl(OplogInterface* localOplog,
+                 OplogInterface* remoteOplog,
                  ReplicationCoordinator* replicationCoordinator,
-                 StorageInterface* storageInterface,
-                 const OnCompletionFn& onCompletion);
+                 Listener* listener);
+
+    /**
+     * Constructs RollbackImpl with a default noop listener.
+     */
+    RollbackImpl(OplogInterface* localOplog,
+                 OplogInterface* remoteOplog,
+                 ReplicationCoordinator* replicationCoordinator);
 
     virtual ~RollbackImpl();
 
     /**
-     * This is a static function that will run the remaining work in the rollback algorithm
-     * (Phase 2) after persisting (in Phase 1) all the information we need from the sync source.
-     * This part of the rollback algorithm runs synchronously and may be invoked in one of two
-     * contexts:
-     * 1) as part of an rollback process started by an in-progress RollbackImpl; or
-     * 2) to resume a previously interrupted rollback process at server startup while initializing
-     *    the replication subsystem. In this case, RollbackImpl will transition the member state
-     *    to ROLLBACK before executing the rest of the rollback procedure.
-     *
-     * This function does not need to communicate with the sync source.
-     *
-     * Returns the last optime applied.
+     * Runs the rollback algorithm.
      */
-    static StatusWith<OpTime> readLocalRollbackInfoAndApplyUntilConsistentWithSyncSource(
-        ReplicationCoordinator* replicationCoordinator, StorageInterface* storageInterface);
-
-private:
-    /**
-     * Schedules the first task of the rollback algorithm, which is to transition to ROLLBACK.
-     * Returns ShutdownInProgress if the first task cannot be scheduled because the task executor is
-     * shutting down.
-     *
-     * Called by AbstractAsyncComponent::startup().
-     */
-    Status _doStartup_inlock() noexcept override;
+    Status runRollback(OperationContext* opCtx);
 
     /**
      * Cancels all outstanding work.
-     *
-     * Called by AbstractAsyncComponent::shutdown().
      */
-    void _doShutdown_inlock() noexcept override;
+    void shutdown();
+
+private:
+    /**
+     * Returns if shutdown was called on this rollback process.
+     */
+    bool _isInShutdown() const;
 
     /**
-     * Returns mutex to guard this component's state variable.
-     *
-     * Used by AbstractAyncComponent to protect access to the component state stored in '_state'.
+     * Finds the common point between the local and remote oplogs.
      */
-    stdx::mutex* _getMutex() noexcept override;
-
-    /**
-     * Rollback flowchart (Incomplete):
-     *
-     *     _doStartup_inlock()
-     *         |
-     *         |
-     *         V
-     *     _transitionToRollbackCallback()
-     *         |
-     *         |
-     *         V
-     *     _commonPointResolverCallback()
-     *         |
-     *         |
-     *         V
-     *    _tearDown()
-     *         |
-     *         |
-     *         V
-     *    _finishCallback()
-     */
+    StatusWith<Timestamp> _findCommonPoint();
 
     /**
      * Uses the ReplicationCoordinator to transition the current member state to ROLLBACK.
      * If the transition to ROLLBACK fails, this could mean that we have been elected PRIMARY. In
-     * this case, we invoke the completion function with a NotSecondary error.
+     * this case, we return a NotSecondary error.
      *
-     * This callback is scheduled by _doStartup_inlock().
+     * 'opCtx' cannot be null.
      */
-    void _transitionToRollbackCallback(const executor::TaskExecutor::CallbackArgs& callbackArgs);
-
-    /**
-     * Callback function invoked when the RollbackCommonPointResolver completes its processing.
-     *
-     * This callback is scheduled by _transitionToRollbackCallback().
-     */
-    void _commonPointResolverCallback(const Status& commonPointResolverStatus);
+    Status _transitionToRollback(OperationContext* opCtx);
 
     /**
      * If we detected that we rolled back the shardIdentity document as part of this rollback
@@ -187,8 +158,6 @@ private:
      * shardIdentity document.
      *
      * 'opCtx' cannot be null.
-     *
-     * Called by _tearDown().
      */
     void _checkShardIdentityRollback(OperationContext* opCtx);
 
@@ -197,8 +166,6 @@ private:
      * to refetch from storage.
      *
      * 'opCtx' cannot be null.
-     *
-     * Called by _tearDown().
      */
     void _clearSessionTransactionTable(OperationContext* opCtx);
 
@@ -207,31 +174,8 @@ private:
      * This operation must succeed. Otherwise, we will shut down the server.
      *
      * 'opCtx' cannot be null.
-     *
-     * Called by _tearDown().
      */
     void _transitionFromRollbackToSecondary(OperationContext* opCtx);
-
-    /**
-     * Performs tear down steps before caller is notified of completion status.
-     *
-     * 'opCtx' cannot be null.
-     *
-     * Called by _finishCallback() before the completion callback '_onCompletion' is invoked.
-     */
-    void _tearDown(OperationContext* opCtx);
-
-    /**
-     * Invokes completion callback and transitions state to State::kComplete.
-     * _finishCallback() may require an OperationContext to perform certain tear down functions.
-     * It will create its own OperationContext unless the caller provides one in 'opCtx'.
-     *
-     * Calls _tearDown() to perform tear down steps before invoking completion callback.
-     *
-     * Finally, this function transitions the component state to Complete by invoking
-     * AbstractAsyncComponent::_transitionToComplete().
-     */
-    void _finishCallback(OperationContext* opCtx, StatusWith<OpTime> lastApplied);
 
     // All member variables are labeled with one of the following codes indicating the
     // synchronization rules for accessing them.
@@ -243,48 +187,21 @@ private:
     // Guards access to member variables.
     mutable stdx::mutex _mutex;  // (S)
 
+    // Set to true when RollbackImpl should shut down.
+    bool _inShutdown = false;  // (M)
+
     // This is used to read oplog entries from the local oplog that will be rolled back.
     OplogInterface* const _localOplog;  // (R)
 
-    // Host and port of the sync source we are rolling back against.
-    const HostAndPort _syncSource;  // (R)
-
-    // Fully qualified namespace of the remote oplog.
-    const NamespaceString _remoteOplogNss;  // (R)
-
-    // Number of times to restart the query in the RollbackCommonPointResolver and OplogFetcher.
-    std::size_t _maxFetcherRestarts;  // (R)
-
-    // This is the current rollback ID on the sync source that we are rolling back against.
-    // It is an error if the rollback ID on the sync source changes before rollback is complete.
-    const int _requiredRollbackId;  // (R)
+    // This is used to read oplog entries from the remote oplog to find the common point.
+    OplogInterface* const _remoteOplog;  // (R)
 
     // This is used to read and update global replication settings. This includes:
     // - update transition member states;
-    // - update current applied and durable optimes; and
-    // - update global rollback ID (that will be returned by the command replSetGetRBID).
     ReplicationCoordinator* const _replicationCoordinator;  // (R)
 
-    // This is used to read and update the global minValid settings and to access the storage layer.
-    StorageInterface* const _storageInterface;  // (R)
-
-    // Once we are in ROLLBACK, this is used to determine the common point between the local and
-    // remote oplogs. As we walk the local oplog backwards towards the common point, we will use
-    // the RollbackFixUpInfo to process each entry (but not including the common point itself). This
-    // gives us the information we need to roll back the local oplog entries that succeed the common
-    // point.
-    std::unique_ptr<RollbackCommonPointResolver::Listener> _listener;   // (S)
-    std::unique_ptr<RollbackCommonPointResolver> _commonPointResolver;  // (S)
-
-    // This is invoked with the final status of the rollback. If startup() fails, this callback
-    // is never invoked. The caller gets the last applied optime when the rollback completes
-    // successfully or an error status.
-    // '_onCompletion' is cleared on completion (in _finishCallback()) in order to release any
-    // resources that might be held by the callback function object.
-    OnCompletionFn _onCompletion;  // (M)
-
-    // Handle to currently scheduled _transitionToRollbackCallback() task.
-    executor::TaskExecutor::CallbackHandle _transitionToRollbackHandle;  // (M)
+    // A listener that's called at various points throughout rollback.
+    Listener* _listener;  // (R)
 };
 
 }  // namespace repl

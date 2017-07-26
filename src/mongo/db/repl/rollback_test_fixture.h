@@ -34,7 +34,6 @@
 #include "mongo/db/repl/storage_interface_impl.h"
 #include "mongo/db/service_context.h"
 #include "mongo/db/service_context_d_test_fixture.h"
-#include "mongo/executor/thread_pool_task_executor_test_fixture.h"
 
 namespace mongo {
 namespace repl {
@@ -45,16 +44,10 @@ namespace repl {
  * - an "ephemeralForTest" storage engine for checking results of the rollback algorithm at the
  *   storage layer. The storage engine is initialized as part of the ServiceContextForMongoD test
  *   fixture.
- * - a task executor for simulating remote command responses from the sync source. The
- *   ThreadPoolExecutorTest is used to initialize the task executor.
  */
 class RollbackTest : public unittest::Test {
 public:
-    /**
-     * Initializes executor::ThreadPoolExecutorTest so that each thread is initialized with a
-     * Client.
-     */
-    RollbackTest();
+    RollbackTest() = default;
 
     /**
      * Initializes the service context and task executor.
@@ -65,9 +58,6 @@ public:
      * Destroys the service context and task executor.
      *
      * Note on overriding tearDown() in tests:
-     * Tests should explicitly shut down and join the task executor (by invoking
-     * TaskExecutorTest::shutdownExecutorThread() and TaskExecutorTest::joinExecutorThread()
-     * respectively) before calling RollbackTest::tearDown().
      * This cancels outstanding tasks and remote command requests scheduled using the task
      * executor.
      */
@@ -76,9 +66,6 @@ public:
 protected:
     // Test fixture used to manage the service context and global storage engine.
     ServiceContextMongoDTest _serviceContextMongoDTest;
-
-    // Test fixture used to manage the task executor.
-    executor::ThreadPoolExecutorTest _threadPoolExecutorTest;
 
     // OperationContext provided to test cases for storage layer operations.
     ServiceContext::UniqueOperationContext _opCtx;

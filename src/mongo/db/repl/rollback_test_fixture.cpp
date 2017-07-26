@@ -57,22 +57,10 @@ ReplSettings createReplSettings() {
     return settings;
 }
 
-/**
- * Creates ThreadPoolMock::Options that initializes a Client for every thread created in the pool.
- */
-executor::ThreadPoolMock::Options createThreadPoolOptions() {
-    executor::ThreadPoolMock::Options options;
-    options.onCreateThread = []() { Client::initThread("RollbackTest"); };
-    return options;
-}
-
 }  // namespace
-
-RollbackTest::RollbackTest() : _threadPoolExecutorTest(createThreadPoolOptions()) {}
 
 void RollbackTest::setUp() {
     _serviceContextMongoDTest.setUp();
-    _threadPoolExecutorTest.setUp();
     auto serviceContext = _serviceContextMongoDTest.getServiceContext();
     _replicationProcess = stdx::make_unique<ReplicationProcess>(
         &_storageInterface, stdx::make_unique<ReplicationConsistencyMarkersMock>());
@@ -90,8 +78,6 @@ void RollbackTest::setUp() {
     _replicationProcess->getConsistencyMarkers()->setAppliedThrough(_opCtx.get(), OpTime{});
     _replicationProcess->getConsistencyMarkers()->setMinValid(_opCtx.get(), OpTime{});
     _replicationProcess->initializeRollbackID(_opCtx.get()).transitional_ignore();
-
-    _threadPoolExecutorTest.launchExecutorThread();
 }
 
 void RollbackTest::tearDown() {
