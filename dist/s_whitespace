@@ -28,6 +28,7 @@ find bench dist examples ext src test \
         -e '/checksum\/power8/d' \
         -e '/3rdparty/d' \
         -e '/docs\/tools/d' \
+        -e '/log\/log_auto/d' \
 | while read f ; do
 	whitespace $f
 done

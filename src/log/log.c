@@ -20,11 +20,11 @@ static int __log_write_internal(
 #define	WT_LOG_OPEN_CREATE_OK	0x01
 
 /*
- * __log_printf_internal --
- *	Internal call to write a log message.
+ * __wt_log_printf --
+ *	Write a text message to the log.
  */
-static int
-__log_printf_internal(WT_SESSION_IMPL *session, const char *fmt, ...)
+int
+__wt_log_printf(WT_SESSION_IMPL *session, const char *fmt, ...)
 {
 	WT_DECL_RET;
 	va_list ap;
@@ -1259,7 +1259,7 @@ __wt_log_set_version(WT_SESSION_IMPL *session, uint16_t version,
 	 * an archive correctly removes all earlier logs.
 	 * Write an internal printf record.
 	 */
-	WT_ERR(__log_printf_internal(session,
+	WT_ERR(__wt_log_printf(session,
 	    "COMPATIBILITY: Version now %" PRIu16, log->log_version));
 	if (lognump != NULL)
 		*lognump = log->alloc_lsn.l.file;

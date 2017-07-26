@@ -994,6 +994,7 @@ oo
 opcode
 opendir
 openfile
+oplist
 oplog
 optimizations
 optype

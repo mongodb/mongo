@@ -109,11 +109,11 @@ __txn_op_log(WT_SESSION_IMPL *session,
 }
 
 /*
- * __txn_commit_printlog --
- *	Print a commit log record.
+ * __txn_oplist_printlog --
+ *	Print a list of operations from a log record.
  */
 static int
-__txn_commit_printlog(WT_SESSION_IMPL *session,
+__txn_oplist_printlog(WT_SESSION_IMPL *session,
     const uint8_t **pp, const uint8_t *end, uint32_t flags)
 {
 	bool firstrecord;
@@ -344,8 +344,8 @@ __wt_txn_checkpoint_log(
 	WT_TXN *txn;
 	uint8_t *end, *p;
 	size_t recsize;
-	uint32_t i, rectype = WT_LOGREC_CHECKPOINT;
-	const char *fmt = WT_UNCHECKED_STRING(IIIIu);
+	uint32_t i, rectype;
+	const char *fmt;
 
 	conn = S2C(session);
 	txn = &session->txn;
@@ -367,7 +367,31 @@ __wt_txn_checkpoint_log(
 	switch (flags) {
 	case WT_TXN_LOG_CKPT_PREPARE:
 		txn->full_ckpt = true;
-		WT_ERR(__wt_log_flush_lsn(session, ckpt_lsn, true));
+
+		if (conn->compat_major >= WT_LOG_V2) {
+			/*
+			 * Write the system log record containing a checkpoint
+			 * start operation.
+			 */
+			rectype = WT_LOGREC_SYSTEM;
+			fmt = WT_UNCHECKED_STRING(I);
+			WT_ERR(__wt_struct_size(
+			    session, &recsize, fmt, rectype));
+			WT_ERR(__wt_logrec_alloc(session, recsize, &logrec));
+
+			WT_ERR(__wt_struct_pack(session,
+			    (uint8_t *)logrec->data + logrec->size, recsize,
+			    fmt, rectype));
+			logrec->size += (uint32_t)recsize;
+			WT_ERR(__wt_logop_checkpoint_start_pack(
+			    session, logrec));
+			WT_ERR(__wt_log_write(session, logrec, ckpt_lsn, 0));
+		} else {
+			WT_ERR(__wt_log_printf(session,
+			    "CHECKPOINT: Starting record"));
+			WT_ERR(__wt_log_flush_lsn(session, ckpt_lsn, true));
+		}
+
 		/*
 		 * We need to make sure that the log records in the checkpoint
 		 * LSN are on disk.  In particular to make sure that the
@@ -401,14 +425,16 @@ __wt_txn_checkpoint_log(
 			ckpt_snapshot = txn->ckpt_snapshot;
 
 		/* Write the checkpoint log record. */
-		WT_ERR(__wt_struct_size(session, &recsize, fmt,
-		    rectype, ckpt_lsn->l.file, ckpt_lsn->l.offset,
+		rectype = WT_LOGREC_CHECKPOINT;
+		fmt = WT_UNCHECKED_STRING(IIIIu);
+		WT_ERR(__wt_struct_size(session, &recsize,
+		    fmt, rectype, ckpt_lsn->l.file, ckpt_lsn->l.offset,
 		    txn->ckpt_nsnapshot, ckpt_snapshot));
 		WT_ERR(__wt_logrec_alloc(session, recsize, &logrec));
 
 		WT_ERR(__wt_struct_pack(session,
-		    (uint8_t *)logrec->data + logrec->size, recsize, fmt,
-		    rectype, ckpt_lsn->l.file, ckpt_lsn->l.offset,
+		    (uint8_t *)logrec->data + logrec->size, recsize,
+		    fmt, rectype, ckpt_lsn->l.file, ckpt_lsn->l.offset,
 		    txn->ckpt_nsnapshot, ckpt_snapshot));
 		logrec->size += (uint32_t)recsize;
 		WT_ERR(__wt_log_write(session, logrec, lsnp,
@@ -568,7 +594,7 @@ __txn_printlog(WT_SESSION_IMPL *session,
 		    "    \"type\" : \"commit\",\n"));
 		WT_RET(__wt_fprintf(session, WT_STDOUT(session),
 		    "    \"txnid\" : %" PRIu64 ",\n", txnid));
-		WT_RET(__txn_commit_printlog(session, &p, end, args->flags));
+		WT_RET(__txn_oplist_printlog(session, &p, end, args->flags));
 		break;
 
 	case WT_LOGREC_FILE_SYNC:
@@ -596,9 +622,7 @@ __txn_printlog(WT_SESSION_IMPL *session,
 		    WT_UNCHECKED_STRING(II), &lsnfile, &lsnoffset));
 		WT_RET(__wt_fprintf(session, WT_STDOUT(session),
 		    "    \"type\" : \"system\",\n"));
-		WT_RET(__wt_fprintf(session, WT_STDOUT(session),
-		    "    \"prev_lsn\" : [%" PRIu32 ",%" PRIu32 "]\n",
-		    lsnfile, lsnoffset));
+		WT_RET(__txn_oplist_printlog(session, &p, end, args->flags));
 		break;
 	}
 
