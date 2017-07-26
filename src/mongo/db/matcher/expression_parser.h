@@ -67,6 +67,7 @@ enum class PathAcceptingKeyword {
     BITS_ALL_CLEAR,
     BITS_ANY_SET,
     BITS_ANY_CLEAR,
+    INTERNAL_SCHEMA_FMOD,
     INTERNAL_SCHEMA_MIN_ITEMS,
     INTERNAL_SCHEMA_MAX_ITEMS,
     INTERNAL_SCHEMA_UNIQUE_ITEMS,
@@ -244,6 +245,8 @@ private:
      * Converts 'theArray', a BSONArray of integers, into a std::vector of integers.
      */
     StatusWith<std::vector<uint32_t>> _parseBitPositionsArray(const BSONObj& theArray);
+
+    StatusWithMatchExpression _parseInternalSchemaFmod(const char* name, const BSONElement& e);
 
     /**
      * Parses a MatchExpression which takes a fixed-size array of MatchExpressions as arguments.

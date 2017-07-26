@@ -116,6 +116,8 @@ TEST_F(DocumentSourceMatchTest, RedactSafePortion) {
 
     assertExpectedRedactSafePortion("{a: {$_internalSchemaMaxLength: 1}}", "{}");
 
+    assertExpectedRedactSafePortion("{a: {$_internalSchemaFmod: [4.5, 2.3]}}", "{}");
+
     // Combinations
     assertExpectedRedactSafePortion("{a:1, b: 'asdf'}", "{a:1, b: 'asdf'}");
 

@@ -40,6 +40,7 @@
 #include "mongo/db/matcher/expression_leaf.h"
 #include "mongo/db/matcher/expression_tree.h"
 #include "mongo/db/matcher/schema/expression_internal_schema_cond.h"
+#include "mongo/db/matcher/schema/expression_internal_schema_fmod.h"
 #include "mongo/db/matcher/schema/expression_internal_schema_max_items.h"
 #include "mongo/db/matcher/schema/expression_internal_schema_max_length.h"
 #include "mongo/db/matcher/schema/expression_internal_schema_max_properties.h"
@@ -295,6 +296,9 @@ StatusWithMatchExpression MatchExpressionParser::_parseSubField(const BSONObj& c
         case PathAcceptingKeyword::BITS_ANY_CLEAR: {
             return _parseBitTest<BitsAnyClearMatchExpression>(name, e);
         }
+
+        case PathAcceptingKeyword::INTERNAL_SCHEMA_FMOD:
+            return _parseInternalSchemaFmod(name, e);
 
         case PathAcceptingKeyword::INTERNAL_SCHEMA_MIN_ITEMS: {
             return _parseInternalSchemaSingleIntegerArgument<InternalSchemaMinItemsMatchExpression>(
@@ -1133,6 +1137,41 @@ StatusWith<long long> MatchExpressionParser::parseIntegerElementToLong(BSONEleme
     return number;
 }
 
+StatusWithMatchExpression MatchExpressionParser::_parseInternalSchemaFmod(const char* name,
+                                                                          const BSONElement& elem) {
+    StringData path(name);
+    if (elem.type() != Array)
+        return {ErrorCodes::BadValue,
+                str::stream() << path << " must be an array, but got type " << elem.type()};
+
+    BSONObjIterator i(elem.embeddedObject());
+
+    if (!i.more())
+        return {ErrorCodes::BadValue, str::stream() << path << " does not have enough elements"};
+    BSONElement d = i.next();
+    if (!d.isNumber())
+        return {ErrorCodes::TypeMismatch,
+                str::stream() << path << " does not have a numeric divisor"};
+
+    if (!i.more())
+        return {ErrorCodes::BadValue, str::stream() << path << " does not have enough elements"};
+    BSONElement r = i.next();
+    if (!d.isNumber())
+        return {ErrorCodes::TypeMismatch,
+                str::stream() << path << " does not have a numeric remainder"};
+
+    if (i.more())
+        return {ErrorCodes::BadValue, str::stream() << path << " has too many elements"};
+
+    std::unique_ptr<InternalSchemaFmodMatchExpression> result =
+        stdx::make_unique<InternalSchemaFmodMatchExpression>();
+    Status s = result->init(name, d.numberDecimal(), r.numberDecimal());
+    if (!s.isOK())
+        return s;
+    return {std::move(result)};
+}
+
+
 template <class T>
 StatusWithMatchExpression MatchExpressionParser::_parseInternalSchemaFixedArityArgument(
     StringData name, const BSONElement& input, const CollatorInterface* collator) {
@@ -1273,6 +1312,7 @@ MONGO_INITIALIZER(MatchExpressionParser)(InitializerContext* context) {
             {"bitsAllClear", PathAcceptingKeyword::BITS_ALL_CLEAR},
             {"bitsAnySet", PathAcceptingKeyword::BITS_ANY_SET},
             {"bitsAnyClear", PathAcceptingKeyword::BITS_ANY_CLEAR},
+            {"_internalSchemaFmod", PathAcceptingKeyword::INTERNAL_SCHEMA_FMOD},
             {"_internalSchemaMinItems", PathAcceptingKeyword::INTERNAL_SCHEMA_MIN_ITEMS},
             {"_internalSchemaMaxItems", PathAcceptingKeyword::INTERNAL_SCHEMA_MAX_ITEMS},
             {"_internalSchemaUniqueItems", PathAcceptingKeyword::INTERNAL_SCHEMA_UNIQUE_ITEMS},

@@ -177,6 +177,9 @@ const char* encodeMatchType(MatchExpression::MatchType mt) {
         case MatchExpression::INTERNAL_SCHEMA_COND:
             return "internalSchemaCond";
             break;
+        case MatchExpression::INTERNAL_SCHEMA_FMOD:
+            return "internalSchemaFmod";
+            break;
         case MatchExpression::INTERNAL_SCHEMA_MIN_ITEMS:
             return "internalSchemaMinItems";
             break;

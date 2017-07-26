@@ -1073,5 +1073,23 @@ TEST(SerializeInternalSchema, ExpressionInternalSchemaMaxPropertiesSerializesCor
     ASSERT_BSONOBJ_EQ(*reserialized.getQuery(), serialize(reserialized.getMatchExpression()));
 }
 
+TEST(SerializeInternalSchema, ExpressionInternalSchemaFmodSerializesCorrectly) {
+    Matcher original(
+        fromjson("{a: {$_internalSchemaFmod: [NumberDecimal('2.3'), NumberDecimal('1.1')]}}"),
+        ExtensionsCallbackNoop(),
+        kSimpleCollator);
+    Matcher reserialized(
+        serialize(original.getMatchExpression()), ExtensionsCallbackNoop(), kSimpleCollator);
+
+    ASSERT_BSONOBJ_EQ(
+        *reserialized.getQuery(),
+        fromjson("{a: {$_internalSchemaFmod: [NumberDecimal('2.3'), NumberDecimal('1.1')]}}"));
+    ASSERT_BSONOBJ_EQ(*reserialized.getQuery(), serialize(reserialized.getMatchExpression()));
+    BSONObj obj = fromjson("{a: NumberDecimal('1.1')}");
+    ASSERT_EQ(original.matches(obj), reserialized.matches(obj));
+    obj = fromjson("{a: NumberDecimal('2.3')}");
+    ASSERT_EQ(original.matches(obj), reserialized.matches(obj));
+}
+
 }  // namespace
 }  // namespace mongo

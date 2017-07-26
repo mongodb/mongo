@@ -33,6 +33,7 @@
 #include "mongo/bson/bsontypes.h"
 #include "mongo/db/matcher/expression_always_boolean.h"
 #include "mongo/db/matcher/expression_parser.h"
+#include "mongo/db/matcher/schema/expression_internal_schema_fmod.h"
 #include "mongo/db/matcher/schema/expression_internal_schema_max_length.h"
 #include "mongo/db/matcher/schema/expression_internal_schema_min_length.h"
 #include "mongo/db/matcher/schema/expression_internal_schema_object_match.h"
@@ -50,6 +51,7 @@ constexpr StringData kSchemaMinimumKeyword = "minimum"_sd;
 constexpr StringData kSchemaMaxLengthKeyword = "maxLength"_sd;
 constexpr StringData kSchemaMinLengthKeyword = "minLength"_sd;
 constexpr StringData kSchemaPatternKeyword = "pattern"_sd;
+constexpr StringData kSchemaMultipleOfKeyword = "multipleOf"_sd;
 constexpr StringData kSchemaPropertiesKeyword = "properties"_sd;
 constexpr StringData kSchemaTypeKeyword = "type"_sd;
 
@@ -264,6 +266,35 @@ StatusWithMatchExpression parsePattern(StringData path,
     return makeRestriction(BSONType::String, std::move(expr), typeExpr);
 }
 
+StatusWithMatchExpression parseMultipleOf(StringData path,
+                                          BSONElement multipleOf,
+                                          TypeMatchExpression* typeExpr) {
+    if (!multipleOf.isNumber()) {
+        return {Status(ErrorCodes::TypeMismatch,
+                       str::stream() << "$jsonSchema keyword '" << kSchemaMultipleOfKeyword
+                                     << "' must be a number")};
+    }
+
+    if (multipleOf.numberDecimal().isNegative() || multipleOf.numberDecimal().isZero()) {
+        return {Status(ErrorCodes::FailedToParse,
+                       str::stream() << "$jsonSchema keyword '" << kSchemaMultipleOfKeyword
+                                     << "' must have a positive value")};
+    }
+    if (path.empty()) {
+        return {stdx::make_unique<AlwaysTrueMatchExpression>()};
+    }
+
+    auto expr = stdx::make_unique<InternalSchemaFmodMatchExpression>();
+    auto status = expr->init(path, multipleOf.numberDecimal(), Decimal128(0));
+    if (!status.isOK()) {
+        return status;
+    }
+
+    TypeMatchExpression::Type restrictionType;
+    restrictionType.allNumbers = true;
+    return makeRestriction(restrictionType, std::move(expr), typeExpr);
+}
+
 }  // namespace
 
 StatusWithMatchExpression JSONSchemaParser::_parseProperties(StringData path,
@@ -318,7 +349,8 @@ StatusWithMatchExpression JSONSchemaParser::_parse(StringData path, BSONObj sche
                                       {kSchemaExclusiveMinimumKeyword, {}},
                                       {kSchemaMaxLengthKeyword, {}},
                                       {kSchemaMinLengthKeyword, {}},
-                                      {kSchemaPatternKeyword, {}}};
+                                      {kSchemaPatternKeyword, {}},
+                                      {kSchemaMultipleOfKeyword, {}}};
 
     for (auto&& elt : schema) {
         auto it = keywordMap.find(elt.fieldNameStringData());
@@ -430,6 +462,13 @@ StatusWithMatchExpression JSONSchemaParser::_parse(StringData path, BSONObj sche
             return patternExpr;
         }
         andExpr->add(patternExpr.getValue().release());
+    }
+    if (auto multipleOfElt = keywordMap[kSchemaMultipleOfKeyword]) {
+        auto multipleOfExpr = parseMultipleOf(path, multipleOfElt, typeExpr.getValue().get());
+        if (!multipleOfExpr.isOK()) {
+            return multipleOfExpr;
+        }
+        andExpr->add(multipleOfExpr.getValue().release());
     }
 
     if (path.empty() && typeExpr.getValue() &&

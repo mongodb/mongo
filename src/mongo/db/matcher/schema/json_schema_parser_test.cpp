@@ -443,5 +443,38 @@ TEST(JSONSchemaParserTest, PatternTranslatesCorrectlyWithString) {
     ASSERT_BSONOBJ_EQ(builder.obj(), expected);
 }
 
+
+TEST(JSONSchemaParserTest, FailsToParseIfMultipleOfIsNotANumber) {
+    BSONObj schema = fromjson("{multipleOf: 'foo'}");
+    auto result = JSONSchemaParser::parse(schema);
+    ASSERT_EQ(result.getStatus(), ErrorCodes::TypeMismatch);
+}
+
+TEST(JSONSchemaParserTest, FailsToParseIfMultipleOfIsLessThanZero) {
+    BSONObj schema = fromjson("{multipleOf: -1}");
+    auto result = JSONSchemaParser::parse(schema);
+    ASSERT_EQ(result.getStatus(), ErrorCodes::FailedToParse);
+}
+
+TEST(JSONSchemaParserTest, FailsToParseIfMultipleOfIsZero) {
+    BSONObj schema = fromjson("{multipleOf: 0}");
+    auto result = JSONSchemaParser::parse(schema);
+    ASSERT_EQ(result.getStatus(), ErrorCodes::FailedToParse);
+}
+
+TEST(JSONSchemaParserTest, MultipleOfTranslatesCorrectlyWithTypeNumber) {
+    BSONObj schema = fromjson(
+        "{properties: {foo: {type: 'number', multipleOf: NumberDecimal('5.3')}}, type: 'object'}");
+    auto result = JSONSchemaParser::parse(schema);
+    ASSERT_OK(result.getStatus());
+    BSONObjBuilder builder;
+    result.getValue()->serialize(&builder);
+    ASSERT_BSONOBJ_EQ(
+        builder.obj(),
+        fromjson("{$and: [{$and: [{$and: [{$or: [{$nor: [{foo: {$type: 'number'}}]}, "
+                 "{foo: {$_internalSchemaFmod: [NumberDecimal('5.3'), 0]}}]}, {$or: [{$nor: [{foo: "
+                 "{$exists: true}}]}, {foo: {$type: 'number'}}]}]}]}]}"));
+}
+
 }  // namespace
 }  // namespace mongo
