@@ -424,13 +424,13 @@ Status AuthzManagerExternalStateLocal::_getRoleDescription_inlock(
         }
 
         if (showRestrictions == AuthenticationRestrictionsFormat::kShow) {
-            auto indirectAuthenticationRestrictionsElement =
-                resultDoc.makeElementArray("indirectAuthenticationRestrictions");
-            fassert(40563, resultDoc.root().pushBack(indirectAuthenticationRestrictionsElement));
+            auto inheritedAuthenticationRestrictionsElement =
+                resultDoc.makeElementArray("inheritedAuthenticationRestrictions");
+            fassert(40563, resultDoc.root().pushBack(inheritedAuthenticationRestrictionsElement));
 
             for (const auto& restrictions : _roleGraph.getAllAuthenticationRestrictions(roleName)) {
                 fassert(40562,
-                        indirectAuthenticationRestrictionsElement.appendArray(
+                        inheritedAuthenticationRestrictionsElement.appendArray(
                             "", restrictions->toBSON()));
             }
         }
