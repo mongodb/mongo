@@ -290,12 +290,6 @@ public:
         const int numIndexesBefore = collection->getIndexCatalog()->numIndexesTotal(txn);
         result.append("numIndexesBefore", numIndexesBefore);
 
-        auto client = txn->getClient();
-        ScopeGuard lastOpSetterGuard =
-            MakeObjGuard(repl::ReplClientInfo::forClient(client),
-                         &repl::ReplClientInfo::setLastOpToSystemLastOpTime,
-                         txn);
-
         MultiIndexBlock indexer(txn, collection);
         indexer.allowBackgroundBuilding();
         indexer.allowInterruption();
@@ -402,8 +396,6 @@ public:
         MONGO_WRITE_CONFLICT_RETRY_LOOP_END(txn, kCommandName, ns.ns());
 
         result.append("numIndexesAfter", collection->getIndexCatalog()->numIndexesTotal(txn));
-
-        lastOpSetterGuard.Dismiss();
 
         return true;
     }
