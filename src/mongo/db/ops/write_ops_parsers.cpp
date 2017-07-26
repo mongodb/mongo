@@ -70,7 +70,7 @@ void validateInsertOp(const write_ops::Insert& insertOp) {
         // This is only for consistency with sharding.
         uassert(ErrorCodes::InvalidLength,
                 "Insert commands to system.indexes are limited to a single insert",
-                insertOp.getDocuments().size() == 1);
+                docs.size() == 1);
 
         const auto indexedNss(extractIndexedNamespace(insertOp));
 
@@ -83,7 +83,7 @@ void validateInsertOp(const write_ops::Insert& insertOp) {
                 nss.db().compare(indexedNss.db()) == 0);
     }
 
-    checkOpCountForCommand(insertOp, insertOp.getDocuments().size());
+    checkOpCountForCommand(insertOp, docs.size());
 }
 
 }  // namespace
