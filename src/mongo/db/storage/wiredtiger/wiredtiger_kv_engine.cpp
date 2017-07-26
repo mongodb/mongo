@@ -54,6 +54,9 @@
 #include "mongo/db/concurrency/locker.h"
 #include "mongo/db/concurrency/write_conflict_exception.h"
 #include "mongo/db/index/index_descriptor.h"
+#include "mongo/db/mongod_options.h"
+#include "mongo/db/repl/repl_settings.h"
+#include "mongo/db/server_options.h"
 #include "mongo/db/server_parameters.h"
 #include "mongo/db/service_context.h"
 #include "mongo/db/storage/journal_listener.h"
@@ -316,6 +319,7 @@ WiredTigerKVEngine::WiredTigerKVEngine(const std::string& canonicalName,
     }
     string config = ss.str();
     log() << "wiredtiger_open config: " << config;
+    _wtOpenConfig = config;
     int ret = wiredtiger_open(path.c_str(), &_eventHandler, config.c_str(), &_conn);
     // Invalid argument (EINVAL) is usually caused by invalid configuration string.
     // We still fassert() but without a stack trace.
@@ -344,7 +348,10 @@ WiredTigerKVEngine::WiredTigerKVEngine(const std::string& canonicalName,
         log() << "Repairing size cache";
         fassertNoTrace(28577, _salvageIfNeeded(_sizeStorerUri.c_str()));
     }
-    _sizeStorer.reset(new WiredTigerSizeStorer(_conn, _sizeStorerUri));
+
+    const bool sizeStorerLoggingEnabled = !getGlobalReplSettings().usingReplSets();
+    _sizeStorer.reset(
+        new WiredTigerSizeStorer(_conn, _sizeStorerUri, sizeStorerLoggingEnabled, _readOnly));
     _sizeStorer->fillCache();
 
     Locker::setGlobalThrottling(&openReadTransaction, &openWriteTransaction);
@@ -398,18 +405,66 @@ void WiredTigerKVEngine::cleanShutdown() {
 #else
         bool leak_memory = false;
 #endif
-        const char* config = nullptr;
+        const char* closeConfig = nullptr;
 
         if (RUNNING_ON_VALGRIND) {
             leak_memory = false;
         }
 
         if (leak_memory) {
-            config = "leak_memory=true";
+            closeConfig = "leak_memory=true";
         }
 
-        invariantWTOK(_conn->close(_conn, config));
-        _conn = NULL;
+        const bool keepOldBehavior = true;
+        const bool needsDowngrade = !keepOldBehavior && !_readOnly &&
+            serverGlobalParams.featureCompatibility.version.load() ==
+                ServerGlobalParams::FeatureCompatibility::Version::k34;
+
+        invariantWTOK(_conn->close(_conn, closeConfig));
+        _conn = nullptr;
+
+        // If FCV 3.4, enable WT logging on all tables.
+        if (needsDowngrade) {
+            log() << "Downgrading files to FCV 3.4";
+            WT_CONNECTION* conn;
+            std::stringstream openConfig;
+            openConfig << _wtOpenConfig << ",log=(archive=false)";
+
+            const bool NEW_WT_DROPPED = false;
+            if (NEW_WT_DROPPED) {
+                openConfig << ",compatibility=(release=2.9)";
+            }
+
+            invariantWTOK(
+                wiredtiger_open(_path.c_str(), &_eventHandler, openConfig.str().c_str(), &conn));
+
+            WT_SESSION* session;
+            conn->open_session(conn, nullptr, "", &session);
+
+            WT_CURSOR* tableCursor;
+            invariantWTOK(
+                session->open_cursor(session, "metadata:", nullptr, nullptr, &tableCursor));
+            while (tableCursor->next(tableCursor) == 0) {
+                const char* raw;
+                tableCursor->get_key(tableCursor, &raw);
+                StringData key(raw);
+                size_t idx = key.find(':');
+                if (idx == string::npos) {
+                    continue;
+                }
+
+                StringData type = key.substr(0, idx);
+                if (type != "table") {
+                    continue;
+                }
+
+                uassertStatusOK(WiredTigerUtil::setTableLogging(session, raw, true));
+            }
+
+            tableCursor->close(tableCursor);
+            session->close(session, nullptr);
+            invariantWTOK(conn->close(conn, closeConfig));
+        }
     }
 }
 
@@ -538,7 +593,8 @@ Status WiredTigerKVEngine::createGroupedRecordStore(OperationContext* opCtx,
 
     string uri = _uri(ident);
     WT_SESSION* s = session.getSession();
-    LOG(2) << "WiredTigerKVEngine::createRecordStore uri: " << uri << " config: " << config;
+    LOG(2) << "WiredTigerKVEngine::createRecordStore ns: " << ns << " uri: " << uri
+           << " config: " << config;
     return wtRCToStatus(s->create(s, uri.c_str(), config.c_str()));
 }
 
@@ -557,6 +613,7 @@ std::unique_ptr<RecordStore> WiredTigerKVEngine::getGroupedRecordStore(
     params.isEphemeral = _ephemeral;
     params.cappedCallback = nullptr;
     params.sizeStorer = _sizeStorer.get();
+    params.isReadOnly = _readOnly;
 
     params.cappedMaxSize = -1;
     if (options.capped) {
@@ -616,8 +673,8 @@ Status WiredTigerKVEngine::createGroupedSortedDataInterface(OperationContext* op
 
     std::string config = result.getValue();
 
-    LOG(2) << "WiredTigerKVEngine::createSortedDataInterface ident: " << ident
-           << " config: " << config;
+    LOG(2) << "WiredTigerKVEngine::createSortedDataInterface ns: " << collection->ns()
+           << " ident: " << ident << " config: " << config;
     return wtRCToStatus(WiredTigerIndex::Create(opCtx, _uri(ident), config));
 }
 
@@ -626,8 +683,8 @@ SortedDataInterface* WiredTigerKVEngine::getGroupedSortedDataInterface(Operation
                                                                        const IndexDescriptor* desc,
                                                                        KVPrefix prefix) {
     if (desc->unique())
-        return new WiredTigerIndexUnique(opCtx, _uri(ident), desc, prefix);
-    return new WiredTigerIndexStandard(opCtx, _uri(ident), desc, prefix);
+        return new WiredTigerIndexUnique(opCtx, _uri(ident), desc, prefix, _readOnly);
+    return new WiredTigerIndexStandard(opCtx, _uri(ident), desc, prefix, _readOnly);
 }
 
 Status WiredTigerKVEngine::dropIdent(OperationContext* opCtx, StringData ident) {

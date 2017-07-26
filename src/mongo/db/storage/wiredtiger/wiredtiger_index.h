@@ -79,7 +79,8 @@ public:
     WiredTigerIndex(OperationContext* ctx,
                     const std::string& uri,
                     const IndexDescriptor* desc,
-                    KVPrefix prefix);
+                    KVPrefix prefix,
+                    bool readOnly);
 
     virtual Status insert(OperationContext* opCtx,
                           const BSONObj& key,
@@ -169,7 +170,8 @@ public:
     WiredTigerIndexUnique(OperationContext* ctx,
                           const std::string& uri,
                           const IndexDescriptor* desc,
-                          KVPrefix prefix);
+                          KVPrefix prefix,
+                          bool readOnly = false);
 
     std::unique_ptr<SortedDataInterface::Cursor> newCursor(OperationContext* opCtx,
                                                            bool forward) const override;
@@ -193,7 +195,8 @@ public:
     WiredTigerIndexStandard(OperationContext* ctx,
                             const std::string& uri,
                             const IndexDescriptor* desc,
-                            KVPrefix prefix);
+                            KVPrefix prefix,
+                            bool readOnly = false);
 
     std::unique_ptr<SortedDataInterface::Cursor> newCursor(OperationContext* opCtx,
                                                            bool forward) const override;

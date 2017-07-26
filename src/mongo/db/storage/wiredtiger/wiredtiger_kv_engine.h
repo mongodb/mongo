@@ -209,6 +209,7 @@ private:
     std::unique_ptr<WiredTigerSessionCache> _sessionCache;
     std::string _canonicalName;
     std::string _path;
+    std::string _wtOpenConfig;
 
     std::unique_ptr<WiredTigerSizeStorer> _sizeStorer;
     std::string _sizeStorerUri;

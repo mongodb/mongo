@@ -37,6 +37,7 @@
 #include "mongo/base/status.h"
 #include "mongo/base/status_with.h"
 #include "mongo/bson/bsonobj.h"
+#include "mongo/db/namespace_string.h"
 #include "mongo/util/assert_util.h"
 
 namespace mongo {
@@ -217,6 +218,12 @@ public:
     static int verifyTable(OperationContext* opCtx,
                            const std::string& uri,
                            std::vector<std::string>* errors = NULL);
+
+    static bool useTableLogging(NamespaceString ns, bool replEnabled);
+
+    static Status setTableLogging(OperationContext* opCtx, const std::string& uri, bool on);
+
+    static Status setTableLogging(WT_SESSION* session, const std::string& uri, bool on);
 
 private:
     /**

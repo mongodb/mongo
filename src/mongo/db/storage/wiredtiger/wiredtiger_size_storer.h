@@ -46,7 +46,10 @@ class WiredTigerSession;
 
 class WiredTigerSizeStorer {
 public:
-    WiredTigerSizeStorer(WT_CONNECTION* conn, const std::string& storageUri);
+    WiredTigerSizeStorer(WT_CONNECTION* conn,
+                         const std::string& storageUri,
+                         const bool isWiredTigerLoggingEnabled,
+                         const bool readOnly = false);
     ~WiredTigerSizeStorer();
 
     void onCreate(WiredTigerRecordStore* rs, long long nr, long long ds);

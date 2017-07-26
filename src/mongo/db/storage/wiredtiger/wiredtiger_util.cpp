@@ -439,6 +439,60 @@ int WiredTigerUtil::verifyTable(OperationContext* opCtx,
     return (session->verify)(session, uri.c_str(), NULL);
 }
 
+bool WiredTigerUtil::useTableLogging(NamespaceString ns, bool replEnabled) {
+    if (!replEnabled) {
+        // All tables on standalones are logged.
+        return true;
+    }
+
+    // Of the replica set configurations:
+    if (ns.db() != "local") {
+        // All replicated collections are not logged.
+        return false;
+    }
+
+    if (ns.coll() == "replset.checkpointTimestamp" || ns.coll() == "replset.minvalid") {
+        // Of local collections, these two are derived from the state of the data and therefore
+        // are not logged.
+        return false;
+    }
+
+    // The remainder of local gets logged. In particular, the oplog and user created collections.
+    return true;
+}
+
+Status WiredTigerUtil::setTableLogging(OperationContext* opCtx, const std::string& uri, bool on) {
+    WiredTigerRecoveryUnit* recoveryUnit = WiredTigerRecoveryUnit::get(opCtx);
+    return setTableLogging(recoveryUnit->getSession(opCtx)->getSession(), uri, on);
+}
+
+Status WiredTigerUtil::setTableLogging(WT_SESSION* session, const std::string& uri, bool on) {
+    const bool NEW_WT_DROPPED = false;
+    if (!NEW_WT_DROPPED) {
+        return Status::OK();
+    }
+
+    LOG(3) << "Changing logging values. Uri: " << uri << " Enabled? " << on;
+    int ret;
+    if (on) {
+        ret = session->alter(session, uri.c_str(), "log=(enabled=true)");
+    } else {
+        ret = session->alter(session, uri.c_str(), "log=(enabled=false)");
+    }
+
+    if (ret) {
+        return Status(ErrorCodes::WriteConflict,
+                      str::stream() << "Failed to update log setting. Uri: " << uri << " Enable? "
+                                    << on
+                                    << " Ret: "
+                                    << ret
+                                    << " Msg: "
+                                    << session->strerror(session, ret));
+    }
+
+    return Status::OK();
+}
+
 Status WiredTigerUtil::exportTableToBSON(WT_SESSION* session,
                                          const std::string& uri,
                                          const std::string& config,

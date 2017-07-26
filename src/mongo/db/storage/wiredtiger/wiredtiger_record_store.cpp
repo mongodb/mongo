@@ -40,8 +40,10 @@
 #include "mongo/bson/util/builder.h"
 #include "mongo/db/concurrency/locker.h"
 #include "mongo/db/concurrency/write_conflict_exception.h"
+#include "mongo/db/mongod_options.h"
 #include "mongo/db/namespace_string.h"
 #include "mongo/db/operation_context.h"
+#include "mongo/db/repl/repl_settings.h"
 #include "mongo/db/service_context.h"
 #include "mongo/db/storage/oplog_hack.h"
 #include "mongo/db/storage/wiredtiger/wiredtiger_customization_hooks.h"
@@ -594,6 +596,15 @@ StatusWith<std::string> WiredTigerRecordStore::generateCreateString(
     }
     ss << ")";
 
+    const bool keepOldLoggingSettings = true;
+    if (keepOldLoggingSettings ||
+        WiredTigerUtil::useTableLogging(NamespaceString(ns),
+                                        getGlobalReplSettings().usingReplSets())) {
+        ss << ",log=(enabled=true)";
+    } else {
+        ss << ",log=(enabled=false)";
+    }
+
     return StatusWith<std::string>(ss);
 }
 
@@ -634,6 +645,14 @@ WiredTigerRecordStore::WiredTigerRecordStore(OperationContext* ctx, Params param
     } else {
         invariant(_cappedMaxSize == -1);
         invariant(_cappedMaxDocs == -1);
+    }
+
+    if (!params.isReadOnly) {
+        uassertStatusOK(WiredTigerUtil::setTableLogging(
+            ctx,
+            _uri,
+            WiredTigerUtil::useTableLogging(NamespaceString(ns()),
+                                            getGlobalReplSettings().usingReplSets())));
     }
 }
 

@@ -110,6 +110,7 @@ public:
         int64_t cappedMaxDocs;
         CappedCallback* cappedCallback;
         WiredTigerSizeStorer* sizeStorer;
+        bool isReadOnly;
     };
 
     WiredTigerRecordStore(OperationContext* opCtx, Params params);
