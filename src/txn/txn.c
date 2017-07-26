@@ -441,18 +441,26 @@ __wt_txn_config(WT_SESSION_IMPL *session, const char *cfg[])
 	if (cval.len > 0) {
 #ifdef HAVE_TIMESTAMPS
 		WT_TXN_GLOBAL *txn_global = &S2C(session)->txn_global;
-		wt_timestamp_t oldest_timestamp;
+		wt_timestamp_t oldest_timestamp, stable_timestamp;
 
 		WT_RET(__wt_txn_parse_timestamp(
 		    session, "read", &txn->read_timestamp, &cval));
 		__wt_readlock(session, &txn_global->rwlock);
 		__wt_timestamp_set(
 		    &oldest_timestamp, &txn_global->oldest_timestamp);
+		__wt_timestamp_set(
+		    &stable_timestamp, &txn_global->stable_timestamp);
 		__wt_readunlock(session, &txn_global->rwlock);
 		if (__wt_timestamp_cmp(
 		    &txn->read_timestamp, &oldest_timestamp) < 0)
 			WT_RET_MSG(session, EINVAL,
 			    "read timestamp %.*s older than oldest timestamp",
+			    (int)cval.len, cval.str);
+		if (!__wt_timestamp_iszero(&stable_timestamp) &&
+		    __wt_timestamp_cmp(
+		    &txn->read_timestamp, &stable_timestamp) > 0)
+			WT_RET_MSG(session, EINVAL,
+			    "read timestamp %.*s newer than stable timestamp",
 			    (int)cval.len, cval.str);
 
 		__wt_txn_set_read_timestamp(session);

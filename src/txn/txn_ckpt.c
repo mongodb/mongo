@@ -571,7 +571,9 @@ __checkpoint_prepare(WT_SESSION_IMPL *session, const char *cfg[])
 	WT_TXN *txn;
 	WT_TXN_GLOBAL *txn_global;
 	WT_TXN_STATE *txn_state;
-	char timestamp_config[100];
+	char timestamp_buf[2 * WT_TIMESTAMP_SIZE + 1], timestamp_config[100];
+	const char *query_cfg[] = { WT_CONFIG_BASE(session,
+	    WT_CONNECTION_query_timestamp), "get=stable", NULL };
 	const char *txn_cfg[] = { WT_CONFIG_BASE(session,
 	    WT_SESSION_begin_transaction), "isolation=snapshot", NULL, NULL };
 
@@ -580,11 +582,31 @@ __checkpoint_prepare(WT_SESSION_IMPL *session, const char *cfg[])
 	txn_global = &conn->txn_global;
 	txn_state = WT_SESSION_TXN_STATE(session);
 
+	/*
+	 * Someone giving us a specific timestamp overrides the general
+	 * use_timestamp.
+	 */
 	WT_RET(__wt_config_gets(session, cfg, "read_timestamp", &cval));
 	if (cval.len > 0) {
 		WT_RET(__wt_snprintf(timestamp_config, sizeof(timestamp_config),
 		    "read_timestamp=%.*s", (int)cval.len, cval.str));
 		txn_cfg[2] = timestamp_config;
+	} else if (txn_global->has_stable_timestamp) {
+		WT_RET(__wt_config_gets(session, cfg, "use_timestamp", &cval));
+		/*
+		 * Get the stable timestamp currently set.  Then set that as
+		 * the read timestamp for the transaction.
+		 */
+		if (cval.val != 0) {
+			if ((ret = __wt_txn_global_query_timestamp(session,
+			    timestamp_buf, query_cfg)) != 0 &&
+			    ret != WT_NOTFOUND)
+				return (ret);
+			WT_RET(__wt_snprintf(timestamp_config,
+			    sizeof(timestamp_config),
+			    "read_timestamp=%s", timestamp_buf));
+			txn_cfg[2] = timestamp_config;
+		}
 	}
 
 	/*

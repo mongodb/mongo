@@ -89,6 +89,8 @@ class test_timestamp02(wttest.WiredTigerTestCase, suite_subprocess):
             c[k] = 1
             self.session.commit_transaction('commit_timestamp=' + timestamp_str(k))
 
+        # Don't set a stable timestamp yet.  Make sure we can read with
+        # a timestamp before the stable timestamp has been set.
         # Now check that we see the expected state when reading at each
         # timestamp
         for i, t in enumerate(orig_keys):
@@ -106,6 +108,9 @@ class test_timestamp02(wttest.WiredTigerTestCase, suite_subprocess):
             c[k] = 2
             self.session.commit_transaction('commit_timestamp=' + timestamp_str(k + 100))
 
+        # Now the stable timestamp before we read.
+        self.conn.set_timestamp('stable_timestamp=' + timestamp_str(200))
+
         for i, t in enumerate(orig_keys):
             self.check(self.session, 'read_timestamp=' + timestamp_str(t + 100),
                 dict((k, (2 if j <= i else 1)) for j, k in enumerate(orig_keys)))
@@ -121,6 +126,8 @@ class test_timestamp02(wttest.WiredTigerTestCase, suite_subprocess):
             del c[k]
             self.session.commit_transaction('commit_timestamp=' + timestamp_str(k + 200))
 
+        # We have to continue to advance the stable timestamp before reading.
+        self.conn.set_timestamp('stable_timestamp=' + timestamp_str(300))
         for i, t in enumerate(orig_keys):
             self.check(self.session, 'read_timestamp=' + timestamp_str(t + 200),
                 dict((k, 2) for k in orig_keys[i+1:]))

@@ -58,14 +58,17 @@ class test_timestamp03(wttest.WiredTigerTestCase, suite_subprocess):
         ('table-simple', dict(uri='table:', use_cg=False, use_index=False)),
     ]
 
-    conncfg = [
-        ('nolog', dict(conncfg='create')),
-        ('V1', dict(conncfg='create,log=(enabled),compatibility=(release="2.9")')),
-        ('V2', dict(conncfg='create,log=(enabled)')),
+    ckpt = [
+        ('use_ts_def', dict(ckptcfg='', val='none')),
+        ('use_ts_false', dict(ckptcfg='use_timestamp=false', val='all')),
+        ('use_ts_true', dict(ckptcfg='use_timestamp=true', val='none')),
+        ('read_ts', dict(ckptcfg='read_timestamp', val='none')),
     ]
 
-    ckpt = [
-        ('read_ts', dict(ckptcfg='read_timestamp', val='none')),
+    conncfg = [
+        ('nolog', dict(conn_config='create')),
+        ('V1', dict(conn_config='create,log=(enabled),compatibility=(release="2.9")')),
+        ('V2', dict(conn_config='create,log=(enabled)')),
     ]
 
     scenarios = make_scenarios(types, ckpt, conncfg)
@@ -73,9 +76,6 @@ class test_timestamp03(wttest.WiredTigerTestCase, suite_subprocess):
     # Binary values.
     value = u'\u0001\u0002abcd\u0003\u0004'
     value2 = u'\u0001\u0002dcba\u0003\u0004'
-
-    def conn_config(self):
-        return self.conncfg
 
     # Check that a cursor (optionally started in a new transaction), sees the
     # expected values.
@@ -193,6 +193,7 @@ class test_timestamp03(wttest.WiredTigerTestCase, suite_subprocess):
         self.assertEqual(self.conn.query_timestamp(), timestamp_ret_str(100))
         self.oldts = timestamp_str(100)
         self.conn.set_timestamp('oldest_timestamp=' + self.oldts)
+        self.conn.set_timestamp('stable_timestamp=' + self.oldts)
         # print "Oldest " + self.oldts
 
         # Update them and retry.
@@ -208,7 +209,7 @@ class test_timestamp03(wttest.WiredTigerTestCase, suite_subprocess):
             self.session.begin_transaction()
             c[k] = self.value2
             c3[k] = self.value2
-            ts = timestamp_str(k + 101)
+            ts = timestamp_str(k + 100)
             self.session.commit_transaction('commit_timestamp=' + ts)
             # print "Commit key " + str(k) + " ts " + ts
             count += 1
@@ -216,15 +217,21 @@ class test_timestamp03(wttest.WiredTigerTestCase, suite_subprocess):
 
         # Take a checkpoint using the given configuration.  Then verify
         # whether value2 appears in a copy of that data or not.
+        valcnt2 = nkeys
         if self.val == 'all':
             valcnt = nkeys
         else:
             valcnt = 0
-        # Table 2 should always see all the keys
-        # Table 3 should see whatever table 1 sees.
-        valcnt2 = nkeys
+        # XXX adjust when logged + timestamps is fixed and defined.
         valcnt3 = valcnt
         self.ckpt_backup(valcnt, valcnt2, valcnt3)
+        if self.ckptcfg != 'read_timestamp':
+            # Update the stable timestamp to the latest, but not the oldest
+            # timestamp and make sure we can see the data.  Once the stable
+            # timestamp is moved we should see all keys with value2.
+            self.conn.set_timestamp('stable_timestamp=' + \
+                timestamp_str(100+nkeys))
+            self.ckpt_backup(nkeys, nkeys, nkeys)
 
 if __name__ == '__main__':
     wttest.run()

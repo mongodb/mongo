@@ -92,8 +92,13 @@ struct __wt_txn_global {
 	WT_DECL_TIMESTAMP(commit_timestamp)
 	WT_DECL_TIMESTAMP(oldest_timestamp)
 	WT_DECL_TIMESTAMP(pinned_timestamp)
-	bool has_commit_timestamp, has_oldest_timestamp, has_pinned_timestamp;
+	WT_DECL_TIMESTAMP(stable_timestamp)
+	bool has_commit_timestamp;
+	bool has_oldest_timestamp;
+	bool has_pinned_timestamp;
+	bool has_stable_timestamp;
 	bool oldest_is_pinned;
+	bool stable_is_pinned;
 
 	WT_SPINLOCK id_lock;
 
