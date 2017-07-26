@@ -47,6 +47,7 @@ flags = {
     ],
     'timing_stress_for_test' : [
         'TIMING_STRESS_CHECKPOINT_SLOW',
+        'TIMING_STRESS_INTERNAL_PAGE_SPLIT_RACE',
         'TIMING_STRESS_PAGE_SPLIT_RACE',
     ],
     'txn_log_checkpoint' : [

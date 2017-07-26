@@ -162,7 +162,8 @@ static const WT_CONFIG_CHECK confchk_WT_CONNECTION_reconfigure[] = {
 	    NULL, NULL,
 	    confchk_WT_CONNECTION_reconfigure_statistics_log_subconfigs, 5 },
 	{ "timing_stress_for_test", "list",
-	    NULL, "choices=[\"checkpoint_slow\",\"page_split_race\"]",
+	    NULL, "choices=[\"checkpoint_slow\",\"internal_page_split_race\""
+	    ",\"page_split_race\"]",
 	    NULL, 0 },
 	{ "verbose", "list",
 	    NULL, "choices=[\"api\",\"block\",\"checkpoint\",\"compact\","
@@ -785,7 +786,8 @@ static const WT_CONFIG_CHECK confchk_wiredtiger_open[] = {
 	    NULL, NULL,
 	    confchk_wiredtiger_open_statistics_log_subconfigs, 6 },
 	{ "timing_stress_for_test", "list",
-	    NULL, "choices=[\"checkpoint_slow\",\"page_split_race\"]",
+	    NULL, "choices=[\"checkpoint_slow\",\"internal_page_split_race\""
+	    ",\"page_split_race\"]",
 	    NULL, 0 },
 	{ "transaction_sync", "category",
 	    NULL, NULL,
@@ -879,7 +881,8 @@ static const WT_CONFIG_CHECK confchk_wiredtiger_open_all[] = {
 	    NULL, NULL,
 	    confchk_wiredtiger_open_statistics_log_subconfigs, 6 },
 	{ "timing_stress_for_test", "list",
-	    NULL, "choices=[\"checkpoint_slow\",\"page_split_race\"]",
+	    NULL, "choices=[\"checkpoint_slow\",\"internal_page_split_race\""
+	    ",\"page_split_race\"]",
 	    NULL, 0 },
 	{ "transaction_sync", "category",
 	    NULL, NULL,
@@ -970,7 +973,8 @@ static const WT_CONFIG_CHECK confchk_wiredtiger_open_basecfg[] = {
 	    NULL, NULL,
 	    confchk_wiredtiger_open_statistics_log_subconfigs, 6 },
 	{ "timing_stress_for_test", "list",
-	    NULL, "choices=[\"checkpoint_slow\",\"page_split_race\"]",
+	    NULL, "choices=[\"checkpoint_slow\",\"internal_page_split_race\""
+	    ",\"page_split_race\"]",
 	    NULL, 0 },
 	{ "transaction_sync", "category",
 	    NULL, NULL,
@@ -1059,7 +1063,8 @@ static const WT_CONFIG_CHECK confchk_wiredtiger_open_usercfg[] = {
 	    NULL, NULL,
 	    confchk_wiredtiger_open_statistics_log_subconfigs, 6 },
 	{ "timing_stress_for_test", "list",
-	    NULL, "choices=[\"checkpoint_slow\",\"page_split_race\"]",
+	    NULL, "choices=[\"checkpoint_slow\",\"internal_page_split_race\""
+	    ",\"page_split_race\"]",
 	    NULL, 0 },
 	{ "transaction_sync", "category",
 	    NULL, NULL,
