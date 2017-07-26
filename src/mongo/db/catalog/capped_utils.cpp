@@ -253,8 +253,6 @@ mongo::Status mongo::convertToCapped(OperationContext* opCtx,
                                      double size) {
     StringData dbname = collectionName.db();
     StringData shortSource = collectionName.coll();
-    const std::string shortTmpName = str::stream() << "tmp.convertToCapped." << shortSource;
-    const NamespaceString longTmpName(dbname, shortTmpName);
 
     AutoGetDb autoDb(opCtx, collectionName.db(), MODE_X);
 
@@ -275,18 +273,18 @@ mongo::Status mongo::convertToCapped(OperationContext* opCtx,
 
     BackgroundOperation::assertNoBgOpInProgForDb(dbname);
 
-    // If the temporary collection already exists due to an earlier aborted attempt, delete it.
-    if (db->getCollection(opCtx, longTmpName)) {
-        BSONObjBuilder unusedResult;
-        Status status =
-            dropCollection(opCtx,
-                           longTmpName,
-                           unusedResult,
-                           repl::OpTime(),
-                           DropCollectionSystemCollectionMode::kAllowSystemCollectionDrops);
-        if (!status.isOK())
-            return status;
+    // Generate a temporary collection name that will not collide with any existing collections.
+    auto tmpNameResult =
+        db->makeUniqueCollectionNamespace(opCtx, "tmp%%%%%.convertToCapped." + shortSource);
+    if (!tmpNameResult.isOK()) {
+        return Status(tmpNameResult.getStatus().code(),
+                      str::stream() << "Cannot generate temporary collection namespace to convert "
+                                    << collectionName.ns()
+                                    << " to a capped collection: "
+                                    << tmpNameResult.getStatus().reason());
     }
+    const auto& longTmpName = tmpNameResult.getValue();
+    const auto shortTmpName = longTmpName.coll().toString();
 
     {
         Status status =
