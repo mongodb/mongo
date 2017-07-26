@@ -86,9 +86,6 @@ public:
                      const BSONObj& detail,
                      const WriteConcernOptions& writeConcern) override;
 
-    StatusWith<ShardDrainingStatus> removeShard(OperationContext* opCtx,
-                                                const ShardId& name) override;
-
     StatusWith<repl::OpTimeWith<DatabaseType>> getDatabase(
         OperationContext* opCtx,
         const std::string& dbName,
@@ -227,14 +224,6 @@ private:
                                          StringData collName,
                                          int cappedSize,
                                          const WriteConcernOptions& writeConcern);
-
-    /**
-     * Helper method for running a count command against the config server with appropriate
-     * error handling.
-     */
-    StatusWith<long long> _runCountCommandOnConfig(OperationContext* opCtx,
-                                                   const NamespaceString& ns,
-                                                   BSONObj query);
 
     StatusWith<repl::OpTimeWith<std::vector<BSONObj>>> _exhaustiveFindOnConfig(
         OperationContext* opCtx,

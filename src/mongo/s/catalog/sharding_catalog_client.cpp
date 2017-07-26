@@ -40,4 +40,7 @@ const WriteConcernOptions ShardingCatalogClient::kMajorityWriteConcern(
     WriteConcernOptions::SyncMode::UNSET,
     Seconds(15));
 
+const WriteConcernOptions ShardingCatalogClient::kLocalWriteConcern(
+    1, WriteConcernOptions::SyncMode::UNSET, Seconds(0));
+
 }  // namespace mongo

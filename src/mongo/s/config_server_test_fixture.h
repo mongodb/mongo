@@ -63,6 +63,23 @@ public:
                                     const BSONObj& doc);
 
     /**
+     * Updates a document to this config server to the specified namespace.
+     */
+    Status updateToConfigCollection(OperationContext* opCtx,
+                                    const NamespaceString& ns,
+                                    const BSONObj& query,
+                                    const BSONObj& update,
+                                    const bool upsert);
+
+    /**
+     * Deletes a document to this config server to the specified namespace.
+     */
+    Status deleteToConfigCollection(OperationContext* opCtx,
+                                    const NamespaceString& ns,
+                                    const BSONObj& doc,
+                                    const bool multi);
+
+    /**
      * Reads a single document from a collection living on the config server.
      */
     StatusWith<BSONObj> findOneOnConfigCollection(OperationContext* opCtx,
