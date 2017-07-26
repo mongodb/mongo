@@ -61,6 +61,8 @@ static const Value pruneVal = Value("prune"_sd);
 static const Value keepVal = Value("keep"_sd);
 
 DocumentSource::GetNextResult DocumentSourceRedact::getNext() {
+    pExpCtx->checkForInterrupt();
+
     auto nextInput = pSource->getNext();
     for (; nextInput.isAdvanced(); nextInput = pSource->getNext()) {
         auto& variables = pExpCtx->variables;

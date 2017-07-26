@@ -93,6 +93,8 @@ intrusive_ptr<DocumentSource> DocumentSourceCollStats::createFromBson(
 }
 
 DocumentSource::GetNextResult DocumentSourceCollStats::getNext() {
+    pExpCtx->checkForInterrupt();
+
     if (_finished) {
         return GetNextResult::makeEOF();
     }

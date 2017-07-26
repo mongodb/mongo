@@ -91,6 +91,8 @@ DocumentSource::InitialSourceType DocumentSourceCurrentOp::getInitialSourceType(
 }
 
 DocumentSource::GetNextResult DocumentSourceCurrentOp::getNext() {
+    pExpCtx->checkForInterrupt();
+
     if (_ops.empty()) {
         _ops =
             _mongod->getCurrentOps(_includeIdleConnections, _includeOpsFromAllUsers, _truncateOps);

@@ -152,6 +152,8 @@ Document DocumentSourceMergeCursors::nextSafeFrom(DBClientCursor* cursor) {
 }
 
 DocumentSource::GetNextResult DocumentSourceMergeCursors::getNext() {
+    pExpCtx->checkForInterrupt();
+
     if (_unstarted)
         start();
 
