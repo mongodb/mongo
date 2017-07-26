@@ -164,10 +164,8 @@ public:
     /**
      * Walk the entire index, checking the internal structure for consistency.
      * Set numKeys to the number of keys in the index.
-
-     * Return OK if the index is valid.
      */
-    Status validate(OperationContext* opCtx, int64_t* numKeys, ValidateResults* fullResults);
+    void validate(OperationContext* opCtx, int64_t* numKeys, ValidateResults* fullResults);
 
     /**
      * Add custom statistics about this index to BSON object builder, for display.

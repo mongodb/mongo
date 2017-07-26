@@ -1346,7 +1346,7 @@ Status WiredTigerRecordStore::validate(OperationContext* opCtx,
                                        ValidateAdaptor* adaptor,
                                        ValidateResults* results,
                                        BSONObjBuilder* output) {
-    if (!_isEphemeral) {
+    if (!_isEphemeral && level == kValidateFull) {
         int err = WiredTigerUtil::verifyTable(opCtx, _uri, &results->errors);
         if (err == EBUSY) {
             std::string msg = str::stream()
@@ -1382,21 +1382,19 @@ Status WiredTigerRecordStore::validate(OperationContext* opCtx,
         ++nrecords;
         auto dataSize = record->data.size();
         dataSizeTotal += dataSize;
-        if (level == kValidateFull) {
-            size_t validatedSize;
-            Status status = adaptor->validate(record->id, record->data, &validatedSize);
+        size_t validatedSize;
+        Status status = adaptor->validate(record->id, record->data, &validatedSize);
 
-            // The validatedSize equals dataSize below is not a general requirement, but must be
-            // true for WT today because we never pad records.
-            if (!status.isOK() || validatedSize != static_cast<size_t>(dataSize)) {
-                if (results->valid) {
-                    // Only log once.
-                    results->errors.push_back("detected one or more invalid documents (see logs)");
-                }
-                nInvalid++;
-                results->valid = false;
-                log() << "document at location: " << record->id << " is corrupted";
+        // The validatedSize equals dataSize below is not a general requirement, but must be
+        // true for WT today because we never pad records.
+        if (!status.isOK() || validatedSize != static_cast<size_t>(dataSize)) {
+            if (results->valid) {
+                // Only log once.
+                results->errors.push_back("detected one or more invalid documents (see logs)");
             }
+            nInvalid++;
+            results->valid = false;
+            log() << "document at location: " << record->id << " is corrupted";
         }
     }
 

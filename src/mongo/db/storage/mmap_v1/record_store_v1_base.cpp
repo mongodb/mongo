@@ -691,139 +691,136 @@ Status RecordStoreV1Base::validate(OperationContext* opCtx,
         // 4444444444444444444444444
 
         set<DiskLoc> recs;
-        if (level == kValidateRecordStore || level == kValidateFull) {
-            int n = 0;
-            int nInvalid = 0;
-            long long nQuantizedSize = 0;
-            long long len = 0;
-            long long nlen = 0;
-            long long bsonLen = 0;
-            int outOfOrder = 0;
-            DiskLoc dl_last;
+        int n = 0;
+        int nInvalid = 0;
+        long long nQuantizedSize = 0;
+        long long len = 0;
+        long long nlen = 0;
+        long long bsonLen = 0;
+        int outOfOrder = 0;
+        DiskLoc dl_last;
 
-            auto cursor = getCursor(opCtx);
-            while (auto record = cursor->next()) {
-                const auto dl = DiskLoc::fromRecordId(record->id);
-                n++;
+        auto cursor = getCursor(opCtx);
+        while (auto record = cursor->next()) {
+            const auto dl = DiskLoc::fromRecordId(record->id);
+            n++;
 
-                if (n < 1000000)
-                    recs.insert(dl);
-                if (isCapped()) {
-                    if (dl < dl_last)
-                        outOfOrder++;
-                    dl_last = dl;
-                }
-
-                MmapV1RecordHeader* r = recordFor(dl);
-                len += r->lengthWithHeaders();
-                nlen += r->netLength();
-
-                if (isQuantized(r->lengthWithHeaders())) {
-                    // Count the number of records having a size consistent with
-                    // the quantizeAllocationSpace quantization implementation.
-                    ++nQuantizedSize;
-                }
-
-                if (level == kValidateFull) {
-                    size_t dataSize = 0;
-                    const Status status =
-                        adaptor->validate(record->id, r->toRecordData(), &dataSize);
-                    if (!status.isOK()) {
-                        results->valid = false;
-                        if (nInvalid == 0)  // only log once;
-                            results->errors.push_back("invalid object detected (see logs)");
-
-                        nInvalid++;
-                        log() << "Invalid object detected in " << _ns << ": " << redact(status);
-                    } else {
-                        bsonLen += dataSize;
-                    }
-                }
+            if (n < 1000000 && level == kValidateFull)
+                recs.insert(dl);
+            if (isCapped()) {
+                if (dl < dl_last)
+                    outOfOrder++;
+                dl_last = dl;
             }
 
-            if (isCapped() && !_details->capLooped()) {
-                output->append("cappedOutOfOrder", outOfOrder);
-                if (outOfOrder > 1) {
-                    results->valid = false;
-                    results->errors.push_back("too many out of order records");
-                }
-            }
-            output->append("objectsFound", n);
+            MmapV1RecordHeader* r = recordFor(dl);
+            len += r->lengthWithHeaders();
+            nlen += r->netLength();
 
-            if (level == kValidateFull) {
-                output->append("invalidObjects", nInvalid);
+            if (isQuantized(r->lengthWithHeaders())) {
+                // Count the number of records having a size consistent with
+                // the quantizeAllocationSpace quantization implementation.
+                ++nQuantizedSize;
             }
 
-            output->appendNumber("nQuantizedSize", nQuantizedSize);
-            output->appendNumber("bytesWithHeaders", len);
-            output->appendNumber("bytesWithoutHeaders", nlen);
+            size_t dataSize = 0;
+            const Status status = adaptor->validate(record->id, r->toRecordData(), &dataSize);
+            if (!status.isOK()) {
+                results->valid = false;
+                if (nInvalid == 0)  // only log once;
+                    results->errors.push_back("invalid object detected (see logs)");
 
-            if (level == kValidateFull) {
-                output->appendNumber("bytesBson", bsonLen);
+                nInvalid++;
+                log() << "Invalid object detected in " << _ns << ": " << redact(status);
+            } else {
+                bsonLen += dataSize;
             }
+        }
+
+        if (isCapped() && !_details->capLooped()) {
+            output->append("cappedOutOfOrder", outOfOrder);
+            if (outOfOrder > 1) {
+                results->valid = false;
+                results->errors.push_back("too many out of order records");
+            }
+        }
+        output->append("objectsFound", n);
+
+        if (level == kValidateFull) {
+            output->append("invalidObjects", nInvalid);
+        }
+
+        output->appendNumber("nQuantizedSize", nQuantizedSize);
+        output->appendNumber("bytesWithHeaders", len);
+        output->appendNumber("bytesWithoutHeaders", nlen);
+
+        if (level == kValidateFull) {
+            output->appendNumber("bytesBson", bsonLen);
         }  // end scanData
 
         // 55555555555555555555555555
-        BSONArrayBuilder deletedListArray;
-        for (int i = 0; i < Buckets; i++) {
-            deletedListArray << _details->deletedListEntry(i).isNull();
-        }
 
-        int ndel = 0;
-        long long delSize = 0;
-        BSONArrayBuilder delBucketSizes;
-        int incorrect = 0;
-        for (int i = 0; i < Buckets; i++) {
-            DiskLoc loc = _details->deletedListEntry(i);
-            try {
-                int k = 0;
-                while (!loc.isNull()) {
-                    if (recs.count(loc))
-                        incorrect++;
-                    ndel++;
+        if (level == kValidateFull) {
+            BSONArrayBuilder deletedListArray;
+            for (int i = 0; i < Buckets; i++) {
+                deletedListArray << _details->deletedListEntry(i).isNull();
+            }
 
-                    if (loc.questionable()) {
-                        if (isCapped() && !loc.isValid() && i == 1) {
-                            /* the constructor for NamespaceDetails intentionally sets
-                             * deletedList[1] to invalid see comments in namespace.h
-                            */
+            int ndel = 0;
+            long long delSize = 0;
+            BSONArrayBuilder delBucketSizes;
+            int incorrect = 0;
+            for (int i = 0; i < Buckets; i++) {
+                DiskLoc loc = _details->deletedListEntry(i);
+                try {
+                    int k = 0;
+                    while (!loc.isNull()) {
+                        if (recs.count(loc))
+                            incorrect++;
+                        ndel++;
+
+                        if (loc.questionable()) {
+                            if (isCapped() && !loc.isValid() && i == 1) {
+                                /* the constructor for NamespaceDetails intentionally sets
+                                 * deletedList[1] to invalid see comments in namespace.h
+                                */
+                                break;
+                            }
+
+                            string err(str::stream() << "bad pointer in deleted record list: "
+                                                     << loc.toString()
+                                                     << " bucket: "
+                                                     << i
+                                                     << " k: "
+                                                     << k);
+                            results->errors.push_back(err);
+                            results->valid = false;
                             break;
                         }
 
-                        string err(str::stream() << "bad pointer in deleted record list: "
-                                                 << loc.toString()
-                                                 << " bucket: "
-                                                 << i
-                                                 << " k: "
-                                                 << k);
-                        results->errors.push_back(err);
-                        results->valid = false;
-                        break;
+                        const DeletedRecord* d = deletedRecordFor(loc);
+                        delSize += d->lengthWithHeaders();
+                        loc = d->nextDeleted();
+                        k++;
+                        opCtx->checkForInterrupt();
                     }
-
-                    const DeletedRecord* d = deletedRecordFor(loc);
-                    delSize += d->lengthWithHeaders();
-                    loc = d->nextDeleted();
-                    k++;
-                    opCtx->checkForInterrupt();
+                    delBucketSizes << k;
+                } catch (...) {
+                    results->errors.push_back((string) "exception in deleted chain for bucket " +
+                                              BSONObjBuilder::numStr(i));
+                    results->valid = false;
                 }
-                delBucketSizes << k;
-            } catch (...) {
-                results->errors.push_back((string) "exception in deleted chain for bucket " +
-                                          BSONObjBuilder::numStr(i));
+            }
+
+            output->appendNumber("deletedCount", ndel);
+            output->appendNumber("deletedSize", delSize);
+            output->append("delBucketSizes", delBucketSizes.arr());
+
+            if (incorrect) {
+                results->errors.push_back(BSONObjBuilder::numStr(incorrect) +
+                                          " records from datafile are in deleted list");
                 results->valid = false;
             }
-        }
-        output->appendNumber("deletedCount", ndel);
-        output->appendNumber("deletedSize", delSize);
-        if (level == kValidateFull) {
-            output->append("delBucketSizes", delBucketSizes.arr());
-        }
-
-        if (incorrect) {
-            results->errors.push_back(BSONObjBuilder::numStr(incorrect) +
-                                      " records from datafile are in deleted list");
-            results->valid = false;
         }
 
     } catch (const AssertionException& e) {

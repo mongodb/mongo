@@ -40,9 +40,11 @@
     // Change failIndexKeyTooLong back to the default value.
     assert.commandWorked(db.adminCommand({setParameter: 1, failIndexKeyTooLong: true}));
 
-    // Verify that a non-full validation fails when the failIndexKeyTooLong parameter is
+    // Verify that a non-full validation succeeds when the failIndexKeyTooLong parameter is
     // reverted to its old value and there are mismatched index keys and documents.
-    checkCollectionIsValid({valid: false, full: false});
+    // Since during the collection scan, we see the un-indexed long keys in the
+    // documents keys.
+    checkCollectionIsValid({valid: true, full: false});
 
     // Verify that a full validation still succeeds.
     checkCollectionIsValid({valid: true, full: true});

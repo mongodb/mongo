@@ -274,13 +274,12 @@ RecordId IndexAccessMethod::findSingle(OperationContext* opCtx, const BSONObj& r
     return RecordId();
 }
 
-Status IndexAccessMethod::validate(OperationContext* opCtx,
-                                   int64_t* numKeys,
-                                   ValidateResults* fullResults) {
+void IndexAccessMethod::validate(OperationContext* opCtx,
+                                 int64_t* numKeys,
+                                 ValidateResults* fullResults) {
     long long keys = 0;
     _newInterface->fullValidate(opCtx, &keys, fullResults);
     *numKeys = keys;
-    return Status::OK();
 }
 
 bool IndexAccessMethod::appendCustomStats(OperationContext* opCtx,

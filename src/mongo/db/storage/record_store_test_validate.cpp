@@ -118,7 +118,7 @@ TEST_F(ValidateTest, ValidateNonEmpty) {
     {
         ServiceContext::UniqueOperationContext opCtx(newOperationContext());
         {
-            ValidateAdaptorSpy adaptor;
+            ValidateAdaptorSpy adaptor(getInsertedRecords());
             ValidateResults results;
             BSONObjBuilder stats;
             ASSERT_OK(
@@ -135,7 +135,7 @@ TEST_F(ValidateTest, ValidateAndScanDataNonEmpty) {
     {
         ServiceContext::UniqueOperationContext opCtx(newOperationContext());
         {
-            ValidateAdaptorSpy adaptor;
+            ValidateAdaptorSpy adaptor(getInsertedRecords());
             ValidateResults results;
             BSONObjBuilder stats;
             ASSERT_OK(getRecordStore().validate(

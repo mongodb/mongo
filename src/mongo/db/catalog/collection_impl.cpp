@@ -1030,7 +1030,7 @@ public:
             return status;
         }
 
-        if (_level != kValidateFull || !_indexCatalog->haveAnyIndexes()) {
+        if (!_indexCatalog->haveAnyIndexes()) {
             return status;
         }
 
@@ -1115,56 +1115,58 @@ public:
      */
     void traverseIndex(const IndexAccessMethod* iam,
                        const IndexDescriptor* descriptor,
-                       ValidateResults& results,
-                       long long numKeys) {
+                       ValidateResults* results,
+                       int64_t* numTraversedKeys) {
         auto indexNs = descriptor->indexNamespace();
-        _keyCounts[indexNs] = numKeys;
+        int64_t numKeys = 0;
 
         uint32_t indexNsHash;
         MurmurHash3_x86_32(indexNs.c_str(), indexNs.size(), 0, &indexNsHash);
 
-        if (_level == kValidateFull) {
-            const auto& key = descriptor->keyPattern();
-            const Ordering ord = Ordering::make(key);
-            KeyString::Version version = KeyString::kLatestVersion;
-            std::unique_ptr<KeyString> prevIndexKeyString = nullptr;
-            bool isFirstEntry = true;
+        const auto& key = descriptor->keyPattern();
+        const Ordering ord = Ordering::make(key);
+        KeyString::Version version = KeyString::kLatestVersion;
+        std::unique_ptr<KeyString> prevIndexKeyString = nullptr;
+        bool isFirstEntry = true;
 
-            std::unique_ptr<SortedDataInterface::Cursor> cursor = iam->newCursor(_opCtx, true);
-            // Seeking to BSONObj() is equivalent to seeking to the first entry of an index.
-            for (auto indexEntry = cursor->seek(BSONObj(), true); indexEntry;
-                 indexEntry = cursor->next()) {
+        std::unique_ptr<SortedDataInterface::Cursor> cursor = iam->newCursor(_opCtx, true);
+        // Seeking to BSONObj() is equivalent to seeking to the first entry of an index.
+        for (auto indexEntry = cursor->seek(BSONObj(), true); indexEntry;
+             indexEntry = cursor->next()) {
 
-                // We want to use the latest version of KeyString here.
-                std::unique_ptr<KeyString> indexKeyString =
-                    stdx::make_unique<KeyString>(version, indexEntry->key, ord, indexEntry->loc);
-                // Ensure that the index entries are in increasing or decreasing order.
-                if (!isFirstEntry && *indexKeyString < *prevIndexKeyString) {
-                    if (results.valid) {
-                        results.errors.push_back(
-                            "one or more indexes are not in strictly ascending or descending "
-                            "order");
-                    }
-                    results.valid = false;
+            // We want to use the latest version of KeyString here.
+            std::unique_ptr<KeyString> indexKeyString =
+                stdx::make_unique<KeyString>(version, indexEntry->key, ord, indexEntry->loc);
+            // Ensure that the index entries are in increasing or decreasing order.
+            if (!isFirstEntry && *indexKeyString < *prevIndexKeyString) {
+                if (results->valid) {
+                    results->errors.push_back(
+                        "one or more indexes are not in strictly ascending or descending "
+                        "order");
                 }
-
-                // Cache the index keys to cross-validate with documents later.
-                uint32_t keyHash = hashIndexEntry(*indexKeyString, indexNsHash);
-                if ((*_ikc)[keyHash] == 0) {
-                    _indexKeyCountTableNumEntries++;
-                }
-                (*_ikc)[keyHash]++;
-
-                isFirstEntry = false;
-                prevIndexKeyString.swap(indexKeyString);
+                results->valid = false;
             }
+
+            // Cache the index keys to cross-validate with documents later.
+            uint32_t keyHash = hashIndexEntry(*indexKeyString, indexNsHash);
+            if ((*_ikc)[keyHash] == 0) {
+                _indexKeyCountTableNumEntries++;
+            }
+            (*_ikc)[keyHash]++;
+            numKeys++;
+
+            isFirstEntry = false;
+            prevIndexKeyString.swap(indexKeyString);
         }
+
+        _keyCounts[indexNs] = numKeys;
+        *numTraversedKeys = numKeys;
     }
 
     void validateIndexKeyCount(IndexDescriptor* idx, int64_t numRecs, ValidateResults& results) {
         const string indexNs = idx->indexNamespace();
-        long long numIndexedKeys = _keyCounts[indexNs];
-        long long numLongKeys = _longKeys[indexNs];
+        int64_t numIndexedKeys = _keyCounts[indexNs];
+        int64_t numLongKeys = _longKeys[indexNs];
         auto totalKeys = numLongKeys + numIndexedKeys;
 
         bool hasTooFewKeys = false;
@@ -1219,8 +1221,8 @@ public:
     }
 
 private:
-    std::map<string, long long> _longKeys;
-    std::map<string, long long> _keyCounts;
+    std::map<string, int64_t> _longKeys;
+    std::map<string, int64_t> _keyCounts;
     std::unique_ptr<IndexKeyCountTable> _ikc;
 
     uint32_t _indexKeyCountTableNumEntries = 0;
@@ -1261,16 +1263,38 @@ Status CollectionImpl::validate(OperationContext* opCtx,
                                       << endl;
             IndexAccessMethod* iam = _indexCatalog.getIndex(descriptor);
             ValidateResults curIndexResults;
-            int64_t numKeys;
-            iam->validate(opCtx, &numKeys, &curIndexResults).transitional_ignore();
-            keysPerIndex.appendNumber(descriptor->indexNamespace(),
-                                      static_cast<long long>(numKeys));
+            bool checkCounts = false;
+            int64_t numTraversedKeys;
+            int64_t numValidatedKeys;
+
+            if (level == kValidateFull) {
+                iam->validate(opCtx, &numValidatedKeys, &curIndexResults);
+                checkCounts = true;
+            }
 
             if (curIndexResults.valid) {
-                indexValidator->traverseIndex(iam, descriptor, curIndexResults, numKeys);
+                indexValidator->traverseIndex(iam, descriptor, &curIndexResults, &numTraversedKeys);
+
+                if (checkCounts && (numValidatedKeys != numTraversedKeys)) {
+                    curIndexResults.valid = false;
+                    string msg = str::stream()
+                        << "number of traversed index entries (" << numTraversedKeys
+                        << ") does not match the number of expected index entries ("
+                        << numValidatedKeys << ")";
+                    results->errors.push_back(msg);
+                    results->valid = false;
+                }
+
+                if (curIndexResults.valid) {
+                    keysPerIndex.appendNumber(descriptor->indexNamespace(),
+                                              static_cast<long long>(numTraversedKeys));
+                } else {
+                    results->valid = false;
+                }
             } else {
                 results->valid = false;
             }
+
             indexNsResultsMap[descriptor->indexNamespace()] = curIndexResults;
         }
 

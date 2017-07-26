@@ -131,7 +131,7 @@ int64_t getIndexKeyCount(OperationContext* opCtx, IndexCatalog* cat, IndexDescri
     auto idx = cat->getIndex(desc);
     int64_t numKeys;
     ValidateResults fullRes;
-    idx->validate(opCtx, &numKeys, &fullRes).transitional_ignore();
+    idx->validate(opCtx, &numKeys, &fullRes);
     return numKeys;
 }
 
