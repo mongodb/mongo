@@ -211,6 +211,60 @@ Status ConfigServerTestFixture::insertToConfigCollection(OperationContext* opCtx
     return status;
 }
 
+Status ConfigServerTestFixture::updateToConfigCollection(OperationContext* opCtx,
+                                                         const NamespaceString& ns,
+                                                         const BSONObj& query,
+                                                         const BSONObj& update,
+                                                         const bool upsert) {
+    auto updateResponse = getConfigShard()->runCommand(opCtx,
+                                                       kReadPref,
+                                                       ns.db().toString(),
+                                                       [&]() {
+                                                           write_ops::Update updateOp(ns);
+                                                           updateOp.setUpdates({[&] {
+                                                               write_ops::UpdateOpEntry entry;
+                                                               entry.setQ(query);
+                                                               entry.setU(update);
+                                                               entry.setUpsert(upsert);
+                                                               return entry;
+                                                           }()});
+                                                           return updateOp.toBSON({});
+                                                       }(),
+                                                       Shard::kDefaultConfigCommandTimeout,
+                                                       Shard::RetryPolicy::kNoRetry);
+
+
+    BatchedCommandResponse batchResponse;
+    auto status = Shard::CommandResponse::processBatchWriteResponse(updateResponse, &batchResponse);
+    return status;
+}
+
+Status ConfigServerTestFixture::deleteToConfigCollection(OperationContext* opCtx,
+                                                         const NamespaceString& ns,
+                                                         const BSONObj& doc,
+                                                         const bool multi) {
+    auto deleteReponse = getConfigShard()->runCommand(opCtx,
+                                                      kReadPref,
+                                                      ns.db().toString(),
+                                                      [&]() {
+                                                          write_ops::Delete deleteOp(ns);
+                                                          deleteOp.setDeletes({[&] {
+                                                              write_ops::DeleteOpEntry entry;
+                                                              entry.setQ(doc);
+                                                              entry.setMulti(multi);
+                                                              return entry;
+                                                          }()});
+                                                          return deleteOp.toBSON({});
+                                                      }(),
+                                                      Shard::kDefaultConfigCommandTimeout,
+                                                      Shard::RetryPolicy::kNoRetry);
+
+
+    BatchedCommandResponse batchResponse;
+    auto status = Shard::CommandResponse::processBatchWriteResponse(deleteReponse, &batchResponse);
+    return status;
+}
+
 StatusWith<BSONObj> ConfigServerTestFixture::findOneOnConfigCollection(OperationContext* opCtx,
                                                                        const NamespaceString& ns,
                                                                        const BSONObj& filter) {

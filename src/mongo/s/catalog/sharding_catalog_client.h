@@ -71,16 +71,6 @@ struct ConnectionPoolStats;
 }
 
 /**
- * Used to indicate to the caller of the removeShard method whether draining of chunks for
- * a particular shard has started, is ongoing, or has been completed.
- */
-enum ShardDrainingStatus {
-    STARTED,
-    ONGOING,
-    COMPLETED,
-};
-
-/**
  * Abstracts reads of the sharding catalog metadata.
  *
  * All implementations of this interface should go directly to the persistent backing store
@@ -101,6 +91,9 @@ public:
     // Constant to use for configuration data majority writes
     static const WriteConcernOptions kMajorityWriteConcern;
 
+    // Constant to use for configuration data local writes
+    static const WriteConcernOptions kLocalWriteConcern;
+
     virtual ~ShardingCatalogClient() = default;
 
     /**
@@ -114,17 +107,6 @@ public:
      * Performs necessary cleanup when shutting down cleanly.
      */
     virtual void shutDown(OperationContext* opCtx) = 0;
-
-    /**
-     * Tries to remove a shard. To completely remove a shard from a sharded cluster,
-     * the data residing in that shard must be moved to the remaining shards in the
-     * cluster by "draining" chunks from that shard.
-     *
-     * Because of the asynchronous nature of the draining mechanism, this method returns
-     * the current draining status. See ShardDrainingStatus enum definition for more details.
-     */
-    virtual StatusWith<ShardDrainingStatus> removeShard(OperationContext* opCtx,
-                                                        const ShardId& name) = 0;
 
     /**
      * Updates or creates the metadata for a given database.

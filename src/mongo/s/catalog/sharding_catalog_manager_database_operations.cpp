@@ -32,6 +32,7 @@
 
 #include <pcrecpp.h>
 
+#include "mongo/bson/util/bson_extract.h"
 #include "mongo/db/namespace_string.h"
 #include "mongo/s/catalog/sharding_catalog_client_impl.h"
 #include "mongo/s/catalog/type_database.h"
@@ -44,7 +45,11 @@ namespace mongo {
 using std::string;
 using std::vector;
 
+namespace {
+
 const ReadPreferenceSetting kConfigReadSelector(ReadPreference::Nearest, TagSet{});
+
+}  // namespace
 
 Status ShardingCatalogManager::createDatabase(OperationContext* opCtx, const std::string& dbName) {
     invariant(nsIsDbOnly(dbName));
@@ -162,6 +167,7 @@ Status ShardingCatalogManager::_checkDbDoesNotExist(OperationContext* opCtx,
         queryBuilder.obj(),
         BSONObj(),
         1);
+
     if (!findStatus.isOK()) {
         return findStatus.getStatus();
     }
@@ -193,6 +199,32 @@ Status ShardingCatalogManager::_checkDbDoesNotExist(OperationContext* opCtx,
                                 << actualDbName
                                 << " want to add: "
                                 << dbName);
+}
+
+Status ShardingCatalogManager::getDatabasesForShard(OperationContext* opCtx,
+                                                    const ShardId& shardId,
+                                                    std::vector<std::string>* dbs) {
+    auto findStatus = Grid::get(opCtx)->catalogClient()->_exhaustiveFindOnConfig(
+        opCtx,
+        kConfigReadSelector,
+        repl::ReadConcernLevel::kLocalReadConcern,
+        NamespaceString(DatabaseType::ConfigNS),
+        BSON(DatabaseType::primary(shardId.toString())),
+        BSONObj(),
+        boost::none);  // no limit
+
+    for (const BSONObj& obj : findStatus.getValue().value) {
+        std::string dbName;
+        Status status = bsonExtractStringField(obj, DatabaseType::name(), &dbName);
+        if (!status.isOK()) {
+            dbs->clear();
+            return status;
+        }
+
+        dbs->push_back(dbName);
+    }
+
+    return Status::OK();
 }
 
 }  // namespace mongo
