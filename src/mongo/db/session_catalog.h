@@ -151,7 +151,9 @@ class ScopedSession {
 
 public:
     ScopedSession(OperationContext* opCtx, std::shared_ptr<SessionCatalog::SessionRuntimeInfo> sri)
-        : _opCtx(opCtx), _sri(std::move(sri)) {}
+        : _opCtx(opCtx), _sri(std::move(sri)) {
+        invariant(_sri);
+    }
 
     ScopedSession(ScopedSession&&) = default;
 

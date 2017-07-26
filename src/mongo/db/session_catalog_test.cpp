@@ -62,5 +62,27 @@ TEST_F(SessionCatalogTest, CheckoutAndReleaseSession) {
     ASSERT_EQ(*opCtx->getLogicalSessionId(), scopedSession->getSessionId());
 }
 
+TEST_F(SessionCatalogTest, NestedOperationContextSession) {
+    auto opCtx = Client::getCurrent()->makeOperationContext();
+    opCtx->setLogicalSessionId(LogicalSessionId());
+
+    {
+        OperationContextSession outerScopedSession(opCtx.get());
+
+        {
+            OperationContextSession innerScopedSession(opCtx.get());
+            auto session = OperationContextSession::get(opCtx.get());
+            ASSERT_TRUE(nullptr != session);
+            ASSERT_EQ(*opCtx->getLogicalSessionId(), session->getSessionId());
+        }
+
+        auto session = OperationContextSession::get(opCtx.get());
+        ASSERT_TRUE(nullptr != session);
+        ASSERT_EQ(*opCtx->getLogicalSessionId(), session->getSessionId());
+    }
+
+    ASSERT_TRUE(nullptr == OperationContextSession::get(opCtx.get()));
+}
+
 }  // namespace
 }  // namespace mongo

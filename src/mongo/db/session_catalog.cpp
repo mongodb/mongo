@@ -45,11 +45,22 @@
 namespace mongo {
 namespace {
 
+struct CheckedOutSession {
+    CheckedOutSession(ScopedSession&& session) : scopedSession(std::move(session)) {}
+
+    ScopedSession scopedSession;
+
+    // This numbers gets incremented every time a request tries to check out this session
+    // including the cases when it was already checked out. Level of 0 means that it's
+    // available or is completely released.
+    int checkOutNestingLevel = 0;
+};
+
 const auto sessionTransactionTableDecoration =
     ServiceContext::declareDecoration<boost::optional<SessionCatalog>>();
 
 const auto operationSessionDecoration =
-    OperationContext::declareDecoration<boost::optional<ScopedSession>>();
+    OperationContext::declareDecoration<boost::optional<CheckedOutSession>>();
 
 }  // namespace
 
@@ -158,25 +169,39 @@ OperationContextSession::OperationContextSession(OperationContext* opCtx) : _opC
         return;
     }
 
-    auto sessionTransactionTable = SessionCatalog::get(opCtx);
+    auto& checkedOutSession = operationSessionDecoration(opCtx);
+    if (!checkedOutSession) {
+        auto sessionTransactionTable = SessionCatalog::get(opCtx);
+        checkedOutSession.emplace(sessionTransactionTable->checkOutSession(opCtx));
+    }
 
-    auto& operationSession = operationSessionDecoration(opCtx);
-    operationSession.emplace(sessionTransactionTable->checkOutSession(opCtx));
+    auto session = checkedOutSession->scopedSession.get();
+    invariant(opCtx->getLogicalSessionId() == session->getSessionId());
+    checkedOutSession->checkOutNestingLevel++;
+
+    if (checkedOutSession->checkOutNestingLevel > 1) {
+        return;
+    }
 
     if (opCtx->getTxnNumber()) {
-        operationSession->get()->begin(opCtx, opCtx->getTxnNumber().get());
+        checkedOutSession->scopedSession->begin(opCtx, opCtx->getTxnNumber().get());
     }
 }
 
 OperationContextSession::~OperationContextSession() {
-    auto& operationSession = operationSessionDecoration(_opCtx);
-    operationSession.reset();
+    auto& checkedOutSession = operationSessionDecoration(_opCtx);
+    if (checkedOutSession) {
+        invariant(checkedOutSession->checkOutNestingLevel > 0);
+        if (--checkedOutSession->checkOutNestingLevel == 0) {
+            checkedOutSession.reset();
+        }
+    }
 }
 
 Session* OperationContextSession::get(OperationContext* opCtx) {
-    auto& operationSession = operationSessionDecoration(opCtx);
-    if (operationSession) {
-        return operationSession->get();
+    auto& checkedOutSession = operationSessionDecoration(opCtx);
+    if (checkedOutSession) {
+        return checkedOutSession->scopedSession.get();
     }
 
     return nullptr;
