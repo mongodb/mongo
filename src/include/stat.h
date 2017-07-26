@@ -505,6 +505,7 @@ struct __wt_connection_stats {
 	int64_t txn_release_blocked;
 	int64_t conn_close_blocked_lsm;
 	int64_t dhandle_lock_blocked;
+	int64_t page_index_slot_ref_blocked;
 	int64_t log_server_sync_blocked;
 	int64_t page_busy_blocked;
 	int64_t page_forcible_evict_blocked;
@@ -513,7 +514,6 @@ struct __wt_connection_stats {
 	int64_t page_sleep;
 	int64_t page_del_rollback_blocked;
 	int64_t child_modify_blocked_page;
-	int64_t page_index_slot_blocked;
 	int64_t tree_descend_blocked;
 	int64_t txn_snapshots_created;
 	int64_t txn_snapshots_dropped;

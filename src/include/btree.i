@@ -1602,3 +1602,24 @@ __wt_split_descent_race(
 	WT_INTL_INDEX_GET(session, ref->home, pindex);
 	return (pindex != saved_pindex);
 }
+
+/*
+ * __wt_ref_state_yield_sleep --
+ *	sleep while waiting for the wt_ref state after THOUSAND yields.
+ */
+static inline void
+__wt_ref_state_yield_sleep(uint64_t *yield_count, uint64_t *sleep_count)
+{
+	/*
+	 * We yield before retrying, and if we've yielded enough times, start
+	 * sleeping so we don't burn CPU to no purpose.
+	 */
+	if ((*yield_count) < WT_THOUSAND) {
+		(*yield_count)++;
+		__wt_yield();
+		return;
+	}
+
+	(*sleep_count) = WT_MIN((*sleep_count) + WT_THOUSAND, 10 * WT_THOUSAND);
+	__wt_sleep(0, (*sleep_count));
+}

@@ -5058,24 +5058,30 @@ extern int wiredtiger_extension_terminate(WT_CONNECTION *connection);
 #define	WT_STAT_CONN_CONN_CLOSE_BLOCKED_LSM		1246
 /*! thread-yield: data handle lock yielded */
 #define	WT_STAT_CONN_DHANDLE_LOCK_BLOCKED		1247
+/*!
+ * thread-yield: get reference for page index and slot time sleeping
+ * (usecs)
+ */
+#define	WT_STAT_CONN_PAGE_INDEX_SLOT_REF_BLOCKED	1248
 /*! thread-yield: log server sync yielded for log write */
-#define	WT_STAT_CONN_LOG_SERVER_SYNC_BLOCKED		1248
+#define	WT_STAT_CONN_LOG_SERVER_SYNC_BLOCKED		1249
 /*! thread-yield: page acquire busy blocked */
-#define	WT_STAT_CONN_PAGE_BUSY_BLOCKED			1249
+#define	WT_STAT_CONN_PAGE_BUSY_BLOCKED			1250
 /*! thread-yield: page acquire eviction blocked */
-#define	WT_STAT_CONN_PAGE_FORCIBLE_EVICT_BLOCKED	1250
+#define	WT_STAT_CONN_PAGE_FORCIBLE_EVICT_BLOCKED	1251
 /*! thread-yield: page acquire locked blocked */
-#define	WT_STAT_CONN_PAGE_LOCKED_BLOCKED		1251
+#define	WT_STAT_CONN_PAGE_LOCKED_BLOCKED		1252
 /*! thread-yield: page acquire read blocked */
-#define	WT_STAT_CONN_PAGE_READ_BLOCKED			1252
+#define	WT_STAT_CONN_PAGE_READ_BLOCKED			1253
 /*! thread-yield: page acquire time sleeping (usecs) */
-#define	WT_STAT_CONN_PAGE_SLEEP				1253
-/*! thread-yield: page delete rollback yielded for instantiation */
-#define	WT_STAT_CONN_PAGE_DEL_ROLLBACK_BLOCKED		1254
+#define	WT_STAT_CONN_PAGE_SLEEP				1254
+/*!
+ * thread-yield: page delete rollback time sleeping for state change
+ * (usecs)
+ */
+#define	WT_STAT_CONN_PAGE_DEL_ROLLBACK_BLOCKED		1255
 /*! thread-yield: page reconciliation yielded due to child modification */
-#define	WT_STAT_CONN_CHILD_MODIFY_BLOCKED_PAGE		1255
-/*! thread-yield: reference for page index and slot yielded */
-#define	WT_STAT_CONN_PAGE_INDEX_SLOT_BLOCKED		1256
+#define	WT_STAT_CONN_CHILD_MODIFY_BLOCKED_PAGE		1256
 /*!
  * thread-yield: tree descend one level yielded for split page index
  * update
