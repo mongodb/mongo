@@ -71,12 +71,6 @@ int32_t getStmtIdForWriteAt(const T& op, size_t writePos) {
     return getStmtIdForWriteAt(op.getWriteCommandBase(), writePos);
 }
 
-/**
- * Must only be called if the insert is for the "system.indexes" namespace. Returns the actual
- * namespace for which the index is being created.
- */
-NamespaceString extractIndexedNamespace(const Insert& insertOp);
-
 // TODO: Delete this getter once IDL supports defaults for object and array fields
 template <class T>
 const BSONObj& collationOf(const T& opEntry) {

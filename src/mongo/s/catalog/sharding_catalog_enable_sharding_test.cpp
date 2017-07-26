@@ -51,6 +51,8 @@
 #include "mongo/s/client/shard_registry.h"
 #include "mongo/s/config_server_test_fixture.h"
 #include "mongo/s/write_ops/batched_command_response.h"
+#include "mongo/s/write_ops/batched_insert_request.h"
+#include "mongo/s/write_ops/batched_update_request.h"
 #include "mongo/stdx/future.h"
 #include "mongo/util/log.h"
 #include "mongo/util/scopeguard.h"

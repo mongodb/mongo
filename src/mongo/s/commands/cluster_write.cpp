@@ -210,6 +210,12 @@ void ClusterWriter::write(OperationContext* opCtx,
 
     const NamespaceString& nss = request->getNS();
 
+    std::string errMsg;
+    if (request->isInsertIndexRequest() && !request->isValidIndexRequest(&errMsg)) {
+        toBatchError(Status(ErrorCodes::InvalidOptions, errMsg), response);
+        return;
+    }
+
     // Config writes and shard writes are done differently
     if (nss.db() == NamespaceString::kConfigDb || nss.db() == NamespaceString::kAdminDb) {
         Grid::get(opCtx)->catalogClient()->writeConfigServerDirect(opCtx, *request, response);

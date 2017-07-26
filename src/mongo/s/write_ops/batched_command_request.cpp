@@ -86,19 +86,41 @@ BatchedDeleteRequest* BatchedCommandRequest::getDeleteRequest() const {
 bool BatchedCommandRequest::isInsertIndexRequest() const {
     if (_batchType != BatchedCommandRequest::BatchType_Insert)
         return false;
-
     return getNS().isSystemDotIndexes();
 }
 
-NamespaceString BatchedCommandRequest::getTargetingNSS() const {
-    if (!isInsertIndexRequest()) {
-        return getNS();
+bool BatchedCommandRequest::isValidIndexRequest(std::string* errMsg) const {
+    std::string dummy;
+    if (!errMsg)
+        errMsg = &dummy;
+    dassert(isInsertIndexRequest());
+
+    if (sizeWriteOps() != 1) {
+        *errMsg = "invalid batch request for index creation";
+        return false;
     }
 
-    const auto& documents = _insertReq->getDocuments();
-    invariant(documents.size() == 1);
+    const NamespaceString& targetNSS = getTargetingNSS();
+    if (!targetNSS.isValid()) {
+        *errMsg = targetNSS.ns() + " is not a valid namespace to index";
+        return false;
+    }
 
-    return NamespaceString(documents.at(0)["ns"].str());
+    const NamespaceString& reqNSS = getNS();
+    if (reqNSS.db().compare(targetNSS.db()) != 0) {
+        *errMsg =
+            targetNSS.ns() + " namespace is not in the request database " + reqNSS.db().toString();
+        return false;
+    }
+
+    return true;
+}
+
+const NamespaceString& BatchedCommandRequest::getTargetingNSS() const {
+    if (!isInsertIndexRequest())
+        return getNS();
+
+    return _insertReq->getIndexTargetingNS();
 }
 
 bool BatchedCommandRequest::isVerboseWC() const {
