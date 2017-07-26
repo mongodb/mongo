@@ -103,9 +103,9 @@ public:
      * queries of the form { field : { $gte : <value>, $lt : <value> } }.
      */
     Status targetUpdate(OperationContext* opCtx,
-                        const BatchedUpdateDocument& updateDoc,
+                        const write_ops::UpdateOpEntry& updateDoc,
                         std::vector<std::unique_ptr<ShardEndpoint>>* endpoints) const override {
-        return targetQuery(updateDoc.getQuery(), endpoints);
+        return targetQuery(updateDoc.getQ(), endpoints);
     }
 
     /**
@@ -113,9 +113,9 @@ public:
      * queries of the form { field : { $gte : <value>, $lt : <value> } }.
      */
     Status targetDelete(OperationContext* opCtx,
-                        const BatchedDeleteDocument& deleteDoc,
+                        const write_ops::DeleteOpEntry& deleteDoc,
                         std::vector<std::unique_ptr<ShardEndpoint>>* endpoints) const {
-        return targetQuery(deleteDoc.getQuery(), endpoints);
+        return targetQuery(deleteDoc.getQ(), endpoints);
     }
 
     Status targetCollection(std::vector<std::unique_ptr<ShardEndpoint>>* endpoints) const override {

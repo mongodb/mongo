@@ -312,6 +312,10 @@ TEST_F(AddShardTest, CreateShardIdentityUpsertForAddShard) {
 
     BSONObj expectedBSON = BSON("update"
                                 << "system.version"
+                                << "bypassDocumentValidation"
+                                << false
+                                << "ordered"
+                                << true
                                 << "updates"
                                 << BSON_ARRAY(
                                        BSON("q" << BSON("_id"
@@ -326,12 +330,10 @@ TEST_F(AddShardTest, CreateShardIdentityUpsertForAddShard) {
                                                                               ->getConfig()
                                                                               .getConnectionString()
                                                                               .toString()))
+                                                << "multi"
+                                                << false
                                                 << "upsert"
                                                 << true))
-                                << "bypassDocumentValidation"
-                                << false
-                                << "ordered"
-                                << true
                                 << "writeConcern"
                                 << BSON("w"
                                         << "majority"

@@ -35,6 +35,7 @@
 #include "mongo/bson/bsonobj_comparator_interface.h"
 #include "mongo/bson/simple_bsonobj_comparator.h"
 #include "mongo/db/namespace_string.h"
+#include "mongo/db/ops/write_ops.h"
 #include "mongo/s/catalog_cache.h"
 #include "mongo/s/ns_targeter.h"
 
@@ -81,12 +82,12 @@ public:
 
     // Returns ShardKeyNotFound if the update can't be targeted without a shard key.
     Status targetUpdate(OperationContext* opCtx,
-                        const BatchedUpdateDocument& updateDoc,
+                        const write_ops::UpdateOpEntry& updateDoc,
                         std::vector<std::unique_ptr<ShardEndpoint>>* endpoints) const override;
 
     // Returns ShardKeyNotFound if the delete can't be targeted without a shard key.
     Status targetDelete(OperationContext* opCtx,
-                        const BatchedDeleteDocument& deleteDoc,
+                        const write_ops::DeleteOpEntry& deleteDoc,
                         std::vector<std::unique_ptr<ShardEndpoint>>* endpoints) const override;
 
     Status targetCollection(std::vector<std::unique_ptr<ShardEndpoint>>* endpoints) const override;

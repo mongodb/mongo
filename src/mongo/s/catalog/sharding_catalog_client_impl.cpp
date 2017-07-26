@@ -409,7 +409,7 @@ StatusWith<ShardDrainingStatus> ShardingCatalogClientImpl::removeShard(Operation
                   "",
                   BSON("shard" << name),
                   ShardingCatalogClientImpl::kMajorityWriteConcern)
-            .transitional_ignore();
+            .ignore();
 
         return ShardDrainingStatus::STARTED;
     }
@@ -460,7 +460,7 @@ StatusWith<ShardDrainingStatus> ShardingCatalogClientImpl::removeShard(Operation
               "",
               BSON("shard" << name),
               ShardingCatalogClientImpl::kMajorityWriteConcern)
-        .transitional_ignore();
+        .ignore();
 
     return ShardDrainingStatus::COMPLETED;
 }
@@ -617,7 +617,7 @@ Status ShardingCatalogClientImpl::dropCollection(OperationContext* opCtx,
               ns.ns(),
               BSONObj(),
               ShardingCatalogClientImpl::kMajorityWriteConcern)
-        .transitional_ignore();
+        .ignore();
 
     auto shardsStatus = getAllShards(opCtx, repl::ReadConcernLevel::kMajorityReadConcern);
     if (!shardsStatus.isOK()) {
@@ -796,7 +796,7 @@ Status ShardingCatalogClientImpl::dropCollection(OperationContext* opCtx,
               ns.ns(),
               BSONObj(),
               ShardingCatalogClientImpl::kMajorityWriteConcern)
-        .transitional_ignore();
+        .ignore();
 
     return Status::OK();
 }
@@ -1242,16 +1242,16 @@ Status ShardingCatalogClientImpl::insertConfigDocument(OperationContext* opCtx,
                                                        const BSONObj& doc,
                                                        const WriteConcernOptions& writeConcern) {
     const NamespaceString nss(ns);
-    invariant(nss.db() == "config" || nss.db() == "admin");
+    invariant(nss.db() == NamespaceString::kAdminDb || nss.db() == NamespaceString::kConfigDb);
 
     const BSONElement idField = doc.getField("_id");
     invariant(!idField.eoo());
 
-    auto insert(stdx::make_unique<BatchedInsertRequest>());
-    insert->addToDocuments(doc);
-
-    BatchedCommandRequest request(insert.release());
-    request.setNS(nss);
+    BatchedCommandRequest request([&] {
+        write_ops::Insert insertOp(nss);
+        insertOp.setDocuments({doc});
+        return insertOp;
+    }());
     request.setWriteConcern(writeConcern.toBSON());
 
     auto configShard = Grid::get(opCtx)->shardRegistry()->getConfigShard();
@@ -1319,8 +1319,7 @@ StatusWith<bool> ShardingCatalogClientImpl::updateConfigDocument(
     const BSONObj& update,
     bool upsert,
     const WriteConcernOptions& writeConcern) {
-    return ShardingCatalogClientImpl::_updateConfigDocument(
-        opCtx, ns, query, update, upsert, writeConcern);
+    return _updateConfigDocument(opCtx, ns, query, update, upsert, writeConcern);
 }
 
 StatusWith<bool> ShardingCatalogClientImpl::_updateConfigDocument(
@@ -1336,17 +1335,18 @@ StatusWith<bool> ShardingCatalogClientImpl::_updateConfigDocument(
     const BSONElement idField = query.getField("_id");
     invariant(!idField.eoo());
 
-    unique_ptr<BatchedUpdateDocument> updateDoc(new BatchedUpdateDocument());
-    updateDoc->setQuery(query);
-    updateDoc->setUpdateExpr(update);
-    updateDoc->setUpsert(upsert);
-    updateDoc->setMulti(false);
-
-    unique_ptr<BatchedUpdateRequest> updateRequest(new BatchedUpdateRequest());
-    updateRequest->addToUpdates(updateDoc.release());
-
-    BatchedCommandRequest request(updateRequest.release());
-    request.setNS(nss);
+    BatchedCommandRequest request([&] {
+        write_ops::Update updateOp(nss);
+        updateOp.setUpdates({[&] {
+            write_ops::UpdateOpEntry entry;
+            entry.setQ(query);
+            entry.setU(update);
+            entry.setUpsert(upsert);
+            entry.setMulti(false);
+            return entry;
+        }()});
+        return updateOp;
+    }());
     request.setWriteConcern(writeConcern.toBSON());
 
     auto configShard = Grid::get(opCtx)->shardRegistry()->getConfigShard();
@@ -1370,15 +1370,16 @@ Status ShardingCatalogClientImpl::removeConfigDocuments(OperationContext* opCtx,
     const NamespaceString nss(ns);
     invariant(nss.db() == "config");
 
-    auto deleteDoc(stdx::make_unique<BatchedDeleteDocument>());
-    deleteDoc->setQuery(query);
-    deleteDoc->setLimit(0);
-
-    auto deleteRequest(stdx::make_unique<BatchedDeleteRequest>());
-    deleteRequest->addToDeletes(deleteDoc.release());
-
-    BatchedCommandRequest request(deleteRequest.release());
-    request.setNS(nss);
+    BatchedCommandRequest request([&] {
+        write_ops::Delete deleteOp(nss);
+        deleteOp.setDeletes({[&] {
+            write_ops::DeleteOpEntry entry;
+            entry.setQ(query);
+            entry.setMulti(true);
+            return entry;
+        }()});
+        return deleteOp;
+    }());
     request.setWriteConcern(writeConcern.toBSON());
 
     auto configShard = Grid::get(opCtx)->shardRegistry()->getConfigShard();

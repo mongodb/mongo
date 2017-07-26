@@ -94,7 +94,7 @@ public:
      * Returns OK and fills the endpoints; returns a status describing the error otherwise.
      */
     virtual Status targetUpdate(OperationContext* opCtx,
-                                const BatchedUpdateDocument& updateDoc,
+                                const write_ops::UpdateOpEntry& updateDoc,
                                 std::vector<std::unique_ptr<ShardEndpoint>>* endpoints) const = 0;
 
     /**
@@ -103,7 +103,7 @@ public:
      * Returns OK and fills the endpoints; returns a status describing the error otherwise.
      */
     virtual Status targetDelete(OperationContext* opCtx,
-                                const BatchedDeleteDocument& deleteDoc,
+                                const write_ops::DeleteOpEntry& deleteDoc,
                                 std::vector<std::unique_ptr<ShardEndpoint>>* endpoints) const = 0;
 
     /**
@@ -164,8 +164,8 @@ struct ShardEndpoint {
     ShardEndpoint(const ShardId& shardName, const ChunkVersion& shardVersion)
         : shardName(shardName), shardVersion(shardVersion) {}
 
-    const ShardId shardName;
-    const ChunkVersion shardVersion;
+    ShardId shardName;
+    ChunkVersion shardVersion;
 };
 
 }  // namespace mongo

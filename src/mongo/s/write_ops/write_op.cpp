@@ -61,9 +61,9 @@ Status WriteOp::targetWrites(OperationContext* opCtx,
     std::vector<std::unique_ptr<ShardEndpoint>> endpoints;
 
     if (isUpdate) {
-        targetStatus = targeter.targetUpdate(opCtx, *_itemRef.getUpdate(), &endpoints);
+        targetStatus = targeter.targetUpdate(opCtx, _itemRef.getUpdate(), &endpoints);
     } else if (isDelete) {
-        targetStatus = targeter.targetDelete(opCtx, *_itemRef.getDelete(), &endpoints);
+        targetStatus = targeter.targetDelete(opCtx, _itemRef.getDelete(), &endpoints);
     } else {
         dassert(_itemRef.getOpType() == BatchedCommandRequest::BatchType_Insert);
 

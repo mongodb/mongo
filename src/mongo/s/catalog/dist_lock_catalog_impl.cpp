@@ -361,17 +361,18 @@ Status DistLockCatalogImpl::_unlock(OperationContext* opCtx, const FindAndModify
 }
 
 Status DistLockCatalogImpl::unlockAll(OperationContext* opCtx, const std::string& processID) {
-    std::unique_ptr<BatchedUpdateDocument> updateDoc(new BatchedUpdateDocument());
-    updateDoc->setQuery(BSON(LocksType::process(processID)));
-    updateDoc->setUpdateExpr(BSON("$set" << BSON(LocksType::state(LocksType::UNLOCKED))));
-    updateDoc->setUpsert(false);
-    updateDoc->setMulti(true);
-
-    std::unique_ptr<BatchedUpdateRequest> updateRequest(new BatchedUpdateRequest());
-    updateRequest->addToUpdates(updateDoc.release());
-
-    BatchedCommandRequest request(updateRequest.release());
-    request.setNS(_locksNS);
+    BatchedCommandRequest request([&] {
+        write_ops::Update updateOp(_locksNS);
+        updateOp.setUpdates({[&] {
+            write_ops::UpdateOpEntry entry;
+            entry.setQ(BSON(LocksType::process(processID)));
+            entry.setU(BSON("$set" << BSON(LocksType::state(LocksType::UNLOCKED))));
+            entry.setUpsert(false);
+            entry.setMulti(true);
+            return entry;
+        }()});
+        return updateOp;
+    }());
     request.setWriteConcern(kLocalWriteConcern.toBSON());
 
     BSONObj cmdObj = request.toBSON();

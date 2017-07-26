@@ -196,52 +196,40 @@ void splitIfNeeded(OperationContext* opCtx,
 
 }  // namespace
 
-ClusterWriter::ClusterWriter(bool autoSplit, int timeoutMillis)
-    : _autoSplit(autoSplit), _timeoutMillis(timeoutMillis) {}
-
 void ClusterWriter::write(OperationContext* opCtx,
-                          const BatchedCommandRequest& origRequest,
+                          const BatchedCommandRequest& request,
+                          BatchWriteExecStats* stats,
                           BatchedCommandResponse* response) {
-    // Add _ids to insert request if req'd
-    std::unique_ptr<BatchedCommandRequest> idRequest(
-        BatchedCommandRequest::cloneWithIds(origRequest));
+    const NamespaceString& nss = request.getNS();
 
-    const BatchedCommandRequest* request = idRequest ? idRequest.get() : &origRequest;
-
-    const NamespaceString& nss = request->getNS();
+    LastError::Disabled disableLastError(&LastError::get(opCtx->getClient()));
 
     // Config writes and shard writes are done differently
     if (nss.db() == NamespaceString::kConfigDb || nss.db() == NamespaceString::kAdminDb) {
-        Grid::get(opCtx)->catalogClient()->writeConfigServerDirect(opCtx, *request, response);
+        Grid::get(opCtx)->catalogClient()->writeConfigServerDirect(opCtx, request, response);
     } else {
         TargeterStats targeterStats;
 
         {
-            ChunkManagerTargeter targeter(request->getTargetingNSS(), &targeterStats);
+            ChunkManagerTargeter targeter(request.getTargetingNS(), &targeterStats);
 
             Status targetInitStatus = targeter.init(opCtx);
             if (!targetInitStatus.isOK()) {
                 toBatchError({targetInitStatus.code(),
                               str::stream() << "unable to target"
-                                            << (request->isInsertIndexRequest() ? " index" : "")
+                                            << (request.isInsertIndexRequest() ? " index" : "")
                                             << " write op for collection "
-                                            << request->getTargetingNSS().toString()
+                                            << request.getTargetingNS().ns()
                                             << causedBy(targetInitStatus)},
                              response);
                 return;
             }
 
-            BatchWriteExec::executeBatch(opCtx, targeter, *request, response, &_stats);
+            BatchWriteExec::executeBatch(opCtx, targeter, request, response, stats);
         }
 
-        if (_autoSplit) {
-            splitIfNeeded(opCtx, request->getNS(), targeterStats);
-        }
+        splitIfNeeded(opCtx, request.getNS(), targeterStats);
     }
-}
-
-const BatchWriteExecStats& ClusterWriter::getStats() {
-    return _stats;
 }
 
 void updateChunkWriteStatsAndSplitIfNeeded(OperationContext* opCtx,
@@ -249,8 +237,8 @@ void updateChunkWriteStatsAndSplitIfNeeded(OperationContext* opCtx,
                                            Chunk* chunk,
                                            long dataWritten) {
     // Disable lastError tracking so that any errors, which occur during auto-split do not get
-    // bubbled up on the client connection doing a write.
-    LastError::Disabled d(&LastError::get(cc()));
+    // bubbled up on the client connection doing a write
+    LastError::Disabled disableLastError(&LastError::get(opCtx->getClient()));
 
     const auto balancerConfig = Grid::get(opCtx)->getBalancerConfiguration();
 

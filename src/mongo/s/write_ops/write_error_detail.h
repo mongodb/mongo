@@ -41,8 +41,6 @@ namespace mongo {
  * the response side.
  */
 class WriteErrorDetail {
-    MONGO_DISALLOW_COPYING(WriteErrorDetail);
-
 public:
     //
     // schema declarations

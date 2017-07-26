@@ -147,28 +147,28 @@ bool wouldMakeBatchesTooBig(const std::vector<TargetedWrite*>& writes,
  */
 int getWriteSizeBytes(const WriteOp& writeOp) {
     const BatchItemRef& item = writeOp.getWriteItem();
-    BatchedCommandRequest::BatchType batchType = item.getOpType();
+    const BatchedCommandRequest::BatchType batchType = item.getOpType();
 
     if (batchType == BatchedCommandRequest::BatchType_Insert) {
         return item.getDocument().objsize();
     } else if (batchType == BatchedCommandRequest::BatchType_Update) {
         // Note: Be conservative here - it's okay if we send slightly too many batches
         auto collationSize =
-            item.getUpdate()->isCollationSet() ? item.getUpdate()->getCollation().objsize() : 0;
-        auto estSize = item.getUpdate()->getQuery().objsize() +
-            item.getUpdate()->getUpdateExpr().objsize() + collationSize + kEstUpdateOverheadBytes;
-        dassert(estSize >= item.getUpdate()->toBSON().objsize());
+            item.getUpdate().getCollation() ? item.getUpdate().getCollation()->objsize() : 0;
+        auto estSize = item.getUpdate().getQ().objsize() + item.getUpdate().getU().objsize() +
+            collationSize + kEstUpdateOverheadBytes;
+        dassert(estSize >= item.getUpdate().toBSON().objsize());
         return estSize;
-    } else {
-        dassert(batchType == BatchedCommandRequest::BatchType_Delete);
+    } else if (batchType == BatchedCommandRequest::BatchType_Delete) {
         // Note: Be conservative here - it's okay if we send slightly too many batches
         auto collationSize =
-            item.getDelete()->isCollationSet() ? item.getDelete()->getCollation().objsize() : 0;
-        auto estSize =
-            item.getDelete()->getQuery().objsize() + collationSize + kEstDeleteOverheadBytes;
-        dassert(estSize >= item.getDelete()->toBSON().objsize());
+            item.getDelete().getCollation() ? item.getDelete().getCollation()->objsize() : 0;
+        auto estSize = item.getDelete().getQ().objsize() + collationSize + kEstDeleteOverheadBytes;
+        dassert(estSize >= item.getDelete().toBSON().objsize());
         return estSize;
     }
+
+    MONGO_UNREACHABLE;
 }
 
 void cloneCommandErrorTo(const BatchedCommandResponse& batchResp, WriteErrorDetail* details) {
@@ -399,16 +399,8 @@ Status BatchWriteOp::targetBatch(const NSTargeter& targeter,
     return Status::OK();
 }
 
-void BatchWriteOp::buildBatchRequest(const TargetedWriteBatch& targetedBatch,
-                                     BatchedCommandRequest* request) const {
-    request->setNS(_clientRequest.getNS());
-
-    write_ops::WriteCommandBase writeCommandBase;
-
-    writeCommandBase.setBypassDocumentValidation(
-        _clientRequest.getWriteCommandBase().getBypassDocumentValidation());
-    writeCommandBase.setOrdered(_clientRequest.getWriteCommandBase().getOrdered());
-
+BatchedCommandRequest BatchWriteOp::buildBatchRequest(
+    const TargetedWriteBatch& targetedBatch) const {
     const auto batchType = _clientRequest.getBatchType();
     const auto batchTxnNum = _opCtx->getTxnNumber();
 
@@ -417,27 +409,34 @@ void BatchWriteOp::buildBatchRequest(const TargetedWriteBatch& targetedBatch,
         stmtIdsForOp.emplace();
     }
 
-    for (auto& targetedWrite : targetedBatch.getWrites()) {
+    boost::optional<std::vector<BSONObj>> insertDocs;
+    boost::optional<std::vector<write_ops::UpdateOpEntry>> updates;
+    boost::optional<std::vector<write_ops::DeleteOpEntry>> deletes;
+
+    for (const auto& targetedWrite : targetedBatch.getWrites()) {
         const WriteOpRef& writeOpRef = targetedWrite->writeOpRef;
 
-        // NOTE:  We copy the batch items themselves here from the client request
-        // TODO: This could be inefficient, maybe we want to just reference in the future
-        if (batchType == BatchedCommandRequest::BatchType_Insert) {
-            BatchedInsertRequest* clientInsertRequest = _clientRequest.getInsertRequest();
-            BSONObj insertDoc = clientInsertRequest->getDocumentsAt(writeOpRef.first);
-            request->getInsertRequest()->addToDocuments(insertDoc);
-        } else if (batchType == BatchedCommandRequest::BatchType_Update) {
-            BatchedUpdateRequest* clientUpdateRequest = _clientRequest.getUpdateRequest();
-            BatchedUpdateDocument* updateDoc = new BatchedUpdateDocument;
-            clientUpdateRequest->getUpdatesAt(writeOpRef.first)->cloneTo(updateDoc);
-            request->getUpdateRequest()->addToUpdates(updateDoc);
-        } else if (batchType == BatchedCommandRequest::BatchType_Delete) {
-            BatchedDeleteRequest* clientDeleteRequest = _clientRequest.getDeleteRequest();
-            BatchedDeleteDocument* deleteDoc = new BatchedDeleteDocument;
-            clientDeleteRequest->getDeletesAt(writeOpRef.first)->cloneTo(deleteDoc);
-            request->getDeleteRequest()->addToDeletes(deleteDoc);
-        } else {
-            MONGO_UNREACHABLE;
+        switch (batchType) {
+            case BatchedCommandRequest::BatchType_Insert:
+                if (!insertDocs)
+                    insertDocs.emplace();
+                insertDocs->emplace_back(
+                    _clientRequest.getInsertRequest().getDocuments().at(writeOpRef.first));
+                break;
+            case BatchedCommandRequest::BatchType_Update:
+                if (!updates)
+                    updates.emplace();
+                updates->emplace_back(
+                    _clientRequest.getUpdateRequest().getUpdates().at(writeOpRef.first));
+                break;
+            case BatchedCommandRequest::BatchType_Delete:
+                if (!deletes)
+                    deletes.emplace();
+                deletes->emplace_back(
+                    _clientRequest.getDeleteRequest().getDeletes().at(writeOpRef.first));
+                break;
+            default:
+                MONGO_UNREACHABLE;
         }
 
         if (stmtIdsForOp) {
@@ -446,23 +445,57 @@ void BatchWriteOp::buildBatchRequest(const TargetedWriteBatch& targetedBatch,
         }
     }
 
-    if (batchTxnNum) {
-        writeCommandBase.setStmtIds(std::move(stmtIdsForOp));
-    }
+    BatchedCommandRequest request([&] {
+        switch (batchType) {
+            case BatchedCommandRequest::BatchType_Insert:
+                return BatchedCommandRequest([&] {
+                    write_ops::Insert insertOp(_clientRequest.getNS());
+                    insertOp.setDocuments(std::move(*insertDocs));
+                    return insertOp;
+                }());
+            case BatchedCommandRequest::BatchType_Update:
+                return BatchedCommandRequest([&] {
+                    write_ops::Update updateOp(_clientRequest.getNS());
+                    updateOp.setUpdates(std::move(*updates));
+                    return updateOp;
+                }());
+            case BatchedCommandRequest::BatchType_Delete:
+                return BatchedCommandRequest([&] {
+                    write_ops::Delete deleteOp(_clientRequest.getNS());
+                    deleteOp.setDeletes(std::move(*deletes));
+                    return deleteOp;
+                }());
+        }
+        MONGO_UNREACHABLE;
+    }());
 
-    request->setWriteCommandBase(std::move(writeCommandBase));
+    request.setWriteCommandBase([&] {
+        write_ops::WriteCommandBase wcb;
 
-    request->setShardVersion(targetedBatch.getEndpoint().shardVersion);
+        wcb.setBypassDocumentValidation(
+            _clientRequest.getWriteCommandBase().getBypassDocumentValidation());
+        wcb.setOrdered(_clientRequest.getWriteCommandBase().getOrdered());
 
-    if (_clientRequest.isWriteConcernSet()) {
+        if (batchTxnNum) {
+            wcb.setStmtIds(std::move(stmtIdsForOp));
+        }
+
+        return wcb;
+    }());
+
+    request.setShardVersion(targetedBatch.getEndpoint().shardVersion);
+
+    if (_clientRequest.hasWriteConcern()) {
         if (_clientRequest.isVerboseWC()) {
-            request->setWriteConcern(_clientRequest.getWriteConcern());
+            request.setWriteConcern(_clientRequest.getWriteConcern());
         } else {
             // Mongos needs to send to the shard with w > 0 so it will be able to see the
             // writeErrors
-            request->setWriteConcern(upgradeWriteConcern(_clientRequest.getWriteConcern()));
+            request.setWriteConcern(upgradeWriteConcern(_clientRequest.getWriteConcern()));
         }
     }
+
+    return request;
 }
 
 void BatchWriteOp::noteBatchResponse(const TargetedWriteBatch& targetedBatch,
@@ -493,9 +526,7 @@ void BatchWriteOp::noteBatchResponse(const TargetedWriteBatch& targetedBatch,
 
     // Special handling for write concern errors, save for later
     if (response.isWriteConcernErrorSet()) {
-        auto wcError = stdx::make_unique<ShardWCError>(targetedBatch.getEndpoint(),
-                                                       *response.getWriteConcernError());
-        _wcErrors.push_back(std::move(wcError));
+        _wcErrors.emplace_back(targetedBatch.getEndpoint(), *response.getWriteConcernError());
     }
 
     vector<WriteErrorDetail*> itemErrors;
@@ -679,19 +710,20 @@ void BatchWriteOp::buildClientResponse(BatchedCommandResponse* batchResp) {
         WriteConcernErrorDetail* error = new WriteConcernErrorDetail;
 
         // Generate the multi-error message below
-        stringstream msg;
+        StringBuilder msg;
         if (_wcErrors.size() > 1) {
             msg << "multiple errors reported : ";
             error->setErrCode(ErrorCodes::WriteConcernFailed);
         } else {
-            error->setErrCode((*_wcErrors.begin())->error.getErrCode());
+            error->setErrCode(_wcErrors.begin()->error.getErrCode());
         }
 
         for (auto it = _wcErrors.begin(); it != _wcErrors.end(); ++it) {
-            const ShardWCError* wcError = it->get();
-            if (it != _wcErrors.begin())
+            const auto& wcError = *it;
+            if (it != _wcErrors.begin()) {
                 msg << " :: and :: ";
-            msg << wcError->error.getErrMessage() << " at " << wcError->endpoint.shardName;
+            }
+            msg << wcError.error.getErrMessage() << " at " << wcError.endpoint.shardName;
         }
 
         error->setErrMessage(msg.str());

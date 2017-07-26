@@ -97,13 +97,11 @@ public:
         onCommandForPoolExecutor([&](const executor::RemoteCommandRequest& request) {
             ASSERT_EQUALS(nss.db(), request.dbname);
 
-            BatchedInsertRequest actualBatchedInsert;
-            actualBatchedInsert.parseRequest(
-                OpMsgRequest::fromDBAndBody(request.dbname, request.cmdObj));
+            const auto opMsgRequest(OpMsgRequest::fromDBAndBody(request.dbname, request.cmdObj));
+            const auto actualBatchedInsert(BatchedCommandRequest::parseInsert(opMsgRequest));
+            ASSERT_EQUALS(nss.toString(), actualBatchedInsert.getNS().ns());
 
-            ASSERT_EQUALS(nss.toString(), actualBatchedInsert.getNS().toString());
-
-            auto inserted = actualBatchedInsert.getDocuments();
+            const auto& inserted = actualBatchedInsert.getInsertRequest().getDocuments();
             ASSERT_EQUALS(expected.size(), inserted.size());
 
             auto itInserted = inserted.begin();
@@ -121,19 +119,14 @@ public:
     }
 
     void expectInsertsReturnStaleVersionErrors(const std::vector<BSONObj>& expected) {
-        WriteErrorDetail error;
-        error.setErrCode(ErrorCodes::StaleShardVersion);
-        error.setErrMessage("mock stale error");
         onCommandForPoolExecutor([&](const executor::RemoteCommandRequest& request) {
             ASSERT_EQUALS(nss.db(), request.dbname);
 
-            BatchedInsertRequest actualBatchedInsert;
-            actualBatchedInsert.parseRequest(
-                OpMsgRequest::fromDBAndBody(request.dbname, request.cmdObj));
+            const auto opMsgRequest(OpMsgRequest::fromDBAndBody(request.dbname, request.cmdObj));
+            const auto actualBatchedInsert(BatchedCommandRequest::parseInsert(opMsgRequest));
+            ASSERT_EQUALS(nss.toString(), actualBatchedInsert.getNS().ns());
 
-            ASSERT_EQUALS(nss.toString(), actualBatchedInsert.getNS().toString());
-
-            auto inserted = actualBatchedInsert.getDocuments();
+            const auto& inserted = actualBatchedInsert.getInsertRequest().getDocuments();
             ASSERT_EQUALS(expected.size(), inserted.size());
 
             auto itInserted = inserted.begin();
@@ -150,10 +143,12 @@ public:
             // Report a stale version error for each write in the batch.
             int i = 0;
             for (itInserted = inserted.begin(); itInserted != inserted.end(); ++itInserted) {
-                WriteErrorDetail* errorCopy = new WriteErrorDetail;
-                error.cloneTo(errorCopy);
-                errorCopy->setIndex(i);
-                staleResponse.addToErrDetails(errorCopy);
+                WriteErrorDetail* error = new WriteErrorDetail;
+                error->setErrCode(ErrorCodes::StaleShardVersion);
+                error->setErrMessage("mock stale error");
+                error->setIndex(i);
+
+                staleResponse.addToErrDetails(error);
                 ++i;
             }
 
@@ -172,22 +167,19 @@ public:
 //
 
 TEST_F(BatchWriteExecTest, SingleOp) {
-    //
-    // Basic execution test
-    //
-
-    BatchedCommandRequest request(BatchedCommandRequest::BatchType_Insert);
-    request.setNS(nss);
-    {
-        write_ops::WriteCommandBase writeCommandBase;
-        writeCommandBase.setOrdered(false);
-        request.setWriteCommandBase(std::move(writeCommandBase));
-    }
+    BatchedCommandRequest request([&] {
+        write_ops::Insert insertOp(nss);
+        insertOp.setWriteCommandBase([] {
+            write_ops::WriteCommandBase writeCommandBase;
+            writeCommandBase.setOrdered(false);
+            return writeCommandBase;
+        }());
+        insertOp.setDocuments({BSON("x" << 1)});
+        return insertOp;
+    }());
     request.setWriteConcern(BSONObj());
-    // Do single-target, single doc batch write op
-    auto objToInsert = BSON("x" << 1);
-    request.getInsertRequest()->addToDocuments(objToInsert);
 
+    // Do single-target, single doc batch write op
     auto future = launchAsync([&] {
         BatchedCommandResponse response;
         BatchWriteExecStats stats;
@@ -196,33 +188,28 @@ TEST_F(BatchWriteExecTest, SingleOp) {
         ASSERT_EQUALS(stats.numRounds, 1);
     });
 
-    std::vector<BSONObj> expected{objToInsert};
-    expectInsertsReturnSuccess(expected);
+    expectInsertsReturnSuccess(std::vector<BSONObj>{BSON("x" << 1)});
 
     future.timed_get(kFutureTimeout);
 }
 
 TEST_F(BatchWriteExecTest, SingleOpError) {
-    //
-    // Basic error test
-    //
-
     BatchedCommandResponse errResponse;
     errResponse.setOk(false);
     errResponse.setErrCode(ErrorCodes::UnknownError);
     errResponse.setErrMessage("mock error");
 
-    BatchedCommandRequest request(BatchedCommandRequest::BatchType_Insert);
-    request.setNS(nss);
-    {
-        write_ops::WriteCommandBase writeCommandBase;
-        writeCommandBase.setOrdered(false);
-        request.setWriteCommandBase(std::move(writeCommandBase));
-    }
+    BatchedCommandRequest request([&] {
+        write_ops::Insert insertOp(nss);
+        insertOp.setWriteCommandBase([] {
+            write_ops::WriteCommandBase writeCommandBase;
+            writeCommandBase.setOrdered(false);
+            return writeCommandBase;
+        }());
+        insertOp.setDocuments({BSON("x" << 1)});
+        return insertOp;
+    }());
     request.setWriteConcern(BSONObj());
-    // Do single-target, single doc batch write op
-    auto objToInsert = BSON("x" << 1);
-    request.getInsertRequest()->addToDocuments(objToInsert);
 
     auto future = launchAsync([&] {
         BatchedCommandResponse response;
@@ -238,17 +225,16 @@ TEST_F(BatchWriteExecTest, SingleOpError) {
         ASSERT_EQUALS(stats.numRounds, 1);
     });
 
-    std::vector<BSONObj> expected{objToInsert};
     onCommandForPoolExecutor([&](const executor::RemoteCommandRequest& request) {
+        const std::vector<BSONObj> expected{BSON("x" << 1)};
+
         ASSERT_EQUALS(nss.db(), request.dbname);
 
-        BatchedInsertRequest actualBatchedInsert;
-        actualBatchedInsert.parseRequest(
-            OpMsgRequest::fromDBAndBody(request.dbname, request.cmdObj));
+        const auto opMsgRequest(OpMsgRequest::fromDBAndBody(request.dbname, request.cmdObj));
+        const auto actualBatchedInsert(BatchedCommandRequest::parseInsert(opMsgRequest));
+        ASSERT_EQUALS(nss.toString(), actualBatchedInsert.getNS().ns());
 
-        ASSERT_EQUALS(nss.toString(), actualBatchedInsert.getNS().toString());
-
-        auto inserted = actualBatchedInsert.getDocuments();
+        const auto& inserted = actualBatchedInsert.getInsertRequest().getDocuments();
         ASSERT_EQUALS(expected.size(), inserted.size());
 
         auto itInserted = inserted.begin();
@@ -269,22 +255,17 @@ TEST_F(BatchWriteExecTest, SingleOpError) {
 //
 
 TEST_F(BatchWriteExecTest, StaleOp) {
-    //
-    // Retry op in exec b/c of stale config
-    //
-
-    // Insert request
-    BatchedCommandRequest request(BatchedCommandRequest::BatchType_Insert);
-    request.setNS(nss);
-    {
-        write_ops::WriteCommandBase writeCommandBase;
-        writeCommandBase.setOrdered(false);
-        request.setWriteCommandBase(std::move(writeCommandBase));
-    }
+    BatchedCommandRequest request([&] {
+        write_ops::Insert insertOp(nss);
+        insertOp.setWriteCommandBase([] {
+            write_ops::WriteCommandBase writeCommandBase;
+            writeCommandBase.setOrdered(false);
+            return writeCommandBase;
+        }());
+        insertOp.setDocuments({BSON("x" << 1)});
+        return insertOp;
+    }());
     request.setWriteConcern(BSONObj());
-    // Do single-target, single doc batch write op
-    auto objToInsert = BSON("x" << 1);
-    request.getInsertRequest()->addToDocuments(objToInsert);
 
     // Execute request
     auto future = launchAsync([&] {
@@ -296,7 +277,8 @@ TEST_F(BatchWriteExecTest, StaleOp) {
         ASSERT_EQUALS(stats.numStaleBatches, 1);
     });
 
-    std::vector<BSONObj> expected{objToInsert};
+    const std::vector<BSONObj> expected{BSON("x" << 1)};
+
     expectInsertsReturnStaleVersionErrors(expected);
     expectInsertsReturnSuccess(expected);
 
@@ -304,22 +286,17 @@ TEST_F(BatchWriteExecTest, StaleOp) {
 }
 
 TEST_F(BatchWriteExecTest, MultiStaleOp) {
-    //
-    // Retry op in exec multiple times b/c of stale config
-    //
-
-    // Insert request
-    BatchedCommandRequest request(BatchedCommandRequest::BatchType_Insert);
-    request.setNS(nss);
-    {
-        write_ops::WriteCommandBase writeCommandBase;
-        writeCommandBase.setOrdered(false);
-        request.setWriteCommandBase(std::move(writeCommandBase));
-    }
+    BatchedCommandRequest request([&] {
+        write_ops::Insert insertOp(nss);
+        insertOp.setWriteCommandBase([] {
+            write_ops::WriteCommandBase writeCommandBase;
+            writeCommandBase.setOrdered(false);
+            return writeCommandBase;
+        }());
+        insertOp.setDocuments({BSON("x" << 1)});
+        return insertOp;
+    }());
     request.setWriteConcern(BSONObj());
-    // Do single-target, single doc batch write op
-    auto objToInsert = BSON("x" << 1);
-    request.getInsertRequest()->addToDocuments(objToInsert);
 
     auto future = launchAsync([&] {
         BatchedCommandResponse response;
@@ -330,9 +307,9 @@ TEST_F(BatchWriteExecTest, MultiStaleOp) {
         ASSERT_EQUALS(stats.numStaleBatches, 3);
     });
 
-    std::vector<BSONObj> expected{objToInsert};
+    const std::vector<BSONObj> expected{BSON("x" << 1)};
 
-    // Return multiple StaleShardVersion errors
+    // Return multiple StaleShardVersion errors, but less than the give-up number
     for (int i = 0; i < 3; i++) {
         expectInsertsReturnStaleVersionErrors(expected);
     }
@@ -343,26 +320,20 @@ TEST_F(BatchWriteExecTest, MultiStaleOp) {
 }
 
 TEST_F(BatchWriteExecTest, TooManyStaleOp) {
-    //
-    // Retry op in exec too many times (without refresh) b/c of stale config
-    // (The mock nsTargeter doesn't report progress on refresh)
-    // We should report a no progress error for everything in the batch
-    //
-
-    // Insert request
-    BatchedCommandRequest request(BatchedCommandRequest::BatchType_Insert);
-    request.setNS(nss);
-    {
-        write_ops::WriteCommandBase writeCommandBase;
-        writeCommandBase.setOrdered(false);
-        request.setWriteCommandBase(std::move(writeCommandBase));
-    }
+    // Retry op in exec too many times (without refresh) b/c of stale config (the mock nsTargeter
+    // doesn't report progress on refresh). We should report a no progress error for everything in
+    // the batch.
+    BatchedCommandRequest request([&] {
+        write_ops::Insert insertOp(nss);
+        insertOp.setWriteCommandBase([] {
+            write_ops::WriteCommandBase writeCommandBase;
+            writeCommandBase.setOrdered(false);
+            return writeCommandBase;
+        }());
+        insertOp.setDocuments({BSON("x" << 1), BSON("x" << 2)});
+        return insertOp;
+    }());
     request.setWriteConcern(BSONObj());
-    // Do single-target, single doc batch write ops
-    auto objToInsert1 = BSON("x" << 1);
-    auto objToInsert2 = BSON("x" << 2);
-    request.getInsertRequest()->addToDocuments(objToInsert1);
-    request.getInsertRequest()->addToDocuments(objToInsert2);
 
     auto future = launchAsync([&] {
         BatchedCommandResponse response;
@@ -377,11 +348,9 @@ TEST_F(BatchWriteExecTest, TooManyStaleOp) {
         ASSERT_EQUALS(stats.numStaleBatches, (1 + kMaxRoundsWithoutProgress));
     });
 
-    std::vector<BSONObj> expected{objToInsert1, objToInsert2};
-
     // Return multiple StaleShardVersion errors
     for (int i = 0; i < (1 + kMaxRoundsWithoutProgress); i++) {
-        expectInsertsReturnStaleVersionErrors(expected);
+        expectInsertsReturnStaleVersionErrors({BSON("x" << 1), BSON("x" << 2)});
     }
 
     future.timed_get(kFutureTimeout);

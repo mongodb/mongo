@@ -1120,22 +1120,23 @@ TEST_F(DistLockCatalogFixture, BasicUnlockAll) {
         ASSERT_EQUALS(dummyHost, request.target);
         ASSERT_EQUALS("config", request.dbname);
 
-        BatchedCommandRequest commandRequest(BatchedCommandRequest::BatchType_Update);
-        commandRequest.parseRequest(OpMsgRequest::fromDBAndBody(request.dbname, request.cmdObj));
+        const auto opMsgRequest(OpMsgRequest::fromDBAndBody(request.dbname, request.cmdObj));
+        const auto commandRequest(BatchedCommandRequest::parseUpdate(opMsgRequest));
 
         ASSERT_BSONOBJ_EQ(BSON("w" << 1 << "wtimeout" << 0), commandRequest.getWriteConcern());
 
-        const auto& batchRequest = *commandRequest.getUpdateRequest();
+        const auto& updateOp = commandRequest.getUpdateRequest();
+        ASSERT_EQUALS(LocksType::ConfigNS, updateOp.getNamespace().ns());
 
-        ASSERT_EQUALS(LocksType::ConfigNS, batchRequest.getNS().toString());
-        auto updates = batchRequest.getUpdates();
+        const auto& updates = updateOp.getUpdates();
         ASSERT_EQUALS(1U, updates.size());
-        auto update = updates.front();
-        ASSERT_FALSE(update->getUpsert());
-        ASSERT_TRUE(update->getMulti());
-        ASSERT_BSONOBJ_EQ(BSON(LocksType::process("processID")), update->getQuery());
+
+        const auto& update = updates.front();
+        ASSERT(!update.getUpsert());
+        ASSERT(update.getMulti());
+        ASSERT_BSONOBJ_EQ(BSON(LocksType::process("processID")), update.getQ());
         ASSERT_BSONOBJ_EQ(BSON("$set" << BSON(LocksType::state(LocksType::UNLOCKED))),
-                          update->getUpdateExpr());
+                          update.getU());
 
         return BSON("ok" << 1);
     });

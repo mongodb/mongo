@@ -41,8 +41,6 @@ namespace mongo {
  * to satisfy the write concern after executing runCommand.
  */
 class WriteConcernErrorDetail {
-    MONGO_DISALLOW_COPYING(WriteConcernErrorDetail);
-
 public:
     WriteConcernErrorDetail();
 

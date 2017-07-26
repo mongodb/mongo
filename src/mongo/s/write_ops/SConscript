@@ -9,11 +9,6 @@ env.Library(
     source=[
         'batched_command_request.cpp',
         'batched_command_response.cpp',
-        'batched_delete_document.cpp',
-        'batched_delete_request.cpp',
-        'batched_insert_request.cpp',
-        'batched_update_document.cpp',
-        'batched_update_request.cpp',
         'batched_upsert_detail.cpp',
         'write_error_detail.cpp',
     ],
@@ -59,9 +54,6 @@ env.CppUnitTest(
     source=[
         'batched_command_request_test.cpp',
         'batched_command_response_test.cpp',
-        'batched_delete_request_test.cpp',
-        'batched_insert_request_test.cpp',
-        'batched_update_request_test.cpp',
     ],
     LIBDEPS=[
         'batch_write_types',

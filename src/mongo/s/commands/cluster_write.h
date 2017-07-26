@@ -41,19 +41,10 @@ class OperationContext;
 
 class ClusterWriter {
 public:
-    ClusterWriter(bool autoSplit, int timeoutMillis);
-
-    void write(OperationContext* opCtx,
-               const BatchedCommandRequest& request,
-               BatchedCommandResponse* response);
-
-    const BatchWriteExecStats& getStats();
-
-private:
-    const bool _autoSplit;
-    const int _timeoutMillis;
-
-    BatchWriteExecStats _stats;
+    static void write(OperationContext* opCtx,
+                      const BatchedCommandRequest& request,
+                      BatchWriteExecStats* stats,
+                      BatchedCommandResponse* response);
 };
 
 /**

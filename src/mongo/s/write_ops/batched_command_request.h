@@ -32,88 +32,80 @@
 
 #include "mongo/db/ops/write_ops.h"
 #include "mongo/s/chunk_version.h"
-#include "mongo/s/write_ops/batched_delete_request.h"
-#include "mongo/s/write_ops/batched_insert_request.h"
-#include "mongo/s/write_ops/batched_update_request.h"
+#include "mongo/stdx/memory.h"
 #include "mongo/util/net/op_msg.h"
 
 namespace mongo {
 
-class NamespaceString;
-
 /**
- * This class wraps the different kinds of command requests into a generically usable write
- * command request.
- *
- * Designed to be a very thin wrapper that mimics the underlying requests exactly.  Owns the
- * wrapped request object once constructed.
+ * This class wraps the different kinds of command requests into a generically usable write command
+ * request that can be passed around.
  */
 class BatchedCommandRequest {
 public:
-    enum BatchType { BatchType_Insert, BatchType_Update, BatchType_Delete, BatchType_Unknown };
+    enum BatchType { BatchType_Insert, BatchType_Update, BatchType_Delete };
 
-    BatchedCommandRequest(BatchType batchType);
+    BatchedCommandRequest(write_ops::Insert insertOp)
+        : _batchType(BatchType_Insert),
+          _insertReq(stdx::make_unique<write_ops::Insert>(std::move(insertOp))) {}
 
-    /**
-     * insertReq ownership is transferred to here.
-     */
-    BatchedCommandRequest(BatchedInsertRequest* insertReq)
-        : _batchType(BatchType_Insert), _insertReq(insertReq) {}
+    BatchedCommandRequest(write_ops::Update updateOp)
+        : _batchType(BatchType_Update),
+          _updateReq(stdx::make_unique<write_ops::Update>(std::move(updateOp))) {}
 
-    /**
-     * updateReq ownership is transferred to here.
-     */
-    BatchedCommandRequest(BatchedUpdateRequest* updateReq)
-        : _batchType(BatchType_Update), _updateReq(updateReq) {}
+    BatchedCommandRequest(write_ops::Delete deleteOp)
+        : _batchType(BatchType_Delete),
+          _deleteReq(stdx::make_unique<write_ops::Delete>(std::move(deleteOp))) {}
 
-    /**
-     * deleteReq ownership is transferred to here.
-     */
-    BatchedCommandRequest(BatchedDeleteRequest* deleteReq)
-        : _batchType(BatchType_Delete), _deleteReq(deleteReq) {}
+    BatchedCommandRequest(BatchedCommandRequest&&) = default;
 
-    BSONObj toBSON() const;
-    void parseRequest(const OpMsgRequest& request);
-    std::string toString() const;
+    static BatchedCommandRequest parseInsert(const OpMsgRequest& request);
+    static BatchedCommandRequest parseUpdate(const OpMsgRequest& request);
+    static BatchedCommandRequest parseDelete(const OpMsgRequest& request);
 
     BatchType getBatchType() const {
         return _batchType;
     }
 
-    auto getInsertRequest() const {
-        return _insertReq.get();
-    }
-
-    auto getUpdateRequest() const {
-        return _updateReq.get();
-    }
-
-    auto getDeleteRequest() const {
-        return _deleteReq.get();
-    }
-
-    // Index creation is also an insert, but a weird one.
-    bool isInsertIndexRequest() const;
-
-    NamespaceString getTargetingNSS() const;
-
-    //
-    // individual field accessors
-    //
-
-    bool isVerboseWC() const;
+    const NamespaceString& getNS() const;
+    NamespaceString getTargetingNS() const;
 
     /**
-     * Sets the namespace for this batched request.
+     * Index creation can be expressed as an insert into the 'system.indexes' namespace.
      */
-    void setNS(NamespaceString ns);
-    const NamespaceString& getNS() const;
+    bool isInsertIndexRequest() const;
+
+    const auto& getInsertRequest() const {
+        invariant(_insertReq);
+        return *_insertReq;
+    }
+
+    const auto& getUpdateRequest() const {
+        invariant(_updateReq);
+        return *_updateReq;
+    }
+
+    const auto& getDeleteRequest() const {
+        invariant(_deleteReq);
+        return *_deleteReq;
+    }
 
     std::size_t sizeWriteOps() const;
 
-    void setWriteConcern(const BSONObj& writeConcern);
-    bool isWriteConcernSet() const;
-    const BSONObj& getWriteConcern() const;
+    void setWriteConcern(const BSONObj& writeConcern) {
+        _writeConcern = writeConcern.getOwned();
+    }
+
+    bool hasWriteConcern() const {
+        return _writeConcern.is_initialized();
+    }
+
+    const BSONObj& getWriteConcern() const {
+        invariant(_writeConcern);
+        return *_writeConcern;
+    }
+
+    bool isVerboseWC() const;
 
     void setShardVersion(ChunkVersion shardVersion) {
         _shardVersion = std::move(shardVersion);
@@ -124,30 +116,28 @@ public:
     }
 
     const ChunkVersion& getShardVersion() const {
-        return _shardVersion.get();
+        invariant(_shardVersion);
+        return *_shardVersion;
     }
 
     const write_ops::WriteCommandBase& getWriteCommandBase() const;
     void setWriteCommandBase(write_ops::WriteCommandBase writeCommandBase);
 
-    //
-    // Helpers for batch pre-processing
-    //
+    void serialize(BSONObjBuilder* builder) const;
+    BSONObj toBSON() const;
+    std::string toString() const;
 
     /**
      * Generates a new request, the same as the old, but with insert _ids if required.
-     * Returns NULL if this is not an insert request or all inserts already have _ids.
      */
-    static BatchedCommandRequest* cloneWithIds(const BatchedCommandRequest& origCmdRequest);
+    static BatchedCommandRequest cloneInsertWithIds(BatchedCommandRequest origCmdRequest);
 
 private:
     BatchType _batchType;
 
-    write_ops::WriteCommandBase _writeCommandBase;
-
-    std::unique_ptr<BatchedInsertRequest> _insertReq;
-    std::unique_ptr<BatchedUpdateRequest> _updateReq;
-    std::unique_ptr<BatchedDeleteRequest> _deleteReq;
+    std::unique_ptr<write_ops::Insert> _insertReq;
+    std::unique_ptr<write_ops::Update> _updateReq;
+    std::unique_ptr<write_ops::Delete> _deleteReq;
 
     boost::optional<ChunkVersion> _shardVersion;
 
@@ -177,30 +167,19 @@ public:
         return _request->getBatchType();
     }
 
-    const BSONObj& getDocument() const {
+    const auto& getDocument() const {
         dassert(_itemIndex < static_cast<int>(_request->sizeWriteOps()));
-        return _request->getInsertRequest()->getDocumentsAt(_itemIndex);
+        return _request->getInsertRequest().getDocuments().at(_itemIndex);
     }
 
-    const BatchedUpdateDocument* getUpdate() const {
+    const auto& getUpdate() const {
         dassert(_itemIndex < static_cast<int>(_request->sizeWriteOps()));
-        return _request->getUpdateRequest()->getUpdatesAt(_itemIndex);
+        return _request->getUpdateRequest().getUpdates().at(_itemIndex);
     }
 
-    const BatchedDeleteDocument* getDelete() const {
+    const auto& getDelete() const {
         dassert(_itemIndex < static_cast<int>(_request->sizeWriteOps()));
-        return _request->getDeleteRequest()->getDeletesAt(_itemIndex);
-    }
-
-    BSONObj toBSON() const {
-        switch (getOpType()) {
-            case BatchedCommandRequest::BatchType_Insert:
-                return getDocument();
-            case BatchedCommandRequest::BatchType_Update:
-                return getUpdate()->toBSON();
-            default:
-                return getDelete()->toBSON();
-        }
+        return _request->getDeleteRequest().getDeletes().at(_itemIndex);
     }
 
 private:

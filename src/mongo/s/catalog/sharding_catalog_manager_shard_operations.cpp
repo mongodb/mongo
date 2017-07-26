@@ -707,32 +707,29 @@ void ShardingCatalogManager::appendConnectionStats(executor::ConnectionPoolStats
 
 BSONObj ShardingCatalogManager::createShardIdentityUpsertForAddShard(OperationContext* opCtx,
                                                                      const std::string& shardName) {
-    std::unique_ptr<BatchedUpdateDocument> updateDoc(new BatchedUpdateDocument());
+    BatchedCommandRequest request([&] {
+        write_ops::Update updateOp(NamespaceString::kServerConfigurationNamespace);
+        updateOp.setUpdates(
+            {[&] {
+                write_ops::UpdateOpEntry entry;
+                entry.setQ(BSON("_id"
+                                << "shardIdentity"
+                                << ShardIdentityType::shardName(shardName)
+                                << ShardIdentityType::clusterId(
+                                       ClusterIdentityLoader::get(opCtx)->getClusterId())));
+                entry.setU(BSON("$set" << BSON(ShardIdentityType::configsvrConnString(
+                                    repl::ReplicationCoordinator::get(opCtx)
+                                        ->getConfig()
+                                        .getConnectionString()
+                                        .toString()))));
+                entry.setUpsert(true);
+                return entry;
+            }()});
+        return updateOp;
+    }());
+    request.setWriteConcern(ShardingCatalogClient::kMajorityWriteConcern.toBSON());
 
-    BSONObjBuilder query;
-    query.append("_id", "shardIdentity");
-    query.append(ShardIdentityType::shardName(), shardName);
-    query.append(ShardIdentityType::clusterId(), ClusterIdentityLoader::get(opCtx)->getClusterId());
-    updateDoc->setQuery(query.obj());
-
-    BSONObjBuilder update;
-    {
-        BSONObjBuilder set(update.subobjStart("$set"));
-        set.append(
-            ShardIdentityType::configsvrConnString(),
-            repl::ReplicationCoordinator::get(opCtx)->getConfig().getConnectionString().toString());
-    }
-    updateDoc->setUpdateExpr(update.obj());
-    updateDoc->setUpsert(true);
-
-    std::unique_ptr<BatchedUpdateRequest> updateRequest(new BatchedUpdateRequest());
-    updateRequest->addToUpdates(updateDoc.release());
-
-    BatchedCommandRequest commandRequest(updateRequest.release());
-    commandRequest.setNS(NamespaceString::kServerConfigurationNamespace);
-    commandRequest.setWriteConcern(ShardingCatalogClient::kMajorityWriteConcern.toBSON());
-
-    return commandRequest.toBSON();
+    return request.toBSON();
 }
 
 }  // namespace mongo

@@ -46,9 +46,36 @@ namespace mongo {
 
 class OperationContext;
 class TargetedWriteBatch;
-struct ShardError;
-struct ShardWCError;
 class TrackedErrors;
+
+/**
+ * Simple struct for storing an error with an endpoint.
+ *
+ * Certain types of errors are not stored in WriteOps or must be returned to a caller.
+ */
+struct ShardError {
+    ShardError(const ShardEndpoint& endpoint, const WriteErrorDetail& error) : endpoint(endpoint) {
+        error.cloneTo(&this->error);
+    }
+
+    ShardEndpoint endpoint;
+    WriteErrorDetail error;
+};
+
+/**
+ * Simple struct for storing a write concern error with an endpoint.
+ *
+ * Certain types of errors are not stored in WriteOps or must be returned to a caller.
+ */
+struct ShardWCError {
+    ShardWCError(const ShardEndpoint& endpoint, const WriteConcernErrorDetail& error)
+        : endpoint(endpoint) {
+        error.cloneTo(&this->error);
+    }
+
+    ShardEndpoint endpoint;
+    WriteConcernErrorDetail error;
+};
 
 /**
  * Compares endpoints in a map.
@@ -115,8 +142,7 @@ public:
     /**
      * Fills a BatchCommandRequest from a TargetedWriteBatch for this BatchWriteOp.
      */
-    void buildBatchRequest(const TargetedWriteBatch& targetedBatch,
-                           BatchedCommandRequest* request) const;
+    BatchedCommandRequest buildBatchRequest(const TargetedWriteBatch& targetedBatch) const;
 
     /**
      * Stores a response from one of the outstanding TargetedWriteBatches for this BatchWriteOp.
@@ -184,7 +210,7 @@ private:
     std::set<const TargetedWriteBatch*> _targeted;
 
     // Write concern responses from all write batches so far
-    std::vector<std::unique_ptr<ShardWCError>> _wcErrors;
+    std::vector<ShardWCError> _wcErrors;
 
     // Upserted ids for the whole write batch
     std::vector<std::unique_ptr<BatchedUpsertDetail>> _upsertedIds;
@@ -235,35 +261,6 @@ private:
 };
 
 /**
- * Simple struct for storing an error with an endpoint.
- *
- * Certain types of errors are not stored in WriteOps or must be returned to a caller.
- */
-struct ShardError {
-    ShardError(const ShardEndpoint& endpoint, const WriteErrorDetail& error) : endpoint(endpoint) {
-        error.cloneTo(&this->error);
-    }
-
-    const ShardEndpoint endpoint;
-    WriteErrorDetail error;
-};
-
-/**
- * Simple struct for storing a write concern error with an endpoint.
- *
- * Certain types of errors are not stored in WriteOps or must be returned to a caller.
- */
-struct ShardWCError {
-    ShardWCError(const ShardEndpoint& endpoint, const WriteConcernErrorDetail& error)
-        : endpoint(endpoint) {
-        error.cloneTo(&this->error);
-    }
-
-    const ShardEndpoint endpoint;
-    WriteConcernErrorDetail error;
-};
-
-/**
  * Helper class for tracking certain errors from batch operations
  */
 class TrackedErrors {
@@ -281,7 +278,7 @@ public:
     void clear();
 
 private:
-    typedef unordered_map<int, std::vector<ShardError*>> TrackedErrorMap;
+    typedef stdx::unordered_map<int, std::vector<ShardError*>> TrackedErrorMap;
     TrackedErrorMap _errorMap;
 };
 
