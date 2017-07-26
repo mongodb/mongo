@@ -62,6 +62,30 @@ void checkOpCountForCommand(const T& op, size_t numOps) {
             !stmtIds || stmtIds->size() == numOps);
 }
 
+void validateInsertOp(const write_ops::Insert& insertOp) {
+    const auto& nss = insertOp.getNamespace();
+    const auto& docs = insertOp.getDocuments();
+
+    if (nss.isSystemDotIndexes()) {
+        // This is only for consistency with sharding.
+        uassert(ErrorCodes::InvalidLength,
+                "Insert commands to system.indexes are limited to a single insert",
+                docs.size() == 1);
+
+        const auto indexedNss(extractIndexedNamespace(insertOp));
+
+        uassert(ErrorCodes::InvalidNamespace,
+                str::stream() << indexedNss.ns() << " is not a valid namespace to index",
+                indexedNss.isValid());
+
+        uassert(ErrorCodes::IllegalOperation,
+                str::stream() << indexedNss.ns() << " is not in the target database " << nss.db(),
+                nss.db().compare(indexedNss.db()) == 0);
+    }
+
+    checkOpCountForCommand(insertOp, docs.size());
+}
+
 }  // namespace
 
 namespace write_ops {
@@ -92,19 +116,21 @@ int32_t getStmtIdForWriteAt(const WriteCommandBase& writeCommandBase, size_t wri
     return kFirstStmtId + writePos;
 }
 
+NamespaceString extractIndexedNamespace(const Insert& insertOp) {
+    invariant(insertOp.getNamespace().isSystemDotIndexes());
+
+    const auto& documents = insertOp.getDocuments();
+    invariant(documents.size() == 1);
+
+    return NamespaceString(documents.at(0)["ns"].str());
+}
+
 }  // namespace write_ops
 
 write_ops::Insert InsertOp::parse(const OpMsgRequest& request) {
     auto insertOp = Insert::parse(IDLParserErrorContext("insert"), request);
 
-    if (insertOp.getNamespace().isSystemDotIndexes()) {
-        // This is only for consistency with sharding.
-        uassert(ErrorCodes::InvalidLength,
-                "Insert commands to system.indexes are limited to a single insert",
-                insertOp.getDocuments().size() == 1);
-    }
-
-    checkOpCountForCommand(insertOp, insertOp.getDocuments().size());
+    validateInsertOp(insertOp);
     return insertOp;
 }
 
@@ -131,6 +157,7 @@ write_ops::Insert InsertOp::parseLegacy(const Message& msgRaw) {
         return documents;
     }());
 
+    validateInsertOp(op);
     return op;
 }
 
@@ -190,7 +217,7 @@ write_ops::Delete DeleteOp::parseLegacy(const Message& msgRaw) {
         op.setWriteCommandBase(std::move(writeCommandBase));
     }
 
-    op.setDeletes([&]() {
+    op.setDeletes([&] {
         std::vector<write_ops::DeleteOpEntry> deletes;
         deletes.emplace_back();
 

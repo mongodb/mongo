@@ -76,23 +76,26 @@ public:
     void parseRequest(const OpMsgRequest& request);
     std::string toString() const;
 
-    //
-    // Batch type accessors
-    //
-
     BatchType getBatchType() const {
         return _batchType;
     }
 
-    BatchedInsertRequest* getInsertRequest() const;
-    BatchedUpdateRequest* getUpdateRequest() const;
-    BatchedDeleteRequest* getDeleteRequest() const;
+    auto getInsertRequest() const {
+        return _insertReq.get();
+    }
+
+    auto getUpdateRequest() const {
+        return _updateReq.get();
+    }
+
+    auto getDeleteRequest() const {
+        return _deleteReq.get();
+    }
 
     // Index creation is also an insert, but a weird one.
     bool isInsertIndexRequest() const;
-    bool isValidIndexRequest(std::string* errMsg) const;
 
-    const NamespaceString& getTargetingNSS() const;
+    NamespaceString getTargetingNSS() const;
 
     //
     // individual field accessors
