@@ -157,8 +157,10 @@ void ThreadPool::_join_inlock(stdx::unique_lock<stdx::mutex>* lk) {
     });
     _setState_inlock(joining);
     ++_numIdleThreads;
-    while (!_pendingTasks.empty()) {
-        _doOneTask(lk);
+    if (!_pendingTasks.empty()) {
+        lk->unlock();
+        _drainPendingTasks();
+        lk->lock();
     }
     --_numIdleThreads;
     ThreadList threadsToJoin;
@@ -170,6 +172,22 @@ void ThreadPool::_join_inlock(stdx::unique_lock<stdx::mutex>* lk) {
     lk->lock();
     invariant(_state == joining);
     _setState_inlock(shutdownComplete);
+}
+
+void ThreadPool::_drainPendingTasks() {
+    // Tasks cannot be run inline because they can create OperationContexts and the join() caller
+    // may already have one associated with the thread.
+    stdx::thread cleanThread = stdx::thread([&] {
+        const std::string threadName = str::stream() << _options.threadNamePrefix
+                                                     << _nextThreadId++;
+        setThreadName(threadName);
+        _options.onCreateThread(threadName);
+        while (!_pendingTasks.empty()) {
+            stdx::unique_lock<stdx::mutex> lock(_mutex);
+            _doOneTask(&lock);
+        }
+    });
+    cleanThread.join();
 }
 
 Status ThreadPool::schedule(Task task) {
