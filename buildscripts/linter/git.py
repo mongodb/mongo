@@ -5,9 +5,9 @@ from __future__ import print_function
 import itertools
 import os
 import re
-import subprocess
 from typing import Any, Callable, List, Tuple
 
+from buildscripts import git as _git
 from buildscripts import moduleconfig
 from buildscripts.resmokelib.utils import globstar
 
@@ -25,8 +25,8 @@ def get_base_dir():
     that to find the base directory.
     """
     try:
-        return subprocess.check_output(['git', 'rev-parse', '--show-toplevel']).rstrip()
-    except subprocess.CalledProcessError:
+        return _git.Repository.get_base_directory()
+    except _git.GitException:
         # We are not in a valid git directory. Use the script path instead.
         return os.path.dirname(os.path.dirname(os.path.realpath(__file__)))
 
@@ -48,51 +48,14 @@ def get_repos():
     return [Repo(p) for p in paths]
 
 
-class Repo(object):
+class Repo(_git.Repository):
     """Class encapsulates all knowledge about a git repository, and its metadata to run linters."""
-
-    def __init__(self, path):
-        # type: (str) -> None
-        """Construct a repo object."""
-        self.path = path
-
-    def _callgito(self, args):
-        # type: (List[str]) -> str
-        """Call git for this repository, and return the captured output."""
-        # These two flags are the equivalent of -C in newer versions of Git
-        # but we use these to support versions pre 1.8.5 but it depends on the command
-        # and what the current directory is
-        if "ls-files" in args:
-            # This command depends on the current directory and works better if not run with
-            # work-tree
-            return subprocess.check_output(['git', '--git-dir', os.path.join(self.path, ".git")] +
-                                           args)
-        else:
-            return subprocess.check_output([
-                'git', '--git-dir', os.path.join(self.path, ".git"), '--work-tree', self.path
-            ] + args)
-
-    def _callgit(self, args):
-        # type: (List[str]) -> int
-        """
-        Call git for this repository without capturing output.
-
-        This is designed to be used when git returns non-zero exit codes.
-        """
-        # These two flags are the equivalent of -C in newer versions of Git
-        # but we use these to support versions pre 1.8.5 but it depends on the command
-        # and what the current directory is
-        return subprocess.call([
-            'git',
-            '--git-dir',
-            os.path.join(self.path, ".git"),
-        ] + args)
 
     def _get_local_dir(self, path):
         # type: (str) -> str
         """Get a directory path relative to the git root directory."""
         if os.path.isabs(path):
-            path = os.path.relpath(path, self.path)
+            path = os.path.relpath(path, self.directory)
 
         # Normalize Windows style paths to Unix style which git uses on all platforms
         path = path.replace("\\", "/")
@@ -114,14 +77,14 @@ class Repo(object):
             valid_files = list(self.get_candidate_files(filter_function))
 
         # Get the full file name here
-        valid_files = [os.path.normpath(os.path.join(self.path, f)) for f in valid_files]
+        valid_files = [os.path.normpath(os.path.join(self.directory, f)) for f in valid_files]
 
         return valid_files
 
-    def _git_ls_files(self, cmd, filter_function):
+    def _git_ls_files(self, args, filter_function):
         # type: (List[str], Callable[[str], bool]) -> List[str]
         """Run git-ls-files and filter the list of files to a valid candidate list."""
-        gito = self._callgito(cmd)
+        gito = self.git_ls_files(args)
 
         # This allows us to pick all the interesting files
         # in the mongo and mongo-enterprise repos
@@ -132,13 +95,13 @@ class Repo(object):
     def get_candidate_files(self, filter_function):
         # type: (Callable[[str], bool]) -> List[str]
         """Query git to get a list of all files in the repo to consider for analysis."""
-        return self._git_ls_files(["ls-files", "--cached"], filter_function)
+        return self._git_ls_files(["--cached"], filter_function)
 
     def get_working_tree_candidate_files(self, filter_function):
         # type: (Callable[[str], bool]) -> List[str]
         # pylint: disable=invalid-name
         """Query git to get a list of all files in the working tree to consider for analysis."""
-        return self._git_ls_files(["ls-files", "--cached", "--others"], filter_function)
+        return self._git_ls_files(["--cached", "--others"], filter_function)
 
     def get_working_tree_candidates(self, filter_function):
         # type: (Callable[[str], bool]) -> List[str]
@@ -150,102 +113,12 @@ class Repo(object):
         valid_files = list(self.get_working_tree_candidate_files(filter_function))
 
         # Get the full file name here
-        valid_files = [os.path.normpath(os.path.join(self.path, f)) for f in valid_files]
+        valid_files = [os.path.normpath(os.path.join(self.directory, f)) for f in valid_files]
 
         # Filter out files that git thinks exist but were removed.
         valid_files = [f for f in valid_files if os.path.exists(f)]
 
         return valid_files
-
-    def is_detached(self):
-        # type: () -> bool
-        """Return true if the current working tree in a detached HEAD state."""
-        # symbolic-ref returns 1 if the repo is in a detached HEAD state
-        return self._callgit(["symbolic-ref", "--quiet", "HEAD"]) == 1
-
-    def is_ancestor(self, parent, child):
-        # type: (str, str) -> bool
-        """Return true if the specified parent hash an ancestor of child hash."""
-        # merge base returns 0 if parent is an ancestor of child
-        return not self._callgit(["merge-base", "--is-ancestor", parent, child])
-
-    def is_commit(self, sha1):
-        # type: (str) -> bool
-        """Return true if the specified hash is a valid git commit."""
-        # cat-file -e returns 0 if it is a valid hash
-        return not self._callgit(["cat-file", "-e", "%s^{commit}" % sha1])
-
-    def is_working_tree_dirty(self):
-        # type: () -> bool
-        """Return true the current working tree have changes."""
-        # diff returns 1 if the working tree has local changes
-        return self._callgit(["diff", "--quiet"]) == 1
-
-    def does_branch_exist(self, branch):
-        # type: (str) -> bool
-        """Return true if the branch exists."""
-        # rev-parse returns 0 if the branch exists
-        return not self._callgit(["rev-parse", "--verify", branch])
-
-    def get_merge_base(self, commit):
-        # type: (str) -> str
-        """Get the merge base between 'commit' and HEAD."""
-        return self._callgito(["merge-base", "HEAD", commit]).rstrip()
-
-    def get_branch_name(self):
-        # type: () -> str
-        """
-        Get the current branch name, short form.
-
-        This returns "master", not "refs/head/master".
-        Will not work if the current branch is detached.
-        """
-        branch = self.rev_parse(["--abbrev-ref", "HEAD"])
-        if branch == "HEAD":
-            raise ValueError("Branch is currently detached")
-
-        return branch
-
-    def add(self, command):
-        # type: (List[str]) -> str
-        """Git add wrapper."""
-        return self._callgito(["add"] + command)
-
-    def checkout(self, command):
-        # type: (List[str]) -> str
-        """Git checkout wrapper."""
-        return self._callgito(["checkout"] + command)
-
-    def commit(self, command):
-        # type: (List[str]) -> str
-        """Git commit wrapper."""
-        return self._callgito(["commit"] + command)
-
-    def diff(self, command):
-        # type: (List[str]) -> str
-        """Git diff wrapper."""
-        return self._callgito(["diff"] + command)
-
-    def log(self, command):
-        # type: (List[str]) -> str
-        """Git log wrapper."""
-        return self._callgito(["log"] + command)
-
-    def rev_parse(self, command):
-        # type: (List[str]) -> str
-        """Git rev-parse wrapper."""
-        return self._callgito(["rev-parse"] + command).rstrip()
-
-    def rm(self, command):
-        # type: (List[str]) -> str
-        # pylint: disable=invalid-name
-        """Git rm wrapper."""
-        return self._callgito(["rm"] + command)
-
-    def show(self, command):
-        # type: (List[str]) -> str
-        """Git show wrapper."""
-        return self._callgito(["show"] + command)
 
 
 def expand_file_string(glob_pattern):

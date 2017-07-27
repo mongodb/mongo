@@ -1,3 +1,4 @@
+jira == 1.0.10
 pyyaml == 3.11
 unittest-xml-reporting == 2.1.0
 # Linters

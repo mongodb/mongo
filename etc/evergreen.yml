@@ -3856,6 +3856,53 @@ tasks:
             - {'source': {'path': '${push_path}-STAGE/${push_name}/mongodb-${push_name}-${push_arch}-debugsymbols-${suffix}-${task_id}.${ext|tgz}.md5', 'bucket': 'build-push-testing'},
                'destination': {'path': '${push_path}/mongodb-${push_name}-${push_arch}-debugsymbols-${suffix}.${ext|tgz}.md5', 'bucket': '${push_bucket}'}}
 
+- name: update_test_lifecycle
+  exec_timeout_secs: 21600 # 6 hour timeout for the task overall
+  depends_on: []
+  commands:
+  - *git_get_project
+  - command: shell.exec
+    timeout_secs: 14400 # Timeout if there is no output for 4 hours
+    type: test
+    params:
+      working_dir: src
+      script: |
+        set -o errexit
+
+        # Setup the git ssh private key
+        mkdir -p ~/.ssh
+        echo -n "${testlifecycle_ssh_key}" > ~/.ssh/test_lifecycle.pem
+        chmod 0600 ~/.ssh/test_lifecycle.pem
+        export GIT_SSH_COMMAND="ssh -i ~/.ssh/test_lifecycle.pem"
+
+        # Create the jira credentials configuration file
+        cat > ~/.jira.yml <<END_OF_CREDS
+        user: "${testlifecycle_jira_user}"
+        password: "${testlifecycle_jira_password}"
+        server: "https://jira.mongodb.org"
+        END_OF_CREDS
+
+        set -o verbose
+
+        # Create and activate the virtualenv. We use the MongoDB toolchain's Python (with --python)
+        # as this task is only expected to run on a Linux builder.
+        /opt/mongodbtoolchain/v2/bin/virtualenv --python=/opt/mongodbtoolchain/v2/bin/python2 \
+            --system-site-packages ./venv
+        . ./venv/bin/activate
+
+        # Install Python jira client with pip until it is available in the toolchain
+        pip install jira==1.0.10
+
+        python buildscripts/update_test_lifecycle.py \
+            --project ${project} \
+            --commit \
+            --resmokeTagFile "etc/test_lifecycle.yml" \
+            --metadataRepo "git@github.com:mongodb/mongo-test-metadata" \
+            --referencesFile "references.yml" \
+            --gitUserName "Test Lifecycle" \
+            --gitUserEmail "build+testlifecycle@mongodb.com" \
+            --jiraConfig ~/.jira.yml
+
 
 #######################################
 #               Modules               #
@@ -9318,3 +9365,12 @@ buildvariants:
     - rhel62-large
   - name: slow1
   - name: slow1_WT
+
+- name: tig-daily-cron
+  display_name: "~ TIG Daily Cron"
+  run_on:
+  - rhel62-large
+  batchtime: 1440 # 1 day
+  stepback: false
+  tasks:
+  - name: update_test_lifecycle

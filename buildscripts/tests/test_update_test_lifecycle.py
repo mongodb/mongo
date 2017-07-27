@@ -370,6 +370,7 @@ class TestUpdateTags(unittest.TestCase):
         initial_tags = collections.OrderedDict()
         lifecycle = ci_tags.TagsConfig.from_dict(
             dict(selector=dict(js_test=copy.deepcopy(initial_tags))))
+        summary_lifecycle = update_test_lifecycle.TagsConfigWithChangelog(lifecycle)
         self.assertEqual(collections.OrderedDict(), self.assert_has_only_js_tests(lifecycle))
 
         report = test_failures.Report([
@@ -381,7 +382,7 @@ class TestUpdateTags(unittest.TestCase):
         ])
 
         update_test_lifecycle.validate_config(config)
-        update_test_lifecycle.update_tags(lifecycle, config, report)
+        update_test_lifecycle.update_tags(summary_lifecycle, config, report)
         updated_tags = self.assert_has_only_js_tests(lifecycle)
         self.assertEqual(updated_tags, expected_tags)
 
@@ -464,6 +465,7 @@ class TestUpdateTags(unittest.TestCase):
 
         lifecycle = ci_tags.TagsConfig.from_dict(
             dict(selector=dict(js_test=copy.deepcopy(initial_tags))))
+        summary_lifecycle = update_test_lifecycle.TagsConfigWithChangelog(lifecycle)
         self.assertEqual(initial_tags, self.assert_has_only_js_tests(lifecycle))
 
         report = test_failures.Report([
@@ -475,7 +477,7 @@ class TestUpdateTags(unittest.TestCase):
         ])
 
         update_test_lifecycle.validate_config(config)
-        update_test_lifecycle.update_tags(lifecycle, config, report)
+        update_test_lifecycle.update_tags(summary_lifecycle, config, report)
         updated_tags = self.assert_has_only_js_tests(lifecycle)
         self.assertEqual(updated_tags, collections.OrderedDict())
 
@@ -566,6 +568,7 @@ class TestUpdateTags(unittest.TestCase):
         initial_tags = collections.OrderedDict()
         lifecycle = ci_tags.TagsConfig.from_dict(
             dict(selector=dict(js_test=copy.deepcopy(initial_tags))))
+        summary_lifecycle = update_test_lifecycle.TagsConfigWithChangelog(lifecycle)
         self.assertEqual(initial_tags, self.assert_has_only_js_tests(lifecycle))
 
         report = test_failures.Report([
@@ -577,7 +580,7 @@ class TestUpdateTags(unittest.TestCase):
         ])
 
         update_test_lifecycle.validate_config(config)
-        update_test_lifecycle.update_tags(lifecycle, config, report)
+        update_test_lifecycle.update_tags(summary_lifecycle, config, report)
         updated_tags = self.assert_has_only_js_tests(lifecycle)
         self.assertEqual(updated_tags, initial_tags)
 
@@ -603,6 +606,7 @@ class TestUpdateTags(unittest.TestCase):
 
         lifecycle = ci_tags.TagsConfig.from_dict(
             dict(selector=dict(js_test=copy.deepcopy(initial_tags))))
+        summary_lifecycle = update_test_lifecycle.TagsConfigWithChangelog(lifecycle)
         self.assertEqual(initial_tags, self.assert_has_only_js_tests(lifecycle))
 
         report = test_failures.Report([
@@ -614,7 +618,7 @@ class TestUpdateTags(unittest.TestCase):
         ])
 
         update_test_lifecycle.validate_config(config)
-        update_test_lifecycle.update_tags(lifecycle, config, report)
+        update_test_lifecycle.update_tags(summary_lifecycle, config, report)
         updated_tags = self.assert_has_only_js_tests(lifecycle)
         self.assertEqual(updated_tags, initial_tags)
 
@@ -653,6 +657,7 @@ class TestUpdateTags(unittest.TestCase):
         initial_tags = collections.OrderedDict()
         lifecycle = ci_tags.TagsConfig.from_dict(
             dict(selector=dict(js_test=copy.deepcopy(initial_tags))))
+        summary_lifecycle = update_test_lifecycle.TagsConfigWithChangelog(lifecycle)
         self.assertEqual(initial_tags, self.assert_has_only_js_tests(lifecycle))
 
         report = test_failures.Report([
@@ -672,7 +677,7 @@ class TestUpdateTags(unittest.TestCase):
         ])
 
         update_test_lifecycle.validate_config(config)
-        update_test_lifecycle.update_tags(lifecycle, config, report)
+        update_test_lifecycle.update_tags(summary_lifecycle, config, report)
         updated_tags = self.assert_has_only_js_tests(lifecycle)
         self.assertEqual(updated_tags, collections.OrderedDict([
             ("jstests/core/all.js", [
@@ -699,6 +704,7 @@ class TestUpdateTags(unittest.TestCase):
         initial_tags = collections.OrderedDict()
         lifecycle = ci_tags.TagsConfig.from_dict(
             dict(selector=dict(js_test=copy.deepcopy(initial_tags))))
+        summary_lifecycle = update_test_lifecycle.TagsConfigWithChangelog(lifecycle)
         self.assertEqual(initial_tags, self.assert_has_only_js_tests(lifecycle))
 
         report = test_failures.Report([
@@ -710,7 +716,7 @@ class TestUpdateTags(unittest.TestCase):
         ])
 
         update_test_lifecycle.validate_config(config)
-        update_test_lifecycle.update_tags(lifecycle, config, report)
+        update_test_lifecycle.update_tags(summary_lifecycle, config, report)
         updated_tags = self.assert_has_only_js_tests(lifecycle)
         self.assertEqual(updated_tags, initial_tags)
 
@@ -736,6 +742,7 @@ class TestUpdateTags(unittest.TestCase):
 
         lifecycle = ci_tags.TagsConfig.from_dict(
             dict(selector=dict(js_test=copy.deepcopy(initial_tags))))
+        summary_lifecycle = update_test_lifecycle.TagsConfigWithChangelog(lifecycle)
         self.assertEqual(initial_tags, self.assert_has_only_js_tests(lifecycle))
 
         report = test_failures.Report([
@@ -755,6 +762,146 @@ class TestUpdateTags(unittest.TestCase):
         ])
 
         update_test_lifecycle.validate_config(config)
-        update_test_lifecycle.update_tags(lifecycle, config, report)
+        update_test_lifecycle.update_tags(summary_lifecycle, config, report)
         updated_tags = self.assert_has_only_js_tests(lifecycle)
         self.assertEqual(updated_tags, collections.OrderedDict())
+
+
+class TestCleanUpTags(unittest.TestCase):
+    @classmethod
+    def setUpClass(cls):
+        cls.evg = MockEvergreenConfig(["task1", "task2", "task3"],
+                                      {"variant1": {"tasks": ["task1", "task2"],
+                                                    "distros": ["distro1"]},
+                                       "variant2": {"tasks": ["task3"],
+                                                    "distros": ["distro2"]}})
+
+    def test_is_unreliable_tag_relevant(self):
+        self.assertTrue(update_test_lifecycle._is_tag_still_relevant(self.evg, "unreliable"))
+
+    def test_is_unknown_task_relevant(self):
+        self.assertFalse(update_test_lifecycle._is_tag_still_relevant(
+            self.evg, "unreliable|task_unknown"))
+
+    def test_is_known_task_relevant(self):
+        self.assertTrue(update_test_lifecycle._is_tag_still_relevant(
+            self.evg, "unreliable|task1"))
+        self.assertTrue(update_test_lifecycle._is_tag_still_relevant(
+            self.evg, "unreliable|task2"))
+        self.assertTrue(update_test_lifecycle._is_tag_still_relevant(
+            self.evg, "unreliable|task3"))
+
+    def test_is_unknown_variant_relevant(self):
+        self.assertFalse(update_test_lifecycle._is_tag_still_relevant(
+            self.evg, "unreliable|task1|variant3"
+        ))
+
+    def test_is_unknown_task_variant_relevant(self):
+        self.assertFalse(update_test_lifecycle._is_tag_still_relevant(
+            self.evg, "unreliable|task3|variant1"))
+        self.assertFalse(update_test_lifecycle._is_tag_still_relevant(
+            self.evg, "unreliable|task1|variant2"))
+
+    def test_is_known_task_variant_relevant(self):
+        self.assertTrue(update_test_lifecycle._is_tag_still_relevant(
+            self.evg, "unreliable|task1|variant1"))
+        self.assertTrue(update_test_lifecycle._is_tag_still_relevant(
+            self.evg, "unreliable|task2|variant1"))
+        self.assertTrue(update_test_lifecycle._is_tag_still_relevant(
+            self.evg, "unreliable|task3|variant2"))
+
+    def test_is_unknown_task_variant_distro_relevant(self):
+        self.assertFalse(update_test_lifecycle._is_tag_still_relevant(
+            self.evg, "unreliable|task1|variant1|distro2"))
+        self.assertFalse(update_test_lifecycle._is_tag_still_relevant(
+            self.evg, "unreliable|task3|variant2|distro1"))
+
+    def test_is_known_task_variant_distro_relevant(self):
+        self.assertTrue(update_test_lifecycle._is_tag_still_relevant(
+            self.evg, "unreliable|task1|variant1|distro1"))
+        self.assertTrue(update_test_lifecycle._is_tag_still_relevant(
+            self.evg, "unreliable|task3|variant2|distro2"))
+
+
+class MockEvergreenConfig(object):
+    def __init__(self, tasks, variants):
+        self.task_names = tasks
+        self.variants = {}
+        for name, fields in variants.items():
+            self.variants[name] = MockVariant(fields["tasks"], fields["distros"])
+
+    def get_variant(self, variant_name):
+        return self.variants.get(variant_name)
+
+
+class MockVariant(object):
+    def __init__(self, task_names, distros):
+        self.task_names = task_names
+        self.distros = distros
+
+
+class TestJiraIssueCreator(unittest.TestCase):
+    def test_description(self):
+        data = {"js_test": {"testfile1": {"tag1": 0.1, "tag2": 0.2},
+                            "testfile2": {"tag1": 0.1, "tag3": 0.3}}}
+        desc = update_test_lifecycle.JiraIssueCreator._make_updated_tags_description(data)
+        expected = ("- *js_test*\n"
+                    "-- {{testfile1}}\n"
+                    "--- {{tag1}} (0.10 %)\n"
+                    "--- {{tag2}} (0.20 %)\n"
+                    "-- {{testfile2}}\n"
+                    "--- {{tag1}} (0.10 %)\n"
+                    "--- {{tag3}} (0.30 %)")
+        self.assertEqual(expected, desc)
+
+    def test_description_empty(self):
+        data = {}
+        desc = update_test_lifecycle.JiraIssueCreator._make_updated_tags_description(data)
+        expected = "_None_"
+        self.assertEqual(expected, desc)
+
+    def test_clean_up_description(self):
+        data = {"js_test": {"testfile1": ["tag1", "tag2"],
+                            "testfile2": []}}
+        desc = update_test_lifecycle.JiraIssueCreator._make_tags_cleaned_up_description(data)
+        expected = ("- *js_test*\n"
+                    "-- {{testfile1}}\n"
+                    "--- {{tag1}}\n"
+                    "--- {{tag2}}\n"
+                    "-- {{testfile2}}\n"
+                    "--- ALL (test file removed or renamed as part of an earlier commit)")
+        self.assertEqual(expected, desc)
+
+    def test_clean_up_description_empty(self):
+        data = {}
+        desc = update_test_lifecycle.JiraIssueCreator._make_tags_cleaned_up_description(data)
+        expected = "_None_"
+        self.assertEqual(expected, desc)
+
+
+class TestTagsConfigWithChangelog(unittest.TestCase):
+    def setUp(self):
+        lifecycle = ci_tags.TagsConfig({"selector": {}})
+        self.summary_lifecycle = update_test_lifecycle.TagsConfigWithChangelog(lifecycle)
+
+    def test_add_tag(self):
+        self.summary_lifecycle.add_tag("js_test", "testfile1", "tag1", 0.1)
+        self.assertEqual({"js_test": {"testfile1": {"tag1": 0.1}}}, self.summary_lifecycle.added)
+
+    def test_remove_tag(self):
+        self.summary_lifecycle.lifecycle.add_tag("js_test", "testfile1", "tag1")
+        self.summary_lifecycle.remove_tag("js_test", "testfile1", "tag1", 0.1)
+        self.assertEqual({"js_test": {"testfile1": {"tag1": 0.1}}}, self.summary_lifecycle.removed)
+
+    def test_add_remove_tag(self):
+        self.summary_lifecycle.add_tag("js_test", "testfile1", "tag1", 0.1)
+        self.summary_lifecycle.remove_tag("js_test", "testfile1", "tag1", 0.4)
+        self.assertEqual({}, self.summary_lifecycle.added)
+        self.assertEqual({}, self.summary_lifecycle.removed)
+
+    def test_remove_add_tag(self):
+        self.summary_lifecycle.lifecycle.add_tag("js_test", "testfile1", "tag1")
+        self.summary_lifecycle.remove_tag("js_test", "testfile1", "tag1", 0.1)
+        self.summary_lifecycle.add_tag("js_test", "testfile1", "tag1", 0.1)
+        self.assertEqual({}, self.summary_lifecycle.added)
+        self.assertEqual({}, self.summary_lifecycle.removed)

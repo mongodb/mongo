@@ -67,24 +67,28 @@ class TagsConfig(object):
         return getdefault(patterns, test_pattern, [])
 
     def add_tag(self, test_kind, test_pattern, tag):
-        """Add a tag."""
+        """Add a tag. Return True if the tag is added or False if the tag was already present."""
         patterns = setdefault(self._conf, test_kind, {})
         tags = setdefault(patterns, test_pattern, [])
         if tag not in tags:
             tags.append(tag)
-        tags.sort(cmp=self._cmp_func)
+            tags.sort(cmp=self._cmp_func)
+            return True
+        return False
 
     def remove_tag(self, test_kind, test_pattern, tag):
-        """Remove a tag."""
+        """Remove a tag. Return True if the tag was removed or False if the tag was not present."""
         patterns = self._conf.get(test_kind)
         if not patterns or test_pattern not in patterns:
-            return
+            return False
         tags = patterns.get(test_pattern)
         if tags and tag in tags:
             tags[:] = (value for value in tags if value != tag)
-        # Remove the pattern if there are no associated tags.
-        if not tags:
-            del patterns[test_pattern]
+            # Remove the pattern if there are no associated tags.
+            if not tags:
+                del patterns[test_pattern]
+            return True
+        return False
 
     def remove_test_pattern(self, test_kind, test_pattern):
         """Remove a test pattern."""
