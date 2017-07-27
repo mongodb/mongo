@@ -185,6 +185,7 @@ class Collection final : CappedCallback, UpdateNotifier {
 public:
     enum ValidationAction { WARN, ERROR_V };
     enum ValidationLevel { OFF, MODERATE, STRICT_V };
+    enum class StoreDeletedDoc { Off, On };
 
     class Impl : virtual CappedCallback, virtual UpdateNotifier {
     public:
@@ -246,7 +247,8 @@ public:
                                     const RecordId& loc,
                                     OpDebug* opDebug,
                                     bool fromMigrate,
-                                    bool noWarn) = 0;
+                                    bool noWarn,
+                                    StoreDeletedDoc storeDeletedDoc) = 0;
 
         virtual Status insertDocuments(OperationContext* opCtx,
                                        std::vector<InsertStatement>::const_iterator begin,
@@ -473,8 +475,10 @@ public:
                                const RecordId& loc,
                                OpDebug* const opDebug,
                                const bool fromMigrate = false,
-                               const bool noWarn = false) {
-        return this->_impl().deleteDocument(opCtx, stmtId, loc, opDebug, fromMigrate, noWarn);
+                               const bool noWarn = false,
+                               StoreDeletedDoc storeDeletedDoc = StoreDeletedDoc::Off) {
+        return this->_impl().deleteDocument(
+            opCtx, stmtId, loc, opDebug, fromMigrate, noWarn, storeDeletedDoc);
     }
 
     /*

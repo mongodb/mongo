@@ -60,7 +60,8 @@ void OpObserverNoop::onDelete(OperationContext*,
                               OptionalCollectionUUID,
                               StmtId stmtId,
                               CollectionShardingState::DeleteState,
-                              bool) {}
+                              bool fromMigrate,
+                              const boost::optional<BSONObj>& deletedDoc) {}
 
 void OpObserverNoop::onOpMessage(OperationContext*, const BSONObj&) {}
 

@@ -133,7 +133,8 @@ public:
                         const RecordId& loc,
                         OpDebug* opDebug,
                         bool fromMigrate,
-                        bool noWarn) {
+                        bool noWarn,
+                        Collection::StoreDeletedDoc storeDeletedDoc) {
         std::abort();
     }
 

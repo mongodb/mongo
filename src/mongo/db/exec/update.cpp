@@ -143,6 +143,19 @@ const std::vector<std::unique_ptr<FieldRef>>* getImmutableFields(OperationContex
     return NULL;
 }
 
+OplogUpdateEntryArgs::StoreDocOption getStoreDocMode(const UpdateRequest& updateRequest) {
+    if (updateRequest.shouldReturnNewDocs()) {
+        return OplogUpdateEntryArgs::StoreDocOption::PostImage;
+    }
+
+    if (updateRequest.shouldReturnOldDocs()) {
+        return OplogUpdateEntryArgs::StoreDocOption::PreImage;
+    }
+
+    invariant(!updateRequest.shouldReturnAnyDocs());
+    return OplogUpdateEntryArgs::StoreDocOption::None;
+}
+
 }  // namespace
 
 const char* UpdateStage::kStageType = "UPDATE";
@@ -289,6 +302,12 @@ BSONObj UpdateStage::transformAndUpdate(const Snapshotted<BSONObj>& oldObj, Reco
                 args.update = logObj;
                 args.criteria = idQuery;
                 args.fromMigrate = request->isFromMigration();
+                args.storeDocOption = getStoreDocMode(*request);
+
+                if (args.storeDocOption == OplogUpdateEntryArgs::StoreDocOption::PreImage) {
+                    args.preImageDoc = oldObj.value().getOwned();
+                }
+
                 StatusWith<RecordData> newRecStatus = _collection->updateDocumentWithDamages(
                     getOpCtx(),
                     recordId,
@@ -320,6 +339,12 @@ BSONObj UpdateStage::transformAndUpdate(const Snapshotted<BSONObj>& oldObj, Reco
                 args.update = logObj;
                 args.criteria = idQuery;
                 args.fromMigrate = request->isFromMigration();
+                args.storeDocOption = getStoreDocMode(*request);
+
+                if (args.storeDocOption == OplogUpdateEntryArgs::StoreDocOption::PreImage) {
+                    args.preImageDoc = oldObj.value().getOwned();
+                }
+
                 newRecordId = _collection->updateDocument(getOpCtx(),
                                                           recordId,
                                                           oldObj,

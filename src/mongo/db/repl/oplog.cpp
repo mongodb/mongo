@@ -333,7 +333,8 @@ OplogDocWriter _logOpWriter(OperationContext* opCtx,
                             long long hashNew,
                             Date_t wallTime,
                             StmtId statementId,
-                            const Timestamp& prevTs) {
+                            const Timestamp& prevTs,
+                            const PreAndPostImageTimestamps& preAndPostTs) {
     BSONObjBuilder b(256);
 
     b.append("ts", optime.getTimestamp());
@@ -359,6 +360,14 @@ OplogDocWriter _logOpWriter(OperationContext* opCtx,
     }
 
     appendSessionInfo(opCtx, &b, statementId, prevTs);
+
+    if (!preAndPostTs.preImageTs.isNull()) {
+        b.append(OplogEntryBase::kPreImageTsFieldName, preAndPostTs.preImageTs);
+    }
+
+    if (!preAndPostTs.postImageTs.isNull()) {
+        b.append(OplogEntryBase::kPostImageTsFieldName, preAndPostTs.postImageTs);
+    }
 
     return OplogDocWriter(OplogDocWriter(b.obj(), obj));
 }
@@ -414,7 +423,8 @@ OpTime logOp(OperationContext* opCtx,
              const BSONObj& obj,
              const BSONObj* o2,
              bool fromMigrate,
-             StmtId statementId) {
+             StmtId statementId,
+             const PreAndPostImageTimestamps& preAndPostTs) {
     auto replCoord = ReplicationCoordinator::get(opCtx);
     if (replCoord->isOplogDisabledFor(opCtx, nss)) {
         invariant(statementId == kUninitializedStmtId);
@@ -444,7 +454,8 @@ OpTime logOp(OperationContext* opCtx,
                                slot.hash,
                                Date_t::now(),
                                statementId,
-                               prevTs);
+                               prevTs,
+                               preAndPostTs);
     const DocWriter* basePtr = &writer;
     _logOpsInner(opCtx, nss, &basePtr, 1, oplog, replMode, slot.opTime);
     return slot.opTime;
@@ -493,7 +504,8 @@ repl::OpTime logInsertOps(OperationContext* opCtx,
                                           slots[i].hash,
                                           wallTime,
                                           insertStatement.stmtId,
-                                          prevTs));
+                                          prevTs,
+                                          {}));
         prevTs = slots[i].opTime.getTimestamp();
     }
 

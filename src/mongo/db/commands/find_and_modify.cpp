@@ -372,6 +372,10 @@ public:
                 const bool isExplain = false;
                 makeDeleteRequest(args, isExplain, &request);
 
+                if (opCtx->getTxnNumber()) {
+                    request.setStmtId(0);
+                }
+
                 ParsedDelete parsedDelete(opCtx, &request);
                 Status parsedDeleteStatus = parsedDelete.parseRequest();
                 if (!parsedDeleteStatus.isOK()) {
@@ -452,6 +456,10 @@ public:
                 UpdateLifecycleImpl updateLifecycle(nsString);
                 const bool isExplain = false;
                 makeUpdateRequest(args, isExplain, &updateLifecycle, &request);
+
+                if (opCtx->getTxnNumber()) {
+                    request.setStmtId(0);
+                }
 
                 ParsedUpdate parsedUpdate(opCtx, &request);
                 Status parsedUpdateStatus = parsedUpdate.parseRequest();

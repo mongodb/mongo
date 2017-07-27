@@ -412,7 +412,8 @@ BSONObj Command::filterCommandRequestForPassthrough(const BSONObj& cmdObj) {
                    name == "$queryOptions" ||            //
                    name == "maxTimeMS" ||                //
                    name == "readConcern" ||              //
-                   name == "writeConcern") {
+                   name == "writeConcern" ||
+                   name == "lsid" || name == "txnNumber") {
             // This is the whitelist of generic arguments that commands can be trusted to blindly
             // forward to the shards.
             bob.append(elem);

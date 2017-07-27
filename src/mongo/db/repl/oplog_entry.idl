@@ -115,4 +115,13 @@ structs:
                 type: timestamp
                 optional: true # Only for writes that are part of a transaction
                 description: "The oplog timestamp of the previous write with the same transaction."
-
+            preImageTs:
+                type: timestamp
+                optional: true
+                description: "The oplog timestamp of another oplog entry that contains the document
+                              before an update/remove was applied."
+            postImageTs:
+                type: timestamp
+                optional: true
+                description: "The oplog timestamp of another oplog entry that contains the document
+                              after an update was applied."

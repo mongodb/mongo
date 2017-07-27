@@ -59,7 +59,8 @@ public:
                   OptionalCollectionUUID uuid,
                   StmtId stmtId,
                   CollectionShardingState::DeleteState deleteState,
-                  bool fromMigrate) override;
+                  bool fromMigrate,
+                  const boost::optional<BSONObj>& deletedDoc) override;
     void onOpMessage(OperationContext* opCtx, const BSONObj& msgObj) override;
     void onCreateCollection(OperationContext* opCtx,
                             Collection* coll,

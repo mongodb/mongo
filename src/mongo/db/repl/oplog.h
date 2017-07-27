@@ -49,6 +49,15 @@ class OperationContext;
 namespace repl {
 class ReplSettings;
 
+struct PreAndPostImageTimestamps {
+    PreAndPostImageTimestamps() = default;
+    PreAndPostImageTimestamps(Timestamp _preImageTs, Timestamp _postImageTs)
+        : preImageTs(std::move(_preImageTs)), postImageTs(std::move(_postImageTs)) {}
+
+    Timestamp preImageTs;
+    Timestamp postImageTs;
+};
+
 /**
  * Create a new capped collection for the oplog if it doesn't yet exist.
  * If the collection already exists (and isReplSet is false),
@@ -88,6 +97,10 @@ OpTime logInsertOps(OperationContext* opCtx,
  *
  * For 'u' records, 'obj' captures the mutation made to the object but not
  * the object itself. 'o2' captures the the criteria for the object that will be modified.
+ *
+ * preAndPostImageTs this contains the timestamp of the oplog entry that contains the document
+ *   before/after update was applied. The timestamps are ignored if isNull() is true.
+ *
  * Returns the optime of the oplog entry written to the oplog.
  * Returns a null optime if oplog was not modified.
  */
@@ -98,7 +111,8 @@ OpTime logOp(OperationContext* opCtx,
              const BSONObj& obj,
              const BSONObj* o2,
              bool fromMigrate,
-             StmtId stmtId);
+             StmtId stmtId,
+             const PreAndPostImageTimestamps& preAndPostTs);
 
 // Flush out the cached pointers to the local database and oplog.
 // Used by the closeDatabase command to ensure we don't cache closed things.

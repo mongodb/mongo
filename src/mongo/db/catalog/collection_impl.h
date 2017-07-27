@@ -146,13 +146,16 @@ public:
      * 'cappedOK' if true, allows deletes on capped collections (Cloner::copyDB uses this).
      * 'noWarn' if unindexing the record causes an error, if noWarn is true the error
      * will not be logged.
+     * 'storeDeletedDoc' whether to store the document deleted in the oplog.
      */
-    void deleteDocument(OperationContext* opCtx,
-                        StmtId stmtId,
-                        const RecordId& loc,
-                        OpDebug* opDebug,
-                        bool fromMigrate = false,
-                        bool noWarn = false) final;
+    void deleteDocument(
+        OperationContext* opCtx,
+        StmtId stmtId,
+        const RecordId& loc,
+        OpDebug* opDebug,
+        bool fromMigrate = false,
+        bool noWarn = false,
+        Collection::StoreDeletedDoc storeDeletedDoc = Collection::StoreDeletedDoc::Off) final;
 
     /*
      * Inserts all documents inside one WUOW.

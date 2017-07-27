@@ -40,6 +40,11 @@
             }
         }();
 
+        var txnNumber = NumberLong(34);
+        var incrementTxnNumber = function() {
+            txnNumber = NumberLong(txnNumber + 1);
+        };
+
         ////////////////////////////////////////////////////////////////////////
         // Test insert command
 
@@ -48,7 +53,7 @@
             documents: [{_id: 10}, {_id: 30}],
             ordered: false,
             lsid: {id: lsid},
-            txnNumber: NumberLong(34),
+            txnNumber: txnNumber,
         };
 
         assert.commandWorked(mainConn.getDB('test').runCommand(cmd));
@@ -56,16 +61,17 @@
         var oplog = priConn.getDB('local').oplog.rs;
 
         var firstDoc = oplog.findOne({ns: 'test.user', 'o._id': 10});
-        checkOplog(firstDoc, lsid, uid, NumberLong(34), 0, Timestamp(0, 0));
+        checkOplog(firstDoc, lsid, uid, txnNumber, 0, Timestamp(0, 0));
 
         var secondDoc = oplog.findOne({ns: 'test.user', 'o._id': 30});
-        checkOplog(secondDoc, lsid, uid, NumberLong(34), 1, firstDoc.ts);
+        checkOplog(secondDoc, lsid, uid, txnNumber, 1, firstDoc.ts);
 
-        checkSessionCatalog(priConn, lsid, uid, NumberLong(34), secondDoc.ts);
+        checkSessionCatalog(priConn, lsid, uid, txnNumber, secondDoc.ts);
 
         ////////////////////////////////////////////////////////////////////////
         // Test update command
 
+        incrementTxnNumber();
         cmd = {
             update: 'user',
             updates: [
@@ -75,46 +81,211 @@
             ],
             ordered: false,
             lsid: {id: lsid},
-            txnNumber: NumberLong(35),
+            txnNumber: txnNumber,
         };
 
         assert.commandWorked(mainConn.getDB('test').runCommand(cmd));
 
         firstDoc = oplog.findOne({ns: 'test.user', op: 'u', 'o2._id': 10});
-        checkOplog(firstDoc, lsid, uid, NumberLong(35), 0, Timestamp(0, 0));
+        checkOplog(firstDoc, lsid, uid, txnNumber, 0, Timestamp(0, 0));
 
         secondDoc = oplog.findOne({ns: 'test.user', op: 'i', 'o._id': 20});
-        checkOplog(secondDoc, lsid, uid, NumberLong(35), 1, firstDoc.ts);
+        checkOplog(secondDoc, lsid, uid, txnNumber, 1, firstDoc.ts);
 
         var thirdDoc = oplog.findOne({ns: 'test.user', op: 'u', 'o2._id': 30});
-        checkOplog(thirdDoc, lsid, uid, NumberLong(35), 2, secondDoc.ts);
+        checkOplog(thirdDoc, lsid, uid, txnNumber, 2, secondDoc.ts);
 
-        checkSessionCatalog(priConn, lsid, uid, NumberLong(35), thirdDoc.ts);
+        checkSessionCatalog(priConn, lsid, uid, txnNumber, thirdDoc.ts);
 
         ////////////////////////////////////////////////////////////////////////
         // Test delete command
 
+        incrementTxnNumber();
         cmd = {
             delete: 'user',
             deletes: [{q: {_id: 10}, limit: 1}, {q: {_id: 20}, limit: 1}],
             ordered: false,
             lsid: {id: lsid},
-            txnNumber: NumberLong(36),
+            txnNumber: txnNumber,
         };
 
         assert.commandWorked(mainConn.getDB('test').runCommand(cmd));
 
         firstDoc = oplog.findOne({ns: 'test.user', op: 'd', 'o._id': 10});
-        checkOplog(firstDoc, lsid, uid, NumberLong(36), 0, Timestamp(0, 0));
+        checkOplog(firstDoc, lsid, uid, txnNumber, 0, Timestamp(0, 0));
 
         secondDoc = oplog.findOne({ns: 'test.user', op: 'd', 'o._id': 20});
-        checkOplog(secondDoc, lsid, uid, NumberLong(36), 1, firstDoc.ts);
+        checkOplog(secondDoc, lsid, uid, txnNumber, 1, firstDoc.ts);
 
-        checkSessionCatalog(priConn, lsid, uid, NumberLong(36), secondDoc.ts);
+        checkSessionCatalog(priConn, lsid, uid, txnNumber, secondDoc.ts);
+
+        ////////////////////////////////////////////////////////////////////////
+        // Test findAndModify command (upsert)
+
+        incrementTxnNumber();
+        cmd = {
+            findAndModify: 'user',
+            query: {_id: 40},
+            update: {$set: {x: 1}},
+            new: true,
+            upsert: true,
+            lsid: {id: lsid},
+            txnNumber: txnNumber,
+        };
+
+        assert.commandWorked(mainConn.getDB('test').runCommand(cmd));
+
+        firstDoc = oplog.findOne({ns: 'test.user', op: 'i', 'o._id': 40});
+        checkOplog(firstDoc, lsid, uid, txnNumber, 0, Timestamp(0, 0));
+
+        assert.eq(null, firstDoc.preImageTs);
+        assert.eq(null, firstDoc.postImageTs);
+
+        checkSessionCatalog(priConn, lsid, uid, txnNumber, firstDoc.ts);
+        var lastTs = firstDoc.ts;
+
+        ////////////////////////////////////////////////////////////////////////
+        // Test findAndModify command (in-place update, return pre-image)
+
+        incrementTxnNumber();
+        cmd = {
+            findAndModify: 'user',
+            query: {_id: 40},
+            update: {$inc: {x: 1}},
+            new: false,
+            upsert: false,
+            lsid: {id: lsid},
+            txnNumber: txnNumber,
+        };
+
+        var beforeDoc = mainConn.getDB('test').user.findOne({_id: 40});
+        var res = assert.commandWorked(mainConn.getDB('test').runCommand(cmd));
+
+        firstDoc = oplog.findOne({ns: 'test.user', op: 'u', 'o2._id': 40, ts: {$gt: lastTs}});
+        checkOplog(firstDoc, lsid, uid, txnNumber, 0, Timestamp(0, 0));
+
+        assert.eq(null, firstDoc.postImageTs);
+
+        var savedDoc = oplog.findOne({ns: 'test.user', op: 'n', ts: firstDoc.preImageTs});
+        assert.eq(beforeDoc, savedDoc.o);
+
+        checkSessionCatalog(priConn, lsid, uid, txnNumber, firstDoc.ts);
+        lastTs = firstDoc.ts;
+
+        ////////////////////////////////////////////////////////////////////////
+        // Test findAndModify command (in-place update, return post-image)
+
+        incrementTxnNumber();
+        cmd = {
+            findAndModify: 'user',
+            query: {_id: 40},
+            update: {$inc: {x: 1}},
+            new: true,
+            upsert: false,
+            lsid: {id: lsid},
+            txnNumber: txnNumber,
+        };
+
+        res = assert.commandWorked(mainConn.getDB('test').runCommand(cmd));
+        var afterDoc = mainConn.getDB('test').user.findOne({_id: 40});
+
+        firstDoc = oplog.findOne({ns: 'test.user', op: 'u', 'o2._id': 40, ts: {$gt: lastTs}});
+        checkOplog(firstDoc, lsid, uid, txnNumber, 0, Timestamp(0, 0));
+
+        assert.eq(null, firstDoc.preImageTs);
+
+        savedDoc = oplog.findOne({ns: 'test.user', op: 'n', ts: firstDoc.postImageTs});
+        assert.eq(afterDoc, savedDoc.o);
+
+        checkSessionCatalog(priConn, lsid, uid, txnNumber, firstDoc.ts);
+        lastTs = firstDoc.ts;
+
+        ////////////////////////////////////////////////////////////////////////
+        // Test findAndModify command (replacement update, return pre-image)
+
+        incrementTxnNumber();
+        cmd = {
+            findAndModify: 'user',
+            query: {_id: 40},
+            update: {y: 1},
+            new: false,
+            upsert: false,
+            lsid: {id: lsid},
+            txnNumber: txnNumber,
+        };
+
+        beforeDoc = mainConn.getDB('test').user.findOne({_id: 40});
+        res = assert.commandWorked(mainConn.getDB('test').runCommand(cmd));
+
+        firstDoc = oplog.findOne({ns: 'test.user', op: 'u', 'o2._id': 40, ts: {$gt: lastTs}});
+        checkOplog(firstDoc, lsid, uid, txnNumber, 0, Timestamp(0, 0));
+
+        assert.eq(null, firstDoc.postImageTs);
+
+        savedDoc = oplog.findOne({ns: 'test.user', op: 'n', ts: firstDoc.preImageTs});
+        assert.eq(beforeDoc, savedDoc.o);
+
+        checkSessionCatalog(priConn, lsid, uid, txnNumber, firstDoc.ts);
+        lastTs = firstDoc.ts;
+
+        ////////////////////////////////////////////////////////////////////////
+        // Test findAndModify command (replacement update, return post-image)
+
+        incrementTxnNumber();
+        cmd = {
+            findAndModify: 'user',
+            query: {_id: 40},
+            update: {z: 1},
+            new: true,
+            upsert: false,
+            lsid: {id: lsid},
+            txnNumber: txnNumber,
+        };
+
+        res = assert.commandWorked(mainConn.getDB('test').runCommand(cmd));
+        afterDoc = mainConn.getDB('test').user.findOne({_id: 40});
+
+        firstDoc = oplog.findOne({ns: 'test.user', op: 'u', 'o2._id': 40, ts: {$gt: lastTs}});
+        checkOplog(firstDoc, lsid, uid, txnNumber, 0, Timestamp(0, 0));
+
+        assert.eq(null, firstDoc.preImageTs);
+
+        savedDoc = oplog.findOne({ns: 'test.user', op: 'n', ts: firstDoc.postImageTs});
+        assert.eq(afterDoc, savedDoc.o);
+
+        checkSessionCatalog(priConn, lsid, uid, txnNumber, firstDoc.ts);
+        lastTs = firstDoc.ts;
+
+        ////////////////////////////////////////////////////////////////////////
+        // Test findAndModify command (remove, return pre-image)
+
+        incrementTxnNumber();
+        cmd = {
+            findAndModify: 'user',
+            query: {_id: 40},
+            remove: true,
+            new: false,
+            lsid: {id: lsid},
+            txnNumber: txnNumber,
+        };
+
+        beforeDoc = mainConn.getDB('test').user.findOne({_id: 40});
+        res = assert.commandWorked(mainConn.getDB('test').runCommand(cmd));
+
+        firstDoc = oplog.findOne({ns: 'test.user', op: 'd', 'o._id': 40, ts: {$gt: lastTs}});
+        checkOplog(firstDoc, lsid, uid, txnNumber, 0, Timestamp(0, 0));
+
+        assert.eq(null, firstDoc.postImageTs);
+
+        savedDoc = oplog.findOne({ns: 'test.user', op: 'n', ts: firstDoc.preImageTs});
+        assert.eq(beforeDoc, savedDoc.o);
+
+        checkSessionCatalog(priConn, lsid, uid, txnNumber, firstDoc.ts);
+        lastTs = firstDoc.ts;
     };
 
     var replTest = new ReplSetTest({nodes: 1});
-    replTest.startSet({verbose: 1});
+    replTest.startSet();
     replTest.initiate();
 
     var priConn = replTest.getPrimary();

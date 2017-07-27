@@ -546,7 +546,8 @@ void CollectionImpl::deleteDocument(OperationContext* opCtx,
                                     const RecordId& loc,
                                     OpDebug* opDebug,
                                     bool fromMigrate,
-                                    bool noWarn) {
+                                    bool noWarn,
+                                    Collection::StoreDeletedDoc storeDeletedDoc) {
     if (isCapped()) {
         log() << "failing remove on a capped ns " << _ns;
         uasserted(10089, "cannot remove from a capped collection");
@@ -557,6 +558,11 @@ void CollectionImpl::deleteDocument(OperationContext* opCtx,
 
     auto deleteState =
         getGlobalServiceContext()->getOpObserver()->aboutToDelete(opCtx, ns(), doc.value());
+
+    boost::optional<BSONObj> deletedDoc;
+    if (storeDeletedDoc == Collection::StoreDeletedDoc::On) {
+        deletedDoc.emplace(doc.value().getOwned());
+    }
 
     /* check if any cursors point to us.  if so, advance them. */
     _cursorManager.invalidateDocument(opCtx, loc, INVALIDATION_DELETION);
@@ -570,7 +576,7 @@ void CollectionImpl::deleteDocument(OperationContext* opCtx,
     _recordStore->deleteRecord(opCtx, loc);
 
     getGlobalServiceContext()->getOpObserver()->onDelete(
-        opCtx, ns(), uuid(), stmtId, std::move(deleteState), fromMigrate);
+        opCtx, ns(), uuid(), stmtId, std::move(deleteState), fromMigrate, deletedDoc);
 }
 
 Counter64 moveCounter;
@@ -658,6 +664,8 @@ RecordId CollectionImpl::updateDocument(OperationContext* opCtx,
         }
     }
 
+    args->preImageDoc = oldDoc.value().getOwned();
+
     Status updateStatus = _recordStore->updateRecord(
         opCtx, oldLocation, newDoc.objdata(), newDoc.objsize(), _enforceQuota(enforceQuota), this);
 
@@ -711,6 +719,8 @@ StatusWith<RecordId> CollectionImpl::_updateDocumentWithMove(OperationContext* o
     invariant(newLocation.getValue() != oldLocation);
 
     _cursorManager.invalidateDocument(opCtx, oldLocation, INVALIDATION_DELETION);
+
+    args->preImageDoc = oldDoc.value().getOwned();
 
     // Remove indexes for old record.
     int64_t keysDeleted;
