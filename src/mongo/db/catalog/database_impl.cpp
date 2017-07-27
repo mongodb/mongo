@@ -220,8 +220,17 @@ Collection* DatabaseImpl::_getOrCreateCollectionInstance(OperationContext* opCtx
 
     // Not registering AddCollectionChange since this is for collections that already exist.
     Collection* coll = new Collection(opCtx, nss.ns(), uuid, cce.release(), rs.release(), _dbEntry);
-    if (uuid)
-        UUIDCatalog::get(opCtx).registerUUIDCatalogEntry(uuid.get(), coll);
+    if (uuid) {
+        // We are not in a WUOW only when we are called from Database::init(). There is no need
+        // to rollback UUIDCatalog changes because we are initializing existing collections.
+        auto&& uuidCatalog = UUIDCatalog::get(opCtx);
+        if (!opCtx->lockState()->inAWriteUnitOfWork()) {
+            uuidCatalog.registerUUIDCatalogEntry(uuid.get(), coll);
+        } else {
+            uuidCatalog.onCreateCollection(opCtx, coll, uuid.get());
+        }
+    }
+
     return coll;
 }
 
