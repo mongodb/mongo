@@ -143,6 +143,8 @@ public:
 
     CollectionShardingState* getNS(const std::string& ns, OperationContext* opCtx);
 
+    ChunkSplitter* getChunkSplitter();
+
     /**
      * Should be invoked when the shard server primary enters the 'PRIMARY' state.
      * Sets up the ChunkSplitter to begin accepting split requests.

@@ -67,13 +67,24 @@ public:
     /**
      * Schedules an autosplit task. This function throws on scheduling failure.
      */
-    void trySplitting(const NamespaceString& nss, const BSONObj& min, const BSONObj& max);
+    void trySplitting(const NamespaceString& nss,
+                      const BSONObj& min,
+                      const BSONObj& max,
+                      long dataWritten);
 
 private:
     /**
-     * Determines if the specified chunk should be split and then performs any necessary split.
+     * Determines if the specified chunk should be split and then performs any necessary splits.
+     *
+     * It may also perform a 'top chunk' optimization where a resulting chunk that contains either
+     * MaxKey or MinKey as a range extreme will be moved off to another shard to relieve load on the
+     * original owner. This optimization presumes that the user is doing writes with increasing or
+     * decreasing shard key values.
      */
-    void _runAutosplit(const NamespaceString& nss, const BSONObj& min, const BSONObj& max);
+    void _runAutosplit(const NamespaceString& nss,
+                       const BSONObj& min,
+                       const BSONObj& max,
+                       long dataWritten);
 
     // Protects the state below.
     stdx::mutex _mutex;

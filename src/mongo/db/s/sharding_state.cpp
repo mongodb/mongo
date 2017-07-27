@@ -205,6 +205,10 @@ CollectionShardingState* ShardingState::getNS(const std::string& ns, OperationCo
     return it->second.get();
 }
 
+ChunkSplitter* ShardingState::getChunkSplitter() {
+    return _chunkSplitter.get();
+}
+
 void ShardingState::initiateChunkSplitter() {
     _chunkSplitter->initiateChunkSplitter();
 }
@@ -356,7 +360,6 @@ Status ShardingState::initializeFromShardIdentity(OperationContext* opCtx,
         }
         _shardName = shardIdentity.getShardName();
         _clusterId = shardIdentity.getClusterId();
-
 
         return status;
     } catch (const DBException& ex) {
