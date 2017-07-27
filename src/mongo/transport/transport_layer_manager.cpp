@@ -70,32 +70,13 @@ void TransportLayerManager::asyncWait(Ticket&& ticket, TicketCallback callback) 
 }
 
 template <typename Callable>
-void TransportLayerManager::_foreach(Callable&& cb) {
+void TransportLayerManager::_foreach(Callable&& cb) const {
     {
         stdx::lock_guard<stdx::mutex> lk(_tlsMutex);
         for (auto&& tl : _tls) {
             cb(tl.get());
         }
     }
-}
-
-TransportLayer::Stats TransportLayerManager::sessionStats() {
-    Stats stats;
-
-    _foreach([&](TransportLayer* tl) {
-        Stats s = tl->sessionStats();
-
-        stats.numOpenSessions += s.numOpenSessions;
-        stats.numCreatedSessions += s.numCreatedSessions;
-        if (std::numeric_limits<size_t>::max() - stats.numAvailableSessions <
-            s.numAvailableSessions) {
-            stats.numAvailableSessions = std::numeric_limits<size_t>::max();
-        } else {
-            stats.numAvailableSessions += s.numAvailableSessions;
-        }
-    });
-
-    return stats;
 }
 
 void TransportLayerManager::end(const SessionHandle& session) {

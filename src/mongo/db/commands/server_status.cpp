@@ -48,7 +48,7 @@
 #include "mongo/db/stats/counters.h"
 #include "mongo/platform/process_id.h"
 #include "mongo/transport/message_compressor_registry.h"
-#include "mongo/transport/transport_layer.h"
+#include "mongo/transport/service_entry_point.h"
 #include "mongo/util/log.h"
 #include "mongo/util/net/hostname_canonicalization.h"
 #include "mongo/util/net/sock.h"
@@ -233,10 +233,11 @@ public:
 
     BSONObj generateSection(OperationContext* opCtx, const BSONElement& configElement) const {
         BSONObjBuilder bb;
-        if (!opCtx->getServiceContext()->getTransportLayer()) {
-            return bb.obj();
-        }
-        auto stats = opCtx->getServiceContext()->getTransportLayer()->sessionStats();
+
+        auto serviceEntryPoint = opCtx->getServiceContext()->getServiceEntryPoint();
+        invariant(serviceEntryPoint);
+
+        auto stats = serviceEntryPoint->sessionStats();
         bb.append("current", static_cast<int>(stats.numOpenSessions));
         bb.append("available", static_cast<int>(stats.numAvailableSessions));
         bb.append("totalCreated", static_cast<int>(stats.numCreatedSessions));

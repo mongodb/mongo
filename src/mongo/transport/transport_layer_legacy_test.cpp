@@ -61,6 +61,14 @@ public:
         _sessions.clear();
     }
 
+    Stats sessionStats() const override {
+        return {};
+    }
+
+    size_t numOpenSessions() const override {
+        return 0ULL;
+    }
+
     transport::TransportLayerLegacy* tll = nullptr;
 
     std::list<transport::SessionHandle> _sessions;

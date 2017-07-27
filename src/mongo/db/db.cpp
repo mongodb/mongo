@@ -1073,7 +1073,7 @@ void shutdownTask() {
     }
 
 #if __has_feature(address_sanitizer)
-    auto sep = checked_cast<ServiceEntryPointImpl*>(serviceContext->getServiceEntryPoint());
+    auto sep = serviceContext->getServiceEntryPoint();
     auto tl = serviceContext->getTransportLayer();
     if (sep && tl) {
         // When running under address sanitizer, we get false positive leaks due to disorder around
@@ -1097,7 +1097,7 @@ void shutdownTask() {
             // There isn't currently a way to wait on the TicketHolder to have all its tickets back,
             // unfortunately. So, busy wait in this detached thread.
             while (true) {
-                const auto runningWorkers = sep->getNumberOfConnections();
+                const auto runningWorkers = sep->numOpenSessions();
 
                 if (runningWorkers == 0) {
                     log(LogComponent::kNetwork) << "shutdown: no running workers found...";

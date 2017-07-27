@@ -69,8 +69,6 @@ public:
     Status wait(Ticket&& ticket) override;
     void asyncWait(Ticket&& ticket, TicketCallback callback) override;
 
-    Stats sessionStats() override;
-
     void end(const SessionHandle& session) override;
 
     Status start() override;
@@ -95,9 +93,9 @@ public:
 
 private:
     template <typename Callable>
-    void _foreach(Callable&& cb);
+    void _foreach(Callable&& cb) const;
 
-    stdx::mutex _tlsMutex;
+    mutable stdx::mutex _tlsMutex;
     std::vector<std::unique_ptr<TransportLayer>> _tls;
 };
 

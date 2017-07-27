@@ -153,15 +153,6 @@ Ticket TransportLayerLegacy::sourceMessage(const SessionHandle& session,
         stdx::make_unique<LegacyTicket>(std::move(legacySession), expiration, std::move(sourceCb)));
 }
 
-TransportLayer::Stats TransportLayerLegacy::sessionStats() {
-    Stats stats;
-    stats.numOpenSessions = _currentConnections.load();
-    stats.numAvailableSessions = Listener::globalTicketHolder.available();
-    stats.numCreatedSessions = Listener::globalConnectionNumber.load();
-
-    return stats;
-}
-
 Ticket TransportLayerLegacy::sinkMessage(const SessionHandle& session,
                                          const Message& message,
                                          Date_t expiration) {
@@ -207,7 +198,6 @@ void TransportLayerLegacy::_closeConnection(Connection* conn) {
 
     conn->closed = true;
     conn->amp->shutdown();
-    Listener::globalTicketHolder.release();
 }
 
 void TransportLayerLegacy::shutdown() {
@@ -220,8 +210,6 @@ void TransportLayerLegacy::_destroy(LegacySession& session) {
     if (!session.conn()->closed) {
         _closeConnection(session.conn());
     }
-
-    _currentConnections.subtractAndFetch(1);
 }
 
 Status TransportLayerLegacy::_runTicket(Ticket ticket) {
@@ -268,16 +256,8 @@ Status TransportLayerLegacy::_runTicket(Ticket ticket) {
 }
 
 void TransportLayerLegacy::_handleNewConnection(std::unique_ptr<AbstractMessagingPort> amp) {
-    if (!Listener::globalTicketHolder.tryAcquire()) {
-        log() << "connection refused because too many open connections: "
-              << Listener::globalTicketHolder.used();
-        amp->shutdown();
-        return;
-    }
-
     amp->setLogLevel(logger::LogSeverity::Debug(1));
 
-    _currentConnections.addAndFetch(1);
     auto session = LegacySession::create(std::move(amp), this);
     invariant(_sep);
     _sep->startSession(std::move(session));

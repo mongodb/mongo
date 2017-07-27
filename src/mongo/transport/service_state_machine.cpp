@@ -463,24 +463,11 @@ ServiceStateMachine::State ServiceStateMachine::state() {
 void ServiceStateMachine::_cleanupSession(ThreadGuard& guard) {
     _state.store(State::Ended);
 
-    auto tl = _session()->getTransportLayer();
-    auto remote = _session()->remote();
-
     _inMessage.reset();
 
     // By ignoring the return value of Client::releaseCurrent() we destroy the session.
     // _dbClient is now nullptr and _dbClientPtr is invalid and should never be accessed.
     Client::releaseCurrent();
-
-    if (!serverGlobalParams.quiet.load()) {
-        // Get the number of open sessions minus 1 (this one will get cleaned up when
-        // this SSM gets destroyed)
-        // TODO Swich to using ServiceEntryPointImpl::getNumberOfConnections(), or move this
-        // into the ServiceEntryPoint
-        auto conns = tl->sessionStats().numOpenSessions - 1;
-        const char* word = (conns == 1 ? " connection" : " connections");
-        log() << "end connection " << remote << " (" << conns << word << " now open)";
-    }
 }
 
 }  // namespace mongo

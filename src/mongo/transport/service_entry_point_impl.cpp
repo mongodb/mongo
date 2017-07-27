@@ -42,7 +42,37 @@
 #include "mongo/util/processinfo.h"
 #include "mongo/util/scopeguard.h"
 
+#if !defined(_WIN32)
+#include <sys/resource.h>
+#endif
+
 namespace mongo {
+ServiceEntryPointImpl::ServiceEntryPointImpl(ServiceContext* svcCtx) : _svcCtx(svcCtx) {
+
+    const auto supportedMax = [] {
+#ifdef _WIN32
+        return serverGlobalParams.maxConns;
+#else
+        struct rlimit limit;
+        verify(getrlimit(RLIMIT_NOFILE, &limit) == 0);
+
+        size_t max = (size_t)(limit.rlim_cur * .8);
+
+        LOG(1) << "fd limit"
+               << " hard:" << limit.rlim_max << " soft:" << limit.rlim_cur << " max conn: " << max;
+
+        return std::min(max, serverGlobalParams.maxConns);
+#endif
+    }();
+
+    // If we asked for more connections than supported, inform the user.
+    if (supportedMax < serverGlobalParams.maxConns &&
+        serverGlobalParams.maxConns != DEFAULT_MAX_CONN) {
+        log() << " --maxConns too high, can only handle " << supportedMax;
+    }
+
+    _maxNumConnections = supportedMax;
+}
 
 void ServiceEntryPointImpl::startSession(transport::SessionHandle session) {
     // Setup the restriction environment on the Session, if the Session has local/remote Sockaddrs
@@ -56,15 +86,47 @@ void ServiceEntryPointImpl::startSession(transport::SessionHandle session) {
     SSMListIterator ssmIt;
 
     const auto sync = (_svcCtx->getServiceExecutor() == nullptr);
-    auto ssm = ServiceStateMachine::create(_svcCtx, std::move(session), sync);
+    const bool quiet = serverGlobalParams.quiet.load();
+    size_t connectionCount;
+
+    auto ssm = ServiceStateMachine::create(_svcCtx, session, sync);
     {
         stdx::lock_guard<decltype(_sessionsMutex)> lk(_sessionsMutex);
-        ssmIt = _sessions.emplace(_sessions.begin(), ssm);
+        connectionCount = _sessions.size() + 1;
+        if (connectionCount <= _maxNumConnections) {
+            ssmIt = _sessions.emplace(_sessions.begin(), ssm);
+            _currentConnections.store(connectionCount);
+            _createdConnections.addAndFetch(1);
+        }
     }
 
-    ssm->setCleanupHook([this, ssmIt] {
-        stdx::lock_guard<decltype(_sessionsMutex)> lk(_sessionsMutex);
-        _sessions.erase(ssmIt);
+    // Checking if we successfully added a connection above. Separated from the lock so we don't log
+    // while holding it.
+    if (connectionCount > _maxNumConnections) {
+        if (!quiet) {
+            log() << "connection refused because too many open connections: " << connectionCount;
+        }
+        return;
+    }
+
+    if (!quiet) {
+        const auto word = (connectionCount == 1 ? " connection"_sd : " connections"_sd);
+        log() << "connection accepted from " << session->remote() << " #" << session->id() << " ("
+              << connectionCount << word << " now open)";
+    }
+
+    ssm->setCleanupHook([ this, ssmIt, session = std::move(session) ] {
+        size_t connectionCount;
+        auto remote = session->remote();
+        {
+            stdx::lock_guard<decltype(_sessionsMutex)> lk(_sessionsMutex);
+            _sessions.erase(ssmIt);
+            connectionCount = _sessions.size();
+            _currentConnections.store(connectionCount);
+        }
+        const auto word = (connectionCount == 1 ? " connection"_sd : " connections"_sd);
+        log() << "end connection " << remote << " (" << connectionCount << word << " now open)";
+
     });
 
     if (!sync) {
@@ -122,9 +184,15 @@ void ServiceEntryPointImpl::endAllSessions(transport::Session::TagMask tags) {
     }
 }
 
-std::size_t ServiceEntryPointImpl::getNumberOfConnections() const {
-    stdx::unique_lock<decltype(_sessionsMutex)> lk(_sessionsMutex);
-    return _sessions.size();
+ServiceEntryPoint::Stats ServiceEntryPointImpl::sessionStats() const {
+
+    size_t sessionCount = _currentConnections.load();
+
+    ServiceEntryPoint::Stats ret;
+    ret.numOpenSessions = sessionCount;
+    ret.numCreatedSessions = _createdConnections.load();
+    ret.numAvailableSessions = _maxNumConnections - sessionCount;
+    return ret;
 }
 
 }  // namespace mongo

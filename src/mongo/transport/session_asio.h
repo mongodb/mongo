@@ -75,10 +75,6 @@ public:
         }
     }
 
-    virtual ~ASIOSession() {
-        _tl->_currentConnections.subtractAndFetch(1);
-    }
-
     TransportLayer* getTransportLayer() const override {
         return _tl;
     }

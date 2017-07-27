@@ -110,7 +110,6 @@ public:
         Status wait(transport::Ticket&& ticket) override;
         void asyncWait(transport::Ticket&& ticket, TicketCallback callback) override;
 
-        Stats sessionStats() override;
         void end(const transport::SessionHandle& session) override;
         Status setup() override;
         Status start() override;

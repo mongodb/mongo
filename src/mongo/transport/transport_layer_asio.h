@@ -102,8 +102,6 @@ public:
 
     void asyncWait(Ticket&& ticket, TicketCallback callback) final;
 
-    Stats sessionStats() final;
-
     void end(const SessionHandle& session) final;
 
     Status setup() final;
@@ -166,9 +164,6 @@ private:
     ServiceEntryPoint* const _sep = nullptr;
     AtomicWord<bool> _running{false};
     Options _listenerOptions;
-
-    AtomicWord<size_t> _createdConnections{0};
-    AtomicWord<size_t> _currentConnections{0};
 };
 
 }  // namespace transport

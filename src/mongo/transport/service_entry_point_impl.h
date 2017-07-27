@@ -54,13 +54,17 @@ class ServiceEntryPointImpl : public ServiceEntryPoint {
     MONGO_DISALLOW_COPYING(ServiceEntryPointImpl);
 
 public:
-    explicit ServiceEntryPointImpl(ServiceContext* svcCtx) : _svcCtx(svcCtx) {}
+    explicit ServiceEntryPointImpl(ServiceContext* svcCtx);
 
     void startSession(transport::SessionHandle session) final;
 
     void endAllSessions(transport::Session::TagMask tags) final;
 
-    std::size_t getNumberOfConnections() const;
+    Stats sessionStats() const final;
+
+    size_t numOpenSessions() const final {
+        return _currentConnections.load();
+    }
 
 private:
     using SSMList = stdx::list<std::shared_ptr<ServiceStateMachine>>;
@@ -71,6 +75,10 @@ private:
 
     mutable stdx::mutex _sessionsMutex;
     SSMList _sessions;
+
+    size_t _maxNumConnections{DEFAULT_MAX_CONN};
+    AtomicWord<size_t> _currentConnections{0};
+    AtomicWord<size_t> _createdConnections{0};
 };
 
 }  // namespace mongo

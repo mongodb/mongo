@@ -67,6 +67,10 @@ public:
 
     void endAllSessions(transport::Session::TagMask tags) override;
 
+    Stats sessionStats() const override;
+
+    size_t numOpenSessions() const override;
+
     DbResponse handleRequest(OperationContext* opCtx, const Message& request) override;
 
 private:

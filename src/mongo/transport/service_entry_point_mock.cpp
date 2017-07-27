@@ -110,4 +110,12 @@ void ServiceEntryPointMock::endAllSessions(transport::Session::TagMask) {
     }
 }
 
+ServiceEntryPoint::Stats ServiceEntryPointMock::sessionStats() const {
+    return {};
+}
+
+size_t ServiceEntryPointMock::numOpenSessions() const {
+    return 0ULL;
+}
+
 }  // namespace mongo
