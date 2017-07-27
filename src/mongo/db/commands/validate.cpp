@@ -40,6 +40,7 @@
 #include "mongo/db/storage/record_store.h"
 #include "mongo/util/fail_point_service.h"
 #include "mongo/util/log.h"
+#include "mongo/util/scopeguard.h"
 
 namespace mongo {
 
@@ -48,6 +49,18 @@ using std::string;
 using std::stringstream;
 
 MONGO_FP_DECLARE(validateCmdCollectionNotValid);
+
+namespace {
+
+// Protects `_validationQueue`
+stdx::mutex _validationMutex;
+
+// Wakes up `_validationQueue`
+stdx::condition_variable _validationNotifier;
+
+// Holds the set of full `database.collections` namespace strings in progress.
+std::set<std::string> _validationsInProgress;
+}  // namespace
 
 class ValidateCmd : public ErrmsgCommandDeprecated {
 public:
@@ -149,6 +162,27 @@ public:
         background = false;
 
         result.append("ns", nss.ns());
+
+        // Only one validation per collection can be in progress, the rest wait in order.
+        {
+            stdx::unique_lock<stdx::mutex> lock(_validationMutex);
+            try {
+                while (_validationsInProgress.find(nss.ns()) != _validationsInProgress.end()) {
+                    opCtx->waitForConditionOrInterrupt(_validationNotifier, lock);
+                }
+            } catch (UserException& e) {
+                errmsg = str::stream() << "Exception during validation: " << e.toString();
+                return false;
+            }
+
+            _validationsInProgress.insert(nss.ns());
+        }
+
+        ON_BLOCK_EXIT([&] {
+            stdx::lock_guard<stdx::mutex> lock(_validationMutex);
+            _validationsInProgress.erase(nss.ns());
+            _validationNotifier.notify_all();
+        });
 
         ValidateResults results;
         Status status = collection->validate(opCtx, level, &results, &result);
