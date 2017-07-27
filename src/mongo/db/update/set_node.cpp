@@ -42,14 +42,14 @@ Status SetNode::init(BSONElement modExpr, const CollatorInterface* collator) {
     return Status::OK();
 }
 
-void SetNode::updateExistingElement(mutablebson::Element* element, bool* noop) const {
+bool SetNode::updateExistingElement(mutablebson::Element* element) const {
     // If 'element' is deserialized, then element.getValue() will be EOO, which will never equal
     // _val.
     if (element->getValue().binaryEqualValues(_val)) {
-        *noop = true;
+        return false;
     } else {
-        *noop = false;
         invariantOK(element->setValueBSONElement(_val));
+        return true;
     }
 }
 

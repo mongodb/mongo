@@ -47,7 +47,7 @@ public:
     void setCollator(const CollatorInterface* collator) final {}
 
 protected:
-    void updateExistingElement(mutablebson::Element* element, bool* noop) const final;
+    bool updateExistingElement(mutablebson::Element* element) const final;
     void setValueForNewElement(mutablebson::Element* element) const final;
 
 private:

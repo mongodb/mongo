@@ -69,34 +69,19 @@ ObjectReplaceNode::ObjectReplaceNode(BSONObj val)
     }
 }
 
-void ObjectReplaceNode::apply(mutablebson::Element element,
-                              FieldRef* pathToCreate,
-                              FieldRef* pathTaken,
-                              StringData matchedField,
-                              bool fromReplication,
-                              bool validateForStorage,
-                              const FieldRefSet& immutablePaths,
-                              const UpdateIndexData* indexData,
-                              LogBuilder* logBuilder,
-                              bool* indexesAffected,
-                              bool* noop) const {
-    invariant(pathToCreate->empty());
-    invariant(pathTaken->empty());
+UpdateNode::ApplyResult ObjectReplaceNode::apply(ApplyParams applyParams) const {
+    invariant(applyParams.pathToCreate->empty());
+    invariant(applyParams.pathTaken->empty());
 
-    auto original = element.getDocument().getObject();
+    auto original = applyParams.element.getDocument().getObject();
 
     // Check for noop.
     if (original.binaryEqual(_val)) {
-        *indexesAffected = false;
-        *noop = true;
-        return;
+        return ApplyResult::noopResult();
     }
 
-    *indexesAffected = true;
-    *noop = false;
-
     // Remove the contents of the provided document.
-    auto current = element.leftChild();
+    auto current = applyParams.element.leftChild();
     while (current.ok()) {
 
         // Keep the _id if the replacement document does not have one.
@@ -112,19 +97,20 @@ void ObjectReplaceNode::apply(mutablebson::Element element,
 
     // Insert the provided contents instead.
     for (auto&& elem : _val) {
-        invariantOK(element.appendElement(elem));
+        invariantOK(applyParams.element.appendElement(elem));
     }
 
     // Validate for storage.
-    if (validateForStorage) {
-        storage_validation::storageValid(element.getDocument());
+    if (applyParams.validateForStorage) {
+        storage_validation::storageValid(applyParams.element.getDocument());
     }
 
     // Check immutable paths.
-    for (auto path = immutablePaths.begin(); path != immutablePaths.end(); ++path) {
+    for (auto path = applyParams.immutablePaths.begin(); path != applyParams.immutablePaths.end();
+         ++path) {
 
         // Find the updated field in the updated document.
-        auto newElem = element;
+        auto newElem = applyParams.element;
         for (size_t i = 0; i < (*path)->numParts(); ++i) {
             newElem = newElem[(*path)->getPart(i)];
             if (!newElem.ok()) {
@@ -156,13 +142,16 @@ void ObjectReplaceNode::apply(mutablebson::Element element,
         }
     }
 
-    if (logBuilder) {
-        auto replacementObject = logBuilder->getDocument().end();
-        invariantOK(logBuilder->getReplacementObject(&replacementObject));
-        for (auto current = element.leftChild(); current.ok(); current = current.rightSibling()) {
+    if (applyParams.logBuilder) {
+        auto replacementObject = applyParams.logBuilder->getDocument().end();
+        invariantOK(applyParams.logBuilder->getReplacementObject(&replacementObject));
+        for (auto current = applyParams.element.leftChild(); current.ok();
+             current = current.rightSibling()) {
             invariantOK(replacementObject.appendElement(current.getValue()));
         }
     }
+
+    return ApplyResult();
 }
 
 }  // namespace mongo

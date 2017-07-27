@@ -33,12 +33,14 @@
 #include "mongo/bson/mutable/algorithm.h"
 #include "mongo/bson/mutable/mutable_bson_test_utils.h"
 #include "mongo/db/json.h"
+#include "mongo/db/update/update_node_test_fixture.h"
 #include "mongo/unittest/death_test.h"
 #include "mongo/unittest/unittest.h"
 
+namespace mongo {
 namespace {
 
-using namespace mongo;
+using BitNodeTest = UpdateNodeTest;
 using mongo::mutablebson::Document;
 using mongo::mutablebson::Element;
 using mongo::mutablebson::countChildren;
@@ -148,252 +150,112 @@ TEST(BitNodeTest, ParsesXorLong) {
     ASSERT_OK(node.init(update["$bit"]["a"], collator));
 }
 
-TEST(BitNodeTest, ApplyAndLogEmptyDocumentAnd) {
+TEST_F(BitNodeTest, ApplyAndLogEmptyDocumentAnd) {
     auto update = fromjson("{$bit: {a: {and: 1}}}");
     const CollatorInterface* collator = nullptr;
     BitNode node;
     ASSERT_OK(node.init(update["$bit"]["a"], collator));
 
     Document doc(fromjson("{}"));
-    FieldRef pathToCreate("a");
-    FieldRef pathTaken("");
-    StringData matchedField;
-    auto fromReplication = false;
-    auto validateForStorage = true;
-    FieldRefSet immutablePaths;
-    const UpdateIndexData* indexData = nullptr;
-    Document logDoc;
-    LogBuilder logBuilder(logDoc.root());
-    auto indexesAffected = false;
-    auto noop = false;
-    node.apply(doc.root(),
-               &pathToCreate,
-               &pathTaken,
-               matchedField,
-               fromReplication,
-               validateForStorage,
-               immutablePaths,
-               indexData,
-               &logBuilder,
-               &indexesAffected,
-               &noop);
-    ASSERT_FALSE(noop);
+    setPathToCreate("a");
+    auto result = node.apply(getApplyParams(doc.root()));
+    ASSERT_FALSE(result.noop);
     ASSERT_EQUALS(fromjson("{a: 0}"), doc);
     ASSERT_FALSE(doc.isInPlaceModeEnabled());
-    ASSERT_EQUALS(fromjson("{$set: {a: 0}}"), logDoc);
+    ASSERT_EQUALS(fromjson("{$set: {a: 0}}"), getLogDoc());
 }
 
-TEST(BitNodeTest, ApplyAndLogEmptyDocumentOr) {
+TEST_F(BitNodeTest, ApplyAndLogEmptyDocumentOr) {
     auto update = fromjson("{$bit: {a: {or: 1}}}");
     const CollatorInterface* collator = nullptr;
     BitNode node;
     ASSERT_OK(node.init(update["$bit"]["a"], collator));
 
     Document doc(fromjson("{}"));
-    FieldRef pathToCreate("a");
-    FieldRef pathTaken("");
-    StringData matchedField;
-    auto fromReplication = false;
-    auto validateForStorage = true;
-    FieldRefSet immutablePaths;
-    const UpdateIndexData* indexData = nullptr;
-    Document logDoc;
-    LogBuilder logBuilder(logDoc.root());
-    auto indexesAffected = false;
-    auto noop = false;
-    node.apply(doc.root(),
-               &pathToCreate,
-               &pathTaken,
-               matchedField,
-               fromReplication,
-               validateForStorage,
-               immutablePaths,
-               indexData,
-               &logBuilder,
-               &indexesAffected,
-               &noop);
-    ASSERT_FALSE(noop);
+    setPathToCreate("a");
+    auto result = node.apply(getApplyParams(doc.root()));
+    ASSERT_FALSE(result.noop);
     ASSERT_EQUALS(fromjson("{a: 1}"), doc);
     ASSERT_FALSE(doc.isInPlaceModeEnabled());
-    ASSERT_EQUALS(fromjson("{$set: {a: 1}}"), logDoc);
+    ASSERT_EQUALS(fromjson("{$set: {a: 1}}"), getLogDoc());
 }
 
-TEST(BitNodeTest, ApplyAndLogEmptyDocumentXor) {
+TEST_F(BitNodeTest, ApplyAndLogEmptyDocumentXor) {
     auto update = fromjson("{$bit: {a: {xor: 1}}}");
     const CollatorInterface* collator = nullptr;
     BitNode node;
     ASSERT_OK(node.init(update["$bit"]["a"], collator));
 
     Document doc(fromjson("{}"));
-    FieldRef pathToCreate("a");
-    FieldRef pathTaken("");
-    StringData matchedField;
-    auto fromReplication = false;
-    auto validateForStorage = true;
-    FieldRefSet immutablePaths;
-    const UpdateIndexData* indexData = nullptr;
-    Document logDoc;
-    LogBuilder logBuilder(logDoc.root());
-    auto indexesAffected = false;
-    auto noop = false;
-    node.apply(doc.root(),
-               &pathToCreate,
-               &pathTaken,
-               matchedField,
-               fromReplication,
-               validateForStorage,
-               immutablePaths,
-               indexData,
-               &logBuilder,
-               &indexesAffected,
-               &noop);
-    ASSERT_FALSE(noop);
+    setPathToCreate("a");
+    auto result = node.apply(getApplyParams(doc.root()));
+    ASSERT_FALSE(result.noop);
     ASSERT_EQUALS(fromjson("{a: 1}"), doc);
     ASSERT_FALSE(doc.isInPlaceModeEnabled());
-    ASSERT_EQUALS(fromjson("{$set: {a: 1}}"), logDoc);
+    ASSERT_EQUALS(fromjson("{$set: {a: 1}}"), getLogDoc());
 }
 
-TEST(BitNodeTest, ApplyAndLogSimpleDocumentAnd) {
+TEST_F(BitNodeTest, ApplyAndLogSimpleDocumentAnd) {
     auto update = BSON("$bit" << BSON("a" << BSON("and" << 0b0110)));
     const CollatorInterface* collator = nullptr;
     BitNode node;
     ASSERT_OK(node.init(update["$bit"]["a"], collator));
 
     Document doc(BSON("a" << 0b0101));
-    FieldRef pathToCreate("");
-    FieldRef pathTaken("a");
-    StringData matchedField;
-    auto fromReplication = false;
-    auto validateForStorage = true;
-    FieldRefSet immutablePaths;
-    const UpdateIndexData* indexData = nullptr;
-    Document logDoc;
-    LogBuilder logBuilder(logDoc.root());
-    auto indexesAffected = false;
-    auto noop = false;
-    node.apply(doc.root()["a"],
-               &pathToCreate,
-               &pathTaken,
-               matchedField,
-               fromReplication,
-               validateForStorage,
-               immutablePaths,
-               indexData,
-               &logBuilder,
-               &indexesAffected,
-               &noop);
-    ASSERT_FALSE(noop);
+    setPathTaken("a");
+    auto result = node.apply(getApplyParams(doc.root()["a"]));
+    ASSERT_FALSE(result.noop);
     ASSERT_EQUALS(BSON("a" << 0b0100), doc);
     ASSERT_TRUE(doc.isInPlaceModeEnabled());
-    ASSERT_EQUALS(BSON("$set" << BSON("a" << 0b0100)), logDoc);
+    ASSERT_EQUALS(BSON("$set" << BSON("a" << 0b0100)), getLogDoc());
 }
 
-TEST(BitNodeTest, ApplyAndLogSimpleDocumentOr) {
+TEST_F(BitNodeTest, ApplyAndLogSimpleDocumentOr) {
     auto update = BSON("$bit" << BSON("a" << BSON("or" << 0b0110)));
     const CollatorInterface* collator = nullptr;
     BitNode node;
     ASSERT_OK(node.init(update["$bit"]["a"], collator));
 
     Document doc(BSON("a" << 0b0101));
-    FieldRef pathToCreate("");
-    FieldRef pathTaken("a");
-    StringData matchedField;
-    auto fromReplication = false;
-    auto validateForStorage = true;
-    FieldRefSet immutablePaths;
-    const UpdateIndexData* indexData = nullptr;
-    Document logDoc;
-    LogBuilder logBuilder(logDoc.root());
-    auto indexesAffected = false;
-    auto noop = false;
-    node.apply(doc.root()["a"],
-               &pathToCreate,
-               &pathTaken,
-               matchedField,
-               fromReplication,
-               validateForStorage,
-               immutablePaths,
-               indexData,
-               &logBuilder,
-               &indexesAffected,
-               &noop);
-    ASSERT_FALSE(noop);
+    setPathTaken("a");
+    auto result = node.apply(getApplyParams(doc.root()["a"]));
+    ASSERT_FALSE(result.noop);
     ASSERT_EQUALS(BSON("a" << 0b0111), doc);
     ASSERT_TRUE(doc.isInPlaceModeEnabled());
-    ASSERT_EQUALS(BSON("$set" << BSON("a" << 0b0111)), logDoc);
+    ASSERT_EQUALS(BSON("$set" << BSON("a" << 0b0111)), getLogDoc());
 }
 
-TEST(BitNodeTest, ApplyAndLogSimpleDocumentXor) {
+TEST_F(BitNodeTest, ApplyAndLogSimpleDocumentXor) {
     auto update = BSON("$bit" << BSON("a" << BSON("xor" << 0b0110)));
     const CollatorInterface* collator = nullptr;
     BitNode node;
     ASSERT_OK(node.init(update["$bit"]["a"], collator));
 
     Document doc(BSON("a" << 0b0101));
-    FieldRef pathToCreate("");
-    FieldRef pathTaken("a");
-    StringData matchedField;
-    auto fromReplication = false;
-    auto validateForStorage = true;
-    FieldRefSet immutablePaths;
-    const UpdateIndexData* indexData = nullptr;
-    Document logDoc;
-    LogBuilder logBuilder(logDoc.root());
-    auto indexesAffected = false;
-    auto noop = false;
-    node.apply(doc.root()["a"],
-               &pathToCreate,
-               &pathTaken,
-               matchedField,
-               fromReplication,
-               validateForStorage,
-               immutablePaths,
-               indexData,
-               &logBuilder,
-               &indexesAffected,
-               &noop);
-    ASSERT_FALSE(noop);
+    setPathTaken("a");
+    auto result = node.apply(getApplyParams(doc.root()["a"]));
+    ASSERT_FALSE(result.noop);
     ASSERT_EQUALS(BSON("a" << 0b0011), doc);
     ASSERT_TRUE(doc.isInPlaceModeEnabled());
-    ASSERT_EQUALS(BSON("$set" << BSON("a" << 0b0011)), logDoc);
+    ASSERT_EQUALS(BSON("$set" << BSON("a" << 0b0011)), getLogDoc());
 }
 
-TEST(BitNodeTest, ApplyShouldReportNoOp) {
+TEST_F(BitNodeTest, ApplyShouldReportNoOp) {
     auto update = BSON("$bit" << BSON("a" << BSON("and" << static_cast<int>(1))));
     const CollatorInterface* collator = nullptr;
     BitNode node;
     ASSERT_OK(node.init(update["$bit"]["a"], collator));
 
     Document doc(BSON("a" << 1));
-    FieldRef pathToCreate("");
-    FieldRef pathTaken("a");
-    StringData matchedField;
-    auto fromReplication = false;
-    auto validateForStorage = true;
-    FieldRefSet immutablePaths;
-    const UpdateIndexData* indexData = nullptr;
-    Document logDoc;
-    LogBuilder logBuilder(logDoc.root());
-    auto indexesAffected = false;
-    auto noop = false;
-    node.apply(doc.root()["a"],
-               &pathToCreate,
-               &pathTaken,
-               matchedField,
-               fromReplication,
-               validateForStorage,
-               immutablePaths,
-               indexData,
-               &logBuilder,
-               &indexesAffected,
-               &noop);
-    ASSERT_TRUE(noop);
+    setPathTaken("a");
+    auto result = node.apply(getApplyParams(doc.root()["a"]));
+    ASSERT_TRUE(result.noop);
     ASSERT_EQUALS(BSON("a" << static_cast<int>(1)), doc);
     ASSERT_TRUE(doc.isInPlaceModeEnabled());
-    ASSERT_EQUALS(fromjson("{}"), logDoc);
+    ASSERT_EQUALS(fromjson("{}"), getLogDoc());
 }
 
-TEST(BitNodeTest, ApplyMultipleBitOps) {
+TEST_F(BitNodeTest, ApplyMultipleBitOps) {
     // End-of-line comments help clang-format break up this line more readably.
     auto update = BSON("$bit" << BSON("a" << BSON("and" << 0b1111000011110000  //
                                                         <<                     //
@@ -405,67 +267,28 @@ TEST(BitNodeTest, ApplyMultipleBitOps) {
     ASSERT_OK(node.init(update["$bit"]["a"], collator));
 
     Document doc(BSON("a" << 0b1111111100000000));
-    FieldRef pathToCreate("");
-    FieldRef pathTaken("a");
-    StringData matchedField;
-    auto fromReplication = false;
-    auto validateForStorage = true;
-    FieldRefSet immutablePaths;
-    const UpdateIndexData* indexData = nullptr;
-    Document logDoc;
-    LogBuilder logBuilder(logDoc.root());
-    auto indexesAffected = false;
-    auto noop = false;
-    node.apply(doc.root()["a"],
-               &pathToCreate,
-               &pathTaken,
-               matchedField,
-               fromReplication,
-               validateForStorage,
-               immutablePaths,
-               indexData,
-               &logBuilder,
-               &indexesAffected,
-               &noop);
-    ASSERT_FALSE(noop);
+    setPathTaken("a");
+    auto result = node.apply(getApplyParams(doc.root()["a"]));
+    ASSERT_FALSE(result.noop);
     ASSERT_EQUALS(BSON("a" << 0b0101011001100110), doc);
     ASSERT_TRUE(doc.isInPlaceModeEnabled());
-    ASSERT_EQUALS(BSON("$set" << BSON("a" << 0b0101011001100110)), logDoc);
+    ASSERT_EQUALS(BSON("$set" << BSON("a" << 0b0101011001100110)), getLogDoc());
 }
 
-TEST(BitNodeTest, ApplyRepeatedBitOps) {
+TEST_F(BitNodeTest, ApplyRepeatedBitOps) {
     auto update = BSON("$bit" << BSON("a" << BSON("xor" << 0b11001100 << "xor" << 0b10101010)));
     const CollatorInterface* collator = nullptr;
     BitNode node;
     ASSERT_OK(node.init(update["$bit"]["a"], collator));
 
     Document doc(BSON("a" << 0b11110000));
-    FieldRef pathToCreate("");
-    FieldRef pathTaken("a");
-    StringData matchedField;
-    auto fromReplication = false;
-    auto validateForStorage = true;
-    FieldRefSet immutablePaths;
-    const UpdateIndexData* indexData = nullptr;
-    Document logDoc;
-    LogBuilder logBuilder(logDoc.root());
-    auto indexesAffected = false;
-    auto noop = false;
-    node.apply(doc.root()["a"],
-               &pathToCreate,
-               &pathTaken,
-               matchedField,
-               fromReplication,
-               validateForStorage,
-               immutablePaths,
-               indexData,
-               &logBuilder,
-               &indexesAffected,
-               &noop);
-    ASSERT_FALSE(noop);
+    setPathTaken("a");
+    auto result = node.apply(getApplyParams(doc.root()["a"]));
+    ASSERT_FALSE(result.noop);
     ASSERT_EQUALS(BSON("a" << 0b10010110), doc);
     ASSERT_TRUE(doc.isInPlaceModeEnabled());
-    ASSERT_EQUALS(BSON("$set" << BSON("a" << 0b10010110)), logDoc);
+    ASSERT_EQUALS(BSON("$set" << BSON("a" << 0b10010110)), getLogDoc());
 }
 
 }  // namespace
+}  // namepace mongo

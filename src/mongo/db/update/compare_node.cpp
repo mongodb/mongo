@@ -46,13 +46,13 @@ void CompareNode::setCollator(const CollatorInterface* collator) {
     _collator = collator;
 }
 
-void CompareNode::updateExistingElement(mutablebson::Element* element, bool* noop) const {
+bool CompareNode::updateExistingElement(mutablebson::Element* element) const {
     const auto compareVal = element->compareWithBSONElement(_val, _collator, false);
     if ((compareVal == 0) || ((_mode == CompareMode::kMax) ? (compareVal > 0) : (compareVal < 0))) {
-        *noop = true;
+        return false;
     } else {
-        *noop = false;
         invariantOK(element->setValueBSONElement(_val));
+        return true;
     }
 }
 

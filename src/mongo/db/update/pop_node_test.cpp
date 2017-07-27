@@ -32,6 +32,7 @@
 
 #include "mongo/bson/json.h"
 #include "mongo/bson/mutable/mutable_bson_test_utils.h"
+#include "mongo/db/update/update_node_test_fixture.h"
 #include "mongo/unittest/death_test.h"
 #include "mongo/unittest/unittest.h"
 
@@ -39,6 +40,7 @@ namespace mongo {
 namespace {
 
 namespace mmb = mongo::mutablebson;
+using PopNodeTest = UpdateNodeTest;
 
 TEST(PopNodeTest, InitSucceedsPositiveOne) {
     auto update = fromjson("{$pop: {a: 1}}");
@@ -98,254 +100,119 @@ TEST(PopNodeTest, InitFailsBool) {
     ASSERT_EQ(ErrorCodes::FailedToParse, popNode.init(update["$pop"]["a"], collator));
 }
 
-TEST(PopNodeTest, NoopWhenFirstPathComponentDoesNotExist) {
+TEST_F(PopNodeTest, NoopWhenFirstPathComponentDoesNotExist) {
     auto update = fromjson("{$pop: {'a.b': 1}}");
     const CollatorInterface* collator = nullptr;
     PopNode popNode;
     ASSERT_OK(popNode.init(update["$pop"]["a.b"], collator));
 
     mmb::Document doc(fromjson("{b: [1, 2, 3]}"));
-    FieldRef pathToCreate("a.b");
-    FieldRef pathTaken("");
-    StringData matchedField;
-    auto fromReplication = false;
-    auto validateForStorage = true;
-    FieldRefSet immutablePaths;
-    UpdateIndexData indexData;
-    indexData.addPath("a.b");
-    mmb::Document logDoc;
-    LogBuilder logBuilder(logDoc.root());
-    bool indexesAffected;
-    bool noop;
-    popNode.apply(doc.root(),
-                  &pathToCreate,
-                  &pathTaken,
-                  matchedField,
-                  fromReplication,
-                  validateForStorage,
-                  immutablePaths,
-                  &indexData,
-                  &logBuilder,
-                  &indexesAffected,
-                  &noop);
-    ASSERT_TRUE(noop);
-    ASSERT_FALSE(indexesAffected);
+    setPathToCreate("a.b");
+    addIndexedPath("a.b");
+    auto result = popNode.apply(getApplyParams(doc.root()));
+    ASSERT_TRUE(result.noop);
+    ASSERT_FALSE(result.indexesAffected);
     ASSERT_EQUALS(fromjson("{b: [1, 2, 3]}"), doc);
-    ASSERT_EQUALS(fromjson("{}"), logDoc);
+    ASSERT_EQUALS(fromjson("{}"), getLogDoc());
 }
 
-TEST(PopNodeTest, NoopWhenPathPartiallyExists) {
+TEST_F(PopNodeTest, NoopWhenPathPartiallyExists) {
     auto update = fromjson("{$pop: {'a.b.c': 1}}");
     const CollatorInterface* collator = nullptr;
     PopNode popNode;
     ASSERT_OK(popNode.init(update["$pop"]["a.b.c"], collator));
 
     mmb::Document doc(fromjson("{a: {}}"));
-    FieldRef pathToCreate("b.c");
-    FieldRef pathTaken("a");
-    StringData matchedField;
-    auto fromReplication = false;
-    auto validateForStorage = true;
-    FieldRefSet immutablePaths;
-    UpdateIndexData indexData;
-    indexData.addPath("a.b.c");
-    mmb::Document logDoc;
-    LogBuilder logBuilder(logDoc.root());
-    bool indexesAffected;
-    bool noop;
-    popNode.apply(doc.root()["a"],
-                  &pathToCreate,
-                  &pathTaken,
-                  matchedField,
-                  fromReplication,
-                  validateForStorage,
-                  immutablePaths,
-                  &indexData,
-                  &logBuilder,
-                  &indexesAffected,
-                  &noop);
-    ASSERT_TRUE(noop);
-    ASSERT_FALSE(indexesAffected);
+    setPathToCreate("b.c");
+    setPathTaken("a");
+    addIndexedPath("a.b.c");
+    auto result = popNode.apply(getApplyParams(doc.root()["a"]));
+    ASSERT_TRUE(result.noop);
+    ASSERT_FALSE(result.indexesAffected);
     ASSERT_EQUALS(fromjson("{a: {}}"), doc);
-    ASSERT_EQUALS(fromjson("{}"), logDoc);
+    ASSERT_EQUALS(fromjson("{}"), getLogDoc());
 }
 
-TEST(PopNodeTest, NoopWhenNumericalPathComponentExceedsArrayLength) {
+TEST_F(PopNodeTest, NoopWhenNumericalPathComponentExceedsArrayLength) {
     auto update = fromjson("{$pop: {'a.0': 1}}");
     const CollatorInterface* collator = nullptr;
     PopNode popNode;
     ASSERT_OK(popNode.init(update["$pop"]["a.0"], collator));
 
     mmb::Document doc(fromjson("{a: []}"));
-    FieldRef pathToCreate("0");
-    FieldRef pathTaken("a");
-    StringData matchedField;
-    auto fromReplication = false;
-    auto validateForStorage = true;
-    FieldRefSet immutablePaths;
-    UpdateIndexData indexData;
-    indexData.addPath("a.0");
-    mmb::Document logDoc;
-    LogBuilder logBuilder(logDoc.root());
-    bool indexesAffected;
-    bool noop;
-    popNode.apply(doc.root()["a"],
-                  &pathToCreate,
-                  &pathTaken,
-                  matchedField,
-                  fromReplication,
-                  validateForStorage,
-                  immutablePaths,
-                  &indexData,
-                  &logBuilder,
-                  &indexesAffected,
-                  &noop);
-    ASSERT_TRUE(noop);
-    ASSERT_FALSE(indexesAffected);
+    setPathToCreate("0");
+    setPathTaken("a");
+    addIndexedPath("a.0");
+    auto result = popNode.apply(getApplyParams(doc.root()["a"]));
+    ASSERT_TRUE(result.noop);
+    ASSERT_FALSE(result.indexesAffected);
     ASSERT_EQUALS(fromjson("{a: []}"), doc);
-    ASSERT_EQUALS(fromjson("{}"), logDoc);
+    ASSERT_EQUALS(fromjson("{}"), getLogDoc());
 }
 
-TEST(PopNodeTest, ThrowsWhenPathIsBlockedByAScalar) {
+TEST_F(PopNodeTest, ThrowsWhenPathIsBlockedByAScalar) {
     auto update = fromjson("{$pop: {'a.b': 1}}");
     const CollatorInterface* collator = nullptr;
     PopNode popNode;
     ASSERT_OK(popNode.init(update["$pop"]["a.b"], collator));
 
     mmb::Document doc(fromjson("{a: 'foo'}"));
-    FieldRef pathToCreate("b");
-    FieldRef pathTaken("a");
-    StringData matchedField;
-    auto fromReplication = false;
-    auto validateForStorage = true;
-    FieldRefSet immutablePaths;
-    UpdateIndexData indexData;
-    indexData.addPath("a.b");
-    mmb::Document logDoc;
-    LogBuilder logBuilder(logDoc.root());
-    bool indexesAffected;
-    bool noop;
+    setPathToCreate("b");
+    setPathTaken("a");
+    addIndexedPath("a.b");
     ASSERT_THROWS_CODE_AND_WHAT(
-        popNode.apply(doc.root()["a"],
-                      &pathToCreate,
-                      &pathTaken,
-                      matchedField,
-                      fromReplication,
-                      validateForStorage,
-                      immutablePaths,
-                      &indexData,
-                      &logBuilder,
-                      &indexesAffected,
-                      &noop),
+        popNode.apply(getApplyParams(doc.root()["a"])),
         UserException,
         ErrorCodes::PathNotViable,
         "Cannot use the part (b) of (a.b) to traverse the element ({a: \"foo\"})");
 }
 
-DEATH_TEST(PopNodeTest, NonOkElementWhenPathExistsIsFatal, "Invariant failure element.ok()") {
+DEATH_TEST_F(PopNodeTest,
+             NonOkElementWhenPathExistsIsFatal,
+             "Invariant failure applyParams.element.ok()") {
     auto update = fromjson("{$pop: {'a.b': 1}}");
     const CollatorInterface* collator = nullptr;
     PopNode popNode;
     ASSERT_OK(popNode.init(update["$pop"]["a.b"], collator));
 
     mmb::Document doc(fromjson("{a: {b: [1, 2, 3]}}"));
-    FieldRef pathToCreate("");
-    FieldRef pathTaken("a.b");
-    StringData matchedField;
-    auto fromReplication = false;
-    auto validateForStorage = true;
-    FieldRefSet immutablePaths;
-    UpdateIndexData indexData;
-    indexData.addPath("a.b");
-    mmb::Document logDoc;
-    LogBuilder logBuilder(logDoc.root());
-    bool indexesAffected;
-    bool noop;
-    popNode.apply(doc.end(),
-                  &pathToCreate,
-                  &pathTaken,
-                  matchedField,
-                  fromReplication,
-                  validateForStorage,
-                  immutablePaths,
-                  &indexData,
-                  &logBuilder,
-                  &indexesAffected,
-                  &noop);
+    setPathTaken("a.b");
+    addIndexedPath("a.b");
+    popNode.apply(getApplyParams(doc.end()));
 }
 
-TEST(PopNodeTest, ThrowsWhenPathExistsButDoesNotContainAnArray) {
+TEST_F(PopNodeTest, ThrowsWhenPathExistsButDoesNotContainAnArray) {
     auto update = fromjson("{$pop: {'a.b': 1}}");
     const CollatorInterface* collator = nullptr;
     PopNode popNode;
     ASSERT_OK(popNode.init(update["$pop"]["a.b"], collator));
 
     mmb::Document doc(fromjson("{a: {b: 'foo'}}"));
-    FieldRef pathToCreate("");
-    FieldRef pathTaken("a.b");
-    StringData matchedField;
-    auto fromReplication = false;
-    auto validateForStorage = true;
-    FieldRefSet immutablePaths;
-    UpdateIndexData indexData;
-    indexData.addPath("a.b");
-    mmb::Document logDoc;
-    LogBuilder logBuilder(logDoc.root());
-    bool indexesAffected;
-    bool noop;
-    ASSERT_THROWS_CODE_AND_WHAT(popNode.apply(doc.root()["a"]["b"],
-                                              &pathToCreate,
-                                              &pathTaken,
-                                              matchedField,
-                                              fromReplication,
-                                              validateForStorage,
-                                              immutablePaths,
-                                              &indexData,
-                                              &logBuilder,
-                                              &indexesAffected,
-                                              &noop),
+    setPathTaken("a.b");
+    addIndexedPath("a.b");
+    ASSERT_THROWS_CODE_AND_WHAT(popNode.apply(getApplyParams(doc.root()["a"]["b"])),
                                 UserException,
                                 ErrorCodes::TypeMismatch,
                                 "Path 'a.b' contains an element of non-array type 'string'");
 }
 
-TEST(PopNodeTest, NoopWhenPathContainsAnEmptyArray) {
+TEST_F(PopNodeTest, NoopWhenPathContainsAnEmptyArray) {
     auto update = fromjson("{$pop: {'a.b': 1}}");
     const CollatorInterface* collator = nullptr;
     PopNode popNode;
     ASSERT_OK(popNode.init(update["$pop"]["a.b"], collator));
 
     mmb::Document doc(fromjson("{a: {b: []}}"));
-    FieldRef pathToCreate("");
-    FieldRef pathTaken("a.b");
-    StringData matchedField;
-    auto fromReplication = false;
-    auto validateForStorage = true;
-    FieldRefSet immutablePaths;
-    UpdateIndexData indexData;
-    indexData.addPath("a.b");
-    mmb::Document logDoc;
-    LogBuilder logBuilder(logDoc.root());
-    bool indexesAffected;
-    bool noop;
-    popNode.apply(doc.root()["a"]["b"],
-                  &pathToCreate,
-                  &pathTaken,
-                  matchedField,
-                  fromReplication,
-                  validateForStorage,
-                  immutablePaths,
-                  &indexData,
-                  &logBuilder,
-                  &indexesAffected,
-                  &noop);
-    ASSERT_TRUE(noop);
-    ASSERT_FALSE(indexesAffected);
+    setPathTaken("a.b");
+    addIndexedPath("a.b");
+    auto result = popNode.apply(getApplyParams(doc.root()["a"]["b"]));
+    ASSERT_TRUE(result.noop);
+    ASSERT_FALSE(result.indexesAffected);
     ASSERT_EQUALS(fromjson("{a: {b: []}}"), doc);
-    ASSERT_EQUALS(fromjson("{}"), logDoc);
+    ASSERT_EQUALS(fromjson("{}"), getLogDoc());
 }
 
-TEST(PopNodeTest, PopsSingleElementFromTheBack) {
+TEST_F(PopNodeTest, PopsSingleElementFromTheBack) {
     auto update = fromjson("{$pop: {'a.b': 1}}");
     const CollatorInterface* collator = nullptr;
     PopNode popNode;
@@ -353,36 +220,16 @@ TEST(PopNodeTest, PopsSingleElementFromTheBack) {
     ASSERT_FALSE(popNode.popFromFront());
 
     mmb::Document doc(fromjson("{a: {b: [1]}}"));
-    FieldRef pathToCreate("");
-    FieldRef pathTaken("a.b");
-    StringData matchedField;
-    auto fromReplication = false;
-    auto validateForStorage = true;
-    FieldRefSet immutablePaths;
-    UpdateIndexData indexData;
-    indexData.addPath("a.b");
-    mmb::Document logDoc;
-    LogBuilder logBuilder(logDoc.root());
-    bool indexesAffected;
-    bool noop;
-    popNode.apply(doc.root()["a"]["b"],
-                  &pathToCreate,
-                  &pathTaken,
-                  matchedField,
-                  fromReplication,
-                  validateForStorage,
-                  immutablePaths,
-                  &indexData,
-                  &logBuilder,
-                  &indexesAffected,
-                  &noop);
-    ASSERT_FALSE(noop);
-    ASSERT_TRUE(indexesAffected);
+    setPathTaken("a.b");
+    addIndexedPath("a.b");
+    auto result = popNode.apply(getApplyParams(doc.root()["a"]["b"]));
+    ASSERT_FALSE(result.noop);
+    ASSERT_TRUE(result.indexesAffected);
     ASSERT_EQUALS(fromjson("{a: {b: []}}"), doc);
-    ASSERT_EQUALS(fromjson("{$set: {'a.b': []}}"), logDoc);
+    ASSERT_EQUALS(fromjson("{$set: {'a.b': []}}"), getLogDoc());
 }
 
-TEST(PopNodeTest, PopsSingleElementFromTheFront) {
+TEST_F(PopNodeTest, PopsSingleElementFromTheFront) {
     auto update = fromjson("{$pop: {'a.b': -1}}");
     const CollatorInterface* collator = nullptr;
     PopNode popNode;
@@ -390,36 +237,16 @@ TEST(PopNodeTest, PopsSingleElementFromTheFront) {
     ASSERT_TRUE(popNode.popFromFront());
 
     mmb::Document doc(fromjson("{a: {b: [[1]]}}"));
-    FieldRef pathToCreate("");
-    FieldRef pathTaken("a.b");
-    StringData matchedField;
-    auto fromReplication = false;
-    auto validateForStorage = true;
-    FieldRefSet immutablePaths;
-    UpdateIndexData indexData;
-    indexData.addPath("a");
-    mmb::Document logDoc;
-    LogBuilder logBuilder(logDoc.root());
-    bool indexesAffected;
-    bool noop;
-    popNode.apply(doc.root()["a"]["b"],
-                  &pathToCreate,
-                  &pathTaken,
-                  matchedField,
-                  fromReplication,
-                  validateForStorage,
-                  immutablePaths,
-                  &indexData,
-                  &logBuilder,
-                  &indexesAffected,
-                  &noop);
-    ASSERT_FALSE(noop);
-    ASSERT_TRUE(indexesAffected);
+    setPathTaken("a.b");
+    addIndexedPath("a");
+    auto result = popNode.apply(getApplyParams(doc.root()["a"]["b"]));
+    ASSERT_FALSE(result.noop);
+    ASSERT_TRUE(result.indexesAffected);
     ASSERT_EQUALS(fromjson("{a: {b: []}}"), doc);
-    ASSERT_EQUALS(fromjson("{$set: {'a.b': []}}"), logDoc);
+    ASSERT_EQUALS(fromjson("{$set: {'a.b': []}}"), getLogDoc());
 }
 
-TEST(PopNodeTest, PopsFromTheBackOfMultiElementArray) {
+TEST_F(PopNodeTest, PopsFromTheBackOfMultiElementArray) {
     auto update = fromjson("{$pop: {'a.b': 1}}");
     const CollatorInterface* collator = nullptr;
     PopNode popNode;
@@ -427,36 +254,16 @@ TEST(PopNodeTest, PopsFromTheBackOfMultiElementArray) {
     ASSERT_FALSE(popNode.popFromFront());
 
     mmb::Document doc(fromjson("{a: {b: [1, 2, 3]}}"));
-    FieldRef pathToCreate("");
-    FieldRef pathTaken("a.b");
-    StringData matchedField;
-    auto fromReplication = false;
-    auto validateForStorage = true;
-    FieldRefSet immutablePaths;
-    UpdateIndexData indexData;
-    indexData.addPath("a.b.c");
-    mmb::Document logDoc;
-    LogBuilder logBuilder(logDoc.root());
-    bool indexesAffected;
-    bool noop;
-    popNode.apply(doc.root()["a"]["b"],
-                  &pathToCreate,
-                  &pathTaken,
-                  matchedField,
-                  fromReplication,
-                  validateForStorage,
-                  immutablePaths,
-                  &indexData,
-                  &logBuilder,
-                  &indexesAffected,
-                  &noop);
-    ASSERT_FALSE(noop);
-    ASSERT_TRUE(indexesAffected);
+    setPathTaken("a.b");
+    addIndexedPath("a.b.c");
+    auto result = popNode.apply(getApplyParams(doc.root()["a"]["b"]));
+    ASSERT_FALSE(result.noop);
+    ASSERT_TRUE(result.indexesAffected);
     ASSERT_EQUALS(fromjson("{a: {b: [1, 2]}}"), doc);
-    ASSERT_EQUALS(fromjson("{$set: {'a.b': [1, 2]}}"), logDoc);
+    ASSERT_EQUALS(fromjson("{$set: {'a.b': [1, 2]}}"), getLogDoc());
 }
 
-TEST(PopNodeTest, PopsFromTheFrontOfMultiElementArray) {
+TEST_F(PopNodeTest, PopsFromTheFrontOfMultiElementArray) {
     auto update = fromjson("{$pop: {'a.b': -1}}");
     const CollatorInterface* collator = nullptr;
     PopNode popNode;
@@ -464,36 +271,16 @@ TEST(PopNodeTest, PopsFromTheFrontOfMultiElementArray) {
     ASSERT_TRUE(popNode.popFromFront());
 
     mmb::Document doc(fromjson("{a: {b: [1, 2, 3]}}"));
-    FieldRef pathToCreate("");
-    FieldRef pathTaken("a.b");
-    StringData matchedField;
-    auto fromReplication = false;
-    auto validateForStorage = true;
-    FieldRefSet immutablePaths;
-    UpdateIndexData indexData;
-    indexData.addPath("a.b");
-    mmb::Document logDoc;
-    LogBuilder logBuilder(logDoc.root());
-    bool indexesAffected;
-    bool noop;
-    popNode.apply(doc.root()["a"]["b"],
-                  &pathToCreate,
-                  &pathTaken,
-                  matchedField,
-                  fromReplication,
-                  validateForStorage,
-                  immutablePaths,
-                  &indexData,
-                  &logBuilder,
-                  &indexesAffected,
-                  &noop);
-    ASSERT_FALSE(noop);
-    ASSERT_TRUE(indexesAffected);
+    setPathTaken("a.b");
+    addIndexedPath("a.b");
+    auto result = popNode.apply(getApplyParams(doc.root()["a"]["b"]));
+    ASSERT_FALSE(result.noop);
+    ASSERT_TRUE(result.indexesAffected);
     ASSERT_EQUALS(fromjson("{a: {b: [2, 3]}}"), doc);
-    ASSERT_EQUALS(fromjson("{$set: {'a.b': [2, 3]}}"), logDoc);
+    ASSERT_EQUALS(fromjson("{$set: {'a.b': [2, 3]}}"), getLogDoc());
 }
 
-TEST(PopNodeTest, PopsFromTheFrontOfMultiElementArrayWithoutAffectingIndexes) {
+TEST_F(PopNodeTest, PopsFromTheFrontOfMultiElementArrayWithoutAffectingIndexes) {
     auto update = fromjson("{$pop: {'a.b': -1}}");
     const CollatorInterface* collator = nullptr;
     PopNode popNode;
@@ -501,36 +288,16 @@ TEST(PopNodeTest, PopsFromTheFrontOfMultiElementArrayWithoutAffectingIndexes) {
     ASSERT_TRUE(popNode.popFromFront());
 
     mmb::Document doc(fromjson("{a: {b: [1, 2, 3]}}"));
-    FieldRef pathToCreate("");
-    FieldRef pathTaken("a.b");
-    StringData matchedField;
-    auto fromReplication = false;
-    auto validateForStorage = true;
-    FieldRefSet immutablePaths;
-    UpdateIndexData indexData;
-    indexData.addPath("unrelated.path");
-    mmb::Document logDoc;
-    LogBuilder logBuilder(logDoc.root());
-    bool indexesAffected;
-    bool noop;
-    popNode.apply(doc.root()["a"]["b"],
-                  &pathToCreate,
-                  &pathTaken,
-                  matchedField,
-                  fromReplication,
-                  validateForStorage,
-                  immutablePaths,
-                  &indexData,
-                  &logBuilder,
-                  &indexesAffected,
-                  &noop);
-    ASSERT_FALSE(noop);
-    ASSERT_FALSE(indexesAffected);
+    setPathTaken("a.b");
+    addIndexedPath("unrelated.path");
+    auto result = popNode.apply(getApplyParams(doc.root()["a"]["b"]));
+    ASSERT_FALSE(result.noop);
+    ASSERT_FALSE(result.indexesAffected);
     ASSERT_EQUALS(fromjson("{a: {b: [2, 3]}}"), doc);
-    ASSERT_EQUALS(fromjson("{$set: {'a.b': [2, 3]}}"), logDoc);
+    ASSERT_EQUALS(fromjson("{$set: {'a.b': [2, 3]}}"), getLogDoc());
 }
 
-TEST(PopNodeTest, SucceedsWithNullUpdateIndexData) {
+TEST_F(PopNodeTest, SucceedsWithNullUpdateIndexData) {
     auto update = fromjson("{$pop: {'a.b': 1}}");
     const CollatorInterface* collator = nullptr;
     PopNode popNode;
@@ -538,34 +305,15 @@ TEST(PopNodeTest, SucceedsWithNullUpdateIndexData) {
     ASSERT_FALSE(popNode.popFromFront());
 
     mmb::Document doc(fromjson("{a: {b: [1, 2, 3]}}"));
-    FieldRef pathToCreate("");
-    FieldRef pathTaken("a.b");
-    StringData matchedField;
-    auto fromReplication = false;
-    auto validateForStorage = true;
-    FieldRefSet immutablePaths;
-    mmb::Document logDoc;
-    LogBuilder logBuilder(logDoc.root());
-    bool indexesAffected;
-    bool noop;
-    popNode.apply(doc.root()["a"]["b"],
-                  &pathToCreate,
-                  &pathTaken,
-                  matchedField,
-                  fromReplication,
-                  validateForStorage,
-                  immutablePaths,
-                  nullptr,
-                  &logBuilder,
-                  &indexesAffected,
-                  &noop);
-    ASSERT_FALSE(noop);
-    ASSERT_FALSE(indexesAffected);
+    setPathTaken("a.b");
+    auto result = popNode.apply(getApplyParams(doc.root()["a"]["b"]));
+    ASSERT_FALSE(result.noop);
+    ASSERT_FALSE(result.indexesAffected);
     ASSERT_EQUALS(fromjson("{a: {b: [1, 2]}}"), doc);
-    ASSERT_EQUALS(fromjson("{$set: {'a.b': [1, 2]}}"), logDoc);
+    ASSERT_EQUALS(fromjson("{$set: {'a.b': [1, 2]}}"), getLogDoc());
 }
 
-TEST(PopNodeTest, SucceedsWithNullLogBuilder) {
+TEST_F(PopNodeTest, SucceedsWithNullLogBuilder) {
     auto update = fromjson("{$pop: {'a.b': 1}}");
     const CollatorInterface* collator = nullptr;
     PopNode popNode;
@@ -573,71 +321,33 @@ TEST(PopNodeTest, SucceedsWithNullLogBuilder) {
     ASSERT_FALSE(popNode.popFromFront());
 
     mmb::Document doc(fromjson("{a: {b: [1, 2, 3]}}"));
-    FieldRef pathToCreate("");
-    FieldRef pathTaken("a.b");
-    StringData matchedField;
-    auto fromReplication = false;
-    auto validateForStorage = true;
-    FieldRefSet immutablePaths;
-    UpdateIndexData indexData;
-    indexData.addPath("a.b.c");
-    bool indexesAffected;
-    bool noop;
-    popNode.apply(doc.root()["a"]["b"],
-                  &pathToCreate,
-                  &pathTaken,
-                  matchedField,
-                  fromReplication,
-                  validateForStorage,
-                  immutablePaths,
-                  &indexData,
-                  nullptr,
-                  &indexesAffected,
-                  &noop);
-    ASSERT_FALSE(noop);
-    ASSERT_TRUE(indexesAffected);
+    setPathTaken("a.b");
+    addIndexedPath("a.b.c");
+    setLogBuilderToNull();
+    auto result = popNode.apply(getApplyParams(doc.root()["a"]["b"]));
+    ASSERT_FALSE(result.noop);
+    ASSERT_TRUE(result.indexesAffected);
     ASSERT_EQUALS(fromjson("{a: {b: [1, 2]}}"), doc);
 }
 
-TEST(PopNodeTest, ThrowsWhenPathIsImmutable) {
+TEST_F(PopNodeTest, ThrowsWhenPathIsImmutable) {
     auto update = fromjson("{$pop: {'a.b': 1}}");
     const CollatorInterface* collator = nullptr;
     PopNode popNode;
     ASSERT_OK(popNode.init(update["$pop"]["a.b"], collator));
 
     mmb::Document doc(fromjson("{a: {b: [0]}}"));
-    FieldRef pathToCreate("");
-    FieldRef pathTaken("a.b");
-    StringData matchedField;
-    auto fromReplication = false;
-    auto validateForStorage = true;
-    FieldRefSet immutablePaths;
-    FieldRef path("a.b");
-    immutablePaths.insert(&path);
-    UpdateIndexData indexData;
-    indexData.addPath("a.b");
-    mmb::Document logDoc;
-    LogBuilder logBuilder(logDoc.root());
-    bool indexesAffected;
-    bool noop;
+    setPathTaken("a.b");
+    addImmutablePath("a.b");
+    addIndexedPath("a.b");
     ASSERT_THROWS_CODE_AND_WHAT(
-        popNode.apply(doc.root()["a"]["b"],
-                      &pathToCreate,
-                      &pathTaken,
-                      matchedField,
-                      fromReplication,
-                      validateForStorage,
-                      immutablePaths,
-                      &indexData,
-                      &logBuilder,
-                      &indexesAffected,
-                      &noop),
+        popNode.apply(getApplyParams(doc.root()["a"]["b"])),
         UserException,
         ErrorCodes::ImmutableField,
         "Performing a $pop on the path 'a.b' would modify the immutable field 'a.b'");
 }
 
-TEST(PopNodeTest, ThrowsWhenPathIsPrefixOfImmutable) {
+TEST_F(PopNodeTest, ThrowsWhenPathIsPrefixOfImmutable) {
 
     // This is only possible for an upsert, since it is not legal to have an array in an immutable
     // path. If this update did not fail, we would fail later for storing an immutable path with an
@@ -649,111 +359,48 @@ TEST(PopNodeTest, ThrowsWhenPathIsPrefixOfImmutable) {
     ASSERT_OK(popNode.init(update["$pop"]["a"], collator));
 
     mmb::Document doc(fromjson("{a: [0]}"));
-    FieldRef pathToCreate("");
-    FieldRef pathTaken("a");
-    StringData matchedField;
-    auto fromReplication = false;
-    auto validateForStorage = true;
-    FieldRefSet immutablePaths;
-    FieldRef path("a.0");
-    immutablePaths.insert(&path);
-    UpdateIndexData indexData;
-    indexData.addPath("a");
-    mmb::Document logDoc;
-    LogBuilder logBuilder(logDoc.root());
-    bool indexesAffected;
-    bool noop;
+    setPathTaken("a");
+    addImmutablePath("a.0");
+    addIndexedPath("a");
     ASSERT_THROWS_CODE_AND_WHAT(
-        popNode.apply(doc.root()["a"],
-                      &pathToCreate,
-                      &pathTaken,
-                      matchedField,
-                      fromReplication,
-                      validateForStorage,
-                      immutablePaths,
-                      &indexData,
-                      &logBuilder,
-                      &indexesAffected,
-                      &noop),
+        popNode.apply(getApplyParams(doc.root()["a"])),
         UserException,
         ErrorCodes::ImmutableField,
         "Performing a $pop on the path 'a' would modify the immutable field 'a.0'");
 }
 
-TEST(PopNodeTest, ThrowsWhenPathIsSuffixOfImmutable) {
+TEST_F(PopNodeTest, ThrowsWhenPathIsSuffixOfImmutable) {
     auto update = fromjson("{$pop: {'a.b': 1}}");
     const CollatorInterface* collator = nullptr;
     PopNode popNode;
     ASSERT_OK(popNode.init(update["$pop"]["a.b"], collator));
 
     mmb::Document doc(fromjson("{a: {b: [0]}}"));
-    FieldRef pathToCreate("");
-    FieldRef pathTaken("a.b");
-    StringData matchedField;
-    auto fromReplication = false;
-    auto validateForStorage = true;
-    FieldRefSet immutablePaths;
-    FieldRef path("a");
-    immutablePaths.insert(&path);
-    UpdateIndexData indexData;
-    indexData.addPath("a.b");
-    mmb::Document logDoc;
-    LogBuilder logBuilder(logDoc.root());
-    bool indexesAffected;
-    bool noop;
+    setPathTaken("a.b");
+    addImmutablePath("a");
+    addIndexedPath("a.b");
     ASSERT_THROWS_CODE_AND_WHAT(
-        popNode.apply(doc.root()["a"]["b"],
-                      &pathToCreate,
-                      &pathTaken,
-                      matchedField,
-                      fromReplication,
-                      validateForStorage,
-                      immutablePaths,
-                      &indexData,
-                      &logBuilder,
-                      &indexesAffected,
-                      &noop),
+        popNode.apply(getApplyParams(doc.root()["a"]["b"])),
         UserException,
         ErrorCodes::ImmutableField,
         "Performing a $pop on the path 'a.b' would modify the immutable field 'a'");
 }
 
-TEST(PopNodeTest, NoopOnImmutablePathSucceeds) {
+TEST_F(PopNodeTest, NoopOnImmutablePathSucceeds) {
     auto update = fromjson("{$pop: {'a.b': 1}}");
     const CollatorInterface* collator = nullptr;
     PopNode popNode;
     ASSERT_OK(popNode.init(update["$pop"]["a.b"], collator));
 
     mmb::Document doc(fromjson("{a: {b: []}}"));
-    FieldRef pathToCreate("");
-    FieldRef pathTaken("a.b");
-    StringData matchedField;
-    auto fromReplication = false;
-    auto validateForStorage = true;
-    FieldRefSet immutablePaths;
-    FieldRef path("a.b");
-    immutablePaths.insert(&path);
-    UpdateIndexData indexData;
-    indexData.addPath("a.b");
-    mmb::Document logDoc;
-    LogBuilder logBuilder(logDoc.root());
-    bool indexesAffected;
-    bool noop;
-    popNode.apply(doc.root()["a"]["b"],
-                  &pathToCreate,
-                  &pathTaken,
-                  matchedField,
-                  fromReplication,
-                  validateForStorage,
-                  immutablePaths,
-                  &indexData,
-                  &logBuilder,
-                  &indexesAffected,
-                  &noop);
-    ASSERT_TRUE(noop);
-    ASSERT_FALSE(indexesAffected);
+    setPathTaken("a.b");
+    addImmutablePath("a.b");
+    addIndexedPath("a.b");
+    auto result = popNode.apply(getApplyParams(doc.root()["a"]["b"]));
+    ASSERT_TRUE(result.noop);
+    ASSERT_FALSE(result.indexesAffected);
     ASSERT_EQUALS(fromjson("{a: {b: []}}"), doc);
-    ASSERT_EQUALS(fromjson("{}"), logDoc);
+    ASSERT_EQUALS(fromjson("{}"), getLogDoc());
 }
 
 }  // namespace

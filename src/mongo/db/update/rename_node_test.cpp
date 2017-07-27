@@ -33,12 +33,14 @@
 #include "mongo/bson/mutable/algorithm.h"
 #include "mongo/bson/mutable/mutable_bson_test_utils.h"
 #include "mongo/db/json.h"
+#include "mongo/db/update/update_node_test_fixture.h"
 #include "mongo/unittest/death_test.h"
 #include "mongo/unittest/unittest.h"
 
 namespace mongo {
 namespace {
 
+using RenameNodeTest = UpdateNodeTest;
 using mongo::mutablebson::Document;
 using mongo::mutablebson::Element;
 using mongo::mutablebson::countChildren;
@@ -107,972 +109,439 @@ TEST(RenameNodeTest, MoveToSelfNotAllowed) {
     ASSERT_EQUALS(ErrorCodes::BadValue, status);
 }
 
-TEST(RenameNodeTest, SimpleNumberAtRoot) {
+TEST_F(RenameNodeTest, SimpleNumberAtRoot) {
     auto update = fromjson("{$rename: {'a': 'b'}}");
     const CollatorInterface* collator = nullptr;
     RenameNode node;
     ASSERT_OK(node.init(update["$rename"]["a"], collator));
 
     Document doc(fromjson("{a: 2}"));
-    FieldRef pathToCreate("b");
-    FieldRef pathTaken("");
-    StringData matchedField;
-    auto fromReplication = false;
-    auto validateForStorage = true;
-    FieldRefSet immutablePaths;
-    UpdateIndexData indexData;
-    indexData.addPath("a");
-    Document logDoc;
-    LogBuilder logBuilder(logDoc.root());
-    auto indexesAffected = false;
-    auto noop = false;
-    node.apply(doc.root(),
-               &pathToCreate,
-               &pathTaken,
-               matchedField,
-               fromReplication,
-               validateForStorage,
-               immutablePaths,
-               &indexData,
-               &logBuilder,
-               &indexesAffected,
-               &noop);
-    ASSERT_FALSE(noop);
-    ASSERT_TRUE(indexesAffected);
+    setPathToCreate("b");
+    addIndexedPath("a");
+    auto result = node.apply(getApplyParams(doc.root()));
+    ASSERT_FALSE(result.noop);
+    ASSERT_TRUE(result.indexesAffected);
     ASSERT_EQUALS(fromjson("{b: 2}"), doc);
-    ASSERT_EQUALS(fromjson("{$set: {b: 2}, $unset: {a: true}}"), logDoc);
+    ASSERT_EQUALS(fromjson("{$set: {b: 2}, $unset: {a: true}}"), getLogDoc());
 }
 
-TEST(RenameNodeTest, ToExistsAtSameLevel) {
+TEST_F(RenameNodeTest, ToExistsAtSameLevel) {
     auto update = fromjson("{$rename: {'a': 'b'}}");
     const CollatorInterface* collator = nullptr;
     RenameNode node;
     ASSERT_OK(node.init(update["$rename"]["a"], collator));
 
     Document doc(fromjson("{a: 2, b: 1}"));
-    FieldRef pathToCreate("");
-    FieldRef pathTaken("b");
-    StringData matchedField;
-    auto fromReplication = false;
-    auto validateForStorage = true;
-    FieldRefSet immutablePaths;
-    UpdateIndexData indexData;
-    indexData.addPath("a");
-    Document logDoc;
-    LogBuilder logBuilder(logDoc.root());
-    auto indexesAffected = false;
-    auto noop = false;
-    node.apply(doc.root()["b"],
-               &pathToCreate,
-               &pathTaken,
-               matchedField,
-               fromReplication,
-               validateForStorage,
-               immutablePaths,
-               &indexData,
-               &logBuilder,
-               &indexesAffected,
-               &noop);
-    ASSERT_FALSE(noop);
-    ASSERT_TRUE(indexesAffected);
+    setPathTaken("b");
+    addIndexedPath("a");
+    auto result = node.apply(getApplyParams(doc.root()["b"]));
+    ASSERT_FALSE(result.noop);
+    ASSERT_TRUE(result.indexesAffected);
     ASSERT_EQUALS(fromjson("{b: 2}"), doc);
-    ASSERT_EQUALS(fromjson("{$set: {b: 2}, $unset: {a: true}}"), logDoc);
+    ASSERT_EQUALS(fromjson("{$set: {b: 2}, $unset: {a: true}}"), getLogDoc());
 }
 
-TEST(RenameNodeTest, ToAndFromHaveSameValue) {
+TEST_F(RenameNodeTest, ToAndFromHaveSameValue) {
     auto update = fromjson("{$rename: {'a': 'b'}}");
     const CollatorInterface* collator = nullptr;
     RenameNode node;
     ASSERT_OK(node.init(update["$rename"]["a"], collator));
 
     Document doc(fromjson("{a: 2, b: 2}"));
-    FieldRef pathToCreate("");
-    FieldRef pathTaken("b");
-    StringData matchedField;
-    auto fromReplication = false;
-    auto validateForStorage = true;
-    FieldRefSet immutablePaths;
-    UpdateIndexData indexData;
-    indexData.addPath("a");
-    Document logDoc;
-    LogBuilder logBuilder(logDoc.root());
-    auto indexesAffected = false;
-    auto noop = false;
-    node.apply(doc.root()["b"],
-               &pathToCreate,
-               &pathTaken,
-               matchedField,
-               fromReplication,
-               validateForStorage,
-               immutablePaths,
-               &indexData,
-               &logBuilder,
-               &indexesAffected,
-               &noop);
-    ASSERT_FALSE(noop);
-    ASSERT_TRUE(indexesAffected);
+    setPathTaken("b");
+    addIndexedPath("a");
+    auto result = node.apply(getApplyParams(doc.root()["b"]));
+    ASSERT_FALSE(result.noop);
+    ASSERT_TRUE(result.indexesAffected);
     ASSERT_EQUALS(fromjson("{b: 2}"), doc);
-    ASSERT_EQUALS(fromjson("{$unset: {a: true}}"), logDoc);
+    ASSERT_EQUALS(fromjson("{$unset: {a: true}}"), getLogDoc());
 }
 
-TEST(RenameNodeTest, FromDottedElement) {
+TEST_F(RenameNodeTest, FromDottedElement) {
     auto update = fromjson("{$rename: {'a.c': 'b'}}");
     const CollatorInterface* collator = nullptr;
     RenameNode node;
     ASSERT_OK(node.init(update["$rename"]["a.c"], collator));
 
     Document doc(fromjson("{a: {c: {d: 6}}, b: 1}"));
-    FieldRef pathToCreate("");
-    FieldRef pathTaken("b");
-    StringData matchedField;
-    auto fromReplication = false;
-    auto validateForStorage = true;
-    FieldRefSet immutablePaths;
-    UpdateIndexData indexData;
-    indexData.addPath("a");
-    Document logDoc;
-    LogBuilder logBuilder(logDoc.root());
-    auto indexesAffected = false;
-    auto noop = false;
-    node.apply(doc.root()["b"],
-               &pathToCreate,
-               &pathTaken,
-               matchedField,
-               fromReplication,
-               validateForStorage,
-               immutablePaths,
-               &indexData,
-               &logBuilder,
-               &indexesAffected,
-               &noop);
-    ASSERT_FALSE(noop);
-    ASSERT_TRUE(indexesAffected);
+    setPathTaken("b");
+    addIndexedPath("a");
+    auto result = node.apply(getApplyParams(doc.root()["b"]));
+    ASSERT_FALSE(result.noop);
+    ASSERT_TRUE(result.indexesAffected);
     ASSERT_EQUALS(fromjson("{a: {}, b: {d: 6}}"), doc);
-    ASSERT_EQUALS(fromjson("{$set: {b: {d: 6}}, $unset: {'a.c': true}}"), logDoc);
+    ASSERT_EQUALS(fromjson("{$set: {b: {d: 6}}, $unset: {'a.c': true}}"), getLogDoc());
 }
 
-TEST(RenameNodeTest, RenameToExistingNestedFieldDoesNotReorderFields) {
+TEST_F(RenameNodeTest, RenameToExistingNestedFieldDoesNotReorderFields) {
     auto update = fromjson("{$rename: {'c.d': 'a.b.c'}}");
     const CollatorInterface* collator = nullptr;
     RenameNode node;
     ASSERT_OK(node.init(update["$rename"]["c.d"], collator));
 
     Document doc(fromjson("{a: {b: {c: 1, d: 2}}, b: 3, c: {d: 4}}"));
-    FieldRef pathToCreate("");
-    FieldRef pathTaken("a.b.c");
-    StringData matchedField;
-    auto fromReplication = false;
-    auto validateForStorage = true;
-    FieldRefSet immutablePaths;
-    UpdateIndexData indexData;
-    indexData.addPath("a");
-    Document logDoc;
-    LogBuilder logBuilder(logDoc.root());
-    auto indexesAffected = false;
-    auto noop = false;
-    node.apply(doc.root()["a"]["b"]["c"],
-               &pathToCreate,
-               &pathTaken,
-               matchedField,
-               fromReplication,
-               validateForStorage,
-               immutablePaths,
-               &indexData,
-               &logBuilder,
-               &indexesAffected,
-               &noop);
-    ASSERT_FALSE(noop);
-    ASSERT_TRUE(indexesAffected);
+    setPathTaken("a.b.c");
+    addIndexedPath("a");
+    auto result = node.apply(getApplyParams(doc.root()["a"]["b"]["c"]));
+    ASSERT_FALSE(result.noop);
+    ASSERT_TRUE(result.indexesAffected);
     ASSERT_EQUALS(fromjson("{a: {b: {c: 4, d: 2}}, b: 3, c: {}}"), doc);
-    ASSERT_EQUALS(fromjson("{$set: {'a.b.c': 4}, $unset: {'c.d': true}}"), logDoc);
+    ASSERT_EQUALS(fromjson("{$set: {'a.b.c': 4}, $unset: {'c.d': true}}"), getLogDoc());
 }
 
-TEST(RenameNodeTest, MissingCompleteTo) {
+TEST_F(RenameNodeTest, MissingCompleteTo) {
     auto update = fromjson("{$rename: {a: 'c.r.d'}}");
     const CollatorInterface* collator = nullptr;
     RenameNode node;
     ASSERT_OK(node.init(update["$rename"]["a"], collator));
 
     Document doc(fromjson("{a: 2, b: 1, c: {}}"));
-    FieldRef pathToCreate("r.d");
-    FieldRef pathTaken("c");
-    StringData matchedField;
-    auto fromReplication = false;
-    auto validateForStorage = true;
-    FieldRefSet immutablePaths;
-    UpdateIndexData indexData;
-    indexData.addPath("a");
-    Document logDoc;
-    LogBuilder logBuilder(logDoc.root());
-    auto indexesAffected = false;
-    auto noop = false;
-    node.apply(doc.root()["c"],
-               &pathToCreate,
-               &pathTaken,
-               matchedField,
-               fromReplication,
-               validateForStorage,
-               immutablePaths,
-               &indexData,
-               &logBuilder,
-               &indexesAffected,
-               &noop);
-    ASSERT_FALSE(noop);
-    ASSERT_TRUE(indexesAffected);
+    setPathToCreate("r.d");
+    setPathTaken("c");
+    addIndexedPath("a");
+    auto result = node.apply(getApplyParams(doc.root()["c"]));
+    ASSERT_FALSE(result.noop);
+    ASSERT_TRUE(result.indexesAffected);
     ASSERT_EQUALS(fromjson("{b: 1, c: {r: {d: 2}}}"), doc);
-    ASSERT_EQUALS(fromjson("{$set: {'c.r.d': 2}, $unset: {'a': true}}"), logDoc);
+    ASSERT_EQUALS(fromjson("{$set: {'c.r.d': 2}, $unset: {'a': true}}"), getLogDoc());
 }
 
-TEST(RenameNodeTest, ToIsCompletelyMissing) {
+TEST_F(RenameNodeTest, ToIsCompletelyMissing) {
     auto update = fromjson("{$rename: {a: 'b.c.d'}}");
     const CollatorInterface* collator = nullptr;
     RenameNode node;
     ASSERT_OK(node.init(update["$rename"]["a"], collator));
 
     Document doc(fromjson("{a: 2}"));
-    FieldRef pathToCreate("b.c.d");
-    FieldRef pathTaken("");
-    StringData matchedField;
-    auto fromReplication = false;
-    auto validateForStorage = true;
-    FieldRefSet immutablePaths;
-    UpdateIndexData indexData;
-    indexData.addPath("a");
-    Document logDoc;
-    LogBuilder logBuilder(logDoc.root());
-    auto indexesAffected = false;
-    auto noop = false;
-    node.apply(doc.root(),
-               &pathToCreate,
-               &pathTaken,
-               matchedField,
-               fromReplication,
-               validateForStorage,
-               immutablePaths,
-               &indexData,
-               &logBuilder,
-               &indexesAffected,
-               &noop);
-    ASSERT_FALSE(noop);
-    ASSERT_TRUE(indexesAffected);
+    setPathToCreate("b.c.d");
+    addIndexedPath("a");
+    auto result = node.apply(getApplyParams(doc.root()));
+    ASSERT_FALSE(result.noop);
+    ASSERT_TRUE(result.indexesAffected);
     ASSERT_EQUALS(fromjson("{b: {c: {d: 2}}}"), doc);
-    ASSERT_EQUALS(fromjson("{$set: {'b.c.d': 2}, $unset: {'a': true}}"), logDoc);
+    ASSERT_EQUALS(fromjson("{$set: {'b.c.d': 2}, $unset: {'a': true}}"), getLogDoc());
 }
 
-TEST(RenameNodeTest, ToMissingDottedField) {
+TEST_F(RenameNodeTest, ToMissingDottedField) {
     auto update = fromjson("{$rename: {a: 'b.c.d'}}");
     const CollatorInterface* collator = nullptr;
     RenameNode node;
     ASSERT_OK(node.init(update["$rename"]["a"], collator));
 
     Document doc(fromjson("{a: [{a:2, b:1}]}"));
-    FieldRef pathToCreate("b.c.d");
-    FieldRef pathTaken("");
-    StringData matchedField;
-    auto fromReplication = false;
-    auto validateForStorage = true;
-    FieldRefSet immutablePaths;
-    UpdateIndexData indexData;
-    indexData.addPath("a");
-    Document logDoc;
-    LogBuilder logBuilder(logDoc.root());
-    auto indexesAffected = false;
-    auto noop = false;
-    node.apply(doc.root(),
-               &pathToCreate,
-               &pathTaken,
-               matchedField,
-               fromReplication,
-               validateForStorage,
-               immutablePaths,
-               &indexData,
-               &logBuilder,
-               &indexesAffected,
-               &noop);
-    ASSERT_FALSE(noop);
-    ASSERT_TRUE(indexesAffected);
+    setPathToCreate("b.c.d");
+    addIndexedPath("a");
+    auto result = node.apply(getApplyParams(doc.root()));
+    ASSERT_FALSE(result.noop);
+    ASSERT_TRUE(result.indexesAffected);
     ASSERT_EQUALS(fromjson("{b: {c: {d: [{a:2, b:1}]}}}"), doc);
-    ASSERT_EQUALS(fromjson("{$set: {'b.c.d': [{a:2, b:1}]}, $unset: {'a': true}}"), logDoc);
+    ASSERT_EQUALS(fromjson("{$set: {'b.c.d': [{a:2, b:1}]}, $unset: {'a': true}}"), getLogDoc());
 }
 
-TEST(RenameNodeTest, MoveIntoArray) {
+TEST_F(RenameNodeTest, MoveIntoArray) {
     auto update = fromjson("{$rename: {b: 'a.2'}}");
     const CollatorInterface* collator = nullptr;
     RenameNode node;
     ASSERT_OK(node.init(update["$rename"]["b"], collator));
 
     Document doc(fromjson("{_id: 'test_object', a: [1, 2], b: 2}"));
-    FieldRef pathToCreate("2");
-    FieldRef pathTaken("a");
-    StringData matchedField;
-    auto fromReplication = false;
-    auto validateForStorage = true;
-    FieldRefSet immutablePaths;
-    UpdateIndexData indexData;
-    indexData.addPath("a");
-    Document logDoc;
-    LogBuilder logBuilder(logDoc.root());
-    auto indexesAffected = false;
-    auto noop = false;
-    ASSERT_THROWS_CODE_AND_WHAT(node.apply(doc.root()["a"],
-                                           &pathToCreate,
-                                           &pathTaken,
-                                           matchedField,
-                                           fromReplication,
-                                           validateForStorage,
-                                           immutablePaths,
-                                           &indexData,
-                                           &logBuilder,
-                                           &indexesAffected,
-                                           &noop),
+    setPathToCreate("2");
+    setPathTaken("a");
+    addIndexedPath("a");
+    ASSERT_THROWS_CODE_AND_WHAT(node.apply(getApplyParams(doc.root()["a"])),
                                 UserException,
                                 ErrorCodes::BadValue,
                                 "The destination field cannot be an array element, 'a.2' in doc "
                                 "with _id: \"test_object\" has an array field called 'a'");
 }
 
-TEST(RenameNodeTest, MoveIntoArrayNoId) {
+TEST_F(RenameNodeTest, MoveIntoArrayNoId) {
     auto update = fromjson("{$rename: {b: 'a.2'}}");
     const CollatorInterface* collator = nullptr;
     RenameNode node;
     ASSERT_OK(node.init(update["$rename"]["b"], collator));
 
     Document doc(fromjson("{a: [1, 2], b: 2}"));
-    FieldRef pathToCreate("2");
-    FieldRef pathTaken("a");
-    StringData matchedField;
-    auto fromReplication = false;
-    auto validateForStorage = true;
-    FieldRefSet immutablePaths;
-    UpdateIndexData indexData;
-    indexData.addPath("a");
-    Document logDoc;
-    LogBuilder logBuilder(logDoc.root());
-    auto indexesAffected = false;
-    auto noop = false;
-    ASSERT_THROWS_CODE_AND_WHAT(node.apply(doc.root()["a"],
-                                           &pathToCreate,
-                                           &pathTaken,
-                                           matchedField,
-                                           fromReplication,
-                                           validateForStorage,
-                                           immutablePaths,
-                                           &indexData,
-                                           &logBuilder,
-                                           &indexesAffected,
-                                           &noop),
+    setPathToCreate("2");
+    setPathTaken("a");
+    addIndexedPath("a");
+    ASSERT_THROWS_CODE_AND_WHAT(node.apply(getApplyParams(doc.root()["a"])),
                                 UserException,
                                 ErrorCodes::BadValue,
                                 "The destination field cannot be an array element, 'a.2' in doc "
                                 "with no id has an array field called 'a'");
 }
 
-TEST(RenameNodeTest, MoveToArrayElement) {
+TEST_F(RenameNodeTest, MoveToArrayElement) {
     auto update = fromjson("{$rename: {b: 'a.1'}}");
     const CollatorInterface* collator = nullptr;
     RenameNode node;
     ASSERT_OK(node.init(update["$rename"]["b"], collator));
 
     Document doc(fromjson("{_id: 'test_object', a: [1, 2], b: 2}"));
-    FieldRef pathToCreate("");
-    FieldRef pathTaken("a.1");
-    StringData matchedField;
-    auto fromReplication = false;
-    auto validateForStorage = true;
-    FieldRefSet immutablePaths;
-    UpdateIndexData indexData;
-    indexData.addPath("a");
-    Document logDoc;
-    LogBuilder logBuilder(logDoc.root());
-    auto indexesAffected = false;
-    auto noop = false;
-    ASSERT_THROWS_CODE_AND_WHAT(node.apply(doc.root()["a"]["1"],
-                                           &pathToCreate,
-                                           &pathTaken,
-                                           matchedField,
-                                           fromReplication,
-                                           validateForStorage,
-                                           immutablePaths,
-                                           &indexData,
-                                           &logBuilder,
-                                           &indexesAffected,
-                                           &noop),
+    setPathTaken("a.1");
+    addIndexedPath("a");
+    ASSERT_THROWS_CODE_AND_WHAT(node.apply(getApplyParams(doc.root()["a"]["1"])),
                                 UserException,
                                 ErrorCodes::BadValue,
                                 "The destination field cannot be an array element, 'a.1' in doc "
                                 "with _id: \"test_object\" has an array field called 'a'");
 }
 
-TEST(RenameNodeTest, MoveOutOfArray) {
+TEST_F(RenameNodeTest, MoveOutOfArray) {
     auto update = fromjson("{$rename: {'a.0': 'b'}}");
     const CollatorInterface* collator = nullptr;
     RenameNode node;
     ASSERT_OK(node.init(update["$rename"]["a.0"], collator));
 
     Document doc(fromjson("{_id: 'test_object', a: [1, 2]}"));
-    FieldRef pathToCreate("b");
-    FieldRef pathTaken("");
-    StringData matchedField;
-    auto fromReplication = false;
-    auto validateForStorage = true;
-    FieldRefSet immutablePaths;
-    UpdateIndexData indexData;
-    indexData.addPath("a");
-    Document logDoc;
-    LogBuilder logBuilder(logDoc.root());
-    auto indexesAffected = false;
-    auto noop = false;
-    ASSERT_THROWS_CODE_AND_WHAT(node.apply(doc.root(),
-                                           &pathToCreate,
-                                           &pathTaken,
-                                           matchedField,
-                                           fromReplication,
-                                           validateForStorage,
-                                           immutablePaths,
-                                           &indexData,
-                                           &logBuilder,
-                                           &indexesAffected,
-                                           &noop),
+    setPathToCreate("b");
+    addIndexedPath("a");
+    ASSERT_THROWS_CODE_AND_WHAT(node.apply(getApplyParams(doc.root())),
                                 UserException,
                                 ErrorCodes::BadValue,
                                 "The source field cannot be an array element, 'a.0' in doc with "
                                 "_id: \"test_object\" has an array field called 'a'");
 }
 
-TEST(RenameNodeTest, MoveNonexistentEmbeddedFieldOut) {
+TEST_F(RenameNodeTest, MoveNonexistentEmbeddedFieldOut) {
     auto update = fromjson("{$rename: {'a.a': 'b'}}");
     const CollatorInterface* collator = nullptr;
     RenameNode node;
     ASSERT_OK(node.init(update["$rename"]["a.a"], collator));
 
     Document doc(fromjson("{a: [{a: 1}, {b: 2}]}"));
-    FieldRef pathToCreate("b");
-    FieldRef pathTaken("");
-    StringData matchedField;
-    auto fromReplication = false;
-    auto validateForStorage = true;
-    FieldRefSet immutablePaths;
-    UpdateIndexData indexData;
-    indexData.addPath("a");
-    Document logDoc;
-    LogBuilder logBuilder(logDoc.root());
-    auto indexesAffected = false;
-    auto noop = false;
+    setPathToCreate("b");
+    addIndexedPath("a");
     ASSERT_THROWS_CODE_AND_WHAT(
-        node.apply(doc.root(),
-                   &pathToCreate,
-                   &pathTaken,
-                   matchedField,
-                   fromReplication,
-                   validateForStorage,
-                   immutablePaths,
-                   &indexData,
-                   &logBuilder,
-                   &indexesAffected,
-                   &noop),
+        node.apply(getApplyParams(doc.root())),
         UserException,
         ErrorCodes::PathNotViable,
         "cannot use the part (a of a.a) to traverse the element ({a: [ { a: 1 }, { b: 2 } ]})");
 }
 
-TEST(RenameNodeTest, MoveEmbeddedFieldOutWithElementNumber) {
+TEST_F(RenameNodeTest, MoveEmbeddedFieldOutWithElementNumber) {
     auto update = fromjson("{$rename: {'a.0.a': 'b'}}");
     const CollatorInterface* collator = nullptr;
     RenameNode node;
     ASSERT_OK(node.init(update["$rename"]["a.0.a"], collator));
 
     Document doc(fromjson("{_id: 'test_object', a: [{a: 1}, {b: 2}]}"));
-    FieldRef pathToCreate("b");
-    FieldRef pathTaken("");
-    StringData matchedField;
-    auto fromReplication = false;
-    auto validateForStorage = true;
-    FieldRefSet immutablePaths;
-    UpdateIndexData indexData;
-    indexData.addPath("a");
-    Document logDoc;
-    LogBuilder logBuilder(logDoc.root());
-    auto indexesAffected = false;
-    auto noop = false;
-    ASSERT_THROWS_CODE_AND_WHAT(node.apply(doc.root(),
-                                           &pathToCreate,
-                                           &pathTaken,
-                                           matchedField,
-                                           fromReplication,
-                                           validateForStorage,
-                                           immutablePaths,
-                                           &indexData,
-                                           &logBuilder,
-                                           &indexesAffected,
-                                           &noop),
+    setPathToCreate("b");
+    addIndexedPath("a");
+    ASSERT_THROWS_CODE_AND_WHAT(node.apply(getApplyParams(doc.root())),
                                 UserException,
                                 ErrorCodes::BadValue,
                                 "The source field cannot be an array element, 'a.0.a' in doc with "
                                 "_id: \"test_object\" has an array field called 'a'");
 }
 
-TEST(RenameNodeTest, ReplaceArrayField) {
+TEST_F(RenameNodeTest, ReplaceArrayField) {
     auto update = fromjson("{$rename: {a: 'b'}}");
     const CollatorInterface* collator = nullptr;
     RenameNode node;
     ASSERT_OK(node.init(update["$rename"]["a"], collator));
 
     Document doc(fromjson("{a: 2, b: []}"));
-    FieldRef pathToCreate("");
-    FieldRef pathTaken("b");
-    StringData matchedField;
-    auto fromReplication = false;
-    auto validateForStorage = true;
-    FieldRefSet immutablePaths;
-    UpdateIndexData indexData;
-    indexData.addPath("a");
-    Document logDoc;
-    LogBuilder logBuilder(logDoc.root());
-    auto indexesAffected = false;
-    auto noop = false;
-    node.apply(doc.root()["b"],
-               &pathToCreate,
-               &pathTaken,
-               matchedField,
-               fromReplication,
-               validateForStorage,
-               immutablePaths,
-               &indexData,
-               &logBuilder,
-               &indexesAffected,
-               &noop);
-    ASSERT_FALSE(noop);
-    ASSERT_TRUE(indexesAffected);
+    setPathTaken("b");
+    addIndexedPath("a");
+    auto result = node.apply(getApplyParams(doc.root()["b"]));
+    ASSERT_FALSE(result.noop);
+    ASSERT_TRUE(result.indexesAffected);
     ASSERT_EQUALS(fromjson("{b: 2}"), doc);
-    ASSERT_EQUALS(fromjson("{$set: {b: 2}, $unset: {a: true}}"), logDoc);
+    ASSERT_EQUALS(fromjson("{$set: {b: 2}, $unset: {a: true}}"), getLogDoc());
 }
 
-TEST(RenameNodeTest, ReplaceWithArrayField) {
+TEST_F(RenameNodeTest, ReplaceWithArrayField) {
     auto update = fromjson("{$rename: {a: 'b'}}");
     const CollatorInterface* collator = nullptr;
     RenameNode node;
     ASSERT_OK(node.init(update["$rename"]["a"], collator));
 
     Document doc(fromjson("{a: [], b: 2}"));
-    FieldRef pathToCreate("");
-    FieldRef pathTaken("b");
-    StringData matchedField;
-    auto fromReplication = false;
-    auto validateForStorage = true;
-    FieldRefSet immutablePaths;
-    UpdateIndexData indexData;
-    indexData.addPath("a");
-    Document logDoc;
-    LogBuilder logBuilder(logDoc.root());
-    auto indexesAffected = false;
-    auto noop = false;
-    node.apply(doc.root()["b"],
-               &pathToCreate,
-               &pathTaken,
-               matchedField,
-               fromReplication,
-               validateForStorage,
-               immutablePaths,
-               &indexData,
-               &logBuilder,
-               &indexesAffected,
-               &noop);
-    ASSERT_FALSE(noop);
-    ASSERT_TRUE(indexesAffected);
+    setPathTaken("b");
+    addIndexedPath("a");
+    auto result = node.apply(getApplyParams(doc.root()["b"]));
+    ASSERT_FALSE(result.noop);
+    ASSERT_TRUE(result.indexesAffected);
     ASSERT_EQUALS(fromjson("{b: []}"), doc);
-    ASSERT_EQUALS(fromjson("{$set: {b: []}, $unset: {a: true}}"), logDoc);
+    ASSERT_EQUALS(fromjson("{$set: {b: []}, $unset: {a: true}}"), getLogDoc());
 }
 
-TEST(RenameNodeTest, CanRenameFromInvalidFieldName) {
+TEST_F(RenameNodeTest, CanRenameFromInvalidFieldName) {
     auto update = fromjson("{$rename: {'$a': 'a'}}");
     const CollatorInterface* collator = nullptr;
     RenameNode node;
     ASSERT_OK(node.init(update["$rename"]["$a"], collator));
 
     Document doc(fromjson("{$a: 2}"));
-    FieldRef pathToCreate("a");
-    FieldRef pathTaken("");
-    StringData matchedField;
-    auto fromReplication = false;
-    auto validateForStorage = true;
-    FieldRefSet immutablePaths;
-    UpdateIndexData indexData;
-    indexData.addPath("a");
-    Document logDoc;
-    LogBuilder logBuilder(logDoc.root());
-    auto indexesAffected = false;
-    auto noop = false;
-    node.apply(doc.root(),
-               &pathToCreate,
-               &pathTaken,
-               matchedField,
-               fromReplication,
-               validateForStorage,
-               immutablePaths,
-               &indexData,
-               &logBuilder,
-               &indexesAffected,
-               &noop);
-    ASSERT_FALSE(noop);
-    ASSERT_TRUE(indexesAffected);
+    setPathToCreate("a");
+    addIndexedPath("a");
+    auto result = node.apply(getApplyParams(doc.root()));
+    ASSERT_FALSE(result.noop);
+    ASSERT_TRUE(result.indexesAffected);
     ASSERT_EQUALS(fromjson("{a: 2}"), doc);
-    ASSERT_EQUALS(fromjson("{$set: {a: 2}, $unset: {'$a': true}}"), logDoc);
+    ASSERT_EQUALS(fromjson("{$set: {a: 2}, $unset: {'$a': true}}"), getLogDoc());
 }
 
-TEST(RenameNodeTest, RenameWithoutLogBuilderOrIndexData) {
+TEST_F(RenameNodeTest, RenameWithoutLogBuilderOrIndexData) {
     auto update = fromjson("{$rename: {'a': 'b'}}");
     const CollatorInterface* collator = nullptr;
     RenameNode node;
     ASSERT_OK(node.init(update["$rename"]["a"], collator));
 
     Document doc(fromjson("{a: 2}"));
-    FieldRef pathToCreate("b");
-    FieldRef pathTaken("");
-    StringData matchedField;
-    auto fromReplication = false;
-    auto validateForStorage = true;
-    FieldRefSet immutablePaths;
-    UpdateIndexData* indexData = nullptr;
-    LogBuilder* logBuilder = nullptr;
-    auto indexesAffected = false;
-    auto noop = false;
-    node.apply(doc.root(),
-               &pathToCreate,
-               &pathTaken,
-               matchedField,
-               fromReplication,
-               validateForStorage,
-               immutablePaths,
-               indexData,
-               logBuilder,
-               &indexesAffected,
-               &noop);
-    ASSERT_FALSE(noop);
+    setPathToCreate("b");
+    setLogBuilderToNull();
+    auto result = node.apply(getApplyParams(doc.root()));
+    ASSERT_FALSE(result.noop);
     ASSERT_EQUALS(fromjson("{b: 2}"), doc);
 }
 
-TEST(RenameNodeTest, RenameFromNonExistentPathIsNoOp) {
+TEST_F(RenameNodeTest, RenameFromNonExistentPathIsNoOp) {
     auto update = fromjson("{$rename: {'a': 'b'}}");
     const CollatorInterface* collator = nullptr;
     RenameNode node;
     ASSERT_OK(node.init(update["$rename"]["a"], collator));
 
     Document doc(fromjson("{b: 2}"));
-    FieldRef pathToCreate("");
-    FieldRef pathTaken("b");
-    StringData matchedField;
-    auto fromReplication = false;
-    auto validateForStorage = true;
-    FieldRefSet immutablePaths;
-    UpdateIndexData indexData;
-    indexData.addPath("a");
-    Document logDoc;
-    LogBuilder logBuilder(logDoc.root());
-    auto indexesAffected = false;
-    auto noop = false;
-    node.apply(doc.root()["b"],
-               &pathToCreate,
-               &pathTaken,
-               matchedField,
-               fromReplication,
-               validateForStorage,
-               immutablePaths,
-               &indexData,
-               &logBuilder,
-               &indexesAffected,
-               &noop);
-    ASSERT_TRUE(noop);
-    ASSERT_FALSE(indexesAffected);
+    setPathTaken("b");
+    addIndexedPath("a");
+    auto result = node.apply(getApplyParams(doc.root()["b"]));
+    ASSERT_TRUE(result.noop);
+    ASSERT_FALSE(result.indexesAffected);
     ASSERT_EQUALS(fromjson("{b: 2}"), doc);
-    ASSERT_EQUALS(fromjson("{}"), logDoc);
+    ASSERT_EQUALS(fromjson("{}"), getLogDoc());
 }
 
-TEST(RenameNodeTest, ApplyCannotRemoveRequiredPartOfDBRef) {
+TEST_F(RenameNodeTest, ApplyCannotRemoveRequiredPartOfDBRef) {
     auto update = fromjson("{$rename: {'a.$id': 'b'}}");
     const CollatorInterface* collator = nullptr;
     RenameNode node;
     ASSERT_OK(node.init(update["$rename"]["a.$id"], collator));
 
     Document doc(fromjson("{a: {$ref: 'c', $id: 0}}"));
-    FieldRef pathToCreate("b");
-    FieldRef pathTaken("");
-    StringData matchedField;
-    auto fromReplication = false;
-    auto validateForStorage = true;
-    FieldRefSet immutablePaths;
-    const UpdateIndexData* indexData = nullptr;
-    LogBuilder* logBuilder = nullptr;
-    auto indexesAffected = false;
-    auto noop = false;
-    ASSERT_THROWS_CODE_AND_WHAT(node.apply(doc.root(),
-                                           &pathToCreate,
-                                           &pathTaken,
-                                           matchedField,
-                                           fromReplication,
-                                           validateForStorage,
-                                           immutablePaths,
-                                           indexData,
-                                           logBuilder,
-                                           &indexesAffected,
-                                           &noop),
+    setPathToCreate("b");
+    ASSERT_THROWS_CODE_AND_WHAT(node.apply(getApplyParams(doc.root())),
                                 UserException,
                                 ErrorCodes::InvalidDBRef,
                                 "The DBRef $ref field must be followed by a $id field");
 }
 
-TEST(RenameNodeTest, ApplyCanRemoveRequiredPartOfDBRefIfValidateForStorageIsFalse) {
+TEST_F(RenameNodeTest, ApplyCanRemoveRequiredPartOfDBRefIfValidateForStorageIsFalse) {
     auto update = fromjson("{$rename: {'a.$id': 'b'}}");
     const CollatorInterface* collator = nullptr;
     RenameNode node;
     ASSERT_OK(node.init(update["$rename"]["a.$id"], collator));
 
     Document doc(fromjson("{a: {$ref: 'c', $id: 0}}"));
-    FieldRef pathToCreate("b");
-    FieldRef pathTaken("");
-    StringData matchedField;
-    auto fromReplication = false;
-    auto validateForStorage = false;
-    FieldRefSet immutablePaths;
-    UpdateIndexData indexData;
-    indexData.addPath("a");
-    Document logDoc;
-    LogBuilder logBuilder(logDoc.root());
-    auto indexesAffected = false;
-    auto noop = false;
-    node.apply(doc.root(),
-               &pathToCreate,
-               &pathTaken,
-               matchedField,
-               fromReplication,
-               validateForStorage,
-               immutablePaths,
-               &indexData,
-               &logBuilder,
-               &indexesAffected,
-               &noop);
-    ASSERT_FALSE(noop);
-    ASSERT_TRUE(indexesAffected);
+    setPathToCreate("b");
+    addIndexedPath("a");
+    setValidateForStorage(false);
+    auto result = node.apply(getApplyParams(doc.root()));
+    ASSERT_FALSE(result.noop);
+    ASSERT_TRUE(result.indexesAffected);
     auto updated = BSON("a" << BSON("$ref"
                                     << "c")
                             << "b"
                             << 0);
     ASSERT_EQUALS(updated, doc);
     ASSERT_FALSE(doc.isInPlaceModeEnabled());
-    ASSERT_EQUALS(fromjson("{$set: {'b': 0}, $unset: {'a.$id': true}}"), logDoc);
+    ASSERT_EQUALS(fromjson("{$set: {'b': 0}, $unset: {'a.$id': true}}"), getLogDoc());
 }
 
-TEST(RenameNodeTest, ApplyCannotRemoveImmutablePath) {
+TEST_F(RenameNodeTest, ApplyCannotRemoveImmutablePath) {
     auto update = fromjson("{$rename: {'a.b': 'c'}}");
     const CollatorInterface* collator = nullptr;
     RenameNode node;
     ASSERT_OK(node.init(update["$rename"]["a.b"], collator));
 
     Document doc(fromjson("{a: {b: 1}}"));
-    FieldRef pathToCreate("c");
-    FieldRef pathTaken("");
-    StringData matchedField;
-    auto fromReplication = false;
-    auto validateForStorage = true;
-    FieldRefSet immutablePaths;
-    FieldRef path("a.b");
-    immutablePaths.insert(&path);
-    const UpdateIndexData* indexData = nullptr;
-    LogBuilder* logBuilder = nullptr;
-    auto indexesAffected = false;
-    auto noop = false;
+    setPathToCreate("c");
+    addImmutablePath("a.b");
     ASSERT_THROWS_CODE_AND_WHAT(
-        node.apply(doc.root(),
-                   &pathToCreate,
-                   &pathTaken,
-                   matchedField,
-                   fromReplication,
-                   validateForStorage,
-                   immutablePaths,
-                   indexData,
-                   logBuilder,
-                   &indexesAffected,
-                   &noop),
+        node.apply(getApplyParams(doc.root())),
         UserException,
         ErrorCodes::ImmutableField,
         "Unsetting the path 'a.b' using $rename would modify the immutable field 'a.b'");
 }
 
-TEST(RenameNodeTest, ApplyCannotRemovePrefixOfImmutablePath) {
+TEST_F(RenameNodeTest, ApplyCannotRemovePrefixOfImmutablePath) {
     auto update = fromjson("{$rename: {a: 'c'}}");
     const CollatorInterface* collator = nullptr;
     RenameNode node;
     ASSERT_OK(node.init(update["$rename"]["a"], collator));
 
     Document doc(fromjson("{a: {b: 1}}"));
-    FieldRef pathToCreate("c");
-    FieldRef pathTaken("");
-    StringData matchedField;
-    auto fromReplication = false;
-    auto validateForStorage = true;
-    FieldRefSet immutablePaths;
-    FieldRef path("a.b");
-    immutablePaths.insert(&path);
-    const UpdateIndexData* indexData = nullptr;
-    LogBuilder* logBuilder = nullptr;
-    auto indexesAffected = false;
-    auto noop = false;
+    setPathToCreate("c");
+    addImmutablePath("a.b");
     ASSERT_THROWS_CODE_AND_WHAT(
-        node.apply(doc.root(),
-                   &pathToCreate,
-                   &pathTaken,
-                   matchedField,
-                   fromReplication,
-                   validateForStorage,
-                   immutablePaths,
-                   indexData,
-                   logBuilder,
-                   &indexesAffected,
-                   &noop),
+        node.apply(getApplyParams(doc.root())),
         UserException,
         ErrorCodes::ImmutableField,
         "Unsetting the path 'a' using $rename would modify the immutable field 'a.b'");
 }
 
-TEST(RenameNodeTest, ApplyCannotRemoveSuffixOfImmutablePath) {
+TEST_F(RenameNodeTest, ApplyCannotRemoveSuffixOfImmutablePath) {
     auto update = fromjson("{$rename: {'a.b.c': 'd'}}");
     const CollatorInterface* collator = nullptr;
     RenameNode node;
     ASSERT_OK(node.init(update["$rename"]["a.b.c"], collator));
 
     Document doc(fromjson("{a: {b: {c: 1}}}"));
-    FieldRef pathToCreate("d");
-    FieldRef pathTaken("");
-    StringData matchedField;
-    auto fromReplication = false;
-    auto validateForStorage = true;
-    FieldRefSet immutablePaths;
-    FieldRef path("a.b");
-    immutablePaths.insert(&path);
-    const UpdateIndexData* indexData = nullptr;
-    LogBuilder* logBuilder = nullptr;
-    auto indexesAffected = false;
-    auto noop = false;
+    setPathToCreate("d");
+    addImmutablePath("a.b");
     ASSERT_THROWS_CODE_AND_WHAT(
-        node.apply(doc.root(),
-                   &pathToCreate,
-                   &pathTaken,
-                   matchedField,
-                   fromReplication,
-                   validateForStorage,
-                   immutablePaths,
-                   indexData,
-                   logBuilder,
-                   &indexesAffected,
-                   &noop),
+        node.apply(getApplyParams(doc.root())),
         UserException,
         ErrorCodes::ImmutableField,
         "Unsetting the path 'a.b.c' using $rename would modify the immutable field 'a.b'");
 }
 
-TEST(RenameNodeTest, ApplyCanRemoveImmutablePathIfNoop) {
+TEST_F(RenameNodeTest, ApplyCanRemoveImmutablePathIfNoop) {
     auto update = fromjson("{$rename: {'a.b.c': 'd'}}");
     const CollatorInterface* collator = nullptr;
     RenameNode node;
     ASSERT_OK(node.init(update["$rename"]["a.b.c"], collator));
 
     Document doc(fromjson("{a: {b: {}}}"));
-    FieldRef pathToCreate("d");
-    FieldRef pathTaken("");
-    StringData matchedField;
-    auto fromReplication = false;
-    auto validateForStorage = false;
-    FieldRefSet immutablePaths;
-    FieldRef path("a.b");
-    immutablePaths.insert(&path);
-    UpdateIndexData indexData;
-    indexData.addPath("a");
-    Document logDoc;
-    LogBuilder logBuilder(logDoc.root());
-    auto indexesAffected = false;
-    auto noop = false;
-    node.apply(doc.root(),
-               &pathToCreate,
-               &pathTaken,
-               matchedField,
-               fromReplication,
-               validateForStorage,
-               immutablePaths,
-               &indexData,
-               &logBuilder,
-               &indexesAffected,
-               &noop);
-    ASSERT_TRUE(noop);
-    ASSERT_FALSE(indexesAffected);
+    setPathToCreate("d");
+    addImmutablePath("a.b");
+    addIndexedPath("a");
+    auto result = node.apply(getApplyParams(doc.root()));
+    ASSERT_TRUE(result.noop);
+    ASSERT_FALSE(result.indexesAffected);
     ASSERT_EQUALS(fromjson("{a: {b: {}}}"), doc);
     ASSERT_TRUE(doc.isInPlaceModeEnabled());
-    ASSERT_EQUALS(fromjson("{}"), logDoc);
+    ASSERT_EQUALS(fromjson("{}"), getLogDoc());
 }
 
-TEST(RenameNodeTest, ApplyCannotCreateDollarPrefixedField) {
+TEST_F(RenameNodeTest, ApplyCannotCreateDollarPrefixedField) {
     auto update = fromjson("{$rename: {a: '$bad'}}");
     const CollatorInterface* collator = nullptr;
     RenameNode node;
     ASSERT_OK(node.init(update["$rename"]["a"], collator));
 
     Document doc(fromjson("{a: 0}"));
-    FieldRef pathToCreate("$bad");
-    FieldRef pathTaken("");
-    StringData matchedField;
-    auto fromReplication = false;
-    auto validateForStorage = true;
-    FieldRefSet immutablePaths;
-    const UpdateIndexData* indexData = nullptr;
-    LogBuilder* logBuilder = nullptr;
-    auto indexesAffected = false;
-    auto noop = false;
+    setPathToCreate("$bad");
     ASSERT_THROWS_CODE_AND_WHAT(
-        node.apply(doc.root(),
-                   &pathToCreate,
-                   &pathTaken,
-                   matchedField,
-                   fromReplication,
-                   validateForStorage,
-                   immutablePaths,
-                   indexData,
-                   logBuilder,
-                   &indexesAffected,
-                   &noop),
+        node.apply(getApplyParams(doc.root())),
         UserException,
         ErrorCodes::DollarPrefixedFieldName,
         "The dollar ($) prefixed field '$bad' in '$bad' is not valid for storage.");
 }
 
-TEST(RenameNodeTest, ApplyCannotOverwriteImmutablePath) {
+TEST_F(RenameNodeTest, ApplyCannotOverwriteImmutablePath) {
     auto update = fromjson("{$rename: {a: 'b'}}");
     const CollatorInterface* collator = nullptr;
     RenameNode node;
     ASSERT_OK(node.init(update["$rename"]["a"], collator));
 
     Document doc(fromjson("{a: 0, b: 1}"));
-    FieldRef pathToCreate("");
-    FieldRef pathTaken("b");
-    StringData matchedField;
-    auto fromReplication = false;
-    auto validateForStorage = true;
-    FieldRefSet immutablePaths;
-    FieldRef path("b");
-    immutablePaths.insert(&path);
-    const UpdateIndexData* indexData = nullptr;
-    LogBuilder* logBuilder = nullptr;
-    auto indexesAffected = false;
-    auto noop = false;
+    setPathTaken("b");
+    addImmutablePath("b");
     ASSERT_THROWS_CODE_AND_WHAT(
-        node.apply(doc.root()["b"],
-                   &pathToCreate,
-                   &pathTaken,
-                   matchedField,
-                   fromReplication,
-                   validateForStorage,
-                   immutablePaths,
-                   indexData,
-                   logBuilder,
-                   &indexesAffected,
-                   &noop),
+        node.apply(getApplyParams(doc.root()["b"])),
         UserException,
         ErrorCodes::ImmutableField,
         "Updating the path 'b' to b: 0 would modify the immutable field 'b'");

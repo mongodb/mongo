@@ -35,60 +35,28 @@
 #include "mongo/db/json.h"
 #include "mongo/db/logical_clock.h"
 #include "mongo/db/service_context_noop.h"
+#include "mongo/db/update/update_node_test_fixture.h"
 #include "mongo/unittest/unittest.h"
 
 namespace mongo {
 namespace {
 
+using ObjectReplaceNodeTest = UpdateNodeTest;
 using mongo::mutablebson::Document;
 using mongo::mutablebson::Element;
 using mongo::mutablebson::countChildren;
-
-class ObjectReplaceNodeTest : public mongo::unittest::Test {
-public:
-    ~ObjectReplaceNodeTest() override = default;
-
-protected:
-    void setUp() override {
-        auto service = mongo::getGlobalServiceContext();
-        auto logicalClock = mongo::stdx::make_unique<mongo::LogicalClock>(service);
-        mongo::LogicalClock::set(service, std::move(logicalClock));
-    }
-    void tearDown() override{};
-};
 
 TEST_F(ObjectReplaceNodeTest, Noop) {
     auto obj = fromjson("{a: 1, b: 2}");
     ObjectReplaceNode node(obj);
 
     Document doc(fromjson("{a: 1, b: 2}"));
-    FieldRef pathToCreate("");
-    FieldRef pathTaken("");
-    StringData matchedField;
-    auto fromReplication = false;
-    auto validateForStorage = true;
-    FieldRefSet immutablePaths;
-    const UpdateIndexData* indexData;
-    Document logDoc;
-    LogBuilder logBuilder(logDoc.root());
-    auto indexesAffected = false;
-    auto noop = false;
-    node.apply(doc.root(),
-               &pathToCreate,
-               &pathTaken,
-               matchedField,
-               fromReplication,
-               validateForStorage,
-               immutablePaths,
-               indexData,
-               &logBuilder,
-               &indexesAffected,
-               &noop);
-    ASSERT_TRUE(noop);
-    ASSERT_FALSE(indexesAffected);
+    auto result = node.apply(getApplyParams(doc.root()));
+    ASSERT_TRUE(result.noop);
+    ASSERT_FALSE(result.indexesAffected);
     ASSERT_EQUALS(fromjson("{a: 1, b: 2}"), doc);
     ASSERT_TRUE(doc.isInPlaceModeEnabled());
-    ASSERT_EQUALS(fromjson("{}"), logDoc);
+    ASSERT_EQUALS(fromjson("{}"), getLogDoc());
 }
 
 TEST_F(ObjectReplaceNodeTest, ShouldNotCreateIdIfNoIdExistsAndNoneIsSpecified) {
@@ -96,33 +64,12 @@ TEST_F(ObjectReplaceNodeTest, ShouldNotCreateIdIfNoIdExistsAndNoneIsSpecified) {
     ObjectReplaceNode node(obj);
 
     Document doc(fromjson("{c: 1, d: 2}"));
-    FieldRef pathToCreate("");
-    FieldRef pathTaken("");
-    StringData matchedField;
-    auto fromReplication = false;
-    auto validateForStorage = true;
-    FieldRefSet immutablePaths;
-    const UpdateIndexData* indexData;
-    Document logDoc;
-    LogBuilder logBuilder(logDoc.root());
-    auto indexesAffected = false;
-    auto noop = false;
-    node.apply(doc.root(),
-               &pathToCreate,
-               &pathTaken,
-               matchedField,
-               fromReplication,
-               validateForStorage,
-               immutablePaths,
-               indexData,
-               &logBuilder,
-               &indexesAffected,
-               &noop);
-    ASSERT_FALSE(noop);
-    ASSERT_TRUE(indexesAffected);
+    auto result = node.apply(getApplyParams(doc.root()));
+    ASSERT_FALSE(result.noop);
+    ASSERT_TRUE(result.indexesAffected);
     ASSERT_EQUALS(fromjson("{a: 1, b: 2}"), doc);
     ASSERT_FALSE(doc.isInPlaceModeEnabled());
-    ASSERT_EQUALS(fromjson("{a: 1, b: 2}"), logDoc);
+    ASSERT_EQUALS(fromjson("{a: 1, b: 2}"), getLogDoc());
 }
 
 TEST_F(ObjectReplaceNodeTest, ShouldPreserveIdOfExistingDocumentIfIdNotSpecified) {
@@ -130,33 +77,12 @@ TEST_F(ObjectReplaceNodeTest, ShouldPreserveIdOfExistingDocumentIfIdNotSpecified
     ObjectReplaceNode node(obj);
 
     Document doc(fromjson("{_id: 0, c: 1, d: 2}"));
-    FieldRef pathToCreate("");
-    FieldRef pathTaken("");
-    StringData matchedField;
-    auto fromReplication = false;
-    auto validateForStorage = true;
-    FieldRefSet immutablePaths;
-    const UpdateIndexData* indexData;
-    Document logDoc;
-    LogBuilder logBuilder(logDoc.root());
-    auto indexesAffected = false;
-    auto noop = false;
-    node.apply(doc.root(),
-               &pathToCreate,
-               &pathTaken,
-               matchedField,
-               fromReplication,
-               validateForStorage,
-               immutablePaths,
-               indexData,
-               &logBuilder,
-               &indexesAffected,
-               &noop);
-    ASSERT_FALSE(noop);
-    ASSERT_TRUE(indexesAffected);
+    auto result = node.apply(getApplyParams(doc.root()));
+    ASSERT_FALSE(result.noop);
+    ASSERT_TRUE(result.indexesAffected);
     ASSERT_EQUALS(fromjson("{_id: 0, a: 1, b: 2}"), doc);
     ASSERT_FALSE(doc.isInPlaceModeEnabled());
-    ASSERT_EQUALS(fromjson("{_id: 0, a: 1, b: 2}"), logDoc);
+    ASSERT_EQUALS(fromjson("{_id: 0, a: 1, b: 2}"), getLogDoc());
 }
 
 TEST_F(ObjectReplaceNodeTest, ShouldSucceedWhenImmutableIdIsNotModified) {
@@ -164,35 +90,13 @@ TEST_F(ObjectReplaceNodeTest, ShouldSucceedWhenImmutableIdIsNotModified) {
     ObjectReplaceNode node(obj);
 
     Document doc(fromjson("{_id: 0, c: 1, d: 2}"));
-    FieldRef pathToCreate("");
-    FieldRef pathTaken("");
-    StringData matchedField;
-    auto fromReplication = false;
-    auto validateForStorage = true;
-    FieldRefSet immutablePaths;
-    FieldRef path("_id");
-    immutablePaths.insert(&path);
-    const UpdateIndexData* indexData;
-    Document logDoc;
-    LogBuilder logBuilder(logDoc.root());
-    auto indexesAffected = false;
-    auto noop = false;
-    node.apply(doc.root(),
-               &pathToCreate,
-               &pathTaken,
-               matchedField,
-               fromReplication,
-               validateForStorage,
-               immutablePaths,
-               indexData,
-               &logBuilder,
-               &indexesAffected,
-               &noop);
-    ASSERT_FALSE(noop);
-    ASSERT_TRUE(indexesAffected);
+    addImmutablePath("_id");
+    auto result = node.apply(getApplyParams(doc.root()));
+    ASSERT_FALSE(result.noop);
+    ASSERT_TRUE(result.indexesAffected);
     ASSERT_EQUALS(fromjson("{_id: 0, a: 1, b: 2}"), doc);
     ASSERT_FALSE(doc.isInPlaceModeEnabled());
-    ASSERT_EQUALS(fromjson("{_id: 0, a: 1, b: 2}"), logDoc);
+    ASSERT_EQUALS(fromjson("{_id: 0, a: 1, b: 2}"), getLogDoc());
 }
 
 TEST_F(ObjectReplaceNodeTest, IdTimestampNotModified) {
@@ -200,33 +104,12 @@ TEST_F(ObjectReplaceNodeTest, IdTimestampNotModified) {
     ObjectReplaceNode node(obj);
 
     Document doc(fromjson("{}"));
-    FieldRef pathToCreate("");
-    FieldRef pathTaken("");
-    StringData matchedField;
-    auto fromReplication = false;
-    auto validateForStorage = true;
-    FieldRefSet immutablePaths;
-    const UpdateIndexData* indexData;
-    Document logDoc;
-    LogBuilder logBuilder(logDoc.root());
-    auto indexesAffected = false;
-    auto noop = false;
-    node.apply(doc.root(),
-               &pathToCreate,
-               &pathTaken,
-               matchedField,
-               fromReplication,
-               validateForStorage,
-               immutablePaths,
-               indexData,
-               &logBuilder,
-               &indexesAffected,
-               &noop);
-    ASSERT_FALSE(noop);
-    ASSERT_TRUE(indexesAffected);
+    auto result = node.apply(getApplyParams(doc.root()));
+    ASSERT_FALSE(result.noop);
+    ASSERT_TRUE(result.indexesAffected);
     ASSERT_EQUALS(fromjson("{_id: Timestamp(0,0)}"), doc);
     ASSERT_FALSE(doc.isInPlaceModeEnabled());
-    ASSERT_EQUALS(fromjson("{_id: Timestamp(0,0)}"), logDoc);
+    ASSERT_EQUALS(fromjson("{_id: Timestamp(0,0)}"), getLogDoc());
 }
 
 TEST_F(ObjectReplaceNodeTest, NonIdTimestampsModified) {
@@ -234,30 +117,9 @@ TEST_F(ObjectReplaceNodeTest, NonIdTimestampsModified) {
     ObjectReplaceNode node(obj);
 
     Document doc(fromjson("{}"));
-    FieldRef pathToCreate("");
-    FieldRef pathTaken("");
-    StringData matchedField;
-    auto fromReplication = false;
-    auto validateForStorage = true;
-    FieldRefSet immutablePaths;
-    const UpdateIndexData* indexData;
-    Document logDoc;
-    LogBuilder logBuilder(logDoc.root());
-    auto indexesAffected = false;
-    auto noop = false;
-    node.apply(doc.root(),
-               &pathToCreate,
-               &pathTaken,
-               matchedField,
-               fromReplication,
-               validateForStorage,
-               immutablePaths,
-               indexData,
-               &logBuilder,
-               &indexesAffected,
-               &noop);
-    ASSERT_FALSE(noop);
-    ASSERT_TRUE(indexesAffected);
+    auto result = node.apply(getApplyParams(doc.root()));
+    ASSERT_FALSE(result.noop);
+    ASSERT_TRUE(result.indexesAffected);
 
     ASSERT_EQUALS(doc.root().countChildren(), 2U);
 
@@ -274,7 +136,7 @@ TEST_F(ObjectReplaceNodeTest, NonIdTimestampsModified) {
     ASSERT_NOT_EQUALS(0U, elemB.getValueTimestamp().getInc());
 
     ASSERT_FALSE(doc.isInPlaceModeEnabled());
-    ASSERT_EQUALS(doc, logDoc);
+    ASSERT_EQUALS(doc, getLogDoc());
 }
 
 TEST_F(ObjectReplaceNodeTest, ComplexDoc) {
@@ -282,33 +144,12 @@ TEST_F(ObjectReplaceNodeTest, ComplexDoc) {
     ObjectReplaceNode node(obj);
 
     Document doc(fromjson("{a: 1, b: [0, 2, 2], e: []}"));
-    FieldRef pathToCreate("");
-    FieldRef pathTaken("");
-    StringData matchedField;
-    auto fromReplication = false;
-    auto validateForStorage = true;
-    FieldRefSet immutablePaths;
-    const UpdateIndexData* indexData;
-    Document logDoc;
-    LogBuilder logBuilder(logDoc.root());
-    auto indexesAffected = false;
-    auto noop = false;
-    node.apply(doc.root(),
-               &pathToCreate,
-               &pathTaken,
-               matchedField,
-               fromReplication,
-               validateForStorage,
-               immutablePaths,
-               indexData,
-               &logBuilder,
-               &indexesAffected,
-               &noop);
-    ASSERT_FALSE(noop);
-    ASSERT_TRUE(indexesAffected);
+    auto result = node.apply(getApplyParams(doc.root()));
+    ASSERT_FALSE(result.noop);
+    ASSERT_TRUE(result.indexesAffected);
     ASSERT_EQUALS(fromjson("{a: 1, b: [0, 1, 2], c: {d: 1}}"), doc);
     ASSERT_FALSE(doc.isInPlaceModeEnabled());
-    ASSERT_EQUALS(fromjson("{a: 1, b: [0, 1, 2], c: {d: 1}}"), logDoc);
+    ASSERT_EQUALS(fromjson("{a: 1, b: [0, 1, 2], c: {d: 1}}"), getLogDoc());
 }
 
 TEST_F(ObjectReplaceNodeTest, CannotRemoveImmutablePath) {
@@ -316,30 +157,8 @@ TEST_F(ObjectReplaceNodeTest, CannotRemoveImmutablePath) {
     ObjectReplaceNode node(obj);
 
     Document doc(fromjson("{_id: 0, a: {b: 1}}"));
-    FieldRef pathToCreate("");
-    FieldRef pathTaken("");
-    StringData matchedField;
-    auto fromReplication = false;
-    auto validateForStorage = true;
-    FieldRefSet immutablePaths;
-    FieldRef path("a.b");
-    immutablePaths.insert(&path);
-    const UpdateIndexData* indexData;
-    Document logDoc;
-    LogBuilder* logBuilder = nullptr;
-    auto indexesAffected = false;
-    auto noop = false;
-    ASSERT_THROWS_CODE_AND_WHAT(node.apply(doc.root(),
-                                           &pathToCreate,
-                                           &pathTaken,
-                                           matchedField,
-                                           fromReplication,
-                                           validateForStorage,
-                                           immutablePaths,
-                                           indexData,
-                                           logBuilder,
-                                           &indexesAffected,
-                                           &noop),
+    addImmutablePath("a.b");
+    ASSERT_THROWS_CODE_AND_WHAT(node.apply(getApplyParams(doc.root())),
                                 UserException,
                                 ErrorCodes::ImmutableField,
                                 "After applying the update, the 'a.b' (required and immutable) "
@@ -351,35 +170,13 @@ TEST_F(ObjectReplaceNodeTest, IdFieldIsNotRemoved) {
     ObjectReplaceNode node(obj);
 
     Document doc(fromjson("{_id: 0, b: 1}"));
-    FieldRef pathToCreate("");
-    FieldRef pathTaken("");
-    StringData matchedField;
-    auto fromReplication = false;
-    auto validateForStorage = true;
-    FieldRefSet immutablePaths;
-    FieldRef path("_id");
-    immutablePaths.insert(&path);
-    const UpdateIndexData* indexData;
-    Document logDoc;
-    LogBuilder logBuilder(logDoc.root());
-    auto indexesAffected = false;
-    auto noop = false;
-    node.apply(doc.root(),
-               &pathToCreate,
-               &pathTaken,
-               matchedField,
-               fromReplication,
-               validateForStorage,
-               immutablePaths,
-               indexData,
-               &logBuilder,
-               &indexesAffected,
-               &noop);
-    ASSERT_FALSE(noop);
-    ASSERT_TRUE(indexesAffected);
+    addImmutablePath("_id");
+    auto result = node.apply(getApplyParams(doc.root()));
+    ASSERT_FALSE(result.noop);
+    ASSERT_TRUE(result.indexesAffected);
     ASSERT_EQUALS(fromjson("{_id: 0, a: 1}"), doc);
     ASSERT_FALSE(doc.isInPlaceModeEnabled());
-    ASSERT_EQUALS(fromjson("{_id: 0, a: 1}"), logDoc);
+    ASSERT_EQUALS(fromjson("{_id: 0, a: 1}"), getLogDoc());
 }
 
 TEST_F(ObjectReplaceNodeTest, CannotReplaceImmutablePathWithArrayField) {
@@ -387,30 +184,8 @@ TEST_F(ObjectReplaceNodeTest, CannotReplaceImmutablePathWithArrayField) {
     ObjectReplaceNode node(obj);
 
     Document doc(fromjson("{_id: 0, a: {b: 1}}"));
-    FieldRef pathToCreate("");
-    FieldRef pathTaken("");
-    StringData matchedField;
-    auto fromReplication = false;
-    auto validateForStorage = true;
-    FieldRefSet immutablePaths;
-    FieldRef path("a.b");
-    immutablePaths.insert(&path);
-    const UpdateIndexData* indexData;
-    Document logDoc;
-    LogBuilder* logBuilder = nullptr;
-    auto indexesAffected = false;
-    auto noop = false;
-    ASSERT_THROWS_CODE_AND_WHAT(node.apply(doc.root(),
-                                           &pathToCreate,
-                                           &pathTaken,
-                                           matchedField,
-                                           fromReplication,
-                                           validateForStorage,
-                                           immutablePaths,
-                                           indexData,
-                                           logBuilder,
-                                           &indexesAffected,
-                                           &noop),
+    addImmutablePath("a.b");
+    ASSERT_THROWS_CODE_AND_WHAT(node.apply(getApplyParams(doc.root())),
                                 UserException,
                                 ErrorCodes::NotSingleValueField,
                                 "After applying the update to the document, the (immutable) field "
@@ -422,30 +197,8 @@ TEST_F(ObjectReplaceNodeTest, CannotMakeImmutablePathArrayDescendant) {
     ObjectReplaceNode node(obj);
 
     Document doc(fromjson("{_id: 0, a: {'0': 1}}"));
-    FieldRef pathToCreate("");
-    FieldRef pathTaken("");
-    StringData matchedField;
-    auto fromReplication = false;
-    auto validateForStorage = true;
-    FieldRefSet immutablePaths;
-    FieldRef path("a.0");
-    immutablePaths.insert(&path);
-    const UpdateIndexData* indexData;
-    Document logDoc;
-    LogBuilder* logBuilder = nullptr;
-    auto indexesAffected = false;
-    auto noop = false;
-    ASSERT_THROWS_CODE_AND_WHAT(node.apply(doc.root(),
-                                           &pathToCreate,
-                                           &pathTaken,
-                                           matchedField,
-                                           fromReplication,
-                                           validateForStorage,
-                                           immutablePaths,
-                                           indexData,
-                                           logBuilder,
-                                           &indexesAffected,
-                                           &noop),
+    addImmutablePath("a.0");
+    ASSERT_THROWS_CODE_AND_WHAT(node.apply(getApplyParams(doc.root())),
                                 UserException,
                                 ErrorCodes::NotSingleValueField,
                                 "After applying the update to the document, the (immutable) field "
@@ -457,30 +210,8 @@ TEST_F(ObjectReplaceNodeTest, CannotModifyImmutablePath) {
     ObjectReplaceNode node(obj);
 
     Document doc(fromjson("{_id: 0, a: {b: 1}}"));
-    FieldRef pathToCreate("");
-    FieldRef pathTaken("");
-    StringData matchedField;
-    auto fromReplication = false;
-    auto validateForStorage = true;
-    FieldRefSet immutablePaths;
-    FieldRef path("a.b");
-    immutablePaths.insert(&path);
-    const UpdateIndexData* indexData;
-    Document logDoc;
-    LogBuilder* logBuilder = nullptr;
-    auto indexesAffected = false;
-    auto noop = false;
-    ASSERT_THROWS_CODE_AND_WHAT(node.apply(doc.root(),
-                                           &pathToCreate,
-                                           &pathTaken,
-                                           matchedField,
-                                           fromReplication,
-                                           validateForStorage,
-                                           immutablePaths,
-                                           indexData,
-                                           logBuilder,
-                                           &indexesAffected,
-                                           &noop),
+    addImmutablePath("a.b");
+    ASSERT_THROWS_CODE_AND_WHAT(node.apply(getApplyParams(doc.root())),
                                 UserException,
                                 ErrorCodes::ImmutableField,
                                 "After applying the update, the (immutable) field 'a.b' was found "
@@ -492,30 +223,8 @@ TEST_F(ObjectReplaceNodeTest, CannotModifyImmutableId) {
     ObjectReplaceNode node(obj);
 
     Document doc(fromjson("{_id: 0}"));
-    FieldRef pathToCreate("");
-    FieldRef pathTaken("");
-    StringData matchedField;
-    auto fromReplication = false;
-    auto validateForStorage = true;
-    FieldRefSet immutablePaths;
-    FieldRef path("_id");
-    immutablePaths.insert(&path);
-    const UpdateIndexData* indexData;
-    Document logDoc;
-    LogBuilder* logBuilder = nullptr;
-    auto indexesAffected = false;
-    auto noop = false;
-    ASSERT_THROWS_CODE_AND_WHAT(node.apply(doc.root(),
-                                           &pathToCreate,
-                                           &pathTaken,
-                                           matchedField,
-                                           fromReplication,
-                                           validateForStorage,
-                                           immutablePaths,
-                                           indexData,
-                                           logBuilder,
-                                           &indexesAffected,
-                                           &noop),
+    addImmutablePath("_id");
+    ASSERT_THROWS_CODE_AND_WHAT(node.apply(getApplyParams(doc.root())),
                                 UserException,
                                 ErrorCodes::ImmutableField,
                                 "After applying the update, the (immutable) field '_id' was found "
@@ -527,35 +236,13 @@ TEST_F(ObjectReplaceNodeTest, CanAddImmutableField) {
     ObjectReplaceNode node(obj);
 
     Document doc(fromjson("{c: 1}"));
-    FieldRef pathToCreate("");
-    FieldRef pathTaken("");
-    StringData matchedField;
-    auto fromReplication = false;
-    auto validateForStorage = true;
-    FieldRefSet immutablePaths;
-    FieldRef path("a.b");
-    immutablePaths.insert(&path);
-    const UpdateIndexData* indexData;
-    Document logDoc;
-    LogBuilder logBuilder(logDoc.root());
-    auto indexesAffected = false;
-    auto noop = false;
-    node.apply(doc.root(),
-               &pathToCreate,
-               &pathTaken,
-               matchedField,
-               fromReplication,
-               validateForStorage,
-               immutablePaths,
-               indexData,
-               &logBuilder,
-               &indexesAffected,
-               &noop);
-    ASSERT_FALSE(noop);
-    ASSERT_TRUE(indexesAffected);
+    addImmutablePath("a.b");
+    auto result = node.apply(getApplyParams(doc.root()));
+    ASSERT_FALSE(result.noop);
+    ASSERT_TRUE(result.indexesAffected);
     ASSERT_EQUALS(fromjson("{a: {b: 1}}"), doc);
     ASSERT_FALSE(doc.isInPlaceModeEnabled());
-    ASSERT_EQUALS(fromjson("{a: {b: 1}}"), logDoc);
+    ASSERT_EQUALS(fromjson("{a: {b: 1}}"), getLogDoc());
 }
 
 TEST_F(ObjectReplaceNodeTest, CanAddImmutableId) {
@@ -563,35 +250,13 @@ TEST_F(ObjectReplaceNodeTest, CanAddImmutableId) {
     ObjectReplaceNode node(obj);
 
     Document doc(fromjson("{c: 1}"));
-    FieldRef pathToCreate("");
-    FieldRef pathTaken("");
-    StringData matchedField;
-    auto fromReplication = false;
-    auto validateForStorage = true;
-    FieldRefSet immutablePaths;
-    FieldRef path("_id");
-    immutablePaths.insert(&path);
-    const UpdateIndexData* indexData;
-    Document logDoc;
-    LogBuilder logBuilder(logDoc.root());
-    auto indexesAffected = false;
-    auto noop = false;
-    node.apply(doc.root(),
-               &pathToCreate,
-               &pathTaken,
-               matchedField,
-               fromReplication,
-               validateForStorage,
-               immutablePaths,
-               indexData,
-               &logBuilder,
-               &indexesAffected,
-               &noop);
-    ASSERT_FALSE(noop);
-    ASSERT_TRUE(indexesAffected);
+    addImmutablePath("_id");
+    auto result = node.apply(getApplyParams(doc.root()));
+    ASSERT_FALSE(result.noop);
+    ASSERT_TRUE(result.indexesAffected);
     ASSERT_EQUALS(fromjson("{_id: 0}"), doc);
     ASSERT_FALSE(doc.isInPlaceModeEnabled());
-    ASSERT_EQUALS(fromjson("{_id: 0}"), logDoc);
+    ASSERT_EQUALS(fromjson("{_id: 0}"), getLogDoc());
 }
 
 TEST_F(ObjectReplaceNodeTest, CannotCreateDollarPrefixedNameWhenValidateForStorageIsTrue) {
@@ -599,29 +264,8 @@ TEST_F(ObjectReplaceNodeTest, CannotCreateDollarPrefixedNameWhenValidateForStora
     ObjectReplaceNode node(obj);
 
     Document doc(fromjson("{}"));
-    FieldRef pathToCreate("");
-    FieldRef pathTaken("");
-    StringData matchedField;
-    auto fromReplication = false;
-    auto validateForStorage = true;
-    FieldRefSet immutablePaths;
-    const UpdateIndexData* indexData;
-    Document logDoc;
-    LogBuilder* logBuilder = nullptr;
-    auto indexesAffected = false;
-    auto noop = false;
     ASSERT_THROWS_CODE_AND_WHAT(
-        node.apply(doc.root(),
-                   &pathToCreate,
-                   &pathTaken,
-                   matchedField,
-                   fromReplication,
-                   validateForStorage,
-                   immutablePaths,
-                   indexData,
-                   logBuilder,
-                   &indexesAffected,
-                   &noop),
+        node.apply(getApplyParams(doc.root())),
         UserException,
         ErrorCodes::DollarPrefixedFieldName,
         "The dollar ($) prefixed field '$bad' in 'a.$bad' is not valid for storage.");
@@ -632,33 +276,13 @@ TEST_F(ObjectReplaceNodeTest, CanCreateDollarPrefixedNameWhenValidateForStorageI
     ObjectReplaceNode node(obj);
 
     Document doc(fromjson("{}"));
-    FieldRef pathToCreate("");
-    FieldRef pathTaken("");
-    StringData matchedField;
-    auto fromReplication = false;
-    auto validateForStorage = false;
-    FieldRefSet immutablePaths;
-    const UpdateIndexData* indexData;
-    Document logDoc;
-    LogBuilder logBuilder(logDoc.root());
-    auto indexesAffected = false;
-    auto noop = false;
-    node.apply(doc.root(),
-               &pathToCreate,
-               &pathTaken,
-               matchedField,
-               fromReplication,
-               validateForStorage,
-               immutablePaths,
-               indexData,
-               &logBuilder,
-               &indexesAffected,
-               &noop);
-    ASSERT_FALSE(noop);
-    ASSERT_TRUE(indexesAffected);
+    setValidateForStorage(false);
+    auto result = node.apply(getApplyParams(doc.root()));
+    ASSERT_FALSE(result.noop);
+    ASSERT_TRUE(result.indexesAffected);
     ASSERT_EQUALS(fromjson("{a: {b: 1, $bad: 1}}"), doc);
     ASSERT_FALSE(doc.isInPlaceModeEnabled());
-    ASSERT_EQUALS(fromjson("{a: {b: 1, $bad: 1}}"), logDoc);
+    ASSERT_EQUALS(fromjson("{a: {b: 1, $bad: 1}}"), getLogDoc());
 }
 
 TEST_F(ObjectReplaceNodeTest, NoLogBuilder) {
@@ -666,29 +290,10 @@ TEST_F(ObjectReplaceNodeTest, NoLogBuilder) {
     ObjectReplaceNode node(obj);
 
     Document doc(fromjson("{b: 1}"));
-    FieldRef pathToCreate("");
-    FieldRef pathTaken("");
-    StringData matchedField;
-    auto fromReplication = false;
-    auto validateForStorage = true;
-    FieldRefSet immutablePaths;
-    const UpdateIndexData* indexData;
-    LogBuilder* logBuilder = nullptr;
-    auto indexesAffected = false;
-    auto noop = false;
-    node.apply(doc.root(),
-               &pathToCreate,
-               &pathTaken,
-               matchedField,
-               fromReplication,
-               validateForStorage,
-               immutablePaths,
-               indexData,
-               logBuilder,
-               &indexesAffected,
-               &noop);
-    ASSERT_FALSE(noop);
-    ASSERT_TRUE(indexesAffected);
+    setLogBuilderToNull();
+    auto result = node.apply(getApplyParams(doc.root()));
+    ASSERT_FALSE(result.noop);
+    ASSERT_TRUE(result.indexesAffected);
     ASSERT_EQUALS(fromjson("{a: 1}"), doc);
     ASSERT_FALSE(doc.isInPlaceModeEnabled());
 }

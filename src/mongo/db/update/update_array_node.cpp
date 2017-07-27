@@ -46,33 +46,20 @@ std::unique_ptr<UpdateNode> UpdateArrayNode::createUpdateNodeByMerging(
     return std::move(mergedNode);
 }
 
-void UpdateArrayNode::apply(mutablebson::Element element,
-                            FieldRef* pathToCreate,
-                            FieldRef* pathTaken,
-                            StringData matchedField,
-                            bool fromReplication,
-                            bool validateForStorage,
-                            const FieldRefSet& immutablePaths,
-                            const UpdateIndexData* indexData,
-                            LogBuilder* logBuilder,
-                            bool* indexesAffected,
-                            bool* noop) const {
-    *indexesAffected = false;
-    *noop = true;
-
-    if (!pathToCreate->empty()) {
-        for (size_t i = 0; i < pathToCreate->numParts(); ++i) {
-            pathTaken->appendPart(pathToCreate->getPart(i));
+UpdateNode::ApplyResult UpdateArrayNode::apply(ApplyParams applyParams) const {
+    if (!applyParams.pathToCreate->empty()) {
+        for (size_t i = 0; i < applyParams.pathToCreate->numParts(); ++i) {
+            applyParams.pathTaken->appendPart(applyParams.pathToCreate->getPart(i));
         }
         uasserted(ErrorCodes::BadValue,
-                  str::stream() << "The path '" << pathTaken->dottedField()
+                  str::stream() << "The path '" << applyParams.pathTaken->dottedField()
                                 << "' must exist in the document in order to apply array updates.");
     }
 
     uassert(ErrorCodes::BadValue,
             str::stream() << "Cannot apply array updates to non-array element "
-                          << element.toString(),
-            element.getType() == BSONType::Array);
+                          << applyParams.element.toString(),
+            applyParams.element.getType() == BSONType::Array);
 
     // Construct a map from the array index to the set of updates that should be applied to the
     // array element at that index. We do not apply the updates yet because we need to know how many
@@ -80,7 +67,7 @@ void UpdateArrayNode::apply(mutablebson::Element element,
     // UpdateNode children.
     std::map<size_t, std::vector<UpdateNode*>> matchingElements;
     size_t i = 0;
-    for (auto childElement = element.leftChild(); childElement.ok();
+    for (auto childElement = applyParams.element.leftChild(); childElement.ok();
          childElement = childElement.rightSibling()) {
 
         // 'childElement' will always be serialized because no updates have been performed on the
@@ -118,8 +105,9 @@ void UpdateArrayNode::apply(mutablebson::Element element,
     size_t nModified = 0;
 
     // Update array elements.
+    auto applyResult = ApplyResult::noopResult();
     i = 0;
-    for (auto childElement = element.leftChild(); childElement.ok();
+    for (auto childElement = applyParams.element.leftChild(); childElement.ok();
          childElement = childElement.rightSibling()) {
         auto updates = matchingElements.find(i);
         if (updates != matchingElements.end()) {
@@ -127,7 +115,7 @@ void UpdateArrayNode::apply(mutablebson::Element element,
             // Merge all of the updates for this array element.
             invariant(updates->second.size() > 0);
             auto mergedChild = updates->second[0];
-            FieldRefTempAppend tempAppend(*pathTaken, childElement.getFieldName());
+            FieldRefTempAppend tempAppend(*(applyParams.pathTaken), childElement.getFieldName());
             for (size_t j = 1; j < updates->second.size(); ++j) {
 
                 // Use the cached merge result, if it is available.
@@ -141,28 +129,22 @@ void UpdateArrayNode::apply(mutablebson::Element element,
                 // result.
                 _mergedChildrenCache[mergedChild][updates->second[j]] =
                     UpdateNode::createUpdateNodeByMerging(
-                        *mergedChild, *updates->second[j], pathTaken);
+                        *mergedChild, *updates->second[j], applyParams.pathTaken.get());
                 mergedChild = _mergedChildrenCache[mergedChild][updates->second[j]].get();
             }
 
-            bool childAffectsIndexes = false;
-            bool childNoop = false;
+            auto childApplyParams = applyParams;
+            childApplyParams.element = childElement;
+            if (!childrenShouldLogThemselves) {
+                childApplyParams.logBuilder = nullptr;
+            }
 
-            mergedChild->apply(childElement,
-                               pathToCreate,
-                               pathTaken,
-                               matchedField,
-                               fromReplication,
-                               validateForStorage,
-                               immutablePaths,
-                               indexData,
-                               childrenShouldLogThemselves ? logBuilder : nullptr,
-                               &childAffectsIndexes,
-                               &childNoop);
+            auto childApplyResult = mergedChild->apply(childApplyParams);
 
-            *indexesAffected = *indexesAffected || childAffectsIndexes;
-            *noop = *noop && childNoop;
-            if (!childNoop) {
+            applyResult.indexesAffected =
+                applyResult.indexesAffected || childApplyResult.indexesAffected;
+            applyResult.noop = applyResult.noop && childApplyResult.noop;
+            if (!childApplyResult.noop) {
                 modifiedElement = childElement;
                 ++nModified;
             }
@@ -172,25 +154,28 @@ void UpdateArrayNode::apply(mutablebson::Element element,
     }
 
     // If the child updates have not been logged, log the updated array elements.
-    if (!childrenShouldLogThemselves && logBuilder) {
+    if (!childrenShouldLogThemselves && applyParams.logBuilder) {
         if (nModified > 1) {
 
             // Log the entire array.
-            auto logElement = logBuilder->getDocument().makeElementWithNewFieldName(
-                pathTaken->dottedField(), element);
+            auto logElement = applyParams.logBuilder->getDocument().makeElementWithNewFieldName(
+                applyParams.pathTaken->dottedField(), applyParams.element);
             invariant(logElement.ok());
-            uassertStatusOK(logBuilder->addToSets(logElement));
+            uassertStatusOK(applyParams.logBuilder->addToSets(logElement));
         } else if (nModified == 1) {
 
             // Log the modified array element.
             invariant(modifiedElement);
-            FieldRefTempAppend tempAppend(*pathTaken, modifiedElement->getFieldName());
-            auto logElement = logBuilder->getDocument().makeElementWithNewFieldName(
-                pathTaken->dottedField(), *modifiedElement);
+            FieldRefTempAppend tempAppend(*(applyParams.pathTaken),
+                                          modifiedElement->getFieldName());
+            auto logElement = applyParams.logBuilder->getDocument().makeElementWithNewFieldName(
+                applyParams.pathTaken->dottedField(), *modifiedElement);
             invariant(logElement.ok());
-            uassertStatusOK(logBuilder->addToSets(logElement));
+            uassertStatusOK(applyParams.logBuilder->addToSets(logElement));
         }
     }
+
+    return applyResult;
 }
 
 UpdateNode* UpdateArrayNode::getChild(const std::string& field) const {

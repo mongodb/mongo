@@ -63,7 +63,7 @@ public:
         return Status::OK();
     }
 
-    void updateExistingElement(mutablebson::Element* element, bool* noop) const final {
+    bool updateExistingElement(mutablebson::Element* element) const final {
         // In the case of a $rename where the source and destination have the same value, (e.g., we
         // are applying {$rename: {a: b}} to the document {a: "foo", b: "foo"}), there's no need to
         // modify the destination element. However, the source and destination values must be
@@ -71,10 +71,10 @@ public:
         StringData::ComparatorInterface* comparator = nullptr;
         auto considerFieldName = false;
         if (_elemToSet.compareWithElement(*element, comparator, considerFieldName) != 0) {
-            *noop = false;
             invariantOK(element->setValueElement(_elemToSet));
+            return true;
         } else {
-            *noop = true;
+            return false;
         }
     }
 
@@ -138,26 +138,13 @@ Status RenameNode::init(BSONElement modExpr, const CollatorInterface* collator) 
     return Status::OK();
 }
 
-void RenameNode::apply(mutablebson::Element element,
-                       FieldRef* pathToCreate,
-                       FieldRef* pathTaken,
-                       StringData matchedField,
-                       bool fromReplication,
-                       bool validateForStorage,
-                       const FieldRefSet& immutablePaths,
-                       const UpdateIndexData* indexData,
-                       LogBuilder* logBuilder,
-                       bool* indexesAffected,
-                       bool* noop) const {
-    *indexesAffected = false;
-    *noop = false;
-
+UpdateNode::ApplyResult RenameNode::apply(ApplyParams applyParams) const {
     // It would make sense to store fromFieldRef and toFieldRef as members during
     // RenameNode::init(), but FieldRef is not copyable.
     FieldRef fromFieldRef(_val.fieldName());
     FieldRef toFieldRef(_val.valueStringData());
 
-    mutablebson::Document& document = element.getDocument();
+    mutablebson::Document& document = applyParams.element.getDocument();
 
     size_t fromIdxFound;
     mutablebson::Element fromElement(document.end());
@@ -175,8 +162,7 @@ void RenameNode::apply(mutablebson::Element element,
 
         // The element we want to rename does not exist. When that happens, we treat the operation
         // as a no-op.
-        *noop = true;
-        return;
+        return ApplyResult::noopResult();
     }
 
     // Renaming through an array is prohibited. Check that our source path does not contain an
@@ -200,7 +186,8 @@ void RenameNode::apply(mutablebson::Element element,
     // Check that our destination path does not contain an array. (If the rename will overwrite an
     // existing element, that element may be an array. Iff pathToCreate is empty, "element"
     // represents an element that we are going to overwrite.)
-    for (auto currentElement = pathToCreate->empty() ? element.parent() : element;
+    for (auto currentElement = applyParams.pathToCreate->empty() ? applyParams.element.parent()
+                                                                 : applyParams.element;
          currentElement != document.root();
          currentElement = currentElement.parent()) {
         invariant(currentElement.ok());
@@ -217,20 +204,8 @@ void RenameNode::apply(mutablebson::Element element,
         }
     }
 
-    bool setAffectedIndexes = false;
-    bool setWasNoop = false;
     SetElementNode setElement(fromElement);
-    setElement.apply(element,
-                     pathToCreate,
-                     pathTaken,
-                     matchedField,
-                     fromReplication,
-                     validateForStorage,
-                     immutablePaths,
-                     indexData,
-                     logBuilder,
-                     &setAffectedIndexes,
-                     &setWasNoop);
+    auto setElementApplyResult = setElement.apply(applyParams);
 
     auto leftSibling = fromElement.leftSibling();
     auto rightSibling = fromElement.rightSibling();
@@ -238,15 +213,15 @@ void RenameNode::apply(mutablebson::Element element,
     invariant(fromElement.parent().ok());
     invariantOK(fromElement.remove());
 
-    if (setAffectedIndexes) {
-        *indexesAffected = true;
-    } else if (indexData && indexData->mightBeIndexed(fromFieldRef.dottedField())) {
-        *indexesAffected = true;
-    } else {
-        // *indexedAffected remains false
+    ApplyResult applyResult;
+
+    if (!applyParams.indexData ||
+        (!setElementApplyResult.indexesAffected &&
+         !applyParams.indexData->mightBeIndexed(fromFieldRef.dottedField()))) {
+        applyResult.indexesAffected = false;
     }
 
-    if (validateForStorage) {
+    if (applyParams.validateForStorage) {
 
         // Validate the left and right sibling, in case this element was part of a DBRef.
         if (leftSibling.ok()) {
@@ -263,7 +238,8 @@ void RenameNode::apply(mutablebson::Element element,
     }
 
     // Ensure we are not changing any immutable paths.
-    for (auto immutablePath = immutablePaths.begin(); immutablePath != immutablePaths.end();
+    for (auto immutablePath = applyParams.immutablePaths.begin();
+         immutablePath != applyParams.immutablePaths.end();
          ++immutablePath) {
         uassert(ErrorCodes::ImmutableField,
                 str::stream() << "Unsetting the path '" << fromFieldRef.dottedField()
@@ -275,9 +251,11 @@ void RenameNode::apply(mutablebson::Element element,
     }
 
     // Log the $unset. The $set was already logged by SetElementNode::apply().
-    if (logBuilder) {
-        uassertStatusOK(logBuilder->addToUnsets(fromFieldRef.dottedField()));
+    if (applyParams.logBuilder) {
+        uassertStatusOK(applyParams.logBuilder->addToUnsets(fromFieldRef.dottedField()));
     }
+
+    return applyResult;
 }
 
 }  // namespace mongo

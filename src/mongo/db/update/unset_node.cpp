@@ -40,47 +40,36 @@ Status UnsetNode::init(BSONElement modExpr, const CollatorInterface* collator) {
     return Status::OK();
 }
 
-void UnsetNode::apply(mutablebson::Element element,
-                      FieldRef* pathToCreate,
-                      FieldRef* pathTaken,
-                      StringData matchedField,
-                      bool fromReplication,
-                      bool validateForStorage,
-                      const FieldRefSet& immutablePaths,
-                      const UpdateIndexData* indexData,
-                      LogBuilder* logBuilder,
-                      bool* indexesAffected,
-                      bool* noop) const {
-    *indexesAffected = false;
-    *noop = false;
-
-    if (!pathToCreate->empty()) {
+UpdateNode::ApplyResult UnsetNode::apply(ApplyParams applyParams) const {
+    if (!applyParams.pathToCreate->empty()) {
         // A non-empty "pathToCreate" implies that our search did not find the field that we wanted
         // to delete. We employ a simple and efficient strategy for deleting fields that don't yet
         // exist.
-        *noop = true;
-        return;
+        return ApplyResult::noopResult();
     }
+
+    ApplyResult applyResult;
 
     // Determine if indexes are affected.
-    if (indexData && indexData->mightBeIndexed(pathTaken->dottedField())) {
-        *indexesAffected = true;
+    if (!applyParams.indexData ||
+        !applyParams.indexData->mightBeIndexed(applyParams.pathTaken->dottedField())) {
+        applyResult.indexesAffected = false;
     }
 
-    auto parent = element.parent();
-    auto leftSibling = element.leftSibling();
-    auto rightSibling = element.rightSibling();
+    auto parent = applyParams.element.parent();
+    auto leftSibling = applyParams.element.leftSibling();
+    auto rightSibling = applyParams.element.rightSibling();
 
     invariant(parent.ok());
     if (!parent.isType(BSONType::Array)) {
-        invariantOK(element.remove());
+        invariantOK(applyParams.element.remove());
     } else {
         // Special case: An $unset on an array element sets it to null instead of removing it from
         // the array.
-        invariantOK(element.setValueNull());
+        invariantOK(applyParams.element.setValueNull());
     }
 
-    if (validateForStorage) {
+    if (applyParams.validateForStorage) {
 
         // Validate the left and right sibling, in case this element was part of a DBRef.
         if (leftSibling.ok()) {
@@ -97,21 +86,24 @@ void UnsetNode::apply(mutablebson::Element element,
     }
 
     // Ensure we are not changing any immutable paths.
-    for (auto immutablePath = immutablePaths.begin(); immutablePath != immutablePaths.end();
+    for (auto immutablePath = applyParams.immutablePaths.begin();
+         immutablePath != applyParams.immutablePaths.end();
          ++immutablePath) {
         uassert(ErrorCodes::ImmutableField,
-                str::stream() << "Unsetting the path '" << pathTaken->dottedField()
+                str::stream() << "Unsetting the path '" << applyParams.pathTaken->dottedField()
                               << "' would modify the immutable field '"
                               << (*immutablePath)->dottedField()
                               << "'",
-                pathTaken->commonPrefixSize(**immutablePath) <
-                    std::min(pathTaken->numParts(), (*immutablePath)->numParts()));
+                applyParams.pathTaken->commonPrefixSize(**immutablePath) <
+                    std::min(applyParams.pathTaken->numParts(), (*immutablePath)->numParts()));
     }
 
     // Log the unset.
-    if (logBuilder) {
-        uassertStatusOK(logBuilder->addToUnsets(pathTaken->dottedField()));
+    if (applyParams.logBuilder) {
+        uassertStatusOK(applyParams.logBuilder->addToUnsets(applyParams.pathTaken->dottedField()));
     }
+
+    return applyResult;
 }
 
 }  // namespace mongo

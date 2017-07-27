@@ -289,27 +289,21 @@ Status UpdateDriver::update(StringData matchedField,
     if (_root) {
 
         // We parsed using the new UpdateNode implementation.
-        FieldRef pathToCreate;
-        FieldRef pathTaken;
-        bool indexesAffected = false;
-        bool noop = false;
-        _root->apply(doc->root(),
-                     &pathToCreate,
-                     &pathTaken,
-                     matchedField,
-                     _modOptions.fromReplication,
-                     validateForStorage,
-                     immutablePaths,
-                     _indexedFields,
-                     (_logOp && logOpRec) ? &logBuilder : nullptr,
-                     &indexesAffected,
-                     &noop);
-        if (indexesAffected) {
+        UpdateNode::ApplyParams applyParams(doc->root(), immutablePaths);
+        applyParams.matchedField = matchedField;
+        applyParams.fromReplication = _modOptions.fromReplication;
+        applyParams.validateForStorage = validateForStorage;
+        applyParams.indexData = _indexedFields;
+        if (_logOp && logOpRec) {
+            applyParams.logBuilder = &logBuilder;
+        }
+        auto applyResult = _root->apply(applyParams);
+        if (applyResult.indexesAffected) {
             _affectIndices = true;
             doc->disableInPlaceUpdates();
         }
         if (docWasModified) {
-            *docWasModified = !noop;
+            *docWasModified = !applyResult.noop;
         }
 
     } else {

@@ -41,25 +41,15 @@ namespace mongo {
  */
 class PathCreatingNode : public UpdateLeafNode {
 public:
-    void apply(mutablebson::Element element,
-               FieldRef* pathToCreate,
-               FieldRef* pathTaken,
-               StringData matchedField,
-               bool fromReplication,
-               bool validateForStorage,
-               const FieldRefSet& immutablePaths,
-               const UpdateIndexData* indexData,
-               LogBuilder* logBuilder,
-               bool* indexesAffected,
-               bool* noop) const final;
+    ApplyResult apply(ApplyParams applyParams) const final;
 
 protected:
     /**
      * PathCreatingNode::apply() calls the updateExistingElement() method when applying its update
      * to an existing path. The child's implementation of this method is responsible for either
-     * updating the given Element or setting *noop to true to indicate that no update is necessary.
+     * updating the given Element or returning false to indicate that no update is necessary.
      */
-    virtual void updateExistingElement(mutablebson::Element* element, bool* noop) const = 0;
+    virtual bool updateExistingElement(mutablebson::Element* element) const = 0;
 
     /**
      * PathCreatingNode::apply() calls the setValueForNewElement() method when it must materialize a

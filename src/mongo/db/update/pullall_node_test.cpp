@@ -34,12 +34,14 @@
 #include "mongo/bson/mutable/mutable_bson_test_utils.h"
 #include "mongo/db/json.h"
 #include "mongo/db/query/collation/collator_interface_mock.h"
+#include "mongo/db/update/update_node_test_fixture.h"
 #include "mongo/unittest/death_test.h"
 #include "mongo/unittest/unittest.h"
 
+namespace mongo {
 namespace {
 
-using namespace mongo;
+using PullAllNodeTest = UpdateNodeTest;
 using mongo::mutablebson::Document;
 using mongo::mutablebson::Element;
 using mongo::mutablebson::countChildren;
@@ -80,409 +82,192 @@ TEST(PullAllNodeTest, InitWithBoolFails) {
     ASSERT_EQUALS(ErrorCodes::BadValue, status);
 }
 
-TEST(PullAllNodeTest, TargetNotFound) {
+TEST_F(PullAllNodeTest, TargetNotFound) {
     auto update = fromjson("{$pullAll : {b: [1]}}");
     const CollatorInterface* collator = nullptr;
     PullAllNode node;
     ASSERT_OK(node.init(update["$pullAll"]["b"], collator));
 
     Document doc(fromjson("{a: [1, 'a', {r: 1, b: 2}]}"));
-    FieldRef pathToCreate("b");
-    FieldRef pathTaken("");
-    StringData matchedField;
-    auto fromReplication = false;
-    auto validateForStorage = true;
-    FieldRefSet immutablePaths;
-    UpdateIndexData indexData;
-    indexData.addPath("a");
-    Document logDoc;
-    LogBuilder logBuilder(logDoc.root());
-    auto indexesAffected = false;
-    auto noop = false;
-    node.apply(doc.root(),
-               &pathToCreate,
-               &pathTaken,
-               matchedField,
-               fromReplication,
-               validateForStorage,
-               immutablePaths,
-               &indexData,
-               &logBuilder,
-               &indexesAffected,
-               &noop);
-    ASSERT_TRUE(noop);
-    ASSERT_FALSE(indexesAffected);
+    setPathToCreate("b");
+    addIndexedPath("a");
+    auto result = node.apply(getApplyParams(doc.root()));
+    ASSERT_TRUE(result.noop);
+    ASSERT_FALSE(result.indexesAffected);
     ASSERT_EQUALS(fromjson("{a: [1, 'a', {r: 1, b: 2}]}"), doc);
     ASSERT_TRUE(doc.isInPlaceModeEnabled());
-    ASSERT_EQUALS(fromjson("{}"), logDoc);
+    ASSERT_EQUALS(fromjson("{}"), getLogDoc());
 }
 
-TEST(PullAllNodeTest, TargetArrayElementNotFound) {
+TEST_F(PullAllNodeTest, TargetArrayElementNotFound) {
     auto update = fromjson("{$pullAll : {'a.2': [1]}}");
     const CollatorInterface* collator = nullptr;
     PullAllNode node;
     ASSERT_OK(node.init(update["$pullAll"]["a.2"], collator));
 
     Document doc(fromjson("{a: [1, 2]}"));
-    FieldRef pathToCreate("2");
-    FieldRef pathTaken("a");
-    StringData matchedField;
-    auto fromReplication = false;
-    auto validateForStorage = true;
-    FieldRefSet immutablePaths;
-    UpdateIndexData indexData;
-    indexData.addPath("a");
-    Document logDoc;
-    LogBuilder logBuilder(logDoc.root());
-    auto indexesAffected = false;
-    auto noop = false;
-    node.apply(doc.root()["a"],
-               &pathToCreate,
-               &pathTaken,
-               matchedField,
-               fromReplication,
-               validateForStorage,
-               immutablePaths,
-               &indexData,
-               &logBuilder,
-               &indexesAffected,
-               &noop);
-    ASSERT_TRUE(noop);
-    ASSERT_FALSE(indexesAffected);
+    setPathToCreate("2");
+    setPathTaken("a");
+    addIndexedPath("a");
+    auto result = node.apply(getApplyParams(doc.root()["a"]));
+    ASSERT_TRUE(result.noop);
+    ASSERT_FALSE(result.indexesAffected);
     ASSERT_EQUALS(fromjson("{a: [1, 2]}"), doc);
     ASSERT_TRUE(doc.isInPlaceModeEnabled());
-    ASSERT_EQUALS(fromjson("{}"), logDoc);
+    ASSERT_EQUALS(fromjson("{}"), getLogDoc());
 }
 
-TEST(PullAllNodeTest, ApplyToNonArrayFails) {
+TEST_F(PullAllNodeTest, ApplyToNonArrayFails) {
     auto update = fromjson("{$pullAll : {'a.0': [1, 2]}}");
     const CollatorInterface* collator = nullptr;
     PullAllNode node;
     ASSERT_OK(node.init(update["$pullAll"]["a.0"], collator));
 
     Document doc(fromjson("{a: [1, 2]}"));
-    FieldRef pathToCreate("");
-    FieldRef pathTaken("a.0");
-    StringData matchedField;
-    auto fromReplication = false;
-    auto validateForStorage = true;
-    FieldRefSet immutablePaths;
-    UpdateIndexData indexData;
-    indexData.addPath("a");
-    Document logDoc;
-    LogBuilder logBuilder(logDoc.root());
-    auto indexesAffected = false;
-    auto noop = false;
-    ASSERT_THROWS_CODE_AND_WHAT(node.apply(doc.root()["a"][0],
-                                           &pathToCreate,
-                                           &pathTaken,
-                                           matchedField,
-                                           fromReplication,
-                                           validateForStorage,
-                                           immutablePaths,
-                                           &indexData,
-                                           &logBuilder,
-                                           &indexesAffected,
-                                           &noop),
+    setPathTaken("a.0");
+    addIndexedPath("a");
+    ASSERT_THROWS_CODE_AND_WHAT(node.apply(getApplyParams(doc.root()["a"][0])),
                                 UserException,
                                 ErrorCodes::BadValue,
                                 "Cannot apply $pull to a non-array value");
 }
 
-TEST(PullAllNodeTest, ApplyWithSingleNumber) {
+TEST_F(PullAllNodeTest, ApplyWithSingleNumber) {
     auto update = fromjson("{$pullAll : {a: [1]}}");
     const CollatorInterface* collator = nullptr;
     PullAllNode node;
     ASSERT_OK(node.init(update["$pullAll"]["a"], collator));
 
     Document doc(fromjson("{a: [1, 'a', {r: 1, b: 2}]}"));
-    FieldRef pathToCreate("");
-    FieldRef pathTaken("a");
-    StringData matchedField;
-    auto fromReplication = false;
-    auto validateForStorage = true;
-    FieldRefSet immutablePaths;
-    UpdateIndexData indexData;
-    indexData.addPath("a");
-    Document logDoc;
-    LogBuilder logBuilder(logDoc.root());
-    auto indexesAffected = false;
-    auto noop = false;
-    node.apply(doc.root()["a"],
-               &pathToCreate,
-               &pathTaken,
-               matchedField,
-               fromReplication,
-               validateForStorage,
-               immutablePaths,
-               &indexData,
-               &logBuilder,
-               &indexesAffected,
-               &noop);
-    ASSERT_FALSE(noop);
-    ASSERT_TRUE(indexesAffected);
+    setPathTaken("a");
+    addIndexedPath("a");
+    auto result = node.apply(getApplyParams(doc.root()["a"]));
+    ASSERT_FALSE(result.noop);
+    ASSERT_TRUE(result.indexesAffected);
     ASSERT_EQUALS(fromjson("{a: ['a', {r: 1, b: 2}]}"), doc);
     ASSERT_FALSE(doc.isInPlaceModeEnabled());
-    ASSERT_EQUALS(fromjson("{$set: {a: ['a', {r: 1, b: 2}]}}"), logDoc);
+    ASSERT_EQUALS(fromjson("{$set: {a: ['a', {r: 1, b: 2}]}}"), getLogDoc());
 }
 
-TEST(PullAllNodeTest, ApplyNoIndexDataNoLogBuilder) {
+TEST_F(PullAllNodeTest, ApplyNoIndexDataNoLogBuilder) {
     auto update = fromjson("{$pullAll : {a: [1]}}");
     const CollatorInterface* collator = nullptr;
     PullAllNode node;
     ASSERT_OK(node.init(update["$pullAll"]["a"], collator));
 
     Document doc(fromjson("{a: [1, 'a', {r: 1, b: 2}]}"));
-    FieldRef pathToCreate("");
-    FieldRef pathTaken("a");
-    StringData matchedField;
-    auto fromReplication = false;
-    auto validateForStorage = true;
-    FieldRefSet immutablePaths;
-    UpdateIndexData* indexData = nullptr;
-    LogBuilder* logBuilder = nullptr;
-    auto indexesAffected = false;
-    auto noop = false;
-    node.apply(doc.root()["a"],
-               &pathToCreate,
-               &pathTaken,
-               matchedField,
-               fromReplication,
-               validateForStorage,
-               immutablePaths,
-               indexData,
-               logBuilder,
-               &indexesAffected,
-               &noop);
-    ASSERT_FALSE(noop);
-    ASSERT_FALSE(indexesAffected);
+    setPathTaken("a");
+    setLogBuilderToNull();
+    auto result = node.apply(getApplyParams(doc.root()["a"]));
+    ASSERT_FALSE(result.noop);
+    ASSERT_FALSE(result.indexesAffected);
     ASSERT_EQUALS(fromjson("{a: ['a', {r: 1, b: 2}]}"), doc);
     ASSERT_FALSE(doc.isInPlaceModeEnabled());
 }
 
-TEST(PullAllNodeTest, ApplyWithElementNotPresentInArray) {
+TEST_F(PullAllNodeTest, ApplyWithElementNotPresentInArray) {
     auto update = fromjson("{$pullAll : {a: ['r']}}");
     const CollatorInterface* collator = nullptr;
     PullAllNode node;
     ASSERT_OK(node.init(update["$pullAll"]["a"], collator));
 
     Document doc(fromjson("{a: [1, 'a', {r: 1, b: 2}]}"));
-    FieldRef pathToCreate("");
-    FieldRef pathTaken("a");
-    StringData matchedField;
-    auto fromReplication = false;
-    auto validateForStorage = true;
-    FieldRefSet immutablePaths;
-    UpdateIndexData indexData;
-    indexData.addPath("a");
-    Document logDoc;
-    LogBuilder logBuilder(logDoc.root());
-    auto indexesAffected = false;
-    auto noop = false;
-    node.apply(doc.root()["a"],
-               &pathToCreate,
-               &pathTaken,
-               matchedField,
-               fromReplication,
-               validateForStorage,
-               immutablePaths,
-               &indexData,
-               &logBuilder,
-               &indexesAffected,
-               &noop);
-    ASSERT_TRUE(noop);
-    ASSERT_FALSE(indexesAffected);
+    setPathTaken("a");
+    addIndexedPath("a");
+    auto result = node.apply(getApplyParams(doc.root()["a"]));
+    ASSERT_TRUE(result.noop);
+    ASSERT_FALSE(result.indexesAffected);
     ASSERT_EQUALS(fromjson("{a: [1, 'a', {r: 1, b: 2}]}"), doc);
     ASSERT_TRUE(doc.isInPlaceModeEnabled());
-    ASSERT_EQUALS(fromjson("{}"), logDoc);
+    ASSERT_EQUALS(fromjson("{}"), getLogDoc());
 }
 
-TEST(PullAllNodeTest, ApplyWithWithTwoElements) {
+TEST_F(PullAllNodeTest, ApplyWithWithTwoElements) {
     auto update = fromjson("{$pullAll : {a: [1, 'a']}}");
     const CollatorInterface* collator = nullptr;
     PullAllNode node;
     ASSERT_OK(node.init(update["$pullAll"]["a"], collator));
 
     Document doc(fromjson("{a: [1, 'a', {r: 1, b: 2}]}"));
-    FieldRef pathToCreate("");
-    FieldRef pathTaken("a");
-    StringData matchedField;
-    auto fromReplication = false;
-    auto validateForStorage = true;
-    FieldRefSet immutablePaths;
-    UpdateIndexData indexData;
-    indexData.addPath("a");
-    Document logDoc;
-    LogBuilder logBuilder(logDoc.root());
-    auto indexesAffected = false;
-    auto noop = false;
-    node.apply(doc.root()["a"],
-               &pathToCreate,
-               &pathTaken,
-               matchedField,
-               fromReplication,
-               validateForStorage,
-               immutablePaths,
-               &indexData,
-               &logBuilder,
-               &indexesAffected,
-               &noop);
-    ASSERT_FALSE(noop);
-    ASSERT_TRUE(indexesAffected);
+    setPathTaken("a");
+    addIndexedPath("a");
+    auto result = node.apply(getApplyParams(doc.root()["a"]));
+    ASSERT_FALSE(result.noop);
+    ASSERT_TRUE(result.indexesAffected);
     ASSERT_EQUALS(fromjson("{a: [{r: 1, b: 2}]}"), doc);
     ASSERT_FALSE(doc.isInPlaceModeEnabled());
-    ASSERT_EQUALS(fromjson("{$set: {a: [{r: 1, b: 2}]}}"), logDoc);
+    ASSERT_EQUALS(fromjson("{$set: {a: [{r: 1, b: 2}]}}"), getLogDoc());
 }
 
-TEST(PullAllNodeTest, ApplyWithAllArrayElements) {
+TEST_F(PullAllNodeTest, ApplyWithAllArrayElements) {
     auto update = fromjson("{$pullAll : {a: [1, 'a', {r: 1, b: 2}]}}");
     const CollatorInterface* collator = nullptr;
     PullAllNode node;
     ASSERT_OK(node.init(update["$pullAll"]["a"], collator));
 
     Document doc(fromjson("{a: [1, 'a', {r: 1, b: 2}]}"));
-    FieldRef pathToCreate("");
-    FieldRef pathTaken("a");
-    StringData matchedField;
-    auto fromReplication = false;
-    auto validateForStorage = true;
-    FieldRefSet immutablePaths;
-    UpdateIndexData indexData;
-    indexData.addPath("a");
-    Document logDoc;
-    LogBuilder logBuilder(logDoc.root());
-    auto indexesAffected = false;
-    auto noop = false;
-    node.apply(doc.root()["a"],
-               &pathToCreate,
-               &pathTaken,
-               matchedField,
-               fromReplication,
-               validateForStorage,
-               immutablePaths,
-               &indexData,
-               &logBuilder,
-               &indexesAffected,
-               &noop);
-    ASSERT_FALSE(noop);
-    ASSERT_TRUE(indexesAffected);
+    setPathTaken("a");
+    addIndexedPath("a");
+    auto result = node.apply(getApplyParams(doc.root()["a"]));
+    ASSERT_FALSE(result.noop);
+    ASSERT_TRUE(result.indexesAffected);
     ASSERT_EQUALS(fromjson("{a: []}"), doc);
     ASSERT_FALSE(doc.isInPlaceModeEnabled());
-    ASSERT_EQUALS(fromjson("{$set: {a: []}}"), logDoc);
+    ASSERT_EQUALS(fromjson("{$set: {a: []}}"), getLogDoc());
 }
 
-TEST(PullAllNodeTest, ApplyWithAllArrayElementsButOutOfOrder) {
+TEST_F(PullAllNodeTest, ApplyWithAllArrayElementsButOutOfOrder) {
     auto update = fromjson("{$pullAll : {a: [{r: 1, b: 2}, 1, 'a']}}");
     const CollatorInterface* collator = nullptr;
     PullAllNode node;
     ASSERT_OK(node.init(update["$pullAll"]["a"], collator));
 
     Document doc(fromjson("{a: [1, 'a', {r: 1, b: 2}]}"));
-    FieldRef pathToCreate("");
-    FieldRef pathTaken("a");
-    StringData matchedField;
-    auto fromReplication = false;
-    auto validateForStorage = true;
-    FieldRefSet immutablePaths;
-    UpdateIndexData indexData;
-    indexData.addPath("a");
-    Document logDoc;
-    LogBuilder logBuilder(logDoc.root());
-    auto indexesAffected = false;
-    auto noop = false;
-    node.apply(doc.root()["a"],
-               &pathToCreate,
-               &pathTaken,
-               matchedField,
-               fromReplication,
-               validateForStorage,
-               immutablePaths,
-               &indexData,
-               &logBuilder,
-               &indexesAffected,
-               &noop);
-    ASSERT_FALSE(noop);
-    ASSERT_TRUE(indexesAffected);
+    setPathTaken("a");
+    addIndexedPath("a");
+    auto result = node.apply(getApplyParams(doc.root()["a"]));
+    ASSERT_FALSE(result.noop);
+    ASSERT_TRUE(result.indexesAffected);
     ASSERT_EQUALS(fromjson("{a: []}"), doc);
     ASSERT_FALSE(doc.isInPlaceModeEnabled());
-    ASSERT_EQUALS(fromjson("{$set: {a: []}}"), logDoc);
+    ASSERT_EQUALS(fromjson("{$set: {a: []}}"), getLogDoc());
 }
 
-TEST(PullAllNodeTest, ApplyWithAllArrayElementsAndThenSome) {
+TEST_F(PullAllNodeTest, ApplyWithAllArrayElementsAndThenSome) {
     auto update = fromjson("{$pullAll : {a: [2, 3, 1, 'r', {r: 1, b: 2}, 'a']}}");
     const CollatorInterface* collator = nullptr;
     PullAllNode node;
     ASSERT_OK(node.init(update["$pullAll"]["a"], collator));
 
     Document doc(fromjson("{a: [1, 'a', {r: 1, b: 2}]}"));
-    FieldRef pathToCreate("");
-    FieldRef pathTaken("a");
-    StringData matchedField;
-    auto fromReplication = false;
-    auto validateForStorage = true;
-    FieldRefSet immutablePaths;
-    UpdateIndexData indexData;
-    indexData.addPath("a");
-    Document logDoc;
-    LogBuilder logBuilder(logDoc.root());
-    auto indexesAffected = false;
-    auto noop = false;
-    node.apply(doc.root()["a"],
-               &pathToCreate,
-               &pathTaken,
-               matchedField,
-               fromReplication,
-               validateForStorage,
-               immutablePaths,
-               &indexData,
-               &logBuilder,
-               &indexesAffected,
-               &noop);
-    ASSERT_FALSE(noop);
-    ASSERT_TRUE(indexesAffected);
+    setPathTaken("a");
+    addIndexedPath("a");
+    auto result = node.apply(getApplyParams(doc.root()["a"]));
+    ASSERT_FALSE(result.noop);
+    ASSERT_TRUE(result.indexesAffected);
     ASSERT_EQUALS(fromjson("{a: []}"), doc);
     ASSERT_FALSE(doc.isInPlaceModeEnabled());
-    ASSERT_EQUALS(fromjson("{$set: {a: []}}"), logDoc);
+    ASSERT_EQUALS(fromjson("{$set: {a: []}}"), getLogDoc());
 }
 
-TEST(PullAllNodeTest, ApplyWithCollator) {
+TEST_F(PullAllNodeTest, ApplyWithCollator) {
     auto update = fromjson("{$pullAll : {a: ['FOO', 'BAR']}}");
     CollatorInterfaceMock collator(CollatorInterfaceMock::MockType::kToLowerString);
     PullAllNode node;
     ASSERT_OK(node.init(update["$pullAll"]["a"], &collator));
 
     Document doc(fromjson("{a: ['foo', 'bar', 'baz']}"));
-    FieldRef pathToCreate("");
-    FieldRef pathTaken("a");
-    StringData matchedField;
-    auto fromReplication = false;
-    auto validateForStorage = true;
-    FieldRefSet immutablePaths;
-    UpdateIndexData indexData;
-    indexData.addPath("a");
-    Document logDoc;
-    LogBuilder logBuilder(logDoc.root());
-    auto indexesAffected = false;
-    auto noop = false;
-    node.apply(doc.root()["a"],
-               &pathToCreate,
-               &pathTaken,
-               matchedField,
-               fromReplication,
-               validateForStorage,
-               immutablePaths,
-               &indexData,
-               &logBuilder,
-               &indexesAffected,
-               &noop);
-    ASSERT_FALSE(noop);
-    ASSERT_TRUE(indexesAffected);
+    setPathTaken("a");
+    addIndexedPath("a");
+    auto result = node.apply(getApplyParams(doc.root()["a"]));
+    ASSERT_FALSE(result.noop);
+    ASSERT_TRUE(result.indexesAffected);
     ASSERT_EQUALS(fromjson("{a: ['baz']}"), doc);
     ASSERT_FALSE(doc.isInPlaceModeEnabled());
-    ASSERT_EQUALS(fromjson("{$set: {a: ['baz']}}"), logDoc);
+    ASSERT_EQUALS(fromjson("{$set: {a: ['baz']}}"), getLogDoc());
 }
 
-TEST(PullAllNodeTest, ApplyAfterSetCollator) {
+TEST_F(PullAllNodeTest, ApplyAfterSetCollator) {
     auto update = fromjson("{$pullAll : {a: ['FOO', 'BAR']}}");
     const CollatorInterface* collator = nullptr;
     PullAllNode node;
@@ -490,52 +275,24 @@ TEST(PullAllNodeTest, ApplyAfterSetCollator) {
 
     // First without a collator.
     Document doc(fromjson("{a: ['foo', 'bar', 'baz']}"));
-    FieldRef pathToCreate("");
-    FieldRef pathTaken("a");
-    StringData matchedField;
-    auto fromReplication = false;
-    auto validateForStorage = true;
-    FieldRefSet immutablePaths;
-    UpdateIndexData* indexData = nullptr;
-    LogBuilder* logBuilder = nullptr;
-    auto indexesAffected = false;
-    auto noop = false;
-    node.apply(doc.root()["a"],
-               &pathToCreate,
-               &pathTaken,
-               matchedField,
-               fromReplication,
-               validateForStorage,
-               immutablePaths,
-               indexData,
-               logBuilder,
-               &indexesAffected,
-               &noop);
-    ASSERT_TRUE(noop);
+    setPathTaken("a");
+    auto result = node.apply(getApplyParams(doc.root()["a"]));
+    ASSERT_TRUE(result.noop);
     ASSERT_EQUALS(fromjson("{a: ['foo', 'bar', 'baz']}"), doc);
     ASSERT_TRUE(doc.isInPlaceModeEnabled());
 
     // Now with a collator.
     CollatorInterfaceMock mockCollator(CollatorInterfaceMock::MockType::kToLowerString);
     node.setCollator(&mockCollator);
-    indexesAffected = false;
-    noop = false;
     Document doc2(fromjson("{a: ['foo', 'bar', 'baz']}"));
-    node.apply(doc2.root()["a"],
-               &pathToCreate,
-               &pathTaken,
-               matchedField,
-               fromReplication,
-               validateForStorage,
-               immutablePaths,
-               indexData,
-               logBuilder,
-               &indexesAffected,
-               &noop);
-    ASSERT_FALSE(noop);
-    ASSERT_FALSE(indexesAffected);
+    resetApplyParams();
+    setPathTaken("a");
+    result = node.apply(getApplyParams(doc2.root()["a"]));
+    ASSERT_FALSE(result.noop);
+    ASSERT_FALSE(result.indexesAffected);
     ASSERT_EQUALS(fromjson("{a: ['baz']}"), doc2);
     ASSERT_FALSE(doc2.isInPlaceModeEnabled());
 }
 
+}  // namespace
 }  // namespace mongo

@@ -76,32 +76,69 @@ public:
     virtual void setCollator(const CollatorInterface* collator) = 0;
 
     /**
-     * Applies the update node to 'element', creating the fields in 'pathToCreate' if required by
-     * the leaves (i.e. the leaves are not all $unset). 'pathTaken' is the path through the root
-     * document to 'element', ending with the field name of 'element'. 'pathToCreate' is the path
-     * taken through the UpdateNode tree beyond where the path existed in the document. For example,
-     * if the update is {$set: {'a.b.c': 5}}, and the document is {a: {}}, then at the leaf node,
-     * pathTaken="a" and pathToCreate="b.c" If there was a positional ($) element in the update
-     * expression, 'matchedField' is the index of the array element that caused the query to match
-     * the document. 'fromReplication' is provided because some modifiers may ignore certain errors
-     * when the update is from replication. Uses the index information in 'indexData' to determine
-     * whether indexes are affected. If a LogBuilder is provided, logs the update. Outputs whether
-     * the operation was a no-op. Trips a uassert (which throws UserException) if the update node
-     * cannot be applied to the document. If 'validateForStorage' is true, ensures that modified
-     * elements do not violate depth or DBRef constraints. Ensures that no paths in 'immutablePaths'
-     * are modified (though they may be created, if they do not yet exist).
+     * The parameters required by UpdateNode::apply.
      */
-    virtual void apply(mutablebson::Element element,
-                       FieldRef* pathToCreate,
-                       FieldRef* pathTaken,
-                       StringData matchedField,
-                       bool fromReplication,
-                       bool validateForStorage,
-                       const FieldRefSet& immutablePaths,
-                       const UpdateIndexData* indexData,
-                       LogBuilder* logBuilder,
-                       bool* indexesAffected,
-                       bool* noop) const = 0;
+    struct ApplyParams {
+        ApplyParams(mutablebson::Element element, const FieldRefSet& immutablePaths)
+            : element(element), immutablePaths(immutablePaths) {}
+
+        // The element to update.
+        mutablebson::Element element;
+
+        // UpdateNode::apply uasserts if it modifies an immutable path.
+        const FieldRefSet& immutablePaths;
+
+        // The path taken through the UpdateNode tree beyond where the path existed in the document.
+        // For example, if the update is {$set: {'a.b.c': 5}}, and the document is {a: {}}, then at
+        // the leaf node, 'pathToCreate'="b.c".
+        std::shared_ptr<FieldRef> pathToCreate = std::make_shared<FieldRef>();
+
+        // The path through the root document to 'element', ending with the field name of 'element'.
+        // For example, if the update is {$set: {'a.b.c': 5}}, and the document is {a: {}}, then at
+        // the leaf node, 'pathTaken'="a".
+        std::shared_ptr<FieldRef> pathTaken = std::make_shared<FieldRef>();
+
+        // If there was a positional ($) element in the update expression, 'matchedField' is the
+        // index of the array element that caused the query to match the document.
+        StringData matchedField;
+
+        // This is provided because some modifiers may ignore certain errors when the update is from
+        // replication.
+        bool fromReplication = false;
+
+        // If true, UpdateNode::apply ensures that modified elements do not violate depth or DBRef
+        // constraints.
+        bool validateForStorage = true;
+
+        // Used to determine whether indexes are affected.
+        const UpdateIndexData* indexData = nullptr;
+
+        // If provided, UpdateNode::apply will log the update here.
+        LogBuilder* logBuilder = nullptr;
+    };
+
+    /**
+     * The outputs of apply().
+     */
+    struct ApplyResult {
+        static ApplyResult noopResult() {
+            ApplyResult applyResult;
+            applyResult.indexesAffected = false;
+            applyResult.noop = true;
+            return applyResult;
+        }
+
+        bool indexesAffected = true;
+        bool noop = false;
+    };
+
+    /**
+     * Applies the update node to 'applyParams.element', creating the fields in
+     * 'applyParams.pathToCreate' if required by the leaves (i.e. the leaves are not all $unset).
+     * Returns an ApplyResult specifying whether the operation was a no-op and whether indexes are
+     * affected.
+     */
+    virtual ApplyResult apply(ApplyParams applyParams) const = 0;
 
     /**
      * Creates a new node by merging the contents of two input nodes. The semantics of the merge

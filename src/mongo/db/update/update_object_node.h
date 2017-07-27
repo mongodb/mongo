@@ -91,17 +91,7 @@ public:
         }
     }
 
-    void apply(mutablebson::Element element,
-               FieldRef* pathToCreate,
-               FieldRef* pathTaken,
-               StringData matchedField,
-               bool fromReplication,
-               bool validateForStorage,
-               const FieldRefSet& immutablePaths,
-               const UpdateIndexData* indexData,
-               LogBuilder* logBuilder,
-               bool* indexesAffected,
-               bool* noop) const final;
+    ApplyResult apply(ApplyParams applyParams) const final;
 
     UpdateNode* getChild(const std::string& field) const final;
 

@@ -32,37 +32,24 @@
 
 namespace mongo {
 
-void ArrayCullingNode::apply(mutablebson::Element element,
-                             FieldRef* pathToCreate,
-                             FieldRef* pathTaken,
-                             StringData matchedField,
-                             bool fromReplication,
-                             bool validateForStorage,
-                             const FieldRefSet& immutablePaths,
-                             const UpdateIndexData* indexData,
-                             LogBuilder* logBuilder,
-                             bool* indexesAffected,
-                             bool* noop) const {
-    *indexesAffected = false;
-    *noop = false;
-
-    if (!pathToCreate->empty()) {
+UpdateNode::ApplyResult ArrayCullingNode::apply(ApplyParams applyParams) const {
+    if (!applyParams.pathToCreate->empty()) {
         // There were path components we could not traverse. We treat this as a no-op, unless it
         // would have been impossible to create those elements, which we check with
         // checkViability().
-        UpdateLeafNode::checkViability(element, *pathToCreate, *pathTaken);
+        UpdateLeafNode::checkViability(
+            applyParams.element, *(applyParams.pathToCreate), *(applyParams.pathTaken));
 
-        *noop = true;
-        return;
+        return ApplyResult::noopResult();
     }
 
     // This operation only applies to arrays
     uassert(ErrorCodes::BadValue,
             "Cannot apply $pull to a non-array value",
-            element.getType() == mongo::Array);
+            applyParams.element.getType() == mongo::Array);
 
     size_t numRemoved = 0;
-    auto cursor = element.leftChild();
+    auto cursor = applyParams.element.leftChild();
     while (cursor.ok()) {
         // Make sure to get the next array element now, because if we remove the 'cursor' element,
         // the rightSibling pointer will be invalidated.
@@ -75,34 +62,39 @@ void ArrayCullingNode::apply(mutablebson::Element element,
     }
 
     if (numRemoved == 0) {
-        *noop = true;
-        return;  // Skip the index check, immutable path check, and logging steps.
+        return ApplyResult::noopResult();  // Skip the index check, immutable path check, and
+                                           // logging steps.
     }
 
+    ApplyResult applyResult;
+
     // Determine if indexes are affected.
-    if (indexData && indexData->mightBeIndexed(pathTaken->dottedField())) {
-        *indexesAffected = true;
+    if (!applyParams.indexData ||
+        !applyParams.indexData->mightBeIndexed(applyParams.pathTaken->dottedField())) {
+        applyResult.indexesAffected = false;
     }
 
     // No need to validate for storage, since we cannot have increased the BSON depth or interfered
     // with a DBRef.
 
     // Ensure we are not changing any immutable paths.
-    for (const auto& immutablePath : immutablePaths) {
+    for (const auto& immutablePath : applyParams.immutablePaths) {
         uassert(ErrorCodes::ImmutableField,
-                str::stream() << "Performing an update on the path '" << pathTaken->dottedField()
+                str::stream() << "Performing an update on the path '"
+                              << applyParams.pathTaken->dottedField()
                               << "' would modify the immutable field '"
                               << immutablePath->dottedField()
                               << "'",
-                pathTaken->commonPrefixSize(*immutablePath) <
-                    std::min(pathTaken->numParts(), immutablePath->numParts()));
+                applyParams.pathTaken->commonPrefixSize(*immutablePath) <
+                    std::min(applyParams.pathTaken->numParts(), immutablePath->numParts()));
     }
 
-    if (logBuilder) {
-        auto& doc = logBuilder->getDocument();
-        auto logElement = doc.makeElementArray(pathTaken->dottedField());
+    if (applyParams.logBuilder) {
+        auto& doc = applyParams.logBuilder->getDocument();
+        auto logElement = doc.makeElementArray(applyParams.pathTaken->dottedField());
 
-        for (auto cursor = element.leftChild(); cursor.ok(); cursor = cursor.rightSibling()) {
+        for (auto cursor = applyParams.element.leftChild(); cursor.ok();
+             cursor = cursor.rightSibling()) {
             dassert(cursor.hasValue());
 
             auto copy = doc.makeElementWithNewFieldName(StringData(), cursor.getValue());
@@ -110,8 +102,10 @@ void ArrayCullingNode::apply(mutablebson::Element element,
             uassertStatusOK(logElement.pushBack(copy));
         }
 
-        uassertStatusOK(logBuilder->addToSets(logElement));
+        uassertStatusOK(applyParams.logBuilder->addToSets(logElement));
     }
+
+    return applyResult;
 }
 
 }  // namespace mongo

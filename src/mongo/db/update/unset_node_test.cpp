@@ -33,12 +33,14 @@
 #include "mongo/bson/mutable/algorithm.h"
 #include "mongo/bson/mutable/mutable_bson_test_utils.h"
 #include "mongo/db/json.h"
+#include "mongo/db/update/update_node_test_fixture.h"
 #include "mongo/unittest/death_test.h"
 #include "mongo/unittest/unittest.h"
 
+namespace mongo {
 namespace {
 
-using namespace mongo;
+using UnsetNodeTest = UpdateNodeTest;
 using mongo::mutablebson::Document;
 using mongo::mutablebson::Element;
 using mongo::mutablebson::countChildren;
@@ -50,34 +52,14 @@ DEATH_TEST(UnsetNodeTest, InitFailsForEmptyElement, "Invariant failure modExpr.o
     node.init(update["$unset"].embeddedObject().firstElement(), collator).transitional_ignore();
 }
 
-DEATH_TEST(UnsetNodeTest, ApplyToRootFails, "Invariant failure parent.ok()") {
+DEATH_TEST_F(UnsetNodeTest, ApplyToRootFails, "Invariant failure parent.ok()") {
     auto update = fromjson("{$unset: {}}");
     const CollatorInterface* collator = nullptr;
     UnsetNode node;
     ASSERT_OK(node.init(update["$unset"], collator));
 
     Document doc(fromjson("{a: 5}"));
-    FieldRef pathToCreate("");
-    FieldRef pathTaken("");
-    StringData matchedField;
-    auto fromReplication = false;
-    auto validateForStorage = true;
-    FieldRefSet immutablePaths;
-    const UpdateIndexData* indexData = nullptr;
-    LogBuilder* logBuilder = nullptr;
-    auto indexesAffected = false;
-    auto noop = false;
-    node.apply(doc.root(),
-               &pathToCreate,
-               &pathTaken,
-               matchedField,
-               fromReplication,
-               validateForStorage,
-               immutablePaths,
-               indexData,
-               logBuilder,
-               &indexesAffected,
-               &noop);
+    node.apply(getApplyParams(doc.root()));
 }
 
 TEST(UnsetNodeTest, InitSucceedsForNonemptyElement) {
@@ -88,773 +70,361 @@ TEST(UnsetNodeTest, InitSucceedsForNonemptyElement) {
 }
 
 /* This is a no-op because we are unsetting a field that does not exit. */
-TEST(UnsetNodeTest, UnsetNoOp) {
+TEST_F(UnsetNodeTest, UnsetNoOp) {
     auto update = fromjson("{$unset: {a: 1}}");
     const CollatorInterface* collator = nullptr;
     UnsetNode node;
     ASSERT_OK(node.init(update["$unset"]["a"], collator));
 
     Document doc(fromjson("{b: 5}"));
-    FieldRef pathToCreate("a");
-    FieldRef pathTaken("");
-    StringData matchedField;
-    auto fromReplication = false;
-    auto validateForStorage = true;
-    FieldRefSet immutablePaths;
-    UpdateIndexData indexData;
-    indexData.addPath("a");
-    Document logDoc;
-    LogBuilder logBuilder(logDoc.root());
-    auto indexesAffected = false;
-    auto noop = false;
-    node.apply(doc.root(),
-               &pathToCreate,
-               &pathTaken,
-               matchedField,
-               fromReplication,
-               validateForStorage,
-               immutablePaths,
-               &indexData,
-               &logBuilder,
-               &indexesAffected,
-               &noop);
-    ASSERT_TRUE(noop);
-    ASSERT_FALSE(indexesAffected);
+    setPathToCreate("a");
+    addIndexedPath("a");
+    auto result = node.apply(getApplyParams(doc.root()));
+    ASSERT_TRUE(result.noop);
+    ASSERT_FALSE(result.indexesAffected);
     ASSERT_EQUALS(fromjson("{b: 5}"), doc);
     ASSERT_TRUE(doc.isInPlaceModeEnabled());
-    ASSERT_EQUALS(fromjson("{}"), logDoc);
+    ASSERT_EQUALS(fromjson("{}"), getLogDoc());
 }
 
-TEST(UnsetNodeTest, UnsetNoOpDottedPath) {
+TEST_F(UnsetNodeTest, UnsetNoOpDottedPath) {
     auto update = fromjson("{$unset: {'a.b': 1}}");
     const CollatorInterface* collator = nullptr;
     UnsetNode node;
     ASSERT_OK(node.init(update["$unset"]["a.b"], collator));
 
     Document doc(fromjson("{a: 5}"));
-    FieldRef pathToCreate("b");
-    FieldRef pathTaken("a");
-    StringData matchedField;
-    auto fromReplication = false;
-    auto validateForStorage = true;
-    FieldRefSet immutablePaths;
-    UpdateIndexData indexData;
-    indexData.addPath("a");
-    Document logDoc;
-    LogBuilder logBuilder(logDoc.root());
-    auto indexesAffected = false;
-    auto noop = false;
-    node.apply(doc.root()["a"],
-               &pathToCreate,
-               &pathTaken,
-               matchedField,
-               fromReplication,
-               validateForStorage,
-               immutablePaths,
-               &indexData,
-               &logBuilder,
-               &indexesAffected,
-               &noop);
-    ASSERT_TRUE(noop);
-    ASSERT_FALSE(indexesAffected);
+    setPathToCreate("b");
+    setPathTaken("a");
+    addIndexedPath("a");
+    auto result = node.apply(getApplyParams(doc.root()["a"]));
+    ASSERT_TRUE(result.noop);
+    ASSERT_FALSE(result.indexesAffected);
     ASSERT_EQUALS(fromjson("{a: 5}"), doc);
     ASSERT_TRUE(doc.isInPlaceModeEnabled());
-    ASSERT_EQUALS(fromjson("{}"), logDoc);
+    ASSERT_EQUALS(fromjson("{}"), getLogDoc());
 }
 
-TEST(UnsetNodeTest, UnsetNoOpThroughArray) {
+TEST_F(UnsetNodeTest, UnsetNoOpThroughArray) {
     auto update = fromjson("{$unset: {'a.b': 1}}");
     const CollatorInterface* collator = nullptr;
     UnsetNode node;
     ASSERT_OK(node.init(update["$unset"]["a.b"], collator));
 
     Document doc(fromjson("{a:[{b:1}]}"));
-    FieldRef pathToCreate("b");
-    FieldRef pathTaken("a");
-    StringData matchedField;
-    auto fromReplication = false;
-    auto validateForStorage = true;
-    FieldRefSet immutablePaths;
-    UpdateIndexData indexData;
-    indexData.addPath("a");
-    Document logDoc;
-    LogBuilder logBuilder(logDoc.root());
-    auto indexesAffected = false;
-    auto noop = false;
-    node.apply(doc.root()["a"],
-               &pathToCreate,
-               &pathTaken,
-               matchedField,
-               fromReplication,
-               validateForStorage,
-               immutablePaths,
-               &indexData,
-               &logBuilder,
-               &indexesAffected,
-               &noop);
-    ASSERT_TRUE(noop);
-    ASSERT_FALSE(indexesAffected);
+    setPathToCreate("b");
+    setPathTaken("a");
+    addIndexedPath("a");
+    auto result = node.apply(getApplyParams(doc.root()["a"]));
+    ASSERT_TRUE(result.noop);
+    ASSERT_FALSE(result.indexesAffected);
     ASSERT_EQUALS(fromjson("{a:[{b:1}]}"), doc);
     ASSERT_TRUE(doc.isInPlaceModeEnabled());
-    ASSERT_EQUALS(fromjson("{}"), logDoc);
+    ASSERT_EQUALS(fromjson("{}"), getLogDoc());
 }
 
-TEST(UnsetNodeTest, UnsetNoOpEmptyDoc) {
+TEST_F(UnsetNodeTest, UnsetNoOpEmptyDoc) {
     auto update = fromjson("{$unset: {a: 1}}");
     const CollatorInterface* collator = nullptr;
     UnsetNode node;
     ASSERT_OK(node.init(update["$unset"]["a"], collator));
 
     Document doc(fromjson("{}"));
-    FieldRef pathToCreate("a");
-    FieldRef pathTaken("");
-    StringData matchedField;
-    auto fromReplication = false;
-    auto validateForStorage = true;
-    FieldRefSet immutablePaths;
-    UpdateIndexData indexData;
-    indexData.addPath("a");
-    Document logDoc;
-    LogBuilder logBuilder(logDoc.root());
-    auto indexesAffected = false;
-    auto noop = false;
-    node.apply(doc.root(),
-               &pathToCreate,
-               &pathTaken,
-               matchedField,
-               fromReplication,
-               validateForStorage,
-               immutablePaths,
-               &indexData,
-               &logBuilder,
-               &indexesAffected,
-               &noop);
-    ASSERT_TRUE(noop);
-    ASSERT_FALSE(indexesAffected);
+    setPathToCreate("a");
+    addIndexedPath("a");
+    auto result = node.apply(getApplyParams(doc.root()));
+    ASSERT_TRUE(result.noop);
+    ASSERT_FALSE(result.indexesAffected);
     ASSERT_EQUALS(fromjson("{}"), doc);
     ASSERT_TRUE(doc.isInPlaceModeEnabled());
-    ASSERT_EQUALS(fromjson("{}"), logDoc);
+    ASSERT_EQUALS(fromjson("{}"), getLogDoc());
 }
 
-TEST(UnsetNodeTest, UnsetTopLevelPath) {
+TEST_F(UnsetNodeTest, UnsetTopLevelPath) {
     auto update = fromjson("{$unset: {a: 1}}");
     const CollatorInterface* collator = nullptr;
     UnsetNode node;
     ASSERT_OK(node.init(update["$unset"]["a"], collator));
 
     Document doc(fromjson("{a: 5}"));
-    FieldRef pathToCreate("");
-    FieldRef pathTaken("a");
-    StringData matchedField;
-    auto fromReplication = false;
-    auto validateForStorage = true;
-    FieldRefSet immutablePaths;
-    UpdateIndexData indexData;
-    indexData.addPath("a");
-    Document logDoc;
-    LogBuilder logBuilder(logDoc.root());
-    auto indexesAffected = false;
-    auto noop = false;
-    node.apply(doc.root()["a"],
-               &pathToCreate,
-               &pathTaken,
-               matchedField,
-               fromReplication,
-               validateForStorage,
-               immutablePaths,
-               &indexData,
-               &logBuilder,
-               &indexesAffected,
-               &noop);
-    ASSERT_FALSE(noop);
-    ASSERT_TRUE(indexesAffected);
+    setPathTaken("a");
+    addIndexedPath("a");
+    auto result = node.apply(getApplyParams(doc.root()["a"]));
+    ASSERT_FALSE(result.noop);
+    ASSERT_TRUE(result.indexesAffected);
     ASSERT_EQUALS(fromjson("{}"), doc);
     ASSERT_FALSE(doc.isInPlaceModeEnabled());
-    ASSERT_EQUALS(fromjson("{$unset: {a: true}}"), logDoc);
+    ASSERT_EQUALS(fromjson("{$unset: {a: true}}"), getLogDoc());
 }
 
-TEST(UnsetNodeTest, UnsetNestedPath) {
+TEST_F(UnsetNodeTest, UnsetNestedPath) {
     auto update = fromjson("{$unset: {'a.b.c': 1}}");
     const CollatorInterface* collator = nullptr;
     UnsetNode node;
     ASSERT_OK(node.init(update["$unset"]["a.b.c"], collator));
 
     Document doc(fromjson("{a: {b: {c: 6}}}}"));
-    FieldRef pathToCreate("");
-    FieldRef pathTaken("a.b.c");
-    StringData matchedField;
-    auto fromReplication = false;
-    auto validateForStorage = true;
-    FieldRefSet immutablePaths;
-    UpdateIndexData indexData;
-    indexData.addPath("a");
-    Document logDoc;
-    LogBuilder logBuilder(logDoc.root());
-    auto indexesAffected = false;
-    auto noop = false;
-    node.apply(doc.root()["a"]["b"]["c"],
-               &pathToCreate,
-               &pathTaken,
-               matchedField,
-               fromReplication,
-               validateForStorage,
-               immutablePaths,
-               &indexData,
-               &logBuilder,
-               &indexesAffected,
-               &noop);
-    ASSERT_FALSE(noop);
-    ASSERT_TRUE(indexesAffected);
+    setPathTaken("a.b.c");
+    addIndexedPath("a");
+    auto result = node.apply(getApplyParams(doc.root()["a"]["b"]["c"]));
+    ASSERT_FALSE(result.noop);
+    ASSERT_TRUE(result.indexesAffected);
     ASSERT_EQUALS(fromjson("{a: {b: {}}}"), doc);
     ASSERT_FALSE(doc.isInPlaceModeEnabled());
-    ASSERT_EQUALS(fromjson("{$unset: {'a.b.c': true}}"), logDoc);
+    ASSERT_EQUALS(fromjson("{$unset: {'a.b.c': true}}"), getLogDoc());
 }
 
-TEST(UnsetNodeTest, UnsetObject) {
+TEST_F(UnsetNodeTest, UnsetObject) {
     auto update = fromjson("{$unset: {'a.b': 1}}");
     const CollatorInterface* collator = nullptr;
     UnsetNode node;
     ASSERT_OK(node.init(update["$unset"]["a.b"], collator));
 
     Document doc(fromjson("{a: {b: {c: 6}}}}"));
-    FieldRef pathToCreate("");
-    FieldRef pathTaken("a.b");
-    StringData matchedField;
-    auto fromReplication = false;
-    auto validateForStorage = true;
-    FieldRefSet immutablePaths;
-    UpdateIndexData indexData;
-    indexData.addPath("a");
-    Document logDoc;
-    LogBuilder logBuilder(logDoc.root());
-    auto indexesAffected = false;
-    auto noop = false;
-    node.apply(doc.root()["a"]["b"],
-               &pathToCreate,
-               &pathTaken,
-               matchedField,
-               fromReplication,
-               validateForStorage,
-               immutablePaths,
-               &indexData,
-               &logBuilder,
-               &indexesAffected,
-               &noop);
-    ASSERT_FALSE(noop);
-    ASSERT_TRUE(indexesAffected);
+    setPathTaken("a.b");
+    addIndexedPath("a");
+    auto result = node.apply(getApplyParams(doc.root()["a"]["b"]));
+    ASSERT_FALSE(result.noop);
+    ASSERT_TRUE(result.indexesAffected);
     ASSERT_EQUALS(fromjson("{a: {}}"), doc);
     ASSERT_FALSE(doc.isInPlaceModeEnabled());
-    ASSERT_EQUALS(fromjson("{$unset: {'a.b': true}}"), logDoc);
+    ASSERT_EQUALS(fromjson("{$unset: {'a.b': true}}"), getLogDoc());
 }
 
-TEST(UnsetNodeTest, UnsetArrayElement) {
+TEST_F(UnsetNodeTest, UnsetArrayElement) {
     auto update = fromjson("{$unset: {'a.0': 1}}");
     const CollatorInterface* collator = nullptr;
     UnsetNode node;
     ASSERT_OK(node.init(update["$unset"]["a.0"], collator));
 
     Document doc(fromjson("{a:[1], b:1}"));
-    FieldRef pathToCreate("");
-    FieldRef pathTaken("a.0");
-    StringData matchedField;
-    auto fromReplication = false;
-    auto validateForStorage = true;
-    FieldRefSet immutablePaths;
-    UpdateIndexData indexData;
-    indexData.addPath("a");
-    Document logDoc;
-    LogBuilder logBuilder(logDoc.root());
-    auto indexesAffected = false;
-    auto noop = false;
-    node.apply(doc.root()["a"]["0"],
-               &pathToCreate,
-               &pathTaken,
-               matchedField,
-               fromReplication,
-               validateForStorage,
-               immutablePaths,
-               &indexData,
-               &logBuilder,
-               &indexesAffected,
-               &noop);
-    ASSERT_FALSE(noop);
-    ASSERT_TRUE(indexesAffected);
+    setPathTaken("a.0");
+    addIndexedPath("a");
+    auto result = node.apply(getApplyParams(doc.root()["a"]["0"]));
+    ASSERT_FALSE(result.noop);
+    ASSERT_TRUE(result.indexesAffected);
     ASSERT_EQUALS(fromjson("{a:[null], b:1}"), doc);
     ASSERT_FALSE(doc.isInPlaceModeEnabled());
-    ASSERT_EQUALS(fromjson("{$unset: {'a.0': true}}"), logDoc);
+    ASSERT_EQUALS(fromjson("{$unset: {'a.0': true}}"), getLogDoc());
 }
 
-TEST(UnsetNodeTest, UnsetPositional) {
+TEST_F(UnsetNodeTest, UnsetPositional) {
     auto update = fromjson("{$unset: {'a.$': 1}}");
     const CollatorInterface* collator = nullptr;
     UnsetNode node;
     ASSERT_OK(node.init(update["$unset"]["a.$"], collator));
 
     Document doc(fromjson("{a: [0, 1, 2]}"));
-    FieldRef pathToCreate("");
-    FieldRef pathTaken("a.1");
-    StringData matchedField = "1";
-    auto fromReplication = false;
-    auto validateForStorage = true;
-    FieldRefSet immutablePaths;
-    UpdateIndexData indexData;
-    indexData.addPath("a");
-    Document logDoc;
-    LogBuilder logBuilder(logDoc.root());
-    auto indexesAffected = false;
-    auto noop = false;
-    node.apply(doc.root()["a"]["1"],
-               &pathToCreate,
-               &pathTaken,
-               matchedField,
-               fromReplication,
-               validateForStorage,
-               immutablePaths,
-               &indexData,
-               &logBuilder,
-               &indexesAffected,
-               &noop);
-    ASSERT_FALSE(noop);
-    ASSERT_TRUE(indexesAffected);
+    setPathTaken("a.1");
+    setMatchedField("1");
+    addIndexedPath("a");
+    auto result = node.apply(getApplyParams(doc.root()["a"]["1"]));
+    ASSERT_FALSE(result.noop);
+    ASSERT_TRUE(result.indexesAffected);
     ASSERT_EQUALS(fromjson("{a: [0, null, 2]}"), doc);
     ASSERT_FALSE(doc.isInPlaceModeEnabled());
-    ASSERT_EQUALS(fromjson("{$unset: {'a.1': true}}"), logDoc);
+    ASSERT_EQUALS(fromjson("{$unset: {'a.1': true}}"), getLogDoc());
 }
 
-TEST(UnsetNodeTest, UnsetEntireArray) {
+TEST_F(UnsetNodeTest, UnsetEntireArray) {
     auto update = fromjson("{$unset: {'a': 1}}");
     const CollatorInterface* collator = nullptr;
     UnsetNode node;
     ASSERT_OK(node.init(update["$unset"]["a"], collator));
 
     Document doc(fromjson("{a: [0, 1, 2]}"));
-    FieldRef pathToCreate("");
-    FieldRef pathTaken("a");
-    StringData matchedField;
-    auto fromReplication = false;
-    auto validateForStorage = true;
-    FieldRefSet immutablePaths;
-    UpdateIndexData indexData;
-    indexData.addPath("a");
-    Document logDoc;
-    LogBuilder logBuilder(logDoc.root());
-    auto indexesAffected = false;
-    auto noop = false;
-    node.apply(doc.root()["a"],
-               &pathToCreate,
-               &pathTaken,
-               matchedField,
-               fromReplication,
-               validateForStorage,
-               immutablePaths,
-               &indexData,
-               &logBuilder,
-               &indexesAffected,
-               &noop);
-    ASSERT_FALSE(noop);
-    ASSERT_TRUE(indexesAffected);
+    setPathTaken("a");
+    addIndexedPath("a");
+    auto result = node.apply(getApplyParams(doc.root()["a"]));
+    ASSERT_FALSE(result.noop);
+    ASSERT_TRUE(result.indexesAffected);
     ASSERT_EQUALS(fromjson("{}"), doc);
     ASSERT_FALSE(doc.isInPlaceModeEnabled());
-    ASSERT_EQUALS(fromjson("{$unset: {a: true}}"), logDoc);
+    ASSERT_EQUALS(fromjson("{$unset: {a: true}}"), getLogDoc());
 }
 
-TEST(UnsetNodeTest, UnsetFromObjectInArray) {
+TEST_F(UnsetNodeTest, UnsetFromObjectInArray) {
     auto update = fromjson("{$unset: {'a.0.b': 1}}");
     const CollatorInterface* collator = nullptr;
     UnsetNode node;
     ASSERT_OK(node.init(update["$unset"]["a.0.b"], collator));
 
     Document doc(fromjson("{a: [{b: 1}]}"));
-    FieldRef pathToCreate("");
-    FieldRef pathTaken("a.0.b");
-    StringData matchedField;
-    auto fromReplication = false;
-    auto validateForStorage = true;
-    FieldRefSet immutablePaths;
-    UpdateIndexData indexData;
-    indexData.addPath("a");
-    Document logDoc;
-    LogBuilder logBuilder(logDoc.root());
-    auto indexesAffected = false;
-    auto noop = false;
-    node.apply(doc.root()["a"]["0"]["b"],
-               &pathToCreate,
-               &pathTaken,
-               matchedField,
-               fromReplication,
-               validateForStorage,
-               immutablePaths,
-               &indexData,
-               &logBuilder,
-               &indexesAffected,
-               &noop);
-    ASSERT_FALSE(noop);
-    ASSERT_TRUE(indexesAffected);
+    setPathTaken("a.0.b");
+    addIndexedPath("a");
+    auto result = node.apply(getApplyParams(doc.root()["a"]["0"]["b"]));
+    ASSERT_FALSE(result.noop);
+    ASSERT_TRUE(result.indexesAffected);
     ASSERT_EQUALS(fromjson("{a:[{}]}"), doc);
     ASSERT_FALSE(doc.isInPlaceModeEnabled());
-    ASSERT_EQUALS(fromjson("{$unset: {'a.0.b': true}}"), logDoc);
+    ASSERT_EQUALS(fromjson("{$unset: {'a.0.b': true}}"), getLogDoc());
 }
 
-TEST(UnsetNodeTest, CanUnsetInvalidField) {
+TEST_F(UnsetNodeTest, CanUnsetInvalidField) {
     auto update = fromjson("{$unset: {'a.$.$b': true}}");
     const CollatorInterface* collator = nullptr;
     UnsetNode node;
     ASSERT_OK(node.init(update["$unset"]["a.$.$b"], collator));
 
     Document doc(fromjson("{b: 1, a: [{$b: 1}]}"));
-    FieldRef pathToCreate("");
-    FieldRef pathTaken("a.0.$b");
-    StringData matchedField = "0";
-    auto fromReplication = false;
-    auto validateForStorage = true;
-    FieldRefSet immutablePaths;
-    UpdateIndexData indexData;
-    indexData.addPath("a");
-    Document logDoc;
-    LogBuilder logBuilder(logDoc.root());
-    auto indexesAffected = false;
-    auto noop = false;
-    node.apply(doc.root()["a"]["0"]["$b"],
-               &pathToCreate,
-               &pathTaken,
-               matchedField,
-               fromReplication,
-               validateForStorage,
-               immutablePaths,
-               &indexData,
-               &logBuilder,
-               &indexesAffected,
-               &noop);
-    ASSERT_FALSE(noop);
-    ASSERT_TRUE(indexesAffected);
+    setPathTaken("a.0.$b");
+    addIndexedPath("a");
+    auto result = node.apply(getApplyParams(doc.root()["a"]["0"]["$b"]));
+    ASSERT_FALSE(result.noop);
+    ASSERT_TRUE(result.indexesAffected);
     ASSERT_EQUALS(fromjson("{b: 1, a: [{}]}"), doc);
     ASSERT_FALSE(doc.isInPlaceModeEnabled());
-    ASSERT_EQUALS(fromjson("{$unset: {'a.0.$b': true}}"), logDoc);
+    ASSERT_EQUALS(fromjson("{$unset: {'a.0.$b': true}}"), getLogDoc());
 }
 
-TEST(UnsetNodeTest, ApplyNoIndexDataNoLogBuilder) {
+TEST_F(UnsetNodeTest, ApplyNoIndexDataNoLogBuilder) {
     auto update = fromjson("{$unset: {a: 1}}");
     const CollatorInterface* collator = nullptr;
     UnsetNode node;
     ASSERT_OK(node.init(update["$unset"]["a"], collator));
 
     Document doc(fromjson("{a: 5}"));
-    FieldRef pathToCreate("");
-    FieldRef pathTaken("a");
-    StringData matchedField;
-    auto fromReplication = false;
-    auto validateForStorage = true;
-    FieldRefSet immutablePaths;
-    const UpdateIndexData* indexData = nullptr;
-    LogBuilder* logBuilder = nullptr;
-    auto indexesAffected = false;
-    auto noop = false;
-    node.apply(doc.root()["a"],
-               &pathToCreate,
-               &pathTaken,
-               matchedField,
-               fromReplication,
-               validateForStorage,
-               immutablePaths,
-               indexData,
-               logBuilder,
-               &indexesAffected,
-               &noop);
-    ASSERT_FALSE(noop);
-    ASSERT_FALSE(indexesAffected);
+    setPathTaken("a");
+    setLogBuilderToNull();
+    auto result = node.apply(getApplyParams(doc.root()["a"]));
+    ASSERT_FALSE(result.noop);
+    ASSERT_FALSE(result.indexesAffected);
     ASSERT_EQUALS(fromjson("{}"), doc);
     ASSERT_FALSE(doc.isInPlaceModeEnabled());
 }
 
-TEST(UnsetNodeTest, ApplyDoesNotAffectIndexes) {
+TEST_F(UnsetNodeTest, ApplyDoesNotAffectIndexes) {
     auto update = fromjson("{$unset: {a: 1}}");
     const CollatorInterface* collator = nullptr;
     UnsetNode node;
     ASSERT_OK(node.init(update["$unset"]["a"], collator));
 
     Document doc(fromjson("{a: 5}"));
-    FieldRef pathToCreate("");
-    FieldRef pathTaken("a");
-    StringData matchedField;
-    auto fromReplication = false;
-    auto validateForStorage = true;
-    FieldRefSet immutablePaths;
-    UpdateIndexData indexData;
-    indexData.addPath("b");
-    Document logDoc;
-    LogBuilder logBuilder(logDoc.root());
-    auto indexesAffected = false;
-    auto noop = false;
-    node.apply(doc.root()["a"],
-               &pathToCreate,
-               &pathTaken,
-               matchedField,
-               fromReplication,
-               validateForStorage,
-               immutablePaths,
-               &indexData,
-               &logBuilder,
-               &indexesAffected,
-               &noop);
-    ASSERT_FALSE(noop);
-    ASSERT_FALSE(indexesAffected);
+    setPathTaken("a");
+    addIndexedPath("b");
+    auto result = node.apply(getApplyParams(doc.root()["a"]));
+    ASSERT_FALSE(result.noop);
+    ASSERT_FALSE(result.indexesAffected);
     ASSERT_EQUALS(fromjson("{}"), doc);
     ASSERT_FALSE(doc.isInPlaceModeEnabled());
-    ASSERT_EQUALS(fromjson("{$unset: {a: true}}"), logDoc);
+    ASSERT_EQUALS(fromjson("{$unset: {a: true}}"), getLogDoc());
 }
 
-TEST(UnsetNodeTest, ApplyFieldWithDot) {
+TEST_F(UnsetNodeTest, ApplyFieldWithDot) {
     auto update = fromjson("{$unset: {'a.b': 1}}");
     const CollatorInterface* collator = nullptr;
     UnsetNode node;
     ASSERT_OK(node.init(update["$unset"]["a.b"], collator));
 
     Document doc(fromjson("{'a.b':4, a: {b: 2}}"));
-    FieldRef pathToCreate("");
-    FieldRef pathTaken("a.b");
-    StringData matchedField;
-    auto fromReplication = false;
-    auto validateForStorage = true;
-    FieldRefSet immutablePaths;
-    UpdateIndexData indexData;
-    indexData.addPath("a");
-    Document logDoc;
-    LogBuilder logBuilder(logDoc.root());
-    auto indexesAffected = false;
-    auto noop = false;
-    node.apply(doc.root()["a"]["b"],
-               &pathToCreate,
-               &pathTaken,
-               matchedField,
-               fromReplication,
-               validateForStorage,
-               immutablePaths,
-               &indexData,
-               &logBuilder,
-               &indexesAffected,
-               &noop);
-    ASSERT_FALSE(noop);
-    ASSERT_TRUE(indexesAffected);
+    setPathTaken("a.b");
+    addIndexedPath("a");
+    auto result = node.apply(getApplyParams(doc.root()["a"]["b"]));
+    ASSERT_FALSE(result.noop);
+    ASSERT_TRUE(result.indexesAffected);
     ASSERT_EQUALS(fromjson("{'a.b':4, a: {}}"), doc);
     ASSERT_FALSE(doc.isInPlaceModeEnabled());
-    ASSERT_EQUALS(fromjson("{$unset: {'a.b': true}}"), logDoc);
+    ASSERT_EQUALS(fromjson("{$unset: {'a.b': true}}"), getLogDoc());
 }
 
-TEST(UnsetNodeTest, ApplyCannotRemoveRequiredPartOfDBRef) {
+TEST_F(UnsetNodeTest, ApplyCannotRemoveRequiredPartOfDBRef) {
     auto update = fromjson("{$unset: {'a.$id': true}}");
     const CollatorInterface* collator = nullptr;
     UnsetNode node;
     ASSERT_OK(node.init(update["$unset"]["a.$id"], collator));
 
     Document doc(fromjson("{a: {$ref: 'c', $id: 0}}"));
-    FieldRef pathToCreate("");
-    FieldRef pathTaken("a.$id");
-    StringData matchedField;
-    auto fromReplication = false;
-    auto validateForStorage = true;
-    FieldRefSet immutablePaths;
-    const UpdateIndexData* indexData = nullptr;
-    LogBuilder* logBuilder = nullptr;
-    auto indexesAffected = false;
-    auto noop = false;
-    ASSERT_THROWS_CODE_AND_WHAT(node.apply(doc.root()["a"]["$id"],
-                                           &pathToCreate,
-                                           &pathTaken,
-                                           matchedField,
-                                           fromReplication,
-                                           validateForStorage,
-                                           immutablePaths,
-                                           indexData,
-                                           logBuilder,
-                                           &indexesAffected,
-                                           &noop),
+    setPathTaken("a.$id");
+    ASSERT_THROWS_CODE_AND_WHAT(node.apply(getApplyParams(doc.root()["a"]["$id"])),
                                 UserException,
                                 ErrorCodes::InvalidDBRef,
                                 "The DBRef $ref field must be followed by a $id field");
 }
 
-TEST(UnsetNodeTest, ApplyCanRemoveRequiredPartOfDBRefIfValidateForStorageIsFalse) {
+TEST_F(UnsetNodeTest, ApplyCanRemoveRequiredPartOfDBRefIfValidateForStorageIsFalse) {
     auto update = fromjson("{$unset: {'a.$id': true}}");
     const CollatorInterface* collator = nullptr;
     UnsetNode node;
     ASSERT_OK(node.init(update["$unset"]["a.$id"], collator));
 
     Document doc(fromjson("{a: {$ref: 'c', $id: 0}}"));
-    FieldRef pathToCreate("");
-    FieldRef pathTaken("a.$id");
-    StringData matchedField;
-    auto fromReplication = false;
-    auto validateForStorage = false;
-    FieldRefSet immutablePaths;
-    UpdateIndexData indexData;
-    indexData.addPath("a");
-    Document logDoc;
-    LogBuilder logBuilder(logDoc.root());
-    auto indexesAffected = false;
-    auto noop = false;
-    node.apply(doc.root()["a"]["$id"],
-               &pathToCreate,
-               &pathTaken,
-               matchedField,
-               fromReplication,
-               validateForStorage,
-               immutablePaths,
-               &indexData,
-               &logBuilder,
-               &indexesAffected,
-               &noop);
-    ASSERT_FALSE(noop);
-    ASSERT_TRUE(indexesAffected);
+    setPathTaken("a.$id");
+    addIndexedPath("a");
+    setValidateForStorage(false);
+    auto result = node.apply(getApplyParams(doc.root()["a"]["$id"]));
+    ASSERT_FALSE(result.noop);
+    ASSERT_TRUE(result.indexesAffected);
     auto updated = BSON("a" << BSON("$ref"
                                     << "c"));
     ASSERT_EQUALS(updated, doc);
     ASSERT_FALSE(doc.isInPlaceModeEnabled());
-    ASSERT_EQUALS(fromjson("{$unset: {'a.$id': true}}"), logDoc);
+    ASSERT_EQUALS(fromjson("{$unset: {'a.$id': true}}"), getLogDoc());
 }
 
-TEST(UnsetNodeTest, ApplyCannotRemoveImmutablePath) {
+TEST_F(UnsetNodeTest, ApplyCannotRemoveImmutablePath) {
     auto update = fromjson("{$unset: {'a.b': true}}");
     const CollatorInterface* collator = nullptr;
     UnsetNode node;
     ASSERT_OK(node.init(update["$unset"]["a.b"], collator));
 
     Document doc(fromjson("{a: {b: 1}}"));
-    FieldRef pathToCreate("");
-    FieldRef pathTaken("a.b");
-    StringData matchedField;
-    auto fromReplication = false;
-    auto validateForStorage = true;
-    FieldRefSet immutablePaths;
-    FieldRef path("a.b");
-    immutablePaths.insert(&path);
-    const UpdateIndexData* indexData = nullptr;
-    LogBuilder* logBuilder = nullptr;
-    auto indexesAffected = false;
-    auto noop = false;
-    ASSERT_THROWS_CODE_AND_WHAT(node.apply(doc.root()["a"]["b"],
-                                           &pathToCreate,
-                                           &pathTaken,
-                                           matchedField,
-                                           fromReplication,
-                                           validateForStorage,
-                                           immutablePaths,
-                                           indexData,
-                                           logBuilder,
-                                           &indexesAffected,
-                                           &noop),
+    setPathTaken("a.b");
+    addImmutablePath("a.b");
+    ASSERT_THROWS_CODE_AND_WHAT(node.apply(getApplyParams(doc.root()["a"]["b"])),
                                 UserException,
                                 ErrorCodes::ImmutableField,
                                 "Unsetting the path 'a.b' would modify the immutable field 'a.b'");
 }
 
-TEST(UnsetNodeTest, ApplyCannotRemovePrefixOfImmutablePath) {
+TEST_F(UnsetNodeTest, ApplyCannotRemovePrefixOfImmutablePath) {
     auto update = fromjson("{$unset: {a: true}}");
     const CollatorInterface* collator = nullptr;
     UnsetNode node;
     ASSERT_OK(node.init(update["$unset"]["a"], collator));
 
     Document doc(fromjson("{a: {b: 1}}"));
-    FieldRef pathToCreate("");
-    FieldRef pathTaken("a");
-    StringData matchedField;
-    auto fromReplication = false;
-    auto validateForStorage = true;
-    FieldRefSet immutablePaths;
-    FieldRef path("a.b");
-    immutablePaths.insert(&path);
-    const UpdateIndexData* indexData = nullptr;
-    LogBuilder* logBuilder = nullptr;
-    auto indexesAffected = false;
-    auto noop = false;
-    ASSERT_THROWS_CODE_AND_WHAT(node.apply(doc.root()["a"],
-                                           &pathToCreate,
-                                           &pathTaken,
-                                           matchedField,
-                                           fromReplication,
-                                           validateForStorage,
-                                           immutablePaths,
-                                           indexData,
-                                           logBuilder,
-                                           &indexesAffected,
-                                           &noop),
+    setPathTaken("a");
+    addImmutablePath("a.b");
+    ASSERT_THROWS_CODE_AND_WHAT(node.apply(getApplyParams(doc.root()["a"])),
                                 UserException,
                                 ErrorCodes::ImmutableField,
                                 "Unsetting the path 'a' would modify the immutable field 'a.b'");
 }
 
-TEST(UnsetNodeTest, ApplyCannotRemoveSuffixOfImmutablePath) {
+TEST_F(UnsetNodeTest, ApplyCannotRemoveSuffixOfImmutablePath) {
     auto update = fromjson("{$unset: {'a.b.c': true}}");
     const CollatorInterface* collator = nullptr;
     UnsetNode node;
     ASSERT_OK(node.init(update["$unset"]["a.b.c"], collator));
 
     Document doc(fromjson("{a: {b: {c: 1}}}"));
-    FieldRef pathToCreate("");
-    FieldRef pathTaken("a.b.c");
-    StringData matchedField;
-    auto fromReplication = false;
-    auto validateForStorage = true;
-    FieldRefSet immutablePaths;
-    FieldRef path("a.b");
-    immutablePaths.insert(&path);
-    const UpdateIndexData* indexData = nullptr;
-    LogBuilder* logBuilder = nullptr;
-    auto indexesAffected = false;
-    auto noop = false;
+    setPathTaken("a.b.c");
+    addImmutablePath("a.b");
     ASSERT_THROWS_CODE_AND_WHAT(
-        node.apply(doc.root()["a"]["b"]["c"],
-                   &pathToCreate,
-                   &pathTaken,
-                   matchedField,
-                   fromReplication,
-                   validateForStorage,
-                   immutablePaths,
-                   indexData,
-                   logBuilder,
-                   &indexesAffected,
-                   &noop),
+        node.apply(getApplyParams(doc.root()["a"]["b"]["c"])),
         UserException,
         ErrorCodes::ImmutableField,
         "Unsetting the path 'a.b.c' would modify the immutable field 'a.b'");
 }
 
-TEST(UnsetNodeTest, ApplyCanRemoveImmutablePathIfNoop) {
+TEST_F(UnsetNodeTest, ApplyCanRemoveImmutablePathIfNoop) {
     auto update = fromjson("{$unset: {'a.b.c': true}}");
     const CollatorInterface* collator = nullptr;
     UnsetNode node;
     ASSERT_OK(node.init(update["$unset"]["a.b.c"], collator));
 
     Document doc(fromjson("{a: {b: 1}}"));
-    FieldRef pathToCreate("c");
-    FieldRef pathTaken("a.b");
-    StringData matchedField;
-    auto fromReplication = false;
-    auto validateForStorage = false;
-    FieldRefSet immutablePaths;
-    FieldRef path("a.b");
-    immutablePaths.insert(&path);
-    UpdateIndexData indexData;
-    indexData.addPath("a");
-    Document logDoc;
-    LogBuilder logBuilder(logDoc.root());
-    auto indexesAffected = false;
-    auto noop = false;
-    node.apply(doc.root()["a"]["b"],
-               &pathToCreate,
-               &pathTaken,
-               matchedField,
-               fromReplication,
-               validateForStorage,
-               immutablePaths,
-               &indexData,
-               &logBuilder,
-               &indexesAffected,
-               &noop);
-    ASSERT_TRUE(noop);
-    ASSERT_FALSE(indexesAffected);
+    setPathToCreate("c");
+    setPathTaken("a.b");
+    addImmutablePath("a.b");
+    addIndexedPath("a");
+    auto result = node.apply(getApplyParams(doc.root()["a"]["b"]));
+    ASSERT_TRUE(result.noop);
+    ASSERT_FALSE(result.indexesAffected);
     ASSERT_EQUALS(fromjson("{a: {b: 1}}"), doc);
     ASSERT_TRUE(doc.isInPlaceModeEnabled());
-    ASSERT_EQUALS(fromjson("{}"), logDoc);
+    ASSERT_EQUALS(fromjson("{}"), getLogDoc());
 }
 
 }  // namespace
+}  // namespace mongo

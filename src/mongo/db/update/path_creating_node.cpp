@@ -107,60 +107,49 @@ void checkImmutablePathsNotModified(mutablebson::Element element,
 
 }  // namespace
 
-void PathCreatingNode::apply(mutablebson::Element element,
-                             FieldRef* pathToCreate,
-                             FieldRef* pathTaken,
-                             StringData matchedField,
-                             bool fromReplication,
-                             bool validateForStorage,
-                             const FieldRefSet& immutablePaths,
-                             const UpdateIndexData* indexData,
-                             LogBuilder* logBuilder,
-                             bool* indexesAffected,
-                             bool* noop) const {
-    *indexesAffected = false;
-    *noop = false;
-
+UpdateNode::ApplyResult PathCreatingNode::apply(ApplyParams applyParams) const {
     // The value in this Element gets used to create a logging entry (if we have a LogBuilder).
-    mutablebson::Element valueToLog = element.getDocument().end();
+    mutablebson::Element valueToLog = applyParams.element.getDocument().end();
 
-    if (pathToCreate->empty()) {
+    if (applyParams.pathToCreate->empty()) {
 
         // If 'pathTaken' is a strict prefix of any immutable path, store the original document to
         // ensure the immutable path does not change.
         BSONObj original;
-        for (auto immutablePath = immutablePaths.begin(); immutablePath != immutablePaths.end();
+        for (auto immutablePath = applyParams.immutablePaths.begin();
+             immutablePath != applyParams.immutablePaths.end();
              ++immutablePath) {
-            if (pathTaken->isPrefixOf(**immutablePath)) {
-                original = element.getDocument().getObject();
+            if (applyParams.pathTaken->isPrefixOf(**immutablePath)) {
+                original = applyParams.element.getDocument().getObject();
                 break;
             }
         }
 
         // We found an existing element at the update path.
-        updateExistingElement(&element, noop);
-        if (*noop) {
-            return;  // Successful no-op update.
+        if (!updateExistingElement(&applyParams.element)) {
+            return ApplyResult::noopResult();  // Successful no-op update.
         }
 
-        if (validateForStorage) {
+        if (applyParams.validateForStorage) {
             const bool doRecursiveCheck = true;
-            const uint32_t recursionLevel = pathTaken->numParts();
-            storage_validation::storageValid(element, doRecursiveCheck, recursionLevel);
+            const uint32_t recursionLevel = applyParams.pathTaken->numParts();
+            storage_validation::storageValid(applyParams.element, doRecursiveCheck, recursionLevel);
         }
 
-        checkImmutablePathsNotModified(element, pathTaken, immutablePaths, original);
+        checkImmutablePathsNotModified(
+            applyParams.element, applyParams.pathTaken.get(), applyParams.immutablePaths, original);
 
-        valueToLog = element;
+        valueToLog = applyParams.element;
     } else {
         // We did not find an element at the update path. Create one.
-        auto newElementFieldName = pathToCreate->getPart(pathToCreate->numParts() - 1);
-        auto newElement = element.getDocument().makeElementNull(newElementFieldName);
+        auto newElementFieldName =
+            applyParams.pathToCreate->getPart(applyParams.pathToCreate->numParts() - 1);
+        auto newElement = applyParams.element.getDocument().makeElementNull(newElementFieldName);
         setValueForNewElement(&newElement);
 
         invariant(newElement.ok());
-        auto statusWithFirstCreatedElem =
-            pathsupport::createPathAt(*pathToCreate, 0, element, newElement);
+        auto statusWithFirstCreatedElem = pathsupport::createPathAt(
+            *(applyParams.pathToCreate), 0, applyParams.element, newElement);
         if (!statusWithFirstCreatedElem.isOK()) {
             // $sets on non-viable paths are ignored when the update came from replication. We do
             // not error because idempotency requires that any other update modifiers must still be
@@ -174,33 +163,35 @@ void PathCreatingNode::apply(mutablebson::Element element,
             // replication, so we are not concerned with their behavior when "fromReplication" is
             // true.)
             if (statusWithFirstCreatedElem.getStatus().code() == ErrorCodes::PathNotViable &&
-                fromReplication) {
-                *noop = true;
-                return;
+                applyParams.fromReplication) {
+                return ApplyResult::noopResult();
             }
             uassertStatusOK(statusWithFirstCreatedElem);
             MONGO_UNREACHABLE;  // The previous uassertStatusOK should always throw.
         }
 
-        if (validateForStorage) {
+        if (applyParams.validateForStorage) {
             const bool doRecursiveCheck = true;
-            const uint32_t recursionLevel = pathTaken->numParts() + 1;
+            const uint32_t recursionLevel = applyParams.pathTaken->numParts() + 1;
             storage_validation::storageValid(
                 statusWithFirstCreatedElem.getValue(), doRecursiveCheck, recursionLevel);
         }
 
-        for (auto immutablePath = immutablePaths.begin(); immutablePath != immutablePaths.end();
+        for (auto immutablePath = applyParams.immutablePaths.begin();
+             immutablePath != applyParams.immutablePaths.end();
              ++immutablePath) {
 
             // If 'immutablePath' is a (strict or non-strict) prefix of 'pathTaken', then we are
             // modifying 'immutablePath'. For example, adding '_id.x' will illegally modify '_id'.
             uassert(ErrorCodes::ImmutableField,
-                    str::stream() << "Updating the path '" << pathTaken->dottedField() << "' to "
-                                  << element.toString()
+                    str::stream() << "Updating the path '" << applyParams.pathTaken->dottedField()
+                                  << "' to "
+                                  << applyParams.element.toString()
                                   << " would modify the immutable field '"
                                   << (*immutablePath)->dottedField()
                                   << "'",
-                    pathTaken->commonPrefixSize(**immutablePath) != (*immutablePath)->numParts());
+                    applyParams.pathTaken->commonPrefixSize(**immutablePath) !=
+                        (*immutablePath)->numParts());
         }
 
         valueToLog = newElement;
@@ -208,24 +199,28 @@ void PathCreatingNode::apply(mutablebson::Element element,
 
     // Create full field path of set element.
     StringBuilder builder;
-    builder << pathTaken->dottedField();
-    if (!pathTaken->empty() && !pathToCreate->empty()) {
+    builder << applyParams.pathTaken->dottedField();
+    if (!applyParams.pathTaken->empty() && !applyParams.pathToCreate->empty()) {
         builder << ".";
     }
-    builder << pathToCreate->dottedField();
+    builder << applyParams.pathToCreate->dottedField();
     auto fullPath = builder.str();
 
+    ApplyResult applyResult;
+
     // Determine if indexes are affected.
-    if (indexData && indexData->mightBeIndexed(fullPath)) {
-        *indexesAffected = true;
+    if (!applyParams.indexData || !applyParams.indexData->mightBeIndexed(fullPath)) {
+        applyResult.indexesAffected = false;
     }
 
     // Log the operation.
-    if (logBuilder) {
+    if (applyParams.logBuilder) {
         auto logElement =
-            logBuilder->getDocument().makeElementWithNewFieldName(fullPath, valueToLog);
+            applyParams.logBuilder->getDocument().makeElementWithNewFieldName(fullPath, valueToLog);
         invariant(logElement.ok());
-        uassertStatusOK(logBuilder->addToSets(logElement));
+        uassertStatusOK(applyParams.logBuilder->addToSets(logElement));
     }
+
+    return applyResult;
 }
 }  // namespace mongo

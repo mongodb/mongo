@@ -81,39 +81,32 @@ StatusWith<std::string> parseArrayFilterIdentifier(
 }
 
 /**
- * Applies 'child' to the child of 'element' named 'field' (which will create it, if it does not
- * exist). If 'pathToCreate' is created, then 'pathToCreate' is moved to the end of 'pathTaken', and
- * 'element' is advanced to the end of 'pathTaken'.
+ * Applies 'child' to the child of 'applyParams->element' named 'field' (which will create it, if it
+ * does not exist). If 'applyParams->pathToCreate' is created, then 'applyParams->pathToCreate' is
+ * moved to the end of 'applyParams->pathTaken', and 'applyParams->element' is advanced to the end
+ * of 'applyParams->pathTaken'. Updates 'applyResult' based on whether 'child' was a noop or
+ * affected indexes.
  */
 void applyChild(const UpdateNode& child,
                 StringData field,
-                mutablebson::Element* element,
-                FieldRef* pathToCreate,
-                FieldRef* pathTaken,
-                StringData matchedField,
-                bool fromReplication,
-                bool validateForStorage,
-                const FieldRefSet& immutablePaths,
-                const UpdateIndexData* indexData,
-                LogBuilder* logBuilder,
-                bool* indexesAffected,
-                bool* noop) {
+                UpdateNode::ApplyParams* applyParams,
+                UpdateNode::ApplyResult* applyResult) {
 
-    auto pathTakenSizeBefore = pathTaken->numParts();
+    auto pathTakenSizeBefore = applyParams->pathTaken->numParts();
 
     // A non-ok value for childElement will indicate that we need to append 'field' to the
     // 'pathToCreate' FieldRef.
-    auto childElement = element->getDocument().end();
+    auto childElement = applyParams->element.getDocument().end();
     invariant(!childElement.ok());
-    if (!pathToCreate->empty()) {
+    if (!applyParams->pathToCreate->empty()) {
         // We're already traversing a path with elements that don't exist yet, so we will definitely
         // need to append.
-    } else if (element->getType() == BSONType::Object) {
-        childElement = element->findFirstChildNamed(field);
-    } else if (element->getType() == BSONType::Array) {
+    } else if (applyParams->element.getType() == BSONType::Object) {
+        childElement = applyParams->element[field];
+    } else if (applyParams->element.getType() == BSONType::Array) {
         boost::optional<size_t> indexFromField = parseUnsignedBase10Integer(field);
         if (indexFromField) {
-            childElement = element->findNthChild(*indexFromField);
+            childElement = applyParams->element.findNthChild(*indexFromField);
         } else {
             // We're trying to traverse an array element, but the path specifies a name instead of
             // an index. We append the name to 'pathToCreate' for now, even though we know we won't
@@ -126,65 +119,54 @@ void applyChild(const UpdateNode& child,
         // The path we've traversed so far already exists in our document, and 'childElement'
         // represents the Element indicated by the 'field' name or index, which we indicate by
         // updating the 'pathTaken' FieldRef.
-        pathTaken->appendPart(field);
+        applyParams->pathTaken->appendPart(field);
     } else {
         // We are traversing path components that do not exist in our document. Any update modifier
         // that creates new path components (i.e., any PathCreatingNode update nodes) will need to
         // create this component, so we append it to the 'pathToCreate' FieldRef.
-        childElement = *element;
-        pathToCreate->appendPart(field);
+        childElement = applyParams->element;
+        applyParams->pathToCreate->appendPart(field);
     }
 
-    bool childAffectsIndexes = false;
-    bool childNoop = false;
+    auto childApplyParams = *applyParams;
+    childApplyParams.element = childElement;
+    auto childApplyResult = child.apply(childApplyParams);
 
-    child.apply(childElement,
-                pathToCreate,
-                pathTaken,
-                matchedField,
-                fromReplication,
-                validateForStorage,
-                immutablePaths,
-                indexData,
-                logBuilder,
-                &childAffectsIndexes,
-                &childNoop);
-
-    *indexesAffected = *indexesAffected || childAffectsIndexes;
-    *noop = *noop && childNoop;
+    applyResult->indexesAffected = applyResult->indexesAffected || childApplyResult.indexesAffected;
+    applyResult->noop = applyResult->noop && childApplyResult.noop;
 
     // Pop 'field' off of 'pathToCreate' or 'pathTaken'.
-    if (!pathToCreate->empty()) {
-        pathToCreate->removeLastPart();
+    if (!applyParams->pathToCreate->empty()) {
+        applyParams->pathToCreate->removeLastPart();
     } else {
-        pathTaken->removeLastPart();
+        applyParams->pathTaken->removeLastPart();
     }
 
     // If the child is an internal node, it may have created 'pathToCreate' and moved 'pathToCreate'
     // to the end of 'pathTaken'. We should advance 'element' to the end of 'pathTaken'.
-    if (pathTaken->numParts() > pathTakenSizeBefore) {
-        for (auto i = pathTakenSizeBefore; i < pathTaken->numParts(); ++i) {
-            *element = (*element)[pathTaken->getPart(i)];
-            invariant(element->ok());
+    if (applyParams->pathTaken->numParts() > pathTakenSizeBefore) {
+        for (auto i = pathTakenSizeBefore; i < applyParams->pathTaken->numParts(); ++i) {
+            applyParams->element = applyParams->element[applyParams->pathTaken->getPart(i)];
+            invariant(applyParams->element.ok());
         }
-    } else if (!pathToCreate->empty()) {
+    } else if (!applyParams->pathToCreate->empty()) {
 
         // If the child is a leaf node, it may have created 'pathToCreate' without moving
         // 'pathToCreate' to the end of 'pathTaken'. We should move 'pathToCreate' to the end of
         // 'pathTaken' and advance 'element' to the end of 'pathTaken'.
-        childElement = (*element)[pathToCreate->getPart(0)];
+        childElement = applyParams->element[applyParams->pathToCreate->getPart(0)];
         if (childElement.ok()) {
-            *element = childElement;
-            pathTaken->appendPart(pathToCreate->getPart(0));
+            applyParams->element = childElement;
+            applyParams->pathTaken->appendPart(applyParams->pathToCreate->getPart(0));
 
             // Either the path was fully created or not created at all.
-            for (size_t i = 1; i < pathToCreate->numParts(); ++i) {
-                *element = (*element)[pathToCreate->getPart(i)];
-                invariant(element->ok());
-                pathTaken->appendPart(pathToCreate->getPart(i));
+            for (size_t i = 1; i < applyParams->pathToCreate->numParts(); ++i) {
+                applyParams->element = applyParams->element[applyParams->pathToCreate->getPart(i)];
+                invariant(applyParams->element.ok());
+                applyParams->pathTaken->appendPart(applyParams->pathToCreate->getPart(i));
             }
 
-            pathToCreate->clear();
+            applyParams->pathToCreate->clear();
         }
     }
 }
@@ -384,72 +366,43 @@ void UpdateObjectNode::setChild(std::string field, std::unique_ptr<UpdateNode> c
     }
 }
 
-void UpdateObjectNode::apply(mutablebson::Element element,
-                             FieldRef* pathToCreate,
-                             FieldRef* pathTaken,
-                             StringData matchedField,
-                             bool fromReplication,
-                             bool validateForStorage,
-                             const FieldRefSet& immutablePaths,
-                             const UpdateIndexData* indexData,
-                             LogBuilder* logBuilder,
-                             bool* indexesAffected,
-                             bool* noop) const {
-    *indexesAffected = false;
-    *noop = true;
-
+UpdateNode::ApplyResult UpdateObjectNode::apply(ApplyParams applyParams) const {
     bool applyPositional = _positionalChild.get();
     if (applyPositional) {
         uassert(ErrorCodes::BadValue,
                 "The positional operator did not find the match needed from the query.",
-                !matchedField.empty());
+                !applyParams.matchedField.empty());
     }
 
-    // Capture arguments to applyChild() to avoid code duplication.
-    auto applyChildClosure = [=, &element, &immutablePaths](const UpdateNode& child,
-                                                            StringData field) {
-        applyChild(child,
-                   field,
-                   &element,
-                   pathToCreate,
-                   pathTaken,
-                   matchedField,
-                   fromReplication,
-                   validateForStorage,
-                   immutablePaths,
-                   indexData,
-                   logBuilder,
-                   indexesAffected,
-                   noop);
-    };
+    auto applyResult = ApplyResult::noopResult();
 
     for (const auto& pair : _children) {
 
         // If this child has the same field name as the positional child, they must be merged and
         // applied.
-        if (applyPositional && pair.first == matchedField) {
+        if (applyPositional && pair.first == applyParams.matchedField) {
 
             // Check if we have stored the result of merging the positional child with this child.
             auto mergedChild = _mergedChildrenCache.find(pair.first);
             if (mergedChild == _mergedChildrenCache.end()) {
 
                 // The full path to the merged field is required for error reporting.
-                for (size_t i = 0; i < pathToCreate->numParts(); ++i) {
-                    pathTaken->appendPart(pathToCreate->getPart(i));
+                for (size_t i = 0; i < applyParams.pathToCreate->numParts(); ++i) {
+                    applyParams.pathTaken->appendPart(applyParams.pathToCreate->getPart(i));
                 }
-                pathTaken->appendPart(matchedField);
-                auto insertResult = _mergedChildrenCache.emplace(
-                    std::make_pair(pair.first,
-                                   UpdateNode::createUpdateNodeByMerging(
-                                       *_positionalChild, *pair.second, pathTaken)));
-                for (size_t i = 0; i < pathToCreate->numParts() + 1; ++i) {
-                    pathTaken->removeLastPart();
+                applyParams.pathTaken->appendPart(applyParams.matchedField);
+                auto insertResult = _mergedChildrenCache.emplace(std::make_pair(
+                    pair.first,
+                    UpdateNode::createUpdateNodeByMerging(
+                        *_positionalChild, *pair.second, applyParams.pathTaken.get())));
+                for (size_t i = 0; i < applyParams.pathToCreate->numParts() + 1; ++i) {
+                    applyParams.pathTaken->removeLastPart();
                 }
                 invariant(insertResult.second);
                 mergedChild = insertResult.first;
             }
 
-            applyChildClosure(*mergedChild->second.get(), pair.first);
+            applyChild(*mergedChild->second.get(), pair.first, &applyParams, &applyResult);
 
             applyPositional = false;
             continue;
@@ -457,19 +410,22 @@ void UpdateObjectNode::apply(mutablebson::Element element,
 
         // If 'matchedField' is alphabetically before the current child, we should apply the
         // positional child now.
-        if (applyPositional && matchedField < pair.first) {
-            applyChildClosure(*_positionalChild.get(), matchedField);
+        if (applyPositional && applyParams.matchedField < pair.first) {
+            applyChild(
+                *_positionalChild.get(), applyParams.matchedField, &applyParams, &applyResult);
             applyPositional = false;
         }
 
         // Apply the current child.
-        applyChildClosure(*pair.second, pair.first);
+        applyChild(*pair.second, pair.first, &applyParams, &applyResult);
     }
 
     // 'matchedField' is alphabetically after all children, so we apply it now.
     if (applyPositional) {
-        applyChildClosure(*_positionalChild.get(), matchedField);
+        applyChild(*_positionalChild.get(), applyParams.matchedField, &applyParams, &applyResult);
     }
+
+    return applyResult;
 }
 
 }  // namespace mongo

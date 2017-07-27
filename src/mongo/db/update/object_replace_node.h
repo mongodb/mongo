@@ -52,25 +52,13 @@ public:
     void setCollator(const CollatorInterface* collator) final {}
 
     /**
-     * Replaces the document that 'element' belongs to with '_val'. If '_val' does not contain an
-     * _id, the _id from the original document is preserved. 'element' must be the root of the
-     * document. 'pathToCreate' and 'pathTaken' must be empty. If 'validateForStorage' is true, the
-     * modified document is validated for storage. Throws if any path in 'immutablePaths' is
-     * modified (but it may be created if it did not yet exist). Logs the update as a
-     * replacement-style update. Always outputs that indexes are affected when the replacement is
-     * not a noop.
+     * Replaces the document that 'applyParams.element' belongs to with '_val'. If '_val' does not
+     * contain an _id, the _id from the original document is preserved. 'applyParams.element' must
+     * be the root of the document. 'applyParams.pathToCreate' and 'applyParams.pathTaken' must be
+     * empty. Always returns a result stating that indexes are affected when the replacement is not
+     * a noop.
      */
-    void apply(mutablebson::Element element,
-               FieldRef* pathToCreate,
-               FieldRef* pathTaken,
-               StringData matchedField,
-               bool fromReplication,
-               bool validateForStorage,
-               const FieldRefSet& immutablePaths,
-               const UpdateIndexData* indexData,
-               LogBuilder* logBuilder,
-               bool* indexesAffected,
-               bool* noop) const final;
+    ApplyResult apply(ApplyParams applyParams) const final;
 
 private:
     // Object to replace with.

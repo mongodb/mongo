@@ -54,17 +54,9 @@ public:
 
     void setCollator(const CollatorInterface* collator) final {}
 
-    void apply(mutablebson::Element element,
-               FieldRef* pathToCreate,
-               FieldRef* pathTaken,
-               StringData matchedField,
-               bool fromReplication,
-               bool validateForStorage,
-               const FieldRefSet& immutablePaths,
-               const UpdateIndexData* indexData,
-               LogBuilder* logBuilder,
-               bool* indexesAffected,
-               bool* noop) const final {}
+    ApplyResult apply(ApplyParams applyParams) const final {
+        return ApplyResult::noopResult();
+    }
 };
 
 }  // namespace mongo

@@ -33,30 +33,17 @@
 #include "mongo/bson/mutable/algorithm.h"
 #include "mongo/bson/mutable/mutable_bson_test_utils.h"
 #include "mongo/db/json.h"
-#include "mongo/db/logical_clock.h"
-#include "mongo/db/service_context_noop.h"
+#include "mongo/db/update/update_node_test_fixture.h"
 #include "mongo/unittest/death_test.h"
 #include "mongo/unittest/unittest.h"
 
+namespace mongo {
 namespace {
 
-using namespace mongo;
+using CurrentDateNodeTest = UpdateNodeTest;
 using mongo::mutablebson::Document;
 using mongo::mutablebson::Element;
 using mongo::mutablebson::countChildren;
-
-class CurrentDateNodeTest : public mongo::unittest::Test {
-public:
-    ~CurrentDateNodeTest() override = default;
-
-protected:
-    void setUp() override {
-        auto service = mongo::getGlobalServiceContext();
-        auto logicalClock = mongo::stdx::make_unique<mongo::LogicalClock>(service);
-        mongo::LogicalClock::set(service, std::move(logicalClock));
-    }
-    void tearDown() override{};
-};
 
 DEATH_TEST(CurrentDateNodeTest, InitFailsForEmptyElement, "Invariant failure modExpr.ok()") {
     auto update = fromjson("{$currentDate: {}}");
@@ -142,41 +129,21 @@ TEST_F(CurrentDateNodeTest, ApplyTrue) {
     ASSERT_OK(node.init(update["$currentDate"]["a"], collator));
 
     Document doc(fromjson("{a: 0}"));
-    FieldRef pathToCreate("");
-    FieldRef pathTaken("a");
-    StringData matchedField;
-    auto fromReplication = true;
-    auto validateForStorage = true;
-    FieldRefSet immutablePaths;
-    UpdateIndexData indexData;
-    indexData.addPath("a");
-    Document logDoc;
-    LogBuilder logBuilder(logDoc.root());
-    auto indexesAffected = false;
-    auto noop = false;
-    node.apply(doc.root()["a"],
-               &pathToCreate,
-               &pathTaken,
-               matchedField,
-               fromReplication,
-               validateForStorage,
-               immutablePaths,
-               &indexData,
-               &logBuilder,
-               &indexesAffected,
-               &noop);
-    ASSERT_FALSE(noop);
-    ASSERT_TRUE(indexesAffected);
+    setPathTaken("a");
+    addIndexedPath("a");
+    auto result = node.apply(getApplyParams(doc.root()["a"]));
+    ASSERT_FALSE(result.noop);
+    ASSERT_TRUE(result.indexesAffected);
 
     ASSERT_EQUALS(doc.root().countChildren(), 1U);
     ASSERT_TRUE(doc.root()["a"].ok());
     ASSERT_EQUALS(doc.root()["a"].getType(), BSONType::Date);
 
-    ASSERT_EQUALS(logDoc.root().countChildren(), 1U);
-    ASSERT_TRUE(logDoc.root()["$set"].ok());
-    ASSERT_EQUALS(logDoc.root()["$set"].countChildren(), 1U);
-    ASSERT_TRUE(logDoc.root()["$set"]["a"].ok());
-    ASSERT_EQUALS(logDoc.root()["$set"]["a"].getType(), BSONType::Date);
+    ASSERT_EQUALS(getLogDoc().root().countChildren(), 1U);
+    ASSERT_TRUE(getLogDoc().root()["$set"].ok());
+    ASSERT_EQUALS(getLogDoc().root()["$set"].countChildren(), 1U);
+    ASSERT_TRUE(getLogDoc().root()["$set"]["a"].ok());
+    ASSERT_EQUALS(getLogDoc().root()["$set"]["a"].getType(), BSONType::Date);
 }
 
 TEST_F(CurrentDateNodeTest, ApplyFalse) {
@@ -186,41 +153,21 @@ TEST_F(CurrentDateNodeTest, ApplyFalse) {
     ASSERT_OK(node.init(update["$currentDate"]["a"], collator));
 
     Document doc(fromjson("{a: 0}"));
-    FieldRef pathToCreate("");
-    FieldRef pathTaken("a");
-    StringData matchedField;
-    auto fromReplication = true;
-    auto validateForStorage = true;
-    FieldRefSet immutablePaths;
-    UpdateIndexData indexData;
-    indexData.addPath("a");
-    Document logDoc;
-    LogBuilder logBuilder(logDoc.root());
-    auto indexesAffected = false;
-    auto noop = false;
-    node.apply(doc.root()["a"],
-               &pathToCreate,
-               &pathTaken,
-               matchedField,
-               fromReplication,
-               validateForStorage,
-               immutablePaths,
-               &indexData,
-               &logBuilder,
-               &indexesAffected,
-               &noop);
-    ASSERT_FALSE(noop);
-    ASSERT_TRUE(indexesAffected);
+    setPathTaken("a");
+    addIndexedPath("a");
+    auto result = node.apply(getApplyParams(doc.root()["a"]));
+    ASSERT_FALSE(result.noop);
+    ASSERT_TRUE(result.indexesAffected);
 
     ASSERT_EQUALS(doc.root().countChildren(), 1U);
     ASSERT_TRUE(doc.root()["a"].ok());
     ASSERT_EQUALS(doc.root()["a"].getType(), BSONType::Date);
 
-    ASSERT_EQUALS(logDoc.root().countChildren(), 1U);
-    ASSERT_TRUE(logDoc.root()["$set"].ok());
-    ASSERT_EQUALS(logDoc.root()["$set"].countChildren(), 1U);
-    ASSERT_TRUE(logDoc.root()["$set"]["a"].ok());
-    ASSERT_EQUALS(logDoc.root()["$set"]["a"].getType(), BSONType::Date);
+    ASSERT_EQUALS(getLogDoc().root().countChildren(), 1U);
+    ASSERT_TRUE(getLogDoc().root()["$set"].ok());
+    ASSERT_EQUALS(getLogDoc().root()["$set"].countChildren(), 1U);
+    ASSERT_TRUE(getLogDoc().root()["$set"]["a"].ok());
+    ASSERT_EQUALS(getLogDoc().root()["$set"]["a"].getType(), BSONType::Date);
 }
 
 TEST_F(CurrentDateNodeTest, ApplyDate) {
@@ -230,41 +177,21 @@ TEST_F(CurrentDateNodeTest, ApplyDate) {
     ASSERT_OK(node.init(update["$currentDate"]["a"], collator));
 
     Document doc(fromjson("{a: 0}"));
-    FieldRef pathToCreate("");
-    FieldRef pathTaken("a");
-    StringData matchedField;
-    auto fromReplication = true;
-    auto validateForStorage = true;
-    FieldRefSet immutablePaths;
-    UpdateIndexData indexData;
-    indexData.addPath("a");
-    Document logDoc;
-    LogBuilder logBuilder(logDoc.root());
-    auto indexesAffected = false;
-    auto noop = false;
-    node.apply(doc.root()["a"],
-               &pathToCreate,
-               &pathTaken,
-               matchedField,
-               fromReplication,
-               validateForStorage,
-               immutablePaths,
-               &indexData,
-               &logBuilder,
-               &indexesAffected,
-               &noop);
-    ASSERT_FALSE(noop);
-    ASSERT_TRUE(indexesAffected);
+    setPathTaken("a");
+    addIndexedPath("a");
+    auto result = node.apply(getApplyParams(doc.root()["a"]));
+    ASSERT_FALSE(result.noop);
+    ASSERT_TRUE(result.indexesAffected);
 
     ASSERT_EQUALS(doc.root().countChildren(), 1U);
     ASSERT_TRUE(doc.root()["a"].ok());
     ASSERT_EQUALS(doc.root()["a"].getType(), BSONType::Date);
 
-    ASSERT_EQUALS(logDoc.root().countChildren(), 1U);
-    ASSERT_TRUE(logDoc.root()["$set"].ok());
-    ASSERT_EQUALS(logDoc.root()["$set"].countChildren(), 1U);
-    ASSERT_TRUE(logDoc.root()["$set"]["a"].ok());
-    ASSERT_EQUALS(logDoc.root()["$set"]["a"].getType(), BSONType::Date);
+    ASSERT_EQUALS(getLogDoc().root().countChildren(), 1U);
+    ASSERT_TRUE(getLogDoc().root()["$set"].ok());
+    ASSERT_EQUALS(getLogDoc().root()["$set"].countChildren(), 1U);
+    ASSERT_TRUE(getLogDoc().root()["$set"]["a"].ok());
+    ASSERT_EQUALS(getLogDoc().root()["$set"]["a"].getType(), BSONType::Date);
 }
 
 TEST_F(CurrentDateNodeTest, ApplyTimestamp) {
@@ -274,41 +201,21 @@ TEST_F(CurrentDateNodeTest, ApplyTimestamp) {
     ASSERT_OK(node.init(update["$currentDate"]["a"], collator));
 
     Document doc(fromjson("{a: 0}"));
-    FieldRef pathToCreate("");
-    FieldRef pathTaken("a");
-    StringData matchedField;
-    auto fromReplication = true;
-    auto validateForStorage = true;
-    FieldRefSet immutablePaths;
-    UpdateIndexData indexData;
-    indexData.addPath("a");
-    Document logDoc;
-    LogBuilder logBuilder(logDoc.root());
-    auto indexesAffected = false;
-    auto noop = false;
-    node.apply(doc.root()["a"],
-               &pathToCreate,
-               &pathTaken,
-               matchedField,
-               fromReplication,
-               validateForStorage,
-               immutablePaths,
-               &indexData,
-               &logBuilder,
-               &indexesAffected,
-               &noop);
-    ASSERT_FALSE(noop);
-    ASSERT_TRUE(indexesAffected);
+    setPathTaken("a");
+    addIndexedPath("a");
+    auto result = node.apply(getApplyParams(doc.root()["a"]));
+    ASSERT_FALSE(result.noop);
+    ASSERT_TRUE(result.indexesAffected);
 
     ASSERT_EQUALS(doc.root().countChildren(), 1U);
     ASSERT_TRUE(doc.root()["a"].ok());
     ASSERT_EQUALS(doc.root()["a"].getType(), BSONType::bsonTimestamp);
 
-    ASSERT_EQUALS(logDoc.root().countChildren(), 1U);
-    ASSERT_TRUE(logDoc.root()["$set"].ok());
-    ASSERT_EQUALS(logDoc.root()["$set"].countChildren(), 1U);
-    ASSERT_TRUE(logDoc.root()["$set"]["a"].ok());
-    ASSERT_EQUALS(logDoc.root()["$set"]["a"].getType(), BSONType::bsonTimestamp);
+    ASSERT_EQUALS(getLogDoc().root().countChildren(), 1U);
+    ASSERT_TRUE(getLogDoc().root()["$set"].ok());
+    ASSERT_EQUALS(getLogDoc().root()["$set"].countChildren(), 1U);
+    ASSERT_TRUE(getLogDoc().root()["$set"]["a"].ok());
+    ASSERT_EQUALS(getLogDoc().root()["$set"]["a"].getType(), BSONType::bsonTimestamp);
 }
 
 TEST_F(CurrentDateNodeTest, ApplyFieldDoesNotExist) {
@@ -318,41 +225,21 @@ TEST_F(CurrentDateNodeTest, ApplyFieldDoesNotExist) {
     ASSERT_OK(node.init(update["$currentDate"]["a"], collator));
 
     Document doc(fromjson("{}"));
-    FieldRef pathToCreate("a");
-    FieldRef pathTaken("");
-    StringData matchedField;
-    auto fromReplication = true;
-    auto validateForStorage = true;
-    FieldRefSet immutablePaths;
-    UpdateIndexData indexData;
-    indexData.addPath("a");
-    Document logDoc;
-    LogBuilder logBuilder(logDoc.root());
-    auto indexesAffected = false;
-    auto noop = false;
-    node.apply(doc.root(),
-               &pathToCreate,
-               &pathTaken,
-               matchedField,
-               fromReplication,
-               validateForStorage,
-               immutablePaths,
-               &indexData,
-               &logBuilder,
-               &indexesAffected,
-               &noop);
-    ASSERT_FALSE(noop);
-    ASSERT_TRUE(indexesAffected);
+    setPathToCreate("a");
+    addIndexedPath("a");
+    auto result = node.apply(getApplyParams(doc.root()));
+    ASSERT_FALSE(result.noop);
+    ASSERT_TRUE(result.indexesAffected);
 
     ASSERT_EQUALS(doc.root().countChildren(), 1U);
     ASSERT_TRUE(doc.root()["a"].ok());
     ASSERT_EQUALS(doc.root()["a"].getType(), BSONType::Date);
 
-    ASSERT_EQUALS(logDoc.root().countChildren(), 1U);
-    ASSERT_TRUE(logDoc.root()["$set"].ok());
-    ASSERT_EQUALS(logDoc.root()["$set"].countChildren(), 1U);
-    ASSERT_TRUE(logDoc.root()["$set"]["a"].ok());
-    ASSERT_EQUALS(logDoc.root()["$set"]["a"].getType(), BSONType::Date);
+    ASSERT_EQUALS(getLogDoc().root().countChildren(), 1U);
+    ASSERT_TRUE(getLogDoc().root()["$set"].ok());
+    ASSERT_EQUALS(getLogDoc().root()["$set"].countChildren(), 1U);
+    ASSERT_TRUE(getLogDoc().root()["$set"]["a"].ok());
+    ASSERT_EQUALS(getLogDoc().root()["$set"]["a"].getType(), BSONType::Date);
 }
 
 TEST_F(CurrentDateNodeTest, ApplyIndexesNotAffected) {
@@ -362,41 +249,21 @@ TEST_F(CurrentDateNodeTest, ApplyIndexesNotAffected) {
     ASSERT_OK(node.init(update["$currentDate"]["a"], collator));
 
     Document doc(fromjson("{a: 0}"));
-    FieldRef pathToCreate("");
-    FieldRef pathTaken("a");
-    StringData matchedField;
-    auto fromReplication = true;
-    auto validateForStorage = true;
-    FieldRefSet immutablePaths;
-    UpdateIndexData indexData;
-    indexData.addPath("b");
-    Document logDoc;
-    LogBuilder logBuilder(logDoc.root());
-    auto indexesAffected = false;
-    auto noop = false;
-    node.apply(doc.root()["a"],
-               &pathToCreate,
-               &pathTaken,
-               matchedField,
-               fromReplication,
-               validateForStorage,
-               immutablePaths,
-               &indexData,
-               &logBuilder,
-               &indexesAffected,
-               &noop);
-    ASSERT_FALSE(noop);
-    ASSERT_FALSE(indexesAffected);
+    setPathTaken("a");
+    addIndexedPath("b");
+    auto result = node.apply(getApplyParams(doc.root()["a"]));
+    ASSERT_FALSE(result.noop);
+    ASSERT_FALSE(result.indexesAffected);
 
     ASSERT_EQUALS(doc.root().countChildren(), 1U);
     ASSERT_TRUE(doc.root()["a"].ok());
     ASSERT_EQUALS(doc.root()["a"].getType(), BSONType::Date);
 
-    ASSERT_EQUALS(logDoc.root().countChildren(), 1U);
-    ASSERT_TRUE(logDoc.root()["$set"].ok());
-    ASSERT_EQUALS(logDoc.root()["$set"].countChildren(), 1U);
-    ASSERT_TRUE(logDoc.root()["$set"]["a"].ok());
-    ASSERT_EQUALS(logDoc.root()["$set"]["a"].getType(), BSONType::Date);
+    ASSERT_EQUALS(getLogDoc().root().countChildren(), 1U);
+    ASSERT_TRUE(getLogDoc().root()["$set"].ok());
+    ASSERT_EQUALS(getLogDoc().root()["$set"].countChildren(), 1U);
+    ASSERT_TRUE(getLogDoc().root()["$set"]["a"].ok());
+    ASSERT_EQUALS(getLogDoc().root()["$set"]["a"].getType(), BSONType::Date);
 }
 
 TEST_F(CurrentDateNodeTest, ApplyNoIndexDataOrLogBuilder) {
@@ -406,33 +273,16 @@ TEST_F(CurrentDateNodeTest, ApplyNoIndexDataOrLogBuilder) {
     ASSERT_OK(node.init(update["$currentDate"]["a"], collator));
 
     Document doc(fromjson("{a: 0}"));
-    FieldRef pathToCreate("");
-    FieldRef pathTaken("a");
-    StringData matchedField;
-    auto fromReplication = true;
-    auto validateForStorage = true;
-    FieldRefSet immutablePaths;
-    const UpdateIndexData* indexData = nullptr;
-    LogBuilder* logBuilder = nullptr;
-    auto indexesAffected = false;
-    auto noop = false;
-    node.apply(doc.root()["a"],
-               &pathToCreate,
-               &pathTaken,
-               matchedField,
-               fromReplication,
-               validateForStorage,
-               immutablePaths,
-               indexData,
-               logBuilder,
-               &indexesAffected,
-               &noop);
-    ASSERT_FALSE(noop);
-    ASSERT_FALSE(indexesAffected);
+    setPathTaken("a");
+    setLogBuilderToNull();
+    auto result = node.apply(getApplyParams(doc.root()["a"]));
+    ASSERT_FALSE(result.noop);
+    ASSERT_FALSE(result.indexesAffected);
 
     ASSERT_EQUALS(doc.root().countChildren(), 1U);
     ASSERT_TRUE(doc.root()["a"].ok());
     ASSERT_EQUALS(doc.root()["a"].getType(), BSONType::Date);
 }
 
+}  // namespace
 }  // namespace

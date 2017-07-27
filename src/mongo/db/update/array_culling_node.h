@@ -43,17 +43,7 @@ namespace mongo {
  */
 class ArrayCullingNode : public UpdateLeafNode {
 public:
-    void apply(mutablebson::Element element,
-               FieldRef* pathToCreate,
-               FieldRef* pathTaken,
-               StringData matchedField,
-               bool fromReplication,
-               bool validateForStorage,
-               const FieldRefSet& immutablePaths,
-               const UpdateIndexData* indexData,
-               LogBuilder* logBuilder,
-               bool* indexesAffected,
-               bool* noop) const final;
+    ApplyResult apply(ApplyParams applyParams) const final;
 
     void setCollator(const CollatorInterface* collator) final {
         _matcher->setCollator(collator);

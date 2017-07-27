@@ -47,79 +47,73 @@ Status PopNode::init(BSONElement modExpr, const CollatorInterface* collator) {
     return Status::OK();
 }
 
-void PopNode::apply(mutablebson::Element element,
-                    FieldRef* pathToCreate,
-                    FieldRef* pathTaken,
-                    StringData matchedField,
-                    bool fromReplication,
-                    bool validateForStorage,
-                    const FieldRefSet& immutablePaths,
-                    const UpdateIndexData* indexData,
-                    LogBuilder* logBuilder,
-                    bool* indexesAffected,
-                    bool* noop) const {
-    *indexesAffected = false;
-    *noop = false;
-
-    if (pathTaken->empty()) {
+UpdateNode::ApplyResult PopNode::apply(ApplyParams applyParams) const {
+    if (applyParams.pathTaken->empty()) {
         // No components of the path existed. The pop is treated as a no-op in this case.
-        *noop = true;
-        return;
+        return ApplyResult::noopResult();
     }
 
-    if (!pathToCreate->empty()) {
+    if (!applyParams.pathToCreate->empty()) {
         // There were path components we could not traverse. We treat this as a no-op, unless it
         // would have been impossible to create those elements, which we check with
         // checkViability().
-        UpdateLeafNode::checkViability(element, *pathToCreate, *pathTaken);
+        UpdateLeafNode::checkViability(
+            applyParams.element, *(applyParams.pathToCreate), *(applyParams.pathTaken));
 
-        *noop = true;
-        return;
+        return ApplyResult::noopResult();
     }
 
-    invariant(!pathTaken->empty());
-    invariant(pathToCreate->empty());
+    invariant(!applyParams.pathTaken->empty());
+    invariant(applyParams.pathToCreate->empty());
 
     // The full path existed, but we must fail if the element at that path is not an array.
-    invariant(element.ok());
+    invariant(applyParams.element.ok());
     uassert(ErrorCodes::TypeMismatch,
-            str::stream() << "Path '" << pathTaken->dottedField()
+            str::stream() << "Path '" << applyParams.pathTaken->dottedField()
                           << "' contains an element of non-array type '"
-                          << typeName(element.getType())
+                          << typeName(applyParams.element.getType())
                           << "'",
-            element.getType() == BSONType::Array);
+            applyParams.element.getType() == BSONType::Array);
 
-    if (!element.hasChildren()) {
+    if (!applyParams.element.hasChildren()) {
         // The path exists and contains an array, but the array is empty.
-        *noop = true;
-        return;
+        return ApplyResult::noopResult();
     }
 
-    if (indexData && indexData->mightBeIndexed(pathTaken->dottedField())) {
-        *indexesAffected = true;
+    ApplyResult applyResult;
+
+    if (!applyParams.indexData ||
+        !applyParams.indexData->mightBeIndexed(applyParams.pathTaken->dottedField())) {
+        applyResult.indexesAffected = false;
     }
 
-    auto elementToRemove = _popFromFront ? element.leftChild() : element.rightChild();
+    auto elementToRemove =
+        _popFromFront ? applyParams.element.leftChild() : applyParams.element.rightChild();
     invariantOK(elementToRemove.remove());
 
     // No need to validate for storage, since we cannot have increased the BSON depth or interfered
     // with a DBRef.
 
     // Ensure we are not changing any immutable paths.
-    for (auto immutablePath = immutablePaths.begin(); immutablePath != immutablePaths.end();
+    for (auto immutablePath = applyParams.immutablePaths.begin();
+         immutablePath != applyParams.immutablePaths.end();
          ++immutablePath) {
         uassert(ErrorCodes::ImmutableField,
-                str::stream() << "Performing a $pop on the path '" << pathTaken->dottedField()
+                str::stream() << "Performing a $pop on the path '"
+                              << applyParams.pathTaken->dottedField()
                               << "' would modify the immutable field '"
                               << (*immutablePath)->dottedField()
                               << "'",
-                pathTaken->commonPrefixSize(**immutablePath) <
-                    std::min(pathTaken->numParts(), (*immutablePath)->numParts()));
+                applyParams.pathTaken->commonPrefixSize(**immutablePath) <
+                    std::min(applyParams.pathTaken->numParts(), (*immutablePath)->numParts()));
     }
 
-    if (logBuilder) {
-        uassertStatusOK(logBuilder->addToSetsWithNewFieldName(pathTaken->dottedField(), element));
+    if (applyParams.logBuilder) {
+        uassertStatusOK(applyParams.logBuilder->addToSetsWithNewFieldName(
+            applyParams.pathTaken->dottedField(), applyParams.element));
     }
+
+    return applyResult;
 }
 
 }  // namespace mongo

@@ -34,12 +34,14 @@
 #include "mongo/bson/mutable/mutable_bson_test_utils.h"
 #include "mongo/db/json.h"
 #include "mongo/db/query/collation/collator_interface_mock.h"
+#include "mongo/db/update/update_node_test_fixture.h"
 #include "mongo/unittest/death_test.h"
 #include "mongo/unittest/unittest.h"
 
+namespace mongo {
 namespace {
 
-using namespace mongo;
+using CompareNodeTest = UpdateNodeTest;
 using mongo::mutablebson::Document;
 using mongo::mutablebson::Element;
 using mongo::mutablebson::countChildren;
@@ -51,562 +53,262 @@ DEATH_TEST(CompareNodeTest, InitFailsForEmptyElement, "Invariant failure modExpr
     node.init(update["$max"].embeddedObject().firstElement(), collator).ignore();
 }
 
-TEST(CompareNodeTest, ApplyMaxSameNumber) {
+TEST_F(CompareNodeTest, ApplyMaxSameNumber) {
     auto update = fromjson("{$max: {a: 1}}");
     const CollatorInterface* collator = nullptr;
     CompareNode node(CompareNode::CompareMode::kMax);
     ASSERT_OK(node.init(update["$max"]["a"], collator));
 
     Document doc(fromjson("{a: 1}"));
-    FieldRef pathToCreate("");
-    FieldRef pathTaken("a");
-    StringData matchedField;
-    auto fromReplication = true;
-    auto validateForStorage = true;
-    FieldRefSet immutablePaths;
-    UpdateIndexData indexData;
-    indexData.addPath("a");
-    Document logDoc;
-    LogBuilder logBuilder(logDoc.root());
-    auto indexesAffected = false;
-    auto noop = false;
-    node.apply(doc.root()["a"],
-               &pathToCreate,
-               &pathTaken,
-               matchedField,
-               fromReplication,
-               validateForStorage,
-               immutablePaths,
-               &indexData,
-               &logBuilder,
-               &indexesAffected,
-               &noop);
-    ASSERT_TRUE(noop);
-    ASSERT_FALSE(indexesAffected);
+    setPathTaken("a");
+    addIndexedPath("a");
+    auto result = node.apply(getApplyParams(doc.root()["a"]));
+    ASSERT_TRUE(result.noop);
+    ASSERT_FALSE(result.indexesAffected);
     ASSERT_EQUALS(fromjson("{a: 1}"), doc);
     ASSERT_TRUE(doc.isInPlaceModeEnabled());
-    ASSERT_EQUALS(fromjson("{}"), logDoc);
+    ASSERT_EQUALS(fromjson("{}"), getLogDoc());
 }
 
-TEST(CompareNodeTest, ApplyMinSameNumber) {
+TEST_F(CompareNodeTest, ApplyMinSameNumber) {
     auto update = fromjson("{$min: {a: 1}}");
     const CollatorInterface* collator = nullptr;
     CompareNode node(CompareNode::CompareMode::kMin);
     ASSERT_OK(node.init(update["$min"]["a"], collator));
 
     Document doc(fromjson("{a: 1}"));
-    FieldRef pathToCreate("");
-    FieldRef pathTaken("a");
-    StringData matchedField;
-    auto fromReplication = true;
-    auto validateForStorage = true;
-    FieldRefSet immutablePaths;
-    UpdateIndexData indexData;
-    indexData.addPath("a");
-    Document logDoc;
-    LogBuilder logBuilder(logDoc.root());
-    auto indexesAffected = false;
-    auto noop = false;
-    node.apply(doc.root()["a"],
-               &pathToCreate,
-               &pathTaken,
-               matchedField,
-               fromReplication,
-               validateForStorage,
-               immutablePaths,
-               &indexData,
-               &logBuilder,
-               &indexesAffected,
-               &noop);
-    ASSERT_TRUE(noop);
-    ASSERT_FALSE(indexesAffected);
+    setPathTaken("a");
+    addIndexedPath("a");
+    auto result = node.apply(getApplyParams(doc.root()["a"]));
+    ASSERT_TRUE(result.noop);
+    ASSERT_FALSE(result.indexesAffected);
     ASSERT_EQUALS(fromjson("{a: 1}"), doc);
     ASSERT_TRUE(doc.isInPlaceModeEnabled());
-    ASSERT_EQUALS(fromjson("{}"), logDoc);
+    ASSERT_EQUALS(fromjson("{}"), getLogDoc());
 }
 
-TEST(CompareNodeTest, ApplyMaxNumberIsLess) {
+TEST_F(CompareNodeTest, ApplyMaxNumberIsLess) {
     auto update = fromjson("{$max: {a: 0}}");
     const CollatorInterface* collator = nullptr;
     CompareNode node(CompareNode::CompareMode::kMax);
     ASSERT_OK(node.init(update["$max"]["a"], collator));
 
     Document doc(fromjson("{a: 1}"));
-    FieldRef pathToCreate("");
-    FieldRef pathTaken("a");
-    StringData matchedField;
-    auto fromReplication = true;
-    auto validateForStorage = true;
-    FieldRefSet immutablePaths;
-    UpdateIndexData indexData;
-    indexData.addPath("a");
-    Document logDoc;
-    LogBuilder logBuilder(logDoc.root());
-    auto indexesAffected = false;
-    auto noop = false;
-    node.apply(doc.root()["a"],
-               &pathToCreate,
-               &pathTaken,
-               matchedField,
-               fromReplication,
-               validateForStorage,
-               immutablePaths,
-               &indexData,
-               &logBuilder,
-               &indexesAffected,
-               &noop);
-    ASSERT_TRUE(noop);
-    ASSERT_FALSE(indexesAffected);
+    setPathTaken("a");
+    addIndexedPath("a");
+    auto result = node.apply(getApplyParams(doc.root()["a"]));
+    ASSERT_TRUE(result.noop);
+    ASSERT_FALSE(result.indexesAffected);
     ASSERT_EQUALS(fromjson("{a: 1}"), doc);
     ASSERT_TRUE(doc.isInPlaceModeEnabled());
-    ASSERT_EQUALS(fromjson("{}"), logDoc);
+    ASSERT_EQUALS(fromjson("{}"), getLogDoc());
 }
 
-TEST(CompareNodeTest, ApplyMinNumberIsMore) {
+TEST_F(CompareNodeTest, ApplyMinNumberIsMore) {
     auto update = fromjson("{$min: {a: 2}}");
     const CollatorInterface* collator = nullptr;
     CompareNode node(CompareNode::CompareMode::kMin);
     ASSERT_OK(node.init(update["$min"]["a"], collator));
 
     Document doc(fromjson("{a: 1}"));
-    FieldRef pathToCreate("");
-    FieldRef pathTaken("a");
-    StringData matchedField;
-    auto fromReplication = true;
-    auto validateForStorage = true;
-    FieldRefSet immutablePaths;
-    UpdateIndexData indexData;
-    indexData.addPath("a");
-    Document logDoc;
-    LogBuilder logBuilder(logDoc.root());
-    auto indexesAffected = false;
-    auto noop = false;
-    node.apply(doc.root()["a"],
-               &pathToCreate,
-               &pathTaken,
-               matchedField,
-               fromReplication,
-               validateForStorage,
-               immutablePaths,
-               &indexData,
-               &logBuilder,
-               &indexesAffected,
-               &noop);
-    ASSERT_TRUE(noop);
-    ASSERT_FALSE(indexesAffected);
+    setPathTaken("a");
+    addIndexedPath("a");
+    auto result = node.apply(getApplyParams(doc.root()["a"]));
+    ASSERT_TRUE(result.noop);
+    ASSERT_FALSE(result.indexesAffected);
     ASSERT_EQUALS(fromjson("{a: 1}"), doc);
     ASSERT_TRUE(doc.isInPlaceModeEnabled());
-    ASSERT_EQUALS(fromjson("{}"), logDoc);
+    ASSERT_EQUALS(fromjson("{}"), getLogDoc());
 }
 
-TEST(CompareNodeTest, ApplyMaxSameValInt) {
+TEST_F(CompareNodeTest, ApplyMaxSameValInt) {
     auto update = BSON("$max" << BSON("a" << 1LL));
     const CollatorInterface* collator = nullptr;
     CompareNode node(CompareNode::CompareMode::kMax);
     ASSERT_OK(node.init(update["$max"]["a"], collator));
 
     Document doc(fromjson("{a: 1.0}"));
-    FieldRef pathToCreate("");
-    FieldRef pathTaken("a");
-    StringData matchedField;
-    auto fromReplication = true;
-    auto validateForStorage = true;
-    FieldRefSet immutablePaths;
-    UpdateIndexData indexData;
-    indexData.addPath("a");
-    Document logDoc;
-    LogBuilder logBuilder(logDoc.root());
-    auto indexesAffected = false;
-    auto noop = false;
-    node.apply(doc.root()["a"],
-               &pathToCreate,
-               &pathTaken,
-               matchedField,
-               fromReplication,
-               validateForStorage,
-               immutablePaths,
-               &indexData,
-               &logBuilder,
-               &indexesAffected,
-               &noop);
-    ASSERT_TRUE(noop);
-    ASSERT_FALSE(indexesAffected);
+    setPathTaken("a");
+    addIndexedPath("a");
+    auto result = node.apply(getApplyParams(doc.root()["a"]));
+    ASSERT_TRUE(result.noop);
+    ASSERT_FALSE(result.indexesAffected);
     ASSERT_EQUALS(fromjson("{a: 1.0}"), doc);
     ASSERT_TRUE(doc.isInPlaceModeEnabled());
-    ASSERT_EQUALS(fromjson("{}"), logDoc);
+    ASSERT_EQUALS(fromjson("{}"), getLogDoc());
 }
 
-TEST(CompareNodeTest, ApplyMaxSameValIntZero) {
+TEST_F(CompareNodeTest, ApplyMaxSameValIntZero) {
     auto update = BSON("$max" << BSON("a" << 0LL));
     const CollatorInterface* collator = nullptr;
     CompareNode node(CompareNode::CompareMode::kMax);
     ASSERT_OK(node.init(update["$max"]["a"], collator));
 
     Document doc(fromjson("{a: 0.0}"));
-    FieldRef pathToCreate("");
-    FieldRef pathTaken("a");
-    StringData matchedField;
-    auto fromReplication = true;
-    auto validateForStorage = true;
-    FieldRefSet immutablePaths;
-    UpdateIndexData indexData;
-    indexData.addPath("a");
-    Document logDoc;
-    LogBuilder logBuilder(logDoc.root());
-    auto indexesAffected = false;
-    auto noop = false;
-    node.apply(doc.root()["a"],
-               &pathToCreate,
-               &pathTaken,
-               matchedField,
-               fromReplication,
-               validateForStorage,
-               immutablePaths,
-               &indexData,
-               &logBuilder,
-               &indexesAffected,
-               &noop);
-    ASSERT_TRUE(noop);
-    ASSERT_FALSE(indexesAffected);
+    setPathTaken("a");
+    addIndexedPath("a");
+    auto result = node.apply(getApplyParams(doc.root()["a"]));
+    ASSERT_TRUE(result.noop);
+    ASSERT_FALSE(result.indexesAffected);
     ASSERT_EQUALS(fromjson("{a: 0.0}"), doc);
     ASSERT_TRUE(doc.isInPlaceModeEnabled());
-    ASSERT_EQUALS(fromjson("{}"), logDoc);
+    ASSERT_EQUALS(fromjson("{}"), getLogDoc());
 }
 
-TEST(CompareNodeTest, ApplyMinSameValIntZero) {
+TEST_F(CompareNodeTest, ApplyMinSameValIntZero) {
     auto update = BSON("$min" << BSON("a" << 0LL));
     const CollatorInterface* collator = nullptr;
     CompareNode node(CompareNode::CompareMode::kMin);
     ASSERT_OK(node.init(update["$min"]["a"], collator));
 
     Document doc(fromjson("{a: 0.0}"));
-    FieldRef pathToCreate("");
-    FieldRef pathTaken("a");
-    StringData matchedField;
-    auto fromReplication = true;
-    auto validateForStorage = true;
-    FieldRefSet immutablePaths;
-    UpdateIndexData indexData;
-    indexData.addPath("a");
-    Document logDoc;
-    LogBuilder logBuilder(logDoc.root());
-    auto indexesAffected = false;
-    auto noop = false;
-    node.apply(doc.root()["a"],
-               &pathToCreate,
-               &pathTaken,
-               matchedField,
-               fromReplication,
-               validateForStorage,
-               immutablePaths,
-               &indexData,
-               &logBuilder,
-               &indexesAffected,
-               &noop);
-    ASSERT_TRUE(noop);
-    ASSERT_FALSE(indexesAffected);
+    setPathTaken("a");
+    addIndexedPath("a");
+    auto result = node.apply(getApplyParams(doc.root()["a"]));
+    ASSERT_TRUE(result.noop);
+    ASSERT_FALSE(result.indexesAffected);
     ASSERT_EQUALS(fromjson("{a: 0.0}"), doc);
     ASSERT_TRUE(doc.isInPlaceModeEnabled());
-    ASSERT_EQUALS(fromjson("{}"), logDoc);
+    ASSERT_EQUALS(fromjson("{}"), getLogDoc());
 }
 
-TEST(CompareNodeTest, ApplyMissingFieldMinNumber) {
+TEST_F(CompareNodeTest, ApplyMissingFieldMinNumber) {
     auto update = fromjson("{$min: {a: 0}}");
     const CollatorInterface* collator = nullptr;
     CompareNode node(CompareNode::CompareMode::kMin);
     ASSERT_OK(node.init(update["$min"]["a"], collator));
 
     Document doc(fromjson("{}"));
-    FieldRef pathToCreate("a");
-    FieldRef pathTaken("");
-    StringData matchedField;
-    auto fromReplication = true;
-    auto validateForStorage = true;
-    FieldRefSet immutablePaths;
-    UpdateIndexData indexData;
-    indexData.addPath("a");
-    Document logDoc;
-    LogBuilder logBuilder(logDoc.root());
-    auto indexesAffected = false;
-    auto noop = false;
-    node.apply(doc.root(),
-               &pathToCreate,
-               &pathTaken,
-               matchedField,
-               fromReplication,
-               validateForStorage,
-               immutablePaths,
-               &indexData,
-               &logBuilder,
-               &indexesAffected,
-               &noop);
-    ASSERT_FALSE(noop);
-    ASSERT_TRUE(indexesAffected);
+    setPathToCreate("a");
+    addIndexedPath("a");
+    auto result = node.apply(getApplyParams(doc.root()));
+    ASSERT_FALSE(result.noop);
+    ASSERT_TRUE(result.indexesAffected);
     ASSERT_EQUALS(fromjson("{a: 0}"), doc);
     ASSERT_FALSE(doc.isInPlaceModeEnabled());
-    ASSERT_EQUALS(fromjson("{$set: {a: 0}}"), logDoc);
+    ASSERT_EQUALS(fromjson("{$set: {a: 0}}"), getLogDoc());
 }
 
-TEST(CompareNodeTest, ApplyExistingNumberMinNumber) {
+TEST_F(CompareNodeTest, ApplyExistingNumberMinNumber) {
     auto update = fromjson("{$min: {a: 0}}");
     const CollatorInterface* collator = nullptr;
     CompareNode node(CompareNode::CompareMode::kMin);
     ASSERT_OK(node.init(update["$min"]["a"], collator));
 
     Document doc(fromjson("{a: 1}"));
-    FieldRef pathToCreate("");
-    FieldRef pathTaken("a");
-    StringData matchedField;
-    auto fromReplication = true;
-    auto validateForStorage = true;
-    FieldRefSet immutablePaths;
-    UpdateIndexData indexData;
-    indexData.addPath("a");
-    Document logDoc;
-    LogBuilder logBuilder(logDoc.root());
-    auto indexesAffected = false;
-    auto noop = false;
-    node.apply(doc.root()["a"],
-               &pathToCreate,
-               &pathTaken,
-               matchedField,
-               fromReplication,
-               validateForStorage,
-               immutablePaths,
-               &indexData,
-               &logBuilder,
-               &indexesAffected,
-               &noop);
-    ASSERT_FALSE(noop);
-    ASSERT_TRUE(indexesAffected);
+    setPathTaken("a");
+    addIndexedPath("a");
+    auto result = node.apply(getApplyParams(doc.root()["a"]));
+    ASSERT_FALSE(result.noop);
+    ASSERT_TRUE(result.indexesAffected);
     ASSERT_EQUALS(fromjson("{a: 0}"), doc);
     ASSERT_TRUE(doc.isInPlaceModeEnabled());
-    ASSERT_EQUALS(fromjson("{$set: {a: 0}}"), logDoc);
+    ASSERT_EQUALS(fromjson("{$set: {a: 0}}"), getLogDoc());
 }
 
-TEST(CompareNodeTest, ApplyMissingFieldMaxNumber) {
+TEST_F(CompareNodeTest, ApplyMissingFieldMaxNumber) {
     auto update = fromjson("{$max: {a: 0}}");
     const CollatorInterface* collator = nullptr;
     CompareNode node(CompareNode::CompareMode::kMax);
     ASSERT_OK(node.init(update["$max"]["a"], collator));
 
     Document doc(fromjson("{}"));
-    FieldRef pathToCreate("a");
-    FieldRef pathTaken("");
-    StringData matchedField;
-    auto fromReplication = true;
-    auto validateForStorage = true;
-    FieldRefSet immutablePaths;
-    UpdateIndexData indexData;
-    indexData.addPath("a");
-    Document logDoc;
-    LogBuilder logBuilder(logDoc.root());
-    auto indexesAffected = false;
-    auto noop = false;
-    node.apply(doc.root(),
-               &pathToCreate,
-               &pathTaken,
-               matchedField,
-               fromReplication,
-               validateForStorage,
-               immutablePaths,
-               &indexData,
-               &logBuilder,
-               &indexesAffected,
-               &noop);
-    ASSERT_FALSE(noop);
-    ASSERT_TRUE(indexesAffected);
+    setPathToCreate("a");
+    addIndexedPath("a");
+    auto result = node.apply(getApplyParams(doc.root()));
+    ASSERT_FALSE(result.noop);
+    ASSERT_TRUE(result.indexesAffected);
     ASSERT_EQUALS(fromjson("{a: 0}"), doc);
     ASSERT_FALSE(doc.isInPlaceModeEnabled());
-    ASSERT_EQUALS(fromjson("{$set: {a: 0}}"), logDoc);
+    ASSERT_EQUALS(fromjson("{$set: {a: 0}}"), getLogDoc());
 }
 
-TEST(CompareNodeTest, ApplyExistingNumberMaxNumber) {
+TEST_F(CompareNodeTest, ApplyExistingNumberMaxNumber) {
     auto update = fromjson("{$max: {a: 2}}");
     const CollatorInterface* collator = nullptr;
     CompareNode node(CompareNode::CompareMode::kMax);
     ASSERT_OK(node.init(update["$max"]["a"], collator));
 
     Document doc(fromjson("{a: 1}"));
-    FieldRef pathToCreate("");
-    FieldRef pathTaken("a");
-    StringData matchedField;
-    auto fromReplication = true;
-    auto validateForStorage = true;
-    FieldRefSet immutablePaths;
-    UpdateIndexData indexData;
-    indexData.addPath("a");
-    Document logDoc;
-    LogBuilder logBuilder(logDoc.root());
-    auto indexesAffected = false;
-    auto noop = false;
-    node.apply(doc.root()["a"],
-               &pathToCreate,
-               &pathTaken,
-               matchedField,
-               fromReplication,
-               validateForStorage,
-               immutablePaths,
-               &indexData,
-               &logBuilder,
-               &indexesAffected,
-               &noop);
-    ASSERT_FALSE(noop);
-    ASSERT_TRUE(indexesAffected);
+    setPathTaken("a");
+    addIndexedPath("a");
+    auto result = node.apply(getApplyParams(doc.root()["a"]));
+    ASSERT_FALSE(result.noop);
+    ASSERT_TRUE(result.indexesAffected);
     ASSERT_EQUALS(fromjson("{a: 2}"), doc);
     ASSERT_TRUE(doc.isInPlaceModeEnabled());
-    ASSERT_EQUALS(fromjson("{$set: {a: 2}}"), logDoc);
+    ASSERT_EQUALS(fromjson("{$set: {a: 2}}"), getLogDoc());
 }
 
-TEST(CompareNodeTest, ApplyExistingDateMaxDate) {
+TEST_F(CompareNodeTest, ApplyExistingDateMaxDate) {
     auto update = fromjson("{$max: {a: {$date: 123123123}}}");
     const CollatorInterface* collator = nullptr;
     CompareNode node(CompareNode::CompareMode::kMax);
     ASSERT_OK(node.init(update["$max"]["a"], collator));
 
     Document doc(fromjson("{a: {$date: 0}}"));
-    FieldRef pathToCreate("");
-    FieldRef pathTaken("a");
-    StringData matchedField;
-    auto fromReplication = true;
-    auto validateForStorage = true;
-    FieldRefSet immutablePaths;
-    UpdateIndexData indexData;
-    indexData.addPath("a");
-    Document logDoc;
-    LogBuilder logBuilder(logDoc.root());
-    auto indexesAffected = false;
-    auto noop = false;
-    node.apply(doc.root()["a"],
-               &pathToCreate,
-               &pathTaken,
-               matchedField,
-               fromReplication,
-               validateForStorage,
-               immutablePaths,
-               &indexData,
-               &logBuilder,
-               &indexesAffected,
-               &noop);
-    ASSERT_FALSE(noop);
-    ASSERT_TRUE(indexesAffected);
+    setPathTaken("a");
+    addIndexedPath("a");
+    auto result = node.apply(getApplyParams(doc.root()["a"]));
+    ASSERT_FALSE(result.noop);
+    ASSERT_TRUE(result.indexesAffected);
     ASSERT_EQUALS(fromjson("{a: {$date: 123123123}}"), doc);
     ASSERT_TRUE(doc.isInPlaceModeEnabled());
-    ASSERT_EQUALS(fromjson("{$set: {a: {$date: 123123123}}}"), logDoc);
+    ASSERT_EQUALS(fromjson("{$set: {a: {$date: 123123123}}}"), getLogDoc());
 }
 
-TEST(CompareNodeTest, ApplyExistingEmbeddedDocMaxDoc) {
+TEST_F(CompareNodeTest, ApplyExistingEmbeddedDocMaxDoc) {
     auto update = fromjson("{$max: {a: {b: 3}}}");
     const CollatorInterface* collator = nullptr;
     CompareNode node(CompareNode::CompareMode::kMax);
     ASSERT_OK(node.init(update["$max"]["a"], collator));
 
     Document doc(fromjson("{a: {b: 2}}"));
-    FieldRef pathToCreate("");
-    FieldRef pathTaken("a");
-    StringData matchedField;
-    auto fromReplication = true;
-    auto validateForStorage = true;
-    FieldRefSet immutablePaths;
-    UpdateIndexData indexData;
-    indexData.addPath("a");
-    Document logDoc;
-    LogBuilder logBuilder(logDoc.root());
-    auto indexesAffected = false;
-    auto noop = false;
-    node.apply(doc.root()["a"],
-               &pathToCreate,
-               &pathTaken,
-               matchedField,
-               fromReplication,
-               validateForStorage,
-               immutablePaths,
-               &indexData,
-               &logBuilder,
-               &indexesAffected,
-               &noop);
-    ASSERT_FALSE(noop);
-    ASSERT_TRUE(indexesAffected);
+    setPathTaken("a");
+    addIndexedPath("a");
+    auto result = node.apply(getApplyParams(doc.root()["a"]));
+    ASSERT_FALSE(result.noop);
+    ASSERT_TRUE(result.indexesAffected);
     ASSERT_EQUALS(fromjson("{a: {b: 3}}"), doc);
     ASSERT_TRUE(doc.isInPlaceModeEnabled());
-    ASSERT_EQUALS(fromjson("{$set: {a: {b: 3}}}"), logDoc);
+    ASSERT_EQUALS(fromjson("{$set: {a: {b: 3}}}"), getLogDoc());
 }
 
-TEST(CompareNodeTest, ApplyExistingEmbeddedDocMaxNumber) {
+TEST_F(CompareNodeTest, ApplyExistingEmbeddedDocMaxNumber) {
     auto update = fromjson("{$max: {a: 3}}");
     const CollatorInterface* collator = nullptr;
     CompareNode node(CompareNode::CompareMode::kMax);
     ASSERT_OK(node.init(update["$max"]["a"], collator));
 
     Document doc(fromjson("{a: {b: 2}}"));
-    FieldRef pathToCreate("");
-    FieldRef pathTaken("a");
-    StringData matchedField;
-    auto fromReplication = true;
-    auto validateForStorage = true;
-    FieldRefSet immutablePaths;
-    UpdateIndexData indexData;
-    indexData.addPath("a");
-    Document logDoc;
-    LogBuilder logBuilder(logDoc.root());
-    auto indexesAffected = false;
-    auto noop = false;
-    node.apply(doc.root()["a"],
-               &pathToCreate,
-               &pathTaken,
-               matchedField,
-               fromReplication,
-               validateForStorage,
-               immutablePaths,
-               &indexData,
-               &logBuilder,
-               &indexesAffected,
-               &noop);
-    ASSERT_TRUE(noop);
-    ASSERT_FALSE(indexesAffected);
+    setPathTaken("a");
+    addIndexedPath("a");
+    auto result = node.apply(getApplyParams(doc.root()["a"]));
+    ASSERT_TRUE(result.noop);
+    ASSERT_FALSE(result.indexesAffected);
     ASSERT_EQUALS(fromjson("{a: {b: 2}}"), doc);
     ASSERT_TRUE(doc.isInPlaceModeEnabled());
-    ASSERT_EQUALS(fromjson("{}"), logDoc);
+    ASSERT_EQUALS(fromjson("{}"), getLogDoc());
 }
 
-TEST(CompareNodeTest, ApplyMinRespectsCollation) {
+TEST_F(CompareNodeTest, ApplyMinRespectsCollation) {
     auto update = fromjson("{$min: {a: 'dba'}}");
     const CollatorInterfaceMock collator(CollatorInterfaceMock::MockType::kReverseString);
     CompareNode node(CompareNode::CompareMode::kMin);
     ASSERT_OK(node.init(update["$min"]["a"], &collator));
 
     Document doc(fromjson("{a: 'cbc'}"));
-    FieldRef pathToCreate("");
-    FieldRef pathTaken("a");
-    StringData matchedField;
-    auto fromReplication = true;
-    auto validateForStorage = true;
-    FieldRefSet immutablePaths;
-    UpdateIndexData indexData;
-    indexData.addPath("a");
-    Document logDoc;
-    LogBuilder logBuilder(logDoc.root());
-    auto indexesAffected = false;
-    auto noop = false;
-    node.apply(doc.root()["a"],
-               &pathToCreate,
-               &pathTaken,
-               matchedField,
-               fromReplication,
-               validateForStorage,
-               immutablePaths,
-               &indexData,
-               &logBuilder,
-               &indexesAffected,
-               &noop);
-    ASSERT_FALSE(noop);
-    ASSERT_TRUE(indexesAffected);
+    setPathTaken("a");
+    addIndexedPath("a");
+    auto result = node.apply(getApplyParams(doc.root()["a"]));
+    ASSERT_FALSE(result.noop);
+    ASSERT_TRUE(result.indexesAffected);
     ASSERT_EQUALS(fromjson("{a: 'dba'}"), doc);
     ASSERT_TRUE(doc.isInPlaceModeEnabled());
-    ASSERT_EQUALS(fromjson("{$set: {a: 'dba'}}"), logDoc);
+    ASSERT_EQUALS(fromjson("{$set: {a: 'dba'}}"), getLogDoc());
 }
 
-TEST(CompareNodeTest, ApplyMinRespectsCollationFromSetCollator) {
+TEST_F(CompareNodeTest, ApplyMinRespectsCollationFromSetCollator) {
     auto update = fromjson("{$min: {a: 'dba'}}");
     const CollatorInterface* binaryComparisonCollator = nullptr;
     CompareNode node(CompareNode::CompareMode::kMin);
@@ -617,37 +319,17 @@ TEST(CompareNodeTest, ApplyMinRespectsCollationFromSetCollator) {
     node.setCollator(&reverseStringCollator);
 
     Document doc(fromjson("{a: 'cbc'}"));
-    FieldRef pathToCreate("");
-    FieldRef pathTaken("a");
-    StringData matchedField;
-    auto fromReplication = true;
-    auto validateForStorage = true;
-    FieldRefSet immutablePaths;
-    UpdateIndexData indexData;
-    indexData.addPath("a");
-    Document logDoc;
-    LogBuilder logBuilder(logDoc.root());
-    auto indexesAffected = false;
-    auto noop = false;
-    node.apply(doc.root()["a"],
-               &pathToCreate,
-               &pathTaken,
-               matchedField,
-               fromReplication,
-               validateForStorage,
-               immutablePaths,
-               &indexData,
-               &logBuilder,
-               &indexesAffected,
-               &noop);
-    ASSERT_FALSE(noop);
-    ASSERT_TRUE(indexesAffected);
+    setPathTaken("a");
+    addIndexedPath("a");
+    auto result = node.apply(getApplyParams(doc.root()["a"]));
+    ASSERT_FALSE(result.noop);
+    ASSERT_TRUE(result.indexesAffected);
     ASSERT_EQUALS(fromjson("{a: 'dba'}"), doc);
     ASSERT_TRUE(doc.isInPlaceModeEnabled());
-    ASSERT_EQUALS(fromjson("{$set: {a: 'dba'}}"), logDoc);
+    ASSERT_EQUALS(fromjson("{$set: {a: 'dba'}}"), getLogDoc());
 }
 
-TEST(CompareNodeTest, ApplyMaxRespectsCollationFromSetCollator) {
+TEST_F(CompareNodeTest, ApplyMaxRespectsCollationFromSetCollator) {
     auto update = fromjson("{$max: {a: 'abd'}}");
     const CollatorInterface* binaryComparisonCollator = nullptr;
     CompareNode node(CompareNode::CompareMode::kMax);
@@ -658,34 +340,14 @@ TEST(CompareNodeTest, ApplyMaxRespectsCollationFromSetCollator) {
     node.setCollator(&reverseStringCollator);
 
     Document doc(fromjson("{a: 'cbc'}"));
-    FieldRef pathToCreate("");
-    FieldRef pathTaken("a");
-    StringData matchedField;
-    auto fromReplication = true;
-    auto validateForStorage = true;
-    FieldRefSet immutablePaths;
-    UpdateIndexData indexData;
-    indexData.addPath("a");
-    Document logDoc;
-    LogBuilder logBuilder(logDoc.root());
-    auto indexesAffected = false;
-    auto noop = false;
-    node.apply(doc.root()["a"],
-               &pathToCreate,
-               &pathTaken,
-               matchedField,
-               fromReplication,
-               validateForStorage,
-               immutablePaths,
-               &indexData,
-               &logBuilder,
-               &indexesAffected,
-               &noop);
-    ASSERT_FALSE(noop);
-    ASSERT_TRUE(indexesAffected);
+    setPathTaken("a");
+    addIndexedPath("a");
+    auto result = node.apply(getApplyParams(doc.root()["a"]));
+    ASSERT_FALSE(result.noop);
+    ASSERT_TRUE(result.indexesAffected);
     ASSERT_EQUALS(fromjson("{a: 'abd'}"), doc);
     ASSERT_TRUE(doc.isInPlaceModeEnabled());
-    ASSERT_EQUALS(fromjson("{$set: {a: 'abd'}}"), logDoc);
+    ASSERT_EQUALS(fromjson("{$set: {a: 'abd'}}"), getLogDoc());
 }
 
 DEATH_TEST(CompareNodeTest, CannotSetCollatorIfCollatorIsNonNull, "Invariant failure !_collator") {
@@ -709,75 +371,38 @@ DEATH_TEST(CompareNodeTest, CannotSetCollatorTwice, "Invariant failure !_collato
     node.setCollator(&caseInsensitiveCollator);
 }
 
-TEST(CompareNodeTest, ApplyIndexesNotAffected) {
+TEST_F(CompareNodeTest, ApplyIndexesNotAffected) {
     auto update = fromjson("{$max: {a: 1}}");
     const CollatorInterface* collator = nullptr;
     CompareNode node(CompareNode::CompareMode::kMax);
     ASSERT_OK(node.init(update["$max"]["a"], collator));
 
     Document doc(fromjson("{a: 0}"));
-    FieldRef pathToCreate("");
-    FieldRef pathTaken("a");
-    StringData matchedField;
-    auto fromReplication = true;
-    auto validateForStorage = true;
-    FieldRefSet immutablePaths;
-    UpdateIndexData indexData;
-    indexData.addPath("b");
-    Document logDoc;
-    LogBuilder logBuilder(logDoc.root());
-    auto indexesAffected = false;
-    auto noop = false;
-    node.apply(doc.root()["a"],
-               &pathToCreate,
-               &pathTaken,
-               matchedField,
-               fromReplication,
-               validateForStorage,
-               immutablePaths,
-               &indexData,
-               &logBuilder,
-               &indexesAffected,
-               &noop);
-    ASSERT_FALSE(noop);
-    ASSERT_FALSE(indexesAffected);
+    setPathTaken("a");
+    addIndexedPath("b");
+    auto result = node.apply(getApplyParams(doc.root()["a"]));
+    ASSERT_FALSE(result.noop);
+    ASSERT_FALSE(result.indexesAffected);
     ASSERT_EQUALS(fromjson("{a: 1}"), doc);
     ASSERT_TRUE(doc.isInPlaceModeEnabled());
-    ASSERT_EQUALS(fromjson("{$set: {a: 1}}"), logDoc);
+    ASSERT_EQUALS(fromjson("{$set: {a: 1}}"), getLogDoc());
 }
 
-TEST(CompareNodeTest, ApplyNoIndexDataOrLogBuilder) {
+TEST_F(CompareNodeTest, ApplyNoIndexDataOrLogBuilder) {
     auto update = fromjson("{$max: {a: 1}}");
     const CollatorInterface* collator = nullptr;
     CompareNode node(CompareNode::CompareMode::kMax);
     ASSERT_OK(node.init(update["$max"]["a"], collator));
 
     Document doc(fromjson("{a: 0}"));
-    FieldRef pathToCreate("");
-    FieldRef pathTaken("a");
-    StringData matchedField;
-    auto fromReplication = true;
-    auto validateForStorage = true;
-    FieldRefSet immutablePaths;
-    const UpdateIndexData* indexData = nullptr;
-    LogBuilder* logBuilder = nullptr;
-    auto indexesAffected = false;
-    auto noop = false;
-    node.apply(doc.root()["a"],
-               &pathToCreate,
-               &pathTaken,
-               matchedField,
-               fromReplication,
-               validateForStorage,
-               immutablePaths,
-               indexData,
-               logBuilder,
-               &indexesAffected,
-               &noop);
-    ASSERT_FALSE(noop);
-    ASSERT_FALSE(indexesAffected);
+    setPathTaken("a");
+    setLogBuilderToNull();
+    auto result = node.apply(getApplyParams(doc.root()["a"]));
+    ASSERT_FALSE(result.noop);
+    ASSERT_FALSE(result.indexesAffected);
     ASSERT_EQUALS(fromjson("{a: 1}"), doc);
     ASSERT_TRUE(doc.isInPlaceModeEnabled());
 }
 
 }  // namespace
+}  // namespace mongo
