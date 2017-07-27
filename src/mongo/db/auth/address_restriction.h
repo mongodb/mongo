@@ -86,30 +86,6 @@ public:
     }
 
     /**
-     * If the given BSONElement represents a valid CIDR range, constructs and returns the
-     * AddressRestriction. Otherwise returns an error.
-     */
-    static StatusWith<AddressRestriction<T>> parse(BSONElement from) {
-        auto cidr = CIDR::parse(from);
-        if (!cidr.isOK()) {
-            return cidr.getStatus();
-        }
-        return AddressRestriction<T>(std::move(cidr.getValue()));
-    }
-
-    /**
-     * If the given string represents a valid CIDR range, constructs and returns the
-     * AddressRestriction. Otherwise returns an error.
-     */
-    static StatusWith<AddressRestriction<T>> parse(StringData from) {
-        auto cidr = CIDR::parse(from);
-        if (!cidr.isOK()) {
-            return cidr.getStatus();
-        }
-        return AddressRestriction<T>(std::move(cidr.getValue()));
-    }
-
-    /**
      * Returns true if the Environment's client/server's address
      * satisfies this restriction set.
      */
