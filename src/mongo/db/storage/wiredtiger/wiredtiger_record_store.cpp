@@ -1417,17 +1417,8 @@ Status WiredTigerRecordStore::validate(OperationContext* opCtx,
         }
     }
 
-    if (_sizeStorer && results->valid) {
-        if (nrecords != _numRecords.load() || dataSizeTotal != _dataSize.load()) {
-            warning() << _uri << ": Existing record and data size counters (" << _numRecords.load()
-                      << " records " << _dataSize.load() << " bytes) "
-                      << "are inconsistent with validation results (" << nrecords << " records "
-                      << dataSizeTotal << " bytes). "
-                      << "Updating counters with new values.";
-        }
-        _numRecords.store(nrecords);
-        _dataSize.store(dataSizeTotal);
-        _sizeStorer->storeToCache(_uri, _numRecords.load(), _dataSize.load());
+    if (results->valid) {
+        updateStatsAfterRepair(opCtx, nrecords, dataSizeTotal);
     }
 
     if (level == kValidateFull) {
