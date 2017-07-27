@@ -2603,26 +2603,6 @@ def doConfigure(myenv):
     if conf.CheckCXX11Align():
         conf.env.SetConfigHeaderDefine('MONGO_CONFIG_HAVE_STD_ALIGN')
 
-    myenv = conf.Finish()
-
-    def CheckBoostMinVersion(context):
-        compile_test_body = textwrap.dedent("""
-        #include <boost/version.hpp>
-
-        #if BOOST_VERSION < 104900
-        #error
-        #endif
-        """)
-
-        context.Message("Checking if system boost version is 1.49 or newer...")
-        result = context.TryCompile(compile_test_body, ".cpp")
-        context.Result(result)
-        return result
-
-    conf = Configure(myenv, custom_tests = {
-        'CheckBoostMinVersion': CheckBoostMinVersion,
-    })
-
     # pthread_setname_np was added in GLIBC 2.12, and Solaris 11.3
     if posix_system:
         myenv = conf.Finish()
@@ -2649,6 +2629,26 @@ def doConfigure(myenv):
 
         if conf.CheckPThreadSetNameNP():
             conf.env.SetConfigHeaderDefine("MONGO_CONFIG_HAVE_PTHREAD_SETNAME_NP")
+
+    myenv = conf.Finish()
+
+    def CheckBoostMinVersion(context):
+        compile_test_body = textwrap.dedent("""
+        #include <boost/version.hpp>
+
+        #if BOOST_VERSION < 104900
+        #error
+        #endif
+        """)
+
+        context.Message("Checking if system boost version is 1.49 or newer...")
+        result = context.TryCompile(compile_test_body, ".cpp")
+        context.Result(result)
+        return result
+
+    conf = Configure(myenv, custom_tests = {
+        'CheckBoostMinVersion': CheckBoostMinVersion,
+    })
 
     libdeps.setup_conftests(conf)
 
