@@ -28,7 +28,7 @@
                 const result =
                     db.currentOp({"ns": dbName + "." + collName, "command.filter": {x: 1}});
                 assert.commandWorked(result);
-                if (result.inprog.length === 1) {
+                if (result.inprog.length === 1 && result.inprog[0].numYields > 0) {
                     opId = result.inprog[0].opid;
                     return true;
                 }
@@ -36,7 +36,8 @@
                 return false;
             },
             function() {
-                return "Failed to find operation in currentOp() output: " + tojson(db.currentOp());
+                return "Failed to find operation in currentOp() output: " +
+                    tojson(db.currentOp({"ns": dbName + "." + collName}));
             });
 
         assert.commandWorked(db.killOp(opId));
