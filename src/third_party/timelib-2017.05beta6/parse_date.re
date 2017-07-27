@@ -41,18 +41,6 @@
 # endif
 #endif
 
-#define TIMELIB_UNSET   -99999
-
-#define TIMELIB_SECOND   1
-#define TIMELIB_MINUTE   2
-#define TIMELIB_HOUR     3
-#define TIMELIB_DAY      4
-#define TIMELIB_MONTH    5
-#define TIMELIB_YEAR     6
-#define TIMELIB_WEEKDAY  7
-#define TIMELIB_SPECIAL  8
-#define TIMELIB_MICROSEC 9
-
 #define EOI      257
 #define TIME     258
 #define DATE     259
@@ -713,7 +701,7 @@ static const timelib_tz_lookup_table* abbr_search(const char *word, timelib_long
 	/* Still didn't find anything, let's find the zone solely based on
 	 * offset/isdst then */
 	for (fmp = timelib_timezone_fallbackmap; fmp->name; fmp++) {
-		if ((fmp->gmtoffset * 60) == gmtoffset && fmp->type == isdst) {
+		if (fmp->gmtoffset == gmtoffset && fmp->type == isdst) {
 			return fmp;
 		}
 	}
@@ -735,9 +723,9 @@ static timelib_long timelib_lookup_abbr(char **ptr, int *dst, char **tz_abbr, in
 	memcpy(word, begin, end - begin);
 
 	if ((tp = abbr_search(word, -1, 0))) {
-		value = -tp->gmtoffset / 60;
+		value = tp->gmtoffset;
 		*dst = tp->type;
-		value += tp->type * 60;
+		value -= tp->type * 3600;
 		*found = 1;
 	} else {
 		*found = 0;
@@ -747,7 +735,43 @@ static timelib_long timelib_lookup_abbr(char **ptr, int *dst, char **tz_abbr, in
 	return value;
 }
 
-timelib_long timelib_parse_zone(char **ptr, int *dst, timelib_time *t, int *tz_not_found, const timelib_tzdb *tzdb, timelib_tz_get_wrapper tz_wrapper)
+#define sHOUR(a) (int)(a * 3600)
+#define sMIN(a) (int)(a * 60)
+
+static timelib_long timelib_parse_tz_cor(char **ptr)
+{
+	char *begin = *ptr, *end;
+	timelib_long  tmp;
+
+	while (isdigit(**ptr) || **ptr == ':') {
+		++*ptr;
+	}
+	end = *ptr;
+	switch (end - begin) {
+		case 1: /* H */
+		case 2: /* HH */
+			return sHOUR(strtol(begin, NULL, 10));
+			break;
+		case 3: /* H:M */
+		case 4: /* H:MM, HH:M, HHMM */
+			if (begin[1] == ':') {
+				tmp = sHOUR(strtol(begin, NULL, 10)) + sMIN(strtol(begin + 2, NULL, 10));
+				return tmp;
+			} else if (begin[2] == ':') {
+				tmp = sHOUR(strtol(begin, NULL, 10)) + sMIN(strtol(begin + 3, NULL, 10));
+				return tmp;
+			} else {
+				tmp = strtol(begin, NULL, 10);
+				return sHOUR(tmp / 100) + sMIN(tmp % 100);
+			}
+		case 5: /* HH:MM */
+			tmp = sHOUR(strtol(begin, NULL, 10)) + sMIN(strtol(begin + 3, NULL, 10));
+			return tmp;
+	}
+	return 0;
+}
+
+static timelib_long timelib_parse_zone(char **ptr, int *dst, timelib_time *t, int *tz_not_found, const timelib_tzdb *tzdb, timelib_tz_get_wrapper tz_wrapper)
 {
 	timelib_tzinfo *res;
 	timelib_long            retval = 0;
@@ -767,7 +791,7 @@ timelib_long timelib_parse_zone(char **ptr, int *dst, timelib_time *t, int *tz_n
 		*tz_not_found = 0;
 		t->dst = 0;
 
-		retval = -1 * timelib_parse_tz_cor(ptr);
+		retval = timelib_parse_tz_cor(ptr);
 	} else if (**ptr == '-') {
 		++*ptr;
 		t->is_localtime = 1;
@@ -775,7 +799,7 @@ timelib_long timelib_parse_zone(char **ptr, int *dst, timelib_time *t, int *tz_n
 		*tz_not_found = 0;
 		t->dst = 0;
 
-		retval = timelib_parse_tz_cor(ptr);
+		retval = -1 * timelib_parse_tz_cor(ptr);
 	} else {
 		int found = 0;
 		timelib_long offset = 0;

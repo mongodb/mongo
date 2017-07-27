@@ -778,6 +778,9 @@
 			if (preg_match( '/^[+-][0-9]{2}$/', $trans['abbr'] ) ) {
 				continue;
 			}
+			if (preg_match( '/^[+-][0-9]{4}$/', $trans['abbr'] ) ) {
+				continue;
+			}
 			if ($trans['abbr'] == 'LMT') {
 				continue;
 			}

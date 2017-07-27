@@ -138,7 +138,7 @@ void timelib_update_from_sse(timelib_time *tm)
 	switch (tm->zone_type) {
 		case TIMELIB_ZONETYPE_ABBR:
 		case TIMELIB_ZONETYPE_OFFSET: {
-			timelib_unixtime2gmt(tm, tm->sse - (tm->z * 60) + (tm->dst * 3600));
+			timelib_unixtime2gmt(tm, tm->sse + tm->z + (tm->dst * 3600));
 
 			goto cleanup;
 		}
@@ -176,7 +176,7 @@ void timelib_unixtime2local(timelib_time *tm, timelib_sll ts)
 			int z = tm->z;
 			signed int dst = tm->dst;
 
-			timelib_unixtime2gmt(tm, ts - (tm->z * 60) + (tm->dst * 3600));
+			timelib_unixtime2gmt(tm, ts + tm->z + (tm->dst * 3600));
 
 			tm->sse = ts;
 			tm->z = z;

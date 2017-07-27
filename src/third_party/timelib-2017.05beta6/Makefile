@@ -1,16 +1,25 @@
-CFLAGS=-O0 -ggdb3 \
+FLAGS=-O0 -ggdb3 \
 	-Wall -Werror -Wextra -fsanitize=undefined -fsanitize=address \
-	-Wmaybe-uninitialized -Wdeclaration-after-statement -Wmissing-field-initializers -Wshadow -Wno-unused-parameter \
+	-Wmaybe-uninitialized -Wmissing-field-initializers -Wshadow -Wno-unused-parameter \
 	-pedantic \
 	-DHAVE_STDINT_H -DHAVE_STRING_H -DHAVE_GETTIMEOFDAY -DHAVE_UNISTD_H -DHAVE_DIRENT_H -I.# -DDEBUG_PARSER
 
+CFLAGS=-Wdeclaration-after-statement ${FLAGS}
+
+CPPFLAGS=${FLAGS}
+
 LDFLAGS=-lm -fsanitize=undefined
+
+TEST_LDFLAGS=-lCppUTest
+
 CC=gcc
 MANUAL_TESTS=tests/tester-parse-interval \
 	tests/tester-parse-tz tests/tester-iso-week tests/test-abbr-to-id \
 	tests/enumerate-timezones tests/date_from_isodate
 AUTO_TESTS=tests/tester-parse-string tests/tester-parse-string-by-format \
 	tests/tester-create-ts tests/tester-render-ts tests/tester-render-ts-zoneinfo
+C_TESTS=tests/c/timelib_get_current_offset_test.cpp tests/c/timelib_decimal_hour.cpp \
+	tests/c/timelib_juliandate.cpp
 TEST_BINARIES=${MANUAL_TESTS} ${AUTO_TESTS}
 
 EXAMPLE_BINARIES=docs/date-from-iso-parts docs/date-from-parts docs/date-from-string \
@@ -91,8 +100,13 @@ clean-all: clean
 clean:
 	rm -f parse_iso_intervals.c parse_date.c *.o timelib.a ${TEST_BINARIES}
 
-test: tests/tester-parse-string tests/tester-create-ts tests/tester-render-ts tests/tester-render-ts-zoneinfo tests/tester-parse-string-by-format
-	php tests/test_all.php
+ctest: tests/c/all_tests.cpp timelib.a ${C_TESTS}
+	g++ $(CPPFLAGS) $(LDFLAGS) tests/c/all_tests.cpp ${C_TESTS} timelib.a $(TEST_LDFLAGS) -o ctest
+
+test: ctest tests/tester-parse-string tests/tester-create-ts tests/tester-render-ts tests/tester-render-ts-zoneinfo tests/tester-parse-string-by-format
+	-@php tests/test_all.php
+	@echo Running C tests
+	@./ctest -c
 
 test-parse-string: tests/tester-parse-string
 	@for i in tests/files/*.parse; do echo $$i; php tests/test_parser.php $$i; echo; done

@@ -236,7 +236,7 @@ boost::optional<Seconds> TimeZoneDatabase::parseUtcOffset(StringData offsetSpec)
         if (offsetSpec.size() == 3 && isdigit(offsetSpec[1]) && isdigit(offsetSpec[2])) {
             int offset;
             if (parseNumberFromStringWithBase(offsetSpec.substr(1, 2), 10, &offset).isOK()) {
-                return Seconds(bias * 60 * offset);
+                return duration_cast<Seconds>(Hours(bias * offset));
             }
             return boost::none;
         }
@@ -246,7 +246,8 @@ boost::optional<Seconds> TimeZoneDatabase::parseUtcOffset(StringData offsetSpec)
             isdigit(offsetSpec[3]) && isdigit(offsetSpec[4])) {
             int offset;
             if (parseNumberFromStringWithBase(offsetSpec.substr(1, 4), 10, &offset).isOK()) {
-                return Seconds(bias * (60 * ((offset / 100L)) + (offset % 100)));
+                return duration_cast<Seconds>(Hours(bias * (offset / 100L)) +
+                                              Minutes(bias * (offset % 100)));
             }
             return boost::none;
         }
@@ -261,7 +262,7 @@ boost::optional<Seconds> TimeZoneDatabase::parseUtcOffset(StringData offsetSpec)
             if (!parseNumberFromStringWithBase(offsetSpec.substr(4, 2), 10, &minuteOffset).isOK()) {
                 return boost::none;
             }
-            return Seconds(bias * ((60 * hourOffset) + minuteOffset));
+            return duration_cast<Seconds>(Hours(bias * hourOffset) + Minutes(bias * minuteOffset));
         }
     }
     return boost::none;
@@ -286,7 +287,7 @@ void TimeZone::adjustTimeZone(timelib_time* timelibTime) const {
     if (isTimeZoneIDZone()) {
         timelib_set_timezone(timelibTime, _tzInfo.get());
     } else if (isUtcOffsetZone()) {
-        timelib_set_timezone_from_offset(timelibTime, -durationCount<Seconds>(_utcOffset));
+        timelib_set_timezone_from_offset(timelibTime, durationCount<Seconds>(_utcOffset));
     }
     timelib_update_ts(timelibTime, nullptr);
     timelib_update_from_sse(timelibTime);
@@ -454,12 +455,6 @@ long long TimeZone::isoYear(Date_t date) const {
 
 Seconds TimeZone::utcOffset(Date_t date) const {
     auto time = getTimelibTime(date);
-
-    // This is required because timelib stores a time with an UTC offset as minutes west, and we
-    // want seconds east here.
-    if (!_tzInfo && durationCount<Seconds>(_utcOffset)) {
-        return duration_cast<Seconds>(Minutes(-time->z));
-    }
 
     return Seconds(time->z);
 }

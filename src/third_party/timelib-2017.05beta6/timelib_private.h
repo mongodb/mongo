@@ -73,6 +73,16 @@
 #include <limits.h>
 #endif
 
+#define TIMELIB_SECOND   1
+#define TIMELIB_MINUTE   2
+#define TIMELIB_HOUR     3
+#define TIMELIB_DAY      4
+#define TIMELIB_MONTH    5
+#define TIMELIB_YEAR     6
+#define TIMELIB_WEEKDAY  7
+#define TIMELIB_SPECIAL  8
+#define TIMELIB_MICROSEC 9
+
 #define TIMELIB_SPECIAL_WEEKDAY                   0x01
 #define TIMELIB_SPECIAL_DAY_OF_WEEK_IN_MONTH      0x02
 #define TIMELIB_SPECIAL_LAST_DAY_OF_WEEK_IN_MONTH 0x03
@@ -98,6 +108,12 @@
 #define timelib_is_leap(y) ((y) % 4 == 0 && ((y) % 100 != 0 || (y) % 400 == 0))
 
 #define TIMELIB_DEBUG(s)  if (0) { s }
+
+#define TIMELIB_TIME_FREE(m)    \
+	if (m) {        \
+		timelib_free(m);    \
+		m = NULL;   \
+	}
 
 typedef struct ttinfo
 {
@@ -131,5 +147,12 @@ typedef struct tlinfo
 #if defined(_MSC_VER) && !defined(strncasecmp)
 #define strncasecmp strnicmp
 #endif
+
+/* From unixtime2tm.c */
+int timelib_apply_localtime(timelib_time *t, unsigned int localtime);
+
+/* From parse_tz.c */
+void timelib_time_tz_abbr_update(timelib_time* tm, char* tz_abbr);
+
 
 #endif

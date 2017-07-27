@@ -299,10 +299,10 @@ double timelib_ts_to_juliandate(timelib_sll ts)
 {
 	double tmp;
 
-	tmp = ts;
-	tmp /= 86400;
-	tmp += 2440587.5;
-	tmp -= 2451543;
+	tmp = (double) ts;
+	tmp /= (double) 86400;
+	tmp += (double) 2440587.5;
+	tmp -= 2451545;
 
 	return tmp;
 }

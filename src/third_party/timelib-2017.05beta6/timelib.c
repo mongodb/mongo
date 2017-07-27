@@ -27,15 +27,7 @@
 #include <ctype.h>
 #include <math.h>
 
-#define TIMELIB_TIME_FREE(m) 	\
-	if (m) {		\
-		timelib_free(m);	\
-		m = NULL;	\
-	}			\
-
 #define TIMELIB_LLABS(y) (y < 0 ? (y * -1) : y)
-
-#define HOUR(a) (int)(a * 60)
 
 const char *timelib_error_messages[8] = {
 	"No error",
@@ -65,12 +57,23 @@ timelib_time* timelib_time_ctor(void)
 	return t;
 }
 
-timelib_rel_time* timelib_rel_time_ctor(void)
+void timelib_time_dtor(timelib_time* t)
 {
-	timelib_rel_time *t;
-	t = timelib_calloc(1, sizeof(timelib_rel_time));
+	TIMELIB_TIME_FREE(t->tz_abbr);
+	TIMELIB_TIME_FREE(t);
+}
 
-	return t;
+int timelib_time_compare(timelib_time *t1, timelib_time *t2)
+{
+	if (t1->sse == t2->sse) {
+		if (t1->us == t2->us) {
+			return 0;
+		}
+
+		return (t1->us < t2->us) ? -1 : 1;
+	}
+
+	return (t1->sse < t2->sse) ? -1 : 1;
 }
 
 timelib_time* timelib_time_clone(timelib_time *orig)
@@ -86,17 +89,17 @@ timelib_time* timelib_time_clone(timelib_time *orig)
 	return tmp;
 }
 
-int timelib_time_compare(timelib_time *t1, timelib_time *t2)
+timelib_rel_time* timelib_rel_time_ctor(void)
 {
-	if (t1->sse == t2->sse) {
-		if (t1->us == t2->us) {
-			return 0;
-		}
+	timelib_rel_time *t;
+	t = timelib_calloc(1, sizeof(timelib_rel_time));
 
-		return (t1->us < t2->us) ? -1 : 1;
-	}
+	return t;
+}
 
-	return (t1->sse < t2->sse) ? -1 : 1;
+void timelib_rel_time_dtor(timelib_rel_time* t)
+{
+	TIMELIB_TIME_FREE(t);
 }
 
 timelib_rel_time* timelib_rel_time_clone(timelib_rel_time *rel)
@@ -118,17 +121,6 @@ void timelib_time_tz_abbr_update(timelib_time* tm, char* tz_abbr)
 	}
 }
 
-void timelib_time_dtor(timelib_time* t)
-{
-	TIMELIB_TIME_FREE(t->tz_abbr);
-	TIMELIB_TIME_FREE(t);
-}
-
-void timelib_rel_time_dtor(timelib_rel_time* t)
-{
-	TIMELIB_TIME_FREE(t);
-}
-
 timelib_time_offset* timelib_time_offset_ctor(void)
 {
 	timelib_time_offset *t;
@@ -141,59 +133,6 @@ void timelib_time_offset_dtor(timelib_time_offset* t)
 {
 	TIMELIB_TIME_FREE(t->abbr);
 	TIMELIB_TIME_FREE(t);
-}
-
-timelib_tzinfo* timelib_tzinfo_ctor(char *name)
-{
-	timelib_tzinfo *t;
-	t = timelib_calloc(1, sizeof(timelib_tzinfo));
-	t->name = timelib_strdup(name);
-
-	return t;
-}
-
-timelib_tzinfo *timelib_tzinfo_clone(timelib_tzinfo *tz)
-{
-	timelib_tzinfo *tmp = timelib_tzinfo_ctor(tz->name);
-	tmp->bit32.ttisgmtcnt = tz->bit32.ttisgmtcnt;
-	tmp->bit32.ttisstdcnt = tz->bit32.ttisstdcnt;
-	tmp->bit32.leapcnt = tz->bit32.leapcnt;
-	tmp->bit32.timecnt = tz->bit32.timecnt;
-	tmp->bit32.typecnt = tz->bit32.typecnt;
-	tmp->bit32.charcnt = tz->bit32.charcnt;
-
-	if (tz->bit32.timecnt) {
-		tmp->trans = (int32_t *) timelib_malloc(tz->bit32.timecnt * sizeof(int32_t));
-		tmp->trans_idx = (unsigned char*) timelib_malloc(tz->bit32.timecnt * sizeof(unsigned char));
-		memcpy(tmp->trans, tz->trans, tz->bit32.timecnt * sizeof(int32_t));
-		memcpy(tmp->trans_idx, tz->trans_idx, tz->bit32.timecnt * sizeof(unsigned char));
-	}
-
-	tmp->type = (ttinfo*) timelib_malloc(tz->bit32.typecnt * sizeof(struct ttinfo));
-	memcpy(tmp->type, tz->type, tz->bit32.typecnt * sizeof(struct ttinfo));
-
-	tmp->timezone_abbr = (char*) timelib_malloc(tz->bit32.charcnt);
-	memcpy(tmp->timezone_abbr, tz->timezone_abbr, tz->bit32.charcnt);
-
-	if (tz->bit32.leapcnt) {
-		tmp->leap_times = (tlinfo*) timelib_malloc(tz->bit32.leapcnt * sizeof(tlinfo));
-		memcpy(tmp->leap_times, tz->leap_times, tz->bit32.leapcnt * sizeof(tlinfo));
-	}
-
-	return tmp;
-}
-
-void timelib_tzinfo_dtor(timelib_tzinfo *tz)
-{
-	TIMELIB_TIME_FREE(tz->name);
-	TIMELIB_TIME_FREE(tz->trans);
-	TIMELIB_TIME_FREE(tz->trans_idx);
-	TIMELIB_TIME_FREE(tz->type);
-	TIMELIB_TIME_FREE(tz->timezone_abbr);
-	TIMELIB_TIME_FREE(tz->leap_times);
-	TIMELIB_TIME_FREE(tz->location.comments);
-	TIMELIB_TIME_FREE(tz);
-	tz = NULL;
 }
 
 char *timelib_get_tz_abbr_ptr(timelib_time *t)
@@ -239,9 +178,24 @@ timelib_long timelib_date_to_int(timelib_time *d, int *error)
 
 void timelib_decimal_hour_to_hms(double h, int *hour, int *min, int *sec)
 {
-	*hour = floor(h);
-	*min =  floor((h - *hour) * 60);
-	*sec =  (h - *hour - ((float) *min / 60)) * 3600;
+	if (h > 0) {
+		*hour = floor(h);
+		*min = floor((h - *hour) * 60);
+		*sec = (h - *hour - ((float) *min / 60)) * 3600;
+	} else {
+		*hour = ceil(h);
+		*min = 0 - ceil((h - *hour) * 60);
+		*sec = 0 - (h - *hour - ((float) *min / -60)) * 3600;
+	}
+}
+
+void timelib_hms_to_decimal_hour(int hour, int min, int sec, double *h)
+{
+	if (hour > 0) {
+		*h = ((double)hour + (double)min / 60 + (double)sec / 3600);
+	} else {
+		*h = ((double)hour - (double)min / 60 - (double)sec / 3600);
+	}
 }
 
 void timelib_dump_date(timelib_time *d, int options)
@@ -330,37 +284,4 @@ void timelib_dump_rel_time(timelib_rel_time *d)
 		}
 	}
 	printf("\n");
-}
-
-timelib_long timelib_parse_tz_cor(char **ptr)
-{
-	char *begin = *ptr, *end;
-	timelib_long  tmp;
-
-	while (isdigit(**ptr) || **ptr == ':') {
-		++*ptr;
-	}
-	end = *ptr;
-	switch (end - begin) {
-		case 1: /* H */
-		case 2: /* HH */
-			return HOUR(strtol(begin, NULL, 10));
-			break;
-		case 3: /* H:M */
-		case 4: /* H:MM, HH:M, HHMM */
-			if (begin[1] == ':') {
-				tmp = HOUR(strtol(begin, NULL, 10)) + strtol(begin + 2, NULL, 10);
-				return tmp;
-			} else if (begin[2] == ':') {
-				tmp = HOUR(strtol(begin, NULL, 10)) + strtol(begin + 3, NULL, 10);
-				return tmp;
-			} else {
-				tmp = strtol(begin, NULL, 10);
-				return HOUR(tmp / 100) + tmp % 100;
-			}
-		case 5: /* HH:MM */
-			tmp = HOUR(strtol(begin, NULL, 10)) + strtol(begin + 3, NULL, 10);
-			return tmp;
-	}
-	return 0;
 }

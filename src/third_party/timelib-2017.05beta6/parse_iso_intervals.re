@@ -39,15 +39,6 @@
 # endif
 #endif
 
-#define TIMELIB_UNSET   -99999
-
-#define TIMELIB_SECOND  1
-#define TIMELIB_MINUTE  2
-#define TIMELIB_HOUR    3
-#define TIMELIB_DAY     4
-#define TIMELIB_MONTH   5
-#define TIMELIB_YEAR    6
-
 #define EOI      257
 
 #define TIMELIB_PERIOD  260
