@@ -193,6 +193,10 @@ public:
                            const CompactOptions* options,
                            CompactStats* stats);
 
+    virtual bool isInRecordIdOrder() const override {
+        return true;
+    }
+
     virtual Status validate(OperationContext* opCtx,
                             ValidateCmdLevel level,
                             ValidateAdaptor* adaptor,

@@ -551,6 +551,19 @@ public:
     }
 
     /**
+     * Does the RecordStore cursor retrieve its document in RecordId Order?
+     *
+     * If a subclass overrides the default value to true, the RecordStore cursor must retrieve
+     * its documents in RecordId order.
+     *
+     * This enables your storage engine to run collection validation in the
+     * background.
+     */
+    virtual bool isInRecordIdOrder() const {
+        return false;
+    }
+
+    /**
      * @return OK if the validate run successfully
      *         OK will be returned even if corruption is found
      *         deatils will be in result
