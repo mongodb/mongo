@@ -796,10 +796,8 @@ void DatabaseImpl::dropDatabase(OperationContext* opCtx, Database* db) {
 
     audit::logDropDatabase(opCtx->getClient(), name);
 
-    UUIDCatalog::get(opCtx).onCloseDatabase(db);
     for (auto&& coll : *db) {
         Top::get(opCtx->getClient()->getServiceContext()).collectionDropped(coll->ns().ns(), true);
-        NamespaceUUIDCache::get(opCtx).evictNamespace(coll->ns());
     }
 
     dbHolder().close(opCtx, name, "database dropped");

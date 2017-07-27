@@ -245,14 +245,6 @@ Status repairDatabase(OperationContext* opCtx,
     }
 
     // Close the db and invalidate all current users and caches.
-    {
-        Database* db = dbHolder().get(opCtx, dbName);
-        if (db) {
-            UUIDCatalog::get(opCtx).onCloseDatabase(db);
-            for (auto&& coll : *db)
-                NamespaceUUIDCache::get(opCtx).evictNamespace(coll->ns());
-        }
-    }
     dbHolder().close(opCtx, dbName, "database closed for repair");
     ON_BLOCK_EXIT([&dbName, &opCtx] {
         try {
