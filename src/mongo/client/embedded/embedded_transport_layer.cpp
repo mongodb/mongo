@@ -32,6 +32,7 @@
 #include <deque>
 #include <iostream>
 #include <iterator>
+#include <memory>
 #include <string>
 
 #include "mongo/base/data_range.h"
@@ -39,10 +40,17 @@
 #include "mongo/util/assert_util.h"
 #include "mongo/util/shared_buffer.h"
 enum RPCState { WaitingForMessageLength, WaitingForMessageContent, HaveOutput };
+
+struct FreeDeleter {
+    void operator()(void* x) {
+        free(x);
+    }
+};
+
 struct mongoc_stream_embedded_t : mongoc_stream_t {
     libmongodbcapi_client* clientHandle;
     mongo::DataRangeCursor inputBuf = mongo::DataRangeCursor(nullptr, nullptr);
-    char* hiddenBuf = nullptr;
+    std::unique_ptr<char, FreeDeleter> hiddenBuf;
     mongo::ConstDataRangeCursor outputBuf = mongo::ConstDataRangeCursor(nullptr, nullptr);
 
     void* libmongo_output;
@@ -52,10 +60,28 @@ struct mongoc_stream_embedded_t : mongoc_stream_t {
     RPCState state;
 };
 
-ssize_t _mongoc_stream_embedded_writev(mongoc_stream_t* s,
-                                       mongoc_iovec_t* iov,
-                                       size_t iovcnt,
-                                       int32_t timeout_msec) {
+namespace {
+
+struct FreeAndDestroy {
+    void operator()(mongoc_stream_t* x) {
+    auto stream = static_cast<mongoc_stream_embedded_t*>(x);
+    libmongodbcapi_db_client_destroy(stream->clientHandle);
+    stream->~mongoc_stream_embedded_t();
+    free(stream);
+    }
+};
+extern "C" void mongoc_stream_embedded_destroy(mongoc_stream_t* s) try {
+    std::unique_ptr<mongoc_stream_t, FreeAndDestroy> stream(s);
+} catch (...) {
+    errno = EBADMSG;
+}
+
+
+
+extern "C" ssize_t mongoc_stream_embedded_writev(mongoc_stream_t* s,
+                                                 mongoc_iovec_t* iov,
+                                                 size_t iovcnt,
+                                                 int32_t timeout_msec) try {
     auto stream = static_cast<mongoc_stream_embedded_t*>(s);
     invariant(stream->state == RPCState::WaitingForMessageContent ||
               stream->state == RPCState::WaitingForMessageLength);
@@ -74,9 +100,11 @@ ssize_t _mongoc_stream_embedded_writev(mongoc_stream_t* s,
             // Should use dataview from mongo server
             stream->input_length_to_go =
                 mongo::ConstDataView(current_loc).read<mongo::LittleEndian<int32_t>>();
-            stream->hiddenBuf = (char*)malloc(stream->input_length_to_go);
+            // stream->hiddenBuf = (char*)malloc(stream->input_length_to_go);
+            stream->hiddenBuf =
+                std::unique_ptr<char, FreeDeleter>((char*)malloc(stream->input_length_to_go));
             stream->inputBuf = mongo::DataRangeCursor(
-                stream->hiddenBuf, stream->hiddenBuf + stream->input_length_to_go);
+                stream->hiddenBuf.get(), stream->hiddenBuf.get() + stream->input_length_to_go);
             auto writeOK =
                 stream->inputBuf.writeAndAdvance(mongo::DataRange(current_loc, current_loc + 4));
             invariant(writeOK.isOK());
@@ -104,10 +132,10 @@ ssize_t _mongoc_stream_embedded_writev(mongoc_stream_t* s,
 
         // if we found a complete message, send it
         if (stream->input_length_to_go == 0) {
-            auto input_len = (size_t)(stream->inputBuf.data() - stream->hiddenBuf);
+            auto input_len = (size_t)(stream->inputBuf.data() - stream->hiddenBuf.get());
             int retVal =
                 libmongodbcapi_db_client_wire_protocol_rpc(stream->clientHandle,
-                                                           stream->hiddenBuf,
+                                                           stream->hiddenBuf.get(),
                                                            input_len,
                                                            &(stream->libmongo_output),
                                                            &(stream->libmongo_output_size));
@@ -116,24 +144,25 @@ ssize_t _mongoc_stream_embedded_writev(mongoc_stream_t* s,
             }
 
             // We will allocate a new one when we read in the next message length
-            free(stream->hiddenBuf);
-
+            stream->hiddenBuf.reset();
             // and then write the output to our output buffer
-            auto start = (char*)(stream->libmongo_output);
-            auto end = ((char*)(stream->libmongo_output)) + stream->libmongo_output_size;
+            auto start = static_cast<char*>(stream->libmongo_output);
+            auto end = (static_cast<char*>(stream->libmongo_output)) + stream->libmongo_output_size;
             stream->outputBuf = mongo::ConstDataRangeCursor(start, end);
             stream->state = RPCState::HaveOutput;
         }
     }
 
     return already_read;
+} catch (...) {
+    errno = EBADMSG;
+    return 0;  // not guarenteeing anything was written
 }
-
-ssize_t _mongoc_stream_embedded_readv(mongoc_stream_t* s,
-                                      mongoc_iovec_t* iov,
-                                      size_t iovcnt,
-                                      size_t min_bytes,
-                                      int32_t timeout_msec) {
+extern "C" ssize_t mongoc_stream_embedded_readv(mongoc_stream_t* s,
+                                                mongoc_iovec_t* iov,
+                                                size_t iovcnt,
+                                                size_t min_bytes,
+                                                int32_t timeout_msec) try {
     size_t bytes_read = 0;
     auto stream = static_cast<mongoc_stream_embedded_t*>(s);
     invariant(stream->state == RPCState::HaveOutput);
@@ -149,39 +178,42 @@ ssize_t _mongoc_stream_embedded_readv(mongoc_stream_t* s,
     stream->state =
         stream->outputBuf.length() == 0 ? RPCState::WaitingForMessageLength : RPCState::HaveOutput;
     return bytes_read;
+} catch (...) {
+    errno = EBADMSG;
+    return 0;  // not guarenteeing anything was read
 }
 
-void _mongoc_stream_embedded_destroy(mongoc_stream_t* s) {
 
-    auto stream = static_cast<mongoc_stream_embedded_t*>(s);
-    libmongodbcapi_db_client_destroy(stream->clientHandle);
-    stream->~mongoc_stream_embedded_t();
-}
-
-int _mongoc_stream_embedded_close(mongoc_stream_t* s) {
+extern "C" int mongoc_stream_embedded_close(mongoc_stream_t* s) {
     return 0;
 }
 
-ssize_t _mongoc_stream_embedded_poll(mongoc_stream_poll_t* s,
-                                     size_t array_length,
-                                     int32_t timeout_msec) {
+extern "C" ssize_t mongoc_stream_embedded_poll(mongoc_stream_poll_t* s,
+                                               size_t array_length,
+                                               int32_t timeout_msec) try {
     for (size_t i = 0; i < array_length; i++) {
         s[i].revents = s[i].events & (POLLIN | POLLOUT);
     }
     return array_length;
+} catch (...) {
+    errno = EBADMSG;
+    return -1;
 }
 
-mongoc_stream_t* embedded_stream_initiator(const mongoc_uri_t* uri,
-                                           const mongoc_host_list_t* host,
-                                           void* user_data,
-                                           bson_error_t* error) {
-    mongoc_stream_embedded_t* stream =
-        static_cast<mongoc_stream_embedded_t*>(bson_malloc0(sizeof(*stream)));
-    if (!stream)
-        return NULL;
-
+extern "C" mongoc_stream_t* embedded_stream_initiator(const mongoc_uri_t* uri,
+                                                      const mongoc_host_list_t* host,
+                                                      void* user_data,
+                                                      bson_error_t* error) try {
+    std::unique_ptr<unsigned char, FreeDeleter> stream_buf(
+        static_cast<unsigned char*>(bson_malloc0(sizeof(mongoc_stream_embedded_t))));
+    if (!stream_buf) {
+        errno = ENOMEM;
+        return nullptr;
+    }
     // Create the stream
-    stream = new (stream) mongoc_stream_embedded_t();
+    std::unique_ptr<mongoc_stream_embedded_t, FreeAndDestroy> stream(
+        new (stream_buf.get()) mongoc_stream_embedded_t());
+    stream_buf.release();  // This must be here so we don't have double ownership
     stream->state = RPCState::WaitingForMessageLength;
     // Set up connections to database
     stream->clientHandle = libmongodbcapi_db_client_new((libmongodbcapi_db*)user_data);
@@ -190,19 +222,47 @@ mongoc_stream_t* embedded_stream_initiator(const mongoc_uri_t* uri,
     // type is not relevant for us. Has to be set for the C Driver, but it has to do with picking
     // how to communicate over the networ
     stream->type = 1000;
-    stream->poll = _mongoc_stream_embedded_poll;
-    stream->close = _mongoc_stream_embedded_close;
-    stream->readv = _mongoc_stream_embedded_readv;
-    stream->writev = _mongoc_stream_embedded_writev;
-    stream->destroy = _mongoc_stream_embedded_destroy;
+    stream->poll = mongoc_stream_embedded_poll;
+    stream->close = mongoc_stream_embedded_close;
+    stream->readv = mongoc_stream_embedded_readv;
+    stream->writev = mongoc_stream_embedded_writev;
+    stream->destroy = mongoc_stream_embedded_destroy;
 
-    return stream;
+    return stream.release();
+} catch (...) {
+    errno = EBADMSG;
+    return nullptr;
 }
-mongoc_client_t* embedded_mongoc_client_new(libmongodbcapi_db* db) {
+
+}  // namespace
+
+struct ClientDeleter {
+    void operator()(mongoc_client_t* x) {
+        mongoc_client_destroy(x);
+    }
+};
+
+extern "C" mongoc_client_t* embedded_mongoc_client_new(libmongodbcapi_db* db) try {
     if (!db) {
+        errno = EINVAL;
         return nullptr;
     }
-    auto client = mongoc_client_new(NULL);
-    mongoc_client_set_stream_initiator(client, embedded_stream_initiator, db);
-    return client;
+    std::unique_ptr<mongoc_client_t, ClientDeleter> client(mongoc_client_new(NULL));
+    mongoc_client_set_stream_initiator(client.get(), embedded_stream_initiator, db);
+    return client.release();
+} catch (const std::out_of_range& c) {
+    errno = EACCES;
+    return nullptr;
+} catch (const std::overflow_error& c) {
+    errno = EOVERFLOW;
+    return nullptr;
+} catch (const std::underflow_error& c) {
+    errno = ERANGE;
+    return nullptr;
+} catch (const std::invalid_argument& c) {
+    errno = EINVAL;
+    return nullptr;
+} catch (...) {
+    errno = EBADMSG;
+    return nullptr;
 }

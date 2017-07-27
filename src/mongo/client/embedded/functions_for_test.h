@@ -26,21 +26,20 @@
  *    then also delete it in the license file.
  */
 
-#include <bson.h>
+#pragma once
+
 #include <mongoc.h>
 
-#include "mongo/client/embedded/libmongodbcapi.h"
-#ifdef __cplusplus
-extern "C" {
-#endif
-struct mongoc_stream_embedded_t;
+namespace mongo {
 
-/* Creates a client with the correct stream intiator set
- * @param db must be a valid db handle created by libmongodbcapi
- * @return a mongoc client or null on error
- */
-mongoc_client_t* embedded_mongoc_client_new(libmongodbcapi_db* db);
+namespace embeddedTest {
 
-#ifdef __cplusplus
-}
-#endif
+bool explain(mongoc_collection_t* collection);
+
+bool insert_data(mongoc_collection_t* collection);
+
+int run_c_driver_all();
+
+}  // namespace embeddedTest
+
+}  // namespace mongo

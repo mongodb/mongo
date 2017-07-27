@@ -28,7 +28,7 @@
 
 
 #include "mongo/client/embedded/embedded_transport_layer.h"
-#include "mongo/client/embedded/common-operations.h"
+#include "mongo/client/embedded/functions_for_test.h"
 #include "mongo/client/embedded/libmongodbcapi.h"
 #include <mongoc.h>
 #include <set>

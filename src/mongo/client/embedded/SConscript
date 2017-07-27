@@ -58,7 +58,7 @@ embeddedTransportTest = env.Program(
     target='mongo_embedded_transport_test',
     source=[
         'embedded_transport_layer_test.cpp',
-        'common-operations.cpp',
+        'functions_for_test.cpp',
     ],
     LIBDEPS=[
         'mongo_embedded_transport',
