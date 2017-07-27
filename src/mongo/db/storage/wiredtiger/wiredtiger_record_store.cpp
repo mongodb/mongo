@@ -781,12 +781,9 @@ int64_t WiredTigerRecordStore::storageSize(OperationContext* opCtx,
 // Retrieve the value from a positioned cursor.
 RecordData WiredTigerRecordStore::_getData(const WiredTigerCursor& cursor) const {
     WT_ITEM value;
-    int ret = cursor->get_value(cursor.get(), &value);
-    invariantWTOK(ret);
+    invariantWTOK(cursor->get_value(cursor.get(), &value));
 
-    SharedBuffer data = SharedBuffer::allocate(value.size);
-    memcpy(data.get(), value.data, value.size);
-    return RecordData(data, value.size);
+    return RecordData(static_cast<const char*>(value.data), value.size).getOwned();
 }
 
 RecordData WiredTigerRecordStore::dataFor(OperationContext* opCtx, const RecordId& id) const {
@@ -1290,7 +1287,7 @@ Status WiredTigerRecordStore::updateRecord(OperationContext* opCtx,
 }
 
 bool WiredTigerRecordStore::updateWithDamagesSupported() const {
-    return false;
+    return true;
 }
 
 StatusWith<RecordData> WiredTigerRecordStore::updateWithDamages(
@@ -1299,7 +1296,34 @@ StatusWith<RecordData> WiredTigerRecordStore::updateWithDamages(
     const RecordData& oldRec,
     const char* damageSource,
     const mutablebson::DamageVector& damages) {
-    MONGO_UNREACHABLE;
+
+    const int nentries = damages.size();
+    mutablebson::DamageVector::const_iterator where = damages.begin();
+    const mutablebson::DamageVector::const_iterator end = damages.cend();
+    std::vector<WT_MODIFY> entries(nentries);
+    for (u_int i = 0; where != end; ++i, ++where) {
+        entries[i].data.data = damageSource + where->sourceOffset;
+        entries[i].data.size = where->size;
+        entries[i].offset = where->targetOffset;
+        entries[i].size = where->size;
+    }
+
+    WiredTigerCursor curwrap(_uri, _tableId, true, opCtx);
+    curwrap.assertInActiveTxn();
+    WT_CURSOR* c = curwrap.get();
+    invariant(c);
+    setKey(c, id);
+
+    // The test harness calls us with empty damage vectors which WiredTiger doesn't allow.
+    if (nentries == 0)
+        invariantWTOK(WT_OP_CHECK(c->search(c)));
+    else
+        invariantWTOK(WT_OP_CHECK(c->modify(c, entries.data(), nentries)));
+
+    WT_ITEM value;
+    invariantWTOK(c->get_value(c, &value));
+
+    return RecordData(static_cast<const char*>(value.data), value.size).getOwned();
 }
 
 void WiredTigerRecordStore::_oplogSetStartHack(WiredTigerRecoveryUnit* wru) const {

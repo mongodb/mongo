@@ -336,9 +336,6 @@ TEST_F(SnapshotManagerTests, UpdateAndDelete) {
     updateRecordAndCommit(id, "Cat");
     auto snapCat = prepareAndCreateSnapshot();
 
-    // Untested since no engine currently supports both updateWithDamanges and snapshots.
-    ASSERT(!rs->updateWithDamagesSupported());
-
     deleteRecordAndCommit(id);
     auto snapAfterDelete = prepareAndCreateSnapshot();
 
