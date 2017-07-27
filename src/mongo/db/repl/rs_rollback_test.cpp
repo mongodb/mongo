@@ -763,7 +763,7 @@ TEST_F(RSRollbackTest, RollbackCreateIndexCommandMissingIndexName) {
     createOplog(_opCtx.get());
     CollectionOptions options;
     options.uuid = UUID::gen();
-    auto collection = _createCollection(_opCtx.get(), "test.t", CollectionOptions());
+    auto collection = _createCollection(_opCtx.get(), "test.t", options);
     auto commonOperation =
         std::make_pair(BSON("ts" << Timestamp(Seconds(1), 0) << "h" << 1LL), RecordId(1));
     BSONObj command = BSON("createIndexes"
