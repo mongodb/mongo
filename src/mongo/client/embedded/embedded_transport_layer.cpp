@@ -64,10 +64,10 @@ namespace {
 
 struct FreeAndDestroy {
     void operator()(mongoc_stream_t* x) {
-    auto stream = static_cast<mongoc_stream_embedded_t*>(x);
-    libmongodbcapi_db_client_destroy(stream->clientHandle);
-    stream->~mongoc_stream_embedded_t();
-    free(stream);
+        auto stream = static_cast<mongoc_stream_embedded_t*>(x);
+        libmongodbcapi_db_client_destroy(stream->clientHandle);
+        stream->~mongoc_stream_embedded_t();
+        free(stream);
     }
 };
 extern "C" void mongoc_stream_embedded_destroy(mongoc_stream_t* s) try {
@@ -75,7 +75,6 @@ extern "C" void mongoc_stream_embedded_destroy(mongoc_stream_t* s) try {
 } catch (...) {
     errno = EBADMSG;
 }
-
 
 
 extern "C" ssize_t mongoc_stream_embedded_writev(mongoc_stream_t* s,
