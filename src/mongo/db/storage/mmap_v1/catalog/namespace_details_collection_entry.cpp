@@ -335,7 +335,7 @@ void NamespaceDetailsCollectionCatalogEntry::indexBuildSuccess(OperationContext*
         setIndexIsMultikey(opCtx, toIdxNo, tempMultikey);
 
         idxNo = toIdxNo;
-        invariant((idxNo = _findIndexNumber(opCtx, indexName)));
+        invariant((idxNo == _findIndexNumber(opCtx, indexName)));
     }
 
     opCtx->recoveryUnit()->writingInt(_details->indexBuildsInProgress) -= 1;
