@@ -573,20 +573,18 @@ Status EphemeralForTestRecordStore::validate(OperationContext* opCtx,
     stdx::lock_guard<stdx::mutex> lock(_data->recordsMutex);
 
     results->valid = true;
-    if (level == kValidateFull) {
-        for (Records::const_iterator it = _data->records.begin(); it != _data->records.end();
-             ++it) {
-            const EphemeralForTestRecord& rec = it->second;
-            size_t dataSize;
-            const Status status = adaptor->validate(it->first, rec.toRecordData(), &dataSize);
-            if (!status.isOK()) {
-                if (results->valid) {
-                    // Only log once.
-                    results->errors.push_back("detected one or more invalid documents (see logs)");
-                }
-                results->valid = false;
-                log() << "Invalid object detected in " << _ns << ": " << status.reason();
+
+    for (Records::const_iterator it = _data->records.begin(); it != _data->records.end(); ++it) {
+        const EphemeralForTestRecord& rec = it->second;
+        size_t dataSize;
+        const Status status = adaptor->validate(it->first, rec.toRecordData(), &dataSize);
+        if (!status.isOK()) {
+            if (results->valid) {
+                // Only log once.
+                results->errors.push_back("detected one or more invalid documents (see logs)");
             }
+            results->valid = false;
+            log() << "Invalid object detected in " << _ns << ": " << status.reason();
         }
     }
 
