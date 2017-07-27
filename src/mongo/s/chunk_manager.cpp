@@ -98,6 +98,9 @@ public:
 
     string shardFor(OperationContext* txn, const string& hostName) const final {
         const auto shard = grid.shardRegistry()->getShard(txn, hostName);
+        uassert(ErrorCodes::ShardNotFound,
+                str::stream() << "Shard " << hostName << " not found.",
+                shard);
         return shard->getId();
     }
 
