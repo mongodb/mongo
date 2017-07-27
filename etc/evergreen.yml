@@ -600,7 +600,7 @@ functions:
 
         # Run reliable set of tests once.
         eval $preamble $wrapper $wrapper_report_file $resmoke_base
-        exit_codes=$?
+        reliable_exit_code=$?
 
         # Set report file for unreliable test run.
         report_file=report_unreliable.json
@@ -619,7 +619,7 @@ functions:
 
         # Run unreliable set of tests.
         eval $preamble $wrapper $wrapper_report_file $resmoke_base
-        exit_codes="$exit_codes $?"
+        unreliable_exit_code=$?
 
         #  Reenable errexit, as the return from combine_reports will return the cumulative error.
         set -o errexit
@@ -634,13 +634,15 @@ functions:
         # We mask any errors from the resmoke runs above (by disabling errexit) until both have
         # completed. If any of the resmoke runs failed due to non-test failures
         # (i.e fixture failures), we need to exit with non-zero status.
-        for exit_code in $exit_codes
-        do
-          if [ $exit_code -ne 0 ]; then
-            echo "resmoke.py failed with error code: $exit_code"
-            exit $exit_code
-          fi
-        done
+        if [ $reliable_exit_code -ne 0 ]; then
+          echo "resmoke.py reliable run failed with error code: $reliable_exit_code"
+          exit $reliable_exit_code
+        fi
+        # Ignoring the error code 1 that is returned when there are only silent failures.
+        if [ $unreliable_exit_code -ne 0 ] && [ $unreliable_exit_code -ne 1 ]; then
+          echo "resmoke.py unreliable run failed with error code: $unreliable_exit_code"
+          exit $unreliable_exit_code
+        fi
 
   "do jepsen setup" :
     - command: shell.exec
