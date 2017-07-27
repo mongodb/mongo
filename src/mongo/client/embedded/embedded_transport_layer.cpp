@@ -199,6 +199,10 @@ extern "C" ssize_t mongoc_stream_embedded_poll(mongoc_stream_poll_t* s,
     return -1;
 }
 
+extern "C" bool mongoc_stream_embedded_check_closed(mongoc_stream_t* s) noexcept {
+    return false;
+}
+
 extern "C" mongoc_stream_t* embedded_stream_initiator(const mongoc_uri_t* uri,
                                                       const mongoc_host_list_t* host,
                                                       void* user_data,
@@ -226,7 +230,7 @@ extern "C" mongoc_stream_t* embedded_stream_initiator(const mongoc_uri_t* uri,
     stream->readv = mongoc_stream_embedded_readv;
     stream->writev = mongoc_stream_embedded_writev;
     stream->destroy = mongoc_stream_embedded_destroy;
-
+    stream->check_closed = mongoc_stream_embedded_check_closed;
     return stream.release();
 } catch (...) {
     errno = EBADMSG;
