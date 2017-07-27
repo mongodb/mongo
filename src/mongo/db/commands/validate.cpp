@@ -62,9 +62,9 @@ stdx::condition_variable _validationNotifier;
 std::set<std::string> _validationsInProgress;
 }  // namespace
 
-class ValidateCmd : public ErrmsgCommandDeprecated {
+class ValidateCmd : public BasicCommand {
 public:
-    ValidateCmd() : ErrmsgCommandDeprecated("validate") {}
+    ValidateCmd() : BasicCommand("validate") {}
 
     virtual bool slaveOk() const {
         return true;
@@ -91,13 +91,11 @@ public:
     }
     //{ validate: "collectionnamewithoutthedbpart" [, scandata: <bool>] [, full: <bool> } */
 
-    bool errmsgRun(OperationContext* opCtx,
-                   const string& dbname,
-                   const BSONObj& cmdObj,
-                   string& errmsg,
-                   BSONObjBuilder& result) {
+    bool run(OperationContext* opCtx,
+             const string& dbname,
+             const BSONObj& cmdObj,
+             BSONObjBuilder& result) {
         if (MONGO_FAIL_POINT(validateCmdCollectionNotValid)) {
-            errmsg = "validateCmdCollectionNotValid fail point was triggered";
             result.appendBool("valid", false);
             return true;
         }
@@ -116,7 +114,9 @@ public:
         }
 
         if (!nss.isNormal() && full) {
-            errmsg = "Can only run full validate on a regular collection";
+            appendCommandStatus(
+                result,
+                {ErrorCodes::CommandFailed, "Can only run full validate on a regular collection"});
             return false;
         }
 
@@ -129,11 +129,11 @@ public:
         Collection* collection = ctx.getDb() ? ctx.getDb()->getCollection(opCtx, nss) : NULL;
         if (!collection) {
             if (ctx.getDb() && ctx.getDb()->getViewCatalog()->lookup(opCtx, nss.ns())) {
-                errmsg = "Cannot validate a view";
-                return appendCommandStatus(result, {ErrorCodes::CommandNotSupportedOnView, errmsg});
+                return appendCommandStatus(
+                    result, {ErrorCodes::CommandNotSupportedOnView, "Cannot validate a view"});
             }
 
-            errmsg = "ns not found";
+            appendCommandStatus(result, {ErrorCodes::NamespaceNotFound, "ns not found"});
             return false;
         }
 
@@ -148,13 +148,17 @@ public:
         }
 
         if (!isInRecordIdOrder && background) {
-            errmsg =
-                "This storage engine does not support the background option, use background:false";
+            appendCommandStatus(result,
+                                {ErrorCodes::CommandFailed,
+                                 "This storage engine does not support the background option, use "
+                                 "background:false"});
             return false;
         }
 
         if (full && background) {
-            errmsg = "A full validate cannot run in the background, use full:false";
+            appendCommandStatus(result,
+                                {ErrorCodes::CommandFailed,
+                                 "A full validate cannot run in the background, use full:false"});
             return false;
         }
 
@@ -171,7 +175,10 @@ public:
                     opCtx->waitForConditionOrInterrupt(_validationNotifier, lock);
                 }
             } catch (UserException& e) {
-                errmsg = str::stream() << "Exception during validation: " << e.toString();
+                appendCommandStatus(
+                    result,
+                    {ErrorCodes::CommandFailed,
+                     str::stream() << "Exception during validation: " << e.toString()});
                 return false;
             }
 
@@ -186,8 +193,9 @@ public:
 
         ValidateResults results;
         Status status = collection->validate(opCtx, level, &results, &result);
-        if (!status.isOK())
+        if (!status.isOK()) {
             return appendCommandStatus(result, status);
+        }
 
         if (!full) {
             results.warnings.push_back(
