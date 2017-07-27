@@ -54,11 +54,11 @@ load('jstests/libs/ftdc.js');
 
         // 2. Set path and succeed
         assert.commandWorked(
-            setParam(admin1, {"diagnosticDataCollectionDirectoryPath": testPath2}));
+            setParam(admin1, {"diagnosticDataCollectionDirectoryPath": testPath1}));
 
         // 3. Set path again and fail
         assert.commandFailed(
-            setParam(admin1, {"diagnosticDataCollectionDirectoryPath": testPath2}));
+            setParam(admin1, {"diagnosticDataCollectionDirectoryPath": testPath1}));
 
         // 4. Enable successfully
         assert.commandWorked(setParam(admin1, {"diagnosticDataCollectionEnabled": 1}));
@@ -100,7 +100,7 @@ load('jstests/libs/ftdc.js');
 
         // 2. Set path fail
         assert.commandFailed(
-            setParam(admin3, {"diagnosticDataCollectionDirectoryPath": testPath2}));
+            setParam(admin3, {"diagnosticDataCollectionDirectoryPath": testPath3}));
 
         // 3. Enable successfully
         assert.commandWorked(setParam(admin3, {"diagnosticDataCollectionEnabled": 1}));
