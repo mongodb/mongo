@@ -60,7 +60,10 @@ public:
     virtual void help(stringstream& h) const {
         h << "Validate contents of a namespace by scanning its data structures for correctness.  "
              "Slow.\n"
-             "Add full:true option to do a more thorough check";
+             "Add full:true option to do a more thorough check\n"
+             "Add scandata:false to skip the scan of the collection data without skipping scans "
+             "of any indexes\n"
+             "Add background:false to block access to the collection during validation";
     }
 
     virtual bool supportsWriteConcern(const BSONObj& cmd) const override {
@@ -120,6 +123,30 @@ public:
             errmsg = "ns not found";
             return false;
         }
+
+        bool background = false;
+        bool isInRecordIdOrder = collection->getRecordStore()->isInRecordIdOrder();
+        if (isInRecordIdOrder && !full) {
+            background = true;
+        }
+
+        if (cmdObj.hasElement("background")) {
+            background = cmdObj["background"].trueValue();
+        }
+
+        if (!isInRecordIdOrder && background) {
+            errmsg =
+                "This storage engine does not support the background option, use background:false";
+            return false;
+        }
+
+        if (full && background) {
+            errmsg = "A full validate cannot run in the background, use full:false";
+            return false;
+        }
+
+        // Set it to false forcefully until it is fully implemented.
+        background = false;
 
         result.append("ns", nss.ns());
 
