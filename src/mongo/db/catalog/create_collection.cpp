@@ -161,8 +161,17 @@ Status createCollectionForApplyOps(OperationContext* opCtx,
                 // node.
                 const bool stayTemp = true;
                 if (auto futureColl = db ? db->getCollection(opCtx, newCollName) : nullptr) {
-                    auto tmpName =
-                        NamespaceString(newCollName.db(), "tmp" + UUID::gen().toString());
+                    auto tmpNameResult = db->makeUniqueCollectionNamespace(opCtx, "tmp%%%%%");
+                    if (!tmpNameResult.isOK()) {
+                        return Result(Status(tmpNameResult.getStatus().code(),
+                                             str::stream() << "Cannot generate temporary "
+                                                              "collection namespace for applyOps "
+                                                              "create command: collection: "
+                                                           << newCollName.ns()
+                                                           << ". error: "
+                                                           << tmpNameResult.getStatus().reason()));
+                    }
+                    const auto& tmpName = tmpNameResult.getValue();
                     Status status =
                         db->renameCollection(opCtx, newCollName.ns(), tmpName.ns(), stayTemp);
                     if (!status.isOK())
