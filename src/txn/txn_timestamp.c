@@ -121,14 +121,17 @@ __txn_global_query_timestamp(
 			return (WT_NOTFOUND);
 		__wt_readlock(session, &txn_global->rwlock);
 		__wt_timestamp_set(&ts, &txn_global->commit_timestamp);
+		WT_ASSERT(session, !__wt_timestamp_iszero(&ts));
 		__wt_readunlock(session, &txn_global->rwlock);
 
 		/* Compare with the oldest running transaction. */
 		__wt_readlock(session, &txn_global->commit_timestamp_rwlock);
 		txn = TAILQ_FIRST(&txn_global->commit_timestamph);
 		if (txn != NULL &&
-		    __wt_timestamp_cmp(&txn->commit_timestamp, &ts) < 0)
-			__wt_timestamp_set(&ts, &txn->commit_timestamp);
+		    __wt_timestamp_cmp(&txn->first_commit_timestamp, &ts) < 0) {
+			__wt_timestamp_set(&ts, &txn->first_commit_timestamp);
+			WT_ASSERT(session, !__wt_timestamp_iszero(&ts));
+		}
 		__wt_readunlock(session, &txn_global->commit_timestamp_rwlock);
 	} else if (WT_STRING_MATCH("oldest_reader", cval.str, cval.len)) {
 		if (!txn_global->has_oldest_timestamp)
@@ -421,6 +424,7 @@ __wt_txn_set_timestamp(WT_SESSION_IMPL *session, const char *cfg[])
 void
 __wt_txn_set_commit_timestamp(WT_SESSION_IMPL *session)
 {
+	wt_timestamp_t ts;
 	WT_TXN *prev, *txn;
 	WT_TXN_GLOBAL *txn_global;
 
@@ -430,10 +434,18 @@ __wt_txn_set_commit_timestamp(WT_SESSION_IMPL *session)
 	if (F_ISSET(txn, WT_TXN_PUBLIC_TS_COMMIT))
 		return;
 
+	/*
+	 * Copy the current commit timestamp (which can change while the
+	 * transaction is running) into the first_commit_timestamp, which is
+	 * fixed.
+	 */
+	__wt_timestamp_set(&ts, &txn->commit_timestamp);
+	__wt_timestamp_set(&txn->first_commit_timestamp, &ts);
+
 	__wt_writelock(session, &txn_global->commit_timestamp_rwlock);
 	for (prev = TAILQ_LAST(&txn_global->commit_timestamph, __wt_txn_cts_qh);
-	    prev != NULL && __wt_timestamp_cmp(
-	    &prev->commit_timestamp, &txn->commit_timestamp) > 0;
+	    prev != NULL &&
+	    __wt_timestamp_cmp(&prev->first_commit_timestamp, &ts) > 0;
 	    prev = TAILQ_PREV(prev, __wt_txn_cts_qh, commit_timestampq))
 		;
 	if (prev == NULL)

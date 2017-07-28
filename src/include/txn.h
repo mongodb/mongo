@@ -205,7 +205,21 @@ struct __wt_txn {
 	uint32_t snapshot_count;
 	uint32_t txn_logsync;	/* Log sync configuration */
 
+	/*
+	 * Timestamp copied into updates created by this transaction.
+	 *
+	 * In some use cases, this can be updated while the transaction is
+	 * running.
+	 */
 	WT_DECL_TIMESTAMP(commit_timestamp)
+
+	/*
+	 * Set to the first commit timestamp used in the transaction and fixed
+	 * while the transaction is on the public list of committed timestamps.
+	 */
+	WT_DECL_TIMESTAMP(first_commit_timestamp)
+
+	/* Read updates committed as of this timestamp. */
 	WT_DECL_TIMESTAMP(read_timestamp)
 
 	TAILQ_ENTRY(__wt_txn) commit_timestampq;
