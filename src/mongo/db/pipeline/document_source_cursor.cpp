@@ -74,7 +74,7 @@ void DocumentSourceCursor::loadBatch() {
     BSONObj resultObj;
     {
         AutoGetCollectionForRead autoColl(pExpCtx->opCtx, _exec->nss());
-        _exec->restoreState();
+        uassertStatusOK(_exec->restoreState());
 
         int memUsageBytes = 0;
         {
@@ -180,7 +180,7 @@ Value DocumentSourceCursor::serialize(boost::optional<ExplainOptions::Verbosity>
     BSONObjBuilder explainBuilder;
     {
         AutoGetCollectionForRead autoColl(pExpCtx->opCtx, _exec->nss());
-        _exec->restoreState();
+        uassertStatusOK(_exec->restoreState());
         Explain::explainStages(_exec.get(), autoColl.getCollection(), *explain, &explainBuilder);
         _exec->saveState();
     }

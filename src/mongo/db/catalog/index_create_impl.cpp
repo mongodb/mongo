@@ -350,8 +350,12 @@ Status MultiIndexBlockImpl::insertAllDocumentsInCollection(std::set<RecordId>* d
                 // Fail the index build hard.
                 return ret;
             }
-            if (_buildInBackground)
-                exec->restoreState();  // Handles any WCEs internally.
+            if (_buildInBackground) {
+                auto restoreStatus = exec->restoreState();  // Handles any WCEs internally.
+                if (!restoreStatus.isOK()) {
+                    return restoreStatus;
+                }
+            }
 
             // Go to the next document
             progress->hit();
@@ -366,7 +370,10 @@ Status MultiIndexBlockImpl::insertAllDocumentsInCollection(std::set<RecordId>* d
             // abandonSnapshot.
             exec->saveState();
             _opCtx->recoveryUnit()->abandonSnapshot();
-            exec->restoreState();  // Handles any WCEs internally.
+            auto restoreStatus = exec->restoreState();  // Handles any WCEs internally.
+            if (!restoreStatus.isOK()) {
+                return restoreStatus;
+            }
         }
     }
 

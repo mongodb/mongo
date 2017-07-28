@@ -236,7 +236,10 @@ mongo::Status mongo::cloneCollectionAsCapped(OperationContext* opCtx,
             // abandonSnapshot.
             exec->saveState();
             opCtx->recoveryUnit()->abandonSnapshot();
-            exec->restoreState();  // Handles any WCEs internally.
+            auto restoreStatus = exec->restoreState();  // Handles any WCEs internally.
+            if (!restoreStatus.isOK()) {
+                return restoreStatus;
+            }
         }
     }
 

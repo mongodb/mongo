@@ -71,7 +71,7 @@ void PlanYieldPolicy::resetTimer() {
     _elapsedTracker.resetLastTime();
 }
 
-bool PlanYieldPolicy::yield(RecordFetcher* recordFetcher) {
+Status PlanYieldPolicy::yield(RecordFetcher* recordFetcher) {
     invariant(_planYielding);
     if (recordFetcher) {
         OperationContext* opCtx = _planYielding->getOpCtx();
@@ -82,8 +82,8 @@ bool PlanYieldPolicy::yield(RecordFetcher* recordFetcher) {
     }
 }
 
-bool PlanYieldPolicy::yield(stdx::function<void()> beforeYieldingFn,
-                            stdx::function<void()> whileYieldingFn) {
+Status PlanYieldPolicy::yield(stdx::function<void()> beforeYieldingFn,
+                              stdx::function<void()> whileYieldingFn) {
     invariant(_planYielding);
     invariant(canAutoYield());
 
@@ -103,9 +103,12 @@ bool PlanYieldPolicy::yield(stdx::function<void()> beforeYieldingFn,
         try {
             // All YIELD_AUTO plans will get here eventually when the elapsed tracker triggers
             // that it's time to yield. Whether or not we will actually yield, we need to check
-            // if this operation has been interrupted. Throws if the interrupt flag is set.
+            // if this operation has been interrupted.
             if (_policy == PlanExecutor::YIELD_AUTO) {
-                opCtx->checkForInterrupt();
+                auto interruptStatus = opCtx->checkForInterruptNoAssert();
+                if (!interruptStatus.isOK()) {
+                    return interruptStatus;
+                }
             }
 
             try {

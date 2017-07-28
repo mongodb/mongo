@@ -40,6 +40,8 @@ class RecordFetcher;
 
 class PlanYieldPolicy {
 public:
+    virtual ~PlanYieldPolicy() {}
+
     PlanYieldPolicy(PlanExecutor* exec, PlanExecutor::YieldPolicy policy);
 
     /**
@@ -54,7 +56,7 @@ public:
      * PlanExecutors give up their locks periodically in order to be fair to other
      * threads.
      */
-    bool shouldYield();
+    virtual bool shouldYield();
 
     /**
      * Resets the yield timer so that we wait for a while before yielding again.
@@ -69,16 +71,18 @@ public:
      * that we will page fault on this record. We use 'fetcher' to retrieve the record
      * after we give up our locks.
      *
-     * Returns true if the executor was restored successfully and is still alive. Returns false
-     * if the executor got killed during yield.
+     * Returns Status::OK() if the executor was restored successfully and is still alive. Returns
+     * ErrorCodes::QueryPlanKilled if the executor got killed during yield, and
+     * ErrorCodes::ExceededTimeLimit if the operation has exceeded the time limit.
      */
-    bool yield(RecordFetcher* fetcher = NULL);
+    virtual Status yield(RecordFetcher* fetcher = NULL);
 
     /**
      * More generic version of yield() above.  This version calls 'beforeYieldingFn' immediately
      * before locks are yielded (if they are), and 'whileYieldingFn' before locks are restored.
      */
-    bool yield(stdx::function<void()> beforeYieldingFn, stdx::function<void()> whileYieldingFn);
+    virtual Status yield(stdx::function<void()> beforeYieldingFn,
+                         stdx::function<void()> whileYieldingFn);
 
     /**
      * All calls to shouldYield() will return true until the next call to yield.
@@ -93,7 +97,19 @@ public:
      * during this PlanExecutor's lifetime.
      */
     bool canReleaseLocksDuringExecution() const {
-        return _policy == PlanExecutor::YIELD_AUTO || _policy == PlanExecutor::YIELD_MANUAL;
+        switch (_policy) {
+            case PlanExecutor::YIELD_AUTO:
+            case PlanExecutor::YIELD_MANUAL:
+            case PlanExecutor::ALWAYS_TIME_OUT:
+            case PlanExecutor::ALWAYS_MARK_KILLED: {
+                return true;
+            }
+            case PlanExecutor::NO_YIELD:
+            case PlanExecutor::WRITE_CONFLICT_RETRY_ONLY: {
+                return false;
+            }
+        }
+        MONGO_UNREACHABLE;
     }
 
     /**
@@ -102,8 +118,18 @@ public:
      * locks.
      */
     bool canAutoYield() const {
-        return _policy == PlanExecutor::YIELD_AUTO ||
-            _policy == PlanExecutor::WRITE_CONFLICT_RETRY_ONLY;
+        switch (_policy) {
+            case PlanExecutor::YIELD_AUTO:
+            case PlanExecutor::WRITE_CONFLICT_RETRY_ONLY:
+            case PlanExecutor::ALWAYS_TIME_OUT:
+            case PlanExecutor::ALWAYS_MARK_KILLED: {
+                return true;
+            }
+            case PlanExecutor::NO_YIELD:
+            case PlanExecutor::YIELD_MANUAL:
+                return false;
+        }
+        MONGO_UNREACHABLE;
     }
 
     PlanExecutor::YieldPolicy getPolicy() const {

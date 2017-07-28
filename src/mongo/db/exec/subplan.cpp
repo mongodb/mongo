@@ -503,9 +503,11 @@ Status SubplanStage::pickBestPlan(PlanYieldPolicy* yieldPolicy) {
     // Plan each branch of the $or.
     Status subplanningStatus = planSubqueries();
     if (!subplanningStatus.isOK()) {
-        if (subplanningStatus == ErrorCodes::QueryPlanKilled) {
+        if (subplanningStatus == ErrorCodes::QueryPlanKilled ||
+            subplanningStatus == ErrorCodes::ExceededTimeLimit) {
             // Query planning cannot continue if the plan for one of the subqueries was killed
-            // because the collection or a candidate index may have been dropped.
+            // because the collection or a candidate index may have been dropped, or if we've
+            // exceeded the operation's time limit.
             return subplanningStatus;
         }
         return choosePlanWholeQuery(yieldPolicy);
@@ -515,9 +517,11 @@ Status SubplanStage::pickBestPlan(PlanYieldPolicy* yieldPolicy) {
     // the overall winning plan from the resulting index tags.
     Status subplanSelectStat = choosePlanForSubqueries(yieldPolicy);
     if (!subplanSelectStat.isOK()) {
-        if (subplanSelectStat == ErrorCodes::QueryPlanKilled) {
-            // Query planning cannot continue if the plan was killed because the collection or a
-            // candidate index may have been dropped.
+        if (subplanSelectStat == ErrorCodes::QueryPlanKilled ||
+            subplanSelectStat == ErrorCodes::ExceededTimeLimit) {
+            // Query planning cannot continue if the plan for one of the subqueries was killed
+            // because the collection or a candidate index may have been dropped, or if we've
+            // exceeded the operation's time limit.
             return subplanSelectStat;
         }
         return choosePlanWholeQuery(yieldPolicy);

@@ -1149,11 +1149,8 @@ void State::finalReduce(OperationContext* opCtx, CurOp* curOp, ProgressMeterHold
         prev = o;
         all.push_back(o);
 
-        if (!exec->restoreState()) {
-            uasserted(34375, "Plan executor killed during mapReduce final reduce");
-        }
-
         _opCtx->checkForInterrupt();
+        uassertStatusOK(exec->restoreState());
     }
 
     uassert(34428,
@@ -1540,12 +1537,9 @@ public:
 
                         scopedAutoDb.reset(new AutoGetDb(opCtx, config.nss.db(), MODE_S));
 
-                        if (!exec->restoreState()) {
-                            return appendCommandStatus(
-                                result,
-                                Status(ErrorCodes::OperationFailed,
-                                       str::stream()
-                                           << "Executor killed during mapReduce command"));
+                        auto restoreStatus = exec->restoreState();
+                        if (!restoreStatus.isOK()) {
+                            return appendCommandStatus(result, restoreStatus);
                         }
 
                         reduceTime += t.micros();

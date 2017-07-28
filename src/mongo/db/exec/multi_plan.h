@@ -172,7 +172,7 @@ private:
      * Checks whether we need to perform either a timing-based yield or a yield for a document
      * fetch. If so, then uses 'yieldPolicy' to actually perform the yield.
      *
-     * Returns a non-OK status if killed during a yield.
+     * Returns a non-OK status if killed during a yield or if the query has exceeded its time limit.
      */
     Status tryYield(PlanYieldPolicy* yieldPolicy);
 

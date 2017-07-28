@@ -42,16 +42,6 @@ class NamespaceString;
 class OperationContext;
 
 /**
- * Whether or not the ClientCursor* is tailable.
- */
-bool isCursorTailable(const ClientCursor* cursor);
-
-/**
- * Whether or not the ClientCursor* has the awaitData flag set.
- */
-bool isCursorAwaitData(const ClientCursor* cursor);
-
-/**
  * Returns true if we should keep a cursor around because we're expecting to return more query
  * results.
  *

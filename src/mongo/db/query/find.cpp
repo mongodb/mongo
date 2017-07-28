@@ -75,14 +75,6 @@ using stdx::make_unique;
 // Failpoint for checking whether we've received a getmore.
 MONGO_FP_DECLARE(failReceivedGetmore);
 
-bool isCursorTailable(const ClientCursor* cursor) {
-    return cursor->queryOptions() & QueryOption_CursorTailable;
-}
-
-bool isCursorAwaitData(const ClientCursor* cursor) {
-    return cursor->queryOptions() & QueryOption_AwaitData;
-}
-
 bool shouldSaveCursor(OperationContext* opCtx,
                       const Collection* collection,
                       PlanExecutor::ExecState finalState,
@@ -367,7 +359,7 @@ Message getMore(OperationContext* opCtx,
         uassert(40548,
                 "OP_GET_MORE operations are not supported on tailable aggregations. Only clients "
                 "which support the getMore command can be used on tailable aggregations.",
-                readLock || !isCursorAwaitData(cc));
+                readLock || !cc->isAwaitData());
 
         // If the operation that spawned this cursor had a time limit set, apply leftover
         // time to this getmore.
@@ -389,7 +381,7 @@ Message getMore(OperationContext* opCtx,
 
         uint64_t notifierVersion = 0;
         std::shared_ptr<CappedInsertNotifier> notifier;
-        if (isCursorAwaitData(cc)) {
+        if (cc->isAwaitData()) {
             invariant(readLock->getCollection()->isCapped());
             // Retrieve the notifier which we will wait on until new data arrives. We make sure
             // to do this in the lock because once we drop the lock it is possible for the
@@ -404,7 +396,7 @@ Message getMore(OperationContext* opCtx,
 
         PlanExecutor* exec = cc->getExecutor();
         exec->reattachToOperationContext(opCtx);
-        exec->restoreState();
+        uassertStatusOK(exec->restoreState());
 
         auto planSummary = Explain::getPlanSummary(exec);
         {
@@ -430,7 +422,7 @@ Message getMore(OperationContext* opCtx,
 
         // If this is an await data cursor, and we hit EOF without generating any results, then
         // we block waiting for new data to arrive.
-        if (isCursorAwaitData(cc) && state == PlanExecutor::IS_EOF && numResults == 0) {
+        if (cc->isAwaitData() && state == PlanExecutor::IS_EOF && numResults == 0) {
             // Save the PlanExecutor and drop our locks.
             exec->saveState();
             readLock.reset();
@@ -445,7 +437,7 @@ Message getMore(OperationContext* opCtx,
 
             // Reacquiring locks.
             readLock.emplace(opCtx, nss);
-            exec->restoreState();
+            uassertStatusOK(exec->restoreState());
 
             // We woke up because either the timed_wait expired, or there was more data. Either
             // way, attempt to generate another batch of results.
@@ -474,7 +466,7 @@ Message getMore(OperationContext* opCtx,
         //    case, the pin's destructor will be invoked, which will call release() on the pin.
         //    Because our ClientCursorPin is declared after our lock is declared, this will happen
         //    under the lock if any locking was necessary.
-        if (!shouldSaveCursorGetMore(state, exec, isCursorTailable(cc))) {
+        if (!shouldSaveCursorGetMore(state, exec, cc->isTailable())) {
             ccPin.getValue().deleteUnderlying();
 
             // cc is now invalid, as is the executor

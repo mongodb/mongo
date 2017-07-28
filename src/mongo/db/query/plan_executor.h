@@ -128,6 +128,16 @@ public:
         //    locked during execution. For example, a PlanExecutor containing a PipelineProxyStage
         //    which is being used to execute an aggregation pipeline.
         NO_YIELD,
+
+        // Used for testing, this yield policy will cause the PlanExecutor to time out on the first
+        // yield, returning DEAD with an error object encoding a ErrorCodes::ExceededTimeLimit
+        // message.
+        ALWAYS_TIME_OUT,
+
+        // Used for testing, this yield policy will cause the PlanExecutor to be marked as killed on
+        // the first yield, returning DEAD with an error object encoding a
+        // ErrorCodes::QueryPlanKilled message.
+        ALWAYS_MARK_KILLED,
     };
 
     /**
@@ -173,9 +183,10 @@ public:
     //
     // Passing YIELD_AUTO to any of these factories will construct a yielding executor which
     // may yield in the following circumstances:
-    //   1) During plan selection inside the call to make().
-    //   2) On any call to getNext().
-    //   3) While executing the plan inside executePlan().
+    //   - During plan selection inside the call to make().
+    //   - On any call to getNext().
+    //   - On any call to restoreState().
+    //   - While executing the plan inside executePlan().
     //
     // The executor will also be automatically registered to receive notifications in the case of
     // YIELD_AUTO or YIELD_MANUAL.
@@ -284,15 +295,18 @@ public:
     /**
      * Restores the state saved by a saveState() call.
      *
-     * Returns true if the state was successfully restored and the execution tree can be
+     * Returns Status::OK() if the state was successfully restored and the execution tree can be
      * work()'d.
      *
-     * Returns false if the PlanExecutor was killed while saved. A killed execution tree cannot be
-     * worked and should be deleted.
+     * Returns ErrorCodes::QueryPlanKilled if the PlanExecutor was killed while saved.
      *
-     * If allowed, will yield and retry if a WriteConflictException is encountered.
+     * If allowed, will yield and retry if a WriteConflictException is encountered. If the time
+     * limit is exceeded during this retry process, returns ErrorCodes::ExceededTimeLimit. If this
+     * PlanExecutor is killed during this retry process, returns ErrorCodes::QueryPlanKilled. In
+     * this scenario, locks will have been released, and will not be held when control returns to
+     * the caller.
      */
-    bool restoreState();
+    Status restoreState();
 
     /**
      * Detaches from the OperationContext and releases any storage-engine state.
@@ -317,7 +331,7 @@ public:
      *
      * This is only public for PlanYieldPolicy. DO NOT CALL ANYWHERE ELSE.
      */
-    bool restoreStateWithoutRetrying();
+    Status restoreStateWithoutRetrying();
 
     //
     // Running Support
@@ -444,19 +458,31 @@ public:
     }
 
 private:
-    // Returns true if the PlanExecutor should wait for data to be inserted, which is when a getMore
-    // is called on a tailable and awaitData cursor on a capped collection.  Returns false if an EOF
-    // should be returned immediately.
+    /**
+     * Returns true if the PlanExecutor should wait for data to be inserted, which is when a getMore
+     * is called on a tailable and awaitData cursor on a capped collection.  Returns false if an EOF
+     * should be returned immediately.
+     */
     bool shouldWaitForInserts();
 
-    // Gets the CappedInsertNotifier for a capped collection.  Returns nullptr if this plan executor
-    // is not capable of yielding based on a notifier.
+    /**
+     * Gets the CappedInsertNotifier for a capped collection.  Returns nullptr if this plan executor
+     * is not capable of yielding based on a notifier.
+     */
     std::shared_ptr<CappedInsertNotifier> getCappedInsertNotifier();
 
-    // Yields locks and waits for inserts to the collection.  Returns true if there may be new
-    // inserts, false if there is a timeout or an interrupt.  If this planExecutor cannot yield,
-    // returns true immediately.
-    bool waitForInserts(CappedInsertNotifierData* notifierData);
+    /**
+     * Yields locks and waits for inserts to the collection. Returns ADVANCED if there has been an
+     * insertion and there may be new results. Returns DEAD if the PlanExecutor was killed during a
+     * yield. This method is only to be used for tailable and awaitData cursors, so rather than
+     * returning DEAD if the operation has exceeded its time limit, we return IS_EOF to preserve
+     * this PlanExecutor for future use.
+     *
+     * If an error is encountered and 'errorObj' is provided, it is populated with an object
+     * describing the error.
+     */
+    ExecState waitForInserts(CappedInsertNotifierData* notifierData,
+                             Snapshotted<BSONObj>* errorObj);
 
     ExecState getNextImpl(Snapshotted<BSONObj>* objOut, RecordId* dlOut);
 
@@ -507,6 +533,14 @@ private:
      * catalog operation.
      */
     Status pickBestPlan(const Collection* collection);
+
+    /**
+     * Given a non-OK status returned from a yield 'yieldError', checks if this PlanExecutor
+     * represents a tailable, awaitData cursor and whether 'yieldError' is the error object
+     * describing an operation time out. If so, returns IS_EOF. Otherwise returns DEAD, and
+     * populates 'errorObj' with the error - if 'errorObj' is not null.
+     */
+    ExecState swallowTimeoutIfAwaitData(Status yieldError, Snapshotted<BSONObj>* errorObj) const;
 
     // The OperationContext that we're executing within. This can be updated if necessary by using
     // detachFromOperationContext() and reattachToOperationContext().

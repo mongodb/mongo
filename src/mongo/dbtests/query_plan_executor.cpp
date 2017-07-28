@@ -53,7 +53,8 @@
 #include "mongo/dbtests/dbtests.h"
 #include "mongo/stdx/memory.h"
 
-namespace QueryPlanExecutor {
+namespace mongo {
+namespace {
 
 using std::shared_ptr;
 using std::string;
@@ -62,11 +63,11 @@ using stdx::make_unique;
 
 static const NamespaceString nss("unittests.QueryPlanExecutor");
 
-class PlanExecutorBase {
+class PlanExecutorTest : public unittest::Test {
 public:
-    PlanExecutorBase() : _client(&_opCtx) {}
+    PlanExecutorTest() : _client(&_opCtx) {}
 
-    virtual ~PlanExecutorBase() {
+    virtual ~PlanExecutorTest() {
         _client.dropCollection(nss.ns());
     }
 
@@ -94,8 +95,12 @@ public:
      * Given a match expression, represented as the BSON object 'filterObj', create a PlanExecutor
      * capable of executing a simple collection scan.
      */
-    unique_ptr<PlanExecutor, PlanExecutor::Deleter> makeCollScanExec(Collection* coll,
-                                                                     BSONObj& filterObj) {
+    unique_ptr<PlanExecutor, PlanExecutor::Deleter> makeCollScanExec(
+        Collection* coll,
+        BSONObj& filterObj,
+        PlanExecutor::YieldPolicy yieldPolicy = PlanExecutor::YieldPolicy::YIELD_MANUAL,
+        bool tailable = false,
+        bool awaitData = false) {
         CollectionScanParams csparams;
         csparams.collection = coll;
         csparams.direction = CollectionScanParams::FORWARD;
@@ -104,8 +109,10 @@ public:
         // Canonicalize the query.
         auto qr = stdx::make_unique<QueryRequest>(nss);
         qr->setFilter(filterObj);
+        qr->setTailable(tailable);
+        qr->setAwaitData(awaitData);
         auto statusWithCQ = CanonicalQuery::canonicalize(&_opCtx, std::move(qr));
-        verify(statusWithCQ.isOK());
+        ASSERT_OK(statusWithCQ.getStatus());
         unique_ptr<CanonicalQuery> cq = std::move(statusWithCQ.getValue());
         verify(NULL != cq.get());
 
@@ -114,12 +121,8 @@ public:
             new CollectionScan(&_opCtx, csparams, ws.get(), cq.get()->root()));
 
         // Hand the plan off to the executor.
-        auto statusWithPlanExecutor = PlanExecutor::make(&_opCtx,
-                                                         std::move(ws),
-                                                         std::move(root),
-                                                         std::move(cq),
-                                                         coll,
-                                                         PlanExecutor::YIELD_MANUAL);
+        auto statusWithPlanExecutor = PlanExecutor::make(
+            &_opCtx, std::move(ws), std::move(root), std::move(cq), coll, yieldPolicy);
         ASSERT_OK(statusWithPlanExecutor.getStatus());
         return std::move(statusWithPlanExecutor.getValue());
     }
@@ -191,105 +194,160 @@ private:
  * Test dropping the collection while the
  * PlanExecutor is doing a collection scan.
  */
-class DropCollScan : public PlanExecutorBase {
-public:
-    void run() {
-        OldClientWriteContext ctx(&_opCtx, nss.ns());
-        insert(BSON("_id" << 1));
-        insert(BSON("_id" << 2));
+TEST_F(PlanExecutorTest, DropCollScan) {
+    OldClientWriteContext ctx(&_opCtx, nss.ns());
+    insert(BSON("_id" << 1));
+    insert(BSON("_id" << 2));
 
-        BSONObj filterObj = fromjson("{_id: {$gt: 0}}");
+    BSONObj filterObj = fromjson("{_id: {$gt: 0}}");
 
-        Collection* coll = ctx.getCollection();
-        auto exec = makeCollScanExec(coll, filterObj);
+    Collection* coll = ctx.getCollection();
+    auto exec = makeCollScanExec(coll, filterObj);
 
-        BSONObj objOut;
-        ASSERT_EQUALS(PlanExecutor::ADVANCED, exec->getNext(&objOut, NULL));
-        ASSERT_EQUALS(1, objOut["_id"].numberInt());
+    BSONObj objOut;
+    ASSERT_EQUALS(PlanExecutor::ADVANCED, exec->getNext(&objOut, NULL));
+    ASSERT_EQUALS(1, objOut["_id"].numberInt());
 
-        // After dropping the collection, the plan executor should be dead.
-        dropCollection();
-        ASSERT_EQUALS(PlanExecutor::DEAD, exec->getNext(&objOut, NULL));
-    }
-};
+    // After dropping the collection, the plan executor should be dead.
+    dropCollection();
+    ASSERT_EQUALS(PlanExecutor::DEAD, exec->getNext(&objOut, NULL));
+}
 
 /**
  * Test dropping the collection while the PlanExecutor is doing an index scan.
  */
-class DropIndexScan : public PlanExecutorBase {
-public:
-    void run() {
-        OldClientWriteContext ctx(&_opCtx, nss.ns());
-        insert(BSON("_id" << 1 << "a" << 6));
-        insert(BSON("_id" << 2 << "a" << 7));
-        insert(BSON("_id" << 3 << "a" << 8));
-        BSONObj indexSpec = BSON("a" << 1);
-        addIndex(indexSpec);
+TEST_F(PlanExecutorTest, DropIndexScan) {
+    OldClientWriteContext ctx(&_opCtx, nss.ns());
+    insert(BSON("_id" << 1 << "a" << 6));
+    insert(BSON("_id" << 2 << "a" << 7));
+    insert(BSON("_id" << 3 << "a" << 8));
+    BSONObj indexSpec = BSON("a" << 1);
+    addIndex(indexSpec);
 
-        auto exec = makeIndexScanExec(ctx.db(), indexSpec, 7, 10);
+    auto exec = makeIndexScanExec(ctx.db(), indexSpec, 7, 10);
 
-        BSONObj objOut;
-        ASSERT_EQUALS(PlanExecutor::ADVANCED, exec->getNext(&objOut, NULL));
-        ASSERT_EQUALS(7, objOut["a"].numberInt());
+    BSONObj objOut;
+    ASSERT_EQUALS(PlanExecutor::ADVANCED, exec->getNext(&objOut, NULL));
+    ASSERT_EQUALS(7, objOut["a"].numberInt());
 
-        // After dropping the collection, the plan executor should be dead.
-        dropCollection();
-        ASSERT_EQUALS(PlanExecutor::DEAD, exec->getNext(&objOut, NULL));
-    }
-};
+    // After dropping the collection, the plan executor should be dead.
+    dropCollection();
+    ASSERT_EQUALS(PlanExecutor::DEAD, exec->getNext(&objOut, NULL));
+}
 
 /**
  * Test dropping the collection while an agg PlanExecutor is doing an index scan.
  */
-class DropIndexScanAgg : public PlanExecutorBase {
-public:
-    void run() {
-        OldClientWriteContext ctx(&_opCtx, nss.ns());
+TEST_F(PlanExecutorTest, DropIndexScanAgg) {
+    OldClientWriteContext ctx(&_opCtx, nss.ns());
 
-        insert(BSON("_id" << 1 << "a" << 6));
-        insert(BSON("_id" << 2 << "a" << 7));
-        insert(BSON("_id" << 3 << "a" << 8));
-        BSONObj indexSpec = BSON("a" << 1);
-        addIndex(indexSpec);
+    insert(BSON("_id" << 1 << "a" << 6));
+    insert(BSON("_id" << 2 << "a" << 7));
+    insert(BSON("_id" << 3 << "a" << 8));
+    BSONObj indexSpec = BSON("a" << 1);
+    addIndex(indexSpec);
 
-        Collection* collection = ctx.getCollection();
+    Collection* collection = ctx.getCollection();
 
-        // Create the aggregation pipeline.
-        std::vector<BSONObj> rawPipeline = {fromjson("{$match: {a: {$gte: 7, $lte: 10}}}")};
-        boost::intrusive_ptr<ExpressionContextForTest> expCtx =
-            new ExpressionContextForTest(&_opCtx, AggregationRequest(nss, rawPipeline));
+    // Create the aggregation pipeline.
+    std::vector<BSONObj> rawPipeline = {fromjson("{$match: {a: {$gte: 7, $lte: 10}}}")};
+    boost::intrusive_ptr<ExpressionContextForTest> expCtx =
+        new ExpressionContextForTest(&_opCtx, AggregationRequest(nss, rawPipeline));
 
-        // Create an "inner" plan executor and register it with the cursor manager so that it can
-        // get notified when the collection is dropped.
-        unique_ptr<PlanExecutor, PlanExecutor::Deleter> innerExec(
-            makeIndexScanExec(ctx.db(), indexSpec, 7, 10));
+    // Create an "inner" plan executor and register it with the cursor manager so that it can
+    // get notified when the collection is dropped.
+    unique_ptr<PlanExecutor, PlanExecutor::Deleter> innerExec(
+        makeIndexScanExec(ctx.db(), indexSpec, 7, 10));
 
-        // Wrap the "inner" plan executor in a DocumentSourceCursor and add it as the first source
-        // in the pipeline.
-        innerExec->saveState();
-        auto cursorSource = DocumentSourceCursor::create(collection, std::move(innerExec), expCtx);
-        auto pipeline = assertGet(Pipeline::create({cursorSource}, expCtx));
+    // Wrap the "inner" plan executor in a DocumentSourceCursor and add it as the first source
+    // in the pipeline.
+    innerExec->saveState();
+    auto cursorSource = DocumentSourceCursor::create(collection, std::move(innerExec), expCtx);
+    auto pipeline = assertGet(Pipeline::create({cursorSource}, expCtx));
 
-        // Create the output PlanExecutor that pulls results from the pipeline.
-        auto ws = make_unique<WorkingSet>();
-        auto proxy = make_unique<PipelineProxyStage>(&_opCtx, std::move(pipeline), ws.get());
+    // Create the output PlanExecutor that pulls results from the pipeline.
+    auto ws = make_unique<WorkingSet>();
+    auto proxy = make_unique<PipelineProxyStage>(&_opCtx, std::move(pipeline), ws.get());
 
-        auto statusWithPlanExecutor = PlanExecutor::make(
-            &_opCtx, std::move(ws), std::move(proxy), collection, PlanExecutor::NO_YIELD);
-        ASSERT_OK(statusWithPlanExecutor.getStatus());
-        auto outerExec = std::move(statusWithPlanExecutor.getValue());
+    auto statusWithPlanExecutor = PlanExecutor::make(
+        &_opCtx, std::move(ws), std::move(proxy), collection, PlanExecutor::NO_YIELD);
+    ASSERT_OK(statusWithPlanExecutor.getStatus());
+    auto outerExec = std::move(statusWithPlanExecutor.getValue());
 
-        dropCollection();
+    dropCollection();
 
-        // Verify that the aggregation pipeline returns an error because its "inner" plan executor
-        // has been killed due to the collection being dropped.
-        BSONObj objOut;
-        ASSERT_THROWS_CODE(
-            outerExec->getNext(&objOut, nullptr), AssertionException, ErrorCodes::QueryPlanKilled);
-    }
-};
+    // Verify that the aggregation pipeline returns an error because its "inner" plan executor
+    // has been killed due to the collection being dropped.
+    BSONObj objOut;
+    ASSERT_THROWS_CODE(
+        outerExec->getNext(&objOut, nullptr), AssertionException, ErrorCodes::QueryPlanKilled);
+}
 
-class SnapshotBase : public PlanExecutorBase {
+TEST_F(PlanExecutorTest, ShouldReportErrorIfExceedsTimeLimitDuringYield) {
+    OldClientWriteContext ctx(&_opCtx, nss.ns());
+    insert(BSON("_id" << 1));
+    insert(BSON("_id" << 2));
+
+    BSONObj filterObj = fromjson("{_id: {$gt: 0}}");
+
+    Collection* coll = ctx.getCollection();
+    auto exec = makeCollScanExec(coll, filterObj, PlanExecutor::YieldPolicy::ALWAYS_TIME_OUT);
+
+    BSONObj resultObj;
+    ASSERT_EQ(PlanExecutor::DEAD, exec->getNext(&resultObj, nullptr));
+    ASSERT_EQ(ErrorCodes::ExceededTimeLimit, WorkingSetCommon::getMemberObjectStatus(resultObj));
+}
+
+TEST_F(PlanExecutorTest, ShouldReportEOFIfExceedsTimeLimitDuringYieldButIsTailableAndAwaitData) {
+    OldClientWriteContext ctx(&_opCtx, nss.ns());
+    insert(BSON("_id" << 1));
+    insert(BSON("_id" << 2));
+
+    BSONObj filterObj = fromjson("{_id: {$gt: 0}}");
+
+    Collection* coll = ctx.getCollection();
+    const bool tailable = true;
+    const bool awaitData = true;
+    auto exec = makeCollScanExec(
+        coll, filterObj, PlanExecutor::YieldPolicy::ALWAYS_TIME_OUT, tailable, awaitData);
+
+    BSONObj resultObj;
+    ASSERT_EQ(PlanExecutor::IS_EOF, exec->getNext(&resultObj, nullptr));
+}
+
+TEST_F(PlanExecutorTest, ShouldNotSwallowExceedsTimeLimitDuringYieldButIsTailableButNotAwaitData) {
+    OldClientWriteContext ctx(&_opCtx, nss.ns());
+    insert(BSON("_id" << 1));
+    insert(BSON("_id" << 2));
+
+    BSONObj filterObj = fromjson("{_id: {$gt: 0}}");
+
+    Collection* coll = ctx.getCollection();
+    const bool tailable = true;
+    auto exec =
+        makeCollScanExec(coll, filterObj, PlanExecutor::YieldPolicy::ALWAYS_TIME_OUT, tailable);
+
+    BSONObj resultObj;
+    ASSERT_EQ(PlanExecutor::DEAD, exec->getNext(&resultObj, nullptr));
+    ASSERT_EQ(ErrorCodes::ExceededTimeLimit, WorkingSetCommon::getMemberObjectStatus(resultObj));
+}
+
+TEST_F(PlanExecutorTest, ShouldReportErrorIfKilledDuringYield) {
+    OldClientWriteContext ctx(&_opCtx, nss.ns());
+    insert(BSON("_id" << 1));
+    insert(BSON("_id" << 2));
+
+    BSONObj filterObj = fromjson("{_id: {$gt: 0}}");
+
+    Collection* coll = ctx.getCollection();
+    auto exec = makeCollScanExec(coll, filterObj, PlanExecutor::YieldPolicy::ALWAYS_MARK_KILLED);
+
+    BSONObj resultObj;
+    ASSERT_EQ(PlanExecutor::DEAD, exec->getNext(&resultObj, nullptr));
+    ASSERT_EQ(ErrorCodes::QueryPlanKilled, WorkingSetCommon::getMemberObjectStatus(resultObj));
+}
+
+class PlanExecutorSnapshotTest : public PlanExecutorTest {
 protected:
     void setupCollection() {
         insert(BSON("_id" << 1 << "a" << 1));
@@ -338,70 +396,50 @@ protected:
  * twice due to a concurrent document move and collection
  * scan.
  */
-class SnapshotControl : public SnapshotBase {
-public:
-    void run() {
-        OldClientWriteContext ctx(&_opCtx, nss.ns());
-        setupCollection();
+TEST_F(PlanExecutorSnapshotTest, SnapshotControl) {
+    OldClientWriteContext ctx(&_opCtx, nss.ns());
+    setupCollection();
 
-        BSONObj filterObj = fromjson("{a: {$gte: 2}}");
+    BSONObj filterObj = fromjson("{a: {$gte: 2}}");
 
-        Collection* coll = ctx.getCollection();
-        auto exec = makeCollScanExec(coll, filterObj);
+    Collection* coll = ctx.getCollection();
+    auto exec = makeCollScanExec(coll, filterObj);
 
-        BSONObj objOut;
-        ASSERT_EQUALS(PlanExecutor::ADVANCED, exec->getNext(&objOut, NULL));
-        ASSERT_EQUALS(2, objOut["a"].numberInt());
+    BSONObj objOut;
+    ASSERT_EQUALS(PlanExecutor::ADVANCED, exec->getNext(&objOut, NULL));
+    ASSERT_EQUALS(2, objOut["a"].numberInt());
 
-        forceDocumentMove();
+    forceDocumentMove();
 
-        int ids[] = {3, 4, 2};
-        checkIds(ids, exec.get());
-    }
-};
+    int ids[] = {3, 4, 2};
+    checkIds(ids, exec.get());
+}
 
 /**
  * A snapshot is really just a hint that means scan the _id index.
  * Make sure that we do not see the document move with an _id
  * index scan.
  */
-class SnapshotTest : public SnapshotBase {
-public:
-    void run() {
-        OldClientWriteContext ctx(&_opCtx, nss.ns());
-        setupCollection();
-        BSONObj indexSpec = BSON("_id" << 1);
-        addIndex(indexSpec);
+TEST_F(PlanExecutorSnapshotTest, SnapshotTest) {
+    OldClientWriteContext ctx(&_opCtx, nss.ns());
+    setupCollection();
+    BSONObj indexSpec = BSON("_id" << 1);
+    addIndex(indexSpec);
 
-        BSONObj filterObj = fromjson("{a: {$gte: 2}}");
-        auto exec = makeIndexScanExec(ctx.db(), indexSpec, 2, 5);
+    BSONObj filterObj = fromjson("{a: {$gte: 2}}");
+    auto exec = makeIndexScanExec(ctx.db(), indexSpec, 2, 5);
 
-        BSONObj objOut;
-        ASSERT_EQUALS(PlanExecutor::ADVANCED, exec->getNext(&objOut, NULL));
-        ASSERT_EQUALS(2, objOut["a"].numberInt());
+    BSONObj objOut;
+    ASSERT_EQUALS(PlanExecutor::ADVANCED, exec->getNext(&objOut, NULL));
+    ASSERT_EQUALS(2, objOut["a"].numberInt());
 
-        forceDocumentMove();
+    forceDocumentMove();
 
-        // Since this time we're scanning the _id index,
-        // we should not see the moved document again.
-        int ids[] = {3, 4};
-        checkIds(ids, exec.get());
-    }
-};
+    // Since this time we're scanning the _id index,
+    // we should not see the moved document again.
+    int ids[] = {3, 4};
+    checkIds(ids, exec.get());
+}
 
-class All : public Suite {
-public:
-    All() : Suite("query_plan_executor") {}
-
-    void setupTests() {
-        add<DropCollScan>();
-        add<DropIndexScan>();
-        add<DropIndexScanAgg>();
-        add<SnapshotControl>();
-        add<SnapshotTest>();
-    }
-};
-
-SuiteInstance<All> queryPlanExecutorAll;
-
-}  // namespace QueryPlanExecutor
+}  // namespace
+}  // namespace mongo

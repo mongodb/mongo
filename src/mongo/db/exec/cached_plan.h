@@ -111,7 +111,8 @@ private:
      * May yield during the cached plan stage's trial period or replanning phases.
      *
      * Returns a non-OK status if query planning fails. In particular, this function returns
-     * ErrorCodes::QueryPlanKilled if the query plan was killed during a yield.
+     * ErrorCodes::QueryPlanKilled if the query plan was killed during a yield, or
+     * ErrorCodes::ExceededTimeLimit if the operation exceeded its time limit.
      */
     Status tryYield(PlanYieldPolicy* yieldPolicy);
 

@@ -751,7 +751,7 @@ public:
                 }
 
                 // Have the lock again. See if we were killed.
-                if (!exec->restoreState()) {
+                if (!exec->restoreState().isOK()) {
                     if (!partialOk) {
                         uasserted(13281, "File deleted during filemd5 command");
                     }

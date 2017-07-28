@@ -267,11 +267,11 @@ public:
         }
 
         // Validation related to awaitData.
-        if (isCursorAwaitData(cursor)) {
-            invariant(isCursorTailable(cursor));
+        if (cursor->isAwaitData()) {
+            invariant(cursor->isTailable());
         }
 
-        if (request.awaitDataTimeout && !isCursorAwaitData(cursor)) {
+        if (request.awaitDataTimeout && !cursor->isAwaitData()) {
             Status status(ErrorCodes::BadValue,
                           "cannot set maxTimeMS on getMore command for a non-awaitData cursor");
             return appendCommandStatus(result, status);
@@ -294,7 +294,7 @@ public:
             // awaitData, then we supply a default time of one second. Otherwise we roll over
             // any leftover time from the maxTimeMS of the operation that spawned this cursor,
             // applying it to this getMore.
-            if (isCursorAwaitData(cursor) && !disableAwaitDataFailpointActive) {
+            if (cursor->isAwaitData() && !disableAwaitDataFailpointActive) {
                 opCtx->setDeadlineAfterNowBy(Seconds{1});
             } else if (cursor->getLeftoverMaxTimeMicros() < Microseconds::max()) {
                 opCtx->setDeadlineAfterNowBy(cursor->getLeftoverMaxTimeMicros());
@@ -304,7 +304,7 @@ public:
 
         PlanExecutor* exec = cursor->getExecutor();
         exec->reattachToOperationContext(opCtx);
-        exec->restoreState();
+        uassertStatusOK(exec->restoreState());
 
         auto planSummary = Explain::getPlanSummary(exec);
         {
@@ -335,7 +335,7 @@ public:
         Explain::getSummaryStats(*exec, &preExecutionStats);
 
         // Mark this as an AwaitData operation if appropriate.
-        if (isCursorAwaitData(cursor) && !disableAwaitDataFailpointActive) {
+        if (cursor->isAwaitData() && !disableAwaitDataFailpointActive) {
             if (request.lastKnownCommittedOpTime)
                 clientsLastKnownCommittedOpTime(opCtx) = request.lastKnownCommittedOpTime.get();
             shouldWaitForInserts(opCtx) = true;
@@ -362,7 +362,7 @@ public:
             curOp->debug().execStats = execStatsBob.obj();
         }
 
-        if (shouldSaveCursorGetMore(state, exec, isCursorTailable(cursor))) {
+        if (shouldSaveCursorGetMore(state, exec, cursor->isTailable())) {
             respondWithId = request.cursorid;
 
             exec->saveState();
@@ -425,7 +425,6 @@ public:
                          PlanExecutor::ExecState* state,
                          long long* numResults) {
         PlanExecutor* exec = cursor->getExecutor();
-        const bool isAwaitData = isCursorAwaitData(cursor);
 
         // If an awaitData getMore is killed during this process due to our max time expiring at
         // an interrupt point, we just continue as normal and return rather than reporting a
@@ -451,13 +450,6 @@ public:
             // FAILURE state will make getMore command close the cursor even if it's tailable.
             *state = PlanExecutor::FAILURE;
             return Status::OK();
-        } catch (const AssertionException& except) {
-            if (isAwaitData && except.code() == ErrorCodes::ExceededTimeLimit) {
-                // We ignore exceptions from interrupt points due to max time expiry for
-                // awaitData cursors.
-            } else {
-                throw;
-            }
         }
 
         if (PlanExecutor::FAILURE == *state) {

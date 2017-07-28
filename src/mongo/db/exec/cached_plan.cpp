@@ -181,12 +181,7 @@ Status CachedPlanStage::tryYield(PlanYieldPolicy* yieldPolicy) {
     // In all cases, the actual yielding happens here.
     if (yieldPolicy->shouldYield()) {
         // Here's where we yield.
-        bool alive = yieldPolicy->yield(_fetcher.get());
-
-        if (!alive) {
-            return Status(ErrorCodes::QueryPlanKilled,
-                          "CachedPlanStage killed during plan selection");
-        }
+        return yieldPolicy->yield(_fetcher.get());
     }
 
     // We're done using the fetcher, so it should be freed. We don't want to
