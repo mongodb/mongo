@@ -306,6 +306,12 @@ Status handleOplogCommand(RoleGraph* roleGraph, const BSONObj& cmdObj) {
         // We don't care about these if they're not on the roles collection.
         return Status::OK();
     }
+
+    if ((cmdName == "collMod") && (cmdObj.nFields() == 1)) {
+        // We also don't care about empty modifications even if they are on roles collection
+        return Status::OK();
+    }
+
     //  No other commands expected.  Warn.
     return Status(ErrorCodes::OplogOperationUnsupported, "Unsupported oplog operation");
 }
