@@ -526,8 +526,10 @@ Status collModForUUIDUpgrade(OperationContext* opCtx,
                              const BSONObj& cmdObj,
                              OptionalCollectionUUID uuid) {
     BSONObjBuilder resultWeDontCareAbout;
-    // First update all non-replicated collection UUIDs.
-    updateUUIDSchemaVersionNonReplicated(opCtx, !!uuid);
+    // Update all non-replicated collection UUIDs.
+    if (nss.ns() == "admin.system.version") {
+        updateUUIDSchemaVersionNonReplicated(opCtx, !!uuid);
+    }
     return _collModInternal(opCtx, nss, cmdObj, &resultWeDontCareAbout, /*upgradeUUID*/ true, uuid);
 }
 
