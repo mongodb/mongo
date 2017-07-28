@@ -251,6 +251,14 @@ Status TransportLayerASIO::start() {
         _acceptConnection(acceptor);
     }
 
+    const char* ssl = "";
+#ifdef MONGO_CONFIG_SSL
+    if (_sslMode != SSLParams::SSLMode_disabled) {
+        ssl = " ssl";
+    }
+#endif
+    log() << "waiting for connections on port " << _listenerOptions.port << ssl;
+
     return Status::OK();
 }
 

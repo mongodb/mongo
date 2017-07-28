@@ -817,14 +817,18 @@ Status storeServerOptions(const moe::Environment& params) {
     }
 
     if (params.count("net.serviceExecutor")) {
-        if (serverGlobalParams.transportLayer == "legacy") {
-            return {ErrorCodes::BadValue,
-                    "Cannot specify a serviceExecutor with the legacy transportLayer"};
-        }
-        const auto valid = {"synchronous"_sd, "fixedForTesting"_sd};
         auto value = params["net.serviceExecutor"].as<std::string>();
-        if (std::find(valid.begin(), valid.end(), value) == valid.end()) {
-            return {ErrorCodes::BadValue, "Unsupported value for serviceExecutor"};
+        if (serverGlobalParams.transportLayer == "legacy") {
+            if (value != "synchronous"_sd) {
+                return {ErrorCodes::BadValue,
+                        "Unsupported value for serviceExecutor with the legacy transportLayer, "
+                        "must be \"synchronous\""};
+            }
+        } else {
+            const auto valid = {"synchronous"_sd, "fixedForTesting"_sd};
+            if (std::find(valid.begin(), valid.end(), value) == valid.end()) {
+                return {ErrorCodes::BadValue, "Unsupported value for serviceExecutor"};
+            }
         }
         serverGlobalParams.serviceExecutor = value;
     } else {
