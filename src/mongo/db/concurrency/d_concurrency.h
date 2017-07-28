@@ -83,8 +83,17 @@ public:
             lock(mode);
         }
 
+        ResourceLock(ResourceLock&& otherLock)
+            : _rid(otherLock._rid), _locker(otherLock._locker), _result(otherLock._result) {
+            // Mark as moved so the destructor doesn't invalidate the newly-
+            // constructed lock.
+            otherLock._result = LOCK_INVALID;
+        }
+
         ~ResourceLock() {
-            unlock();
+            if (isLocked()) {
+                unlock();
+            }
         }
 
         void lock(LockMode mode);
@@ -174,6 +183,7 @@ public:
         class EnqueueOnly {};
 
         GlobalLock(OperationContext* opCtx, LockMode lockMode, unsigned timeoutMs);
+        GlobalLock(GlobalLock&&);
 
         /**
          * Enqueues lock but does not block on lock acquisition.
@@ -188,10 +198,12 @@ public:
                    EnqueueOnly enqueueOnly);
 
         ~GlobalLock() {
-            if (isLocked() && _isOutermostLock) {
-                _opCtx->recoveryUnit()->abandonSnapshot();
+            if (_result != LOCK_INVALID) {
+                if (isLocked() && _isOutermostLock) {
+                    _opCtx->recoveryUnit()->abandonSnapshot();
+                }
+                _unlock();
             }
-            _unlock();
         }
 
         /**
@@ -268,6 +280,7 @@ public:
     class DBLock {
     public:
         DBLock(OperationContext* opCtx, StringData db, LockMode mode);
+        DBLock(DBLock&&);
         ~DBLock();
 
         /**

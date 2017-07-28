@@ -308,7 +308,7 @@ void ShardingTestFixture::expectGetShards(const std::vector<ShardType>& shards) 
         ASSERT_OK(queryResult.getStatus());
 
         const auto& query = queryResult.getValue();
-        ASSERT_EQ(query->ns(), ShardType::ConfigNS);
+        ASSERT_EQ(query->nss().ns(), ShardType::ConfigNS);
 
         ASSERT_BSONOBJ_EQ(query->getFilter(), BSONObj());
         ASSERT_BSONOBJ_EQ(query->getSort(), BSONObj());

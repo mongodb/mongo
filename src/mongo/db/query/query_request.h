@@ -31,8 +31,10 @@
 #include <boost/optional.hpp>
 #include <string>
 
+#include "mongo/db/catalog/collection_options.h"
 #include "mongo/db/jsobj.h"
 #include "mongo/db/namespace_string.h"
+#include "mongo/db/operation_context.h"
 
 namespace mongo {
 
@@ -52,6 +54,8 @@ public:
 
     QueryRequest(NamespaceString nss);
 
+    QueryRequest(CollectionUUID uuid);
+
     /**
      * Returns a non-OK status if any property of the QR has a bad value (e.g. a negative skip
      * value) or if there is a bad combination of options (e.g. awaitData is illegal without
@@ -61,7 +65,8 @@ public:
 
     /**
      * Parses a find command object, 'cmdObj'. Caller must indicate whether or not this lite
-     * parsed query is an explained query or not via 'isExplain'.
+     * parsed query is an explained query or not via 'isExplain'. Accepts a NSS with which
+     * to initialize the QueryRequest if there is no UUID in cmdObj.
      *
      * Returns a heap allocated QueryRequest on success or an error if 'cmdObj' is not well
      * formed.
@@ -69,6 +74,12 @@ public:
     static StatusWith<std::unique_ptr<QueryRequest>> makeFromFindCommand(NamespaceString nss,
                                                                          const BSONObj& cmdObj,
                                                                          bool isExplain);
+
+    /**
+     * If _uuid exists for this QueryRequest, use it to update the value of _nss via the
+     * UUIDCatalog associated with opCtx.
+     */
+    void refreshNSS(OperationContext* opCtx);
 
     /**
      * Converts this QR into a find command.
@@ -131,11 +142,8 @@ public:
     static const std::string metaTextScore;
 
     const NamespaceString& nss() const {
+        invariant(!_nss.isEmpty());
         return _nss;
-    }
-
-    const std::string& ns() const {
-        return _nss.ns();
     }
 
     const BSONObj& getFilter() const {
@@ -412,6 +420,8 @@ public:
                                                                      int queryOptions);
 
 private:
+    static StatusWith<std::unique_ptr<QueryRequest>> parseFromFindCommand(
+        std::unique_ptr<QueryRequest> qr, const BSONObj& cmdObj, bool isExplain);
     Status init(int ntoskip,
                 int ntoreturn,
                 int queryOptions,
@@ -443,7 +453,8 @@ private:
      */
     void addMetaProjection();
 
-    const NamespaceString _nss;
+    NamespaceString _nss;
+    OptionalCollectionUUID _uuid;
 
     BSONObj _filter;
     BSONObj _proj;

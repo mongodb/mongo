@@ -49,13 +49,23 @@ MONGO_FP_DECLARE(setAutoGetCollectionWait);
 AutoGetDb::AutoGetDb(OperationContext* opCtx, StringData ns, LockMode mode)
     : _dbLock(opCtx, ns, mode), _db(dbHolder().get(opCtx, ns)) {}
 
+AutoGetDb::AutoGetDb(OperationContext* opCtx, StringData ns, Lock::DBLock lock)
+    : _dbLock(std::move(lock)), _db(dbHolder().get(opCtx, ns)) {}
+
 AutoGetCollection::AutoGetCollection(OperationContext* opCtx,
                                      const NamespaceString& nss,
                                      LockMode modeDB,
                                      LockMode modeColl,
                                      ViewMode viewMode)
+    : AutoGetCollection(opCtx, nss, modeColl, viewMode, Lock::DBLock(opCtx, nss.db(), modeDB)) {}
+
+AutoGetCollection::AutoGetCollection(OperationContext* opCtx,
+                                     const NamespaceString& nss,
+                                     LockMode modeColl,
+                                     ViewMode viewMode,
+                                     Lock::DBLock lock)
     : _viewMode(viewMode),
-      _autoDb(opCtx, nss.db(), modeDB),
+      _autoDb(opCtx, nss.db(), std::move(lock)),
       _collLock(opCtx->lockState(), nss.ns(), modeColl),
       _coll(_autoDb.getDb() ? _autoDb.getDb()->getCollection(opCtx, nss) : nullptr) {
     Database* db = _autoDb.getDb();
@@ -132,6 +142,15 @@ AutoGetCollectionForRead::AutoGetCollectionForRead(OperationContext* opCtx,
     _ensureMajorityCommittedSnapshotIsValid(nss, opCtx);
 }
 
+AutoGetCollectionForRead::AutoGetCollectionForRead(OperationContext* opCtx,
+                                                   const NamespaceString& nss,
+                                                   AutoGetCollection::ViewMode viewMode,
+                                                   Lock::DBLock lock) {
+    _autoColl.emplace(opCtx, nss, MODE_IS, viewMode, std::move(lock));
+
+    // Note: this can yield.
+    _ensureMajorityCommittedSnapshotIsValid(nss, opCtx);
+}
 void AutoGetCollectionForRead::_ensureMajorityCommittedSnapshotIsValid(const NamespaceString& nss,
                                                                        OperationContext* opCtx) {
     while (true) {
@@ -169,9 +188,11 @@ void AutoGetCollectionForRead::_ensureMajorityCommittedSnapshotIsValid(const Nam
 }
 
 AutoGetCollectionForReadCommand::AutoGetCollectionForReadCommand(
-    OperationContext* opCtx, const NamespaceString& nss, AutoGetCollection::ViewMode viewMode) {
-
-    _autoCollForRead.emplace(opCtx, nss, viewMode);
+    OperationContext* opCtx,
+    const NamespaceString& nss,
+    AutoGetCollection::ViewMode viewMode,
+    Lock::DBLock lock) {
+    _autoCollForRead.emplace(opCtx, nss, viewMode, std::move(lock));
     const int doNotChangeProfilingLevel = 0;
     _statsTracker.emplace(opCtx,
                           nss,
@@ -185,9 +206,22 @@ AutoGetCollectionForReadCommand::AutoGetCollectionForReadCommand(
     css->checkShardVersionOrThrow(opCtx);
 }
 
+AutoGetCollectionForReadCommand::AutoGetCollectionForReadCommand(
+    OperationContext* opCtx, const NamespaceString& nss, AutoGetCollection::ViewMode viewMode)
+    : AutoGetCollectionForReadCommand(
+          opCtx, nss, viewMode, Lock::DBLock(opCtx, nss.db(), MODE_IS)) {}
+
 AutoGetCollectionOrViewForReadCommand::AutoGetCollectionOrViewForReadCommand(
     OperationContext* opCtx, const NamespaceString& nss)
     : AutoGetCollectionForReadCommand(opCtx, nss, AutoGetCollection::ViewMode::kViewsPermitted),
+      _view(_autoCollForRead->getDb() && !getCollection()
+                ? _autoCollForRead->getDb()->getViewCatalog()->lookup(opCtx, nss.ns())
+                : nullptr) {}
+
+AutoGetCollectionOrViewForReadCommand::AutoGetCollectionOrViewForReadCommand(
+    OperationContext* opCtx, const NamespaceString& nss, Lock::DBLock lock)
+    : AutoGetCollectionForReadCommand(
+          opCtx, nss, AutoGetCollection::ViewMode::kViewsPermitted, std::move(lock)),
       _view(_autoCollForRead->getDb() && !getCollection()
                 ? _autoCollForRead->getDb()->getViewCatalog()->lookup(opCtx, nss.ns())
                 : nullptr) {}

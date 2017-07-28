@@ -152,6 +152,15 @@ Lock::GlobalLock::GlobalLock(OperationContext* opCtx,
     _enqueue(lockMode, timeoutMs);
 }
 
+Lock::GlobalLock::GlobalLock(GlobalLock&& otherLock)
+    : _opCtx(otherLock._opCtx),
+      _result(otherLock._result),
+      _pbwm(std::move(otherLock._pbwm)),
+      _isOutermostLock(otherLock._isOutermostLock) {
+    // Mark as moved so the destructor doesn't invalidate the newly-constructed lock.
+    otherLock._result = LOCK_INVALID;
+}
+
 void Lock::GlobalLock::_enqueue(LockMode lockMode, unsigned timeoutMs) {
     if (_opCtx->lockState()->shouldConflictWithSecondaryBatchApplication()) {
         _pbwm.lock(MODE_IS);
@@ -200,8 +209,19 @@ Lock::DBLock::DBLock(OperationContext* opCtx, StringData db, LockMode mode)
     invariant(LOCK_OK == _opCtx->lockState()->lock(_id, _mode));
 }
 
+Lock::DBLock::DBLock(DBLock&& otherLock)
+    : _id(otherLock._id),
+      _opCtx(otherLock._opCtx),
+      _mode(otherLock._mode),
+      _globalLock(std::move(otherLock._globalLock)) {
+    // Mark as moved so the destructor doesn't invalidate the newly-constructed lock.
+    otherLock._mode = MODE_NONE;
+}
+
 Lock::DBLock::~DBLock() {
-    _opCtx->lockState()->unlock(_id);
+    if (_mode != MODE_NONE) {
+        _opCtx->lockState()->unlock(_id);
+    }
 }
 
 void Lock::DBLock::relockWithMode(LockMode newMode) {

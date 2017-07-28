@@ -40,6 +40,7 @@
 #include "mongo/db/clientcursor.h"
 #include "mongo/db/commands.h"
 #include "mongo/db/commands/run_aggregate.h"
+#include "mongo/db/concurrency/d_concurrency.h"
 #include "mongo/db/db_raii.h"
 #include "mongo/db/exec/working_set_common.h"
 #include "mongo/db/matcher/extensions_callback_real.h"
@@ -228,14 +229,14 @@ public:
              const std::string& dbname,
              const BSONObj& cmdObj,
              BSONObjBuilder& result) override {
-        const NamespaceString nss(parseNsOrUUID(opCtx, dbname, cmdObj));
-
         // Although it is a command, a find command gets counted as a query.
         globalOpCounters.gotQuery();
 
         // Parse the command BSON to a QueryRequest.
         const bool isExplain = false;
-        auto qrStatus = QueryRequest::makeFromFindCommand(nss, cmdObj, isExplain);
+        // Pass parseNs to makeFromFindCommand in case cmdObj does not have a UUID.
+        auto qrStatus = QueryRequest::makeFromFindCommand(
+            NamespaceString(parseNs(dbname, cmdObj)), cmdObj, isExplain);
         if (!qrStatus.isOK()) {
             return appendCommandStatus(result, qrStatus.getStatus());
         }
@@ -251,6 +252,12 @@ public:
                 return appendCommandStatus(result, status);
             }
         }
+
+        // Acquire locks. If the query is on a view, we release our locks and convert the query
+        // request into an aggregation command.
+        Lock::DBLock dbSLock(opCtx, dbname, MODE_IS);
+        const NamespaceString nss(parseNsOrUUID(opCtx, dbname, cmdObj));
+        qr->refreshNSS(opCtx);
 
         // Fill out curop information.
         //
@@ -276,9 +283,7 @@ public:
         }
         std::unique_ptr<CanonicalQuery> cq = std::move(statusWithCQ.getValue());
 
-        // Acquire locks. If the query is on a view, we release our locks and convert the query
-        // request into an aggregation command.
-        AutoGetCollectionOrViewForReadCommand ctx(opCtx, nss);
+        AutoGetCollectionOrViewForReadCommand ctx(opCtx, nss, std::move(dbSLock));
         Collection* collection = ctx.getCollection();
         if (ctx.getView()) {
             // Relinquish locks. The aggregation command will re-acquire them.

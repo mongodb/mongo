@@ -120,6 +120,7 @@ public:
              const string& dbname,
              const BSONObj& cmdObj,
              BSONObjBuilder& result) {
+        Lock::DBLock dbSLock(opCtx, dbname, MODE_IS);
         const NamespaceString ns(parseNsOrUUID(opCtx, dbname, cmdObj));
         const long long defaultBatchSize = std::numeric_limits<long long>::max();
         long long batchSize;
@@ -129,7 +130,7 @@ public:
             return appendCommandStatus(result, parseCursorStatus);
         }
 
-        AutoGetCollectionForReadCommand autoColl(opCtx, ns);
+        AutoGetCollectionForReadCommand autoColl(opCtx, ns, std::move(dbSLock));
         if (!autoColl.getDb()) {
             return appendCommandStatus(
                 result,

@@ -89,9 +89,10 @@ public:
                      const string& dbname,
                      const BSONObj& cmdObj,
                      BSONObjBuilder& result) {
+        Lock::DBLock dbSLock(opCtx, dbname, MODE_IS);
         const NamespaceString ns(parseNsOrUUID(opCtx, dbname, cmdObj));
 
-        AutoGetCollectionForReadCommand ctx(opCtx, ns);
+        AutoGetCollectionForReadCommand ctx(opCtx, ns, std::move(dbSLock));
 
         Collection* collection = ctx.getCollection();
         if (!collection)

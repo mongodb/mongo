@@ -58,6 +58,7 @@ class AutoGetDb {
 
 public:
     AutoGetDb(OperationContext* opCtx, StringData ns, LockMode mode);
+    AutoGetDb(OperationContext* opCtx, StringData ns, Lock::DBLock lock);
 
     Database* getDb() const {
         return _db;
@@ -94,6 +95,11 @@ public:
                       LockMode modeColl)
         : AutoGetCollection(opCtx, nss, modeDB, modeColl, ViewMode::kViewsForbidden) {}
 
+    AutoGetCollection(OperationContext* opCtx,
+                      const NamespaceString& nss,
+                      LockMode modeColl,
+                      ViewMode viewMode,
+                      Lock::DBLock lock);
     /**
      * This constructor is intended for internal use and should not be used outside this file.
      * AutoGetCollectionForReadCommand and AutoGetCollectionOrViewForReadCommand use 'viewMode' to
@@ -272,6 +278,10 @@ public:
                              const NamespaceString& nss,
                              AutoGetCollection::ViewMode viewMode);
 
+    AutoGetCollectionForRead(OperationContext* opCtx,
+                             const NamespaceString& nss,
+                             AutoGetCollection::ViewMode viewMode,
+                             Lock::DBLock lock);
     Database* getDb() const {
         return _autoColl->getDb();
     }
@@ -309,6 +319,12 @@ public:
         : AutoGetCollectionForReadCommand(
               opCtx, nss, AutoGetCollection::ViewMode::kViewsForbidden) {}
 
+    AutoGetCollectionForReadCommand(OperationContext* opCtx,
+                                    const NamespaceString& nss,
+                                    Lock::DBLock lock)
+        : AutoGetCollectionForReadCommand(
+              opCtx, nss, AutoGetCollection::ViewMode::kViewsForbidden, std::move(lock)) {}
+
     Database* getDb() const {
         return _autoCollForRead->getDb();
     }
@@ -321,6 +337,11 @@ protected:
     AutoGetCollectionForReadCommand(OperationContext* opCtx,
                                     const NamespaceString& nss,
                                     AutoGetCollection::ViewMode viewMode);
+
+    AutoGetCollectionForReadCommand(OperationContext* opCtx,
+                                    const NamespaceString& nss,
+                                    AutoGetCollection::ViewMode viewMode,
+                                    Lock::DBLock lock);
 
     // '_autoCollForRead' may need to be reset by AutoGetCollectionOrViewForReadCommand, so needs to
     // be a boost::optional.
@@ -343,6 +364,9 @@ class AutoGetCollectionOrViewForReadCommand final : public AutoGetCollectionForR
 
 public:
     AutoGetCollectionOrViewForReadCommand(OperationContext* opCtx, const NamespaceString& nss);
+    AutoGetCollectionOrViewForReadCommand(OperationContext* opCtx,
+                                          const NamespaceString& nss,
+                                          Lock::DBLock lock);
 
     ViewDefinition* getView() const {
         return _view.get();

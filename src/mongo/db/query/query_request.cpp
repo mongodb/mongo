@@ -34,6 +34,7 @@
 #include "mongo/base/status_with.h"
 #include "mongo/bson/simple_bsonobj_comparator.h"
 #include "mongo/client/dbclientinterface.h"
+#include "mongo/db/catalog/uuid_catalog.h"
 #include "mongo/db/commands.h"
 #include "mongo/db/dbmessage.h"
 #include "mongo/db/namespace_string.h"
@@ -110,12 +111,21 @@ const char QueryRequest::kFindCommandName[] = "find";
 const char QueryRequest::kShardVersionField[] = "shardVersion";
 
 QueryRequest::QueryRequest(NamespaceString nss) : _nss(std::move(nss)) {}
+QueryRequest::QueryRequest(CollectionUUID uuid) : _uuid(std::move(uuid)) {}
+
+void QueryRequest::refreshNSS(OperationContext* opCtx) {
+    UUIDCatalog& catalog = UUIDCatalog::get(opCtx);
+    if (_uuid) {
+        invariant(catalog.lookupCollectionByUUID(_uuid.get()));
+        _nss = catalog.lookupNSSByUUID(_uuid.get());
+    }
+    invariant(!_nss.isEmpty());
+}
 
 // static
-StatusWith<unique_ptr<QueryRequest>> QueryRequest::makeFromFindCommand(NamespaceString nss,
-                                                                       const BSONObj& cmdObj,
-                                                                       bool isExplain) {
-    auto qr = stdx::make_unique<QueryRequest>(nss);
+StatusWith<unique_ptr<QueryRequest>> QueryRequest::parseFromFindCommand(unique_ptr<QueryRequest> qr,
+                                                                        const BSONObj& cmdObj,
+                                                                        bool isExplain) {
     qr->_explain = isExplain;
 
     // Parse the command BSON by looping through one element at a time.
@@ -383,6 +393,20 @@ StatusWith<unique_ptr<QueryRequest>> QueryRequest::makeFromFindCommand(Namespace
     }
 
     return std::move(qr);
+}
+
+StatusWith<unique_ptr<QueryRequest>> QueryRequest::makeFromFindCommand(NamespaceString nss,
+                                                                       const BSONObj& cmdObj,
+                                                                       bool isExplain) {
+    BSONElement first = cmdObj.firstElement();
+    if (first.type() == BinData && first.binDataType() == BinDataType::newUUID) {
+        auto uuid = uassertStatusOK(UUID::parse(first));
+        auto qr = stdx::make_unique<QueryRequest>(uuid);
+        return parseFromFindCommand(std::move(qr), cmdObj, isExplain);
+    } else {
+        auto qr = stdx::make_unique<QueryRequest>(nss);
+        return parseFromFindCommand(std::move(qr), cmdObj, isExplain);
+    }
 }
 
 BSONObj QueryRequest::asFindCommand() const {

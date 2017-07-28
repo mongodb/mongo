@@ -35,6 +35,7 @@
 #include "mongo/db/catalog/index_create.h"
 #include "mongo/db/catalog/uuid_catalog.h"
 #include "mongo/db/client.h"
+#include "mongo/db/concurrency/d_concurrency.h"
 #include "mongo/db/concurrency/write_conflict_exception.h"
 #include "mongo/db/db_raii.h"
 #include "mongo/db/jsobj.h"
@@ -536,5 +537,27 @@ TEST_F(
         ASSERT_EQUALS(ErrorCodes::NamespaceExists,
                       db->makeUniqueCollectionNamespace(_opCtx.get(), model));
     });
+}
+
+TEST_F(DatabaseTest, DBLockCanBePassedToAutoGetDb) {
+    NamespaceString nss("test", "coll");
+    Lock::DBLock lock(_opCtx.get(), nss.db(), MODE_X);
+    {
+        AutoGetDb db(_opCtx.get(), nss.db(), std::move(lock));
+        ASSERT(_opCtx.get()->lockState()->isDbLockedForMode(nss.db(), MODE_X));
+    }
+    // The moved lock should go out of scope here, so the database should no longer be locked.
+    ASSERT_FALSE(_opCtx.get()->lockState()->isDbLockedForMode(nss.db(), MODE_X));
+}
+
+TEST_F(DatabaseTest, DBLockCanBePassedToAutoGetCollectionOrViewForReadCommand) {
+    NamespaceString nss("test", "coll");
+    Lock::DBLock lock(_opCtx.get(), nss.db(), MODE_X);
+    {
+        AutoGetCollectionOrViewForReadCommand coll(_opCtx.get(), nss, std::move(lock));
+        ASSERT(_opCtx.get()->lockState()->isDbLockedForMode(nss.db(), MODE_X));
+    }
+    // The moved lock should go out of scope here, so the database should no longer be locked.
+    ASSERT_FALSE(_opCtx.get()->lockState()->isDbLockedForMode(nss.db(), MODE_X));
 }
 }  // namespace

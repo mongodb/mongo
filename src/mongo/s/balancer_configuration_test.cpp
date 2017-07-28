@@ -74,7 +74,7 @@ protected:
 
             auto query = assertGet(QueryRequest::makeFromFindCommand(nss, request.cmdObj, false));
 
-            ASSERT_EQ(query->ns(), "config.settings");
+            ASSERT_EQ(query->nss().ns(), "config.settings");
             ASSERT_BSONOBJ_EQ(query->getFilter(), BSON("_id" << key));
 
             checkReadConcern(request.cmdObj, Timestamp(0, 0), repl::OpTime::kUninitializedTerm);
