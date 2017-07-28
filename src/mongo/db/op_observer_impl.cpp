@@ -276,11 +276,10 @@ void OpObserverImpl::onRenameCollection(OperationContext* txn,
                                 << dropTarget);
 
     repl::logOp(txn, "c", dbName.c_str(), cmdObj, nullptr, false);
-    if (fromCollection.coll() == DurableViewCatalog::viewsCollectionName() ||
-        toCollection.coll() == DurableViewCatalog::viewsCollectionName()) {
-        DurableViewCatalog::onExternalChange(
-            txn, NamespaceString(DurableViewCatalog::viewsCollectionName()));
-    }
+    if (fromCollection.isSystemDotViews())
+        DurableViewCatalog::onExternalChange(txn, fromCollection);
+    if (toCollection.isSystemDotViews())
+        DurableViewCatalog::onExternalChange(txn, toCollection);
 
     getGlobalAuthorizationManager()->logOp(txn, "c", dbName.c_str(), cmdObj, nullptr);
     logOpForDbHash(txn, dbName.c_str());
