@@ -200,18 +200,9 @@ Status renameCollectionCommon(OperationContext* opCtx,
 
     // Create a temporary collection in the target database. It will be removed if we fail to copy
     // the collection, or on restart, so there is no need to replicate these writes.
-    auto tmpNameResult =
-        targetDB->makeUniqueCollectionNamespace(opCtx, "tmp%%%%%.renameCollection");
-    if (!tmpNameResult.isOK()) {
-        return Status(tmpNameResult.getStatus().code(),
-                      str::stream() << "Cannot generate temporary collection name to rename "
-                                    << source.ns()
-                                    << " to "
-                                    << target.ns()
-                                    << ": "
-                                    << tmpNameResult.getStatus().reason());
-    }
-    const auto& tmpName = tmpNameResult.getValue();
+    // A fixed name is not ideal, but there can never be more than one of these due to the global
+    // write lock acquired at the top.
+    NamespaceString tmpName(target.db(), "tmp.renameCollection");
     Collection* tmpColl = nullptr;
     OptionalCollectionUUID newUUID;
     {
