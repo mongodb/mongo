@@ -447,11 +447,10 @@ void OpObserverImpl::onRenameCollection(OperationContext* opCtx,
     BSONObj cmdObj = builder.done();
 
     repl::logOp(opCtx, "c", cmdNss, uuid, cmdObj, nullptr, false, kUninitializedStmtId);
-    if (fromCollection.coll() == DurableViewCatalog::viewsCollectionName() ||
-        toCollection.coll() == DurableViewCatalog::viewsCollectionName()) {
-        DurableViewCatalog::onExternalChange(
-            opCtx, NamespaceString(DurableViewCatalog::viewsCollectionName()));
-    }
+    if (fromCollection.isSystemDotViews())
+        DurableViewCatalog::onExternalChange(opCtx, fromCollection);
+    if (toCollection.isSystemDotViews())
+        DurableViewCatalog::onExternalChange(opCtx, toCollection);
 
     getGlobalAuthorizationManager()->logOp(opCtx, "c", cmdNss, cmdObj, nullptr);
 
