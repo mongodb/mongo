@@ -58,6 +58,32 @@ load("jstests/aggregation/extras/utils.js");  // For assertErrorCode
     });
 
     /* --------------------------------------------------------------------------------------- */
+    /* Normal format tests with UTC offset. */
+
+    coll.drop();
+    assert.writeOK(coll.insert({_id: 0}));
+
+    testCases = [
+        {expect: "2017-07-04T10:56:02Z", inputString: "2017-07-04T11:56.02"},
+        {expect: "2017-07-04T10:56:02.813Z", inputString: "2017-07-04T11:56.02.813"},
+        {expect: "2017-07-04T10:56:02.810Z", inputString: "2017-07-04T11:56.02.81"},
+        {expect: "2017-07-04T10:56:02.800Z", inputString: "2017-07-04T11:56.02.8"},
+    ];
+    testCases.forEach(function(testCase) {
+        assert.eq([{_id: 0, date: ISODate(testCase.expect)}],
+                  coll.aggregate({
+                          $project: {
+                              date: {
+                                  $dateFromString:
+                                      {dateString: testCase.inputString, timezone: "+01:00"}
+                              }
+                          }
+                      })
+                      .toArray(),
+                  tojson(testCase));
+    });
+
+    /* --------------------------------------------------------------------------------------- */
     /* Normal format tests from data. */
 
     coll.drop();
@@ -112,6 +138,7 @@ load("jstests/aggregation/extras/utils.js");  // For assertErrorCode
         {_id: 3, dateString: "1960-07-10T12:35:37.513", timezone: "Europe/London"},
         {_id: 4, dateString: "2017-07-06T12:35:37.513", timezone: "America/Los_Angeles"},
         {_id: 5, dateString: "2017-07-06T12:35:37.513", timezone: "Europe/Paris"},
+        {_id: 6, dateString: "2017-07-06T12:35:37.513", timezone: "+04:00"},
     ]));
 
     assert.eq(
@@ -122,6 +149,7 @@ load("jstests/aggregation/extras/utils.js");  // For assertErrorCode
           {"_id": 3, "date": ISODate("1960-07-10T11:35:37.513Z")},
           {"_id": 4, "date": ISODate("2017-07-06T19:35:37.513Z")},
           {"_id": 5, "date": ISODate("2017-07-06T10:35:37.513Z")},
+          {"_id": 6, "date": ISODate("2017-07-06T08:35:37.513Z")},
         ],
         coll.aggregate([
                 {
@@ -164,12 +192,14 @@ load("jstests/aggregation/extras/utils.js");  // For assertErrorCode
     assert.writeOK(coll.insert([
         {_id: 0, timezone: "Europe/London"},
         {_id: 1, timezone: "America/New_York"},
+        {_id: 2, timezone: "-05:00"},
     ]));
 
     assert.eq(
         [
           {"_id": 0, "date": ISODate("2017-07-19T17:52:35.199Z")},
           {"_id": 1, "date": ISODate("2017-07-19T22:52:35.199Z")},
+          {"_id": 2, "date": ISODate("2017-07-19T23:52:35.199Z")},
         ],
         coll.aggregate([
                 {

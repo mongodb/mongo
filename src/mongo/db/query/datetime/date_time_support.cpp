@@ -219,15 +219,9 @@ Date_t TimeZoneDatabase::fromString(StringData dateString, boost::optional<TimeZ
                           "at the same time");
                 break;
         }
-
-        // _tzInfo, although private, can be accessed because TimeZoneDatabase is a friend of
-        // TimeZone.
-        timelib_update_ts(parsedTime.get(), tz->_tzInfo.get());
-    } else {
-        timelib_update_ts(parsedTime.get(), nullptr);
     }
 
-    timelib_unixtime2local(parsedTime.get(), parsedTime->sse);
+    tz->adjustTimeZone(parsedTime.get());
 
     return Date_t::fromMillisSinceEpoch(
         durationCount<Milliseconds>(Seconds(parsedTime->sse) + Microseconds(parsedTime->us)));
@@ -288,14 +282,14 @@ TimeZone TimeZoneDatabase::getTimeZone(StringData timeZoneId) const {
               str::stream() << "unrecognized time zone identifier: \"" << timeZoneId << "\"");
 }
 
-void TimeZone::adjustTimeZone(timelib_time* t) const {
-    if (_tzInfo) {
-        timelib_set_timezone(t, _tzInfo.get());
-    } else if (durationCount<Seconds>(_utcOffset)) {
-        timelib_set_timezone_from_offset(t, -durationCount<Seconds>(_utcOffset));
+void TimeZone::adjustTimeZone(timelib_time* timelibTime) const {
+    if (isTimeZoneIDZone()) {
+        timelib_set_timezone(timelibTime, _tzInfo.get());
+    } else if (isUtcOffsetZone()) {
+        timelib_set_timezone_from_offset(timelibTime, -durationCount<Seconds>(_utcOffset));
     }
-    timelib_update_ts(t, nullptr);
-    timelib_update_from_sse(t);
+    timelib_update_ts(timelibTime, nullptr);
+    timelib_update_from_sse(timelibTime);
 }
 
 Date_t TimeZone::createFromDateParts(

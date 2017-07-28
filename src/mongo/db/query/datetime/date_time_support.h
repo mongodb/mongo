@@ -49,7 +49,6 @@ namespace mongo {
  * for the hour, minute, or second of a date, even when given the same date.
  */
 class TimeZone {
-    friend class TimeZoneDatabase;
 
 public:
     /**
@@ -130,7 +129,21 @@ public:
      * Returns whether this is the zone representing UTC.
      */
     bool isUtcZone() const {
-        return _tzInfo == nullptr;
+        return (_tzInfo == nullptr && !durationCount<Seconds>(_utcOffset));
+    }
+
+    /**
+     * Returns whether this is a zone representing a UTC offset, like "+04:00".
+     */
+    bool isUtcOffsetZone() const {
+        return durationCount<Seconds>(_utcOffset) != 0;
+    }
+
+    /**
+     * Returns whether this is a zone representing an Olson time zone, like "Europe/London".
+     */
+    bool isTimeZoneIDZone() const {
+        return _tzInfo != nullptr;
     }
 
     /**
@@ -164,6 +177,11 @@ public:
      * Returns the number of seconds offset from UTC.
      */
     Seconds utcOffset(Date_t) const;
+
+    /**
+     * Adjusts 'timelibTime' according to this time zone definition.
+     */
+    void adjustTimeZone(timelib_time* timelibTime) const;
 
     /**
      * Converts a date object to a string according to 'format'. 'format' can be any string literal,
@@ -296,12 +314,6 @@ private:
     struct TimelibTZInfoDeleter {
         void operator()(timelib_tzinfo* tzInfo);
     };
-
-    /**
-     * Helper function to apply tzInfo and utcOffset information to the constructed timelib_time*
-     * value.
-     */
-    void adjustTimeZone(timelib_time* t) const;
 
     // null if this TimeZone represents the default UTC time zone, or a UTC-offset time zone
     std::shared_ptr<timelib_tzinfo> _tzInfo;
