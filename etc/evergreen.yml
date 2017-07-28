@@ -768,7 +768,7 @@ functions:
       script: |
         process_kill_list="(^cl\.exe$|bsondump|java|lein|lldb|mongo|python|_test$|_test\.exe$)"
         # Exclude Evergreen agent processes
-        process_exclude_list="(main)"
+        process_exclude_list="(main|evergreen)"
 
         if [ "Windows_NT" = "$OS" ]; then
           # Get the list of Windows tasks (tasklist list format):
