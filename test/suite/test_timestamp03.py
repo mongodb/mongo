@@ -66,9 +66,9 @@ class test_timestamp03(wttest.WiredTigerTestCase, suite_subprocess):
     ]
 
     conncfg = [
-        ('nolog', dict(conn_config='create')),
-        ('V1', dict(conn_config='create,log=(enabled),compatibility=(release="2.9")')),
-        ('V2', dict(conn_config='create,log=(enabled)')),
+        ('nolog', dict(conn_config='create', using_log=False)),
+        ('V1', dict(conn_config='create,log=(enabled),compatibility=(release="2.9")', using_log=True)),
+        ('V2', dict(conn_config='create,log=(enabled)', using_log=True)),
     ]
 
     scenarios = make_scenarios(types, ckpt, conncfg)
@@ -76,6 +76,7 @@ class test_timestamp03(wttest.WiredTigerTestCase, suite_subprocess):
     # Binary values.
     value = u'\u0001\u0002abcd\u0003\u0004'
     value2 = u'\u0001\u0002dcba\u0003\u0004'
+    value3 = u'\u0001\u0002cdef\u0003\u0004'
 
     # Check that a cursor (optionally started in a new transaction), sees the
     # expected values.
@@ -91,19 +92,12 @@ class test_timestamp03(wttest.WiredTigerTestCase, suite_subprocess):
         c.close()
         if txn_config:
             session.commit_transaction()
-
-    # Check that a cursor sees the expected values after a checkpoint.
-    def ckpt_backup(self, valcnt, valcnt2, valcnt3):
+    #
+    # Take a backup of the database and verify that the value we want to
+    # check exists in the tables the expected number of times.
+    #
+    def backup_check(self, check_value, valcnt, valcnt2, valcnt3):
         newdir = "BACKUP"
-
-        # Take a checkpoint.  Make a copy of the database.  Open the
-        # copy and verify whether or not the expected data is in there.
-        self.pr("CKPT: " + self.ckptcfg)
-        ckptcfg = self.ckptcfg
-        if ckptcfg == 'read_timestamp':
-            ckptcfg = self.ckptcfg + '=' + self.oldts
-        # print "CKPT: " + ckptcfg
-        self.session.checkpoint(ckptcfg)
         copy_wiredtiger_home('.', newdir, True)
 
         conn = self.setUpConnectionOpen(newdir)
@@ -114,31 +108,24 @@ class test_timestamp03(wttest.WiredTigerTestCase, suite_subprocess):
         # Count how many times the second value is present
         count = 0
         for k, v in c:
-            if self.value2 in str(v):
-                # print "value2 found in key " + str(k)
+            if check_value in str(v):
+                # print "check_value found in key " + str(k)
                 count += 1
-            # else:
-                # print "Non-value2: key " + str(k)
         c.close()
         # Count how many times the second value is present in the
         # non-timestamp table.
         count2 = 0
         for k, v in c2:
-            if self.value2 in str(v):
-                # print "value2 found in key " + str(k)
+            if check_value in str(v):
+                # print "check_value found in key " + str(k)
                 count2 += 1
-            # else:
-                # print "Non-value2: key " + str(k)
         c2.close()
         # Count how many times the second value is present in the
         # logged timestamp table.
         count3 = 0
         for k, v in c3:
-            if self.value2 in str(v):
-                # print "value2 found in key " + str(k)
+            if check_value in str(v):
                 count3 += 1
-            # else:
-                # print "Non-value2: key " + str(k)
         c3.close()
         conn.close()
         # print "CHECK BACKUP: Count " + str(count) + " Count2 " + str(count2) + " Count3 " + str(count3)
@@ -149,6 +136,19 @@ class test_timestamp03(wttest.WiredTigerTestCase, suite_subprocess):
         self.assertEqual(count, valcnt)
         self.assertEqual(count2, valcnt2)
         self.assertEqual(count3, valcnt3)
+
+    # Check that a cursor sees the expected values after a checkpoint.
+    def ckpt_backup(self, check_value, valcnt, valcnt2, valcnt3):
+
+        # Take a checkpoint.  Make a copy of the database.  Open the
+        # copy and verify whether or not the expected data is in there.
+        self.pr("CKPT: " + self.ckptcfg)
+        ckptcfg = self.ckptcfg
+        if ckptcfg == 'read_timestamp':
+            ckptcfg = self.ckptcfg + '=' + self.oldts
+        # print "CKPT: " + ckptcfg
+        self.session.checkpoint(ckptcfg)
+        self.backup_check(check_value, valcnt, valcnt2, valcnt3)
 
     def test_timestamp03(self):
         if not wiredtiger.timestamp_build():
@@ -224,14 +224,48 @@ class test_timestamp03(wttest.WiredTigerTestCase, suite_subprocess):
             valcnt = 0
         # XXX adjust when logged + timestamps is fixed and defined.
         valcnt3 = valcnt
-        self.ckpt_backup(valcnt, valcnt2, valcnt3)
+        self.ckpt_backup(self.value2, valcnt, valcnt2, valcnt3)
         if self.ckptcfg != 'read_timestamp':
             # Update the stable timestamp to the latest, but not the oldest
             # timestamp and make sure we can see the data.  Once the stable
             # timestamp is moved we should see all keys with value2.
             self.conn.set_timestamp('stable_timestamp=' + \
                 timestamp_str(100+nkeys))
-            self.ckpt_backup(nkeys, nkeys, nkeys)
+            self.ckpt_backup(self.value2, nkeys, nkeys, nkeys)
+
+        # If we're not using the log we're done.
+        if not self.using_log:
+            return
+
+        # Update them and retry.  This time take a backup and recover.
+        random.shuffle(keys)
+        count = 0
+        for k in keys:
+            # Make sure a timestamp cursor is the last one to update.  This
+            # tests the scenario for a bug we found where recovery replayed
+            # the last record written into the log.
+            #
+            # print "Key " + str(k) + " to value3"
+            c2[k] = self.value3
+            self.session.begin_transaction()
+            c[k] = self.value3
+            c3[k] = self.value3
+            ts = timestamp_str(k + 200)
+            self.session.commit_transaction('commit_timestamp=' + ts)
+            # print "Commit key " + str(k) + " ts " + ts
+            count += 1
+        # print "Updated " + str(count) + " keys to value3"
+
+        # Flush the log but don't checkpoint
+        self.session.log_flush('sync=on')
+
+        # Take a backup and then verify whether value3 appears in a copy
+        # of that data or not.  Both tables that are logged should see
+        # all the data regardless of timestamps.  The table that is not
+        # logged should not see any of it.
+        valcnt = 0
+        valcnt2 = valcnt3 = nkeys
+        self.backup_check(self.value3, valcnt, valcnt2, valcnt3)
 
 if __name__ == '__main__':
     wttest.run()
