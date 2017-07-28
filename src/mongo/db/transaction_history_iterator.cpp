@@ -52,10 +52,7 @@ repl::OplogEntry TransactionHistoryIterator::next(OperationContext* opCtx) {
     // TODO: SERVER-29843 oplogReplay option might be needed to activate fast ts search.
     auto oplogBSON =
         client.findOne(NamespaceString::kRsOplogNamespace.ns(),
-                       BSON(repl::OplogEntryBase::kTimestampFieldName << _nextOpTimeTs),
-                       /* fieldsToReturn */ nullptr,
-                       DBClientCursor::QueryOptionLocal_forceOpQuery  // SERVER-30318
-                       /* QueryOption_OplogReplay */);
+                       BSON(repl::OplogEntryBase::kTimestampFieldName << _nextOpTimeTs));
 
     uassert(ErrorCodes::IncompleteTransactionHistory,
             str::stream() << "oplog no longer contains the complete write history of this "
