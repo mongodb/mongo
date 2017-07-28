@@ -91,6 +91,81 @@ __logrec_make_hex_str(WT_SESSION_IMPL *session, char **destp, WT_ITEM *item)
 }
 
 int
+__wt_logop_col_modify_pack(
+    WT_SESSION_IMPL *session, WT_ITEM *logrec,
+    uint32_t fileid, uint64_t recno, WT_ITEM *value)
+{
+	const char *fmt = WT_UNCHECKED_STRING(IIIru);
+	size_t size;
+	uint32_t optype, recsize;
+
+	optype = WT_LOGOP_COL_MODIFY;
+	WT_RET(__wt_struct_size(session, &size, fmt,
+	    optype, 0, fileid, recno, value));
+
+	__wt_struct_size_adjust(session, &size);
+	WT_RET(__wt_buf_extend(session, logrec, logrec->size + size));
+	recsize = (uint32_t)size;
+	WT_RET(__wt_struct_pack(session,
+	    (uint8_t *)logrec->data + logrec->size, size, fmt,
+	    optype, recsize, fileid, recno, value));
+
+	logrec->size += (uint32_t)size;
+	return (0);
+}
+
+int
+__wt_logop_col_modify_unpack(
+    WT_SESSION_IMPL *session, const uint8_t **pp, const uint8_t *end,
+    uint32_t *fileidp, uint64_t *recnop, WT_ITEM *valuep)
+{
+	WT_DECL_RET;
+	const char *fmt = WT_UNCHECKED_STRING(IIIru);
+	uint32_t optype, size;
+
+	if ((ret = __wt_struct_unpack(session, *pp, WT_PTRDIFF(end, *pp), fmt,
+	    &optype, &size, fileidp, recnop, valuep)) != 0)
+		WT_RET_MSG(session, ret, "logop_col_modify: unpack failure");
+	WT_ASSERT(session, optype == WT_LOGOP_COL_MODIFY);
+
+	*pp += size;
+	return (0);
+}
+
+int
+__wt_logop_col_modify_print(WT_SESSION_IMPL *session,
+    const uint8_t **pp, const uint8_t *end, uint32_t flags)
+{
+	WT_DECL_RET;
+	uint32_t fileid;
+	uint64_t recno;
+	WT_ITEM value;
+	char *escaped;
+
+	escaped = NULL;
+	WT_RET(__wt_logop_col_modify_unpack(
+	    session, pp, end, &fileid, &recno, &value));
+
+	WT_RET(__wt_fprintf(session, WT_STDOUT(session),
+	    " \"optype\": \"col_modify\",\n"));
+	WT_ERR(__wt_fprintf(session, WT_STDOUT(session),
+	    "        \"fileid\": %" PRIu32 ",\n", fileid));
+	WT_ERR(__wt_fprintf(session, WT_STDOUT(session),
+	    "        \"recno\": %" PRIu64 ",\n", recno));
+	WT_ERR(__logrec_make_json_str(session, &escaped, &value));
+	WT_ERR(__wt_fprintf(session, WT_STDOUT(session),
+	    "        \"value\": \"%s\"", escaped));
+	if (LF_ISSET(WT_TXN_PRINTLOG_HEX)) {
+		WT_ERR(__logrec_make_hex_str(session, &escaped, &value));
+		WT_ERR(__wt_fprintf(session, WT_STDOUT(session),
+		    ",\n        \"value-hex\": \"%s\"", escaped));
+	}
+
+err:	__wt_free(session, escaped);
+	return (ret);
+}
+
+int
 __wt_logop_col_put_pack(
     WT_SESSION_IMPL *session, WT_ITEM *logrec,
     uint32_t fileid, uint64_t recno, WT_ITEM *value)
@@ -290,6 +365,87 @@ __wt_logop_col_truncate_print(WT_SESSION_IMPL *session,
 	WT_RET(__wt_fprintf(session, WT_STDOUT(session),
 	    "        \"stop\": %" PRIu64 "", stop));
 	return (0);
+}
+
+int
+__wt_logop_row_modify_pack(
+    WT_SESSION_IMPL *session, WT_ITEM *logrec,
+    uint32_t fileid, WT_ITEM *key, WT_ITEM *value)
+{
+	const char *fmt = WT_UNCHECKED_STRING(IIIuu);
+	size_t size;
+	uint32_t optype, recsize;
+
+	optype = WT_LOGOP_ROW_MODIFY;
+	WT_RET(__wt_struct_size(session, &size, fmt,
+	    optype, 0, fileid, key, value));
+
+	__wt_struct_size_adjust(session, &size);
+	WT_RET(__wt_buf_extend(session, logrec, logrec->size + size));
+	recsize = (uint32_t)size;
+	WT_RET(__wt_struct_pack(session,
+	    (uint8_t *)logrec->data + logrec->size, size, fmt,
+	    optype, recsize, fileid, key, value));
+
+	logrec->size += (uint32_t)size;
+	return (0);
+}
+
+int
+__wt_logop_row_modify_unpack(
+    WT_SESSION_IMPL *session, const uint8_t **pp, const uint8_t *end,
+    uint32_t *fileidp, WT_ITEM *keyp, WT_ITEM *valuep)
+{
+	WT_DECL_RET;
+	const char *fmt = WT_UNCHECKED_STRING(IIIuu);
+	uint32_t optype, size;
+
+	if ((ret = __wt_struct_unpack(session, *pp, WT_PTRDIFF(end, *pp), fmt,
+	    &optype, &size, fileidp, keyp, valuep)) != 0)
+		WT_RET_MSG(session, ret, "logop_row_modify: unpack failure");
+	WT_ASSERT(session, optype == WT_LOGOP_ROW_MODIFY);
+
+	*pp += size;
+	return (0);
+}
+
+int
+__wt_logop_row_modify_print(WT_SESSION_IMPL *session,
+    const uint8_t **pp, const uint8_t *end, uint32_t flags)
+{
+	WT_DECL_RET;
+	uint32_t fileid;
+	WT_ITEM key;
+	WT_ITEM value;
+	char *escaped;
+
+	escaped = NULL;
+	WT_RET(__wt_logop_row_modify_unpack(
+	    session, pp, end, &fileid, &key, &value));
+
+	WT_RET(__wt_fprintf(session, WT_STDOUT(session),
+	    " \"optype\": \"row_modify\",\n"));
+	WT_ERR(__wt_fprintf(session, WT_STDOUT(session),
+	    "        \"fileid\": %" PRIu32 ",\n", fileid));
+	WT_ERR(__logrec_make_json_str(session, &escaped, &key));
+	WT_ERR(__wt_fprintf(session, WT_STDOUT(session),
+	    "        \"key\": \"%s\",\n", escaped));
+	if (LF_ISSET(WT_TXN_PRINTLOG_HEX)) {
+		WT_ERR(__logrec_make_hex_str(session, &escaped, &key));
+		WT_ERR(__wt_fprintf(session, WT_STDOUT(session),
+		    "        \"key-hex\": \"%s\",\n", escaped));
+	}
+	WT_ERR(__logrec_make_json_str(session, &escaped, &value));
+	WT_ERR(__wt_fprintf(session, WT_STDOUT(session),
+	    "        \"value\": \"%s\"", escaped));
+	if (LF_ISSET(WT_TXN_PRINTLOG_HEX)) {
+		WT_ERR(__logrec_make_hex_str(session, &escaped, &value));
+		WT_ERR(__wt_fprintf(session, WT_STDOUT(session),
+		    ",\n        \"value-hex\": \"%s\"", escaped));
+	}
+
+err:	__wt_free(session, escaped);
+	return (ret);
 }
 
 int
@@ -656,6 +812,10 @@ __wt_txn_op_printlog(WT_SESSION_IMPL *session,
 	end = *pp + opsize;
 
 	switch (optype) {
+	case WT_LOGOP_COL_MODIFY:
+		WT_RET(__wt_logop_col_modify_print(session, pp, end, flags));
+		break;
+
 	case WT_LOGOP_COL_PUT:
 		WT_RET(__wt_logop_col_put_print(session, pp, end, flags));
 		break;
@@ -666,6 +826,10 @@ __wt_txn_op_printlog(WT_SESSION_IMPL *session,
 
 	case WT_LOGOP_COL_TRUNCATE:
 		WT_RET(__wt_logop_col_truncate_print(session, pp, end, flags));
+		break;
+
+	case WT_LOGOP_ROW_MODIFY:
+		WT_RET(__wt_logop_row_modify_print(session, pp, end, flags));
 		break;
 
 	case WT_LOGOP_ROW_PUT:

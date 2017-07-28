@@ -489,6 +489,11 @@ struct __wt_cursor {
 	 * The modify method is only supported on raw byte arrays accessed using
 	 * a WT_ITEM structure, that is, a format type of \c u.
 	 *
+	 * Calling the WT_CURSOR::modify method outside of snapshot isolation
+	 * can lead to unexpected results. While \c read-committed isolation
+	 * is supported with the WT_CURSOR::modify method, \c read-uncommitted
+	 * isolation is not.
+	 *
 	 * @snippet ex_all.c Modify an existing record
 	 *
 	 * On success, the cursor ends positioned at the modified record; to
@@ -4501,22 +4506,26 @@ extern int wiredtiger_extension_terminate(WT_CONNECTION *connection);
 #define	WT_LOGREC_SYSTEM	4
 /*! invalid operation */
 #define	WT_LOGOP_INVALID	0
-/*! column put */
+/*! column-store put */
 #define	WT_LOGOP_COL_PUT	1
-/*! column remove */
+/*! column-store remove */
 #define	WT_LOGOP_COL_REMOVE	2
-/*! column truncate */
+/*! column-store truncate */
 #define	WT_LOGOP_COL_TRUNCATE	3
-/*! row put */
+/*! row-store put */
 #define	WT_LOGOP_ROW_PUT	4
-/*! row remove */
+/*! row-store remove */
 #define	WT_LOGOP_ROW_REMOVE	5
-/*! row truncate */
+/*! row-store truncate */
 #define	WT_LOGOP_ROW_TRUNCATE	6
 /*! checkpoint start */
 #define	WT_LOGOP_CHECKPOINT_START	7
 /*! previous LSN */
 #define	WT_LOGOP_PREV_LSN	8
+/*! column-store modify */
+#define	WT_LOGOP_COL_MODIFY	9
+/*! row-store modify */
+#define	WT_LOGOP_ROW_MODIFY	10
 /*! @} */
 
 /*******************************************

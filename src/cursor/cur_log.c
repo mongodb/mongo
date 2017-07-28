@@ -104,6 +104,13 @@ __curlog_op_read(WT_SESSION_IMPL *session,
 	pp = cl->stepp;
 	end = pp + opsize;
 	switch (optype) {
+	case WT_LOGOP_COL_MODIFY:
+		WT_RET(__wt_logop_col_modify_unpack(session, &pp, end,
+		    fileid, &recno, &value));
+		WT_RET(__wt_buf_set(session, cl->opkey, &recno, sizeof(recno)));
+		WT_RET(__wt_buf_set(session,
+		    cl->opvalue, value.data, value.size));
+		break;
 	case WT_LOGOP_COL_PUT:
 		WT_RET(__wt_logop_col_put_unpack(session, &pp, end,
 		    fileid, &recno, &value));
@@ -116,6 +123,13 @@ __curlog_op_read(WT_SESSION_IMPL *session,
 		    fileid, &recno));
 		WT_RET(__wt_buf_set(session, cl->opkey, &recno, sizeof(recno)));
 		WT_RET(__wt_buf_set(session, cl->opvalue, NULL, 0));
+		break;
+	case WT_LOGOP_ROW_MODIFY:
+		WT_RET(__wt_logop_row_modify_unpack(session, &pp, end,
+		    fileid, &key, &value));
+		WT_RET(__wt_buf_set(session, cl->opkey, key.data, key.size));
+		WT_RET(__wt_buf_set(session,
+		    cl->opvalue, value.data, value.size));
 		break;
 	case WT_LOGOP_ROW_PUT:
 		WT_RET(__wt_logop_row_put_unpack(session, &pp, end,

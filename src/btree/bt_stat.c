@@ -137,7 +137,6 @@ __stat_page_col_var(
 	WT_CELL_UNPACK *unpack, _unpack;
 	WT_COL *cip;
 	WT_INSERT *ins;
-	WT_UPDATE *upd;
 	uint64_t deleted_cnt, entry_cnt, ovfl_cnt, rle_cnt;
 	uint32_t i;
 	bool orig_deleted;
@@ -177,31 +176,39 @@ __stat_page_col_var(
 		 * we find, correct the original count based on its state.
 		 */
 		WT_SKIP_FOREACH(ins, WT_COL_UPDATE(page, cip)) {
-			upd = ins->upd;
-			if (upd->type == WT_UPDATE_RESERVED)
-				continue;
-			if (upd->type == WT_UPDATE_DELETED) {
+			switch (ins->upd->type) {
+			case WT_UPDATE_DELETED:
 				if (!orig_deleted) {
 					++deleted_cnt;
 					--entry_cnt;
 				}
-			} else
+				break;
+			case WT_UPDATE_MODIFIED:
+			case WT_UPDATE_STANDARD:
 				if (orig_deleted) {
 					--deleted_cnt;
 					++entry_cnt;
 				}
+				break;
+			case WT_UPDATE_RESERVED:
+				break;
+			}
 		}
 	}
 
 	/* Walk any append list. */
-	WT_SKIP_FOREACH(ins, WT_COL_APPEND(page)) {
-		if (ins->upd->type == WT_UPDATE_RESERVED)
-			continue;
-		if (ins->upd->type == WT_UPDATE_DELETED)
+	WT_SKIP_FOREACH(ins, WT_COL_APPEND(page))
+		switch (ins->upd->type) {
+		case WT_UPDATE_DELETED:
 			++deleted_cnt;
-		else
+			break;
+		case WT_UPDATE_MODIFIED:
+		case WT_UPDATE_STANDARD:
 			++entry_cnt;
-	}
+			break;
+		case WT_UPDATE_RESERVED:
+			break;
+		}
 
 	WT_STAT_INCRV(session, stats, btree_column_deleted, deleted_cnt);
 	WT_STAT_INCRV(session, stats, btree_column_rle, rle_cnt);

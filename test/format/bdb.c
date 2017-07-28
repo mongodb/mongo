@@ -78,7 +78,7 @@ bdb_open(void)
 	assert(db->cursor(db, NULL, &dbc, 0) == 0);
 	g.dbc = dbc;
 
-	key_gen_setup(&keyitem);
+	key_gen_init(&keyitem);
 }
 
 void
@@ -95,7 +95,7 @@ bdb_close(void)
 	assert(db->close(db, 0) == 0);
 	assert(dbenv->close(dbenv, 0) == 0);
 
-	free(keyitem.mem);
+	key_gen_teardown(&keyitem);
 }
 
 void

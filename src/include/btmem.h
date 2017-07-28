@@ -263,17 +263,17 @@ struct __wt_page_modify {
 		void	*disk_image;
 
 		/*
-		 * List of unresolved updates. Updates are either a WT_INSERT
-		 * or a row-store leaf page entry; when creating lookaside
-		 * records, there is an additional value, the committed item's
-		 * transaction ID.
+		 * List of unresolved updates. Updates are either a row-store
+		 * insert or update list, or column-store insert list. When
+		 * creating lookaside records, there is an additional value,
+		 * the committed item's transaction information.
 		 *
 		 * If there are unresolved updates, the block wasn't written and
 		 * there will always be a disk image.
 		 */
 		struct __wt_save_upd {
-			WT_INSERT *ins;
-			WT_ROW	  *rip;
+			WT_INSERT *ins;		/* Insert list reference */
+			WT_ROW	  *ripcip;	/* Original on-page reference */
 			uint64_t   onpage_txn;
 			WT_DECL_TIMESTAMP(onpage_timestamp)
 		} *supd;
@@ -895,9 +895,10 @@ struct __wt_update {
 
 	uint32_t size;			/* data length */
 
-#define	WT_UPDATE_STANDARD	0
-#define	WT_UPDATE_DELETED	1
-#define	WT_UPDATE_RESERVED	2
+#define	WT_UPDATE_DELETED	0	/* deleted */
+#define	WT_UPDATE_MODIFIED	1	/* partial-update modify value */
+#define	WT_UPDATE_RESERVED	2	/* reserved */
+#define	WT_UPDATE_STANDARD	3	/* complete value */
 	uint8_t type;			/* type (one byte to conserve memory) */
 
 	/* If the update includes a complete value. */
@@ -929,6 +930,13 @@ struct __wt_update {
  * we verify the build to ensure the compiler hasn't inserted padding.
  */
 #define	WT_UPDATE_SIZE	(21 + WT_TIMESTAMP_SIZE)
+
+/*
+ * WT_MAX_MODIFY_UPDATE --
+ *	Limit update chains to a small value to avoid penalizing reads and
+ * permit truncation.
+ */
+#define	WT_MAX_MODIFY_UPDATE	100
 
 /*
  * WT_INSERT --

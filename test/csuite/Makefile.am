@@ -57,6 +57,9 @@ noinst_PROGRAMS += test_wt3135_search_near_collator
 test_wt3184_dup_index_collator_SOURCES = wt3184_dup_index_collator/main.c
 noinst_PROGRAMS += test_wt3184_dup_index_collator
 
+test_wt3338_partial_update_SOURCES = wt3338_partial_update/main.c
+noinst_PROGRAMS += test_wt3338_partial_update
+
 test_wt3363_checkpoint_op_races_SOURCES = wt3363_checkpoint_op_races/main.c
 noinst_PROGRAMS += test_wt3363_checkpoint_op_races
 

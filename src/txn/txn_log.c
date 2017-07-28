@@ -32,9 +32,9 @@ __txn_op_log_row_key_check(WT_SESSION_IMPL *session, WT_CURSOR_BTREE *cbt)
 	memset(&key, 0, sizeof(key));
 
 	/*
-	 * We used to take the key for row-store logging from the page
-	 * referenced by the cursor, when we switched to taking it from the
-	 * cursor itself. Check that they are the same.
+	 * We used to take the row-store logging key from the page referenced by
+	 * the cursor, then switched to taking it from the cursor itself. Check
+	 * they are the same.
 	 *
 	 * If the cursor references a WT_INSERT item, take the key from there,
 	 * else take the key from the original page.
@@ -50,8 +50,7 @@ __txn_op_log_row_key_check(WT_SESSION_IMPL *session, WT_CURSOR_BTREE *cbt)
 		key.size = WT_INSERT_KEY_SIZE(cbt->ins);
 	}
 
-	WT_ASSERT(session,
-	    key.size == cursor->key.size &&
+	WT_ASSERT(session, key.size == cursor->key.size &&
 	    memcmp(key.data, cursor->key.data, key.size) == 0);
 
 	__wt_buf_free(session, &key);
@@ -78,31 +77,47 @@ __txn_op_log(WT_SESSION_IMPL *session,
 	value.size = upd->size;
 
 	/*
-	 * Log the operation. It must be a row- or column-store insert, remove
-	 * or update, all of which require log records. We shouldn't ever log
-	 * reserve operations.
+	 * Log the row- or column-store insert, modify, remove or update. Our
+	 * caller doesn't log reserve operations, we shouldn't see them here.
 	 */
-	WT_ASSERT(session, upd->type != WT_UPDATE_RESERVED);
 	if (cbt->btree->type == BTREE_ROW) {
 #ifdef HAVE_DIAGNOSTIC
 		__txn_op_log_row_key_check(session, cbt);
 #endif
-		if (upd->type == WT_UPDATE_DELETED)
+		switch (upd->type) {
+		case WT_UPDATE_DELETED:
 			WT_RET(__wt_logop_row_remove_pack(
 			    session, logrec, op->fileid, &cursor->key));
-		else
+			break;
+		case WT_UPDATE_MODIFIED:
+			WT_RET(__wt_logop_row_modify_pack(
+			    session, logrec, op->fileid, &cursor->key, &value));
+			break;
+		case WT_UPDATE_STANDARD:
 			WT_RET(__wt_logop_row_put_pack(
 			    session, logrec, op->fileid, &cursor->key, &value));
+			break;
+		WT_ILLEGAL_VALUE(session);
+		}
 	} else {
 		recno = WT_INSERT_RECNO(cbt->ins);
 		WT_ASSERT(session, recno != WT_RECNO_OOB);
 
-		if (upd->type == WT_UPDATE_DELETED)
+		switch (upd->type) {
+		case WT_UPDATE_DELETED:
 			WT_RET(__wt_logop_col_remove_pack(
 			    session, logrec, op->fileid, recno));
-		else
+			break;
+		case WT_UPDATE_MODIFIED:
+			WT_RET(__wt_logop_col_modify_pack(
+			    session, logrec, op->fileid, recno, &value));
+			break;
+		case WT_UPDATE_STANDARD:
 			WT_RET(__wt_logop_col_put_pack(
 			    session, logrec, op->fileid, recno, &value));
+			break;
+		WT_ILLEGAL_VALUE(session);
+		}
 	}
 
 	return (0);

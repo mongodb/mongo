@@ -141,15 +141,16 @@ __wt_cursor_set_notsup(WT_CURSOR *cursor)
 	 * in the future to change these configurations.
 	 */
 	cursor->compare = __wt_cursor_compare_notsup;
+	cursor->insert = __wt_cursor_notsup;
+	cursor->modify = __wt_cursor_modify_notsup;
 	cursor->next = __wt_cursor_notsup;
 	cursor->prev = __wt_cursor_notsup;
+	cursor->remove = __wt_cursor_notsup;
+	cursor->reserve = __wt_cursor_notsup;
 	cursor->reset = __wt_cursor_noop;
 	cursor->search = __wt_cursor_notsup;
 	cursor->search_near = __wt_cursor_search_near_notsup;
-	cursor->insert = __wt_cursor_notsup;
 	cursor->update = __wt_cursor_notsup;
-	cursor->remove = __wt_cursor_notsup;
-	cursor->reserve = __wt_cursor_notsup;
 }
 
 /*
@@ -603,88 +604,36 @@ __cursor_modify(WT_CURSOR *cursor, WT_MODIFY *entries, int nentries)
 {
 	WT_DECL_RET;
 	WT_SESSION_IMPL *session;
-	WT_DECL_ITEM(ta);
-	WT_DECL_ITEM(tb);
-	WT_DECL_ITEM(tmp);
-	size_t len, size;
-	int i;
 
 	CURSOR_UPDATE_API_CALL(cursor, session, modify);
-	WT_ERR(__cursor_checkkey(cursor));
-
-	/* Check for a rational modify vector count. */
-	if (nentries <= 0)
-		WT_ERR_MSG(
-		    session, EINVAL, "Illegal modify vector of %d", nentries);
 
 	WT_STAT_CONN_INCR(session, cursor_modify);
 	WT_STAT_DATA_INCR(session, cursor_modify);
 
-	/* Acquire position and value. */
-	WT_ERR(cursor->search(cursor));
+	/* Check for a rational modify vector count. */
+	if (nentries <= 0)
+		WT_ERR_MSG(session, EINVAL,
+		    "Illegal modify vector with %d entries", nentries);
 
 	/*
-	 * Process the entries to figure out how large a buffer we need. This is
-	 * a bit pessimistic because we're ignoring replacement bytes, but it's
-	 * a simpler calculation.
+	 * The underlying btree code cannot support WT_CURSOR.modify within
+	 * a read-uncommitted transaction. Disallow it here for consistency.
 	 */
-	for (size = cursor->value.size, i = 0; i < nentries; ++i) {
-		if (entries[i].offset >= size)
-			size = entries[i].offset;
-		size += entries[i].data.size;
-	}
+	if (session->txn.isolation == WT_ISO_READ_UNCOMMITTED)
+		WT_ERR_MSG(session, ENOTSUP,
+		    "not supported in read-uncommitted transactions");
 
-	/* Allocate a pair of buffers. */
-	WT_ERR(__wt_scr_alloc(session, size, &ta));
-	WT_ERR(__wt_scr_alloc(session, size, &tb));
+	WT_ERR(__cursor_checkkey(cursor));
 
-	/* Apply the change vector to the value. */
-	WT_ERR(__wt_buf_set(
-	    session, ta, cursor->value.data, cursor->value.size));
-	for (i = 0; i < nentries; ++i) {
-		/* Take leading bytes from the original, plus any gap bytes. */
-		if (entries[i].offset >= ta->size) {
-			memcpy(tb->mem, ta->mem, ta->size);
-			if (entries[i].offset > ta->size)
-				memset((uint8_t *)tb->mem + ta->size,
-				    '\0', entries[i].offset - ta->size);
-		} else
-			if (entries[i].offset > 0)
-				memcpy(tb->mem, ta->mem, entries[i].offset);
-		tb->size = entries[i].offset;
-
-		/* Take replacement bytes. */
-		if (entries[i].data.size > 0) {
-			memcpy((uint8_t *)tb->mem + tb->size,
-			    entries[i].data.data, entries[i].data.size);
-			tb->size += entries[i].data.size;
-		}
-
-		/* Take trailing bytes from the original. */
-		len = entries[i].offset + entries[i].size;
-		if (ta->size > len) {
-			memcpy((uint8_t *)tb->mem + tb->size,
-			    (uint8_t *)ta->mem + len, ta->size - len);
-			tb->size += ta->size - len;
-		}
-		WT_ASSERT(session, tb->size <= size);
-
-		tmp = ta;
-		ta = tb;
-		tb = tmp;
-	}
-
-	/* Set the cursor's value. */
-	ta->data = ta->mem;
-	cursor->set_value(cursor, ta);
+	/* Get the current value, apply the modifications. */
+	WT_ERR(cursor->search(cursor));
+	WT_ERR(__wt_modify_apply_api(
+	    session, &cursor->value, entries, nentries));
 
 	/* We know both key and value are set, "overwrite" doesn't matter. */
 	ret = cursor->update(cursor);
 
-err:	__wt_scr_free(session, &ta);
-	__wt_scr_free(session, &tb);
-
-	CURSOR_UPDATE_API_END(session, ret);
+err:	CURSOR_UPDATE_API_END(session, ret);
 	return (ret);
 }
 
@@ -789,6 +738,7 @@ __wt_cursor_init(WT_CURSOR *cursor,
 	WT_CONFIG_ITEM cval;
 	WT_CURSOR *cdump;
 	WT_SESSION_IMPL *session;
+	bool readonly;
 
 	session = (WT_SESSION_IMPL *)cursor->session;
 
@@ -810,21 +760,23 @@ __wt_cursor_init(WT_CURSOR *cursor,
 	 * Checkpoint cursors are permanently read-only, avoid the extra work
 	 * of two configuration string checks.
 	 */
-	WT_RET(__wt_config_gets_def(session, cfg, "checkpoint", 0, &cval));
-	if (cval.len != 0) {
+	readonly = F_ISSET(S2C(session), WT_CONN_READONLY);
+	if (!readonly) {
+		WT_RET(
+		    __wt_config_gets_def(session, cfg, "checkpoint", 0, &cval));
+		readonly = cval.len != 0;
+	}
+	if (!readonly) {
+		WT_RET(
+		    __wt_config_gets_def(session, cfg, "readonly", 0, &cval));
+		readonly = cval.val != 0;
+	}
+	if (readonly) {
 		cursor->insert = __wt_cursor_notsup;
+		cursor->modify = __wt_cursor_modify_notsup;
 		cursor->remove = __wt_cursor_notsup;
 		cursor->reserve = __wt_cursor_notsup;
 		cursor->update = __wt_cursor_notsup;
-	} else {
-		WT_RET(
-		    __wt_config_gets_def(session, cfg, "readonly", 0, &cval));
-		if (cval.val != 0 || F_ISSET(S2C(session), WT_CONN_READONLY)) {
-			cursor->insert = __wt_cursor_notsup;
-			cursor->remove = __wt_cursor_notsup;
-			cursor->reserve = __wt_cursor_notsup;
-			cursor->update = __wt_cursor_notsup;
-		}
 	}
 
 	/*
@@ -865,7 +817,7 @@ __wt_cursor_init(WT_CURSOR *cursor,
 
 	/*
 	 * WT_CURSOR.modify supported on 'u' value formats, but may have been
-	 * already initialized.
+	 * already initialized (file cursors have a faster implementation).
 	 */
 	if (WT_STREQ(cursor->value_format, "u") &&
 	    cursor->modify == __wt_cursor_modify_notsup)

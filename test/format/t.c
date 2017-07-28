@@ -178,7 +178,8 @@ main(int argc, char *argv[])
 
 		config_setup();			/* Run configuration */
 		config_print(0);		/* Dump run configuration */
-		key_len_setup();		/* Setup keys */
+		key_init();			/* Setup keys/values */
+		val_init();
 
 		start = time(NULL);
 		track("starting up", 0ULL, NULL);
@@ -254,6 +255,8 @@ main(int argc, char *argv[])
 		    g.run_cnt, g.c_data_source,
 		    g.c_file_type, difftime(time(NULL), start));
 		fflush(stdout);
+
+		val_teardown();			/* Teardown keys/values */
 	}
 
 	/* Flush/close any logging information. */
