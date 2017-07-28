@@ -293,17 +293,6 @@ env.Library(
     ]
 )
 
-env.CppUnitTest(
-    target='split_chunk_test',
-    source=[
-        'split_chunk_test.cpp'
-    ],
-    LIBDEPS=[
-        'split_chunk',
-        '$BUILD_DIR/mongo/s/shard_server_test_fixture',
-    ]
-)
-
 env.Library(
     target='split_vector',
     source=[
