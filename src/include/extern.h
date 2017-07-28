@@ -754,6 +754,8 @@ extern int __wt_thread_group_create( WT_SESSION_IMPL *session, WT_THREAD_GROUP *
 extern int __wt_thread_group_destroy(WT_SESSION_IMPL *session, WT_THREAD_GROUP *group) WT_GCC_FUNC_DECL_ATTRIBUTE((warn_unused_result));
 extern void __wt_thread_group_start_one( WT_SESSION_IMPL *session, WT_THREAD_GROUP *group, bool is_locked);
 extern void __wt_thread_group_stop_one(WT_SESSION_IMPL *session, WT_THREAD_GROUP *group);
+extern void __wt_epoch(WT_SESSION_IMPL *session, struct timespec *tsp) WT_GCC_FUNC_DECL_ATTRIBUTE((visibility("default")));
+extern void __wt_seconds(WT_SESSION_IMPL *session, time_t *timep);
 extern void __wt_txn_release_snapshot(WT_SESSION_IMPL *session);
 extern void __wt_txn_get_snapshot(WT_SESSION_IMPL *session);
 extern int __wt_txn_update_oldest(WT_SESSION_IMPL *session, uint32_t flags) WT_GCC_FUNC_DECL_ATTRIBUTE((warn_unused_result));
