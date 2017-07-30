@@ -123,6 +123,27 @@ Status appendCursorResponseToCommandResult(const ShardId& shardId,
     return getStatusFromCommandResult(result->asTempObj());
 }
 
+StatusWith<CachedCollectionRoutingInfo> getExecutionNsRoutingInfo(OperationContext* opCtx,
+                                                                  const NamespaceString& execNss,
+                                                                  CatalogCache* catalogCache) {
+    // This call to getCollectionRoutingInfo will return !OK if the database does not exist.
+    auto swRoutingInfo = catalogCache->getCollectionRoutingInfo(opCtx, execNss);
+
+    // Collectionless aggregations, however, may be run on 'admin' (which should always exist) but
+    // are subsequently targeted towards the shards. If getCollectionRoutingInfo is OK, we perform a
+    // further check that at least one shard exists if the aggregation is collectionless.
+    if (swRoutingInfo.isOK() && execNss.isCollectionlessAggregateNS()) {
+        std::vector<ShardId> shardIds;
+        Grid::get(opCtx)->shardRegistry()->getAllShardIds(&shardIds);
+
+        if (shardIds.size() == 0) {
+            return {ErrorCodes::NamespaceNotFound, "No shards are present in the cluster"};
+        }
+    }
+
+    return swRoutingInfo;
+}
+
 std::set<ShardId> getTargetedShards(OperationContext* opCtx,
                                     const NamespaceString& nss,
                                     const CachedCollectionRoutingInfo& routingInfo,
@@ -296,7 +317,8 @@ Status ClusterAggregate::runAggregate(OperationContext* opCtx,
     const auto catalogCache = Grid::get(opCtx)->catalogCache();
 
     auto executionNsRoutingInfoStatus =
-        catalogCache->getCollectionRoutingInfo(opCtx, namespaces.executionNss);
+        getExecutionNsRoutingInfo(opCtx, namespaces.executionNss, catalogCache);
+
     if (!executionNsRoutingInfoStatus.isOK()) {
         appendEmptyResultSet(
             *result, executionNsRoutingInfoStatus.getStatus(), namespaces.requestedNss.ns());
@@ -389,6 +411,11 @@ Status ClusterAggregate::runAggregate(OperationContext* opCtx,
                                                        shardQuery,
                                                        request.getCollation());
 
+        uassert(ErrorCodes::ShardNotFound,
+                "No targets were found for this aggregation. All shards were removed from the "
+                "cluster mid-operation",
+                shardIds.size() > 0);
+
         // Don't need to split pipeline if we are only targeting a single shard, unless there is a
         // stage that needs to be run on the primary shard and the single target shard is not the
         // primary.
@@ -458,6 +485,8 @@ Status ClusterAggregate::runAggregate(OperationContext* opCtx,
 
     // Retrieve the shard cursors and check whether or not we dispatched to a single shard.
     auto cursors = uassertStatusOK(std::move(swCursors));
+
+    invariant(cursors.size() > 0);
 
     // If we dispatched to a single shard, store the remote cursor and return immediately.
     if (!pipelineForTargetedShards->isSplitForSharded()) {
