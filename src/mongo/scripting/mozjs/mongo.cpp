@@ -477,29 +477,10 @@ void MongoBase::Functions::update::call(JSContext* cx, JS::CallArgs args) {
 
 void MongoBase::Functions::auth::call(JSContext* cx, JS::CallArgs args) {
     auto conn = getConnection(args);
-    if (!conn)
-        uasserted(ErrorCodes::BadValue, "no connection");
+    uassert(ErrorCodes::BadValue, "no connection", conn);
+    uassert(ErrorCodes::BadValue, "mongoAuth takes exactly 1 object argument", args.length() == 1);
 
-    BSONObj params;
-    switch (args.length()) {
-        case 1:
-            params = ValueWriter(cx, args.get(0)).toBSON();
-            break;
-        case 3:
-            params =
-                BSON(saslCommandMechanismFieldName << "MONGODB-CR" << saslCommandUserDBFieldName
-                                                   << ValueWriter(cx, args[0]).toString()
-                                                   << saslCommandUserFieldName
-                                                   << ValueWriter(cx, args[1]).toString()
-                                                   << saslCommandPasswordFieldName
-                                                   << ValueWriter(cx, args[2]).toString());
-            break;
-        default:
-            uasserted(ErrorCodes::BadValue, "mongoAuth takes 1 object or 3 string arguments");
-    }
-
-    conn->auth(params);
-
+    conn->auth(ValueWriter(cx, args.get(0)).toBSON());
     args.rval().setBoolean(true);
 }
 
