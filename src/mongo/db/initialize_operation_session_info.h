@@ -28,36 +28,22 @@
 
 #pragma once
 
-#include <initializer_list>
-#include <vector>
-
-#include "mongo/db/auth/privilege.h"
 #include "mongo/db/logical_session_id.h"
 
 namespace mongo {
 
 /**
- * Factory functions to generate logical session records.
+ * Parses the session information from the body of a request and installs it on the current
+ * operation context. Must only be called once per operation and should be done right in the
+ * beginning.
+ *
+ * Throws if the sessionId/txnNumber combination is not properly formatted.
+ *
+ * requiresAuth specifies if the command we're initializing operationSessionInfo for requires
+ * authorization or not.  This can be determined by invoking ->requiresAuth() on the parsed command.
  */
-LogicalSessionId makeLogicalSessionId(const LogicalSessionFromClient& lsid,
-                                      OperationContext* opCtx,
-                                      std::initializer_list<Privilege> allowSpoof = {});
-LogicalSessionId makeLogicalSessionId(OperationContext* opCtx);
-
-/**
- * Factory functions to make logical session records. The overloads that
- * take an OperationContext should be used when possible, as they will also set the
- * user information on the record.
- */
-LogicalSessionRecord makeLogicalSessionRecord(const LogicalSessionId& lsid, Date_t lastUse);
-LogicalSessionRecord makeLogicalSessionRecord(OperationContext* opCtx, Date_t lastUse);
-LogicalSessionRecord makeLogicalSessionRecord(OperationContext* opCtx,
-                                              const LogicalSessionId& lsid,
-                                              Date_t lastUse);
-
-LogicalSessionToClient makeLogicalSessionToClient(const LogicalSessionId& lsid);
-LogicalSessionIdSet makeLogicalSessionIds(const std::vector<LogicalSessionFromClient>& sessions,
-                                          OperationContext* opCtx,
-                                          std::initializer_list<Privilege> allowSpoof = {});
+void initializeOperationSessionInfo(OperationContext* opCtx,
+                                    const BSONObj& requestBody,
+                                    bool requiresAuth);
 
 }  // namespace mongo

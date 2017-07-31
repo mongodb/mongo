@@ -41,6 +41,7 @@
 #include "mongo/db/client.h"
 #include "mongo/db/db_raii.h"
 #include "mongo/db/kill_sessions_common.h"
+#include "mongo/db/logical_session_cache.h"
 #include "mongo/db/namespace_string.h"
 #include "mongo/db/operation_context.h"
 #include "mongo/db/query/plan_executor.h"
@@ -512,6 +513,13 @@ StatusWith<ClientCursorPin> CursorManager::pinCursor(OperationContext* opCtx, Cu
         return error;
     }
     cursor->_isPinned = true;
+
+    // We use pinning of a cursor as a proxy for active, user-initiated use of a cursor.  Therefor,
+    // we pass down to the logical session cache and vivify the record (updating last use).
+    if (cursor->getSessionId()) {
+        LogicalSessionCache::get(opCtx)->vivify(opCtx, cursor->getSessionId().get());
+    }
+
     return ClientCursorPin(opCtx, cursor);
 }
 

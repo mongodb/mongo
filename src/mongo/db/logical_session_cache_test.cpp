@@ -31,6 +31,7 @@
 #include "mongo/bson/oid.h"
 #include "mongo/db/auth/user_name.h"
 #include "mongo/db/logical_session_cache.h"
+#include "mongo/db/logical_session_cache_impl.h"
 #include "mongo/db/logical_session_id.h"
 #include "mongo/db/logical_session_id_helpers.h"
 #include "mongo/db/operation_context_noop.h"
@@ -46,7 +47,7 @@ namespace {
 
 const Milliseconds kSessionTimeout = duration_cast<Milliseconds>(kLogicalSessionDefaultTimeout);
 const Milliseconds kForceRefresh =
-    duration_cast<Milliseconds>(LogicalSessionCache::kLogicalSessionDefaultRefresh);
+    duration_cast<Milliseconds>(LogicalSessionCacheImpl::kLogicalSessionDefaultRefresh);
 
 using SessionList = std::list<LogicalSessionId>;
 
@@ -68,8 +69,8 @@ public:
 
         auto mockService = stdx::make_unique<MockServiceLiason>(_service);
         auto mockSessions = stdx::make_unique<MockSessionsCollection>(_sessions);
-        _cache =
-            stdx::make_unique<LogicalSessionCache>(std::move(mockService), std::move(mockSessions));
+        _cache = stdx::make_unique<LogicalSessionCacheImpl>(std::move(mockService),
+                                                            std::move(mockSessions));
     }
 
     void tearDown() override {
@@ -344,7 +345,7 @@ TEST_F(LogicalSessionCacheTest, RefreshCachedAndServiceSignedLsidsTogether) {
 
 // Test large sets of cache-only session lsids
 TEST_F(LogicalSessionCacheTest, ManySignedLsidsInCacheRefresh) {
-    int count = LogicalSessionCache::kLogicalSessionCacheDefaultCapacity;
+    int count = LogicalSessionCacheImpl::kLogicalSessionCacheDefaultCapacity;
     for (int i = 0; i < count; i++) {
         auto record = makeLogicalSessionRecordForTest();
         cache()->startSession(opCtx(), record).transitional_ignore();
@@ -364,7 +365,7 @@ TEST_F(LogicalSessionCacheTest, ManySignedLsidsInCacheRefresh) {
 
 // Test larger sets of service-only session lsids
 TEST_F(LogicalSessionCacheTest, ManyLongRunningSessionsRefresh) {
-    int count = LogicalSessionCache::kLogicalSessionCacheDefaultCapacity;
+    int count = LogicalSessionCacheImpl::kLogicalSessionCacheDefaultCapacity;
     for (int i = 0; i < count; i++) {
         auto lsid = makeLogicalSessionIdForTest();
         service()->add(lsid);
@@ -384,7 +385,7 @@ TEST_F(LogicalSessionCacheTest, ManyLongRunningSessionsRefresh) {
 
 // Test larger mixed sets of cache/service active sessions
 TEST_F(LogicalSessionCacheTest, ManySessionsRefreshComboDeluxe) {
-    int count = LogicalSessionCache::kLogicalSessionCacheDefaultCapacity;
+    int count = LogicalSessionCacheImpl::kLogicalSessionCacheDefaultCapacity;
     for (int i = 0; i < count; i++) {
         auto lsid = makeLogicalSessionIdForTest();
         service()->add(lsid);

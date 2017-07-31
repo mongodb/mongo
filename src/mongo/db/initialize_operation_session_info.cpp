@@ -26,38 +26,42 @@
  * then also delete it in the license file.
  */
 
-#pragma once
+#include "mongo/platform/basic.h"
 
-#include <initializer_list>
-#include <vector>
+#include "mongo/db/initialize_operation_session_info.h"
 
-#include "mongo/db/auth/privilege.h"
-#include "mongo/db/logical_session_id.h"
+#include "mongo/db/logical_session_cache.h"
+#include "mongo/db/logical_session_id_helpers.h"
+#include "mongo/db/operation_context.h"
 
 namespace mongo {
 
-/**
- * Factory functions to generate logical session records.
- */
-LogicalSessionId makeLogicalSessionId(const LogicalSessionFromClient& lsid,
-                                      OperationContext* opCtx,
-                                      std::initializer_list<Privilege> allowSpoof = {});
-LogicalSessionId makeLogicalSessionId(OperationContext* opCtx);
+void initializeOperationSessionInfo(OperationContext* opCtx,
+                                    const BSONObj& requestBody,
+                                    bool requiresAuth) {
+    if (!requiresAuth) {
+        return;
+    }
 
-/**
- * Factory functions to make logical session records. The overloads that
- * take an OperationContext should be used when possible, as they will also set the
- * user information on the record.
- */
-LogicalSessionRecord makeLogicalSessionRecord(const LogicalSessionId& lsid, Date_t lastUse);
-LogicalSessionRecord makeLogicalSessionRecord(OperationContext* opCtx, Date_t lastUse);
-LogicalSessionRecord makeLogicalSessionRecord(OperationContext* opCtx,
-                                              const LogicalSessionId& lsid,
-                                              Date_t lastUse);
+    auto osi = OperationSessionInfoFromClient::parse("OperationSessionInfo"_sd, requestBody);
 
-LogicalSessionToClient makeLogicalSessionToClient(const LogicalSessionId& lsid);
-LogicalSessionIdSet makeLogicalSessionIds(const std::vector<LogicalSessionFromClient>& sessions,
-                                          OperationContext* opCtx,
-                                          std::initializer_list<Privilege> allowSpoof = {});
+    if (osi.getSessionId()) {
+        opCtx->setLogicalSessionId(makeLogicalSessionId(osi.getSessionId().get(), opCtx));
+
+        LogicalSessionCache* lsc = LogicalSessionCache::get(opCtx->getServiceContext());
+        lsc->vivify(opCtx, opCtx->getLogicalSessionId().get());
+    }
+
+    if (osi.getTxnNumber()) {
+        uassert(ErrorCodes::IllegalOperation,
+                "Transaction number requires a sessionId to be specified",
+                opCtx->getLogicalSessionId());
+        uassert(ErrorCodes::BadValue,
+                "Transaction number cannot be negative",
+                *osi.getTxnNumber() >= 0);
+
+        opCtx->setTxnNumber(*osi.getTxnNumber());
+    }
+}
 
 }  // namespace mongo

@@ -32,6 +32,7 @@
 
 #include "mongo/db/logical_session_cache_factory_mongod.h"
 
+#include "mongo/db/logical_session_cache_impl.h"
 #include "mongo/db/service_liason_mongod.h"
 #include "mongo/db/sessions_collection_rs.h"
 #include "mongo/db/sessions_collection_sharded.h"
@@ -62,8 +63,8 @@ std::unique_ptr<LogicalSessionCache> makeLogicalSessionCacheD(LogicalSessionCach
 
     // Set up the logical session cache
     auto sessionsColl = makeSessionsCollection(state);
-    return stdx::make_unique<LogicalSessionCache>(
-        std::move(liason), std::move(sessionsColl), LogicalSessionCache::Options{});
+    return stdx::make_unique<LogicalSessionCacheImpl>(
+        std::move(liason), std::move(sessionsColl), LogicalSessionCacheImpl::Options{});
 }
 
 }  // namespace mongo

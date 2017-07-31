@@ -44,6 +44,7 @@
 #include "mongo/db/cursor_manager.h"
 #include "mongo/db/dbdirectclient.h"
 #include "mongo/db/diag_log.h"
+#include "mongo/db/initialize_operation_session_info.h"
 #include "mongo/db/introspect.h"
 #include "mongo/db/jsobj.h"
 #include "mongo/db/lasterror.h"

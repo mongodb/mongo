@@ -206,6 +206,10 @@ public:
         // No auth required for getlasterror
     }
 
+    bool requiresAuth() const override {
+        return false;
+    }
+
     virtual bool run(OperationContext* opCtx,
                      const std::string& dbname,
                      const BSONObj& cmdObj,

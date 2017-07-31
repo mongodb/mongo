@@ -633,6 +633,7 @@ env.Library(
     ],
     LIBDEPS=[
         "$BUILD_DIR/mongo/base",
+        "$BUILD_DIR/mongo/db/logical_session_cache",
         "$BUILD_DIR/mongo/db/logical_session_id",
         "$BUILD_DIR/mongo/util/background_job",
         "query/query",
@@ -895,23 +896,6 @@ env.Library(
     ],
 )
 
-env.CppUnitTest(
-    target='logical_session_id_test',
-    source=[
-        'logical_session_id_test.cpp',
-    ],
-    LIBDEPS=[
-        '$BUILD_DIR/mongo/base',
-        '$BUILD_DIR/mongo/db/service_context_noop_init',
-        '$BUILD_DIR/mongo/transport/transport_layer_mock',
-        '$BUILD_DIR/mongo/db/auth/authcore',
-        '$BUILD_DIR/mongo/db/auth/authmocks',
-        '$BUILD_DIR/mongo/db/auth/authorization_session_for_test',
-        'logical_session_id',
-        'logical_session_id_helpers',
-    ],
-)
-
 env.Library(
     target='service_liason',
     source=[
@@ -928,6 +912,27 @@ env.Library(
 
 envWithAsio = env.Clone()
 envWithAsio.InjectThirdPartyIncludePaths(libraries=['asio'])
+
+envWithAsio.CppUnitTest(
+    target='logical_session_id_test',
+    source=[
+        'logical_session_id_test.cpp',
+    ],
+    LIBDEPS=[
+        '$BUILD_DIR/mongo/base',
+        '$BUILD_DIR/mongo/db/auth/authcore',
+        '$BUILD_DIR/mongo/db/auth/authmocks',
+        '$BUILD_DIR/mongo/db/auth/authorization_session_for_test',
+        '$BUILD_DIR/mongo/db/service_context_noop_init',
+        '$BUILD_DIR/mongo/transport/transport_layer_mock',
+        'logical_session_cache',
+        'logical_session_cache_impl',
+        'logical_session_id',
+        'logical_session_id_helpers',
+        'service_liason_mock',
+        'sessions_collection_mock',
+    ],
+)
 
 envWithAsio.Library(
     target='service_liason_mock',
@@ -1043,10 +1048,23 @@ env.Library(
     target='logical_session_cache',
     source=[
         'logical_session_cache.cpp',
+    ],
+    LIBDEPS=[
+        'logical_session_id',
+        'service_context',
+    ],
+)
+
+env.Library(
+    target='logical_session_cache_impl',
+    source=[
+        'initialize_operation_session_info.cpp',
+        'logical_session_cache_impl.cpp',
         'logical_session_server_status_section.cpp',
     ],
     LIBDEPS=[
         '$BUILD_DIR/mongo/db/commands/server_status',
+        'logical_session_cache',
         'logical_session_id',
         'logical_session_id_helpers',
         'sessions_collection',
@@ -1069,6 +1087,7 @@ envWithAsio.CppUnitTest(
         'logical_session_id',
         'logical_session_id_helpers',
         'logical_session_cache',
+        'logical_session_cache_impl',
         'service_liason_mock',
         'sessions_collection_mock',
     ],
@@ -1081,6 +1100,7 @@ envWithAsio.Library(
     ],
     LIBDEPS=[
         'logical_session_cache',
+        'logical_session_cache_impl',
         'service_liason_mongod',
         'sessions_collection_rs',
         'sessions_collection_sharded',
@@ -1095,6 +1115,7 @@ envWithAsio.Library(
     ],
     LIBDEPS=[
         'logical_session_cache',
+        'logical_session_cache_impl',
         'service_liason_mongos',
         'sessions_collection_sharded',
     ],

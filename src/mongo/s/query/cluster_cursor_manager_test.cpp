@@ -32,6 +32,10 @@
 
 #include <vector>
 
+#include "mongo/db/logical_session_cache.h"
+#include "mongo/db/logical_session_cache_noop.h"
+#include "mongo/db/operation_context_noop.h"
+#include "mongo/db/service_context_noop.h"
 #include "mongo/s/query/cluster_client_cursor_mock.h"
 #include "mongo/stdx/memory.h"
 #include "mongo/unittest/unittest.h"
@@ -47,6 +51,10 @@ const NamespaceString nss("test.collection");
 class ClusterCursorManagerTest : public unittest::Test {
 protected:
     ClusterCursorManagerTest() : _manager(&_clockSourceMock) {}
+
+    ServiceContextNoop serviceContext;
+    ServiceContext::UniqueOperationContext _opCtx;
+    Client* _client;
 
     /**
      * Returns an unowned pointer to the manager owned by this test fixture.
@@ -89,9 +97,25 @@ protected:
     }
 
 private:
+    void setUp() final {
+        auto client = serviceContext.makeClient("testClient");
+        _opCtx = client->makeOperationContext();
+        _client = client.get();
+        Client::setCurrent(std::move(client));
+
+        LogicalSessionCache::set(&serviceContext, stdx::make_unique<LogicalSessionCacheNoop>());
+    }
+
     void tearDown() final {
         _manager.killAllCursors();
         _manager.reapZombieCursors(nullptr);
+
+        if (_opCtx) {
+            _opCtx.reset();
+        }
+
+        Client::releaseCurrent();
+        LogicalSessionCache::set(&serviceContext, nullptr);
     }
 
     // List of flags representing whether our allocated cursors have been killed yet.  The value of
@@ -1008,7 +1032,7 @@ TEST_F(ClusterCursorManagerTest, GetSessionIdsWhileCheckedOut) {
                                                ClusterCursorManager::CursorLifetime::Mortal));
 
     // Check the cursor out, then try to append cursors, see that we get one.
-    auto res = getManager()->checkOutCursor(nss, cursorId, nullptr);
+    auto res = getManager()->checkOutCursor(nss, cursorId, _opCtx.get());
     ASSERT(res.isOK());
 
     auto cursors = getManager()->getCursorsForSession(lsid);

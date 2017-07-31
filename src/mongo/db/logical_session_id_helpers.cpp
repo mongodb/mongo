@@ -32,7 +32,6 @@
 
 #include "mongo/db/auth/authorization_session.h"
 #include "mongo/db/auth/user.h"
-#include "mongo/db/logical_session_cache.h"
 #include "mongo/db/operation_context.h"
 
 namespace mongo {
@@ -165,32 +164,6 @@ LogicalSessionToClient makeLogicalSessionToClient(const LogicalSessionId& lsid) 
 
     return id;
 };
-
-void initializeOperationSessionInfo(OperationContext* opCtx,
-                                    const BSONObj& requestBody,
-                                    bool requiresAuth) {
-    if (!requiresAuth) {
-        return;
-    }
-
-    auto osi = OperationSessionInfoFromClient::parse(IDLParserErrorContext("OperationSessionInfo"),
-                                                     requestBody);
-
-    if (osi.getSessionId()) {
-        opCtx->setLogicalSessionId(makeLogicalSessionId(*(osi.getSessionId()), opCtx));
-    }
-
-    if (osi.getTxnNumber()) {
-        uassert(ErrorCodes::IllegalOperation,
-                "Transaction number requires a sessionId to be specified",
-                opCtx->getLogicalSessionId());
-        uassert(ErrorCodes::BadValue,
-                "Transaction number cannot be negative",
-                *osi.getTxnNumber() >= 0);
-
-        opCtx->setTxnNumber(*osi.getTxnNumber());
-    }
-}
 
 LogicalSessionIdSet makeLogicalSessionIds(const std::vector<LogicalSessionFromClient>& sessions,
                                           OperationContext* opCtx,

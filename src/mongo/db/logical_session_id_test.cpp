@@ -40,11 +40,16 @@
 #include "mongo/db/auth/authz_manager_external_state_mock.h"
 #include "mongo/db/auth/authz_session_external_state_mock.h"
 #include "mongo/db/auth/user.h"
+#include "mongo/db/initialize_operation_session_info.h"
 #include "mongo/db/jsobj.h"
+#include "mongo/db/logical_session_cache.h"
+#include "mongo/db/logical_session_cache_impl.h"
 #include "mongo/db/logical_session_id_helpers.h"
 #include "mongo/db/operation_context_noop.h"
 #include "mongo/db/server_options.h"
 #include "mongo/db/service_context_noop.h"
+#include "mongo/db/service_liason_mock.h"
+#include "mongo/db/sessions_collection_mock.h"
 #include "mongo/transport/session.h"
 #include "mongo/transport/transport_layer_mock.h"
 #include "mongo/unittest/unittest.h"
@@ -88,6 +93,16 @@ public:
 
         AuthorizationSession::set(client.get(), std::move(localauthzSession));
         authzManager->setAuthEnabled(true);
+
+        auto localServiceLiason =
+            stdx::make_unique<MockServiceLiason>(std::make_shared<MockServiceLiasonImpl>());
+        auto localSessionsCollection = stdx::make_unique<MockSessionsCollection>(
+            std::make_shared<MockSessionsCollectionImpl>());
+
+        auto localLogicalSessionCache = stdx::make_unique<LogicalSessionCacheImpl>(
+            std::move(localServiceLiason), std::move(localSessionsCollection));
+
+        LogicalSessionCache::set(&serviceContext, std::move(localLogicalSessionCache));
     }
 
     User* addSimpleUser(UserName un) {

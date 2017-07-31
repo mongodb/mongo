@@ -41,6 +41,7 @@
 #include "mongo/db/auth/action_type.h"
 #include "mongo/db/auth/authorization_session.h"
 #include "mongo/db/commands.h"
+#include "mongo/db/initialize_operation_session_info.h"
 #include "mongo/db/logical_clock.h"
 #include "mongo/db/logical_session_id_helpers.h"
 #include "mongo/db/logical_time_validator.h"

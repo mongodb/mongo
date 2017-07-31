@@ -28,15 +28,9 @@
 
 #pragma once
 
-#include "mongo/base/status_with.h"
+#include "mongo/base/status.h"
 #include "mongo/db/logical_session_id.h"
 #include "mongo/db/refresh_sessions_gen.h"
-#include "mongo/db/service_liason.h"
-#include "mongo/db/sessions_collection.h"
-#include "mongo/db/time_proof_service.h"
-#include "mongo/platform/atomic_word.h"
-#include "mongo/stdx/thread.h"
-#include "mongo/util/lru_cache.h"
 
 namespace mongo {
 
@@ -44,14 +38,8 @@ class Client;
 class OperationContext;
 class ServiceContext;
 
-extern int logicalSessionRecordCacheSize;
-extern int logicalSessionRefreshMinutes;
-
 /**
- * A thread-safe cache structure for logical session records.
- *
- * The cache takes ownership of the passed-in ServiceLiason and
- * SessionsCollection helper types.
+ * The interface for the logical session cache
  */
 class LogicalSessionCache {
 public:
@@ -62,61 +50,14 @@ public:
     static LogicalSessionCache* get(OperationContext* opCtx);
     static void set(ServiceContext* service, std::unique_ptr<LogicalSessionCache> sessionCache);
 
-    static constexpr int kLogicalSessionCacheDefaultCapacity = 10000;
-    static constexpr Minutes kLogicalSessionDefaultRefresh = Minutes(5);
-
-    /**
-     * An Options type to support the LogicalSessionCache.
-     */
-    struct Options {
-        Options(){};
-
-        /**
-         * The number of session records to keep in the cache.
-         *
-         * May be set with --setParameter logicalSessionRecordCacheSize=X.
-         */
-        int capacity = logicalSessionRecordCacheSize;
-
-        /**
-         * A timeout value to use for sessions in the cache, in minutes.
-         *
-         * By default, this is set to 30 minutes.
-         *
-         * May be set with --setParameter localLogicalSessionTimeoutMinutes=X.
-         */
-        Minutes sessionTimeout = Minutes(localLogicalSessionTimeoutMinutes);
-
-        /**
-         * The interval over which the cache will refresh session records.
-         *
-         * By default, this is set to every 5 minutes. If the caller is
-         * setting the sessionTimeout by hand, it is suggested that they
-         * consider also setting the refresh interval accordingly.
-         *
-         * May be set with --setParameter logicalSessionRefreshMinutes=X.
-         */
-        Minutes refreshInterval = Minutes(logicalSessionRefreshMinutes);
-    };
-
-    /**
-     * Construct a new session cache.
-     */
-    explicit LogicalSessionCache(std::unique_ptr<ServiceLiason> service,
-                                 std::unique_ptr<SessionsCollection> collection,
-                                 Options options = Options{});
-
-    LogicalSessionCache(const LogicalSessionCache&) = delete;
-    LogicalSessionCache operator=(const LogicalSessionCache&) = delete;
-
-    ~LogicalSessionCache();
+    virtual ~LogicalSessionCache() = 0;
 
     /**
      * If the cache contains a record for this LogicalSessionId, promotes that lsid
      * to be the most recently used and updates its lastUse date to be the current
      * time. Returns an error if the session was not found.
      */
-    Status promote(LogicalSessionId lsid);
+    virtual Status promote(LogicalSessionId lsid) = 0;
 
     /**
      * Inserts a new authoritative session record into the cache. This method will
@@ -124,63 +65,44 @@ public:
      * should only be used when starting new sessions and should not be used to
      * insert records for existing sessions.
      */
-    Status startSession(OperationContext* opCtx, LogicalSessionRecord record);
+    virtual Status startSession(OperationContext* opCtx, LogicalSessionRecord record) = 0;
 
     /**
      * Refresh the given sessions. Updates the timestamps of these records in
      * the local cache.
      */
-    Status refreshSessions(OperationContext* opCtx, const RefreshSessionsCmdFromClient& cmd);
-    Status refreshSessions(OperationContext* opCtx, const RefreshSessionsCmdFromClusterMember& cmd);
+    virtual Status refreshSessions(OperationContext* opCtx,
+                                   const RefreshSessionsCmdFromClient& cmd) = 0;
+    virtual Status refreshSessions(OperationContext* opCtx,
+                                   const RefreshSessionsCmdFromClusterMember& cmd) = 0;
+
+    /**
+     * Vivifies the session in the cache. I.e. creates it if it isn't there, updates last use if it
+     * is.
+     */
+    virtual void vivify(OperationContext* opCtx, const LogicalSessionId& lsid) = 0;
 
     /**
      * Removes all local records in this cache. Does not remove the corresponding
      * authoritative session records from the sessions collection.
      */
-    void clear();
+    virtual void clear() = 0;
 
     /**
      * Refreshes the cache synchronously. This flushes all pending refreshes and
      * inserts to the sessions collection.
      */
-    Status refreshNow(Client* client);
+    virtual Status refreshNow(Client* client) = 0;
 
     /**
      * Returns the current time.
      */
-    Date_t now();
+    virtual Date_t now() = 0;
 
     /**
      * Returns the number of session records currently in the cache.
      */
-    size_t size();
-
-private:
-    /**
-     * Internal methods to handle scheduling and perform refreshes for active
-     * session records contained within the cache.
-     */
-    void _periodicRefresh(Client* client);
-    Status _refresh(Client* client);
-
-    /**
-     * Returns true if a record has passed its given expiration.
-     */
-    bool _isDead(const LogicalSessionRecord& record, Date_t now) const;
-
-    /**
-     * Takes the lock and inserts the given record into the cache.
-     */
-    boost::optional<LogicalSessionRecord> _addToCache(LogicalSessionRecord record);
-
-    const Minutes _refreshInterval;
-    const Minutes _sessionTimeout;
-
-    std::unique_ptr<ServiceLiason> _service;
-    std::unique_ptr<SessionsCollection> _sessionsColl;
-
-    stdx::mutex _cacheMutex;
-    LRUCache<LogicalSessionId, LogicalSessionRecord, LogicalSessionIdHash> _cache;
+    virtual size_t size() = 0;
 };
 
 }  // namespace mongo

@@ -28,36 +28,51 @@
 
 #pragma once
 
-#include <initializer_list>
-#include <vector>
-
-#include "mongo/db/auth/privilege.h"
-#include "mongo/db/logical_session_id.h"
+#include "mongo/db/logical_session_cache.h"
 
 namespace mongo {
 
-/**
- * Factory functions to generate logical session records.
- */
-LogicalSessionId makeLogicalSessionId(const LogicalSessionFromClient& lsid,
-                                      OperationContext* opCtx,
-                                      std::initializer_list<Privilege> allowSpoof = {});
-LogicalSessionId makeLogicalSessionId(OperationContext* opCtx);
+class Client;
+class OperationContext;
+class ServiceContext;
 
 /**
- * Factory functions to make logical session records. The overloads that
- * take an OperationContext should be used when possible, as they will also set the
- * user information on the record.
+ * A noop logical session cache for use in tests
  */
-LogicalSessionRecord makeLogicalSessionRecord(const LogicalSessionId& lsid, Date_t lastUse);
-LogicalSessionRecord makeLogicalSessionRecord(OperationContext* opCtx, Date_t lastUse);
-LogicalSessionRecord makeLogicalSessionRecord(OperationContext* opCtx,
-                                              const LogicalSessionId& lsid,
-                                              Date_t lastUse);
+class LogicalSessionCacheNoop : public LogicalSessionCache {
+public:
+    Status promote(LogicalSessionId lsid) override {
+        return Status::OK();
+    }
 
-LogicalSessionToClient makeLogicalSessionToClient(const LogicalSessionId& lsid);
-LogicalSessionIdSet makeLogicalSessionIds(const std::vector<LogicalSessionFromClient>& sessions,
-                                          OperationContext* opCtx,
-                                          std::initializer_list<Privilege> allowSpoof = {});
+    Status startSession(OperationContext* opCtx, LogicalSessionRecord record) override {
+        return Status::OK();
+    }
+
+    Status refreshSessions(OperationContext* opCtx,
+                           const RefreshSessionsCmdFromClient& cmd) override {
+        return Status::OK();
+    }
+    Status refreshSessions(OperationContext* opCtx,
+                           const RefreshSessionsCmdFromClusterMember& cmd) override {
+        return Status::OK();
+    }
+
+    void vivify(OperationContext* opCtx, const LogicalSessionId& lsid) override {}
+
+    void clear() override {}
+
+    Status refreshNow(Client* client) override {
+        return Status::OK();
+    }
+
+    Date_t now() override {
+        return Date_t::now();
+    }
+
+    size_t size() override {
+        return 0;
+    }
+};
 
 }  // namespace mongo
