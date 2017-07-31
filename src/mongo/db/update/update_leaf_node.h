@@ -38,7 +38,7 @@ namespace mongo {
  */
 class UpdateLeafNode : public UpdateNode {
 public:
-    UpdateLeafNode() : UpdateNode(Type::Leaf) {}
+    explicit UpdateLeafNode(Context context = Context::kAll) : UpdateNode(Type::Leaf, context) {}
 
     /**
      * Initializes the leaf node with the value in 'modExpr'. 'modExpr' is a single modifier

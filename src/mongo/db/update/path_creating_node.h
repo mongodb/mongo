@@ -41,6 +41,8 @@ namespace mongo {
  */
 class PathCreatingNode : public UpdateLeafNode {
 public:
+    explicit PathCreatingNode(Context context = Context::kAll) : UpdateLeafNode(context) {}
+
     ApplyResult apply(ApplyParams applyParams) const final;
 
 protected:

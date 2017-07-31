@@ -216,6 +216,8 @@ std::unique_ptr<UpdateLeafNode> makeUpdateLeafNode(ModifierType modType) {
             return stdx::make_unique<RenameNode>();
         case MOD_SET:
             return stdx::make_unique<SetNode>();
+        case MOD_SET_ON_INSERT:
+            return stdx::make_unique<SetNode>(UpdateNode::Context::kInsertOnly);
         case MOD_UNSET:
             return stdx::make_unique<UnsetNode>();
         default:

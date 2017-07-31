@@ -165,8 +165,6 @@ UpdateStage::UpdateStage(OperationContext* opCtx,
       _updatedRecordIds(params.request->isMulti() ? new RecordIdSet() : NULL),
       _doc(params.driver->getDocument()) {
     _children.emplace_back(child);
-    // We are an update until we fall into the insert case.
-    params.driver->setContext(ModifierInterface::ExecInfo::UPDATE_CONTEXT);
 
     // Before we even start executing, we know whether or not this is a replacement
     // style or $mod style update.
@@ -378,7 +376,7 @@ Status UpdateStage::applyUpdateOpsForInsert(OperationContext* opCtx,
     // oplog record, then. We also set the context of the update driver to the INSERT_CONTEXT.
     // Some mods may only work in that context (e.g. $setOnInsert).
     driver->setLogOp(false);
-    driver->setContext(ModifierInterface::ExecInfo::INSERT_CONTEXT);
+    driver->setInsert(true);
 
     FieldRefSet immutablePaths;
     if (!isInternalRequest) {

@@ -55,6 +55,7 @@ protected:
         _pathToCreate = std::make_shared<FieldRef>();
         _pathTaken = std::make_shared<FieldRef>();
         _matchedField = StringData();
+        _insert = false;
         _fromReplication = false;
         _validateForStorage = true;
         _indexData.reset();
@@ -67,6 +68,7 @@ protected:
         applyParams.pathToCreate = _pathToCreate;
         applyParams.pathTaken = _pathTaken;
         applyParams.matchedField = _matchedField;
+        applyParams.insert = _insert;
         applyParams.fromReplication = _fromReplication;
         applyParams.validateForStorage = _validateForStorage;
         applyParams.indexData = _indexData.get();
@@ -92,6 +94,10 @@ protected:
 
     void setMatchedField(StringData matchedField) {
         _matchedField = matchedField;
+    }
+
+    void setInsert(bool insert) {
+        _insert = insert;
     }
 
     void setFromReplication(bool fromReplication) {
@@ -123,6 +129,7 @@ private:
     std::shared_ptr<FieldRef> _pathToCreate;
     std::shared_ptr<FieldRef> _pathTaken;
     StringData _matchedField;
+    bool _insert;
     bool _fromReplication;
     bool _validateForStorage;
     std::unique_ptr<UpdateIndexData> _indexData;

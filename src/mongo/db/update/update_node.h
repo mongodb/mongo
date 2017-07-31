@@ -59,9 +59,11 @@ class FieldRef;
  */
 class UpdateNode {
 public:
+    enum class Context { kAll, kInsertOnly };
     enum class Type { Object, Array, Leaf, Replacement };
 
-    explicit UpdateNode(Type type) : type(type) {}
+    explicit UpdateNode(Type type, Context context = Context::kAll)
+        : context(context), type(type) {}
     virtual ~UpdateNode() = default;
 
     virtual std::unique_ptr<UpdateNode> clone() const = 0;
@@ -101,6 +103,10 @@ public:
         // If there was a positional ($) element in the update expression, 'matchedField' is the
         // index of the array element that caused the query to match the document.
         StringData matchedField;
+
+        // True if the update is being applied to a document to be inserted. $setOnInsert behaves as
+        // a no-op when this flag is false.
+        bool insert = false;
 
         // This is provided because some modifiers may ignore certain errors when the update is from
         // replication.
@@ -151,6 +157,7 @@ public:
                                                                  const UpdateNode& rightNode,
                                                                  FieldRef* pathTaken);
 
+    const Context context;
     const Type type;
 };
 

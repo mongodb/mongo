@@ -219,6 +219,20 @@ TEST(UpdateObjectNodeTest, ValidCurrentDatePathParsesSuccessfully) {
                                               foundIdentifiers));
 }
 
+TEST(UpdateObjectNodeTest, ValidSetOnInsertPathParsesSuccessfully) {
+    auto update = fromjson("{$setOnInsert: {'a.b': true}}");
+    const CollatorInterface* collator = nullptr;
+    std::map<StringData, std::unique_ptr<ExpressionWithPlaceholder>> arrayFilters;
+    std::set<std::string> foundIdentifiers;
+    UpdateObjectNode root;
+    ASSERT_OK(UpdateObjectNode::parseAndMerge(&root,
+                                              modifiertable::ModifierType::MOD_SET_ON_INSERT,
+                                              update["$setOnInsert"]["a.b"],
+                                              collator,
+                                              arrayFilters,
+                                              foundIdentifiers));
+}
+
 TEST(UpdateObjectNodeTest, MultiplePositionalElementsFailToParse) {
     auto update = fromjson("{$set: {'a.$.b.$': 5}}");
     const CollatorInterface* collator = nullptr;

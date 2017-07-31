@@ -137,8 +137,9 @@ public:
     ModifierInterface::Options modOptions() const;
     void setModOptions(ModifierInterface::Options modOpts);
 
-    ModifierInterface::ExecInfo::UpdateContext context() const;
-    void setContext(ModifierInterface::ExecInfo::UpdateContext context);
+    void setInsert(bool insert) {
+        _insert = insert;
+    }
 
     mutablebson::Document& getDocument() {
         return _objDoc;
@@ -205,7 +206,7 @@ private:
     bool _positional;
 
     // Is this update going to be an upsert?
-    ModifierInterface::ExecInfo::UpdateContext _context;
+    bool _insert = false;
 
     // The document used to represent or store the object being updated.
     mutablebson::Document _objDoc;

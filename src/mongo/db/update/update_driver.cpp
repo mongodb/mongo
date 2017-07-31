@@ -291,6 +291,7 @@ Status UpdateDriver::update(StringData matchedField,
         // We parsed using the new UpdateNode implementation.
         UpdateNode::ApplyParams applyParams(doc->root(), immutablePaths);
         applyParams.matchedField = matchedField;
+        applyParams.insert = _insert;
         applyParams.fromReplication = _modOptions.fromReplication;
         applyParams.validateForStorage = validateForStorage;
         applyParams.indexData = _indexedFields;
@@ -320,15 +321,7 @@ Status UpdateDriver::update(StringData matchedField,
                 return status;
             }
 
-            // If a mod wants to be applied only if this is an upsert (or only if this is a
-            // strict update), we should respect that. If a mod doesn't care, it would state
-            // it is fine with ANY update context.
-            const bool validContext =
-                (execInfo.context == ModifierInterface::ExecInfo::ANY_CONTEXT ||
-                 execInfo.context == _context);
-
-            // Nothing to do if not in a valid context.
-            if (!validContext) {
+            if (execInfo.context == ModifierInterface::ExecInfo::INSERT_CONTEXT && !_insert) {
                 continue;
             }
 
@@ -501,14 +494,6 @@ void UpdateDriver::setCollator(const CollatorInterface* collator) {
     }
 
     _modOptions.collator = collator;
-}
-
-ModifierInterface::ExecInfo::UpdateContext UpdateDriver::context() const {
-    return _context;
-}
-
-void UpdateDriver::setContext(ModifierInterface::ExecInfo::UpdateContext context) {
-    _context = context;
 }
 
 BSONObj UpdateDriver::makeOplogEntryQuery(const BSONObj& doc, bool multi) const {

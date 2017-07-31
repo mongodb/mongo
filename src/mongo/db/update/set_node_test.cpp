@@ -1275,5 +1275,58 @@ TEST_F(SetNodeTest, ApplyCanCreatePrefixOfImmutablePath) {
     ASSERT_EQUALS(fromjson("{$set: {a: 2}}"), getLogDoc());
 }
 
+TEST_F(SetNodeTest, ApplySetOnInsertIsNoopWhenInsertIsFalse) {
+    auto update = fromjson("{$setOnInsert: {a: 2}}");
+    const CollatorInterface* collator = nullptr;
+    SetNode node(UpdateNode::Context::kInsertOnly);
+    ASSERT_OK(node.init(update["$setOnInsert"]["a"], collator));
+
+    Document doc(fromjson("{}"));
+    setPathToCreate("a");
+    addIndexedPath("a");
+    auto result = node.apply(getApplyParams(doc.root()));
+    ASSERT_TRUE(result.noop);
+    ASSERT_FALSE(result.indexesAffected);
+    ASSERT_EQUALS(fromjson("{}"), doc);
+    ASSERT_TRUE(doc.isInPlaceModeEnabled());
+    ASSERT_EQUALS(fromjson("{}"), getLogDoc());
+}
+
+TEST_F(SetNodeTest, ApplySetOnInsertIsAppliedWhenInsertIsTrue) {
+    auto update = fromjson("{$setOnInsert: {a: 2}}");
+    const CollatorInterface* collator = nullptr;
+    SetNode node(UpdateNode::Context::kInsertOnly);
+    ASSERT_OK(node.init(update["$setOnInsert"]["a"], collator));
+
+    Document doc(fromjson("{}"));
+    setPathToCreate("a");
+    setInsert(true);
+    addIndexedPath("a");
+    setLogBuilderToNull();  // The log builder is null for inserts.
+    auto result = node.apply(getApplyParams(doc.root()));
+    ASSERT_FALSE(result.noop);
+    ASSERT_TRUE(result.indexesAffected);
+    ASSERT_EQUALS(fromjson("{a: 2}"), doc);
+    ASSERT_FALSE(doc.isInPlaceModeEnabled());
+}
+
+TEST_F(SetNodeTest, ApplySetOnInsertExistingPath) {
+    auto update = fromjson("{$setOnInsert: {a: 2}}");
+    const CollatorInterface* collator = nullptr;
+    SetNode node(UpdateNode::Context::kInsertOnly);
+    ASSERT_OK(node.init(update["$setOnInsert"]["a"], collator));
+
+    Document doc(fromjson("{a: 1}"));
+    setPathTaken("a");
+    setInsert(true);
+    addIndexedPath("a");
+    setLogBuilderToNull();  // The log builder is null for inserts.
+    auto result = node.apply(getApplyParams(doc.root()["a"]));
+    ASSERT_FALSE(result.noop);
+    ASSERT_TRUE(result.indexesAffected);
+    ASSERT_EQUALS(fromjson("{a: 2}"), doc);
+    ASSERT_TRUE(doc.isInPlaceModeEnabled());
+}
+
 }  // namespace
 }  // namespace mongo

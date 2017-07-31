@@ -322,22 +322,16 @@
     assert.eq(coll.findOne({_id: 0}), {_id: 0, b: [0]});
 
     // $setOnInsert.
-    // TODO SERVER-28773: $setOnInsert should use the new update implementation.
     coll.drop();
     if (db.getMongo().writeMode() === "commands") {
-        res = coll.update({_id: 0}, {$setOnInsert: {"a.$[i]": 1}}, {arrayFilters: [{i: 0}]});
-        assert.writeErrorWithCode(res, ErrorCodes.InvalidOptions);
-        assert.neq(-1,
-                   res.getWriteError().errmsg.indexOf(
-                       "Cannot use array filters with modifier $setOnInsert"),
-                   "update failed for a reason other than using array filters with $setOnInsert");
+        assert.writeOK(coll.update({_id: 0, a: [0]},
+                                   {$setOnInsert: {"a.$[i]": 1}},
+                                   {arrayFilters: [{i: 0}], upsert: true}));
+        assert.eq(coll.findOne({_id: 0}), {_id: 0, a: [1]});
     }
-    res = coll.update({_id: 0, a: [0]}, {$setOnInsert: {"a.$[]": 1}}, {upsert: true});
-    assert.writeErrorWithCode(res, 16836);
-    assert.neq(-1,
-               res.getWriteError().errmsg.indexOf(
-                   "cannot use the part (a of a.$[]) to traverse the element ({a: [ 0.0 ]})"),
-               "update failed for a reason other than using array updates with $setOnInsert");
+    coll.drop();
+    assert.writeOK(coll.update({_id: 0, a: [0]}, {$setOnInsert: {"a.$[]": 1}}, {upsert: true}));
+    assert.eq(coll.findOne({_id: 0}), {_id: 0, a: [1]});
 
     // $min.
     coll.drop();

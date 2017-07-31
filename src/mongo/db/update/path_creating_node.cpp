@@ -108,6 +108,10 @@ void checkImmutablePathsNotModified(mutablebson::Element element,
 }  // namespace
 
 UpdateNode::ApplyResult PathCreatingNode::apply(ApplyParams applyParams) const {
+    if (context == Context::kInsertOnly && !applyParams.insert) {
+        return ApplyResult::noopResult();
+    }
+
     // The value in this Element gets used to create a logging entry (if we have a LogBuilder).
     mutablebson::Element valueToLog = applyParams.element.getDocument().end();
 
