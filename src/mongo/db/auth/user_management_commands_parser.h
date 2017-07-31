@@ -101,10 +101,11 @@ Status parseAndValidateDropAllUsersFromDatabaseCommand(const BSONObj& cmdObj,
 
 struct UsersInfoArgs {
     std::vector<UserName> userNames;
-    bool allForDB;
-    bool showPrivileges;
-    bool showCredentials;
-    UsersInfoArgs() : allForDB(false), showPrivileges(false), showCredentials(false) {}
+    bool allForDB = false;
+    bool showPrivileges = false;
+    AuthenticationRestrictionsFormat authenticationRestrictionsFormat =
+        AuthenticationRestrictionsFormat::kOmit;
+    bool showCredentials = false;
 };
 
 /**

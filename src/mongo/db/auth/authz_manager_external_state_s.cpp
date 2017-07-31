@@ -130,6 +130,8 @@ Status AuthzManagerExternalStateMongos::getUserDescription(OperationContext* opC
                              << "showPrivileges"
                              << true
                              << "showCredentials"
+                             << true
+                             << "showAuthenticationRestrictions"
                              << true);
         BSONObjBuilder builder;
         const bool ok = Grid::get(opCtx)->catalogClient()->runUserManagementReadCommand(

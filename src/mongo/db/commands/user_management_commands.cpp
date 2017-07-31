@@ -1201,17 +1201,21 @@ public:
             return appendCommandStatus(result, status);
         }
 
-        if (args.allForDB && args.showPrivileges) {
+        if (args.allForDB &&
+            (args.showPrivileges ||
+             args.authenticationRestrictionsFormat == AuthenticationRestrictionsFormat::kShow)) {
             return appendCommandStatus(
                 result,
                 Status(ErrorCodes::IllegalOperation,
-                       "Can only get privilege details on exact-match usersInfo "
+                       "Can only get privilege or restriction details on exact-match usersInfo "
                        "queries."));
         }
 
         BSONArrayBuilder usersArrayBuilder;
-        if (args.showPrivileges) {
-            // If you want privileges you need to call getUserDescription on each user.
+        if (args.showPrivileges ||
+            args.authenticationRestrictionsFormat == AuthenticationRestrictionsFormat::kShow) {
+            // If you want privileges or restrictions you need to call getUserDescription on each
+            // user.
             for (size_t i = 0; i < args.userNames.size(); ++i) {
                 BSONObj userDetails;
                 status = getGlobalAuthorizationManager()->getUserDescription(
@@ -1223,22 +1227,31 @@ public:
                     return appendCommandStatus(result, status);
                 }
 
-                if (!args.showCredentials) {
-                    // getUserDescription always includes credentials, need to strip it out
-                    BSONObjBuilder userWithoutCredentials(usersArrayBuilder.subobjStart());
-                    for (BSONObjIterator it(userDetails); it.more();) {
-                        BSONElement e = it.next();
-                        if (e.fieldNameStringData() != "credentials" &&
-                            e.fieldNameStringData() != AuthorizationManager::USER_ID_FIELD_NAME)
-                            userWithoutCredentials.append(e);
+                // getUserDescription always includes credentials and restrictions, which may need
+                // to be stripped out
+                BSONObjBuilder strippedUser(usersArrayBuilder.subobjStart());
+                for (const BSONElement& e : userDetails) {
+                    if (!args.showCredentials && e.fieldNameStringData() == "credentials") {
+                        continue;
                     }
-                    userWithoutCredentials.doneFast();
-                } else {
-                    usersArrayBuilder.append(userDetails);
+
+                    if (e.fieldNameStringData() == AuthorizationManager::USER_ID_FIELD_NAME) {
+                        continue;
+                    }
+
+                    if (e.fieldNameStringData() == "authenticationRestrictions" &&
+                        args.authenticationRestrictionsFormat ==
+                            AuthenticationRestrictionsFormat::kOmit) {
+                        continue;
+                    }
+
+                    strippedUser.append(e);
                 }
+                strippedUser.doneFast();
             }
         } else {
-            // If you don't need privileges, you can just do a regular query on system.users
+            // If you don't need privileges, or authenticationRestrictions, you can just do a
+            // regular query on system.users
             BSONObjBuilder queryBuilder;
             if (args.allForDB) {
                 queryBuilder.append("query",
@@ -1257,18 +1270,22 @@ public:
             queryBuilder.append("orderby", BSON("user" << 1 << "db" << 1));
 
             BSONObjBuilder projection;
+            projection.append("authenticationRestrictions", 0);
             if (!args.showCredentials) {
                 projection.append(AuthorizationManager::USER_ID_FIELD_NAME, 0);
                 projection.append("credentials", 0);
             }
             const stdx::function<void(const BSONObj&)> function = stdx::bind(
                 appendBSONObjToBSONArrayBuilder, &usersArrayBuilder, stdx::placeholders::_1);
-            queryAuthzDocument(opCtx,
-                               AuthorizationManager::usersCollectionNamespace,
-                               queryBuilder.done(),
-                               projection.done(),
-                               function)
-                .transitional_ignore();
+
+            Status status = queryAuthzDocument(opCtx,
+                                               AuthorizationManager::usersCollectionNamespace,
+                                               queryBuilder.done(),
+                                               projection.done(),
+                                               function);
+            if (!status.isOK()) {
+                return appendCommandStatus(result, status);
+            }
         }
         result.append("users", usersArrayBuilder.arr());
         return true;

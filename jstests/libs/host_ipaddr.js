@@ -13,7 +13,7 @@ function get_ipaddr() {
     } catch (err) {
     }
 
-    var ipFile = path + "ipaddr.log";
+    var ipFile = path + "ipaddr-" + Random.srand() + ".log";
     var windowsCmd = "ipconfig > " + ipFile;
     var unixCmd = "/sbin/ifconfig | grep inet | grep -v '127.0.0.1' > " + ipFile;
     var ipAddr = null;

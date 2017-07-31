@@ -254,11 +254,17 @@ void AuthzManagerExternalStateLocal::resolveUserRoles(mutablebson::Document* use
     fassert(17158, userDoc->root().pushBack(privilegesElement));
     addPrivilegeObjectsOrWarningsToArrayElement(privilegesElement, warningsElement, allPrivileges);
 
-    auto authenticationRestrictionsElement =
+    auto inheritedAuthenticationRestrictionsElement =
         userDoc->makeElementArray("inheritedAuthenticationRestrictions");
-    fassert(40558, userDoc->root().pushBack(authenticationRestrictionsElement));
-    addAuthenticationRestrictionObjectsToArrayElement(authenticationRestrictionsElement,
+    fassert(40558, userDoc->root().pushBack(inheritedAuthenticationRestrictionsElement));
+    addAuthenticationRestrictionObjectsToArrayElement(inheritedAuthenticationRestrictionsElement,
                                                       allAuthenticationRestrictions);
+
+    if (!mutablebson::findFirstChildNamed(userDoc->root(), "authenticationRestrictions").ok()) {
+        auto authenticationRestrictionsElement =
+            userDoc->makeElementArray("authenticationRestrictions");
+        fassert(40572, userDoc->root().pushBack(authenticationRestrictionsElement));
+    }
 
     if (!isRoleGraphConsistent) {
         fassert(17160,
