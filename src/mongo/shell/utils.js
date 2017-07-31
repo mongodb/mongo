@@ -231,7 +231,8 @@ jsTestOptions = function() {
             networkMessageCompressors: TestData.networkMessageCompressors,
             skipValidationOnInvalidViewDefinitions: TestData.skipValidationOnInvalidViewDefinitions,
             skipCollectionAndIndexValidation: TestData.skipCollectionAndIndexValidation,
-            skipValidationOnNamespaceNotFound: TestData.skipValidationOnNamespaceNotFound
+            skipValidationOnNamespaceNotFound: TestData.skipValidationOnNamespaceNotFound,
+            jsonSchemaTestFile: TestData.jsonSchemaTestFile,
         });
     }
     return _jsTestOptions;

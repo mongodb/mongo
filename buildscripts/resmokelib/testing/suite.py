@@ -64,6 +64,8 @@ class Suite(object):
             tests = _selector.filter_cpp_unit_tests(**test_info)
         elif test_kind == "db_test":
             tests = _selector.filter_dbtests(**test_info)
+        elif test_kind == "json_schema_test":
+            tests = _selector.filter_json_schema_tests(**test_info)
         else:  # test_kind == "js_test":
             tests = _selector.filter_jstests(**test_info)
 

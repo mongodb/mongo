@@ -233,6 +233,26 @@ def filter_jstests(roots,
     # Specifying include_files overrides tags.
     return list((jstests_set - excluded) | set(include_files))
 
+def filter_json_schema_tests(roots,
+                             include_files=None,
+                             exclude_files=None):
+    """
+    Filters out what json test cases to load.
+    """
+    include_files = utils.default_if_none(include_files, [])
+    exclude_files = utils.default_if_none(exclude_files, [])
+
+    # TODO: SERVER-22170 Implement full tagging support
+    # If --includeWithAnyTags is supplied, then no tests should be run since
+    # JSON Schema tests cannot be tagged.
+    if _tags_from_list(config.INCLUDE_WITH_ANY_TAGS):
+        return []
+
+    tests = []
+    for root in roots:
+        tests.extend(globstar.iglob(root))
+
+    return list(_filter_by_filename("JSON Schema Test", tests, include_files, exclude_files))
 
 def _filter_by_filename(kind, universe, include_files, exclude_files):
     """

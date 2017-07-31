@@ -1759,6 +1759,7 @@ tasks:
           - "repo/**"
           - "src/mongo/util/options_parser/test_config_files/**"
           - "library_dependency_graph.json"
+          - "src/third_party/JSON-Schema-Test-Suite/tests/draft4/**"
         exclude_files:
           - "*_test.pdb"
     - func: "upload debugsymbols"
@@ -3564,6 +3565,15 @@ tasks:
   - func: "run tests"
     vars:
       resmoke_args: --suites=watchdog --storageEngine=wiredTiger
+      run_multiple_jobs: false
+
+- <<: *task_template
+  name: jsonSchema
+  commands:
+  - func: "do setup"
+  - func: "run tests"
+    vars:
+      resmoke_args: --suites=json_schema --storageEngine=wiredTiger
       run_multiple_jobs: false
 
 - name: idl_tests
@@ -5513,6 +5523,7 @@ buildvariants:
   - name: jsCore_compatibility_WT
   - name: jsCore_decimal
   - name: jsCore_decimal_WT
+  - name: jsonSchema
   - name: mmap
   - name: mongosTest
   - name: noPassthrough
@@ -5852,6 +5863,7 @@ buildvariants:
   - name: jsCore_compatibility_WT
   - name: jsCore_decimal
   - name: jsCore_decimal_WT
+  - name: jsonSchema
   - name: generational_jstestfuzz_WT
   - name: jstestfuzz
   - name: jstestfuzz_WT
@@ -6315,6 +6327,7 @@ buildvariants:
   - name: jsCore_minimum_batch_size_WT
   - name: jsCore_op_query
   - name: jsCore_op_query_WT
+  - name: jsonSchema
   - name: generational_jstestfuzz_WT
   - name: jstestfuzz
   - name: jstestfuzz_WT
@@ -9015,6 +9028,7 @@ buildvariants:
   - name: jsCore_minimum_batch_size_WT
   - name: jsCore_op_query
   - name: jsCore_op_query_WT
+  - name: jsonSchema
   - name: mmap
   - name: mongosTest
   - name: multiversion
@@ -9196,6 +9210,7 @@ buildvariants:
   - name: jsCore_minimum_batch_size_WT
   - name: jsCore_op_query
   - name: jsCore_op_query_WT
+  - name: jsonSchema
   - name: mmap
   - name: mongosTest
   - name: multiversion
