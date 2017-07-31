@@ -156,8 +156,8 @@ Status AuthorizationSession::addAndAuthorizeUser(OperationContext* opCtx,
     Status restrictionStatus =
         restrictionSet.validate(RestrictionEnvironment::get(*opCtx->getClient()));
     if (!restrictionStatus.isOK()) {
-        log() << "Failed to acquire user because of unmet authentication restrictions: "
-              << restrictionStatus.reason();
+        log() << "Failed to acquire user '" << userName
+              << "' because of unmet authentication restrictions: " << restrictionStatus.reason();
         return AuthorizationManager::authenticationFailedStatus;
     }
 
