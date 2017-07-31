@@ -1834,6 +1834,82 @@ TEST(Parsing, BadConfigFileOption) {
     ASSERT_NOT_OK(parser.run(testOpts, argv, env_map, &environment));
 }
 
+TEST(Parsing, MapForScalarMismatch) {
+    OptionsParserTester parser;
+    moe::Environment environment;
+    moe::OptionSection testOpts;
+
+    testOpts.addOptionChaining("config", "config", moe::Int, "Config file to parse");
+    testOpts.addOptionChaining("str", "str", moe::String, "");
+
+    std::vector<std::string> argv;
+    argv.push_back("binaryname");
+    argv.push_back("--config");
+    argv.push_back("config.json");
+    std::map<std::string, std::string> env_map;
+
+    parser.setConfig("config.json", R"cfg({ str: { elem: "val" } })cfg");
+
+    ASSERT_NOT_OK(parser.run(testOpts, argv, env_map, &environment));
+}
+
+TEST(Parsing, ScalarForMapMismatch) {
+    OptionsParserTester parser;
+    moe::Environment environment;
+    moe::OptionSection testOpts;
+
+    testOpts.addOptionChaining("config", "config", moe::Int, "Config file to parse");
+    testOpts.addOptionChaining("strmap", "strmap", moe::StringMap, "");
+
+    std::vector<std::string> argv;
+    argv.push_back("binaryname");
+    argv.push_back("--config");
+    argv.push_back("config.json");
+    std::map<std::string, std::string> env_map;
+
+    parser.setConfig("config.json", R"cfg({ str: "val" })cfg");
+
+    ASSERT_NOT_OK(parser.run(testOpts, argv, env_map, &environment));
+}
+
+TEST(Parsing, ListForScalarMismatch) {
+    OptionsParserTester parser;
+    moe::Environment environment;
+    moe::OptionSection testOpts;
+
+    testOpts.addOptionChaining("config", "config", moe::Int, "Config file to parse");
+    testOpts.addOptionChaining("str", "str", moe::String, "");
+
+    std::vector<std::string> argv;
+    argv.push_back("binaryname");
+    argv.push_back("--config");
+    argv.push_back("config.json");
+    std::map<std::string, std::string> env_map;
+
+    parser.setConfig("config.json", R"cfg({ str: ["val"] })cfg");
+
+    ASSERT_NOT_OK(parser.run(testOpts, argv, env_map, &environment));
+}
+
+TEST(Parsing, ScalarForListMismatch) {
+    OptionsParserTester parser;
+    moe::Environment environment;
+    moe::OptionSection testOpts;
+
+    testOpts.addOptionChaining("config", "config", moe::Int, "Config file to parse");
+    testOpts.addOptionChaining("strlist", "strlist", moe::StringVector, "");
+
+    std::vector<std::string> argv;
+    argv.push_back("binaryname");
+    argv.push_back("--config");
+    argv.push_back("config.json");
+    std::map<std::string, std::string> env_map;
+
+    parser.setConfig("config.json", R"cfg({ str: "val" })cfg");
+
+    ASSERT_NOT_OK(parser.run(testOpts, argv, env_map, &environment));
+}
+
 TEST(ConfigFromFilesystem, JSONGood) {
     moe::OptionsParser parser;
     moe::Environment environment;
