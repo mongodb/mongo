@@ -341,6 +341,11 @@ Status YAMLNodeToValue(const YAML::Node& YAMLNode,
         return Status::OK();
     }
 
+    if (!YAMLNode.IsScalar() && !YAMLNode.IsNull()) {
+        return Status(ErrorCodes::BadValue,
+                      str::stream() << "Scalar option '" << key << "' must be a single value");
+    }
+
     // Our YAML parser reads everything as a string, so we need to parse it ourselves.
     std::string stringVal = YAMLNode.Scalar();
     return stringToValue(stringVal, type, key, value);
