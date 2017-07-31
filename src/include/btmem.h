@@ -915,14 +915,6 @@ struct __wt_update {
 	 * the semantics we want.
 	 */
 	uint8_t data[];			/* start of the data */
-
-	/*
-	 * The memory size of an update: include some padding because this is
-	 * such a common case that overhead of tiny allocations can swamp our
-	 * cache overhead calculation.
-	 */
-#define	WT_UPDATE_MEMSIZE(upd)						\
-	WT_ALIGN(WT_UPDATE_SIZE + (upd)->size, 32)
 };
 
 /*
@@ -930,6 +922,14 @@ struct __wt_update {
  * we verify the build to ensure the compiler hasn't inserted padding.
  */
 #define	WT_UPDATE_SIZE	(21 + WT_TIMESTAMP_SIZE)
+
+/*
+ * The memory size of an update: include some padding because this is such a
+ * common case that overhead of tiny allocations can swamp our cache overhead
+ * calculation.
+ */
+#define	WT_UPDATE_MEMSIZE(upd)						\
+	WT_ALIGN(WT_UPDATE_SIZE + (upd)->size, 32)
 
 /*
  * WT_MAX_MODIFY_UPDATE --

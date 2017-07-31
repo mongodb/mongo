@@ -1506,10 +1506,8 @@ retry:	while (slot < max_entries) {
 		goto retry;
 	}
 
-err:	if (dhandle_locked) {
+err:	if (dhandle_locked)
 		__wt_readunlock(session, &conn->dhandle_lock);
-		dhandle_locked = false;
-	}
 
 	/*
 	 * If we didn't find any entries on a walk when we weren't interrupted,

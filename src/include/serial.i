@@ -259,8 +259,7 @@ __wt_insert_serial(WT_SESSION_IMPL *session, WT_PAGE *page,
  */
 static inline int
 __wt_update_serial(WT_SESSION_IMPL *session, WT_PAGE *page,
-    WT_UPDATE **srch_upd, WT_UPDATE **updp, size_t upd_size,
-    bool exclusive)
+    WT_UPDATE **srch_upd, WT_UPDATE **updp, size_t upd_size, bool exclusive)
 {
 	WT_DECL_RET;
 	WT_UPDATE *obsolete, *upd = *updp;
@@ -290,19 +289,17 @@ __wt_update_serial(WT_SESSION_IMPL *session, WT_PAGE *page,
 	}
 
 	/*
-	 * Increment in-memory footprint after releasing the mutex: that's safe
-	 * because the structures we added cannot be discarded while visible to
-	 * any running transaction, and we're a running transaction, which means
-	 * there can be no corresponding delete until we complete.
+	 * Increment in-memory footprint after swapping the update into place.
+	 * Safe because the structures we added cannot be discarded while
+	 * visible to any running transaction, and we're a running transaction,
+	 * which means there can be no corresponding delete until we complete.
 	 */
 	__wt_cache_page_inmem_incr(session, page, upd_size);
 
 	/* Mark the page dirty after updating the footprint. */
 	__wt_page_modify_set(session, page);
 
-	/*
-	 * If there are no subsequent WT_UPDATE structures we are done here.
-	 */
+	/* If there are no subsequent WT_UPDATE structures we are done here. */
 	if (upd->next == NULL || exclusive)
 		return (0);
 

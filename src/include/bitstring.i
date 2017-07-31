@@ -166,8 +166,6 @@ __bit_ffc(uint8_t *bitf, uint64_t nbits, uint64_t *retp)
 	uint8_t lb;
 	uint64_t byte, stopbyte, value;
 
-	value = 0;		/* -Wuninitialized */
-
 	if (nbits == 0)
 		return (-1);
 
@@ -199,7 +197,6 @@ __bit_ffs(uint8_t *bitf, uint64_t nbits, uint64_t *retp)
 	uint8_t lb;
 	uint64_t byte, stopbyte, value;
 
-	value = 0;
 	if (nbits == 0)
 		return (-1);
 

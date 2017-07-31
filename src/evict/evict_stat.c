@@ -29,7 +29,7 @@ __evict_stat_walk(WT_SESSION_IMPL *session)
 	btree = S2BT(session);
 	cache = S2C(session)->cache;
 	next_walk = NULL;
-	dsk_size = gen_gap = gen_gap_max = gen_gap_sum = max_pagesize = 0;
+	gen_gap_max = gen_gap_sum = max_pagesize = 0;
 	num_memory = num_not_queueable = num_queued = 0;
 	num_smaller_allocsz = pages_clean = pages_dirty = pages_internal = 0;
 	pages_leaf = seen_count = size = visited_count = 0;

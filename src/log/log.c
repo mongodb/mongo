@@ -54,10 +54,7 @@ __log_checksum_match(WT_SESSION_IMPL *session, WT_ITEM *buf, uint32_t reclen)
 	checksum_calculate = __wt_bswap32(checksum_calculate);
 #endif
 	logrec->checksum = checksum_tmp;
-	if (logrec->checksum != checksum_calculate)
-		return (false);
-	else
-		return (true);
+	return (logrec->checksum == checksum_calculate);
 }
 
 /*
@@ -1214,8 +1211,8 @@ __log_set_version(WT_SESSION_IMPL *session, uint16_t version,
 		F_SET(log, WT_LOG_FORCE_NEWFILE);
 	if (!F_ISSET(conn, WT_CONN_READONLY))
 		return (__log_prealloc_remove(session));
-	else
-		return (0);
+
+	return (0);
 }
 
 /*
