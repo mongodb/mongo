@@ -58,7 +58,7 @@ namespace {
 /**
  * Return true iff the applyOpsCmd can be executed in a single WriteUnitOfWork.
  */
-bool canBeAtomic(const BSONObj& applyOpCmd) {
+bool _areOpsCrudOnly(const BSONObj& applyOpCmd) {
     for (const auto& elem : applyOpCmd.firstElement().Obj()) {
         const char* names[] = {"ns", "op"};
         BSONElement fields[2];
@@ -265,6 +265,12 @@ Status applyOps(OperationContext* opCtx,
                 const std::string& dbName,
                 const BSONObj& applyOpCmd,
                 BSONObjBuilder* result) {
+    bool allowAtomic = false;
+    uassertStatusOK(
+        bsonExtractBooleanFieldWithDefault(applyOpCmd, "allowAtomic", true, &allowAtomic));
+    auto areOpsCrudOnly = _areOpsCrudOnly(applyOpCmd);
+    auto isAtomic = allowAtomic && areOpsCrudOnly;
+
     Lock::GlobalWrite globalWriteLock(opCtx);
 
     bool userInitiatedWritesAndNotPrimary = opCtx->writesAreReplicated() &&
@@ -280,7 +286,7 @@ Status applyOps(OperationContext* opCtx,
     }
 
     int numApplied = 0;
-    if (!canBeAtomic(applyOpCmd))
+    if (!isAtomic)
         return _applyOps(opCtx, dbName, applyOpCmd, result, &numApplied);
 
     // Perform write ops atomically
