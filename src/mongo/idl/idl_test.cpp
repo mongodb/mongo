@@ -1737,6 +1737,20 @@ void TestDocSequence(StringData name) {
     ASSERT_EQUALS(2UL, testStruct.getStructs().size());
     ASSERT_EQUALS("hello", testStruct.getStructs()[0].getValue());
     ASSERT_EQUALS("world", testStruct.getStructs()[1].getValue());
+
+    auto opmsg = testStruct.serialize(BSONObj());
+
+    BSONObjBuilder builder;
+    builder.appendElements(testTempDoc);
+    builder.append("structs",
+                   BSON_ARRAY(BSON("value"
+                                   << "hello")
+                              << BSON("value"
+                                      << "world")));
+    builder.append("objects", BSON_ARRAY(BSON("foo" << 1)));
+    auto testCompleteMsg = OpMsgRequest::fromDBAndBody("db", builder.obj());
+
+    ASSERT_BSONOBJ_EQ(opmsg.body, testCompleteMsg.body);
 }
 
 // Positive: Test a command read and written to OpMsgRequest with content in DocumentSequence works

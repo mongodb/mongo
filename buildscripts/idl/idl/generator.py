@@ -1009,6 +1009,10 @@ class _CppSourceFileWriter(_CppFileWriterBase):
                         with self._predicate(field_predicate, not first_field):
                             field_usage_check.add(field, "sequence.name")
 
+                            if _is_required_serializer_field(field):
+                                self._writer.write_line('%s = true;' %
+                                                        (_get_has_field_member_name(field)))
+
                             self.gen_doc_sequence_deserializer(field)
 
                         if first_field:
