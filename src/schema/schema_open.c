@@ -425,37 +425,40 @@ __schema_open_table(WT_SESSION_IMPL *session,
 	WT_DECL_RET;
 	WT_TABLE *table;
 	const char *tconfig;
-	char *tablename;
 
 	*tablep = NULL;
 
 	cursor = NULL;
 	table = NULL;
-	tablename = NULL;
 
 	WT_ASSERT(session, F_ISSET(session, WT_SESSION_LOCKED_TABLE));
 
-	WT_ERR(__wt_scr_alloc(session, 0, &buf));
-	WT_ERR(__wt_buf_fmt(session, buf, "table:%.*s", (int)namelen, name));
-	WT_ERR(__wt_strndup(session, buf->data, buf->size, &tablename));
-
-	WT_ERR(__wt_metadata_cursor(session, &cursor));
-	cursor->set_key(cursor, tablename);
-	WT_ERR(cursor->search(cursor));
-	WT_ERR(cursor->get_value(cursor, &tconfig));
-
 	WT_ERR(__wt_calloc_one(session, &table));
-	table->name = tablename;
-	tablename = NULL;
 	table->name_hash = __wt_hash_city64(name, namelen);
 
-	WT_ERR(__wt_config_getones(session, tconfig, "columns", &cval));
+	WT_ERR(__wt_scr_alloc(session, 0, &buf));
+	WT_ERR(__wt_buf_fmt(session, buf, "table:%.*s", (int)namelen, name));
+	WT_ERR(__wt_strndup(session, buf->data, buf->size, &table->name));
 
-	WT_ERR(__wt_config_getones(session, tconfig, "key_format", &cval));
+	/*
+	 * Don't hold the metadata cursor pinned, we call functions that use it
+	 * to retrieve column group information.
+	 */
+	WT_ERR(__wt_metadata_cursor(session, &cursor));
+	cursor->set_key(cursor, table->name);
+	if ((ret = cursor->search(cursor)) == 0 &&
+	    (ret = cursor->get_value(cursor, &tconfig)) == 0)
+		ret = __wt_strdup(session, tconfig, &table->config);
+	WT_TRET(__wt_metadata_cursor_release(session, &cursor));
+	WT_ERR(ret);
+
+	WT_ERR(__wt_config_getones(session, table->config, "columns", &cval));
+	WT_ERR(__wt_config_getones(
+	    session, table->config, "key_format", &cval));
 	WT_ERR(__wt_strndup(session, cval.str, cval.len, &table->key_format));
-	WT_ERR(__wt_config_getones(session, tconfig, "value_format", &cval));
+	WT_ERR(__wt_config_getones(
+	    session, table->config, "value_format", &cval));
 	WT_ERR(__wt_strndup(session, cval.str, cval.len, &table->value_format));
-	WT_ERR(__wt_strdup(session, tconfig, &table->config));
 
 	/* Point to some items in the copy to save re-parsing. */
 	WT_ERR(__wt_config_getones(session, table->config,
@@ -491,7 +494,7 @@ __schema_open_table(WT_SESSION_IMPL *session,
 
 	if (table->ncolgroups > 0 && table->is_simple)
 		WT_ERR_MSG(session, EINVAL,
-		    "%s requires a table with named columns", tablename);
+		    "%s requires a table with named columns", table->name);
 
 	WT_ERR(__wt_calloc_def(session, WT_COLGROUPS(table), &table->cgroups));
 	WT_ERR(__wt_schema_open_colgroups(session, table));
@@ -509,9 +512,7 @@ __schema_open_table(WT_SESSION_IMPL *session,
 	if (0) {
 err:		WT_TRET(__wt_schema_destroy_table(session, &table));
 	}
-	WT_TRET(__wt_metadata_cursor_release(session, &cursor));
 
-	__wt_free(session, tablename);
 	__wt_scr_free(session, &buf);
 	return (ret);
 }
