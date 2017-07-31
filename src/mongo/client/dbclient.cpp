@@ -483,13 +483,17 @@ void DBClientBase::logout(const string& dbname, BSONObj& info) {
     runCommand(dbname, BSON("logout" << 1), info);
 }
 
-BSONObj ismastercmdobj = fromjson("{\"ismaster\":1}");
-
 bool DBClientBase::isMaster(bool& isMaster, BSONObj* info) {
+    BSONObjBuilder bob;
+    bob.append("ismaster", 1);
+    if (WireSpec::instance().isInternalClient) {
+        WireSpec::appendInternalClientWireVersion(WireSpec::instance().outgoing, &bob);
+    }
+
     BSONObj o;
     if (info == 0)
         info = &o;
-    bool ok = runCommand("admin", ismastercmdobj, *info);
+    bool ok = runCommand("admin", bob.obj(), *info);
     isMaster = info->getField("ismaster").trueValue();
     return ok;
 }

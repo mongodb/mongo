@@ -61,24 +61,19 @@
     // Kill and restart all shards and mongos processes so they have no keys in memory.
     st.rs0.stopSet(null /* signal */, true /* forRestart */);
     st.rs0.startSet({restart: true});
-    st.restartMongos(0);
 
     // The shard primary should return a dummy signed cluster time, because there are no keys.
     res = assert.commandWorked(st.rs0.getPrimary().getDB("test").runCommand({isMaster: 1}));
     assert.hasFields(res, ["$clusterTime", "operationTime"]);
     assert.eq(res.$clusterTime.signature.keyId, NumberLong(0));
 
-    // Mongos shouldn't return a cluster time at all.
-    res = assert.commandWorked(st.s.getDB("test").runCommand({isMaster: 1}));
-    assert.throws(function() {
-        assert.hasFields(res, ["$clusterTime", "operationTime"]);
-    }, [], "expected the mongos not to return cluster time or operation time");
-
     // Resume key generation.
     for (let i = 0; i < st.configRS.nodes.length; i++) {
         st.configRS.getPrimary().adminCommand(
             {configureFailPoint: "disableKeyGeneration", mode: "off"});
     }
+
+    st.restartMongos(0);
 
     // Wait for config server primary to create new keys.
     assert.soonNoExcept(function() {

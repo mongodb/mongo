@@ -126,6 +126,45 @@ namespace {
 
 boost::optional<ShardingUptimeReporter> shardingUptimeReporter;
 
+static constexpr auto kRetryInterval = Seconds{1};
+
+Status waitForSigningKeys(OperationContext* opCtx) {
+    while (true) {
+        // this should be true when shard registry is up
+        invariant(grid.shardRegistry()->isUp());
+        auto configCS = grid.shardRegistry()->getConfigServerConnectionString();
+        auto rsm = ReplicaSetMonitor::get(configCS.getSetName());
+        // mongod will set minWireVersion == maxWireVersion for isMaster requests from
+        // internalClient.
+        if (rsm && (rsm->getMaxWireVersion() < WireVersion::SUPPORTS_OP_MSG ||
+                    rsm->getMaxWireVersion() != rsm->getMinWireVersion())) {
+            log() << "Not waiting for signing keys, not supported by the config shard "
+                  << configCS.getSetName();
+            return Status::OK();
+        }
+        auto stopStatus = opCtx->checkForInterruptNoAssert();
+        if (!stopStatus.isOK()) {
+            return stopStatus;
+        }
+
+        try {
+            if (LogicalTimeValidator::get(opCtx)->shouldGossipLogicalTime()) {
+                return Status::OK();
+            }
+            log() << "Waiting for signing keys, sleeping for " << kRetryInterval
+                  << " and trying again.";
+            sleepFor(kRetryInterval);
+            continue;
+        } catch (const DBException& ex) {
+            Status status = ex.toStatus();
+            warning() << "Error waiting for signing keys, sleeping for " << kRetryInterval
+                      << " and trying again " << causedBy(status);
+            sleepFor(kRetryInterval);
+            continue;
+        }
+    }
+}
+
 }  // namespace
 
 #if defined(_WIN32)
@@ -236,6 +275,11 @@ static Status initializeSharding(OperationContext* opCtx) {
     }
 
     status = waitForShardRegistryReload(opCtx);
+    if (!status.isOK()) {
+        return status;
+    }
+
+    status = waitForSigningKeys(opCtx);
     if (!status.isOK()) {
         return status;
     }

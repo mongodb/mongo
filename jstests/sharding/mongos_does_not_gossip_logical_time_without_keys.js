@@ -53,20 +53,14 @@
         "data": {"overrideMS": 1000}
     });
 
-    // Mongos should restart with no problems.
-    st.restartMongoses();
-
-    // There should be no cluster time metadata in mongos responses.
-    res = assert.commandWorked(st.s.getDB("test").runCommand({isMaster: 1}));
-    assert.throws(function() {
-        assertContainsValidLogicalTime(res);
-    }, [], "expected mongos to not return cluster time metadata");
-
     // Disable the failpoint.
     for (let i = 0; i < st.configRS.nodes.length; i++) {
         assert.commandWorked(st.configRS.nodes[i].adminCommand(
             {"configureFailPoint": "disableKeyGeneration", "mode": "off"}));
     }
+
+    // Mongos should restart with no problems.
+    st.restartMongoses();
 
     // Eventually mongos will discover the new keys, and start signing cluster times.
     assert.soonNoExcept(function() {
