@@ -85,7 +85,7 @@ Status RollbackImpl::runRollback(OperationContext* opCtx) {
     // These functions fassert on failure.
     ON_BLOCK_EXIT([this, opCtx] {
         _checkShardIdentityRollback(opCtx);
-        _clearSessionTransactionTable(opCtx);
+        _resetSessions(opCtx);
         _transitionFromRollbackToSecondary(opCtx);
     });
 
@@ -161,12 +161,12 @@ void RollbackImpl::_checkShardIdentityRollback(OperationContext* opCtx) {
     }
 }
 
-void RollbackImpl::_clearSessionTransactionTable(OperationContext* opCtx) {
+void RollbackImpl::_resetSessions(OperationContext* opCtx) {
     invariant(opCtx);
 
-    log() << "Rollback - clearing transaction table";
+    log() << "Rollback - resetting in-memory state of active sessions";
 
-    SessionCatalog::get(opCtx)->clearTransactionTable();
+    SessionCatalog::get(opCtx)->resetSessions();
 }
 
 void RollbackImpl::_transitionFromRollbackToSecondary(OperationContext* opCtx) {

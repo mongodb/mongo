@@ -1307,9 +1307,9 @@ void syncFixUp(OperationContext* opCtx,
         fassertFailedNoTrace(40496);
     }
 
-    // If necessary, clear the in-memory session transaction table.
+    // If necessary, clear the memory of existing sessions.
     if (fixUpInfo.refetchTransactionDocs) {
-        SessionCatalog::get(opCtx)->clearTransactionTable();
+        SessionCatalog::get(opCtx)->resetSessions();
     }
 
     // Reload the lastAppliedOpTime and lastDurableOpTime value in the replcoord and the

@@ -544,5 +544,89 @@ TEST_F(SessionTest, CheckStatementExecuted) {
     ASSERT_FALSE(fetchedEntry);
 }
 
+TEST_F(SessionTest, BeginReloadsStateAfterReset) {
+    const auto sessionId = makeLogicalSessionIdForTest();
+    const TxnNumber txnNum = 20;
+
+    Session txnState(sessionId);
+    txnState.begin(opCtx(), txnNum);
+
+    ASSERT_EQ(sessionId, txnState.getSessionId());
+    ASSERT_EQ(txnNum, txnState.getTxnNum());
+    ASSERT(txnState.getLastWriteOpTimeTs().isNull());
+
+    const TxnNumber newTxnNum = 50;
+    const auto newTs = Timestamp(1, 1);
+    Session::updateSessionRecord(opCtx(), sessionId, newTxnNum, newTs);
+    txnState.reset();
+
+    txnState.begin(opCtx(), newTxnNum);
+
+    ASSERT_EQ(sessionId, txnState.getSessionId());
+    ASSERT_EQ(newTxnNum, txnState.getTxnNum());
+    ASSERT_EQ(txnState.getLastWriteOpTimeTs(), newTs);
+}
+
+TEST_F(SessionTest, BeginDoesNotReloadWithoutReset) {
+    const auto sessionId = makeLogicalSessionIdForTest();
+    const TxnNumber txnNum = 20;
+
+    Session txnState(sessionId);
+    txnState.begin(opCtx(), txnNum);
+
+    ASSERT_EQ(sessionId, txnState.getSessionId());
+    ASSERT_EQ(txnNum, txnState.getTxnNum());
+    ASSERT(txnState.getLastWriteOpTimeTs().isNull());
+
+    const TxnNumber newTxnNum = 30;
+    const auto newTs = Timestamp(1, 1);
+    Session::updateSessionRecord(opCtx(), sessionId, newTxnNum, newTs);
+
+    txnState.begin(opCtx(), txnNum);
+
+    ASSERT_EQ(sessionId, txnState.getSessionId());
+    ASSERT_EQ(txnNum, txnState.getTxnNum());
+    ASSERT(txnState.getLastWriteOpTimeTs().isNull());
+}
+
+TEST_F(SessionTest, StartingOldTxnFailsAfterReset) {
+    const auto sessionId = makeLogicalSessionIdForTest();
+    const TxnNumber oldTxnNum = 20;
+
+    Session txnState(sessionId);
+    txnState.begin(opCtx(), oldTxnNum);
+
+    ASSERT_EQ(sessionId, txnState.getSessionId());
+    ASSERT_EQ(oldTxnNum, txnState.getTxnNum());
+    ASSERT(txnState.getLastWriteOpTimeTs().isNull());
+
+    const TxnNumber newTxnNum = 30;
+    Session::updateSessionRecord(opCtx(), sessionId, newTxnNum, Timestamp());
+    txnState.reset();
+
+    ASSERT_THROWS(txnState.begin(opCtx(), oldTxnNum), UserException);
+}
+
+TEST_F(SessionTest, CanStartLaterTxnAfterReset) {
+    const auto sessionId = makeLogicalSessionIdForTest();
+    const TxnNumber txnNum = 20;
+
+    Session txnState(sessionId);
+    txnState.begin(opCtx(), txnNum);
+
+    ASSERT_EQ(sessionId, txnState.getSessionId());
+    ASSERT_EQ(txnNum, txnState.getTxnNum());
+    ASSERT(txnState.getLastWriteOpTimeTs().isNull());
+
+    txnState.reset();
+
+    const TxnNumber newTxnNum = 40;
+    txnState.begin(opCtx(), newTxnNum);
+
+    ASSERT_EQ(sessionId, txnState.getSessionId());
+    ASSERT_EQ(newTxnNum, txnState.getTxnNum());
+    ASSERT(txnState.getLastWriteOpTimeTs().isNull());
+}
+
 }  // namespace
 }  // namespace mongo

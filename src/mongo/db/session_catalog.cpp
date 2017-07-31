@@ -146,9 +146,11 @@ ScopedSession SessionCatalog::checkOutSession(OperationContext* opCtx) {
     return ScopedSession(opCtx, std::move(sri));
 }
 
-void SessionCatalog::clearTransactionTable() {
+void SessionCatalog::resetSessions() {
     stdx::lock_guard<stdx::mutex> lg(_mutex);
-    _txnTable.clear();
+    for (const auto& it : _txnTable) {
+        it.second->txnState.reset();
+    }
 }
 
 void SessionCatalog::_releaseSession(const LogicalSessionId& lsid) {

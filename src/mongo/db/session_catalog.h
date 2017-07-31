@@ -93,9 +93,10 @@ public:
     ScopedSession checkOutSession(OperationContext* opCtx);
 
     /**
-     * Clears the entire transaction table. Invoked after rollback.
+     * Resets all created sessions and increments their generation, forcing each to be reloaded by
+     * subsequent write commands. Invoked after rollback.
      */
-    void clearTransactionTable();
+    void resetSessions();
 
 private:
     struct SessionRuntimeInfo {

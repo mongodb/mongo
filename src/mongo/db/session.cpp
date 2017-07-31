@@ -99,35 +99,58 @@ void Session::begin(OperationContext* opCtx, const TxnNumber& txnNumber) {
     invariant(!opCtx->lockState()->isLocked());
     invariant(!opCtx->lockState()->inAWriteUnitOfWork());
 
-    if (!_txnRecord) {
-        _txnRecord = loadSessionRecord(opCtx, _sessionId);
+    // Repeats if the generation of the session changes during I/O.
+    while (true) {
+        int startGeneration = 0;
+        boost::optional<SessionTxnRecord> txnRecord;
+        {
+            stdx::lock_guard<stdx::mutex> lg(_mutex);
+            startGeneration = _generation;
+            txnRecord = _txnRecord;
+        }
 
-        // Previous read failed to retrieve the txn record, which means it does not exist yet,
-        // so create a new entry.
-        if (!_txnRecord) {
+        // Do I/O outside of the lock.
+        if (!txnRecord) {
+            txnRecord = loadSessionRecord(opCtx, _sessionId);
+
+            // Previous read failed to retrieve the txn record, which means it does not exist yet,
+            // so create a new entry.
+            if (!txnRecord) {
+                updateSessionRecord(opCtx, _sessionId, txnNumber, Timestamp());
+                txnRecord = makeSessionTxnRecord(_sessionId, txnNumber, Timestamp());
+            }
+
+            stdx::lock_guard<stdx::mutex> lg(_mutex);
+            _txnRecord = txnRecord;
+        }
+
+        uassert(40528,
+                str::stream() << "cannot start transaction with id " << txnNumber << " on session "
+                              << _sessionId
+                              << " because transaction with id "
+                              << txnRecord->getTxnNum()
+                              << " already started",
+                txnRecord->getTxnNum() <= txnNumber);
+
+        if (txnNumber > txnRecord->getTxnNum()) {
             updateSessionRecord(opCtx, _sessionId, txnNumber, Timestamp());
+            txnRecord->setTxnNum(txnNumber);
+            txnRecord->setLastWriteOpTimeTs(Timestamp());
+        }
 
-            _txnRecord.emplace();
-            _txnRecord->setSessionId(_sessionId);
-            _txnRecord->setTxnNum(txnNumber);
-            _txnRecord->setLastWriteOpTimeTs(Timestamp());
+        {
+            stdx::lock_guard<stdx::mutex> lg(_mutex);
 
+            // Reload if the session was modified since the beginning of this loop, e.g. by
+            // rollback.
+            if (startGeneration != _generation) {
+                _txnRecord.reset();
+                continue;
+            }
+
+            _txnRecord = std::move(txnRecord);
             return;
         }
-    }
-
-    uassert(40528,
-            str::stream() << "cannot start transaction with id " << txnNumber << " on session "
-                          << _sessionId
-                          << " because transaction with id "
-                          << _txnRecord->getTxnNum()
-                          << " already started",
-            _txnRecord->getTxnNum() <= txnNumber);
-
-    if (txnNumber > _txnRecord->getTxnNum()) {
-        updateSessionRecord(opCtx, _sessionId, txnNumber, Timestamp());
-        _txnRecord->setTxnNum(txnNumber);
-        _txnRecord->setLastWriteOpTimeTs(Timestamp());
     }
 }
 
@@ -150,7 +173,7 @@ void Session::saveTxnProgress(OperationContext* opCtx, Timestamp opTimeTs) {
     updateRequest.setQuery(BSON(SessionTxnRecord::kSessionIdFieldName
                                 << _sessionId.toBSON()
                                 << SessionTxnRecord::kTxnNumFieldName
-                                << _txnRecord->getTxnNum()));
+                                << getTxnNum()));
     updateRequest.setUpdates(
         BSON("$set" << BSON(SessionTxnRecord::kLastWriteOpTimeTsFieldName << opTimeTs)));
     updateRequest.setUpsert(false);
@@ -160,19 +183,30 @@ void Session::saveTxnProgress(OperationContext* opCtx, Timestamp opTimeTs) {
             str::stream() << "Failed to update transaction progress for session " << _sessionId,
             updateResult.numDocsModified >= 1);
 
+    stdx::lock_guard<stdx::mutex> lg(_mutex);
     _txnRecord->setLastWriteOpTimeTs(opTimeTs);
 }
 
 TxnNumber Session::getTxnNum() const {
+    stdx::lock_guard<stdx::mutex> lg(_mutex);
+    invariant(_txnRecord);
     return _txnRecord->getTxnNum();
 }
 
-const Timestamp& Session::getLastWriteOpTimeTs() const {
+Timestamp Session::getLastWriteOpTimeTs() const {
+    stdx::lock_guard<stdx::mutex> lg(_mutex);
+    invariant(_txnRecord);
     return _txnRecord->getLastWriteOpTimeTs();
 }
 
 TransactionHistoryIterator Session::getWriteHistory(OperationContext* opCtx) const {
     return TransactionHistoryIterator(getLastWriteOpTimeTs());
+}
+
+void Session::reset() {
+    stdx::lock_guard<stdx::mutex> lg(_mutex);
+    _txnRecord.reset();
+    _generation += 1;
 }
 
 boost::optional<repl::OplogEntry> Session::checkStatementExecuted(OperationContext* opCtx,

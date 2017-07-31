@@ -76,7 +76,8 @@ public:
                                     const Timestamp& ts);
 
     /**
-     *  Load transaction state from storage if it hasn't.
+     * Load transaction state from storage if it hasn't or if the session has been reset. Will retry
+     * until the session generation does not change during I/O.
      */
     void begin(OperationContext* opCtx, const TxnNumber& txnNumber);
 
@@ -98,7 +99,13 @@ public:
     /**
      * Note: can only be called after at least one successful execution of begin().
      */
-    const Timestamp& getLastWriteOpTimeTs() const;
+    Timestamp getLastWriteOpTimeTs() const;
+
+    /**
+     * Resets the session's in-memory state, forcing it to reload from the transactions table the
+     * next time begin is called.
+     */
+    void reset();
 
     /**
      * Returns the oplog entry with the given statementId, if it exists.
@@ -109,7 +116,16 @@ public:
 private:
     const LogicalSessionId _sessionId;
 
+    // Protects the member variables below.
+    mutable stdx::mutex _mutex;
+
     boost::optional<SessionTxnRecord> _txnRecord;
+
+    /**
+     * Incremented each time the session is externally modified. Used to determine if the session
+     * needs to be reloaded after I/O.
+     */
+    int _generation;
 };
 
 }  // namespace mongo
