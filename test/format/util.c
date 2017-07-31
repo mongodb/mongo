@@ -470,6 +470,7 @@ rng(WT_RAND_STATE *rnd)
 		errno = 0;
 		ulv = strtoul(buf, &endptr, 10);
 		testutil_assert(errno == 0 && endptr[0] == '\n');
+		testutil_assert(ulv <= UINT32_MAX);
 		return ((uint32_t)ulv);
 	}
 
