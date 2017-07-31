@@ -613,19 +613,6 @@ TEST_F(V2UserDocumentParsing, V2RoleExtraction) {
     ASSERT_FALSE(roles.more());
 }
 
-TEST_F(V2UserDocumentParsing,
-       V2AuthenticationRestrictionsExtractioniFailsOnOldFeatureCompatibilityVersion) {
-    serverGlobalParams.featureCompatibility.version.store(
-        ServerGlobalParams::FeatureCompatibility::Version::k34);
-    Status status = v2parser.initializeAuthenticationRestrictionsFromUserDocument(
-        BSON("user"
-             << "spencer"
-             << "authenticationRestrictions"
-             << BSON_ARRAY(BSON("clientSource" << BSON_ARRAY("::1")))),
-        user.get());
-    ASSERT_EQ(ErrorCodes::UnsupportedFormat, status.code());
-}
-
 TEST_F(V2UserDocumentParsing, V2AuthenticationRestrictionsExtraction) {
     const auto emptyArray = BSONArrayBuilder().arr();
     const auto emptyObj = BSONObjBuilder().obj();

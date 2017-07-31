@@ -194,7 +194,7 @@
             eventualDb.getSiblingDB("test").runCommand({find: "foo", batchSize: 0}));
 
         print(
-            "When a client downgrades featureCompatibilityVersion, users with featureCompatibilityVersions become unusable.");
+            "When a client downgrades featureCompatibilityVersion, authenticationRestrictions are still enforced");
         assert.commandWorked(admin.runCommand({
             createUser: "user13",
             pwd: "user",
@@ -212,9 +212,12 @@
         assert.commandWorked(admin.runCommand({setFeatureCompatibilityVersion: "3.4"}));
 
         sleepUntilUserDataRefreshed();
-        assert.commandFailed(db.getSiblingDB("test").runCommand({find: "foo", batchSize: 0}));
-        assert.commandFailed(
+        assert(db.auth("user13", "user"));
+        assert.commandWorked(db.getSiblingDB("test").runCommand({find: "foo", batchSize: 0}));
+        assert(eventualDb.auth("user13", "user"));
+        assert.commandWorked(
             eventualDb.getSiblingDB("test").runCommand({find: "foo", batchSize: 0}));
+        assert(!externalDb.auth("user13", "user"));
     }
 
     print("Testing standalone");

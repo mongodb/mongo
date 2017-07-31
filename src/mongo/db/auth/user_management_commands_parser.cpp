@@ -192,7 +192,10 @@ Status parseCreateOrUpdateUserCommands(const BSONObj& cmdObj,
     validFieldNames.insert("digestPassword");
     validFieldNames.insert("pwd");
     validFieldNames.insert("roles");
-    validFieldNames.insert("authenticationRestrictions");
+    if (serverGlobalParams.featureCompatibility.version.load() >=
+        ServerGlobalParams::FeatureCompatibility::Version::k36) {
+        validFieldNames.insert("authenticationRestrictions");
+    }
 
     Status status = _checkNoExtraFields(cmdObj, cmdName, validFieldNames);
     if (!status.isOK()) {
@@ -490,7 +493,10 @@ Status parseCreateOrUpdateRoleCommands(const BSONObj& cmdObj,
     validFieldNames.insert(cmdName.toString());
     validFieldNames.insert("privileges");
     validFieldNames.insert("roles");
-    validFieldNames.insert("authenticationRestrictions");
+    if (serverGlobalParams.featureCompatibility.version.load() >=
+        ServerGlobalParams::FeatureCompatibility::Version::k36) {
+        validFieldNames.insert("authenticationRestrictions");
+    }
 
     Status status = _checkNoExtraFields(cmdObj, cmdName, validFieldNames);
     if (!status.isOK()) {

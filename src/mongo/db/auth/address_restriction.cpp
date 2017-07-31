@@ -74,12 +74,6 @@ mongo::StatusWith<mongo::SharedRestrictionDocument> mongo::parseAuthenticationRe
                                std::unique_ptr<document_type::element_type>>::value,
                   "SharedRestrictionDocument expected to contain a sequence of unique_ptrs");
 
-    if (serverGlobalParams.featureCompatibility.version.load() <
-        ServerGlobalParams::FeatureCompatibility::Version::k36) {
-        return Status(ErrorCodes::UnsupportedFormat,
-                      "'authenticationRestrictions' requires 3.6 feature compatibility version");
-    }
-
     document_type::sequence_type doc;
     for (const auto& elem : arr) {
         if (elem.type() != Object) {
@@ -102,12 +96,6 @@ mongo::StatusWith<mongo::SharedRestrictionDocument> mongo::parseAuthenticationRe
 mongo::StatusWith<mongo::BSONArray> mongo::getRawAuthenticationRestrictions(
     const BSONArray& arr) noexcept try {
     BSONArrayBuilder builder;
-
-    if (serverGlobalParams.featureCompatibility.version.load() <
-        ServerGlobalParams::FeatureCompatibility::Version::k36) {
-        return Status(ErrorCodes::UnsupportedFormat,
-                      "'authenticationRestrictions' requires 3.6 feature compatibility version");
-    }
 
     for (auto const& elem : arr) {
         if (elem.type() != Object) {

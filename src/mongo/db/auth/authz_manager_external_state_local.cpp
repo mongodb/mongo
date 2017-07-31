@@ -31,6 +31,7 @@
 #include "mongo/db/auth/authz_manager_external_state_local.h"
 
 #include "mongo/base/status.h"
+#include "mongo/bson/mutable/algorithm.h"
 #include "mongo/bson/mutable/document.h"
 #include "mongo/bson/mutable/element.h"
 #include "mongo/bson/util/bson_extract.h"
@@ -197,21 +198,6 @@ Status AuthzManagerExternalStateLocal::getUserDescription(OperationContext* opCt
     resolveUserRoles(&resultDoc, directRoles);
     *result = resultDoc.getObject();
 
-    const auto isNonEmptyArray = [](const BSONObj& doc, StringData element) {
-        const auto& e = doc[element];
-        return !e.eoo() && (e.type() == Array) && !e.Obj().isEmpty();
-    };
-
-    if ((isNonEmptyArray(*result, "authenticationRestrictions") ||
-         isNonEmptyArray(*result, "inheritedAuthenticationRestrictions")) &&
-        serverGlobalParams.featureCompatibility.version.load() <
-            ServerGlobalParams::FeatureCompatibility::Version::k36) {
-        // Mongos isn't able to evaluate whether documents are valid under the current
-        // featureCompatibilityVersion. We must make the decision before it sees them.
-        return Status(ErrorCodes::UnsupportedFormat,
-                      "'authenticationRestrictions' requires 3.6 feature compatibility version");
-    }
-
     return Status::OK();
 }
 
@@ -300,13 +286,6 @@ Status AuthzManagerExternalStateLocal::_getUserDocument(OperationContext* opCtx,
         status =
             Status(ErrorCodes::UserNotFound,
                    mongoutils::str::stream() << "Could not find user " << userName.getFullName());
-    } else if ((*userDoc)["authenticationRestrictions"] &&
-               serverGlobalParams.featureCompatibility.version.load() <
-                   ServerGlobalParams::FeatureCompatibility::Version::k36) {
-        // Mongos isn't able to evaluate whether documents are valid under the current
-        // featureCompatibilityVersion. We must make the decision before it sees them.
-        status = Status(ErrorCodes::UnsupportedFormat,
-                        "'authenticationRestrictions' requires 3.6 feature compatibility version");
     }
     return status;
 }

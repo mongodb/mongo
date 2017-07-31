@@ -276,9 +276,8 @@ env.Library(
         'address_restriction.cpp',
         env.Idlc('address_restriction.idl')[0],
     ],
-    LIBDEPS=[
+    LIBDEPS_PRIVATE=[
         'authentication_restriction',
-        '$BUILD_DIR/mongo/db/server_options_core',
         '$BUILD_DIR/mongo/base',
         '$BUILD_DIR/mongo/util/net/network',
         '$BUILD_DIR/mongo/idl/idl_parser',
