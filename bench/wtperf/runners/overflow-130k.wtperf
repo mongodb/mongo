@@ -1,7 +1,7 @@
 #
 # Run with very large overflow items and btree.
 #
-conn_config="cache_size=21G,checkpoint_sync=false,mmap=false,statistics=(fast),statistics_log=(wait=10)"
+conn_config="cache_size=21G,checkpoint_sync=false,mmap=false"
 compact=true
 compression="snappy"
 sess_config="isolation=snapshot"

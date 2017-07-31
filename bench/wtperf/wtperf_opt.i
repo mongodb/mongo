@@ -92,7 +92,8 @@ DEF_OPT_AS_UINT32(checkpoint_stress_rate, 0,
     "checkpoint every rate operations during the populate phase in the "
     "populate thread(s), 0 to disable")
 DEF_OPT_AS_UINT32(checkpoint_threads, 0, "number of checkpoint threads")
-DEF_OPT_AS_CONFIG_STRING(conn_config, "create",
+DEF_OPT_AS_CONFIG_STRING(conn_config,
+    "create,statistics=(fast),statistics_log=(json,wait=1)",
     "connection configuration string")
 DEF_OPT_AS_BOOL(close_conn, 1, "properly close connection at end of test. "
     "Setting to false does not sync data to disk and can result in lost "
