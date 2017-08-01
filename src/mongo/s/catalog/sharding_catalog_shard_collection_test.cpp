@@ -135,6 +135,7 @@ TEST_F(ShardCollectionTest, anotherMongosSharding) {
     ASSERT_THROWS_CODE(ShardingCatalogManager::get(operationContext())
                            ->shardCollection(operationContext(),
                                              nss.ns(),
+                                             boost::none,  // UUID
                                              shardKeyPattern,
                                              defaultCollation,
                                              false,
@@ -174,6 +175,7 @@ TEST_F(ShardCollectionTest, noInitialChunksOrData) {
         ShardingCatalogManager::get(operationContext())
             ->shardCollection(opCtx.get(),
                               nss.ns(),
+                              boost::none,  // UUID
                               shardKeyPattern,
                               defaultCollation,
                               false,
@@ -302,6 +304,7 @@ TEST_F(ShardCollectionTest, withInitialChunks) {
         ShardingCatalogManager::get(operationContext())
             ->shardCollection(opCtx.get(),
                               ns,
+                              boost::none,  // UUID
                               keyPattern,
                               defaultCollation,
                               true,
@@ -398,8 +401,14 @@ TEST_F(ShardCollectionTest, withInitialData) {
         Client::initThreadIfNotAlready("Test");
         auto opCtx = cc().makeOperationContext();
         ShardingCatalogManager::get(operationContext())
-            ->shardCollection(
-                opCtx.get(), ns, keyPattern, defaultCollation, false, vector<BSONObj>{}, false);
+            ->shardCollection(opCtx.get(),
+                              ns,
+                              boost::none,  // UUID
+                              keyPattern,
+                              defaultCollation,
+                              false,
+                              vector<BSONObj>{},
+                              false);
     });
 
     // Report that documents exist for the given collection on the primary shard, so that calling

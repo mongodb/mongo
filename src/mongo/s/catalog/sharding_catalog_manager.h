@@ -43,6 +43,7 @@ namespace mongo {
 class OperationContext;
 class RemoteCommandTargeter;
 class ServiceContext;
+class UUID;
 
 /**
  * Implements modifications to the sharding catalog metadata.
@@ -199,6 +200,7 @@ public:
      * Shards a collection. Assumes that the database is enabled for sharding.
      *
      * @param ns: namespace of collection to shard
+     * @param uuid: the collection's UUID. Optional because new in 3.6.
      * @param fieldsAndOrder: shardKey pattern
      * @param defaultCollation: the default collation for the collection, to be written to
      *     config.collections. If empty, the collection default collation is simple binary
@@ -211,6 +213,7 @@ public:
      */
     void shardCollection(OperationContext* opCtx,
                          const std::string& ns,
+                         const boost::optional<UUID> uuid,
                          const ShardKeyPattern& fieldsAndOrder,
                          const BSONObj& defaultCollation,
                          bool unique,

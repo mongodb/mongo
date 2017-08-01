@@ -216,6 +216,7 @@ void checkForExistingChunks(OperationContext* opCtx, const string& ns) {
 
 void ShardingCatalogManager::shardCollection(OperationContext* opCtx,
                                              const string& ns,
+                                             const boost::optional<UUID> uuid,
                                              const ShardKeyPattern& fieldsAndOrder,
                                              const BSONObj& defaultCollation,
                                              bool unique,
@@ -236,6 +237,9 @@ void ShardingCatalogManager::shardCollection(OperationContext* opCtx,
         BSONObjBuilder collectionDetail;
         collectionDetail.append("shardKey", fieldsAndOrder.toBSON());
         collectionDetail.append("collection", ns);
+        if (uuid) {
+            uuid->appendToBuilder(&collectionDetail, "uuid");
+        }
         collectionDetail.append("primary", primaryShard->toString());
         collectionDetail.append("numChunks", static_cast<int>(initPoints.size() + 1));
         catalogClient
@@ -262,6 +266,9 @@ void ShardingCatalogManager::shardCollection(OperationContext* opCtx,
     {
         CollectionType coll;
         coll.setNs(nss);
+        if (uuid) {
+            coll.setUUID(*uuid);
+        }
         coll.setEpoch(collVersion.epoch());
 
         // TODO(schwerin): The following isn't really a date, but is stored as one in-memory and in

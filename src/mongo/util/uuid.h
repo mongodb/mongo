@@ -53,6 +53,7 @@ class UUID {
     using UUIDStorage = std::array<unsigned char, 16>;
 
     // Make the IDL generated parser a friend
+    friend class ConfigsvrShardCollection;
     friend class One_UUID;
     friend class LogicalSessionId;
     friend class LogicalSessionToClient;

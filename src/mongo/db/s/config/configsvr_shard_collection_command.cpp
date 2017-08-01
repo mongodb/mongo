@@ -629,6 +629,55 @@ void migrateAndFurtherSplitInitialChunks(OperationContext* opCtx,
     }
 }
 
+boost::optional<UUID> getUUIDFromPrimaryShard(const NamespaceString& nss,
+                                              ScopedDbConnection& conn) {
+    // UUIDs were introduced in featureCompatibilityVersion 3.6.
+    if (serverGlobalParams.featureCompatibility.version.load() <
+        ServerGlobalParams::FeatureCompatibility::Version::k36) {
+        return boost::none;
+    }
+
+    // Obtain the collection's UUID from the primary shard's listCollections response.
+    BSONObj res;
+    {
+        std::list<BSONObj> all =
+            conn->getCollectionInfos(nss.db().toString(), BSON("name" << nss.coll()));
+        if (!all.empty()) {
+            res = all.front().getOwned();
+        }
+    }
+
+    uassert(ErrorCodes::InternalError,
+            str::stream() << "expected the primary shard host " << conn.getHost()
+                          << " for database "
+                          << nss.db()
+                          << " to return an entry for "
+                          << nss.ns()
+                          << " in its listCollections response, but it did not",
+            !res.isEmpty());
+
+    BSONObj collectionInfo;
+    if (res["info"].type() == BSONType::Object) {
+        collectionInfo = res["info"].Obj();
+    }
+
+    uassert(ErrorCodes::InternalError,
+            str::stream() << "expected primary shard to return 'info' field as part of "
+                             "listCollections for "
+                          << nss.ns()
+                          << " because the cluster is in featureCompatibilityVersion=3.6, but got "
+                          << res,
+            !collectionInfo.isEmpty());
+
+    uassert(ErrorCodes::InternalError,
+            str::stream() << "expected primary shard to return a UUID for collection " << nss.ns()
+                          << " as part of 'info' field but got "
+                          << res,
+            collectionInfo.hasField("uuid"));
+
+    return uassertStatusOK(UUID::parse(collectionInfo["uuid"]));
+}
+
 /**
  * Internal sharding command run on config servers to add a shard to the cluster.
  */
@@ -728,10 +777,13 @@ public:
         validateShardKeyAgainstExistingIndexes(
             opCtx, nss, proposedKey, shardKeyPattern, primaryShard, conn, request);
 
+        // Step 4.
+        auto uuid = getUUIDFromPrimaryShard(nss, conn);
+
         // isEmpty is used by multiple steps below.
         bool isEmpty = (conn->count(nss.ns()) == 0);
 
-        // Step 4.
+        // Step 5.
         std::vector<BSONObj> initSplits;  // there will be at most numShards-1 of these
         std::vector<BSONObj> allSplits;   // all of the initial desired split points
         determinePresplittingPoints(opCtx,
@@ -753,9 +805,10 @@ public:
         // (below) if using a hashed shard key.
         const bool distributeInitialChunks = request.getInitialSplitPoints().is_initialized();
 
-        // Step 5. Actually shard the collection.
+        // Step 6. Actually shard the collection.
         catalogManager->shardCollection(opCtx,
                                         nss.ns(),
+                                        uuid,
                                         shardKeyPattern,
                                         *request.getCollation(),
                                         request.getUnique(),
@@ -770,7 +823,7 @@ public:
         // proceed.
         scopedDistLock.reset();
 
-        // Step 6. Migrate initial chunks to distribute them across shards.
+        // Step 7. Migrate initial chunks to distribute them across shards.
         migrateAndFurtherSplitInitialChunks(
             opCtx, nss, numShards, shardIds, isEmpty, shardKeyPattern, allSplits);
 
