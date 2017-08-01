@@ -85,9 +85,8 @@ void CatalogCacheLoaderMock::notifyOfCollectionVersionUpdate(const NamespaceStri
     MONGO_UNREACHABLE;
 }
 
-Status CatalogCacheLoaderMock::waitForCollectionVersion(OperationContext* opCtx,
-                                                        const NamespaceString& nss,
-                                                        const ChunkVersion& version) {
+void CatalogCacheLoaderMock::waitForCollectionFlush(OperationContext* opCtx,
+                                                    const NamespaceString& nss) {
     MONGO_UNREACHABLE;
 }
 

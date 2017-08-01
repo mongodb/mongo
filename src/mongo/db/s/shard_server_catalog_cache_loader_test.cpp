@@ -104,7 +104,6 @@ void ShardServerCatalogCacheLoaderTest::setUp() {
 
     // Set the shard loader to primary mode, and set it for testing.
     _shardLoader->initializeReplicaSetRole(true);
-    _shardLoader->setForTesting();
 }
 
 void ShardServerCatalogCacheLoaderTest::tearDown() {
@@ -407,8 +406,7 @@ TEST_F(ShardServerCatalogCacheLoaderTest, PrimaryLoadFromShardedAndFindDiffReque
     notification->get();
 
     // Wait for persistence of update
-    ASSERT_OK(_shardLoader->waitForCollectionVersion(
-        operationContext(), kNss, updatedChunksDiff.back().getVersion()));
+    _shardLoader->waitForCollectionFlush(operationContext(), kNss);
 
     // Set up the remote loader to return a single document we've already seen, indicating no change
     // occurred.

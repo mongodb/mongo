@@ -105,13 +105,6 @@ public:
     virtual void notifyOfCollectionVersionUpdate(const NamespaceString& nss) = 0;
 
     /**
-     * Waits for the persisted collection version to be GTE to 'version', or an epoch change.
-     */
-    virtual Status waitForCollectionVersion(OperationContext* opCtx,
-                                            const NamespaceString& nss,
-                                            const ChunkVersion& version) = 0;
-
-    /**
      * Non-blocking call, which requests the chunks changed since the specified version to be
      * fetched from the persistent metadata store and invokes the callback function with the result.
      * The callback function must never throw - it is a fatal error to do so.
@@ -128,6 +121,19 @@ public:
         ChunkVersion version,
         stdx::function<void(OperationContext*, StatusWith<CollectionAndChangedChunks>)>
             callbackFn) = 0;
+
+    /**
+     * Waits for any pending changes for the specified collection to be persisted locally (not
+     * necessarily replicated). If newer changes come after this method has started running, they
+     * will not be waited for except if there is a drop.
+     *
+     * May throw if the node steps down from primary or if the operation time is exceeded or due to
+     * any other error condition.
+     *
+     * If the specific loader implementation does not support persistence, this method is undefined
+     * and must fassert.
+     */
+    virtual void waitForCollectionFlush(OperationContext* opCtx, const NamespaceString& nss) = 0;
 
     /**
      * Only used for unit-tests, clears a previously-created catalog cache loader from the specified

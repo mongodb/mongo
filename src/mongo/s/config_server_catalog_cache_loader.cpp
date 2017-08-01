@@ -157,9 +157,8 @@ void ConfigServerCatalogCacheLoader::notifyOfCollectionVersionUpdate(const Names
     MONGO_UNREACHABLE;
 }
 
-Status ConfigServerCatalogCacheLoader::waitForCollectionVersion(OperationContext* opCtx,
-                                                                const NamespaceString& nss,
-                                                                const ChunkVersion& version) {
+void ConfigServerCatalogCacheLoader::waitForCollectionFlush(OperationContext* opCtx,
+                                                            const NamespaceString& nss) {
     MONGO_UNREACHABLE;
 }
 

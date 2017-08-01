@@ -37,37 +37,25 @@
 #include "mongo/db/auth/privilege.h"
 #include "mongo/db/client.h"
 #include "mongo/db/commands.h"
-#include "mongo/db/db_raii.h"
-#include "mongo/db/lasterror.h"
 #include "mongo/db/operation_context.h"
-#include "mongo/db/repl/replication_coordinator_global.h"
-#include "mongo/db/s/collection_metadata.h"
-#include "mongo/db/s/collection_sharding_state.h"
-#include "mongo/db/s/migration_source_manager.h"
+#include "mongo/db/repl/repl_client_info.h"
 #include "mongo/db/s/sharding_state.h"
-#include "mongo/db/wire_version.h"
-#include "mongo/s/catalog_cache.h"
-#include "mongo/s/chunk_version.h"
-#include "mongo/s/client/shard_registry.h"
+#include "mongo/s/catalog_cache_loader.h"
 #include "mongo/s/grid.h"
 #include "mongo/util/log.h"
-#include "mongo/util/stringutils.h"
 
 namespace mongo {
-
 namespace {
 
-/**
- * Takes a single argument, a namespace string, and forces this node to refresh its routing table
- * cache entry for that namespace.
- */
 class ForceRoutingTableRefresh : public BasicCommand {
 public:
     ForceRoutingTableRefresh() : BasicCommand("forceRoutingTableRefresh") {}
 
     void help(std::stringstream& help) const override {
-        help << "internal command to force a node to refresh its routing table entry for a "
-                "namespace";
+        help << "Internal command which forces a sharded node to refresh its metadata from the "
+                "config server and persist it locally only. Behaves like any other write command "
+                "in that it returns the cluster time of the last metadata write so it can be "
+                "waited on.";
     }
 
     bool adminOnly() const override {
@@ -78,7 +66,7 @@ public:
         return true;
     }
 
-    virtual bool supportsWriteConcern(const BSONObj& cmd) const override {
+    bool supportsWriteConcern(const BSONObj& cmd) const override {
         return false;
     }
 
@@ -107,27 +95,25 @@ public:
     bool run(OperationContext* opCtx,
              const std::string& dbname,
              const BSONObj& cmdObj,
-             BSONObjBuilder& result) {
-        auto shardingState = ShardingState::get(opCtx);
+             BSONObjBuilder& result) override {
+        auto const shardingState = ShardingState::get(opCtx);
         uassertStatusOK(shardingState->canAcceptShardedCommands());
 
         uassert(ErrorCodes::IllegalOperation,
-                "can't issue forceRoutingTableRefresh from 'eval'",
+                "Can't issue forceRoutingTableRefresh from 'eval'",
                 !opCtx->getClient()->isInDirectClient());
 
-        NamespaceString nss(parseNs(dbname, cmdObj));
+        const NamespaceString nss(parseNs(dbname, cmdObj));
 
-        log() << "forcing routing table refresh for " << nss;
+        LOG(1) << "Forcing routing table refresh for " << nss;
+
         ChunkVersion unusedShardVersion;
-        uassertStatusOK(
-            ShardingState::get(opCtx)->refreshMetadataNow(opCtx, nss, &unusedShardVersion));
+        uassertStatusOK(shardingState->refreshMetadataNow(opCtx, nss, &unusedShardVersion));
 
-        auto routingInfo =
-            uassertStatusOK(Grid::get(opCtx)->catalogCache()->getCollectionRoutingInfo(opCtx, nss));
+        CatalogCacheLoader::get(opCtx).waitForCollectionFlush(opCtx, nss);
 
-        const auto collectionVersion =
-            routingInfo.cm() ? routingInfo.cm()->getVersion() : ChunkVersion::UNSHARDED();
-        collectionVersion.appendWithFieldForCommands(&result, "collectionVersion");
+        repl::ReplClientInfo::forClient(opCtx->getClient()).setLastOpToSystemLastOpTime(opCtx);
+
         return true;
     }
 

@@ -31,6 +31,7 @@
 #include "mongo/db/operation_context_group.h"
 #include "mongo/db/s/namespace_metadata_change_notifications.h"
 #include "mongo/s/catalog_cache_loader.h"
+#include "mongo/stdx/condition_variable.h"
 #include "mongo/util/concurrency/thread_pool.h"
 
 namespace mongo {
@@ -49,15 +50,6 @@ class ShardServerCatalogCacheLoader : public CatalogCacheLoader {
 public:
     ShardServerCatalogCacheLoader(std::unique_ptr<CatalogCacheLoader> configServerLoader);
     ~ShardServerCatalogCacheLoader();
-
-    /**
-     * For testing use only.
-     *
-     * Currently this only sets a boolean such that after metadata updates the notification system
-     * is signaled internally, rather than depending on the OpObservers which are not connectted for
-     * unit testing.
-     */
-    void setForTesting();
 
     /**
      * Initializes internal state so that the loader behaves as a primary or secondary. This can
@@ -82,23 +74,6 @@ public:
     void notifyOfCollectionVersionUpdate(const NamespaceString& nss) override;
 
     /**
-     * Waits for the persisted collection version to be gte to 'version', or an epoch change. Only
-     * call this function if you KNOW that a version gte WILL eventually be persisted.
-     *
-     * This function cannot wait for a version if nothing is persisted because a collection can
-     * become unsharded after we start waiting and 'version' will then never be reached. If 'nss'
-     * has no persisted metadata, even if it will shortly, a NamespaceNotFound error will be
-     * returned.
-     *
-     * A lock must not be held when calling this because it would prevent using the latest snapshot
-     * and actually seeing the change after it arrives.
-     * This function can throw a DBException if the opCtx is interrupted.
-     */
-    Status waitForCollectionVersion(OperationContext* opCtx,
-                                    const NamespaceString& nss,
-                                    const ChunkVersion& version) override;
-
-    /**
      * This must be called serially, never in parallel, including waiting for the returned
      * Notification to be signalled.
      *
@@ -113,6 +88,8 @@ public:
         ChunkVersion version,
         stdx::function<void(OperationContext*, StatusWith<CollectionAndChangedChunks>)> callbackFn)
         override;
+
+    void waitForCollectionFlush(OperationContext* opCtx, const NamespaceString& nss) override;
 
 private:
     // Differentiates the server's role in the replica set so that the chunk loader knows whether to
@@ -144,6 +121,9 @@ private:
         Task(StatusWith<CollectionAndChangedChunks> statusWithCollectionAndChangedChunks,
              ChunkVersion minimumQueryVersion,
              long long currentTerm);
+
+        // Always-incrementing task number to uniquely identify different tasks
+        uint64_t taskNum;
 
         // Chunks and Collection updates to be applied to the shard persisted metadata store.
         boost::optional<CollectionAndChangedChunks> collectionAndChangedChunks{boost::none};
@@ -177,6 +157,8 @@ private:
      */
     class TaskList {
     public:
+        TaskList();
+
         /**
          * Adds 'task' to the back of the 'tasks' list.
          *
@@ -186,22 +168,41 @@ private:
          */
         void addTask(Task task);
 
-        /**
-         * Returns the front of the 'tasks' list. Invariants if 'tasks' is empty.
-         */
-        const Task& getActiveTask() const;
+        auto& front() {
+            invariant(!_tasks.empty());
+            return _tasks.front();
+        }
 
-        /**
-         * Erases the current active task and updates 'activeTask' to the next task in 'tasks'.
-         */
-        void removeActiveTask();
+        auto& back() {
+            invariant(!_tasks.empty());
+            return _tasks.back();
+        }
 
-        /**
-         * Checks whether there are any tasks left.
-         */
-        const bool empty() {
+        auto begin() {
+            invariant(!_tasks.empty());
+            return _tasks.begin();
+        }
+
+        auto end() {
+            invariant(!_tasks.empty());
+            return _tasks.end();
+        }
+
+        void pop_front();
+
+        bool empty() const {
             return _tasks.empty();
         }
+
+        /**
+         * Must only be called if there is an active task. Behaves like a condition variable and
+         * will be signaled when the active task has been completed.
+         *
+         * NOTE: Because this call unlocks and locks the provided mutex, it is not safe to use the
+         * same task object on which it was called because it might have been deleted during the
+         * unlocked period.
+         */
+        void waitForActiveTaskCompletion(stdx::unique_lock<stdx::mutex>& lg);
 
         /**
          * Checks whether 'term' matches the term of the latest task in the task list. This is
@@ -223,6 +224,10 @@ private:
 
     private:
         std::list<Task> _tasks{};
+
+        // Condition variable which will be signaled whenever the active task from the tasks list is
+        // completed. Must be used in conjunction with the loader's mutex.
+        std::shared_ptr<stdx::condition_variable> _activeTaskCompletedCondVar;
     };
 
     typedef std::map<NamespaceString, TaskList> TaskLists;
@@ -238,17 +243,6 @@ private:
         const NamespaceString& nss,
         const ChunkVersion& catalogCacheSinceVersion,
         stdx::function<void(OperationContext*, StatusWith<CollectionAndChangedChunks>)> callbackFn);
-
-    /**
-     * Forces the  primary to refresh its chunk metadata for 'nss' and obtain's the primary's
-     * collectionVersion after the refresh.
-     *
-     * Then waits until it has replicated chunk metadata up to at least that collectionVersion.
-     *
-     * Throws on error.
-     */
-    void _forcePrimaryRefreshAndWaitForReplication(OperationContext* opCtx,
-                                                   const NamespaceString& nss);
 
     /**
      * Refreshes chunk metadata from the config server's metadata store, and schedules maintenance
@@ -362,9 +356,6 @@ private:
 
     // The collection of operation contexts in use by all threads.
     OperationContextGroup _contexts;
-
-    // Gates additional actions needed when testing.
-    bool _testing{false};
 };
 
 }  // namespace mongo

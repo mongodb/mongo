@@ -242,25 +242,10 @@ private:
         auto nss = moveChunkRequest.getNss();
         const auto range = ChunkRange(moveChunkRequest.getMinKey(), moveChunkRequest.getMaxKey());
 
-        // Wait for the metadata update to be persisted before scheduling the range deletion.
-        //
-        // This is necessary to prevent a race on the secondary because both metadata persistence
-        // and range deletion is done asynchronously and we must prevent the data deletion from
-        // being propagated before the metadata update.
-        ChunkVersion collectionVersion = [&]() {
-            AutoGetCollection autoColl(opCtx, nss, MODE_IS);
-            auto metadata = CollectionShardingState::get(opCtx, nss)->getMetadata();
-            uassert(ErrorCodes::NamespaceNotSharded,
-                    str::stream() << "Chunk move failed because collection '" << nss.ns()
-                                  << "' is no longer sharded.",
-                    metadata);
-            return metadata->getCollVersion();
-        }();
-
-        // Now schedule the range deletion clean up.
+        // Wait for the metadata update to be persisted in order to avoid orphaned documents from
+        // starting to get deleted before the metadata changes have propagated to the secondaries.
         auto notification = [&] {
-            uassertStatusOK(CatalogCacheLoader::get(opCtx).waitForCollectionVersion(
-                opCtx, nss, collectionVersion));
+            CatalogCacheLoader::get(opCtx).waitForCollectionFlush(opCtx, nss);
 
             auto const whenToClean = moveChunkRequest.getWaitForDelete()
                 ? CollectionShardingState::kNow

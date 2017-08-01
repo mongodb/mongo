@@ -30,32 +30,13 @@
 
 #include "mongo/db/s/read_only_catalog_cache_loader.h"
 
-#include "mongo/db/operation_context.h"
-
 namespace mongo {
 
 using CollectionAndChangedChunks = CatalogCacheLoader::CollectionAndChangedChunks;
 
-void ReadOnlyCatalogCacheLoader::initializeReplicaSetRole(bool isPrimary) {
-    return;
-}
-
-void ReadOnlyCatalogCacheLoader::onStepDown() {
-    return;
-}
-
-void ReadOnlyCatalogCacheLoader::onStepUp() {
-    return;
-}
-
-void ReadOnlyCatalogCacheLoader::notifyOfCollectionVersionUpdate(const NamespaceString& nss) {
-    return;
-}
-
-Status ReadOnlyCatalogCacheLoader::waitForCollectionVersion(OperationContext* opCtx,
-                                                            const NamespaceString& nss,
-                                                            const ChunkVersion& version) {
-    return Status::OK();
+void ReadOnlyCatalogCacheLoader::waitForCollectionFlush(OperationContext* opCtx,
+                                                        const NamespaceString& nss) {
+    MONGO_UNREACHABLE;
 }
 
 std::shared_ptr<Notification<void>> ReadOnlyCatalogCacheLoader::getChunksSince(
