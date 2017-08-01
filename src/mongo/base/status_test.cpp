@@ -42,10 +42,9 @@ using mongo::ErrorCodes;
 using mongo::Status;
 
 TEST(Basic, Accessors) {
-    Status status(ErrorCodes::MaxError, "error", 9999);
+    Status status(ErrorCodes::MaxError, "error");
     ASSERT_EQUALS(status.code(), ErrorCodes::MaxError);
     ASSERT_EQUALS(status.reason(), "error");
-    ASSERT_EQUALS(status.location(), 9999);
 }
 
 TEST(Basic, OKIsAValidStatus) {
@@ -55,11 +54,8 @@ TEST(Basic, OKIsAValidStatus) {
 
 TEST(Basic, Compare) {
     Status errMax(ErrorCodes::MaxError, "error");
-    ASSERT_TRUE(errMax.compare(errMax));
-    ASSERT_FALSE(errMax.compare(Status::OK()));
-
-    Status errMaxWithLoc(ErrorCodes::MaxError, "error", 9998);
-    ASSERT_FALSE(errMaxWithLoc.compare(errMax));
+    ASSERT_EQ(errMax, errMax);
+    ASSERT_NE(errMax, Status::OK());
 }
 
 TEST(Cloning, Copy) {

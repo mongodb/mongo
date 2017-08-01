@@ -1338,8 +1338,7 @@ Status _syncRollback(OperationContext* opCtx,
                       str::stream()
                           << "need to rollback, but unable to determine common point between"
                              " local and remote oplog: "
-                          << e.what(),
-                      18752);
+                          << e.what());
     }
 
     log() << "Rollback common point is " << how.commonPoint;
@@ -1350,7 +1349,7 @@ Status _syncRollback(OperationContext* opCtx,
         });
         syncFixUp(opCtx, how, rollbackSource, replCoord, replicationProcess);
     } catch (const RSFatalException& e) {
-        return Status(ErrorCodes::UnrecoverableRollbackError, e.what(), 18753);
+        return Status(ErrorCodes::UnrecoverableRollbackError, e.what());
     }
 
     if (MONGO_FAIL_POINT(rollbackHangBeforeFinish)) {

@@ -75,10 +75,6 @@ inline std::string Status::reason() const {
     return _error ? _error->reason : std::string();
 }
 
-inline int Status::location() const {
-    return _error ? _error->location : 0;
-}
-
 inline AtomicUInt32::WordType Status::refCount() const {
     return _error ? _error->refs.load() : 0;
 }

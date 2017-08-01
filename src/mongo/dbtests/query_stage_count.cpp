@@ -126,16 +126,14 @@ public:
         BSONObj oldDoc = _coll->getRecordStore()->dataFor(&_opCtx, oldrecordId).releaseToBson();
         OplogUpdateEntryArgs args;
         args.nss = _coll->ns();
-        _coll
-            ->updateDocument(&_opCtx,
-                             oldrecordId,
-                             Snapshotted<BSONObj>(_opCtx.recoveryUnit()->getSnapshotId(), oldDoc),
-                             newDoc,
-                             false,
-                             true,
-                             NULL,
-                             &args)
-            .status_with_transitional_ignore();
+        _coll->updateDocument(&_opCtx,
+                              oldrecordId,
+                              Snapshotted<BSONObj>(_opCtx.recoveryUnit()->getSnapshotId(), oldDoc),
+                              newDoc,
+                              false,
+                              true,
+                              NULL,
+                              &args);
         wunit.commit();
     }
 

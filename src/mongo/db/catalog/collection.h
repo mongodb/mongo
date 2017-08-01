@@ -270,14 +270,14 @@ public:
                                       const std::vector<MultiIndexBlock*>& indexBlocks,
                                       bool enforceQuota) = 0;
 
-        virtual StatusWith<RecordId> updateDocument(OperationContext* opCtx,
-                                                    const RecordId& oldLocation,
-                                                    const Snapshotted<BSONObj>& oldDoc,
-                                                    const BSONObj& newDoc,
-                                                    bool enforceQuota,
-                                                    bool indexesAffected,
-                                                    OpDebug* opDebug,
-                                                    OplogUpdateEntryArgs* args) = 0;
+        virtual RecordId updateDocument(OperationContext* opCtx,
+                                        const RecordId& oldLocation,
+                                        const Snapshotted<BSONObj>& oldDoc,
+                                        const BSONObj& newDoc,
+                                        bool enforceQuota,
+                                        bool indexesAffected,
+                                        OpDebug* opDebug,
+                                        OplogUpdateEntryArgs* args) = 0;
 
         virtual bool updateWithDamagesSupported() const = 0;
 
@@ -539,14 +539,14 @@ public:
      * 'opDebug' Optional argument. When not null, will be used to record operation statistics.
      * @return the post update location of the doc (may or may not be the same as oldLocation)
      */
-    inline StatusWith<RecordId> updateDocument(OperationContext* const opCtx,
-                                               const RecordId& oldLocation,
-                                               const Snapshotted<BSONObj>& oldDoc,
-                                               const BSONObj& newDoc,
-                                               const bool enforceQuota,
-                                               const bool indexesAffected,
-                                               OpDebug* const opDebug,
-                                               OplogUpdateEntryArgs* const args) {
+    inline RecordId updateDocument(OperationContext* const opCtx,
+                                   const RecordId& oldLocation,
+                                   const Snapshotted<BSONObj>& oldDoc,
+                                   const BSONObj& newDoc,
+                                   const bool enforceQuota,
+                                   const bool indexesAffected,
+                                   OpDebug* const opDebug,
+                                   OplogUpdateEntryArgs* const args) {
         return this->_impl().updateDocument(
             opCtx, oldLocation, oldDoc, newDoc, enforceQuota, indexesAffected, opDebug, args);
     }

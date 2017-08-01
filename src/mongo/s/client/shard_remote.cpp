@@ -336,7 +336,7 @@ StatusWith<Shard::QueryResponse> ShardRemote::_exhaustiveFindOnConfig(
     updateReplSetMonitor(host.getValue(), status);
 
     if (!status.isOK()) {
-        if (status.compareCode(ErrorCodes::ExceededTimeLimit)) {
+        if (status == ErrorCodes::ExceededTimeLimit) {
             LOG(0) << "Operation timed out " << causedBy(status);
         }
         return status;

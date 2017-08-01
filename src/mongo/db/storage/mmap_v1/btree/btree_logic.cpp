@@ -1058,7 +1058,7 @@ Status BtreeLogic<BtreeLayout>::_find(OperationContext* opCtx,
                         dupsCheckedYet = true;
                         if (exists(opCtx, key)) {
                             if (wouldCreateDup(opCtx, key, genericRecordLoc)) {
-                                return Status(ErrorCodes::DuplicateKey, dupKeyError(key), 11000);
+                                return Status(ErrorCodes::DuplicateKey, dupKeyError(key));
                             } else {
                                 return Status(ErrorCodes::DuplicateKeyValue,
                                               "key/value already in index");
@@ -1069,7 +1069,7 @@ Status BtreeLogic<BtreeLayout>::_find(OperationContext* opCtx,
                     if (fullKey.recordLoc == recordLoc) {
                         return Status(ErrorCodes::DuplicateKeyValue, "key/value already in index");
                     } else {
-                        return Status(ErrorCodes::DuplicateKey, dupKeyError(key), 11000);
+                        return Status(ErrorCodes::DuplicateKey, dupKeyError(key));
                     }
                 }
             }

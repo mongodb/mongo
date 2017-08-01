@@ -200,8 +200,7 @@ Status rollback_internal_no_uuid::updateFixUpInfoFromLocalOplogEntry(FixUpInfo& 
         if (cmd == NULL) {
             severe() << "Rollback no such command " << first.fieldName();
             return Status(ErrorCodes::UnrecoverableRollbackError,
-                          str::stream() << "Rollback no such command " << first.fieldName(),
-                          18751);
+                          str::stream() << "Rollback no such command " << first.fieldName());
         }
         if (cmdname == "create") {
             // Create collection operation
@@ -914,8 +913,7 @@ Status _syncRollback(OperationContext* opCtx,
                       str::stream()
                           << "need to rollback, but unable to determine common point between"
                              " local and remote oplog: "
-                          << e.what(),
-                      18752);
+                          << e.what());
     }
 
     log() << "Rollback common point is " << how.commonPoint;
@@ -926,7 +924,7 @@ Status _syncRollback(OperationContext* opCtx,
         });
         syncFixUp(opCtx, how, rollbackSource, replCoord, replicationProcess);
     } catch (const RSFatalException& e) {
-        return Status(ErrorCodes::UnrecoverableRollbackError, e.what(), 18753);
+        return Status(ErrorCodes::UnrecoverableRollbackError, e.what());
     }
 
     if (MONGO_FAIL_POINT(rollbackHangBeforeFinish)) {

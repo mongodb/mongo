@@ -381,7 +381,7 @@ TEST(CappedRecordStoreV1, OversizedRecordHuge) {
 
     StatusWith<RecordId> status = rs.insertRecord(&opCtx, zeros, 16000, false);
     ASSERT_EQUALS(status.getStatus(), ErrorCodes::DocTooLargeForCapped);
-    ASSERT_EQUALS(status.getStatus().location(), 16328);
+    ASSERT_STRING_CONTAINS(status.getStatus().reason(), "larger than capped size");
 }
 
 // Smaller than storageSize, but larger than usable space (fails late)
@@ -403,7 +403,7 @@ TEST(CappedRecordStoreV1, OversizedRecordMedium) {
     StatusWith<RecordId> status =
         rs.insertRecord(&opCtx, zeros, 1004 - MmapV1RecordHeader::HeaderSize, false);
     ASSERT_EQUALS(status.getStatus(), ErrorCodes::DocTooLargeForCapped);
-    ASSERT_EQUALS(status.getStatus().location(), 28575);
+    ASSERT_STRING_CONTAINS(status.getStatus().reason(), "doesn't fit");
 }
 
 //

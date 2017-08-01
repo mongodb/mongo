@@ -350,18 +350,19 @@ public:
         set<RecordId>::iterator it = recordIds.begin();
         Snapshotted<BSONObj> oldDoc = coll->docFor(&_opCtx, *it);
 
-        OID updatedId = oldDoc.value().getField("_id").OID();
-        SnapshotId idBeforeUpdate = oldDoc.snapshotId();
+        const OID updatedId = oldDoc.value().getField("_id").OID();
+        const SnapshotId idBeforeUpdate = oldDoc.snapshotId();
         // We purposefully update the document to have a 'foo' value greater than limit().
         // This allows us to check that we don't return the new copy of a doc by asserting
         // foo < limit().
-        BSONObj newDoc = BSON("_id" << updatedId << "foo" << limit() + 10);
+        auto newDoc = [&](const Snapshotted<BSONObj>& oldDoc) {
+            return BSON("_id" << oldDoc.value()["_id"] << "foo" << limit() + 10);
+        };
         OplogUpdateEntryArgs args;
         args.nss = coll->ns();
         {
             WriteUnitOfWork wuow(&_opCtx);
-            coll->updateDocument(&_opCtx, *it, oldDoc, newDoc, false, false, NULL, &args)
-                .status_with_transitional_ignore();
+            coll->updateDocument(&_opCtx, *it, oldDoc, newDoc(oldDoc), false, false, NULL, &args);
             wuow.commit();
         }
         exec->restoreState();
@@ -379,8 +380,8 @@ public:
             oldDoc = coll->docFor(&_opCtx, *it);
             {
                 WriteUnitOfWork wuow(&_opCtx);
-                coll->updateDocument(&_opCtx, *it++, oldDoc, newDoc, false, false, NULL, &args)
-                    .status_with_transitional_ignore();
+                coll->updateDocument(
+                    &_opCtx, *it++, oldDoc, newDoc(oldDoc), false, false, NULL, &args);
                 wuow.commit();
             }
         }

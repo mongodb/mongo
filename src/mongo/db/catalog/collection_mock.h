@@ -167,14 +167,14 @@ public:
         std::abort();
     }
 
-    StatusWith<RecordId> updateDocument(OperationContext* opCtx,
-                                        const RecordId& oldLocation,
-                                        const Snapshotted<BSONObj>& oldDoc,
-                                        const BSONObj& newDoc,
-                                        bool enforceQuota,
-                                        bool indexesAffected,
-                                        OpDebug* opDebug,
-                                        OplogUpdateEntryArgs* args) {
+    RecordId updateDocument(OperationContext* opCtx,
+                            const RecordId& oldLocation,
+                            const Snapshotted<BSONObj>& oldDoc,
+                            const BSONObj& newDoc,
+                            bool enforceQuota,
+                            bool indexesAffected,
+                            OpDebug* opDebug,
+                            OplogUpdateEntryArgs* args) {
         std::abort();
     }
 

@@ -293,16 +293,15 @@ TEST_F(MultikeyPathsTest, PathsUpdatedOnDocumentUpdate) {
             const bool indexesAffected = true;
             OpDebug* opDebug = nullptr;
             OplogUpdateEntryArgs args;
-            collection
-                ->updateDocument(_opCtx.get(),
-                                 record->id,
-                                 oldDoc,
-                                 BSON("_id" << 0 << "a" << 5 << "b" << BSON_ARRAY(1 << 2 << 3)),
-                                 enforceQuota,
-                                 indexesAffected,
-                                 opDebug,
-                                 &args)
-                .status_with_transitional_ignore();
+            collection->updateDocument(
+                _opCtx.get(),
+                record->id,
+                oldDoc,
+                BSON("_id" << 0 << "a" << 5 << "b" << BSON_ARRAY(1 << 2 << 3)),
+                enforceQuota,
+                indexesAffected,
+                opDebug,
+                &args);
             wuow.commit();
         }
     }

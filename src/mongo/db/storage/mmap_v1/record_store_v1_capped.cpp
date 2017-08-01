@@ -105,8 +105,7 @@ StatusWith<DiskLoc> CappedRecordStoreV1::allocRecord(OperationContext* opCtx,
                 ErrorCodes::DocTooLargeForCapped,
                 mongoutils::str::stream() << "document is larger than capped size " << lenToAlloc
                                           << " > "
-                                          << storageSize(opCtx),
-                16328);
+                                          << storageSize(opCtx));
         }
     }
     DiskLoc loc;
@@ -165,8 +164,7 @@ StatusWith<DiskLoc> CappedRecordStoreV1::allocRecord(OperationContext* opCtx,
                                                    << " size: "
                                                    << lenToAlloc
                                                    << " storageSize:"
-                                                   << storageSize(opCtx),
-                                               28575);
+                                                   << storageSize(opCtx));
                 }
                 continue;
             }

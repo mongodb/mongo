@@ -175,8 +175,7 @@ namespace mongo {
 %(fromStringIfStatements)s
         return Status(ErrorCodes::FailedToParse,
                       mongoutils::str::stream() << "Unrecognized action privilege string: "
-                                                << action,
-                      0);
+                                                << action);
     }
 
     // Takes an ActionType and returns the string representation

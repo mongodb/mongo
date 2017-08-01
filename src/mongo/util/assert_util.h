@@ -322,10 +322,7 @@ inline void fassertNoTraceWithLocation(int msgid,
     ::mongo::uassertStatusOKWithLocation(__VA_ARGS__, __FILE__, __LINE__)
 inline void uassertStatusOKWithLocation(const Status& status, const char* file, unsigned line) {
     if (MONGO_unlikely(!status.isOK())) {
-        uassertedWithLocation((status.location() != 0 ? status.location() : status.code()),
-                              status.reason(),
-                              file,
-                              line);
+        uassertedWithLocation(status.code(), status.reason(), file, line);
     }
 }
 
@@ -386,10 +383,7 @@ inline void fassertStatusOKWithLocation(int msgid,
     ::mongo::massertStatusOKWithLocation(__VA_ARGS__, __FILE__, __LINE__)
 inline void massertStatusOKWithLocation(const Status& status, const char* file, unsigned line) {
     if (MONGO_unlikely(!status.isOK())) {
-        msgassertedWithLocation((status.location() != 0 ? status.location() : status.code()),
-                                status.reason(),
-                                file,
-                                line);
+        msgassertedWithLocation(status.code(), status.reason(), file, line);
     }
 }
 
@@ -401,11 +395,7 @@ inline void massertNoTraceStatusOKWithLocation(const Status& status,
                                                unsigned line) {
     if (MONGO_unlikely(!status.isOK())) {
         [&]() MONGO_COMPILER_COLD_FUNCTION {
-            msgassertedNoTraceWithLocation(
-                (status.location() != 0 ? status.location() : status.code()),
-                status.reason(),
-                file,
-                line);
+            msgassertedNoTraceWithLocation(status.code(), status.reason(), file, line);
         }();
         MONGO_COMPILER_UNREACHABLE;
     }

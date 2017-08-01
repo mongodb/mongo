@@ -256,14 +256,15 @@ WiredTigerIndex::WiredTigerIndex(OperationContext* ctx,
     auto version = WiredTigerUtil::checkApplicationMetadataFormatVersion(
         ctx, uri, kMinimumIndexVersion, kMaximumIndexVersion);
     if (!version.isOK()) {
-        str::stream ss;
         Status versionStatus = version.getStatus();
-        ss << versionStatus.reason() << " Index: {name: " << desc->indexName()
-           << ", ns: " << desc->parentNS() << "} - version too new for this mongod."
-           << " See http://dochub.mongodb.org/core/3.4-index-downgrade for detailed"
-           << " instructions on how to handle this error.";
         Status indexVersionStatus(
-            ErrorCodes::UnsupportedFormat, ss.ss.str(), versionStatus.location());
+            ErrorCodes::UnsupportedFormat,
+            str::stream() << versionStatus.reason() << " Index: {name: " << desc->indexName()
+                          << ", ns: "
+                          << desc->parentNS()
+                          << "} - version too new for this mongod."
+                          << " See http://dochub.mongodb.org/core/3.4-index-downgrade for detailed"
+                          << " instructions on how to handle this error.");
         fassertFailedWithStatusNoTrace(28579, indexVersionStatus);
     }
     _keyStringVersion =

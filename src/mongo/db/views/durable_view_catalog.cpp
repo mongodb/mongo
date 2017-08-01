@@ -154,15 +154,14 @@ void DurableViewCatalogImpl::upsert(OperationContext* opCtx,
         args.fromMigrate = false;
 
         const bool assumeIndexesAreAffected = true;
-        auto res = systemViews->updateDocument(opCtx,
-                                               id,
-                                               oldView,
-                                               view,
-                                               enforceQuota,
-                                               assumeIndexesAreAffected,
-                                               &CurOp::get(opCtx)->debug(),
-                                               &args);
-        uassertStatusOK(res);
+        systemViews->updateDocument(opCtx,
+                                    id,
+                                    oldView,
+                                    view,
+                                    enforceQuota,
+                                    assumeIndexesAreAffected,
+                                    &CurOp::get(opCtx)->debug(),
+                                    &args);
     }
 }
 

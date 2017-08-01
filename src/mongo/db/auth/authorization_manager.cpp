@@ -416,8 +416,7 @@ Status AuthorizationManager::_initializeUserFromPrivilegeDocument(User* user,
                                                 << userName
                                                 << "\" doesn't match name of provided User \""
                                                 << user->getName().getUser()
-                                                << "\"",
-                      0);
+                                                << "\"");
     }
 
     Status status = parser.initializeUserCredentialsFromUserDocument(user, privDoc);

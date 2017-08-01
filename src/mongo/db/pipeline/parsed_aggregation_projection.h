@@ -53,10 +53,10 @@ namespace parsed_aggregation_projection {
 class ProjectionSpecValidator {
 public:
     /**
-     * Returns a Status: either a Status::OK() if the specification is valid for a projection, or a
-     * non-OK Status, error number, and message with why not.
+     * Throws if the specification is not valid for a projection. The stageName is used to provide a
+     * more helpful error message.
      */
-    static Status validate(const BSONObj& spec);
+    static void uassertValid(const BSONObj& spec, StringData stageName);
 
 private:
     ProjectionSpecValidator(const BSONObj& spec) : _rawObj(spec) {}
@@ -67,12 +67,12 @@ private:
      * For example, a user is not allowed to specify {'a': 1, 'a.b': 1}, or some similar conflicting
      * paths.
      */
-    Status ensurePathDoesNotConflictOrThrow(StringData path);
+    void ensurePathDoesNotConflictOrThrow(StringData path);
 
     /**
-     * Returns the relevant error if an invalid projection specification is detected.
+     * Throws if an invalid projection specification is detected.
      */
-    Status validate();
+    void validate();
 
     /**
      * Parses a single BSONElement. 'pathToElem' should include the field name of 'elem'.
@@ -80,19 +80,18 @@ private:
      * Delegates to parseSubObject() if 'elem' is an object. Otherwise adds the full path to 'elem'
      * to '_seenPaths'.
      *
-     * Calls ensurePathDoesNotConflictOrThrow with the path to this element, which sets the _status
-     * appropriately for conflicting path specifications.
+     * Calls ensurePathDoesNotConflictOrThrow with the path to this element, throws on conflicting
+     * path specifications.
      */
-    Status parseElement(const BSONElement& elem, const FieldPath& pathToElem);
+    void parseElement(const BSONElement& elem, const FieldPath& pathToElem);
 
     /**
      * Traverses 'thisLevelSpec', parsing each element in turn.
      *
-     * Sets _status appropriately if any paths conflict with each other or existing paths,
-     * 'thisLevelSpec' contains a dotted path, or if 'thisLevelSpec' represents an invalid
-     * expression.
+     * Throws if any paths conflict with each other or existing paths, 'thisLevelSpec' contains a
+     * dotted path, or if 'thisLevelSpec' represents an invalid expression.
      */
-    Status parseNestedObject(const BSONObj& thisLevelSpec, const FieldPath& prefix);
+    void parseNestedObject(const BSONObj& thisLevelSpec, const FieldPath& prefix);
 
     // The original object. Used to generate more helpful error messages.
     const BSONObj& _rawObj;

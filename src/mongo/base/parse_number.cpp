@@ -124,7 +124,7 @@ Status parseNumberFromStringWithBase(StringData stringValue, int base, NumberTyp
     typedef ::std::numeric_limits<NumberType> limits;
 
     if (base == 1 || base < 0 || base > 36)
-        return Status(ErrorCodes::BadValue, "Invalid base", 0);
+        return Status(ErrorCodes::BadValue, "Invalid base");
 
     bool isNegative = false;
     StringData str = _extractBase(_extractSign(stringValue, &isNegative), base, &base);

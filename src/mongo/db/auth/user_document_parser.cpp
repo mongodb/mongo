@@ -64,22 +64,22 @@ constexpr StringData AUTHENTICATION_RESTRICTIONS_FIELD_NAME = "authenticationRes
 constexpr StringData INHERITED_AUTHENTICATION_RESTRICTIONS_FIELD_NAME =
     "inheritedAuthenticationRestrictions"_sd;
 
-inline Status _badValue(const char* reason, int location) {
-    return Status(ErrorCodes::BadValue, reason, location);
+inline Status _badValue(const char* reason) {
+    return Status(ErrorCodes::BadValue, reason);
 }
 
-inline Status _badValue(const std::string& reason, int location) {
-    return Status(ErrorCodes::BadValue, reason, location);
+inline Status _badValue(const std::string& reason) {
+    return Status(ErrorCodes::BadValue, reason);
 }
 
 Status _checkV1RolesArray(const BSONElement& rolesElement) {
     if (rolesElement.type() != Array) {
-        return _badValue("Role fields must be an array when present in system.users entries", 0);
+        return _badValue("Role fields must be an array when present in system.users entries");
     }
     for (BSONObjIterator iter(rolesElement.embeddedObject()); iter.more(); iter.next()) {
         BSONElement element = *iter;
         if (element.type() != String || element.valueStringData().empty()) {
-            return _badValue("Roles must be non-empty strings.", 0);
+            return _badValue("Roles must be non-empty strings.");
         }
     }
     return Status::OK();
@@ -210,14 +210,14 @@ Status V1UserDocumentParser::initializeUserRolesFromUserDocument(User* user,
 
 Status _checkV2RolesArray(const BSONElement& rolesElement) {
     if (rolesElement.eoo()) {
-        return _badValue("User document needs 'roles' field to be provided", 0);
+        return _badValue("User document needs 'roles' field to be provided");
     }
     if (rolesElement.type() != Array) {
-        return _badValue("'roles' field must be an array", 0);
+        return _badValue("'roles' field must be an array");
     }
     for (BSONObjIterator iter(rolesElement.embeddedObject()); iter.more(); iter.next()) {
         if ((*iter).type() != Object) {
-            return _badValue("Elements in 'roles' array must objects", 0);
+            return _badValue("Elements in 'roles' array must objects");
         }
         Status status = V2UserDocumentParser::checkValidRoleObject((*iter).Obj());
         if (!status.isOK())
@@ -234,41 +234,39 @@ Status V2UserDocumentParser::checkValidUserDocument(const BSONObj& doc) const {
 
     // Validate the "user" element.
     if (userElement.type() != String)
-        return _badValue("User document needs 'user' field to be a string", 0);
+        return _badValue("User document needs 'user' field to be a string");
     if (userElement.valueStringData().empty())
-        return _badValue("User document needs 'user' field to be non-empty", 0);
+        return _badValue("User document needs 'user' field to be non-empty");
 
     // Validate the "db" element
     if (userDBElement.type() != String || userDBElement.valueStringData().empty()) {
-        return _badValue("User document needs 'db' field to be a non-empty string", 0);
+        return _badValue("User document needs 'db' field to be a non-empty string");
     }
     StringData userDBStr = userDBElement.valueStringData();
     if (!NamespaceString::validDBName(userDBStr, NamespaceString::DollarInDbNameBehavior::Allow) &&
         userDBStr != "$external") {
         return _badValue(mongoutils::str::stream() << "'" << userDBStr
-                                                   << "' is not a valid value for the db field.",
-                         0);
+                                                   << "' is not a valid value for the db field.");
     }
 
     // Validate the "credentials" element
     if (credentialsElement.eoo()) {
-        return _badValue("User document needs 'credentials' object", 0);
+        return _badValue("User document needs 'credentials' object");
     }
     if (credentialsElement.type() != Object) {
-        return _badValue("User document needs 'credentials' field to be an object", 0);
+        return _badValue("User document needs 'credentials' field to be an object");
     }
 
     BSONObj credentialsObj = credentialsElement.Obj();
     if (credentialsObj.isEmpty()) {
-        return _badValue("User document needs 'credentials' field to be a non-empty object", 0);
+        return _badValue("User document needs 'credentials' field to be a non-empty object");
     }
     if (userDBStr == "$external") {
         BSONElement externalElement = credentialsObj[MONGODB_EXTERNAL_CREDENTIAL_FIELD_NAME];
         if (externalElement.eoo() || externalElement.type() != Bool || !externalElement.Bool()) {
             return _badValue(
                 "User documents for users defined on '$external' must have "
-                "'credentials' field set to {external: true}",
-                0);
+                "'credentials' field set to {external: true}");
         }
     } else {
         BSONElement scramElement = credentialsObj[SCRAM_CREDENTIAL_FIELD_NAME];
@@ -278,18 +276,16 @@ Status V2UserDocumentParser::checkValidUserDocument(const BSONObj& doc) const {
             if (mongoCRElement.type() != String || mongoCRElement.valueStringData().empty()) {
                 return _badValue(
                     "MONGODB-CR credential must to be a non-empty string"
-                    ", if present",
-                    0);
+                    ", if present");
             }
         } else if (!scramElement.eoo()) {
             if (scramElement.type() != Object) {
-                return _badValue("SCRAM credential must be an object, if present", 0);
+                return _badValue("SCRAM credential must be an object, if present");
             }
         } else {
             return _badValue(
                 "User document must provide credentials for all "
-                "non-external users",
-                0);
+                "non-external users");
         }
     }
 

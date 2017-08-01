@@ -320,17 +320,17 @@ private:
     void unstitch();
 
     /**
-     * Returns a non-OK status if the pipeline fails any of a set of semantic checks. For example,
-     * if an $out stage is present then it must come last in the pipeline, while initial stages such
-     * as $indexStats must be at the start.
+     * Throws if the pipeline fails any of a set of semantic checks. For example, if an $out stage
+     * is present then it must come last in the pipeline, while initial stages such as $indexStats
+     * must be at the start.
      */
-    Status validatePipeline() const;
+    void validatePipeline() const;
 
     /**
-     * Returns a non-OK status if the $facet pipeline fails any of a set of semantic checks. For
-     * example, the pipeline cannot be empty and may not contain any initial stages.
+     * Throws if the $facet pipeline fails any of a set of semantic checks. For example, the
+     * pipeline cannot be empty and may not contain any initial stages.
      */
-    Status validateFacetPipeline() const;
+    void validateFacetPipeline() const;
 
     /**
      * Helper method which validates that each stage in pipeline is in a legal position. For
@@ -338,7 +338,7 @@ private:
      * start. Note that this method accepts an initial source as the first stage, which is illegal
      * for $facet pipelines.
      */
-    Status ensureAllStagesAreInLegalPositions() const;
+    void ensureAllStagesAreInLegalPositions() const;
 
     SourceContainer _sources;
 

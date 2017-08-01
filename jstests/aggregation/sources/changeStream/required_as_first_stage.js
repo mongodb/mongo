@@ -10,14 +10,14 @@
 
     const coll = rst.getPrimary().getDB("test").getCollection(testName);
 
-    assertErrorCode(coll, [{$indexStats: {}}, {$changeStream: {}}], 40549);
+    assertErrorCode(coll, [{$indexStats: {}}, {$changeStream: {}}], 40602);
     assertErrorCode(
         coll,
         [{$indexStats: {}}, {$changeStream: {}}, {$match: {test: "this is an extra stage"}}],
-        40549);
+        40602);
 
     // Test that a $changeStream stage is not allowed within a $facet stage.
-    assertErrorCode(coll, [{$facet: {testPipe: [{$changeStream: {}}]}}], 40550);
+    assertErrorCode(coll, [{$facet: {testPipe: [{$changeStream: {}}]}}], 40600);
     assertErrorCode(coll,
                     [{
                        $facet: {
@@ -28,5 +28,5 @@
                            ]
                        }
                     }],
-                    40550);
+                    40600);
 }());

@@ -115,24 +115,28 @@ StatusWith<std::unique_ptr<Pipeline, Pipeline::Deleter>> Pipeline::createTopLeve
     const bool isFacetPipeline) {
     std::unique_ptr<Pipeline, Pipeline::Deleter> pipeline(new Pipeline(std::move(stages), expCtx),
                                                           Pipeline::Deleter(expCtx->opCtx));
-    auto status =
-        (isFacetPipeline ? pipeline->validateFacetPipeline() : pipeline->validatePipeline());
-    if (!status.isOK()) {
-        return status;
+    try {
+        if (isFacetPipeline) {
+            pipeline->validateFacetPipeline();
+        } else {
+            pipeline->validatePipeline();
+        }
+    } catch (const DBException& ex) {
+        return ex.toStatus();
     }
 
     pipeline->stitch();
     return std::move(pipeline);
 }
 
-Status Pipeline::validatePipeline() const {
+void Pipeline::validatePipeline() const {
     // Verify that the specified namespace is valid for the initial stage of this pipeline.
     const NamespaceString& nss = pCtx->ns;
 
     if (_sources.empty()) {
         if (nss.isCollectionlessAggregateNS()) {
-            return {ErrorCodes::InvalidNamespace,
-                    "{aggregate: 1} is not valid for an empty pipeline."};
+            uasserted(ErrorCodes::InvalidNamespace,
+                      "{aggregate: 1} is not valid for an empty pipeline.");
         }
     } else if (!dynamic_cast<DocumentSourceMergeCursors*>(_sources.front().get())) {
         // The $mergeCursors stage can take {aggregate: 1} or a normal namespace. Aside from this,
@@ -141,35 +145,34 @@ Status Pipeline::validatePipeline() const {
 
         if (nss.isCollectionlessAggregateNS() &&
             !firstStage->constraints().isIndependentOfAnyCollection) {
-            return {ErrorCodes::InvalidNamespace,
-                    str::stream() << "{aggregate: 1} is not valid for '"
-                                  << firstStage->getSourceName()
-                                  << "'; a collection is required."};
+            uasserted(ErrorCodes::InvalidNamespace,
+                      str::stream() << "{aggregate: 1} is not valid for '"
+                                    << firstStage->getSourceName()
+                                    << "'; a collection is required.");
         }
 
         if (!nss.isCollectionlessAggregateNS() &&
             firstStage->constraints().isIndependentOfAnyCollection) {
-            return {ErrorCodes::InvalidNamespace,
-                    str::stream() << "'" << firstStage->getSourceName()
-                                  << "' can only be run with {aggregate: 1}"};
+            uasserted(ErrorCodes::InvalidNamespace,
+                      str::stream() << "'" << firstStage->getSourceName()
+                                    << "' can only be run with {aggregate: 1}");
         }
     }
 
     // Verify that each stage is in a legal position within the pipeline.
-    return ensureAllStagesAreInLegalPositions();
+    ensureAllStagesAreInLegalPositions();
 }
 
-Status Pipeline::validateFacetPipeline() const {
+void Pipeline::validateFacetPipeline() const {
     if (_sources.empty()) {
-        return {ErrorCodes::BadValue, "sub-pipeline in $facet stage cannot be empty"};
+        uasserted(ErrorCodes::BadValue, "sub-pipeline in $facet stage cannot be empty");
     }
     for (auto&& stage : _sources) {
         auto stageConstraints = stage->constraints();
         if (!stageConstraints.isAllowedInsideFacetStage) {
-            return {ErrorCodes::BadValue,
-                    str::stream() << stage->getSourceName()
-                                  << " is not allowed to be used within a $facet stage",
-                    40550};
+            uasserted(40600,
+                      str::stream() << stage->getSourceName()
+                                    << " is not allowed to be used within a $facet stage");
         }
         // We expect a stage within a $facet stage to have these properties.
         invariant(stageConstraints.requiresInputDocSource);
@@ -180,35 +183,30 @@ Status Pipeline::validateFacetPipeline() const {
     // Facet pipelines cannot have any stages which are initial sources. We've already validated the
     // first stage, and the 'ensureAllStagesAreInLegalPositions' method checks that there are no
     // initial sources in positions 1...N, so we can just return its result directly.
-    return ensureAllStagesAreInLegalPositions();
+    ensureAllStagesAreInLegalPositions();
 }
 
-Status Pipeline::ensureAllStagesAreInLegalPositions() const {
+void Pipeline::ensureAllStagesAreInLegalPositions() const {
     size_t i = 0;
     for (auto&& stage : _sources) {
         if (stage->constraints().requiredPosition == PositionRequirement::kFirst && i != 0) {
-            return {ErrorCodes::BadValue,
-                    str::stream() << stage->getSourceName()
-                                  << " is only valid as the first stage in a pipeline.",
-                    40549};
+            uasserted(40602,
+                      str::stream() << stage->getSourceName()
+                                    << " is only valid as the first stage in a pipeline.");
         }
         auto matchStage = dynamic_cast<DocumentSourceMatch*>(stage.get());
         if (i != 0 && matchStage && matchStage->isTextQuery()) {
-            return {ErrorCodes::BadValue,
-                    "$match with $text is only allowed as the first pipeline stage",
-                    17313};
+            uasserted(17313, "$match with $text is only allowed as the first pipeline stage");
         }
 
         if (stage->constraints().requiredPosition == PositionRequirement::kLast &&
             i != _sources.size() - 1) {
-            return {ErrorCodes::BadValue,
-                    str::stream() << stage->getSourceName()
-                                  << " can only be the final stage in the pipeline",
-                    40551};
+            uasserted(40601,
+                      str::stream() << stage->getSourceName()
+                                    << " can only be the final stage in the pipeline");
         }
         ++i;
     }
-    return Status::OK();
 }
 
 void Pipeline::optimizePipeline() {

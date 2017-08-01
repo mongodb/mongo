@@ -576,25 +576,25 @@ void CollectionImpl::deleteDocument(OperationContext* opCtx,
 Counter64 moveCounter;
 ServerStatusMetricField<Counter64> moveCounterDisplay("record.moves", &moveCounter);
 
-StatusWith<RecordId> CollectionImpl::updateDocument(OperationContext* opCtx,
-                                                    const RecordId& oldLocation,
-                                                    const Snapshotted<BSONObj>& oldDoc,
-                                                    const BSONObj& newDoc,
-                                                    bool enforceQuota,
-                                                    bool indexesAffected,
-                                                    OpDebug* opDebug,
-                                                    OplogUpdateEntryArgs* args) {
+RecordId CollectionImpl::updateDocument(OperationContext* opCtx,
+                                        const RecordId& oldLocation,
+                                        const Snapshotted<BSONObj>& oldDoc,
+                                        const BSONObj& newDoc,
+                                        bool enforceQuota,
+                                        bool indexesAffected,
+                                        OpDebug* opDebug,
+                                        OplogUpdateEntryArgs* args) {
     {
         auto status = checkValidation(opCtx, newDoc);
         if (!status.isOK()) {
             if (_validationLevel == ValidationLevel::STRICT_V) {
-                return status;
+                uassertStatusOK(status);
             }
             // moderate means we have to check the old doc
             auto oldDocStatus = checkValidation(opCtx, oldDoc.value());
             if (oldDocStatus.isOK()) {
                 // transitioning from good -> bad is not ok
-                return status;
+                uassertStatusOK(status);
             }
             // bad -> bad is ok in moderate mode
         }
@@ -616,8 +616,7 @@ StatusWith<RecordId> CollectionImpl::updateDocument(OperationContext* opCtx,
 
     BSONElement oldId = oldDoc.value()["_id"];
     if (!oldId.eoo() && SimpleBSONElementComparator::kInstance.evaluate(oldId != newDoc["_id"]))
-        return StatusWith<RecordId>(
-            ErrorCodes::InternalError, "in Collection::updateDocument _id mismatch", 13596);
+        uasserted(13596, "in Collection::updateDocument _id mismatch");
 
     // The MMAPv1 storage engine implements capped collections in a way that does not allow records
     // to grow beyond their original size. If MMAPv1 part of a replicaset with storage engines that
@@ -628,11 +627,11 @@ StatusWith<RecordId> CollectionImpl::updateDocument(OperationContext* opCtx,
     // all size changes.
     const auto oldSize = oldDoc.value().objsize();
     if (_recordStore->isCapped() && oldSize != newDoc.objsize())
-        return {ErrorCodes::CannotGrowDocumentInCappedNamespace,
-                str::stream() << "Cannot change the size of a document in a capped collection: "
-                              << oldSize
-                              << " != "
-                              << newDoc.objsize()};
+        uasserted(ErrorCodes::CannotGrowDocumentInCappedNamespace,
+                  str::stream() << "Cannot change the size of a document in a capped collection: "
+                                << oldSize
+                                << " != "
+                                << newDoc.objsize());
 
     // At the end of this step, we will have a map of UpdateTickets, one per index, which
     // represent the index updates needed to be done, based on the changes between oldDoc and
@@ -649,16 +648,13 @@ StatusWith<RecordId> CollectionImpl::updateDocument(OperationContext* opCtx,
             IndexCatalog::prepareInsertDeleteOptions(opCtx, descriptor, &options);
             UpdateTicket* updateTicket = new UpdateTicket();
             updateTickets.mutableMap()[descriptor] = updateTicket;
-            Status ret = iam->validateUpdate(opCtx,
-                                             oldDoc.value(),
-                                             newDoc,
-                                             oldLocation,
-                                             options,
-                                             updateTicket,
-                                             entry->getFilterExpression());
-            if (!ret.isOK()) {
-                return StatusWith<RecordId>(ret);
-            }
+            uassertStatusOK(iam->validateUpdate(opCtx,
+                                                oldDoc.value(),
+                                                newDoc,
+                                                oldLocation,
+                                                options,
+                                                updateTicket,
+                                                entry->getFilterExpression()));
         }
     }
 
@@ -666,11 +662,10 @@ StatusWith<RecordId> CollectionImpl::updateDocument(OperationContext* opCtx,
         opCtx, oldLocation, newDoc.objdata(), newDoc.objsize(), _enforceQuota(enforceQuota), this);
 
     if (updateStatus == ErrorCodes::NeedsDocumentMove) {
-        return _updateDocumentWithMove(
-            opCtx, oldLocation, oldDoc, newDoc, enforceQuota, opDebug, args, sid);
-    } else if (!updateStatus.isOK()) {
-        return updateStatus;
+        return uassertStatusOK(_updateDocumentWithMove(
+            opCtx, oldLocation, oldDoc, newDoc, enforceQuota, opDebug, args, sid));
     }
+    uassertStatusOK(updateStatus);
 
     // Object did not move.  We update each index with each respective UpdateTicket.
     if (indexesAffected) {
@@ -681,10 +676,8 @@ StatusWith<RecordId> CollectionImpl::updateDocument(OperationContext* opCtx,
 
             int64_t keysInserted;
             int64_t keysDeleted;
-            Status ret = iam->update(
-                opCtx, *updateTickets.mutableMap()[descriptor], &keysInserted, &keysDeleted);
-            if (!ret.isOK())
-                return StatusWith<RecordId>(ret);
+            uassertStatusOK(iam->update(
+                opCtx, *updateTickets.mutableMap()[descriptor], &keysInserted, &keysDeleted));
             if (opDebug) {
                 opDebug->keysInserted += keysInserted;
                 opDebug->keysDeleted += keysDeleted;

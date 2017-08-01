@@ -248,7 +248,7 @@ TEST_F(RSRollbackTest, InconsistentMinValid) {
                                _coordinator,
                                _replicationProcess.get());
     ASSERT_EQUALS(ErrorCodes::UnrecoverableRollbackError, status.code());
-    ASSERT_EQUALS(18752, status.location());
+    ASSERT_STRING_CONTAINS(status.reason(), "unable to determine common point");
 }
 
 TEST_F(RSRollbackTest, OplogStartMissing) {
@@ -278,7 +278,7 @@ TEST_F(RSRollbackTest, NoRemoteOpLog) {
                                _coordinator,
                                _replicationProcess.get());
     ASSERT_EQUALS(ErrorCodes::UnrecoverableRollbackError, status.code());
-    ASSERT_EQUALS(18752, status.location());
+    ASSERT_STRING_CONTAINS(status.reason(), "unable to determine common point");
 }
 
 TEST_F(RSRollbackTest, RemoteGetRollbackIdThrows) {
@@ -514,7 +514,7 @@ TEST_F(RSRollbackTest, RollbackInsertDocumentWithNoId) {
                                _replicationProcess.get());
     stopCapturingLogMessages();
     ASSERT_EQUALS(ErrorCodes::UnrecoverableRollbackError, status.code());
-    ASSERT_EQUALS(18752, status.location());
+    ASSERT_STRING_CONTAINS(status.reason(), "unable to determine common point");
     ASSERT_EQUALS(1, countLogLinesContaining("Cannot roll back op with no _id. ns: test.t,"));
     ASSERT_FALSE(rollbackSource.called);
 }
@@ -832,7 +832,7 @@ TEST_F(RSRollbackTest, RollbackCreateIndexCommandMissingIndexName) {
                                _replicationProcess.get());
     stopCapturingLogMessages();
     ASSERT_EQUALS(ErrorCodes::UnrecoverableRollbackError, status.code());
-    ASSERT_EQUALS(18752, status.location());
+    ASSERT_STRING_CONTAINS(status.reason(), "unable to determine common point");
     ASSERT_EQUALS(1,
                   countLogLinesContaining(
                       "Missing index name in createIndexes operation on rollback, document: "));
@@ -864,7 +864,7 @@ TEST_F(RSRollbackTest, RollbackUnknownCommand) {
                      _coordinator,
                      _replicationProcess.get());
     ASSERT_EQUALS(ErrorCodes::UnrecoverableRollbackError, status.code());
-    ASSERT_EQUALS(18752, status.location());
+    ASSERT_STRING_CONTAINS(status.reason(), "unable to determine common point");
 }
 
 TEST_F(RSRollbackTest, RollbackDropCollectionCommand) {
@@ -1820,7 +1820,7 @@ TEST_F(RSRollbackTest, RollbackCollectionModificationCommandInvalidCollectionOpt
                      _coordinator,
                      _replicationProcess.get());
     ASSERT_EQUALS(ErrorCodes::UnrecoverableRollbackError, status.code());
-    ASSERT_EQUALS(18753, status.location());
+    ASSERT_STRING_CONTAINS(status.reason(), "Failed to parse options");
 }
 
 TEST(RSRollbackTest, LocalEntryWithoutNsIsFatal) {
@@ -2048,12 +2048,12 @@ TEST_F(RSRollbackTest, RollbackReturnsImmediatelyOnFailureToTransitionToRollback
     ASSERT_EQUALS(MemberState(MemberState::RS_SECONDARY), _coordinator->getMemberState());
 }
 
-DEATH_TEST_F(RSRollbackTest,
-             RollbackUnrecoverableRollbackErrorTriggersFatalAssertion,
-             "Unable to complete rollback. A full resync may be needed: "
-             "UnrecoverableRollbackError: need to rollback, but unable to determine common point "
-             "between local and remote oplog: InvalidSyncSource: remote oplog empty or unreadable "
-             "@ 18752") {
+DEATH_TEST_F(
+    RSRollbackTest,
+    RollbackUnrecoverableRollbackErrorTriggersFatalAssertion,
+    "Unable to complete rollback. A full resync may be needed: "
+    "UnrecoverableRollbackError: need to rollback, but unable to determine common point "
+    "between local and remote oplog: InvalidSyncSource: remote oplog empty or unreadable") {
     // rollback() should abort on getting UnrecoverableRollbackError from syncRollback(). An empty
     // local oplog will make syncRollback() return the intended error.
     OplogInterfaceMock localOplogWithSingleOplogEntry({makeNoopOplogEntryAndRecordId(Seconds(1))});

@@ -1496,8 +1496,7 @@ TEST_F(PipelineInitialSourceNSTest, ChangeStreamIsNotValidIfNotFirstStage) {
     setMockReplicationCoordinatorOnOpCtx(ctx->opCtx);
     ctx->ns = NamespaceString("a.collection");
     auto parseStatus = Pipeline::parse(rawPipeline, ctx).getStatus();
-    ASSERT_EQ(parseStatus, ErrorCodes::BadValue);
-    ASSERT_EQ(parseStatus.location(), 40549);
+    ASSERT_EQ(parseStatus, ErrorCodes::fromInt(40602));
 }
 
 TEST_F(PipelineInitialSourceNSTest, ChangeStreamIsNotValidIfNotFirstStageInFacet) {
@@ -1507,8 +1506,7 @@ TEST_F(PipelineInitialSourceNSTest, ChangeStreamIsNotValidIfNotFirstStageInFacet
     setMockReplicationCoordinatorOnOpCtx(ctx->opCtx);
     ctx->ns = NamespaceString("a.collection");
     auto parseStatus = Pipeline::parseFacetPipeline(rawPipeline, ctx).getStatus();
-    ASSERT_EQ(parseStatus, ErrorCodes::BadValue);
-    ASSERT_EQ(parseStatus.location(), 40550);
+    ASSERT_EQ(parseStatus, ErrorCodes::fromInt(40600));
     ASSERT(std::string::npos != parseStatus.reason().find("$changeStream"));
 }
 

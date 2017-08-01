@@ -47,8 +47,7 @@ namespace mongo {
  *
  * A Status uses the standardized error codes -- from file 'error_codes.h' -- to
  * determine an error's cause. It further clarifies the error with a textual
- * description. Optionally, a Status may also have an error location number, which
- * should be a unique, grep-able point in the code base (including assert numbers).
+ * description.
  *
  * Example usage:
  *
@@ -60,10 +59,6 @@ namespace mongo {
  *       *c = a+b;
  *       return Status::OK();
  *   }
- *
- * TODO: expand base/error_codes.h to capture common errors in current code
- * TODO: generate base/error_codes.h out of a description file
- * TODO: check 'location' duplicates against assert numbers
  */
 class MONGO_WARN_UNUSED_RESULT_CLASS Status {
 public:
@@ -71,22 +66,16 @@ public:
     static inline Status OK();
 
     /**
-     * Builds an error status given the error code, a textual description of what
-     * caused the error, and a unique position in the where the error occurred
-     * (similar to an assert number).
+     * Builds an error status given the error code and a textual description of what
+     * caused the error.
      *
      * For OK Statuses prefer using Status::OK(). If code is OK, the remaining arguments are
      * ignored.
      */
+    MONGO_COMPILER_COLD_FUNCTION Status(ErrorCodes::Error code, std::string reason);
+    MONGO_COMPILER_COLD_FUNCTION Status(ErrorCodes::Error code, const char* reason);
     MONGO_COMPILER_COLD_FUNCTION Status(ErrorCodes::Error code,
-                                        std::string reason,
-                                        int location = 0);
-    MONGO_COMPILER_COLD_FUNCTION Status(ErrorCodes::Error code,
-                                        const char* reason,
-                                        int location = 0);
-    MONGO_COMPILER_COLD_FUNCTION Status(ErrorCodes::Error code,
-                                        const mongoutils::str::stream& reason,
-                                        int location = 0);
+                                        const mongoutils::str::stream& reason);
 
     inline Status(const Status& other);
     inline Status& operator=(const Status& other);
@@ -97,20 +86,24 @@ public:
     inline ~Status();
 
     /**
-     * Returns true if 'other's error code and location are equal/different to this
-     * instance's. Otherwise returns false.
+     * Only compares codes. Ignores reason strings.
      */
-    bool compare(const Status& other) const;
-    bool operator==(const Status& other) const;
-    bool operator!=(const Status& other) const;
+    bool operator==(const Status& other) const {
+        return code() == other.code();
+    }
+    bool operator!=(const Status& other) const {
+        return !(*this == other);
+    }
 
     /**
-     * Returns true if 'other's error code is equal/different to this instance's.
-     * Otherwise returns false.
+     * Compares this Status's code with an error code.
      */
-    bool compareCode(const ErrorCodes::Error other) const;
-    bool operator==(const ErrorCodes::Error other) const;
-    bool operator!=(const ErrorCodes::Error other) const;
+    bool operator==(const ErrorCodes::Error other) const {
+        return code() == other;
+    }
+    bool operator!=(const ErrorCodes::Error other) const {
+        return !(*this == other);
+    }
 
     //
     // accessors
@@ -123,8 +116,6 @@ public:
     inline std::string codeString() const;
 
     inline std::string reason() const;
-
-    inline int location() const;
 
     std::string toString() const;
 
@@ -162,11 +153,10 @@ private:
         AtomicUInt32 refs;             // reference counter
         const ErrorCodes::Error code;  // error code
         const std::string reason;      // description of error cause
-        const int location;            // unique location of the triggering line in the code
 
-        static ErrorInfo* create(ErrorCodes::Error code, std::string reason, int location);
+        static ErrorInfo* create(ErrorCodes::Error code, std::string reason);
 
-        ErrorInfo(ErrorCodes::Error code, std::string reason, int location);
+        ErrorInfo(ErrorCodes::Error code, std::string reason);
     };
 
     ErrorInfo* _error;

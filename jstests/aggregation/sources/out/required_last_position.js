@@ -11,7 +11,7 @@
     assert.doesNotThrow(() => coll.aggregate([{$out: "out_collection"}]));
 
     // Test that $out is not allowed to have a stage after it.
-    assertErrorCode(coll, [{$out: "out_collection"}, {$match: {x: true}}], 40551);
+    assertErrorCode(coll, [{$out: "out_collection"}, {$match: {x: true}}], 40601);
     assertErrorCode(
-        coll, [{$project: {x: 0}}, {$out: "out_collection"}, {$match: {x: true}}], 40551);
+        coll, [{$project: {x: 0}}, {$out: "out_collection"}, {$match: {x: true}}], 40601);
 }());

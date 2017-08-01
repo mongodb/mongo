@@ -46,12 +46,6 @@ TEST(RedactStatusTest, BasicStatus) {
     ASSERT_EQ(redact(status), "InternalError: " + kRedactionDefaultMask);
 }
 
-TEST(RedactStatusTest, StatusWithLocation) {
-    logger::globalLogDomain()->setShouldRedactLogs(true);
-    Status status(ErrorCodes::InternalError, kMsg, 777);
-    ASSERT_EQ(redact(status), "InternalError: " + kRedactionDefaultMask + " @ 777");
-}
-
 TEST(RedactStatusTest, StatusOK) {
     logger::globalLogDomain()->setShouldRedactLogs(true);
     ASSERT_EQ(redact(Status::OK()), "OK");

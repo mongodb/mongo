@@ -65,8 +65,6 @@ std::string redact(const Status& statusToRedact) {
     sb << statusToRedact.codeString();
     if (!statusToRedact.isOK())
         sb << ": " << kRedactionDefaultMask;
-    if (statusToRedact.location() != 0)
-        sb << " @ " << statusToRedact.location();
     return sb.str();
 }
 

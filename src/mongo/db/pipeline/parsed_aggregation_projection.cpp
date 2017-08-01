@@ -53,57 +53,56 @@ using TransformerType =
 // ProjectionSpecValidator
 //
 
-Status ProjectionSpecValidator::validate(const BSONObj& spec) {
-    return ProjectionSpecValidator(spec).validate();
+void ProjectionSpecValidator::uassertValid(const BSONObj& spec, StringData stageName) {
+    try {
+        ProjectionSpecValidator(spec).validate();
+    } catch (DBException& ex) {
+        ex.addContext("Invalid " + stageName.toString());
+        throw;
+    }
 }
 
-Status ProjectionSpecValidator::ensurePathDoesNotConflictOrThrow(StringData path) {
+void ProjectionSpecValidator::ensurePathDoesNotConflictOrThrow(StringData path) {
     for (auto&& seenPath : _seenPaths) {
         if ((path == seenPath) || (expression::isPathPrefixOf(path, seenPath)) ||
             (expression::isPathPrefixOf(seenPath, path))) {
-            return Status(ErrorCodes::FailedToParse,
-                          str::stream() << "specification contains two conflicting paths. "
-                                           "Cannot specify both '"
-                                        << path
-                                        << "' and '"
-                                        << seenPath
-                                        << "': "
-                                        << _rawObj.toString(),
-                          40176);
+            uasserted(40176,
+                      str::stream() << "specification contains two conflicting paths. "
+                                       "Cannot specify both '"
+                                    << path
+                                    << "' and '"
+                                    << seenPath
+                                    << "': "
+                                    << _rawObj.toString());
         }
     }
     _seenPaths.emplace_back(path.toString());
-    return Status::OK();
 }
 
-Status ProjectionSpecValidator::validate() {
+void ProjectionSpecValidator::validate() {
     if (_rawObj.isEmpty()) {
-        return Status(
-            ErrorCodes::FailedToParse, "specification must have at least one field", 40177);
+        uasserted(40177, "specification must have at least one field");
     }
     for (auto&& elem : _rawObj) {
-        Status status = parseElement(elem, FieldPath(elem.fieldName()));
-        if (!status.isOK())
-            return status;
+        parseElement(elem, FieldPath(elem.fieldName()));
     }
-    return Status::OK();
 }
 
-Status ProjectionSpecValidator::parseElement(const BSONElement& elem, const FieldPath& pathToElem) {
+void ProjectionSpecValidator::parseElement(const BSONElement& elem, const FieldPath& pathToElem) {
     if (elem.type() == BSONType::Object) {
-        return parseNestedObject(elem.Obj(), pathToElem);
+        parseNestedObject(elem.Obj(), pathToElem);
+    } else {
+        ensurePathDoesNotConflictOrThrow(pathToElem.fullPath());
     }
-    return ensurePathDoesNotConflictOrThrow(pathToElem.fullPath());
 }
 
-Status ProjectionSpecValidator::parseNestedObject(const BSONObj& thisLevelSpec,
-                                                  const FieldPath& prefix) {
+void ProjectionSpecValidator::parseNestedObject(const BSONObj& thisLevelSpec,
+                                                const FieldPath& prefix) {
     if (thisLevelSpec.isEmpty()) {
-        return Status(ErrorCodes::FailedToParse,
-                      str::stream()
-                          << "an empty object is not a valid value. Found empty object at path "
-                          << prefix.fullPath(),
-                      40180);
+        uasserted(
+            40180,
+            str::stream() << "an empty object is not a valid value. Found empty object at path "
+                          << prefix.fullPath());
     }
     for (auto&& elem : thisLevelSpec) {
         auto fieldName = elem.fieldNameStringData();
@@ -112,34 +111,26 @@ Status ProjectionSpecValidator::parseNestedObject(const BSONObj& thisLevelSpec,
             // into an Expression later, but for now, just track that the prefix has been
             // specified and skip it.
             if (thisLevelSpec.nFields() != 1) {
-                return Status(ErrorCodes::FailedToParse,
-                              str::stream() << "an expression specification must contain exactly "
-                                               "one field, the name of the expression. Found "
-                                            << thisLevelSpec.nFields()
-                                            << " fields in "
-                                            << thisLevelSpec.toString()
-                                            << ", while parsing object "
-                                            << _rawObj.toString(),
-                              40181);
+                uasserted(40181,
+                          str::stream() << "an expression specification must contain exactly "
+                                           "one field, the name of the expression. Found "
+                                        << thisLevelSpec.nFields()
+                                        << " fields in "
+                                        << thisLevelSpec.toString()
+                                        << ", while parsing object "
+                                        << _rawObj.toString());
             }
-            Status status = ensurePathDoesNotConflictOrThrow(prefix.fullPath());
-            if (!status.isOK())
-                return status;
+            ensurePathDoesNotConflictOrThrow(prefix.fullPath());
             continue;
         }
         if (fieldName.find('.') != std::string::npos) {
-            return Status(ErrorCodes::FailedToParse,
-                          str::stream() << "cannot use dotted field name '" << fieldName
-                                        << "' in a sub object: "
-                                        << _rawObj.toString(),
-                          40183);
+            uasserted(40183,
+                      str::stream() << "cannot use dotted field name '" << fieldName
+                                    << "' in a sub object: "
+                                    << _rawObj.toString());
         }
-        Status status =
-            parseElement(elem, FieldPath::getFullyQualifiedPath(prefix.fullPath(), fieldName));
-        if (!status.isOK())
-            return status;
+        parseElement(elem, FieldPath::getFullyQualifiedPath(prefix.fullPath(), fieldName));
     }
-    return Status::OK();
 }
 
 namespace {
@@ -279,11 +270,7 @@ std::unique_ptr<ParsedAggregationProjection> ParsedAggregationProjection::create
     // Check that the specification was valid. Status returned is unspecific because validate()
     // is used by the $addFields stage as well as $project.
     // If there was an error, uassert with a $project-specific message.
-    Status status = ProjectionSpecValidator::validate(spec);
-    if (!status.isOK()) {
-        uasserted(status.location(),
-                  str::stream() << "Invalid $project specification: " << status.reason());
-    }
+    ProjectionSpecValidator::uassertValid(spec, "$project");
 
     // Check for any conflicting specifications, and determine the type of the projection.
     auto projectionType = ProjectTypeParser::parse(spec);

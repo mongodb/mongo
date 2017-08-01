@@ -132,17 +132,16 @@ public:
      *
      * Fills out whether or not this is a fastmodinsert in 'stats'.
      *
-     * Returns the document to insert in *out.
+     * Returns the document to insert.
      */
-    static Status applyUpdateOpsForInsert(OperationContext* opCtx,
-                                          const CanonicalQuery* cq,
-                                          const BSONObj& query,
-                                          UpdateDriver* driver,
-                                          mutablebson::Document* doc,
-                                          bool isInternalRequest,
-                                          const NamespaceString& ns,
-                                          UpdateStats* stats,
-                                          BSONObj* out);
+    static BSONObj applyUpdateOpsForInsert(OperationContext* opCtx,
+                                           const CanonicalQuery* cq,
+                                           const BSONObj& query,
+                                           UpdateDriver* driver,
+                                           mutablebson::Document* doc,
+                                           bool isInternalRequest,
+                                           const NamespaceString& ns,
+                                           UpdateStats* stats);
 
 private:
     /**
@@ -169,11 +168,6 @@ private:
      * to do. If so then this stage is not EOF yet.
      */
     bool needInsert();
-
-    /**
-     * Helper for restoring the state of this update.
-     */
-    Status restoreUpdateState();
 
     /**
      * Stores 'idToRetry' in '_idRetrying' so the update can be retried during the next call to

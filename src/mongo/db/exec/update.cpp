@@ -87,16 +87,12 @@ Status ensureIdFieldIsFirst(mb::Document* doc) {
     return Status::OK();
 }
 
-Status addObjectIDIdField(mb::Document* doc) {
+void addObjectIDIdField(mb::Document* doc) {
     const auto idElem = doc->makeElementNewOID(idFieldName);
     if (!idElem.ok())
-        return {ErrorCodes::BadValue, "Could not create new ObjectId '_id' field.", 17268};
+        uasserted(17268, "Could not create new ObjectId '_id' field.");
 
-    const auto s = doc->root().pushFront(idElem);
-    if (!s.isOK())
-        return s;
-
-    return Status::OK();
+    uassertStatusOK(doc->root().pushFront(idElem));
 }
 
 /**
@@ -253,7 +249,7 @@ BSONObj UpdateStage::transformAndUpdate(const Snapshotted<BSONObj>& oldObj, Reco
     if (status.code() == ErrorCodes::InvalidIdField) {
         // Create ObjectId _id field if we are doing that
         if (createIdField) {
-            uassertStatusOK(addObjectIDIdField(&_doc));
+            addObjectIDIdField(&_doc);
         }
     } else {
         uassertStatusOK(status);
@@ -324,16 +320,14 @@ BSONObj UpdateStage::transformAndUpdate(const Snapshotted<BSONObj>& oldObj, Reco
                 args.update = logObj;
                 args.criteria = idQuery;
                 args.fromMigrate = request->isFromMigration();
-                StatusWith<RecordId> res = _collection->updateDocument(getOpCtx(),
-                                                                       recordId,
-                                                                       oldObj,
-                                                                       newObj,
-                                                                       true,
-                                                                       driver->modsAffectIndices(),
-                                                                       _params.opDebug,
-                                                                       &args);
-                uassertStatusOK(res.getStatus());
-                newRecordId = res.getValue();
+                newRecordId = _collection->updateDocument(getOpCtx(),
+                                                          recordId,
+                                                          oldObj,
+                                                          newObj,
+                                                          true,
+                                                          driver->modsAffectIndices(),
+                                                          _params.opDebug,
+                                                          &args);
             }
         }
 
@@ -362,15 +356,14 @@ BSONObj UpdateStage::transformAndUpdate(const Snapshotted<BSONObj>& oldObj, Reco
     return newObj;
 }
 
-Status UpdateStage::applyUpdateOpsForInsert(OperationContext* opCtx,
-                                            const CanonicalQuery* cq,
-                                            const BSONObj& query,
-                                            UpdateDriver* driver,
-                                            mutablebson::Document* doc,
-                                            bool isInternalRequest,
-                                            const NamespaceString& ns,
-                                            UpdateStats* stats,
-                                            BSONObj* out) {
+BSONObj UpdateStage::applyUpdateOpsForInsert(OperationContext* opCtx,
+                                             const CanonicalQuery* cq,
+                                             const BSONObj& query,
+                                             UpdateDriver* driver,
+                                             mutablebson::Document* doc,
+                                             bool isInternalRequest,
+                                             const NamespaceString& ns,
+                                             UpdateStats* stats) {
     // Since this is an insert (no docs found and upsert:true), we will be logging it
     // as an insert in the oplog. We don't need the driver's help to build the
     // oplog record, then. We also set the context of the update driver to the INSERT_CONTEXT.
@@ -392,11 +385,7 @@ Status UpdateStage::applyUpdateOpsForInsert(OperationContext* opCtx,
     BSONObj original;
 
     if (cq) {
-        Status status = driver->populateDocumentWithQueryFields(*cq, immutablePaths, *doc);
-        if (!status.isOK()) {
-            return status;
-        }
-
+        uassertStatusOK(driver->populateDocumentWithQueryFields(*cq, immutablePaths, *doc));
         if (driver->isDocReplacement())
             stats->fastmodinsert = true;
         original = doc->getObject();
@@ -416,17 +405,15 @@ Status UpdateStage::applyUpdateOpsForInsert(OperationContext* opCtx,
     Status updateStatus =
         driver->update(StringData(), original, doc, validateForStorage, immutablePaths);
     if (!updateStatus.isOK()) {
-        return Status(updateStatus.code(), updateStatus.reason(), 16836);
+        uasserted(16836, updateStatus.reason());
     }
 
     // Ensure _id exists and is first
     auto idAndFirstStatus = ensureIdFieldIsFirst(doc);
     if (idAndFirstStatus.code() == ErrorCodes::InvalidIdField) {  // _id field is missing
-        idAndFirstStatus = addObjectIDIdField(doc);
-    }
-
-    if (!idAndFirstStatus.isOK()) {
-        return idAndFirstStatus;
+        addObjectIDIdField(doc);
+    } else {
+        uassertStatusOK(idAndFirstStatus);
     }
 
     // Validate that the object replacement or modifiers resulted in a document
@@ -441,13 +428,11 @@ Status UpdateStage::applyUpdateOpsForInsert(OperationContext* opCtx,
 
     BSONObj newObj = doc->getObject();
     if (newObj.objsize() > BSONObjMaxUserSize) {
-        return Status(ErrorCodes::InvalidBSON,
-                      str::stream() << "Document to upsert is larger than " << BSONObjMaxUserSize,
-                      17420);
+        uasserted(17420,
+                  str::stream() << "Document to upsert is larger than " << BSONObjMaxUserSize);
     }
 
-    *out = newObj;
-    return Status::OK();
+    return newObj;
 }
 
 void UpdateStage::doInsert() {
@@ -459,16 +444,14 @@ void UpdateStage::doInsert() {
     // Reset the document we will be writing to.
     _doc.reset();
 
-    BSONObj newObj;
-    uassertStatusOK(applyUpdateOpsForInsert(getOpCtx(),
-                                            _params.canonicalQuery,
-                                            request->getQuery(),
-                                            _params.driver,
-                                            &_doc,
-                                            isInternalRequest,
-                                            request->getNamespaceString(),
-                                            &_specificStats,
-                                            &newObj));
+    BSONObj newObj = applyUpdateOpsForInsert(getOpCtx(),
+                                             _params.canonicalQuery,
+                                             request->getQuery(),
+                                             _params.driver,
+                                             &_doc,
+                                             isInternalRequest,
+                                             request->getNamespaceString(),
+                                             &_specificStats);
 
     _specificStats.objInserted = newObj;
 
@@ -722,7 +705,7 @@ PlanStage::StageState UpdateStage::doWork(WorkingSetID* out) {
     return status;
 }
 
-Status UpdateStage::restoreUpdateState() {
+void UpdateStage::doRestoreState() {
     const UpdateRequest& request = *_params.request;
     const NamespaceString& nsString(request.getNamespaceString());
 
@@ -731,9 +714,9 @@ Status UpdateStage::restoreUpdateState() {
         !repl::getGlobalReplicationCoordinator()->canAcceptWritesFor(getOpCtx(), nsString);
 
     if (userInitiatedWritesAndNotPrimary) {
-        return Status(ErrorCodes::PrimarySteppedDown,
-                      str::stream() << "Demoted from primary while performing update on "
-                                    << nsString.ns());
+        uasserted(ErrorCodes::PrimarySteppedDown,
+                  str::stream() << "Demoted from primary while performing update on "
+                                << nsString.ns());
     }
 
     if (request.getLifecycle()) {
@@ -741,19 +724,11 @@ Status UpdateStage::restoreUpdateState() {
         lifecycle->setCollection(_collection);
 
         if (!lifecycle->canContinue()) {
-            return Status(ErrorCodes::IllegalOperation,
-                          "Update aborted due to invalid state transitions after yield.",
-                          17270);
+            uasserted(17270, "Update aborted due to invalid state transitions after yield.");
         }
 
         _params.driver->refreshIndexKeys(lifecycle->getIndexKeys(getOpCtx()));
     }
-
-    return Status::OK();
-}
-
-void UpdateStage::doRestoreState() {
-    uassertStatusOK(restoreUpdateState());
 }
 
 unique_ptr<PlanStageStats> UpdateStage::getStats() {
