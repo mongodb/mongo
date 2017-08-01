@@ -117,6 +117,23 @@ using UserHolder = std::unique_ptr<User, UserReleaser>;
 
 }  // namespace
 
+AuthorizationSession::ScopedImpersonate::ScopedImpersonate(AuthorizationSession* authSession,
+                                                           std::vector<UserName>* users,
+                                                           std::vector<RoleName>* roles)
+    : _authSession(*authSession), _users(*users), _roles(*roles) {
+    swap();
+}
+
+AuthorizationSession::ScopedImpersonate::~ScopedImpersonate() {
+    swap();
+}
+
+void AuthorizationSession::ScopedImpersonate::swap() {
+    using std::swap;
+    swap(_authSession._impersonatedUserNames, _users);
+    swap(_authSession._impersonatedRoleNames, _roles);
+}
+
 AuthorizationSession::AuthorizationSession(std::unique_ptr<AuthzSessionExternalState> externalState)
     : _externalState(std::move(externalState)), _impersonationFlag(false) {}
 

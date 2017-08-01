@@ -32,7 +32,9 @@
 #include <vector>
 
 #include "mongo/db/cursor_id.h"
+#include "mongo/db/kill_sessions.h"
 #include "mongo/db/namespace_string.h"
+#include "mongo/db/session_killer.h"
 #include "mongo/platform/random.h"
 #include "mongo/s/query/cluster_client_cursor.h"
 #include "mongo/stdx/mutex.h"
@@ -352,6 +354,9 @@ public:
      * Appends sessions that have open cursors in this cursor manager to the given set of lsids.
      */
     void appendActiveSessions(LogicalSessionIdSet* lsids) const;
+
+    Status killCursorsWithMatchingSessions(OperationContext* opCtx,
+                                           const SessionKiller::Matcher& matcher);
 
     /**
      * Returns a list of all open cursors for the given session.

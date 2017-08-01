@@ -31,6 +31,7 @@
 #include <array>
 #include <cstddef>
 #include <string>
+#include <third_party/murmurhash3/MurmurHash3.h>
 #include <vector>
 
 #include "mongo/base/data_range.h"
@@ -191,6 +192,19 @@ public:
     bool operator!=(const SHABlock& other) const {
         return !(*this == other);
     }
+
+    /**
+     * Custom hasher so SHABlocks can be used in unordered data structures.
+     *
+     * ex: std::unordered_set<SHABlock, SHABlock::Hash> shaSet;
+     */
+    struct Hash {
+        std::size_t operator()(const SHABlock& shaBlock) const {
+            uint32_t hash;
+            MurmurHash3_x86_32(shaBlock.data(), SHABlock::kHashLength, 0, &hash);
+            return hash;
+        }
+    };
 
 private:
     // The backing array of bytes for the sha block

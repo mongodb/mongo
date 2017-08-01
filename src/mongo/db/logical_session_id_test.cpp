@@ -157,6 +157,24 @@ TEST_F(LogicalSessionIdTest, ConstructorFromClientWithPassedUidWithPermissions) 
     ASSERT_EQ(lsid.getUid(), uid);
 }
 
+TEST_F(LogicalSessionIdTest, ConstructorFromClientWithPassedUidWithNonImpersonatePermissions) {
+    auto id = UUID::gen();
+    auto uid = SHA256Block{};
+    addSimpleUser(UserName("simple", "test"));
+
+    LogicalSessionFromClient req;
+    req.setId(id);
+    req.setUid(uid);
+
+    LogicalSessionId lsid = makeLogicalSessionId(
+        req,
+        _opCtx.get(),
+        {Privilege{ResourcePattern::forClusterResource(), ActionType::startSession}});
+
+    ASSERT_EQ(lsid.getId(), id);
+    ASSERT_EQ(lsid.getUid(), uid);
+}
+
 TEST_F(LogicalSessionIdTest, ConstructorFromClientWithPassedUidWithoutAuthedUser) {
     auto id = UUID::gen();
     auto uid = SHA256Block{};
@@ -168,7 +186,7 @@ TEST_F(LogicalSessionIdTest, ConstructorFromClientWithPassedUidWithoutAuthedUser
     ASSERT_THROWS(makeLogicalSessionId(req, _opCtx.get()), AssertionException);
 }
 
-TEST_F(LogicalSessionIdTest, ConstructorFromClientWithPassedUidWithoutPermissions) {
+TEST_F(LogicalSessionIdTest, ConstructorFromClientWithPassedNonMatchingUidWithoutPermissions) {
     auto id = UUID::gen();
     auto uid = SHA256Block{};
     addSimpleUser(UserName("simple", "test"));
@@ -178,6 +196,21 @@ TEST_F(LogicalSessionIdTest, ConstructorFromClientWithPassedUidWithoutPermission
     req.setUid(uid);
 
     ASSERT_THROWS(makeLogicalSessionId(req, _opCtx.get()), AssertionException);
+}
+
+TEST_F(LogicalSessionIdTest, ConstructorFromClientWithPassedMatchingUidWithoutPermissions) {
+    auto id = UUID::gen();
+    User* user = addSimpleUser(UserName("simple", "test"));
+    auto uid = user->getDigest();
+
+    LogicalSessionFromClient req;
+    req.setId(id);
+    req.setUid(uid);
+
+    LogicalSessionId lsid = makeLogicalSessionId(req, _opCtx.get());
+
+    ASSERT_EQ(lsid.getId(), id);
+    ASSERT_EQ(lsid.getUid(), uid);
 }
 
 TEST_F(LogicalSessionIdTest, GenWithUser) {

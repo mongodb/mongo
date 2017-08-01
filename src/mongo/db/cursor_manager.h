@@ -32,8 +32,10 @@
 #include "mongo/db/clientcursor.h"
 #include "mongo/db/cursor_id.h"
 #include "mongo/db/invalidation_type.h"
+#include "mongo/db/kill_sessions.h"
 #include "mongo/db/namespace_string.h"
 #include "mongo/db/record_id.h"
+#include "mongo/db/session_killer.h"
 #include "mongo/platform/unordered_map.h"
 #include "mongo/platform/unordered_set.h"
 #include "mongo/stdx/unordered_set.h"
@@ -84,6 +86,12 @@ public:
      * all collection-level cursor managers to the given set of lsids.
      */
     static void appendAllActiveSessions(OperationContext* opCtx, LogicalSessionIdSet* lsids);
+
+    /**
+     * Kills cursors with matching logical sessions.
+     */
+    static Status killCursorsWithMatchingSessions(OperationContext* opCtx,
+                                                  const SessionKiller::Matcher& matcher);
 
     CursorManager(NamespaceString nss);
 

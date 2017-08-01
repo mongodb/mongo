@@ -40,6 +40,7 @@
 #include "mongo/db/catalog/database_holder.h"
 #include "mongo/db/client.h"
 #include "mongo/db/db_raii.h"
+#include "mongo/db/kill_sessions_common.h"
 #include "mongo/db/namespace_string.h"
 #include "mongo/db/operation_context.h"
 #include "mongo/db/query/plan_executor.h"
@@ -103,7 +104,8 @@ public:
 
     std::size_t timeoutCursors(OperationContext* opCtx, Date_t now);
 
-    void appendActiveSessions(OperationContext* opCtx, LogicalSessionIdSet* lsids);
+    template <typename Visitor>
+    void visitAllCursorManagers(OperationContext* opCtx, Visitor* visitor);
 
     int64_t nextSeed();
 
@@ -271,10 +273,9 @@ std::size_t GlobalCursorIdCache::timeoutCursors(OperationContext* opCtx, Date_t 
 }
 }  // namespace
 
-void GlobalCursorIdCache::appendActiveSessions(OperationContext* opCtx,
-                                               LogicalSessionIdSet* lsids) {
-    // Get active session ids from the global cursor manager
-    globalCursorManager->appendActiveSessions(lsids);
+template <typename Visitor>
+void GlobalCursorIdCache::visitAllCursorManagers(OperationContext* opCtx, Visitor* visitor) {
+    (*visitor)(*globalCursorManager);
 
     // Compute the set of collection names that we have to get sessions for
     vector<NamespaceString> namespaces;
@@ -298,7 +299,7 @@ void GlobalCursorIdCache::appendActiveSessions(OperationContext* opCtx,
             continue;
         }
 
-        collection->getCursorManager()->appendActiveSessions(lsids);
+        (*visitor)(*(collection->getCursorManager()));
     }
 }
 
@@ -309,7 +310,19 @@ CursorManager* CursorManager::getGlobalCursorManager() {
 }
 
 void CursorManager::appendAllActiveSessions(OperationContext* opCtx, LogicalSessionIdSet* lsids) {
-    globalCursorIdCache->appendActiveSessions(opCtx, lsids);
+    auto visitor = [&](CursorManager& mgr) { mgr.appendActiveSessions(lsids); };
+    globalCursorIdCache->visitAllCursorManagers(opCtx, &visitor);
+}
+
+Status CursorManager::killCursorsWithMatchingSessions(OperationContext* opCtx,
+                                                      const SessionKiller::Matcher& matcher) {
+    auto eraser = [&](CursorManager& mgr, CursorId id) {
+        uassertStatusOK(mgr.eraseCursor(opCtx, id, true));
+    };
+
+    auto visitor = makeKillSessionsCursorManagerVisitor(opCtx, matcher, std::move(eraser));
+    globalCursorIdCache->visitAllCursorManagers(opCtx, &visitor);
+    return visitor.getStatus();
 }
 
 std::size_t CursorManager::timeoutCursorsGlobal(OperationContext* opCtx, Date_t now) {

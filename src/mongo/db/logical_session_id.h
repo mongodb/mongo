@@ -112,4 +112,7 @@ inline StringBuilder& operator<<(StringBuilder& s, const LogicalSessionFromClien
 using LogicalSessionIdSet = stdx::unordered_set<LogicalSessionId, LogicalSessionIdHash>;
 using LogicalSessionRecordSet = stdx::unordered_set<LogicalSessionRecord, LogicalSessionRecordHash>;
 
+template <typename T>
+using LogicalSessionIdMap = stdx::unordered_map<LogicalSessionId, T, LogicalSessionIdHash>;
+
 }  // namespace mongo

@@ -70,6 +70,27 @@ class AuthorizationSession {
 
 public:
     /**
+     * Provides a way to swap out impersonate data for the duration of the ScopedImpersonate's
+     * lifetime.
+     */
+    class ScopedImpersonate {
+    public:
+        ScopedImpersonate(AuthorizationSession* authSession,
+                          std::vector<UserName>* users,
+                          std::vector<RoleName>* roles);
+        ~ScopedImpersonate();
+
+    private:
+        void swap();
+
+        AuthorizationSession& _authSession;
+        std::vector<UserName>& _users;
+        std::vector<RoleName>& _roles;
+    };
+
+    friend class ScopedImpersonate;
+
+    /**
      * Gets the AuthorizationSession associated with the given "client", or nullptr.
      *
      * The "client" object continues to own the returned AuthorizationSession.

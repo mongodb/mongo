@@ -26,6 +26,17 @@ env.Library(target='remote_command',
                 '$BUILD_DIR/mongo/util/net/network',
             ])
 
+env.Library(target='async_multicaster',
+            source=[
+                'async_multicaster.cpp',
+            ],
+            LIBDEPS=[
+                'remote_command',
+                'task_executor_interface',
+                '$BUILD_DIR/mongo/base',
+                '$BUILD_DIR/mongo/util/net/network',
+            ])
+
 env.Library(target='task_executor_interface',
             source=[
                 'task_executor.cpp',

@@ -75,6 +75,8 @@
 #include "mongo/db/introspect.h"
 #include "mongo/db/json.h"
 #include "mongo/db/keys_collection_manager.h"
+#include "mongo/db/kill_sessions.h"
+#include "mongo/db/kill_sessions_local.h"
 #include "mongo/db/log_process_details.h"
 #include "mongo/db/logical_clock.h"
 #include "mongo/db/logical_session_cache.h"
@@ -109,6 +111,7 @@
 #include "mongo/db/service_context_d.h"
 #include "mongo/db/service_entry_point_mongod.h"
 #include "mongo/db/session_catalog.h"
+#include "mongo/db/session_killer.h"
 #include "mongo/db/startup_warnings_mongod.h"
 #include "mongo/db/stats/counters.h"
 #include "mongo/db/storage/encryption_hooks.h"
@@ -761,6 +764,9 @@ ExitCode _initAndListen(int listenPort) {
     auto runner = makePeriodicRunner();
     runner->startup().transitional_ignore();
     globalServiceContext->setPeriodicRunner(std::move(runner));
+
+    SessionKiller::set(globalServiceContext,
+                       std::make_shared<SessionKiller>(globalServiceContext, killSessionsLocal));
 
     // Set up the logical session cache
     LogicalSessionCacheServer kind = LogicalSessionCacheServer::kStandalone;

@@ -8,6 +8,7 @@ selector:
   - jstests/sharding/auth*.js
   - jstests/sharding/cleanup_orphaned_auth.js
   - jstests/sharding/localhostAuthBypass.js
+  - jstests/sharding/kill_sessions.js
   - jstests/sharding/mongos_rs_auth_shard_failure_tolerance.js
   - jstests/sharding/mrShardedOutputAuth.js
   - jstests/sharding/aggregation_currentop.js

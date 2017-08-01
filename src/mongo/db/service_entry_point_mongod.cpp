@@ -450,7 +450,7 @@ bool runCommandImpl(OperationContext* opCtx,
             return result;
         }
 
-        result = command->enhancedRun(opCtx, request, inPlaceReplyBob);
+        result = command->publicRun(opCtx, request, inPlaceReplyBob);
     } else {
         auto wcResult = extractWriteConcern(opCtx, cmd, db);
         if (!wcResult.isOK()) {
@@ -471,7 +471,7 @@ bool runCommandImpl(OperationContext* opCtx,
                 opCtx, command->getName(), lastOpBeforeRun, &inPlaceReplyBob);
         });
 
-        result = command->enhancedRun(opCtx, request, inPlaceReplyBob);
+        result = command->publicRun(opCtx, request, inPlaceReplyBob);
 
         // Nothing in run() should change the writeConcern.
         dassert(SimpleBSONObjComparator::kInstance.evaluate(opCtx->getWriteConcern().toBSON() ==

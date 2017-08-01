@@ -34,6 +34,7 @@
 
 #include <set>
 
+#include "mongo/db/kill_sessions_common.h"
 #include "mongo/util/clock_source.h"
 #include "mongo/util/log.h"
 #include "mongo/util/mongoutils/str.h"
@@ -469,6 +470,17 @@ void ClusterCursorManager::appendActiveSessions(LogicalSessionIdSet* lsids) cons
             }
         }
     }
+}
+
+Status ClusterCursorManager::killCursorsWithMatchingSessions(
+    OperationContext* opCtx, const SessionKiller::Matcher& matcher) {
+    auto eraser = [&](ClusterCursorManager& mgr, CursorId id) {
+        uassertStatusOK(mgr.killCursor(getNamespaceForCursorId(id).get(), id));
+    };
+
+    auto visitor = makeKillSessionsCursorManagerVisitor(opCtx, matcher, std::move(eraser));
+    visitor(*this);
+    return visitor.getStatus();
 }
 
 stdx::unordered_set<CursorId> ClusterCursorManager::getCursorsForSession(

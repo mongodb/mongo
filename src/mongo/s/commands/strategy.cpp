@@ -217,14 +217,14 @@ void execCommandClient(OperationContext* opCtx,
     try {
         bool ok = false;
         if (!supportsWriteConcern) {
-            ok = c->enhancedRun(opCtx, request, result);
+            ok = c->publicRun(opCtx, request, result);
         } else {
             // Change the write concern while running the command.
             const auto oldWC = opCtx->getWriteConcern();
             ON_BLOCK_EXIT([&] { opCtx->setWriteConcern(oldWC); });
             opCtx->setWriteConcern(wcResult.getValue());
 
-            ok = c->enhancedRun(opCtx, request, result);
+            ok = c->publicRun(opCtx, request, result);
         }
         if (!ok) {
             c->incrementCommandsFailed();

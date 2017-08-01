@@ -326,6 +326,9 @@
             }
         },
         killOp: {skip: isUnrelated},
+        killSessions: {skip: isUnrelated},
+        killAllSessions: {skip: isUnrelated},
+        killAllSessionsByPattern: {skip: isUnrelated},
         listCollections: {skip: "tested in views/views_creation.js"},
         listCommands: {skip: isUnrelated},
         listDatabases: {skip: isUnrelated},
@@ -357,6 +360,7 @@
             expectedErrorCode: ErrorCodes.NamespaceNotSharded,
         },
         movePrimary: {skip: "Tested in sharding/movePrimary1.js"},
+        multicast: {skip: isUnrelated},
         netstat: {skip: isAnInternalCommand},
         parallelCollectionScan: {command: {parallelCollectionScan: "view"}, expectFailure: true},
         ping: {command: {ping: 1}},

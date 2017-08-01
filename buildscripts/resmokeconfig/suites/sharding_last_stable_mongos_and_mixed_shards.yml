@@ -30,6 +30,7 @@ selector:
   - jstests/sharding/after_cluster_time.js
   - jstests/sharding/mongos_does_not_gossip_logical_time_without_keys.js
   - jstests/sharding/key_rotation.js
+  - jstests/sharding/kill_sessions.js
   - jstests/sharding/advance_logical_time_with_valid_signature.js
   - jstests/sharding/safe_secondary_reads_drop_recreate.js
   - jstests/sharding/safe_secondary_reads_single_migration_suspend_range_deletion.js

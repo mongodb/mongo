@@ -52,6 +52,7 @@
 #include "mongo/db/client.h"
 #include "mongo/db/ftdc/ftdc_mongos.h"
 #include "mongo/db/initialize_server_global_state.h"
+#include "mongo/db/kill_sessions.h"
 #include "mongo/db/lasterror.h"
 #include "mongo/db/log_process_details.h"
 #include "mongo/db/logical_clock.h"
@@ -62,6 +63,7 @@
 #include "mongo/db/server_options.h"
 #include "mongo/db/service_context.h"
 #include "mongo/db/service_context_noop.h"
+#include "mongo/db/session_killer.h"
 #include "mongo/db/startup_warnings_common.h"
 #include "mongo/db/wire_version.h"
 #include "mongo/executor/task_executor_pool.h"
@@ -75,6 +77,7 @@
 #include "mongo/s/client/shard_registry.h"
 #include "mongo/s/client/shard_remote.h"
 #include "mongo/s/client/sharding_connection_hook.h"
+#include "mongo/s/commands/kill_sessions_remote.h"
 #include "mongo/s/config_server_catalog_cache_loader.h"
 #include "mongo/s/grid.h"
 #include "mongo/s/is_mongos.h"
@@ -394,6 +397,10 @@ static ExitCode runMongosServer() {
     auto runner = makePeriodicRunner();
     runner->startup().transitional_ignore();
     getGlobalServiceContext()->setPeriodicRunner(std::move(runner));
+
+    SessionKiller::set(
+        getGlobalServiceContext(),
+        std::make_shared<SessionKiller>(getGlobalServiceContext(), killSessionsRemote));
 
     // Set up the logical session cache
     LogicalSessionCache::set(getGlobalServiceContext(), makeLogicalSessionCacheS());

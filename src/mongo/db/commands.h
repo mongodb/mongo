@@ -92,18 +92,6 @@ public:
     virtual std::size_t reserveBytesForReply() const = 0;
 
     /**
-     * Runs the command.
-     *
-     * The default implementation verifies that request has no document sections then forwards to
-     * BasicCommand::run().
-     *
-     * For now commands should only implement if they need access to OP_MSG-specific functionality.
-     */
-    virtual bool enhancedRun(OperationContext* opCtx,
-                             const OpMsgRequest& request,
-                             BSONObjBuilder& result) = 0;
-
-    /**
      * supportsWriteConcern returns true if this command should be parsed for a writeConcern
      * field and wait for that write concern to be satisfied after the command runs.
      *
@@ -349,6 +337,13 @@ public:
         _commandsFailed.increment();
     }
 
+    /**
+     * Runs the command.
+     *
+     * Forwards to enhancedRun, but additionally runs audit checks if run throws unauthorized.
+     */
+    bool publicRun(OperationContext* opCtx, const OpMsgRequest& request, BSONObjBuilder& result);
+
     static const CommandMap& allCommands() {
         return *_commands;
     }
@@ -513,6 +508,18 @@ public:
 private:
     static CommandMap* _commands;
     static CommandMap* _commandsByBestName;
+
+    /**
+     * Runs the command.
+     *
+     * The default implementation verifies that request has no document sections then forwards to
+     * BasicCommand::run().
+     *
+     * For now commands should only implement if they need access to OP_MSG-specific functionality.
+     */
+    virtual bool enhancedRun(OperationContext* opCtx,
+                             const OpMsgRequest& request,
+                             BSONObjBuilder& result) = 0;
 
     // Counters for how many times this command has been executed and failed
     Counter64 _commandsExecuted;

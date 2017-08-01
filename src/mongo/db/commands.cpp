@@ -189,7 +189,7 @@ BSONObj Command::runCommandDirectly(OperationContext* opCtx, const OpMsgRequest&
 
     BSONObjBuilder out;
     try {
-        bool ok = command->enhancedRun(opCtx, request, out);
+        bool ok = command->publicRun(opCtx, request, out);
         appendCommandStatus(out, ok);
     } catch (const StaleConfigException& ex) {
         // These exceptions are intended to be handled at a higher level and cannot losslessly
@@ -319,6 +319,20 @@ Status Command::checkAuthorization(Command* c,
     }
     audit::logCommandAuthzCheck(opCtx->getClient(), request, c, status.code());
     return status;
+}
+
+bool Command::publicRun(OperationContext* opCtx,
+                        const OpMsgRequest& request,
+                        BSONObjBuilder& result) {
+    try {
+        return enhancedRun(opCtx, request, result);
+    } catch (const DBException& e) {
+        if (e.code() == ErrorCodes::Unauthorized) {
+            audit::logCommandAuthzCheck(
+                opCtx->getClient(), request, this, ErrorCodes::Unauthorized);
+        }
+        throw;
+    }
 }
 
 bool Command::isHelpRequest(const BSONElement& helpElem) {

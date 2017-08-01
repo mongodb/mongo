@@ -280,6 +280,11 @@ public:
                     infoBuilder.append("killPending", true);
                 }
 
+                if (clientOpCtx->getLogicalSessionId()) {
+                    BSONObjBuilder bob(infoBuilder.subobjStart("lsid"));
+                    clientOpCtx->getLogicalSessionId()->serialize(&bob);
+                }
+
                 CurOp::get(clientOpCtx)
                     ->reportState(&infoBuilder,
                                   (truncateMode == CurrentOpTruncateMode::kTruncateOps));

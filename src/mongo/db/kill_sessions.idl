@@ -1,0 +1,81 @@
+# Copyright (C) 2017 MongoDB Inc.
+#
+# This program is free software: you can redistribute it and/or  modify
+# it under the terms of the GNU Affero General Public License, version 3,
+# as published by the Free Software Foundation.
+#
+# This program is distributed in the hope that it will be useful,
+# but WITHOUT ANY WARRANTY; without even the implied warranty of
+# MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+# GNU Affero General Public License for more details.
+#
+# You should have received a copy of the GNU Affero General Public License
+# along with this program.  If not, see <http://www.gnu.org/licenses/>.
+#
+
+global:
+  cpp_namespace: "mongo"
+
+imports:
+  - "mongo/crypto/sha256_block.idl"
+  - "mongo/db/logical_session_id.idl"
+  - "mongo/idl/basic_types.idl"
+
+structs:
+
+  KillSessionsCmdFromClient:
+    description: "A struct representing a killSessions command from a client"
+    strict: false
+    fields:
+      killSessions: array<LogicalSessionFromClient>
+
+  KillAllSessionsUser:
+    description: "A struct representing a killAllSessions User"
+    strict: true
+    fields:
+      user: string
+      db: string
+
+  KillAllSessionsRole:
+    description: "A struct representing a killAllSessions Role"
+    strict: true
+    fields:
+      role: string
+      db: string
+
+  KillAllSessionsCmd:
+    description: "A struct representing a killAllSessions command"
+    strict: false
+    fields:
+      killAllSessions: array<KillAllSessionsUser>
+
+  KillAllSessionsByPattern:
+    description: "A struct representing a killAllSessionsByPatternCmd kill pattern"
+    strict: true
+    fields:
+      lsid:
+        type: LogicalSessionId
+        optional: true
+      uid:
+        type: sha256Block
+        optional: true
+      users:
+        description: "logged in users for impersonate"
+        type: array<KillAllSessionsUser>
+        optional: true
+      roles:
+        description: "logged in roles for impersonate"
+        type: array<KillAllSessionsRole>
+        optional: true
+
+  KillAllSessionsByPatternCmd:
+    description: "A struct representing a killAllSessionsByPattern command"
+    strict: false
+    fields:
+      killAllSessionsByPattern: array<KillAllSessionsByPattern>
+
+  KillSessionsCmdToServer:
+    description: "A struct representing a killSessions command to a server"
+    strict: true
+    fields:
+      killSessions: array<LogicalSessionId>
