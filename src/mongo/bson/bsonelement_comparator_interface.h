@@ -33,6 +33,9 @@
 
 namespace mongo {
 
+typedef std::set<BSONElement, BSONElementCmpWithoutField> BSONElementSet;
+typedef std::multiset<BSONElement, BSONElementCmpWithoutField> BSONElementMultiSet;
+
 /**
  * A BSONElement::ComparatorInterface is an abstract class for comparing BSONElement objects. Usage
  * for comparing two BSON elements, 'lhs' and 'rhs', where 'comparator' is an instance of a class
@@ -58,6 +61,14 @@ public:
      */
     Set makeBSONEltSet(std::initializer_list<BSONElement> init = {}) const {
         return makeSet(init);
+    }
+
+    /**
+     * Constructs a BSONEltFlatSet whose equivalence classes are given by this comparator. This
+     * comparator must outlive the returned set.
+     */
+    FlatSet makeBSONEltFlatSet(const std::vector<BSONElement>& elements) const {
+        return makeFlatSet(elements);
     }
 
     /**
@@ -90,6 +101,8 @@ public:
 };
 
 using BSONEltSet = BSONComparatorInterfaceBase<BSONElement>::Set;
+
+using BSONEltFlatSet = BSONComparatorInterfaceBase<BSONElement>::FlatSet;
 
 using BSONEltUnorderedSet = BSONComparatorInterfaceBase<BSONElement>::UnorderedSet;
 

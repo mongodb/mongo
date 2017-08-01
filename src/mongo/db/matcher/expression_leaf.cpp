@@ -593,29 +593,31 @@ bool InMatchExpression::equivalent(const MatchExpression* other) const {
 
 void InMatchExpression::_doSetCollator(const CollatorInterface* collator) {
     _collator = collator;
+    _eltCmp = BSONElementComparator(BSONElementComparator::FieldNamesMode::kIgnore, _collator);
 
     // We need to re-compute '_equalitySet', since our set comparator has changed.
-    BSONElementSet equalitiesWithNewComparator(
-        _originalEqualityVector.begin(), _originalEqualityVector.end(), collator);
-    _equalitySet = std::move(equalitiesWithNewComparator);
+    _equalitySet = _eltCmp.makeBSONEltFlatSet(_originalEqualityVector);
 }
 
-Status InMatchExpression::addEquality(const BSONElement& elt) {
-    if (elt.type() == BSONType::RegEx) {
-        return Status(ErrorCodes::BadValue, "InMatchExpression equality cannot be a regex");
-    }
-    if (elt.type() == BSONType::Undefined) {
-        return Status(ErrorCodes::BadValue, "InMatchExpression equality cannot be undefined");
-    }
+Status InMatchExpression::setEqualities(std::vector<BSONElement> equalities) {
+    for (auto&& equality : equalities) {
+        if (equality.type() == BSONType::RegEx) {
+            return Status(ErrorCodes::BadValue, "InMatchExpression equality cannot be a regex");
+        }
+        if (equality.type() == BSONType::Undefined) {
+            return Status(ErrorCodes::BadValue, "InMatchExpression equality cannot be undefined");
+        }
 
-    if (elt.type() == BSONType::jstNULL) {
-        _hasNull = true;
+        if (equality.type() == BSONType::jstNULL) {
+            _hasNull = true;
+        } else if (equality.type() == BSONType::Array && equality.Obj().isEmpty()) {
+            _hasEmptyArray = true;
+        }
     }
-    if (elt.type() == BSONType::Array && elt.Obj().isEmpty()) {
-        _hasEmptyArray = true;
-    }
-    _equalitySet.insert(elt);
-    _originalEqualityVector.push_back(elt);
+    _originalEqualityVector = std::move(equalities);
+
+    _equalitySet = _eltCmp.makeBSONEltFlatSet(_originalEqualityVector);
+
     return Status::OK();
 }
 

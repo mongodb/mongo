@@ -32,6 +32,7 @@
 
 #include <utility>
 
+#include "mongo/bson/bsonelement_comparator_interface.h"
 #include "mongo/bson/simple_bsonobj_comparator.h"
 #include "mongo/db/bson/dotted_path_support.h"
 #include "mongo/db/field_ref.h"
@@ -236,7 +237,7 @@ void ExpressionKeysPrivate::get2DKeys(const BSONObj& obj,
                                       const TwoDIndexingParams& params,
                                       BSONObjSet* keys,
                                       std::vector<BSONObj>* locs) {
-    BSONElementMSet bSet;
+    BSONElementMultiSet bSet;
 
     // Get all the nested location fields, but don't return individual elements from
     // the last array, if it exists.
@@ -245,7 +246,7 @@ void ExpressionKeysPrivate::get2DKeys(const BSONObj& obj,
     if (bSet.empty())
         return;
 
-    for (BSONElementMSet::iterator setI = bSet.begin(); setI != bSet.end(); ++setI) {
+    for (BSONElementMultiSet::iterator setI = bSet.begin(); setI != bSet.end(); ++setI) {
         BSONElement geo = *setI;
 
         if (geo.eoo() || !geo.isABSONObj())

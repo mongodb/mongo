@@ -1470,7 +1470,8 @@ TEST(InMatchExpression, MatchesElementSingle) {
     BSONObj match = BSON("a" << 1);
     BSONObj notMatch = BSON("a" << 2);
     InMatchExpression in;
-    in.addEquality(operand.firstElement()).transitional_ignore();
+    std::vector<BSONElement> equalities{operand.firstElement()};
+    ASSERT_OK(in.setEqualities(std::move(equalities)));
     ASSERT(in.matchesSingleElement(match["a"]));
     ASSERT(!in.matchesSingleElement(notMatch["a"]));
 }
@@ -1488,10 +1489,8 @@ TEST(InMatchExpression, MatchesEmpty) {
 TEST(InMatchExpression, MatchesElementMultiple) {
     BSONObj operand = BSON_ARRAY(1 << "r" << true << 1);
     InMatchExpression in;
-    in.addEquality(operand[0]).transitional_ignore();
-    in.addEquality(operand[1]).transitional_ignore();
-    in.addEquality(operand[2]).transitional_ignore();
-    in.addEquality(operand[3]).transitional_ignore();
+    std::vector<BSONElement> equalities{operand[0], operand[1], operand[2], operand[3]};
+    ASSERT_OK(in.setEqualities(std::move(equalities)));
 
     BSONObj matchFirst = BSON("a" << 1);
     BSONObj matchSecond = BSON("a"
@@ -1509,7 +1508,8 @@ TEST(InMatchExpression, MatchesScalar) {
     BSONObj operand = BSON_ARRAY(5);
     InMatchExpression in;
     in.init("a").transitional_ignore();
-    in.addEquality(operand.firstElement()).transitional_ignore();
+    std::vector<BSONElement> equalities{operand.firstElement()};
+    ASSERT_OK(in.setEqualities(std::move(equalities)));
 
     ASSERT(in.matchesBSON(BSON("a" << 5.0), NULL));
     ASSERT(!in.matchesBSON(BSON("a" << 4), NULL));
@@ -1519,7 +1519,8 @@ TEST(InMatchExpression, MatchesArrayValue) {
     BSONObj operand = BSON_ARRAY(5);
     InMatchExpression in;
     in.init("a").transitional_ignore();
-    in.addEquality(operand.firstElement()).transitional_ignore();
+    std::vector<BSONElement> equalities{operand.firstElement()};
+    ASSERT_OK(in.setEqualities(std::move(equalities)));
 
     ASSERT(in.matchesBSON(BSON("a" << BSON_ARRAY(5.0 << 6)), NULL));
     ASSERT(!in.matchesBSON(BSON("a" << BSON_ARRAY(6 << 7)), NULL));
@@ -1531,7 +1532,8 @@ TEST(InMatchExpression, MatchesNull) {
 
     InMatchExpression in;
     in.init("a").transitional_ignore();
-    in.addEquality(operand.firstElement()).transitional_ignore();
+    std::vector<BSONElement> equalities{operand.firstElement()};
+    ASSERT_OK(in.setEqualities(std::move(equalities)));
 
     ASSERT(in.matchesBSON(BSONObj(), NULL));
     ASSERT(in.matchesBSON(BSON("a" << BSONNULL), NULL));
@@ -1545,15 +1547,16 @@ TEST(InMatchExpression, MatchesUndefined) {
 
     InMatchExpression in;
     in.init("a").transitional_ignore();
-    Status s = in.addEquality(operand.firstElement());
-    ASSERT_NOT_OK(s);
+    std::vector<BSONElement> equalities{operand.firstElement()};
+    ASSERT_NOT_OK(in.setEqualities(std::move(equalities)));
 }
 
 TEST(InMatchExpression, MatchesMinKey) {
     BSONObj operand = BSON_ARRAY(MinKey);
     InMatchExpression in;
     in.init("a").transitional_ignore();
-    in.addEquality(operand.firstElement()).transitional_ignore();
+    std::vector<BSONElement> equalities{operand.firstElement()};
+    ASSERT_OK(in.setEqualities(std::move(equalities)));
 
     ASSERT(in.matchesBSON(BSON("a" << MinKey), NULL));
     ASSERT(!in.matchesBSON(BSON("a" << MaxKey), NULL));
@@ -1564,7 +1567,8 @@ TEST(InMatchExpression, MatchesMaxKey) {
     BSONObj operand = BSON_ARRAY(MaxKey);
     InMatchExpression in;
     in.init("a").transitional_ignore();
-    in.addEquality(operand.firstElement()).transitional_ignore();
+    std::vector<BSONElement> equalities{operand.firstElement()};
+    ASSERT_OK(in.setEqualities(std::move(equalities)));
 
     ASSERT(in.matchesBSON(BSON("a" << MaxKey), NULL));
     ASSERT(!in.matchesBSON(BSON("a" << MinKey), NULL));
@@ -1575,9 +1579,8 @@ TEST(InMatchExpression, MatchesFullArray) {
     BSONObj operand = BSON_ARRAY(BSON_ARRAY(1 << 2) << 4 << 5);
     InMatchExpression in;
     in.init("a").transitional_ignore();
-    in.addEquality(operand[0]).transitional_ignore();
-    in.addEquality(operand[1]).transitional_ignore();
-    in.addEquality(operand[2]).transitional_ignore();
+    std::vector<BSONElement> equalities{operand[0], operand[1], operand[2]};
+    ASSERT_OK(in.setEqualities(std::move(equalities)));
 
     ASSERT(in.matchesBSON(BSON("a" << BSON_ARRAY(1 << 2)), NULL));
     ASSERT(!in.matchesBSON(BSON("a" << BSON_ARRAY(1 << 2 << 3)), NULL));
@@ -1589,8 +1592,8 @@ TEST(InMatchExpression, ElemMatchKey) {
     BSONObj operand = BSON_ARRAY(5 << 2);
     InMatchExpression in;
     in.init("a").transitional_ignore();
-    in.addEquality(operand[0]).transitional_ignore();
-    in.addEquality(operand[1]).transitional_ignore();
+    std::vector<BSONElement> equalities{operand[0], operand[1]};
+    ASSERT_OK(in.setEqualities(std::move(equalities)));
 
     MatchDetails details;
     details.requestElemMatchKey();
@@ -1608,7 +1611,8 @@ TEST(InMatchExpression, InMatchExpressionsWithDifferentNumbersOfElementsAreUnequ
                        << "string");
     InMatchExpression eq1;
     InMatchExpression eq2;
-    eq1.addEquality(obj.firstElement()).transitional_ignore();
+    std::vector<BSONElement> equalities{obj.firstElement()};
+    ASSERT_OK(eq1.setEqualities(std::move(equalities)));
     ASSERT(!eq1.equivalent(&eq2));
 }
 
@@ -1644,8 +1648,12 @@ TEST(InMatchExpression, InMatchExpressionsWithCollationEquivalentElementsAreEqua
     InMatchExpression eq2;
     eq2.setCollator(&collator2);
 
-    eq1.addEquality(obj1.firstElement()).transitional_ignore();
-    eq2.addEquality(obj2.firstElement()).transitional_ignore();
+    std::vector<BSONElement> equalities1{obj1.firstElement()};
+    ASSERT_OK(eq1.setEqualities(std::move(equalities1)));
+
+    std::vector<BSONElement> equalities2{obj2.firstElement()};
+    ASSERT_OK(eq2.setEqualities(std::move(equalities2)));
+
     ASSERT(eq1.equivalent(&eq2));
 }
 
@@ -1661,8 +1669,12 @@ TEST(InMatchExpression, InMatchExpressionsWithCollationNonEquivalentElementsAreU
     InMatchExpression eq2;
     eq2.setCollator(&collator2);
 
-    eq1.addEquality(obj1.firstElement()).transitional_ignore();
-    eq2.addEquality(obj2.firstElement()).transitional_ignore();
+    std::vector<BSONElement> equalities1{obj1.firstElement()};
+    ASSERT_OK(eq1.setEqualities(std::move(equalities1)));
+
+    std::vector<BSONElement> equalities2{obj2.firstElement()};
+    ASSERT_OK(eq2.setEqualities(std::move(equalities2)));
+
     ASSERT(!eq1.equivalent(&eq2));
 }
 
@@ -1671,7 +1683,8 @@ TEST(InMatchExpression, StringMatchingWithNullCollatorUsesBinaryComparison) {
     BSONObj notMatch = BSON("a"
                             << "string2");
     InMatchExpression in;
-    in.addEquality(operand.firstElement()).transitional_ignore();
+    std::vector<BSONElement> equalities{operand.firstElement()};
+    ASSERT_OK(in.setEqualities(std::move(equalities)));
     ASSERT(!in.matchesSingleElement(notMatch["a"]));
 }
 
@@ -1682,7 +1695,8 @@ TEST(InMatchExpression, StringMatchingRespectsCollation) {
     CollatorInterfaceMock collator(CollatorInterfaceMock::MockType::kAlwaysEqual);
     InMatchExpression in;
     in.setCollator(&collator);
-    in.addEquality(operand.firstElement()).transitional_ignore();
+    std::vector<BSONElement> equalities{operand.firstElement()};
+    ASSERT_OK(in.setEqualities(std::move(equalities)));
     ASSERT(in.matchesSingleElement(match["a"]));
 }
 
@@ -1695,8 +1709,8 @@ TEST(InMatchExpression, ChangingCollationAfterAddingEqualitiesPreservesEqualitie
     CollatorInterfaceMock collatorReverseString(CollatorInterfaceMock::MockType::kReverseString);
     InMatchExpression in;
     in.setCollator(&collatorAlwaysEqual);
-    in.addEquality(obj1.firstElement()).transitional_ignore();
-    in.addEquality(obj2.firstElement()).transitional_ignore();
+    std::vector<BSONElement> equalities{obj1.firstElement(), obj2.firstElement()};
+    ASSERT_OK(in.setEqualities(std::move(equalities)));
     ASSERT(in.getEqualities().size() == 1);
     in.setCollator(&collatorReverseString);
     ASSERT(in.getEqualities().size() == 2);

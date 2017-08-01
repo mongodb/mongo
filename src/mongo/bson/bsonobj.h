@@ -42,7 +42,6 @@
 #include "mongo/base/string_data_comparator_interface.h"
 #include "mongo/bson/bson_comparator_interface_base.h"
 #include "mongo/bson/bsonelement.h"
-#include "mongo/bson/bsonelement_comparator_interface.h"
 #include "mongo/bson/bsontypes.h"
 #include "mongo/bson/oid.h"
 #include "mongo/bson/timestamp.h"
@@ -52,9 +51,6 @@
 #include "mongo/util/shared_buffer.h"
 
 namespace mongo {
-
-typedef std::set<BSONElement, BSONElementCmpWithoutField> BSONElementSet;
-typedef std::multiset<BSONElement, BSONElementCmpWithoutField> BSONElementMSet;
 
 /**
    C++ representation of a "BSON" object -- that is, an extended JSON-style
