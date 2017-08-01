@@ -1231,11 +1231,9 @@ public:
                 // to be stripped out
                 BSONObjBuilder strippedUser(usersArrayBuilder.subobjStart());
                 for (const BSONElement& e : userDetails) {
-                    if (!args.showCredentials && e.fieldNameStringData() == "credentials") {
-                        continue;
-                    }
-
-                    if (e.fieldNameStringData() == AuthorizationManager::USER_ID_FIELD_NAME) {
+                    if (!args.showCredentials &&
+                        (e.fieldNameStringData() == "credentials" ||
+                         e.fieldNameStringData() == AuthorizationManager::USER_ID_FIELD_NAME)) {
                         continue;
                     }
 
