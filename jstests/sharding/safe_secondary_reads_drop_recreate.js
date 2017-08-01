@@ -325,40 +325,43 @@
             test.checkResults(res);
 
             if (test.behavior === "unshardedOnly") {
-                profilerDoesNotHaveMatchingEntryOrThrow(primaryShardSecondary.getDB(db),
-                                                        commandProfile);
+                profilerHasZeroMatchingEntriesOrThrow(
+                    {profileDB: primaryShardSecondary.getDB(db), filter: commandProfile});
             } else if (test.behavior === "unversioned") {
                 // Check that the primary shard secondary received the request *without* an
                 // attached shardVersion and returned success.
-                profilerHasSingleMatchingEntryOrThrow(
-                    primaryShardSecondary.getDB(db),
-                    Object.extend({
+                profilerHasSingleMatchingEntryOrThrow({
+                    profileDB: primaryShardSecondary.getDB(db),
+                    filter: Object.extend({
                         "command.shardVersion": {"$exists": false},
                         "command.$readPreference": {"mode": "secondary"},
                         "exceptionCode": {"$exists": false}
                     },
-                                  commandProfile));
+                                          commandProfile)
+                });
             } else if (test.behavior == "versioned") {
                 // Check that the primary shard secondary returned stale shardVersion.
-                profilerHasSingleMatchingEntryOrThrow(
-                    primaryShardSecondary.getDB(db),
-                    Object.extend({
+                profilerHasSingleMatchingEntryOrThrow({
+                    profileDB: primaryShardSecondary.getDB(db),
+                    filter: Object.extend({
                         "command.shardVersion": {"$exists": true},
                         "command.$readPreference": {"mode": "secondary"},
                         "exceptionCode": ErrorCodes.SendStaleConfig
                     },
-                                  commandProfile));
+                                          commandProfile)
+                });
 
                 // Check that the primary shard secondary received the request again and returned
                 // success.
-                profilerHasSingleMatchingEntryOrThrow(
-                    primaryShardSecondary.getDB(db),
-                    Object.extend({
+                profilerHasSingleMatchingEntryOrThrow({
+                    profileDB: primaryShardSecondary.getDB(db),
+                    filter: Object.extend({
                         "command.shardVersion": {"$exists": true},
                         "command.$readPreference": {"mode": "secondary"},
                         "exceptionCode": {"$exists": false}
                     },
-                                  commandProfile));
+                                          commandProfile)
+                });
             }
         },
         dropRecreateAsShardedOnSameShard: function(staleMongos, freshMongos, test, commandProfile) {
@@ -375,40 +378,43 @@
             test.checkResults(res);
 
             if (test.behavior === "unshardedOnly") {
-                profilerDoesNotHaveMatchingEntryOrThrow(primaryShardSecondary.getDB(db),
-                                                        commandProfile);
+                profilerHasZeroMatchingEntriesOrThrow(
+                    {profileDB: primaryShardSecondary.getDB(db), filter: commandProfile});
             } else if (test.behavior === "unversioned") {
                 // Check that the primary shard secondary received the request *without* an
                 // attached shardVersion and returned success.
-                profilerHasSingleMatchingEntryOrThrow(
-                    primaryShardSecondary.getDB(db),
-                    Object.extend({
+                profilerHasSingleMatchingEntryOrThrow({
+                    profileDB: primaryShardSecondary.getDB(db),
+                    filter: Object.extend({
                         "command.shardVersion": {"$exists": false},
                         "command.$readPreference": {"mode": "secondary"},
                         "exceptionCode": {"$exists": false}
                     },
-                                  commandProfile));
+                                          commandProfile)
+                });
             } else if (test.behavior == "versioned") {
                 // Check that the primary shard secondary returned stale shardVersion.
-                profilerHasSingleMatchingEntryOrThrow(
-                    primaryShardSecondary.getDB(db),
-                    Object.extend({
+                profilerHasSingleMatchingEntryOrThrow({
+                    profileDB: primaryShardSecondary.getDB(db),
+                    filter: Object.extend({
                         "command.shardVersion": {"$exists": true},
                         "command.$readPreference": {"mode": "secondary"},
                         "exceptionCode": ErrorCodes.SendStaleConfig
                     },
-                                  commandProfile));
+                                          commandProfile)
+                });
 
                 // Check that the primary shard secondary received the request again and returned
                 // success.
-                profilerHasSingleMatchingEntryOrThrow(
-                    primaryShardSecondary.getDB(db),
-                    Object.extend({
+                profilerHasSingleMatchingEntryOrThrow({
+                    profileDB: primaryShardSecondary.getDB(db),
+                    filter: Object.extend({
                         "command.shardVersion": {"$exists": true},
                         "command.$readPreference": {"mode": "secondary"},
                         "exceptionCode": {"$exists": false}
                     },
-                                  commandProfile));
+                                          commandProfile)
+                });
             }
         },
         dropRecreateAsUnshardedOnDifferentShard: function(
@@ -438,42 +444,45 @@
             test.checkResults(res);
 
             if (test.behavior === "unshardedOnly") {
-                profilerDoesNotHaveMatchingEntryOrThrow(donorShardSecondary.getDB(db),
-                                                        commandProfile);
-                profilerDoesNotHaveMatchingEntryOrThrow(recipientShardSecondary.getDB(db),
-                                                        commandProfile);
+                profilerHasZeroMatchingEntriesOrThrow(
+                    {profileDB: donorShardSecondary.getDB(db), filter: commandProfile});
+                profilerHasZeroMatchingEntriesOrThrow(
+                    {profileDB: recipientShardSecondary.getDB(db), filter: commandProfile});
             } else if (test.behavior === "unversioned") {
                 // Check that the donor shard secondary received the request *without* an attached
                 // shardVersion and returned success.
-                profilerHasSingleMatchingEntryOrThrow(
-                    donorShardSecondary.getDB(db),
-                    Object.extend({
+                profilerHasSingleMatchingEntryOrThrow({
+                    profileDB: donorShardSecondary.getDB(db),
+                    filter: Object.extend({
                         "command.shardVersion": {"$exists": false},
                         "command.$readPreference": {"mode": "secondary"},
                         "exceptionCode": {"$exists": false}
                     },
-                                  commandProfile));
+                                          commandProfile)
+                });
             } else if (test.behavior == "versioned") {
                 // Check that the donor shard secondary returned stale shardVersion.
-                profilerHasSingleMatchingEntryOrThrow(
-                    donorShardSecondary.getDB(db),
-                    Object.extend({
+                profilerHasSingleMatchingEntryOrThrow({
+                    profileDB: donorShardSecondary.getDB(db),
+                    filter: Object.extend({
                         "command.shardVersion": {"$exists": true},
                         "command.$readPreference": {"mode": "secondary"},
                         "exceptionCode": ErrorCodes.SendStaleConfig
                     },
-                                  commandProfile));
+                                          commandProfile)
+                });
 
                 // Check that the recipient shard secondary received the request and returned
                 // success.
-                profilerHasSingleMatchingEntryOrThrow(
-                    recipientShardSecondary.getDB(db),
-                    Object.extend({
+                profilerHasSingleMatchingEntryOrThrow({
+                    profileDB: recipientShardSecondary.getDB(db),
+                    filter: Object.extend({
                         "command.shardVersion": {"$exists": true},
                         "command.$readPreference": {"mode": "secondary"},
                         "exceptionCode": {"$exists": false}
                     },
-                                  commandProfile));
+                                          commandProfile)
+                });
             }
         }
     };

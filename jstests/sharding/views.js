@@ -146,10 +146,14 @@
 
     assert.eq(5, view.find({a: {$lte: 8}}).comment("agg_comment").itcount());
 
-    profilerHasSingleMatchingEntryOrThrow(sdb, {
-        "command.aggregate": coll.getName(),
-        "command.fromRouter": true,
-        "command.comment": "agg_comment"
+    profilerHasSingleMatchingEntryOrThrow({
+        profileDB: sdb,
+        filter: {
+            "command.aggregate": coll.getName(),
+            "command.comment": "agg_comment",
+            "command.needsMerge": true,
+            "command.pipeline.$mergeCursors": {$exists: false}
+        }
     });
 
     st.stop();

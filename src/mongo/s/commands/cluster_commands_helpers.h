@@ -99,6 +99,7 @@ StatusWith<std::vector<AsyncRequestsSender::Response>> scatterGather(
     const boost::optional<BSONObj> query = boost::none,
     const boost::optional<BSONObj> collation = boost::none,
     const bool appendShardVersion = true,
+    const bool retryOnStaleShardVersion = true,
     BSONObj* viewDefinition = nullptr);
 
 /**

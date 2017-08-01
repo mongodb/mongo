@@ -377,57 +377,62 @@
         if (test.behavior === "unshardedOnly") {
             // Check that neither the donor shard secondary nor recipient shard secondary
             // received the request.
-            profilerDoesNotHaveMatchingEntryOrThrow(donorShardSecondary.getDB(db), commandProfile);
-            profilerDoesNotHaveMatchingEntryOrThrow(recipientShardSecondary.getDB(db),
-                                                    commandProfile);
+            profilerHasZeroMatchingEntriesOrThrow(
+                {profileDB: donorShardSecondary.getDB(db), filter: commandProfile});
+            profilerHasZeroMatchingEntriesOrThrow(
+                {profileDB: recipientShardSecondary.getDB(db), filter: commandProfile});
         } else if (test.behavior === "unversioned") {
             // Check that the donor shard secondary received the request *without* an attached
             // shardVersion and returned success.
-            profilerHasSingleMatchingEntryOrThrow(
-                donorShardSecondary.getDB(db),
-                Object.extend({
+            profilerHasSingleMatchingEntryOrThrow({
+                profileDB: donorShardSecondary.getDB(db),
+                filter: Object.extend({
                     "command.shardVersion": {"$exists": false},
                     "command.$readPreference": {"mode": "secondary"},
                     "exceptionCode": {"$exists": false}
                 },
-                              commandProfile));
+                                      commandProfile)
+            });
 
             // Check that the recipient shard secondary did not receive the request.
-            profilerDoesNotHaveMatchingEntryOrThrow(recipientShardSecondary.getDB(db),
-                                                    commandProfile);
+            profilerHasZeroMatchingEntriesOrThrow(
+                {profileDB: recipientShardSecondary.getDB(db), filter: commandProfile});
         } else if (test.behavior === "versioned") {
             // Check that the donor shard secondary returned stale shardVersion.
-            profilerHasSingleMatchingEntryOrThrow(
-                donorShardSecondary.getDB(db),
-                Object.extend({
+            profilerHasSingleMatchingEntryOrThrow({
+                profileDB: donorShardSecondary.getDB(db),
+                filter: Object.extend({
                     "command.shardVersion": {"$exists": true},
                     "command.$readPreference": {"mode": "secondary"},
                     "exceptionCode": ErrorCodes.SendStaleConfig
                 },
-                              commandProfile));
+                                      commandProfile)
+            });
 
             // Check that the recipient shard secondary received the request and returned stale
             // shardVersion once, even though the mongos is fresh, because the secondary was
             // stale.
-            profilerHasSingleMatchingEntryOrThrow(
-                donorShardSecondary.getDB(db),
-                Object.extend({
+            profilerHasSingleMatchingEntryOrThrow({
+                profileDB: donorShardSecondary.getDB(db),
+                filter: Object.extend({
                     "command.shardVersion": {"$exists": true},
                     "command.$readPreference": {"mode": "secondary"},
                     "exceptionCode": ErrorCodes.SendStaleConfig
                 },
-                              commandProfile));
+                                      commandProfile)
+            });
 
             // Check that the recipient shard secondary received the request again and returned
             // success.
-            profilerHasSingleMatchingEntryOrThrow(
-                recipientShardSecondary.getDB(db),
-                Object.extend({
+            profilerHasSingleMatchingEntryOrThrow({
+                profileDB: recipientShardSecondary.getDB(db),
+                filter: Object.extend({
                     "command.shardVersion": {"$exists": true},
                     "command.$readPreference": {"mode": "secondary"},
                     "exceptionCode": {"$exists": false}
                 },
-                              commandProfile));
+                                      commandProfile)
+            });
         }
 
         // Clean up the collection by dropping it. This also drops all associated indexes.

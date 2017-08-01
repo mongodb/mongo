@@ -1047,11 +1047,23 @@ public:
         NamespaceString lookupCollNs("a", "lookupColl");
         ctx->setResolvedNamespace(lookupCollNs, {lookupCollNs, std::vector<BSONObj>{}});
 
+        // Test that we can both split the pipeline and reassemble it into its original form.
         mergePipe = uassertStatusOK(Pipeline::parse(request.getPipeline(), ctx));
         mergePipe->optimizePipeline();
 
+        auto beforeSplit = Value(mergePipe->serialize());
+
         shardPipe = mergePipe->splitForSharded();
-        ASSERT(shardPipe != nullptr);
+        ASSERT(shardPipe);
+
+        shardPipe->unsplitFromSharded(std::move(mergePipe));
+        ASSERT_FALSE(mergePipe);
+
+        ASSERT_VALUE_EQ(Value(shardPipe->serialize()), beforeSplit);
+
+        mergePipe = std::move(shardPipe);
+        shardPipe = mergePipe->splitForSharded();
+        ASSERT(shardPipe);
 
         ASSERT_VALUE_EQ(Value(shardPipe->writeExplainOps(ExplainOptions::Verbosity::kQueryPlanner)),
                         Value(shardPipeExpected["pipeline"]));

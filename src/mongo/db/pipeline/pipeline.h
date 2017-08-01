@@ -184,6 +184,30 @@ public:
     */
     std::unique_ptr<Pipeline, Pipeline::Deleter> splitForSharded();
 
+    /**
+     * Reassemble a split shard pipeline into its original form. Upon return, this pipeline will
+     * contain the original source list. Must be called on the shards part of a split pipeline
+     * returned by a call to splitForSharded(). It is an error to call this on the merge part of the
+     * pipeline, or on a pipeline that has not been split.
+     */
+    void unsplitFromSharded(std::unique_ptr<Pipeline, Pipeline::Deleter> pipelineForMergingShard);
+
+    /**
+     * Returns true if this pipeline is the part of a split pipeline which should be targeted to the
+     * shards.
+     */
+    bool isSplitForSharded() {
+        return _splitForSharded;
+    }
+
+    /**
+     * Returns true if this pipeline is the part of a split pipeline which is responsible for
+     * merging the results from the shards.
+     */
+    bool isSplitForMerge() {
+        return _splitForMerge;
+    }
+
     /** If the pipeline starts with a $match, return its BSON predicate.
      *  Returns empty BSON if the first stage isn't $match.
      */
@@ -313,7 +337,15 @@ private:
 
     SourceContainer _sources;
 
+    // When a pipeline is split via splitForSharded(), the resulting shards pipeline will set
+    // '_unsplitSources' to be the original list of DocumentSources representing the full pipeline.
+    // This is to allow the split pipelines to be subsequently reassembled into the original
+    // pipeline, if necessary.
+    boost::optional<SourceContainer> _unsplitSources;
+
     boost::intrusive_ptr<ExpressionContext> pCtx;
+    bool _splitForSharded = false;
+    bool _splitForMerge = false;
     bool _disposed = false;
 };
 }  // namespace mongo

@@ -4,7 +4,7 @@
 (function() {
     "use strict";
 
-    load("jstests/libs/profiler.js");  // For profilerHasMatchingEntryOrThrow.
+    load("jstests/libs/profiler.js");  // For profilerHasAtLeastOneMatchingEntryOrThrow.
 
     const st = new ShardingTest({
         name: "agg_explain_readPref",
@@ -86,12 +86,15 @@
                 // However, the requests may have reached the other shards before they are canceled.
                 // If the other shards were already fresh, they will re-receive the request in the
                 // next attempt, meaning the request can show up more than once in the profiler.
-                profilerHasMatchingEntryOrThrow(target, {
-                    "ns": coll.getFullName(),
-                    "command.explain.aggregate": coll.getName(),
-                    "command.explain.comment": comment,
-                    "command.$readPreference.mode": pref == 'primary' ? null : pref,
-                    "exception": {"$exists": false}
+                profilerHasAtLeastOneMatchingEntryOrThrow({
+                    profileDB: target,
+                    filter: {
+                        "ns": coll.getFullName(),
+                        "command.explain.aggregate": coll.getName(),
+                        "command.explain.comment": comment,
+                        "command.$readPreference.mode": pref == 'primary' ? null : pref,
+                        "exception": {"$exists": false}
+                    }
                 });
 
                 //
@@ -119,12 +122,15 @@
                 // However, the requests may have reached the other shards before they are canceled.
                 // If the other shards were already fresh, they will re-receive the request in the
                 // next attempt, meaning the request can show up more than once in the profiler.
-                profilerHasMatchingEntryOrThrow(target, {
-                    "ns": coll.getFullName(),
-                    "command.explain.aggregate": coll.getName(),
-                    "command.explain.comment": comment,
-                    "command.$readPreference.mode": pref == 'primary' ? null : pref,
-                    "exception": {"$exists": false}
+                profilerHasAtLeastOneMatchingEntryOrThrow({
+                    profileDB: target,
+                    filter: {
+                        "ns": coll.getFullName(),
+                        "command.explain.aggregate": coll.getName(),
+                        "command.explain.comment": comment,
+                        "command.$readPreference.mode": pref == 'primary' ? null : pref,
+                        "exception": {"$exists": false}
+                    }
                 });
             });
 

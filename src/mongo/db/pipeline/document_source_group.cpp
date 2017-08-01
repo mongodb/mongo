@@ -110,7 +110,7 @@ DocumentSource::GetNextResult DocumentSourceGroup::getNextSpilled() {
         _firstPartOfNextGroup = _sorterIterator->next();
     }
 
-    return makeDocument(_currentId, _currentAccumulators, pExpCtx->inShard);
+    return makeDocument(_currentId, _currentAccumulators, pExpCtx->needsMerge);
 }
 
 DocumentSource::GetNextResult DocumentSourceGroup::getNextStandard() {
@@ -118,7 +118,7 @@ DocumentSource::GetNextResult DocumentSourceGroup::getNextStandard() {
     if (_groups->empty())
         return GetNextResult::makeEOF();
 
-    Document out = makeDocument(groupsIterator->first, groupsIterator->second, pExpCtx->inShard);
+    Document out = makeDocument(groupsIterator->first, groupsIterator->second, pExpCtx->needsMerge);
 
     if (++groupsIterator == _groups->end())
         dispose();
@@ -158,7 +158,7 @@ DocumentSource::GetNextResult DocumentSourceGroup::getNextStreaming() {
         id = computeId(*_firstDocOfNextGroup);
     } while (pExpCtx->getValueComparator().evaluate(_currentId == id));
 
-    Document out = makeDocument(_currentId, _currentAccumulators, pExpCtx->inShard);
+    Document out = makeDocument(_currentId, _currentAccumulators, pExpCtx->needsMerge);
     _currentId = std::move(id);
 
     return std::move(out);

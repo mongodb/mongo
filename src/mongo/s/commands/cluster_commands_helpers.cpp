@@ -230,6 +230,7 @@ StatusWith<std::vector<AsyncRequestsSender::Response>> scatterGather(
     const boost::optional<BSONObj> query,
     const boost::optional<BSONObj> collation,
     const bool appendShardVersion,
+    const bool retryOnStaleShardVersion,
     BSONObj* viewDefinition) {
 
     // If a NamespaceString is specified, it must match the dbName.
@@ -277,7 +278,8 @@ StatusWith<std::vector<AsyncRequestsSender::Response>> scatterGather(
                            << " while dispatching " << redact(cmdObj) << " after " << numAttempts
                            << " dispatch attempts";
                 }
-            } while (numAttempts < kMaxNumStaleVersionRetries && !swResponses.getStatus().isOK());
+            } while (retryOnStaleShardVersion && numAttempts < kMaxNumStaleVersionRetries &&
+                     !swResponses.getStatus().isOK());
 
             return swResponses;
         }

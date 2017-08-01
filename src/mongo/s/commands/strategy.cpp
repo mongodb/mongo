@@ -623,6 +623,7 @@ Status Strategy::explainFind(OperationContext* opCtx,
                                           qr.getFilter(),
                                           qr.getCollation(),
                                           true,  // do shard versioning
+                                          true,  // retry on stale shard version
                                           &viewDefinition);
 
     long long millisElapsed = timer.millis();

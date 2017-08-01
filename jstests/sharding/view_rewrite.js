@@ -64,14 +64,17 @@
             cursor: {}
         }));
 
-        profilerHasSingleMatchingEntryOrThrow(shardPrimary, {
-            "ns": coll.getFullName(),
-            "command.aggregate": coll.getName(),
-            "command.comment": "agg_rewrite",
-            "command.maxTimeMS": {"$exists": true},
-            "command.readConcern": {level: "linearizable"},
-            "command.pipeline.$mergeCursors": {"$exists": false},
-            "nreturned": {"$exists": true}
+        profilerHasSingleMatchingEntryOrThrow({
+            profileDB: shardPrimary,
+            filter: {
+                "ns": coll.getFullName(),
+                "command.aggregate": coll.getName(),
+                "command.comment": "agg_rewrite",
+                "command.maxTimeMS": {"$exists": true},
+                "command.readConcern": {level: "linearizable"},
+                "command.pipeline.$mergeCursors": {"$exists": false},
+                "nreturned": {"$exists": true}
+            }
         });
 
         // Find
@@ -82,14 +85,17 @@
             readConcern: {level: "linearizable"}
         }));
 
-        profilerHasSingleMatchingEntryOrThrow(shardPrimary, {
-            "ns": coll.getFullName(),
-            "command.aggregate": coll.getName(),
-            "command.comment": "find_rewrite",
-            "command.maxTimeMS": {"$exists": true},
-            "command.readConcern": {level: "linearizable"},
-            "command.pipeline.$mergeCursors": {"$exists": false},
-            "nreturned": {"$exists": true}
+        profilerHasSingleMatchingEntryOrThrow({
+            profileDB: shardPrimary,
+            filter: {
+                "ns": coll.getFullName(),
+                "command.aggregate": coll.getName(),
+                "command.comment": "find_rewrite",
+                "command.maxTimeMS": {"$exists": true},
+                "command.readConcern": {level: "linearizable"},
+                "command.pipeline.$mergeCursors": {"$exists": false},
+                "nreturned": {"$exists": true}
+            }
         });
 
         // Count
@@ -100,14 +106,17 @@
             readConcern: {level: "linearizable"}
         }));
 
-        profilerHasSingleMatchingEntryOrThrow(shardPrimary, {
-            "ns": coll.getFullName(),
-            "command.aggregate": coll.getName(),
-            "command.comment": "count_rewrite",
-            "command.maxTimeMS": {"$exists": true},
-            "command.readConcern": {level: "linearizable"},
-            "command.pipeline.$mergeCursors": {"$exists": false},
-            "nreturned": {"$exists": true}
+        profilerHasSingleMatchingEntryOrThrow({
+            profileDB: shardPrimary,
+            filter: {
+                "ns": coll.getFullName(),
+                "command.aggregate": coll.getName(),
+                "command.comment": "count_rewrite",
+                "command.maxTimeMS": {"$exists": true},
+                "command.readConcern": {level: "linearizable"},
+                "command.pipeline.$mergeCursors": {"$exists": false},
+                "nreturned": {"$exists": true}
+            }
         });
 
         // Distinct
@@ -119,14 +128,17 @@
             readConcern: {level: "linearizable"}
         }));
 
-        profilerHasSingleMatchingEntryOrThrow(shardPrimary, {
-            "ns": coll.getFullName(),
-            "command.aggregate": coll.getName(),
-            "command.comment": "distinct_rewrite",
-            "command.maxTimeMS": {"$exists": true},
-            "command.readConcern": {level: "linearizable"},
-            "command.pipeline.$mergeCursors": {"$exists": false},
-            "nreturned": {"$exists": true}
+        profilerHasSingleMatchingEntryOrThrow({
+            profileDB: shardPrimary,
+            filter: {
+                "ns": coll.getFullName(),
+                "command.aggregate": coll.getName(),
+                "command.comment": "distinct_rewrite",
+                "command.maxTimeMS": {"$exists": true},
+                "command.readConcern": {level: "linearizable"},
+                "command.pipeline.$mergeCursors": {"$exists": false},
+                "nreturned": {"$exists": true}
+            }
         });
 
         assert.commandWorked(shardPrimary.setProfilingLevel(0));
@@ -146,12 +158,15 @@
             $readPreference: {mode: "nearest", tags: [{tag: "secondary"}]}
         }));
 
-        profilerHasSingleMatchingEntryOrThrow(shardSecondary, {
-            "ns": coll.getFullName(),
-            "command.aggregate": coll.getName(),
-            "command.comment": "agg_readPref",
-            "command.pipeline.$mergeCursors": {"$exists": false},
-            "nreturned": {"$exists": true}
+        profilerHasSingleMatchingEntryOrThrow({
+            profileDB: shardSecondary,
+            filter: {
+                "ns": coll.getFullName(),
+                "command.aggregate": coll.getName(),
+                "command.comment": "agg_readPref",
+                "command.pipeline.$mergeCursors": {"$exists": false},
+                "nreturned": {"$exists": true}
+            }
         });
 
         // Find
@@ -160,12 +175,15 @@
             $readPreference: {mode: "nearest", tags: [{tag: "secondary"}]}
         }));
 
-        profilerHasSingleMatchingEntryOrThrow(shardSecondary, {
-            "ns": coll.getFullName(),
-            "command.aggregate": coll.getName(),
-            "command.comment": "find_readPref",
-            "command.pipeline.$mergeCursors": {"$exists": false},
-            "nreturned": {"$exists": true}
+        profilerHasSingleMatchingEntryOrThrow({
+            profileDB: shardSecondary,
+            filter: {
+                "ns": coll.getFullName(),
+                "command.aggregate": coll.getName(),
+                "command.comment": "find_readPref",
+                "command.pipeline.$mergeCursors": {"$exists": false},
+                "nreturned": {"$exists": true}
+            }
         });
 
         // Count
@@ -174,12 +192,15 @@
             $readPreference: {mode: "nearest", tags: [{tag: "secondary"}]}
         }));
 
-        profilerHasSingleMatchingEntryOrThrow(shardSecondary, {
-            "ns": coll.getFullName(),
-            "command.aggregate": coll.getName(),
-            "command.comment": "count_readPref",
-            "command.pipeline.$mergeCursors": {"$exists": false},
-            "nreturned": {"$exists": true}
+        profilerHasSingleMatchingEntryOrThrow({
+            profileDB: shardSecondary,
+            filter: {
+                "ns": coll.getFullName(),
+                "command.aggregate": coll.getName(),
+                "command.comment": "count_readPref",
+                "command.pipeline.$mergeCursors": {"$exists": false},
+                "nreturned": {"$exists": true}
+            }
         });
 
         // Distinct
@@ -188,12 +209,15 @@
             $readPreference: {mode: "nearest", tags: [{tag: "secondary"}]}
         }));
 
-        profilerHasSingleMatchingEntryOrThrow(shardSecondary, {
-            "ns": coll.getFullName(),
-            "command.aggregate": coll.getName(),
-            "command.comment": "distinct_readPref",
-            "command.pipeline.$mergeCursors": {"$exists": false},
-            "nreturned": {"$exists": true}
+        profilerHasSingleMatchingEntryOrThrow({
+            profileDB: shardSecondary,
+            filter: {
+                "ns": coll.getFullName(),
+                "command.aggregate": coll.getName(),
+                "command.comment": "distinct_readPref",
+                "command.pipeline.$mergeCursors": {"$exists": false},
+                "nreturned": {"$exists": true}
+            }
         });
 
         assert.commandWorked(shardSecondary.setProfilingLevel(0));

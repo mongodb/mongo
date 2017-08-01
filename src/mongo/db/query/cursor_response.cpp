@@ -97,11 +97,13 @@ void appendGetMoreResponseObject(long long cursorId,
 CursorResponse::CursorResponse(NamespaceString nss,
                                CursorId cursorId,
                                std::vector<BSONObj> batch,
-                               boost::optional<long long> numReturnedSoFar)
+                               boost::optional<long long> numReturnedSoFar,
+                               boost::optional<BSONObj> writeConcernError)
     : _nss(std::move(nss)),
       _cursorId(cursorId),
       _batch(std::move(batch)),
-      _numReturnedSoFar(numReturnedSoFar) {}
+      _numReturnedSoFar(numReturnedSoFar),
+      _writeConcernError(std::move(writeConcernError)) {}
 
 StatusWith<CursorResponse> CursorResponse::parseFromBSON(const BSONObj& cmdResponse) {
     Status cmdStatus = getStatusFromCommandResult(cmdResponse);
@@ -173,7 +175,19 @@ StatusWith<CursorResponse> CursorResponse::parseFromBSON(const BSONObj& cmdRespo
         doc.shareOwnershipWith(cmdResponse);
     }
 
-    return {{NamespaceString(fullns), cursorId, std::move(batch)}};
+    auto writeConcernError = cmdResponse["writeConcernError"];
+
+    if (writeConcernError && writeConcernError.type() != BSONType::Object) {
+        return {ErrorCodes::BadValue,
+                str::stream() << "invalid writeConcernError format; expected object but found: "
+                              << writeConcernError.type()};
+    }
+
+    return {{NamespaceString(fullns),
+             cursorId,
+             std::move(batch),
+             boost::none,
+             writeConcernError ? writeConcernError.Obj().getOwned() : boost::optional<BSONObj>{}}};
 }
 
 void CursorResponse::addToBSON(CursorResponse::ResponseType responseType,
@@ -194,6 +208,10 @@ void CursorResponse::addToBSON(CursorResponse::ResponseType responseType,
     cursorBuilder.doneFast();
 
     builder->append("ok", 1.0);
+
+    if (_writeConcernError) {
+        builder->append("writeConcernError", *_writeConcernError);
+    }
 }
 
 BSONObj CursorResponse::toBSON(CursorResponse::ResponseType responseType) const {

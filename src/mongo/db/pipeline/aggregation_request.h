@@ -51,6 +51,7 @@ public:
     static constexpr StringData kCursorName = "cursor"_sd;
     static constexpr StringData kBatchSizeName = "batchSize"_sd;
     static constexpr StringData kFromRouterName = "fromRouter"_sd;
+    static constexpr StringData kNeedsMergeName = "needsMerge"_sd;
     static constexpr StringData kPipelineName = "pipeline"_sd;
     static constexpr StringData kCollationName = "collation"_sd;
     static constexpr StringData kExplainName = "explain"_sd;
@@ -131,8 +132,19 @@ public:
         return _pipeline;
     }
 
+    /**
+     * Returns true if this request originated from a mongoS.
+     */
     bool isFromRouter() const {
         return _fromRouter;
+    }
+
+    /**
+     * Returns true if this request represents the shards part of a split pipeline, and should
+     * produce mergeable output.
+     */
+    bool needsMerge() const {
+        return _needsMerge;
     }
 
     bool shouldAllowDiskUse() const {
@@ -210,6 +222,10 @@ public:
         _fromRouter = isFromRouter;
     }
 
+    void setNeedsMerge(bool needsMerge) {
+        _needsMerge = needsMerge;
+    }
+
     void setBypassDocumentValidation(bool shouldBypassDocumentValidation) {
         _bypassDocumentValidation = shouldBypassDocumentValidation;
     }
@@ -261,6 +277,7 @@ private:
 
     bool _allowDiskUse = false;
     bool _fromRouter = false;
+    bool _needsMerge = false;
     bool _bypassDocumentValidation = false;
 
     // A user-specified maxTimeMS limit, or a value of '0' if not specified.

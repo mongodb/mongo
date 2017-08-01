@@ -415,11 +415,11 @@ Status runAggregate(OperationContext* opCtx,
 
         pipeline->optimizePipeline();
 
-        if (kDebugBuild && !expCtx->explain && !expCtx->inShard) {
+        if (kDebugBuild && !expCtx->explain && !expCtx->fromRouter) {
             // Make sure all operations round-trip through Pipeline::serialize() correctly by
             // re-parsing every command in debug builds. This is important because sharded
-            // aggregations rely on this ability.  Skipping when inShard because this has
-            // already been through the transformation (and this un-sets expCtx->inShard).
+            // aggregations rely on this ability.  Skipping when fromRouter because this has
+            // already been through the transformation (and this un-sets expCtx->fromRouter).
             pipeline = reparsePipeline(pipeline.get(), request, expCtx);
         }
 

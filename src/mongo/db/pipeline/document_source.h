@@ -512,18 +512,23 @@ private:
         boost::optional<ExplainOptions::Verbosity> explain = boost::none) const = 0;
 };
 
-/** This class marks DocumentSources that should be split between the merger and the shards.
- *  See Pipeline::Optimizations::Sharded::findSplitPoint() for details.
+/**
+ * This class marks DocumentSources that should be split between the merger and the shards. See
+ * Pipeline::Optimizations::Sharded::findSplitPoint() for details.
  */
 class SplittableDocumentSource {
 public:
-    /** returns a source to be run on the shards.
-     *  if NULL, don't run on shards
+    /**
+     * Returns a source to be run on the shards, or NULL if no work should be done on the shards for
+     * this stage. Must not mutate the existing source object; if different behaviour is required in
+     * the split-pipeline case, a new source should be created and configured appropriately.
      */
     virtual boost::intrusive_ptr<DocumentSource> getShardSource() = 0;
 
-    /** returns a source that combines results from shards.
-     *  if NULL, don't run on merger
+    /**
+     * Returns a source that combines results from the shards, or NULL if no work should be done in
+     * the merge pipeline for this stage. Must not mutate the existing source object; if different
+     * behaviour is required, a new source should be created and configured appropriately.
      */
     virtual boost::intrusive_ptr<DocumentSource> getMergeSource() = 0;
 

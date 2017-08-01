@@ -57,13 +57,14 @@ TEST(AggregationRequestTest, ShouldParseAllKnownOptions) {
     NamespaceString nss("a.collection");
     const BSONObj inputBson = fromjson(
         "{pipeline: [{$match: {a: 'abc'}}], explain: false, allowDiskUse: true, fromRouter: true, "
-        "bypassDocumentValidation: true, collation: {locale: 'en_US'}, cursor: {batchSize: 10}, "
-        "hint: {a: 1}, maxTimeMS: 100, readConcern: {level: 'linearizable'}, "
+        "needsMerge: true, bypassDocumentValidation: true, collation: {locale: 'en_US'}, cursor: "
+        "{batchSize: 10}, hint: {a: 1}, maxTimeMS: 100, readConcern: {level: 'linearizable'}, "
         "$queryOptions: {$readPreference: 'nearest'}, comment: 'agg_comment'}}");
     auto request = unittest::assertGet(AggregationRequest::parseFromBSON(nss, inputBson));
     ASSERT_FALSE(request.getExplain());
     ASSERT_TRUE(request.shouldAllowDiskUse());
     ASSERT_TRUE(request.isFromRouter());
+    ASSERT_TRUE(request.needsMerge());
     ASSERT_TRUE(request.shouldBypassDocumentValidation());
     ASSERT_EQ(request.getBatchSize(), 10);
     ASSERT_BSONOBJ_EQ(request.getHint(), BSON("a" << 1));
@@ -136,6 +137,7 @@ TEST(AggregationRequestTest, ShouldNotSerializeOptionalValuesIfEquivalentToDefau
     request.setExplain(boost::none);
     request.setAllowDiskUse(false);
     request.setFromRouter(false);
+    request.setNeedsMerge(false);
     request.setBypassDocumentValidation(false);
     request.setCollation(BSONObj());
     request.setHint(BSONObj());
@@ -156,6 +158,7 @@ TEST(AggregationRequestTest, ShouldSerializeOptionalValuesIfSet) {
     AggregationRequest request(nss, {});
     request.setAllowDiskUse(true);
     request.setFromRouter(true);
+    request.setNeedsMerge(true);
     request.setBypassDocumentValidation(true);
     request.setBatchSize(10);
     request.setMaxTimeMS(10u);
@@ -178,6 +181,7 @@ TEST(AggregationRequestTest, ShouldSerializeOptionalValuesIfSet) {
                  {AggregationRequest::kPipelineName, Value(std::vector<Value>{})},
                  {AggregationRequest::kAllowDiskUseName, true},
                  {AggregationRequest::kFromRouterName, true},
+                 {AggregationRequest::kNeedsMergeName, true},
                  {bypassDocumentValidationCommandOption(), true},
                  {AggregationRequest::kCollationName, collationObj},
                  {AggregationRequest::kCursorName,
@@ -317,6 +321,13 @@ TEST(AggregationRequestTest, ShouldRejectNonBoolFromRouter) {
     NamespaceString nss("a.collection");
     const BSONObj inputBson =
         fromjson("{pipeline: [{$match: {a: 'abc'}}], cursor: {}, fromRouter: 1}");
+    ASSERT_NOT_OK(AggregationRequest::parseFromBSON(nss, inputBson).getStatus());
+}
+
+TEST(AggregationRequestTest, ShouldRejectNonBoolNeedsMerge) {
+    NamespaceString nss("a.collection");
+    const BSONObj inputBson =
+        fromjson("{pipeline: [{$match: {a: 'abc'}}], cursor: {}, needsMerge: 1}");
     ASSERT_NOT_OK(AggregationRequest::parseFromBSON(nss, inputBson).getStatus());
 }
 

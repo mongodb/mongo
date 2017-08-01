@@ -150,6 +150,7 @@ public:
                                               filter,
                                               collation,
                                               true,  // do shard versioning
+                                              true,  // retry on stale shard version
                                               &viewDefinition);
 
         if (ErrorCodes::CommandOnShardedViewNotSupportedOnMongod == swShardResponses.getStatus()) {
@@ -279,6 +280,7 @@ public:
                                               targetingQuery,
                                               targetingCollation,
                                               true,  // do shard versioning
+                                              true,  // retry on stale shard version
                                               &viewDefinition);
 
         long long millisElapsed = timer.millis();

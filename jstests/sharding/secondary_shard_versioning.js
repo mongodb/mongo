@@ -48,34 +48,43 @@
     assert.eq(1, res.n, tojson(res));
 
     // Check that the donor shard secondary returned stale shardVersion.
-    profilerHasSingleMatchingEntryOrThrow(donorShardSecondary.getDB('test'), {
-        "ns": "test.foo",
-        "command.count": "foo",
-        "command.query": {x: 1},
-        "command.shardVersion": {"$exists": true},
-        "command.$readPreference": {"mode": "secondary"},
-        "exceptionCode": ErrorCodes.SendStaleConfig
+    profilerHasSingleMatchingEntryOrThrow({
+        profileDB: donorShardSecondary.getDB('test'),
+        filter: {
+            "ns": "test.foo",
+            "command.count": "foo",
+            "command.query": {x: 1},
+            "command.shardVersion": {"$exists": true},
+            "command.$readPreference": {"mode": "secondary"},
+            "exceptionCode": ErrorCodes.SendStaleConfig
+        }
     });
 
     // The recipient shard secondary will also return stale shardVersion once, even though the
     // mongos is fresh, because the recipient shard secondary was stale.
-    profilerHasSingleMatchingEntryOrThrow(donorShardSecondary.getDB('test'), {
-        "ns": "test.foo",
-        "command.count": "foo",
-        "command.query": {x: 1},
-        "command.shardVersion": {"$exists": true},
-        "command.$readPreference": {"mode": "secondary"},
-        "exceptionCode": ErrorCodes.SendStaleConfig
+    profilerHasSingleMatchingEntryOrThrow({
+        profileDB: donorShardSecondary.getDB('test'),
+        filter: {
+            "ns": "test.foo",
+            "command.count": "foo",
+            "command.query": {x: 1},
+            "command.shardVersion": {"$exists": true},
+            "command.$readPreference": {"mode": "secondary"},
+            "exceptionCode": ErrorCodes.SendStaleConfig
+        }
     });
 
     // Check that the recipient shard secondary received the query and returned results.
-    profilerHasSingleMatchingEntryOrThrow(recipientShardSecondary.getDB('test'), {
-        "ns": "test.foo",
-        "command.count": "foo",
-        "command.query": {x: 1},
-        "command.shardVersion": {"$exists": true},
-        "command.$readPreference": {"mode": "secondary"},
-        "exceptionCode": {"$exists": false}
+    profilerHasSingleMatchingEntryOrThrow({
+        profileDB: recipientShardSecondary.getDB('test'),
+        filter: {
+            "ns": "test.foo",
+            "command.count": "foo",
+            "command.query": {x: 1},
+            "command.shardVersion": {"$exists": true},
+            "command.$readPreference": {"mode": "secondary"},
+            "exceptionCode": {"$exists": false}
+        }
     });
 
     st.stop();

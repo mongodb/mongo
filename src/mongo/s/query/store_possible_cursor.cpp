@@ -68,7 +68,6 @@ StatusWith<BSONObj> storePossibleCursor(OperationContext* opCtx,
         server,
         CursorResponse(requestedNss, incomingCursorResponse.getValue().getCursorId(), {}));
 
-
     auto ccc = ClusterClientCursorImpl::make(opCtx, executor, std::move(params));
 
     auto clusterCursorId =

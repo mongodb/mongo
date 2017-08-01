@@ -212,7 +212,8 @@ protected:
 
         intrusive_ptr<ExpressionContextForTest> expressionContext =
             new ExpressionContextForTest(_opCtx.get(), AggregationRequest(NamespaceString(ns), {}));
-        expressionContext->inShard = inShard;
+        // For $group, 'inShard' implies 'fromRouter' and 'needsMerge'.
+        expressionContext->fromRouter = expressionContext->needsMerge = inShard;
         expressionContext->inRouter = inRouter;
         // Won't spill to disk properly if it needs to.
         expressionContext->tempDir = _tempDir.path();
