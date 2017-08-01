@@ -252,17 +252,22 @@ bool checkIfAlreadyShardedWithSameOptions(OperationContext* opCtx,
                                           const ConfigsvrShardCollection& request) {
     auto catalogCache = Grid::get(opCtx)->catalogCache();
 
-    // We must reload the collection while metadata commands are split between mongos and the
-    // config servers.
+    // Until all metadata commands are on the config server, the CatalogCache on the config
+    // server may be stale. Force a refresh for the collection before reading it.
     catalogCache->invalidateShardedCollection(nss);
     auto routingInfo = uassertStatusOK(catalogCache->getCollectionRoutingInfo(opCtx, nss));
 
     // If the collection is already sharded, fail if the deduced options in this request do not
     // match the options the collection was originally sharded with.
     if (routingInfo.cm()) {
-        auto existingColl =
-            uassertStatusOK(Grid::get(opCtx)->catalogClient()->getCollection(opCtx, nss.ns()))
-                .value;
+        auto cm = routingInfo.cm();
+
+        CollectionType existingOptions;
+        existingOptions.setNs(NamespaceString(cm->getns()));
+        existingOptions.setKeyPattern(cm->getShardKeyPattern().getKeyPattern());
+        existingOptions.setDefaultCollation(
+            cm->getDefaultCollator() ? cm->getDefaultCollator()->getSpec().toBSON() : BSONObj());
+        existingOptions.setUnique(cm->isUnique());
 
         CollectionType requestedOptions;
         requestedOptions.setNs(nss);
@@ -273,8 +278,8 @@ bool checkIfAlreadyShardedWithSameOptions(OperationContext* opCtx,
         uassert(ErrorCodes::AlreadyInitialized,
                 str::stream() << "sharding already enabled for collection " << nss.ns()
                               << " with options "
-                              << existingColl.toString(),
-                requestedOptions.hasSameOptions(existingColl));
+                              << existingOptions.toString(),
+                requestedOptions.hasSameOptions(existingOptions));
 
         // If the options do match, we can immediately return success.
         return true;
@@ -739,7 +744,10 @@ public:
             uassertStatusOK(Grid::get(opCtx)->catalogClient()->getDistLockManager()->lock(
                 opCtx, nss.ns(), "shardCollection", DistLockManager::kDefaultLockTimeout)));
 
-        // Ensure sharding is allowed on the database
+        // Ensure sharding is allowed on the database.
+        // Until all metadata commands are on the config server, the CatalogCache on the config
+        // server may be stale. Read the database entry directly rather than purging and reloading
+        // the database into the CatalogCache, which is very expensive.
         auto dbType = uassertStatusOK(Grid::get(opCtx)->catalogClient()->getDatabase(
                                           opCtx, nss.db().toString()))
                           .value;
