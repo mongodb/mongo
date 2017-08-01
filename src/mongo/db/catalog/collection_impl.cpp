@@ -30,6 +30,8 @@
 
 #include "mongo/platform/basic.h"
 
+#include "mongo/db/catalog/private/record_store_validate_adaptor.h"
+
 #include "mongo/db/catalog/collection_impl.h"
 
 #include "mongo/base/counter.h"
@@ -44,7 +46,6 @@
 #include "mongo/db/catalog/document_validation.h"
 #include "mongo/db/catalog/index_create.h"
 #include "mongo/db/catalog/namespace_uuid_cache.h"
-#include "mongo/db/catalog/private/record_store_validate_adaptor.h"
 #include "mongo/db/catalog/uuid_catalog.h"
 #include "mongo/db/clientcursor.h"
 #include "mongo/db/commands/server_status_metric.h"
