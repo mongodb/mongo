@@ -128,22 +128,22 @@ public:
         _defaultCollation = collation.getOwned();
     }
 
-    const bool getUnique() const {
+    bool getUnique() const {
         return _unique;
     }
     void setUnique(bool unique) {
         _unique = unique;
     }
 
-    const bool hasRefreshing() const {
+    bool hasRefreshing() const {
         return _refreshing.is_initialized();
     }
-    const bool getRefreshing() const;
+    bool getRefreshing() const;
     void setRefreshing(bool refreshing) {
         _refreshing = refreshing;
     }
 
-    const bool hasLastRefreshedCollectionVersion() const {
+    bool hasLastRefreshedCollectionVersion() const {
         return _lastRefreshedCollectionVersion.is_initialized();
     }
     const ChunkVersion& getLastRefreshedCollectionVersion() const;

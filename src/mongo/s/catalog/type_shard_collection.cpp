@@ -216,7 +216,7 @@ void ShardCollectionType::setKeyPattern(const KeyPattern& keyPattern) {
     _keyPattern = keyPattern;
 }
 
-const bool ShardCollectionType::getRefreshing() const {
+bool ShardCollectionType::getRefreshing() const {
     invariant(_refreshing);
     return _refreshing.get();
 }
