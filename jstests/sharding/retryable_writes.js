@@ -24,7 +24,7 @@
         var result = assert.commandWorked(testDBMain.runCommand(cmd));
 
         var oplog = priConn.getDB('local').oplog.rs;
-        var oplogEntries = oplog.find({ns: 'test.user', op: 'i'}).itcount();
+        var insertOplogEntries = oplog.find({ns: 'test.user', op: 'i'}).itcount();
 
         var testDBPri = priConn.getDB('test');
         assert.eq(2, testDBPri.user.find().itcount());
@@ -36,7 +36,7 @@
         assert.eq(result.writeConcernErrors, retryResult.writeConcernErrors);
 
         assert.eq(2, testDBPri.user.find().itcount());
-        assert.eq(oplogEntries, oplog.find({ns: 'test.user', op: 'i'}).itcount());
+        assert.eq(insertOplogEntries, oplog.find({ns: 'test.user', op: 'i'}).itcount());
 
         ////////////////////////////////////////////////////////////////////////
         // Test update command
@@ -55,7 +55,10 @@
 
         result = assert.commandWorked(testDBMain.runCommand(cmd));
 
-        oplogEntries = oplog.find({ns: 'test.user', op: 'u'}).itcount();
+        let updateOplogEntries = oplog.find({ns: 'test.user', op: 'u'}).itcount();
+
+        // Upserts are stored as inserts in the oplog, so check inserts too.
+        insertOplogEntries = oplog.find({ns: 'test.user', op: 'i'}).itcount();
 
         assert.eq(3, testDBPri.user.find().itcount());
 
@@ -73,7 +76,8 @@
         assert.eq({_id: 20, y: 1}, testDBPri.user.findOne({_id: 20}));
         assert.eq({_id: 30, z: 1}, testDBPri.user.findOne({_id: 30}));
 
-        assert.eq(oplogEntries, oplog.find({ns: 'test.user', op: 'u'}).itcount());
+        assert.eq(updateOplogEntries, oplog.find({ns: 'test.user', op: 'u'}).itcount());
+        assert.eq(insertOplogEntries, oplog.find({ns: 'test.user', op: 'i'}).itcount());
 
         ////////////////////////////////////////////////////////////////////////
         // Test delete command
@@ -94,7 +98,7 @@
 
         result = assert.commandWorked(mainConn.getDB('test').runCommand(cmd));
 
-        oplogEntries = oplog.find({ns: 'test.user', op: 'd'}).itcount();
+        let deleteOplogEntries = oplog.find({ns: 'test.user', op: 'd'}).itcount();
 
         assert.eq(1, testDBPri.user.find({x: 1}).itcount());
         assert.eq(1, testDBPri.user.find({y: 1}).itcount());
@@ -108,7 +112,7 @@
         assert.eq(1, testDBPri.user.find({x: 1}).itcount());
         assert.eq(1, testDBPri.user.find({y: 1}).itcount());
 
-        assert.eq(oplogEntries, oplog.find({ns: 'test.user', op: 'd'}).itcount());
+        assert.eq(deleteOplogEntries, oplog.find({ns: 'test.user', op: 'd'}).itcount());
     };
 
     var replTest = new ReplSetTest({nodes: 1});
