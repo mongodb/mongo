@@ -87,6 +87,7 @@
 #include "mongo/s/client/shard_registry.h"
 #include "mongo/s/cluster_identity_loader.h"
 #include "mongo/s/grid.h"
+#include "mongo/s/periodic_balancer_settings_refresher.h"
 #include "mongo/stdx/functional.h"
 #include "mongo/stdx/memory.h"
 #include "mongo/stdx/thread.h"
@@ -714,6 +715,7 @@ void ReplicationCoordinatorExternalStateImpl::shardingOnStepDownHook() {
         invariant(serverGlobalParams.clusterRole == ClusterRole::ShardServer);
         ShardingState::get(_service)->interruptChunkSplitter();
         CatalogCacheLoader::get(_service).onStepDown();
+        PeriodicBalancerSettingsRefresher::get(_service)->stop();
     }
 
     ShardingState::get(_service)->markCollectionsNotShardedAtStepdown();
@@ -802,6 +804,7 @@ void ReplicationCoordinatorExternalStateImpl::_shardingOnTransitionToPrimaryHook
         }
 
         CatalogCacheLoader::get(_service).onStepUp();
+        PeriodicBalancerSettingsRefresher::get(_service)->start();
         ShardingState::get(_service)->initiateChunkSplitter();
     }
 
