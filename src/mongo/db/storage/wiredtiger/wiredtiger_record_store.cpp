@@ -1445,10 +1445,7 @@ Status WiredTigerRecordStore::validate(OperationContext* opCtx,
         updateStatsAfterRepair(opCtx, nrecords, dataSizeTotal);
     }
 
-    if (level == kValidateFull) {
-        output->append("nInvalidDocuments", nInvalid);
-    }
-
+    output->append("nInvalidDocuments", nInvalid);
     output->appendNumber("nrecords", nrecords);
     return Status::OK();
 }

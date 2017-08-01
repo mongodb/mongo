@@ -745,11 +745,7 @@ Status RecordStoreV1Base::validate(OperationContext* opCtx,
             }
         }
         output->append("objectsFound", n);
-
-        if (level == kValidateFull) {
-            output->append("invalidObjects", nInvalid);
-        }
-
+        output->append("invalidObjects", nInvalid);
         output->appendNumber("nQuantizedSize", nQuantizedSize);
         output->appendNumber("bytesWithHeaders", len);
         output->appendNumber("bytesWithoutHeaders", nlen);
