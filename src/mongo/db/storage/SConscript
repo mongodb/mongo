@@ -164,19 +164,6 @@ env.Library(
     )
 
 env.Library(
-    target='record_store_validate_adaptor',
-    source=[
-        'record_store_validate_adaptor.cpp',
-        ],
-    LIBDEPS_PRIVATE=[
-        '$BUILD_DIR/mongo/db/catalog/index_catalog',
-        '$BUILD_DIR/mongo/db/index/index_descriptor',
-        '$BUILD_DIR/mongo/db/index/index_access_methods',
-        '$BUILD_DIR/mongo/db/service_context',
-        ],
-    )
-
-env.Library(
     target='storage_engine_lock_file',
     source=[
         'storage_engine_lock_file_${TARGET_OS_FAMILY}.cpp',

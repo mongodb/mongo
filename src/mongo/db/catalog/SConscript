@@ -197,6 +197,7 @@ env.Library(
         "index_catalog_impl.cpp",
         "index_catalog_entry_impl.cpp",
         "index_create_impl.cpp",
+        "private/record_store_validate_adaptor.cpp",
     ],
     LIBDEPS=[
         'collection',
@@ -226,9 +227,6 @@ env.Library(
         '$BUILD_DIR/mongo/db/index/index_access_methods',
         '$BUILD_DIR/mongo/db/s/balancer',
         '$BUILD_DIR/mongo/db/views/views_mongod',
-    ],
-    LIBDEPS_PRIVATE=[
-        '$BUILD_DIR/mongo/db/storage/record_store_validate_adaptor',
     ],
 )
 

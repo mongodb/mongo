@@ -28,6 +28,10 @@
 
 #define MONGO_LOG_DEFAULT_COMPONENT ::mongo::logger::LogComponent::kStorage
 
+#include "mongo/platform/basic.h"
+
+#include "mongo/db/catalog/private/record_store_validate_adaptor.h"
+
 #include <third_party/murmurhash3/MurmurHash3.h>
 
 #include "mongo/bson/bsonobj.h"
@@ -37,7 +41,6 @@
 #include "mongo/db/operation_context.h"
 #include "mongo/db/storage/key_string.h"
 #include "mongo/db/storage/record_store.h"
-#include "mongo/db/storage/record_store_validate_adaptor.h"
 #include "mongo/rpc/object_check.h"
 
 namespace mongo {
