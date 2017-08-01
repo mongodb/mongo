@@ -30,6 +30,7 @@
 #pragma once
 
 #include <bitset>
+#include <boost/container/flat_set.hpp>
 #include <list>
 #include <set>
 #include <string>
@@ -51,6 +52,7 @@
 namespace mongo {
 
 typedef std::set<BSONElement, BSONElementCmpWithoutField> BSONElementSet;
+typedef boost::container::flat_set<BSONElement, BSONElementCmpWithoutField> BSONElementFlatSet;
 typedef std::multiset<BSONElement, BSONElementCmpWithoutField> BSONElementMSet;
 
 /**

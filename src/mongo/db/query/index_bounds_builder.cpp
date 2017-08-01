@@ -522,9 +522,8 @@ void IndexBoundsBuilder::translate(const MatchExpression* expr,
         // Create our various intervals.
 
         IndexBoundsBuilder::BoundsTightness tightness;
-        for (BSONElementSet::iterator it = afr.equalities().begin(); it != afr.equalities().end();
-             ++it) {
-            translateEquality(*it, isHashed, oilOut, &tightness);
+        for (auto&& equality : afr.equalities()) {
+            translateEquality(equality, isHashed, oilOut, &tightness);
             if (tightness != IndexBoundsBuilder::EXACT) {
                 *tightnessOut = tightness;
             }

@@ -1458,7 +1458,8 @@ TEST(InMatchExpression, MatchesElementSingle) {
     BSONObj match = BSON("a" << 1);
     BSONObj notMatch = BSON("a" << 2);
     InMatchExpression in;
-    in.getArrayFilterEntries()->addEquality(operand.firstElement());
+    std::vector<BSONElement> equalities{operand.firstElement()};
+    ASSERT_OK(in.getArrayFilterEntries()->setEqualities(std::move(equalities)));
     ASSERT(in.matchesSingleElement(match["a"]));
     ASSERT(!in.matchesSingleElement(notMatch["a"]));
 }
@@ -1476,10 +1477,8 @@ TEST(InMatchExpression, MatchesEmpty) {
 TEST(InMatchExpression, MatchesElementMultiple) {
     BSONObj operand = BSON_ARRAY(1 << "r" << true << 1);
     InMatchExpression in;
-    in.getArrayFilterEntries()->addEquality(operand[0]);
-    in.getArrayFilterEntries()->addEquality(operand[1]);
-    in.getArrayFilterEntries()->addEquality(operand[2]);
-    in.getArrayFilterEntries()->addEquality(operand[3]);
+    std::vector<BSONElement> equalities{operand[0], operand[1], operand[2], operand[3]};
+    ASSERT_OK(in.getArrayFilterEntries()->setEqualities(std::move(equalities)));
 
     BSONObj matchFirst = BSON("a" << 1);
     BSONObj matchSecond = BSON("a"
@@ -1497,7 +1496,8 @@ TEST(InMatchExpression, MatchesScalar) {
     BSONObj operand = BSON_ARRAY(5);
     InMatchExpression in;
     in.init("a");
-    in.getArrayFilterEntries()->addEquality(operand.firstElement());
+    std::vector<BSONElement> equalities{operand.firstElement()};
+    ASSERT_OK(in.getArrayFilterEntries()->setEqualities(std::move(equalities)));
 
     ASSERT(in.matchesBSON(BSON("a" << 5.0), NULL));
     ASSERT(!in.matchesBSON(BSON("a" << 4), NULL));
@@ -1507,7 +1507,8 @@ TEST(InMatchExpression, MatchesArrayValue) {
     BSONObj operand = BSON_ARRAY(5);
     InMatchExpression in;
     in.init("a");
-    in.getArrayFilterEntries()->addEquality(operand.firstElement());
+    std::vector<BSONElement> equalities{operand.firstElement()};
+    ASSERT_OK(in.getArrayFilterEntries()->setEqualities(std::move(equalities)));
 
     ASSERT(in.matchesBSON(BSON("a" << BSON_ARRAY(5.0 << 6)), NULL));
     ASSERT(!in.matchesBSON(BSON("a" << BSON_ARRAY(6 << 7)), NULL));
@@ -1519,7 +1520,8 @@ TEST(InMatchExpression, MatchesNull) {
 
     InMatchExpression in;
     in.init("a");
-    in.getArrayFilterEntries()->addEquality(operand.firstElement());
+    std::vector<BSONElement> equalities{operand.firstElement()};
+    ASSERT_OK(in.getArrayFilterEntries()->setEqualities(std::move(equalities)));
 
     ASSERT(in.matchesBSON(BSONObj(), NULL));
     ASSERT(in.matchesBSON(BSON("a" << BSONNULL), NULL));
@@ -1533,15 +1535,16 @@ TEST(InMatchExpression, MatchesUndefined) {
 
     InMatchExpression in;
     in.init("a");
-    Status s = in.getArrayFilterEntries()->addEquality(operand.firstElement());
-    ASSERT_NOT_OK(s);
+    std::vector<BSONElement> equalities{operand.firstElement()};
+    ASSERT_NOT_OK(in.getArrayFilterEntries()->setEqualities(std::move(equalities)));
 }
 
 TEST(InMatchExpression, MatchesMinKey) {
     BSONObj operand = BSON_ARRAY(MinKey);
     InMatchExpression in;
     in.init("a");
-    in.getArrayFilterEntries()->addEquality(operand.firstElement());
+    std::vector<BSONElement> equalities{operand.firstElement()};
+    ASSERT_OK(in.getArrayFilterEntries()->setEqualities(std::move(equalities)));
 
     ASSERT(in.matchesBSON(BSON("a" << MinKey), NULL));
     ASSERT(!in.matchesBSON(BSON("a" << MaxKey), NULL));
@@ -1552,7 +1555,8 @@ TEST(InMatchExpression, MatchesMaxKey) {
     BSONObj operand = BSON_ARRAY(MaxKey);
     InMatchExpression in;
     in.init("a");
-    in.getArrayFilterEntries()->addEquality(operand.firstElement());
+    std::vector<BSONElement> equalities{operand.firstElement()};
+    ASSERT_OK(in.getArrayFilterEntries()->setEqualities(std::move(equalities)));
 
     ASSERT(in.matchesBSON(BSON("a" << MaxKey), NULL));
     ASSERT(!in.matchesBSON(BSON("a" << MinKey), NULL));
@@ -1563,9 +1567,8 @@ TEST(InMatchExpression, MatchesFullArray) {
     BSONObj operand = BSON_ARRAY(BSON_ARRAY(1 << 2) << 4 << 5);
     InMatchExpression in;
     in.init("a");
-    in.getArrayFilterEntries()->addEquality(operand[0]);
-    in.getArrayFilterEntries()->addEquality(operand[1]);
-    in.getArrayFilterEntries()->addEquality(operand[2]);
+    std::vector<BSONElement> equalities{operand[0], operand[1], operand[2]};
+    ASSERT_OK(in.getArrayFilterEntries()->setEqualities(std::move(equalities)));
 
     ASSERT(in.matchesBSON(BSON("a" << BSON_ARRAY(1 << 2)), NULL));
     ASSERT(!in.matchesBSON(BSON("a" << BSON_ARRAY(1 << 2 << 3)), NULL));
@@ -1577,8 +1580,8 @@ TEST(InMatchExpression, ElemMatchKey) {
     BSONObj operand = BSON_ARRAY(5 << 2);
     InMatchExpression in;
     in.init("a");
-    in.getArrayFilterEntries()->addEquality(operand[0]);
-    in.getArrayFilterEntries()->addEquality(operand[1]);
+    std::vector<BSONElement> equalities{operand[0], operand[1]};
+    ASSERT_OK(in.getArrayFilterEntries()->setEqualities(std::move(equalities)));
 
     MatchDetails details;
     details.requestElemMatchKey();

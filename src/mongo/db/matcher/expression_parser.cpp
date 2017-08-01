@@ -588,6 +588,7 @@ StatusWithMatchExpression MatchExpressionParser::_parseRegexDocument(const char*
 
 Status MatchExpressionParser::_parseArrayFilterEntries(ArrayFilterEntries* entries,
                                                        const BSONObj& theArray) {
+    std::vector<BSONElement> equalities;
     BSONObjIterator i(theArray);
     while (i.more()) {
         BSONElement e = i.next();
@@ -606,12 +607,10 @@ Status MatchExpressionParser::_parseArrayFilterEntries(ArrayFilterEntries* entri
             if (!s.isOK())
                 return s;
         } else {
-            Status s = entries->addEquality(e);
-            if (!s.isOK())
-                return s;
+            equalities.push_back(e);
         }
     }
-    return Status::OK();
+    return entries->setEqualities(std::move(equalities));
 }
 
 StatusWithMatchExpression MatchExpressionParser::_parseType(const char* name,

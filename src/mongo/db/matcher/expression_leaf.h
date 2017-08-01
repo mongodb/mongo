@@ -301,10 +301,10 @@ public:
     ArrayFilterEntries();
     ~ArrayFilterEntries();
 
-    Status addEquality(const BSONElement& e);
+    Status setEqualities(std::vector<BSONElement> equalities);
     Status addRegex(RegexMatchExpression* expr);
 
-    const BSONElementSet& equalities() const {
+    const BSONElementFlatSet& equalities() const {
         return _equalities;
     }
     bool contains(const BSONElement& elem) const {
@@ -342,7 +342,7 @@ public:
 private:
     bool _hasNull;  // if _equalities has a jstNULL element in it
     bool _hasEmptyArray;
-    BSONElementSet _equalities;
+    BSONElementFlatSet _equalities;
     std::vector<RegexMatchExpression*> _regexes;
 };
 

@@ -534,22 +534,24 @@ ArrayFilterEntries::~ArrayFilterEntries() {
     _regexes.clear();
 }
 
-Status ArrayFilterEntries::addEquality(const BSONElement& e) {
-    if (e.type() == RegEx)
-        return Status(ErrorCodes::BadValue, "ArrayFilterEntries equality cannot be a regex");
+Status ArrayFilterEntries::setEqualities(std::vector<BSONElement> equalities) {
+    for (auto&& equality : equalities) {
+        if (equality.type() == BSONType::RegEx) {
+            return Status(ErrorCodes::BadValue, "ArrayFilterEntries equality cannot be a regex");
+        }
 
-    if (e.type() == Undefined) {
-        return Status(ErrorCodes::BadValue, "ArrayFilterEntries equality cannot be undefined");
+        if (equality.type() == BSONType::Undefined) {
+            return Status(ErrorCodes::BadValue, "ArrayFilterEntries equality cannot be undefined");
+        }
+
+        if (equality.type() == BSONType::jstNULL) {
+            _hasNull = true;
+        } else if (equality.type() == BSONType::Array && equality.Obj().isEmpty()) {
+            _hasEmptyArray = true;
+        }
     }
 
-    if (e.type() == jstNULL) {
-        _hasNull = true;
-    }
-
-    if (e.type() == Array && e.Obj().isEmpty())
-        _hasEmptyArray = true;
-
-    _equalities.insert(e);
+    _equalities = BSONElementFlatSet(equalities.begin(), equalities.end());
     return Status::OK();
 }
 
@@ -582,8 +584,8 @@ void ArrayFilterEntries::copyTo(ArrayFilterEntries& toFillIn) const {
 
 void ArrayFilterEntries::debugString(StringBuilder& debug) const {
     debug << "[ ";
-    for (BSONElementSet::const_iterator it = _equalities.begin(); it != _equalities.end(); ++it) {
-        debug << it->toString(false) << " ";
+    for (auto&& equality : _equalities) {
+        debug << equality.toString(false) << " ";
     }
     for (size_t i = 0; i < _regexes.size(); ++i) {
         _regexes[i]->shortDebugString(debug);
@@ -593,8 +595,8 @@ void ArrayFilterEntries::debugString(StringBuilder& debug) const {
 }
 
 void ArrayFilterEntries::toBSON(BSONArrayBuilder* out) const {
-    for (BSONElementSet::const_iterator it = _equalities.begin(); it != _equalities.end(); ++it) {
-        out->append(*it);
+    for (auto&& equality : _equalities) {
+        out->append(equality);
     }
     for (size_t i = 0; i < _regexes.size(); ++i) {
         BSONObjBuilder regexBob;
