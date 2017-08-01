@@ -32,6 +32,7 @@
 #include "mongo/db/commands/server_status.h"
 #include "mongo/db/s/sharding_state.h"
 #include "mongo/db/server_options.h"
+#include "mongo/s/balancer_configuration.h"
 #include "mongo/s/grid.h"
 
 namespace mongo {
@@ -51,10 +52,15 @@ public:
         auto shardingState = ShardingState::get(opCtx);
         if (shardingState->enabled() &&
             serverGlobalParams.clusterRole != ClusterRole::ConfigServer) {
+
             result.append("configsvrConnectionString",
                           shardingState->getConfigServer(opCtx).toString());
 
             Grid::get(opCtx)->configOpTime().append(&result, "lastSeenConfigServerOpTime");
+
+            long long maxChunkSizeInBytes =
+                Grid::get(opCtx)->getBalancerConfiguration()->getMaxChunkSizeBytes();
+            result.append("maxChunkSizeInBytes", maxChunkSizeInBytes);
 
             // Get a migration status report if a migration is active for which this is the source
             // shard. ShardingState::getActiveMigrationStatusReport will take an IS lock on the

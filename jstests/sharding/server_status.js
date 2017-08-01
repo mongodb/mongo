@@ -15,7 +15,7 @@
     // Initialize shard metadata in shards
     testDB.user.insert({x: 1});
 
-    var checkShardingServerStatus = function(doc, isCSRS) {
+    var checkShardingServerStatus = function(doc) {
         var shardingSection = doc.sharding;
         assert.neq(shardingSection, null);
 
@@ -25,26 +25,20 @@
 
         var configOpTimeObj = shardingSection.lastSeenConfigServerOpTime;
 
-        if (isCSRS) {
-            assert.gt(configConnStr.indexOf('/'), 0);
-            assert.gte(configIsMaster.configsvr, 1);  // If it's a shard, this field won't exist.
-            assert.neq(null, configOpTimeObj);
-            assert.neq(null, configOpTimeObj.ts);
-            assert.neq(null, configOpTimeObj.t);
-        } else {
-            assert.eq(-1, configConnStr.indexOf('/'));
-            assert.gt(configConnStr.indexOf(','), 0);
-            assert.eq(0, configIsMaster.configsvr);
-            assert.eq(null, configOpTimeObj);
-        }
+        assert.gt(configConnStr.indexOf('/'), 0);
+        assert.gte(configIsMaster.configsvr, 1);  // If it's a shard, this field won't exist.
+        assert.neq(null, configOpTimeObj);
+        assert.neq(null, configOpTimeObj.ts);
+        assert.neq(null, configOpTimeObj.t);
+
+        assert.neq(null, shardingSection.maxChunkSizeInBytes);
     };
 
     var mongosServerStatus = testDB.adminCommand({serverStatus: 1});
-    var isCSRS = st.configRS != null;
-    checkShardingServerStatus(mongosServerStatus, isCSRS);
+    checkShardingServerStatus(mongosServerStatus);
 
     var mongodServerStatus = st.d0.getDB('admin').runCommand({serverStatus: 1});
-    checkShardingServerStatus(mongodServerStatus, isCSRS);
+    checkShardingServerStatus(mongodServerStatus);
 
     st.stop();
 })();

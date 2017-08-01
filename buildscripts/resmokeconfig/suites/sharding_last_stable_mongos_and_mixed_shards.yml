@@ -52,6 +52,8 @@ selector:
   # SERVER-19318: added new $currentOp agg stage in 3.6
   - jstests/sharding/aggregation_currentop.js
   - jstests/sharding/read_pref_cmd.js
+  # SERVER-30444: Add a maxChunkSize field to the serverStatus command response
+  - jstests/sharding/server_status.js
 
 executor:
   config:

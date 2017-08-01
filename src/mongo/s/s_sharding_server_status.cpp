@@ -31,6 +31,7 @@
 #include "mongo/base/init.h"
 #include "mongo/bson/bsonobjbuilder.h"
 #include "mongo/db/commands/server_status.h"
+#include "mongo/s/balancer_configuration.h"
 #include "mongo/s/client/shard_registry.h"
 #include "mongo/s/grid.h"
 
@@ -55,6 +56,10 @@ public:
                       shardRegistry->getConfigServerConnectionString().toString());
 
         Grid::get(opCtx)->configOpTime().append(&result, "lastSeenConfigServerOpTime");
+
+        long long maxChunkSizeInBytes =
+            Grid::get(opCtx)->getBalancerConfiguration()->getMaxChunkSizeBytes();
+        result.append("maxChunkSizeInBytes", maxChunkSizeInBytes);
 
         return result.obj();
     }
