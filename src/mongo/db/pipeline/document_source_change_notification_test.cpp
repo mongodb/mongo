@@ -49,17 +49,13 @@
 namespace mongo {
 namespace {
 
-using boost::intrusive_ptr;
-using repl::OpTypeEnum;
-using repl::OplogEntry;
-using std::list;
-using std::string;
 using std::vector;
-
+using std::string;
+using boost::intrusive_ptr;
+using repl::OplogEntry;
+using repl::OpTypeEnum;
 using D = Document;
 using V = Value;
-
-using DSChangeNotification = DocumentSourceChangeNotification;
 
 static const Timestamp ts(100, 1);
 static const repl::OpTime optime(ts, 1);
@@ -71,10 +67,10 @@ public:
 
     void checkTransformation(const OplogEntry& entry, const boost::optional<Document> expectedDoc) {
         const auto spec = fromjson("{$changeNotification: {}}");
-        list<intrusive_ptr<DocumentSource>> result =
-            DSChangeNotification::createFromBson(spec.firstElement(), getExpCtx());
+        vector<intrusive_ptr<DocumentSource>> result =
+            DocumentSourceChangeNotification::createFromBson(spec.firstElement(), getExpCtx());
 
-        auto match = dynamic_cast<DocumentSourceMatch*>(result.front().get());
+        auto match = dynamic_cast<DocumentSourceMatch*>(result[0].get());
         ASSERT(match);
         auto mock = DocumentSourceMock::create(D(entry.toBSON()));
         match->setSource(mock.get());
@@ -82,7 +78,7 @@ public:
         // Check the oplog entry is transformed correctly.
         auto transform = result.back().get();
         ASSERT(transform);
-        ASSERT_EQ(string(transform->getSourceName()), DSChangeNotification::kStageName);
+        ASSERT_EQ(string(transform->getSourceName()), "$changeNotification");
         transform->setSource(match);
 
         auto next = transform->getNext();
@@ -98,62 +94,16 @@ public:
     }
 };
 
-TEST_F(ChangeNotificationStageTest, ShouldRejectUnrecognizedOption) {
-    auto expCtx = getExpCtx();
-
-    ASSERT_THROWS_CODE(
-        DSChangeNotification::createFromBson(
-            BSON(DSChangeNotification::kStageName << BSON("unexpected" << 4)).firstElement(),
-            expCtx),
-        UserException,
-        40577);
-}
-
-TEST_F(ChangeNotificationStageTest, ShouldRejectResumeAfterOption) {
-    // TODO SERVER-29131 change this test to accept the option.
-    auto expCtx = getExpCtx();
-
-    ASSERT_THROWS_CODE(
-        DSChangeNotification::createFromBson(
-            BSON(DSChangeNotification::kStageName << BSON("resumeAfter" << ts)).firstElement(),
-            expCtx),
-        UserException,
-        40576);
-}
-
-TEST_F(ChangeNotificationStageTest, ShouldRejectNonStringFullDocumentOption) {
-    auto expCtx = getExpCtx();
-
-    ASSERT_THROWS_CODE(
-        DSChangeNotification::createFromBson(
-            BSON(DSChangeNotification::kStageName << BSON("fullDocument" << true)).firstElement(),
-            expCtx),
-        UserException,
-        40574);
-}
-
-TEST_F(ChangeNotificationStageTest, ShouldRejectUnrecognizedFullDocumentOption) {
-    auto expCtx = getExpCtx();
-
-    ASSERT_THROWS_CODE(DSChangeNotification::createFromBson(
-                           BSON(DSChangeNotification::kStageName << BSON("fullDocument"
-                                                                         << "unrecognized"))
-                               .firstElement(),
-                           expCtx),
-                       UserException,
-                       40575);
-}
-
 TEST_F(ChangeNotificationStageTest, StagesGeneratedCorrectly) {
     const auto spec = fromjson("{$changeNotification: {}}");
 
-    list<intrusive_ptr<DocumentSource>> result =
-        DSChangeNotification::createFromBson(spec.firstElement(), getExpCtx());
+    vector<intrusive_ptr<DocumentSource>> result =
+        DocumentSourceChangeNotification::createFromBson(spec.firstElement(), getExpCtx());
 
     ASSERT_EQUALS(result.size(), 2UL);
-    ASSERT_TRUE(dynamic_cast<DocumentSourceMatch*>(result.front().get()));
-    ASSERT_EQUALS(string(result.front()->getSourceName()), DSChangeNotification::kStageName);
-    ASSERT_EQUALS(string(result.back()->getSourceName()), DSChangeNotification::kStageName);
+    ASSERT_TRUE(dynamic_cast<DocumentSourceMatch*>(result[0].get()));
+    ASSERT_EQUALS(string(result[0]->getSourceName()), "$changeNotification");
+    ASSERT_EQUALS(string(result[1]->getSourceName()), "$changeNotification");
 
     // TODO: Check explain result.
 }
@@ -162,11 +112,11 @@ TEST_F(ChangeNotificationStageTest, TransformInsert) {
     OplogEntry insert(optime, 1, OpTypeEnum::kInsert, nss, BSON("_id" << 1 << "x" << 1));
     // Insert
     Document expectedInsert{
-        {DSChangeNotification::kIdField, D{{"ts", ts}, {"ns", nss.ns()}, {"_id", 1}}},
-        {DSChangeNotification::kOperationTypeField, DSChangeNotification::kInsertOpType},
-        {DSChangeNotification::kFullDocumentField, D{{"_id", 1}, {"x", 1}}},
-        {DSChangeNotification::kNamespaceField, D{{"db", nss.db()}, {"coll", nss.coll()}}},
-        {DSChangeNotification::kDocumentKeyField, D{{"_id", 1}}},
+        {"_id", D{{"ts", ts}, {"ns", nss.ns()}, {"_id", 1}}},
+        {"operationType", "insert"_sd},
+        {"ns", D{{"db", nss.db()}, {"coll", nss.coll()}}},
+        {"documentKey", D{{"_id", 1}}},
+        {"newDocument", D{{"_id", 1}, {"x", 1}}},
     };
     checkTransformation(insert, expectedInsert);
 }
@@ -176,15 +126,13 @@ TEST_F(ChangeNotificationStageTest, TransformUpdateFields) {
         optime, 1, OpTypeEnum::kUpdate, nss, BSON("$set" << BSON("y" << 1)), BSON("_id" << 1));
     // Update fields
     Document expectedUpdateField{
-        {DSChangeNotification::kIdField, D{{"ts", ts}, {"ns", nss.ns()}, {"_id", 1}}},
-        {DSChangeNotification::kOperationTypeField, DSChangeNotification::kUpdateOpType},
-        {DSChangeNotification::kFullDocumentField, BSONNULL},
-        {DSChangeNotification::kNamespaceField, D{{"db", nss.db()}, {"coll", nss.coll()}}},
-        {DSChangeNotification::kDocumentKeyField, D{{"_id", 1}}},
+        {"_id", D{{"ts", ts}, {"ns", nss.ns()}, {"_id", 1}}},
+        {"operationType", "update"_sd},
+        {"ns", D{{"db", nss.db()}, {"coll", nss.coll()}}},
+        {"documentKey", D{{"_id", 1}}},
         {
             "updateDescription", D{{"updatedFields", D{{"y", 1}}}, {"removedFields", vector<V>()}},
-        },
-    };
+        }};
     checkTransformation(updateField, expectedUpdateField);
 }
 
@@ -193,11 +141,10 @@ TEST_F(ChangeNotificationStageTest, TransformRemoveFields) {
         optime, 1, OpTypeEnum::kUpdate, nss, BSON("$unset" << BSON("y" << 1)), BSON("_id" << 1));
     // Remove fields
     Document expectedRemoveField{
-        {DSChangeNotification::kIdField, D{{"ts", ts}, {"ns", nss.ns()}, {"_id", 1}}},
-        {DSChangeNotification::kOperationTypeField, DSChangeNotification::kUpdateOpType},
-        {DSChangeNotification::kFullDocumentField, BSONNULL},
-        {DSChangeNotification::kNamespaceField, D{{"db", nss.db()}, {"coll", nss.coll()}}},
-        {DSChangeNotification::kDocumentKeyField, D{{"_id", 1}}},
+        {"_id", D{{"ts", ts}, {"ns", nss.ns()}, {"_id", 1}}},
+        {"operationType", "update"_sd},
+        {"ns", D{{"db", nss.db()}, {"coll", nss.coll()}}},
+        {"documentKey", D{{"_id", 1}}},
         {
             "updateDescription", D{{"updatedFields", D{}}, {"removedFields", vector<V>{V("y"_sd)}}},
         }};
@@ -209,11 +156,11 @@ TEST_F(ChangeNotificationStageTest, TransformReplace) {
         optime, 1, OpTypeEnum::kUpdate, nss, BSON("_id" << 1 << "y" << 1), BSON("_id" << 1));
     // Replace
     Document expectedReplace{
-        {DSChangeNotification::kIdField, D{{"ts", ts}, {"ns", nss.ns()}, {"_id", 1}}},
-        {DSChangeNotification::kOperationTypeField, DSChangeNotification::kReplaceOpType},
-        {DSChangeNotification::kFullDocumentField, D{{"_id", 1}, {"y", 1}}},
-        {DSChangeNotification::kNamespaceField, D{{"db", nss.db()}, {"coll", nss.coll()}}},
-        {DSChangeNotification::kDocumentKeyField, D{{"_id", 1}}},
+        {"_id", D{{"ts", ts}, {"ns", nss.ns()}, {"_id", 1}}},
+        {"operationType", "replace"_sd},
+        {"ns", D{{"db", nss.db()}, {"coll", nss.coll()}}},
+        {"documentKey", D{{"_id", 1}}},
+        {"newDocument", D{{"_id", 1}, {"y", 1}}},
     };
     checkTransformation(replace, expectedReplace);
 }
@@ -222,11 +169,10 @@ TEST_F(ChangeNotificationStageTest, TransformDelete) {
     OplogEntry deleteEntry(optime, 1, OpTypeEnum::kDelete, nss, BSON("_id" << 1));
     // Delete
     Document expectedDelete{
-        {DSChangeNotification::kIdField, D{{"ts", ts}, {"ns", nss.ns()}, {"_id", 1}}},
-        {DSChangeNotification::kOperationTypeField, DSChangeNotification::kDeleteOpType},
-        {DSChangeNotification::kFullDocumentField, BSONNULL},
-        {DSChangeNotification::kNamespaceField, D{{"db", nss.db()}, {"coll", nss.coll()}}},
-        {DSChangeNotification::kDocumentKeyField, D{{"_id", 1}}},
+        {"_id", D{{"ts", ts}, {"ns", nss.ns()}, {"_id", 1}}},
+        {"operationType", "delete"_sd},
+        {"ns", D{{"db", nss.db()}, {"coll", nss.coll()}}},
+        {"documentKey", D{{"_id", 1}}},
     };
     checkTransformation(deleteEntry, expectedDelete);
 }
@@ -241,9 +187,7 @@ TEST_F(ChangeNotificationStageTest, TransformInvalidate) {
 
     // Invalidate entry includes $cmd namespace in _id and doesn't have a document id.
     Document expectedInvalidate{
-        {DSChangeNotification::kIdField, D{{"ts", ts}, {"ns", nss.getCommandNS().ns()}}},
-        {DSChangeNotification::kOperationTypeField, DSChangeNotification::kInvalidateOpType},
-        {DSChangeNotification::kFullDocumentField, BSONNULL},
+        {"_id", D{{"ts", ts}, {"ns", nss.getCommandNS().ns()}}}, {"operationType", "invalidate"_sd},
     };
     for (auto& entry : {dropColl, dropDB, rename}) {
         checkTransformation(entry, expectedInvalidate);
@@ -259,9 +203,8 @@ TEST_F(ChangeNotificationStageTest, TransformInvalidateRenameDropTarget) {
                       otherColl.getCommandNS(),
                       BSON("renameCollection" << otherColl.ns() << "to" << nss.ns()));
     Document expectedInvalidate{
-        {DSChangeNotification::kIdField, D{{"ts", ts}, {"ns", otherColl.getCommandNS().ns()}}},
-        {DSChangeNotification::kOperationTypeField, DSChangeNotification::kInvalidateOpType},
-        {DSChangeNotification::kFullDocumentField, BSONNULL},
+        {"_id", D{{"ts", ts}, {"ns", otherColl.getCommandNS().ns()}}},
+        {"operationType", "invalidate"_sd},
     };
     checkTransformation(rename, expectedInvalidate);
 }
@@ -285,39 +228,6 @@ TEST_F(ChangeNotificationStageTest, MatchFiltersCreateIndex) {
     NamespaceString indexNs(nss.getSystemIndexesCollection());
     OplogEntry createIndex(optime, 1, OpTypeEnum::kInsert, indexNs, indexSpec.toBson());
     checkTransformation(createIndex, boost::none);
-}
-
-TEST_F(ChangeNotificationStageTest, TransformationShouldBeAbleToReParseSerializedStage) {
-    auto expCtx = getExpCtx();
-
-    auto originalSpec = BSON(DSChangeNotification::kStageName << BSONObj());
-    auto allStages = DSChangeNotification::createFromBson(originalSpec.firstElement(), expCtx);
-    ASSERT_EQ(allStages.size(), 2UL);
-    auto stage = allStages.back();
-    ASSERT(dynamic_cast<DocumentSourceSingleDocumentTransformation*>(stage.get()));
-
-    //
-    // Serialize the stage and confirm contents.
-    //
-    vector<Value> serialization;
-    stage->serializeToArray(serialization);
-    ASSERT_EQ(serialization.size(), 1UL);
-    ASSERT_EQ(serialization[0].getType(), BSONType::Object);
-    auto serializedDoc = serialization[0].getDocument();
-    ASSERT_BSONOBJ_EQ(serializedDoc.toBson(), originalSpec);
-
-    //
-    // Create a new stage from the serialization. Serialize the new stage and confirm that it is
-    // equivalent to the original serialization.
-    //
-    auto serializedBson = serializedDoc.toBson();
-    auto roundTripped = uassertStatusOK(Pipeline::create(
-        DSChangeNotification::createFromBson(serializedBson.firstElement(), expCtx), expCtx));
-
-    auto newSerialization = roundTripped->serialize();
-
-    ASSERT_EQ(newSerialization.size(), 1UL);
-    ASSERT_VALUE_EQ(newSerialization[0], serialization[0]);
 }
 
 }  // namespace

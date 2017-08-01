@@ -37,7 +37,6 @@ namespace mongo {
 
 using boost::intrusive_ptr;
 using std::vector;
-using std::list;
 
 REGISTER_MULTI_STAGE_ALIAS(bucket,
                            LiteParsedDocumentSourceDefault::parse,
@@ -53,7 +52,7 @@ intrusive_ptr<ExpressionConstant> getExpressionConstant(
 }
 }  // namespace
 
-list<intrusive_ptr<DocumentSource>> DocumentSourceBucket::createFromBson(
+vector<intrusive_ptr<DocumentSource>> DocumentSourceBucket::createFromBson(
     BSONElement elem, const intrusive_ptr<ExpressionContext>& pExpCtx) {
     uassert(40201,
             str::stream() << "Argument to $bucket stage must be an object, but found type: "

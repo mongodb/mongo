@@ -51,8 +51,6 @@ public:
         }
 
         stdx::unordered_set<NamespaceString> getInvolvedNamespaces() const final {
-            // TODO SERVER-29138: we need to communicate that this stage will need to look up
-            // documents from different collections.
             return stdx::unordered_set<NamespaceString>();
         }
 
@@ -64,8 +62,6 @@ public:
 
     class Transformation : public DocumentSourceSingleDocumentTransformation::TransformerInterface {
     public:
-        Transformation(BSONObj changeNotificationSpec)
-            : _changeNotificationSpec(changeNotificationSpec.getOwned()) {}
         ~Transformation() = default;
         Document applyTransformation(const Document& input) final;
         TransformerType getType() const final {
@@ -76,48 +72,10 @@ public:
             boost::optional<ExplainOptions::Verbosity> explain) const final;
         DocumentSource::GetDepsReturn addDependencies(DepsTracker* deps) const final;
         DocumentSource::GetModPathsReturn getModifiedPaths() const final;
-
-    private:
-        BSONObj _changeNotificationSpec;
     };
 
-    // The name of the field where the document key (_id and shard key, if present) will be found
-    // after the transformation.
-    static constexpr StringData kDocumentKeyField = "documentKey"_sd;
-
-    // The name of the field where the full document will be found after the transformation. The
-    // full document is only present for certain types of operations, such as an insert.
-    static constexpr StringData kFullDocumentField = "fullDocument"_sd;
-
-    // The name of the field where the change identifier will be located after the transformation.
-    static constexpr StringData kIdField = "_id"_sd;
-
-    // The name of the field where the namespace of the change will be located after the
-    // transformation.
-    static constexpr StringData kNamespaceField = "ns"_sd;
-
-    // The name of the field where the type of the operation will be located after the
-    // transformation.
-    static constexpr StringData kOperationTypeField = "operationType"_sd;
-
-    // The name of this stage.
-    static constexpr StringData kStageName = "$changeNotification"_sd;
-
-    // The name of the field where the timestamp of the change will be located after the
-    // transformation. The timestamp will be located inside the change identifier, so the full path
-    // to the timestamp will be kIdField + "." + kTimestampField.
-    static constexpr StringData kTimestmapField = "ts"_sd;
-
-    // The different types of operations we can use for the operation type.
-    static constexpr StringData kUpdateOpType = "update"_sd;
-    static constexpr StringData kDeleteOpType = "delete"_sd;
-    static constexpr StringData kReplaceOpType = "replace"_sd;
-    static constexpr StringData kInsertOpType = "insert"_sd;
-    static constexpr StringData kInvalidateOpType = "invalidate"_sd;
-
     /**
-     * Produce the BSON object representing the filter for the $match stage to filter oplog entries
-     * to only those relevant for this $changeNotification stage.
+     * Produce the BSON for the $match stage based on a $changeNotification stage.
      */
     static BSONObj buildMatchFilter(const NamespaceString& nss);
 
@@ -125,11 +83,11 @@ public:
      * Parses a $changeNotification stage from 'elem' and produces the $match and transformation
      * stages required.
      */
-    static std::list<boost::intrusive_ptr<DocumentSource>> createFromBson(
+    static std::vector<boost::intrusive_ptr<DocumentSource>> createFromBson(
         BSONElement elem, const boost::intrusive_ptr<ExpressionContext>& expCtx);
 
     static boost::intrusive_ptr<DocumentSource> createTransformationStage(
-        BSONObj changeNotificationSpec, const boost::intrusive_ptr<ExpressionContext>& pExpCtx);
+        const boost::intrusive_ptr<ExpressionContext>& pExpCtx);
 
 private:
     // It is illegal to construct a DocumentSourceChangeNotification directly, use createFromBson()

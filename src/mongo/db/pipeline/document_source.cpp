@@ -41,7 +41,6 @@ namespace mongo {
 
 using Parser = DocumentSource::Parser;
 using boost::intrusive_ptr;
-using std::list;
 using std::string;
 using std::vector;
 
@@ -61,7 +60,7 @@ void DocumentSource::registerParser(string name, Parser parser) {
     parserMap[name] = parser;
 }
 
-list<intrusive_ptr<DocumentSource>> DocumentSource::parse(
+vector<intrusive_ptr<DocumentSource>> DocumentSource::parse(
     const intrusive_ptr<ExpressionContext>& expCtx, BSONObj stageObj) {
     uassert(16435,
             "A pipeline stage specification object must contain exactly one field.",

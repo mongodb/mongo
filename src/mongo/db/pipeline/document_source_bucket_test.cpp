@@ -47,22 +47,21 @@
 namespace mongo {
 namespace {
 
-using boost::intrusive_ptr;
-using std::list;
 using std::vector;
+using boost::intrusive_ptr;
 
 class BucketReturnsGroupAndSort : public AggregationContextFixture {
 public:
     void testCreateFromBsonResult(BSONObj bucketSpec, Value expectedGroupExplain) {
-        list<intrusive_ptr<DocumentSource>> result =
+        vector<intrusive_ptr<DocumentSource>> result =
             DocumentSourceBucket::createFromBson(bucketSpec.firstElement(), getExpCtx());
 
         ASSERT_EQUALS(result.size(), 2UL);
 
-        const auto* groupStage = dynamic_cast<DocumentSourceGroup*>(result.front().get());
+        const auto* groupStage = dynamic_cast<DocumentSourceGroup*>(result[0].get());
         ASSERT(groupStage);
 
-        const auto* sortStage = dynamic_cast<DocumentSourceSort*>(result.back().get());
+        const auto* sortStage = dynamic_cast<DocumentSourceSort*>(result[1].get());
         ASSERT(sortStage);
 
         // Serialize the DocumentSourceGroup and DocumentSourceSort from $bucket so that we can
@@ -155,7 +154,7 @@ TEST_F(BucketReturnsGroupAndSort, BucketSucceedsWithMultipleBoundaryValues) {
 
 class InvalidBucketSpec : public AggregationContextFixture {
 public:
-    list<intrusive_ptr<DocumentSource>> createBucket(BSONObj bucketSpec) {
+    vector<intrusive_ptr<DocumentSource>> createBucket(BSONObj bucketSpec) {
         auto sources = DocumentSourceBucket::createFromBson(bucketSpec.firstElement(), getExpCtx());
         return sources;
     }
@@ -268,14 +267,14 @@ TEST_F(InvalidBucketSpec, GroupFailsForBucketWithInvalidOutputField) {
 
 TEST_F(InvalidBucketSpec, SwitchFailsForBucketWhenNoDefaultSpecified) {
     const auto spec = fromjson("{$bucket : {groupBy : '$x', boundaries : [1, 2, 3]}}");
-    list<intrusive_ptr<DocumentSource>> bucketStages = createBucket(spec);
+    vector<intrusive_ptr<DocumentSource>> bucketStages = createBucket(spec);
 
     ASSERT_EQUALS(bucketStages.size(), 2UL);
 
-    auto* groupStage = dynamic_cast<DocumentSourceGroup*>(bucketStages.front().get());
+    auto* groupStage = dynamic_cast<DocumentSourceGroup*>(bucketStages[0].get());
     ASSERT(groupStage);
 
-    const auto* sortStage = dynamic_cast<DocumentSourceSort*>(bucketStages.back().get());
+    const auto* sortStage = dynamic_cast<DocumentSourceSort*>(bucketStages[1].get());
     ASSERT(sortStage);
 
     auto doc = Document{{"x", 4}};

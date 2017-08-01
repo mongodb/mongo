@@ -45,23 +45,22 @@
 
 namespace mongo {
 namespace {
-using boost::intrusive_ptr;
-using std::list;
 using std::vector;
+using boost::intrusive_ptr;
 
 class CountReturnsGroupAndProjectStages : public AggregationContextFixture {
 public:
     void testCreateFromBsonResult(BSONObj countSpec) {
-        list<intrusive_ptr<DocumentSource>> result =
+        vector<intrusive_ptr<DocumentSource>> result =
             DocumentSourceCount::createFromBson(countSpec.firstElement(), getExpCtx());
 
         ASSERT_EQUALS(result.size(), 2UL);
 
-        const auto* groupStage = dynamic_cast<DocumentSourceGroup*>(result.front().get());
+        const auto* groupStage = dynamic_cast<DocumentSourceGroup*>(result[0].get());
         ASSERT(groupStage);
 
         const auto* projectStage =
-            dynamic_cast<DocumentSourceSingleDocumentTransformation*>(result.back().get());
+            dynamic_cast<DocumentSourceSingleDocumentTransformation*>(result[1].get());
         ASSERT(projectStage);
 
         auto explain = ExplainOptions::Verbosity::kQueryPlanner;
@@ -95,7 +94,7 @@ TEST_F(CountReturnsGroupAndProjectStages, ValidStringSpec) {
 
 class InvalidCountSpec : public AggregationContextFixture {
 public:
-    list<intrusive_ptr<DocumentSource>> createCount(BSONObj countSpec) {
+    vector<intrusive_ptr<DocumentSource>> createCount(BSONObj countSpec) {
         auto specElem = countSpec.firstElement();
         return DocumentSourceCount::createFromBson(specElem, getExpCtx());
     }

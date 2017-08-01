@@ -40,7 +40,7 @@ public:
     /**
      * Returns a $group stage followed by a $project stage.
      */
-    static std::list<boost::intrusive_ptr<DocumentSource>> createFromBson(
+    static std::vector<boost::intrusive_ptr<DocumentSource>> createFromBson(
         BSONElement elem, const boost::intrusive_ptr<ExpressionContext>& pExpCtx);
 
 private:

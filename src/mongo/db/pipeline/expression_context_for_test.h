@@ -40,9 +40,7 @@ namespace mongo {
  */
 class ExpressionContextForTest : public ExpressionContext {
 public:
-    ExpressionContextForTest() : ExpressionContext(NamespaceString{"test"_sd, "namespace"_sd}) {}
-
-    ExpressionContextForTest(NamespaceString nss) : ExpressionContext(std::move(nss)) {}
+    ExpressionContextForTest() = default;
 
     ExpressionContextForTest(OperationContext* opCtx, const AggregationRequest& request)
         : ExpressionContext(opCtx, request, nullptr, {}) {}
