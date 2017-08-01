@@ -53,9 +53,6 @@ BSONObj buildErrReply(const DBException& ex) {
     BSONObjBuilder errB;
     errB.append("$err", ex.what());
     errB.append("code", ex.getCode());
-    if (!ex._shard.empty()) {
-        errB.append("shard", ex._shard);
-    }
     return errB.obj();
 }
 

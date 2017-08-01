@@ -115,9 +115,6 @@ public:
         return Status(convertExceptionCode(getCode()), this->what());
     }
 
-    // context when applicable. otherwise ""
-    std::string _shard;
-
     virtual std::string toString() const;
 
     const ExceptionInfo& getInfo() const {
