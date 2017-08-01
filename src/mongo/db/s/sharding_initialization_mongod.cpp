@@ -38,6 +38,7 @@
 #include "mongo/client/remote_command_targeter_factory_impl.h"
 #include "mongo/db/logical_time_metadata_hook.h"
 #include "mongo/db/operation_context.h"
+#include "mongo/db/s/read_only_catalog_cache_loader.h"
 #include "mongo/db/s/shard_server_catalog_cache_loader.h"
 #include "mongo/db/s/sharding_egress_metadata_hook_for_mongod.h"
 #include "mongo/db/server_options.h"
@@ -88,9 +89,14 @@ Status initializeGlobalShardingStateForMongod(OperationContext* opCtx,
         stdx::make_unique<ShardFactory>(std::move(buildersMap), std::move(targeterFactory));
 
     if (serverGlobalParams.clusterRole == ClusterRole::ShardServer) {
-        CatalogCacheLoader::set(opCtx->getServiceContext(),
-                                stdx::make_unique<ShardServerCatalogCacheLoader>(
-                                    stdx::make_unique<ConfigServerCatalogCacheLoader>()));
+        if (storageGlobalParams.readOnly) {
+            CatalogCacheLoader::set(opCtx->getServiceContext(),
+                                    stdx::make_unique<ReadOnlyCatalogCacheLoader>());
+        } else {
+            CatalogCacheLoader::set(opCtx->getServiceContext(),
+                                    stdx::make_unique<ShardServerCatalogCacheLoader>(
+                                        stdx::make_unique<ConfigServerCatalogCacheLoader>()));
+        }
     } else {
         CatalogCacheLoader::set(opCtx->getServiceContext(),
                                 stdx::make_unique<ConfigServerCatalogCacheLoader>());
