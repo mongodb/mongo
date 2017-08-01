@@ -434,7 +434,7 @@ func TestMongoDumpBSON(t *testing.T) {
 				Convey("it dumps to standard output", func() {
 					md.OutputOptions.Out = "-"
 					stdoutBuf := &bytes.Buffer{}
-					md.stdout = stdoutBuf
+					md.OutputWriter = stdoutBuf
 					err = md.Dump()
 					So(err, ShouldBeNil)
 					var count int

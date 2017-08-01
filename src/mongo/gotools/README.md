@@ -9,6 +9,8 @@ MongoDB Tools
  - **mongofiles** - _Read, write, delete, or update files in [GridFS](http://docs.mongodb.org/manual/core/gridfs/)_
  - **mongooplog** - _Replay oplog entries between MongoDB servers_
  - **mongotop** - _Monitor read/write activity on a mongo server_
+ - **mongoreplay** - _Capture, observe, and replay traffic for MongoDB_
+
 
 Report any bugs, improvements, or new feature requests at https://jira.mongodb.org/browse/TOOLS
 

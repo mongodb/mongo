@@ -127,11 +127,17 @@ func BuildWriteConcern(writeConcern string, nodeType NodeType, cs *connstring.Co
 	}
 
 	if cs != nil {
+		if cs.W == "" {
+			cs.W = "majority"
+		}
 		sessionSafety, err = constructSafetyFromConnString(cs)
 		if err != nil {
 			return nil, err
 		}
-	} else if writeConcern != "" {
+	} else {
+		if writeConcern == "" {
+			writeConcern = "majority"
+		}
 		sessionSafety, err = constructWCObject(writeConcern)
 		if err != nil {
 			return nil, err

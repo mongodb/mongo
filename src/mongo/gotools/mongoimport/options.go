@@ -69,7 +69,9 @@ type IngestOptions struct {
 	UpsertFields string `long:"upsertFields" value-name:"<field>[,<field>]*" description:"comma-separated fields for the query part when --mode is set to upsert or merge"`
 
 	// Sets write concern level for write operations.
-	WriteConcern string `long:"writeConcern" default:"majority" value-name:"<write-concern-specifier>" default-mask:"-" description:"write concern options e.g. --writeConcern majority, --writeConcern '{w: 3, wtimeout: 500, fsync: true, j: true}' (defaults to 'majority')"`
+	// By default mongoimport uses a write concern of 'majority'.
+	// Cannot be used simultaneously with write concern options in a URI.
+	WriteConcern string `long:"writeConcern" value-name:"<write-concern-specifier>" default-mask:"-" description:"write concern options e.g. --writeConcern majority, --writeConcern '{w: 3, wtimeout: 500, fsync: true, j: true}'"`
 
 	// Indicates that the server should bypass document validation on import.
 	BypassDocumentValidation bool `long:"bypassDocumentValidation" description:"bypass document validation"`

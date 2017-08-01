@@ -2,9 +2,11 @@ package intents
 
 import (
 	"container/heap"
+	"testing"
+
 	"github.com/mongodb/mongo-tools/common/testutil"
 	. "github.com/smartystreets/goconvey/convey"
-	"testing"
+	"gopkg.in/mgo.v2/bson"
 )
 
 func TestLegacyPrioritizer(t *testing.T) {
@@ -107,6 +109,37 @@ func TestDBCounterCollectionSorting(t *testing.T) {
 			So(dbc.PopIntent(), ShouldBeNil)
 		})
 	})
+}
+
+func TestBySizeAndView(t *testing.T) {
+	var prioritizer IntentPrioritizer
+
+	testutil.VerifyTestType(t, testutil.UnitTestType)
+
+	Convey("With a prioritizer initialized with on a set of intents", t, func() {
+		intents := []*Intent{
+			&Intent{C: "non-view2", Size: 32},
+			&Intent{C: "view", Size: 0,
+				Options: &bson.D{{"viewOn", true}},
+			},
+			&Intent{C: "non-view1", Size: 1024},
+			&Intent{C: "non-view3", Size: 2},
+			&Intent{C: "view", Size: 0,
+				Options: &bson.D{{"viewOn", true}},
+			},
+		}
+		prioritizer = NewLongestTaskFirstPrioritizer(intents)
+		Convey("getting the sorted intents should produce views first, followed by largest to smallest", func() {
+
+			So(prioritizer.Get().C, ShouldEqual, "view")
+			So(prioritizer.Get().C, ShouldEqual, "view")
+			So(prioritizer.Get().C, ShouldEqual, "non-view1")
+			So(prioritizer.Get().C, ShouldEqual, "non-view2")
+			So(prioritizer.Get().C, ShouldEqual, "non-view3")
+		})
+
+	})
+
 }
 
 func TestSimulatedMultiDBJob(t *testing.T) {

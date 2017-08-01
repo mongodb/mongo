@@ -51,8 +51,8 @@ type MongoDump struct {
 	// as well as the signal handler, and allows them to notify
 	// the intent dumpers that they should shutdown
 	shutdownIntentsNotifier *notifier
-	// the value of stdout gets initizlied to os.Stdout if it's unset
-	stdout       io.Writer
+	// the value of OutputWriter gets initizlied to os.Stdout if it's unset
+	OutputWriter io.Writer
 	readPrefMode mgo.Mode
 	readPrefTags []bson.D
 }
@@ -115,8 +115,8 @@ func (dump *MongoDump) Init() error {
 	if err != nil {
 		return fmt.Errorf("bad option: %v", err)
 	}
-	if dump.stdout == nil {
-		dump.stdout = os.Stdout
+	if dump.OutputWriter == nil {
+		dump.OutputWriter = os.Stdout
 	}
 	dump.sessionProvider, err = db.NewSessionProvider(*dump.ToolOptions)
 	if err != nil {
@@ -782,7 +782,7 @@ func (*nopCloseWriter) Close() error {
 
 func (dump *MongoDump) getArchiveOut() (out io.WriteCloser, err error) {
 	if dump.OutputOptions.Archive == "-" {
-		out = &nopCloseWriter{dump.stdout}
+		out = &nopCloseWriter{dump.OutputWriter}
 	} else {
 		targetStat, err := os.Stat(dump.OutputOptions.Archive)
 		if err == nil && targetStat.IsDir() {

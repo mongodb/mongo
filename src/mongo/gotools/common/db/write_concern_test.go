@@ -54,6 +54,13 @@ func TestBuildWriteConcern(t *testing.T) {
 				So(err, ShouldBeNil)
 				So(writeConcern.J, ShouldBeTrue)
 			})
+			// Regression test for TOOLS-1741
+			Convey("When passing an empty writeConcern and empty URI"+
+				"then write concern should default to being majority", func() {
+				writeConcern, err := BuildWriteConcern("", ReplSet, nil)
+				So(err, ShouldBeNil)
+				So(writeConcern.WMode, ShouldEqual, "majority")
+			})
 		})
 		Convey("and given a connection string", func() {
 			Convey("with a w value of 0, without j set, a nil write concern should be returned", func() {

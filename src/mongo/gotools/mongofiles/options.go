@@ -34,7 +34,8 @@ type StorageOptions struct {
 
 	// Specifies the write concern for each write operation that mongofiles writes to the target database.
 	// By default, mongofiles waits for a majority of members from the replica set to respond before returning.
-	WriteConcern string `long:"writeConcern" value-name:"<write-concern>" default:"majority" default-mask:"-" description:"write concern options e.g. --writeConcern majority, --writeConcern '{w: 3, wtimeout: 500, fsync: true, j: true}' (defaults to 'majority')"`
+	// Cannot be used simultaneously with write concern options in a URI.
+	WriteConcern string `long:"writeConcern" value-name:"<write-concern>" default-mask:"-" description:"write concern options e.g. --writeConcern majority, --writeConcern '{w: 3, wtimeout: 500, fsync: true, j: true}'"`
 }
 
 // Name returns a human-readable group name for storage options.

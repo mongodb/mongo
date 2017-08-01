@@ -59,8 +59,8 @@ func (legacy *legacyPrioritizer) Finish(*Intent) {
 //===== Longest Task First =====
 
 // longestTaskFirstPrioritizer returns intents in the order of largest -> smallest,
-// which is better at minimizing total runtime in parallel environments than
-// other simple orderings.
+// with views at the front of the list, which is better at minimizing total
+// runtime in parallel environments than other simple orderings.
 type longestTaskFirstPrioritizer struct {
 	sync.Mutex
 	queue []*Intent
@@ -68,7 +68,7 @@ type longestTaskFirstPrioritizer struct {
 
 // NewLongestTaskFirstPrioritizer returns an initialized LTP prioritizer
 func NewLongestTaskFirstPrioritizer(intents []*Intent) *longestTaskFirstPrioritizer {
-	sort.Sort(BySize(intents))
+	sort.Sort(BySizeAndView(intents))
 	return &longestTaskFirstPrioritizer{
 		queue: intents,
 	}
@@ -90,6 +90,22 @@ func (ltf *longestTaskFirstPrioritizer) Get() *Intent {
 func (ltf *longestTaskFirstPrioritizer) Finish(*Intent) {
 	// no-op
 	return
+}
+
+// BySizeAndView attaches the methods for sort.Interface for sorting intents
+// from largest to smallest size, taking into account if it's a view or not.
+type BySizeAndView []*Intent
+
+func (s BySizeAndView) Len() int      { return len(s) }
+func (s BySizeAndView) Swap(i, j int) { s[i], s[j] = s[j], s[i] }
+func (s BySizeAndView) Less(i, j int) bool {
+	if s[i].IsView() && !s[j].IsView() {
+		return true
+	}
+	if !s[i].IsView() && s[j].IsView() {
+		return false
+	}
+	return s[i].Size > s[j].Size
 }
 
 // For sorting intents from largest to smallest size

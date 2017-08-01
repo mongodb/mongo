@@ -1785,21 +1785,6 @@ buildvariants:
 #######################################
 #        Windows Buildvariants        #
 #######################################
-- name: windows-32
-  display_name: Windows 32-bit
-  run_on:
-  - windows-32
-  expansions:
-    <<: *mongod_win32_startup_args
-    <<: *mongo_default_startup_args
-    mongo_target: "windows_i686"
-    mongo_arch: "i386"
-    extension: .exe
-    preproc_gpm: "perl -pi -e 's/\\r\\n/\\n/g' "
-    excludes: requires_large_ram
-    integration_test_args: "integration"
-  tasks: *windows_32_tasks
-
 - name: windows-64
   display_name: Windows 64-bit
   run_on:
