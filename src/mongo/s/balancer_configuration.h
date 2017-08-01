@@ -33,6 +33,7 @@
 #include <cstdint>
 
 #include "mongo/base/disallow_copying.h"
+#include "mongo/db/repl/read_concern_args.h"
 #include "mongo/platform/atomic_word.h"
 #include "mongo/s/migration_secondary_throttle_options.h"
 #include "mongo/stdx/mutex.h"
@@ -254,14 +255,18 @@ public:
      * This method is thread-safe but it doesn't make sense to be called from more than one thread
      * at a time.
      */
-    Status refreshAndCheck(OperationContext* opCtx);
+    Status refreshAndCheck(
+        OperationContext* opCtx,
+        const repl::ReadConcernLevel& readConcern = repl::ReadConcernLevel::kMajorityReadConcern);
 
 private:
     /**
      * Reloads the balancer configuration from the settings document. Fails if the settings document
      * cannot be read, in which case the values will remain unchanged.
      */
-    Status _refreshBalancerSettings(OperationContext* opCtx);
+    Status _refreshBalancerSettings(
+        OperationContext* opCtx,
+        const repl::ReadConcernLevel& readConcern = repl::ReadConcernLevel::kMajorityReadConcern);
 
     /**
      * Reloads the chunk sizes configuration from the settings document. Fails if the settings

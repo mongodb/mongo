@@ -131,9 +131,10 @@ bool BalancerConfiguration::waitForDelete() const {
     return _balancerSettings.waitForDelete();
 }
 
-Status BalancerConfiguration::refreshAndCheck(OperationContext* opCtx) {
+Status BalancerConfiguration::refreshAndCheck(OperationContext* opCtx,
+                                              const repl::ReadConcernLevel& readConcern) {
     // Balancer configuration
-    Status balancerSettingsStatus = _refreshBalancerSettings(opCtx);
+    Status balancerSettingsStatus = _refreshBalancerSettings(opCtx, readConcern);
     if (!balancerSettingsStatus.isOK()) {
         return {balancerSettingsStatus.code(),
                 str::stream() << "Failed to refresh the balancer settings due to "
@@ -159,11 +160,12 @@ Status BalancerConfiguration::refreshAndCheck(OperationContext* opCtx) {
     return Status::OK();
 }
 
-Status BalancerConfiguration::_refreshBalancerSettings(OperationContext* opCtx) {
+Status BalancerConfiguration::_refreshBalancerSettings(OperationContext* opCtx,
+                                                       const repl::ReadConcernLevel& readConcern) {
     BalancerSettingsType settings = BalancerSettingsType::createDefault();
 
-    auto settingsObjStatus =
-        Grid::get(opCtx)->catalogClient()->getGlobalSettings(opCtx, BalancerSettingsType::kKey);
+    auto settingsObjStatus = Grid::get(opCtx)->catalogClient()->getGlobalSettings(
+        opCtx, BalancerSettingsType::kKey, readConcern);
     if (settingsObjStatus.isOK()) {
         auto settingsStatus = BalancerSettingsType::fromBSON(settingsObjStatus.getValue());
         if (!settingsStatus.isOK()) {

@@ -381,7 +381,7 @@ StatusWith<ShardDrainingStatus> ShardingCatalogClientImpl::removeShard(Operation
 }
 
 StatusWith<repl::OpTimeWith<DatabaseType>> ShardingCatalogClientImpl::getDatabase(
-    OperationContext* opCtx, const std::string& dbName) {
+    OperationContext* opCtx, const std::string& dbName, const repl::ReadConcernLevel& readConcern) {
     if (!NamespaceString::validDBName(dbName, NamespaceString::DollarInDbNameBehavior::Allow)) {
         return {ErrorCodes::InvalidNamespace, stream() << dbName << " is not a valid db name"};
     }
@@ -396,12 +396,12 @@ StatusWith<repl::OpTimeWith<DatabaseType>> ShardingCatalogClientImpl::getDatabas
         return repl::OpTimeWith<DatabaseType>(dbt);
     }
 
-    auto result = _fetchDatabaseMetadata(opCtx, dbName, kConfigReadSelector);
+    auto result = _fetchDatabaseMetadata(opCtx, dbName, kConfigReadSelector, readConcern);
     if (result == ErrorCodes::NamespaceNotFound) {
         // If we failed to find the database metadata on the 'nearest' config server, try again
         // against the primary, in case the database was recently created.
         result = _fetchDatabaseMetadata(
-            opCtx, dbName, ReadPreferenceSetting{ReadPreference::PrimaryOnly});
+            opCtx, dbName, ReadPreferenceSetting{ReadPreference::PrimaryOnly}, readConcern);
         if (!result.isOK() && (result != ErrorCodes::NamespaceNotFound)) {
             return {result.getStatus().code(),
                     str::stream() << "Could not confirm non-existence of database " << dbName
@@ -414,12 +414,15 @@ StatusWith<repl::OpTimeWith<DatabaseType>> ShardingCatalogClientImpl::getDatabas
 }
 
 StatusWith<repl::OpTimeWith<DatabaseType>> ShardingCatalogClientImpl::_fetchDatabaseMetadata(
-    OperationContext* opCtx, const std::string& dbName, const ReadPreferenceSetting& readPref) {
+    OperationContext* opCtx,
+    const std::string& dbName,
+    const ReadPreferenceSetting& readPref,
+    const repl::ReadConcernLevel& readConcern) {
     dassert(dbName != "admin" && dbName != "config");
 
     auto findStatus = _exhaustiveFindOnConfig(opCtx,
                                               readPref,
-                                              repl::ReadConcernLevel::kMajorityReadConcern,
+                                              readConcern,
                                               NamespaceString(DatabaseType::ConfigNS),
                                               BSON(DatabaseType::name(dbName)),
                                               BSONObj(),
@@ -444,10 +447,10 @@ StatusWith<repl::OpTimeWith<DatabaseType>> ShardingCatalogClientImpl::_fetchData
 }
 
 StatusWith<repl::OpTimeWith<CollectionType>> ShardingCatalogClientImpl::getCollection(
-    OperationContext* opCtx, const std::string& collNs) {
+    OperationContext* opCtx, const std::string& collNs, const repl::ReadConcernLevel& readConcern) {
     auto statusFind = _exhaustiveFindOnConfig(opCtx,
                                               kConfigReadSelector,
-                                              repl::ReadConcernLevel::kMajorityReadConcern,
+                                              readConcern,
                                               NamespaceString(CollectionType::ConfigNS),
                                               BSON(CollectionType::fullNs(collNs)),
                                               BSONObj(),
@@ -482,7 +485,8 @@ StatusWith<repl::OpTimeWith<CollectionType>> ShardingCatalogClientImpl::getColle
 Status ShardingCatalogClientImpl::getCollections(OperationContext* opCtx,
                                                  const std::string* dbName,
                                                  std::vector<CollectionType>* collections,
-                                                 OpTime* opTime) {
+                                                 OpTime* opTime,
+                                                 const repl::ReadConcernLevel& readConcern) {
     BSONObjBuilder b;
     if (dbName) {
         invariant(!dbName->empty());
@@ -492,7 +496,7 @@ Status ShardingCatalogClientImpl::getCollections(OperationContext* opCtx,
 
     auto findStatus = _exhaustiveFindOnConfig(opCtx,
                                               kConfigReadSelector,
-                                              repl::ReadConcernLevel::kMajorityReadConcern,
+                                              readConcern,
                                               NamespaceString(CollectionType::ConfigNS),
                                               b.obj(),
                                               BSONObj(),
@@ -716,11 +720,11 @@ Status ShardingCatalogClientImpl::dropCollection(OperationContext* opCtx,
     return Status::OK();
 }
 
-StatusWith<BSONObj> ShardingCatalogClientImpl::getGlobalSettings(OperationContext* opCtx,
-                                                                 StringData key) {
+StatusWith<BSONObj> ShardingCatalogClientImpl::getGlobalSettings(
+    OperationContext* opCtx, StringData key, const repl::ReadConcernLevel& readConcern) {
     auto findStatus = _exhaustiveFindOnConfig(opCtx,
                                               kConfigReadSelector,
-                                              repl::ReadConcernLevel::kMajorityReadConcern,
+                                              readConcern,
                                               kSettingsNamespace,
                                               BSON("_id" << key),
                                               BSONObj(),
@@ -1155,7 +1159,8 @@ void ShardingCatalogClientImpl::writeConfigServerDirect(OperationContext* opCtx,
 Status ShardingCatalogClientImpl::insertConfigDocument(OperationContext* opCtx,
                                                        const std::string& ns,
                                                        const BSONObj& doc,
-                                                       const WriteConcernOptions& writeConcern) {
+                                                       const WriteConcernOptions& writeConcern,
+                                                       const repl::ReadConcernLevel& readConcern) {
     const NamespaceString nss(ns);
     invariant(nss.db() == NamespaceString::kAdminDb || nss.db() == NamespaceString::kConfigDb);
 
@@ -1194,7 +1199,7 @@ Status ShardingCatalogClientImpl::insertConfigDocument(OperationContext* opCtx,
             auto fetchDuplicate =
                 _exhaustiveFindOnConfig(opCtx,
                                         ReadPreferenceSetting{ReadPreference::PrimaryOnly},
-                                        repl::ReadConcernLevel::kMajorityReadConcern,
+                                        readConcern,
                                         nss,
                                         idField.wrap(),
                                         BSONObj(),

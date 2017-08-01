@@ -149,11 +149,13 @@ StatusWith<CachedDatabaseInfo> CatalogCache::getDatabase(OperationContext* opCtx
 }
 
 StatusWith<CachedCollectionRoutingInfo> CatalogCache::getCollectionRoutingInfo(
-    OperationContext* opCtx, const NamespaceString& nss) {
+    OperationContext* opCtx,
+    const NamespaceString& nss,
+    const repl::ReadConcernLevel& readConcern) {
     while (true) {
         std::shared_ptr<DatabaseInfoEntry> dbEntry;
         try {
-            dbEntry = _getDatabase(opCtx, nss.db());
+            dbEntry = _getDatabase(opCtx, nss.db(), readConcern);
         } catch (const DBException& ex) {
             return ex.toStatus();
         }
@@ -185,7 +187,7 @@ StatusWith<CachedCollectionRoutingInfo> CatalogCache::getCollectionRoutingInfo(
                 refreshNotification = (collEntry.refreshCompletionNotification =
                                            std::make_shared<Notification<Status>>());
                 _scheduleCollectionRefresh_inlock(
-                    dbEntry, std::move(collEntry.routingInfo), nss, 1);
+                    dbEntry, std::move(collEntry.routingInfo), nss, 1, readConcern);
             }
 
             // Wait on the notification outside of the mutex
@@ -306,8 +308,8 @@ void CatalogCache::purgeAllDatabases() {
     _databases.clear();
 }
 
-std::shared_ptr<CatalogCache::DatabaseInfoEntry> CatalogCache::_getDatabase(OperationContext* opCtx,
-                                                                            StringData dbName) {
+std::shared_ptr<CatalogCache::DatabaseInfoEntry> CatalogCache::_getDatabase(
+    OperationContext* opCtx, StringData dbName, const repl::ReadConcernLevel& readConcern) {
     stdx::lock_guard<stdx::mutex> lg(_mutex);
 
     auto it = _databases.find(dbName);
@@ -320,14 +322,15 @@ std::shared_ptr<CatalogCache::DatabaseInfoEntry> CatalogCache::_getDatabase(Oper
     const auto dbNameCopy = dbName.toString();
 
     // Load the database entry
-    const auto opTimeWithDb = uassertStatusOK(catalogClient->getDatabase(opCtx, dbNameCopy));
+    const auto opTimeWithDb =
+        uassertStatusOK(catalogClient->getDatabase(opCtx, dbNameCopy, readConcern));
     const auto& dbDesc = opTimeWithDb.value;
 
     // Load the sharded collections entries
     std::vector<CollectionType> collections;
     repl::OpTime collLoadConfigOptime;
-    uassertStatusOK(
-        catalogClient->getCollections(opCtx, &dbNameCopy, &collections, &collLoadConfigOptime));
+    uassertStatusOK(catalogClient->getCollections(
+        opCtx, &dbNameCopy, &collections, &collLoadConfigOptime, readConcern));
 
     StringMap<CollectionRoutingInfoEntry> collectionEntries;
     for (const auto& coll : collections) {
@@ -346,14 +349,15 @@ void CatalogCache::_scheduleCollectionRefresh_inlock(
     std::shared_ptr<DatabaseInfoEntry> dbEntry,
     std::shared_ptr<ChunkManager> existingRoutingInfo,
     const NamespaceString& nss,
-    int refreshAttempt) {
+    int refreshAttempt,
+    const repl::ReadConcernLevel& readConcern) {
     Timer t;
 
     const ChunkVersion startingCollectionVersion =
         (existingRoutingInfo ? existingRoutingInfo->getVersion() : ChunkVersion::UNSHARDED());
 
     const auto refreshFailed_inlock =
-        [ this, t, dbEntry, nss, refreshAttempt ](const Status& status) noexcept {
+        [ this, t, dbEntry, nss, refreshAttempt, readConcern ](const Status& status) noexcept {
         log() << "Refresh for collection " << nss << " took " << t.millis() << " ms and failed"
               << causedBy(redact(status));
 
@@ -366,7 +370,8 @@ void CatalogCache::_scheduleCollectionRefresh_inlock(
         // refresh again
         if (status == ErrorCodes::ConflictingOperationInProgress &&
             refreshAttempt < kMaxInconsistentRoutingInfoRefreshAttempts) {
-            _scheduleCollectionRefresh_inlock(dbEntry, nullptr, nss, refreshAttempt + 1);
+            _scheduleCollectionRefresh_inlock(
+                dbEntry, nullptr, nss, refreshAttempt + 1, readConcern);
         } else {
             // Leave needsRefresh to true so that any subsequent get attempts will kick off
             // another round of refresh
@@ -376,7 +381,7 @@ void CatalogCache::_scheduleCollectionRefresh_inlock(
     };
 
     const auto refreshCallback =
-        [ this, t, dbEntry, nss, existingRoutingInfo, refreshFailed_inlock ](
+        [ this, t, dbEntry, nss, existingRoutingInfo, refreshFailed_inlock, readConcern ](
             OperationContext * opCtx,
             StatusWith<CatalogCacheLoader::CollectionAndChangedChunks> swCollAndChunks) noexcept {
         std::shared_ptr<ChunkManager> newRoutingInfo;
@@ -416,7 +421,7 @@ void CatalogCache::_scheduleCollectionRefresh_inlock(
           << startingCollectionVersion;
 
     try {
-        _cacheLoader.getChunksSince(nss, startingCollectionVersion, refreshCallback);
+        _cacheLoader.getChunksSince(nss, startingCollectionVersion, refreshCallback, readConcern);
     } catch (const DBException& ex) {
         const auto status = ex.toStatus();
 

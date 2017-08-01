@@ -89,16 +89,24 @@ public:
     StatusWith<ShardDrainingStatus> removeShard(OperationContext* opCtx,
                                                 const ShardId& name) override;
 
-    StatusWith<repl::OpTimeWith<DatabaseType>> getDatabase(OperationContext* opCtx,
-                                                           const std::string& dbName) override;
+    StatusWith<repl::OpTimeWith<DatabaseType>> getDatabase(
+        OperationContext* opCtx,
+        const std::string& dbName,
+        const repl::ReadConcernLevel& readConcern =
+            repl::ReadConcernLevel::kMajorityReadConcern) override;
 
-    StatusWith<repl::OpTimeWith<CollectionType>> getCollection(OperationContext* opCtx,
-                                                               const std::string& collNs) override;
+    StatusWith<repl::OpTimeWith<CollectionType>> getCollection(
+        OperationContext* opCtx,
+        const std::string& collNs,
+        const repl::ReadConcernLevel& readConcern =
+            repl::ReadConcernLevel::kMajorityReadConcern) override;
 
     Status getCollections(OperationContext* opCtx,
                           const std::string* dbName,
                           std::vector<CollectionType>* collections,
-                          repl::OpTime* optime) override;
+                          repl::OpTime* optime,
+                          const repl::ReadConcernLevel& readConcern =
+                              repl::ReadConcernLevel::kMajorityReadConcern) override;
 
     Status dropCollection(OperationContext* opCtx, const NamespaceString& ns) override;
 
@@ -140,7 +148,11 @@ public:
                                    const WriteConcernOptions& writeConcern,
                                    repl::ReadConcernLevel readConcern) override;
 
-    StatusWith<BSONObj> getGlobalSettings(OperationContext* opCtx, StringData key) override;
+    StatusWith<BSONObj> getGlobalSettings(
+        OperationContext* opCtx,
+        StringData key,
+        const repl::ReadConcernLevel& readConcern =
+            repl::ReadConcernLevel::kMajorityReadConcern) override;
 
     StatusWith<VersionType> getConfigVersion(OperationContext* opCtx,
                                              repl::ReadConcernLevel readConcern) override;
@@ -152,7 +164,9 @@ public:
     Status insertConfigDocument(OperationContext* opCtx,
                                 const std::string& ns,
                                 const BSONObj& doc,
-                                const WriteConcernOptions& writeConcern) override;
+                                const WriteConcernOptions& writeConcern,
+                                const repl::ReadConcernLevel& readConcern =
+                                    repl::ReadConcernLevel::kMajorityReadConcern) override;
 
     StatusWith<bool> updateConfigDocument(OperationContext* opCtx,
                                           const std::string& ns,
@@ -241,7 +255,10 @@ private:
      * given read preference.  Returns NamespaceNotFound if no database metadata is found.
      */
     StatusWith<repl::OpTimeWith<DatabaseType>> _fetchDatabaseMetadata(
-        OperationContext* opCtx, const std::string& dbName, const ReadPreferenceSetting& readPref);
+        OperationContext* opCtx,
+        const std::string& dbName,
+        const ReadPreferenceSetting& readPref,
+        const repl::ReadConcernLevel& readConcern = repl::ReadConcernLevel::kMajorityReadConcern);
 
     /**
      * Best effort method, which logs diagnostic events on the config server. If the config server

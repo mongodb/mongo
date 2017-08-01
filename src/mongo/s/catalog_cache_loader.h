@@ -33,6 +33,7 @@
 #include "mongo/base/disallow_copying.h"
 #include "mongo/base/status_with.h"
 #include "mongo/base/string_data.h"
+#include "mongo/db/repl/read_concern_args.h"
 #include "mongo/s/catalog/type_chunk.h"
 #include "mongo/s/catalog/type_collection.h"
 #include "mongo/s/chunk_version.h"
@@ -128,8 +129,9 @@ public:
     virtual std::shared_ptr<Notification<void>> getChunksSince(
         const NamespaceString& nss,
         ChunkVersion version,
-        stdx::function<void(OperationContext*, StatusWith<CollectionAndChangedChunks>)>
-            callbackFn) = 0;
+        stdx::function<void(OperationContext*, StatusWith<CollectionAndChangedChunks>)> callbackFn,
+        const repl::ReadConcernLevel& readConcern =
+            repl::ReadConcernLevel::kMajorityReadConcern) = 0;
 
     /**
      * Only used for unit-tests, clears a previously-created catalog cache loader from the specified

@@ -99,8 +99,9 @@ public:
     std::shared_ptr<Notification<void>> getChunksSince(
         const NamespaceString& nss,
         ChunkVersion version,
-        stdx::function<void(OperationContext*, StatusWith<CollectionAndChangedChunks>)> callbackFn)
-        override;
+        stdx::function<void(OperationContext*, StatusWith<CollectionAndChangedChunks>)> callbackFn,
+        const repl::ReadConcernLevel& readConcern =
+            repl::ReadConcernLevel::kMajorityReadConcern) override;
 
 private:
     // Differentiates the server's role in the replica set so that the chunk loader knows whether to

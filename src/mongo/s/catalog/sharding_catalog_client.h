@@ -143,8 +143,11 @@ public:
      * the failure. These are some of the known failures:
      *  - NamespaceNotFound - database does not exist
      */
-    virtual StatusWith<repl::OpTimeWith<DatabaseType>> getDatabase(OperationContext* opCtx,
-                                                                   const std::string& dbName) = 0;
+    virtual StatusWith<repl::OpTimeWith<DatabaseType>> getDatabase(
+        OperationContext* opCtx,
+        const std::string& dbName,
+        const repl::ReadConcernLevel& readConcern =
+            repl::ReadConcernLevel::kMajorityReadConcern) = 0;
 
     /**
      * Retrieves the metadata for a given collection, if it exists.
@@ -157,7 +160,10 @@ public:
      *  - NamespaceNotFound - collection does not exist
      */
     virtual StatusWith<repl::OpTimeWith<CollectionType>> getCollection(
-        OperationContext* opCtx, const std::string& collNs) = 0;
+        OperationContext* opCtx,
+        const std::string& collNs,
+        const repl::ReadConcernLevel& readConcern =
+            repl::ReadConcernLevel::kMajorityReadConcern) = 0;
 
     /**
      * Retrieves all collections undera specified database (or in the system).
@@ -174,7 +180,9 @@ public:
     virtual Status getCollections(OperationContext* opCtx,
                                   const std::string* dbName,
                                   std::vector<CollectionType>* collections,
-                                  repl::OpTime* optime) = 0;
+                                  repl::OpTime* optime,
+                                  const repl::ReadConcernLevel& readConcern =
+                                      repl::ReadConcernLevel::kMajorityReadConcern) = 0;
 
     /**
      * Drops the specified collection from the collection metadata store.
@@ -307,7 +315,11 @@ public:
      * Returns ErrorCodes::NoMatchingDocument if no such key exists or the BSON content of the
      * setting otherwise.
      */
-    virtual StatusWith<BSONObj> getGlobalSettings(OperationContext* opCtx, StringData key) = 0;
+    virtual StatusWith<BSONObj> getGlobalSettings(
+        OperationContext* opCtx,
+        StringData key,
+        const repl::ReadConcernLevel& readConcern =
+            repl::ReadConcernLevel::kMajorityReadConcern) = 0;
 
     /**
      * Returns the contents of the config.version document - containing the current cluster schema
@@ -348,7 +360,9 @@ public:
     virtual Status insertConfigDocument(OperationContext* opCtx,
                                         const std::string& ns,
                                         const BSONObj& doc,
-                                        const WriteConcernOptions& writeConcern) = 0;
+                                        const WriteConcernOptions& writeConcern,
+                                        const repl::ReadConcernLevel& readConcern =
+                                            repl::ReadConcernLevel::kMajorityReadConcern) = 0;
 
     /**
      * Updates a single document in the specified namespace on the config server. The document must

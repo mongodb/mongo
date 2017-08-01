@@ -84,7 +84,8 @@ ChunkVersion createFirstChunks(OperationContext* opCtx,
                                const ShardKeyPattern& shardKeyPattern,
                                const ShardId& primaryShardId,
                                const std::vector<BSONObj>& initPoints,
-                               const bool distributeInitialChunks) {
+                               const bool distributeInitialChunks,
+                               repl::ReadConcernLevel readConcern) {
 
     const KeyPattern keyPattern = shardKeyPattern.getKeyPattern();
 
@@ -109,7 +110,8 @@ ChunkVersion createFirstChunks(OperationContext* opCtx,
 
         // Refresh the balancer settings to ensure the chunk size setting, which is sent as part of
         // the splitVector command and affects the number of chunks returned, has been loaded.
-        uassertStatusOK(Grid::get(opCtx)->getBalancerConfiguration()->refreshAndCheck(opCtx));
+        uassertStatusOK(
+            Grid::get(opCtx)->getBalancerConfiguration()->refreshAndCheck(opCtx, readConcern));
 
         if (numObjects > 0) {
             splitPoints = uassertStatusOK(shardutil::selectChunkSplitPoints(
@@ -171,7 +173,8 @@ ChunkVersion createFirstChunks(OperationContext* opCtx,
             opCtx,
             ChunkType::ConfigNS,
             chunk.toConfigBSON(),
-            ShardingCatalogClient::kMajorityWriteConcern));
+            ShardingCatalogClient::kMajorityWriteConcern,
+            readConcern));
     }
 
     return version;
@@ -225,7 +228,11 @@ void ShardingCatalogManager::shardCollection(OperationContext* opCtx,
     const auto catalogClient = Grid::get(opCtx)->catalogClient();
     const auto shardRegistry = Grid::get(opCtx)->shardRegistry();
 
-    auto dbEntry = uassertStatusOK(catalogClient->getDatabase(opCtx, nsToDatabase(ns))).value;
+    auto dbEntry =
+        uassertStatusOK(catalogClient->getDatabase(
+                            opCtx, nsToDatabase(ns), repl::ReadConcernLevel::kLocalReadConcern))
+            .value;
+
     auto dbPrimaryShardId = dbEntry.getPrimary();
     const auto primaryShard = uassertStatusOK(shardRegistry->getShard(opCtx, dbPrimaryShardId));
 
@@ -260,8 +267,13 @@ void ShardingCatalogManager::shardCollection(OperationContext* opCtx,
                                               ->makeFromBSON(defaultCollation));
     }
 
-    const auto& collVersion = createFirstChunks(
-        opCtx, nss, fieldsAndOrder, dbPrimaryShardId, initPoints, distributeInitialChunks);
+    const auto& collVersion = createFirstChunks(opCtx,
+                                                nss,
+                                                fieldsAndOrder,
+                                                dbPrimaryShardId,
+                                                initPoints,
+                                                distributeInitialChunks,
+                                                repl::ReadConcernLevel::kLocalReadConcern);
 
     {
         CollectionType coll;

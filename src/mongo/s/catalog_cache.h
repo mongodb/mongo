@@ -125,8 +125,10 @@ public:
      * with the primary shard for the specified database. If an error occurs loading the metadata
      * returns a failed status.
      */
-    StatusWith<CachedCollectionRoutingInfo> getCollectionRoutingInfo(OperationContext* opCtx,
-                                                                     const NamespaceString& nss);
+    StatusWith<CachedCollectionRoutingInfo> getCollectionRoutingInfo(
+        OperationContext* opCtx,
+        const NamespaceString& nss,
+        const repl::ReadConcernLevel& readConcern = repl::ReadConcernLevel::kMajorityReadConcern);
     StatusWith<CachedCollectionRoutingInfo> getCollectionRoutingInfo(OperationContext* opCtx,
                                                                      StringData ns);
 
@@ -203,16 +205,21 @@ private:
      * Ensures that the specified database is in the cache, loading it if necessary. If the database
      * was not in cache, all the sharded collections will be in the 'needsRefresh' state.
      */
-    std::shared_ptr<DatabaseInfoEntry> _getDatabase(OperationContext* opCtx, StringData dbName);
+    std::shared_ptr<DatabaseInfoEntry> _getDatabase(
+        OperationContext* opCtx,
+        StringData dbName,
+        const repl::ReadConcernLevel& readConcern = repl::ReadConcernLevel::kMajorityReadConcern);
 
     /**
      * Non-blocking call which schedules an asynchronous refresh for the specified namespace. The
      * namespace must be in the 'needRefresh' state.
      */
-    void _scheduleCollectionRefresh_inlock(std::shared_ptr<DatabaseInfoEntry> dbEntry,
-                                           std::shared_ptr<ChunkManager> existingRoutingInfo,
-                                           const NamespaceString& nss,
-                                           int refreshAttempt);
+    void _scheduleCollectionRefresh_inlock(
+        std::shared_ptr<DatabaseInfoEntry> dbEntry,
+        std::shared_ptr<ChunkManager> existingRoutingInfo,
+        const NamespaceString& nss,
+        int refreshAttempt,
+        const repl::ReadConcernLevel& readConcern = repl::ReadConcernLevel::kMajorityReadConcern);
 
     // Interface from which chunks will be retrieved
     CatalogCacheLoader& _cacheLoader;
