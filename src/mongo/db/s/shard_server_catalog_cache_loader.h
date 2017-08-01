@@ -320,18 +320,15 @@ private:
     void _updatePersistedMetadata(OperationContext* opCtx, const NamespaceString& nss);
 
     /**
-     * Attempt to read the collection and chunk metadata since version 'sinceVersion' from the shard
-     * persisted metadata store.
+     * Attempts to read the collection and chunk metadata since 'version' from the shard persisted
+     * metadata store. Continues to retry reading the metadata until a complete diff is read
+     * uninterrupted by concurrent updates.
      *
-     * Retries reading the metadata if the shard persisted metadata store becomes imcomplete due to
-     * concurrent updates being applied -- complete here means that every chunk range is accounted
-     * for.
-     *
-     * May return: a complete metadata update, which when applied to a complete metadata store up to
-     * 'sinceVersion' again produces a complete metadata store; or a NamespaceNotFound error, which
-     * means no metadata was found and the collection was dropped.
+     * Returns a complete metadata update since 'version', which when applied to a complete metadata
+     * store up to 'version' again produces a complete metadata store. Throws on error --
+     * NamespaceNotFound error means the collection does not exist.
      */
-    StatusWith<CollectionAndChangedChunks> _getCompletePersistedMetadataForSecondarySinceVersion(
+    CollectionAndChangedChunks _getCompletePersistedMetadataForSecondarySinceVersion(
         OperationContext* opCtx, const NamespaceString& nss, const ChunkVersion& version);
 
     // Used by the shard primary to retrieve chunk metadata from the config server.

@@ -164,7 +164,6 @@ ChunkVersion getPersistedMaxVersion(OperationContext* opCtx, const NamespaceStri
  *
  * Tries to find persisted chunk metadata with chunk versions GTE to 'version'.
  *
- *
  * If 'version's epoch matches persisted metadata, returns persisted metadata GTE 'version'.
  * If 'version's epoch doesn't match persisted metadata, returns all persisted metadata.
  * If collections entry does not exist, throws NamespaceNotFound error. Can return an empty
@@ -192,6 +191,45 @@ CollectionAndChangedChunks getPersistedMetadataSinceVersion(OperationContext* op
                                       shardCollectionEntry.getDefaultCollation(),
                                       shardCollectionEntry.getUnique(),
                                       std::move(changedChunks)};
+}
+
+/**
+ * Attempts to read the collection and chunk metadata. May not read a complete diff if the metadata
+ * for the collection is being updated concurrently. This is safe if those updates are appended.
+ *
+ * If the epoch changes while reading the chunks, returns an empty object.
+ */
+StatusWith<CollectionAndChangedChunks> getIncompletePersistedMetadataSinceVersion(
+    OperationContext* opCtx, const NamespaceString& nss, ChunkVersion version) {
+
+    try {
+        CollectionAndChangedChunks collAndChunks =
+            getPersistedMetadataSinceVersion(opCtx, nss, version, false);
+        if (collAndChunks.changedChunks.empty()) {
+            // Found a collections entry, but the chunks are being updated.
+            return CollectionAndChangedChunks();
+        }
+
+        // Make sure the collections entry epoch has not changed since we began reading chunks --
+        // an epoch change between reading the collections entry and reading the chunk metadata
+        // would invalidate the chunks.
+
+        auto afterShardCollectionsEntry = uassertStatusOK(readShardCollectionsEntry(opCtx, nss));
+        if (collAndChunks.epoch != afterShardCollectionsEntry.getEpoch()) {
+            // The collection was dropped and recreated since we began. Return empty results.
+            return CollectionAndChangedChunks();
+        }
+
+        return collAndChunks;
+    } catch (const DBException& ex) {
+        Status status = ex.toStatus();
+        if (status == ErrorCodes::NamespaceNotFound) {
+            return CollectionAndChangedChunks();
+        }
+        return Status(ErrorCodes::OperationFailed,
+                      str::stream() << "Failed to load local metadata due to '" << status.toString()
+                                    << "'.");
+    }
 }
 
 /**
@@ -516,11 +554,8 @@ StatusWith<CollectionAndChangedChunks> ShardServerCatalogCacheLoader::_getLoader
     bool tasksAreEnqueued = std::move(enqueuedRes.first);
     CollectionAndChangedChunks enqueued = std::move(enqueuedRes.second);
 
-    // TODO: a primary can load metadata while updates are being applied once we have indexes on the
-    // chunk collections that ensure new data is seen after query yields. This function keeps
-    // retrying until no updates are applied concurrently. Waiting on SERVER-27714 to add indexes.
     auto swPersisted =
-        _getCompletePersistedMetadataForSecondarySinceVersion(opCtx, nss, catalogCacheSinceVersion);
+        getIncompletePersistedMetadataSinceVersion(opCtx, nss, catalogCacheSinceVersion);
     CollectionAndChangedChunks persisted;
     if (swPersisted == ErrorCodes::NamespaceNotFound) {
         // No persisted metadata found, create an empty object.
@@ -752,57 +787,41 @@ void ShardServerCatalogCacheLoader::_updatePersistedMetadata(OperationContext* o
            << task.minQueryVersion << "' to collection version '" << task.maxQueryVersion << "'.";
 }
 
-StatusWith<CollectionAndChangedChunks>
+CollectionAndChangedChunks
 ShardServerCatalogCacheLoader::_getCompletePersistedMetadataForSecondarySinceVersion(
     OperationContext* opCtx, const NamespaceString& nss, const ChunkVersion& version) {
-    try {
-        // Keep trying to load the metadata until we get a complete view without updates being
-        // concurrently applied.
-        while (true) {
-            const auto beginRefreshState = [&]() {
-                while (true) {
-                    auto notif = _namespaceNotifications.createNotification(nss);
+    // Keep trying to load the metadata until we get a complete view without updates being
+    // concurrently applied.
+    while (true) {
+        const auto beginRefreshState = [&]() {
+            while (true) {
+                auto notif = _namespaceNotifications.createNotification(nss);
 
-                    auto refreshState = uassertStatusOK(getPersistedRefreshFlags(opCtx, nss));
+                auto refreshState = uassertStatusOK(getPersistedRefreshFlags(opCtx, nss));
 
-                    if (!refreshState.refreshing) {
-                        return refreshState;
-                    }
-
-                    notif.get(opCtx);
+                if (!refreshState.refreshing) {
+                    return refreshState;
                 }
-            }();
 
-            // Load the metadata.
-            CollectionAndChangedChunks collAndChangedChunks =
-                getPersistedMetadataSinceVersion(opCtx, nss, version, true);
-
-            // Check that no updates were concurrently applied while we were loading the metadata:
-            // this could cause the loaded metadata to provide an incomplete view of the chunk
-            // ranges.
-            const auto endRefreshState = uassertStatusOK(getPersistedRefreshFlags(opCtx, nss));
-
-            if (beginRefreshState == endRefreshState) {
-                return collAndChangedChunks;
+                notif.get(opCtx);
             }
+        }();
 
-            LOG(1) << "Cache loader read meatadata while updates were being applied: this"
-                   << " metadata may be incomplete. Retrying. Refresh state before read: "
-                   << beginRefreshState << ". Current refresh state: '" << endRefreshState << "'.";
+        // Load the metadata.
+        CollectionAndChangedChunks collAndChangedChunks =
+            getPersistedMetadataSinceVersion(opCtx, nss, version, true);
+
+        // Check that no updates were concurrently applied while we were loading the metadata: this
+        // could cause the loaded metadata to provide an incomplete view of the chunk ranges.
+        const auto endRefreshState = uassertStatusOK(getPersistedRefreshFlags(opCtx, nss));
+
+        if (beginRefreshState == endRefreshState) {
+            return collAndChangedChunks;
         }
-    } catch (const DBException& ex) {
-        Status status = ex.toStatus();
 
-        // NamespaceNotFound errors are expected and must be returned.
-        if (status == ErrorCodes::NamespaceNotFound) {
-            return status;
-        }
-
-        // All other errors are unhandled.
-        return Status(ErrorCodes::OperationFailed,
-                      str::stream() << "Failed to load local metadata due to '"
-                                    << ex.toStatus().toString()
-                                    << "'.");
+        LOG(1) << "Cache loader read meatadata while updates were being applied: this metadata may"
+               << " be incomplete. Retrying. Refresh state before read: " << beginRefreshState
+               << ". Current refresh state: '" << endRefreshState << "'.";
     }
 }
 
