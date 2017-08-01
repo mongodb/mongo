@@ -30,9 +30,11 @@
 
 #pragma once
 
+#include "mongo/bson/bsonelement_comparator.h"
 #include "mongo/bson/bsonmisc.h"
 #include "mongo/bson/bsonobj.h"
 #include "mongo/db/matcher/expression.h"
+#include "mongo/db/query/collation/collator_interface.h"
 #include "mongo/stdx/memory.h"
 #include "mongo/stdx/unordered_map.h"
 
@@ -330,7 +332,10 @@ public:
  */
 class InMatchExpression : public LeafMatchExpression {
 public:
-    InMatchExpression() : LeafMatchExpression(MATCH_IN) {}
+    InMatchExpression()
+        : LeafMatchExpression(MATCH_IN),
+          _eltCmp(BSONElementComparator::FieldNamesMode::kIgnore, _collator),
+          _equalitySet(_eltCmp.makeBSONEltFlatSet(_originalEqualityVector)) {}
 
     Status init(StringData path);
 
@@ -349,11 +354,11 @@ public:
      */
     virtual void _doSetCollator(const CollatorInterface* collator);
 
-    Status addEquality(const BSONElement& elt);
+    Status setEqualities(std::vector<BSONElement> equalities);
 
     Status addRegex(std::unique_ptr<RegexMatchExpression> expr);
 
-    const BSONElementSet& getEqualities() const {
+    const BSONEltFlatSet& getEqualities() const {
         return _equalitySet;
     }
 
@@ -380,16 +385,19 @@ private:
     // Whether or not '_equalities' has an empty array element in it.
     bool _hasEmptyArray = false;
 
-    // Collator used to compare elements. By default, simple binary comparison will be used.
+    // Collator used to construct '_eltCmp';
     const CollatorInterface* _collator = nullptr;
 
-    // Set of equality elements associated with this expression. '_collator' is used as a comparator
-    // for this set.
-    BSONElementSet _equalitySet;
+    // Comparator used to compare elements. By default, simple binary comparison will be used.
+    BSONElementComparator _eltCmp;
 
     // Original container of equality elements, including duplicates. Needed for re-computing
     // '_equalitySet' in case '_collator' changes after elements have been added.
     std::vector<BSONElement> _originalEqualityVector;
+
+    // Set of equality elements associated with this expression. '_eltCmp' is used as a comparator
+    // for this set.
+    BSONEltFlatSet _equalitySet;
 
     // Container of regex elements this object owns.
     std::vector<std::unique_ptr<RegexMatchExpression>> _regexes;

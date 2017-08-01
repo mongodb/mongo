@@ -176,7 +176,7 @@ void extractAllElementsAlongPath(const BSONObj& obj,
 
 void extractAllElementsAlongPath(const BSONObj& obj,
                                  StringData path,
-                                 BSONElementMSet& elements,
+                                 BSONElementMultiSet& elements,
                                  bool expandArrayOnTrailingField,
                                  std::set<size_t>* arrayComponents) {
     const size_t initialDepth = 0;

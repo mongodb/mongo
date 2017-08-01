@@ -28,9 +28,11 @@
 
 #pragma once
 
+#include <boost/container/flat_set.hpp>
 #include <initializer_list>
 #include <map>
 #include <set>
+#include <vector>
 
 #include "mongo/base/disallow_copying.h"
 #include "mongo/base/string_data_comparator_interface.h"
@@ -51,6 +53,9 @@ class BSONComparatorInterfaceBase {
     MONGO_DISALLOW_COPYING(BSONComparatorInterfaceBase);
 
 public:
+    BSONComparatorInterfaceBase(BSONComparatorInterfaceBase&& other) = default;
+    BSONComparatorInterfaceBase& operator=(BSONComparatorInterfaceBase&& other) = default;
+
     /**
      * A deferred comparison between two objects of type T, which can be converted into a boolean
      * via the evaluate() method.
@@ -121,6 +126,8 @@ public:
     };
 
     using Set = std::set<T, LessThan>;
+
+    using FlatSet = boost::container::flat_set<T, LessThan>;
 
     using UnorderedSet = stdx::unordered_set<T, Hasher, EqualTo>;
 
@@ -205,6 +212,10 @@ protected:
 
     Set makeSet(std::initializer_list<T> init = {}) const {
         return Set(init, LessThan(this));
+    }
+
+    FlatSet makeFlatSet(const std::vector<T>& elements) const {
+        return FlatSet(elements.begin(), elements.end(), LessThan(this));
     }
 
     UnorderedSet makeUnorderedSet(std::initializer_list<T> init = {}) const {

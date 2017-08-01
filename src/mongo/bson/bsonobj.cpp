@@ -33,6 +33,7 @@
 
 #include "mongo/base/data_range.h"
 #include "mongo/bson/bson_validate.h"
+#include "mongo/bson/bsonelement_comparator_interface.h"
 #include "mongo/db/json.h"
 #include "mongo/util/allocator.h"
 #include "mongo/util/hex.h"
