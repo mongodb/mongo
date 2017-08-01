@@ -95,7 +95,7 @@ void PeriodicRunnerASIO::_scheduleJob(std::weak_ptr<PeriodicJobASIO> job) {
         }
 
         lockedJob->start = _timerFactory->now();
-        lockedJob->job();
+        lockedJob->job(_client);
 
         _io_service.post([this, job]() mutable { _scheduleJob(job); });
     });
@@ -110,11 +110,16 @@ Status PeriodicRunnerASIO::startup() {
     _state = State::kRunning;
     _thread = stdx::thread([this]() {
         try {
-            Client::initThread("PeriodicRunnerASIO");
+            auto client = getGlobalServiceContext()->makeClient("PeriodicRunnerASIO");
+            _client = client.get();
+            Client::setCurrent(std::move(client));
 
             asio::io_service::work workItem(_io_service);
             std::error_code ec;
             _io_service.run(ec);
+
+            client = Client::releaseCurrent();
+
             if (ec) {
                 severe() << "Failure in PeriodicRunnerASIO: " << ec.message();
                 fassertFailed(40438);

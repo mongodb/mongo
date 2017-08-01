@@ -29,8 +29,13 @@
 #pragma once
 
 #include "mongo/db/logical_session_id.h"
+#include "mongo/stdx/functional.h"
 
 namespace mongo {
+
+class BSONArrayBuilder;
+class BSONObjBuilder;
+class OperationContext;
 
 /**
  * An abstract interface describing the entrypoint into the sessions collection.
@@ -42,37 +47,50 @@ class SessionsCollection {
 public:
     virtual ~SessionsCollection();
 
+    static constexpr StringData kSessionsDb = "admin"_sd;
+    static constexpr StringData kSessionsCollection = "system.sessions"_sd;
+    static constexpr StringData kSessionsFullNS = "admin.system.sessions"_sd;
+
     /**
      * Returns a LogicalSessionRecord for the given session id. This method
      * may run networking operations on the calling thread.
      */
-    virtual StatusWith<LogicalSessionRecord> fetchRecord(LogicalSessionId id) = 0;
-
-    /**
-     * Inserts the given record into the sessions collection. This method may run
-     * networking operations on the calling thread.
-     *
-     * Returns a DuplicateSession error if the session already exists in the
-     * sessions collection.
-     */
-    virtual Status insertRecord(LogicalSessionRecord record) = 0;
+    virtual StatusWith<LogicalSessionRecord> fetchRecord(OperationContext* opCtx,
+                                                         const LogicalSessionId& id) = 0;
 
     /**
      * Updates the last-use times on the given sessions to be greater than
-     * or equal to the current time.
+     * or equal to the given time.
      *
      * Returns a list of sessions for which no authoritative record was found,
-     * and hence were not refreshed.
+     * and hence were not refreshed. Returns an error if a networking issue occurred.
      */
-    virtual LogicalSessionIdSet refreshSessions(LogicalSessionIdSet sessions) = 0;
+    virtual Status refreshSessions(OperationContext* opCtx,
+                                   const LogicalSessionRecordSet& sessions,
+                                   Date_t refreshTime) = 0;
 
     /**
      * Removes the authoritative records for the specified sessions.
      *
      * Implementations should perform authentication checks to ensure that
      * session records may only be removed if their owner is logged in.
+     *
+     * Returns an error if the removal fails, for example from a network error.
      */
-    virtual void removeRecords(LogicalSessionIdSet sessions) = 0;
+    virtual Status removeRecords(OperationContext* opCtx, const LogicalSessionIdSet& sessions) = 0;
+
+protected:
+    using SendBatchFn = stdx::function<Status(BSONObj batch)>;
+
+    /**
+     * Formats and sends batches of refreshes for the given set of sessions.
+     */
+    Status doRefresh(const LogicalSessionRecordSet& sessions, Date_t refreshTime, SendBatchFn send);
+
+    /**
+     * Formats and sends batches of deletes for the given set of sessions.
+     */
+    Status doRemove(const LogicalSessionIdSet& sessions, SendBatchFn send);
 };
 
 }  // namespace mongo

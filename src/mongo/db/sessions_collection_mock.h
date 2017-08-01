@@ -58,14 +58,12 @@ public:
 
     MockSessionsCollectionImpl();
 
-    using FetchHook = stdx::function<StatusWith<LogicalSessionRecord>(LogicalSessionId)>;
-    using InsertHook = stdx::function<Status(LogicalSessionRecord)>;
-    using RefreshHook = stdx::function<LogicalSessionIdSet(LogicalSessionIdSet)>;
-    using RemoveHook = stdx::function<void(LogicalSessionIdSet)>;
+    using FetchHook = stdx::function<StatusWith<LogicalSessionRecord>(const LogicalSessionId&)>;
+    using RefreshHook = stdx::function<Status(const LogicalSessionRecordSet&)>;
+    using RemoveHook = stdx::function<Status(const LogicalSessionIdSet&)>;
 
     // Set custom hooks to override default behavior
     void setFetchHook(FetchHook hook);
-    void setInsertHook(InsertHook hook);
     void setRefreshHook(RefreshHook hook);
     void setRemoveHook(RemoveHook hook);
 
@@ -73,10 +71,9 @@ public:
     void clearHooks();
 
     // Forwarding methods from the MockSessionsCollection
-    StatusWith<LogicalSessionRecord> fetchRecord(LogicalSessionId id);
-    Status insertRecord(LogicalSessionRecord record);
-    LogicalSessionIdSet refreshSessions(LogicalSessionIdSet sessions);
-    void removeRecords(LogicalSessionIdSet sessions);
+    StatusWith<LogicalSessionRecord> fetchRecord(const LogicalSessionId& id);
+    Status refreshSessions(const LogicalSessionRecordSet& sessions);
+    Status removeRecords(const LogicalSessionIdSet& sessions);
 
     // Test-side methods that operate on the _sessions map
     void add(LogicalSessionRecord record);
@@ -87,16 +84,14 @@ public:
 
 private:
     // Default implementations, may be overridden with custom hooks.
-    StatusWith<LogicalSessionRecord> _fetchRecord(LogicalSessionId id);
-    Status _insertRecord(LogicalSessionRecord record);
-    LogicalSessionIdSet _refreshSessions(LogicalSessionIdSet sessions);
-    void _removeRecords(LogicalSessionIdSet sessions);
+    StatusWith<LogicalSessionRecord> _fetchRecord(const LogicalSessionId& id);
+    Status _refreshSessions(const LogicalSessionRecordSet& sessions);
+    Status _removeRecords(const LogicalSessionIdSet& sessions);
 
     stdx::mutex _mutex;
     SessionMap _sessions;
 
     FetchHook _fetch;
-    InsertHook _insert;
     RefreshHook _refresh;
     RemoveHook _remove;
 };
@@ -111,20 +106,19 @@ public:
     explicit MockSessionsCollection(std::shared_ptr<MockSessionsCollectionImpl> impl)
         : _impl(std::move(impl)) {}
 
-    StatusWith<LogicalSessionRecord> fetchRecord(LogicalSessionId id) override {
-        return _impl->fetchRecord(std::move(id));
+    StatusWith<LogicalSessionRecord> fetchRecord(OperationContext* opCtx,
+                                                 const LogicalSessionId& id) override {
+        return _impl->fetchRecord(id);
     }
 
-    Status insertRecord(LogicalSessionRecord record) override {
-        return _impl->insertRecord(std::move(record));
+    Status refreshSessions(OperationContext* opCtx,
+                           const LogicalSessionRecordSet& sessions,
+                           Date_t refreshTime) override {
+        return _impl->refreshSessions(sessions);
     }
 
-    LogicalSessionIdSet refreshSessions(LogicalSessionIdSet sessions) override {
-        return _impl->refreshSessions(std::move(sessions));
-    }
-
-    void removeRecords(LogicalSessionIdSet sessions) override {
-        return _impl->removeRecords(std::move(sessions));
+    Status removeRecords(OperationContext* opCtx, const LogicalSessionIdSet& sessions) override {
+        return _impl->removeRecords(sessions);
     }
 
 private:

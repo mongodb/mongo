@@ -64,12 +64,27 @@ structs:
       id: LogicalSessionIdToClient
       timeoutMinutes: int
 
+  UserNameWithId:
+    description: "A struct representing the combination of a UserName and an id"
+    strict: true
+    fields:
+      name:
+        type: string
+      id:
+        type: objectid
+        optional: true
+
   LogicalSessionRecord:
     description: "A struct representing a LogicalSessionRecord"
     strict: true
     fields:
-      id: LogicalSessionId
+      _id:
+        type: LogicalSessionId
+        cpp_name: id
       lastUse: date
+      user:
+        type: UserNameWithId
+        optional: true
 
   LogicalSessionFromClient:
     description: "A struct representing a LogicalSessionId from external clients"

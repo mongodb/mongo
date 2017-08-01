@@ -119,6 +119,10 @@ public:
     // and ownership of the user stays with the AuthorizationManager
     User* lookupUser(const UserName& name);
 
+    // Returns the single user on this auth session. If no user is authenticated, or if
+    // multiple users are authenticated, this method will throw an exception.
+    User* getSingleUser();
+
     // Gets an iterator over the names of all authenticated users stored in this manager.
     UserNameIterator getAuthenticatedUserNames();
 

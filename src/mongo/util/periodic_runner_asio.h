@@ -37,6 +37,8 @@
 
 namespace mongo {
 
+class Client;
+
 /**
  * A PeriodicRunner implementation that uses the ASIO library's eventing system
  * to schedule and run jobs at regular intervals.
@@ -106,6 +108,7 @@ private:
     asio::io_service _io_service;
     asio::io_service::strand _strand;
 
+    Client* _client;
     stdx::thread _thread;
 
     std::unique_ptr<executor::AsyncTimerFactoryInterface> _timerFactory;

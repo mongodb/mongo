@@ -423,6 +423,11 @@ class _CppHeaderFileWriter(_CppFileWriterBase):
                 self._writer.write_template(
                     'const ${param_type} get${method_name}() const& { ${body} }')
                 self._writer.write_template('void get${method_name}() && = delete;')
+            elif field.struct_type:
+                # Support mutable accessors
+                self._writer.write_template(
+                    'const ${param_type} get${method_name}() const { ${body} }')
+                self._writer.write_template('${param_type} get${method_name}() { ${body} }')
             else:
                 self._writer.write_template(
                     '${const_type}${param_type} get${method_name}() const { ${body} }')

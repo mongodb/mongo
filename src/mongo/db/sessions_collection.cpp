@@ -30,8 +30,125 @@
 
 #include "mongo/db/sessions_collection.h"
 
+#include <memory>
+
+#include "mongo/bson/bsonobjbuilder.h"
+#include "mongo/db/logical_session_id.h"
+#include "mongo/stdx/functional.h"
+#include "mongo/stdx/memory.h"
+
 namespace mongo {
 
+namespace {
+
+BSONObj lsidQuery(const LogicalSessionId& lsid) {
+    return BSON(LogicalSessionRecord::kIdFieldName << lsid.toBSON());
+}
+
+BSONObj lsidQuery(const LogicalSessionRecord& record) {
+    return lsidQuery(record.getId());
+}
+
+BSONObj updateQuery(const LogicalSessionRecord& record, Date_t refreshTime) {
+    // { $max : { lastUse : <time> }, $setOnInsert : { user : <user> } }
+
+    // Build our update doc.
+    BSONObjBuilder updateBuilder;
+
+    {
+        BSONObjBuilder maxBuilder(updateBuilder.subobjStart("$max"));
+        maxBuilder.append(LogicalSessionRecord::kLastUseFieldName, refreshTime);
+    }
+
+    if (record.getUser()) {
+        BSONObjBuilder setBuilder(updateBuilder.subobjStart("$setOnInsert"));
+        setBuilder.append(LogicalSessionRecord::kUserFieldName, record.getUser()->toBSON());
+    }
+
+    return updateBuilder.obj();
+}
+
+template <typename InitBatchFn, typename AddLineFn, typename SendBatchFn, typename Container>
+Status runBulkCmd(StringData label,
+                  InitBatchFn&& initBatch,
+                  AddLineFn&& addLine,
+                  SendBatchFn&& sendBatch,
+                  const Container& items) {
+    int i = 0;
+    BufBuilder buf;
+
+    boost::optional<BSONObjBuilder> batchBuilder;
+    boost::optional<BSONArrayBuilder> entries;
+
+    auto setupBatchBuilder = [&] {
+        buf.reset();
+        batchBuilder.emplace(buf);
+        initBatch(&(batchBuilder.get()));
+        entries.emplace(batchBuilder->subarrayStart(label));
+    };
+
+    auto sendLocalBatch = [&] {
+        entries->done();
+        return sendBatch(batchBuilder->done());
+    };
+
+    setupBatchBuilder();
+
+    for (const auto& item : items) {
+        addLine(&(entries.get()), item);
+
+        if (++i >= 1000) {
+            auto res = sendLocalBatch();
+            if (!res.isOK()) {
+                return res;
+            }
+
+            setupBatchBuilder();
+            i = 0;
+        }
+    }
+
+    return sendLocalBatch();
+}
+
+}  // namespace
+
+
+constexpr StringData SessionsCollection::kSessionsDb;
+constexpr StringData SessionsCollection::kSessionsCollection;
+constexpr StringData SessionsCollection::kSessionsFullNS;
+
+
 SessionsCollection::~SessionsCollection() = default;
+
+Status SessionsCollection::doRefresh(const LogicalSessionRecordSet& sessions,
+                                     Date_t refreshTime,
+                                     SendBatchFn send) {
+    auto init = [](BSONObjBuilder* batch) {
+        batch->append("update", kSessionsCollection);
+        batch->append("ordered", false);
+    };
+
+    auto add = [&refreshTime](BSONArrayBuilder* entries, const LogicalSessionRecord& record) {
+        entries->append(BSON("q" << lsidQuery(record) << "u" << updateQuery(record, refreshTime)
+                                 << "upsert"
+                                 << true));
+    };
+
+    return runBulkCmd("updates", init, add, send, sessions);
+}
+
+Status SessionsCollection::doRemove(const LogicalSessionIdSet& sessions, SendBatchFn send) {
+    auto init = [](BSONObjBuilder* batch) {
+        batch->append("delete", kSessionsCollection);
+        batch->append("ordered", false);
+    };
+
+    auto add = [](BSONArrayBuilder* builder, const LogicalSessionId& lsid) {
+        builder->append(BSON("q" << lsidQuery(lsid) << "limit" << 0));
+    };
+
+    return runBulkCmd("deletes", init, add, send, sessions);
+}
 
 }  // namespace mongo

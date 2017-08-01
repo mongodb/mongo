@@ -38,6 +38,9 @@
 #include "mongo/util/periodic_runner_asio.h"
 
 namespace mongo {
+
+class Client;
+
 namespace {
 
 class PeriodicRunnerASIOTestNoSetup : public unittest::Test {
@@ -91,7 +94,7 @@ TEST_F(PeriodicRunnerASIOTest, OneJobTest) {
 
     // Add a job, ensure that it runs once
     PeriodicRunner::PeriodicJob job(
-        [&count, &mutex, &cv] {
+        [&count, &mutex, &cv](Client*) {
             {
                 stdx::unique_lock<stdx::mutex> lk(mutex);
                 count++;
@@ -128,7 +131,7 @@ TEST_F(PeriodicRunnerASIOTestNoSetup, ScheduleBeforeStartupTest) {
 
     // Schedule a job before startup
     PeriodicRunner::PeriodicJob job(
-        [&count, &mutex, &cv] {
+        [&count, &mutex, &cv](Client*) {
             {
                 stdx::unique_lock<stdx::mutex> lk(mutex);
                 count++;
@@ -153,7 +156,7 @@ TEST_F(PeriodicRunnerASIOTest, ScheduleAfterShutdownTest) {
     Milliseconds interval{5};
 
     // Schedule a job before shutdown
-    PeriodicRunner::PeriodicJob job([&count] { count++; }, interval);
+    PeriodicRunner::PeriodicJob job([&count](Client*) { count++; }, interval);
 
     runner()->scheduleJob(std::move(job));
 
@@ -185,7 +188,7 @@ TEST_F(PeriodicRunnerASIOTest, TwoJobsTest) {
 
     // Add two jobs, ensure they both run the proper number of times
     PeriodicRunner::PeriodicJob jobA(
-        [&countA, &mutex, &cv] {
+        [&countA, &mutex, &cv](Client*) {
             {
                 stdx::unique_lock<stdx::mutex> lk(mutex);
                 countA++;
@@ -195,7 +198,7 @@ TEST_F(PeriodicRunnerASIOTest, TwoJobsTest) {
         intervalA);
 
     PeriodicRunner::PeriodicJob jobB(
-        [&countB, &mutex, &cv] {
+        [&countB, &mutex, &cv](Client*) {
             {
                 stdx::unique_lock<stdx::mutex> lk(mutex);
                 countB++;

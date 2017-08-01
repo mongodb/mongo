@@ -82,25 +82,24 @@ public:
         auto client = opCtx->getClient();
         ServiceContext* serviceContext = client->getServiceContext();
 
-        boost::optional<LogicalSessionId> lsid;
+        auto lsCache = LogicalSessionCache::get(serviceContext);
+        boost::optional<LogicalSessionRecord> record;
 
         try {
-            lsid = makeLogicalSessionId(opCtx);
+            record = makeLogicalSessionRecord(opCtx, lsCache->now());
         } catch (...) {
             auto status = exceptionToStatus();
 
             return appendCommandStatus(result, status);
         }
 
-        auto lsCache = LogicalSessionCache::get(serviceContext);
-
-        Status startSessionStatus = lsCache->startSession(lsid.get());
+        Status startSessionStatus = lsCache->startSession(opCtx, record.get());
 
         if (!startSessionStatus.isOK()) {
             return appendCommandStatus(result, startSessionStatus);
         }
 
-        makeLogicalSessionToClient(lsid.get()).serialize(&result);
+        makeLogicalSessionToClient(record->getId()).serialize(&result);
 
         return true;
     }

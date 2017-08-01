@@ -1,5 +1,5 @@
 /**
- *    Copyright (C) 2016 MongoDB Inc.
+ *    Copyright (C) 2017 MongoDB Inc.
  *
  *    This program is free software: you can redistribute it and/or  modify
  *    it under the terms of the GNU Affero General Public License, version 3,
@@ -26,41 +26,44 @@
  *    it in the license file.
  */
 
-#include "mongo/platform/basic.h"
+#pragma once
 
-#include "mongo/db/s/migration_util.h"
-
-#include "mongo/bson/bsonobj.h"
-#include "mongo/bson/bsonobjbuilder.h"
-#include "mongo/db/namespace_string.h"
-#include "mongo/s/catalog/type_chunk.h"
+#include "mongo/db/logical_session_id.h"
+#include "mongo/db/sessions_collection.h"
+#include "mongo/util/time_support.h"
 
 namespace mongo {
-namespace migrationutil {
-namespace {
 
-const char kSourceShard[] = "source";
-const char kDestinationShard[] = "destination";
-const char kIsDonorShard[] = "isDonorShard";
-const char kChunk[] = "chunk";
-const char kCollection[] = "collection";
-}
+class DBDirectClient;
+class OperationContext;
 
-BSONObj makeMigrationStatusDocument(const NamespaceString& nss,
-                                    const ShardId& fromShard,
-                                    const ShardId& toShard,
-                                    const bool& isDonorShard,
-                                    const BSONObj& min,
-                                    const BSONObj& max) {
-    BSONObjBuilder builder;
-    builder.append(kSourceShard, fromShard.toString());
-    builder.append(kDestinationShard, toShard.toString());
-    builder.append(kIsDonorShard, isDonorShard);
-    builder.append(kChunk, BSON(ChunkType::min(min) << ChunkType::max(max)));
-    builder.append(kCollection, nss.ns());
-    return builder.obj();
-}
+/**
+ * Accesses the sessions collection directly for standalone servers.
+ */
+class SessionsCollectionStandalone : public SessionsCollection {
+public:
+    /**
+     * Returns a LogicalSessionRecord for the given session id, or an error if
+     * no such record was found.
+     */
+    StatusWith<LogicalSessionRecord> fetchRecord(OperationContext* opCtx,
+                                                 const LogicalSessionId& lsid) override;
 
-}  // namespace migrationutil
+    /**
+     * Updates the last-use times on the given sessions to be greater than
+     * or equal to the current time.
+     */
+    Status refreshSessions(OperationContext* opCtx,
+                           const LogicalSessionRecordSet& sessions,
+                           Date_t refreshTime) override;
+
+    /**
+     * Removes the authoritative records for the specified sessions.
+     */
+    Status removeRecords(OperationContext* opCtx, const LogicalSessionIdSet& sessions) override;
+
+private:
+    SessionsCollection::SendBatchFn makeSendFn(DBDirectClient* client);
+};
 
 }  // namespace mongo

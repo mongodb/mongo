@@ -52,22 +52,7 @@ SHA256Block lookupUserDigest(OperationContext* opCtx) {
     if (AuthorizationManager::get(serviceContext)->isAuthEnabled()) {
         UserName userName;
 
-        auto authzSession = AuthorizationSession::get(client);
-        auto userNameItr = authzSession->getAuthenticatedUserNames();
-        if (userNameItr.more()) {
-            userName = userNameItr.next();
-            if (userNameItr.more()) {
-                uasserted(ErrorCodes::Unauthorized,
-                          "must only be authenticated as exactly one user "
-                          "to create a logical session");
-            }
-        } else {
-            uasserted(ErrorCodes::Unauthorized,
-                      "must only be authenticated as exactly one user "
-                      "to create a logical session");
-        }
-
-        User* user = authzSession->lookupUser(userName);
+        auto user = AuthorizationSession::get(client)->getSingleUser();
         invariant(user);
 
         return user->getDigest();
@@ -109,8 +94,36 @@ LogicalSessionId makeLogicalSessionId(OperationContext* opCtx) {
     return id;
 }
 
+LogicalSessionRecord makeLogicalSessionRecord(OperationContext* opCtx, Date_t lastUse) {
+    LogicalSessionId id{};
+    LogicalSessionRecord lsr{};
+
+    auto client = opCtx->getClient();
+    ServiceContext* serviceContext = client->getServiceContext();
+    if (AuthorizationManager::get(serviceContext)->isAuthEnabled()) {
+        auto user = AuthorizationSession::get(client)->getSingleUser();
+        invariant(user);
+
+        id.setUid(user->getDigest());
+
+        UserNameWithId userDoc{};
+        userDoc.setName(StringData(user->getName().toString()));
+        userDoc.setId(user->getID());
+        lsr.setUser(userDoc);
+    } else {
+        id.setUid(kNoAuthDigest);
+    }
+
+    id.setId(UUID::gen());
+
+    lsr.setId(id);
+    lsr.setLastUse(lastUse);
+
+    return lsr;
+}
+
 LogicalSessionRecord makeLogicalSessionRecord(const LogicalSessionId& lsid, Date_t lastUse) {
-    LogicalSessionRecord lsr;
+    LogicalSessionRecord lsr{};
 
     lsr.setId(lsid);
     lsr.setLastUse(lastUse);
@@ -118,11 +131,35 @@ LogicalSessionRecord makeLogicalSessionRecord(const LogicalSessionId& lsid, Date
     return lsr;
 }
 
+LogicalSessionRecord makeLogicalSessionRecord(OperationContext* opCtx,
+                                              const LogicalSessionId& lsid,
+                                              Date_t lastUse) {
+    auto lsr = makeLogicalSessionRecord(lsid, lastUse);
+
+    auto client = opCtx->getClient();
+    ServiceContext* serviceContext = client->getServiceContext();
+    if (AuthorizationManager::get(serviceContext)->isAuthEnabled()) {
+        auto user = AuthorizationSession::get(client)->getSingleUser();
+        invariant(user);
+
+        if (user->getDigest() == lsid.getUid()) {
+            UserNameWithId userDoc{};
+            userDoc.setName(StringData(user->getName().toString()));
+            userDoc.setId(user->getID());
+            lsr.setUser(userDoc);
+        }
+    }
+
+    return lsr;
+}
+
+
 LogicalSessionToClient makeLogicalSessionToClient(const LogicalSessionId& lsid) {
     LogicalSessionIdToClient lsitc;
     lsitc.setId(lsid.getId());
 
     LogicalSessionToClient id;
+
     id.setId(lsitc);
     id.setTimeoutMinutes(localLogicalSessionTimeoutMinutes);
 

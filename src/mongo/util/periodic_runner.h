@@ -34,6 +34,8 @@
 
 namespace mongo {
 
+class Client;
+
 /**
  * An interface for objects that run work items at specified intervals.
  *
@@ -41,10 +43,12 @@ namespace mongo {
  * model they wish. Implementations may choose when to stop running
  * scheduled jobs (for example, some implementations may stop running
  * when the server is in global shutdown).
+ *
+ * The runner will create client objects that it passes to jobs to use.
  */
 class PeriodicRunner {
 public:
-    using Job = stdx::function<void()>;
+    using Job = stdx::function<void(Client* client)>;
 
     struct PeriodicJob {
         PeriodicJob(Job callable, Milliseconds period)

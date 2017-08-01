@@ -879,6 +879,7 @@ env.Library(
         '$BUILD_DIR/mongo/crypto/sha_block_${MONGO_CRYPTO}',
         '$BUILD_DIR/mongo/idl/idl_parser',
         '$BUILD_DIR/mongo/util/uuid',
+        'server_parameters',
     ],
 )
 
@@ -889,7 +890,6 @@ env.Library(
     ],
     LIBDEPS=[
         'logical_session_id',
-        'logical_session_cache',
         '$BUILD_DIR/mongo/db/auth/authcore',
     ],
 )
@@ -977,6 +977,8 @@ env.Library(
         'sessions_collection.cpp',
     ],
     LIBDEPS=[
+        '$BUILD_DIR/mongo/base',
+        'logical_session_id',
     ],
 )
 
@@ -993,12 +995,26 @@ env.Library(
 )
 
 env.Library(
+    target='sessions_collection_standalone',
+    source=[
+        'sessions_collection_standalone.cpp',
+    ],
+    LIBDEPS=[
+        '$BUILD_DIR/mongo/base',
+        'dbdirectclient',
+        'logical_session_id',
+        'sessions_collection',
+    ],
+)
+
+env.Library(
     target='logical_session_cache',
     source=[
         'logical_session_cache.cpp',
     ],
     LIBDEPS=[
         'logical_session_id',
+        'logical_session_id_helpers',
         'sessions_collection',
         'server_parameters',
         'service_liason',
@@ -1016,6 +1032,7 @@ envWithAsio.CppUnitTest(
         'keys_collection_manager',
         'keys_collection_document',
         'logical_clock',
+        'logical_session_id',
         'logical_session_id_helpers',
         'logical_session_cache',
         'service_liason_mock',
@@ -1031,7 +1048,8 @@ envWithAsio.Library(
     LIBDEPS=[
         'logical_session_cache',
         'service_liason_mongod',
-        'sessions_collection_mock', # TODO SERVER-29201, SERVER-29202, SERVER-29203
+        'sessions_collection_mock', # TODO SERVER-29202, SERVER-29203
+        'sessions_collection_standalone',
     ],
 )
 

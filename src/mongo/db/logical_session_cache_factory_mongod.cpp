@@ -34,6 +34,7 @@
 
 #include "mongo/db/service_liason_mongod.h"
 #include "mongo/db/sessions_collection_mock.h"
+#include "mongo/db/sessions_collection_standalone.h"
 #include "mongo/stdx/memory.h"
 
 namespace mongo {
@@ -51,9 +52,7 @@ std::unique_ptr<SessionsCollection> makeSessionsCollection(LogicalSessionCacheSe
             return stdx::make_unique<MockSessionsCollection>(
                 std::make_shared<MockSessionsCollectionImpl>());
         case LogicalSessionCacheServer::kStandalone:
-            // TODO SERVER-29201, replace with SessionsCollectionStandalone
-            return stdx::make_unique<MockSessionsCollection>(
-                std::make_shared<MockSessionsCollectionImpl>());
+            return stdx::make_unique<SessionsCollectionStandalone>();
         default:
             MONGO_UNREACHABLE;
     }

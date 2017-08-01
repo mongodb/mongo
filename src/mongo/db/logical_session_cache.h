@@ -39,11 +39,11 @@
 
 namespace mongo {
 
+class Client;
 class OperationContext;
 class ServiceContext;
 
 extern int logicalSessionRecordCacheSize;
-extern int localLogicalSessionTimeoutMinutes;
 extern int logicalSessionRefreshMinutes;
 
 /**
@@ -62,7 +62,6 @@ public:
     static void set(ServiceContext* service, std::unique_ptr<LogicalSessionCache> sessionCache);
 
     static constexpr int kLogicalSessionCacheDefaultCapacity = 10000;
-    static constexpr Minutes kLogicalSessionDefaultTimeout = Minutes(30);
     static constexpr Minutes kLogicalSessionDefaultRefresh = Minutes(5);
 
     /**
@@ -127,7 +126,7 @@ public:
      *
      * This method may issue networking calls.
      */
-    Status fetchAndPromote(LogicalSessionId lsid);
+    Status fetchAndPromote(OperationContext* opCtx, const LogicalSessionId& lsid);
 
     /**
      * Inserts a new authoritative session record into the cache. This method will
@@ -135,7 +134,7 @@ public:
      * should only be used when starting new sessions and should not be used to
      * insert records for existing sessions.
      */
-    Status startSession(LogicalSessionId lsid);
+    Status startSession(OperationContext* opCtx, LogicalSessionRecord record);
 
     /**
      * Removes all local records in this cache. Does not remove the corresponding
@@ -143,12 +142,23 @@ public:
      */
     void clear();
 
+    /**
+     * Refreshes the cache synchronously. This flushes all pending refreshes and
+     * inserts to the sessions collection.
+     */
+    void refreshNow(Client* client);
+
+    /**
+     * Returns the current time.
+     */
+    Date_t now();
+
 private:
     /**
      * Internal methods to handle scheduling and perform refreshes for active
      * session records contained within the cache.
      */
-    void _refresh();
+    void _refresh(Client* client);
 
     /**
      * Returns true if a record has passed its given expiration.

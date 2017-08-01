@@ -56,7 +56,8 @@ Date_t MockServiceLiasonImpl::now() const {
 }
 
 void MockServiceLiasonImpl::scheduleJob(PeriodicRunner::PeriodicJob job) {
-    _runner->scheduleJob(std::move(job));
+    // The cache should be refreshed from tests by calling refreshNow().
+    return;
 }
 
 void MockServiceLiasonImpl::add(LogicalSessionId lsid) {
