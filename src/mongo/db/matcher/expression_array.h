@@ -35,40 +35,38 @@
 #include "mongo/base/status.h"
 #include "mongo/bson/bsonmisc.h"
 #include "mongo/bson/bsonobj.h"
-#include "mongo/db/matcher/expression.h"
-#include "mongo/db/matcher/expression_leaf.h"
+#include "mongo/db/matcher/expression_path.h"
 
 namespace mongo {
 
-class ArrayMatchingMatchExpression : public MatchExpression {
+/**
+ * A path match expression which does not expand arrays at the end of the path, and which only
+ * matches if the path contains an array.
+ */
+class ArrayMatchingMatchExpression : public PathMatchExpression {
 public:
-    ArrayMatchingMatchExpression(MatchType matchType) : MatchExpression(matchType) {}
+    ArrayMatchingMatchExpression(MatchType matchType) : PathMatchExpression(matchType) {}
+
     virtual ~ArrayMatchingMatchExpression() {}
 
-    Status setPath(StringData path);
-
-    virtual bool matches(const MatchableDocument* doc, MatchDetails* details) const;
-
     /**
-     * @param e - has to be an array.  calls matchesArray with e as an array
+     * Returns whether or not the nested array, represented as the object 'anArray', matches.
+     *
+     * 'anArray' must be the nested array at this expression's path.
      */
-    virtual bool matchesSingleElement(const BSONElement& e) const;
-
     virtual bool matchesArray(const BSONObj& anArray, MatchDetails* details) const = 0;
 
-    bool equivalent(const MatchExpression* other) const;
+    bool matchesSingleElement(const BSONElement&, MatchDetails* details = nullptr) const final;
 
-    const StringData path() const {
-        return _path;
+    bool equivalent(const MatchExpression* other) const override;
+
+    bool shouldExpandLeafArray() const final {
+        return false;
     }
 
     MatchCategory getCategory() const final {
         return MatchCategory::kArrayMatching;
     }
-
-private:
-    StringData _path;
-    ElementPath _elementPath;
 };
 
 class ElemMatchObjectMatchExpression : public ArrayMatchingMatchExpression {

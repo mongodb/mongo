@@ -48,7 +48,7 @@ public:
         return _value;
     }
 
-    bool matchesSingleElement(const BSONElement& e) const final {
+    bool matchesSingleElement(const BSONElement&, MatchDetails* details = nullptr) const final {
         return _value;
     }
 

@@ -34,7 +34,8 @@ namespace mongo {
 
 constexpr StringData InternalSchemaObjectMatchExpression::kName;
 
-bool InternalSchemaObjectMatchExpression::matchesSingleElement(const BSONElement& elem) const {
+bool InternalSchemaObjectMatchExpression::matchesSingleElement(const BSONElement& elem,
+                                                               MatchDetails* details) const {
     if (elem.type() != BSONType::Object) {
         return false;
     }

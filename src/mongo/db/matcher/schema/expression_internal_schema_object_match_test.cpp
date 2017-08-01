@@ -79,8 +79,13 @@ TEST(InternalSchemaObjectMatchExpression, AcceptsObjectsThatMatch) {
 
     ASSERT_TRUE(objMatch.matchesBSON(BSON("a" << BSON("b"
                                                       << "string"))));
-    ASSERT_TRUE(objMatch.matchesBSON(BSON("a" << BSON_ARRAY(BSON("b" << 1) << BSON("b"
-                                                                                   << "string")))));
+    ASSERT_TRUE(objMatch.matchesBSON(BSON("a" << BSON("b"
+                                                      << "string"
+                                                      << "c"
+                                                      << 1))));
+    ASSERT_FALSE(
+        objMatch.matchesBSON(BSON("a" << BSON_ARRAY(BSON("b" << 1) << BSON("b"
+                                                                           << "string")))));
     ASSERT_TRUE(objMatch.matchesBSON(BSON("a" << BSON("b" << BSON_ARRAY("string")))));
 }
 
@@ -115,7 +120,7 @@ TEST(InternalSchemaObjectMatchExpression, EmptyMatchAcceptsAllObjects) {
     ASSERT_TRUE(objMatch.matchesBSON(BSON("a" << BSONObj())));
     ASSERT_TRUE(objMatch.matchesBSON(BSON("a" << BSON("b"
                                                       << "string"))));
-    ASSERT_TRUE(objMatch.matchesBSON(BSON("a" << BSON_ARRAY(BSONObj()))));
+    ASSERT_FALSE(objMatch.matchesBSON(BSON("a" << BSON_ARRAY(BSONObj()))));
 }
 
 TEST(InternalSchemaObjectMatchExpression, NestedObjectMatchReturnsCorrectPath) {
@@ -186,6 +191,18 @@ TEST(InternalSchemaObjectMatchExpression, SubExpressionRespectsCollator) {
     ASSERT_TRUE(objectMatch.getValue()->matchesBSON(fromjson("{a: {b: 'FOO'}}")));
     ASSERT_TRUE(objectMatch.getValue()->matchesBSON(fromjson("{a: {b: 'foO'}}")));
     ASSERT_TRUE(objectMatch.getValue()->matchesBSON(fromjson("{a: {b: 'foo'}}")));
+}
+
+TEST(InternalSchemaObjectMatchExpression, RejectsArraysContainingMatchingSubObject) {
+    auto query = fromjson("{a: {$_internalSchemaObjectMatch: {b: 1}}}");
+    auto objMatch =
+        MatchExpressionParser::parse(query, ExtensionsCallbackDisallowExtensions(), nullptr);
+    ASSERT_OK(objMatch.getStatus());
+
+    ASSERT_FALSE(objMatch.getValue()->matchesBSON(fromjson("{a: 1}")));
+    ASSERT_TRUE(objMatch.getValue()->matchesBSON(fromjson("{a: {b: 1}}")));
+    ASSERT_FALSE(objMatch.getValue()->matchesBSON(fromjson("{a: [{b: 1}]}")));
+    ASSERT_FALSE(objMatch.getValue()->matchesBSON(fromjson("{a: [{b: 1}, {b: 2}]}")));
 }
 
 }  // namespace

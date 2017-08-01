@@ -62,7 +62,7 @@ public:
     // Methods inherited from MatchExpression.
     //
 
-    bool matchesSingleElement(const BSONElement& e) const final {
+    bool matchesSingleElement(const BSONElement& e, MatchDetails* details = nullptr) const final {
         // Text match expressions force the selection of the text index and always generate EXACT
         // index bounds (which causes the MatchExpression node to be trimmed), so we don't currently
         // implement any explicit text matching logic here. SERVER-17648 tracks the work to

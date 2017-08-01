@@ -43,7 +43,7 @@ public:
         return setPath(path);
     }
 
-    bool matchesSingleElement(const BSONElement& elem) const final;
+    bool matchesSingleElement(const BSONElement& elem, MatchDetails* details = nullptr) const final;
 
     std::unique_ptr<MatchExpression> shallowClone() const final;
 
@@ -61,6 +61,10 @@ public:
 
     MatchCategory getCategory() const final {
         return MatchCategory::kOther;
+    }
+
+    bool shouldExpandLeafArray() const final {
+        return false;
     }
 
 private:

@@ -51,10 +51,11 @@ bool InternalSchemaXorMatchExpression::matches(const MatchableDocument* doc,
     return found;
 }
 
-bool InternalSchemaXorMatchExpression::matchesSingleElement(const BSONElement& element) const {
+bool InternalSchemaXorMatchExpression::matchesSingleElement(const BSONElement& element,
+                                                            MatchDetails* details) const {
     bool found = false;
     for (size_t i = 0; i < numChildren(); i++) {
-        if (getChild(i)->matchesSingleElement(element)) {
+        if (getChild(i)->matchesSingleElement(element, details)) {
             if (found) {
                 return false;
             }

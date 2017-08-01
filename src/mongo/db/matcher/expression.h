@@ -182,9 +182,9 @@ public:
     // Determine if a document satisfies the tree-predicate.
     //
 
-    virtual bool matches(const MatchableDocument* doc, MatchDetails* details = 0) const = 0;
+    virtual bool matches(const MatchableDocument* doc, MatchDetails* details = nullptr) const = 0;
 
-    virtual bool matchesBSON(const BSONObj& doc, MatchDetails* details = 0) const;
+    virtual bool matchesBSON(const BSONObj& doc, MatchDetails* details = nullptr) const;
 
     /**
      * Determines if 'elem' would satisfy the predicate if wrapped with the top-level field name of
@@ -199,7 +199,8 @@ public:
      * Determines if the element satisfies the tree-predicate.
      * Not valid for all expressions (e.g. $where); in those cases, returns false.
      */
-    virtual bool matchesSingleElement(const BSONElement& e) const = 0;
+    virtual bool matchesSingleElement(const BSONElement& e,
+                                      MatchDetails* details = nullptr) const = 0;
 
     //
     // Tagging mechanism: Hang data off of the tree for retrieval later.

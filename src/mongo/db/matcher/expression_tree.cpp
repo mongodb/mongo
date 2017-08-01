@@ -91,9 +91,9 @@ bool AndMatchExpression::matches(const MatchableDocument* doc, MatchDetails* det
     return true;
 }
 
-bool AndMatchExpression::matchesSingleElement(const BSONElement& e) const {
+bool AndMatchExpression::matchesSingleElement(const BSONElement& e, MatchDetails* details) const {
     for (size_t i = 0; i < numChildren(); i++) {
-        if (!getChild(i)->matchesSingleElement(e)) {
+        if (!getChild(i)->matchesSingleElement(e, details)) {
             return false;
         }
     }
@@ -130,9 +130,9 @@ bool OrMatchExpression::matches(const MatchableDocument* doc, MatchDetails* deta
     return false;
 }
 
-bool OrMatchExpression::matchesSingleElement(const BSONElement& e) const {
+bool OrMatchExpression::matchesSingleElement(const BSONElement& e, MatchDetails* details) const {
     for (size_t i = 0; i < numChildren(); i++) {
-        if (getChild(i)->matchesSingleElement(e)) {
+        if (getChild(i)->matchesSingleElement(e, details)) {
             return true;
         }
     }
@@ -162,9 +162,9 @@ bool NorMatchExpression::matches(const MatchableDocument* doc, MatchDetails* det
     return true;
 }
 
-bool NorMatchExpression::matchesSingleElement(const BSONElement& e) const {
+bool NorMatchExpression::matchesSingleElement(const BSONElement& e, MatchDetails* details) const {
     for (size_t i = 0; i < numChildren(); i++) {
-        if (getChild(i)->matchesSingleElement(e)) {
+        if (getChild(i)->matchesSingleElement(e, details)) {
             return false;
         }
     }

@@ -44,7 +44,7 @@ public:
 
     bool matches(const MatchableDocument* doc, MatchDetails* details = nullptr) const final;
 
-    bool matchesSingleElement(const BSONElement& element) const final;
+    bool matchesSingleElement(const BSONElement&, MatchDetails* details = nullptr) const final;
 
     virtual std::unique_ptr<MatchExpression> shallowClone() const {
         auto xorCopy = stdx::make_unique<InternalSchemaXorMatchExpression>();

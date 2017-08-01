@@ -48,7 +48,8 @@ public:
         return (obj.nFields() >= numProperties());
     }
 
-    bool matchesSingleElement(const BSONElement& elem) const final {
+    bool matchesSingleElement(const BSONElement& elem,
+                              MatchDetails* details = nullptr) const final {
         if (elem.type() != BSONType::Object) {
             return false;
         }

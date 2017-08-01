@@ -35,39 +35,13 @@
 
 namespace mongo {
 
-Status ArrayMatchingMatchExpression::setPath(StringData path) {
-    _path = path;
-    Status s = _elementPath.init(_path);
-    _elementPath.setTraverseLeafArray(false);
-    return s;
-}
-
-bool ArrayMatchingMatchExpression::matches(const MatchableDocument* doc,
-                                           MatchDetails* details) const {
-    MatchableDocument::IteratorHolder cursor(doc, &_elementPath);
-
-    while (cursor->more()) {
-        ElementIterator::Context e = cursor->next();
-        if (e.element().type() != Array)
-            continue;
-
-        bool amIRoot = e.arrayOffset().eoo();
-
-        if (!matchesArray(e.element().Obj(), amIRoot ? details : NULL))
-            continue;
-
-        if (!amIRoot && details && details->needRecord() && !e.arrayOffset().eoo()) {
-            details->setElemMatchKey(e.arrayOffset().fieldName());
-        }
-        return true;
-    }
-    return false;
-}
-
-bool ArrayMatchingMatchExpression::matchesSingleElement(const BSONElement& e) const {
-    if (e.type() != Array)
+bool ArrayMatchingMatchExpression::matchesSingleElement(const BSONElement& elt,
+                                                        MatchDetails* details) const {
+    if (elt.type() != BSONType::Array) {
         return false;
-    return matchesArray(e.Obj(), NULL);
+    }
+
+    return matchesArray(elt.embeddedObject(), details);
 }
 
 
@@ -78,7 +52,7 @@ bool ArrayMatchingMatchExpression::equivalent(const MatchExpression* other) cons
     const ArrayMatchingMatchExpression* realOther =
         static_cast<const ArrayMatchingMatchExpression*>(other);
 
-    if (_path != realOther->_path)
+    if (path() != realOther->path())
         return false;
 
     if (numChildren() != realOther->numChildren())

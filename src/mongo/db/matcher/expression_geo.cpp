@@ -337,7 +337,7 @@ Status GeoMatchExpression::init(StringData path,
     return setPath(path);
 }
 
-bool GeoMatchExpression::matchesSingleElement(const BSONElement& e) const {
+bool GeoMatchExpression::matchesSingleElement(const BSONElement& e, MatchDetails* details) const {
     if (!e.isABSONObj())
         return false;
 
@@ -420,10 +420,8 @@ Status GeoNearMatchExpression::init(StringData path,
     return setPath(path);
 }
 
-bool GeoNearMatchExpression::matchesSingleElement(const BSONElement& e) const {
-    // See ops/update.cpp.
-    // This node is removed by the query planner.  It's only ever called if we're getting an
-    // elemMatchKey.
+bool GeoNearMatchExpression::matchesSingleElement(const BSONElement& e,
+                                                  MatchDetails* details) const {
     return true;
 }
 

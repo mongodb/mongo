@@ -45,11 +45,21 @@ public:
 
     virtual ~PathMatchExpression() {}
 
+    /**
+     * Returns whether or not this expression should match against each element of an array (in
+     * addition to the array as a whole).
+     *
+     * For example, returns true if a path match expression on "f" should match against 1, 2, and
+     * [1, 2] for document {f: [1, 2]}. Returns false if this expression should only match against
+     * [1, 2].
+     */
+    virtual bool shouldExpandLeafArray() const = 0;
+
     bool matches(const MatchableDocument* doc, MatchDetails* details = nullptr) const final {
         MatchableDocument::IteratorHolder cursor(doc, &_elementPath);
         while (cursor->more()) {
             ElementIterator::Context e = cursor->next();
-            if (!matchesSingleElement(e.element())) {
+            if (!matchesSingleElement(e.element(), details)) {
                 continue;
             }
             if (details && details->needRecord() && !e.arrayOffset().eoo()) {
@@ -66,7 +76,13 @@ public:
 
     Status setPath(StringData path) {
         _path = path;
-        return _elementPath.init(_path);
+        auto status = _elementPath.init(_path);
+        if (!status.isOK()) {
+            return status;
+        }
+
+        _elementPath.setTraverseLeafArray(shouldExpandLeafArray());
+        return Status::OK();
     }
 
 private:

@@ -26,16 +26,16 @@
  *    it in the license file.
  */
 
-/** Unit tests for MatchMatchExpression operator implementations in match_operators.{h,cpp}. */
-
-#include "mongo/unittest/unittest.h"
+#include "mongo/platform/basic.h"
 
 #include "mongo/db/jsobj.h"
 #include "mongo/db/json.h"
 #include "mongo/db/matcher/expression.h"
 #include "mongo/db/matcher/expression_array.h"
+#include "mongo/db/matcher/expression_leaf.h"
 #include "mongo/db/matcher/expression_tree.h"
 #include "mongo/db/query/collation/collator_interface_mock.h"
+#include "mongo/unittest/unittest.h"
 
 namespace mongo {
 

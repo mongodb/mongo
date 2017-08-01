@@ -50,7 +50,8 @@ public:
 
     virtual Validator getComparator() const = 0;
 
-    bool matchesSingleElement(const BSONElement& elem) const final {
+    bool matchesSingleElement(const BSONElement& elem,
+                              MatchDetails* details = nullptr) const final {
         if (elem.type() != BSONType::String) {
             return false;
         }

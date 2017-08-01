@@ -214,7 +214,7 @@ TEST(MatchExpressionParserSchemaTest, ObjectMatchCorrectlyParsesObjects) {
     ASSERT_FALSE(result.getValue()->matchesBSON(fromjson("{a: {b: 'string'}}")));
     ASSERT_FALSE(result.getValue()->matchesBSON(fromjson("{a: {b: -1}}")));
     ASSERT_TRUE(result.getValue()->matchesBSON(fromjson("{a: {b: 1}}")));
-    ASSERT_TRUE(result.getValue()->matchesBSON(fromjson("{a: [{b: 0}]}")));
+    ASSERT_FALSE(result.getValue()->matchesBSON(fromjson("{a: [{b: 0}]}")));
 }
 
 TEST(MatchExpressionParserSchemaTest, ObjectMatchCorrectlyParsesNestedObjectMatch) {
@@ -233,7 +233,7 @@ TEST(MatchExpressionParserSchemaTest, ObjectMatchCorrectlyParsesNestedObjectMatc
     ASSERT_FALSE(result.getValue()->matchesBSON(fromjson("{a: {b: {c: 0}}}")));
     ASSERT_TRUE(result.getValue()->matchesBSON(fromjson("{a: {b: {c: 'string'}}}")));
     ASSERT_TRUE(result.getValue()->matchesBSON(fromjson("{a: {b: {c: 1}}}")));
-    ASSERT_TRUE(
+    ASSERT_FALSE(
         result.getValue()->matchesBSON(fromjson("{a: [{b: 0}, {b: [{c: 0}, {c: 'string'}]}]}")));
 }
 

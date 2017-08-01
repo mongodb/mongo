@@ -69,7 +69,7 @@ public:
      * 'thenBranch'. Otherwise, returns the result of matching it against 'elseBranch'.
      */
     bool matches(const MatchableDocument* doc, MatchDetails* details = nullptr) const final;
-    bool matchesSingleElement(const BSONElement& elem) const final;
+    bool matchesSingleElement(const BSONElement& elem, MatchDetails* details = nullptr) const final;
 };
 
 }  // namespace mongo

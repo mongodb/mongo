@@ -49,6 +49,10 @@ public:
 
     virtual ~LeafMatchExpression() {}
 
+    bool shouldExpandLeafArray() const final {
+        return true;
+    }
+
     MatchCategory getCategory() const final {
         return MatchCategory::kLeaf;
     }
@@ -65,7 +69,7 @@ public:
 
     virtual ~ComparisonMatchExpression() {}
 
-    virtual bool matchesSingleElement(const BSONElement& e) const;
+    bool matchesSingleElement(const BSONElement&, MatchDetails* details = nullptr) const final;
 
     virtual void debugString(StringBuilder& debug, int level = 0) const;
 
@@ -205,7 +209,7 @@ public:
         return std::move(e);
     }
 
-    virtual bool matchesSingleElement(const BSONElement& e) const;
+    bool matchesSingleElement(const BSONElement&, MatchDetails* details = nullptr) const final;
 
     virtual void debugString(StringBuilder& debug, int level) const;
 
@@ -245,7 +249,7 @@ public:
         return std::move(m);
     }
 
-    virtual bool matchesSingleElement(const BSONElement& e) const;
+    bool matchesSingleElement(const BSONElement&, MatchDetails* details = nullptr) const final;
 
     virtual void debugString(StringBuilder& debug, int level) const;
 
@@ -280,7 +284,7 @@ public:
         return std::move(e);
     }
 
-    virtual bool matchesSingleElement(const BSONElement& e) const;
+    bool matchesSingleElement(const BSONElement&, MatchDetails* details = nullptr) const final;
 
     virtual void debugString(StringBuilder& debug, int level) const;
 
@@ -300,7 +304,7 @@ public:
 
     virtual std::unique_ptr<MatchExpression> shallowClone() const;
 
-    virtual bool matchesSingleElement(const BSONElement& e) const;
+    bool matchesSingleElement(const BSONElement&, MatchDetails* details = nullptr) const final;
 
     virtual void debugString(StringBuilder& debug, int level) const;
 
@@ -392,7 +396,7 @@ public:
         return std::move(e);
     }
 
-    bool matchesSingleElement(const BSONElement& e) const override;
+    bool matchesSingleElement(const BSONElement&, MatchDetails* details = nullptr) const final;
 
     void debugString(StringBuilder& debug, int level) const override;
 
@@ -438,7 +442,7 @@ public:
     Status init(StringData path, uint64_t bitMask);
     Status init(StringData path, const char* bitMaskBinary, uint32_t bitMaskLen);
 
-    virtual bool matchesSingleElement(const BSONElement& e) const;
+    bool matchesSingleElement(const BSONElement&, MatchDetails* details = nullptr) const final;
 
     virtual void debugString(StringBuilder& debug, int level) const;
 

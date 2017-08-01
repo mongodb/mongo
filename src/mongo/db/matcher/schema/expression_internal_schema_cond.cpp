@@ -39,8 +39,10 @@ bool InternalSchemaCondMatchExpression::matches(const MatchableDocument* doc,
                                               : elseBranch()->matches(doc, details);
 }
 
-bool InternalSchemaCondMatchExpression::matchesSingleElement(const BSONElement& elem) const {
-    return condition()->matchesSingleElement(elem) ? thenBranch()->matchesSingleElement(elem)
-                                                   : elseBranch()->matchesSingleElement(elem);
+bool InternalSchemaCondMatchExpression::matchesSingleElement(const BSONElement& elem,
+                                                             MatchDetails* details) const {
+    return condition()->matchesSingleElement(elem, details)
+        ? thenBranch()->matchesSingleElement(elem, details)
+        : elseBranch()->matchesSingleElement(elem, details);
 }
 }  // namespace mongo
