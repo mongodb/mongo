@@ -536,6 +536,11 @@ int WiredTigerKVEngine::flushAllFiles(OperationContext* opCtx, bool sync) {
 Status WiredTigerKVEngine::beginBackup(OperationContext* opCtx) {
     invariant(!_backupSession);
 
+    // The inMemory Storage Engine cannot create a backup cursor.
+    if (_ephemeral) {
+        return Status::OK();
+    }
+
     // This cursor will be freed by the backupSession being closed as the session is uncached
     auto session = stdx::make_unique<WiredTigerSession>(_conn);
     WT_CURSOR* c = NULL;
