@@ -51,10 +51,15 @@
 #include "mongo/db/repl/replication_coordinator_global.h"
 #include "mongo/db/service_context.h"
 #include "mongo/rpc/get_status_from_command_result.h"
+#include "mongo/util/fail_point_service.h"
 #include "mongo/util/log.h"
 
 namespace mongo {
 namespace {
+
+// If enabled, causes loop in _applyOps() to hang after applying current operation.
+MONGO_FP_DECLARE(applyOpsPauseBetweenOperations);
+
 /**
  * Return true iff the applyOpsCmd can be executed in a single WriteUnitOfWork.
  */
@@ -200,6 +205,19 @@ Status _applyOps(OperationContext* opCtx,
         }
 
         (*numApplied)++;
+
+        if (MONGO_FAIL_POINT(applyOpsPauseBetweenOperations)) {
+            // While holding a database lock under MMAPv1, we would be implicitly holding the
+            // flush lock here. This would prevent other threads from acquiring the global
+            // lock or any database locks. We release all locks temporarily while the fail
+            // point is enabled to allow other threads to make progress.
+            boost::optional<Lock::TempRelease> release;
+            auto storageEngine = opCtx->getServiceContext()->getGlobalStorageEngine();
+            if (storageEngine->isMmapV1() && !opCtx->lockState()->isW()) {
+                release.emplace(opCtx->lockState());
+            }
+            MONGO_FAIL_POINT_PAUSE_WHILE_SET(applyOpsPauseBetweenOperations);
+        }
     }
 
     result->append("applied", *numApplied);
