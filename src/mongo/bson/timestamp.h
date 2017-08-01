@@ -41,6 +41,9 @@ class BSONObj;
  */
 class Timestamp {
 public:
+    // Timestamp to signal that the storage engine should take unstable checkpoints.
+    static const Timestamp kAllowUnstableCheckpointsSentinal;
+
     // Maximum Timestamp value.
     static Timestamp max();
 

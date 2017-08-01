@@ -39,6 +39,8 @@
 
 namespace mongo {
 
+const Timestamp Timestamp::kAllowUnstableCheckpointsSentinal = Timestamp(0, 1);
+
 Timestamp Timestamp::max() {
     unsigned int t = static_cast<unsigned int>(std::numeric_limits<uint32_t>::max());
     unsigned int i = std::numeric_limits<uint32_t>::max();

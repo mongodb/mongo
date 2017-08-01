@@ -31,6 +31,7 @@
 #include <cstdint>
 #include <limits>
 
+#include "mongo/bson/timestamp.h"
 #include "mongo/util/mongoutils/str.h"
 
 namespace mongo {
@@ -38,6 +39,7 @@ namespace mongo {
 class SnapshotName {
 public:
     explicit SnapshotName(uint64_t value) : _value(value) {}
+    explicit SnapshotName(Timestamp ts) : SnapshotName(ts.asULL()) {}
 
     /**
      * Returns a SnapshotName guaranteed to compare < all names of actual snapshots.
@@ -80,6 +82,10 @@ public:
     }
     bool operator>=(const SnapshotName& rhs) const {
         return _value >= rhs._value;
+    }
+
+    friend std::ostream& operator<<(std::ostream& out, const SnapshotName& snapshotName) {
+        return out << snapshotName.toString();
     }
 
 private:
