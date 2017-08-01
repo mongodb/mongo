@@ -2296,7 +2296,7 @@ public:
 
             ASSERT(!"Expected Throw");
         } catch (const DBException& e) {
-            if (e.getCode() != 13548)  // we expect the code for oversized buffer
+            if (e.code() != 13548)  // we expect the code for oversized buffer
                 throw;
         }
     }

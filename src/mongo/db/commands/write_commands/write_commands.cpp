@@ -221,7 +221,7 @@ public:
             runImpl(opCtx, request, result);
             return true;
         } catch (const DBException& ex) {
-            LastError::get(opCtx->getClient()).setLastError(ex.getCode(), ex.reason());
+            LastError::get(opCtx->getClient()).setLastError(ex.code(), ex.reason());
             throw;
         }
     }

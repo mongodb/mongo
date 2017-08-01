@@ -52,7 +52,7 @@ namespace {
 BSONObj buildErrReply(const DBException& ex) {
     BSONObjBuilder errB;
     errB.append("$err", ex.what());
-    errB.append("code", ex.getCode());
+    errB.append("code", ex.code());
     return errB.obj();
 }
 
@@ -145,7 +145,7 @@ DbResponse ServiceEntryPointMongos::handleRequest(OperationContext* opCtx, const
         }
 
         // We *always* populate the last error for now
-        LastError::get(opCtx->getClient()).setLastError(ex.getCode(), ex.what());
+        LastError::get(opCtx->getClient()).setLastError(ex.code(), ex.what());
     }
     return dbResponse;
 }

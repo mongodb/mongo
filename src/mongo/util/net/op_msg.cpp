@@ -126,8 +126,7 @@ OpMsg OpMsg::parse(const Message& message) try {
 
     return msg;
 } catch (const DBException& ex) {
-    LOG(1) << "invalid message: " << ErrorCodes::errorString(ErrorCodes::fromInt(ex.getCode()))
-           << " " << redact(ex) << " -- "
+    LOG(1) << "invalid message: " << ex.code() << " " << redact(ex) << " -- "
            << redact(hexdump(message.singleData().view2ptr(), message.size()));
     throw;
 }

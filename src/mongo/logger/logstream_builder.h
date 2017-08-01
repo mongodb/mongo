@@ -31,6 +31,7 @@
 #include <sstream>
 #include <string>
 
+#include "mongo/base/error_codes.h"
 #include "mongo/bson/bsontypes.h"
 #include "mongo/logger/labeled_level.h"
 #include "mongo/logger/log_component.h"
@@ -196,6 +197,11 @@ public:
 
     LogstreamBuilder& operator<<(BSONType t) {
         stream() << typeName(t);
+        return *this;
+    }
+
+    LogstreamBuilder& operator<<(ErrorCodes::Error ec) {
+        stream() << ErrorCodes::errorString(ec);
         return *this;
     }
 

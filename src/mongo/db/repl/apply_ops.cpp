@@ -193,9 +193,8 @@ Status _applyOps(OperationContext* opCtx,
             } catch (const DBException& ex) {
                 ab.append(false);
                 result->append("applied", ++(*numApplied));
-                result->append("code", ex.getCode());
-                result->append("codeName",
-                               ErrorCodes::errorString(ErrorCodes::fromInt(ex.getCode())));
+                result->append("code", ex.code());
+                result->append("codeName", ErrorCodes::errorString(ex.code()));
                 result->append("errmsg", ex.what());
                 result->append("results", ab.arr());
                 return Status(ErrorCodes::UnknownError, ex.what());
@@ -374,7 +373,7 @@ Status applyOps(OperationContext* opCtx,
             result->appendElements(intermediateResult.obj());
         });
     } catch (const DBException& ex) {
-        if (ex.getCode() == ErrorCodes::NamespaceNotFound) {
+        if (ex.code() == ErrorCodes::NamespaceNotFound) {
             // Retry in non-atomic mode, since MMAP cannot implicitly create a new database
             // within an active WriteUnitOfWork.
             return _applyOps(opCtx, dbName, applyOpCmd, result, &numApplied);
@@ -384,8 +383,8 @@ Status applyOps(OperationContext* opCtx,
         for (int j = 0; j < numApplied; j++)
             ab.append(false);
         result->append("applied", numApplied);
-        result->append("code", ex.getCode());
-        result->append("codeName", ErrorCodes::errorString(ErrorCodes::fromInt(ex.getCode())));
+        result->append("code", ex.code());
+        result->append("codeName", ErrorCodes::errorString(ex.code()));
         result->append("errmsg", ex.what());
         result->append("results", ab.arr());
         return Status(ErrorCodes::UnknownError, ex.what());

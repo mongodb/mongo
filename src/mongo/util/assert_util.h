@@ -78,9 +78,7 @@ public:
     virtual const char* what() const throw() {
         return reason().c_str();
     }
-    virtual int getCode() const {
-        return code();
-    }
+
     virtual void appendPrefix(std::stringstream& ss) const {}
     virtual void addContext(const std::string& str) {
         _status = Status(code(), str + causedBy(reason()));

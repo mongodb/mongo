@@ -456,7 +456,7 @@ void syncFixUp(OperationContext* opCtx,
             // If the collection turned into a view, we might get an error trying to
             // refetch documents, but these errors should be ignored, as we'll be creating
             // the view during oplog replay.
-            if (ex.getCode() == ErrorCodes::CommandNotSupportedOnView)
+            if (ex.code() == ErrorCodes::CommandNotSupportedOnView)
                 continue;
 
             log() << "Rollback couldn't re-get from ns: " << doc.ns << " _id: " << redact(doc._id)
@@ -780,7 +780,7 @@ void syncFixUp(OperationContext* opCtx,
                                     try {
                                         collection->cappedTruncateAfter(opCtx, loc, true);
                                     } catch (const DBException& e) {
-                                        if (e.getCode() == 13415) {
+                                        if (e.code() == 13415) {
                                             // hack: need to just make cappedTruncate do this...
                                             writeConflictRetry(
                                                 opCtx, "truncate", collection->ns().ns(), [&] {
@@ -1009,7 +1009,7 @@ void rollbackNoUUID(OperationContext* opCtx,
     } catch (const DBException& ex) {
         // UnrecoverableRollbackError should only come from a returned status which is handled
         // above.
-        invariant(ex.getCode() != ErrorCodes::UnrecoverableRollbackError);
+        invariant(ex.code() != ErrorCodes::UnrecoverableRollbackError);
 
         warning() << "Rollback cannot complete at this time (retrying later): " << redact(ex)
                   << " appliedThrough= " << replCoord->getMyLastAppliedOpTime() << " minvalid= "

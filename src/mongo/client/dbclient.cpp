@@ -473,7 +473,7 @@ bool DBClientBase::auth(const string& dbname,
         auth(authParams);
         return true;
     } catch (const UserException& ex) {
-        if (ex.getCode() != ErrorCodes::AuthenticationFailed)
+        if (ex.code() != ErrorCodes::AuthenticationFailed)
             throw;
         errmsg = ex.what();
         return false;
@@ -968,7 +968,7 @@ void DBClientConnection::_checkConnection() {
         try {
             DBClientConnection::_auth(i->second);
         } catch (UserException& ex) {
-            if (ex.getCode() != ErrorCodes::AuthenticationFailed)
+            if (ex.code() != ErrorCodes::AuthenticationFailed)
                 throw;
             LOG(_logLevel) << "reconnect: auth failed "
                            << i->second[auth::getSaslCommandUserDBFieldName()]

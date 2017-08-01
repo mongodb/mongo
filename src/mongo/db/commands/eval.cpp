@@ -210,7 +210,7 @@ public:
         } catch (const UserException& ex) {
             // Convert a stale shardVersion error to a stronger error to prevent this node or the
             // sending node from believing it needs to refresh its routing table.
-            if (ex.getCode() == ErrorCodes::RecvStaleConfig) {
+            if (ex.code() == ErrorCodes::RecvStaleConfig) {
                 uasserted(ErrorCodes::BadValue,
                           str::stream() << "can't use sharded collection from db.eval");
             }

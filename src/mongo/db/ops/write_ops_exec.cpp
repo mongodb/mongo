@@ -197,15 +197,15 @@ bool handleError(OperationContext* opCtx,
                  const NamespaceString& nss,
                  const write_ops::WriteCommandBase& wholeOp,
                  WriteResult* out) {
-    LastError::get(opCtx->getClient()).setLastError(ex.getCode(), ex.reason());
+    LastError::get(opCtx->getClient()).setLastError(ex.code(), ex.reason());
     auto& curOp = *CurOp::get(opCtx);
     curOp.debug().exceptionInfo = ex.toStatus();
 
-    if (ErrorCodes::isInterruption(ErrorCodes::Error(ex.getCode()))) {
+    if (ErrorCodes::isInterruption(ex.code())) {
         throw;  // These have always failed the whole batch.
     }
 
-    if (ErrorCodes::isStaleShardingError(ErrorCodes::Error(ex.getCode()))) {
+    if (ErrorCodes::isStaleShardingError(ex.code())) {
         auto staleConfigException = dynamic_cast<const SendStaleConfigException*>(&ex);
         if (!staleConfigException) {
             // We need to get extra info off of the SCE, but some common patterns can result in the

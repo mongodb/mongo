@@ -539,7 +539,7 @@ bool RecoveryJob::processFileBuffer(OperationContext* opCtx, const void* p, unsi
                     !globalInShutdownDeprecated());
         }
     } catch (const DBException& ex) {
-        if (ex.getCode() != ErrorCodes::Overflow)
+        if (ex.code() != ErrorCodes::Overflow)
             throw;  // Only ignore errors related to the file abruptly ending.
 
         if (mmapv1GlobalOptions.journalOptions & MMAPV1Options::JournalDumpJournal)

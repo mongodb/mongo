@@ -137,7 +137,7 @@ TEST_F(CatalogCacheRefreshTest, DatabaseNotFound) {
         FAIL(str::stream() << "Returning no database did not fail and returned "
                            << (cm ? cm->toString() : routingInfo->primaryId().toString()));
     } catch (const DBException& ex) {
-        ASSERT_EQ(ErrorCodes::NamespaceNotFound, ex.getCode());
+        ASSERT_EQ(ErrorCodes::NamespaceNotFound, ex.code());
     }
 }
 
@@ -157,7 +157,7 @@ TEST_F(CatalogCacheRefreshTest, DatabaseBSONCorrupted) {
         FAIL(str::stream() << "Returning corrupted database entry did not fail and returned "
                            << (cm ? cm->toString() : routingInfo->primaryId().toString()));
     } catch (const DBException& ex) {
-        ASSERT_EQ(ErrorCodes::NoSuchKey, ex.getCode());
+        ASSERT_EQ(ErrorCodes::NoSuchKey, ex.code());
     }
 }
 
@@ -193,7 +193,7 @@ TEST_F(CatalogCacheRefreshTest, CollectionBSONCorrupted) {
         FAIL(str::stream() << "Returning corrupted collection entry did not fail and returned "
                            << (cm ? cm->toString() : routingInfo->primaryId().toString()));
     } catch (const DBException& ex) {
-        ASSERT_EQ(ErrorCodes::FailedToParse, ex.getCode());
+        ASSERT_EQ(ErrorCodes::FailedToParse, ex.code());
     }
 }
 
@@ -224,7 +224,7 @@ TEST_F(CatalogCacheRefreshTest, NoChunksFoundForCollection) {
         FAIL(str::stream() << "Returning no chunks for collection did not fail and returned "
                            << (cm ? cm->toString() : routingInfo->primaryId().toString()));
     } catch (const DBException& ex) {
-        ASSERT_EQ(ErrorCodes::ConflictingOperationInProgress, ex.getCode());
+        ASSERT_EQ(ErrorCodes::ConflictingOperationInProgress, ex.code());
     }
 }
 
@@ -258,7 +258,7 @@ TEST_F(CatalogCacheRefreshTest, ChunksBSONCorrupted) {
         FAIL(str::stream() << "Returning no chunks for collection did not fail and returned "
                            << (cm ? cm->toString() : routingInfo->primaryId().toString()));
     } catch (const DBException& ex) {
-        ASSERT_EQ(ErrorCodes::NoSuchKey, ex.getCode());
+        ASSERT_EQ(ErrorCodes::NoSuchKey, ex.code());
     }
 }
 
@@ -314,7 +314,7 @@ TEST_F(CatalogCacheRefreshTest, IncompleteChunksFoundForCollection) {
             str::stream() << "Returning incomplete chunks for collection did not fail and returned "
                           << (cm ? cm->toString() : routingInfo->primaryId().toString()));
     } catch (const DBException& ex) {
-        ASSERT_EQ(ErrorCodes::ConflictingOperationInProgress, ex.getCode());
+        ASSERT_EQ(ErrorCodes::ConflictingOperationInProgress, ex.code());
     }
 }
 
@@ -361,7 +361,7 @@ TEST_F(CatalogCacheRefreshTest, ChunkEpochChangeDuringIncrementalLoad) {
              << "Returning chunks with different epoch for collection did not fail and returned "
              << (cm ? cm->toString() : routingInfo->primaryId().toString()));
     } catch (const DBException& ex) {
-        ASSERT_EQ(ErrorCodes::ConflictingOperationInProgress, ex.getCode());
+        ASSERT_EQ(ErrorCodes::ConflictingOperationInProgress, ex.code());
     }
 }
 

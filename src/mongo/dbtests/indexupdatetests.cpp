@@ -84,7 +84,7 @@ protected:
             indexer.commit();
             wunit.commit();
         } catch (const DBException& e) {
-            if (ErrorCodes::isInterruption(ErrorCodes::Error(e.getCode())))
+            if (ErrorCodes::isInterruption(e.code()))
                 return true;
 
             throw;

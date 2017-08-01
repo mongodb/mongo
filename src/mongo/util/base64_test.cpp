@@ -84,7 +84,7 @@ TEST(Base64Test, parseFail) {
             base64::decode(t.encoded);
             ASSERT_TRUE(false);
         } catch (const UserException& e) {
-            ASSERT_EQ(e.getCode(), t.code);
+            ASSERT_EQ(e.code(), t.code);
         }
     }
 }

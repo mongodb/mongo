@@ -342,7 +342,7 @@ public:
             Lock::CollectionLock colLock(opCtx->lockState(), ns.ns(), MODE_IX);
             uassertStatusOK(indexer.insertAllDocumentsInCollection());
         } catch (const DBException& e) {
-            invariant(e.getCode() != ErrorCodes::WriteConflict);
+            invariant(e.code() != ErrorCodes::WriteConflict);
             // Must have exclusive DB lock before we clean up the index build via the
             // destructor of 'indexer'.
             if (indexer.getBuildInBackground()) {

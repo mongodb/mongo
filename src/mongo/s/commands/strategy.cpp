@@ -232,7 +232,7 @@ void execCommandClient(OperationContext* opCtx,
         Command::appendCommandStatus(result, ok);
     } catch (const DBException& e) {
         result.resetToEmpty();
-        const int code = e.getCode();
+        const int code = e.code();
 
         // Codes for StaleConfigException
         if (code == ErrorCodes::RecvStaleConfig || code == ErrorCodes::SendStaleConfig) {

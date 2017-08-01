@@ -1284,7 +1284,7 @@ Status multiInitialSyncApply_noAbort(OperationContext* opCtx,
         } catch (const DBException& e) {
             // SERVER-24927 If we have a NamespaceNotFound exception, then this document will be
             // dropped before initial sync ends anyways and we should ignore it.
-            if (e.getCode() == ErrorCodes::NamespaceNotFound && entry.isCrudOpType()) {
+            if (e.code() == ErrorCodes::NamespaceNotFound && entry.isCrudOpType()) {
                 continue;
             }
 

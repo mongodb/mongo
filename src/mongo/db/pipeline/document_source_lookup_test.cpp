@@ -224,7 +224,7 @@ TEST_F(DocumentSourceLookUpTest, RejectsLocalFieldForeignFieldWhenPipelineIsSpec
              << lookupStage->getSourceName()
              << " stage to uassert on mix of localField/foreignField and pipeline options");
     } catch (const UserException& ex) {
-        ASSERT_EQ(ErrorCodes::FailedToParse, ex.getCode());
+        ASSERT_EQ(ErrorCodes::FailedToParse, ex.code());
     }
 }
 

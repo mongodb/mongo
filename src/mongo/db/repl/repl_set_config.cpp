@@ -758,7 +758,7 @@ void ReplSetConfig::_initializeConnectionString() {
     try {
         _connectionString = ConnectionString::forReplicaSet(_replSetName, visibleMembers);
     } catch (const DBException& e) {
-        invariant(e.getCode() == ErrorCodes::FailedToParse);
+        invariant(e.code() == ErrorCodes::FailedToParse);
         // Failure to construct the ConnectionString means either an invalid replica set name
         // or members array, which should be caught in validate()
     }

@@ -191,8 +191,7 @@ MMAPV1DatabaseCatalogEntry::MMAPV1DatabaseCatalogEntry(OperationContext* opCtx,
         _init(opCtx);
     } catch (const DBException& dbe) {
         warning() << "database " << path << " " << name
-                  << " could not be opened due to DBException " << dbe.getCode() << ": "
-                  << dbe.what();
+                  << " could not be opened due to DBException " << dbe.code() << ": " << dbe.what();
         throw;
     } catch (const std::exception& e) {
         warning() << "database " << path << " " << name << " could not be opened " << e.what();

@@ -75,7 +75,7 @@ std::string redact(const DBException& exceptionToRedact) {
 
     // Construct an exception representation with the what()
     std::stringstream ss;
-    ss << exceptionToRedact.getCode() << " " << kRedactionDefaultMask;
+    ss << exceptionToRedact.code() << " " << kRedactionDefaultMask;
     return ss.str();
 }
 

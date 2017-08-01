@@ -249,7 +249,7 @@ void Scope::loadStored(OperationContext* opCtx, bool ignoreNotConnected) {
             thisTime.insert(n.valuestr());
             _storedNames.insert(n.valuestr());
         } catch (const DBException& setElemEx) {
-            if (setElemEx.getCode() == ErrorCodes::Interrupted) {
+            if (setElemEx.code() == ErrorCodes::Interrupted) {
                 throw;
             }
 

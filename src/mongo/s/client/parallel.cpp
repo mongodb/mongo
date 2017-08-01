@@ -395,7 +395,7 @@ void ParallelSortClusteredCursor::setupVersionAndHandleSlaveOk(
                     << "compatible with " << vinfo;
         }
     } catch (const DBException& dbExcep) {
-        auto errCode = dbExcep.getCode();
+        auto errCode = dbExcep.code();
         if (allowShardVersionFailure &&
             (ErrorCodes::isNotMasterError(ErrorCodes::fromInt(errCode)) ||
              errCode == ErrorCodes::FailedToSatisfyReadPreference ||
@@ -646,7 +646,7 @@ void ParallelSortClusteredCursor::startInit(OperationContext* opCtx) {
             warning() << "db exception when initializing on " << shardId
                       << ", current connection state is " << mdata.toBSON() << causedBy(redact(e));
             mdata.errored = true;
-            if (returnPartial && e.getCode() == 15925 /* From above! */) {
+            if (returnPartial && e.code() == 15925 /* From above! */) {
                 mdata.cleanup(true);
                 continue;
             }
@@ -790,7 +790,7 @@ void ParallelSortClusteredCursor::finishInit(OperationContext* opCtx) {
         } catch (DBException& e) {
             // NOTE: RECV() WILL NOT THROW A SOCKET EXCEPTION - WE GET THIS AS ERROR 15988 FROM
             // ABOVE
-            if (e.getCode() == 15988) {
+            if (e.code() == 15988) {
                 warning() << "exception when receiving data from " << shardId
                           << ", current connection state is " << mdata.toBSON()
                           << causedBy(redact(e));
@@ -804,7 +804,7 @@ void ParallelSortClusteredCursor::finishInit(OperationContext* opCtx) {
             } else {
                 // the InvalidBSON exception indicates that the BSON is malformed ->
                 // don't print/call "mdata.toBSON()" to avoid unexpected errors e.g. a segfault
-                if (e.getCode() == 22)
+                if (e.code() == ErrorCodes::InvalidBSON)
                     warning() << "bson is malformed :: db exception when finishing on " << shardId
                               << causedBy(redact(e));
                 else

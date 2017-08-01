@@ -1224,7 +1224,7 @@ Status CollectionImpl::validate(OperationContext* opCtx,
             log(LogComponent::kIndex) << "validated collection " << ns().toString() << endl;
         }
     } catch (DBException& e) {
-        if (ErrorCodes::isInterruption(ErrorCodes::Error(e.getCode()))) {
+        if (ErrorCodes::isInterruption(e.code())) {
             return e.toStatus();
         }
         string err = str::stream() << "exception during index validation: " << e.toString();

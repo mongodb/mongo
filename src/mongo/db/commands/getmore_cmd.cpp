@@ -452,7 +452,7 @@ public:
             *state = PlanExecutor::FAILURE;
             return Status::OK();
         } catch (const UserException& except) {
-            if (isAwaitData && except.getCode() == ErrorCodes::ExceededTimeLimit) {
+            if (isAwaitData && except.code() == ErrorCodes::ExceededTimeLimit) {
                 // We ignore exceptions from interrupt points due to max time expiry for
                 // awaitData cursors.
             } else {

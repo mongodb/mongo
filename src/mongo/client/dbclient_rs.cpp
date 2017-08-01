@@ -410,7 +410,7 @@ bool DBClientReplicaSet::connect() {
 }
 
 static bool isAuthenticationException(const DBException& ex) {
-    return ex.getCode() == ErrorCodes::AuthenticationFailed;
+    return ex.code() == ErrorCodes::AuthenticationFailed;
 }
 
 void DBClientReplicaSet::_auth(const BSONObj& params) {

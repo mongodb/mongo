@@ -116,7 +116,7 @@ void generateLegacyQueryErrorResponse(const AssertionException* exception,
                                   << " ntoreturn:" << queryMessage.ntoreturn;
     }
 
-    const SendStaleConfigException* scex = (exception->getCode() == ErrorCodes::SendStaleConfig)
+    const SendStaleConfigException* scex = (exception->code() == ErrorCodes::SendStaleConfig)
         ? static_cast<const SendStaleConfigException*>(exception)
         : NULL;
 
@@ -155,7 +155,7 @@ void generateLegacyQueryErrorResponse(const AssertionException* exception,
 }
 
 void registerError(OperationContext* opCtx, const DBException& exception) {
-    LastError::get(opCtx->getClient()).setLastError(exception.getCode(), exception.reason());
+    LastError::get(opCtx->getClient()).setLastError(exception.code(), exception.reason());
     CurOp::get(opCtx)->debug().exceptionInfo = exception.toStatus();
 }
 
@@ -170,7 +170,7 @@ void _generateErrorResponse(OperationContext* opCtx,
     replyBuilder->reset();
 
     // We need to include some extra information for SendStaleConfig.
-    if (exception.getCode() == ErrorCodes::SendStaleConfig) {
+    if (exception.code() == ErrorCodes::SendStaleConfig) {
         const SendStaleConfigException& scex =
             static_cast<const SendStaleConfigException&>(exception);
         replyBuilder->setCommandReply(scex.toStatus(),
@@ -197,7 +197,7 @@ void _generateErrorResponse(OperationContext* opCtx,
     replyBuilder->reset();
 
     // We need to include some extra information for SendStaleConfig.
-    if (exception.getCode() == ErrorCodes::SendStaleConfig) {
+    if (exception.code() == ErrorCodes::SendStaleConfig) {
         const SendStaleConfigException& scex =
             static_cast<const SendStaleConfigException&>(exception);
         replyBuilder->setCommandReply(scex.toStatus(),
@@ -698,7 +698,7 @@ void execCommandDatabase(OperationContext* opCtx,
         }
     } catch (const DBException& e) {
         // If we got a stale config, wait in case the operation is stuck in a critical section
-        if (e.getCode() == ErrorCodes::SendStaleConfig) {
+        if (e.code() == ErrorCodes::SendStaleConfig) {
             auto sce = dynamic_cast<const StaleConfigException*>(&e);
             invariant(sce);  // do not upcasts from DBException created by uassert variants.
 
@@ -844,7 +844,7 @@ DbResponse receivedQuery(OperationContext* opCtx,
         dbResponse.exhaustNS = runQuery(opCtx, q, nss, dbResponse.response);
     } catch (const AssertionException& e) {
         // If we got a stale config, wait in case the operation is stuck in a critical section
-        if (!opCtx->getClient()->isInDirectClient() && e.getCode() == ErrorCodes::SendStaleConfig) {
+        if (!opCtx->getClient()->isInDirectClient() && e.code() == ErrorCodes::SendStaleConfig) {
             auto& sce = static_cast<const StaleConfigException&>(e);
             ShardingState::get(opCtx)
                 ->onStaleShardVersion(opCtx, NamespaceString(sce.getns()), sce.getVersionReceived())
@@ -1107,12 +1107,12 @@ DbResponse ServiceEntryPointMongod::handleRequest(OperationContext* opCtx, const
                 }
             }
         } catch (const UserException& ue) {
-            LastError::get(c).setLastError(ue.getCode(), ue.reason());
+            LastError::get(c).setLastError(ue.code(), ue.reason());
             LOG(3) << " Caught Assertion in " << networkOpToString(op) << ", continuing "
                    << redact(ue);
             debug.exceptionInfo = ue.toStatus();
         } catch (const AssertionException& e) {
-            LastError::get(c).setLastError(e.getCode(), e.reason());
+            LastError::get(c).setLastError(e.code(), e.reason());
             LOG(3) << " Caught Assertion in " << networkOpToString(op) << ", continuing "
                    << redact(e);
             debug.exceptionInfo = e.toStatus();

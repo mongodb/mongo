@@ -60,7 +60,7 @@ TEST(RedactExceptionTest, NoRedact) {
 TEST(RedactExceptionTest, BasicException) {
     logger::globalLogDomain()->setShouldRedactLogs(true);
     DBException ex(kMsg, ErrorCodes::InternalError);
-    ASSERT_EQ(redact(ex), "1 ###");
+    ASSERT_EQ(redact(ex), "InternalError ###");
 }
 
 TEST(RedactBSONTest, NoRedact) {

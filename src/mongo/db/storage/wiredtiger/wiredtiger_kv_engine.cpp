@@ -113,7 +113,7 @@ public:
                 const bool stableCheckpoint = false;
                 _sessionCache->waitUntilDurable(forceCheckpoint, stableCheckpoint);
             } catch (const UserException& e) {
-                invariant(e.getCode() == ErrorCodes::ShutdownInProgress);
+                invariant(e.code() == ErrorCodes::ShutdownInProgress);
             }
 
             int ms = storageGlobalParams.journalCommitIntervalMs.load();
@@ -202,7 +202,7 @@ public:
                     }
                 }
             } catch (const UserException& exc) {
-                invariant(exc.getCode() == ErrorCodes::ShutdownInProgress);
+                invariant(exc.code() == ErrorCodes::ShutdownInProgress);
             }
         }
         LOG(1) << "stopping " << name() << " thread";
