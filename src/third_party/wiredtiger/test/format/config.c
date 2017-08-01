@@ -74,8 +74,11 @@ config_setup(void)
 		else
 			switch (mmrand(NULL, 1, 10)) {
 			case 1:					/* 10% */
-				config_single("file_type=fix", 0);
-				break;
+				if (!config_is_perm("modify_pct")) {
+					config_single("file_type=fix", 0);
+					break;
+				}
+				/* FALLTHROUGH */
 			case 2: case 3: case 4:			/* 30% */
 				config_single("file_type=var", 0);
 				break;				/* 60% */
@@ -545,16 +548,33 @@ config_pct(void)
 			list[i].order = mmrand(NULL, 1, 1000);
 	if (pct > 100)
 		testutil_die(EINVAL,
-		    "operation percentages total to more than 100%%");
+		    "operation percentages do not total to 100%%");
 
 	/* Cursor modify isn't possible for fixed-length column store. */
 	if (g.type == FIX) {
 		if (config_is_perm("modify_pct"))
 			testutil_die(EINVAL,
 			    "WT_CURSOR.modify not supported by fixed-length "
-			    "column store or LSM");
+			    "column store");
 		list[CONFIG_MODIFY_ENTRY].order = 0;
 		*list[CONFIG_MODIFY_ENTRY].vp = 0;
+	}
+
+	/*
+	 * Cursor modify isn't possible for read-uncommitted transactions.
+	 * If both forced, it's an error, else, prefer the forced one, else,
+	 * prefer modify operations.
+	 */
+	if (g.c_isolation_flag == ISOLATION_READ_UNCOMMITTED) {
+		if (config_is_perm("isolation")) {
+			if (config_is_perm("modify_pct"))
+				testutil_die(EINVAL,
+				    "WT_CURSOR.modify not supported with "
+				    "read-uncommitted transactions");
+			list[CONFIG_MODIFY_ENTRY].order = 0;
+			*list[CONFIG_MODIFY_ENTRY].vp = 0;
+		} else
+			config_single("isolation=random", 0);
 	}
 
 	/*

@@ -153,6 +153,7 @@ void
 __wt_delete_page_rollback(WT_SESSION_IMPL *session, WT_REF *ref)
 {
 	WT_UPDATE **upd;
+	uint64_t sleep_count, yield_count;
 
 	/*
 	 * If the page is still "deleted", it's as we left it, reset the state
@@ -160,7 +161,7 @@ __wt_delete_page_rollback(WT_SESSION_IMPL *session, WT_REF *ref)
 	 * instantiated or being instantiated.  Loop because it's possible for
 	 * the page to return to the deleted state if instantiation fails.
 	 */
-	for (;; __wt_yield())
+	for (sleep_count = yield_count = 0;;) {
 		switch (ref->state) {
 		case WT_REF_DISK:
 		case WT_REF_READING:
@@ -205,6 +206,15 @@ __wt_delete_page_rollback(WT_SESSION_IMPL *session, WT_REF *ref)
 			__wt_free(session, ref->page_del);
 			return;
 		}
+		/*
+		 * We wait for the change in page state, yield before retrying,
+		 * and if we've yielded enough times, start sleeping so we don't
+		 * burn CPU to no purpose.
+		 */
+		__wt_ref_state_yield_sleep(&yield_count, &sleep_count);
+		WT_STAT_CONN_INCRV(session, page_del_rollback_blocked,
+		    sleep_count);
+	}
 }
 
 /*
@@ -242,10 +252,10 @@ __wt_delete_page_skip(WT_SESSION_IMPL *session, WT_REF *ref, bool visible_all)
 		return (false);
 
 	skip = ref->page_del == NULL || (visible_all ?
-	    __wt_txn_visible_all(session,
-		ref->page_del->txnid, WT_GET_TIMESTAMP(ref->page_del)):
-	    __wt_txn_visible(session,
-		ref->page_del->txnid, WT_GET_TIMESTAMP(ref->page_del)));
+	    __wt_txn_visible_all(session, ref->page_del->txnid,
+		WT_TIMESTAMP_NULL(&ref->page_del->timestamp)):
+	    __wt_txn_visible(session, ref->page_del->txnid,
+		WT_TIMESTAMP_NULL(&ref->page_del->timestamp)));
 
 	/*
 	 * The page_del structure can be freed as soon as the delete is stable:
@@ -254,8 +264,8 @@ __wt_delete_page_skip(WT_SESSION_IMPL *session, WT_REF *ref, bool visible_all)
 	 * no longer need synchronization to check the ref.
 	 */
 	if (skip && ref->page_del != NULL && (visible_all ||
-	    __wt_txn_visible_all(session,
-	    ref->page_del->txnid, WT_GET_TIMESTAMP(ref->page_del)))) {
+	    __wt_txn_visible_all(session, ref->page_del->txnid,
+		WT_TIMESTAMP_NULL(&ref->page_del->timestamp)))) {
 		__wt_free(session, ref->page_del->update_list);
 		__wt_free(session, ref->page_del);
 	}

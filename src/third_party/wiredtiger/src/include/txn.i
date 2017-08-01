@@ -10,14 +10,15 @@ static inline int __wt_txn_id_check(WT_SESSION_IMPL *session);
 static inline void __wt_txn_read_last(WT_SESSION_IMPL *session);
 
 #ifdef HAVE_TIMESTAMPS
+#if WT_TIMESTAMP_SIZE == 8
 /*
  * __wt_timestamp_cmp --
  *	Compare two timestamps.
  */
 static inline int
-__wt_timestamp_cmp(const uint8_t *ts1, const uint8_t *ts2)
+__wt_timestamp_cmp(const wt_timestamp_t *ts1, const wt_timestamp_t *ts2)
 {
-	return (memcmp(ts1, ts2, WT_TIMESTAMP_SIZE));
+	return (ts1->val == ts2->val ? 0 : (ts1->val > ts2->val ? 1 : -1));
 }
 
 /*
@@ -25,9 +26,9 @@ __wt_timestamp_cmp(const uint8_t *ts1, const uint8_t *ts2)
  *	Set a timestamp.
  */
 static inline void
-__wt_timestamp_set(uint8_t *dest, const uint8_t *src)
+__wt_timestamp_set(wt_timestamp_t *dest, const wt_timestamp_t *src)
 {
-	(void)memcpy(dest, src, WT_TIMESTAMP_SIZE);
+	dest->val = src->val;
 }
 
 /*
@@ -35,11 +36,9 @@ __wt_timestamp_set(uint8_t *dest, const uint8_t *src)
  *	Check if a timestamp is equal to the special "zero" time.
  */
 static inline bool
-__wt_timestamp_iszero(const uint8_t *ts)
+__wt_timestamp_iszero(wt_timestamp_t *ts)
 {
-	static const wt_timestamp_t zero_timestamp;
-
-	return (memcmp(ts, zero_timestamp, WT_TIMESTAMP_SIZE) == 0);
+	return (ts->val == 0);
 }
 
 /*
@@ -47,9 +46,9 @@ __wt_timestamp_iszero(const uint8_t *ts)
  *	Set a timestamp to the maximum value.
  */
 static inline void
-__wt_timestamp_set_inf(uint8_t *ts)
+__wt_timestamp_set_inf(wt_timestamp_t *ts)
 {
-	memset(ts, 0xff, WT_TIMESTAMP_SIZE);
+	ts->val = UINT64_MAX;
 }
 
 /*
@@ -57,11 +56,65 @@ __wt_timestamp_set_inf(uint8_t *ts)
  *	Zero out a timestamp.
  */
 static inline void
-__wt_timestamp_set_zero(uint8_t *ts)
+__wt_timestamp_set_zero(wt_timestamp_t *ts)
 {
-	memset(ts, 0x00, WT_TIMESTAMP_SIZE);
+	ts->val = 0;
 }
-#endif
+#else
+/*
+ * __wt_timestamp_cmp --
+ *	Compare two timestamps.
+ */
+static inline int
+__wt_timestamp_cmp(const wt_timestamp_t *ts1, const wt_timestamp_t *ts2)
+{
+	return (memcmp(ts1->ts, ts2->ts, WT_TIMESTAMP_SIZE));
+}
+
+/*
+ * __wt_timestamp_set --
+ *	Set a timestamp.
+ */
+static inline void
+__wt_timestamp_set(wt_timestamp_t *dest, const wt_timestamp_t *src)
+{
+	(void)memcpy(dest->ts, src->ts, WT_TIMESTAMP_SIZE);
+}
+
+/*
+ * __wt_timestamp_iszero --
+ *	Check if a timestamp is equal to the special "zero" time.
+ */
+static inline bool
+__wt_timestamp_iszero(wt_timestamp_t *ts)
+{
+	static const wt_timestamp_t zero_timestamp;
+
+	return (memcmp(ts->ts,
+	    WT_TIMESTAMP_NULL(&zero_timestamp), WT_TIMESTAMP_SIZE) == 0);
+}
+
+/*
+ * __wt_timestamp_set_inf --
+ *	Set a timestamp to the maximum value.
+ */
+static inline void
+__wt_timestamp_set_inf(wt_timestamp_t *ts)
+{
+	memset(ts->ts, 0xff, WT_TIMESTAMP_SIZE);
+}
+
+/*
+ * __wt_timestamp_set_zero --
+ *	Zero out a timestamp.
+ */
+static inline void
+__wt_timestamp_set_zero(wt_timestamp_t *ts)
+{
+	memset(ts->ts, 0x00, WT_TIMESTAMP_SIZE);
+}
+#endif /* WT_TIMESTAMP_SIZE == 8 */
+#endif /* HAVE_TIMESTAMPS */
 
 /*
  * __txn_next_op --
@@ -130,7 +183,7 @@ __wt_txn_modify(WT_SESSION_IMPL *session, WT_UPDATE *upd)
 	    WT_TXN_OP_INMEM : WT_TXN_OP_BASIC;
 #ifdef HAVE_TIMESTAMPS
 	if (F_ISSET(txn, WT_TXN_HAS_TS_COMMIT)) {
-		__wt_timestamp_set(upd->timestamp, txn->commit_timestamp);
+		__wt_timestamp_set(&upd->timestamp, &txn->commit_timestamp);
 		if (!F_ISSET(session, WT_SESSION_LOGGING_INMEM))
 			op->type = WT_TXN_OP_BASIC_TS;
 	}
@@ -215,16 +268,6 @@ __wt_txn_oldest_id(WT_SESSION_IMPL *session)
 }
 
 /*
- * __wt_txn_committed --
- *	Return if a transaction has been committed.
- */
-static inline bool
-__wt_txn_committed(WT_SESSION_IMPL *session, uint64_t id)
-{
-	return (WT_TXNID_LT(id, S2C(session)->txn_global.last_running));
-}
-
-/*
  * __txn_visible_all_id --
  *	Check if a given transaction ID is "globally visible".	This is, if
  *	all sessions in the system will see the transaction ID including the
@@ -248,7 +291,7 @@ __txn_visible_all_id(WT_SESSION_IMPL *session, uint64_t id)
  */
 static inline bool
 __wt_txn_visible_all(
-    WT_SESSION_IMPL *session, uint64_t id, const uint8_t *timestamp)
+    WT_SESSION_IMPL *session, uint64_t id, const wt_timestamp_t *timestamp)
 {
 	if (!__txn_visible_all_id(session, id))
 		return (false);
@@ -263,7 +306,7 @@ __wt_txn_visible_all(
 		return (true);
 
 	__wt_readlock(session, &txn_global->rwlock);
-	cmp = __wt_timestamp_cmp(timestamp, txn_global->pinned_timestamp);
+	cmp = __wt_timestamp_cmp(timestamp, &txn_global->pinned_timestamp);
 	__wt_readunlock(session, &txn_global->rwlock);
 
 	/*
@@ -289,7 +332,7 @@ static inline bool
 __wt_txn_upd_visible_all(WT_SESSION_IMPL *session, WT_UPDATE *upd)
 {
 	return (__wt_txn_visible_all(
-	    session, upd->txnid, WT_GET_TIMESTAMP(upd)));
+	    session, upd->txnid, WT_TIMESTAMP_NULL(&upd->timestamp)));
 }
 
 /*
@@ -351,7 +394,7 @@ __txn_visible_id(WT_SESSION_IMPL *session, uint64_t id)
  */
 static inline bool
 __wt_txn_visible(
-    WT_SESSION_IMPL *session, uint64_t id, const uint8_t *timestamp)
+    WT_SESSION_IMPL *session, uint64_t id, const wt_timestamp_t *timestamp)
 {
 	if (!__txn_visible_id(session, id))
 		return (false);
@@ -364,7 +407,7 @@ __wt_txn_visible(
 	if (!F_ISSET(txn, WT_TXN_HAS_TS_READ) || timestamp == NULL)
 		return (true);
 
-	return (memcmp(timestamp, txn->read_timestamp, WT_TIMESTAMP_SIZE) <= 0);
+	return (__wt_timestamp_cmp(timestamp, &txn->read_timestamp) <= 0);
 	}
 #else
 	WT_UNUSED(timestamp);
@@ -379,7 +422,8 @@ __wt_txn_visible(
 static inline bool
 __wt_txn_upd_visible(WT_SESSION_IMPL *session, WT_UPDATE *upd)
 {
-	return (__wt_txn_visible(session, upd->txnid, WT_GET_TIMESTAMP(upd)));
+	return (__wt_txn_visible(session,
+	    upd->txnid, WT_TIMESTAMP_NULL(&upd->timestamp)));
 }
 
 /*

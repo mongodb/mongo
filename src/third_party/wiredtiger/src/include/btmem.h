@@ -263,17 +263,17 @@ struct __wt_page_modify {
 		void	*disk_image;
 
 		/*
-		 * List of unresolved updates. Updates are either a WT_INSERT
-		 * or a row-store leaf page entry; when creating lookaside
-		 * records, there is an additional value, the committed item's
-		 * transaction ID.
+		 * List of unresolved updates. Updates are either a row-store
+		 * insert or update list, or column-store insert list. When
+		 * creating lookaside records, there is an additional value,
+		 * the committed item's transaction information.
 		 *
 		 * If there are unresolved updates, the block wasn't written and
 		 * there will always be a disk image.
 		 */
 		struct __wt_save_upd {
-			WT_INSERT *ins;
-			WT_ROW	  *rip;
+			WT_INSERT *ins;		/* Insert list reference */
+			WT_ROW	  *ripcip;	/* Original on-page reference */
 			uint64_t   onpage_txn;
 			WT_DECL_TIMESTAMP(onpage_timestamp)
 		} *supd;
@@ -695,7 +695,7 @@ struct __wt_page {
  *	Related information for fast-delete, on-disk pages.
  */
 struct __wt_page_deleted {
-	uint64_t txnid;			/* Transaction ID */
+	volatile uint64_t txnid;			/* Transaction ID */
 	WT_DECL_TIMESTAMP(timestamp)
 
 	WT_UPDATE **update_list;	/* List of updates for abort */
@@ -885,41 +885,58 @@ struct __wt_ikey {
  * is done for an entry, WT_UPDATE structures are formed into a forward-linked
  * list.
  */
-WT_PACKED_STRUCT_BEGIN(__wt_update)
-	uint64_t txnid;			/* transaction */
-	WT_DECL_TIMESTAMP(timestamp)
+struct __wt_update {
+	volatile uint64_t txnid;	/* transaction ID */
+#if WT_TIMESTAMP_SIZE == 8
+	WT_DECL_TIMESTAMP(timestamp)	/* aligned uint64_t timestamp */
+#endif
 
 	WT_UPDATE *next;		/* forward-linked list */
 
 	uint32_t size;			/* data length */
 
-#define	WT_UPDATE_STANDARD	0
-#define	WT_UPDATE_DELETED	1
-#define	WT_UPDATE_RESERVED	2
+#define	WT_UPDATE_DELETED	0	/* deleted */
+#define	WT_UPDATE_MODIFIED	1	/* partial-update modify value */
+#define	WT_UPDATE_RESERVED	2	/* reserved */
+#define	WT_UPDATE_STANDARD	3	/* complete value */
 	uint8_t type;			/* type (one byte to conserve memory) */
 
-	/* The update includes a complete value. */
+	/* If the update includes a complete value. */
 #define	WT_UPDATE_DATA_VALUE(upd)					\
 	((upd)->type == WT_UPDATE_STANDARD || (upd)->type == WT_UPDATE_DELETED)
 
-	/* The untyped value immediately follows the WT_UPDATE structure. */
-#define	WT_UPDATE_DATA(upd)						\
-	((void *)((uint8_t *)(upd) + sizeof(WT_UPDATE)))
+#if WT_TIMESTAMP_SIZE != 8
+	WT_DECL_TIMESTAMP(timestamp)	/* unaligned uint8_t array timestamp */
+#endif
 
 	/*
-	 * The memory size of an update: include some padding because this is
-	 * such a common case that overhead of tiny allocations can swamp our
-	 * cache overhead calculation.
+	 * Zero or more bytes of value (the payload) immediately follows the
+	 * WT_UPDATE structure.  We use a C99 flexible array member which has
+	 * the semantics we want.
 	 */
-#define	WT_UPDATE_MEMSIZE(upd)						\
-	WT_ALIGN(sizeof(WT_UPDATE) + (upd)->size, 32)
-WT_PACKED_STRUCT_END
+	uint8_t data[];			/* start of the data */
+};
 
 /*
- * WT_UPDATE_SIZE is the expected structure size -- we verify the build to
- * ensure the compiler hasn't inserted padding.
+ * WT_UPDATE_SIZE is the expected structure size excluding the payload data --
+ * we verify the build to ensure the compiler hasn't inserted padding.
  */
 #define	WT_UPDATE_SIZE	(21 + WT_TIMESTAMP_SIZE)
+
+/*
+ * The memory size of an update: include some padding because this is such a
+ * common case that overhead of tiny allocations can swamp our cache overhead
+ * calculation.
+ */
+#define	WT_UPDATE_MEMSIZE(upd)						\
+	WT_ALIGN(WT_UPDATE_SIZE + (upd)->size, 32)
+
+/*
+ * WT_MAX_MODIFY_UPDATE --
+ *	Limit update chains to a small value to avoid penalizing reads and
+ * permit truncation.
+ */
+#define	WT_MAX_MODIFY_UPDATE	100
 
 /*
  * WT_INSERT --

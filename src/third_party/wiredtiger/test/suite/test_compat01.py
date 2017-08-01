@@ -102,7 +102,7 @@ class test_compat01(wttest.WiredTigerTestCase, suite_subprocess):
         contains = 0
         with open('printlog.out') as logfile:
             for line in logfile:
-                if 'prev_lsn' in line:
+                if 'optype' in line and 'prev_lsn' in line:
                     contains += 1
         self.assertEqual(prev_lsn_count, contains)
 

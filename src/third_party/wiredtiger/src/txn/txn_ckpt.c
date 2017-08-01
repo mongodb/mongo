@@ -571,7 +571,9 @@ __checkpoint_prepare(WT_SESSION_IMPL *session, const char *cfg[])
 	WT_TXN *txn;
 	WT_TXN_GLOBAL *txn_global;
 	WT_TXN_STATE *txn_state;
-	char timestamp_config[100];
+	char timestamp_buf[2 * WT_TIMESTAMP_SIZE + 1], timestamp_config[100];
+	const char *query_cfg[] = { WT_CONFIG_BASE(session,
+	    WT_CONNECTION_query_timestamp), "get=stable", NULL };
 	const char *txn_cfg[] = { WT_CONFIG_BASE(session,
 	    WT_SESSION_begin_transaction), "isolation=snapshot", NULL, NULL };
 
@@ -580,11 +582,31 @@ __checkpoint_prepare(WT_SESSION_IMPL *session, const char *cfg[])
 	txn_global = &conn->txn_global;
 	txn_state = WT_SESSION_TXN_STATE(session);
 
+	/*
+	 * Someone giving us a specific timestamp overrides the general
+	 * use_timestamp.
+	 */
 	WT_RET(__wt_config_gets(session, cfg, "read_timestamp", &cval));
 	if (cval.len > 0) {
 		WT_RET(__wt_snprintf(timestamp_config, sizeof(timestamp_config),
 		    "read_timestamp=%.*s", (int)cval.len, cval.str));
 		txn_cfg[2] = timestamp_config;
+	} else if (txn_global->has_stable_timestamp) {
+		WT_RET(__wt_config_gets(session, cfg, "use_timestamp", &cval));
+		/*
+		 * Get the stable timestamp currently set.  Then set that as
+		 * the read timestamp for the transaction.
+		 */
+		if (cval.val != 0) {
+			if ((ret = __wt_txn_global_query_timestamp(session,
+			    timestamp_buf, query_cfg)) != 0 &&
+			    ret != WT_NOTFOUND)
+				return (ret);
+			WT_RET(__wt_snprintf(timestamp_config,
+			    sizeof(timestamp_config),
+			    "read_timestamp=%s", timestamp_buf));
+			txn_cfg[2] = timestamp_config;
+		}
 	}
 
 	/*
@@ -1675,18 +1697,6 @@ __wt_checkpoint_close(WT_SESSION_IMPL *session, bool final)
 	bulk = F_ISSET(btree, WT_BTREE_BULK);
 
 	/*
-	 * If the handle is already dead or the file isn't durable, force the
-	 * discard.
-	 *
-	 * If the file isn't durable, mark the handle dead, there are asserts
-	 * later on that only dead handles can have modified pages.
-	 */
-	if (F_ISSET(btree, WT_BTREE_NO_CHECKPOINT))
-		F_SET(session->dhandle, WT_DHANDLE_DEAD);
-	if (F_ISSET(session->dhandle, WT_DHANDLE_DEAD))
-		return (__wt_cache_op(session, WT_SYNC_DISCARD));
-
-	/*
 	 * If closing an unmodified file, check that no update is required
 	 * for active readers.
 	 */
@@ -1694,7 +1704,7 @@ __wt_checkpoint_close(WT_SESSION_IMPL *session, bool final)
 		WT_RET(__wt_txn_update_oldest(
 		    session, WT_TXN_OLDEST_STRICT | WT_TXN_OLDEST_WAIT));
 		return (__wt_txn_visible_all(session, btree->rec_max_txn,
-		    WT_TIMESTAMP(btree->rec_max_timestamp)) ?
+		    WT_TIMESTAMP_NULL(&btree->rec_max_timestamp)) ?
 		    __wt_cache_op(session, WT_SYNC_DISCARD) : EBUSY);
 	}
 

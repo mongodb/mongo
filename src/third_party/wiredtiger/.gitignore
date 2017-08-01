@@ -54,6 +54,7 @@ build_posix/wt
 tags
 
 # Documentation
+/dist/plantuml.jar
 /docs/
 /src/docs/changelog.md
 /src/docs/doxygen.log
@@ -119,6 +120,7 @@ _wiredtiger.pyd
 **/test/csuite/test_wt3120_filesys
 **/test/csuite/test_wt3135_search_near_collator
 **/test/csuite/test_wt3184_dup_index_collator
+**/test/csuite/test_wt3338_partial_update
 **/test/csuite/test_wt3363_checkpoint_op_races
 **/test/cursor_order/cursor_order
 **/test/fops/t

@@ -489,6 +489,7 @@ NOTFOUND_OK(__wt_cursor::prev)
 NOTFOUND_OK(__wt_cursor::remove)
 NOTFOUND_OK(__wt_cursor::search)
 NOTFOUND_OK(__wt_cursor::update)
+NOTFOUND_OK(__wt_cursor::_modify)
 ANY_OK(__wt_modify::__wt_modify)
 ANY_OK(__wt_modify::~__wt_modify)
 

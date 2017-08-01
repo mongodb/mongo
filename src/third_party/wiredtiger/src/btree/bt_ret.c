@@ -75,10 +75,10 @@ __key_return(WT_SESSION_IMPL *session, WT_CURSOR_BTREE *cbt)
 
 /*
  * __value_return --
- *	Change the cursor to reference an internal return value.
+ *	Change the cursor to reference an internal original-page return value.
  */
 static inline int
-__value_return(WT_SESSION_IMPL *session, WT_CURSOR_BTREE *cbt, WT_UPDATE *upd)
+__value_return(WT_SESSION_IMPL *session, WT_CURSOR_BTREE *cbt)
 {
 	WT_BTREE *btree;
 	WT_CELL *cell;
@@ -92,13 +92,6 @@ __value_return(WT_SESSION_IMPL *session, WT_CURSOR_BTREE *cbt, WT_UPDATE *upd)
 
 	page = cbt->ref->page;
 	cursor = &cbt->iface;
-
-	/* If the cursor references a WT_UPDATE item, return it. */
-	if (upd != NULL) {
-		cursor->value.data = WT_UPDATE_DATA(upd);
-		cursor->value.size = upd->size;
-		return (0);
-	}
 
 	if (page->type == WT_PAGE_ROW_LEAF) {
 		rip = &page->pg_row[cbt->slot];
@@ -136,6 +129,99 @@ __value_return(WT_SESSION_IMPL *session, WT_CURSOR_BTREE *cbt, WT_UPDATE *upd)
 }
 
 /*
+ * __value_return_upd --
+ *	Change the cursor to reference an internal update structure return
+ * value.
+ */
+static inline int
+__value_return_upd(
+    WT_SESSION_IMPL *session, WT_CURSOR_BTREE *cbt, WT_UPDATE *upd)
+{
+	WT_CURSOR *cursor;
+	WT_DECL_RET;
+	WT_UPDATE **listp, *list[WT_MAX_MODIFY_UPDATE];
+	u_int i;
+	size_t allocated_bytes;
+
+	cursor = &cbt->iface;
+	allocated_bytes = 0;
+
+	/*
+	 * We're passed a "standard" or "modified"  update that's visible to us.
+	 * Our caller should have already checked for deleted items (we're too
+	 * far down the call stack to return not-found).
+	 *
+	 * Fast path if it's a standard item, assert our caller's behavior.
+	 */
+	if (upd->type == WT_UPDATE_STANDARD) {
+		cursor->value.data = upd->data;
+		cursor->value.size = upd->size;
+		return (0);
+	}
+	WT_ASSERT(session, upd->type == WT_UPDATE_MODIFIED);
+
+	/*
+	 * Find a complete update that's visible to us, tracking modifications
+	 * that are visible to us.
+	 */
+	for (i = 0, listp = list; upd != NULL; upd = upd->next) {
+		if (!__wt_txn_upd_visible(session, upd))
+			continue;
+
+		if (WT_UPDATE_DATA_VALUE(upd))
+			break;
+
+		if (upd->type == WT_UPDATE_MODIFIED) {
+			/*
+			 * Update lists are expected to be short, but it's not
+			 * guaranteed. There's sufficient room on the stack to
+			 * avoid memory allocation in normal cases, but we have
+			 * to handle the edge cases too.
+			 */
+			if (i >= WT_MAX_MODIFY_UPDATE) {
+				if (i == WT_MAX_MODIFY_UPDATE)
+					listp = NULL;
+				WT_ERR(__wt_realloc_def(
+				    session, &allocated_bytes, i + 1, &listp));
+				if (i == WT_MAX_MODIFY_UPDATE)
+					memcpy(listp, list, sizeof(list));
+			}
+			listp[i++] = upd;
+		}
+	}
+
+	/*
+	 * If we hit the end of the chain, roll forward from the update item we
+	 * found, otherwise, from the original page's value.
+	 */
+	if (upd == NULL) {
+		/*
+		 * Callers of this function set the cursor slot to an impossible
+		 * value to check we're not trying to return on-page values when
+		 * the update list should have been sufficient (which happens,
+		 * for example, if an update list was truncated, deleting some
+		 * standard update required by a previous modify update). Assert
+		 * the case.
+		 */
+		WT_ASSERT(session, cbt->slot != UINT32_MAX);
+
+		WT_ERR(__value_return(session, cbt));
+	} else if (upd->type == WT_UPDATE_DELETED)
+		WT_ERR(__wt_buf_set(session, &cursor->value, "", 0));
+	else
+		WT_ERR(__wt_buf_set(session,
+		    &cursor->value, upd->data, upd->size));
+
+	while (i > 0)
+		WT_ERR(__wt_modify_apply(
+		    session, &cursor->value, listp[--i]->data));
+
+err:	if (allocated_bytes)
+		__wt_free(session, listp);
+	return (ret);
+}
+
+/*
  * __wt_key_return --
  *	Change the cursor to reference an internal return key.
  */
@@ -164,21 +250,22 @@ __wt_key_return(WT_SESSION_IMPL *session, WT_CURSOR_BTREE *cbt)
 }
 
 /*
- * __wt_kv_return --
- *	Return a page referenced key/value pair to the application.
+ * __wt_value_return --
+ *	Change the cursor to reference an internal return value.
  */
 int
-__wt_kv_return(WT_SESSION_IMPL *session, WT_CURSOR_BTREE *cbt, WT_UPDATE *upd)
+__wt_value_return(
+    WT_SESSION_IMPL *session, WT_CURSOR_BTREE *cbt, WT_UPDATE *upd)
 {
 	WT_CURSOR *cursor;
 
 	cursor = &cbt->iface;
 
-	WT_RET(__wt_key_return(session, cbt));
-
 	F_CLR(cursor, WT_CURSTD_VALUE_EXT);
-	WT_RET(__value_return(session, cbt, upd));
+	if (upd == NULL)
+		WT_RET(__value_return(session, cbt));
+	else
+		WT_RET(__value_return_upd(session, cbt, upd));
 	F_SET(cursor, WT_CURSTD_VALUE_INT);
-
 	return (0);
 }

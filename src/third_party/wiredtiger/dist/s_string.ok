@@ -350,11 +350,14 @@ Syscall
 TAILQ
 TCMalloc
 TESTUTIL
+TIMESTAMP
+TIMESTAMPS
 TODO
 TORTIOUS
 TSO
 TXN
 TXNC
+Teardown
 ThreadList
 ThreadListWrapper
 Timespec
@@ -992,6 +995,7 @@ oo
 opcode
 opendir
 openfile
+oplist
 oplog
 optimizations
 optype
@@ -1085,6 +1089,7 @@ refp
 regionp
 reinitialization
 relocked
+repl
 resize
 resizing
 ret
@@ -1320,3 +1325,4 @@ zseries
 zstd
 zstd's
 zu
+zyxwvutsrqponmlkjihgfedcba

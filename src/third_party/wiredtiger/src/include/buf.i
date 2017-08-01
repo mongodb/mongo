@@ -116,18 +116,18 @@ __wt_scr_free(WT_SESSION_IMPL *session, WT_ITEM **bufp)
 {
 	WT_ITEM *buf;
 
-	if ((buf = *bufp) != NULL) {
-		*bufp = NULL;
+	if ((buf = *bufp) == NULL)
+		return;
+	*bufp = NULL;
 
-		if (session->scratch_cached + buf->memsize >=
-		    S2C(session)->session_scratch_max) {
-			__wt_free(session, buf->mem);
-			buf->memsize = 0;
-		} else
-			session->scratch_cached += buf->memsize;
+	if (session->scratch_cached + buf->memsize >=
+	    S2C(session)->session_scratch_max) {
+		__wt_free(session, buf->mem);
+		buf->memsize = 0;
+	} else
+		session->scratch_cached += buf->memsize;
 
-		buf->data = NULL;
-		buf->size = 0;
-		F_CLR(buf, WT_ITEM_INUSE);
-	}
+	buf->data = NULL;
+	buf->size = 0;
+	F_CLR(buf, WT_ITEM_INUSE);
 }

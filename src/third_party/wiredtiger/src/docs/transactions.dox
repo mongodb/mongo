@@ -164,7 +164,7 @@ timestamp size is 8 bytes (i.e., 64 bits).  Setting a size of zero disables
 transaction timestamp functionality.
 
 Applications can assign explicit commit timestamps to transactions, then read
-"as of" a timestamp.  Timestamps and are communicated to WiredTiger using a
+"as of" a timestamp.  Timestamps are communicated to WiredTiger using a
 lower case hexadecimal encoding, so the encoded value can be twice as long as
 the raw timestamp value.
 
@@ -176,6 +176,13 @@ future read timestamps will be at least as recent as the oldest timestamp, so
 WiredTiger can discard history before the specified point.  It is critical
 that the oldest timestamp update frequently or the cache can become full of
 updates, reducing performance.
+
+Setting a stable timestamp in WT_CONNECTION::set_timestamp indicates a
+known stable location that is sufficient for durability.  During a checkpoint
+the state of a table will be saved only as of the stable timestamp.  Newer
+updates after that stable timestamp will not be included in the checkpoint.
+That can be overridden in the call to WT_SESSION::checkpoint.  It is expected
+that the stable timestamp is updated frequently.
 
 Commit timestamps cannot be set in the past of any read timestamp that has
 been used.  This is enforced by assertions in diagnostic builds, if

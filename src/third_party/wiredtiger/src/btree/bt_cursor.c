@@ -308,8 +308,22 @@ __wt_cursor_valid(WT_CURSOR_BTREE *cbt, WT_UPDATE **updp)
 }
 
 /*
+ * __cursor_kv_return --
+ *	Return a page referenced key/value pair to the application.
+ */
+static inline int
+__cursor_kv_return(
+    WT_SESSION_IMPL *session, WT_CURSOR_BTREE *cbt, WT_UPDATE *upd)
+{
+	WT_RET(__wt_key_return(session, cbt));
+	WT_RET(__wt_value_return(session, cbt, upd));
+
+	return (0);
+}
+
+/*
  * __cursor_col_search --
- *	Column-store search from an application cursor.
+ *	Column-store search from a cursor.
  */
 static inline int
 __cursor_col_search(
@@ -324,7 +338,7 @@ __cursor_col_search(
 
 /*
  * __cursor_row_search --
- *	Row-store search from an application cursor.
+ *	Row-store search from a cursor.
  */
 static inline int
 __cursor_row_search(
@@ -338,8 +352,32 @@ __cursor_row_search(
 }
 
 /*
+ * __cursor_col_modify_v --
+ *	Column-store modify from a cursor, with a separate value.
+ */
+static inline int
+__cursor_col_modify_v(WT_SESSION_IMPL *session,
+    WT_CURSOR_BTREE *cbt, WT_ITEM *value, u_int modify_type)
+{
+	return (__wt_col_modify(session, cbt,
+	    cbt->iface.recno, value, NULL, modify_type, false));
+}
+
+/*
+ * __cursor_row_modify_v --
+ *	Row-store modify from a cursor, with a separate value.
+ */
+static inline int
+__cursor_row_modify_v(WT_SESSION_IMPL *session,
+    WT_CURSOR_BTREE *cbt, WT_ITEM *value, u_int modify_type)
+{
+	return (__wt_row_modify(session, cbt,
+	    &cbt->iface.key, value, NULL, modify_type, false));
+}
+
+/*
  * __cursor_col_modify --
- *	Column-store delete, insert, and update from an application cursor.
+ *	Column-store modify from a cursor.
  */
 static inline int
 __cursor_col_modify(
@@ -351,7 +389,7 @@ __cursor_col_modify(
 
 /*
  * __cursor_row_modify --
- *	Row-store insert, update and delete from an application cursor.
+ *	Row-store modify from a cursor.
  */
 static inline int
 __cursor_row_modify(
@@ -442,7 +480,7 @@ __wt_btcur_search(WT_CURSOR_BTREE *cbt)
 	}
 
 	if (valid)
-		ret = __wt_kv_return(session, cbt, upd);
+		ret = __cursor_kv_return(session, cbt, upd);
 	else if (__cursor_fix_implicit(btree, cbt)) {
 		/*
 		 * Creating a record past the end of the tree in a fixed-length
@@ -564,7 +602,7 @@ __wt_btcur_search_near(WT_CURSOR_BTREE *cbt, int *exactp)
 	 */
 	if (valid) {
 		exact = cbt->compare;
-		ret = __wt_kv_return(session, cbt, upd);
+		ret = __cursor_kv_return(session, cbt, upd);
 	} else if (__cursor_fix_implicit(btree, cbt)) {
 		cbt->recno = cursor->recno;
 		cbt->v = 0;
@@ -582,7 +620,7 @@ __wt_btcur_search_near(WT_CURSOR_BTREE *cbt, int *exactp)
 		    __cursor_col_search(session, cbt, NULL));
 		if (__wt_cursor_valid(cbt, &upd)) {
 			exact = cbt->compare;
-			ret = __wt_kv_return(session, cbt, upd);
+			ret = __cursor_kv_return(session, cbt, upd);
 		} else if ((ret = __wt_btcur_prev(cbt, false)) != WT_NOTFOUND)
 			exact = -1;
 	}
@@ -987,7 +1025,7 @@ done:	/*
  *	Update a record in the tree.
  */
 static int
-__btcur_update(WT_CURSOR_BTREE *cbt, u_int modify_type)
+__btcur_update(WT_CURSOR_BTREE *cbt, WT_ITEM *value, u_int modify_type)
 {
 	WT_BTREE *btree;
 	WT_CURFILE_STATE state;
@@ -1015,6 +1053,7 @@ __btcur_update(WT_CURSOR_BTREE *cbt, u_int modify_type)
 	 */
 	if (__cursor_page_pinned(cbt) && F_ISSET(cursor, WT_CURSTD_KEY_INT)) {
 		WT_ERR(__wt_txn_autocommit_check(session));
+
 		/*
 		 * The cursor position may not be exact (the cursor's comparison
 		 * value not equal to zero). Correct to an exact match so we can
@@ -1022,8 +1061,8 @@ __btcur_update(WT_CURSOR_BTREE *cbt, u_int modify_type)
 		 */
 		cbt->compare = 0;
 		ret = btree->type == BTREE_ROW ?
-		    __cursor_row_modify(session, cbt, modify_type) :
-		    __cursor_col_modify(session, cbt, modify_type);
+		    __cursor_row_modify_v(session, cbt, value, modify_type) :
+		    __cursor_col_modify_v(session, cbt, value, modify_type);
 		if (ret == 0)
 			goto done;
 
@@ -1052,6 +1091,7 @@ retry:	WT_ERR(__cursor_func_init(cbt, true));
 
 	if (btree->type == BTREE_ROW) {
 		WT_ERR(__cursor_row_search(session, cbt, NULL, true));
+
 		/*
 		 * If not overwriting, check for conflicts and fail if the key
 		 * does not exist.
@@ -1061,7 +1101,7 @@ retry:	WT_ERR(__cursor_func_init(cbt, true));
 			if (cbt->compare != 0 || !__wt_cursor_valid(cbt, NULL))
 				WT_ERR(WT_NOTFOUND);
 		}
-		ret = __cursor_row_modify(session, cbt, modify_type);
+		ret = __cursor_row_modify_v(session, cbt, value, modify_type);
 	} else {
 		WT_ERR(__cursor_col_search(session, cbt, NULL));
 
@@ -1080,7 +1120,7 @@ retry:	WT_ERR(__cursor_func_init(cbt, true));
 			    !__cursor_fix_implicit(btree, cbt))
 				WT_ERR(WT_NOTFOUND);
 		}
-		ret = __cursor_col_modify(session, cbt, modify_type);
+		ret = __cursor_col_modify_v(session, cbt, value, modify_type);
 	}
 
 err:	if (ret == WT_RESTART) {
@@ -1097,20 +1137,154 @@ err:	if (ret == WT_RESTART) {
 	 * To make this work, we add a field to the btree cursor to pass back a
 	 * pointer to the modify function's allocated update structure.
 	 */
-done:	if (ret == 0) {
-		if (modify_type == WT_UPDATE_RESERVED) {
+done:	if (ret == 0)
+		switch (modify_type) {
+		case WT_UPDATE_STANDARD:
+			/*
+			 * WT_CURSOR.update returns a key and a value.
+			 */
+			WT_TRET(__cursor_kv_return(
+			    session, cbt, cbt->modify_update));
+			break;
+		case WT_UPDATE_RESERVED:
+			/*
+			 * WT_CURSOR.reserve doesn't return any value.
+			 */
 			F_CLR(cursor, WT_CURSTD_VALUE_SET);
+			/* FALLTHROUGH */
+		case WT_UPDATE_MODIFIED:
+			/*
+			 * WT_CURSOR.modify has already created the return value
+			 * and our job is to leave it untouched.
+			 */
 			WT_TRET(__wt_key_return(session, cbt));
-		} else
-			WT_TRET(
-			    __wt_kv_return(session, cbt, cbt->modify_update));
-	}
+			break;
+		case WT_UPDATE_DELETED:
+		default:
+			WT_TRET(__wt_illegal_value(session, NULL));
+			break;
+		}
 
 	if (ret != 0) {
 		WT_TRET(__cursor_reset(cbt));
 		__cursor_state_restore(cursor, &state);
 	}
 
+	return (ret);
+}
+
+/*
+ * __cursor_chain_exceeded --
+ *	Return if the update chain has exceeded the limit. Deleted or standard
+ * updates are anticipated to be sufficient to base the modify (although that's
+ * not guaranteed, they may not be visible or might abort before we read them).
+ * Also, this is not a hard limit, threads can race modifying updates.
+ */
+static bool
+__cursor_chain_exceeded(WT_CURSOR_BTREE *cbt)
+{
+	WT_PAGE *page;
+	WT_UPDATE *upd;
+	int i;
+
+	page = cbt->ref->page;
+
+	upd = NULL;
+	if (cbt->ins != NULL)
+		upd = cbt->ins->upd;
+	else if (cbt->btree->type == BTREE_ROW &&
+	    page->modify != NULL && page->modify->mod_row_update != NULL)
+		upd = page->modify->mod_row_update[cbt->slot];
+
+	for (i = 0; upd != NULL; ++i, upd = upd->next) {
+		if (upd->type == WT_UPDATE_DELETED ||
+		    upd->type == WT_UPDATE_STANDARD)
+			return (false);
+		if (i >= WT_MAX_MODIFY_UPDATE)
+			return (true);
+	}
+	return (false);
+}
+
+/*
+ * __wt_btcur_modify --
+ *     Modify a record in the tree.
+ */
+int
+__wt_btcur_modify(WT_CURSOR_BTREE *cbt, WT_MODIFY *entries, int nentries)
+{
+	WT_CURFILE_STATE state;
+	WT_CURSOR *cursor;
+	WT_DECL_ITEM(modify);
+	WT_DECL_RET;
+	WT_SESSION_IMPL *session;
+	size_t orig, new;
+	bool chain_exceeded, overwrite;
+
+	cursor = &cbt->iface;
+	session = (WT_SESSION_IMPL *)cursor->session;
+
+	WT_STAT_CONN_INCR(session, cursor_modify);
+	WT_STAT_DATA_INCR(session, cursor_modify);
+
+	/* Save the cursor state. */
+	__cursor_state_save(cursor, &state);
+
+	/*
+	 * Get the current value and apply the modification to it, for a few
+	 * reasons: first, we set the updated value so the application can
+	 * retrieve the cursor's value; second, we use the updated value as
+	 * the update if the update chain is too long; third, there's a check
+	 * if the updated value is too large to store; fourth, to simplify the
+	 * count of bytes being added/removed; fifth, we can get into serious
+	 * trouble if we attempt to modify a value that doesn't exist. For the
+	 * fifth reason, verify we're not in a read-uncommitted transaction,
+	 * that implies a value that might disappear out from under us.
+	 */
+	if (session->txn.isolation == WT_ISO_READ_UNCOMMITTED)
+		WT_ERR_MSG(session, ENOTSUP,
+		    "not supported in read-uncommitted transactions");
+
+	WT_ERR(__wt_btcur_search(cbt));
+	orig = cursor->value.size;
+	WT_ERR(__wt_modify_apply_api(
+	    session, &cursor->value, entries, nentries));
+	new = cursor->value.size;
+	WT_ERR(__cursor_size_chk(session, &cursor->value));
+	if (new > orig)
+		WT_STAT_DATA_INCRV(session, cursor_update_bytes, new - orig);
+	else
+		WT_STAT_DATA_DECRV(session, cursor_update_bytes, orig - new);
+
+	/*
+	 * WT_CURSOR.modify is update-without-overwrite.
+	 *
+	 * Use the modify buffer as the update if under the limit, else use the
+	 * complete value.
+	 */
+	overwrite = F_ISSET(cursor, WT_CURSTD_OVERWRITE);
+	F_CLR(cursor, WT_CURSTD_OVERWRITE);
+	chain_exceeded = __cursor_chain_exceeded(cbt);
+	if (chain_exceeded)
+		ret = __btcur_update(cbt, &cursor->value, WT_UPDATE_STANDARD);
+	else if ((ret =
+	    __wt_modify_pack(session, &modify, entries, nentries)) == 0)
+		ret = __btcur_update(cbt, modify, WT_UPDATE_MODIFIED);
+	if (overwrite)
+	       F_SET(cursor, WT_CURSTD_OVERWRITE);
+
+	/*
+	 * We have our own cursor state restoration because we've modified the
+	 * cursor before calling the underlying cursor update function and we
+	 * need to restore it to its original state. This means multiple calls
+	 * to reset the cursor, but that shouldn't be a problem.
+	 */
+	if (ret != 0) {
+err:		WT_TRET(__cursor_reset(cbt));
+		__cursor_state_restore(cursor, &state);
+	}
+
+	__wt_scr_free(session, &modify);
 	return (ret);
 }
 
@@ -1135,7 +1309,7 @@ __wt_btcur_reserve(WT_CURSOR_BTREE *cbt)
 	/* WT_CURSOR.reserve is update-without-overwrite and a special value. */
 	overwrite = F_ISSET(cursor, WT_CURSTD_OVERWRITE);
 	F_CLR(cursor, WT_CURSTD_OVERWRITE);
-	ret = __btcur_update(cbt, WT_UPDATE_RESERVED);
+	ret = __btcur_update(cbt, &cursor->value, WT_UPDATE_RESERVED);
 	if (overwrite)
 	       F_SET(cursor, WT_CURSTD_OVERWRITE);
 	return (ret);
@@ -1164,7 +1338,7 @@ __wt_btcur_update(WT_CURSOR_BTREE *cbt)
 		WT_RET(__cursor_size_chk(session, &cursor->key));
 	WT_RET(__cursor_size_chk(session, &cursor->value));
 
-	return (__btcur_update(cbt, WT_UPDATE_STANDARD));
+	return (__btcur_update(cbt, &cursor->value, WT_UPDATE_STANDARD));
 }
 
 /*

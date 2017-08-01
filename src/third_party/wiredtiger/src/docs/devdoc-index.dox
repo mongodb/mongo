@@ -1,0 +1,12 @@
+/*! @page devdoc-index Developer Documentation
+
+Most applications begin to make use of WiredTiger by creating a table (or other
+data object) to store their data in. Create is one of several schema operations
+available in WiredTiger.
+
+For more information on how schema operations are implemented in WiredTiger,
+see:
+
+- @subpage devdoc-schema
+
+*/

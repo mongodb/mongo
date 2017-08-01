@@ -166,14 +166,35 @@ __session_alter(WT_SESSION *wt_session, const char *uri, const char *config)
 	WT_WITH_CHECKPOINT_LOCK(session,
 	    WT_WITH_SCHEMA_LOCK(session,
 		ret = __wt_schema_worker(session, uri, __wt_alter, NULL, cfg,
-		WT_BTREE_ALTER |
-		WT_DHANDLE_DISCARD_FORCE | WT_DHANDLE_EXCLUSIVE)));
+		WT_BTREE_ALTER | WT_DHANDLE_EXCLUSIVE)));
 
 err:	if (ret != 0)
 		WT_STAT_CONN_INCR(session, session_table_alter_fail);
 	else
 		WT_STAT_CONN_INCR(session, session_table_alter_success);
 	API_END_RET_NOTFOUND_MAP(session, ret);
+}
+
+/*
+ * __session_alter_readonly --
+ *	WT_SESSION->alter method; readonly version.
+ */
+static int
+__session_alter_readonly(
+    WT_SESSION *wt_session, const char *uri, const char *config)
+{
+	WT_DECL_RET;
+	WT_SESSION_IMPL *session;
+
+	WT_UNUSED(uri);
+	WT_UNUSED(config);
+
+	session = (WT_SESSION_IMPL *)wt_session;
+	SESSION_API_CALL_NOCONF(session, alter);
+
+	WT_STAT_CONN_INCR(session, session_table_alter_fail);
+	ret = __wt_session_notsup(session);
+err:	API_END_RET(session, ret);
 }
 
 /*
@@ -1142,11 +1163,11 @@ __wt_session_range_truncate(WT_SESSION_IMPL *session,
 	 *
 	 * Rather happily, the compare routine will also confirm the cursors
 	 * reference the same object and the keys are set.
+	 *
+	 * The test for a NULL start comparison function isn't necessary (we
+	 * checked it above), but it quiets clang static analysis complaints.
 	 */
-	if (start != NULL && stop != NULL) {
-						/* quiet clang scan-build */
-		WT_ASSERT(session, start->compare != NULL);
-
+	if (start != NULL && stop != NULL && start->compare != NULL) {
 		WT_ERR(start->compare(start, stop, &cmp));
 		if (cmp > 0)
 			WT_ERR_MSG(session, EINVAL,
@@ -1553,7 +1574,6 @@ __session_transaction_sync(WT_SESSION *wt_session, const char *config)
 		WT_ERR_MSG(session, EINVAL, "logging not enabled");
 
 	log = conn->log;
-	timeout_ms = waited_ms = 0;
 
 	/*
 	 * If there is no background sync LSN in this session, there
@@ -1775,7 +1795,7 @@ __open_session(WT_CONNECTION_IMPL *conn,
 	}, stds_readonly = {
 		NULL,
 		NULL,
-		__session_alter,
+		__session_alter_readonly,
 		__session_close,
 		__session_reconfigure,
 		__wt_session_strerror,

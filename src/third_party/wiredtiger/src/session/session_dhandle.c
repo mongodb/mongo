@@ -235,6 +235,7 @@ __wt_session_lock_dhandle(
 		lock_busy = true;
 
 		/* Give other threads a chance to make progress. */
+		WT_STAT_CONN_INCR(session, dhandle_lock_blocked);
 		__wt_yield();
 	}
 }
@@ -261,17 +262,14 @@ __wt_session_release_btree(WT_SESSION_IMPL *session)
 	 * If we had special flags set, close the handle so that future access
 	 * can get a handle without special flags.
 	 */
-	if (F_ISSET(dhandle, WT_DHANDLE_DISCARD | WT_DHANDLE_DISCARD_FORCE)) {
+	if (F_ISSET(dhandle, WT_DHANDLE_DISCARD | WT_DHANDLE_DISCARD_KILL)) {
 		WT_SAVE_DHANDLE(session, __session_find_dhandle(session,
 		    dhandle->name, dhandle->checkpoint, &dhandle_cache));
 		if (dhandle_cache != NULL)
 			__session_discard_dhandle(session, dhandle_cache);
 	}
 
-	if (F_ISSET(dhandle, WT_DHANDLE_DISCARD_FORCE)) {
-		ret = __wt_conn_btree_sync_and_close(session, false, true);
-		F_CLR(dhandle, WT_DHANDLE_DISCARD_FORCE);
-	} else if (F_ISSET(btree, WT_BTREE_BULK)) {
+	if (F_ISSET(btree, WT_BTREE_BULK)) {
 		WT_ASSERT(session, F_ISSET(dhandle, WT_DHANDLE_EXCLUSIVE) &&
 		    !F_ISSET(dhandle, WT_DHANDLE_DISCARD));
 		/*
@@ -281,11 +279,12 @@ __wt_session_release_btree(WT_SESSION_IMPL *session)
 		 */
 		WT_WITH_SCHEMA_LOCK(session, ret =
 		    __wt_conn_btree_sync_and_close(session, false, false));
-	} else if (F_ISSET(dhandle, WT_DHANDLE_DISCARD) ||
-	    F_ISSET(btree, WT_BTREE_SPECIAL_FLAGS)) {
+	} else if (F_ISSET(btree, WT_BTREE_SPECIAL_FLAGS) ||
+	    F_ISSET(dhandle, WT_DHANDLE_DISCARD | WT_DHANDLE_DISCARD_KILL)) {
 		WT_ASSERT(session, F_ISSET(dhandle, WT_DHANDLE_EXCLUSIVE));
-		ret = __wt_conn_btree_sync_and_close(session, false, false);
-		F_CLR(dhandle, WT_DHANDLE_DISCARD);
+		ret = __wt_conn_btree_sync_and_close(session, false,
+		    F_ISSET(dhandle, WT_DHANDLE_DISCARD_KILL));
+		F_CLR(dhandle, WT_DHANDLE_DISCARD | WT_DHANDLE_DISCARD_KILL);
 	}
 
 	if (session == dhandle->excl_session) {

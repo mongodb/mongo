@@ -194,7 +194,7 @@ __las_page_instantiate(WT_SESSION_IMPL *session,
 		upd->txnid = upd_txnid;
 #ifdef HAVE_TIMESTAMPS
 		WT_ASSERT(session, las_timestamp.size == WT_TIMESTAMP_SIZE);
-		__wt_timestamp_set(upd->timestamp, las_timestamp.data);
+		__wt_timestamp_set(&upd->timestamp, las_timestamp.data);
 #endif
 
 		switch (page->type) {
@@ -487,7 +487,7 @@ __wt_page_in_func(WT_SESSION_IMPL *session, WT_REF *ref, uint32_t flags
 	WT_BTREE *btree;
 	WT_DECL_RET;
 	WT_PAGE *page;
-	u_int sleep_cnt, wait_cnt;
+	uint64_t sleep_cnt, wait_cnt;
 	bool busy, cache_work, evict_soon, stalled;
 	int force_attempts;
 
@@ -672,9 +672,8 @@ skip_evict:
 			if (cache_work)
 				continue;
 		}
-		sleep_cnt = WT_MIN(sleep_cnt + WT_THOUSAND, 10000);
+		__wt_ref_state_yield_sleep(&wait_cnt, &sleep_cnt);
 		WT_STAT_CONN_INCRV(session, page_sleep, sleep_cnt);
-		__wt_sleep(0, sleep_cnt);
 	}
 }
 

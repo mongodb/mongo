@@ -187,12 +187,14 @@ src/support/hash_fnv.c
 src/support/hazard.c
 src/support/hex.c
 src/support/huffman.c
+src/support/modify.c
 src/support/mtx_rw.c
 src/support/pow.c
 src/support/rand.c
 src/support/scratch.c
 src/support/stat.c
 src/support/thread_group.c
+src/support/time.c
 src/txn/txn.c
 src/txn/txn_ckpt.c
 src/txn/txn_ext.c

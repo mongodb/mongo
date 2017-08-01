@@ -20,11 +20,11 @@ static int __log_write_internal(
 #define	WT_LOG_OPEN_CREATE_OK	0x01
 
 /*
- * __log_printf_internal --
- *	Internal call to write a log message.
+ * __wt_log_printf --
+ *	Write a text message to the log.
  */
-static int
-__log_printf_internal(WT_SESSION_IMPL *session, const char *fmt, ...)
+int
+__wt_log_printf(WT_SESSION_IMPL *session, const char *fmt, ...)
 {
 	WT_DECL_RET;
 	va_list ap;
@@ -54,10 +54,7 @@ __log_checksum_match(WT_SESSION_IMPL *session, WT_ITEM *buf, uint32_t reclen)
 	checksum_calculate = __wt_bswap32(checksum_calculate);
 #endif
 	logrec->checksum = checksum_tmp;
-	if (logrec->checksum != checksum_calculate)
-		return (false);
-	else
-		return (true);
+	return (logrec->checksum == checksum_calculate);
 }
 
 /*
@@ -1214,8 +1211,8 @@ __log_set_version(WT_SESSION_IMPL *session, uint16_t version,
 		F_SET(log, WT_LOG_FORCE_NEWFILE);
 	if (!F_ISSET(conn, WT_CONN_READONLY))
 		return (__log_prealloc_remove(session));
-	else
-		return (0);
+
+	return (0);
 }
 
 /*
@@ -1259,7 +1256,7 @@ __wt_log_set_version(WT_SESSION_IMPL *session, uint16_t version,
 	 * an archive correctly removes all earlier logs.
 	 * Write an internal printf record.
 	 */
-	WT_ERR(__log_printf_internal(session,
+	WT_ERR(__wt_log_printf(session,
 	    "COMPATIBILITY: Version now %" PRIu16, log->log_version));
 	if (lognump != NULL)
 		*lognump = log->alloc_lsn.l.file;

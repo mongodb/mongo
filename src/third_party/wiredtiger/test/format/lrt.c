@@ -50,8 +50,8 @@ lrt(void *arg)
 
 	saved_keyno = 0;		/* [-Werror=maybe-uninitialized] */
 
-	key_gen_setup(&key);
-	val_gen_setup(NULL, &value);
+	key_gen_init(&key);
+	val_gen_init(&value);
 
 	buf = NULL;
 	buf_len = buf_size = 0;
@@ -184,8 +184,8 @@ lrt(void *arg)
 
 	testutil_check(session->close(session, NULL));
 
-	free(key.mem);
-	free(value.mem);
+	key_gen_teardown(&key);
+	val_gen_teardown(&value);
 	free(buf);
 
 	return (WT_THREAD_RET_VALUE);

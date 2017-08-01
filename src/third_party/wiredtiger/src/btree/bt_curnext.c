@@ -15,12 +15,10 @@
 static inline int
 __cursor_fix_append_next(WT_CURSOR_BTREE *cbt, bool newpage)
 {
-	WT_ITEM *val;
 	WT_SESSION_IMPL *session;
 	WT_UPDATE *upd;
 
 	session = (WT_SESSION_IMPL *)cbt->iface.session;
-	val = &cbt->iface.value;
 
 	if (newpage) {
 		if ((cbt->ins = WT_SKIP_FIRST(cbt->ins_head)) == NULL)
@@ -59,10 +57,10 @@ __cursor_fix_append_next(WT_CURSOR_BTREE *cbt, bool newpage)
 	if (cbt->recno < WT_INSERT_RECNO(cbt->ins) ||
 	    (upd = __wt_txn_read(session, cbt->ins->upd)) == NULL) {
 		cbt->v = 0;
-		val->data = &cbt->v;
+		cbt->iface.value.data = &cbt->v;
 	} else
-		val->data = WT_UPDATE_DATA(upd);
-	val->size = 1;
+		cbt->iface.value.data = upd->data;
+	cbt->iface.value.size = 1;
 	return (0);
 }
 
@@ -74,7 +72,6 @@ static inline int
 __cursor_fix_next(WT_CURSOR_BTREE *cbt, bool newpage)
 {
 	WT_BTREE *btree;
-	WT_ITEM *val;
 	WT_PAGE *page;
 	WT_SESSION_IMPL *session;
 	WT_UPDATE *upd;
@@ -82,7 +79,6 @@ __cursor_fix_next(WT_CURSOR_BTREE *cbt, bool newpage)
 	session = (WT_SESSION_IMPL *)cbt->iface.session;
 	btree = S2BT(session);
 	page = cbt->ref->page;
-	val = &cbt->iface.value;
 
 	/* Initialize for each new page. */
 	if (newpage) {
@@ -108,10 +104,10 @@ new_page:
 	upd = cbt->ins == NULL ? NULL : __wt_txn_read(session, cbt->ins->upd);
 	if (upd == NULL) {
 		cbt->v = __bit_getv_recno(cbt->ref, cbt->recno, btree->bitcnt);
-		val->data = &cbt->v;
+		cbt->iface.value.data = &cbt->v;
 	} else
-		val->data = WT_UPDATE_DATA(upd);
-	val->size = 1;
+		cbt->iface.value.data = upd->data;
+	cbt->iface.value.size = 1;
 	return (0);
 }
 
@@ -122,12 +118,10 @@ new_page:
 static inline int
 __cursor_var_append_next(WT_CURSOR_BTREE *cbt, bool newpage)
 {
-	WT_ITEM *val;
 	WT_SESSION_IMPL *session;
 	WT_UPDATE *upd;
 
 	session = (WT_SESSION_IMPL *)cbt->iface.session;
-	val = &cbt->iface.value;
 
 	if (newpage) {
 		cbt->ins = WT_SKIP_FIRST(cbt->ins_head);
@@ -147,9 +141,7 @@ new_page:	if (cbt->ins == NULL)
 				++cbt->page_deleted_count;
 			continue;
 		}
-		val->data = WT_UPDATE_DATA(upd);
-		val->size = upd->size;
-		return (0);
+		return (__wt_value_return(session, cbt, upd));
 	}
 	/* NOTREACHED */
 }
@@ -164,7 +156,6 @@ __cursor_var_next(WT_CURSOR_BTREE *cbt, bool newpage)
 	WT_CELL *cell;
 	WT_CELL_UNPACK unpack;
 	WT_COL *cip;
-	WT_ITEM *val;
 	WT_INSERT *ins;
 	WT_PAGE *page;
 	WT_SESSION_IMPL *session;
@@ -173,7 +164,6 @@ __cursor_var_next(WT_CURSOR_BTREE *cbt, bool newpage)
 
 	session = (WT_SESSION_IMPL *)cbt->iface.session;
 	page = cbt->ref->page;
-	val = &cbt->iface.value;
 
 	rle_start = 0;			/* -Werror=maybe-uninitialized */
 
@@ -210,10 +200,7 @@ new_page:	/* Find the matching WT_COL slot. */
 					++cbt->page_deleted_count;
 				continue;
 			}
-
-			val->data = WT_UPDATE_DATA(upd);
-			val->size = upd->size;
-			return (0);
+			return (__wt_value_return(session, cbt, upd));
 		}
 
 		/*
@@ -267,8 +254,8 @@ new_page:	/* Find the matching WT_COL slot. */
 
 			cbt->cip_saved = cip;
 		}
-		val->data = cbt->tmp->data;
-		val->size = cbt->tmp->size;
+		cbt->iface.value.data = cbt->tmp->data;
+		cbt->iface.value.size = cbt->tmp->size;
 		return (0);
 	}
 	/* NOTREACHED */
@@ -282,7 +269,7 @@ static inline int
 __cursor_row_next(WT_CURSOR_BTREE *cbt, bool newpage)
 {
 	WT_INSERT *ins;
-	WT_ITEM *key, *val;
+	WT_ITEM *key;
 	WT_PAGE *page;
 	WT_ROW *rip;
 	WT_SESSION_IMPL *session;
@@ -291,7 +278,6 @@ __cursor_row_next(WT_CURSOR_BTREE *cbt, bool newpage)
 	session = (WT_SESSION_IMPL *)cbt->iface.session;
 	page = cbt->ref->page;
 	key = &cbt->iface.key;
-	val = &cbt->iface.value;
 
 	/*
 	 * For row-store pages, we need a single item that tells us the part
@@ -332,9 +318,7 @@ new_insert:	if ((ins = cbt->ins) != NULL) {
 			}
 			key->data = WT_INSERT_KEY(ins);
 			key->size = WT_INSERT_KEY_SIZE(ins);
-			val->data = WT_UPDATE_DATA(upd);
-			val->size = upd->size;
-			return (0);
+			return (__wt_value_return(session, cbt, upd));
 		}
 
 		/* Check for the end of the page. */
@@ -363,7 +347,6 @@ new_insert:	if ((ins = cbt->ins) != NULL) {
 				++cbt->page_deleted_count;
 			continue;
 		}
-
 		return (__cursor_row_slot_return(cbt, rip, upd));
 	}
 	/* NOTREACHED */

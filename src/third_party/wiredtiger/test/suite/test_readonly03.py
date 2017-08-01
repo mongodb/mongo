@@ -43,8 +43,8 @@ class test_readonly03(wttest.WiredTigerTestCase, suite_subprocess):
     conn_params = 'create,log=(enabled),'
     conn_params_rd = 'readonly=true'
 
-    session_ops = [ 'create', 'compact', 'drop', 'log_flush', 'log_printf',
-        'rebalance', 'rename', 'salvage', 'truncate', 'upgrade', ]
+    session_ops = [ 'alter', 'create', 'compact', 'drop', 'log_flush',
+        'log_printf', 'rebalance', 'rename', 'salvage', 'truncate', 'upgrade', ]
     cursor_ops = [ 'insert', 'remove', 'update', ]
 
     def setUpConnectionOpen(self, dir):
@@ -86,7 +86,10 @@ class test_readonly03(wttest.WiredTigerTestCase, suite_subprocess):
                 self.fail('Unknown cursor operation: ' + op)
         c.close()
         for op in self.session_ops:
-            if op == 'create':
+            if op == 'alter':
+                self.assertRaisesWithMessage(wiredtiger.WiredTigerError,
+                    lambda: self.session.alter(self.uri, None), msg)
+            elif op == 'create':
                 self.assertRaisesWithMessage(wiredtiger.WiredTigerError,
                     lambda: self.session.create(self.uri2, create_params),
                     msg)

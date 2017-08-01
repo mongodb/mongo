@@ -1,0 +1,208 @@
+/*! @page devdoc-schema Schema operations
+
+A schema defines the format of the application data in WiredTiger. WiredTiger
+supports various types of schemas (See @ref schema for more
+information), operated upon through a WT_SESSION reference. This section details
+the internals of these various schema operations.
+
+Schema operations cause an update to the metadata and are performed under a
+schema lock to avoid concurrent operations on the same object. The following
+sequence of steps define a generic schema operation:
+
+@plantuml_start{schema_generic.png}
+@startuml{schema_generic.png}
+:A schema operation;
+partition with-schema-lock {
+    :perform operation on underlying data-object;
+    :update metadata-file;
+    :checkpoint and sync metadata;
+}
+stop
+@enduml
+@plantuml_end
+
+@section schema_create Schema Create
+
+The create schema operation is responsible for creating the underlying data
+object on the filesystem with the right parameters and then creating an entry
+for this new object into the metadata. The sequence of operations involved in a
+create for various schema types are as follows:
+
+@plantuml_start{schema_create.png}
+@startuml{schema_create.png}
+:WT_SESSION->create(.,name,.)
+(__session_create());
+
+partition session-API-call {
+    :API session init with NULL dhandle;
+    :exit if PANIC flag set;
+    :exit if invalid configuration;
+}
+
+:validate "name" and if passed "type" config parameter;
+note right
+    "name" parameter is called as "uri" internally.
+    "type" is usually not passed and generally
+    implied from the uri.
+end note
+
+partition with-schema-lock {
+    partition with-table-lock {
+        :turn on meta tracking;
+        :check uri}
+
+        split
+            :uri matches "file:"
+            ("file" is the underlying
+             type for all the objects);
+        split again
+            :uri matches "colgroup:";
+            :__create_colgroup();
+        split again
+            :uri matches "table:";
+            :__create_table();
+        split again
+            :uri matches "lsm:";
+            :__wt_lsm_tree_create();
+        split again
+            :uri matches "index:";
+            :__create_index();
+        split again
+            :matches a named data-source;
+            :__create_data_source();
+        end split
+
+        partition __create_file() {
+            :exit if file exists;
+            :validate allocation size;
+            :block manager creates the file:
+             1.create file using __wt_open()
+             2.write an initial descriptor to file
+             3.fsync and close the file handle;
+            if (metadata-file?) then (yes)
+            else (no)
+                :update metadata with file
+                 configuration and version;
+            endif
+            :check if file setup correctly by
+             getting btree handle with
+             WT_DHANDLE_EXCLUSIVE set;
+            if (metatracking on?) then (yes)
+                :track locked handle*;
+            else (no)
+                :release btree -
+                 sync and close;
+            endif
+        }
+
+        partition turn-off-meta-tracking {
+            if (errors?) then (yes)
+                :unroll operations;
+            else (no)
+                if (logging?) then (yes)
+                    :sync log;
+                else (no)
+                endif
+                :checkpoint and sync;
+            endif
+            :apply post-commit ops:
+             release tracked (handle) btree* -
+             sync and close;
+            note right
+                if meta tracking is on, this btree
+                was being tracked as locked. As part
+                of tuning off meta tracking, we sync
+                and close this btree
+            end note
+        }
+    }
+}
+
+:API-end;
+
+stop
+@enduml
+@plantuml_end
+
+@section schema_rename Schema Rename
+
+The rename schema operation is responsible for renaming the underlying data
+object on the filesystem and updating the metadata accordingly. The sequence of
+operations involved in a rename for various schema types are as follows:
+
+@plantuml_start{schema_rename.png}
+@startuml{schema_rename.png}
+:WT_SESSION->rename(old-uri, new-uri, .)
+(__session_rename());
+:session-API-call;
+
+partition with-checkpoint-lock {
+    partition with-schema-lock {
+        partition with-table-write-lock {
+            :validate new uri-type to match the old type;
+            :turn on meta tracking;
+            :check uri}
+
+            split
+                :uri matches "file:"
+                ("file" is the underlying
+                 type for all the objects);
+            split again
+                :uri matches "lsm:";
+                :__wt_lsm_tree_rename();
+            split again
+                :matches a named data-source;
+                :WT_DATA_SOURCE::rename();
+            split again
+                :uri matches "table:";
+                partition __rename_table() {
+                    :rename colgroups and indices represented by the table:
+                     1. extract names from the uri
+                     2. create new uri with existing types and configuration
+                     3. recursive call the rename operation on individual
+                        colgroup and index with the old and the new uri
+                     4. remove old entry for colgroups and indices from
+                        the metadata table and add the new ones;
+                    :close and remove table handle from the session;
+                    :remove old table entry from the metadata table
+                     and add a new one;
+                }
+            end split
+
+            partition __rename_file() {
+                :fail if backup cursor open and schema operations will conflict;
+                :close btree handles in the file;
+                :fail if file with the old name doesn't exist or with the new
+                 name exists;
+                :remove old file entries and add new in the metadata;
+                :rename the underlying file;
+                if (meta-tracking?) then (yes)
+                    :track filesystem op;
+                else (no)
+                endif
+            }
+
+            :bump schema generation number to ignore stale data;
+
+            partition turn-off-meta-tracking {
+                if (errors?) then (yes)
+                    :unroll operations;
+                else (no)
+                    if (logging?) then (yes)
+                        :sync log;
+                    else (no)
+                    endif
+                    :checkpoint and sync;
+                endif
+            }
+        }
+    }
+}
+
+:API-end;
+
+stop
+@enduml
+@plantuml_end
+
+*/

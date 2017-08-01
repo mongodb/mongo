@@ -441,18 +441,26 @@ __wt_txn_config(WT_SESSION_IMPL *session, const char *cfg[])
 	if (cval.len > 0) {
 #ifdef HAVE_TIMESTAMPS
 		WT_TXN_GLOBAL *txn_global = &S2C(session)->txn_global;
-		wt_timestamp_t oldest_timestamp;
+		wt_timestamp_t oldest_timestamp, stable_timestamp;
 
 		WT_RET(__wt_txn_parse_timestamp(
-		    session, "read", txn->read_timestamp, &cval));
+		    session, "read", &txn->read_timestamp, &cval));
 		__wt_readlock(session, &txn_global->rwlock);
 		__wt_timestamp_set(
-		    oldest_timestamp, txn_global->oldest_timestamp);
+		    &oldest_timestamp, &txn_global->oldest_timestamp);
+		__wt_timestamp_set(
+		    &stable_timestamp, &txn_global->stable_timestamp);
 		__wt_readunlock(session, &txn_global->rwlock);
 		if (__wt_timestamp_cmp(
-		    txn->read_timestamp, oldest_timestamp) < 0)
+		    &txn->read_timestamp, &oldest_timestamp) < 0)
 			WT_RET_MSG(session, EINVAL,
 			    "read timestamp %.*s older than oldest timestamp",
+			    (int)cval.len, cval.str);
+		if (!__wt_timestamp_iszero(&stable_timestamp) &&
+		    __wt_timestamp_cmp(
+		    &txn->read_timestamp, &stable_timestamp) > 0)
+			WT_RET_MSG(session, EINVAL,
+			    "read timestamp %.*s newer than stable timestamp",
 			    (int)cval.len, cval.str);
 
 		__wt_txn_set_read_timestamp(session);
@@ -590,7 +598,7 @@ __wt_txn_commit(WT_SESSION_IMPL *session, const char *cfg[])
 	if (cval.len != 0) {
 #ifdef HAVE_TIMESTAMPS
 		WT_ERR(__wt_txn_parse_timestamp(
-		    session, "commit", txn->commit_timestamp, &cval));
+		    session, "commit", &txn->commit_timestamp, &cval));
 		__wt_txn_set_commit_timestamp(session);
 #else
 		WT_ERR_MSG(session, EINVAL, "commit_timestamp requires a "
@@ -686,8 +694,8 @@ __wt_txn_commit(WT_SESSION_IMPL *session, const char *cfg[])
 #ifdef HAVE_TIMESTAMPS
 			if (F_ISSET(txn, WT_TXN_HAS_TS_COMMIT) &&
 			    op->type != WT_TXN_OP_BASIC_TS)
-				__wt_timestamp_set(op->u.upd->timestamp,
-				    txn->commit_timestamp);
+				__wt_timestamp_set(&op->u.upd->timestamp,
+				    &txn->commit_timestamp);
 #endif
 			break;
 
@@ -695,8 +703,8 @@ __wt_txn_commit(WT_SESSION_IMPL *session, const char *cfg[])
 #ifdef HAVE_TIMESTAMPS
 			if (F_ISSET(txn, WT_TXN_HAS_TS_COMMIT))
 				__wt_timestamp_set(
-				    op->u.ref->page_del->timestamp,
-				    txn->commit_timestamp);
+				    &op->u.ref->page_del->timestamp,
+				    &txn->commit_timestamp);
 #endif
 			break;
 
@@ -728,10 +736,10 @@ __wt_txn_commit(WT_SESSION_IMPL *session, const char *cfg[])
 	if (update_timestamp) {
 		__wt_readlock(session, &txn_global->rwlock);
 		__wt_timestamp_set(
-		    prev_commit_timestamp, txn_global->commit_timestamp);
+		    &prev_commit_timestamp, &txn_global->commit_timestamp);
 		__wt_readunlock(session, &txn_global->rwlock);
 		update_timestamp = __wt_timestamp_cmp(
-		    txn->commit_timestamp, prev_commit_timestamp) > 0;
+		    &txn->commit_timestamp, &prev_commit_timestamp) > 0;
 	}
 
 	/*
@@ -740,10 +748,10 @@ __wt_txn_commit(WT_SESSION_IMPL *session, const char *cfg[])
 	 */
 	if (update_timestamp) {
 		__wt_writelock(session, &txn_global->rwlock);
-		if (__wt_timestamp_cmp(txn->commit_timestamp,
-		    txn_global->commit_timestamp) > 0) {
-			__wt_timestamp_set(txn_global->commit_timestamp,
-			    txn->commit_timestamp);
+		if (__wt_timestamp_cmp(&txn->commit_timestamp,
+		    &txn_global->commit_timestamp) > 0) {
+			__wt_timestamp_set(&txn_global->commit_timestamp,
+			    &txn->commit_timestamp);
 			txn_global->has_commit_timestamp = true;
 		}
 		__wt_writeunlock(session, &txn_global->rwlock);
@@ -998,6 +1006,8 @@ __wt_txn_global_shutdown(WT_SESSION_IMPL *session)
 		if (txn_global->oldest_id == txn_global->current &&
 		    txn_global->metadata_pinned == txn_global->current)
 			break;
+
+		WT_STAT_CONN_INCR(session, txn_release_blocked);
 		__wt_yield();
 	}
 
@@ -1006,7 +1016,7 @@ __wt_txn_global_shutdown(WT_SESSION_IMPL *session)
 	 * Now that all transactions have completed, no timestamps should be
 	 * pinned.
 	 */
-	memset(txn_global->pinned_timestamp, 0xff, WT_TIMESTAMP_SIZE);
+	__wt_timestamp_set_inf(&txn_global->pinned_timestamp);
 #endif
 
 	return (ret);

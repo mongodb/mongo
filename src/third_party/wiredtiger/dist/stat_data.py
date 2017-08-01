@@ -459,11 +459,19 @@ connection_stats = [
     ##########################################
     YieldStat('application_cache_time', 'application thread time waiting for cache (usecs)'),
     YieldStat('application_evict_time', 'application thread time evicting (usecs)'),
+    YieldStat('child_modify_blocked_page', 'page reconciliation yielded due to child modification'),
+    YieldStat('conn_close_blocked_lsm', 'connection close yielded for lsm manager shutdown'),
+    YieldStat('dhandle_lock_blocked', 'data handle lock yielded'),
+    YieldStat('log_server_sync_blocked', 'log server sync yielded for log write'),
     YieldStat('page_busy_blocked', 'page acquire busy blocked'),
+    YieldStat('page_del_rollback_blocked', 'page delete rollback time sleeping for state change (usecs)'),
     YieldStat('page_forcible_evict_blocked', 'page acquire eviction blocked'),
+    YieldStat('page_index_slot_ref_blocked', 'get reference for page index and slot time sleeping (usecs)'),
     YieldStat('page_locked_blocked', 'page acquire locked blocked'),
     YieldStat('page_read_blocked', 'page acquire read blocked'),
     YieldStat('page_sleep', 'page acquire time sleeping (usecs)'),
+    YieldStat('tree_descend_blocked', 'tree descend one level yielded for split page index update'),
+    YieldStat('txn_release_blocked', 'connection close blocked waiting for transaction state stabilization'),
 ]
 
 connection_stats = sorted(connection_stats, key=attrgetter('desc'))

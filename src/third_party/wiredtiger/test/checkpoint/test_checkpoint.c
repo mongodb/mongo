@@ -93,10 +93,24 @@ main(int argc, char *argv[])
 			runs = atoi(__wt_optarg);
 			break;
 		case 's':
+			/*
+			 * disabled below block temporarily to avoid spurious
+			 * test failures as per ticket WT-3446 and
+			 * to be reverted when WT-3386 is merged.
+			 */
+#if 0
 #ifdef HAVE_TIMESTAMPS
 			g.use_timestamps = true;
 #endif
 			break;
+#endif
+			/*
+			 * The below code segment to be deleted as part of
+			 * reverting the above block i.e. WT-3386
+			 */
+			fprintf(stderr,
+			    "Checkpoint Timestamp testing is not supported\n");
+			return (EXIT_FAILURE);
 		case 't':
 			switch (__wt_optarg[0]) {
 			case 'c':

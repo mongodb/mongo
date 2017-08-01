@@ -75,7 +75,7 @@ AC_SUBST(AM_LIBTOOLFLAGS)
 # WiredTiger uses anonymous unions to pad structures. It's part of C11, but
 # some compilers require -std=c11 to support them. Turn on that flag for any
 # compiler that supports it, except for Solaris, where gcc -std=c11 makes
-# some none-C11 prototypes unavailable.
+# some non-C11 prototypes unavailable.
 if test "$wt_cv_solaris" = "no"; then
 	AX_CHECK_COMPILE_FLAG([-std=c11], [AM_CFLAGS="$AM_CFLAGS -std=c11"])
 fi
@@ -169,6 +169,44 @@ AS_CASE([$host_os], [darwin*], [], [AC_CHECK_FUNCS([fdatasync])])
 # Check for posix_memalign explicitly: it is a builtin in some compilers and
 # the generic declaration in AC_CHECK_FUNCS is incompatible.
 AX_FUNC_POSIX_MEMALIGN
+
+# Check for POSIX condition variables with monotonic clock support
+AC_CACHE_CHECK([for condition waits with monotonic clock support],
+  [wt_cv_pthread_cond_monotonic],
+  [AC_RUN_IFELSE([AC_LANG_SOURCE([[
+#include <errno.h>
+#include <pthread.h>
+#include <stdlib.h>
+#include <time.h>
+
+int main()
+{
+  int ret;
+  pthread_condattr_t condattr;
+  pthread_cond_t cond;
+  pthread_mutex_t mtx;
+  struct timespec ts;
+
+  if ((ret = pthread_condattr_init(&condattr)) != 0) exit(1);
+  if ((ret = pthread_condattr_setclock(&condattr, CLOCK_MONOTONIC)) != 0) exit(1);
+  if ((ret = pthread_cond_init(&cond, &condattr)) != 0) exit(1);
+  if ((ret = pthread_mutex_init(&mtx, NULL)) != 0) exit(1);
+  if ((ret = clock_gettime(CLOCK_MONOTONIC, &ts)) != 0) exit(1);
+  ts.tv_sec += 1;
+  if ((ret = pthread_mutex_lock(&mtx)) != 0) exit(1);
+  if ((ret = pthread_cond_timedwait(&cond, &mtx, &ts)) != 0 && ret != EINTR && ret != ETIMEDOUT) exit(1);
+
+  exit(0);
+}
+    ]])],
+    [wt_pthread_cond_monotonic=yes],
+    [wt_pthread_cond_monotonic=no],
+    [wt_pthread_cond_monotonic=no])])
+AC_MSG_RESULT($wt_pthread_cond_monotonic)
+if test "$wt_pthread_cond_monotonic" = "yes" ; then
+  AC_DEFINE([HAVE_PTHREAD_COND_MONOTONIC], [1],
+    [Define to 1 if pthread condition variables support monotonic clocks.])
+fi
 
 AC_SYS_LARGEFILE
 

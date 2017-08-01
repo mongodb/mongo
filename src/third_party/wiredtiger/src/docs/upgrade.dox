@@ -60,11 +60,17 @@ the WT_SESSION::upgrade method.
 Applications wanting the ability to downgrade to previous releases of
 WiredTiger are constrained in some important ways:
 
-- The underlying data file formats must not have changed between the
+- The underlying table file formats must not have changed between the
 release currently being run and the release to which you are
-downgrading. In other words, data file format changes are not backward
-compatible, and an upgraded data file cannot be downgraded without being
+downgrading. In other words, table file format changes are not backward
+compatible, and an upgraded table file cannot be downgraded without being
 dumped and re-loaded.
+- If the underlying log file format changed and you have logging enabled
+in the database, in order to retain the ability to downgrade to earlier
+releases you must use \c compatibility option in the call to
+::wiredtiger_open or WT_CONNECTION::reconfigure.  When running at an
+earlier compatibility release setting, the log files generated will be
+compatible with earlier binaries.
 <br><br>
 - Applications concerned with downgrading should configure the
 ::wiredtiger_open \c config_base value to \c false, so WiredTiger does

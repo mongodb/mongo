@@ -33,7 +33,7 @@
 #endif
 
 void
-key_len_setup(void)
+key_init(void)
 {
 	size_t i;
 	uint32_t max;
@@ -61,7 +61,7 @@ key_len_setup(void)
 }
 
 void
-key_gen_setup(WT_ITEM *key)
+key_gen_init(WT_ITEM *key)
 {
 	size_t i, len;
 	char *p;
@@ -75,6 +75,13 @@ key_gen_setup(WT_ITEM *key)
 	key->memsize = len;
 	key->data = key->mem;
 	key->size = 0;
+}
+
+void
+key_gen_teardown(WT_ITEM *key)
+{
+	free(key->mem);
+	memset(key, 0, sizeof(*key));
 }
 
 static void
@@ -137,7 +144,9 @@ key_gen_insert(WT_RAND_STATE *rnd, WT_ITEM *key, uint64_t keyno)
 	key_gen_common(key, keyno, suffix[mmrand(rnd, 0, 14)]);
 }
 
-static uint32_t val_dup_data_len;	/* Length of duplicate data items */
+static char	*val_base;		/* Base/original value */
+static uint32_t  val_dup_data_len;	/* Length of duplicate data items */
+static uint32_t  val_len;		/* Length of data items */
 
 static inline uint32_t
 value_len(WT_RAND_STATE *rnd, uint64_t keyno, uint32_t min, uint32_t max)
@@ -157,12 +166,9 @@ value_len(WT_RAND_STATE *rnd, uint64_t keyno, uint32_t min, uint32_t max)
 }
 
 void
-val_gen_setup(WT_RAND_STATE *rnd, WT_ITEM *value)
+val_init(void)
 {
-	size_t i, len;
-	char *p;
-
-	memset(value, 0, sizeof(WT_ITEM));
+	size_t i;
 
 	/*
 	 * Set initial buffer contents to recognizable text.
@@ -171,18 +177,37 @@ val_gen_setup(WT_RAND_STATE *rnd, WT_ITEM *value)
 	 * into the buffer by a few extra bytes, used to generate different
 	 * data for column-store run-length encoded files.
 	 */
-	len = MAX(KILOBYTE(100), g.c_value_max) + 20;
-	p = dmalloc(len);
-	for (i = 0; i < len; ++i)
-		p[i] = "ABCDEFGHIJKLMNOPQRSTUVWXYZ"[i % 26];
+	val_len = MAX(KILOBYTE(100), g.c_value_max) + 20;
+	val_base = dmalloc(val_len);
+	for (i = 0; i < val_len; ++i)
+		val_base[i] = "ABCDEFGHIJKLMNOPQRSTUVWXYZ"[i % 26];
 
-	value->mem = p;
-	value->memsize = len;
+	val_dup_data_len = value_len(NULL,
+	    (uint64_t)mmrand(NULL, 1, 20), g.c_value_min, g.c_value_max);
+}
+
+void
+val_teardown(void)
+{
+	free(val_base);
+	val_base = NULL;
+	val_dup_data_len = val_len = 0;
+}
+
+void
+val_gen_init(WT_ITEM *value)
+{
+	value->mem = dmalloc(val_len);
+	value->memsize = val_len;
 	value->data = value->mem;
 	value->size = 0;
+}
 
-	val_dup_data_len = value_len(rnd,
-	    (uint64_t)mmrand(rnd, 1, 20), g.c_value_min, g.c_value_max);
+void
+val_gen_teardown(WT_ITEM *value)
+{
+	free(value->mem);
+	memset(value, 0, sizeof(*value));
 }
 
 void
@@ -227,14 +252,16 @@ val_gen(WT_RAND_STATE *rnd, WT_ITEM *value, uint64_t keyno)
 	 * variable-length column-stores use a duplicate data value to test RLE.
 	 */
 	if (g.type == VAR && mmrand(rnd, 1, 100) < g.c_repeat_data_pct) {
+		value->size = val_dup_data_len;
+		memcpy(p, val_base, value->size);
 		(void)strcpy(p, "DUPLICATEV");
 		p[10] = '/';
-		value->size = val_dup_data_len;
 	} else {
-		u64_to_string_zf(keyno, p, 11);
-		p[10] = '/';
 		value->size =
 		    value_len(rnd, keyno, g.c_value_min, g.c_value_max);
+		memcpy(p, val_base, value->size);
+		u64_to_string_zf(keyno, p, 11);
+		p[10] = '/';
 	}
 }
 
@@ -562,4 +589,40 @@ compat(void *arg)
 			break;
 	}
 	return (WT_THREAD_RET_VALUE);
+}
+
+/*
+ * print_item_data --
+ *	Display a single data/size pair, with a tag.
+ */
+void
+print_item_data(const char *tag, const uint8_t *data, size_t size)
+{
+	static const char hex[] = "0123456789abcdef";
+	u_char ch;
+
+	fprintf(stderr, "\t%s {", tag);
+	if (g.type == FIX)
+		fprintf(stderr, "0x%02x", data[0]);
+	else
+		for (; size > 0; --size, ++data) {
+			ch = data[0];
+			if (__wt_isprint(ch))
+				fprintf(stderr, "%c", (int)ch);
+			else
+				fprintf(stderr, "%x%x",
+				    (u_int)hex[(data[0] & 0xf0) >> 4],
+				    (u_int)hex[data[0] & 0x0f]);
+		}
+	fprintf(stderr, "}\n");
+}
+
+/*
+ * print_item --
+ *	Display a single data/size pair, with a tag.
+ */
+void
+print_item(const char *tag, WT_ITEM *item)
+{
+	print_item_data(tag, item->data, item->size);
 }

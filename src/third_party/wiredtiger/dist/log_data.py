@@ -41,9 +41,8 @@ rectypes = [
     # Debugging message in the log
     LogRecordType('message', 'message', [('string', 'message')]),
 
-    # System record
-    LogRecordType('system', 'system', [
-        ('WT_LSN','prev_lsn'), ('item', 'unused')]),
+    # System (internal) log record
+    LogRecordType('system', 'system', []),
 ]
 
 class LogOperationType:
@@ -61,12 +60,17 @@ class LogOperationType:
 # never change after they're written in a log file.
 #
 optypes = [
+# commit operations
+    LogOperationType('col_modify', 'column modify',
+        [('uint32', 'fileid'), ('recno', 'recno'), ('item', 'value')]),
     LogOperationType('col_put', 'column put',
         [('uint32', 'fileid'), ('recno', 'recno'), ('item', 'value')]),
     LogOperationType('col_remove', 'column remove',
         [('uint32', 'fileid'), ('recno', 'recno')]),
     LogOperationType('col_truncate', 'column truncate',
         [('uint32', 'fileid'), ('recno', 'start'), ('recno', 'stop')]),
+    LogOperationType('row_modify', 'row modify',
+        [('uint32', 'fileid'), ('item', 'key'), ('item', 'value')]),
     LogOperationType('row_put', 'row put',
         [('uint32', 'fileid'), ('item', 'key'), ('item', 'value')]),
     LogOperationType('row_remove', 'row remove',
@@ -74,4 +78,9 @@ optypes = [
     LogOperationType('row_truncate', 'row truncate',
         [('uint32', 'fileid'), ('item', 'start'), ('item', 'stop'),
             ('uint32', 'mode')]),
+
+# system operations
+    LogOperationType('checkpoint_start', 'checkpoint start', []),
+    LogOperationType('prev_lsn', 'previous LSN',
+        [('WT_LSN', 'prev_lsn')]),
 ]

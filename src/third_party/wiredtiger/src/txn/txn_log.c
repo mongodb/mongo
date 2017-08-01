@@ -32,9 +32,9 @@ __txn_op_log_row_key_check(WT_SESSION_IMPL *session, WT_CURSOR_BTREE *cbt)
 	memset(&key, 0, sizeof(key));
 
 	/*
-	 * We used to take the key for row-store logging from the page
-	 * referenced by the cursor, when we switched to taking it from the
-	 * cursor itself. Check that they are the same.
+	 * We used to take the row-store logging key from the page referenced by
+	 * the cursor, then switched to taking it from the cursor itself. Check
+	 * they are the same.
 	 *
 	 * If the cursor references a WT_INSERT item, take the key from there,
 	 * else take the key from the original page.
@@ -50,8 +50,7 @@ __txn_op_log_row_key_check(WT_SESSION_IMPL *session, WT_CURSOR_BTREE *cbt)
 		key.size = WT_INSERT_KEY_SIZE(cbt->ins);
 	}
 
-	WT_ASSERT(session,
-	    key.size == cursor->key.size &&
+	WT_ASSERT(session, key.size == cursor->key.size &&
 	    memcmp(key.data, cursor->key.data, key.size) == 0);
 
 	__wt_buf_free(session, &key);
@@ -74,46 +73,62 @@ __txn_op_log(WT_SESSION_IMPL *session,
 	cursor = &cbt->iface;
 
 	upd = op->u.upd;
-	value.data = WT_UPDATE_DATA(upd);
+	value.data = upd->data;
 	value.size = upd->size;
 
 	/*
-	 * Log the operation. It must be a row- or column-store insert, remove
-	 * or update, all of which require log records. We shouldn't ever log
-	 * reserve operations.
+	 * Log the row- or column-store insert, modify, remove or update. Our
+	 * caller doesn't log reserve operations, we shouldn't see them here.
 	 */
-	WT_ASSERT(session, upd->type != WT_UPDATE_RESERVED);
 	if (cbt->btree->type == BTREE_ROW) {
 #ifdef HAVE_DIAGNOSTIC
 		__txn_op_log_row_key_check(session, cbt);
 #endif
-		if (upd->type == WT_UPDATE_DELETED)
+		switch (upd->type) {
+		case WT_UPDATE_DELETED:
 			WT_RET(__wt_logop_row_remove_pack(
 			    session, logrec, op->fileid, &cursor->key));
-		else
+			break;
+		case WT_UPDATE_MODIFIED:
+			WT_RET(__wt_logop_row_modify_pack(
+			    session, logrec, op->fileid, &cursor->key, &value));
+			break;
+		case WT_UPDATE_STANDARD:
 			WT_RET(__wt_logop_row_put_pack(
 			    session, logrec, op->fileid, &cursor->key, &value));
+			break;
+		WT_ILLEGAL_VALUE(session);
+		}
 	} else {
 		recno = WT_INSERT_RECNO(cbt->ins);
 		WT_ASSERT(session, recno != WT_RECNO_OOB);
 
-		if (upd->type == WT_UPDATE_DELETED)
+		switch (upd->type) {
+		case WT_UPDATE_DELETED:
 			WT_RET(__wt_logop_col_remove_pack(
 			    session, logrec, op->fileid, recno));
-		else
+			break;
+		case WT_UPDATE_MODIFIED:
+			WT_RET(__wt_logop_col_modify_pack(
+			    session, logrec, op->fileid, recno, &value));
+			break;
+		case WT_UPDATE_STANDARD:
 			WT_RET(__wt_logop_col_put_pack(
 			    session, logrec, op->fileid, recno, &value));
+			break;
+		WT_ILLEGAL_VALUE(session);
+		}
 	}
 
 	return (0);
 }
 
 /*
- * __txn_commit_printlog --
- *	Print a commit log record.
+ * __txn_oplist_printlog --
+ *	Print a list of operations from a log record.
  */
 static int
-__txn_commit_printlog(WT_SESSION_IMPL *session,
+__txn_oplist_printlog(WT_SESSION_IMPL *session,
     const uint8_t **pp, const uint8_t *end, uint32_t flags)
 {
 	bool firstrecord;
@@ -344,8 +359,8 @@ __wt_txn_checkpoint_log(
 	WT_TXN *txn;
 	uint8_t *end, *p;
 	size_t recsize;
-	uint32_t i, rectype = WT_LOGREC_CHECKPOINT;
-	const char *fmt = WT_UNCHECKED_STRING(IIIIu);
+	uint32_t i, rectype;
+	const char *fmt;
 
 	conn = S2C(session);
 	txn = &session->txn;
@@ -367,7 +382,31 @@ __wt_txn_checkpoint_log(
 	switch (flags) {
 	case WT_TXN_LOG_CKPT_PREPARE:
 		txn->full_ckpt = true;
-		WT_ERR(__wt_log_flush_lsn(session, ckpt_lsn, true));
+
+		if (conn->compat_major >= WT_LOG_V2) {
+			/*
+			 * Write the system log record containing a checkpoint
+			 * start operation.
+			 */
+			rectype = WT_LOGREC_SYSTEM;
+			fmt = WT_UNCHECKED_STRING(I);
+			WT_ERR(__wt_struct_size(
+			    session, &recsize, fmt, rectype));
+			WT_ERR(__wt_logrec_alloc(session, recsize, &logrec));
+
+			WT_ERR(__wt_struct_pack(session,
+			    (uint8_t *)logrec->data + logrec->size, recsize,
+			    fmt, rectype));
+			logrec->size += (uint32_t)recsize;
+			WT_ERR(__wt_logop_checkpoint_start_pack(
+			    session, logrec));
+			WT_ERR(__wt_log_write(session, logrec, ckpt_lsn, 0));
+		} else {
+			WT_ERR(__wt_log_printf(session,
+			    "CHECKPOINT: Starting record"));
+			WT_ERR(__wt_log_flush_lsn(session, ckpt_lsn, true));
+		}
+
 		/*
 		 * We need to make sure that the log records in the checkpoint
 		 * LSN are on disk.  In particular to make sure that the
@@ -401,14 +440,16 @@ __wt_txn_checkpoint_log(
 			ckpt_snapshot = txn->ckpt_snapshot;
 
 		/* Write the checkpoint log record. */
-		WT_ERR(__wt_struct_size(session, &recsize, fmt,
-		    rectype, ckpt_lsn->l.file, ckpt_lsn->l.offset,
+		rectype = WT_LOGREC_CHECKPOINT;
+		fmt = WT_UNCHECKED_STRING(IIIIu);
+		WT_ERR(__wt_struct_size(session, &recsize,
+		    fmt, rectype, ckpt_lsn->l.file, ckpt_lsn->l.offset,
 		    txn->ckpt_nsnapshot, ckpt_snapshot));
 		WT_ERR(__wt_logrec_alloc(session, recsize, &logrec));
 
 		WT_ERR(__wt_struct_pack(session,
-		    (uint8_t *)logrec->data + logrec->size, recsize, fmt,
-		    rectype, ckpt_lsn->l.file, ckpt_lsn->l.offset,
+		    (uint8_t *)logrec->data + logrec->size, recsize,
+		    fmt, rectype, ckpt_lsn->l.file, ckpt_lsn->l.offset,
 		    txn->ckpt_nsnapshot, ckpt_snapshot));
 		logrec->size += (uint32_t)recsize;
 		WT_ERR(__wt_log_write(session, logrec, lsnp,
@@ -568,7 +609,7 @@ __txn_printlog(WT_SESSION_IMPL *session,
 		    "    \"type\" : \"commit\",\n"));
 		WT_RET(__wt_fprintf(session, WT_STDOUT(session),
 		    "    \"txnid\" : %" PRIu64 ",\n", txnid));
-		WT_RET(__txn_commit_printlog(session, &p, end, args->flags));
+		WT_RET(__txn_oplist_printlog(session, &p, end, args->flags));
 		break;
 
 	case WT_LOGREC_FILE_SYNC:
@@ -596,9 +637,7 @@ __txn_printlog(WT_SESSION_IMPL *session,
 		    WT_UNCHECKED_STRING(II), &lsnfile, &lsnoffset));
 		WT_RET(__wt_fprintf(session, WT_STDOUT(session),
 		    "    \"type\" : \"system\",\n"));
-		WT_RET(__wt_fprintf(session, WT_STDOUT(session),
-		    "    \"prev_lsn\" : [%" PRIu32 ",%" PRIu32 "]\n",
-		    lsnfile, lsnoffset));
+		WT_RET(__txn_oplist_printlog(session, &p, end, args->flags));
 		break;
 	}
 

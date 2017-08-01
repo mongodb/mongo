@@ -290,6 +290,8 @@ struct __wt_thread;
     typedef struct __wt_thread WT_THREAD;
 struct __wt_thread_group;
     typedef struct __wt_thread_group WT_THREAD_GROUP;
+struct __wt_timestamp_t;
+    typedef struct __wt_timestamp_t WT_TIMESTAMP_T;
 struct __wt_txn;
     typedef struct __wt_txn WT_TXN;
 struct __wt_txn_global;

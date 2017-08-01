@@ -275,6 +275,40 @@ err:	CURSOR_UPDATE_API_END(session, ret);
 }
 
 /*
+ * __curfile_modify --
+ *	WT_CURSOR->modify method for the btree cursor type.
+ */
+static int
+__curfile_modify(WT_CURSOR *cursor, WT_MODIFY *entries, int nentries)
+{
+	WT_CURSOR_BTREE *cbt;
+	WT_DECL_RET;
+	WT_SESSION_IMPL *session;
+
+	cbt = (WT_CURSOR_BTREE *)cursor;
+	CURSOR_UPDATE_API_CALL_BTREE(cursor, session, modify, cbt->btree);
+	WT_ERR(__cursor_checkkey(cursor));
+
+	/* Check for a rational modify vector count. */
+	if (nentries <= 0)
+		WT_ERR_MSG(session, EINVAL,
+		    "Illegal modify vector with %d entries", nentries);
+
+	WT_ERR(__wt_btcur_modify(cbt, entries, nentries));
+
+	/*
+	 * Modify maintains a position, key and value. Unlike update, it's not
+	 * always an internal value.
+	 */
+	WT_ASSERT(session,
+	    F_MASK(cursor, WT_CURSTD_KEY_SET) == WT_CURSTD_KEY_INT);
+	WT_ASSERT(session, F_MASK(cursor, WT_CURSTD_VALUE_SET) != 0);
+
+err:	CURSOR_UPDATE_API_END(session, ret);
+	return (ret);
+}
+
+/*
  * __curfile_update --
  *	WT_CURSOR->update method for the btree cursor type.
  */
@@ -512,6 +546,15 @@ __curfile_create(WT_SESSION_IMPL *session,
 
 	/* Underlying btree initialization. */
 	__wt_btcur_open(cbt);
+
+	/*
+	 * WT_CURSOR.modify supported on 'u' value formats, but the fast-path
+	 * through the btree code requires log file format changes, it's not
+	 * available in all versions.
+	 */
+	if (WT_STREQ(cursor->value_format, "u") &&
+	    S2C(session)->compat_major >= WT_LOG_V2)
+		cursor->modify = __curfile_modify;
 
 	WT_ERR(__wt_cursor_init(
 	    cursor, cursor->internal_uri, owner, cfg, cursorp));

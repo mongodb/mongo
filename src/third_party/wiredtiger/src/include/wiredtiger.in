@@ -489,6 +489,11 @@ struct __wt_cursor {
 	 * The modify method is only supported on raw byte arrays accessed using
 	 * a WT_ITEM structure, that is, a format type of \c u.
 	 *
+	 * Calling the WT_CURSOR::modify method outside of snapshot isolation
+	 * can lead to unexpected results. While \c read-committed isolation
+	 * is supported with the WT_CURSOR::modify method, \c read-uncommitted
+	 * isolation is not.
+	 *
 	 * @snippet ex_all.c Modify an existing record
 	 *
 	 * On success, the cursor ends positioned at the modified record; to
@@ -1387,7 +1392,7 @@ struct __wt_session {
 	 * @configstart{WT_SESSION.drop, see dist/api_data.py}
 	 * @config{force, return success if the object does not exist., a
 	 * boolean flag; default \c false.}
-	 * @config{remove_files, should the underlying files be removed?., a
+	 * @config{remove_files, if the underlying files should be removed., a
 	 * boolean flag; default \c true.}
 	 * @configend
 	 * @ebusy_errors
@@ -1778,6 +1783,11 @@ struct __wt_session {
 	 * empty.}
 	 * @config{target, if non-empty\, checkpoint the list of objects., a
 	 * list of strings; default empty.}
+	 * @config{use_timestamp, by default\, create the checkpoint as of the
+	 * last stable timestamp if timestamps are in use\, or all current
+	 * updates if there is no stable timestamp set.  If false\, this option
+	 * generates a checkpoint with all updates including those later than
+	 * the timestamp., a boolean flag; default \c true.}
 	 * @configend
 	 * @errors
 	 */
@@ -2239,8 +2249,13 @@ struct __wt_connection {
 	 * @configstart{WT_CONNECTION.set_timestamp, see dist/api_data.py}
 	 * @config{oldest_timestamp, future commits and queries will be no
 	 * earlier than the specified timestamp.  Supplied values must be
-	 * monotonically increasing.  see @ref transaction_timestamps., a
+	 * monotonically increasing.  See @ref transaction_timestamps., a
 	 * string; default empty.}
+	 * @config{stable_timestamp, future checkpoints will be no later than
+	 * the specified timestamp.  Supplied values must be monotonically
+	 * increasing.  The stable timestamp data stability only applies to
+	 * tables that are not being logged.  See @ref transaction_timestamps.,
+	 * a string; default empty.}
 	 * @configend
 	 * @errors
 	 */
@@ -4491,18 +4506,26 @@ extern int wiredtiger_extension_terminate(WT_CONNECTION *connection);
 #define	WT_LOGREC_SYSTEM	4
 /*! invalid operation */
 #define	WT_LOGOP_INVALID	0
-/*! column put */
+/*! column-store put */
 #define	WT_LOGOP_COL_PUT	1
-/*! column remove */
+/*! column-store remove */
 #define	WT_LOGOP_COL_REMOVE	2
-/*! column truncate */
+/*! column-store truncate */
 #define	WT_LOGOP_COL_TRUNCATE	3
-/*! row put */
+/*! row-store put */
 #define	WT_LOGOP_ROW_PUT	4
-/*! row remove */
+/*! row-store remove */
 #define	WT_LOGOP_ROW_REMOVE	5
-/*! row truncate */
+/*! row-store truncate */
 #define	WT_LOGOP_ROW_TRUNCATE	6
+/*! checkpoint start */
+#define	WT_LOGOP_CHECKPOINT_START	7
+/*! previous LSN */
+#define	WT_LOGOP_PREV_LSN	8
+/*! column-store modify */
+#define	WT_LOGOP_COL_MODIFY	9
+/*! row-store modify */
+#define	WT_LOGOP_ROW_MODIFY	10
 /*! @} */
 
 /*******************************************
@@ -5045,74 +5068,102 @@ extern int wiredtiger_extension_terminate(WT_CONNECTION *connection);
 #define	WT_STAT_CONN_APPLICATION_EVICT_TIME		1243
 /*! thread-yield: application thread time waiting for cache (usecs) */
 #define	WT_STAT_CONN_APPLICATION_CACHE_TIME		1244
+/*!
+ * thread-yield: connection close blocked waiting for transaction state
+ * stabilization
+ */
+#define	WT_STAT_CONN_TXN_RELEASE_BLOCKED		1245
+/*! thread-yield: connection close yielded for lsm manager shutdown */
+#define	WT_STAT_CONN_CONN_CLOSE_BLOCKED_LSM		1246
+/*! thread-yield: data handle lock yielded */
+#define	WT_STAT_CONN_DHANDLE_LOCK_BLOCKED		1247
+/*!
+ * thread-yield: get reference for page index and slot time sleeping
+ * (usecs)
+ */
+#define	WT_STAT_CONN_PAGE_INDEX_SLOT_REF_BLOCKED	1248
+/*! thread-yield: log server sync yielded for log write */
+#define	WT_STAT_CONN_LOG_SERVER_SYNC_BLOCKED		1249
 /*! thread-yield: page acquire busy blocked */
-#define	WT_STAT_CONN_PAGE_BUSY_BLOCKED			1245
+#define	WT_STAT_CONN_PAGE_BUSY_BLOCKED			1250
 /*! thread-yield: page acquire eviction blocked */
-#define	WT_STAT_CONN_PAGE_FORCIBLE_EVICT_BLOCKED	1246
+#define	WT_STAT_CONN_PAGE_FORCIBLE_EVICT_BLOCKED	1251
 /*! thread-yield: page acquire locked blocked */
-#define	WT_STAT_CONN_PAGE_LOCKED_BLOCKED		1247
+#define	WT_STAT_CONN_PAGE_LOCKED_BLOCKED		1252
 /*! thread-yield: page acquire read blocked */
-#define	WT_STAT_CONN_PAGE_READ_BLOCKED			1248
+#define	WT_STAT_CONN_PAGE_READ_BLOCKED			1253
 /*! thread-yield: page acquire time sleeping (usecs) */
-#define	WT_STAT_CONN_PAGE_SLEEP				1249
+#define	WT_STAT_CONN_PAGE_SLEEP				1254
+/*!
+ * thread-yield: page delete rollback time sleeping for state change
+ * (usecs)
+ */
+#define	WT_STAT_CONN_PAGE_DEL_ROLLBACK_BLOCKED		1255
+/*! thread-yield: page reconciliation yielded due to child modification */
+#define	WT_STAT_CONN_CHILD_MODIFY_BLOCKED_PAGE		1256
+/*!
+ * thread-yield: tree descend one level yielded for split page index
+ * update
+ */
+#define	WT_STAT_CONN_TREE_DESCEND_BLOCKED		1257
 /*! transaction: number of named snapshots created */
-#define	WT_STAT_CONN_TXN_SNAPSHOTS_CREATED		1250
+#define	WT_STAT_CONN_TXN_SNAPSHOTS_CREATED		1258
 /*! transaction: number of named snapshots dropped */
-#define	WT_STAT_CONN_TXN_SNAPSHOTS_DROPPED		1251
+#define	WT_STAT_CONN_TXN_SNAPSHOTS_DROPPED		1259
 /*! transaction: transaction begins */
-#define	WT_STAT_CONN_TXN_BEGIN				1252
+#define	WT_STAT_CONN_TXN_BEGIN				1260
 /*! transaction: transaction checkpoint currently running */
-#define	WT_STAT_CONN_TXN_CHECKPOINT_RUNNING		1253
+#define	WT_STAT_CONN_TXN_CHECKPOINT_RUNNING		1261
 /*! transaction: transaction checkpoint generation */
-#define	WT_STAT_CONN_TXN_CHECKPOINT_GENERATION		1254
+#define	WT_STAT_CONN_TXN_CHECKPOINT_GENERATION		1262
 /*! transaction: transaction checkpoint max time (msecs) */
-#define	WT_STAT_CONN_TXN_CHECKPOINT_TIME_MAX		1255
+#define	WT_STAT_CONN_TXN_CHECKPOINT_TIME_MAX		1263
 /*! transaction: transaction checkpoint min time (msecs) */
-#define	WT_STAT_CONN_TXN_CHECKPOINT_TIME_MIN		1256
+#define	WT_STAT_CONN_TXN_CHECKPOINT_TIME_MIN		1264
 /*! transaction: transaction checkpoint most recent time (msecs) */
-#define	WT_STAT_CONN_TXN_CHECKPOINT_TIME_RECENT		1257
+#define	WT_STAT_CONN_TXN_CHECKPOINT_TIME_RECENT		1265
 /*! transaction: transaction checkpoint scrub dirty target */
-#define	WT_STAT_CONN_TXN_CHECKPOINT_SCRUB_TARGET	1258
+#define	WT_STAT_CONN_TXN_CHECKPOINT_SCRUB_TARGET	1266
 /*! transaction: transaction checkpoint scrub time (msecs) */
-#define	WT_STAT_CONN_TXN_CHECKPOINT_SCRUB_TIME		1259
+#define	WT_STAT_CONN_TXN_CHECKPOINT_SCRUB_TIME		1267
 /*! transaction: transaction checkpoint total time (msecs) */
-#define	WT_STAT_CONN_TXN_CHECKPOINT_TIME_TOTAL		1260
+#define	WT_STAT_CONN_TXN_CHECKPOINT_TIME_TOTAL		1268
 /*! transaction: transaction checkpoints */
-#define	WT_STAT_CONN_TXN_CHECKPOINT			1261
+#define	WT_STAT_CONN_TXN_CHECKPOINT			1269
 /*!
  * transaction: transaction checkpoints skipped because database was
  * clean
  */
-#define	WT_STAT_CONN_TXN_CHECKPOINT_SKIPPED		1262
+#define	WT_STAT_CONN_TXN_CHECKPOINT_SKIPPED		1270
 /*! transaction: transaction failures due to cache overflow */
-#define	WT_STAT_CONN_TXN_FAIL_CACHE			1263
+#define	WT_STAT_CONN_TXN_FAIL_CACHE			1271
 /*!
  * transaction: transaction fsync calls for checkpoint after allocating
  * the transaction ID
  */
-#define	WT_STAT_CONN_TXN_CHECKPOINT_FSYNC_POST		1264
+#define	WT_STAT_CONN_TXN_CHECKPOINT_FSYNC_POST		1272
 /*!
  * transaction: transaction fsync duration for checkpoint after
  * allocating the transaction ID (usecs)
  */
-#define	WT_STAT_CONN_TXN_CHECKPOINT_FSYNC_POST_DURATION	1265
+#define	WT_STAT_CONN_TXN_CHECKPOINT_FSYNC_POST_DURATION	1273
 /*! transaction: transaction range of IDs currently pinned */
-#define	WT_STAT_CONN_TXN_PINNED_RANGE			1266
+#define	WT_STAT_CONN_TXN_PINNED_RANGE			1274
 /*! transaction: transaction range of IDs currently pinned by a checkpoint */
-#define	WT_STAT_CONN_TXN_PINNED_CHECKPOINT_RANGE	1267
+#define	WT_STAT_CONN_TXN_PINNED_CHECKPOINT_RANGE	1275
 /*!
  * transaction: transaction range of IDs currently pinned by named
  * snapshots
  */
-#define	WT_STAT_CONN_TXN_PINNED_SNAPSHOT_RANGE		1268
+#define	WT_STAT_CONN_TXN_PINNED_SNAPSHOT_RANGE		1276
 /*! transaction: transaction sync calls */
-#define	WT_STAT_CONN_TXN_SYNC				1269
+#define	WT_STAT_CONN_TXN_SYNC				1277
 /*! transaction: transactions committed */
-#define	WT_STAT_CONN_TXN_COMMIT				1270
+#define	WT_STAT_CONN_TXN_COMMIT				1278
 /*! transaction: transactions rolled back */
-#define	WT_STAT_CONN_TXN_ROLLBACK			1271
+#define	WT_STAT_CONN_TXN_ROLLBACK			1279
 /*! transaction: update conflicts */
-#define	WT_STAT_CONN_TXN_UPDATE_CONFLICT		1272
+#define	WT_STAT_CONN_TXN_UPDATE_CONFLICT		1280
 
 /*!
  * @}

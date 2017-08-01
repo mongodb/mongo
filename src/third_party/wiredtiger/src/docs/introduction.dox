@@ -59,4 +59,8 @@ To browse the WiredTiger source code repository or contact us, see:
 
 - @subpage community
 
+For more information on WiredTiger internals, see:
+
+- @subpage devdoc-index
+
 */

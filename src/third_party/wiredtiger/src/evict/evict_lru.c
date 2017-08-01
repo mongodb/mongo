@@ -964,7 +964,7 @@ __evict_tune_workers(WT_SESSION_IMPL *session)
 	 * If we have a fixed number of eviction threads, there is no value in
 	 * calculating if we should do any tuning.
 	 */
-       if (conn->evict_threads_max == conn->evict_threads_min)
+	if (conn->evict_threads_max == conn->evict_threads_min)
 		return;
 
 	WT_ASSERT(session, conn->evict_threads.threads[0]->session == session);
@@ -1506,10 +1506,8 @@ retry:	while (slot < max_entries) {
 		goto retry;
 	}
 
-err:	if (dhandle_locked) {
+err:	if (dhandle_locked)
 		__wt_readunlock(session, &conn->dhandle_lock);
-		dhandle_locked = false;
-	}
 
 	/*
 	 * If we didn't find any entries on a walk when we weren't interrupted,
@@ -1604,7 +1602,6 @@ __evict_walk_file(WT_SESSION_IMPL *session,
 	start = queue->evict_queue + *slotp;
 	remaining_slots = max_entries - *slotp;
 	total_slots = max_entries - queue->evict_entries;
-	btree_inuse = cache_inuse = 0;
 	target_pages_clean = target_pages_dirty = 0;
 
 	/*
@@ -1813,10 +1810,8 @@ __evict_walk_file(WT_SESSION_IMPL *session,
 		}
 
 		if (ref == NULL) {
-			WT_STAT_CONN_INCR(
-			    session, cache_eviction_walks_ended);
-			WT_STAT_DATA_INCR(
-			    session, cache_eviction_walks_ended);
+			WT_STAT_CONN_INCR(session, cache_eviction_walks_ended);
+			WT_STAT_DATA_INCR(session, cache_eviction_walks_ended);
 
 			if (++restarts == 2) {
 				WT_STAT_CONN_INCR(

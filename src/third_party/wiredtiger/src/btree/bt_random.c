@@ -417,9 +417,10 @@ random_page_entry:
 	 * the next entry, if that doesn't work, move to the previous entry.
 	 */
 	WT_ERR(__wt_row_random_leaf(session, cbt));
-	if (__wt_cursor_valid(cbt, &upd))
-		WT_ERR(__wt_kv_return(session, cbt, upd));
-	else {
+	if (__wt_cursor_valid(cbt, &upd)) {
+		WT_ERR(__wt_key_return(session, cbt));
+		WT_ERR(__wt_value_return(session, cbt, upd));
+	} else {
 		if ((ret = __wt_btcur_next(cbt, false)) == WT_NOTFOUND)
 			ret = __wt_btcur_prev(cbt, false);
 		WT_ERR(ret);

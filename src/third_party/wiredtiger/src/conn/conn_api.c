@@ -1936,13 +1936,16 @@ __wt_verbose_config(WT_SESSION_IMPL *session, const char *cfg[])
 
 /*
  * __wt_timing_stress_config --
- *	Set diagnostic stress timing delay configuration.
+ *	Set timing stress for test delay configuration.
  */
 int
 __wt_timing_stress_config(WT_SESSION_IMPL *session, const char *cfg[])
 {
 	static const WT_NAME_FLAG stress_types[] = {
 		{ "checkpoint_slow",	WT_TIMING_STRESS_CHECKPOINT_SLOW },
+		{ "internal_page_split_race",
+		    WT_TIMING_STRESS_INTERNAL_PAGE_SPLIT_RACE },
+		{ "page_split_race",	WT_TIMING_STRESS_PAGE_SPLIT_RACE },
 		{ NULL, 0 }
 	};
 	WT_CONFIG_ITEM cval, sval;
@@ -1954,22 +1957,13 @@ __wt_timing_stress_config(WT_SESSION_IMPL *session, const char *cfg[])
 	conn = S2C(session);
 
 	WT_RET(__wt_config_gets(
-	    session, cfg, "diagnostic_timing_stress", &cval));
+	    session, cfg, "timing_stress_for_test", &cval));
 
 	flags = 0;
 	for (ft = stress_types; ft->name != NULL; ft++) {
 		if ((ret = __wt_config_subgets(
 		    session, &cval, ft->name, &sval)) == 0 && sval.val != 0) {
-#ifdef HAVE_DIAGNOSTIC
 			LF_SET(ft->flag);
-#else
-			WT_RET_MSG(session, EINVAL,
-			    "diagnostic_timing_stress option specified when "
-			    "WiredTiger built without diagnostic support. Add "
-			    "--enable-diagnostic to configure command and "
-			    "rebuild to include support for diagnostic stress "
-			    "timing delays");
-#endif
 		}
 		WT_RET_NOTFOUND_OK(ret);
 	}
