@@ -1160,7 +1160,7 @@ void ParallelSortClusteredCursor::_oldInit() {
             throw RecvStaleConfigException(
                 _ns, errMsg.str(), ChunkVersion(0, 0, OID()), ChunkVersion(0, 0, OID()));
         } else if (throwException) {
-            throw DBException(errMsg.str(), 14827);
+            throw DBException(14827, errMsg.str());
         } else {
             warning() << redact(errMsg.str());
         }

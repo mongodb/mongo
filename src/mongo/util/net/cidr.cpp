@@ -111,7 +111,7 @@ CIDR::CIDR(StringData s) try {
         _family = AF_INET6;
         _len = kIPv6Bits;
     } else {
-        throw CIDRException("Invalid IP address in CIDR string", ErrorCodes::BadValue);
+        throw CIDRException("Invalid IP address in CIDR string");
     }
 
     if (slash == end(s)) {
@@ -120,14 +120,14 @@ CIDR::CIDR(StringData s) try {
 
     auto len = strict_stoi(std::string(slash + 1, end(s)), 10);
     if ((len < 0) || (len > _len)) {
-        throw CIDRException("Invalid length in CIDR string", ErrorCodes::BadValue);
+        throw CIDRException("Invalid length in CIDR string");
     }
     _len = len;
 
 } catch (const std::invalid_argument& e) {
-    throw CIDRException("Non-numeric length in CIDR string", ErrorCodes::BadValue);
+    throw CIDRException("Non-numeric length in CIDR string");
 } catch (const std::out_of_range& e) {
-    throw CIDRException("Invalid length in CIDR string", ErrorCodes::BadValue);
+    throw CIDRException("Invalid length in CIDR string");
 }
 
 template <>

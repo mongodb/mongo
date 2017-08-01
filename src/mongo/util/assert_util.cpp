@@ -113,7 +113,7 @@ NOINLINE_DECL void verifyFailed(const char* expr, const char* file, unsigned lin
     logContext();
     stringstream temp;
     temp << "assertion " << file << ":" << line;
-    AssertionException e(temp.str(), 0);
+    AssertionException e(0, temp.str());
     breakpoint();
 #if defined(MONGO_CONFIG_DEBUG_BUILD)
     // this is so we notice in buildbot

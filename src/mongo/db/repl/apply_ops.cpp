@@ -139,9 +139,9 @@ Status _applyOps(OperationContext* opCtx,
 
             if (!dbHolder().get(opCtx, ns)) {
                 throw DBException(
+                    ErrorCodes::NamespaceNotFound,
                     "cannot create a database in atomic applyOps mode; will retry without "
-                    "atomicity",
-                    ErrorCodes::NamespaceNotFound);
+                    "atomicity");
             }
 
             OldClientContext ctx(opCtx, ns);

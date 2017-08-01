@@ -44,7 +44,7 @@ namespace mongo {
 
 class CIDRException : public DBException {
 public:
-    CIDRException(const StringData& w, int code) : DBException(w.toString(), code) {}
+    CIDRException(const StringData& w) : DBException(ErrorCodes::BadValue, w.toString()) {}
 };
 
 /**

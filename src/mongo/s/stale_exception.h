@@ -46,13 +46,13 @@ public:
                          ChunkVersion received,
                          ChunkVersion wanted)
         : AssertionException(
+              code,
               str::stream() << raw << " ( ns : " << ns << ", received : " << received.toString()
                             << ", wanted : "
                             << wanted.toString()
                             << ", "
                             << (code == ErrorCodes::SendStaleConfig ? "send" : "recv")
-                            << " )",
-              code),
+                            << " )"),
           _ns(ns),
           _received(received),
           _wanted(wanted) {}
@@ -60,6 +60,7 @@ public:
     /** Preferred if we're rebuilding this from a thrown exception */
     StaleConfigException(const std::string& raw, int code, const BSONObj& error)
         : AssertionException(
+              code,
               str::stream() << raw << " ( ns : " << (error["ns"].type() == String
                                                          ? error["ns"].String()
                                                          : std::string("<unknown>"))
@@ -69,8 +70,7 @@ public:
                             << ChunkVersion::fromBSON(error, "vWanted").toString()
                             << ", "
                             << (code == ErrorCodes::SendStaleConfig ? "send" : "recv")
-                            << " )",
-              code),
+                            << " )"),
           // For legacy reasons, we may not always get a namespace here
           _ns(error["ns"].type() == String ? error["ns"].String() : ""),
           _received(ChunkVersion::fromBSON(error, "vReceived")),
@@ -81,7 +81,7 @@ public:
      * stale config exceptions in a map and this requires a default constructor.
      */
     StaleConfigException()
-        : AssertionException("initializing empty stale config exception object", 0) {}
+        : AssertionException(0, "initializing empty stale config exception object") {}
 
     virtual ~StaleConfigException() throw() {}
 

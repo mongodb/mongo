@@ -53,13 +53,13 @@ TEST(RedactStatusTest, StatusOK) {
 
 TEST(RedactExceptionTest, NoRedact) {
     logger::globalLogDomain()->setShouldRedactLogs(false);
-    DBException ex(kMsg, ErrorCodes::InternalError);
+    DBException ex(ErrorCodes::InternalError, kMsg);
     ASSERT_EQ(redact(ex), ex.toString());
 }
 
 TEST(RedactExceptionTest, BasicException) {
     logger::globalLogDomain()->setShouldRedactLogs(true);
-    DBException ex(kMsg, ErrorCodes::InternalError);
+    DBException ex(ErrorCodes::InternalError, kMsg);
     ASSERT_EQ(redact(ex), "InternalError ###");
 }
 

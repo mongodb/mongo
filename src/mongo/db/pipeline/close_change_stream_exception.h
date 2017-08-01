@@ -40,7 +40,7 @@ namespace mongo {
 class CloseChangeStreamException : public DBException {
 public:
     CloseChangeStreamException()
-        : DBException("CloseChangeStream", ErrorCodes::CloseChangeStream) {}
+        : DBException(ErrorCodes::CloseChangeStream, "CloseChangeStream") {}
 };
 
 }  // namespace mongo

@@ -69,9 +69,7 @@ public:
         invariant(!status.isOK());
         traceIfNeeded(*this);
     }
-    DBException(const char* msg, int code)
-        : DBException(Status(code ? ErrorCodes::fromInt(code) : ErrorCodes::UnknownError, msg)) {}
-    DBException(const std::string& msg, int code)
+    DBException(int code, const std::string& msg)
         : DBException(Status(code ? ErrorCodes::fromInt(code) : ErrorCodes::UnknownError, msg)) {}
     virtual ~DBException() throw() {}
 
@@ -116,8 +114,7 @@ protected:
 class AssertionException : public DBException {
 public:
     AssertionException(const Status& status) : DBException(status) {}
-    AssertionException(const char* msg, int code) : DBException(msg, code) {}
-    AssertionException(const std::string& msg, int code) : DBException(msg, code) {}
+    AssertionException(int code, const std::string& msg) : DBException(code, msg) {}
 
     virtual ~AssertionException() throw() {}
 
@@ -132,7 +129,7 @@ public:
 /* UserExceptions are valid errors that a user can cause, like out of disk space or duplicate key */
 class UserException : public AssertionException {
 public:
-    UserException(int c, const std::string& m) : AssertionException(m, c) {}
+    UserException(int c, const std::string& m) : AssertionException(c, m) {}
     virtual bool severe() const {
         return false;
     }
@@ -145,7 +142,7 @@ public:
 class MsgAssertionException : public AssertionException {
 public:
     MsgAssertionException(const Status& status) : AssertionException(status) {}
-    MsgAssertionException(int c, const std::string& m) : AssertionException(m, c) {}
+    MsgAssertionException(int c, const std::string& m) : AssertionException(c, m) {}
     virtual bool severe() const {
         return false;
     }

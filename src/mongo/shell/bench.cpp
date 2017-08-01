@@ -954,9 +954,9 @@ void BenchRunWorker::generateLoadOnConnection(DBClientBase* conn) {
 
                             if (!result["err"].eoo() && result["err"].type() == String &&
                                 (_config->throwGLE || op.throwGLE))
-                                throw DBException((string) "From benchRun GLE" +
-                                                      causedBy(result["err"].String()),
-                                                  result["code"].eoo() ? 0 : result["code"].Int());
+                                throw DBException(result["code"].eoo() ? 0 : result["code"].Int(),
+                                                  (string) "From benchRun GLE" +
+                                                      causedBy(result["err"].String()));
                         }
                     } break;
                     case OpType::INSERT: {
@@ -1023,9 +1023,9 @@ void BenchRunWorker::generateLoadOnConnection(DBClientBase* conn) {
 
                             if (!result["err"].eoo() && result["err"].type() == String &&
                                 (_config->throwGLE || op.throwGLE))
-                                throw DBException((string) "From benchRun GLE" +
-                                                      causedBy(result["err"].String()),
-                                                  result["code"].eoo() ? 0 : result["code"].Int());
+                                throw DBException(result["code"].eoo() ? 0 : result["code"].Int(),
+                                                  (string) "From benchRun GLE" +
+                                                      causedBy(result["err"].String()));
                         }
                     } break;
                     case OpType::REMOVE: {
@@ -1072,9 +1072,9 @@ void BenchRunWorker::generateLoadOnConnection(DBClientBase* conn) {
 
                             if (!result["err"].eoo() && result["err"].type() == String &&
                                 (_config->throwGLE || op.throwGLE))
-                                throw DBException((string) "From benchRun GLE " +
-                                                      causedBy(result["err"].String()),
-                                                  result["code"].eoo() ? 0 : result["code"].Int());
+                                throw DBException(result["code"].eoo() ? 0 : result["code"].Int(),
+                                                  (string) "From benchRun GLE " +
+                                                      causedBy(result["err"].String()));
                         }
                     } break;
                     case OpType::CREATEINDEX:

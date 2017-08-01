@@ -61,7 +61,7 @@ extern const char* replInfo;
 /* A replication exception */
 class SyncException : public DBException {
 public:
-    SyncException() : DBException("sync exception", 10001) {}
+    SyncException() : DBException(10001, "sync exception") {}
 };
 
 /* A Source is a source from which we can pull (replicate) data.

@@ -90,14 +90,14 @@ OptionDescription& OptionSection::addOptionChaining(
         if (option._dottedName == oditerator->_dottedName) {
             StringBuilder sb;
             sb << "Attempted to register option with duplicate dottedName: " << option._dottedName;
-            throw DBException(sb.str(), ErrorCodes::InternalError);
+            throw DBException(ErrorCodes::InternalError, sb.str());
         }
         // Allow options with empty singleName since some options are not allowed on the command
         // line
         if (!option._singleName.empty() && option._singleName == oditerator->_singleName) {
             StringBuilder sb;
             sb << "Attempted to register option with duplicate singleName: " << option._singleName;
-            throw DBException(sb.str(), ErrorCodes::InternalError);
+            throw DBException(ErrorCodes::InternalError, sb.str());
         }
         // Deprecated dotted names should not conflict with dotted names or deprecated dotted
         // names of any other options.
@@ -107,7 +107,7 @@ OptionDescription& OptionSection::addOptionChaining(
             StringBuilder sb;
             sb << "Attempted to register option with duplicate deprecated dotted name "
                << "(with another option's dotted name): " << option._dottedName;
-            throw DBException(sb.str(), ErrorCodes::BadValue);
+            throw DBException(ErrorCodes::BadValue, sb.str());
         }
         for (std::vector<std::string>::const_iterator i =
                  oditerator->_deprecatedDottedNames.begin();
@@ -119,7 +119,7 @@ OptionDescription& OptionSection::addOptionChaining(
                 StringBuilder sb;
                 sb << "Attempted to register option with duplicate deprecated dotted name " << *i
                    << " (other option " << oditerator->_dottedName << ")";
-                throw DBException(sb.str(), ErrorCodes::BadValue);
+                throw DBException(ErrorCodes::BadValue, sb.str());
             }
         }
     }

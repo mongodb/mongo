@@ -209,7 +209,7 @@ TEST(Transformers, ExceptionToStatus) {
 
     Status fromDBExcept = [=]() {
         try {
-            throw DBException(reason, ErrorCodes::TypeMismatch);
+            throw DBException(ErrorCodes::TypeMismatch, reason);
         } catch (...) {
             return exceptionToStatus();
         }
