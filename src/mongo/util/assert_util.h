@@ -57,24 +57,6 @@ public:
 
 extern AssertionCount assertionCount;
 
-class BSONObjBuilder;
-
-struct ExceptionInfo {
-    ExceptionInfo() : msg(""), code(-1) {}
-    ExceptionInfo(const char* m, int c) : msg(m), code(c) {}
-    ExceptionInfo(const std::string& m, int c) : msg(m), code(c) {}
-    void append(BSONObjBuilder& b, const char* m = "$err", const char* c = "code") const;
-    std::string toString() const;
-    bool empty() const {
-        return msg.empty();
-    }
-    void reset() {
-        msg = "";
-        code = -1;
-    }
-    std::string msg;
-    int code;
-};
 
 class DBException;
 std::string causedBy(const DBException& e);
@@ -83,42 +65,44 @@ std::string causedBy(const std::string& e);
 /** Most mongo exceptions inherit from this; this is commonly caught in most threads */
 class DBException : public std::exception {
 public:
-    DBException(const ExceptionInfo& ei) : _ei(ei) {
+    DBException(const Status& status) : _status(status) {
+        invariant(!status.isOK());
         traceIfNeeded(*this);
     }
-    DBException(const char* msg, int code) : _ei(msg, code) {
-        traceIfNeeded(*this);
-    }
-    DBException(const std::string& msg, int code) : _ei(msg, code) {
-        traceIfNeeded(*this);
-    }
+    DBException(const char* msg, int code)
+        : DBException(Status(code ? ErrorCodes::fromInt(code) : ErrorCodes::UnknownError, msg)) {}
+    DBException(const std::string& msg, int code)
+        : DBException(Status(code ? ErrorCodes::fromInt(code) : ErrorCodes::UnknownError, msg)) {}
     virtual ~DBException() throw() {}
 
     virtual const char* what() const throw() {
-        return _ei.msg.c_str();
+        return reason().c_str();
     }
     virtual int getCode() const {
-        return _ei.code;
+        return code();
     }
     virtual void appendPrefix(std::stringstream& ss) const {}
     virtual void addContext(const std::string& str) {
-        _ei.msg = str + causedBy(_ei.msg);
+        _status = Status(code(), str + causedBy(reason()));
     }
-
-    // Utilities for the migration to Status objects
-    static ErrorCodes::Error convertExceptionCode(int exCode);
 
     Status toStatus(const std::string& context) const {
-        return Status(convertExceptionCode(getCode()), context + causedBy(*this));
+        return Status(code(), context + causedBy(*this));
     }
-    Status toStatus() const {
-        return Status(convertExceptionCode(getCode()), this->what());
+    const Status& toStatus() const {
+        return _status;
     }
 
-    virtual std::string toString() const;
+    virtual std::string toString() const {
+        return _status.toString();
+    }
 
-    const ExceptionInfo& getInfo() const {
-        return _ei;
+    const std::string& reason() const {
+        return _status.reason();
+    }
+
+    ErrorCodes::Error code() const {
+        return _status.code();
     }
 
 private:
@@ -128,12 +112,12 @@ public:
     static AtomicBool traceExceptions;
 
 protected:
-    ExceptionInfo _ei;
+    Status _status;
 };
 
 class AssertionException : public DBException {
 public:
-    AssertionException(const ExceptionInfo& ei) : DBException(ei) {}
+    AssertionException(const Status& status) : DBException(status) {}
     AssertionException(const char* msg, int code) : DBException(msg, code) {}
     AssertionException(const std::string& msg, int code) : DBException(msg, code) {}
 
@@ -162,7 +146,7 @@ public:
 
 class MsgAssertionException : public AssertionException {
 public:
-    MsgAssertionException(const ExceptionInfo& ei) : AssertionException(ei) {}
+    MsgAssertionException(const Status& status) : AssertionException(status) {}
     MsgAssertionException(int c, const std::string& m) : AssertionException(m, c) {}
     virtual bool severe() const {
         return false;

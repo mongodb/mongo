@@ -94,8 +94,7 @@ Status extractGLEErrors(const BSONObj& gleResponse, GLEErrors* errors) {
         // !!! SOME GLE ERROR OCCURRED, UNKNOWN WRITE RESULT !!!
         //
 
-        return Status(DBException::convertExceptionCode(code ? code : ErrorCodes::UnknownError),
-                      errMsg);
+        return Status(ErrorCodes::fromInt(code ? code : ErrorCodes::UnknownError), errMsg);
     } else if (!err.empty()) {
         // Write error
         errors->writeError.reset(new WriteErrorDetail);

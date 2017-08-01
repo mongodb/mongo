@@ -105,7 +105,7 @@ void generateLegacyQueryErrorResponse(const AssertionException* exception,
                                       const QueryMessage& queryMessage,
                                       CurOp* curop,
                                       Message* response) {
-    curop->debug().exceptionInfo = exception->getInfo();
+    curop->debug().exceptionInfo = exception->toStatus();
 
     log(LogComponent::kQuery) << "assertion " << exception->toString() << " ns:" << queryMessage.ns
                               << " query:" << (queryMessage.query.valid(BSONVersion::kLatest)
@@ -121,7 +121,8 @@ void generateLegacyQueryErrorResponse(const AssertionException* exception,
         : NULL;
 
     BSONObjBuilder err;
-    exception->getInfo().append(err);
+    err.append("$err", exception->reason());
+    err.append("code", exception->code());
     if (scex) {
         err.append("ok", 0.0);
         err.append("ns", scex->getns());
@@ -154,8 +155,8 @@ void generateLegacyQueryErrorResponse(const AssertionException* exception,
 }
 
 void registerError(OperationContext* opCtx, const DBException& exception) {
-    LastError::get(opCtx->getClient()).setLastError(exception.getCode(), exception.getInfo().msg);
-    CurOp::get(opCtx)->debug().exceptionInfo = exception.getInfo();
+    LastError::get(opCtx->getClient()).setLastError(exception.getCode(), exception.reason());
+    CurOp::get(opCtx)->debug().exceptionInfo = exception.toStatus();
 }
 
 void _generateErrorResponse(OperationContext* opCtx,
@@ -985,10 +986,11 @@ DbResponse receivedGetMore(OperationContext* opCtx,
         }
 
         BSONObjBuilder err;
-        e.getInfo().append(err);
-        BSONObj errObj = err.done();
+        err.append("$err", e.reason());
+        err.append("code", e.code());
+        BSONObj errObj = err.obj();
 
-        curop.debug().exceptionInfo = e.getInfo();
+        curop.debug().exceptionInfo = e.toStatus();
 
         dbresponse = replyToQuery(errObj, ResultFlag_ErrSet);
         curop.debug().responseLength = dbresponse.response.header().dataLen();
@@ -1105,15 +1107,15 @@ DbResponse ServiceEntryPointMongod::handleRequest(OperationContext* opCtx, const
                 }
             }
         } catch (const UserException& ue) {
-            LastError::get(c).setLastError(ue.getCode(), ue.getInfo().msg);
+            LastError::get(c).setLastError(ue.getCode(), ue.reason());
             LOG(3) << " Caught Assertion in " << networkOpToString(op) << ", continuing "
                    << redact(ue);
-            debug.exceptionInfo = ue.getInfo();
+            debug.exceptionInfo = ue.toStatus();
         } catch (const AssertionException& e) {
-            LastError::get(c).setLastError(e.getCode(), e.getInfo().msg);
+            LastError::get(c).setLastError(e.getCode(), e.reason());
             LOG(3) << " Caught Assertion in " << networkOpToString(op) << ", continuing "
                    << redact(e);
-            debug.exceptionInfo = e.getInfo();
+            debug.exceptionInfo = e.toStatus();
             shouldLogOpDebug = true;
         }
     }

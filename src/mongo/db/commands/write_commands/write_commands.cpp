@@ -151,7 +151,7 @@ void serializeReply(OperationContext* opCtx,
             BSONObjBuilder error(errorsSizeTracker);
             error.append("index", i);
             error.append("code", int(ErrorCodes::StaleShardVersion));  // Different from exception!
-            error.append("errmsg", errorMessage(result.staleConfigException->getInfo().msg));
+            error.append("errmsg", errorMessage(result.staleConfigException->reason()));
             {
                 BSONObjBuilder errInfo(error.subobjStart("errInfo"));
                 result.staleConfigException->getVersionWanted().addToBSON(errInfo, "vWanted");
@@ -221,7 +221,7 @@ public:
             runImpl(opCtx, request, result);
             return true;
         } catch (const DBException& ex) {
-            LastError::get(opCtx->getClient()).setLastError(ex.getCode(), ex.getInfo().msg);
+            LastError::get(opCtx->getClient()).setLastError(ex.getCode(), ex.reason());
             throw;
         }
     }

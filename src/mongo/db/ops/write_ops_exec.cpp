@@ -99,7 +99,7 @@ void finishCurOp(OperationContext* opCtx, CurOp* curOp) {
                     curOp->isCommand(),
                     curOp->getReadWriteType());
 
-        if (!curOp->debug().exceptionInfo.empty()) {
+        if (!curOp->debug().exceptionInfo.isOK()) {
             LOG(3) << "Caught Assertion in " << redact(logicalOpToString(curOp->getLogicalOp()))
                    << ": " << curOp->debug().exceptionInfo.toString();
         }
@@ -197,9 +197,9 @@ bool handleError(OperationContext* opCtx,
                  const NamespaceString& nss,
                  const write_ops::WriteCommandBase& wholeOp,
                  WriteResult* out) {
-    LastError::get(opCtx->getClient()).setLastError(ex.getCode(), ex.getInfo().msg);
+    LastError::get(opCtx->getClient()).setLastError(ex.getCode(), ex.reason());
     auto& curOp = *CurOp::get(opCtx);
-    curOp.debug().exceptionInfo = ex.getInfo();
+    curOp.debug().exceptionInfo = ex.toStatus();
 
     if (ErrorCodes::isInterruption(ErrorCodes::Error(ex.getCode()))) {
         throw;  // These have always failed the whole batch.

@@ -115,7 +115,17 @@ public:
 
     inline std::string codeString() const;
 
-    inline std::string reason() const;
+
+    /**
+     * Returns the reason string or the empty string if isOK().
+     */
+    const std::string& reason() const {
+        if (_error)
+            return _error->reason;
+
+        static const std::string empty;
+        return empty;
+    }
 
     std::string toString() const;
 

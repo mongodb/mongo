@@ -44,7 +44,6 @@ using namespace std;
 #include <boost/exception/exception.hpp>
 #include <exception>
 
-#include "mongo/bson/bsonobjbuilder.h"
 #include "mongo/config.h"
 #include "mongo/util/debug_util.h"
 #include "mongo/util/debugger.h"
@@ -76,34 +75,11 @@ void AssertionCount::condrollover(int newvalue) {
 
 AtomicBool DBException::traceExceptions(false);
 
-string DBException::toString() const {
-    stringstream ss;
-    ss << getCode() << " " << what();
-    return ss.str();
-}
-
 void DBException::traceIfNeeded(const DBException& e) {
     if (traceExceptions.load()) {
         warning() << "DBException thrown" << causedBy(e) << endl;
         printStackTrace();
     }
-}
-
-ErrorCodes::Error DBException::convertExceptionCode(int exCode) {
-    if (exCode == 0) {
-        return ErrorCodes::UnknownError;
-    }
-    return ErrorCodes::fromInt(exCode);
-}
-
-void ExceptionInfo::append(BSONObjBuilder& b, const char* m, const char* c) const {
-    if (msg.empty())
-        b.append(m, "unknown assertion");
-    else
-        b.append(m, msg);
-
-    if (code)
-        b.append(c, code);
 }
 
 /* "warning" assert -- safe to continue, so we don't throw exception. */
@@ -319,11 +295,5 @@ Status exceptionToStatus() noexcept {
         severe() << "Caught unknown exception in exceptionToStatus()";
         std::terminate();
     }
-}
-
-string ExceptionInfo::toString() const {
-    stringstream ss;
-    ss << "exception: " << code << " " << msg;
-    return ss.str();
 }
 }

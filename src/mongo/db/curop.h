@@ -121,7 +121,7 @@ public:
     BSONObj execStats;  // Owned here.
 
     // error handling
-    ExceptionInfo exceptionInfo;
+    Status exceptionInfo = Status::OK();
 
     // response info
     long long executionTimeMicros{0};

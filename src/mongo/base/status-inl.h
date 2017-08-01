@@ -71,10 +71,6 @@ inline std::string Status::codeString() const {
     return ErrorCodes::errorString(code());
 }
 
-inline std::string Status::reason() const {
-    return _error ? _error->reason : std::string();
-}
-
 inline AtomicUInt32::WordType Status::refCount() const {
     return _error ? _error->refs.load() : 0;
 }

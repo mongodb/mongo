@@ -75,7 +75,7 @@ bool SocketException::shouldPrint() const {
 
 std::string SocketException::toString() const {
     std::stringstream ss;
-    ss << _ei.code << " socket exception [" << getStringType(_type) << "] ";
+    ss << _status.codeString() << " socket exception [" << getStringType(_type) << "] ";
 
     if (_server.size())
         ss << "server [" << _server << "] ";
