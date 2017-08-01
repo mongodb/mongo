@@ -183,6 +183,13 @@ Status UpdateDriver::populateDocumentWithQueryFields(const BSONObj& query,
     return populateDocumentWithQueryFields(*cq, immutablePaths, doc);
 }
 
+namespace {
+
+const FieldRef idPath("_id");
+const vector<FieldRef*> emptyImmutablePaths;
+
+}  // namespace
+
 Status UpdateDriver::populateDocumentWithQueryFields(const CanonicalQuery& query,
                                                      const vector<FieldRef*>* immutablePathsPtr,
                                                      mutablebson::Document& doc) const {
@@ -192,13 +199,12 @@ Status UpdateDriver::populateDocumentWithQueryFields(const CanonicalQuery& query
     if (isDocReplacement()) {
         FieldRefSet pathsToExtract;
 
-        // TODO: Refactor update logic, make _id just another immutable field
-        static const FieldRef idPath("_id");
-        static const vector<FieldRef*> emptyImmutablePaths;
         const vector<FieldRef*>& immutablePaths =
             immutablePathsPtr ? *immutablePathsPtr : emptyImmutablePaths;
 
         pathsToExtract.fillFrom(immutablePaths);
+
+        // TODO: Refactor update logic, make _id just another immutable field
         pathsToExtract.insert(&idPath);
 
         // Extract only immutable fields from replacement-style
