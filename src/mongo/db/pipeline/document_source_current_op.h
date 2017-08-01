@@ -78,14 +78,7 @@ public:
 
     const char* getSourceName() const final;
 
-    StageConstraints constraints() const final {
-        StageConstraints constraints;
-        constraints.requiredPosition = StageConstraints::PositionRequirement::kFirst;
-        constraints.requiresInputDocSource = false;
-        constraints.isAllowedInsideFacetStage = false;
-        constraints.isIndependentOfAnyCollection = true;
-        return constraints;
-    }
+    InitialSourceType getInitialSourceType() const final;
 
     static boost::intrusive_ptr<DocumentSource> createFromBson(
         BSONElement spec, const boost::intrusive_ptr<ExpressionContext>& pExpCtx);

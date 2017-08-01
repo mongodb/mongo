@@ -74,13 +74,7 @@ public:
 
     const char* getSourceName() const final;
 
-    StageConstraints constraints() const final {
-        StageConstraints constraints;
-        constraints.requiredPosition = StageConstraints::PositionRequirement::kFirst;
-        constraints.requiresInputDocSource = false;
-        constraints.isAllowedInsideFacetStage = false;
-        return constraints;
-    }
+    InitialSourceType getInitialSourceType() const final;
 
     Value serialize(boost::optional<ExplainOptions::Verbosity> explain = boost::none) const final;
 

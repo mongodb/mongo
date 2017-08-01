@@ -111,6 +111,16 @@ TEST_F(DocumentSourceFacetTest, ShouldRejectEmptyPipelines) {
     ASSERT_THROWS(DocumentSourceFacet::createFromBson(spec.firstElement(), ctx), UserException);
 }
 
+TEST_F(DocumentSourceFacetTest, ShouldRejectFacetsWithStagesThatMustBeTheFirstStage) {
+    auto ctx = getExpCtx();
+    auto spec = BSON("$facet" << BSON("a" << BSON_ARRAY(BSON("$indexStats" << BSONObj()))));
+    ASSERT_THROWS(DocumentSourceFacet::createFromBson(spec.firstElement(), ctx), UserException);
+
+    spec = BSON("$facet" << BSON(
+                    "a" << BSON_ARRAY(BSON("$limit" << 1) << BSON("$indexStats" << BSONObj()))));
+    ASSERT_THROWS(DocumentSourceFacet::createFromBson(spec.firstElement(), ctx), UserException);
+}
+
 TEST_F(DocumentSourceFacetTest, ShouldSucceedWhenNamespaceIsCollectionless) {
     auto ctx = getExpCtx();
     auto spec = fromjson("{$facet: {a: [{$match: {}}]}}");
@@ -168,10 +178,9 @@ class DocumentSourcePassthrough : public DocumentSourceMock {
 public:
     DocumentSourcePassthrough() : DocumentSourceMock({}) {}
 
-    StageConstraints constraints() const override {
-        StageConstraints constraints;
-        constraints.isAllowedInsideFacetStage = true;
-        return constraints;
+    // We need this to be false so that it can be used in a $facet stage.
+    InitialSourceType getInitialSourceType() const final {
+        return InitialSourceType::kNotInitialSource;
     }
 
     DocumentSource::GetNextResult getNext() final {
@@ -607,10 +616,8 @@ TEST_F(DocumentSourceFacetTest, ShouldThrowIfAnyPipelineRequiresTextScoreButItIs
  */
 class DocumentSourceNeedsPrimaryShard final : public DocumentSourcePassthrough {
 public:
-    StageConstraints constraints() const final {
-        StageConstraints constraints;
-        constraints.mustRunOnPrimaryShardIfSharded = true;
-        return constraints;
+    bool needsPrimaryShard() const final {
+        return true;
     }
 
     static boost::intrusive_ptr<DocumentSourceNeedsPrimaryShard> create() {
@@ -633,7 +640,7 @@ TEST_F(DocumentSourceFacetTest, ShouldRequirePrimaryShardIfAnyStageRequiresPrima
     facets.emplace_back("needsPrimaryShard", std::move(secondPipeline));
     auto facetStage = DocumentSourceFacet::create(std::move(facets), ctx);
 
-    ASSERT_TRUE(facetStage->constraints().mustRunOnPrimaryShardIfSharded);
+    ASSERT_TRUE(facetStage->needsPrimaryShard());
 }
 
 TEST_F(DocumentSourceFacetTest, ShouldNotRequirePrimaryShardIfNoStagesRequiresPrimaryShard) {
@@ -652,7 +659,7 @@ TEST_F(DocumentSourceFacetTest, ShouldNotRequirePrimaryShardIfNoStagesRequiresPr
     facets.emplace_back("second", std::move(secondPipeline));
     auto facetStage = DocumentSourceFacet::create(std::move(facets), ctx);
 
-    ASSERT_FALSE(facetStage->constraints().mustRunOnPrimaryShardIfSharded);
+    ASSERT_FALSE(facetStage->needsPrimaryShard());
 }
 
 }  // namespace

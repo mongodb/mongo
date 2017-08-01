@@ -101,8 +101,7 @@ TEST_F(ChangeNotificationStageTest, StagesGeneratedCorrectly) {
         DocumentSourceChangeNotification::createFromBson(spec.firstElement(), getExpCtx());
 
     ASSERT_EQUALS(result.size(), 2UL);
-    ASSERT_TRUE(dynamic_cast<DocumentSourceMatch*>(result[0].get()));
-    ASSERT_EQUALS(string(result[0]->getSourceName()), "$changeNotification");
+    ASSERT_EQUALS(string(result[0]->getSourceName()), "$match");
     ASSERT_EQUALS(string(result[1]->getSourceName()), "$changeNotification");
 
     // TODO: Check explain result.

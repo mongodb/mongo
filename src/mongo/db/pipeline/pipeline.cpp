@@ -32,8 +32,6 @@
 #include "mongo/db/pipeline/pipeline.h"
 #include "mongo/db/pipeline/pipeline_optimizations.h"
 
-#include <algorithm>
-
 #include "mongo/base/error_codes.h"
 #include "mongo/db/bson/dotted_path_support.h"
 #include "mongo/db/catalog/document_validation.h"
@@ -136,16 +134,14 @@ Status Pipeline::validatePipeline() const {
         // {aggregate: 1} is only valid for collectionless sources, and vice-versa.
         const auto firstStage = _sources.front().get();
 
-        if (nss.isCollectionlessAggregateNS() &&
-            !firstStage->constraints().isIndependentOfAnyCollection) {
+        if (nss.isCollectionlessAggregateNS() && !firstStage->isCollectionlessInitialSource()) {
             return {ErrorCodes::InvalidNamespace,
                     str::stream() << "{aggregate: 1} is not valid for '"
                                   << firstStage->getSourceName()
                                   << "'; a collection is required."};
         }
 
-        if (!nss.isCollectionlessAggregateNS() &&
-            firstStage->constraints().isIndependentOfAnyCollection) {
+        if (!nss.isCollectionlessAggregateNS() && firstStage->isCollectionlessInitialSource()) {
             return {ErrorCodes::InvalidNamespace,
                     str::stream() << "'" << firstStage->getSourceName()
                                   << "' can only be run with {aggregate: 1}"};
@@ -158,21 +154,11 @@ Status Pipeline::validatePipeline() const {
 
 Status Pipeline::validateFacetPipeline() const {
     if (_sources.empty()) {
-        return {ErrorCodes::BadValue, "sub-pipeline in $facet stage cannot be empty"};
-    }
-    for (auto&& stage : _sources) {
-        auto stageConstraints = stage->constraints();
-        if (!stageConstraints.isAllowedInsideFacetStage) {
-            return {ErrorCodes::BadValue,
-                    str::stream() << stage->getSourceName()
-                                  << " is not allowed to be used within a $facet stage",
-                    40550};
-        }
-        // We expect a stage within a $facet stage to have these properties.
-        invariant(stageConstraints.requiresInputDocSource);
-        invariant(!stageConstraints.isIndependentOfAnyCollection);
-        invariant(stageConstraints.requiredPosition ==
-                  DocumentSource::StageConstraints::PositionRequirement::kNone);
+        return {ErrorCodes::BadValue, "sub-pipeline in $facet stage cannot be empty."};
+    } else if (_sources.front()->isInitialSource()) {
+        return {ErrorCodes::BadValue,
+                str::stream() << _sources.front()->getSourceName()
+                              << " is not allowed to be used within a $facet stage."};
     }
 
     // Facet pipelines cannot have any stages which are initial sources. We've already validated the
@@ -184,13 +170,10 @@ Status Pipeline::validateFacetPipeline() const {
 Status Pipeline::ensureAllStagesAreInLegalPositions() const {
     size_t i = 0;
     for (auto&& stage : _sources) {
-        if (stage->constraints().requiredPosition ==
-                DocumentSource::StageConstraints::PositionRequirement::kFirst &&
-            i != 0) {
+        if (stage->isInitialSource() && i != 0) {
             return {ErrorCodes::BadValue,
                     str::stream() << stage->getSourceName()
-                                  << " is only valid as the first stage in a pipeline.",
-                    40549};
+                                  << " is only valid as the first stage in a pipeline."};
         }
         auto matchStage = dynamic_cast<DocumentSourceMatch*>(stage.get());
         if (i != 0 && matchStage && matchStage->isTextQuery()) {
@@ -199,13 +182,8 @@ Status Pipeline::ensureAllStagesAreInLegalPositions() const {
                     17313};
         }
 
-        if (stage->constraints().requiredPosition ==
-                DocumentSource::StageConstraints::PositionRequirement::kLast &&
-            i != _sources.size() - 1) {
-            return {ErrorCodes::BadValue,
-                    str::stream() << stage->getSourceName()
-                                  << " can only be the final stage in the pipeline",
-                    40551};
+        if (dynamic_cast<DocumentSourceOut*>(stage.get()) && i != _sources.size() - 1) {
+            return {ErrorCodes::BadValue, "$out can only be the final stage in the pipeline"};
         }
         ++i;
     }
@@ -395,9 +373,12 @@ BSONObj Pipeline::getInitialQuery() const {
 }
 
 bool Pipeline::needsPrimaryShardMerger() const {
-    return std::any_of(_sources.begin(), _sources.end(), [](const auto& stage) {
-        return stage->constraints().mustRunOnPrimaryShardIfSharded;
-    });
+    for (auto&& source : _sources) {
+        if (source->needsPrimaryShard()) {
+            return true;
+        }
+    }
+    return false;
 }
 
 std::vector<NamespaceString> Pipeline::getInvolvedCollections() const {

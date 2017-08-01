@@ -454,7 +454,8 @@ void PipelineD::prepareCursorSource(Collection* collection,
         }
     }
 
-    if (!sources.empty() && !sources.front()->constraints().requiresInputDocSource) {
+    // If the first stage of the pipeline is an initial source, we don't need an input cursor.
+    if (!sources.empty() && sources.front()->isInitialSource()) {
         return;
     }
 

@@ -148,6 +148,10 @@ DocumentSource::GetNextResult DocumentSourceCollStats::getNext() {
     return {Document(builder.obj())};
 }
 
+DocumentSource::InitialSourceType DocumentSourceCollStats::getInitialSourceType() const {
+    return InitialSourceType::kInitialSource;
+}
+
 Value DocumentSourceCollStats::serialize(boost::optional<ExplainOptions::Verbosity> explain) const {
     return Value(Document{{getSourceName(), _collStatsSpec}});
 }

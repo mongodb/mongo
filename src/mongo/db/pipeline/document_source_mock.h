@@ -48,15 +48,9 @@ public:
     const char* getSourceName() const override;
     Value serialize(
         boost::optional<ExplainOptions::Verbosity> explain = boost::none) const override;
-
-    StageConstraints constraints() const override {
-        StageConstraints constraints;
-        constraints.requiredPosition = StageConstraints::PositionRequirement::kFirst;
-        constraints.requiresInputDocSource = false;
-        constraints.isAllowedInsideFacetStage = false;
-        return constraints;
+    InitialSourceType getInitialSourceType() const override {
+        return InitialSourceType::kInitialSource;
     }
-
     BSONObjSet getOutputSorts() override {
         return sorts;
     }

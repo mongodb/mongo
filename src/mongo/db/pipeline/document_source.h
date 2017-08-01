@@ -118,39 +118,14 @@ public:
     using Parser = stdx::function<std::vector<boost::intrusive_ptr<DocumentSource>>(
         BSONElement, const boost::intrusive_ptr<ExpressionContext>&)>;
 
-    /**
-     * A struct describing various constraints about where this stage can run, where it must be in
-     * the pipeline, and things like that.
-     */
-    struct StageConstraints {
-        /**
-         * A Position describes a requirement of the position of the stage within the pipeline.
-         */
-        enum class PositionRequirement { kNone, kFirst, kLast };
-
-        // Set if this stage needs to be in a particular position of the pipeline.
-        PositionRequirement requiredPosition = PositionRequirement::kNone;
-
-        bool isAllowedInsideFacetStage = true;
-
-        // True if this stage does not generate results itself, and instead pulls inputs from an
-        // input DocumentSource (via 'pSource').
-        bool requiresInputDocSource = true;
-
-        // True if this stage operates on a global or database level, like $currentOp.
-        bool isIndependentOfAnyCollection = false;
-
-        // True if this stage can ever be safely swapped with a subsequent $match stage, provided
-        // that the match does not depend on the paths returned by getModifiedPaths().
-        //
-        // Stages that want to participate in match swapping should set this to true. Such a stage
-        // must also override getModifiedPaths() to provide information about which particular
-        // $match predicates be swapped before itself.
-        bool canSwapWithMatch = false;
-
-        // True if this stage must run on the primary shard when the collection being aggregated is
-        // sharded.
-        bool mustRunOnPrimaryShardIfSharded = false;
+    enum class InitialSourceType {
+        // Stage requires input from a preceding DocumentSource.
+        kNotInitialSource,
+        // Stage does not need an input source and should be the first stage in the pipeline.
+        kInitialSource,
+        // Similar to kInitialSource, but does not require an underlying collection to produce
+        // output.
+        kCollectionlessInitialSource
     };
 
     /**
@@ -244,14 +219,6 @@ public:
     virtual GetNextResult getNext() = 0;
 
     /**
-     * Returns a struct containing information about any special constraints imposed on using this
-     * stage.
-     */
-    virtual StageConstraints constraints() const {
-        return StageConstraints{};
-    }
-
-    /**
      * Informs the stage that it is no longer needed and can release its resources. After dispose()
      * is called the stage must still be able to handle calls to getNext(), but can return kEOF.
      *
@@ -290,6 +257,38 @@ public:
     virtual void serializeToArray(
         std::vector<Value>& array,
         boost::optional<ExplainOptions::Verbosity> explain = boost::none) const;
+
+    /**
+     * Subclasses should return InitialSourceType::kInitialSource if the stage does not require an
+     * input source, or InitialSourceType::kCollectionlessInitialSource if the stage will produce
+     * the input for the pipeline independent of an underlying collection. The latter are specified
+     * with {aggregate: 1}, e.g. $currentOp.
+     */
+    virtual InitialSourceType getInitialSourceType() const {
+        return InitialSourceType::kNotInitialSource;
+    }
+
+    /**
+     * Returns true if this stage does not require an input source.
+     */
+    bool isInitialSource() const {
+        return getInitialSourceType() != InitialSourceType::kNotInitialSource;
+    }
+
+    /**
+     * Returns true if this stage will produce the input for the pipeline independent of an
+     * underlying collection. These are specified with {aggregate: 1}, e.g. $currentOp.
+     */
+    bool isCollectionlessInitialSource() const {
+        return getInitialSourceType() == InitialSourceType::kCollectionlessInitialSource;
+    }
+
+    /**
+     * Returns true if the DocumentSource needs to be run on the primary shard.
+     */
+    virtual bool needsPrimaryShard() const {
+        return false;
+    }
 
     /**
      * If DocumentSource uses additional collections, it adds the namespaces to the input vector.
@@ -425,6 +424,18 @@ public:
      */
     virtual GetModPathsReturn getModifiedPaths() const {
         return {GetModPathsReturn::Type::kNotSupported, std::set<std::string>{}, {}};
+    }
+
+    /**
+     * Returns whether this stage can swap with a subsequent $match stage, provided that the match
+     * does not depend on the paths returned by getModifiedPaths().
+     *
+     * Subclasses which want to participate in match swapping should override this to return true.
+     * Such a subclass must also override getModifiedPaths() to provide information about which
+     * $match predicates be swapped before itself.
+     */
+    virtual bool canSwapWithMatch() const {
+        return false;
     }
 
     enum GetDepsReturn {

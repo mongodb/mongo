@@ -69,12 +69,8 @@ public:
     const char* getSourceName() const final;
     Value serialize(boost::optional<ExplainOptions::Verbosity> explain = boost::none) const final;
 
-    StageConstraints constraints() const final {
-        StageConstraints constraints;
-        constraints.requiredPosition = StageConstraints::PositionRequirement::kFirst;
-        constraints.requiresInputDocSource = false;
-        constraints.isAllowedInsideFacetStage = false;
-        return constraints;
+    virtual InitialSourceType getInitialSourceType() const final {
+        return InitialSourceType::kInitialSource;
     }
 
     static boost::intrusive_ptr<DocumentSource> createFromBson(

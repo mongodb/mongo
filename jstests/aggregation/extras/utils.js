@@ -272,8 +272,8 @@ function assertErrorCode(coll, pipe, code, errmsg) {
             cursor.itcount();
         }, [], "expected error: " + code);
 
-        assert.eq(error.code, code, tojson(error));
+        assert.eq(error.code, code);
     } else {
-        assert.eq(cursorRes.code, code, tojson(cursorRes));
+        assert.eq(cursorRes.code, code);
     }
 }

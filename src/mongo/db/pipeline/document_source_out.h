@@ -43,13 +43,8 @@ public:
     const char* getSourceName() const final;
     Value serialize(boost::optional<ExplainOptions::Verbosity> explain = boost::none) const final;
     GetDepsReturn getDependencies(DepsTracker* deps) const final;
-
-    StageConstraints constraints() const final {
-        StageConstraints constraints;
-        constraints.mustRunOnPrimaryShardIfSharded = true;
-        constraints.isAllowedInsideFacetStage = false;
-        constraints.requiredPosition = StageConstraints::PositionRequirement::kLast;
-        return constraints;
+    bool needsPrimaryShard() const final {
+        return true;
     }
 
     // Virtuals for SplittableDocumentSource

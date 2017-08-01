@@ -52,12 +52,10 @@ public:
         return {GetModPathsReturn::Type::kFiniteSet, std::set<std::string>{}, {}};
     }
 
-    StageConstraints constraints() const final {
-        StageConstraints constraints;
+    bool canSwapWithMatch() const final {
         // Can't swap with a $match if a limit has been absorbed, since in general match can't swap
         // with limit.
-        constraints.canSwapWithMatch = !limitSrc;
-        return constraints;
+        return !limitSrc;
     }
 
     BSONObjSet getOutputSorts() final {

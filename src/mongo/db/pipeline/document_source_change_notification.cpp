@@ -40,7 +40,6 @@
 namespace mongo {
 
 using boost::intrusive_ptr;
-using boost::optional;
 using std::vector;
 using std::string;
 
@@ -54,52 +53,7 @@ REGISTER_MULTI_STAGE_ALIAS(changeNotification,
                            DocumentSourceChangeNotification::LiteParsed::parse,
                            DocumentSourceChangeNotification::createFromBson);
 
-namespace {
-
-static constexpr StringData kOplogMatchExplainName = "$_internalOplogMatch"_sd;
-
-/**
- * A custom subclass of DocumentSourceMatch which does not serialize itself (since it came from an
- * alias) and requires itself to be the first stage in the pipeline.
- */
-class DocumentSourceOplogMatch final : public DocumentSourceMatch {
-public:
-    static intrusive_ptr<DocumentSourceOplogMatch> create(
-        BSONObj filter, const intrusive_ptr<ExpressionContext>& expCtx) {
-        return new DocumentSourceOplogMatch(std::move(filter), expCtx);
-    }
-
-    const char* getSourceName() const final {
-        // This is used in error reporting, particularly if we find this stage in a position other
-        // than first, so report the name as $changeNotification.
-        return "$changeNotification";
-    }
-
-    StageConstraints constraints() const final {
-        StageConstraints constraints;
-        constraints.requiredPosition = StageConstraints::PositionRequirement::kFirst;
-        constraints.isAllowedInsideFacetStage = false;
-        return constraints;
-    }
-
-    /**
-     * Only serialize this stage for explain purposes, otherwise keep it hidden so that we can
-     * properly alias.
-     */
-    Value serialize(optional<ExplainOptions::Verbosity> explain) const final {
-        if (explain) {
-            return Value(Document{{kOplogMatchExplainName, Document{}}});
-        }
-        return Value();
-    }
-
-private:
-    DocumentSourceOplogMatch(BSONObj filter, const intrusive_ptr<ExpressionContext>& expCtx)
-        : DocumentSourceMatch(std::move(filter), expCtx) {}
-};
-}  // namespace
-
-BSONObj DocumentSourceChangeNotification::buildMatchFilter(const NamespaceString& nss) {
+BSONObj DocumentSourceChangeNotification::buildMatch(BSONElement elem, const NamespaceString& nss) {
     auto target = nss.ns();
 
     // 1) Supported commands that have the target db namespace (e.g. test.$cmd) in "ns" field.
@@ -124,7 +78,9 @@ BSONObj DocumentSourceChangeNotification::buildMatchFilter(const NamespaceString
     auto opMatch = BSON("ns" << target);
 
     // Match oplog entries after "start" and are either (3) supported commands or (4) CRUD ops.
-    return BSON("ts" << GT << Timestamp() << "$or" << BSON_ARRAY(opMatch << commandMatch));
+    auto matchFilter =
+        BSON("ts" << GT << Timestamp() << "$or" << BSON_ARRAY(opMatch << commandMatch));
+    return BSON("$match" << matchFilter);
 }
 
 vector<intrusive_ptr<DocumentSource>> DocumentSourceChangeNotification::createFromBson(
@@ -137,11 +93,11 @@ vector<intrusive_ptr<DocumentSource>> DocumentSourceChangeNotification::createFr
             "Only default collation is allowed when using a $changeNotification stage.",
             !expCtx->getCollator());
 
-    BSONObj filter = buildMatchFilter(expCtx->ns);
+    BSONObj matchObj = buildMatch(elem, expCtx->ns);
 
-    auto oplogMatch = DocumentSourceOplogMatch::create(filter, expCtx);
-    auto transformation = createTransformationStage(expCtx);
-    return {oplogMatch, transformation};
+    auto matchSource = DocumentSourceMatch::createFromBson(matchObj.firstElement(), expCtx);
+    auto transformSource = createTransformationStage(expCtx);
+    return {matchSource, transformSource};
 }
 
 intrusive_ptr<DocumentSource> DocumentSourceChangeNotification::createTransformationStage(
@@ -238,8 +194,6 @@ Document DocumentSourceChangeNotification::Transformation::applyTransformation(
 
 Document DocumentSourceChangeNotification::Transformation::serializeStageOptions(
     boost::optional<ExplainOptions::Verbosity> explain) const {
-    // TODO SERVER-29135 Be sure to re-serialize the 'postImage' argument.
-    // TODO SERVER-29131 Be sure to re-serialize the 'resumeAfter' argument.
     return Document();
 }
 

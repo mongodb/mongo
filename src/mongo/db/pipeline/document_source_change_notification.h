@@ -77,7 +77,7 @@ public:
     /**
      * Produce the BSON for the $match stage based on a $changeNotification stage.
      */
-    static BSONObj buildMatchFilter(const NamespaceString& nss);
+    static BSONObj buildMatch(BSONElement elem, const NamespaceString& nss);
 
     /**
      * Parses a $changeNotification stage from 'elem' and produces the $match and transformation

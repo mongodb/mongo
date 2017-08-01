@@ -101,10 +101,8 @@ public:
     DocumentSource::GetDepsReturn getDependencies(DepsTracker* deps) const final;
     GetModPathsReturn getModifiedPaths() const final;
 
-    StageConstraints constraints() const final {
-        StageConstraints constraints;
-        constraints.canSwapWithMatch = true;
-        return constraints;
+    bool canSwapWithMatch() const final {
+        return true;
     }
 
     TransformerInterface::TransformerType getType() const {

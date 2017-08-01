@@ -94,17 +94,18 @@ public:
      */
     GetModPathsReturn getModifiedPaths() const final;
 
-    StageConstraints constraints() const final {
-        StageConstraints constraints;
-        constraints.canSwapWithMatch = true;
-        constraints.mustRunOnPrimaryShardIfSharded = true;
-        return constraints;
+    bool canSwapWithMatch() const final {
+        return true;
     }
 
     GetDepsReturn getDependencies(DepsTracker* deps) const final;
 
     BSONObjSet getOutputSorts() final {
         return DocumentSource::truncateSortSet(pSource->getOutputSorts(), {_as.fullPath()});
+    }
+
+    bool needsPrimaryShard() const final {
+        return true;
     }
 
     boost::intrusive_ptr<DocumentSource> getShardSource() final {

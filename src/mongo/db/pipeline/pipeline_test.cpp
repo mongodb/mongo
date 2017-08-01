@@ -1349,10 +1349,8 @@ class DocumentSourceCollectionlessMock : public DocumentSourceMock {
 public:
     DocumentSourceCollectionlessMock() : DocumentSourceMock({}) {}
 
-    StageConstraints constraints() const final {
-        StageConstraints constraints;
-        constraints.isIndependentOfAnyCollection = true;
-        return constraints;
+    InitialSourceType getInitialSourceType() const final {
+        return InitialSourceType::kCollectionlessInitialSource;
     }
 
     static boost::intrusive_ptr<DocumentSourceCollectionlessMock> create() {
@@ -1405,34 +1403,6 @@ TEST_F(PipelineInitialSourceNSTest, AggregateOneNSValidForFacetPipelineRegardles
     ASSERT_OK(Pipeline::parseFacetPipeline(rawPipeline, ctx).getStatus());
 }
 
-TEST_F(PipelineInitialSourceNSTest, ChangeNotificationIsValidAsFirstStage) {
-    const std::vector<BSONObj> rawPipeline = {fromjson("{$changeNotification: {}}")};
-    auto ctx = getExpCtx();
-    ctx->ns = NamespaceString("a.collection");
-    ASSERT_OK(Pipeline::parse(rawPipeline, ctx).getStatus());
-}
-
-TEST_F(PipelineInitialSourceNSTest, ChangeNotificationIsNotValidIfNotFirstStage) {
-    const std::vector<BSONObj> rawPipeline = {fromjson("{$match: {custom: 'filter'}}"),
-                                              fromjson("{$changeNotification: {}}")};
-    auto ctx = getExpCtx();
-    ctx->ns = NamespaceString("a.collection");
-    auto parseStatus = Pipeline::parse(rawPipeline, ctx).getStatus();
-    ASSERT_EQ(parseStatus, ErrorCodes::BadValue);
-    ASSERT_EQ(parseStatus.location(), 40549);
-}
-
-TEST_F(PipelineInitialSourceNSTest, ChangeNotificationIsNotValidIfNotFirstStageInFacet) {
-    const std::vector<BSONObj> rawPipeline = {fromjson("{$match: {custom: 'filter'}}"),
-                                              fromjson("{$changeNotification: {}}")};
-    auto ctx = getExpCtx();
-    ctx->ns = NamespaceString("a.collection");
-    auto parseStatus = Pipeline::parseFacetPipeline(rawPipeline, ctx).getStatus();
-    ASSERT_EQ(parseStatus, ErrorCodes::BadValue);
-    ASSERT_EQ(parseStatus.location(), 40550);
-    ASSERT(std::string::npos != parseStatus.reason().find("$changeNotification"));
-}
-
 }  // namespace Namespaces
 
 namespace Dependencies {
@@ -1460,8 +1430,8 @@ class DocumentSourceDependencyDummy : public DocumentSourceMock {
 public:
     DocumentSourceDependencyDummy() : DocumentSourceMock({}) {}
 
-    StageConstraints constraints() const final {
-        return StageConstraints{};  // Overrides DocumentSourceMock's required position.
+    InitialSourceType getInitialSourceType() const final {
+        return InitialSourceType::kNotInitialSource;
     }
 };
 
