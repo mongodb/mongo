@@ -227,6 +227,9 @@ env.Library(
         '$BUILD_DIR/mongo/db/s/balancer',
         '$BUILD_DIR/mongo/db/views/views_mongod',
     ],
+    LIBDEPS_PRIVATE=[
+        '$BUILD_DIR/mongo/db/storage/record_store_validate_adaptor',
+    ],
 )
 
 env.Library(

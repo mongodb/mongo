@@ -28,8 +28,6 @@
 
 #define MONGO_LOG_DEFAULT_COMPONENT ::mongo::logger::LogComponent::kStorage
 
-#include <third_party/murmurhash3/MurmurHash3.h>
-
 #include "mongo/platform/basic.h"
 
 #include "mongo/db/catalog/collection_impl.h"
@@ -66,6 +64,7 @@
 #include "mongo/db/storage/mmap_v1/mmap_v1_options.h"
 #include "mongo/db/storage/record_fetcher.h"
 #include "mongo/db/storage/record_store.h"
+#include "mongo/db/storage/record_store_validate_adaptor.h"
 #include "mongo/db/update/update_driver.h"
 
 #include "mongo/db/auth/user_document_parser.h"  // XXX-ANDY
@@ -162,8 +161,6 @@ using std::string;
 using std::vector;
 
 using logger::LogComponent;
-
-static const int IndexKeyMaxSize = 1024;  // this goes away with SERVER-3372
 
 CollectionImpl::CollectionImpl(Collection* _this_init,
                                OperationContext* opCtx,
@@ -1004,243 +1001,8 @@ const CollatorInterface* CollectionImpl::getDefaultCollator() const {
 
 namespace {
 
-static const uint32_t kKeyCountTableSize = 1U << 22;
-
-using IndexKeyCountTable = std::array<uint64_t, kKeyCountTableSize>;
 using ValidateResultsMap = std::map<std::string, ValidateResults>;
 
-class RecordStoreValidateAdaptor : public ValidateAdaptor {
-public:
-    RecordStoreValidateAdaptor(OperationContext* opCtx,
-                               ValidateCmdLevel level,
-                               IndexCatalog* ic,
-                               ValidateResultsMap* irm)
-        : _opCtx(opCtx), _level(level), _indexCatalog(ic), _indexNsResultsMap(irm) {
-        _ikc = stdx::make_unique<IndexKeyCountTable>();
-    }
-
-    virtual Status validate(const RecordId& recordId, const RecordData& record, size_t* dataSize) {
-        BSONObj recordBson = record.toBson();
-
-        const Status status = validateBSON(
-            recordBson.objdata(), recordBson.objsize(), Validator<BSONObj>::enabledBSONVersion());
-        if (status.isOK()) {
-            *dataSize = recordBson.objsize();
-        } else {
-            return status;
-        }
-
-        if (!_indexCatalog->haveAnyIndexes()) {
-            return status;
-        }
-
-        IndexCatalog::IndexIterator i = _indexCatalog->getIndexIterator(_opCtx, false);
-
-        while (i.more()) {
-            const IndexDescriptor* descriptor = i.next();
-            const string indexNs = descriptor->indexNamespace();
-            ValidateResults curRecordResults;
-
-            const IndexAccessMethod* iam = _indexCatalog->getIndex(descriptor);
-
-            if (descriptor->isPartial()) {
-                const IndexCatalogEntry* ice = _indexCatalog->getEntry(descriptor);
-                if (!ice->getFilterExpression()->matchesBSON(recordBson)) {
-                    (*_indexNsResultsMap)[indexNs] = curRecordResults;
-                    continue;
-                }
-            }
-
-            BSONObjSet documentKeySet = SimpleBSONObjComparator::kInstance.makeBSONObjSet();
-            // There's no need to compute the prefixes of the indexed fields that cause the
-            // index to be multikey when validating the index keys.
-            MultikeyPaths* multikeyPaths = nullptr;
-            iam->getKeys(recordBson,
-                         IndexAccessMethod::GetKeysMode::kEnforceConstraints,
-                         &documentKeySet,
-                         multikeyPaths);
-
-            if (!descriptor->isMultikey(_opCtx) && documentKeySet.size() > 1) {
-                string msg = str::stream() << "Index " << descriptor->indexName()
-                                           << " is not multi-key but has more than one"
-                                           << " key in document " << recordId;
-                curRecordResults.errors.push_back(msg);
-                curRecordResults.valid = false;
-            }
-
-            uint32_t indexNsHash;
-            const auto& pattern = descriptor->keyPattern();
-            const Ordering ord = Ordering::make(pattern);
-            MurmurHash3_x86_32(indexNs.c_str(), indexNs.size(), 0, &indexNsHash);
-
-            for (const auto& key : documentKeySet) {
-                if (key.objsize() >= IndexKeyMaxSize) {
-                    // Index keys >= 1024 bytes are not indexed.
-                    _longKeys[indexNs]++;
-                    continue;
-                }
-
-                // We want to use the latest version of KeyString here.
-                KeyString ks(KeyString::kLatestVersion, key, ord, recordId);
-                uint32_t indexEntryHash = hashIndexEntry(ks, indexNsHash);
-
-                if ((*_ikc)[indexEntryHash] == 0) {
-                    _indexKeyCountTableNumEntries++;
-                }
-                (*_ikc)[indexEntryHash]++;
-            }
-            (*_indexNsResultsMap)[indexNs] = curRecordResults;
-        }
-        return status;
-    }
-
-    bool tooManyIndexEntries() const {
-        return _indexKeyCountTableNumEntries != 0;
-    }
-
-    bool tooFewIndexEntries() const {
-        return _hasDocWithoutIndexEntry;
-    }
-
-    /**
-     * Traverse the index to validate the entries and cache index keys for later use.
-     */
-    void traverseIndex(const IndexAccessMethod* iam,
-                       const IndexDescriptor* descriptor,
-                       ValidateResults* results,
-                       int64_t* numTraversedKeys) {
-        auto indexNs = descriptor->indexNamespace();
-        int64_t numKeys = 0;
-
-        uint32_t indexNsHash;
-        MurmurHash3_x86_32(indexNs.c_str(), indexNs.size(), 0, &indexNsHash);
-
-        const auto& key = descriptor->keyPattern();
-        const Ordering ord = Ordering::make(key);
-        KeyString::Version version = KeyString::kLatestVersion;
-        std::unique_ptr<KeyString> prevIndexKeyString = nullptr;
-        bool isFirstEntry = true;
-
-        std::unique_ptr<SortedDataInterface::Cursor> cursor = iam->newCursor(_opCtx, true);
-        // Seeking to BSONObj() is equivalent to seeking to the first entry of an index.
-        for (auto indexEntry = cursor->seek(BSONObj(), true); indexEntry;
-             indexEntry = cursor->next()) {
-
-            // We want to use the latest version of KeyString here.
-            std::unique_ptr<KeyString> indexKeyString =
-                stdx::make_unique<KeyString>(version, indexEntry->key, ord, indexEntry->loc);
-            // Ensure that the index entries are in increasing or decreasing order.
-            if (!isFirstEntry && *indexKeyString < *prevIndexKeyString) {
-                if (results->valid) {
-                    results->errors.push_back(
-                        "one or more indexes are not in strictly ascending or descending "
-                        "order");
-                }
-                results->valid = false;
-            }
-
-            // Cache the index keys to cross-validate with documents later.
-            uint32_t keyHash = hashIndexEntry(*indexKeyString, indexNsHash);
-            uint64_t& indexEntryCount = (*_ikc)[keyHash];
-            if (indexEntryCount != 0) {
-                indexEntryCount--;
-                dassert(indexEntryCount >= 0);
-                if (indexEntryCount == 0) {
-                    _indexKeyCountTableNumEntries--;
-                }
-            } else {
-                _hasDocWithoutIndexEntry = true;
-                results->valid = false;
-            }
-            numKeys++;
-
-            isFirstEntry = false;
-            prevIndexKeyString.swap(indexKeyString);
-        }
-
-        _keyCounts[indexNs] = numKeys;
-        *numTraversedKeys = numKeys;
-    }
-
-    void validateIndexKeyCount(IndexDescriptor* idx, int64_t numRecs, ValidateResults& results) {
-        const string indexNs = idx->indexNamespace();
-        int64_t numIndexedKeys = _keyCounts[indexNs];
-        int64_t numLongKeys = _longKeys[indexNs];
-        auto totalKeys = numLongKeys + numIndexedKeys;
-
-        bool hasTooFewKeys = false;
-        bool noErrorOnTooFewKeys = !failIndexKeyTooLong.load() && (_level != kValidateFull);
-
-        if (idx->isIdIndex() && totalKeys != numRecs) {
-            hasTooFewKeys = totalKeys < numRecs ? true : hasTooFewKeys;
-            string msg = str::stream() << "number of _id index entries (" << numIndexedKeys
-                                       << ") does not match the number of documents in the index ("
-                                       << numRecs - numLongKeys << ")";
-            if (noErrorOnTooFewKeys && (numIndexedKeys < numRecs)) {
-                results.warnings.push_back(msg);
-            } else {
-                results.errors.push_back(msg);
-                results.valid = false;
-            }
-        }
-
-        if (results.valid && !idx->isMultikey(_opCtx) && totalKeys > numRecs) {
-            string err = str::stream()
-                << "index " << idx->indexName() << " is not multi-key, but has more entries ("
-                << numIndexedKeys << ") than documents in the index (" << numRecs - numLongKeys
-                << ")";
-            results.errors.push_back(err);
-            results.valid = false;
-        }
-        // Ignore any indexes with a special access method. If an access method name is given, the
-        // index may be a full text, geo or special index plugin with different semantics.
-        if (results.valid && !idx->isSparse() && !idx->isPartial() && !idx->isIdIndex() &&
-            idx->getAccessMethodName() == "" && totalKeys < numRecs) {
-            hasTooFewKeys = true;
-            string msg = str::stream() << "index " << idx->indexName()
-                                       << " is not sparse or partial, but has fewer entries ("
-                                       << numIndexedKeys << ") than documents in the index ("
-                                       << numRecs - numLongKeys << ")";
-            if (noErrorOnTooFewKeys) {
-                results.warnings.push_back(msg);
-            } else {
-                results.errors.push_back(msg);
-                results.valid = false;
-            }
-        }
-
-        if ((_level != kValidateFull) && hasTooFewKeys) {
-            string warning = str::stream()
-                << "index " << idx->indexName()
-                << " has fewer keys than records. This may be the result of currently or "
-                   "previously running the server with the failIndexKeyTooLong parameter set to "
-                   "false. Please re-run the validate command with {full: true}";
-            results.warnings.push_back(warning);
-        }
-    }
-
-private:
-    std::map<string, int64_t> _longKeys;
-    std::map<string, int64_t> _keyCounts;
-    std::unique_ptr<IndexKeyCountTable> _ikc;
-
-    uint32_t _indexKeyCountTableNumEntries = 0;
-    bool _hasDocWithoutIndexEntry = false;
-
-    OperationContext* _opCtx;  // Not owned.
-    ValidateCmdLevel _level;
-    IndexCatalog* _indexCatalog;             // Not owned.
-    ValidateResultsMap* _indexNsResultsMap;  // Not owned.
-
-    uint32_t hashIndexEntry(KeyString& ks, uint32_t hash) {
-        MurmurHash3_x86_32(ks.getTypeBits().getBuffer(), ks.getTypeBits().getSize(), hash, &hash);
-        MurmurHash3_x86_32(ks.getBuffer(), ks.getSize(), hash, &hash);
-        return hash % kKeyCountTableSize;
-    }
-};
-}  // namespace
-
-namespace {
 void _validateRecordStore(OperationContext* opCtx,
                           RecordStore* recordStore,
                           ValidateCmdLevel level,
