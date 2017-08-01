@@ -151,15 +151,15 @@ functions:
 
   "infrastructure provisioning":
     - command: shell.exec
-      # call infrastructure-provisioning.sh. This will either create a cluster, or update tags on existing instances.
+      # call infrastructure-provisioning.py. This will either create a cluster, or update tags on existing instances.
       params:
         working_dir: work
         script: |
           set -e
           set -v
           source ./dsienv.sh
-          export PRODUCTION=true
-          $DSI_PATH/bin/infrastructure_provisioning.sh ${cluster}
+          source ./venv/bin/activate
+          $DSI_PATH/bin/infrastructure_provisioning.py
 
   "configure mongodb cluster":
     - command: shell.exec
@@ -200,10 +200,11 @@ functions:
           set -o verbose
           source ./dsienv.sh
           # Longevity runs so rarely, we simply teardown the cluster when done.
-          # Note that nowadays infrastructure_teardown.sh is actually copying the terraform.tfstate into /data/infrastructure_provisioning
+          # Note that nowadays infrastructure_teardown.py is actually copying the terraform.tfstate into /data/infrastructure_provisioning
           # but as of this writing the rhel70-perf-longevity distro didn't actually use the teardown hook.
           source ./dsienv.sh
-          $DSI_PATH/bin/infrastructure_teardown.sh
+          source ./venv/bin/activate
+          $DSI_PATH/bin/infrastructure_teardown.py
           echo "Cluster DESTROYED."
           echo
           echo "All perf results"
