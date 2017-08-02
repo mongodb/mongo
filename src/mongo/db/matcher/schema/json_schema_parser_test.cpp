@@ -36,19 +36,19 @@ namespace mongo {
 namespace {
 
 TEST(JSONSchemaParserTest, FailsToParseIfTypeIsNotAString) {
-    BSONObj schema = fromjson("{type: 1}");
+    BSONObj schema = fromjson("{type: 1}}");
     auto result = JSONSchemaParser::parse(schema);
     ASSERT_EQ(result.getStatus(), ErrorCodes::TypeMismatch);
 }
 
 TEST(JSONSchemaParserTest, FailsToParseUnknownKeyword) {
-    BSONObj schema = fromjson("{unknown: 1}");
+    BSONObj schema = fromjson("{unknown: 1}}");
     auto result = JSONSchemaParser::parse(schema);
     ASSERT_EQ(result.getStatus(), ErrorCodes::FailedToParse);
 }
 
 TEST(JSONSchemaParserTest, FailsToParseIfPropertiesIsNotAnObject) {
-    BSONObj schema = fromjson("{properties: 1}");
+    BSONObj schema = fromjson("{properties: 1}}");
     auto result = JSONSchemaParser::parse(schema);
     ASSERT_EQ(result.getStatus(), ErrorCodes::TypeMismatch);
 }
@@ -178,22 +178,50 @@ TEST(JSONSchemaParserTest, MaximumTranslatesCorrectlyWithNoType) {
                  "{$or: [{$nor: [{num: {$type: 'number'}}]}, {num: {$lte: 0}}]}]}]}]}"));
 }
 
+TEST(JSONSchemaParserTest, MaximumTranslatesCorrectlyWithExclusiveMaximumTrue) {
+    BSONObj schema = fromjson(
+        "{properties: {num: {type: 'long', maximum: 0, exclusiveMaximum: true}}, type: 'object'}");
+    auto result = JSONSchemaParser::parse(schema);
+    ASSERT_OK(result.getStatus());
+    BSONObjBuilder builder;
+    result.getValue()->serialize(&builder);
+    ASSERT_BSONOBJ_EQ(builder.obj(),
+                      fromjson("{$and: [{$and: [{$and: ["
+                               "{$or: [{$nor: [{num: {$type: 'number'}}]}, {num: {$lt: 0}}]},"
+                               "{$or: [{$nor: [{num: {$exists: true}}]}, {num: {$type: 18}}]}"
+                               "]}]}]}"));
+}
+
+TEST(JSONSchemaParserTest, MaximumTranslatesCorrectlyWithExclusiveMaximumFalse) {
+    BSONObj schema = fromjson(
+        "{properties: {num: {type: 'long', maximum: 0, exclusiveMaximum: false}}, type: 'object'}");
+    auto result = JSONSchemaParser::parse(schema);
+    ASSERT_OK(result.getStatus());
+    BSONObjBuilder builder;
+    result.getValue()->serialize(&builder);
+    ASSERT_BSONOBJ_EQ(builder.obj(),
+                      fromjson("{$and: [{$and: [{$and: ["
+                               "{$or: [{$nor: [{num: {$type: 'number'}}]}, {num: {$lte: 0}}]},"
+                               "{$or: [{$nor: [{num: {$exists: true}}]}, {num: {$type: 18}}]}"
+                               "]}]}]}"));
+}
+
 TEST(JSONSchemaParserTest, FailsToParseIfMaximumIsNotANumber) {
     BSONObj schema = fromjson("{maximum: 'foo'}");
     auto result = JSONSchemaParser::parse(schema);
     ASSERT_EQ(result.getStatus(), ErrorCodes::TypeMismatch);
 }
 
-TEST(JSONSchemaParserTest, FailsToParseIfMaxLengthIsNotANumber) {
-    BSONObj schema = fromjson("{maxLength: 'foo'}");
-    auto result = JSONSchemaParser::parse(schema);
-    ASSERT_EQ(result.getStatus(), ErrorCodes::TypeMismatch);
-}
-
-TEST(JSONSchemaParserTest, FailsToParseIfMaxLengthIsLessThanZero) {
-    BSONObj schema = fromjson("{maxLength: -1}");
+TEST(JSONSchemaParserTest, FailsToParseIfExclusiveMaximumIsPresentButMaximumIsNot) {
+    BSONObj schema = fromjson("{exclusiveMaximum: true}");
     auto result = JSONSchemaParser::parse(schema);
     ASSERT_EQ(result.getStatus(), ErrorCodes::FailedToParse);
+}
+
+TEST(JSONSchemaParserTest, FailsToParseIfExclusiveMaximumIsNotABoolean) {
+    BSONObj schema = fromjson("{maximum: 5, exclusiveMaximum: 'foo'}");
+    auto result = JSONSchemaParser::parse(schema);
+    ASSERT_EQ(result.getStatus(), ErrorCodes::TypeMismatch);
 }
 
 TEST(JSONSchemaParserTest, MinimumTranslatesCorrectlyWithTypeNumber) {
@@ -207,41 +235,6 @@ TEST(JSONSchemaParserTest, MinimumTranslatesCorrectlyWithTypeNumber) {
                                "{$or: [{$nor: [{num: {$type: 'number'}}]}, {num: {$gte: 0}}]},"
                                "{$or: [{$nor: [{num: {$exists: true}}]}, {num: {$type: 'number'}}]}"
                                "]}]}]}"));
-}
-
-TEST(JSONSchemaParserTest, FailsToParseIfMaxLengthIsNonIntegralDouble) {
-    BSONObj schema =
-        fromjson("{properties: {foo: {type: 'string', maxLength: 5.5}}, type: 'object'}");
-    auto result = JSONSchemaParser::parse(schema);
-    ASSERT_EQ(result.getStatus(), ErrorCodes::FailedToParse);
-}
-
-TEST(JSONSchemaParserTest, MaxLengthTranslatesCorrectlyWithIntegralDouble) {
-    BSONObj schema =
-        fromjson("{properties: {foo: {type: 'string', maxLength: 5.0}}, type: 'object'}");
-    auto result = JSONSchemaParser::parse(schema);
-    ASSERT_OK(result.getStatus());
-    BSONObjBuilder builder;
-    result.getValue()->serialize(&builder);
-    ASSERT_BSONOBJ_EQ(
-        builder.obj(),
-        fromjson("{ $and: [ { $and: [ { $and: [ { $or: [ { $nor: [ { foo: { $type: 2 } } ] }, { "
-                 "foo: { $_internalSchemaMaxLength: 5 } } ] }, { $or: [ { $nor: [ { foo: { "
-                 "$exists: true } } ] }, { foo: { $type: 2 } } ] } ] } ] } ] }"));
-}
-
-TEST(JSONSchemaParserTest, MaxLengthTranslatesCorrectlyWithTypeString) {
-    BSONObj schema =
-        fromjson("{properties: {foo: {type: 'string', maxLength: 5}}, type: 'object'}");
-    auto result = JSONSchemaParser::parse(schema);
-    ASSERT_OK(result.getStatus());
-    BSONObjBuilder builder;
-    result.getValue()->serialize(&builder);
-    ASSERT_BSONOBJ_EQ(
-        builder.obj(),
-        fromjson("{ $and: [ { $and: [ { $and: [ { $or: [ { $nor: [ { foo: { $type: 2 } } ] }, { "
-                 "foo: { $_internalSchemaMaxLength: 5 } } ] }, { $or: [ { $nor: [ { foo: { "
-                 "$exists: true } } ] }, { foo: { $type: 2 } } ] } ] } ] } ] }"));
 }
 
 TEST(JSONSchemaParserTest, MinimumTranslatesCorrectlyWithTypeLong) {
@@ -281,46 +274,6 @@ TEST(JSONSchemaParserTest, MinimumTranslatesCorrectlyWithNoType) {
                  "{$or: [{$nor: [{num: {$type: 'number'}}]}, {num: {$gte: 0}}]}]}]}]}"));
 }
 
-TEST(JSONSchemaParserTest, MaximumTranslatesCorrectlyWithExclusiveMaximumTrue) {
-    BSONObj schema = fromjson(
-        "{properties: {num: {type: 'long', maximum: 0, exclusiveMaximum: true}}, type: 'object'}");
-    auto result = JSONSchemaParser::parse(schema);
-    ASSERT_OK(result.getStatus());
-    BSONObjBuilder builder;
-    result.getValue()->serialize(&builder);
-    ASSERT_BSONOBJ_EQ(builder.obj(),
-                      fromjson("{ $and: [ { $and: [ { $and: [ { $or: [ { $nor: [ { "
-                               "num: { $type: 'number' } } ] }, { num: { $lt: 0 } } "
-                               "] }, { $or: [ { $nor: [ { num: { $exists: true } } "
-                               "] }, { num: { $type: 18 } } ] } ] } ] } ] }"));
-}
-
-TEST(JSONSchemaParserTest, MaximumTranslatesCorrectlyWithExclusiveMaximumFalse) {
-    BSONObj schema = fromjson(
-        "{properties: {num: {type: 'long', maximum: 0, exclusiveMaximum: false}}, type: 'object'}");
-    auto result = JSONSchemaParser::parse(schema);
-    ASSERT_OK(result.getStatus());
-    BSONObjBuilder builder;
-    result.getValue()->serialize(&builder);
-    ASSERT_BSONOBJ_EQ(builder.obj(),
-                      fromjson("{ $and: [ { $and: [ { $and: [ { $or: [ { $nor: [ { "
-                               "num: { $type: 'number' } } ] }, { num: { $lte: 0 } "
-                               "} ] }, { $or: [ { $nor: [ { num: { $exists: true } "
-                               "} ] }, { num: { $type: 18 } } ] } ] } ] } ] }"));
-}
-
-TEST(JSONSchemaParserTest, FailsToParseIfExclusiveMaximumIsPresentButMaximumIsNot) {
-    BSONObj schema = fromjson("{exclusiveMaximum: true}");
-    auto result = JSONSchemaParser::parse(schema);
-    ASSERT_EQ(result.getStatus(), ErrorCodes::FailedToParse);
-}
-
-TEST(JSONSchemaParserTest, FailsToParseIfExclusiveMaximumIsNotABoolean) {
-    BSONObj schema = fromjson("{maximum: 5, exclusiveMaximum: 'foo'}");
-    auto result = JSONSchemaParser::parse(schema);
-    ASSERT_EQ(result.getStatus(), ErrorCodes::TypeMismatch);
-}
-
 TEST(JSONSchemaParserTest, MinimumTranslatesCorrectlyWithExclusiveMinimumTrue) {
     BSONObj schema = fromjson(
         "{properties: {num: {type: 'long', minimum: 0, exclusiveMinimum: true}}, type: 'object'}");
@@ -349,6 +302,13 @@ TEST(JSONSchemaParserTest, MinimumTranslatesCorrectlyWithExclusiveMinimumFalse) 
                                "]}]}]}"));
 }
 
+TEST(JSONSchemaParserTest, FailsToParseIfMinimumIsNotANumber) {
+    BSONObj schema = fromjson("{minimum: 'foo'}");
+    auto result = JSONSchemaParser::parse(schema);
+    ASSERT_EQ(result.getStatus(), ErrorCodes::TypeMismatch);
+}
+
+
 TEST(JSONSchemaParserTest, FailsToParseIfExclusiveMinimumIsPresentButMinimumIsNot) {
     BSONObj schema = fromjson("{exclusiveMinimum: true}");
     auto result = JSONSchemaParser::parse(schema);
@@ -359,88 +319,6 @@ TEST(JSONSchemaParserTest, FailsToParseIfExclusiveMinimumIsNotABoolean) {
     BSONObj schema = fromjson("{minimum: 5, exclusiveMinimum: 'foo'}");
     auto result = JSONSchemaParser::parse(schema);
     ASSERT_EQ(result.getStatus(), ErrorCodes::TypeMismatch);
-}
-
-TEST(JSONSchemaParserTest, FailsToParseIfMinLengthIsNotANumber) {
-    BSONObj schema = fromjson("{minLength: 'foo'}");
-    auto result = JSONSchemaParser::parse(schema);
-    ASSERT_EQ(result.getStatus(), ErrorCodes::TypeMismatch);
-}
-
-TEST(JSONSchemaParserTest, FailsToParseIfMinLengthIsLessThanZero) {
-    BSONObj schema = fromjson("{minLength: -1}");
-    auto result = JSONSchemaParser::parse(schema);
-    ASSERT_EQ(result.getStatus(), ErrorCodes::FailedToParse);
-}
-
-TEST(JSONSchemaParserTest, FailsToParseIfMinLengthIsNonIntegralDouble) {
-    BSONObj schema =
-        fromjson("{properties: {foo: {type: 'string', minLength: 5.5}}, type: 'object'}");
-    auto result = JSONSchemaParser::parse(schema);
-    ASSERT_EQ(result.getStatus(), ErrorCodes::FailedToParse);
-}
-
-TEST(JSONSchemaParserTest, MinLengthTranslatesCorrectlyWithTypeString) {
-    BSONObj schema =
-        fromjson("{properties: {foo: {type: 'string', minLength: 5}}, type: 'object'}");
-    auto result = JSONSchemaParser::parse(schema);
-    ASSERT_OK(result.getStatus());
-    BSONObjBuilder builder;
-    result.getValue()->serialize(&builder);
-    ASSERT_BSONOBJ_EQ(
-        builder.obj(),
-        fromjson("{ $and: [ { $and: [ { $and: [ { $or: [ { $nor: [ { foo: { $type: 2 } } ] }, { "
-                 "foo: { $_internalSchemaMinLength: 5 } } ] }, { $or: [ { $nor: [ { foo: { "
-                 "$exists: true } } ] }, { foo: { $type: 2 } } ] } ] } ] } ] }"));
-}
-
-TEST(JSONSchemaParserTest, MinLengthTranslatesCorrectlyWithIntegralDouble) {
-    BSONObj schema =
-        fromjson("{properties: {foo: {type: 'string', minLength: 5.0}}, type: 'object'}");
-    auto result = JSONSchemaParser::parse(schema);
-    ASSERT_OK(result.getStatus());
-    BSONObjBuilder builder;
-    result.getValue()->serialize(&builder);
-    ASSERT_BSONOBJ_EQ(
-        builder.obj(),
-        fromjson("{ $and: [ { $and: [ { $and: [ { $or: [ { $nor: [ { foo: { $type: 2 } } ] }, { "
-                 "foo: { $_internalSchemaMinLength: 5 } } ] }, { $or: [ { $nor: [ { foo: { "
-                 "$exists: true } } ] }, { foo: { $type: 2 } } ] } ] } ] } ] }"));
-}
-
-TEST(JSONSchemaParserTest, FailsToParseIfMinimumIsNotANumber) {
-    BSONObj schema = fromjson("{minimum: 'foo'}");
-    auto result = JSONSchemaParser::parse(schema);
-    ASSERT_EQ(result.getStatus(), ErrorCodes::TypeMismatch);
-}
-
-TEST(JSONSchemaParserTest, FailsToParseIfPatternIsNotString) {
-    BSONObj schema = fromjson("{pattern: 6}");
-    auto result = JSONSchemaParser::parse(schema);
-    ASSERT_EQ(result.getStatus(), ErrorCodes::TypeMismatch);
-}
-
-TEST(JSONSchemaParserTest, PatternTranslatesCorrectlyWithString) {
-    BSONObj schema =
-        fromjson("{properties: {foo: {type: 'string', pattern: 'abc'}}, type: 'object'}");
-    auto result = JSONSchemaParser::parse(schema);
-    ASSERT_OK(result.getStatus());
-    BSONObjBuilder builder;
-    result.getValue()->serialize(&builder);
-
-    BSONObj expected = BSON(
-        "$and" << BSON_ARRAY(BSON(
-            "$and" << BSON_ARRAY(BSON(
-                "$and" << BSON_ARRAY(
-                    BSON("$or" << BSON_ARRAY(
-                             BSON("$nor" << BSON_ARRAY(BSON("foo" << BSON("$type" << 2))))
-                             << BSON("foo" << BSON("$regex"
-                                                   << "abc"))))
-                    << BSON("$or" << BSON_ARRAY(
-                                BSON("$nor" << BSON_ARRAY(BSON("foo" << BSON("$exists" << true))))
-                                << BSON("foo" << BSON("$type" << 2))))))))));
-
-    ASSERT_BSONOBJ_EQ(builder.obj(), expected);
 }
 
 }  // namespace
