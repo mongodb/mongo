@@ -73,7 +73,7 @@ void ExpressionContext::setCollator(std::unique_ptr<CollatorInterface> coll) {
 }
 
 intrusive_ptr<ExpressionContext> ExpressionContext::copyWith(NamespaceString ns) const {
-    intrusive_ptr<ExpressionContext> expCtx = new ExpressionContext();
+    intrusive_ptr<ExpressionContext> expCtx = new ExpressionContext(std::move(ns));
 
     expCtx->explain = explain;
     expCtx->inShard = inShard;
@@ -81,7 +81,6 @@ intrusive_ptr<ExpressionContext> ExpressionContext::copyWith(NamespaceString ns)
     expCtx->extSortAllowed = extSortAllowed;
     expCtx->bypassDocumentValidation = bypassDocumentValidation;
 
-    expCtx->ns = std::move(ns);
     expCtx->tempDir = tempDir;
 
     expCtx->opCtx = opCtx;

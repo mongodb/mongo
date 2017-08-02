@@ -85,7 +85,7 @@ class Document;
     MONGO_INITIALIZER(addToDocSourceParserMap_##key)(InitializerContext*) {                  \
         auto fullParserWrapper = [](BSONElement stageSpec,                                   \
                                     const boost::intrusive_ptr<ExpressionContext>& expCtx) { \
-            return std::vector<boost::intrusive_ptr<DocumentSource>>{                        \
+            return std::list<boost::intrusive_ptr<DocumentSource>>{                          \
                 (fullParser)(stageSpec, expCtx)};                                            \
         };                                                                                   \
         LiteParsedDocumentSource::registerParser("$" #key, liteParser);                      \
@@ -115,7 +115,7 @@ class Document;
 
 class DocumentSource : public IntrusiveCounterUnsigned {
 public:
-    using Parser = stdx::function<std::vector<boost::intrusive_ptr<DocumentSource>>(
+    using Parser = stdx::function<std::list<boost::intrusive_ptr<DocumentSource>>(
         BSONElement, const boost::intrusive_ptr<ExpressionContext>&)>;
 
     /**
@@ -303,7 +303,7 @@ public:
     /**
      * Create a DocumentSource pipeline stage from 'stageObj'.
      */
-    static std::vector<boost::intrusive_ptr<DocumentSource>> parse(
+    static std::list<boost::intrusive_ptr<DocumentSource>> parse(
         const boost::intrusive_ptr<ExpressionContext>& expCtx, BSONObj stageObj);
 
     /**

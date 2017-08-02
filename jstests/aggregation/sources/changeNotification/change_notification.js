@@ -2,19 +2,42 @@
 (function() {
     "use strict";
 
-    var oplogProjection = {$project: {"_id.ts": 0}};
+    const oplogProjection = {$project: {"_id.ts": 0}};
 
-    // Helper for testing that pipeline returns correct set of results.
-    function testPipeline(pipeline, expectedResult, collection) {
-        // Limit to the last N documents from the end of the oplog, because currently
-        // $changeNotification always comes from the start of the oplog.
-        pipeline.push({$sort: {"_id.ts": -1}});
-        if (expectedResult.length > 0) {
-            pipeline.push({$limit: expectedResult.length});
-        }
-        // Strip the oplog fields we aren't testing.
-        pipeline.push(oplogProjection);
-        assert.docEq(collection.aggregate(pipeline).toArray().reverse(), expectedResult);
+    /**
+     * Tests the output of a $changeNotification stage, asserting only that the result at the end of
+     * the change stream on the collection 'collection' (the newest matching entry in the oplog) is
+     * equal to 'expectedResult'.
+     *
+     * Note this change assumes that the set of changes will fit within one batch.
+     */
+    function checkLatestChange(expectedResult, collection) {
+        const cmdResponse = assert.commandWorked(db.runCommand({
+            aggregate: collection.getName(),
+            pipeline: [
+                {$changeNotification: {}},
+                // Strip the oplog fields we aren't testing.
+                {$project: {"_id.ts": 0}}
+            ],
+            cursor: {}
+        }));
+        const firstBatch = cmdResponse.cursor.firstBatch;
+        assert.neq(firstBatch.length, 0);
+        assert.docEq(firstBatch[firstBatch.length - 1], expectedResult);
+    }
+
+    /**
+     * Tests that there are no changes in the 'collection'.
+     */
+    function assertNoLatestChange(collection) {
+        const cmdResponse = assert.commandWorked(db.runCommand({
+            aggregate: collection.getName(),
+            pipeline: [
+                {$changeNotification: {}},
+            ],
+            cursor: {}
+        }));
+        assert.eq(cmdResponse.cursor.firstBatch.length, 0);
     }
 
     let replTest = new ReplSetTest({name: 'changeNotificationTest', nodes: 1});
@@ -28,113 +51,115 @@
     jsTestLog("Testing single insert");
     assert.writeOK(db.t1.insert({_id: 0, a: 1}));
     let expected = {
-        "_id": {
-            "_id": 0,
-            "ns": "test.t1",
+        _id: {
+            _id: 0,
+            ns: "test.t1",
         },
-        "documentKey": {"_id": 0},
-        "newDocument": {"_id": 0, "a": 1},
-        "ns": {"coll": "t1", "db": "test"},
-        "operationType": "insert"
+        documentKey: {_id: 0},
+        fullDocument: {_id: 0, a: 1},
+        ns: {coll: "t1", db: "test"},
+        operationType: "insert",
     };
-    testPipeline([{$changeNotification: {}}], [expected], db.t1);
+    checkLatestChange(expected, db.t1);
 
     jsTestLog("Testing second insert");
     assert.writeOK(db.t1.insert({_id: 1, a: 2}));
     expected = {
-        "_id": {
-            "_id": 1,
-            "ns": "test.t1",
+        _id: {
+            _id: 1,
+            ns: "test.t1",
         },
-        "documentKey": {"_id": 1},
-        "newDocument": {"_id": 1, "a": 2},
-        "ns": {"coll": "t1", "db": "test"},
-        "operationType": "insert"
+        documentKey: {_id: 1},
+        fullDocument: {_id: 1, a: 2},
+        ns: {coll: "t1", db: "test"},
+        operationType: "insert",
     };
-    testPipeline([{$changeNotification: {}}], [expected], db.t1);
+    checkLatestChange(expected, db.t1);
 
     jsTestLog("Testing update");
     assert.writeOK(db.t1.update({_id: 0}, {a: 3}));
     expected = {
-        "_id": {"_id": 0, "ns": "test.t1"},
-        "documentKey": {"_id": 0},
-        "newDocument": {"_id": 0, "a": 3},
-        "ns": {"coll": "t1", "db": "test"},
-        "operationType": "replace"
+        _id: {_id: 0, ns: "test.t1"},
+        documentKey: {_id: 0},
+        fullDocument: {_id: 0, a: 3},
+        ns: {coll: "t1", db: "test"},
+        operationType: "replace",
     };
-    testPipeline([{$changeNotification: {}}], [expected], db.t1);
+    checkLatestChange(expected, db.t1);
 
     jsTestLog("Testing update of another field");
     assert.writeOK(db.t1.update({_id: 0}, {b: 3}));
     expected = {
-        "_id": {"_id": 0, "ns": "test.t1"},
-        "documentKey": {"_id": 0},
-        "newDocument": {"_id": 0, "b": 3},
-        "ns": {"coll": "t1", "db": "test"},
-        "operationType": "replace"
+        _id: {_id: 0, ns: "test.t1"},
+        documentKey: {_id: 0},
+        fullDocument: {_id: 0, b: 3},
+        ns: {coll: "t1", db: "test"},
+        operationType: "replace",
     };
-    testPipeline([{$changeNotification: {}}], [expected], db.t1);
+    checkLatestChange(expected, db.t1);
 
     jsTestLog("Testing upsert");
     assert.writeOK(db.t1.update({_id: 2}, {a: 4}, {upsert: true}));
     expected = {
-        "_id": {
-            "_id": 2,
-            "ns": "test.t1",
+        _id: {
+            _id: 2,
+            ns: "test.t1",
         },
-        "documentKey": {"_id": 2},
-        "newDocument": {"_id": 2, "a": 4},
-        "ns": {"coll": "t1", "db": "test"},
-        "operationType": "insert"
+        documentKey: {_id: 2},
+        fullDocument: {_id: 2, a: 4},
+        ns: {coll: "t1", db: "test"},
+        operationType: "insert",
     };
-    testPipeline([{$changeNotification: {}}], [expected], db.t1);
+    checkLatestChange(expected, db.t1);
 
     jsTestLog("Testing partial update with $inc");
     assert.writeOK(db.t1.insert({_id: 3, a: 5, b: 1}));
     assert.writeOK(db.t1.update({_id: 3}, {$inc: {b: 2}}));
     expected = {
-        "_id": {"_id": 3, "ns": "test.t1"},
-        "documentKey": {"_id": 3},
-        "ns": {"coll": "t1", "db": "test"},
-        "operationType": "update",
-        "updateDescription": {"removedFields": [], "updatedFields": {"b": 3}}
+        _id: {_id: 3, ns: "test.t1"},
+        documentKey: {_id: 3},
+        fullDocument: null,
+        ns: {coll: "t1", db: "test"},
+        operationType: "update",
+        updateDescription: {removedFields: [], updatedFields: {b: 3}},
     };
-    testPipeline([{$changeNotification: {}}], [expected], db.t1);
+    checkLatestChange(expected, db.t1);
 
     jsTestLog("Testing delete");
     assert.writeOK(db.t1.remove({_id: 1}));
     expected = {
-        "_id": {"_id": 1, "ns": "test.t1"},
-        "documentKey": {"_id": 1},
-        "ns": {"coll": "t1", "db": "test"},
-        "operationType": "delete"
+        _id: {_id: 1, ns: "test.t1"},
+        documentKey: {_id: 1},
+        fullDocument: null,
+        ns: {coll: "t1", db: "test"},
+        operationType: "delete",
     };
-    testPipeline([{$changeNotification: {}}], [expected], db.t1);
+    checkLatestChange(expected, db.t1);
 
     jsTestLog("Testing intervening write on another collection");
     assert.writeOK(db.t2.insert({_id: 100, c: 1}));
-    testPipeline([{$changeNotification: {}}], [expected], db.t1);
+    checkLatestChange(expected, db.t1);
     expected = {
-        "_id": {
-            "_id": 100,
-            "ns": "test.t2",
+        _id: {
+            _id: 100,
+            ns: "test.t2",
         },
-        "documentKey": {"_id": 100},
-        "newDocument": {"_id": 100, "c": 1},
-        "ns": {"coll": "t2", "db": "test"},
-        "operationType": "insert"
+        documentKey: {_id: 100},
+        fullDocument: {_id: 100, c: 1},
+        ns: {coll: "t2", db: "test"},
+        operationType: "insert",
     };
-    testPipeline([{$changeNotification: {}}], [expected], db.t2);
+    checkLatestChange(expected, db.t2);
 
     jsTestLog("Testing rename");
     assert.writeOK(db.t2.renameCollection("t3"));
-    expected = {"_id": {"ns": "test.$cmd"}, "operationType": "invalidate"};
-    testPipeline([{$changeNotification: {}}], [expected], db.t2);
+    expected = {_id: {ns: "test.$cmd"}, operationType: "invalidate", fullDocument: null};
+    checkLatestChange(expected, db.t2);
 
     jsTestLog("Testing insert that looks like rename");
     assert.writeOK(db.t3.insert({_id: 101, renameCollection: "test.dne1", to: "test.dne2"}));
-    testPipeline([{$changeNotification: {}}], [], db.dne1);
-    testPipeline([{$changeNotification: {}}], [], db.dne2);
+    assertNoLatestChange(db.dne1);
+    assertNoLatestChange(db.dne2);
 
     // Now make sure the cursor behaves like a tailable awaitData cursor.
     jsTestLog("Testing tailability");
@@ -143,14 +168,14 @@
     assert.writeOK(db.tailable1.insert({_id: 101, a: 1}));
     assert(tailableCursor.hasNext());
     assert.docEq(tailableCursor.next(), {
-        "_id": {
-            "_id": 101,
-            "ns": "test.tailable1",
+        _id: {
+            _id: 101,
+            ns: "test.tailable1",
         },
-        "documentKey": {"_id": 101},
-        "newDocument": {"_id": 101, "a": 1},
-        "ns": {"coll": "tailable1", "db": "test"},
-        "operationType": "insert"
+        documentKey: {_id: 101},
+        fullDocument: {_id: 101, a: 1},
+        ns: {coll: "tailable1", db: "test"},
+        operationType: "insert",
     });
 
     jsTestLog("Testing awaitdata");
@@ -188,14 +213,14 @@
     aggcursor = res.cursor;
     assert.eq(aggcursor.nextBatch.length, 1);
     assert.docEq(aggcursor.nextBatch[0], {
-        "_id": {
-            "_id": 102,
-            "ns": "test.tailable2",
+        _id: {
+            _id: 102,
+            ns: "test.tailable2",
         },
-        "documentKey": {"_id": 102},
-        "newDocument": {"_id": 102, "a": 2},
-        "ns": {"coll": "tailable2", "db": "test"},
-        "operationType": "insert"
+        documentKey: {_id: 102},
+        fullDocument: {_id: 102, a: 2},
+        ns: {coll: "tailable2", db: "test"},
+        operationType: "insert",
     });
 
     // Wait for insert shell to terminate.
@@ -254,14 +279,14 @@
     assert.neq(aggcursor.id, 0);
     assert.eq(aggcursor.nextBatch.length, 1);
     assert.docEq(aggcursor.nextBatch[0], {
-        "_id": {
-            "_id": 105,
-            "ns": "test.tailable3",
+        _id: {
+            _id: 105,
+            ns: "test.tailable3",
         },
-        "documentKey": {"_id": 105},
-        "newDocument": {"_id": 105, "a": 3},
-        "ns": {"coll": "tailable3", "db": "test"},
-        "operationType": "insert"
+        documentKey: {_id: 105},
+        fullDocument: {_id: 105, a: 3},
+        ns: {coll: "tailable3", db: "test"},
+        operationType: "insert",
     });
 
     // Wait for insert shell to terminate.
