@@ -33,6 +33,8 @@
 #include "mongo/bson/bsontypes.h"
 #include "mongo/db/matcher/expression_always_boolean.h"
 #include "mongo/db/matcher/expression_parser.h"
+#include "mongo/db/matcher/schema/expression_internal_schema_max_length.h"
+#include "mongo/db/matcher/schema/expression_internal_schema_min_length.h"
 #include "mongo/db/matcher/schema/expression_internal_schema_object_match.h"
 #include "mongo/stdx/memory.h"
 #include "mongo/util/string_map.h"
@@ -45,6 +47,9 @@ constexpr StringData kSchemaExclusiveMaximumKeyword = "exclusiveMaximum"_sd;
 constexpr StringData kSchemaExclusiveMinimumKeyword = "exclusiveMinimum"_sd;
 constexpr StringData kSchemaMaximumKeyword = "maximum"_sd;
 constexpr StringData kSchemaMinimumKeyword = "minimum"_sd;
+constexpr StringData kSchemaMaxLengthKeyword = "maxLength"_sd;
+constexpr StringData kSchemaMinLengthKeyword = "minLength"_sd;
+constexpr StringData kSchemaPatternKeyword = "pattern"_sd;
 constexpr StringData kSchemaPropertiesKeyword = "properties"_sd;
 constexpr StringData kSchemaTypeKeyword = "type"_sd;
 
@@ -169,7 +174,6 @@ StatusWithMatchExpression parseMaximum(StringData path,
         return status;
     }
 
-    // We use Number as a stand-in for all numeric restrictions.
     TypeMatchExpression::Type restrictionType;
     restrictionType.allNumbers = true;
     return makeRestriction(restrictionType, std::move(expr), typeExpr);
@@ -201,11 +205,65 @@ StatusWithMatchExpression parseMinimum(StringData path,
         return status;
     }
 
-    // We use Number as a stand-in for all numeric restrictions.
     TypeMatchExpression::Type restrictionType;
     restrictionType.allNumbers = true;
     return makeRestriction(restrictionType, std::move(expr), typeExpr);
 }
+
+template <class T>
+StatusWithMatchExpression parseStrLength(StringData path,
+                                         BSONElement strLength,
+                                         TypeMatchExpression* typeExpr,
+                                         StringData keyword) {
+    if (!strLength.isNumber()) {
+        return {
+            Status(ErrorCodes::TypeMismatch,
+                   str::stream() << "$jsonSchema keyword '" << keyword << "' must be a number")};
+    }
+
+    auto strLengthWithStatus =
+        MatchExpressionParser::parseIntegerElementToNonNegativeLong(strLength);
+
+    if (!strLengthWithStatus.isOK()) {
+        return strLengthWithStatus.getStatus();
+    }
+
+    if (path.empty()) {
+        return {stdx::make_unique<AlwaysTrueMatchExpression>()};
+    }
+
+    auto expr = stdx::make_unique<T>();
+    auto status = expr->init(path, strLengthWithStatus.getValue());
+    if (!status.isOK()) {
+        return status;
+    }
+    return makeRestriction(BSONType::String, std::move(expr), typeExpr);
+}
+
+StatusWithMatchExpression parsePattern(StringData path,
+                                       BSONElement pattern,
+                                       TypeMatchExpression* typeExpr) {
+    if (pattern.type() != BSONType::String) {
+        return {Status(ErrorCodes::TypeMismatch,
+                       str::stream() << "$jsonSchema keyword '" << kSchemaPatternKeyword
+                                     << "' must be a string")};
+    }
+
+    if (path.empty()) {
+        return {stdx::make_unique<AlwaysTrueMatchExpression>()};
+    }
+
+    auto expr = stdx::make_unique<RegexMatchExpression>();
+
+    // JSON Schema does not allow regex flags to be specified.
+    constexpr auto emptyFlags = "";
+    auto status = expr->init(path, pattern.valueStringData(), emptyFlags);
+    if (!status.isOK()) {
+        return status;
+    }
+    return makeRestriction(BSONType::String, std::move(expr), typeExpr);
+}
+
 }  // namespace
 
 StatusWithMatchExpression JSONSchemaParser::_parseProperties(StringData path,
@@ -257,7 +315,10 @@ StatusWithMatchExpression JSONSchemaParser::_parse(StringData path, BSONObj sche
                                       {kSchemaMaximumKeyword, {}},
                                       {kSchemaMinimumKeyword, {}},
                                       {kSchemaExclusiveMaximumKeyword, {}},
-                                      {kSchemaExclusiveMinimumKeyword, {}}};
+                                      {kSchemaExclusiveMinimumKeyword, {}},
+                                      {kSchemaMaxLengthKeyword, {}},
+                                      {kSchemaMinLengthKeyword, {}},
+                                      {kSchemaPatternKeyword, {}}};
 
     for (auto&& elt : schema) {
         auto it = keywordMap.find(elt.fieldNameStringData());
@@ -343,6 +404,32 @@ StatusWithMatchExpression JSONSchemaParser::_parse(StringData path, BSONObj sche
                                      << "' must be a present if "
                                      << kSchemaExclusiveMinimumKeyword
                                      << " is present")};
+    }
+
+    if (auto maxLengthElt = keywordMap[kSchemaMaxLengthKeyword]) {
+        auto maxLengthExpr = parseStrLength<InternalSchemaMaxLengthMatchExpression>(
+            path, maxLengthElt, typeExpr.getValue().get(), kSchemaMaxLengthKeyword);
+        if (!maxLengthExpr.isOK()) {
+            return maxLengthExpr;
+        }
+        andExpr->add(maxLengthExpr.getValue().release());
+    }
+
+    if (auto minLengthElt = keywordMap[kSchemaMinLengthKeyword]) {
+        auto minLengthExpr = parseStrLength<InternalSchemaMinLengthMatchExpression>(
+            path, minLengthElt, typeExpr.getValue().get(), kSchemaMinLengthKeyword);
+        if (!minLengthExpr.isOK()) {
+            return minLengthExpr;
+        }
+        andExpr->add(minLengthExpr.getValue().release());
+    }
+
+    if (auto patternElt = keywordMap[kSchemaPatternKeyword]) {
+        auto patternExpr = parsePattern(path, patternElt, typeExpr.getValue().get());
+        if (!patternExpr.isOK()) {
+            return patternExpr;
+        }
+        andExpr->add(patternExpr.getValue().release());
     }
 
     if (path.empty() && typeExpr.getValue() &&
