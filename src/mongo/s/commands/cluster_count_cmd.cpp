@@ -76,23 +76,12 @@ public:
                    const BSONObj& cmdObj,
                    std::string& errmsg,
                    BSONObjBuilder& result) override {
-        const NamespaceString nss(parseNs(dbname, cmdObj));
-        uassert(ErrorCodes::InvalidNamespace,
-                str::stream() << "Invalid namespace specified '" << nss.ns() << "'",
-                nss.isValid());
-
-        long long skip = 0;
-
-        if (cmdObj["skip"].isNumber()) {
-            skip = cmdObj["skip"].numberLong();
-            if (skip < 0) {
-                errmsg = "skip value is negative in count query";
-                return false;
-            }
-        } else if (cmdObj["skip"].ok()) {
-            errmsg = "skip value is not a valid number";
-            return false;
+        const bool isExplain = true;
+        auto request = CountRequest::parseFromBSON(dbname, cmdObj, isExplain);
+        if (!request.isOK()) {
+            return request.getStatus();
         }
+
 
         BSONObjBuilder countCmdBuilder;
         countCmdBuilder.append("count", nss.coll());
@@ -141,16 +130,14 @@ public:
         auto countCmdObj = countCmdBuilder.done();
 
         BSONObj viewDefinition;
-        auto swShardResponses = scatterGather(opCtx,
-                                              dbname,
-                                              nss,
-                                              countCmdObj,
-                                              ReadPreferenceSetting::get(opCtx),
-                                              ShardTargetingPolicy::UseRoutingTable,
-                                              filter,
-                                              collation,
-                                              true,  // do shard versioning
-                                              &viewDefinition);
+        auto swShardResponses = scatterGatherForNamespace(opCtx,
+                                                          nss,
+                                                          countCmdObj,
+                                                          getReadPref(countCmdObj),
+                                                          filter,
+                                                          collation,
+                                                          true,  // do shard versioning
+                                                          &viewDefinition);
 
         if (ErrorCodes::CommandOnShardedViewNotSupportedOnMongod == swShardResponses.getStatus()) {
             if (viewDefinition.isEmpty()) {
@@ -184,11 +171,12 @@ public:
                 resolvedView.asExpandedViewAggregation(aggRequestOnView.getValue());
             auto resolvedAggCmd = resolvedAggRequest.serializeToCommandObj().toBson();
 
-            BSONObj aggResult = Command::runCommandDirectly(
-                opCtx, OpMsgRequest::fromDBAndBody(dbname, std::move(resolvedAggCmd)));
+            BSONObjBuilder aggResult;
+            Command::findCommand("aggregate")
+                ->run(opCtx, dbname, resolvedAggCmd, errmsg, aggResult);
 
             result.resetToEmpty();
-            ViewResponseFormatter formatter(aggResult);
+            ViewResponseFormatter formatter(aggResult.obj());
             auto formatStatus = formatter.appendAsCountResponse(&result);
             if (!formatStatus.isOK()) {
                 return appendCommandStatus(result, formatStatus);
@@ -270,16 +258,14 @@ public:
         Timer timer;
 
         BSONObj viewDefinition;
-        auto swShardResponses = scatterGather(opCtx,
-                                              dbname,
-                                              nss,
-                                              explainCmd,
-                                              ReadPreferenceSetting::get(opCtx),
-                                              ShardTargetingPolicy::UseRoutingTable,
-                                              targetingQuery,
-                                              targetingCollation,
-                                              true,  // do shard versioning
-                                              &viewDefinition);
+        auto swShardResponses = scatterGatherForNamespace(opCtx,
+                                                          nss,
+                                                          explainCmd,
+                                                          getReadPref(explainCmd),
+                                                          targetingQuery,
+                                                          targetingCollation,
+                                                          true,  // do shard versioning
+                                                          &viewDefinition);
 
         long long millisElapsed = timer.millis();
 
