@@ -103,8 +103,6 @@ Status _applyOps(OperationContext* opCtx,
                  const BSONObj& applyOpCmd,
                  BSONObjBuilder* result,
                  int* numApplied) {
-    invariant(opCtx->lockState()->isW());
-
     BSONObj ops = applyOpCmd.firstElement().Obj();
 
     // apply
@@ -136,6 +134,7 @@ Status _applyOps(OperationContext* opCtx,
         Status status(ErrorCodes::InternalError, "");
 
         if (haveWrappingWUOW) {
+            invariant(opCtx->lockState()->isW());
             invariant(*opType != 'c');
 
             if (!dbHolder().get(opCtx, ns)) {
@@ -153,8 +152,10 @@ Status _applyOps(OperationContext* opCtx,
             try {
                 writeConflictRetry(opCtx, "applyOps", ns, [&] {
                     if (*opType == 'c') {
+                        invariant(opCtx->lockState()->isW());
                         status = repl::applyCommand_inlock(opCtx, opObj, true);
                     } else {
+                        Lock::DBLock dbWriteLock(opCtx, nss.db(), MODE_X);
                         OldClientContext ctx(opCtx, ns);
                         const char* names[] = {"o", "ns"};
                         BSONElement fields[2];
@@ -294,7 +295,16 @@ Status applyOps(OperationContext* opCtx,
     auto isAtomic = allowAtomic && areOpsCrudOnly;
     auto hasPrecondition = _hasPrecondition(applyOpCmd);
 
-    Lock::GlobalWrite globalWriteLock(opCtx);
+    boost::optional<Lock::GlobalWrite> globalWriteLock;
+    boost::optional<Lock::DBLock> dbWriteLock;
+
+    // There's only one case where we are allowed to take the database lock instead of the global
+    // lock - no preconditions; only CRUD ops; and non-atomic mode.
+    if (!hasPrecondition && areOpsCrudOnly && !allowAtomic) {
+        dbWriteLock.emplace(opCtx, dbName, MODE_X);
+    } else {
+        globalWriteLock.emplace(opCtx);
+    }
 
     bool userInitiatedWritesAndNotPrimary = opCtx->writesAreReplicated() &&
         !repl::getGlobalReplicationCoordinator()->canAcceptWritesForDatabase(opCtx, dbName);
@@ -315,6 +325,7 @@ Status applyOps(OperationContext* opCtx,
         return _applyOps(opCtx, dbName, applyOpCmd, result, &numApplied);
 
     // Perform write ops atomically
+    invariant(globalWriteLock);
     try {
         writeConflictRetry(opCtx, "applyOps", dbName, [&] {
             BSONObjBuilder intermediateResult;

@@ -112,7 +112,7 @@
     // global lock, the insert opcounter will eventually be incremented to 2.
     try {
         let insertOpCount = 0;
-        const expectedFinalOpCount = 1;
+        const expectedFinalOpCount = 2;
         assert.soon(
             function() {
                 const serverStatus = adminDb.serverStatus();
