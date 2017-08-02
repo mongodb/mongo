@@ -43,10 +43,11 @@ class TestEvergreenProjectConfig(unittest.TestCase):
         self.assertIn("resmoke_task", self.conf.task_names)
 
     def test_list_variants(self):
-        self.assertEqual(2, len(self.conf.variants))
-        self.assertEqual(2, len(self.conf.variant_names))
+        self.assertEqual(3, len(self.conf.variants))
+        self.assertEqual(3, len(self.conf.variant_names))
         self.assertIn("osx-108", self.conf.variant_names)
         self.assertIn("ubuntu", self.conf.variant_names)
+        self.assertIn("debian", self.conf.variant_names)
 
     def test_get_variant(self):
         variant = self.conf.get_variant("osx-108")
@@ -55,10 +56,11 @@ class TestEvergreenProjectConfig(unittest.TestCase):
         self.assertEqual("osx-108", variant.name)
 
     def test_list_distro_names(self):
-        self.assertEqual(3, len(self.conf.distro_names))
+        self.assertEqual(4, len(self.conf.distro_names))
         self.assertIn("localtestdistro", self.conf.distro_names)
         self.assertIn("ubuntu1404-test", self.conf.distro_names)
         self.assertIn("pdp-11", self.conf.distro_names)
+        self.assertIn("debian-stretch", self.conf.distro_names)
 
 
 class TestTask(unittest.TestCase):
@@ -177,8 +179,19 @@ class TestVariant(unittest.TestCase):
             self.assertEqual(variant_ubuntu, task.variant)
             self.assertIn(task_name, variant_ubuntu.task_names)
 
+        # Check combined_resmoke_args when test_flags is set on the variant.
         resmoke_task = variant_ubuntu.get_task("resmoke_task")
         self.assertEqual("--suites=somesuite --storageEngine=mmapv1 --param=value --ubuntu",
+                         resmoke_task.combined_resmoke_args)
+
+        # Check combined_resmoke_args when the task doesn't have resmoke_args.
+        passing_task = variant_ubuntu.get_task("passing_test")
+        self.assertIsNone(passing_task.combined_resmoke_args)
+
+        # Check combined_resmoke_args when test_flags is not set on the variant.
+        variant_debian = self.conf.get_variant("debian")
+        resmoke_task = variant_debian.get_task("resmoke_task")
+        self.assertEqual("--suites=somesuite --storageEngine=mmapv1",
                          resmoke_task.combined_resmoke_args)
 
 if __name__ == "__main__":

@@ -184,8 +184,18 @@ class VariantTask(Task):
     @property
     def combined_resmoke_args(self):
         """Return the combined resmoke arguments resulting from the concatenation of the task's
-         resmoke_args parameter and the variant's test_flags parameter."""
-        return "{} {}".format(self.resmoke_args, self.variant.test_flags)
+        resmoke_args parameter and the variant's test_flags parameter.
+
+        If the task does not have a 'resmoke_args' parameter, then None is returned.
+        """
+        resmoke_args = self.resmoke_args
+        test_flags = self.variant.test_flags
+        if resmoke_args is None:
+            return None
+        elif test_flags is None:
+            return self.resmoke_args
+        else:
+            return "{} {}".format(resmoke_args, test_flags)
 
 
 class ResmokeArgs(object):

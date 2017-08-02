@@ -289,7 +289,9 @@ def create_task_list(evergreen_conf, buildvariant, suites, exclude_tasks):
         if task.name not in exclude_tasks_set:
             # Using 'task.combined_resmoke_args' to include the variant's test_flags and
             # allow the storage engine to be overridden.
-            variant_task_args[task.name] = task.combined_resmoke_args
+            resmoke_args = task.combined_resmoke_args
+            if resmoke_args:
+                variant_task_args[task.name] = resmoke_args
 
     # Create the list of tasks to run for the specified suite.
     tasks_to_run = {}
