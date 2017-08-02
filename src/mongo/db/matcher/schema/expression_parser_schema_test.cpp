@@ -31,6 +31,7 @@
 #include "mongo/db/json.h"
 #include "mongo/db/matcher/expression.h"
 #include "mongo/db/matcher/expression_parser.h"
+#include "mongo/db/matcher/expression_type.h"
 #include "mongo/db/matcher/extensions_callback_disallow_extensions.h"
 #include "mongo/db/matcher/schema/expression_internal_schema_max_items.h"
 #include "mongo/db/matcher/schema/expression_internal_schema_max_length.h"
@@ -625,6 +626,50 @@ TEST(InternalSchemaAllElemMatchFromIndexMatchExpression, ParsesCorreclyWithValid
 
     ASSERT_TRUE(expr.getValue()->matchesBSON(fromjson("{a: [5, 3, 3, 3, 3, 3]}")));
     ASSERT_FALSE(expr.getValue()->matchesBSON(fromjson("{a: [3, 3, 3, 5, 3, 3]}")));
+}
+
+TEST(MatchExpressionParserSchemaTest, InternalTypeFailsToParseOnTypeMismatch) {
+    BSONObj query = BSON("x" << BSON("$_internalSchemaType" << BSONObj()));
+    auto result = MatchExpressionParser::parse(
+        query, ExtensionsCallbackDisallowExtensions(), kSimpleCollator);
+    ASSERT_NOT_OK(result.getStatus());
+}
+
+TEST(MatchExpressionParserSchemaTest, InternalTypeCanParseNumberAlias) {
+    BSONObj query = BSON("x" << BSON("$_internalSchemaType"
+                                     << "number"));
+    auto result = MatchExpressionParser::parse(
+        query, ExtensionsCallbackDisallowExtensions(), kSimpleCollator);
+    ASSERT_OK(result.getStatus());
+
+    ASSERT_EQ(result.getValue()->matchType(), MatchExpression::INTERNAL_SCHEMA_TYPE);
+    auto typeExpr = static_cast<const InternalSchemaTypeExpression*>(result.getValue().get());
+    ASSERT_TRUE(typeExpr->matchesAllNumbers());
+}
+
+TEST(MatchExpressionParserSchemaTest, InternalTypeCanParseLongAlias) {
+    BSONObj query = BSON("x" << BSON("$_internalSchemaType"
+                                     << "long"));
+    auto result = MatchExpressionParser::parse(
+        query, ExtensionsCallbackDisallowExtensions(), kSimpleCollator);
+    ASSERT_OK(result.getStatus());
+
+    ASSERT_EQ(result.getValue()->matchType(), MatchExpression::INTERNAL_SCHEMA_TYPE);
+    auto typeExpr = static_cast<const InternalSchemaTypeExpression*>(result.getValue().get());
+    ASSERT_FALSE(typeExpr->matchesAllNumbers());
+    ASSERT_EQ(typeExpr->getBSONType(), BSONType::NumberLong);
+}
+
+TEST(MatchExpressionParserSchemaTest, InternalTypeCanParseLongCode) {
+    BSONObj query = BSON("x" << BSON("$_internalSchemaType" << 18));
+    auto result = MatchExpressionParser::parse(
+        query, ExtensionsCallbackDisallowExtensions(), kSimpleCollator);
+    ASSERT_OK(result.getStatus());
+
+    ASSERT_EQ(result.getValue()->matchType(), MatchExpression::INTERNAL_SCHEMA_TYPE);
+    auto typeExpr = static_cast<const InternalSchemaTypeExpression*>(result.getValue().get());
+    ASSERT_FALSE(typeExpr->matchesAllNumbers());
+    ASSERT_EQ(typeExpr->getBSONType(), BSONType::NumberLong);
 }
 }  // namespace
 }  // namespace mongo

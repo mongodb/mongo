@@ -254,22 +254,23 @@ Document redactSafePortionDollarOps(BSONObj expr) {
 
             // These are never allowed
             case PathAcceptingKeyword::EQUALITY:  // This actually means unknown
-            case PathAcceptingKeyword::GEO_NEAR:
-            case PathAcceptingKeyword::NOT_EQUAL:
-            case PathAcceptingKeyword::SIZE:
-            case PathAcceptingKeyword::NOT_IN:
             case PathAcceptingKeyword::EXISTS:
-            case PathAcceptingKeyword::WITHIN:
             case PathAcceptingKeyword::GEO_INTERSECTS:
+            case PathAcceptingKeyword::GEO_NEAR:
             case PathAcceptingKeyword::INTERNAL_SCHEMA_ALL_ELEM_MATCH_FROM_INDEX:
             case PathAcceptingKeyword::INTERNAL_SCHEMA_FMOD:
-            case PathAcceptingKeyword::INTERNAL_SCHEMA_MIN_ITEMS:
-            case PathAcceptingKeyword::INTERNAL_SCHEMA_MAX_ITEMS:
-            case PathAcceptingKeyword::INTERNAL_SCHEMA_UNIQUE_ITEMS:
-            case PathAcceptingKeyword::INTERNAL_SCHEMA_OBJECT_MATCH:
-            case PathAcceptingKeyword::INTERNAL_SCHEMA_MIN_LENGTH:
-            case PathAcceptingKeyword::INTERNAL_SCHEMA_MAX_LENGTH:
             case PathAcceptingKeyword::INTERNAL_SCHEMA_MATCH_ARRAY_INDEX:
+            case PathAcceptingKeyword::INTERNAL_SCHEMA_MAX_ITEMS:
+            case PathAcceptingKeyword::INTERNAL_SCHEMA_MAX_LENGTH:
+            case PathAcceptingKeyword::INTERNAL_SCHEMA_MIN_ITEMS:
+            case PathAcceptingKeyword::INTERNAL_SCHEMA_MIN_LENGTH:
+            case PathAcceptingKeyword::INTERNAL_SCHEMA_OBJECT_MATCH:
+            case PathAcceptingKeyword::INTERNAL_SCHEMA_TYPE:
+            case PathAcceptingKeyword::INTERNAL_SCHEMA_UNIQUE_ITEMS:
+            case PathAcceptingKeyword::NOT_EQUAL:
+            case PathAcceptingKeyword::NOT_IN:
+            case PathAcceptingKeyword::SIZE:
+            case PathAcceptingKeyword::WITHIN:
                 continue;
         }
     }

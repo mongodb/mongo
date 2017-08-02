@@ -6,6 +6,8 @@ selector:
   include_files:
   - src/third_party/JSON-Schema-Test-Suite/tests/draft4/maximum.json
   - src/third_party/JSON-Schema-Test-Suite/tests/draft4/minimum.json
+  - src/third_party/JSON-Schema-Test-Suite/tests/draft4/multipleOf.json
+  - src/third_party/JSON-Schema-Test-Suite/tests/draft4/pattern.json
 
 executor:
   config:

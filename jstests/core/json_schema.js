@@ -215,4 +215,23 @@
                   {_id: 1})
             .sort({_id: 1})
             .toArray());
+
+    coll.drop();
+    assert.writeOK(coll.insert({_id: 0, arr: 3}));
+    assert.writeOK(coll.insert({_id: 1, arr: [1, "foo"]}));
+    assert.writeOK(coll.insert({_id: 2, arr: [{a: 1}, {b: 2}]}));
+    assert.writeOK(coll.insert({_id: 3, arr: []}));
+    assert.writeOK(coll.insert({_id: 4, arr: {a: []}}));
+
+    // Test that the type:"array" restriction works as expected.
+    assert.eq([{_id: 1}, {_id: 2}, {_id: 3}],
+              coll.find({$jsonSchema: {properties: {arr: {type: "array"}}}}, {_id: 1})
+                  .sort({_id: 1})
+                  .toArray());
+
+    // Test that type:"number" works correctly in the presence of arrays.
+    assert.eq([{_id: 0}],
+              coll.find({$jsonSchema: {properties: {arr: {type: "number"}}}}, {_id: 1})
+                  .sort({_id: 1})
+                  .toArray());
 }());

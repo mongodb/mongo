@@ -40,6 +40,7 @@
 #include "mongo/db/matcher/expression_geo.h"
 #include "mongo/db/matcher/expression_leaf.h"
 #include "mongo/db/matcher/expression_tree.h"
+#include "mongo/db/matcher/expression_type.h"
 #include "mongo/db/matcher/expression_with_placeholder.h"
 #include "mongo/db/matcher/schema/expression_internal_schema_all_elem_match_from_index.h"
 #include "mongo/db/matcher/schema/expression_internal_schema_cond.h"
@@ -260,7 +261,7 @@ StatusWithMatchExpression MatchExpressionParser::_parseSubField(
         }
 
         case PathAcceptingKeyword::TYPE:
-            return _parseType(name, e, expCtx);
+            return _parseType<TypeMatchExpression>(name, e, expCtx);
 
         case PathAcceptingKeyword::MOD:
             return _parseMOD(name, e, expCtx);
@@ -432,7 +433,12 @@ StatusWithMatchExpression MatchExpressionParser::_parseSubField(
             }
             return {std::move(expr)};
         }
+
+        case PathAcceptingKeyword::INTERNAL_SCHEMA_TYPE: {
+            return _parseType<InternalSchemaTypeExpression>(name, e, expCtx);
+        }
     }
+
     return {Status(ErrorCodes::BadValue,
                    mongoutils::str::stream() << "not handled: " << e.fieldName())};
 }
@@ -845,65 +851,18 @@ Status MatchExpressionParser::_parseInExpression(
     return inExpression->setEqualities(std::move(equalities));
 }
 
-StatusWith<std::unique_ptr<TypeMatchExpression>> MatchExpressionParser::parseTypeFromAlias(
-    StringData path, StringData typeAlias) {
-    auto typeExpr = stdx::make_unique<TypeMatchExpression>();
-
-    TypeMatchExpression::Type type;
-
-    if (typeAlias == TypeMatchExpression::kMatchesAllNumbersAlias) {
-        type.allNumbers = true;
-        Status status = typeExpr->init(path, type);
-        if (!status.isOK()) {
-            return status;
-        }
-        return {std::move(typeExpr)};
-    }
-
-    auto it = TypeMatchExpression::typeAliasMap.find(typeAlias.toString());
-    if (it == TypeMatchExpression::typeAliasMap.end()) {
-        return Status(ErrorCodes::BadValue,
-                      str::stream() << "Unknown string alias for $type: " << typeAlias);
-    }
-
-    type.bsonType = it->second;
-    Status status = typeExpr->init(path, type);
-    if (!status.isOK()) {
-        return status;
-    }
-    return {std::move(typeExpr)};
-}
-
+template <class T>
 StatusWithMatchExpression MatchExpressionParser::_parseType(
     const char* name,
     const BSONElement& elt,
     const boost::intrusive_ptr<ExpressionContext>& expCtx) {
-    if (!elt.isNumber() && elt.type() != BSONType::String) {
-        return Status(ErrorCodes::TypeMismatch, "argument to $type is not a number or a string");
+    auto parsedType = MatcherTypeAlias::parse(elt);
+    if (!parsedType.isOK()) {
+        return parsedType.getStatus();
     }
 
-    if (elt.type() == BSONType::String) {
-        auto typeExpr = parseTypeFromAlias(name, elt.valueStringData());
-        if (!typeExpr.isOK()) {
-            return typeExpr.getStatus();
-        }
-
-        return {std::move(typeExpr.getValue())};
-    }
-
-    invariant(elt.isNumber());
-    int typeInt = elt.numberInt();
-    if (elt.type() != BSONType::NumberInt && typeInt != elt.number()) {
-        typeInt = -1;
-    }
-
-    if (!isValidBSONType(typeInt)) {
-        return Status(ErrorCodes::BadValue,
-                      str::stream() << "Invalid numerical $type code: " << typeInt);
-    }
-
-    auto typeExpr = stdx::make_unique<TypeMatchExpression>();
-    auto status = typeExpr->init(name, static_cast<BSONType>(typeInt));
+    auto typeExpr = stdx::make_unique<T>();
+    auto status = typeExpr->init(name, parsedType.getValue());
     if (!status.isOK()) {
         return status;
     }
@@ -1490,42 +1449,46 @@ MONGO_INITIALIZER(MatchExpressionParser)(InitializerContext* context) {
     queryOperatorMap =
         stdx::make_unique<StringMap<PathAcceptingKeyword>>(StringMap<PathAcceptingKeyword>{
             // TODO: SERVER-19565 Add $eq after auditing callers.
-            {"lt", PathAcceptingKeyword::LESS_THAN},
-            {"lte", PathAcceptingKeyword::LESS_THAN_OR_EQUAL},
-            {"gte", PathAcceptingKeyword::GREATER_THAN_OR_EQUAL},
-            {"gt", PathAcceptingKeyword::GREATER_THAN},
-            {"in", PathAcceptingKeyword::IN_EXPR},
-            {"ne", PathAcceptingKeyword::NOT_EQUAL},
-            {"size", PathAcceptingKeyword::SIZE},
-            {"all", PathAcceptingKeyword::ALL},
-            {"nin", PathAcceptingKeyword::NOT_IN},
-            {"exists", PathAcceptingKeyword::EXISTS},
-            {"mod", PathAcceptingKeyword::MOD},
-            {"type", PathAcceptingKeyword::TYPE},
-            {"regex", PathAcceptingKeyword::REGEX},
-            {"options", PathAcceptingKeyword::OPTIONS},
-            {"elemMatch", PathAcceptingKeyword::ELEM_MATCH},
-            {"near", PathAcceptingKeyword::GEO_NEAR},
-            {"nearSphere", PathAcceptingKeyword::GEO_NEAR},
-            {"geoNear", PathAcceptingKeyword::GEO_NEAR},
-            {"within", PathAcceptingKeyword::WITHIN},
-            {"geoWithin", PathAcceptingKeyword::WITHIN},
-            {"geoIntersects", PathAcceptingKeyword::GEO_INTERSECTS},
-            {"bitsAllSet", PathAcceptingKeyword::BITS_ALL_SET},
-            {"bitsAllClear", PathAcceptingKeyword::BITS_ALL_CLEAR},
-            {"bitsAnySet", PathAcceptingKeyword::BITS_ANY_SET},
-            {"bitsAnyClear", PathAcceptingKeyword::BITS_ANY_CLEAR},
             {"_internalSchemaAllElemMatchFromIndex",
              PathAcceptingKeyword::INTERNAL_SCHEMA_ALL_ELEM_MATCH_FROM_INDEX},
             {"_internalSchemaFmod", PathAcceptingKeyword::INTERNAL_SCHEMA_FMOD},
-            {"_internalSchemaMinItems", PathAcceptingKeyword::INTERNAL_SCHEMA_MIN_ITEMS},
-            {"_internalSchemaMaxItems", PathAcceptingKeyword::INTERNAL_SCHEMA_MAX_ITEMS},
-            {"_internalSchemaUniqueItems", PathAcceptingKeyword::INTERNAL_SCHEMA_UNIQUE_ITEMS},
-            {"_internalSchemaObjectMatch", PathAcceptingKeyword::INTERNAL_SCHEMA_OBJECT_MATCH},
-            {"_internalSchemaMinLength", PathAcceptingKeyword::INTERNAL_SCHEMA_MIN_LENGTH},
-            {"_internalSchemaMaxLength", PathAcceptingKeyword::INTERNAL_SCHEMA_MAX_LENGTH},
             {"_internalSchemaMatchArrayIndex",
-             PathAcceptingKeyword::INTERNAL_SCHEMA_MATCH_ARRAY_INDEX}});
+             PathAcceptingKeyword::INTERNAL_SCHEMA_MATCH_ARRAY_INDEX},
+            {"_internalSchemaMaxItems", PathAcceptingKeyword::INTERNAL_SCHEMA_MAX_ITEMS},
+            {"_internalSchemaMaxLength", PathAcceptingKeyword::INTERNAL_SCHEMA_MAX_LENGTH},
+            {"_internalSchemaMaxLength", PathAcceptingKeyword::INTERNAL_SCHEMA_MAX_LENGTH},
+            {"_internalSchemaMinItems", PathAcceptingKeyword::INTERNAL_SCHEMA_MIN_ITEMS},
+            {"_internalSchemaMinItems", PathAcceptingKeyword::INTERNAL_SCHEMA_MIN_ITEMS},
+            {"_internalSchemaMinLength", PathAcceptingKeyword::INTERNAL_SCHEMA_MIN_LENGTH},
+            {"_internalSchemaObjectMatch", PathAcceptingKeyword::INTERNAL_SCHEMA_OBJECT_MATCH},
+            {"_internalSchemaType", PathAcceptingKeyword::INTERNAL_SCHEMA_TYPE},
+            {"_internalSchemaUniqueItems", PathAcceptingKeyword::INTERNAL_SCHEMA_UNIQUE_ITEMS},
+            {"all", PathAcceptingKeyword::ALL},
+            {"bitsAllClear", PathAcceptingKeyword::BITS_ALL_CLEAR},
+            {"bitsAllSet", PathAcceptingKeyword::BITS_ALL_SET},
+            {"bitsAnyClear", PathAcceptingKeyword::BITS_ANY_CLEAR},
+            {"bitsAnySet", PathAcceptingKeyword::BITS_ANY_SET},
+            {"elemMatch", PathAcceptingKeyword::ELEM_MATCH},
+            {"exists", PathAcceptingKeyword::EXISTS},
+            {"geoIntersects", PathAcceptingKeyword::GEO_INTERSECTS},
+            {"geoNear", PathAcceptingKeyword::GEO_NEAR},
+            {"geoWithin", PathAcceptingKeyword::WITHIN},
+            {"gt", PathAcceptingKeyword::GREATER_THAN},
+            {"gte", PathAcceptingKeyword::GREATER_THAN_OR_EQUAL},
+            {"in", PathAcceptingKeyword::IN_EXPR},
+            {"lt", PathAcceptingKeyword::LESS_THAN},
+            {"lte", PathAcceptingKeyword::LESS_THAN_OR_EQUAL},
+            {"mod", PathAcceptingKeyword::MOD},
+            {"ne", PathAcceptingKeyword::NOT_EQUAL},
+            {"near", PathAcceptingKeyword::GEO_NEAR},
+            {"nearSphere", PathAcceptingKeyword::GEO_NEAR},
+            {"nin", PathAcceptingKeyword::NOT_IN},
+            {"options", PathAcceptingKeyword::OPTIONS},
+            {"regex", PathAcceptingKeyword::REGEX},
+            {"size", PathAcceptingKeyword::SIZE},
+            {"type", PathAcceptingKeyword::TYPE},
+            {"within", PathAcceptingKeyword::WITHIN},
+        });
     return Status::OK();
 }
 }  // anonymous namespace

@@ -33,6 +33,7 @@
 #include "mongo/bson/bsontypes.h"
 #include "mongo/db/matcher/expression_always_boolean.h"
 #include "mongo/db/matcher/expression_parser.h"
+#include "mongo/db/matcher/matcher_type_alias.h"
 #include "mongo/db/matcher/schema/expression_internal_schema_fmod.h"
 #include "mongo/db/matcher/schema/expression_internal_schema_max_length.h"
 #include "mongo/db/matcher/schema/expression_internal_schema_min_length.h"
@@ -69,15 +70,19 @@ constexpr StringData kSchemaTypeKeyword = "type"_sd;
  * enforce this restriction, should the types match (e.g. $_internalSchemaMaxItems). 'statedType' is
  * a parsed representation of the JSON Schema type keyword which is in effect.
  */
-std::unique_ptr<MatchExpression> makeRestriction(TypeMatchExpression::Type restrictionType,
+std::unique_ptr<MatchExpression> makeRestriction(MatcherTypeAlias restrictionType,
                                                  std::unique_ptr<MatchExpression> restrictionExpr,
-                                                 TypeMatchExpression* statedType) {
+                                                 InternalSchemaTypeExpression* statedType) {
     if (statedType) {
         const bool bothNumeric = restrictionType.allNumbers &&
             (statedType->matchesAllNumbers() || isNumericBSONType(statedType->getBSONType()));
         const bool bsonTypesMatch = restrictionType.bsonType == statedType->getBSONType();
 
-        if (!bothNumeric && !bsonTypesMatch) {
+        if (bothNumeric || bsonTypesMatch) {
+            // This restriction applies to the type that is already being enforced. We return the
+            // restriction unmodified.
+            return restrictionExpr;
+        } else {
             // This restriction doesn't take any effect, since the type of the schema is different
             // from the type to which this retriction applies.
             return stdx::make_unique<AlwaysTrueMatchExpression>();
@@ -86,19 +91,16 @@ std::unique_ptr<MatchExpression> makeRestriction(TypeMatchExpression::Type restr
 
     // Generate and return the following expression tree:
     //
-    //      OR
-    //    /   /
-    //  NOT  <restrictionExpr>
-    //  /
-    // TYPE
-    //  <restrictionType>
+    //  (OR (<restrictionExpr>) (NOT (INTERNAL_SCHEMA_TYPE <restrictionType>))
     //
     // We need to do this because restriction keywords do not apply when a field is either not
     // present or of a different type.
-    auto typeExprForNot = stdx::make_unique<TypeMatchExpression>();
-    invariantOK(typeExprForNot->init(restrictionExpr->path(), restrictionType));
+    auto typeExpr = stdx::make_unique<InternalSchemaTypeExpression>();
+    invariantOK(typeExpr->init(restrictionExpr->path(), restrictionType));
 
-    auto notExpr = stdx::make_unique<NotMatchExpression>(typeExprForNot.release());
+    auto notExpr = stdx::make_unique<NotMatchExpression>();
+    invariantOK(notExpr->init(typeExpr.release()));
+
     auto orExpr = stdx::make_unique<OrMatchExpression>();
     orExpr->add(notExpr.release());
     orExpr->add(restrictionExpr.release());
@@ -106,37 +108,8 @@ std::unique_ptr<MatchExpression> makeRestriction(TypeMatchExpression::Type restr
     return std::move(orExpr);
 }
 
-/**
- * Constructs and returns the following expression tree:
- *     OR
- *    /  \
- *  NOT   <typeExpr>
- *  /
- * EXISTS
- *  <typeExpr field>
- *
- * This is needed because the JSON Schema 'type' keyword only applies if the corresponding field is
- * present.
- *
- * 'typeExpr' must be non-null and must have a non-empty path.
- */
-std::unique_ptr<MatchExpression> makeTypeRestriction(
-    std::unique_ptr<TypeMatchExpression> typeExpr) {
-    invariant(typeExpr);
-    invariant(!typeExpr->path().empty());
-
-    auto existsExpr = stdx::make_unique<ExistsMatchExpression>();
-    invariantOK(existsExpr->init(typeExpr->path()));
-
-    auto notExpr = stdx::make_unique<NotMatchExpression>(existsExpr.release());
-    auto orExpr = stdx::make_unique<OrMatchExpression>();
-    orExpr->add(notExpr.release());
-    orExpr->add(typeExpr.release());
-
-    return std::move(orExpr);
-}
-
-StatusWith<std::unique_ptr<TypeMatchExpression>> parseType(StringData path, BSONElement typeElt) {
+StatusWith<std::unique_ptr<InternalSchemaTypeExpression>> parseType(StringData path,
+                                                                    BSONElement typeElt) {
     if (!typeElt) {
         return {nullptr};
     }
@@ -147,12 +120,23 @@ StatusWith<std::unique_ptr<TypeMatchExpression>> parseType(StringData path, BSON
                                      << "' must be a string")};
     }
 
-    return MatchExpressionParser::parseTypeFromAlias(path, typeElt.valueStringData());
+    auto parsedType = MatcherTypeAlias::parseFromStringAlias(typeElt.valueStringData());
+    if (!parsedType.isOK()) {
+        return parsedType.getStatus();
+    }
+
+    auto typeExpr = stdx::make_unique<InternalSchemaTypeExpression>();
+    auto initStatus = typeExpr->init(path, parsedType.getValue());
+    if (!initStatus.isOK()) {
+        return initStatus;
+    }
+
+    return {std::move(typeExpr)};
 }
 
 StatusWithMatchExpression parseMaximum(StringData path,
                                        BSONElement maximum,
-                                       TypeMatchExpression* typeExpr,
+                                       InternalSchemaTypeExpression* typeExpr,
                                        bool isExclusiveMaximum) {
     if (!maximum.isNumber()) {
         return {Status(ErrorCodes::TypeMismatch,
@@ -176,14 +160,14 @@ StatusWithMatchExpression parseMaximum(StringData path,
         return status;
     }
 
-    TypeMatchExpression::Type restrictionType;
+    MatcherTypeAlias restrictionType;
     restrictionType.allNumbers = true;
     return makeRestriction(restrictionType, std::move(expr), typeExpr);
 }
 
 StatusWithMatchExpression parseMinimum(StringData path,
                                        BSONElement minimum,
-                                       TypeMatchExpression* typeExpr,
+                                       InternalSchemaTypeExpression* typeExpr,
                                        bool isExclusiveMinimum) {
     if (!minimum.isNumber()) {
         return {Status(ErrorCodes::TypeMismatch,
@@ -207,7 +191,7 @@ StatusWithMatchExpression parseMinimum(StringData path,
         return status;
     }
 
-    TypeMatchExpression::Type restrictionType;
+    MatcherTypeAlias restrictionType;
     restrictionType.allNumbers = true;
     return makeRestriction(restrictionType, std::move(expr), typeExpr);
 }
@@ -215,7 +199,7 @@ StatusWithMatchExpression parseMinimum(StringData path,
 template <class T>
 StatusWithMatchExpression parseStrLength(StringData path,
                                          BSONElement strLength,
-                                         TypeMatchExpression* typeExpr,
+                                         InternalSchemaTypeExpression* typeExpr,
                                          StringData keyword) {
     if (!strLength.isNumber()) {
         return {
@@ -244,7 +228,7 @@ StatusWithMatchExpression parseStrLength(StringData path,
 
 StatusWithMatchExpression parsePattern(StringData path,
                                        BSONElement pattern,
-                                       TypeMatchExpression* typeExpr) {
+                                       InternalSchemaTypeExpression* typeExpr) {
     if (pattern.type() != BSONType::String) {
         return {Status(ErrorCodes::TypeMismatch,
                        str::stream() << "$jsonSchema keyword '" << kSchemaPatternKeyword
@@ -268,7 +252,7 @@ StatusWithMatchExpression parsePattern(StringData path,
 
 StatusWithMatchExpression parseMultipleOf(StringData path,
                                           BSONElement multipleOf,
-                                          TypeMatchExpression* typeExpr) {
+                                          InternalSchemaTypeExpression* typeExpr) {
     if (!multipleOf.isNumber()) {
         return {Status(ErrorCodes::TypeMismatch,
                        str::stream() << "$jsonSchema keyword '" << kSchemaMultipleOfKeyword
@@ -290,16 +274,15 @@ StatusWithMatchExpression parseMultipleOf(StringData path,
         return status;
     }
 
-    TypeMatchExpression::Type restrictionType;
+    MatcherTypeAlias restrictionType;
     restrictionType.allNumbers = true;
     return makeRestriction(restrictionType, std::move(expr), typeExpr);
 }
 
 }  // namespace
 
-StatusWithMatchExpression JSONSchemaParser::_parseProperties(StringData path,
-                                                             BSONElement propertiesElt,
-                                                             TypeMatchExpression* typeExpr) {
+StatusWithMatchExpression JSONSchemaParser::_parseProperties(
+    StringData path, BSONElement propertiesElt, InternalSchemaTypeExpression* typeExpr) {
     if (propertiesElt.type() != BSONType::Object) {
         return {Status(ErrorCodes::TypeMismatch,
                        str::stream() << "$jsonSchema keyword '" << kSchemaPropertiesKeyword
@@ -320,7 +303,20 @@ StatusWithMatchExpression JSONSchemaParser::_parseProperties(StringData path,
         if (!nestedSchemaMatch.isOK()) {
             return nestedSchemaMatch.getStatus();
         }
-        andExpr->add(nestedSchemaMatch.getValue().release());
+
+        // Each property either must not exist or must match the nested schema. Therefore, we
+        // generate the match expression (OR (NOT (EXISTS)) <nestedSchemaMatch>).
+        auto existsExpr = stdx::make_unique<ExistsMatchExpression>();
+        invariantOK(existsExpr->init(property.fieldNameStringData()));
+
+        auto notExpr = stdx::make_unique<NotMatchExpression>();
+        invariantOK(notExpr->init(existsExpr.release()));
+
+        auto orExpr = stdx::make_unique<OrMatchExpression>();
+        orExpr->add(notExpr.release());
+        orExpr->add(nestedSchemaMatch.getValue().release());
+
+        andExpr->add(orExpr.release());
     }
 
     // If this is a top-level schema, then we have no path and there is no need for an
@@ -479,7 +475,7 @@ StatusWithMatchExpression JSONSchemaParser::_parse(StringData path, BSONObj sche
     }
 
     if (!path.empty() && typeExpr.getValue()) {
-        andExpr->add(makeTypeRestriction(std::move(typeExpr.getValue())).release());
+        andExpr->add(typeExpr.getValue().release());
     }
     return {std::move(andExpr)};
 }

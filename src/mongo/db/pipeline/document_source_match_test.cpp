@@ -126,6 +126,8 @@ TEST_F(DocumentSourceMatchTest, RedactSafePortion) {
     assertExpectedRedactSafePortion(
         "{a: {$_internalSchemaAllElemMatchFromIndex: [3, {a: {$lt: 4}}]}}", "{}");
 
+    assertExpectedRedactSafePortion("{a: {$_internalSchemaType: 2}}", "{}");
+
     // Combinations
     assertExpectedRedactSafePortion("{a:1, b: 'asdf'}", "{a:1, b: 'asdf'}");
 

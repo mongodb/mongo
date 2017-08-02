@@ -52,11 +52,11 @@ public:
 
     virtual ~LeafMatchExpression() {}
 
-    bool shouldExpandLeafArray() const final {
+    bool shouldExpandLeafArray() const override {
         return true;
     }
 
-    MatchCategory getCategory() const final {
+    MatchCategory getCategory() const override {
         return MatchCategory::kLeaf;
     }
 };
@@ -375,69 +375,6 @@ private:
 
     // Container of regex elements this object owns.
     std::vector<std::unique_ptr<RegexMatchExpression>> _regexes;
-};
-
-/**
- * Implements matching for $type.
- */
-class TypeMatchExpression : public LeafMatchExpression {
-public:
-    static const std::string kMatchesAllNumbersAlias;
-    static const stdx::unordered_map<std::string, BSONType> typeAliasMap;
-
-    /**
-     * Represents either a particular BSON type, or the "number" type, which is an alias for all
-     * numeric BSON types.
-     */
-    struct Type {
-        Type() = default;
-        /* implicit */ Type(BSONType bsonType) : bsonType(bsonType) {}
-
-        bool allNumbers = false;
-        BSONType bsonType = BSONType::EOO;
-    };
-
-    TypeMatchExpression() : LeafMatchExpression(TYPE_OPERATOR) {}
-
-    Status init(StringData path, Type type);
-
-    std::unique_ptr<MatchExpression> shallowClone() const override {
-        std::unique_ptr<TypeMatchExpression> e = stdx::make_unique<TypeMatchExpression>();
-        invariantOK(e->init(path(), _type));
-        if (getTag()) {
-            e->setTag(getTag()->clone());
-        }
-        return std::move(e);
-    }
-
-    bool matchesSingleElement(const BSONElement&, MatchDetails* details = nullptr) const final;
-
-    void debugString(StringBuilder& debug, int level) const override;
-
-    void serialize(BSONObjBuilder* out) const override;
-
-    bool equivalent(const MatchExpression* other) const override;
-
-    BSONType getBSONType() const {
-        return _type.bsonType;
-    }
-
-    Type getType() const {
-        return _type;
-    }
-
-    /**
-     * Whether or not to match against all number types (NumberDouble, NumberLong, and NumberInt).
-     * Defaults to false. If this is true, _type is EOO.
-     */
-    bool matchesAllNumbers() const {
-        return _type.allNumbers;
-    }
-
-private:
-    bool _matches(StringData path, const MatchableDocument* doc, MatchDetails* details = 0) const;
-
-    Type _type;
 };
 
 /**

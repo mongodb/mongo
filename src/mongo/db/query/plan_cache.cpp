@@ -173,19 +173,15 @@ const char* encodeMatchType(MatchExpression::MatchType mt) {
 
         case MatchExpression::BITS_ANY_CLEAR:
             return "yc";
-            break;
 
         case MatchExpression::INTERNAL_SCHEMA_ALL_ELEM_MATCH_FROM_INDEX:
             return "internalSchemaAllElemMatchFromIndex";
-            break;
 
         case MatchExpression::INTERNAL_SCHEMA_COND:
             return "internalSchemaCond";
-            break;
 
         case MatchExpression::INTERNAL_SCHEMA_FMOD:
             return "internalSchemaFmod";
-            break;
 
         case MatchExpression::INTERNAL_SCHEMA_MIN_ITEMS:
             return "internalSchemaMinItems";
@@ -216,6 +212,9 @@ const char* encodeMatchType(MatchExpression::MatchType mt) {
 
         case MatchExpression::INTERNAL_SCHEMA_MATCH_ARRAY_INDEX:
             return "internalSchemaMatchArrayIndex";
+
+        case MatchExpression::INTERNAL_SCHEMA_TYPE:
+            return "internalSchemaType";
 
         default:
             MONGO_UNREACHABLE;

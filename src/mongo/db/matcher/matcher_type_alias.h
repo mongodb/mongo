@@ -28,34 +28,45 @@
 
 #pragma once
 
-#include "mongo/db/matcher/expression.h"
-#include "mongo/db/matcher/expression_tree.h"
-#include "mongo/db/matcher/expression_type.h"
+#include <string>
+
+#include "mongo/bson/bsonelement.h"
+#include "mongo/bson/bsontypes.h"
+#include "mongo/stdx/unordered_map.h"
 
 namespace mongo {
 
-class JSONSchemaParser {
-public:
+/**
+ * Represents a type alias in the match language. This is either a particular BSON type, or the
+ * "number" type, which is is the union of all numeric BSON types.
+ */
+struct MatcherTypeAlias {
+    static constexpr StringData kMatchesAllNumbersAlias = "number"_sd;
+    static const stdx::unordered_map<std::string, BSONType> typeAliasMap;
+
     /**
-     * Converts a JSON schema, represented as BSON, into a semantically equivalent match expression
-     * tree. Returns a non-OK status if the schema is invalid or cannot be parsed.
+     * Creates a MatcherTypeAlias from a BSONElement. Returns an error if the element does not
+     * contain a valid numerical type code or a valid string type alias.
      */
-    static StatusWithMatchExpression parse(BSONObj schema);
+    static StatusWith<MatcherTypeAlias> parse(BSONElement);
 
-private:
-    // Parses 'schema' to the semantically equivalent match expression. If the schema has an
-    // associated path, e.g. if we are parsing the nested schema for property "myProp" in
-    //
-    //    {properties: {myProp: <nested-schema>}}
-    //
-    // then this is passed in 'path'. In this example, the value of 'path' is "myProp". If there is
-    // no path, e.g. for top-level schemas, then 'path' is empty.
-    static StatusWithMatchExpression _parse(StringData path, BSONObj schema);
+    /**
+     * Creates a MatcherTypeAlias from a type alias string, or returns an error if the alias is not
+     * valid.
+     */
+    static StatusWith<MatcherTypeAlias> parseFromStringAlias(StringData typeAlias);
 
-    // Parser for the JSON Schema 'properties' keyword.
-    static StatusWithMatchExpression _parseProperties(StringData path,
-                                                      BSONElement propertiesElt,
-                                                      InternalSchemaTypeExpression* typeExpr);
+    MatcherTypeAlias() = default;
+
+    /* implicit */ MatcherTypeAlias(BSONType bsonType) : bsonType(bsonType) {}
+
+    /**
+     * Returns whether the element is of a type which matches this type.
+     */
+    bool elementMatchesType(BSONElement) const;
+
+    bool allNumbers = false;
+    BSONType bsonType = BSONType::EOO;
 };
 
 }  // namespace mongo
