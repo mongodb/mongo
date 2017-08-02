@@ -109,9 +109,11 @@ protected:
                              stdx::bind(stringContains, stdx::placeholders::_1, needle));
     }
 
-    void makeSelfPrimary(const Timestamp& electionOpTime = Timestamp(0, 0)) {
-        getTopoCoord().changeMemberState_forTest(MemberState::RS_PRIMARY, electionOpTime);
+    void makeSelfPrimary(const Timestamp& electionTimestamp = Timestamp(0, 0),
+                         const OpTime& firstOpTimeOfTerm = OpTime()) {
+        getTopoCoord().changeMemberState_forTest(MemberState::RS_PRIMARY, electionTimestamp);
         getTopoCoord()._setCurrentPrimaryForTest(_selfIndex);
+        getTopoCoord().completeTransitionToPrimary(firstOpTimeOfTerm);
     }
 
     void setSelfMemberState(const MemberState& newState) {
@@ -2738,7 +2740,8 @@ TEST_F(HeartbeatResponseTestOneRetry, StepDownSelfWhenRemoteNodeWasElectedMoreRe
     ASSERT_TRUE(TopologyCoordinator::Role::leader == getTopoCoord().getRole());
     ASSERT_EQUALS(0, getCurrentPrimaryIndex());
 
-    ASSERT_TRUE(getTopoCoord().stepDownIfPending());
+    getTopoCoord().prepareForUnconditionalStepDown();
+    getTopoCoord().finishUnconditionalStepDown();
     ASSERT_TRUE(TopologyCoordinator::Role::follower == getTopoCoord().getRole());
     ASSERT_EQUALS(1, getCurrentPrimaryIndex());
 }
@@ -2911,7 +2914,8 @@ TEST_F(HeartbeatResponseTestTwoRetries, StepDownSelfWhenRemoteNodeWasElectedMore
     ASSERT_TRUE(TopologyCoordinator::Role::leader == getTopoCoord().getRole());
     ASSERT_EQUALS(0, getCurrentPrimaryIndex());
 
-    ASSERT_TRUE(getTopoCoord().stepDownIfPending());
+    getTopoCoord().prepareForUnconditionalStepDown();
+    getTopoCoord().finishUnconditionalStepDown();
     ASSERT_TRUE(TopologyCoordinator::Role::follower == getTopoCoord().getRole());
     ASSERT_EQUALS(1, getCurrentPrimaryIndex());
 }
@@ -3297,7 +3301,8 @@ TEST_F(HeartbeatResponseTest, StepDownSelfWhenRemoteNodeWasElectedMoreRecently) 
     ASSERT_TRUE(TopologyCoordinator::Role::leader == getTopoCoord().getRole());
     ASSERT_EQUALS(0, getCurrentPrimaryIndex());
 
-    ASSERT_TRUE(getTopoCoord().stepDownIfPending());
+    getTopoCoord().prepareForUnconditionalStepDown();
+    getTopoCoord().finishUnconditionalStepDown();
     ASSERT_TRUE(TopologyCoordinator::Role::follower == getTopoCoord().getRole());
     ASSERT_EQUALS(1, getCurrentPrimaryIndex());
 }
@@ -3931,7 +3936,8 @@ TEST_F(HeartbeatResponseTest, RelinquishPrimaryWhenMajorityOfVotersIsNoLongerVis
     ASSERT_TRUE(TopologyCoordinator::Role::leader == getTopoCoord().getRole());
     ASSERT_EQUALS(0, getCurrentPrimaryIndex());
 
-    ASSERT_TRUE(getTopoCoord().stepDownIfPending());
+    getTopoCoord().prepareForUnconditionalStepDown();
+    getTopoCoord().finishUnconditionalStepDown();
     ASSERT_TRUE(TopologyCoordinator::Role::follower == getTopoCoord().getRole());
     ASSERT_EQUALS(-1, getCurrentPrimaryIndex());
 }

@@ -299,10 +299,6 @@ void ReplicationCoordinatorImpl::_onVoteRequestComplete(long long originalTerm) 
     Date_t now = _replExecutor->now();
     _topCoord->resetMemberTimeouts(now, _voteRequester->getResponders());
 
-    // Prevent last committed optime from updating until we finish draining.
-    _topCoord->setFirstOpTimeOfMyTerm(
-        OpTime(Timestamp(std::numeric_limits<int>::max(), 0), std::numeric_limits<int>::max()));
-
     _voteRequester.reset();
     auto electionFinishedEvent = _electionFinishedEvent;
 

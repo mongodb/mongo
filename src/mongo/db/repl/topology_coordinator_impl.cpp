@@ -137,7 +137,6 @@ TopologyCoordinatorImpl::TopologyCoordinatorImpl(Options options)
       _forceSyncSourceIndex(-1),
       _options(std::move(options)),
       _selfIndex(-1),
-      _stepDownPending(false),
       _maintenanceModeCalls(0),
       _followerMode(MemberState::RS_STARTUP2) {
     invariant(getMemberState() == MemberState::RS_STARTUP);
@@ -1134,22 +1133,22 @@ bool TopologyCoordinatorImpl::haveTaggedNodesReachedOpTime(const OpTime& opTime,
 }
 
 HeartbeatResponseAction TopologyCoordinatorImpl::checkMemberTimeouts(Date_t now) {
-    HeartbeatResponseAction result = HeartbeatResponseAction::makeNoAction();
+    bool stepdown = false;
     for (int memberIndex = 0; memberIndex < static_cast<int>(_memberData.size()); memberIndex++) {
         auto& memberData = _memberData[memberIndex];
         if (!memberData.isSelf() && !memberData.lastUpdateStale() &&
             now - memberData.getLastUpdate() >= _rsConfig.getElectionTimeoutPeriod()) {
             memberData.markLastUpdateStale();
-            if (getMemberState().primary()) {
-                HeartbeatResponseAction action = setMemberAsDown(now, memberIndex);
-                if (action.getAction() != HeartbeatResponseAction::NoAction) {
-                    invariant(action.getAction() == HeartbeatResponseAction::StepDownSelf);
-                    result = action;
-                }
+            if (_iAmPrimary()) {
+                stepdown = stepdown || setMemberAsDown(now, memberIndex);
             }
         }
     }
-    return result;
+    if (stepdown) {
+        log() << "can't see a majority of the set, relinquishing primary";
+        return HeartbeatResponseAction::makeStepDownSelfAction(_selfIndex);
+    }
+    return HeartbeatResponseAction::makeNoAction();
 }
 
 std::vector<HostAndPort> TopologyCoordinatorImpl::getHostsWrittenTo(const OpTime& op,
@@ -1174,8 +1173,7 @@ std::vector<HostAndPort> TopologyCoordinatorImpl::getHostsWrittenTo(const OpTime
     return hosts;
 }
 
-HeartbeatResponseAction TopologyCoordinatorImpl::setMemberAsDown(Date_t now,
-                                                                 const int memberIndex) {
+bool TopologyCoordinatorImpl::setMemberAsDown(Date_t now, const int memberIndex) {
     invariant(memberIndex != _selfIndex);
     invariant(memberIndex != -1);
     invariant(_currentPrimaryIndex == _selfIndex);
@@ -1183,15 +1181,10 @@ HeartbeatResponseAction TopologyCoordinatorImpl::setMemberAsDown(Date_t now,
     hbData.setDownValues(now, "no response within election timeout period");
 
     if (CannotSeeMajority & _getMyUnelectableReason(now, StartElectionReason::kElectionTimeout)) {
-        if (_stepDownPending) {
-            return HeartbeatResponseAction::makeNoAction();
-        }
-        _stepDownPending = true;
-        log() << "can't see a majority of the set, relinquishing primary";
-        return HeartbeatResponseAction::makeStepDownSelfAction(_selfIndex);
+        return true;
     }
 
-    return HeartbeatResponseAction::makeNoAction();
+    return false;
 }
 
 std::pair<int, Date_t> TopologyCoordinatorImpl::getStalestLiveMember() const {
@@ -1386,10 +1379,9 @@ HeartbeatResponseAction TopologyCoordinatorImpl::_updatePrimaryFromHBData(
                 const OpTime latestOpTime = _latestKnownOpTime();
 
                 if (_iAmPrimary()) {
-                    if (_stepDownPending) {
+                    if (_leaderMode == LeaderMode::kSteppingDown) {
                         return HeartbeatResponseAction::makeNoAction();
                     }
-                    _stepDownPending = true;
                     log() << "Stepping down self (priority " << currentPrimaryMember.getPriority()
                           << ") because " << highestPriorityMember.getHostAndPort()
                           << " has higher priority " << highestPriorityMember.getPriority()
@@ -1460,10 +1452,9 @@ HeartbeatResponseAction TopologyCoordinatorImpl::_updatePrimaryFromHBData(
 
                 // Step down whomever has the older election time.
                 if (remoteElectionTime > _electionTime) {
-                    if (_stepDownPending) {
+                    if (_leaderMode == LeaderMode::kSteppingDown) {
                         return HeartbeatResponseAction::makeNoAction();
                     }
-                    _stepDownPending = true;
                     log() << "stepping down; another primary was elected more recently";
                     return HeartbeatResponseAction::makeStepDownSelfAction(_selfIndex);
                 } else {
@@ -1489,10 +1480,9 @@ HeartbeatResponseAction TopologyCoordinatorImpl::_updatePrimaryFromHBData(
     if (_iAmPrimary()) {
         if (CannotSeeMajority &
             _getMyUnelectableReason(now, StartElectionReason::kElectionTimeout)) {
-            if (_stepDownPending) {
+            if (_leaderMode == LeaderMode::kSteppingDown) {
                 return HeartbeatResponseAction::makeNoAction();
             }
-            _stepDownPending = true;
             log() << "can't see a majority of the set, relinquishing primary";
             return HeartbeatResponseAction::makeStepDownSelfAction(_selfIndex);
         }
@@ -1672,6 +1662,7 @@ bool TopologyCoordinatorImpl::_amIFreshEnoughForCatchupTakeover() const {
 bool TopologyCoordinatorImpl::_iAmPrimary() const {
     if (_role == Role::leader) {
         invariant(_currentPrimaryIndex == _selfIndex);
+        invariant(_leaderMode != LeaderMode::kNotLeader);
         return true;
     }
     return false;
@@ -1731,8 +1722,31 @@ int TopologyCoordinatorImpl::_getHighestPriorityElectableIndex(Date_t now) const
     return maxIndex;
 }
 
-void TopologyCoordinatorImpl::prepareForStepDown() {
-    _stepDownPending = true;
+bool TopologyCoordinatorImpl::prepareForUnconditionalStepDown() {
+    if (_leaderMode == LeaderMode::kSteppingDown) {
+        // Can only be processing one required stepdown at a time.
+        return false;
+    }
+    // Heartbeat-initiated stepdowns take precedence over stepdown command initiated stepdowns, so
+    // it's safe to transition from kAttemptingStepDown to kSteppingDown.
+    _setLeaderMode(LeaderMode::kSteppingDown);
+    return true;
+}
+
+Status TopologyCoordinatorImpl::prepareForStepDownAttempt() {
+    if (_leaderMode == LeaderMode::kSteppingDown ||
+        _leaderMode == LeaderMode::kAttemptingStepDown) {
+        return Status{ErrorCodes::ConflictingOperationInProgress,
+                      "This node is already in the process of stepping down"};
+    }
+    _setLeaderMode(LeaderMode::kAttemptingStepDown);
+    return Status::OK();
+}
+
+void TopologyCoordinatorImpl::abortAttemptedStepDownIfNeeded() {
+    if (_leaderMode == TopologyCoordinator::LeaderMode::kAttemptingStepDown) {
+        _setLeaderMode(TopologyCoordinator::LeaderMode::kMaster);
+    }
 }
 
 void TopologyCoordinatorImpl::changeMemberState_forTest(const MemberState& newMemberState,
@@ -1754,7 +1768,7 @@ void TopologyCoordinatorImpl::changeMemberState_forTest(const MemberState& newMe
             _followerMode = newMemberState.s;
             if (_currentPrimaryIndex == _selfIndex) {
                 _currentPrimaryIndex = -1;
-                _stepDownPending = false;
+                _setLeaderMode(LeaderMode::kNotLeader);
             }
             break;
         case MemberState::RS_STARTUP:
@@ -2261,7 +2275,6 @@ void TopologyCoordinatorImpl::updateConfig(const ReplSetConfig& newConfig,
     }
 
     _updateHeartbeatDataForReconfig(newConfig, selfIndex, now);
-    _stepDownPending = false;
     _rsConfig = newConfig;
     _selfIndex = selfIndex;
     _forceSyncSourceIndex = -1;
@@ -2277,6 +2290,7 @@ void TopologyCoordinatorImpl::updateConfig(const ReplSetConfig& newConfig,
             return;
         }
         _role = Role::follower;
+        _setLeaderMode(LeaderMode::kNotLeader);
     }
 
     // By this point we know we are in Role::follower
@@ -2551,6 +2565,43 @@ bool TopologyCoordinatorImpl::voteForMyself(Date_t now) {
     return true;
 }
 
+bool TopologyCoordinatorImpl::isSteppingDown() const {
+    return _leaderMode == LeaderMode::kAttemptingStepDown ||
+        _leaderMode == LeaderMode::kSteppingDown;
+}
+
+bool TopologyCoordinatorImpl::isUnconditionallySteppingDown() const {
+    return _leaderMode == LeaderMode::kSteppingDown;
+}
+
+void TopologyCoordinatorImpl::_setLeaderMode(TopologyCoordinator::LeaderMode newMode) {
+    // Invariants for valid state transitions.
+    switch (_leaderMode) {
+        case LeaderMode::kNotLeader:
+            invariant(newMode == LeaderMode::kLeaderElect);
+            break;
+        case LeaderMode::kLeaderElect:
+            invariant(newMode == LeaderMode::kNotLeader ||  // TODO(SERVER-30852): remove this case
+                      newMode == LeaderMode::kMaster ||
+                      newMode == LeaderMode::kAttemptingStepDown ||
+                      newMode == LeaderMode::kSteppingDown);
+            break;
+        case LeaderMode::kMaster:
+            invariant(newMode == LeaderMode::kNotLeader ||  // TODO(SERVER-30852): remove this case
+                      newMode == LeaderMode::kAttemptingStepDown ||
+                      newMode == LeaderMode::kSteppingDown);
+            break;
+        case LeaderMode::kAttemptingStepDown:
+            invariant(newMode == LeaderMode::kNotLeader || newMode == LeaderMode::kMaster ||
+                      newMode == LeaderMode::kSteppingDown);
+            break;
+        case LeaderMode::kSteppingDown:
+            invariant(newMode == LeaderMode::kNotLeader);
+            break;
+    }
+    _leaderMode = std::move(newMode);
+}
+
 MemberState TopologyCoordinatorImpl::getMemberState() const {
     if (_selfIndex == -1) {
         if (_rsConfig.isInitialized()) {
@@ -2576,6 +2627,7 @@ MemberState TopologyCoordinatorImpl::getMemberState() const {
 
     if (_role == Role::leader) {
         invariant(_currentPrimaryIndex == _selfIndex);
+        invariant(_leaderMode != LeaderMode::kNotLeader);
         return MemberState::RS_PRIMARY;
     }
     const MemberConfig& myConfig = _selfConfig();
@@ -2597,15 +2649,21 @@ void TopologyCoordinatorImpl::setElectionInfo(OID electionId, Timestamp election
 
 void TopologyCoordinatorImpl::processWinElection(OID electionId, Timestamp electionOpTime) {
     invariant(_role == Role::candidate);
+    invariant(_leaderMode == LeaderMode::kNotLeader);
     _role = Role::leader;
+    _setLeaderMode(LeaderMode::kLeaderElect);
     setElectionInfo(electionId, electionOpTime);
     _currentPrimaryIndex = _selfIndex;
     _syncSource = HostAndPort();
     _forceSyncSourceIndex = -1;
+    // Prevent last committed optime from updating until we finish draining.
+    _firstOpTimeOfMyTerm =
+        OpTime(Timestamp(std::numeric_limits<int>::max(), 0), std::numeric_limits<int>::max());
 }
 
 void TopologyCoordinatorImpl::processLoseElection() {
     invariant(_role == Role::candidate);
+    invariant(_leaderMode == LeaderMode::kNotLeader);
     const HostAndPort syncSourceAddress = getSyncSourceAddress();
     _electionTime = Timestamp(0, 0);
     _electionId = OID();
@@ -2618,7 +2676,7 @@ void TopologyCoordinatorImpl::processLoseElection() {
     }
 }
 
-bool TopologyCoordinatorImpl::stepDown(Date_t until, bool force) {
+bool TopologyCoordinatorImpl::finishAttemptedStepDown(Date_t until, bool force) {
 
     // force==true overrides all other checks.
     if (force) {
@@ -2678,10 +2736,8 @@ bool TopologyCoordinatorImpl::_isElectableNodeInSingleNodeReplicaSet() const {
         _maintenanceModeCalls == 0;
 }
 
-bool TopologyCoordinatorImpl::stepDownIfPending() {
-    if (!_stepDownPending) {
-        return false;
-    }
+void TopologyCoordinatorImpl::finishUnconditionalStepDown() {
+    invariant(_leaderMode == LeaderMode::kSteppingDown);
 
     int remotePrimaryIndex = -1;
     for (std::vector<MemberData>::const_iterator it = _memberData.begin(); it != _memberData.end();
@@ -2703,11 +2759,6 @@ bool TopologyCoordinatorImpl::stepDownIfPending() {
         }
     }
     _stepDownSelfAndReplaceWith(remotePrimaryIndex);
-    return true;
-}
-
-bool TopologyCoordinatorImpl::isStepDownPending() const {
-    return _stepDownPending;
 }
 
 void TopologyCoordinatorImpl::_stepDownSelfAndReplaceWith(int newPrimary) {
@@ -2717,11 +2768,15 @@ void TopologyCoordinatorImpl::_stepDownSelfAndReplaceWith(int newPrimary) {
     invariant(_selfIndex == _currentPrimaryIndex);
     _currentPrimaryIndex = newPrimary;
     _role = Role::follower;
-    _stepDownPending = false;
+    _setLeaderMode(LeaderMode::kNotLeader);
 }
 
 bool TopologyCoordinatorImpl::updateLastCommittedOpTime() {
-    if (!getMemberState().primary() || isStepDownPending()) {
+    // If we're not primary or we're stepping down due to learning of a new term then  we must not
+    // advance the commit point.  If we are stepping down due to a user request, however, then it
+    // is safe to advance the commit point, and in fact we must since the stepdown request may be
+    // waiting for the commit point to advance enough to be able to safely complete the step down.
+    if (!_iAmPrimary() || _leaderMode == LeaderMode::kSteppingDown) {
         return false;
     }
 
@@ -2762,7 +2817,7 @@ bool TopologyCoordinatorImpl::advanceLastCommittedOpTime(const OpTime& committed
     }
 
     // This check is performed to ensure primaries do not commit an OpTime from a previous term.
-    if (getMemberState().primary() && committedOpTime < _firstOpTimeOfMyTerm) {
+    if (_iAmPrimary() && committedOpTime < _firstOpTimeOfMyTerm) {
         LOG(1) << "Ignoring older committed snapshot from before I became primary, optime: "
                << committedOpTime << ", firstOpTimeOfMyTerm: " << _firstOpTimeOfMyTerm;
         return false;
@@ -2777,8 +2832,10 @@ OpTime TopologyCoordinatorImpl::getLastCommittedOpTime() const {
     return _lastCommittedOpTime;
 }
 
-void TopologyCoordinatorImpl::setFirstOpTimeOfMyTerm(const OpTime& newOpTime) {
-    _firstOpTimeOfMyTerm = newOpTime;
+void TopologyCoordinatorImpl::completeTransitionToPrimary(const OpTime& firstOpTimeOfTerm) {
+    invariant(_leaderMode == LeaderMode::kLeaderElect);
+    _setLeaderMode(LeaderMode::kMaster);
+    _firstOpTimeOfMyTerm = firstOpTimeOfTerm;
 }
 
 void TopologyCoordinatorImpl::adjustMaintenanceCountBy(int inc) {

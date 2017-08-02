@@ -262,10 +262,13 @@ stdx::unique_lock<stdx::mutex> ReplicationCoordinatorImpl::_handleHeartbeatRespo
             break;
         case HeartbeatResponseAction::StepDownSelf:
             invariant(action.getPrimaryConfigIndex() == _selfIndex);
-            log() << "Stepping down from primary in response to heartbeat";
-            _topCoord->prepareForStepDown();
-            // Don't need to wait for stepdown to finish.
-            _stepDownStart();
+            if (_topCoord->prepareForUnconditionalStepDown()) {
+                log() << "Stepping down from primary in response to heartbeat";
+                _stepDownStart();
+            } else {
+                LOG(2) << "Heartbeat would have triggered a stepdown, but we're already in the "
+                          "process of stepping down";
+            }
             break;
         case HeartbeatResponseAction::StepDownRemotePrimary: {
             invariant(action.getPrimaryConfigIndex() != _selfIndex);
@@ -375,11 +378,10 @@ void ReplicationCoordinatorImpl::_stepDownFinish(
     // TODO Add invariant that we've got global shared or global exclusive lock, when supported
     // by lock manager.
     stdx::unique_lock<stdx::mutex> lk(_mutex);
-    if (_topCoord->stepDownIfPending()) {
-        const auto action = _updateMemberStateFromTopologyCoordinator_inlock();
-        lk.unlock();
-        _performPostMemberStateUpdateAction(action);
-    }
+    _topCoord->finishUnconditionalStepDown();
+    const auto action = _updateMemberStateFromTopologyCoordinator_inlock();
+    lk.unlock();
+    _performPostMemberStateUpdateAction(action);
     _replExecutor->signalEvent(finishedEvent);
 }
 

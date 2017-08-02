@@ -1406,6 +1406,39 @@ protected:
         return std::make_pair(operationFuture.get(), std::move(result));
     }
 
+    // Makes it so enough secondaries are caught up that a stepdown command can succeed.
+    void catchUpSecondaries(const OpTime& desiredOpTime) {
+        auto config = getReplCoord()->getConfig();
+        auto heartbeatInterval = config.getHeartbeatInterval();
+
+        enterNetwork();
+        getNet()->runUntil(getNet()->now() + heartbeatInterval);
+        NetworkInterfaceMock::NetworkOperationIterator noi = getNet()->getNextReadyRequest();
+        RemoteCommandRequest request = noi->getRequest();
+        log() << request.target.toString() << " processing " << request.cmdObj;
+        ReplSetHeartbeatArgsV1 hbArgs;
+        if (hbArgs.initialize(request.cmdObj).isOK()) {
+            ReplSetHeartbeatResponse hbResp;
+            hbResp.setSetName(hbArgs.getSetName());
+            hbResp.setState(MemberState::RS_SECONDARY);
+            hbResp.setConfigVersion(hbArgs.getConfigVersion());
+            hbResp.setAppliedOpTime(desiredOpTime);
+            hbResp.setDurableOpTime(desiredOpTime);
+            BSONObjBuilder respObj;
+            respObj << "ok" << 1;
+            hbResp.addToBSON(&respObj, false);
+            getNet()->scheduleResponse(noi, getNet()->now(), makeResponseStatus(respObj.obj()));
+        }
+        while (getNet()->hasReadyRequests()) {
+            auto noi = getNet()->getNextReadyRequest();
+            log() << "Blackholing network request " << noi->getRequest().cmdObj;
+            getNet()->blackHole(noi);
+        }
+
+        getNet()->runReadyNetworkOperations();
+        exitNetwork();
+    }
+
     OID myRid;
     OID rid2;
     OID rid3;
@@ -1908,33 +1941,7 @@ TEST_F(StepDownTest,
     // the heartbeat requests.
     auto result = stepDown_nonBlocking(false, Seconds(10), Seconds(60));
 
-    // Make a secondary actually catch up
-    enterNetwork();
-    getNet()->runUntil(getNet()->now() + Milliseconds(1000));
-    NetworkInterfaceMock::NetworkOperationIterator noi = getNet()->getNextReadyRequest();
-    RemoteCommandRequest request = noi->getRequest();
-    log() << request.target.toString() << " processing " << request.cmdObj;
-    ReplSetHeartbeatArgsV1 hbArgs;
-    if (hbArgs.initialize(request.cmdObj).isOK()) {
-        ReplSetHeartbeatResponse hbResp;
-        hbResp.setSetName(hbArgs.getSetName());
-        hbResp.setState(MemberState::RS_SECONDARY);
-        hbResp.setConfigVersion(hbArgs.getConfigVersion());
-        hbResp.setAppliedOpTime(optime2);
-        hbResp.setDurableOpTime(optime2);
-        BSONObjBuilder respObj;
-        respObj << "ok" << 1;
-        hbResp.addToBSON(&respObj, false);
-        getNet()->scheduleResponse(noi, getNet()->now(), makeResponseStatus(respObj.obj()));
-    }
-    while (getNet()->hasReadyRequests()) {
-        auto noi = getNet()->getNextReadyRequest();
-        log() << "Blackholing network request " << noi->getRequest().cmdObj;
-        getNet()->blackHole(noi);
-    }
-
-    getNet()->runReadyNetworkOperations();
-    exitNetwork();
+    catchUpSecondaries(optime2);
 
     ASSERT_OK(*result.second.get());
     ASSERT_TRUE(repl->getMemberState().secondary());
@@ -1984,34 +1991,7 @@ TEST_F(StepDownTest,
     getNet()->runReadyNetworkOperations();
     exitNetwork();
 
-    auto config = getReplCoord()->getConfig();
-    auto heartbeatInterval = config.getHeartbeatInterval();
-
-    // Make a secondary actually catch up
-    enterNetwork();
-    auto until = getNet()->now() + heartbeatInterval;
-    getNet()->runUntil(until);
-    ASSERT_EQUALS(until, getNet()->now());
-    noi = getNet()->getNextReadyRequest();
-    request = noi->getRequest();
-    log() << "HB2: " << request.target.toString() << " processing " << request.cmdObj;
-    if (hbArgs.initialize(request.cmdObj).isOK()) {
-        ReplSetHeartbeatResponse hbResp;
-        hbResp.setSetName(hbArgs.getSetName());
-        hbResp.setState(MemberState::RS_SECONDARY);
-        hbResp.setConfigVersion(hbArgs.getConfigVersion());
-        hbResp.setAppliedOpTime(optime2);
-        hbResp.setDurableOpTime(optime2);
-        BSONObjBuilder respObj;
-        respObj << "ok" << 1;
-        hbResp.addToBSON(&respObj, false);
-        getNet()->scheduleResponse(noi, getNet()->now(), makeResponseStatus(respObj.obj()));
-    }
-    while (getNet()->hasReadyRequests()) {
-        getNet()->blackHole(getNet()->getNextReadyRequest());
-    }
-    getNet()->runReadyNetworkOperations();
-    exitNetwork();
+    catchUpSecondaries(optime2);
 
     ASSERT_OK(*result.second.get());
     ASSERT_TRUE(repl->getMemberState().secondary());
@@ -2036,6 +2016,41 @@ TEST_F(StepDownTest, NodeReturnsInterruptedWhenInterruptedDuringStepDown) {
     killOperation(result.first.opCtx.get());
     ASSERT_EQUALS(ErrorCodes::Interrupted, *result.second.get());
     ASSERT_TRUE(repl->getMemberState().primary());
+}
+
+TEST_F(StepDownTest, OnlyOneStepDownCmdIsAllowedAtATime) {
+    OpTime optime1(Timestamp(100, 1), 1);
+    OpTime optime2(Timestamp(100, 2), 1);
+
+    // No secondary is caught up
+    auto repl = getReplCoord();
+    repl->setMyLastAppliedOpTime(optime2);
+    repl->setMyLastDurableOpTime(optime2);
+    ASSERT_OK(repl->setLastAppliedOptime_forTest(1, 1, optime1));
+    ASSERT_OK(repl->setLastAppliedOptime_forTest(1, 2, optime1));
+
+    simulateSuccessfulV1Election();
+
+    ASSERT_TRUE(getReplCoord()->getMemberState().primary());
+
+    // Step down where the secondary actually has to catch up before the stepDown can succeed.
+    // On entering the network, _stepDownContinue should cancel the heartbeats scheduled for
+    // T + 2 seconds and send out a new round of heartbeats immediately.
+    // This makes it unnecessary to advance the clock after entering the network to process
+    // the heartbeat requests.
+    auto result = stepDown_nonBlocking(false, Seconds(10), Seconds(60));
+
+    // Now while the first stepdown request is waiting for secondaries to catch up, attempt another
+    // stepdown request and ensure it fails.
+    const auto opCtx = makeOperationContext();
+    auto status = getReplCoord()->stepDown(opCtx.get(), false, Seconds(10), Seconds(60));
+    ASSERT_EQUALS(ErrorCodes::ConflictingOperationInProgress, status);
+
+    // Now ensure that the original stepdown command can still succeed.
+    catchUpSecondaries(optime2);
+
+    ASSERT_OK(*result.second.get());
+    ASSERT_TRUE(repl->getMemberState().secondary());
 }
 
 TEST_F(ReplCoordTest, GetReplicationModeNone) {

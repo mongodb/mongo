@@ -641,6 +641,8 @@ private:
      * Non-blocking helper method for the stepDown method, that represents executing
      * one attempt to step down. See implementation of this method and stepDown for
      * details.
+     *
+     * TODO(spencer): Move the bulk of this method into the TopologyCoordinator.
      */
     bool _tryToStepDown_inlock(Date_t waitUntil, Date_t stepdownUntil, bool force);
 

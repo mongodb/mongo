@@ -935,7 +935,7 @@ void ReplicationCoordinatorImpl::signalDrainComplete(OperationContext* opCtx,
         AllowNonLocalWritesBlock writesAllowed(opCtx);
         OpTime firstOpTime = _externalState->onTransitionToPrimary(opCtx, isV1ElectionProtocol());
         lk.lock();
-        _topCoord->setFirstOpTimeOfMyTerm(firstOpTime);
+        _topCoord->completeTransitionToPrimary(firstOpTime);
     }
 
     // Must calculate the commit level again because firstOpTimeOfMyTerm wasn't set when we logged
@@ -1527,7 +1527,7 @@ Status ReplicationCoordinatorImpl::_awaitReplication_inlock(
                                  "have stepped down."};
         }
 
-        if (_topCoord->isStepDownPending()) {
+        if (_topCoord->isSteppingDown()) {
             return {ErrorCodes::PrimarySteppedDown,
                     "Received stepdown request while waiting for replication"};
         }
@@ -1635,6 +1635,16 @@ Status ReplicationCoordinatorImpl::stepDown(OperationContext* opCtx,
     PostMemberStateUpdateAction action = kActionNone;
     try {
         stdx::unique_lock<stdx::mutex> lk(_mutex);
+
+        Status status = _topCoord->prepareForStepDownAttempt();
+        if (!status.isOK()) {
+            // This will cause us to fail if we're already in the process of stepping down.
+            return status;
+        }
+        // If we return before this stepdown completes successfully, reset our state back as it was
+        // before we attempted the stepdown.
+        auto guard = MakeGuard([this] { _topCoord->abortAttemptedStepDownIfNeeded(); });
+
         opCtx->checkForInterrupt();
         if (!_tryToStepDown_inlock(waitUntil, stepDownUntil, force)) {
             // We send out a fresh round of heartbeats because stepping down successfully
@@ -1671,6 +1681,13 @@ bool ReplicationCoordinatorImpl::_tryToStepDown_inlock(const Date_t waitUntil,
         uasserted(ErrorCodes::NotMaster,
                   "Already stepped down from primary while processing step down request");
     }
+    if (_topCoord->isUnconditionallySteppingDown()) {
+        uasserted(ErrorCodes::PrimarySteppedDown,
+                  "While waiting for secondaries to catch up before stepping down, "
+                  "this node decided to step down for other reasons");
+    }
+
+
     const Date_t now = _replExecutor->now();
     if (now >= stepDownUntil) {
         uasserted(ErrorCodes::ExceededTimeLimit,
@@ -1682,7 +1699,7 @@ bool ReplicationCoordinatorImpl::_tryToStepDown_inlock(const Date_t waitUntil,
     OpTime lastApplied = _getMyLastAppliedOpTime_inlock();
 
     if (forceNow) {
-        return _topCoord->stepDown(stepDownUntil, forceNow);
+        return _topCoord->finishAttemptedStepDown(stepDownUntil, forceNow);
     }
 
     auto tagStatus = _rsConfig.findCustomWriteMode(ReplSetConfig::kMajorityWriteConcernModeName);
@@ -1691,7 +1708,7 @@ bool ReplicationCoordinatorImpl::_tryToStepDown_inlock(const Date_t waitUntil,
     // Check if a majority of nodes have reached the last applied optime
     // and there exist an electable node that has my last applied optime.
     if (_topCoord->haveTaggedNodesReachedOpTime(lastApplied, tagStatus.getValue(), false) &&
-        _topCoord->stepDown(stepDownUntil, forceNow)) {
+        _topCoord->finishAttemptedStepDown(stepDownUntil, forceNow)) {
         return true;
     }
 
@@ -3320,9 +3337,13 @@ EventHandle ReplicationCoordinatorImpl::_updateTerm_inlock(
     }
 
     if (localUpdateTermResult == TopologyCoordinator::UpdateTermResult::kTriggerStepDown) {
-        log() << "stepping down from primary, because a new term has begun: " << term;
-        _topCoord->prepareForStepDown();
-        return _stepDownStart();
+        if (_topCoord->prepareForUnconditionalStepDown()) {
+            log() << "stepping down from primary, because a new term has begun: " << term;
+            return _stepDownStart();
+        } else {
+            LOG(2) << "Updated term but not triggering stepdown because we are already in the "
+                      "process of stepping down";
+        }
     }
     return EventHandle();
 }
