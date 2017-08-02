@@ -102,9 +102,6 @@ Status _applyOps(OperationContext* opCtx,
                  const BSONObj& applyOpCmd,
                  BSONObjBuilder* result,
                  int* numApplied) {
-    dassert(opCtx->lockState()->isLockHeldForMode(
-        ResourceId(RESOURCE_GLOBAL, ResourceId::SINGLETON_GLOBAL), MODE_X));
-
     BSONObj ops = applyOpCmd.firstElement().Obj();
 
     // apply
@@ -130,6 +127,7 @@ Status _applyOps(OperationContext* opCtx,
                 continue;
 
             const std::string ns = opObj["ns"].String();
+            const NamespaceString nss{ns};
 
             // Need to check this here, or OldClientContext may fail an invariant.
             if (*opType != 'c' && !NamespaceString(ns).isValid())
@@ -138,6 +136,7 @@ Status _applyOps(OperationContext* opCtx,
             Status status(ErrorCodes::InternalError, "");
 
             if (haveWrappingWUOW) {
+                invariant(opCtx->lockState()->isW());
                 invariant(*opType != 'c');
 
                 if (!dbHolder().get(opCtx, ns)) {
@@ -154,28 +153,12 @@ Status _applyOps(OperationContext* opCtx,
                 logOpForDbHash(opCtx, ns.c_str());
             } else {
                 try {
-                    // Run operations under a nested lock as a hack to prevent yielding.
-                    //
-                    // The list of operations is supposed to be applied atomically; yielding
-                    // would break atomicity by allowing an interruption or a shutdown to occur
-                    // after only some operations are applied.  We are already locked globally
-                    // at this point, so taking a DBLock on the namespace creates a nested lock,
-                    // and yields are disallowed for operations that hold a nested lock.
-                    //
-                    // We do not have a wrapping WriteUnitOfWork so it is possible for a journal
-                    // commit to happen with a subset of ops applied.
-                    Lock::GlobalWrite globalWriteLockDisallowTempRelease(opCtx->lockState());
-
-                    // Ensures that yielding will not happen (see the comment above).
-                    DEV {
-                        Locker::LockSnapshot lockSnapshot;
-                        invariant(!opCtx->lockState()->saveLockStateAndUnlock(&lockSnapshot));
-                    };
-
                     MONGO_WRITE_CONFLICT_RETRY_LOOP_BEGIN {
                         if (*opType == 'c') {
+                            invariant(opCtx->lockState()->isW());
                             status = repl::applyCommand_inlock(opCtx, opObj, true);
                         } else {
+                            Lock::DBLock dbWriteLock(opCtx->lockState(), nss.db(), MODE_X);
                             OldClientContext ctx(opCtx, ns);
 
                             status =
@@ -340,7 +323,16 @@ Status applyOps(OperationContext* opCtx,
     auto hasPrecondition = _hasPrecondition(applyOpCmd);
 
     ScopedTransaction scopedXact(opCtx, MODE_X);
-    Lock::GlobalWrite globalWriteLock(opCtx->lockState());
+    boost::optional<Lock::GlobalWrite> globalWriteLock;
+    boost::optional<Lock::DBLock> dbWriteLock;
+
+    // There's only one case where we are allowed to take the database lock instead of the global
+    // lock - no preconditions; only CRUD ops; and non-atomic mode.
+    if (!hasPrecondition && areOpsCrudOnly && !allowAtomic) {
+        dbWriteLock.emplace(opCtx->lockState(), dbName, MODE_X);
+    } else {
+        globalWriteLock.emplace(opCtx->lockState());
+    }
 
     bool userInitiatedWritesAndNotPrimary = opCtx->writesAreReplicated() &&
         !repl::getGlobalReplicationCoordinator()->canAcceptWritesForDatabase(dbName);
@@ -361,6 +353,7 @@ Status applyOps(OperationContext* opCtx,
         return _applyOps(opCtx, dbName, applyOpCmd, result, &numApplied);
 
     // Perform write ops atomically
+    invariant(globalWriteLock);
     try {
         MONGO_WRITE_CONFLICT_RETRY_LOOP_BEGIN {
             BSONObjBuilder intermediateResult;
