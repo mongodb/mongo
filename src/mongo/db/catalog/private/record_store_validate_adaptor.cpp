@@ -42,6 +42,7 @@
 #include "mongo/db/storage/key_string.h"
 #include "mongo/db/storage/record_store.h"
 #include "mongo/rpc/object_check.h"
+#include "mongo/util/log.h"
 
 namespace mongo {
 
@@ -184,6 +185,60 @@ void RecordStoreValidateAdaptor::traverseIndex(const IndexAccessMethod* iam,
 
     _keyCounts[indexNs] = numKeys;
     *numTraversedKeys = numKeys;
+}
+
+void RecordStoreValidateAdaptor::traverseRecordStore(RecordStore* recordStore,
+                                                     ValidateCmdLevel level,
+                                                     ValidateResults* results,
+                                                     BSONObjBuilder* output) {
+
+    long long nrecords = 0;
+    long long dataSizeTotal = 0;
+    long long nInvalid = 0;
+
+    results->valid = true;
+    std::unique_ptr<SeekableRecordCursor> cursor = recordStore->getCursor(_opCtx, true);
+    int interruptInterval = 4096;
+    RecordId prevRecordId;
+
+    while (auto record = cursor->next()) {
+        ++nrecords;
+
+        if (!(nrecords % interruptInterval)) {
+            _opCtx->checkForInterrupt();
+        }
+
+        auto dataSize = record->data.size();
+        dataSizeTotal += dataSize;
+        size_t validatedSize;
+        Status status = validate(record->id, record->data, &validatedSize);
+
+        // Checks to ensure isInRecordIdOrder() is being used properly.
+        if (prevRecordId.isNormal()) {
+            invariant(prevRecordId < record->id);
+        }
+
+        // While some storage engines, such as MMAPv1, may use padding, we still require
+        // that they return the unpadded record data.
+        if (!status.isOK() || validatedSize != static_cast<size_t>(dataSize)) {
+            if (results->valid) {
+                // Only log once.
+                results->errors.push_back("detected one or more invalid documents (see logs)");
+            }
+            nInvalid++;
+            results->valid = false;
+            log() << "document at location: " << record->id << " is corrupted";
+        }
+
+        prevRecordId = record->id;
+    }
+
+    if (results->valid) {
+        recordStore->updateStatsAfterRepair(_opCtx, nrecords, dataSizeTotal);
+    }
+
+    output->append("nInvalidDocuments", nInvalid);
+    output->appendNumber("nrecords", nrecords);
 }
 
 void RecordStoreValidateAdaptor::validateIndexKeyCount(IndexDescriptor* idx,

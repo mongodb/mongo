@@ -1007,16 +1007,21 @@ using ValidateResultsMap = std::map<std::string, ValidateResults>;
 void _validateRecordStore(OperationContext* opCtx,
                           RecordStore* recordStore,
                           ValidateCmdLevel level,
+                          bool background,
                           RecordStoreValidateAdaptor* indexValidator,
                           ValidateResults* results,
                           BSONObjBuilder* output) {
 
-    // Validate RecordStore and, if `level == kValidateFull`, cross validate indexes and
-    // RecordStore.
-    auto status = recordStore->validate(opCtx, level, indexValidator, results, output);
-    // RecordStore::validate always returns Status::OK(). Errors are reported through
-    // `results`.
-    dassert(status.isOK());
+    // Validate RecordStore and, if `level == kValidateFull`, use the RecordStore's validate
+    // function.
+    if (background) {
+        indexValidator->traverseRecordStore(recordStore, level, results, output);
+    } else {
+        auto status = recordStore->validate(opCtx, level, indexValidator, results, output);
+        // RecordStore::validate always returns Status::OK(). Errors are reported through
+        // `results`.
+        dassert(status.isOK());
+    }
 }
 
 void _validateIndexes(OperationContext* opCtx,
@@ -1165,7 +1170,8 @@ Status CollectionImpl::validate(OperationContext* opCtx,
 
         // Validate the record store
         log(LogComponent::kIndex) << "validating collection " << ns().toString() << endl;
-        _validateRecordStore(opCtx, _recordStore, level, &indexValidator, results, output);
+        _validateRecordStore(
+            opCtx, _recordStore, level, /*somgarg*/ false, &indexValidator, results, output);
 
         // Validate indexes and check for mismatches.
         if (results->valid) {

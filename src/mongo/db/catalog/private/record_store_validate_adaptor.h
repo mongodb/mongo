@@ -76,6 +76,15 @@ public:
                        int64_t* numTraversedKeys);
 
     /**
+     * Traverses the record store to retrieve every record and go through its document key
+     * set to keep track of the index consistency during a validation.
+     */
+    void traverseRecordStore(RecordStore* recordStore,
+                             ValidateCmdLevel level,
+                             ValidateResults* results,
+                             BSONObjBuilder* output);
+
+    /**
      * Validate that the number of document keys matches the number of index keys.
      */
     void validateIndexKeyCount(IndexDescriptor* idx, int64_t numRecs, ValidateResults& results);
