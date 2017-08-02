@@ -115,30 +115,6 @@ CatalogCache::CatalogCache(CatalogCacheLoader& cacheLoader) : _cacheLoader(cache
 
 CatalogCache::~CatalogCache() = default;
 
-void CatalogCache::initializeReplicaSetRole(bool isPrimary) {
-    _cacheLoader.initializeReplicaSetRole(isPrimary);
-}
-
-void CatalogCache::onStepDown() {
-    _cacheLoader.onStepDown();
-}
-
-void CatalogCache::onStepUp() {
-    _cacheLoader.onStepUp();
-}
-
-void CatalogCache::notifyOfCollectionVersionUpdate(OperationContext* opCtx,
-                                                   const NamespaceString& nss,
-                                                   const ChunkVersion& version) {
-    _cacheLoader.notifyOfCollectionVersionUpdate(opCtx, nss, version);
-}
-
-Status CatalogCache::waitForCollectionVersion(OperationContext* opCtx,
-                                              const NamespaceString& nss,
-                                              const ChunkVersion& version) {
-    return _cacheLoader.waitForCollectionVersion(opCtx, nss, version);
-}
-
 StatusWith<CachedDatabaseInfo> CatalogCache::getDatabase(OperationContext* opCtx,
                                                          StringData dbName) {
     try {
@@ -294,13 +270,7 @@ void CatalogCache::invalidateShardedCollection(StringData ns) {
 
 void CatalogCache::purgeDatabase(StringData dbName) {
     stdx::lock_guard<stdx::mutex> lg(_mutex);
-
-    auto it = _databases.find(dbName);
-    if (it == _databases.end()) {
-        return;
-    }
-
-    _databases.erase(it);
+    _databases.erase(dbName);
 }
 
 void CatalogCache::purgeAllDatabases() {

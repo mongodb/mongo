@@ -75,12 +75,17 @@ public:
                                          const ChunkVersion& version) override;
 
     /**
-     * This function can throw a DBException if the opCtx is interrupted. A lock must not be held
-     * when calling this because it would prevent using the latest snapshot and actually seeing the
-     * change after it arrives.
+     * Waits for the persisted collection version to be gte to 'version', or an epoch change. Only
+     * call this function if you KNOW that a version gte WILL eventually be persisted.
      *
-     * See CatalogCache::waitForCollectionVersion for function details: it's a passthrough function
-     * to give external access to this function, and so it is the interface.
+     * This function cannot wait for a version if nothing is persisted because a collection can
+     * become unsharded after we start waiting and 'version' will then never be reached. If 'nss'
+     * has no persisted metadata, even if it will shortly, a NamespaceNotFound error will be
+     * returned.
+     *
+     * A lock must not be held when calling this because it would prevent using the latest snapshot
+     * and actually seeing the change after it arrives.
+     * This function can throw a DBException if the opCtx is interrupted.
      */
     Status waitForCollectionVersion(OperationContext* opCtx,
                                     const NamespaceString& nss,

@@ -29,7 +29,7 @@
 
 #include "mongo/platform/basic.h"
 
-#include <boost/optional/optional_io.hpp>
+#include <boost/optional.hpp>
 
 #include "mongo/db/s/split_chunk.h"
 
@@ -46,7 +46,7 @@
 #include "mongo/s/catalog/type_collection.h"
 #include "mongo/s/catalog/type_database.h"
 #include "mongo/s/catalog/type_shard.h"
-#include "mongo/s/catalog_cache.h"
+#include "mongo/s/catalog_cache_loader.h"
 #include "mongo/s/client/shard_registry.h"
 #include "mongo/s/grid.h"
 #include "mongo/s/shard_server_test_fixture.h"
@@ -64,11 +64,9 @@ using executor::RemoteCommandResponse;
 class SplitChunkTest : public ShardServerTestFixture {
 public:
     void setUp() override {
-
         ShardServerTestFixture::setUp();
 
-        // Initialize the CatalogCache so that shard server metadata refreshes will work.
-        catalogCache()->initializeReplicaSetRole(true);
+        CatalogCacheLoader::get(getServiceContext()).initializeReplicaSetRole(true);
 
         // Instantiate names.
         _epoch = OID::gen();

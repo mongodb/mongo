@@ -54,7 +54,7 @@
 #include "mongo/s/catalog/type_config_version.h"
 #include "mongo/s/catalog/type_shard.h"
 #include "mongo/s/catalog/type_shard_collection.h"
-#include "mongo/s/catalog_cache.h"
+#include "mongo/s/catalog_cache_loader.h"
 #include "mongo/s/chunk_version.h"
 #include "mongo/s/cluster_identity_loader.h"
 #include "mongo/s/grid.h"
@@ -100,7 +100,7 @@ public:
         : _opCtx(opCtx), _nss(nss), _updatedVersion(updatedVersion) {}
 
     void commit() override {
-        Grid::get(_opCtx)->catalogCache()->notifyOfCollectionVersionUpdate(
+        CatalogCacheLoader::get(_opCtx).notifyOfCollectionVersionUpdate(
             _opCtx, _nss, _updatedVersion);
     }
 

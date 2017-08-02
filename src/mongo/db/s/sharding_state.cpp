@@ -342,7 +342,8 @@ Status ShardingState::initializeFromShardIdentity(OperationContext* opCtx,
                 !isReplSet || (repl::ReplicationCoordinator::get(opCtx)->getMemberState() ==
                                repl::MemberState::RS_PRIMARY);
 
-            Grid::get(opCtx)->catalogCache()->initializeReplicaSetRole(isStandaloneOrPrimary);
+            CatalogCacheLoader::get(opCtx).initializeReplicaSetRole(isStandaloneOrPrimary);
+
             _chunkSplitter->setReplicaSetMode(isStandaloneOrPrimary);
 
             log() << "initialized sharding components for "

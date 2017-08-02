@@ -44,7 +44,7 @@
 #include "mongo/db/s/migration_source_manager.h"
 #include "mongo/db/s/move_timing_helper.h"
 #include "mongo/db/s/sharding_state.h"
-#include "mongo/s/catalog_cache.h"
+#include "mongo/s/catalog_cache_loader.h"
 #include "mongo/s/client/shard_registry.h"
 #include "mongo/s/grid.h"
 #include "mongo/s/migration_secondary_throttle_options.h"
@@ -256,20 +256,20 @@ private:
                     metadata);
             return metadata->getCollVersion();
         }();
-        uassertStatusOK(Grid::get(opCtx)->catalogCache()->waitForCollectionVersion(
-            opCtx, nss, collectionVersion));
 
         // Now schedule the range deletion clean up.
-        CollectionShardingState::CleanupNotification notification;
-        {
+        auto notification = [&] {
+            uassertStatusOK(CatalogCacheLoader::get(opCtx).waitForCollectionVersion(
+                opCtx, nss, collectionVersion));
+
+            auto const whenToClean = moveChunkRequest.getWaitForDelete()
+                ? CollectionShardingState::kNow
+                : CollectionShardingState::kDelayed;
+
             AutoGetCollection autoColl(opCtx, nss, MODE_IS);
 
-            auto const now = CollectionShardingState::kNow,
-                       later = CollectionShardingState::kDelayed;
-            auto whenToClean = moveChunkRequest.getWaitForDelete() ? now : later;
-            notification =
-                CollectionShardingState::get(opCtx, nss)->cleanUpRange(range, whenToClean);
-        }
+            return CollectionShardingState::get(opCtx, nss)->cleanUpRange(range, whenToClean);
+        }();
 
         // Check for immediate failure on scheduling range deletion.
         if (notification.ready() && !notification.waitStatus(opCtx).isOK()) {

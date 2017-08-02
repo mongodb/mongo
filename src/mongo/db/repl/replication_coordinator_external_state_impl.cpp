@@ -83,7 +83,7 @@
 #include "mongo/rpc/metadata/egress_metadata_hook_list.h"
 #include "mongo/s/catalog/sharding_catalog_manager.h"
 #include "mongo/s/catalog/type_shard.h"
-#include "mongo/s/catalog_cache.h"
+#include "mongo/s/catalog_cache_loader.h"
 #include "mongo/s/client/shard_registry.h"
 #include "mongo/s/cluster_identity_loader.h"
 #include "mongo/s/grid.h"
@@ -713,7 +713,7 @@ void ReplicationCoordinatorExternalStateImpl::shardingOnStepDownHook() {
     } else if (ShardingState::get(_service)->enabled()) {
         invariant(serverGlobalParams.clusterRole == ClusterRole::ShardServer);
         ShardingState::get(_service)->interruptChunkSplitter();
-        Grid::get(_service)->catalogCache()->onStepDown();
+        CatalogCacheLoader::get(_service).onStepDown();
     }
 
     ShardingState::get(_service)->markCollectionsNotShardedAtStepdown();
@@ -801,7 +801,7 @@ void ReplicationCoordinatorExternalStateImpl::_shardingOnTransitionToPrimaryHook
                       << configsvrConnStr << causedBy(status);
         }
 
-        Grid::get(_service)->catalogCache()->onStepUp();
+        CatalogCacheLoader::get(_service).onStepUp();
         ShardingState::get(_service)->initiateChunkSplitter();
     }
 
