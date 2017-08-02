@@ -96,9 +96,12 @@ void TransportLayerASIO::ASIOSourceTicket::_headerCallback(const std::error_code
     MSGHEADER::View headerView(_buffer.get());
     auto msgLen = static_cast<size_t>(headerView.getMessageLength());
     if (msgLen < kHeaderSize || msgLen > MaxMessageSizeBytes) {
-        LOG(0) << "recv(): message msgLen " << msgLen << " is invalid. "
-               << "Min " << kHeaderSize << " Max: " << MaxMessageSizeBytes;
-        finishFill(errorCodeToStatus(ec));
+        StringBuilder sb;
+        sb << "recv(): message msgLen " << msgLen << " is invalid. "
+           << "Min " << kHeaderSize << " Max: " << MaxMessageSizeBytes;
+        const auto str = sb.str();
+        LOG(0) << str;
+        finishFill(Status(ErrorCodes::ProtocolError, str));
         return;
     }
 
