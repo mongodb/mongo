@@ -65,6 +65,7 @@ public:
 protected:
     void setUp() override;
     void tearDown() override;
+    std::vector<BSONObj> makeSecondaryIndexSpecs(const NamespaceString& nss);
 
     // A simple arbitrary value to use as the default batch size.
     const int defaultBatchSize = 1024;
@@ -98,14 +99,26 @@ void CollectionClonerTest::setUp() {
         [this](const NamespaceString& nss,
                const CollectionOptions& options,
                const BSONObj idIndexSpec,
-               const std::vector<BSONObj>& secondaryIndexSpecs) {
+               const std::vector<BSONObj>& nonIdIndexSpecs) {
             (_loader = new CollectionBulkLoaderMock(&collectionStats))
-                ->init(secondaryIndexSpecs)
+                ->init(nonIdIndexSpecs)
                 .transitional_ignore();
 
             return StatusWith<std::unique_ptr<CollectionBulkLoader>>(
                 std::unique_ptr<CollectionBulkLoader>(_loader));
         };
+}
+
+// Return index specs to use for secondary indexes.
+std::vector<BSONObj> CollectionClonerTest::makeSecondaryIndexSpecs(const NamespaceString& nss) {
+    return {BSON("v" << 1 << "key" << BSON("a" << 1) << "name"
+                     << "a_1"
+                     << "ns"
+                     << nss.ns()),
+            BSON("v" << 1 << "key" << BSON("b" << 1) << "name"
+                     << "b_1"
+                     << "ns"
+                     << nss.ns())};
 }
 
 void CollectionClonerTest::tearDown() {
@@ -640,14 +653,7 @@ TEST_F(CollectionClonerTest, BeginCollection) {
 
     // Split listIndexes response into 2 batches: first batch contains idIndexSpec and
     // second batch contains specs
-    std::vector<BSONObj> specs{BSON("v" << 1 << "key" << BSON("a" << 1) << "name"
-                                        << "a_1"
-                                        << "ns"
-                                        << nss.ns()),
-                               BSON("v" << 1 << "key" << BSON("b" << 1) << "name"
-                                        << "b_1"
-                                        << "ns"
-                                        << nss.ns())};
+    auto nonIdIndexSpecs = makeSecondaryIndexSpecs(nss);
 
     // First batch contains the _id_ index spec.
     {
@@ -663,8 +669,8 @@ TEST_F(CollectionClonerTest, BeginCollection) {
     // Second batch contains the other index specs.
     {
         executor::NetworkInterfaceMock::InNetworkGuard guard(getNet());
-        processNetworkResponse(
-            createListIndexesResponse(0, BSON_ARRAY(specs[0] << specs[1]), "nextBatch"));
+        processNetworkResponse(createListIndexesResponse(
+            0, BSON_ARRAY(nonIdIndexSpecs[0] << nonIdIndexSpecs[1]), "nextBatch"));
     }
 
     collectionCloner->waitForDbWorker();
@@ -674,9 +680,9 @@ TEST_F(CollectionClonerTest, BeginCollection) {
 
     ASSERT_EQUALS(nss.ns(), collNss.ns());
     ASSERT_BSONOBJ_EQ(options.toBSON(), collOptions.toBSON());
-    ASSERT_EQUALS(specs.size(), collIndexSpecs.size());
-    for (std::vector<BSONObj>::size_type i = 0; i < specs.size(); ++i) {
-        ASSERT_BSONOBJ_EQ(specs[i], collIndexSpecs[i]);
+    ASSERT_EQUALS(nonIdIndexSpecs.size(), collIndexSpecs.size());
+    for (std::vector<BSONObj>::size_type i = 0; i < nonIdIndexSpecs.size(); ++i) {
+        ASSERT_BSONOBJ_EQ(nonIdIndexSpecs[i], collIndexSpecs[i]);
     }
 
     // Cloner is still active because it has to read the documents from the source collection.
@@ -1395,6 +1401,171 @@ TEST_F(CollectionClonerTest,
     ASSERT_EQUALS(ErrorCodes::OperationFailed, getStatus());
 }
 
+class CollectionClonerUUIDTest : public CollectionClonerTest {
+protected:
+    // The UUID tests should deal gracefully with renamed collections, so start the cloner with
+    // an alternate name.
+    const NamespaceString alternateNss{"db", "alternateCollName"};
+    void startupWithUUID(int maxNumCloningCursors = 1) {
+        collectionCloner.reset();
+        options.uuid = UUID::gen();
+        collectionCloner = stdx::make_unique<CollectionCloner>(
+            &getExecutor(),
+            dbWorkThreadPool.get(),
+            target,
+            alternateNss,
+            options,
+            stdx::bind(&CollectionClonerTest::setStatus, this, stdx::placeholders::_1),
+            storageInterface.get(),
+            defaultBatchSize,
+            maxNumCloningCursors);
+
+        ASSERT_OK(collectionCloner->startup());
+    }
+
+    void testWithMaxNumCloningCursors(int maxNumCloningCursors, StringData cmdName) {
+        startupWithUUID(maxNumCloningCursors);
+
+        CollectionOptions actualOptions;
+        CollectionMockStats stats;
+        CollectionBulkLoaderMock* loader = new CollectionBulkLoaderMock(&stats);
+        bool collectionCreated = false;
+        storageInterface->createCollectionForBulkFn = [&](const NamespaceString& theNss,
+                                                          const CollectionOptions& theOptions,
+                                                          const BSONObj idIndexSpec,
+                                                          const std::vector<BSONObj>& theIndexSpecs)
+            -> StatusWith<std::unique_ptr<CollectionBulkLoader>> {
+                collectionCreated = true;
+                actualOptions = theOptions;
+                return std::unique_ptr<CollectionBulkLoader>(loader);
+            };
+
+        {
+            executor::NetworkInterfaceMock::InNetworkGuard guard(getNet());
+            processNetworkResponse(createCountResponse(0));
+            processNetworkResponse(createListIndexesResponse(0, BSON_ARRAY(idIndexSpec)));
+        }
+
+        collectionCloner->waitForDbWorker();
+        ASSERT_TRUE(collectionCreated);
+
+        // Fetcher should be scheduled after cloner creates collection.
+        auto net = getNet();
+        executor::NetworkInterfaceMock::InNetworkGuard guard(net);
+        ASSERT_TRUE(net->hasReadyRequests());
+        NetworkOperationIterator noi = net->getNextReadyRequest();
+        ASSERT_FALSE(net->hasReadyRequests());
+        auto&& noiRequest = noi->getRequest();
+        ASSERT_EQUALS(nss.db().toString(), noiRequest.dbname);
+        ASSERT_BSONOBJ_EQ(actualOptions.toBSON(), options.toBSON());
+
+        ASSERT_EQUALS(cmdName, std::string(noiRequest.cmdObj.firstElementFieldName()));
+        ASSERT_EQUALS(cmdName == "find", noiRequest.cmdObj.getField("noCursorTimeout").trueValue());
+        auto requestUUID = uassertStatusOK(UUID::parse(noiRequest.cmdObj.firstElement()));
+        ASSERT_EQUALS(options.uuid.get(), requestUUID);
+    }
+};
+
+TEST_F(CollectionClonerUUIDTest, FirstRemoteCommandWithUUID) {
+    startupWithUUID();
+
+    auto net = getNet();
+    executor::NetworkInterfaceMock::InNetworkGuard guard(getNet());
+    ASSERT_TRUE(net->hasReadyRequests());
+    NetworkOperationIterator noi = net->getNextReadyRequest();
+    auto&& noiRequest = noi->getRequest();
+    ASSERT_EQUALS(nss.db().toString(), noiRequest.dbname);
+    ASSERT_EQUALS("count", std::string(noiRequest.cmdObj.firstElementFieldName()));
+    auto requestUUID = uassertStatusOK(UUID::parse(noiRequest.cmdObj.firstElement()));
+    ASSERT_EQUALS(options.uuid.get(), requestUUID);
+
+    ASSERT_FALSE(net->hasReadyRequests());
+    ASSERT_TRUE(collectionCloner->isActive());
+}
+
+TEST_F(CollectionClonerUUIDTest, BeginCollectionWithUUID) {
+    startupWithUUID();
+
+    CollectionMockStats stats;
+    CollectionBulkLoaderMock* loader = new CollectionBulkLoaderMock(&stats);
+    NamespaceString collNss;
+    CollectionOptions collOptions;
+    BSONObj collIdIndexSpec;
+    std::vector<BSONObj> collSecondaryIndexSpecs;
+    storageInterface->createCollectionForBulkFn = [&](const NamespaceString& theNss,
+                                                      const CollectionOptions& theOptions,
+                                                      const BSONObj idIndexSpec,
+                                                      const std::vector<BSONObj>& nonIdIndexSpecs)
+        -> StatusWith<std::unique_ptr<CollectionBulkLoader>> {
+            collNss = theNss;
+            collOptions = theOptions;
+            collIdIndexSpec = idIndexSpec;
+            collSecondaryIndexSpecs = nonIdIndexSpecs;
+            return std::unique_ptr<CollectionBulkLoader>(loader);
+        };
+
+    // Split listIndexes response into 2 batches: first batch contains idIndexSpec and
+    // second batch contains specs. We expect the collection cloner to fix up the collection names
+    // (here from 'nss' to 'alternateNss') in the index specs, as the collection with the given UUID
+    // may be known with a different name by the sync source due to a rename or two-phase drop.
+    auto nonIdIndexSpecsToReturnBySyncSource = makeSecondaryIndexSpecs(nss);
+
+    // First batch contains the _id_ index spec.
+    {
+        executor::NetworkInterfaceMock::InNetworkGuard guard(getNet());
+        processNetworkResponse(createCountResponse(0));
+        processNetworkResponse(createListIndexesResponse(1, BSON_ARRAY(idIndexSpec)));
+    }
+
+    // 'status' should not be modified because cloning is not finished.
+    ASSERT_EQUALS(getDetectableErrorStatus(), getStatus());
+    ASSERT_TRUE(collectionCloner->isActive());
+
+    // Second batch contains the other index specs.
+    {
+        executor::NetworkInterfaceMock::InNetworkGuard guard(getNet());
+        processNetworkResponse(
+            createListIndexesResponse(0,
+                                      BSON_ARRAY(nonIdIndexSpecsToReturnBySyncSource[0]
+                                                 << nonIdIndexSpecsToReturnBySyncSource[1]),
+                                      "nextBatch"));
+    }
+
+    collectionCloner->waitForDbWorker();
+
+    // 'status' will be set if listIndexes fails.
+    ASSERT_EQUALS(getDetectableErrorStatus(), getStatus());
+
+    ASSERT_EQUALS(collNss.ns(), alternateNss.ns());
+    ASSERT_BSONOBJ_EQ(options.toBSON(), collOptions.toBSON());
+
+    BSONObj expectedIdIndexSpec = BSON("v" << 1 << "key" << BSON("_id" << 1) << "name"
+                                           << "_id_"
+                                           << "ns"
+                                           << alternateNss.ns());
+    ASSERT_BSONOBJ_EQ(collIdIndexSpec, expectedIdIndexSpec);
+
+    auto expectedNonIdIndexSpecs = makeSecondaryIndexSpecs(alternateNss);
+    ASSERT_EQUALS(collSecondaryIndexSpecs.size(), expectedNonIdIndexSpecs.size());
+
+    for (std::vector<BSONObj>::size_type i = 0; i < expectedNonIdIndexSpecs.size(); ++i) {
+        ASSERT_BSONOBJ_EQ(collSecondaryIndexSpecs[i], expectedNonIdIndexSpecs[i]);
+    }
+
+    // Cloner is still active because it has to read the documents from the source collection.
+    ASSERT_TRUE(collectionCloner->isActive());
+}
+
+TEST_F(CollectionClonerUUIDTest, SingleCloningCursorWithUUIDUsesFindCommand) {
+    // With a single cloning cursor, expect a find command.
+    testWithMaxNumCloningCursors(1, "find");
+}
+
+TEST_F(CollectionClonerUUIDTest, ThreeCloningCursorsWithUUIDUsesParallelCollectionScanCommand) {
+    // With three cloning cursors, expect a parallelCollectionScan command.
+    testWithMaxNumCloningCursors(3, "parallelCollectionScan");
+}
+
 class ParallelCollectionClonerTest : public BaseClonerTest {
 public:
     BaseCloner* getCloner() const override;
@@ -1436,9 +1607,9 @@ void ParallelCollectionClonerTest::setUp() {
         [this](const NamespaceString& nss,
                const CollectionOptions& options,
                const BSONObj idIndexSpec,
-               const std::vector<BSONObj>& secondaryIndexSpecs) {
+               const std::vector<BSONObj>& nonIdIndexSpecs) {
             _loader = new CollectionBulkLoaderMock(&collectionStats);
-            Status initCollectionBulkLoader = _loader->init(secondaryIndexSpecs);
+            Status initCollectionBulkLoader = _loader->init(nonIdIndexSpecs);
             ASSERT_OK(initCollectionBulkLoader);
 
             return StatusWith<std::unique_ptr<CollectionBulkLoader>>(
@@ -1942,8 +2113,8 @@ TEST_F(ParallelCollectionClonerTest,
 
     // At this point, the CollectionCloner has sent the find request to establish the cursor.
     // We want to return the first batch of documents for the collection from the network so that
-    // the CollectionCloner schedules the first _insertDocuments DB task and the getMore request for
-    // the next batch of documents.
+    // the CollectionCloner schedules the first _insertDocuments DB task and the getMore request
+    // for the next batch of documents.
 
     // Store the scheduled CollectionCloner::_insertDocuments task but do not run it yet.
     executor::TaskExecutor::CallbackFn insertDocumentsFn;
@@ -1983,8 +2154,8 @@ TEST_F(ParallelCollectionClonerTest,
     ASSERT_TRUE(collectionCloner->isActive());
     ASSERT_EQUALS(getDetectableErrorStatus(), getStatus());
 
-    // Run the insertDocuments task. The final status of the CollectionCloner should match the first
-    // error passed to the completion guard (ie. from the failed getMore request).
+    // Run the insertDocuments task. The final status of the CollectionCloner should match the
+    // first error passed to the completion guard (ie. from the failed getMore request).
     executor::TaskExecutor::CallbackArgs callbackArgs(
         &getExecutor(), {}, Status(ErrorCodes::CallbackCanceled, ""));
     insertDocumentsFn(callbackArgs);

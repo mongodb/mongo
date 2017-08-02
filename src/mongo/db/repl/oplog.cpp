@@ -1236,9 +1236,10 @@ Status applyCommand_inlock(OperationContext* opCtx,
         }
     }
 
-    // Applying renameCollection during initial sync might lead to data corruption, so we restart
-    // the initial sync.
-    if (!inSteadyStateReplication && o.firstElementFieldName() == std::string("renameCollection")) {
+    // Applying renameCollection during initial sync to a collection without UUID might lead to
+    // data corruption, so we restart the initial sync.
+    if (fieldUI.eoo() && !inSteadyStateReplication &&
+        o.firstElementFieldName() == std::string("renameCollection")) {
         if (!allowUnsafeRenamesDuringInitialSync.load()) {
             return Status(ErrorCodes::OplogOperationUnsupported,
                           str::stream()

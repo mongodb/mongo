@@ -26,8 +26,7 @@
     rst.awaitReplication();
 
     jsTestLog('Bring up a new node');
-    // TODO(SERVER-4941): Only a single initial sync attempt should be necessary.
-    const secondary = rst.add({setParameter: 'numInitialSyncAttempts=3'});
+    const secondary = rst.add({setParameter: 'numInitialSyncAttempts=1'});
     rst.reInitiate();
     assert.eq(primary, rst.getPrimary(), 'Primary changed after reconfig');
 

@@ -78,6 +78,17 @@ MONGO_FP_DECLARE(initialSyncHangDuringCollectionClone);
 // 'AsyncResultsMerger' for a specific collection.
 MONGO_FP_DECLARE(initialSyncHangCollectionClonerAfterHandlingBatchResponse);
 
+BSONObj makeCommandWithUUIDorCollectionName(StringData command,
+                                            OptionalCollectionUUID uuid,
+                                            const NamespaceString& nss) {
+    BSONObjBuilder builder;
+    if (uuid)
+        uuid->appendToBuilder(&builder, command);
+    else
+        builder.append(command, nss.coll());
+    return builder.obj();
+}
+
 CollectionCloner::CollectionCloner(executor::TaskExecutor* executor,
                                    OldThreadPool* dbWorkThreadPool,
                                    const HostAndPort& source,
@@ -96,33 +107,35 @@ CollectionCloner::CollectionCloner(executor::TaskExecutor* executor,
       _onCompletion(onCompletion),
       _storageInterface(storageInterface),
       _countScheduler(_executor,
-                      RemoteCommandRequest(_source,
-                                           _sourceNss.db().toString(),
-                                           BSON("count" << _sourceNss.coll()),
-                                           ReadPreferenceSetting::secondaryPreferredMetadata(),
-                                           nullptr,
-                                           RemoteCommandRequest::kNoTimeout),
+                      RemoteCommandRequest(
+                          _source,
+                          _sourceNss.db().toString(),
+                          makeCommandWithUUIDorCollectionName("count", _options.uuid, sourceNss),
+                          ReadPreferenceSetting::secondaryPreferredMetadata(),
+                          nullptr,
+                          RemoteCommandRequest::kNoTimeout),
                       stdx::bind(&CollectionCloner::_countCallback, this, stdx::placeholders::_1),
                       RemoteCommandRetryScheduler::makeRetryPolicy(
                           numInitialSyncCollectionCountAttempts.load(),
                           executor::RemoteCommandRequest::kNoTimeout,
                           RemoteCommandRetryScheduler::kAllRetriableErrors)),
-      _listIndexesFetcher(_executor,
-                          _source,
-                          _sourceNss.db().toString(),
-                          BSON("listIndexes" << _sourceNss.coll()),
-                          stdx::bind(&CollectionCloner::_listIndexesCallback,
-                                     this,
-                                     stdx::placeholders::_1,
-                                     stdx::placeholders::_2,
-                                     stdx::placeholders::_3),
-                          ReadPreferenceSetting::secondaryPreferredMetadata(),
-                          RemoteCommandRequest::kNoTimeout /* find network timeout */,
-                          RemoteCommandRequest::kNoTimeout /* getMore network timeout */,
-                          RemoteCommandRetryScheduler::makeRetryPolicy(
-                              numInitialSyncListIndexesAttempts.load(),
-                              executor::RemoteCommandRequest::kNoTimeout,
-                              RemoteCommandRetryScheduler::kAllRetriableErrors)),
+      _listIndexesFetcher(
+          _executor,
+          _source,
+          _sourceNss.db().toString(),
+          makeCommandWithUUIDorCollectionName("listIndexes", _options.uuid, sourceNss),
+          stdx::bind(&CollectionCloner::_listIndexesCallback,
+                     this,
+                     stdx::placeholders::_1,
+                     stdx::placeholders::_2,
+                     stdx::placeholders::_3),
+          ReadPreferenceSetting::secondaryPreferredMetadata(),
+          RemoteCommandRequest::kNoTimeout /* find network timeout */,
+          RemoteCommandRequest::kNoTimeout /* getMore network timeout */,
+          RemoteCommandRetryScheduler::makeRetryPolicy(
+              numInitialSyncListIndexesAttempts.load(),
+              executor::RemoteCommandRequest::kNoTimeout,
+              RemoteCommandRetryScheduler::kAllRetriableErrors)),
       _indexSpecs(),
       _documentsToInsert(),
       _dbWorkTaskRunner(_dbWorkThreadPool),
@@ -375,14 +388,22 @@ void CollectionCloner::_listIndexesCallback(const Fetcher::QueryResponseStatus& 
     }
 
     UniqueLock lk(_mutex);
+    // When listing indexes by UUID, the sync source may use a different name for the collection
+    // as result of renaming or two-phase drop. As the index spec also includes a 'ns' field, this
+    // must be rewritten.
+    BSONObjBuilder nsFieldReplacementBuilder;
+    nsFieldReplacementBuilder.append("ns", _sourceNss.ns());
+    BSONElement nsFieldReplacementElem = nsFieldReplacementBuilder.done().firstElement();
+
     // We may be called with multiple batches leading to a need to grow _indexSpecs.
     _indexSpecs.reserve(_indexSpecs.size() + documents.size());
     for (auto&& doc : documents) {
+        // The addField replaces the 'ns' field with the correct name, see above.
         if (StringData("_id_") == doc["name"].str()) {
-            _idIndexSpec = doc;
+            _idIndexSpec = doc.addField(nsFieldReplacementElem);
             continue;
         }
-        _indexSpecs.push_back(doc);
+        _indexSpecs.push_back(doc.addField(nsFieldReplacementElem));
     }
     lk.unlock();
 
@@ -435,14 +456,16 @@ void CollectionCloner::_beginCollectionCallback(const executor::TaskExecutor::Ca
     // the correctness of the collection cloning process until 'parallelCollectionScan'
     // can be tested more extensively in context of initial sync.
     if (_maxNumClonerCursors == 1) {
-        cmdObj.append("find", _sourceNss.coll());
+        cmdObj.appendElements(
+            makeCommandWithUUIDorCollectionName("find", _options.uuid, _sourceNss));
         cmdObj.append("noCursorTimeout", true);
         // Set batchSize to be 0 to establish the cursor without fetching any documents,
         // similar to the response format of 'parallelCollectionScan'.
         cmdObj.append("batchSize", 0);
         cursorCommand = Find;
     } else {
-        cmdObj.append("parallelCollectionScan", _sourceNss.coll());
+        cmdObj.appendElements(makeCommandWithUUIDorCollectionName(
+            "parallelCollectionScan", _options.uuid, _sourceNss));
         cmdObj.append("numCursors", _maxNumClonerCursors);
         cursorCommand = ParallelCollScan;
     }

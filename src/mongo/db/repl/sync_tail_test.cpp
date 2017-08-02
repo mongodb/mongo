@@ -1413,20 +1413,6 @@ TEST_F(IdempotencyTest, CollModIndexNotFound) {
     testOpsAreIdempotent(ops);
 }
 
-TEST_F(IdempotencyTest, ResyncOnRenameCollection) {
-    ASSERT_OK(
-        ReplicationCoordinator::get(_opCtx.get())->setFollowerMode(MemberState::RS_RECOVERING));
-
-    auto cmd = BSON("renameCollection" << nss.ns() << "to"
-                                       << "test.bar"
-                                       << "stayTemp"
-                                       << false
-                                       << "dropTarget"
-                                       << false);
-    auto op = makeCommandOplogEntry(nextOpTime(), nss, cmd);
-    ASSERT_EQUALS(runOp(op), ErrorCodes::OplogOperationUnsupported);
-}
-
 }  // namespace
 }  // namespace repl
 }  // namespace mongo
