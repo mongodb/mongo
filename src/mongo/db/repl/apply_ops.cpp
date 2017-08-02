@@ -57,6 +57,8 @@
 namespace mongo {
 namespace {
 
+const auto kPreconditionFieldName = "preCondition"_sd;
+
 // If enabled, causes loop in _applyOps() to hang after applying current operation.
 MONGO_FP_DECLARE(applyOpsPauseBetweenOperations);
 
@@ -230,51 +232,53 @@ Status _applyOps(OperationContext* opCtx,
     return Status::OK();
 }
 
-Status preconditionOK(OperationContext* opCtx, const BSONObj& applyOpCmd, BSONObjBuilder* result) {
-    dassert(opCtx->lockState()->isLockHeldForMode(
-        ResourceId(RESOURCE_GLOBAL, ResourceId::SINGLETON_GLOBAL), MODE_X));
+bool _hasPrecondition(const BSONObj& applyOpCmd) {
+    return applyOpCmd[kPreconditionFieldName].type() == Array;
+}
 
-    if (applyOpCmd["preCondition"].type() == Array) {
-        BSONObjIterator i(applyOpCmd["preCondition"].Obj());
-        while (i.more()) {
-            BSONObj preCondition = i.next().Obj();
-            if (preCondition["ns"].type() != BSONType::String) {
-                return {ErrorCodes::InvalidNamespace,
-                        str::stream() << "ns in preCondition must be a string, but found type: "
-                                      << typeName(preCondition["ns"].type())};
-            }
-            const NamespaceString nss(preCondition["ns"].valueStringData());
-            if (!nss.isValid()) {
-                return {ErrorCodes::InvalidNamespace, "invalid ns: " + nss.ns()};
-            }
+Status _checkPrecondition(OperationContext* opCtx,
+                          const BSONObj& applyOpCmd,
+                          BSONObjBuilder* result) {
+    invariant(opCtx->lockState()->isW());
+    invariant(_hasPrecondition(applyOpCmd));
 
-            DBDirectClient db(opCtx);
-            BSONObj realres = db.findOne(nss.ns(), preCondition["q"].Obj());
+    for (auto elem : applyOpCmd[kPreconditionFieldName].Obj()) {
+        auto preCondition = elem.Obj();
+        if (preCondition["ns"].type() != BSONType::String) {
+            return {ErrorCodes::InvalidNamespace,
+                    str::stream() << "ns in preCondition must be a string, but found type: "
+                                  << typeName(preCondition["ns"].type())};
+        }
+        const NamespaceString nss(preCondition["ns"].valueStringData());
+        if (!nss.isValid()) {
+            return {ErrorCodes::InvalidNamespace, "invalid ns: " + nss.ns()};
+        }
 
-            // Get collection default collation.
-            Database* database = dbHolder().get(opCtx, nss.db());
-            if (!database) {
-                return {ErrorCodes::NamespaceNotFound,
-                        "database in ns does not exist: " + nss.ns()};
-            }
-            Collection* collection = database->getCollection(opCtx, nss);
-            if (!collection) {
-                return {ErrorCodes::NamespaceNotFound,
-                        "collection in ns does not exist: " + nss.ns()};
-            }
-            const CollatorInterface* collator = collection->getDefaultCollator();
+        DBDirectClient db(opCtx);
+        BSONObj realres = db.findOne(nss.ns(), preCondition["q"].Obj());
 
-            // Apply-ops would never have a $where/$text matcher. Using the "DisallowExtensions"
-            // callback ensures that parsing will throw an error if $where or $text are found.
-            Matcher matcher(
-                preCondition["res"].Obj(), ExtensionsCallbackDisallowExtensions(), collator);
-            if (!matcher.matches(realres)) {
-                result->append("got", realres);
-                result->append("whatFailed", preCondition);
-                return {ErrorCodes::BadValue, "preCondition failed"};
-            }
+        // Get collection default collation.
+        Database* database = dbHolder().get(opCtx, nss.db());
+        if (!database) {
+            return {ErrorCodes::NamespaceNotFound, "database in ns does not exist: " + nss.ns()};
+        }
+        Collection* collection = database->getCollection(opCtx, nss);
+        if (!collection) {
+            return {ErrorCodes::NamespaceNotFound, "collection in ns does not exist: " + nss.ns()};
+        }
+        const CollatorInterface* collator = collection->getDefaultCollator();
+
+        // Apply-ops would never have a $where/$text matcher. Using the "DisallowExtensions"
+        // callback ensures that parsing will throw an error if $where or $text are found.
+        Matcher matcher(
+            preCondition["res"].Obj(), ExtensionsCallbackDisallowExtensions(), collator);
+        if (!matcher.matches(realres)) {
+            result->append("got", realres);
+            result->append("whatFailed", preCondition);
+            return {ErrorCodes::BadValue, "preCondition failed"};
         }
     }
+
     return Status::OK();
 }
 }  // namespace
@@ -288,6 +292,7 @@ Status applyOps(OperationContext* opCtx,
         bsonExtractBooleanFieldWithDefault(applyOpCmd, "allowAtomic", true, &allowAtomic));
     auto areOpsCrudOnly = _areOpsCrudOnly(applyOpCmd);
     auto isAtomic = allowAtomic && areOpsCrudOnly;
+    auto hasPrecondition = _hasPrecondition(applyOpCmd);
 
     Lock::GlobalWrite globalWriteLock(opCtx);
 
@@ -298,9 +303,11 @@ Status applyOps(OperationContext* opCtx,
         return Status(ErrorCodes::NotMaster,
                       str::stream() << "Not primary while applying ops to database " << dbName);
 
-    Status preconditionStatus = preconditionOK(opCtx, applyOpCmd, result);
-    if (!preconditionStatus.isOK()) {
-        return preconditionStatus;
+    if (hasPrecondition) {
+        auto status = _checkPrecondition(opCtx, applyOpCmd, result);
+        if (!status.isOK()) {
+            return status;
+        }
     }
 
     int numApplied = 0;
@@ -328,7 +335,7 @@ Status applyOps(OperationContext* opCtx,
 
                 for (auto elem : applyOpCmd) {
                     auto name = elem.fieldNameStringData();
-                    if (name == "preCondition")
+                    if (name == kPreconditionFieldName)
                         continue;
                     if (name == "bypassDocumentValidation")
                         continue;
