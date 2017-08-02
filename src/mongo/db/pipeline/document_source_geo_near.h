@@ -46,9 +46,15 @@ public:
      */
     Pipeline::SourceContainer::iterator doOptimizeAt(Pipeline::SourceContainer::iterator itr,
                                                      Pipeline::SourceContainer* container) final;
-    InitialSourceType getInitialSourceType() const final {
-        return InitialSourceType::kInitialSource;
+
+    StageConstraints constraints() const final {
+        StageConstraints constraints;
+        constraints.requiredPosition = StageConstraints::PositionRequirement::kFirst;
+        constraints.requiresInputDocSource = false;
+        constraints.isAllowedInsideFacetStage = false;
+        return constraints;
     }
+
     Value serialize(boost::optional<ExplainOptions::Verbosity> explain = boost::none) const final;
     BSONObjSet getOutputSorts() final {
         return SimpleBSONObjComparator::kInstance.makeBSONObjSet(

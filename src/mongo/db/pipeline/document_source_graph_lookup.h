@@ -53,18 +53,17 @@ public:
      */
     GetModPathsReturn getModifiedPaths() const final;
 
-    bool canSwapWithMatch() const final {
-        return true;
+    StageConstraints constraints() const final {
+        StageConstraints constraints;
+        constraints.canSwapWithMatch = true;
+        constraints.mustRunOnPrimaryShardIfSharded = true;
+        return constraints;
     }
 
     GetDepsReturn getDependencies(DepsTracker* deps) const final {
         _startWith->addDependencies(deps);
         return SEE_NEXT;
     };
-
-    bool needsPrimaryShard() const final {
-        return true;
-    }
 
     void addInvolvedCollections(std::vector<NamespaceString>* collections) const final {
         collections->push_back(_from);

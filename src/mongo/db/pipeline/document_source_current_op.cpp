@@ -86,10 +86,6 @@ const char* DocumentSourceCurrentOp::getSourceName() const {
     return "$currentOp";
 }
 
-DocumentSource::InitialSourceType DocumentSourceCurrentOp::getInitialSourceType() const {
-    return InitialSourceType::kCollectionlessInitialSource;
-}
-
 DocumentSource::GetNextResult DocumentSourceCurrentOp::getNext() {
     pExpCtx->checkForInterrupt();
 

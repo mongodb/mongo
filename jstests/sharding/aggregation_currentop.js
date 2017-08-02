@@ -234,7 +234,7 @@
         assert.commandFailedWithCode(
             adminDB.runCommand(
                 {aggregate: 1, pipeline: [{$currentOp: {}}, {$currentOp: {}}], cursor: {}}),
-            ErrorCodes.BadValue);
+            40549);
 
         // Test that $currentOp fails when run on admin without {aggregate: 1}.
         assert.commandFailedWithCode(

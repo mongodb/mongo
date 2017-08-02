@@ -16,7 +16,7 @@
 
     // Test that $collStats must be first stage.
     let pipeline = [{$match: {}}, {$collStats: {}}];
-    assertErrorCode(coll, pipeline, ErrorCodes.BadValue);
+    assertErrorCode(coll, pipeline, 40549);
 
     // Test that an error is returned if count is not an object.
     pipeline = [{$collStats: {count: 1}}];
