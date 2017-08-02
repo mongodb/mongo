@@ -150,6 +150,14 @@ public:
         return !static_cast<bool>(_localField);
     }
 
+    const Variables& getVariables_forTest() {
+        return _variables;
+    }
+
+    const VariablesParseState& getVariablesParseState_forTest() {
+        return _variablesParseState;
+    }
+
 protected:
     void doDispose() final;
 

@@ -70,7 +70,8 @@ DocumentSourceLookUp::DocumentSourceLookUp(NamespaceString fromNs,
     : DocumentSourceNeedsMongod(pExpCtx),
       _fromNs(std::move(fromNs)),
       _as(std::move(as)),
-      _variablesParseState(_variables.useIdGenerator()) {
+      _variables(pExpCtx->variables),
+      _variablesParseState(pExpCtx->variablesParseState.copyWith(_variables.useIdGenerator())) {
     const auto& resolvedNamespace = pExpCtx->getResolvedNamespace(_fromNs);
     _resolvedNs = resolvedNamespace.ns;
     _resolvedPipeline = resolvedNamespace.pipeline;
