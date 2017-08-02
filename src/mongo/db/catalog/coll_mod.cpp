@@ -420,6 +420,10 @@ void _updateDBSchemaVersion(OperationContext* opCtx,
     {
         AutoGetDb autoDb(opCtx, dbname, MODE_X);
         Database* const db = autoDb.getDb();
+        // If the database no longer exists, we're done with upgrading.
+        if (!db) {
+            return;
+        }
         for (auto collectionIt = db->begin(); collectionIt != db->end(); ++collectionIt) {
             Collection* coll = *collectionIt;
             collNamespaceStrings.push_back(coll->ns());
@@ -436,7 +440,11 @@ void _updateDBSchemaVersion(OperationContext* opCtx,
         }
         AutoGetDb autoDb(opCtx, dbname, MODE_X);
         Database* const db = autoDb.getDb();
-        Collection* coll = db->getCollection(opCtx, collNSS);
+        Collection* coll = db ? db->getCollection(opCtx, collNSS) : nullptr;
+        // If the collection no longer exists, skip it.
+        if (!coll) {
+            continue;
+        }
         BSONObjBuilder collModObjBuilder;
         collModObjBuilder.append("collMod", coll->ns().coll());
         BSONObj collModObj = collModObjBuilder.done();
@@ -458,6 +466,9 @@ void _updateDBSchemaVersionNonReplicated(OperationContext* opCtx,
     if (dbname == "local") {
         AutoGetDb autoDb(opCtx, dbname, MODE_X);
         Database* const db = autoDb.getDb();
+        if (!db) {
+            return;
+        }
         for (auto collectionIt = db->begin(); collectionIt != db->end(); ++collectionIt) {
             Collection* coll = *collectionIt;
             collNamespaceStrings.push_back(coll->ns());
@@ -474,11 +485,11 @@ void _updateDBSchemaVersionNonReplicated(OperationContext* opCtx,
         }
         AutoGetDb autoDb(opCtx, dbname, MODE_X);
         Database* const db = autoDb.getDb();
-        Collection* coll = db->getCollection(opCtx, collNSS);
+        Collection* coll = db ? db->getCollection(opCtx, collNSS) : nullptr;
         if (!coll) {
-            // This will only occur if we incorrectly assumed there was a
-            // system.profile collection present.
-            return;
+            // If the collection or database was dropped, or if we incorrectly assumed there was
+            // a system.profile collection present, continue.
+            continue;
         }
         BSONObjBuilder collModObjBuilder;
         collModObjBuilder.append("collMod", coll->ns().coll());
