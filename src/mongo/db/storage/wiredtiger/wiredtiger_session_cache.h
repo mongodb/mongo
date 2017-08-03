@@ -191,7 +191,7 @@ public:
      * the log or forcing a checkpoint if forceCheckpoint is true or the journal is disabled.
      * Uses a temporary session. Safe to call without any locks, even during shutdown.
      */
-    void waitUntilDurable(bool forceCheckpoint);
+    void waitUntilDurable(bool forceCheckpoint, bool stableCheckpoint);
 
     WT_CONNECTION* conn() const {
         return _conn;

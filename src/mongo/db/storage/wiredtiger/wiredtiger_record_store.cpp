@@ -1562,7 +1562,9 @@ void WiredTigerRecordStore::_oplogJournalThreadLoop(WiredTigerSessionCache* sess
         _opsWaitingForJournal.swap(opsAboutToBeJournaled);
 
         lk.unlock();
-        sessionCache->waitUntilDurable(/*forceCheckpoint=*/false);
+        const bool forceCheckpoint = false;
+        const bool stableCheckpoint = false;
+        sessionCache->waitUntilDurable(forceCheckpoint, stableCheckpoint);
         lk.lock();
 
         for (auto&& op : opsAboutToBeJournaled) {

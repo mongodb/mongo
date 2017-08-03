@@ -108,7 +108,9 @@ public:
 
         while (!_shuttingDown.load()) {
             try {
-                _sessionCache->waitUntilDurable(false);
+                const bool forceCheckpoint = false;
+                const bool stableCheckpoint = false;
+                _sessionCache->waitUntilDurable(forceCheckpoint, stableCheckpoint);
             } catch (const UserException& e) {
                 invariant(e.getCode() == ErrorCodes::ShutdownInProgress);
             }
@@ -154,14 +156,50 @@ public:
         while (!_shuttingDown.load()) {
             {
                 stdx::unique_lock<stdx::mutex> lock(_mutex);
+                MONGO_IDLE_THREAD_BLOCK;
                 _condvar.wait_for(lock,
                                   stdx::chrono::seconds(static_cast<std::int64_t>(
                                       wiredTigerGlobalOptions.checkpointDelaySecs)));
             }
 
+            const SnapshotName stableTimestamp(_stableTimestamp.load());
+            const SnapshotName initialDataTimestamp(_initialDataTimestamp.load());
+            const bool keepOldBehavior = true;
+
             try {
-                const bool forceCheckpoint = true;
-                _sessionCache->waitUntilDurable(forceCheckpoint);
+                if (keepOldBehavior) {
+                    const bool forceCheckpoint = true;
+                    const bool stableCheckpoint = false;
+                    _sessionCache->waitUntilDurable(forceCheckpoint, stableCheckpoint);
+                } else {
+                    // Three cases:
+                    //
+                    // First, initialDataTimestamp is Timestamp(0, 1) -> Take full
+                    // checkpoint. This is when there is no consistent view of the data (i.e:
+                    // during initial sync).
+                    //
+                    // Second, stableTimestamp < initialDataTimestamp: Skip checkpoints. The data
+                    // on disk is prone to being rolled back. Hold off on checkpoints.  Hope that
+                    // the stable timestamp surpasses the data on disk, allowing storage to
+                    // persist newer copies to disk.
+                    //
+                    // Third, stableTimestamp >= initialDataTimestamp: Take stable
+                    // checkpoint. Steady state case.
+                    if (initialDataTimestamp.asU64() <= 1) {
+                        const bool forceCheckpoint = true;
+                        const bool stableCheckpoint = false;
+                        _sessionCache->waitUntilDurable(forceCheckpoint, stableCheckpoint);
+                    } else if (stableTimestamp < initialDataTimestamp) {
+                        LOG(1) << "Stable timestamp is behind the initial data timestamp, skipping "
+                                  "a checkpoint. StableTimestamp: "
+                               << stableTimestamp.toString()
+                               << " InitialDataTimestamp: " << initialDataTimestamp.toString();
+                    } else {
+                        const bool forceCheckpoint = true;
+                        const bool stableCheckpoint = true;
+                        _sessionCache->waitUntilDurable(forceCheckpoint, stableCheckpoint);
+                    }
+                }
             } catch (const UserException& exc) {
                 invariant(exc.getCode() == ErrorCodes::ShutdownInProgress);
             }
@@ -542,7 +580,10 @@ int WiredTigerKVEngine::flushAllFiles(OperationContext* opCtx, bool sync) {
         return 0;
     }
     syncSizeInfo(true);
-    _sessionCache->waitUntilDurable(true);
+    const bool forceCheckpoint = true;
+    // If there's no journal, we must take a full checkpoint.
+    const bool stableCheckpoint = _durable;
+    _sessionCache->waitUntilDurable(forceCheckpoint, stableCheckpoint);
 
     return 1;
 }

@@ -142,7 +142,9 @@ void WiredTigerRecoveryUnit::_ensureSession() {
 bool WiredTigerRecoveryUnit::waitUntilDurable() {
     invariant(!_inUnitOfWork);
     // _session may be nullptr. We cannot _ensureSession() here as that needs shutdown protection.
-    _sessionCache->waitUntilDurable(false);
+    const bool forceCheckpoint = false;
+    const bool stableCheckpoint = false;
+    _sessionCache->waitUntilDurable(forceCheckpoint, stableCheckpoint);
     return true;
 }
 

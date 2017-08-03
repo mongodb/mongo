@@ -36,6 +36,8 @@
 #include "mongo/db/storage/wiredtiger/wiredtiger_session_cache.h"
 
 #include "mongo/base/error_codes.h"
+#include "mongo/db/mongod_options.h"
+#include "mongo/db/repl/repl_settings.h"
 #include "mongo/db/storage/journal_listener.h"
 #include "mongo/db/storage/wiredtiger/wiredtiger_kv_engine.h"
 #include "mongo/db/storage/wiredtiger/wiredtiger_util.h"
@@ -190,7 +192,7 @@ void WiredTigerSessionCache::shuttingDown() {
     _snapshotManager.shutdown();
 }
 
-void WiredTigerSessionCache::waitUntilDurable(bool forceCheckpoint) {
+void WiredTigerSessionCache::waitUntilDurable(bool forceCheckpoint, bool stableCheckpoint) {
     // For inMemory storage engines, the data is "as durable as it's going to get".
     // That is, a restart is equivalent to a complete node failure.
     if (isEphemeral()) {
@@ -204,6 +206,15 @@ void WiredTigerSessionCache::waitUntilDurable(bool forceCheckpoint) {
             "Cannot wait for durability because a shutdown is in progress",
             !(shuttingDown & kShuttingDownMask));
 
+    // Stable checkpoints are only meaningful in a replica set. Replication sets the "stable
+    // timestamp". If the stable timestamp is unset, WiredTiger takes a full checkpoint, which is
+    // incidentally what we want. A "true" stable checkpoint (a stable timestamp was set on the
+    // WT_CONNECTION, i.e: replication is on) requires `forceCheckpoint` to be true and journaling
+    // to be enabled.
+    if (stableCheckpoint && getGlobalReplSettings().usingReplSets()) {
+        invariant(forceCheckpoint && _engine->isDurable());
+    }
+
     // When forcing a checkpoint with journaling enabled, don't synchronize with other
     // waiters, as a log flush is much cheaper than a full checkpoint.
     if (forceCheckpoint && _engine->isDurable()) {
@@ -212,7 +223,14 @@ void WiredTigerSessionCache::waitUntilDurable(bool forceCheckpoint) {
         {
             stdx::unique_lock<stdx::mutex> lk(_journalListenerMutex);
             JournalListener::Token token = _journalListener->getToken();
-            invariantWTOK(s->checkpoint(s, NULL));
+            const bool keepOldBehavior = true;
+            if (keepOldBehavior) {
+                invariantWTOK(s->checkpoint(s, nullptr));
+            } else {
+                std::string config =
+                    stableCheckpoint ? "use_timestamp=true" : "use_timestamp=false";
+                invariantWTOK(s->checkpoint(s, config.c_str()));
+            }
             _journalListener->onDurable(token);
         }
         LOG(4) << "created checkpoint (forced)";
