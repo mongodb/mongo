@@ -1,0 +1,54 @@
+# Copyright (C) 2017 MongoDB Inc.
+#
+# This program is free software: you can redistribute it and/or  modify
+# it under the terms of the GNU Affero General Public License, version 3,
+# as published by the Free Software Foundation.
+#
+# This program is distributed in the hope that it will be useful,
+# but WITHOUT ANY WARRANTY; without even the implied warranty of
+# MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+# GNU Affero General Public License for more details.
+#
+# You should have received a copy of the GNU Affero General Public License
+# along with this program.  If not, see <http://www.gnu.org/licenses/>.
+#
+
+# This IDL file describes the BSON format for a LogicalSessionId, and
+# handles the serialization to and deserialization from its BSON representation
+# for that class.
+
+global:
+  cpp_namespace: "mongo"
+
+imports:
+  - "mongo/idl/basic_types.idl"
+
+structs:
+
+  FindAndModifyLastError:
+    description: "contains some metrics for the write result."
+    strict: true
+    fields:
+      updatedExisting:
+        description: "true if the command modified an existing document."
+        type: bool
+        optional: true
+      # TODO: SERVER-30532
+      #upserted:
+      #  description: "the _id value of the upserted document"
+      #  type: any_basic_type
+      #  optional: true
+      n:
+        description: "the number of documents that were inserted/deleted/match the update predicate"
+        type: safeInt64
+
+  FindAndModifyResult:
+    description: "Parser for serializing result for findAndModify"
+    strict: false
+    fields:
+      lastErrorObject:
+        type: FindAndModifyLastError
+      value:
+        description: "the document before or after the write depending on the 'new' field of
+                      the request was set to true or false."
+        type: object

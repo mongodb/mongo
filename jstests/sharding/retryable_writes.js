@@ -6,6 +6,19 @@
 
     "use strict";
 
+    var checkFindAndModifyResult = function(expected, toCheck) {
+        assert.eq(expected.ok, toCheck.ok);
+        assert.eq(expected.value, toCheck.value);
+
+        // TODO: SERVER-30532: after adding upserted, just compare the entire lastErrorObject
+        var expectedLE = expected.lastErrorObject;
+        var toCheckLE = toCheck.lastErrorObject;
+
+        assert.neq(null, toCheckLE);
+        assert.eq(expected.updatedExisting, toCheck.updatedExisting);
+        assert.eq(expected.n, toCheck.n);
+    };
+
     var runTests = function(mainConn, priConn) {
         var lsid = UUID();
 
@@ -113,6 +126,105 @@
         assert.eq(1, testDBPri.user.find({y: 1}).itcount());
 
         assert.eq(deleteOplogEntries, oplog.find({ns: 'test.user', op: 'd'}).itcount());
+
+        ////////////////////////////////////////////////////////////////////////
+        // Test findAndModify command (upsert)
+
+        cmd = {
+            findAndModify: 'user',
+            query: {_id: 60},
+            update: {$inc: {x: 1}},
+            new: true,
+            upsert: true,
+            lsid: {id: lsid},
+            txnNumber: NumberLong(37),
+        };
+
+        result = assert.commandWorked(mainConn.getDB('test').runCommand(cmd));
+        insertOplogEntries = oplog.find({ns: 'test.user', op: 'i'}).itcount();
+        updateOplogEntries = oplog.find({ns: 'test.user', op: 'u'}).itcount();
+        assert.eq({_id: 60, x: 1}, testDBPri.user.findOne({_id: 60}));
+
+        retryResult = assert.commandWorked(testDBMain.runCommand(cmd));
+
+        assert.eq({_id: 60, x: 1}, testDBPri.user.findOne({_id: 60}));
+        assert.eq(insertOplogEntries, oplog.find({ns: 'test.user', op: 'i'}).itcount());
+        assert.eq(updateOplogEntries, oplog.find({ns: 'test.user', op: 'u'}).itcount());
+
+        checkFindAndModifyResult(result, retryResult);
+
+        ////////////////////////////////////////////////////////////////////////
+        // Test findAndModify command (update, return pre-image)
+
+        cmd = {
+            findAndModify: 'user',
+            query: {_id: 60},
+            update: {$inc: {x: 1}},
+            new: false,
+            upsert: false,
+            lsid: {id: lsid},
+            txnNumber: NumberLong(38),
+        };
+
+        result = assert.commandWorked(mainConn.getDB('test').runCommand(cmd));
+        var oplogEntries = oplog.find({ns: 'test.user', op: 'u'}).itcount();
+        assert.eq({_id: 60, x: 2}, testDBPri.user.findOne({_id: 60}));
+
+        retryResult = assert.commandWorked(testDBMain.runCommand(cmd));
+
+        assert.eq({_id: 60, x: 2}, testDBPri.user.findOne({_id: 60}));
+        assert.eq(oplogEntries, oplog.find({ns: 'test.user', op: 'u'}).itcount());
+
+        checkFindAndModifyResult(result, retryResult);
+
+        ////////////////////////////////////////////////////////////////////////
+        // Test findAndModify command (update, return post-image)
+
+        cmd = {
+            findAndModify: 'user',
+            query: {_id: 60},
+            update: {$inc: {x: 1}},
+            new: true,
+            upsert: false,
+            lsid: {id: lsid},
+            txnNumber: NumberLong(39),
+        };
+
+        result = assert.commandWorked(mainConn.getDB('test').runCommand(cmd));
+        oplogEntries = oplog.find({ns: 'test.user', op: 'u'}).itcount();
+        assert.eq({_id: 60, x: 3}, testDBPri.user.findOne({_id: 60}));
+
+        retryResult = assert.commandWorked(testDBMain.runCommand(cmd));
+
+        assert.eq({_id: 60, x: 3}, testDBPri.user.findOne({_id: 60}));
+        assert.eq(oplogEntries, oplog.find({ns: 'test.user', op: 'u'}).itcount());
+
+        checkFindAndModifyResult(result, retryResult);
+
+        ////////////////////////////////////////////////////////////////////////
+        // Test findAndModify command (remove, return pre-image)
+
+        assert.writeOK(testDBMain.user.insert({_id: 70, f: 1}));
+        assert.writeOK(testDBMain.user.insert({_id: 80, f: 1}));
+
+        cmd = {
+            findAndModify: 'user',
+            query: {f: 1},
+            remove: true,
+            lsid: {id: lsid},
+            txnNumber: NumberLong(40),
+        };
+
+        result = assert.commandWorked(mainConn.getDB('test').runCommand(cmd));
+        oplogEntries = oplog.find({ns: 'test.user', op: 'd'}).itcount();
+        var docCount = testDBPri.user.find().itcount();
+
+        retryResult = assert.commandWorked(testDBMain.runCommand(cmd));
+
+        assert.eq(oplogEntries, oplog.find({ns: 'test.user', op: 'd'}).itcount());
+        assert.eq(docCount, testDBPri.user.find().itcount());
+
+        checkFindAndModifyResult(result, retryResult);
     };
 
     var replTest = new ReplSetTest({nodes: 1});

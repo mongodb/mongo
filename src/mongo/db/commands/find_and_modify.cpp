@@ -55,6 +55,7 @@
 #include "mongo/db/ops/parsed_update.h"
 #include "mongo/db/ops/update_lifecycle_impl.h"
 #include "mongo/db/ops/update_request.h"
+#include "mongo/db/ops/write_ops_retryability.h"
 #include "mongo/db/query/explain.h"
 #include "mongo/db/query/find_and_modify_request.h"
 #include "mongo/db/query/get_executor.h"
@@ -63,6 +64,7 @@
 #include "mongo/db/repl/repl_client_info.h"
 #include "mongo/db/repl/replication_coordinator_global.h"
 #include "mongo/db/s/collection_sharding_state.h"
+#include "mongo/db/session_catalog.h"
 #include "mongo/db/stats/top.h"
 #include "mongo/db/write_concern.h"
 #include "mongo/util/log.h"
@@ -359,6 +361,19 @@ public:
         boost::optional<DisableDocumentValidation> maybeDisableValidation;
         if (shouldBypassDocumentValidationForCommand(cmdObj))
             maybeDisableValidation.emplace(opCtx);
+
+        if (opCtx->getTxnNumber()) {
+            auto session = OperationContextSession::get(opCtx);
+            invariant(session);
+            auto writeHistory = session->getWriteHistory(opCtx);
+
+            if (writeHistory.hasNext()) {
+                auto findAndModifyResult =
+                    parseOplogEntryForFindAndModify(opCtx, args, writeHistory.next(opCtx));
+                findAndModifyResult.serialize(&result);
+                return true;
+            }
+        }
 
         auto curOp = CurOp::get(opCtx);
         OpDebug* opDebug = &curOp->debug();

@@ -28,12 +28,122 @@
 
 #include "mongo/platform/basic.h"
 
+#include "mongo/db/dbdirectclient.h"
+#include "mongo/db/namespace_string.h"
+#include "mongo/db/operation_context.h"
 #include "mongo/db/ops/single_write_result_gen.h"
 #include "mongo/db/ops/write_ops.h"
 #include "mongo/db/ops/write_ops_exec.h"
 #include "mongo/db/ops/write_ops_retryability.h"
+#include "mongo/db/query/find_and_modify_request.h"
+#include "mongo/logger/redaction.h"
 
 namespace mongo {
+
+namespace {
+
+/**
+ * Validates that the request is retry-compatible with the operation that occurred.
+ */
+void validateFindAndModifyRetryability(const FindAndModifyRequest& request,
+                                       const repl::OplogEntry& oplogEntry) {
+    auto opType = oplogEntry.getOpType();
+    auto ts = oplogEntry.getTimestamp();
+
+    if (opType == repl::OpTypeEnum::kDelete) {
+        uassert(
+            40606,
+            str::stream() << "findAndModify retry request: " << redact(request.toBSON())
+                          << " is not compatible with previous write in the transaction of type: "
+                          << OpType_serializer(oplogEntry.getOpType())
+                          << ", oplogTs: "
+                          << ts.toString()
+                          << ", oplog: "
+                          << redact(oplogEntry.toBSON()),
+            request.isRemove());
+        uassert(40607,
+                str::stream() << "No pre-image available for findAndModify retry request:"
+                              << redact(request.toBSON()),
+                oplogEntry.getPreImageTs());
+    } else if (opType == repl::OpTypeEnum::kInsert) {
+        uassert(
+            40608,
+            str::stream() << "findAndModify retry request: " << redact(request.toBSON())
+                          << " is not compatible with previous write in the transaction of type: "
+                          << OpType_serializer(oplogEntry.getOpType())
+                          << ", oplogTs: "
+                          << ts.toString()
+                          << ", oplog: "
+                          << redact(oplogEntry.toBSON()),
+            request.isUpsert());
+    } else {
+        uassert(
+            40609,
+            str::stream() << "findAndModify retry request: " << redact(request.toBSON())
+                          << " is not compatible with previous write in the transaction of type: "
+                          << OpType_serializer(oplogEntry.getOpType())
+                          << ", oplogTs: "
+                          << ts.toString()
+                          << ", oplog: "
+                          << redact(oplogEntry.toBSON()),
+            opType == repl::OpTypeEnum::kUpdate);
+        uassert(
+            40610,
+            str::stream() << "findAndModify retry request: " << redact(request.toBSON())
+                          << " is not compatible with previous write in the transaction of type: "
+                          << OpType_serializer(oplogEntry.getOpType())
+                          << ", oplogTs: "
+                          << ts.toString()
+                          << ", oplog: "
+                          << redact(oplogEntry.toBSON()),
+            !request.isUpsert());
+
+        if (request.shouldReturnNew()) {
+            uassert(40611,
+                    str::stream() << "findAndModify retry request: " << redact(request.toBSON())
+                                  << " wants the document after update returned, but only before "
+                                     "update document is stored, oplogTs: "
+                                  << ts.toString()
+                                  << ", oplog: "
+                                  << redact(oplogEntry.toBSON()),
+                    oplogEntry.getPostImageTs());
+        } else {
+            uassert(40612,
+                    str::stream() << "findAndModify retry request: " << redact(request.toBSON())
+                                  << " wants the document before update returned, but only after "
+                                     "update document is stored, oplogTs: "
+                                  << ts.toString()
+                                  << ", oplog: "
+                                  << redact(oplogEntry.toBSON()),
+                    oplogEntry.getPreImageTs());
+        }
+    }
+}
+
+/**
+ * Extracts either the pre or post image (cannot be both) of the findAndModify operation from the
+ * oplog.
+ */
+BSONObj extractPreOrPostImage(OperationContext* opCtx, const repl::OplogEntry& oplog) {
+    invariant(oplog.getPreImageTs() || oplog.getPostImageTs());
+    auto ts =
+        oplog.getPreImageTs() ? oplog.getPreImageTs().value() : oplog.getPostImageTs().value();
+
+    DBDirectClient client(opCtx);
+    auto oplogDoc = client.findOne(NamespaceString::kRsOplogNamespace.ns(), BSON("ts" << ts));
+
+    uassert(40613,
+            str::stream() << "oplog no longer contains the complete write history of this "
+                             "transaction, log with ts "
+                          << ts.toString()
+                          << " cannot be found",
+            !oplogDoc.isEmpty());
+    auto oplogEntry = uassertStatusOK(repl::OplogEntry::parse(oplogDoc));
+
+    return oplogEntry.getObject().getOwned();
+}
+
+}  // namespace
 
 SingleWriteResult parseOplogEntryForInsert(const repl::OplogEntry& entry) {
     invariant(entry.getOpType() == repl::OpTypeEnum::kInsert);
@@ -70,6 +180,48 @@ SingleWriteResult parseOplogEntryForDelete(const repl::OplogEntry& entry) {
     res.setN(1);
     res.setNModified(0);
     return res;
+}
+
+FindAndModifyResult parseOplogEntryForFindAndModify(OperationContext* opCtx,
+                                                    const FindAndModifyRequest& request,
+                                                    const repl::OplogEntry& oplogEntry) {
+    validateFindAndModifyRetryability(request, oplogEntry);
+
+    FindAndModifyResult result;
+
+    auto opType = oplogEntry.getOpType();
+
+    if (opType == repl::OpTypeEnum::kDelete) {
+        FindAndModifyLastError lastError;
+        lastError.setN(1);
+        result.setLastErrorObject(std::move(lastError));
+        result.setValue(extractPreOrPostImage(opCtx, oplogEntry));
+
+        return result;
+    }
+
+    // Upsert case
+    if (opType == repl::OpTypeEnum::kInsert) {
+        FindAndModifyLastError lastError;
+        lastError.setN(1);
+        lastError.setUpdatedExisting(false);
+        // TODO: SERVER-30532 set upserted
+
+        result.setLastErrorObject(std::move(lastError));
+        result.setValue(oplogEntry.getObject().getOwned());
+
+        return result;
+    }
+
+    // Update case
+    FindAndModifyLastError lastError;
+    lastError.setN(1);
+    lastError.setUpdatedExisting(true);
+
+    result.setLastErrorObject(std::move(lastError));
+    result.setValue(extractPreOrPostImage(opCtx, oplogEntry));
+
+    return result;
 }
 
 }  // namespace mongo
