@@ -998,11 +998,15 @@ void WiredTigerKVEngine::setStableTimestamp(SnapshotName stableTimestamp) {
         std::string conf = str::stream() << "stable_timestamp=" << stableTimestamp.toString();
         _conn->set_timestamp(_conn, conf.c_str());
     }
-    _checkpointThread->setStableTimestamp(stableTimestamp);
+    if (_checkpointThread) {
+        _checkpointThread->setStableTimestamp(stableTimestamp);
+    }
 }
 
 void WiredTigerKVEngine::setInitialDataTimestamp(SnapshotName initialDataTimestamp) {
-    _checkpointThread->setInitialDataTimestamp(initialDataTimestamp);
+    if (_checkpointThread) {
+        _checkpointThread->setInitialDataTimestamp(initialDataTimestamp);
+    }
 }
 
 bool WiredTigerKVEngine::supportsRecoverToStableTimestamp() const {
