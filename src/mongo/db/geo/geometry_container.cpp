@@ -449,8 +449,8 @@ bool GeometryContainer::contains(const S2Polyline& otherLine) const {
     }
 
     if (NULL != _cap && (_cap->crs == SPHERE)) {
-        // If any of the points are not contained within 
-        // the S2Cap region we can stop iterating over 
+        // If any of the points are not contained within
+        // the S2Cap region we can stop iterating over
         // the other points to save time.
         for (size_t i = 0; i < (size_t)otherLine.num_vertices(); ++i) {
             if (!_cap->cap.MayIntersect(S2Cell(otherLine.vertex(i)))) {
