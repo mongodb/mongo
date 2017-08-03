@@ -479,8 +479,8 @@ OpTime logOp(OperationContext* opCtx,
     getNextOpTime(opCtx, oplog, replCoord, replMode, 1, &slot);
 
     Timestamp prevTs;
-    if (auto session = OperationContextSession::get(opCtx)) {
-        prevTs = session->getLastWriteOpTimeTs();
+    if (opCtx->getTxnNumber()) {
+        prevTs = OperationContextSession::get(opCtx)->getLastWriteOpTimeTs();
     }
 
     auto writer = _logOpWriter(opCtx,
@@ -526,8 +526,8 @@ repl::OpTime logInsertOps(OperationContext* opCtx,
     auto wallTime = Date_t::now();
 
     Timestamp prevTs;
-    if (auto session = OperationContextSession::get(opCtx)) {
-        prevTs = session->getLastWriteOpTimeTs();
+    if (opCtx->getTxnNumber()) {
+        prevTs = OperationContextSession::get(opCtx)->getLastWriteOpTimeTs();
     }
 
     for (size_t i = 0; i < count; i++) {

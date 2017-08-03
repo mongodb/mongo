@@ -65,11 +65,11 @@ bool isMasterSlave() {
  * operation context.
  */
 void updateSessionProgress(OperationContext* opCtx, const repl::OpTime& lastTxnWriteOpTime) {
-    if (auto session = OperationContextSession::get(opCtx)) {
+    if (opCtx->getTxnNumber()) {
         auto lastWriteTs = lastTxnWriteOpTime.getTimestamp();
         if (!lastWriteTs.isNull()) {
             // Update session only if a new oplog entry was actually created.
-            session->saveTxnProgress(opCtx, lastWriteTs);
+            OperationContextSession::get(opCtx)->saveTxnProgress(opCtx, lastWriteTs);
         }
     }
 }
