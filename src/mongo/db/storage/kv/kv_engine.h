@@ -250,6 +250,13 @@ public:
     virtual void setInitialDataTimestamp(SnapshotName initialDataTimestamp) {}
 
     /**
+     * See `StorageEngine::supportsRecoverToStableTimestamp`
+     */
+    virtual bool supportsRecoverToStableTimestamp() const {
+        return false;
+    }
+
+    /**
      * The destructor will never be called from mongod, but may be called from tests.
      * Engines may assume that this will only be called in the case of clean shutdown, even if
      * cleanShutdown() hasn't been called.

@@ -164,6 +164,8 @@ public:
 
     virtual void setInitialDataTimestamp(SnapshotName initialDataTimestamp) override;
 
+    virtual bool supportsRecoverToStableTimestamp() const override;
+
     // wiredtiger specific
     // Calls WT_CONNECTION::reconfigure on the underlying WT_CONNECTION
     // held by this class

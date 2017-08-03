@@ -630,7 +630,7 @@ TEST_F(InitialSyncerTest, StartupSetsInitialDataTimestampAndStableTimestampOnSuc
     ASSERT_OK(initialSyncer->startup(opCtx.get(), maxAttempts));
     ASSERT_TRUE(initialSyncer->isActive());
 
-    ASSERT_EQUALS(SnapshotName(Timestamp::kAllowUnstableCheckpointsSentinal),
+    ASSERT_EQUALS(SnapshotName(Timestamp::kAllowUnstableCheckpointsSentinel),
                   _storageInterface->getInitialDataTimestamp());
     ASSERT_EQUALS(SnapshotName::min(), _storageInterface->getStableTimestamp());
 }

@@ -309,4 +309,8 @@ void KVStorageEngine::setInitialDataTimestamp(SnapshotName initialDataTimestamp)
     _engine->setInitialDataTimestamp(initialDataTimestamp);
 }
 
+bool KVStorageEngine::supportsRecoverToStableTimestamp() const {
+    return _engine->supportsRecoverToStableTimestamp();
+}
+
 }  // namespace mongo

@@ -395,7 +395,7 @@ void InitialSyncer::_setUp_inlock(OperationContext* opCtx, std::uint32_t initial
     // 'opCtx' is passed through from startup().
     _replicationProcess->getConsistencyMarkers()->setInitialSyncFlag(opCtx);
     _storage->setInitialDataTimestamp(opCtx,
-                                      SnapshotName(Timestamp::kAllowUnstableCheckpointsSentinal));
+                                      SnapshotName(Timestamp::kAllowUnstableCheckpointsSentinel));
     _storage->setStableTimestamp(opCtx, SnapshotName::min());
 
     LOG(1) << "Creating oplogBuffer.";

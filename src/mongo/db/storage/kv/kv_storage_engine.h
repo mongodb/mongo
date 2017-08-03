@@ -111,6 +111,8 @@ public:
 
     virtual void setInitialDataTimestamp(SnapshotName initialDataTimestamp) override;
 
+    virtual bool supportsRecoverToStableTimestamp() const override;
+
     SnapshotManager* getSnapshotManager() const final;
 
     void setJournalListener(JournalListener* jl) final;

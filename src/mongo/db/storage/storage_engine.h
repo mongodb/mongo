@@ -286,6 +286,9 @@ public:
      * if the storage engine supports the "recover to stable timestamp" feature but does not have
      * a stable timestamp, or if for some reason the storage engine is unable to recover to the
      * last provided stable timestamp.
+     *
+     * It is illegal to call this concurrently with `setStableTimestamp` or
+     * `setInitialDataTimestamp`.
      */
     virtual bool supportsRecoverToStableTimestamp() const {
         return false;

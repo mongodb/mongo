@@ -207,11 +207,34 @@ public:
         LOG(1) << "stopping " << name() << " thread";
     }
 
-    virtual void setStableTimestamp(SnapshotName stableTimestamp) {
+    bool supportsRecoverToStableTimestamp() {
+        // Replication is calling this method, however it is not setting the
+        // `_initialDataTimestamp` in all necessary cases. This may be removed when replication
+        // believes all sets of `_initialDataTimestamp` are correct. See SERVER-30184,
+        // SERVER-30185, SERVER-30335.
+        const bool keepOldBehavior = true;
+        if (keepOldBehavior) {
+            return false;
+        }
+
+        static const std::uint64_t allowUnstableCheckpointsSentinel =
+            static_cast<std::uint64_t>(Timestamp::kAllowUnstableCheckpointsSentinel.asULL());
+        const std::uint64_t initialDataTimestamp = _initialDataTimestamp.load();
+        // Illegal to be called when the dataset is incomplete.
+        invariant(initialDataTimestamp > allowUnstableCheckpointsSentinel);
+
+        // Must return false until `recoverToStableTimestamp` is implemented. See SERVER-29213.
+        if (keepOldBehavior) {
+            return false;
+        }
+        return _stableTimestamp.load() > initialDataTimestamp;
+    }
+
+    void setStableTimestamp(SnapshotName stableTimestamp) {
         _stableTimestamp.store(stableTimestamp.asU64());
     }
 
-    virtual void setInitialDataTimestamp(SnapshotName initialDataTimestamp) {
+    void setInitialDataTimestamp(SnapshotName initialDataTimestamp) {
         _initialDataTimestamp.store(initialDataTimestamp.asU64());
     }
 
@@ -980,5 +1003,13 @@ void WiredTigerKVEngine::setStableTimestamp(SnapshotName stableTimestamp) {
 
 void WiredTigerKVEngine::setInitialDataTimestamp(SnapshotName initialDataTimestamp) {
     _checkpointThread->setInitialDataTimestamp(initialDataTimestamp);
+}
+
+bool WiredTigerKVEngine::supportsRecoverToStableTimestamp() const {
+    if (_ephemeral) {
+        return false;
+    }
+
+    return _checkpointThread->supportsRecoverToStableTimestamp();
 }
 }  // namespace mongo
