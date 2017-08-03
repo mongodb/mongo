@@ -332,23 +332,17 @@ void CollectionShardingState::onUpdateOp(OperationContext* opCtx,
     }
 }
 
-CollectionShardingState::DeleteState::DeleteState(OperationContext* opCtx,
-                                                  CollectionShardingState* css,
-                                                  BSONObj const& doc)
-    : documentKey(css->_metadataManager->extractDocumentKey(doc).getOwned()),
-      isMigrating(css->_sourceMgr && css->isDocumentInMigratingChunk(opCtx, doc)) {}
-
 void CollectionShardingState::onDeleteOp(OperationContext* opCtx,
                                          const CollectionShardingState::DeleteState& deleteState) {
     dassert(opCtx->lockState()->isCollectionLockedForMode(_nss.ns(), MODE_IX));
 
     if (serverGlobalParams.clusterRole == ClusterRole::ShardServer) {
         if (_nss == NamespaceString::kShardConfigCollectionsCollectionName) {
-            _onConfigDeleteInvalidateCachedMetadataAndNotify(opCtx, deleteState.documentKey);
+            _onConfigDeleteInvalidateCachedMetadataAndNotify(opCtx, deleteState.idDoc);
         }
 
         if (_nss == NamespaceString::kServerConfigurationNamespace) {
-            if (auto idElem = deleteState.documentKey["_id"]) {
+            if (auto idElem = deleteState.idDoc["_id"]) {
                 auto idStr = idElem.str();
                 if (idStr == ShardIdentityType::IdName) {
                     if (!repl::ReplicationCoordinator::get(opCtx)->getMemberState().rollback()) {
@@ -380,7 +374,7 @@ void CollectionShardingState::onDeleteOp(OperationContext* opCtx,
     checkShardVersionOrThrow(opCtx);
 
     if (_sourceMgr && deleteState.isMigrating) {
-        _sourceMgr->getCloner()->onDeleteOp(opCtx, deleteState.documentKey);
+        _sourceMgr->getCloner()->onDeleteOp(opCtx, deleteState.idDoc);
     }
 }
 

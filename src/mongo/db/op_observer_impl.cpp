@@ -182,11 +182,19 @@ void OpObserverImpl::onUpdate(OperationContext* opCtx, const OplogUpdateEntryArg
     updateSessionProgress(opCtx, opTime);
 }
 
-auto OpObserverImpl::aboutToDelete(OperationContext* opCtx,
-                                   NamespaceString const& nss,
-                                   BSONObj const& doc) -> CollectionShardingState::DeleteState {
-    auto* css = CollectionShardingState::get(opCtx, nss.ns());
-    return CollectionShardingState::DeleteState(opCtx, css, doc);
+CollectionShardingState::DeleteState OpObserverImpl::aboutToDelete(OperationContext* opCtx,
+                                                                   const NamespaceString& nss,
+                                                                   const BSONObj& doc) {
+    CollectionShardingState::DeleteState deleteState;
+    BSONElement idElement = doc["_id"];
+    if (!idElement.eoo()) {
+        deleteState.idDoc = idElement.wrap();
+    }
+
+    auto css = CollectionShardingState::get(opCtx, nss.ns());
+    deleteState.isMigrating = css->isDocumentInMigratingChunk(opCtx, doc);
+
+    return deleteState;
 }
 
 void OpObserverImpl::onDelete(OperationContext* opCtx,
@@ -195,13 +203,13 @@ void OpObserverImpl::onDelete(OperationContext* opCtx,
                               StmtId stmtId,
                               CollectionShardingState::DeleteState deleteState,
                               bool fromMigrate) {
-    if (deleteState.documentKey.isEmpty())
+    if (deleteState.idDoc.isEmpty())
         return;
 
     auto opTime =
-        repl::logOp(opCtx, "d", nss, uuid, deleteState.documentKey, nullptr, fromMigrate, stmtId);
+        repl::logOp(opCtx, "d", nss, uuid, deleteState.idDoc, nullptr, fromMigrate, stmtId);
     AuthorizationManager::get(opCtx->getServiceContext())
-        ->logOp(opCtx, "d", nss, deleteState.documentKey, nullptr);
+        ->logOp(opCtx, "d", nss, deleteState.idDoc, nullptr);
 
     auto css = CollectionShardingState::get(opCtx, nss.ns());
     if (!fromMigrate) {
@@ -215,7 +223,7 @@ void OpObserverImpl::onDelete(OperationContext* opCtx,
         DurableViewCatalog::onExternalChange(opCtx, nss);
     }
     if (nss.ns() == FeatureCompatibilityVersion::kCollection) {
-        FeatureCompatibilityVersion::onDelete(opCtx, deleteState.documentKey);
+        FeatureCompatibilityVersion::onDelete(opCtx, deleteState.idDoc);
     }
 
     updateSessionProgress(opCtx, opTime);

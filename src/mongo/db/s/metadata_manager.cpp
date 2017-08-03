@@ -32,7 +32,6 @@
 
 #include "mongo/db/s/metadata_manager.h"
 
-#include "mongo/base/string_data.h"
 #include "mongo/bson/simple_bsonobj_comparator.h"
 #include "mongo/bson/util/builder.h"
 #include "mongo/db/db_raii.h"
@@ -326,8 +325,6 @@ ScopedCollectionMetadata::operator bool() const {
     return _metadata.get();
 }
 
-// Remaining MetadataManager members
-
 void MetadataManager::toBSONPending(BSONArrayBuilder& bb) const {
     for (auto it = _receivingChunks.begin(); it != _receivingChunks.end(); ++it) {
         BSONArrayBuilder pendingBB(bb.subarrayStart());
@@ -569,20 +566,6 @@ boost::optional<KeyRange> MetadataManager::getNextOrphanRange(BSONObj const& fro
     stdx::unique_lock<stdx::mutex> scopedLock(_managerLock);
     invariant(!_metadata.empty());
     return _metadata.back()->getNextOrphanRange(_receivingChunks, from);
-}
-
-BSONObj MetadataManager::extractDocumentKey(BSONObj const& doc) {
-    BSONObj result;
-    {
-        stdx::lock_guard<stdx::mutex> scopedLock(_managerLock);
-        if (!_metadata.empty()) {
-            result = _metadata.back()->_cm->getShardKeyPattern().extractShardKeyFromDoc(doc);
-        }
-    }
-    if (!result.hasField("_id") && doc.hasField("_id")) {
-        result = BSONObjBuilder(std::move(result)).append(doc["_id"]).obj();
-    }
-    return result;
 }
 
 }  // namespace mongo

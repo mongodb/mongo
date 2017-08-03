@@ -74,16 +74,12 @@ public:
      * Holds information used for tracking document removals during chunk migration.
      */
     struct DeleteState {
-        DeleteState() = default;
-        DeleteState(OperationContext*, CollectionShardingState*, BSONObj const& doc);
+        // Contains the _id field of the document being deleted.
+        BSONObj idDoc;
 
-        // Contains the fields of the document that are in the collection's shard key, and "_id".
-        BSONObj documentKey;
-
-        // True if the document being deleted belongs to a chunk which, while still in the shard,
-        // is being migrated out. (Not to be confused with "fromMigrate", which tags operations
-        // that are steps in performing the migration.)
-        bool isMigrating;
+        // True if the document being deleted belongs to a chunk which is currently being migrated
+        // out of this shard.
+        bool isMigrating = false;
     };
 
     /**
@@ -327,7 +323,6 @@ private:
                                                          int maxToDelete,
                                                          CollectionRangeDeleter*)
         -> boost::optional<Date_t>;
-    friend DeleteState;
 };
 
 }  // namespace mongo
