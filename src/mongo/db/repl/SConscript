@@ -595,9 +595,12 @@ env.Library(
     target='idempotency_test_util',
     source=[
         'idempotency_document_structure.cpp',
+        'idempotency_sequence.cpp',
+        'idempotency_update_sequence.cpp',
     ],
     LIBDEPS=[
         '$BUILD_DIR/mongo/base',
+        '$BUILD_DIR/mongo/db/common',
     ],
 )
 
@@ -605,6 +608,16 @@ env.CppUnitTest(
     target='idempotency_document_structure_test',
     source=[
         'idempotency_document_structure_test.cpp',
+    ],
+    LIBDEPS=[
+        'idempotency_test_util',
+    ],
+)
+
+env.CppUnitTest(
+    target='idempotency_update_sequence_test',
+    source=[
+        'idempotency_update_sequence_test.cpp',
     ],
     LIBDEPS=[
         'idempotency_test_util',

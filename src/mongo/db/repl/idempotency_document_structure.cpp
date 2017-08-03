@@ -30,6 +30,8 @@
 
 #include "mongo/db/repl/idempotency_document_structure.h"
 
+#include "mongo/db/jsobj.h"
+
 namespace mongo {
 
 DocumentStructureEnumerator::iterator DocumentStructureEnumerator::begin() const {
@@ -54,8 +56,8 @@ BSONArrayBuilder DocumentStructureEnumerator::_getArrayBuilderFromArr(BSONArray 
 }
 
 void DocumentStructureEnumerator::_enumerateFixedLenArrs(const std::set<StringData>& fields,
-                                                         const size_t depthRemaining,
-                                                         const size_t length,
+                                                         const std::size_t depthRemaining,
+                                                         const std::size_t length,
                                                          BSONArray arr,
                                                          std::vector<BSONArray>* arrs) {
     if (!length) {
@@ -99,8 +101,8 @@ void DocumentStructureEnumerator::_enumerateFixedLenArrs(const std::set<StringDa
 }
 
 void DocumentStructureEnumerator::_enumerateDocs(const std::set<StringData>& fields,
-                                                 const size_t depthRemaining,
-                                                 const size_t length,
+                                                 const std::size_t depthRemaining,
+                                                 const std::size_t length,
                                                  BSONObj doc,
                                                  std::vector<BSONObj>* docs) {
     if (fields.empty()) {
@@ -151,14 +153,14 @@ void DocumentStructureEnumerator::_enumerateDocs(const std::set<StringData>& fie
 }
 
 std::vector<BSONArray> DocumentStructureEnumerator::_enumerateArrs(
-    const std::set<StringData>& fields, const size_t depth, const size_t length) {
+    const std::set<StringData>& fields, const std::size_t depth, const std::size_t length) {
     std::vector<BSONArray> arrs;
     // We enumerate arrays of each possible length independently of each other to avoid having to
     // account for how different omissions of elements in an array are equivalent to each other.
     // For example, we'd otherwise need to treat omitting the first element and adding x as distinct
     // from adding x and omitting the second element since both yield an array containing only the
     // element x. Without this, we will enumerate duplicate arrays.
-    for (size_t i = 0; i <= length; i++) {
+    for (std::size_t i = 0; i <= length; i++) {
         BSONArray emptyArr;
         _enumerateFixedLenArrs(fields, depth, i, emptyArr, &arrs);
     }
@@ -178,8 +180,8 @@ std::vector<BSONArray> DocumentStructureEnumerator::enumerateArrs() const {
 }
 
 DocumentStructureEnumerator::DocumentStructureEnumerator(std::set<StringData> fields,
-                                                         size_t depth,
-                                                         size_t length)
+                                                         std::size_t depth,
+                                                         std::size_t length)
     : _fields(std::move(fields)), _depth(depth), _length(length) {
     this->_docs = enumerateDocs();
 }

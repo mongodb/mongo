@@ -30,26 +30,33 @@
 
 #include <cstddef>
 #include <set>
-#include <string>
 #include <vector>
 
-#include "mongo/db/jsobj.h"
+#include "mongo/bson/bsonobj.h"
 
 namespace mongo {
+
+class BSONArrayBuilder;
+class StringData;
 
 class DocumentStructureEnumerator {
 public:
     using iterator = std::vector<BSONObj>::const_iterator;
+
     DocumentStructureEnumerator(std::set<StringData> fields, std::size_t depth, std::size_t length);
 
     iterator begin() const;
+
     iterator end() const;
+
     std::vector<BSONObj> getDocs() const;
+
     std::vector<BSONObj> enumerateDocs() const;
+
     std::vector<BSONArray> enumerateArrs() const;
 
 private:
-    static BSONArrayBuilder _getArrayBuilderFromArr(const BSONArray arr);
+    static BSONArrayBuilder _getArrayBuilderFromArr(BSONArray arr);
 
     static void _enumerateFixedLenArrs(const std::set<StringData>& fields,
                                        const std::size_t depthRemaining,
