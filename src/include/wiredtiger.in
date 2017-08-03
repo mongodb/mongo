@@ -1760,8 +1760,19 @@ struct __wt_session {
 
 	/*!
 	 * Write a transactionally consistent snapshot of a database or set of
-	 * objects.  The checkpoint includes all transactions committed before
-	 * the checkpoint starts.  Additionally, checkpoints may optionally be
+	 * objects.  In the absence of transaction timestamps, the checkpoint
+	 * includes all transactions committed before the checkpoint starts.
+	 *
+	 * When timestamps are in use and a \c stable_timestamp has been set
+	 * via WT_CONNECTION::set_timestamp and the checkpoint runs with
+	 * \c use_timestamp=true (the default), updates committed with a
+	 * timestamp larger than the \c stable_timestamp will not be included
+	 * in the checkpoint for tables configured with \c log=(enabled=false).
+	 * For tables with logging enabled, all committed changes will be
+	 * included in the checkpoint (since recovery would roll them forward
+	 * anyway).
+	 *
+	 * Additionally, existing named checkpoints may optionally be
 	 * discarded.
 	 *
 	 * @snippet ex_all.c Checkpoint examples
@@ -2251,8 +2262,9 @@ struct __wt_connection {
 	 * earlier than the specified timestamp.  Supplied values must be
 	 * monotonically increasing.  See @ref transaction_timestamps., a
 	 * string; default empty.}
-	 * @config{stable_timestamp, future checkpoints will be no later than
-	 * the specified timestamp.  Supplied values must be monotonically
+	 * @config{stable_timestamp, checkpoints will not include commits that
+	 * are newer than the specified timestamp in tables configured with \c
+	 * log=(enabled=false). Supplied values must be monotonically
 	 * increasing.  The stable timestamp data stability only applies to
 	 * tables that are not being logged.  See @ref transaction_timestamps.,
 	 * a string; default empty.}

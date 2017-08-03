@@ -217,13 +217,11 @@ class test_timestamp03(wttest.WiredTigerTestCase, suite_subprocess):
 
         # Take a checkpoint using the given configuration.  Then verify
         # whether value2 appears in a copy of that data or not.
-        valcnt2 = nkeys
+        valcnt2 = valcnt3 = nkeys
         if self.val == 'all':
             valcnt = nkeys
         else:
             valcnt = 0
-        # XXX adjust when logged + timestamps is fixed and defined.
-        valcnt3 = valcnt
         self.ckpt_backup(self.value2, valcnt, valcnt2, valcnt3)
         if self.ckptcfg != 'read_timestamp':
             # Update the stable timestamp to the latest, but not the oldest

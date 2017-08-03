@@ -1603,10 +1603,27 @@ __checkpoint_tree_helper(WT_SESSION_IMPL *session, const char *cfg[])
 {
 	WT_BTREE *btree;
 	WT_DECL_RET;
+	WT_TXN *txn;
+	bool with_timestamp;
 
 	btree = S2BT(session);
+	txn = &session->txn;
+
+	/* Are we using a read timestamp for this checkpoint transaction? */
+	with_timestamp = F_ISSET(txn, WT_TXN_HAS_TS_READ);
+
+	/*
+	 * For tables with immediate durability (indicated by having logging
+	 * enabled), ignore any read timestamp configured for the checkpoint.
+	 */
+	if (!F_ISSET(btree, WT_BTREE_NO_LOGGING))
+		F_CLR(txn, WT_TXN_HAS_TS_READ);
 
 	ret = __checkpoint_tree(session, true, cfg);
+
+	/* Restore the use of the timestamp for other tables. */
+	if (with_timestamp)
+		F_SET(txn, WT_TXN_HAS_TS_READ);
 
 	/*
 	 * Whatever happened, we aren't visiting this tree again in this
