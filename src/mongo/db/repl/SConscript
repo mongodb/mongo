@@ -595,7 +595,6 @@ env.Library(
     target='idempotency_test_util',
     source=[
         'idempotency_document_structure.cpp',
-        'idempotency_sequence.cpp',
         'idempotency_update_sequence.cpp',
     ],
     LIBDEPS=[

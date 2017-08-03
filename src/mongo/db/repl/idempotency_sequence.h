@@ -40,8 +40,6 @@ public:
     SequenceGenerator() = default;
 
     virtual BSONObj generate() const = 0;
-
-    std::vector<BSONObj> generateBatch(const std::size_t count) const;
 };
 
 }  // namespace mongo

@@ -39,11 +39,25 @@ namespace mongo {
 class BSONArrayBuilder;
 class StringData;
 
+struct DocumentStructureEnumeratorConfig {
+    DocumentStructureEnumeratorConfig(std::set<StringData> fields_,
+                                      size_t depth_,
+                                      size_t length_,
+                                      bool skipSubDocs_ = false,
+                                      bool skipSubArrs_ = false);
+
+    std::set<StringData> fields = {};
+    size_t depth = 0;
+    size_t length = 0;
+    const bool skipSubDocs = false;
+    const bool skipSubArrs = false;
+};
+
 class DocumentStructureEnumerator {
 public:
     using iterator = std::vector<BSONObj>::const_iterator;
 
-    DocumentStructureEnumerator(std::set<StringData> fields, std::size_t depth, std::size_t length);
+    explicit DocumentStructureEnumerator(DocumentStructureEnumeratorConfig config);
 
     iterator begin() const;
 
@@ -58,26 +72,18 @@ public:
 private:
     static BSONArrayBuilder _getArrayBuilderFromArr(BSONArray arr);
 
-    static void _enumerateFixedLenArrs(const std::set<StringData>& fields,
-                                       const std::size_t depthRemaining,
-                                       const std::size_t length,
+    static void _enumerateFixedLenArrs(const DocumentStructureEnumeratorConfig& config,
                                        BSONArray arr,
                                        std::vector<BSONArray>* arrs);
 
-    static void _enumerateDocs(const std::set<StringData>& fields,
-                               const std::size_t depthRemaining,
-                               const std::size_t length,
+    static void _enumerateDocs(const DocumentStructureEnumeratorConfig& config,
                                BSONObj doc,
                                std::vector<BSONObj>* docs);
 
-    static std::vector<BSONArray> _enumerateArrs(const std::set<StringData>& fields,
-                                                 const std::size_t depth,
-                                                 const std::size_t length);
+    static std::vector<BSONArray> _enumerateArrs(const DocumentStructureEnumeratorConfig& config);
 
 
-    const std::set<StringData> _fields;
-    const std::size_t _depth = 0;
-    const std::size_t _length = 0;
+    const DocumentStructureEnumeratorConfig _config;
     std::vector<BSONObj> _docs;
 };
 

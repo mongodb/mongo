@@ -238,7 +238,7 @@ DocumentStructureEnumerator UpdateSequenceGenerator::_getValidEnumeratorForPath(
         remainingDepth -= 1;
     }
 
-    DocumentStructureEnumerator enumerator(remainingFields, remainingDepth, this->_length);
+    DocumentStructureEnumerator enumerator({remainingFields, remainingDepth, this->_length});
     return enumerator;
 }
 
