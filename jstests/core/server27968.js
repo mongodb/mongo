@@ -55,6 +55,20 @@
             .toArray();
     assert.eq(result, []);
 
+    // Test for a LineString intersecting with the boundary of geowithin sphere (should not return a
+    // match)
+    result = coll.find({
+                     route: {
+                         $geoWithin: {
+                             $centerSphere:
+                                 [[150.60873004726824, -35.15381561943695], 0.02354657484463536]
+                         }
+                     }
+                 },
+                       {"name": 1, "_id": 0})
+                 .toArray();
+    assert.eq(result, []);
+
     // Test for a LineString forming a closed loop rectangle within a geowithin sphere
     route = {
         "name": "LineString3",
@@ -179,8 +193,8 @@
             .toArray();
     assert.eq(result, [{name: "MultiPolygon1"}]);
 
-    // Test for a MultiPolygon with geowithin sphere only one of the polygons (should not return a
-    // match)
+    // Test for a MultiPolygon with geowithin sphere only one of the polygons
+    //(should not return a match)
     result =
         coll.find({
                 boundary: {
@@ -193,6 +207,28 @@
                   {"name": 1, "_id": 0})
             .toArray();
     assert.eq(result, []);
+
+    // Test for a MultiPolygon with the boundary of geowithin sphere
+    // (should not return a match)
+    result =
+        coll.find({
+                boundary: {
+                    $geoWithin: {
+                        $centerSphere:
+                            [[151.2079123018654, -33.86617801222522], 0.0008612335666681253]
+                    }
+                }
+            },
+                  {"name": 1, "_id": 0})
+            .toArray();
+    assert.eq(result, []);
+
+    {
+        boundary: {
+            $geoWithin:
+                {$centerSphere: [[151.2079123018654, -33.86617801222522], 0.0008612335666681253]}
+        }
+    }
 
     // Test for a MultiPolygon (with a hole) within a geowithin sphere
     customRegion = {
