@@ -5,7 +5,7 @@
     "use strict";
 
     db.getMongo().setCausalConsistency();
-    // SERVER-29096 setReadPref and override runCommand to route to the secondary.
+    db.getMongo().setReadPref("secondary");
 
     var originalStartParallelShell = startParallelShell;
     startParallelShell = function(jsCode, port, noConnect) {

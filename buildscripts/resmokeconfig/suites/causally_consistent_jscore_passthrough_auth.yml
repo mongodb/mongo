@@ -124,6 +124,100 @@ selector:
   - jstests/core/or4.js
   - jstests/core/recursion.js
   - jstests/core/temp_cleanup.js
+  # Tests that fail for Causal Consistency with default injected readPreference 'secondary'
+  # "TODO SERVER-30384: These tests assume that documents are returned in the same order they are
+  # written when no sort is specified; however, the order of documents within a collection can
+  # be different across a primary and secondary."
+  - jstests/core/elemMatchProjection.js
+  - jstests/core/find1.js
+  - jstests/core/find4.js
+  - jstests/core/find5.js
+  - jstests/core/fts1.js
+  - jstests/core/find_dedup.js
+  - jstests/core/fts_spanish.js
+  - jstests/core/geo_distinct.js
+  - jstests/core/geo_s2ordering.js
+  - jstests/core/group1.js
+  - jstests/core/nan.js
+  - jstests/core/null2.js
+  - jstests/core/not2.js
+  - jstests/core/snapshot_queries.js
+  - jstests/core/sorta.js
+  - jstests/core/sortc.js
+  - jstests/core/sort3.js
+  - jstests/core/sort4.js
+  - jstests/core/ord.js
+  # plan_cache tests does not work because they check the plan_cache on the primary while the 
+  # cache is created on the secondary.
+  - jstests/core/plan_cache*.js 
+  - jstests/core/collation_plan_cache.js
+  - jstests/core/index_filter_commands.js
+  # Parallel shell is not causally consistent
+  - jstests/core/count10.js
+  - jstests/core/cursora.js
+  - jstests/core/count_plan_summary.js
+  - jstests/core/shellstartparallel.js
+  # TODO SERVER-30463: Tests that that use explain are not causally consistent because explain does
+  # not support readConcern.
+  - jstests/core/agg_hint.js
+  - jstests/core/and3.js
+  - jstests/core/bindata_indexonly.js
+  - jstests/core/bittest.js
+  - jstests/core/coveredIndex1.js
+  - jstests/core/coveredIndex2.js
+  - jstests/core/covered_index_compound_1.js
+  - jstests/core/covered_index_negative_1.js
+  - jstests/core/covered_index_simple_1.js
+  - jstests/core/covered_index_simple_2.js
+  - jstests/core/covered_index_simple_3.js
+  - jstests/core/covered_index_simple_id.js
+  - jstests/core/covered_index_sort_1.js
+  - jstests/core/covered_index_sort_2.js
+  - jstests/core/covered_index_sort_3.js
+  - jstests/core/covered_multikey.js
+  - jstests/core/distinct1.js
+  - jstests/core/distinct_compound_index.js
+  - jstests/core/distinct_index1.js
+  - jstests/core/explain1.js
+  - jstests/core/explain2.js
+  - jstests/core/explain3.js
+  - jstests/core/explain4.js
+  - jstests/core/explain5.js
+  - jstests/core/explain6.js
+  - jstests/core/explain_count.js
+  - jstests/core/explain_delete.js
+  - jstests/core/explain_execution_error.js
+  - jstests/core/explain_find.js
+  - jstests/core/explain_large_bounds.js
+  - jstests/core/explain_multi_plan.js
+  - jstests/core/explain_shell_helpers.js
+  - jstests/core/explain_distinct.js
+  - jstests/core/explain_multikey.js
+  - jstests/core/fts_explain.js
+  - jstests/core/idhack.js
+  - jstests/core/index_bounds_timestamp.js
+  - jstests/core/index_check6.js
+  - jstests/core/index_check7.js
+  - jstests/core/index13.js
+  - jstests/core/indexj.js
+  - jstests/core/indexv.js
+  - jstests/core/indexOtherNamespace.js
+  - jstests/core/ne2.js
+  - jstests/core/record_store_count.js
+  - jstests/core/sort_array.js
+  # TODO SERVER-30466
+  - jstests/core/index_partial_read_ops.js
+  - jstests/core/update_arrayFilters.js
+  # TODO: SERVER-30488
+  - jstests/core/apitest_dbcollection.js 
+  - jstests/core/getmore_invalidated_cursors.js
+  - jstests/core/views/views_stats.js
+  - jstests/core/orf.js #explain.executionStats is not CC
+  - jstests/core/rename7.js
+  # TODO: SERVER-30497
+  - jstests/core/maxscan.js
+  # TODO: SERVER-30498
+  - jstests/core/group2.js
 
 executor:
   config:

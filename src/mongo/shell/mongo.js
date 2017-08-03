@@ -161,6 +161,13 @@ Mongo.prototype._injectAfterClusterTime = function(cmdObj) {
         if (!readConcern.hasOwnProperty("level")) {
             readConcern.level = "local";
         }
+
+        // While the readConcern must be set on the commandObject level i.e. in this case its the
+        // object referenced by cmdObjUnwrapped the $readPreference must be set on the top level.
+        const readPref = this.getReadPref();
+        if (!cmdObj.hasOwnProperty("$readPreference") && readPref) {
+            cmdObj.$readPreference = readPref;
+        }
     }
     return cmdObj;
 };
@@ -200,6 +207,7 @@ Mongo.prototype._setLogicalTimeFromReply = function(res) {
             metadata = this._gossipLogicalTime(metadata);
         }
         const res = original.call(this, dbName, metadata, cmdObj);
+
         this._setLogicalTimeFromReply(res);
         return res;
     };
