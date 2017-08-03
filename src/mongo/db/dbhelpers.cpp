@@ -283,6 +283,7 @@ long long Helpers::removeRange(OperationContext* txn,
     BSONObj max;
 
     {
+        ScopedTransaction scopedXact(txn, MODE_IS);
         AutoGetCollectionForRead ctx(txn, ns);
         Collection* collection = ctx.getCollection();
         if (!collection) {
@@ -331,6 +332,7 @@ long long Helpers::removeRange(OperationContext* txn,
     while (1) {
         // Scoping for write lock.
         {
+            ScopedTransaction scopedXact(txn, MODE_IX);
             AutoGetCollection ctx(txn, NamespaceString(ns), MODE_IX, MODE_IX);
             Collection* collection = ctx.getCollection();
             if (!collection)
