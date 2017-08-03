@@ -3,41 +3,39 @@
     "use strict";
 
     const oplogProjection = {$project: {"_id.ts": 0}};
-
-    /**
-     * Tests the output of a $changeNotification stage, asserting only that the result at the end of
-     * the change stream on the collection 'collection' (the newest matching entry in the oplog) is
-     * equal to 'expectedResult'.
-     *
-     * Note this change assumes that the set of changes will fit within one batch.
-     */
-    function checkLatestChange(expectedResult, collection) {
-        const cmdResponse = assert.commandWorked(db.runCommand({
-            aggregate: collection.getName(),
-            pipeline: [
-                {$changeNotification: {}},
-                // Strip the oplog fields we aren't testing.
-                {$project: {"_id.ts": 0}}
-            ],
-            cursor: {}
-        }));
-        const firstBatch = cmdResponse.cursor.firstBatch;
-        assert.neq(firstBatch.length, 0);
-        assert.docEq(firstBatch[firstBatch.length - 1], expectedResult);
+    function getCollectionNameFromFullNamespace(ns) {
+        return ns.split(/\.(.+)/)[1];
     }
 
-    /**
-     * Tests that there are no changes in the 'collection'.
-     */
-    function assertNoLatestChange(collection) {
-        const cmdResponse = assert.commandWorked(db.runCommand({
-            aggregate: collection.getName(),
-            pipeline: [
-                {$changeNotification: {}},
-            ],
-            cursor: {}
+    // Helpers for testing that pipeline returns correct set of results.  Run startWatchingChanges
+    // with the pipeline, then insert the changes, then run assertNextBatchMatches with the result
+    // of startWatchingChanges and the expected set of results.
+    function startWatchingChanges(pipeline, collection) {
+        // Strip the oplog fields we aren't testing.
+        pipeline.push(oplogProjection);
+        // Waiting for replication assures no previous operations will be included.
+        replTest.awaitReplication();
+        let res = assert.commandWorked(
+            db.runCommand({aggregate: collection.getName(), "pipeline": pipeline, cursor: {}}));
+        assert.neq(res.cursor.id, 0);
+        return res.cursor;
+    }
+
+    function assertNextBatchMatches({cursor, expectedBatch}) {
+        replTest.awaitReplication();
+        if (expectedBatch.length == 0)
+            assert.commandWorked(db.adminCommand(
+                {configureFailPoint: "disableAwaitDataForGetMoreCmd", mode: "alwaysOn"}));
+        let res = assert.commandWorked(db.runCommand({
+            getMore: cursor.id,
+            collection: getCollectionNameFromFullNamespace(cursor.ns),
+            maxTimeMS: 5 * 60 * 1000,
+            batchSize: (expectedBatch.length + 1)
         }));
-        assert.eq(cmdResponse.cursor.firstBatch.length, 0);
+        if (expectedBatch.length == 0)
+            assert.commandWorked(db.adminCommand(
+                {configureFailPoint: "disableAwaitDataForGetMoreCmd", mode: "off"}));
+        assert.docEq(res.cursor.nextBatch, expectedBatch);
     }
 
     let replTest = new ReplSetTest({name: 'changeNotificationTest', nodes: 1});
@@ -49,6 +47,7 @@
     db.getMongo().forceReadMode('commands');
 
     jsTestLog("Testing single insert");
+    let cursor = startWatchingChanges([{$changeNotification: {}}], db.t1);
     assert.writeOK(db.t1.insert({_id: 0, a: 1}));
     let expected = {
         _id: {
@@ -60,9 +59,10 @@
         ns: {coll: "t1", db: "test"},
         operationType: "insert",
     };
-    checkLatestChange(expected, db.t1);
+    assertNextBatchMatches({cursor: cursor, expectedBatch: [expected]});
 
     jsTestLog("Testing second insert");
+    cursor = startWatchingChanges([{$changeNotification: {}}], db.t1);
     assert.writeOK(db.t1.insert({_id: 1, a: 2}));
     expected = {
         _id: {
@@ -74,9 +74,10 @@
         ns: {coll: "t1", db: "test"},
         operationType: "insert",
     };
-    checkLatestChange(expected, db.t1);
+    assertNextBatchMatches({cursor: cursor, expectedBatch: [expected]});
 
     jsTestLog("Testing update");
+    cursor = startWatchingChanges([{$changeNotification: {}}], db.t1);
     assert.writeOK(db.t1.update({_id: 0}, {a: 3}));
     expected = {
         _id: {_id: 0, ns: "test.t1"},
@@ -85,9 +86,10 @@
         ns: {coll: "t1", db: "test"},
         operationType: "replace",
     };
-    checkLatestChange(expected, db.t1);
+    assertNextBatchMatches({cursor: cursor, expectedBatch: [expected]});
 
     jsTestLog("Testing update of another field");
+    cursor = startWatchingChanges([{$changeNotification: {}}], db.t1);
     assert.writeOK(db.t1.update({_id: 0}, {b: 3}));
     expected = {
         _id: {_id: 0, ns: "test.t1"},
@@ -96,9 +98,10 @@
         ns: {coll: "t1", db: "test"},
         operationType: "replace",
     };
-    checkLatestChange(expected, db.t1);
+    assertNextBatchMatches({cursor: cursor, expectedBatch: [expected]});
 
     jsTestLog("Testing upsert");
+    cursor = startWatchingChanges([{$changeNotification: {}}], db.t1);
     assert.writeOK(db.t1.update({_id: 2}, {a: 4}, {upsert: true}));
     expected = {
         _id: {
@@ -110,10 +113,11 @@
         ns: {coll: "t1", db: "test"},
         operationType: "insert",
     };
-    checkLatestChange(expected, db.t1);
+    assertNextBatchMatches({cursor: cursor, expectedBatch: [expected]});
 
     jsTestLog("Testing partial update with $inc");
     assert.writeOK(db.t1.insert({_id: 3, a: 5, b: 1}));
+    cursor = startWatchingChanges([{$changeNotification: {}}], db.t1);
     assert.writeOK(db.t1.update({_id: 3}, {$inc: {b: 2}}));
     expected = {
         _id: {_id: 3, ns: "test.t1"},
@@ -123,9 +127,10 @@
         operationType: "update",
         updateDescription: {removedFields: [], updatedFields: {b: 3}},
     };
-    checkLatestChange(expected, db.t1);
+    assertNextBatchMatches({cursor: cursor, expectedBatch: [expected]});
 
     jsTestLog("Testing delete");
+    cursor = startWatchingChanges([{$changeNotification: {}}], db.t1);
     assert.writeOK(db.t1.remove({_id: 1}));
     expected = {
         _id: {_id: 1, ns: "test.t1"},
@@ -134,11 +139,13 @@
         ns: {coll: "t1", db: "test"},
         operationType: "delete",
     };
-    checkLatestChange(expected, db.t1);
+    assertNextBatchMatches({cursor: cursor, expectedBatch: [expected]});
 
     jsTestLog("Testing intervening write on another collection");
+    cursor = startWatchingChanges([{$changeNotification: {}}], db.t1);
+    let t2cursor = startWatchingChanges([{$changeNotification: {}}], db.t2);
     assert.writeOK(db.t2.insert({_id: 100, c: 1}));
-    checkLatestChange(expected, db.t1);
+    assertNextBatchMatches({cursor: cursor, expectedBatch: []});
     expected = {
         _id: {
             _id: 100,
@@ -149,21 +156,24 @@
         ns: {coll: "t2", db: "test"},
         operationType: "insert",
     };
-    checkLatestChange(expected, db.t2);
+    assertNextBatchMatches({cursor: t2cursor, expectedBatch: [expected]});
 
     jsTestLog("Testing rename");
+    t2cursor = startWatchingChanges([{$changeNotification: {}}], db.t2);
     assert.writeOK(db.t2.renameCollection("t3"));
     expected = {_id: {ns: "test.$cmd"}, operationType: "invalidate", fullDocument: null};
-    checkLatestChange(expected, db.t2);
+    assertNextBatchMatches({cursor: t2cursor, expectedBatch: [expected]});
 
     jsTestLog("Testing insert that looks like rename");
+    const dne1cursor = startWatchingChanges([{$changeNotification: {}}], db.dne1);
+    const dne2cursor = startWatchingChanges([{$changeNotification: {}}], db.dne2);
     assert.writeOK(db.t3.insert({_id: 101, renameCollection: "test.dne1", to: "test.dne2"}));
-    assertNoLatestChange(db.dne1);
-    assertNoLatestChange(db.dne2);
+    assertNextBatchMatches({cursor: dne1cursor, expectedBatch: []});
+    assertNextBatchMatches({cursor: dne2cursor, expectedBatch: []});
 
     // Now make sure the cursor behaves like a tailable awaitData cursor.
     jsTestLog("Testing tailability");
-    let tailableCursor = db.tailable1.aggregate([{$changeNotification: {}}, oplogProjection]);
+    const tailableCursor = db.tailable1.aggregate([{$changeNotification: {}}, oplogProjection]);
     assert(!tailableCursor.hasNext());
     assert.writeOK(db.tailable1.insert({_id: 101, a: 1}));
     assert(tailableCursor.hasNext());
@@ -192,9 +202,11 @@
     // Initial batch size should be zero as there should be no data.
     assert.eq(aggcursor.firstBatch.length, 0);
 
-    // No data, so should return no results, but cursor should remain valid.
+    // No data, so should return no results, but cursor should remain valid.  Note we are
+    // specifically testing awaitdata behavior here, so we cannot use the failpoint to skip the
+    // wait.
     res = assert.commandWorked(
-        db.runCommand({getMore: aggcursor.id, collection: "tailable2", maxTimeMS: 50}));
+        db.runCommand({getMore: aggcursor.id, collection: "tailable2", maxTimeMS: 1000}));
     aggcursor = res.cursor;
     assert.neq(aggcursor.id, 0);
     assert.eq(aggcursor.nextBatch.length, 0);
@@ -294,11 +306,117 @@
 
     jsTestLog("Ensuring attempt to read with legacy operations fails.");
     db.getMongo().forceReadMode('legacy');
-    tailableCursor = db.tailable2.aggregate([{$changeNotification: {}}, oplogProjection],
-                                            {cursor: {batchSize: 0}});
+    const legacyCursor = db.tailable2.aggregate([{$changeNotification: {}}, oplogProjection],
+                                                {cursor: {batchSize: 0}});
     assert.throws(function() {
-        tailableCursor.next();
+        legacyCursor.next();
     }, [], "Legacy getMore expected to fail on changeNotification cursor.");
+
+    /**
+     * Gets one document from the cursor using getMore with awaitData disabled. Asserts if no
+     * document is present.
+     */
+    function getOneDoc(cursor) {
+        replTest.awaitReplication();
+        assert.commandWorked(db.adminCommand(
+            {configureFailPoint: "disableAwaitDataForGetMoreCmd", mode: "alwaysOn"}));
+        let res = assert.commandWorked(db.runCommand({
+            getMore: cursor.id,
+            collection: getCollectionNameFromFullNamespace(cursor.ns),
+            batchSize: 1
+        }));
+        assert.eq(res.cursor.nextBatch.length, 1);
+        assert.commandWorked(
+            db.adminCommand({configureFailPoint: "disableAwaitDataForGetMoreCmd", mode: "off"}));
+        return res.cursor.nextBatch[0];
+    }
+
+    /**
+     * Attempts to get a document from the cursor with awaitData disabled, and asserts if a document
+     * is present.
+     */
+    function assertNextBatchIsEmpty(cursor) {
+        replTest.awaitReplication();
+        assert.commandWorked(db.adminCommand(
+            {configureFailPoint: "disableAwaitDataForGetMoreCmd", mode: "alwaysOn"}));
+        let res = assert.commandWorked(db.runCommand({
+            getMore: cursor.id,
+            collection: getCollectionNameFromFullNamespace(cursor.ns),
+            batchSize: 1
+        }));
+        assert.eq(res.cursor.nextBatch.length, 0);
+        assert.commandWorked(
+            db.adminCommand({configureFailPoint: "disableAwaitDataForGetMoreCmd", mode: "off"}));
+    }
+
+    jsTestLog("Testing resumability");
+    assert.commandWorked(db.createCollection("resume1"));
+
+    // Note we do not project away 'id.ts' as it is part of the resume token.
+    res = assert.commandWorked(
+        db.runCommand({aggregate: "resume1", pipeline: [{$changeNotification: {}}], cursor: {}}));
+    let resumeCursor = res.cursor;
+    assert.neq(resumeCursor.id, 0);
+    assert.eq(resumeCursor.firstBatch.length, 0);
+
+    // Insert a document and save the resulting change notification.
+    assert.writeOK(db.resume1.insert({_id: 1}));
+    const firstInsertChangeDoc = getOneDoc(resumeCursor);
+    assert.docEq(firstInsertChangeDoc.fullDocument, {_id: 1});
+
+    jsTestLog("Testing resume after one document.");
+    res = assert.commandWorked(db.runCommand({
+        aggregate: "resume1",
+        pipeline: [{$changeNotification: {resumeAfter: firstInsertChangeDoc._id}}],
+        cursor: {batchSize: 0}
+    }));
+    resumeCursor = res.cursor;
+    assertNextBatchIsEmpty(resumeCursor);
+
+    jsTestLog("Inserting additional documents.");
+    assert.writeOK(db.resume1.insert({_id: 2}));
+    const secondInsertChangeDoc = getOneDoc(resumeCursor);
+    assert.docEq(secondInsertChangeDoc.fullDocument, {_id: 2});
+    assert.writeOK(db.resume1.insert({_id: 3}));
+    const thirdInsertChangeDoc = getOneDoc(resumeCursor);
+    assert.docEq(thirdInsertChangeDoc.fullDocument, {_id: 3});
+    assertNextBatchIsEmpty(resumeCursor);
+
+    jsTestLog("Testing resume after first document of three.");
+    res = assert.commandWorked(db.runCommand({
+        aggregate: "resume1",
+        pipeline: [{$changeNotification: {resumeAfter: firstInsertChangeDoc._id}}],
+        cursor: {batchSize: 0}
+    }));
+    resumeCursor = res.cursor;
+    assert.docEq(getOneDoc(resumeCursor), secondInsertChangeDoc);
+    assert.docEq(getOneDoc(resumeCursor), thirdInsertChangeDoc);
+    assertNextBatchIsEmpty(resumeCursor);
+
+    jsTestLog("Testing resume after second document of three.");
+    res = assert.commandWorked(db.runCommand({
+        aggregate: "resume1",
+        pipeline: [{$changeNotification: {resumeAfter: secondInsertChangeDoc._id}}],
+        cursor: {batchSize: 0}
+    }));
+    resumeCursor = res.cursor;
+    assert.docEq(getOneDoc(resumeCursor), thirdInsertChangeDoc);
+    assertNextBatchIsEmpty(resumeCursor);
+
+    jsTestLog("Testing that resume is possible after the collection is dropped.");
+    assert(db.resume1.drop());
+    const invalidateDoc = getOneDoc(resumeCursor);
+    assert.eq(invalidateDoc.operationType, "invalidate");
+    res = assert.commandWorked(db.runCommand({
+        aggregate: "resume1",
+        pipeline: [{$changeNotification: {resumeAfter: firstInsertChangeDoc._id}}],
+        cursor: {batchSize: 0}
+    }));
+    resumeCursor = res.cursor;
+    assert.docEq(getOneDoc(resumeCursor), secondInsertChangeDoc);
+    assert.docEq(getOneDoc(resumeCursor), thirdInsertChangeDoc);
+    assert.docEq(getOneDoc(resumeCursor), invalidateDoc);
+    assertNextBatchIsEmpty(resumeCursor);
 
     replTest.stopSet();
 }());

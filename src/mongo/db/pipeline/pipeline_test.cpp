@@ -48,6 +48,7 @@
 #include "mongo/db/pipeline/pipeline.h"
 #include "mongo/db/query/collation/collator_interface_mock.h"
 #include "mongo/db/query/query_test_service_context.h"
+#include "mongo/db/repl/replication_coordinator_mock.h"
 #include "mongo/dbtests/dbtests.h"
 
 namespace PipelineTests {
@@ -57,6 +58,14 @@ using std::string;
 using std::vector;
 
 const NamespaceString kTestNss = NamespaceString("a.collection");
+
+namespace {
+void setMockReplicationCoordinatorOnOpCtx(OperationContext* opCtx) {
+    repl::ReplicationCoordinator::set(
+        opCtx->getServiceContext(),
+        stdx::make_unique<repl::ReplicationCoordinatorMock>(opCtx->getServiceContext()));
+}
+}  // namespace
 
 namespace Optimizations {
 using namespace mongo;
@@ -974,6 +983,7 @@ TEST(PipelineOptimizationTest, ChangeNotificationLookupSwapsWithIndependentMatch
 
     intrusive_ptr<ExpressionContext> expCtx(new ExpressionContextForTest(kTestNss));
     expCtx->opCtx = opCtx.get();
+    setMockReplicationCoordinatorOnOpCtx(expCtx->opCtx);
 
     auto spec = BSON("$changeNotification" << BSON("fullDocument"
                                                    << "lookup"));
@@ -998,6 +1008,7 @@ TEST(PipelineOptimizationTest, ChangeNotificationLookupDoesNotSwapWithMatchOnPos
 
     intrusive_ptr<ExpressionContext> expCtx(new ExpressionContextForTest(kTestNss));
     expCtx->opCtx = opCtx.get();
+    setMockReplicationCoordinatorOnOpCtx(expCtx->opCtx);
 
     auto spec = BSON("$changeNotification" << BSON("fullDocument"
                                                    << "lookup"));
@@ -1472,6 +1483,7 @@ TEST_F(PipelineInitialSourceNSTest, AggregateOneNSValidForFacetPipelineRegardles
 TEST_F(PipelineInitialSourceNSTest, ChangeNotificationIsValidAsFirstStage) {
     const std::vector<BSONObj> rawPipeline = {fromjson("{$changeNotification: {}}")};
     auto ctx = getExpCtx();
+    setMockReplicationCoordinatorOnOpCtx(ctx->opCtx);
     ctx->ns = NamespaceString("a.collection");
     ASSERT_OK(Pipeline::parse(rawPipeline, ctx).getStatus());
 }
@@ -1480,6 +1492,7 @@ TEST_F(PipelineInitialSourceNSTest, ChangeNotificationIsNotValidIfNotFirstStage)
     const std::vector<BSONObj> rawPipeline = {fromjson("{$match: {custom: 'filter'}}"),
                                               fromjson("{$changeNotification: {}}")};
     auto ctx = getExpCtx();
+    setMockReplicationCoordinatorOnOpCtx(ctx->opCtx);
     ctx->ns = NamespaceString("a.collection");
     auto parseStatus = Pipeline::parse(rawPipeline, ctx).getStatus();
     ASSERT_EQ(parseStatus, ErrorCodes::BadValue);
@@ -1490,6 +1503,7 @@ TEST_F(PipelineInitialSourceNSTest, ChangeNotificationIsNotValidIfNotFirstStageI
     const std::vector<BSONObj> rawPipeline = {fromjson("{$match: {custom: 'filter'}}"),
                                               fromjson("{$changeNotification: {}}")};
     auto ctx = getExpCtx();
+    setMockReplicationCoordinatorOnOpCtx(ctx->opCtx);
     ctx->ns = NamespaceString("a.collection");
     auto parseStatus = Pipeline::parseFacetPipeline(rawPipeline, ctx).getStatus();
     ASSERT_EQ(parseStatus, ErrorCodes::BadValue);

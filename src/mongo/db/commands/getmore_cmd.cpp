@@ -66,6 +66,9 @@ namespace mongo {
 
 namespace {
 MONGO_FP_DECLARE(rsStopGetMoreCmd);
+// Failpoint for making getMore not wait for an awaitdata cursor.  Allows us to avoid waiting during
+// tests.
+MONGO_FP_DECLARE(disableAwaitDataForGetMoreCmd);
 }  // namespace
 
 /**
@@ -281,6 +284,8 @@ public:
 
         const bool hasOwnMaxTime = opCtx->hasDeadline();
 
+        const bool disableAwaitDataFailpointActive =
+            MONGO_FAIL_POINT(disableAwaitDataForGetMoreCmd);
         // We assume that cursors created through a DBDirectClient are always used from their
         // original OperationContext, so we do not need to move time to and from the cursor.
         if (!hasOwnMaxTime && !opCtx->getClient()->isInDirectClient()) {
@@ -288,7 +293,7 @@ public:
             // awaitData, then we supply a default time of one second. Otherwise we roll over
             // any leftover time from the maxTimeMS of the operation that spawned this cursor,
             // applying it to this getMore.
-            if (isCursorAwaitData(cursor)) {
+            if (isCursorAwaitData(cursor) && !disableAwaitDataFailpointActive) {
                 opCtx->setDeadlineAfterNowBy(Seconds{1});
             } else if (cursor->getLeftoverMaxTimeMicros() < Microseconds::max()) {
                 opCtx->setDeadlineAfterNowBy(cursor->getLeftoverMaxTimeMicros());
@@ -329,7 +334,7 @@ public:
         Explain::getSummaryStats(*exec, &preExecutionStats);
 
         // Mark this as an AwaitData operation if appropriate.
-        if (isCursorAwaitData(cursor)) {
+        if (isCursorAwaitData(cursor) && !disableAwaitDataFailpointActive) {
             if (request.lastKnownCommittedOpTime)
                 clientsLastKnownCommittedOpTime(opCtx) = request.lastKnownCommittedOpTime.get();
             shouldWaitForInserts(opCtx) = true;

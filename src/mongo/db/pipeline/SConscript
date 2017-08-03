@@ -130,6 +130,7 @@ env.CppUnitTest(
         'document_source_bucket_auto_test.cpp',
         'document_source_bucket_test.cpp',
         'document_source_change_notification_test.cpp',
+        'document_source_check_resume_token_test.cpp',
         'document_source_count_test.cpp',
         'document_source_current_op_test.cpp',
         'document_source_geo_near_test.cpp',
@@ -157,6 +158,7 @@ env.CppUnitTest(
         '$BUILD_DIR/mongo/db/auth/authorization_manager_mock_init',
         '$BUILD_DIR/mongo/db/query/query_test_service_context',
         '$BUILD_DIR/mongo/db/repl/oplog_entry',
+        '$BUILD_DIR/mongo/db/repl/replmocks',
         '$BUILD_DIR/mongo/db/service_context',
         '$BUILD_DIR/mongo/s/is_mongos',
         '$BUILD_DIR/mongo/util/clock_source_mock',
@@ -264,6 +266,7 @@ docSourceEnv.Library(
         '$BUILD_DIR/mongo/db/matcher/expressions',
         '$BUILD_DIR/mongo/db/pipeline/lite_parsed_document_source',
         '$BUILD_DIR/mongo/db/repl/oplog_entry',
+        '$BUILD_DIR/mongo/db/repl/repl_coordinator_interface',
         '$BUILD_DIR/mongo/db/service_context',
         '$BUILD_DIR/mongo/db/stats/top',
         '$BUILD_DIR/mongo/db/storage/encryption_hooks',
@@ -272,6 +275,7 @@ docSourceEnv.Library(
         '$BUILD_DIR/third_party/shim_snappy',
         'accumulator',
         'dependencies',
+        'document_sources_idl',
         'document_value',
         'expression',
         'granularity_rounder',
@@ -312,6 +316,7 @@ env.Library(
     target='document_source_lookup',
     source=[
         'document_source_change_notification.cpp',
+        'document_source_check_resume_token.cpp',
         'document_source_graph_lookup.cpp',
         'document_source_lookup.cpp',
         'document_source_lookup_change_post_image.cpp',
@@ -391,6 +396,7 @@ env.CppUnitTest(
         '$BUILD_DIR/mongo/db/auth/authorization_manager_mock_init',
         '$BUILD_DIR/mongo/db/query/collation/collator_interface_mock',
         '$BUILD_DIR/mongo/db/query/query_test_service_context',
+        '$BUILD_DIR/mongo/db/repl/replmocks',
         '$BUILD_DIR/mongo/db/service_context',
         '$BUILD_DIR/mongo/db/service_context_noop_init',
         '$BUILD_DIR/mongo/s/is_mongos',
@@ -489,5 +495,18 @@ env.Library(
         '$BUILD_DIR/mongo/db/index/index_access_methods',
         '$BUILD_DIR/mongo/db/matcher/expressions_mongod_only',
         '$BUILD_DIR/mongo/db/stats/serveronly',
+    ],
+)
+
+env.Library(
+    target='document_sources_idl',
+    source=[
+        env.Idlc('document_sources.idl')[0],
+        'resume_token.cpp',
+    ],
+    LIBDEPS=[
+        '$BUILD_DIR/mongo/base',
+        '$BUILD_DIR/mongo/idl/idl_parser',
+        'document_value',
     ],
 )

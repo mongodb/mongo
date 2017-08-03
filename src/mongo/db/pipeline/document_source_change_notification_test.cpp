@@ -44,6 +44,7 @@
 #include "mongo/db/pipeline/value.h"
 #include "mongo/db/pipeline/value_comparator.h"
 #include "mongo/db/repl/oplog_entry.h"
+#include "mongo/db/repl/replication_coordinator_mock.h"
 #include "mongo/unittest/unittest.h"
 
 namespace mongo {
@@ -65,9 +66,15 @@ static const Timestamp ts(100, 1);
 static const repl::OpTime optime(ts, 1);
 static const NamespaceString nss("unittests.change_notification");
 
+using ChangeNotificationStageTestNoSetup = AggregationContextFixture;
+
 class ChangeNotificationStageTest : public AggregationContextFixture {
 public:
-    ChangeNotificationStageTest() : AggregationContextFixture(nss) {}
+    ChangeNotificationStageTest() : AggregationContextFixture(nss) {
+        repl::ReplicationCoordinator::set(getExpCtx()->opCtx->getServiceContext(),
+                                          stdx::make_unique<repl::ReplicationCoordinatorMock>(
+                                              getExpCtx()->opCtx->getServiceContext()));
+    }
 
     void checkTransformation(const OplogEntry& entry, const boost::optional<Document> expectedDoc) {
         const auto spec = fromjson("{$changeNotification: {}}");
@@ -106,19 +113,7 @@ TEST_F(ChangeNotificationStageTest, ShouldRejectUnrecognizedOption) {
             BSON(DSChangeNotification::kStageName << BSON("unexpected" << 4)).firstElement(),
             expCtx),
         UserException,
-        40577);
-}
-
-TEST_F(ChangeNotificationStageTest, ShouldRejectResumeAfterOption) {
-    // TODO SERVER-29131 change this test to accept the option.
-    auto expCtx = getExpCtx();
-
-    ASSERT_THROWS_CODE(
-        DSChangeNotification::createFromBson(
-            BSON(DSChangeNotification::kStageName << BSON("resumeAfter" << ts)).firstElement(),
-            expCtx),
-        UserException,
-        40576);
+        40415);
 }
 
 TEST_F(ChangeNotificationStageTest, ShouldRejectNonStringFullDocumentOption) {
@@ -129,7 +124,7 @@ TEST_F(ChangeNotificationStageTest, ShouldRejectNonStringFullDocumentOption) {
             BSON(DSChangeNotification::kStageName << BSON("fullDocument" << true)).firstElement(),
             expCtx),
         UserException,
-        40574);
+        ErrorCodes::TypeMismatch);
 }
 
 TEST_F(ChangeNotificationStageTest, ShouldRejectUnrecognizedFullDocumentOption) {
@@ -142,6 +137,15 @@ TEST_F(ChangeNotificationStageTest, ShouldRejectUnrecognizedFullDocumentOption) 
                            expCtx),
                        UserException,
                        40575);
+}
+
+TEST_F(ChangeNotificationStageTestNoSetup, FailsWithNoReplicationCoordinator) {
+    const auto spec = fromjson("{$changeNotification: {}}");
+
+    ASSERT_THROWS_CODE(
+        DocumentSourceChangeNotification::createFromBson(spec.firstElement(), getExpCtx()),
+        UserException,
+        40573);
 }
 
 TEST_F(ChangeNotificationStageTest, StagesGeneratedCorrectly) {

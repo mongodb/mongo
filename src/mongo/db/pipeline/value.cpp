@@ -1323,4 +1323,17 @@ Value Value::deserializeForSorter(BufReader& buf, const SorterDeserializeSetting
     }
     verify(false);
 }
+
+void Value::serializeForIDL(StringData fieldName, BSONObjBuilder* builder) const {
+    addToBsonObj(builder, fieldName);
 }
+
+void Value::serializeForIDL(BSONArrayBuilder* builder) const {
+    addToBsonArray(builder);
+}
+
+Value Value::deserializeForIDL(const BSONElement& element) {
+    return Value(element);
+}
+
+}  // namespace mongo

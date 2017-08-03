@@ -23,13 +23,42 @@
         return cmdResponse.cursor.firstBatch[cmdResponse.cursor.firstBatch.length - 1];
     }
 
-    jsTestLog("Testing change streams without 'fullDocument' specified");
+    function getCollectionNameFromFullNamespace(ns) {
+        return ns.split(/\.(.+)/)[1];
+    }
 
+    /**
+     * Gets one document from the cursor using getMore with awaitData disabled. Asserts if no
+     * document is present.
+     */
+    function getOneDoc(cursor) {
+        replTest.awaitReplication();
+        assert.commandWorked(db.adminCommand(
+            {configureFailPoint: "disableAwaitDataForGetMoreCmd", mode: "alwaysOn"}));
+        let res = assert.commandWorked(db.runCommand({
+            getMore: cursor.id,
+            collection: getCollectionNameFromFullNamespace(cursor.ns),
+            batchSize: 1
+        }));
+        assert.eq(res.cursor.nextBatch.length, 1);
+        assert.commandWorked(
+            db.adminCommand({configureFailPoint: "disableAwaitDataForGetMoreCmd", mode: "off"}));
+        return res.cursor.nextBatch[0];
+    }
+
+    // Dummy document to give a resumeAfter point.
+    db.createCollection(coll.getName());
+    let res = assert.commandWorked(db.runCommand(
+        {aggregate: coll.getName(), pipeline: [{$changeNotification: {}}], cursor: {}}));
+    assert.writeOK(coll.insert({_id: "dummy"}));
+    const firstChange = getOneDoc(res.cursor);
+
+    jsTestLog("Testing change streams without 'fullDocument' specified");
     // Test that not specifying 'fullDocument' does include a 'fullDocument' in the result for an
     // insert.
     assert.writeOK(coll.insert({_id: "fullDocument not specified"}));
-    let latestChange =
-        getLastResultFromFirstBatch({collection: coll, pipeline: [{$changeNotification: {}}]});
+    let latestChange = getLastResultFromFirstBatch(
+        {collection: coll, pipeline: [{$changeNotification: {resumeAfter: firstChange._id}}]});
     assert.eq(latestChange.operationType, "insert");
     assert.eq(latestChange.fullDocument, {_id: "fullDocument not specified"});
 
@@ -37,16 +66,16 @@
     // replacement-style update.
     assert.writeOK(coll.update({_id: "fullDocument not specified"},
                                {_id: "fullDocument not specified", replaced: true}));
-    latestChange =
-        getLastResultFromFirstBatch({collection: coll, pipeline: [{$changeNotification: {}}]});
+    latestChange = getLastResultFromFirstBatch(
+        {collection: coll, pipeline: [{$changeNotification: {resumeAfter: firstChange._id}}]});
     assert.eq(latestChange.operationType, "replace");
     assert.eq(latestChange.fullDocument, {_id: "fullDocument not specified", replaced: true});
 
     // Test that not specifying 'fullDocument' does not include a 'fullDocument' in the result for
     // a non-replacement update.
     assert.writeOK(coll.update({_id: "fullDocument not specified"}, {$set: {updated: true}}));
-    latestChange =
-        getLastResultFromFirstBatch({collection: coll, pipeline: [{$changeNotification: {}}]});
+    latestChange = getLastResultFromFirstBatch(
+        {collection: coll, pipeline: [{$changeNotification: {resumeAfter: firstChange._id}}]});
     assert.eq(latestChange.operationType, "update");
     assert.eq(null, latestChange.fullDocument);
 
@@ -55,8 +84,10 @@
     // Test that specifying 'fullDocument' as 'none' does include a 'fullDocument' in the result for
     // an insert.
     assert.writeOK(coll.insert({_id: "fullDocument is none"}));
-    latestChange = getLastResultFromFirstBatch(
-        {collection: coll, pipeline: [{$changeNotification: {fullDocument: "none"}}]});
+    latestChange = getLastResultFromFirstBatch({
+        collection: coll,
+        pipeline: [{$changeNotification: {fullDocument: "none", resumeAfter: firstChange._id}}]
+    });
     assert.eq(latestChange.operationType, "insert");
     assert.eq(latestChange.fullDocument, {_id: "fullDocument is none"});
 
@@ -64,16 +95,16 @@
     // a replacement-style update.
     assert.writeOK(
         coll.update({_id: "fullDocument is none"}, {_id: "fullDocument is none", replaced: true}));
-    latestChange =
-        getLastResultFromFirstBatch({collection: coll, pipeline: [{$changeNotification: {}}]});
+    latestChange = getLastResultFromFirstBatch(
+        {collection: coll, pipeline: [{$changeNotification: {resumeAfter: firstChange._id}}]});
     assert.eq(latestChange.operationType, "replace");
     assert.eq(latestChange.fullDocument, {_id: "fullDocument is none", replaced: true});
 
     // Test that specifying 'fullDocument' as 'none' does not include a 'fullDocument' in the result
     // for a non-replacement update.
     assert.writeOK(coll.update({_id: "fullDocument is none"}, {$set: {updated: true}}));
-    latestChange =
-        getLastResultFromFirstBatch({collection: coll, pipeline: [{$changeNotification: {}}]});
+    latestChange = getLastResultFromFirstBatch(
+        {collection: coll, pipeline: [{$changeNotification: {resumeAfter: firstChange._id}}]});
     assert.eq(latestChange.operationType, "update");
     assert.eq(null, latestChange.fullDocument);
 
@@ -82,8 +113,10 @@
     // Test that specifying 'fullDocument' as 'lookup' does include a 'fullDocument' in the result
     // for an insert.
     assert.writeOK(coll.insert({_id: "fullDocument is lookup"}));
-    latestChange = getLastResultFromFirstBatch(
-        {collection: coll, pipeline: [{$changeNotification: {fullDocument: "lookup"}}]});
+    latestChange = getLastResultFromFirstBatch({
+        collection: coll,
+        pipeline: [{$changeNotification: {fullDocument: "lookup", resumeAfter: firstChange._id}}]
+    });
     assert.eq(latestChange.operationType, "insert");
     assert.eq(latestChange.fullDocument, {_id: "fullDocument is lookup"});
 
@@ -91,16 +124,20 @@
     // for a replacement-style update.
     assert.writeOK(coll.update({_id: "fullDocument is lookup"},
                                {_id: "fullDocument is lookup", replaced: true}));
-    latestChange = getLastResultFromFirstBatch(
-        {collection: coll, pipeline: [{$changeNotification: {fullDocument: "lookup"}}]});
+    latestChange = getLastResultFromFirstBatch({
+        collection: coll,
+        pipeline: [{$changeNotification: {fullDocument: "lookup", resumeAfter: firstChange._id}}]
+    });
     assert.eq(latestChange.operationType, "replace");
     assert.eq(latestChange.fullDocument, {_id: "fullDocument is lookup", replaced: true});
 
     // Test that specifying 'fullDocument' as 'lookup' does include a 'fullDocument' in the result
     // for a non-replacement update.
     assert.writeOK(coll.update({_id: "fullDocument is lookup"}, {$set: {updated: true}}));
-    latestChange = getLastResultFromFirstBatch(
-        {collection: coll, pipeline: [{$changeNotification: {fullDocument: "lookup"}}]});
+    latestChange = getLastResultFromFirstBatch({
+        collection: coll,
+        pipeline: [{$changeNotification: {fullDocument: "lookup", resumeAfter: firstChange._id}}]
+    });
     assert.eq(latestChange.operationType, "update");
     assert.eq(latestChange.fullDocument,
               {_id: "fullDocument is lookup", replaced: true, updated: true});
@@ -111,7 +148,7 @@
     latestChange = getLastResultFromFirstBatch({
         collection: coll,
         pipeline: [
-            {$changeNotification: {fullDocument: "lookup"}},
+            {$changeNotification: {fullDocument: "lookup", resumeAfter: firstChange._id}},
             {$match: {operationType: "update"}}
         ]
     });
@@ -124,7 +161,7 @@
     latestChange = getLastResultFromFirstBatch({
         collection: coll,
         pipeline: [
-            {$changeNotification: {fullDocument: "lookup"}},
+            {$changeNotification: {fullDocument: "lookup", resumeAfter: firstChange._id}},
             {$match: {operationType: "update"}}
         ]
     });

@@ -30,6 +30,7 @@
 
 #include "mongo/db/pipeline/document_source.h"
 #include "mongo/db/pipeline/document_source_single_document_transformation.h"
+#include "mongo/db/pipeline/document_sources_gen.h"
 
 namespace mongo {
 
@@ -119,7 +120,7 @@ public:
      * Produce the BSON object representing the filter for the $match stage to filter oplog entries
      * to only those relevant for this $changeNotification stage.
      */
-    static BSONObj buildMatchFilter(const NamespaceString& nss);
+    static BSONObj buildMatchFilter(const NamespaceString& nss, Timestamp startFrom, bool isResume);
 
     /**
      * Parses a $changeNotification stage from 'elem' and produces the $match and transformation

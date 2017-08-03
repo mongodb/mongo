@@ -31,14 +31,17 @@
 #include "mongo/db/pipeline/document_source_change_notification.h"
 
 #include "mongo/bson/simple_bsonelement_comparator.h"
+#include "mongo/db/pipeline/document_source_check_resume_token.h"
 #include "mongo/db/pipeline/document_source_limit.h"
 #include "mongo/db/pipeline/document_source_lookup_change_post_image.h"
 #include "mongo/db/pipeline/document_source_match.h"
 #include "mongo/db/pipeline/document_source_sort.h"
 #include "mongo/db/pipeline/expression.h"
 #include "mongo/db/pipeline/lite_parsed_document_source.h"
+#include "mongo/db/pipeline/resume_token.h"
 #include "mongo/db/repl/oplog_entry.h"
 #include "mongo/db/repl/oplog_entry_gen.h"
+#include "mongo/db/repl/replication_coordinator.h"
 #include "mongo/util/log.h"
 
 namespace mongo {
@@ -115,7 +118,9 @@ private:
 };
 }  // namespace
 
-BSONObj DocumentSourceChangeNotification::buildMatchFilter(const NamespaceString& nss) {
+BSONObj DocumentSourceChangeNotification::buildMatchFilter(const NamespaceString& nss,
+                                                           Timestamp startFrom,
+                                                           bool isResume) {
     auto target = nss.ns();
 
     // 1) Supported commands that have the target db namespace (e.g. test.$cmd) in "ns" field.
@@ -140,7 +145,9 @@ BSONObj DocumentSourceChangeNotification::buildMatchFilter(const NamespaceString
     auto opMatch = BSON("ns" << target);
 
     // Match oplog entries after "start" and are either (3) supported commands or (4) CRUD ops.
-    return BSON("ts" << GT << Timestamp() << "$or" << BSON_ARRAY(opMatch << commandMatch));
+    // Include the resume token if resuming, so we can verify it was still present in the oplog.
+    return BSON("ts" << (isResume ? GTE : GT) << startFrom << "$or"
+                     << BSON_ARRAY(opMatch << commandMatch));
 }
 
 list<intrusive_ptr<DocumentSource>> DocumentSourceChangeNotification::createFromBson(
@@ -153,44 +160,39 @@ list<intrusive_ptr<DocumentSource>> DocumentSourceChangeNotification::createFrom
             "Only default collation is allowed when using a $changeNotification stage.",
             !expCtx->getCollator());
 
-    uassert(40573,
-            str::stream() << "the $changeNotification stage must be specified as an object, got "
-                          << typeName(elem.type()),
-            elem.type() == BSONType::Object);
+    auto replCoord = repl::ReplicationCoordinator::get(expCtx->opCtx);
+    uassert(40573, "The $changeNotification stage is only supported on replica sets", replCoord);
+    Timestamp startFrom = replCoord->getLastCommittedOpTime().getTimestamp();
 
-    bool shouldLookupPostImage = false;
-    for (auto&& option : elem.embeddedObject()) {
-        auto optionName = option.fieldNameStringData();
-        if (optionName == "fullDocument"_sd) {
-            uassert(40574,
-                    str::stream() << "the 'fullDocument' option to the $changeNotification stage "
-                                     "must be a string, got "
-                                  << typeName(option.type()),
-                    option.type() == BSONType::String);
-            auto fullDocOption = option.valueStringData();
-            uassert(40575,
-                    str::stream() << "unrecognized value for the 'fullDocument' option to the "
-                                     "$changeNotification stage. Expected \"none\" or "
-                                     "\"fullDocument\", got \""
-                                  << option.String()
-                                  << "\"",
-                    fullDocOption == "lookup"_sd || fullDocOption == "none"_sd);
-            shouldLookupPostImage = (fullDocOption == "lookup"_sd);
-        } else if (optionName == "resumeAfter"_sd) {
-            uasserted(
-                40576,
-                "the 'resumeAfter' option to the $changeNotification stage is not yet supported");
-        } else {
-            uasserted(40577,
-                      str::stream() << "unrecognized option to $changeNotification stage: \""
-                                    << optionName
-                                    << "\"");
-        }
+    intrusive_ptr<DocumentSourceCheckResumeToken> resumeStage = nullptr;
+    auto spec = DocumentSourceChangeNotificationSpec::parse(
+        IDLParserErrorContext("$changeNotification"), elem.embeddedObject());
+    if (auto resumeAfter = spec.getResumeAfter()) {
+        ResumeToken token = resumeAfter.get();
+        startFrom = token.getTimestamp();
+        DocumentSourceCheckResumeTokenSpec spec;
+        spec.setResumeToken(std::move(token));
+        resumeStage = DocumentSourceCheckResumeToken::create(expCtx, std::move(spec));
     }
+    const bool changeStreamIsResuming = resumeStage != nullptr;
 
-    auto oplogMatch = DocumentSourceOplogMatch::create(buildMatchFilter(expCtx->ns), expCtx);
+    auto fullDocOption = spec.getFullDocument();
+    uassert(40575,
+            str::stream() << "unrecognized value for the 'fullDocument' option to the "
+                             "$changeNotification stage. Expected \"none\" or "
+                             "\"lookup\", got \""
+                          << fullDocOption
+                          << "\"",
+            fullDocOption == "lookup"_sd || fullDocOption == "none"_sd);
+    const bool shouldLookupPostImage = (fullDocOption == "lookup"_sd);
+
+    auto oplogMatch = DocumentSourceOplogMatch::create(
+        buildMatchFilter(expCtx->ns, startFrom, changeStreamIsResuming), expCtx);
     auto transformation = createTransformationStage(elem.embeddedObject(), expCtx);
     list<intrusive_ptr<DocumentSource>> stages = {oplogMatch, transformation};
+    if (resumeStage) {
+        stages.push_back(resumeStage);
+    }
     if (shouldLookupPostImage) {
         stages.push_back(DocumentSourceLookupChangePostImage::create(expCtx));
     }

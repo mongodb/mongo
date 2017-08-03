@@ -328,6 +328,11 @@ public:
         return *this;
     }
 
+    /// Members to support parsing/deserialization from IDL generated code.
+    void serializeForIDL(StringData fieldName, BSONObjBuilder* builder) const;
+    void serializeForIDL(BSONArrayBuilder* builder) const;
+    static Value deserializeForIDL(const BSONElement& element);
+
 private:
     /** This is a "honeypot" to prevent unexpected implicit conversions to the accepted argument
      *  types. bool is especially bad since without this it will accept any pointer.
