@@ -443,7 +443,11 @@ functions:
           set -o errexit
           set -o verbose
 
-          virtualenv --system-site-packages ./venv
+          python_loc=$(which ${python|/opt/mongodbtoolchain/v2/bin/python2})
+          if [ "Windows_NT" = "$OS" ]; then
+            python_loc=$(cygpath -w $python_loc)
+          fi
+          virtualenv --python $python_loc --system-site-packages ./venv
 
   "run tests" :
     command: shell.exec
@@ -454,14 +458,8 @@ functions:
         set -o errexit
         set -o verbose
 
-        # check if virtualenv is set up
-        if [ -d "venv" ]; then
-          if [ "Windows_NT" = "$OS" ]; then
-            . ./venv/Scripts/activate
-          else
-            . ./venv/bin/activate
-          fi
-        fi
+        # activate the virtualenv if it has been set up
+        ${activate_virtualenv}
 
         if [ -f /proc/self/coredump_filter ]; then
           # Set the shell process (and its children processes) to dump ELF headers (bit 4),
@@ -1052,6 +1050,16 @@ pre:
   - command: expansions.update
     params:
        updates:
+       - key: activate_virtualenv
+         value: |
+          # check if virtualenv is set up
+          if [ -d "venv" ]; then
+            if [ "Windows_NT" = "$OS" ]; then
+              . ./venv/Scripts/activate
+            else
+              . ./venv/bin/activate
+            fi
+          fi
        - key: set_sudo
          value: |
           set -o | grep errexit | grep on
@@ -2243,11 +2251,7 @@ tasks:
         set -o errexit
         set -o verbose
 
-        if [ "Windows_NT" = "$OS" ]; then
-          . ./venv/Scripts/activate
-        else
-          . ./venv/bin/activate
-        fi
+        ${activate_virtualenv}
         # we should go back to using pip when it works on SLES
         easy_install --upgrade `cat src/mongo/db/modules/enterprise/jstests/encryptdb/libs/requirements.txt`
   - func: "run tests"
@@ -3877,6 +3881,7 @@ tasks:
   depends_on: []
   commands:
   - *git_get_project
+  - func: "set up virtualenv"
   - command: shell.exec
     timeout_secs: 14400 # Timeout if there is no output for 4 hours
     type: test
@@ -3900,23 +3905,19 @@ tasks:
 
         set -o verbose
 
-        # Create and activate the virtualenv. We use the MongoDB toolchain's Python (with --python)
-        # as this task is only expected to run on a Linux builder.
-        /opt/mongodbtoolchain/v2/bin/virtualenv --python=/opt/mongodbtoolchain/v2/bin/python2 \
-            --system-site-packages ./venv
-        . ./venv/bin/activate
+        ${activate_virtualenv}
 
         # Install Python jira client with pip until it is available in the toolchain
         pip install jira==1.0.10
 
-        python buildscripts/update_test_lifecycle.py \
-            --project ${project} \
-            --commit \
-            --resmokeTagFile "etc/test_lifecycle.yml" \
+        python buildscripts/update_test_lifecycle.py                    \
+            --project ${project}                                        \
+            --commit                                                    \
+            --resmokeTagFile "etc/test_lifecycle.yml"                   \
             --metadataRepo "git@github.com:mongodb/mongo-test-metadata" \
-            --referencesFile "references.yml" \
-            --gitUserName "Test Lifecycle" \
-            --gitUserEmail "build+testlifecycle@mongodb.com" \
+            --referencesFile "references.yml"                           \
+            --gitUserName "Test Lifecycle"                              \
+            --gitUserEmail "build+testlifecycle@mongodb.com"            \
             --jiraConfig ~/.jira.yml
 
 
