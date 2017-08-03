@@ -174,6 +174,16 @@ public:
      * always safe.
      */
     virtual OpTime getAppliedThrough(OperationContext* opCtx) const = 0;
+
+    // -------- Checkpoint Timestamp ----------
+
+    /**
+     * The checkpoint timestamp is the latest timestamp that the database can recover to. It is the
+     * job of a storage engine to call this function with the timestamp of the checkpoint it is
+     * about to take.
+     */
+    virtual void writeCheckpointTimestamp(OperationContext* opCtx, const Timestamp& timestamp) = 0;
+    virtual Timestamp getCheckpointTimestamp(OperationContext* opCtx) = 0;
 };
 
 }  // namespace repl

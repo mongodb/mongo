@@ -68,3 +68,14 @@ structs:
             _id:
                 type: string
                 description: "Always set to 'oplogTruncateAfterPoint' to easily retrieve it."
+    CheckpointTimestampDocument:
+        description: A document that stores the latest timestamp the database can recover to.
+        fields:
+            checkpointTimestamp:
+                type: timestamp
+                description: "The checkpoint timestamp. Should be set by a storage engine
+                              before a checkpoint is taken."
+            _id:
+                type: string
+                description: "Always set to 'checkpointTimestamp' to easily retrieve it."
+
