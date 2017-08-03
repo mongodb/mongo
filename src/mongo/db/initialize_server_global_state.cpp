@@ -135,7 +135,9 @@ static bool forkServer() {
             if (WIFEXITED(pstat)) {
                 if (WEXITSTATUS(pstat)) {
                     cout << "ERROR: child process failed, exited with error number "
-                         << WEXITSTATUS(pstat) << endl;
+                         << WEXITSTATUS(pstat) << endl
+                         << "To see additional information in this output, start without "
+                         << "the \"--fork\" option." << endl;
                 } else {
                     cout << "child process started successfully, parent exiting" << endl;
                 }
