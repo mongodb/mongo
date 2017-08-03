@@ -504,7 +504,7 @@ bool runCommandImpl(OperationContext* opCtx,
     if (operationTime != LogicalTime::kUninitialized &&
         serverGlobalParams.featureCompatibility.version.load() ==
             ServerGlobalParams::FeatureCompatibility::Version::k36) {
-        Command::appendOperationTime(inPlaceReplyBob, operationTime);
+        operationTime.appendAsOperationTime(&inPlaceReplyBob);
     }
 
     inPlaceReplyBob.doneFast();

@@ -32,6 +32,9 @@
 
 namespace mongo {
 
+class BSONObj;
+class BSONObjBuilder;
+
 /**
  *  The LogicalTime class holds the cluster time of the cluster. It provides conversions to
  *  a Timestamp to allow integration with opLog.
@@ -39,7 +42,18 @@ namespace mongo {
 class LogicalTime {
 public:
     LogicalTime() = default;
-    explicit LogicalTime(Timestamp);
+    explicit LogicalTime(Timestamp ts);
+
+    /**
+     * Parses the 'operationTime' field of the specified object and extracts a LogicalTime from it.
+     * If 'operationTime' is missing or of the wrong type, throws.
+     */
+    static LogicalTime fromOperationTime(const BSONObj& obj);
+
+    /**
+     * Appends "operationTime" field to the specified builder as a Timestamp type.
+     */
+    void appendAsOperationTime(BSONObjBuilder* builder) const;
 
     Timestamp asTimestamp() const {
         return Timestamp(_time);
@@ -49,7 +63,6 @@ public:
      * Increases the _time by ticks.
      */
     void addTicks(uint64_t ticks);
-
 
     /**
      * Const version, returns the LogicalTime with increased _time by ticks.
@@ -95,6 +108,10 @@ inline bool operator>(const LogicalTime& l, const LogicalTime& r) {
 
 inline bool operator>=(const LogicalTime& l, const LogicalTime& r) {
     return (l > r || l == r);
+}
+
+inline std::ostream& operator<<(std::ostream& s, const LogicalTime& v) {
+    return (s << v.toString());
 }
 
 }  // namespace mongo

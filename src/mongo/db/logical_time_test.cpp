@@ -105,6 +105,40 @@ TEST(LogicalTime, toUnsignedArray) {
     }
 }
 
+TEST(LogicalTime, appendAsOperationTime) {
+    BSONObjBuilder actualResultBuilder;
+    LogicalTime testTime(Timestamp(1));
+    testTime.appendAsOperationTime(&actualResultBuilder);
+
+    const auto actualResult = actualResultBuilder.obj();
+    ASSERT_BSONOBJ_EQ(BSON("operationTime" << Timestamp(1)), actualResult);
+
+    // Test round-trip works
+    ASSERT_EQ(testTime, LogicalTime::fromOperationTime(actualResult));
+}
+
+TEST(LogicalTime, fromOperationTime) {
+    const auto actualTime = LogicalTime::fromOperationTime(BSON("someOtherCommandParameter"
+                                                                << "Value"
+                                                                << "operationTime"
+                                                                << Timestamp(1)));
+    ASSERT_EQ(LogicalTime(Timestamp(1)), actualTime);
+}
+
+TEST(LogicalTime, fromOperationTimeMissingOperationTime) {
+    ASSERT_THROWS_CODE(LogicalTime::fromOperationTime(BSON("someOtherCommandParameter"
+                                                           << "Value")),
+                       DBException,
+                       ErrorCodes::FailedToParse);
+}
+
+TEST(LogicalTime, fromOperationTimeBadType) {
+    ASSERT_THROWS_CODE(LogicalTime::fromOperationTime(BSON("operationTime"
+                                                           << "BadStringValue")),
+                       DBException,
+                       ErrorCodes::BadValue);
+}
+
 TEST(SignedLogicalTime, roundtrip) {
     Timestamp tX(1);
     TimeProofService tps;

@@ -63,8 +63,8 @@
 #include "mongo/util/version.h"
 
 namespace mongo {
+namespace {
 
-using std::endl;
 using std::string;
 using std::stringstream;
 using std::vector;
@@ -99,7 +99,6 @@ public:
     }
 
 } cmdBuildInfo;
-
 
 class PingCommand : public BasicCommand {
 public:
@@ -264,10 +263,10 @@ public:
                      BSONObjBuilder& result) {
         // sort the commands before building the result BSON
         std::vector<Command*> commands;
-        for (CommandMap::const_iterator it = _commands->begin(); it != _commands->end(); ++it) {
+        for (const auto command : allCommands()) {
             // don't show oldnames
-            if (it->first == it->second->getName())
-                commands.push_back(it->second);
+            if (command.first == command.second->getName())
+                commands.push_back(command.second);
         }
         std::sort(commands.begin(), commands.end(), [](Command* lhs, Command* rhs) {
             return (lhs->getName()) < (rhs->getName());
@@ -295,49 +294,6 @@ public:
     }
 
 } listCommandsCmd;
-
-namespace {
-MONGO_FP_DECLARE(crashOnShutdown);
-
-int* volatile illegalAddress;  // NOLINT - used for fail point only
-}  // namespace
-
-void CmdShutdown::addRequiredPrivileges(const std::string& dbname,
-                                        const BSONObj& cmdObj,
-                                        std::vector<Privilege>* out) {
-    ActionSet actions;
-    actions.addAction(ActionType::shutdown);
-    out->push_back(Privilege(ResourcePattern::forClusterResource(), actions));
-}
-
-void CmdShutdown::shutdownHelper() {
-    MONGO_FAIL_POINT_BLOCK(crashOnShutdown, crashBlock) {
-        const std::string crashHow = crashBlock.getData()["how"].str();
-        if (crashHow == "fault") {
-            ++*illegalAddress;
-        }
-        ::abort();
-    }
-
-    log() << "terminating, shutdown command received";
-
-#if defined(_WIN32)
-    // Signal the ServiceMain thread to shutdown.
-    if (ntservice::shouldStartService()) {
-        shutdownNoTerminate();
-
-        // Client expects us to abruptly close the socket as part of exiting
-        // so this function is not allowed to return.
-        // The ServiceMain thread will quit for us so just sleep until it does.
-        while (true)
-            sleepsecs(60);  // Loop forever
-    } else
-#endif
-    {
-        exitCleanly(EXIT_CLEAN);  // this never returns
-        invariant(false);
-    }
-}
 
 /* for testing purposes only */
 class CmdForceError : public BasicCommand {
@@ -520,4 +476,47 @@ public:
     }
 
 } cmdGetCmdLineOpts;
+
+MONGO_FP_DECLARE(crashOnShutdown);
+int* volatile illegalAddress;  // NOLINT - used for fail point only
+
+}  // namespace
+
+void CmdShutdown::addRequiredPrivileges(const std::string& dbname,
+                                        const BSONObj& cmdObj,
+                                        std::vector<Privilege>* out) {
+    ActionSet actions;
+    actions.addAction(ActionType::shutdown);
+    out->push_back(Privilege(ResourcePattern::forClusterResource(), actions));
 }
+
+void CmdShutdown::shutdownHelper() {
+    MONGO_FAIL_POINT_BLOCK(crashOnShutdown, crashBlock) {
+        const std::string crashHow = crashBlock.getData()["how"].str();
+        if (crashHow == "fault") {
+            ++*illegalAddress;
+        }
+        ::abort();
+    }
+
+    log() << "terminating, shutdown command received";
+
+#if defined(_WIN32)
+    // Signal the ServiceMain thread to shutdown.
+    if (ntservice::shouldStartService()) {
+        shutdownNoTerminate();
+
+        // Client expects us to abruptly close the socket as part of exiting
+        // so this function is not allowed to return.
+        // The ServiceMain thread will quit for us so just sleep until it does.
+        while (true)
+            sleepsecs(60);  // Loop forever
+    } else
+#endif
+    {
+        exitCleanly(EXIT_CLEAN);  // this never returns
+        invariant(false);
+    }
+}
+
+}  // namespace mongo

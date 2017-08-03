@@ -246,10 +246,6 @@ void Command::appendCommandWCStatus(BSONObjBuilder& result,
     }
 }
 
-void Command::appendOperationTime(BSONObjBuilder& result, LogicalTime operationTime) {
-    result.append("operationTime", operationTime.asTimestamp());
-}
-
 Status BasicCommand::checkAuthForRequest(OperationContext* opCtx, const OpMsgRequest& request) {
     uassertNoDocumentSequences(request);
     return checkAuthForOperation(opCtx, request.getDatabase().toString(), request.body);

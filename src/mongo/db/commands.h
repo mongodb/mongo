@@ -40,7 +40,6 @@
 #include "mongo/db/client.h"
 #include "mongo/db/commands/server_status_metric.h"
 #include "mongo/db/jsobj.h"
-#include "mongo/db/logical_time.h"
 #include "mongo/db/query/explain.h"
 #include "mongo/db/write_concern.h"
 #include "mongo/rpc/reply_builder_interface.h"
@@ -50,9 +49,6 @@
 
 namespace mongo {
 
-class BSONObj;
-class BSONObjBuilder;
-class Client;
 class OperationContext;
 class Timer;
 
@@ -264,7 +260,7 @@ public:
                                          const std::string& dbname,
                                          const BSONObj& cmdObj);
 
-    typedef StringMap<Command*> CommandMap;
+    using CommandMap = StringMap<Command*>;
 
     /**
      * Constructs a new command and causes it to be registered with the global commands list. It is
@@ -351,13 +347,12 @@ public:
         _commandsFailed.increment();
     }
 
-protected:
-    static CommandMap* _commands;
-    static CommandMap* _commandsByBestName;
+    static const CommandMap& allCommands() {
+        return *_commands;
+    }
 
-public:
-    static const CommandMap* commandsByBestName() {
-        return _commandsByBestName;
+    static const CommandMap& allCommandsByBestName() {
+        return *_commandsByBestName;
     }
 
     // Counter for unknown commands
@@ -379,11 +374,6 @@ public:
 
     // @return s.isOK()
     static bool appendCommandStatus(BSONObjBuilder& result, const Status& status);
-
-    /**
-     * Appends "operationTime" field to the command result object as a Timestamp type.
-     */
-    static void appendOperationTime(BSONObjBuilder& result, LogicalTime operationTime);
 
     /**
      * Helper for setting a writeConcernError field in the command result object if
@@ -519,6 +509,9 @@ public:
     static BSONObj filterCommandReplyForPassthrough(const BSONObj& reply);
 
 private:
+    static CommandMap* _commands;
+    static CommandMap* _commandsByBestName;
+
     // Counters for how many times this command has been executed and failed
     Counter64 _commandsExecuted;
     Counter64 _commandsFailed;
