@@ -35,7 +35,6 @@ class Repository(object):
     """Represent a local git repository."""
     def __init__(self, directory):
         self.directory = directory
-        self.git_dir = os.path.join(directory, ".git")
 
     def git_add(self, args):
         """Run a git add command."""
@@ -228,27 +227,18 @@ class Repository(object):
         """Run the git command and return a GitCommandResult instance.
         """
 
-        # These two flags are the equivalent of -C in newer versions of Git
-        # but we use these to support versions pre 1.8.5 but it depends on the command
-        # and what the current directory is
-        if cmd == "ls-files":
-            # This command depends on the current directory and works better if not run with
-            # work-tree
-            params = ["git", "--git-dir", self.git_dir, cmd] + args
-        elif cmd == "rebase":
-            # The 'rebase' command will only work with -C.
-            params = ["git", "-C", self.directory, cmd] + args
-        else:
-            params = ["git", "--git-dir", self.git_dir, "--work-tree", self.directory, cmd] + args
-        return self._run_process(cmd, params)
+        params = ["git", cmd] + args
+        return self._run_process(cmd, params, cwd=self.directory)
 
     @staticmethod
-    def _run_process(cmd, params):
-        LOGGER.debug("Running '%s'", " ".join(params))
-        process = subprocess.Popen(params, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
+    def _run_process(cmd, params, cwd=None):
+        process = subprocess.Popen(params, stdout=subprocess.PIPE, stderr=subprocess.PIPE, cwd=cwd)
         (stdout, stderr) = process.communicate()
-        if process.returncode and stderr:
-            LOGGER.error("Error output of '%s': %s", " ".join(params), stderr)
+        if process.returncode:
+            if stdout:
+                LOGGER.error("Output of '%s': %s", " ".join(params), stdout)
+            if stderr:
+                LOGGER.error("Error output of '%s': %s", " ".join(params), stderr)
         return GitCommandResult(cmd, params, process.returncode, stdout=stdout, stderr=stderr)
 
 
