@@ -295,7 +295,7 @@ Status runAggregate(OperationContext* opCtx,
     auto curOp = CurOp::get(opCtx);
     {
         const LiteParsedPipeline liteParsedPipeline(request);
-        if (liteParsedPipeline.hasChangeNotification()) {
+        if (liteParsedPipeline.hasChangeStream()) {
             nss = NamespaceString::kRsOplogNamespace;
         }
 
@@ -396,7 +396,7 @@ Status runAggregate(OperationContext* opCtx,
                                   uassertStatusOK(resolveInvolvedNamespaces(opCtx, request))));
         expCtx->tempDir = storageGlobalParams.dbpath + "/_tmp";
 
-        if (liteParsedPipeline.hasChangeNotification()) {
+        if (liteParsedPipeline.hasChangeStream()) {
             expCtx->tailableMode = ExpressionContext::TailableMode::kTailableAndAwaitData;
         }
 

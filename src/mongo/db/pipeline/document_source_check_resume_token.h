@@ -35,7 +35,7 @@
 namespace mongo {
 
 /**
- * This stage is used internally for change notifications to ensure that the resume token is in the
+ * This stage is used internally for change streams to ensure that the resume token is in the
  * stream.  It is not intended to be created by the user.
  */
 class DocumentSourceCheckResumeToken final : public DocumentSource,

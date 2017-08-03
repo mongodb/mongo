@@ -62,10 +62,9 @@ DocumentSource::GetNextResult DocumentSourceLookupChangePostImage::getNext() {
     if (!input.isAdvanced()) {
         return input;
     }
-    auto opTypeVal = assertFieldHasType(input.getDocument(),
-                                        DocumentSourceChangeNotification::kOperationTypeField,
-                                        BSONType::String);
-    if (opTypeVal.getString() != DocumentSourceChangeNotification::kUpdateOpType) {
+    auto opTypeVal = assertFieldHasType(
+        input.getDocument(), DocumentSourceChangeStream::kOperationTypeField, BSONType::String);
+    if (opTypeVal.getString() != DocumentSourceChangeStream::kUpdateOpType) {
         return input;
     }
 
@@ -76,10 +75,9 @@ DocumentSource::GetNextResult DocumentSourceLookupChangePostImage::getNext() {
 
 NamespaceString DocumentSourceLookupChangePostImage::assertNamespaceMatches(
     const Document& inputDoc) const {
-    auto namespaceObject = assertFieldHasType(inputDoc,
-                                              DocumentSourceChangeNotification::kNamespaceField,
-                                              BSONType::Object)
-                               .getDocument();
+    auto namespaceObject =
+        assertFieldHasType(inputDoc, DocumentSourceChangeStream::kNamespaceField, BSONType::Object)
+            .getDocument();
     auto dbName = assertFieldHasType(namespaceObject, "db"_sd, BSONType::String);
     auto collectionName = assertFieldHasType(namespaceObject, "coll"_sd, BSONType::String);
     NamespaceString nss(dbName.getString(), collectionName.getString());
@@ -96,7 +94,7 @@ Value DocumentSourceLookupChangePostImage::lookupPostImage(const Document& updat
     auto nss = assertNamespaceMatches(updateOp);
 
     auto documentKey = assertFieldHasType(
-        updateOp, DocumentSourceChangeNotification::kDocumentKeyField, BSONType::Object);
+        updateOp, DocumentSourceChangeStream::kDocumentKeyField, BSONType::Object);
     auto matchSpec = BSON("$match" << documentKey);
 
     // TODO SERVER-29134 we need to extract the namespace from the document and set them on the new

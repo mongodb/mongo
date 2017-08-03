@@ -1,5 +1,5 @@
-// Tests that the $changeNotification returns an error when run against a mongos.
-// TODO SERVER-29141 Add support for sending a $changeNotification to a mongos.
+// Tests that the $changeStream returns an error when run against a mongos.
+// TODO SERVER-29141 Add support for sending a $changeStream to a mongos.
 (function() {
     "use strict";
 
@@ -9,25 +9,25 @@
 
     const testDB = shardingTest.getDB("test");
 
-    // Test that $changeNotification is disallowed on an unsharded collection.
+    // Test that $changeStream is disallowed on an unsharded collection.
     const unshardedCollection = testDB.getCollection("unsharded");
 
     // Insert a document to ensure the database exists on mongos.
     assert.writeOK(unshardedCollection.insert({}));
 
-    assertErrorCode(unshardedCollection, [{$changeNotification: {}}], 40567);
+    assertErrorCode(unshardedCollection, [{$changeStream: {}}], 40567);
 
     // Test that it is still disallowed even if it's not specified as the first stage.
-    assertErrorCode(unshardedCollection, [{$project: {_id: 0}}, {$changeNotification: {}}], 40567);
+    assertErrorCode(unshardedCollection, [{$project: {_id: 0}}, {$changeStream: {}}], 40567);
 
-    // Test that $changeNotification is disallowed on a sharded collection.
+    // Test that $changeStream is disallowed on a sharded collection.
 
     assert(shardingTest.adminCommand({enableSharding: "test"}));
     assert(shardingTest.adminCommand({shardCollection: "test.sharded", key: {_id: 1}}));
     const shardedCollection = testDB.getCollection("sharded");
 
-    assertErrorCode(shardedCollection, [{$changeNotification: {}}], 40567);
+    assertErrorCode(shardedCollection, [{$changeStream: {}}], 40567);
 
     // Test that it is still disallowed even if it's not specified as the first stage.
-    assertErrorCode(shardedCollection, [{$project: {_id: 0}}, {$changeNotification: {}}], 40567);
+    assertErrorCode(shardedCollection, [{$project: {_id: 0}}, {$changeStream: {}}], 40567);
 }());

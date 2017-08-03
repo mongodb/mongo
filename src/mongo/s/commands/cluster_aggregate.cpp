@@ -338,10 +338,10 @@ Status ClusterAggregate::runAggregate(OperationContext* opCtx,
     StringMap<ExpressionContext::ResolvedNamespace> resolvedNamespaces;
     LiteParsedPipeline liteParsedPipeline(request);
 
-    // TODO SERVER-29141 support $changeNotification on mongos.
+    // TODO SERVER-29141 support $changeStream on mongos.
     uassert(40567,
-            "$changeNotification is not yet supported on mongos",
-            !liteParsedPipeline.hasChangeNotification());
+            "$changeStream is not yet supported on mongos",
+            !liteParsedPipeline.hasChangeStream());
 
     for (auto&& nss : liteParsedPipeline.getInvolvedNamespaces()) {
         const auto resolvedNsRoutingInfo =

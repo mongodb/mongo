@@ -37,8 +37,8 @@
 namespace mongo {
 
 ResumeToken::ResumeToken(const BSONObj& resumeBson) {
-    auto token = ResumeTokenInternal::parse(
-        IDLParserErrorContext("$changeNotification.resumeAfter"), resumeBson);
+    auto token =
+        ResumeTokenInternal::parse(IDLParserErrorContext("$changeStream.resumeAfter"), resumeBson);
     _timestamp = token.getTimestamp();
     _namespace = token.getNs().toString();
     _documentId = token.getDocumentId();

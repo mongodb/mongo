@@ -39,7 +39,7 @@ types:
     # parse it as a type with a custom class now.
     resumeToken:
         bson_serialization_type: object
-        description: An object representing a resume token for change notification
+        description: An object representing a resume token for a change stream
         cpp_type: ResumeToken
         serializer: ResumeToken::toBSON
         deserializer: ResumeToken::parse
@@ -54,8 +54,8 @@ types:
         deserializer: Value::deserializeForIDL
 
 structs:
-  DocumentSourceChangeNotificationSpec:
-      description: A document used to specify the $changeNotification stage of an aggregation
+  DocumentSourceChangeStreamSpec:
+      description: A document used to specify the $changeStream stage of an aggregation
                    pipeline.
       fields:
           resumeAfter:

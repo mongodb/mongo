@@ -92,13 +92,13 @@ public:
     }
 
     /**
-     * Returns true if the pipeline has a $changeNotification stage.
+     * Returns true if the pipeline has a $changeStream stage.
      *
-     * TODO SERVER-29506 Require $changeNotification to be the first stage.
+     * TODO SERVER-29506 Require $changeStream to be the first stage.
      */
-    bool hasChangeNotification() const {
+    bool hasChangeStream() const {
         return std::any_of(_stageSpecs.begin(), _stageSpecs.end(), [](auto&& spec) {
-            return spec->isChangeNotification();
+            return spec->isChangeStream();
         });
     }
 

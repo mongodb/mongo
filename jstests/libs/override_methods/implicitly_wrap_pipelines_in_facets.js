@@ -32,7 +32,7 @@
         }
 
         const stagesDisallowedInsideFacet = [
-            '$changeNotification',
+            '$changeStream',
             '$collStats',
             '$facet',
             '$geoNear',

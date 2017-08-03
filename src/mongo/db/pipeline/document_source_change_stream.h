@@ -35,10 +35,10 @@
 namespace mongo {
 
 /**
- * The $changeNotification stage is an alias for a cursor on oplog followed by a $match stage and a
+ * The $changeStream stage is an alias for a cursor on oplog followed by a $match stage and a
  * transform stage on mongod.
  */
-class DocumentSourceChangeNotification final {
+class DocumentSourceChangeStream final {
 public:
     class LiteParsed final : public LiteParsedDocumentSource {
     public:
@@ -47,7 +47,7 @@ public:
             return stdx::make_unique<LiteParsed>();
         }
 
-        bool isChangeNotification() const final {
+        bool isChangeStream() const final {
             return true;
         }
 
@@ -65,12 +65,11 @@ public:
 
     class Transformation : public DocumentSourceSingleDocumentTransformation::TransformerInterface {
     public:
-        Transformation(BSONObj changeNotificationSpec)
-            : _changeNotificationSpec(changeNotificationSpec.getOwned()) {}
+        Transformation(BSONObj changeStreamSpec) : _changeStreamSpec(changeStreamSpec.getOwned()) {}
         ~Transformation() = default;
         Document applyTransformation(const Document& input) final;
         TransformerType getType() const final {
-            return TransformerType::kChangeNotificationTransformation;
+            return TransformerType::kChangeStreamTransformation;
         };
         void optimize() final{};
         Document serializeStageOptions(
@@ -79,7 +78,7 @@ public:
         DocumentSource::GetModPathsReturn getModifiedPaths() const final;
 
     private:
-        BSONObj _changeNotificationSpec;
+        BSONObj _changeStreamSpec;
     };
 
     // The name of the field where the document key (_id and shard key, if present) will be found
@@ -102,7 +101,7 @@ public:
     static constexpr StringData kOperationTypeField = "operationType"_sd;
 
     // The name of this stage.
-    static constexpr StringData kStageName = "$changeNotification"_sd;
+    static constexpr StringData kStageName = "$changeStream"_sd;
 
     // The name of the field where the timestamp of the change will be located after the
     // transformation. The timestamp will be located inside the change identifier, so the full path
@@ -118,24 +117,24 @@ public:
 
     /**
      * Produce the BSON object representing the filter for the $match stage to filter oplog entries
-     * to only those relevant for this $changeNotification stage.
+     * to only those relevant for this $changeStream stage.
      */
     static BSONObj buildMatchFilter(const NamespaceString& nss, Timestamp startFrom, bool isResume);
 
     /**
-     * Parses a $changeNotification stage from 'elem' and produces the $match and transformation
+     * Parses a $changeStream stage from 'elem' and produces the $match and transformation
      * stages required.
      */
     static std::list<boost::intrusive_ptr<DocumentSource>> createFromBson(
         BSONElement elem, const boost::intrusive_ptr<ExpressionContext>& expCtx);
 
     static boost::intrusive_ptr<DocumentSource> createTransformationStage(
-        BSONObj changeNotificationSpec, const boost::intrusive_ptr<ExpressionContext>& pExpCtx);
+        BSONObj changeStreamSpec, const boost::intrusive_ptr<ExpressionContext>& pExpCtx);
 
 private:
-    // It is illegal to construct a DocumentSourceChangeNotification directly, use createFromBson()
+    // It is illegal to construct a DocumentSourceChangeStream directly, use createFromBson()
     // instead.
-    DocumentSourceChangeNotification() = default;
+    DocumentSourceChangeStream() = default;
 };
 
 }  // namespace mongo

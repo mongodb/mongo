@@ -38,7 +38,7 @@ const char* DocumentSourceCheckResumeToken::getSourceName() const {
 
 Value DocumentSourceCheckResumeToken::serialize(
     boost::optional<ExplainOptions::Verbosity> explain) const {
-    // This stage is created by the DocumentSourceChangeNotification stage, so serializing it here
+    // This stage is created by the DocumentSourceChangeStream stage, so serializing it here
     // would result in it being created twice.
     return Value();
 }
@@ -57,7 +57,7 @@ DocumentSource::GetNextResult DocumentSourceCheckResumeToken::getNext() {
 
     auto nextInput = pSource->getNext();
     uassert(40584,
-            "resume of change notification was not possible, as no change data was found. ",
+            "resume of change stream was not possible, as no change data was found. ",
             _seenDoc || !nextInput.isEOF());
 
     if (_seenDoc || !nextInput.isAdvanced())
@@ -67,12 +67,11 @@ DocumentSource::GetNextResult DocumentSourceCheckResumeToken::getNext() {
     auto doc = nextInput.getDocument();
 
     ResumeToken receivedToken(doc["_id"]);
-    uassert(
-        40585,
-        str::stream()
-            << "resume of change notification was not possible, as the resume token was not found. "
-            << receivedToken.toDocument().toString(),
-        receivedToken == _token);
+    uassert(40585,
+            str::stream()
+                << "resume of change stream was not possible, as the resume token was not found. "
+                << receivedToken.toDocument().toString(),
+            receivedToken == _token);
     // Don't return the document which has the token; the user has already seen it.
     return pSource->getNext();
 }

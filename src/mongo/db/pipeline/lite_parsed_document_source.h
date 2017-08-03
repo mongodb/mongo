@@ -98,9 +98,9 @@ public:
     }
 
     /**
-     * Returns true if this is a $changeNotification stage.
+     * Returns true if this is a $changeStream stage.
      */
-    virtual bool isChangeNotification() const {
+    virtual bool isChangeStream() const {
         return false;
     }
 

@@ -1,9 +1,9 @@
-// Test that an insert to an unrelated collection will not cause a $changeNotification getMore to
+// Test that an insert to an unrelated collection will not cause a $changeStream getMore to
 // return early.
 (function() {
     "use strict";
 
-    const replTest = new ReplSetTest({name: "changeNotificationTest", nodes: 1});
+    const replTest = new ReplSetTest({name: "changeStreamTest", nodes: 1});
     const nodes = replTest.startSet();
     replTest.initiate();
     replTest.awaitReplication();
@@ -107,7 +107,7 @@ eventFn();`,
     let res = assert.commandWorked(db.runCommand({
         aggregate: changesCollection.getName(),
         // Project out the timestamp, since that's subject to change unpredictably.
-        pipeline: [{$changeNotification: {}}, {$project: {"_id.ts": 0}}],
+        pipeline: [{$changeStream: {}}, {$project: {"_id.ts": 0}}],
         cursor: {}
     }));
     const changeCursorId = res.cursor.id;
@@ -144,7 +144,7 @@ eventFn();`,
         aggregate: changesCollection.getName(),
         // This pipeline filters changes to only invalidates, so regular inserts should not cause
         // the awaitData to end early.
-        pipeline: [{$changeNotification: {}}, {$match: {operationType: "invalidate"}}],
+        pipeline: [{$changeStream: {}}, {$match: {operationType: "invalidate"}}],
         cursor: {}
     }));
     assert.eq(

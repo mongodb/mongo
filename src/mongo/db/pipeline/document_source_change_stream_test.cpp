@@ -35,7 +35,7 @@
 #include "mongo/bson/json.h"
 #include "mongo/db/pipeline/aggregation_context_fixture.h"
 #include "mongo/db/pipeline/document.h"
-#include "mongo/db/pipeline/document_source_change_notification.h"
+#include "mongo/db/pipeline/document_source_change_stream.h"
 #include "mongo/db/pipeline/document_source_limit.h"
 #include "mongo/db/pipeline/document_source_match.h"
 #include "mongo/db/pipeline/document_source_mock.h"
@@ -60,17 +60,17 @@ using std::vector;
 using D = Document;
 using V = Value;
 
-using DSChangeNotification = DocumentSourceChangeNotification;
+using DSChangeStream = DocumentSourceChangeStream;
 
 static const Timestamp ts(100, 1);
 static const repl::OpTime optime(ts, 1);
-static const NamespaceString nss("unittests.change_notification");
+static const NamespaceString nss("unittests.change_stream");
 
-using ChangeNotificationStageTestNoSetup = AggregationContextFixture;
+using ChangeStreamStageTestNoSetup = AggregationContextFixture;
 
-class ChangeNotificationStageTest : public AggregationContextFixture {
+class ChangeStreamStageTest : public AggregationContextFixture {
 public:
-    ChangeNotificationStageTest() : AggregationContextFixture(nss) {
+    ChangeStreamStageTest() : AggregationContextFixture(nss) {
         repl::ReplicationCoordinator::set(getExpCtx()->opCtx->getServiceContext(),
                                           stdx::make_unique<repl::ReplicationCoordinatorMock>(
                                               getExpCtx()->opCtx->getServiceContext()));
@@ -79,7 +79,7 @@ public:
     void checkTransformation(const OplogEntry& entry, const boost::optional<Document> expectedDoc) {
         const auto spec = fromjson("{$changeNotification: {}}");
         list<intrusive_ptr<DocumentSource>> result =
-            DSChangeNotification::createFromBson(spec.firstElement(), getExpCtx());
+            DSChangeStream::createFromBson(spec.firstElement(), getExpCtx());
 
         auto match = dynamic_cast<DocumentSourceMatch*>(result.front().get());
         ASSERT(match);
@@ -89,7 +89,7 @@ public:
         // Check the oplog entry is transformed correctly.
         auto transform = result.back().get();
         ASSERT(transform);
-        ASSERT_EQ(string(transform->getSourceName()), DSChangeNotification::kStageName);
+        ASSERT_EQ(string(transform->getSourceName()), DSChangeStream::kStageName);
         transform->setSource(match);
 
         auto next = transform->getNext();
@@ -105,86 +105,84 @@ public:
     }
 };
 
-TEST_F(ChangeNotificationStageTest, ShouldRejectUnrecognizedOption) {
+TEST_F(ChangeStreamStageTest, ShouldRejectUnrecognizedOption) {
     auto expCtx = getExpCtx();
 
     ASSERT_THROWS_CODE(
-        DSChangeNotification::createFromBson(
-            BSON(DSChangeNotification::kStageName << BSON("unexpected" << 4)).firstElement(),
-            expCtx),
+        DSChangeStream::createFromBson(
+            BSON(DSChangeStream::kStageName << BSON("unexpected" << 4)).firstElement(), expCtx),
         UserException,
         40415);
 }
 
-TEST_F(ChangeNotificationStageTest, ShouldRejectNonStringFullDocumentOption) {
+TEST_F(ChangeStreamStageTest, ShouldRejectNonStringFullDocumentOption) {
     auto expCtx = getExpCtx();
 
     ASSERT_THROWS_CODE(
-        DSChangeNotification::createFromBson(
-            BSON(DSChangeNotification::kStageName << BSON("fullDocument" << true)).firstElement(),
+        DSChangeStream::createFromBson(
+            BSON(DSChangeStream::kStageName << BSON("fullDocument" << true)).firstElement(),
             expCtx),
         UserException,
         ErrorCodes::TypeMismatch);
 }
 
-TEST_F(ChangeNotificationStageTest, ShouldRejectUnrecognizedFullDocumentOption) {
+TEST_F(ChangeStreamStageTest, ShouldRejectUnrecognizedFullDocumentOption) {
     auto expCtx = getExpCtx();
 
-    ASSERT_THROWS_CODE(DSChangeNotification::createFromBson(
-                           BSON(DSChangeNotification::kStageName << BSON("fullDocument"
-                                                                         << "unrecognized"))
-                               .firstElement(),
-                           expCtx),
-                       UserException,
-                       40575);
-}
-
-TEST_F(ChangeNotificationStageTestNoSetup, FailsWithNoReplicationCoordinator) {
-    const auto spec = fromjson("{$changeNotification: {}}");
-
     ASSERT_THROWS_CODE(
-        DocumentSourceChangeNotification::createFromBson(spec.firstElement(), getExpCtx()),
+        DSChangeStream::createFromBson(BSON(DSChangeStream::kStageName << BSON("fullDocument"
+                                                                               << "unrecognized"))
+                                           .firstElement(),
+                                       expCtx),
         UserException,
-        40573);
+        40575);
 }
 
-TEST_F(ChangeNotificationStageTest, StagesGeneratedCorrectly) {
-    const auto spec = fromjson("{$changeNotification: {}}");
+TEST_F(ChangeStreamStageTestNoSetup, FailsWithNoReplicationCoordinator) {
+    const auto spec = fromjson("{$changeStream: {}}");
+
+    ASSERT_THROWS_CODE(DocumentSourceChangeStream::createFromBson(spec.firstElement(), getExpCtx()),
+                       UserException,
+                       40573);
+}
+
+TEST_F(ChangeStreamStageTest, StagesGeneratedCorrectly) {
+    const auto spec = fromjson("{$changeStream: {}}");
 
     list<intrusive_ptr<DocumentSource>> result =
-        DSChangeNotification::createFromBson(spec.firstElement(), getExpCtx());
+        DSChangeStream::createFromBson(spec.firstElement(), getExpCtx());
 
     ASSERT_EQUALS(result.size(), 2UL);
     ASSERT_TRUE(dynamic_cast<DocumentSourceMatch*>(result.front().get()));
-    ASSERT_EQUALS(string(result.front()->getSourceName()), DSChangeNotification::kStageName);
-    ASSERT_EQUALS(string(result.back()->getSourceName()), DSChangeNotification::kStageName);
+    ASSERT_EQUALS(string(result.front()->getSourceName()), DSChangeStream::kStageName);
+    ASSERT_EQUALS(string(result.back()->getSourceName()), DSChangeStream::kStageName);
 
     // TODO: Check explain result.
 }
 
-TEST_F(ChangeNotificationStageTest, TransformInsert) {
+TEST_F(ChangeStreamStageTest, TransformInsert) {
     OplogEntry insert(optime, 1, OpTypeEnum::kInsert, nss, BSON("_id" << 1 << "x" << 1));
     // Insert
     Document expectedInsert{
-        {DSChangeNotification::kIdField, D{{"ts", ts}, {"ns", nss.ns()}, {"_id", 1}}},
-        {DSChangeNotification::kOperationTypeField, DSChangeNotification::kInsertOpType},
-        {DSChangeNotification::kFullDocumentField, D{{"_id", 1}, {"x", 1}}},
-        {DSChangeNotification::kNamespaceField, D{{"db", nss.db()}, {"coll", nss.coll()}}},
-        {DSChangeNotification::kDocumentKeyField, D{{"_id", 1}}},
+        {DSChangeStream::kIdField, D{{"ts", ts}, {"ns", nss.ns()}, {"_id", 1}}},
+        {DSChangeStream::kOperationTypeField, DSChangeStream::kInsertOpType},
+        {DSChangeStream::kFullDocumentField, D{{"_id", 1}, {"x", 1}}},
+        {DSChangeStream::kNamespaceField, D{{"db", nss.db()}, {"coll", nss.coll()}}},
+        {DSChangeStream::kDocumentKeyField, D{{"_id", 1}}},
     };
     checkTransformation(insert, expectedInsert);
 }
 
-TEST_F(ChangeNotificationStageTest, TransformUpdateFields) {
+TEST_F(ChangeStreamStageTest, TransformUpdateFields) {
     OplogEntry updateField(
         optime, 1, OpTypeEnum::kUpdate, nss, BSON("$set" << BSON("y" << 1)), BSON("_id" << 1));
     // Update fields
     Document expectedUpdateField{
-        {DSChangeNotification::kIdField, D{{"ts", ts}, {"ns", nss.ns()}, {"_id", 1}}},
-        {DSChangeNotification::kOperationTypeField, DSChangeNotification::kUpdateOpType},
-        {DSChangeNotification::kFullDocumentField, BSONNULL},
-        {DSChangeNotification::kNamespaceField, D{{"db", nss.db()}, {"coll", nss.coll()}}},
-        {DSChangeNotification::kDocumentKeyField, D{{"_id", 1}}},
+        {DSChangeStream::kIdField, D{{"ts", ts}, {"ns", nss.ns()}, {"_id", 1}}},
+        {DSChangeStream::kOperationTypeField, DSChangeStream::kUpdateOpType},
+        {DSChangeStream::kFullDocumentField, BSONNULL},
+        {DSChangeStream::kNamespaceField, D{{"db", nss.db()}, {"coll", nss.coll()}}},
+        {DSChangeStream::kDocumentKeyField, D{{"_id", 1}}},
         {
             "updateDescription", D{{"updatedFields", D{{"y", 1}}}, {"removedFields", vector<V>()}},
         },
@@ -192,50 +190,50 @@ TEST_F(ChangeNotificationStageTest, TransformUpdateFields) {
     checkTransformation(updateField, expectedUpdateField);
 }
 
-TEST_F(ChangeNotificationStageTest, TransformRemoveFields) {
+TEST_F(ChangeStreamStageTest, TransformRemoveFields) {
     OplogEntry removeField(
         optime, 1, OpTypeEnum::kUpdate, nss, BSON("$unset" << BSON("y" << 1)), BSON("_id" << 1));
     // Remove fields
     Document expectedRemoveField{
-        {DSChangeNotification::kIdField, D{{"ts", ts}, {"ns", nss.ns()}, {"_id", 1}}},
-        {DSChangeNotification::kOperationTypeField, DSChangeNotification::kUpdateOpType},
-        {DSChangeNotification::kFullDocumentField, BSONNULL},
-        {DSChangeNotification::kNamespaceField, D{{"db", nss.db()}, {"coll", nss.coll()}}},
-        {DSChangeNotification::kDocumentKeyField, D{{"_id", 1}}},
+        {DSChangeStream::kIdField, D{{"ts", ts}, {"ns", nss.ns()}, {"_id", 1}}},
+        {DSChangeStream::kOperationTypeField, DSChangeStream::kUpdateOpType},
+        {DSChangeStream::kFullDocumentField, BSONNULL},
+        {DSChangeStream::kNamespaceField, D{{"db", nss.db()}, {"coll", nss.coll()}}},
+        {DSChangeStream::kDocumentKeyField, D{{"_id", 1}}},
         {
             "updateDescription", D{{"updatedFields", D{}}, {"removedFields", vector<V>{V("y"_sd)}}},
         }};
     checkTransformation(removeField, expectedRemoveField);
 }
 
-TEST_F(ChangeNotificationStageTest, TransformReplace) {
+TEST_F(ChangeStreamStageTest, TransformReplace) {
     OplogEntry replace(
         optime, 1, OpTypeEnum::kUpdate, nss, BSON("_id" << 1 << "y" << 1), BSON("_id" << 1));
     // Replace
     Document expectedReplace{
-        {DSChangeNotification::kIdField, D{{"ts", ts}, {"ns", nss.ns()}, {"_id", 1}}},
-        {DSChangeNotification::kOperationTypeField, DSChangeNotification::kReplaceOpType},
-        {DSChangeNotification::kFullDocumentField, D{{"_id", 1}, {"y", 1}}},
-        {DSChangeNotification::kNamespaceField, D{{"db", nss.db()}, {"coll", nss.coll()}}},
-        {DSChangeNotification::kDocumentKeyField, D{{"_id", 1}}},
+        {DSChangeStream::kIdField, D{{"ts", ts}, {"ns", nss.ns()}, {"_id", 1}}},
+        {DSChangeStream::kOperationTypeField, DSChangeStream::kReplaceOpType},
+        {DSChangeStream::kFullDocumentField, D{{"_id", 1}, {"y", 1}}},
+        {DSChangeStream::kNamespaceField, D{{"db", nss.db()}, {"coll", nss.coll()}}},
+        {DSChangeStream::kDocumentKeyField, D{{"_id", 1}}},
     };
     checkTransformation(replace, expectedReplace);
 }
 
-TEST_F(ChangeNotificationStageTest, TransformDelete) {
+TEST_F(ChangeStreamStageTest, TransformDelete) {
     OplogEntry deleteEntry(optime, 1, OpTypeEnum::kDelete, nss, BSON("_id" << 1));
     // Delete
     Document expectedDelete{
-        {DSChangeNotification::kIdField, D{{"ts", ts}, {"ns", nss.ns()}, {"_id", 1}}},
-        {DSChangeNotification::kOperationTypeField, DSChangeNotification::kDeleteOpType},
-        {DSChangeNotification::kFullDocumentField, BSONNULL},
-        {DSChangeNotification::kNamespaceField, D{{"db", nss.db()}, {"coll", nss.coll()}}},
-        {DSChangeNotification::kDocumentKeyField, D{{"_id", 1}}},
+        {DSChangeStream::kIdField, D{{"ts", ts}, {"ns", nss.ns()}, {"_id", 1}}},
+        {DSChangeStream::kOperationTypeField, DSChangeStream::kDeleteOpType},
+        {DSChangeStream::kFullDocumentField, BSONNULL},
+        {DSChangeStream::kNamespaceField, D{{"db", nss.db()}, {"coll", nss.coll()}}},
+        {DSChangeStream::kDocumentKeyField, D{{"_id", 1}}},
     };
     checkTransformation(deleteEntry, expectedDelete);
 }
 
-TEST_F(ChangeNotificationStageTest, TransformInvalidate) {
+TEST_F(ChangeStreamStageTest, TransformInvalidate) {
     NamespaceString otherColl("test.bar");
 
     OplogEntry dropColl = createCommand(BSON("drop" << nss.coll()));
@@ -245,16 +243,16 @@ TEST_F(ChangeNotificationStageTest, TransformInvalidate) {
 
     // Invalidate entry includes $cmd namespace in _id and doesn't have a document id.
     Document expectedInvalidate{
-        {DSChangeNotification::kIdField, D{{"ts", ts}, {"ns", nss.getCommandNS().ns()}}},
-        {DSChangeNotification::kOperationTypeField, DSChangeNotification::kInvalidateOpType},
-        {DSChangeNotification::kFullDocumentField, BSONNULL},
+        {DSChangeStream::kIdField, D{{"ts", ts}, {"ns", nss.getCommandNS().ns()}}},
+        {DSChangeStream::kOperationTypeField, DSChangeStream::kInvalidateOpType},
+        {DSChangeStream::kFullDocumentField, BSONNULL},
     };
     for (auto& entry : {dropColl, dropDB, rename}) {
         checkTransformation(entry, expectedInvalidate);
     }
 }
 
-TEST_F(ChangeNotificationStageTest, TransformInvalidateRenameDropTarget) {
+TEST_F(ChangeStreamStageTest, TransformInvalidateRenameDropTarget) {
     // renameCollection command with dropTarget: true has the namespace of the "from" database.
     NamespaceString otherColl("test.bar");
     OplogEntry rename(optime,
@@ -263,14 +261,14 @@ TEST_F(ChangeNotificationStageTest, TransformInvalidateRenameDropTarget) {
                       otherColl.getCommandNS(),
                       BSON("renameCollection" << otherColl.ns() << "to" << nss.ns()));
     Document expectedInvalidate{
-        {DSChangeNotification::kIdField, D{{"ts", ts}, {"ns", otherColl.getCommandNS().ns()}}},
-        {DSChangeNotification::kOperationTypeField, DSChangeNotification::kInvalidateOpType},
-        {DSChangeNotification::kFullDocumentField, BSONNULL},
+        {DSChangeStream::kIdField, D{{"ts", ts}, {"ns", otherColl.getCommandNS().ns()}}},
+        {DSChangeStream::kOperationTypeField, DSChangeStream::kInvalidateOpType},
+        {DSChangeStream::kFullDocumentField, BSONNULL},
     };
     checkTransformation(rename, expectedInvalidate);
 }
 
-TEST_F(ChangeNotificationStageTest, MatchFiltersCreateCollection) {
+TEST_F(ChangeStreamStageTest, MatchFiltersCreateCollection) {
     auto collSpec =
         D{{"create", "foo"_sd},
           {"idIndex", D{{"v", 2}, {"key", D{{"_id", 1}}}, {"name", "_id_"_sd}, {"ns", nss.ns()}}}};
@@ -278,24 +276,24 @@ TEST_F(ChangeNotificationStageTest, MatchFiltersCreateCollection) {
     checkTransformation(createColl, boost::none);
 }
 
-TEST_F(ChangeNotificationStageTest, MatchFiltersNoOp) {
+TEST_F(ChangeStreamStageTest, MatchFiltersNoOp) {
     OplogEntry noOp(
         optime, 1, OpTypeEnum::kNoop, NamespaceString(), fromjson("{'msg':'new primary'}"));
     checkTransformation(noOp, boost::none);
 }
 
-TEST_F(ChangeNotificationStageTest, MatchFiltersCreateIndex) {
+TEST_F(ChangeStreamStageTest, MatchFiltersCreateIndex) {
     auto indexSpec = D{{"v", 2}, {"key", D{{"a", 1}}}, {"name", "a_1"_sd}, {"ns", nss.ns()}};
     NamespaceString indexNs(nss.getSystemIndexesCollection());
     OplogEntry createIndex(optime, 1, OpTypeEnum::kInsert, indexNs, indexSpec.toBson());
     checkTransformation(createIndex, boost::none);
 }
 
-TEST_F(ChangeNotificationStageTest, TransformationShouldBeAbleToReParseSerializedStage) {
+TEST_F(ChangeStreamStageTest, TransformationShouldBeAbleToReParseSerializedStage) {
     auto expCtx = getExpCtx();
 
-    auto originalSpec = BSON(DSChangeNotification::kStageName << BSONObj());
-    auto allStages = DSChangeNotification::createFromBson(originalSpec.firstElement(), expCtx);
+    auto originalSpec = BSON(DSChangeStream::kStageName << BSONObj());
+    auto allStages = DSChangeStream::createFromBson(originalSpec.firstElement(), expCtx);
     ASSERT_EQ(allStages.size(), 2UL);
     auto stage = allStages.back();
     ASSERT(dynamic_cast<DocumentSourceSingleDocumentTransformation*>(stage.get()));
@@ -316,7 +314,7 @@ TEST_F(ChangeNotificationStageTest, TransformationShouldBeAbleToReParseSerialize
     //
     auto serializedBson = serializedDoc.toBson();
     auto roundTripped = uassertStatusOK(Pipeline::create(
-        DSChangeNotification::createFromBson(serializedBson.firstElement(), expCtx), expCtx));
+        DSChangeStream::createFromBson(serializedBson.firstElement(), expCtx), expCtx));
 
     auto newSerialization = roundTripped->serialize();
 

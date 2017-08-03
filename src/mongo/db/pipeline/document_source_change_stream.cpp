@@ -28,7 +28,7 @@
 
 #define MONGO_LOG_DEFAULT_COMPONENT ::mongo::logger::LogComponent::kCommand
 
-#include "mongo/db/pipeline/document_source_change_notification.h"
+#include "mongo/db/pipeline/document_source_change_stream.h"
 
 #include "mongo/bson/simple_bsonelement_comparator.h"
 #include "mongo/db/pipeline/document_source_check_resume_token.h"
@@ -52,26 +52,26 @@ using std::list;
 using std::string;
 using std::vector;
 
-// The $changeNotification stage is an alias for many stages, but we need to be able to serialize
+// The $changeStream stage is an alias for many stages, but we need to be able to serialize
 // and re-parse the pipeline. To make this work, the 'transformation' stage will serialize itself
 // with the original specification, and all other stages that are created during the alias expansion
 // will not serialize themselves.
-REGISTER_MULTI_STAGE_ALIAS(changeNotification,
-                           DocumentSourceChangeNotification::LiteParsed::parse,
-                           DocumentSourceChangeNotification::createFromBson);
+REGISTER_MULTI_STAGE_ALIAS(changeStream,
+                           DocumentSourceChangeStream::LiteParsed::parse,
+                           DocumentSourceChangeStream::createFromBson);
 
-constexpr StringData DocumentSourceChangeNotification::kDocumentKeyField;
-constexpr StringData DocumentSourceChangeNotification::kFullDocumentField;
-constexpr StringData DocumentSourceChangeNotification::kIdField;
-constexpr StringData DocumentSourceChangeNotification::kNamespaceField;
-constexpr StringData DocumentSourceChangeNotification::kOperationTypeField;
-constexpr StringData DocumentSourceChangeNotification::kStageName;
-constexpr StringData DocumentSourceChangeNotification::kTimestmapField;
-constexpr StringData DocumentSourceChangeNotification::kUpdateOpType;
-constexpr StringData DocumentSourceChangeNotification::kDeleteOpType;
-constexpr StringData DocumentSourceChangeNotification::kReplaceOpType;
-constexpr StringData DocumentSourceChangeNotification::kInsertOpType;
-constexpr StringData DocumentSourceChangeNotification::kInvalidateOpType;
+constexpr StringData DocumentSourceChangeStream::kDocumentKeyField;
+constexpr StringData DocumentSourceChangeStream::kFullDocumentField;
+constexpr StringData DocumentSourceChangeStream::kIdField;
+constexpr StringData DocumentSourceChangeStream::kNamespaceField;
+constexpr StringData DocumentSourceChangeStream::kOperationTypeField;
+constexpr StringData DocumentSourceChangeStream::kStageName;
+constexpr StringData DocumentSourceChangeStream::kTimestmapField;
+constexpr StringData DocumentSourceChangeStream::kUpdateOpType;
+constexpr StringData DocumentSourceChangeStream::kDeleteOpType;
+constexpr StringData DocumentSourceChangeStream::kReplaceOpType;
+constexpr StringData DocumentSourceChangeStream::kInsertOpType;
+constexpr StringData DocumentSourceChangeStream::kInvalidateOpType;
 
 namespace {
 
@@ -90,8 +90,8 @@ public:
 
     const char* getSourceName() const final {
         // This is used in error reporting, particularly if we find this stage in a position other
-        // than first, so report the name as $changeNotification.
-        return "$changeNotification";
+        // than first, so report the name as $changeStream.
+        return DocumentSourceChangeStream::kStageName.rawData();
     }
 
     StageConstraints constraints() const final {
@@ -116,11 +116,21 @@ private:
     DocumentSourceOplogMatch(BSONObj filter, const intrusive_ptr<ExpressionContext>& expCtx)
         : DocumentSourceMatch(std::move(filter), expCtx) {}
 };
+
+void checkValueType(const Value v, const StringData filedName, BSONType expectedType) {
+    uassert(40532,
+            str::stream() << "Entry field \"" << filedName << "\" should be "
+                          << typeName(expectedType)
+                          << ", found: "
+                          << typeName(v.getType()),
+            (v.getType() == expectedType));
+}
+
 }  // namespace
 
-BSONObj DocumentSourceChangeNotification::buildMatchFilter(const NamespaceString& nss,
-                                                           Timestamp startFrom,
-                                                           bool isResume) {
+BSONObj DocumentSourceChangeStream::buildMatchFilter(const NamespaceString& nss,
+                                                     Timestamp startFrom,
+                                                     bool isResume) {
     auto target = nss.ns();
 
     // 1) Supported commands that have the target db namespace (e.g. test.$cmd) in "ns" field.
@@ -150,23 +160,22 @@ BSONObj DocumentSourceChangeNotification::buildMatchFilter(const NamespaceString
                      << BSON_ARRAY(opMatch << commandMatch));
 }
 
-list<intrusive_ptr<DocumentSource>> DocumentSourceChangeNotification::createFromBson(
+list<intrusive_ptr<DocumentSource>> DocumentSourceChangeStream::createFromBson(
     BSONElement elem, const intrusive_ptr<ExpressionContext>& expCtx) {
     // TODO: Add sharding support here (SERVER-29141).
-    uassert(40470,
-            "The $changeNotification stage is not supported on sharded systems.",
-            !expCtx->inRouter);
+    uassert(
+        40470, "The $changeStream stage is not supported on sharded systems.", !expCtx->inRouter);
     uassert(40471,
-            "Only default collation is allowed when using a $changeNotification stage.",
+            "Only default collation is allowed when using a $changeStream stage.",
             !expCtx->getCollator());
 
     auto replCoord = repl::ReplicationCoordinator::get(expCtx->opCtx);
-    uassert(40573, "The $changeNotification stage is only supported on replica sets", replCoord);
+    uassert(40573, "The $changeStream stage is only supported on replica sets", replCoord);
     Timestamp startFrom = replCoord->getLastCommittedOpTime().getTimestamp();
 
     intrusive_ptr<DocumentSourceCheckResumeToken> resumeStage = nullptr;
-    auto spec = DocumentSourceChangeNotificationSpec::parse(
-        IDLParserErrorContext("$changeNotification"), elem.embeddedObject());
+    auto spec = DocumentSourceChangeStreamSpec::parse(IDLParserErrorContext("$changeStream"),
+                                                      elem.embeddedObject());
     if (auto resumeAfter = spec.getResumeAfter()) {
         ResumeToken token = resumeAfter.get();
         startFrom = token.getTimestamp();
@@ -179,7 +188,7 @@ list<intrusive_ptr<DocumentSource>> DocumentSourceChangeNotification::createFrom
     auto fullDocOption = spec.getFullDocument();
     uassert(40575,
             str::stream() << "unrecognized value for the 'fullDocument' option to the "
-                             "$changeNotification stage. Expected \"none\" or "
+                             "$changeStream stage. Expected \"none\" or "
                              "\"lookup\", got \""
                           << fullDocOption
                           << "\"",
@@ -199,26 +208,13 @@ list<intrusive_ptr<DocumentSource>> DocumentSourceChangeNotification::createFrom
     return stages;
 }
 
-intrusive_ptr<DocumentSource> DocumentSourceChangeNotification::createTransformationStage(
-    BSONObj changeNotificationSpec, const intrusive_ptr<ExpressionContext>& expCtx) {
+intrusive_ptr<DocumentSource> DocumentSourceChangeStream::createTransformationStage(
+    BSONObj changeStreamSpec, const intrusive_ptr<ExpressionContext>& expCtx) {
     return intrusive_ptr<DocumentSource>(new DocumentSourceSingleDocumentTransformation(
-        expCtx, stdx::make_unique<Transformation>(changeNotificationSpec), kStageName.toString()));
+        expCtx, stdx::make_unique<Transformation>(changeStreamSpec), kStageName.toString()));
 }
 
-namespace {
-void checkValueType(Value v, StringData filedName, BSONType expectedType) {
-    uassert(40532,
-            str::stream() << "Oplog entry field \"" << filedName << "\" should be "
-                          << typeName(expectedType)
-                          << ", found: "
-                          << typeName(v.getType()),
-            (v.getType() == expectedType));
-}
-}  // namespace
-
-Document DocumentSourceChangeNotification::Transformation::applyTransformation(
-    const Document& input) {
-
+Document DocumentSourceChangeStream::Transformation::applyTransformation(const Document& input) {
     MutableDocument doc;
 
     // Extract the fields we need.
@@ -238,7 +234,7 @@ Document DocumentSourceChangeNotification::Transformation::applyTransformation(
     Value updateDescription;
 
     // Deal with CRUD operations and commands.
-    auto opType = repl::OpType_parse(IDLParserErrorContext("ChangeNotificationEntry.op"), op);
+    auto opType = repl::OpType_parse(IDLParserErrorContext("ChangeStreamEntry.op"), op);
     switch (opType) {
         case repl::OpTypeEnum::kInsert: {
             operationType = kInsertOpType;
@@ -307,12 +303,12 @@ Document DocumentSourceChangeNotification::Transformation::applyTransformation(
     return doc.freeze();
 }
 
-Document DocumentSourceChangeNotification::Transformation::serializeStageOptions(
+Document DocumentSourceChangeStream::Transformation::serializeStageOptions(
     boost::optional<ExplainOptions::Verbosity> explain) const {
-    return Document(_changeNotificationSpec);
+    return Document(_changeStreamSpec);
 }
 
-DocumentSource::GetDepsReturn DocumentSourceChangeNotification::Transformation::addDependencies(
+DocumentSource::GetDepsReturn DocumentSourceChangeStream::Transformation::addDependencies(
     DepsTracker* deps) const {
     deps->fields.insert(repl::OplogEntry::kOpTypeFieldName.toString());
     deps->fields.insert(repl::OplogEntry::kTimestampFieldName.toString());
@@ -322,8 +318,8 @@ DocumentSource::GetDepsReturn DocumentSourceChangeNotification::Transformation::
     return DocumentSource::GetDepsReturn::EXHAUSTIVE_ALL;
 }
 
-DocumentSource::GetModPathsReturn
-DocumentSourceChangeNotification::Transformation::getModifiedPaths() const {
+DocumentSource::GetModPathsReturn DocumentSourceChangeStream::Transformation::getModifiedPaths()
+    const {
     // All paths are modified.
     return {DocumentSource::GetModPathsReturn::Type::kAllPaths, std::set<string>{}, {}};
 }

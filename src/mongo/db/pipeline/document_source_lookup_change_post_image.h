@@ -29,12 +29,12 @@
 #pragma once
 
 #include "mongo/db/pipeline/document_source.h"
-#include "mongo/db/pipeline/document_source_change_notification.h"
+#include "mongo/db/pipeline/document_source_change_stream.h"
 
 namespace mongo {
 
 /**
- * Part of the change notification API machinery used to look up the post-image of a document. Uses
+ * Part of the change stream API machinery used to look up the post-image of a document. Uses
  * the "documentKey" field of the input to look up the new version of the document.
  *
  * Uses the ExpressionContext to determine what collection to look up into.
@@ -44,7 +44,7 @@ class DocumentSourceLookupChangePostImage final : public DocumentSourceNeedsMong
 public:
     static constexpr StringData kStageName = "$_internalLookupChangePostImage"_sd;
     static constexpr StringData kFullDocumentFieldName =
-        DocumentSourceChangeNotification::kFullDocumentField;
+        DocumentSourceChangeStream::kFullDocumentField;
 
     /**
      * Creates a DocumentSourceLookupChangePostImage stage.
@@ -71,9 +71,9 @@ public:
     GetDepsReturn getDependencies(DepsTracker* deps) const {
         // The namespace is not technically needed yet, but we will if there is more than one
         // collection involved.
-        deps->fields.insert(DocumentSourceChangeNotification::kNamespaceField.toString());
-        deps->fields.insert(DocumentSourceChangeNotification::kDocumentKeyField.toString());
-        deps->fields.insert(DocumentSourceChangeNotification::kOperationTypeField.toString());
+        deps->fields.insert(DocumentSourceChangeStream::kNamespaceField.toString());
+        deps->fields.insert(DocumentSourceChangeStream::kDocumentKeyField.toString());
+        deps->fields.insert(DocumentSourceChangeStream::kOperationTypeField.toString());
         // This stage does not restrict the output fields to a finite set, and has no impact on
         // whether metadata is available or needed.
         return SEE_NEXT;

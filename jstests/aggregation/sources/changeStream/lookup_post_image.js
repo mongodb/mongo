@@ -1,6 +1,6 @@
-// Tests the 'fullDocument' argument to the $changeNotification stage.
+// Tests the 'fullDocument' argument to the $changeStream stage.
 //
-// The $changeNotification stage is not allowed within a $facet stage.
+// The $changeStream stage is not allowed within a $facet stage.
 // @tags: [do_not_wrap_aggregations_in_facets]
 (function() {
     "use strict";
@@ -48,8 +48,8 @@
 
     // Dummy document to give a resumeAfter point.
     db.createCollection(coll.getName());
-    let res = assert.commandWorked(db.runCommand(
-        {aggregate: coll.getName(), pipeline: [{$changeNotification: {}}], cursor: {}}));
+    let res = assert.commandWorked(
+        db.runCommand({aggregate: coll.getName(), pipeline: [{$changeStream: {}}], cursor: {}}));
     assert.writeOK(coll.insert({_id: "dummy"}));
     const firstChange = getOneDoc(res.cursor);
 
@@ -58,7 +58,7 @@
     // insert.
     assert.writeOK(coll.insert({_id: "fullDocument not specified"}));
     let latestChange = getLastResultFromFirstBatch(
-        {collection: coll, pipeline: [{$changeNotification: {resumeAfter: firstChange._id}}]});
+        {collection: coll, pipeline: [{$changeStream: {resumeAfter: firstChange._id}}]});
     assert.eq(latestChange.operationType, "insert");
     assert.eq(latestChange.fullDocument, {_id: "fullDocument not specified"});
 
@@ -67,7 +67,7 @@
     assert.writeOK(coll.update({_id: "fullDocument not specified"},
                                {_id: "fullDocument not specified", replaced: true}));
     latestChange = getLastResultFromFirstBatch(
-        {collection: coll, pipeline: [{$changeNotification: {resumeAfter: firstChange._id}}]});
+        {collection: coll, pipeline: [{$changeStream: {resumeAfter: firstChange._id}}]});
     assert.eq(latestChange.operationType, "replace");
     assert.eq(latestChange.fullDocument, {_id: "fullDocument not specified", replaced: true});
 
@@ -75,7 +75,7 @@
     // a non-replacement update.
     assert.writeOK(coll.update({_id: "fullDocument not specified"}, {$set: {updated: true}}));
     latestChange = getLastResultFromFirstBatch(
-        {collection: coll, pipeline: [{$changeNotification: {resumeAfter: firstChange._id}}]});
+        {collection: coll, pipeline: [{$changeStream: {resumeAfter: firstChange._id}}]});
     assert.eq(latestChange.operationType, "update");
     assert.eq(null, latestChange.fullDocument);
 
@@ -86,7 +86,7 @@
     assert.writeOK(coll.insert({_id: "fullDocument is none"}));
     latestChange = getLastResultFromFirstBatch({
         collection: coll,
-        pipeline: [{$changeNotification: {fullDocument: "none", resumeAfter: firstChange._id}}]
+        pipeline: [{$changeStream: {fullDocument: "none", resumeAfter: firstChange._id}}]
     });
     assert.eq(latestChange.operationType, "insert");
     assert.eq(latestChange.fullDocument, {_id: "fullDocument is none"});
@@ -96,7 +96,7 @@
     assert.writeOK(
         coll.update({_id: "fullDocument is none"}, {_id: "fullDocument is none", replaced: true}));
     latestChange = getLastResultFromFirstBatch(
-        {collection: coll, pipeline: [{$changeNotification: {resumeAfter: firstChange._id}}]});
+        {collection: coll, pipeline: [{$changeStream: {resumeAfter: firstChange._id}}]});
     assert.eq(latestChange.operationType, "replace");
     assert.eq(latestChange.fullDocument, {_id: "fullDocument is none", replaced: true});
 
@@ -104,7 +104,7 @@
     // for a non-replacement update.
     assert.writeOK(coll.update({_id: "fullDocument is none"}, {$set: {updated: true}}));
     latestChange = getLastResultFromFirstBatch(
-        {collection: coll, pipeline: [{$changeNotification: {resumeAfter: firstChange._id}}]});
+        {collection: coll, pipeline: [{$changeStream: {resumeAfter: firstChange._id}}]});
     assert.eq(latestChange.operationType, "update");
     assert.eq(null, latestChange.fullDocument);
 
@@ -115,7 +115,7 @@
     assert.writeOK(coll.insert({_id: "fullDocument is lookup"}));
     latestChange = getLastResultFromFirstBatch({
         collection: coll,
-        pipeline: [{$changeNotification: {fullDocument: "lookup", resumeAfter: firstChange._id}}]
+        pipeline: [{$changeStream: {fullDocument: "lookup", resumeAfter: firstChange._id}}]
     });
     assert.eq(latestChange.operationType, "insert");
     assert.eq(latestChange.fullDocument, {_id: "fullDocument is lookup"});
@@ -126,7 +126,7 @@
                                {_id: "fullDocument is lookup", replaced: true}));
     latestChange = getLastResultFromFirstBatch({
         collection: coll,
-        pipeline: [{$changeNotification: {fullDocument: "lookup", resumeAfter: firstChange._id}}]
+        pipeline: [{$changeStream: {fullDocument: "lookup", resumeAfter: firstChange._id}}]
     });
     assert.eq(latestChange.operationType, "replace");
     assert.eq(latestChange.fullDocument, {_id: "fullDocument is lookup", replaced: true});
@@ -136,7 +136,7 @@
     assert.writeOK(coll.update({_id: "fullDocument is lookup"}, {$set: {updated: true}}));
     latestChange = getLastResultFromFirstBatch({
         collection: coll,
-        pipeline: [{$changeNotification: {fullDocument: "lookup", resumeAfter: firstChange._id}}]
+        pipeline: [{$changeStream: {fullDocument: "lookup", resumeAfter: firstChange._id}}]
     });
     assert.eq(latestChange.operationType, "update");
     assert.eq(latestChange.fullDocument,
@@ -148,7 +148,7 @@
     latestChange = getLastResultFromFirstBatch({
         collection: coll,
         pipeline: [
-            {$changeNotification: {fullDocument: "lookup", resumeAfter: firstChange._id}},
+            {$changeStream: {fullDocument: "lookup", resumeAfter: firstChange._id}},
             {$match: {operationType: "update"}}
         ]
     });
@@ -161,7 +161,7 @@
     latestChange = getLastResultFromFirstBatch({
         collection: coll,
         pipeline: [
-            {$changeNotification: {fullDocument: "lookup", resumeAfter: firstChange._id}},
+            {$changeStream: {fullDocument: "lookup", resumeAfter: firstChange._id}},
             {$match: {operationType: "update"}}
         ]
     });

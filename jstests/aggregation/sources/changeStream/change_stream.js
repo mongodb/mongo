@@ -1,4 +1,4 @@
-// Basic $changeNotification tests.
+// Basic $changeStream tests.
 (function() {
     "use strict";
 
@@ -38,7 +38,7 @@
         assert.docEq(res.cursor.nextBatch, expectedBatch);
     }
 
-    let replTest = new ReplSetTest({name: 'changeNotificationTest', nodes: 1});
+    let replTest = new ReplSetTest({name: 'changeStreamTest', nodes: 1});
     let nodes = replTest.startSet();
     replTest.initiate();
     replTest.awaitReplication();
@@ -47,7 +47,7 @@
     db.getMongo().forceReadMode('commands');
 
     jsTestLog("Testing single insert");
-    let cursor = startWatchingChanges([{$changeNotification: {}}], db.t1);
+    let cursor = startWatchingChanges([{$changeStream: {}}], db.t1);
     assert.writeOK(db.t1.insert({_id: 0, a: 1}));
     let expected = {
         _id: {
@@ -62,7 +62,7 @@
     assertNextBatchMatches({cursor: cursor, expectedBatch: [expected]});
 
     jsTestLog("Testing second insert");
-    cursor = startWatchingChanges([{$changeNotification: {}}], db.t1);
+    cursor = startWatchingChanges([{$changeStream: {}}], db.t1);
     assert.writeOK(db.t1.insert({_id: 1, a: 2}));
     expected = {
         _id: {
@@ -77,7 +77,7 @@
     assertNextBatchMatches({cursor: cursor, expectedBatch: [expected]});
 
     jsTestLog("Testing update");
-    cursor = startWatchingChanges([{$changeNotification: {}}], db.t1);
+    cursor = startWatchingChanges([{$changeStream: {}}], db.t1);
     assert.writeOK(db.t1.update({_id: 0}, {a: 3}));
     expected = {
         _id: {_id: 0, ns: "test.t1"},
@@ -89,7 +89,7 @@
     assertNextBatchMatches({cursor: cursor, expectedBatch: [expected]});
 
     jsTestLog("Testing update of another field");
-    cursor = startWatchingChanges([{$changeNotification: {}}], db.t1);
+    cursor = startWatchingChanges([{$changeStream: {}}], db.t1);
     assert.writeOK(db.t1.update({_id: 0}, {b: 3}));
     expected = {
         _id: {_id: 0, ns: "test.t1"},
@@ -101,7 +101,7 @@
     assertNextBatchMatches({cursor: cursor, expectedBatch: [expected]});
 
     jsTestLog("Testing upsert");
-    cursor = startWatchingChanges([{$changeNotification: {}}], db.t1);
+    cursor = startWatchingChanges([{$changeStream: {}}], db.t1);
     assert.writeOK(db.t1.update({_id: 2}, {a: 4}, {upsert: true}));
     expected = {
         _id: {
@@ -117,7 +117,7 @@
 
     jsTestLog("Testing partial update with $inc");
     assert.writeOK(db.t1.insert({_id: 3, a: 5, b: 1}));
-    cursor = startWatchingChanges([{$changeNotification: {}}], db.t1);
+    cursor = startWatchingChanges([{$changeStream: {}}], db.t1);
     assert.writeOK(db.t1.update({_id: 3}, {$inc: {b: 2}}));
     expected = {
         _id: {_id: 3, ns: "test.t1"},
@@ -130,7 +130,7 @@
     assertNextBatchMatches({cursor: cursor, expectedBatch: [expected]});
 
     jsTestLog("Testing delete");
-    cursor = startWatchingChanges([{$changeNotification: {}}], db.t1);
+    cursor = startWatchingChanges([{$changeStream: {}}], db.t1);
     assert.writeOK(db.t1.remove({_id: 1}));
     expected = {
         _id: {_id: 1, ns: "test.t1"},
@@ -142,8 +142,8 @@
     assertNextBatchMatches({cursor: cursor, expectedBatch: [expected]});
 
     jsTestLog("Testing intervening write on another collection");
-    cursor = startWatchingChanges([{$changeNotification: {}}], db.t1);
-    let t2cursor = startWatchingChanges([{$changeNotification: {}}], db.t2);
+    cursor = startWatchingChanges([{$changeStream: {}}], db.t1);
+    let t2cursor = startWatchingChanges([{$changeStream: {}}], db.t2);
     assert.writeOK(db.t2.insert({_id: 100, c: 1}));
     assertNextBatchMatches({cursor: cursor, expectedBatch: []});
     expected = {
@@ -164,21 +164,21 @@
     // Should still see the previous change from t2, shouldn't see anything about 'dropping'.
 
     jsTestLog("Testing rename");
-    t2cursor = startWatchingChanges([{$changeNotification: {}}], db.t2);
+    t2cursor = startWatchingChanges([{$changeStream: {}}], db.t2);
     assert.writeOK(db.t2.renameCollection("t3"));
     expected = {_id: {ns: "test.$cmd"}, operationType: "invalidate", fullDocument: null};
     assertNextBatchMatches({cursor: t2cursor, expectedBatch: [expected]});
 
     jsTestLog("Testing insert that looks like rename");
-    const dne1cursor = startWatchingChanges([{$changeNotification: {}}], db.dne1);
-    const dne2cursor = startWatchingChanges([{$changeNotification: {}}], db.dne2);
+    const dne1cursor = startWatchingChanges([{$changeStream: {}}], db.dne1);
+    const dne2cursor = startWatchingChanges([{$changeStream: {}}], db.dne2);
     assert.writeOK(db.t3.insert({_id: 101, renameCollection: "test.dne1", to: "test.dne2"}));
     assertNextBatchMatches({cursor: dne1cursor, expectedBatch: []});
     assertNextBatchMatches({cursor: dne2cursor, expectedBatch: []});
 
     // Now make sure the cursor behaves like a tailable awaitData cursor.
     jsTestLog("Testing tailability");
-    const tailableCursor = db.tailable1.aggregate([{$changeNotification: {}}, oplogProjection]);
+    const tailableCursor = db.tailable1.aggregate([{$changeStream: {}}, oplogProjection]);
     assert(!tailableCursor.hasNext());
     assert.writeOK(db.tailable1.insert({_id: 101, a: 1}));
     assert(tailableCursor.hasNext());
@@ -194,11 +194,8 @@
     });
 
     jsTestLog("Testing awaitdata");
-    let res = assert.commandWorked(db.runCommand({
-        aggregate: "tailable2",
-        pipeline: [{$changeNotification: {}}, oplogProjection],
-        cursor: {}
-    }));
+    let res = assert.commandWorked(db.runCommand(
+        {aggregate: "tailable2", pipeline: [{$changeStream: {}}, oplogProjection], cursor: {}}));
     let aggcursor = res.cursor;
 
     // We should get a valid cursor.
@@ -245,11 +242,11 @@
 
     jsTestLog("Ensuring attempt to read with legacy operations fails.");
     db.getMongo().forceReadMode('legacy');
-    const legacyCursor = db.tailable2.aggregate([{$changeNotification: {}}, oplogProjection],
-                                                {cursor: {batchSize: 0}});
+    const legacyCursor =
+        db.tailable2.aggregate([{$changeStream: {}}, oplogProjection], {cursor: {batchSize: 0}});
     assert.throws(function() {
         legacyCursor.next();
-    }, [], "Legacy getMore expected to fail on changeNotification cursor.");
+    }, [], "Legacy getMore expected to fail on changeStream cursor.");
 
     /**
      * Gets one document from the cursor using getMore with awaitData disabled. Asserts if no
@@ -293,12 +290,12 @@
 
     // Note we do not project away 'id.ts' as it is part of the resume token.
     res = assert.commandWorked(
-        db.runCommand({aggregate: "resume1", pipeline: [{$changeNotification: {}}], cursor: {}}));
+        db.runCommand({aggregate: "resume1", pipeline: [{$changeStream: {}}], cursor: {}}));
     let resumeCursor = res.cursor;
     assert.neq(resumeCursor.id, 0);
     assert.eq(resumeCursor.firstBatch.length, 0);
 
-    // Insert a document and save the resulting change notification.
+    // Insert a document and save the resulting change stream.
     assert.writeOK(db.resume1.insert({_id: 1}));
     const firstInsertChangeDoc = getOneDoc(resumeCursor);
     assert.docEq(firstInsertChangeDoc.fullDocument, {_id: 1});
@@ -306,7 +303,7 @@
     jsTestLog("Testing resume after one document.");
     res = assert.commandWorked(db.runCommand({
         aggregate: "resume1",
-        pipeline: [{$changeNotification: {resumeAfter: firstInsertChangeDoc._id}}],
+        pipeline: [{$changeStream: {resumeAfter: firstInsertChangeDoc._id}}],
         cursor: {batchSize: 0}
     }));
     resumeCursor = res.cursor;
@@ -324,7 +321,7 @@
     jsTestLog("Testing resume after first document of three.");
     res = assert.commandWorked(db.runCommand({
         aggregate: "resume1",
-        pipeline: [{$changeNotification: {resumeAfter: firstInsertChangeDoc._id}}],
+        pipeline: [{$changeStream: {resumeAfter: firstInsertChangeDoc._id}}],
         cursor: {batchSize: 0}
     }));
     resumeCursor = res.cursor;
@@ -335,7 +332,7 @@
     jsTestLog("Testing resume after second document of three.");
     res = assert.commandWorked(db.runCommand({
         aggregate: "resume1",
-        pipeline: [{$changeNotification: {resumeAfter: secondInsertChangeDoc._id}}],
+        pipeline: [{$changeStream: {resumeAfter: secondInsertChangeDoc._id}}],
         cursor: {batchSize: 0}
     }));
     resumeCursor = res.cursor;
@@ -348,7 +345,7 @@
     assert.eq(invalidateDoc.operationType, "invalidate");
     res = assert.commandWorked(db.runCommand({
         aggregate: "resume1",
-        pipeline: [{$changeNotification: {resumeAfter: firstInsertChangeDoc._id}}],
+        pipeline: [{$changeStream: {resumeAfter: firstInsertChangeDoc._id}}],
         cursor: {batchSize: 0}
     }));
     resumeCursor = res.cursor;

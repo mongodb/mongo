@@ -36,7 +36,7 @@
 namespace mongo {
 /**
  * A token passed in by the user to indicate where in the oplog we should start for
- * $changeNotification.
+ * $changeStream.
  */
 class ResumeToken {
 public:
