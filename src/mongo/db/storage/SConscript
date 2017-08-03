@@ -219,3 +219,10 @@ env.CppUnitTest(
         '$BUILD_DIR/mongo/base',
         ]
 )
+
+env.CppUnitTest(
+    target='storage_snapshot_name_test',
+    source='storage_snapshot_name_test.cpp',
+    LIBDEPS=[],
+    LIBDEPS_PRIVATE=[],
+)

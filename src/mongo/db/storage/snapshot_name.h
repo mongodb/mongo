@@ -29,10 +29,10 @@
 #pragma once
 
 #include <cstdint>
+#include <iostream>
 #include <limits>
 
 #include "mongo/bson/timestamp.h"
-#include "mongo/util/mongoutils/str.h"
 
 namespace mongo {
 
@@ -63,8 +63,11 @@ public:
     }
 
     std::string toString() const {
-        return (str::stream() << _value);
+        std::stringstream str;
+        str << std::hex << _value;
+        return str.str();
     }
+
     bool operator==(const SnapshotName& rhs) const {
         return _value == rhs._value;
     }

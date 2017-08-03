@@ -160,6 +160,10 @@ public:
 
     void setJournalListener(JournalListener* jl) final;
 
+    virtual void setStableTimestamp(SnapshotName stableTimestamp) override;
+
+    virtual void setInitialDataTimestamp(SnapshotName initialDataTimestamp) override;
+
     // wiredtiger specific
     // Calls WT_CONNECTION::reconfigure on the underlying WT_CONNECTION
     // held by this class

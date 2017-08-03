@@ -107,6 +107,10 @@ public:
 
     virtual void cleanShutdown();
 
+    virtual void setStableTimestamp(SnapshotName stableTimestamp) override;
+
+    virtual void setInitialDataTimestamp(SnapshotName initialDataTimestamp) override;
+
     SnapshotManager* getSnapshotManager() const final;
 
     void setJournalListener(JournalListener* jl) final;

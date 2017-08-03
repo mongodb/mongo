@@ -70,6 +70,7 @@
 #include "mongo/db/storage/wiredtiger/wiredtiger_session_cache.h"
 #include "mongo/db/storage/wiredtiger/wiredtiger_size_storer.h"
 #include "mongo/db/storage/wiredtiger/wiredtiger_util.h"
+#include "mongo/platform/atomic_word.h"
 #include "mongo/stdx/memory.h"
 #include "mongo/util/background.h"
 #include "mongo/util/concurrency/idle_thread_block.h"
@@ -136,7 +137,10 @@ private:
 class WiredTigerKVEngine::WiredTigerCheckpointThread : public BackgroundJob {
 public:
     explicit WiredTigerCheckpointThread(WiredTigerSessionCache* sessionCache)
-        : BackgroundJob(false /* deleteSelf */), _sessionCache(sessionCache) {}
+        : BackgroundJob(false /* deleteSelf */),
+          _sessionCache(sessionCache),
+          _stableTimestamp(0),
+          _initialDataTimestamp(0) {}
 
     virtual string name() const {
         return "WTCheckpointThread";
@@ -165,6 +169,14 @@ public:
         LOG(1) << "stopping " << name() << " thread";
     }
 
+    virtual void setStableTimestamp(SnapshotName stableTimestamp) {
+        _stableTimestamp.store(stableTimestamp.asU64());
+    }
+
+    virtual void setInitialDataTimestamp(SnapshotName initialDataTimestamp) {
+        _initialDataTimestamp.store(initialDataTimestamp.asU64());
+    }
+
     void shutdown() {
         _shuttingDown.store(true);
         _condvar.notify_one();
@@ -178,6 +190,8 @@ private:
     stdx::mutex _mutex;
     stdx::condition_variable _condvar;
     AtomicBool _shuttingDown{false};
+    AtomicWord<std::uint64_t> _stableTimestamp;
+    AtomicWord<std::uint64_t> _initialDataTimestamp;
 };
 
 namespace {
@@ -899,4 +913,31 @@ void WiredTigerKVEngine::setInitRsOplogBackgroundThreadCallback(
 bool WiredTigerKVEngine::initRsOplogBackgroundThread(StringData ns) {
     return initRsOplogBackgroundThreadCallback(ns);
 }
+
+void WiredTigerKVEngine::setStableTimestamp(SnapshotName stableTimestamp) {
+    const bool keepOldBehavior = true;
+    // Communicate to WiredTiger what the "stable timestamp" is. Timestamp-aware checkpoints will
+    // only persist to disk transactions committed with a timestamp earlier than the "stable
+    // timestamp".
+    //
+    // After passing the "stable timestamp" to WiredTiger, communicate it to the
+    // `CheckpointThread`. It's not obvious a stale stable timestamp in the `CheckpointThread` is
+    // safe. Consider the following arguments:
+    //
+    // Setting the "stable timestamp" is only meaningful when the "initial data timestamp" is real
+    // (i.e: not `kAllowUnstableCheckpointsSentinel`). In this normal case, the `stableTimestamp`
+    // input must be greater than the current value. The only effect this can have in the
+    // `CheckpointThread` is to transition it from a state of not taking any checkpoints, to
+    // taking "stable checkpoints". In the transitioning case, it's imperative for the "stable
+    // timestamp" to have first been communicated to WiredTiger.
+    if (!keepOldBehavior) {
+        std::string conf = str::stream() << "stable_timestamp=" << stableTimestamp.toString();
+        _conn->set_timestamp(_conn, conf.c_str());
+    }
+    _checkpointThread->setStableTimestamp(stableTimestamp);
 }
+
+void WiredTigerKVEngine::setInitialDataTimestamp(SnapshotName initialDataTimestamp) {
+    _checkpointThread->setInitialDataTimestamp(initialDataTimestamp);
+}
+}  // namespace mongo
