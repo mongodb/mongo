@@ -103,7 +103,12 @@ public:
         return chk(mongo::Date).date();
     }
     double Number() const {
-        return chk(isNumber()).number();
+        uassert(13118,
+                str::stream() << "expected " << fieldName()
+                              << " to have a numberic type, but it is a "
+                              << type(),
+                isNumber());
+        return number();
     }
     Decimal128 Decimal() const {
         return chk(NumberDecimal)._numberDecimal();
@@ -124,12 +129,6 @@ public:
     mongo::OID OID() const {
         return chk(jstOID).__oid();
     }
-    void Null() const {
-        chk(isNull());
-    }  // throw MsgAssertionException if not null
-    void OK() const {
-        chk(ok());
-    }  // throw MsgAssertionException if element DNE
 
     /** @return the embedded object associated with this field.
         Note the returned object is a reference to within the parent bson object. If that
@@ -699,10 +698,6 @@ private:
                 ss << "wrong type for field (" << fieldName() << ") " << type() << " != " << t;
             uasserted(13111, ss.str());
         }
-        return *this;
-    }
-    const BSONElement& chk(bool expr) const {
-        uassert(13118, "unexpected or missing type value in BSON object", expr);
         return *this;
     }
 };
