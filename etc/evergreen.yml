@@ -1043,6 +1043,138 @@ functions:
         else
           exit 0
         fi
+  "set up EC2 instance":
+    - command: shell.exec
+      params:
+        working_dir: src
+        script: |
+
+          ${activate_virtualenv}
+          easy_install --upgrade boto3
+
+          # Clone another instance of this host in EC2.
+          buildscripts/launch_evergreen_ec2_instance.sh \
+            -k ${ssh_key_id}                            \
+            -t "AMI Evergreen ${task_id}"               \
+            -y ${aws_ec2_yml}
+
+    - command: expansions.update
+      params:
+        file: src/${aws_ec2_yml}
+
+    - command: shell.exec
+      params:
+        shell: bash
+        working_dir: src
+        script: |
+          # Copy mount_ephemeral_drive.sh script to remote host.
+          ssh_options="${ssh_credentials} ${ssh_options}"
+          ${python|/opt/mongodbtoolchain/v2/bin/python2} buildscripts/remote_operations.py \
+            --verbose                      \
+            --userHost $USER@${ip_address} \
+            --operation "copy_to"          \
+            --sshOptions "$ssh_options"    \
+            --retries ${ssh_retries|0}     \
+            --file buildscripts/mount_ephemeral_drive.sh
+
+    - command: shell.exec
+      params:
+        shell: bash
+        working_dir: src
+        script: |
+          # Mount /data on the attached ephemeral drive(s), more than 1 indicates a RAID set.
+          ${set_sudo}
+          script_opts="-d '${device_names}'"
+          if [ ! -z "${raid_device_name}" ]; then
+            script_opts="$script_opts -r ${raid_device_name}"
+          fi
+          if [ ! -z "${fstype}" ]; then
+            script_opts="$script_opts -t ${fstype}"
+          fi
+          if [ ! -z "${fs_options}" ]; then
+            script_opts="$script_opts -o '${fs_options}'"
+          fi
+          group=$(id -Gn $USER | cut -f1 -d ' ') || true
+          user_group="$USER:$group"
+          script_opts="$script_opts -u $user_group"
+          data_db=/data/db
+          set_permission="chmod 777 $data_db"
+          if [ "Windows_NT" = "$OS" ]; then
+            set_permission="setfacl -s user::rwx,group::rwx,other::rwx $data_db"
+          fi
+          cmds="$sudo bash mount_ephemeral_drive.sh $script_opts; $set_permission; ls -ld $data_db; df; mount"
+          ssh_options="${ssh_credentials} ${ssh_options}"
+          ${python|/opt/mongodbtoolchain/v2/bin/python2} buildscripts/remote_operations.py \
+            --verbose                      \
+            --userHost $USER@${ip_address} \
+            --sshOptions "$ssh_options"    \
+            --retries ${ssh_retries|0}     \
+            --commands "$cmds"
+
+    - command: shell.exec
+      params:
+        shell: bash
+        working_dir: src
+        script: |
+          # Create remote_dir, if specified as expansion macro and is not '.' (pwd).
+          if [[ -z "${remote_dir|}" || ${remote_dir} == "." ]]; then
+            exit 0
+          fi
+          ${set_sudo}
+          ssh_options="${ssh_credentials} ${ssh_options}"
+          group=$(id -Gn $USER | cut -f1 -d ' ') || true
+          user_group="$USER:$group"
+          set_permission="chmod 777 ${remote_dir}"
+          if [ "Windows_NT" = "$OS" ]; then
+            set_permission="setfacl -s user::rwx,group::rwx,other::rwx ${remote_dir}"
+          fi
+          cmds="$sudo mkdir -p ${remote_dir}; $sudo chown $user_group ${remote_dir}; $set_permission; ls -ld ${remote_dir}"
+          ${python|/opt/mongodbtoolchain/v2/bin/python2} buildscripts/remote_operations.py \
+            --userHost $USER@${ip_address} \
+            --sshOptions "$ssh_options"    \
+            --retries ${ssh_retries|0}     \
+            --commands "$cmds"
+
+    - command: shell.exec
+      params:
+        shell: bash
+        working_dir: src
+        script: |
+          # Copy buildscripts, mongoDB executables and debug symbols to the remote host.
+          file_param="--file buildscripts"
+          mongo_executables="mongo mongod mongos"
+          file_extensions="${exe} .debug .dSYM .pdb"
+          for executable in $mongo_executables
+          do
+            for extension in $file_extensions
+            do
+              file=$executable$extension
+              if [[ -f $file || -d $file ]]; then
+                file_param="$file_param --file $file"
+              fi
+            done
+          done
+          ssh_options="${ssh_credentials} ${ssh_options}"
+          ${python|/opt/mongodbtoolchain/v2/bin/python2} buildscripts/remote_operations.py \
+            --userHost $USER@${ip_address} \
+            --operation "copy_to"          \
+            --sshOptions "$ssh_options"    \
+            --retries ${ssh_retries|0}     \
+            $file_param                    \
+            --remoteDir ${remote_dir}
+
+  "cleanup EC2 instance":
+    command: shell.exec
+    params:
+      working_dir: src
+      script: |
+        if [ -z ${aws_ec2_yml} ]; then
+          exit 0
+        fi
+        ${activate_virtualenv}
+        echo "Terminating $instance_id"
+        aws_ec2=$(python buildscripts/aws_ec2.py --imageId ${instance_id} --mode terminate)
+        echo "Terminated AMI EC2 instance: $aws_ec2"
 
 pre:
   - func: "kill processes"
@@ -1060,6 +1192,12 @@ pre:
               . ./venv/bin/activate
             fi
           fi
+        # For ssh disable the options GSSAPIAuthentication, CheckHostIP, StrictHostKeyChecking
+        # & UserKnownHostsFile, since these are local connections from one AWS instance to another.
+       - key: ssh_options
+         value: -o GSSAPIAuthentication=no -o CheckHostIP=no -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null -o ConnectTimeout=10 -o ConnectionAttempts=10
+       - key: ssh_retries
+         value: "10"
        - key: set_sudo
          value: |
           set -o | grep errexit | grep on
@@ -1075,6 +1213,16 @@ pre:
           # Set errexit "on", if previously enabled.
           if [ $errexit_on -eq 0 ]; then
             set -o errexit
+          fi
+       - key: virtualenv
+         value: |
+          # check if virtualenv is set up
+          if [ -d "venv" ]; then
+            if [ "Windows_NT" = "$OS" ]; then
+              . ./venv/Scripts/activate
+            else
+              . ./venv/bin/activate
+            fi
           fi
   - command: shell.exec
     params:
@@ -1102,6 +1250,7 @@ post:
     params:
       file_location: src/report.json
 
+  - func: "cleanup EC2 instance"
   - func: "kill processes"
   # Print out any Out of Memory killed process messages.
   - command: shell.exec
