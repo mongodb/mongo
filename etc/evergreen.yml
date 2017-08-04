@@ -1602,6 +1602,36 @@ timeout:
         echo "Calling the hang analyzer: PATH=\"/opt/mongodbtoolchain/gdb/bin:$PATH\" $sudo ${python|/opt/mongodbtoolchain/v2/bin/python2} buildscripts/hang_analyzer.py $hang_analyzer_option"
         PATH="/opt/mongodbtoolchain/gdb/bin:$PATH" $sudo ${python|/opt/mongodbtoolchain/v2/bin/python2} buildscripts/hang_analyzer.py $hang_analyzer_option
 
+        # Call hang_analyzer.py script for tasks that are running remote mongo processes
+        # The file ${aws_ec2_yml} will define the remote's ${ip_address} and ${remote_dir}.
+        # Any task which uses remote processes will have previously loaded this file to set these
+        # expansions macros.
+        if [ -f ${aws_ec2_yml|} ]; then
+          core_ext=core
+          if [ "Windows_NT" = "$OS" ]; then
+            core_ext=mdmp
+          fi
+          ssh_options="${ssh_credentials} ${ssh_options}"
+          # buildscripts must be installed in ${remote_dir} on the remote host.
+          remote_dir=${remote_dir|.}
+          cmds="PATH=\"/opt/mongodbtoolchain/gdb/bin:\$PATH\" $sudo ${python|/opt/mongodbtoolchain/v2/bin/python2} buildscripts/hang_analyzer.py $hang_analyzer_option"
+          ${python|/opt/mongodbtoolchain/v2/bin/python2} buildscripts/remote_operations.py \
+            --verbose                      \
+            --userHost $USER@${ip_address} \
+            --sshOptions "$ssh_options"    \
+            --retries ${ssh_retries}       \
+            --commands "$cmds"             \
+            --commandDir ${remote_dir}
+          ${python|/opt/mongodbtoolchain/v2/bin/python2} buildscripts/remote_operations.py \
+            --verbose                          \
+            --userHost $USER@${ip_address}     \
+            --operation "copy_from"            \
+            --sshOptions "$ssh_options"        \
+            --retries ${ssh_retries}           \
+            --file "${remote_dir}/debugger*.*" \
+            --file "${remote_dir}/*.$core_ext"
+        fi
+
 #######################################
 #               Tasks                 #
 #######################################
