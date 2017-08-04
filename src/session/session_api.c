@@ -836,6 +836,8 @@ __session_reset(WT_SESSION *wt_session)
 
 	WT_TRET(__wt_session_reset_cursors(session, true));
 
+	WT_TRET(__wt_schema_sweep_tables(session));
+
 	/* Release common session resources. */
 	WT_TRET(__wt_session_release_resources(session));
 
