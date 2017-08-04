@@ -213,14 +213,11 @@ TEST(RandomTest, NextInt64InRange) {
 }
 
 TEST(RandomTest, Secure1) {
-    SecureRandom* a = SecureRandom::create();
-    SecureRandom* b = SecureRandom::create();
+    auto a = SecureRandom::create();
+    auto b = SecureRandom::create();
 
     for (int i = 0; i < 100; i++) {
         ASSERT_NOT_EQUALS(a->nextInt64(), b->nextInt64());
     }
-
-    delete a;
-    delete b;
 }
 }

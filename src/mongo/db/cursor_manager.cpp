@@ -140,7 +140,7 @@ GlobalCursorIdCache::~GlobalCursorIdCache() {}
 int64_t GlobalCursorIdCache::nextSeed() {
     stdx::lock_guard<SimpleMutex> lk(_mutex);
     if (!_secureRandom)
-        _secureRandom.reset(SecureRandom::create());
+        _secureRandom = SecureRandom::create();
     return _secureRandom->nextInt64();
 }
 

@@ -143,8 +143,8 @@ private:
     BCRYPT_ALG_HANDLE _algHandle;
 };
 
-SecureRandom* SecureRandom::create() {
-    return new WinSecureRandom();
+std::unique_ptr<SecureRandom> SecureRandom::create() {
+    return stdx::make_unique<WinSecureRandom>();
 }
 
 #elif defined(__linux__) || defined(__sun) || defined(__APPLE__) || defined(__FreeBSD__)
@@ -173,8 +173,8 @@ private:
     std::unique_ptr<std::ifstream> _in;
 };
 
-SecureRandom* SecureRandom::create() {
-    return new InputStreamSecureRandom("/dev/urandom");
+std::unique_ptr<SecureRandom> SecureRandom::create() {
+    return stdx::make_unique<InputStreamSecureRandom>("/dev/urandom");
 }
 
 #elif defined(__OpenBSD__)
@@ -188,8 +188,8 @@ public:
     }
 };
 
-SecureRandom* SecureRandom::create() {
-    return new Arc4SecureRandom();
+std::unique_ptr<SecureRandom> SecureRandom::create() {
+    return stdx::make_unique<Arc4SecureRandom>();
 }
 
 #else

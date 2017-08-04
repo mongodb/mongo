@@ -162,7 +162,7 @@ bool JSectFooter::checkHash(const void* begin, int len) const {
 }
 
 namespace {
-SecureRandom* mySecureRandom = NULL;
+std::unique_ptr<SecureRandom> mySecureRandom;
 stdx::mutex mySecureRandomMutex;
 int64_t getMySecureRandomNumber() {
     stdx::lock_guard<stdx::mutex> lk(mySecureRandomMutex);

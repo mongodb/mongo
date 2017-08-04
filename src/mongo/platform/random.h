@@ -30,6 +30,7 @@
 #pragma once
 
 #include <cstdint>
+#include <memory>
 
 namespace mongo {
 
@@ -98,6 +99,6 @@ public:
 
     virtual int64_t nextInt64() = 0;
 
-    static SecureRandom* create();
+    static std::unique_ptr<SecureRandom> create();
 };
 }  // namespace mongo
