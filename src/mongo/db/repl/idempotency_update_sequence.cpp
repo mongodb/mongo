@@ -256,7 +256,7 @@ UpdateSequenceGenerator::UpdateSequenceGenerator(std::set<StringData> fields,
     : _fields(fields),
       _depth(depth),
       _length(length),
-      _random(SecureRandom::create()->nextInt64()) {
+      _random(std::unique_ptr<SecureRandom>(SecureRandom::create())->nextInt64()) {
     auto path = "";
     _generatePaths(fields, depth, length, path);
     // Creates the same shuffle each time, but we don't care. We want to mess up the DFS ordering.
