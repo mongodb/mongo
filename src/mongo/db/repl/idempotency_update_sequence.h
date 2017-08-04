@@ -44,10 +44,26 @@ class BSONObj;
 struct BSONArray;
 class BSONObjBuilder;
 
+struct UpdateSequenceGeneratorConfig {
+    UpdateSequenceGeneratorConfig(std::set<StringData> fields_,
+                                  size_t depth_,
+                                  size_t length_,
+                                  double scalarProbability_ = 0.250,
+                                  double docProbability_ = 0.250,
+                                  double arrProbability_ = 0.250);
+
+    const std::set<StringData> fields = {};
+    const size_t depth = 0;
+    const size_t length = 0;
+    const double scalarProbability = 0.250;
+    const double docProbability = 0.250;
+    const double arrProbability = 0.250;
+};
+
 class UpdateSequenceGenerator : public SequenceGenerator {
 
 public:
-    UpdateSequenceGenerator(std::set<StringData> fields, std::size_t depth, std::size_t length);
+    explicit UpdateSequenceGenerator(UpdateSequenceGeneratorConfig config);
 
     BSONObj generateUpdate() const;
 
@@ -88,10 +104,7 @@ private:
     static std::vector<std::string> _eliminatePrefixPaths(const std::string& path,
                                                           const std::vector<std::string>& paths);
 
-    void _generatePaths(const std::set<StringData>& fields,
-                        const std::size_t depth,
-                        const std::size_t length,
-                        const std::string& path);
+    void _generatePaths(const UpdateSequenceGeneratorConfig& config, const std::string& path);
 
     std::set<StringData> _getRemainingFields(const std::string& path) const;
 
@@ -116,9 +129,7 @@ private:
     BSONObj _generateDocToSet(const std::string& setPath) const;
 
     std::vector<std::string> _paths;
-    const std::set<StringData> _fields;
-    const std::size_t _depth;
-    const std::size_t _length;
+    const UpdateSequenceGeneratorConfig _config;
     mutable PseudoRandom _random;
 };
 

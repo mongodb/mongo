@@ -55,7 +55,7 @@ TEST(UpdateGenTest, FindsAllPaths) {
     std::set<StringData> fields{"a", "b"};
     size_t depth = 1;
     size_t length = 1;
-    UpdateSequenceGenerator generator(fields, depth, length);
+    UpdateSequenceGenerator generator({fields, depth, length});
 
     ASSERT_EQ(generator.getPaths().size(), 5U);
 
@@ -84,7 +84,7 @@ TEST(UpdateGenTest, NoDuplicatePaths) {
     std::set<StringData> fields{"a", "b"};
     size_t depth = 2;
     size_t length = 2;
-    UpdateSequenceGenerator generator(fields, depth, length);
+    UpdateSequenceGenerator generator({fields, depth, length});
 
     auto paths = generator.getPaths();
     for (size_t i = 0; i < paths.size(); i++) {
@@ -103,7 +103,7 @@ TEST(UpdateGenTest, UpdatesHaveValidPaths) {
     std::set<StringData> fields{"a", "b"};
     size_t depth = 1;
     size_t length = 1;
-    UpdateSequenceGenerator generator(fields, depth, length);
+    UpdateSequenceGenerator generator({fields, depth, length});
     auto update = generator.generateUpdate();
 
     BSONObj updateArg;
@@ -140,7 +140,7 @@ TEST(UpdateGenTest, UpdatesAreNotAmbiguous) {
     std::set<StringData> fields{"a", "b"};
     size_t depth = 1;
     size_t length = 1;
-    UpdateSequenceGenerator generator(fields, depth, length);
+    UpdateSequenceGenerator generator({fields, depth, length});
     auto update = generator.generateUpdate();
 
     BSONObj updateArg;
@@ -180,21 +180,19 @@ std::size_t getMaxDepth(BSONObj obj) {
     }
 
     return curMaxDepth;
-};
+}
 
 TEST(UpdateGenTest, UpdatesPreserveDepthConstraint) {
     std::set<StringData> fields{"a", "b"};
     size_t depth = 2;
     size_t length = 1;
-    UpdateSequenceGenerator generator(fields, depth, length);
+    UpdateSequenceGenerator generator({fields, depth, length, 0.333, 0.333, 0.334});
 
     BSONElement setElem;
     BSONObj update;
-    // Keep trying until we get a $set, so that we can avoid a no-op test case.
-    while (!setElem) {
-        update = generator.generateUpdate();
-        setElem = update["$set"];
-    }
+    // Because our probabilities sum to 1, we are guaranteed to always get a $set.
+    update = generator.generateUpdate();
+    setElem = update["$set"];
     BSONObj updateArg = setElem.Obj();
 
     std::set<std::string> argPaths;
@@ -217,5 +215,83 @@ TEST(UpdateGenTest, UpdatesPreserveDepthConstraint) {
         }
     }
 }
+
+TEST(UpdateGenTest, OnlyGenerateUnset) {
+    std::set<StringData> fields{"a", "b"};
+    size_t depth = 1;
+    size_t length = 1;
+
+    UpdateSequenceGenerator generatorNoSet({fields, depth, length, 0.0, 0.0, 0.0});
+    for (size_t i = 0; i < 100; i++) {
+        auto update = generatorNoSet.generateUpdate();
+        if (!update["$unset"]) {
+            StringBuilder sb;
+            sb << "Generator created an update that was not an $unset, even though the probability "
+                  "of doing so is zero: "
+               << update;
+            FAIL(sb.str());
+        }
+    }
+}
+
+TEST(UpdateGenTest, OnlySetUpdatesWithScalarValue) {
+    std::set<StringData> fields{"a", "b"};
+    size_t depth = 1;
+    size_t length = 1;
+    UpdateSequenceGenerator generatorNoUnsetAndOnlyScalar({fields, depth, length, 1.0, 0.0, 0.0});
+    for (size_t i = 0; i < 100; i++) {
+        auto update = generatorNoUnsetAndOnlyScalar.generateUpdate();
+        if (!update["$set"]) {
+            StringBuilder sb;
+            sb << "Generator created an update that was not an $set, even though the probability "
+                  "of doing so is zero: "
+               << update;
+            FAIL(sb.str());
+        } else if (getMaxDepth(update["$set"].Obj()) != 0) {
+            StringBuilder sb;
+            sb << "Generator created an update that had a nonscalar value, because it's maximum "
+                  "depth was nonzero: "
+               << update;
+            FAIL(sb.str());
+        }
+    }
+}
+
+TEST(UpdateGenTest, OnlySetUpdatesWithScalarsAtMaxDepth) {
+    std::set<StringData> fields{"a", "b"};
+    size_t depth = 2;
+    size_t length = 1;
+    UpdateSequenceGenerator generatorNeverScalar({fields, depth, length, 0.0, 0.5, 0.5});
+    for (size_t i = 0; i < 100; i++) {
+        auto update = generatorNeverScalar.generateUpdate();
+        for (auto elem : update["$set"].Obj()) {
+            StringData fieldName = elem.fieldNameStringData();
+            FieldRef fieldRef(fieldName);
+            size_t pathDepth = getPathDepth_forTest(fieldName.toString());
+            bool isDocOrArr = elem.type() == BSONType::Object || elem.type() == BSONType::Array;
+            if (pathDepth != depth) {
+                // If the path is not equal to the max depth we provided above, then there
+                // should
+                // only be an array or doc at this point.
+                if (!isDocOrArr) {
+                    StringBuilder sb;
+                    sb << "The set argument: " << elem
+                       << " is a scalar, but the probability of a scalar occuring for a path that "
+                          "does not meet the maximum depth is zero.";
+                    FAIL(sb.str());
+                }
+            } else {
+                if (isDocOrArr) {
+                    StringBuilder sb;
+                    sb << "The set argument: " << elem
+                       << " is not scalar, however, this path reaches the maximum depth so a "
+                          "scalar should be the only choice.";
+                    FAIL(sb.str());
+                }
+            }
+        }
+    }
+}
+
 }  // namespace
 }  // namespace mongo

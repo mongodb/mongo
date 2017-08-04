@@ -39,6 +39,19 @@
 
 namespace mongo {
 
+UpdateSequenceGeneratorConfig::UpdateSequenceGeneratorConfig(std::set<StringData> fields_,
+                                                             size_t depth_,
+                                                             size_t length_,
+                                                             double scalarProbability_,
+                                                             double docProbability_,
+                                                             double arrProbability_)
+    : fields(std::move(fields_)),
+      depth(depth_),
+      length(length_),
+      scalarProbability(scalarProbability_),
+      docProbability(docProbability_),
+      arrProbability(arrProbability_) {}
+
 std::size_t UpdateSequenceGenerator::_getPathDepth(const std::string& path) {
     // Our depth is -1 because we count at 0, but numParts just counts the number of fields.
     return path == "" ? 0 : FieldRef(path).numParts() - 1;
@@ -57,36 +70,40 @@ std::vector<std::string> UpdateSequenceGenerator::_eliminatePrefixPaths(
     return remainingPaths;
 }
 
-void UpdateSequenceGenerator::_generatePaths(const std::set<StringData>& fields,
-                                             const std::size_t depth,
-                                             const std::size_t length,
+void UpdateSequenceGenerator::_generatePaths(const UpdateSequenceGeneratorConfig& config,
                                              const std::string& path) {
-    if (UpdateSequenceGenerator::_getPathDepth(path) == depth) {
+    if (UpdateSequenceGenerator::_getPathDepth(path) == config.depth) {
         return;
     }
 
     if (!path.empty()) {
-        for (std::size_t i = 0; i < length; i++) {
+        for (std::size_t i = 0; i < config.length; i++) {
             FieldRef arrPathRef(path);
             arrPathRef.appendPart(std::to_string(i));
             auto arrPath = arrPathRef.dottedField().toString();
             _paths.push_back(arrPath);
-            _generatePaths(fields, depth, length, arrPath);
+            _generatePaths(config, arrPath);
         }
     }
 
-    if (fields.empty()) {
+    if (config.fields.empty()) {
         return;
     }
 
-    std::set<StringData> remainingFields(fields);
-    for (auto field : fields) {
+    std::set<StringData> remainingFields(config.fields);
+    for (auto field : config.fields) {
         remainingFields.erase(remainingFields.begin());
         FieldRef docPathRef(path);
         docPathRef.appendPart(field);
         auto docPath = docPathRef.dottedField().toString();
         _paths.push_back(docPath);
-        _generatePaths(remainingFields, depth, length, docPath);
+        UpdateSequenceGeneratorConfig remainingConfig = {remainingFields,
+                                                         config.depth,
+                                                         config.length,
+                                                         config.scalarProbability,
+                                                         config.arrProbability,
+                                                         config.docProbability};
+        _generatePaths(remainingConfig, docPath);
     }
 }
 
@@ -109,9 +126,10 @@ std::vector<std::string> UpdateSequenceGenerator::_getRandomPaths() const {
 }
 
 BSONObj UpdateSequenceGenerator::generateUpdate() const {
-    bool generateSetUpdate =
-        this->_random.nextInt32(UpdateSequenceGenerator::kNumUpdateChoices) == 1;
-    if (generateSetUpdate) {
+    double setSum = this->_config.scalarProbability + this->_config.arrProbability +
+        this->_config.docProbability;
+    double generateSetUpdate = this->_random.nextCanonicalDouble();
+    if (generateSetUpdate <= setSum) {
         return _generateSet();
     } else {
         return _generateUnset();
@@ -132,12 +150,22 @@ BSONObj UpdateSequenceGenerator::_generateSet() const {
 
 UpdateSequenceGenerator::SetChoice UpdateSequenceGenerator::_determineWhatToSet(
     const std::string& setPath) const {
-    if (UpdateSequenceGenerator::_getPathDepth(setPath) == this->_depth) {
+    if (UpdateSequenceGenerator::_getPathDepth(setPath) == this->_config.depth) {
+        // If we have hit the max depth, we don't have a choice anyways.
         auto choice = static_cast<size_t>(SetChoice::kNumScalarSetChoices);
         return static_cast<SetChoice>(this->_random.nextInt32(choice));
     } else {
-        auto choice = static_cast<size_t>(SetChoice::kNumScalarSetChoices);
-        return static_cast<SetChoice>(UpdateSequenceGenerator::_random.nextInt32(choice));
+        double setSum = this->_config.scalarProbability + this->_config.arrProbability +
+            this->_config.docProbability;
+        double choice = this->_random.nextCanonicalDouble() * setSum;
+        if (choice <= this->_config.scalarProbability) {
+            auto scalarChoice = static_cast<size_t>(SetChoice::kNumScalarSetChoices);
+            return static_cast<SetChoice>(this->_random.nextInt32(scalarChoice));
+        } else if (choice <= setSum - this->_config.docProbability) {
+            return SetChoice::kSetArr;
+        } else {
+            return SetChoice::kSetDoc;
+        }
     }
 }
 
@@ -204,7 +232,7 @@ BSONObj UpdateSequenceGenerator::_generateDocToSet(const std::string& setPath) c
 }
 
 std::set<StringData> UpdateSequenceGenerator::_getRemainingFields(const std::string& path) const {
-    std::set<StringData> remainingFields(this->_fields);
+    std::set<StringData> remainingFields(this->_config.fields);
 
     FieldRef pathRef(path);
     StringData lastField;
@@ -212,7 +240,7 @@ std::set<StringData> UpdateSequenceGenerator::_getRemainingFields(const std::str
     // array positions (numbers).
     for (int i = pathRef.numParts() - 1; i >= 0; i--) {
         auto field = pathRef.getPart(i);
-        if (this->_fields.find(field) != this->_fields.end()) {
+        if (this->_config.fields.find(field) != this->_config.fields.end()) {
             lastField = field;
             break;
         }
@@ -221,7 +249,7 @@ std::set<StringData> UpdateSequenceGenerator::_getRemainingFields(const std::str
     // The last alphabetic field used must be after all other alphabetic fields that could ever be
     // used, since the fields that are used are selected in the order that they pop off from a
     // std::set.
-    for (auto field : this->_fields) {
+    for (auto field : this->_config.fields) {
         remainingFields.erase(field);
         if (field == lastField) {
             break;
@@ -234,12 +262,12 @@ std::set<StringData> UpdateSequenceGenerator::_getRemainingFields(const std::str
 DocumentStructureEnumerator UpdateSequenceGenerator::_getValidEnumeratorForPath(
     const std::string& path) const {
     auto remainingFields = _getRemainingFields(path);
-    std::size_t remainingDepth = this->_depth - UpdateSequenceGenerator::_getPathDepth(path);
+    std::size_t remainingDepth = this->_config.depth - UpdateSequenceGenerator::_getPathDepth(path);
     if (remainingDepth > 0) {
         remainingDepth -= 1;
     }
 
-    DocumentStructureEnumerator enumerator({remainingFields, remainingDepth, this->_length});
+    DocumentStructureEnumerator enumerator({remainingFields, remainingDepth, this->_config.length});
     return enumerator;
 }
 
@@ -251,15 +279,11 @@ std::vector<std::string> UpdateSequenceGenerator::getPaths() const {
     return this->_paths;
 }
 
-UpdateSequenceGenerator::UpdateSequenceGenerator(std::set<StringData> fields,
-                                                 std::size_t depth,
-                                                 std::size_t length)
-    : _fields(fields),
-      _depth(depth),
-      _length(length),
+UpdateSequenceGenerator::UpdateSequenceGenerator(UpdateSequenceGeneratorConfig config)
+    : _config(std::move(config)),
       _random(std::unique_ptr<SecureRandom>(SecureRandom::create())->nextInt64()) {
     auto path = "";
-    _generatePaths(fields, depth, length, path);
+    _generatePaths(config, path);
     // Creates the same shuffle each time, but we don't care. We want to mess up the DFS ordering.
     std::random_shuffle(this->_paths.begin(), this->_paths.end(), this->_random);
 }
