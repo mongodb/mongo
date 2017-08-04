@@ -791,7 +791,7 @@ void ReplicationCoordinatorImpl::_startElectSelfIfEligibleV1(
     const auto status = _topCoord->becomeCandidateIfElectable(_replExecutor->now(), reason);
     if (!status.isOK()) {
         switch (reason) {
-            case TopologyCoordinator::StartElectionReason::kElectionTimeout:
+            case TopologyCoordinator::TopologyCoordinator::StartElectionReason::kElectionTimeout:
                 log() << "Not starting an election, since we are not electable due to: "
                       << status.reason();
                 break;
@@ -827,7 +827,7 @@ void ReplicationCoordinatorImpl::_startElectSelfIfEligibleV1(
             break;
     }
 
-    _startElectSelfV1_inlock(reason);
+    _startElectSelfV1_inlock();
 }
 
 }  // namespace repl

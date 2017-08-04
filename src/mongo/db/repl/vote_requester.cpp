@@ -48,8 +48,7 @@ VoteRequester::Algorithm::Algorithm(const ReplSetConfig& rsConfig,
                                     long long candidateIndex,
                                     long long term,
                                     bool dryRun,
-                                    OpTime lastDurableOpTime,
-                                    int primaryIndex)
+                                    OpTime lastDurableOpTime)
     : _rsConfig(rsConfig),
       _candidateIndex(candidateIndex),
       _term(term),
@@ -60,9 +59,6 @@ VoteRequester::Algorithm::Algorithm(const ReplSetConfig& rsConfig,
     for (auto member = _rsConfig.membersBegin(); member != _rsConfig.membersEnd(); member++) {
         if (member->isVoter() && index != candidateIndex) {
             _targets.push_back(member->getHostAndPort());
-        }
-        if (index == primaryIndex) {
-            _primaryHost = member->getHostAndPort();
         }
         index++;
     }
@@ -102,11 +98,6 @@ void VoteRequester::Algorithm::processResponse(const RemoteCommandRequest& reque
         return;
     }
     _responders.insert(request.target);
-
-    // If the primary's vote is a yes, we will set _primaryVote to be Yes.
-    if (request.target == _primaryHost.get()) {
-        _primaryVote = PrimaryVote::No;
-    }
     ReplSetRequestVotesResponse voteResponse;
     const auto status = voteResponse.initialize(response.data);
     if (!status.isOK()) {
@@ -115,9 +106,6 @@ void VoteRequester::Algorithm::processResponse(const RemoteCommandRequest& reque
 
     if (voteResponse.getVoteGranted()) {
         logLine << "received a yes vote from " << request.target;
-        if (request.target == _primaryHost.get()) {
-            _primaryVote = PrimaryVote::Yes;
-        }
         _votes++;
     } else {
         logLine << "received a no vote from " << request.target << " with reason \""
@@ -131,23 +119,13 @@ void VoteRequester::Algorithm::processResponse(const RemoteCommandRequest& reque
 }
 
 bool VoteRequester::Algorithm::hasReceivedSufficientResponses() const {
-    if (_primaryHost && _primaryVote == PrimaryVote::No) {
-        return true;
-    }
-
-    if (_primaryHost && _primaryVote == PrimaryVote::Pending) {
-        return false;
-    }
-
-    return _staleTerm || _votes >= _rsConfig.getMajorityVoteCount() ||
+    return _staleTerm || _votes == _rsConfig.getMajorityVoteCount() ||
         _responsesProcessed == static_cast<int>(_targets.size());
 }
 
 VoteRequester::Result VoteRequester::Algorithm::getResult() const {
     if (_staleTerm) {
         return Result::kStaleTerm;
-    } else if (_primaryHost && _primaryVote != PrimaryVote::Yes) {
-        return Result::kPrimaryRespondedNo;
     } else if (_votes >= _rsConfig.getMajorityVoteCount()) {
         return Result::kSuccessfullyElected;
     } else {
@@ -168,10 +146,8 @@ StatusWith<executor::TaskExecutor::EventHandle> VoteRequester::start(
     long long candidateIndex,
     long long term,
     bool dryRun,
-    OpTime lastDurableOpTime,
-    int primaryIndex) {
-    _algorithm.reset(
-        new Algorithm(rsConfig, candidateIndex, term, dryRun, lastDurableOpTime, primaryIndex));
+    OpTime lastDurableOpTime) {
+    _algorithm.reset(new Algorithm(rsConfig, candidateIndex, term, dryRun, lastDurableOpTime));
     _runner.reset(new ScatterGatherRunner(_algorithm.get(), executor));
     return _runner->start();
 }
