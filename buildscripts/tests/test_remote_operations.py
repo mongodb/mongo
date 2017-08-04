@@ -1,0 +1,344 @@
+#!/usr/bin/env python
+
+"""Unit test for buildscripts/remote_operations.py.
+
+   Note - Tests require sshd to be enabled on localhost with paswordless login."""
+
+import os
+import shutil
+import sys
+import tempfile
+import unittest
+
+if __name__ == "__main__" and __package__ is None:
+    sys.path.append(os.getcwd())
+from buildscripts import remote_operations as rop
+
+
+class RemoteOperationsTestCase(unittest.TestCase):
+    def setUp(self):
+        self.temp_local_dir = tempfile.mkdtemp()
+        self.temp_remote_dir = tempfile.mkdtemp()
+        self.rop = rop.RemoteOperations(user_host="localhost")
+        self.rop_shell = rop.RemoteOperations(user_host="localhost", use_shell=True)
+
+    def tearDown(self):
+        shutil.rmtree(self.temp_local_dir)
+        shutil.rmtree(self.temp_remote_dir)
+
+
+class RemoteOperationConnection(RemoteOperationsTestCase):
+    def runTest(self):
+
+        self.assertTrue(self.rop.access_established())
+        ret, buff = self.rop.access_info()
+        self.assertEqual(0, ret)
+
+        # Invalid host
+        remote_op = rop.RemoteOperations(user_host="badhost")
+        ret, buff = remote_op.access_info()
+        self.assertFalse(remote_op.access_established())
+        self.assertEqual(255, ret)
+        self.assertIsNotNone(buff)
+
+        # Invalid host with retries
+        remote_op = rop.RemoteOperations(user_host="badhost2", retries=3)
+        ret, buff = remote_op.access_info()
+        self.assertFalse(remote_op.access_established())
+        self.assertNotEqual(0, ret)
+        self.assertIsNotNone(buff)
+
+        # Invalid host with retries & retry_sleep
+        remote_op = rop.RemoteOperations(user_host="badhost3", retries=3, retry_sleep=1)
+        ret, buff = remote_op.access_info()
+        self.assertFalse(remote_op.access_established())
+        self.assertNotEqual(0, ret)
+        self.assertIsNotNone(buff)
+
+        # Valid host with invalid ssh_options
+        ssh_options = "-o invalid"
+        remote_op = rop.RemoteOperations(user_host="localhost", ssh_options=ssh_options)
+        ret, buff = remote_op.access_info()
+        self.assertFalse(remote_op.access_established())
+        self.assertNotEqual(0, ret)
+        self.assertIsNotNone(buff)
+
+        # Valid host with valid ssh_options
+        ssh_options = "-v -o ConnectTimeout=10 -o ConnectionAttempts=10"
+        remote_op = rop.RemoteOperations(user_host="localhost", ssh_options=ssh_options)
+        ret, buff = remote_op.access_info()
+        self.assertTrue(remote_op.access_established())
+        self.assertEqual(0, ret)
+        self.assertIsNotNone(buff)
+
+
+class RemoteOperationShell(RemoteOperationsTestCase):
+    def runTest(self):
+
+        # Shell connect
+        ret, buff = self.rop.shell("uname")
+        self.assertEqual(0, ret)
+        self.assertIsNotNone(buff)
+
+        ret, buff = self.rop_shell.shell("uname")
+        self.assertEqual(0, ret)
+        self.assertIsNotNone(buff)
+
+        ret, buff = self.rop.operation("shell", "uname")
+        self.assertEqual(0, ret)
+        self.assertIsNotNone(buff)
+
+        # Invalid command
+        ret, buff = self.rop.shell("invalid_command")
+        self.assertNotEqual(0, ret)
+        self.assertIsNotNone(buff)
+
+        # Multiple commands
+        ret, buff = self.rop.shell("date; whoami; ls")
+        self.assertEqual(0, ret)
+        self.assertIsNotNone(buff)
+
+        ret, buff = self.rop_shell.shell("date; whoami; ls")
+        self.assertEqual(0, ret)
+        self.assertIsNotNone(buff)
+
+        # Command with single quotes
+        ret, buff = self.rop.shell("echo 'hello there' | grep 'hello'")
+        self.assertEqual(0, ret)
+        self.assertIsNotNone(buff)
+
+        ret, buff = self.rop_shell.shell("echo 'hello there'| grep 'hello'")
+        self.assertEqual(0, ret)
+        self.assertIsNotNone(buff)
+
+        # Command with escaped double quotes
+        ret, buff = self.rop.shell("echo \"hello there\" | grep \"hello\"")
+        self.assertEqual(0, ret)
+        self.assertIsNotNone(buff)
+
+        ret, buff = self.rop_shell.shell("echo \"hello there\" | grep \"hello\"")
+        self.assertEqual(0, ret)
+        self.assertIsNotNone(buff)
+
+        # Command with directory and pipe
+        ret, buff = self.rop.shell(
+            "touch {dir}/{file}; ls {dir} | grep {file}".format(
+                file="b",
+                dir=self.temp_local_dir))
+        self.assertEqual(0, ret)
+        self.assertIsNotNone(buff)
+
+        ret, buff = self.rop_shell.shell(
+            "touch {dir}/{file}; ls {dir} | grep {file}".format(
+                file="c",
+                dir=self.temp_local_dir))
+        self.assertEqual(0, ret)
+        self.assertIsNotNone(buff)
+
+
+class RemoteOperationCopy(RemoteOperationsTestCase):
+    def runTest(self):
+
+        # Copy to remote
+        l_temp_path = tempfile.mkstemp(dir=self.temp_local_dir)[1]
+        l_temp_file = os.path.basename(l_temp_path)
+        ret, buff = self.rop.copy_to(l_temp_path, self.temp_remote_dir)
+        self.assertEqual(0, ret)
+        self.assertIsNotNone(buff)
+        r_temp_path = os.path.join(self.temp_remote_dir, l_temp_file)
+        self.assertTrue(os.path.isfile(r_temp_path))
+
+        l_temp_path = tempfile.mkstemp(dir=self.temp_local_dir)[1]
+        l_temp_file = os.path.basename(l_temp_path)
+        ret, buff = self.rop_shell.copy_to(l_temp_path, self.temp_remote_dir)
+        self.assertEqual(0, ret)
+        self.assertIsNotNone(buff)
+        r_temp_path = os.path.join(self.temp_remote_dir, l_temp_file)
+        self.assertTrue(os.path.isfile(r_temp_path))
+
+        l_temp_path = tempfile.mkstemp(dir=self.temp_local_dir)[1]
+        l_temp_file = os.path.basename(l_temp_path)
+        ret, buff = self.rop.operation("copy_to", l_temp_path, self.temp_remote_dir)
+        self.assertEqual(0, ret)
+        self.assertIsNotNone(buff)
+        self.assertTrue(os.path.isfile(r_temp_path))
+
+        # Copy multiple files to remote
+        num_files = 3
+        l_temp_files = []
+        for i in range(num_files):
+            l_temp_path = tempfile.mkstemp(dir=self.temp_local_dir)[1]
+            l_temp_file = os.path.basename(l_temp_path)
+            l_temp_files.append(l_temp_path)
+        ret, buff = self.rop.copy_to(" ".join(l_temp_files), self.temp_remote_dir)
+        self.assertEqual(0, ret)
+        self.assertIsNotNone(buff)
+        for i in range(num_files):
+            r_temp_path = os.path.join(self.temp_remote_dir, os.path.basename(l_temp_files[i]))
+            self.assertTrue(os.path.isfile(r_temp_path))
+
+        num_files = 3
+        l_temp_files = []
+        for i in range(num_files):
+            l_temp_path = tempfile.mkstemp(dir=self.temp_local_dir)[1]
+            l_temp_file = os.path.basename(l_temp_path)
+            l_temp_files.append(l_temp_path)
+        ret, buff = self.rop_shell.copy_to(" ".join(l_temp_files), self.temp_remote_dir)
+        self.assertEqual(0, ret)
+        self.assertIsNotNone(buff)
+        for i in range(num_files):
+            r_temp_path = os.path.join(self.temp_remote_dir, os.path.basename(l_temp_files[i]))
+            self.assertTrue(os.path.isfile(r_temp_path))
+
+        # Copy to remote without directory
+        l_temp_path = tempfile.mkstemp(dir=self.temp_local_dir)[1]
+        l_temp_file = os.path.basename(l_temp_path)
+        ret, buff = self.rop.copy_to(l_temp_path)
+        self.assertEqual(0, ret)
+        self.assertIsNotNone(buff)
+        r_temp_path = os.path.join(os.environ["HOME"], l_temp_file)
+        self.assertTrue(os.path.isfile(r_temp_path))
+        os.remove(r_temp_path)
+
+        l_temp_path = tempfile.mkstemp(dir=self.temp_local_dir)[1]
+        l_temp_file = os.path.basename(l_temp_path)
+        ret, buff = self.rop_shell.copy_to(l_temp_path)
+        self.assertEqual(0, ret)
+        self.assertIsNotNone(buff)
+        r_temp_path = os.path.join(os.environ["HOME"], l_temp_file)
+        self.assertTrue(os.path.isfile(r_temp_path))
+        os.remove(r_temp_path)
+
+        # Copy to remote with space in file name, note it must be quoted.
+        l_temp_path = tempfile.mkstemp(dir=self.temp_local_dir, prefix="filename with space")[1]
+        l_temp_file = os.path.basename(l_temp_path)
+        ret, buff = self.rop.copy_to("'{}'".format(l_temp_path))
+        self.assertEqual(0, ret)
+        self.assertIsNotNone(buff)
+        r_temp_path = os.path.join(os.environ["HOME"], l_temp_file)
+        self.assertTrue(os.path.isfile(r_temp_path))
+        os.remove(r_temp_path)
+
+        l_temp_path = tempfile.mkstemp(dir=self.temp_local_dir, prefix="filename with space")[1]
+        l_temp_file = os.path.basename(l_temp_path)
+        ret, buff = self.rop_shell.copy_to("'{}'".format(l_temp_path))
+        self.assertEqual(0, ret)
+        self.assertIsNotNone(buff)
+        r_temp_path = os.path.join(os.environ["HOME"], l_temp_file)
+        self.assertTrue(os.path.isfile(r_temp_path))
+        os.remove(r_temp_path)
+
+        # Copy from remote
+        r_temp_path = tempfile.mkstemp(dir=self.temp_remote_dir)[1]
+        r_temp_file = os.path.basename(r_temp_path)
+        ret, buff = self.rop.copy_from(r_temp_path, self.temp_local_dir)
+        self.assertEqual(0, ret)
+        self.assertIsNotNone(buff)
+        l_temp_path = os.path.join(self.temp_local_dir, r_temp_file)
+        self.assertTrue(os.path.isfile(l_temp_path))
+
+        r_temp_path = tempfile.mkstemp(dir=self.temp_remote_dir)[1]
+        r_temp_file = os.path.basename(r_temp_path)
+        ret, buff = self.rop_shell.copy_from(r_temp_path, self.temp_local_dir)
+        self.assertEqual(0, ret)
+        self.assertIsNotNone(buff)
+        l_temp_path = os.path.join(self.temp_local_dir, r_temp_file)
+        self.assertTrue(os.path.isfile(l_temp_path))
+
+        # Copy from remote without directory
+        r_temp_path = tempfile.mkstemp(dir=self.temp_remote_dir)[1]
+        r_temp_file = os.path.basename(r_temp_path)
+        ret, buff = self.rop.copy_from(r_temp_path)
+        self.assertEqual(0, ret)
+        self.assertIsNotNone(buff)
+        self.assertTrue(os.path.isfile(r_temp_file))
+        os.remove(r_temp_file)
+
+        r_temp_path = tempfile.mkstemp(dir=self.temp_remote_dir)[1]
+        r_temp_file = os.path.basename(r_temp_path)
+        ret, buff = self.rop_shell.copy_from(r_temp_path)
+        self.assertEqual(0, ret)
+        self.assertIsNotNone(buff)
+        self.assertTrue(os.path.isfile(r_temp_file))
+        os.remove(r_temp_file)
+
+        # Copy from remote with space in file name, note it must be quoted.
+        r_temp_path = tempfile.mkstemp(dir=self.temp_remote_dir, prefix="filename with space")[1]
+        r_temp_file = os.path.basename(r_temp_path)
+        ret, buff = self.rop.copy_from("'{}'".format(r_temp_path))
+        self.assertEqual(0, ret)
+        self.assertIsNotNone(buff)
+        self.assertTrue(os.path.isfile(r_temp_file))
+        os.remove(r_temp_file)
+
+        # Copy multiple files from remote
+        num_files = 3
+        r_temp_files = []
+        for i in range(num_files):
+            r_temp_path = tempfile.mkstemp(dir=self.temp_remote_dir)[1]
+            r_temp_file = os.path.basename(r_temp_path)
+            r_temp_files.append(r_temp_path)
+        ret, buff = self.rop.copy_from(" ".join(r_temp_files), self.temp_local_dir)
+        self.assertEqual(0, ret)
+        self.assertIsNotNone(buff)
+        for i in range(num_files):
+            basefile_name = os.path.basename(l_temp_files[i])
+            l_temp_path = os.path.join(self.temp_local_dir, basefile_name)
+            self.assertTrue(os.path.isfile(l_temp_path))
+
+        num_files = 3
+        r_temp_files = []
+        for i in range(num_files):
+            r_temp_path = tempfile.mkstemp(dir=self.temp_remote_dir)[1]
+            r_temp_file = os.path.basename(r_temp_path)
+            r_temp_files.append(r_temp_path)
+        ret, buff = self.rop_shell.copy_from(" ".join(r_temp_files), self.temp_local_dir)
+        self.assertEqual(0, ret)
+        self.assertIsNotNone(buff)
+        for i in range(num_files):
+            basefile_name = os.path.basename(l_temp_files[i])
+            l_temp_path = os.path.join(self.temp_local_dir, basefile_name)
+            self.assertTrue(os.path.isfile(l_temp_path))
+
+        # Copy files from remote with wilcard
+        num_files = 3
+        r_temp_files = []
+        for i in range(num_files):
+            r_temp_path = tempfile.mkstemp(dir=self.temp_remote_dir, prefix="wild1")[1]
+            r_temp_file = os.path.basename(r_temp_path)
+            r_temp_files.append(r_temp_path)
+        r_temp_path = os.path.join(self.temp_remote_dir, "wild1*")
+        ret, buff = self.rop.copy_from(r_temp_path, self.temp_local_dir)
+        self.assertEqual(0, ret)
+        self.assertIsNotNone(buff)
+        for i in range(num_files):
+            l_temp_path = os.path.join(self.temp_local_dir, os.path.basename(r_temp_files[i]))
+            self.assertTrue(os.path.isfile(l_temp_path))
+
+        num_files = 3
+        r_temp_files = []
+        for i in range(num_files):
+            r_temp_path = tempfile.mkstemp(dir=self.temp_remote_dir, prefix="wild2")[1]
+            r_temp_file = os.path.basename(r_temp_path)
+            r_temp_files.append(r_temp_path)
+        r_temp_path = os.path.join(self.temp_remote_dir, "wild2*")
+        ret, buff = self.rop_shell.copy_from(r_temp_path, self.temp_local_dir)
+        self.assertEqual(0, ret)
+        self.assertIsNotNone(buff)
+        for i in range(num_files):
+            l_temp_path = os.path.join(self.temp_local_dir, os.path.basename(r_temp_files[i]))
+            self.assertTrue(os.path.isfile(l_temp_path))
+
+        # Local directory does not exist.
+        self.assertRaises(ValueError, lambda: self.rop_shell.copy_from(r_temp_path, "bad_dir"))
+
+
+class RemoteOperation(RemoteOperationsTestCase):
+    def runTest(self):
+
+        # Invalid operation
+        self.assertRaises(ValueError, lambda: self.rop.operation("invalid", None))
+
+
+if __name__ == "__main__":
+    unittest.main()
