@@ -31,6 +31,7 @@
 #include "mongo/db/repl/idempotency_update_sequence.h"
 
 #include <algorithm>
+#include <memory>
 
 #include "mongo/db/field_ref.h"
 #include "mongo/db/jsobj.h"
