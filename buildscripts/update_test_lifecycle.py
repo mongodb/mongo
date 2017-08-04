@@ -517,7 +517,7 @@ class JiraIssueCreator(object):
                 tags_lines.append("-- {0}".format(mono(test)))
                 for tag in sorted(tags.keys()):
                     coefficient = tags[tag]
-                    tags_lines.append("--- {0} ({1:.2} %)".format(mono(tag), coefficient))
+                    tags_lines.append("--- {0} ({1:.2})".format(mono(tag), coefficient))
         if tags_lines:
             return "\n".join(tags_lines)
         else:
