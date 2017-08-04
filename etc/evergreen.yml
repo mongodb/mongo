@@ -1799,7 +1799,13 @@ tasks:
 
           rm -rf ${install_directory|/data/mongo-install-directory}
 
-          ${compile_env|} ${python|/opt/mongodbtoolchain/v2/bin/python2} ./buildscripts/scons.py ${compile_flags|} ${scons_cache_args|} --use-new-tools --build-mongoreplay="${build_mongoreplay}" all ${additional_targets|} MONGO_VERSION=${version}
+          extra_args=""
+          if [ -n "${num_scons_compile_all_jobs_available|}" ]; then
+            echo "Changing SCons to run with --jobs=${num_scons_compile_all_jobs_available|}"
+            extra_args="$extra_args --jobs=${num_scons_compile_all_jobs_available|}"
+          fi
+
+          ${compile_env|} ${python|/opt/mongodbtoolchain/v2/bin/python2} ./buildscripts/scons.py ${compile_flags|} ${scons_cache_args|} --use-new-tools --build-mongoreplay="${build_mongoreplay}" $extra_args all ${additional_targets|} MONGO_VERSION=${version}
 
 ## compile_all - build all scons targets including unittests ##
 - name: compile_all
@@ -1825,7 +1831,13 @@ tasks:
 
           rm -rf ${install_directory|/data/mongo-install-directory}
 
-          ${compile_env|} ${python|/opt/mongodbtoolchain/v2/bin/python2} ./buildscripts/scons.py ${compile_flags|} ${scons_cache_args|} --use-new-tools --build-mongoreplay="${build_mongoreplay}" all ${additional_targets|} MONGO_VERSION=${version}
+          extra_args=""
+          if [ -n "${num_scons_compile_all_jobs_available|}" ]; then
+            echo "Changing SCons to run with --jobs=${num_scons_compile_all_jobs_available|}"
+            extra_args="$extra_args --jobs=${num_scons_compile_all_jobs_available|}"
+          fi
+
+          ${compile_env|} ${python|/opt/mongodbtoolchain/v2/bin/python2} ./buildscripts/scons.py ${compile_flags|} ${scons_cache_args|} --use-new-tools --build-mongoreplay="${build_mongoreplay}" $extra_args all ${additional_targets|} MONGO_VERSION=${version}
 
     - command: s3.put
       params:
@@ -5494,6 +5506,9 @@ buildvariants:
     content_type: application/zip
     num_jobs_available: $(grep -c ^processor /proc/cpuinfo)
     compile_flags: --dbg=on --opt=on --win-version-min=ws08r2 -j$(( $(grep -c ^processor /proc/cpuinfo) / 2 )) MONGO_DISTMOD=2008plus
+    # We invoke SCons using --jobs = (# of CPUs / 4) to avoid causing out of memory errors due to
+    # spawning a large number of linker processes.
+    num_scons_compile_all_jobs_available: $(( $(grep -c ^processor /proc/cpuinfo) / 4 ))
     python: python
     ext: zip
     use_scons_cache: true
@@ -5647,6 +5662,9 @@ buildvariants:
     msi_target: msi
     content_type: application/zip
     compile_flags: --release --ssl MONGO_DISTMOD=windows-64 CPPPATH="c:/openssl/include c:/sasl/include c:/snmp/include c:/curl/include" LIBPATH="c:/openssl/lib c:/sasl/lib c:/snmp/lib c:/curl/lib" -j$(( $(grep -c ^processor /proc/cpuinfo) / 2 )) --dynamic-windows --win-version-min=ws08r2
+    # We invoke SCons using --jobs = (# of CPUs / 4) to avoid causing out of memory errors due to
+    # spawning a large number of linker processes.
+    num_scons_compile_all_jobs_available: $(( $(grep -c ^processor /proc/cpuinfo) / 4 ))
     python: python
     num_jobs_available: $(grep -c ^processor /proc/cpuinfo)
     ext: zip
