@@ -89,7 +89,8 @@ public:
                                                       candidateId,
                                                       term,
                                                       false,  // not a dryRun
-                                                      lastOplogEntry));
+                                                      lastOplogEntry,
+                                                      -1));
     }
 
     virtual void tearDown() {
@@ -218,7 +219,42 @@ public:
                                                       candidateId,
                                                       term,
                                                       true,  // dryRun
-                                                      lastOplogEntry));
+                                                      lastOplogEntry,
+                                                      -1));
+    }
+};
+
+class VoteRequesterCatchupTakeoverDryRunTest : public VoteRequesterTest {
+public:
+    virtual void setUp() {
+        ReplSetConfig config;
+        ASSERT_OK(config.initialize(BSON("_id"
+                                         << "rs0"
+                                         << "version"
+                                         << 2
+                                         << "members"
+                                         << BSON_ARRAY(BSON("_id" << 0 << "host"
+                                                                  << "host0")
+                                                       << BSON("_id" << 1 << "host"
+                                                                     << "host1")
+                                                       << BSON("_id" << 2 << "host"
+                                                                     << "host2")
+                                                       << BSON("_id" << 3 << "host"
+                                                                     << "host3")
+                                                       << BSON("_id" << 4 << "host"
+                                                                     << "host4")))));
+        ASSERT_OK(config.validate());
+        long long candidateId = 0;
+        long long term = 2;
+        int primaryIndex = 1;
+        OpTime lastOplogEntry = OpTime(Timestamp(999, 0), 1);
+
+        _requester.reset(new VoteRequester::Algorithm(config,
+                                                      candidateId,
+                                                      term,
+                                                      true,  // dryRun
+                                                      lastOplogEntry,
+                                                      primaryIndex));
     }
 };
 
@@ -415,6 +451,49 @@ TEST_F(VoteRequesterDryRunTest, NotEnoughVotesLoseElection) {
     ASSERT_TRUE(hasReceivedSufficientResponses());
     ASSERT(VoteRequester::Result::kInsufficientVotes == getResult());
     ASSERT_EQUALS(1, getNumResponders());
+    stopCapturingLogMessages();
+}
+
+TEST_F(VoteRequesterCatchupTakeoverDryRunTest, CatchupTakeoverPrimarySaysYesWinElection) {
+    ASSERT_FALSE(hasReceivedSufficientResponses());
+    processResponse(requestFrom("host1"), votedYes());
+    processResponse(requestFrom("host2"), votedYes());
+    ASSERT_TRUE(hasReceivedSufficientResponses());
+    ASSERT(VoteRequester::Result::kSuccessfullyElected == getResult());
+    ASSERT_EQUALS(2, getNumResponders());
+}
+
+TEST_F(VoteRequesterCatchupTakeoverDryRunTest, CatchupTakeoverPrimarySaysYesButNotEnoughVotes) {
+    ASSERT_FALSE(hasReceivedSufficientResponses());
+    processResponse(requestFrom("host1"), votedYes());
+    ASSERT(VoteRequester::Result::kInsufficientVotes == getResult());
+    processResponse(requestFrom("host2"), votedNoBecauseLastOpTimeIsGreater());
+    processResponse(requestFrom("host3"), votedNoBecauseLastOpTimeIsGreater());
+    processResponse(requestFrom("host4"), votedNoBecauseLastOpTimeIsGreater());
+    ASSERT_TRUE(hasReceivedSufficientResponses());
+    ASSERT(VoteRequester::Result::kInsufficientVotes == getResult());
+    ASSERT_EQUALS(4, getNumResponders());
+}
+
+TEST_F(VoteRequesterCatchupTakeoverDryRunTest, CatchupTakeoverPrimarySaysNoLoseElection) {
+    startCapturingLogMessages();
+    ASSERT_FALSE(hasReceivedSufficientResponses());
+    processResponse(requestFrom("host2"), votedYes());
+    processResponse(requestFrom("host3"), votedYes());
+
+    // This covers the case that the Vote Requester is cancelled partway through
+    // the dry run before the primary responded.
+    ASSERT(VoteRequester::Result::kPrimaryRespondedNo == getResult());
+
+    // It also tests that even if a majority of yes votes have already been received,
+    // it still needs to wait for a yes response from the primary.
+    ASSERT_FALSE(hasReceivedSufficientResponses());
+
+    processResponse(requestFrom("host1"), votedNoBecauseLastOpTimeIsGreater());
+    ASSERT_EQUALS(1, countLogLinesContaining("received a no vote from host1:27017"));
+    ASSERT_TRUE(hasReceivedSufficientResponses());
+    ASSERT(VoteRequester::Result::kPrimaryRespondedNo == getResult());
+    ASSERT_EQUALS(3, getNumResponders());
     stopCapturingLogMessages();
 }
 

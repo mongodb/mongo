@@ -50,11 +50,7 @@ class VoteRequester {
     MONGO_DISALLOW_COPYING(VoteRequester);
 
 public:
-    enum class Result {
-        kSuccessfullyElected,
-        kStaleTerm,
-        kInsufficientVotes,
-    };
+    enum class Result { kSuccessfullyElected, kStaleTerm, kInsufficientVotes, kPrimaryRespondedNo };
 
     class Algorithm : public ScatterGatherAlgorithm {
     public:
@@ -62,7 +58,8 @@ public:
                   long long candidateIndex,
                   long long term,
                   bool dryRun,
-                  OpTime lastDurableOpTime);
+                  OpTime lastDurableOpTime,
+                  int primaryIndex);
         virtual ~Algorithm();
         virtual std::vector<executor::RemoteCommandRequest> getRequests() const;
         virtual void processResponse(const executor::RemoteCommandRequest& request,
@@ -82,6 +79,8 @@ public:
         unordered_set<HostAndPort> getResponders() const;
 
     private:
+        enum class PrimaryVote { Pending, Yes, No };
+
         const ReplSetConfig _rsConfig;
         const long long _candidateIndex;
         const long long _term;
@@ -92,6 +91,8 @@ public:
         bool _staleTerm = false;
         long long _responsesProcessed = 0;
         long long _votes = 1;
+        boost::optional<HostAndPort> _primaryHost;
+        PrimaryVote _primaryVote = PrimaryVote::Pending;
     };
 
     VoteRequester();
@@ -100,6 +101,8 @@ public:
     /**
      * Begins the process of sending replSetRequestVotes commands to all non-DOWN nodes
      * in currentConfig, in attempt to receive sufficient votes to win the election.
+     * If primaryIndex is not -1, then it means that the primary's vote is required
+     * to win the elction.
      *
      * evh can be used to schedule a callback when the process is complete.
      * If this function returns Status::OK(), evh is then guaranteed to be signaled.
@@ -109,7 +112,8 @@ public:
                                                           long long candidateIndex,
                                                           long long term,
                                                           bool dryRun,
-                                                          OpTime lastDurableOpTime);
+                                                          OpTime lastDurableOpTime,
+                                                          int primaryIndex);
 
     /**
      * Informs the VoteRequester to cancel further processing.

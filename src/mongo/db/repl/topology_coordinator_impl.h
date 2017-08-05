@@ -228,6 +228,7 @@ public:
     virtual void voteForMyselfV1();
     virtual void prepareForStepDown();
     virtual void setPrimaryIndex(long long primaryIndex);
+    virtual int getCurrentPrimaryIndex() const;
     virtual bool haveNumNodesReachedOpTime(const OpTime& opTime, int numNodes, bool durablyWritten);
     virtual bool haveTaggedNodesReachedOpTime(const OpTime& opTime,
                                               const ReplSetTagPattern& tagPattern,
@@ -277,9 +278,6 @@ public:
 
     // Returns _electionId.  Only used in unittests.
     OID getElectionId() const;
-
-    // Returns _currentPrimaryIndex.  Only used in unittests.
-    int getCurrentPrimaryIndex() const;
 
 private:
     enum UnelectableReason {
