@@ -133,7 +133,8 @@ void startMongoSFTDC() {
                          "'diagnosticDataCollectionDirectoryPath' are specified.";
             startMode = FTDCStartMode::kSkipStart;
         } else {
-            directory = FTDCUtil::getMongoSPath(serverGlobalParams.logpath);
+            directory = boost::filesystem::absolute(
+                FTDCUtil::getMongoSPath(serverGlobalParams.logpath), serverGlobalParams.cwd);
 
             // Update the server parameter with the computed path.
             // Note: If the computed FTDC directory conflicts with an existing file, then FTDC will

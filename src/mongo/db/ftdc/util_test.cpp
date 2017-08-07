@@ -60,6 +60,8 @@ TEST(FTDCUtilTest, TestMongoSPath) {
         {"c:\\var\\log\\log_file", "c:\\var\\log\\log_file.diagnostic.data"},
         {"/var/some.log/mongos.log", "/var/some.log/mongos.diagnostic.data"},
         {"/var/some.log/log_file", "/var/some.log/log_file.diagnostic.data"},
+
+        {"foo/mongos.log", "foo/mongos.diagnostic.data"},
     };
 
     for (const auto& p : testCases) {

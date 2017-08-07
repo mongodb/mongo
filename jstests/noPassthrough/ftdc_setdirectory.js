@@ -8,10 +8,14 @@ load('jstests/libs/ftdc.js');
     let testPath1 = MongoRunner.toRealPath('ftdc_setdir1');
     let testPath2 = MongoRunner.toRealPath('ftdc_setdir2');
     let testPath3 = MongoRunner.toRealPath('ftdc_setdir3');
+    // SERVER-30394: Use a directory relative to the current working directory.
+    let testPath4 = 'ftdc_setdir4/';
     let testLog3 = testPath3 + "mongos_ftdc.log";
+    let testLog4 = testPath4 + "mongos_ftdc.log";
 
     // Make the log file directory for mongos.
     mkdir(testPath3);
+    mkdir(testPath4);
 
     // Startup 3 mongos:
     // 1. Normal MongoS with no log file to verify FTDC can be startup at runtime with a path.
@@ -22,13 +26,15 @@ load('jstests/libs/ftdc.js');
         mongos: {
             s0: {verbose: 0},
             s1: {setParameter: {diagnosticDataCollectionDirectoryPath: testPath2}},
-            s2: {logpath: testLog3}
+            s2: {logpath: testLog3},
+            s3: {logpath: testLog4}
         }
     });
 
     let admin1 = st.s0.getDB('admin');
     let admin2 = st.s1.getDB('admin');
     let admin3 = st.s2.getDB('admin');
+    let admin4 = st.s3.getDB('admin');
 
     function setParam(admin, obj) {
         var ret = admin.runCommand(Object.extend({setParameter: 1}, obj));
@@ -86,7 +92,9 @@ load('jstests/libs/ftdc.js');
     }
 
     function normpath(path) {
-        return path.replace(/\\/g, "/");
+        // On Windows, strip the drive path because MongoRunner.toRealPath() returns a Unix Path
+        // while FTDC returns a Windows path.
+        return path.replace(/\\/g, "/").replace(/\w:/, "");
     }
 
     // Verify FTDC is already running if there was a path set at startup.
@@ -110,9 +118,26 @@ load('jstests/libs/ftdc.js');
         verifyGetDiagnosticData(admin3);
     }
 
+    // Verify FTDC is already running if there is a relative log file path.
+    function verifyFTDCStartsWithRelativeLogFile() {
+        jsTestLog("Running verifyFTDCStartsWithRelativeLogFile");
+        verifyCommonFTDCParameters(admin4, true);
+
+        // Skip verification of diagnosticDataCollectionDirectoryPath because it relies on comparing
+        // cwd vs dbPath.
+
+        // 1. Enable successfully
+        assert.commandWorked(setParam(admin4, {"diagnosticDataCollectionEnabled": 1}));
+
+        // 2. Validate getDiagnosticData returns FTDC data now
+        jsTestLog("Verifying FTDC getDiagnosticData");
+        verifyGetDiagnosticData(admin4);
+    }
+
     verifyFTDCDisabledOnStartup();
     verifyFTDCStartsWithPath();
     verifyFTDCStartsWithLogFile();
+    verifyFTDCStartsWithRelativeLogFile();
 
     st.stop();
 })();
