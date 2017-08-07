@@ -758,7 +758,7 @@ std::map<std::string, ApplyOpMetadata> opsMap = {
           createIndexForApplyOps(opCtx, indexSpec, nss, {});
           return Status::OK();
       },
-      {ErrorCodes::IndexAlreadyExists}}},
+      {ErrorCodes::IndexAlreadyExists, ErrorCodes::NamespaceNotFound}}},
     {"collMod",
      {[](OperationContext* opCtx,
          const char* ns,
