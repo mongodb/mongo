@@ -40,6 +40,7 @@ namespace repl {
 
 class OplogInterface;
 class ReplicationCoordinator;
+class ReplicationProcess;
 
 /**
  * During steady state replication, it is possible to find the local server in a state where it
@@ -110,6 +111,7 @@ public:
      */
     RollbackImpl(OplogInterface* localOplog,
                  OplogInterface* remoteOplog,
+                 ReplicationProcess* replicationProcess,
                  ReplicationCoordinator* replicationCoordinator,
                  Listener* listener);
 
@@ -118,6 +120,7 @@ public:
      */
     RollbackImpl(OplogInterface* localOplog,
                  OplogInterface* remoteOplog,
+                 ReplicationProcess* replicationProcess,
                  ReplicationCoordinator* replicationCoordinator);
 
     virtual ~RollbackImpl();
@@ -195,6 +198,10 @@ private:
 
     // This is used to read oplog entries from the remote oplog to find the common point.
     OplogInterface* const _remoteOplog;  // (R)
+
+    // The ReplicationProcess associated with this Rollback instance. Used to update and persist
+    // various pieces of replication state related to the rollback process.
+    ReplicationProcess* _replicationProcess;  // (R)
 
     // This is used to read and update global replication settings. This includes:
     // - update transition member states;

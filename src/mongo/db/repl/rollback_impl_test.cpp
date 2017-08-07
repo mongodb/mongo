@@ -80,8 +80,11 @@ void RollbackImplTest::setUp() {
     _localOplog = stdx::make_unique<OplogInterfaceMock>();
     _remoteOplog = stdx::make_unique<OplogInterfaceMock>();
     _listener = stdx::make_unique<Listener>(this);
-    _rollback = stdx::make_unique<RollbackImpl>(
-        _localOplog.get(), _remoteOplog.get(), _coordinator, _listener.get());
+    _rollback = stdx::make_unique<RollbackImpl>(_localOplog.get(),
+                                                _remoteOplog.get(),
+                                                _replicationProcess.get(),
+                                                _coordinator,
+                                                _listener.get());
 }
 
 void RollbackImplTest::tearDown() {
@@ -168,6 +171,18 @@ TEST_F(RollbackImplTest, RollbackReturnsNoMatchingDocumentWhenNoCommonPoint) {
     _localOplog->setOperations({makeOpAndRecordId(2)});
 
     ASSERT_EQUALS(ErrorCodes::NoMatchingDocument, _rollback->runRollback(_opCtx.get()));
+}
+
+TEST_F(RollbackImplTest, RollbackPersistsCommonPointToOplogTruncateAfterPoint) {
+    _remoteOplog->setOperations({makeOpAndRecordId(2)});
+    _localOplog->setOperations({makeOpAndRecordId(2)});
+
+    ASSERT_EQUALS(Status::OK(), _rollback->runRollback(_opCtx.get()));
+
+    // Check that the common point was saved.
+    auto truncateAfterPoint =
+        _replicationProcess->getConsistencyMarkers()->getOplogTruncateAfterPoint(_opCtx.get());
+    ASSERT_EQUALS(Timestamp(2, 2), truncateAfterPoint);
 }
 
 TEST_F(RollbackImplTest, RollbackSucceeds) {

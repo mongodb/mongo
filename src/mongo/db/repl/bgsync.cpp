@@ -730,7 +730,8 @@ void BackgroundSync::_runRollbackViaRecoverToCheckpoint(
         }
     }
 
-    _rollback = stdx::make_unique<RollbackImpl>(localOplog, &remoteOplog, _replCoord);
+    _rollback =
+        stdx::make_unique<RollbackImpl>(localOplog, &remoteOplog, _replicationProcess, _replCoord);
 
     log() << "Scheduling rollback (sync source: " << source << ")";
     auto status = _rollback->runRollback(opCtx);
