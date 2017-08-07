@@ -54,6 +54,7 @@ public:
         kQuery,
         kReplication,
         kReplicationHeartbeats,
+        kReplicationRollback,
         kSharding,
         kStorage,
         kJournal,

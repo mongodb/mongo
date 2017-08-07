@@ -34,7 +34,9 @@ def mongod_program(logger, executable=None, process_kwargs=None, **kwargs):
 
     # Turn on replication heartbeat logging.
     if "replSet" in kwargs and "logComponentVerbosity" not in suite_set_parameters:
-        suite_set_parameters["logComponentVerbosity"] = {"replication": {"heartbeats": 2}}
+        suite_set_parameters["logComponentVerbosity"] = {
+            "replication": {"heartbeats": 2, "rollback": 2}
+        }
 
     # orphanCleanupDelaySecs controls an artificial delay before cleaning up an orphaned chunk
     # that has migrated off of a shard, meant to allow most dependent queries on secondaries to

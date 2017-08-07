@@ -76,6 +76,7 @@ LogComponent LogComponent::parent() const {
             DECLARE_LOG_COMPONENT_PARENT(kASIO, kNetwork);
             DECLARE_LOG_COMPONENT_PARENT(kBridge, kNetwork);
             DECLARE_LOG_COMPONENT_PARENT(kReplicationHeartbeats, kReplication);
+            DECLARE_LOG_COMPONENT_PARENT(kReplicationRollback, kReplication);
         case kNumLogComponents:
             return kNumLogComponents;
         default:
@@ -108,6 +109,8 @@ StringData LogComponent::toStringData() const {
             return "replication"_sd;
         case kReplicationHeartbeats:
             return "heartbeats"_sd;
+        case kReplicationRollback:
+            return "rollback"_sd;
         case kSharding:
             return "sharding"_sd;
         case kStorage:
@@ -182,6 +185,8 @@ StringData LogComponent::getNameForLog() const {
             return "REPL    "_sd;
         case kReplicationHeartbeats:
             return "REPL_HB "_sd;
+        case kReplicationRollback:
+            return "ROLLBACK"_sd;
         case kSharding:
             return "SHARDING"_sd;
         case kStorage:
