@@ -51,6 +51,7 @@
 #include "mongo/db/repl/replication_coordinator.h"
 #include "mongo/db/repl/replication_coordinator_mock.h"
 #include "mongo/db/repl/replication_process.h"
+#include "mongo/db/repl/replication_recovery_mock.h"
 #include "mongo/db/repl/storage_interface_mock.h"
 #include "mongo/db/service_context_noop.h"
 #include "mongo/executor/network_interface_mock.h"
@@ -130,10 +131,11 @@ void ShardingMongodTestFixture::setUp() {
     repl::DropPendingCollectionReaper::set(
         service, stdx::make_unique<repl::DropPendingCollectionReaper>(storagePtr.get()));
 
-    repl::ReplicationProcess::set(
-        service,
-        stdx::make_unique<repl::ReplicationProcess>(
-            storagePtr.get(), stdx::make_unique<repl::ReplicationConsistencyMarkersMock>()));
+    repl::ReplicationProcess::set(service,
+                                  stdx::make_unique<repl::ReplicationProcess>(
+                                      storagePtr.get(),
+                                      stdx::make_unique<repl::ReplicationConsistencyMarkersMock>(),
+                                      stdx::make_unique<repl::ReplicationRecoveryMock>()));
     repl::ReplicationProcess::get(_opCtx.get())
         ->initializeRollbackID(_opCtx.get())
         .transitional_ignore();

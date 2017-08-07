@@ -45,6 +45,7 @@
 #include "mongo/db/repl/optime.h"
 #include "mongo/db/repl/replication_consistency_markers_mock.h"
 #include "mongo/db/repl/replication_process.h"
+#include "mongo/db/repl/replication_recovery_mock.h"
 #include "mongo/db/repl/reporter.h"
 #include "mongo/db/repl/storage_interface.h"
 #include "mongo/db/repl/storage_interface_mock.h"
@@ -285,7 +286,9 @@ protected:
         launchExecutorThread();
 
         _replicationProcess = stdx::make_unique<ReplicationProcess>(
-            _storageInterface.get(), stdx::make_unique<ReplicationConsistencyMarkersMock>());
+            _storageInterface.get(),
+            stdx::make_unique<ReplicationConsistencyMarkersMock>(),
+            stdx::make_unique<ReplicationRecoveryMock>());
 
         _executorProxy = stdx::make_unique<TaskExecutorMock>(&getExecutor());
 
