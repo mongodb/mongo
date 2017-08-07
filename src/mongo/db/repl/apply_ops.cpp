@@ -155,7 +155,8 @@ Status _applyOps(OperationContext* opCtx,
                         invariant(opCtx->lockState()->isW());
                         status = repl::applyCommand_inlock(opCtx, opObj, true);
                     } else {
-                        Lock::DBLock dbWriteLock(opCtx, nss.db(), MODE_X);
+                        Lock::DBLock dbWriteLock(opCtx, nss.db(), MODE_IX);
+                        Lock::CollectionLock lock(opCtx->lockState(), nss.ns(), MODE_IX);
                         OldClientContext ctx(opCtx, ns);
                         const char* names[] = {"o", "ns"};
                         BSONElement fields[2];
@@ -310,7 +311,7 @@ Status applyOps(OperationContext* opCtx,
     // There's only one case where we are allowed to take the database lock instead of the global
     // lock - no preconditions; only CRUD ops; and non-atomic mode.
     if (!hasPrecondition && areOpsCrudOnly && !allowAtomic) {
-        dbWriteLock.emplace(opCtx, dbName, MODE_X);
+        dbWriteLock.emplace(opCtx, dbName, MODE_IX);
     } else {
         globalWriteLock.emplace(opCtx);
     }
