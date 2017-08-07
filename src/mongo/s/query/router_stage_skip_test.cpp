@@ -40,9 +40,10 @@ namespace mongo {
 
 namespace {
 
-// Note: Though the next() method on RouterExecStage and its subclasses takes an OperationContext*,
-// these stages are mocked in this test using RouterStageMock. RouterStageMock does not actually use
-// the OperationContext, so we pass a nullptr OperationContext* to next() in these tests.
+// Note: Though the next() method on RouterExecStage and its subclasses depend on an
+// OperationContext* provided via a preceding call to reattachToOperationContext(), these stages are
+// mocked in this test using RouterStageMock. RouterStageMock does not actually use the
+// OperationContext, so we omit the call to rettachToOperationContext in these tests.
 
 TEST(RouterStageSkipTest, SkipIsOne) {
     auto mockStage = stdx::make_unique<RouterStageMock>();
@@ -52,22 +53,22 @@ TEST(RouterStageSkipTest, SkipIsOne) {
 
     auto skipStage = stdx::make_unique<RouterStageSkip>(std::move(mockStage), 1);
 
-    auto firstResult = skipStage->next(nullptr);
+    auto firstResult = skipStage->next();
     ASSERT_OK(firstResult.getStatus());
     ASSERT(firstResult.getValue().getResult());
     ASSERT_BSONOBJ_EQ(*firstResult.getValue().getResult(), BSON("a" << 2));
 
-    auto secondResult = skipStage->next(nullptr);
+    auto secondResult = skipStage->next();
     ASSERT_OK(secondResult.getStatus());
     ASSERT(secondResult.getValue().getResult());
     ASSERT_BSONOBJ_EQ(*secondResult.getValue().getResult(), BSON("a" << 3));
 
     // Once end-of-stream is reached, the skip stage should keep returning boost::none.
-    auto thirdResult = skipStage->next(nullptr);
+    auto thirdResult = skipStage->next();
     ASSERT_OK(thirdResult.getStatus());
     ASSERT(thirdResult.getValue().isEOF());
 
-    auto fourthResult = skipStage->next(nullptr);
+    auto fourthResult = skipStage->next();
     ASSERT_OK(thirdResult.getStatus());
     ASSERT(thirdResult.getValue().isEOF());
 }
@@ -81,12 +82,12 @@ TEST(RouterStageSkipTest, SkipIsThree) {
 
     auto skipStage = stdx::make_unique<RouterStageSkip>(std::move(mockStage), 3);
 
-    auto firstResult = skipStage->next(nullptr);
+    auto firstResult = skipStage->next();
     ASSERT_OK(firstResult.getStatus());
     ASSERT(firstResult.getValue().getResult());
     ASSERT_BSONOBJ_EQ(*firstResult.getValue().getResult(), BSON("a" << 4));
 
-    auto secondResult = skipStage->next(nullptr);
+    auto secondResult = skipStage->next();
     ASSERT_OK(secondResult.getStatus());
     ASSERT(secondResult.getValue().isEOF());
 }
@@ -99,7 +100,7 @@ TEST(RouterStageSkipTest, SkipEqualToResultSetSize) {
 
     auto skipStage = stdx::make_unique<RouterStageSkip>(std::move(mockStage), 3);
 
-    auto firstResult = skipStage->next(nullptr);
+    auto firstResult = skipStage->next();
     ASSERT_OK(firstResult.getStatus());
     ASSERT(firstResult.getValue().isEOF());
 }
@@ -112,7 +113,7 @@ TEST(RouterStageSkipTest, SkipExceedsResultSetSize) {
 
     auto skipStage = stdx::make_unique<RouterStageSkip>(std::move(mockStage), 100);
 
-    auto firstResult = skipStage->next(nullptr);
+    auto firstResult = skipStage->next();
     ASSERT_OK(firstResult.getStatus());
     ASSERT(firstResult.getValue().isEOF());
 }
@@ -126,7 +127,7 @@ TEST(RouterStageSkipTest, ErrorWhileSkippingResults) {
 
     auto skipStage = stdx::make_unique<RouterStageSkip>(std::move(mockStage), 2);
 
-    auto firstResult = skipStage->next(nullptr);
+    auto firstResult = skipStage->next();
     ASSERT_NOT_OK(firstResult.getStatus());
     ASSERT_EQ(firstResult.getStatus(), ErrorCodes::BadValue);
     ASSERT_EQ(firstResult.getStatus().reason(), "bad thing happened");
@@ -141,12 +142,12 @@ TEST(RouterStageSkipTest, ErrorAfterSkippingResults) {
 
     auto skipStage = stdx::make_unique<RouterStageSkip>(std::move(mockStage), 2);
 
-    auto firstResult = skipStage->next(nullptr);
+    auto firstResult = skipStage->next();
     ASSERT_OK(firstResult.getStatus());
     ASSERT(firstResult.getValue().getResult());
     ASSERT_BSONOBJ_EQ(*firstResult.getValue().getResult(), BSON("a" << 3));
 
-    auto secondResult = skipStage->next(nullptr);
+    auto secondResult = skipStage->next();
     ASSERT_NOT_OK(secondResult.getStatus());
     ASSERT_EQ(secondResult.getStatus(), ErrorCodes::BadValue);
     ASSERT_EQ(secondResult.getStatus().reason(), "bad thing happened");
@@ -162,16 +163,16 @@ TEST(RouterStageSkipTest, SkipStageToleratesMidStreamEOF) {
 
     auto skipStage = stdx::make_unique<RouterStageSkip>(std::move(mockStage), 2);
 
-    auto firstResult = skipStage->next(nullptr);
+    auto firstResult = skipStage->next();
     ASSERT_OK(firstResult.getStatus());
     ASSERT(firstResult.getValue().isEOF());
 
-    auto secondResult = skipStage->next(nullptr);
+    auto secondResult = skipStage->next();
     ASSERT_OK(secondResult.getStatus());
     ASSERT(secondResult.getValue().getResult());
     ASSERT_BSONOBJ_EQ(*secondResult.getValue().getResult(), BSON("a" << 3));
 
-    auto thirdResult = skipStage->next(nullptr);
+    auto thirdResult = skipStage->next();
     ASSERT_OK(thirdResult.getStatus());
     ASSERT(thirdResult.getValue().isEOF());
 }
@@ -186,19 +187,19 @@ TEST(RouterStageSkipTest, SkipStageRemotesExhausted) {
     auto skipStage = stdx::make_unique<RouterStageSkip>(std::move(mockStage), 1);
     ASSERT_TRUE(skipStage->remotesExhausted());
 
-    auto firstResult = skipStage->next(nullptr);
+    auto firstResult = skipStage->next();
     ASSERT_OK(firstResult.getStatus());
     ASSERT(firstResult.getValue().getResult());
     ASSERT_BSONOBJ_EQ(*firstResult.getValue().getResult(), BSON("a" << 2));
     ASSERT_TRUE(skipStage->remotesExhausted());
 
-    auto secondResult = skipStage->next(nullptr);
+    auto secondResult = skipStage->next();
     ASSERT_OK(secondResult.getStatus());
     ASSERT(secondResult.getValue().getResult());
     ASSERT_BSONOBJ_EQ(*secondResult.getValue().getResult(), BSON("a" << 3));
     ASSERT_TRUE(skipStage->remotesExhausted());
 
-    auto thirdResult = skipStage->next(nullptr);
+    auto thirdResult = skipStage->next();
     ASSERT_OK(thirdResult.getStatus());
     ASSERT(thirdResult.getValue().isEOF());
     ASSERT_TRUE(skipStage->remotesExhausted());

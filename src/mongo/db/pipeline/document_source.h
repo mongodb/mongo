@@ -128,8 +128,17 @@ public:
          */
         enum class PositionRequirement { kNone, kFirst, kLast };
 
+        /**
+         * A HostTypeRequirement defines where this stage is permitted to be executed when the
+         * pipeline is run on a sharded cluster.
+         */
+        enum class HostTypeRequirement { kPrimaryShard, kAnyShard, kAnyShardOrMongoS };
+
         // Set if this stage needs to be in a particular position of the pipeline.
         PositionRequirement requiredPosition = PositionRequirement::kNone;
+
+        // Set if this stage can only be executed on specific components of a sharded cluster.
+        HostTypeRequirement hostRequirement = HostTypeRequirement::kAnyShard;
 
         bool isAllowedInsideFacetStage = true;
 
@@ -147,11 +156,10 @@ public:
         // must also override getModifiedPaths() to provide information about which particular
         // $match predicates be swapped before itself.
         bool canSwapWithMatch = false;
-
-        // True if this stage must run on the primary shard when the collection being aggregated is
-        // sharded.
-        bool mustRunOnPrimaryShardIfSharded = false;
     };
+
+    using HostTypeRequirement = StageConstraints::HostTypeRequirement;
+    using PositionRequirement = StageConstraints::PositionRequirement;
 
     /**
      * This is what is returned from the main DocumentSource API: getNext(). It is essentially a

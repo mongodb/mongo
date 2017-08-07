@@ -40,10 +40,6 @@
 
     assert.commandWorked(mongosDB.dropDatabase());
 
-    // Always merge on primary shard, so we know where to look for $mergeCursors stages.
-    assert.commandWorked(
-        mongosDB.adminCommand({setParameter: 1, internalQueryAlwaysMergeOnPrimaryShard: true}));
-
     // Enable sharding on the test DB and ensure its primary is shard0000.
     assert.commandWorked(mongosDB.adminCommand({enableSharding: mongosDB.getName()}));
     st.ensurePrimaryShard(mongosDB.getName(), "shard0000");
@@ -78,6 +74,9 @@
         ErrorCodes.StaleShardVersion,
         ErrorCodes.StaleEpoch
     ];
+
+    // Create an $_internalSplitPipeline stage that forces the merge to occur on the Primary shard.
+    const forcePrimaryMerge = [{$_internalSplitPipeline: {mergeType: "primaryShard"}}];
 
     function runAggShardTargetTest({splitPoint}) {
         // Ensure that both mongoS have up-to-date caches, and enable the profiler on both shards.
@@ -166,10 +165,13 @@
 
         // Run the same aggregation that targeted a single shard via the now-stale mongoS. It should
         // attempt to send the aggregation to shard0000, hit a stale config exception, split the
-        // pipeline and redispatch.
+        // pipeline and redispatch. We append an $_internalSplitPipeline stage in order to force a
+        // shard merge rather than a mongoS merge.
         testName = "agg_shard_targeting_backout_passthrough_and_split_if_cache_is_stale";
         assert.eq(mongosColl
-                      .aggregate([{$match: {_id: {$gte: -150, $lte: -50}}}].concat(splitPoint),
+                      .aggregate([{$match: {_id: {$gte: -150, $lte: -50}}}]
+                                     .concat(splitPoint)
+                                     .concat(forcePrimaryMerge),
                                  {comment: testName})
                       .itcount(),
                   2);
@@ -259,10 +261,14 @@
             {moveChunk: mongosColl.getFullName(), find: {_id: -50}, to: "shard0000"}));
 
         // Run the same aggregation via the now-stale mongoS. It should split the pipeline, hit a
-        // stale config exception, and reset to the original single-shard pipeline upon refresh.
+        // stale config exception, and reset to the original single-shard pipeline upon refresh. We
+        // append an $_internalSplitPipeline stage in order to force a shard merge rather than a
+        // mongoS merge.
         testName = "agg_shard_targeting_backout_split_pipeline_and_reassemble_if_cache_is_stale";
         assert.eq(mongosColl
-                      .aggregate([{$match: {_id: {$gte: -150, $lte: -50}}}].concat(splitPoint),
+                      .aggregate([{$match: {_id: {$gte: -150, $lte: -50}}}]
+                                     .concat(splitPoint)
+                                     .concat(forcePrimaryMerge),
                                  {comment: testName})
                       .itcount(),
                   2);

@@ -73,11 +73,12 @@ void ClusterCursorCleanupJob::run() {
         // Mirroring the behavior in CursorManager::timeoutCursors(), a negative value for
         // cursorTimeoutMillis has the same effect as a 0 value: cursors are cleaned immediately.
         auto cursorTimeoutValue = cursorTimeoutMillis.load();
+        const auto opCtx = client->makeOperationContext();
         Date_t cutoff = (cursorTimeoutValue > 0)
             ? (Date_t::now() - Milliseconds(cursorTimeoutValue))
             : Date_t::now();
         manager->killMortalCursorsInactiveSince(cutoff);
-        manager->incrementCursorsTimedOut(manager->reapZombieCursors());
+        manager->incrementCursorsTimedOut(manager->reapZombieCursors(opCtx.get()));
 
         MONGO_IDLE_THREAD_BLOCK;
         sleepsecs(clientCursorMonitorFrequencySecs.load());

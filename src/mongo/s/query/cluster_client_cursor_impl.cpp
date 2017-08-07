@@ -32,6 +32,7 @@
 
 #include "mongo/s/query/cluster_client_cursor_impl.h"
 
+#include "mongo/s/query/router_stage_aggregation_merge.h"
 #include "mongo/s/query/router_stage_limit.h"
 #include "mongo/s/query/router_stage_merge.h"
 #include "mongo/s/query/router_stage_mock.h"
@@ -77,7 +78,7 @@ ClusterClientCursorImpl::ClusterClientCursorImpl(std::unique_ptr<RouterStageMock
                                                  boost::optional<LogicalSessionId> lsid)
     : _params(std::move(params)), _root(std::move(root)), _lsid(lsid) {}
 
-StatusWith<ClusterQueryResult> ClusterClientCursorImpl::next(OperationContext* opCtx) {
+StatusWith<ClusterQueryResult> ClusterClientCursorImpl::next() {
     // First return stashed results, if there are any.
     if (!_stash.empty()) {
         auto front = std::move(_stash.front());
@@ -86,7 +87,7 @@ StatusWith<ClusterQueryResult> ClusterClientCursorImpl::next(OperationContext* o
         return {front};
     }
 
-    auto next = _root->next(opCtx);
+    auto next = _root->next();
     if (next.isOK() && !next.getValue().isEOF()) {
         ++_numReturnedSoFar;
     }
@@ -95,6 +96,14 @@ StatusWith<ClusterQueryResult> ClusterClientCursorImpl::next(OperationContext* o
 
 void ClusterClientCursorImpl::kill(OperationContext* opCtx) {
     _root->kill(opCtx);
+}
+
+void ClusterClientCursorImpl::reattachToOperationContext(OperationContext* opCtx) {
+    _root->reattachToOperationContext(opCtx);
+}
+
+void ClusterClientCursorImpl::detachFromOperationContext() {
+    _root->detachFromOperationContext();
 }
 
 bool ClusterClientCursorImpl::isTailable() const {
@@ -136,7 +145,14 @@ std::unique_ptr<RouterExecStage> ClusterClientCursorImpl::buildMergerPlan(
     const auto limit = params->limit;
     const bool hasSort = !params->sort.isEmpty();
 
-    // The first stage is always the one which merges from the remotes.
+    // The first stage always merges from the remotes. If 'mergePipeline' has been specified in
+    // ClusterClientCursorParams, then RouterStageAggregationMerge should be the root and only node.
+    // Otherwise, construct a RouterStage pipeline from the remotes, skip, limit, and sort fields in
+    // 'params'.
+    if (params->mergePipeline) {
+        return stdx::make_unique<RouterStageAggregationMerge>(std::move(params->mergePipeline));
+    }
+
     std::unique_ptr<RouterExecStage> root = stdx::make_unique<RouterStageMerge>(executor, params);
 
     if (skip) {

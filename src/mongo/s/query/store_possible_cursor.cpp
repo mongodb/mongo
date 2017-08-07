@@ -74,7 +74,7 @@ StatusWith<BSONObj> storePossibleCursor(OperationContext* opCtx,
         cursorManager->registerCursor(opCtx,
                                       ccc.releaseCursor(),
                                       requestedNss,
-                                      ClusterCursorManager::CursorType::NamespaceNotSharded,
+                                      ClusterCursorManager::CursorType::SingleTarget,
                                       ClusterCursorManager::CursorLifetime::Mortal);
     if (!clusterCursorId.isOK()) {
         return clusterCursorId.getStatus();

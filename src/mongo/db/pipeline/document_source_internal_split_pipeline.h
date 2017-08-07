@@ -34,27 +34,40 @@ namespace mongo {
 
 /**
  * An internal stage available for testing. Acts as a simple passthrough of intermediate results
- * from the source stage. Does not participate in optimizations such as swapping, coalescing, or
- * pushdown into the query system, so this stage can be useful in tests to ensure that an
- * unoptimized code path is being exercised.
+ * from the source stage, but forces the pipeline to split at the point where this stage appears
+ * (assuming that no earlier splitpoints exist). Takes a single parameter, 'mergeType', which can be
+ * one of 'anyShard', 'primaryShard' or 'mongos' to control where the merge may occur. Omitting this
+ * parameter or specifying 'anyShard' produces the default merging behaviour; the merge half of the
+ * pipeline will be sent to a random participating shard, subject to the requirements of any
+ * subsequent splittable stages in the pipeline.
  */
-class DocumentSourceInternalInhibitOptimization final : public DocumentSource {
+class DocumentSourceInternalSplitPipeline final : public DocumentSource,
+                                                  public SplittableDocumentSource {
 public:
-    static constexpr StringData kStageName = "$_internalInhibitOptimization"_sd;
+    static constexpr StringData kStageName = "$_internalSplitPipeline"_sd;
 
     static boost::intrusive_ptr<DocumentSource> createFromBson(
         BSONElement, const boost::intrusive_ptr<ExpressionContext>&);
 
-    DocumentSourceInternalInhibitOptimization(const boost::intrusive_ptr<ExpressionContext>& expCtx)
-        : DocumentSource(expCtx) {}
+    DocumentSourceInternalSplitPipeline(const boost::intrusive_ptr<ExpressionContext>& expCtx,
+                                        HostTypeRequirement mergeType)
+        : DocumentSource(expCtx), _mergeType(mergeType) {}
 
     const char* getSourceName() const final {
         return kStageName.rawData();
     }
 
+    boost::intrusive_ptr<DocumentSource> getShardSource() final {
+        return this;
+    }
+
+    boost::intrusive_ptr<DocumentSource> getMergeSource() final {
+        return this;
+    }
+
     StageConstraints constraints() const final {
         StageConstraints constraints;
-        constraints.hostRequirement = HostTypeRequirement::kAnyShardOrMongoS;
+        constraints.hostRequirement = _mergeType;
         return constraints;
     }
 
@@ -62,6 +75,7 @@ public:
 
 private:
     Value serialize(boost::optional<ExplainOptions::Verbosity> explain = boost::none) const final;
+    HostTypeRequirement _mergeType = HostTypeRequirement::kAnyShard;
 };
 
 }  // namesace mongo

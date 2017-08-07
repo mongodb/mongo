@@ -42,6 +42,12 @@ public:
                        : SimpleBSONObjComparator::kInstance.makeBSONObjSet();
     }
 
+    StageConstraints constraints() const final {
+        StageConstraints constraints;
+        constraints.hostRequirement = HostTypeRequirement::kAnyShardOrMongoS;
+        return constraints;
+    }
+
     /**
      * Attempts to combine with a subsequent $limit stage, setting 'limit' appropriately.
      */

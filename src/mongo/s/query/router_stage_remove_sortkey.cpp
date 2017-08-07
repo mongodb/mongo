@@ -41,8 +41,8 @@ namespace mongo {
 RouterStageRemoveSortKey::RouterStageRemoveSortKey(std::unique_ptr<RouterExecStage> child)
     : RouterExecStage(std::move(child)) {}
 
-StatusWith<ClusterQueryResult> RouterStageRemoveSortKey::next(OperationContext* opCtx) {
-    auto childResult = getChildStage()->next(opCtx);
+StatusWith<ClusterQueryResult> RouterStageRemoveSortKey::next() {
+    auto childResult = getChildStage()->next();
     if (!childResult.isOK() || !childResult.getValue().getResult()) {
         return childResult;
     }

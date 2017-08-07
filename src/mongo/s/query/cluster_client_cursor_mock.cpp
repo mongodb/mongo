@@ -44,7 +44,7 @@ ClusterClientCursorMock::~ClusterClientCursorMock() {
     invariant(_exhausted || _killed);
 }
 
-StatusWith<ClusterQueryResult> ClusterClientCursorMock::next(OperationContext* opCtx) {
+StatusWith<ClusterQueryResult> ClusterClientCursorMock::next() {
     invariant(!_killed);
 
     if (_resultsQueue.empty()) {

@@ -57,6 +57,10 @@ public:
         // Can't swap with a $match if a limit has been absorbed, since in general match can't swap
         // with limit.
         constraints.canSwapWithMatch = !limitSrc;
+
+        // Can run on mongoS only if this stage is merging presorted streams.
+        constraints.hostRequirement = (_mergingPresorted ? HostTypeRequirement::kAnyShardOrMongoS
+                                                         : HostTypeRequirement::kAnyShard);
         return constraints;
     }
 

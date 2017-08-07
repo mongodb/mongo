@@ -37,6 +37,13 @@ public:
     // virtuals from DocumentSource
     GetNextResult getNext() final;
     const char* getSourceName() const final;
+
+    StageConstraints constraints() const final {
+        StageConstraints constraints;
+        constraints.hostRequirement = HostTypeRequirement::kAnyShardOrMongoS;
+        return constraints;
+    }
+
     /**
      * Attempts to move a subsequent $limit before the skip, potentially allowing for forther
      * optimizations earlier in the pipeline.

@@ -40,9 +40,10 @@ namespace mongo {
 
 namespace {
 
-// Note: Though the next() method on RouterExecStage and its subclasses takes an OperationContext*,
-// these stages are mocked in this test using RouterStageMock. RouterStageMock does not actually use
-// the OperationContext, so we pass a nullptr OperationContext* to next() in these tests.
+// Note: Though the next() method on RouterExecStage and its subclasses depend on an
+// OperationContext* provided via a preceding call to reattachToOperationContext(), these stages are
+// mocked in this test using RouterStageMock. RouterStageMock does not actually use the
+// OperationContext, so we omit the call to rettachToOperationContext in these tests.
 
 TEST(ClusterClientCursorImpl, NumReturnedSoFar) {
     auto mockStage = stdx::make_unique<RouterStageMock>();
@@ -57,13 +58,13 @@ TEST(ClusterClientCursorImpl, NumReturnedSoFar) {
     ASSERT_EQ(cursor.getNumReturnedSoFar(), 0);
 
     for (int i = 1; i < 10; ++i) {
-        auto result = cursor.next(nullptr);
+        auto result = cursor.next();
         ASSERT(result.isOK());
         ASSERT_BSONOBJ_EQ(*result.getValue().getResult(), BSON("a" << i));
         ASSERT_EQ(cursor.getNumReturnedSoFar(), i);
     }
     // Now check that if nothing is fetched the getNumReturnedSoFar stays the same.
-    auto result = cursor.next(nullptr);
+    auto result = cursor.next();
     ASSERT_OK(result.getStatus());
     ASSERT_TRUE(result.getValue().isEOF());
     ASSERT_EQ(cursor.getNumReturnedSoFar(), 9LL);
@@ -78,7 +79,7 @@ TEST(ClusterClientCursorImpl, QueueResult) {
                                    ClusterClientCursorParams(NamespaceString("unused"), {}),
                                    boost::none);
 
-    auto firstResult = cursor.next(nullptr);
+    auto firstResult = cursor.next();
     ASSERT_OK(firstResult.getStatus());
     ASSERT(firstResult.getValue().getResult());
     ASSERT_BSONOBJ_EQ(*firstResult.getValue().getResult(), BSON("a" << 1));
@@ -86,22 +87,22 @@ TEST(ClusterClientCursorImpl, QueueResult) {
     cursor.queueResult(BSON("a" << 2));
     cursor.queueResult(BSON("a" << 3));
 
-    auto secondResult = cursor.next(nullptr);
+    auto secondResult = cursor.next();
     ASSERT_OK(secondResult.getStatus());
     ASSERT(secondResult.getValue().getResult());
     ASSERT_BSONOBJ_EQ(*secondResult.getValue().getResult(), BSON("a" << 2));
 
-    auto thirdResult = cursor.next(nullptr);
+    auto thirdResult = cursor.next();
     ASSERT_OK(thirdResult.getStatus());
     ASSERT(thirdResult.getValue().getResult());
     ASSERT_BSONOBJ_EQ(*thirdResult.getValue().getResult(), BSON("a" << 3));
 
-    auto fourthResult = cursor.next(nullptr);
+    auto fourthResult = cursor.next();
     ASSERT_OK(fourthResult.getStatus());
     ASSERT(fourthResult.getValue().getResult());
     ASSERT_BSONOBJ_EQ(*fourthResult.getValue().getResult(), BSON("a" << 4));
 
-    auto fifthResult = cursor.next(nullptr);
+    auto fifthResult = cursor.next();
     ASSERT_OK(fifthResult.getStatus());
     ASSERT(fifthResult.getValue().isEOF());
 
@@ -119,19 +120,19 @@ TEST(ClusterClientCursorImpl, RemotesExhausted) {
                                    boost::none);
     ASSERT_TRUE(cursor.remotesExhausted());
 
-    auto firstResult = cursor.next(nullptr);
+    auto firstResult = cursor.next();
     ASSERT_OK(firstResult.getStatus());
     ASSERT(firstResult.getValue().getResult());
     ASSERT_BSONOBJ_EQ(*firstResult.getValue().getResult(), BSON("a" << 1));
     ASSERT_TRUE(cursor.remotesExhausted());
 
-    auto secondResult = cursor.next(nullptr);
+    auto secondResult = cursor.next();
     ASSERT_OK(secondResult.getStatus());
     ASSERT(secondResult.getValue().getResult());
     ASSERT_BSONOBJ_EQ(*secondResult.getValue().getResult(), BSON("a" << 2));
     ASSERT_TRUE(cursor.remotesExhausted());
 
-    auto thirdResult = cursor.next(nullptr);
+    auto thirdResult = cursor.next();
     ASSERT_OK(thirdResult.getStatus());
     ASSERT_TRUE(thirdResult.getValue().isEOF());
     ASSERT_TRUE(cursor.remotesExhausted());

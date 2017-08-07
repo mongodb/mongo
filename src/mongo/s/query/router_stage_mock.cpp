@@ -50,7 +50,7 @@ void RouterStageMock::markRemotesExhausted() {
     _remotesExhausted = true;
 }
 
-StatusWith<ClusterQueryResult> RouterStageMock::next(OperationContext* opCtx) {
+StatusWith<ClusterQueryResult> RouterStageMock::next() {
     if (_resultsQueue.empty()) {
         return {ClusterQueryResult()};
     }

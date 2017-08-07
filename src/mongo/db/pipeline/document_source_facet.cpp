@@ -243,12 +243,12 @@ DocumentSource::StageConstraints DocumentSourceFacet::constraints() const {
 
     for (auto&& facet : _facets) {
         for (auto&& nestedStage : facet.pipeline->getSources()) {
-            if (nestedStage->constraints().mustRunOnPrimaryShardIfSharded) {
+            if (nestedStage->constraints().hostRequirement == HostTypeRequirement::kPrimaryShard) {
                 // Currently we don't split $facet to have a merger part and a shards part (see
                 // SERVER-24154). This means that if any stage in any of the $facet pipelines
                 // requires the primary shard, then the entire $facet must happen on the merger, and
                 // the merger must be the primary shard.
-                constraints.mustRunOnPrimaryShardIfSharded = true;
+                constraints.hostRequirement = HostTypeRequirement::kPrimaryShard;
             }
         }
     }

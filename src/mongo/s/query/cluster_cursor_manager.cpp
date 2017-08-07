@@ -110,9 +110,19 @@ ClusterCursorManager::PinnedCursor& ClusterCursorManager::PinnedCursor::operator
     return *this;
 }
 
-StatusWith<ClusterQueryResult> ClusterCursorManager::PinnedCursor::next(OperationContext* opCtx) {
+StatusWith<ClusterQueryResult> ClusterCursorManager::PinnedCursor::next() {
     invariant(_cursor);
-    return _cursor->next(opCtx);
+    return _cursor->next();
+}
+
+void ClusterCursorManager::PinnedCursor::reattachToOperationContext(OperationContext* opCtx) {
+    invariant(_cursor);
+    _cursor->reattachToOperationContext(opCtx);
+}
+
+void ClusterCursorManager::PinnedCursor::detachFromOperationContext() {
+    invariant(_cursor);
+    _cursor->detachFromOperationContext();
 }
 
 bool ClusterCursorManager::PinnedCursor::isTailable() const {
@@ -182,13 +192,13 @@ ClusterCursorManager::~ClusterCursorManager() {
     invariant(_namespaceToContainerMap.empty());
 }
 
-void ClusterCursorManager::shutdown() {
+void ClusterCursorManager::shutdown(OperationContext* opCtx) {
     stdx::unique_lock<stdx::mutex> lk(_mutex);
     _inShutdown = true;
     lk.unlock();
 
     killAllCursors();
-    reapZombieCursors();
+    reapZombieCursors(opCtx);
 }
 
 StatusWith<CursorId> ClusterCursorManager::registerCursor(
@@ -356,7 +366,7 @@ void ClusterCursorManager::killAllCursors() {
     }
 }
 
-std::size_t ClusterCursorManager::reapZombieCursors() {
+std::size_t ClusterCursorManager::reapZombieCursors(OperationContext* opCtx) {
     struct CursorDescriptor {
         CursorDescriptor(NamespaceString ns, CursorId cursorId, bool isInactive)
             : ns(std::move(ns)), cursorId(cursorId), isInactive(isInactive) {}
@@ -395,11 +405,9 @@ std::size_t ClusterCursorManager::reapZombieCursors() {
         }
 
         lk.unlock();
-        // Pass a null OperationContext, because this call should not actually schedule any remote
-        // work: the cursor is already pending kill, meaning the killCursors commands are already
-        // being scheduled to be sent to the remote shard hosts. This method will just wait for them
-        // all to be scheduled.
-        zombieCursor.getValue()->kill(nullptr);
+        // Pass opCtx to kill(), since a cursor which wraps an underlying aggregation pipeline is
+        // obliged to call Pipeline::dispose with a valid OperationContext prior to deletion.
+        zombieCursor.getValue()->kill(opCtx);
         zombieCursor.getValue().reset();
         lk.lock();
 
@@ -430,11 +438,11 @@ ClusterCursorManager::Stats ClusterCursorManager::stats() const {
             }
 
             switch (entry.getCursorType()) {
-                case CursorType::NamespaceNotSharded:
-                    ++stats.cursorsNotSharded;
+                case CursorType::SingleTarget:
+                    ++stats.cursorsSingleTarget;
                     break;
-                case CursorType::NamespaceSharded:
-                    ++stats.cursorsSharded;
+                case CursorType::MultiTarget:
+                    ++stats.cursorsMultiTarget;
                     break;
             }
         }

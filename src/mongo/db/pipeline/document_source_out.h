@@ -46,9 +46,9 @@ public:
 
     StageConstraints constraints() const final {
         StageConstraints constraints;
-        constraints.mustRunOnPrimaryShardIfSharded = true;
+        constraints.hostRequirement = HostTypeRequirement::kPrimaryShard;
         constraints.isAllowedInsideFacetStage = false;
-        constraints.requiredPosition = StageConstraints::PositionRequirement::kLast;
+        constraints.requiredPosition = PositionRequirement::kLast;
         return constraints;
     }
 

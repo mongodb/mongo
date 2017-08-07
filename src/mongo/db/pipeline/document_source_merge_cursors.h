@@ -55,7 +55,8 @@ public:
 
     StageConstraints constraints() const final {
         StageConstraints constraints;
-        constraints.requiredPosition = StageConstraints::PositionRequirement::kFirst;
+        constraints.hostRequirement = HostTypeRequirement::kAnyShardOrMongoS;
+        constraints.requiredPosition = PositionRequirement::kFirst;
         constraints.requiresInputDocSource = false;
         constraints.isAllowedInsideFacetStage = false;
         return constraints;
@@ -67,6 +68,11 @@ public:
     static boost::intrusive_ptr<DocumentSource> create(
         std::vector<CursorDescriptor> cursorDescriptors,
         const boost::intrusive_ptr<ExpressionContext>& pExpCtx);
+
+    /**
+     * Returns true if all remotes have reported that their cursors are closed.
+     */
+    bool remotesExhausted() const;
 
     /** Returns non-owning pointers to cursors managed by this stage.
      *  Call this instead of getNext() if you want access to the raw streams.

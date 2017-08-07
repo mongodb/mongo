@@ -176,6 +176,12 @@ DocumentSource::GetNextResult DocumentSourceMergeCursors::getNext() {
     return std::move(next);
 }
 
+bool DocumentSourceMergeCursors::remotesExhausted() const {
+    return std::all_of(_cursors.begin(), _cursors.end(), [](const auto& cursorAndConn) {
+        return cursorAndConn->cursor.isDead();
+    });
+}
+
 void DocumentSourceMergeCursors::doDispose() {
     for (auto&& cursorAndConn : _cursors) {
         // Note it is an error to call done() on a connection before consuming the reply from a

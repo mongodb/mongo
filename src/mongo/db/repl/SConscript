@@ -778,6 +778,8 @@ env.CppUnitTest(
     LIBDEPS=[
         'repl_coordinator_impl',
         'replmocks',
+        '$BUILD_DIR/mongo/db/service_context_noop_init',
+        '$BUILD_DIR/mongo/db/auth/authorization_manager_mock_init',
         '$BUILD_DIR/mongo/executor/thread_pool_task_executor_test_fixture',
     ],
 )
@@ -791,6 +793,8 @@ env.CppUnitTest(
         'repl_coordinator_impl',
         'replica_set_messages',
         'replmocks',
+        '$BUILD_DIR/mongo/db/service_context_noop_init',
+        '$BUILD_DIR/mongo/db/auth/authorization_manager_mock_init',
         '$BUILD_DIR/mongo/executor/thread_pool_task_executor_test_fixture',
     ],
 )
@@ -819,6 +823,8 @@ env.CppUnitTest(
         'repl_coordinator_impl',
         'replica_set_messages',
         'replmocks',
+        '$BUILD_DIR/mongo/db/service_context_noop_init',
+        '$BUILD_DIR/mongo/db/auth/authorization_manager_mock_init',
         '$BUILD_DIR/mongo/executor/thread_pool_task_executor_test_fixture',
     ],
 )
@@ -1396,6 +1402,7 @@ env.CppUnitTest(
         'sync_source_selector_mock',
         'task_executor_mock',
         '$BUILD_DIR/mongo/db/query/command_request_response',
+        '$BUILD_DIR/mongo/db/auth/authorization_manager_mock_init',
         '$BUILD_DIR/mongo/executor/thread_pool_task_executor_test_fixture',
         '$BUILD_DIR/mongo/unittest/concurrency',
     ],

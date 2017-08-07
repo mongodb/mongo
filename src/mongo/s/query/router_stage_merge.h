@@ -45,7 +45,7 @@ class RouterStageMerge final : public RouterExecStage {
 public:
     RouterStageMerge(executor::TaskExecutor* executor, ClusterClientCursorParams* params);
 
-    StatusWith<ClusterQueryResult> next(OperationContext* opCtx) final;
+    StatusWith<ClusterQueryResult> next() final;
 
     void kill(OperationContext* opCtx) final;
 

@@ -609,7 +609,7 @@ class DocumentSourceNeedsPrimaryShard final : public DocumentSourcePassthrough {
 public:
     StageConstraints constraints() const final {
         StageConstraints constraints;
-        constraints.mustRunOnPrimaryShardIfSharded = true;
+        constraints.hostRequirement = HostTypeRequirement::kPrimaryShard;
         return constraints;
     }
 
@@ -633,7 +633,8 @@ TEST_F(DocumentSourceFacetTest, ShouldRequirePrimaryShardIfAnyStageRequiresPrima
     facets.emplace_back("needsPrimaryShard", std::move(secondPipeline));
     auto facetStage = DocumentSourceFacet::create(std::move(facets), ctx);
 
-    ASSERT_TRUE(facetStage->constraints().mustRunOnPrimaryShardIfSharded);
+    ASSERT(facetStage->constraints().hostRequirement ==
+           DocumentSource::StageConstraints::HostTypeRequirement::kPrimaryShard);
 }
 
 TEST_F(DocumentSourceFacetTest, ShouldNotRequirePrimaryShardIfNoStagesRequiresPrimaryShard) {
@@ -652,7 +653,8 @@ TEST_F(DocumentSourceFacetTest, ShouldNotRequirePrimaryShardIfNoStagesRequiresPr
     facets.emplace_back("second", std::move(secondPipeline));
     auto facetStage = DocumentSourceFacet::create(std::move(facets), ctx);
 
-    ASSERT_FALSE(facetStage->constraints().mustRunOnPrimaryShardIfSharded);
+    ASSERT(facetStage->constraints().hostRequirement ==
+           DocumentSource::StageConstraints::HostTypeRequirement::kAnyShard);
 }
 
 }  // namespace

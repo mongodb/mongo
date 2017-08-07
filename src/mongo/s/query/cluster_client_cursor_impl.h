@@ -89,9 +89,13 @@ public:
                                          executor::TaskExecutor* executor,
                                          ClusterClientCursorParams&& params);
 
-    StatusWith<ClusterQueryResult> next(OperationContext* opCtx) final;
+    StatusWith<ClusterQueryResult> next() final;
 
     void kill(OperationContext* opCtx) final;
+
+    void reattachToOperationContext(OperationContext* opCtx) final;
+
+    void detachFromOperationContext() final;
 
     bool isTailable() const final;
 

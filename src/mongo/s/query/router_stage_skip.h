@@ -39,7 +39,7 @@ class RouterStageSkip final : public RouterExecStage {
 public:
     RouterStageSkip(std::unique_ptr<RouterExecStage> child, long long skip);
 
-    StatusWith<ClusterQueryResult> next(OperationContext* opCtx) final;
+    StatusWith<ClusterQueryResult> next() final;
 
     void kill(OperationContext* opCtx) final;
 

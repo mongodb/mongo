@@ -219,6 +219,11 @@ public:
     bool needsPrimaryShardMerger() const;
 
     /**
+     * Returns whether or not every DocumentSource in the pipeline can run on mongoS.
+     */
+    bool canRunOnMongos() const;
+
+    /**
      * Modifies the pipeline, optimizing it by combining and swapping stages.
      */
     void optimizePipeline();

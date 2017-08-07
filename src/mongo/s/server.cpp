@@ -206,7 +206,7 @@ static void cleanupTask() {
         }
 
         if (auto cursorManager = Grid::get(opCtx)->getCursorManager()) {
-            cursorManager->shutdown();
+            cursorManager->shutdown(opCtx);
         }
 
         if (auto pool = Grid::get(opCtx)->getExecutorPool()) {

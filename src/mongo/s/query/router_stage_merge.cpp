@@ -40,9 +40,9 @@ RouterStageMerge::RouterStageMerge(executor::TaskExecutor* executor,
                                    ClusterClientCursorParams* params)
     : _executor(executor), _arm(executor, params) {}
 
-StatusWith<ClusterQueryResult> RouterStageMerge::next(OperationContext* opCtx) {
+StatusWith<ClusterQueryResult> RouterStageMerge::next() {
     while (!_arm.ready()) {
-        auto nextEventStatus = _arm.nextEvent(opCtx);
+        auto nextEventStatus = _arm.nextEvent(getOpCtx());
         if (!nextEventStatus.isOK()) {
             return nextEventStatus.getStatus();
         }

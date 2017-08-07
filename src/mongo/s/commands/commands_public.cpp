@@ -1548,7 +1548,7 @@ public:
         }
 
         return Status(ErrorCodes::Unauthorized,
-                      str::stream() << "Not authorized to create users on db: " << dbname);
+                      str::stream() << "Not authorized to list collections on db: " << dbname);
     }
 
     bool supportsWriteConcern(const BSONObj& cmd) const override {

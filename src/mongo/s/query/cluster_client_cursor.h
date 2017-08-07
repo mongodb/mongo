@@ -66,7 +66,7 @@ public:
      *
      * A non-ok status is returned in case of any error.
      */
-    virtual StatusWith<ClusterQueryResult> next(OperationContext* opCtx) = 0;
+    virtual StatusWith<ClusterQueryResult> next() = 0;
 
     /**
      * Must be called before destruction to abandon a not-yet-exhausted cursor. If next() has
@@ -75,6 +75,17 @@ public:
      * May block waiting for responses from remote hosts.
      */
     virtual void kill(OperationContext* opCtx) = 0;
+
+    /**
+     * Sets the operation context for the cursor. Must be called before the first call to next().
+     * The cursor attaches to a new OperationContext on each getMore.
+     */
+    virtual void reattachToOperationContext(OperationContext* opCtx) = 0;
+
+    /**
+     * Detaches the cursor from its current OperationContext.
+     */
+    virtual void detachFromOperationContext() = 0;
 
     /**
      * Returns whether or not this cursor is tailing a capped collection on a shard.

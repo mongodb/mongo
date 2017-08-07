@@ -37,6 +37,7 @@
 #include "mongo/db/auth/user_name.h"
 #include "mongo/db/cursor_id.h"
 #include "mongo/db/namespace_string.h"
+#include "mongo/db/pipeline/pipeline.h"
 #include "mongo/db/query/cursor_response.h"
 #include "mongo/s/client/shard.h"
 #include "mongo/util/net/hostandport.h"
@@ -109,6 +110,9 @@ struct ClusterClientCursorParams {
     // Limits the number of results returned by the ClusterClientCursor to this many. Optional.
     // Should be forwarded to the remote hosts in 'cmdObj'.
     boost::optional<long long> limit;
+
+    // If set, we use this pipeline to merge the output of aggregations on each remote.
+    std::unique_ptr<Pipeline, Pipeline::Deleter> mergePipeline;
 
     // Whether this cursor is tailing a capped collection.
     bool isTailable = false;

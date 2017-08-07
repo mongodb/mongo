@@ -49,6 +49,13 @@ public:
     }
 
     const char* getSourceName() const override;
+
+    StageConstraints constraints() const override {
+        StageConstraints constraints;
+        constraints.hostRequirement = HostTypeRequirement::kAnyShardOrMongoS;
+        return constraints;
+    }
+
     Value serialize(
         boost::optional<ExplainOptions::Verbosity> explain = boost::none) const override;
 

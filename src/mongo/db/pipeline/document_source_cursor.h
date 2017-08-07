@@ -53,7 +53,7 @@ public:
 
     StageConstraints constraints() const final {
         StageConstraints constraints;
-        constraints.requiredPosition = StageConstraints::PositionRequirement::kFirst;
+        constraints.requiredPosition = PositionRequirement::kFirst;
         constraints.requiresInputDocSource = false;
         return constraints;
     }

@@ -66,7 +66,7 @@ public:
      * holding on to a subset of the returned results and need to minimize memory usage, call copy()
      * on the BSONObjs.
      */
-    virtual StatusWith<ClusterQueryResult> next(OperationContext* opCtx) = 0;
+    virtual StatusWith<ClusterQueryResult> next() = 0;
 
     /**
      * Must be called before destruction to abandon a not-yet-exhausted plan. May block waiting for
@@ -88,7 +88,47 @@ public:
      */
     virtual Status setAwaitDataTimeout(Milliseconds awaitDataTimeout) = 0;
 
+    /**
+     * Sets the current operation context to be used by the router stage.
+     */
+    void reattachToOperationContext(OperationContext* opCtx) {
+        invariant(!_opCtx);
+        _opCtx = opCtx;
+
+        if (_child) {
+            _child->reattachToOperationContext(opCtx);
+        }
+
+        doReattachToOperationContext();
+    }
+
+    /**
+     * Discards the stage's current OperationContext, setting it to 'nullptr'.
+     */
+    void detachFromOperationContext() {
+        invariant(_opCtx);
+        _opCtx = nullptr;
+
+        if (_child) {
+            _child->detachFromOperationContext();
+        }
+
+        doDetachFromOperationContext();
+    }
+
 protected:
+    /**
+     * Performs any stage-specific reattach actions. Called after the OperationContext has been set
+     * and is available via getOpCtx().
+     */
+    virtual void doReattachToOperationContext() {}
+
+    /**
+     * Performs any stage-specific detach actions. Called after the OperationContext has been set to
+     * nullptr.
+     */
+    virtual void doDetachFromOperationContext() {}
+
     /**
      * Returns an unowned pointer to the child stage, or nullptr if there is no child.
      */
@@ -96,8 +136,16 @@ protected:
         return _child.get();
     }
 
+    /**
+     * Returns a pointer to the current OperationContext, or nullptr if there is no context.
+     */
+    OperationContext* getOpCtx() {
+        return _opCtx;
+    }
+
 private:
     std::unique_ptr<RouterExecStage> _child;
+    OperationContext* _opCtx = nullptr;
 };
 
 }  // namespace mongo

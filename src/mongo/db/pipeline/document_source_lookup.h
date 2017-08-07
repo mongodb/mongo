@@ -97,7 +97,7 @@ public:
     StageConstraints constraints() const final {
         StageConstraints constraints;
         constraints.canSwapWithMatch = true;
-        constraints.mustRunOnPrimaryShardIfSharded = true;
+        constraints.hostRequirement = HostTypeRequirement::kPrimaryShard;
         return constraints;
     }
 

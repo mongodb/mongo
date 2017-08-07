@@ -51,7 +51,7 @@ public:
 
     StageConstraints constraints() const override {
         StageConstraints constraints;
-        constraints.requiredPosition = StageConstraints::PositionRequirement::kFirst;
+        constraints.requiredPosition = PositionRequirement::kFirst;
         constraints.requiresInputDocSource = false;
         constraints.isAllowedInsideFacetStage = false;
         return constraints;

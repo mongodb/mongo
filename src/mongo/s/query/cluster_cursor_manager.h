@@ -76,11 +76,11 @@ public:
     //
 
     enum class CursorType {
-        // Represents a cursor operating on an unsharded namespace.
-        NamespaceNotSharded,
+        // Represents a cursor retrieving data from a single remote source.
+        SingleTarget,
 
-        // Represents a cursor operating on a sharded namespace.
-        NamespaceSharded,
+        // Represents a cursor retrieving data from multiple remote sources.
+        MultiTarget,
     };
 
     enum class CursorLifetime {
@@ -100,11 +100,11 @@ public:
     };
 
     struct Stats {
-        // Count of open cursors registered with CursorType::NamespaceSharded.
-        size_t cursorsSharded = 0;
+        // Count of open cursors registered with CursorType::MultiTarget.
+        size_t cursorsMultiTarget = 0;
 
-        // Count of open cursors registered with CursorType::NamespaceNotSharded.
-        size_t cursorsNotSharded = 0;
+        // Count of open cursors registered with CursorType::SingleTarget.
+        size_t cursorsSingleTarget = 0;
 
         // Count of pinned cursors.
         size_t cursorsPinned = 0;
@@ -154,7 +154,18 @@ public:
          *
          * Can block.
          */
-        StatusWith<ClusterQueryResult> next(OperationContext* opCtx);
+        StatusWith<ClusterQueryResult> next();
+
+        /**
+         * Sets the operation context for the cursor. Must be called before the first call to
+         * next().
+         */
+        void reattachToOperationContext(OperationContext* opCtx);
+
+        /**
+         * Detaches the cursor from its current OperationContext.
+         */
+        void detachFromOperationContext();
 
         /**
          * Returns whether or not the underlying cursor is tailing a capped collection.  Cannot be
@@ -252,7 +263,7 @@ public:
      * Kills and reaps all cursors currently owned by this cursor manager, and puts the manager
      * into the shutting down state where it will not accept any new cursors for registration.
      */
-    void shutdown();
+    void shutdown(OperationContext* opCtx);
 
     /**
      * Registers the given cursor with this manager, and returns the registered cursor's id, or
@@ -322,13 +333,13 @@ public:
      * as 'kill pending'. Returns the number of cursors that were marked as inactive.
      *
      * If no other non-const methods are called simultaneously, it is guaranteed that this method
-     * will delete all non-pinned cursors marked as 'kill pending'.  Otherwise, no such guarantee is
+     * will delete all non-pinned cursors marked as 'kill pending'. Otherwise, no such guarantee is
      * made (this is due to the fact that the blocking kill for each cursor is performed outside of
      * the cursor manager lock).
      *
      * Can block.
      */
-    std::size_t reapZombieCursors();
+    std::size_t reapZombieCursors(OperationContext* opCtx);
 
     /**
      * Returns the number of open cursors on a ClusterCursorManager, broken down by type.
@@ -496,7 +507,7 @@ private:
         std::unique_ptr<ClusterClientCursor> _cursor;
         bool _killPending = false;
         bool _isInactive = false;
-        CursorType _cursorType = CursorType::NamespaceNotSharded;
+        CursorType _cursorType = CursorType::SingleTarget;
         CursorLifetime _cursorLifetime = CursorLifetime::Mortal;
         Date_t _lastActive;
         boost::optional<LogicalSessionId> _lsid;

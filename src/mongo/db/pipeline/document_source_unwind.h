@@ -48,6 +48,7 @@ public:
 
     StageConstraints constraints() const final {
         StageConstraints constraints;
+        constraints.hostRequirement = HostTypeRequirement::kAnyShardOrMongoS;
         constraints.canSwapWithMatch = true;
         return constraints;
     }

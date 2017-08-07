@@ -32,6 +32,7 @@ env.Library(
 env.Library(
     target="router_exec_stage",
     source=[
+        "router_stage_aggregation_merge.cpp",
         "router_stage_limit.cpp",
         "router_stage_merge.cpp",
         "router_stage_mock.cpp",
@@ -69,6 +70,7 @@ env.Library(
         "$BUILD_DIR/mongo/executor/task_executor_interface",
         "$BUILD_DIR/mongo/s/async_requests_sender",
         "$BUILD_DIR/mongo/s/client/sharding_client",
+        '$BUILD_DIR/mongo/db/pipeline/pipeline',
         "$BUILD_DIR/mongo/s/coreshard",
     ],
 )
