@@ -295,6 +295,15 @@ Status applyOps(OperationContext* opCtx,
     auto isAtomic = allowAtomic && areOpsCrudOnly;
     auto hasPrecondition = _hasPrecondition(applyOpCmd);
 
+    if (hasPrecondition) {
+        uassert(ErrorCodes::InvalidOptions,
+                "Cannot use preCondition with {allowAtomic: false}.",
+                allowAtomic);
+        uassert(ErrorCodes::InvalidOptions,
+                "Cannot use preCondition when operations include commands.",
+                areOpsCrudOnly);
+    }
+
     boost::optional<Lock::GlobalWrite> globalWriteLock;
     boost::optional<Lock::DBLock> dbWriteLock;
 
@@ -314,6 +323,7 @@ Status applyOps(OperationContext* opCtx,
                       str::stream() << "Not primary while applying ops to database " << dbName);
 
     if (hasPrecondition) {
+        invariant(isAtomic);
         auto status = _checkPrecondition(opCtx, applyOpCmd, result);
         if (!status.isOK()) {
             return status;

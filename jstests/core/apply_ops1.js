@@ -332,6 +332,26 @@
         preCondition: [{ns: t.getFullName(), q: {_id: 5}, res: {x: 19}}]
     });
 
+    // The use of preCondition requires applyOps to run atomically. Therefore, it is incompatible
+    // with {allowAtomic: false}.
+    assert.commandFailedWithCode(
+        db.runCommand({
+            applyOps: [{op: 'u', ns: t.getFullName(), o2: {_id: 5}, o: {$set: {x: 22}}}],
+            preCondition: [{ns: t.getFullName(), q: {_id: 5}, res: {x: 21}}],
+            allowAtomic: false,
+        }),
+        ErrorCodes.InvalidOptions,
+        'applyOps should fail when preCondition is present and atomicAllowed is false.');
+
+    // The use of preCondition is also incompatible with operations that include commands.
+    assert.commandFailedWithCode(
+        db.runCommand({
+            applyOps: [{op: 'c', ns: t.getCollection('$cmd').getFullName(), o: {applyOps: []}}],
+            preCondition: [{ns: t.getFullName(), q: {_id: 5}, res: {x: 21}}],
+        }),
+        ErrorCodes.InvalidOptions,
+        'applyOps should fail when preCondition is present and operations includes commands.');
+
     o.x++;
     o.x++;
 
