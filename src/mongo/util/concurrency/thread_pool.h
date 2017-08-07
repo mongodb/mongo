@@ -186,6 +186,12 @@ private:
     void _join_inlock(stdx::unique_lock<stdx::mutex>* lk);
 
     /**
+     * Runs the remaining tasks on a new thread as part of the join process, blocking until
+     * complete. Caller must not hold the mutex!
+     */
+    void _drainPendingTasks();
+
+    /**
      * Executes one task from _pendingTasks. "lk" must own _mutex, and _pendingTasks must have at
      * least one entry.
      */
