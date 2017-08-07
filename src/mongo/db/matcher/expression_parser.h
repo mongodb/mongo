@@ -73,7 +73,8 @@ enum class PathAcceptingKeyword {
     INTERNAL_SCHEMA_UNIQUE_ITEMS,
     INTERNAL_SCHEMA_OBJECT_MATCH,
     INTERNAL_SCHEMA_MIN_LENGTH,
-    INTERNAL_SCHEMA_MAX_LENGTH
+    INTERNAL_SCHEMA_MAX_LENGTH,
+    INTERNAL_SCHEMA_MATCH_ARRAY_INDEX,
 };
 
 class MatchExpressionParser {
@@ -270,6 +271,12 @@ private:
     template <class T>
     StatusWithMatchExpression _parseTopLevelInternalSchemaSingleIntegerArgument(
         const BSONElement& elem) const;
+
+    /**
+     * Parses 'elem' into an InternalSchemaMatchArrayIndexMatchExpression.
+     */
+    StatusWithMatchExpression _parseInternalSchemaMatchArrayIndex(
+        const char* path, const BSONElement& elem, const CollatorInterface* collator);
 
     // Performs parsing for the match extensions. We do not own this pointer - it has to live
     // as long as the parser is active.

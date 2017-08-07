@@ -481,5 +481,110 @@ TEST(MatchExpressionParserSchemaTest, CondParsesThreeMatchExpresssions) {
         expr.getValue()->matchesBSON(fromjson("{climate: 'rainy', clothing: ['poncho']}")));
     ASSERT_FALSE(expr.getValue()->matchesBSON(fromjson("{clothing: ['jacket']}")));
 }
+
+TEST(MatchExpressionParserSchemaTest, MatchArrayIndexFailsToParseNonObjectArguments) {
+    auto query = fromjson("{foo: {$_internalSchemaMatchArrayIndex: 7}}");
+    ASSERT_EQ(
+        MatchExpressionParser::parse(query, ExtensionsCallbackDisallowExtensions(), kSimpleCollator)
+            .getStatus(),
+        ErrorCodes::TypeMismatch);
+
+    query = fromjson("{foo: {$_internalSchemaMatchArrayIndex: []}}");
+    ASSERT_EQ(
+        MatchExpressionParser::parse(query, ExtensionsCallbackDisallowExtensions(), kSimpleCollator)
+            .getStatus(),
+        ErrorCodes::TypeMismatch);
+
+    query = fromjson(
+        "{foo: {$_internalSchemaMatchArrayIndex:"
+        "[{index: 5, namePlaceholder: 'i', expression: {i: 1}}]}}");
+    ASSERT_EQ(
+        MatchExpressionParser::parse(query, ExtensionsCallbackDisallowExtensions(), kSimpleCollator)
+            .getStatus(),
+        ErrorCodes::TypeMismatch);
+}
+
+TEST(MatchExpressionParserSchemaTest, MatchArrayIndexFailsToParseIfPlaceholderNotValid) {
+    auto query = fromjson(
+        "{foo: {$_internalSchemaMatchArrayIndex:"
+        "{index: 5, namePlaceholder: 7, expression: {i: 1}}}}");
+    ASSERT_EQ(
+        MatchExpressionParser::parse(query, ExtensionsCallbackDisallowExtensions(), kSimpleCollator)
+            .getStatus(),
+        ErrorCodes::TypeMismatch);
+
+    query = fromjson(
+        "{foo: {$_internalSchemaMatchArrayIndex:"
+        "{index: 5, namePlaceholder: 'Z', expression: {i: 1}}}}");
+    ASSERT_EQ(
+        MatchExpressionParser::parse(query, ExtensionsCallbackDisallowExtensions(), kSimpleCollator)
+            .getStatus(),
+        ErrorCodes::FailedToParse);
+}
+
+TEST(MatchExpressionParserSchemaTest, MatchArrayIndexFailsToParseIfIndexNotANonnegativeInteger) {
+    auto query = fromjson(
+        "{foo: {$_internalSchemaMatchArrayIndex:"
+        "{index: 'blah', namePlaceholder: 'i', expression: {i: 1}}}}");
+    ASSERT_EQ(
+        MatchExpressionParser::parse(query, ExtensionsCallbackDisallowExtensions(), kSimpleCollator)
+            .getStatus(),
+        ErrorCodes::FailedToParse);
+
+    query = fromjson(
+        "{foo: {$_internalSchemaMatchArrayIndex:"
+        "{index: -1, namePlaceholder: 'i', expression: {i: 1}}}}");
+    ASSERT_EQ(
+        MatchExpressionParser::parse(query, ExtensionsCallbackDisallowExtensions(), kSimpleCollator)
+            .getStatus(),
+        ErrorCodes::FailedToParse);
+
+    query = fromjson(
+        "{foo: {$_internalSchemaMatchArrayIndex:"
+        "{index: 3.14, namePlaceholder: 'i', expression: {i: 1}}}}");
+    ASSERT_EQ(
+        MatchExpressionParser::parse(query, ExtensionsCallbackDisallowExtensions(), kSimpleCollator)
+            .getStatus(),
+        ErrorCodes::FailedToParse);
+}
+
+TEST(MatchExpressionParserSchemaTest, MatchArrayIndexFailsToParseIfExpressionNotValid) {
+    auto query = fromjson(
+        "{foo: {$_internalSchemaMatchArrayIndex:"
+        "{index: 0, namePlaceholder: 'i', expression: 'blah'}}}");
+    ASSERT_EQ(
+        MatchExpressionParser::parse(query, ExtensionsCallbackDisallowExtensions(), kSimpleCollator)
+            .getStatus(),
+        ErrorCodes::TypeMismatch);
+
+    query = fromjson(
+        "{foo: {$_internalSchemaMatchArrayIndex:"
+        "{index: 0, namePlaceholder: 'i', expression: {doesntMatchThePlaceholder: 7}}}}");
+    ASSERT_EQ(
+        MatchExpressionParser::parse(query, ExtensionsCallbackDisallowExtensions(), kSimpleCollator)
+            .getStatus(),
+        ErrorCodes::FailedToParse);
+
+    query = fromjson(
+        "{foo: {$_internalSchemaMatchArrayIndex:"
+        "{index: 0, namePlaceholder: 'i', expression: {$invalid: 'blah'}}}}");
+    ASSERT_EQ(
+        MatchExpressionParser::parse(query, ExtensionsCallbackDisallowExtensions(), kSimpleCollator)
+            .getStatus(),
+        ErrorCodes::BadValue);
+}
+
+TEST(MatchExpressionParserSchemaTest, MatchArrayIndexParsesSuccessfully) {
+    auto query = fromjson(
+        "{foo: {$_internalSchemaMatchArrayIndex:"
+        "{index: 0, namePlaceholder: 'i', expression: {i: {$lt: 0}}}}}");
+    auto matchArrayIndex = MatchExpressionParser::parse(
+        query, ExtensionsCallbackDisallowExtensions(), kSimpleCollator);
+    ASSERT_OK(matchArrayIndex.getStatus());
+
+    ASSERT_TRUE(matchArrayIndex.getValue()->matchesBSON(fromjson("{foo: [-1, 0, 1]}")));
+    ASSERT_FALSE(matchArrayIndex.getValue()->matchesBSON(fromjson("{foo: [2, 'blah']}")));
+    ASSERT_FALSE(matchArrayIndex.getValue()->matchesBSON(fromjson("{foo: [{x: 'baz'}]}")));
+}
 }  // namespace
 }  // namespace mongo

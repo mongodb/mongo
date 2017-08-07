@@ -52,8 +52,19 @@ public:
     static StatusWith<std::unique_ptr<ExpressionWithPlaceholder>> parse(
         BSONObj rawFilter, const CollatorInterface* collator);
 
+    /**
+     * Construct a new ExpressionWithPlaceholder. 'filter' must point to a valid MatchExpression.
+     */
     ExpressionWithPlaceholder(std::string placeholder, std::unique_ptr<MatchExpression> filter)
-        : _placeholder(std::move(placeholder)), _filter(std::move(filter)) {}
+        : _placeholder(std::move(placeholder)), _filter(std::move(filter)) {
+        invariant(static_cast<bool>(_filter));
+    }
+
+    /**
+     * Returns true if this expression has both a placeholder and filter
+     * equivalent to 'other'.
+     */
+    bool equivalent(const ExpressionWithPlaceholder* other) const;
 
     StringData getPlaceholder() const {
         return _placeholder;

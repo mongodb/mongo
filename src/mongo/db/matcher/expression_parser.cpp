@@ -39,8 +39,10 @@
 #include "mongo/db/matcher/expression_geo.h"
 #include "mongo/db/matcher/expression_leaf.h"
 #include "mongo/db/matcher/expression_tree.h"
+#include "mongo/db/matcher/expression_with_placeholder.h"
 #include "mongo/db/matcher/schema/expression_internal_schema_cond.h"
 #include "mongo/db/matcher/schema/expression_internal_schema_fmod.h"
+#include "mongo/db/matcher/schema/expression_internal_schema_match_array_index.h"
 #include "mongo/db/matcher/schema/expression_internal_schema_max_items.h"
 #include "mongo/db/matcher/schema/expression_internal_schema_max_length.h"
 #include "mongo/db/matcher/schema/expression_internal_schema_max_properties.h"
@@ -351,6 +353,10 @@ StatusWithMatchExpression MatchExpressionParser::_parseSubField(const BSONObj& c
         case PathAcceptingKeyword::INTERNAL_SCHEMA_MAX_LENGTH: {
             return _parseInternalSchemaSingleIntegerArgument<
                 InternalSchemaMaxLengthMatchExpression>(name, e);
+        }
+
+        case PathAcceptingKeyword::INTERNAL_SCHEMA_MATCH_ARRAY_INDEX: {
+            return _parseInternalSchemaMatchArrayIndex(name, e, collator);
         }
     }
     return {Status(ErrorCodes::BadValue,
@@ -1248,6 +1254,77 @@ StatusWithMatchExpression MatchExpressionParser::_parseTopLevelInternalSchemaSin
     return {std::move(matchExpression)};
 }
 
+StatusWithMatchExpression MatchExpressionParser::_parseInternalSchemaMatchArrayIndex(
+    const char* path, const BSONElement& elem, const CollatorInterface* collator) {
+    if (elem.type() != BSONType::Object) {
+        return {ErrorCodes::TypeMismatch,
+                str::stream() << InternalSchemaMatchArrayIndexMatchExpression::kName
+                              << " must be an object"};
+    }
+
+    auto subobj = elem.embeddedObject();
+    if (subobj.nFields() != 3) {
+        return {ErrorCodes::FailedToParse,
+                str::stream() << InternalSchemaMatchArrayIndexMatchExpression::kName
+                              << " requires exactly three fields: 'index', "
+                                 "'namePlaceholder' and 'expression'"};
+    }
+
+    auto index = parseIntegerElementToNonNegativeLong(subobj["index"]);
+    if (!index.isOK()) {
+        return index.getStatus();
+    }
+
+    auto namePlaceholderElem = subobj["namePlaceholder"];
+    if (!namePlaceholderElem) {
+        return {ErrorCodes::FailedToParse,
+                str::stream() << InternalSchemaMatchArrayIndexMatchExpression::kName
+                              << " requires a 'namePlaceholder'"};
+    } else if (namePlaceholderElem.type() != BSONType::String) {
+        return {ErrorCodes::TypeMismatch,
+                str::stream() << InternalSchemaMatchArrayIndexMatchExpression::kName
+                              << " requires 'namePlaceholder' to be a string, not "
+                              << namePlaceholderElem.type()};
+    }
+
+    auto expressionElem = subobj["expression"];
+    if (!expressionElem) {
+        return {ErrorCodes::FailedToParse,
+                str::stream() << InternalSchemaMatchArrayIndexMatchExpression::kName
+                              << " requires an 'expression'"};
+    } else if (expressionElem.type() != BSONType::Object) {
+        return {ErrorCodes::TypeMismatch,
+                str::stream() << InternalSchemaMatchArrayIndexMatchExpression::kName
+                              << " requires 'expression' to be an object, not "
+                              << expressionElem.type()};
+    }
+
+    auto expressionWithPlaceholder =
+        ExpressionWithPlaceholder::parse(expressionElem.embeddedObject(), collator);
+    if (!expressionWithPlaceholder.isOK()) {
+        return expressionWithPlaceholder.getStatus();
+    }
+
+    if (namePlaceholderElem.valueStringData() !=
+        expressionWithPlaceholder.getValue()->getPlaceholder()) {
+        return {ErrorCodes::FailedToParse,
+                str::stream() << InternalSchemaMatchArrayIndexMatchExpression::kName
+                              << " has a 'namePlaceholder' of '"
+                              << namePlaceholderElem.valueStringData()
+                              << "', but 'expression' has a mismatching placeholder '"
+                              << expressionWithPlaceholder.getValue()->getPlaceholder()
+                              << "'"};
+    }
+
+    auto matchArrayIndexExpr = stdx::make_unique<InternalSchemaMatchArrayIndexMatchExpression>();
+    auto initStatus = matchArrayIndexExpr->init(
+        path, index.getValue(), std::move(expressionWithPlaceholder.getValue()));
+    if (!initStatus.isOK()) {
+        return initStatus;
+    }
+    return {std::move(matchArrayIndexExpr)};
+}
+
 StatusWithMatchExpression MatchExpressionParser::_parseGeo(const char* name,
                                                            PathAcceptingKeyword type,
                                                            const BSONObj& section) {
@@ -1318,7 +1395,9 @@ MONGO_INITIALIZER(MatchExpressionParser)(InitializerContext* context) {
             {"_internalSchemaUniqueItems", PathAcceptingKeyword::INTERNAL_SCHEMA_UNIQUE_ITEMS},
             {"_internalSchemaObjectMatch", PathAcceptingKeyword::INTERNAL_SCHEMA_OBJECT_MATCH},
             {"_internalSchemaMinLength", PathAcceptingKeyword::INTERNAL_SCHEMA_MIN_LENGTH},
-            {"_internalSchemaMaxLength", PathAcceptingKeyword::INTERNAL_SCHEMA_MAX_LENGTH}});
+            {"_internalSchemaMaxLength", PathAcceptingKeyword::INTERNAL_SCHEMA_MAX_LENGTH},
+            {"_internalSchemaMatchArrayIndex",
+             PathAcceptingKeyword::INTERNAL_SCHEMA_MATCH_ARRAY_INDEX}});
     return Status::OK();
 }
 }  // anonymous namespace

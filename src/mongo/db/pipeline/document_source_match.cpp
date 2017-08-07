@@ -268,6 +268,7 @@ Document redactSafePortionDollarOps(BSONObj expr) {
             case PathAcceptingKeyword::INTERNAL_SCHEMA_OBJECT_MATCH:
             case PathAcceptingKeyword::INTERNAL_SCHEMA_MIN_LENGTH:
             case PathAcceptingKeyword::INTERNAL_SCHEMA_MAX_LENGTH:
+            case PathAcceptingKeyword::INTERNAL_SCHEMA_MATCH_ARRAY_INDEX:
                 continue;
         }
     }

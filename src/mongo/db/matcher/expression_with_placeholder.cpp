@@ -92,6 +92,13 @@ StatusWith<StringData> parseTopLevelFieldName(MatchExpression* expr) {
 
 }  // namespace
 
+bool ExpressionWithPlaceholder::equivalent(const ExpressionWithPlaceholder* other) const {
+    if (!other) {
+        return false;
+    }
+    return _placeholder == other->_placeholder && _filter->equivalent(other->_filter.get());
+}
+
 // The placeholder must begin with a lowercase letter and contain no special characters.
 const std::regex ExpressionWithPlaceholder::placeholderRegex("^[a-z][a-zA-Z0-9]*$");
 

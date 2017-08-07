@@ -95,120 +95,125 @@ const char* encodeMatchType(MatchExpression::MatchType mt) {
     switch (mt) {
         case MatchExpression::AND:
             return "an";
-            break;
+
         case MatchExpression::OR:
             return "or";
-            break;
+
         case MatchExpression::NOR:
             return "nr";
-            break;
+
         case MatchExpression::NOT:
             return "nt";
-            break;
+
         case MatchExpression::ELEM_MATCH_OBJECT:
             return "eo";
-            break;
+
         case MatchExpression::ELEM_MATCH_VALUE:
             return "ev";
-            break;
+
         case MatchExpression::SIZE:
             return "sz";
-            break;
+
         case MatchExpression::LTE:
             return "le";
-            break;
+
         case MatchExpression::LT:
             return "lt";
-            break;
+
         case MatchExpression::EQ:
             return "eq";
-            break;
+
         case MatchExpression::GT:
             return "gt";
-            break;
+
         case MatchExpression::GTE:
             return "ge";
-            break;
+
         case MatchExpression::REGEX:
             return "re";
-            break;
+
         case MatchExpression::MOD:
             return "mo";
-            break;
+
         case MatchExpression::EXISTS:
             return "ex";
-            break;
+
         case MatchExpression::MATCH_IN:
             return "in";
-            break;
+
         case MatchExpression::TYPE_OPERATOR:
             return "ty";
-            break;
+
         case MatchExpression::GEO:
             return "go";
-            break;
+
         case MatchExpression::WHERE:
             return "wh";
-            break;
+
         case MatchExpression::ALWAYS_FALSE:
             return "af";
-            break;
+
         case MatchExpression::ALWAYS_TRUE:
             return "at";
-            break;
+
         case MatchExpression::GEO_NEAR:
             return "gn";
-            break;
+
         case MatchExpression::TEXT:
             return "te";
-            break;
+
         case MatchExpression::BITS_ALL_SET:
             return "ls";
-            break;
+
         case MatchExpression::BITS_ALL_CLEAR:
             return "lc";
-            break;
+
         case MatchExpression::BITS_ANY_SET:
             return "ys";
-            break;
+
         case MatchExpression::BITS_ANY_CLEAR:
             return "yc";
-            break;
+
         case MatchExpression::INTERNAL_SCHEMA_COND:
             return "internalSchemaCond";
             break;
+
         case MatchExpression::INTERNAL_SCHEMA_FMOD:
             return "internalSchemaFmod";
             break;
+
         case MatchExpression::INTERNAL_SCHEMA_MIN_ITEMS:
             return "internalSchemaMinItems";
-            break;
+
         case MatchExpression::INTERNAL_SCHEMA_MAX_ITEMS:
             return "internalSchemaMaxItems";
-            break;
+
         case MatchExpression::INTERNAL_SCHEMA_UNIQUE_ITEMS:
             return "internalSchemaUniqueItems";
-            break;
+
         case MatchExpression::INTERNAL_SCHEMA_XOR:
             return "internalSchemaXor";
-            break;
+
         case MatchExpression::INTERNAL_SCHEMA_OBJECT_MATCH:
             return "internalSchemaObjectMatch";
+
         case MatchExpression::INTERNAL_SCHEMA_MIN_LENGTH:
             return "internalSchemaMinLength";
-            break;
+
         case MatchExpression::INTERNAL_SCHEMA_MAX_LENGTH:
             return "internalSchemaMaxLength";
-            break;
+
         case MatchExpression::INTERNAL_SCHEMA_MIN_PROPERTIES:
             return "internalSchemaMinProperties";
-            break;
+
         case MatchExpression::INTERNAL_SCHEMA_MAX_PROPERTIES:
             return "internalSchemaMaxProperties";
-            break;
+
+        case MatchExpression::INTERNAL_SCHEMA_MATCH_ARRAY_INDEX:
+            return "internalSchemaMatchArrayIndex";
+
         default:
             MONGO_UNREACHABLE;
-            return "";
     }
 }
 

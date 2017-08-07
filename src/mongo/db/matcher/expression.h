@@ -110,6 +110,7 @@ public:
         INTERNAL_SCHEMA_XOR,
         INTERNAL_SCHEMA_MIN_LENGTH,
         INTERNAL_SCHEMA_MAX_LENGTH,
+        INTERNAL_SCHEMA_MATCH_ARRAY_INDEX,
     };
 
     MatchExpression(MatchType type);

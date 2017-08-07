@@ -118,6 +118,11 @@ TEST_F(DocumentSourceMatchTest, RedactSafePortion) {
 
     assertExpectedRedactSafePortion("{a: {$_internalSchemaFmod: [4.5, 2.3]}}", "{}");
 
+    assertExpectedRedactSafePortion(
+        "{a: {$_internalSchemaMatchArrayIndex:"
+        "{index: 0, namePlaceholder: 'i', expression: {i: {$gt: 0}}}}}",
+        "{}");
+
     // Combinations
     assertExpectedRedactSafePortion("{a:1, b: 'asdf'}", "{a:1, b: 'asdf'}");
 

@@ -1091,5 +1091,18 @@ TEST(SerializeInternalSchema, ExpressionInternalSchemaFmodSerializesCorrectly) {
     ASSERT_EQ(original.matches(obj), reserialized.matches(obj));
 }
 
+TEST(SerializeInternalSchema, ExpressionInternalSchemaMatchArrayIndexSerializesCorrectly) {
+    constexpr CollatorInterface* collator = nullptr;
+    Matcher original(fromjson("{a: {$_internalSchemaMatchArrayIndex:"
+                              "{index: 2, namePlaceholder: 'i', expression: {i: {$lt: 3}}}}}"),
+                     ExtensionsCallbackDisallowExtensions(),
+                     collator);
+    Matcher reserialized(
+        serialize(original.getMatchExpression()), ExtensionsCallbackDisallowExtensions(), collator);
+    ASSERT_BSONOBJ_EQ(*reserialized.getQuery(),
+                      fromjson("{a: {$_internalSchemaMatchArrayIndex:"
+                               "{index: 2, namePlaceholder: 'i', expression: {i: {$lt: 3}}}}}"));
+    ASSERT_BSONOBJ_EQ(*reserialized.getQuery(), serialize(reserialized.getMatchExpression()));
+}
 }  // namespace
 }  // namespace mongo

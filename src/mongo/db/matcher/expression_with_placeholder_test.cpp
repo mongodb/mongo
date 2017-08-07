@@ -178,5 +178,43 @@ TEST(ExpressionWithPlaceholderTest, WhereExpressionFailsToParse) {
     ASSERT_NOT_OK(status.getStatus());
 }
 
+TEST(ExpressionWithPlaceholderTest, EquivalentIfPlaceholderAndExpressionMatch) {
+    constexpr auto collator = nullptr;
+    auto rawFilter1 = fromjson("{i: 5}}");
+    auto expressionWithPlaceholder1 = ExpressionWithPlaceholder::parse(rawFilter1, collator);
+    ASSERT_OK(expressionWithPlaceholder1.getStatus());
+
+    auto rawFilter2 = fromjson("{i: 5}");
+    auto expressionWithPlaceholder2 = ExpressionWithPlaceholder::parse(rawFilter2, collator);
+    ASSERT_OK(expressionWithPlaceholder2.getStatus());
+    ASSERT_TRUE(expressionWithPlaceholder1.getValue()->equivalent(
+        expressionWithPlaceholder2.getValue().get()));
+}
+
+TEST(ExpressionWithPlaceholderTest, NotEquivalentIfPlaceholderDoesNotMatch) {
+    constexpr auto collator = nullptr;
+    auto rawFilter1 = fromjson("{i: {$type: 'array'}}");
+    auto expressionWithPlaceholder1 = ExpressionWithPlaceholder::parse(rawFilter1, collator);
+    ASSERT_OK(expressionWithPlaceholder1.getStatus());
+
+    auto rawFilter2 = fromjson("{j: {$type: 'array'}}");
+    auto expressionWithPlaceholder2 = ExpressionWithPlaceholder::parse(rawFilter2, collator);
+    ASSERT_OK(expressionWithPlaceholder2.getStatus());
+    ASSERT_FALSE(expressionWithPlaceholder1.getValue()->equivalent(
+        expressionWithPlaceholder2.getValue().get()));
+}
+
+TEST(ExpressionWithPlaceholderTest, NotEquivalentIfExpressionDoesNotMatch) {
+    constexpr auto collator = nullptr;
+    auto rawFilter1 = fromjson("{i: {$lte: 5}}");
+    auto expressionWithPlaceholder1 = ExpressionWithPlaceholder::parse(rawFilter1, collator);
+    ASSERT_OK(expressionWithPlaceholder1.getStatus());
+
+    auto rawFilter2 = fromjson("{i: {$gte: 5}}");
+    auto expressionWithPlaceholder2 = ExpressionWithPlaceholder::parse(rawFilter2, collator);
+    ASSERT_OK(expressionWithPlaceholder2.getStatus());
+    ASSERT_FALSE(expressionWithPlaceholder1.getValue()->equivalent(
+        expressionWithPlaceholder2.getValue().get()));
+}
 }  // namespace
 }  // namespace mongo
