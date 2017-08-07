@@ -29,14 +29,38 @@ from . import writer
 _STD_ARRAY_UINT8_16 = 'std::array<std::uint8_t,16>'
 
 
+def is_primitive_scalar_type(cpp_type):
+    # type: (unicode) -> bool
+    """
+    Return True if a cpp_type is a primitive scalar type.
+
+    Primitive scalar types need to have a default value to prevent warnings from Coverity.
+    """
+    cpp_type = cpp_type.replace(' ', '')
+    return cpp_type in [
+        'bool', 'double', 'std::int32_t', 'std::uint32_t', 'std::uint64_t', 'std::int64_t'
+    ]
+
+
+def get_primitive_scalar_type_default_value(cpp_type):
+    # type: (unicode) -> unicode
+    """
+    Return a default value for a primitive scalar type.
+
+    Assumes the IDL generated code verifies the user sets the value before serialization.
+    """
+    # pylint: disable=invalid-name
+    assert is_primitive_scalar_type(cpp_type)
+    if cpp_type == 'bool':
+        return 'false'
+    return '-1'
+
+
 def _is_primitive_type(cpp_type):
     # type: (unicode) -> bool
     """Return True if a cpp_type is a primitive type and should not be returned as reference."""
     cpp_type = cpp_type.replace(' ', '')
-    return cpp_type in [
-        'bool', 'double', 'std::int32_t', 'std::uint32_t', 'std::uint64_t', 'std::int64_t',
-        _STD_ARRAY_UINT8_16
-    ]
+    return is_primitive_scalar_type(cpp_type) or cpp_type == _STD_ARRAY_UINT8_16
 
 
 def _qualify_optional_type(cpp_type):
