@@ -31,6 +31,7 @@
 #include "mongo/db/pipeline/document_source_change_stream.h"
 
 #include "mongo/bson/simple_bsonelement_comparator.h"
+#include "mongo/db/pipeline/close_change_stream_exception.h"
 #include "mongo/db/pipeline/document_source_check_resume_token.h"
 #include "mongo/db/pipeline/document_source_limit.h"
 #include "mongo/db/pipeline/document_source_lookup_change_post_image.h"
@@ -126,6 +127,66 @@ void checkValueType(const Value v, const StringData filedName, BSONType expected
             (v.getType() == expectedType));
 }
 
+/**
+ * This stage is used internally for change notifications to close cursor after returning
+ * "invalidate" entries.
+ * It is not intended to be created by the user.
+ */
+class DocumentSourceCloseCursor final : public DocumentSource {
+public:
+    GetNextResult getNext() final;
+
+    const char* getSourceName() const final {
+        // This is used in error reporting.
+        return "$changeStream";
+    }
+
+    Value serialize(boost::optional<ExplainOptions::Verbosity> explain = boost::none) const final {
+        // This stage is created by the DocumentSourceChangeStream stage, so serializing it
+        // here would result in it being created twice.
+        return Value();
+    }
+
+    static boost::intrusive_ptr<DocumentSourceCloseCursor> create(
+        const boost::intrusive_ptr<ExpressionContext>& expCtx) {
+        return new DocumentSourceCloseCursor(expCtx);
+    }
+
+private:
+    /**
+     * Use the create static method to create a DocumentSourceCheckResumeToken.
+     */
+    DocumentSourceCloseCursor(const boost::intrusive_ptr<ExpressionContext>& expCtx)
+        : DocumentSource(expCtx) {}
+
+    bool _shouldCloseCursor = false;
+};
+
+DocumentSource::GetNextResult DocumentSourceCloseCursor::getNext() {
+    pExpCtx->checkForInterrupt();
+
+    // Close cursor if we have returned an invalidate entry.
+    if (_shouldCloseCursor) {
+        throw CloseChangeStreamException();
+    }
+
+    auto nextInput = pSource->getNext();
+    if (!nextInput.isAdvanced())
+        return nextInput;
+
+    auto doc = nextInput.getDocument();
+    const auto& kOperationTypeField = DocumentSourceChangeStream::kOperationTypeField;
+    checkValueType(doc[kOperationTypeField], kOperationTypeField, BSONType::String);
+    if (doc[kOperationTypeField].getString() == DocumentSourceChangeStream::kInvalidateOpType) {
+        // Pass the invalidation forward, so that it can be included in the results, or
+        // filtered/transformed by further stages in the pipeline, then throw an exception
+        // to close the cursor on the next call to getNext().
+        _shouldCloseCursor = true;
+    }
+
+    return nextInput;
+}
+
 }  // namespace
 
 BSONObj DocumentSourceChangeStream::buildMatchFilter(const NamespaceString& nss,
@@ -202,6 +263,8 @@ list<intrusive_ptr<DocumentSource>> DocumentSourceChangeStream::createFromBson(
     if (resumeStage) {
         stages.push_back(resumeStage);
     }
+    auto closeCursorSource = DocumentSourceCloseCursor::create(expCtx);
+    stages.push_back(closeCursorSource);
     if (shouldLookupPostImage) {
         stages.push_back(DocumentSourceLookupChangePostImage::create(expCtx));
     }
