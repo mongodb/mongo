@@ -330,9 +330,11 @@ __wt_update_obsolete_check(
 
 	/*
 	 * If the list is long, don't retry checks on this page until the
-	 * transaction state has moved forwards.
+	 * transaction state has moved forwards. This function is used to
+	 * trim update lists independently of the page state, ensure there
+	 * is a modify structure.
 	 */
-	if (count > 20)
+	if (count > 20 && page->modify != NULL)
 		page->modify->obsolete_check_txn =
 		    S2C(session)->txn_global.last_running;
 

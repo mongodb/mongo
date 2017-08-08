@@ -128,8 +128,12 @@ __statlog_config(WT_SESSION_IMPL *session, const char **cfg, bool *runp)
 	*runp = cval.val != 0;
 	conn->stat_usecs = (uint64_t)cval.val * WT_MILLION;
 
+	/*
+	 * Only set the JSON flag when stats are enabled, otherwise setting
+	 * this flag can implicitly enable statistics gathering.
+	 */
 	WT_RET(__wt_config_gets(session, cfg, "statistics_log.json", &cval));
-	if (cval.val != 0)
+	if (cval.val != 0 && WT_STAT_ENABLED(session))
 		FLD_SET(conn->stat_flags, WT_STAT_JSON);
 
 	WT_RET(__wt_config_gets(

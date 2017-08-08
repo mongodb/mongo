@@ -98,6 +98,12 @@ struct __wt_session_impl {
 	 */
 	TAILQ_HEAD(__tables, __wt_table) tables;
 
+	/*
+	 * Updated when the table cache is swept of all tables older than the
+	 * current schema generation.
+	 */
+	uint64_t table_sweep_gen;
+
 	/* Current rwlock for callback. */
 	WT_RWLOCK *current_rwlock;
 	uint8_t current_rwticket;

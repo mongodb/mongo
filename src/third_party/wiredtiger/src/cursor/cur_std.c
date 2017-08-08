@@ -591,8 +591,7 @@ __wt_cursor_equals(WT_CURSOR *cursor, WT_CURSOR *other, int *equalp)
 	WT_ERR(cursor->compare(cursor, other, &cmp));
 	*equalp = (cmp == 0) ? 1 : 0;
 
-err:	API_END(session, ret);
-	return (ret);
+err:	API_END_RET(session, ret);
 }
 
 /*
@@ -605,7 +604,7 @@ __cursor_modify(WT_CURSOR *cursor, WT_MODIFY *entries, int nentries)
 	WT_DECL_RET;
 	WT_SESSION_IMPL *session;
 
-	CURSOR_UPDATE_API_CALL(cursor, session, modify);
+	CURSOR_API_CALL(cursor, session, modify, NULL);
 
 	WT_STAT_CONN_INCR(session, cursor_modify);
 	WT_STAT_DATA_INCR(session, cursor_modify);
@@ -633,8 +632,7 @@ __cursor_modify(WT_CURSOR *cursor, WT_MODIFY *entries, int nentries)
 	/* We know both key and value are set, "overwrite" doesn't matter. */
 	ret = cursor->update(cursor);
 
-err:	CURSOR_UPDATE_API_END(session, ret);
-	return (ret);
+err:	API_END_RET(session, ret);
 }
 
 /*

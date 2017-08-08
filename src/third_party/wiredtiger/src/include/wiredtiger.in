@@ -1760,8 +1760,19 @@ struct __wt_session {
 
 	/*!
 	 * Write a transactionally consistent snapshot of a database or set of
-	 * objects.  The checkpoint includes all transactions committed before
-	 * the checkpoint starts.  Additionally, checkpoints may optionally be
+	 * objects.  In the absence of transaction timestamps, the checkpoint
+	 * includes all transactions committed before the checkpoint starts.
+	 *
+	 * When timestamps are in use and a \c stable_timestamp has been set
+	 * via WT_CONNECTION::set_timestamp and the checkpoint runs with
+	 * \c use_timestamp=true (the default), updates committed with a
+	 * timestamp larger than the \c stable_timestamp will not be included
+	 * in the checkpoint for tables configured with \c log=(enabled=false).
+	 * For tables with logging enabled, all committed changes will be
+	 * included in the checkpoint (since recovery would roll them forward
+	 * anyway).
+	 *
+	 * Additionally, existing named checkpoints may optionally be
 	 * discarded.
 	 *
 	 * @snippet ex_all.c Checkpoint examples
@@ -2243,16 +2254,26 @@ struct __wt_connection {
 	/*!
 	 * Set a global transaction timestamp.
 	 *
+	 * @snippet ex_all.c set commit timestamp
+	 *
 	 * @snippet ex_all.c set oldest timestamp
 	 *
 	 * @param connection the connection handle
 	 * @configstart{WT_CONNECTION.set_timestamp, see dist/api_data.py}
+	 * @config{commit_timestamp, reset the maximum commit timestamp tracked
+	 * by WiredTiger.  This will cause future calls to
+	 * WT_CONNECTION::query_timestamp to ignore commit timestamps greater
+	 * than the specified value until the next commit moves the tracked
+	 * commit timestamp forwards.  This is only intended for use where the
+	 * application is rolling back locally committed transactions.  See @ref
+	 * transaction_timestamps., a string; default empty.}
 	 * @config{oldest_timestamp, future commits and queries will be no
 	 * earlier than the specified timestamp.  Supplied values must be
 	 * monotonically increasing.  See @ref transaction_timestamps., a
 	 * string; default empty.}
-	 * @config{stable_timestamp, future checkpoints will be no later than
-	 * the specified timestamp.  Supplied values must be monotonically
+	 * @config{stable_timestamp, checkpoints will not include commits that
+	 * are newer than the specified timestamp in tables configured with \c
+	 * log=(enabled=false). Supplied values must be monotonically
 	 * increasing.  The stable timestamp data stability only applies to
 	 * tables that are not being logged.  See @ref transaction_timestamps.,
 	 * a string; default empty.}
@@ -2261,6 +2282,32 @@ struct __wt_connection {
 	 */
 	int __F(set_timestamp)(
 	    WT_CONNECTION *connection, const char *config);
+
+	/*!
+	 * Rollback in-memory non-logged state to an earlier point in time.
+	 *
+	 * This method uses a timestamp to define the rollback point, and thus
+	 * requires that the application uses timestamps and that the
+	 * stable_timestamp must have been set via a call to
+	 * WT_CONNECTION::set_timestamp. Any updates to checkpoint durable
+	 * tables that are more recent than the stable timestamp are removed.
+	 *
+	 * This method requires that there are no active cursor operations
+	 * for the duration of the call.
+	 *
+	 * Any updates made to logged tables will not be rolled back. Any
+	 * updates made without an associated timestamp will not be rolled
+	 * back. See @ref transaction_timestamps.
+	 *
+	 * @snippet ex_all.c rollback to stable
+	 *
+	 * @param connection the connection handle
+	 * @configempty{WT_CONNECTION.rollback_to_stable, see dist/api_data.py}
+	 * @errors
+	 */
+	int __F(rollback_to_stable)(
+	    WT_CONNECTION *connection, const char *config);
+
 	/*! @} */
 
 	/*!

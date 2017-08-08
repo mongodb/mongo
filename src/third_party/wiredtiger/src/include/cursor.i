@@ -109,7 +109,7 @@ __cursor_needkey(WT_CURSOR *cursor)
 static inline int
 __cursor_needvalue(WT_CURSOR *cursor)
 {
-	WT_RET(__cursor_localkey(cursor));
+	WT_RET(__cursor_localvalue(cursor));
 	return (__cursor_checkvalue(cursor));
 }
 

@@ -285,7 +285,9 @@ __ref_initial_descent_prev(
  */
 static inline int
 __tree_walk_internal(WT_SESSION_IMPL *session,
-    WT_REF **refp, uint64_t *walkcntp, uint64_t *skipleafcntp, uint32_t flags)
+    WT_REF **refp, uint64_t *walkcntp,
+    int (*skip_func)(WT_SESSION_IMPL *, WT_REF *, void *, bool *),
+    void *func_cookie, uint32_t flags)
 {
 	WT_BTREE *btree;
 	WT_DECL_RET;
@@ -486,14 +488,9 @@ restart:	/*
 				if (skip)
 					break;
 				empty_internal = false;
-			} else if (LF_ISSET(WT_READ_COMPACT)) {
-				/*
-				 * Compaction has relatively complex tests to
-				 * decide if a page can be skipped, call out
-				 * to a helper function.
-				 */
-				WT_ERR(__wt_compact_page_skip(
-				    session, ref, &skip));
+			} else if (skip_func != NULL) {
+				WT_ERR(skip_func(session,
+				    ref, func_cookie, &skip));
 				if (skip)
 					break;
 			} else {
@@ -503,23 +500,6 @@ restart:	/*
 				if (ref->state == WT_REF_DELETED &&
 				    __wt_delete_page_skip(session, ref, false))
 					break;
-			}
-
-			/*
-			 * Optionally skip leaf pages: when the skip-leaf-count
-			 * variable is non-zero, skip some count of leaf pages,
-			 * then take the next leaf page we can.
-			 *
-			 * The reason to do some of this work here (rather than
-			 * in our caller), is because we can look at the cell
-			 * and know it's a leaf page without reading it into
-			 * memory. If this page is disk-based, crack the cell
-			 * to figure out it's a leaf page without reading it.
-			 */
-			if (skipleafcntp != NULL &&
-			    *skipleafcntp > 0 && __ref_is_leaf(ref)) {
-				--*skipleafcntp;
-				break;
 			}
 
 			ret = __wt_page_swap(session, couple, ref,
@@ -654,7 +634,8 @@ err:	WT_LEAVE_PAGE_INDEX(session);
 int
 __wt_tree_walk(WT_SESSION_IMPL *session, WT_REF **refp, uint32_t flags)
 {
-	return (__tree_walk_internal(session, refp, NULL, NULL, flags));
+	return (__tree_walk_internal(
+	    session, refp, NULL, NULL, NULL, flags));
 }
 
 /*
@@ -666,7 +647,56 @@ int
 __wt_tree_walk_count(WT_SESSION_IMPL *session,
     WT_REF **refp, uint64_t *walkcntp, uint32_t flags)
 {
-	return (__tree_walk_internal(session, refp, walkcntp, NULL, flags));
+	return (__tree_walk_internal(
+	    session, refp, walkcntp, NULL, NULL, flags));
+}
+
+/*
+ * __wt_tree_walk_custom_skip --
+ *	Walk the tree calling a custom function to decide whether to skip refs.
+ */
+int
+__wt_tree_walk_custom_skip(
+    WT_SESSION_IMPL *session, WT_REF **refp,
+   int (*skip_func)(WT_SESSION_IMPL *, WT_REF *, void *, bool *),
+   void *func_cookie, uint32_t flags)
+{
+	return (__tree_walk_internal(session, refp,
+	    NULL, skip_func, func_cookie, flags));
+}
+
+/*
+ * __tree_walk_skip_count_callback --
+ *	Optionally skip leaf pages.
+ * When the skip-leaf-count variable is non-zero, skip some count of leaf
+ * pages, then take the next leaf page we can.
+ *
+ * The reason to do some of this work here, is because we can look at the cell
+ * and know it's a leaf page without reading it into memory. If this page is
+ * disk-based, crack the cell to figure out it's a leaf page without reading
+ * it.
+ */
+static int
+__tree_walk_skip_count_callback(
+    WT_SESSION_IMPL *session, WT_REF *ref, void *context, bool *skipp)
+{
+	uint64_t *skipleafcntp;
+
+	skipleafcntp = (uint64_t *)context;
+	WT_ASSERT(session, skipleafcntp != NULL);
+
+	/*
+	 * Skip deleted pages visible to us.
+	 */
+	if (ref->state == WT_REF_DELETED &&
+	    __wt_delete_page_skip(session, ref, false))
+		*skipp = true;
+	else if (*skipleafcntp > 0 && __ref_is_leaf(ref)) {
+		--*skipleafcntp;
+		*skipp = true;
+	} else
+		*skipp = false;
+	return (0);
 }
 
 /*
@@ -688,7 +718,8 @@ __wt_tree_walk_skip(
 	 * decrementing the count.
 	 */
 	do {
-		WT_RET(__tree_walk_internal(session, refp, NULL, skipleafcntp,
+		WT_RET(__tree_walk_internal(session, refp, NULL,
+		    __tree_walk_skip_count_callback, skipleafcntp,
 		    WT_READ_NO_GEN | WT_READ_SKIP_INTL | WT_READ_WONT_NEED));
 
 		/*

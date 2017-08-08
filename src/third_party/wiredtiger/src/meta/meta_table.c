@@ -231,12 +231,23 @@ __wt_metadata_remove(WT_SESSION_IMPL *session, const char *key)
 		WT_RET_MSG(session, EINVAL,
 		    "%s: remove not supported on the turtle file", key);
 
+	/*
+	 * Take, release, and reacquire the metadata cursor. It's complicated,
+	 * but that way the underlying meta-tracking function doesn't have to
+	 * open a second metadata cursor, it can use the session's cached one.
+	 */
 	WT_RET(__wt_metadata_cursor(session, &cursor));
 	cursor->set_key(cursor, key);
 	WT_ERR(cursor->search(cursor));
+	WT_ERR(__wt_metadata_cursor_release(session, &cursor));
+
 	if (WT_META_TRACKING(session))
 		WT_ERR(__wt_meta_track_update(session, key));
-	WT_ERR(cursor->remove(cursor));
+
+	WT_ERR(__wt_metadata_cursor(session, &cursor));
+	cursor->set_key(cursor, key);
+	ret = cursor->remove(cursor);
+
 err:	WT_TRET(__wt_metadata_cursor_release(session, &cursor));
 	return (ret);
 }

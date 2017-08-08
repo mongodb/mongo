@@ -81,12 +81,22 @@ err:	/*
  */
 static int
 __col_instantiate(WT_SESSION_IMPL *session,
-    uint64_t recno, WT_REF *ref, WT_CURSOR_BTREE *cbt, WT_UPDATE *upd)
+    uint64_t recno, WT_REF *ref, WT_CURSOR_BTREE *cbt, WT_UPDATE *updlist)
 {
+	WT_PAGE *page;
+	WT_UPDATE *upd;
+
+	page = ref->page;
+
+	/* Discard any of the updates we don't need. */
+	if (updlist->next != NULL &&
+	    (upd = __wt_update_obsolete_check(session, page, updlist)) != NULL)
+		__wt_update_obsolete_free(session, page, upd);
+
 	/* Search the page and add updates. */
 	WT_RET(__wt_col_search(session, recno, ref, cbt));
 	WT_RET(__wt_col_modify(
-	    session, cbt, recno, NULL, upd, WT_UPDATE_STANDARD, false));
+	    session, cbt, recno, NULL, updlist, updlist->type, false));
 	return (0);
 }
 
@@ -96,12 +106,22 @@ __col_instantiate(WT_SESSION_IMPL *session,
  */
 static int
 __row_instantiate(WT_SESSION_IMPL *session,
-    WT_ITEM *key, WT_REF *ref, WT_CURSOR_BTREE *cbt, WT_UPDATE *upd)
+    WT_ITEM *key, WT_REF *ref, WT_CURSOR_BTREE *cbt, WT_UPDATE *updlist)
 {
+	WT_PAGE *page;
+	WT_UPDATE *upd;
+
+	page = ref->page;
+
+	/* Discard any of the updates we don't need. */
+	if (updlist->next != NULL &&
+	    (upd = __wt_update_obsolete_check(session, page, updlist)) != NULL)
+		__wt_update_obsolete_free(session, page, upd);
+
 	/* Search the page and add updates. */
 	WT_RET(__wt_row_search(session, key, ref, cbt, true));
 	WT_RET(__wt_row_modify(
-	    session, cbt, key, NULL, upd, WT_UPDATE_STANDARD, false));
+	    session, cbt, key, NULL, updlist, updlist->type, false));
 	return (0);
 }
 
@@ -187,9 +207,8 @@ __las_page_instantiate(WT_SESSION_IMPL *session,
 		/* Allocate the WT_UPDATE structure. */
 		WT_ERR(cursor->get_value(cursor,
 		    &upd_txnid, &las_timestamp, &upd_type, &las_value));
-		WT_ERR(__wt_update_alloc(session, &las_value, &upd, &incr,
-		    upd_type == WT_UPDATE_DELETED ?
-		    WT_UPDATE_DELETED : WT_UPDATE_STANDARD));
+		WT_ERR(__wt_update_alloc(
+		    session, &las_value, &upd, &incr, upd_type));
 		total_incr += incr;
 		upd->txnid = upd_txnid;
 #ifdef HAVE_TIMESTAMPS

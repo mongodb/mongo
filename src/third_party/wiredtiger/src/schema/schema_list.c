@@ -252,3 +252,34 @@ __wt_schema_close_tables(WT_SESSION_IMPL *session)
 
 	return (ret);
 }
+
+/*
+ * __wt_schema_sweep_tables --
+ *	Close all idle, obsolete tables in a session.
+ */
+int
+__wt_schema_sweep_tables(WT_SESSION_IMPL *session)
+{
+	WT_TABLE *table, *next;
+	uint64_t schema_gen;
+	bool old_table_busy;
+
+	schema_gen = __wt_gen(session, WT_GEN_SCHEMA);
+	if (schema_gen == session->table_sweep_gen)
+		return (0);
+
+	old_table_busy = false;
+	TAILQ_FOREACH_SAFE(table, &session->tables, q, next)
+		if (table->schema_gen != schema_gen) {
+			if (table->refcnt == 0)
+				WT_RET(__wt_schema_remove_table(
+				    session, table));
+			else
+				old_table_busy = true;
+		}
+
+	if (!old_table_busy)
+		session->table_sweep_gen = schema_gen;
+
+	return (0);
+}

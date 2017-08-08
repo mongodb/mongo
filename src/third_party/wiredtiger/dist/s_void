@@ -48,6 +48,8 @@ func_ok()
 	    -e '/int __page_write_gen_wrapped_check$/d' \
 	    -e '/int __posix_terminate$/d' \
 	    -e '/int __rec_destroy_session$/d' \
+	    -e '/int __tree_walk_skip_count_callback$/d' \
+	    -e '/int __txn_rollback_to_stable_custom_skip$/d' \
 	    -e '/int __win_terminate$/d' \
 	    -e '/int __wt_block_compact_end$/d' \
 	    -e '/int __wt_block_compact_start$/d' \

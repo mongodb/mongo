@@ -216,7 +216,7 @@ __value_return_upd(
 		WT_ERR(__wt_modify_apply(
 		    session, &cursor->value, listp[--i]->data));
 
-err:	if (allocated_bytes)
+err:	if (allocated_bytes != 0)
 		__wt_free(session, listp);
 	return (ret);
 }
