@@ -280,13 +280,14 @@ public:
      * Sets the highest timestamp at which the storage engine is allowed to take a checkpoint.
      * This timestamp can never decrease, and thus should be a timestamp that can never roll back.
      */
-    virtual void setStableTimestamp(OperationContext* opCtx, SnapshotName snapshotName) = 0;
+    virtual void setStableTimestamp(StorageEngine* storageEngine, SnapshotName snapshotName) = 0;
 
     /**
      * Tells the storage engine the timestamp of the data at startup. This is necessary because
      * timestamps are not persisted in the storage layer.
      */
-    virtual void setInitialDataTimestamp(OperationContext* opCtx, SnapshotName snapshotName) = 0;
+    virtual void setInitialDataTimestamp(StorageEngine* storageEngine,
+                                         SnapshotName snapshotName) = 0;
 };
 
 }  // namespace repl

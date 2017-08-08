@@ -394,9 +394,11 @@ void InitialSyncer::setScheduleDbWorkFn_forTest(const CollectionCloner::Schedule
 void InitialSyncer::_setUp_inlock(OperationContext* opCtx, std::uint32_t initialSyncMaxAttempts) {
     // 'opCtx' is passed through from startup().
     _replicationProcess->getConsistencyMarkers()->setInitialSyncFlag(opCtx);
-    _storage->setInitialDataTimestamp(opCtx,
+
+    auto storageEngine = opCtx->getServiceContext()->getGlobalStorageEngine();
+    _storage->setInitialDataTimestamp(storageEngine,
                                       SnapshotName(Timestamp::kAllowUnstableCheckpointsSentinel));
-    _storage->setStableTimestamp(opCtx, SnapshotName::min());
+    _storage->setStableTimestamp(storageEngine, SnapshotName::min());
 
     LOG(1) << "Creating oplogBuffer.";
     _oplogBuffer = _dataReplicatorExternalState->makeInitialSyncOplogBuffer(opCtx);
@@ -419,7 +421,7 @@ void InitialSyncer::_tearDown_inlock(OperationContext* opCtx,
         return;
     }
 
-    _storage->setInitialDataTimestamp(opCtx,
+    _storage->setInitialDataTimestamp(opCtx->getServiceContext()->getGlobalStorageEngine(),
                                       SnapshotName(lastApplied.getValue().opTime.getTimestamp()));
     _replicationProcess->getConsistencyMarkers()->clearInitialSyncFlag(opCtx);
     _opts.setMyLastOptime(lastApplied.getValue().opTime);

@@ -378,6 +378,15 @@ public:
     Status setLastDurableOptime_forTest(long long cfgVer, long long memberId, const OpTime& opTime);
 
     /**
+     * Simple test wrappers that expose private methods.
+     */
+    boost::optional<Timestamp> calculateStableTimestamp_forTest(
+        const std::set<Timestamp>& candidates, const Timestamp& commitPoint);
+    void cleanupStableTimestampCandidates_forTest(std::set<Timestamp>* candidates,
+                                                  Timestamp stableTimestamp);
+    std::set<Timestamp> getStableTimestampCandidates_forTest();
+
+    /**
      * Non-blocking version of updateTerm.
      * Returns event handle that we can use to wait for the operation to complete.
      * When the operation is complete (waitForEvent() returns), 'updateResult' will be set
@@ -1015,6 +1024,28 @@ private:
     void _updateCommittedSnapshot_inlock(SnapshotInfo newCommittedSnapshot);
 
     /**
+     * Calculates the 'stable' replication timestamp given a set of timestamp candidates and the
+     * current commit point. The stable timestamp is the greatest timestamp in 'candidates' that is
+     * also less than or equal to 'commitPoint'.
+     */
+    boost::optional<Timestamp> _calculateStableTimestamp(const std::set<Timestamp>& candidates,
+                                                         const Timestamp& commitPoint);
+
+    /**
+     * Removes any timestamps from the timestamp set 'candidates' that are less than
+     * 'stableTimestamp'.
+     */
+    void _cleanupStableTimestampCandidates(std::set<Timestamp>* candidates,
+                                           Timestamp stableTimestamp);
+
+    /**
+     * Calculates and sets the value of the 'stable' replication timestamp for the storage engine.
+     * See ReplicationCoordinatorImpl::_calculateStableTimestamp for a definition of 'stable', in
+     * this context.
+     */
+    void _setStableTimestampForStorage_inlock();
+
+    /**
      * Drops all snapshots and clears the "committed" snapshot.
      */
     void _dropAllSnapshots_inlock();
@@ -1279,6 +1310,12 @@ private:
     // there is one.
     // When engaged, this must be <= _lastCommittedOpTime and < _uncommittedSnapshots.front().
     boost::optional<SnapshotInfo> _currentCommittedSnapshot;  // (M)
+
+    // A set of timestamps that are used for computing the replication system's current 'stable'
+    // timestamp. Every time a node's applied optime is updated, it will be added to this set.
+    // Timestamps that are older than the current stable timestamp should get removed from this set.
+    // This set should also be cleared if a rollback occurs.
+    std::set<Timestamp> _stableTimestampCandidates;  // (M)
 
     // Used to signal threads that are waiting for new committed snapshots.
     stdx::condition_variable _currentCommittedSnapshotCond;  // (M)

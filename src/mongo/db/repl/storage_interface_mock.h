@@ -244,9 +244,9 @@ public:
         return 0;
     }
 
-    void setStableTimestamp(OperationContext* opCtx, SnapshotName snapshotName) override;
+    void setStableTimestamp(StorageEngine* storageEngine, SnapshotName snapshotName) override;
 
-    void setInitialDataTimestamp(OperationContext* opCtx, SnapshotName snapshotName) override;
+    void setInitialDataTimestamp(StorageEngine* storageEngine, SnapshotName snapshotName) override;
 
     SnapshotName getStableTimestamp() const;
 

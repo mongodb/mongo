@@ -68,12 +68,13 @@ Status StorageInterfaceMock::incrementRollbackID(OperationContext* opCtx) {
     return Status::OK();
 }
 
-void StorageInterfaceMock::setStableTimestamp(OperationContext* opCtx, SnapshotName snapshotName) {
+void StorageInterfaceMock::setStableTimestamp(StorageEngine* storageEngine,
+                                              SnapshotName snapshotName) {
     stdx::lock_guard<stdx::mutex> lock(_mutex);
     _stableTimestamp = snapshotName;
 }
 
-void StorageInterfaceMock::setInitialDataTimestamp(OperationContext* opCtx,
+void StorageInterfaceMock::setInitialDataTimestamp(StorageEngine* storageEngine,
                                                    SnapshotName snapshotName) {
     stdx::lock_guard<stdx::mutex> lock(_mutex);
     _initialDataTimestamp = snapshotName;

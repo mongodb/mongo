@@ -1034,6 +1034,12 @@ void ReplicationCoordinatorImpl::_setMyLastAppliedOpTime_inlock(const OpTime& op
     invariant(isRollbackAllowed || myMemberData->getLastAppliedOpTime() <= opTime);
     myMemberData->setLastAppliedOpTime(opTime, _replExecutor->now());
     _updateLastCommittedOpTime_inlock();
+
+    // Add the new applied timestamp to the list of stable timestamp candidates and then set the
+    // last stable timestamp.
+    _stableTimestampCandidates.insert(opTime.getTimestamp());
+    _setStableTimestampForStorage_inlock();
+
     _opTimeWaiterList.signalAndRemoveIf_inlock(
         [opTime](Waiter* waiter) { return waiter->opTime <= opTime; });
 }
@@ -2312,7 +2318,7 @@ Status ReplicationCoordinatorImpl::processReplSetInitiate(OperationContext* opCt
     // Sets the initial data timestamp on the storage engine so it can assign a timestamp
     // to data on disk. We do this after writing the "initiating set" oplog entry.
     auto initialDataTS = SnapshotName(lastAppliedOpTime.getTimestamp().asULL());
-    _storage->setInitialDataTimestamp(opCtx, initialDataTS);
+    _storage->setInitialDataTimestamp(getServiceContext()->getGlobalStorageEngine(), initialDataTS);
 
     _finishReplSetInitiate(newConfig, myIndex.getValue());
 
@@ -2943,6 +2949,72 @@ void ReplicationCoordinatorImpl::_updateLastCommittedOpTime_inlock() {
     _wakeReadyWaiters_inlock();
 }
 
+boost::optional<Timestamp> ReplicationCoordinatorImpl::_calculateStableTimestamp(
+    const std::set<Timestamp>& candidates, const Timestamp& commitPoint) {
+
+    // Find the greatest timestamp candidate that is less than or equal to the commit point. To do
+    // this, we search through the candidates in descending order, stopping at the first timestamp
+    // that is less than or equal to the commit point. Note that std::set maintains its elements in
+    // sorted order.
+    auto stableTimestampIter =
+        std::find_if(candidates.rbegin(), candidates.rend(), [commitPoint](Timestamp ts) {
+            return ts <= commitPoint;
+        });
+
+    // No stable timestamp found.
+    if (stableTimestampIter == candidates.rend()) {
+        return boost::none;
+    }
+    return *stableTimestampIter;
+}
+
+void ReplicationCoordinatorImpl::_cleanupStableTimestampCandidates(std::set<Timestamp>* candidates,
+                                                                   Timestamp stableTimestamp) {
+    // Discard timestamp candidates earlier than the current stable timestamp, since we don't need
+    // them anymore. To do this, we iterate through timestamps in ascending order, searching for the
+    // first timestamp T such that T >= stableTimestamp. We then discard all timestamps earlier than
+    // T.
+    auto deletePoint = std::find_if(candidates->begin(), candidates->end(), [&](Timestamp ts) {
+        return ts >= stableTimestamp;
+    });
+
+    // Delete the entire range of unneeded timestamps.
+    candidates->erase(candidates->begin(), deletePoint);
+}
+
+boost::optional<Timestamp> ReplicationCoordinatorImpl::calculateStableTimestamp_forTest(
+    const std::set<Timestamp>& candidates, const Timestamp& commitPoint) {
+    return _calculateStableTimestamp(candidates, commitPoint);
+}
+void ReplicationCoordinatorImpl::cleanupStableTimestampCandidates_forTest(
+    std::set<Timestamp>* candidates, Timestamp stableTimestamp) {
+    _cleanupStableTimestampCandidates(candidates, stableTimestamp);
+}
+
+std::set<Timestamp> ReplicationCoordinatorImpl::getStableTimestampCandidates_forTest() {
+    stdx::unique_lock<stdx::mutex> lk(_mutex);
+    return _stableTimestampCandidates;
+}
+
+void ReplicationCoordinatorImpl::_setStableTimestampForStorage_inlock() {
+
+    // Get the current stable timestamp.
+    auto commitPoint = _topCoord->getLastCommittedOpTime();
+    auto stableTimestamp =
+        _calculateStableTimestamp(_stableTimestampCandidates, commitPoint.getTimestamp());
+
+    // If there is a valid stable timestamp, set it for the storage engine, and then remove any
+    // old, unneeded stable timestamp candidates.
+    if (stableTimestamp) {
+        LOG(2) << "Setting replication's stable timestamp to " << stableTimestamp.value();
+
+        auto storageEngine = getServiceContext()->getGlobalStorageEngine();
+        _storage->setStableTimestamp(storageEngine, SnapshotName(stableTimestamp.get()));
+
+        _cleanupStableTimestampCandidates(&_stableTimestampCandidates, stableTimestamp.get());
+    }
+}
+
 void ReplicationCoordinatorImpl::advanceCommitPoint(const OpTime& committedOpTime) {
     stdx::unique_lock<stdx::mutex> lk(_mutex);
     _advanceCommitPoint_inlock(committedOpTime);
@@ -2961,6 +3033,9 @@ void ReplicationCoordinatorImpl::_advanceCommitPoint_inlock(const OpTime& commit
 void ReplicationCoordinatorImpl::_updateCommitPoint_inlock() {
     auto committedOpTime = _topCoord->getLastCommittedOpTime();
     _externalState->notifyOplogMetadataWaiters(committedOpTime);
+
+    // Update the stable timestamp.
+    _setStableTimestampForStorage_inlock();
 
     auto maxSnapshotForOpTime = SnapshotInfo{committedOpTime, SnapshotName::max()};
 

@@ -894,13 +894,14 @@ StatusWith<StorageInterface::CollectionCount> StorageInterfaceImpl::getCollectio
     return collection->numRecords(opCtx);
 }
 
-void StorageInterfaceImpl::setStableTimestamp(OperationContext* opCtx, SnapshotName snapshotName) {
-    opCtx->getServiceContext()->getGlobalStorageEngine()->setStableTimestamp(snapshotName);
+void StorageInterfaceImpl::setStableTimestamp(StorageEngine* storageEngine,
+                                              SnapshotName snapshotName) {
+    storageEngine->setStableTimestamp(snapshotName);
 }
 
-void StorageInterfaceImpl::setInitialDataTimestamp(OperationContext* opCtx,
+void StorageInterfaceImpl::setInitialDataTimestamp(StorageEngine* storageEngine,
                                                    SnapshotName snapshotName) {
-    opCtx->getServiceContext()->getGlobalStorageEngine()->setInitialDataTimestamp(snapshotName);
+    storageEngine->setInitialDataTimestamp(snapshotName);
 }
 
 Status StorageInterfaceImpl::isAdminDbValid(OperationContext* opCtx) {

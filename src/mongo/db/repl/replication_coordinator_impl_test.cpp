@@ -30,6 +30,7 @@
 
 #include "mongo/platform/basic.h"
 
+#include <boost/optional/optional_io.hpp>
 #include <iostream>
 #include <memory>
 #include <set>
@@ -3538,6 +3539,176 @@ TEST_F(ReplCoordTest,
     ASSERT_OK(getReplCoord()->setLastDurableOptime_forTest(2, 1, newTime));
     ASSERT_EQUALS(newTime, getReplCoord()->getLastCommittedOpTime());
 }
+
+/**
+ * Tests to ensure that ReplicationCoordinator correctly calculates and updates the stable
+ * timestamp.
+ */
+class StableTimestampTest : public ReplCoordTest {
+protected:
+    /**
+     * Return a string representation of the given set 's'.
+     */
+    std::string timestampSetString(std::set<Timestamp> s) {
+        std::stringstream ss;
+        ss << "{ ";
+        for (Timestamp const& el : s) {
+            ss << el << " ";
+        }
+        ss << "}";
+        return ss.str();
+    }
+
+private:
+    virtual void setUp() {
+        ReplCoordTest::setUp();
+        init(ReplSettings());
+    }
+};
+
+// An equality assertion for two std::set<Timestamp> values. Prints the elements of each set when
+// the assertion fails. Only to be used in a 'StableTimestampTest' unit test function.
+#define ASSERT_TIMESTAMP_SET_EQ(a, b) \
+    ASSERT(a == b) << (timestampSetString(a) + " != " + timestampSetString(b));
+
+TEST_F(StableTimestampTest, CalculateStableTimestamp) {
+
+    /**
+     * Tests the 'ReplicationCoordinatorImpl::_calculateStableTimestamp' method.
+     */
+
+    auto repl = getReplCoord();
+    Timestamp commitPoint;
+    boost::optional<Timestamp> expectedStableTimestamp, stableTimestamp;
+    std::set<Timestamp> stableTimestampCandidates;
+
+    // There is a valid stable timestamp less than the commit point.
+    commitPoint = {0, 3};
+    stableTimestampCandidates = {{0, 0}, {0, 1}, {0, 2}, {0, 4}};
+    expectedStableTimestamp = Timestamp(0, 2);
+    stableTimestamp =
+        repl->calculateStableTimestamp_forTest(stableTimestampCandidates, commitPoint);
+    ASSERT_EQ(expectedStableTimestamp, stableTimestamp);
+
+    // There is a valid stable timestamp equal to the commit point.
+    commitPoint = Timestamp(0, 2);
+    stableTimestampCandidates = {{0, 0}, {0, 1}, {0, 2}, {0, 3}};
+    expectedStableTimestamp = Timestamp(0, 2);
+    stableTimestamp =
+        repl->calculateStableTimestamp_forTest(stableTimestampCandidates, commitPoint);
+    ASSERT_EQ(expectedStableTimestamp, stableTimestamp);
+
+    // There is no valid stable timestamp.
+    commitPoint = Timestamp(0, 0);
+    stableTimestampCandidates = {{0, 1}, {0, 2}, {0, 3}};
+    expectedStableTimestamp = boost::none;
+    stableTimestamp =
+        repl->calculateStableTimestamp_forTest(stableTimestampCandidates, commitPoint);
+    ASSERT_EQ(expectedStableTimestamp, stableTimestamp);
+
+    // There are no timestamp candidates.
+    commitPoint = Timestamp(0, 0);
+    stableTimestampCandidates = {};
+    expectedStableTimestamp = boost::none;
+    stableTimestamp =
+        repl->calculateStableTimestamp_forTest(stableTimestampCandidates, commitPoint);
+    ASSERT_EQ(expectedStableTimestamp, stableTimestamp);
+}
+
+TEST_F(StableTimestampTest, CleanupStableTimestampCandidates) {
+
+    /**
+     * Tests the 'ReplicationCoordinatorImpl::_cleanupStableTimestampCandidates' method.
+     */
+
+    auto repl = getReplCoord();
+    Timestamp stableTimestamp;
+    std::set<Timestamp> timestampCandidates, expectedTimestampCandidates;
+
+    // Cleanup should remove all timestamp candidates < the stable timestamp.
+    stableTimestamp = Timestamp(0, 3);
+    timestampCandidates = {{0, 1}, {0, 2}, {0, 3}, {0, 4}};
+    expectedTimestampCandidates = {{0, 3}, {0, 4}};
+    repl->cleanupStableTimestampCandidates_forTest(&timestampCandidates, stableTimestamp);
+    ASSERT_TIMESTAMP_SET_EQ(expectedTimestampCandidates, timestampCandidates);
+
+    // Cleanup should have no effect when stable timestamp is less than all candidates.
+    stableTimestamp = Timestamp(0, 0);
+    timestampCandidates = {{0, 1}, {0, 2}, {0, 3}, {0, 4}};
+    expectedTimestampCandidates = {{0, 1}, {0, 2}, {0, 3}, {0, 4}};
+    repl->cleanupStableTimestampCandidates_forTest(&timestampCandidates, stableTimestamp);
+    ASSERT_TIMESTAMP_SET_EQ(expectedTimestampCandidates, timestampCandidates);
+
+    // Cleanup should leave an empty candidate list unchanged.
+    stableTimestamp = Timestamp(0, 0);
+    timestampCandidates = {};
+    expectedTimestampCandidates = {};
+    repl->cleanupStableTimestampCandidates_forTest(&timestampCandidates, stableTimestamp);
+    ASSERT_TIMESTAMP_SET_EQ(expectedTimestampCandidates, timestampCandidates);
+}
+
+
+TEST_F(StableTimestampTest, SetMyLastAppliedSetsStableTimestampForStorage) {
+
+    /**
+     * Test that 'setMyLastAppliedOpTime' sets the stable timestamp properly for the storage engine
+     * and that timestamp cleanup occurs. This test is not meant to fully exercise the stable
+     * timestamp calculation logic.
+     */
+
+    auto repl = getReplCoord();
+    Timestamp stableTimestamp;
+
+    // There should be no stable timestamp candidates until setMyLastAppliedOpTime is called.
+    repl->advanceCommitPoint(OpTime({0, 2}, 0));
+    ASSERT_EQUALS(SnapshotName::min(), getStorageInterface()->getStableTimestamp());
+
+    // Check that the stable timestamp is updated when we set the applied optime.
+    repl->setMyLastAppliedOpTime(OpTime({0, 1}, 0));
+    stableTimestamp = Timestamp(getStorageInterface()->getStableTimestamp().asU64());
+    ASSERT_EQUALS(Timestamp(0, 1), stableTimestamp);
+
+    // Check that timestamp cleanup occurs.
+    repl->setMyLastAppliedOpTime(OpTime({0, 2}, 0));
+    stableTimestamp = Timestamp(getStorageInterface()->getStableTimestamp().asU64());
+    ASSERT_EQUALS(Timestamp(0, 2), stableTimestamp);
+
+    auto timestampCandidates = repl->getStableTimestampCandidates_forTest();
+    std::set<Timestamp> expectedTimestampCandidates = {{0, 2}};
+    ASSERT_TIMESTAMP_SET_EQ(expectedTimestampCandidates, timestampCandidates);
+}
+
+TEST_F(StableTimestampTest, AdvanceCommitPointSetsStableTimestampForStorage) {
+
+    /**
+     * Test that 'advanceCommitPoint' sets the stable timestamp for the storage engine and that
+     * timestamp cleanup occurs. This test is not meant to fully exercise the stable timestamp
+     * calculation logic.
+     */
+
+    auto repl = getReplCoord();
+    Timestamp stableTimestamp;
+
+    // Add two stable timestamp candidates.
+    repl->setMyLastAppliedOpTime(OpTime({0, 1}, 0));
+    repl->setMyLastAppliedOpTime(OpTime({0, 2}, 0));
+
+    // Set a commit point and check the stable timestamp.
+    repl->advanceCommitPoint(OpTime({0, 1}, 0));
+    stableTimestamp = Timestamp(getStorageInterface()->getStableTimestamp().asU64());
+    ASSERT_EQUALS(Timestamp(0, 1), stableTimestamp);
+
+    // Check that the stable timestamp is updated when we advance the commit point.
+    repl->advanceCommitPoint(OpTime({0, 2}, 0));
+    stableTimestamp = Timestamp(getStorageInterface()->getStableTimestamp().asU64());
+    ASSERT_EQUALS(Timestamp(0, 2), stableTimestamp);
+
+    // Check that timestamp candidate cleanup occurs.
+    auto timestampCandidates = getReplCoord()->getStableTimestampCandidates_forTest();
+    std::set<Timestamp> expectedTimestampCandidates = {{0, 2}};
+    ASSERT_TIMESTAMP_SET_EQ(expectedTimestampCandidates, timestampCandidates);
+}
+
 
 TEST_F(ReplCoordTest, NodeReturnsShutdownInProgressWhenWaitingUntilAnOpTimeDuringShutdown) {
     assertStartSuccess(BSON("_id"
