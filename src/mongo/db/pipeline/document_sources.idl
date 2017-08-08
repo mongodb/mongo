@@ -90,6 +90,24 @@ structs:
             type: timestamp
             description: The timestamp of the logical time
 
+  ListSessionsUser:
+    description: "A struct representing a $listSessions/$listLocalSessions User"
+    strict: true
+    fields:
+      user: string
+      db: string
+
+  ListSessionsSpec:
+    description: "$listSessions and $listLocalSessions pipeline spec"
+    strict: true
+    fields:
+      allUsers:
+        type: bool
+        default: false
+      users:
+        type: array<ListSessionsUser>
+        optional: true
+
   ResumeTokenInternal:
       description: The internal format of a resume token.  For use by the ResumeToken class
                    only.

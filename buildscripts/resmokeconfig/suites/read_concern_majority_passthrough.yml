@@ -70,6 +70,8 @@ selector:
   # Comments list possible problem point under review.
   - jstests/core/capped6.js # Uses captrunc test command.
   - jstests/core/stages_delete.js # Uses stageDebug command for deletes.
+  - jstests/core/list_all_local_sessions.js # collectionless aggregation stage
+  - jstests/core/list_local_sessions.js # collectionless aggregation stage
 
 executor:
   config:

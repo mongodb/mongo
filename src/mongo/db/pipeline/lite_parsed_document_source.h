@@ -111,6 +111,13 @@ public:
     virtual bool isInitialSource() const {
         return false;
     }
+
+    /**
+     * Returns true if this stage may be forwarded to shards from a mongos.
+     */
+    virtual bool allowedToForwardFromMongos() const {
+        return true;
+    }
 };
 
 class LiteParsedDocumentSourceDefault final : public LiteParsedDocumentSource {

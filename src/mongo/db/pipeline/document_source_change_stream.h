@@ -61,6 +61,10 @@ public:
         PrivilegeVector requiredPrivileges(bool isMongos) const final {
             return {};
         }
+
+        bool allowedToForwardFromMongos() const final {
+            return false;
+        }
     };
 
     class Transformation : public DocumentSourceSingleDocumentTransformation::TransformerInterface {

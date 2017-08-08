@@ -48,6 +48,8 @@ selector:
   # TODO: SERVER-27269: mongos can't establish cursor if view has $collStats and views another view.
   - jstests/core/views/views_coll_stats.js
   - jstests/core/killop_drop_collection.js # Uses fsyncLock.
+  - jstests/core/list_local_sessions.js # SERVER-29628 needs MongoSOnly support
+  - jstests/core/list_all_local_sessions.js # SERVER-29628 needs MongoSOnly support
 
 
 executor:

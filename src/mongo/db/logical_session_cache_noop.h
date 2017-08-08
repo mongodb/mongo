@@ -73,6 +73,19 @@ public:
     size_t size() override {
         return 0;
     }
+
+    std::vector<LogicalSessionId> listIds() const override {
+        return {};
+    }
+
+    std::vector<LogicalSessionId> listIds(
+        const std::vector<SHA256Block>& userDigest) const override {
+        return {};
+    }
+
+    boost::optional<LogicalSessionRecord> peekCached(const LogicalSessionId& id) const override {
+        return boost::none;
+    }
 };
 
 }  // namespace mongo

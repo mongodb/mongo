@@ -182,6 +182,8 @@ selector:
   - jstests/core/views/views_find.js
   # TODO: SERVER-30582
   - jstests/core/explain_multi_plan.js
+  - jstests/core/list_local_sessions.js # SERVER-29628 needs MongoSOnly support
+  - jstests/core/list_all_local_sessions.js # SERVER-29628 needs MongoSOnly support
 
 executor:
   config:

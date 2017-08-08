@@ -200,10 +200,10 @@ User* AuthorizationSession::getSingleUser() {
     if (userNameItr.more()) {
         userName = userNameItr.next();
         if (userNameItr.more()) {
-            uasserted(ErrorCodes::Unauthorized, "there are no users authenticated");
+            uasserted(ErrorCodes::Unauthorized, "too many users are authenticated");
         }
     } else {
-        uasserted(ErrorCodes::Unauthorized, "too many users are authenticated");
+        uasserted(ErrorCodes::Unauthorized, "there are no users authenticated");
     }
 
     return lookupUser(userName);

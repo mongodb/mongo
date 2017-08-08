@@ -123,6 +123,13 @@ public:
 
     size_t size() override;
 
+    std::vector<LogicalSessionId> listIds() const override;
+
+    std::vector<LogicalSessionId> listIds(
+        const std::vector<SHA256Block>& userDigest) const override;
+
+    boost::optional<LogicalSessionRecord> peekCached(const LogicalSessionId& id) const override;
+
 private:
     /**
      * Internal methods to handle scheduling and perform refreshes for active
@@ -147,7 +154,7 @@ private:
     std::unique_ptr<ServiceLiason> _service;
     std::unique_ptr<SessionsCollection> _sessionsColl;
 
-    stdx::mutex _cacheMutex;
+    mutable stdx::mutex _cacheMutex;
     LRUCache<LogicalSessionId, LogicalSessionRecord, LogicalSessionIdHash> _cache;
 };
 

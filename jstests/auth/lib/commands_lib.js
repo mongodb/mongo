@@ -661,6 +661,22 @@ var authCommandsLib = {
           skipSharded: true
         },
         {
+          testname: "aggregate_listLocalSessions_allUsers_true",
+          command: {aggregate: 1, pipeline: [{$listLocalSessions: {allUsers: true}}], cursor: {}},
+          testcases: [{
+              runOnDb: adminDbName,
+              roles:
+                  {clusterAdmin: 1, clusterMonitor: 1, clusterManager: 1, root: 1, __system: 1}
+          }],
+          skipSharded: true
+        },
+        {
+          testname: "aggregate_listLocalSessions_allUsers_false",
+          command: {aggregate: 1, pipeline: [{$listLocalSessions: {allUsers: false}}], cursor: {}},
+          testcases: [{runOnDb: adminDbName, roles: roles_all}],
+          skipSharded: true
+        },
+        {
           testname: "aggregate_lookup",
           command: {
               aggregate: "foo",

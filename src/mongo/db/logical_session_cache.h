@@ -28,6 +28,8 @@
 
 #pragma once
 
+#include <boost/optional.hpp>
+
 #include "mongo/base/status.h"
 #include "mongo/db/logical_session_id.h"
 #include "mongo/db/refresh_sessions_gen.h"
@@ -103,6 +105,22 @@ public:
      * Returns the number of session records currently in the cache.
      */
     virtual size_t size() = 0;
+
+    /**
+     * Ennumerate all LogicalSessionId keys currently in the cache.
+     */
+    virtual std::vector<LogicalSessionId> listIds() const = 0;
+
+    /**
+     * Ennumerate all LogicalSessionId keys in the cache for the given UserDigests.
+     */
+    virtual std::vector<LogicalSessionId> listIds(
+        const std::vector<SHA256Block>& userDigest) const = 0;
+
+    /**
+     * Retrieve a LogicalSessionRecord by LogicalSessionId, if it exists in the cache.
+     */
+    virtual boost::optional<LogicalSessionRecord> peekCached(const LogicalSessionId& id) const = 0;
 };
 
 }  // namespace mongo

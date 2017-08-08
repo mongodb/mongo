@@ -37,6 +37,16 @@
 namespace mongo {
 
 /**
+ * Get the currently logged in user's UID digest.
+ */
+SHA256Block getLogicalSessionUserDigestForLoggedInUser(const OperationContext* opCtx);
+
+/**
+ * Get a user digest for a specific user/db identifier.
+ */
+SHA256Block getLogicalSessionUserDigestFor(StringData user, StringData db);
+
+/**
  * Factory functions to generate logical session records.
  */
 LogicalSessionId makeLogicalSessionId(const LogicalSessionFromClient& lsid,

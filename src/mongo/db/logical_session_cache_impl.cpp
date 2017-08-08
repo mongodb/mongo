@@ -263,4 +263,36 @@ boost::optional<LogicalSessionRecord> LogicalSessionCacheImpl::_addToCache(
     return _cache.add(record.getId(), std::move(record));
 }
 
+std::vector<LogicalSessionId> LogicalSessionCacheImpl::listIds() const {
+    stdx::lock_guard<stdx::mutex> lk(_cacheMutex);
+    std::vector<LogicalSessionId> ret;
+    ret.reserve(_cache.size());
+    for (const auto& id : _cache) {
+        ret.push_back(id.first);
+    }
+    return ret;
+}
+
+std::vector<LogicalSessionId> LogicalSessionCacheImpl::listIds(
+    const std::vector<SHA256Block>& userDigests) const {
+    stdx::lock_guard<stdx::mutex> lk(_cacheMutex);
+    std::vector<LogicalSessionId> ret;
+    for (const auto& it : _cache) {
+        if (std::find(userDigests.cbegin(), userDigests.cend(), it.first.getUid()) !=
+            userDigests.cend()) {
+            ret.push_back(it.first);
+        }
+    }
+    return ret;
+}
+
+boost::optional<LogicalSessionRecord> LogicalSessionCacheImpl::peekCached(
+    const LogicalSessionId& id) const {
+    stdx::lock_guard<stdx::mutex> lk(_cacheMutex);
+    const auto it = _cache.cfind(id);
+    if (it == _cache.cend()) {
+        return boost::none;
+    }
+    return it->second;
+}
 }  // namespace mongo

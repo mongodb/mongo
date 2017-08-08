@@ -102,6 +102,15 @@ public:
         });
     }
 
+    /**
+     * Returns false if the pipeline has any stage which must be run locally on mongos.
+     */
+    bool allowedToForwardFromMongos() const {
+        return std::all_of(_stageSpecs.cbegin(), _stageSpecs.cend(), [](const auto& spec) {
+            return spec->allowedToForwardFromMongos();
+        });
+    }
+
 private:
     std::vector<std::unique_ptr<LiteParsedDocumentSource>> _stageSpecs;
 };

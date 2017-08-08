@@ -415,10 +415,10 @@ Status ClusterAggregate::runAggregate(OperationContext* opCtx,
     StringMap<ExpressionContext::ResolvedNamespace> resolvedNamespaces;
     LiteParsedPipeline liteParsedPipeline(request);
 
-    // TODO SERVER-29141 support $changeStream on mongos.
+    // TODO SERVER-29141 support forcing pipeline to run on Mongos.
     uassert(40567,
-            "$changeStream is not yet supported on mongos",
-            !liteParsedPipeline.hasChangeStream());
+            "Unable to force mongos-only stage to run on mongos",
+            liteParsedPipeline.allowedToForwardFromMongos());
 
     for (auto&& nss : liteParsedPipeline.getInvolvedNamespaces()) {
         const auto resolvedNsRoutingInfo =
