@@ -47,6 +47,9 @@ public:
 
     Status enableSharding(OperationContext* opCtx, const std::string& dbName);
 
+    StatusWith<ShardDrainingStatus> removeShard(OperationContext* opCtx,
+                                                const ShardId& name) override;
+
     Status updateDatabase(OperationContext* opCtx,
                           const std::string& dbName,
                           const DatabaseType& db) override;

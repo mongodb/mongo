@@ -31,7 +31,6 @@
 #include "mongo/base/disallow_copying.h"
 #include "mongo/base/status_with.h"
 #include "mongo/db/concurrency/d_concurrency.h"
-#include "mongo/db/repl/optime_with.h"
 #include "mongo/executor/task_executor.h"
 #include "mongo/s/catalog/type_chunk.h"
 #include "mongo/s/catalog/type_database.h"
@@ -47,16 +46,6 @@ class OperationContext;
 class RemoteCommandTargeter;
 class ServiceContext;
 class UUID;
-
-/**
- * Used to indicate to the caller of the removeShard method whether draining of chunks for
- * a particular shard has started, is ongoing, or has been completed.
- */
-enum ShardDrainingStatus {
-    STARTED,
-    ONGOING,
-    COMPLETED,
-};
 
 /**
  * Implements modifications to the sharding catalog metadata.
@@ -218,15 +207,6 @@ public:
      */
     Status enableSharding(OperationContext* opCtx, const std::string& dbName);
 
-    /**
-     * Retrieves all databases for a shard.
-     *
-     * Returns a !OK status if an error occurs.
-     */
-    Status getDatabasesForShard(OperationContext* opCtx,
-                                const ShardId& shardId,
-                                std::vector<std::string>* dbs);
-
 
     //
     // Collection Operations
@@ -278,16 +258,6 @@ public:
                                      const std::string* shardProposedName,
                                      const ConnectionString& shardConnectionString,
                                      const long long maxSize);
-
-    /**
-     * Tries to remove a shard. To completely remove a shard from a sharded cluster,
-     * the data residing in that shard must be moved to the remaining shards in the
-     * cluster by "draining" chunks from that shard.
-     *
-     * Because of the asynchronous nature of the draining mechanism, this method returns
-     * the current draining status. See ShardDrainingStatus enum definition for more details.
-     */
-    StatusWith<ShardDrainingStatus> removeShard(OperationContext* opCtx, const ShardId& shardId);
 
     //
     // Cluster Upgrade Operations
@@ -408,19 +378,6 @@ private:
      */
     static StatusWith<ShardId> _selectShardForNewDatabase(OperationContext* opCtx,
                                                           ShardRegistry* shardRegistry);
-
-    /**
-     * Helper method for running a count command against the config server with appropriate error
-     * handling.
-     */
-    StatusWith<long long> _runCountCommandOnConfig(OperationContext* opCtx,
-                                                   const NamespaceString& ns,
-                                                   BSONObj query);
-
-    /**
-     * Appends a read committed read concern to the request object.
-     */
-    void _appendReadConcern(BSONObjBuilder* builder);
 
     // The owning service context
     ServiceContext* const _serviceContext;

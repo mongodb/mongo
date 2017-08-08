@@ -40,15 +40,12 @@
 #include "mongo/executor/task_executor.h"
 #include "mongo/rpc/metadata/repl_set_metadata.h"
 #include "mongo/rpc/metadata/tracking_metadata.h"
-#include "mongo/s/catalog/sharding_catalog_manager.h"
-#include "mongo/s/catalog/type_changelog.h"
+#include "mongo/s/catalog/sharding_catalog_client_impl.h"
+#include "mongo/s/catalog/sharding_catalog_test_fixture.h"
 #include "mongo/s/catalog/type_chunk.h"
 #include "mongo/s/catalog/type_database.h"
 #include "mongo/s/catalog/type_shard.h"
 #include "mongo/s/client/shard_registry.h"
-#include "mongo/s/cluster_identity_loader.h"
-#include "mongo/s/config_server_test_fixture.h"
-#include "mongo/s/grid.h"
 #include "mongo/s/write_ops/batched_command_response.h"
 #include "mongo/stdx/chrono.h"
 #include "mongo/stdx/future.h"
@@ -74,251 +71,314 @@ BSONObj getReplSecondaryOkMetadata() {
     return o.obj();
 }
 
-class RemoveShardTest : public ConfigServerTestFixture {
-protected:
-    /**
-     * Performs the test setup steps from the parent class and then configures the config shard and
-     * the client name.
-     */
+class RemoveShardTest : public ShardingCatalogTestFixture {
+public:
     void setUp() override {
-        ConfigServerTestFixture::setUp();
-
-        // Make sure clusterID is written to the config.version collection.
-        ASSERT_OK(ShardingCatalogManager::get(operationContext())
-                      ->initializeConfigDatabaseIfNeeded(operationContext()));
-
-        auto clusterIdLoader = ClusterIdentityLoader::get(operationContext());
-        ASSERT_OK(clusterIdLoader->loadClusterId(operationContext(),
-                                                 repl::ReadConcernLevel::kLocalReadConcern));
-        _clusterId = clusterIdLoader->getClusterId();
+        ShardingCatalogTestFixture::setUp();
+        configTargeter()->setFindHostReturnValue(configHost);
     }
 
-    /**
-     * Checks whether a particular shard's "draining" field is set to true.
-     */
-    bool isDraining(const std::string& shardName) {
-        auto response = assertGet(shardRegistry()->getConfigShard()->exhaustiveFindOnConfig(
-            operationContext(),
-            ReadPreferenceSetting{ReadPreference::PrimaryOnly},
-            repl::ReadConcernLevel::kMajorityReadConcern,
-            NamespaceString(ShardType::ConfigNS),
-            BSON(ShardType::name() << shardName),
-            BSONObj(),
-            1));
-        BSONObj shardBSON = response.docs.front();
-        if (shardBSON.hasField("draining")) {
-            return shardBSON["draining"].Bool();
-        }
-        return false;
-    }
-
+protected:
     const HostAndPort configHost{"TestHost1"};
-    OID _clusterId;
 };
 
 TEST_F(RemoveShardTest, RemoveShardAnotherShardDraining) {
+    string shardName = "shardToRemove";
 
-    ShardType shard1;
-    shard1.setName("shard1");
-    shard1.setHost("host1:12345");
-    shard1.setMaxSizeMB(100);
-    shard1.setState(ShardType::ShardState::kShardAware);
+    auto future = launchAsync([&] {
+        ASSERT_EQUALS(ErrorCodes::ConflictingOperationInProgress,
+                      catalogClient()->removeShard(operationContext(), shardName));
+    });
 
-    ShardType shard2;
-    shard2.setName("shard2");
-    shard2.setHost("host2:12345");
-    shard2.setMaxSizeMB(100);
-    shard2.setState(ShardType::ShardState::kShardAware);
+    expectCount(configHost,
+                NamespaceString(ShardType::ConfigNS),
+                BSON(ShardType::name() << NE << shardName << ShardType::draining(true)),
+                1);
 
-    ASSERT_OK(setupShards(std::vector<ShardType>{shard1, shard2}));
-
-    auto result = assertGet(ShardingCatalogManager::get(operationContext())
-                                ->removeShard(operationContext(), shard1.getName()));
-    ASSERT_EQUALS(ShardDrainingStatus::STARTED, result);
-    ASSERT_TRUE(isDraining(shard1.getName()));
-
-    ASSERT_EQUALS(ErrorCodes::ConflictingOperationInProgress,
-                  ShardingCatalogManager::get(operationContext())
-                      ->removeShard(operationContext(), shard2.getName()));
-    ASSERT_FALSE(isDraining(shard2.getName()));
+    future.timed_get(kFutureTimeout);
 }
 
 TEST_F(RemoveShardTest, RemoveShardCantRemoveLastShard) {
     string shardName = "shardToRemove";
 
-    ShardType shard1;
-    shard1.setName("shard1");
-    shard1.setHost("host1:12345");
-    shard1.setMaxSizeMB(100);
-    shard1.setState(ShardType::ShardState::kShardAware);
+    auto future = launchAsync([&] {
+        ASSERT_EQUALS(ErrorCodes::IllegalOperation,
+                      catalogClient()->removeShard(operationContext(), shardName));
+    });
 
-    ASSERT_OK(setupShards(std::vector<ShardType>{shard1}));
+    // Report that there are no other draining operations ongoing
+    expectCount(configHost,
+                NamespaceString(ShardType::ConfigNS),
+                BSON(ShardType::name() << NE << shardName << ShardType::draining(true)),
+                0);
 
-    ASSERT_EQUALS(ErrorCodes::IllegalOperation,
-                  ShardingCatalogManager::get(operationContext())
-                      ->removeShard(operationContext(), shard1.getName()));
-    ASSERT_FALSE(isDraining(shard1.getName()));
+    // Now report that there are no other shard left
+    expectCount(configHost,
+                NamespaceString(ShardType::ConfigNS),
+                BSON(ShardType::name() << NE << shardName),
+                0);
+
+    future.timed_get(kFutureTimeout);
 }
 
 TEST_F(RemoveShardTest, RemoveShardStartDraining) {
-    ShardType shard1;
-    shard1.setName("shard1");
-    shard1.setHost("host1:12345");
-    shard1.setMaxSizeMB(100);
-    shard1.setState(ShardType::ShardState::kShardAware);
+    string shardName = "shardToRemove";
+    const HostAndPort clientHost{"client1:12345"};
+    setRemote(clientHost);
 
-    ShardType shard2;
-    shard2.setName("shard2");
-    shard2.setHost("host2:12345");
-    shard2.setMaxSizeMB(100);
-    shard2.setState(ShardType::ShardState::kShardAware);
+    auto future = launchAsync([&] {
+        auto result = assertGet(catalogClient()->removeShard(operationContext(), shardName));
+        ASSERT_EQUALS(ShardDrainingStatus::STARTED, result);
 
-    ASSERT_OK(setupShards(std::vector<ShardType>{shard1, shard2}));
+    });
 
-    auto result = assertGet(ShardingCatalogManager::get(operationContext())
-                                ->removeShard(operationContext(), shard1.getName()));
-    ASSERT_EQUALS(ShardDrainingStatus::STARTED, result);
-    ASSERT_TRUE(isDraining(shard1.getName()));
+    // Report that there are no other draining operations ongoing
+    expectCount(configHost,
+                NamespaceString(ShardType::ConfigNS),
+                BSON(ShardType::name() << NE << shardName << ShardType::draining(true)),
+                0);
+
+    // Report that there *are* other shards left
+    expectCount(configHost,
+                NamespaceString(ShardType::ConfigNS),
+                BSON(ShardType::name() << NE << shardName),
+                1);
+
+    // Report that the shard is not yet marked as draining
+    expectCount(configHost,
+                NamespaceString(ShardType::ConfigNS),
+                BSON(ShardType::name() << shardName << ShardType::draining(true)),
+                0);
+
+    // Respond to request to update shard entry and mark it as draining.
+    onCommand([&](const RemoteCommandRequest& request) {
+        ASSERT_EQUALS(configHost, request.target);
+        ASSERT_EQUALS("config", request.dbname);
+
+        ASSERT_BSONOBJ_EQ(BSON(rpc::kReplSetMetadataFieldName << 1),
+                          rpc::TrackingMetadata::removeTrackingData(request.metadata));
+
+        const auto opMsgRequest = OpMsgRequest::fromDBAndBody(request.dbname, request.cmdObj);
+        const auto updateOp = UpdateOp::parse(opMsgRequest);
+        ASSERT_EQUALS(ShardType::ConfigNS, updateOp.getNamespace().ns());
+
+        const auto& updates = updateOp.getUpdates();
+        ASSERT_EQUALS(1U, updates.size());
+
+        const auto& update = updates.front();
+        ASSERT(!update.getUpsert());
+        ASSERT(!update.getMulti());
+        ASSERT_BSONOBJ_EQ(BSON(ShardType::name() << shardName), update.getQ());
+        ASSERT_BSONOBJ_EQ(BSON("$set" << BSON(ShardType::draining(true))), update.getU());
+
+        BatchedCommandResponse response;
+        response.setOk(true);
+        response.setNModified(1);
+
+        return response.toBSON();
+    });
+
+    // Respond to request to reload information about existing shards
+    onFindCommand([&](const RemoteCommandRequest& request) {
+        ASSERT_EQUALS(configHost, request.target);
+        ASSERT_BSONOBJ_EQ(getReplSecondaryOkMetadata(),
+                          rpc::TrackingMetadata::removeTrackingData(request.metadata));
+
+        const NamespaceString nss(request.dbname, request.cmdObj.firstElement().String());
+        auto query = assertGet(QueryRequest::makeFromFindCommand(nss, request.cmdObj, false));
+
+        ASSERT_EQ(ShardType::ConfigNS, query->ns());
+        ASSERT_BSONOBJ_EQ(BSONObj(), query->getFilter());
+        ASSERT_BSONOBJ_EQ(BSONObj(), query->getSort());
+        ASSERT_FALSE(query->getLimit().is_initialized());
+
+        checkReadConcern(request.cmdObj, Timestamp(0, 0), repl::OpTime::kUninitializedTerm);
+
+        ShardType remainingShard;
+        remainingShard.setHost("host1");
+        remainingShard.setName("shard0");
+        return vector<BSONObj>{remainingShard.toBSON()};
+    });
+
+    expectChangeLogCreate(configHost, BSON("ok" << 1));
+    expectChangeLogInsert(
+        configHost, network()->now(), "removeShard.start", "", BSON("shard" << shardName));
+
+    future.timed_get(kFutureTimeout);
 }
 
 TEST_F(RemoveShardTest, RemoveShardStillDrainingChunksRemaining) {
+    string shardName = "shardToRemove";
 
-    ShardType shard1;
-    shard1.setName("shard1");
-    shard1.setHost("host1:12345");
-    shard1.setMaxSizeMB(100);
-    shard1.setState(ShardType::ShardState::kShardAware);
+    auto future = launchAsync([&] {
+        auto result = assertGet(catalogClient()->removeShard(operationContext(), shardName));
+        ASSERT_EQUALS(ShardDrainingStatus::ONGOING, result);
 
-    ShardType shard2;
-    shard2.setName("shard2");
-    shard2.setHost("host2:12345");
-    shard2.setMaxSizeMB(100);
-    shard2.setState(ShardType::ShardState::kShardAware);
+    });
 
-    auto epoch = OID::gen();
-    ChunkType chunk1(NamespaceString("testDB.testColl"),
-                     ChunkRange(BSON("_id" << 0), BSON("_id" << 20)),
-                     ChunkVersion(1, 1, epoch),
-                     shard1.getName());
-    ChunkType chunk2(NamespaceString("testDB.testColl"),
-                     ChunkRange(BSON("_id" << 21), BSON("_id" << 50)),
-                     ChunkVersion(1, 2, epoch),
-                     shard1.getName());
-    ChunkType chunk3(NamespaceString("testDB.testColl"),
-                     ChunkRange(BSON("_id" << 51), BSON("_id" << 1000)),
-                     ChunkVersion(1, 3, epoch),
-                     shard1.getName());
+    // Report that there are no other draining operations ongoing
+    expectCount(configHost,
+                NamespaceString(ShardType::ConfigNS),
+                BSON(ShardType::name() << NE << shardName << ShardType::draining(true)),
+                0);
 
-    ASSERT_OK(setupShards(std::vector<ShardType>{shard1, shard2}));
-    setupDatabase("testDB", shard1.getName(), true);
-    ASSERT_OK(setupChunks(std::vector<ChunkType>{chunk1, chunk2, chunk3}));
+    // Report that there *are* other shards left
+    expectCount(configHost,
+                NamespaceString(ShardType::ConfigNS),
+                BSON(ShardType::name() << NE << shardName),
+                1);
 
-    auto startedResult = assertGet(ShardingCatalogManager::get(operationContext())
-                                       ->removeShard(operationContext(), shard1.getName()));
-    ASSERT_EQUALS(ShardDrainingStatus::STARTED, startedResult);
-    ASSERT_TRUE(isDraining(shard1.getName()));
+    // Report that the shard is already marked as draining
+    expectCount(configHost,
+                NamespaceString(ShardType::ConfigNS),
+                BSON(ShardType::name() << shardName << ShardType::draining(true)),
+                1);
 
-    auto ongoingResult = assertGet(ShardingCatalogManager::get(operationContext())
-                                       ->removeShard(operationContext(), shard1.getName()));
-    ASSERT_EQUALS(ShardDrainingStatus::ONGOING, ongoingResult);
-    ASSERT_TRUE(isDraining(shard1.getName()));
+    // Report that there are still chunks to drain
+    expectCount(
+        configHost, NamespaceString(ChunkType::ConfigNS), BSON(ChunkType::shard(shardName)), 10);
+
+    // Report that there are no more databases to drain
+    expectCount(configHost,
+                NamespaceString(DatabaseType::ConfigNS),
+                BSON(DatabaseType::primary(shardName)),
+                0);
+
+    future.timed_get(kFutureTimeout);
 }
 
 TEST_F(RemoveShardTest, RemoveShardStillDrainingDatabasesRemaining) {
+    string shardName = "shardToRemove";
 
-    ShardType shard1;
-    shard1.setName("shard1");
-    shard1.setHost("host1:12345");
-    shard1.setMaxSizeMB(100);
-    shard1.setState(ShardType::ShardState::kShardAware);
+    auto future = launchAsync([&] {
+        auto result = assertGet(catalogClient()->removeShard(operationContext(), shardName));
+        ASSERT_EQUALS(ShardDrainingStatus::ONGOING, result);
 
-    ShardType shard2;
-    shard2.setName("shard2");
-    shard2.setHost("host2:12345");
-    shard2.setMaxSizeMB(100);
-    shard2.setState(ShardType::ShardState::kShardAware);
+    });
 
-    ASSERT_OK(setupShards(std::vector<ShardType>{shard1, shard2}));
-    setupDatabase("testDB", shard1.getName(), false);
+    // Report that there are no other draining operations ongoing
+    expectCount(configHost,
+                NamespaceString(ShardType::ConfigNS),
+                BSON(ShardType::name() << NE << shardName << ShardType::draining(true)),
+                0);
 
-    auto startedResult = assertGet(ShardingCatalogManager::get(operationContext())
-                                       ->removeShard(operationContext(), shard1.getName()));
-    ASSERT_EQUALS(ShardDrainingStatus::STARTED, startedResult);
-    ASSERT_TRUE(isDraining(shard1.getName()));
+    // Report that there *are* other shards left
+    expectCount(configHost,
+                NamespaceString(ShardType::ConfigNS),
+                BSON(ShardType::name() << NE << shardName),
+                1);
 
-    auto ongoingResult = assertGet(ShardingCatalogManager::get(operationContext())
-                                       ->removeShard(operationContext(), shard1.getName()));
-    ASSERT_EQUALS(ShardDrainingStatus::ONGOING, ongoingResult);
-    ASSERT_TRUE(isDraining(shard1.getName()));
+    // Report that the shard is already marked as draining
+    expectCount(configHost,
+                NamespaceString(ShardType::ConfigNS),
+                BSON(ShardType::name() << shardName << ShardType::draining(true)),
+                1);
+
+    // Report that there are no more chunks to drain
+    expectCount(
+        configHost, NamespaceString(ChunkType::ConfigNS), BSON(ChunkType::shard(shardName)), 0);
+
+    // Report that there are still more databases to drain
+    expectCount(configHost,
+                NamespaceString(DatabaseType::ConfigNS),
+                BSON(DatabaseType::primary(shardName)),
+                5);
+
+    future.timed_get(kFutureTimeout);
 }
 
 TEST_F(RemoveShardTest, RemoveShardCompletion) {
+    string shardName = "shardToRemove";
+    const HostAndPort clientHost{"client1:12345"};
+    setRemote(clientHost);
 
-    ShardType shard1;
-    shard1.setName("shard1");
-    shard1.setHost("host1:12345");
-    shard1.setMaxSizeMB(100);
-    shard1.setState(ShardType::ShardState::kShardAware);
+    auto future = launchAsync([&] {
+        auto result = assertGet(catalogClient()->removeShard(operationContext(), shardName));
+        ASSERT_EQUALS(ShardDrainingStatus::COMPLETED, result);
 
-    ShardType shard2;
-    shard2.setName("shard2");
-    shard2.setHost("host2:12345");
-    shard2.setMaxSizeMB(100);
-    shard2.setState(ShardType::ShardState::kShardAware);
+    });
 
-    auto epoch = OID::gen();
-    ChunkType chunk1(NamespaceString("testDB.testColl"),
-                     ChunkRange(BSON("_id" << 0), BSON("_id" << 20)),
-                     ChunkVersion(1, 1, epoch),
-                     shard1.getName());
-    ChunkType chunk2(NamespaceString("testDB.testColl"),
-                     ChunkRange(BSON("_id" << 21), BSON("_id" << 50)),
-                     ChunkVersion(1, 2, epoch),
-                     shard1.getName());
-    ChunkType chunk3(NamespaceString("testDB.testColl"),
-                     ChunkRange(BSON("_id" << 51), BSON("_id" << 1000)),
-                     ChunkVersion(1, 3, epoch),
-                     shard1.getName());
+    // Report that there are no other draining operations ongoing
+    expectCount(configHost,
+                NamespaceString(ShardType::ConfigNS),
+                BSON(ShardType::name() << NE << shardName << ShardType::draining(true)),
+                0);
 
-    std::vector<ChunkType> chunks{chunk1, chunk2, chunk3};
+    // Report that there *are* other shards left
+    expectCount(configHost,
+                NamespaceString(ShardType::ConfigNS),
+                BSON(ShardType::name() << NE << shardName),
+                1);
 
-    ASSERT_OK(setupShards(std::vector<ShardType>{shard1, shard2}));
-    setupDatabase("testDB", shard2.getName(), false);
-    ASSERT_OK(setupChunks(std::vector<ChunkType>{chunk1, chunk2, chunk3}));
+    // Report that the shard is already marked as draining
+    expectCount(configHost,
+                NamespaceString(ShardType::ConfigNS),
+                BSON(ShardType::name() << shardName << ShardType::draining(true)),
+                1);
 
-    auto startedResult = assertGet(ShardingCatalogManager::get(operationContext())
-                                       ->removeShard(operationContext(), shard1.getName()));
-    ASSERT_EQUALS(ShardDrainingStatus::STARTED, startedResult);
-    ASSERT_TRUE(isDraining(shard1.getName()));
+    // Report that there are no more chunks to drain
+    expectCount(
+        configHost, NamespaceString(ChunkType::ConfigNS), BSON(ChunkType::shard(shardName)), 0);
 
-    auto ongoingResult = assertGet(ShardingCatalogManager::get(operationContext())
-                                       ->removeShard(operationContext(), shard1.getName()));
-    ASSERT_EQUALS(ShardDrainingStatus::ONGOING, ongoingResult);
-    ASSERT_TRUE(isDraining(shard1.getName()));
+    // Report that there are no more databases to drain
+    expectCount(configHost,
+                NamespaceString(DatabaseType::ConfigNS),
+                BSON(DatabaseType::primary(shardName)),
+                0);
 
-    // Mock the operation during which the chunks are moved to the other shard.
-    const NamespaceString chunkNS(ChunkType::ConfigNS);
-    for (ChunkType chunk : chunks) {
-        ChunkType updatedChunk = chunk;
-        updatedChunk.setShard(shard2.getName());
-        ASSERT_OK(updateToConfigCollection(
-            operationContext(), chunkNS, chunk.toConfigBSON(), updatedChunk.toConfigBSON(), false));
-    }
+    // Respond to request to remove shard entry.
+    onCommand([&](const RemoteCommandRequest& request) {
+        ASSERT_EQUALS(configHost, request.target);
+        ASSERT_EQUALS(NamespaceString::kConfigDb, request.dbname);
 
-    auto completedResult = assertGet(ShardingCatalogManager::get(operationContext())
-                                         ->removeShard(operationContext(), shard1.getName()));
-    ASSERT_EQUALS(ShardDrainingStatus::COMPLETED, completedResult);
+        ASSERT_BSONOBJ_EQ(BSON(rpc::kReplSetMetadataFieldName << 1),
+                          rpc::TrackingMetadata::removeTrackingData(request.metadata));
 
-    // Now make sure that the shard no longer exists on config.
-    auto response = assertGet(shardRegistry()->getConfigShard()->exhaustiveFindOnConfig(
-        operationContext(),
-        ReadPreferenceSetting{ReadPreference::PrimaryOnly},
-        repl::ReadConcernLevel::kMajorityReadConcern,
-        NamespaceString(ShardType::ConfigNS),
-        BSON(ShardType::name() << shard1.getName()),
-        BSONObj(),
-        1));
-    ASSERT_TRUE(response.docs.empty());
+        const auto opMsgRequest = OpMsgRequest::fromDBAndBody(request.dbname, request.cmdObj);
+        const auto deleteOp = DeleteOp::parse(opMsgRequest);
+        ASSERT_EQUALS(ShardType::ConfigNS, deleteOp.getNamespace().ns());
+
+        const auto& deletes = deleteOp.getDeletes();
+        ASSERT_EQUALS(1U, deletes.size());
+
+        const auto& deleteEntry = deletes.front();
+        ASSERT(deleteEntry.getMulti());
+        ASSERT_BSONOBJ_EQ(BSON(ShardType::name() << shardName), deleteEntry.getQ());
+
+        BatchedCommandResponse response;
+        response.setOk(true);
+        response.setNModified(1);
+
+        return response.toBSON();
+    });
+
+    // Respond to request to reload information about existing shards
+    onFindCommand([&](const RemoteCommandRequest& request) {
+        ASSERT_EQUALS(configHost, request.target);
+        ASSERT_BSONOBJ_EQ(getReplSecondaryOkMetadata(),
+                          rpc::TrackingMetadata::removeTrackingData(request.metadata));
+
+        const NamespaceString nss(request.dbname, request.cmdObj.firstElement().String());
+        auto query = assertGet(QueryRequest::makeFromFindCommand(nss, request.cmdObj, false));
+
+        ASSERT_EQ(ShardType::ConfigNS, query->ns());
+        ASSERT_BSONOBJ_EQ(BSONObj(), query->getFilter());
+        ASSERT_BSONOBJ_EQ(BSONObj(), query->getSort());
+        ASSERT_FALSE(query->getLimit().is_initialized());
+
+        checkReadConcern(request.cmdObj, Timestamp(0, 0), repl::OpTime::kUninitializedTerm);
+
+        ShardType remainingShard;
+        remainingShard.setHost("host1");
+        remainingShard.setName("shard0");
+        return vector<BSONObj>{remainingShard.toBSON()};
+    });
+
+    expectChangeLogCreate(configHost, BSON("ok" << 1));
+    expectChangeLogInsert(
+        configHost, network()->now(), "removeShard", "", BSON("shard" << shardName));
+
+    future.timed_get(kFutureTimeout);
 }
 
 }  // namespace

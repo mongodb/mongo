@@ -66,6 +66,11 @@ Status ShardingCatalogClientMock::enableSharding(OperationContext* opCtx,
     return {ErrorCodes::InternalError, "Method not implemented"};
 }
 
+StatusWith<ShardDrainingStatus> ShardingCatalogClientMock::removeShard(OperationContext* opCtx,
+                                                                       const ShardId& name) {
+    return ShardDrainingStatus::COMPLETED;
+}
+
 Status ShardingCatalogClientMock::updateDatabase(OperationContext* opCtx,
                                                  const string& dbName,
                                                  const DatabaseType& db) {
