@@ -456,12 +456,6 @@ __wt_txn_config(WT_SESSION_IMPL *session, const char *cfg[])
 			WT_RET_MSG(session, EINVAL,
 			    "read timestamp %.*s older than oldest timestamp",
 			    (int)cval.len, cval.str);
-		if (!__wt_timestamp_iszero(&stable_timestamp) &&
-		    __wt_timestamp_cmp(
-		    &txn->read_timestamp, &stable_timestamp) > 0)
-			WT_RET_MSG(session, EINVAL,
-			    "read timestamp %.*s newer than stable timestamp",
-			    (int)cval.len, cval.str);
 
 		__wt_txn_set_read_timestamp(session);
 		txn->isolation = WT_ISO_SNAPSHOT;

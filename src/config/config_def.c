@@ -1143,6 +1143,10 @@ static const WT_CONFIG_ENTRY config_entries[] = {
 	  "timing_stress_for_test=,verbose=",
 	  confchk_WT_CONNECTION_reconfigure, 21
 	},
+	{ "WT_CONNECTION.rollback_to_stable",
+	  "",
+	  NULL, 0
+	},
 	{ "WT_CONNECTION.set_file_system",
 	  "",
 	  NULL, 0

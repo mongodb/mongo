@@ -2273,6 +2273,32 @@ struct __wt_connection {
 	 */
 	int __F(set_timestamp)(
 	    WT_CONNECTION *connection, const char *config);
+
+	/*!
+	 * Rollback in-memory non-logged state to an earlier point in time.
+	 *
+	 * This method uses a timestamp to define the rollback point, and thus
+	 * requires that the application uses timestamps and that the
+	 * stable_timestamp must have been set via a call to
+	 * WT_CONNECTION::set_timestamp. Any updates to checkpoint durable
+	 * tables that are more recent than the stable timestamp are removed.
+	 *
+	 * This method requires that there are no active cursor operations
+	 * for the duration of the call.
+	 *
+	 * Any updates made to logged tables will not be rolled back. Any
+	 * updates made without an associated timestamp will not be rolled
+	 * back. See @ref transaction_timestamps.
+	 *
+	 * @snippet ex_all.c rollback to stable
+	 *
+	 * @param connection the connection handle
+	 * @configempty{WT_CONNECTION.rollback_to_stable, see dist/api_data.py}
+	 * @errors
+	 */
+	int __F(rollback_to_stable)(
+	    WT_CONNECTION *connection, const char *config);
+
 	/*! @} */
 
 	/*!

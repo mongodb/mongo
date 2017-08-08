@@ -23,7 +23,6 @@ flags = {
     ],
     'page_read' : [
         'READ_CACHE',
-        'READ_COMPACT',
         'READ_NOTFOUND_OK',
         'READ_NO_EMPTY',
         'READ_NO_EVICT',

@@ -875,3 +875,24 @@ __btree_page_sizes(WT_SESSION_IMPL *session)
 
 	return (0);
 }
+
+/*
+ * __wt_btree_immediately_durable --
+ *	Check whether this btree is configured for immediate durability.
+ */
+bool
+__wt_btree_immediately_durable(WT_SESSION_IMPL *session)
+{
+	WT_BTREE *btree;
+
+	btree = S2BT(session);
+
+	/*
+	 * This is used to determine whether timestamp updates should
+	 * be rolled back for this btree. It's likely that the particular
+	 * test required here will change when rollback to stable is
+	 * supported with in-memory configurations.
+	 */
+	return (FLD_ISSET(S2C(session)->log_flags, WT_CONN_LOG_ENABLED) &&
+	    !F_ISSET(btree, WT_BTREE_NO_LOGGING));
+}

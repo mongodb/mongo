@@ -1264,6 +1264,8 @@ methods = {
         transaction_timestamps'''),
 ]),
 
+'WT_CONNECTION.rollback_to_stable' : Method([]),
+
 'WT_SESSION.reconfigure' : Method(session_config),
 
 # There are 4 variants of the wiredtiger_open configurations.

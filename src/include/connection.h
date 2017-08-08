@@ -377,6 +377,9 @@ struct __wt_connection_impl {
 	volatile uint64_t	las_verb_gen_read;
 	volatile uint64_t	las_verb_gen_write;
 
+	/* Set of btree IDs not being rolled back */
+	uint8_t *stable_rollback_bitstring;
+
 					/* Locked: collator list */
 	TAILQ_HEAD(__wt_coll_qh, __wt_named_collator) collqh;
 
