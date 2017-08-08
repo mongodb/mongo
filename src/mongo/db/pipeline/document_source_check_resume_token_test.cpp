@@ -61,8 +61,10 @@ protected:
      * namespace in the mock queue.
      */
     void addDocument(Timestamp ts, std::string id, StringData ns = kTestNs) {
-        _mock->queue.push_back(
-            Document({{"_id", Document({{"ts", ts}, {"ns", ns}, {"_id", id}})}}));
+        _mock->queue.push_back(Document{{"_id",
+                                         Document{{"clusterTime", Document{{"ts", ts}}},
+                                                  {"ns", ns},
+                                                  {"documentKey", Document{{"_id", id}}}}}});
     }
 
     void addPause() {
@@ -75,7 +77,8 @@ protected:
     intrusive_ptr<DocumentSourceCheckResumeToken> createCheckResumeToken(Timestamp ts,
                                                                          StringData id,
                                                                          StringData ns = kTestNs) {
-        auto token = ResumeToken::parse(BSON("ts" << ts << "_id" << id << "ns" << ns));
+        auto token = ResumeToken::parse(BSON(
+            "clusterTime" << BSON("ts" << ts) << "ns" << ns << "documentKey" << BSON("_id" << id)));
         DocumentSourceCheckResumeTokenSpec spec;
         spec.setResumeToken(token);
         auto checkResumeToken = DocumentSourceCheckResumeToken::create(getExpCtx(), spec);
@@ -123,7 +126,8 @@ TEST_F(CheckResumeTokenTest, ShouldSucceedWithPausesAfterResumeToken) {
     auto result1 = checkResumeToken->getNext();
     ASSERT_TRUE(result1.isAdvanced());
     auto& doc1 = result1.getDocument();
-    ASSERT_VALUE_EQ(Value(doc1Timestamp), doc1["_id"].getDocument()["ts"]);
+    ASSERT_VALUE_EQ(Value(Document{{"ts", doc1Timestamp}}),
+                    doc1["_id"].getDocument()["clusterTime"]);
     ASSERT_TRUE(checkResumeToken->getNext().isEOF());
 }
 
@@ -141,11 +145,13 @@ TEST_F(CheckResumeTokenTest, ShouldSucceedWithMultipleDocumentsAfterResumeToken)
     auto result1 = checkResumeToken->getNext();
     ASSERT_TRUE(result1.isAdvanced());
     auto& doc1 = result1.getDocument();
-    ASSERT_VALUE_EQ(Value(doc1Timestamp), doc1["_id"].getDocument()["ts"]);
+    ASSERT_VALUE_EQ(Value(Document{{"ts", doc1Timestamp}}),
+                    doc1["_id"].getDocument()["clusterTime"]);
     auto result2 = checkResumeToken->getNext();
     ASSERT_TRUE(result2.isAdvanced());
     auto& doc2 = result2.getDocument();
-    ASSERT_VALUE_EQ(Value(doc2Timestamp), doc2["_id"].getDocument()["ts"]);
+    ASSERT_VALUE_EQ(Value(Document{{"ts", doc2Timestamp}}),
+                    doc2["_id"].getDocument()["clusterTime"]);
     ASSERT_TRUE(checkResumeToken->getNext().isEOF());
 }
 

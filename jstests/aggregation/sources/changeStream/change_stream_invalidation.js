@@ -4,7 +4,7 @@
     "use strict";
 
     // Strip the oplog fields we aren't testing.
-    const oplogProjection = {$project: {"_id.ts": 0}};
+    const oplogProjection = {$project: {"_id.clusterTime": 0}};
 
     // Helpers for testing that pipeline returns correct set of results.  Run startWatchingChanges
     // with the pipeline, then insert the changes, then run assertNextBatchMatches with the result

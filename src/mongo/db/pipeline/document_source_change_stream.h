@@ -103,10 +103,15 @@ public:
     // The name of this stage.
     static constexpr StringData kStageName = "$changeStream"_sd;
 
+    // The name of the field where the clusterTime of the change will be located after the
+    // transformation. The cluster time will be located inside the change identifier, so the full
+    // path to the cluster time will be kIdField + "." + kClusterTimeField.
+    static constexpr StringData kClusterTimeField = "clusterTime"_sd;
+
     // The name of the field where the timestamp of the change will be located after the
-    // transformation. The timestamp will be located inside the change identifier, so the full path
-    // to the timestamp will be kIdField + "." + kTimestampField.
-    static constexpr StringData kTimestmapField = "ts"_sd;
+    // transformation. The timestamp will be located inside the cluster time, so the full path
+    // to the timestamp will be kIdField + "." + kClusterTimeField + "." + kTimestampField.
+    static constexpr StringData kTimestampField = "ts"_sd;
 
     // The different types of operations we can use for the operation type.
     static constexpr StringData kUpdateOpType = "update"_sd;

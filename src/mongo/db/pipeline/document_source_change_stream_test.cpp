@@ -123,6 +123,13 @@ public:
     OplogEntry createCommand(const BSONObj& oField) {
         return OplogEntry(optime, 1, OpTypeEnum::kCommand, nss.getCommandNS(), oField);
     }
+
+    Document makeResumeToken(Timestamp ts, const NamespaceString& nss, ImplicitValue id = Value()) {
+        if (id.missing()) {
+            return {{"clusterTime", D{{"ts", ts}}}, {"ns", nss.ns()}};
+        }
+        return {{"clusterTime", D{{"ts", ts}}}, {"ns", nss.ns()}, {"documentKey", D{{"_id", id}}}};
+    }
 };
 
 TEST_F(ChangeStreamStageTest, ShouldRejectUnrecognizedOption) {
@@ -185,7 +192,7 @@ TEST_F(ChangeStreamStageTest, TransformInsert) {
     OplogEntry insert(optime, 1, OpTypeEnum::kInsert, nss, BSON("_id" << 1 << "x" << 1));
     // Insert
     Document expectedInsert{
-        {DSChangeStream::kIdField, D{{"ts", ts}, {"ns", nss.ns()}, {"_id", 1}}},
+        {DSChangeStream::kIdField, makeResumeToken(ts, nss, 1)},
         {DSChangeStream::kOperationTypeField, DSChangeStream::kInsertOpType},
         {DSChangeStream::kFullDocumentField, D{{"_id", 1}, {"x", 1}}},
         {DSChangeStream::kNamespaceField, D{{"db", nss.db()}, {"coll", nss.coll()}}},
@@ -207,7 +214,7 @@ TEST_F(ChangeStreamStageTest, TransformUpdateFields) {
         optime, 1, OpTypeEnum::kUpdate, nss, BSON("$set" << BSON("y" << 1)), BSON("_id" << 1));
     // Update fields
     Document expectedUpdateField{
-        {DSChangeStream::kIdField, D{{"ts", ts}, {"ns", nss.ns()}, {"_id", 1}}},
+        {DSChangeStream::kIdField, makeResumeToken(ts, nss, 1)},
         {DSChangeStream::kOperationTypeField, DSChangeStream::kUpdateOpType},
         {DSChangeStream::kFullDocumentField, BSONNULL},
         {DSChangeStream::kNamespaceField, D{{"db", nss.db()}, {"coll", nss.coll()}}},
@@ -224,7 +231,7 @@ TEST_F(ChangeStreamStageTest, TransformRemoveFields) {
         optime, 1, OpTypeEnum::kUpdate, nss, BSON("$unset" << BSON("y" << 1)), BSON("_id" << 1));
     // Remove fields
     Document expectedRemoveField{
-        {DSChangeStream::kIdField, D{{"ts", ts}, {"ns", nss.ns()}, {"_id", 1}}},
+        {DSChangeStream::kIdField, makeResumeToken(ts, nss, 1)},
         {DSChangeStream::kOperationTypeField, DSChangeStream::kUpdateOpType},
         {DSChangeStream::kFullDocumentField, BSONNULL},
         {DSChangeStream::kNamespaceField, D{{"db", nss.db()}, {"coll", nss.coll()}}},
@@ -240,7 +247,7 @@ TEST_F(ChangeStreamStageTest, TransformReplace) {
         optime, 1, OpTypeEnum::kUpdate, nss, BSON("_id" << 1 << "y" << 1), BSON("_id" << 1));
     // Replace
     Document expectedReplace{
-        {DSChangeStream::kIdField, D{{"ts", ts}, {"ns", nss.ns()}, {"_id", 1}}},
+        {DSChangeStream::kIdField, makeResumeToken(ts, nss, 1)},
         {DSChangeStream::kOperationTypeField, DSChangeStream::kReplaceOpType},
         {DSChangeStream::kFullDocumentField, D{{"_id", 1}, {"y", 1}}},
         {DSChangeStream::kNamespaceField, D{{"db", nss.db()}, {"coll", nss.coll()}}},
@@ -253,7 +260,7 @@ TEST_F(ChangeStreamStageTest, TransformDelete) {
     OplogEntry deleteEntry(optime, 1, OpTypeEnum::kDelete, nss, BSON("_id" << 1));
     // Delete
     Document expectedDelete{
-        {DSChangeStream::kIdField, D{{"ts", ts}, {"ns", nss.ns()}, {"_id", 1}}},
+        {DSChangeStream::kIdField, makeResumeToken(ts, nss, 1)},
         {DSChangeStream::kOperationTypeField, DSChangeStream::kDeleteOpType},
         {DSChangeStream::kFullDocumentField, BSONNULL},
         {DSChangeStream::kNamespaceField, D{{"db", nss.db()}, {"coll", nss.coll()}}},
@@ -281,7 +288,7 @@ TEST_F(ChangeStreamStageTest, TransformInvalidate) {
 
     // Invalidate entry includes $cmd namespace in _id and doesn't have a document id.
     Document expectedInvalidate{
-        {DSChangeStream::kIdField, D{{"ts", ts}, {"ns", nss.getCommandNS().ns()}}},
+        {DSChangeStream::kIdField, makeResumeToken(ts, nss.getCommandNS())},
         {DSChangeStream::kOperationTypeField, DSChangeStream::kInvalidateOpType},
         {DSChangeStream::kFullDocumentField, BSONNULL},
     };
@@ -315,7 +322,7 @@ TEST_F(ChangeStreamStageTest, TransformInvalidateRenameDropTarget) {
                       otherColl.getCommandNS(),
                       BSON("renameCollection" << otherColl.ns() << "to" << nss.ns()));
     Document expectedInvalidate{
-        {DSChangeStream::kIdField, D{{"ts", ts}, {"ns", otherColl.getCommandNS().ns()}}},
+        {DSChangeStream::kIdField, makeResumeToken(ts, otherColl.getCommandNS())},
         {DSChangeStream::kOperationTypeField, DSChangeStream::kInvalidateOpType},
         {DSChangeStream::kFullDocumentField, BSONNULL},
     };
@@ -392,7 +399,7 @@ TEST_F(ChangeStreamStageTest, CloseCursorOnInvalidateEntries) {
     auto closeCursor = stages.back();
 
     Document expectedInvalidate{
-        {DSChangeStream::kIdField, D{{"ts", ts}, {"ns", nss.getCommandNS().ns()}}},
+        {DSChangeStream::kIdField, makeResumeToken(ts, nss.getCommandNS())},
         {DSChangeStream::kOperationTypeField, DSChangeStream::kInvalidateOpType},
         {DSChangeStream::kFullDocumentField, BSONNULL},
     };

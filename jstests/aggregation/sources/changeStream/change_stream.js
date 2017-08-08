@@ -2,7 +2,7 @@
 (function() {
     "use strict";
 
-    const oplogProjection = {$project: {"_id.ts": 0}};
+    const oplogProjection = {$project: {"_id.clusterTime": 0}};
     function getCollectionNameFromFullNamespace(ns) {
         return ns.split(/\.(.+)/)[1];
     }
@@ -51,12 +51,12 @@
     assert.writeOK(db.t1.insert({_id: 0, a: 1}));
     let expected = {
         _id: {
-            _id: 0,
+            documentKey: {_id: 0},
             ns: "test.t1",
         },
         documentKey: {_id: 0},
         fullDocument: {_id: 0, a: 1},
-        ns: {coll: "t1", db: "test"},
+        ns: {db: "test", coll: "t1"},
         operationType: "insert",
     };
     assertNextBatchMatches({cursor: cursor, expectedBatch: [expected]});
@@ -66,12 +66,12 @@
     assert.writeOK(db.t1.insert({_id: 1, a: 2}));
     expected = {
         _id: {
-            _id: 1,
+            documentKey: {_id: 1},
             ns: "test.t1",
         },
         documentKey: {_id: 1},
         fullDocument: {_id: 1, a: 2},
-        ns: {coll: "t1", db: "test"},
+        ns: {db: "test", coll: "t1"},
         operationType: "insert",
     };
     assertNextBatchMatches({cursor: cursor, expectedBatch: [expected]});
@@ -80,10 +80,10 @@
     cursor = startWatchingChanges([{$changeStream: {}}], db.t1);
     assert.writeOK(db.t1.update({_id: 0}, {a: 3}));
     expected = {
-        _id: {_id: 0, ns: "test.t1"},
+        _id: {documentKey: {_id: 0}, ns: "test.t1"},
         documentKey: {_id: 0},
         fullDocument: {_id: 0, a: 3},
-        ns: {coll: "t1", db: "test"},
+        ns: {db: "test", coll: "t1"},
         operationType: "replace",
     };
     assertNextBatchMatches({cursor: cursor, expectedBatch: [expected]});
@@ -92,10 +92,10 @@
     cursor = startWatchingChanges([{$changeStream: {}}], db.t1);
     assert.writeOK(db.t1.update({_id: 0}, {b: 3}));
     expected = {
-        _id: {_id: 0, ns: "test.t1"},
+        _id: {documentKey: {_id: 0}, ns: "test.t1"},
         documentKey: {_id: 0},
         fullDocument: {_id: 0, b: 3},
-        ns: {coll: "t1", db: "test"},
+        ns: {db: "test", coll: "t1"},
         operationType: "replace",
     };
     assertNextBatchMatches({cursor: cursor, expectedBatch: [expected]});
@@ -105,12 +105,12 @@
     assert.writeOK(db.t1.update({_id: 2}, {a: 4}, {upsert: true}));
     expected = {
         _id: {
-            _id: 2,
+            documentKey: {_id: 2},
             ns: "test.t1",
         },
         documentKey: {_id: 2},
         fullDocument: {_id: 2, a: 4},
-        ns: {coll: "t1", db: "test"},
+        ns: {db: "test", coll: "t1"},
         operationType: "insert",
     };
     assertNextBatchMatches({cursor: cursor, expectedBatch: [expected]});
@@ -120,10 +120,10 @@
     cursor = startWatchingChanges([{$changeStream: {}}], db.t1);
     assert.writeOK(db.t1.update({_id: 3}, {$inc: {b: 2}}));
     expected = {
-        _id: {_id: 3, ns: "test.t1"},
+        _id: {documentKey: {_id: 3}, ns: "test.t1"},
         documentKey: {_id: 3},
         fullDocument: null,
-        ns: {coll: "t1", db: "test"},
+        ns: {db: "test", coll: "t1"},
         operationType: "update",
         updateDescription: {removedFields: [], updatedFields: {b: 3}},
     };
@@ -133,10 +133,10 @@
     cursor = startWatchingChanges([{$changeStream: {}}], db.t1);
     assert.writeOK(db.t1.remove({_id: 1}));
     expected = {
-        _id: {_id: 1, ns: "test.t1"},
+        _id: {documentKey: {_id: 1}, ns: "test.t1"},
         documentKey: {_id: 1},
         fullDocument: null,
-        ns: {coll: "t1", db: "test"},
+        ns: {db: "test", coll: "t1"},
         operationType: "delete",
     };
     assertNextBatchMatches({cursor: cursor, expectedBatch: [expected]});
@@ -148,12 +148,12 @@
     assertNextBatchMatches({cursor: cursor, expectedBatch: []});
     expected = {
         _id: {
-            _id: 100,
+            documentKey: {_id: 100},
             ns: "test.t2",
         },
         documentKey: {_id: 100},
         fullDocument: {_id: 100, c: 1},
-        ns: {coll: "t2", db: "test"},
+        ns: {db: "test", coll: "t2"},
         operationType: "insert",
     };
     assertNextBatchMatches({cursor: t2cursor, expectedBatch: [expected]});
@@ -184,12 +184,12 @@
     assert(tailableCursor.hasNext());
     assert.docEq(tailableCursor.next(), {
         _id: {
-            _id: 101,
+            documentKey: {_id: 101},
             ns: "test.tailable1",
         },
         documentKey: {_id: 101},
         fullDocument: {_id: 101, a: 1},
-        ns: {coll: "tailable1", db: "test"},
+        ns: {db: "test", coll: "tailable1"},
         operationType: "insert",
     });
 
@@ -228,12 +228,12 @@
     assert.eq(aggcursor.nextBatch.length, 1);
     assert.docEq(aggcursor.nextBatch[0], {
         _id: {
-            _id: 102,
+            documentKey: {_id: 102},
             ns: "test.tailable2",
         },
         documentKey: {_id: 102},
         fullDocument: {_id: 102, a: 2},
-        ns: {coll: "tailable2", db: "test"},
+        ns: {db: "test", coll: "tailable2"},
         operationType: "insert",
     });
 

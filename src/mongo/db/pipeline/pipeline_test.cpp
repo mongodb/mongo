@@ -987,7 +987,7 @@ TEST(PipelineOptimizationTest, ChangeStreamLookupSwapsWithIndependentMatch) {
     setMockReplicationCoordinatorOnOpCtx(expCtx->opCtx);
 
     auto spec = BSON("$changeStream" << BSON("fullDocument"
-                                             << "lookup"));
+                                             << "updateLookup"));
     auto stages = DocumentSourceChangeStream::createFromBson(spec.firstElement(), expCtx);
     ASSERT_EQ(stages.size(), 4UL);
     // Make sure the change lookup is at the end.
@@ -1012,7 +1012,7 @@ TEST(PipelineOptimizationTest, ChangeStreamLookupDoesNotSwapWithMatchOnPostImage
     setMockReplicationCoordinatorOnOpCtx(expCtx->opCtx);
 
     auto spec = BSON("$changeStream" << BSON("fullDocument"
-                                             << "lookup"));
+                                             << "updateLookup"));
     auto stages = DocumentSourceChangeStream::createFromBson(spec.firstElement(), expCtx);
     ASSERT_EQ(stages.size(), 4UL);
     // Make sure the change lookup is at the end.

@@ -67,7 +67,8 @@ constexpr StringData DocumentSourceChangeStream::kIdField;
 constexpr StringData DocumentSourceChangeStream::kNamespaceField;
 constexpr StringData DocumentSourceChangeStream::kOperationTypeField;
 constexpr StringData DocumentSourceChangeStream::kStageName;
-constexpr StringData DocumentSourceChangeStream::kTimestmapField;
+constexpr StringData DocumentSourceChangeStream::kTimestampField;
+constexpr StringData DocumentSourceChangeStream::kClusterTimeField;
 constexpr StringData DocumentSourceChangeStream::kUpdateOpType;
 constexpr StringData DocumentSourceChangeStream::kDeleteOpType;
 constexpr StringData DocumentSourceChangeStream::kReplaceOpType;
@@ -251,12 +252,12 @@ list<intrusive_ptr<DocumentSource>> DocumentSourceChangeStream::createFromBson(
     auto fullDocOption = spec.getFullDocument();
     uassert(40575,
             str::stream() << "unrecognized value for the 'fullDocument' option to the "
-                             "$changeStream stage. Expected \"none\" or "
-                             "\"lookup\", got \""
+                             "$changeStream stage. Expected \"default\" or "
+                             "\"updateLookup\", got \""
                           << fullDocOption
                           << "\"",
-            fullDocOption == "lookup"_sd || fullDocOption == "none"_sd);
-    const bool shouldLookupPostImage = (fullDocOption == "lookup"_sd);
+            fullDocOption == "updateLookup"_sd || fullDocOption == "default"_sd);
+    const bool shouldLookupPostImage = (fullDocOption == "updateLookup"_sd);
 
     auto oplogMatch = DocumentSourceOplogMatch::create(
         buildMatchFilter(expCtx->ns, startFrom, changeStreamIsResuming), expCtx);
@@ -346,11 +347,16 @@ Document DocumentSourceChangeStream::Transformation::applyTransformation(const D
         default: { MONGO_UNREACHABLE; }
     }
 
-    // Construct the result document. Note that 'documentId' might be the missing value, in which
-    // case it will not appear in the output.
-    doc.addField(
-        kIdField,
-        Value(Document{{kTimestmapField, ts}, {kNamespaceField, ns}, {kIdField, documentId}}));
+    // Construct the result document.
+    Value documentKey;
+    if (!documentId.missing()) {
+        documentKey = Value(Document{{kIdField, documentId}});
+    }
+    // Note that 'documentKey' might be missing, in which case it will not appear in the output.
+    Document resumeToken{{kClusterTimeField, Document{{kTimestampField, ts}}},
+                         {kNamespaceField, ns},
+                         {kDocumentKeyField, documentKey}};
+    doc.addField(kIdField, Value(resumeToken));
     doc.addField(kOperationTypeField, Value(operationType));
     doc.addField(kFullDocumentField, fullDocument);
 
@@ -360,7 +366,7 @@ Document DocumentSourceChangeStream::Transformation::applyTransformation(const D
     }
 
     doc.addField(kNamespaceField, Value(Document{{"db", nss.db()}, {"coll", nss.coll()}}));
-    doc.addField(kDocumentKeyField, Value(Document{{kIdField, documentId}}));
+    doc.addField(kDocumentKeyField, documentKey);
 
     // Note that 'updateDescription' might be the 'missing' value, in which case it will not be
     // serialized.

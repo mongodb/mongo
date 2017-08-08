@@ -44,14 +44,15 @@ types:
         serializer: ResumeToken::toBSON
         deserializer: ResumeToken::parse
 
-    # The _id element in a resume token can be any BSON element, so we need a custom type which
-    # leaves it as a BSONElement
-    resumeTokenOpaqueId:
+    # The document key element in a resume token can be any BSON element, so we need a custom type
+    # which leaves it as a BSONElement
+    resumeTokenDocumentKey:
         bson_serialization_type: any
         description: The document id contained within a resume token
         cpp_type: Value
         serializer: Value::serializeForIDL
         deserializer: Value::deserializeForIDL
+
 
 structs:
   DocumentSourceChangeStreamSpec:
@@ -67,9 +68,9 @@ structs:
           fullDocument:
               cpp_name: fullDocument
               type: string
-              default: '"none"'
-              description: A string '"lookup"' or '"none"', indicating whether or not we should
-                           return a full document or just changes for an update.
+              default: '"default"'
+              description: A string '"updateLookup"' or '"default"', indicating whether or not we
+                           should return a full document or just changes for an update.
 
 
   DocumentSourceCheckResumeTokenSpec:
@@ -81,14 +82,21 @@ structs:
               type: resumeToken
               description: The resume token which is required to be present in the pipeline.
 
+  ResumeTokenClusterTime:
+      description: The IDL type of cluster time
+      fields:
+          ts:
+            cpp_name: timestamp
+            type: timestamp
+            description: The timestamp of the logical time
 
   ResumeTokenInternal:
       description: The internal format of a resume token.  For use by the ResumeToken class
                    only.
       fields:
-          ts:
-              cpp_name: timestamp
-              type: timestamp
+          clusterTime:
+              cpp_name: clusterTime
+              type: ResumeTokenClusterTime
               description: The timestamp of the oplog entry represented by this resume token.
 
           ns:
@@ -96,8 +104,8 @@ structs:
               type: string
               description: The namespace of the oplog entry represented by this resume token.
 
-          _id:
-              cpp_name: documentId
-              type: resumeTokenOpaqueId
+          documentKey:
+              cpp_name: documentKey
+              type: resumeTokenDocumentKey
               description: The document key of the document in the oplog entry represented by this
                            resume token.

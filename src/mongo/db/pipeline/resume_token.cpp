@@ -39,18 +39,19 @@ namespace mongo {
 ResumeToken::ResumeToken(const BSONObj& resumeBson) {
     auto token =
         ResumeTokenInternal::parse(IDLParserErrorContext("$changeStream.resumeAfter"), resumeBson);
-    _timestamp = token.getTimestamp();
+    _timestamp = token.getClusterTime().getTimestamp();
     _namespace = token.getNs().toString();
-    _documentId = token.getDocumentId();
+    _documentId = token.getDocumentKey();
 }
 
 ResumeToken::ResumeToken(const Value& resumeValue) {
     Document resumeTokenDoc = resumeValue.getDocument();
-    Value timestamp = resumeTokenDoc[ResumeTokenInternal::kTimestampFieldName];
+    Value clusterTime = resumeTokenDoc[ResumeTokenInternal::kClusterTimeFieldName];
+    Value timestamp = clusterTime[ResumeTokenClusterTime::kTimestampFieldName];
     _timestamp = timestamp.getTimestamp();
     Value ns = resumeTokenDoc[ResumeTokenInternal::kNsFieldName];
     _namespace = ns.getString();
-    _documentId = resumeTokenDoc[ResumeTokenInternal::kDocumentIdFieldName];
+    _documentId = resumeTokenDoc[ResumeTokenInternal::kDocumentKeyFieldName];
 }
 
 bool ResumeToken::operator==(const ResumeToken& other) {
@@ -59,17 +60,15 @@ bool ResumeToken::operator==(const ResumeToken& other) {
 }
 
 Document ResumeToken::toDocument() const {
-    return Document({{ResumeTokenInternal::kTimestampFieldName, _timestamp},
+    ResumeTokenClusterTime clusterTime;
+    clusterTime.setTimestamp(_timestamp);
+    return Document({{ResumeTokenInternal::kClusterTimeFieldName, clusterTime.toBSON()},
                      {{ResumeTokenInternal::kNsFieldName}, _namespace},
-                     {{ResumeTokenInternal::kDocumentIdFieldName}, _documentId}});
+                     {{ResumeTokenInternal::kDocumentKeyFieldName}, _documentId}});
 }
 
 BSONObj ResumeToken::toBSON() const {
-    return BSON(
-        ResumeTokenInternal::kTimestampFieldName << _timestamp << ResumeTokenInternal::kNsFieldName
-                                                 << _namespace
-                                                 << ResumeTokenInternal::kDocumentIdFieldName
-                                                 << _documentId);
+    return toDocument().toBson();
 }
 
 ResumeToken ResumeToken::parse(const BSONObj& resumeBson) {
