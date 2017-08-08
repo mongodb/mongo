@@ -43,20 +43,15 @@ namespace mongo {
 
 namespace {
 
-SHA256Block computeDigest(const UserName& name, const boost::optional<OID>& id) {
+SHA256Block computeDigest(const UserName& name) {
     const auto& fn = name.getFullName();
-
-    if (id) {
-        return SHA256Block::computeHash({id->toCDR(), ConstDataRange(fn.c_str(), fn.size())});
-    } else {
-        return SHA256Block::computeHash({ConstDataRange(fn.c_str(), fn.size())});
-    }
+    return SHA256Block::computeHash({ConstDataRange(fn.c_str(), fn.size())});
 };
 
 }  // namespace
 
 User::User(const UserName& name)
-    : _name(name), _id(), _digest(computeDigest(_name, _id)), _refCount(0), _isValid(1) {}
+    : _name(name), _digest(computeDigest(_name)), _refCount(0), _isValid(1) {}
 
 User::~User() {
     dassert(_refCount == 0);
@@ -64,10 +59,6 @@ User::~User() {
 
 const UserName& User::getName() const {
     return _name;
-}
-
-const boost::optional<OID>& User::getID() const {
-    return _id;
 }
 
 const SHA256Block& User::getDigest() const {
@@ -104,11 +95,6 @@ const ActionSet User::getActionsForResource(const ResourcePattern& resource) con
         return ActionSet();
     }
     return it->second.getActions();
-}
-
-void User::setID(boost::optional<OID> id) {
-    _id = std::move(id);
-    _digest = computeDigest(_name, _id);
 }
 
 void User::setCredentials(const CredentialData& credentials) {

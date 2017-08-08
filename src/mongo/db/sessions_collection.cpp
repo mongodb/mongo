@@ -63,7 +63,7 @@ BSONObj updateQuery(const LogicalSessionRecord& record, Date_t refreshTime) {
 
     if (record.getUser()) {
         BSONObjBuilder setBuilder(updateBuilder.subobjStart("$setOnInsert"));
-        setBuilder.append(LogicalSessionRecord::kUserFieldName, record.getUser()->toBSON());
+        setBuilder.append(LogicalSessionRecord::kUserFieldName, BSON("name" << *record.getUser()));
     }
 
     return updateBuilder.obj();

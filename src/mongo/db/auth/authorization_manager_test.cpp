@@ -218,7 +218,7 @@ TEST_F(AuthorizationManagerTest, testAcquireV2User) {
                                                      BSONObj()));
 
     User* v2read;
-    ASSERT_OK(authzManager->acquireUserForInitialAuth(&opCtx, UserName("v2read", "test"), &v2read));
+    ASSERT_OK(authzManager->acquireUser(&opCtx, UserName("v2read", "test"), &v2read));
     ASSERT_EQUALS(UserName("v2read", "test"), v2read->getName());
     ASSERT(v2read->isValid());
     ASSERT_EQUALS(1U, v2read->getRefCount());
@@ -232,8 +232,7 @@ TEST_F(AuthorizationManagerTest, testAcquireV2User) {
     authzManager->releaseUser(v2read);
 
     User* v2cluster;
-    ASSERT_OK(authzManager->acquireUserForInitialAuth(
-        &opCtx, UserName("v2cluster", "admin"), &v2cluster));
+    ASSERT_OK(authzManager->acquireUser(&opCtx, UserName("v2cluster", "admin"), &v2cluster));
     ASSERT_EQUALS(UserName("v2cluster", "admin"), v2cluster->getName());
     ASSERT(v2cluster->isValid());
     ASSERT_EQUALS(1U, v2cluster->getRefCount());
@@ -258,8 +257,8 @@ TEST_F(AuthorizationManagerTest, testLocalX509Authorization) {
     ServiceContext::UniqueOperationContext opCtx = client->makeOperationContext();
 
     User* x509User;
-    ASSERT_OK(authzManager->acquireUserForInitialAuth(
-        opCtx.get(), UserName("CN=mongodb.com", "$external"), &x509User));
+    ASSERT_OK(
+        authzManager->acquireUser(opCtx.get(), UserName("CN=mongodb.com", "$external"), &x509User));
     ASSERT(x509User->isValid());
 
     stdx::unordered_set<RoleName> expectedRoles{RoleName("read", "test"),
@@ -292,8 +291,8 @@ TEST_F(AuthorizationManagerTest, testLocalX509AuthorizationInvalidUser) {
     ServiceContext::UniqueOperationContext opCtx = client->makeOperationContext();
 
     User* x509User;
-    ASSERT_NOT_OK(authzManager->acquireUserForInitialAuth(
-        opCtx.get(), UserName("CN=10gen.com", "$external"), &x509User));
+    ASSERT_NOT_OK(
+        authzManager->acquireUser(opCtx.get(), UserName("CN=10gen.com", "$external"), &x509User));
 }
 
 TEST_F(AuthorizationManagerTest, testLocalX509AuthenticationNoAuthorization) {
@@ -305,8 +304,8 @@ TEST_F(AuthorizationManagerTest, testLocalX509AuthenticationNoAuthorization) {
     ServiceContext::UniqueOperationContext opCtx = client->makeOperationContext();
 
     User* x509User;
-    ASSERT_NOT_OK(authzManager->acquireUserForInitialAuth(
-        opCtx.get(), UserName("CN=mongodb.com", "$external"), &x509User));
+    ASSERT_NOT_OK(
+        authzManager->acquireUser(opCtx.get(), UserName("CN=mongodb.com", "$external"), &x509User));
 }
 
 /**
@@ -404,7 +403,7 @@ TEST_F(AuthorizationManagerTest, testAcquireV2UserWithUnrecognizedActions) {
                                                BSONObj()));
 
     User* myUser;
-    ASSERT_OK(authzManager->acquireUserForInitialAuth(&opCtx, UserName("myUser", "test"), &myUser));
+    ASSERT_OK(authzManager->acquireUser(&opCtx, UserName("myUser", "test"), &myUser));
     ASSERT_EQUALS(UserName("myUser", "test"), myUser->getName());
     ASSERT(myUser->isValid());
     ASSERT_EQUALS(1U, myUser->getRefCount());

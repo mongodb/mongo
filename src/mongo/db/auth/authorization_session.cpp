@@ -140,7 +140,7 @@ Status AuthorizationSession::addAndAuthorizeUser(OperationContext* opCtx,
                                                  const UserName& userName) {
     User* user;
     AuthorizationManager* authzManager = AuthorizationManager::get(opCtx->getServiceContext());
-    Status status = authzManager->acquireUserForInitialAuth(opCtx, userName, &user);
+    Status status = authzManager->acquireUser(opCtx, userName, &user);
     if (!status.isOK()) {
         return status;
     }
@@ -797,9 +797,7 @@ void AuthorizationSession::_refreshUserInfoAsNeeded(OperationContext* opCtx) {
             UserName name = user->getName();
             User* updatedUser;
 
-            Status status =
-                authMan.acquireUserToRefreshSessionCache(opCtx, name, user->getID(), &updatedUser);
-
+            Status status = authMan.acquireUser(opCtx, name, &updatedUser);
             switch (status.code()) {
                 case ErrorCodes::OK: {
 

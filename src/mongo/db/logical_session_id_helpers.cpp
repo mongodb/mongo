@@ -105,11 +105,7 @@ LogicalSessionRecord makeLogicalSessionRecord(OperationContext* opCtx, Date_t la
         invariant(user);
 
         id.setUid(user->getDigest());
-
-        UserNameWithId userDoc{};
-        userDoc.setName(StringData(user->getName().toString()));
-        userDoc.setId(user->getID());
-        lsr.setUser(userDoc);
+        lsr.setUser(StringData(user->getName().toString()));
     } else {
         id.setUid(kNoAuthDigest);
     }
@@ -143,10 +139,7 @@ LogicalSessionRecord makeLogicalSessionRecord(OperationContext* opCtx,
         invariant(user);
 
         if (user->getDigest() == lsid.getUid()) {
-            UserNameWithId userDoc{};
-            userDoc.setName(StringData(user->getName().toString()));
-            userDoc.setId(user->getID());
-            lsr.setUser(userDoc);
+            lsr.setUser(StringData(user->getName().toString()));
         }
     }
 

@@ -28,7 +28,6 @@ selector:
   - jstests/sharding/logical_time_api.js
   - jstests/sharding/operation_time_api.js
   - jstests/sharding/after_cluster_time.js
-  - jstests/sharding/auth_drop_user_while_logged_in.js
   - jstests/sharding/mongos_does_not_gossip_logical_time_without_keys.js
   - jstests/sharding/key_rotation.js
   - jstests/sharding/advance_logical_time_with_valid_signature.js
