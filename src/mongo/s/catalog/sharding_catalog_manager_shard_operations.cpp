@@ -85,8 +85,6 @@ const Seconds kDefaultFindHostMaxWaitTime(20);
 const ReadPreferenceSetting kConfigReadSelector(ReadPreference::Nearest, TagSet{});
 const WriteConcernOptions kNoWaitWriteConcern(1, WriteConcernOptions::SyncMode::UNSET, Seconds(0));
 
-MONGO_FP_DECLARE(dontUpsertShardIdentityOnNewShards);
-
 /**
  * Generates a unique name to be given to a newly added shard.
  */
@@ -620,6 +618,22 @@ StatusWith<std::string> ShardingCatalogManager::addShard(
         shardType.setMaxSizeMB(maxSize);
     }
 
+    // Insert a shardIdentity document onto the shard. This also triggers sharding initialization on
+    // the shard.
+    LOG(2) << "going to insert shardIdentity document into shard: " << shardType;
+    auto commandRequest = createShardIdentityUpsertForAddShard(opCtx, shardType.getName());
+    auto swCommandResponse = _runCommandForAddShard(opCtx, targeter.get(), "admin", commandRequest);
+    if (!swCommandResponse.isOK()) {
+        return swCommandResponse.getStatus();
+    }
+    auto commandResponse = std::move(swCommandResponse.getValue());
+    BatchedCommandResponse batchResponse;
+    auto batchResponseStatus =
+        Shard::CommandResponse::processBatchWriteResponse(commandResponse, &batchResponse);
+    if (!batchResponseStatus.isOK()) {
+        return batchResponseStatus;
+    }
+
     // The featureCompatibilityVersion should be the same throughout the cluster.
     auto versionResponse = _runCommandForAddShard(
         opCtx,
@@ -633,27 +647,6 @@ StatusWith<std::string> ShardingCatalogManager::addShard(
 
     if (!versionResponse.getValue().commandStatus.isOK()) {
         return versionResponse.getValue().commandStatus;
-    }
-
-    if (!MONGO_FAIL_POINT(dontUpsertShardIdentityOnNewShards)) {
-        auto commandRequest = createShardIdentityUpsertForAddShard(opCtx, shardType.getName());
-
-        LOG(2) << "going to insert shardIdentity document into shard: " << shardType;
-
-        auto swCommandResponse =
-            _runCommandForAddShard(opCtx, targeter.get(), "admin", commandRequest);
-        if (!swCommandResponse.isOK()) {
-            return swCommandResponse.getStatus();
-        }
-
-        auto commandResponse = std::move(swCommandResponse.getValue());
-
-        BatchedCommandResponse batchResponse;
-        auto batchResponseStatus =
-            Shard::CommandResponse::processBatchWriteResponse(commandResponse, &batchResponse);
-        if (!batchResponseStatus.isOK()) {
-            return batchResponseStatus;
-        }
     }
 
     log() << "going to insert new entry for shard into config.shards: " << shardType.toString();

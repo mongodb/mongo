@@ -37,8 +37,10 @@
 #include "mongo/db/commands/feature_compatibility_version_command_parser.h"
 #include "mongo/db/concurrency/d_concurrency.h"
 #include "mongo/db/db_raii.h"
+#include "mongo/db/logical_time_validator.h"
 #include "mongo/db/repl/replication_coordinator.h"
 #include "mongo/db/repl/replication_coordinator_global.h"
+#include "mongo/db/s/sharding_state.h"
 #include "mongo/db/server_options.h"
 #include "mongo/rpc/get_status_from_command_result.h"
 #include "mongo/util/scopeguard.h"
@@ -130,6 +132,12 @@ public:
         if (version != existingVersion) {
             serverGlobalParams.featureCompatibility.isSchemaVersion36.store(false);
             updateUUIDSchemaVersion(opCtx, /*upgrade*/ false);
+        }
+
+        // Ensure we try reading the keys for signing clusterTime immediately on upgrade to 3.6.
+        if (ShardingState::get(opCtx)->enabled() &&
+            version == FeatureCompatibilityVersionCommandParser::kVersion36) {
+            LogicalTimeValidator::get(opCtx)->forceKeyRefreshNow(opCtx);
         }
 
         return true;

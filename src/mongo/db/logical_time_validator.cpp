@@ -186,4 +186,8 @@ bool LogicalTimeValidator::shouldGossipLogicalTime() {
     return _keyManager->hasSeenKeys();
 }
 
+void LogicalTimeValidator::forceKeyRefreshNow(OperationContext* opCtx) {
+    _keyManager->refreshNow(opCtx);
+}
+
 }  // namespace mongo

@@ -41,6 +41,7 @@ selector:
   - jstests/sharding/retryable_writes.js
   - jstests/sharding/uuid_propagated_to_config_server_on_shardCollection.js
   - jstests/sharding/uuid_propagated_to_recipient_shard_on_recvChunkStart.js
+  - jstests/sharding/uuid_propagated_to_shards_on_setFCV_3_6.js
   # New feature in v3.6 mongo shell.
   - jstests/sharding/causal_consistency_shell_support.js
   - jstests/sharding/keys_rotation_interval_sec.js

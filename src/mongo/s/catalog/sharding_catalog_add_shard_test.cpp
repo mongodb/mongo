@@ -398,11 +398,11 @@ TEST_F(AddShardTest, StandaloneBasicSuccess) {
                              BSON("name" << discoveredDB1.getName() << "sizeOnDisk" << 2000),
                              BSON("name" << discoveredDB2.getName() << "sizeOnDisk" << 5000)});
 
-    // The shard receives the setFeatureCompatibilityVersion command.
-    expectSetFeatureCompatibilityVersion(shardTarget, BSON("ok" << 1));
-
     // The shardIdentity doc inserted into the admin.system.version collection on the shard.
     expectShardIdentityUpsertReturnSuccess(shardTarget, expectedShardName);
+
+    // The shard receives the setFeatureCompatibilityVersion command.
+    expectSetFeatureCompatibilityVersion(shardTarget, BSON("ok" << 1));
 
     // Wait for the addShard to complete before checking the config database
     future.timed_get(kLongFutureTimeout);
@@ -481,11 +481,11 @@ TEST_F(AddShardTest, StandaloneGenerateName) {
                              BSON("name" << discoveredDB1.getName() << "sizeOnDisk" << 2000),
                              BSON("name" << discoveredDB2.getName() << "sizeOnDisk" << 5000)});
 
-    // The shard receives the setFeatureCompatibilityVersion command.
-    expectSetFeatureCompatibilityVersion(shardTarget, BSON("ok" << 1));
-
     // The shardIdentity doc inserted into the admin.system.version collection on the shard.
     expectShardIdentityUpsertReturnSuccess(shardTarget, expectedShardName);
+
+    // The shard receives the setFeatureCompatibilityVersion command.
+    expectSetFeatureCompatibilityVersion(shardTarget, BSON("ok" << 1));
 
     // Wait for the addShard to complete before checking the config database
     future.timed_get(kLongFutureTimeout);
@@ -906,11 +906,11 @@ TEST_F(AddShardTest, SuccessfullyAddReplicaSet) {
     // Get databases list from new shard
     expectListDatabases(shardTarget, std::vector<BSONObj>{BSON("name" << discoveredDB.getName())});
 
-    // The shard receives the setFeatureCompatibilityVersion command.
-    expectSetFeatureCompatibilityVersion(shardTarget, BSON("ok" << 1));
-
     // The shardIdentity doc inserted into the admin.system.version collection on the shard.
     expectShardIdentityUpsertReturnSuccess(shardTarget, expectedShardName);
+
+    // The shard receives the setFeatureCompatibilityVersion command.
+    expectSetFeatureCompatibilityVersion(shardTarget, BSON("ok" << 1));
 
     // Wait for the addShard to complete before checking the config database
     future.timed_get(kLongFutureTimeout);
@@ -971,11 +971,11 @@ TEST_F(AddShardTest, ReplicaSetExtraHostsDiscovered) {
     // Get databases list from new shard
     expectListDatabases(shardTarget, std::vector<BSONObj>{BSON("name" << discoveredDB.getName())});
 
-    // The shard receives the setFeatureCompatibilityVersion command.
-    expectSetFeatureCompatibilityVersion(shardTarget, BSON("ok" << 1));
-
     // The shardIdentity doc inserted into the admin.system.version collection on the shard.
     expectShardIdentityUpsertReturnSuccess(shardTarget, expectedShardName);
+
+    // The shard receives the setFeatureCompatibilityVersion command.
+    expectSetFeatureCompatibilityVersion(shardTarget, BSON("ok" << 1));
 
     // Wait for the addShard to complete before checking the config database
     future.timed_get(kLongFutureTimeout);
@@ -1052,11 +1052,11 @@ TEST_F(AddShardTest, AddShardSucceedsEvenIfAddingDBsFromNewShardFails) {
                              BSON("name" << discoveredDB1.getName() << "sizeOnDisk" << 2000),
                              BSON("name" << discoveredDB2.getName() << "sizeOnDisk" << 5000)});
 
-    // The shard receives the setFeatureCompatibilityVersion command.
-    expectSetFeatureCompatibilityVersion(shardTarget, BSON("ok" << 1));
-
     // The shardIdentity doc inserted into the admin.system.version collection on the shard.
     expectShardIdentityUpsertReturnSuccess(shardTarget, expectedShardName);
+
+    // The shard receives the setFeatureCompatibilityVersion command.
+    expectSetFeatureCompatibilityVersion(shardTarget, BSON("ok" << 1));
 
     // Wait for the addShard to complete before checking the config database
     future.timed_get(kLongFutureTimeout);

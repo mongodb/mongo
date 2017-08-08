@@ -101,6 +101,11 @@ public:
      */
     bool shouldGossipLogicalTime();
 
+    /**
+     * Makes the KeysCollectionManager refresh synchronously.
+     */
+    void forceKeyRefreshNow(OperationContext* opCtx);
+
 private:
     SignedLogicalTime _getProof(const KeysCollectionDocument& keyDoc, LogicalTime newTime);
 
