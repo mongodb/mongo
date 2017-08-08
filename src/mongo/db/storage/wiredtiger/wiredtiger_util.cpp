@@ -467,8 +467,8 @@ Status WiredTigerUtil::setTableLogging(OperationContext* opCtx, const std::strin
 }
 
 Status WiredTigerUtil::setTableLogging(WT_SESSION* session, const std::string& uri, bool on) {
-    const bool keepOldBehavior = true;
-    if (keepOldBehavior) {
+    const bool NEW_WT_DROPPED = false;
+    if (!NEW_WT_DROPPED) {
         return Status::OK();
     }
 
