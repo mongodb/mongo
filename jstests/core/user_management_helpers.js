@@ -102,6 +102,16 @@ function runTest(db) {
     db.updateUser('user2', {pwd: 'y', passwordDigestor: 'client'});
     assert(db.auth('user1', 'y'));
     assert(db.auth('user2', 'y'));
+
+    // Test createUser requires 'user' field
+    assert.throws(function() {
+        db.createUser({pwd: 'x', roles: ['dbAdmin']});
+    });
+
+    // Test createUser disallows 'createUser' field
+    assert.throws(function() {
+        db.createUser({createUser: 'ben', pwd: 'x', roles: ['dbAdmin']});
+    });
 }
 
 try {

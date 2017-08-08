@@ -1403,6 +1403,14 @@ var DB;
 
     DB.prototype.createUser = function(userObj, writeConcern) {
         var name = userObj["user"];
+        if (name === undefined) {
+            throw Error("no 'user' field provided to 'createUser' function");
+        }
+
+        if (userObj["createUser"] !== undefined) {
+            throw Error("calling 'createUser' function with 'createUser' field is disallowed");
+        }
+
         var cmdObj = {createUser: name};
         cmdObj = Object.extend(cmdObj, userObj);
         delete cmdObj["user"];
