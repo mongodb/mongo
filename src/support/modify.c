@@ -24,7 +24,7 @@ __wt_modify_pack(WT_SESSION_IMPL *session,
 	/*
 	 * Build the in-memory modify value. It's the entries count, followed
 	 * by the modify structure offsets written in order, followed by the
-	 * data (data at the end to avoid unaligned reads/writes).
+	 * data (data at the end to minimize unaligned reads/writes).
 	 */
 	len = sizeof(size_t);                           /* nentries */
 	for (i = 0; i < nentries; ++i) {
@@ -179,22 +179,27 @@ int
 __wt_modify_apply(WT_SESSION_IMPL *session, WT_ITEM *value, const void *modify)
 {
 	const size_t *p;
-	int nentries;
+	size_t nentries, data_size, offset, size;
 	const uint8_t *data;
 
 	/*
 	 * Get the number of entries, and set a second pointer to reference the
-	 * change data.
+	 * change data. The modify string isn't necessarily aligned for size_t
+	 * access, copy to be sure.
 	 */
 	p = modify;
-	nentries = (int)*p++;
+	memcpy(&nentries, p++, sizeof(size_t));
 	data = (uint8_t *)modify +
-	    sizeof(size_t) + ((size_t)nentries * 3 * sizeof(size_t));
+	    sizeof(size_t) + (nentries * 3 * sizeof(size_t));
 
 	/* Step through the list of entries, applying them in order. */
-	for (; nentries-- > 0; data += p[0], p += 3)
+	for (; nentries-- > 0; data += data_size) {
+		memcpy(&data_size, p++, sizeof(size_t));
+		memcpy(&offset, p++, sizeof(size_t));
+		memcpy(&size, p++, sizeof(size_t));
 		WT_RET(__modify_apply_one(
-		    session, value, p[0], p[1], p[2], data));
+		    session, value, data_size, offset, size, data));
+	}
 
 	return (0);
 }
