@@ -38,7 +38,6 @@
 #include "mongo/db/repl/replication_coordinator.h"
 #include "mongo/db/repl/replication_coordinator_mock.h"
 #include "mongo/db/repl/replication_process.h"
-#include "mongo/db/repl/replication_recovery_mock.h"
 #include "mongo/db/session_catalog.h"
 #include "mongo/stdx/memory.h"
 #include "mongo/util/mongoutils/str.h"
@@ -64,9 +63,7 @@ void RollbackTest::setUp() {
     _serviceContextMongoDTest.setUp();
     auto serviceContext = _serviceContextMongoDTest.getServiceContext();
     _replicationProcess = stdx::make_unique<ReplicationProcess>(
-        &_storageInterface,
-        stdx::make_unique<ReplicationConsistencyMarkersMock>(),
-        stdx::make_unique<ReplicationRecoveryMock>());
+        &_storageInterface, stdx::make_unique<ReplicationConsistencyMarkersMock>());
     _dropPendingCollectionReaper = new DropPendingCollectionReaper(&_storageInterface);
     DropPendingCollectionReaper::set(
         serviceContext, std::unique_ptr<DropPendingCollectionReaper>(_dropPendingCollectionReaper));

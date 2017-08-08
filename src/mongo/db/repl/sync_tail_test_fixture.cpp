@@ -36,7 +36,6 @@
 #include "mongo/db/repl/replication_consistency_markers_mock.h"
 #include "mongo/db/repl/replication_coordinator_mock.h"
 #include "mongo/db/repl/replication_process.h"
-#include "mongo/db/repl/replication_recovery_mock.h"
 #include "mongo/db/repl/storage_interface_mock.h"
 
 namespace mongo {
@@ -57,10 +56,8 @@ void SyncTailTest::setUp() {
     DropPendingCollectionReaper::set(
         service, stdx::make_unique<DropPendingCollectionReaper>(_storageInterface));
 
-    _replicationProcess =
-        new ReplicationProcess(_storageInterface,
-                               stdx::make_unique<ReplicationConsistencyMarkersMock>(),
-                               stdx::make_unique<ReplicationRecoveryMock>());
+    _replicationProcess = new ReplicationProcess(
+        _storageInterface, stdx::make_unique<ReplicationConsistencyMarkersMock>());
     ReplicationProcess::set(cc().getServiceContext(),
                             std::unique_ptr<ReplicationProcess>(_replicationProcess));
 

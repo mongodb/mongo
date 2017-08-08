@@ -447,7 +447,7 @@ bool ReplicationCoordinatorImpl::_startLoadLocalConfig(OperationContext* opCtx) 
     }
 
     // Read the last op from the oplog after cleaning up any partially applied batches.
-    _replicationProcess->getReplicationRecovery()->recoverFromOplog(opCtx);
+    _externalState->cleanUpLastApplyBatch(opCtx);
     auto lastOpTimeStatus = _externalState->loadLastOpTime(opCtx);
 
     // Use a callback here, because _finishLoadLocalConfig calls isself() which requires

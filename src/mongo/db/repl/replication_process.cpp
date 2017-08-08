@@ -82,11 +82,9 @@ void ReplicationProcess::set(ServiceContext* service, std::unique_ptr<Replicatio
 
 ReplicationProcess::ReplicationProcess(
     StorageInterface* storageInterface,
-    std::unique_ptr<ReplicationConsistencyMarkers> consistencyMarkers,
-    std::unique_ptr<ReplicationRecovery> recovery)
+    std::unique_ptr<ReplicationConsistencyMarkers> consistencyMarkers)
     : _storageInterface(storageInterface),
       _consistencyMarkers(std::move(consistencyMarkers)),
-      _recovery(std::move(recovery)),
       _rbid(kUninitializedRollbackId) {}
 
 StatusWith<int> ReplicationProcess::getRollbackID(OperationContext* opCtx) {
@@ -182,10 +180,6 @@ Status ReplicationProcess::clearRollbackProgress(OperationContext* opCtx) {
 
 ReplicationConsistencyMarkers* ReplicationProcess::getConsistencyMarkers() {
     return _consistencyMarkers.get();
-}
-
-ReplicationRecovery* ReplicationProcess::getReplicationRecovery() {
-    return _recovery.get();
 }
 
 }  // namespace repl

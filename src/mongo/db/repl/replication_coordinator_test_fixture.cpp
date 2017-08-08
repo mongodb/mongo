@@ -42,7 +42,6 @@
 #include "mongo/db/repl/replication_coordinator_external_state_mock.h"
 #include "mongo/db/repl/replication_coordinator_impl.h"
 #include "mongo/db/repl/replication_process.h"
-#include "mongo/db/repl/replication_recovery_mock.h"
 #include "mongo/db/repl/storage_interface_mock.h"
 #include "mongo/db/repl/topology_coordinator_impl.h"
 #include "mongo/executor/network_interface_mock.h"
@@ -126,11 +125,10 @@ void ReplCoordTest::init() {
     StorageInterface::set(service, std::unique_ptr<StorageInterface>(_storageInterface));
     ASSERT_TRUE(_storageInterface == StorageInterface::get(service));
 
-    ReplicationProcess::set(service,
-                            stdx::make_unique<ReplicationProcess>(
-                                _storageInterface,
-                                stdx::make_unique<ReplicationConsistencyMarkersMock>(),
-                                stdx::make_unique<ReplicationRecoveryMock>()));
+    ReplicationProcess::set(
+        service,
+        stdx::make_unique<ReplicationProcess>(
+            _storageInterface, stdx::make_unique<ReplicationConsistencyMarkersMock>()));
     auto replicationProcess = ReplicationProcess::get(service);
 
     // PRNG seed for tests.
