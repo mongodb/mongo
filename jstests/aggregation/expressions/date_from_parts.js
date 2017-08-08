@@ -114,7 +114,7 @@ load("jstests/aggregation/extras/utils.js");  // For assertErrorCode
           hour: 14,
           minute: 27,
           second: 37,
-          milliseconds: 742,
+          millisecond: 742,
           timezone: "Europe/Berlin"
         },
     ]));
@@ -131,7 +131,7 @@ load("jstests/aggregation/extras/utils.js");  // For assertErrorCode
                        hour: 14,
                        minute: 27,
                        second: 37,
-                       milliseconds: 742
+                       millisecond: 742
                    }
                }
            }
@@ -147,7 +147,7 @@ load("jstests/aggregation/extras/utils.js");  // For assertErrorCode
                        hour: NumberInt("14"),
                        minute: NumberInt("27"),
                        second: NumberInt("37"),
-                       milliseconds: NumberInt("742")
+                       millisecond: NumberInt("742")
                    }
                }
            }
@@ -163,7 +163,7 @@ load("jstests/aggregation/extras/utils.js");  // For assertErrorCode
                        hour: NumberLong("14"),
                        minute: NumberLong("27"),
                        second: NumberLong("37"),
-                       milliseconds: NumberLong("742")
+                       millisecond: NumberLong("742")
                    }
                }
            }
@@ -179,7 +179,7 @@ load("jstests/aggregation/extras/utils.js");  // For assertErrorCode
                        hour: NumberDecimal("14"),
                        minute: NumberDecimal("27"),
                        second: NumberDecimal("37"),
-                       milliseconds: NumberDecimal("742")
+                       millisecond: NumberDecimal("742")
                    }
                }
            }
@@ -195,7 +195,7 @@ load("jstests/aggregation/extras/utils.js");  // For assertErrorCode
                        hour: 14,
                        minute: 27,
                        second: 37,
-                       milliseconds: 742
+                       millisecond: 742
                    }
                }
            }
@@ -211,7 +211,7 @@ load("jstests/aggregation/extras/utils.js");  // For assertErrorCode
                        hour: 10,
                        minute: 27,
                        second: 37,
-                       milliseconds: 742
+                       millisecond: 742
                    }
                }
            }
@@ -227,7 +227,7 @@ load("jstests/aggregation/extras/utils.js");  // For assertErrorCode
                        hour: 14,
                        minute: 27,
                        second: 37,
-                       milliseconds: 742
+                       millisecond: 742
                    }
                }
            }
@@ -243,7 +243,7 @@ load("jstests/aggregation/extras/utils.js");  // For assertErrorCode
                        hour: 16,
                        minute: 42,
                        second: 37,
-                       milliseconds: 742
+                       millisecond: 742
                    }
                }
            }
@@ -259,7 +259,7 @@ load("jstests/aggregation/extras/utils.js");  // For assertErrorCode
                        hour: 14,
                        minute: 27,
                        second: 37,
-                       milliseconds: 742
+                       millisecond: 742
                    }
                }
            }
@@ -275,7 +275,7 @@ load("jstests/aggregation/extras/utils.js");  // For assertErrorCode
                        hour: 14,
                        minute: 27,
                        second: 37,
-                       milliseconds: 742
+                       millisecond: 742
                    }
                }
            }
@@ -291,7 +291,7 @@ load("jstests/aggregation/extras/utils.js");  // For assertErrorCode
                        hour: 14,
                        minute: 27,
                        second: 37,
-                       milliseconds: 742
+                       millisecond: 742
                    }
                }
            }
@@ -307,7 +307,7 @@ load("jstests/aggregation/extras/utils.js");  // For assertErrorCode
                        hour: 14,
                        minute: 27,
                        second: 37,
-                       milliseconds: 742
+                       millisecond: 742
                    }
                }
            }
@@ -323,7 +323,7 @@ load("jstests/aggregation/extras/utils.js");  // For assertErrorCode
                        hour: "$hour",
                        minute: 27,
                        second: 37,
-                       milliseconds: 742
+                       millisecond: 742
                    }
                }
            }
@@ -339,7 +339,7 @@ load("jstests/aggregation/extras/utils.js");  // For assertErrorCode
                        hour: 14,
                        minute: "$minute",
                        second: 37,
-                       milliseconds: 742
+                       millisecond: 742
                    }
                }
            }
@@ -355,7 +355,7 @@ load("jstests/aggregation/extras/utils.js");  // For assertErrorCode
                        hour: 14,
                        minute: 27,
                        second: "$second",
-                       milliseconds: 742
+                       millisecond: 742
                    }
                }
            }
@@ -371,7 +371,7 @@ load("jstests/aggregation/extras/utils.js");  // For assertErrorCode
                        hour: 14,
                        minute: 27,
                        second: 37,
-                       milliseconds: "$milliseconds"
+                       millisecond: "$millisecond"
                    }
                }
            }
@@ -400,7 +400,7 @@ load("jstests/aggregation/extras/utils.js");  // For assertErrorCode
         [{'$project': {date: {'$dateFromParts': {year: 2017, hour: "$hour"}}}}],
         [{'$project': {date: {'$dateFromParts': {year: 2017, minute: "$minute"}}}}],
         [{'$project': {date: {'$dateFromParts': {year: 2017, second: "$second"}}}}],
-        [{'$project': {date: {'$dateFromParts': {year: 2017, milliseconds: "$milliseconds"}}}}],
+        [{'$project': {date: {'$dateFromParts': {year: 2017, millisecond: "$millisecond"}}}}],
         [{'$project': {date: {'$dateFromParts': {isoYear: "$isoYear"}}}}],
         [{'$project': {date: {'$dateFromParts': {isoYear: 2017, isoWeekYear: "$isoWeekYear"}}}}],
         [{'$project': {date: {'$dateFromParts': {isoYear: 2017, isoDayOfWeek: "$isoDayOfWeek"}}}}],
@@ -429,7 +429,7 @@ load("jstests/aggregation/extras/utils.js");  // For assertErrorCode
         [{'$project': {date: {'$dateFromParts': {year: 2017, hour: "$falseValue"}}}}],
         [{'$project': {date: {'$dateFromParts': {year: 2017, minute: "$falseValue"}}}}],
         [{'$project': {date: {'$dateFromParts': {year: 2017, second: "$falseValue"}}}}],
-        [{'$project': {date: {'$dateFromParts': {year: 2017, milliseconds: "$falseValue"}}}}],
+        [{'$project': {date: {'$dateFromParts': {year: 2017, millisecond: "$falseValue"}}}}],
         [{'$project': {date: {'$dateFromParts': {isoYear: "$falseValue"}}}}],
         [{'$project': {date: {'$dateFromParts': {isoYear: 2017, isoWeekYear: "$falseValue"}}}}],
         [{'$project': {date: {'$dateFromParts': {isoYear: 2017, isoDayOfWeek: "$falseValue"}}}}],
@@ -458,7 +458,7 @@ load("jstests/aggregation/extras/utils.js");  // For assertErrorCode
         [{'$project': {date: {'$dateFromParts': {year: 2017, hour: "$outOfRangeValue"}}}}],
         [{'$project': {date: {'$dateFromParts': {year: 2017, minute: "$outOfRangeValue"}}}}],
         [{'$project': {date: {'$dateFromParts': {year: 2017, second: "$outOfRangeValue"}}}}],
-        [{'$project': {date: {'$dateFromParts': {year: 2017, milliseconds: "$outOfRangeValue"}}}}],
+        [{'$project': {date: {'$dateFromParts': {year: 2017, millisecond: "$outOfRangeValue"}}}}],
         [{'$project': {date: {'$dateFromParts': {isoYear: "$outOfRangeValue"}}}}],
         [{
            '$project':
@@ -481,8 +481,8 @@ load("jstests/aggregation/extras/utils.js");  // For assertErrorCode
         [{'$project': {date: {'$dateFromParts': {year: 2017, minute: 60}}}}],
         [{'$project': {date: {'$dateFromParts': {year: 2017, second: -1}}}}],
         [{'$project': {date: {'$dateFromParts': {year: 2017, second: 60}}}}],
-        [{'$project': {date: {'$dateFromParts': {year: 2017, milliseconds: -1}}}}],
-        [{'$project': {date: {'$dateFromParts': {year: 2017, milliseconds: 1000}}}}],
+        [{'$project': {date: {'$dateFromParts': {year: 2017, millisecond: -1}}}}],
+        [{'$project': {date: {'$dateFromParts': {year: 2017, millisecond: 1000}}}}],
         [{'$project': {date: {'$dateFromParts': {isoYear: -1}}}}],
         [{'$project': {date: {'$dateFromParts': {isoYear: 10000}}}}],
         [{'$project': {date: {'$dateFromParts': {isoYear: 2017, isoWeekYear: -1}}}}],
@@ -575,7 +575,7 @@ load("jstests/aggregation/extras/utils.js");  // For assertErrorCode
           year: NumberDecimal("2017"),
           minute: 6.0,
           second: NumberInt(19),
-          milliseconds: NumberLong(15)
+          millisecond: NumberLong(15)
         },
         {_id: 2, isoYear: NumberDecimal("2017"), isoWeekYear: 6.0, isoDayOfWeek: NumberInt(4)},
     ]));
@@ -614,7 +614,7 @@ load("jstests/aggregation/extras/utils.js");  // For assertErrorCode
                               year: "$year",
                               minute: "$minute",
                               second: "$second",
-                              milliseconds: "$milliseconds"
+                              millisecond: "$millisecond"
                           }
                       }
                   }
@@ -657,7 +657,7 @@ load("jstests/aggregation/extras/utils.js");  // For assertErrorCode
           hour: NumberLong(15),
           minute: NumberDecimal(1),
           second: 51,
-          milliseconds: 551
+          millisecond: 551
         },
     ]));
 
@@ -684,7 +684,7 @@ load("jstests/aggregation/extras/utils.js");  // For assertErrorCode
                                 hour: "$hour",
                                 minute: "$minute",
                                 second: "$second",
-                                milliseconds: "$milliseconds",
+                                millisecond: "$millisecond",
                                 timezone: test.tz
                             }
                         }
@@ -707,7 +707,7 @@ load("jstests/aggregation/extras/utils.js");  // For assertErrorCode
           hour: NumberLong(15),
           minute: NumberDecimal(1),
           second: 51,
-          milliseconds: 551
+          millisecond: 551
         },
     ]));
 
@@ -734,7 +734,7 @@ load("jstests/aggregation/extras/utils.js");  // For assertErrorCode
                                 hour: "$hour",
                                 minute: "$minute",
                                 second: "$second",
-                                milliseconds: "$milliseconds",
+                                millisecond: "$millisecond",
                                 timezone: test.tz
                             }
                         }

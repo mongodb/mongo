@@ -4390,7 +4390,7 @@ TEST_F(ExpressionDateFromPartsTest, SerializesToObjectSyntax) {
                  "year" << 2017 << "month" << 6 << "day" << 27 << "hour" << 14 << "minute" << 37
                         << "second"
                         << 15
-                        << "milliseconds"
+                        << "millisecond"
                         << 414
                         << "timezone"
                         << "America/Los_Angeles"));
@@ -4403,7 +4403,7 @@ TEST_F(ExpressionDateFromPartsTest, SerializesToObjectSyntax) {
                                  {"hour", Document{{"$const", 14}}},
                                  {"minute", Document{{"$const", 37}}},
                                  {"second", Document{{"$const", 15}}},
-                                 {"milliseconds", Document{{"$const", 414}}},
+                                 {"millisecond", Document{{"$const", 414}}},
                                  {"timezone", Document{{"$const", "America/Los_Angeles"_sd}}}}}});
     ASSERT_VALUE_EQ(dateExp->serialize(true), expectedSerialization);
     ASSERT_VALUE_EQ(dateExp->serialize(false), expectedSerialization);
@@ -4433,7 +4433,7 @@ TEST_F(ExpressionDateFromPartsTest, OptimizesToConstantIfAllInputsAreConstant) {
     // Test that it becomes a constant if both year and milliseconds are provided, and year is an
     // expressions which evaluate to a constant, with milliseconds a constant
     spec = BSON("$dateFromParts" << BSON(
-                    "year" << BSON("$add" << BSON_ARRAY(1900 << 107)) << "milliseconds" << 514));
+                    "year" << BSON("$add" << BSON_ARRAY(1900 << 107)) << "millisecond" << 514));
     dateExp = Expression::parseExpression(expCtx, spec, expCtx->variablesParseState);
     ASSERT(dynamic_cast<ExpressionConstant*>(dateExp->optimize().get()));
 
