@@ -96,6 +96,13 @@ Status RollbackImpl::runRollback(OperationContext* opCtx) {
         opCtx, commonPointSW.getValue());
     _listener->onCommonPointFound(commonPointSW.getValue());
 
+    // Increment the Rollback ID of this node. The Rollback ID is a natural number that it is
+    // incremented by 1 every time a rollback occurs.
+    status = _replicationProcess->incrementRollbackID(opCtx);
+    if (!status.isOK()) {
+        return status;
+    }
+
     // At this point these functions need to always be called before returning, even on failure.
     // These functions fassert on failure.
     ON_BLOCK_EXIT([this, opCtx] {

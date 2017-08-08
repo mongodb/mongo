@@ -185,6 +185,38 @@ TEST_F(RollbackImplTest, RollbackPersistsCommonPointToOplogTruncateAfterPoint) {
     ASSERT_EQUALS(Timestamp(2, 2), truncateAfterPoint);
 }
 
+TEST_F(RollbackImplTest, RollbackIncrementsRollbackID) {
+    auto op = makeOpAndRecordId(1);
+    _remoteOplog->setOperations({op});
+    _localOplog->setOperations({op});
+
+    // Get the initial rollback id.
+    int initRollbackId = unittest::assertGet(_replicationProcess->getRollbackID(_opCtx.get()));
+
+    // Run rollback.
+    ASSERT_OK(_rollback->runRollback(_opCtx.get()));
+
+    // Check that the rollback id was incremented.
+    int newRollbackId = unittest::assertGet(_replicationProcess->getRollbackID(_opCtx.get()));
+    ASSERT_EQUALS(initRollbackId + 1, newRollbackId);
+}
+
+TEST_F(RollbackImplTest, RollbackReturnsBadStatusIfIncrementRollbackIDFails) {
+    auto op = makeOpAndRecordId(1);
+    _remoteOplog->setOperations({op});
+    _localOplog->setOperations({op});
+
+    // Delete the rollback id collection.
+    auto rollbackIdNss = NamespaceString(_storageInterface.kDefaultRollbackIdNamespace);
+    ASSERT_OK(_storageInterface.dropCollection(_opCtx.get(), rollbackIdNss));
+
+    // Run rollback.
+    auto status = _rollback->runRollback(_opCtx.get());
+
+    // Check that a bad status was returned since incrementing the rollback id should have failed.
+    ASSERT_EQUALS(ErrorCodes::NamespaceNotFound, status.code());
+}
+
 TEST_F(RollbackImplTest, RollbackSucceeds) {
     auto op = makeOpAndRecordId(1);
     _remoteOplog->setOperations({op});
