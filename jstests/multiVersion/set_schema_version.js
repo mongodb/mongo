@@ -8,17 +8,20 @@
     const latest = "latest";
     const downgrade = "3.4";
 
-    let checkCollectionUUIDs = function(adminDB, isDowngrade, excludeSysIndexes) {
+    let checkCollectionUUIDs = function(adminDB, isDowngrade, excludeLocal) {
         let databaseList = adminDB.runCommand({"listDatabases": 1}).databases;
 
         databaseList.forEach(function(database) {
             let currentDatabase = adminDB.getSiblingDB(database.name);
             let collectionInfos = currentDatabase.getCollectionInfos();
             for (let i = 0; i < collectionInfos.length; i++) {
-                if (excludeSysIndexes) {
-                    // Exclude system.indexes and all collections in local until SERVER-29926
-                    // and SERVER-30131 are fixed.
-                    if (collectionInfos[i].name != "system.indexes" && currentDatabase != "local") {
+                // Always skip system.indexes due to SERVER-30500.
+                if (collectionInfos[i].name == "system.indexes") {
+                    continue;
+                }
+                if (excludeLocal) {
+                    // Exclude checking all collections in local until SERVER-30131 is fixed.
+                    if (currentDatabase != "local") {
                         assert(collectionInfos[i].info.uuid);
                     }
                 } else {
