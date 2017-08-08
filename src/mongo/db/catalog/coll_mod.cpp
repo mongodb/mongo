@@ -390,9 +390,8 @@ Status _collModInternal(OperationContext* opCtx,
         setCollectionOptionFlag(opCtx, coll, cmr.noPadding, result);
 
     // Modify collection UUID if we are upgrading or downgrading. This is a no-op if we have
-    // already upgraded or downgraded. As we don't assign UUIDs to system.indexes (SERVER-29926),
-    // don't implicitly upgrade them on collMod either.
-    if (upgradeUUID && !nss.isSystemDotIndexes()) {
+    // already upgraded or downgraded.
+    if (upgradeUUID) {
         if (uuid && !coll->uuid()) {
             CollectionCatalogEntry* cce = coll->getCatalogEntry();
             cce->addUUID(opCtx, uuid.get(), coll);
