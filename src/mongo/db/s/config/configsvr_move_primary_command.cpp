@@ -131,9 +131,7 @@ public:
         auto const catalogCache = Grid::get(opCtx)->catalogCache();
         auto const shardRegistry = Grid::get(opCtx)->shardRegistry();
 
-        auto dbType = uassertStatusOK(catalogClient->getDatabase(
-                                          opCtx, dbname, repl::ReadConcernLevel::kLocalReadConcern))
-                          .value;
+        auto dbType = uassertStatusOK(catalogClient->getDatabase(opCtx, dbname)).value;
 
         const std::string to = movePrimaryRequest.getTo().toString();
 
@@ -168,13 +166,10 @@ public:
               << " to: " << toShard->toString();
 
         const std::string whyMessage(str::stream() << "Moving primary shard of " << dbname);
-
-        // ReplSetDistLockManager  uses local read concern and majority write concern by default.
         auto scopedDistLock = uassertStatusOK(catalogClient->getDistLockManager()->lock(
             opCtx, dbname + "-movePrimary", whyMessage, DistLockManager::kDefaultLockTimeout));
 
-        const auto shardedColls =
-            getAllShardedCollectionsForDb(opCtx, dbname, repl::ReadConcernLevel::kLocalReadConcern);
+        const auto shardedColls = getAllShardedCollectionsForDb(opCtx, dbname);
 
         // Record start in changelog
         uassertStatusOK(catalogClient->logChange(
@@ -222,10 +217,7 @@ public:
 
         // Update the new primary in the config server metadata
         {
-            auto dbt =
-                uassertStatusOK(catalogClient->getDatabase(
-                                    opCtx, dbname, repl::ReadConcernLevel::kLocalReadConcern))
-                    .value;
+            auto dbt = uassertStatusOK(catalogClient->getDatabase(opCtx, dbname)).value;
             dbt.setPrimary(toShard->getId());
             uassertStatusOK(catalogClient->updateDatabase(opCtx, dbname, dbt));
         }

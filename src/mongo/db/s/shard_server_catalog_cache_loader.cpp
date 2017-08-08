@@ -346,8 +346,7 @@ void ShardServerCatalogCacheLoader::onStepUp() {
 std::shared_ptr<Notification<void>> ShardServerCatalogCacheLoader::getChunksSince(
     const NamespaceString& nss,
     ChunkVersion version,
-    stdx::function<void(OperationContext*, StatusWith<CollectionAndChangedChunks>)> callbackFn,
-    const repl::ReadConcernLevel& readConcern) {
+    stdx::function<void(OperationContext*, StatusWith<CollectionAndChangedChunks>)> callbackFn) {
     long long currentTerm;
     bool isPrimary;
     {

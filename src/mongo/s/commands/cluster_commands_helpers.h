@@ -136,10 +136,8 @@ bool appendEmptyResultSet(BSONObjBuilder& result, Status status, const std::stri
  *
  * Throws exception on errors.
  */
-std::vector<NamespaceString> getAllShardedCollectionsForDb(
-    OperationContext* opCtx,
-    StringData dbName,
-    const repl::ReadConcernLevel& readConcern = repl::ReadConcernLevel::kMajorityReadConcern);
+std::vector<NamespaceString> getAllShardedCollectionsForDb(OperationContext* opCtx,
+                                                           StringData dbName);
 
 /**
  * Abstracts the common pattern of refreshing a collection and checking if it is sharded used across

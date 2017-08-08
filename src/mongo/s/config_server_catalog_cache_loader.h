@@ -54,9 +54,8 @@ public:
     std::shared_ptr<Notification<void>> getChunksSince(
         const NamespaceString& nss,
         ChunkVersion version,
-        stdx::function<void(OperationContext*, StatusWith<CollectionAndChangedChunks>)> callbackFn,
-        const repl::ReadConcernLevel& readConcern =
-            repl::ReadConcernLevel::kMajorityReadConcern) override;
+        stdx::function<void(OperationContext*, StatusWith<CollectionAndChangedChunks>)> callbackFn)
+        override;
 
 private:
     // Thread pool to be used to perform metadata load

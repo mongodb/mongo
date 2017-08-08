@@ -407,13 +407,13 @@ bool appendEmptyResultSet(BSONObjBuilder& result, Status status, const std::stri
     return Command::appendCommandStatus(result, status);
 }
 
-std::vector<NamespaceString> getAllShardedCollectionsForDb(
-    OperationContext* opCtx, StringData dbName, const repl::ReadConcernLevel& readConcern) {
+std::vector<NamespaceString> getAllShardedCollectionsForDb(OperationContext* opCtx,
+                                                           StringData dbName) {
     const auto dbNameStr = dbName.toString();
 
     std::vector<CollectionType> collectionsOnConfig;
     uassertStatusOK(Grid::get(opCtx)->catalogClient()->getCollections(
-        opCtx, &dbNameStr, &collectionsOnConfig, nullptr, readConcern));
+        opCtx, &dbNameStr, &collectionsOnConfig, nullptr));
 
     std::vector<NamespaceString> collectionsToReturn;
     for (const auto& coll : collectionsOnConfig) {

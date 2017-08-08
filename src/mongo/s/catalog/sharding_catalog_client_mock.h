@@ -54,24 +54,16 @@ public:
                           const std::string& dbName,
                           const DatabaseType& db) override;
 
-    StatusWith<repl::OpTimeWith<DatabaseType>> getDatabase(
-        OperationContext* opCtx,
-        const std::string& dbName,
-        const repl::ReadConcernLevel& readConcern =
-            repl::ReadConcernLevel::kMajorityReadConcern) override;
+    StatusWith<repl::OpTimeWith<DatabaseType>> getDatabase(OperationContext* opCtx,
+                                                           const std::string& dbName) override;
 
-    StatusWith<repl::OpTimeWith<CollectionType>> getCollection(
-        OperationContext* opCtx,
-        const std::string& collNs,
-        const repl::ReadConcernLevel& readConcern =
-            repl::ReadConcernLevel::kMajorityReadConcern) override;
+    StatusWith<repl::OpTimeWith<CollectionType>> getCollection(OperationContext* opCtx,
+                                                               const std::string& collNs) override;
 
     Status getCollections(OperationContext* opCtx,
                           const std::string* dbName,
                           std::vector<CollectionType>* collections,
-                          repl::OpTime* optime,
-                          const repl::ReadConcernLevel& readConcern =
-                              repl::ReadConcernLevel::kMajorityReadConcern) override;
+                          repl::OpTime* optime) override;
 
     Status dropCollection(OperationContext* opCtx, const NamespaceString& ns) override;
 
@@ -124,11 +116,7 @@ public:
                      const BSONObj& detail,
                      const WriteConcernOptions& writeConcern) override;
 
-    StatusWith<BSONObj> getGlobalSettings(
-        OperationContext* opCtx,
-        StringData key,
-        const repl::ReadConcernLevel& readConcern =
-            repl::ReadConcernLevel::kMajorityReadConcern) override;
+    StatusWith<BSONObj> getGlobalSettings(OperationContext* opCtx, StringData key) override;
 
     StatusWith<VersionType> getConfigVersion(OperationContext* opCtx,
                                              repl::ReadConcernLevel readConcern) override;
@@ -140,9 +128,7 @@ public:
     Status insertConfigDocument(OperationContext* opCtx,
                                 const std::string& ns,
                                 const BSONObj& doc,
-                                const WriteConcernOptions& writeConcern,
-                                const repl::ReadConcernLevel& readConcern =
-                                    repl::ReadConcernLevel::kMajorityReadConcern) override;
+                                const WriteConcernOptions& writeConcern) override;
 
     StatusWith<bool> updateConfigDocument(OperationContext* opCtx,
                                           const std::string& ns,

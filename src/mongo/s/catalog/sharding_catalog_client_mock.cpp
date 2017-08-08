@@ -78,20 +78,19 @@ Status ShardingCatalogClientMock::updateDatabase(OperationContext* opCtx,
 }
 
 StatusWith<repl::OpTimeWith<DatabaseType>> ShardingCatalogClientMock::getDatabase(
-    OperationContext* opCtx, const string& dbName, const repl::ReadConcernLevel& readConcern) {
+    OperationContext* opCtx, const string& dbName) {
     return {ErrorCodes::InternalError, "Method not implemented"};
 }
 
 StatusWith<repl::OpTimeWith<CollectionType>> ShardingCatalogClientMock::getCollection(
-    OperationContext* opCtx, const string& collNs, const repl::ReadConcernLevel& readConcern) {
+    OperationContext* opCtx, const string& collNs) {
     return {ErrorCodes::InternalError, "Method not implemented"};
 }
 
 Status ShardingCatalogClientMock::getCollections(OperationContext* opCtx,
                                                  const string* dbName,
                                                  vector<CollectionType>* collections,
-                                                 repl::OpTime* optime,
-                                                 const repl::ReadConcernLevel& readConcern) {
+                                                 repl::OpTime* optime) {
     return {ErrorCodes::InternalError, "Method not implemented"};
 }
 
@@ -167,8 +166,8 @@ Status ShardingCatalogClientMock::logChange(OperationContext* opCtx,
     return {ErrorCodes::InternalError, "Method not implemented"};
 }
 
-StatusWith<BSONObj> ShardingCatalogClientMock::getGlobalSettings(
-    OperationContext* opCtx, StringData key, const repl::ReadConcernLevel& readConcern) {
+StatusWith<BSONObj> ShardingCatalogClientMock::getGlobalSettings(OperationContext* opCtx,
+                                                                 StringData key) {
     return {ErrorCodes::InternalError, "Method not implemented"};
 }
 
@@ -184,8 +183,7 @@ void ShardingCatalogClientMock::writeConfigServerDirect(OperationContext* opCtx,
 Status ShardingCatalogClientMock::insertConfigDocument(OperationContext* opCtx,
                                                        const std::string& ns,
                                                        const BSONObj& doc,
-                                                       const WriteConcernOptions& writeConcern,
-                                                       const repl::ReadConcernLevel& readConcern) {
+                                                       const WriteConcernOptions& writeConcern) {
     return {ErrorCodes::InternalError, "Method not implemented"};
 }
 
