@@ -80,7 +80,14 @@ MONGO_EXPORT_STARTUP_SERVER_PARAMETER(ShardingTaskExecutorPoolHostTimeoutMS,
                                       int,
                                       ConnectionPool::kDefaultHostTimeout.count());
 MONGO_EXPORT_STARTUP_SERVER_PARAMETER(ShardingTaskExecutorPoolMaxSize, int, -1);
-MONGO_EXPORT_STARTUP_SERVER_PARAMETER(ShardingTaskExecutorPoolMaxConnecting, int, -1);
+
+// By default, limit us to two concurrent pending connection attempts
+// in any one pool. Since pools are currently per-cpu, we still may
+// have something like 64 concurrent total connection attempts on a
+// modestly sized system. We could set it to one, but that seems too
+// restrictive.
+MONGO_EXPORT_STARTUP_SERVER_PARAMETER(ShardingTaskExecutorPoolMaxConnecting, int, 2);
+
 MONGO_EXPORT_STARTUP_SERVER_PARAMETER(ShardingTaskExecutorPoolMinSize,
                                       int,
                                       static_cast<int>(ConnectionPool::kDefaultMinConns));
