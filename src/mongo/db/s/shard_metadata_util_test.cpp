@@ -273,22 +273,6 @@ TEST_F(ShardMetadataUtilTest, WriteAndReadChunks) {
     ASSERT_BSONOBJ_EQ(chunks.back().toShardBSON(), readChunks.front().toShardBSON());
 }
 
-TEST_F(ShardMetadataUtilTest, UpdatingChunksFindsNewEpoch) {
-    std::vector<ChunkType> chunks = makeFourChunks();
-    ASSERT_OK(updateShardChunks(operationContext(), kNss, chunks, getCollectionVersion().epoch()));
-    checkChunks(kChunkMetadataNss, chunks);
-
-    ChunkVersion originalChunkVersion = chunks.back().getVersion();
-    chunks.back().setVersion(ChunkVersion(1, 0, OID::gen()));
-    ASSERT_EQUALS(
-        updateShardChunks(operationContext(), kNss, chunks, getCollectionVersion().epoch()).code(),
-        ErrorCodes::ConflictingOperationInProgress);
-
-    // Check that the chunk with a different epoch did not get written.
-    chunks.back().setVersion(std::move(originalChunkVersion));
-    checkChunks(kChunkMetadataNss, chunks);
-}
-
 TEST_F(ShardMetadataUtilTest, UpdateWithWriteNewChunks) {
     // Load some chunk metadata.
 

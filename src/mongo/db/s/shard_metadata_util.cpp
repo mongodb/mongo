@@ -290,17 +290,7 @@ Status updateShardChunks(OperationContext* opCtx,
          *
          */
         for (auto& chunk : chunks) {
-            // Check for a different epoch.
-            if (!chunk.getVersion().hasEqualEpoch(currEpoch)) {
-                return Status{ErrorCodes::ConflictingOperationInProgress,
-                              str::stream() << "Invalid chunks found when reloading '"
-                                            << nss.toString()
-                                            << "'. Previous collection epoch was '"
-                                            << currEpoch.toString()
-                                            << "', but unexpectedly found a new epoch '"
-                                            << chunk.getVersion().epoch().toString()
-                                            << "'. Collection was dropped and recreated."};
-            }
+            invariant(chunk.getVersion().hasEqualEpoch(currEpoch));
 
             // Delete any overlapping chunk ranges. Overlapping chunks will have a min value
             // ("_id") between (chunk.min, chunk.max].
