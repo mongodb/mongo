@@ -97,7 +97,8 @@ Status RollbackImpl::runRollback(OperationContext* opCtx) {
     _listener->onCommonPointFound(commonPointSW.getValue());
 
     // Increment the Rollback ID of this node. The Rollback ID is a natural number that it is
-    // incremented by 1 every time a rollback occurs.
+    // incremented by 1 every time a rollback occurs. Note that the Rollback ID must be incremented
+    // before modifying any local data.
     status = _replicationProcess->incrementRollbackID(opCtx);
     if (!status.isOK()) {
         return status;
