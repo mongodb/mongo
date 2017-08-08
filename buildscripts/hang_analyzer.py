@@ -24,6 +24,7 @@ import signal
 import subprocess
 import sys
 import tempfile
+import traceback
 import time
 from distutils import spawn
 from optparse import OptionParser
@@ -53,7 +54,7 @@ def call(a, logger):
 
     if ret != 0:
         logger.error("Bad exit code %d" % (ret))
-        raise Exception()
+        raise Exception("Bad exit code %d from %s" % (ret, " ".join(a)))
 
 
 def callo(a, logger):
@@ -340,14 +341,14 @@ class GDBDumper(object):
             base, ext = os.path.splitext(logger.mongo_process_filename)
             raw_stacks_filename = base + '_raw_stacks' + ext
             raw_stacks_commands = [
-                    'echo \\nWriting raw stacks to %s.\\n' % raw_stacks_filename,
-                    # This sends output to log file rather than stdout until we turn logging off.
-                    'set logging redirect on',
-                    'set logging file ' + raw_stacks_filename,
-                    'set logging on',
-                    'thread apply all bt',
-                    'set logging off',
-                    ]
+                'echo \\nWriting raw stacks to %s.\\n' % raw_stacks_filename,
+                # This sends output to log file rather than stdout until we turn logging off.
+                'set logging redirect on',
+                'set logging file ' + raw_stacks_filename,
+                'set logging on',
+                'thread apply all bt',
+                'set logging off',
+                ]
 
         cmds = [
             "set interactive-mode off",
@@ -697,28 +698,38 @@ def main():
         # a signal handler to wait for the signal since it supports POSIX signals.
         if _is_windows:
             root_logger.info("Calling SetEvent to signal python process %s with PID %d" %
-                (process_name, pid))
+                             (process_name, pid))
             signal_event_object(root_logger, pid)
         else:
             root_logger.info("Sending signal SIGUSR1 to python process %s with PID %d" %
-                (process_name, pid))
+                             (process_name, pid))
             signal_process(root_logger, pid, signal.SIGUSR1)
+
+    trapped_exceptions = []
 
     # Dump all processes, except python & java.
     for (pid, process_name) in [(p, pn) for (p, pn) in processes
                                 if not re.match("^(java|python)", pn)]:
         process_logger = get_process_logger(options.debugger_output, pid, process_name)
-        dbg.dump_info(
-            root_logger,
-            process_logger,
-            pid,
-            process_name,
-            options.dump_core and check_dump_quota(max_dump_size_bytes, dbg.get_dump_ext()))
+        try:
+            dbg.dump_info(
+                root_logger,
+                process_logger,
+                pid,
+                process_name,
+                options.dump_core and check_dump_quota(max_dump_size_bytes, dbg.get_dump_ext()))
+        except Exception as err:
+            root_logger.info("Error encountered when invoking debugger %s" % err)
+            trapped_exceptions.append(traceback.format_exc())
 
     # Dump java processes using jstack.
     for (pid, process_name) in [(p, pn) for (p, pn) in processes if pn.startswith("java")]:
         process_logger = get_process_logger(options.debugger_output, pid, process_name)
-        jstack.dump_info(root_logger, process_logger, pid, process_name)
+        try:
+            jstack.dump_info(root_logger, process_logger, pid, process_name)
+        except Exception as err:
+            root_logger.info("Error encountered when invoking debugger %s" % err)
+            trapped_exceptions.append(traceback.format_exc())
 
     # Signal go processes to ensure they print out stack traces, and die on POSIX OSes.
     # On Windows, this will simply kill the process since python emulates SIGABRT as
@@ -726,10 +737,15 @@ def main():
     # Note: The stacktrace output may be captured elsewhere (i.e. resmoke).
     for (pid, process_name) in [(p, pn) for (p, pn) in processes if pn in go_processes]:
         root_logger.info("Sending signal SIGABRT to go process %s with PID %d" %
-            (process_name, pid))
+                         (process_name, pid))
         signal_process(root_logger, pid, signal.SIGABRT)
 
     root_logger.info("Done analyzing all processes for hangs")
+
+    for exception in trapped_exceptions:
+        root_logger.info(exception)
+    if trapped_exceptions:
+        sys.exit(1)
 
 if __name__ == "__main__":
     main()
