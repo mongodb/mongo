@@ -118,6 +118,13 @@ public:
     virtual bool allowedToForwardFromMongos() const {
         return true;
     }
+
+    /**
+     * Returns true if this stage may be forwarded from Mongos unmodified.
+     */
+    virtual bool allowedToPassthroughFromMongos() const {
+        return true;
+    }
 };
 
 class LiteParsedDocumentSourceDefault final : public LiteParsedDocumentSource {

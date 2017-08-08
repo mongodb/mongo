@@ -184,6 +184,8 @@ selector:
   - jstests/core/explain_multi_plan.js
   - jstests/core/list_local_sessions.js # SERVER-29628 needs MongoSOnly support
   - jstests/core/list_all_local_sessions.js # SERVER-29628 needs MongoSOnly support
+  - jstests/core/list_all_sessions.js # Too many users authenticated
+  - jstests/core/list_sessions.js # Too many users authenticated
 
 executor:
   config:

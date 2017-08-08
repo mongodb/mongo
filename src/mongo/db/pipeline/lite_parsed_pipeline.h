@@ -111,6 +111,15 @@ public:
         });
     }
 
+    /**
+     * Returns false if the pipeline has any Documet Source which requires rewriting via serialize.
+     */
+    bool allowedToPassthroughFromMongos() const {
+        return std::all_of(_stageSpecs.cbegin(), _stageSpecs.cend(), [](const auto& spec) {
+            return spec->allowedToPassthroughFromMongos();
+        });
+    }
+
 private:
     std::vector<std::unique_ptr<LiteParsedDocumentSource>> _stageSpecs;
 };

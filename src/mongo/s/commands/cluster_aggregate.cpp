@@ -429,7 +429,8 @@ Status ClusterAggregate::runAggregate(OperationContext* opCtx,
     }
 
     // If this aggregation is on an unsharded collection, pass through to the primary shard.
-    if (!executionNsRoutingInfo.cm() && !namespaces.executionNss.isCollectionlessAggregateNS()) {
+    if (!executionNsRoutingInfo.cm() && !namespaces.executionNss.isCollectionlessAggregateNS() &&
+        liteParsedPipeline.allowedToPassthroughFromMongos()) {
         return aggPassthrough(
             opCtx, namespaces, executionNsRoutingInfo.primary()->getId(), request, cmdObj, result);
     }
