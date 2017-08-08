@@ -863,10 +863,6 @@ transaction_ops(WT_CONNECTION *conn, WT_SESSION *session)
 	/*! [query timestamp] */
 	}
 
-	/*! [set commit timestamp] */
-	error_check(conn->set_timestamp(conn, "commit_timestamp=2a"));
-	/*! [set commit timestamp] */
-
 	/*! [set oldest timestamp] */
 	error_check(conn->set_timestamp(conn, "oldest_timestamp=2a"));
 	/*! [set oldest timestamp] */
