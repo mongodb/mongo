@@ -27,7 +27,7 @@ from buildscripts import resmokelib
 from buildscripts.ciconfig import evergreen
 
 
-API_SERVER_DEFAULT = "http://evergreen-api.mongodb.com:8080"
+API_SERVER_DEFAULT = "https://evergreen.mongodb.com"
 
 
 def parse_command_line():
