@@ -96,8 +96,33 @@ public:
      */
     NamespaceString lookupNSSByUUID(CollectionUUID uuid) const;
 
+    /**
+     * Return the UUID lexicographically preceding `uuid` in the database named by `db`.
+     *
+     * Return `boost::none` if `uuid` is not found, or is the first UUID in that database.
+     */
+    boost::optional<CollectionUUID> prev(const StringData& db, CollectionUUID uuid);
+
+    /**
+     * Return the UUID lexicographically following `uuid` in the database named by `db`.
+     *
+     * Return `boost::none` if `uuid` is not found, or is the last UUID in that database.
+     */
+    boost::optional<CollectionUUID> next(const StringData& db, CollectionUUID uuid);
+
 private:
+    const std::vector<CollectionUUID>& _getOrdering_inlock(const StringData& db,
+                                                           const stdx::lock_guard<stdx::mutex>&);
+
     mutable mongo::stdx::mutex _catalogLock;
+
+    /**
+     * Map from database names to ordered `vector`s of their UUIDs.
+     *
+     * Works as a cache of such orderings: every ordering in this map is guaranteed to be valid, but
+     * not all databases are guaranteed to have an ordering in it.
+     */
+    StringMap<std::vector<CollectionUUID>> _orderedCollections;
     mongo::stdx::unordered_map<CollectionUUID, Collection*, CollectionUUID::Hash> _catalog;
 };
 

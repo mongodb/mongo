@@ -74,6 +74,7 @@
 #include "mongo/db/ops/update_lifecycle_impl.h"
 #include "mongo/db/repl/apply_ops.h"
 #include "mongo/db/repl/bgsync.h"
+#include "mongo/db/repl/dbcheck.h"
 #include "mongo/db/repl/oplogreader.h"
 #include "mongo/db/repl/optime.h"
 #include "mongo/db/repl/repl_client_info.h"
@@ -776,6 +777,7 @@ std::map<std::string, ApplyOpMetadata> opsMap = {
           return collModForUUIDUpgrade(opCtx, nss, cmd, uuid);
       },
       {ErrorCodes::IndexNotFound, ErrorCodes::NamespaceNotFound}}},
+    {"dbCheck", {dbCheckOplogCommand, {}}},
     {"dropDatabase",
      {[](OperationContext* opCtx,
          const char* ns,

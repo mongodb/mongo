@@ -157,6 +157,7 @@ env.Library(
         "cpuload.cpp",
         "create_indexes.cpp",
         "current_op.cpp",
+        "dbcheck.cpp",
         "dbcommands.cpp",
         "dbhash.cpp",
         "distinct.cpp",

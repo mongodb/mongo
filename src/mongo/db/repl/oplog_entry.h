@@ -45,6 +45,7 @@ public:
         kNotCommand,
         kCreate,
         kRenameCollection,
+        kDbCheck,
         kDrop,
         kCollMod,
         kApplyOps,

@@ -12,6 +12,7 @@ env.Library(
         'oplogreader.cpp',
     ],
     LIBDEPS=[
+        'dbcheck',
         'repl_coordinator_interface',
         'repl_coordinator_global',
         '$BUILD_DIR/mongo/base',
@@ -24,7 +25,6 @@ env.Library(
         '$BUILD_DIR/mongo/db/dbhelpers',
         '$BUILD_DIR/mongo/db/index_d',
         '$BUILD_DIR/mongo/db/index/index_descriptor',
-        '$BUILD_DIR/mongo/util/fail_point',
         '$BUILD_DIR/mongo/db/write_ops',
         '$BUILD_DIR/mongo/db/catalog/catalog_helpers',
         '$BUILD_DIR/mongo/db/namespace_string',
@@ -130,6 +130,28 @@ env.CppUnitTest(
         '$BUILD_DIR/mongo/executor/thread_pool_task_executor_test_fixture',
     ],
 )
+
+env.Library(
+    target='dbcheck',
+    source=[
+        'dbcheck.cpp',
+        "dbcheck_idl.cpp",
+        env.Idlc('dbcheck.idl')[0],
+    ],
+    LIBDEPS=[
+        '$BUILD_DIR/mongo/base',
+        '$BUILD_DIR/mongo/idl/idl_parser',
+        '$BUILD_DIR/mongo/db/catalog/database',
+        '$BUILD_DIR/mongo/db/catalog/health_log',
+        '$BUILD_DIR/mongo/db/db_raii',
+    ],
+    LIBDEPS_PRIVATE=[
+        '$BUILD_DIR/mongo/util/md5',
+        '$BUILD_DIR/mongo/db/query/internal_plans',
+        '$BUILD_DIR/mongo/db/query/query',
+    ],
+)
+
 
 env.Library(
     target='rollback_idl',

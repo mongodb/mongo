@@ -158,6 +158,7 @@
             command: {dataSize: "test.view"},
             expectFailure: true,
         },
+        dbCheck: {command: {dbCheck: "view"}, expectFailure: true},
         dbHash: {
             command: function(conn) {
                 let getHash = function() {

@@ -249,6 +249,8 @@ Status userAllowedCreateNS(StringData db, StringData coll) {
         if (db == "local") {
             if (coll == "system.replset")
                 return Status::OK();
+            if (coll == "system.healthlog")
+                return Status::OK();
         }
         return Status(ErrorCodes::InvalidNamespace,
                       str::stream() << "cannot write to '" << db << "." << coll << "'");

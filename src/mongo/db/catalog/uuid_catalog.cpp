@@ -109,6 +109,10 @@ NamespaceString UUIDCatalog::lookupNSSByUUID(CollectionUUID uuid) const {
 
 void UUIDCatalog::registerUUIDCatalogEntry(CollectionUUID uuid, Collection* coll) {
     stdx::lock_guard<stdx::mutex> lock(_catalogLock);
+
+    // Invalidate this database's ordering, since we're adding a new UUID.
+    _orderedCollections.erase(coll->ns().db());
+
     if (coll && !_catalog.count(uuid)) {
         std::pair<CollectionUUID, Collection*> entry = std::make_pair(uuid, coll);
         LOG(2) << "registering collection " << coll->ns() << " with UUID " << uuid.toString();
@@ -118,13 +122,65 @@ void UUIDCatalog::registerUUIDCatalogEntry(CollectionUUID uuid, Collection* coll
 
 Collection* UUIDCatalog::removeUUIDCatalogEntry(CollectionUUID uuid) {
     stdx::lock_guard<stdx::mutex> lock(_catalogLock);
+
     auto foundIt = _catalog.find(uuid);
     if (foundIt == _catalog.end())
         return nullptr;
+
+    // Invalidate this database's ordering, since we're deleting a UUID.
+    _orderedCollections.erase(foundIt->second->ns().db());
 
     auto foundCol = foundIt->second;
     LOG(2) << "unregistering collection " << foundCol->ns() << " with UUID " << uuid.toString();
     _catalog.erase(foundIt);
     return foundCol;
+}
+
+boost::optional<CollectionUUID> UUIDCatalog::prev(const StringData& db, CollectionUUID uuid) {
+    stdx::lock_guard<stdx::mutex> lock(_catalogLock);
+    const auto& ordering = _getOrdering_inlock(db, lock);
+    auto current = std::lower_bound(ordering.cbegin(), ordering.cend(), uuid);
+
+    // If the element does not appear, or is the first element.
+    if (*current != uuid || current == ordering.cbegin()) {
+        return boost::none;
+    }
+
+    return *(current - 1);
+}
+
+boost::optional<CollectionUUID> UUIDCatalog::next(const StringData& db, CollectionUUID uuid) {
+    stdx::lock_guard<stdx::mutex> lock(_catalogLock);
+    const auto& ordering = _getOrdering_inlock(db, lock);
+    auto current = std::lower_bound(ordering.cbegin(), ordering.cend(), uuid);
+
+    if (*current != uuid || current + 1 == ordering.cend()) {
+        return boost::none;
+    }
+
+    return *(current + 1);
+}
+
+const std::vector<CollectionUUID>& UUIDCatalog::_getOrdering_inlock(
+    const StringData& db, const stdx::lock_guard<stdx::mutex>&) {
+    // If an ordering is already cached,
+    auto it = _orderedCollections.find(db);
+    if (it != _orderedCollections.end()) {
+        // return it.
+        return it->second;
+    }
+
+    // Otherwise, get all of the UUIDs for this database,
+    auto& newOrdering = _orderedCollections[db];
+    for (const auto& pair : _catalog) {
+        if (pair.second->ns().db() == db) {
+            newOrdering.push_back(pair.first);
+        }
+    }
+
+    // and sort them.
+    std::sort(newOrdering.begin(), newOrdering.end());
+
+    return newOrdering;
 }
 }  // namespace mongo
