@@ -74,6 +74,7 @@ Checksum
 Checksums
 CityHash
 CloseHandle
+Cmvz
 Collet
 Comparator
 Config
@@ -1285,6 +1286,7 @@ vtype
 vunpack
 vw
 vxr
+vz
 waitpid
 waker
 wakeup
