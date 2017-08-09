@@ -40,13 +40,6 @@ namespace mongo {
 
 class ElementPath {
 public:
-    ElementPath(StringData path, bool traverseNonLeafArr = true, bool traverseLeafArr = true)
-        : _shouldTraverseNonleafArrays(traverseNonLeafArr),
-          _shouldTraverseLeafArray(traverseLeafArr),
-          _fieldRef(path) {}
-
-    // TODO: replace uses of members below with regular construction.
-    ElementPath() {}
     Status init(StringData path);
 
     void setTraverseNonleafArrays(bool b) {
@@ -67,9 +60,9 @@ public:
     }
 
 private:
+    FieldRef _fieldRef;
     bool _shouldTraverseNonleafArrays;
     bool _shouldTraverseLeafArray;
-    FieldRef _fieldRef;
 };
 
 class ElementIterator {
