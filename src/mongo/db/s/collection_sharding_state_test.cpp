@@ -1,5 +1,4 @@
-/**
- *    Copyright (C) 2016 MongoDB Inc.
+/*    Copyright (C) 2016 MongoDB Inc.
  *
  *    This program is free software: you can redistribute it and/or  modify
  *    it under the terms of the GNU Affero General Public License, version 3,
@@ -31,6 +30,7 @@
 #include "mongo/db/s/collection_sharding_state.h"
 
 #include "mongo/db/concurrency/d_concurrency.h"
+#include "mongo/db/db_raii.h"
 #include "mongo/db/namespace_string.h"
 #include "mongo/db/s/collection_metadata.h"
 #include "mongo/db/s/sharding_state.h"
@@ -165,5 +165,92 @@ TEST_F(CollShardingStateTest, GlobalInitDoesntGetsCalledIfShardIdentityDocWasNot
     ASSERT_EQ(0, getInitCallCount());
 }
 
+namespace {
+
+NamespaceString testNss("testDB", "TestColl");
+
+/**
+ * Constructs a CollectionMetadata suitable for refreshing a CollectionShardingState. The only
+ * salient detail is the argument `keyPattern` which, defining the shard key, selects the fields
+ * that DeleteState's constructor will extract from its `doc` argument into its member
+ * DeleteState::documentKey.
+ */
+auto makeAMetadata(BSONObj const& keyPattern) -> std::unique_ptr<CollectionMetadata> {
+    const OID epoch = OID::gen();
+    auto range = ChunkRange(BSON("key" << MINKEY), BSON("key" << MAXKEY));
+    auto chunk = ChunkType(testNss, std::move(range), ChunkVersion(1, 0, epoch), ShardId("other"));
+    auto cm = ChunkManager::makeNew(
+        testNss, KeyPattern(keyPattern), nullptr, false, epoch, {std::move(chunk)});
+    return stdx::make_unique<CollectionMetadata>(std::move(cm), ShardId("this"));
+}
+
+}  // namespace
+
+// clang-format off
+
+TEST_F(CollShardingStateTest, MakeDeleteStateUnsharded) {
+    AutoGetCollection autoColl(operationContext(), testNss, MODE_IX);
+    auto* css = CollectionShardingState::get(operationContext(), testNss);
+
+    auto doc = BSON("key3" << "abc" << "key" << 3 << "_id" << "hello" << "key2" << true);
+
+    // First, check that an order for deletion from an unsharded collection (where css has not been
+    // "refreshed" with chunk metadata) extracts just the "_id" field:
+    auto deleteState = CollectionShardingState::DeleteState(operationContext(), css, doc);
+    ASSERT_BSONOBJ_EQ(deleteState.documentKey, BSON("_id" << "hello"));
+    ASSERT_FALSE(deleteState.isMigrating);
+}
+
+TEST_F(CollShardingStateTest, MakeDeleteStateShardedWithoutIdInShardKey) {
+    AutoGetCollection autoColl(operationContext(), testNss, MODE_IX);
+    auto* css = CollectionShardingState::get(operationContext(), testNss);
+
+    // Push a CollectionMetadata with a shard key not including "_id"...
+    css->refreshMetadata(operationContext(), makeAMetadata(BSON("key" << 1 << "key3" << 1)));
+
+    // The order of fields in `doc` deliberately does not match the shard key
+    auto doc = BSON("key3" << "abc" << "key" << 100 << "_id" << "hello" << "key2" << true);
+
+    // Verify the shard key is extracted, in correct order, followed by the "_id" field.
+    auto deleteState = CollectionShardingState::DeleteState(operationContext(), css, doc);
+    ASSERT_BSONOBJ_EQ(
+        deleteState.documentKey, BSON("key" << 100 << "key3" << "abc" << "_id" << "hello"));
+    ASSERT_FALSE(deleteState.isMigrating);
+}
+
+TEST_F(CollShardingStateTest, MakeDeleteStateShardedWithIdInShardKey) {
+    AutoGetCollection autoColl(operationContext(), testNss, MODE_IX);
+    auto* css = CollectionShardingState::get(operationContext(), testNss);
+
+    // Push a CollectionMetadata with a shard key that does have "_id" in the middle...
+    css->refreshMetadata(
+        operationContext(), makeAMetadata(BSON("key" << 1 << "_id" << 1 << "key2" << 1)));
+
+    // The order of fields in `doc` deliberately does not match the shard key
+    auto doc = BSON("key2" << true << "key3" << "abc" << "_id" << "hello" << "key" << 100);
+
+    // Verify the shard key is extracted with "_id" in the right place.
+    auto deleteState = CollectionShardingState::DeleteState(operationContext(), css, doc);
+    ASSERT_BSONOBJ_EQ(
+        deleteState.documentKey, BSON("key" << 100 << "_id" << "hello" << "key2" << true));
+    ASSERT_FALSE(deleteState.isMigrating);
+}
+
+TEST_F(CollShardingStateTest, MakeDeleteStateShardedWithIdHashInShardKey) {
+    AutoGetCollection autoColl(operationContext(), testNss, MODE_IX);
+    auto* css = CollectionShardingState::get(operationContext(), testNss);
+
+    // Push a CollectionMetadata with a shard key "_id", hashed.
+    auto aMetadata = makeAMetadata(BSON("_id" << "hashed"));
+    css->refreshMetadata(operationContext(), std::move(aMetadata));
+
+    auto doc = BSON("key2" << true << "_id" << "hello" << "key" << 100);
+
+    // Verify the shard key is extracted with "_id" in the right place, not hashed.
+    auto deleteState = CollectionShardingState::DeleteState(operationContext(), css, doc);
+    ASSERT_BSONOBJ_EQ(
+        deleteState.documentKey, BSON("_id" << "hello"));
+    ASSERT_FALSE(deleteState.isMigrating);
+}
 }  // unnamed namespace
 }  // namespace mongo
