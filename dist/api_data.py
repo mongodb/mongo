@@ -560,6 +560,7 @@ connection_runtime_config = [
             'split',
             'temporary',
             'thread_group',
+            'timestamp',
             'transaction',
             'verify',
             'version',
