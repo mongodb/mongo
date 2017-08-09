@@ -30,6 +30,7 @@
 
 #include "mongo/db/client.h"
 #include "mongo/db/commands.h"
+#include "mongo/db/logical_session_id.h"
 #include "mongo/db/operation_context.h"
 #include "mongo/db/ops/write_ops.h"
 #include "mongo/db/server_options.h"
@@ -104,6 +105,7 @@ public:
         result.appendNumber("maxMessageSizeBytes", MaxMessageSizeBytes);
         result.appendNumber("maxWriteBatchSize", write_ops::kMaxWriteBatchSize);
         result.appendDate("localTime", jsTime());
+        result.append("logicalSessionTimeoutMinutes", localLogicalSessionTimeoutMinutes);
 
         // Mongos tries to keep exactly the same version range of the server for which
         // it is compiled.

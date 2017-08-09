@@ -40,6 +40,7 @@
 #include "mongo/db/exec/working_set_common.h"
 #include "mongo/db/jsobj.h"
 #include "mongo/db/lasterror.h"
+#include "mongo/db/logical_session_id.h"
 #include "mongo/db/namespace_string.h"
 #include "mongo/db/ops/write_ops.h"
 #include "mongo/db/query/internal_plans.h"
@@ -356,6 +357,7 @@ public:
         result.appendNumber("maxWriteBatchSize", write_ops::kMaxWriteBatchSize);
         result.appendDate("localTime", jsTime());
         result.append("maxWireVersion", WireSpec::instance().incoming.maxWireVersion);
+        result.append("logicalSessionTimeoutMinutes", localLogicalSessionTimeoutMinutes);
 
         // If the featureCompatibilityVersion is 3.6, respond with minWireVersion=maxWireVersion.
         // Then if the connection is from a mongod/mongos of an earlier version, it will fail to
