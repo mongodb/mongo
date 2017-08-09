@@ -644,8 +644,14 @@ boost::optional<RecordId> EphemeralForTestRecordStore::oplogStartHack(
         return RecordId();
 
     Records::const_iterator it = records.lower_bound(startingPosition);
-    if (it == records.end() || it->first > startingPosition)
+    if (it == records.end() || it->first > startingPosition) {
+        // If the startingPosition is before the oldest oplog entry, this ensures that we return
+        // RecordId() as specified in record_store.h.
+        if (it == records.begin()) {
+            return RecordId();
+        }
         --it;
+    }
 
     return it->first;
 }
