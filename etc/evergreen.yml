@@ -86,7 +86,7 @@ variables:
 
       # This script converts the generated version string into a sanitized version string for
       # use by scons and uploading artifacts as well as information about for the scons cache.
-      echo $MONGO_VERSION | SCONS_CACHE_MODE=${scons_cache_mode|nolinked} USE_SCONS_CACHE=${use_scons_cache|false} ${python|/opt/mongodbtoolchain/v2/bin/python2} buildscripts/generate_compile_expansions.py | tee compile_expansions.yml
+      MONGO_VERSION=$MONGO_VERSION SCONS_CACHE_MODE=${scons_cache_mode|nolinked} USE_SCONS_CACHE=${use_scons_cache|false} ${python|/opt/mongodbtoolchain/v2/bin/python2} buildscripts/generate_compile_expansions.py --out compile_expansions.yml
 
 - &apply_compile_expansions
   command: expansions.update
