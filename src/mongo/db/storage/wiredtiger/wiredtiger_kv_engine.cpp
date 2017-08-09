@@ -345,7 +345,7 @@ WiredTigerKVEngine::WiredTigerKVEngine(const std::string& canonicalName,
     ss << "eviction=(threads_min=4,threads_max=4),";
     ss << "config_base=false,";
     ss << "statistics=(fast),";
-    ss << "compatibility=(release=\"2.9\"),";
+
     // The setting may have a later setting override it if not using the journal.  We make it
     // unconditional here because even nojournal may need this setting if it is a transition
     // from using the journal.
@@ -491,25 +491,37 @@ void WiredTigerKVEngine::cleanShutdown() {
         }
 
         const bool keepOldBehavior = true;
-        const bool needsDowngrade = !keepOldBehavior && !_readOnly &&
+        const bool needsDowngrade = !_readOnly &&
             serverGlobalParams.featureCompatibility.version.load() ==
                 ServerGlobalParams::FeatureCompatibility::Version::k34;
+        if (keepOldBehavior && needsDowngrade) {
+            // When Recover to a timestamp is turned on (SERVER-30349), this block can go
+            // away. The 3.4 downgrade block below that restarts WT will run the following
+            // `reconfigure` at the very end after reverting all table logging.
+            log() << "Downgrading WiredTiger to 2.9";
+            invariantWTOK(_conn->reconfigure(_conn, "compatibility=(release=2.9)"));
+        }
 
         invariantWTOK(_conn->close(_conn, closeConfig));
         _conn = nullptr;
 
         // If FCV 3.4, enable WT logging on all tables.
-        if (needsDowngrade) {
+        if (!keepOldBehavior && needsDowngrade) {
+            // Steps for downgrading:
+            //
+            // 1) Close and reopen WiredTiger. This clears out any leftover cursors that get in
+            //    the way of performing the downgrade.
+            //
+            // 2) Enable WiredTiger logging on all tables.
+            //
+            // 3) Reconfigure the WiredTiger to release compatibility 2.9. The WiredTiger version
+            //    shipped with MongoDB 3.4 will always refuse to start up without this reconfigure
+            //    being successful. Doing this last prevents MongoDB running in 3.4 with only some
+            //    underlying tables being logged.
             log() << "Downgrading files to FCV 3.4";
             WT_CONNECTION* conn;
             std::stringstream openConfig;
             openConfig << _wtOpenConfig << ",log=(archive=false)";
-
-            const bool NEW_WT_DROPPED = false;
-            if (NEW_WT_DROPPED) {
-                openConfig << ",compatibility=(release=2.9)";
-            }
-
             invariantWTOK(
                 wiredtiger_open(_path.c_str(), &_eventHandler, openConfig.str().c_str(), &conn));
 
@@ -538,6 +550,7 @@ void WiredTigerKVEngine::cleanShutdown() {
 
             tableCursor->close(tableCursor);
             session->close(session, nullptr);
+            invariantWTOK(conn->reconfigure(conn, "compatibility=(release=2.9)"));
             invariantWTOK(conn->close(conn, closeConfig));
         }
     }
