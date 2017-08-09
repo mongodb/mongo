@@ -101,8 +101,8 @@ void UpdateSequenceGenerator::_generatePaths(const UpdateSequenceGeneratorConfig
                                                          config.depth,
                                                          config.length,
                                                          config.scalarProbability,
-                                                         config.arrProbability,
-                                                         config.docProbability};
+                                                         config.docProbability,
+                                                         config.arrProbability};
         _generatePaths(remainingConfig, docPath);
     }
 }
