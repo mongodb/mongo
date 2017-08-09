@@ -58,23 +58,45 @@ static const char* const _ns = "unittests.validate_tests";
  */
 class ValidateBase {
 public:
-    explicit ValidateBase(bool full) : _ctx(&_opCtx, _ns), _client(&_opCtx), _full(full) {
+    explicit ValidateBase(bool full, bool background)
+        : _client(&_opCtx),
+          _full(full),
+          _background(background),
+          _nss(_ns),
+          _autoDb(nullptr),
+          _db(nullptr) {
         _client.createCollection(_ns);
+        {
+            AutoGetCollection autoGetCollection(&_opCtx, _nss, MODE_X);
+            _isInRecordIdOrder =
+                autoGetCollection.getCollection()->getRecordStore()->isInRecordIdOrder();
+        }
     }
+
     ~ValidateBase() {
         _client.dropCollection(_ns);
         getGlobalServiceContext()->unsetKillAllOperations();
-    }
-    Collection* collection() {
-        return _ctx.getCollection();
     }
 
 protected:
     bool checkValid() {
         ValidateResults results;
         BSONObjBuilder output;
-        ASSERT_OK(collection()->validate(
-            &_opCtx, _full ? kValidateFull : kValidateIndex, &results, &output));
+
+        lockDb(MODE_IX);
+        invariant(_opCtx.lockState()->isDbLockedForMode(_nss.db(), MODE_IX));
+        std::unique_ptr<Lock::CollectionLock> lock =
+            stdx::make_unique<Lock::CollectionLock>(_opCtx.lockState(), _nss.ns(), MODE_X);
+        invariant(_opCtx.lockState()->isCollectionLockedForMode(_nss.ns(), MODE_X));
+
+        Database* db = _autoDb.get()->getDb();
+        ASSERT_OK(db->getCollection(&_opCtx, _nss)
+                      ->validate(&_opCtx,
+                                 _full ? kValidateFull : kValidateIndex,
+                                 _background,
+                                 std::move(lock),
+                                 &results,
+                                 &output));
 
         //  Check if errors are reported if and only if valid is set to false.
         ASSERT_EQ(results.valid, results.errors.empty());
@@ -92,28 +114,52 @@ protected:
         return results.valid;
     }
 
+    void lockDb(LockMode mode) {
+        _autoDb.reset();
+        invariant(_opCtx.lockState()->isDbLockedForMode(_nss.db(), MODE_NONE));
+        _autoDb.reset(new AutoGetDb(&_opCtx, _nss.db().toString(), mode));
+        invariant(_opCtx.lockState()->isDbLockedForMode(_nss.db(), mode));
+        _db = _autoDb.get()->getDb();
+    }
+
+    void releaseDb() {
+        _autoDb.reset();
+        _db = nullptr;
+        invariant(_opCtx.lockState()->isDbLockedForMode(_nss.db(), MODE_NONE));
+    }
+
     const ServiceContext::UniqueOperationContext _txnPtr = cc().makeOperationContext();
     OperationContext& _opCtx = *_txnPtr;
-    OldClientWriteContext _ctx;
     DBDirectClient _client;
     bool _full;
+    bool _background;
+    const NamespaceString _nss;
+    unique_ptr<AutoGetDb> _autoDb;
+    Database* _db;
+    bool _isInRecordIdOrder;
 };
 
-template <bool full>
+template <bool full, bool background>
 class ValidateIdIndexCount : public ValidateBase {
 public:
-    ValidateIdIndexCount() : ValidateBase(full) {}
+    ValidateIdIndexCount() : ValidateBase(full, background) {}
 
     void run() {
+
+        // Can't do it in background is the RecordStore is not in RecordId order.
+        if (_background && !_isInRecordIdOrder) {
+            return;
+        }
+
         // Create a new collection, insert records {_id: 1} and {_id: 2} and check it's valid.
-        Database* db = _ctx.db();
+        lockDb(MODE_X);
         Collection* coll;
         RecordId id1;
         {
             OpDebug* const nullOpDebug = nullptr;
             WriteUnitOfWork wunit(&_opCtx);
-            ASSERT_OK(db->dropCollection(&_opCtx, _ns));
-            coll = db->createCollection(&_opCtx, _ns);
+            ASSERT_OK(_db->dropCollection(&_opCtx, _ns));
+            coll = _db->createCollection(&_opCtx, _ns);
 
             ASSERT_OK(coll->insertDocument(
                 &_opCtx, InsertStatement(BSON("_id" << 1)), nullOpDebug, true));
@@ -125,6 +171,7 @@ public:
 
         ASSERT_TRUE(checkValid());
 
+        lockDb(MODE_X);
         RecordStore* rs = coll->getRecordStore();
 
         // Remove {_id: 1} from the record store, so we get more _id entries than records.
@@ -135,6 +182,8 @@ public:
         }
 
         ASSERT_FALSE(checkValid());
+
+        lockDb(MODE_X);
 
         // Insert records {_id: 0} and {_id: 1} , so we get too few _id entries, and verify
         // validate fails.
@@ -149,23 +198,30 @@ public:
         }
 
         ASSERT_FALSE(checkValid());
+        releaseDb();
     }
 };
 
-template <bool full>
+template <bool full, bool background>
 class ValidateSecondaryIndexCount : public ValidateBase {
 public:
-    ValidateSecondaryIndexCount() : ValidateBase(full) {}
+    ValidateSecondaryIndexCount() : ValidateBase(full, background) {}
     void run() {
+
+        // Can't do it in background is the RecordStore is not in RecordId order.
+        if (_background && !_isInRecordIdOrder) {
+            return;
+        }
+
         // Create a new collection, insert two documents.
-        Database* db = _ctx.db();
+        lockDb(MODE_X);
         Collection* coll;
         RecordId id1;
         {
             OpDebug* const nullOpDebug = nullptr;
             WriteUnitOfWork wunit(&_opCtx);
-            ASSERT_OK(db->dropCollection(&_opCtx, _ns));
-            coll = db->createCollection(&_opCtx, _ns);
+            ASSERT_OK(_db->dropCollection(&_opCtx, _ns));
+            coll = _db->createCollection(&_opCtx, _ns);
             ASSERT_OK(coll->insertDocument(
                 &_opCtx, InsertStatement(BSON("_id" << 1 << "a" << 1)), nullOpDebug, true));
             id1 = coll->getCursor(&_opCtx)->next()->id;
@@ -190,6 +246,7 @@ public:
         ASSERT_OK(status);
         ASSERT_TRUE(checkValid());
 
+        lockDb(MODE_X);
         RecordStore* rs = coll->getRecordStore();
 
         // Remove a record, so we get more _id entries than records, and verify validate fails.
@@ -200,6 +257,8 @@ public:
         }
 
         ASSERT_FALSE(checkValid());
+
+        lockDb(MODE_X);
 
         // Insert two more records, so we get too few entries for a non-sparse index, and
         // verify validate fails.
@@ -214,22 +273,30 @@ public:
         }
 
         ASSERT_FALSE(checkValid());
+        releaseDb();
     }
 };
 
+template <bool full, bool background>
 class ValidateSecondaryIndex : public ValidateBase {
 public:
-    ValidateSecondaryIndex() : ValidateBase(true) {}
+    ValidateSecondaryIndex() : ValidateBase(full, background) {}
     void run() {
+
+        // Can't do it in background is the RecordStore is not in RecordId order.
+        if (_background && !_isInRecordIdOrder) {
+            return;
+        }
+
         // Create a new collection, insert three records.
-        Database* db = _ctx.db();
+        lockDb(MODE_X);
         OpDebug* const nullOpDebug = nullptr;
         Collection* coll;
         RecordId id1;
         {
             WriteUnitOfWork wunit(&_opCtx);
-            ASSERT_OK(db->dropCollection(&_opCtx, _ns));
-            coll = db->createCollection(&_opCtx, _ns);
+            ASSERT_OK(_db->dropCollection(&_opCtx, _ns));
+            coll = _db->createCollection(&_opCtx, _ns);
             ASSERT_OK(coll->insertDocument(
                 &_opCtx, InsertStatement(BSON("_id" << 1 << "a" << 1)), nullOpDebug, true));
             id1 = coll->getCursor(&_opCtx)->next()->id;
@@ -256,6 +323,7 @@ public:
         ASSERT_OK(status);
         ASSERT_TRUE(checkValid());
 
+        lockDb(MODE_X);
         RecordStore* rs = coll->getRecordStore();
 
         // Update {a: 1} to {a: 9} without updating the index, so we get inconsistent values
@@ -271,23 +339,31 @@ public:
         }
 
         ASSERT_FALSE(checkValid());
+        releaseDb();
     }
 };
 
+template <bool full, bool background>
 class ValidateIdIndex : public ValidateBase {
 public:
-    ValidateIdIndex() : ValidateBase(true) {}
+    ValidateIdIndex() : ValidateBase(full, background) {}
 
     void run() {
+
+        // Can't do it in background is the RecordStore is not in RecordId order.
+        if (_background && !_isInRecordIdOrder) {
+            return;
+        }
+
         // Create a new collection, insert records {_id: 1} and {_id: 2} and check it's valid.
-        Database* db = _ctx.db();
+        lockDb(MODE_X);
         OpDebug* const nullOpDebug = nullptr;
         Collection* coll;
         RecordId id1;
         {
             WriteUnitOfWork wunit(&_opCtx);
-            ASSERT_OK(db->dropCollection(&_opCtx, _ns));
-            coll = db->createCollection(&_opCtx, _ns);
+            ASSERT_OK(_db->dropCollection(&_opCtx, _ns));
+            coll = _db->createCollection(&_opCtx, _ns);
 
             ASSERT_OK(coll->insertDocument(
                 &_opCtx, InsertStatement(BSON("_id" << 1)), nullOpDebug, true));
@@ -299,6 +375,7 @@ public:
 
         ASSERT_TRUE(checkValid());
 
+        lockDb(MODE_X);
         RecordStore* rs = coll->getRecordStore();
 
         // Update {_id: 1} to {_id: 9} without updating the index, so we get inconsistent values
@@ -314,6 +391,8 @@ public:
 
         ASSERT_FALSE(checkValid());
 
+        lockDb(MODE_X);
+
         // Revert {_id: 9} to {_id: 1} and verify that validate succeeds.
         {
             WriteUnitOfWork wunit(&_opCtx);
@@ -325,6 +404,8 @@ public:
         }
 
         ASSERT_TRUE(checkValid());
+
+        lockDb(MODE_X);
 
         // Remove the {_id: 1} document and insert a new document without an index entry, so there
         // will still be the same number of index entries and documents, but one document will not
@@ -340,16 +421,24 @@ public:
         }
 
         ASSERT_FALSE(checkValid());
+        releaseDb();
     }
 };
 
+template <bool full, bool background>
 class ValidateMultiKeyIndex : public ValidateBase {
 public:
-    ValidateMultiKeyIndex() : ValidateBase(true) {}
+    ValidateMultiKeyIndex() : ValidateBase(full, background) {}
 
     void run() {
+
+        // Can't do it in background is the RecordStore is not in RecordId order.
+        if (_background && !_isInRecordIdOrder) {
+            return;
+        }
+
         // Create a new collection, insert three records and check it's valid.
-        Database* db = _ctx.db();
+        lockDb(MODE_X);
         OpDebug* const nullOpDebug = nullptr;
         Collection* coll;
         RecordId id1;
@@ -364,8 +453,8 @@ public:
         auto doc3 = BSON("_id" << 3 << "a" << BSON_ARRAY(BSON("c" << 1)));
         {
             WriteUnitOfWork wunit(&_opCtx);
-            ASSERT_OK(db->dropCollection(&_opCtx, _ns));
-            coll = db->createCollection(&_opCtx, _ns);
+            ASSERT_OK(_db->dropCollection(&_opCtx, _ns));
+            coll = _db->createCollection(&_opCtx, _ns);
 
 
             ASSERT_OK(coll->insertDocument(&_opCtx, InsertStatement(doc1), nullOpDebug, true));
@@ -376,6 +465,8 @@ public:
         }
 
         ASSERT_TRUE(checkValid());
+
+        lockDb(MODE_X);
 
         // Create multi-key index.
         auto status = dbtests::createIndexFromSpec(&_opCtx,
@@ -394,6 +485,7 @@ public:
         ASSERT_OK(status);
         ASSERT_TRUE(checkValid());
 
+        lockDb(MODE_X);
         RecordStore* rs = coll->getRecordStore();
 
         // Update a document's indexed field without updating the index.
@@ -407,6 +499,8 @@ public:
 
         ASSERT_FALSE(checkValid());
 
+        lockDb(MODE_X);
+
         // Update a document's non-indexed field without updating the index.
         // Index validation should still be valid.
         {
@@ -418,23 +512,31 @@ public:
         }
 
         ASSERT_TRUE(checkValid());
+        releaseDb();
     }
 };
 
+template <bool full, bool background>
 class ValidateSparseIndex : public ValidateBase {
 public:
-    ValidateSparseIndex() : ValidateBase(true) {}
+    ValidateSparseIndex() : ValidateBase(full, background) {}
 
     void run() {
+
+        // Can't do it in background is the RecordStore is not in RecordId order.
+        if (_background && !_isInRecordIdOrder) {
+            return;
+        }
+
         // Create a new collection, insert three records and check it's valid.
-        Database* db = _ctx.db();
+        lockDb(MODE_X);
         OpDebug* const nullOpDebug = nullptr;
         Collection* coll;
         RecordId id1;
         {
             WriteUnitOfWork wunit(&_opCtx);
-            ASSERT_OK(db->dropCollection(&_opCtx, _ns));
-            coll = db->createCollection(&_opCtx, _ns);
+            ASSERT_OK(_db->dropCollection(&_opCtx, _ns));
+            coll = _db->createCollection(&_opCtx, _ns);
 
             ASSERT_OK(coll->insertDocument(
                 &_opCtx, InsertStatement(BSON("_id" << 1 << "a" << 1)), nullOpDebug, true));
@@ -465,6 +567,7 @@ public:
         ASSERT_OK(status);
         ASSERT_TRUE(checkValid());
 
+        lockDb(MODE_X);
         RecordStore* rs = coll->getRecordStore();
 
         // Update a document's indexed field without updating the index.
@@ -478,23 +581,31 @@ public:
         }
 
         ASSERT_FALSE(checkValid());
+        releaseDb();
     }
 };
 
+template <bool full, bool background>
 class ValidatePartialIndex : public ValidateBase {
 public:
-    ValidatePartialIndex() : ValidateBase(true) {}
+    ValidatePartialIndex() : ValidateBase(full, background) {}
 
     void run() {
+
+        // Can't do it in background is the RecordStore is not in RecordId order.
+        if (_background && !_isInRecordIdOrder) {
+            return;
+        }
+
         // Create a new collection, insert three records and check it's valid.
-        Database* db = _ctx.db();
+        lockDb(MODE_X);
         OpDebug* const nullOpDebug = nullptr;
         Collection* coll;
         RecordId id1;
         {
             WriteUnitOfWork wunit(&_opCtx);
-            ASSERT_OK(db->dropCollection(&_opCtx, _ns));
-            coll = db->createCollection(&_opCtx, _ns);
+            ASSERT_OK(_db->dropCollection(&_opCtx, _ns));
+            coll = _db->createCollection(&_opCtx, _ns);
 
             ASSERT_OK(coll->insertDocument(
                 &_opCtx, InsertStatement(BSON("_id" << 1 << "a" << 1)), nullOpDebug, true));
@@ -530,6 +641,7 @@ public:
         ASSERT_OK(status);
         ASSERT_TRUE(checkValid());
 
+        lockDb(MODE_X);
         RecordStore* rs = coll->getRecordStore();
 
         // Update an unindexed document without updating the index.
@@ -543,24 +655,32 @@ public:
         }
 
         ASSERT_TRUE(checkValid());
+        releaseDb();
     }
 };
 
+template <bool full, bool background>
 class ValidatePartialIndexOnCollectionWithNonIndexableFields : public ValidateBase {
 public:
-    ValidatePartialIndexOnCollectionWithNonIndexableFields() : ValidateBase(true) {}
+    ValidatePartialIndexOnCollectionWithNonIndexableFields() : ValidateBase(full, background) {}
 
     void run() {
+
+        // Can't do it in background is the RecordStore is not in RecordId order.
+        if (_background && !_isInRecordIdOrder) {
+            return;
+        }
+
         // Create a new collection and insert a record that has a non-indexable value on the indexed
         // field.
-        Database* db = _ctx.db();
+        lockDb(MODE_X);
         OpDebug* const nullOpDebug = nullptr;
         Collection* coll;
         RecordId id1;
         {
             WriteUnitOfWork wunit(&_opCtx);
-            ASSERT_OK(db->dropCollection(&_opCtx, _ns));
-            coll = db->createCollection(&_opCtx, _ns);
+            ASSERT_OK(_db->dropCollection(&_opCtx, _ns));
+            coll = _db->createCollection(&_opCtx, _ns);
             ASSERT_OK(
                 coll->insertDocument(&_opCtx,
                                      InsertStatement(BSON("_id" << 1 << "x" << 1 << "a" << 2)),
@@ -606,23 +726,31 @@ public:
                                                         << BSON("a" << BSON("$eq" << 1))));
         ASSERT_OK(status);
         ASSERT_TRUE(checkValid());
+        releaseDb();
     }
 };
 
+template <bool full, bool background>
 class ValidateCompoundIndex : public ValidateBase {
 public:
-    ValidateCompoundIndex() : ValidateBase(true) {}
+    ValidateCompoundIndex() : ValidateBase(full, background) {}
 
     void run() {
+
+        // Can't do it in background is the RecordStore is not in RecordId order.
+        if (_background && !_isInRecordIdOrder) {
+            return;
+        }
+
         // Create a new collection, insert five records and check it's valid.
-        Database* db = _ctx.db();
+        lockDb(MODE_X);
         OpDebug* const nullOpDebug = nullptr;
         Collection* coll;
         RecordId id1;
         {
             WriteUnitOfWork wunit(&_opCtx);
-            ASSERT_OK(db->dropCollection(&_opCtx, _ns));
-            coll = db->createCollection(&_opCtx, _ns);
+            ASSERT_OK(_db->dropCollection(&_opCtx, _ns));
+            coll = _db->createCollection(&_opCtx, _ns);
 
             ASSERT_OK(
                 coll->insertDocument(&_opCtx,
@@ -676,6 +804,7 @@ public:
         ASSERT_OK(status);
         ASSERT_TRUE(checkValid());
 
+        lockDb(MODE_X);
         RecordStore* rs = coll->getRecordStore();
 
         // Update a document's indexed field without updating the index.
@@ -689,23 +818,31 @@ public:
         }
 
         ASSERT_FALSE(checkValid());
+        releaseDb();
     }
 };
 
+template <bool full, bool background>
 class ValidateIndexEntry : public ValidateBase {
 public:
-    ValidateIndexEntry() : ValidateBase(true) {}
+    ValidateIndexEntry() : ValidateBase(full, background) {}
 
     void run() {
+
+        // Can't do it in background is the RecordStore is not in RecordId order.
+        if (_background && !_isInRecordIdOrder) {
+            return;
+        }
+
         // Create a new collection, insert three records and check it's valid.
-        Database* db = _ctx.db();
+        lockDb(MODE_X);
         OpDebug* const nullOpDebug = nullptr;
         Collection* coll;
         RecordId id1;
         {
             WriteUnitOfWork wunit(&_opCtx);
-            ASSERT_OK(db->dropCollection(&_opCtx, _ns));
-            coll = db->createCollection(&_opCtx, _ns);
+            ASSERT_OK(_db->dropCollection(&_opCtx, _ns));
+            coll = _db->createCollection(&_opCtx, _ns);
 
             ASSERT_OK(coll->insertDocument(
                 &_opCtx, InsertStatement(BSON("_id" << 1 << "a" << 1)), nullOpDebug, true));
@@ -728,6 +865,8 @@ public:
 
         ASSERT_OK(status);
         ASSERT_TRUE(checkValid());
+
+        lockDb(MODE_X);
 
         // Replace a correct index entry with a bad one and check it's invalid.
         IndexCatalog* indexCatalog = coll->getIndexCatalog();
@@ -754,23 +893,31 @@ public:
         }
 
         ASSERT_FALSE(checkValid());
+        releaseDb();
     }
 };
 
+template <bool full, bool background>
 class ValidateIndexOrdering : public ValidateBase {
 public:
-    ValidateIndexOrdering() : ValidateBase(true) {}
+    ValidateIndexOrdering() : ValidateBase(full, background) {}
 
     void run() {
+
+        // Can't do it in background is the RecordStore is not in RecordId order.
+        if (_background && !_isInRecordIdOrder) {
+            return;
+        }
+
         // Create a new collection, insert three records and check it's valid.
-        Database* db = _ctx.db();
+        lockDb(MODE_X);
         OpDebug* const nullOpDebug = nullptr;
         Collection* coll;
         RecordId id1;
         {
             WriteUnitOfWork wunit(&_opCtx);
-            ASSERT_OK(db->dropCollection(&_opCtx, _ns));
-            coll = db->createCollection(&_opCtx, _ns);
+            ASSERT_OK(_db->dropCollection(&_opCtx, _ns));
+            coll = _db->createCollection(&_opCtx, _ns);
 
             ASSERT_OK(coll->insertDocument(
                 &_opCtx, InsertStatement(BSON("_id" << 1 << "a" << 1)), nullOpDebug, true));
@@ -794,6 +941,8 @@ public:
         ASSERT_OK(status);
         ASSERT_TRUE(checkValid());
 
+        lockDb(MODE_X);
+
         // Change the IndexDescriptor's keyPattern to descending so the index ordering
         // appears wrong.
         IndexCatalog* indexCatalog = coll->getIndexCatalog();
@@ -801,6 +950,7 @@ public:
         descriptor->setKeyPatternForTest(BSON("a" << -1));
 
         ASSERT_FALSE(checkValid());
+        releaseDb();
     }
 };
 
@@ -810,23 +960,34 @@ public:
 
     void setupTests() {
         // Add tests for both full validate and non-full validate.
-        add<ValidateIdIndexCount<true>>();
-        add<ValidateIdIndexCount<false>>();
-        add<ValidateSecondaryIndexCount<true>>();
-        add<ValidateSecondaryIndexCount<false>>();
+        add<ValidateIdIndexCount<true, false>>();
+        add<ValidateIdIndexCount<false, false>>();
+        add<ValidateIdIndexCount<false, true>>();
+        add<ValidateSecondaryIndexCount<true, false>>();
+        add<ValidateSecondaryIndexCount<false, false>>();
+        add<ValidateSecondaryIndexCount<false, true>>();
 
-        // These tests are only needed for full validate.
-        add<ValidateIdIndex>();
-        add<ValidateSecondaryIndex>();
-        add<ValidateMultiKeyIndex>();
-        add<ValidateSparseIndex>();
-        add<ValidateCompoundIndex>();
-        add<ValidatePartialIndex>();
-        add<ValidatePartialIndexOnCollectionWithNonIndexableFields>();
+        // These tests are only needed for non-full validate.
+        add<ValidateIdIndex<false, false>>();
+        add<ValidateIdIndex<false, true>>();
+        add<ValidateSecondaryIndex<false, false>>();
+        add<ValidateSecondaryIndex<false, true>>();
+        add<ValidateMultiKeyIndex<false, false>>();
+        add<ValidateMultiKeyIndex<false, true>>();
+        add<ValidateSparseIndex<false, false>>();
+        add<ValidateSparseIndex<false, true>>();
+        add<ValidateCompoundIndex<false, false>>();
+        add<ValidateCompoundIndex<false, true>>();
+        add<ValidatePartialIndex<false, false>>();
+        add<ValidatePartialIndex<false, true>>();
+        add<ValidatePartialIndexOnCollectionWithNonIndexableFields<false, false>>();
+        add<ValidatePartialIndexOnCollectionWithNonIndexableFields<false, true>>();
 
         // Tests for index validation.
-        add<ValidateIndexEntry>();
-        add<ValidateIndexOrdering>();
+        add<ValidateIndexEntry<false, false>>();
+        add<ValidateIndexEntry<false, true>>();
+        add<ValidateIndexOrdering<false, false>>();
+        add<ValidateIndexOrdering<false, true>>();
     }
 } validateTests;
 }  // namespace ValidateTests

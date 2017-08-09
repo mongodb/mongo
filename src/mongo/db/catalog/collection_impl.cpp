@@ -44,6 +44,7 @@
 #include "mongo/db/catalog/collection_catalog_entry.h"
 #include "mongo/db/catalog/database_catalog_entry.h"
 #include "mongo/db/catalog/document_validation.h"
+#include "mongo/db/catalog/index_consistency.h"
 #include "mongo/db/catalog/index_create.h"
 #include "mongo/db/catalog/namespace_uuid_cache.h"
 #include "mongo/db/catalog/uuid_catalog.h"
@@ -1157,6 +1158,8 @@ void _reportValidationResults(OperationContext* opCtx,
 
 Status CollectionImpl::validate(OperationContext* opCtx,
                                 ValidateCmdLevel level,
+                                bool background,
+                                std::unique_ptr<Lock::CollectionLock> collLk,
                                 ValidateResults* results,
                                 BSONObjBuilder* output) {
     dassert(opCtx->lockState()->isCollectionLockedForMode(ns().toString(), MODE_IS));
@@ -1164,14 +1167,16 @@ Status CollectionImpl::validate(OperationContext* opCtx,
     try {
         ValidateResultsMap indexNsResultsMap;
         BSONObjBuilder keysPerIndex;  // not using subObjStart to be exception safe
-        RecordStoreValidateAdaptor indexValidator =
-            RecordStoreValidateAdaptor(opCtx, level, &_indexCatalog, &indexNsResultsMap);
+        IndexConsistency indexConsistency(
+            opCtx, _this, ns(), _recordStore, std::move(collLk), background);
+        RecordStoreValidateAdaptor indexValidator = RecordStoreValidateAdaptor(
+            opCtx, &indexConsistency, level, &_indexCatalog, &indexNsResultsMap);
 
 
         // Validate the record store
         log(LogComponent::kIndex) << "validating collection " << ns().toString() << endl;
         _validateRecordStore(
-            opCtx, _recordStore, level, /*somgarg*/ false, &indexValidator, results, output);
+            opCtx, _recordStore, level, background, &indexValidator, results, output);
 
         // Validate indexes and check for mismatches.
         if (results->valid) {
@@ -1183,11 +1188,7 @@ Status CollectionImpl::validate(OperationContext* opCtx,
                              &indexNsResultsMap,
                              results);
 
-            if (indexValidator.tooFewIndexEntries()) {
-                string msg = "one or more indexes contain invalid index entries.";
-                results->errors.push_back(msg);
-                results->valid = false;
-            } else if (indexValidator.tooManyIndexEntries()) {
+            if (indexConsistency.haveEntryMismatch()) {
                 _markIndexEntriesInvalid(&indexNsResultsMap, results);
             }
         }

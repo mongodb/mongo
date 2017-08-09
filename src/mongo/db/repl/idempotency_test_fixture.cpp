@@ -282,7 +282,10 @@ CollectionState IdempotencyTest::validate() {
     ValidateResults validateResults;
     BSONObjBuilder bob;
 
-    ASSERT_OK(collection->validate(_opCtx.get(), kValidateFull, &validateResults, &bob));
+    Lock::DBLock lk(_opCtx.get(), nss.db(), MODE_IX);
+    auto lock = stdx::make_unique<Lock::CollectionLock>(_opCtx->lockState(), nss.ns(), MODE_X);
+    ASSERT_OK(collection->validate(
+        _opCtx.get(), kValidateFull, false, std::move(lock), &validateResults, &bob));
     ASSERT_TRUE(validateResults.valid);
 
     IndexDescriptor* desc = collection->getIndexCatalog()->findIdIndex(_opCtx.get());

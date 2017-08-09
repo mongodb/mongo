@@ -40,6 +40,7 @@
 #include "mongo/db/catalog/collection_info_cache.h"
 #include "mongo/db/catalog/collection_options.h"
 #include "mongo/db/catalog/index_catalog.h"
+#include "mongo/db/concurrency/d_concurrency.h"
 #include "mongo/db/cursor_manager.h"
 #include "mongo/db/exec/collection_scan_common.h"
 #include "mongo/db/logical_session_id.h"
@@ -294,6 +295,8 @@ public:
 
         virtual Status validate(OperationContext* opCtx,
                                 ValidateCmdLevel level,
+                                bool background,
+                                std::unique_ptr<Lock::CollectionLock> collLk,
                                 ValidateResults* results,
                                 BSONObjBuilder* output) = 0;
 
@@ -587,9 +590,11 @@ public:
      */
     inline Status validate(OperationContext* const opCtx,
                            const ValidateCmdLevel level,
+                           bool background,
+                           std::unique_ptr<Lock::CollectionLock> collLk,
                            ValidateResults* const results,
                            BSONObjBuilder* const output) {
-        return this->_impl().validate(opCtx, level, results, output);
+        return this->_impl().validate(opCtx, level, background, std::move(collLk), results, output);
     }
 
     /**

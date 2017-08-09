@@ -32,10 +32,9 @@
 
 #include "mongo/db/catalog/private/record_store_validate_adaptor.h"
 
-#include <third_party/murmurhash3/MurmurHash3.h>
-
 #include "mongo/bson/bsonobj.h"
 #include "mongo/db/catalog/index_catalog.h"
+#include "mongo/db/catalog/index_consistency.h"
 #include "mongo/db/index/index_access_method.h"
 #include "mongo/db/index/index_descriptor.h"
 #include "mongo/db/operation_context.h"
@@ -45,14 +44,6 @@
 #include "mongo/util/log.h"
 
 namespace mongo {
-
-namespace {
-uint32_t hashIndexEntry(KeyString& ks, uint32_t hash) {
-    MurmurHash3_x86_32(ks.getTypeBits().getBuffer(), ks.getTypeBits().getSize(), hash, &hash);
-    MurmurHash3_x86_32(ks.getBuffer(), ks.getSize(), hash, &hash);
-    return hash % kKeyCountTableSize;
-}
-}
 
 Status RecordStoreValidateAdaptor::validate(const RecordId& recordId,
                                             const RecordData& record,
@@ -76,6 +67,7 @@ Status RecordStoreValidateAdaptor::validate(const RecordId& recordId,
     while (i.more()) {
         const IndexDescriptor* descriptor = i.next();
         const std::string indexNs = descriptor->indexNamespace();
+        int indexNumber = _indexConsistency->getIndexNumber(indexNs);
         ValidateResults curRecordResults;
 
         const IndexAccessMethod* iam = _indexCatalog->getIndex(descriptor);
@@ -105,26 +97,19 @@ Status RecordStoreValidateAdaptor::validate(const RecordId& recordId,
             curRecordResults.valid = false;
         }
 
-        uint32_t indexNsHash;
         const auto& pattern = descriptor->keyPattern();
         const Ordering ord = Ordering::make(pattern);
-        MurmurHash3_x86_32(indexNs.c_str(), indexNs.size(), 0, &indexNsHash);
 
         for (const auto& key : documentKeySet) {
-            if (key.objsize() >= IndexKeyMaxSize) {
+            if (key.objsize() >= static_cast<int64_t>(KeyString::TypeBits::kMaxKeyBytes)) {
                 // Index keys >= 1024 bytes are not indexed.
-                _longKeys[indexNs]++;
+                _indexConsistency->addLongIndexKey(indexNumber);
                 continue;
             }
 
             // We want to use the latest version of KeyString here.
             KeyString ks(KeyString::kLatestVersion, key, ord, recordId);
-            uint32_t indexEntryHash = hashIndexEntry(ks, indexNsHash);
-
-            if ((*_ikc)[indexEntryHash] == 0) {
-                _indexKeyCountTableNumEntries++;
-            }
-            (*_ikc)[indexEntryHash]++;
+            _indexConsistency->addDocKey(ks, indexNumber);
         }
         (*_indexNsResultsMap)[indexNs] = curRecordResults;
     }
@@ -136,10 +121,8 @@ void RecordStoreValidateAdaptor::traverseIndex(const IndexAccessMethod* iam,
                                                ValidateResults* results,
                                                int64_t* numTraversedKeys) {
     auto indexNs = descriptor->indexNamespace();
+    int indexNumber = _indexConsistency->getIndexNumber(indexNs);
     int64_t numKeys = 0;
-
-    uint32_t indexNsHash;
-    MurmurHash3_x86_32(indexNs.c_str(), indexNs.size(), 0, &indexNsHash);
 
     const auto& key = descriptor->keyPattern();
     const Ordering ord = Ordering::make(key);
@@ -164,26 +147,13 @@ void RecordStoreValidateAdaptor::traverseIndex(const IndexAccessMethod* iam,
             results->valid = false;
         }
 
-        // Cache the index keys to cross-validate with documents later.
-        uint32_t keyHash = hashIndexEntry(*indexKeyString, indexNsHash);
-        uint64_t& indexEntryCount = (*_ikc)[keyHash];
-        if (indexEntryCount != 0) {
-            indexEntryCount--;
-            dassert(indexEntryCount >= 0);
-            if (indexEntryCount == 0) {
-                _indexKeyCountTableNumEntries--;
-            }
-        } else {
-            _hasDocWithoutIndexEntry = true;
-            results->valid = false;
-        }
-        numKeys++;
+        _indexConsistency->addIndexKey(*indexKeyString, indexNumber);
 
+        numKeys++;
         isFirstEntry = false;
         prevIndexKeyString.swap(indexKeyString);
     }
 
-    _keyCounts[indexNs] = numKeys;
     *numTraversedKeys = numKeys;
 }
 
@@ -245,8 +215,9 @@ void RecordStoreValidateAdaptor::validateIndexKeyCount(IndexDescriptor* idx,
                                                        int64_t numRecs,
                                                        ValidateResults& results) {
     const std::string indexNs = idx->indexNamespace();
-    int64_t numIndexedKeys = _keyCounts[indexNs];
-    int64_t numLongKeys = _longKeys[indexNs];
+    int indexNumber = _indexConsistency->getIndexNumber(indexNs);
+    int64_t numIndexedKeys = _indexConsistency->getNumKeys(indexNumber);
+    int64_t numLongKeys = _indexConsistency->getNumLongKeys(indexNumber);
     auto totalKeys = numLongKeys + numIndexedKeys;
 
     bool hasTooFewKeys = false;

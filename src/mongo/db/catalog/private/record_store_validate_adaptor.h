@@ -36,10 +36,10 @@
 
 namespace mongo {
 
-namespace {
-const uint32_t kKeyCountTableSize = 1U << 22;
+class IndexConsistency;
 
-using IndexKeyCountTable = std::array<uint64_t, kKeyCountTableSize>;
+namespace {
+
 using ValidateResultsMap = std::map<std::string, ValidateResults>;
 }
 
@@ -50,12 +50,13 @@ using ValidateResultsMap = std::map<std::string, ValidateResults>;
 class RecordStoreValidateAdaptor : public ValidateAdaptor {
 public:
     RecordStoreValidateAdaptor(OperationContext* opCtx,
+                               IndexConsistency* indexConsistency,
                                ValidateCmdLevel level,
                                IndexCatalog* ic,
                                ValidateResultsMap* irm)
 
-        : _ikc(stdx::make_unique<IndexKeyCountTable>()),
-          _opCtx(opCtx),
+        : _opCtx(opCtx),
+          _indexConsistency(indexConsistency),
           _level(level),
           _indexCatalog(ic),
           _indexNsResultsMap(irm) {}
@@ -89,33 +90,9 @@ public:
      */
     void validateIndexKeyCount(IndexDescriptor* idx, int64_t numRecs, ValidateResults& results);
 
-    /**
-     * Returns true if there are too many index entries, otherwise return false.
-     */
-    bool tooManyIndexEntries() const {
-        return _indexKeyCountTableNumEntries != 0;
-    }
-
-    /**
-     * Returns true if there are too few index entries, which happens when a document doesn't have
-     * and index entry, otherwise return false.
-     */
-    bool tooFewIndexEntries() const {
-        return _hasDocWithoutIndexEntry;
-    }
-
-
 private:
-    std::map<std::string, int64_t> _longKeys;
-    std::map<std::string, int64_t> _keyCounts;
-    std::unique_ptr<IndexKeyCountTable> _ikc;
-
-    uint32_t _indexKeyCountTableNumEntries = 0;
-    bool _hasDocWithoutIndexEntry = false;
-
-    const int IndexKeyMaxSize = 1024;  // this goes away with SERVER-3372
-
-    OperationContext* _opCtx;  // Not owned.
+    OperationContext* _opCtx;             // Not owned.
+    IndexConsistency* _indexConsistency;  // Not owned.
     ValidateCmdLevel _level;
     IndexCatalog* _indexCatalog;             // Not owned.
     ValidateResultsMap* _indexNsResultsMap;  // Not owned.

@@ -193,12 +193,13 @@ env.CppUnitTest(
     target='uuid_catalog_test',
     source=[
         'uuid_catalog_test.cpp',
-        ],
+    ],
     LIBDEPS=[
         'uuid_catalog',
+        '$BUILD_DIR/mongo/db/concurrency/lock_manager',
         '$BUILD_DIR/mongo/db/service_context',
-        ]
-    )
+    ],
+)
 
 env.Library(
     target='catalog',
@@ -210,6 +211,7 @@ env.Library(
         "database_holder_impl.cpp",
         "index_catalog_impl.cpp",
         "index_catalog_entry_impl.cpp",
+        "index_consistency.cpp",
         "index_create_impl.cpp",
         "private/record_store_validate_adaptor.cpp",
     ],
