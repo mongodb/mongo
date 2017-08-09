@@ -2,7 +2,7 @@
 // detail/impl/socket_ops.ipp
 // ~~~~~~~~~~~~~~~~~~~~~~~~~~
 //
-// Copyright (c) 2003-2016 Christopher M. Kohlhoff (chris at kohlhoff dot com)
+// Copyright (c) 2003-2017 Christopher M. Kohlhoff (chris at kohlhoff dot com)
 //
 // Distributed under the Boost Software License, Version 1.0. (See accompanying
 // file LICENSE_1_0.txt or copy at http://www.boost.org/LICENSE_1_0.txt)
@@ -241,8 +241,6 @@ bool non_blocking_accept(socket_type s,
     if (ec == asio::error::would_block
         || ec == asio::error::try_again)
     {
-      if (state & user_set_non_blocking)
-        return true;
       // Fall through to retry operation.
     }
     else if (ec == asio::error::connection_aborted)
@@ -3435,7 +3433,6 @@ asio::error_code getnameinfo(const socket_addr_type* addr,
   using namespace std; // For memcpy.
   sockaddr_storage_type tmp_addr;
   memcpy(&tmp_addr, addr, addrlen);
-  tmp_addr.ss_len = addrlen;
   addr = reinterpret_cast<socket_addr_type*>(&tmp_addr);
   clear_last_error();
   return getnameinfo_emulation(addr, addrlen,

@@ -2,7 +2,7 @@
 // detail/consuming_buffers.hpp
 // ~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 //
-// Copyright (c) 2003-2016 Christopher M. Kohlhoff (chris at kohlhoff dot com)
+// Copyright (c) 2003-2017 Christopher M. Kohlhoff (chris at kohlhoff dot com)
 //
 // Distributed under the Boost Software License, Version 1.0. (See accompanying
 // file LICENSE_1_0.txt or copy at http://www.boost.org/LICENSE_1_0.txt)
@@ -56,11 +56,12 @@ public:
   // Construct to represent the entire list of buffers.
   explicit consuming_buffers(const Buffers& buffers)
     : buffers_(buffers),
-      total_size_(asio::buffer_size(buffers)),
       total_consumed_(0),
       next_elem_(0),
       next_elem_offset_(0)
   {
+    using asio::buffer_size;
+    total_size_ = buffer_size(buffers);
   }
 
   // Determine if we are at the end of the buffers.

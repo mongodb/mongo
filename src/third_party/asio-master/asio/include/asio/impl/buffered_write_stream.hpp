@@ -2,7 +2,7 @@
 // impl/buffered_write_stream.hpp
 // ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 //
-// Copyright (c) 2003-2016 Christopher M. Kohlhoff (chris at kohlhoff dot com)
+// Copyright (c) 2003-2017 Christopher M. Kohlhoff (chris at kohlhoff dot com)
 //
 // Distributed under the Boost Software License, Version 1.0. (See accompanying
 // file LICENSE_1_0.txt or copy at http://www.boost.org/LICENSE_1_0.txt)
@@ -182,7 +182,8 @@ template <typename ConstBufferSequence>
 std::size_t buffered_write_stream<Stream>::write_some(
     const ConstBufferSequence& buffers)
 {
-  if (asio::buffer_size(buffers) == 0)
+  using asio::buffer_size;
+  if (buffer_size(buffers) == 0)
     return 0;
 
   if (storage_.size() == storage_.capacity())
@@ -198,7 +199,8 @@ std::size_t buffered_write_stream<Stream>::write_some(
 {
   ec = asio::error_code();
 
-  if (asio::buffer_size(buffers) == 0)
+  using asio::buffer_size;
+  if (buffer_size(buffers) == 0)
     return 0;
 
   if (storage_.size() == storage_.capacity() && !flush(ec))
@@ -246,9 +248,10 @@ namespace detail
       }
       else
       {
+        using asio::buffer_size;
         std::size_t orig_size = storage_.size();
         std::size_t space_avail = storage_.capacity() - orig_size;
-        std::size_t bytes_avail = asio::buffer_size(buffers_);
+        std::size_t bytes_avail = buffer_size(buffers_);
         std::size_t length = bytes_avail < space_avail
           ? bytes_avail : space_avail;
         storage_.resize(orig_size + length);
@@ -365,7 +368,8 @@ buffered_write_stream<Stream>::async_write_some(
   async_completion<WriteHandler,
     void (asio::error_code, std::size_t)> init(handler);
 
-  if (asio::buffer_size(buffers) == 0
+  using asio::buffer_size;
+  if (buffer_size(buffers) == 0
       || storage_.size() < storage_.capacity())
   {
     next_layer_.async_write_some(ASIO_CONST_BUFFER(0, 0),
@@ -390,9 +394,10 @@ template <typename ConstBufferSequence>
 std::size_t buffered_write_stream<Stream>::copy(
     const ConstBufferSequence& buffers)
 {
+  using asio::buffer_size;
   std::size_t orig_size = storage_.size();
   std::size_t space_avail = storage_.capacity() - orig_size;
-  std::size_t bytes_avail = asio::buffer_size(buffers);
+  std::size_t bytes_avail = buffer_size(buffers);
   std::size_t length = bytes_avail < space_avail ? bytes_avail : space_avail;
   storage_.resize(orig_size + length);
   return asio::buffer_copy(

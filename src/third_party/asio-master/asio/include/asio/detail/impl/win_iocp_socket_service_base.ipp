@@ -2,7 +2,7 @@
 // detail/impl/win_iocp_socket_service_base.ipp
 // ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 //
-// Copyright (c) 2003-2016 Christopher M. Kohlhoff (chris at kohlhoff dot com)
+// Copyright (c) 2003-2017 Christopher M. Kohlhoff (chris at kohlhoff dot com)
 //
 // Distributed under the Boost Software License, Version 1.0. (See accompanying
 // file LICENSE_1_0.txt or copy at http://www.boost.org/LICENSE_1_0.txt)
@@ -45,7 +45,6 @@ void win_iocp_socket_service_base::base_shutdown()
   base_implementation_type* impl = impl_list_;
   while (impl)
   {
-    asio::error_code ignored_ec;
     close_for_destruction(*impl);
     impl = impl->next_;
   }
@@ -178,9 +177,16 @@ asio::error_code win_iocp_socket_service_base::close(
             reinterpret_cast<void**>(&reactor_), 0, 0));
     if (r)
       r->deregister_descriptor(impl.socket_, impl.reactor_data_, true);
-  }
 
-  socket_ops::close(impl.socket_, impl.state_, false, ec);
+    socket_ops::close(impl.socket_, impl.state_, false, ec);
+
+    if (r)
+      r->cleanup_descriptor_data(impl.reactor_data_);
+  }
+  else
+  {
+    ec = asio::error_code();
+  }
 
   impl.socket_ = invalid_socket;
   impl.state_ = 0;
@@ -665,10 +671,14 @@ void win_iocp_socket_service_base::close_for_destruction(
             reinterpret_cast<void**>(&reactor_), 0, 0));
     if (r)
       r->deregister_descriptor(impl.socket_, impl.reactor_data_, true);
+
+    asio::error_code ignored_ec;
+    socket_ops::close(impl.socket_, impl.state_, true, ignored_ec);
+
+    if (r)
+      r->cleanup_descriptor_data(impl.reactor_data_);
   }
 
-  asio::error_code ignored_ec;
-  socket_ops::close(impl.socket_, impl.state_, true, ignored_ec);
   impl.socket_ = invalid_socket;
   impl.state_ = 0;
   impl.cancel_token_.reset();
@@ -744,7 +754,7 @@ win_iocp_socket_service_base::get_nt_set_info()
   void* ptr = interlocked_compare_exchange_pointer(&nt_set_info_, 0, 0);
   if (!ptr)
   {
-    if (HMODULE h = GetModuleHandleA("NTDLL.DLL"))
+    if (HMODULE h = ::GetModuleHandleA("NTDLL.DLL"))
       ptr = reinterpret_cast<void*>(GetProcAddress(h, "NtSetInformationFile"));
 
     // On failure, set nt_set_info_ to a special value to indicate that the

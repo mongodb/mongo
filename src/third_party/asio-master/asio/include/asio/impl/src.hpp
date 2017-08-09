@@ -2,7 +2,7 @@
 // impl/src.hpp
 // ~~~~~~~~~~~~
 //
-// Copyright (c) 2003-2016 Christopher M. Kohlhoff (chris at kohlhoff dot com)
+// Copyright (c) 2003-2017 Christopher M. Kohlhoff (chris at kohlhoff dot com)
 //
 // Distributed under the Boost Software License, Version 1.0. (See accompanying
 // file LICENSE_1_0.txt or copy at http://www.boost.org/LICENSE_1_0.txt)
@@ -26,7 +26,7 @@
 #include "asio/impl/handler_alloc_hook.ipp"
 #include "asio/impl/io_context.ipp"
 #include "asio/impl/serial_port_base.ipp"
-#include "asio/impl/system_executor.ipp"
+#include "asio/impl/system_context.ipp"
 #include "asio/impl/thread_pool.ipp"
 #include "asio/detail/impl/buffer_sequence_adapter.ipp"
 #include "asio/detail/impl/descriptor_ops.ipp"

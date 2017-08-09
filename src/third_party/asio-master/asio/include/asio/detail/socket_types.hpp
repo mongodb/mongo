@@ -2,7 +2,7 @@
 // detail/socket_types.hpp
 // ~~~~~~~~~~~~~~~~~~~~~~~
 //
-// Copyright (c) 2003-2016 Christopher M. Kohlhoff (chris at kohlhoff dot com)
+// Copyright (c) 2003-2017 Christopher M. Kohlhoff (chris at kohlhoff dot com)
 //
 // Distributed under the Boost Software License, Version 1.0. (See accompanying
 // file LICENSE_1_0.txt or copy at http://www.boost.org/LICENSE_1_0.txt)
@@ -57,7 +57,11 @@
 # include "asio/detail/old_win_sdk_compat.hpp"
 #else
 # include <sys/ioctl.h>
-# if !defined(__SYMBIAN32__)
+# if (defined(__MACH__) && defined(__APPLE__)) \
+   || defined(__FreeBSD__) || defined(__NetBSD__) \
+   || defined(__OpenBSD__) || defined(__linux__)
+#  include <poll.h>
+# elif !defined(__SYMBIAN32__)
 #  include <sys/poll.h>
 # endif
 # include <sys/types.h>
@@ -147,6 +151,7 @@ typedef int signed_size_type;
 # define ASIO_OS_DEF_SO_DONTROUTE 0x10
 # define ASIO_OS_DEF_SO_KEEPALIVE 0x8
 # define ASIO_OS_DEF_SO_LINGER 0x80
+# define ASIO_OS_DEF_SO_OOBINLINE 0x100
 # define ASIO_OS_DEF_SO_SNDBUF 0x1001
 # define ASIO_OS_DEF_SO_RCVBUF 0x1002
 # define ASIO_OS_DEF_SO_SNDLOWAT 0x1003
@@ -231,6 +236,7 @@ typedef int signed_size_type;
 # define ASIO_OS_DEF_SO_DONTROUTE SO_DONTROUTE
 # define ASIO_OS_DEF_SO_KEEPALIVE SO_KEEPALIVE
 # define ASIO_OS_DEF_SO_LINGER SO_LINGER
+# define ASIO_OS_DEF_SO_OOBINLINE SO_OOBINLINE
 # define ASIO_OS_DEF_SO_SNDBUF SO_SNDBUF
 # define ASIO_OS_DEF_SO_RCVBUF SO_RCVBUF
 # define ASIO_OS_DEF_SO_SNDLOWAT SO_SNDLOWAT
@@ -346,6 +352,7 @@ typedef int signed_size_type;
 # define ASIO_OS_DEF_SO_DONTROUTE SO_DONTROUTE
 # define ASIO_OS_DEF_SO_KEEPALIVE SO_KEEPALIVE
 # define ASIO_OS_DEF_SO_LINGER SO_LINGER
+# define ASIO_OS_DEF_SO_OOBINLINE SO_OOBINLINE
 # define ASIO_OS_DEF_SO_SNDBUF SO_SNDBUF
 # define ASIO_OS_DEF_SO_RCVBUF SO_RCVBUF
 # define ASIO_OS_DEF_SO_SNDLOWAT SO_SNDLOWAT

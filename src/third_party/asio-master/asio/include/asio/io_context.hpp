@@ -2,7 +2,7 @@
 // io_context.hpp
 // ~~~~~~~~~~~~~~
 //
-// Copyright (c) 2003-2016 Christopher M. Kohlhoff (chris at kohlhoff dot com)
+// Copyright (c) 2003-2017 Christopher M. Kohlhoff (chris at kohlhoff dot com)
 //
 // Distributed under the Boost Software License, Version 1.0. (See accompanying
 // file LICENSE_1_0.txt or copy at http://www.boost.org/LICENSE_1_0.txt)
@@ -64,12 +64,12 @@ namespace detail {
  *
  * @par Thread Safety
  * @e Distinct @e objects: Safe.@n
- * @e Shared @e objects: Safe, with the specific exceptions of the restart() and
- * notify_fork() functions. Calling restart() while there are unfinished run(),
- * run_one(), poll() or poll_one() calls results in undefined behaviour. The
- * notify_fork() function should not be called while any io_context function,
- * or any function on an I/O object that is associated with the io_context, is
- * being called in another thread.
+ * @e Shared @e objects: Safe, with the specific exceptions of the restart()
+ * and notify_fork() functions. Calling restart() while there are unfinished
+ * run(), run_one(), run_for(), run_until(), poll() or poll_one() calls results
+ * in undefined behaviour. The notify_fork() function should not be called
+ * while any io_context function, or any function on an I/O object that is
+ * associated with the io_context, is being called in another thread.
  *
  * @par Concepts:
  * Dispatcher.
@@ -78,25 +78,26 @@ namespace detail {
  *
  * Synchronous operations on I/O objects implicitly run the io_context object
  * for an individual operation. The io_context functions run(), run_one(),
- * poll() or poll_one() must be called for the io_context to perform
- * asynchronous operations on behalf of a C++ program. Notification that an
- * asynchronous operation has completed is delivered by invocation of the
- * associated handler. Handlers are invoked only by a thread that is currently
- * calling any overload of run(), run_one(), poll() or poll_one() for the
- * io_context.
+ * run_for(), run_until(), poll() or poll_one() must be called for the
+ * io_context to perform asynchronous operations on behalf of a C++ program.
+ * Notification that an asynchronous operation has completed is delivered by
+ * invocation of the associated handler. Handlers are invoked only by a thread
+ * that is currently calling any overload of run(), run_one(), run_for(),
+ * run_until(), poll() or poll_one() for the io_context.
  *
  * @par Effect of exceptions thrown from handlers
  *
  * If an exception is thrown from a handler, the exception is allowed to
  * propagate through the throwing thread's invocation of run(), run_one(),
- * poll() or poll_one(). No other threads that are calling any of these
- * functions are affected. It is then the responsibility of the application to
- * catch the exception.
+ * run_for(), run_until(), poll() or poll_one(). No other threads that are
+ * calling any of these functions are affected. It is then the responsibility
+ * of the application to catch the exception.
  *
- * After the exception has been caught, the run(), run_one(), poll() or
- * poll_one() call may be restarted @em without the need for an intervening
- * call to restart(). This allows the thread to rejoin the io_context object's
- * thread pool without impacting any other threads in the pool.
+ * After the exception has been caught, the run(), run_one(), run_for(),
+ * run_until(), poll() or poll_one() call may be restarted @em without the need
+ * for an intervening call to restart(). This allows the thread to rejoin the
+ * io_context object's thread pool without impacting any other threads in the
+ * pool.
  *
  * For example:
  *
@@ -238,9 +239,10 @@ public:
    *
    * @return The number of handlers that were executed.
    *
-   * @note The run() function must not be called from a thread that is currently
-   * calling one of run(), run_one(), poll() or poll_one() on the same
-   * io_context object.
+   * @note Calling the run() function from a thread that is currently calling
+   * one of run(), run_one(), run_for(), run_until(), poll() or poll_one() on
+   * the same io_context object may introduce the potential for deadlock. It is
+   * the caller's reponsibility to avoid this.
    *
    * The poll() function may also be used to dispatch ready handlers, but
    * without blocking.
@@ -268,9 +270,10 @@ public:
    *
    * @return The number of handlers that were executed.
    *
-   * @note The run() function must not be called from a thread that is currently
-   * calling one of run(), run_one(), poll() or poll_one() on the same
-   * io_context object.
+   * @note Calling the run() function from a thread that is currently calling
+   * one of run(), run_one(), run_for(), run_until(), poll() or poll_one() on
+   * the same io_context object may introduce the potential for deadlock. It is
+   * the caller's reponsibility to avoid this.
    *
    * The poll() function may also be used to dispatch ready handlers, but
    * without blocking.
@@ -318,6 +321,11 @@ public:
    * returns @c true). Subsequent calls to run(), run_one(), poll() or
    * poll_one() will return immediately unless there is a prior call to
    * restart().
+   *
+   * @note Calling the run_one() function from a thread that is currently
+   * calling one of run(), run_one(), run_for(), run_until(), poll() or
+   * poll_one() on the same io_context object may introduce the potential for
+   * deadlock. It is the caller's reponsibility to avoid this.
    */
   ASIO_DECL count_type run_one();
 
@@ -335,6 +343,11 @@ public:
    * restart().
    *
    * @return The number of handlers that were executed.
+   *
+   * @note Calling the run_one() function from a thread that is currently
+   * calling one of run(), run_one(), run_for(), run_until(), poll() or
+   * poll_one() on the same io_context object may introduce the potential for
+   * deadlock. It is the caller's reponsibility to avoid this.
    */
   ASIO_DECL count_type run_one(asio::error_code& ec);
 #endif // !defined(ASIO_NO_DEPRECATED)

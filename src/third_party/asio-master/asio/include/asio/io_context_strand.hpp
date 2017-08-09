@@ -2,7 +2,7 @@
 // io_context_strand.hpp
 // ~~~~~~~~~~~~~~~~~~~~~
 //
-// Copyright (c) 2003-2016 Christopher M. Kohlhoff (chris at kohlhoff dot com)
+// Copyright (c) 2003-2017 Christopher M. Kohlhoff (chris at kohlhoff dot com)
 //
 // Distributed under the Boost Software License, Version 1.0. (See accompanying
 // file LICENSE_1_0.txt or copy at http://www.boost.org/LICENSE_1_0.txt)
@@ -144,7 +144,7 @@ public:
 #endif // !defined(ASIO_NO_DEPRECATED)
 
   /// Obtain the underlying execution context.
-  asio::io_context& context() ASIO_NOEXCEPT
+  asio::io_context& context() const ASIO_NOEXCEPT
   {
     return service_.get_io_context();
   }
@@ -153,7 +153,7 @@ public:
   /**
    * The strand delegates this call to its underlying io_context.
    */
-  void on_work_started() ASIO_NOEXCEPT
+  void on_work_started() const ASIO_NOEXCEPT
   {
     context().get_executor().on_work_started();
   }
@@ -162,7 +162,7 @@ public:
   /**
    * The strand delegates this call to its underlying io_context.
    */
-  void on_work_finished() ASIO_NOEXCEPT
+  void on_work_finished() const ASIO_NOEXCEPT
   {
     context().get_executor().on_work_finished();
   }
@@ -183,7 +183,7 @@ public:
    * internal storage needed for function invocation.
    */
   template <typename Function, typename Allocator>
-  void dispatch(ASIO_MOVE_ARG(Function) f, const Allocator& a)
+  void dispatch(ASIO_MOVE_ARG(Function) f, const Allocator& a) const
   {
     typename decay<Function>::type tmp(ASIO_MOVE_CAST(Function)(f));
     service_.dispatch(impl_, tmp);
@@ -241,7 +241,7 @@ public:
    * internal storage needed for function invocation.
    */
   template <typename Function, typename Allocator>
-  void post(ASIO_MOVE_ARG(Function) f, const Allocator& a)
+  void post(ASIO_MOVE_ARG(Function) f, const Allocator& a) const
   {
     typename decay<Function>::type tmp(ASIO_MOVE_CAST(Function)(f));
     service_.post(impl_, tmp);
@@ -295,7 +295,7 @@ public:
    * internal storage needed for function invocation.
    */
   template <typename Function, typename Allocator>
-  void defer(ASIO_MOVE_ARG(Function) f, const Allocator& a)
+  void defer(ASIO_MOVE_ARG(Function) f, const Allocator& a) const
   {
     typename decay<Function>::type tmp(ASIO_MOVE_CAST(Function)(f));
     service_.post(impl_, tmp);
@@ -370,7 +370,7 @@ public:
 
 private:
   asio::detail::strand_service& service_;
-  asio::detail::strand_service::implementation_type impl_;
+  mutable asio::detail::strand_service::implementation_type impl_;
 };
 
 } // namespace asio

@@ -2,7 +2,7 @@
 // detail/impl/scheduler.ipp
 // ~~~~~~~~~~~~~~~~~~~~~~~~~
 //
-// Copyright (c) 2003-2016 Christopher M. Kohlhoff (chris at kohlhoff dot com)
+// Copyright (c) 2003-2017 Christopher M. Kohlhoff (chris at kohlhoff dot com)
 //
 // Distributed under the Boost Software License, Version 1.0. (See accompanying
 // file LICENSE_1_0.txt or copy at http://www.boost.org/LICENSE_1_0.txt)
@@ -89,7 +89,9 @@ scheduler::scheduler(
   : asio::detail::execution_context_service_base<scheduler>(ctx),
     one_thread_(concurrency_hint == 1
         || !ASIO_CONCURRENCY_HINT_IS_LOCKING(
-          SCHEDULER, concurrency_hint)),
+          SCHEDULER, concurrency_hint)
+        || !ASIO_CONCURRENCY_HINT_IS_LOCKING(
+          REACTOR_IO, concurrency_hint)),
     mutex_(ASIO_CONCURRENCY_HINT_IS_LOCKING(
           SCHEDULER, concurrency_hint)),
     task_(0),

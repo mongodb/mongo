@@ -1,28 +1,28 @@
 //
-// impl/system_executor.ipp
-// ~~~~~~~~~~~~~~~~~~~~
+// impl/system_context.ipp
+// ~~~~~~~~~~~~~~~~~~~~~~~
 //
-// Copyright (c) 2003-2016 Christopher M. Kohlhoff (chris at kohlhoff dot com)
+// Copyright (c) 2003-2017 Christopher M. Kohlhoff (chris at kohlhoff dot com)
 //
 // Distributed under the Boost Software License, Version 1.0. (See accompanying
 // file LICENSE_1_0.txt or copy at http://www.boost.org/LICENSE_1_0.txt)
 //
 
-#ifndef ASIO_IMPL_SYSTEM_EXECUTOR_IPP
-#define ASIO_IMPL_SYSTEM_EXECUTOR_IPP
+#ifndef ASIO_IMPL_SYSTEM_CONTEXT_IPP
+#define ASIO_IMPL_SYSTEM_CONTEXT_IPP
 
 #if defined(_MSC_VER) && (_MSC_VER >= 1200)
 # pragma once
 #endif // defined(_MSC_VER) && (_MSC_VER >= 1200)
 
 #include "asio/detail/config.hpp"
-#include "asio/system_executor.hpp"
+#include "asio/system_context.hpp"
 
 #include "asio/detail/push_options.hpp"
 
 namespace asio {
 
-struct system_executor::thread_function
+struct system_context::thread_function
 {
   detail::scheduler* scheduler_;
 
@@ -33,7 +33,7 @@ struct system_executor::thread_function
   }
 };
 
-system_executor::context_impl::context_impl()
+system_context::system_context()
   : scheduler_(use_service<detail::scheduler>(*this))
 {
   scheduler_.work_started();
@@ -43,10 +43,26 @@ system_executor::context_impl::context_impl()
   threads_.create_threads(f, num_threads ? num_threads : 2);
 }
 
-system_executor::context_impl::~context_impl()
+system_context::~system_context()
 {
   scheduler_.work_finished();
   scheduler_.stop();
+  threads_.join();
+}
+
+void system_context::stop()
+{
+  scheduler_.stop();
+}
+
+bool system_context::stopped() const ASIO_NOEXCEPT
+{
+  return scheduler_.stopped();
+}
+
+void system_context::join()
+{
+  scheduler_.work_finished();
   threads_.join();
 }
 
@@ -54,4 +70,4 @@ system_executor::context_impl::~context_impl()
 
 #include "asio/detail/pop_options.hpp"
 
-#endif // ASIO_IMPL_SYSTEM_EXECUTOR_IPP
+#endif // ASIO_IMPL_SYSTEM_CONTEXT_IPP

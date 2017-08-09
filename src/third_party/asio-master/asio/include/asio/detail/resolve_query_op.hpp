@@ -2,7 +2,7 @@
 // detail/resolve_query_op.hpp
 // ~~~~~~~~~~~~~~~~~~~~~~~~~~~
 //
-// Copyright (c) 2003-2016 Christopher M. Kohlhoff (chris at kohlhoff dot com)
+// Copyright (c) 2003-2017 Christopher M. Kohlhoff (chris at kohlhoff dot com)
 //
 // Distributed under the Boost Software License, Version 1.0. (See accompanying
 // file LICENSE_1_0.txt or copy at http://www.boost.org/LICENSE_1_0.txt)
@@ -67,7 +67,6 @@ public:
     // Take ownership of the operation object.
     resolve_query_op* o(static_cast<resolve_query_op*>(base));
     ptr p = { asio::detail::addressof(o->handler_), o, o };
-    handler_work<Handler> w(o->handler_);
 
     if (owner && owner != &o->io_context_impl_)
     {
@@ -87,6 +86,9 @@ public:
     {
       // The operation has been returned to the main io_context. The completion
       // handler is ready to be delivered.
+
+      // Take ownership of the operation's outstanding work.
+      handler_work<Handler> w(o->handler_);
 
       ASIO_HANDLER_COMPLETION((*o));
 

@@ -2,7 +2,7 @@
 // detail/impl/signal_set_service.ipp
 // ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 //
-// Copyright (c) 2003-2016 Christopher M. Kohlhoff (chris at kohlhoff dot com)
+// Copyright (c) 2003-2017 Christopher M. Kohlhoff (chris at kohlhoff dot com)
 //
 // Distributed under the Boost Software License, Version 1.0. (See accompanying
 // file LICENSE_1_0.txt or copy at http://www.boost.org/LICENSE_1_0.txt)
@@ -189,6 +189,7 @@ void signal_set_service::notify_fork(
       state->fork_prepared_ = true;
       lock.unlock();
       reactor_.deregister_internal_descriptor(read_descriptor, reactor_data_);
+      reactor_.cleanup_descriptor_data(reactor_data_);
     }
     break;
   case asio::io_context::fork_parent:
@@ -558,8 +559,9 @@ void signal_set_service::remove_service(signal_set_service* service)
     // Disable the pipe readiness notifications.
     int read_descriptor = state->read_descriptor_;
     lock.unlock();
-    service->reactor_.deregister_descriptor(
-        read_descriptor, service->reactor_data_, false);
+    service->reactor_.deregister_internal_descriptor(
+        read_descriptor, service->reactor_data_);
+    service->reactor_.cleanup_descriptor_data(service->reactor_data_);
     lock.lock();
 #endif // !defined(ASIO_WINDOWS)
        //   && !defined(ASIO_WINDOWS_RUNTIME)
