@@ -62,28 +62,6 @@ void toBatchError(const Status& status, BatchedCommandResponse* response) {
 }
 
 /**
- * Given a maxChunkSize configuration and the number of chunks in a particular sharded collection,
- * returns an optimal chunk size to use in order to achieve a good ratio between number of chunks
- * and their size.
- */
-uint64_t calculateDesiredChunkSize(uint64_t maxChunkSizeBytes, uint64_t numChunks) {
-    // Splitting faster in early chunks helps spread out an initial load better
-    const uint64_t minChunkSize = 1 << 20;  // 1 MBytes
-
-    if (numChunks <= 1) {
-        return 1024;
-    } else if (numChunks < 3) {
-        return minChunkSize / 2;
-    } else if (numChunks < 10) {
-        return std::max(maxChunkSizeBytes / 4, minChunkSize);
-    } else if (numChunks < 20) {
-        return std::max(maxChunkSizeBytes / 2, minChunkSize);
-    } else {
-        return maxChunkSizeBytes;
-    }
-}
-
-/**
  * Returns the split point that will result in one of the chunk having exactly one document. Also
  * returns an empty document if the split point cannot be determined.
  *
@@ -249,8 +227,7 @@ void updateChunkWriteStatsAndSplitIfNeeded(OperationContext* opCtx,
 
     const uint64_t chunkBytesWritten = chunk->addBytesWritten(dataWritten);
 
-    const uint64_t desiredChunkSize =
-        calculateDesiredChunkSize(balancerConfig->getMaxChunkSizeBytes(), manager->numChunks());
+    const uint64_t desiredChunkSize = balancerConfig->getMaxChunkSizeBytes();
 
     if (!chunk->shouldSplit(desiredChunkSize, minIsInf, maxIsInf)) {
         return;
