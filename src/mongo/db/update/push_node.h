@@ -28,27 +28,33 @@
 
 #pragma once
 
+#include <boost/optional.hpp>
+#include <limits>
+#include <vector>
+
 #include "mongo/db/update/path_creating_node.h"
+#include "mongo/db/update/push_sorter.h"
 #include "mongo/stdx/memory.h"
 
 namespace mongo {
 
-/**
- * Represents the application of $max or $min to the value at the end of a path.
- */
-class CompareNode : public PathCreatingNode {
+class PushNode final : public PathCreatingNode {
 public:
-    enum class CompareMode { kMax, kMin };
-
-    explicit CompareNode(CompareMode mode) : _mode(mode) {}
-
+    PushNode()
+        : _slice(std::numeric_limits<long long>::max()),
+          _position(std::numeric_limits<long long>::max()) {}
     Status init(BSONElement modExpr, const CollatorInterface* collator) final;
 
     std::unique_ptr<UpdateNode> clone() const final {
-        return stdx::make_unique<CompareNode>(*this);
+        return stdx::make_unique<PushNode>(*this);
     }
 
-    void setCollator(const CollatorInterface* collator) final;
+    void setCollator(const CollatorInterface* collator) final {
+        if (_sort) {
+            invariant(!_sort->collator);
+            _sort->collator = collator;
+        }
+    }
 
 protected:
     UpdateExistingElementResult updateExistingElement(mutablebson::Element* element,
@@ -57,9 +63,31 @@ protected:
     void setValueForNewElement(mutablebson::Element* element) const final;
 
 private:
-    CompareMode _mode;
-    BSONElement _val;
-    const CollatorInterface* _collator = nullptr;
+    /**
+     * Used to describe the result of the PerformPush operation. Note that appending to any empty
+     * array is always considered kModifyArray. That's because we want $push onto an empty to array
+     * to trigger a log entry with a $set on the entire array.
+     */
+    enum class PushResult {
+        kNoOp,                // The array is left exactly as it was.
+        kAppendToEndOfArray,  // The only change to the array is items appended to the end.
+        kModifyArray          // Any other modification of the array.
+    };
+
+    static PushResult insertElementsWithPosition(mutablebson::Element* array,
+                                                 long long position,
+                                                 const std::vector<BSONElement> valuesToPush);
+    PushResult performPush(mutablebson::Element* element, FieldRef* elementPath) const;
+
+    static const StringData kEachClauseName;
+    static const StringData kSliceClauseName;
+    static const StringData kSortClauseName;
+    static const StringData kPositionClauseName;
+
+    std::vector<BSONElement> _valuesToPush;
+    long long _slice;
+    long long _position;
+    boost::optional<PatternElementCmp> _sort;
 };
 
 }  // namespace mongo

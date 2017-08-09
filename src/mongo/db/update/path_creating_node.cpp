@@ -130,7 +130,9 @@ UpdateNode::ApplyResult PathCreatingNode::apply(ApplyParams applyParams) const {
         }
 
         // We found an existing element at the update path.
-        if (!updateExistingElement(&applyParams.element)) {
+        auto updateResult = updateExistingElement(
+            &applyParams.element, applyParams.pathTaken, applyParams.logBuilder);
+        if (updateResult == UpdateExistingElementResult::kNoOp) {
             return ApplyResult::noopResult();  // Successful no-op update.
         }
 
@@ -143,7 +145,11 @@ UpdateNode::ApplyResult PathCreatingNode::apply(ApplyParams applyParams) const {
         checkImmutablePathsNotModified(
             applyParams.element, applyParams.pathTaken.get(), applyParams.immutablePaths, original);
 
-        valueToLog = applyParams.element;
+        if (updateResult == UpdateExistingElementResult::kUpdated) {
+            valueToLog = applyParams.element;
+        } else {
+            // updateExistingElement() has already performed logging, so we don't set a log value.
+        }
     } else {
         // We did not find an element at the update path. Create one.
         auto newElementFieldName =
@@ -218,7 +224,7 @@ UpdateNode::ApplyResult PathCreatingNode::apply(ApplyParams applyParams) const {
     }
 
     // Log the operation.
-    if (applyParams.logBuilder) {
+    if (applyParams.logBuilder && valueToLog.ok()) {
         auto logElement =
             applyParams.logBuilder->getDocument().makeElementWithNewFieldName(fullPath, valueToLog);
         invariant(logElement.ok());

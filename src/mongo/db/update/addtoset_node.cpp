@@ -102,7 +102,10 @@ void AddToSetNode::setCollator(const CollatorInterface* collator) {
     deduplicate(_elements, _collator);
 }
 
-bool AddToSetNode::updateExistingElement(mutablebson::Element* element) const {
+PathCreatingNode::UpdateExistingElementResult AddToSetNode::updateExistingElement(
+    mutablebson::Element* element,
+    std::shared_ptr<FieldRef> elementPath,
+    LogBuilder* logBuilder) const {
     uassert(ErrorCodes::BadValue,
             str::stream() << "Cannot apply $addToSet to non-array field. Field named '"
                           << element->getFieldName()
@@ -127,7 +130,7 @@ bool AddToSetNode::updateExistingElement(mutablebson::Element* element) const {
     }
 
     if (elementsToAdd.empty()) {
-        return false;
+        return UpdateExistingElementResult::kNoOp;
     }
 
     for (auto&& elem : elementsToAdd) {
@@ -135,7 +138,7 @@ bool AddToSetNode::updateExistingElement(mutablebson::Element* element) const {
         invariantOK(element->pushBack(toAdd));
     }
 
-    return true;
+    return UpdateExistingElementResult::kUpdated;
 }
 
 void AddToSetNode::setValueForNewElement(mutablebson::Element* element) const {

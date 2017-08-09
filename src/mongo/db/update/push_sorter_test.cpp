@@ -1,5 +1,5 @@
 /**
- *    Copyright (C) 2013 10gen Inc.
+ *    Copyright (C) 2017 10gen Inc.
  *
  *    This program is free software: you can redistribute it and/or  modify
  *    it under the terms of the GNU Affero General Public License, version 3,
@@ -26,7 +26,7 @@
  *    it in the license file.
  */
 
-#include "mongo/db/ops/modifier_push_sorter.h"
+#include "mongo/db/update/push_sorter.h"
 
 #include "mongo/bson/mutable/algorithm.h"
 #include "mongo/bson/mutable/document.h"
@@ -37,13 +37,9 @@
 #include "mongo/db/query/collation/collator_interface_mock.h"
 #include "mongo/unittest/unittest.h"
 
+namespace mongo {
 namespace {
 
-using mongo::BSONObj;
-using mongo::CollatorInterface;
-using mongo::CollatorInterfaceMock;
-using mongo::PatternElementCmp;
-using mongo::fromjson;
 using mongo::mutablebson::Document;
 using mongo::mutablebson::Element;
 using mongo::mutablebson::sortChildren;
@@ -201,4 +197,5 @@ TEST_F(ObjectArray, SortRespectsCollation) {
     ASSERT_BSONOBJ_EQ(getOrigObj(2), getSortedObj(1));
 }
 
-}  // unnamed namespace
+}  // namespace
+}  // namespace mongo

@@ -73,7 +73,10 @@ Status ArithmeticNode::init(BSONElement modExpr, const CollatorInterface* collat
     return Status::OK();
 }
 
-bool ArithmeticNode::updateExistingElement(mutablebson::Element* element) const {
+PathCreatingNode::UpdateExistingElementResult ArithmeticNode::updateExistingElement(
+    mutablebson::Element* element,
+    std::shared_ptr<FieldRef> elementPath,
+    LogBuilder* logBuilder) const {
     if (!element->isNumeric()) {
         mutablebson::Element idElem =
             mutablebson::findFirstChildNamed(element->getDocument().root(), "_id");
@@ -101,12 +104,12 @@ bool ArithmeticNode::updateExistingElement(mutablebson::Element* element) const 
     // If the updated value is identical to the original value, treat this as a no-op. Caveat:
     // if the found element is in a deserialized state, we can't do that.
     if (element->getValue().ok() && valueToSet.isIdentical(originalValue)) {
-        return false;
+        return UpdateExistingElementResult::kNoOp;
     } else {
 
         // This can fail if 'valueToSet' is not representable as a 64-bit integer.
         uassertStatusOK(element->setValueSafeNum(valueToSet));
-        return true;
+        return UpdateExistingElementResult::kUpdated;
     }
 }
 

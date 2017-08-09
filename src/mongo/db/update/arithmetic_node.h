@@ -51,7 +51,9 @@ public:
     void setCollator(const CollatorInterface* collator) final {}
 
 protected:
-    bool updateExistingElement(mutablebson::Element* element) const final;
+    UpdateExistingElementResult updateExistingElement(mutablebson::Element* element,
+                                                      std::shared_ptr<FieldRef> elementPath,
+                                                      LogBuilder* logBuilder) const final;
     void setValueForNewElement(mutablebson::Element* element) const final;
 
 private:

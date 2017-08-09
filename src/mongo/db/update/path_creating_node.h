@@ -46,12 +46,20 @@ public:
     ApplyResult apply(ApplyParams applyParams) const final;
 
 protected:
+    enum class UpdateExistingElementResult {
+        kNoOp,
+        kUpdated,
+        kUpdatedAndLogged,  // PathCreatingNode::apply() does not need to do any logging.
+    };
+
     /**
      * PathCreatingNode::apply() calls the updateExistingElement() method when applying its update
      * to an existing path. The child's implementation of this method is responsible for either
      * updating the given Element or returning false to indicate that no update is necessary.
      */
-    virtual bool updateExistingElement(mutablebson::Element* element) const = 0;
+    virtual UpdateExistingElementResult updateExistingElement(mutablebson::Element* element,
+                                                              std::shared_ptr<FieldRef> elementPath,
+                                                              LogBuilder* logBuilder) const = 0;
 
     /**
      * PathCreatingNode::apply() calls the setValueForNewElement() method when it must materialize a

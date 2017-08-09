@@ -35,7 +35,7 @@
 #include "mongo/db/field_ref.h"
 #include "mongo/db/jsobj.h"
 #include "mongo/db/ops/modifier_interface.h"
-#include "mongo/db/ops/modifier_push_sorter.h"
+#include "mongo/db/update/push_sorter.h"
 
 namespace mongo {
 

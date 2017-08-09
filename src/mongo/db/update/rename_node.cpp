@@ -63,7 +63,9 @@ public:
         return Status::OK();
     }
 
-    bool updateExistingElement(mutablebson::Element* element) const final {
+    UpdateExistingElementResult updateExistingElement(mutablebson::Element* element,
+                                                      std::shared_ptr<FieldRef> elementPath,
+                                                      LogBuilder* logBuilder) const final {
         // In the case of a $rename where the source and destination have the same value, (e.g., we
         // are applying {$rename: {a: b}} to the document {a: "foo", b: "foo"}), there's no need to
         // modify the destination element. However, the source and destination values must be
@@ -72,9 +74,9 @@ public:
         auto considerFieldName = false;
         if (_elemToSet.compareWithElement(*element, comparator, considerFieldName) != 0) {
             invariantOK(element->setValueElement(_elemToSet));
-            return true;
+            return UpdateExistingElementResult::kUpdated;
         } else {
-            return false;
+            return UpdateExistingElementResult::kNoOp;
         }
     }
 

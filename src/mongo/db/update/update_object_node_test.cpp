@@ -233,6 +233,20 @@ TEST(UpdateObjectNodeTest, ValidSetOnInsertPathParsesSuccessfully) {
                                               foundIdentifiers));
 }
 
+TEST(UpdateObjectNodeTest, ValidPushParsesSuccessfully) {
+    auto update = fromjson("{$push: {'a.b': {$each: [0, 1], $sort: 1, $position: 0, $slice: 10}}}");
+    const CollatorInterface* collator = nullptr;
+    std::map<StringData, std::unique_ptr<ExpressionWithPlaceholder>> arrayFilters;
+    std::set<std::string> foundIdentifiers;
+    UpdateObjectNode root;
+    ASSERT_OK(UpdateObjectNode::parseAndMerge(&root,
+                                              modifiertable::ModifierType::MOD_PUSH,
+                                              update["$push"]["a.b"],
+                                              collator,
+                                              arrayFilters,
+                                              foundIdentifiers));
+}
+
 TEST(UpdateObjectNodeTest, MultiplePositionalElementsFailToParse) {
     auto update = fromjson("{$set: {'a.$.b.$': 5}}");
     const CollatorInterface* collator = nullptr;
@@ -299,24 +313,6 @@ TEST(UpdateObjectNodeTest, PositionalElementFirstPositionFailsToParse) {
     ASSERT_EQ(result.getStatus().code(), ErrorCodes::BadValue);
     ASSERT_EQ(result.getStatus().reason(),
               "Cannot have positional (i.e. '$') element in the first position in path '$'");
-}
-
-// TODO SERVER-28777: All modifier types should succeed.
-TEST(UpdateObjectNodeTest, PushFailsToParse) {
-    auto update = fromjson("{$push: {a: 5}}");
-    const CollatorInterface* collator = nullptr;
-    std::map<StringData, std::unique_ptr<ExpressionWithPlaceholder>> arrayFilters;
-    std::set<std::string> foundIdentifiers;
-    UpdateObjectNode root;
-    auto result = UpdateObjectNode::parseAndMerge(&root,
-                                                  modifiertable::ModifierType::MOD_PUSH,
-                                                  update["$push"]["a"],
-                                                  collator,
-                                                  arrayFilters,
-                                                  foundIdentifiers);
-    ASSERT_NOT_OK(result);
-    ASSERT_EQ(result.getStatus().code(), ErrorCodes::FailedToParse);
-    ASSERT_EQ(result.getStatus().reason(), "Cannot construct modifier of type 10");
 }
 
 TEST(UpdateObjectNodeTest, TwoModifiersOnSameFieldFailToParse) {
