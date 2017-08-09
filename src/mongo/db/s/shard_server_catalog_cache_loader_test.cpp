@@ -227,8 +227,7 @@ vector<ChunkType> ShardServerCatalogCacheLoaderTest::setUpChunkLoaderWithFiveChu
     ASSERT_EQUALS(collAndChunkRes.epoch, collectionType.getEpoch());
     ASSERT_EQUALS(collAndChunkRes.changedChunks.size(), 5UL);
     for (unsigned int i = 0; i < collAndChunkRes.changedChunks.size(); ++i) {
-        ASSERT_BSONOBJ_EQ(collAndChunkRes.changedChunks[i].toConfigBSON(),
-                          chunks[i].toConfigBSON());
+        ASSERT_BSONOBJ_EQ(collAndChunkRes.changedChunks[i].toShardBSON(), chunks[i].toShardBSON());
     }
 
     return chunks;
@@ -311,8 +310,8 @@ TEST_F(ShardServerCatalogCacheLoaderTest, PrimaryLoadFromShardedAndFindNoDiff) {
     auto collAndChunksRes = results.getValue();
     ASSERT_EQUALS(collAndChunksRes.epoch, chunks.back().getVersion().epoch());
     ASSERT_EQUALS(collAndChunksRes.changedChunks.size(), 1UL);
-    ASSERT_BSONOBJ_EQ(collAndChunksRes.changedChunks.back().toConfigBSON(),
-                      chunks.back().toConfigBSON());
+    ASSERT_BSONOBJ_EQ(collAndChunksRes.changedChunks.back().toShardBSON(),
+                      chunks.back().toShardBSON());
 }
 
 // Same as the above unit test, PrimaryLoadFromShardedAndFindNoDiff, but caller requests complete
