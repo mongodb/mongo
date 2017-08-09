@@ -117,7 +117,7 @@ Status RollbackImpl::runRollback(OperationContext* opCtx) {
 }
 
 void RollbackImpl::shutdown() {
-    log() << "rollback shutting down";
+    log() << "Rollback - shutting down";
 
     stdx::lock_guard<stdx::mutex> lock(_mutex);
     _inShutdown = true;
@@ -134,7 +134,7 @@ Status RollbackImpl::_transitionToRollback(OperationContext* opCtx) {
         return Status(ErrorCodes::ShutdownInProgress, "rollback shutting down");
     }
 
-    log() << "transition to ROLLBACK";
+    log() << "Rollback - transition to ROLLBACK";
     {
         Lock::GlobalWrite globalWrite(opCtx);
 
@@ -156,7 +156,7 @@ StatusWith<Timestamp> RollbackImpl::_findCommonPoint() {
         return Status(ErrorCodes::ShutdownInProgress, "rollback shutting down");
     }
 
-    log() << "finding common point";
+    log() << "Rollback - finding common point";
 
     auto onLocalOplogEntryFn = [](const BSONObj& operation) { return Status::OK(); };
 
@@ -174,7 +174,7 @@ StatusWith<Timestamp> RollbackImpl::_findCommonPoint() {
 void RollbackImpl::_checkShardIdentityRollback(OperationContext* opCtx) {
     invariant(opCtx);
 
-    log() << "checking shard identity document for roll back";
+    log() << "Rollback - checking shard identity document for roll back";
 
     if (ShardIdentityRollbackNotifier::get(opCtx)->didRollbackHappen()) {
         severe() << "shardIdentity document rollback detected.  Shutting down to clear "
@@ -187,7 +187,7 @@ void RollbackImpl::_checkShardIdentityRollback(OperationContext* opCtx) {
 void RollbackImpl::_resetSessions(OperationContext* opCtx) {
     invariant(opCtx);
 
-    log() << "resetting in-memory state of active sessions";
+    log() << "Rollback - resetting in-memory state of active sessions";
 
     SessionCatalog::get(opCtx)->resetSessions();
 }
@@ -196,7 +196,7 @@ void RollbackImpl::_transitionFromRollbackToSecondary(OperationContext* opCtx) {
     invariant(opCtx);
     invariant(_replicationCoordinator->getMemberState() == MemberState(MemberState::RS_ROLLBACK));
 
-    log() << "transition to SECONDARY";
+    log() << "Rollback - transition to SECONDARY";
 
     Lock::GlobalWrite globalWrite(opCtx);
 

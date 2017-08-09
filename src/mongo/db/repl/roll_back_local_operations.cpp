@@ -97,9 +97,9 @@ StatusWith<RollBackLocalOperations::RollbackCommonPoint> RollBackLocalOperations
         long long diff = static_cast<long long>(getTimestamp(_localOplogValue).getSecs()) -
             getTimestamp(operation).getSecs();
         // diff could be positive, negative, or zero
-        log() << "our last optime:   " << getTimestamp(_localOplogValue).toStringPretty();
-        log() << "their last optime: " << getTimestamp(operation).toStringPretty();
-        log() << "diff in end of log times: " << diff << " seconds";
+        log() << "rollback our last optime:   " << getTimestamp(_localOplogValue).toStringPretty();
+        log() << "rollback their last optime: " << getTimestamp(operation).toStringPretty();
+        log() << "rollback diff in end of log times: " << diff << " seconds";
         if (diff > 1800) {
             severe() << "rollback too long a time period for a rollback.";
             return StatusWith<RollbackCommonPoint>(

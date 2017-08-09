@@ -134,7 +134,7 @@ bool FixUpInfo::removeRedundantIndexCommands(UUID uuid, std::string indexName) {
         if ((*indexes).second.empty()) {
             indexesToCreate.erase(uuid);
         }
-        log() << "Index " << indexName
+        log() << "Rollback: Index " << indexName
               << " was previously dropped. The createIndexes command is canceled out.";
         return true;
     }
