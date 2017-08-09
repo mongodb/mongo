@@ -89,19 +89,22 @@ tlEnv.Library(
     ],
 )
 
-tlEnv.CppUnitTest(
-    target='service_executor_adaptive_test',
-    source=[
-        'service_executor_adaptive_test.cpp',
-    ],
-    LIBDEPS=[
-        'service_executor',
-        '$BUILD_DIR/mongo/db/service_context',
-        '$BUILD_DIR/mongo/unittest/unittest',
-        '$BUILD_DIR/mongo/util/clock_source_mock',
-        '$BUILD_DIR/third_party/shim_asio',
-    ],
-)
+# Disable this test until SERVER-30475 and associated build failure tickets
+# are resolved.
+#
+# tlEnv.CppUnitTest(
+#     target='service_executor_adaptive_test',
+#     source=[
+#         'service_executor_adaptive_test.cpp',
+#     ],
+#     LIBDEPS=[
+#         'service_executor',
+#         '$BUILD_DIR/mongo/db/service_context',
+#         '$BUILD_DIR/mongo/unittest/unittest',
+#         '$BUILD_DIR/mongo/util/clock_source_mock',
+#         '$BUILD_DIR/third_party/shim_asio',
+#     ],
+# )
 
 env.Library(
     target='service_entry_point_test_suite',
