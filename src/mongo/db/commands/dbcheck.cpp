@@ -152,13 +152,21 @@ protected:
 
         for (const auto& coll : *_run) {
             _doCollection(coll);
+
+            if (_done) {
+                return;
+            }
         }
     }
 
 private:
     void _doCollection(const DbCheckCollectionInfo& info) {
         // If we can't find the collection, abort the check.
-        if (!_collectionMetadata(info)) {
+        if (!_getCollectionMetadata(info)) {
+            return;
+        }
+
+        if (_done) {
             return;
         }
 
@@ -173,7 +181,12 @@ private:
         do {
             auto result = _runBatch(info, start, kBatchDocs, kBatchBytes);
 
+            if (_done) {
+                return;
+            }
+
             std::unique_ptr<HealthLogEntry> entry;
+
             if (!result.isOK()) {
                 entry = dbCheckErrorHealthLogEntry(
                     info.nss, "dbCheck batch failed", OplogEntriesEnum::Batch, result.getStatus());
@@ -219,10 +232,12 @@ private:
         repl::OpTime time;
     };
 
+    // Set if the job cannot proceed.
+    bool _done;
     std::string _dbName;
     std::unique_ptr<DbCheckRun> _run;
 
-    bool _collectionMetadata(const DbCheckCollectionInfo& info) {
+    bool _getCollectionMetadata(const DbCheckCollectionInfo& info) {
         auto uniqueOpCtx = Client::getCurrent()->makeOperationContext();
         auto opCtx = uniqueOpCtx.get();
 
@@ -255,21 +270,18 @@ private:
         entry.setIndexes(indices);
         entry.setOptions(options);
 
-        repl::OpTime optime =
+        StatusWith<repl::OpTime> optime =
             writeConflictRetry(opCtx, "log dbCheck to oplog", collection->ns().ns(), [&] {
                 WriteUnitOfWork uow(opCtx);
-                auto optime = repl::logOp(opCtx,
-                                          "c",
-                                          collection->ns(),
-                                          collection->uuid(),
-                                          entry.toBSON(),
-                                          nullptr,
-                                          false,
-                                          kUninitializedStmtId,
-                                          repl::PreAndPostImageTimestamps());
+                // Send information on this collection over the oplog for the secondary to check.
+                auto optime = _logOp(opCtx, collection->ns(), collection->uuid(), entry.toBSON());
                 uow.commit();
                 return optime;
             });
+
+        if (!optime.isOK()) {
+            return true;
+        }
 
         DbCheckCollectionInformation collectionInfo;
         collectionInfo.collectionName = collection->ns().coll().toString();
@@ -278,8 +290,11 @@ private:
         collectionInfo.indexes = entry.getIndexes();
         collectionInfo.options = entry.getOptions();
 
-        auto hle = dbCheckCollectionEntry(
-            collection->ns(), *collection->uuid(), collectionInfo, collectionInfo, optime);
+        auto hle = dbCheckCollectionEntry(collection->ns(),
+                                          *collection->uuid(),
+                                          collectionInfo,
+                                          collectionInfo,
+                                          optime.getValue());
 
         HealthLog::get(opCtx).log(*hle);
 
@@ -334,15 +349,14 @@ private:
 
             BatchStats result;
 
-            result.time = repl::logOp(opCtx,
-                                      "c",
-                                      info.nss,
-                                      collection->uuid(),
-                                      batch.toBSON(),
-                                      nullptr,
-                                      false,
-                                      kUninitializedStmtId,
-                                      repl::PreAndPostImageTimestamps());
+            // Send information on this batch over the oplog.
+            auto optime = _logOp(opCtx, info.nss, collection->uuid(), batch.toBSON());
+
+            if (!optime.isOK()) {
+                return Result(optime.getStatus());
+            }
+
+            result.time = optime.getValue();
 
             uow.commit();
 
@@ -355,6 +369,40 @@ private:
         });
 
         return result;
+    }
+
+    StatusWith<repl::OpTime> _logOp(OperationContext* opCtx,
+                                    const NamespaceString& nss,
+                                    OptionalCollectionUUID uuid,
+                                    const BSONObj& obj) {
+        // Stepdown takes a global S lock (see SERVER-28544).  We therefore take an incompatible
+        // lock to ensure that stepdown can't happen between when we check if this thread has been
+        // interrupted and when we attempt to write to the oplog.
+        Lock::GlobalLock lock(opCtx, MODE_IX, std::numeric_limits<unsigned int>::max());
+
+        Status status = opCtx->checkForInterruptNoAssert();
+
+        if (!status.isOK()) {
+            _done = true;
+            return status;
+        }
+
+        auto coord = repl::ReplicationCoordinator::get(opCtx);
+
+        if (!coord->canAcceptWritesFor(opCtx, nss)) {
+            _done = true;
+            return Status(ErrorCodes::PrimarySteppedDown, "dbCheck terminated by stepdown");
+        }
+
+        return repl::logOp(opCtx,
+                           "c",
+                           nss,
+                           uuid,
+                           obj,
+                           nullptr,
+                           false,
+                           kUninitializedStmtId,
+                           repl::PreAndPostImageTimestamps());
     }
 };
 
