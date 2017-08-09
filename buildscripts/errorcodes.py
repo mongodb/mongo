@@ -14,9 +14,9 @@ from collections import defaultdict, namedtuple
 from optparse import OptionParser
 
 try:
-    import re2 as re
+    import regex as re
 except ImportError:
-    print("*** Run 'pip2 install --user re2' to speed up error code checking")
+    print("*** Run 'pip2 install --user regex' to speed up error code checking")
     import re
 
 ASSERT_NAMES = [ "uassert" , "massert", "fassert", "fassertFailed" ]
