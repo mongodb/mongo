@@ -67,17 +67,23 @@ std::unique_ptr<HealthLogEntry> dbCheckBatchEntry(const NamespaceString& nss,
                                                   const repl::OpTime& optime);
 
 /**
+ * The collection metadata dbCheck sends between nodes.
+ */
+struct DbCheckCollectionInformation {
+    std::string collectionName;
+    boost::optional<UUID> prev;
+    boost::optional<UUID> next;
+    std::vector<BSONObj> indexes;
+    BSONObj options;
+};
+
+/**
  * Get a HealthLogEntry for a dbCheck collection.
  */
 std::unique_ptr<HealthLogEntry> dbCheckCollectionEntry(const NamespaceString& nss,
-                                                       const std::string& foundName,
                                                        const UUID& uuid,
-                                                       const boost::optional<UUID>& expectedPrev,
-                                                       const boost::optional<UUID>& foundPrev,
-                                                       const boost::optional<UUID>& expectedNext,
-                                                       const boost::optional<UUID>& foundNext,
-                                                       const std::vector<BSONObj>& expectedIndexes,
-                                                       const std::vector<BSONObj>& foundIndexes,
+                                                       const DbCheckCollectionInformation& expected,
+                                                       const DbCheckCollectionInformation& found,
                                                        const repl::OpTime& optime);
 
 /**
@@ -165,6 +171,11 @@ std::unique_ptr<AutoGetCollection> getCollectionForDbCheck(OperationContext* opC
  * Gather the index information for a collection.
  */
 std::vector<BSONObj> collectionIndexInfo(OperationContext* opCtx, Collection* collection);
+
+/**
+ * Gather other information for a collection.
+ */
+BSONObj collectionOptions(OperationContext* opCtx, Collection* collection);
 
 namespace repl {
 

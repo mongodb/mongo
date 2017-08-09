@@ -114,3 +114,6 @@ structs:
       indexes:
         type: array<object>
         cpp_name: indexes
+      options:
+        type: object
+        cpp_name: options

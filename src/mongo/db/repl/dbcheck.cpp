@@ -52,10 +52,6 @@ namespace {
  * Some utilities for dealing with the expected/found documents in health log entries.
  */
 
-bool operator==(const BSONObj& lhs, const BSONObj& rhs) {
-    return lhs.woCompare(lhs, rhs) == 0;
-}
-
 bool operator==(const std::vector<BSONObj>& lhs, const std::vector<BSONObj>& rhs) {
     return std::equal(lhs.cbegin(),
                       lhs.cend(),
@@ -72,6 +68,12 @@ template <typename T>
 std::pair<bool, BSONObj> expectedFound(const T& expected, const T& found) {
     auto obj = BSON("expected" << expected << "found" << found);
     return std::pair<bool, BSONObj>(expected == found, obj);
+}
+
+template <>
+std::pair<bool, BSONObj> expectedFound(const BSONObj& expected, const BSONObj& found) {
+    auto obj = BSON("expected" << expected << "found" << found);
+    return std::pair<bool, BSONObj>(expected.woCompare(found) == 0, obj);
 }
 
 /**
@@ -173,37 +175,6 @@ std::unique_ptr<HealthLogEntry> dbCheckBatchEntry(const NamespaceString& nss,
     return dbCheckHealthLogEntry(nss, severity, msg, OplogEntriesEnum::Batch, data);
 }
 
-std::unique_ptr<HealthLogEntry> dbCheckCollectionEntry(const NamespaceString& nss,
-                                                       const std::string& collName,
-                                                       const UUID& uuid,
-                                                       const boost::optional<UUID>& expectedPrev,
-                                                       const boost::optional<UUID>& foundPrev,
-                                                       const boost::optional<UUID>& expectedNext,
-                                                       const boost::optional<UUID>& foundNext,
-                                                       const std::vector<BSONObj>& expectedIndexes,
-                                                       const std::vector<BSONObj>& foundIndexes,
-                                                       const repl::OpTime& optime) {
-    auto names = expectedFound(nss.coll().toString(), collName);
-    auto prevs = expectedFound<UUID>(expectedPrev, foundPrev);
-    auto nexts = expectedFound<UUID>(expectedNext, foundNext);
-    auto indices = expectedFound(expectedIndexes, foundIndexes);
-    bool match = names.first && prevs.first && nexts.first && indices.first;
-    auto severity = match ? SeverityEnum::Info : SeverityEnum::Error;
-    std::string msg =
-        "dbCheck collection " + (match ? std::string("consistent") : std::string("inconsistent"));
-    auto data =
-        BSON("uuid" << uuid.toString() << "found" << true << "name" << names.second << "prev"
-                    << prevs.second
-                    << "next"
-                    << nexts.second
-                    << "indexes"
-                    << indices.second
-                    << "optime"
-                    << optime);
-
-    return dbCheckHealthLogEntry(nss, severity, msg, OplogEntriesEnum::Collection, data);
-}
-
 DbCheckHasher::DbCheckHasher(OperationContext* opCtx,
                              Collection* collection,
                              const BSONKey& start,
@@ -232,6 +203,75 @@ DbCheckHasher::DbCheckHasher(OperationContext* opCtx,
                                        InternalPlanner::IXSCAN_FETCH);
 }
 
+
+template <typename T>
+const md5_byte_t* md5Cast(const T* ptr) {
+    return reinterpret_cast<const md5_byte_t*>(ptr);
+}
+
+void maybeAppend(md5_state_t* state, const boost::optional<UUID>& uuid) {
+    if (uuid) {
+        md5_append(state, md5Cast(uuid->toCDR().data()), uuid->toCDR().length());
+    }
+}
+
+std::string hashCollectionInfo(const DbCheckCollectionInformation& info) {
+    md5_state_t state;
+    md5_init(&state);
+
+    md5_append(&state, md5Cast(info.collectionName.data()), info.collectionName.size());
+
+    maybeAppend(&state, info.prev);
+    maybeAppend(&state, info.next);
+
+    for (const auto& index : info.indexes) {
+        md5_append(&state, md5Cast(index.objdata()), index.objsize());
+    }
+
+    md5_append(&state, md5Cast(info.options.objdata()), info.options.objsize());
+
+    md5digest digest;
+
+    md5_finish(&state, digest);
+    return digestToString(digest);
+}
+
+std::unique_ptr<HealthLogEntry> dbCheckCollectionEntry(const NamespaceString& nss,
+                                                       const UUID& uuid,
+                                                       const DbCheckCollectionInformation& expected,
+                                                       const DbCheckCollectionInformation& found,
+                                                       const repl::OpTime& optime) {
+    auto names = expectedFound(expected.collectionName, found.collectionName);
+    auto prevs = expectedFound(expected.prev, found.prev);
+    auto nexts = expectedFound(expected.next, found.next);
+    auto indices = expectedFound(expected.indexes, found.indexes);
+    auto options = expectedFound(expected.options, found.options);
+    bool match = names.first && prevs.first && nexts.first && indices.first && options.first;
+    auto severity = match ? SeverityEnum::Info : SeverityEnum::Error;
+
+    // Get the hash of all of the other fields.
+    auto md5s = expectedFound(hashCollectionInfo(expected), hashCollectionInfo(found));
+
+    std::string msg =
+        "dbCheck collection " + (match ? std::string("consistent") : std::string("inconsistent"));
+    auto data = BSON("success" << true << "uuid" << uuid.toString() << "found" << true << "name"
+                               << names.second
+                               << "prev"
+                               << prevs.second
+                               << "next"
+                               << nexts.second
+                               << "indexes"
+                               << indices.second
+                               << "options"
+                               << options.second
+                               << "md5"
+                               << md5s.second
+                               << "optime"
+                               << optime);
+
+    return dbCheckHealthLogEntry(nss, severity, msg, OplogEntriesEnum::Collection, data);
+}
+
 Status DbCheckHasher::hashAll(void) {
     BSONObj currentObj;
 
@@ -251,9 +291,7 @@ Status DbCheckHasher::hashAll(void) {
         _bytesSeen += currentObj.objsize();
         _countSeen += 1;
 
-        md5_append(&_state,
-                   reinterpret_cast<const md5_byte_t*>(currentObj.objdata()),
-                   currentObj.objsize());
+        md5_append(&_state, md5Cast(currentObj.objdata()), currentObj.objsize());
     }
 
     // If we got to the end of the collection, set the last key to MaxKey.
@@ -322,6 +360,10 @@ std::vector<BSONObj> collectionIndexInfo(OperationContext* opCtx, Collection* co
     std::sort(result.begin(), result.end(), SimpleBSONObjComparator::LessThan(comp.get()));
 
     return result;
+}
+
+BSONObj collectionOptions(OperationContext* opCtx, Collection* collection) {
+    return collection->getCatalogEntry()->getCollectionOptions(opCtx).toBSON();
 }
 
 std::unique_ptr<AutoGetCollection> getCollectionForDbCheck(OperationContext* opCtx,
@@ -426,39 +468,38 @@ Status dbCheckDatabaseOnSecondary(OperationContext* opCtx,
         return Status::OK();
     }
 
-    auto dbName = collection->ns().db();
-    AutoGetDb agd(opCtx, dbName, MODE_X);
+    auto db = collection->ns().db();
+    AutoGetDb agd(opCtx, db, MODE_X);
 
-    auto collName = collection->ns().coll().toString();
+    DbCheckCollectionInformation expected;
+    DbCheckCollectionInformation found;
+
+    expected.collectionName = entry.getNss().coll().toString();
+    found.collectionName = collection->ns().coll().toString();
 
     // found/expected previous UUID,
-    boost::optional<UUID> expectedPrev = entry.getPrev();
-    boost::optional<UUID> foundPrev = UUIDCatalog::get(opCtx).prev(dbName, uuid);
+    expected.prev = entry.getPrev();
+    found.prev = UUIDCatalog::get(opCtx).prev(db, uuid);
 
     // found/expected next UUID,
-    auto expectedNext = entry.getNext();
-    auto foundNext = UUIDCatalog::get(opCtx).next(dbName, uuid);
+    expected.next = entry.getNext();
+    found.next = UUIDCatalog::get(opCtx).next(db, uuid);
 
-    // and found/expected indices.
-    auto expectedIndexes = entry.getIndexes();
-    auto foundIndexes = collectionIndexInfo(opCtx, collection);
+    // found/expected indices,
+    expected.indexes = entry.getIndexes();
+    found.indexes = collectionIndexInfo(opCtx, collection);
 
-    auto logEntry = dbCheckCollectionEntry(entry.getNss(),
-                                           collName,
-                                           uuid,
-                                           expectedPrev,
-                                           foundPrev,
-                                           expectedNext,
-                                           foundNext,
-                                           expectedIndexes,
-                                           foundIndexes,
-                                           optime);
+    // and found/expected collection options.
+    expected.options = entry.getOptions();
+    found.options = collectionOptions(opCtx, collection);
 
-    HealthLog::get(opCtx).log(*logEntry);
+    auto hle = dbCheckCollectionEntry(entry.getNss(), uuid, expected, found, optime);
+
+    HealthLog::get(opCtx).log(*hle);
 
     return Status::OK();
 }
-}  // namespace
+}
 
 namespace repl {
 

@@ -186,7 +186,7 @@ private:
                                           stats.nBytes,
                                           stats.md5,
                                           stats.md5,
-                                          info.start,
+                                          start,
                                           stats.lastKey,
                                           stats.time);
                 HealthLog::get(Client::getCurrent()->getServiceContext()).log(*entry);
@@ -238,8 +238,9 @@ private:
         auto prev = UUIDCatalog::get(opCtx).prev(_dbName, *collection->uuid());
         auto next = UUIDCatalog::get(opCtx).next(_dbName, *collection->uuid());
 
-        // Find and report the indices.
+        // Find and report collection metadata.
         auto indices = collectionIndexInfo(opCtx, collection);
+        auto options = collectionOptions(opCtx, collection);
 
         DbCheckOplogCollection entry;
         entry.setNss(collection->ns());
@@ -252,6 +253,7 @@ private:
         }
         entry.setType(OplogEntriesEnum::Collection);
         entry.setIndexes(indices);
+        entry.setOptions(options);
 
         repl::OpTime optime =
             writeConflictRetry(opCtx, "log dbCheck to oplog", collection->ns().ns(), [&] {
@@ -269,16 +271,15 @@ private:
                 return optime;
             });
 
-        auto hle = dbCheckCollectionEntry(collection->ns(),
-                                          collection->ns().coll().toString(),
-                                          *collection->uuid(),
-                                          entry.getPrev(),
-                                          entry.getPrev(),
-                                          entry.getNext(),
-                                          entry.getNext(),
-                                          entry.getIndexes(),
-                                          entry.getIndexes(),
-                                          optime);
+        DbCheckCollectionInformation collectionInfo;
+        collectionInfo.collectionName = collection->ns().coll().toString();
+        collectionInfo.prev = entry.getPrev();
+        collectionInfo.next = entry.getNext();
+        collectionInfo.indexes = entry.getIndexes();
+        collectionInfo.options = entry.getOptions();
+
+        auto hle = dbCheckCollectionEntry(
+            collection->ns(), *collection->uuid(), collectionInfo, collectionInfo, optime);
 
         HealthLog::get(opCtx).log(*hle);
 
