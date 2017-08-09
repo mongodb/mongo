@@ -656,7 +656,10 @@ void execCommandDatabase(OperationContext* opCtx,
         }
 
         // We do not redo shard version handling if this command was issued via the direct client.
-        if (!opCtx->getClient()->isInDirectClient()) {
+        if ((serverGlobalParams.featureCompatibility.version.load() ==
+                 ServerGlobalParams::FeatureCompatibility::Version::k36 ||
+             iAmPrimary) &&
+            !opCtx->getClient()->isInDirectClient()) {
             // Handle a shard version that may have been sent along with the command.
             auto commandNS = NamespaceString(command->parseNs(dbname, request.body));
             auto& oss = OperationShardingState::get(opCtx);

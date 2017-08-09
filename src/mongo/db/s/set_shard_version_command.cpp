@@ -220,13 +220,13 @@ public:
             boost::optional<AutoGetDb> autoDb;
             autoDb.emplace(opCtx, nss.db(), MODE_IS);
 
-            // we can run on a slave up to here
-            if (!repl::getGlobalReplicationCoordinator()->canAcceptWritesForDatabase(opCtx,
-                                                                                     nss.db())) {
-                result.append("errmsg", "not master");
-                result.append("note", "from post init in setShardVersion");
-                return false;
-            }
+            // Slave nodes cannot support set shard version
+            uassert(40589,
+                    str::stream() << "setShardVersion with collection version is only supported "
+                                     "against primary nodes, but it was received for namespace "
+                                  << nss.ns(),
+                    repl::ReplicationCoordinator::get(opCtx)->canAcceptWritesForDatabase(opCtx,
+                                                                                         nss.db()));
 
             // Views do not require a shard version check.
             if (autoDb->getDb() && !autoDb->getDb()->getCollection(opCtx, nss) &&
