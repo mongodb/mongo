@@ -485,5 +485,82 @@ TEST_F(ShardServerCatalogCacheLoaderTest, PrimaryLoadFromShardedAndFindNewEpoch)
     }
 }
 
+TEST_F(ShardServerCatalogCacheLoaderTest, PrimaryLoadFromShardedAndFindMixedChunkVersions) {
+    // First set up the shard chunk loader as sharded.
+
+    vector<ChunkType> chunks = setUpChunkLoaderWithFiveChunks();
+
+    // Then refresh again and retrieve chunks from the config server that have mixed epoches, like
+    // as if the chunks read yielded around a drop and recreate of the collection.
+
+    CollectionType originalCollectionType = makeCollectionType(chunks.back().getVersion());
+
+    ChunkVersion collVersionWithNewEpoch(1, 0, OID::gen());
+    CollectionType collectionTypeWithNewEpoch = makeCollectionType(collVersionWithNewEpoch);
+    vector<ChunkType> chunksWithNewEpoch = makeFiveChunks(collVersionWithNewEpoch);
+    vector<ChunkType> mixedChunks;
+    mixedChunks.push_back(chunks.back());
+    mixedChunks.insert(mixedChunks.end(), chunksWithNewEpoch.begin(), chunksWithNewEpoch.end());
+    _remoteLoaderMock->setChunkRefreshReturnValue(mixedChunks);
+
+    StatusWith<CatalogCacheLoader::CollectionAndChangedChunks> mixedResults{
+        Status(ErrorCodes::InternalError, "")};
+    const auto mixedRefreshCallbackFn = [&mixedResults](
+        OperationContext * opCtx,
+        StatusWith<CatalogCacheLoader::CollectionAndChangedChunks> swCollAndChunks) noexcept {
+        mixedResults = std::move(swCollAndChunks);
+    };
+
+    auto mixedNotification =
+        _shardLoader->getChunksSince(kNss, chunks.back().getVersion(), mixedRefreshCallbackFn);
+    mixedNotification->get();
+
+    ASSERT_EQUALS(mixedResults.getStatus().code(), ErrorCodes::ConflictingOperationInProgress);
+
+    // Now make sure the newly recreated collection is cleanly loaded. We cannot ensure a
+    // non-variable response until the loader has remotely retrieved the new metadata and applied
+    // them to the persisted store. So first do a reload and ignore the results. Then call again,
+    // this time checking the results.
+
+    _remoteLoaderMock->setCollectionRefreshReturnValue(collectionTypeWithNewEpoch);
+    _remoteLoaderMock->setChunkRefreshReturnValue(chunksWithNewEpoch);
+
+    auto cleanNotification =
+        _shardLoader->getChunksSince(kNss, chunks.back().getVersion(), kDoNothingCallbackFn);
+    cleanNotification->get();
+
+    // Wait for persistence of update.
+    _shardLoader->waitForCollectionFlush(operationContext(), kNss);
+
+    vector<ChunkType> lastChunkWithNewEpoch;
+    lastChunkWithNewEpoch.push_back(chunksWithNewEpoch.back());
+    _remoteLoaderMock->setChunkRefreshReturnValue(lastChunkWithNewEpoch);
+
+    StatusWith<CatalogCacheLoader::CollectionAndChangedChunks> results{
+        Status(ErrorCodes::InternalError, "")};
+    const auto refreshCallbackFn = [&results](
+        OperationContext * opCtx,
+        StatusWith<CatalogCacheLoader::CollectionAndChangedChunks> swCollAndChunks) noexcept {
+        results = std::move(swCollAndChunks);
+    };
+
+    auto notification =
+        _shardLoader->getChunksSince(kNss, ChunkVersion::UNSHARDED(), refreshCallbackFn);
+    notification->get();
+
+    ASSERT_OK(results.getStatus());
+    auto collAndChunksRes = results.getValue();
+    ASSERT_EQUALS(collAndChunksRes.epoch, collectionTypeWithNewEpoch.getEpoch());
+    ASSERT_EQUALS(collAndChunksRes.changedChunks.size(), 5UL);
+    for (unsigned int i = 0; i < collAndChunksRes.changedChunks.size(); ++i) {
+        ASSERT_BSONOBJ_EQ(collAndChunksRes.changedChunks[i].getMin(),
+                          chunksWithNewEpoch[i].getMin());
+        ASSERT_BSONOBJ_EQ(collAndChunksRes.changedChunks[i].getMax(),
+                          chunksWithNewEpoch[i].getMax());
+        ASSERT_EQUALS(collAndChunksRes.changedChunks[i].getVersion(),
+                      chunksWithNewEpoch[i].getVersion());
+    }
+}
+
 }  // namespace
 }  // namespace mongo
