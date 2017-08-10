@@ -9289,6 +9289,7 @@ buildvariants:
   run_on:
   - ubuntu1604-build
   stepback: true
+  batchtime: 1440 # 1 day
   expansions:
     tooltags: "-tags 'ssl'"
     # We need llvm-symbolizer in the PATH for ASAN for clang-3.7 or later.
