@@ -223,6 +223,34 @@ env.CppUnitTest(
 )
 
 env.Library(
+    target='replication_recovery',
+    source=[
+        'replication_recovery.cpp',
+    ],
+    LIBDEPS=[
+    ],
+    LIBDEPS_PRIVATE=[
+        'sync_tail',
+        '$BUILD_DIR/mongo/base',
+    ],
+)
+
+env.CppUnitTest(
+    target='replication_recovery_test',
+    source=[
+        'replication_recovery_test.cpp',
+    ],
+    LIBDEPS=[
+    ],
+    LIBDEPS_PRIVATE=[
+        'replmocks',
+        'replication_recovery',
+        'storage_interface_impl',
+        '$BUILD_DIR/mongo/db/service_context_d_test_fixture',
+    ],
+)
+
+env.Library(
     target='replication_process',
     source=[
         'replication_consistency_markers.cpp',
@@ -1534,6 +1562,7 @@ env.Library(
         'repl_settings',
         'replication_consistency_markers_impl',
         'replication_process',
+        'replication_recovery',
         'rollback_source_impl',
         'sync_tail',
     ],

@@ -37,6 +37,7 @@
 #include "mongo/db/repl/replication_coordinator.h"
 #include "mongo/db/repl/replication_coordinator_mock.h"
 #include "mongo/db/repl/replication_process.h"
+#include "mongo/db/repl/replication_recovery_mock.h"
 #include "mongo/db/repl/storage_interface_impl.h"
 #include "mongo/db/repl/storage_interface_mock.h"
 #include "mongo/db/service_context.h"
@@ -78,7 +79,8 @@ TEST_F(ReplicationProcessTest, ServiceContextDecorator) {
     ASSERT_FALSE(ReplicationProcess::get(serviceContext));
     ReplicationProcess* replicationProcess = new ReplicationProcess(
         _storageInterface.get(),
-        stdx::make_unique<ReplicationConsistencyMarkersImpl>(_storageInterface.get()));
+        stdx::make_unique<ReplicationConsistencyMarkersImpl>(_storageInterface.get()),
+        stdx::make_unique<ReplicationRecoveryMock>());
     ReplicationProcess::set(serviceContext,
                             std::unique_ptr<ReplicationProcess>(replicationProcess));
     ASSERT_TRUE(replicationProcess == ReplicationProcess::get(serviceContext));
@@ -90,7 +92,8 @@ TEST_F(ReplicationProcessTest,
        GetRollbackProgressReturnsNoSuchKeyIfDocumentWithIdProgressIsNotFound) {
     ReplicationProcess replicationProcess(
         _storageInterface.get(),
-        stdx::make_unique<ReplicationConsistencyMarkersImpl>(_storageInterface.get()));
+        stdx::make_unique<ReplicationConsistencyMarkersImpl>(_storageInterface.get()),
+        stdx::make_unique<ReplicationRecoveryMock>());
 
     // Collection is not found.
     auto opCtx = makeOpCtx();
@@ -126,7 +129,8 @@ TEST_F(ReplicationProcessTest, GetRollbackProgressReturnsBadStatusIfApplyUntilFi
 
     ReplicationProcess replicationProcess(
         _storageInterface.get(),
-        stdx::make_unique<ReplicationConsistencyMarkersImpl>(_storageInterface.get()));
+        stdx::make_unique<ReplicationConsistencyMarkersImpl>(_storageInterface.get()),
+        stdx::make_unique<ReplicationRecoveryMock>());
     ASSERT_EQUALS(ErrorCodes::TypeMismatch, replicationProcess.getRollbackProgress(opCtx.get()));
 }
 
@@ -147,7 +151,8 @@ TEST_F(ReplicationProcessTest,
 
     ReplicationProcess replicationProcess(
         _storageInterface.get(),
-        stdx::make_unique<ReplicationConsistencyMarkersImpl>(_storageInterface.get()));
+        stdx::make_unique<ReplicationConsistencyMarkersImpl>(_storageInterface.get()),
+        stdx::make_unique<ReplicationRecoveryMock>());
     ASSERT_EQUALS(ErrorCodes::TypeMismatch, replicationProcess.getRollbackProgress(opCtx.get()));
 }
 
@@ -166,7 +171,8 @@ TEST_F(ReplicationProcessTest,
 
     ReplicationProcess replicationProcess(
         _storageInterface.get(),
-        stdx::make_unique<ReplicationConsistencyMarkersImpl>(_storageInterface.get()));
+        stdx::make_unique<ReplicationConsistencyMarkersImpl>(_storageInterface.get()),
+        stdx::make_unique<ReplicationRecoveryMock>());
     ASSERT_EQUALS(applyUntil,
                   unittest::assertGet(replicationProcess.getRollbackProgress(opCtx.get())));
 
@@ -181,7 +187,8 @@ TEST_F(ReplicationProcessTest,
     auto opCtx = makeOpCtx();
     ReplicationProcess replicationProcess(
         _storageInterface.get(),
-        stdx::make_unique<ReplicationConsistencyMarkersImpl>(_storageInterface.get()));
+        stdx::make_unique<ReplicationConsistencyMarkersImpl>(_storageInterface.get()),
+        stdx::make_unique<ReplicationRecoveryMock>());
     ASSERT_OK(replicationProcess.setRollbackProgress(opCtx.get(), applyUntil));
     ASSERT_EQUALS(1U,
                   unittest::assertGet(_storageInterface->getCollectionCount(
@@ -199,7 +206,8 @@ TEST_F(ReplicationProcessTest,
     auto opCtx = makeOpCtx();
     ReplicationProcess replicationProcess(
         _storageInterface.get(),
-        stdx::make_unique<ReplicationConsistencyMarkersImpl>(_storageInterface.get()));
+        stdx::make_unique<ReplicationConsistencyMarkersImpl>(_storageInterface.get()),
+        stdx::make_unique<ReplicationRecoveryMock>());
     ASSERT_EQUALS(ErrorCodes::IllegalOperation,
                   replicationProcess.setRollbackProgress(opCtx.get(), applyUntil));
 }
@@ -208,7 +216,8 @@ TEST_F(ReplicationProcessTest, ClearRollbackProgressReturnsSuccessIfCollectionDo
     auto opCtx = makeOpCtx();
     ReplicationProcess replicationProcess(
         _storageInterface.get(),
-        stdx::make_unique<ReplicationConsistencyMarkersImpl>(_storageInterface.get()));
+        stdx::make_unique<ReplicationConsistencyMarkersImpl>(_storageInterface.get()),
+        stdx::make_unique<ReplicationRecoveryMock>());
     ASSERT_OK(replicationProcess.clearRollbackProgress(opCtx.get()));
 }
 
@@ -220,7 +229,8 @@ TEST_F(ReplicationProcessTest,
     auto opCtx = makeOpCtx();
     ReplicationProcess replicationProcess(
         _storageInterface.get(),
-        stdx::make_unique<ReplicationConsistencyMarkersImpl>(_storageInterface.get()));
+        stdx::make_unique<ReplicationConsistencyMarkersImpl>(_storageInterface.get()),
+        stdx::make_unique<ReplicationRecoveryMock>());
     ASSERT_EQUALS(ErrorCodes::IllegalOperation,
                   replicationProcess.clearRollbackProgress(opCtx.get()));
 }

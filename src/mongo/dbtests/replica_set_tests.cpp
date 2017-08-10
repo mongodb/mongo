@@ -35,6 +35,7 @@
 #include "mongo/db/repl/replication_consistency_markers_impl.h"
 #include "mongo/db/repl/replication_coordinator_external_state_impl.h"
 #include "mongo/db/repl/replication_process.h"
+#include "mongo/db/repl/replication_recovery.h"
 #include "mongo/db/repl/storage_interface_mock.h"
 #include "mongo/db/service_context.h"
 #include "mongo/unittest/unittest.h"
@@ -53,9 +54,12 @@ protected:
         _storageInterface = stdx::make_unique<repl::StorageInterfaceMock>();
         _dropPendingCollectionReaper =
             stdx::make_unique<repl::DropPendingCollectionReaper>(_storageInterface.get());
+        auto consistencyMarkers =
+            stdx::make_unique<repl::ReplicationConsistencyMarkersImpl>(_storageInterface.get());
+        auto recovery = stdx::make_unique<repl::ReplicationRecoveryImpl>(_storageInterface.get(),
+                                                                         consistencyMarkers.get());
         _replicationProcess = stdx::make_unique<repl::ReplicationProcess>(
-            _storageInterface.get(),
-            stdx::make_unique<repl::ReplicationConsistencyMarkersImpl>(_storageInterface.get()));
+            _storageInterface.get(), std::move(consistencyMarkers), std::move(recovery));
         _replCoordExternalState = stdx::make_unique<repl::ReplicationCoordinatorExternalStateImpl>(
             opCtx->getServiceContext(),
             _dropPendingCollectionReaper.get(),

@@ -94,6 +94,7 @@
 #include "mongo/db/repl/replication_coordinator_global.h"
 #include "mongo/db/repl/replication_coordinator_impl.h"
 #include "mongo/db/repl/replication_process.h"
+#include "mongo/db/repl/replication_recovery.h"
 #include "mongo/db/repl/storage_interface_impl.h"
 #include "mongo/db/repl/topology_coordinator_impl.h"
 #include "mongo/db/s/balancer/balancer.h"
@@ -919,11 +920,14 @@ MONGO_INITIALIZER_WITH_PREREQUISITES(CreateReplicationManager,
     repl::StorageInterface::set(serviceContext, stdx::make_unique<repl::StorageInterfaceImpl>());
     auto storageInterface = repl::StorageInterface::get(serviceContext);
 
+    auto consistencyMarkers =
+        stdx::make_unique<repl::ReplicationConsistencyMarkersImpl>(storageInterface);
+    auto recovery = stdx::make_unique<repl::ReplicationRecoveryImpl>(storageInterface,
+                                                                     consistencyMarkers.get());
     repl::ReplicationProcess::set(
         serviceContext,
         stdx::make_unique<repl::ReplicationProcess>(
-            storageInterface,
-            stdx::make_unique<repl::ReplicationConsistencyMarkersImpl>(storageInterface)));
+            storageInterface, std::move(consistencyMarkers), std::move(recovery)));
     auto replicationProcess = repl::ReplicationProcess::get(serviceContext);
 
     repl::DropPendingCollectionReaper::set(
