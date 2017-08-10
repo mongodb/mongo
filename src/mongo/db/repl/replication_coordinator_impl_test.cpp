@@ -3559,10 +3559,16 @@ protected:
         return ss.str();
     }
 
-private:
-    virtual void setUp() {
-        ReplCoordTest::setUp();
-        init(ReplSettings());
+    void initReplSetMode() {
+        auto settings = ReplSettings();
+        settings.setReplSetString("replset");
+        init(settings);
+    }
+
+    void initMasterSlaveMode() {
+        auto settings = ReplSettings();
+        settings.setSlave(true);
+        init(settings);
     }
 };
 
@@ -3577,6 +3583,7 @@ TEST_F(StableTimestampTest, CalculateStableTimestamp) {
      * Tests the 'ReplicationCoordinatorImpl::_calculateStableTimestamp' method.
      */
 
+    initReplSetMode();
     auto repl = getReplCoord();
     Timestamp commitPoint;
     boost::optional<Timestamp> expectedStableTimestamp, stableTimestamp;
@@ -3621,6 +3628,7 @@ TEST_F(StableTimestampTest, CleanupStableTimestampCandidates) {
      * Tests the 'ReplicationCoordinatorImpl::_cleanupStableTimestampCandidates' method.
      */
 
+    initReplSetMode();
     auto repl = getReplCoord();
     Timestamp stableTimestamp;
     std::set<Timestamp> timestampCandidates, expectedTimestampCandidates;
@@ -3656,6 +3664,7 @@ TEST_F(StableTimestampTest, SetMyLastAppliedSetsStableTimestampForStorage) {
      * timestamp calculation logic.
      */
 
+    initReplSetMode();
     auto repl = getReplCoord();
     Timestamp stableTimestamp;
 
@@ -3686,6 +3695,7 @@ TEST_F(StableTimestampTest, AdvanceCommitPointSetsStableTimestampForStorage) {
      * calculation logic.
      */
 
+    initReplSetMode();
     auto repl = getReplCoord();
     Timestamp stableTimestamp;
 
@@ -3709,6 +3719,25 @@ TEST_F(StableTimestampTest, AdvanceCommitPointSetsStableTimestampForStorage) {
     ASSERT_TIMESTAMP_SET_EQ(expectedTimestampCandidates, timestampCandidates);
 }
 
+TEST_F(StableTimestampTest, SetMyLastAppliedDoesntAddTimestampCandidateInMasterSlaveMode) {
+
+    /**
+     * Test that 'setMyLastAppliedOpTime' doesn't add timestamp candidates to the stable timestamp
+     * list when running in master-slave mode.
+     */
+
+    initMasterSlaveMode();
+    auto repl = getReplCoord();
+    Timestamp stableTimestamp;
+
+    ASSERT(repl->getStableTimestampCandidates_forTest().empty());
+
+    repl->setMyLastAppliedOpTime(OpTime({0, 1}, 0));
+    repl->setMyLastAppliedOpTime(OpTime({0, 2}, 0));
+
+    // Make sure no timestamps candidates were added.
+    ASSERT(repl->getStableTimestampCandidates_forTest().empty());
+}
 
 TEST_F(ReplCoordTest, NodeReturnsShutdownInProgressWhenWaitingUntilAnOpTimeDuringShutdown) {
     assertStartSuccess(BSON("_id"
