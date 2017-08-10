@@ -2028,6 +2028,19 @@ tasks:
       jepsen_test_name: read-concern-majority
       jepsen_write_concern: --write-concern w1
 
+## jstestfuzz standalone generational fuzzer mmapv1 ##
+- <<: *jstestfuzz_template
+  name: generational_jstestfuzz
+  commands:
+  - func: "do setup"
+  - func: "run jstestfuzz"
+    vars:
+      jstestfuzz_vars: -g
+  - <<: *run_jstestfuzz_tests
+    vars:
+      <<: *jstestfuzz_config_vars
+      resmoke_args: --suites=generational_jstestfuzz --storageEngine=mmapv1
+
 ## jstestfuzz standalone generational fuzzer WT ##
 - <<: *jstestfuzz_template
   name: generational_jstestfuzz_WT
@@ -4200,6 +4213,7 @@ buildvariants:
   - name: jsCore_compatibility_WT
   - name: jsCore_decimal
   - name: jsCore_decimal_WT
+  - name: generational_jstestfuzz
   - name: generational_jstestfuzz_WT
   - name: jstestfuzz
   - name: jstestfuzz_WT
@@ -4430,6 +4444,7 @@ buildvariants:
   - name: jsCore
   - name: jsCore_auth
   - name: jsCore_compatibility
+  - name: generational_jstestfuzz
   - name: generational_jstestfuzz_WT
   - name: jstestfuzz
   - name: jstestfuzz_WT
@@ -4588,6 +4603,7 @@ buildvariants:
   - name: jsCore_compatibility_WT
   - name: jsCore_decimal
   - name: jsCore_decimal_WT
+  - name: generational_jstestfuzz
   - name: generational_jstestfuzz_WT
   - name: jstestfuzz
   - name: jstestfuzz_WT
@@ -4740,6 +4756,7 @@ buildvariants:
   - name: jsCore_compatibility_WT
   - name: jsCore_decimal
   - name: jsCore_decimal_WT
+  - name: generational_jstestfuzz
   - name: generational_jstestfuzz_WT
   - name: jstestfuzz
   - name: jstestfuzz_WT
@@ -4865,6 +4882,7 @@ buildvariants:
   - name: jsCore_compatibility_WT
   - name: jsCore_decimal
   - name: jsCore_decimal_WT
+  - name: generational_jstestfuzz
   - name: generational_jstestfuzz_WT
   - name: jstestfuzz
   - name: jstestfuzz_WT
@@ -5289,6 +5307,7 @@ buildvariants:
   - name: jsCore_auth
   - name: jsCore_decimal
   - name: jsCore_decimal_WT
+  - name: generational_jstestfuzz
   - name: generational_jstestfuzz_WT
   - name: jstestfuzz
   - name: jstestfuzz_WT
@@ -5397,6 +5416,7 @@ buildvariants:
   - name: jsCore_compatibility_WT
   - name: jsCore_decimal
   - name: jsCore_decimal_WT
+  - name: generational_jstestfuzz
   - name: generational_jstestfuzz_WT
   - name: jstestfuzz
   - name: jstestfuzz_WT
@@ -5668,6 +5688,7 @@ buildvariants:
   - name: jsCore_decimal_WT
   - name: sharding_WT_ese
   - name: jsCore_auth
+  - name: generational_jstestfuzz
   - name: generational_jstestfuzz_WT
   - name: jstestfuzz
   - name: jstestfuzz_WT
@@ -5775,6 +5796,7 @@ buildvariants:
   - name: concurrency_simultaneous
   - name: jsCore
   - name: jsCore_auth
+  - name: generational_jstestfuzz
   - name: generational_jstestfuzz_WT
   - name: jstestfuzz
   - name: jstestfuzz_concurrent
@@ -5865,6 +5887,7 @@ buildvariants:
   - name: jsCore_decimal
   - name: jsCore_decimal_WT
   - name: jsonSchema
+  - name: generational_jstestfuzz
   - name: generational_jstestfuzz_WT
   - name: jstestfuzz
   - name: jstestfuzz_WT
@@ -6021,6 +6044,7 @@ buildvariants:
   - name: jsCore_compatibility_WT
   - name: jsCore_decimal
   - name: jsCore_decimal_WT
+  - name: generational_jstestfuzz
   - name: generational_jstestfuzz_WT
   - name: jstestfuzz
   - name: jstestfuzz_WT
@@ -6151,6 +6175,7 @@ buildvariants:
   - name: ese_WT
   - name: jsCore
   - name: jsCore_auth
+  - name: generational_jstestfuzz
   - name: generational_jstestfuzz_WT
   - name: jstestfuzz
   - name: jstestfuzz_WT
@@ -6329,6 +6354,7 @@ buildvariants:
   - name: jsCore_op_query
   - name: jsCore_op_query_WT
   - name: jsonSchema
+  - name: generational_jstestfuzz
   - name: generational_jstestfuzz_WT
   - name: jstestfuzz
   - name: jstestfuzz_WT
@@ -6656,6 +6682,7 @@ buildvariants:
   - name: ese_WT
   - name: jsCore
   - name: jsCore_auth
+  - name: generational_jstestfuzz
   - name: generational_jstestfuzz_WT
   - name: jstestfuzz
   - name: jstestfuzz_WT
@@ -6746,6 +6773,7 @@ buildvariants:
   - name: jsCore_compatibility_WT
   - name: jsCore_decimal
   - name: jsCore_decimal_WT
+  - name: generational_jstestfuzz
   - name: generational_jstestfuzz_WT
   - name: jstestfuzz
   - name: jstestfuzz_WT
@@ -6872,6 +6900,7 @@ buildvariants:
   - name: jsCore_compatibility_WT
   - name: jsCore_decimal
   - name: jsCore_decimal_WT
+  - name: generational_jstestfuzz
   - name: generational_jstestfuzz_WT
   - name: jstestfuzz
   - name: jstestfuzz_WT
@@ -7346,6 +7375,7 @@ buildvariants:
   - name: ese_WT
   - name: jsCore
   - name: jsCore_auth
+  - name: generational_jstestfuzz
   - name: generational_jstestfuzz_WT
   - name: jstestfuzz
   - name: jstestfuzz_WT
@@ -7437,6 +7467,7 @@ buildvariants:
     - ubuntu1404-jepsen
   - name: jsCore
   - name: jsCore_auth
+  - name: generational_jstestfuzz
   - name: generational_jstestfuzz_WT
   - name: jstestfuzz
   - name: jstestfuzz_WT
@@ -7501,6 +7532,7 @@ buildvariants:
   - name: ese_WT
   - name: jsCore
   - name: jsCore_auth
+  - name: generational_jstestfuzz
   - name: generational_jstestfuzz_WT
   - name: jstestfuzz
   - name: jstestfuzz_WT
@@ -7591,6 +7623,7 @@ buildvariants:
   - name: ese_WT
   - name: jsCore
   - name: jsCore_auth
+  - name: generational_jstestfuzz
   - name: generational_jstestfuzz_WT
   - name: jstestfuzz
   - name: jstestfuzz_WT
@@ -7783,6 +7816,7 @@ buildvariants:
   - name: jsCore_auth
   - name: jsCore_compatibility
   - name: jsCore_compatibility_WT
+  - name: generational_jstestfuzz
   - name: generational_jstestfuzz_WT
   - name: jstestfuzz
   - name: jstestfuzz_WT
@@ -7884,6 +7918,7 @@ buildvariants:
   - name: ese_WT
   - name: jsCore
   - name: jsCore_auth
+  - name: generational_jstestfuzz
   - name: generational_jstestfuzz_WT
   - name: jstestfuzz
   - name: jstestfuzz_WT
@@ -8068,6 +8103,7 @@ buildvariants:
   - name: jsCore_auth
   - name: jsCore_compatibility
   - name: jsCore_compatibility_WT
+  - name: generational_jstestfuzz
   - name: generational_jstestfuzz_WT
   - name: jstestfuzz
   - name: jstestfuzz_WT
@@ -8174,6 +8210,7 @@ buildvariants:
   - name: ese_WT
   - name: jsCore
   - name: jsCore_auth
+  - name: generational_jstestfuzz
   - name: generational_jstestfuzz_WT
   - name: jstestfuzz
   - name: jstestfuzz_WT
@@ -8238,6 +8275,7 @@ buildvariants:
   - name: ese_WT
   - name: jsCore
   - name: jsCore_auth
+  - name: generational_jstestfuzz
   - name: generational_jstestfuzz_WT
   - name: jstestfuzz
   - name: jstestfuzz_WT
@@ -8325,6 +8363,7 @@ buildvariants:
   - name: jsCore_auth
   - name: jsCore_compatibility
   - name: jsCore_compatibility_WT
+  - name: generational_jstestfuzz
   - name: generational_jstestfuzz_WT
   - name: jstestfuzz
   - name: jstestfuzz_WT
@@ -8454,6 +8493,7 @@ buildvariants:
   - name: jsCore_auth
   - name: jsCore_compatibility
   - name: jsCore_compatibility_WT
+  - name: generational_jstestfuzz
   - name: generational_jstestfuzz_WT
   - name: jstestfuzz
   - name: jstestfuzz_WT
@@ -8913,6 +8953,7 @@ buildvariants:
   - name: jsCore
   - name: jsCore_auth
   - name: jsCore_compatibility
+  - name: generational_jstestfuzz
   - name: generational_jstestfuzz_WT
   - name: jstestfuzz
   - name: jstestfuzz_concurrent_WT
@@ -9118,6 +9159,7 @@ buildvariants:
   tasks:
   - name: compile
   - name: compile_all
+  - name: generational_jstestfuzz
   - name: generational_jstestfuzz_WT
   - name: jstestfuzz
   - name: jstestfuzz_WT
