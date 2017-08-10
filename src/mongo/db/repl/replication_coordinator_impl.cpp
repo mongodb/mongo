@@ -1036,17 +1036,9 @@ void ReplicationCoordinatorImpl::_setMyLastAppliedOpTime_inlock(const OpTime& op
     _updateLastCommittedOpTime_inlock();
 
     // Add the new applied timestamp to the list of stable timestamp candidates and then set the
-    // last stable timestamp. Stable timestamps are used to determine the last timestamp that it is
-    // safe to revert the database to, in the event of a rollback. Note that master-slave mode has
-    // no automatic fail over, and so rollbacks never occur. Additionally, the commit point for a
-    // master-slave set will never advance, since it doesn't use any consensus protocol. Since the
-    // set of stable timestamp candidates can only get cleaned up when the commit point advances, we
-    // should refrain from updating stable timestamp candidates in master-slave mode, to avoid the
-    // candidates list from growing unbounded.
-    if (getReplicationMode() == Mode::modeReplSet) {
-        _stableTimestampCandidates.insert(opTime.getTimestamp());
-        _setStableTimestampForStorage_inlock();
-    }
+    // last stable timestamp.
+    _stableTimestampCandidates.insert(opTime.getTimestamp());
+    _setStableTimestampForStorage_inlock();
 
     _opTimeWaiterList.signalAndRemoveIf_inlock(
         [opTime](Waiter* waiter) { return waiter->opTime <= opTime; });
