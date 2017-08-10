@@ -182,7 +182,17 @@ __wt_txn_modify(WT_SESSION_IMPL *session, WT_UPDATE *upd)
 	op->type = F_ISSET(session, WT_SESSION_LOGGING_INMEM) ?
 	    WT_TXN_OP_INMEM : WT_TXN_OP_BASIC;
 #ifdef HAVE_TIMESTAMPS
-	if (F_ISSET(txn, WT_TXN_HAS_TS_COMMIT)) {
+	/*
+	 * Mark the update with a timestamp, if we have one.
+	 *
+	 * Updates in the metadata never get timestamps (either now or at
+	 * commit): metadata cannot be read at a point in time, only the most
+	 * recently committed data matches files on disk.
+	 */
+	if (WT_IS_METADATA(session->dhandle)) {
+		if (!F_ISSET(session, WT_SESSION_LOGGING_INMEM))
+			op->type = WT_TXN_OP_BASIC_TS;
+	} else if (F_ISSET(txn, WT_TXN_HAS_TS_COMMIT)) {
 		__wt_timestamp_set(&upd->timestamp, &txn->commit_timestamp);
 		if (!F_ISSET(session, WT_SESSION_LOGGING_INMEM))
 			op->type = WT_TXN_OP_BASIC_TS;
