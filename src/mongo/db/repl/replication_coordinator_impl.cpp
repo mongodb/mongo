@@ -1123,6 +1123,13 @@ Status ReplicationCoordinatorImpl::waitUntilOpTimeForRead(OperationContext* opCt
 Status ReplicationCoordinatorImpl::_waitUntilOpTime(OperationContext* opCtx,
                                                     bool isMajorityReadConcern,
                                                     OpTime targetOpTime) {
+    if (!isMajorityReadConcern) {
+        // This assumes the read concern is "local" level.
+        // We need to wait for all committed writes to be visible, even in the oplog (which uses
+        // special visibility rules).
+        _externalState->waitForAllEarlierOplogWritesToBeVisible(opCtx);
+    }
+
     stdx::unique_lock<stdx::mutex> lock(_mutex);
 
     if (isMajorityReadConcern && !_externalState->snapshotsEnabled()) {

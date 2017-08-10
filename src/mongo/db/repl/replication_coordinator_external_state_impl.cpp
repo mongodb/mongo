@@ -399,6 +399,7 @@ Status ReplicationCoordinatorExternalStateImpl::initializeReplSetStorage(Operati
                                // retries and they will succeed.  Unfortunately, initial sync will
                                // fail if it finds its sync source has an empty oplog.  Thus, we
                                // need to wait here until the seed document is visible in our oplog.
+                               AutoGetCollection oplog(opCtx, kRsOplogNamespace, MODE_IS);
                                waitForAllEarlierOplogWritesToBeVisible(opCtx);
                            });
 
@@ -407,6 +408,12 @@ Status ReplicationCoordinatorExternalStateImpl::initializeReplSetStorage(Operati
         return ex.toStatus();
     }
     return Status::OK();
+}
+
+void ReplicationCoordinatorExternalStateImpl::waitForAllEarlierOplogWritesToBeVisible(
+    OperationContext* opCtx) {
+    AutoGetCollection oplog(opCtx, NamespaceString::kRsOplogNamespace, MODE_IS);
+    oplog.getCollection()->getRecordStore()->waitForAllEarlierOplogWritesToBeVisible(opCtx);
 }
 
 void ReplicationCoordinatorExternalStateImpl::onDrainComplete(OperationContext* opCtx) {
