@@ -43,7 +43,12 @@ class BSONObj;
 
 namespace repl {
 
-enum class ReadConcernLevel { kLocalReadConcern, kMajorityReadConcern, kLinearizableReadConcern };
+enum class ReadConcernLevel {
+    kLocalReadConcern,
+    kMajorityReadConcern,
+    kLinearizableReadConcern,
+    kAvailableReadConcern
+};
 
 class ReadConcernArgs {
 public:
@@ -66,7 +71,7 @@ public:
      *    find: "coll"
      *    filter: <Query Object>,
      *    readConcern: { // optional
-     *      level: "[majority|local|linearizable]",
+     *      level: "[majority|local|linearizable|available]",
      *      afterOpTime: { ts: <timestamp>, term: <NumberLong> },
      *      afterClusterTime: <timestamp>,
      *    }
