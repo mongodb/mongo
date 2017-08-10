@@ -31,6 +31,7 @@
 #include <string>
 #include <vector>
 
+#include "mongo/db/catalog/index_catalog_entry.h"
 #include "mongo/db/index/2d_common.h"
 #include "mongo/db/index/expression_keys_private.h"
 #include "mongo/db/index/expression_params.h"

@@ -39,7 +39,7 @@
 #include "mongo/db/catalog/coll_mod.h"
 #include "mongo/db/catalog/collection_info_cache.h"
 #include "mongo/db/catalog/collection_options.h"
-#include "mongo/db/catalog/index_catalog.h"
+#include "mongo/db/catalog/index_consistency.h"
 #include "mongo/db/concurrency/d_concurrency.h"
 #include "mongo/db/cursor_manager.h"
 #include "mongo/db/exec/collection_scan_common.h"
@@ -60,6 +60,7 @@ class CollectionCatalogEntry;
 class DatabaseCatalogEntry;
 class ExtentManager;
 class IndexCatalog;
+class IndexDescriptor;
 class DatabaseImpl;
 class MatchExpression;
 class MultiIndexBlock;
@@ -336,6 +337,11 @@ public:
         virtual void notifyCappedWaitersIfNeeded() = 0;
 
         virtual const CollatorInterface* getDefaultCollator() const = 0;
+
+        virtual void informIndexObserver(OperationContext* opCtx,
+                                         const IndexDescriptor* descriptor,
+                                         const IndexKeyEntry& indexEntry,
+                                         const ValidationOperation operation) const = 0;
     };
 
 private:
@@ -725,6 +731,16 @@ public:
      */
     inline const CollatorInterface* getDefaultCollator() const {
         return this->_impl().getDefaultCollator();
+    }
+
+    /**
+     * Calls the Inforn function in the IndexObserver if it's hooked.
+     */
+    inline void informIndexObserver(OperationContext* opCtx,
+                                    const IndexDescriptor* descriptor,
+                                    const IndexKeyEntry& indexEntry,
+                                    const ValidationOperation operation) const {
+        return this->_impl().informIndexObserver(opCtx, descriptor, indexEntry, operation);
     }
 
 private:

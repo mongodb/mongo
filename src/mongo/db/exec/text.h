@@ -46,6 +46,7 @@ using std::vector;
 using fts::FTSQueryImpl;
 using fts::FTSSpec;
 
+class MatchExpression;
 class OperationContext;
 
 struct TextStageParams {

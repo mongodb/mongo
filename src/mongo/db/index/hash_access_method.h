@@ -38,6 +38,8 @@
 
 namespace mongo {
 
+class CollatorInterface;
+
 /**
  * This is the access method for "hashed" indices.
  */

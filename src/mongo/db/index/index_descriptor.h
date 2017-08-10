@@ -33,7 +33,6 @@
 #include <set>
 #include <string>
 
-#include "mongo/db/catalog/collection.h"
 #include "mongo/db/index/multikey_paths.h"
 #include "mongo/db/jsobj.h"
 #include "mongo/db/server_options.h"
@@ -42,6 +41,7 @@
 
 namespace mongo {
 
+class Collection;
 class IndexCatalog;
 class IndexCatalogEntry;
 class IndexCatalogEntryContainer;
@@ -209,13 +209,9 @@ public:
     }
 
     // Is this index multikey?
-    bool isMultikey(OperationContext* opCtx) const {
-        return _collection->getIndexCatalog()->isMultikey(opCtx, this);
-    }
+    bool isMultikey(OperationContext* opCtx) const;
 
-    MultikeyPaths getMultikeyPaths(OperationContext* opCtx) const {
-        return _collection->getIndexCatalog()->getMultikeyPaths(opCtx, this);
-    }
+    MultikeyPaths getMultikeyPaths(OperationContext* opCtx) const;
 
     bool isIdIndex() const {
         return _isIdIndex;
@@ -249,9 +245,7 @@ public:
     const Collection* getCollection() const {
         return _collection;
     }
-    const IndexCatalog* getIndexCatalog() const {
-        return _collection->getIndexCatalog();
-    }
+    const IndexCatalog* getIndexCatalog() const;
 
     bool areIndexOptionsEquivalent(const IndexDescriptor* other) const;
 

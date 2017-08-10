@@ -32,6 +32,8 @@
 
 #include "mongo/platform/basic.h"
 
+#include "mongo/db/catalog/collection.h"
+#include "mongo/db/catalog/index_catalog.h"
 #include "mongo/db/index/index_descriptor.h"
 
 #include <algorithm>
@@ -128,6 +130,18 @@ Status IndexDescriptor::isIndexVersionAllowedForCreation(
 IndexVersion IndexDescriptor::getDefaultIndexVersion(
     ServerGlobalParams::FeatureCompatibility::Version featureCompatibilityVersion) {
     return IndexVersion::kV2;
+}
+
+bool IndexDescriptor::isMultikey(OperationContext* opCtx) const {
+    return _collection->getIndexCatalog()->isMultikey(opCtx, this);
+}
+
+MultikeyPaths IndexDescriptor::getMultikeyPaths(OperationContext* opCtx) const {
+    return _collection->getIndexCatalog()->getMultikeyPaths(opCtx, this);
+}
+
+const IndexCatalog* IndexDescriptor::getIndexCatalog() const {
+    return _collection->getIndexCatalog();
 }
 
 bool IndexDescriptor::areIndexOptionsEquivalent(const IndexDescriptor* other) const {

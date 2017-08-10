@@ -35,6 +35,7 @@
 
 #include "mongo/base/status.h"
 #include "mongo/db/bson/dotted_path_support.h"
+#include "mongo/db/catalog/index_catalog.h"
 #include "mongo/db/exec/working_set_common.h"
 #include "mongo/db/geo/hash.h"
 #include "mongo/db/index/expression_keys_private.h"

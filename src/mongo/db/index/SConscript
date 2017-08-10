@@ -11,6 +11,8 @@ env.Library(
         ],
         LIBDEPS=[
             '$BUILD_DIR/mongo/base',
+            '$BUILD_DIR/mongo/db/catalog/collection',
+            '$BUILD_DIR/mongo/db/catalog/index_catalog',
         ],
 )
 

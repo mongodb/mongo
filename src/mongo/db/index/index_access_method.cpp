@@ -37,6 +37,10 @@
 
 #include "mongo/base/error_codes.h"
 #include "mongo/base/status.h"
+#include "mongo/db/catalog/collection_impl.h"
+#include "mongo/db/catalog/index_catalog.h"
+#include "mongo/db/catalog/index_consistency.h"
+#include "mongo/db/catalog/index_observer.h"
 #include "mongo/db/client.h"
 #include "mongo/db/concurrency/write_conflict_exception.h"
 #include "mongo/db/curop.h"
@@ -133,6 +137,8 @@ Status IndexAccessMethod::insert(OperationContext* opCtx,
     // Delegate to the subclass.
     getKeys(obj, options.getKeysMode, &keys, &multikeyPaths);
 
+    const ValidationOperation operation = ValidationOperation::INSERT;
+
     Status ret = Status::OK();
     for (BSONObjSet::const_iterator i = keys.begin(); i != keys.end(); ++i) {
         Status status = _newInterface->insert(opCtx, *i, loc, options.dupsAllowed);
@@ -140,12 +146,18 @@ Status IndexAccessMethod::insert(OperationContext* opCtx,
         // Everything's OK, carry on.
         if (status.isOK()) {
             ++*numInserted;
+            IndexKeyEntry indexEntry = IndexKeyEntry(*i, loc);
+            _descriptor->getCollection()->informIndexObserver(
+                opCtx, _descriptor, indexEntry, operation);
             continue;
         }
 
         // Error cases.
 
         if (status.code() == ErrorCodes::KeyTooLong && ignoreKeyTooLong(opCtx)) {
+            IndexKeyEntry indexEntry = IndexKeyEntry(*i, loc);
+            _descriptor->getCollection()->informIndexObserver(
+                opCtx, _descriptor, indexEntry, operation);
             continue;
         }
 
@@ -178,8 +190,14 @@ void IndexAccessMethod::removeOneKey(OperationContext* opCtx,
                                      const BSONObj& key,
                                      const RecordId& loc,
                                      bool dupsAllowed) {
+
+    const ValidationOperation operation = ValidationOperation::REMOVE;
+
     try {
         _newInterface->unindex(opCtx, key, loc, dupsAllowed);
+        IndexKeyEntry indexEntry = IndexKeyEntry(key, loc);
+        _descriptor->getCollection()->informIndexObserver(
+            opCtx, _descriptor, indexEntry, operation);
     } catch (AssertionException& e) {
         log() << "Assertion failure: _unindex failed " << _descriptor->indexNamespace();
         log() << "Assertion failure: _unindex failed: " << redact(e) << "  key:" << key.toString()
@@ -376,9 +394,16 @@ Status IndexAccessMethod::update(OperationContext* opCtx,
         _btreeState->setMultikey(opCtx, ticket.newMultikeyPaths);
     }
 
+    const ValidationOperation removeOperation = ValidationOperation::REMOVE;
+
     for (size_t i = 0; i < ticket.removed.size(); ++i) {
         _newInterface->unindex(opCtx, ticket.removed[i], ticket.loc, ticket.dupsAllowed);
+        IndexKeyEntry indexEntry = IndexKeyEntry(ticket.removed[i], ticket.loc);
+        _descriptor->getCollection()->informIndexObserver(
+            opCtx, _descriptor, indexEntry, removeOperation);
     }
+
+    const ValidationOperation insertOperation = ValidationOperation::INSERT;
 
     for (size_t i = 0; i < ticket.added.size(); ++i) {
         Status status =
@@ -386,11 +411,18 @@ Status IndexAccessMethod::update(OperationContext* opCtx,
         if (!status.isOK()) {
             if (status.code() == ErrorCodes::KeyTooLong && ignoreKeyTooLong(opCtx)) {
                 // Ignore.
+                IndexKeyEntry indexEntry = IndexKeyEntry(ticket.added[i], ticket.loc);
+                _descriptor->getCollection()->informIndexObserver(
+                    opCtx, _descriptor, indexEntry, insertOperation);
                 continue;
             }
 
             return status;
         }
+
+        IndexKeyEntry indexEntry = IndexKeyEntry(ticket.added[i], ticket.loc);
+        _descriptor->getCollection()->informIndexObserver(
+            opCtx, _descriptor, indexEntry, insertOperation);
     }
 
     *numInserted = ticket.added.size();

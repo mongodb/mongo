@@ -35,6 +35,7 @@
 #include "mongo/bson/ordering.h"
 #include "mongo/db/catalog/index_catalog_entry.h"
 #include "mongo/db/index/multikey_paths.h"
+#include "mongo/db/matcher/expression.h"
 #include "mongo/db/record_id.h"
 #include "mongo/db/storage/kv/kv_prefix.h"
 #include "mongo/db/storage/snapshot_name.h"

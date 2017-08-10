@@ -213,6 +213,7 @@ env.Library(
         "index_catalog_entry_impl.cpp",
         "index_consistency.cpp",
         "index_create_impl.cpp",
+        "index_observer.cpp",
         "private/record_store_validate_adaptor.cpp",
     ],
     LIBDEPS=[

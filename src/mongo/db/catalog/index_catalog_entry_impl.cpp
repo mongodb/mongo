@@ -36,6 +36,7 @@
 
 #include "mongo/base/init.h"
 #include "mongo/db/catalog/collection_catalog_entry.h"
+#include "mongo/db/catalog/collection_info_cache_impl.h"
 #include "mongo/db/catalog/head_manager.h"
 #include "mongo/db/concurrency/d_concurrency.h"
 #include "mongo/db/concurrency/write_conflict_exception.h"

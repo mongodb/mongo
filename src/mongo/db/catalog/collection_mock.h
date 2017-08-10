@@ -276,6 +276,13 @@ public:
         std::abort();
     }
 
+    void informIndexObserver(OperationContext* opCtx,
+                             const IndexDescriptor* descriptor,
+                             const IndexKeyEntry& indexEntry,
+                             const ValidationOperation operation) const {
+        std::abort();
+    }
+
     OptionalCollectionUUID uuid() const {
         std::abort();
     }

@@ -35,6 +35,7 @@
 #include "mongo/db/catalog/database_catalog_entry.h"
 #include "mongo/db/index/index_descriptor.h"
 #include "mongo/db/index/multikey_paths.h"
+#include "mongo/db/index_names.h"
 #include "mongo/db/operation_context_noop.h"
 #include "mongo/db/storage/devnull/devnull_kv_engine.h"
 #include "mongo/db/storage/kv/kv_database_catalog_entry_mock.h"

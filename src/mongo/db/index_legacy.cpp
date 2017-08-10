@@ -30,6 +30,8 @@
 
 #include <string>
 
+#include "mongo/db/catalog/collection.h"
+#include "mongo/db/catalog/index_catalog.h"
 #include "mongo/db/client.h"
 #include "mongo/db/fts/fts_spec.h"
 #include "mongo/db/index/expression_keys_private.h"
