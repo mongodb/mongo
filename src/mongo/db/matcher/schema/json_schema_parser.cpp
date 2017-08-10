@@ -38,6 +38,7 @@
 #include "mongo/db/matcher/schema/expression_internal_schema_max_length.h"
 #include "mongo/db/matcher/schema/expression_internal_schema_min_length.h"
 #include "mongo/db/matcher/schema/expression_internal_schema_object_match.h"
+#include "mongo/db/matcher/schema/expression_internal_schema_xor.h"
 #include "mongo/stdx/memory.h"
 #include "mongo/util/string_map.h"
 
@@ -45,16 +46,31 @@ namespace mongo {
 
 namespace {
 // JSON Schema keyword constants.
+constexpr StringData kSchemaAllOfKeyword = "allOf"_sd;
+constexpr StringData kSchemaAnyOfKeyword = "anyOf"_sd;
 constexpr StringData kSchemaExclusiveMaximumKeyword = "exclusiveMaximum"_sd;
 constexpr StringData kSchemaExclusiveMinimumKeyword = "exclusiveMinimum"_sd;
 constexpr StringData kSchemaMaximumKeyword = "maximum"_sd;
-constexpr StringData kSchemaMinimumKeyword = "minimum"_sd;
 constexpr StringData kSchemaMaxLengthKeyword = "maxLength"_sd;
+constexpr StringData kSchemaMinimumKeyword = "minimum"_sd;
 constexpr StringData kSchemaMinLengthKeyword = "minLength"_sd;
-constexpr StringData kSchemaPatternKeyword = "pattern"_sd;
 constexpr StringData kSchemaMultipleOfKeyword = "multipleOf"_sd;
+constexpr StringData kSchemaNotKeyword = "not"_sd;
+constexpr StringData kSchemaOneOfKeyword = "oneOf"_sd;
+constexpr StringData kSchemaPatternKeyword = "pattern"_sd;
 constexpr StringData kSchemaPropertiesKeyword = "properties"_sd;
 constexpr StringData kSchemaTypeKeyword = "type"_sd;
+
+/**
+ * Parses 'schema' to the semantically equivalent match expression. If the schema has an
+ * associated path, e.g. if we are parsing the nested schema for property "myProp" in
+ *
+ * {properties: {myProp: <nested-schema>}}
+ *
+ * then this is passed in 'path'. In this example, the value of 'path' is "myProp". If there is
+ * no path, e.g. for top-level schemas, then 'path' is empty.
+ */
+StatusWithMatchExpression _parse(StringData path, BSONObj schema);
 
 /**
  * Constructs and returns a match expression to evaluate a JSON Schema restriction keyword.
@@ -279,10 +295,106 @@ StatusWithMatchExpression parseMultipleOf(StringData path,
     return makeRestriction(restrictionType, std::move(expr), typeExpr);
 }
 
-}  // namespace
+template <class T>
+StatusWithMatchExpression parseLogicalKeyword(StringData path, BSONElement logicalElement) {
+    if (logicalElement.type() != BSONType::Array) {
+        return {ErrorCodes::TypeMismatch,
+                str::stream() << "$jsonSchema keyword '" << logicalElement.fieldNameStringData()
+                              << "' must be an array"};
+    }
 
-StatusWithMatchExpression JSONSchemaParser::_parseProperties(
-    StringData path, BSONElement propertiesElt, InternalSchemaTypeExpression* typeExpr) {
+    auto logicalElementObj = logicalElement.embeddedObject();
+    if (logicalElementObj.isEmpty()) {
+        return {ErrorCodes::BadValue,
+                str::stream() << "$jsonSchema keyword '" << logicalElement.fieldNameStringData()
+                              << "' must be a non-empty array"};
+    }
+
+    std::unique_ptr<T> listOfExpr = stdx::make_unique<T>();
+    for (const auto& elem : logicalElementObj) {
+        if (elem.type() != BSONType::Object) {
+            return {ErrorCodes::TypeMismatch,
+                    str::stream() << "$jsonSchema keyword '" << logicalElement.fieldNameStringData()
+                                  << "' must be an array of objects, but found an element of type "
+                                  << elem.type()};
+        }
+
+        auto nestedSchemaMatch = _parse(path, elem.embeddedObject());
+        if (!nestedSchemaMatch.isOK()) {
+            return nestedSchemaMatch.getStatus();
+        }
+
+        listOfExpr->add(nestedSchemaMatch.getValue().release());
+    }
+
+    return {std::move(listOfExpr)};
+}
+
+/**
+ * Parses the logical keywords in 'keywordMap' to their equivalent match expressions
+ * and, on success, adds the results to 'andExpr'.
+ *
+ * This function parses the following keywords:
+ *  - allOf
+ *  - anyOf
+ *  - oneOf
+ *  - not
+ *  - enum
+ */
+Status parseLogicalKeywords(StringMap<BSONElement>& keywordMap,
+                            StringData path,
+                            AndMatchExpression* andExpr) {
+    if (auto allOfElt = keywordMap[kSchemaAllOfKeyword]) {
+        auto allOfExpr = parseLogicalKeyword<AndMatchExpression>(path, allOfElt);
+        if (!allOfExpr.isOK()) {
+            return allOfExpr.getStatus();
+        }
+        andExpr->add(allOfExpr.getValue().release());
+    }
+
+    if (auto anyOfElt = keywordMap[kSchemaAnyOfKeyword]) {
+        auto anyOfExpr = parseLogicalKeyword<OrMatchExpression>(path, anyOfElt);
+        if (!anyOfExpr.isOK()) {
+            return anyOfExpr.getStatus();
+        }
+        andExpr->add(anyOfExpr.getValue().release());
+    }
+
+    if (auto oneOfElt = keywordMap[kSchemaOneOfKeyword]) {
+        auto oneOfExpr = parseLogicalKeyword<InternalSchemaXorMatchExpression>(path, oneOfElt);
+        if (!oneOfExpr.isOK()) {
+            return oneOfExpr.getStatus();
+        }
+        andExpr->add(oneOfExpr.getValue().release());
+    }
+
+    if (auto notElt = keywordMap[kSchemaNotKeyword]) {
+        if (notElt.type() != BSONType::Object) {
+            return {ErrorCodes::TypeMismatch,
+                    str::stream() << "$jsonSchema keyword '" << kSchemaNotKeyword
+                                  << "' must be an object, but found an element of type "
+                                  << notElt.type()};
+        }
+
+        auto parsedExpr = _parse(path, notElt.embeddedObject());
+        if (!parsedExpr.isOK()) {
+            return parsedExpr.getStatus();
+        }
+
+        auto notMatchExpr = stdx::make_unique<NotMatchExpression>();
+        auto initStatus = notMatchExpr->init(parsedExpr.getValue().release());
+        if (!initStatus.isOK()) {
+            return initStatus;
+        }
+        andExpr->add(notMatchExpr.release());
+    }
+
+    return Status::OK();
+}
+
+StatusWithMatchExpression parseProperties(StringData path,
+                                          BSONElement propertiesElt,
+                                          InternalSchemaTypeExpression* typeExpr) {
     if (propertiesElt.type() != BSONType::Object) {
         return {Status(ErrorCodes::TypeMismatch,
                        str::stream() << "$jsonSchema keyword '" << kSchemaPropertiesKeyword
@@ -334,19 +446,25 @@ StatusWithMatchExpression JSONSchemaParser::_parseProperties(
     return makeRestriction(BSONType::Object, std::move(objectMatch), typeExpr);
 }
 
-StatusWithMatchExpression JSONSchemaParser::_parse(StringData path, BSONObj schema) {
+StatusWithMatchExpression _parse(StringData path, BSONObj schema) {
     // Map from JSON Schema keyword to the corresponding element from 'schema', or to an empty
     // BSONElement if the JSON Schema keyword is not specified.
-    StringMap<BSONElement> keywordMap{{kSchemaTypeKeyword, {}},
-                                      {kSchemaPropertiesKeyword, {}},
-                                      {kSchemaMaximumKeyword, {}},
-                                      {kSchemaMinimumKeyword, {}},
-                                      {kSchemaExclusiveMaximumKeyword, {}},
-                                      {kSchemaExclusiveMinimumKeyword, {}},
-                                      {kSchemaMaxLengthKeyword, {}},
-                                      {kSchemaMinLengthKeyword, {}},
-                                      {kSchemaPatternKeyword, {}},
-                                      {kSchemaMultipleOfKeyword, {}}};
+    StringMap<BSONElement> keywordMap{
+        {kSchemaAllOfKeyword, {}},
+        {kSchemaAnyOfKeyword, {}},
+        {kSchemaExclusiveMaximumKeyword, {}},
+        {kSchemaExclusiveMinimumKeyword, {}},
+        {kSchemaMaximumKeyword, {}},
+        {kSchemaMaxLengthKeyword, {}},
+        {kSchemaMinimumKeyword, {}},
+        {kSchemaMinLengthKeyword, {}},
+        {kSchemaMultipleOfKeyword, {}},
+        {kSchemaNotKeyword, {}},
+        {kSchemaOneOfKeyword, {}},
+        {kSchemaPatternKeyword, {}},
+        {kSchemaPropertiesKeyword, {}},
+        {kSchemaTypeKeyword, {}},
+    };
 
     for (auto&& elt : schema) {
         auto it = keywordMap.find(elt.fieldNameStringData());
@@ -373,7 +491,7 @@ StatusWithMatchExpression JSONSchemaParser::_parse(StringData path, BSONObj sche
     auto andExpr = stdx::make_unique<AndMatchExpression>();
 
     if (auto propertiesElt = keywordMap[kSchemaPropertiesKeyword]) {
-        auto propertiesExpr = _parseProperties(path, propertiesElt, typeExpr.getValue().get());
+        auto propertiesExpr = parseProperties(path, propertiesElt, typeExpr.getValue().get());
         if (!propertiesExpr.isOK()) {
             return propertiesExpr;
         }
@@ -467,6 +585,11 @@ StatusWithMatchExpression JSONSchemaParser::_parse(StringData path, BSONObj sche
         andExpr->add(multipleOfExpr.getValue().release());
     }
 
+    auto parseStatus = parseLogicalKeywords(keywordMap, path, andExpr.get());
+    if (!parseStatus.isOK()) {
+        return parseStatus;
+    }
+
     if (path.empty() && typeExpr.getValue() &&
         typeExpr.getValue()->getBSONType() != BSONType::Object) {
         // This is a top-level schema which requires that the type is something other than
@@ -479,6 +602,8 @@ StatusWithMatchExpression JSONSchemaParser::_parse(StringData path, BSONObj sche
     }
     return {std::move(andExpr)};
 }
+
+}  // namespace
 
 StatusWithMatchExpression JSONSchemaParser::parse(BSONObj schema) {
     return _parse(StringData{}, schema);
