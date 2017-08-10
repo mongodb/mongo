@@ -216,7 +216,6 @@ TEST_F(ChangeStreamStageTest, TransformUpdateFields) {
     Document expectedUpdateField{
         {DSChangeStream::kIdField, makeResumeToken(ts, nss, 1)},
         {DSChangeStream::kOperationTypeField, DSChangeStream::kUpdateOpType},
-        {DSChangeStream::kFullDocumentField, BSONNULL},
         {DSChangeStream::kNamespaceField, D{{"db", nss.db()}, {"coll", nss.coll()}}},
         {DSChangeStream::kDocumentKeyField, D{{"_id", 1}}},
         {
@@ -233,7 +232,6 @@ TEST_F(ChangeStreamStageTest, TransformRemoveFields) {
     Document expectedRemoveField{
         {DSChangeStream::kIdField, makeResumeToken(ts, nss, 1)},
         {DSChangeStream::kOperationTypeField, DSChangeStream::kUpdateOpType},
-        {DSChangeStream::kFullDocumentField, BSONNULL},
         {DSChangeStream::kNamespaceField, D{{"db", nss.db()}, {"coll", nss.coll()}}},
         {DSChangeStream::kDocumentKeyField, D{{"_id", 1}}},
         {
@@ -262,7 +260,6 @@ TEST_F(ChangeStreamStageTest, TransformDelete) {
     Document expectedDelete{
         {DSChangeStream::kIdField, makeResumeToken(ts, nss, 1)},
         {DSChangeStream::kOperationTypeField, DSChangeStream::kDeleteOpType},
-        {DSChangeStream::kFullDocumentField, BSONNULL},
         {DSChangeStream::kNamespaceField, D{{"db", nss.db()}, {"coll", nss.coll()}}},
         {DSChangeStream::kDocumentKeyField, D{{"_id", 1}}},
     };
@@ -290,7 +287,6 @@ TEST_F(ChangeStreamStageTest, TransformInvalidate) {
     Document expectedInvalidate{
         {DSChangeStream::kIdField, makeResumeToken(ts, nss.getCommandNS())},
         {DSChangeStream::kOperationTypeField, DSChangeStream::kInvalidateOpType},
-        {DSChangeStream::kFullDocumentField, BSONNULL},
     };
     for (auto& entry : {dropColl, dropDB, rename}) {
         checkTransformation(entry, expectedInvalidate);
@@ -324,7 +320,6 @@ TEST_F(ChangeStreamStageTest, TransformInvalidateRenameDropTarget) {
     Document expectedInvalidate{
         {DSChangeStream::kIdField, makeResumeToken(ts, otherColl.getCommandNS())},
         {DSChangeStream::kOperationTypeField, DSChangeStream::kInvalidateOpType},
-        {DSChangeStream::kFullDocumentField, BSONNULL},
     };
     checkTransformation(rename, expectedInvalidate);
 }
@@ -401,7 +396,6 @@ TEST_F(ChangeStreamStageTest, CloseCursorOnInvalidateEntries) {
     Document expectedInvalidate{
         {DSChangeStream::kIdField, makeResumeToken(ts, nss.getCommandNS())},
         {DSChangeStream::kOperationTypeField, DSChangeStream::kInvalidateOpType},
-        {DSChangeStream::kFullDocumentField, BSONNULL},
     };
 
     auto next = closeCursor->getNext();

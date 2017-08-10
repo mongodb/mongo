@@ -122,7 +122,6 @@
     expected = {
         _id: {documentKey: {_id: 3}, ns: "test.t1"},
         documentKey: {_id: 3},
-        fullDocument: null,
         ns: {db: "test", coll: "t1"},
         operationType: "update",
         updateDescription: {removedFields: [], updatedFields: {b: 3}},
@@ -135,7 +134,6 @@
     expected = {
         _id: {documentKey: {_id: 1}, ns: "test.t1"},
         documentKey: {_id: 1},
-        fullDocument: null,
         ns: {db: "test", coll: "t1"},
         operationType: "delete",
     };
@@ -166,7 +164,7 @@
     jsTestLog("Testing rename");
     t2cursor = startWatchingChanges([{$changeStream: {}}], db.t2);
     assert.writeOK(db.t2.renameCollection("t3"));
-    expected = {_id: {ns: "test.$cmd"}, operationType: "invalidate", fullDocument: null};
+    expected = {_id: {ns: "test.$cmd"}, operationType: "invalidate"};
     assertNextBatchMatches({cursor: t2cursor, expectedBatch: [expected]});
 
     jsTestLog("Testing insert that looks like rename");

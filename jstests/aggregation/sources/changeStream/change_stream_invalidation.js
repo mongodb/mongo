@@ -42,8 +42,7 @@
     aggcursor = res.cursor;
     assert.eq(aggcursor.id, 0, "expected invalidation to cause the cursor to be closed");
     assert.eq(aggcursor.nextBatch.length, 1);
-    assert.docEq(aggcursor.nextBatch[0],
-                 {_id: {ns: "test.$cmd"}, fullDocument: null, operationType: "invalidate"});
+    assert.docEq(aggcursor.nextBatch[0], {_id: {ns: "test.$cmd"}, operationType: "invalidate"});
 
     jsTestLog("Testing aggregate command closes cursor for invalidate entries");
     const collAgg = db.change_stream_agg_invalidations;
@@ -69,8 +68,7 @@
     aggcursor = res.cursor;
     assert.eq(aggcursor.id, 0, "expected invalidation to cause the cursor to be closed");
     assert.eq(aggcursor.firstBatch.length, 1);
-    assert.docEq(aggcursor.firstBatch,
-                 [{_id: {ns: "test.$cmd"}, fullDocument: null, operationType: "invalidate"}]);
+    assert.docEq(aggcursor.firstBatch, [{_id: {ns: "test.$cmd"}, operationType: "invalidate"}]);
 
     replTest.stopSet();
 }());

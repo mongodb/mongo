@@ -296,7 +296,7 @@ Document DocumentSourceChangeStream::Transformation::applyTransformation(const D
     // Non-replace updates have the _id in field "o2".
     Value documentId = id.missing() ? input.getNestedField("o2._id") : id;
     StringData operationType;
-    Value fullDocument = Value(BSONNULL);
+    Value fullDocument;
     Value updateDescription;
 
     // Deal with CRUD operations and commands.

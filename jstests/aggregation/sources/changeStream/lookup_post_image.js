@@ -77,7 +77,7 @@
     latestChange = getLastResultFromFirstBatch(
         {collection: coll, pipeline: [{$changeStream: {resumeAfter: firstChange._id}}]});
     assert.eq(latestChange.operationType, "update");
-    assert.eq(null, latestChange.fullDocument);
+    assert(!latestChange.hasOwnProperty("fullDocument"));
 
     jsTestLog("Testing change streams with 'fullDocument' specified as 'default'");
 
@@ -106,7 +106,7 @@
     latestChange = getLastResultFromFirstBatch(
         {collection: coll, pipeline: [{$changeStream: {resumeAfter: firstChange._id}}]});
     assert.eq(latestChange.operationType, "update");
-    assert.eq(null, latestChange.fullDocument);
+    assert(!latestChange.hasOwnProperty("fullDocument"));
 
     jsTestLog("Testing change streams with 'fullDocument' specified as 'updateLookup'");
 
@@ -153,6 +153,7 @@
         ]
     });
     assert.eq(latestChange.operationType, "update");
+    assert(latestChange.hasOwnProperty("fullDocument"));
     assert.eq(latestChange.fullDocument, null);
 
     // Test that looking up the post image of an update after the collection has been dropped will
@@ -166,7 +167,18 @@
         ]
     });
     assert.eq(latestChange.operationType, "update");
+    assert(latestChange.hasOwnProperty("fullDocument"));
     assert.eq(latestChange.fullDocument, null);
+
+    // Test that invalidate entries don't have 'fullDocument' even if 'updateLookup' is specified.
+    latestChange = getLastResultFromFirstBatch({
+        collection: coll,
+        pipeline: [
+            {$changeStream: {fullDocument: "updateLookup", resumeAfter: firstChange._id}},
+        ]
+    });
+    assert.eq(latestChange.operationType, "invalidate");
+    assert(!latestChange.hasOwnProperty("fullDocument"));
 
     replTest.stopSet();
 }());

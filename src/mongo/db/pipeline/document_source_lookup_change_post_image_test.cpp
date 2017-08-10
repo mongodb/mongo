@@ -219,12 +219,11 @@ TEST_F(DocumentSourceLookupChangePostImageTest, ShouldPropagatePauses) {
     auto mockLocalSource = DocumentSourceMock::create(
         {Document{{"documentKey", Document{{"_id", 0}}},
                   {"operationType", "insert"_sd},
-                  {"fullDocument", Document{{"_id", 0}}},
-                  {"ns", Document{{"db", expCtx->ns.db()}, {"coll", expCtx->ns.coll()}}}},
+                  {"ns", Document{{"db", expCtx->ns.db()}, {"coll", expCtx->ns.coll()}}},
+                  {"fullDocument", Document{{"_id", 0}}}},
          DocumentSource::GetNextResult::makePauseExecution(),
          Document{{"documentKey", Document{{"_id", 1}}},
                   {"operationType", "update"_sd},
-                  {"fullDocument", BSONNULL},
                   {"ns", Document{{"db", expCtx->ns.db()}, {"coll", expCtx->ns.coll()}}}},
          DocumentSource::GetNextResult::makePauseExecution()});
 
@@ -242,8 +241,8 @@ TEST_F(DocumentSourceLookupChangePostImageTest, ShouldPropagatePauses) {
         next.releaseDocument(),
         (Document{{"documentKey", Document{{"_id", 0}}},
                   {"operationType", "insert"_sd},
-                  {"fullDocument", Document{{"_id", 0}}},
-                  {"ns", Document{{"db", expCtx->ns.db()}, {"coll", expCtx->ns.coll()}}}}));
+                  {"ns", Document{{"db", expCtx->ns.db()}, {"coll", expCtx->ns.coll()}}},
+                  {"fullDocument", Document{{"_id", 0}}}}));
 
     ASSERT_TRUE(lookupChangeStage->getNext().isPaused());
 
@@ -253,8 +252,8 @@ TEST_F(DocumentSourceLookupChangePostImageTest, ShouldPropagatePauses) {
         next.releaseDocument(),
         (Document{{"documentKey", Document{{"_id", 1}}},
                   {"operationType", "update"_sd},
-                  {"fullDocument", Document{{"_id", 1}}},
-                  {"ns", Document{{"db", expCtx->ns.db()}, {"coll", expCtx->ns.coll()}}}}));
+                  {"ns", Document{{"db", expCtx->ns.db()}, {"coll", expCtx->ns.coll()}}},
+                  {"fullDocument", Document{{"_id", 1}}}}));
 
     ASSERT_TRUE(lookupChangeStage->getNext().isPaused());
 
