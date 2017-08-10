@@ -239,15 +239,9 @@ StatusWith<bool> UpdateObjectNode::parseAndMerge(
                 << "'");
     }
 
-    // Construct the leaf node.
-    // TODO SERVER-28777: This should never fail because all modifiers are implemented.
+    // Construct and initialize the leaf node.
     auto leaf = modifiertable::makeUpdateLeafNode(type);
-    if (!leaf) {
-        return Status(ErrorCodes::FailedToParse,
-                      str::stream() << "Cannot construct modifier of type " << type);
-    }
-
-    // Initialize the leaf node.
+    invariant(leaf);
     status = leaf->init(modExpr, collator);
     if (!status.isOK()) {
         return status;

@@ -86,7 +86,7 @@ modifiertable::ModifierType validateMod(BSONElement mod) {
 }
 
 // Parses 'updateExpr' and merges it into 'root'. Returns whether 'updateExpr' is positional.
-StatusWith<bool> parseUpdateExpression(
+bool parseUpdateExpression(
     BSONObj updateExpr,
     UpdateObjectNode* root,
     const CollatorInterface* collator,
@@ -98,23 +98,7 @@ StatusWith<bool> parseUpdateExpression(
         for (auto&& field : mod.Obj()) {
             auto statusWithPositional = UpdateObjectNode::parseAndMerge(
                 root, modType, field, collator, arrayFilters, foundIdentifiers);
-            if (!statusWithPositional.isOK()) {
-
-                // Check whether we failed to parse because this mod type is not yet supported by
-                // UpdateNode.
-                // TODO SERVER-28777: Skip this check.
-                auto leaf = modifiertable::makeUpdateLeafNode(modType);
-                if (!leaf) {
-                    uassert(ErrorCodes::InvalidOptions,
-                            str::stream() << "Cannot use array filters with modifier "
-                                          << mod.fieldName(),
-                            arrayFilters.empty());
-                    return statusWithPositional;
-                }
-
-                uassertStatusOK(statusWithPositional);
-                MONGO_UNREACHABLE;
-            }
+            uassertStatusOK(statusWithPositional);
             positional = positional || statusWithPositional.getValue();
         }
     }
@@ -167,36 +151,27 @@ Status UpdateDriver::parse(
     // Register the fact that this driver is not doing a full object replacement.
     _replacementMode = false;
 
-    // If the featureCompatibilityVersion is 3.6, parse using UpdateNode.
-    // TODO SERVER-28777: Remove the restriction that this is only done if the update is not from
-    // replication.
+    // If the featureCompatibilityVersion is 3.4, parse using the ModifierInterfaces.
     if (serverGlobalParams.featureCompatibility.version.load() ==
-            ServerGlobalParams::FeatureCompatibility::Version::k36 &&
-        !_modOptions.fromReplication) {
-        auto root = stdx::make_unique<UpdateObjectNode>();
-        auto statusWithPositional =
-            parseUpdateExpression(updateExpr, root.get(), _modOptions.collator, arrayFilters);
-        if (statusWithPositional.isOK()) {
-            _positional = statusWithPositional.getValue();
-            _root = std::move(root);
-            return Status::OK();
-        }
-    }
-
-    // TODO SERVER-28777: This can be an else case, since we will not fall back to the old parsing
-    // if we fail to parse using the new implementation.
-    uassert(ErrorCodes::InvalidOptions,
-            "The featureCompatibilityVersion must be 3.6 to use arrayFilters. See "
-            "http://dochub.mongodb.org/core/3.6-feature-compatibility.",
-            arrayFilters.empty());
-    for (auto&& mod : updateExpr) {
-        auto modType = validateMod(mod);
-        for (auto&& field : mod.Obj()) {
-            auto status = addAndParse(modType, field);
-            if (!status.isOK()) {
-                return status;
+        ServerGlobalParams::FeatureCompatibility::Version::k34) {
+        uassert(ErrorCodes::InvalidOptions,
+                "The featureCompatibilityVersion must be 3.6 to use arrayFilters. See "
+                "http://dochub.mongodb.org/core/3.6-feature-compatibility.",
+                arrayFilters.empty());
+        for (auto&& mod : updateExpr) {
+            auto modType = validateMod(mod);
+            for (auto&& field : mod.Obj()) {
+                auto status = addAndParse(modType, field);
+                if (!status.isOK()) {
+                    return status;
+                }
             }
         }
+    } else {
+        auto root = stdx::make_unique<UpdateObjectNode>();
+        _positional =
+            parseUpdateExpression(updateExpr, root.get(), _modOptions.collator, arrayFilters);
+        _root = std::move(root);
     }
 
     return Status::OK();
