@@ -83,22 +83,12 @@ bool inEachMode(const BSONElement& modExpr) {
     return true;
 }
 
-Status parseEachMode(ModifierPush::ModifierPushMode pushMode,
-                     const BSONElement& modExpr,
+Status parseEachMode(const BSONElement& modExpr,
                      BSONElement* eachElem,
                      BSONElement* sliceElem,
                      BSONElement* sortElem,
                      BSONElement* positionElem) {
     Status status = Status::OK();
-
-    // If in $pushAll mode, all we need is the array.
-    if (pushMode == ModifierPush::PUSH_ALL) {
-        if (modExpr.type() != Array) {
-            return Status(ErrorCodes::BadValue, "$pushAll requires an array");
-        }
-        *eachElem = modExpr;
-        return Status::OK();
-    }
 
     // The $each clause must be an array.
     *eachElem = modExpr.embeddedObject()[kEach];
@@ -179,7 +169,7 @@ struct ModifierPush::PreparedState {
     size_t actualPosition;
 };
 
-ModifierPush::ModifierPush(ModifierPush::ModifierPushMode pushMode)
+ModifierPush::ModifierPush()
     : _fieldRef(),
       _posDollar(0),
       _eachMode(false),
@@ -189,7 +179,6 @@ ModifierPush::ModifierPush(ModifierPush::ModifierPushMode pushMode)
       _sortPresent(false),
       _position(std::numeric_limits<std::int32_t>::max()),
       _sort(),
-      _pushMode(pushMode),
       _val() {}
 
 ModifierPush::~ModifierPush() {}
@@ -231,32 +220,13 @@ Status ModifierPush::init(const BSONElement& modExpr, const Options& opts, bool*
     BSONElement sortElem;
     BSONElement positionElem;
     switch (modExpr.type()) {
-        case Array:
-            if (_pushMode == PUSH_ALL) {
-                _eachMode = true;
-                Status status = parseEachMode(
-                    PUSH_ALL, modExpr, &_eachElem, &sliceElem, &sortElem, &positionElem);
-                if (!status.isOK()) {
-                    return status;
-                }
-            } else {
-                _val = modExpr;
-            }
-            break;
-
         case Object:
-            if (_pushMode == PUSH_ALL) {
-                return Status(ErrorCodes::BadValue,
-                              str::stream() << "$pushAll requires an array of values "
-                                               "but was given an embedded document.");
-            }
-
             // If any known clause ($each, $slice, or $sort) is present, we'd assume
             // we're using the $each variation of push and would parse accodingly.
             _eachMode = inEachMode(modExpr);
             if (_eachMode) {
-                Status status = parseEachMode(
-                    PUSH_NORMAL, modExpr, &_eachElem, &sliceElem, &sortElem, &positionElem);
+                Status status =
+                    parseEachMode(modExpr, &_eachElem, &sliceElem, &sortElem, &positionElem);
                 if (!status.isOK()) {
                     return status;
                 }
@@ -266,23 +236,12 @@ Status ModifierPush::init(const BSONElement& modExpr, const Options& opts, bool*
             break;
 
         default:
-            if (_pushMode == PUSH_ALL) {
-                return Status(ErrorCodes::BadValue,
-                              str::stream() << "$pushAll requires an array of values "
-                                               "but was given type: "
-                                            << typeName(modExpr.type()));
-            }
-
             _val = modExpr;
             break;
     }
 
     // Is slice present and correct?
     if (sliceElem.type() != EOO) {
-        if (_pushMode == PUSH_ALL) {
-            return Status(ErrorCodes::BadValue, "cannot use $slice in $pushAll");
-        }
-
         if (!sliceElem.isNumber()) {
             return Status(ErrorCodes::BadValue,
                           str::stream() << "The value for $slice must "
@@ -305,10 +264,6 @@ Status ModifierPush::init(const BSONElement& modExpr, const Options& opts, bool*
 
     // Is position present and correct?
     if (positionElem.type() != EOO) {
-        if (_pushMode == PUSH_ALL) {
-            return Status(ErrorCodes::BadValue, "cannot use $position in $pushAll");
-        }
-
         // Check that $position can be represented by a 32-bit integer.
         switch (positionElem.type()) {
             case NumberInt:
@@ -343,10 +298,6 @@ Status ModifierPush::init(const BSONElement& modExpr, const Options& opts, bool*
 
     // Is sort present and correct?
     if (sortElem.type() != EOO) {
-        if (_pushMode == PUSH_ALL) {
-            return Status(ErrorCodes::BadValue, "cannot use $sort in $pushAll");
-        }
-
         if (sortElem.type() != Object && !sortElem.isNumber()) {
             return Status(ErrorCodes::BadValue,
                           "The $sort is invalid: use 1/-1 to sort the whole element, "
@@ -570,7 +521,7 @@ Status ModifierPush::apply() const {
 
     // 2. Add new elements to the array either by going over the $each array or by
     // appending the (old style $push) element.
-    if (_eachMode || _pushMode == PUSH_ALL) {
+    if (_eachMode) {
         BSONObjIterator itEach(_eachElem.embeddedObject());
 
         // When adding more than one element we keep track of the previous one
@@ -672,7 +623,7 @@ Status ModifierPush::log(LogBuilder* logBuilder) const {
                                                      _preparedState->elemFound);
     } else {
         // Set only the positional elements appended
-        if (_eachMode || _pushMode == PUSH_ALL) {
+        if (_eachMode) {
             // For each input element log it as a posisional $set
             BSONObjIterator itEach(_eachElem.embeddedObject());
             while (itEach.more()) {

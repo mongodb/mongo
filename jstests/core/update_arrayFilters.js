@@ -419,25 +419,6 @@
     assert.writeOK(coll.update({_id: 0}, {$pull: {"a.$[]": 1}}));
     assert.eq({_id: 0, a: [[0], [2]]}, coll.findOne());
 
-    // $pushAll.
-    // TODO SERVER-28772: $pushAll should use the new update implementation.
-    coll.drop();
-    if (db.getMongo().writeMode() === "commands") {
-        res = coll.update({_id: 0}, {$pushAll: {"a.$[i]": [0]}}, {arrayFilters: [{i: 0}]});
-        assert.writeErrorWithCode(res, ErrorCodes.InvalidOptions);
-        assert.neq(
-            -1,
-            res.getWriteError().errmsg.indexOf("Cannot use array filters with modifier $pushAll"),
-            "update failed for a reason other than using array filters with $pushAll");
-    }
-    assert.writeOK(coll.insert({_id: 0, a: [[0]]}));
-    res = coll.update({_id: 0}, {$pushAll: {"a.$[]": [1]}});
-    assert.writeErrorWithCode(res, 16837);
-    assert.neq(-1,
-               res.getWriteError().errmsg.indexOf(
-                   "cannot use the part (a of a.$[]) to traverse the element ({a: [ [ 0.0 ] ]})"),
-               "update failed for a reason other than using array updates with $pushAll");
-
     // $push.
     coll.drop();
     assert.writeOK(coll.insert({_id: 0, a: [[0, 1], [2, 3]]}));

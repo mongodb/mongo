@@ -23,9 +23,6 @@ assert.writeError(res);
 res = t.update({x: 1}, {$inc: {$z: 1}});  // not ok
 assert.writeError(res);
 
-res = t.update({x: 1}, {$pushAll: {$z: [1, 2, 3]}});  // not ok
-assert.writeError(res);
-
 // Second section
 t.drop();
 

@@ -116,9 +116,6 @@ void init(NameMap* nameMap) {
     ModifierEntry* entryPush = new ModifierEntry("$push", MOD_PUSH);
     nameMap->insert(make_pair(StringData(entryPush->name), entryPush));
 
-    ModifierEntry* entryPushAll = new ModifierEntry("$pushAll", MOD_PUSH_ALL);
-    nameMap->insert(make_pair(StringData(entryPushAll->name), entryPushAll));
-
     ModifierEntry* entrySet = new ModifierEntry("$set", MOD_SET);
     nameMap->insert(make_pair(StringData(entrySet->name), entrySet));
 
@@ -173,9 +170,7 @@ ModifierInterface* makeUpdateMod(ModifierType modType) {
         case MOD_PULL_ALL:
             return new ModifierPullAll;
         case MOD_PUSH:
-            return new ModifierPush(ModifierPush::PUSH_NORMAL);
-        case MOD_PUSH_ALL:
-            return new ModifierPush(ModifierPush::PUSH_ALL);
+            return new ModifierPush;
         case MOD_SET:
             return new ModifierSet(ModifierSet::SET_NORMAL);
         case MOD_SET_ON_INSERT:

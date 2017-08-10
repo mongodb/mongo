@@ -33,12 +33,6 @@ res = t.update({}, {$push: {a: 1}});
 assert.writeOK(res);
 t.remove({});
 
-t.save({_id: 1});
-res = t.update({}, {$pushAll: {a: [1]}});
-assert.writeOK(res);
-t.remove({});
-
-t.save({_id: 1});
 res = t.update({}, {$addToSet: {a: 1}});
 assert.writeOK(res);
 t.remove({});

@@ -45,8 +45,7 @@ class ModifierPush : public ModifierInterface {
     MONGO_DISALLOW_COPYING(ModifierPush);
 
 public:
-    enum ModifierPushMode { PUSH_NORMAL, PUSH_ALL };
-    explicit ModifierPush(ModifierPushMode mode = PUSH_NORMAL);
+    ModifierPush();
 
     //
     // Modifier interface implementation
@@ -113,9 +112,6 @@ private:
     int32_t _position;  // Can be negative.
 
     PatternElementCmp _sort;
-
-    // Whether this mod is supposed to be parsed as a $pushAll.
-    const ModifierPushMode _pushMode;
 
     // Simple (old style) push value when the $each variation of the command is not
     // used. The _eachMode flag would be off if we're this mode.

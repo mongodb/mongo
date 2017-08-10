@@ -268,8 +268,8 @@ BSONObj UpdateStage::transformAndUpdate(const Snapshotted<BSONObj>& oldObj, Reco
         // during its 'prepare' phase. That represents a missed optimization, but we still
         // shouldn't do any real work. Toggle 'docWasModified' to 'false'.
         //
-        // Currently, an example of this is '{ $pushAll : { x : [] } }' when the 'x' array
-        // exists.
+        // Currently, an example of this is '{ $push : { x : {$each: [], $sort: 1} } }' when the 'x'
+        // array exists and is already sorted.
         docWasModified = false;
     }
 

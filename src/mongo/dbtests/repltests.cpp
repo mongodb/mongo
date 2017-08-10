@@ -894,22 +894,6 @@ public:
     }
 };
 
-class PushAll : public Base {
-public:
-    void doIt() const {
-        _client.update(ns(), BSON("_id" << 0), fromjson("{$pushAll:{a:[5.0,6.0]}}"));
-    }
-    using ReplTests::Base::check;
-    void check() const {
-        ASSERT_EQUALS(1, count());
-        check(fromjson("{'_id':0,a:[4,5,6]}"), one(fromjson("{'_id':0}")));
-    }
-    void reset() const {
-        deleteAll(ns());
-        insert(fromjson("{'_id':0,a:[4]}"));
-    }
-};
-
 class PushWithDollarSigns : public Base {
     void doIt() const {
         _client.update(ns(), BSON("_id" << 0), BSON("$push" << BSON("a" << BSON("$foo" << 1))));
@@ -976,38 +960,6 @@ class PushSliceToZero : public Base {
     void reset() const {
         deleteAll(ns());
         insert(BSON("_id" << 0));
-    }
-};
-
-class PushAllUpsert : public Base {
-public:
-    void doIt() const {
-        _client.update(ns(), BSON("_id" << 0), fromjson("{$pushAll:{a:[5.0,6.0]}}"), true);
-    }
-    using ReplTests::Base::check;
-    void check() const {
-        ASSERT_EQUALS(1, count());
-        check(fromjson("{'_id':0,a:[4,5,6]}"), one(fromjson("{'_id':0}")));
-    }
-    void reset() const {
-        deleteAll(ns());
-        insert(fromjson("{'_id':0,a:[4]}"));
-    }
-};
-
-class EmptyPushAll : public Base {
-public:
-    void doIt() const {
-        _client.update(ns(), BSON("_id" << 0), fromjson("{$pushAll:{a:[5.0,6.0]}}"));
-    }
-    using ReplTests::Base::check;
-    void check() const {
-        ASSERT_EQUALS(1, count());
-        check(fromjson("{'_id':0,a:[5,6]}"), one(fromjson("{'_id':0}")));
-    }
-    void reset() const {
-        deleteAll(ns());
-        insert(fromjson("{'_id':0}"));
     }
 };
 
@@ -1454,12 +1406,9 @@ public:
         add<Idempotence::PushUpsert>();
         add<Idempotence::MultiPush>();
         add<Idempotence::EmptyPush>();
-        add<Idempotence::PushAll>();
         add<Idempotence::PushSlice>();
         add<Idempotence::PushSliceInitiallyInexistent>();
         add<Idempotence::PushSliceToZero>();
-        add<Idempotence::PushAllUpsert>();
-        add<Idempotence::EmptyPushAll>();
         add<Idempotence::Pull>();
         add<Idempotence::PullNothing>();
         add<Idempotence::PullAll>();

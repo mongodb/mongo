@@ -130,15 +130,6 @@ TEST(Parse, ModsWithLaterObjReplacement) {
         "Unknown modifier: obj");
 }
 
-TEST(Parse, PushAll) {
-    UpdateDriver::Options opts;
-    UpdateDriver driver(opts);
-    std::map<StringData, std::unique_ptr<ExpressionWithPlaceholder>> arrayFilters;
-    ASSERT_OK(driver.parse(fromjson("{$pushAll:{a:[1,2,3]}}"), arrayFilters));
-    ASSERT_EQUALS(driver.numMods(), 1U);
-    ASSERT_FALSE(driver.isDocReplacement());
-}
-
 TEST(Parse, SetOnInsert) {
     UpdateDriver::Options opts;
     UpdateDriver driver(opts);
