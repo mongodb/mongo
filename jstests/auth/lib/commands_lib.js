@@ -4460,6 +4460,11 @@ var authCommandsLib = {
           privileges: [{resource: {cluster: true}, actions: ["startSession"]}],
           testcases: [{runOnDb: adminDbName, roles: roles_all}],
         },
+        {
+          testname: "refreshLogicalSessionCacheNow",
+          command: {refreshLogicalSessionCacheNow: 1},
+          testcases: [{runOnDb: adminDbName, roles: roles_all}],
+        },
     ],
 
     /************* SHARED TEST LOGIC ****************/

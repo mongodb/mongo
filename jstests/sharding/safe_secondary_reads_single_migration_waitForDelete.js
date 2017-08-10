@@ -256,6 +256,7 @@
         planCacheListQueryShapes: {skip: "does not return user data"},
         planCacheSetFilter: {skip: "does not return user data"},
         profile: {skip: "primary only"},
+        refreshLogicalSessionCacheNow: {skip: "does not return user data"},
         reIndex: {skip: "does not return user data"},
         removeShard: {skip: "primary only"},
         removeShardFromZone: {skip: "primary only"},

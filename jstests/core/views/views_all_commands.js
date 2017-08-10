@@ -476,6 +476,7 @@
         },
         stageDebug: {skip: isAnInternalCommand},
         startSession: {skip: isAnInternalCommand},
+        refreshLogicalSessionCacheNow: {skip: isAnInternalCommand},
         top: {skip: "tested in views/views_stats.js"},
         touch: {
             command: {touch: "view", data: true},
