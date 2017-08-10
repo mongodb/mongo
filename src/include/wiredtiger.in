@@ -2259,6 +2259,8 @@ struct __wt_connection {
 	 *
 	 * @snippet ex_all.c set oldest timestamp
 	 *
+	 * @snippet ex_all.c set stable timestamp
+	 *
 	 * @param connection the connection handle
 	 * @configstart{WT_CONNECTION.set_timestamp, see dist/api_data.py}
 	 * @config{commit_timestamp, reset the maximum commit timestamp tracked
