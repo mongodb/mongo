@@ -40,7 +40,6 @@
 #include "mongo/client/remote_command_retry_scheduler.h"
 #include "mongo/client/remote_command_targeter.h"
 #include "mongo/client/replica_set_monitor.h"
-#include "mongo/db/commands.h"
 #include "mongo/db/jsobj.h"
 #include "mongo/db/operation_context.h"
 #include "mongo/db/query/query_request.h"
@@ -215,14 +214,15 @@ StatusWith<Shard::CommandResponse> ShardRemote::_runCommand(OperationContext* op
         return response.status;
     }
 
-    auto commandStatus = getStatusFromCommandResult(response.data);
-    auto writeConcernStatus = getWriteConcernStatusFromCommandResult(response.data);
+    auto result = response.data.getOwned();
+    auto commandStatus = getStatusFromCommandResult(result);
+    auto writeConcernStatus = getWriteConcernStatusFromCommandResult(result);
 
     updateReplSetMonitor(host, commandStatus);
     updateReplSetMonitor(host, writeConcernStatus);
 
     return Shard::CommandResponse(std::move(host),
-                                  Command::filterCommandReplyForPassthrough(response.data),
+                                  std::move(result),
                                   response.metadata.getOwned(),
                                   std::move(commandStatus),
                                   std::move(writeConcernStatus));
