@@ -925,19 +925,17 @@ transaction_ops(WT_SESSION *session_arg)
 
 	error_check(session->begin_transaction(session, NULL));
 
+#ifdef HAVE_TIMESTAMPS
+	{
+	/*! [query timestamp] */
+	char timestamp_buf[2 * WT_TIMESTAMP_SIZE + 1];
+
 	/*! [transaction timestamp] */
 	error_check(
 	    session->timestamp_transaction(session, "commit_timestamp=2a"));
 	/*! [transaction timestamp] */
 
 	error_check(session->commit_transaction(session, NULL));
-
-	{
-#ifndef WT_TIMESTAMP_SIZE
-#define	WT_TIMESTAMP_SIZE	8
-#endif
-	/*! [query timestamp] */
-	char timestamp_buf[2 * WT_TIMESTAMP_SIZE + 1];
 
 	error_check(conn->query_timestamp(
 	    conn, timestamp_buf, "get=all_committed"));
@@ -959,6 +957,7 @@ transaction_ops(WT_SESSION *session_arg)
 	/*! [rollback to stable] */
 	error_check(conn->rollback_to_stable(conn, NULL));
 	/*! [rollback to stable] */
+#endif
 }
 
 /*! [Implement WT_COLLATOR] */
