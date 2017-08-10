@@ -226,8 +226,17 @@ void LogicalSessionCache::_refresh(Client* client) {
     // failed to refresh, it means their authoritative records were removed, and
     // we should remove such records from our cache as well.
     {
-        auto opCtx = client->makeOperationContext();
-        auto res = _sessionsColl->refreshSessions(opCtx.get(), std::move(activeSessions), time);
+        boost::optional<ServiceContext::UniqueOperationContext> uniqueCtx;
+        auto* const opCtx = [&client, &uniqueCtx] {
+            if (client->getOperationContext()) {
+                return client->getOperationContext();
+            }
+
+            uniqueCtx.emplace(client->makeOperationContext());
+            return uniqueCtx->get();
+        }();
+
+        auto res = _sessionsColl->refreshSessions(opCtx, std::move(activeSessions), time);
         if (!res.isOK()) {
             // TODO SERVER-29709: handle network errors here.
             return;

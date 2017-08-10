@@ -65,9 +65,19 @@ LogicalSessionIdSet ServiceLiasonMongod::getActiveSessions() const {
 
     // Append any in-use session ids from the global and collection-level cursor managers
     {
+        boost::optional<ServiceContext::UniqueOperationContext> uniqueCtx;
         auto client = Client::getCurrent();
-        auto opCtx = client->makeOperationContext();
-        CursorManager::appendAllActiveSessions(opCtx.get(), &activeSessions);
+
+        auto* const opCtx = [&client, &uniqueCtx] {
+            if (client->getOperationContext()) {
+                return client->getOperationContext();
+            }
+
+            uniqueCtx.emplace(client->makeOperationContext());
+            return uniqueCtx->get();
+        }();
+
+        CursorManager::appendAllActiveSessions(opCtx, &activeSessions);
     }
 
     return activeSessions;
