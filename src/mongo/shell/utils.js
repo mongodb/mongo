@@ -233,6 +233,7 @@ jsTestOptions = function() {
             skipCollectionAndIndexValidation: TestData.skipCollectionAndIndexValidation,
             skipValidationOnNamespaceNotFound: TestData.skipValidationOnNamespaceNotFound,
             jsonSchemaTestFile: TestData.jsonSchemaTestFile,
+            excludedDBsFromDBHash: TestData.excludedDBsFromDBHash,
         });
     }
     return _jsTestOptions;
