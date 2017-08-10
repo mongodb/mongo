@@ -449,7 +449,7 @@ bool DBClientBase::authenticateInternalUser() {
     try {
         auth(getInternalUserAuthParams());
         return true;
-    } catch (const UserException& ex) {
+    } catch (const AssertionException& ex) {
         if (!serverGlobalParams.quiet.load()) {
             log() << "can't authenticate to " << toString()
                   << " as internal user, error: " << ex.what();
@@ -472,7 +472,7 @@ bool DBClientBase::auth(const string& dbname,
             auth::buildAuthParams(dbname, username, password_text, digestPassword);
         auth(authParams);
         return true;
-    } catch (const UserException& ex) {
+    } catch (const AssertionException& ex) {
         if (ex.code() != ErrorCodes::AuthenticationFailed)
             throw;
         errmsg = ex.what();
@@ -967,7 +967,7 @@ void DBClientConnection::_checkConnection() {
     for (map<string, BSONObj>::const_iterator i = authCache.begin(); i != authCache.end(); i++) {
         try {
             DBClientConnection::_auth(i->second);
-        } catch (UserException& ex) {
+        } catch (AssertionException& ex) {
             if (ex.code() != ErrorCodes::AuthenticationFailed)
                 throw;
             LOG(_logLevel) << "reconnect: auth failed "

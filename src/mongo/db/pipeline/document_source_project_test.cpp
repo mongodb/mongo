@@ -88,7 +88,8 @@ TEST_F(ProjectStageTest, ShouldErrorOnNonObjectSpec) {
     BSONObj spec = BSON("$project"
                         << "foo");
     BSONElement specElement = spec.firstElement();
-    ASSERT_THROWS(DocumentSourceProject::createFromBson(specElement, getExpCtx()), UserException);
+    ASSERT_THROWS(DocumentSourceProject::createFromBson(specElement, getExpCtx()),
+                  AssertionException);
 }
 
 /**
@@ -290,7 +291,7 @@ TEST_F(ProjectStageTest, CannotAddNestedDocumentExceedingDepthLimit) {
     ASSERT_THROWS_CODE(
         DocumentSourceProject::create(
             makeProjectForNestedDocument(BSONDepth::getMaxAllowableDepth() + 1), getExpCtx()),
-        UserException,
+        AssertionException,
         ErrorCodes::Overflow);
 }
 }  // namespace

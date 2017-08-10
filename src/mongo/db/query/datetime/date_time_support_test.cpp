@@ -94,25 +94,25 @@ TEST(GetTimeZone, DoesParseHourMinuteOffsetWithColon) {
 }
 
 TEST(GetTimeZone, DoesNotReturnUnknownTimeZone) {
-    ASSERT_THROWS_CODE(kDefaultTimeZoneDatabase.getTimeZone("The moon"), UserException, 40485);
-    ASSERT_THROWS_CODE(kDefaultTimeZoneDatabase.getTimeZone("xyz"), UserException, 40485);
-    ASSERT_THROWS_CODE(kDefaultTimeZoneDatabase.getTimeZone("Jupiter"), UserException, 40485);
+    ASSERT_THROWS_CODE(kDefaultTimeZoneDatabase.getTimeZone("The moon"), AssertionException, 40485);
+    ASSERT_THROWS_CODE(kDefaultTimeZoneDatabase.getTimeZone("xyz"), AssertionException, 40485);
+    ASSERT_THROWS_CODE(kDefaultTimeZoneDatabase.getTimeZone("Jupiter"), AssertionException, 40485);
 }
 
 TEST(GetTimeZone, ThrowsUserExceptionIfGivenUnparsableUtcOffset) {
-    ASSERT_THROWS_CODE(kDefaultTimeZoneDatabase.getTimeZone("123"), UserException, 40485);
-    ASSERT_THROWS_CODE(kDefaultTimeZoneDatabase.getTimeZone("1234"), UserException, 40485);
-    ASSERT_THROWS_CODE(kDefaultTimeZoneDatabase.getTimeZone("12345"), UserException, 40485);
-    ASSERT_THROWS_CODE(kDefaultTimeZoneDatabase.getTimeZone("-123"), UserException, 40485);
-    ASSERT_THROWS_CODE(kDefaultTimeZoneDatabase.getTimeZone("-12*34"), UserException, 40485);
-    ASSERT_THROWS_CODE(kDefaultTimeZoneDatabase.getTimeZone("-1:23"), UserException, 40485);
-    ASSERT_THROWS_CODE(kDefaultTimeZoneDatabase.getTimeZone("-12:3"), UserException, 40485);
-    ASSERT_THROWS_CODE(kDefaultTimeZoneDatabase.getTimeZone("+123"), UserException, 40485);
-    ASSERT_THROWS_CODE(kDefaultTimeZoneDatabase.getTimeZone("+12*34"), UserException, 40485);
-    ASSERT_THROWS_CODE(kDefaultTimeZoneDatabase.getTimeZone("+1:23"), UserException, 40485);
-    ASSERT_THROWS_CODE(kDefaultTimeZoneDatabase.getTimeZone("+12:3"), UserException, 40485);
-    ASSERT_THROWS_CODE(kDefaultTimeZoneDatabase.getTimeZone("+0x4"), UserException, 40485);
-    ASSERT_THROWS_CODE(kDefaultTimeZoneDatabase.getTimeZone("-0xa0"), UserException, 40485);
+    ASSERT_THROWS_CODE(kDefaultTimeZoneDatabase.getTimeZone("123"), AssertionException, 40485);
+    ASSERT_THROWS_CODE(kDefaultTimeZoneDatabase.getTimeZone("1234"), AssertionException, 40485);
+    ASSERT_THROWS_CODE(kDefaultTimeZoneDatabase.getTimeZone("12345"), AssertionException, 40485);
+    ASSERT_THROWS_CODE(kDefaultTimeZoneDatabase.getTimeZone("-123"), AssertionException, 40485);
+    ASSERT_THROWS_CODE(kDefaultTimeZoneDatabase.getTimeZone("-12*34"), AssertionException, 40485);
+    ASSERT_THROWS_CODE(kDefaultTimeZoneDatabase.getTimeZone("-1:23"), AssertionException, 40485);
+    ASSERT_THROWS_CODE(kDefaultTimeZoneDatabase.getTimeZone("-12:3"), AssertionException, 40485);
+    ASSERT_THROWS_CODE(kDefaultTimeZoneDatabase.getTimeZone("+123"), AssertionException, 40485);
+    ASSERT_THROWS_CODE(kDefaultTimeZoneDatabase.getTimeZone("+12*34"), AssertionException, 40485);
+    ASSERT_THROWS_CODE(kDefaultTimeZoneDatabase.getTimeZone("+1:23"), AssertionException, 40485);
+    ASSERT_THROWS_CODE(kDefaultTimeZoneDatabase.getTimeZone("+12:3"), AssertionException, 40485);
+    ASSERT_THROWS_CODE(kDefaultTimeZoneDatabase.getTimeZone("+0x4"), AssertionException, 40485);
+    ASSERT_THROWS_CODE(kDefaultTimeZoneDatabase.getTimeZone("-0xa0"), AssertionException, 40485);
 }
 
 TEST(UTCTimeBeforeEpoch, DoesExtractDateParts) {
@@ -939,21 +939,22 @@ TEST(NewYorkTimeAfterEpoch, DoesOutputFormatDate) {
 }
 
 TEST(DateFormat, ThrowsUserExceptionIfGivenUnrecognizedFormatter) {
-    ASSERT_THROWS_CODE(TimeZoneDatabase::utcZone().validateFormat("%x"), UserException, 18536);
+    ASSERT_THROWS_CODE(TimeZoneDatabase::utcZone().validateFormat("%x"), AssertionException, 18536);
 }
 
 TEST(DateFormat, ThrowsUserExceptionIfGivenUnmatchedPercent) {
-    ASSERT_THROWS_CODE(TimeZoneDatabase::utcZone().validateFormat("%"), UserException, 18535);
-    ASSERT_THROWS_CODE(TimeZoneDatabase::utcZone().validateFormat("%%%"), UserException, 18535);
+    ASSERT_THROWS_CODE(TimeZoneDatabase::utcZone().validateFormat("%"), AssertionException, 18535);
     ASSERT_THROWS_CODE(
-        TimeZoneDatabase::utcZone().validateFormat("blahblah%"), UserException, 18535);
+        TimeZoneDatabase::utcZone().validateFormat("%%%"), AssertionException, 18535);
+    ASSERT_THROWS_CODE(
+        TimeZoneDatabase::utcZone().validateFormat("blahblah%"), AssertionException, 18535);
 }
 
 TEST(DateFormat, ThrowsUserExceptionIfGivenDateBeforeYear0) {
     const long long kMillisPerYear = 31556926000;
     ASSERT_THROWS_CODE(TimeZoneDatabase::utcZone().formatDate(
                            "%Y", Date_t::fromMillisSinceEpoch(-(kMillisPerYear * 1971))),
-                       UserException,
+                       AssertionException,
                        18537);
     ASSERT_EQ("0000",
               TimeZoneDatabase::utcZone().formatDate(
@@ -962,7 +963,7 @@ TEST(DateFormat, ThrowsUserExceptionIfGivenDateBeforeYear0) {
 
 TEST(DateFormat, ThrowsUserExceptionIfGivenDateAfterYear9999) {
     ASSERT_THROWS_CODE(
-        TimeZoneDatabase::utcZone().formatDate("%Y", Date_t::max()), UserException, 18537);
+        TimeZoneDatabase::utcZone().formatDate("%Y", Date_t::max()), AssertionException, 18537);
 }
 
 }  // namespace

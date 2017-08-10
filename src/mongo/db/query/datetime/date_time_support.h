@@ -364,7 +364,7 @@ public:
      * 'dateString' may contain time zone information if the information is simply an offset from
      * UTC, in which case the returned Date_t will be adjusted accordingly.
      *
-     * Throws a UserException if any of the following occur:
+     * Throws a AssertionException if any of the following occur:
      *  * The string cannot be parsed into a date.
      *  * The string specifies a time zone that is not simply an offset from UTC, like
      *    in the string "July 4, 2017 America/New_York".

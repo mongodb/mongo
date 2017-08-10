@@ -102,7 +102,7 @@ TEST_F(DocumentSourceLookupChangePostImageTest, ShouldErrorIfMissingDocumentKeyO
     lookupChangeStage->injectMongodInterface(
         std::make_shared<MockMongodInterface>(deque<DocumentSource::GetNextResult>{}));
 
-    ASSERT_THROWS_CODE(lookupChangeStage->getNext(), UserException, 40578);
+    ASSERT_THROWS_CODE(lookupChangeStage->getNext(), AssertionException, 40578);
 }
 
 TEST_F(DocumentSourceLookupChangePostImageTest, ShouldErrorIfMissingOperationType) {
@@ -123,7 +123,7 @@ TEST_F(DocumentSourceLookupChangePostImageTest, ShouldErrorIfMissingOperationTyp
     lookupChangeStage->injectMongodInterface(
         std::make_shared<MockMongodInterface>(deque<DocumentSource::GetNextResult>{}));
 
-    ASSERT_THROWS_CODE(lookupChangeStage->getNext(), UserException, 40578);
+    ASSERT_THROWS_CODE(lookupChangeStage->getNext(), AssertionException, 40578);
 }
 
 TEST_F(DocumentSourceLookupChangePostImageTest, ShouldErrorIfMissingNamespace) {
@@ -143,7 +143,7 @@ TEST_F(DocumentSourceLookupChangePostImageTest, ShouldErrorIfMissingNamespace) {
     lookupChangeStage->injectMongodInterface(
         std::make_shared<MockMongodInterface>(deque<DocumentSource::GetNextResult>{}));
 
-    ASSERT_THROWS_CODE(lookupChangeStage->getNext(), UserException, 40578);
+    ASSERT_THROWS_CODE(lookupChangeStage->getNext(), AssertionException, 40578);
 }
 
 TEST_F(DocumentSourceLookupChangePostImageTest, ShouldErrorIfNsFieldHasWrongType) {
@@ -162,7 +162,7 @@ TEST_F(DocumentSourceLookupChangePostImageTest, ShouldErrorIfNsFieldHasWrongType
     lookupChangeStage->injectMongodInterface(
         std::make_shared<MockMongodInterface>(deque<DocumentSource::GetNextResult>{}));
 
-    ASSERT_THROWS_CODE(lookupChangeStage->getNext(), UserException, 40578);
+    ASSERT_THROWS_CODE(lookupChangeStage->getNext(), AssertionException, 40578);
 }
 
 TEST_F(DocumentSourceLookupChangePostImageTest, ShouldErrorIfNsFieldDoesNotMatchPipeline) {
@@ -183,7 +183,7 @@ TEST_F(DocumentSourceLookupChangePostImageTest, ShouldErrorIfNsFieldDoesNotMatch
     lookupChangeStage->injectMongodInterface(
         std::make_shared<MockMongodInterface>(deque<DocumentSource::GetNextResult>{}));
 
-    ASSERT_THROWS_CODE(lookupChangeStage->getNext(), UserException, 40579);
+    ASSERT_THROWS_CODE(lookupChangeStage->getNext(), AssertionException, 40579);
 }
 
 TEST_F(DocumentSourceLookupChangePostImageTest, ShouldErrorIfDocumentKeyIsNotUnique) {
@@ -206,7 +206,7 @@ TEST_F(DocumentSourceLookupChangePostImageTest, ShouldErrorIfDocumentKeyIsNotUni
     lookupChangeStage->injectMongodInterface(
         std::make_shared<MockMongodInterface>(std::move(foreignCollection)));
 
-    ASSERT_THROWS_CODE(lookupChangeStage->getNext(), UserException, 40580);
+    ASSERT_THROWS_CODE(lookupChangeStage->getNext(), AssertionException, 40580);
 }
 
 TEST_F(DocumentSourceLookupChangePostImageTest, ShouldPropagatePauses) {

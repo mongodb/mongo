@@ -57,7 +57,7 @@ def parseSourceFiles( callback ):
 
     patterns = [
         re.compile( r"(?:u|m(?:sg)?)asser(?:t|ted)(?:NoTrace)?\s*\(\s*(\d+)", re.MULTILINE ) ,
-        re.compile( r"(?:User|Msg|MsgAssertion)Exception\s*\(\s*(\d+)", re.MULTILINE ),
+        re.compile( r"(?:DB|Assertion)Exception\s*\(\s*(\d+)", re.MULTILINE ),
         re.compile( r"fassert(?:Failed)?(?:WithStatus)?(?:NoTrace)?(?:StatusOK)?\s*\(\s*(\d+)",
                     re.MULTILINE ),
     ]

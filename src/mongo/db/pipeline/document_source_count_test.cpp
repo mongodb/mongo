@@ -103,35 +103,35 @@ public:
 
 TEST_F(InvalidCountSpec, NonStringSpec) {
     BSONObj spec = BSON("$count" << 1);
-    ASSERT_THROWS_CODE(createCount(spec), UserException, 40156);
+    ASSERT_THROWS_CODE(createCount(spec), AssertionException, 40156);
 
     spec = BSON("$count" << BSON("field1"
                                  << "test"));
-    ASSERT_THROWS_CODE(createCount(spec), UserException, 40156);
+    ASSERT_THROWS_CODE(createCount(spec), AssertionException, 40156);
 }
 
 TEST_F(InvalidCountSpec, EmptyStringSpec) {
     BSONObj spec = BSON("$count"
                         << "");
-    ASSERT_THROWS_CODE(createCount(spec), UserException, 40157);
+    ASSERT_THROWS_CODE(createCount(spec), AssertionException, 40157);
 }
 
 TEST_F(InvalidCountSpec, FieldPathSpec) {
     BSONObj spec = BSON("$count"
                         << "$x");
-    ASSERT_THROWS_CODE(createCount(spec), UserException, 40158);
+    ASSERT_THROWS_CODE(createCount(spec), AssertionException, 40158);
 }
 
 TEST_F(InvalidCountSpec, EmbeddedNullByteSpec) {
     BSONObj spec = BSON("$count"
                         << "te\0st"_sd);
-    ASSERT_THROWS_CODE(createCount(spec), UserException, 40159);
+    ASSERT_THROWS_CODE(createCount(spec), AssertionException, 40159);
 }
 
 TEST_F(InvalidCountSpec, PeriodInStringSpec) {
     BSONObj spec = BSON("$count"
                         << "test.string");
-    ASSERT_THROWS_CODE(createCount(spec), UserException, 40160);
+    ASSERT_THROWS_CODE(createCount(spec), AssertionException, 40160);
 }
 }  // namespace
 }  // namespace mongo

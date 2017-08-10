@@ -61,14 +61,14 @@ TEST(RollBackLocalOperationsTest, InvalidLocalOplogIterator) {
     } invalidOplog;
     ASSERT_THROWS_CODE(
         RollBackLocalOperations(invalidOplog, [](const BSONObj&) { return Status::OK(); }),
-        UserException,
+        AssertionException,
         ErrorCodes::BadValue);
 }
 
 TEST(RollBackLocalOperationsTest, InvalidRollbackOperationFunction) {
     ASSERT_THROWS_CODE(RollBackLocalOperations(OplogInterfaceMock({makeOpAndRecordId(1, 0)}),
                                                RollBackLocalOperations::RollbackOperationFn()),
-                       UserException,
+                       AssertionException,
                        ErrorCodes::BadValue);
 }
 

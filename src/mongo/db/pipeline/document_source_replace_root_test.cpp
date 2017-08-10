@@ -213,18 +213,18 @@ TEST_F(ReplaceRootBasics, ErrorsWhenNewRootDoesNotEvaluateToAnObject) {
     // A string is not an object.
     auto mock = DocumentSourceMock::create(Document{{"a", "hello"_sd}});
     replaceRoot->setSource(mock.get());
-    ASSERT_THROWS_CODE(replaceRoot->getNext(), UserException, 40228);
+    ASSERT_THROWS_CODE(replaceRoot->getNext(), AssertionException, 40228);
 
     // An integer is not an object.
     mock = DocumentSourceMock::create(Document{{"a", 5}});
     replaceRoot->setSource(mock.get());
-    ASSERT_THROWS_CODE(replaceRoot->getNext(), UserException, 40228);
+    ASSERT_THROWS_CODE(replaceRoot->getNext(), AssertionException, 40228);
 
     // Literals are not objects.
     replaceRoot = createReplaceRoot(BSON("newRoot" << BSON("$literal" << 1)));
     mock = DocumentSourceMock::create(Document());
     replaceRoot->setSource(mock.get());
-    ASSERT_THROWS_CODE(replaceRoot->getNext(), UserException, 40228);
+    ASSERT_THROWS_CODE(replaceRoot->getNext(), AssertionException, 40228);
     assertExhausted(replaceRoot);
 
     // Most operator expressions do not resolve to objects.
@@ -232,7 +232,7 @@ TEST_F(ReplaceRootBasics, ErrorsWhenNewRootDoesNotEvaluateToAnObject) {
                                                            << "$a")));
     mock = DocumentSourceMock::create(Document{{"a", true}});
     replaceRoot->setSource(mock.get());
-    ASSERT_THROWS_CODE(replaceRoot->getNext(), UserException, 40228);
+    ASSERT_THROWS_CODE(replaceRoot->getNext(), AssertionException, 40228);
     assertExhausted(replaceRoot);
 }
 
@@ -244,12 +244,12 @@ TEST_F(ReplaceRootBasics, ErrorsIfNewRootFieldPathDoesNotExist) {
 
     auto mock = DocumentSourceMock::create(Document());
     replaceRoot->setSource(mock.get());
-    ASSERT_THROWS_CODE(replaceRoot->getNext(), UserException, 40228);
+    ASSERT_THROWS_CODE(replaceRoot->getNext(), AssertionException, 40228);
     assertExhausted(replaceRoot);
 
     mock = DocumentSourceMock::create(Document{{"e", Document{{"b", Document{{"c", 3}}}}}});
     replaceRoot->setSource(mock.get());
-    ASSERT_THROWS_CODE(replaceRoot->getNext(), UserException, 40228);
+    ASSERT_THROWS_CODE(replaceRoot->getNext(), AssertionException, 40228);
     assertExhausted(replaceRoot);
 }
 
@@ -286,7 +286,7 @@ TEST_F(ReplaceRootBasics, ReplaceRootWithRemoveSystemVariableThrows) {
     auto mock = DocumentSourceMock::create({inputDoc});
     replaceRoot->setSource(mock.get());
 
-    ASSERT_THROWS_CODE(replaceRoot->getNext(), UserException, 40228);
+    ASSERT_THROWS_CODE(replaceRoot->getNext(), AssertionException, 40228);
 }
 
 /**
@@ -310,10 +310,10 @@ public:
 
 // Verify that the creation of a $replaceRoot stage requires an object specification
 TEST_F(ReplaceRootSpec, CreationRequiresObjectSpecification) {
-    ASSERT_THROWS_CODE(createReplaceRoot(BSON("$replaceRoot" << 1)), UserException, 40229);
+    ASSERT_THROWS_CODE(createReplaceRoot(BSON("$replaceRoot" << 1)), AssertionException, 40229);
     ASSERT_THROWS_CODE(createReplaceRoot(BSON("$replaceRoot"
                                               << "string")),
-                       UserException,
+                       AssertionException,
                        40229);
 }
 
@@ -323,30 +323,31 @@ TEST_F(ReplaceRootSpec, OnlyValidOptionInObjectSpecIsNewRoot) {
                                                          << "$a"
                                                          << "root"
                                                          << 2))),
-                       UserException,
+                       AssertionException,
                        40230);
     ASSERT_THROWS_CODE(createReplaceRoot(createSpec(BSON("newRoot"
                                                          << "$a"
                                                          << "path"
                                                          << 2))),
-                       UserException,
+                       AssertionException,
                        40230);
     ASSERT_THROWS_CODE(createReplaceRoot(createSpec(BSON("path"
                                                          << "$a"))),
-                       UserException,
+                       AssertionException,
                        40230);
 }
 
 // Verify that $replaceRoot requires a valid expression as input to the newRoot option.
 TEST_F(ReplaceRootSpec, RequiresExpressionForNewRootOption) {
-    ASSERT_THROWS_CODE(createReplaceRoot(createSpec(BSONObj())), UserException, 40231);
+    ASSERT_THROWS_CODE(createReplaceRoot(createSpec(BSONObj())), AssertionException, 40231);
     ASSERT_THROWS(createReplaceRoot(createSpec(BSON("newRoot"
                                                     << "$$$a"))),
-                  UserException);
+                  AssertionException);
     ASSERT_THROWS(createReplaceRoot(createSpec(BSON("newRoot"
                                                     << "$$a"))),
-                  UserException);
-    ASSERT_THROWS(createReplaceRoot(createFullSpec(BSON("$map" << BSON("a" << 1)))), UserException);
+                  AssertionException);
+    ASSERT_THROWS(createReplaceRoot(createFullSpec(BSON("$map" << BSON("a" << 1)))),
+                  AssertionException);
 }
 
 // Verify that newRoot accepts all types of expressions.

@@ -145,7 +145,7 @@ TEST(DecorableTest, ThrowingConstructor) {
 
     try {
         DecorationContainer d(&registry);
-    } catch (const UserException& ex) {
+    } catch (const AssertionException& ex) {
         ASSERT_EQ(ErrorCodes::Unauthorized, ex.code());
     }
     ASSERT_EQ(1, numConstructedAs);

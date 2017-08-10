@@ -367,7 +367,7 @@ void DBClientReplicaSet::_authConnection(DBClientConnection* conn) {
     for (map<string, BSONObj>::const_iterator i = _auths.begin(); i != _auths.end(); ++i) {
         try {
             conn->auth(i->second);
-        } catch (const UserException&) {
+        } catch (const AssertionException&) {
             warning() << "cached auth failed for set: " << _setName
                       << " db: " << i->second[saslCommandUserDBFieldName].str()
                       << " user: " << i->second[saslCommandUserFieldName].str() << endl;
@@ -380,7 +380,7 @@ void DBClientReplicaSet::logoutAll(DBClientConnection* conn) {
         BSONObj response;
         try {
             conn->logout(i->first, response);
-        } catch (const UserException& ex) {
+        } catch (const AssertionException& ex) {
             warning() << "Failed to logout: " << conn->getServerAddress() << " on db: " << i->first
                       << causedBy(redact(ex));
         }

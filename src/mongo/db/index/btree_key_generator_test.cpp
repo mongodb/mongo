@@ -248,7 +248,7 @@ TEST(BtreeKeyGeneratorTest, GetKeysFromParallelArraysBasic) {
     BSONObjSet expectedKeys = SimpleBSONObjComparator::kInstance.makeBSONObjSet();
     MultikeyPaths expectedMultikeyPaths(keyPattern.nFields());
     ASSERT_THROWS(testKeygen(keyPattern, genKeysFrom, expectedKeys, expectedMultikeyPaths),
-                  UserException);
+                  AssertionException);
 }
 
 TEST(BtreeKeyGeneratorTest, GetKeysFromArraySubobjectBasic) {
@@ -356,7 +356,7 @@ TEST(BtreeKeyGeneratorTest, GetKeysFromParallelArraysComplex) {
     BSONObjSet expectedKeys = SimpleBSONObjComparator::kInstance.makeBSONObjSet();
     MultikeyPaths expectedMultikeyPaths(keyPattern.nFields());
     ASSERT_THROWS(testKeygen(keyPattern, genKeysFrom, expectedKeys, expectedMultikeyPaths),
-                  UserException);
+                  AssertionException);
 }
 
 TEST(BtreeKeyGeneratorTest, GetKeysAlternateMissing) {
@@ -604,11 +604,11 @@ TEST(BtreeKeyGeneratorTest, GetKeysFromIndexedArrayIndex) {
     genKeysFrom = fromjson("{a:[{'0':1}]}");
     expectedKeys.clear();
     ASSERT_THROWS(testKeygen(keyPattern, genKeysFrom, expectedKeys, expectedMultikeyPaths),
-                  UserException);
+                  AssertionException);
 
     genKeysFrom = fromjson("{a:[1,{'0':2}]}");
     ASSERT_THROWS(testKeygen(keyPattern, genKeysFrom, expectedKeys, expectedMultikeyPaths),
-                  UserException);
+                  AssertionException);
 }
 
 TEST(BtreeKeyGeneratorTest, GetKeysFromDoubleIndexedArrayIndex) {
@@ -739,7 +739,7 @@ TEST(BtreeKeyGeneratorTest, ParallelArraysInNestedObjects) {
     BSONObjSet expectedKeys = SimpleBSONObjComparator::kInstance.makeBSONObjSet();
     MultikeyPaths expectedMultikeyPaths(keyPattern.nFields());
     ASSERT_THROWS(testKeygen(keyPattern, genKeysFrom, expectedKeys, expectedMultikeyPaths),
-                  UserException);
+                  AssertionException);
 }
 
 TEST(BtreeKeyGeneratorTest, ParallelArraysUneven) {
@@ -748,7 +748,7 @@ TEST(BtreeKeyGeneratorTest, ParallelArraysUneven) {
     BSONObjSet expectedKeys = SimpleBSONObjComparator::kInstance.makeBSONObjSet();
     MultikeyPaths expectedMultikeyPaths(keyPattern.nFields());
     ASSERT_THROWS(testKeygen(keyPattern, genKeysFrom, expectedKeys, expectedMultikeyPaths),
-                  UserException);
+                  AssertionException);
 }
 
 TEST(BtreeKeyGeneratorTest, MultipleArraysNotParallel) {
@@ -804,7 +804,7 @@ TEST(BtreeKeyGeneratorTest, GetKeysParallelEmptyArrays) {
     BSONObjSet expectedKeys = SimpleBSONObjComparator::kInstance.makeBSONObjSet();
     MultikeyPaths expectedMultikeyPaths(keyPattern.nFields());
     ASSERT_THROWS(testKeygen(keyPattern, genKeysFrom, expectedKeys, expectedMultikeyPaths),
-                  UserException);
+                  AssertionException);
 }
 
 TEST(BtreeKeyGeneratorTest, GetKeysParallelArraysOneArrayEmpty) {
@@ -813,7 +813,7 @@ TEST(BtreeKeyGeneratorTest, GetKeysParallelArraysOneArrayEmpty) {
     BSONObjSet expectedKeys = SimpleBSONObjComparator::kInstance.makeBSONObjSet();
     MultikeyPaths expectedMultikeyPaths(keyPattern.nFields());
     ASSERT_THROWS(testKeygen(keyPattern, genKeysFrom, expectedKeys, expectedMultikeyPaths),
-                  UserException);
+                  AssertionException);
 }
 
 TEST(BtreeKeyGeneratorTest, GetKeysParallelArraysOneArrayEmptyNested) {
@@ -822,7 +822,7 @@ TEST(BtreeKeyGeneratorTest, GetKeysParallelArraysOneArrayEmptyNested) {
     BSONObjSet expectedKeys = SimpleBSONObjComparator::kInstance.makeBSONObjSet();
     MultikeyPaths expectedMultikeyPaths(keyPattern.nFields());
     ASSERT_THROWS(testKeygen(keyPattern, genKeysFrom, expectedKeys, expectedMultikeyPaths),
-                  UserException);
+                  AssertionException);
 }
 
 // Descriptive test. The semantics for key generation are odd for positional key patterns.
@@ -973,7 +973,7 @@ TEST(BtreeKeyGeneratorTest, PositionalKeyPatternParallelArrays) {
     BSONObjSet expectedKeys = SimpleBSONObjComparator::kInstance.makeBSONObjSet();
     MultikeyPaths expectedMultikeyPaths(keyPattern.nFields());
     ASSERT_THROWS(testKeygen(keyPattern, genKeysFrom, expectedKeys, expectedMultikeyPaths),
-                  UserException);
+                  AssertionException);
 }
 
 TEST(BtreeKeyGeneratorTest, KeyPattern_a_0_b_Extracts_b_ElementInsideSingleton2DArray) {

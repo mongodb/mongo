@@ -311,7 +311,7 @@ TEST_F(OpMsgParser, FailsIfNoBody) {
         kNoFlags,  //
     };
 
-    ASSERT_THROWS_CODE(msg.parse(), UserException, 40587);
+    ASSERT_THROWS_CODE(msg.parse(), AssertionException, 40587);
 }
 
 TEST_F(OpMsgParser, FailsIfNoBodyEvenWithSequence) {
@@ -322,7 +322,7 @@ TEST_F(OpMsgParser, FailsIfNoBodyEvenWithSequence) {
         Sized{"docs"},
     };
 
-    ASSERT_THROWS_CODE(msg.parse(), UserException, 40587);
+    ASSERT_THROWS_CODE(msg.parse(), AssertionException, 40587);
 }
 
 TEST_F(OpMsgParser, FailsIfTwoBodies) {
@@ -335,7 +335,7 @@ TEST_F(OpMsgParser, FailsIfTwoBodies) {
         fromjson("{pong: 1}"),
     };
 
-    ASSERT_THROWS_CODE(msg.parse(), UserException, 40430);
+    ASSERT_THROWS_CODE(msg.parse(), AssertionException, 40430);
 }
 
 TEST_F(OpMsgParser, FailsIfDuplicateSequences) {
@@ -351,7 +351,7 @@ TEST_F(OpMsgParser, FailsIfDuplicateSequences) {
         Sized{"docs"},
     };
 
-    ASSERT_THROWS_CODE(msg.parse(), UserException, 40431);
+    ASSERT_THROWS_CODE(msg.parse(), AssertionException, 40431);
 }
 
 TEST_F(OpMsgParser, FailsIfDuplicateSequenceWithBody) {
@@ -364,7 +364,7 @@ TEST_F(OpMsgParser, FailsIfDuplicateSequenceWithBody) {
         Sized{"docs"},
     };
 
-    ASSERT_THROWS_CODE(msg.parse(), UserException, 40433);
+    ASSERT_THROWS_CODE(msg.parse(), AssertionException, 40433);
 }
 
 TEST_F(OpMsgParser, FailsIfDuplicateSequenceWithBodyNested) {
@@ -377,7 +377,7 @@ TEST_F(OpMsgParser, FailsIfDuplicateSequenceWithBodyNested) {
         Sized{"a.b"},
     };
 
-    ASSERT_THROWS_CODE(msg.parse(), UserException, 40433);
+    ASSERT_THROWS_CODE(msg.parse(), AssertionException, 40433);
 }
 
 TEST_F(OpMsgParser, SucceedsIfSequenceAndBodyHaveCommonPrefix) {
@@ -407,7 +407,7 @@ TEST_F(OpMsgParser, FailsIfUnknownSectionKind) {
         Sized{},
     };
 
-    ASSERT_THROWS_CODE(msg.parse(), UserException, 40432);
+    ASSERT_THROWS_CODE(msg.parse(), AssertionException, 40432);
 }
 
 TEST_F(OpMsgParser, FailsIfBodyTooBig) {
@@ -417,7 +417,7 @@ TEST_F(OpMsgParser, FailsIfBodyTooBig) {
         fromjson("{ping: 1}"),
     }.addToSize(-1);  // Shrink message so body extends past end.
 
-    ASSERT_THROWS_CODE(msg.parse(), UserException, ErrorCodes::InvalidBSON);
+    ASSERT_THROWS_CODE(msg.parse(), AssertionException, ErrorCodes::InvalidBSON);
 }
 
 TEST_F(OpMsgParser, FailsIfBodyTooBigIntoChecksum) {
@@ -428,7 +428,7 @@ TEST_F(OpMsgParser, FailsIfBodyTooBigIntoChecksum) {
         kFakeCRC,
     }.addToSize(-1);  // Shrink message so body extends past end.
 
-    ASSERT_THROWS_CODE(msg.parse(), UserException, ErrorCodes::InvalidBSON);
+    ASSERT_THROWS_CODE(msg.parse(), AssertionException, ErrorCodes::InvalidBSON);
 }
 
 TEST_F(OpMsgParser, FailsIfDocumentSequenceTooBig) {
@@ -444,7 +444,7 @@ TEST_F(OpMsgParser, FailsIfDocumentSequenceTooBig) {
         },
     }.addToSize(-1);  // Shrink message so body extends past end.
 
-    ASSERT_THROWS_CODE(msg.parse(), UserException, ErrorCodes::Overflow);
+    ASSERT_THROWS_CODE(msg.parse(), AssertionException, ErrorCodes::Overflow);
 }
 
 TEST_F(OpMsgParser, FailsIfDocumentSequenceTooBigIntoChecksum) {
@@ -462,7 +462,7 @@ TEST_F(OpMsgParser, FailsIfDocumentSequenceTooBigIntoChecksum) {
         kFakeCRC,
     }.addToSize(-1);  // Shrink message so body extends past end.
 
-    ASSERT_THROWS_CODE(msg.parse(), UserException, ErrorCodes::Overflow);
+    ASSERT_THROWS_CODE(msg.parse(), AssertionException, ErrorCodes::Overflow);
 }
 
 TEST_F(OpMsgParser, FailsIfDocumentInSequenceTooBig) {
@@ -478,7 +478,7 @@ TEST_F(OpMsgParser, FailsIfDocumentInSequenceTooBig) {
         }.addToSize(-1),  // Shrink sequence so document extends past end.
     };
 
-    ASSERT_THROWS_CODE(msg.parse(), UserException, ErrorCodes::InvalidBSON);
+    ASSERT_THROWS_CODE(msg.parse(), AssertionException, ErrorCodes::InvalidBSON);
 }
 
 TEST_F(OpMsgParser, FailsIfNameOfDocumentSequenceTooBig) {
@@ -493,7 +493,7 @@ TEST_F(OpMsgParser, FailsIfNameOfDocumentSequenceTooBig) {
         }.addToSize(-1),  // Shrink sequence so document extends past end.
     };
 
-    ASSERT_THROWS_CODE(msg.parse(), UserException, ErrorCodes::Overflow);
+    ASSERT_THROWS_CODE(msg.parse(), AssertionException, ErrorCodes::Overflow);
 }
 
 TEST_F(OpMsgParser, FailsIfNameOfDocumentSequenceHasNoNulTerminator) {
@@ -507,15 +507,16 @@ TEST_F(OpMsgParser, FailsIfNameOfDocumentSequenceHasNoNulTerminator) {
         // No '\0' at end of document. ASAN should complain if we keep looking for one.
     };
 
-    ASSERT_THROWS_CODE(msg.parse(), UserException, ErrorCodes::Overflow);
+    ASSERT_THROWS_CODE(msg.parse(), AssertionException, ErrorCodes::Overflow);
 }
 
 TEST_F(OpMsgParser, FailsIfNoRoomForFlags) {
     // Flags are 4 bytes. Try 0-3 bytes.
-    ASSERT_THROWS_CODE(OpMsgBytes{}.parse(), UserException, ErrorCodes::Overflow);
-    ASSERT_THROWS_CODE(OpMsgBytes{'\0'}.parse(), UserException, ErrorCodes::Overflow);
-    ASSERT_THROWS_CODE((OpMsgBytes{'\0', '\0'}.parse()), UserException, ErrorCodes::Overflow);
-    ASSERT_THROWS_CODE((OpMsgBytes{'\0', '\0', '\0'}.parse()), UserException, ErrorCodes::Overflow);
+    ASSERT_THROWS_CODE(OpMsgBytes{}.parse(), AssertionException, ErrorCodes::Overflow);
+    ASSERT_THROWS_CODE(OpMsgBytes{'\0'}.parse(), AssertionException, ErrorCodes::Overflow);
+    ASSERT_THROWS_CODE((OpMsgBytes{'\0', '\0'}.parse()), AssertionException, ErrorCodes::Overflow);
+    ASSERT_THROWS_CODE(
+        (OpMsgBytes{'\0', '\0', '\0'}.parse()), AssertionException, ErrorCodes::Overflow);
 }
 
 TEST_F(OpMsgParser, FailsWithUnknownRequiredFlags) {
@@ -528,7 +529,7 @@ TEST_F(OpMsgParser, FailsWithUnknownRequiredFlags) {
             fromjson("{ping: 1}"),
         };
 
-        ASSERT_THROWS_CODE(msg.parse(), UserException, 40429);
+        ASSERT_THROWS_CODE(msg.parse(), AssertionException, 40429);
     }
 }
 
@@ -744,10 +745,10 @@ TEST(OpMsgRequest, GetDatabaseThrowsWrongType) {
 TEST(OpMsgRequest, GetDatabaseThrowsMissing) {
     OpMsgRequest msg;
     msg.body = fromjson("{}");
-    ASSERT_THROWS(msg.getDatabase(), UserException);
+    ASSERT_THROWS(msg.getDatabase(), AssertionException);
 
     msg.body = fromjson("{$notdb: 'foo'}");
-    ASSERT_THROWS(msg.getDatabase(), UserException);
+    ASSERT_THROWS(msg.getDatabase(), AssertionException);
 }
 
 TEST(OpMsgRequest, FromDbAndBodyDoesNotCopy) {

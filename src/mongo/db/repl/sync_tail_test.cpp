@@ -218,8 +218,9 @@ TEST_F(SyncTailTest, SyncApplyNoOpApplyOpThrowsException) {
 }
 
 TEST_F(SyncTailTest, SyncApplyInsertDocumentDatabaseMissing) {
-    ASSERT_THROWS_CODE(
-        _testSyncApplyInsertDocument(ErrorCodes::OK), UserException, ErrorCodes::NamespaceNotFound);
+    ASSERT_THROWS_CODE(_testSyncApplyInsertDocument(ErrorCodes::OK),
+                       AssertionException,
+                       ErrorCodes::NamespaceNotFound);
 }
 
 TEST_F(SyncTailTest, SyncApplyInsertDocumentCollectionMissing) {

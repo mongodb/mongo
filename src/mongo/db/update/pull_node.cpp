@@ -137,7 +137,7 @@ Status PullNode::init(BSONElement modExpr, const CollatorInterface* collator) {
         } else {
             _matcher = stdx::make_unique<EqualityMatcher>(modExpr, collator);
         }
-    } catch (UserException& exception) {
+    } catch (AssertionException& exception) {
         return exception.toStatus();
     }
 

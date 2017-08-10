@@ -46,8 +46,8 @@ namespace mongo {
 class CopyableMatchExpression {
 public:
     /**
-     * Parse 'matchAST' to create a new MatchExpression, throwing a UserException if we encounter an
-     * error.
+     * Parse 'matchAST' to create a new MatchExpression, throwing a AssertionException if we
+     * encounter an error.
      */
     CopyableMatchExpression(BSONObj matchAST,
                             std::unique_ptr<const ExtensionsCallback> extensionsCallback,

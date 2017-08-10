@@ -580,7 +580,7 @@ public:
     /** Create an index on the collection 'ns' as described by the given keys. If you wish
      *  to specify options, see the more flexible overload of 'createIndex' which takes an
      *  IndexSpec object. Failure to construct the index is reported by throwing a
-     *  UserException.
+     *  AssertionException.
      *
      *  @param ns Namespace on which to create the index
      *  @param keys Document describing keys and index types. You must provide at least one
@@ -592,7 +592,7 @@ public:
 
     /** Create an index on the collection 'ns' as described by the given
      *  descriptor. Failure to construct the index is reported by throwing a
-     *  UserException.
+     *  AssertionException.
      *
      *  @param ns Namespace on which to create the index
      *  @param descriptor Configuration object describing the index to create. The
@@ -871,7 +871,7 @@ public:
     Status connectSocketOnly(const HostAndPort& server);
 
     /** Connect to a Mongo database server.  Exception throwing version.
-        Throws a UserException if cannot connect.
+        Throws a AssertionException if cannot connect.
 
        If autoReconnect is true, you can try to use the DBClientConnection even when
        false was returned -- it will try to connect again.

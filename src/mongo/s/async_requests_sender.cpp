@@ -94,7 +94,7 @@ AsyncRequestsSender::Response AsyncRequestsSender::next() {
         if (_interruptStatus.isOK()) {
             try {
                 _notification->get(_opCtx);
-            } catch (const UserException& ex) {
+            } catch (const AssertionException& ex) {
                 // If the operation is interrupted, we cancel outstanding requests and switch to
                 // waiting for the (canceled) callbacks to finish without checking for interrupts.
                 _interruptStatus = ex.toStatus();

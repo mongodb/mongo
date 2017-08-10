@@ -106,7 +106,7 @@ private:
     Value lookupPostImage(const Document& updateOp) const;
 
     /**
-     * Throws a UserException if the namespace found in 'inputDoc' doesn't match the one on the
+     * Throws a AssertionException if the namespace found in 'inputDoc' doesn't match the one on the
      * ExpressionContext.
      */
     NamespaceString assertNamespaceMatches(const Document& inputDoc) const;

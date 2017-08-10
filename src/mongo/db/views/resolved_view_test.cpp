@@ -178,33 +178,33 @@ TEST(ResolvedViewTest, ExpandingAggRequestPreservesComment) {
 
 TEST(ResolvedViewTest, FromBSONFailsIfMissingResolvedView) {
     BSONObj badCmdResponse = BSON("x" << 1);
-    ASSERT_THROWS_CODE(ResolvedView::fromBSON(badCmdResponse), UserException, 40248);
+    ASSERT_THROWS_CODE(ResolvedView::fromBSON(badCmdResponse), AssertionException, 40248);
 }
 
 TEST(ResolvedViewTest, FromBSONFailsOnResolvedViewBadType) {
     BSONObj badCmdResponse = BSON("resolvedView" << 7);
-    ASSERT_THROWS_CODE(ResolvedView::fromBSON(badCmdResponse), UserException, 40249);
+    ASSERT_THROWS_CODE(ResolvedView::fromBSON(badCmdResponse), AssertionException, 40249);
 }
 
 TEST(ResolvedViewTest, FromBSONFailsIfMissingViewNs) {
     BSONObj badCmdResponse = BSON("resolvedView" << BSON("pipeline" << BSONArray()));
-    ASSERT_THROWS_CODE(ResolvedView::fromBSON(badCmdResponse), UserException, 40250);
+    ASSERT_THROWS_CODE(ResolvedView::fromBSON(badCmdResponse), AssertionException, 40250);
 }
 
 TEST(ResolvedViewTest, FromBSONFailsOnInvalidViewNsType) {
     BSONObj badCmdResponse = BSON("resolvedView" << BSON("ns" << 8));
-    ASSERT_THROWS_CODE(ResolvedView::fromBSON(badCmdResponse), UserException, 40250);
+    ASSERT_THROWS_CODE(ResolvedView::fromBSON(badCmdResponse), AssertionException, 40250);
 }
 
 TEST(ResolvedViewTest, FromBSONFailsIfMissingPipeline) {
     BSONObj badCmdResponse = BSON("resolvedView" << BSON("ns" << backingNss.ns()));
-    ASSERT_THROWS_CODE(ResolvedView::fromBSON(badCmdResponse), UserException, 40251);
+    ASSERT_THROWS_CODE(ResolvedView::fromBSON(badCmdResponse), AssertionException, 40251);
 }
 
 TEST(ResolvedViewTest, FromBSONFailsOnInvalidPipelineType) {
     BSONObj badCmdResponse =
         BSON("resolvedView" << BSON("ns" << backingNss.ns() << "pipeline" << 7));
-    ASSERT_THROWS_CODE(ResolvedView::fromBSON(badCmdResponse), UserException, 40251);
+    ASSERT_THROWS_CODE(ResolvedView::fromBSON(badCmdResponse), AssertionException, 40251);
 }
 
 TEST(ResolvedViewTest, FromBSONSuccessfullyParsesEmptyBSONArrayIntoEmptyVector) {

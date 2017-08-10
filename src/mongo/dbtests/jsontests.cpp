@@ -646,7 +646,7 @@ class Bad {
 public:
     virtual ~Bad() {}
     void run() {
-        ASSERT_THROWS(fromjson(json()), MsgAssertionException);
+        ASSERT_THROWS(fromjson(json()), AssertionException);
     }
 
 protected:

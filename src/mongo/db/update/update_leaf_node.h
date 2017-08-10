@@ -57,7 +57,7 @@ public:
      * it. If 'element' is not an embedded object or array (e.g., we are trying to create path
      * "a.b.c" in the document {a: 1}) or 'element' is an array but the first component in
      * 'pathToCreate' is not an array index (e.g., the path "a.b.c" in the document
-     * {a: [{b: 1}, {b: 2}]}), then this function throws a UserException with
+     * {a: [{b: 1}, {b: 2}]}), then this function throws a AssertionException with
      * ErrorCode::PathNotViable. Otherwise, this function is a no-op.
      *
      * With the exception of $unset, update modifiers that do not create nonexistent paths ($pop,

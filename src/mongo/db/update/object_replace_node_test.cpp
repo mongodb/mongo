@@ -158,7 +158,7 @@ TEST_F(ObjectReplaceNodeTest, CannotRemoveImmutablePath) {
     mutablebson::Document doc(fromjson("{_id: 0, a: {b: 1}}"));
     addImmutablePath("a.b");
     ASSERT_THROWS_CODE_AND_WHAT(node.apply(getApplyParams(doc.root())),
-                                UserException,
+                                AssertionException,
                                 ErrorCodes::ImmutableField,
                                 "After applying the update, the 'a.b' (required and immutable) "
                                 "field was found to have been removed --{ _id: 0, a: { b: 1 } }");
@@ -185,7 +185,7 @@ TEST_F(ObjectReplaceNodeTest, CannotReplaceImmutablePathWithArrayField) {
     mutablebson::Document doc(fromjson("{_id: 0, a: {b: 1}}"));
     addImmutablePath("a.b");
     ASSERT_THROWS_CODE_AND_WHAT(node.apply(getApplyParams(doc.root())),
-                                UserException,
+                                AssertionException,
                                 ErrorCodes::NotSingleValueField,
                                 "After applying the update to the document, the (immutable) field "
                                 "'a.b' was found to be an array or array descendant.");
@@ -198,7 +198,7 @@ TEST_F(ObjectReplaceNodeTest, CannotMakeImmutablePathArrayDescendant) {
     mutablebson::Document doc(fromjson("{_id: 0, a: {'0': 1}}"));
     addImmutablePath("a.0");
     ASSERT_THROWS_CODE_AND_WHAT(node.apply(getApplyParams(doc.root())),
-                                UserException,
+                                AssertionException,
                                 ErrorCodes::NotSingleValueField,
                                 "After applying the update to the document, the (immutable) field "
                                 "'a.0' was found to be an array or array descendant.");
@@ -211,7 +211,7 @@ TEST_F(ObjectReplaceNodeTest, CannotModifyImmutablePath) {
     mutablebson::Document doc(fromjson("{_id: 0, a: {b: 1}}"));
     addImmutablePath("a.b");
     ASSERT_THROWS_CODE_AND_WHAT(node.apply(getApplyParams(doc.root())),
-                                UserException,
+                                AssertionException,
                                 ErrorCodes::ImmutableField,
                                 "After applying the update, the (immutable) field 'a.b' was found "
                                 "to have been altered to b: 2");
@@ -224,7 +224,7 @@ TEST_F(ObjectReplaceNodeTest, CannotModifyImmutableId) {
     mutablebson::Document doc(fromjson("{_id: 0}"));
     addImmutablePath("_id");
     ASSERT_THROWS_CODE_AND_WHAT(node.apply(getApplyParams(doc.root())),
-                                UserException,
+                                AssertionException,
                                 ErrorCodes::ImmutableField,
                                 "After applying the update, the (immutable) field '_id' was found "
                                 "to have been altered to _id: 1");
@@ -265,7 +265,7 @@ TEST_F(ObjectReplaceNodeTest, CannotCreateDollarPrefixedNameWhenValidateForStora
     mutablebson::Document doc(fromjson("{}"));
     ASSERT_THROWS_CODE_AND_WHAT(
         node.apply(getApplyParams(doc.root())),
-        UserException,
+        AssertionException,
         ErrorCodes::DollarPrefixedFieldName,
         "The dollar ($) prefixed field '$bad' in 'a.$bad' is not valid for storage.");
 }

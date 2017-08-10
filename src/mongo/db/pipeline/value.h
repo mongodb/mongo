@@ -200,8 +200,8 @@ public:
 
     /**
      * Recursively serializes this value as a field in the object in 'builder' with the field name
-     * 'fieldName'. This function throws a UserException if the recursion exceeds the server's BSON
-     * depth limit.
+     * 'fieldName'. This function throws a AssertionException if the recursion exceeds the server's
+     * BSON depth limit.
      */
     void addToBsonObj(BSONObjBuilder* builder,
                       StringData fieldName,
@@ -209,7 +209,7 @@ public:
 
     /**
      * Recursively serializes this value as an element in the array in 'builder'. This function
-     * throws a UserException if the recursion exceeds the server's BSON depth limit.
+     * throws a AssertionException if the recursion exceeds the server's BSON depth limit.
      */
     void addToBsonArray(BSONArrayBuilder* builder, size_t recursionLevel = 1) const;
 

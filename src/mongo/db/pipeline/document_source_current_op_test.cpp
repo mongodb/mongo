@@ -86,7 +86,7 @@ private:
 TEST_F(DocumentSourceCurrentOpTest, ShouldFailToParseIfSpecIsNotObject) {
     const auto specObj = fromjson("{$currentOp:1}");
     ASSERT_THROWS_CODE(DocumentSourceCurrentOp::createFromBson(specObj.firstElement(), getExpCtx()),
-                       UserException,
+                       AssertionException,
                        ErrorCodes::FailedToParse);
 }
 
@@ -94,7 +94,7 @@ TEST_F(DocumentSourceCurrentOpTest, ShouldFailToParseIfNotRunOnAdmin) {
     const auto specObj = fromjson("{$currentOp:{}}");
     getExpCtx()->ns = NamespaceString::makeCollectionlessAggregateNSS("foo");
     ASSERT_THROWS_CODE(DocumentSourceCurrentOp::createFromBson(specObj.firstElement(), getExpCtx()),
-                       UserException,
+                       AssertionException,
                        ErrorCodes::InvalidNamespace);
 }
 
@@ -102,35 +102,35 @@ TEST_F(DocumentSourceCurrentOpTest, ShouldFailToParseIfNotRunWithAggregateOne) {
     const auto specObj = fromjson("{$currentOp:{}}");
     getExpCtx()->ns = NamespaceString("admin.foo");
     ASSERT_THROWS_CODE(DocumentSourceCurrentOp::createFromBson(specObj.firstElement(), getExpCtx()),
-                       UserException,
+                       AssertionException,
                        ErrorCodes::InvalidNamespace);
 }
 
 TEST_F(DocumentSourceCurrentOpTest, ShouldFailToParseIdleConnectionsIfNotBoolean) {
     const auto specObj = fromjson("{$currentOp:{idleConnections:1}}");
     ASSERT_THROWS_CODE(DocumentSourceCurrentOp::createFromBson(specObj.firstElement(), getExpCtx()),
-                       UserException,
+                       AssertionException,
                        ErrorCodes::FailedToParse);
 }
 
 TEST_F(DocumentSourceCurrentOpTest, ShouldFailToParseAllUsersIfNotBoolean) {
     const auto specObj = fromjson("{$currentOp:{allUsers:1}}");
     ASSERT_THROWS_CODE(DocumentSourceCurrentOp::createFromBson(specObj.firstElement(), getExpCtx()),
-                       UserException,
+                       AssertionException,
                        ErrorCodes::FailedToParse);
 }
 
 TEST_F(DocumentSourceCurrentOpTest, ShouldFailToParseTruncateOpsIfNotBoolean) {
     const auto specObj = fromjson("{$currentOp:{truncateOps:1}}");
     ASSERT_THROWS_CODE(DocumentSourceCurrentOp::createFromBson(specObj.firstElement(), getExpCtx()),
-                       UserException,
+                       AssertionException,
                        ErrorCodes::FailedToParse);
 }
 
 TEST_F(DocumentSourceCurrentOpTest, ShouldFailToParseIfUnrecognisedParameterSpecified) {
     const auto specObj = fromjson("{$currentOp:{foo:true}}");
     ASSERT_THROWS_CODE(DocumentSourceCurrentOp::createFromBson(specObj.firstElement(), getExpCtx()),
-                       UserException,
+                       AssertionException,
                        ErrorCodes::FailedToParse);
 }
 
@@ -231,7 +231,7 @@ TEST_F(DocumentSourceCurrentOpTest, ShouldFailIfNoShardNameAvailableForShardedRe
     const auto currentOp = DocumentSourceCurrentOp::create(getExpCtx());
     currentOp->injectMongodInterface(mongod);
 
-    ASSERT_THROWS_CODE(currentOp->getNext(), UserException, 40465);
+    ASSERT_THROWS_CODE(currentOp->getNext(), AssertionException, 40465);
 }
 
 TEST_F(DocumentSourceCurrentOpTest, ShouldFailIfOpIDIsNonNumericWhenModifyingInShardedContext) {
@@ -243,7 +243,7 @@ TEST_F(DocumentSourceCurrentOpTest, ShouldFailIfOpIDIsNonNumericWhenModifyingInS
     const auto currentOp = DocumentSourceCurrentOp::create(getExpCtx());
     currentOp->injectMongodInterface(mongod);
 
-    ASSERT_THROWS_CODE(currentOp->getNext(), UserException, ErrorCodes::TypeMismatch);
+    ASSERT_THROWS_CODE(currentOp->getNext(), AssertionException, ErrorCodes::TypeMismatch);
 }
 
 }  // namespace

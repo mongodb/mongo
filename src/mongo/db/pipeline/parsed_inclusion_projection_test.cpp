@@ -57,13 +57,13 @@ TEST(InclusionProjection, ShouldThrowWhenParsingInvalidExpression) {
     ParsedInclusionProjection inclusion(expCtx);
     ASSERT_THROWS(inclusion.parse(BSON("a" << BSON("$gt" << BSON("bad"
                                                                  << "arguments")))),
-                  UserException);
+                  AssertionException);
 }
 
 TEST(InclusionProjection, ShouldRejectProjectionWithNoOutputFields) {
     const boost::intrusive_ptr<ExpressionContextForTest> expCtx(new ExpressionContextForTest());
     ParsedInclusionProjection inclusion(expCtx);
-    ASSERT_THROWS(inclusion.parse(BSON("_id" << false)), UserException);
+    ASSERT_THROWS(inclusion.parse(BSON("_id" << false)), AssertionException);
 }
 
 TEST(InclusionProjection, ShouldAddIncludedFieldsToDependencies) {

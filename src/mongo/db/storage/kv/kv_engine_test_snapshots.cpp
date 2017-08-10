@@ -249,7 +249,7 @@ TEST_F(SnapshotManagerTests, FailsAfterDropAllSnapshotsWhileYielded) {
     // Now it doesn't.
     op->recoveryUnit()->abandonSnapshot();
     ASSERT_THROWS_CODE(
-        itCountOn(op), UserException, ErrorCodes::ReadConcernMajorityNotAvailableYet);
+        itCountOn(op), AssertionException, ErrorCodes::ReadConcernMajorityNotAvailableYet);
 }
 
 TEST_F(SnapshotManagerTests, BasicFunctionality) {

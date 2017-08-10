@@ -46,7 +46,7 @@ TEST(NamespaceUUIDCache, ensureNamespaceInCache) {
 
     if (debugCollectionUUIDs) {
         // Uassert if we query for existing nss and uuid that does not match.
-        ASSERT_THROWS(cache.ensureNamespaceInCache(nss, uuidConflict), UserException);
+        ASSERT_THROWS(cache.ensureNamespaceInCache(nss, uuidConflict), AssertionException);
     }
 }
 

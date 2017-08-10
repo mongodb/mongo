@@ -121,12 +121,12 @@ static GeoHash makeHash(const string& a) {
 
 TEST(GeoHash, MakeTooLongHash) {
     string a = makeRandomBitString(100);
-    ASSERT_THROWS(makeHash(a), mongo::UserException);
+    ASSERT_THROWS(makeHash(a), mongo::AssertionException);
 }
 
 TEST(GeoHash, MakeOddHash) {
     string a = makeRandomBitString(13);
-    ASSERT_THROWS(makeHash(a), mongo::UserException);
+    ASSERT_THROWS(makeHash(a), mongo::AssertionException);
 }
 
 TEST(GeoHash, UnhashFastMatchesUnhashSlow) {

@@ -57,7 +57,7 @@ Status getKey(
         const BSONObj& k = b.obj();
         try {
             s->invoke(func, &k, 0);
-        } catch (const UserException& e) {
+        } catch (const AssertionException& e) {
             return e.toStatus("Failed to invoke group keyf function: ");
         }
         int type = s->type("__returnValue");
@@ -106,7 +106,7 @@ Status GroupStage::initGroupScripting() {
     try {
         _scope->exec(
             "$reduce = " + _request.reduceCode, "group reduce init", false, true, true, 2 * 1000);
-    } catch (const UserException& e) {
+    } catch (const AssertionException& e) {
         return e.toStatus("Failed to initialize group reduce function: ");
     }
     invariant(_scope->exec(
@@ -157,7 +157,7 @@ Status GroupStage::processObject(const BSONObj& obj) {
 
     try {
         _scope->invoke(_reduceFunction, 0, 0, 0, true /*assertOnError*/);
-    } catch (const UserException& e) {
+    } catch (const AssertionException& e) {
         return e.toStatus("Failed to invoke group reduce function: ");
     }
 
@@ -173,7 +173,7 @@ StatusWith<BSONObj> GroupStage::finalizeResults() {
                          true,   // reportError
                          true,   // assertOnError
                          2 * 1000);
-        } catch (const UserException& e) {
+        } catch (const AssertionException& e) {
             return e.toStatus("Failed to initialize group finalize function: ");
         }
         ScriptingFunction finalizeFunction = _scope->createFunction(
@@ -186,7 +186,7 @@ StatusWith<BSONObj> GroupStage::finalizeResults() {
             "}");
         try {
             _scope->invoke(finalizeFunction, 0, 0, 0, true /*assertOnError*/);
-        } catch (const UserException& e) {
+        } catch (const AssertionException& e) {
             return e.toStatus("Failed to invoke group finalize function: ");
         }
     }

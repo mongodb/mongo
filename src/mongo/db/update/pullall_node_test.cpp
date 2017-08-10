@@ -126,7 +126,7 @@ TEST_F(PullAllNodeTest, ApplyToNonArrayFails) {
     setPathTaken("a.0");
     addIndexedPath("a");
     ASSERT_THROWS_CODE_AND_WHAT(node.apply(getApplyParams(doc.root()["a"][0])),
-                                UserException,
+                                AssertionException,
                                 ErrorCodes::BadValue,
                                 "Cannot apply $pull to a non-array value");
 }

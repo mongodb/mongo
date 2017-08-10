@@ -158,7 +158,7 @@ TEST_F(SyncSourceResolverTest, InvalidConstruction) {
     // Null task executor.
     ASSERT_THROWS_CODE_AND_WHAT(
         SyncSourceResolver(nullptr, &selector, lastOpTimeFetched, requiredOpTime, onCompletion),
-        UserException,
+        AssertionException,
         ErrorCodes::BadValue,
         "task executor cannot be null");
 
@@ -166,14 +166,14 @@ TEST_F(SyncSourceResolverTest, InvalidConstruction) {
     ASSERT_THROWS_CODE_AND_WHAT(
         SyncSourceResolver(
             &getExecutor(), nullptr, lastOpTimeFetched, requiredOpTime, onCompletion),
-        UserException,
+        AssertionException,
         ErrorCodes::BadValue,
         "sync source selector cannot be null");
 
     // Null last fetched optime.
     ASSERT_THROWS_CODE_AND_WHAT(
         SyncSourceResolver(&getExecutor(), &selector, OpTime(), requiredOpTime, onCompletion),
-        UserException,
+        AssertionException,
         ErrorCodes::BadValue,
         "last fetched optime cannot be null");
 
@@ -183,7 +183,7 @@ TEST_F(SyncSourceResolverTest, InvalidConstruction) {
                                                    lastOpTimeFetched,
                                                    OpTime(Timestamp(Seconds(50), 1U), 1LL),
                                                    onCompletion),
-                                UserException,
+                                AssertionException,
                                 ErrorCodes::BadValue,
                                 "required optime (if provided) must be more recent than last "
                                 "fetched optime. requiredOpTime: { ts: Timestamp 50000|1, t: 1 }, "
@@ -191,7 +191,7 @@ TEST_F(SyncSourceResolverTest, InvalidConstruction) {
     ASSERT_THROWS_CODE_AND_WHAT(
         SyncSourceResolver(
             &getExecutor(), &selector, lastOpTimeFetched, lastOpTimeFetched, onCompletion),
-        UserException,
+        AssertionException,
         ErrorCodes::BadValue,
         "required optime (if provided) must be more recent than last fetched optime. "
         "requiredOpTime: { ts: Timestamp 100000|1, t: 1 }, lastOpTimeFetched: { ts: Timestamp "
@@ -203,7 +203,7 @@ TEST_F(SyncSourceResolverTest, InvalidConstruction) {
                                                    lastOpTimeFetched,
                                                    requiredOpTime,
                                                    SyncSourceResolver::OnCompletionFn()),
-                                UserException,
+                                AssertionException,
                                 ErrorCodes::BadValue,
                                 "callback function cannot be null");
 }

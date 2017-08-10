@@ -207,7 +207,7 @@ TEST(WiredTigerRecordStoreTest, StorageSizeStatisticsDisabled) {
     unique_ptr<RecordStore> rs(harnessHelper.newNonCappedRecordStore("a.b"));
 
     ServiceContext::UniqueOperationContext opCtx(harnessHelper.newOperationContext());
-    ASSERT_THROWS(rs->storageSize(opCtx.get()), UserException);
+    ASSERT_THROWS(rs->storageSize(opCtx.get()), AssertionException);
 }
 
 TEST(WiredTigerRecordStoreTest, SizeStorer1) {

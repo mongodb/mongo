@@ -47,7 +47,7 @@ public:
     /**
      * Constructs a LiteParsedPipeline from the raw BSON stages given in 'request'.
      *
-     * May throw a UserException if there is an invalid stage specification, although full
+     * May throw a AssertionException if there is an invalid stage specification, although full
      * validation happens later, during Pipeline construction.
      */
     LiteParsedPipeline(const AggregationRequest& request) {

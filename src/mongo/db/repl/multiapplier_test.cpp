@@ -83,7 +83,7 @@ TEST_F(MultiApplierTest, InvalidConstruction) {
     // Null executor.
     ASSERT_THROWS_CODE_AND_WHAT(
         MultiApplier(nullptr, operations, applyOperation, multiApply, callback),
-        UserException,
+        AssertionException,
         ErrorCodes::BadValue,
         "null replication executor");
 
@@ -91,7 +91,7 @@ TEST_F(MultiApplierTest, InvalidConstruction) {
     ASSERT_THROWS_CODE_AND_WHAT(
         MultiApplier(
             &getExecutor(), MultiApplier::Operations(), applyOperation, multiApply, callback),
-        UserException,
+        AssertionException,
         ErrorCodes::BadValue,
         "empty list of operations");
 
@@ -99,7 +99,7 @@ TEST_F(MultiApplierTest, InvalidConstruction) {
     ASSERT_THROWS_CODE_AND_WHAT(
         MultiApplier(
             &getExecutor(), operations, MultiApplier::ApplyOperationFn(), multiApply, callback),
-        UserException,
+        AssertionException,
         ErrorCodes::BadValue,
         "apply operation function cannot be null");
 
@@ -107,7 +107,7 @@ TEST_F(MultiApplierTest, InvalidConstruction) {
     ASSERT_THROWS_CODE_AND_WHAT(
         MultiApplier(
             &getExecutor(), operations, applyOperation, MultiApplier::MultiApplyFn(), callback),
-        UserException,
+        AssertionException,
         ErrorCodes::BadValue,
         "multi apply function cannot be null");
 
@@ -115,7 +115,7 @@ TEST_F(MultiApplierTest, InvalidConstruction) {
     ASSERT_THROWS_CODE_AND_WHAT(
         MultiApplier(
             &getExecutor(), operations, applyOperation, multiApply, MultiApplier::CallbackFn()),
-        UserException,
+        AssertionException,
         ErrorCodes::BadValue,
         "callback function cannot be null");
 }

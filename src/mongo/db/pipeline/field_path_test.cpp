@@ -41,7 +41,7 @@ using std::vector;
 
 /** FieldPath constructed from empty string. */
 TEST(FieldPathTest, Empty) {
-    ASSERT_THROWS(FieldPath path(""), UserException);
+    ASSERT_THROWS(FieldPath path(""), AssertionException);
 }
 
 /** FieldPath constructed from a simple string (without dots). */
@@ -55,12 +55,12 @@ TEST(FieldPathTest, Simple) {
 
 /** FieldPath consisting of a '$' character. */
 TEST(FieldPathTest, DollarSign) {
-    ASSERT_THROWS(FieldPath path("$"), UserException);
+    ASSERT_THROWS(FieldPath path("$"), AssertionException);
 }
 
 /** FieldPath with a '$' prefix. */
 TEST(FieldPathTest, DollarSignPrefix) {
-    ASSERT_THROWS(FieldPath path("$a"), UserException);
+    ASSERT_THROWS(FieldPath path("$a"), AssertionException);
 }
 
 /** FieldPath constructed from a string with one dot. */
@@ -75,7 +75,7 @@ TEST(FieldPathTest, Dotted) {
 
 /** FieldPath with a '$' prefix in the second field. */
 TEST(FieldPathTest, DollarSignPrefixSecondField) {
-    ASSERT_THROWS(FieldPath path("a.$b"), UserException);
+    ASSERT_THROWS(FieldPath path("a.$b"), AssertionException);
 }
 
 /** FieldPath constructed from a string with two dots. */
@@ -90,22 +90,22 @@ TEST(FieldPathTest, TwoDotted) {
 
 /** FieldPath constructed from a string ending in a dot. */
 TEST(FieldPathTest, TerminalDot) {
-    ASSERT_THROWS(FieldPath path("foo."), UserException);
+    ASSERT_THROWS(FieldPath path("foo."), AssertionException);
 }
 
 /** FieldPath constructed from a string beginning with a dot. */
 TEST(FieldPathTest, PrefixDot) {
-    ASSERT_THROWS(FieldPath path(".foo"), UserException);
+    ASSERT_THROWS(FieldPath path(".foo"), AssertionException);
 }
 
 /** FieldPath constructed from a string with adjacent dots. */
 TEST(FieldPathTest, AdjacentDots) {
-    ASSERT_THROWS(FieldPath path("foo..bar"), UserException);
+    ASSERT_THROWS(FieldPath path("foo..bar"), AssertionException);
 }
 
 /** FieldPath constructed with only dots. */
 TEST(FieldPathTest, OnlyDots) {
-    ASSERT_THROWS(FieldPath path("..."), UserException);
+    ASSERT_THROWS(FieldPath path("..."), AssertionException);
 }
 
 /** FieldPath constructed from a string with one letter between two dots. */
@@ -117,7 +117,7 @@ TEST(FieldPathTest, LetterBetweenDots) {
 
 /** FieldPath containing a null character. */
 TEST(FieldPathTest, NullCharacter) {
-    ASSERT_THROWS(FieldPath path(string("foo.b\0r", 7)), UserException);
+    ASSERT_THROWS(FieldPath path(string("foo.b\0r", 7)), AssertionException);
 }
 
 /** Tail of a FieldPath. */
@@ -157,7 +157,7 @@ TEST(FieldPathTest, CanConstructFieldPathAtOrUnderDepthLimit) {
 // Tests that a FieldPath can't be constructed if the path is too deeply nested.
 TEST(FieldPathTest, ConstructorAssertsOnDeeplyNestedPath) {
     ASSERT_THROWS_CODE(FieldPath(makeFieldPathOfDepth(BSONDepth::getMaxAllowableDepth() + 1)),
-                       UserException,
+                       AssertionException,
                        ErrorCodes::Overflow);
 }
 
@@ -184,7 +184,7 @@ TEST(FieldPathTest, CanConstructArrayFieldPathAtOrUnderDepthLimit) {
 // Tests that a FieldPath can't be constructed if an array path is too deeply nested.
 TEST(FieldPathTest, ConstructorAssertsOnDeeplyNestedArrayPath) {
     ASSERT_THROWS_CODE(makeArrayFieldPathOfDepth(BSONDepth::getMaxAllowableDepth() + 1),
-                       UserException,
+                       AssertionException,
                        ErrorCodes::Overflow);
 }
 }  // namespace

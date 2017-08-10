@@ -55,35 +55,40 @@ using std::vector;
 TEST(ParsedAddFieldsSpec, ThrowsOnCreationWithConflictingFieldPaths) {
     boost::intrusive_ptr<ExpressionContextForTest> expCtx(new ExpressionContextForTest());
     // These specs contain the same exact path.
-    ASSERT_THROWS(ParsedAddFields::create(expCtx, BSON("a" << 1 << "a" << 2)), UserException);
+    ASSERT_THROWS(ParsedAddFields::create(expCtx, BSON("a" << 1 << "a" << 2)), AssertionException);
     ASSERT_THROWS(ParsedAddFields::create(expCtx, BSON("a" << BSON("b" << 1 << "b" << 2))),
-                  UserException);
+                  AssertionException);
     ASSERT_THROWS(ParsedAddFields::create(expCtx, BSON("_id" << 3 << "_id" << true)),
-                  UserException);
+                  AssertionException);
 
     // These specs contain overlapping paths.
-    ASSERT_THROWS(ParsedAddFields::create(expCtx, BSON("a" << 1 << "a.b" << 2)), UserException);
-    ASSERT_THROWS(ParsedAddFields::create(expCtx, BSON("a.b.c" << 1 << "a" << 2)), UserException);
+    ASSERT_THROWS(ParsedAddFields::create(expCtx, BSON("a" << 1 << "a.b" << 2)),
+                  AssertionException);
+    ASSERT_THROWS(ParsedAddFields::create(expCtx, BSON("a.b.c" << 1 << "a" << 2)),
+                  AssertionException);
     ASSERT_THROWS(ParsedAddFields::create(expCtx, BSON("_id" << true << "_id.x" << true)),
-                  UserException);
+                  AssertionException);
 }
 
 // Verify that ParsedAddFields rejects specifications that contain invalid field paths.
 TEST(ParsedAddFieldsSpec, ThrowsOnCreationWithInvalidFieldPath) {
     boost::intrusive_ptr<ExpressionContextForTest> expCtx(new ExpressionContextForTest());
     // Dotted subfields are not allowed.
-    ASSERT_THROWS(ParsedAddFields::create(expCtx, BSON("a" << BSON("b.c" << true))), UserException);
+    ASSERT_THROWS(ParsedAddFields::create(expCtx, BSON("a" << BSON("b.c" << true))),
+                  AssertionException);
 
     // The user cannot start a field with $.
-    ASSERT_THROWS(ParsedAddFields::create(expCtx, BSON("$dollar" << 0)), UserException);
-    ASSERT_THROWS(ParsedAddFields::create(expCtx, BSON("c.$d" << true)), UserException);
+    ASSERT_THROWS(ParsedAddFields::create(expCtx, BSON("$dollar" << 0)), AssertionException);
+    ASSERT_THROWS(ParsedAddFields::create(expCtx, BSON("c.$d" << true)), AssertionException);
 
     // Empty field names should throw an error.
-    ASSERT_THROWS(ParsedAddFields::create(expCtx, BSON("" << 2)), UserException);
-    ASSERT_THROWS(ParsedAddFields::create(expCtx, BSON("a" << BSON("" << true))), UserException);
-    ASSERT_THROWS(ParsedAddFields::create(expCtx, BSON("" << BSON("a" << true))), UserException);
-    ASSERT_THROWS(ParsedAddFields::create(expCtx, BSON("a." << true)), UserException);
-    ASSERT_THROWS(ParsedAddFields::create(expCtx, BSON(".a" << true)), UserException);
+    ASSERT_THROWS(ParsedAddFields::create(expCtx, BSON("" << 2)), AssertionException);
+    ASSERT_THROWS(ParsedAddFields::create(expCtx, BSON("a" << BSON("" << true))),
+                  AssertionException);
+    ASSERT_THROWS(ParsedAddFields::create(expCtx, BSON("" << BSON("a" << true))),
+                  AssertionException);
+    ASSERT_THROWS(ParsedAddFields::create(expCtx, BSON("a." << true)), AssertionException);
+    ASSERT_THROWS(ParsedAddFields::create(expCtx, BSON(".a" << true)), AssertionException);
 }
 
 // Verify that ParsedAddFields rejects specifications that contain empty objects or invalid
@@ -93,20 +98,20 @@ TEST(ParsedAddFieldsSpec, ThrowsOnCreationWithInvalidObjectsOrExpressions) {
     // Invalid expressions should be rejected.
     ASSERT_THROWS(ParsedAddFields::create(
                       expCtx, BSON("a" << BSON("$add" << BSON_ARRAY(4 << 2) << "b" << 1))),
-                  UserException);
+                  AssertionException);
     ASSERT_THROWS(ParsedAddFields::create(expCtx,
                                           BSON("a" << BSON("$gt" << BSON("bad"
                                                                          << "arguments")))),
-                  UserException);
+                  AssertionException);
     ASSERT_THROWS(ParsedAddFields::create(
                       expCtx, BSON("a" << false << "b" << BSON("$unknown" << BSON_ARRAY(4 << 2)))),
-                  UserException);
+                  AssertionException);
 
     // Empty specifications are not allowed.
-    ASSERT_THROWS(ParsedAddFields::create(expCtx, BSONObj()), UserException);
+    ASSERT_THROWS(ParsedAddFields::create(expCtx, BSONObj()), AssertionException);
 
     // Empty nested objects are not allowed.
-    ASSERT_THROWS(ParsedAddFields::create(expCtx, BSON("a" << BSONObj())), UserException);
+    ASSERT_THROWS(ParsedAddFields::create(expCtx, BSON("a" << BSONObj())), AssertionException);
 }
 
 TEST(ParsedAddFields, DoesNotErrorOnTwoNestedFields) {

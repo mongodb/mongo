@@ -134,7 +134,7 @@ public:
         Note the returned object is a reference to within the parent bson object. If that
         object is out of scope, this pointer will no longer be valid. Call getOwned() on the
         returned BSONObj if you need your own copy.
-        throws UserException if the element is not of type object.
+        throws AssertionException if the element is not of type object.
     */
     BSONObj Obj() const;
 

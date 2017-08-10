@@ -404,25 +404,27 @@ TEST(AggregationRequestTest, ParseNSShouldReturnAggregateOneNSIfAggregateFieldIs
 TEST(AggregationRequestTest, ParseNSShouldRejectNumericNSIfAggregateFieldIsNotOne) {
     const BSONObj inputBSON = fromjson("{aggregate: 2, pipeline: []}");
     ASSERT_THROWS_CODE(
-        AggregationRequest::parseNs("a", inputBSON), UserException, ErrorCodes::FailedToParse);
+        AggregationRequest::parseNs("a", inputBSON), AssertionException, ErrorCodes::FailedToParse);
 }
 
 TEST(AggregationRequestTest, ParseNSShouldRejectNonStringNonNumericNS) {
     const BSONObj inputBSON = fromjson("{aggregate: {}, pipeline: []}");
     ASSERT_THROWS_CODE(
-        AggregationRequest::parseNs("a", inputBSON), UserException, ErrorCodes::TypeMismatch);
+        AggregationRequest::parseNs("a", inputBSON), AssertionException, ErrorCodes::TypeMismatch);
 }
 
 TEST(AggregationRequestTest, ParseNSShouldRejectAggregateOneStringAsCollectionName) {
     const BSONObj inputBSON = fromjson("{aggregate: '$cmd.aggregate', pipeline: []}");
-    ASSERT_THROWS_CODE(
-        AggregationRequest::parseNs("a", inputBSON), UserException, ErrorCodes::InvalidNamespace);
+    ASSERT_THROWS_CODE(AggregationRequest::parseNs("a", inputBSON),
+                       AssertionException,
+                       ErrorCodes::InvalidNamespace);
 }
 
 TEST(AggregationRequestTest, ParseNSShouldRejectInvalidCollectionName) {
     const BSONObj inputBSON = fromjson("{aggregate: '', pipeline: []}");
-    ASSERT_THROWS_CODE(
-        AggregationRequest::parseNs("a", inputBSON), UserException, ErrorCodes::InvalidNamespace);
+    ASSERT_THROWS_CODE(AggregationRequest::parseNs("a", inputBSON),
+                       AssertionException,
+                       ErrorCodes::InvalidNamespace);
 }
 
 TEST(AggregationRequestTest, ParseFromBSONOverloadsShouldProduceIdenticalRequests) {

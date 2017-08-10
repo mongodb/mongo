@@ -141,7 +141,7 @@ TEST_F(ShardCollectionTest, anotherMongosSharding) {
                                              false,
                                              vector<BSONObj>{},
                                              false),
-                       UserException,
+                       AssertionException,
                        ErrorCodes::ManualInterventionRequired);
 }
 

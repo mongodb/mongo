@@ -206,7 +206,7 @@ TEST_F(RemoteCommandRetrySchedulerTest, InvalidConstruction) {
     // Null executor.
     ASSERT_THROWS_CODE_AND_WHAT(
         RemoteCommandRetryScheduler(nullptr, request, callback, makeRetryPolicy()),
-        UserException,
+        AssertionException,
         ErrorCodes::BadValue,
         "task executor cannot be null");
 
@@ -217,7 +217,7 @@ TEST_F(RemoteCommandRetrySchedulerTest, InvalidConstruction) {
             executor::RemoteCommandRequest(HostAndPort(), request.dbname, request.cmdObj, nullptr),
             callback,
             makeRetryPolicy()),
-        UserException,
+        AssertionException,
         ErrorCodes::BadValue,
         "source in remote command request cannot be empty");
 
@@ -228,7 +228,7 @@ TEST_F(RemoteCommandRetrySchedulerTest, InvalidConstruction) {
             executor::RemoteCommandRequest(request.target, "", request.cmdObj, nullptr),
             callback,
             makeRetryPolicy()),
-        UserException,
+        AssertionException,
         ErrorCodes::BadValue,
         "database name in remote command request cannot be empty");
 
@@ -239,7 +239,7 @@ TEST_F(RemoteCommandRetrySchedulerTest, InvalidConstruction) {
             executor::RemoteCommandRequest(request.target, request.dbname, BSONObj(), nullptr),
             callback,
             makeRetryPolicy()),
-        UserException,
+        AssertionException,
         ErrorCodes::BadValue,
         "command object in remote command request cannot be empty");
 
@@ -249,7 +249,7 @@ TEST_F(RemoteCommandRetrySchedulerTest, InvalidConstruction) {
                                     request,
                                     executor::TaskExecutor::RemoteCommandCallbackFn(),
                                     makeRetryPolicy()),
-        UserException,
+        AssertionException,
         ErrorCodes::BadValue,
         "remote command callback function cannot be null");
 
@@ -259,7 +259,7 @@ TEST_F(RemoteCommandRetrySchedulerTest, InvalidConstruction) {
                                     request,
                                     callback,
                                     std::unique_ptr<RemoteCommandRetryScheduler::RetryPolicy>()),
-        UserException,
+        AssertionException,
         ErrorCodes::BadValue,
         "retry policy cannot be null");
 
@@ -270,7 +270,7 @@ TEST_F(RemoteCommandRetrySchedulerTest, InvalidConstruction) {
             request,
             callback,
             RemoteCommandRetryScheduler::makeRetryPolicy(0, Milliseconds(100), {})),
-        UserException,
+        AssertionException,
         ErrorCodes::BadValue,
         "policy max attempts cannot be zero");
 
@@ -281,7 +281,7 @@ TEST_F(RemoteCommandRetrySchedulerTest, InvalidConstruction) {
             request,
             callback,
             RemoteCommandRetryScheduler::makeRetryPolicy(1U, Milliseconds(-100), {})),
-        UserException,
+        AssertionException,
         ErrorCodes::BadValue,
         "policy max response elapsed total cannot be negative");
 }

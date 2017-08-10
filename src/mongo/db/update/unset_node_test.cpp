@@ -335,7 +335,7 @@ TEST_F(UnsetNodeTest, ApplyCannotRemoveRequiredPartOfDBRef) {
     mutablebson::Document doc(fromjson("{a: {$ref: 'c', $id: 0}}"));
     setPathTaken("a.$id");
     ASSERT_THROWS_CODE_AND_WHAT(node.apply(getApplyParams(doc.root()["a"]["$id"])),
-                                UserException,
+                                AssertionException,
                                 ErrorCodes::InvalidDBRef,
                                 "The DBRef $ref field must be followed by a $id field");
 }
@@ -370,7 +370,7 @@ TEST_F(UnsetNodeTest, ApplyCannotRemoveImmutablePath) {
     setPathTaken("a.b");
     addImmutablePath("a.b");
     ASSERT_THROWS_CODE_AND_WHAT(node.apply(getApplyParams(doc.root()["a"]["b"])),
-                                UserException,
+                                AssertionException,
                                 ErrorCodes::ImmutableField,
                                 "Unsetting the path 'a.b' would modify the immutable field 'a.b'");
 }
@@ -385,7 +385,7 @@ TEST_F(UnsetNodeTest, ApplyCannotRemovePrefixOfImmutablePath) {
     setPathTaken("a");
     addImmutablePath("a.b");
     ASSERT_THROWS_CODE_AND_WHAT(node.apply(getApplyParams(doc.root()["a"])),
-                                UserException,
+                                AssertionException,
                                 ErrorCodes::ImmutableField,
                                 "Unsetting the path 'a' would modify the immutable field 'a.b'");
 }
@@ -401,7 +401,7 @@ TEST_F(UnsetNodeTest, ApplyCannotRemoveSuffixOfImmutablePath) {
     addImmutablePath("a.b");
     ASSERT_THROWS_CODE_AND_WHAT(
         node.apply(getApplyParams(doc.root()["a"]["b"]["c"])),
-        UserException,
+        AssertionException,
         ErrorCodes::ImmutableField,
         "Unsetting the path 'a.b.c' would modify the immutable field 'a.b'");
 }

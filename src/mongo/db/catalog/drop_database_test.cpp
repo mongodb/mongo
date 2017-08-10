@@ -306,7 +306,7 @@ TEST_F(DropDatabaseTest, DropDatabaseResetsDropPendingStateOnException) {
     ASSERT_TRUE(db);
 
     ASSERT_THROWS_CODE_AND_WHAT(dropDatabase(_opCtx.get(), _nss.db().toString()).ignore(),
-                                UserException,
+                                AssertionException,
                                 ErrorCodes::OperationFailed,
                                 "onDropCollection() failed");
 

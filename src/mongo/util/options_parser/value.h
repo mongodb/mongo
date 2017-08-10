@@ -122,7 +122,7 @@ public:
      */
 
     /**
-     *  Returns the contents of this Value as type T.  Throws MsgAssertionException if the type
+     *  Returns the contents of this Value as type T.  Throws AssertionException if the type
      *  does not match
      */
     template <typename T>
@@ -171,7 +171,7 @@ T Value::as() const {
     if (!ret.isOK()) {
         StringBuilder message;
         message << "failed to extract typed value from Value container: " << ret.toString();
-        throw MsgAssertionException(17114, message.str());
+        throw AssertionException(17114, message.str());
     }
 
     return valueType;

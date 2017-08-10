@@ -45,7 +45,7 @@ TEST(DBMessage1, ShortFlags) {
     Message toSend;
     toSend.setData(dbDelete, b.buf(), b.len());
 
-    ASSERT_THROWS(DbMessage d1(toSend), UserException);
+    ASSERT_THROWS(DbMessage d1(toSend), AssertionException);
 }
 
 // Test a short NS missing a trailing null
@@ -61,7 +61,7 @@ TEST(DBMessage1, BadNS) {
     Message toSend;
     toSend.setData(dbDelete, b.buf(), b.len());
 
-    ASSERT_THROWS(DbMessage d1(toSend), UserException);
+    ASSERT_THROWS(DbMessage d1(toSend), AssertionException);
 }
 
 // Test a valid kill message and try an extra pull
@@ -77,7 +77,7 @@ TEST(DBMessage1, GoodKill) {
     DbMessage d1(toSend);
     ASSERT_EQUALS(3, d1.pullInt());
 
-    ASSERT_THROWS(d1.pullInt(), UserException);
+    ASSERT_THROWS(d1.pullInt(), AssertionException);
 }
 
 // Try a bad read of a type too large
@@ -91,7 +91,7 @@ TEST(DBMessage1, GoodKill2) {
     toSend.setData(dbKillCursors, b.buf(), b.len());
 
     DbMessage d1(toSend);
-    ASSERT_THROWS(d1.pullInt64(), UserException);
+    ASSERT_THROWS(d1.pullInt64(), AssertionException);
 }
 
 // Test a basic good insert, and an extra read
@@ -110,7 +110,7 @@ TEST(DBMessage1, GoodInsert) {
     DbMessage d1(toSend);
     ASSERT_EQUALS(3, d1.pullInt());
     ASSERT_EQUALS(39, d1.pullInt());
-    ASSERT_THROWS(d1.pullInt(), UserException);
+    ASSERT_THROWS(d1.pullInt(), AssertionException);
 }
 
 // Test a basic good insert, and an extra read
@@ -135,7 +135,7 @@ TEST(DBMessage1, GoodInsert2) {
 
     ASSERT_EQUALS(39, d1.pullInt());
     BSONObj bo2 = d1.nextJsObj();
-    ASSERT_THROWS(d1.nextJsObj(), UserException);
+    ASSERT_THROWS(d1.nextJsObj(), AssertionException);
 }
 
 

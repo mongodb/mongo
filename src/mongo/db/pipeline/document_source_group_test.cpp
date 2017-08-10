@@ -158,7 +158,7 @@ TEST_F(DocumentSourceGroupTest, ShouldErrorIfNotAllowedToSpillToDiskAndResultSet
                                             Document{{"_id", 1}, {"largeStr", largeStr}}});
     group->setSource(mock.get());
 
-    ASSERT_THROWS_CODE(group->getNext(), UserException, 16945);
+    ASSERT_THROWS_CODE(group->getNext(), AssertionException, 16945);
 }
 
 TEST_F(DocumentSourceGroupTest, ShouldCorrectlyTrackMemoryUsageBetweenPauses) {
@@ -186,7 +186,7 @@ TEST_F(DocumentSourceGroupTest, ShouldCorrectlyTrackMemoryUsageBetweenPauses) {
     ASSERT_TRUE(group->getNext().isPaused());
 
     // The next should realize it's used too much memory.
-    ASSERT_THROWS_CODE(group->getNext(), UserException, 16945);
+    ASSERT_THROWS_CODE(group->getNext(), AssertionException, 16945);
 }
 
 BSONObj toBson(const intrusive_ptr<DocumentSource>& source) {
@@ -258,7 +258,7 @@ class ParseErrorBase : public Base {
 public:
     virtual ~ParseErrorBase() {}
     void run() {
-        ASSERT_THROWS(createGroup(spec()), UserException);
+        ASSERT_THROWS(createGroup(spec()), AssertionException);
     }
 
 protected:
@@ -302,7 +302,7 @@ public:
         BSONObj spec = BSON("$group"
                             << "foo");
         BSONElement specElement = spec.firstElement();
-        ASSERT_THROWS(DocumentSourceGroup::createFromBson(specElement, ctx()), UserException);
+        ASSERT_THROWS(DocumentSourceGroup::createFromBson(specElement, ctx()), AssertionException);
     }
 };
 
@@ -1101,7 +1101,7 @@ class ArrayConstantAccumulatorExpression : public CheckResultsBase {
 public:
     void run() {
         // A parse exception is thrown when a raw array is provided to an accumulator.
-        ASSERT_THROWS(createGroup(fromjson("{_id:1,a:{$push:[4,5,6]}}")), UserException);
+        ASSERT_THROWS(createGroup(fromjson("{_id:1,a:{$push:[4,5,6]}}")), AssertionException);
         // Run standard base tests.
         CheckResultsBase::run();
     }

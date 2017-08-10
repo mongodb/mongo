@@ -79,7 +79,7 @@ Status saslExtractPayload(const BSONObj& cmdObj, std::string* payload, BSONType*
     } else if (payloadElement.type() == String) {
         try {
             *payload = base64::decode(payloadElement.str());
-        } catch (UserException& e) {
+        } catch (AssertionException& e) {
             return Status(ErrorCodes::FailedToParse, e.what());
         }
     } else {

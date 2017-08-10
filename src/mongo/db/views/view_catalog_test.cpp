@@ -143,7 +143,7 @@ TEST_F(ViewCatalogFixture, CreateViewWithPipelineFailsOnInvalidStageName) {
     ASSERT_THROWS(
         viewCatalog.createView(opCtx.get(), viewName, viewOn, invalidPipeline, emptyCollation)
             .transitional_ignore(),
-        UserException);
+        AssertionException);
 }
 
 TEST_F(ViewCatalogFixture, CreateViewOnInvalidCollectionName) {

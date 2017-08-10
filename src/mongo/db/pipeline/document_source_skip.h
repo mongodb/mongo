@@ -86,7 +86,7 @@ public:
     /**
      * Parses the user-supplied BSON into a $skip stage.
      *
-     * Throws a UserException if 'elem' is an invalid $skip specification.
+     * Throws a AssertionException if 'elem' is an invalid $skip specification.
      */
     static boost::intrusive_ptr<DocumentSource> createFromBson(
         BSONElement elem, const boost::intrusive_ptr<ExpressionContext>& pExpCtx);

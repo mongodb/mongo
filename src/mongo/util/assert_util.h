@@ -77,7 +77,6 @@ public:
         return reason().c_str();
     }
 
-    virtual void appendPrefix(std::stringstream& ss) const {}
     virtual void addContext(const std::string& str) {
         _status = Status(code(), str + causedBy(reason()));
     }
@@ -117,36 +116,6 @@ public:
     AssertionException(int code, const std::string& msg) : DBException(code, msg) {}
 
     virtual ~AssertionException() throw() {}
-
-    virtual bool severe() const {
-        return true;
-    }
-    virtual bool isUserAssertion() const {
-        return false;
-    }
-};
-
-/* UserExceptions are valid errors that a user can cause, like out of disk space or duplicate key */
-class UserException : public AssertionException {
-public:
-    UserException(int c, const std::string& m) : AssertionException(c, m) {}
-    virtual bool severe() const {
-        return false;
-    }
-    virtual bool isUserAssertion() const {
-        return true;
-    }
-    virtual void appendPrefix(std::stringstream& ss) const;
-};
-
-class MsgAssertionException : public AssertionException {
-public:
-    MsgAssertionException(const Status& status) : AssertionException(status) {}
-    MsgAssertionException(int c, const std::string& m) : AssertionException(c, m) {}
-    virtual bool severe() const {
-        return false;
-    }
-    virtual void appendPrefix(std::stringstream& ss) const;
 };
 
 MONGO_COMPILER_NORETURN void verifyFailed(const char* expr, const char* file, unsigned line);
@@ -406,7 +375,7 @@ inline void massertNoTraceStatusOKWithLocation(const Status& status,
 // some special ids that we want to duplicate
 
 // > 10000 asserts
-// < 10000 UserException
+// < 10000 AssertionException
 
 enum { ASSERT_ID_DUPKEY = 11000 };
 

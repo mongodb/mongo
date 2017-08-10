@@ -164,7 +164,7 @@ TEST_F(CheckResumeTokenTest, ShouldFailIfFirstDocHasWrongResumeToken) {
     Timestamp doc2Timestamp(101, 1);
     addDocument(doc1Timestamp, "1");
     addDocument(doc2Timestamp, "2");
-    ASSERT_THROWS_CODE(checkResumeToken->getNext(), UserException, 40585);
+    ASSERT_THROWS_CODE(checkResumeToken->getNext(), AssertionException, 40585);
 }
 
 TEST_F(CheckResumeTokenTest, ShouldFailIfTokenHasWrongDocumentId) {
@@ -172,7 +172,7 @@ TEST_F(CheckResumeTokenTest, ShouldFailIfTokenHasWrongDocumentId) {
 
     auto checkResumeToken = createCheckResumeToken(resumeTimestamp, "0");
     addDocument(resumeTimestamp, "1");
-    ASSERT_THROWS_CODE(checkResumeToken->getNext(), UserException, 40585);
+    ASSERT_THROWS_CODE(checkResumeToken->getNext(), AssertionException, 40585);
 }
 
 TEST_F(CheckResumeTokenTest, ShouldFailIfTokenHasWrongNamespace) {
@@ -180,7 +180,7 @@ TEST_F(CheckResumeTokenTest, ShouldFailIfTokenHasWrongNamespace) {
 
     auto checkResumeToken = createCheckResumeToken(resumeTimestamp, "1", "test1.ns");
     addDocument(resumeTimestamp, "1", "test2.ns");
-    ASSERT_THROWS_CODE(checkResumeToken->getNext(), UserException, 40585);
+    ASSERT_THROWS_CODE(checkResumeToken->getNext(), AssertionException, 40585);
 }
 
 /**
@@ -190,7 +190,7 @@ TEST_F(CheckResumeTokenTest, ShouldFailWithNoDocuments) {
     Timestamp resumeTimestamp(100, 1);
 
     auto checkResumeToken = createCheckResumeToken(resumeTimestamp, "0");
-    ASSERT_THROWS_CODE(checkResumeToken->getNext(), UserException, 40584);
+    ASSERT_THROWS_CODE(checkResumeToken->getNext(), AssertionException, 40584);
 }
 
 }  // namespace

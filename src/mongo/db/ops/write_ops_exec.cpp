@@ -209,10 +209,10 @@ bool handleError(OperationContext* opCtx,
         auto staleConfigException = dynamic_cast<const SendStaleConfigException*>(&ex);
         if (!staleConfigException) {
             // We need to get extra info off of the SCE, but some common patterns can result in the
-            // exception being converted to a Status then rethrown as a UserException, losing the
-            // info we need. It would be a bug if this happens so we want to detect it in testing,
-            // but it isn't severe enough that we should bring down the server if it happens in
-            // production.
+            // exception being converted to a Status then rethrown as a AssertionException, losing
+            // the info we need. It would be a bug if this happens so we want to detect it in
+            // testing, but it isn't severe enough that we should bring down the server if it
+            // happens in production.
             dassert(staleConfigException);
             msgassertedNoTrace(35475,
                                str::stream()
@@ -485,7 +485,7 @@ WriteResult performInserts(OperationContext* opCtx, const write_ops::Insert& who
             globalOpCounters.gotInsert();
             canContinue = handleError(
                 opCtx,
-                UserException(fixedDoc.getStatus().code(), fixedDoc.getStatus().reason()),
+                AssertionException(fixedDoc.getStatus().code(), fixedDoc.getStatus().reason()),
                 wholeOp.getNamespace(),
                 wholeOp.getWriteCommandBase(),
                 &out);

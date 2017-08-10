@@ -53,7 +53,7 @@ std::regex uuidRegex("[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4
 StatusWith<UUID> UUID::parse(BSONElement from) {
     try {
         return UUID{from.uuid()};
-    } catch (const UserException& e) {
+    } catch (const AssertionException& e) {
         return e.toStatus();
     }
 }

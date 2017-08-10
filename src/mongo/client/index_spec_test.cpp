@@ -32,7 +32,7 @@
 
 #include "mongo/unittest/unittest.h"
 
-#define ASSERT_UASSERTS(STATEMENT) ASSERT_THROWS(STATEMENT, UserException)
+#define ASSERT_UASSERTS(STATEMENT) ASSERT_THROWS(STATEMENT, AssertionException)
 
 namespace mongo {
 

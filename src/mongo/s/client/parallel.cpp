@@ -68,7 +68,7 @@ void throwCursorError(DBClientCursor* cursor) {
 
     if (cursor->hasResultFlag(ResultFlag_ErrSet)) {
         BSONObj o = cursor->next();
-        throw UserException(o["code"].numberInt(), o["$err"].str());
+        throw AssertionException(o["code"].numberInt(), o["$err"].str());
     }
 }
 

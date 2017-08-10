@@ -40,12 +40,12 @@ namespace mongo {
 namespace {
 
 TEST(TeeBufferTest, ShouldRequireAtLeastOneConsumer) {
-    ASSERT_THROWS_CODE(TeeBuffer::create(0), UserException, 40309);
+    ASSERT_THROWS_CODE(TeeBuffer::create(0), AssertionException, 40309);
 }
 
 TEST(TeeBufferTest, ShouldRequirePositiveBatchSize) {
-    ASSERT_THROWS_CODE(TeeBuffer::create(1, 0), UserException, 40310);
-    ASSERT_THROWS_CODE(TeeBuffer::create(1, -2), UserException, 40310);
+    ASSERT_THROWS_CODE(TeeBuffer::create(1, 0), AssertionException, 40310);
+    ASSERT_THROWS_CODE(TeeBuffer::create(1, -2), AssertionException, 40310);
 }
 
 TEST(TeeBufferTest, ShouldBeExhaustedIfInputIsExhausted) {

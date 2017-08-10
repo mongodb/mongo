@@ -115,23 +115,24 @@ void _testConfigParseOutputOptions(const std::string& dbname,
  */
 TEST(ConfigOutputOptionsTest, parseOutputOptions) {
     // Missing 'out' field.
-    ASSERT_THROWS(mr::Config::parseOutputOptions("mydb", fromjson("{}")), UserException);
+    ASSERT_THROWS(mr::Config::parseOutputOptions("mydb", fromjson("{}")), AssertionException);
     // 'out' must be either string or object.
-    ASSERT_THROWS(mr::Config::parseOutputOptions("mydb", fromjson("{out: 99}")), UserException);
+    ASSERT_THROWS(mr::Config::parseOutputOptions("mydb", fromjson("{out: 99}")),
+                  AssertionException);
     // 'out.nonAtomic' is not supported with normal, replace or inline.
     ASSERT_THROWS(mr::Config::parseOutputOptions(
                       "mydb", fromjson("{out: {normal: 'mycoll', nonAtomic: true}}")),
-                  UserException);
+                  AssertionException);
     ASSERT_THROWS(mr::Config::parseOutputOptions(
                       "mydb", fromjson("{out: {replace: 'mycoll', nonAtomic: true}}")),
-                  UserException);
+                  AssertionException);
     ASSERT_THROWS(mr::Config::parseOutputOptions(
                       "mydb", fromjson("{out: {inline: 'mycoll', nonAtomic: true}}")),
-                  UserException);
+                  AssertionException);
     // Unknown output specifer.
     ASSERT_THROWS(
         mr::Config::parseOutputOptions("mydb", fromjson("{out: {no_such_out_type: 'mycoll'}}")),
-        UserException);
+        AssertionException);
 
 
     // 'out' is string.
@@ -251,7 +252,7 @@ TEST(ConfigTest, CollationNotAnObjectFailsToParse) {
     bob.append("out", "outCollection");
     bob.append("collation", "en_US");
     BSONObj cmdObj = bob.obj();
-    ASSERT_THROWS(mr::Config(dbname, cmdObj), UserException);
+    ASSERT_THROWS(mr::Config(dbname, cmdObj), AssertionException);
 }
 
 }  // namespace

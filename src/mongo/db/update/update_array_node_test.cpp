@@ -63,7 +63,7 @@ TEST_F(UpdateArrayNodeTest, ApplyCreatePathFails) {
     addIndexedPath("a");
     ASSERT_THROWS_CODE_AND_WHAT(
         root.apply(getApplyParams(doc.root())),
-        UserException,
+        AssertionException,
         ErrorCodes::BadValue,
         "The path 'a.b' must exist in the document in order to apply array updates.");
 }
@@ -86,7 +86,7 @@ TEST_F(UpdateArrayNodeTest, ApplyToNonArrayFails) {
     mutablebson::Document doc(fromjson("{a: {}}"));
     addIndexedPath("a");
     ASSERT_THROWS_CODE_AND_WHAT(root.apply(getApplyParams(doc.root())),
-                                UserException,
+                                AssertionException,
                                 ErrorCodes::BadValue,
                                 "Cannot apply array updates to non-array element a: {}");
 }
@@ -370,7 +370,7 @@ TEST_F(UpdateArrayNodeTest, ApplyUpdatesWithMergeConflictToArrayElementFails) {
     mutablebson::Document doc(fromjson("{a: [0]}"));
     addIndexedPath("a");
     ASSERT_THROWS_CODE_AND_WHAT(root.apply(getApplyParams(doc.root())),
-                                UserException,
+                                AssertionException,
                                 ErrorCodes::ConflictingUpdateOperators,
                                 "Update created a conflict at 'a.0'");
 }
@@ -401,7 +401,7 @@ TEST_F(UpdateArrayNodeTest, ApplyUpdatesWithEmptyIdentifiersWithMergeConflictToA
     mutablebson::Document doc(fromjson("{a: [{b: [0]}]}"));
     addIndexedPath("a");
     ASSERT_THROWS_CODE_AND_WHAT(root.apply(getApplyParams(doc.root())),
-                                UserException,
+                                AssertionException,
                                 ErrorCodes::ConflictingUpdateOperators,
                                 "Update created a conflict at 'a.0.b.0'");
 }
@@ -436,7 +436,7 @@ TEST_F(UpdateArrayNodeTest, ApplyNestedArrayUpdatesWithMergeConflictFails) {
     mutablebson::Document doc(fromjson("{a: [{b: [0], c: 0}]}"));
     addIndexedPath("a");
     ASSERT_THROWS_CODE_AND_WHAT(root.apply(getApplyParams(doc.root())),
-                                UserException,
+                                AssertionException,
                                 ErrorCodes::ConflictingUpdateOperators,
                                 "Update created a conflict at 'a.0.b.0'");
 }
@@ -659,7 +659,7 @@ TEST_F(UpdateArrayNodeTest, ApplyArrayUpdateNotFromReplication) {
     mutablebson::Document doc(fromjson("{a: [0]}"));
     addIndexedPath("a");
     ASSERT_THROWS_CODE_AND_WHAT(root.apply(getApplyParams(doc.root())),
-                                UserException,
+                                AssertionException,
                                 ErrorCodes::PathNotViable,
                                 "Cannot create field 'b' in element {0: 0}");
 }

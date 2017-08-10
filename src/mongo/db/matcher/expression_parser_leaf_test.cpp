@@ -103,7 +103,7 @@ TEST(MatchExpressionParserLeafTest, ConstantExprFailsWithMissingVariable) {
 
     ASSERT_THROWS_CODE(auto sw = MatchExpressionParser::parse(
                            query, ExtensionsCallbackDisallowExtensions(), collator, expCtx),
-                       UserException,
+                       AssertionException,
                        17276);
 }
 

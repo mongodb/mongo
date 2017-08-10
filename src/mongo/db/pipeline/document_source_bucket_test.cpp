@@ -163,107 +163,107 @@ public:
 
 TEST_F(InvalidBucketSpec, BucketFailsWithNonObject) {
     auto spec = fromjson("{$bucket : 1}");
-    ASSERT_THROWS_CODE(createBucket(spec), UserException, 40201);
+    ASSERT_THROWS_CODE(createBucket(spec), AssertionException, 40201);
 
     spec = fromjson("{$bucket : 'test'}");
-    ASSERT_THROWS_CODE(createBucket(spec), UserException, 40201);
+    ASSERT_THROWS_CODE(createBucket(spec), AssertionException, 40201);
 }
 
 TEST_F(InvalidBucketSpec, BucketFailsWithUnknownField) {
     const auto spec =
         fromjson("{$bucket : {groupBy : '$x', boundaries : [0, 1, 2], unknown : 'field'}}");
-    ASSERT_THROWS_CODE(createBucket(spec), UserException, 40197);
+    ASSERT_THROWS_CODE(createBucket(spec), AssertionException, 40197);
 }
 
 TEST_F(InvalidBucketSpec, BucketFailsWithNoGroupBy) {
     const auto spec = fromjson("{$bucket : {boundaries : [0, 1, 2]}}");
-    ASSERT_THROWS_CODE(createBucket(spec), UserException, 40198);
+    ASSERT_THROWS_CODE(createBucket(spec), AssertionException, 40198);
 }
 
 TEST_F(InvalidBucketSpec, BucketFailsWithNoBoundaries) {
     const auto spec = fromjson("{$bucket : {groupBy : '$x'}}");
-    ASSERT_THROWS_CODE(createBucket(spec), UserException, 40198);
+    ASSERT_THROWS_CODE(createBucket(spec), AssertionException, 40198);
 }
 
 TEST_F(InvalidBucketSpec, BucketFailsWithNonExpressionGroupBy) {
     auto spec = fromjson("{$bucket : {groupBy : {test : 'obj'}, boundaries : [0, 1, 2]}}");
-    ASSERT_THROWS_CODE(createBucket(spec), UserException, 40202);
+    ASSERT_THROWS_CODE(createBucket(spec), AssertionException, 40202);
 
     spec = fromjson("{$bucket : {groupBy : 'test', boundaries : [0, 1, 2]}}");
-    ASSERT_THROWS_CODE(createBucket(spec), UserException, 40202);
+    ASSERT_THROWS_CODE(createBucket(spec), AssertionException, 40202);
 
     spec = fromjson("{$bucket : {groupBy : 1, boundaries : [0, 1, 2]}}");
-    ASSERT_THROWS_CODE(createBucket(spec), UserException, 40202);
+    ASSERT_THROWS_CODE(createBucket(spec), AssertionException, 40202);
 }
 
 TEST_F(InvalidBucketSpec, BucketFailsWithNonArrayBoundaries) {
     auto spec = fromjson("{$bucket : {groupBy : '$x', boundaries : 'test'}}");
-    ASSERT_THROWS_CODE(createBucket(spec), UserException, 40200);
+    ASSERT_THROWS_CODE(createBucket(spec), AssertionException, 40200);
 
     spec = fromjson("{$bucket : {groupBy : '$x', boundaries : 1}}");
-    ASSERT_THROWS_CODE(createBucket(spec), UserException, 40200);
+    ASSERT_THROWS_CODE(createBucket(spec), AssertionException, 40200);
 
     spec = fromjson("{$bucket : {groupBy : '$x', boundaries : {test : 'obj'}}}");
-    ASSERT_THROWS_CODE(createBucket(spec), UserException, 40200);
+    ASSERT_THROWS_CODE(createBucket(spec), AssertionException, 40200);
 }
 
 TEST_F(InvalidBucketSpec, BucketFailsWithNotEnoughBoundaries) {
     auto spec = fromjson("{$bucket : {groupBy : '$x', boundaries : [0]}}");
-    ASSERT_THROWS_CODE(createBucket(spec), UserException, 40192);
+    ASSERT_THROWS_CODE(createBucket(spec), AssertionException, 40192);
 
     spec = fromjson("{$bucket : {groupBy : '$x', boundaries : []}}");
-    ASSERT_THROWS_CODE(createBucket(spec), UserException, 40192);
+    ASSERT_THROWS_CODE(createBucket(spec), AssertionException, 40192);
 }
 
 TEST_F(InvalidBucketSpec, BucketFailsWithNonConstantValueBoundaries) {
     const auto spec = fromjson("{$bucket : {groupBy : '$x', boundaries : ['$x', '$y', '$z']}}");
-    ASSERT_THROWS_CODE(createBucket(spec), UserException, 40191);
+    ASSERT_THROWS_CODE(createBucket(spec), AssertionException, 40191);
 }
 
 TEST_F(InvalidBucketSpec, BucketFailsWithMixedTypesBoundaries) {
     const auto spec = fromjson("{$bucket : {groupBy : '$x', boundaries : [0, 'test']}}");
-    ASSERT_THROWS_CODE(createBucket(spec), UserException, 40193);
+    ASSERT_THROWS_CODE(createBucket(spec), AssertionException, 40193);
 }
 
 TEST_F(InvalidBucketSpec, BucketFailsWithNonUniqueBoundaries) {
     auto spec = fromjson("{$bucket : {groupBy : '$x', boundaries : [1, 1, 2, 3]}}");
-    ASSERT_THROWS_CODE(createBucket(spec), UserException, 40194);
+    ASSERT_THROWS_CODE(createBucket(spec), AssertionException, 40194);
 
     spec = fromjson("{$bucket : {groupBy : '$x', boundaries : ['a', 'b', 'b', 'c']}}");
-    ASSERT_THROWS_CODE(createBucket(spec), UserException, 40194);
+    ASSERT_THROWS_CODE(createBucket(spec), AssertionException, 40194);
 }
 
 TEST_F(InvalidBucketSpec, BucketFailsWithNonSortedBoundaries) {
     const auto spec = fromjson("{$bucket : {groupBy : '$x', boundaries : [4, 5, 3, 6]}}");
-    ASSERT_THROWS_CODE(createBucket(spec), UserException, 40194);
+    ASSERT_THROWS_CODE(createBucket(spec), AssertionException, 40194);
 }
 
 TEST_F(InvalidBucketSpec, BucketFailsWithNonConstantExpressionDefault) {
     const auto spec =
         fromjson("{$bucket : {groupBy : '$x', boundaries : [0, 1, 2], default : '$x'}}");
-    ASSERT_THROWS_CODE(createBucket(spec), UserException, 40195);
+    ASSERT_THROWS_CODE(createBucket(spec), AssertionException, 40195);
 }
 
 TEST_F(InvalidBucketSpec, BucketFailsWhenDefaultIsInBoundariesRange) {
     auto spec = fromjson("{$bucket : {groupBy : '$x', boundaries : [1, 2, 4], default : 3}}");
-    ASSERT_THROWS_CODE(createBucket(spec), UserException, 40199);
+    ASSERT_THROWS_CODE(createBucket(spec), AssertionException, 40199);
 
     spec = fromjson("{$bucket : {groupBy : '$x', boundaries : [1, 2, 4], default : 1}}");
-    ASSERT_THROWS_CODE(createBucket(spec), UserException, 40199);
+    ASSERT_THROWS_CODE(createBucket(spec), AssertionException, 40199);
 }
 
 TEST_F(InvalidBucketSpec, GroupFailsForBucketWithInvalidOutputField) {
     auto spec = fromjson("{$bucket : {groupBy : '$x', boundaries : [1, 2, 3], output : 'test'}}");
-    ASSERT_THROWS_CODE(createBucket(spec), UserException, 40196);
+    ASSERT_THROWS_CODE(createBucket(spec), AssertionException, 40196);
 
     spec = fromjson(
         "{$bucket : {groupBy : '$x', boundaries : [1, 2, 3], output : {number : 'test'}}}");
-    ASSERT_THROWS_CODE(createBucket(spec), UserException, 40234);
+    ASSERT_THROWS_CODE(createBucket(spec), AssertionException, 40234);
 
     spec = fromjson(
         "{$bucket : {groupBy : '$x', boundaries : [1, 2, 3], output : {'test.test' : {$sum : "
         "1}}}}");
-    ASSERT_THROWS_CODE(createBucket(spec), UserException, 40235);
+    ASSERT_THROWS_CODE(createBucket(spec), AssertionException, 40235);
 }
 
 TEST_F(InvalidBucketSpec, SwitchFailsForBucketWhenNoDefaultSpecified) {
@@ -281,7 +281,7 @@ TEST_F(InvalidBucketSpec, SwitchFailsForBucketWhenNoDefaultSpecified) {
     auto doc = Document{{"x", 4}};
     auto source = DocumentSourceMock::create(doc);
     groupStage->setSource(source.get());
-    ASSERT_THROWS_CODE(groupStage->getNext(), UserException, 40066);
+    ASSERT_THROWS_CODE(groupStage->getNext(), AssertionException, 40066);
 }
 }  // namespace
 }  // namespace mongo

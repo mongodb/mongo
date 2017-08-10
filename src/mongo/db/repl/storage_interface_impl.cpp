@@ -392,7 +392,7 @@ Status StorageInterfaceImpl::createCollection(OperationContext* opCtx,
         try {
             auto coll = db->createCollection(opCtx, nss.ns(), options);
             invariant(coll);
-        } catch (const UserException& ex) {
+        } catch (const AssertionException& ex) {
             return ex.toStatus();
         }
         wuow.commit();

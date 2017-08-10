@@ -55,7 +55,7 @@ public:
     /**
      * This function adds the pair nss.ns(), uuid to the namespace UUID cache
      * if it does not yet exist. If nss.ns() already exists in the cache with
-     * a different UUID, a UserException is thrown, so we can guarantee that
+     * a different UUID, a AssertionException is thrown, so we can guarantee that
      * an operation will always resolve the same name to the same collection,
      * even in presence of drops and renames.
      */

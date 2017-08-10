@@ -451,7 +451,7 @@ public:
             // FAILURE state will make getMore command close the cursor even if it's tailable.
             *state = PlanExecutor::FAILURE;
             return Status::OK();
-        } catch (const UserException& except) {
+        } catch (const AssertionException& except) {
             if (isAwaitData && except.code() == ErrorCodes::ExceededTimeLimit) {
                 // We ignore exceptions from interrupt points due to max time expiry for
                 // awaitData cursors.

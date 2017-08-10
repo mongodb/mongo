@@ -68,7 +68,7 @@ public:
      * Parses a BSONElement that is an accumulated field, and returns an AccumulationStatement for
      * that accumulated field.
      *
-     * Throws a UserException if parsing fails.
+     * Throws a AssertionException if parsing fails.
      */
     static AccumulationStatement parseAccumulationStatement(
         const boost::intrusive_ptr<ExpressionContext>& expCtx,

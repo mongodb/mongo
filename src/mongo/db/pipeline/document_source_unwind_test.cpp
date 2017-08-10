@@ -749,25 +749,26 @@ TEST_F(UnwindStageTest, UnwindIncludesIndexPathWhenIncludingIndex) {
 //
 
 TEST_F(UnwindStageTest, ShouldRejectNonObjectNonString) {
-    ASSERT_THROWS_CODE(createUnwind(BSON("$unwind" << 1)), UserException, 15981);
+    ASSERT_THROWS_CODE(createUnwind(BSON("$unwind" << 1)), AssertionException, 15981);
 }
 
 TEST_F(UnwindStageTest, ShouldRejectSpecWithoutPath) {
-    ASSERT_THROWS_CODE(createUnwind(BSON("$unwind" << BSONObj())), UserException, 28812);
+    ASSERT_THROWS_CODE(createUnwind(BSON("$unwind" << BSONObj())), AssertionException, 28812);
 }
 
 TEST_F(UnwindStageTest, ShouldRejectNonStringPath) {
-    ASSERT_THROWS_CODE(createUnwind(BSON("$unwind" << BSON("path" << 2))), UserException, 28808);
+    ASSERT_THROWS_CODE(
+        createUnwind(BSON("$unwind" << BSON("path" << 2))), AssertionException, 28808);
 }
 
 TEST_F(UnwindStageTest, ShouldRejectNonDollarPrefixedPath) {
     ASSERT_THROWS_CODE(createUnwind(BSON("$unwind"
                                          << "somePath")),
-                       UserException,
+                       AssertionException,
                        28818);
     ASSERT_THROWS_CODE(createUnwind(BSON("$unwind" << BSON("path"
                                                            << "somePath"))),
-                       UserException,
+                       AssertionException,
                        28818);
 }
 
@@ -776,7 +777,7 @@ TEST_F(UnwindStageTest, ShouldRejectNonBoolPreserveNullAndEmptyArrays) {
                                                            << "$x"
                                                            << "preserveNullAndEmptyArrays"
                                                            << 2))),
-                       UserException,
+                       AssertionException,
                        28809);
 }
 
@@ -785,7 +786,7 @@ TEST_F(UnwindStageTest, ShouldRejectNonStringIncludeArrayIndex) {
                                                            << "$x"
                                                            << "includeArrayIndex"
                                                            << 2))),
-                       UserException,
+                       AssertionException,
                        28810);
 }
 
@@ -794,7 +795,7 @@ TEST_F(UnwindStageTest, ShouldRejectEmptyStringIncludeArrayIndex) {
                                                            << "$x"
                                                            << "includeArrayIndex"
                                                            << ""))),
-                       UserException,
+                       AssertionException,
                        28810);
 }
 
@@ -803,13 +804,13 @@ TEST_F(UnwindStageTest, ShoudlRejectDollarPrefixedIncludeArrayIndex) {
                                                            << "$x"
                                                            << "includeArrayIndex"
                                                            << "$"))),
-                       UserException,
+                       AssertionException,
                        28822);
     ASSERT_THROWS_CODE(createUnwind(BSON("$unwind" << BSON("path"
                                                            << "$x"
                                                            << "includeArrayIndex"
                                                            << "$path"))),
-                       UserException,
+                       AssertionException,
                        28822);
 }
 
@@ -820,13 +821,13 @@ TEST_F(UnwindStageTest, ShouldRejectUnrecognizedOption) {
                                                            << true
                                                            << "foo"
                                                            << 3))),
-                       UserException,
+                       AssertionException,
                        28811);
     ASSERT_THROWS_CODE(createUnwind(BSON("$unwind" << BSON("path"
                                                            << "$x"
                                                            << "foo"
                                                            << 3))),
-                       UserException,
+                       AssertionException,
                        28811);
 }
 

@@ -154,7 +154,7 @@ TEST(CollationIndexKeyTest, CollationAwareAppendThrowsIfSymbol) {
     BSONObjBuilder out;
     ASSERT_THROWS_CODE(
         CollationIndexKey::collationAwareIndexKeyAppend(dataObj.firstElement(), &collator, &out),
-        UserException,
+        AssertionException,
         ErrorCodes::CannotBuildIndexKeys);
 }
 
@@ -175,7 +175,7 @@ TEST(CollationIndexKeyTest, CollationAwareAppendThrowsIfSymbolInsideObject) {
     BSONObjBuilder out;
     ASSERT_THROWS_CODE(
         CollationIndexKey::collationAwareIndexKeyAppend(dataObj.firstElement(), &collator, &out),
-        UserException,
+        AssertionException,
         ErrorCodes::CannotBuildIndexKeys);
 }
 
@@ -185,7 +185,7 @@ TEST(CollationIndexKeyTest, CollationAwareAppendThrowsIfSymbolInsideArray) {
     BSONObjBuilder out;
     ASSERT_THROWS_CODE(
         CollationIndexKey::collationAwareIndexKeyAppend(dataObj.firstElement(), &collator, &out),
-        UserException,
+        AssertionException,
         ErrorCodes::CannotBuildIndexKeys);
 }
 

@@ -45,7 +45,7 @@ namespace mongo {
  * quotes.  JSON unicode escape sequences (of the form \uXXXX) are
  * converted to utf8.
  *
- * @throws MsgAssertionException if parsing fails.  The message included with
+ * @throws AssertionException if parsing fails.  The message included with
  * this assertion includes the character offset where parsing failed.
  */
 BSONObj fromjson(const std::string& str);

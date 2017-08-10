@@ -631,7 +631,7 @@ void doNothing(const BSONObj&) {}
  * single object in the query result set (or the empty object, if the result set is empty).
  * If 'qr' doesn't have these options set, then nullptr must be passed for 'objOut'.
  *
- * On error, throws a UserException.
+ * On error, throws a AssertionException.
  */
 int runQueryWithReadCommands(DBClientBase* conn,
                              unique_ptr<QueryRequest> qr,

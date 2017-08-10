@@ -81,13 +81,10 @@ public:
      * stale config exceptions in a map and this requires a default constructor.
      */
     StaleConfigException()
-        : AssertionException(0, "initializing empty stale config exception object") {}
+        : AssertionException(ErrorCodes::InternalError,
+                             "initializing empty stale config exception object") {}
 
     virtual ~StaleConfigException() throw() {}
-
-    virtual void appendPrefix(std::stringstream& ss) const {
-        ss << "stale sharding config exception: ";
-    }
 
     std::string getns() const {
         return _ns;

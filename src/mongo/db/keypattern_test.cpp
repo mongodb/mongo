@@ -40,17 +40,17 @@ TEST(KeyPattern, ExtendRangeBound) {
     // test keyPattern shorter than bound, should fail
     {
         KeyPattern keyPat(BSON("a" << 1));
-        ASSERT_THROWS(keyPat.extendRangeBound(longBound, false), MsgAssertionException);
+        ASSERT_THROWS(keyPat.extendRangeBound(longBound, false), AssertionException);
     }
 
     // test keyPattern doesn't match bound, should fail
     {
         KeyPattern keyPat(BSON("b" << 1));
-        ASSERT_THROWS(keyPat.extendRangeBound(bound, false), MsgAssertionException);
+        ASSERT_THROWS(keyPat.extendRangeBound(bound, false), AssertionException);
     }
     {
         KeyPattern keyPat(BSON("a" << 1 << "c" << 1));
-        ASSERT_THROWS(keyPat.extendRangeBound(longBound, false), MsgAssertionException);
+        ASSERT_THROWS(keyPat.extendRangeBound(longBound, false), AssertionException);
     }
 
     // test keyPattern same as bound

@@ -72,7 +72,8 @@ public:
     static void registerParser(const std::string& name, Parser parser);
 
     /**
-     * Constructs a LiteParsedDocumentSource from the user-supplied BSON, or throws a UserException.
+     * Constructs a LiteParsedDocumentSource from the user-supplied BSON, or throws a
+     * AssertionException.
      *
      * Extracts the first field name from 'spec', and delegates to the parser that was registered
      * with that field name using registerParser() above.

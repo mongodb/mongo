@@ -112,7 +112,7 @@ public:
                 const bool forceCheckpoint = false;
                 const bool stableCheckpoint = false;
                 _sessionCache->waitUntilDurable(forceCheckpoint, stableCheckpoint);
-            } catch (const UserException& e) {
+            } catch (const AssertionException& e) {
                 invariant(e.code() == ErrorCodes::ShutdownInProgress);
             }
 
@@ -201,7 +201,7 @@ public:
                         _sessionCache->waitUntilDurable(forceCheckpoint, stableCheckpoint);
                     }
                 }
-            } catch (const UserException& exc) {
+            } catch (const AssertionException& exc) {
                 invariant(exc.code() == ErrorCodes::ShutdownInProgress);
             }
         }

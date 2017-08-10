@@ -83,7 +83,7 @@ TEST(Base64Test, parseFail) {
         try {
             base64::decode(t.encoded);
             ASSERT_TRUE(false);
-        } catch (const UserException& e) {
+        } catch (const AssertionException& e) {
             ASSERT_EQ(e.code(), t.code);
         }
     }

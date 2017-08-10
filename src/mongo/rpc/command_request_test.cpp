@@ -117,7 +117,7 @@ TEST(CommandRequest, EmptyCommandObjThrows) {
     Message msg;
     msg.setData(dbCommand, opCommandData.data(), opCommandData.size());
 
-    ASSERT_THROWS_CODE(rpc::ParsedOpCommand::parse(msg), UserException, 39950);
+    ASSERT_THROWS_CODE(rpc::ParsedOpCommand::parse(msg), AssertionException, 39950);
 }
 
 TEST(CommandRequest, MismatchBetweenCommandNamesThrows) {
@@ -152,7 +152,7 @@ TEST(CommandRequest, MismatchBetweenCommandNamesThrows) {
     Message msg;
     msg.setData(dbCommand, opCommandData.data(), opCommandData.size());
 
-    ASSERT_THROWS_CODE(rpc::ParsedOpCommand::parse(msg), UserException, 39950);
+    ASSERT_THROWS_CODE(rpc::ParsedOpCommand::parse(msg), AssertionException, 39950);
 }
 
 }  // namespace

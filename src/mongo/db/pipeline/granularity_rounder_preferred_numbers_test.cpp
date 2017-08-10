@@ -532,8 +532,8 @@ TEST(GranularityRounderPreferredNumbersTest, ShouldFailOnRoundingNonNumericValue
 
         // Make sure that each GranularityRounder fails when rounding a non-numeric value.
         Value stringValue = Value("test"_sd);
-        ASSERT_THROWS_CODE(rounder->roundUp(stringValue), UserException, 40262);
-        ASSERT_THROWS_CODE(rounder->roundDown(stringValue), UserException, 40262);
+        ASSERT_THROWS_CODE(rounder->roundUp(stringValue), AssertionException, 40262);
+        ASSERT_THROWS_CODE(rounder->roundDown(stringValue), AssertionException, 40262);
     }
 }
 
@@ -544,15 +544,15 @@ TEST(GranularityRounderPreferredNumbersTest, ShouldFailOnRoundingNaN) {
 
         // Make sure that each GranularityRounder fails when rounding NaN.
         Value nan = Value(std::nan("NaN"));
-        ASSERT_THROWS_CODE(rounder->roundUp(nan), UserException, 40263);
-        ASSERT_THROWS_CODE(rounder->roundDown(nan), UserException, 40263);
+        ASSERT_THROWS_CODE(rounder->roundUp(nan), AssertionException, 40263);
+        ASSERT_THROWS_CODE(rounder->roundDown(nan), AssertionException, 40263);
 
         Value positiveNan = Value(Decimal128::kPositiveNaN);
         Value negativeNan = Value(Decimal128::kNegativeNaN);
-        ASSERT_THROWS_CODE(rounder->roundUp(positiveNan), UserException, 40263);
-        ASSERT_THROWS_CODE(rounder->roundDown(positiveNan), UserException, 40263);
-        ASSERT_THROWS_CODE(rounder->roundUp(negativeNan), UserException, 40263);
-        ASSERT_THROWS_CODE(rounder->roundDown(negativeNan), UserException, 40263);
+        ASSERT_THROWS_CODE(rounder->roundUp(positiveNan), AssertionException, 40263);
+        ASSERT_THROWS_CODE(rounder->roundDown(positiveNan), AssertionException, 40263);
+        ASSERT_THROWS_CODE(rounder->roundUp(negativeNan), AssertionException, 40263);
+        ASSERT_THROWS_CODE(rounder->roundDown(negativeNan), AssertionException, 40263);
     }
 }
 
@@ -563,12 +563,12 @@ TEST(GranularityRounderPreferredNumbersTest, ShouldFailOnRoundingNegativeNumber)
 
         // Make sure that each GranularityRounder fails when rounding a negative number.
         Value negativeNumber = Value(-1);
-        ASSERT_THROWS_CODE(rounder->roundUp(negativeNumber), UserException, 40268);
-        ASSERT_THROWS_CODE(rounder->roundDown(negativeNumber), UserException, 40268);
+        ASSERT_THROWS_CODE(rounder->roundUp(negativeNumber), AssertionException, 40268);
+        ASSERT_THROWS_CODE(rounder->roundDown(negativeNumber), AssertionException, 40268);
 
         negativeNumber = Value(Decimal128(-1));
-        ASSERT_THROWS_CODE(rounder->roundUp(negativeNumber), UserException, 40268);
-        ASSERT_THROWS_CODE(rounder->roundDown(negativeNumber), UserException, 40268);
+        ASSERT_THROWS_CODE(rounder->roundUp(negativeNumber), AssertionException, 40268);
+        ASSERT_THROWS_CODE(rounder->roundDown(negativeNumber), AssertionException, 40268);
     }
 }
 }  // namespace

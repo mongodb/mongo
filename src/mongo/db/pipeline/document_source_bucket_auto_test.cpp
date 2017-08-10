@@ -527,103 +527,103 @@ TEST_F(BucketAutoTests, ShouldBeAbleToReParseSerializedStage) {
 
 TEST_F(BucketAutoTests, FailsWithInvalidNumberOfBuckets) {
     auto spec = fromjson("{$bucketAuto : {groupBy : '$x', buckets : 'test'}}");
-    ASSERT_THROWS_CODE(createBucketAuto(spec), UserException, 40241);
+    ASSERT_THROWS_CODE(createBucketAuto(spec), AssertionException, 40241);
 
     spec = fromjson("{$bucketAuto : {groupBy : '$x', buckets : 2147483648}}");
-    ASSERT_THROWS_CODE(createBucketAuto(spec), UserException, 40242);
+    ASSERT_THROWS_CODE(createBucketAuto(spec), AssertionException, 40242);
 
     spec = fromjson("{$bucketAuto : {groupBy : '$x', buckets : 1.5}}");
-    ASSERT_THROWS_CODE(createBucketAuto(spec), UserException, 40242);
+    ASSERT_THROWS_CODE(createBucketAuto(spec), AssertionException, 40242);
 
     spec = fromjson("{$bucketAuto : {groupBy : '$x', buckets : 0}}");
-    ASSERT_THROWS_CODE(createBucketAuto(spec), UserException, 40243);
+    ASSERT_THROWS_CODE(createBucketAuto(spec), AssertionException, 40243);
 
     spec = fromjson("{$bucketAuto : {groupBy : '$x', buckets : -1}}");
-    ASSERT_THROWS_CODE(createBucketAuto(spec), UserException, 40243);
+    ASSERT_THROWS_CODE(createBucketAuto(spec), AssertionException, 40243);
 
     // Use the create() helper.
     const int numBuckets = 0;
     ASSERT_THROWS_CODE(
         DocumentSourceBucketAuto::create(
             getExpCtx(), ExpressionConstant::create(getExpCtx(), Value(0)), numBuckets),
-        UserException,
+        AssertionException,
         40243);
 }
 
 TEST_F(BucketAutoTests, FailsWithNonExpressionGroupBy) {
     auto spec = fromjson("{$bucketAuto : {groupBy : 'test', buckets : 1}}");
-    ASSERT_THROWS_CODE(createBucketAuto(spec), UserException, 40239);
+    ASSERT_THROWS_CODE(createBucketAuto(spec), AssertionException, 40239);
 
     spec = fromjson("{$bucketAuto : {groupBy : {test : 'test'}, buckets : 1}}");
-    ASSERT_THROWS_CODE(createBucketAuto(spec), UserException, 40239);
+    ASSERT_THROWS_CODE(createBucketAuto(spec), AssertionException, 40239);
 }
 
 TEST_F(BucketAutoTests, FailsWithNonObjectArgument) {
     auto spec = fromjson("{$bucketAuto : 'test'}");
-    ASSERT_THROWS_CODE(createBucketAuto(spec), UserException, 40240);
+    ASSERT_THROWS_CODE(createBucketAuto(spec), AssertionException, 40240);
 
     spec = fromjson("{$bucketAuto : [1, 2, 3]}");
-    ASSERT_THROWS_CODE(createBucketAuto(spec), UserException, 40240);
+    ASSERT_THROWS_CODE(createBucketAuto(spec), AssertionException, 40240);
 }
 
 TEST_F(BucketAutoTests, FailsWithNonObjectOutput) {
     auto spec = fromjson("{$bucketAuto : {groupBy : '$x', buckets : 1, output : 'test'}}");
-    ASSERT_THROWS_CODE(createBucketAuto(spec), UserException, 40244);
+    ASSERT_THROWS_CODE(createBucketAuto(spec), AssertionException, 40244);
 
     spec = fromjson("{$bucketAuto : {groupBy : '$x', buckets : 1, output : [1, 2, 3]}}");
-    ASSERT_THROWS_CODE(createBucketAuto(spec), UserException, 40244);
+    ASSERT_THROWS_CODE(createBucketAuto(spec), AssertionException, 40244);
 
     spec = fromjson("{$bucketAuto : {groupBy : '$x', buckets : 1, output : 1}}");
-    ASSERT_THROWS_CODE(createBucketAuto(spec), UserException, 40244);
+    ASSERT_THROWS_CODE(createBucketAuto(spec), AssertionException, 40244);
 }
 
 TEST_F(BucketAutoTests, FailsWhenGroupByMissing) {
     auto spec = fromjson("{$bucketAuto : {buckets : 1}}");
-    ASSERT_THROWS_CODE(createBucketAuto(spec), UserException, 40246);
+    ASSERT_THROWS_CODE(createBucketAuto(spec), AssertionException, 40246);
 }
 
 TEST_F(BucketAutoTests, FailsWhenBucketsMissing) {
     auto spec = fromjson("{$bucketAuto : {groupBy : '$x'}}");
-    ASSERT_THROWS_CODE(createBucketAuto(spec), UserException, 40246);
+    ASSERT_THROWS_CODE(createBucketAuto(spec), AssertionException, 40246);
 }
 
 TEST_F(BucketAutoTests, FailsWithUnknownField) {
     auto spec = fromjson("{$bucketAuto : {groupBy : '$x', buckets : 1, field : 'test'}}");
-    ASSERT_THROWS_CODE(createBucketAuto(spec), UserException, 40245);
+    ASSERT_THROWS_CODE(createBucketAuto(spec), AssertionException, 40245);
 }
 
 TEST_F(BucketAutoTests, FailsWithInvalidExpressionToAccumulator) {
     auto spec = fromjson(
         "{$bucketAuto : {groupBy : '$x', buckets : 1, output : {avg : {$avg : ['$x', 1]}}}}");
-    ASSERT_THROWS_CODE(createBucketAuto(spec), UserException, 40237);
+    ASSERT_THROWS_CODE(createBucketAuto(spec), AssertionException, 40237);
 
     spec = fromjson(
         "{$bucketAuto : {groupBy : '$x', buckets : 1, output : {test : {$avg : '$x', $sum : "
         "'$x'}}}}");
-    ASSERT_THROWS_CODE(createBucketAuto(spec), UserException, 40238);
+    ASSERT_THROWS_CODE(createBucketAuto(spec), AssertionException, 40238);
 }
 
 TEST_F(BucketAutoTests, FailsWithNonAccumulatorObjectOutputField) {
     auto spec =
         fromjson("{$bucketAuto : {groupBy : '$x', buckets : 1, output : {field : 'test'}}}");
-    ASSERT_THROWS_CODE(createBucketAuto(spec), UserException, 40234);
+    ASSERT_THROWS_CODE(createBucketAuto(spec), AssertionException, 40234);
 
     spec = fromjson("{$bucketAuto : {groupBy : '$x', buckets : 1, output : {field : 1}}}");
-    ASSERT_THROWS_CODE(createBucketAuto(spec), UserException, 40234);
+    ASSERT_THROWS_CODE(createBucketAuto(spec), AssertionException, 40234);
 
     spec = fromjson(
         "{$bucketAuto : {groupBy : '$x', buckets : 1, output : {test : {field : 'test'}}}}");
-    ASSERT_THROWS_CODE(createBucketAuto(spec), UserException, 40234);
+    ASSERT_THROWS_CODE(createBucketAuto(spec), AssertionException, 40234);
 }
 
 TEST_F(BucketAutoTests, FailsWithInvalidOutputFieldName) {
     auto spec = fromjson(
         "{$bucketAuto : {groupBy : '$x', buckets : 1, output : {'field.test' : {$avg : '$x'}}}}");
-    ASSERT_THROWS_CODE(createBucketAuto(spec), UserException, 40235);
+    ASSERT_THROWS_CODE(createBucketAuto(spec), AssertionException, 40235);
 
     spec = fromjson(
         "{$bucketAuto : {groupBy : '$x', buckets : 1, output : {'$field' : {$avg : '$x'}}}}");
-    ASSERT_THROWS_CODE(createBucketAuto(spec), UserException, 40236);
+    ASSERT_THROWS_CODE(createBucketAuto(spec), AssertionException, 40236);
 }
 
 void assertCannotSpillToDisk(const boost::intrusive_ptr<ExpressionContext>& expCtx) {
@@ -641,7 +641,7 @@ void assertCannotSpillToDisk(const boost::intrusive_ptr<ExpressionContext>& expC
         {Document{{"a", 0}, {"largeStr", largeStr}}, Document{{"a", 1}, {"largeStr", largeStr}}});
     bucketAutoStage->setSource(mock.get());
 
-    ASSERT_THROWS_CODE(bucketAutoStage->getNext(), UserException, 16819);
+    ASSERT_THROWS_CODE(bucketAutoStage->getNext(), AssertionException, 16819);
 }
 
 TEST_F(BucketAutoTests, ShouldFailIfBufferingTooManyDocuments) {
@@ -683,7 +683,7 @@ TEST_F(BucketAutoTests, ShouldCorrectlyTrackMemoryUsageBetweenPauses) {
     ASSERT_TRUE(bucketAutoStage->getNext().isPaused());
 
     // The next should realize it's used too much memory.
-    ASSERT_THROWS_CODE(bucketAutoStage->getNext(), UserException, 16819);
+    ASSERT_THROWS_CODE(bucketAutoStage->getNext(), AssertionException, 16819);
 }
 
 TEST_F(BucketAutoTests, ShouldRoundUpMaximumBoundariesWithGranularitySpecified) {
@@ -774,7 +774,7 @@ TEST_F(BucketAutoTests, ShouldFailOnNaNWhenGranularitySpecified) {
                                    Document{{"x", std::nan("NaN")}},
                                    Document{{"x", 1}},
                                    Document{{"x", 1}}}),
-                       UserException,
+                       AssertionException,
                        40259);
 }
 
@@ -787,7 +787,7 @@ TEST_F(BucketAutoTests, ShouldFailOnNonNumericValuesWhenGranularitySpecified) {
                                    Document{{"x", "test"_sd}},
                                    Document{{"x", 1}},
                                    Document{{"x", 1}}}),
-                       UserException,
+                       AssertionException,
                        40258);
 }
 
@@ -799,7 +799,7 @@ TEST_F(BucketAutoTests, ShouldFailOnNegativeNumbersWhenGranularitySpecified) {
         getResults(
             bucketAutoSpec,
             {Document{{"x", 0}}, Document{{"x", -1}}, Document{{"x", 1}}, Document{{"x", 2}}}),
-        UserException,
+        AssertionException,
         40260);
 }
 }  // namespace

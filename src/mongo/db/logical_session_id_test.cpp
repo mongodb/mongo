@@ -139,7 +139,7 @@ TEST_F(LogicalSessionIdTest, ConstructorFromClientWithoutPassedUidAndWithoutAuth
     LogicalSessionFromClient req;
     req.setId(id);
 
-    ASSERT_THROWS(makeLogicalSessionId(req, _opCtx.get()), UserException);
+    ASSERT_THROWS(makeLogicalSessionId(req, _opCtx.get()), AssertionException);
 }
 
 TEST_F(LogicalSessionIdTest, ConstructorFromClientWithPassedUidWithPermissions) {
@@ -165,7 +165,7 @@ TEST_F(LogicalSessionIdTest, ConstructorFromClientWithPassedUidWithoutAuthedUser
     req.setId(id);
     req.setUid(uid);
 
-    ASSERT_THROWS(makeLogicalSessionId(req, _opCtx.get()), UserException);
+    ASSERT_THROWS(makeLogicalSessionId(req, _opCtx.get()), AssertionException);
 }
 
 TEST_F(LogicalSessionIdTest, ConstructorFromClientWithPassedUidWithoutPermissions) {
@@ -177,7 +177,7 @@ TEST_F(LogicalSessionIdTest, ConstructorFromClientWithPassedUidWithoutPermission
     req.setId(id);
     req.setUid(uid);
 
-    ASSERT_THROWS(makeLogicalSessionId(req, _opCtx.get()), UserException);
+    ASSERT_THROWS(makeLogicalSessionId(req, _opCtx.get()), AssertionException);
 }
 
 TEST_F(LogicalSessionIdTest, GenWithUser) {
@@ -191,11 +191,11 @@ TEST_F(LogicalSessionIdTest, GenWithMultipleAuthedUsers) {
     addSimpleUser(UserName("simple", "test"));
     addSimpleUser(UserName("simple", "test2"));
 
-    ASSERT_THROWS(makeLogicalSessionId(_opCtx.get()), UserException);
+    ASSERT_THROWS(makeLogicalSessionId(_opCtx.get()), AssertionException);
 }
 
 TEST_F(LogicalSessionIdTest, GenWithoutAuthedUser) {
-    ASSERT_THROWS(makeLogicalSessionId(_opCtx.get()), UserException);
+    ASSERT_THROWS(makeLogicalSessionId(_opCtx.get()), AssertionException);
 }
 
 TEST_F(LogicalSessionIdTest, InitializeOperationSessionInfo_NoSessionIdNoTransactionNumber) {
@@ -229,7 +229,7 @@ TEST_F(LogicalSessionIdTest, InitializeOperationSessionInfo_MissingSessionIdWith
                                        BSON("TestCmd" << 1 << "txnNumber" << 100LL << "OtherField"
                                                       << "TestField"),
                                        true),
-        UserException,
+        AssertionException,
         ErrorCodes::IllegalOperation);
 }
 

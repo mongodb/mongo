@@ -138,7 +138,7 @@ TEST_F(ChangeStreamStageTest, ShouldRejectUnrecognizedOption) {
     ASSERT_THROWS_CODE(
         DSChangeStream::createFromBson(
             BSON(DSChangeStream::kStageName << BSON("unexpected" << 4)).firstElement(), expCtx),
-        UserException,
+        AssertionException,
         40415);
 }
 
@@ -149,7 +149,7 @@ TEST_F(ChangeStreamStageTest, ShouldRejectNonStringFullDocumentOption) {
         DSChangeStream::createFromBson(
             BSON(DSChangeStream::kStageName << BSON("fullDocument" << true)).firstElement(),
             expCtx),
-        UserException,
+        AssertionException,
         ErrorCodes::TypeMismatch);
 }
 
@@ -161,7 +161,7 @@ TEST_F(ChangeStreamStageTest, ShouldRejectUnrecognizedFullDocumentOption) {
                                                                                << "unrecognized"))
                                            .firstElement(),
                                        expCtx),
-        UserException,
+        AssertionException,
         40575);
 }
 
@@ -169,7 +169,7 @@ TEST_F(ChangeStreamStageTestNoSetup, FailsWithNoReplicationCoordinator) {
     const auto spec = fromjson("{$changeStream: {}}");
 
     ASSERT_THROWS_CODE(DocumentSourceChangeStream::createFromBson(spec.firstElement(), getExpCtx()),
-                       UserException,
+                       AssertionException,
                        40573);
 }
 

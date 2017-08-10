@@ -112,7 +112,7 @@ TEST_F(AddToSetNodeTest, ApplyFailsOnNonArray) {
     setPathTaken("a");
     ASSERT_THROWS_CODE_AND_WHAT(
         node.apply(getApplyParams(doc.root()["a"])),
-        UserException,
+        AssertionException,
         ErrorCodes::BadValue,
         "Cannot apply $addToSet to non-array field. Field named 'a' has non-array type int");
 }

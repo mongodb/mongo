@@ -112,7 +112,7 @@ public:
     /**
      * Main entry point for a ParsedAggregationProjection.
      *
-     * Throws a UserException if 'spec' is an invalid projection specification.
+     * Throws a AssertionException if 'spec' is an invalid projection specification.
      */
     static std::unique_ptr<ParsedAggregationProjection> create(
         const boost::intrusive_ptr<ExpressionContext>& expCtx, const BSONObj& spec);

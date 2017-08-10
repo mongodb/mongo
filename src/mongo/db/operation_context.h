@@ -137,7 +137,7 @@ public:
     std::unique_ptr<Locker> releaseLockState();
 
     /**
-     * Raises a UserException if this operation is in a killed state.
+     * Raises a AssertionException if this operation is in a killed state.
      */
     void checkForInterrupt();
 
@@ -159,7 +159,7 @@ public:
     /**
      * Waits for either the condition "cv" to be signaled, this operation to be interrupted, or the
      * deadline on this operation to expire.  In the event of interruption or operation deadline
-     * expiration, raises a UserException with an error code indicating the interruption type.
+     * expiration, raises a AssertionException with an error code indicating the interruption type.
      */
     void waitForConditionOrInterrupt(stdx::condition_variable& cv,
                                      stdx::unique_lock<stdx::mutex>& m);

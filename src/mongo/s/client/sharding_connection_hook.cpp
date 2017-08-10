@@ -54,8 +54,8 @@ ShardingConnectionHook::ShardingConnectionHook(bool shardedConnections,
 
 void ShardingConnectionHook::onCreate(DBClientBase* conn) {
     if (conn->type() == ConnectionString::INVALID) {
-        throw UserException(ErrorCodes::BadValue,
-                            str::stream() << "Unrecognized connection string.");
+        throw AssertionException(ErrorCodes::BadValue,
+                                 str::stream() << "Unrecognized connection string.");
     }
 
     // Authenticate as the first thing we do

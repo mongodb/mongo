@@ -542,7 +542,7 @@ TEST_F(InitialSyncerTest, InvalidConstruction) {
                                                   _storageInterface.get(),
                                                   _replicationProcess.get(),
                                                   callback),
-                                    UserException,
+                                    AssertionException,
                                     ErrorCodes::BadValue,
                                     "task executor cannot be null");
     }
@@ -556,7 +556,7 @@ TEST_F(InitialSyncerTest, InvalidConstruction) {
                                                   _storageInterface.get(),
                                                   _replicationProcess.get(),
                                                   InitialSyncer::OnCompletionFn()),
-                                    UserException,
+                                    AssertionException,
                                     ErrorCodes::BadValue,
                                     "callback function cannot be null");
     }

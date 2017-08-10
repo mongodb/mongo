@@ -205,32 +205,32 @@ TEST_F(FetcherTest, InvalidConstruction) {
 
     // Null executor.
     ASSERT_THROWS_CODE_AND_WHAT(Fetcher(nullptr, source, "db", findCmdObj, unreachableCallback),
-                                UserException,
+                                AssertionException,
                                 ErrorCodes::BadValue,
                                 "task executor cannot be null");
 
     // Empty source.
     ASSERT_THROWS_CODE_AND_WHAT(
         Fetcher(&executor, HostAndPort(), "db", findCmdObj, unreachableCallback),
-        UserException,
+        AssertionException,
         ErrorCodes::BadValue,
         "source in remote command request cannot be empty");
 
     // Empty database name.
     ASSERT_THROWS_CODE_AND_WHAT(Fetcher(&executor, source, "", findCmdObj, unreachableCallback),
-                                UserException,
+                                AssertionException,
                                 ErrorCodes::BadValue,
                                 "database name in remote command request cannot be empty");
 
     // Empty command object.
     ASSERT_THROWS_CODE_AND_WHAT(Fetcher(&executor, source, "db", BSONObj(), unreachableCallback),
-                                UserException,
+                                AssertionException,
                                 ErrorCodes::BadValue,
                                 "command object in remote command request cannot be empty");
 
     // Callback function cannot be null.
     ASSERT_THROWS_CODE_AND_WHAT(Fetcher(&executor, source, "db", findCmdObj, Fetcher::CallbackFn()),
-                                UserException,
+                                AssertionException,
                                 ErrorCodes::BadValue,
                                 "callback function cannot be null");
 
@@ -244,7 +244,7 @@ TEST_F(FetcherTest, InvalidConstruction) {
                 rpc::makeEmptyMetadata(),
                 RemoteCommandRequest::kNoTimeout,
                 std::unique_ptr<RemoteCommandRetryScheduler::RetryPolicy>()),
-        UserException,
+        AssertionException,
         ErrorCodes::BadValue,
         "retry policy cannot be null");
 }

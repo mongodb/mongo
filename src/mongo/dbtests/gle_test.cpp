@@ -33,7 +33,7 @@
 #include "mongo/dbtests/dbtests.h"
 #include "mongo/util/assert_util.h"
 
-using mongo::MsgAssertionException;
+using mongo::AssertionException;
 
 /**
  * Test getLastError client handling

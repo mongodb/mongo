@@ -143,7 +143,7 @@ TEST(DocumentSerialization, CannotSerializeDocumentThatExceedsDepthLimit) {
 
     Document doc(builder.obj());
     BSONObjBuilder throwaway;
-    ASSERT_THROWS_CODE(doc.toBson(&throwaway), UserException, ErrorCodes::Overflow);
+    ASSERT_THROWS_CODE(doc.toBson(&throwaway), AssertionException, ErrorCodes::Overflow);
     throwaway.abandon();
 }
 
@@ -582,7 +582,7 @@ TEST(MetaFields, BadSerialization) {
     BufReader reader(bb.buf(), bb.len());
     ASSERT_THROWS_CODE(
         Document::deserializeForSorter(reader, Document::SorterDeserializeSettings()),
-        UserException,
+        AssertionException,
         28744);
 }
 }  // namespace MetaFields
@@ -1035,7 +1035,7 @@ public:
     virtual ~ToIntBase() {}
     void run() {
         if (asserts())
-            ASSERT_THROWS(value().coerceToInt(), UserException);
+            ASSERT_THROWS(value().coerceToInt(), AssertionException);
         else
             ASSERT_EQUALS(expected(), value().coerceToInt());
     }
@@ -1104,7 +1104,7 @@ class UndefinedToInt : public ToIntBase {
 class StringToInt {
 public:
     void run() {
-        ASSERT_THROWS(Value(StringData()).coerceToInt(), UserException);
+        ASSERT_THROWS(Value(StringData()).coerceToInt(), AssertionException);
     }
 };
 
@@ -1113,7 +1113,7 @@ public:
     virtual ~ToLongBase() {}
     void run() {
         if (asserts())
-            ASSERT_THROWS(value().coerceToLong(), UserException);
+            ASSERT_THROWS(value().coerceToLong(), AssertionException);
         else
             ASSERT_EQUALS(expected(), value().coerceToLong());
     }
@@ -1182,7 +1182,7 @@ class UndefinedToLong : public ToLongBase {
 class StringToLong {
 public:
     void run() {
-        ASSERT_THROWS(Value(StringData()).coerceToLong(), UserException);
+        ASSERT_THROWS(Value(StringData()).coerceToLong(), AssertionException);
     }
 };
 
@@ -1191,7 +1191,7 @@ public:
     virtual ~ToDoubleBase() {}
     void run() {
         if (asserts())
-            ASSERT_THROWS(value().coerceToDouble(), UserException);
+            ASSERT_THROWS(value().coerceToDouble(), AssertionException);
         else
             ASSERT_EQUALS(expected(), value().coerceToDouble());
     }
@@ -1261,7 +1261,7 @@ class UndefinedToDouble : public ToDoubleBase {
 class StringToDouble {
 public:
     void run() {
-        ASSERT_THROWS(Value(StringData()).coerceToDouble(), UserException);
+        ASSERT_THROWS(Value(StringData()).coerceToDouble(), AssertionException);
     }
 };
 
@@ -1304,7 +1304,7 @@ class TimestampToDate : public ToDateBase {
 class StringToDate {
 public:
     void run() {
-        ASSERT_THROWS(Value(StringData()).coerceToDate(), UserException);
+        ASSERT_THROWS(Value(StringData()).coerceToDate(), AssertionException);
     }
 };
 
@@ -1400,7 +1400,7 @@ class UndefinedToString : public ToStringBase {
 class DocumentToString {
 public:
     void run() {
-        ASSERT_THROWS(Value(mongo::Document()).coerceToString(), UserException);
+        ASSERT_THROWS(Value(mongo::Document()).coerceToString(), AssertionException);
     }
 };
 
@@ -1417,7 +1417,8 @@ public:
 class DateToTimestamp {
 public:
     void run() {
-        ASSERT_THROWS(Value(Date_t::fromMillisSinceEpoch(1010)).coerceToTimestamp(), UserException);
+        ASSERT_THROWS(Value(Date_t::fromMillisSinceEpoch(1010)).coerceToTimestamp(),
+                      AssertionException);
     }
 };
 

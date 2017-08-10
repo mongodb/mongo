@@ -165,9 +165,9 @@ public:
                 .value());
 
         // Check findOne() returning object, requiring indexed scan without index.
-        ASSERT_THROWS(Helpers::findOne(&_opCtx, _collection, query, ret, true), UserException);
+        ASSERT_THROWS(Helpers::findOne(&_opCtx, _collection, query, ret, true), AssertionException);
         // Check findOne() returning location, requiring indexed scan without index.
-        ASSERT_THROWS(Helpers::findOne(&_opCtx, _collection, query, true), UserException);
+        ASSERT_THROWS(Helpers::findOne(&_opCtx, _collection, query, true), AssertionException);
 
         addIndex(IndexSpec().addKey("b").unique(false));
 
@@ -327,7 +327,7 @@ public:
                                    cursor->next();
                                }
                            }()),
-                           UserException,
+                           AssertionException,
                            ErrorCodes::InterruptedAtShutdown);
 
         // Revert the killop kill all flag.
@@ -370,7 +370,7 @@ public:
         ASSERT_THROWS(
             _client.getMore("unittests.querytests.GetMoreInvalidRequest_WRONG_NAMESPACE_FOR_CURSOR",
                             cursor->getCursorId()),
-            UserException);
+            AssertionException);
 
         // Check that the cursor still exists
         {
@@ -540,7 +540,7 @@ public:
         const char* ns = "unittests.querytests.TailCappedOnly";
         _client.insert(ns, BSONObj());
         ASSERT_THROWS(_client.query(ns, BSONObj(), 0, 0, 0, QueryOption_CursorTailable),
-                      UserException);
+                      AssertionException);
     }
 };
 
@@ -1342,7 +1342,7 @@ public:
                               c->nextSafe();
                           }
                       }()),
-                      UserException);
+                      AssertionException);
     }
 
     void insertNext() {

@@ -179,13 +179,6 @@ MONGO_COMPILER_NORETURN void fassertFailedWithStatusNoTraceWithLocation(int msgi
     quickExit(EXIT_ABRUPT);
 }
 
-void UserException::appendPrefix(stringstream& ss) const {
-    ss << "userassert:";
-}
-void MsgAssertionException::appendPrefix(stringstream& ss) const {
-    ss << "massert:";
-}
-
 void uassertedWithLocation(int msgid, const string& msg, const char* file, unsigned line) {
     uassertedWithLocation(msgid, msg.c_str(), file, line);
 }
@@ -197,7 +190,7 @@ NOINLINE_DECL void uassertedWithLocation(int msgid,
     assertionCount.condrollover(++assertionCount.user);
     LOG(1) << "User Assertion: " << msgid << ":" << redact(msg) << ' ' << file << ' ' << dec << line
            << endl;
-    throw UserException(msgid, msg);
+    throw AssertionException(msgid, msg);
 }
 
 void msgassertedWithLocation(int msgid, const string& msg, const char* file, unsigned line) {
@@ -212,7 +205,7 @@ NOINLINE_DECL void msgassertedWithLocation(int msgid,
     error() << "Assertion: " << msgid << ":" << redact(msg) << ' ' << file << ' ' << dec << line
             << endl;
     logContext();
-    throw MsgAssertionException(msgid, msg);
+    throw AssertionException(msgid, msg);
 }
 
 NOINLINE_DECL void msgassertedNoTraceWithLocation(int msgid,
@@ -222,7 +215,7 @@ NOINLINE_DECL void msgassertedNoTraceWithLocation(int msgid,
     assertionCount.condrollover(++assertionCount.warning);
     error() << "Assertion: " << msgid << ":" << redact(msg) << ' ' << file << ' ' << dec << line
             << endl;
-    throw MsgAssertionException(msgid, msg);
+    throw AssertionException(msgid, msg);
 }
 
 void msgassertedNoTraceWithLocation(int msgid,

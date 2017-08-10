@@ -105,7 +105,7 @@ TEST_F(DocumentSourceGraphLookUpTest,
     graphLookupStage->injectMongodInterface(
         std::make_shared<MockMongodImplementation>(std::move(fromContents)));
 
-    ASSERT_THROWS_CODE(graphLookupStage->getNext(), UserException, 40271);
+    ASSERT_THROWS_CODE(graphLookupStage->getNext(), AssertionException, 40271);
 }
 
 TEST_F(DocumentSourceGraphLookUpTest,
@@ -135,7 +135,7 @@ TEST_F(DocumentSourceGraphLookUpTest,
     graphLookupStage->injectMongodInterface(
         std::make_shared<MockMongodImplementation>(std::move(fromContents)));
 
-    ASSERT_THROWS_CODE(graphLookupStage->getNext(), UserException, 40271);
+    ASSERT_THROWS_CODE(graphLookupStage->getNext(), AssertionException, 40271);
 }
 
 TEST_F(DocumentSourceGraphLookUpTest,
@@ -165,7 +165,7 @@ TEST_F(DocumentSourceGraphLookUpTest,
         std::make_shared<MockMongodImplementation>(std::move(fromContents)));
     graphLookupStage->setSource(inputMock.get());
 
-    ASSERT_THROWS_CODE(graphLookupStage->getNext(), UserException, 40271);
+    ASSERT_THROWS_CODE(graphLookupStage->getNext(), AssertionException, 40271);
 }
 
 bool arrayContains(const boost::intrusive_ptr<ExpressionContext>& expCtx,

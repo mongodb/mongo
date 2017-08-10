@@ -1328,7 +1328,7 @@ TEST(UpdateObjectNodeTest, TopLevelConflictFails) {
     std::unique_ptr<UpdateNode> result;
     ASSERT_THROWS_CODE_AND_WHAT(
         result = UpdateNode::createUpdateNodeByMerging(setRoot1, setRoot2, &fakeFieldRef),
-        UserException,
+        AssertionException,
         ErrorCodes::ConflictingUpdateOperators,
         "Update created a conflict at 'root.a'");
 }
@@ -1357,7 +1357,7 @@ TEST(UpdateObjectNodeTest, NestedConflictFails) {
     std::unique_ptr<UpdateNode> result;
     ASSERT_THROWS_CODE_AND_WHAT(
         result = UpdateNode::createUpdateNodeByMerging(setRoot1, setRoot2, &fakeFieldRef),
-        UserException,
+        AssertionException,
         ErrorCodes::ConflictingUpdateOperators,
         "Update created a conflict at 'root.a.b'");
 }
@@ -1386,7 +1386,7 @@ TEST(UpdateObjectNodeTest, LeftPrefixMergeFails) {
     std::unique_ptr<UpdateNode> result;
     ASSERT_THROWS_CODE_AND_WHAT(
         result = UpdateNode::createUpdateNodeByMerging(setRoot1, setRoot2, &fakeFieldRef),
-        UserException,
+        AssertionException,
         ErrorCodes::ConflictingUpdateOperators,
         "Update created a conflict at 'root.a.b'");
 }
@@ -1415,7 +1415,7 @@ TEST(UpdateObjectNodeTest, RightPrefixMergeFails) {
     std::unique_ptr<UpdateNode> result;
     ASSERT_THROWS_CODE_AND_WHAT(
         result = UpdateNode::createUpdateNodeByMerging(setRoot1, setRoot2, &fakeFieldRef),
-        UserException,
+        AssertionException,
         ErrorCodes::ConflictingUpdateOperators,
         "Update created a conflict at 'root.a.b'");
 }
@@ -1444,7 +1444,7 @@ TEST(UpdateObjectNodeTest, LeftPrefixMergeThroughPositionalFails) {
     std::unique_ptr<UpdateNode> result;
     ASSERT_THROWS_CODE_AND_WHAT(
         result = UpdateNode::createUpdateNodeByMerging(setRoot1, setRoot2, &fakeFieldRef),
-        UserException,
+        AssertionException,
         ErrorCodes::ConflictingUpdateOperators,
         "Update created a conflict at 'root.a.$.c'");
 }
@@ -1473,7 +1473,7 @@ TEST(UpdateObjectNodeTest, RightPrefixMergeThroughPositionalFails) {
     std::unique_ptr<UpdateNode> result;
     ASSERT_THROWS_CODE_AND_WHAT(
         result = UpdateNode::createUpdateNodeByMerging(setRoot1, setRoot2, &fakeFieldRef),
-        UserException,
+        AssertionException,
         ErrorCodes::ConflictingUpdateOperators,
         "Update created a conflict at 'root.a.$.c'");
 }
@@ -1502,7 +1502,7 @@ TEST(UpdateObjectNodeTest, MergeWithConflictingPositionalFails) {
     std::unique_ptr<UpdateNode> result;
     ASSERT_THROWS_CODE_AND_WHAT(
         result = UpdateNode::createUpdateNodeByMerging(setRoot1, setRoot2, &fakeFieldRef),
-        UserException,
+        AssertionException,
         ErrorCodes::ConflictingUpdateOperators,
         "Update created a conflict at 'root.a.$'");
 }
@@ -1564,7 +1564,7 @@ TEST(UpdateObjectNodeTest, MergingArrayNodeWithObjectNodeFails) {
     std::unique_ptr<UpdateNode> result;
     ASSERT_THROWS_CODE_AND_WHAT(
         result = UpdateNode::createUpdateNodeByMerging(setRoot1, setRoot2, &fakeFieldRef),
-        UserException,
+        AssertionException,
         ErrorCodes::ConflictingUpdateOperators,
         "Update created a conflict at 'root.a'");
 }
@@ -1595,7 +1595,7 @@ TEST(UpdateObjectNodeTest, MergingArrayNodeWithLeafNodeFails) {
     std::unique_ptr<UpdateNode> result;
     ASSERT_THROWS_CODE_AND_WHAT(
         result = UpdateNode::createUpdateNodeByMerging(setRoot1, setRoot2, &fakeFieldRef),
-        UserException,
+        AssertionException,
         ErrorCodes::ConflictingUpdateOperators,
         "Update created a conflict at 'root.a'");
 }
@@ -1666,7 +1666,7 @@ TEST(UpdateObjectNodeTest, MergeConflictThroughArrayNodesFails) {
     std::unique_ptr<UpdateNode> result;
     ASSERT_THROWS_CODE_AND_WHAT(
         result = UpdateNode::createUpdateNodeByMerging(setRoot1, setRoot2, &fakeFieldRef),
-        UserException,
+        AssertionException,
         ErrorCodes::ConflictingUpdateOperators,
         "Update created a conflict at 'root.a.$[i].b'");
 }
@@ -2088,7 +2088,7 @@ TEST_F(UpdateObjectNodeTest, ApplyBlockingElement) {
     mutablebson::Document doc(fromjson("{a: 0}"));
     addIndexedPath("a");
     ASSERT_THROWS_CODE_AND_WHAT(root.apply(getApplyParams(doc.root())),
-                                UserException,
+                                AssertionException,
                                 ErrorCodes::PathNotViable,
                                 "Cannot create field 'b' in element {a: 0}");
 }
@@ -2140,7 +2140,7 @@ TEST_F(UpdateObjectNodeTest, ApplyPositionalMissingMatchedField) {
     addIndexedPath("a");
     ASSERT_THROWS_CODE_AND_WHAT(
         root.apply(getApplyParams(doc.root())),
-        UserException,
+        AssertionException,
         ErrorCodes::BadValue,
         "The positional operator did not find the match needed from the query.");
 }
@@ -2241,7 +2241,7 @@ TEST_F(UpdateObjectNodeTest, ApplyMergeConflictWithPositionalChild) {
     setMatchedField("0");
     addIndexedPath("a");
     ASSERT_THROWS_CODE_AND_WHAT(root.apply(getApplyParams(doc.root())),
-                                UserException,
+                                AssertionException,
                                 ErrorCodes::ConflictingUpdateOperators,
                                 "Update created a conflict at 'a.0'");
 }
@@ -2489,7 +2489,7 @@ TEST_F(UpdateObjectNodeTest, ApplyUpdateToNonViablePathInArray) {
     mutablebson::Document doc(fromjson("{a: [{b: 1}, {b: 2}]}"));
     addIndexedPath("a");
     ASSERT_THROWS_CODE_AND_WHAT(root.apply(getApplyParams(doc.root())),
-                                UserException,
+                                AssertionException,
                                 ErrorCodes::PathNotViable,
                                 "Cannot create field 'b' in element {a: [ { b: 1 }, { b: 2 } ]}");
 }

@@ -228,7 +228,7 @@ public:
         params.bounds.boundInclusion = BoundInclusion::kIncludeBothStartAndEndKeys;
         params.direction = 1;
 
-        ASSERT_THROWS(countResults(params, BSON("baz" << 25)), MsgAssertionException);
+        ASSERT_THROWS(countResults(params, BSON("baz" << 25)), AssertionException);
     }
 };
 

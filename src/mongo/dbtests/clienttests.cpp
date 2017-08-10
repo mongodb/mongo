@@ -377,7 +377,8 @@ public:
         DBDirectClient db(&opCtx);
 
         db.createIndex(ns(), IndexSpec().addKey("aField"));
-        ASSERT_THROWS(db.createIndex(ns(), IndexSpec().addKey("aField").unique()), UserException);
+        ASSERT_THROWS(db.createIndex(ns(), IndexSpec().addKey("aField").unique()),
+                      AssertionException);
     }
 };
 

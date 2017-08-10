@@ -352,7 +352,7 @@ TEST_F(DBsClonerTest, InvalidConstruction) {
     ASSERT_THROWS_CODE_AND_WHAT(
         DatabasesCloner(
             nullptr, &getExecutor(), &getDbWorkThreadPool(), source, includeDbPred, finishFn),
-        UserException,
+        AssertionException,
         ErrorCodes::InvalidOptions,
         "storage interface must be provided.");
 
@@ -360,14 +360,14 @@ TEST_F(DBsClonerTest, InvalidConstruction) {
     ASSERT_THROWS_CODE_AND_WHAT(
         DatabasesCloner(
             &getStorage(), nullptr, &getDbWorkThreadPool(), source, includeDbPred, finishFn),
-        UserException,
+        AssertionException,
         ErrorCodes::InvalidOptions,
         "executor must be provided.");
 
     // Null db worker thread pool.
     ASSERT_THROWS_CODE_AND_WHAT(
         DatabasesCloner(&getStorage(), &getExecutor(), nullptr, source, includeDbPred, finishFn),
-        UserException,
+        AssertionException,
         ErrorCodes::InvalidOptions,
         "db worker thread pool must be provided.");
 
@@ -375,7 +375,7 @@ TEST_F(DBsClonerTest, InvalidConstruction) {
     ASSERT_THROWS_CODE_AND_WHAT(
         DatabasesCloner(
             &getStorage(), &getExecutor(), &getDbWorkThreadPool(), {}, includeDbPred, finishFn),
-        UserException,
+        AssertionException,
         ErrorCodes::InvalidOptions,
         "source must be provided.");
 
@@ -383,7 +383,7 @@ TEST_F(DBsClonerTest, InvalidConstruction) {
     ASSERT_THROWS_CODE_AND_WHAT(
         DatabasesCloner(
             &getStorage(), &getExecutor(), &getDbWorkThreadPool(), source, {}, finishFn),
-        UserException,
+        AssertionException,
         ErrorCodes::InvalidOptions,
         "includeDbPred must be provided.");
 
@@ -391,7 +391,7 @@ TEST_F(DBsClonerTest, InvalidConstruction) {
     ASSERT_THROWS_CODE_AND_WHAT(
         DatabasesCloner(
             &getStorage(), &getExecutor(), &getDbWorkThreadPool(), source, includeDbPred, {}),
-        UserException,
+        AssertionException,
         ErrorCodes::InvalidOptions,
         "finishFn must be provided.");
 }

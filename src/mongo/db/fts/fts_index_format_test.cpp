@@ -257,7 +257,7 @@ TEST(FTSIndexFormat, GetKeysWithLeadingEmptyArrayThrows) {
     BSONObjSet keys = SimpleBSONObjComparator::kInstance.makeBSONObjSet();
     BSONObj objToIndex = fromjson("{a: {b: []}, data: 'foo'}");
     ASSERT_THROWS_CODE(FTSIndexFormat::getKeys(spec, objToIndex, &keys),
-                       UserException,
+                       AssertionException,
                        ErrorCodes::CannotBuildIndexKeys);
 }
 
@@ -267,7 +267,7 @@ TEST(FTSIndexFormat, GetKeysWithTrailingEmptyArrayThrows) {
     BSONObjSet keys = SimpleBSONObjComparator::kInstance.makeBSONObjSet();
     BSONObj objToIndex = fromjson("{a: {b: []}, data: 'foo'}");
     ASSERT_THROWS_CODE(FTSIndexFormat::getKeys(spec, objToIndex, &keys),
-                       UserException,
+                       AssertionException,
                        ErrorCodes::CannotBuildIndexKeys);
 }
 
@@ -277,7 +277,7 @@ TEST(FTSIndexFormat, GetKeysWithLeadingSingleElementArrayThrows) {
     BSONObjSet keys = SimpleBSONObjComparator::kInstance.makeBSONObjSet();
     BSONObj objToIndex = fromjson("{a: [{b: 9}], data: 'foo'}");
     ASSERT_THROWS_CODE(FTSIndexFormat::getKeys(spec, objToIndex, &keys),
-                       UserException,
+                       AssertionException,
                        ErrorCodes::CannotBuildIndexKeys);
 }
 
@@ -287,7 +287,7 @@ TEST(FTSIndexFormat, GetKeysWithTrailingSingleElementArrayThrows) {
     BSONObjSet keys = SimpleBSONObjComparator::kInstance.makeBSONObjSet();
     BSONObj objToIndex = fromjson("{a: [{b: 9}], data: 'foo'}");
     ASSERT_THROWS_CODE(FTSIndexFormat::getKeys(spec, objToIndex, &keys),
-                       UserException,
+                       AssertionException,
                        ErrorCodes::CannotBuildIndexKeys);
 }
 
@@ -297,7 +297,7 @@ TEST(FTSIndexFormat, GetKeysWithMultiElementArrayThrows) {
     BSONObjSet keys = SimpleBSONObjComparator::kInstance.makeBSONObjSet();
     BSONObj objToIndex = fromjson("{a: [{b: 9, c: 'foo'}, {b: 10, c: 'bar'}]}");
     ASSERT_THROWS_CODE(FTSIndexFormat::getKeys(spec, objToIndex, &keys),
-                       UserException,
+                       AssertionException,
                        ErrorCodes::CannotBuildIndexKeys);
 }
 

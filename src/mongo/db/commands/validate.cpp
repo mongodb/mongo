@@ -174,7 +174,7 @@ public:
                 while (_validationsInProgress.find(nss.ns()) != _validationsInProgress.end()) {
                     opCtx->waitForConditionOrInterrupt(_validationNotifier, lock);
                 }
-            } catch (UserException& e) {
+            } catch (AssertionException& e) {
                 appendCommandStatus(
                     result,
                     {ErrorCodes::CommandFailed,

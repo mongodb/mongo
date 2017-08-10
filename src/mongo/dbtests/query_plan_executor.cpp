@@ -288,7 +288,7 @@ public:
         // has been killed due to the collection being dropped.
         BSONObj objOut;
         ASSERT_THROWS_CODE(
-            outerExec->getNext(&objOut, nullptr), UserException, ErrorCodes::QueryPlanKilled);
+            outerExec->getNext(&objOut, nullptr), AssertionException, ErrorCodes::QueryPlanKilled);
     }
 };
 

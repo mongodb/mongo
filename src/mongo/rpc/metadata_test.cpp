@@ -122,7 +122,7 @@ TEST(Metadata, UpconvertInvalidMetadata) {
                                                      << "$maxTimeMS"
                                                      << 200),
                                         0),
-                       UserException,
+                       AssertionException,
                        ErrorCodes::InvalidOptions);
     ASSERT_THROWS_CODE(upconvertRequest("db",
                                         BSON("$query" << BSON("foo"
@@ -130,22 +130,22 @@ TEST(Metadata, UpconvertInvalidMetadata) {
                                                       << "$maxTimeMS"
                                                       << 200),
                                         0),
-                       UserException,
+                       AssertionException,
                        ErrorCodes::InvalidOptions);
 
     // invalid wrapped query
-    ASSERT_THROWS(upconvertRequest("db", BSON("$query" << 1), 0), UserException);
+    ASSERT_THROWS(upconvertRequest("db", BSON("$query" << 1), 0), AssertionException);
     ASSERT_THROWS(upconvertRequest("db",
                                    BSON("$query"
                                         << ""),
                                    0),
-                  UserException);
-    ASSERT_THROWS(upconvertRequest("db", BSON("query" << 0), 0), UserException);
+                  AssertionException);
+    ASSERT_THROWS(upconvertRequest("db", BSON("query" << 0), 0), AssertionException);
     ASSERT_THROWS(upconvertRequest("db",
                                    BSON("query"
                                         << ""),
                                    0),
-                  UserException);
+                  AssertionException);
 }
 
 

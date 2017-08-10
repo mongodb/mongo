@@ -72,7 +72,7 @@ namespace {
  * Extracts the names of the facets and the vectors of raw BSONObjs representing the stages within
  * that facet's pipeline.
  *
- * Throws a UserException if it fails to parse for any reason.
+ * Throws a AssertionException if it fails to parse for any reason.
  */
 vector<pair<string, vector<BSONObj>>> extractRawPipelines(const BSONElement& elem) {
     uassert(40169,

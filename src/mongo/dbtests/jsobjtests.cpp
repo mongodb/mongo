@@ -1048,7 +1048,7 @@ public:
          * should fail with an assertion
          */
         nestedBSON = recursiveBSON(BSONObj::maxToStringRecursionDepth + 1);
-        ASSERT_THROWS(nestedBSON.toString(s, false, true), UserException);
+        ASSERT_THROWS(nestedBSON.toString(s, false, true), AssertionException);
     }
 };
 
@@ -1554,8 +1554,8 @@ class LabelishOr : public LabelBase {
 class Unallowed {
 public:
     void run() {
-        ASSERT_THROWS(BSON(GT << 4), MsgAssertionException);
-        ASSERT_THROWS(BSON("a" << 1 << GT << 4), MsgAssertionException);
+        ASSERT_THROWS(BSON(GT << 4), AssertionException);
+        ASSERT_THROWS(BSON("a" << 1 << GT << 4), AssertionException);
     }
 };
 
@@ -2040,7 +2040,7 @@ public:
     void good(BSONObj o) {
         if (o.storageValidEmbedded().isOK())
             return;
-        throw UserException(12528, (string) "should be ok for storage:" + o.toString());
+        throw AssertionException(12528, (string) "should be ok for storage:" + o.toString());
     }
 
     void bad(string s) {
@@ -2050,7 +2050,7 @@ public:
     void bad(BSONObj o) {
         if (!o.storageValidEmbedded().isOK())
             return;
-        throw UserException(12529, (string) "should NOT be ok for storage:" + o.toString());
+        throw AssertionException(12529, (string) "should NOT be ok for storage:" + o.toString());
     }
 
     void run() {

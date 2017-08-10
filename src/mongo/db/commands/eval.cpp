@@ -207,7 +207,7 @@ public:
             OldClientContext ctx(opCtx, dbname, false /* no shard version checking here */);
 
             return dbEval(opCtx, dbname, cmdObj, result, errmsg);
-        } catch (const UserException& ex) {
+        } catch (const AssertionException& ex) {
             // Convert a stale shardVersion error to a stronger error to prevent this node or the
             // sending node from believing it needs to refresh its routing table.
             if (ex.code() == ErrorCodes::RecvStaleConfig) {

@@ -55,7 +55,7 @@ void assertFixSuccess(const std::string& s) {
         // fixSpec() on an already-fixed spec shouldn't change it.
         BSONObj fixed2 = assertGet(FTSSpec::fixSpec(fixed));
         ASSERT_BSONOBJ_EQ(fixed, fixed2);
-    } catch (UserException&) {
+    } catch (AssertionException&) {
         ASSERT(false);
     }
 }

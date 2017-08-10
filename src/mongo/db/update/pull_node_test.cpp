@@ -90,7 +90,7 @@ TEST_F(PullNodeTest, ApplyToStringFails) {
     setPathTaken("a");
     addIndexedPath("a");
     ASSERT_THROWS_CODE_AND_WHAT(node.apply(getApplyParams(doc.root()["a"])),
-                                UserException,
+                                AssertionException,
                                 ErrorCodes::BadValue,
                                 "Cannot apply $pull to a non-array value");
 }
@@ -105,7 +105,7 @@ TEST_F(PullNodeTest, ApplyToObjectFails) {
     setPathTaken("a");
     addIndexedPath("a");
     ASSERT_THROWS_CODE_AND_WHAT(node.apply(getApplyParams(doc.root()["a"])),
-                                UserException,
+                                AssertionException,
                                 ErrorCodes::BadValue,
                                 "Cannot apply $pull to a non-array value");
 }
@@ -122,7 +122,7 @@ TEST_F(PullNodeTest, ApplyToNonViablePathFails) {
     addIndexedPath("a");
     ASSERT_THROWS_CODE_AND_WHAT(
         node.apply(getApplyParams(doc.root()["a"])),
-        UserException,
+        AssertionException,
         ErrorCodes::PathNotViable,
         "Cannot use the part (b) of (a.b) to traverse the element ({a: 1})");
 }
@@ -580,7 +580,7 @@ TEST_F(PullNodeTest, CannotModifyImmutableField) {
     addImmutablePath("_id");
     ASSERT_THROWS_CODE_AND_WHAT(
         node.apply(getApplyParams(doc.root()["_id"]["a"])),
-        UserException,
+        AssertionException,
         ErrorCodes::ImmutableField,
         "Performing an update on the path '_id.a' would modify the immutable field '_id'");
 }

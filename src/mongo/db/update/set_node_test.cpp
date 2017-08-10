@@ -156,7 +156,7 @@ TEST_F(SetNodeTest, ApplyNonViablePathToCreate) {
     setPathTaken("a");
     addIndexedPath("a");
     ASSERT_THROWS_CODE_AND_WHAT(node.apply(getApplyParams(doc.root()["a"])),
-                                UserException,
+                                AssertionException,
                                 ErrorCodes::PathNotViable,
                                 "Cannot create field 'b' in element {a: 5}");
 }
@@ -385,7 +385,7 @@ TEST_F(SetNodeTest, ApplyPathNotViable) {
     setPathToCreate("b");
     setPathTaken("a");
     ASSERT_THROWS_CODE_AND_WHAT(node.apply(getApplyParams(doc.root()["a"])),
-                                UserException,
+                                AssertionException,
                                 ErrorCodes::PathNotViable,
                                 "Cannot create field 'b' in element {a: 1}");
 }
@@ -400,7 +400,7 @@ TEST_F(SetNodeTest, ApplyPathNotViableArrray) {
     setPathToCreate("b");
     setPathTaken("a");
     ASSERT_THROWS_CODE_AND_WHAT(node.apply(getApplyParams(doc.root()["a"])),
-                                UserException,
+                                AssertionException,
                                 ErrorCodes::PathNotViable,
                                 "Cannot create field 'b' in element {a: [ { b: 1 } ]}");
 }
@@ -560,7 +560,7 @@ TEST_F(SetNodeTest, ApplyNonViablePath) {
     setPathToCreate("2.b");
     setPathTaken("a");
     ASSERT_THROWS_CODE_AND_WHAT(node.apply(getApplyParams(doc.root()["a"])),
-                                UserException,
+                                AssertionException,
                                 ErrorCodes::PathNotViable,
                                 "Cannot create field '2' in element {a: 0}");
 }
@@ -789,7 +789,7 @@ TEST_F(SetNodeTest, NonViablePathWithoutRepl) {
     setPathToCreate("1.b");
     setPathTaken("a");
     ASSERT_THROWS_CODE_AND_WHAT(node.apply(getApplyParams(doc.root()["a"])),
-                                UserException,
+                                AssertionException,
                                 ErrorCodes::PathNotViable,
                                 "Cannot create field '1' in element {a: 1}");
 }
@@ -973,7 +973,7 @@ TEST_F(SetNodeTest, ApplyCannotCreateDollarPrefixedFieldInsideSetElement) {
     setPathTaken("a");
     ASSERT_THROWS_CODE_AND_WHAT(
         node.apply(getApplyParams(doc.root()["a"])),
-        UserException,
+        AssertionException,
         ErrorCodes::DollarPrefixedFieldName,
         "The dollar ($) prefixed field '$bad' in 'a.$bad' is not valid for storage.");
 }
@@ -988,7 +988,7 @@ TEST_F(SetNodeTest, ApplyCannotCreateDollarPrefixedFieldAtStartOfPath) {
     setPathToCreate("$bad.a");
     ASSERT_THROWS_CODE_AND_WHAT(
         node.apply(getApplyParams(doc.root())),
-        UserException,
+        AssertionException,
         ErrorCodes::DollarPrefixedFieldName,
         "The dollar ($) prefixed field '$bad' in '$bad' is not valid for storage.");
 }
@@ -1003,7 +1003,7 @@ TEST_F(SetNodeTest, ApplyCannotCreateDollarPrefixedFieldInMiddleOfPath) {
     setPathToCreate("a.$bad.b");
     ASSERT_THROWS_CODE_AND_WHAT(
         node.apply(getApplyParams(doc.root())),
-        UserException,
+        AssertionException,
         ErrorCodes::DollarPrefixedFieldName,
         "The dollar ($) prefixed field '$bad' in 'a.$bad' is not valid for storage.");
 }
@@ -1018,7 +1018,7 @@ TEST_F(SetNodeTest, ApplyCannotCreateDollarPrefixedFieldAtEndOfPath) {
     setPathToCreate("a.$bad");
     ASSERT_THROWS_CODE_AND_WHAT(
         node.apply(getApplyParams(doc.root())),
-        UserException,
+        AssertionException,
         ErrorCodes::DollarPrefixedFieldName,
         "The dollar ($) prefixed field '$bad' in 'a.$bad' is not valid for storage.");
 }
@@ -1053,7 +1053,7 @@ TEST_F(SetNodeTest, ApplyCannotOverwriteImmutablePath) {
     addImmutablePath("a.b");
     ASSERT_THROWS_CODE_AND_WHAT(
         node.apply(getApplyParams(doc.root()["a"]["b"])),
-        UserException,
+        AssertionException,
         ErrorCodes::ImmutableField,
         "Updating the path 'a.b' to b: 1 would modify the immutable field 'a.b'");
 }
@@ -1088,7 +1088,7 @@ TEST_F(SetNodeTest, ApplyCannotOverwritePrefixToRemoveImmutablePath) {
     addImmutablePath("a.b");
     ASSERT_THROWS_CODE_AND_WHAT(
         node.apply(getApplyParams(doc.root()["a"])),
-        UserException,
+        AssertionException,
         ErrorCodes::ImmutableField,
         "After applying the update, the immutable field 'a.b' was found to have been removed.");
 }
@@ -1103,7 +1103,7 @@ TEST_F(SetNodeTest, ApplyCannotOverwritePrefixToModifyImmutablePath) {
     setPathTaken("a");
     addImmutablePath("a.b");
     ASSERT_THROWS_CODE_AND_WHAT(node.apply(getApplyParams(doc.root()["a"])),
-                                UserException,
+                                AssertionException,
                                 ErrorCodes::ImmutableField,
                                 "After applying the update, the immutable field 'a.b' was found to "
                                 "have been altered to b: 1");
@@ -1177,7 +1177,7 @@ TEST_F(SetNodeTest, ApplyCannotOverwriteSuffixOfImmutablePath) {
     addImmutablePath("a.b");
     ASSERT_THROWS_CODE_AND_WHAT(
         node.apply(getApplyParams(doc.root()["a"]["b"]["c"])),
-        UserException,
+        AssertionException,
         ErrorCodes::ImmutableField,
         "Updating the path 'a.b.c' to c: 1 would modify the immutable field 'a.b'");
 }
@@ -1213,7 +1213,7 @@ TEST_F(SetNodeTest, ApplyCannotCreateFieldAtEndOfImmutablePath) {
     addImmutablePath("a.b");
     ASSERT_THROWS_CODE_AND_WHAT(
         node.apply(getApplyParams(doc.root()["a"]["b"])),
-        UserException,
+        AssertionException,
         ErrorCodes::ImmutableField,
         "Updating the path 'a.b' to b: { c: 1 } would modify the immutable field 'a.b'");
 }
@@ -1230,7 +1230,7 @@ TEST_F(SetNodeTest, ApplyCannotCreateFieldBeyondEndOfImmutablePath) {
     addImmutablePath("a");
     ASSERT_THROWS_CODE_AND_WHAT(
         node.apply(getApplyParams(doc.root()["a"]["b"])),
-        UserException,
+        AssertionException,
         ErrorCodes::ImmutableField,
         "Updating the path 'a.b' to b: { c: 1 } would modify the immutable field 'a'");
 }

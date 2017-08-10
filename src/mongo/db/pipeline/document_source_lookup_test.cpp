@@ -223,7 +223,7 @@ TEST_F(DocumentSourceLookUpTest, RejectsLocalFieldForeignFieldWhenPipelineIsSpec
              << "Expected creation of the "
              << lookupStage->getSourceName()
              << " stage to uassert on mix of localField/foreignField and pipeline options");
-    } catch (const UserException& ex) {
+    } catch (const AssertionException& ex) {
         ASSERT_EQ(ErrorCodes::FailedToParse, ex.code());
     }
 }
@@ -246,7 +246,7 @@ TEST_F(DocumentSourceLookUpTest, RejectsLocalFieldForeignFieldWhenLetIsSpecified
                                                                                    << "as"))
                                                                 .firstElement(),
                                                             expCtx),
-                       UserException,
+                       AssertionException,
                        ErrorCodes::FailedToParse);
 }
 
@@ -267,7 +267,7 @@ TEST_F(DocumentSourceLookUpTest, RejectsInvalidLetVariableName) {
                                                   << "as"))
                                .firstElement(),
                            expCtx),
-                       UserException,
+                       AssertionException,
                        16866);
 
     ASSERT_THROWS_CODE(DocumentSourceLookUp::createFromBson(
@@ -282,7 +282,7 @@ TEST_F(DocumentSourceLookUpTest, RejectsInvalidLetVariableName) {
                                                   << "as"))
                                .firstElement(),
                            expCtx),
-                       UserException,
+                       AssertionException,
                        16867);
 
     ASSERT_THROWS_CODE(DocumentSourceLookUp::createFromBson(
@@ -297,7 +297,7 @@ TEST_F(DocumentSourceLookUpTest, RejectsInvalidLetVariableName) {
                                                   << "as"))
                                .firstElement(),
                            expCtx),
-                       UserException,
+                       AssertionException,
                        16868);
 }
 

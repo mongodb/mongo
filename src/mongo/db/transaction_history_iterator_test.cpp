@@ -196,7 +196,8 @@ TEST_F(SessionHistoryIteratorTest, NextShouldAssertIfHistoryIsTruncated) {
     ASSERT_BSONOBJ_EQ(BSON("y" << 50), nextEntry.getObject());
 
     ASSERT_TRUE(iter.hasNext());
-    ASSERT_THROWS_CODE(iter.next(opCtx()), UserException, ErrorCodes::IncompleteTransactionHistory);
+    ASSERT_THROWS_CODE(
+        iter.next(opCtx()), AssertionException, ErrorCodes::IncompleteTransactionHistory);
 }
 
 TEST_F(SessionHistoryIteratorTest, OplogInWriteHistoryChainWithMissingPrevTSShouldAssert) {
@@ -209,7 +210,7 @@ TEST_F(SessionHistoryIteratorTest, OplogInWriteHistoryChainWithMissingPrevTSShou
 
     TransactionHistoryIterator iter(Timestamp(67, 54801));
     ASSERT_TRUE(iter.hasNext());
-    ASSERT_THROWS_CODE(iter.next(opCtx()), UserException, ErrorCodes::FailedToParse);
+    ASSERT_THROWS_CODE(iter.next(opCtx()), AssertionException, ErrorCodes::FailedToParse);
 }
 
 }  // namespace mongo

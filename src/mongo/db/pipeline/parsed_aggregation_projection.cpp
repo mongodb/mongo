@@ -188,7 +188,7 @@ private:
      * Delegates to parseSubObject() if 'elem' is an object. Otherwise updates '_parsedType' if
      * appropriate.
      *
-     * Throws a UserException if this element represents a mix of projection types.
+     * Throws a AssertionException if this element represents a mix of projection types.
      */
     void parseElement(const BSONElement& elem, const FieldPath& pathToElem) {
         if (elem.type() == BSONType::Object) {
@@ -230,7 +230,7 @@ private:
     /**
      * Traverses 'thisLevelSpec', parsing each element in turn.
      *
-     * Throws a UserException if 'thisLevelSpec' represents an invalid mix of projections.
+     * Throws a AssertionException if 'thisLevelSpec' represents an invalid mix of projections.
      */
     void parseNestedObject(const BSONObj& thisLevelSpec, const FieldPath& prefix) {
 

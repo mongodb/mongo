@@ -212,7 +212,7 @@ TEST_F(RSRollbackTest, RemoteGetRollbackIdThrows) {
                            _coordinator,
                            _replicationProcess.get())
             .transitional_ignore(),
-        UserException,
+        AssertionException,
         ErrorCodes::UnknownError);
 }
 
@@ -237,7 +237,7 @@ TEST_F(RSRollbackTest, RemoteGetRollbackIdDiffersFromRequiredRBID) {
                            _coordinator,
                            _replicationProcess.get())
             .transitional_ignore(),
-        UserException,
+        AssertionException,
         ErrorCodes::Error(40362));
 }
 

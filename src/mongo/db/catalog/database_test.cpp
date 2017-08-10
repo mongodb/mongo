@@ -122,7 +122,7 @@ TEST_F(DatabaseTest, SetDropPendingThrowsExceptionIfDatabaseIsAlreadyInADropPend
 
         ASSERT_THROWS_CODE_AND_WHAT(
             db->setDropPending(_opCtx.get(), true),
-            UserException,
+            AssertionException,
             ErrorCodes::DatabaseDropPending,
             (StringBuilder() << "Unable to drop database " << _nss.db()
                              << " because it is already in the process of being dropped.")
@@ -156,7 +156,7 @@ TEST_F(DatabaseTest, CreateCollectionThrowsExceptionWhenDatabaseIsInADropPending
 
             ASSERT_THROWS_CODE_AND_WHAT(
                 db->createCollection(_opCtx.get(), _nss.ns()),
-                UserException,
+                AssertionException,
                 ErrorCodes::DatabaseDropPending,
                 (StringBuilder() << "Cannot create collection " << _nss.ns()
                                  << " - database is in the process of being dropped.")
@@ -380,9 +380,8 @@ void _testDropCollectionThrowsExceptionIfThereAreIndexesInProgress(OperationCont
         ASSERT_GREATER_THAN(indexCatalog->numIndexesInProgress(opCtx), 0);
 
         WriteUnitOfWork wuow(opCtx);
-        ASSERT_THROWS_CODE(db->dropCollection(opCtx, nss.ns()).transitional_ignore(),
-                           MsgAssertionException,
-                           40461);
+        ASSERT_THROWS_CODE(
+            db->dropCollection(opCtx, nss.ns()).transitional_ignore(), AssertionException, 40461);
     });
 }
 

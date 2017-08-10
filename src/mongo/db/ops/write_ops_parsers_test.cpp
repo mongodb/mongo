@@ -98,7 +98,7 @@ TEST(CommandWriteOpsParsers, GarbageFieldsAtTopLevel_Body) {
                     << BSON_ARRAY(BSONObj()));
     for (bool seq : {false, true}) {
         auto request = toOpMsg("foo", cmd, seq);
-        ASSERT_THROWS(InsertOp::parse(request), UserException);
+        ASSERT_THROWS(InsertOp::parse(request), AssertionException);
     }
 }
 
@@ -111,7 +111,7 @@ TEST(CommandWriteOpsParsers, ErrorOnDuplicateCommonField) {
                     << BSON_ARRAY(BSONObj()));
     for (bool seq : {false, true}) {
         auto request = toOpMsg("foo", cmd, seq);
-        ASSERT_THROWS(InsertOp::parse(request), UserException);
+        ASSERT_THROWS(InsertOp::parse(request), AssertionException);
     }
 }
 
@@ -128,7 +128,7 @@ TEST(CommandWriteOpsParsers, ErrorOnDuplicateCommonFieldBetweenBodyAndSequence) 
                               BSONObj(),
                           }}};
 
-    ASSERT_THROWS(InsertOp::parse(request), UserException);
+    ASSERT_THROWS(InsertOp::parse(request), AssertionException);
 }
 
 TEST(CommandWriteOpsParsers, GarbageFieldsInUpdateDoc) {
@@ -138,7 +138,7 @@ TEST(CommandWriteOpsParsers, GarbageFieldsInUpdateDoc) {
                     << BSON_ARRAY(BSON("q" << BSONObj() << "u" << BSONObj() << "GARBAGE" << 1)));
     for (bool seq : {false, true}) {
         auto request = toOpMsg("foo", cmd, seq);
-        ASSERT_THROWS(UpdateOp::parse(request), UserException);
+        ASSERT_THROWS(UpdateOp::parse(request), AssertionException);
     }
 }
 
@@ -149,7 +149,7 @@ TEST(CommandWriteOpsParsers, GarbageFieldsInDeleteDoc) {
                     << BSON_ARRAY(BSON("q" << BSONObj() << "limit" << 0 << "GARBAGE" << 1)));
     for (bool seq : {false, true}) {
         auto request = toOpMsg("foo", cmd, seq);
-        ASSERT_THROWS(DeleteOp::parse(request), UserException);
+        ASSERT_THROWS(DeleteOp::parse(request), AssertionException);
     }
 }
 
@@ -160,7 +160,7 @@ TEST(CommandWriteOpsParsers, BadCollationFieldInUpdateDoc) {
                     << BSON_ARRAY(BSON("q" << BSONObj() << "u" << BSONObj() << "collation" << 1)));
     for (bool seq : {false, true}) {
         auto request = toOpMsg("foo", cmd, seq);
-        ASSERT_THROWS_CODE(UpdateOp::parse(request), UserException, ErrorCodes::TypeMismatch);
+        ASSERT_THROWS_CODE(UpdateOp::parse(request), AssertionException, ErrorCodes::TypeMismatch);
     }
 }
 
@@ -171,7 +171,7 @@ TEST(CommandWriteOpsParsers, BadCollationFieldInDeleteDoc) {
                     << BSON_ARRAY(BSON("q" << BSONObj() << "limit" << 0 << "collation" << 1)));
     for (bool seq : {false, true}) {
         auto request = toOpMsg("foo", cmd, seq);
-        ASSERT_THROWS_CODE(DeleteOp::parse(request), UserException, ErrorCodes::TypeMismatch);
+        ASSERT_THROWS_CODE(DeleteOp::parse(request), AssertionException, ErrorCodes::TypeMismatch);
     }
 }
 
@@ -183,7 +183,7 @@ TEST(CommandWriteOpsParsers, BadArrayFiltersFieldInUpdateDoc) {
                                            << "bad")));
     for (bool seq : {false, true}) {
         auto request = toOpMsg("foo", cmd, seq);
-        ASSERT_THROWS(UpdateOp::parse(request), UserException);
+        ASSERT_THROWS(UpdateOp::parse(request), AssertionException);
     }
 }
 
@@ -195,7 +195,7 @@ TEST(CommandWriteOpsParsers, BadArrayFiltersElementInUpdateDoc) {
                                            << BSON_ARRAY("bad"))));
     for (bool seq : {false, true}) {
         auto request = toOpMsg("foo", cmd, seq);
-        ASSERT_THROWS_CODE(UpdateOp::parse(request), UserException, ErrorCodes::TypeMismatch);
+        ASSERT_THROWS_CODE(UpdateOp::parse(request), AssertionException, ErrorCodes::TypeMismatch);
     }
 }
 
@@ -219,7 +219,7 @@ TEST(CommandWriteOpsParsers, EmptyMultiInsertFails) {
     auto cmd = BSON("insert" << ns.coll() << "documents" << BSONArray());
     for (bool seq : {false, true}) {
         auto request = toOpMsg(ns.db(), cmd, seq);
-        ASSERT_THROWS_CODE(InsertOp::parse(request), UserException, ErrorCodes::InvalidLength);
+        ASSERT_THROWS_CODE(InsertOp::parse(request), AssertionException, ErrorCodes::InvalidLength);
     }
 }
 
@@ -312,7 +312,8 @@ TEST(CommandWriteOpsParsers, RemoveErrorsWithBadLimit) {
                         << BSON_ARRAY(BSON("q" << BSONObj() << "limit" << limit)));
         for (bool seq : {false, true}) {
             auto request = toOpMsg("foo", cmd, seq);
-            ASSERT_THROWS_CODE(DeleteOp::parse(request), UserException, ErrorCodes::FailedToParse);
+            ASSERT_THROWS_CODE(
+                DeleteOp::parse(request), AssertionException, ErrorCodes::FailedToParse);
         }
     }
 }
@@ -339,7 +340,7 @@ TEST(LegacyWriteOpsParsers, EmptyMultiInsertFails) {
         auto message = makeInsertMessage(
             ns, objs.data(), objs.size(), (continueOnError ? InsertOption_ContinueOnError : 0));
         ASSERT_THROWS_CODE(
-            InsertOp::parseLegacy(message), UserException, ErrorCodes::InvalidLength);
+            InsertOp::parseLegacy(message), AssertionException, ErrorCodes::InvalidLength);
     }
 }
 

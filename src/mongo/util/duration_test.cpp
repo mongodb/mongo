@@ -136,10 +136,12 @@ TEST(DurationCast, TruncatingDurationCasts) {
 }
 
 TEST(DurationCast, OverflowingCastsThrow) {
-    ASSERT_THROWS_CODE(
-        duration_cast<Milliseconds>(Seconds::max()), UserException, ErrorCodes::DurationOverflow);
-    ASSERT_THROWS_CODE(
-        duration_cast<Milliseconds>(Seconds::min()), UserException, ErrorCodes::DurationOverflow);
+    ASSERT_THROWS_CODE(duration_cast<Milliseconds>(Seconds::max()),
+                       AssertionException,
+                       ErrorCodes::DurationOverflow);
+    ASSERT_THROWS_CODE(duration_cast<Milliseconds>(Seconds::min()),
+                       AssertionException,
+                       ErrorCodes::DurationOverflow);
 }
 
 TEST(DurationCast, ImplicitConversionToStdxDuration) {
@@ -165,17 +167,17 @@ TEST(DurationArithmetic, AddNoOverflowSucceeds) {
 TEST(DurationArithmetic, AddOverflowThrows) {
     // Max + 1 should throw
     ASSERT_THROWS_CODE(
-        Milliseconds::max() + Milliseconds{1}, UserException, ErrorCodes::DurationOverflow);
+        Milliseconds::max() + Milliseconds{1}, AssertionException, ErrorCodes::DurationOverflow);
 
     // Min + -1 should throw
     ASSERT_THROWS_CODE(
-        Milliseconds::min() + Milliseconds{-1}, UserException, ErrorCodes::DurationOverflow);
+        Milliseconds::min() + Milliseconds{-1}, AssertionException, ErrorCodes::DurationOverflow);
 
     // Conversion of Seconds::min() to Milliseconds should throw
     ASSERT_THROWS_CODE(
-        Seconds::min() + Milliseconds{1}, UserException, ErrorCodes::DurationOverflow);
+        Seconds::min() + Milliseconds{1}, AssertionException, ErrorCodes::DurationOverflow);
     ASSERT_THROWS_CODE(
-        Milliseconds{1} + Seconds::min(), UserException, ErrorCodes::DurationOverflow);
+        Milliseconds{1} + Seconds::min(), AssertionException, ErrorCodes::DurationOverflow);
 }
 
 TEST(DurationArithmetic, SubtractNoOverflowSucceeds) {
@@ -188,17 +190,17 @@ TEST(DurationArithmetic, SubtractNoOverflowSucceeds) {
 TEST(DurationArithmetic, SubtractOverflowThrows) {
     // Min - 1 should throw
     ASSERT_THROWS_CODE(
-        Milliseconds::min() - Milliseconds{1}, UserException, ErrorCodes::DurationOverflow);
+        Milliseconds::min() - Milliseconds{1}, AssertionException, ErrorCodes::DurationOverflow);
 
     // Max + -1 should throw
     ASSERT_THROWS_CODE(
-        Milliseconds::max() - Milliseconds{-1}, UserException, ErrorCodes::DurationOverflow);
+        Milliseconds::max() - Milliseconds{-1}, AssertionException, ErrorCodes::DurationOverflow);
 
     // Conversion of Seconds::min() to Milliseconds should throw
     ASSERT_THROWS_CODE(
-        Seconds::min() - Milliseconds{1}, UserException, ErrorCodes::DurationOverflow);
+        Seconds::min() - Milliseconds{1}, AssertionException, ErrorCodes::DurationOverflow);
     ASSERT_THROWS_CODE(
-        Milliseconds{1} - Seconds::min(), UserException, ErrorCodes::DurationOverflow);
+        Milliseconds{1} - Seconds::min(), AssertionException, ErrorCodes::DurationOverflow);
 }
 
 TEST(DurationArithmetic, MultiplyNoOverflowSucceds) {
@@ -207,10 +209,10 @@ TEST(DurationArithmetic, MultiplyNoOverflowSucceds) {
 }
 
 TEST(DurationArithmetic, MultilpyOverflowThrows) {
-    ASSERT_THROWS_CODE(Milliseconds::max() * 2, UserException, ErrorCodes::DurationOverflow);
-    ASSERT_THROWS_CODE(2 * Milliseconds::max(), UserException, ErrorCodes::DurationOverflow);
-    ASSERT_THROWS_CODE(Milliseconds::max() * -2, UserException, ErrorCodes::DurationOverflow);
-    ASSERT_THROWS_CODE(-2 * Milliseconds::max(), UserException, ErrorCodes::DurationOverflow);
+    ASSERT_THROWS_CODE(Milliseconds::max() * 2, AssertionException, ErrorCodes::DurationOverflow);
+    ASSERT_THROWS_CODE(2 * Milliseconds::max(), AssertionException, ErrorCodes::DurationOverflow);
+    ASSERT_THROWS_CODE(Milliseconds::max() * -2, AssertionException, ErrorCodes::DurationOverflow);
+    ASSERT_THROWS_CODE(-2 * Milliseconds::max(), AssertionException, ErrorCodes::DurationOverflow);
 }
 
 TEST(DurationArithmetic, DivideNoOverflowSucceeds) {
@@ -218,7 +220,7 @@ TEST(DurationArithmetic, DivideNoOverflowSucceeds) {
 }
 
 TEST(DurationArithmetic, DivideOverflowThrows) {
-    ASSERT_THROWS_CODE(Milliseconds::min() / -1, UserException, ErrorCodes::DurationOverflow);
+    ASSERT_THROWS_CODE(Milliseconds::min() / -1, AssertionException, ErrorCodes::DurationOverflow);
 }
 
 }  // namespace

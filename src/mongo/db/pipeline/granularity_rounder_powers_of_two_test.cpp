@@ -225,8 +225,8 @@ TEST(GranularityRounderPowersOfTwoTest, ShouldFailOnRoundingNonNumericValues) {
 
     // Make sure that each GranularityRounder fails when rounding a non-numeric value.
     Value stringValue = Value("test"_sd);
-    ASSERT_THROWS_CODE(rounder->roundUp(stringValue), UserException, 40265);
-    ASSERT_THROWS_CODE(rounder->roundDown(stringValue), UserException, 40265);
+    ASSERT_THROWS_CODE(rounder->roundUp(stringValue), AssertionException, 40265);
+    ASSERT_THROWS_CODE(rounder->roundDown(stringValue), AssertionException, 40265);
 }
 
 TEST(GranularityRounderPowersOfTwoTest, ShouldFailOnRoundingNaN) {
@@ -234,15 +234,15 @@ TEST(GranularityRounderPowersOfTwoTest, ShouldFailOnRoundingNaN) {
         GranularityRounder::getGranularityRounder(new ExpressionContextForTest(), "POWERSOF2");
 
     Value nan = Value(std::nan("NaN"));
-    ASSERT_THROWS_CODE(rounder->roundUp(nan), UserException, 40266);
-    ASSERT_THROWS_CODE(rounder->roundDown(nan), UserException, 40266);
+    ASSERT_THROWS_CODE(rounder->roundUp(nan), AssertionException, 40266);
+    ASSERT_THROWS_CODE(rounder->roundDown(nan), AssertionException, 40266);
 
     Value positiveNan = Value(Decimal128::kPositiveNaN);
     Value negativeNan = Value(Decimal128::kNegativeNaN);
-    ASSERT_THROWS_CODE(rounder->roundUp(positiveNan), UserException, 40266);
-    ASSERT_THROWS_CODE(rounder->roundDown(positiveNan), UserException, 40266);
-    ASSERT_THROWS_CODE(rounder->roundUp(negativeNan), UserException, 40266);
-    ASSERT_THROWS_CODE(rounder->roundDown(negativeNan), UserException, 40266);
+    ASSERT_THROWS_CODE(rounder->roundUp(positiveNan), AssertionException, 40266);
+    ASSERT_THROWS_CODE(rounder->roundDown(positiveNan), AssertionException, 40266);
+    ASSERT_THROWS_CODE(rounder->roundUp(negativeNan), AssertionException, 40266);
+    ASSERT_THROWS_CODE(rounder->roundDown(negativeNan), AssertionException, 40266);
 }
 
 TEST(GranularityRounderPowersOfTwoTest, ShouldFailOnRoundingNegativeNumber) {
@@ -250,8 +250,8 @@ TEST(GranularityRounderPowersOfTwoTest, ShouldFailOnRoundingNegativeNumber) {
         GranularityRounder::getGranularityRounder(new ExpressionContextForTest(), "POWERSOF2");
 
     Value negativeNumber = Value(-1);
-    ASSERT_THROWS_CODE(rounder->roundUp(negativeNumber), UserException, 40267);
-    ASSERT_THROWS_CODE(rounder->roundDown(negativeNumber), UserException, 40267);
+    ASSERT_THROWS_CODE(rounder->roundUp(negativeNumber), AssertionException, 40267);
+    ASSERT_THROWS_CODE(rounder->roundDown(negativeNumber), AssertionException, 40267);
 }
 }  // namespace
 }  // namespace mongo

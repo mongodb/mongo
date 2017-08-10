@@ -248,13 +248,13 @@ TEST_F(ReporterTestNoTriggerAtSetUp, InvalidConstruction) {
                            Reporter::PrepareReplSetUpdatePositionCommandFn(),
                            HostAndPort("h1"),
                            Milliseconds(1000)),
-                  UserException);
+                  AssertionException);
 
     // null TaskExecutor
     ASSERT_THROWS_WHAT(
         Reporter(
             nullptr, prepareReplSetUpdatePositionCommandFn, HostAndPort("h1"), Milliseconds(1000)),
-        UserException,
+        AssertionException,
         "null task executor");
 
     // null PrepareReplSetUpdatePositionCommandFn
@@ -262,7 +262,7 @@ TEST_F(ReporterTestNoTriggerAtSetUp, InvalidConstruction) {
                                 Reporter::PrepareReplSetUpdatePositionCommandFn(),
                                 HostAndPort("h1"),
                                 Milliseconds(1000)),
-                       UserException,
+                       AssertionException,
                        "null function to create replSetUpdatePosition command object");
 
     // empty HostAndPort
@@ -270,21 +270,21 @@ TEST_F(ReporterTestNoTriggerAtSetUp, InvalidConstruction) {
                                 prepareReplSetUpdatePositionCommandFn,
                                 HostAndPort(),
                                 Milliseconds(1000)),
-                       UserException,
+                       AssertionException,
                        "target name cannot be empty");
 
     // zero keep alive interval.
     ASSERT_THROWS_WHAT(
         Reporter(
             &getExecutor(), prepareReplSetUpdatePositionCommandFn, HostAndPort("h1"), Seconds(-1)),
-        UserException,
+        AssertionException,
         "keep alive interval must be positive");
 
     // negative keep alive interval.
     ASSERT_THROWS_WHAT(
         Reporter(
             &getExecutor(), prepareReplSetUpdatePositionCommandFn, HostAndPort("h1"), Seconds(-1)),
-        UserException,
+        AssertionException,
         "keep alive interval must be positive");
 }
 

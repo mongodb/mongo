@@ -78,7 +78,8 @@ TEST_F(RollbackCheckerTest, InvalidConstruction) {
     HostAndPort syncSource;
 
     // Null executor.
-    ASSERT_THROWS_CODE(RollbackChecker(nullptr, syncSource), UserException, ErrorCodes::BadValue);
+    ASSERT_THROWS_CODE(
+        RollbackChecker(nullptr, syncSource), AssertionException, ErrorCodes::BadValue);
 }
 
 TEST_F(RollbackCheckerTest, ShutdownBeforeStart) {

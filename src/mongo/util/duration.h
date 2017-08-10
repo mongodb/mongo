@@ -97,9 +97,9 @@ using HigherPrecisionDuration =
 /**
  * Casts from one Duration precision to another.
  *
- * May throw a UserException if "from" is of lower-precision type and is outside the range of the
- * ToDuration. For example, Seconds::max() cannot be represented as a Milliseconds, and
- * so attempting to cast that value to Milliseconds will throw an exception.
+ * May throw a AssertionException if "from" is of lower-precision type and is outside the range of
+ * the ToDuration. For example, Seconds::max() cannot be represented as a Milliseconds, and so
+ * attempting to cast that value to Milliseconds will throw an exception.
  */
 template <typename ToDuration, typename FromPeriod>
 ToDuration duration_cast(const Duration<FromPeriod>& from) {
@@ -232,7 +232,7 @@ public:
     /**
      * Constructs a higher-precision duration from a lower-precision one, as by duration_cast.
      *
-     * Throws a UserException if "from" is out of the range of this duration type.
+     * Throws a AssertionException if "from" is out of the range of this duration type.
      *
      * It is a compilation error to attempt a conversion from higher-precision to lower-precision by
      * this constructor.

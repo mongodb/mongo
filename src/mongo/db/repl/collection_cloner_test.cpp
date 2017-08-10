@@ -138,7 +138,7 @@ TEST_F(CollectionClonerTest, InvalidConstruction) {
                                                      si,
                                                      defaultBatchSize,
                                                      defaultNumCloningCursors),
-                                    UserException,
+                                    AssertionException,
                                     ErrorCodes::BadValue,
                                     "task executor cannot be null");
     }
@@ -153,7 +153,7 @@ TEST_F(CollectionClonerTest, InvalidConstruction) {
                                                  nullptr,
                                                  defaultBatchSize,
                                                  defaultNumCloningCursors),
-                                UserException,
+                                AssertionException,
                                 ErrorCodes::BadValue,
                                 "storage interface cannot be null");
 
@@ -170,7 +170,7 @@ TEST_F(CollectionClonerTest, InvalidConstruction) {
                                                      si,
                                                      defaultBatchSize,
                                                      defaultNumCloningCursors),
-                                    UserException,
+                                    AssertionException,
                                     ErrorCodes::BadValue,
                                     "invalid collection namespace: db.");
     }
@@ -191,7 +191,7 @@ TEST_F(CollectionClonerTest, InvalidConstruction) {
                              si,
                              defaultBatchSize,
                              defaultNumCloningCursors),
-            UserException,
+            AssertionException,
             ErrorCodes::BadValue,
             "'storageEngine.storageEngine1' has to be an embedded document.");
     }
@@ -209,7 +209,7 @@ TEST_F(CollectionClonerTest, InvalidConstruction) {
                                                      si,
                                                      defaultBatchSize,
                                                      defaultNumCloningCursors),
-                                    UserException,
+                                    AssertionException,
                                     ErrorCodes::BadValue,
                                     "callback function cannot be null");
     }

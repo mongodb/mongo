@@ -149,7 +149,7 @@ StatusWith<BSONObj> SortKeyGenerator::getIndexKey(const BSONObj& obj) const {
         // multikey when getting the index keys for sorting.
         MultikeyPaths* multikeyPaths = nullptr;
         _indexKeyGen->getKeys(obj, &keys, multikeyPaths);
-    } catch (const UserException& e) {
+    } catch (const AssertionException& e) {
         // Probably a parallel array.
         if (ErrorCodes::CannotIndexParallelArrays == e.code()) {
             return Status(ErrorCodes::BadValue, "cannot sort with keys that are parallel arrays");

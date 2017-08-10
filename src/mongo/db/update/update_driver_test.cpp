@@ -90,7 +90,7 @@ TEST(Parse, EmptyMod) {
     std::map<StringData, std::unique_ptr<ExpressionWithPlaceholder>> arrayFilters;
     ASSERT_THROWS_CODE_AND_WHAT(
         driver.parse(fromjson("{$set:{}}"), arrayFilters).transitional_ignore(),
-        UserException,
+        AssertionException,
         ErrorCodes::FailedToParse,
         "'$set' is empty. You must specify a field like so: {$set: {<field>: ...}}");
 }
@@ -101,7 +101,7 @@ TEST(Parse, WrongMod) {
     std::map<StringData, std::unique_ptr<ExpressionWithPlaceholder>> arrayFilters;
     ASSERT_THROWS_CODE_AND_WHAT(
         driver.parse(fromjson("{$xyz:{a:1}}"), arrayFilters).transitional_ignore(),
-        UserException,
+        AssertionException,
         ErrorCodes::FailedToParse,
         "Unknown modifier: $xyz");
 }
@@ -112,7 +112,7 @@ TEST(Parse, WrongType) {
     std::map<StringData, std::unique_ptr<ExpressionWithPlaceholder>> arrayFilters;
     ASSERT_THROWS_CODE_AND_WHAT(
         driver.parse(fromjson("{$set:[{a:1}]}"), arrayFilters).transitional_ignore(),
-        UserException,
+        AssertionException,
         ErrorCodes::FailedToParse,
         "Modifiers operate on fields but we found type array instead. For "
         "example: {$mod: {<field>: ...}} not {$set: [ { a: 1 } ]}");
@@ -125,7 +125,7 @@ TEST(Parse, ModsWithLaterObjReplacement) {
     ASSERT_THROWS_CODE_AND_WHAT(
         driver.parse(fromjson("{$set:{a:1}, obj: \"obj replacement\"}"), arrayFilters)
             .transitional_ignore(),
-        UserException,
+        AssertionException,
         ErrorCodes::FailedToParse,
         "Unknown modifier: obj");
 }

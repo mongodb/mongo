@@ -63,7 +63,7 @@ public:
         size_t maxMemoryUsageBytes = kDefaultMaxMemoryUsageBytes);
 
     /**
-     * Parses 'elem' into a $group stage, or throws a UserException if 'elem' was an invalid
+     * Parses 'elem' into a $group stage, or throws a AssertionException if 'elem' was an invalid
      * specification.
      */
     static boost::intrusive_ptr<DocumentSource> createFromBson(

@@ -69,7 +69,7 @@ TEST_F(NamespaceMetadataChangeNotificationsTest, WaitForNotify) {
         auto opCtx = client()->makeOperationContext();
         opCtx->setDeadlineAfterNowBy(Milliseconds{0});
         ASSERT_THROWS_CODE(
-            scopedNotif.get(opCtx.get()), UserException, ErrorCodes::ExceededTimeLimit);
+            scopedNotif.get(opCtx.get()), AssertionException, ErrorCodes::ExceededTimeLimit);
     }
 
     notifications.notifyChange(kNss);
@@ -89,7 +89,7 @@ TEST_F(NamespaceMetadataChangeNotificationsTest, GiveUpWaitingForNotify) {
         auto opCtx = client()->makeOperationContext();
         opCtx->setDeadlineAfterNowBy(Milliseconds{0});
         ASSERT_THROWS_CODE(
-            scopedNotif.get(opCtx.get()), UserException, ErrorCodes::ExceededTimeLimit);
+            scopedNotif.get(opCtx.get()), AssertionException, ErrorCodes::ExceededTimeLimit);
     }
 
     notifications.notifyChange(kNss);
@@ -105,7 +105,7 @@ TEST_F(NamespaceMetadataChangeNotificationsTest, MoveConstructionWaitForNotify) 
         auto opCtx = client()->makeOperationContext();
         opCtx->setDeadlineAfterNowBy(Milliseconds{0});
         ASSERT_THROWS_CODE(
-            movedScopedNotif.get(opCtx.get()), UserException, ErrorCodes::ExceededTimeLimit);
+            movedScopedNotif.get(opCtx.get()), AssertionException, ErrorCodes::ExceededTimeLimit);
     }
 
     notifications.notifyChange(kNss);

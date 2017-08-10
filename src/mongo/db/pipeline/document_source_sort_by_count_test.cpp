@@ -120,22 +120,22 @@ public:
 
 TEST_F(InvalidSortByCountSpec, NonObjectNonStringSpec) {
     BSONObj spec = BSON("$sortByCount" << 1);
-    ASSERT_THROWS_CODE(createSortByCount(spec), UserException, 40149);
+    ASSERT_THROWS_CODE(createSortByCount(spec), AssertionException, 40149);
 
     spec = BSON("$sortByCount" << BSONNULL);
-    ASSERT_THROWS_CODE(createSortByCount(spec), UserException, 40149);
+    ASSERT_THROWS_CODE(createSortByCount(spec), AssertionException, 40149);
 }
 
 TEST_F(InvalidSortByCountSpec, NonExpressionInObjectSpec) {
     BSONObj spec = BSON("$sortByCount" << BSON("field1"
                                                << "$x"));
-    ASSERT_THROWS_CODE(createSortByCount(spec), UserException, 40147);
+    ASSERT_THROWS_CODE(createSortByCount(spec), AssertionException, 40147);
 }
 
 TEST_F(InvalidSortByCountSpec, NonFieldPathStringSpec) {
     BSONObj spec = BSON("$sortByCount"
                         << "test");
-    ASSERT_THROWS_CODE(createSortByCount(spec), UserException, 40148);
+    ASSERT_THROWS_CODE(createSortByCount(spec), AssertionException, 40148);
 }
 
 }  // namespace

@@ -402,11 +402,11 @@ public:
 
         BSONObj out;
 
-        ASSERT_THROWS(s->invoke("blah.y = 'e'", 0, 0), mongo::UserException);
-        ASSERT_THROWS(s->invoke("blah.a = 19;", 0, 0), mongo::UserException);
-        ASSERT_THROWS(s->invoke("blah.zz.a = 19;", 0, 0), mongo::UserException);
-        ASSERT_THROWS(s->invoke("blah.zz = { a : 19 };", 0, 0), mongo::UserException);
-        ASSERT_THROWS(s->invoke("delete blah['x']", 0, 0), mongo::UserException);
+        ASSERT_THROWS(s->invoke("blah.y = 'e'", 0, 0), mongo::AssertionException);
+        ASSERT_THROWS(s->invoke("blah.a = 19;", 0, 0), mongo::AssertionException);
+        ASSERT_THROWS(s->invoke("blah.zz.a = 19;", 0, 0), mongo::AssertionException);
+        ASSERT_THROWS(s->invoke("blah.zz = { a : 19 };", 0, 0), mongo::AssertionException);
+        ASSERT_THROWS(s->invoke("delete blah['x']", 0, 0), mongo::AssertionException);
 
         // read-only object itself can be overwritten
         s->invoke("blah = {}", 0, 0);

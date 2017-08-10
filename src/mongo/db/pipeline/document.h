@@ -192,7 +192,8 @@ public:
 
     /**
      * Serializes this document to the BSONObj under construction in 'builder'. Metadata is not
-     * included. Throws a UserException if 'recursionLevel' exceeds the maximum allowable depth.
+     * included. Throws a AssertionException if 'recursionLevel' exceeds the maximum allowable
+     * depth.
      */
     void toBson(BSONObjBuilder* builder, size_t recursionLevel = 1) const;
     BSONObj toBson() const;

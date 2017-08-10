@@ -602,7 +602,7 @@ void IndexAccessMethod::getKeys(const BSONObj& obj,
                                               13027};
     try {
         doGetKeys(obj, keys, multikeyPaths);
-    } catch (const UserException& ex) {
+    } catch (const AssertionException& ex) {
         if (mode == GetKeysMode::kEnforceConstraints) {
             throw;
         }

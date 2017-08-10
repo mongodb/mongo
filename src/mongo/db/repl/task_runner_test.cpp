@@ -48,7 +48,7 @@ using Task = TaskRunner::Task;
 TEST_F(TaskRunnerTest, InvalidConstruction) {
     // Null thread pool.
     ASSERT_THROWS_CODE_AND_WHAT(
-        TaskRunner(nullptr), UserException, ErrorCodes::BadValue, "null thread pool");
+        TaskRunner(nullptr), AssertionException, ErrorCodes::BadValue, "null thread pool");
 }
 
 TEST_F(TaskRunnerTest, GetDiagnosticString) {

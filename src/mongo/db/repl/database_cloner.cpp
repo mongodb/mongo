@@ -369,7 +369,7 @@ void DatabaseCloner::_listCollectionsCallback(const StatusWith<Fetcher::QueryRes
                 _storageInterface,
                 collectionClonerBatchSize,
                 maxNumInitialSyncCollectionClonerCursors.load());
-        } catch (const UserException& ex) {
+        } catch (const AssertionException& ex) {
             _finishCallback_inlock(lk, ex.toStatus());
             return;
         }

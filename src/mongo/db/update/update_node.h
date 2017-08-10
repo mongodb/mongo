@@ -150,8 +150,8 @@ public:
      * Creates a new node by merging the contents of two input nodes. The semantics of the merge
      * operation depend on the types of the input nodes. When the nodes have the same type, this
      * function dispatches the merge to a createUpdateNodeByMerging implementation defined for that
-     * subtype. Throws UserException with a ConflictingUpdateOperators code when the types of the
-     * input nodes differ or when any of the child nodes fail to merge.
+     * subtype. Throws AssertionException with a ConflictingUpdateOperators code when the types of
+     * the input nodes differ or when any of the child nodes fail to merge.
      */
     static std::unique_ptr<UpdateNode> createUpdateNodeByMerging(const UpdateNode& leftNode,
                                                                  const UpdateNode& rightNode,

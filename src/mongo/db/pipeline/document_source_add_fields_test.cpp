@@ -86,8 +86,9 @@ TEST_F(AddFieldsTest, ShouldErrorOnNonObjectSpec) {
     BSONObj spec = BSON("$addFields"
                         << "foo");
     BSONElement specElement = spec.firstElement();
-    ASSERT_THROWS_CODE(
-        DocumentSourceAddFields::createFromBson(specElement, getExpCtx()), UserException, 40272);
+    ASSERT_THROWS_CODE(DocumentSourceAddFields::createFromBson(specElement, getExpCtx()),
+                       AssertionException,
+                       40272);
 }
 
 TEST_F(AddFieldsTest, ShouldBeAbleToProcessMultipleDocuments) {
@@ -223,7 +224,7 @@ TEST_F(AddFieldsTest, CannotAddNestedDocumentExceedingDepthLimit) {
     ASSERT_THROWS_CODE(
         DocumentSourceAddFields::create(
             makeAddFieldsForNestedDocument(BSONDepth::getMaxAllowableDepth() + 1), getExpCtx()),
-        UserException,
+        AssertionException,
         ErrorCodes::Overflow);
 }
 }  // namespace

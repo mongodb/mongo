@@ -147,9 +147,9 @@ public:
      * Returns ErrorCodes::CursorNotFound if the cursor does not exist or
      * ErrorCodes::QueryPlanKilled if the cursor was killed in between uses.
      *
-     * Throws a UserException if the cursor is already pinned. Callers need not specially handle
-     * this error, as it should only happen if a misbehaving client attempts to simultaneously issue
-     * two operations against the same cursor id.
+     * Throws a AssertionException if the cursor is already pinned. Callers need not specially
+     * handle this error, as it should only happen if a misbehaving client attempts to
+     * simultaneously issue two operations against the same cursor id.
      */
     StatusWith<ClientCursorPin> pinCursor(OperationContext* opCtx, CursorId id);
 

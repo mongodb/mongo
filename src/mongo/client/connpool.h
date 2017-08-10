@@ -382,7 +382,7 @@ private:
 class ScopedDbConnection : public AScopedConnection {
 public:
     /** the main constructor you want to use
-        throws UserException if can't connect
+        throws AssertionException if can't connect
         */
     explicit ScopedDbConnection(const std::string& host, double socketTimeout = 0);
     explicit ScopedDbConnection(const ConnectionString& host, double socketTimeout = 0);

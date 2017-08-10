@@ -86,7 +86,7 @@ StatusWith<ShardIdentityType> ShardIdentityType::fromBSON(const BSONObj& source)
             }
 
             shardIdentity.setConfigsvrConnString(std::move(configSvrConnStr));
-        } catch (const UserException& parseException) {
+        } catch (const AssertionException& parseException) {
             return parseException.toStatus();
         }
     }

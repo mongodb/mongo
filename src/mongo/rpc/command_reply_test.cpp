@@ -94,7 +94,7 @@ TEST_F(ReplyTest, ParseAllFields) {
 }
 
 TEST_F(ReplyTest, EmptyMessageThrows) {
-    ASSERT_THROWS(rpc::CommandReply{buildMessage()}, UserException);
+    ASSERT_THROWS(rpc::CommandReply{buildMessage()}, AssertionException);
 }
 
 TEST_F(ReplyTest, MetadataOnlyThrows) {
@@ -103,7 +103,7 @@ TEST_F(ReplyTest, MetadataOnlyThrows) {
     auto metadata = metadataBob.done();
     writeObj(metadata);
 
-    ASSERT_THROWS(rpc::CommandReply{buildMessage()}, UserException);
+    ASSERT_THROWS(rpc::CommandReply{buildMessage()}, AssertionException);
 }
 
 TEST_F(ReplyTest, MetadataInvalidLengthThrows) {
@@ -120,7 +120,7 @@ TEST_F(ReplyTest, MetadataInvalidLengthThrows) {
     auto commandReply = commandReplyBob.done();
     writeObj(commandReply);
 
-    ASSERT_THROWS(rpc::CommandReply{buildMessage()}, UserException);
+    ASSERT_THROWS(rpc::CommandReply{buildMessage()}, AssertionException);
 }
 
 TEST_F(ReplyTest, InvalidLengthThrows) {
@@ -138,6 +138,6 @@ TEST_F(ReplyTest, InvalidLengthThrows) {
     DataView(const_cast<char*>(commandReply.objdata())).write<LittleEndian<int32_t>>(100000);
     writeObj(commandReply, trueSize);
 
-    ASSERT_THROWS(rpc::CommandReply{buildMessage()}, UserException);
+    ASSERT_THROWS(rpc::CommandReply{buildMessage()}, AssertionException);
 }
 }

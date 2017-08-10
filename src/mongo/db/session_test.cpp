@@ -147,7 +147,7 @@ TEST_F(SessionTest, StartingOldTxnShouldAssert) {
     Session txnState(sessionId);
     txnState.begin(opCtx(), txnNum);
 
-    ASSERT_THROWS(txnState.begin(opCtx(), txnNum - 1), UserException);
+    ASSERT_THROWS(txnState.begin(opCtx(), txnNum - 1), AssertionException);
     ASSERT_EQ(sessionId, txnState.getSessionId());
     ASSERT_EQ(txnNum, txnState.getTxnNum());
     ASSERT_TRUE(txnState.getLastWriteOpTimeTs().isNull());
@@ -245,7 +245,7 @@ TEST_F(SessionTest, StartingNewSessionWithNewerEntryInStorageShouldAssert) {
     client.insert(NamespaceString::kSessionTransactionsTableNamespace.ns(), origRecord.toBSON());
 
     Session txnState(sessionId);
-    ASSERT_THROWS(txnState.begin(opCtx(), txnNum - 1), UserException);
+    ASSERT_THROWS(txnState.begin(opCtx(), txnNum - 1), AssertionException);
 
     ASSERT_EQ(sessionId, txnState.getSessionId());
     ASSERT_EQ(txnNum, txnState.getTxnNum());
@@ -407,7 +407,7 @@ TEST_F(SessionTest, StartingNewSessionWithDroppedTableShouldAssert) {
     ASSERT_TRUE(client.runCommand(ns.db().toString(), BSON("drop" << ns.coll()), dropResult));
 
     Session txnState(sessionId);
-    ASSERT_THROWS(txnState.begin(opCtx(), txnNum), UserException);
+    ASSERT_THROWS(txnState.begin(opCtx(), txnNum), AssertionException);
 
     ASSERT_EQ(sessionId, txnState.getSessionId());
 }
@@ -429,7 +429,7 @@ TEST_F(SessionTest, SaveTxnProgressShouldAssertIfTableIsDropped) {
     AutoGetCollection autoColl(opCtx(), NamespaceString("test.user"), MODE_IX);
     WriteUnitOfWork wuow(opCtx());
 
-    ASSERT_THROWS(txnState.saveTxnProgress(opCtx(), ts1), UserException);
+    ASSERT_THROWS(txnState.saveTxnProgress(opCtx(), ts1), AssertionException);
 }
 
 TEST_F(SessionTest, TwoSessionsShouldBeIndependent) {
@@ -604,7 +604,7 @@ TEST_F(SessionTest, StartingOldTxnFailsAfterReset) {
     Session::updateSessionRecord(opCtx(), sessionId, newTxnNum, Timestamp());
     txnState.reset();
 
-    ASSERT_THROWS(txnState.begin(opCtx(), oldTxnNum), UserException);
+    ASSERT_THROWS(txnState.begin(opCtx(), oldTxnNum), AssertionException);
 }
 
 TEST_F(SessionTest, CanStartLaterTxnAfterReset) {

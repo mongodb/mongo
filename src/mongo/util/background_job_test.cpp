@@ -136,7 +136,7 @@ TEST(BackgroundJobLifeCycle, Go) {
     j.go();
 
     // Calling 'go' again while it is running is an error.
-    ASSERT_THROWS(j.go(), MsgAssertionException);
+    ASSERT_THROWS(j.go(), AssertionException);
 
     // Stop the Job
     j.notify();

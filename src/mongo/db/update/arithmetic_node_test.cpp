@@ -258,7 +258,7 @@ TEST_F(ArithmeticNodeTest, ApplyNonViablePathToInc) {
     setPathTaken("a");
     addIndexedPath("a");
     ASSERT_THROWS_CODE_AND_WHAT(node.apply(getApplyParams(doc.root()["a"])),
-                                UserException,
+                                AssertionException,
                                 ErrorCodes::PathNotViable,
                                 "Cannot create field 'b' in element {a: 5}");
 }
@@ -552,7 +552,7 @@ TEST_F(ArithmeticNodeTest, ApplyIncToObjectFails) {
     setPathTaken("a");
     addIndexedPath("a");
     ASSERT_THROWS_CODE_AND_WHAT(node.apply(getApplyParams(doc.root()["a"])),
-                                UserException,
+                                AssertionException,
                                 ErrorCodes::TypeMismatch,
                                 "Cannot apply $inc to a value of non-numeric type. {_id: "
                                 "\"test_object\"} has the field 'a' of non-numeric type object");
@@ -568,7 +568,7 @@ TEST_F(ArithmeticNodeTest, ApplyIncToArrayFails) {
     setPathTaken("a");
     addIndexedPath("a");
     ASSERT_THROWS_CODE_AND_WHAT(node.apply(getApplyParams(doc.root()["a"])),
-                                UserException,
+                                AssertionException,
                                 ErrorCodes::TypeMismatch,
                                 "Cannot apply $inc to a value of non-numeric type. {_id: "
                                 "\"test_object\"} has the field 'a' of non-numeric type array");
@@ -584,7 +584,7 @@ TEST_F(ArithmeticNodeTest, ApplyIncToStringFails) {
     setPathTaken("a");
     addIndexedPath("a");
     ASSERT_THROWS_CODE_AND_WHAT(node.apply(getApplyParams(doc.root()["a"])),
-                                UserException,
+                                AssertionException,
                                 ErrorCodes::TypeMismatch,
                                 "Cannot apply $inc to a value of non-numeric type. {_id: "
                                 "\"test_object\"} has the field 'a' of non-numeric type string");
@@ -663,7 +663,7 @@ TEST_F(ArithmeticNodeTest, ApplyPathNotViableArray) {
     setPathToCreate("b");
     setPathTaken("a");
     ASSERT_THROWS_CODE_AND_WHAT(node.apply(getApplyParams(doc.root()["a"])),
-                                UserException,
+                                AssertionException,
                                 ErrorCodes::PathNotViable,
                                 "Cannot create field 'b' in element {a: [ { b: 1 } ]}");
 }
@@ -775,7 +775,7 @@ TEST_F(ArithmeticNodeTest, ApplyNonViablePathThroughArray) {
     setPathToCreate("2.b");
     setPathTaken("a");
     ASSERT_THROWS_CODE_AND_WHAT(node.apply(getApplyParams(doc.root()["a"])),
-                                UserException,
+                                AssertionException,
                                 ErrorCodes::PathNotViable,
                                 "Cannot create field '2' in element {a: 0}");
 }

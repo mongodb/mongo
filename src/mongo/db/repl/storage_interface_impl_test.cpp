@@ -1908,7 +1908,7 @@ TEST_F(StorageInterfaceImplTest,
                                                 BSON("" << 1).firstElement(),
                                                 BSON("$unknownUpdateOp" << BSON("x" << 1000)))
                                     .transitional_ignore(),
-                                UserException,
+                                AssertionException,
                                 ErrorCodes::FailedToParse,
                                 "Unknown modifier: $unknownUpdateOp");
 }

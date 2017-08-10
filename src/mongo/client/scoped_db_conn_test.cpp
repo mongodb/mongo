@@ -421,7 +421,7 @@ TEST_F(DummyServerFixture, ScopedDbConnectionWithTimeout) {
 
     log() << "Testing MongoURI with explicit timeout";
     start = Date_t::now();
-    ASSERT_THROWS(ScopedDbConnection conn4(uri, overrideTimeout.count()), UserException);
+    ASSERT_THROWS(ScopedDbConnection conn4(uri, overrideTimeout.count()), AssertionException);
     end = Date_t::now();
     ASSERT_GTE((end - start) + gracePeriod, overrideTimeout);
     ASSERT_LT(end - start, uriTimeout);

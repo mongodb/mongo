@@ -94,7 +94,7 @@ NamespaceDetails::Extra* NamespaceDetails::allocExtra(OperationContext* opCtx,
     verify(i >= 0 && i <= 1);
 
     Namespace fullns(ns);
-    Namespace extrans(fullns.extraName(i));  // throws UserException if ns name too long
+    Namespace extrans(fullns.extraName(i));  // throws AssertionException if ns name too long
 
     massert(10351, "allocExtra: extra already exists", ni.details(extrans) == 0);
 
@@ -125,7 +125,7 @@ IndexDetails& NamespaceDetails::idx(int idxNo, bool missingExpected) {
     Extra* e = extra();
     if (!e) {
         if (missingExpected)
-            throw MsgAssertionException(13283, "Missing Extra");
+            throw AssertionException(13283, "Missing Extra");
         massert(14045, "missing Extra", e);
     }
     int i = idxNo - NIndexesBase;
@@ -133,7 +133,7 @@ IndexDetails& NamespaceDetails::idx(int idxNo, bool missingExpected) {
         e = e->next(this);
         if (!e) {
             if (missingExpected)
-                throw MsgAssertionException(14823, "missing extra");
+                throw AssertionException(14823, "missing extra");
             massert(14824, "missing Extra", e);
         }
         i -= NIndexesExtra;
@@ -150,7 +150,7 @@ const IndexDetails& NamespaceDetails::idx(int idxNo, bool missingExpected) const
     const Extra* e = extra();
     if (!e) {
         if (missingExpected)
-            throw MsgAssertionException(17421, "Missing Extra");
+            throw AssertionException(17421, "Missing Extra");
         massert(17422, "missing Extra", e);
     }
     int i = idxNo - NIndexesBase;
@@ -158,7 +158,7 @@ const IndexDetails& NamespaceDetails::idx(int idxNo, bool missingExpected) const
         e = e->next(this);
         if (!e) {
             if (missingExpected)
-                throw MsgAssertionException(17423, "missing extra");
+                throw AssertionException(17423, "missing extra");
             massert(17424, "missing Extra", e);
         }
         i -= NIndexesExtra;

@@ -220,32 +220,32 @@ public:
 };
 
 TEST_F(InvalidSampleSpec, NonObject) {
-    ASSERT_THROWS_CODE(createSample(BSON("$sample" << 1)), UserException, 28745);
+    ASSERT_THROWS_CODE(createSample(BSON("$sample" << 1)), AssertionException, 28745);
     ASSERT_THROWS_CODE(createSample(BSON("$sample"
                                          << "string")),
-                       UserException,
+                       AssertionException,
                        28745);
 }
 
 TEST_F(InvalidSampleSpec, NonNumericSize) {
     ASSERT_THROWS_CODE(createSample(createSpec(BSON("size"
                                                     << "string"))),
-                       UserException,
+                       AssertionException,
                        28746);
 }
 
 TEST_F(InvalidSampleSpec, NegativeSize) {
-    ASSERT_THROWS_CODE(createSample(createSpec(BSON("size" << -1))), UserException, 28747);
-    ASSERT_THROWS_CODE(createSample(createSpec(BSON("size" << -1.0))), UserException, 28747);
+    ASSERT_THROWS_CODE(createSample(createSpec(BSON("size" << -1))), AssertionException, 28747);
+    ASSERT_THROWS_CODE(createSample(createSpec(BSON("size" << -1.0))), AssertionException, 28747);
 }
 
 TEST_F(InvalidSampleSpec, ExtraOption) {
     ASSERT_THROWS_CODE(
-        createSample(createSpec(BSON("size" << 1 << "extra" << 2))), UserException, 28748);
+        createSample(createSpec(BSON("size" << 1 << "extra" << 2))), AssertionException, 28748);
 }
 
 TEST_F(InvalidSampleSpec, MissingSize) {
-    ASSERT_THROWS_CODE(createSample(createSpec(BSONObj())), UserException, 28749);
+    ASSERT_THROWS_CODE(createSample(createSpec(BSONObj())), AssertionException, 28749);
 }
 
 //
@@ -344,7 +344,7 @@ TEST_F(SampleFromRandomCursorBasics, TooManyDups) {
     ASSERT_TRUE(sample()->getNext().isAdvanced());
 
     // The rest are duplicates, should error.
-    ASSERT_THROWS_CODE(sample()->getNext(), UserException, 28799);
+    ASSERT_THROWS_CODE(sample()->getNext(), AssertionException, 28799);
 }
 
 /**
@@ -354,7 +354,7 @@ TEST_F(SampleFromRandomCursorBasics, MissingIdField) {
     // Once with only a bad document.
     createSample(2);  // _idField is '_id'.
     source()->queue.push_back(DOC("non_id" << 2));
-    ASSERT_THROWS_CODE(sample()->getNext(), UserException, 28793);
+    ASSERT_THROWS_CODE(sample()->getNext(), AssertionException, 28793);
 
     // Again, with some regular documents before a bad one.
     createSample(2);  // _idField is '_id'.
@@ -365,7 +365,7 @@ TEST_F(SampleFromRandomCursorBasics, MissingIdField) {
     // First should be successful.
     ASSERT_TRUE(sample()->getNext().isAdvanced());
 
-    ASSERT_THROWS_CODE(sample()->getNext(), UserException, 28793);
+    ASSERT_THROWS_CODE(sample()->getNext(), AssertionException, 28793);
 }
 
 /**

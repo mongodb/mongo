@@ -1106,17 +1106,11 @@ DbResponse ServiceEntryPointMongod::handleRequest(OperationContext* opCtx, const
                     invariant(false);
                 }
             }
-        } catch (const UserException& ue) {
+        } catch (const AssertionException& ue) {
             LastError::get(c).setLastError(ue.code(), ue.reason());
             LOG(3) << " Caught Assertion in " << networkOpToString(op) << ", continuing "
                    << redact(ue);
             debug.exceptionInfo = ue.toStatus();
-        } catch (const AssertionException& e) {
-            LastError::get(c).setLastError(e.code(), e.reason());
-            LOG(3) << " Caught Assertion in " << networkOpToString(op) << ", continuing "
-                   << redact(e);
-            debug.exceptionInfo = e.toStatus();
-            shouldLogOpDebug = true;
         }
     }
     currentOp.ensureStarted();

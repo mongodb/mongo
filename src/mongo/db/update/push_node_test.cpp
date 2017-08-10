@@ -266,7 +266,7 @@ TEST_F(PushNodeTest, ApplyToNonArrayFails) {
     addIndexedPath("a");
     ASSERT_THROWS_CODE_AND_WHAT(
         node.apply(getApplyParams(doc.root()["a"])),
-        UserException,
+        AssertionException,
         ErrorCodes::BadValue,
         "The field 'a' must be an array but is of type int in document {_id: \"test_object\"}");
 }

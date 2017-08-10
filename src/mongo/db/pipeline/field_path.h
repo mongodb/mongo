@@ -42,7 +42,7 @@ namespace mongo {
 class FieldPath {
 public:
     /**
-     * Throws a UserException if a field name does not pass validation.
+     * Throws a AssertionException if a field name does not pass validation.
      */
     static void uassertValidFieldName(StringData fieldName);
 
@@ -60,7 +60,8 @@ public:
     }
 
     /**
-     * Throws a UserException if the string is empty or if any of the field names fail validation.
+     * Throws a AssertionException if the string is empty or if any of the field names fail
+     * validation.
      *
      * Field names are validated using uassertValidFieldName().
      */
