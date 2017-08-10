@@ -129,14 +129,18 @@ public:
     void run() {
         DBDirectClient db(opCtx());
 
-        // Attempt to refresh one active record, should succeed.
         auto now = Date_t::now();
         auto thePast = now - Minutes(5);
 
+        // Attempt to refresh with no active records, should succeed (and do nothing).
+        auto resRefresh = collection()->refreshSessions(opCtx(), LogicalSessionRecordSet{}, now);
+        ASSERT(resRefresh.isOK());
+
+        // Attempt to refresh one active record, should succeed.
         auto record1 = makeRecord(thePast);
         auto res = insertRecord(opCtx(), record1);
         ASSERT_OK(res);
-        auto resRefresh = collection()->refreshSessions(opCtx(), {record1}, now);
+        resRefresh = collection()->refreshSessions(opCtx(), {record1}, now);
         ASSERT(resRefresh.isOK());
 
         // The timestamp on the refreshed record should be updated.

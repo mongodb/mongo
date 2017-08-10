@@ -34,6 +34,7 @@
 
 #include "mongo/bson/bsonobjbuilder.h"
 #include "mongo/db/logical_session_id.h"
+#include "mongo/db/ops/write_ops.h"
 #include "mongo/stdx/functional.h"
 #include "mongo/stdx/memory.h"
 
@@ -74,7 +75,7 @@ Status runBulkCmd(StringData label,
                   AddLineFn&& addLine,
                   SendBatchFn&& sendBatch,
                   const Container& items) {
-    int i = 0;
+    size_t i = 0;
     BufBuilder buf;
 
     boost::optional<BSONObjBuilder> batchBuilder;
@@ -97,7 +98,7 @@ Status runBulkCmd(StringData label,
     for (const auto& item : items) {
         addLine(&(entries.get()), item);
 
-        if (++i >= 1000) {
+        if (++i >= write_ops::kMaxWriteBatchSize) {
             auto res = sendLocalBatch();
             if (!res.isOK()) {
                 return res;
@@ -108,7 +109,11 @@ Status runBulkCmd(StringData label,
         }
     }
 
-    return sendLocalBatch();
+    if (i > 0) {
+        return sendLocalBatch();
+    } else {
+        return Status::OK();
+    }
 }
 
 }  // namespace
