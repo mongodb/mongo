@@ -33,6 +33,7 @@
 #include "mongo/db/service_context.h"
 #include "mongo/db/service_context_d_test_fixture.h"
 #include "mongo/db/session_catalog.h"
+#include "mongo/stdx/future.h"
 #include "mongo/stdx/memory.h"
 #include "mongo/unittest/unittest.h"
 
@@ -60,6 +61,62 @@ TEST_F(SessionCatalogTest, CheckoutAndReleaseSession) {
 
     ASSERT(scopedSession.get());
     ASSERT_EQ(*opCtx->getLogicalSessionId(), scopedSession->getSessionId());
+}
+
+TEST_F(SessionCatalogTest, OperationContextSession) {
+    auto opCtx = Client::getCurrent()->makeOperationContext();
+    opCtx->setLogicalSessionId(LogicalSessionId());
+
+    {
+        OperationContextSession ocs(opCtx.get());
+        auto session = OperationContextSession::get(opCtx.get());
+
+        ASSERT(session);
+        ASSERT_EQ(*opCtx->getLogicalSessionId(), session->getSessionId());
+    }
+
+    ASSERT(!OperationContextSession::get(opCtx.get()));
+}
+
+TEST_F(SessionCatalogTest, GetOrCreateNonExistentSession) {
+    auto opCtx = Client::getCurrent()->makeOperationContext();
+
+    const LogicalSessionId lsid;
+    auto scopedSession = SessionCatalog::get(opCtx.get())->getOrCreateSession(opCtx.get(), lsid);
+
+    ASSERT(scopedSession.get());
+    ASSERT_EQ(lsid, scopedSession->getSessionId());
+}
+
+TEST_F(SessionCatalogTest, GetOrCreateSessionAfterCheckOutSession) {
+    const LogicalSessionId lsid;
+
+    auto opCtx = Client::getCurrent()->makeOperationContext();
+    opCtx->setLogicalSessionId(lsid);
+
+    boost::optional<OperationContextSession> ocs(opCtx.get());
+
+    stdx::async(stdx::launch::async, [&] {
+        Client::initThreadIfNotAlready();
+        auto sideOpCtx = Client::getCurrent()->makeOperationContext();
+        auto scopedSession =
+            SessionCatalog::get(sideOpCtx.get())->getOrCreateSession(sideOpCtx.get(), lsid);
+
+        ASSERT(scopedSession.get());
+        ASSERT_EQ(lsid, scopedSession->getSessionId());
+    }).get();
+
+    ocs.reset();
+
+    stdx::async(stdx::launch::async, [&] {
+        Client::initThreadIfNotAlready();
+        auto sideOpCtx = Client::getCurrent()->makeOperationContext();
+        auto scopedSession =
+            SessionCatalog::get(sideOpCtx.get())->getOrCreateSession(sideOpCtx.get(), lsid);
+
+        ASSERT(scopedSession.get());
+        ASSERT_EQ(lsid, scopedSession->getSessionId());
+    }).get();
 }
 
 TEST_F(SessionCatalogTest, NestedOperationContextSession) {

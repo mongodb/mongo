@@ -46,13 +46,13 @@ namespace mongo {
 namespace {
 
 struct CheckedOutSession {
-    CheckedOutSession(ScopedSession&& session) : scopedSession(std::move(session)) {}
+    CheckedOutSession(ScopedCheckedOutSession&& session) : scopedSession(std::move(session)) {}
 
-    ScopedSession scopedSession;
+    ScopedCheckedOutSession scopedSession;
 
-    // This numbers gets incremented every time a request tries to check out this session
-    // including the cases when it was already checked out. Level of 0 means that it's
-    // available or is completely released.
+    // This number gets incremented every time a request tries to check out this session, including
+    // the cases when it was already checked out. Level of 0 means that it's available or is
+    // completely released.
     int checkOutNestingLevel = 0;
 };
 
@@ -121,20 +121,13 @@ void SessionCatalog::onStepUp(OperationContext* opCtx) {
                             << status.reason());
 }
 
-ScopedSession SessionCatalog::checkOutSession(OperationContext* opCtx) {
+ScopedCheckedOutSession SessionCatalog::checkOutSession(OperationContext* opCtx) {
     invariant(!opCtx->lockState()->isLocked());
     invariant(opCtx->getLogicalSessionId());
 
-    const auto lsid = *opCtx->getLogicalSessionId();
-
     stdx::unique_lock<stdx::mutex> ul(_mutex);
 
-    auto it = _txnTable.find(lsid);
-    if (it == _txnTable.end()) {
-        it = _txnTable.emplace(lsid, std::make_shared<SessionRuntimeInfo>(lsid)).first;
-    }
-
-    auto sri = it->second;
+    auto sri = _getOrCreateSessionRuntimeInfo_inlock(opCtx, *opCtx->getLogicalSessionId(), ul);
 
     // Wait until the session is no longer in use
     opCtx->waitForConditionOrInterrupt(
@@ -143,7 +136,14 @@ ScopedSession SessionCatalog::checkOutSession(OperationContext* opCtx) {
     invariant(sri->state == SessionRuntimeInfo::kAvailable);
     sri->state = SessionRuntimeInfo::kInUse;
 
-    return ScopedSession(opCtx, std::move(sri));
+    return ScopedCheckedOutSession(opCtx, ScopedSession(std::move(sri)));
+}
+
+ScopedSession SessionCatalog::getOrCreateSession(OperationContext* opCtx,
+                                                 const LogicalSessionId& lsid) {
+    stdx::unique_lock<stdx::mutex> ul(_mutex);
+
+    return ScopedSession(_getOrCreateSessionRuntimeInfo_inlock(opCtx, lsid, ul));
 }
 
 void SessionCatalog::resetSessions() {
@@ -151,6 +151,20 @@ void SessionCatalog::resetSessions() {
     for (const auto& it : _txnTable) {
         it.second->txnState.reset();
     }
+}
+
+std::shared_ptr<SessionCatalog::SessionRuntimeInfo>
+SessionCatalog::_getOrCreateSessionRuntimeInfo_inlock(OperationContext* opCtx,
+                                                      const LogicalSessionId& lsid,
+                                                      stdx::unique_lock<stdx::mutex>& ul) {
+    invariant(!opCtx->lockState()->inAWriteUnitOfWork());
+
+    auto it = _txnTable.find(lsid);
+    if (it == _txnTable.end()) {
+        it = _txnTable.emplace(lsid, std::make_shared<SessionRuntimeInfo>(lsid)).first;
+    }
+
+    return it->second;
 }
 
 void SessionCatalog::_releaseSession(const LogicalSessionId& lsid) {
@@ -177,8 +191,9 @@ OperationContextSession::OperationContextSession(OperationContext* opCtx) : _opC
         checkedOutSession.emplace(sessionTransactionTable->checkOutSession(opCtx));
     }
 
-    auto session = checkedOutSession->scopedSession.get();
+    const auto session = checkedOutSession->scopedSession.get();
     invariant(opCtx->getLogicalSessionId() == session->getSessionId());
+
     checkedOutSession->checkOutNestingLevel++;
 
     if (checkedOutSession->checkOutNestingLevel > 1) {

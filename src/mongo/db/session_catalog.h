@@ -39,6 +39,7 @@ namespace mongo {
 
 class OperationContext;
 class ScopedSession;
+class ScopedCheckedOutSession;
 class ServiceContext;
 
 /**
@@ -48,6 +49,7 @@ class SessionCatalog {
     MONGO_DISALLOW_COPYING(SessionCatalog);
 
     friend class ScopedSession;
+    friend class ScopedCheckedOutSession;
 
 public:
     explicit SessionCatalog(ServiceContext* serviceContext);
@@ -90,7 +92,14 @@ public:
      *
      * Throws exception on errors.
      */
-    ScopedSession checkOutSession(OperationContext* opCtx);
+    ScopedCheckedOutSession checkOutSession(OperationContext* opCtx);
+
+    /**
+     * Returns a reference to the specified cached session regardless of whether it is checked-out
+     * or not. The returned session is not returned checked-out and is allowed to be checked-out
+     * concurrently.
+     */
+    ScopedSession getOrCreateSession(OperationContext* opCtx, const LogicalSessionId& lsid);
 
     /**
      * Resets all created sessions and increments their generation, forcing each to be reloaded by
@@ -133,7 +142,15 @@ private:
                                                       LogicalSessionIdHash>;
 
     /**
-     * Returns a session, previously clecked out through 'checkoutSession', available again.
+     * Must be called with _mutex locked and returns it locked. May release and re-acquire it zero
+     * or more times before returning. The returned 'SessionRuntimeInfo' is guaranteed to be linked
+     * on the catalog's _txnTable as long as the lock is held.
+     */
+    std::shared_ptr<SessionRuntimeInfo> _getOrCreateSessionRuntimeInfo_inlock(
+        OperationContext* opCtx, const LogicalSessionId& lsid, stdx::unique_lock<stdx::mutex>& ul);
+
+    /**
+     * Makes a session, previously checked out through 'checkoutSession', available again.
      */
     void _releaseSession(const LogicalSessionId& lsid);
 
@@ -144,24 +161,13 @@ private:
 };
 
 /**
- * Scoped object representing a checked-out session. See comments for the 'checkoutSession' method
- * for more information on its behaviour.
+ * Scoped object representing a reference to a session.
  */
 class ScopedSession {
-    MONGO_DISALLOW_COPYING(ScopedSession);
-
 public:
-    ScopedSession(OperationContext* opCtx, std::shared_ptr<SessionCatalog::SessionRuntimeInfo> sri)
-        : _opCtx(opCtx), _sri(std::move(sri)) {
+    explicit ScopedSession(std::shared_ptr<SessionCatalog::SessionRuntimeInfo> sri)
+        : _sri(std::move(sri)) {
         invariant(_sri);
-    }
-
-    ScopedSession(ScopedSession&&) = default;
-
-    ~ScopedSession() {
-        if (_sri) {
-            SessionCatalog::get(_opCtx)->_releaseSession(_sri->txnState.getSessionId());
-        }
     }
 
     Session* get() const {
@@ -176,10 +182,53 @@ public:
         return *get();
     }
 
+    operator bool() const {
+        return !!_sri;
+    }
+
+private:
+    std::shared_ptr<SessionCatalog::SessionRuntimeInfo> _sri;
+};
+
+/**
+ * Scoped object representing a checked-out session. See comments for the 'checkoutSession' method
+ * for more information on its behaviour.
+ */
+class ScopedCheckedOutSession {
+    MONGO_DISALLOW_COPYING(ScopedCheckedOutSession);
+
+public:
+    ScopedCheckedOutSession(OperationContext* opCtx, ScopedSession scopedSession)
+        : _opCtx(opCtx), _scopedSession(std::move(scopedSession)) {}
+
+    ScopedCheckedOutSession(ScopedCheckedOutSession&&) = default;
+
+    ~ScopedCheckedOutSession() {
+        if (_scopedSession) {
+            SessionCatalog::get(_opCtx)->_releaseSession(_scopedSession->getSessionId());
+        }
+    }
+
+    Session* get() const {
+        return _scopedSession.get();
+    }
+
+    Session* operator->() const {
+        return get();
+    }
+
+    Session& operator*() const {
+        return *get();
+    }
+
+    operator bool() const {
+        return _scopedSession;
+    }
+
 private:
     OperationContext* const _opCtx;
 
-    std::shared_ptr<SessionCatalog::SessionRuntimeInfo> _sri;
+    ScopedSession _scopedSession;
 };
 
 /**
