@@ -6,6 +6,7 @@ from __future__ import print_function
 
 import optparse
 import os
+import posixpath
 import re
 import shlex
 import sys
@@ -30,7 +31,24 @@ else:
 if __name__ == "__main__" and __package__ is None:
     sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
+_is_windows = sys.platform == "win32" or sys.platform == "cygwin"
+
 _OPERATIONS = ["shell", "copy_to", "copy_from"]
+
+
+def posix_path(path):
+    # If path is already quoted, we need to remove the quotes before calling
+    path_quote = "\'" if path.startswith("\'") else ""
+    path_quote = "\"" if path.startswith("\"") else path_quote
+    if path_quote:
+        path = path[1:-1]
+    drive, new_path = os.path.splitdrive(path)
+    if drive:
+        new_path = posixpath.join(
+            "/cygdrive",
+            drive.split(":")[0],
+            *re.split("/|\\\\", new_path))
+    return "{quote}{path}{quote}".format(quote=path_quote, path=new_path)
 
 
 class RemoteOperations(object):
@@ -109,23 +127,38 @@ class RemoteOperations(object):
 
         # File names with a space must be quoted, since we permit the
         # the file names to be either a string or a list.
-        if operation_type != "shell" and isinstance(operation_param, str):
-            operation_param = shlex.split(operation_param)
+        if operation_type.startswith("copy") and isinstance(operation_param, str):
+            operation_param = shlex.split(operation_param, posix=not _is_windows)
 
         cmds = []
         if operation_type == "shell":
             if operation_dir is not None:
                 operation_param = "cd {}; {}".format(operation_dir, operation_param)
-            cmd = "ssh {} {} '{}'".format(self.ssh_options, self.user_host, operation_param)
+            dollar = ""
+            if self.use_shell:
+                # To ensure any single quotes in operation_param are handled correctly when
+                # invoking the operation_param, escape with \ and add $ in the front.
+                # See https://stackoverflow.com/questions/8254120/
+                #   how-to-escape-a-single-quote-in-single-quote-string-in-bash
+                if "'" in operation_param:
+                    operation_param = "{}".format(operation_param.replace("'", "\\'"))
+                    dollar = "$"
+            cmd = "ssh {} {} {}'{}'".format(
+                self.ssh_options,
+                self.user_host,
+                dollar,
+                operation_param)
             cmds.append(cmd)
 
         elif operation_type == "copy_to":
-            cmd = "scp -r {}".format(self.ssh_options)
+            cmd = "scp -r {} ".format(self.ssh_options)
             # To support spaces in the filename or directory, we quote them one at a time.
             for file in operation_param:
-                cmd += "\"{}\" ".format(file)
+                # Quote file on Posix.
+                quote = "\"" if not _is_windows else ""
+                cmd += "{quote}{file}{quote} ".format(quote=quote, file=posix_path(file))
             operation_dir = operation_dir if operation_dir else ""
-            cmd += " {}:{}".format(self.user_host, operation_dir)
+            cmd += " {}:{}".format(self.user_host, posix_path(operation_dir))
             cmds.append(cmd)
 
         elif operation_type == "copy_from":
@@ -138,12 +171,14 @@ class RemoteOperations(object):
             # by invoking scp for each file specified.
             # Note - this is a method which scp does not support directly.
             for file in operation_param:
+                file = posix_path(file)
                 cmd = "scp -r {} {}:".format(self.ssh_options, self.user_host)
-                # Quote, and escape the file if there are spaces.
+                # Quote (on Posix), and escape the file if there are spaces.
                 # Note - we do not support other non-ASCII characters in a file name.
+                quote = "\"" if not _is_windows else ""
                 if " " in file:
-                    file = re.escape("\"{}\"".format(file))
-                cmd += "{} {}".format(file, operation_dir)
+                    file = re.escape("{quote}{file}{quote}".format(quote=quote, file=file))
+                cmd += "{} {}".format(file, posix_path(operation_dir))
                 cmds.append(cmd)
 
         else:
