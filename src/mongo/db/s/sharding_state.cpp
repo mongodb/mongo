@@ -165,8 +165,8 @@ string ShardingState::getShardName() {
 void ShardingState::shutDown(OperationContext* opCtx) {
     stdx::unique_lock<stdx::mutex> lk(_mutex);
     if (enabled()) {
-        grid.getExecutorPool()->shutdownAndJoin();
-        grid.catalogClient()->shutDown(opCtx);
+        Grid::get(opCtx)->getExecutorPool()->shutdownAndJoin();
+        Grid::get(opCtx)->catalogClient()->shutDown(opCtx);
     }
 }
 
@@ -184,7 +184,7 @@ Status ShardingState::updateConfigServerOpTimeFromMetadata(OperationContext* opC
             return Status(ErrorCodes::Unauthorized, "Unauthorized to update config opTime");
         }
 
-        grid.advanceConfigOpTime(*opTime);
+        Grid::get(opCtx)->advanceConfigOpTime(*opTime);
     }
 
     return Status::OK();
@@ -307,7 +307,8 @@ Status ShardingState::initializeFromShardIdentity(OperationContext* opCtx,
         invariant(!_shardName.empty());
         fassert(40372, _shardName == shardIdentity.getShardName());
 
-        auto prevConfigsvrConnStr = grid.shardRegistry()->getConfigServerConnectionString();
+        auto prevConfigsvrConnStr =
+            Grid::get(opCtx)->shardRegistry()->getConfigServerConnectionString();
         invariant(prevConfigsvrConnStr.type() == ConnectionString::SET);
         fassert(40373, prevConfigsvrConnStr.getSetName() == configSvrConnStr.getSetName());
 
@@ -549,7 +550,7 @@ void ShardingState::appendInfo(OperationContext* opCtx, BSONObjBuilder& builder)
     stdx::lock_guard<stdx::mutex> lk(_mutex);
 
     builder.append("configServer",
-                   grid.shardRegistry()->getConfigServerConnectionString().toString());
+                   Grid::get(opCtx)->shardRegistry()->getConfigServerConnectionString().toString());
     builder.append("shardName", _shardName);
     builder.append("clusterId", _clusterId);
 

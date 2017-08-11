@@ -1082,14 +1082,13 @@ DbResponse ServiceEntryPointMongod::handleRequest(OperationContext* opCtx, const
                 shouldLogOpDebug = true;
             } else {
                 if (!opCtx->getClient()->isInDirectClient()) {
-                    const ShardedConnectionInfo* connInfo = ShardedConnectionInfo::get(&c, false);
                     uassert(18663,
                             str::stream() << "legacy writeOps not longer supported for "
                                           << "versioned connections, ns: "
                                           << nsString.ns()
                                           << ", op: "
                                           << networkOpToString(op),
-                            connInfo == NULL);
+                            !ShardedConnectionInfo::get(&c, false));
                 }
 
                 if (!nsString.isValid()) {

@@ -52,7 +52,6 @@
 #include "mongo/db/query/plan_summary_stats.h"
 #include "mongo/db/repl/oplog.h"
 #include "mongo/db/repl/replication_coordinator_global.h"
-#include "mongo/db/s/operation_sharding_state.h"
 #include "mongo/db/service_context.h"
 #include "mongo/db/stats/counters.h"
 #include "mongo/db/stats/top.h"
@@ -66,11 +65,12 @@
 namespace mongo {
 
 namespace {
+
 MONGO_FP_DECLARE(rsStopGetMoreCmd);
-// Failpoint for making getMore not wait for an awaitdata cursor.  Allows us to avoid waiting during
+
+// Failpoint for making getMore not wait for an awaitdata cursor. Allows us to avoid waiting during
 // tests.
 MONGO_FP_DECLARE(disableAwaitDataForGetMoreCmd);
-}  // namespace
 
 /**
  * A command for running getMore() against an existing cursor registered with a CursorManager.
@@ -482,4 +482,5 @@ public:
 
 } getMoreCmd;
 
+}  // namespace
 }  // namespace mongo

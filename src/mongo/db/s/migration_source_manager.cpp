@@ -39,7 +39,6 @@
 #include "mongo/db/s/collection_sharding_state.h"
 #include "mongo/db/s/migration_chunk_cloner_source_legacy.h"
 #include "mongo/db/s/migration_util.h"
-#include "mongo/db/s/operation_sharding_state.h"
 #include "mongo/db/s/sharding_state.h"
 #include "mongo/db/s/sharding_state_recovery.h"
 #include "mongo/s/catalog/sharding_catalog_client.h"

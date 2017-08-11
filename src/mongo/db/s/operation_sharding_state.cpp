@@ -130,25 +130,4 @@ void OperationShardingState::_clear() {
     _ns = NamespaceString();
 }
 
-OperationShardingState::IgnoreVersioningBlock::IgnoreVersioningBlock(OperationContext* opCtx,
-                                                                     const NamespaceString& ns)
-    : _opCtx(opCtx), _ns(ns) {
-    auto& oss = OperationShardingState::get(opCtx);
-    _hadOriginalVersion = oss._hasVersion;
-    if (_hadOriginalVersion) {
-        _originalVersion = oss.getShardVersion(ns);
-    }
-    oss.setShardVersion(ns, ChunkVersion::IGNORED());
-}
-
-OperationShardingState::IgnoreVersioningBlock::~IgnoreVersioningBlock() {
-    auto& oss = OperationShardingState::get(_opCtx);
-    invariant(ChunkVersion::isIgnoredVersion(oss.getShardVersion(_ns)));
-    if (_hadOriginalVersion) {
-        oss.setShardVersion(_ns, _originalVersion);
-    } else {
-        oss._clear();
-    }
-}
-
 }  // namespace mongo

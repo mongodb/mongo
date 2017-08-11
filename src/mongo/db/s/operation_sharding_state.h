@@ -32,8 +32,8 @@
 
 #include "mongo/base/disallow_copying.h"
 #include "mongo/db/namespace_string.h"
-#include "mongo/db/s/migration_source_manager.h"
 #include "mongo/s/chunk_version.h"
+#include "mongo/util/concurrency/notification.h"
 
 namespace mongo {
 
@@ -51,8 +51,6 @@ class OperationShardingState {
     MONGO_DISALLOW_COPYING(OperationShardingState);
 
 public:
-    class IgnoreVersioningBlock;
-
     OperationShardingState();
 
     /**
@@ -127,27 +125,6 @@ private:
     // This value will only be non-null if version check during the operation execution failed due
     // to stale version and there was a migration for that namespace, which was in critical section.
     std::shared_ptr<Notification<void>> _migrationCriticalSectionSignal;
-};
-
-/**
- * RAII type that sets the shard version for the current operation to IGNORED in its constructor,
- * then restores the original version in its destructor.  Used for temporarily disabling shard
- * version checking for certain operations, such as multi-updates, that need to be unversioned
- * but may be part of a larger group of operations with a single OperationContext where the other
- * sub-operations might still require versioning.
- */
-class OperationShardingState::IgnoreVersioningBlock {
-    MONGO_DISALLOW_COPYING(IgnoreVersioningBlock);
-
-public:
-    IgnoreVersioningBlock(OperationContext* opCtx, const NamespaceString& ns);
-    ~IgnoreVersioningBlock();
-
-private:
-    OperationContext* _opCtx;
-    NamespaceString _ns;
-    ChunkVersion _originalVersion;
-    bool _hadOriginalVersion;
 };
 
 }  // namespace mongo
