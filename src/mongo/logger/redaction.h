@@ -29,6 +29,8 @@
 
 #include <string>
 
+#include "mongo/base/string_data.h"
+
 /**
  * The 'redact' methods defined below should be used to redact possibly sensitive
  * information when operating the server in 'redact' mode.
@@ -48,8 +50,6 @@ class BSONObj;
 class Status;
 class DBException;
 
-const std::string kRedactionDefaultMask = "###";
-
 /**
  *  In 'redact' mode replace all values with '###' and keep keys intact.
  *  In normal mode return objectToRedact.toString().
@@ -60,7 +60,13 @@ std::string redact(const BSONObj& objectToRedact);
  *  In 'redact mode return '###'.
  *  In normal mode return stringToRedact.
  */
-std::string redact(const std::string& stringToRedact);
+StringData redact(StringData stringToRedact);
+inline StringData redact(const char* stringToRedact) {
+    return redact(StringData(stringToRedact));
+}
+inline StringData redact(const std::string& stringToRedact) {
+    return redact(StringData(stringToRedact));
+}
 
 /**
  *  In 'redact' mode keep status code and replace reason with '###'.

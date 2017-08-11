@@ -179,12 +179,8 @@ MONGO_COMPILER_NORETURN void fassertFailedWithStatusNoTraceWithLocation(int msgi
     quickExit(EXIT_ABRUPT);
 }
 
-void uassertedWithLocation(int msgid, const string& msg, const char* file, unsigned line) {
-    uassertedWithLocation(msgid, msg.c_str(), file, line);
-}
-
 NOINLINE_DECL void uassertedWithLocation(int msgid,
-                                         const char* msg,
+                                         StringData msg,
                                          const char* file,
                                          unsigned line) {
     assertionCount.condrollover(++assertionCount.user);
@@ -193,12 +189,8 @@ NOINLINE_DECL void uassertedWithLocation(int msgid,
     throw AssertionException(msgid, msg);
 }
 
-void msgassertedWithLocation(int msgid, const string& msg, const char* file, unsigned line) {
-    msgassertedWithLocation(msgid, msg.c_str(), file, line);
-}
-
 NOINLINE_DECL void msgassertedWithLocation(int msgid,
-                                           const char* msg,
+                                           StringData msg,
                                            const char* file,
                                            unsigned line) {
     assertionCount.condrollover(++assertionCount.warning);
@@ -209,20 +201,13 @@ NOINLINE_DECL void msgassertedWithLocation(int msgid,
 }
 
 NOINLINE_DECL void msgassertedNoTraceWithLocation(int msgid,
-                                                  const char* msg,
+                                                  StringData msg,
                                                   const char* file,
                                                   unsigned line) {
     assertionCount.condrollover(++assertionCount.warning);
     error() << "Assertion: " << msgid << ":" << redact(msg) << ' ' << file << ' ' << dec << line
             << endl;
     throw AssertionException(msgid, msg);
-}
-
-void msgassertedNoTraceWithLocation(int msgid,
-                                    const std::string& msg,
-                                    const char* file,
-                                    unsigned line) {
-    msgassertedNoTraceWithLocation(msgid, msg.c_str(), file, line);
 }
 
 void msgassertedNoTraceWithStatusWithLocation(int msgid,
@@ -232,8 +217,17 @@ void msgassertedNoTraceWithStatusWithLocation(int msgid,
     msgassertedNoTraceWithLocation(msgid, status.toString(), file, line);
 }
 
+std::string causedBy(StringData e) {
+    constexpr auto prefix = " :: caused by :: "_sd;
+    std::string out;
+    out.reserve(prefix.size() + e.size());
+    out.append(prefix.rawData(), prefix.size());
+    out.append(e.rawData(), e.size());
+    return out;
+}
+
 std::string causedBy(const char* e) {
-    return std::string(" :: caused by :: ") + e;
+    return causedBy(StringData(e));
 }
 
 std::string causedBy(const DBException& e) {
@@ -245,7 +239,7 @@ std::string causedBy(const std::exception& e) {
 }
 
 std::string causedBy(const std::string& e) {
-    return causedBy(e.c_str());
+    return causedBy(StringData(e));
 }
 
 std::string causedBy(const Status& e) {

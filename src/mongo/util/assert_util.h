@@ -69,7 +69,7 @@ public:
         invariant(!status.isOK());
         traceIfNeeded(*this);
     }
-    DBException(int code, const std::string& msg)
+    DBException(int code, StringData msg)
         : DBException(Status(code ? ErrorCodes::fromInt(code) : ErrorCodes::UnknownError, msg)) {}
     virtual ~DBException() throw() {}
 
@@ -113,7 +113,7 @@ protected:
 class AssertionException : public DBException {
 public:
     AssertionException(const Status& status) : DBException(status) {}
-    AssertionException(int code, const std::string& msg) : DBException(code, msg) {}
+    AssertionException(int code, StringData msg) : DBException(code, msg) {}
 
     virtual ~AssertionException() throw() {}
 };
@@ -158,11 +158,7 @@ MONGO_COMPILER_NORETURN void fassertFailedWithStatusNoTraceWithLocation(int msgi
     could cause, such as duplicate key, disk full, etc.
 */
 MONGO_COMPILER_NORETURN void uassertedWithLocation(int msgid,
-                                                   const char* msg,
-                                                   const char* file,
-                                                   unsigned line);
-MONGO_COMPILER_NORETURN void uassertedWithLocation(int msgid,
-                                                   const std::string& msg,
+                                                   StringData msg,
                                                    const char* file,
                                                    unsigned line);
 
@@ -174,11 +170,7 @@ MONGO_COMPILER_NORETURN void uassertedWithLocation(int msgid,
 #define MONGO_msgassertedNoTrace(...) \
     ::mongo::msgassertedNoTraceWithLocation(__VA_ARGS__, __FILE__, __LINE__)
 MONGO_COMPILER_NORETURN void msgassertedNoTraceWithLocation(int msgid,
-                                                            const char* msg,
-                                                            const char* file,
-                                                            unsigned line);
-MONGO_COMPILER_NORETURN void msgassertedNoTraceWithLocation(int msgid,
-                                                            const std::string& msg,
+                                                            StringData msg,
                                                             const char* file,
                                                             unsigned line);
 
@@ -193,15 +185,12 @@ MONGO_COMPILER_NORETURN void msgassertedNoTraceWithStatusWithLocation(int msgid,
 #define msgasserted MONGO_msgasserted
 #define MONGO_msgasserted(...) ::mongo::msgassertedWithLocation(__VA_ARGS__, __FILE__, __LINE__)
 MONGO_COMPILER_NORETURN void msgassertedWithLocation(int msgid,
-                                                     const char* msg,
-                                                     const char* file,
-                                                     unsigned line);
-MONGO_COMPILER_NORETURN void msgassertedWithLocation(int msgid,
-                                                     const std::string& msg,
+                                                     StringData msg,
                                                      const char* file,
                                                      unsigned line);
 
 /* convert various types of exceptions to strings */
+std::string causedBy(StringData e);
 std::string causedBy(const char* e);
 std::string causedBy(const DBException& e);
 std::string causedBy(const std::exception& e);

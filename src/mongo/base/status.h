@@ -74,6 +74,7 @@ public:
      */
     MONGO_COMPILER_COLD_FUNCTION Status(ErrorCodes::Error code, std::string reason);
     MONGO_COMPILER_COLD_FUNCTION Status(ErrorCodes::Error code, const char* reason);
+    MONGO_COMPILER_COLD_FUNCTION Status(ErrorCodes::Error code, StringData reason);
     MONGO_COMPILER_COLD_FUNCTION Status(ErrorCodes::Error code,
                                         const mongoutils::str::stream& reason);
 

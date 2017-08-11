@@ -38,6 +38,12 @@
 
 namespace mongo {
 
+namespace {
+
+constexpr auto kRedactionDefaultMask = "###"_sd;
+
+}  // namespace
+
 std::string redact(const BSONObj& objectToRedact) {
     if (!logger::globalLogDomain()->shouldRedactLogs()) {
         return objectToRedact.toString(false);
@@ -46,7 +52,7 @@ std::string redact(const BSONObj& objectToRedact) {
     return objectToRedact.toString(true);
 }
 
-std::string redact(const std::string& stringToRedact) {
+StringData redact(StringData stringToRedact) {
     if (!logger::globalLogDomain()->shouldRedactLogs()) {
         return stringToRedact;
     }

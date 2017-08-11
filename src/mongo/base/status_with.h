@@ -69,6 +69,8 @@ public:
     /**
      * for the error case
      */
+    MONGO_COMPILER_COLD_FUNCTION StatusWith(ErrorCodes::Error code, StringData reason)
+        : _status(code, reason) {}
     MONGO_COMPILER_COLD_FUNCTION StatusWith(ErrorCodes::Error code, std::string reason)
         : _status(code, std::move(reason)) {}
     MONGO_COMPILER_COLD_FUNCTION StatusWith(ErrorCodes::Error code, const char* reason)

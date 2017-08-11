@@ -48,6 +48,7 @@ Status::Status(ErrorCodes::Error code, std::string reason)
 }
 
 Status::Status(ErrorCodes::Error code, const char* reason) : Status(code, std::string(reason)) {}
+Status::Status(ErrorCodes::Error code, StringData reason) : Status(code, reason.toString()) {}
 
 Status::Status(ErrorCodes::Error code, const mongoutils::str::stream& reason)
     : Status(code, std::string(reason)) {}
