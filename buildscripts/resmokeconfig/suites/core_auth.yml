@@ -30,6 +30,15 @@ executor:
       username: __system
       readMode: commands
   hooks:
+  - class: ValidateCollections
+    shell_options:
+      global_vars:
+        TestData:
+          auth: true
+          authMechanism: SCRAM-SHA-1
+          keyFile: *keyFile
+          keyFileData: *keyFileData
+          skipValidationOnNamespaceNotFound: false
   - class: CleanEveryN
     n: 20
   fixture:

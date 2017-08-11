@@ -14,6 +14,7 @@ executor:
       global_vars:
         TestData:
           skipValidationOnInvalidViewDefinitions: true
+          skipValidationOnNamespaceNotFound: false
   fixture:
     class: MongoDFixture
     mongod_options:

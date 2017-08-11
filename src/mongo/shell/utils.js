@@ -231,7 +231,13 @@ jsTestOptions = function() {
             networkMessageCompressors: TestData.networkMessageCompressors,
             skipValidationOnInvalidViewDefinitions: TestData.skipValidationOnInvalidViewDefinitions,
             skipCollectionAndIndexValidation: TestData.skipCollectionAndIndexValidation,
-            skipValidationOnNamespaceNotFound: TestData.skipValidationOnNamespaceNotFound,
+            // We default skipValidationOnNamespaceNotFound to true because mongod can end up
+            // dropping a collection after calling listCollections (e.g. if a secondary applies an
+            // oplog entry).
+            skipValidationOnNamespaceNotFound:
+                TestData.hasOwnProperty("skipValidationOnNamespaceNotFound")
+                ? TestData.skipValidationOnNamespaceNotFound
+                : true,
             jsonSchemaTestFile: TestData.jsonSchemaTestFile,
             excludedDBsFromDBHash: TestData.excludedDBsFromDBHash,
         });
