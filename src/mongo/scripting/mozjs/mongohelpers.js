@@ -33,6 +33,14 @@
 exportToMongoHelpers = {
     // This function accepts an expression or function body and returns a function definition
     'functionExpressionParser': function functionExpressionParser(fnSrc) {
+
+        // Ensure that a provided expression or function body is not terminated with a ';'.
+        // This ensures we interpret the input as a single expression, rather than a sequence
+        // of expressions, and can wrap it in parentheses.
+        while (fnSrc.endsWith(";") || fnSrc != fnSrc.trimRight()) {
+            fnSrc = fnSrc.slice(0, -1).trimRight();
+        }
+
         var parseTree;
         try {
             parseTree = this.Reflect.parse(fnSrc);
