@@ -74,13 +74,13 @@ thread_local TickSource::Tick ticksSpentExecuting = 0;
 thread_local TickSource::Tick ticksSpentScheduled = 0;
 thread_local int tasksExecuted = 0;
 
-constexpr auto kTotalScheduled = "totalScheduled"_sd;
+constexpr auto kTotalQueued = "totalQueued"_sd;
 constexpr auto kTotalExecuted = "totalExecuted"_sd;
-constexpr auto kQueueDepth = "queueDepth"_sd;
-constexpr auto kTotalTimeExecutingUs = "totaltimeExecutingMicros"_sd;
+constexpr auto kTasksQueued = "tasksQueued"_sd;
+constexpr auto kTotalTimeExecutingUs = "totalTimeExecutingMicros"_sd;
 constexpr auto kTotalTimeRunningUs = "totalTimeRunningMicros"_sd;
 constexpr auto kTotalTimeQueuedUs = "totalTimeQueuedMicros"_sd;
-constexpr auto kTasksExecuting = "tasksExecutng";
+constexpr auto kTasksExecuting = "tasksExecuting";
 constexpr auto kThreadsRunning = "threadsRunning";
 constexpr auto kThreadsPending = "threadsPending";
 constexpr auto kExecutorLabel = "executor";
@@ -175,10 +175,10 @@ Status ServiceExecutorAdaptive::shutdown() {
 
 Status ServiceExecutorAdaptive::schedule(ServiceExecutorAdaptive::Task task, ScheduleFlags flags) {
     auto scheduleTime = _tickSource->getTicks();
-    auto pending = _tasksPending.addAndFetch(1);
+    auto pending = _tasksQueued.addAndFetch(1);
 
     _ioContext->post([ this, task = std::move(task), scheduleTime ] {
-        _tasksPending.subtractAndFetch(1);
+        _tasksQueued.subtractAndFetch(1);
         auto start = _tickSource->getTicks();
         ticksSpentScheduled += (start - scheduleTime);
         _tasksExecuting.addAndFetch(1);
@@ -195,7 +195,7 @@ Status ServiceExecutorAdaptive::schedule(ServiceExecutorAdaptive::Task task, Sch
     });
 
     _lastScheduleTimer.reset();
-    _totalScheduled.addAndFetch(1);
+    _totalQueued.addAndFetch(1);
 
     if (_isStarved(pending) && !(flags & DeferredTask)) {
         _scheduleCondition.notify_one();
@@ -210,7 +210,7 @@ bool ServiceExecutorAdaptive::_isStarved(int pending) const {
         return false;
 
     if (pending == -1) {
-        pending = _tasksPending.load();
+        pending = _tasksQueued.load();
     }
     // If there are no pending tasks, then we definitely aren't starved
     if (pending == 0)
@@ -476,8 +476,8 @@ void ServiceExecutorAdaptive::_workerThreadRoutine(
 void ServiceExecutorAdaptive::appendStats(BSONObjBuilder* bob) const {
     BSONObjBuilder section(bob->subobjStart("serviceExecutorTaskStats"));
     section << kExecutorLabel << kExecutorName  //
-            << kTotalScheduled << _totalScheduled.load() << kTotalExecuted << _totalExecuted.load()
-            << kQueueDepth << _tasksPending.load() << kTasksExecuting << _tasksExecuting.load()
+            << kTotalQueued << _totalQueued.load() << kTotalExecuted << _totalExecuted.load()
+            << kTasksQueued << _tasksQueued.load() << kTasksExecuting << _tasksExecuting.load()
             << kTotalTimeRunningUs << ticksToMicros(_totalSpentRunning.load(), _tickSource)
             << kTotalTimeExecutingUs << ticksToMicros(_totalSpentExecuting.load(), _tickSource)
             << kTotalTimeQueuedUs << ticksToMicros(_totalSpentScheduled.load(), _tickSource)

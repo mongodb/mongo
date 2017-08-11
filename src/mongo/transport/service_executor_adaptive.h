@@ -146,7 +146,7 @@ private:
     AtomicWord<int> _threadsRunning{0};
     AtomicWord<int> _threadsPending{0};
     AtomicWord<int> _tasksExecuting{0};
-    AtomicWord<int> _tasksPending{0};
+    AtomicWord<int> _tasksQueued{0};
     TickTimer _lastScheduleTimer;
     AtomicWord<TickSource::Tick> _totalSpentExecuting{0};
     AtomicWord<TickSource::Tick> _totalSpentRunning{0};
@@ -155,7 +155,7 @@ private:
     std::list<TickTimer> _threadsRunningTimers;
 
     // These counters are only used for reporting in serverStatus.
-    AtomicWord<int64_t> _totalScheduled{0};
+    AtomicWord<int64_t> _totalQueued{0};
     AtomicWord<int64_t> _totalExecuted{0};
     AtomicWord<TickSource::Tick> _totalSpentScheduled{0};
 
