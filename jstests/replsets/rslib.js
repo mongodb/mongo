@@ -275,7 +275,8 @@ var getLastOpTime;
     };
 
     /**
-     * Waits for the given node to reach the given state, ignoring network errors.
+     * Waits for the given node to reach the given state, ignoring network errors.  Ensures that the
+     * connection is re-connected and usable when the function returns.
      */
     waitForState = function(node, state) {
         assert.soonNoExcept(function() {
@@ -283,6 +284,10 @@ var getLastOpTime;
                 {replSetTest: 1, waitForMemberState: state, timeoutMillis: 60 * 1000 * 5}));
             return true;
         });
+        // Some state transitions cause connections to be closed, but whether the connection close
+        // happens before or after the replSetTest command above returns is racy, so to ensure that
+        // the connection to 'node' is usable after this function returns, reconnect it first.
+        reconnect(node);
     };
 
     /**
