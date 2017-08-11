@@ -568,9 +568,9 @@ __wt_txn_commit(WT_SESSION_IMPL *session, const char *cfg[])
 	WT_CONNECTION_IMPL *conn;
 	WT_DECL_RET;
 	WT_TXN *txn;
+	WT_TXN_GLOBAL *txn_global;
 	WT_TXN_OP *op;
 #ifdef HAVE_TIMESTAMPS
-	WT_TXN_GLOBAL *txn_global = &S2C(session)->txn_global;
 	wt_timestamp_t prev_commit_timestamp;
 	bool update_timestamp;
 #endif
@@ -579,6 +579,7 @@ __wt_txn_commit(WT_SESSION_IMPL *session, const char *cfg[])
 
 	txn = &session->txn;
 	conn = S2C(session);
+	txn_global = &conn->txn_global;
 	did_update = txn->mod_count != 0;
 	locked = false;
 
