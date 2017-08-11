@@ -1704,14 +1704,6 @@ tasks:
             ${strip_command|/usr/bin/strip} mongobridge
           fi
 
-          # If this is a scheduled build, we check for changes against the last scheduled commit.
-          if [ "${is_patch}" != "true" ]; then
-            burn_in_args="--checkEvergreen"
-          fi
-
-          # Capture a list of new and modified tests.
-          ${python|/opt/mongodbtoolchain/v2/bin/python2} buildscripts/burn_in_tests.py --branch=${branch_name} --buildVariant=${build_variant} --testListOutfile=jstests/new_tests.json --noExec $burn_in_args
-
     - command: shell.exec
       params:
         working_dir: src
@@ -1891,7 +1883,25 @@ tasks:
   depends_on:
   - name: compile
   commands:
+  - *git_get_project
+  - command: shell.exec
+    params:
+      working_dir: src
+      script: |
+        # Remove the empty directory path left over by the git.get_project command as it can cause
+        # a name conflict when copying the binaries over during 'do setup'. See EVG-1954.
+        rmdir -p mongo/db/modules/* 2>/dev/null || true
   - func: "do setup"
+  - command: shell.exec
+    params:
+      working_dir: src
+      script: |
+        # If this is a scheduled build, we check for changes against the last scheduled commit.
+        if [ "${is_patch}" != "true" ]; then
+          burn_in_args="--checkEvergreen"
+        fi
+        # Capture a list of new and modified tests.
+        ${python|/opt/mongodbtoolchain/v2/bin/python2} buildscripts/burn_in_tests.py --branch=${branch_name} --buildVariant=${build_variant} --testListOutfile=jstests/new_tests.json --noExec $burn_in_args
   - func: "do multiversion setup"
   - func: "run tests"
     vars:
