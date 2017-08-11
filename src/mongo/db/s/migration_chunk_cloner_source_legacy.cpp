@@ -339,8 +339,7 @@ void MigrationChunkClonerSourceLegacy::cancelClone(OperationContext* opCtx) {
     }
 }
 
-bool MigrationChunkClonerSourceLegacy::isDocumentInMigratingChunk(OperationContext* opCtx,
-                                                                  const BSONObj& doc) {
+bool MigrationChunkClonerSourceLegacy::isDocumentInMigratingChunk(const BSONObj& doc) {
     return isInRange(doc, _args.getMinKey(), _args.getMaxKey(), _shardKeyPattern);
 }
 

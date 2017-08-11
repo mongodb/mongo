@@ -140,11 +140,6 @@ public:
 
     boost::optional<KeyRange> getNextOrphanRange(BSONObj const& from);
 
-    /**
-     * Returns just the shard key fields, if collection is sharded, and the _id field, from `doc`.
-     */
-    BSONObj extractDocumentKey(BSONObj const& doc);
-
 private:
     // All of the following functions must be called while holding _managerLock.
 
@@ -264,6 +259,12 @@ public:
      */
     CollectionMetadata* operator->() const;
     CollectionMetadata* getMetadata() const;
+
+    /**
+     * Returns just the shard key fields, if collection is sharded, and the _id field, from `doc`.
+     * Does not alter any field values (e.g. by hashing); values are copied verbatim.
+     */
+    BSONObj extractDocumentKey(BSONObj const& doc) const;
 
     /**
      * True if the ScopedCollectionMetadata stores a metadata (is not empty) and the collection is

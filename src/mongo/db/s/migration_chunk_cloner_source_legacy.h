@@ -70,7 +70,7 @@ public:
 
     void cancelClone(OperationContext* opCtx) override;
 
-    bool isDocumentInMigratingChunk(OperationContext* opCtx, const BSONObj& doc) override;
+    bool isDocumentInMigratingChunk(const BSONObj& doc) override;
 
     void onInsertOp(OperationContext* opCtx, const BSONObj& insertedDoc) override;
 

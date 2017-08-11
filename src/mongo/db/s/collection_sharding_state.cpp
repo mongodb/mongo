@@ -267,17 +267,6 @@ boost::optional<KeyRange> CollectionShardingState::getNextOrphanRange(BSONObj co
     return _metadataManager->getNextOrphanRange(from);
 }
 
-bool CollectionShardingState::isDocumentInMigratingChunk(OperationContext* opCtx,
-                                                         const BSONObj& doc) {
-    dassert(opCtx->lockState()->isCollectionLockedForMode(_nss.ns(), MODE_IX));
-
-    if (_sourceMgr) {
-        return _sourceMgr->getCloner()->isDocumentInMigratingChunk(opCtx, doc);
-    }
-
-    return false;
-}
-
 void CollectionShardingState::onInsertOp(OperationContext* opCtx, const BSONObj& insertedDoc) {
     dassert(opCtx->lockState()->isCollectionLockedForMode(_nss.ns(), MODE_IX));
 
@@ -330,11 +319,12 @@ void CollectionShardingState::onUpdateOp(OperationContext* opCtx,
     }
 }
 
-CollectionShardingState::DeleteState::DeleteState(OperationContext* opCtx,
-                                                  CollectionShardingState* css,
-                                                  BSONObj const& doc)
-    : documentKey(css->_metadataManager->extractDocumentKey(doc).getOwned()),
-      isMigrating(css->_sourceMgr && css->isDocumentInMigratingChunk(opCtx, doc)) {}
+auto CollectionShardingState::makeDeleteState(BSONObj const& doc) -> DeleteState {
+    BSONObj documentKey = getMetadata().extractDocumentKey(doc).getOwned();
+    invariant(documentKey.hasField("_id"_sd));
+    return {std::move(documentKey),
+            _sourceMgr && _sourceMgr->getCloner()->isDocumentInMigratingChunk(doc)};
+}
 
 void CollectionShardingState::onDeleteOp(OperationContext* opCtx,
                                          const CollectionShardingState::DeleteState& deleteState) {

@@ -225,11 +225,20 @@ public:
      */
     BoundList flattenBounds(const IndexBounds& indexBounds) const;
 
+    /**
+     * Returns true if the key pattern has an "_id" field of any flavor.
+     */
+    bool hasId() const {
+        return _hasId;
+    };
+
 private:
     // Ordered, parsed paths
     std::vector<std::unique_ptr<FieldRef>> _keyPatternPaths;
 
     KeyPattern _keyPattern;
+
+    bool _hasId;
 };
 
 }  // namespace mongo

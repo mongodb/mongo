@@ -35,6 +35,7 @@
 #include "mongo/base/string_data.h"
 #include "mongo/bson/simple_bsonobj_comparator.h"
 #include "mongo/bson/util/builder.h"
+#include "mongo/db/bson/dotted_path_support.h"
 #include "mongo/db/db_raii.h"
 #include "mongo/db/query/internal_plans.h"
 #include "mongo/db/range_arithmetic.h"
@@ -275,6 +276,22 @@ ScopedCollectionMetadata::ScopedCollectionMetadata(std::shared_ptr<MetadataManag
     invariant(_metadata);
     invariant(_manager);
     ++_metadata->_tracker.usageCounter;
+}
+
+BSONObj ScopedCollectionMetadata::extractDocumentKey(BSONObj const& doc) const {
+    BSONObj key;
+    if (*this) {  // is sharded
+        auto const& pattern = _metadata->_cm->getShardKeyPattern();
+        key = dotted_path_support::extractElementsBasedOnTemplate(doc, pattern.toBSON());
+        if (pattern.hasId()) {
+            return key;
+        }
+        // else, try to append an _id field from the document.
+    }
+    if (auto id = doc["_id"_sd]) {
+        return key.isEmpty() ? id.wrap() : BSONObjBuilder(std::move(key)).append(id).obj();
+    }
+    return key;
 }
 
 ScopedCollectionMetadata::~ScopedCollectionMetadata() {
@@ -569,47 +586,6 @@ boost::optional<KeyRange> MetadataManager::getNextOrphanRange(BSONObj const& fro
     stdx::unique_lock<stdx::mutex> scopedLock(_managerLock);
     invariant(!_metadata.empty());
     return _metadata.back()->getNextOrphanRange(_receivingChunks, from);
-}
-
-namespace {
-
-static BSONElement extractKeyElement(const BSONObj& doc, StringData pathStr) {
-    ElementPath path(pathStr, false, false);
-    BSONElementIterator elemIter(&path, doc);
-    if (!elemIter.more()) {
-        return {};
-    }
-    BSONElement matchEl = elemIter.next().element();
-    // We shouldn't have more than one element - we don't expand arrays
-    dassert(!elemIter.more());
-    return matchEl;
-}
-
-}  // namespace
-
-BSONObj MetadataManager::extractDocumentKey(BSONObj const& doc) {
-    BSONObjBuilder keyBuilder;
-    bool gotId = false;
-    {
-        stdx::lock_guard<stdx::mutex> scopedLock(_managerLock);
-        if (!_metadata.empty()) {
-            BSONObjIterator patternIt(_metadata.back()->_cm->getShardKeyPattern().toBSON());
-            while (patternIt.more()) {
-                BSONElement patternEl = patternIt.next();
-                BSONElement matchEl = extractKeyElement(doc, patternEl.fieldNameStringData());
-                if (matchEl.ok()) {
-                    if (patternEl.fieldNameStringData() == StringData("_id")) {
-                        gotId = true;
-                    }
-                    keyBuilder.appendAs(matchEl, patternEl.fieldName());
-                }
-            }
-        }
-    }
-    if (!gotId && doc.hasField("_id")) {
-        keyBuilder.append(doc["_id"]);
-    }
-    return keyBuilder.obj();
 }
 
 }  // namespace mongo

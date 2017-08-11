@@ -109,7 +109,7 @@ public:
      *
      * NOTE: Must be called with at least IS lock held on the collection.
      */
-    virtual bool isDocumentInMigratingChunk(OperationContext* opCtx, const BSONObj& doc) = 0;
+    virtual bool isDocumentInMigratingChunk(const BSONObj& doc) = 0;
 
     /**
      * Notifies this cloner that an insert happened to the collection, which it owns. It is up to

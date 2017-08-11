@@ -130,7 +130,8 @@ Status ShardKeyPattern::checkShardKeySize(const BSONObj& shardKey) {
 
 ShardKeyPattern::ShardKeyPattern(const BSONObj& keyPattern)
     : _keyPatternPaths(parseShardKeyPattern(keyPattern)),
-      _keyPattern(_keyPatternPaths.empty() ? BSONObj() : keyPattern) {}
+      _keyPattern(_keyPatternPaths.empty() ? BSONObj() : keyPattern),
+      _hasId(keyPattern.hasField("_id"_sd)) {}
 
 ShardKeyPattern::ShardKeyPattern(const KeyPattern& keyPattern)
     : ShardKeyPattern(keyPattern.toBSON()) {}

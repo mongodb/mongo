@@ -196,7 +196,7 @@ TEST_F(CollShardingStateTest, MakeDeleteStateUnsharded) {
 
     // First, check that an order for deletion from an unsharded collection (where css has not been
     // "refreshed" with chunk metadata) extracts just the "_id" field:
-    auto deleteState = CollectionShardingState::DeleteState(operationContext(), css, doc);
+    auto deleteState = css->makeDeleteState(doc);
     ASSERT_BSONOBJ_EQ(deleteState.documentKey, BSON("_id" << "hello"));
     ASSERT_FALSE(deleteState.isMigrating);
 }
@@ -212,7 +212,7 @@ TEST_F(CollShardingStateTest, MakeDeleteStateShardedWithoutIdInShardKey) {
     auto doc = BSON("key3" << "abc" << "key" << 100 << "_id" << "hello" << "key2" << true);
 
     // Verify the shard key is extracted, in correct order, followed by the "_id" field.
-    auto deleteState = CollectionShardingState::DeleteState(operationContext(), css, doc);
+    auto deleteState = css->makeDeleteState(doc);
     ASSERT_BSONOBJ_EQ(
         deleteState.documentKey, BSON("key" << 100 << "key3" << "abc" << "_id" << "hello"));
     ASSERT_FALSE(deleteState.isMigrating);
@@ -230,7 +230,7 @@ TEST_F(CollShardingStateTest, MakeDeleteStateShardedWithIdInShardKey) {
     auto doc = BSON("key2" << true << "key3" << "abc" << "_id" << "hello" << "key" << 100);
 
     // Verify the shard key is extracted with "_id" in the right place.
-    auto deleteState = CollectionShardingState::DeleteState(operationContext(), css, doc);
+    auto deleteState = css->makeDeleteState(doc);
     ASSERT_BSONOBJ_EQ(
         deleteState.documentKey, BSON("key" << 100 << "_id" << "hello" << "key2" << true));
     ASSERT_FALSE(deleteState.isMigrating);
@@ -247,9 +247,8 @@ TEST_F(CollShardingStateTest, MakeDeleteStateShardedWithIdHashInShardKey) {
     auto doc = BSON("key2" << true << "_id" << "hello" << "key" << 100);
 
     // Verify the shard key is extracted with "_id" in the right place, not hashed.
-    auto deleteState = CollectionShardingState::DeleteState(operationContext(), css, doc);
-    ASSERT_BSONOBJ_EQ(
-        deleteState.documentKey, BSON("_id" << "hello"));
+    auto deleteState = css->makeDeleteState(doc);
+    ASSERT_BSONOBJ_EQ(deleteState.documentKey, BSON("_id" << "hello"));
     ASSERT_FALSE(deleteState.isMigrating);
 }
 }  // unnamed namespace
