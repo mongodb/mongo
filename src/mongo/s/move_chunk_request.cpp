@@ -195,7 +195,8 @@ bool MoveChunkRequest::operator==(const MoveChunkRequest& other) const {
         return false;
     if (_range != other._range)
         return false;
-
+    if (_waitForDelete != other._waitForDelete)
+        return false;
     return true;
 }
 
