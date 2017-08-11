@@ -145,7 +145,9 @@ TEST_F(AbstractOplogFetcherTest, OplogFetcherReturnsOperationFailedIfExecutorFai
 
     ASSERT_FALSE(oplogFetcher.isActive());
     ASSERT_OK(oplogFetcher.startup());
-    ASSERT_TRUE(oplogFetcher.isActive());
+
+    // It is racy to check OplogFetcher::isActive() immediately after calling startup() because
+    // OplogFetcher schedules the remote command on a different thread from the caller of startup().
 
     oplogFetcher.join();
 
