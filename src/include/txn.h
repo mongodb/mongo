@@ -105,6 +105,9 @@ struct __wt_txn_global {
 	/* Protects the active transaction states. */
 	WT_RWLOCK rwlock;
 
+	/* Protects logging, checkpoints and transaction visibility. */
+	WT_RWLOCK visibility_rwlock;
+
 	/* List of transactions sorted by commit timestamp. */
 	WT_RWLOCK commit_timestamp_rwlock;
 	TAILQ_HEAD(__wt_txn_cts_qh, __wt_txn) commit_timestamph;
