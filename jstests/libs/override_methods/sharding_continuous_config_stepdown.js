@@ -268,9 +268,22 @@ tracking: {verbosity: 0} }";
      * command.
      */
     (function(original) {
+        let manualInterventionActions = {
+            removePartiallyWrittenChunks: function(mongosConn, ns, cmdObj, numAttempts) {
+                print("command " + tojson(cmdObj) + " failed after " + numAttempts +
+                      " attempts due to seeing partially written chunks for collection " + ns +
+                      ", probably due to a previous failed shardCollection attempt. Manually" +
+                      " deleting chunks for " + ns +
+                      " from config.chunks and retrying the command.");
+                assert.writeOK(mongosConn.getDB("config").chunks.remove(
+                    {ns: ns}, {writeConcern: {w: "majority"}}));
+            }
+        };
+
         Mongo.prototype.runCommand = function runCommand(dbName, cmdObj, options) {
             const cmdName = Object.keys(cmdObj)[0];
-            const commandsToRetry = new Set(["shardCollection", "shardcollection"]);
+            const commandsToRetry =
+                new Set(["mapReduce", "mapreduce", "shardCollection", "shardcollection"]);
 
             if (!commandsToRetry.has(cmdName)) {
                 return original.apply(this, arguments);
@@ -291,16 +304,33 @@ tracking: {verbosity: 0} }";
 
                 if (cmdName === "shardCollection" || cmdName === "shardcollection") {
                     const ns = cmdObj[cmdName];
+                    manualInterventionActions.removePartiallyWrittenChunks(
+                        this, ns, cmdObj, numAttempts);
+                } else if (cmdName === "mapReduce" || cmdName === "mapreduce") {
+                    const out = cmdObj.out;
 
-                    print(
-                        "shardCollection command " + tojson(cmdObj) + " failed after " +
-                        numAttempts +
-                        " attempts due to partially written chunks. Manually deleting chunks for " +
-                        ns + " from config.chunks and retrying the shardCollection command.");
+                    // The output collection can be specified as a string argument to the mapReduce
+                    // command's 'out' option, or nested under 'out.replace', 'out.merge', or
+                    // 'out.reduce'.
+                    let outCollName;
+                    if (typeof out === "string") {
+                        outCollName = out;
+                    } else if (typeof out === "object") {
+                        outCollName = out.replace || out.merge || out.reduce;
+                    } else {
+                        print("Could not parse the output collection's name from 'out' option in " +
+                              tojson(cmdObj) +
+                              "; not retrying on ManualInterventionRequired error " + tojson(res));
+                        break;
+                    }
 
-                    // Remove the partially written chunks.
-                    assert.writeOK(this.getDB("config").chunks.remove(
-                        {ns: ns}, {writeConcern: {w: "majority"}}));
+                    // The output collection's database can optionally be specified under 'out.db',
+                    // else it defaults to the input collection's database.
+                    const outDbName = out.db || dbName;
+
+                    const ns = outDbName + "." + outCollName;
+                    manualInterventionActions.removePartiallyWrittenChunks(
+                        this, ns, cmdObj, numAttempts);
                 }
             }
             return res;
