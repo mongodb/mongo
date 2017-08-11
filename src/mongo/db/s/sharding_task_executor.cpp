@@ -38,11 +38,8 @@
 #include "mongo/db/logical_time.h"
 #include "mongo/db/operation_time_tracker.h"
 #include "mongo/executor/thread_pool_task_executor.h"
-#include "mongo/rpc/get_status_from_command_result.h"
 #include "mongo/rpc/metadata/sharding_metadata.h"
-#include "mongo/s/client/shard_registry.h"
 #include "mongo/s/cluster_last_error_info.h"
-#include "mongo/s/grid.h"
 #include "mongo/util/log.h"
 #include "mongo/util/scopeguard.h"
 
@@ -119,17 +116,10 @@ StatusWith<TaskExecutor::CallbackHandle> ShardingTaskExecutor::scheduleRemoteCom
         const TaskExecutor::RemoteCommandCallbackArgs& args) {
         ON_BLOCK_EXIT([&cb, &args]() { cb(args); });
 
-        auto shard = grid.shardRegistry()->getShardForHostNoReload(request.target);
-        if (!shard) {
-            LOG(1) << "Could not find shard containing host: " << request.target.toString();
-            return;
-        }
         if (!args.response.isOK()) {
-            shard->updateReplSetMonitor(request.target, args.response.status);
             LOG(1) << "Error processing the remote request, not updating operationTime or gLE";
             return;
         }
-        shard->updateReplSetMonitor(request.target, getStatusFromCommandResult(args.response.data));
 
         // Update the logical clock.
         invariant(timeTracker);

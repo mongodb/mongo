@@ -76,11 +76,6 @@ BSONObj BaseClonerTest::createCursorResponse(CursorId cursorId, const BSONArray&
 }
 
 // static
-BSONObj BaseClonerTest::createFinalCursorResponse(const BSONArray& docs) {
-    return createCursorResponse(0, docs, "nextBatch");
-}
-
-// static
 BSONObj BaseClonerTest::createListCollectionsResponse(CursorId cursorId,
                                                       const BSONArray& colls,
                                                       const char* fieldName) {
