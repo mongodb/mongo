@@ -1102,13 +1102,11 @@ var ReplSetTest = function(opts) {
         this.getPrimary();
         var res = {};
         res.master = this.liveNodes.master.getDB(db).runCommand("dbhash");
-        Object.defineProperty(res.master, "_mongo", {value: this.liveNodes.master});
         res.slaves = [];
         this.liveNodes.slaves.forEach(function(node) {
             var isArbiter = node.getDB('admin').isMaster('admin').arbiterOnly;
             if (!isArbiter) {
                 var slaveRes = node.getDB(db).runCommand("dbhash");
-                Object.defineProperty(slaveRes, "_mongo", {value: node});
                 res.slaves.push(slaveRes);
             }
         });
