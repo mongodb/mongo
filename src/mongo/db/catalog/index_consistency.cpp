@@ -289,7 +289,7 @@ void IndexConsistency::nextStage() {
     }
 }
 
-const ValidationStage IndexConsistency::getStage() {
+ValidationStage IndexConsistency::getStage() const {
 
     stdx::lock_guard<stdx::mutex> lock(_classMutex);
     return _stage;
@@ -387,7 +387,7 @@ void IndexConsistency::relockCollectionWithMode(LockMode mode) {
     uassertStatusOK(_throwExceptionIfError());
 }
 
-const bool IndexConsistency::scanLimitHit() {
+bool IndexConsistency::scanLimitHit() {
 
     stdx::lock_guard<stdx::mutex> lock(_classMutex);
 

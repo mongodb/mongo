@@ -179,7 +179,7 @@ public:
     /**
      * Returns the `_stage` that the validation is on.
      */
-    const ValidationStage getStage();
+    ValidationStage getStage() const;
 
     /**
      * Sets `_lastProcessedRecordId` to `recordId`.
@@ -236,7 +236,7 @@ public:
     /**
      * Returns true if the ElapsedTracker says its time to yield during background validation.
      */
-    const bool scanLimitHit();
+    bool scanLimitHit();
 
     /**
      * Yields the locks temporarily to allow Global/DB/Collection operations
