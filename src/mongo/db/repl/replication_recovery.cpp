@@ -38,6 +38,7 @@
 #include "mongo/db/repl/storage_interface.h"
 #include "mongo/db/repl/sync_tail.h"
 #include "mongo/util/log.h"
+#include "mongo/util/scopeguard.h"
 
 namespace mongo {
 namespace repl {
@@ -46,7 +47,7 @@ ReplicationRecoveryImpl::ReplicationRecoveryImpl(StorageInterface* storageInterf
                                                  ReplicationConsistencyMarkers* consistencyMarkers)
     : _storageInterface(storageInterface), _consistencyMarkers(consistencyMarkers) {}
 
-void ReplicationRecoveryImpl::recoverFromOplog(OperationContext* opCtx) {
+void ReplicationRecoveryImpl::recoverFromOplog(OperationContext* opCtx) try {
     if (_consistencyMarkers->getInitialSyncFlag(opCtx)) {
         log() << "No recovery needed. Initial sync flag set.";
         return;  // Initial Sync will take over so no cleanup is needed.
@@ -72,31 +73,84 @@ void ReplicationRecoveryImpl::recoverFromOplog(OperationContext* opCtx) {
     }
     _consistencyMarkers->setOplogTruncateAfterPoint(opCtx, {});  // clear the truncateAfterPoint
 
+    auto topOfOplogSW = _getLastAppliedOpTime(opCtx);
+    boost::optional<OpTime> topOfOplog = boost::none;
+    if (topOfOplogSW.getStatus() != ErrorCodes::CollectionIsEmpty &&
+        topOfOplogSW.getStatus() != ErrorCodes::NamespaceNotFound) {
+        fassertStatusOK(40290, topOfOplogSW);
+        topOfOplog = topOfOplogSW.getValue();
+    }
+
+    // If we have a checkpoint timestamp, then we recovered to a timestamp and should set the
+    // initial data timestamp to that. Otherwise, we simply recovered the data on disk so we should
+    // set the initial data timestamp to the top OpTime in the oplog once the data is consistent
+    // there. If there is nothing in the oplog, then we do not set the initial data timestamp.
+    auto checkpointTimestamp = _consistencyMarkers->getCheckpointTimestamp(opCtx);
+    if (!checkpointTimestamp.isNull()) {
+        // If we have a checkpoint timestamp, we set the initial data timestamp now so that
+        // the operations we apply below can be given the proper timestamps.
+        _storageInterface->setInitialDataTimestamp(
+            opCtx->getServiceContext()->getGlobalStorageEngine(),
+            SnapshotName(checkpointTimestamp));
+    }
+
+    // If we don't have a checkpoint timestamp, then we are either not running a storage engine
+    // that supports 'recover to stable timestamp' or we just upgraded from 3.4. In both cases, the
+    // data on disk is not consistent until we have applied all oplog entries to the end of the
+    // oplog, since we do not know which ones actually got applied before shutdown. As a result,
+    // we do not set the initial data timestamp until after we have applied to the end of the
+    // oplog.
+    ON_BLOCK_EXIT([&] {
+        if (checkpointTimestamp.isNull() && topOfOplog) {
+            _storageInterface->setInitialDataTimestamp(
+                opCtx->getServiceContext()->getGlobalStorageEngine(),
+                SnapshotName(topOfOplog->getTimestamp()));
+        }
+    });
+
+    if (!topOfOplog) {
+        invariant(appliedThrough.isNull());
+        log() << "No oplog entries to apply for recovery. Oplog is empty.";
+        return;
+    }
+
+    // If appliedThrough is null, that means we are consistent at the top of the oplog.
     if (appliedThrough.isNull()) {
         log() << "No oplog entries to apply for recovery. appliedThrough is null.";
         // No follow-up work to do.
         return;
     }
 
+    _applyToEndOfOplog(opCtx, appliedThrough, topOfOplog.get());
+} catch (...) {
+    severe() << "Caught exception during replication recovery: " << exceptionToStatus();
+    std::terminate();
+}
+
+void ReplicationRecoveryImpl::_applyToEndOfOplog(OperationContext* opCtx,
+                                                 OpTime oplogApplicationStartPoint,
+                                                 OpTime topOfOplog) {
+    invariant(!oplogApplicationStartPoint.isNull());
+    invariant(!topOfOplog.isNull());
+
     // Check if we have any unapplied ops in our oplog. It is important that this is done after
     // deleting the ragged end of the oplog.
-    const auto topOfOplog = fassertStatusOK(40290, _getLastAppliedOpTime(opCtx));
-    if (appliedThrough == topOfOplog) {
+    if (oplogApplicationStartPoint == topOfOplog) {
         log()
             << "No oplog entries to apply for recovery. appliedThrough is at the top of the oplog.";
         return;  // We've applied all the valid oplog we have.
-    } else if (appliedThrough > topOfOplog) {
-        severe() << "Applied op " << appliedThrough << " not found. Top of oplog is " << topOfOplog
-                 << '.';
+    } else if (oplogApplicationStartPoint > topOfOplog) {
+        severe() << "Applied op " << oplogApplicationStartPoint << " not found. Top of oplog is "
+                 << topOfOplog << '.';
         fassertFailedNoTrace(40313);
     }
 
-    log() << "Replaying stored operations from " << appliedThrough << " (exclusive) to "
+    log() << "Replaying stored operations from " << oplogApplicationStartPoint << " (exclusive) to "
           << topOfOplog << " (inclusive).";
 
     DBDirectClient db(opCtx);
     auto cursor = db.query(NamespaceString::kRsOplogNamespace.ns(),
-                           QUERY("ts" << BSON("$gte" << appliedThrough.getTimestamp())),
+                           QUERY("ts" << BSON("$gte" << oplogApplicationStartPoint.getTimestamp())),
                            /*batchSize*/ 0,
                            /*skip*/ 0,
                            /*projection*/ nullptr,
@@ -108,14 +162,15 @@ void ReplicationRecoveryImpl::recoverFromOplog(OperationContext* opCtx) {
         // This should really be impossible because we check above that the top of the oplog is
         // strictly > appliedThrough. If this fails it represents a serious bug in either the
         // storage engine or query's implementation of OplogReplay.
-        severe() << "Couldn't find any entries in the oplog >= " << appliedThrough
+        severe() << "Couldn't find any entries in the oplog >= " << oplogApplicationStartPoint
                  << " which should be impossible.";
         fassertFailedNoTrace(40293);
     }
+
     auto firstOpTimeFound = fassertStatusOK(40291, OpTime::parseFromOplogEntry(cursor->nextSafe()));
-    if (firstOpTimeFound != appliedThrough) {
-        severe() << "Oplog entry at " << appliedThrough << " is missing; actual entry found is "
-                 << firstOpTimeFound;
+    if (firstOpTimeFound != oplogApplicationStartPoint) {
+        severe() << "Oplog entry at " << oplogApplicationStartPoint
+                 << " is missing; actual entry found is " << firstOpTimeFound;
         fassertFailedNoTrace(40292);
     }
 
@@ -142,6 +197,9 @@ StatusWith<OpTime> ReplicationRecoveryImpl::_getLastAppliedOpTime(OperationConte
         return docsSW.getStatus();
     }
     const auto docs = docsSW.getValue();
+    if (docs.empty()) {
+        return Status(ErrorCodes::CollectionIsEmpty, "oplog is empty");
+    }
     invariant(1U == docs.size());
 
     return OpTime::parseFromOplogEntry(docs.front());

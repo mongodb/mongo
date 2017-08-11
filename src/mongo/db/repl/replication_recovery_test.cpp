@@ -52,6 +52,23 @@ using namespace mongo::repl;
 const auto& oplogNs = NamespaceString::kRsOplogNamespace;
 const NamespaceString testNs("a.a");
 
+class StorageInterfaceRecovery : public StorageInterfaceImpl {
+public:
+    void setInitialDataTimestamp(StorageEngine* storageEngine, SnapshotName snapshotName) override {
+        stdx::lock_guard<stdx::mutex> lock(_mutex);
+        _initialDataTimestamp = snapshotName;
+    }
+
+    SnapshotName getInitialDataTimestamp() const {
+        stdx::lock_guard<stdx::mutex> lock(_mutex);
+        return _initialDataTimestamp;
+    }
+
+private:
+    mutable stdx::mutex _mutex;
+    SnapshotName _initialDataTimestamp = SnapshotName::min();
+};
+
 class ReplicationRecoveryTest : public ServiceContextMongoDTest {
 protected:
     OperationContext* getOperationContext() {
@@ -59,6 +76,10 @@ protected:
     }
 
     StorageInterface* getStorageInterface() {
+        return _storageInterface.get();
+    }
+
+    StorageInterfaceRecovery* getStorageInterfaceRecovery() {
         return _storageInterface.get();
     }
 
@@ -70,7 +91,7 @@ private:
     void setUp() override {
         ServiceContextMongoDTest::setUp();
         _createOpCtx();
-        _storageInterface = stdx::make_unique<StorageInterfaceImpl>();
+        _storageInterface = stdx::make_unique<StorageInterfaceRecovery>();
         _consistencyMarkers = stdx::make_unique<ReplicationConsistencyMarkersMock>();
 
         auto service = getServiceContext();
@@ -93,7 +114,7 @@ private:
     }
 
     ServiceContext::UniqueOperationContext _opCtx;
-    std::unique_ptr<StorageInterfaceImpl> _storageInterface;
+    std::unique_ptr<StorageInterfaceRecovery> _storageInterface;
     std::unique_ptr<ReplicationConsistencyMarkersMock> _consistencyMarkers;
 };
 
@@ -174,6 +195,21 @@ void _assertDocsInTestCollection(OperationContext* opCtx, std::vector<int> ids) 
     _assertDocumentsInCollectionEquals(opCtx, testNs, expectedColl);
 }
 
+TEST_F(ReplicationRecoveryTest, RecoveryWithNoOplogSucceeds) {
+    ReplicationRecoveryImpl recovery(getStorageInterface(), getConsistencyMarkers());
+    auto opCtx = getOperationContext();
+
+    // Create the database.
+    ASSERT_OK(getStorageInterface()->createCollection(
+        opCtx, NamespaceString("local.other"), CollectionOptions()));
+
+    recovery.recoverFromOplog(opCtx);
+
+    _assertDocsInOplog(opCtx, {});
+    _assertDocsInTestCollection(opCtx, {});
+    ASSERT_EQ(getStorageInterfaceRecovery()->getInitialDataTimestamp(), SnapshotName::min());
+}
+
 TEST_F(ReplicationRecoveryTest, RecoveryWithEmptyOplogSucceeds) {
     ReplicationRecoveryImpl recovery(getStorageInterface(), getConsistencyMarkers());
     auto opCtx = getOperationContext();
@@ -184,11 +220,12 @@ TEST_F(ReplicationRecoveryTest, RecoveryWithEmptyOplogSucceeds) {
 
     _assertDocsInOplog(opCtx, {});
     _assertDocsInTestCollection(opCtx, {});
+    ASSERT_EQ(getStorageInterfaceRecovery()->getInitialDataTimestamp(), SnapshotName::min());
 }
 
 DEATH_TEST_F(ReplicationRecoveryTest,
              RecoveryWithEmptyOplogAndNonNullAppliedThroughInvariants,
-             "Invariant failure 1U == docs.size()") {
+             "Invariant failure appliedThrough.isNull()") {
     ReplicationRecoveryImpl recovery(getStorageInterface(), getConsistencyMarkers());
     auto opCtx = getOperationContext();
 
@@ -217,10 +254,7 @@ DEATH_TEST_F(ReplicationRecoveryTest,
     recovery.recoverFromOplog(opCtx);
 }
 
-DEATH_TEST_F(ReplicationRecoveryTest,
-             TruncateEntireOplogFasserts,
-             "Reached end of oplog looking for oplog entry before { : Timestamp 4000|4 } but "
-             "couldn't find any after looking through 3 entries.") {
+DEATH_TEST_F(ReplicationRecoveryTest, TruncateEntireOplogFasserts, "Fatal Assertion 40296") {
     ReplicationRecoveryImpl recovery(getStorageInterface(), getConsistencyMarkers());
     auto opCtx = getOperationContext();
 
@@ -245,6 +279,8 @@ TEST_F(ReplicationRecoveryTest, RecoveryTruncatesOplogAtOplogTruncateAfterPoint)
     _assertDocsInTestCollection(opCtx, {});
     ASSERT_EQ(getConsistencyMarkers()->getOplogTruncateAfterPoint(opCtx), Timestamp());
     ASSERT_EQ(getConsistencyMarkers()->getAppliedThrough(opCtx), OpTime(Timestamp(3, 3), 1));
+    ASSERT_EQ(getStorageInterfaceRecovery()->getInitialDataTimestamp(),
+              SnapshotName(Timestamp(3, 3)));
 }
 
 TEST_F(ReplicationRecoveryTest, RecoverySkipsEverythingIfInitialSyncFlagIsSet) {
@@ -262,6 +298,7 @@ TEST_F(ReplicationRecoveryTest, RecoverySkipsEverythingIfInitialSyncFlagIsSet) {
     _assertDocsInTestCollection(opCtx, {});
     ASSERT_EQ(getConsistencyMarkers()->getOplogTruncateAfterPoint(opCtx), Timestamp(4, 4));
     ASSERT_EQ(getConsistencyMarkers()->getAppliedThrough(opCtx), OpTime(Timestamp(1, 1), 1));
+    ASSERT_EQ(getStorageInterfaceRecovery()->getInitialDataTimestamp(), SnapshotName::min());
 }
 
 TEST_F(ReplicationRecoveryTest, RecoveryResetsOplogTruncateAfterPointWhenAppliedThroughIsNull) {
@@ -278,6 +315,8 @@ TEST_F(ReplicationRecoveryTest, RecoveryResetsOplogTruncateAfterPointWhenApplied
     _assertDocsInTestCollection(opCtx, {});
     ASSERT_EQ(getConsistencyMarkers()->getOplogTruncateAfterPoint(opCtx), Timestamp());
     ASSERT_EQ(getConsistencyMarkers()->getAppliedThrough(opCtx), OpTime());
+    ASSERT_EQ(getStorageInterfaceRecovery()->getInitialDataTimestamp(),
+              SnapshotName(Timestamp(5, 5)));
 }
 
 TEST_F(ReplicationRecoveryTest, RecoveryAppliesDocumentsWhenAppliedThroughIsBehind) {
@@ -293,6 +332,8 @@ TEST_F(ReplicationRecoveryTest, RecoveryAppliesDocumentsWhenAppliedThroughIsBehi
     _assertDocsInTestCollection(opCtx, {4, 5});
     ASSERT_EQ(getConsistencyMarkers()->getOplogTruncateAfterPoint(opCtx), Timestamp());
     ASSERT_EQ(getConsistencyMarkers()->getAppliedThrough(opCtx), OpTime(Timestamp(5, 5), 1));
+    ASSERT_EQ(getStorageInterfaceRecovery()->getInitialDataTimestamp(),
+              SnapshotName(Timestamp(5, 5)));
 }
 
 TEST_F(ReplicationRecoveryTest, RecoveryAppliesDocumentsWhenAppliedThroughIsBehindAfterTruncation) {
@@ -309,6 +350,8 @@ TEST_F(ReplicationRecoveryTest, RecoveryAppliesDocumentsWhenAppliedThroughIsBehi
     _assertDocsInTestCollection(opCtx, {2, 3});
     ASSERT_EQ(getConsistencyMarkers()->getOplogTruncateAfterPoint(opCtx), Timestamp());
     ASSERT_EQ(getConsistencyMarkers()->getAppliedThrough(opCtx), OpTime(Timestamp(3, 3), 1));
+    ASSERT_EQ(getStorageInterfaceRecovery()->getInitialDataTimestamp(),
+              SnapshotName(Timestamp(3, 3)));
 }
 
 DEATH_TEST_F(ReplicationRecoveryTest, AppliedThroughBehindOplogFasserts, "Fatal Assertion 40292") {
@@ -323,8 +366,7 @@ DEATH_TEST_F(ReplicationRecoveryTest, AppliedThroughBehindOplogFasserts, "Fatal 
 
 DEATH_TEST_F(ReplicationRecoveryTest,
              AppliedThroughAheadOfTopOfOplogCausesFassert,
-             "Applied op { ts: Timestamp 9000|9, t: 1 } not found. Top of oplog is { ts: Timestamp "
-             "5000|5, t: -1 }.") {
+             "Fatal Assertion 40313") {
     ReplicationRecoveryImpl recovery(getStorageInterface(), getConsistencyMarkers());
     auto opCtx = getOperationContext();
 
@@ -336,8 +378,7 @@ DEATH_TEST_F(ReplicationRecoveryTest,
 
 DEATH_TEST_F(ReplicationRecoveryTest,
              AppliedThroughNotInOplogCausesFassert,
-             "Oplog entry at { ts: Timestamp 3000|3, t: 1 } is missing; actual entry found is { "
-             "ts: Timestamp 4000|4, t: -1 }") {
+             "Fatal Assertion 40292") {
     ReplicationRecoveryImpl recovery(getStorageInterface(), getConsistencyMarkers());
     auto opCtx = getOperationContext();
 
@@ -345,6 +386,76 @@ DEATH_TEST_F(ReplicationRecoveryTest,
     _setUpOplog(opCtx, getStorageInterface(), {1, 2, 4, 5});
 
     recovery.recoverFromOplog(opCtx);
+}
+
+TEST_F(ReplicationRecoveryTest, RecoverySetsInitialDataTimestampToCheckpointTimestampIfItExists) {
+    ReplicationRecoveryImpl recovery(getStorageInterface(), getConsistencyMarkers());
+    auto opCtx = getOperationContext();
+
+    getConsistencyMarkers()->writeCheckpointTimestamp(opCtx, Timestamp(4, 4));
+    _setUpOplog(opCtx, getStorageInterface(), {1, 2, 3, 4, 5, 6});
+
+    recovery.recoverFromOplog(opCtx);
+
+    _assertDocsInOplog(opCtx, {1, 2, 3, 4, 5, 6});
+    _assertDocsInTestCollection(opCtx, {});
+    ASSERT(getConsistencyMarkers()->getOplogTruncateAfterPoint(opCtx).isNull());
+    ASSERT(getConsistencyMarkers()->getAppliedThrough(opCtx).isNull());
+    ASSERT_EQ(getStorageInterfaceRecovery()->getInitialDataTimestamp(),
+              SnapshotName(Timestamp(4, 4)));
+}
+
+TEST_F(ReplicationRecoveryTest,
+       RecoverySetsInitialDataTimestampToTopOfOplogIfNoCheckpointTimestampAndSingleOp) {
+    ReplicationRecoveryImpl recovery(getStorageInterface(), getConsistencyMarkers());
+    auto opCtx = getOperationContext();
+
+    _setUpOplog(opCtx, getStorageInterface(), {5});
+
+    recovery.recoverFromOplog(opCtx);
+
+    _assertDocsInOplog(opCtx, {5});
+    _assertDocsInTestCollection(opCtx, {});
+    ASSERT(getConsistencyMarkers()->getOplogTruncateAfterPoint(opCtx).isNull());
+    ASSERT(getConsistencyMarkers()->getAppliedThrough(opCtx).isNull());
+    ASSERT(getConsistencyMarkers()->getCheckpointTimestamp(opCtx).isNull());
+    ASSERT_EQ(getStorageInterfaceRecovery()->getInitialDataTimestamp(),
+              SnapshotName(Timestamp(5, 5)));
+}
+
+TEST_F(ReplicationRecoveryTest,
+       RecoverySetsInitialDataTimestampToTopOfOplogIfNoCheckpointTimestampAndMultipleOps) {
+    ReplicationRecoveryImpl recovery(getStorageInterface(), getConsistencyMarkers());
+    auto opCtx = getOperationContext();
+
+    _setUpOplog(opCtx, getStorageInterface(), {5, 6});
+
+    recovery.recoverFromOplog(opCtx);
+
+    _assertDocsInOplog(opCtx, {5, 6});
+    _assertDocsInTestCollection(opCtx, {});
+    ASSERT(getConsistencyMarkers()->getOplogTruncateAfterPoint(opCtx).isNull());
+    ASSERT(getConsistencyMarkers()->getAppliedThrough(opCtx).isNull());
+    ASSERT(getConsistencyMarkers()->getCheckpointTimestamp(opCtx).isNull());
+    ASSERT_EQ(getStorageInterfaceRecovery()->getInitialDataTimestamp(),
+              SnapshotName(Timestamp(6, 6)));
+}
+
+TEST_F(ReplicationRecoveryTest,
+       RecoveryDoesNotSetInitialDataTimestampIfNoCheckpointTimestampOrOplog) {
+    ReplicationRecoveryImpl recovery(getStorageInterface(), getConsistencyMarkers());
+    auto opCtx = getOperationContext();
+
+    _setUpOplog(opCtx, getStorageInterface(), {});
+
+    recovery.recoverFromOplog(opCtx);
+
+    _assertDocsInOplog(opCtx, {});
+    _assertDocsInTestCollection(opCtx, {});
+    ASSERT(getConsistencyMarkers()->getOplogTruncateAfterPoint(opCtx).isNull());
+    ASSERT(getConsistencyMarkers()->getAppliedThrough(opCtx).isNull());
+    ASSERT(getConsistencyMarkers()->getCheckpointTimestamp(opCtx).isNull());
+    ASSERT_EQ(getStorageInterfaceRecovery()->getInitialDataTimestamp(), SnapshotName::min());
 }
 
 }  // namespace

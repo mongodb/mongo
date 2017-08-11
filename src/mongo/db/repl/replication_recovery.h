@@ -66,7 +66,16 @@ public:
 
 private:
     /**
-     * Gets the last applied OpTime from the end of the oplog.
+     * Applies all oplog entries from oplogApplicationStartPoint (exclusive) to topOfOplog
+     * (inclusive). This fasserts if oplogApplicationStartPoint is not in the oplog.
+     */
+    void _applyToEndOfOplog(OperationContext* opCtx,
+                            OpTime oplogApplicationStartPoint,
+                            OpTime topOfOplog);
+
+    /**
+     * Gets the last applied OpTime from the end of the oplog. Returns CollectionIsEmpty if there is
+     * no oplog.
      */
     StatusWith<OpTime> _getLastAppliedOpTime(OperationContext* opCtx) const;
 
