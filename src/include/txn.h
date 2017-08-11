@@ -93,6 +93,8 @@ struct __wt_txn_global {
 	 * the global transaction state.
 	 */
 	WT_RWLOCK scan_rwlock;
+	/* Protects logging, checkpoints and transaction visibility. */
+	WT_RWLOCK visibility_rwlock;
 
 	/*
 	 * Track information about the running checkpoint. The transaction

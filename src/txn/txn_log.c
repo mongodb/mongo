@@ -294,11 +294,13 @@ __wt_txn_checkpoint_log(
 	WT_ITEM *ckpt_snapshot, empty;
 	WT_LSN *ckpt_lsn;
 	WT_TXN *txn;
+	WT_TXN_GLOBAL *txn_global;
 	uint8_t *end, *p;
 	size_t recsize;
 	uint32_t i, rectype = WT_LOGREC_CHECKPOINT;
 	const char *fmt = WT_UNCHECKED_STRING(IIIIu);
 
+	txn_global = &S2C(session)->txn_global;
 	txn = &session->txn;
 	ckpt_lsn = &txn->ckpt_lsn;
 
@@ -319,6 +321,15 @@ __wt_txn_checkpoint_log(
 	case WT_TXN_LOG_CKPT_PREPARE:
 		txn->full_ckpt = true;
 		WT_ERR(__wt_log_flush_lsn(session, ckpt_lsn, true));
+		/*
+		 * We take and immediately release the visibility lock.
+		 * Acquiring the write lock guarantees that any transaction
+		 * that has written to the log has also made its transaction
+		 * visible at this time.
+		 */
+		__wt_writelock(session, &txn_global->visibility_rwlock);
+		__wt_writeunlock(session, &txn_global->visibility_rwlock);
+
 		/*
 		 * We need to make sure that the log records in the checkpoint
 		 * LSN are on disk.  In particular to make sure that the
