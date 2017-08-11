@@ -5,10 +5,12 @@ old = db.adminCommand({"getParameter": "*"});
 // the first time getParameter sends a request to with a shardingTaskExecutor and this sets an
 // operationTime. The following commands do not use shardingTaskExecutor.
 delete old["operationTime"];
+delete old["$clusterTime"];
 tmp1 = db.adminCommand({"setParameter": 1, "logLevel": 5});
 tmp2 = db.adminCommand({"setParameter": 1, "logLevel": old.logLevel});
 now = db.adminCommand({"getParameter": "*"});
 delete now["operationTime"];
+delete now["$clusterTime"];
 
 assert.eq(old, now, "A");
 assert.eq(old.logLevel, tmp1.was, "B");
