@@ -31,12 +31,13 @@
 #include "mongo/db/repl/idempotency_document_structure.h"
 
 #include "mongo/db/jsobj.h"
+#include "mongo/db/pipeline/value.h"
 
 namespace mongo {
 
 DocumentStructureEnumeratorConfig::DocumentStructureEnumeratorConfig(std::set<StringData> fields_,
-                                                                     size_t depth_,
-                                                                     size_t length_,
+                                                                     std::size_t depth_,
+                                                                     std::size_t length_,
                                                                      bool skipSubDocs_,
                                                                      bool skipSubArrs_)
     : fields(std::move(fields_)),
@@ -67,7 +68,10 @@ BSONArrayBuilder DocumentStructureEnumerator::_getArrayBuilderFromArr(BSONArray 
 }
 
 void DocumentStructureEnumerator::_enumerateFixedLenArrs(
-    const DocumentStructureEnumeratorConfig& config, BSONArray arr, std::vector<BSONArray>* arrs) {
+    const DocumentStructureEnumeratorConfig& config,
+    const ScalarGenerator* scalarGenerator,
+    BSONArray arr,
+    std::vector<BSONArray>* arrs) {
     if (!config.length) {
         // Base case: no more room for any other elements.
         arrs->push_back(arr);
@@ -81,8 +85,8 @@ void DocumentStructureEnumerator::_enumerateFixedLenArrs(
 
     // Scalar.
     BSONArrayBuilder scalarArr = _getArrayBuilderFromArr(arr);
-    scalarArr.append(0);
-    _enumerateFixedLenArrs(nextElementConfig, scalarArr.arr(), arrs);
+    scalarGenerator->generateScalar().addToBsonArray(&scalarArr);
+    _enumerateFixedLenArrs(nextElementConfig, scalarGenerator, scalarArr.arr(), arrs);
 
     if (config.depth <= 0) {
         return;
@@ -92,22 +96,22 @@ void DocumentStructureEnumerator::_enumerateFixedLenArrs(
     nextLayerConfig.depth--;
     nextLayerConfig.length += arr.nFields();
     // Subarray.
-    std::vector<BSONArray> subArrs = _enumerateArrs(nextLayerConfig);
+    std::vector<BSONArray> subArrs = _enumerateArrs(nextLayerConfig, scalarGenerator);
     for (auto subArr : subArrs) {
         BSONArrayBuilder arrayArr = _getArrayBuilderFromArr(arr);
         arrayArr.append(subArr);
-        _enumerateFixedLenArrs(nextElementConfig, arrayArr.arr(), arrs);
+        _enumerateFixedLenArrs(nextElementConfig, scalarGenerator, arrayArr.arr(), arrs);
     }
 
     // Document.
     if (!config.skipSubDocs) {
         BSONObj blankDoc;
         std::vector<BSONObj> subDocs;
-        _enumerateDocs(nextLayerConfig, blankDoc, &subDocs);
+        _enumerateDocs(nextLayerConfig, scalarGenerator, blankDoc, &subDocs);
         for (auto subDoc : subDocs) {
             BSONArrayBuilder docArr = _getArrayBuilderFromArr(arr);
             docArr.append(subDoc);
-            _enumerateFixedLenArrs(nextElementConfig, docArr.arr(), arrs);
+            _enumerateFixedLenArrs(nextElementConfig, scalarGenerator, docArr.arr(), arrs);
         }
     }
 
@@ -115,10 +119,11 @@ void DocumentStructureEnumerator::_enumerateFixedLenArrs(
 }
 
 void DocumentStructureEnumerator::_enumerateDocs(const DocumentStructureEnumeratorConfig& config,
+                                                 const ScalarGenerator* scalarGenerator,
                                                  BSONObj doc,
                                                  std::vector<BSONObj>* docs) {
     if (config.fields.empty()) {
-        // Base case: when we have run out of fields to use
+        // Base case: when we have run out of fields to use.
         docs->push_back(doc);
         return;
     }
@@ -137,12 +142,12 @@ void DocumentStructureEnumerator::_enumerateDocs(const DocumentStructureEnumerat
 
     // Scalar.
     BSONObjBuilder scalarDoc(doc);
-    scalarDoc.append(field, 0);
-    _enumerateDocs(nextFieldConfig, scalarDoc.obj(), docs);
+    scalarGenerator->generateScalar().addToBsonObj(&scalarDoc, field);
+    _enumerateDocs(nextFieldConfig, scalarGenerator, scalarDoc.obj(), docs);
 
     // Omit the field.
     BSONObjBuilder vanishDoc(doc);
-    _enumerateDocs(nextFieldConfig, vanishDoc.obj(), docs);
+    _enumerateDocs(nextFieldConfig, scalarGenerator, vanishDoc.obj(), docs);
 
     if (config.depth <= 0) {
         // If we are ever at the deepest level possible, we have no more choices after this.
@@ -154,10 +159,10 @@ void DocumentStructureEnumerator::_enumerateDocs(const DocumentStructureEnumerat
 
     if (!config.skipSubArrs) {
         // Array.
-        for (auto subArr : _enumerateArrs(nextLayerConfig)) {
+        for (auto subArr : _enumerateArrs(nextLayerConfig, scalarGenerator)) {
             BSONObjBuilder arrayDoc(doc);
             arrayDoc.append(field, subArr);
-            _enumerateDocs(nextFieldConfig, arrayDoc.obj(), docs);
+            _enumerateDocs(nextFieldConfig, scalarGenerator, arrayDoc.obj(), docs);
         }
     }
 
@@ -165,17 +170,17 @@ void DocumentStructureEnumerator::_enumerateDocs(const DocumentStructureEnumerat
     if (!config.skipSubDocs) {
         BSONObj blankDoc;
         std::vector<BSONObj> subDocs;
-        _enumerateDocs(nextLayerConfig, blankDoc, &subDocs);
+        _enumerateDocs(nextLayerConfig, scalarGenerator, blankDoc, &subDocs);
         for (auto subDoc : subDocs) {
             BSONObjBuilder docDoc(doc);
             docDoc.append(field, subDoc);
-            _enumerateDocs(nextFieldConfig, docDoc.obj(), docs);
+            _enumerateDocs(nextFieldConfig, scalarGenerator, docDoc.obj(), docs);
         }
     }
 }
 
 std::vector<BSONArray> DocumentStructureEnumerator::_enumerateArrs(
-    const DocumentStructureEnumeratorConfig& config) {
+    const DocumentStructureEnumeratorConfig& config, const ScalarGenerator* scalarGenerator) {
     std::vector<BSONArray> arrs;
     // We enumerate arrays of each possible length independently of each other to avoid having to
     // account for how different omissions of elements in an array are equivalent to each other.
@@ -186,7 +191,7 @@ std::vector<BSONArray> DocumentStructureEnumerator::_enumerateArrs(
         BSONArray emptyArr;
         DocumentStructureEnumeratorConfig nextConfig(config);
         nextConfig.length = i;
-        _enumerateFixedLenArrs(nextConfig, emptyArr, &arrs);
+        _enumerateFixedLenArrs(nextConfig, scalarGenerator, emptyArr, &arrs);
     }
 
     return arrs;
@@ -195,16 +200,17 @@ std::vector<BSONArray> DocumentStructureEnumerator::_enumerateArrs(
 std::vector<BSONObj> DocumentStructureEnumerator::enumerateDocs() const {
     BSONObj startDoc;
     std::vector<BSONObj> docs;
-    _enumerateDocs(this->_config, startDoc, &docs);
+    _enumerateDocs(this->_config, this->_scalarGenerator, startDoc, &docs);
     return docs;
 }
 
 std::vector<BSONArray> DocumentStructureEnumerator::enumerateArrs() const {
-    return _enumerateArrs(this->_config);
+    return _enumerateArrs(this->_config, this->_scalarGenerator);
 }
 
-DocumentStructureEnumerator::DocumentStructureEnumerator(DocumentStructureEnumeratorConfig config)
-    : _config(std::move(config)) {
+DocumentStructureEnumerator::DocumentStructureEnumerator(DocumentStructureEnumeratorConfig config,
+                                                         const ScalarGenerator* scalarGenerator)
+    : _config(std::move(config)), _scalarGenerator(scalarGenerator) {
     this->_docs = enumerateDocs();
 }
 }  // namespace mongo

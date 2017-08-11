@@ -33,6 +33,7 @@
 #include <vector>
 
 #include "mongo/bson/bsonobj.h"
+#include "mongo/db/repl/idempotency_scalar_generator.h"
 
 namespace mongo {
 
@@ -41,14 +42,14 @@ class StringData;
 
 struct DocumentStructureEnumeratorConfig {
     DocumentStructureEnumeratorConfig(std::set<StringData> fields_,
-                                      size_t depth_,
-                                      size_t length_,
+                                      std::size_t depth_,
+                                      std::size_t length_,
                                       bool skipSubDocs_ = false,
                                       bool skipSubArrs_ = false);
 
     std::set<StringData> fields = {};
-    size_t depth = 0;
-    size_t length = 0;
+    std::size_t depth = 0;
+    std::size_t length = 0;
     const bool skipSubDocs = false;
     const bool skipSubArrs = false;
 };
@@ -57,7 +58,8 @@ class DocumentStructureEnumerator {
 public:
     using iterator = std::vector<BSONObj>::const_iterator;
 
-    explicit DocumentStructureEnumerator(DocumentStructureEnumeratorConfig config);
+    DocumentStructureEnumerator(DocumentStructureEnumeratorConfig config,
+                                const ScalarGenerator* scalarGenerator);
 
     iterator begin() const;
 
@@ -73,17 +75,21 @@ private:
     static BSONArrayBuilder _getArrayBuilderFromArr(BSONArray arr);
 
     static void _enumerateFixedLenArrs(const DocumentStructureEnumeratorConfig& config,
+                                       const ScalarGenerator* scalarGenerator,
                                        BSONArray arr,
                                        std::vector<BSONArray>* arrs);
 
     static void _enumerateDocs(const DocumentStructureEnumeratorConfig& config,
+                               const ScalarGenerator* scalarGenerator,
                                BSONObj doc,
                                std::vector<BSONObj>* docs);
 
-    static std::vector<BSONArray> _enumerateArrs(const DocumentStructureEnumeratorConfig& config);
+    static std::vector<BSONArray> _enumerateArrs(const DocumentStructureEnumeratorConfig& config,
+                                                 const ScalarGenerator* scalarGenerator);
 
 
     const DocumentStructureEnumeratorConfig _config;
+    const ScalarGenerator* _scalarGenerator;
     std::vector<BSONObj> _docs;
 };
 

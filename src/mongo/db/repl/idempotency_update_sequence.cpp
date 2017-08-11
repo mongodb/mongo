@@ -35,13 +35,14 @@
 
 #include "mongo/db/field_ref.h"
 #include "mongo/db/jsobj.h"
+#include "mongo/db/pipeline/value.h"
 #include "mongo/db/repl/idempotency_document_structure.h"
 
 namespace mongo {
 
 UpdateSequenceGeneratorConfig::UpdateSequenceGeneratorConfig(std::set<StringData> fields_,
-                                                             size_t depth_,
-                                                             size_t length_,
+                                                             std::size_t depth_,
+                                                             std::size_t length_,
                                                              double scalarProbability_,
                                                              double docProbability_,
                                                              double arrProbability_)
@@ -152,15 +153,13 @@ UpdateSequenceGenerator::SetChoice UpdateSequenceGenerator::_determineWhatToSet(
     const std::string& setPath) const {
     if (UpdateSequenceGenerator::_getPathDepth(setPath) == this->_config.depth) {
         // If we have hit the max depth, we don't have a choice anyways.
-        auto choice = static_cast<size_t>(SetChoice::kNumScalarSetChoices);
-        return static_cast<SetChoice>(this->_random.nextInt32(choice));
+        return SetChoice::kSetScalar;
     } else {
         double setSum = this->_config.scalarProbability + this->_config.arrProbability +
             this->_config.docProbability;
         double choice = this->_random.nextCanonicalDouble() * setSum;
         if (choice <= this->_config.scalarProbability) {
-            auto scalarChoice = static_cast<size_t>(SetChoice::kNumScalarSetChoices);
-            return static_cast<SetChoice>(this->_random.nextInt32(scalarChoice));
+            return SetChoice::kSetScalar;
         } else if (choice <= setSum - this->_config.docProbability) {
             return SetChoice::kSetArr;
         } else {
@@ -173,14 +172,8 @@ void UpdateSequenceGenerator::_appendSetArgToBuilder(const std::string& setPath,
                                                      BSONObjBuilder* setArgBuilder) const {
     auto setChoice = _determineWhatToSet(setPath);
     switch (setChoice) {
-        case SetChoice::kSetNumeric:
-            setArgBuilder->append(setPath, _generateNumericToSet());
-            return;
-        case SetChoice::kSetNull:
-            setArgBuilder->appendNull(setPath);
-            return;
-        case SetChoice::kSetBool:
-            setArgBuilder->append(setPath, _generateBoolToSet());
+        case SetChoice::kSetScalar:
+            this->_scalarGenerator->generateScalar().addToBsonObj(setArgBuilder, setPath);
             return;
         case SetChoice::kSetArr:
             setArgBuilder->append(setPath, _generateArrToSet(setPath));
@@ -267,7 +260,8 @@ DocumentStructureEnumerator UpdateSequenceGenerator::_getValidEnumeratorForPath(
         remainingDepth -= 1;
     }
 
-    DocumentStructureEnumerator enumerator({remainingFields, remainingDepth, this->_config.length});
+    DocumentStructureEnumerator enumerator({remainingFields, remainingDepth, this->_config.length},
+                                           this->_scalarGenerator);
     return enumerator;
 }
 
@@ -279,9 +273,11 @@ std::vector<std::string> UpdateSequenceGenerator::getPaths() const {
     return this->_paths;
 }
 
-UpdateSequenceGenerator::UpdateSequenceGenerator(UpdateSequenceGeneratorConfig config)
+UpdateSequenceGenerator::UpdateSequenceGenerator(UpdateSequenceGeneratorConfig config,
+                                                 ScalarGenerator* scalarGenerator)
     : _config(std::move(config)),
-      _random(std::unique_ptr<SecureRandom>(SecureRandom::create())->nextInt64()) {
+      _random(std::unique_ptr<SecureRandom>(SecureRandom::create())->nextInt64()),
+      _scalarGenerator(scalarGenerator) {
     auto path = "";
     _generatePaths(config, path);
     // Creates the same shuffle each time, but we don't care. We want to mess up the DFS ordering.

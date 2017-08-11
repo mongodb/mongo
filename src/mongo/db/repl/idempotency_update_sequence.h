@@ -34,6 +34,7 @@
 #include <vector>
 
 #include "mongo/base/string_data.h"
+#include "mongo/db/repl/idempotency_scalar_generator.h"
 #include "mongo/db/repl/idempotency_sequence.h"
 #include "mongo/platform/random.h"
 
@@ -46,15 +47,15 @@ class BSONObjBuilder;
 
 struct UpdateSequenceGeneratorConfig {
     UpdateSequenceGeneratorConfig(std::set<StringData> fields_,
-                                  size_t depth_,
-                                  size_t length_,
+                                  std::size_t depth_,
+                                  std::size_t length_,
                                   double scalarProbability_ = 0.250,
                                   double docProbability_ = 0.250,
                                   double arrProbability_ = 0.250);
 
     const std::set<StringData> fields = {};
-    const size_t depth = 0;
-    const size_t length = 0;
+    const std::size_t depth = 0;
+    const std::size_t length = 0;
     const double scalarProbability = 0.250;
     const double docProbability = 0.250;
     const double arrProbability = 0.250;
@@ -63,7 +64,7 @@ struct UpdateSequenceGeneratorConfig {
 class UpdateSequenceGenerator : public SequenceGenerator {
 
 public:
-    explicit UpdateSequenceGenerator(UpdateSequenceGeneratorConfig config);
+    UpdateSequenceGenerator(UpdateSequenceGeneratorConfig config, ScalarGenerator* scalarGenerator);
 
     BSONObj generateUpdate() const;
 
@@ -77,17 +78,7 @@ public:
     friend std::size_t getPathDepth_forTest(const std::string& path);
 
 private:
-    enum class SetChoice : int {
-        kSetNumeric = 0,
-        kSetNull = 1,
-        kSetBool = 2,
-        kNumScalarSetChoices = 3,
-        kSetDoc = kNumScalarSetChoices,
-        kSetArr = 4,
-        kNumTotalSetChoices = 5
-    };
-
-    static const std::size_t kNumUpdateChoices = 2;
+    enum class SetChoice : int { kSetScalar, kSetArr, kSetDoc, kNumTotalSetChoices = 3 };
 
     static std::size_t _getPathDepth(const std::string& path);
 
@@ -131,6 +122,7 @@ private:
     std::vector<std::string> _paths;
     const UpdateSequenceGeneratorConfig _config;
     mutable PseudoRandom _random;
+    const ScalarGenerator* _scalarGenerator;
 };
 
 }  // namespace mongo

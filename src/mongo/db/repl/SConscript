@@ -623,11 +623,13 @@ env.Library(
     target='idempotency_test_util',
     source=[
         'idempotency_document_structure.cpp',
+        'idempotency_scalar_generator.cpp',
         'idempotency_update_sequence.cpp',
     ],
     LIBDEPS=[
         '$BUILD_DIR/mongo/base',
         '$BUILD_DIR/mongo/db/common',
+        '$BUILD_DIR/mongo/db/pipeline/document_value'
     ],
 )
 
