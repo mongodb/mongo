@@ -265,19 +265,14 @@ DocumentStructureEnumerator UpdateSequenceGenerator::_getValidEnumeratorForPath(
     return enumerator;
 }
 
-BSONObj UpdateSequenceGenerator::generate() const {
-    return generateUpdate();
-}
-
 std::vector<std::string> UpdateSequenceGenerator::getPaths() const {
     return this->_paths;
 }
 
 UpdateSequenceGenerator::UpdateSequenceGenerator(UpdateSequenceGeneratorConfig config,
+                                                 PseudoRandom random,
                                                  ScalarGenerator* scalarGenerator)
-    : _config(std::move(config)),
-      _random(std::unique_ptr<SecureRandom>(SecureRandom::create())->nextInt64()),
-      _scalarGenerator(scalarGenerator) {
+    : _config(std::move(config)), _random(random), _scalarGenerator(scalarGenerator) {
     auto path = "";
     _generatePaths(config, path);
     // Creates the same shuffle each time, but we don't care. We want to mess up the DFS ordering.

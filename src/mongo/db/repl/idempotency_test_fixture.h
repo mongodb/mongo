@@ -46,6 +46,9 @@
 #include "mongo/util/uuid.h"
 
 namespace mongo {
+
+class Collection;
+
 namespace repl {
 
 struct CollectionState {
@@ -78,11 +81,16 @@ struct CollectionState {
 };
 
 bool operator==(const CollectionState& lhs, const CollectionState& rhs);
+bool operator!=(const CollectionState& lhs, const CollectionState& rhs);
 std::ostream& operator<<(std::ostream& stream, const CollectionState& state);
+StringBuilderImpl<SharedBufferAllocator>& operator<<(StringBuilderImpl<SharedBufferAllocator>& sb,
+                                                     const CollectionState& state);
 
 class IdempotencyTest : public SyncTailTest {
 protected:
+    enum class SequenceType : int { kEntireSequence, kAnyPrefix, kAnySuffix, kAnyPrefixOrSuffix };
     OplogEntry createCollection(CollectionUUID uuid = UUID::gen());
+    OplogEntry dropCollection();
     OplogEntry insert(const BSONObj& obj);
     template <class IdType>
     OplogEntry update(IdType _id, const BSONObj& obj);
@@ -93,13 +101,30 @@ protected:
         return OpTime(Timestamp(Seconds(lastSecond++), 0), 1LL);
     }
     Status runOp(const OplogEntry& entry);
-    Status runOps(std::initializer_list<OplogEntry> ops);
+    Status runOps(std::vector<OplogEntry> ops);
+    virtual Status resetState();
+
     /**
      * This method returns true if running the list of operations a single time is equivalent to
      * running them two times. It returns false otherwise.
      */
-    void testOpsAreIdempotent(std::initializer_list<OplogEntry> ops);
+    void testOpsAreIdempotent(std::vector<OplogEntry> ops,
+                              SequenceType sequenceType = SequenceType::kEntireSequence);
 
+    /**
+     * This function exists to work around the issue described in SERVER-30470 by providing a
+     * mechanism for the RandomizedIdempotencyTest class to avoid triggering failures caused by
+     * differences in the ordering of fields within a document. By default it returns the document
+     * unchanged.
+     */
+    virtual BSONObj canonicalizeDocumentForDataHash(const BSONObj& obj) {
+        return obj;
+    };
+
+    std::string computeDataHash(Collection* collection);
+    virtual std::string getStateString(const CollectionState& state1,
+                                       const CollectionState& state2,
+                                       const std::vector<OplogEntry>& ops);
     /**
      * Validate data and indexes. Return the MD5 hash of the documents ordered by _id.
      */
@@ -116,7 +141,6 @@ OplogEntry makeCreateCollectionOplogEntry(OpTime opTime,
 OplogEntry makeInsertDocumentOplogEntry(OpTime opTime,
                                         const NamespaceString& nss,
                                         const BSONObj& documentToInsert);
-
 OplogEntry makeUpdateDocumentOplogEntry(OpTime opTime,
                                         const NamespaceString& nss,
                                         const BSONObj& documentToUpdate,

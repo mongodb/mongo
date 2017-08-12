@@ -35,7 +35,6 @@
 
 #include "mongo/base/string_data.h"
 #include "mongo/db/repl/idempotency_scalar_generator.h"
-#include "mongo/db/repl/idempotency_sequence.h"
 #include "mongo/platform/random.h"
 
 namespace mongo {
@@ -61,14 +60,14 @@ struct UpdateSequenceGeneratorConfig {
     const double arrProbability = 0.250;
 };
 
-class UpdateSequenceGenerator : public SequenceGenerator {
+class UpdateSequenceGenerator {
 
 public:
-    UpdateSequenceGenerator(UpdateSequenceGeneratorConfig config, ScalarGenerator* scalarGenerator);
+    UpdateSequenceGenerator(UpdateSequenceGeneratorConfig config,
+                            PseudoRandom random,
+                            ScalarGenerator* scalarGenerator);
 
     BSONObj generateUpdate() const;
-
-    BSONObj generate() const override;
 
     std::vector<std::string> getPaths() const;
 

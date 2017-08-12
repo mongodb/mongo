@@ -634,6 +634,17 @@ env.Library(
 )
 
 env.CppUnitTest(
+    target='idempotency_test',
+    source=[
+        'idempotency_test.cpp',
+    ],
+    LIBDEPS=[
+        'idempotency_test_fixture',
+        'idempotency_test_util',
+    ],
+)
+
+env.CppUnitTest(
     target='idempotency_document_structure_test',
     source=[
         'idempotency_document_structure_test.cpp',
