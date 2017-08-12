@@ -36,7 +36,7 @@
 
     // Step up one of the lagged nodes.
     assert.commandWorked(nodes[2].adminCommand({replSetStepUp: 1}));
-    replSet.awaitNodesAgreeOnPrimary(replSet.kDefaultTimeoutMS, nodes);
+    replSet.awaitNodesAgreeOnPrimary();
     assert.eq(ReplSetTest.State.PRIMARY,
               assert.commandWorked(nodes[2].adminCommand('replSetGetStatus')).myState,
               nodes[2].host + " was not primary after step-up");
@@ -51,6 +51,8 @@
     // after the default catchup delay.
     replSet.waitForState(0, ReplSetTest.State.PRIMARY, 60 * 1000);
 
-    // Let the nodes catchup
+    // Wait until the old primary steps down so the connections won't be closed.
+    replSet.waitForState(2, ReplSetTest.State.SECONDARY, replSet.kDefaultTimeoutMS);
+    // Let the nodes catchup.
     restartServerReplication(nodes.slice(1, 5));
 })();

@@ -72,6 +72,9 @@
     replSet.waitForState(0, ReplSetTest.State.PRIMARY, 60 * 1000);
     jsTestLog('node 0 performed catchup takeover and is now primary');
 
+    // Wait until the old primary steps down.
+    replSet.awaitNodesAgreeOnPrimary();
+
     // Let the nodes catchup.
     restartServerReplication(nodes[1]);
     restartServerReplication(nodes[2]);
