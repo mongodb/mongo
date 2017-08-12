@@ -459,7 +459,7 @@
                 max: {x: 0},
                 keyPattern: {x: 1},
                 splitKeys: [{x: -2}, {x: -1}],
-                shardVersion: [1, 2]
+                shardVersion: [ObjectId(), 2]
             },
             skipSharded: true,
             expectFailure: true,
