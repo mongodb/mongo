@@ -52,7 +52,7 @@ class test_timestamp01(wttest.WiredTigerTestCase, suite_subprocess):
         self.session.begin_transaction()
         self.assertRaisesWithMessage(wiredtiger.WiredTigerError,
             lambda: self.session.commit_transaction(
-                'commit_timestamp=' + timestamp_str(1 << 100)),
+                'commit_timestamp=' + timestamp_str(1 << 5000)),
                 '/too long/')
 
         # One is okay, as is 2**64 - 1

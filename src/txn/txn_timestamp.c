@@ -95,7 +95,7 @@ __wt_txn_parse_timestamp(WT_SESSION_IMPL *session,
 	/* Protect against unexpectedly long hex strings. */
 	if (cval->len > 2 * WT_TIMESTAMP_SIZE)
 		WT_RET_MSG(session, EINVAL,
-		    "Failed to parse %s timestamp '%.*s': too long",
+		    "%s timestamp too long '%.*s'",
 		    name, (int)cval->len, cval->str);
 
 #if WT_TIMESTAMP_SIZE == 8
