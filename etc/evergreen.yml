@@ -5702,6 +5702,8 @@ buildvariants:
   - enterprise
   run_on:
   - windows-64-vs2015-small
+  stepback: true
+  batchtime: 1440 # 1 day
   expansions:
     platform_decompress: unzip
     tooltags: "-tags 'ssl sasl'"
