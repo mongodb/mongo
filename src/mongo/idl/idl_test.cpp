@@ -71,6 +71,56 @@ bool isEquals(const std::vector<std::array<std::uint8_t, 16>>& left,
         left.data(), left.data() + left.size(), right.data(), right.data() + right.size());
 }
 
+/**
+ * Flatten an OpMsgRequest into a BSONObj.
+ */
+BSONObj flatten(const OpMsgRequest& msg) {
+    BSONObjBuilder builder;
+    builder.appendElements(msg.body);
+
+    for (auto&& docSeq : msg.sequences) {
+        builder.append(docSeq.name, docSeq.objs);
+    }
+
+    return builder.obj();
+}
+
+/**
+ * Validate two OpMsgRequests are the same regardless of whether they both use DocumentSequences.
+ */
+void assertOpMsgEquals(const OpMsgRequest& left, const OpMsgRequest& right) {
+    auto flatLeft = flatten(left);
+    auto flatRight = flatten(right);
+
+    ASSERT_BSONOBJ_EQ(flatLeft, flatRight);
+}
+
+/**
+* Validate two OpMsgRequests are the same including their DocumentSequences.
+*/
+void assertOpMsgEqualsExact(const OpMsgRequest& left, const OpMsgRequest& right) {
+
+    ASSERT_BSONOBJ_EQ(left.body, right.body);
+
+    ASSERT_EQUALS(left.sequences.size(), right.sequences.size());
+
+    for (size_t i = 0; i < left.sequences.size(); ++i) {
+        auto leftItem = left.sequences[i];
+        auto rightItem = right.sequences[i];
+
+        ASSERT_TRUE(std::equal(leftItem.objs.begin(),
+                               leftItem.objs.end(),
+                               rightItem.objs.begin(),
+                               rightItem.objs.end(),
+                               [](const BSONObj& leftBson, const BSONObj& rightBson) {
+                                   return SimpleBSONObjComparator::kInstance.compare(
+                                              leftBson, rightBson) == 0;
+                               }));
+        ASSERT_EQUALS(leftItem.name, rightItem.name);
+    }
+}
+
+
 BSONObj appendDB(const BSONObj& obj, StringData dbName) {
     BSONObjBuilder builder;
     builder.appendElements(obj);
@@ -1633,6 +1683,8 @@ TEST(IDLDocSequence, TestBasic) {
                             << 3
                             << "field2"
                             << "five"
+                            << "$db"
+                            << "db"
                             << "structs"
                             << BSON_ARRAY(BSON("value"
                                                << "hello")
@@ -1641,7 +1693,8 @@ TEST(IDLDocSequence, TestBasic) {
                             << "objects"
                             << BSON_ARRAY(BSON("foo" << 1)));
 
-    OpMsgRequest request = OpMsgRequest::fromDBAndBody("db", testTempDoc);
+    OpMsgRequest request;
+    request.body = testTempDoc;
 
     auto testStruct = DocSequenceCommand::parse(ctxt, request);
     ASSERT_EQUALS(testStruct.getField1(), 3);
@@ -1654,11 +1707,22 @@ TEST(IDLDocSequence, TestBasic) {
 
     assert_same_types<decltype(testStruct.getNamespace()), const NamespaceString&>();
 
-    // Positive: Test we can roundtrip just the body from the just parsed document
+    // Positive: Test we can round trip to a document sequence from the just parsed document
     {
         OpMsgRequest loopbackRequest = testStruct.serialize(BSONObj());
 
-        ASSERT_BSONOBJ_EQ(request.body, loopbackRequest.body);
+        assertOpMsgEquals(request, loopbackRequest);
+        ASSERT_EQUALS(loopbackRequest.sequences.size(), 2UL);
+    }
+
+    // Positive: Test we can roundtrip just the body from the just parsed document
+    {
+        BSONObjBuilder builder;
+        testStruct.serialize(BSONObj(), &builder);
+
+        auto testTempDocWithoutDB = testTempDoc.removeField("$db");
+
+        ASSERT_BSONOBJ_EQ(testTempDocWithoutDB, builder.obj());
     }
 
     // Positive: Test we can serialize from nothing the same document
@@ -1683,7 +1747,7 @@ TEST(IDLDocSequence, TestBasic) {
 
         OpMsgRequest serializeRequest = one_new.serialize(BSONObj());
 
-        ASSERT_BSONOBJ_EQ(request.body, serializeRequest.body);
+        assertOpMsgEquals(request, serializeRequest);
     }
 }
 
@@ -1738,18 +1802,10 @@ void TestDocSequence(StringData name) {
     ASSERT_EQUALS("world", testStruct.getStructs()[1].getValue());
 
     auto opmsg = testStruct.serialize(BSONObj());
+    ASSERT_EQUALS(2UL, opmsg.sequences.size());
 
-    BSONObjBuilder builder;
-    builder.appendElements(testTempDoc);
-    builder.append("structs",
-                   BSON_ARRAY(BSON("value"
-                                   << "hello")
-                              << BSON("value"
-                                      << "world")));
-    builder.append("objects", BSON_ARRAY(BSON("foo" << 1)));
-    auto testCompleteMsg = OpMsgRequest::fromDBAndBody("db", builder.obj());
-
-    ASSERT_BSONOBJ_EQ(opmsg.body, testCompleteMsg.body);
+    assertOpMsgEquals(opmsg, request);
+    assertOpMsgEqualsExact(opmsg, request);
 }
 
 // Positive: Test a command read and written to OpMsgRequest with content in DocumentSequence works
@@ -1997,18 +2053,17 @@ TEST(IDLDocSequence, TestWellKnownFieldsPassthrough) {
                                 << 3
                                 << "field2"
                                 << "five"
+                                << "$db"
+                                << "db"
+                                << knownField
+                                << "extra"
                                 << "structs"
                                 << BSON_ARRAY(BSON("value"
                                                    << "hello")
                                               << BSON("value"
                                                       << "world"))
                                 << "objects"
-                                << BSON_ARRAY(BSON("foo" << 1))
-
-                                << "$db"
-                                << "db"
-                                << knownField
-                                << "extra");
+                                << BSON_ARRAY(BSON("foo" << 1)));
 
         OpMsgRequest request;
         request.body = testTempDoc;
@@ -2016,7 +2071,7 @@ TEST(IDLDocSequence, TestWellKnownFieldsPassthrough) {
         ASSERT_EQUALS(2UL, testStruct.getStructs().size());
 
         auto reply = testStruct.serialize(testTempDoc);
-        ASSERT_BSONOBJ_EQ(request.body, reply.body);
+        assertOpMsgEquals(request, reply);
     }
 }
 

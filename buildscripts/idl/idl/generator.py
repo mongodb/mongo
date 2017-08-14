@@ -808,7 +808,10 @@ class _CppSourceFileWriter(_CppFileWriterBase):
                     common.title_case(field.struct_type))
             else:
                 assert field.bson_serialization_type == ['object']
-                array_value = "sequenceObject"
+                if field.deserializer:
+                    array_value = '%s(sequenceObject)' % (field.deserializer)
+                else:
+                    array_value = "sequenceObject"
 
             self._writer.write_line('values.emplace_back(%s);' % (array_value))
 
@@ -1145,6 +1148,7 @@ class _CppSourceFileWriter(_CppFileWriterBase):
     def _gen_serializer_methods_common(self, struct, is_op_msg_request):
         # type: (ast.Struct, bool) -> None
         """Generate the serialize method definition."""
+        # pylint: disable=too-many-branches
 
         struct_type_info = struct_types.get_struct_info(struct)
 
@@ -1173,6 +1177,11 @@ class _CppSourceFileWriter(_CppFileWriterBase):
             # The $db injected field should only be inject when serializing to OpMsgRequest. In the
             # BSON case, it will be injected in the generic command layer.
             if field.serialize_op_msg_request_only and not is_op_msg_request:
+                continue
+
+            # Serialize fields that can be document sequence as document sequences so as not to
+            # generate the BSON body >= 16 MB.
+            if field.supports_doc_sequence and is_op_msg_request:
                 continue
 
             member_name = _get_field_member_name(field)
@@ -1234,6 +1243,43 @@ class _CppSourceFileWriter(_CppFileWriterBase):
                 "builder", "&builder"))
             self._writer.write_line('return builder.obj();')
 
+    def _gen_doc_sequence_serializer(self, struct):
+        # type: (ast.Struct) -> None
+        """Generate the serialize method portion for fields which can be document sequence."""
+
+        for field in struct.fields:
+            if not field.supports_doc_sequence:
+                continue
+
+            member_name = _get_field_member_name(field)
+
+            optional_block_start = '{'
+            if field.optional:
+                optional_block_start = 'if (%s.is_initialized()) {' % (member_name)
+
+            with self._block(optional_block_start, '}'):
+                self._writer.write_line('OpMsg::DocumentSequence documentSequence;')
+                self._writer.write_template('documentSequence.name = %s.toString();' %
+                                            (_get_field_constant_name(field)))
+
+                with self._block('for (const auto& item : %s) {' % (_access_member(field)), '}'):
+
+                    if not field.struct_type:
+                        if field.serializer:
+                            self._writer.write_line('documentSequence.objs.push_back(item.%s());' %
+                                                    (writer.get_method_name(field.serializer)))
+                        else:
+                            self._writer.write_line('documentSequence.objs.push_back(item);')
+                    else:
+                        self._writer.write_line('BSONObjBuilder builder;')
+                        self._writer.write_line('item.serialize(&builder);')
+                        self._writer.write_line('documentSequence.objs.push_back(builder.obj());')
+
+                self._writer.write_template('request.sequences.emplace_back(documentSequence);')
+
+            # Add a blank line after each block
+            self._writer.write_empty_line()
+
     def gen_op_msg_request_serializer_method(self, struct):
         # type: (ast.Struct) -> None
         """Generate the serialzer method definition for OpMsgRequest."""
@@ -1247,12 +1293,17 @@ class _CppSourceFileWriter(_CppFileWriterBase):
                          (struct_type_info.get_op_msg_request_serializer_method().get_definition()),
                          '}'):
             self._writer.write_line('BSONObjBuilder localBuilder;')
-            self._writer.write_line('BSONObjBuilder* builder = &localBuilder;')
 
-            self._gen_serializer_methods_common(struct, True)
+            with self._block('{', '}'):
+                self._writer.write_line('BSONObjBuilder* builder = &localBuilder;')
+
+                self._gen_serializer_methods_common(struct, True)
 
             self._writer.write_line('OpMsgRequest request;')
             self._writer.write_line('request.body = localBuilder.obj();')
+
+            self._gen_doc_sequence_serializer(struct)
+
             self._writer.write_line('return request;')
 
     def gen_string_constants_definitions(self, struct):

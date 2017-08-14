@@ -516,6 +516,10 @@ commands:
             objects:
                 type: array<object>
                 supports_doc_sequence: true
+            objects_custom:
+                type: array<object_basic_type>
+                supports_doc_sequence: true
+                optional: true
 
     DocSequenceCommandNonStrict:
         description: UnitTest for a basic command with fields marked with supports_doc_sequence and non-strict parsing
@@ -530,6 +534,10 @@ commands:
             objects:
                 type: array<object>
                 supports_doc_sequence: true
+            objects_custom:
+                type: array<object_basic_type>
+                supports_doc_sequence: true
+                optional: true
 
     chained_command_type_mixed:
         description: Chained command with chained types, structs, and fields
