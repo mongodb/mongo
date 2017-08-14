@@ -339,6 +339,14 @@ MozJSImplScope::MozRuntime::MozRuntime(const MozJSScriptEngine* engine) {
                 .setIon(true)
                 .setAsyncStack(false)
                 .setNativeRegExp(true);
+        } else {
+            JS::RuntimeOptionsRef(_runtime.get())
+                .setAsmJS(false)
+                .setThrowOnAsmJSValidationFailure(false)
+                .setBaseline(false)
+                .setIon(false)
+                .setAsyncStack(false)
+                .setNativeRegExp(false);
         }
 
         const StackLocator locator;
