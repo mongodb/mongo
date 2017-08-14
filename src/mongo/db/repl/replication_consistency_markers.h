@@ -59,6 +59,8 @@ class StorageInterface;
  *                  ts: <Timestamp>,
  *                  t: <long long>
  *             },                           // field for 'appliedThrough'
+ *      oplogDeleteFromPoint: <Timestamp>,  // only exists on unclean upgrade
+ *                                          // TODO (SERVER-30556): Remove after 3.6
  * }
  *
  * The oplogTruncateAfterPoint document, in 'local.replset.oplogTruncateAfterPoint', is used to
@@ -140,20 +142,33 @@ public:
      */
     virtual void setMinValidToAtLeast(OperationContext* opCtx, const OpTime& minValid) = 0;
 
-    // -------- Oplog Delete From Point ----------
+    // -------- Oplog Truncate After Point ----------
 
     /**
-     * The oplog delete from point is set to the beginning of a batch of oplog entries before
+     * The oplog truncate after point is set to the beginning of a batch of oplog entries before
      * the oplog entries are written into the oplog, and reset before we begin applying the batch.
-     * On startup all oplog entries with a value >= the oplog delete from point should be deleted.
-     * We write operations to the oplog in parallel so if we crash mid-batch there could be holes
-     * in the oplog. Deleting them at startup keeps us consistent.
+     * On startup all oplog entries with a value >= the oplog truncate after point should be
+     * deleted. We write operations to the oplog in parallel so if we crash mid-batch there could
+     * be holes in the oplog. Deleting them at startup keeps us consistent.
      *
      * If null, no documents should be deleted.
+     *
+     * If we are in feature compatibility version 3.4 and there is no oplog truncate after point
+     * document, we fall back on the old oplog delete from point field in the minValid
+     * collection.
      */
     virtual void setOplogTruncateAfterPoint(OperationContext* opCtx,
                                             const Timestamp& timestamp) = 0;
     virtual Timestamp getOplogTruncateAfterPoint(OperationContext* opCtx) const = 0;
+
+    /**
+     * The oplog delete from point may still exist on upgrade from an unclean shutdown. This
+     * function removes the field so it's gone after 3.6.
+     *
+     * TODO (SERVER-30556): Delete this function in 3.8 because the old oplog delete from point
+     * cannot exist.
+     */
+    virtual void removeOldOplogDeleteFromPointField(OperationContext* opCtx) = 0;
 
     // -------- Applied Through ----------
 

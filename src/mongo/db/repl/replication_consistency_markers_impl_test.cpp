@@ -300,8 +300,7 @@ TEST_F(ReplicationConsistencyMarkersTest, OplogTruncateAfterPointUpgrade) {
     Timestamp time2(Seconds(456), 0);
     OpTime minValidTime(Timestamp(789), 2);
 
-    // Insert the old oplogDeleteFromPoint and make sure that we don't read it and do not have
-    // trouble reading and updating the new one.
+    // Insert the old oplogDeleteFromPoint and make sure getOplogTruncateAfterPoint() returns it.
     ASSERT_OK(getStorageInterface()->createCollection(opCtx, minValidNss, {}));
     ASSERT_OK(getStorageInterface()->insertDocument(
         opCtx,
@@ -310,12 +309,51 @@ TEST_F(ReplicationConsistencyMarkersTest, OplogTruncateAfterPointUpgrade) {
                    << minValidTime.getTimestamp()
                    << MinValidDocument::kMinValidTermFieldName
                    << minValidTime.getTerm()
-                   << ReplicationConsistencyMarkersImpl::kOldOplogDeleteFromPointFieldName
+                   << MinValidDocument::kOldOplogDeleteFromPointFieldName
                    << time1)));
     consistencyMarkers.initializeMinValidDocument(opCtx);
+
+    // Set the feature compatibility version to 3.6.
+    serverGlobalParams.featureCompatibility.version.store(
+        ServerGlobalParams::FeatureCompatibility::Version::k36);
+
+    // Check that we see no oplog truncate after point in FCV 3.6.
     ASSERT(consistencyMarkers.getOplogTruncateAfterPoint(opCtx).isNull());
     ASSERT_EQ(consistencyMarkers.getMinValid(opCtx), minValidTime);
 
+    // Set the feature compatibility version to 3.4.
+    serverGlobalParams.featureCompatibility.version.store(
+        ServerGlobalParams::FeatureCompatibility::Version::k34);
+
+    // Check that we see the old oplog delete from point in FCV 3.4.
+    ASSERT_EQ(consistencyMarkers.getOplogTruncateAfterPoint(opCtx), time1);
+    ASSERT_EQ(consistencyMarkers.getMinValid(opCtx), minValidTime);
+
+    // Check that the minValid document has the oplog delete from point.
+    auto minValidDocument = getMinValidDocument(opCtx, minValidNss);
+    ASSERT_TRUE(minValidDocument.hasField(MinValidDocument::kOldOplogDeleteFromPointFieldName));
+
+    consistencyMarkers.removeOldOplogDeleteFromPointField(opCtx);
+
+    // Check that the minValid document does not have the oplog delete from point.
+    minValidDocument = getMinValidDocument(opCtx, minValidNss);
+    ASSERT_FALSE(minValidDocument.hasField(MinValidDocument::kOldOplogDeleteFromPointFieldName));
+
+    // Check that after removing the old oplog delete from point, that we do not see the oplog
+    // truncate after point in FCV 3.4.
+    ASSERT(consistencyMarkers.getOplogTruncateAfterPoint(opCtx).isNull());
+    ASSERT_EQ(consistencyMarkers.getMinValid(opCtx), minValidTime);
+
+    // Set the feature compatibility version to 3.6.
+    serverGlobalParams.featureCompatibility.version.store(
+        ServerGlobalParams::FeatureCompatibility::Version::k36);
+
+    // Check that after removing the old oplog delete from point, that we do not see the oplog
+    // truncate after point in FCV 3.6.
+    ASSERT(consistencyMarkers.getOplogTruncateAfterPoint(opCtx).isNull());
+    ASSERT_EQ(consistencyMarkers.getMinValid(opCtx), minValidTime);
+
+    // Check that we can set the oplog truncate after point.
     consistencyMarkers.setOplogTruncateAfterPoint(opCtx, time2);
     ASSERT_EQ(consistencyMarkers.getOplogTruncateAfterPoint(opCtx), time2);
 }

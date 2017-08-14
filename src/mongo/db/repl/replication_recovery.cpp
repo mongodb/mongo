@@ -73,6 +73,9 @@ void ReplicationRecoveryImpl::recoverFromOplog(OperationContext* opCtx) try {
     }
     _consistencyMarkers->setOplogTruncateAfterPoint(opCtx, {});  // clear the truncateAfterPoint
 
+    // TODO (SERVER-30556): Delete this line since the old oplog delete from point cannot exist.
+    _consistencyMarkers->removeOldOplogDeleteFromPointField(opCtx);
+
     auto topOfOplogSW = _getLastAppliedOpTime(opCtx);
     boost::optional<OpTime> topOfOplog = boost::none;
     if (topOfOplogSW.getStatus() != ErrorCodes::CollectionIsEmpty &&

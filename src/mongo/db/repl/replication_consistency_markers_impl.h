@@ -53,8 +53,6 @@ public:
         "local.replset.oplogTruncateAfterPoint"_sd;
     static constexpr StringData kDefaultCheckpointTimestampNamespace =
         "local.replset.checkpointTimestamp"_sd;
-    // TODO: Remove this constant and its usage in minValid initialization in 3.8.
-    static constexpr StringData kOldOplogDeleteFromPointFieldName = "oplogDeleteFromPoint"_sd;
 
     explicit ReplicationConsistencyMarkersImpl(StorageInterface* storageInterface);
     ReplicationConsistencyMarkersImpl(StorageInterface* storageInterface,
@@ -74,6 +72,8 @@ public:
 
     void setOplogTruncateAfterPoint(OperationContext* opCtx, const Timestamp& timestamp) override;
     Timestamp getOplogTruncateAfterPoint(OperationContext* opCtx) const override;
+
+    void removeOldOplogDeleteFromPointField(OperationContext* opCtx) override;
 
     void setAppliedThrough(OperationContext* opCtx, const OpTime& optime) override;
     OpTime getAppliedThrough(OperationContext* opCtx) const override;
@@ -102,6 +102,13 @@ private:
      */
     boost::optional<OplogTruncateAfterPointDocument> _getOplogTruncateAfterPointDocument(
         OperationContext* opCtx) const;
+
+    /**
+     * Returns the old oplog delete from point from the minValid document. Returns an empty
+     * timestamp if the field does not exist. This is used to fallback in FCV 3.4 if the oplog
+     * truncate after point document does not exist.
+     */
+    Timestamp _getOldOplogDeleteFromPoint(OperationContext* opCtx) const;
 
     /**
      * Reads the CheckpointTimestamp document from disk.

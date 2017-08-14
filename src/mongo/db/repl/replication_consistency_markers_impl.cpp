@@ -45,7 +45,6 @@ namespace repl {
 constexpr StringData ReplicationConsistencyMarkersImpl::kDefaultMinValidNamespace;
 constexpr StringData ReplicationConsistencyMarkersImpl::kDefaultOplogTruncateAfterPointNamespace;
 constexpr StringData ReplicationConsistencyMarkersImpl::kDefaultCheckpointTimestampNamespace;
-constexpr StringData ReplicationConsistencyMarkersImpl::kOldOplogDeleteFromPointFieldName;
 
 namespace {
 const BSONObj kInitialSyncFlag(BSON(MinValidDocument::kInitialSyncFlagFieldName << true));
@@ -112,17 +111,12 @@ void ReplicationConsistencyMarkersImpl::initializeMinValidDocument(OperationCont
 
     // This initializes the values of the required fields if they are not already set.
     // If one of the fields is already set, the $max will prefer the existing value since it
-    // will always be greater than the provided ones. We unset the old 'oplogDeleteFromPoint'
-    // field so that we can remove it from the IDL struct. This is required because servers
-    // upgrading from 3.4 may have created an 'oplogDeleteFromPoint' field already. The field
-    // is guaranteed to be empty on clean shutdown and thus on upgrade, but may still exist.
+    // will always be greater than the provided ones.
     _updateMinValidDocument(opCtx,
                             BSON("$max" << BSON(MinValidDocument::kMinValidTimestampFieldName
                                                 << Timestamp()
                                                 << MinValidDocument::kMinValidTermFieldName
-                                                << OpTime::kUninitializedTerm)
-                                        << "$unset"
-                                        << BSON(kOldOplogDeleteFromPointFieldName << 1)));
+                                                << OpTime::kUninitializedTerm)));
 }
 
 bool ReplicationConsistencyMarkersImpl::getInitialSyncFlag(OperationContext* opCtx) const {
@@ -196,6 +190,12 @@ void ReplicationConsistencyMarkersImpl::setMinValidToAtLeast(OperationContext* o
                                                 << minValid.getTimestamp()
                                                 << MinValidDocument::kMinValidTermFieldName
                                                 << minValid.getTerm())));
+}
+
+void ReplicationConsistencyMarkersImpl::removeOldOplogDeleteFromPointField(
+    OperationContext* opCtx) {
+    _updateMinValidDocument(
+        opCtx, BSON("$unset" << BSON(MinValidDocument::kOldOplogDeleteFromPointFieldName << 1)));
 }
 
 void ReplicationConsistencyMarkersImpl::setAppliedThrough(OperationContext* opCtx,
@@ -277,6 +277,12 @@ Timestamp ReplicationConsistencyMarkersImpl::getOplogTruncateAfterPoint(
     OperationContext* opCtx) const {
     auto doc = _getOplogTruncateAfterPointDocument(opCtx);
     if (!doc) {
+        if (serverGlobalParams.featureCompatibility.version.load() ==
+            ServerGlobalParams::FeatureCompatibility::Version::k34) {
+            LOG(3) << "Falling back on old oplog delete from point because there is no oplog "
+                      "truncate after point and we are in FCV 3.4.";
+            return _getOldOplogDeleteFromPoint(opCtx);
+        }
         LOG(3) << "Returning empty oplog truncate after point since document did not exist";
         return {};
     }
@@ -285,6 +291,21 @@ Timestamp ReplicationConsistencyMarkersImpl::getOplogTruncateAfterPoint(
 
     LOG(3) << "returning oplog truncate after point: " << out;
     return out;
+}
+
+Timestamp ReplicationConsistencyMarkersImpl::_getOldOplogDeleteFromPoint(
+    OperationContext* opCtx) const {
+    auto doc = _getMinValidDocument(opCtx);
+    invariant(doc);  // Initialized at startup so it should never be missing.
+
+    auto oplogDeleteFromPoint = doc->getOldOplogDeleteFromPoint();
+    if (!oplogDeleteFromPoint) {
+        LOG(3) << "No oplogDeleteFromPoint timestamp set, returning empty timestamp.";
+        return {};
+    }
+
+    LOG(3) << "returning oplog delete from point: " << oplogDeleteFromPoint.get();
+    return oplogDeleteFromPoint.get();
 }
 
 void ReplicationConsistencyMarkersImpl::_upsertCheckpointTimestampDocument(
