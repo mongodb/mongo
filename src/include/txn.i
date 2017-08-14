@@ -616,7 +616,7 @@ __wt_txn_id_check(WT_SESSION_IMPL *session)
 	 * more we can do.
 	 */
 	if (txn->id == WT_TXN_ABORTED)
-		WT_RET_MSG(session, ENOMEM, "Out of transaction IDs");
+		WT_RET_MSG(session, WT_ERROR, "out of transaction IDs");
 	F_SET(txn, WT_TXN_HAS_ID);
 
 	return (0);
