@@ -192,6 +192,14 @@ TEST_F(ChangeStreamStageTest, TransformInsert) {
         {DSChangeStream::kDocumentKeyField, D{{"_id", 1}}},
     };
     checkTransformation(insert, expectedInsert);
+    insert.setFromMigrate(false);  // also check actual "fromMigrate: false" not filtered
+    checkTransformation(insert, expectedInsert);
+}
+
+TEST_F(ChangeStreamStageTest, TransformInsertFromMigrate) {
+    OplogEntry insert(optime, 1, OpTypeEnum::kInsert, nss, BSON("_id" << 1 << "x" << 1));
+    insert.setFromMigrate(true);
+    checkTransformation(insert, boost::none);
 }
 
 TEST_F(ChangeStreamStageTest, TransformUpdateFields) {
@@ -252,6 +260,14 @@ TEST_F(ChangeStreamStageTest, TransformDelete) {
         {DSChangeStream::kDocumentKeyField, D{{"_id", 1}}},
     };
     checkTransformation(deleteEntry, expectedDelete);
+    deleteEntry.setFromMigrate(false);  // also check actual "fromMigrate: false" not filtered
+    checkTransformation(deleteEntry, expectedDelete);
+}
+
+TEST_F(ChangeStreamStageTest, TransformDeleteFromMigrate) {
+    OplogEntry deleteEntry(optime, 1, OpTypeEnum::kDelete, nss, BSON("_id" << 1));
+    deleteEntry.setFromMigrate(true);
+    checkTransformation(deleteEntry, boost::none);
 }
 
 TEST_F(ChangeStreamStageTest, TransformInvalidate) {
@@ -259,6 +275,7 @@ TEST_F(ChangeStreamStageTest, TransformInvalidate) {
 
     OplogEntry dropColl = createCommand(BSON("drop" << nss.coll()));
     OplogEntry dropDB = createCommand(BSON("dropDatabase" << 1));
+    dropDB.setFromMigrate(false);  // verify this doesn't get it filtered
     OplogEntry rename =
         createCommand(BSON("renameCollection" << nss.ns() << "to" << otherColl.ns()));
 
@@ -270,6 +287,22 @@ TEST_F(ChangeStreamStageTest, TransformInvalidate) {
     };
     for (auto& entry : {dropColl, dropDB, rename}) {
         checkTransformation(entry, expectedInvalidate);
+    }
+}
+
+TEST_F(ChangeStreamStageTest, TransformInvalidateFromMigrate) {
+    NamespaceString otherColl("test.bar");
+
+    OplogEntry dropColl = createCommand(BSON("drop" << nss.coll()));
+    dropColl.setFromMigrate(true);
+    OplogEntry dropDB = createCommand(BSON("dropDatabase" << 1));
+    dropDB.setFromMigrate(true);
+    OplogEntry rename =
+        createCommand(BSON("renameCollection" << nss.ns() << "to" << otherColl.ns()));
+    rename.setFromMigrate(true);
+
+    for (auto& entry : {dropColl, dropDB, rename}) {
+        checkTransformation(entry, boost::none);
     }
 }
 
@@ -307,6 +340,15 @@ TEST_F(ChangeStreamStageTest, MatchFiltersCreateIndex) {
     auto indexSpec = D{{"v", 2}, {"key", D{{"a", 1}}}, {"name", "a_1"_sd}, {"ns", nss.ns()}};
     NamespaceString indexNs(nss.getSystemIndexesCollection());
     OplogEntry createIndex(optime, 1, OpTypeEnum::kInsert, indexNs, indexSpec.toBson());
+    createIndex.setFromMigrate(false);  // At the moment this makes no difference.
+    checkTransformation(createIndex, boost::none);
+}
+
+TEST_F(ChangeStreamStageTest, MatchFiltersCreateIndexFromMigrate) {
+    auto indexSpec = D{{"v", 2}, {"key", D{{"a", 1}}}, {"name", "a_1"_sd}, {"ns", nss.ns()}};
+    NamespaceString indexNs(nss.getSystemIndexesCollection());
+    OplogEntry createIndex(optime, 1, OpTypeEnum::kInsert, indexNs, indexSpec.toBson());
+    createIndex.setFromMigrate(true);
     checkTransformation(createIndex, boost::none);
 }
 

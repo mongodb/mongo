@@ -215,10 +215,12 @@ BSONObj DocumentSourceChangeStream::buildMatchFilter(const NamespaceString& nss,
     // 4) Normal CRUD ops on the target collection.
     auto opMatch = BSON("ns" << target);
 
-    // Match oplog entries after "start" and are either (3) supported commands or (4) CRUD ops.
-    // Include the resume token if resuming, so we can verify it was still present in the oplog.
-    return BSON("ts" << (isResume ? GTE : GT) << startFrom << "$or"
-                     << BSON_ARRAY(opMatch << commandMatch));
+    // Match oplog entries after "start" and are either (3) supported commands or (4) CRUD ops,
+    // excepting those tagged "fromMigrate".
+    // Include the resume token, if resuming, so we can verify it was still present in the oplog.
+    return BSON("$and" << BSON_ARRAY(BSON("ts" << (isResume ? GTE : GT) << startFrom)
+                                     << BSON("$or" << BSON_ARRAY(opMatch << commandMatch))
+                                     << BSON("fromMigrate" << NE << true)));
 }
 
 list<intrusive_ptr<DocumentSource>> DocumentSourceChangeStream::createFromBson(
