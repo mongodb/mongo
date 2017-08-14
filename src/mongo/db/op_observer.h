@@ -161,7 +161,7 @@ public:
     /**
      * This function logs an oplog entry when a 'drop' command on a collection is executed.
      * Returns the optime of the oplog entry successfully written to the oplog.
-     * Returns a null optime if an oplog entry should not be written for this operation.
+     * Returns a null optime if an oplog entry was not written for this operation.
      */
     virtual repl::OpTime onDropCollection(OperationContext* opCtx,
                                           const NamespaceString& collectionName,
@@ -181,14 +181,21 @@ public:
                              OptionalCollectionUUID uuid,
                              const std::string& indexName,
                              const BSONObj& indexInfo) = 0;
-    virtual void onRenameCollection(OperationContext* opCtx,
-                                    const NamespaceString& fromCollection,
-                                    const NamespaceString& toCollection,
-                                    OptionalCollectionUUID uuid,
-                                    bool dropTarget,
-                                    OptionalCollectionUUID dropTargetUUID,
-                                    OptionalCollectionUUID dropSourceUUID,
-                                    bool stayTemp) = 0;
+
+    /**
+     * This function logs an oplog entry when a 'renameCollection' command on a collection is
+     * executed.
+     * Returns the optime of the oplog entry successfully written to the oplog.
+     * Returns a null optime if an oplog entry was not written for this operation.
+     */
+    virtual repl::OpTime onRenameCollection(OperationContext* opCtx,
+                                            const NamespaceString& fromCollection,
+                                            const NamespaceString& toCollection,
+                                            OptionalCollectionUUID uuid,
+                                            bool dropTarget,
+                                            OptionalCollectionUUID dropTargetUUID,
+                                            OptionalCollectionUUID dropSourceUUID,
+                                            bool stayTemp) = 0;
     virtual void onApplyOps(OperationContext* opCtx,
                             const std::string& dbName,
                             const BSONObj& applyOpCmd) = 0;

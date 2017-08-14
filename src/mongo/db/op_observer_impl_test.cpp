@@ -203,5 +203,40 @@ TEST_F(OpObserverTest, OnDropCollectionReturnsDropOpTime) {
     ASSERT_EQUALS(repl::ReplClientInfo::forClient(&cc()).getLastOp(), dropOpTime);
 }
 
+TEST_F(OpObserverTest, OnRenameCollectionReturnsRenameOpTime) {
+    OpObserverImpl opObserver;
+    auto opCtx = cc().makeOperationContext();
+
+    // Create 'renameCollection' command.
+    auto dropTarget = false;
+    auto stayTemp = false;
+    NamespaceString sourceNss("test.foo");
+    NamespaceString targetNss("test.bar");
+    auto renameCmd = BSON(
+        "renameCollection" << sourceNss.ns() << "to" << targetNss.ns() << "stayTemp" << stayTemp
+                           << "dropTarget"
+                           << dropTarget);
+
+    // Write to the oplog.
+    repl::OpTime renameOpTime;
+    {
+        AutoGetDb autoDb(opCtx.get(), sourceNss.db(), MODE_X);
+        WriteUnitOfWork wunit(opCtx.get());
+        renameOpTime = opObserver.onRenameCollection(
+            opCtx.get(), sourceNss, targetNss, {}, dropTarget, {}, {}, stayTemp);
+        wunit.commit();
+    }
+
+    auto oplogEntry = getSingleOplogEntry(opCtx.get());
+
+    // Ensure that renameCollection fields were properly added to oplog entry.
+    auto o = oplogEntry.getObjectField("o");
+    auto oExpected = renameCmd;
+    ASSERT_BSONOBJ_EQ(oExpected, o);
+
+    // Ensure that the rename optime returned is the same as the last optime in the ReplClientInfo.
+    ASSERT_EQUALS(repl::ReplClientInfo::forClient(&cc()).getLastOp(), renameOpTime);
+}
+
 }  // namespace
 }  // namespace mongo

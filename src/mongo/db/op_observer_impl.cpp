@@ -415,14 +415,14 @@ void OpObserverImpl::onDropIndex(OperationContext* opCtx,
     getGlobalAuthorizationManager()->logOp(opCtx, "c", commandNS, cmdObj, &indexInfo);
 }
 
-void OpObserverImpl::onRenameCollection(OperationContext* opCtx,
-                                        const NamespaceString& fromCollection,
-                                        const NamespaceString& toCollection,
-                                        OptionalCollectionUUID uuid,
-                                        bool dropTarget,
-                                        OptionalCollectionUUID dropTargetUUID,
-                                        OptionalCollectionUUID dropSourceUUID,
-                                        bool stayTemp) {
+repl::OpTime OpObserverImpl::onRenameCollection(OperationContext* opCtx,
+                                                const NamespaceString& fromCollection,
+                                                const NamespaceString& toCollection,
+                                                OptionalCollectionUUID uuid,
+                                                bool dropTarget,
+                                                OptionalCollectionUUID dropTargetUUID,
+                                                OptionalCollectionUUID dropSourceUUID,
+                                                bool stayTemp) {
     const NamespaceString cmdNss = fromCollection.getCommandNS();
     BSONObjBuilder builder;
     builder.append("renameCollection", fromCollection.ns());
@@ -438,7 +438,9 @@ void OpObserverImpl::onRenameCollection(OperationContext* opCtx,
     }
     BSONObj cmdObj = builder.done();
 
-    repl::logOp(opCtx, "c", cmdNss, uuid, cmdObj, nullptr, false, kUninitializedStmtId);
+    auto renameOpTime =
+        repl::logOp(opCtx, "c", cmdNss, uuid, cmdObj, nullptr, false, kUninitializedStmtId);
+
     if (fromCollection.isSystemDotViews())
         DurableViewCatalog::onExternalChange(opCtx, fromCollection);
     if (toCollection.isSystemDotViews())
@@ -462,6 +464,8 @@ void OpObserverImpl::onRenameCollection(OperationContext* opCtx,
         UUIDCatalog& catalog = UUIDCatalog::get(opCtx);
         catalog.onRenameCollection(opCtx, newColl, uuid.get());
     }
+
+    return renameOpTime;
 }
 
 void OpObserverImpl::onApplyOps(OperationContext* opCtx,
