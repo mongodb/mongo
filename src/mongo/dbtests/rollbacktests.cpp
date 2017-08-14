@@ -82,7 +82,7 @@ Status renameCollection(OperationContext* opCtx,
                         const NamespaceString& source,
                         const NamespaceString& target) {
     ASSERT_EQ(source.db(), target.db());
-    return renameCollection(opCtx, source, target, false, false);
+    return renameCollection(opCtx, source, target, {});
 }
 Status truncateCollection(OperationContext* opCtx, const NamespaceString& nss) {
     Collection* coll = dbHolder().get(opCtx, nss.db())->getCollection(opCtx, nss);

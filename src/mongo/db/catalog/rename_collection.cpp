@@ -76,8 +76,7 @@ Status renameCollectionCommon(OperationContext* opCtx,
                               const NamespaceString& source,
                               const NamespaceString& target,
                               OptionalCollectionUUID targetUUID,
-                              bool dropTarget,
-                              bool stayTemp) {
+                              const RenameCollectionOptions& options) {
     DisableDocumentValidation validationDisabler(opCtx);
 
     boost::optional<Lock::GlobalWrite> globalWriteLock;
@@ -150,7 +149,7 @@ Status renameCollectionCommon(OperationContext* opCtx,
             return {ErrorCodes::IllegalOperation, "cannot rename to a sharded collection"};
         }
 
-        if (!dropTarget) {
+        if (!options.dropTarget) {
             return Status(ErrorCodes::NamespaceExists, "target namespace exists");
         }
 
@@ -175,7 +174,8 @@ Status renameCollectionCommon(OperationContext* opCtx,
                 }
             }
 
-            Status s = targetDB->renameCollection(opCtx, source.ns(), target.ns(), stayTemp);
+            Status s =
+                targetDB->renameCollection(opCtx, source.ns(), target.ns(), options.stayTemp);
             if (!s.isOK()) {
                 return s;
             }
@@ -184,10 +184,10 @@ Status renameCollectionCommon(OperationContext* opCtx,
                                                                            NamespaceString(source),
                                                                            NamespaceString(target),
                                                                            sourceUUID,
-                                                                           dropTarget,
+                                                                           options.dropTarget,
                                                                            dropTargetUUID,
                                                                            /*dropSourceUUID*/ {},
-                                                                           stayTemp);
+                                                                           options.stayTemp);
 
             wunit.commit();
             return Status::OK();
@@ -313,7 +313,8 @@ Status renameCollectionCommon(OperationContext* opCtx,
                 status = targetDB->dropCollection(opCtx, target.ns());
             }
             if (status.isOK())
-                status = targetDB->renameCollection(opCtx, tmpName.ns(), target.ns(), stayTemp);
+                status =
+                    targetDB->renameCollection(opCtx, tmpName.ns(), target.ns(), options.stayTemp);
             if (status.isOK())
                 status = sourceDB->dropCollection(opCtx, source.ns());
 
@@ -321,8 +322,14 @@ Status renameCollectionCommon(OperationContext* opCtx,
                 return status;
         }
 
-        getGlobalServiceContext()->getOpObserver()->onRenameCollection(
-            opCtx, source, target, newUUID, dropTarget, dropTargetUUID, sourceUUID, stayTemp);
+        getGlobalServiceContext()->getOpObserver()->onRenameCollection(opCtx,
+                                                                       source,
+                                                                       target,
+                                                                       newUUID,
+                                                                       options.dropTarget,
+                                                                       dropTargetUUID,
+                                                                       sourceUUID,
+                                                                       options.stayTemp);
 
         wunit.commit();
         return Status::OK();
@@ -340,10 +347,9 @@ Status renameCollectionCommon(OperationContext* opCtx,
 Status renameCollection(OperationContext* opCtx,
                         const NamespaceString& source,
                         const NamespaceString& target,
-                        bool dropTarget,
-                        bool stayTemp) {
+                        const RenameCollectionOptions& options) {
     OptionalCollectionUUID noTargetUUID;
-    return renameCollectionCommon(opCtx, source, target, noTargetUUID, dropTarget, stayTemp);
+    return renameCollectionCommon(opCtx, source, target, noTargetUUID, options);
 }
 
 
@@ -403,11 +409,9 @@ Status renameCollectionForApplyOps(OperationContext* opCtx,
     if (!ui.eoo())
         targetUUID = uassertStatusOK(UUID::parse(ui));
 
-    return renameCollectionCommon(opCtx,
-                                  sourceNss,
-                                  targetNss,
-                                  targetUUID,
-                                  cmd["dropTarget"].trueValue(),
-                                  cmd["stayTemp"].trueValue());
+    RenameCollectionOptions options;
+    options.dropTarget = cmd["dropTarget"].trueValue();
+    options.stayTemp = cmd["stayTemp"].trueValue();
+    return renameCollectionCommon(opCtx, sourceNss, targetNss, targetUUID, options);
 }
 }  // namespace mongo

@@ -144,12 +144,10 @@ public:
             return false;
         }
 
-        return appendCommandStatus(result,
-                                   renameCollection(opCtx,
-                                                    source,
-                                                    target,
-                                                    cmdObj["dropTarget"].trueValue(),
-                                                    cmdObj["stayTemp"].trueValue()));
+        RenameCollectionOptions options;
+        options.dropTarget = cmdObj["dropTarget"].trueValue();
+        options.stayTemp = cmdObj["stayTemp"].trueValue();
+        return appendCommandStatus(result, renameCollection(opCtx, source, target, options));
     }
 
 } cmdrenamecollection;

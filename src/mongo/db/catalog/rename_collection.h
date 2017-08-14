@@ -39,11 +39,14 @@ class OperationContext;
  * iff "dropTarget" is true. "stayTemp" indicates whether a collection should maintain its
  * temporariness.
  */
+struct RenameCollectionOptions {
+    bool dropTarget = false;
+    bool stayTemp = false;
+};
 Status renameCollection(OperationContext* opCtx,
                         const NamespaceString& source,
                         const NamespaceString& target,
-                        bool dropTarget,
-                        bool stayTemp);
+                        const RenameCollectionOptions& options);
 
 /**
  * As above, but may only be called from applyCommand_inlock. This allows creating a collection

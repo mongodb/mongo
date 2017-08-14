@@ -294,6 +294,8 @@ mongo::Status mongo::convertToCapped(OperationContext* opCtx,
             return status;
     }
 
-    return renameCollection(
-        opCtx, longTmpName, collectionName, /*dropTarget*/ true, /*stayTemp*/ false);
+    RenameCollectionOptions options;
+    options.dropTarget = true;
+    options.stayTemp = false;
+    return renameCollection(opCtx, longTmpName, collectionName, options);
 }
