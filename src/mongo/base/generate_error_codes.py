@@ -301,6 +301,7 @@ class cpp_generator(base_generator):
 #pragma once
 #include <string>
 #include <cstdint>
+#include <iosfwd>
 #include "mongo/base/string_data.h"
 namespace mongo {
     /**
@@ -329,9 +330,13 @@ namespace mongo {
          * that the result of a call to fromInt() may not be one of the values in the
          * Error enumeration.
          */
-        static Error fromInt(int code);
+        static Error fromInt(int code) {
+            return static_cast<Error>(code);
+        }
         %(error_code_class_predicate_declarations)s;
     };
+
+    std::ostream& operator<<(std::ostream& stream, ErrorCodes::Error code);
 }  // namespace mongo
 '''
 
@@ -369,15 +374,15 @@ namespace mongo {
     std::string ErrorCodes::errorString(Error err) {
         switch (err) {
         %(symbol_to_string_cases)s;
-        default: return mongoutils::str::stream() << "Location" << err;
+        default: return mongoutils::str::stream() << "Location" << int(err);
         }
     }
     ErrorCodes::Error ErrorCodes::fromString(StringData name) {
         %(string_to_symbol_cases)s;
         return UnknownError;
     }
-    ErrorCodes::Error ErrorCodes::fromInt(int code) {
-        return static_cast<Error>(code);
+    std::ostream& operator<<(std::ostream& stream, ErrorCodes::Error code) {
+        return stream << ErrorCodes::errorString(code);
     }
     %(error_code_class_predicate_definitions)s
 namespace {

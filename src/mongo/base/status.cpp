@@ -57,10 +57,6 @@ std::ostream& operator<<(std::ostream& os, const Status& status) {
     return os << status.codeString() << " " << status.reason();
 }
 
-std::ostream& operator<<(std::ostream& os, ErrorCodes::Error code) {
-    return os << ErrorCodes::errorString(code);
-}
-
 std::string Status::toString() const {
     std::ostringstream ss;
     ss << codeString();

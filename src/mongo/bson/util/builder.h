@@ -443,6 +443,10 @@ public:
         append(typeName(type));
         return *this;
     }
+    StringBuilderImpl& operator<<(ErrorCodes::Error code) {
+        append(ErrorCodes::errorString(code));
+        return *this;
+    }
 
     void appendDoubleNice(double x) {
         const int prev = _buf.l;

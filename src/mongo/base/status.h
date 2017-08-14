@@ -185,12 +185,7 @@ inline bool operator==(const ErrorCodes::Error lhs, const Status& rhs);
 
 inline bool operator!=(const ErrorCodes::Error lhs, const Status& rhs);
 
-//
-// Convenience method for unittest code. Please use accessors otherwise.
-//
-
 std::ostream& operator<<(std::ostream& os, const Status& status);
-std::ostream& operator<<(std::ostream& os, ErrorCodes::Error);
 
 }  // namespace mongo
 
