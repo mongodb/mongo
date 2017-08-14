@@ -66,6 +66,8 @@ env.Library(
         "mr_common.cpp",
         "parameters.cpp",
         "refresh_logical_session_cache_now.cpp",
+        "refresh_sessions_command.cpp",
+        "refresh_sessions_command_internal.cpp",
         "rename_collection_common.cpp",
         "start_session_command.cpp",
         "user_management_commands_common.cpp",

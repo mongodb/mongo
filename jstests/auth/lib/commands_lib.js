@@ -4465,6 +4465,16 @@ var authCommandsLib = {
           command: {refreshLogicalSessionCacheNow: 1},
           testcases: [{runOnDb: adminDbName, roles: roles_all}],
         },
+        {
+          testname: "refreshSessions",
+          command: {refreshSessions: []},
+          testcases: [{runOnDb: adminDbName, roles: roles_all}],
+        },
+        {
+          testname: "refreshSessionsInternal",
+          command: {refreshSessionsInternal: []},
+          testcases: [{runOnDb: adminDbName, roles: {__system: 1}}],
+        },
     ],
 
     /************* SHARED TEST LOGIC ****************/

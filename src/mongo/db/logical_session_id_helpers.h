@@ -28,6 +28,10 @@
 
 #pragma once
 
+#include <initializer_list>
+#include <vector>
+
+#include "mongo/db/auth/privilege.h"
 #include "mongo/db/logical_session_id.h"
 
 namespace mongo {
@@ -36,7 +40,8 @@ namespace mongo {
  * Factory functions to generate logical session records.
  */
 LogicalSessionId makeLogicalSessionId(const LogicalSessionFromClient& lsid,
-                                      OperationContext* opCtx);
+                                      OperationContext* opCtx,
+                                      std::initializer_list<Privilege> allowSpoof = {});
 LogicalSessionId makeLogicalSessionId(OperationContext* opCtx);
 
 /**
@@ -51,6 +56,9 @@ LogicalSessionRecord makeLogicalSessionRecord(OperationContext* opCtx,
                                               Date_t lastUse);
 
 LogicalSessionToClient makeLogicalSessionToClient(const LogicalSessionId& lsid);
+LogicalSessionIdSet makeLogicalSessionIds(const std::vector<LogicalSessionFromClient>& sessions,
+                                          OperationContext* opCtx,
+                                          std::initializer_list<Privilege> allowSpoof = {});
 
 /**
  * Parses the session information from the body of a request and installs it on the current

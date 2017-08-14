@@ -130,33 +130,49 @@ Status LogicalSessionCache::promote(LogicalSessionId lsid) {
         return {ErrorCodes::NoSuchSession, "no matching session record found in the cache"};
     }
 
-    // Do not use records if they have expired.
-    auto time = now();
-    if (_isDead(it->second, time)) {
-        return {ErrorCodes::NoSuchSession, "no matching session record found in the cache"};
-    }
-
     // Update the last use time before returning.
-    it->second.setLastUse(time);
+    it->second.setLastUse(now());
     return Status::OK();
 }
 
 Status LogicalSessionCache::startSession(OperationContext* opCtx, LogicalSessionRecord record) {
     // Add the new record to our local cache. We will insert it into the sessions collection
-    // the next time _refresh is called.
+    // the next time _refresh is called. If there is already a record in the cache for this
+    // session, we'll just write over it with our newer, more recent one.
+    _addToCache(record);
+    return Status::OK();
+}
 
-    // If we get a conflict here, then an interloper may have ended this session
-    // and then created a new one with the same id. In this case, return a failure.
-    auto oldRecord = _addToCache(record);
-    if (oldRecord) {
-        if (*oldRecord != record) {
-            if (!_isDead(*oldRecord, now())) {
-                return {ErrorCodes::DuplicateSession, "session with this id already exists"};
-            }
+Status LogicalSessionCache::refreshSessions(OperationContext* opCtx,
+                                            const RefreshSessionsCmdFromClient& cmd) {
+    // Update the timestamps of all these records in our cache.
+    auto sessions = makeLogicalSessionIds(cmd.getRefreshSessions(), opCtx);
+    for (auto& lsid : sessions) {
+        if (!promote(lsid).isOK()) {
+            // This is a new record, insert it.
+            _addToCache(makeLogicalSessionRecord(opCtx, lsid, now()));
         }
     }
 
     return Status::OK();
+}
+
+Status LogicalSessionCache::refreshSessions(OperationContext* opCtx,
+                                            const RefreshSessionsCmdFromClusterMember& cmd) {
+    LogicalSessionRecordSet toRefresh{};
+
+    // Update the timestamps of all these records in our cache.
+    auto records = cmd.getRefreshSessionsInternal();
+    for (auto& record : records) {
+        if (!promote(record.getId()).isOK()) {
+            // This is a new record, insert it.
+            _addToCache(record);
+        }
+        toRefresh.insert(record);
+    }
+
+    // Write to the sessions collection now.
+    return _sessionsColl->refreshSessions(opCtx, toRefresh, now());
 }
 
 void LogicalSessionCache::refreshNow(Client* client) {

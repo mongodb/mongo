@@ -60,10 +60,7 @@ public:
 
     /**
      * Updates the last-use times on the given sessions to be greater than
-     * or equal to the given time.
-     *
-     * Returns a list of sessions for which no authoritative record was found,
-     * and hence were not refreshed. Returns an error if a networking issue occurred.
+     * or equal to the given time. Returns an error if a networking issue occurred.
      */
     virtual Status refreshSessions(OperationContext* opCtx,
                                    const LogicalSessionRecordSet& sessions,

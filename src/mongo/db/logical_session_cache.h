@@ -30,6 +30,7 @@
 
 #include "mongo/base/status_with.h"
 #include "mongo/db/logical_session_id.h"
+#include "mongo/db/refresh_sessions_gen.h"
 #include "mongo/db/service_liason.h"
 #include "mongo/db/sessions_collection.h"
 #include "mongo/db/time_proof_service.h"
@@ -113,9 +114,7 @@ public:
     /**
      * If the cache contains a record for this LogicalSessionId, promotes that lsid
      * to be the most recently used and updates its lastUse date to be the current
-     * time. Otherwise, returns an error.
-     *
-     * This method does not issue networking calls.
+     * time. Returns an error if the session was not found.
      */
     Status promote(LogicalSessionId lsid);
 
@@ -135,6 +134,13 @@ public:
      * insert records for existing sessions.
      */
     Status startSession(OperationContext* opCtx, LogicalSessionRecord record);
+
+    /**
+     * Refresh the given sessions. Updates the timestamps of these records in
+     * the local cache.
+     */
+    Status refreshSessions(OperationContext* opCtx, const RefreshSessionsCmdFromClient& cmd);
+    Status refreshSessions(OperationContext* opCtx, const RefreshSessionsCmdFromClusterMember& cmd);
 
     /**
      * Removes all local records in this cache. Does not remove the corresponding

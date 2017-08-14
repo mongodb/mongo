@@ -257,6 +257,8 @@
         planCacheSetFilter: {skip: "does not return user data"},
         profile: {skip: "primary only"},
         refreshLogicalSessionCacheNow: {skip: "does not return user data"},
+        refreshSessions: {skip: "does not return user data"},
+        refreshSessionsInternal: {skip: "does not return user data"},
         reIndex: {skip: "does not return user data"},
         removeShard: {skip: "primary only"},
         removeShardFromZone: {skip: "primary only"},
