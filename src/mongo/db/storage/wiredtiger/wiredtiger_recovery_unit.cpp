@@ -234,7 +234,9 @@ void WiredTigerRecoveryUnit::_txnOpen() {
     }
     WT_SESSION* session = _session->getSession();
 
-    if (_readFromMajorityCommittedSnapshot) {
+    if (_readAtTimestamp != SnapshotName::min()) {
+        _sessionCache->snapshotManager().beginTransactionAtTimestamp(_readAtTimestamp, session);
+    } else if (_readFromMajorityCommittedSnapshot) {
         _majorityCommittedSnapshot =
             _sessionCache->snapshotManager().beginTransactionOnCommittedSnapshot(session);
     } else if (_isOplogReader) {
@@ -261,6 +263,11 @@ Status WiredTigerRecoveryUnit::setTimestamp(SnapshotName timestamp) {
     const std::string conf = str::stream() << "commit_timestamp=" << timestamp.toString();
     auto rc = session->timestamp_transaction(session, conf.c_str());
     return wtRCToStatus(rc, "timestamp_transaction");
+}
+
+Status WiredTigerRecoveryUnit::selectSnapshot(SnapshotName timestamp) {
+    _readAtTimestamp = timestamp;
+    return Status::OK();
 }
 
 void WiredTigerRecoveryUnit::setIsOplogReader() {

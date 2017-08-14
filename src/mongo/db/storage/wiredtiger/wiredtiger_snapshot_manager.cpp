@@ -95,6 +95,18 @@ boost::optional<SnapshotName> WiredTigerSnapshotManager::getMinSnapshotForNextCo
     return _committedSnapshot;
 }
 
+void WiredTigerSnapshotManager::beginTransactionAtTimestamp(SnapshotName pointInTime,
+                                                            WT_SESSION* session) const {
+    char readTSConfigString[15 /* read_timestamp= */ + (8 * 2) /* 8 hexadecimal characters */ +
+                            1 /* trailing null */];
+    auto size = std::snprintf(readTSConfigString,
+                              sizeof(readTSConfigString),
+                              "read_timestamp=%llx",
+                              static_cast<unsigned long long>(pointInTime.asU64()));
+    invariant(static_cast<std::size_t>(size) < sizeof(readTSConfigString));
+    invariantWTOK(session->begin_transaction(session, readTSConfigString));
+}
+
 SnapshotName WiredTigerSnapshotManager::beginTransactionOnCommittedSnapshot(
     WT_SESSION* session) const {
     stdx::lock_guard<stdx::mutex> lock(_mutex);

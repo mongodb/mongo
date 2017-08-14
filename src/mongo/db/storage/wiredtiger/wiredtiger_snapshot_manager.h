@@ -69,6 +69,8 @@ public:
      */
     void shutdown();
 
+    void beginTransactionAtTimestamp(SnapshotName pointInTime, WT_SESSION* session) const;
+
     /**
      * Starts a transaction and returns the SnapshotName used.
      *

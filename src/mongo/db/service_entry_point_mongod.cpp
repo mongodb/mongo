@@ -298,7 +298,7 @@ StatusWith<repl::ReadConcernArgs> _extractReadConcern(const BSONObj& cmdObj,
                                                       bool supportsNonLocalReadConcern) {
     repl::ReadConcernArgs readConcernArgs;
 
-    auto readConcernParseStatus = readConcernArgs.initialize(cmdObj);
+    auto readConcernParseStatus = readConcernArgs.initialize(cmdObj, Command::testCommandsEnabled);
     if (!readConcernParseStatus.isOK()) {
         return readConcernParseStatus;
     }

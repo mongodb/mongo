@@ -179,6 +179,12 @@ Status waitForReadConcern(OperationContext* opCtx, const repl::ReadConcernArgs& 
         }
     }
 
+    auto pointInTime = readConcernArgs.getArgsPointInTime();
+    if (pointInTime) {
+        fassertStatusOK(
+            39345, opCtx->recoveryUnit()->selectSnapshot(SnapshotName(pointInTime->asTimestamp())));
+    }
+
     // Skip waiting for the OpTime when testing snapshot behavior
     if (!testingSnapshotBehaviorInIsolation && !readConcernArgs.isEmpty()) {
         if (replCoord->isReplEnabled() && afterClusterTime) {

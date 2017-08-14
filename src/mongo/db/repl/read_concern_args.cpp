@@ -55,6 +55,8 @@ const char kAvailableReadConcernStr[] = "available";
 const string ReadConcernArgs::kReadConcernFieldName("readConcern");
 const string ReadConcernArgs::kAfterOpTimeFieldName("afterOpTime");
 const string ReadConcernArgs::kAfterClusterTimeFieldName("afterClusterTime");
+const string ReadConcernArgs::kAtClusterTimeFieldName("atClusterTime");
+
 const string ReadConcernArgs::kLevelFieldName("level");
 
 const OperationContext::Decoration<ReadConcernArgs> ReadConcernArgs::get =
@@ -99,7 +101,11 @@ boost::optional<LogicalTime> ReadConcernArgs::getArgsClusterTime() const {
     return _clusterTime;
 }
 
-Status ReadConcernArgs::initialize(const BSONElement& readConcernElem) {
+boost::optional<LogicalTime> ReadConcernArgs::getArgsPointInTime() const {
+    return _pointInTime;
+}
+
+Status ReadConcernArgs::initialize(const BSONElement& readConcernElem, bool testMode) {
     invariant(isEmpty());  // only legal to call on uninitialized object.
 
     if (readConcernElem.eoo()) {
@@ -133,6 +139,14 @@ Status ReadConcernArgs::initialize(const BSONElement& readConcernElem) {
                 return clusterTimeStatus;
             }
             _clusterTime = LogicalTime(clusterTime);
+        } else if (fieldName == kAtClusterTimeFieldName && testMode) {
+            Timestamp pointInTime;
+            auto pointInTimeStatus =
+                bsonExtractTimestampField(readConcernObj, kAtClusterTimeFieldName, &pointInTime);
+            if (!pointInTimeStatus.isOK()) {
+                return pointInTimeStatus;
+            }
+            _pointInTime = LogicalTime(pointInTime);
         } else if (fieldName == kLevelFieldName) {
             std::string levelString;
             // TODO pass field in rather than scanning again.

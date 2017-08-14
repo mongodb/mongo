@@ -73,6 +73,8 @@ public:
 
     Status setTimestamp(SnapshotName timestamp) override;
 
+    Status selectSnapshot(SnapshotName timestamp) override;
+
     void* writingPtr(void* data, size_t len) override;
 
     void setRollbackWritesDisabled() override {}
@@ -129,6 +131,7 @@ private:
     uint64_t _mySnapshotId;
     bool _readFromMajorityCommittedSnapshot = false;
     SnapshotName _majorityCommittedSnapshot = SnapshotName::min();
+    SnapshotName _readAtTimestamp = SnapshotName::min();
     std::unique_ptr<Timer> _timer;
     bool _isOplogReader = false;
     typedef std::vector<std::unique_ptr<Change>> Changes;
