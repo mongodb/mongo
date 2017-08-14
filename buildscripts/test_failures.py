@@ -332,7 +332,7 @@ class TestHistory(object):
     A class for interacting with the /test_history Evergreen API endpoint.
     """
 
-    DEFAULT_API_SERVER = "http://evergreen-api.mongodb.com:8080"
+    DEFAULT_API_SERVER = "https://evergreen.mongodb.com"
     DEFAULT_PROJECT = "mongodb-mongo-master"
 
     DEFAULT_TEST_STATUSES = ("pass", "fail", "silentfail")
