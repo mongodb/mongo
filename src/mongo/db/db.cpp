@@ -983,8 +983,6 @@ void shutdownTask() {
     log(LogComponent::kNetwork) << "shutdown: going to flush diaglog...";
     _diaglog.flush();
 
-    serviceContext->setKillAllOperations();
-
     if (serviceContext->getGlobalStorageEngine()) {
         ServiceContext::UniqueOperationContext uniqueOpCtx;
         OperationContext* opCtx = client->getOperationContext();
@@ -1021,6 +1019,8 @@ void shutdownTask() {
 
         ShardingState::get(serviceContext)->shutDown(opCtx);
     }
+
+    serviceContext->setKillAllOperations();
 
     // Shut down the background periodic task runner
     if (auto runner = serviceContext->getPeriodicRunner()) {
