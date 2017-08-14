@@ -45,6 +45,11 @@
     let collToDrop34 = "collectionToDrop34";
     twoPhaseDropTest.createCollection(collToDrop34);
 
+    // Make sure checkpointTimestamp collection is not empty at shutdown.
+    let checkpointColl = replTest.getPrimary().getCollection("local.replset.checkpointTimestamp");
+    assert.writeOK(checkpointColl.insert({a: 1}));
+    assert.gt(checkpointColl.find().itcount(), 0);
+
     jsTestLog("Setting FCV=3.4 on the primary before collection drop.");
     setFCV(replTest.getPrimary(), "3.4");
     twoPhaseDropTest.prepareDropCollection(collToDrop34);
@@ -54,6 +59,9 @@
 
     assert(!twoPhaseDropTest.collectionIsPendingDrop(collToDrop34),
            "Collection was not removed on clean shutdown when FCV is 3.4.");
+
+    // Test that the checkpointTimestamp collection is also dropped on 3.4 fCV shutdown.
+    assert(!twoPhaseDropTest.collectionExists("local.replset.checkpointTimestamp"));
 
     // Resume oplog application so that we can set FCV again.
     twoPhaseDropTest.resumeOplogApplication(replTest.getSecondary());

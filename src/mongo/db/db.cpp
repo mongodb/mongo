@@ -996,6 +996,21 @@ static void shutdownTask() {
             log(LogComponent::kReplication) << "shutdown: removing all drop-pending collections...";
             repl::DropPendingCollectionReaper::get(opCtx)->dropCollectionsOlderThan(
                 opCtx, repl::OpTime::max());
+
+            // If we are in fCV 3.4, drop the 'checkpointTimestamp' collection so if we downgrade
+            // and then upgrade again, we do not trust a stale 'checkpointTimestamp'.
+            log(LogComponent::kReplication)
+                << "shutdown: removing checkpointTimestamp collection...";
+            Status status = repl::StorageInterface::get(opCtx)->dropCollection(
+                opCtx,
+                NamespaceString(
+                    repl::ReplicationConsistencyMarkersImpl::kDefaultCheckpointTimestampNamespace));
+
+            if (!status.isOK()) {
+                warning(LogComponent::kReplication)
+                    << "shutdown: dropping checkpointTimestamp collection failed: "
+                    << redact(status.toString());
+            }
         }
 
         // This can wait a long time while we drain the secondary's apply queue, especially if it is
