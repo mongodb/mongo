@@ -276,6 +276,9 @@ struct FixUpInfo {
     stdx::unordered_map<UUID, std::pair<OpTime, NamespaceString>, UUID::Hash>
         collectionsToRemoveFromDropPendingCollections;
 
+    // The UUID of the transactions collection. Set at the beginning of rollback.
+    boost::optional<UUID> transactionTableUUID = boost::none;
+
     // True if rollback requires re-fetching documents in the session transaction table. If true,
     // after rollback the in-memory transaction table is cleared.
     bool refetchTransactionDocs = false;

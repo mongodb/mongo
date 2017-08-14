@@ -34,6 +34,7 @@
 
 #include <boost/optional.hpp>
 
+#include "mongo/db/db_raii.h"
 #include "mongo/db/dbdirectclient.h"
 #include "mongo/db/namespace_string.h"
 #include "mongo/db/operation_context.h"
@@ -89,6 +90,17 @@ SessionCatalog* SessionCatalog::get(ServiceContext* service) {
     invariant(sessionTransactionTable);
 
     return sessionTransactionTable.get_ptr();
+}
+
+boost::optional<UUID> SessionCatalog::getTransactionTableUUID(OperationContext* opCtx) {
+    AutoGetCollection autoColl(opCtx, NamespaceString::kSessionTransactionsTableNamespace, MODE_IS);
+
+    const auto coll = autoColl.getCollection();
+    if (coll == nullptr) {
+        return boost::none;
+    }
+
+    return coll->uuid();
 }
 
 void SessionCatalog::onStepUp(OperationContext* opCtx) {

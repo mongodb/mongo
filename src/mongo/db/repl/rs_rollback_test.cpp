@@ -1975,53 +1975,78 @@ DEATH_TEST_F(RSRollbackTest, LocalEntryWithTxnNumberWithoutStmtIdIsFatal, "invar
                   RSFatalException);
 }
 
-// TODO: Uncomment this test once transactions have been updated to work with the proper
-// uuid. See SERVER-30076.
-// TEST(RSRollbackTest, LocalEntryWithTxnNumberAddsTransactionTableDocToBeRefetched) {
-//    FixUpInfo fui;
-//    auto entryWithoutTxnNumber =
-//        BSON("ts" << Timestamp(Seconds(1), 0) << "t" << 1LL << "h" << 1LL << "op"
-//                  << "i"
-//                  << "ui"
-//                  << UUID::gen()
-//                  << "ns"
-//                  << "test.t2"
-//                  << "o"
-//                  << BSON("_id" << 2 << "a" << 2));
-//    ASSERT_OK(updateFixUpInfoFromLocalOplogEntry(fui, entryWithoutTxnNumber));
-//
-//    // With no txnNumber present, no extra documents need to be refetched.
-//    ASSERT_EQ(fui.docsToRefetch.size(), 1U);
-//
-//    UUID uuid = UUID::gen();
-//    auto entryWithTxnNumber =
-//        BSON("ts" << Timestamp(Seconds(1), 0) << "t" << 1LL << "h" << 1LL << "op"
-//                  << "i"
-//                  << "ui"
-//                  << uuid
-//                  << "ns"
-//                  << "test.t"
-//                  << "o"
-//                  << BSON("_id" << 1 << "a" << 1)
-//                  << "txnNumber"
-//                  << 1LL
-//                  << "stmtId"
-//                  << 1
-//                  << "lsid"
-//                  << makeLogicalSessionIdForTest().toBSON());
-//    ASSERT_OK(updateFixUpInfoFromLocalOplogEntry(fui, entryWithTxnNumber));
-//
-//    // If txnNumber is present, the session transactions table document corresponding to the oplog
-//    // entry's sessionId also needs to be refetched.
-//    ASSERT_EQ(fui.docsToRefetch.size(), 3U);
-//
-//    DocID expectedTxnDoc;
-//    expectedTxnDoc.ownedObj = BSON("_id" << entryWithTxnNumber["lsid"]);
-//    expectedTxnDoc._id = expectedTxnDoc.ownedObj.firstElement();
-//    expectedTxnDoc.ns = NamespaceString::kSessionTransactionsTableNamespace.ns().c_str();
-//    expectedTxnDoc.uuid = uuid;
-//    ASSERT_TRUE(fui.docsToRefetch.find(expectedTxnDoc) != fui.docsToRefetch.end());
-//}
+TEST_F(RSRollbackTest, LocalEntryWithTxnNumberWithoutTxnTableUUIDIsFatal) {
+    // If txnNumber is present, but the transaction collection has no UUID, rollback fails.
+    UUID uuid = UUID::gen();
+    auto lsid = makeLogicalSessionIdForTest();
+    auto entryWithTxnNumber =
+        BSON("ts" << Timestamp(Seconds(1), 0) << "t" << 1LL << "h" << 1LL << "op"
+                  << "i"
+                  << "ui"
+                  << uuid
+                  << "ns"
+                  << "test.t"
+                  << "o"
+                  << BSON("_id" << 1 << "a" << 1)
+                  << "txnNumber"
+                  << 1LL
+                  << "stmtId"
+                  << 1
+                  << "lsid"
+                  << lsid.toBSON());
+
+    FixUpInfo fui;
+    ASSERT_THROWS(updateFixUpInfoFromLocalOplogEntry(fui, entryWithTxnNumber).ignore(),
+                  RSFatalException);
+}
+
+TEST_F(RSRollbackTest, LocalEntryWithTxnNumberAddsTransactionTableDocToBeRefetched) {
+    FixUpInfo fui;
+
+    // With no txnNumber present, no extra documents need to be refetched.
+    auto entryWithoutTxnNumber =
+        BSON("ts" << Timestamp(Seconds(1), 0) << "t" << 1LL << "h" << 1LL << "op"
+                  << "i"
+                  << "ui"
+                  << UUID::gen()
+                  << "ns"
+                  << "test.t2"
+                  << "o"
+                  << BSON("_id" << 2 << "a" << 2));
+
+    ASSERT_OK(updateFixUpInfoFromLocalOplogEntry(fui, entryWithoutTxnNumber));
+    ASSERT_EQ(fui.docsToRefetch.size(), 1U);
+
+    // If txnNumber is present, and the transaction table exists and has a UUID, the session
+    // transactions table document corresponding to the oplog entry's sessionId also needs to be
+    // refetched.
+    UUID uuid = UUID::gen();
+    auto lsid = makeLogicalSessionIdForTest();
+    auto entryWithTxnNumber =
+        BSON("ts" << Timestamp(Seconds(1), 0) << "t" << 1LL << "h" << 1LL << "op"
+                  << "i"
+                  << "ui"
+                  << uuid
+                  << "ns"
+                  << "test.t"
+                  << "o"
+                  << BSON("_id" << 1 << "a" << 1)
+                  << "txnNumber"
+                  << 1LL
+                  << "stmtId"
+                  << 1
+                  << "lsid"
+                  << lsid.toBSON());
+    UUID transactionTableUUID = UUID::gen();
+    fui.transactionTableUUID = transactionTableUUID;
+
+    ASSERT_OK(updateFixUpInfoFromLocalOplogEntry(fui, entryWithTxnNumber));
+    ASSERT_EQ(fui.docsToRefetch.size(), 3U);
+
+    auto expectedObj = BSON("_id" << lsid.toBSON());
+    DocID expectedTxnDoc(expectedObj, expectedObj.firstElement(), transactionTableUUID);
+    ASSERT_TRUE(fui.docsToRefetch.find(expectedTxnDoc) != fui.docsToRefetch.end());
+}
 
 TEST_F(RSRollbackTest, RollbackReturnsImmediatelyOnFailureToTransitionToRollback) {
     // On failing to transition to ROLLBACK, rollback() should return immediately and not call

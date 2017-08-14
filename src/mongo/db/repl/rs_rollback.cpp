@@ -256,19 +256,23 @@ Status rollback_internal::updateFixUpInfoFromLocalOplogEntry(FixUpInfo& fixUpInf
         invariant(sessionId);
         invariant(oplogEntry.getStatementId());
 
-        // TODO: SERVER-30076
-        // Once collection uuids replace namespace strings for rollback, this will need to be
-        // changed to the uuid of the session transaction table collection. Need to add
-        // txnDoc.uuid with the proper uuid.
-        //        DocID txnDoc;
-        //        BSONObjBuilder txnBob;
-        //        txnBob.append("_id", sessionId->toBSON());
-        //        txnDoc.ownedObj = txnBob.obj();
-        //        txnDoc._id = txnDoc.ownedObj.firstElement();
-        //        txnDoc.ns = NamespaceString::kSessionTransactionsTableNamespace.ns().c_str();
-        //
-        //        fixUpInfo.docsToRefetch.insert(txnDoc);
-        //        fixUpInfo.refetchTransactionDocs = true;
+        auto transactionTableUUID = fixUpInfo.transactionTableUUID;
+        if (transactionTableUUID) {
+            BSONObjBuilder txnBob;
+            txnBob.append("_id", sessionId->toBSON());
+            auto txnObj = txnBob.obj();
+
+            DocID txnDoc(txnObj, txnObj.firstElement(), transactionTableUUID.get());
+            txnDoc.ns = NamespaceString::kSessionTransactionsTableNamespace.ns();
+
+            fixUpInfo.docsToRefetch.insert(txnDoc);
+            fixUpInfo.refetchTransactionDocs = true;
+        } else {
+            throw RSFatalException(
+                str::stream() << NamespaceString::kSessionTransactionsTableNamespace.ns()
+                              << " does not have a UUID, but local op has a transaction number: "
+                              << redact(oplogEntry.toBSON()));
+        }
     }
 
     if (oplogEntry.getOpType() == OpTypeEnum::kCommand) {
@@ -1307,6 +1311,10 @@ Status _syncRollback(OperationContext* opCtx,
     how.rbid = rollbackSource.getRollbackId();
     uassert(
         40506, "Upstream node rolled back. Need to retry our rollback.", how.rbid == requiredRBID);
+
+    // Find the UUID of the transactions collection. An OperationContext is required because the
+    // UUID is not known at compile time, so the SessionCatalog needs to load the collection.
+    how.transactionTableUUID = SessionCatalog::getTransactionTableUUID(opCtx);
 
     log() << "Finding the Common Point";
     try {

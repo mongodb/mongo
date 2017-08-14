@@ -75,6 +75,12 @@ public:
     static SessionCatalog* get(ServiceContext* service);
 
     /**
+     * Fetches the UUID of the transaction table, or an empty optional if the collection does not
+     * exist or has no UUID. Acquires a lock on the collection. Required for rollback via refetch.
+     */
+    static boost::optional<UUID> getTransactionTableUUID(OperationContext* opCtx);
+
+    /**
      * Invoked when the node enters the primary state. Ensures that the transactions collection is
      * created. Throws on severe exceptions due to which it is not safe to continue the step-up
      * process.
