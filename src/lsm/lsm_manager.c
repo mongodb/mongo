@@ -208,14 +208,20 @@ __wt_lsm_manager_start(WT_SESSION_IMPL *session)
 	conn = S2C(session);
 	manager = &conn->lsm_manager;
 
-	if (F_ISSET(conn, WT_CONN_READONLY)) {
-		manager->lsm_workers = 0;
-		return (0);
-	}
 	/*
-	 * We need at least a manager, a switch thread and a generic
-	 * worker.
+	 * If readonly or the manager is running, or we've already failed,
+	 * there's no work to do.
 	 */
+	if (F_ISSET(conn, WT_CONN_READONLY) ||
+	    manager->lsm_workers != 0 ||
+	    F_ISSET(manager, WT_LSM_MANAGER_SHUTDOWN))
+		return (0);
+
+	/* It's possible to race, see if we're the winner. */
+	if (!__wt_atomic_cas32(&manager->lsm_workers, 0, 1))
+		return (0);
+
+	/* We need at least a manager, a switch thread and a generic worker. */
 	WT_ASSERT(session, manager->lsm_workers_max > 2);
 
 	/*
@@ -245,6 +251,15 @@ err:		for (i = 0;
 		    i++)
 			WT_TRET((&worker_session->iface)->close(
 			    &worker_session->iface, NULL));
+
+		/* Make the failure permanent, we won't try again. */
+		F_SET(manager, WT_LSM_MANAGER_SHUTDOWN);
+
+		/*
+		 * Reset the workers count (otherwise, LSM destroy will hang
+		 * waiting for threads to exit.
+		 */
+		WT_PUBLISH(manager->lsm_workers, 0);
 	}
 	return (ret);
 }

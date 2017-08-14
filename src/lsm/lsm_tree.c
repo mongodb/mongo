@@ -474,8 +474,7 @@ __lsm_tree_open(WT_SESSION_IMPL *session,
 	    F_ISSET(session, WT_SESSION_LOCKED_HANDLE_LIST_WRITE));
 
 	/* Start the LSM manager thread if it isn't running. */
-	if (__wt_atomic_cas32(&conn->lsm_manager.lsm_workers, 0, 1))
-		WT_RET(__wt_lsm_manager_start(session));
+	WT_RET(__wt_lsm_manager_start(session));
 
 	/* Make sure no one beat us to it. */
 	if ((ret = __lsm_tree_find(
