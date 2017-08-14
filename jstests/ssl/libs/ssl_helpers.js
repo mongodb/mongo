@@ -6,6 +6,7 @@ var KEYFILE = "jstests/libs/key1";
 var SERVER_CERT = "jstests/libs/server.pem";
 var CA_CERT = "jstests/libs/ca.pem";
 var CLIENT_CERT = "jstests/libs/client.pem";
+var DH_PARAM = "jstests/libs/8k-prime.dhparam";
 
 // Note: "sslAllowInvalidCertificates" is enabled to avoid
 // hostname conflicts with our testing certificates
@@ -27,6 +28,14 @@ var requireSSL = {
     sslAllowInvalidCertificates: "",
     sslPEMKeyFile: SERVER_CERT,
     sslCAFile: CA_CERT
+};
+
+var dhparamSSL = {
+    sslMode: "requireSSL",
+    sslAllowInvalidCertificates: "",
+    sslPEMKeyFile: SERVER_CERT,
+    sslCAFile: CA_CERT,
+    setParameter: {"opensslDiffieHellmanParameters": DH_PARAM}
 };
 
 // Test if ssl replset  configs work

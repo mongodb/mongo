@@ -41,6 +41,9 @@
 
 namespace mongo {
 
+namespace moe = mongo::optionenvironment;
+
+
 using std::string;
 
 Status addSSLServerOptions(moe::OptionSection* options) {

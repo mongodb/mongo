@@ -33,6 +33,7 @@
 
 #include <boost/algorithm/string.hpp>
 #include <boost/date_time/posix_time/posix_time.hpp>
+#include <fstream>
 #include <iostream>
 #include <sstream>
 #include <string>
@@ -78,6 +79,20 @@ namespace {
 const transport::Session::Decoration<SSLPeerInfo> peerInfoForSession =
     transport::Session::declareDecoration<SSLPeerInfo>();
 
+/**
+ * Configurable via --setParameter disableNonSSLConnectionLogging=true. If false (default)
+ * if the sslMode is set to preferSSL, we will log connections that are not using SSL.
+ * If true, such log messages will be suppressed.
+ */
+ExportedServerParameter<bool, ServerParameterType::kStartupOnly>
+    disableNonSSLConnectionLoggingParameter(ServerParameterSet::getGlobal(),
+                                            "disableNonSSLConnectionLogging",
+                                            &sslGlobalParams.disableNonSSLConnectionLogging);
+
+ExportedServerParameter<std::string, ServerParameterType::kStartupOnly>
+    setDiffieHellmanParameterPEMFile(ServerParameterSet::getGlobal(),
+                                     "opensslDiffieHellmanParameters",
+                                     &sslGlobalParams.sslPEMTempDHParam);
 }  // namespace
 
 SSLPeerInfo& SSLPeerInfo::forSession(const transport::SessionHandle& session) {
@@ -89,16 +104,6 @@ SSLParams sslGlobalParams;
 const SSLParams& getSSLGlobalParams() {
     return sslGlobalParams;
 }
-
-/**
- * Configurable via --setParameter disableNonSSLConnectionLogging=true. If false (default)
- * if the sslMode is set to preferSSL, we will log connections that are not using SSL.
- * If true, such log messages will be suppressed.
- */
-ExportedServerParameter<bool, ServerParameterType::kStartupOnly>
-    disableNonSSLConnectionLoggingParameter(ServerParameterSet::getGlobal(),
-                                            "disableNonSSLConnectionLogging",
-                                            &sslGlobalParams.disableNonSSLConnectionLogging);
 
 class OpenSSLCipherConfigParameter
     : public ExportedServerParameter<std::string, ServerParameterType::kStartupOnly> {
@@ -126,6 +131,57 @@ public:
 } openSSLCipherConfig;
 
 #ifdef MONGO_CONFIG_SSL
+namespace {
+
+// If the underlying SSL supports auto-configuration of ECDH parameters, this function will select
+// it, otherwise this function will do nothing.
+void setECDHModeAuto(SSL_CTX* const ctx) {
+#ifdef MONGO_CONFIG_HAVE_SSL_SET_ECDH_AUTO
+    ::SSL_CTX_set_ecdh_auto(ctx, true);
+#endif
+    std::ignore = ctx;
+}
+
+struct DHFreer {
+    void operator()(DH* const dh) noexcept {
+        if (dh) {
+            ::DH_free(dh);
+        }
+    }
+};
+using UniqueDHParams = std::unique_ptr<DH, DHFreer>;
+
+struct BIOFree {
+    void operator()(BIO* const p) noexcept {
+        // Assumes that BIO_free succeeds.
+        if (p) {
+            ::BIO_free(p);
+        }
+    }
+};
+using UniqueBIO = std::unique_ptr<BIO, BIOFree>;
+
+UniqueBIO makeUniqueMemBio(std::vector<std::uint8_t>& v) {
+    UniqueBIO rv(::BIO_new_mem_buf(v.data(), v.size()));
+    if (!rv) {
+        class ssl_bad_alloc : public std::bad_alloc {
+        private:
+            std::string message;
+
+        public:
+            explicit ssl_bad_alloc(std::string m) : message(std::move(m)) {}
+
+            const char* what() const noexcept override {
+                return message.c_str();
+            }
+        };
+        throw ssl_bad_alloc(str::stream()
+                            << "Error allocating SSL BIO: "
+                            << SSLManagerInterface::getSSLErrorMessage(ERR_get_error()));
+    }
+    return rv;
+}
+
 // Old copies of OpenSSL will not have constants to disable protocols they don't support.
 // Define them to values we can OR together safely to generically disable these protocols across
 // all versions of OpenSSL.
@@ -135,8 +191,6 @@ public:
 #ifndef SSL_OP_NO_TLSv1_2
 #define SSL_OP_NO_TLSv1_2 0
 #endif
-
-namespace {
 
 // clang-format off
 #ifndef MONGO_CONFIG_HAVE_ASN1_ANY_DEFINITIONS
@@ -238,19 +292,21 @@ private:
 };
 std::vector<std::unique_ptr<stdx::recursive_mutex>> SSLThreadInfo::_mutex;
 
+namespace {
 // We only want to free SSL_CTX objects if they have been populated. OpenSSL seems to perform this
 // check before freeing them, but because it does not document this, we should protect ourselves.
-void _free_ssl_context(SSL_CTX* ctx) {
+void free_ssl_context(SSL_CTX* ctx) {
     if (ctx != nullptr) {
         SSL_CTX_free(ctx);
     }
 }
+}  // namespace
 
 ////////////////////////////////////////////////////////////////
 
 SimpleMutex sslManagerMtx;
 SSLManagerInterface* theSSLManager = NULL;
-using UniqueSSLContext = std::unique_ptr<SSL_CTX, decltype(&_free_ssl_context)>;
+using UniqueSSLContext = std::unique_ptr<SSL_CTX, decltype(&free_ssl_context)>;
 static const int BUFFER_SIZE = 8 * 1024;
 static const int DATE_LEN = 128;
 
@@ -313,7 +369,7 @@ private:
 
     /**
      * Given an error code from an SSL-type IO function, logs an
-     * appropriate message and throws a SocketException
+     * appropriate message and throws a SocketException.
      */
     MONGO_COMPILER_NORETURN void _handleSSLError(int code, int ret);
 
@@ -384,7 +440,7 @@ private:
     bool _hostNameMatch(const char* nameToMatch, const char* certHostName);
 
     /**
-     * Callbacks for SSL functions
+     * Callbacks for SSL functions.
      */
     static int password_cb(char* buf, int num, int rwflag, void* userdata);
     static int verify_cb(int ok, X509_STORE_CTX* ctx);
@@ -514,7 +570,7 @@ void canonicalizeClusterDN(std::vector<std::string>* dn) {
     }
     std::stable_sort(dn->begin(), dn->end());
 }
-}
+}  // namespace
 
 bool SSLConfiguration::isClusterMember(StringData subjectName) const {
     std::vector<std::string> clientRDN = StringSplitter::split(subjectName.toString(), ",");
@@ -546,8 +602,8 @@ BSONObj SSLConfiguration::getServerStatusBSON() const {
 SSLManagerInterface::~SSLManagerInterface() {}
 
 SSLManager::SSLManager(const SSLParams& params, bool isServer)
-    : _serverContext(nullptr, _free_ssl_context),
-      _clientContext(nullptr, _free_ssl_context),
+    : _serverContext(nullptr, free_ssl_context),
+      _clientContext(nullptr, free_ssl_context),
       _weakValidation(params.sslWeakCertificateValidation),
       _allowInvalidCertificates(params.sslAllowInvalidCertificates),
       _allowInvalidHostnames(params.sslAllowInvalidHostnames) {
@@ -666,15 +722,13 @@ Status SSLManager::initSSLContext(SSL_CTX* context,
 
     // Set the supported TLS protocols. Allow --sslDisabledProtocols to disable selected
     // ciphers.
-    if (!params.sslDisabledProtocols.empty()) {
-        for (const SSLParams::Protocols& protocol : params.sslDisabledProtocols) {
-            if (protocol == SSLParams::Protocols::TLS1_0) {
-                supportedProtocols |= SSL_OP_NO_TLSv1;
-            } else if (protocol == SSLParams::Protocols::TLS1_1) {
-                supportedProtocols |= SSL_OP_NO_TLSv1_1;
-            } else if (protocol == SSLParams::Protocols::TLS1_2) {
-                supportedProtocols |= SSL_OP_NO_TLSv1_2;
-            }
+    for (const SSLParams::Protocols& protocol : params.sslDisabledProtocols) {
+        if (protocol == SSLParams::Protocols::TLS1_0) {
+            supportedProtocols |= SSL_OP_NO_TLSv1;
+        } else if (protocol == SSLParams::Protocols::TLS1_1) {
+            supportedProtocols |= SSL_OP_NO_TLSv1_1;
+        } else if (protocol == SSLParams::Protocols::TLS1_2) {
+            supportedProtocols |= SSL_OP_NO_TLSv1_2;
         }
     }
     ::SSL_CTX_set_options(context, supportedProtocols);
@@ -728,13 +782,45 @@ Status SSLManager::initSSLContext(SSL_CTX* context,
         }
     }
 
+    if (!params.sslPEMTempDHParam.empty()) {
+        try {
+            std::ifstream dhparamPemFile(params.sslPEMTempDHParam, std::ios_base::binary);
+            if (dhparamPemFile.fail() || dhparamPemFile.bad()) {
+                return Status(ErrorCodes::InvalidSSLConfiguration,
+                              str::stream() << "Cannot open PEM DHParams file.");
+            }
+
+            std::vector<std::uint8_t> paramData{std::istreambuf_iterator<char>(dhparamPemFile),
+                                                std::istreambuf_iterator<char>()};
+            auto bio = makeUniqueMemBio(paramData);
+
+            UniqueDHParams dhparams(::PEM_read_bio_DHparams(bio.get(), nullptr, nullptr, nullptr));
+            if (!dhparams) {
+                return Status(ErrorCodes::InvalidSSLConfiguration,
+                              str::stream() << "Error reading DHParams file."
+                                            << getSSLErrorMessage(ERR_get_error()));
+            }
+
+            if (::SSL_CTX_set_tmp_dh(context, dhparams.get()) != 1) {
+                return Status(ErrorCodes::InvalidSSLConfiguration,
+                              str::stream() << "Failure to set PFS DH parameters: "
+                                            << getSSLErrorMessage(ERR_get_error()));
+            }
+        } catch (const std::exception& ex) {
+            return Status(ErrorCodes::InvalidSSLConfiguration, ex.what());
+        }
+    }
+
+    // We always set ECDH mode anyhow, if available.
+    setECDHModeAuto(context);
+
     return Status::OK();
 }
 
 bool SSLManager::_initSynchronousSSLContext(UniqueSSLContext* contextPtr,
                                             const SSLParams& params,
                                             ConnectionDirection direction) {
-    *contextPtr = UniqueSSLContext(SSL_CTX_new(SSLv23_method()), _free_ssl_context);
+    *contextPtr = UniqueSSLContext(SSL_CTX_new(SSLv23_method()), free_ssl_context);
 
     uassertStatusOK(initSSLContext(contextPtr->get(), params, direction));
 
@@ -1501,4 +1587,4 @@ MONGO_INITIALIZER(SSLManager)(InitializerContext*) {
 }
 
 #endif  // #ifdef MONGO_CONFIG_SSL
-}
+}  // namespace mongo
