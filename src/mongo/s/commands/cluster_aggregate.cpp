@@ -106,11 +106,11 @@ Status appendExplainResults(
     }
 
     BSONObjBuilder shardExplains(result->subobjStart("shards"));
-    for (const auto& result : shardResults) {
-        invariant(result.shardHostAndPort);
-        shardExplains.append(result.shardId.toString(),
-                             BSON("host" << result.shardHostAndPort->toString() << "stages"
-                                         << result.swResponse.getValue().data["stages"]));
+    for (const auto& shardResult : shardResults) {
+        invariant(shardResult.shardHostAndPort);
+        shardExplains.append(shardResult.shardId.toString(),
+                             BSON("host" << shardResult.shardHostAndPort->toString() << "stages"
+                                         << shardResult.swResponse.getValue().data["stages"]));
     }
 
     return Status::OK();
