@@ -5490,15 +5490,14 @@ buildvariants:
     ext: zip
     use_scons_cache: true
   tasks:
+  # TODO SERVER-30634: Re-enable the burn_in_tests task on Windows after addressing how git detects
+  # all JavaScript tests as having been modified and causes the Evergreen task to time out.
   - name: compile
-    requires:
-    - name: burn_in_tests
     distros:
     - windows-64-vs2015-large
   - name: compile_all
     distros:
     - windows-64-vs2015-large
-  - name: burn_in_tests
   - name: aggregation
   - name: aggregation_WT
   - name: aggregation_facet_unwind_passthrough_WT
