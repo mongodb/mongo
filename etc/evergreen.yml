@@ -364,7 +364,7 @@ functions:
         rm -rf rocksdb
         git clone https://github.com/facebook/rocksdb.git
         cd rocksdb
-        make CC=/opt/mongodbtoolchain/v2/bin/gcc CXX=/opt/mongodbtoolchain/v2/bin/g++ static_lib
+        make USE_RTTI=1 CC=/opt/mongodbtoolchain/v2/bin/gcc CXX=/opt/mongodbtoolchain/v2/bin/g++ static_lib
         fi
 
   "build cdriver" :
