@@ -1616,7 +1616,7 @@ timeout:
         # The file ${aws_ec2_yml} will define the remote's ${ip_address} and ${remote_dir}.
         # Any task which uses remote processes will have previously loaded this file to set these
         # expansions macros.
-        if [ -f ${aws_ec2_yml|} ]; then
+        if [ -f ${aws_ec2_yml|""} ]; then
           core_ext=core
           if [ "Windows_NT" = "$OS" ]; then
             core_ext=mdmp
