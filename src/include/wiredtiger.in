@@ -504,6 +504,12 @@ struct __wt_cursor {
 	 * (as it partially depends on the underlying file configuration), but
 	 * is always a small number of bytes less than 4GB.
 	 *
+	 * The WT_CURSOR::modify method stores a change record in cache and
+	 * writes a change record to the log, instead of the usual complete
+	 * value. This can reduce cache and logging requirements, but may result
+	 * in slower reads because the complete value must be assembled during
+	 * retrieval.
+	 *
 	 * @param cursor the cursor handle
 	 * @param entries an array of modification data structures
 	 * @param nentries the number of modification data structures

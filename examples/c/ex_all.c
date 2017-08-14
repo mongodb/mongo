@@ -311,10 +311,10 @@ cursor_ops(WT_SESSION *session)
 	{
 	/*! [Reserve a record] */
 	const char *key = "some key";
-	session->begin_transaction(session, NULL);
+	error_check(session->begin_transaction(session, NULL));
 	cursor->set_key(cursor, key);
 	error_check(cursor->reserve(cursor));
-	session->commit_transaction(session, NULL);
+	error_check(session->commit_transaction(session, NULL));
 	/*! [Reserve a record] */
 	}
 
@@ -325,8 +325,8 @@ cursor_ops(WT_SESSION *session)
 	{
 	WT_ITEM value;
 	value.data = "abcdefghijklmnopqrstuvwxyz"
-	   "abcdefghijklmnopqrstuvwxyz"
-	   "abcdefghijklmnopqrstuvwxyz";
+	    "abcdefghijklmnopqrstuvwxyz"
+	    "abcdefghijklmnopqrstuvwxyz";
 	value.size = strlen(value.data);
 	cursor->set_key(cursor, "some key");
 	cursor->set_value(cursor, &value);
@@ -822,7 +822,7 @@ session_ops(WT_SESSION *session)
 
 	/* Call other functions, where possible. */
 	checkpoint_ops(session);
-	cursor_ops(session);
+	error_check(cursor_ops(session));
 	cursor_statistics(session);
 	named_snapshot_ops(session);
 	pack_ops(session);

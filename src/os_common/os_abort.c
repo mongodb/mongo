@@ -16,12 +16,18 @@ void
 __wt_abort(WT_SESSION_IMPL *session)
     WT_GCC_FUNC_ATTRIBUTE((noreturn))
 {
+#ifdef HAVE_ATTACH
+	u_int i;
+
+	__wt_errx(session, "process ID %" PRIdMAX
+	    ": waiting for debugger...", (intmax_t)getpid());
+
+	/* Sleep forever, the debugger will interrupt us when it attaches. */
+	for (i = 0; i < WT_MILLION; ++i)
+		__wt_sleep(10, 0);
+#else
 	__wt_errx(session, "aborting WiredTiger library");
-
-#ifdef HAVE_DIAGNOSTIC
-	__wt_attach(session);
 #endif
-
 	abort();
 	/* NOTREACHED */
 }

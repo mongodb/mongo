@@ -937,10 +937,9 @@ retry:		/*
 		goto retry;
 
 err:	__clsm_leave(clsm);
-	API_END(session, ret);
 	if (ret == 0)
 		__clsm_deleted_decode(clsm, &cursor->value);
-	return (ret);
+	API_END_RET(session, ret);
 }
 
 /*
@@ -1029,8 +1028,7 @@ __clsm_next_random(WT_CURSOR *cursor)
 err:		F_CLR(cursor, WT_CURSTD_KEY_INT | WT_CURSTD_VALUE_INT);
 	}
 	__clsm_leave(clsm);
-	API_END(session, ret);
-	return (ret);
+	API_END_RET(session, ret);
 }
 
 /*
@@ -1116,10 +1114,9 @@ retry:		/*
 		goto retry;
 
 err:	__clsm_leave(clsm);
-	API_END(session, ret);
 	if (ret == 0)
 		__clsm_deleted_decode(clsm, &cursor->value);
-	return (ret);
+	API_END_RET(session, ret);
 }
 
 /*
@@ -1275,10 +1272,9 @@ __clsm_search(WT_CURSOR *cursor)
 	ret = __clsm_lookup(clsm, &cursor->value);
 
 err:	__clsm_leave(clsm);
-	API_END(session, ret);
 	if (ret == 0)
 		__clsm_deleted_decode(clsm, &cursor->value);
-	return (ret);
+	API_END_RET(session, ret);
 }
 
 /*
@@ -1418,7 +1414,6 @@ __clsm_search_near(WT_CURSOR *cursor, int *exactp)
 	*exactp = cmp;
 
 err:	__clsm_leave(clsm);
-	API_END(session, ret);
 	if (closest != NULL)
 		WT_TRET(closest->reset(closest));
 
@@ -1428,7 +1423,7 @@ err:	__clsm_leave(clsm);
 	} else
 		clsm->current = NULL;
 
-	return (ret);
+	API_END_RET(session, ret);
 }
 
 /*

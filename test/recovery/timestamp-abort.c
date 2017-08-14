@@ -145,10 +145,9 @@ thread_ckpt_run(void *arg)
 		 * timer.
 		 */
 		if (first_ckpt) {
-			if ((fp = fopen(ckpt_file, "w")) == NULL)
-				testutil_die(errno, "fopen");
+			testutil_checksys((fp = fopen(ckpt_file, "w")) == NULL);
 			first_ckpt = false;
-			fclose(fp);
+			testutil_checksys(fclose(fp) != 0);
 		}
 	}
 	/* NOTREACHED */
@@ -184,8 +183,7 @@ thread_run(void *arg)
 	 */
 	testutil_check(__wt_snprintf(cbuf, sizeof(cbuf), RECORDS_FILE, td->id));
 	(void)unlink(cbuf);
-	if ((fp = fopen(cbuf, "w")) == NULL)
-		testutil_die(errno, "fopen");
+	testutil_checksys((fp = fopen(cbuf, "w")) == NULL);
 	/*
 	 * Set to line buffering.  But that is advisory only.  We've seen
 	 * cases where the result files end up with partial lines.
@@ -282,8 +280,8 @@ thread_run(void *arg)
 		 * Save the timestamp and key separately for checking later.
 		 */
 		if (fprintf(fp,
-		    "%" PRIu64 " %" PRIu64 "\n", stable_ts, i) == -1)
-			testutil_die(errno, "fprintf");
+		    "%" PRIu64 " %" PRIu64 "\n", stable_ts, i) < 0)
+			testutil_die(EIO, "fprintf");
 	}
 	/* NOTREACHED */
 }
@@ -474,8 +472,7 @@ main(int argc, char *argv[])
 		 * kill the child, run recovery and make sure all items we wrote
 		 * exist after recovery runs.
 		 */
-		if ((pid = fork()) < 0)
-			testutil_die(errno, "fork");
+		testutil_checksys((pid = fork()) < 0);
 
 		if (pid == 0) { /* child */
 			run_workload(nth);
@@ -503,10 +500,8 @@ main(int argc, char *argv[])
 		 * here.
 		 */
 		printf("Kill child\n");
-		if (kill(pid, SIGKILL) != 0)
-			testutil_die(errno, "kill");
-		if (waitpid(pid, &status, 0) == -1)
-			testutil_die(errno, "waitpid");
+		testutil_checksys(kill(pid, SIGKILL) != 0);
+		testutil_checksys(waitpid(pid, &status, 0) == -1);
 	}
 	/*
 	 * !!! If we wanted to take a copy of the directory before recovery,
@@ -684,8 +679,7 @@ main(int argc, char *argv[])
 				fatal = true;
 			}
 		}
-		if (fclose(fp) != 0)
-			testutil_die(errno, "fclose");
+		testutil_checksys(fclose(fp) != 0);
 	}
 	if ((ret = conn->close(conn, NULL)) != 0)
 		testutil_die(ret, "WT_CONNECTION:close");

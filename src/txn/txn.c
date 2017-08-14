@@ -570,12 +570,12 @@ __wt_txn_commit(WT_SESSION_IMPL *session, const char *cfg[])
 	WT_TXN *txn;
 	WT_TXN_GLOBAL *txn_global;
 	WT_TXN_OP *op;
+	u_int i;
+	bool did_update, locked;
 #ifdef HAVE_TIMESTAMPS
 	wt_timestamp_t prev_commit_timestamp;
 	bool update_timestamp;
 #endif
-	u_int i;
-	bool did_update, locked;
 
 	txn = &session->txn;
 	conn = S2C(session);

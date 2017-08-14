@@ -683,7 +683,6 @@ extern int __wt_stash_add(WT_SESSION_IMPL *session, int which, uint64_t generati
 extern void __wt_stash_discard_all(WT_SESSION_IMPL *session_safe, WT_SESSION_IMPL *session);
 extern int __wt_library_init(void) WT_GCC_FUNC_DECL_ATTRIBUTE((warn_unused_result));
 extern void __wt_breakpoint(void);
-extern void __wt_attach(WT_SESSION_IMPL *session);
 extern uint64_t __wt_hash_city64(const void *s, size_t len);
 extern uint64_t __wt_hash_fnv64(const void *string, size_t len);
 extern int

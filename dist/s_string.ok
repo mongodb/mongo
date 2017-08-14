@@ -530,6 +530,7 @@ checkpointer
 checkpointing
 checksum
 checksums
+checksys
 checkvalue
 children's
 chk
@@ -942,6 +943,7 @@ msvc
 multi
 multiblock
 multicore
+multicycle
 multiprocess
 multisocket
 multithreaded

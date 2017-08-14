@@ -634,8 +634,7 @@ err:	WT_LEAVE_PAGE_INDEX(session);
 int
 __wt_tree_walk(WT_SESSION_IMPL *session, WT_REF **refp, uint32_t flags)
 {
-	return (__tree_walk_internal(
-	    session, refp, NULL, NULL, NULL, flags));
+	return (__tree_walk_internal(session, refp, NULL, NULL, NULL, flags));
 }
 
 /*
@@ -661,8 +660,8 @@ __wt_tree_walk_custom_skip(
    int (*skip_func)(WT_SESSION_IMPL *, WT_REF *, void *, bool *),
    void *func_cookie, uint32_t flags)
 {
-	return (__tree_walk_internal(session, refp,
-	    NULL, skip_func, func_cookie, flags));
+	return (__tree_walk_internal(
+	    session, refp, NULL, skip_func, func_cookie, flags));
 }
 
 /*

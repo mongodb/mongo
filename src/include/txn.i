@@ -295,9 +295,9 @@ __txn_visible_all_id(WT_SESSION_IMPL *session, uint64_t id)
 
 /*
  * __wt_txn_visible_all --
- *	Check if a given transaction is "globally visible".	This is, if
- *	all sessions in the system will see the transaction ID including the
- *	ID that belongs to a running checkpoint.
+ *	Check if a given transaction is "globally visible". This is, if all
+ *	sessions in the system will see the transaction ID including the ID
+ *	that belongs to a running checkpoint.
  */
 static inline bool
 __wt_txn_visible_all(
@@ -591,8 +591,7 @@ __wt_txn_id_alloc(WT_SESSION_IMPL *session, bool publish)
 
 /*
  * __wt_txn_id_check --
- *	A transaction is going to do an update, start an auto commit
- *	transaction if required and allocate a transaction ID.
+ *	A transaction is going to do an update, allocate a transaction ID.
  */
 static inline int
 __wt_txn_id_check(WT_SESSION_IMPL *session)

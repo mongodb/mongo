@@ -7,7 +7,7 @@ POSIX-like systems (for example, EINVAL or EBUSY), negative error codes
 are WiredTiger-specific (for example, WT_ROLLBACK).
 
 WiredTiger-specific error codes always appear in the -31,800 to -31,999
-range.
+range, inclusive.
 
 @m_if{java}
 Informational return values, like <code>wiredtiger.WT_NOTFOUND</code>

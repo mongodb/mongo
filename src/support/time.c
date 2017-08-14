@@ -35,8 +35,7 @@ __time_check_monotonic(WT_SESSION_IMPL *session, struct timespec *tsp)
 
 /*
  * __wt_epoch --
- *	Return the time since the Epoch, adjusted so it never appears to go
- *	backwards.
+ *	Return the time since the Epoch.
  */
 void
 __wt_epoch(WT_SESSION_IMPL *session, struct timespec *tsp)
@@ -45,9 +44,14 @@ __wt_epoch(WT_SESSION_IMPL *session, struct timespec *tsp)
 	struct timespec tmp;
 
 	/*
-	 * Read into a local variable so that we're comparing the correct
-	 * value when we check for monotonic increasing time.  There are
-	 * many places we read into an unlocked global variable.
+	 * Read into a local variable, then check for monotonically increasing
+	 * time, ensuring single threads never see time move backward. We don't
+	 * prevent multiple threads from seeing time move backwards (even when
+	 * reading time serially, the saved last-read time is per thread, not
+	 * per timer, so multiple threads can race the time). Nor do we prevent
+	 * multiple threads simultaneously reading the time from seeing random
+	 * time or time moving backwards (assigning the time structure to the
+	 * returned memory location implies multicycle writes to memory).
 	 */
 	__wt_epoch_raw(session, &tmp);
 	__time_check_monotonic(session, &tmp);

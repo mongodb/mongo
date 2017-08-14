@@ -38,17 +38,16 @@ static int
 __curds_key_set(WT_CURSOR *cursor)
 {
 	WT_CURSOR *source;
-	WT_DECL_RET;
 
 	source = ((WT_CURSOR_DATA_SOURCE *)cursor)->source;
 
-	WT_ERR(__cursor_needkey(cursor));
+	WT_RET(__cursor_needkey(cursor));
 
 	source->recno = cursor->recno;
 	source->key.data = cursor->key.data;
 	source->key.size = cursor->key.size;
 
-err:	return (ret);
+	return (0);
 }
 
 /*
@@ -59,16 +58,15 @@ static int
 __curds_value_set(WT_CURSOR *cursor)
 {
 	WT_CURSOR *source;
-	WT_DECL_RET;
 
 	source = ((WT_CURSOR_DATA_SOURCE *)cursor)->source;
 
-	WT_ERR(__cursor_needvalue(cursor));
+	WT_RET(__cursor_needvalue(cursor));
 
 	source->value.data = cursor->value.data;
 	source->value.size = cursor->value.size;
 
-err:	return (ret);
+	return (0);
 }
 
 /*
