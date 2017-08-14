@@ -90,8 +90,7 @@ __wt_timestamp_iszero(const wt_timestamp_t *ts)
 {
 	static const wt_timestamp_t zero_timestamp;
 
-	return (memcmp(ts->ts,
-	    WT_TIMESTAMP_NULL(&zero_timestamp), WT_TIMESTAMP_SIZE) == 0);
+	return (memcmp(ts->ts, &zero_timestamp, WT_TIMESTAMP_SIZE) == 0);
 }
 
 /*

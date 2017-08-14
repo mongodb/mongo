@@ -1052,17 +1052,10 @@ __debug_update(WT_DBG *ds, WT_UPDATE *upd, bool hexbyte)
 #ifdef HAVE_TIMESTAMPS
 		if (!__wt_timestamp_iszero(
 		    WT_TIMESTAMP_NULL(&upd->timestamp))) {
-#if WT_TIMESTAMP_SIZE == 8
-			WT_RET(ds->f(ds,
-			    ", stamp %" PRIu64, upd->timestamp.val));
-#else
-			int i;
-
-			WT_RET(ds->f(ds, ", stamp 0x"));
-			for (i = 0; i < WT_TIMESTAMP_SIZE; ++i)
-				WT_RET(ds->f(ds,
-				    "%" PRIx8, upd->timestamp.ts[i]));
-#endif
+			char hex_timestamp[2 * WT_TIMESTAMP_SIZE + 1];
+			WT_RET(__wt_timestamp_to_hex_string(
+			    ds->session, hex_timestamp, &upd->timestamp));
+			WT_RET(ds->f(ds, ", stamp %s", hex_timestamp));
 		}
 #endif
 		WT_RET(ds->f(ds, "\n"));
