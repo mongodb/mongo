@@ -1000,10 +1000,7 @@ __wt_txn_global_destroy(WT_SESSION_IMPL *session)
 int
 __wt_txn_global_shutdown(WT_SESSION_IMPL *session)
 {
-	WT_TXN_GLOBAL *txn_global;
 	bool txn_active;
-
-	txn_global = &S2C(session)->txn_global;
 
 	/*
 	 * We're shutting down.  Make sure everything gets freed.
@@ -1027,7 +1024,7 @@ __wt_txn_global_shutdown(WT_SESSION_IMPL *session)
 	 * Now that all transactions have completed, no timestamps should be
 	 * pinned.
 	 */
-	__wt_timestamp_set_inf(&txn_global->pinned_timestamp);
+	__wt_timestamp_set_inf(&S2C(session)->txn_global.pinned_timestamp);
 #endif
 
 	return (0);
