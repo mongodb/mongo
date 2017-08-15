@@ -128,6 +128,8 @@ selector:
   # "TODO SERVER-30384: These tests assume that documents are returned in the same order they are
   # written when no sort is specified; however, the order of documents within a collection can
   # be different across a primary and secondary."
+  - jstests/core/coveredIndex1.js
+  - jstests/core/distinct1.js
   - jstests/core/elemMatchProjection.js
   - jstests/core/find1.js
   - jstests/core/find4.js
@@ -157,54 +159,6 @@ selector:
   - jstests/core/cursora.js
   - jstests/core/count_plan_summary.js
   - jstests/core/shellstartparallel.js
-  # TODO SERVER-30463: Tests that that use explain are not causally consistent because explain does
-  # not support readConcern.
-  - jstests/core/agg_hint.js
-  - jstests/core/and3.js
-  - jstests/core/bindata_indexonly.js
-  - jstests/core/bittest.js
-  - jstests/core/coveredIndex1.js
-  - jstests/core/coveredIndex2.js
-  - jstests/core/covered_index_compound_1.js
-  - jstests/core/covered_index_negative_1.js
-  - jstests/core/covered_index_simple_1.js
-  - jstests/core/covered_index_simple_2.js
-  - jstests/core/covered_index_simple_3.js
-  - jstests/core/covered_index_simple_id.js
-  - jstests/core/covered_index_sort_1.js
-  - jstests/core/covered_index_sort_2.js
-  - jstests/core/covered_index_sort_3.js
-  - jstests/core/covered_multikey.js
-  - jstests/core/distinct1.js
-  - jstests/core/distinct_compound_index.js
-  - jstests/core/distinct_index1.js
-  - jstests/core/explain1.js
-  - jstests/core/explain2.js
-  - jstests/core/explain3.js
-  - jstests/core/explain4.js
-  - jstests/core/explain5.js
-  - jstests/core/explain6.js
-  - jstests/core/explain_count.js
-  - jstests/core/explain_delete.js
-  - jstests/core/explain_execution_error.js
-  - jstests/core/explain_find.js
-  - jstests/core/explain_large_bounds.js
-  - jstests/core/explain_multi_plan.js
-  - jstests/core/explain_shell_helpers.js
-  - jstests/core/explain_distinct.js
-  - jstests/core/explain_multikey.js
-  - jstests/core/fts_explain.js
-  - jstests/core/idhack.js
-  - jstests/core/index_bounds_timestamp.js
-  - jstests/core/index_check6.js
-  - jstests/core/index_check7.js
-  - jstests/core/index13.js
-  - jstests/core/indexj.js
-  - jstests/core/indexv.js
-  - jstests/core/indexOtherNamespace.js
-  - jstests/core/ne2.js
-  - jstests/core/record_store_count.js
-  - jstests/core/sort_array.js
   # TODO SERVER-30466
   - jstests/core/index_partial_read_ops.js
   - jstests/core/update_arrayFilters.js
@@ -218,6 +172,18 @@ selector:
   - jstests/core/maxscan.js
   # TODO: SERVER-30498
   - jstests/core/group2.js
+  # TODO: SERVER-30582
+  - jstests/core/agg_hint.js
+  - jstests/core/explain_agg_write_concern.js
+  - jstests/core/explain_missing_collection.js
+  - jstests/core/explain_shell_helpers.js
+  - jstests/core/sort_array.js
+  - jstests/core/views/views_aggregation.js
+  - jstests/core/views/views_distinct.js
+  - jstests/core/views/views_count.js
+  - jstests/core/views/views_find.js
+  # TODO: SERVER-30582
+  - jstests/core/explain_multi_plan.js
 
 executor:
   config:

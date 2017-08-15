@@ -9,15 +9,18 @@
     load("jstests/replsets/rslib.js");  // For startSetIfSupportsReadMajority.
 
     // Verifies causal consistency is either enabled or disabled for each given command name.
-    function checkCausalConsistencySupportForCommandNames(cmdNames, isEnabled) {
-        cmdNames.forEach(function(cmdName) {
-            var cmd = {};
-            cmd[cmdName] = 1;
+    function checkCausalConsistencySupportForCommandNames(cmdObjs, isReadCommand) {
+        cmdObjs.forEach(function(cmdObj) {
+            let cmdName = Object.keys(cmdObj)[0];
+            if (cmdName === "query" || cmdName === "$query") {
+                cmdObj = cmdObj[cmdName];
+                cmdName = Object.keys(cmdObj)[0];
+            }
 
-            assert.eq(testDB.getMongo().isCausalConsistencyEnabled(cmd),
-                      isEnabled,
-                      "expected causal consistency support for command, " + cmdName + ", to be " +
-                          isEnabled);
+            assert.eq(testDB.getMongo()._isReadCommand(cmdObj),
+                      isReadCommand,
+                      "expected causal consistency support for command, " + tojson(cmdObj) +
+                          ", to be " + isReadCommand);
         });
     }
 
@@ -67,26 +70,45 @@
 
     // All commands currently enabled to use causal consistency in the shell.
     const supportedCommandNames = [
-        "aggregate",
-        "count",
-        "distinct",
-        "find",
-        "geoNear",
-        "geoSearch",
-        "mapReduce",
-        "parallelCollectionScan"
+        {"query": {"aggregate": "test", "pipeline": [{"$match": {"x": 1}}]}},
+        {"aggregate": "test", "pipeline": [{"$match": {"x": 1}}]},
+        {"group": {"key": {"x": 1}}},
+        {"query": {"group": {"key": {"x": 1}}}},
+        {"query": {"explain": {"group": {"key": {"x": 1}}}}},
+        {"count": "test", "query": {}},
+        {"query": {"count": "test", "query": {}}},
+        {"query": {"explain": {"count": "test", "query": {}}}},
+        {"explain": {"count": "test", "query": {}}},
+        {"distinct": "test", "query": {}},
+        {"query": {"distinct": "test", "query": {}}},
+        {"query": {"explain": {"distinct": "test", "query": {}}}},
+        {"find": "test", "query": {}},
+        {"query": {"find": "test", "query": {}}},
+        {"query": {"explain": {"find": "test", "query": {}}}},
+        {"geoNear": "test", "near": {}},
+        {"query": {"geoNear": "test", "near": {}}},
+        {"query": {"explain": {"geoNear": "test", "near": {}}}},
+        {"geoSearch": "test", "near": {}},
+        {"mapReduce": "test"},
+        {"parallelCollectionScan": "test"},
+        {"getMore": NumberLong("5888577173997830861")}
     ];
 
     // Omitting some commands for simplicity. Every command not listed above should be unsupported.
     const unsupportedCommandNames = [
-        "delete",
-        "findAndModify",
-        "getLastError",
-        "getMore",
-        "getPrevError",
-        "insert",
-        "resetError",
-        "update"
+        {"aggregate": "test", "pipeline": [{"$match": {"x": 1}}], "explain": true},
+        {"explain": {"aggregate": "test", "pipeline": [{"$match": {"x": 1}}]}},
+        {"delete": "coll", "query": {"x": 1}},
+        {"explain": {"delete": "coll", "query": {"x": 1}}},
+        {"findAndModify": "coll", "query": {"x": 1}},
+        {"explain": {"findAndModify": "coll", "query": {"x": 1}}},
+        {"query": {"explain": {"findAndModify": "coll", "query": {"x": 1}}}},
+        {"insert": "coll"},
+        {"explain": {"insert": "coll"}},
+        {"explain": {"update": "coll"}},
+        {"update": "coll"},
+        {"getLastError": {"x": 1}},
+        {"getPrevError": {"x": 1}}
     ];
 
     // Manually create a shard so tests on storage engines that don't support majority readConcern
@@ -118,22 +140,11 @@
 
     // Verify causal consistency is disabled unless explicitly set.
     assert.eq(!!mongo._isCausal, false);
-    checkCausalConsistencySupportForCommandNames(supportedCommandNames, false);
-    checkCausalConsistencySupportForCommandNames(unsupportedCommandNames, false);
-
-    // Enable causal consistency.
     mongo.setCausalConsistency(true);
 
     // Verify causal consistency is enabled for the connection and for each supported command.
     assert.eq(!!mongo._isCausal, true);
     checkCausalConsistencySupportForCommandNames(supportedCommandNames, true);
-    checkCausalConsistencySupportForCommandNames(unsupportedCommandNames, false);
-
-    // Verify causal consistency can be disabled.
-    mongo.setCausalConsistency(false);
-
-    assert.eq(!!mongo._isCausal, false);
-    checkCausalConsistencySupportForCommandNames(supportedCommandNames, false);
     checkCausalConsistencySupportForCommandNames(unsupportedCommandNames, false);
 
     // Verify cluster times are tracked even before causal consistency is set (so the first

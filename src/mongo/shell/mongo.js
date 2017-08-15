@@ -53,56 +53,6 @@ Mongo.prototype.setCausalConsistency = function(value) {
     this._isCausal = value;
 };
 
-Mongo.prototype.isCausalConsistencyEnabled = function(cmdObj) {
-    let cmdName = Object.keys(cmdObj)[0];
-    // If the command is in a wrapped form, then we look for the actual command name inside the
-    // query/$query object.
-    let cmdObjUnwrapped = cmdObj;
-    if (cmdName === "query" || cmdName === "$query") {
-        cmdObjUnwrapped = cmdObj[cmdName];
-        cmdName = Object.keys(cmdObjUnwrapped)[0];
-    }
-
-    if (!this._isCausal) {
-        return false;
-    }
-
-    // Currently, read concern afterClusterTime is only supported for commands that support read
-    // concern level majority.
-    var commandsThatSupportMajorityReadConcern = [
-        "count",
-        "distinct",
-        "find",
-        "geoNear",
-        "geoSearch",
-        "group",
-        "mapReduce",
-        "mapreduce",
-        "parallelCollectionScan",
-    ];
-
-    var supportsMajorityReadConcern =
-        Array.contains(commandsThatSupportMajorityReadConcern, cmdName);
-
-    if (cmdName === "aggregate") {
-        // Aggregate can be either a read or a write depending on whether it has a $out stage.
-        // $out is required to be the last stage of the pipeline.
-        var stages = cmdObjUnwrapped.pipeline;
-        const lastStage = stages && Array.isArray(stages) && (stages.length !== 0)
-            ? stages[stages.length - 1]
-            : undefined;
-        const hasOut =
-            lastStage && (typeof lastStage === "object") && lastStage.hasOwnProperty("$out");
-        const hasExplain = cmdObjUnwrapped.hasOwnProperty("explain");
-
-        if (!hasExplain && !hasOut) {
-            supportsMajorityReadConcern = true;
-        }
-    }
-
-    return supportsMajorityReadConcern;
-};
-
 Mongo.prototype.setSlaveOk = function(value) {
     if (value == undefined)
         value = true;
@@ -134,6 +84,47 @@ Mongo.prototype.getDBs = function() {
     return res;
 };
 
+Mongo.prototype._isReadCommand = function(cmdObj) {
+    let readCommands = [
+        "count",
+        "distinct",
+        "find",
+        "getMore",
+        "geoNear",
+        "geoSearch",
+        "group",
+        "mapReduce",
+        "mapreduce",
+        "parallelCollectionScan",
+    ];
+
+    const cmdName = Object.keys(cmdObj)[0];
+    let isReadCommand = Array.contains(readCommands, cmdName);
+    if (cmdName === "aggregate") {
+        // Aggregate can be either a read or a write depending on whether it has a $out stage.
+        // $out is required to be the last stage of the pipeline.
+        var stages = cmdObj.pipeline;
+        const lastStage = stages && Array.isArray(stages) && (stages.length !== 0)
+            ? stages[stages.length - 1]
+            : undefined;
+        const hasOut =
+            lastStage && (typeof lastStage === "object") && lastStage.hasOwnProperty("$out");
+        const hasExplain = cmdObj.hasOwnProperty("explain") && cmdObj.explain;
+
+        if (!hasExplain && !hasOut) {
+            isReadCommand = true;
+        }
+    }
+
+    if (cmdName === "explain") {
+        if (Array.contains(readCommands, Object.keys(cmdObj[cmdName])[0])) {
+            isReadCommand = true;
+        }
+    }
+
+    return isReadCommand;
+};
+
 /**
  *  Adds afterClusterTime to the readConcern.
  */
@@ -145,11 +136,12 @@ Mongo.prototype._injectAfterClusterTime = function(cmdObj) {
     // clusterTime.
     const operationTime = this.getOperationTime();
     if (operationTime) {
-        const cmdName = Object.keys(cmdObj)[0];
+        let cmdName = Object.keys(cmdObj)[0];
         let cmdObjUnwrapped = cmdObj;
         if (cmdName === "query" || cmdName === "$query") {
             cmdObj[cmdName] = Object.assign({}, cmdObj[cmdName]);
             cmdObjUnwrapped = cmdObj[cmdName];
+            cmdName = Object.keys(cmdObjUnwrapped)[0];
         }
 
         cmdObjUnwrapped.readConcern = Object.assign({}, cmdObjUnwrapped.readConcern);
@@ -162,10 +154,11 @@ Mongo.prototype._injectAfterClusterTime = function(cmdObj) {
             readConcern.level = "local";
         }
 
+        const isReadCommand = this._isReadCommand(cmdObjUnwrapped);
+        const readPref = this.getReadPref();
         // While the readConcern must be set on the commandObject level i.e. in this case its the
         // object referenced by cmdObjUnwrapped the $readPreference must be set on the top level.
-        const readPref = this.getReadPref();
-        if (!cmdObj.hasOwnProperty("$readPreference") && readPref) {
+        if (isReadCommand && !cmdObj.hasOwnProperty("$readPreference") && readPref) {
             cmdObj.$readPreference = readPref;
         }
     }
@@ -200,10 +193,8 @@ Mongo.prototype._setLogicalTimeFromReply = function(res) {
 (function(original) {
     Mongo.prototype.runCommandWithMetadata = function runCommandWithMetadata(
         dbName, metadata, cmdObj) {
-        if (this.isCausalConsistencyEnabled(cmdObj) && cmdObj) {
+        if (this._isCausal && cmdObj) {
             cmdObj = this._injectAfterClusterTime(cmdObj);
-        }
-        if (this._isCausal) {
             metadata = this._gossipLogicalTime(metadata);
         }
         const res = original.call(this, dbName, metadata, cmdObj);
@@ -218,10 +209,8 @@ Mongo.prototype._setLogicalTimeFromReply = function(res) {
  */
 (function(original) {
     Mongo.prototype.runCommand = function runCommand(dbName, cmdObj, options) {
-        if (this.isCausalConsistencyEnabled(cmdObj) && cmdObj) {
+        if (this._isCausal && cmdObj) {
             cmdObj = this._injectAfterClusterTime(cmdObj);
-        }
-        if (this._isCausal) {
             cmdObj = this._gossipLogicalTime(cmdObj);
         }
         const res = original.call(this, dbName, cmdObj, options);

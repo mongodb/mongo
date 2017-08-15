@@ -87,7 +87,7 @@ public:
         return false;
     }
 
-    bool supportsReadConcern(const std::string& dbName, const BSONObj& cmdObj) const final {
+    bool supportsNonLocalReadConcern(const std::string& dbName, const BSONObj& cmdObj) const final {
         return true;
     }
 

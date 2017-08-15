@@ -411,7 +411,8 @@ bool runCommandImpl(OperationContext* opCtx,
     const std::string db = request.getDatabase().toString();
 
     BSONObjBuilder inPlaceReplyBob = replyBuilder->getInPlaceReplyBuilder(bytesToReserve);
-    auto readConcernArgsStatus = _extractReadConcern(cmd, command->supportsReadConcern(db, cmd));
+    auto readConcernArgsStatus =
+        _extractReadConcern(cmd, command->supportsNonLocalReadConcern(db, cmd));
 
     if (!readConcernArgsStatus.isOK()) {
         auto result =
@@ -478,7 +479,7 @@ bool runCommandImpl(OperationContext* opCtx,
 
     // When a linearizable read command is passed in, check to make sure we're reading
     // from the primary.
-    if (command->supportsReadConcern(db, cmd) &&
+    if (command->supportsNonLocalReadConcern(db, cmd) &&
         (readConcernArgsStatus.getValue().getLevel() ==
          repl::ReadConcernLevel::kLinearizableReadConcern) &&
         (request.getCommandName() != "getMore")) {
@@ -712,8 +713,8 @@ void execCommandDatabase(OperationContext* opCtx,
         appendReplyMetadata(opCtx, request, &metadataBob);
 
         const std::string db = request.getDatabase().toString();
-        auto readConcernArgsStatus =
-            _extractReadConcern(request.body, command->supportsReadConcern(db, request.body));
+        auto readConcernArgsStatus = _extractReadConcern(
+            request.body, command->supportsNonLocalReadConcern(db, request.body));
         auto operationTime = readConcernArgsStatus.isOK()
             ? computeOperationTime(
                   opCtx, startOperationTime, readConcernArgsStatus.getValue().getLevel())

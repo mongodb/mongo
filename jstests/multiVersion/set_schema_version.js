@@ -26,9 +26,11 @@
                     }
                 } else {
                     if (isDowngrade) {
-                        assert(!collectionInfos[i].info.uuid);
+                        assert(!collectionInfos[i].info.uuid,
+                               "Unexpected uuid for collection: " + tojson(collectionInfos[i]));
                     } else {
-                        assert(collectionInfos[i].info.uuid);
+                        assert(collectionInfos[i].info.uuid,
+                               "Expect uuid for collection: " + tojson(collectionInfos[i]));
                     }
                 }
             }
