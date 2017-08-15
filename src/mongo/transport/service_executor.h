@@ -30,7 +30,9 @@
 
 #include "mongo/base/status.h"
 #include "mongo/bson/bsonobjbuilder.h"
+#include "mongo/platform/bitwise_enum_operators.h"
 #include "mongo/stdx/functional.h"
+#include "mongo/transport/transport_mode.h"
 
 namespace mongo {
 // This needs to be forward declared here because the service_context.h is a circular dependency.
@@ -55,6 +57,10 @@ public:
 
         // MayRecurse indicates that a task may be run recursively.
         kMayRecurse = 1 << 2,
+
+        // MayYieldBeforeSchedule indicates that the executor may yield on the current thread before
+        // scheduling the task.
+        kMayYieldBeforeSchedule = 1 << 3,
     };
 
     /*
@@ -82,10 +88,18 @@ public:
     virtual Status shutdown() = 0;
 
     /*
+     * Returns if this service executor is using asynchronous or synchronous networking.
+     */
+    virtual Mode transportMode() const = 0;
+
+    /*
      * Appends statistics about task scheduling to a BSONObjBuilder for serverStatus output.
      */
     virtual void appendStats(BSONObjBuilder* bob) const = 0;
 };
 
 }  // namespace transport
+
+ENABLE_BITMASK_OPERATORS(transport::ServiceExecutor::ScheduleFlags)
+
 }  // namespace mongo

@@ -39,6 +39,7 @@
 #include "mongo/stdx/thread.h"
 #include "mongo/transport/ticket_impl.h"
 #include "mongo/transport/transport_layer.h"
+#include "mongo/transport/transport_mode.h"
 #include "mongo/util/net/hostandport.h"
 #include "mongo/util/net/ssl_options.h"
 #include "mongo/util/net/ssl_types.h"
@@ -80,10 +81,10 @@ public:
 #ifndef _WIN32
         bool useUnixSockets = true;  // whether to allow UNIX sockets in ipList
 #endif
-        bool enableIPv6 = false;             // whether to allow IPv6 sockets in ipList
-        bool async = false;                  // whether accepted sockets should be put into
-                                             // non-blocking mode after they're accepted
-        size_t maxConns = DEFAULT_MAX_CONN;  // maximum number of active connections
+        bool enableIPv6 = false;                  // whether to allow IPv6 sockets in ipList
+        Mode transportMode = Mode::kSynchronous;  // whether accepted sockets should be put into
+                                                  // non-blocking mode after they're accepted
+        size_t maxConns = DEFAULT_MAX_CONN;       // maximum number of active connections
     };
 
     TransportLayerASIO(const Options& opts, ServiceEntryPoint* sep);

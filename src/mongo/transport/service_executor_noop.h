@@ -1,5 +1,5 @@
 /**
- *    Copyright (C) 2015 MongoDB Inc.
+ *    Copyright (C) 2017 MongoDB Inc.
  *
  *    This program is free software: you can redistribute it and/or  modify
  *    it under the terms of the GNU Affero General Public License, version 3,
@@ -28,15 +28,36 @@
 
 #pragma once
 
-#include <condition_variable>
+#include "mongo/base/status.h"
+#include "mongo/transport/service_executor.h"
 
 namespace mongo {
-namespace stdx {
+namespace transport {
 
-using condition_variable = ::std::condition_variable;          // NOLINT
-using condition_variable_any = ::std::condition_variable_any;  // NOLINT
-using cv_status = ::std::cv_status;                            // NOLINT
-using ::std::notify_all_at_thread_exit;                        // NOLINT
+/**
+ * The noop service executor provides the necessary interface for some unittests. Doesn't actually
+ * execute any work
+ */
+class ServiceExecutorNoop final : public ServiceExecutor {
+public:
+    explicit ServiceExecutorNoop(ServiceContext* ctx) {}
 
-}  // namespace stdx
+    Status start() override {
+        return Status::OK();
+    }
+    Status shutdown() override {
+        return Status::OK();
+    }
+    Status schedule(Task task, ScheduleFlags flags) override {
+        return Status::OK();
+    }
+
+    Mode transportMode() const override {
+        return Mode::kSynchronous;
+    }
+
+    void appendStats(BSONObjBuilder* bob) const override {}
+};
+
+}  // namespace transport
 }  // namespace mongo

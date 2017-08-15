@@ -178,16 +178,16 @@ private:
 
 std::shared_ptr<ServiceStateMachine> ServiceStateMachine::create(ServiceContext* svcContext,
                                                                  transport::SessionHandle session,
-                                                                 bool sync) {
-    return std::make_shared<ServiceStateMachine>(svcContext, std::move(session), sync);
+                                                                 transport::Mode transportMode) {
+    return std::make_shared<ServiceStateMachine>(svcContext, std::move(session), transportMode);
 }
 
 ServiceStateMachine::ServiceStateMachine(ServiceContext* svcContext,
                                          transport::SessionHandle session,
-                                         bool sync)
+                                         transport::Mode transportMode)
     : _state{State::Created},
       _sep{svcContext->getServiceEntryPoint()},
-      _sync(sync),
+      _transportMode(transportMode),
       _serviceContext(svcContext),
       _sessionHandle(session),
       _dbClient{svcContext->makeClient("conn", std::move(session))},
@@ -275,7 +275,7 @@ void ServiceStateMachine::_sinkCallback(Status status) {
         _state.store(State::Source);
     }
 
-    return scheduleNext(ServiceExecutor::kDeferredTask);
+    return scheduleNext(ServiceExecutor::kDeferredTask | ServiceExecutor::kMayYieldBeforeSchedule);
 }
 
 void ServiceStateMachine::_processMessage(ThreadGuard& guard) {
@@ -337,11 +337,13 @@ void ServiceStateMachine::_processMessage(ThreadGuard& guard) {
         auto ticket = _session()->sinkMessage(toSink);
 
         _state.store(State::SinkWait);
-        if (_sync) {
+        if (_transportMode == transport::Mode::kSynchronous) {
             _sinkCallback(_session()->getTransportLayer()->wait(std::move(ticket)));
-        } else {
+        } else if (_transportMode == transport::Mode::kAsynchronous) {
             _session()->getTransportLayer()->asyncWait(
                 std::move(ticket), [this](Status status) { _sinkCallback(status); });
+        } else {
+            MONGO_UNREACHABLE;
         }
     } else {
         _state.store(State::Source);
@@ -382,14 +384,16 @@ void ServiceStateMachine::_runNextInGuard(ThreadGuard& guard) {
 
                 auto ticket = _session()->sourceMessage(&_inMessage);
                 _state.store(State::SourceWait);
-                if (_sync) {
+                if (_transportMode == transport::Mode::kSynchronous) {
                     _sourceCallback([this](auto ticket) {
                         MONGO_IDLE_THREAD_BLOCK;
                         return _session()->getTransportLayer()->wait(std::move(ticket));
                     }(std::move(ticket)));
-                } else {
+                } else if (_transportMode == transport::Mode::kAsynchronous) {
                     _session()->getTransportLayer()->asyncWait(
                         std::move(ticket), [this](Status status) { _sourceCallback(status); });
+                } else {
+                    MONGO_UNREACHABLE;
                 }
                 break;
             }
@@ -402,10 +406,6 @@ void ServiceStateMachine::_runNextInGuard(ThreadGuard& guard) {
                 break;
             default:
                 MONGO_UNREACHABLE;
-        }
-
-        if ((_counter++ & 0xf) == 0) {
-            markThreadIdle();
         }
 
         if (state() == State::EndSession) {
@@ -426,7 +426,7 @@ void ServiceStateMachine::_runNextInGuard(ThreadGuard& guard) {
 }
 
 void ServiceStateMachine::scheduleNext(ServiceExecutor::ScheduleFlags flags) {
-    _maybeScheduleFunc(_serviceContext->getServiceExecutor(), [this] { runNext(); }, flags);
+    _scheduleFunc([this] { runNext(); }, flags);
 }
 
 void ServiceStateMachine::terminateIfTagsDontMatch(transport::Session::TagMask tags) {
@@ -448,6 +448,13 @@ void ServiceStateMachine::setCleanupHook(stdx::function<void()> hook) {
 
 ServiceStateMachine::State ServiceStateMachine::state() {
     return _state.load();
+}
+
+void ServiceStateMachine::_terminateAndLogIfError(Status status) {
+    if (!status.isOK()) {
+        warning(logger::LogComponent::kExecutor) << "Terminating session due to error: " << status;
+        terminateIfTagsDontMatch(transport::Session::kEmptyTagMask);
+    }
 }
 
 void ServiceStateMachine::_cleanupSession(ThreadGuard& guard) {

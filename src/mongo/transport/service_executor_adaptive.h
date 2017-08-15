@@ -93,6 +93,10 @@ public:
     Status shutdown() final;
     Status schedule(Task task, ScheduleFlags flags) final;
 
+    Mode transportMode() const final {
+        return Mode::kAsynchronous;
+    }
+
     void appendStats(BSONObjBuilder* bob) const final;
 
     int threadsRunning() {

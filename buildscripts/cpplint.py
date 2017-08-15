@@ -1630,6 +1630,7 @@ def make_polyfill_regex():
     'lock_guard',
     'make_unique',
     'mutex',
+    'notify_all_at_thread_exit',
     'packaged_task',
     'placeholders',
     'promise',

@@ -814,12 +814,10 @@ ExitCode _initAndListen(int listenPort) {
         return EXIT_NET_ERROR;
     }
 
-    if (globalServiceContext->getServiceExecutor()) {
-        start = globalServiceContext->getServiceExecutor()->start();
-        if (!start.isOK()) {
-            error() << "Failed to start the service executor: " << start;
-            return EXIT_NET_ERROR;
-        }
+    start = globalServiceContext->getServiceExecutor()->start();
+    if (!start.isOK()) {
+        error() << "Failed to start the service executor: " << start;
+        return EXIT_NET_ERROR;
     }
 
     globalServiceContext->notifyStartupComplete();
@@ -1140,9 +1138,10 @@ void shutdownTask() {
         }
 
         // Shutdown and wait for the service executor to exit
-        auto svcExec = serviceContext->getServiceExecutor();
-        if (svcExec) {
-            fassertStatusOK(40550, svcExec->shutdown());
+        Status status = serviceContext->getServiceExecutor()->shutdown();
+        if (!status.isOK()) {
+            log(LogComponent::kExecutor) << "shutdown: service executor failed with: "
+                                         << status.reason();
         }
     }
 #endif

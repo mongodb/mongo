@@ -1,5 +1,5 @@
 /**
- *    Copyright (C) 2015 MongoDB Inc.
+ *    Copyright (C) 2017 MongoDB Inc.
  *
  *    This program is free software: you can redistribute it and/or  modify
  *    it under the terms of the GNU Affero General Public License, version 3,
@@ -28,15 +28,48 @@
 
 #pragma once
 
-#include <condition_variable>
+#include <deque>
+
+#include "mongo/base/status.h"
+#include "mongo/platform/atomic_word.h"
+#include "mongo/stdx/condition_variable.h"
+#include "mongo/stdx/mutex.h"
+#include "mongo/transport/service_executor.h"
 
 namespace mongo {
-namespace stdx {
+namespace transport {
 
-using condition_variable = ::std::condition_variable;          // NOLINT
-using condition_variable_any = ::std::condition_variable_any;  // NOLINT
-using cv_status = ::std::cv_status;                            // NOLINT
-using ::std::notify_all_at_thread_exit;                        // NOLINT
+/**
+ * The passthrough service executor emulates a thread per connection.
+ * Each connection has its own worker thread where jobs get scheduled.
+ */
+class ServiceExecutorSynchronous final : public ServiceExecutor {
+public:
+    explicit ServiceExecutorSynchronous(ServiceContext* ctx);
 
-}  // namespace stdx
+    Status start() override;
+    Status shutdown() override;
+    Status schedule(Task task, ScheduleFlags flags) override;
+
+    Mode transportMode() const override {
+        return Mode::kSynchronous;
+    }
+
+    void appendStats(BSONObjBuilder* bob) const override;
+
+private:
+    static thread_local std::deque<Task> _localWorkQueue;
+    static thread_local int _localRecursionDepth;
+    static thread_local int64_t _localThreadIdleCounter;
+
+    AtomicBool _stillRunning{false};
+
+    mutable stdx::mutex _shutdownMutex;
+    stdx::condition_variable _shutdownCondition;
+
+    AtomicWord<size_t> _numRunningWorkerThreads{0};
+    size_t _numHardwareCores{0};
+};
+
+}  // namespace transport
 }  // namespace mongo
