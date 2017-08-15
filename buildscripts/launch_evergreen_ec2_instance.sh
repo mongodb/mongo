@@ -58,62 +58,72 @@ ami=$(curl -s $aws_metadata_url/ami-id)
 instance_type=$(curl -s $aws_metadata_url/instance-type)
 echo "AMI EC2 info: $ami $instance_type"
 
+data_df=$(df -BG -T /data | tail -n1 | tr -s ' ')
+base_device_name=$(echo $data_df | cut -f1 -d ' ' | sed -e 's/.*\///g')
+fstype=$(echo $data_df | cut -f2 -d ' ')
+device_size=$(echo $data_df | cut -f3 -d ' ' | cut -f1 -d "G" | cut -f1 -d ".")
+if [[ -z $base_device_name || -z $fstype || -z $device_size ]]; then
+  echo "Could not detect /data mount point, one of the following are not detected:"
+  echo "base_device_name: '$base_device_name' fstype: '$fstype' device_size: '$device_size'"
+  exit 1
+fi
+
 # Linux variants have block device mappings, so discover the mounted drives.
 if [ $(uname) = "Linux" ]; then
-  # Get /data device name & size.
-  data_df=$(df -BG -T | grep /data | tr -s ' ')
-  base_device_name=$(echo $data_df | cut -f1 -d ' ' | sed -e 's/.*\///g')
-  fstype=$(echo $data_df | cut -f2 -d ' ')
-  device_size=$(echo $data_df | cut -f3 -d ' ' | cut -f1 -d "G" | cut -f1 -d ".")
-  if [[ -z $base_device_name || -z $fstype || -z $device_size ]]; then
-    echo "Could not detect /data mount point"
-    exit 1
-  else
-    devices_info="$base_device_name;$fstype;$device_size"
+  devices_info="$base_device_name;$fstype;$device_size"
 
-    is_raid_device=$(grep -s active /proc/mdstat | grep $base_device_name) || true
-    if [ ! -z "$is_raid_device" ]; then
-      raid_device_name=$base_device_name
-      raid_devices=$(lsblk | grep $raid_device_name -B1 | cut -f1 -d ' ' | grep -v $raid_device_name | tr '\n\r' ' ')
-      devices_info=
-      for device in $raid_devices
-      do
-        data_device=$(lsblk -o NAME,SIZE | grep $device | tr -s ' ')
-        device_size=$(echo $data_device | cut -f2 -d ' ' | cut -f1 -d "G" | cut -f1 -d ".")
-        devices_info="$devices_info $device;$fstype;$device_size"
-      done
-    fi
+  is_raid_device=$(grep -s active /proc/mdstat | grep $base_device_name) || true
+  if [ ! -z "$is_raid_device" ]; then
+    raid_device_name=$base_device_name
+    raid_devices=$(lsblk | grep $raid_device_name -B1 | cut -f1 -d ' ' | grep -v $raid_device_name | tr '\n\r' ' ')
+    devices_info=
+    for device in $raid_devices
+    do
+      data_device=$(lsblk -o NAME,SIZE | grep $device | tr -s ' ')
+      device_size=$(echo $data_device | cut -f2 -d ' ' | cut -f1 -d "G" | cut -f1 -d ".")
+      devices_info="$devices_info $device;$fstype;$device_size"
+    done
+  fi
 
-    # Discover FS options on device, for now, only supports:
-    #  - XFS options: crc finobt
-    if [ $fstype = "xfs" ]; then
-      xfs_info=$(xfs_info /dev/$base_device_name)
-      xfs_option_choices="crc finobt"
-      opt_num=0
-      opt_sep=""
-      for xfs_option_choice in $xfs_option_choices
-      do
-        opt_grep=$(echo $xfs_info | grep $xfs_option_choice) || true
-        if [ ! -z "$opt_grep" ]; then
-          let "opt_num=opt_num+1"
-          if [ $opt_num -gt 1 ]; then
-            opt_sep=","
-          fi
-          opt_val=$(echo $opt_grep | sed -e "s/.*$xfs_option_choice=//; s/ .*//")
-          xfs_options="$xfs_options$opt_sep$xfs_option_choice=$opt_val"
+  # Discover FS options on device, for now, only supports:
+  #  - XFS options: crc finobt
+  if [ $fstype = "xfs" ]; then
+    xfs_info=$(xfs_info /dev/$base_device_name)
+    xfs_option_choices="crc finobt"
+    opt_num=0
+    opt_sep=""
+    for xfs_option_choice in $xfs_option_choices
+    do
+      opt_grep=$(echo $xfs_info | grep $xfs_option_choice) || true
+      if [ ! -z "$opt_grep" ]; then
+        let "opt_num=opt_num+1"
+        if [ $opt_num -gt 1 ]; then
+          opt_sep=","
         fi
-      done
-      if [ ! -z "$xfs_options" ]; then
-        fs_options="-m $xfs_options"
+        xfs_val=$(echo $opt_grep | sed -e "s/.*$xfs_option_choice=//; s/ .*//")
+        xfs_options="$xfs_options$opt_sep$xfs_option_choice=$xfs_val"
       fi
+    done
+    if [ ! -z "$xfs_options" ]; then
+      fs_options="-m $xfs_options"
     fi
   fi
-  echo "Devices: $devices_info"
 elif [ "Windows_NT" = "$OS" ]; then
-  # Windows variants have an instance store, so there is no Block device.
-  # The instance store uses drive 'z'.
-  device_names="z"
-  fi
+  # We use 'xvdf' as the first available device for the EBS volume, which is mounted on 'd:'
+  # See http://docs.aws.amazon.com/AWSEC2/latest/WindowsGuide/device_naming.html
+  used_drive_letters=$(wmic logicaldisk get name | grep ':' | tr -d ' :[\r\n]' | tr '[:upper:]' '[:lower:]')
+  for letter in {z..a}
+  do
+    if [ $(echo $used_drive_letters | tr -d $letter) == $used_drive_letters ]; then
+      device_names="$letter:"
+      break
+    fi
+  done
+  device_names="d"
+  devices_info="xvdf;$fstype;$device_size"
+fi
+
+echo "Devices: $devices_info"
 
 # Specify the Block devices and sizes to be attached to the EC2 instance.
 for info in $devices_info
@@ -130,7 +140,7 @@ aws_ec2=$(python buildscripts/aws_ec2.py \
           --instanceType $instance_type  \
           --keyName $ssh_key_id          \
           --mode create                  \
-          --tagName "tag_name"           \
+          --tagName "$tag_name"           \
           --tagOwner "$USER"             \
           $block_device_option | tr -cd "[:print:]\n")
 echo "Spawned new AMI EC2 instance: $aws_ec2"
