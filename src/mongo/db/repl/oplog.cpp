@@ -624,6 +624,29 @@ NamespaceString parseNs(const string& ns, const BSONObj& cmdObj) {
     return NamespaceString(NamespaceString(ns).db().toString(), coll);
 }
 
+std::pair<OptionalCollectionUUID, NamespaceString> parseCollModUUIDAndNss(OperationContext* opCtx,
+                                                                          const BSONElement& ui,
+                                                                          const char* ns,
+                                                                          BSONObj& cmd) {
+    if (ui.eoo()) {
+        return std::pair<OptionalCollectionUUID, NamespaceString>(boost::none, parseNs(ns, cmd));
+    }
+    CollectionUUID uuid = uassertStatusOK(UUID::parse(ui));
+    auto& catalog = UUIDCatalog::get(opCtx);
+    if (catalog.lookupCollectionByUUID(uuid)) {
+        return std::pair<OptionalCollectionUUID, NamespaceString>(uuid,
+                                                                  catalog.lookupNSSByUUID(uuid));
+    } else {
+        uassert(ErrorCodes::NamespaceNotFound,
+                str::stream() << "Failed to apply operation due to missing collection (" << uuid
+                              << "): "
+                              << redact(cmd.toString()),
+                cmd.nFields() == 1);
+        // If cmd is an empty collMod, i.e., nFields is 1, this is a UUID upgrade collMod.
+        return std::pair<OptionalCollectionUUID, NamespaceString>(uuid, parseNs(ns, cmd));
+    }
+}
+
 NamespaceString parseUUID(OperationContext* opCtx, const BSONElement& ui) {
     auto statusWithUUID = UUID::parse(ui);
     uassertStatusOK(statusWithUUID);
@@ -715,22 +738,9 @@ std::map<std::string, ApplyOpMetadata> opsMap = {
          const BSONElement& ui,
          BSONObj& cmd,
          const OpTime& opTime) -> Status {
-          // Get UUID from cmd, if it exists.
           OptionalCollectionUUID uuid;
           NamespaceString nss;
-          if (ui.eoo()) {
-              uuid = boost::none;
-              nss = parseNs(ns, cmd);
-          } else {
-              uuid = uassertStatusOK(UUID::parse(ui));
-              // We need to see whether a collection with UUID ui exists before attempting to do
-              // a collMod on it. This is because we add UUIDs during upgrade to
-              // featureCompatibilityVersion 3.6 with a collMod command, so the collection will
-              // not have a UUID at the time we attempt to look it up by UUID.
-              auto& catalog = UUIDCatalog::get(opCtx);
-              nss = catalog.lookupCollectionByUUID(uuid.get()) ? catalog.lookupNSSByUUID(uuid.get())
-                                                               : parseNs(ns, cmd);
-          }
+          std::tie(uuid, nss) = parseCollModUUIDAndNss(opCtx, ui, ns, cmd);
           return collModForUUIDUpgrade(opCtx, nss, cmd, uuid);
       },
       {ErrorCodes::IndexNotFound, ErrorCodes::NamespaceNotFound}}},
