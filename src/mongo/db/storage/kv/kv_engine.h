@@ -197,6 +197,13 @@ public:
     virtual bool supportsDocLocking() const = 0;
 
     /**
+     * This must not change over the lifetime of the engine.
+     */
+    virtual bool supportsDBLocking() const {
+        return true;
+    }
+
+    /**
      * Returns true if storage engine supports --directoryperdb.
      * See:
      *     http://docs.mongodb.org/manual/reference/program/mongod/#cmdoption--directoryperdb

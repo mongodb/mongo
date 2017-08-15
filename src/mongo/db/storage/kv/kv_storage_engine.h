@@ -90,6 +90,10 @@ public:
         return _supportsDocLocking;
     }
 
+    virtual bool supportsDBLocking() const {
+        return _supportsDBLocking;
+    }
+
     virtual Status closeDatabase(OperationContext* opCtx, StringData db);
 
     virtual Status dropDatabase(OperationContext* opCtx, StringData db);
@@ -151,6 +155,7 @@ private:
     std::unique_ptr<KVEngine> _engine;
 
     const bool _supportsDocLocking;
+    const bool _supportsDBLocking;
 
     std::unique_ptr<RecordStore> _catalogRecordStore;
     std::unique_ptr<KVCatalog> _catalog;

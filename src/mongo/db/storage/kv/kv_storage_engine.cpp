@@ -74,7 +74,8 @@ KVStorageEngine::KVStorageEngine(
     : _databaseCatalogEntryFactory(std::move(databaseCatalogEntryFactory)),
       _options(options),
       _engine(engine),
-      _supportsDocLocking(_engine->supportsDocLocking()) {
+      _supportsDocLocking(_engine->supportsDocLocking()),
+      _supportsDBLocking(_engine->supportsDBLocking()) {
     uassert(28601,
             "Storage engine does not support --directoryperdb",
             !(options.directoryPerDB && !engine->supportsDirectoryPerDB()));
