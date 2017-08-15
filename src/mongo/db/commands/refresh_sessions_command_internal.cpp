@@ -34,6 +34,7 @@
 #include "mongo/db/commands.h"
 #include "mongo/db/jsobj.h"
 #include "mongo/db/logical_session_cache.h"
+#include "mongo/db/logical_session_id_helpers.h"
 #include "mongo/db/operation_context.h"
 #include "mongo/db/refresh_sessions_gen.h"
 

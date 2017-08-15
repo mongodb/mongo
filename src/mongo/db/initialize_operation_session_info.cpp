@@ -33,6 +33,7 @@
 #include "mongo/db/logical_session_cache.h"
 #include "mongo/db/logical_session_id_helpers.h"
 #include "mongo/db/operation_context.h"
+#include "mongo/db/server_options.h"
 
 namespace mongo {
 
@@ -41,6 +42,11 @@ void initializeOperationSessionInfo(OperationContext* opCtx,
                                     bool requiresAuth,
                                     bool canAcceptTxnNumber) {
     if (!requiresAuth) {
+        return;
+    }
+
+    if (serverGlobalParams.featureCompatibility.version.load() ==
+        ServerGlobalParams::FeatureCompatibility::Version::k34) {
         return;
     }
 

@@ -66,8 +66,12 @@ public:
     Status checkAuthForOperation(OperationContext* opCtx,
                                  const std::string& dbname,
                                  const BSONObj& cmdObj) override {
-        // Anybody may start a session. The command body below checks
-        // that only a single user is logged in.
+
+        if (serverGlobalParams.featureCompatibility.version.load() ==
+            ServerGlobalParams::FeatureCompatibility::Version::k34) {
+            return SessionsCommandFCV34Status(getName());
+        }
+
         return Status::OK();
     }
 
@@ -75,6 +79,11 @@ public:
                      const std::string& db,
                      const BSONObj& cmdObj,
                      BSONObjBuilder& result) override {
+
+        if (serverGlobalParams.featureCompatibility.version.load() ==
+            ServerGlobalParams::FeatureCompatibility::Version::k34) {
+            return appendCommandStatus(result, SessionsCommandFCV34Status(getName()));
+        }
 
         auto client = opCtx->getClient();
         ServiceContext* serviceContext = client->getServiceContext();
