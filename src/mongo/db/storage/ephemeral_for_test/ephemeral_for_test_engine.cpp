@@ -53,7 +53,9 @@ Status EphemeralForTestEngine::createRecordStore(OperationContext* opCtx,
                                                  StringData ns,
                                                  StringData ident,
                                                  const CollectionOptions& options) {
-    // All work done in getRecordStore
+    // Register the ident in the `_dataMap` (for `getAllIdents`). Remainder of work done in
+    // `getRecordStore`.
+    _dataMap[ident] = {};
     return Status::OK();
 }
 
@@ -75,7 +77,9 @@ std::unique_ptr<RecordStore> EphemeralForTestEngine::getRecordStore(
 Status EphemeralForTestEngine::createSortedDataInterface(OperationContext* opCtx,
                                                          StringData ident,
                                                          const IndexDescriptor* desc) {
-    // All work done in getSortedDataInterface
+    // Register the ident in `_dataMap` (for `getAllIdents`). Remainder of work done in
+    // `getSortedDataInterface`.
+    _dataMap[ident] = {};
     return Status::OK();
 }
 

@@ -326,12 +326,39 @@ void repairDatabasesAndCheckVersion(OperationContext* opCtx) {
     const repl::ReplSettings& replSettings = repl::getGlobalReplicationCoordinator()->getSettings();
 
     if (!storageGlobalParams.readOnly) {
-        // We open the "local" database before calling checkIfReplMissingFromCommandLine() to ensure
-        // the in-memory catalog entries for the 'kSystemReplSetCollection' collection have been
-        // populated if the collection exists. If the "local" database didn't exist at this point
-        // yet, then it will be created. If the mongod is running in a read-only mode, then it is
-        // fine to not open the "local" database and populate the catalog entries because we won't
-        // attempt to drop the temporary collections anyway.
+        StatusWith<std::vector<StorageEngine::CollectionIndexNamePair>> swIndexesToRebuild =
+            storageEngine->reconcileCatalogAndIdents(opCtx);
+        fassertStatusOK(40593, swIndexesToRebuild);
+        for (auto&& collIndexPair : swIndexesToRebuild.getValue()) {
+            const std::string& coll = collIndexPair.first;
+            const std::string& indexName = collIndexPair.second;
+            DatabaseCatalogEntry* dbce =
+                storageEngine->getDatabaseCatalogEntry(opCtx, NamespaceString(coll).db());
+            invariant(dbce);
+            CollectionCatalogEntry* cce = dbce->getCollectionCatalogEntry(coll);
+            invariant(cce);
+
+            StatusWith<IndexNameObjs> swIndexToRebuild(
+                getIndexNameObjs(opCtx, dbce, cce, [&indexName](const std::string& str) {
+                    return str == indexName;
+                }));
+            if (!swIndexToRebuild.isOK() || swIndexToRebuild.getValue().first.empty()) {
+                severe() << "Unable to get indexes for collection. Collection: " << coll;
+                fassertFailedNoTrace(40590);
+            }
+
+            invariant(swIndexToRebuild.getValue().first.size() == 1 &&
+                      swIndexToRebuild.getValue().second.size() == 1);
+            fassertStatusOK(
+                40592, rebuildIndexesOnCollection(opCtx, dbce, cce, swIndexToRebuild.getValue()));
+        }
+
+        // We open the "local" database before calling checkIfReplMissingFromCommandLine() to
+        // ensure the in-memory catalog entries for the 'kSystemReplSetCollection' collection have
+        // been populated if the collection exists. If the "local" database didn't exist at this
+        // point yet, then it will be created. If the mongod is running in a read-only mode, then
+        // it is fine to not open the "local" database and populate the catalog entries because we
+        // won't attempt to drop the temporary collections anyway.
         Lock::DBLock dbLock(opCtx, kSystemReplSetCollection.db(), MODE_X);
         dbHolder().openDb(opCtx, kSystemReplSetCollection.db());
     }

@@ -321,6 +321,18 @@ public:
      */
     virtual void setInitialDataTimestamp(SnapshotName snapshotName) {}
 
+    // (CollectionName, IndexName)
+    typedef std::pair<std::string, std::string> CollectionIndexNamePair;
+
+    /**
+     * Drop abandoned idents. In the successful case, returns a list of collection, index name
+     * pairs to rebuild.
+     */
+    virtual StatusWith<std::vector<CollectionIndexNamePair>> reconcileCatalogAndIdents(
+        OperationContext* opCtx) {
+        return std::vector<CollectionIndexNamePair>();
+    };
+
 protected:
     /**
      * The destructor will never be called. See cleanShutdown instead.

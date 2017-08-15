@@ -31,6 +31,7 @@
 #include <map>
 #include <string>
 
+#include "mongo/base/status_with.h"
 #include "mongo/base/string_data.h"
 #include "mongo/db/storage/journal_listener.h"
 #include "mongo/db/storage/kv/kv_catalog.h"
@@ -132,6 +133,12 @@ public:
     const KVCatalog* getCatalog() const {
         return _catalog.get();
     }
+
+    /**
+     * Drop abandoned idents. Returns a parallel list of index name, index spec pairs to rebuild.
+     */
+    StatusWith<std::vector<StorageEngine::CollectionIndexNamePair>> reconcileCatalogAndIdents(
+        OperationContext* opCtx) override;
 
 private:
     class RemoveDBChange;

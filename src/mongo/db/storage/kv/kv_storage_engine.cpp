@@ -131,40 +131,102 @@ KVStorageEngine::KVStorageEngine(
 
     KVPrefix::setLargestPrefix(maxSeenPrefix);
     opCtx.recoveryUnit()->abandonSnapshot();
+}
 
-    // now clean up orphaned idents
-    // we don't do this in readOnly mode.
-    if (storageGlobalParams.readOnly) {
-        return;
-    }
+/**
+ * This method reconciles differences between idents the KVEngine is aware of and the
+ * KVCatalog. There are three differences to consider:
+ *
+ * First, a KVEngine may know of an ident that the KVCatalog does not. This method will drop
+ * the ident from the KVEngine.
+ *
+ * Second, a KVCatalog may have a collection ident that the KVEngine does not. This is an
+ * illegal state and this method fasserts.
+ *
+ * Third, a KVCatalog may have an index ident that the KVEngine does not. This method will
+ * rebuild the index.
+ */
+StatusWith<std::vector<StorageEngine::CollectionIndexNamePair>>
+KVStorageEngine::reconcileCatalogAndIdents(OperationContext* opCtx) {
+    // Gather all tables known to the storage engine and drop those that aren't cross-referenced
+    // in the _mdb_catalog. This can happen for two reasons.
+    //
+    // First, collection creation and deletion happen in two steps. First the storage engine
+    // creates/deletes the table, followed by the change to the _mdb_catalog. It's not assumed a
+    // storage engine can make these steps atomic.
+    //
+    // Second, a replica set node in 3.6+ on supported storage engines will only persist "stable"
+    // data to disk. That is data which replication guarantees won't be rolled back. The
+    // _mdb_catalog will reflect the "stable" set of collections/indexes. However, it's not
+    // expected for a storage engine's ability to persist stable data to extend to "stable
+    // tables".
+    std::set<std::string> engineIdents;
     {
-        // get all idents
-        std::set<std::string> allIdents;
-        {
-            std::vector<std::string> v = _engine->getAllIdents(&opCtx);
-            allIdents.insert(v.begin(), v.end());
-            allIdents.erase(catalogInfo);
+        std::vector<std::string> vec = _engine->getAllIdents(opCtx);
+        engineIdents.insert(vec.begin(), vec.end());
+        engineIdents.erase(catalogInfo);
+    }
+
+    std::set<std::string> catalogIdents;
+    {
+        std::vector<std::string> vec = _catalog->getAllIdents(opCtx);
+        catalogIdents.insert(vec.begin(), vec.end());
+    }
+
+    // Drop all idents in the storage engine that are not known to the catalog. This can happen in
+    // the case of a collection or index creation being rolled back.
+    for (const auto& it : engineIdents) {
+        if (catalogIdents.find(it) != catalogIdents.end()) {
+            continue;
         }
 
-        // remove ones still in use
-        {
-            vector<string> idents = _catalog->getAllIdents(&opCtx);
-            for (size_t i = 0; i < idents.size(); i++) {
-                allIdents.erase(idents[i]);
-            }
+        if (!_catalog->isUserDataIdent(it)) {
+            continue;
         }
 
-        for (std::set<std::string>::const_iterator it = allIdents.begin(); it != allIdents.end();
-             ++it) {
-            const std::string& toRemove = *it;
-            if (!_catalog->isUserDataIdent(toRemove))
-                continue;
-            log() << "dropping unused ident: " << toRemove;
-            WriteUnitOfWork wuow(&opCtx);
-            _engine->dropIdent(&opCtx, toRemove).transitional_ignore();
-            wuow.commit();
+        const auto& toRemove = it;
+        log() << "Dropping unknown ident: " << toRemove;
+        WriteUnitOfWork wuow(opCtx);
+        fassertStatusOK(40591, _engine->dropIdent(opCtx, toRemove));
+        wuow.commit();
+    }
+
+    // Scan all collections in the catalog and make sure their ident is known to the storage
+    // engine. An omission here is fatal. A missing ident could mean a collection drop was rolled
+    // back. Note that startup already attempts to open tables; this should only catch errors in
+    // other contexts such as `recoverToStableTimestamp`.
+    std::vector<std::string> collections;
+    _catalog->getAllCollections(&collections);
+    for (const auto& coll : collections) {
+        const auto& identForColl = _catalog->getCollectionIdent(coll);
+        if (engineIdents.find(identForColl) == engineIdents.end()) {
+            return {ErrorCodes::UnrecoverableRollbackError,
+                    str::stream() << "Expected collection does not exist. NS: " << coll
+                                  << " Ident: "
+                                  << identForColl};
         }
     }
+
+    // Scan all indexes and return those in the catalog where the storage engine does not have the
+    // corresponding ident. The caller is expected to rebuild these indexes.
+    std::vector<CollectionIndexNamePair> ret;
+    for (const auto& coll : collections) {
+        const BSONCollectionCatalogEntry::MetaData metaData = _catalog->getMetaData(opCtx, coll);
+        for (const auto& indexMetaData : metaData.indexes) {
+            const std::string& indexName = indexMetaData.name();
+            std::string indexIdent = _catalog->getIndexIdent(opCtx, coll, indexName);
+            if (engineIdents.find(indexIdent) != engineIdents.end()) {
+                continue;
+            }
+
+            log() << "Expected index data is missing, rebuilding. NS: " << coll
+                  << " Index: " << indexName << " Ident: " << indexIdent;
+
+            ret.push_back(CollectionIndexNamePair(coll, indexName));
+        }
+    }
+
+    return ret;
 }
 
 void KVStorageEngine::cleanShutdown() {

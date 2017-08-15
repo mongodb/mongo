@@ -37,6 +37,7 @@ var StandaloneFixture, ShardedFixture, runReadOnlyTest, zip2, cycleN;
             var options = {queryableBackupMode: "", noCleanData: true, dbpath: this.dbpath};
 
             this.mongod = MongoRunner.runMongod(options);
+            assert.neq(this.mongod, null);
 
             test.exec(this.mongod.getDB("test")[test.name]);
 

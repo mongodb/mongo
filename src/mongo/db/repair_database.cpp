@@ -30,11 +30,14 @@
 
 #include "mongo/platform/basic.h"
 
+#include <algorithm>
+
 #include "mongo/db/repair_database.h"
 
 #include "mongo/base/status.h"
 #include "mongo/base/string_data.h"
 #include "mongo/bson/bson_validate.h"
+#include "mongo/bson/bsonobjbuilder.h"
 #include "mongo/db/background.h"
 #include "mongo/db/catalog/collection.h"
 #include "mongo/db/catalog/collection_catalog_entry.h"
@@ -60,17 +63,22 @@ using std::string;
 
 using IndexVersion = IndexDescriptor::IndexVersion;
 
-namespace {
-Status rebuildIndexesOnCollection(OperationContext* opCtx,
-                                  DatabaseCatalogEntry* dbce,
-                                  const std::string& collectionName) {
-    CollectionCatalogEntry* cce = dbce->getCollectionCatalogEntry(collectionName);
-
-    std::vector<string> indexNames;
-    std::vector<BSONObj> indexSpecs;
+StatusWith<IndexNameObjs> getIndexNameObjs(OperationContext* opCtx,
+                                           DatabaseCatalogEntry* dbce,
+                                           CollectionCatalogEntry* cce,
+                                           stdx::function<bool(const std::string&)> filter) {
+    IndexNameObjs ret;
+    std::vector<string>& indexNames = ret.first;
+    std::vector<BSONObj>& indexSpecs = ret.second;
     {
         // Fetch all indexes
         cce->getAllIndexes(opCtx, &indexNames);
+        auto newEnd =
+            std::remove_if(indexNames.begin(),
+                           indexNames.end(),
+                           [&filter](const std::string& indexName) { return !filter(indexName); });
+        indexNames.erase(newEnd, indexNames.end());
+
         indexSpecs.reserve(indexNames.size());
 
         for (size_t i = 0; i < indexNames.size(); i++) {
@@ -117,6 +125,16 @@ Status rebuildIndexesOnCollection(OperationContext* opCtx,
             }
         }
     }
+
+    return ret;
+}
+
+Status rebuildIndexesOnCollection(OperationContext* opCtx,
+                                  DatabaseCatalogEntry* dbce,
+                                  CollectionCatalogEntry* cce,
+                                  const IndexNameObjs& indexNameObjs) {
+    const std::vector<std::string>& indexNames = indexNameObjs.first;
+    const std::vector<BSONObj>& indexSpecs = indexNameObjs.second;
 
     // Skip the rest if there are no indexes to rebuild.
     if (indexSpecs.empty())
@@ -211,7 +229,6 @@ Status rebuildIndexesOnCollection(OperationContext* opCtx,
 
     return Status::OK();
 }
-}  // namespace
 
 Status repairDatabase(OperationContext* opCtx,
                       StorageEngine* engine,
@@ -283,7 +300,12 @@ Status repairDatabase(OperationContext* opCtx,
         if (!status.isOK())
             return status;
 
-        status = rebuildIndexesOnCollection(opCtx, dbce, *it);
+        CollectionCatalogEntry* cce = dbce->getCollectionCatalogEntry(*it);
+        auto swIndexNameObjs = getIndexNameObjs(opCtx, dbce, cce);
+        if (!swIndexNameObjs.isOK())
+            return swIndexNameObjs.getStatus();
+
+        status = rebuildIndexesOnCollection(opCtx, dbce, cce, swIndexNameObjs.getValue());
         if (!status.isOK())
             return status;
 
