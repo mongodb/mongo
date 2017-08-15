@@ -88,7 +88,7 @@ LogicalSessionCache::LogicalSessionCache(std::unique_ptr<ServiceLiason> service,
       _service(std::move(service)),
       _sessionsColl(std::move(collection)),
       _cache(options.capacity) {
-    PeriodicRunner::PeriodicJob job{[this](Client* client) { _refresh(client); },
+    PeriodicRunner::PeriodicJob job{[this](Client* client) { _periodicRefresh(client); },
                                     duration_cast<Milliseconds>(_refreshInterval)};
     _service->scheduleJob(std::move(job));
 }
@@ -182,7 +182,7 @@ Status LogicalSessionCache::refreshSessions(OperationContext* opCtx,
     return _sessionsColl->refreshSessions(opCtx, toRefresh, now());
 }
 
-void LogicalSessionCache::refreshNow(Client* client) {
+Status LogicalSessionCache::refreshNow(Client* client) {
     return _refresh(client);
 }
 
@@ -195,7 +195,16 @@ size_t LogicalSessionCache::size() {
     return _cache.size();
 }
 
-void LogicalSessionCache::_refresh(Client* client) {
+void LogicalSessionCache::_periodicRefresh(Client* client) {
+    auto res = _refresh(client);
+    if (!res.isOK()) {
+        log() << "Failed to refresh session cache: " << res;
+    }
+
+    return;
+}
+
+Status LogicalSessionCache::_refresh(Client* client) {
     LogicalSessionRecordSet activeSessions;
     LogicalSessionRecordSet deadSessions;
 
@@ -267,7 +276,7 @@ void LogicalSessionCache::_refresh(Client* client) {
         auto res = _sessionsColl->refreshSessions(opCtx, std::move(activeSessions), time);
         if (!res.isOK()) {
             // TODO SERVER-29709: handle network errors here.
-            return;
+            return res;
         }
     }
 
@@ -279,6 +288,8 @@ void LogicalSessionCache::_refresh(Client* client) {
     {
         // TODO SERVER-29709: handle expiration separately from failure to refresh.
     }
+
+    return Status::OK();
 }
 
 bool LogicalSessionCache::_isDead(const LogicalSessionRecord& record, Date_t now) const {

@@ -74,7 +74,10 @@ public:
         auto cache = LogicalSessionCache::get(opCtx);
         auto client = opCtx->getClient();
 
-        cache->refreshNow(client);
+        auto res = cache->refreshNow(client);
+        if (!res.isOK()) {
+            return appendCommandStatus(result, res);
+        }
 
         return true;
     }

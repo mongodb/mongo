@@ -61,9 +61,6 @@ public:
      * Removes the authoritative records for the specified sessions.
      */
     Status removeRecords(OperationContext* opCtx, const LogicalSessionIdSet& sessions) override;
-
-private:
-    SessionsCollection::SendBatchFn makeSendFn(DBDirectClient* client);
 };
 
 }  // namespace mongo

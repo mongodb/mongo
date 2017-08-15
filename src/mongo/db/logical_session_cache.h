@@ -152,7 +152,7 @@ public:
      * Refreshes the cache synchronously. This flushes all pending refreshes and
      * inserts to the sessions collection.
      */
-    void refreshNow(Client* client);
+    Status refreshNow(Client* client);
 
     /**
      * Returns the current time.
@@ -169,7 +169,8 @@ private:
      * Internal methods to handle scheduling and perform refreshes for active
      * session records contained within the cache.
      */
-    void _refresh(Client* client);
+    void _periodicRefresh(Client* client);
+    Status _refresh(Client* client);
 
     /**
      * Returns true if a record has passed its given expiration.

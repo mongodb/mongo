@@ -64,28 +64,13 @@ Status SessionsCollectionStandalone::refreshSessions(OperationContext* opCtx,
                                                      const LogicalSessionRecordSet& sessions,
                                                      Date_t refreshTime) {
     DBDirectClient client(opCtx);
-    return doRefresh(sessions, refreshTime, makeSendFn(&client));
+    return doRefresh(sessions, refreshTime, makeSendFnForBatchWrite(&client));
 }
 
 Status SessionsCollectionStandalone::removeRecords(OperationContext* opCtx,
                                                    const LogicalSessionIdSet& sessions) {
     DBDirectClient client(opCtx);
-    return doRemove(sessions, makeSendFn(&client));
+    return doRemove(sessions, makeSendFnForBatchWrite(&client));
 }
-
-SessionsCollection::SendBatchFn SessionsCollectionStandalone::makeSendFn(DBDirectClient* client) {
-    auto send = [client](BSONObj batch) -> Status {
-        BSONObj res;
-        auto ok = client->runCommand(SessionsCollection::kSessionsDb.toString(), batch, res);
-        if (!ok) {
-            return {ErrorCodes::UnknownError,
-                    client->getLastError(SessionsCollection::kSessionsDb.toString())};
-        }
-        return Status::OK();
-    };
-
-    return send;
-}
-
 
 }  // namespace mongo

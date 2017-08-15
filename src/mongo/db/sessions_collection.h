@@ -35,15 +35,17 @@ namespace mongo {
 
 class BSONArrayBuilder;
 class BSONObjBuilder;
+class DBClientBase;
 class OperationContext;
 
 /**
  * An abstract interface describing the entrypoint into the sessions collection.
  *
  * Different server deployments (standalone, replica set, sharded cluster) should
- * implement their own class that fulfill this interface.
+ * implement their own classes that fulfill this interface.
  */
 class SessionsCollection {
+
 public:
     virtual ~SessionsCollection();
 
@@ -77,17 +79,26 @@ public:
     virtual Status removeRecords(OperationContext* opCtx, const LogicalSessionIdSet& sessions) = 0;
 
 protected:
+    /**
+     * Makes a send function for the given client.
+     */
     using SendBatchFn = stdx::function<Status(BSONObj batch)>;
+    SendBatchFn makeSendFnForCommand(DBClientBase* client);
+    SendBatchFn makeSendFnForBatchWrite(DBClientBase* client);
 
     /**
      * Formats and sends batches of refreshes for the given set of sessions.
      */
     Status doRefresh(const LogicalSessionRecordSet& sessions, Date_t refreshTime, SendBatchFn send);
+    Status doRefreshExternal(const LogicalSessionRecordSet& sessions,
+                             Date_t refreshTime,
+                             SendBatchFn send);
 
     /**
      * Formats and sends batches of deletes for the given set of sessions.
      */
     Status doRemove(const LogicalSessionIdSet& sessions, SendBatchFn send);
+    Status doRemoveExternal(const LogicalSessionIdSet& sessions, SendBatchFn send);
 };
 
 }  // namespace mongo

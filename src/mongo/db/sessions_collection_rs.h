@@ -26,46 +26,52 @@
  *    it in the license file.
  */
 
-#include "mongo/platform/basic.h"
+#pragma once
 
 #include <memory>
 
-#include "mongo/db/logical_session_cache_factory_mongod.h"
-
-#include "mongo/db/service_liason_mongod.h"
-#include "mongo/db/sessions_collection_mock.h"
-#include "mongo/db/sessions_collection_rs.h"
-#include "mongo/db/sessions_collection_standalone.h"
-#include "mongo/stdx/memory.h"
+#include "mongo/client/connection_string.h"
+#include "mongo/client/connpool.h"
+#include "mongo/client/remote_command_targeter.h"
+#include "mongo/db/logical_session_id.h"
+#include "mongo/db/sessions_collection.h"
+#include "mongo/util/time_support.h"
 
 namespace mongo {
 
-namespace {
+class DBDirectClient;
+class OperationContext;
+class RemoteCommandTargeter;
 
-std::unique_ptr<SessionsCollection> makeSessionsCollection(LogicalSessionCacheServer state) {
-    switch (state) {
-        case LogicalSessionCacheServer::kSharded:
-            // TODO SERVER-29203, replace with SessionsCollectionSharded
-            return stdx::make_unique<MockSessionsCollection>(
-                std::make_shared<MockSessionsCollectionImpl>());
-        case LogicalSessionCacheServer::kReplicaSet:
-            return stdx::make_unique<SessionsCollectionRS>();
-        case LogicalSessionCacheServer::kStandalone:
-            return stdx::make_unique<SessionsCollectionStandalone>();
-        default:
-            MONGO_UNREACHABLE;
-    }
-}
+/**
+ * Accesses the sessions collection for replica set members.
+ */
+class SessionsCollectionRS : public SessionsCollection {
+public:
+    /**
+     * Constructs a new SessionsCollectionRS.
+     */
+    SessionsCollectionRS() = default;
 
-}  // namespace
+    /**
+     * Returns a LogicalSessionRecord for the given session id, or an error if
+     * no such record was found.
+     */
+    StatusWith<LogicalSessionRecord> fetchRecord(OperationContext* opCtx,
+                                                 const LogicalSessionId& lsid) override;
 
-std::unique_ptr<LogicalSessionCache> makeLogicalSessionCacheD(LogicalSessionCacheServer state) {
-    auto liason = stdx::make_unique<ServiceLiasonMongod>();
+    /**
+     * Updates the last-use times on the given sessions to be greater than
+     * or equal to the current time.
+     */
+    Status refreshSessions(OperationContext* opCtx,
+                           const LogicalSessionRecordSet& sessions,
+                           Date_t refreshTime) override;
 
-    // Set up the logical session cache
-    auto sessionsColl = makeSessionsCollection(state);
-    return stdx::make_unique<LogicalSessionCache>(
-        std::move(liason), std::move(sessionsColl), LogicalSessionCache::Options{});
-}
+    /**
+     * Removes the authoritative records for the specified sessions.
+     */
+    Status removeRecords(OperationContext* opCtx, const LogicalSessionIdSet& sessions) override;
+};
 
 }  // namespace mongo
