@@ -241,7 +241,7 @@ TEST(JSONSchemaParserTest, FailsToParseIfMaximumIsNotANumber) {
 TEST(JSONSchemaParserTest, FailsToParseIfMaxLengthIsNotANumber) {
     BSONObj schema = fromjson("{maxLength: 'foo'}");
     auto result = JSONSchemaParser::parse(schema);
-    ASSERT_EQ(result.getStatus(), ErrorCodes::TypeMismatch);
+    ASSERT_EQ(result.getStatus(), ErrorCodes::FailedToParse);
 }
 
 TEST(JSONSchemaParserTest, FailsToParseIfMaxLengthIsLessThanZero) {
@@ -497,7 +497,7 @@ TEST(JSONSchemaParserTest, FailsToParseIfExclusiveMinimumIsNotABoolean) {
 TEST(JSONSchemaParserTest, FailsToParseIfMinLengthIsNotANumber) {
     BSONObj schema = fromjson("{minLength: 'foo'}");
     auto result = JSONSchemaParser::parse(schema);
-    ASSERT_EQ(result.getStatus(), ErrorCodes::TypeMismatch);
+    ASSERT_EQ(result.getStatus(), ErrorCodes::FailedToParse);
 }
 
 TEST(JSONSchemaParserTest, FailsToParseIfMinLengthIsLessThanZero) {
@@ -868,5 +868,146 @@ TEST(JSONSchemaParserTest, TopLevelNotTranslatesCorrectly) {
         }]})"));
 }
 
+TEST(JSONSchemaParserTest, FailsToParseIfMinItemsIsNotANumber) {
+    auto schema = BSON("minItems" << BSON_ARRAY(1));
+    ASSERT_EQ(JSONSchemaParser::parse(schema).getStatus(), ErrorCodes::FailedToParse);
+}
+
+TEST(JSONSchemaParserTest, FailsToParseIfMinItemsIsNotANonNegativeInteger) {
+    auto schema = BSON("minItems" << -1);
+    ASSERT_EQ(JSONSchemaParser::parse(schema).getStatus(), ErrorCodes::FailedToParse);
+
+    schema = BSON("minItems" << 3.14);
+    ASSERT_EQ(JSONSchemaParser::parse(schema).getStatus(), ErrorCodes::FailedToParse);
+}
+
+TEST(JSONSchemaParserTest, MinItemsTranslatesCorrectlyWithNoType) {
+    auto schema = BSON("minItems" << 1);
+    auto result = JSONSchemaParser::parse(schema);
+    ASSERT_OK(result.getStatus());
+    ASSERT_SERIALIZES_TO(result.getValue(), fromjson("{$and: [{$alwaysTrue: 1}]}"));
+
+    schema = fromjson("{properties: {a: {minItems: 1}}}");
+    result = JSONSchemaParser::parse(schema);
+    ASSERT_OK(result.getStatus());
+
+    ASSERT_SERIALIZES_TO(result.getValue(), fromjson(R"(
+        {$and: [{
+              $and: [{
+                  $or: [
+                      {$nor: [{a: {$exists: true}}]},
+                      {
+                        $and: [{
+                            $or: [
+                                {$nor: [{a: {$_internalSchemaType: 4}}]},
+                                {a: {$_internalSchemaMinItems: 1}}
+                            ]
+                        }]
+                      }
+                  ]
+              }]
+          }]})"));
+}
+
+TEST(JSONSchemaParserTest, MinItemsTranslatesCorrectlyWithArrayType) {
+    auto schema = fromjson("{properties: {a: {minItems: 1, type: 'array'}}}");
+    auto result = JSONSchemaParser::parse(schema);
+    ASSERT_OK(result.getStatus());
+    ASSERT_SERIALIZES_TO(result.getValue(), fromjson(R"(
+        {$and: [{
+              $and: [{
+                  $or: [
+                      {$nor: [{a: {$exists: true}}]},
+                      {$and: [{a: {$_internalSchemaMinItems: 1}}, {a: {$_internalSchemaType: 4}}]}
+                  ]
+              }]
+        }]})"));
+}
+
+TEST(JSONSchemaParserTest, MinItemsTranslatesCorrectlyWithNonArrayType) {
+    auto schema = fromjson("{properties: {a: {minItems: 1, type: 'number'}}}");
+    auto result = JSONSchemaParser::parse(schema);
+    ASSERT_OK(result.getStatus());
+    ASSERT_SERIALIZES_TO(result.getValue(), fromjson(R"(
+        {$and: [{
+              $and: [{
+                  $or: [
+                      {$nor: [{a: {$exists: true}}]},
+                      {$and: [{$alwaysTrue: 1}, {a: {$_internalSchemaType: "number"}}]}
+                  ]
+              }]
+        }]})"));
+}
+
+TEST(JSONSchemaParserTest, FailsToParseIfMaxItemsIsNotANumber) {
+    auto schema = BSON("maxItems" << BSON_ARRAY(1));
+    ASSERT_EQ(JSONSchemaParser::parse(schema).getStatus(), ErrorCodes::FailedToParse);
+}
+
+TEST(JSONSchemaParserTest, FailsToParseIfMaxItemsIsNotANonNegativeInteger) {
+    auto schema = BSON("maxItems" << -1);
+    ASSERT_EQ(JSONSchemaParser::parse(schema).getStatus(), ErrorCodes::FailedToParse);
+
+    schema = BSON("maxItems" << 1.60217);
+    ASSERT_EQ(JSONSchemaParser::parse(schema).getStatus(), ErrorCodes::FailedToParse);
+}
+
+TEST(JSONSchemaParserTest, MaxItemsTranslatesCorrectlyWithNoType) {
+    auto schema = BSON("maxItems" << 1);
+    auto result = JSONSchemaParser::parse(schema);
+    ASSERT_OK(result.getStatus());
+    ASSERT_SERIALIZES_TO(result.getValue(), fromjson("{$and: [{$alwaysTrue: 1}]}"));
+
+    schema = fromjson("{properties: {a: {maxItems: 1}}}");
+    result = JSONSchemaParser::parse(schema);
+    ASSERT_OK(result.getStatus());
+
+    ASSERT_SERIALIZES_TO(result.getValue(), fromjson(R"(
+        {$and: [{
+              $and: [{
+                  $or: [
+                      {$nor: [{a: {$exists: true}}]},
+                      {
+                        $and: [{
+                            $or: [
+                                {$nor: [{a: {$_internalSchemaType: 4}}]},
+                                {a: {$_internalSchemaMaxItems: 1}}
+                            ]
+                        }]
+                      }
+                  ]
+              }]
+        }]})"));
+}
+
+TEST(JSONSchemaParserTest, MaxItemsTranslatesCorrectlyWithArrayType) {
+    auto schema = fromjson("{properties: {a: {maxItems: 1, type: 'array'}}}");
+    auto result = JSONSchemaParser::parse(schema);
+    ASSERT_OK(result.getStatus());
+    ASSERT_SERIALIZES_TO(result.getValue(), fromjson(R"(
+        {$and: [{
+              $and: [{
+                  $or: [
+                      {$nor: [{a: {$exists: true}}]},
+                      {$and: [{a: {$_internalSchemaMaxItems: 1}}, {a: {$_internalSchemaType: 4}}]}
+                  ]
+              }]
+        }]})"));
+}
+
+TEST(JSONSchemaParserTest, MaxItemsTranslatesCorrectlyWithNonArrayType) {
+    auto schema = fromjson("{properties: {a: {maxItems: 1, type: 'string'}}}");
+    auto result = JSONSchemaParser::parse(schema);
+    ASSERT_OK(result.getStatus());
+    ASSERT_SERIALIZES_TO(result.getValue(), fromjson(R"(
+    {$and: [{
+            $and: [{
+                $or: [
+                    {$nor: [{a: {$exists: true}}]},
+                    {$and: [{$alwaysTrue: 1}, {a: {$_internalSchemaType: 2}}]}
+                ]
+            }]
+    }]})"));
+}
 }  // namespace
 }  // namespace mongo
