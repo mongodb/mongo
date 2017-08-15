@@ -4,10 +4,14 @@
     var admin;
     var foo;
     var result;
-    var request = {startSession: 1};
+    const request = {startSession: 1};
 
     conn = MongoRunner.runMongod({nojournal: ""});
     admin = conn.getDB("admin");
+
+    // ensure that the cache is empty
+    var serverStatus = assert.commandWorked(admin.adminCommand({serverStatus: 1}));
+    assert.eq(0, serverStatus.logicalSessionRecordCache.records);
 
     // test that we can run startSession unauthenticated when the server is running without --auth
 
@@ -18,6 +22,10 @@
     assert(result.id, "failed test that our session response has an id");
     assert.eq(
         result.timeoutMinutes, 30, "failed test that our session record has the correct timeout");
+
+    // test that startSession added to the cache
+    serverStatus = assert.commandWorked(admin.adminCommand({serverStatus: 1}));
+    assert.eq(1, serverStatus.logicalSessionRecordCache.records);
 
     // test that we can run startSession authenticated when the server is running without --auth
 
@@ -84,4 +92,5 @@
     //
 
     MongoRunner.stopMongod(conn);
+
 })();

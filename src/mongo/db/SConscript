@@ -1012,8 +1012,10 @@ env.Library(
     target='logical_session_cache',
     source=[
         'logical_session_cache.cpp',
+        'logical_session_server_status_section.cpp',
     ],
     LIBDEPS=[
+        '$BUILD_DIR/mongo/db/commands/server_status',
         'logical_session_id',
         'logical_session_id_helpers',
         'sessions_collection',

@@ -159,6 +159,11 @@ public:
      */
     Date_t now();
 
+    /**
+     * Returns the number of session records currently in the cache.
+     */
+    size_t size();
+
 private:
     /**
      * Internal methods to handle scheduling and perform refreshes for active

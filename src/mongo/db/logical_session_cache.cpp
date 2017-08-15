@@ -37,6 +37,7 @@
 #include "mongo/db/operation_context.h"
 #include "mongo/db/server_parameters.h"
 #include "mongo/db/service_context.h"
+#include "mongo/platform/atomic_word.h"
 #include "mongo/util/duration.h"
 #include "mongo/util/log.h"
 #include "mongo/util/periodic_runner.h"
@@ -46,6 +47,8 @@ namespace mongo {
 namespace {
 const auto getLogicalSessionCache =
     ServiceContext::declareDecoration<std::unique_ptr<LogicalSessionCache>>();
+
+const auto getLogicalSessionCacheIsRegistered = ServiceContext::declareDecoration<AtomicBool>();
 }  // namespace
 
 MONGO_EXPORT_STARTUP_SERVER_PARAMETER(logicalSessionRecordCacheSize,
@@ -60,7 +63,10 @@ constexpr int LogicalSessionCache::kLogicalSessionCacheDefaultCapacity;
 constexpr Minutes LogicalSessionCache::kLogicalSessionDefaultRefresh;
 
 LogicalSessionCache* LogicalSessionCache::get(ServiceContext* service) {
-    return getLogicalSessionCache(service).get();
+    if (getLogicalSessionCacheIsRegistered(service).load()) {
+        return getLogicalSessionCache(service).get();
+    }
+    return nullptr;
 }
 
 LogicalSessionCache* LogicalSessionCache::get(OperationContext* ctx) {
@@ -71,6 +77,7 @@ void LogicalSessionCache::set(ServiceContext* service,
                               std::unique_ptr<LogicalSessionCache> sessionCache) {
     auto& cache = getLogicalSessionCache(service);
     cache = std::move(sessionCache);
+    getLogicalSessionCacheIsRegistered(service).store(true);
 }
 
 LogicalSessionCache::LogicalSessionCache(std::unique_ptr<ServiceLiason> service,
@@ -181,6 +188,11 @@ void LogicalSessionCache::refreshNow(Client* client) {
 
 Date_t LogicalSessionCache::now() {
     return _service->now();
+}
+
+size_t LogicalSessionCache::size() {
+    stdx::lock_guard<stdx::mutex> lock(_cacheMutex);
+    return _cache.size();
 }
 
 void LogicalSessionCache::_refresh(Client* client) {
