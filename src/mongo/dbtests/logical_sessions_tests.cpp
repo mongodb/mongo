@@ -65,6 +65,26 @@ Status insertRecord(OperationContext* opCtx, LogicalSessionRecord record) {
     return {ErrorCodes::DuplicateSession, errorString};
 }
 
+BSONObj lsidQuery(const LogicalSessionId& lsid) {
+    return BSON(LogicalSessionRecord::kIdFieldName << lsid.toBSON());
+}
+
+StatusWith<LogicalSessionRecord> fetchRecord(OperationContext* opCtx,
+                                             const LogicalSessionId& lsid) {
+    DBDirectClient client(opCtx);
+    auto cursor = client.query(kTestNS.toString(), lsidQuery(lsid), 1);
+    if (!cursor->more()) {
+        return {ErrorCodes::NoSuchSession, "No matching record in the sessions collection"};
+    }
+
+    try {
+        IDLParserErrorContext ctx("LogicalSessionRecord");
+        return LogicalSessionRecord::parse(ctx, cursor->next());
+    } catch (...) {
+        return exceptionToStatus();
+    }
+}
+
 }  // namespace
 
 class SessionsCollectionStandaloneTest {
@@ -115,10 +135,10 @@ public:
         res = collection()->removeRecords(opCtx(), {record1.getId()});
         ASSERT_OK(res);
 
-        auto swRecord = collection()->fetchRecord(opCtx(), record1.getId());
+        auto swRecord = fetchRecord(opCtx(), record1.getId());
         ASSERT(!swRecord.isOK());
 
-        swRecord = collection()->fetchRecord(opCtx(), record2.getId());
+        swRecord = fetchRecord(opCtx(), record2.getId());
         ASSERT(swRecord.isOK());
     }
 };
@@ -144,7 +164,7 @@ public:
         ASSERT(resRefresh.isOK());
 
         // The timestamp on the refreshed record should be updated.
-        auto swRecord = collection()->fetchRecord(opCtx(), record1.getId());
+        auto swRecord = fetchRecord(opCtx(), record1.getId());
         ASSERT(swRecord.isOK());
         ASSERT_EQ(swRecord.getValue().getLastUse(), now);
 
@@ -156,7 +176,7 @@ public:
         resRefresh = collection()->refreshSessions(opCtx(), {record2}, now);
         ASSERT(resRefresh.isOK());
 
-        swRecord = collection()->fetchRecord(opCtx(), record2.getId());
+        swRecord = fetchRecord(opCtx(), record2.getId());
         ASSERT(swRecord.isOK());
 
         // Clear the collection.

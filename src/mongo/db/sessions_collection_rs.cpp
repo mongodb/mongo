@@ -98,23 +98,6 @@ Status runIfStandaloneOrPrimary(OperationContext* opCtx, Callback callback) {
 
 }  // namespace
 
-StatusWith<LogicalSessionRecord> SessionsCollectionRS::fetchRecord(OperationContext* opCtx,
-                                                                   const LogicalSessionId& lsid) {
-
-    DBDirectClient client(opCtx);
-    auto cursor = client.query(kSessionsFullNS.toString(), lsidQuery(lsid), 1);
-    if (!cursor->more()) {
-        return {ErrorCodes::NoSuchSession, "No matching record in the sessions collection"};
-    }
-
-    try {
-        IDLParserErrorContext ctx("LogicalSessionRecord");
-        return LogicalSessionRecord::parse(ctx, cursor->next());
-    } catch (...) {
-        return exceptionToStatus();
-    }
-}
-
 Status SessionsCollectionRS::refreshSessions(OperationContext* opCtx,
                                              const LogicalSessionRecordSet& sessions,
                                              Date_t refreshTime) {

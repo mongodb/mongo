@@ -34,15 +34,10 @@ namespace mongo {
 
 MockSessionsCollectionImpl::MockSessionsCollectionImpl()
     : _sessions(),
-      _fetch(stdx::bind(&MockSessionsCollectionImpl::_fetchRecord, this, stdx::placeholders::_1)),
       _refresh(
           stdx::bind(&MockSessionsCollectionImpl::_refreshSessions, this, stdx::placeholders::_1)),
       _remove(
           stdx::bind(&MockSessionsCollectionImpl::_removeRecords, this, stdx::placeholders::_1)) {}
-
-void MockSessionsCollectionImpl::setFetchHook(FetchHook hook) {
-    _fetch = std::move(hook);
-}
 
 void MockSessionsCollectionImpl::setRefreshHook(RefreshHook hook) {
     _refresh = std::move(hook);
@@ -53,15 +48,9 @@ void MockSessionsCollectionImpl::setRemoveHook(RemoveHook hook) {
 }
 
 void MockSessionsCollectionImpl::clearHooks() {
-    _fetch = stdx::bind(&MockSessionsCollectionImpl::_fetchRecord, this, stdx::placeholders::_1);
     _refresh =
         stdx::bind(&MockSessionsCollectionImpl::_refreshSessions, this, stdx::placeholders::_1);
     _remove = stdx::bind(&MockSessionsCollectionImpl::_removeRecords, this, stdx::placeholders::_1);
-}
-
-StatusWith<LogicalSessionRecord> MockSessionsCollectionImpl::fetchRecord(
-    const LogicalSessionId& id) {
-    return _fetch(id);
 }
 
 Status MockSessionsCollectionImpl::refreshSessions(const LogicalSessionRecordSet& sessions) {
@@ -94,19 +83,6 @@ void MockSessionsCollectionImpl::clearSessions() {
 
 const MockSessionsCollectionImpl::SessionMap& MockSessionsCollectionImpl::sessions() const {
     return _sessions;
-}
-
-StatusWith<LogicalSessionRecord> MockSessionsCollectionImpl::_fetchRecord(
-    const LogicalSessionId& id) {
-    stdx::unique_lock<stdx::mutex> lk(_mutex);
-
-    // If we do not have this record, return an error
-    auto it = _sessions.find(id);
-    if (it == _sessions.end()) {
-        return {ErrorCodes::NoSuchSession, "No matching record in the sessions collection"};
-    }
-
-    return it->second;
 }
 
 Status MockSessionsCollectionImpl::_refreshSessions(const LogicalSessionRecordSet& sessions) {

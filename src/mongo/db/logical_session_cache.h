@@ -119,15 +119,6 @@ public:
     Status promote(LogicalSessionId lsid);
 
     /**
-     * If the cache contains a record for this LogicalSessionId, promotes it.
-     * Otherwise, attempts to fetch the record for this LogicalSessionId from the
-     * sessions collection, and returns the record if found. Otherwise, returns an error.
-     *
-     * This method may issue networking calls.
-     */
-    Status fetchAndPromote(OperationContext* opCtx, const LogicalSessionId& lsid);
-
-    /**
      * Inserts a new authoritative session record into the cache. This method will
      * insert the authoritative record into the sessions collection. This method
      * should only be used when starting new sessions and should not be used to

@@ -127,30 +127,6 @@ private:
     Client* _client;
 };
 
-// Test that session cache fetches new records from the sessions collection
-TEST_F(LogicalSessionCacheTest, CacheFetchesNewRecords) {
-    auto lsid = makeLogicalSessionIdForTest();
-
-    // When the record is not present (and not in the sessions collection) returns an error
-    auto res = cache()->fetchAndPromote(opCtx(), lsid);
-    ASSERT(!res.isOK());
-
-    // When the record is not present (but is in the sessions collection) returns it
-    sessions()->add(makeLogicalSessionRecord(lsid, service()->now()));
-    res = cache()->fetchAndPromote(opCtx(), lsid);
-    ASSERT(res.isOK());
-
-    // When the record is present in the cache, returns it
-    sessions()->setFetchHook([](LogicalSessionId id) -> StatusWith<LogicalSessionRecord> {
-        // We should not be querying the sessions collection on the next call
-        ASSERT(false);
-        return {ErrorCodes::NoSuchSession, "no such session"};
-    });
-
-    res = cache()->fetchAndPromote(opCtx(), lsid);
-    ASSERT(res.isOK());
-}
-
 // Test that the getFromCache method does not make calls to the sessions collection
 TEST_F(LogicalSessionCacheTest, TestCacheHitsOnly) {
     auto lsid = makeLogicalSessionIdForTest();
@@ -163,15 +139,10 @@ TEST_F(LogicalSessionCacheTest, TestCacheHitsOnly) {
     sessions()->add(makeLogicalSessionRecord(lsid, service()->now()));
     res = cache()->promote(lsid);
     ASSERT(!res.isOK());
-
-    // When the record is present, returns the owner
-    cache()->fetchAndPromote(opCtx(), lsid).transitional_ignore();
-    res = cache()->promote(lsid);
-    ASSERT(res.isOK());
 }
 
-// Test that fetching from the cache updates the lastUse date of records
-TEST_F(LogicalSessionCacheTest, FetchUpdatesLastUse) {
+// Test that promoting from the cache updates the lastUse date of records
+TEST_F(LogicalSessionCacheTest, PromoteUpdatesLastUse) {
     auto lsid = makeLogicalSessionIdForTest();
 
     auto start = service()->now();
@@ -179,23 +150,23 @@ TEST_F(LogicalSessionCacheTest, FetchUpdatesLastUse) {
     // Insert the record into the sessions collection with 'start'
     ASSERT(cache()->startSession(opCtx(), makeLogicalSessionRecord(lsid, start)).isOK());
 
-    // Fast forward time and fetch
+    // Fast forward time and promote
     service()->fastForward(Milliseconds(500));
     ASSERT(start != service()->now());
-    auto res = cache()->fetchAndPromote(opCtx(), lsid);
+    auto res = cache()->promote(lsid);
     ASSERT(res.isOK());
 
-    // Now that we fetched, lifetime of session should be extended
+    // Now that we promoted, lifetime of session should be extended
     service()->fastForward(kSessionTimeout - Milliseconds(500));
-    res = cache()->fetchAndPromote(opCtx(), lsid);
+    res = cache()->promote(lsid);
     ASSERT(res.isOK());
 
-    // We fetched again, so lifetime extended again
+    // We promoted again, so lifetime extended again
     service()->fastForward(kSessionTimeout - Milliseconds(10));
-    res = cache()->fetchAndPromote(opCtx(), lsid);
+    res = cache()->promote(lsid);
     ASSERT(res.isOK());
 
-    // Fast forward and hit-only fetch
+    // Fast forward and promote
     service()->fastForward(kSessionTimeout - Milliseconds(10));
     res = cache()->promote(lsid);
     ASSERT(res.isOK());
@@ -280,7 +251,7 @@ TEST_F(LogicalSessionCacheTest, CacheRefreshesOwnRecords) {
 
     // Use one of the records
     setOpCtx();
-    auto res = cache()->fetchAndPromote(opCtx(), record1.getId());
+    auto res = cache()->promote(record1.getId());
     ASSERT(res.isOK());
 
     // Advance time so that one record expires

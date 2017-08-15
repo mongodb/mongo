@@ -103,33 +103,6 @@ LogicalSessionCache::~LogicalSessionCache() {
     }
 }
 
-// TODO: fetch should attempt to update user info, if it is not in the found record.
-
-Status LogicalSessionCache::fetchAndPromote(OperationContext* opCtx, const LogicalSessionId& lsid) {
-    // Search our local cache first
-    auto promoteRes = promote(lsid);
-    if (promoteRes.isOK()) {
-        return promoteRes;
-    }
-
-    // Cache miss, must fetch from the sessions collection.
-    auto res = _sessionsColl->fetchRecord(opCtx, lsid);
-
-    // If we got a valid record, add it to our cache.
-    if (res.isOK()) {
-        auto& record = res.getValue();
-        record.setLastUse(now());
-
-        // Any duplicate records here are actually the same record with different
-        // lastUse times, ignore them.
-        auto oldRecord = _addToCache(record);
-        return Status::OK();
-    }
-
-    // If we could not get a valid record, return the error.
-    return res.getStatus();
-}
-
 Status LogicalSessionCache::promote(LogicalSessionId lsid) {
     stdx::unique_lock<stdx::mutex> lk(_cacheMutex);
     auto it = _cache.find(lsid);

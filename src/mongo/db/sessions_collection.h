@@ -54,13 +54,6 @@ public:
     static constexpr StringData kSessionsFullNS = "admin.system.sessions"_sd;
 
     /**
-     * Returns a LogicalSessionRecord for the given session id. This method
-     * may run networking operations on the calling thread.
-     */
-    virtual StatusWith<LogicalSessionRecord> fetchRecord(OperationContext* opCtx,
-                                                         const LogicalSessionId& id) = 0;
-
-    /**
      * Updates the last-use times on the given sessions to be greater than
      * or equal to the given time. Returns an error if a networking issue occurred.
      */
