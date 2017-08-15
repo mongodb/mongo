@@ -406,6 +406,25 @@ void DatabaseImpl::getStats(OperationContext* opCtx, BSONObjBuilder* output, dou
     output->appendNumber("indexSize", indexSize / scale);
 
     _dbEntry->appendExtraStats(opCtx, output, scale);
+
+    if (!getGlobalServiceContext()->getGlobalStorageEngine()->isEphemeral()) {
+        boost::filesystem::path dbpath(storageGlobalParams.dbpath);
+        if (storageGlobalParams.directoryperdb) {
+            dbpath /= _name;
+        }
+
+        boost::system::error_code ec;
+        boost::filesystem::space_info spaceInfo = boost::filesystem::space(dbpath, ec);
+        if (!ec) {
+            output->appendNumber("fsUsedSize", (spaceInfo.capacity - spaceInfo.available) / scale);
+            output->appendNumber("fsTotalSize", spaceInfo.capacity / scale);
+        } else {
+            output->appendNumber("fsUsedSize", -1);
+            output->appendNumber("fsTotalSize", -1);
+            log() << "Failed to query filesystem disk stats (code: " << ec.value()
+                  << "): " << ec.message();
+        }
+    }
 }
 
 Status DatabaseImpl::dropView(OperationContext* opCtx, StringData fullns) {

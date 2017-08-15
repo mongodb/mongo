@@ -11,6 +11,7 @@
 
     const isMongoS = serverIsMongos();
     const isMMAPv1 = jsTest.options().storageEngine === "mmapv1";
+    const isInMemory = jsTest.options().storageEngine === "inMemory";
 
     let testDB = db.getSiblingDB("dbstats_js");
     assert.commandWorked(testDB.dropDatabase());
@@ -56,6 +57,11 @@
     assert(dbStats.hasOwnProperty("storageSize"), tojson(dbStats));
     assert(dbStats.hasOwnProperty("numExtents"), tojson(dbStats));
     assert(dbStats.hasOwnProperty("indexSize"), tojson(dbStats));
+
+    if (!isMongoS && !isInMemory) {
+        assert(dbStats.hasOwnProperty("fsUsedSize"), tojson(dbStats));
+        assert(dbStats.hasOwnProperty("fsTotalSize"), tojson(dbStats));
+    }
 
     // Confirm extentFreeList field existence. Displayed for mongoD running MMAPv1 and for mongoS
     // regardless of storage engine.
