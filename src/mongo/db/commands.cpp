@@ -80,10 +80,10 @@ BSONObj Command::appendPassthroughFields(const BSONObj& cmdObjWithPassthroughFie
                                          const BSONObj& request) {
     BSONObjBuilder b;
     b.appendElements(request);
-    for (const auto& elem : cmdObjWithPassthroughFields) {
+    for (const auto& elem :
+         Command::filterCommandRequestForPassthrough(cmdObjWithPassthroughFields)) {
         const auto name = elem.fieldNameStringData();
-        // $db is one of the generic arguments, but is implicitly contained in request
-        if (Command::isGenericArgument(name) && !request.hasField(name) && name != "$db") {
+        if (Command::isGenericArgument(name) && !request.hasField(name)) {
             b.append(elem);
         }
     }
