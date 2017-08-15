@@ -33,6 +33,7 @@
 #include "mongo/db/s/migration_source_manager.h"
 
 #include "mongo/bson/bsonobjbuilder.h"
+#include "mongo/db/concurrency/write_conflict_exception.h"
 #include "mongo/db/db_raii.h"
 #include "mongo/db/operation_context.h"
 #include "mongo/db/s/collection_metadata.h"
@@ -120,6 +121,9 @@ MigrationSourceManager::MigrationSourceManager(OperationContext* opCtx,
 
         _collectionMetadata = CollectionShardingState::get(opCtx, getNss())->getMetadata();
         _keyPattern = _collectionMetadata->getKeyPattern();
+        if (autoColl.getCollection()->uuid()) {
+            _collectionUuid = autoColl.getCollection()->uuid().value();
+        }
     }
 
     const ChunkVersion collectionVersion = _collectionMetadata->getCollVersion();
@@ -218,7 +222,38 @@ Status MigrationSourceManager::enterCriticalSection(OperationContext* opCtx) {
     invariant(_state == kCloneCaughtUp);
     auto scopedGuard = MakeGuard([&] { cleanupOnError(opCtx); });
 
-    // Mark the shard as running critical operation, which requires recovery on crash
+    const ShardId& recipientId = _args.getToShardId();
+    if (!_collectionMetadata->getChunkManager()->getVersion(recipientId).isSet() &&
+        serverGlobalParams.featureCompatibility.version.load() >=
+            ServerGlobalParams::FeatureCompatibility::Version::k36) {
+        // The recipient didn't have any chunks of this collection. Write the no-op message so that
+        // change stream will notice that and close cursor to notify mongos to target to the new
+        // shard.
+        std::stringstream ss;
+        // The message for debugging.
+        ss << "Migrating chunk from shard " << _args.getFromShardId() << " to shard "
+           << _args.getToShardId() << " with no chunks for this collection";
+        // The message expected by change streams.
+        auto message = BSON("type"
+                            << "migrateChunkToNewShard"
+                            << "from"
+                            << _args.getFromShardId()
+                            << "to"
+                            << _args.getToShardId());
+        AutoGetCollection autoColl(opCtx, NamespaceString::kRsOplogNamespace, MODE_IX);
+        writeConflictRetry(
+            opCtx, "migrateChunkToNewShard", NamespaceString::kRsOplogNamespace.ns(), [&] {
+                WriteUnitOfWork uow(opCtx);
+                opCtx->getClient()->getServiceContext()->getOpObserver()->onInternalOpMessage(
+                    opCtx, getNss(), _collectionUuid, BSON("msg" << ss.str()), message);
+                uow.commit();
+            });
+    }
+
+    // Mark the shard as running critical operation, which requires recovery on crash.
+    //
+    // Note: the 'migrateChunkToNewShard' oplog message written above depends on this
+    // majority write to carry its local write to majority committed.
     Status status = ShardingStateRecovery::startMetadataOp(opCtx);
     if (!status.isOK()) {
         return status;

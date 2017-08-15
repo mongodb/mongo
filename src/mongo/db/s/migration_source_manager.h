@@ -223,6 +223,10 @@ private:
     // The key pattern of the collection whose chunks are being moved.
     BSONObj _keyPattern;
 
+    // The UUID of the the collection whose chunks are being moved. Default to empty if the
+    // collection doesn't have UUID.
+    UUID _collectionUuid;
+
     // The chunk cloner source. Only available if there is an active migration going on. To set and
     // remove it, global S lock needs to be acquired first in order to block all logOp calls and
     // then the mutex. To access it, only the mutex is necessary. Available after cloning stage has

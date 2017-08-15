@@ -76,6 +76,7 @@ constexpr StringData DocumentSourceChangeStream::kDeleteOpType;
 constexpr StringData DocumentSourceChangeStream::kReplaceOpType;
 constexpr StringData DocumentSourceChangeStream::kInsertOpType;
 constexpr StringData DocumentSourceChangeStream::kInvalidateOpType;
+constexpr StringData DocumentSourceChangeStream::kRetryNeededOpType;
 
 namespace {
 
@@ -176,7 +177,9 @@ DocumentSource::GetNextResult DocumentSourceCloseCursor::getNext() {
     auto doc = nextInput.getDocument();
     const auto& kOperationTypeField = DocumentSourceChangeStream::kOperationTypeField;
     checkValueType(doc[kOperationTypeField], kOperationTypeField, BSONType::String);
-    if (doc[kOperationTypeField].getString() == DocumentSourceChangeStream::kInvalidateOpType) {
+    auto operationType = doc[kOperationTypeField].getString();
+    if (operationType == DocumentSourceChangeStream::kInvalidateOpType ||
+        operationType == DocumentSourceChangeStream::kRetryNeededOpType) {
         // Pass the invalidation forward, so that it can be included in the results, or
         // filtered/transformed by further stages in the pipeline, then throw an exception
         // to close the cursor on the next call to getNext().
@@ -207,10 +210,18 @@ BSONObj DocumentSourceChangeStream::buildMatchFilter(const NamespaceString& nss,
                                 << "c"
                                 << OR(commandsOnTargetDb, renameDropTarget));
 
-    // 2) Normal CRUD ops on the target collection.
-    auto opMatch = BSON("ns" << target);
+    // 2.1) Normal CRUD ops on the target collection.
+    auto normalOpTypeMatch = BSON("op" << NE << "n");
 
-    // Match oplog entries after "start" and are either (1) supported commands or (2) CRUD ops,
+    // 2.2) A chunk gets migrated to a new shard that doesn't have any chunks.
+    auto chunkMigratedMatch = BSON("op"
+                                   << "n"
+                                   << "o2.type"
+                                   << "migrateChunkToNewShard");
+    // 2) Supported operations on the target namespace.
+    auto opMatch = BSON("ns" << target << OR(normalOpTypeMatch, chunkMigratedMatch));
+
+    // Match oplog entries after "start" and are either supported (1) commands or (2) operations,
     // excepting those tagged "fromMigrate".
     // Include the resume token, if resuming, so we can verify it was still present in the oplog.
     return BSON("$and" << BSON_ARRAY(BSON("ts" << (isResume ? GTE : GT) << startFrom)
@@ -299,8 +310,9 @@ Document DocumentSourceChangeStream::Transformation::applyTransformation(const D
     Value ns = input[repl::OplogEntry::kNamespaceFieldName];
     checkValueType(ns, repl::OplogEntry::kNamespaceFieldName, BSONType::String);
     Value uuid = input[repl::OplogEntry::kUuidFieldName];
-    if (!uuid.missing())
+    if (!uuid.missing()) {
         checkValueType(uuid, repl::OplogEntry::kUuidFieldName, BSONType::BinData);
+    }
     NamespaceString nss(ns.getString());
     Value id = input.getNestedField("o._id");
     // Non-replace updates have the _id in field "o2".
@@ -354,6 +366,13 @@ Document DocumentSourceChangeStream::Transformation::applyTransformation(const D
             documentId = Value();
             break;
         }
+        case repl::OpTypeEnum::kNoop: {
+            operationType = kRetryNeededOpType;
+            // Generate a fake document Id for RetryNeeded operation so that we can resume after
+            // this operation.
+            documentId = input[repl::OplogEntry::kObject2FieldName];
+            break;
+        }
         default: { MONGO_UNREACHABLE; }
     }
 
@@ -371,13 +390,13 @@ Document DocumentSourceChangeStream::Transformation::applyTransformation(const D
                          {kDocumentKeyField, documentKey}};
     doc.addField(kIdField, Value(resumeToken));
     doc.addField(kOperationTypeField, Value(operationType));
-    doc.addField(kFullDocumentField, fullDocument);
 
-    // "invalidate" entry has fewer fields.
-    if (opType == repl::OpTypeEnum::kCommand) {
+    // "invalidate" and "retryNeeded" entries have fewer fields.
+    if (opType == repl::OpTypeEnum::kCommand || opType == repl::OpTypeEnum::kNoop) {
         return doc.freeze();
     }
 
+    doc.addField(kFullDocumentField, fullDocument);
     doc.addField(kNamespaceField, Value(Document{{"db", nss.db()}, {"coll", nss.coll()}}));
     doc.addField(kDocumentKeyField, documentKey);
 

@@ -335,8 +335,13 @@ void OpObserverImpl::onDelete(OperationContext* opCtx,
     onWriteOpCompleted(opCtx, nss, std::vector<StmtId>{stmtId}, opTime);
 }
 
-void OpObserverImpl::onOpMessage(OperationContext* opCtx, const BSONObj& msgObj) {
-    repl::logOp(opCtx, "n", {}, {}, msgObj, nullptr, false, {}, kUninitializedStmtId, {});
+void OpObserverImpl::onInternalOpMessage(OperationContext* opCtx,
+                                         const NamespaceString& nss,
+                                         const boost::optional<UUID> uuid,
+                                         const BSONObj& msgObj,
+                                         const boost::optional<BSONObj> o2MsgObj) {
+    const BSONObj* o2MsgPtr = o2MsgObj ? o2MsgObj.get_ptr() : nullptr;
+    repl::logOp(opCtx, "n", nss, uuid, msgObj, o2MsgPtr, false, {}, kUninitializedStmtId, {});
 }
 
 void OpObserverImpl::onCreateCollection(OperationContext* opCtx,

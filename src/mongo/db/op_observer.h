@@ -121,7 +121,25 @@ public:
                           CollectionShardingState::DeleteState deleteState,
                           bool fromMigrate,
                           const boost::optional<BSONObj>& deletedDoc) = 0;
-    virtual void onOpMessage(OperationContext* opCtx, const BSONObj& msgObj) = 0;
+    /**
+     * Logs a no-op with "msgObj" in the o field into oplog.
+     *
+     * This function should only be used internally. "nss", "uuid" and the o2 field should never be
+     * exposed to users (for instance through the appendOplogNote command).
+     */
+    virtual void onInternalOpMessage(OperationContext* opCtx,
+                                     const NamespaceString& nss,
+                                     const boost::optional<UUID> uuid,
+                                     const BSONObj& msgObj,
+                                     const boost::optional<BSONObj> o2MsgObj) = 0;
+
+    /**
+     * Logs a no-op with "msgObj" in the o field into oplog.
+     */
+    void onOpMessage(OperationContext* opCtx, const BSONObj& msgObj) {
+        onInternalOpMessage(opCtx, {}, boost::none, msgObj, boost::none);
+    }
+
     virtual void onCreateCollection(OperationContext* opCtx,
                                     Collection* coll,
                                     const NamespaceString& collectionName,

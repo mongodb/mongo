@@ -446,5 +446,25 @@ TEST_F(ChangeStreamStageTest, CloseCursorEvenIfInvalidateEntriesGetFilteredOut) 
     ASSERT_THROWS_CODE(match->getNext(), CloseChangeStreamException, ErrorCodes::CloseChangeStream);
 }
 
+TEST_F(ChangeStreamStageTest, CloseCursorOnRetryNeededEntries) {
+    auto o2Field = D{{"type", "migrateChunkToNewShard"_sd}};
+    OplogEntry retryNeeded(optime, 1, OpTypeEnum::kNoop, nss, BSONObj(), o2Field.toBson());
+    retryNeeded.setUuid(testUuid());
+    auto stages = makeStages(retryNeeded);
+    auto closeCursor = stages.back();
+
+    Document expectedRetryNeeded{
+        {DSChangeStream::kIdField, makeResumeToken(ts, testUuid(), o2Field)},
+        {DSChangeStream::kOperationTypeField, DSChangeStream::kRetryNeededOpType},
+    };
+
+    auto next = closeCursor->getNext();
+    // Transform into RetryNeeded entry.
+    ASSERT_DOCUMENT_EQ(next.releaseDocument(), expectedRetryNeeded);
+    // Then throw an exception on the next call of getNext().
+    ASSERT_THROWS_CODE(
+        closeCursor->getNext(), CloseChangeStreamException, ErrorCodes::CloseChangeStream);
+}
+
 }  // namespace
 }  // namespace mongo

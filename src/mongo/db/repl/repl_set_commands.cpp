@@ -425,6 +425,8 @@ public:
 
         WriteUnitOfWork wuow(opCtx);
         if (status.isOK() && !parsedArgs.force) {
+            // Users must not be allowed to provide their own contents for the o2 field.
+            // o2 field of no-ops is supposed to be used internally.
             getGlobalServiceContext()->getOpObserver()->onOpMessage(
                 opCtx,
                 BSON("msg"
