@@ -738,11 +738,11 @@ __wt_txn_am_oldest(WT_SESSION_IMPL *session)
 }
 
 /*
- * __wt_txn_are_any_active --
+ * __wt_txn_activity_check --
  *	Check whether there are any running transactions.
  */
 static inline int
-__wt_txn_are_any_active(WT_SESSION_IMPL *session, bool *any_active)
+__wt_txn_activity_check(WT_SESSION_IMPL *session, bool *txn_active)
 {
 	WT_TXN_GLOBAL *txn_global;
 
@@ -755,6 +755,8 @@ __wt_txn_are_any_active(WT_SESSION_IMPL *session, bool *any_active)
 	WT_RET(__wt_txn_update_oldest(session,
 	    WT_TXN_OLDEST_STRICT | WT_TXN_OLDEST_WAIT));
 
-	*any_active = (txn_global->oldest_id != txn_global->current);
+	*txn_active = (txn_global->oldest_id != txn_global->current ||
+	    txn_global->metadata_pinned != txn_global->current);
+
 	return (0);
 }

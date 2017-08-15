@@ -332,7 +332,7 @@ static int
 __txn_rollback_to_stable_check(WT_SESSION_IMPL *session)
 {
 	WT_TXN_GLOBAL *txn_global;
-	bool active_txns, stable_set;
+	bool stable_set, txn_active;
 
 	txn_global = &S2C(session)->txn_global;
 	__wt_readlock(session, &txn_global->rwlock);
@@ -348,8 +348,8 @@ __txn_rollback_to_stable_check(WT_SESSION_IMPL *session)
 	 * require peeking into all open sessions, which isn't really
 	 * kosher.
 	 */
-	WT_RET(__wt_txn_are_any_active(session, &active_txns));
-	if (active_txns)
+	WT_RET(__wt_txn_activity_check(session, &txn_active));
+	if (txn_active)
 		WT_RET_MSG(session, EINVAL,
 		    "rollback_to_stable illegal with active transactions");
 

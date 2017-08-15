@@ -2004,8 +2004,10 @@ struct __wt_connection {
 	 * checkpoint; setting this value above 0 configures periodic
 	 * checkpoints., an integer between 0 and 100000; default \c 0.}
 	 * @config{ ),,}
-	 * @config{compatibility = (, set compatibility version of database., a
-	 * set of related configuration options defined below.}
+	 * @config{compatibility = (, set compatibility version of database.
+	 * Changing the compatibility version requires that there are no active
+	 * operations for the duration of the call., a set of related
+	 * configuration options defined below.}
 	 * @config{&nbsp;&nbsp;&nbsp;&nbsp;release, compatibility release
 	 * version string., a string; default empty.}
 	 * @config{ ),,}
@@ -2301,8 +2303,8 @@ struct __wt_connection {
 	 * WT_CONNECTION::set_timestamp. Any updates to checkpoint durable
 	 * tables that are more recent than the stable timestamp are removed.
 	 *
-	 * This method requires that there are no active cursor operations
-	 * for the duration of the call.
+	 * This method requires that there are no active operations for the
+	 * duration of the call.
 	 *
 	 * Any updates made to logged tables will not be rolled back. Any
 	 * updates made without an associated timestamp will not be rolled
@@ -2536,10 +2538,12 @@ struct __wt_connection {
  * @config{ ),,}
  * @config{checkpoint_sync, flush files to stable storage when closing or
  * writing checkpoints., a boolean flag; default \c true.}
- * @config{compatibility = (, set compatibility version of database., a set of
- * related configuration options defined below.}
- * @config{&nbsp;&nbsp;&nbsp;&nbsp;release, compatibility release version
- * string., a string; default empty.}
+ * @config{compatibility = (, set compatibility version of database.  Changing
+ * the compatibility version requires that there are no active operations for
+ * the duration of the call., a set of related configuration options defined
+ * below.}
+ * @config{&nbsp;&nbsp;&nbsp;&nbsp;release, compatibility release
+ * version string., a string; default empty.}
  * @config{ ),,}
  * @config{config_base, write the base configuration file if creating the
  * database.  If \c false in the config passed directly to ::wiredtiger_open\,

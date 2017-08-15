@@ -402,7 +402,9 @@ connection_runtime_config = [
             min='0', max='100000'),
         ]),
     Config('compatibility', '', r'''
-        set compatibility version of database''',
+        set compatibility version of database.  Changing the compatibility
+        version requires that there are no active operations for the duration
+        of the call.''',
         type='category', subconfig=[
         Config('release', '', r'''
             compatibility release version string'''),
