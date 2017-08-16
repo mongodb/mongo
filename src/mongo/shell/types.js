@@ -58,42 +58,27 @@ ISODate = function(isoDateStr) {
         return new Date();
 
     var isoDateRegex =
-        /(\d{4})-?(\d{2})-?(\d{2})([T ](\d{2})(:?(\d{2})(:?(\d{2}(\.\d+)?))?)?(Z|([+-])(\d{2}):?(\d{2})?)?)?/;
+        /^(\d{4})-?(\d{2})-?(\d{2})([T ](\d{2})(:?(\d{2})(:?(\d{2}(\.\d+)?))?)?(Z|([+-])(\d{2}):?(\d{2})?)?)?$/;
     var res = isoDateRegex.exec(isoDateStr);
 
     if (!res)
-        throw Error("invalid ISO date");
+        throw Error("invalid ISO date: " + isoDateStr);
 
-    var year = parseInt(res[1], 10) || 1970;  // this should always be present
-    var month = (parseInt(res[2], 10) || 1) - 1;
-    var date = parseInt(res[3], 10) || 0;
+    var year = parseInt(res[1], 10);
+    var month = (parseInt(res[2], 10)) - 1;
+    var date = parseInt(res[3], 10);
     var hour = parseInt(res[5], 10) || 0;
     var min = parseInt(res[7], 10) || 0;
     var sec = parseInt((res[9] && res[9].substr(0, 2)), 10) || 0;
     var ms = Math.round((parseFloat(res[10]) || 0) * 1000);
-    if (ms == 1000) {
-        ms = 0;
-        ++sec;
-    }
-    if (sec == 60) {
-        sec = 0;
-        ++min;
-    }
-    if (min == 60) {
-        min = 0;
-        ++hour;
-    }
-    if (hour == 24) {
-        hour = 0;  // the day wrapped, let JavaScript figure out the rest
-        var tempTime = Date.UTC(year, month, date, hour, min, sec, ms);
-        tempTime += 24 * 60 * 60 * 1000;  // milliseconds in a day
-        var tempDate = new Date(tempTime);
-        year = tempDate.getUTCFullYear();
-        month = tempDate.getUTCMonth();
-        date = tempDate.getUTCDate();
-    }
 
-    var time = Date.UTC(year, month, date, hour, min, sec, ms);
+    var dateTime = new Date();
+
+    dateTime.setUTCFullYear(year, month, date);
+    dateTime.setUTCHours(hour);
+    dateTime.setUTCMinutes(min);
+    dateTime.setUTCSeconds(sec);
+    var time = dateTime.setUTCMilliseconds(ms);
 
     if (res[11] && res[11] != 'Z') {
         var ofs = 0;
@@ -104,6 +89,14 @@ ISODate = function(isoDateStr) {
 
         time += ofs;
     }
+
+    // If we are outside the range 0000-01-01T00:00:00.000Z - 9999-12-31T23:59:59.999Z, abort with
+    // error.
+    const DATE_RANGE_MIN_MICROSECONDS = -62167219200000;
+    const DATE_RANGE_MAX_MICROSECONDS = 253402300799999;
+
+    if (time < DATE_RANGE_MIN_MICROSECONDS || time > DATE_RANGE_MAX_MICROSECONDS)
+        throw Error("invalid ISO date: " + isoDateStr);
 
     return new Date(time);
 };
