@@ -143,10 +143,9 @@
             command: {distinct: coll, key: "x"},
             checkResults: function(res) {
                 assert.commandWorked(res);
-                // Expect the command not to find any results, since the chunk moved.
-                assert.eq(0, res.values.length, tojson(res));
+                assert.eq(1, res.values.length, tojson(res));
             },
-            behavior: "unversioned"
+            behavior: "versioned"
         },
         driverOIDTest: {skip: "does not return user data"},
         drop: {skip: "primary only"},

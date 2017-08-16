@@ -1002,6 +1002,7 @@ public:
         auto routingInfo =
             uassertStatusOK(Grid::get(opCtx)->catalogCache()->getCollectionRoutingInfo(opCtx, nss));
         if (!routingInfo.cm()) {
+            // TODO (SERVER-30734) make distinct versioned against unsharded collections
             if (passthrough(opCtx, dbName, routingInfo.primaryId(), cmdObj, result)) {
                 return true;
             }
@@ -1049,49 +1050,45 @@ public:
         const auto cm = routingInfo.cm();
 
         auto query = getQuery(cmdObj);
-        auto queryCollation = getCollation(cmdObj);
-        if (!queryCollation.isOK()) {
-            return appendEmptyResultSet(result, queryCollation.getStatus(), nss.ns());
+        auto swCollation = getCollation(cmdObj);
+        if (!swCollation.isOK()) {
+            return appendEmptyResultSet(result, swCollation.getStatus(), nss.ns());
         }
+        auto collation = std::move(swCollation.getValue());
 
         // Construct collator for deduping.
         std::unique_ptr<CollatorInterface> collator;
-        if (!queryCollation.getValue().isEmpty()) {
-            auto statusWithCollator = CollatorFactoryInterface::get(opCtx->getServiceContext())
-                                          ->makeFromBSON(queryCollation.getValue());
-            if (!statusWithCollator.isOK()) {
-                return appendEmptyResultSet(result, statusWithCollator.getStatus(), nss.ns());
+        if (!collation.isEmpty()) {
+            auto swCollator =
+                CollatorFactoryInterface::get(opCtx->getServiceContext())->makeFromBSON(collation);
+            if (!swCollator.isOK()) {
+                return appendEmptyResultSet(result, swCollator.getStatus(), nss.ns());
             }
-            collator = std::move(statusWithCollator.getValue());
+            collator = std::move(swCollator.getValue());
         }
 
-        set<ShardId> shardIds;
-        cm->getShardIdsForQuery(opCtx, query, queryCollation.getValue(), &shardIds);
+        auto shardResponses =
+            uassertStatusOK(scatterGather(opCtx,
+                                          dbName,
+                                          nss,
+                                          filterCommandRequestForPassthrough(cmdObj),
+                                          ReadPreferenceSetting::get(opCtx),
+                                          ShardTargetingPolicy::UseRoutingTable,
+                                          query,
+                                          collation));
 
         BSONObjComparator bsonCmp(BSONObj(),
                                   BSONObjComparator::FieldNamesMode::kConsider,
-                                  !queryCollation.getValue().isEmpty() ? collator.get()
-                                                                       : cm->getDefaultCollator());
+                                  !collation.isEmpty() ? collator.get() : cm->getDefaultCollator());
         BSONObjSet all = bsonCmp.makeBSONObjSet();
 
-        for (const ShardId& shardId : shardIds) {
-            const auto shardStatus = Grid::get(opCtx)->shardRegistry()->getShard(opCtx, shardId);
-            if (!shardStatus.isOK()) {
-                invariant(shardStatus.getStatus() == ErrorCodes::ShardNotFound);
-                continue;
-            }
+        for (const auto& response : shardResponses) {
+            auto status = response.swResponse.isOK()
+                ? getStatusFromCommandResult(response.swResponse.getValue().data)
+                : response.swResponse.getStatus();
+            uassertStatusOK(status);
 
-            ShardConnection conn(shardStatus.getValue()->getConnString(), nss.ns());
-            BSONObj res;
-            bool ok = conn->runCommand(
-                nss.db().toString(), filterCommandRequestForPassthrough(cmdObj), res);
-            conn.done();
-
-            if (!ok) {
-                filterCommandReplyForPassthrough(res, &result);
-                return false;
-            }
-
+            BSONObj res = std::move(response.swResponse.getValue().data);
             BSONObjIterator it(res["values"].embeddedObject());
             while (it.more()) {
                 BSONElement nxt = it.next();

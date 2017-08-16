@@ -143,10 +143,9 @@
             command: {distinct: coll, key: "x"},
             checkResults: function(res) {
                 assert.commandWorked(res);
-                // Expect the command to return correct results, since it will read orphaned data.
                 assert.eq(1, res.values.length, tojson(res));
             },
-            behavior: "unversioned"
+            behavior: "versioned"
         },
         driverOIDTest: {skip: "does not return user data"},
         drop: {skip: "primary only"},
