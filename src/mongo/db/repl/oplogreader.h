@@ -78,6 +78,12 @@ public:
     BSONObj findOne(const char* ns, const Query& q) {
         return conn()->findOne(ns, q, 0, QueryOption_SlaveOk);
     }
+    BSONObj findOneByUUID(const std::string& db, UUID uuid, const BSONObj& filter) {
+        // Note that the findOneByUUID() function of DBClient passes SlaveOK to the client.
+        BSONObj foundDoc;
+        std::tie(foundDoc, std::ignore) = conn()->findOneByUUID(db, uuid, filter);
+        return foundDoc;
+    }
 
     /* SO_TIMEOUT (send/recv time out) for our DBClientConnections */
     static const Seconds kSocketTimeout;

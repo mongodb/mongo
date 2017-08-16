@@ -264,6 +264,19 @@ void ApplyBatchFinalizerForJournal::_run() {
         _recordDurable(latestOpTime);
     }
 }
+
+NamespaceString parseUUIDOrNs(OperationContext* opCtx, const BSONObj& o) {
+    auto statusWithUUID = UUID::parse(o.getField("ui"));
+    if (!statusWithUUID.isOK()) {
+        return NamespaceString(o.getStringField("ns"));
+    }
+    auto uuid = statusWithUUID.getValue();
+    auto& catalog = UUIDCatalog::get(opCtx);
+    auto nss = catalog.lookupNSSByUUID(uuid);
+    uassert(
+        ErrorCodes::NamespaceNotFound, "No namespace with UUID " + uuid.toString(), !nss.isEmpty());
+    return nss;
+}
 }  // namespace
 
 SyncTail::SyncTail(BackgroundSync* q, MultiSyncApplyFunc func)
@@ -976,7 +989,6 @@ OldThreadPool* SyncTail::getWriterPool() {
 
 BSONObj SyncTail::getMissingDoc(OperationContext* opCtx, const BSONObj& o) {
     OplogReader missingObjReader;  // why are we using OplogReader to run a non-oplog query?
-    const char* ns = o.getStringField("ns");
 
     if (MONGO_FAIL_POINT(initialSyncHangBeforeGettingMissingDocument)) {
         log() << "initial sync - initialSyncHangBeforeGettingMissingDocument fail point enabled. "
@@ -1017,8 +1029,16 @@ BSONObj SyncTail::getMissingDoc(OperationContext* opCtx, const BSONObj& o) {
 
         BSONObj query = BSONObjBuilder().append(idElem).obj();
         BSONObj missingObj;
+        const char* ns = o.getStringField("ns");
         try {
-            missingObj = missingObjReader.findOne(ns, query);
+            if (o.getField("ui").eoo()) {
+                missingObj = missingObjReader.findOne(ns, query);
+            } else {
+                auto uuid = uassertStatusOK(UUID::parse(o.getField("ui")));
+                auto dbname = nsToDatabaseSubstring(ns);
+                // If a UUID exists for the command object, find the document by UUID.
+                missingObj = missingObjReader.findOneByUUID(dbname.toString(), uuid, query);
+            }
         } catch (const SocketException&) {
             warning() << "network problem detected while fetching a missing document from the "
                       << "sync source, attempt " << retryCount << " of " << retryMax << endl;
@@ -1037,7 +1057,10 @@ BSONObj SyncTail::getMissingDoc(OperationContext* opCtx, const BSONObj& o) {
 }
 
 bool SyncTail::fetchAndInsertMissingDocument(OperationContext* opCtx, const BSONObj& o) {
-    const NamespaceString nss(o.getStringField("ns"));
+    // Note that using the local UUID/NamespaceString mapping is sufficient for checking
+    // whether the collection is capped on the remote because convertToCapped creates a
+    // new collection with a different UUID.
+    const NamespaceString nss(parseUUIDOrNs(opCtx, o));
 
     {
         // If the document is in a capped collection then it's okay for it to be missing.
@@ -1063,13 +1086,29 @@ bool SyncTail::fetchAndInsertMissingDocument(OperationContext* opCtx, const BSON
 
     return writeConflictRetry(opCtx, "fetchAndInsertMissingDocument", nss.ns(), [&] {
         // Take an X lock on the database in order to preclude other modifications.
-        // Also, the database might not exist yet, so create it.
-        AutoGetOrCreateDb autoDb(opCtx, nss.db(), MODE_X);
+        AutoGetDb autoDb(opCtx, nss.db(), MODE_X);
         Database* const db = autoDb.getDb();
 
         WriteUnitOfWork wunit(opCtx);
 
-        Collection* const coll = db->getOrCreateCollection(opCtx, nss);
+        Collection* coll = nullptr;
+        if (o.getField("ui").eoo()) {
+            if (!db) {
+                return false;
+            }
+            coll = db->getOrCreateCollection(opCtx, nss);
+        } else {
+            // If the oplog entry has a UUID, use it to find the collection in which to insert the
+            // missing document.
+            auto uuid = uassertStatusOK(UUID::parse(o.getField("ui")));
+            auto& catalog = UUIDCatalog::get(opCtx);
+            coll = catalog.lookupCollectionByUUID(uuid);
+            if (!coll) {
+                // TODO(SERVER-30819) insert this UUID into the missing UUIDs set.
+                return false;
+            }
+        }
+
         invariant(coll);
 
         OpDebug* const nullOpDebug = nullptr;
