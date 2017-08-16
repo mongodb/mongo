@@ -74,14 +74,6 @@ Lock::GlobalLock::GlobalLock(Locker* locker,
                              EnqueueOnly enqueueOnly)
     : _locker(locker), _result(LOCK_INVALID), _pbwm(locker, resourceIdParallelBatchWriterMode) {
     _enqueue(lockMode, timeoutMs);
-
-    if ((lockMode == LockMode::MODE_IX || lockMode == LockMode::MODE_X) && isLocked() &&
-        haveClient()) {
-        auto opCtx = cc().getOperationContext();
-        if (opCtx) {
-            GlobalLockAcquisitionTracker::get(opCtx).setGlobalExclusiveLockTaken();
-        }
-    }
 }
 
 void Lock::GlobalLock::_enqueue(LockMode lockMode, unsigned timeoutMs) {
@@ -99,6 +91,13 @@ void Lock::GlobalLock::waitForLock(unsigned timeoutMs) {
 
     if (_result != LOCK_OK && _locker->shouldConflictWithSecondaryBatchApplication()) {
         _pbwm.unlock();
+    }
+
+    if (_locker->isWriteLocked() && haveClient()) {
+        auto opCtx = cc().getOperationContext();
+        if (opCtx) {
+            GlobalLockAcquisitionTracker::get(opCtx).setGlobalExclusiveLockTaken();
+        }
     }
 }
 
