@@ -49,31 +49,11 @@
 #include "mongo/util/time_support.h"
 
 namespace mongo {
-
-extern bool _supportsDocLocking;
-
 namespace {
 
 const int kMaxPerfThreads = 16;    // max number of threads to use for lock perf
 const int kMaxStressThreads = 32;  // max number of threads to use for lock stress
 const int kMinPerfMillis = 30;     // min duration for reliable timing
-
-/**
- * Temporarily forces setting of the docLockingSupported global for testing purposes.
- */
-class ForceSupportsDocLocking {
-public:
-    explicit ForceSupportsDocLocking(bool supported) : _oldSupportsDocLocking(_supportsDocLocking) {
-        _supportsDocLocking = supported;
-    }
-
-    ~ForceSupportsDocLocking() {
-        _supportsDocLocking = _oldSupportsDocLocking;
-    }
-
-private:
-    bool _oldSupportsDocLocking;
-};
 
 /**
  * A RAII object that instantiates a TicketHolder that limits number of allowed global lock
