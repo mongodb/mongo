@@ -73,7 +73,7 @@ public:
             stringstream ss;
             ss << "couldn't open [" << name << "] " << errnoWithDescription();
             string s = ss.str();
-            msgassertedNoTrace(13538, s.c_str());
+            msgasserted(13538, s.c_str());
         }
         int found = fscanf(f,
                            "%d %127s %c "

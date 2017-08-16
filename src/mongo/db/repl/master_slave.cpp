@@ -438,7 +438,7 @@ void ReplSource::forceResync(OperationContext* opCtx, const char* requester) {
         if (!_connect(&oplogReader,
                       HostAndPort(hostName),
                       getGlobalReplicationCoordinator()->getMyRID())) {
-            msgassertedNoTrace(14051, "unable to connect to resync");
+            msgasserted(14051, "unable to connect to resync");
         }
         bool ok = oplogReader.conn()->runCommand(
             "admin", BSON("listDatabases" << 1), info, QueryOption_SlaveOk);

@@ -214,10 +214,10 @@ bool handleError(OperationContext* opCtx,
             // testing, but it isn't severe enough that we should bring down the server if it
             // happens in production.
             dassert(staleConfigException);
-            msgassertedNoTrace(35475,
-                               str::stream()
-                                   << "Got a StaleConfig error but exception was the wrong type: "
-                                   << demangleName(typeid(ex)));
+            msgasserted(35475,
+                        str::stream()
+                            << "Got a StaleConfig error but exception was the wrong type: "
+                            << demangleName(typeid(ex)));
         }
 
         if (!opCtx->getClient()->isInDirectClient()) {

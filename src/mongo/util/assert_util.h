@@ -163,24 +163,8 @@ MONGO_COMPILER_NORETURN void uassertedWithLocation(int msgid,
                                                    unsigned line);
 
 /** msgassert and massert are for errors that are internal but have a well defined error text
-    std::string.  a stack trace is logged.
+    std::string.
 */
-
-#define msgassertedNoTrace MONGO_msgassertedNoTrace
-#define MONGO_msgassertedNoTrace(...) \
-    ::mongo::msgassertedNoTraceWithLocation(__VA_ARGS__, __FILE__, __LINE__)
-MONGO_COMPILER_NORETURN void msgassertedNoTraceWithLocation(int msgid,
-                                                            StringData msg,
-                                                            const char* file,
-                                                            unsigned line);
-
-#define msgassertedNoTraceWithStatus MONGO_msgassertedNoTraceWithStatus
-#define MONGO_msgassertedNoTraceWithStatus(...) \
-    ::mongo::msgassertedNoTraceWithStatusWithLocation(__VA_ARGS__, __FILE__, __LINE__)
-MONGO_COMPILER_NORETURN void msgassertedNoTraceWithStatusWithLocation(int msgid,
-                                                                      const Status& status,
-                                                                      const char* file,
-                                                                      unsigned line);
 
 #define msgasserted MONGO_msgasserted
 #define MONGO_msgasserted(...) ::mongo::msgassertedWithLocation(__VA_ARGS__, __FILE__, __LINE__)
@@ -321,20 +305,6 @@ inline void fassertStatusOKWithLocation(int msgid,
 inline void massertStatusOKWithLocation(const Status& status, const char* file, unsigned line) {
     if (MONGO_unlikely(!status.isOK())) {
         msgassertedWithLocation(status.code(), status.reason(), file, line);
-    }
-}
-
-#define massertNoTraceStatusOK MONGO_massertNoTraceStatusOK
-#define MONGO_massertNoTraceStatusOK(...) \
-    ::mongo::massertNoTraceStatusOKWithLocation(__VA_ARGS__, __FILE__, __LINE__)
-inline void massertNoTraceStatusOKWithLocation(const Status& status,
-                                               const char* file,
-                                               unsigned line) {
-    if (MONGO_unlikely(!status.isOK())) {
-        [&]() MONGO_COMPILER_COLD_FUNCTION {
-            msgassertedNoTraceWithLocation(status.code(), status.reason(), file, line);
-        }();
-        MONGO_COMPILER_UNREACHABLE;
     }
 }
 

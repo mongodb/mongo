@@ -379,7 +379,7 @@ WiredTigerKVEngine::WiredTigerKVEngine(const std::string& canonicalName,
                 fassertFailedNoTrace(28717);
             } else if (ret != 0) {
                 Status s(wtRCToStatus(ret));
-                msgassertedNoTrace(28718, s.reason());
+                msgasserted(28718, s.reason());
             }
             invariantWTOK(_conn->close(_conn, NULL));
             // After successful recovery, remove the journal directory.
@@ -403,7 +403,7 @@ WiredTigerKVEngine::WiredTigerKVEngine(const std::string& canonicalName,
         fassertFailedNoTrace(28561);
     } else if (ret != 0) {
         Status s(wtRCToStatus(ret));
-        msgassertedNoTrace(28595, s.reason());
+        msgasserted(28595, s.reason());
     }
 
     _sessionCache.reset(new WiredTigerSessionCache(this));

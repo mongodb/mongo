@@ -106,25 +106,8 @@ DEATH_TEST(MassertionTerminationTest, massertStatusOK, "Terminating with massert
     massertStatusOK(Status(ErrorCodes::InternalError, "Terminating with massertStatusOK"));
 }
 
-DEATH_TEST(MassertionTerminationTest,
-           massertNoTraceStatusOK,
-           "Terminating with massertNoTraceStatusOK") {
-    massertNoTraceStatusOK(
-        Status(ErrorCodes::InternalError, "Terminating with massertNoTraceStatusOK"));
-}
-
 DEATH_TEST(MassertionTerminationTest, msgasserted, "Terminating with msgasserted") {
     msgasserted(40215, "Terminating with msgasserted");
 }
 
-DEATH_TEST(MassertionTerminationTest, msgassertedNoTrace, "Terminating with msgassertedNoTrace") {
-    msgassertedNoTrace(40216, "Terminating with msgassertedNoTrace");
-}
-
-DEATH_TEST(MassertionTerminationTest,
-           msgassertedNoTraceWithStatus,
-           "Terminating with msgassertedNoTraceWithStatus") {
-    msgassertedNoTraceWithStatus(
-        40217, Status(ErrorCodes::InternalError, "Terminating with msgassertedNoTraceWithStatus"));
-}
 }  // namespace

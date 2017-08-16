@@ -193,28 +193,10 @@ NOINLINE_DECL void msgassertedWithLocation(int msgid,
                                            StringData msg,
                                            const char* file,
                                            unsigned line) {
-    assertionCount.condrollover(++assertionCount.warning);
-    error() << "Assertion: " << msgid << ":" << redact(msg) << ' ' << file << ' ' << dec << line
-            << endl;
-    logContext();
-    throw AssertionException(msgid, msg);
-}
-
-NOINLINE_DECL void msgassertedNoTraceWithLocation(int msgid,
-                                                  StringData msg,
-                                                  const char* file,
-                                                  unsigned line) {
-    assertionCount.condrollover(++assertionCount.warning);
+    assertionCount.condrollover(++assertionCount.msg);
     error() << "Assertion: " << msgid << ":" << redact(msg) << ' ' << file << ' ' << dec << line
             << endl;
     throw AssertionException(msgid, msg);
-}
-
-void msgassertedNoTraceWithStatusWithLocation(int msgid,
-                                              const Status& status,
-                                              const char* file,
-                                              unsigned line) {
-    msgassertedNoTraceWithLocation(msgid, status.toString(), file, line);
 }
 
 std::string causedBy(StringData e) {

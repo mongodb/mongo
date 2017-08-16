@@ -746,9 +746,8 @@ Collection* DatabaseImpl::createCollection(OperationContext* opCtx,
     _checkCanCreateCollection(opCtx, nss, optionsWithUUID);
     audit::logCreateCollection(&cc(), ns);
 
-    Status status =
-        _dbEntry->createCollection(opCtx, ns, optionsWithUUID, true /*allocateDefaultSpace*/);
-    massertNoTraceStatusOK(status);
+    massertStatusOK(
+        _dbEntry->createCollection(opCtx, ns, optionsWithUUID, true /*allocateDefaultSpace*/));
 
     opCtx->recoveryUnit()->registerChange(new AddCollectionChange(opCtx, this, ns));
     Collection* collection = _getOrCreateCollectionInstance(opCtx, nss);
