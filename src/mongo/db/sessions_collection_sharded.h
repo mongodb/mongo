@@ -26,25 +26,35 @@
  *    it in the license file.
  */
 
-#include "mongo/platform/basic.h"
+#pragma once
 
 #include <memory>
 
-#include "mongo/db/logical_session_cache_factory_mongos.h"
-
-#include "mongo/db/server_parameters.h"
-#include "mongo/db/service_liason_mongos.h"
-#include "mongo/db/sessions_collection_sharded.h"
-#include "mongo/stdx/memory.h"
+#include "mongo/db/logical_session_id.h"
+#include "mongo/db/sessions_collection.h"
+#include "mongo/util/time_support.h"
 
 namespace mongo {
 
-std::unique_ptr<LogicalSessionCache> makeLogicalSessionCacheS() {
-    auto liason = stdx::make_unique<ServiceLiasonMongos>();
-    auto sessionsColl = stdx::make_unique<SessionsCollectionSharded>();
+class OperationContext;
 
-    return stdx::make_unique<LogicalSessionCache>(
-        std::move(liason), std::move(sessionsColl), LogicalSessionCache::Options{});
-}
+/**
+ * Accesses the sessions collection for mongos and shard servers.
+ */
+class SessionsCollectionSharded : public SessionsCollection {
+public:
+    /**
+     * Updates the last-use times on the given sessions to be greater than
+     * or equal to the current time.
+     */
+    Status refreshSessions(OperationContext* opCtx,
+                           const LogicalSessionRecordSet& sessions,
+                           Date_t refreshTime) override;
+
+    /**
+     * Removes the authoritative records for the specified sessions.
+     */
+    Status removeRecords(OperationContext* opCtx, const LogicalSessionIdSet& sessions) override;
+};
 
 }  // namespace mongo

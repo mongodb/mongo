@@ -26,7 +26,6 @@ env.Library(
 env.Library(
     target='cluster_commands',
     source=[
-        'chunk_manager_targeter.cpp',
         'cluster_add_shard_cmd.cpp',
         'cluster_add_shard_to_zone_cmd.cpp',
         'cluster_aggregate.cpp',
@@ -77,7 +76,6 @@ env.Library(
         'cluster_update_zone_key_range_cmd.cpp',
         'cluster_user_management_commands.cpp',
         'cluster_whats_my_uri_cmd.cpp',
-        'cluster_write.cpp',
         'cluster_write_cmd.cpp',
         'commands_public.cpp',
         'kill_sessions_remote.cpp',

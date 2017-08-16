@@ -27,12 +27,15 @@ env.Library(
         'write_op.cpp',
         'batch_write_op.cpp',
         'batch_write_exec.cpp',
+        '$BUILD_DIR/mongo/s/commands/chunk_manager_targeter.cpp',
+        '$BUILD_DIR/mongo/s/commands/cluster_write.cpp',
     ],
     LIBDEPS=[
         'batch_write_types',
         '$BUILD_DIR/mongo/client/connection_string',
         '$BUILD_DIR/mongo/s/async_requests_sender',
         '$BUILD_DIR/mongo/s/client/sharding_client',
+        '$BUILD_DIR/mongo/s/commands/shared_cluster_commands',
         '$BUILD_DIR/mongo/s/coreshard',
     ],
 )

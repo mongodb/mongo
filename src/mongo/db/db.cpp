@@ -770,7 +770,7 @@ ExitCode _initAndListen(int listenPort) {
 
     // Set up the logical session cache
     LogicalSessionCacheServer kind = LogicalSessionCacheServer::kStandalone;
-    if (shardingInitialized) {
+    if (serverGlobalParams.clusterRole == ClusterRole::ShardServer) {
         kind = LogicalSessionCacheServer::kSharded;
     } else if (replSettings.usingReplSets()) {
         kind = LogicalSessionCacheServer::kReplicaSet;
