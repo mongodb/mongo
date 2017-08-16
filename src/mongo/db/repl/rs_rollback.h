@@ -371,6 +371,19 @@ private:
  * to be reverted.
  */
 Status updateFixUpInfoFromLocalOplogEntry(FixUpInfo& fixUpInfo, const BSONObj& ourObj);
+
+/**
+ * This function uses the FixUpInfo struct to undo all of the operations that occurred after the
+ * common point on the rolling back node, checking the rollback ID and updating minValid as
+ * necessary. This includes refetching, updating, and deleting individual documents, resyncing
+ * collection data and metadata, and dropping and creating collections and indexes. Truncates the
+ * oplog and triggers necessary in-memory refreshes before returning.
+ */
+void syncFixUp(OperationContext* opCtx,
+               const FixUpInfo& fixUpInfo,
+               const RollbackSource& rollbackSource,
+               ReplicationCoordinator* replCoord,
+               ReplicationProcess* replicationProcess);
 }  // namespace rollback_internal
 }  // namespace repl
 }  // namespace mongo

@@ -81,11 +81,12 @@ public:
     virtual BSONObj findOne(const NamespaceString& nss, const BSONObj& filter) const = 0;
 
     /**
-     * Fetch a single document from the sync source using the UUID.
+     * Fetch a single document from the sync source using the UUID. Returns the namespace matching
+     * the UUID on the sync source as well.
      */
-    virtual BSONObj findOneByUUID(const std::string& db,
-                                  UUID uuid,
-                                  const BSONObj& filter) const = 0;
+    virtual std::pair<BSONObj, NamespaceString> findOneByUUID(const std::string& db,
+                                                              UUID uuid,
+                                                              const BSONObj& filter) const = 0;
 
     /**
      * Clones a single collection from the sync source.

@@ -73,9 +73,9 @@ BSONObj RollbackSourceImpl::findOne(const NamespaceString& nss, const BSONObj& f
     return _getConnection()->findOne(nss.toString(), filter, NULL, QueryOption_SlaveOk).getOwned();
 }
 
-BSONObj RollbackSourceImpl::findOneByUUID(const std::string& db,
-                                          UUID uuid,
-                                          const BSONObj& filter) const {
+std::pair<BSONObj, NamespaceString> RollbackSourceImpl::findOneByUUID(const std::string& db,
+                                                                      UUID uuid,
+                                                                      const BSONObj& filter) const {
     return _getConnection()->findOneByUUID(db, uuid, filter);
 }
 

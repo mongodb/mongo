@@ -65,6 +65,13 @@
     jsTestLog("Making sure 'downstream node' is the primary node.");
     assert.eq(downstream, replTest.getPrimary());
 
+    // Renaming or dropping the transactions collection shouldn't crash if command is not rolled
+    // back.
+    assert.commandWorked(downstream.getDB("config").transactions.renameCollection("foo"));
+    assert.commandWorked(downstream.getDB("config").foo.renameCollection("transactions"));
+    assert(downstream.getDB("config").transactions.drop());
+    assert.commandWorked(downstream.getDB("config").createCollection("transactions"));
+
     jsTestLog("Running a transaction on the 'downstream node' and waiting for it to replicate.");
     let firstLsid = {id: UUID()};
     let firstCmd = {

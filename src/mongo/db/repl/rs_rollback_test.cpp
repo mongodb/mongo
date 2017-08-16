@@ -75,7 +75,9 @@ public:
     BSONObj getLastOperation() const override;
     BSONObj findOne(const NamespaceString& nss, const BSONObj& filter) const override;
 
-    BSONObj findOneByUUID(const std::string& db, UUID uuid, const BSONObj& filter) const override;
+    std::pair<BSONObj, NamespaceString> findOneByUUID(const std::string& db,
+                                                      UUID uuid,
+                                                      const BSONObj& filter) const override;
 
     void copyCollectionFromRemote(OperationContext* opCtx,
                                   const NamespaceString& nss) const override;
@@ -114,10 +116,10 @@ BSONObj RollbackSourceMock::findOne(const NamespaceString& nss, const BSONObj& f
     return BSONObj();
 }
 
-BSONObj RollbackSourceMock::findOneByUUID(const std::string& db,
-                                          UUID uuid,
-                                          const BSONObj& filter) const {
-    return BSONObj();
+std::pair<BSONObj, NamespaceString> RollbackSourceMock::findOneByUUID(const std::string& db,
+                                                                      UUID uuid,
+                                                                      const BSONObj& filter) const {
+    return {BSONObj(), NamespaceString()};
 }
 
 void RollbackSourceMock::copyCollectionFromRemote(OperationContext* opCtx,
@@ -396,9 +398,11 @@ int _testRollbackDelete(OperationContext* opCtx,
             : RollbackSourceMock(std::move(oplog)),
               called(false),
               _documentAtSource(documentAtSource) {}
-        BSONObj findOneByUUID(const std::string& db, UUID uuid, const BSONObj& filter) const {
+        std::pair<BSONObj, NamespaceString> findOneByUUID(const std::string& db,
+                                                          UUID uuid,
+                                                          const BSONObj& filter) const override {
             called = true;
-            return _documentAtSource;
+            return {_documentAtSource, NamespaceString()};
         }
         mutable bool called;
 
@@ -1643,9 +1647,9 @@ TEST_F(RSRollbackTest, RollbackApplyOpsCommand) {
         RollbackSourceLocal(std::unique_ptr<OplogInterface> oplog)
             : RollbackSourceMock(std::move(oplog)) {}
 
-        BSONObj findOneByUUID(const std::string& db,
-                              UUID uuid,
-                              const BSONObj& filter) const override {
+        std::pair<BSONObj, NamespaceString> findOneByUUID(const std::string& db,
+                                                          UUID uuid,
+                                                          const BSONObj& filter) const override {
             int numFields = 0;
             for (const auto element : filter) {
                 ++numFields;
@@ -1655,11 +1659,11 @@ TEST_F(RSRollbackTest, RollbackApplyOpsCommand) {
             searchedIds.insert(filter.firstElement().numberInt());
             switch (filter.firstElement().numberInt()) {
                 case 1:
-                    return BSON("_id" << 1 << "v" << 1);
+                    return {BSON("_id" << 1 << "v" << 1), NamespaceString()};
                 case 2:
-                    return BSON("_id" << 2 << "v" << 3);
+                    return {BSON("_id" << 2 << "v" << 3), NamespaceString()};
                 case 3:
-                    return BSON("_id" << 3 << "v" << 5);
+                    return {BSON("_id" << 3 << "v" << 5), NamespaceString()};
                 case 4:
                     return {};
             }
@@ -2046,6 +2050,92 @@ TEST_F(RSRollbackTest, LocalEntryWithTxnNumberAddsTransactionTableDocToBeRefetch
     auto expectedObj = BSON("_id" << lsid.toBSON());
     DocID expectedTxnDoc(expectedObj, expectedObj.firstElement(), transactionTableUUID);
     ASSERT_TRUE(fui.docsToRefetch.find(expectedTxnDoc) != fui.docsToRefetch.end());
+}
+
+TEST_F(RSRollbackTest, RollbackFailsIfTransactionDocumentRefetchReturnsDifferentNamespace) {
+    createOplog(_opCtx.get());
+
+    // Create a valid FixUpInfo struct for rolling back a single CRUD operation that has a
+    // transaction number and session id.
+    FixUpInfo fui;
+
+    auto entryWithTxnNumber =
+        BSON("ts" << Timestamp(Seconds(2), 0) << "t" << 1LL << "h" << 1LL << "op"
+                  << "i"
+                  << "ui"
+                  << UUID::gen()
+                  << "ns"
+                  << "test.t"
+                  << "o"
+                  << BSON("_id" << 1 << "a" << 1)
+                  << "txnNumber"
+                  << 1LL
+                  << "stmtId"
+                  << 1
+                  << "lsid"
+                  << makeLogicalSessionIdForTest().toBSON());
+
+    UUID transactionTableUUID = UUID::gen();
+    fui.transactionTableUUID = transactionTableUUID;
+
+    auto commonOperation =
+        std::make_pair(BSON("ts" << Timestamp(Seconds(1), 0) << "h" << 1LL), RecordId(1));
+    fui.commonPoint = OpTime(Timestamp(Seconds(1), 0), 1LL);
+    fui.commonPointOurDiskloc = RecordId(1);
+
+    fui.rbid = 1;
+
+    // The FixUpInfo will have an extra doc to refetch: the corresponding transaction table entry.
+    ASSERT_OK(updateFixUpInfoFromLocalOplogEntry(fui, entryWithTxnNumber));
+    ASSERT_EQ(fui.docsToRefetch.size(), 2U);
+
+    {
+        class RollbackSourceLocal : public RollbackSourceMock {
+        public:
+            RollbackSourceLocal(std::unique_ptr<OplogInterface> oplog)
+                : RollbackSourceMock(std::move(oplog)) {}
+            std::pair<BSONObj, NamespaceString> findOneByUUID(
+                const std::string& db, UUID uuid, const BSONObj& filter) const override {
+                return {BSONObj(), NamespaceString::kSessionTransactionsTableNamespace};
+            }
+            int getRollbackId() const override {
+                return 1;
+            }
+        };
+
+        // Should not throw, since findOneByUUID will return the expected namespace.
+        syncFixUp(_opCtx.get(),
+                  fui,
+                  RollbackSourceLocal(
+                      std::unique_ptr<OplogInterface>(new OplogInterfaceMock({commonOperation}))),
+                  _coordinator,
+                  _replicationProcess.get());
+    }
+
+    {
+        class RollbackSourceLocal : public RollbackSourceMock {
+        public:
+            RollbackSourceLocal(std::unique_ptr<OplogInterface> oplog)
+                : RollbackSourceMock(std::move(oplog)) {}
+            std::pair<BSONObj, NamespaceString> findOneByUUID(
+                const std::string& db, UUID uuid, const BSONObj& filter) const override {
+                return {BSONObj(), NamespaceString("foo.bar")};
+            }
+            int getRollbackId() const override {
+                return 1;
+            }
+        };
+
+        // The returned namespace will not be the expected one, implying a rename/drop of the
+        // transactions collection across this node and the sync source, so rollback should fail.
+        ASSERT_THROWS(syncFixUp(_opCtx.get(),
+                                fui,
+                                RollbackSourceLocal(std::unique_ptr<OplogInterface>(
+                                    new OplogInterfaceMock({commonOperation}))),
+                                _coordinator,
+                                _replicationProcess.get()),
+                      RSFatalException);
+    }
 }
 
 TEST_F(RSRollbackTest, RollbackReturnsImmediatelyOnFailureToTransitionToRollback) {

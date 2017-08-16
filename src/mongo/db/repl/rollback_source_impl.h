@@ -66,7 +66,9 @@ public:
 
     BSONObj findOne(const NamespaceString& nss, const BSONObj& filter) const override;
 
-    BSONObj findOneByUUID(const std::string& db, UUID uuid, const BSONObj& filter) const override;
+    std::pair<BSONObj, NamespaceString> findOneByUUID(const std::string& db,
+                                                      UUID uuid,
+                                                      const BSONObj& filter) const override;
 
     void copyCollectionFromRemote(OperationContext* opCtx,
                                   const NamespaceString& nss) const override;

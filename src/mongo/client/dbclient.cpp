@@ -684,7 +684,9 @@ BSONObj DBClientBase::findOne(const string& ns,
     return v.empty() ? BSONObj() : v[0];
 }
 
-BSONObj DBClientBase::findOneByUUID(const std::string& db, UUID uuid, const BSONObj& filter) {
+std::pair<BSONObj, NamespaceString> DBClientBase::findOneByUUID(const std::string& db,
+                                                                UUID uuid,
+                                                                const BSONObj& filter) {
     list<BSONObj> results;
     BSONObj res;
 
@@ -705,10 +707,11 @@ BSONObj DBClientBase::findOneByUUID(const std::string& db, UUID uuid, const BSON
             results.push_back(e.Obj().getOwned());
         }
         invariant(results.size() <= 1);
+        NamespaceString resNss(cursorObj["ns"].valueStringData());
         if (results.empty()) {
-            return BSONObj();
+            return {BSONObj(), resNss};
         }
-        return results.front();
+        return {results.front(), resNss};
     }
     uasserted(
         40586,
