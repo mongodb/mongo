@@ -30,8 +30,6 @@
 #   Timestamps: Test that rollback_to_stable obeys expected visibility rules
 #
 
-import datetime
-import random
 from suite_subprocess import suite_subprocess
 import wiredtiger, wttest
 from wtscenario import make_scenarios
@@ -50,9 +48,10 @@ class test_timestamp04(wttest.WiredTigerTestCase, suite_subprocess):
     uri = 'table:' + tablename
 
     scenarios = make_scenarios([
-        #('col', dict(extra_config=',key_format=r')),
-        #('lsm', dict(extra_config=',type=lsm')),
-        ('row', dict(extra_config=',memory_page_max=32k,leaf_page_max=8k,internal_page_max=8k')),
+        ('col_fix', dict(empty=1, extra_config=',key_format=r, value_format=8t')),
+        ('col_var', dict(empty=0, extra_config=',key_format=r')),
+        #('lsm', dict(empty=0, extra_config=',type=lsm')),
+        ('row', dict(empty=0, extra_config='')),
     ])
 
     # Rollback only works for non-durable tables
@@ -65,17 +64,21 @@ class test_timestamp04(wttest.WiredTigerTestCase, suite_subprocess):
             session.begin_transaction(txn_config)
         c = session.open_cursor(self.uri, None)
         if missing == False:
-            actual = dict((k, v) for k, v, pad in c if v != 0)
+            actual = dict((k, v) for k, v in c if v != 0)
             #print expected
             #print actual
             self.assertEqual(actual, expected)
         # Search for the expected items as well as iterating
         for k, v in expected.iteritems():
             if missing == False:
-                self.assertEqual(c[k][0], v, "for key " + str(k))
+                self.assertEqual(c[k], v, "for key " + str(k))
             else:
                 c.set_key(k)
-                self.assertEqual(c.search(), wiredtiger.WT_NOTFOUND)
+                if self.empty:
+                    # Fixed-length column-store rows always exist.
+                    self.assertEqual(c.search(), 0)
+                else:
+                    self.assertEqual(c.search(), wiredtiger.WT_NOTFOUND)
         c.close()
         if txn_config:
             session.commit_transaction()
@@ -87,7 +90,8 @@ class test_timestamp04(wttest.WiredTigerTestCase, suite_subprocess):
         # Configure small page sizes to ensure eviction comes through and we have a
        #  somewhat complex tree
         self.session.create(self.uri,
-            'key_format=i,value_format=iS,memory_page_max=16k,leaf_page_max=8k' + self.extra_config)
+            'key_format=i,value_format=i,memory_page_max=32k,leaf_page_max=8k,internal_page_max=8k'
+                + self.extra_config)
         c = self.session.open_cursor(self.uri)
 
         # Insert keys each with timestamp=key, in some order
@@ -96,7 +100,7 @@ class test_timestamp04(wttest.WiredTigerTestCase, suite_subprocess):
 
         for k in keys:
             self.session.begin_transaction()
-            c[k] = (1, 'the quick brown fox')
+            c[k] = 1
             self.session.commit_transaction('commit_timestamp=' + timestamp_str(k))
             # Setup an oldest timestamp to ensure state remains in cache.
             if k == 1:
@@ -119,7 +123,7 @@ class test_timestamp04(wttest.WiredTigerTestCase, suite_subprocess):
         # Update the values again in preparation for rolling back more
         for k in keys:
             self.session.begin_transaction()
-            c[k] = (2, 'jumped over the lazy dog')
+            c[k] = 2
             self.session.commit_transaction('commit_timestamp=' + timestamp_str(k + key_range))
 
         # Now we should have: keys 1-100 with value 2
