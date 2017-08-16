@@ -440,7 +440,8 @@ long long Helpers::removeRange(OperationContext* txn,
                     txn,
                     repl::ReplClientInfo::forClient(txn->getClient()).getLastOp(),
                     writeConcern);
-            if (replStatus.status.code() == ErrorCodes::ExceededTimeLimit) {
+            if (replStatus.status.code() == ErrorCodes::ExceededTimeLimit ||
+                    replStatus.status.code() == ErrorCodes::WriteConcernFailed) {
                 warning(LogComponent::kSharding) << "replication to secondaries for removeRange at "
                                                     "least 60 seconds behind";
             } else {
