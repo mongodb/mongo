@@ -2834,76 +2834,14 @@ var authCommandsLib = {
           ]
         },
         {
-          testname: "getMore",
-          command: {getMore: NumberLong("1"), collection: "foo"},
-          testcases: [
-              {
-                runOnDb: firstDbName,
-                roles: roles_read,
-                privileges: [{resource: {db: firstDbName, collection: "foo"}, actions: ["find"]}],
-                expectFail: true
-              },
-              {
-                runOnDb: secondDbName,
-                roles: roles_readAny,
-                privileges: [{resource: {db: secondDbName, collection: "foo"}, actions: ["find"]}],
-                expectFail: true
-              }
-          ]
-        },
-        {
           testname: "getMoreWithTerm",
           command: {getMore: NumberLong("1"), collection: "foo", term: NumberLong(1)},
           testcases: [{
               runOnDb: firstDbName,
               roles: {__system: 1},
-              privileges: [
-                  {resource: {db: firstDbName, collection: "foo"}, actions: ["find"]},
-                  {resource: {cluster: true}, actions: ["internal"]}
-              ],
+              privileges: [{resource: {cluster: true}, actions: ["internal"]}],
               expectFail: true
           }]
-        },
-        {
-          testname: "listCollections_getMore",  // Tests for error described in SERVER-26577
-          command: {
-              getMore: null,  // These two values get filled in by authenticatedSetup()
-              collection: null
-          },
-          setup: function(db) {
-              db.x.insert({_id: 5});
-              db.y.insert({_id: 6});
-          },
-          authenticatedSetup: function(db) {
-              // For this test, we want to call getMore on a collections cursor, which we create
-              // in this setup function.
-              var listCollectionsCursor =
-                  db.runCommand({listCollections: 1, cursor: {batchSize: 0}});
-              this.command.getMore = listCollectionsCursor.cursor.id;
-              // Compute the "collections" property for our getMore:
-              // "roles_commands_1.$cmd.listCollections" -> "$cmd.listCollections"
-              this.command.collection = listCollectionsCursor.cursor.ns.replace(db + ".", "");
-          },
-          teardown: function(db) {
-              db.x.drop();
-              db.y.drop();
-          },
-          testcases: [
-              {
-                runOnDb: firstDbName,
-                // Modern way to allow listCollections privileges
-                privileges:
-                    [{resource: {db: firstDbName, collection: ""}, actions: ["listCollections"]}]
-              },
-              {
-                runOnDb: firstDbName,
-                // Deprecated way to allow listCollection privileges
-                privileges: [{
-                    resource: {db: firstDbName, collection: "system.namespaces"},
-                    actions: ["find"]
-                }]
-              }
-          ]
         },
         {
           testname: "getnonce",

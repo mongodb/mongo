@@ -127,6 +127,36 @@
         }
 
         //
+        // Test that a user can call getMore on an indexStats cursor they created, even if the
+        // indexStats privilege has been revoked in the meantime.
+        //
+
+        assert.eq(1, adminDB.auth("admin", "admin"));
+        assert.commandWorked(testDB.runCommand({
+            createRole: "indexStatsOnly",
+            privileges: [{resource: {db: testDBName, collection: "foo"}, actions: ["indexStats"]}],
+            roles: []
+        }));
+        assert.commandWorked(
+            testDB.runCommand({createUser: "Bob", pwd: "pwd", roles: ["indexStatsOnly"]}));
+        adminDB.logout();
+
+        assert.eq(1, testDB.auth("Bob", "pwd"));
+        res = assert.commandWorked(testDB.runCommand(
+            {aggregate: "foo", pipeline: [{$indexStats: {}}], cursor: {batchSize: 0}}));
+        cursorId = res.cursor.id;
+        testDB.logout();
+
+        assert.eq(1, adminDB.auth("admin", "admin"));
+        assert.commandWorked(
+            testDB.runCommand({revokeRolesFromUser: "Bob", roles: ["indexStatsOnly"]}));
+        adminDB.logout();
+
+        assert.eq(1, testDB.auth("Bob", "pwd"));
+        assert.commandWorked(testDB.runCommand({getMore: cursorId, collection: "foo"}));
+        testDB.logout();
+
+        //
         // Test that a user can run a getMore on an aggregate cursor they created, even if some
         // privileges required for the pipeline have been revoked in the meantime.
         //
@@ -193,16 +223,14 @@
         assert.commandWorked(testDB.runCommand({getMore: cursorId, collection: "foo"}));
         testDB.logout();
 
-        // Test that a cursor created by "fooUser" and "fooBarUser" cannot be used by "fooUser" if
+        // Test that a cursor created by "fooUser" and "fooBarUser" can be used by "fooUser" even if
         // "fooUser" does not have the privilege to read the collection.
         assert.eq(1, testDB.auth("fooUser", "pwd"));
         assert.eq(1, adminDB.auth("fooBarUser", "pwd"));
         res = assert.commandWorked(testDB.runCommand({find: "bar", batchSize: 0}));
         cursorId = res.cursor.id;
         adminDB.logout();
-        assert.commandFailedWithCode(testDB.runCommand({getMore: cursorId, collection: "bar"}),
-                                     ErrorCodes.Unauthorized,
-                                     "'fooUser' should not be able to read 'bar' collection");
+        assert.commandWorked(testDB.runCommand({getMore: cursorId, collection: "bar"}));
         testDB.logout();
 
         // Test that an aggregate cursor created by "fooUser" and "fooBarUser" can be used by
