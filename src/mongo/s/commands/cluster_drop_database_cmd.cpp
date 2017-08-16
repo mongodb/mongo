@@ -85,7 +85,7 @@ public:
 
         // Lock the database globally to prevent conflicts with simultaneous database
         // creation/modification.
-        auto scopedDistLock = uassertStatusOK(catalogClient->getDistLockManager()->lock(
+        auto scopedDatabaseDistLock = uassertStatusOK(catalogClient->getDistLockManager()->lock(
             opCtx, dbname, "dropDatabase", DistLockManager::kDefaultLockTimeout));
 
         auto const catalogCache = Grid::get(opCtx)->catalogCache();

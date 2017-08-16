@@ -738,9 +738,25 @@ public:
         auto const catalogManager = ShardingCatalogManager::get(opCtx);
         auto const catalogCache = Grid::get(opCtx)->catalogCache();
 
+        // Take a lock to ensure that different movePrimary and shardCollection commands cannot run
+        // concurrently in mixed 3.4 and 3.6 MongoS versions.
+        boost::optional<DistLockManager::ScopedDistLock> backwardsCompatibleLock(
+            uassertStatusOK(Grid::get(opCtx)->catalogClient()->getDistLockManager()->lock(
+                opCtx,
+                dbname + "-movePrimary",
+                "shardCollection",
+                DistLockManager::kDefaultLockTimeout)));
+
+        // If shardCollection is called concurrently with movePrimary, which changes the UUID of a
+        // collection, shardCollection may persist the original UUID on the config server, leaving
+        // the collection UUIDs inconsistent between the moved collection and the config server.
+        boost::optional<DistLockManager::ScopedDistLock> scopedDatabaseDistLock(
+            uassertStatusOK(Grid::get(opCtx)->catalogClient()->getDistLockManager()->lock(
+                opCtx, dbname, "shardCollection", DistLockManager::kDefaultLockTimeout)));
+
         // Lock the collection to prevent older mongos instances from trying to shard or drop it
         // concurrently.
-        boost::optional<DistLockManager::ScopedDistLock> scopedDistLock(
+        boost::optional<DistLockManager::ScopedDistLock> scopedCollectionDistLock(
             uassertStatusOK(Grid::get(opCtx)->catalogClient()->getDistLockManager()->lock(
                 opCtx, nss.ns(), "shardCollection", DistLockManager::kDefaultLockTimeout)));
 
@@ -832,7 +848,11 @@ public:
 
         // Free the collection dist lock in order to allow the initial splits and moves below to
         // proceed.
-        scopedDistLock.reset();
+        scopedCollectionDistLock.reset();
+
+        // Free the database and backwards compatibility dist locks, as they are no longer needed.
+        scopedDatabaseDistLock.reset();
+        backwardsCompatibleLock.reset();
 
         // Step 7. Migrate initial chunks to distribute them across shards.
         migrateAndFurtherSplitInitialChunks(
