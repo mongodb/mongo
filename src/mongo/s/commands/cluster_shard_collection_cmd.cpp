@@ -112,7 +112,7 @@ public:
         auto shardCollRequest =
             ShardCollection::parse(IDLParserErrorContext("ShardCollection"), cmdObj);
 
-        ConfigsvrShardCollection configShardCollRequest;
+        ConfigsvrShardCollectionRequest configShardCollRequest;
         configShardCollRequest.set_configsvrShardCollection(nss);
         configShardCollRequest.setKey(shardCollRequest.getKey());
         configShardCollRequest.setUnique(shardCollRequest.getUnique());

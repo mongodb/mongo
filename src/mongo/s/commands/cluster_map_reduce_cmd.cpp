@@ -641,7 +641,7 @@ private:
         // collection the next time it's accessed, even if we receive a failure, e.g. NetworkError.
         ON_BLOCK_EXIT([catalogCache, nss] { catalogCache->invalidateShardedCollection(nss); });
 
-        ConfigsvrShardCollection configShardCollRequest;
+        ConfigsvrShardCollectionRequest configShardCollRequest;
         configShardCollRequest.set_configsvrShardCollection(nss);
         configShardCollRequest.setKey(BSON("_id" << 1));
         configShardCollRequest.setUnique(true);

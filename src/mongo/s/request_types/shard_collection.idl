@@ -61,8 +61,8 @@ structs:
                 description: "The collation to use for the shard key index."
                 optional: true
 
-    ConfigsvrShardCollection:
-        description: "The internal shardCollection command on the config server"
+    ConfigsvrShardCollectionRequest:
+        description: "The request format of the internal shardCollection command on the config server"
         strict: false
         fields:
             _configsvrShardCollection:
@@ -87,4 +87,16 @@ structs:
             collation:
                 type: object
                 description: "The collation to use for the shard key index."
+                optional: true
+
+    ConfigsvrShardCollectionResponse:
+        description: "The response format of the internal shardCollection command on the config server"
+        strict: false
+        fields:
+            collectionsharded:
+                type: string
+                description: "The name of the collection that just got sharded."
+            collectionUUID:
+                type: uuid
+                description: "The UUID of the collection that just got sharded."
                 optional: true

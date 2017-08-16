@@ -132,7 +132,7 @@ void validateAndDeduceFullRequestOptions(OperationContext* opCtx,
                                          const ShardKeyPattern& shardKeyPattern,
                                          int numShards,
                                          ScopedDbConnection& conn,
-                                         ConfigsvrShardCollection* request) {
+                                         ConfigsvrShardCollectionRequest* request) {
     uassert(
         ErrorCodes::InvalidOptions, "cannot have empty shard key", !request->getKey().isEmpty());
 
@@ -249,7 +249,7 @@ void validateAndDeduceFullRequestOptions(OperationContext* opCtx,
  */
 bool checkIfAlreadyShardedWithSameOptions(OperationContext* opCtx,
                                           const NamespaceString& nss,
-                                          const ConfigsvrShardCollection& request) {
+                                          const ConfigsvrShardCollectionRequest& request) {
     auto catalogCache = Grid::get(opCtx)->catalogCache();
 
     // Until all metadata commands are on the config server, the CatalogCache on the config
@@ -301,7 +301,7 @@ void validateShardKeyAgainstExistingIndexes(OperationContext* opCtx,
                                             const ShardKeyPattern& shardKeyPattern,
                                             const std::shared_ptr<Shard> primaryShard,
                                             ScopedDbConnection& conn,
-                                            const ConfigsvrShardCollection& request) {
+                                            const ConfigsvrShardCollectionRequest& request) {
     // The proposed shard key must be validated against the set of existing indexes.
     // In particular, we must ensure the following constraints
     //
@@ -452,7 +452,7 @@ void determinePresplittingPoints(OperationContext* opCtx,
                                  bool isEmpty,
                                  const BSONObj& proposedKey,
                                  const ShardKeyPattern& shardKeyPattern,
-                                 const ConfigsvrShardCollection& request,
+                                 const ConfigsvrShardCollectionRequest& request,
                                  std::vector<BSONObj>* initSplits,
                                  std::vector<BSONObj>* allSplits) {
     auto numChunks = request.getNumInitialChunks();
@@ -732,8 +732,8 @@ public:
                 serverGlobalParams.clusterRole == ClusterRole::ConfigServer);
 
         const NamespaceString nss(parseNs(dbname, cmdObj));
-        auto request = ConfigsvrShardCollection::parse(
-            IDLParserErrorContext("ConfigsvrShardCollection"), cmdObj);
+        auto request = ConfigsvrShardCollectionRequest::parse(
+            IDLParserErrorContext("ConfigsvrShardCollectionRequest"), cmdObj);
 
         auto const catalogManager = ShardingCatalogManager::get(opCtx);
         auto const catalogCache = Grid::get(opCtx)->catalogCache();
@@ -823,6 +823,9 @@ public:
                                         initSplits,
                                         distributeInitialChunks);
         result << "collectionsharded" << nss.ns();
+        if (uuid) {
+            result << "collectionUUID" << *uuid;
+        }
 
         // Make sure the cached metadata for the collection knows that we are now sharded
         catalogCache->invalidateShardedCollection(nss);
