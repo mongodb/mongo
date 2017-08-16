@@ -190,7 +190,7 @@
             checkResults: function(res) {
                 assert.commandWorked(res);
                 // Expect the command not to find any results, since the chunk moved.
-                assert.eq(0, res.results.length, res);
+                assert.eq(0, res.results.length, tojson(res));
             },
             behavior: "unversioned"
         },
