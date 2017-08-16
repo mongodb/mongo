@@ -149,10 +149,6 @@ Lock::GlobalLock::GlobalLock(OperationContext* opCtx,
       _result(LOCK_INVALID),
       _pbwm(opCtx->lockState(), resourceIdParallelBatchWriterMode) {
     _enqueue(lockMode, timeoutMs);
-
-    if ((lockMode == LockMode::MODE_IX || lockMode == LockMode::MODE_X) && isLocked()) {
-        GlobalLockAcquisitionTracker::get(opCtx).setGlobalExclusiveLockTaken();
-    }
 }
 
 void Lock::GlobalLock::_enqueue(LockMode lockMode, unsigned timeoutMs) {
@@ -170,6 +166,10 @@ void Lock::GlobalLock::waitForLock(unsigned timeoutMs) {
 
     if (_result != LOCK_OK && _opCtx->lockState()->shouldConflictWithSecondaryBatchApplication()) {
         _pbwm.unlock();
+    }
+
+    if (_opCtx->lockState()->isWriteLocked()) {
+        GlobalLockAcquisitionTracker::get(_opCtx).setGlobalExclusiveLockTaken();
     }
 }
 

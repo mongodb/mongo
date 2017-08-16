@@ -178,6 +178,9 @@ public:
         /**
          * Enqueues lock but does not block on lock acquisition.
          * Call waitForLock() to complete locking process.
+         *
+         * Does not set that the global lock was taken on the GlobalLockAcquisitionTracker. Call
+         * waitForLock to do so.
          */
         GlobalLock(OperationContext* opCtx,
                    LockMode lockMode,
@@ -192,7 +195,8 @@ public:
         }
 
         /**
-         * Waits for lock to be granted.
+         * Waits for lock to be granted. Sets that the global lock was taken on the
+         * GlobalLockAcquisitionTracker.
          */
         void waitForLock(unsigned timeoutMs);
 
