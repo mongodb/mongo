@@ -904,6 +904,10 @@ void StorageInterfaceImpl::setInitialDataTimestamp(StorageEngine* storageEngine,
     storageEngine->setInitialDataTimestamp(snapshotName);
 }
 
+Status StorageInterfaceImpl::recoverToStableTimestamp(StorageEngine* storageEngine) {
+    return storageEngine->recoverToStableTimestamp();
+}
+
 Status StorageInterfaceImpl::isAdminDbValid(OperationContext* opCtx) {
     AutoGetDb autoDB(opCtx, "admin", MODE_X);
     auto adminDb = autoDB.getDb();

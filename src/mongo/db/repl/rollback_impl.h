@@ -30,6 +30,7 @@
 
 #include "mongo/base/status_with.h"
 #include "mongo/db/repl/rollback.h"
+#include "mongo/db/repl/storage_interface.h"
 #include "mongo/stdx/functional.h"
 
 namespace mongo {
@@ -111,6 +112,7 @@ public:
      */
     RollbackImpl(OplogInterface* localOplog,
                  OplogInterface* remoteOplog,
+                 StorageInterface* storageInterface,
                  ReplicationProcess* replicationProcess,
                  ReplicationCoordinator* replicationCoordinator,
                  Listener* listener);
@@ -120,6 +122,7 @@ public:
      */
     RollbackImpl(OplogInterface* localOplog,
                  OplogInterface* remoteOplog,
+                 StorageInterface* storageInterface,
                  ReplicationProcess* replicationProcess,
                  ReplicationCoordinator* replicationCoordinator);
 
@@ -198,6 +201,10 @@ private:
 
     // This is used to read oplog entries from the remote oplog to find the common point.
     OplogInterface* const _remoteOplog;  // (R)
+
+    // The StorageInterface associated with this Rollback instance. Used to execute operations
+    // at the storage layer e.g. recovering to a timestamp.
+    StorageInterface* _storageInterface;  // (R)
 
     // The ReplicationProcess associated with this Rollback instance. Used to update and persist
     // various pieces of replication state related to the rollback process.

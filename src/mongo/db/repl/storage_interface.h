@@ -288,6 +288,17 @@ public:
      */
     virtual void setInitialDataTimestamp(StorageEngine* storageEngine,
                                          SnapshotName snapshotName) = 0;
+
+    /**
+     * Reverts the state of all database data to the last stable timestamp.
+     *
+     * The "local" database is exempt and none of its state should be reverted except for
+     * "local.replset.minvalid" and "local.replset.checkpointTimestamp" which should be reverted to
+     * the last stable timestamp.
+     *
+     * The 'stable' timestamp is set by calling StorageInterface::setStableTimestamp.
+     */
+    virtual Status recoverToStableTimestamp(StorageEngine* storageEngine) = 0;
 };
 
 }  // namespace repl

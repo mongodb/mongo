@@ -37,6 +37,7 @@
 #include "mongo/db/repl/replication_coordinator.h"
 #include "mongo/db/repl/replication_process.h"
 #include "mongo/db/repl/roll_back_local_operations.h"
+#include "mongo/db/repl/storage_interface.h"
 #include "mongo/db/s/shard_identity_rollback_notifier.h"
 #include "mongo/db/session_catalog.h"
 #include "mongo/util/log.h"
@@ -47,17 +48,20 @@ namespace repl {
 
 RollbackImpl::RollbackImpl(OplogInterface* localOplog,
                            OplogInterface* remoteOplog,
+                           StorageInterface* storageInterface,
                            ReplicationProcess* replicationProcess,
                            ReplicationCoordinator* replicationCoordinator,
                            Listener* listener)
     : _localOplog(localOplog),
       _remoteOplog(remoteOplog),
+      _storageInterface(storageInterface),
       _replicationProcess(replicationProcess),
       _replicationCoordinator(replicationCoordinator),
       _listener(listener) {
 
     invariant(localOplog);
     invariant(remoteOplog);
+    invariant(storageInterface);
     invariant(replicationProcess);
     invariant(replicationCoordinator);
     invariant(listener);
@@ -65,9 +69,15 @@ RollbackImpl::RollbackImpl(OplogInterface* localOplog,
 
 RollbackImpl::RollbackImpl(OplogInterface* localOplog,
                            OplogInterface* remoteOplog,
+                           StorageInterface* storageInterface,
                            ReplicationProcess* replicationProcess,
                            ReplicationCoordinator* replicationCoordinator)
-    : RollbackImpl(localOplog, remoteOplog, replicationProcess, replicationCoordinator, {}) {}
+    : RollbackImpl(localOplog,
+                   remoteOplog,
+                   storageInterface,
+                   replicationProcess,
+                   replicationCoordinator,
+                   {}) {}
 
 RollbackImpl::~RollbackImpl() {
     shutdown();
@@ -103,6 +113,17 @@ Status RollbackImpl::runRollback(OperationContext* opCtx) {
     if (!status.isOK()) {
         return status;
     }
+
+    // Recover to the stable timestamp while holding the global exclusive lock.
+    auto storageEngine = opCtx->getServiceContext()->getGlobalStorageEngine();
+    {
+        Lock::GlobalWrite globalWrite(opCtx);
+        status = _storageInterface->recoverToStableTimestamp(storageEngine);
+        if (!status.isOK()) {
+            return status;
+        }
+    }
+
 
     // At this point these functions need to always be called before returning, even on failure.
     // These functions fassert on failure.

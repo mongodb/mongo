@@ -252,6 +252,10 @@ public:
 
     SnapshotName getInitialDataTimestamp() const;
 
+    Status recoverToStableTimestamp(StorageEngine* storageEngine) override {
+        return Status{ErrorCodes::IllegalOperation, "recoverToStableTimestamp not implemented."};
+    }
+
     Status isAdminDbValid(OperationContext* opCtx) override {
         return isAdminDbValidFn(opCtx);
     };

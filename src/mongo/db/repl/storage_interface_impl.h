@@ -138,6 +138,8 @@ public:
 
     void setInitialDataTimestamp(StorageEngine* storageEngine, SnapshotName snapshotName) override;
 
+    Status recoverToStableTimestamp(StorageEngine* storageEngine) override;
+
     /**
      * Checks that the "admin" database contains a supported version of the auth data schema.
      */
