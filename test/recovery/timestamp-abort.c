@@ -65,11 +65,12 @@ static const char * const ckpt_file = "checkpoint_done";
 static bool compat, inmem, use_ts;
 static uint64_t global_ts = 1;
 
-#define	MAX_TH	12
+#define	MAX_TH		12
 #define	MAX_TIME	40
-#define	MIN_TH	5
+#define	MIN_TH		5
 #define	MIN_TIME	10
 #define	RECORDS_FILE	"records-%" PRIu32
+#define	STABLE_PERIOD	100
 
 #define	ENV_CONFIG_COMPAT	",compatibility=(release=\"2.9\")"
 #define	ENV_CONFIG_DEF						\
@@ -264,11 +265,23 @@ thread_run(void *arg)
 		if ((ret = cur_local->insert(cur_local)) != 0)
 			testutil_die(ret, "WT_CURSOR.insert");
 
-		if (i % 1000 == 0) {
+		/*
+		 * Every N records we will record our stable timestamp into the
+		 * stable table.  That will define our threshold where we
+		 * expect to find records after recovery.
+		 */
+		if (i % STABLE_PERIOD == 0) {
 			if (use_ts) {
+				/*
+				 * Set both the oldest and stable timestamp
+				 * so that we don't need to maintain read
+				 * availability at older timestamps.
+				 */
 				testutil_check(__wt_snprintf(
 				    tscfg, sizeof(tscfg),
-				    "stable_timestamp=%" PRIx64, stable_ts));
+				    "oldest_timestamp=%" PRIx64
+				    ",stable_timestamp=%" PRIx64,
+				    stable_ts, stable_ts));
 				testutil_check(
 				    td->conn->set_timestamp(td->conn, tscfg));
 			}
@@ -542,6 +555,7 @@ main(int argc, char *argv[])
 	 * Find the biggest stable timestamp value that was saved.
 	 */
 	stable_val = 0;
+	memset(val, 0, sizeof(val));
 	while (cur_stable->next(cur_stable) == 0) {
 		cur_stable->get_key(cur_stable, &key);
 		cur_stable->get_value(cur_stable, &val[key]);
