@@ -36,6 +36,7 @@
 #include <fstream>
 #include <iostream>
 #include <sstream>
+#include <stack>
 #include <string>
 #include <vector>
 
@@ -235,34 +236,35 @@ const STACK_OF(X509_EXTENSION) * X509_get0_extensions(const X509* peerCert) {
  * OpenSSL before version 1.1.0 requires applications provide a callback which emits a thread
  * identifier. This ID is used to store thread specific ERR information. When a thread is
  * terminated, it must call ERR_remove_state or ERR_remove_thread_state. These functions may
- * themselves invoke the application provided callback.
+ * themselves invoke the application provided callback. These IDs are stored in a hashtable with
+ * a questionable hash function. They must be uniformly distributed to prevent collisions.
  */
 class SSLThreadInfo {
 public:
     static unsigned long getID() {
+        struct CallErrRemoveState {
+            explicit CallErrRemoveState(ThreadIDManager& manager, unsigned long id)
+                : _manager(manager), id(id) {}
+
+            ~CallErrRemoveState() {
+                ERR_remove_state(0);
+                _manager.releaseID(id);
+            };
+
+            ThreadIDManager& _manager;
+            unsigned long id;
+        };
+
         // NOTE: This logic is fully intentional. Because ERR_remove_state (called within
         // the destructor of the kRemoveStateFromThread object) re-enters this function,
         // we must have a two phase protection, otherwise we would access a thread local
         // during its destruction.
-        static thread_local bool firstCall = false;
-        if (!firstCall) {
-            firstCall = true;
-
-            static const thread_local struct CallErrRemoveState {
-                ~CallErrRemoveState() {
-                    ERR_remove_state(0);
-                };
-            } kRemoveStateFromThread{};
+        static thread_local boost::optional<CallErrRemoveState> threadLocalState;
+        if (!threadLocalState) {
+            threadLocalState.emplace(_idManager, _idManager.reserveID());
         }
 
-#ifdef _WIN32
-        return GetCurrentThreadId();
-#else
-        static_assert(sizeof(void*) == sizeof(unsigned long),
-                      "OpenSSL needs the address of a thread-unique object to be castable to"
-                      "unsigned long");
-        return reinterpret_cast<unsigned long>(&errno);
-#endif
+        return threadLocalState->id;
     }
 
     static void lockingCallback(int mode, int type, const char* file, int line) {
@@ -289,8 +291,35 @@ private:
     // Once the deadlock fix in OpenSSL is incorporated into most distros of
     // Linux, this can be changed back to a nonrecursive mutex.
     static std::vector<std::unique_ptr<stdx::recursive_mutex>> _mutex;
+
+    class ThreadIDManager {
+    public:
+        unsigned long reserveID() {
+            stdx::unique_lock<stdx::mutex> lock(_idMutex);
+            if (!_idLast.empty()) {
+                unsigned long ret = _idLast.top();
+                _idLast.pop();
+                return ret;
+            }
+            return ++_idNext;
+        }
+
+        void releaseID(unsigned long id) {
+            stdx::unique_lock<stdx::mutex> lock(_idMutex);
+            _idLast.push(id);
+        }
+
+    private:
+        // Machinery for producing IDs that are unique for the life of a thread.
+        stdx::mutex _idMutex;       // Protects _idNext and _idLast.
+        unsigned long _idNext = 0;  // Stores the next thread ID to use, if none already allocated.
+        std::stack<unsigned long, std::vector<unsigned long>>
+            _idLast;  // Stores old thread IDs, for reuse.
+    };
+    static ThreadIDManager _idManager;
 };
 std::vector<std::unique_ptr<stdx::recursive_mutex>> SSLThreadInfo::_mutex;
+SSLThreadInfo::ThreadIDManager SSLThreadInfo::_idManager;
 
 namespace {
 // We only want to free SSL_CTX objects if they have been populated. OpenSSL seems to perform this
