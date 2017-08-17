@@ -53,37 +53,6 @@
 namespace mongo {
 namespace {
 constexpr int SOCK_FAMILY_UNKNOWN_ERROR = 13078;
-
-using AddrInfo = std::unique_ptr<addrinfo, decltype(&freeaddrinfo)>;
-
-std::pair<int, AddrInfo> resolveAddrInfo(const std::string& hostOrIp,
-                                         int port,
-                                         sa_family_t familyHint) {
-    addrinfo hints;
-    memset(&hints, 0, sizeof(addrinfo));
-    hints.ai_socktype = SOCK_STREAM;
-    hints.ai_flags |= AI_NUMERICHOST;  // first pass tries w/o DNS lookup
-    hints.ai_family = familyHint;
-    addrinfo* addrs = nullptr;
-
-    ItoA portStr(port);
-    int ret = getaddrinfo(hostOrIp.c_str(), StringData(portStr).rawData(), &hints, &addrs);
-
-// old C compilers on IPv6-capable hosts return EAI_NODATA error
-#ifdef EAI_NODATA
-    int nodata = (ret == EAI_NODATA);
-#else
-    int nodata = false;
-#endif
-    if ((ret == EAI_NONAME) || nodata) {
-        // iporhost isn't an IP address, allow DNS lookup
-        hints.ai_flags &= ~AI_NUMERICHOST;
-        ret = getaddrinfo(hostOrIp.c_str(), StringData(portStr).rawData(), &hints, &addrs);
-    }
-
-    return {ret, AddrInfo(addrs, &freeaddrinfo)};
-}
-
 }  // namespace
 
 std::string getAddrInfoStrError(int code) {
@@ -111,18 +80,6 @@ SockAddr::SockAddr(int sourcePort) {
     _isValid = true;
 }
 
-void SockAddr::initUnixDomainSocket(const std::string& path, int port) {
-#ifdef _WIN32
-    uassert(13080, "no unix socket support on windows", false);
-#endif
-    uassert(
-        13079, "path to unix socket too long", path.size() < sizeof(as<sockaddr_un>().sun_path));
-    as<sockaddr_un>().sun_family = AF_UNIX;
-    strcpy(as<sockaddr_un>().sun_path, path.c_str());
-    addressSize = sizeof(sockaddr_un);
-    _isValid = true;
-}
-
 SockAddr::SockAddr(StringData target, int port, sa_family_t familyHint)
     : _hostOrIp(target.toString()) {
     if (_hostOrIp == "localhost") {
@@ -130,18 +87,48 @@ SockAddr::SockAddr(StringData target, int port, sa_family_t familyHint)
     }
 
     if (mongoutils::str::contains(_hostOrIp, '/')) {
-        initUnixDomainSocket(_hostOrIp, port);
+#ifdef _WIN32
+        uassert(13080, "no unix socket support on windows", false);
+#endif
+        uassert(13079,
+                "path to unix socket too long",
+                _hostOrIp.size() < sizeof(as<sockaddr_un>().sun_path));
+        as<sockaddr_un>().sun_family = AF_UNIX;
+        strcpy(as<sockaddr_un>().sun_path, _hostOrIp.c_str());
+        addressSize = sizeof(sockaddr_un);
+        _isValid = true;
         return;
     }
 
-    auto addrErr = resolveAddrInfo(_hostOrIp, port, familyHint);
+    addrinfo* addrs = NULL;
+    addrinfo hints;
+    memset(&hints, 0, sizeof(addrinfo));
+    hints.ai_socktype = SOCK_STREAM;
+    // hints.ai_flags = AI_ADDRCONFIG; // This is often recommended but don't do it.
+    // SERVER-1579
+    hints.ai_flags |= AI_NUMERICHOST;  // first pass tries w/o DNS lookup
+    hints.ai_family = familyHint;
 
-    if (addrErr.first) {
+    ItoA portStr(port);
+    int ret = getaddrinfo(_hostOrIp.c_str(), StringData(portStr).rawData(), &hints, &addrs);
+
+// old C compilers on IPv6-capable hosts return EAI_NODATA error
+#ifdef EAI_NODATA
+    int nodata = (ret == EAI_NODATA);
+#else
+    int nodata = false;
+#endif
+    if ((ret == EAI_NONAME || nodata)) {
+        // iporhost isn't an IP address, allow DNS lookup
+        hints.ai_flags &= ~AI_NUMERICHOST;
+        ret = getaddrinfo(_hostOrIp.c_str(), StringData(portStr).rawData(), &hints, &addrs);
+    }
+
+    if (ret) {
         // we were unsuccessful
         if (_hostOrIp != "0.0.0.0") {  // don't log if this as it is a
                                        // CRT construction and log() may not work yet.
-            log() << "getaddrinfo(\"" << _hostOrIp
-                  << "\") failed: " << getAddrInfoStrError(addrErr.first);
+            log() << "getaddrinfo(\"" << _hostOrIp << "\") failed: " << getAddrInfoStrError(ret);
             _isValid = false;
             return;
         }
@@ -149,38 +136,12 @@ SockAddr::SockAddr(StringData target, int port, sa_family_t familyHint)
         return;
     }
 
-    // This throws away all but the first address.
-    // Use SockAddr::createAll() to get all addresses.
-    const auto* addrs = addrErr.second.get();
+    // TODO: handle other addresses in linked list;
     fassert(16501, addrs->ai_addrlen <= sizeof(sa));
     memcpy(&sa, addrs->ai_addr, addrs->ai_addrlen);
     addressSize = addrs->ai_addrlen;
+    freeaddrinfo(addrs);
     _isValid = true;
-}
-
-std::vector<SockAddr> SockAddr::createAll(StringData target, int port, sa_family_t familyHint) {
-    std::string hostOrIp = target.toString();
-    if (mongoutils::str::contains(hostOrIp, '/')) {
-        std::vector<SockAddr> ret = {SockAddr()};
-        ret[0].initUnixDomainSocket(hostOrIp, port);
-        // Currently, this is always valid since initUnixDomainSocket()
-        // will uassert() on failure. Be defensive against future changes.
-        return ret[0].isValid() ? ret : std::vector<SockAddr>();
-    }
-
-    auto addrErr = resolveAddrInfo(hostOrIp, port, familyHint);
-    if (addrErr.first) {
-        log() << "getaddrinfo(\"" << hostOrIp
-              << "\") failed: " << getAddrInfoStrError(addrErr.first);
-        return {};
-    }
-
-    std::vector<SockAddr> ret;
-    for (const auto* addrs = addrErr.second.get(); addrs; addrs = addrs->ai_next) {
-        fassert(40594, addrs->ai_addrlen <= sizeof(struct sockaddr_storage));
-        ret.emplace_back(*(struct sockaddr_storage*)addrs->ai_addr, addrs->ai_addrlen);
-    }
-    return ret;
 }
 
 SockAddr::SockAddr(struct sockaddr_storage& other, socklen_t size)
