@@ -95,8 +95,12 @@ Status appendExplainResults(
     const std::unique_ptr<Pipeline, Pipeline::Deleter>& pipelineForMerging,
     BSONObjBuilder* result) {
     if (pipelineForTargetedShards->isSplitForSharded()) {
-        *result << "needsPrimaryShardMerger" << pipelineForMerging->needsPrimaryShardMerger()
-                << "mergeOnMongoS" << pipelineForMerging->canRunOnMongos() << "splitPipeline"
+        *result << "mergeType"
+                << (pipelineForMerging->canRunOnMongos()
+                        ? "mongos"
+                        : pipelineForMerging->needsPrimaryShardMerger() ? "primaryShard"
+                                                                        : "anyShard")
+                << "splitPipeline"
                 << Document{
                        {"shardsPart",
                         pipelineForTargetedShards->writeExplainOps(*mergeCtx->explain)},

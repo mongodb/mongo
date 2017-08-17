@@ -74,23 +74,23 @@
     /**
      * Runs the aggregation specified by 'pipeline', verifying that:
      * - The number of documents returned by the aggregation matches 'expectedCount'.
-     * - The merge was performed on a mongoS if 'mergeOnMongoS' is true, and on a shard otherwise.
+     * - The merge was performed on a mongoS if 'mergeType' is 'mongos', and on a shard otherwise.
      */
-    function assertMergeBehaviour({testName, pipeline, mergeOnMongoS, expectedCount}) {
+    function assertMergeBehaviour({testName, pipeline, mergeType, expectedCount}) {
         // Verify that the 'mergeOnMongoS' explain() output for this pipeline matches our
         // expectation.
         assert.eq(
             assert.commandWorked(mongosColl.explain().aggregate(pipeline, {comment: testName}))
-                .mergeOnMongoS,
-            mergeOnMongoS);
+                .mergeType,
+            mergeType);
 
         assert.eq(mongosColl.aggregate(pipeline, {comment: testName}).itcount(), expectedCount);
 
-        // Verify that a $mergeCursors aggregation ran on the primary shard if 'mergeOnMongoS' is
-        // false, and that no such aggregation ran if 'mergeOnMongoS' is true.
+        // Verify that a $mergeCursors aggregation ran on the primary shard if 'mergeType' is not
+        // 'mongos', and that no such aggregation ran otherwise.
         profilerHasNumMatchingEntriesOrThrow({
             profileDB: primaryShardDB,
-            numExpectedMatches: (mergeOnMongoS ? 0 : 1),
+            numExpectedMatches: (mergeType === "mongos" ? 0 : 1),
             filter: {
                 "command.aggregate": mongosColl.getName(),
                 "command.comment": testName,
@@ -107,7 +107,7 @@
         assertMergeBehaviour({
             testName: testName,
             pipeline: pipeline,
-            mergeOnMongoS: true,
+            mergeType: "mongos",
             expectedCount: expectedCount
         });
     }
@@ -116,11 +116,11 @@
      * Throws an assertion if the aggregation specified by 'pipeline' does not produce
      * 'expectedCount' results, or if the merge phase was not performed on a shard.
      */
-    function assertMergeOnMongoD({testName, pipeline, expectedCount}) {
+    function assertMergeOnMongoD({testName, pipeline, mergeType, expectedCount}) {
         assertMergeBehaviour({
             testName: testName,
             pipeline: pipeline,
-            mergeOnMongoS: false,
+            mergeType: (mergeType || "anyShard"),
             expectedCount: expectedCount
         });
     }
@@ -149,6 +149,17 @@
     assertMergeOnMongoD({
         testName: "agg_mongos_merge_sort_in_mem",
         pipeline: [{$match: {_id: {$gte: -200, $lte: 200}}}, {$sort: {_id: -1}}, {$sort: {a: 1}}],
+        expectedCount: 400
+    });
+
+    // Test that a merge pipeline which needs to run on the primary shard is NOT merged on mongoS.
+    assertMergeOnMongoD({
+        testName: "agg_mongos_merge_primary_shard",
+        pipeline: [
+            {$match: {_id: {$gte: -200, $lte: 200}}},
+            {$_internalSplitPipeline: {mergeType: "primaryShard"}}
+        ],
+        mergeType: "primaryShard",
         expectedCount: 400
     });
 
