@@ -14,7 +14,6 @@
 
     jsTest.log('Checking write to config collections...');
     assert.writeOK(admin.TestColl.insert({SingleDoc: 1}));
-    assert.writeError(admin.TestColl.insert([{Doc1: 1}, {Doc2: 1}]));
 
     jsTest.log("Setting up collections...");
 

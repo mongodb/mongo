@@ -1020,16 +1020,6 @@ DistLockManager* ShardingCatalogClientImpl::getDistLockManager() {
 void ShardingCatalogClientImpl::writeConfigServerDirect(OperationContext* opCtx,
                                                         const BatchedCommandRequest& batchRequest,
                                                         BatchedCommandResponse* batchResponse) {
-    // We only support batch sizes of one for config writes
-    if (batchRequest.sizeWriteOps() != 1) {
-        toBatchError(Status(ErrorCodes::InvalidOptions,
-                            str::stream() << "Writes to config servers must have batch size of 1, "
-                                          << "found "
-                                          << batchRequest.sizeWriteOps()),
-                     batchResponse);
-        return;
-    }
-
     auto configShard = Grid::get(opCtx)->shardRegistry()->getConfigShard();
     *batchResponse = configShard->runBatchWriteCommand(opCtx,
                                                        Shard::kDefaultConfigCommandTimeout,

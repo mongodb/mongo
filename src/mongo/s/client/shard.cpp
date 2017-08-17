@@ -186,11 +186,6 @@ BatchedCommandResponse Shard::runBatchWriteCommand(OperationContext* opCtx,
                                                    const Milliseconds maxTimeMS,
                                                    const BatchedCommandRequest& batchRequest,
                                                    RetryPolicy retryPolicy) {
-    // Cluster metadata writes are not done in batches.
-    if (isConfig()) {
-        invariant(batchRequest.sizeWriteOps() == 1);
-    }
-
     const std::string dbname = batchRequest.getNS().db().toString();
 
     const BSONObj cmdObj = batchRequest.toBSON();
