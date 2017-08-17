@@ -105,13 +105,8 @@ void DBQueryInfo::construct(JSContext* cx, JS::CallArgs args) {
     args.rval().setObjectOrNull(thisv);
 }
 
-void DBQueryInfo::getProperty(JSContext* cx,
-                              JS::HandleObject obj,
-                              JS::HandleId id,
-                              JS::MutableHandleValue vp) {
-    if (!vp.isUndefined()) {
-        return;
-    }
+void DBQueryInfo::resolve(JSContext* cx, JS::HandleObject obj, JS::HandleId id, bool* resolvedp) {
+    *resolvedp = false;
 
     IdWrapper wid(cx, id);
 
@@ -134,9 +129,19 @@ void DBQueryInfo::getProperty(JSContext* cx,
 
         args[0].setInt32(wid.toInt32());
 
-        ObjectWrapper(cx, obj).callMethod(arrayAccess, args, vp);
-    } else {
-        uasserted(ErrorCodes::BadValue, "arrayAccess is not a function");
+        JS::RootedValue vp(cx);
+
+        ObjectWrapper(cx, obj).callMethod(arrayAccess, args, &vp);
+
+        if (!vp.isNullOrUndefined()) {
+            ObjectWrapper o(cx, obj);
+
+            // Assumes the user won't modify the contents of what DBQuery::arrayAccess returns
+            // otherwise we need to install a getter.
+            o.defineProperty(id, vp, 0);
+        }
+
+        *resolvedp = true;
     }
 }
 
