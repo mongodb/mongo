@@ -11,6 +11,8 @@ static inline void __wt_txn_read_last(WT_SESSION_IMPL *session);
 
 #ifdef HAVE_TIMESTAMPS
 #if WT_TIMESTAMP_SIZE == 8
+#define	WT_WITH_TIMESTAMP_READLOCK(session, l, e)       e
+
 /*
  * __wt_timestamp_cmp --
  *	Compare two timestamps.
@@ -61,6 +63,12 @@ __wt_timestamp_set_zero(wt_timestamp_t *ts)
 	ts->val = 0;
 }
 #else
+#define	WT_WITH_TIMESTAMP_READLOCK(s, l, e)	do {                    \
+	__wt_readlock((s), (l));                                        \
+	e;                                                              \
+	__wt_readunlock((s), (l));                                      \
+} while (0)
+
 /*
  * __wt_timestamp_cmp --
  *	Compare two timestamps.
@@ -314,9 +322,8 @@ __wt_txn_visible_all(
 	if (!txn_global->has_pinned_timestamp || timestamp == NULL)
 		return (true);
 
-	__wt_readlock(session, &txn_global->rwlock);
-	cmp = __wt_timestamp_cmp(timestamp, &txn_global->pinned_timestamp);
-	__wt_readunlock(session, &txn_global->rwlock);
+	WT_WITH_TIMESTAMP_READLOCK(session, &txn_global->rwlock,
+	    cmp = __wt_timestamp_cmp(timestamp, &txn_global->pinned_timestamp));
 
 	/*
 	 * We can discard updates with timestamps less than or equal to the

@@ -38,9 +38,9 @@ __txn_rollback_to_stable_lookaside_fixup(WT_SESSION_IMPL *session)
 	 * violate protocol.
 	 */
 	txn_global = &conn->txn_global;
-	__wt_readlock(session, &txn_global->rwlock);
-	__wt_timestamp_set(&rollback_timestamp, &txn_global->stable_timestamp);
-	__wt_readunlock(session, &txn_global->rwlock);
+	WT_WITH_TIMESTAMP_READLOCK(session, &txn_global->rwlock,
+	    __wt_timestamp_set(
+		&rollback_timestamp, &txn_global->stable_timestamp));
 
 	__wt_las_cursor(session, &cursor, &session_flags);
 
@@ -347,9 +347,9 @@ __txn_rollback_to_stable_btree(
 	 * updated while rolling back, accessing it without a lock would
 	 * violate protocol.
 	 */
-	__wt_readlock(session, &txn_global->rwlock);
-	__wt_timestamp_set(&rollback_timestamp, &txn_global->stable_timestamp);
-	__wt_readunlock(session, &txn_global->rwlock);
+	WT_WITH_TIMESTAMP_READLOCK(session, &txn_global->rwlock,
+	    __wt_timestamp_set(
+		&rollback_timestamp, &txn_global->stable_timestamp));
 
 	/*
 	 * Ensure the eviction server is out of the file - we don't
@@ -373,13 +373,10 @@ static int
 __txn_rollback_to_stable_check(WT_SESSION_IMPL *session)
 {
 	WT_TXN_GLOBAL *txn_global;
-	bool stable_set, txn_active;
+	bool txn_active;
 
 	txn_global = &S2C(session)->txn_global;
-	__wt_readlock(session, &txn_global->rwlock);
-	stable_set = !__wt_timestamp_iszero(&txn_global->stable_timestamp);
-	__wt_readunlock(session, &txn_global->rwlock);
-	if (!stable_set)
+	if (!txn_global->has_stable_timestamp)
 		WT_RET_MSG(session, EINVAL,
 		    "rollback_to_stable requires a stable timestamp");
 

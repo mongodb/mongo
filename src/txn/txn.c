@@ -445,12 +445,11 @@ __wt_txn_config(WT_SESSION_IMPL *session, const char *cfg[])
 
 		WT_RET(__wt_txn_parse_timestamp(
 		    session, "read", &txn->read_timestamp, &cval));
-		__wt_readlock(session, &txn_global->rwlock);
-		__wt_timestamp_set(
-		    &oldest_timestamp, &txn_global->oldest_timestamp);
-		__wt_timestamp_set(
-		    &stable_timestamp, &txn_global->stable_timestamp);
-		__wt_readunlock(session, &txn_global->rwlock);
+		WT_WITH_TIMESTAMP_READLOCK(session, &txn_global->rwlock,
+		    __wt_timestamp_set(
+			&oldest_timestamp, &txn_global->oldest_timestamp);
+		    __wt_timestamp_set(
+			&stable_timestamp, &txn_global->stable_timestamp));
 		if (__wt_timestamp_cmp(
 		    &txn->read_timestamp, &oldest_timestamp) < 0)
 			WT_RET_MSG(session, EINVAL,
@@ -743,10 +742,9 @@ __wt_txn_commit(WT_SESSION_IMPL *session, const char *cfg[])
 #ifdef HAVE_TIMESTAMPS
 	/* First check if we've already committed something in the future. */
 	if (update_timestamp) {
-		__wt_readlock(session, &txn_global->rwlock);
-		__wt_timestamp_set(
-		    &prev_commit_timestamp, &txn_global->commit_timestamp);
-		__wt_readunlock(session, &txn_global->rwlock);
+		WT_WITH_TIMESTAMP_READLOCK(session, &txn_global->rwlock,
+		    __wt_timestamp_set(
+			&prev_commit_timestamp, &txn_global->commit_timestamp));
 		update_timestamp = __wt_timestamp_cmp(
 		    &txn->commit_timestamp, &prev_commit_timestamp) > 0;
 	}
