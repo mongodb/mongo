@@ -244,9 +244,9 @@ def libdeps_emitter(target, source, env):
     prog_builder = env['BUILDERS']['Program']
     prog_node_factory = prog_builder.target_factory or env.File
 
-    prereqs = [dependency(l, False, dependency.Public) for l in env.get(libdeps_env_var, [])]
-    prereqs.extend(dependency(l, False, dependency.Interface) for l in env.get(libdeps_env_var + '_INTERFACE', []))
-    prereqs.extend(dependency(l, False, dependency.Private) for l in env.get(libdeps_env_var + '_PRIVATE', []))
+    prereqs = [dependency(l, False, dependency.Public) for l in env.get(libdeps_env_var, []) if l]
+    prereqs.extend(dependency(l, False, dependency.Interface) for l in env.get(libdeps_env_var + '_INTERFACE', []) if l)
+    prereqs.extend(dependency(l, False, dependency.Private) for l in env.get(libdeps_env_var + '_PRIVATE', []) if l)
 
     for prereq in prereqs:
         prereqWithIxes = SCons.Util.adjustixes(
@@ -300,9 +300,9 @@ def shlibdeps_emitter(target, source, env):
     prog_builder = env['BUILDERS']['Program']
     prog_node_factory = prog_builder.target_factory or env.File
 
-    prereqs = [dependency(l, True, dependency.Public) for l in env.get(libdeps_env_var, [])]
-    prereqs.extend(dependency(l, True, dependency.Interface) for l in env.get(libdeps_env_var + '_INTERFACE', []))
-    prereqs.extend(dependency(l, True, dependency.Private) for l in env.get(libdeps_env_var + '_PRIVATE', []))
+    prereqs = [dependency(l, True, dependency.Public) for l in env.get(libdeps_env_var, []) if l]
+    prereqs.extend(dependency(l, True, dependency.Interface) for l in env.get(libdeps_env_var + '_INTERFACE', []) if l)
+    prereqs.extend(dependency(l, True, dependency.Private) for l in env.get(libdeps_env_var + '_PRIVATE', []) if l)
 
     for prereq in prereqs:
         prereqWithIxes = SCons.Util.adjustixes(
