@@ -237,12 +237,7 @@ TEST(CIDRTest, doesNotParse) {
         {"candygram", kBadIp},
     };
     for (auto&& p : bad_addrs) {
-        try {
-            CIDR cidr(p.first);
-            ASSERT_TRUE(false);
-        } catch (const CIDRException& e) {
-            ASSERT_EQUALS(e.what(), p.second);
-        }
+        ASSERT_THROWS_WHAT(CIDR(p.first), DBException, p.second);
     }
 }
 

@@ -96,8 +96,8 @@ StatusWith<CIDR> CIDR::parse(BSONElement from) noexcept {
 
 StatusWith<CIDR> CIDR::parse(StringData s) noexcept try {
     return CIDR(s);
-} catch (const CIDRException& e) {
-    return {ErrorCodes::UnsupportedFormat, e.what()};
+} catch (const DBException& e) {
+    return e.toStatus();
 }
 
 CIDR::CIDR(StringData s) try {
@@ -111,7 +111,7 @@ CIDR::CIDR(StringData s) try {
         _family = AF_INET6;
         _len = kIPv6Bits;
     } else {
-        throw CIDRException("Invalid IP address in CIDR string");
+        uasserted(ErrorCodes::UnsupportedFormat, "Invalid IP address in CIDR string");
     }
 
     if (slash == end(s)) {
@@ -119,15 +119,15 @@ CIDR::CIDR(StringData s) try {
     }
 
     auto len = strict_stoi(std::string(slash + 1, end(s)), 10);
-    if ((len < 0) || (len > _len)) {
-        throw CIDRException("Invalid length in CIDR string");
-    }
+    uassert(ErrorCodes::UnsupportedFormat,
+            "Invalid length in CIDR string",
+            (len >= 0) && (len <= _len));
     _len = len;
 
 } catch (const std::invalid_argument& e) {
-    throw CIDRException("Non-numeric length in CIDR string");
+    uasserted(ErrorCodes::UnsupportedFormat, "Non-numeric length in CIDR string");
 } catch (const std::out_of_range& e) {
-    throw CIDRException("Invalid length in CIDR string");
+    uasserted(ErrorCodes::UnsupportedFormat, "Invalid length in CIDR string");
 }
 
 template <>
