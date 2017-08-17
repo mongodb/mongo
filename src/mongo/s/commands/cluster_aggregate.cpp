@@ -308,7 +308,7 @@ StatusWith<std::pair<ShardId, Shard::CommandResponse>> establishMergingShardCurs
                                                        ReadPreferenceSetting::get(opCtx),
                                                        nss.db().toString(),
                                                        mergeCmdObj,
-                                                       Shard::RetryPolicy::kNoRetry));
+                                                       Shard::RetryPolicy::kIdempotent));
 
     return {{std::move(mergingShardId), std::move(shardCmdResponse)}};
 }
@@ -682,7 +682,7 @@ Status ClusterAggregate::aggPassthrough(OperationContext* opCtx,
         namespaces.executionNss.db().toString(),
         !shard->isConfig() ? appendShardVersion(std::move(cmdObj), ChunkVersion::UNSHARDED())
                            : std::move(cmdObj),
-        Shard::RetryPolicy::kNoRetry));
+        Shard::RetryPolicy::kIdempotent));
 
     if (ErrorCodes::isStaleShardingError(cmdResponse.commandStatus.code())) {
         throw RecvStaleConfigException("command failed because of stale config",
