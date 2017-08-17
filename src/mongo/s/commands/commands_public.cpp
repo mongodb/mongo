@@ -260,7 +260,37 @@ protected:
                 str::stream() << "can't do command: " << getName() << " on sharded collection",
                 !routingInfo.cm());
 
-        return passthrough(opCtx, dbName, routingInfo.primaryId(), cmdObj, result);
+        const auto primaryShardId = routingInfo.primaryId();
+        const auto primaryShard =
+            uassertStatusOK(Grid::get(opCtx)->shardRegistry()->getShard(opCtx, primaryShardId));
+
+        // Here, we first filter the command before appending an UNSHARDED shardVersion, because
+        // "shardVersion" is one of the fields that gets filtered out.
+        BSONObj filteredCmdObj(Command::filterCommandRequestForPassthrough(cmdObj));
+        BSONObj filteredCmdObjWithVersion(
+            appendShardVersion(filteredCmdObj, ChunkVersion::UNSHARDED()));
+
+        auto commandResponse = uassertStatusOK(primaryShard->runCommandWithFixedRetryAttempts(
+            opCtx,
+            ReadPreferenceSetting::get(opCtx),
+            dbName,
+            primaryShard->isConfig() ? filteredCmdObj : filteredCmdObjWithVersion,
+            Shard::RetryPolicy::kIdempotent));
+
+        uassert(ErrorCodes::IllegalOperation,
+                str::stream() << "can't do command: " << getName() << " on a sharded collection",
+                !ErrorCodes::isStaleShardingError(commandResponse.commandStatus.code()));
+
+        uassertStatusOK(commandResponse.commandStatus);
+
+        if (!commandResponse.writeConcernStatus.isOK()) {
+            appendWriteConcernErrorToCmdResponse(
+                primaryShardId, commandResponse.response["writeConcernError"], result);
+        }
+        result.appendElementsUnique(
+            filterCommandReplyForPassthrough(std::move(commandResponse.response)));
+
+        return true;
     }
 };
 
