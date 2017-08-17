@@ -29,6 +29,7 @@
 #pragma once
 
 #include <string>
+#include <vector>
 
 #ifndef _WIN32
 
@@ -71,9 +72,34 @@ struct SockAddr {
 
     explicit SockAddr(int sourcePort); /* listener side */
 
-    explicit SockAddr(StringData ip, int port, sa_family_t familyHint);
+    /**
+     * Initialize a SockAddr for a given IP or Hostname.
+     *
+     * If target fails to resolve/parse, SockAddr.isValid() may return false,
+     * or the resulting SockAddr may be equivalent to SockAddr(port).
+     *
+     * If target is a unix domain socket, a uassert() exception will be thrown
+     * on windows or if addr exceeds maximum path length.
+     *
+     * If target resolves to more than one address, only the first address
+     * will be used. Others will be discarded.
+     * SockAddr::createAll() is recommended for capturing all addresses.
+     */
+    explicit SockAddr(StringData target, int port, sa_family_t familyHint);
 
     explicit SockAddr(struct sockaddr_storage& other, socklen_t size);
+
+    /**
+     * Resolve an ip or hostname to a vector of SockAddr objects.
+     *
+     * Works similar to SockAddr(StringData, int, sa_family_t) above,
+     * however all addresses returned from ::getaddrinfo() are used,
+     * it never falls-open to SockAddr(port),
+     * and isInvalid() SockAddrs are excluded.
+     *
+     * May return an empty vector.
+     */
+    static std::vector<SockAddr> createAll(StringData target, int port, sa_family_t familyHint);
 
     template <typename T>
     T& as() {
@@ -123,6 +149,8 @@ struct SockAddr {
     socklen_t addressSize;
 
 private:
+    void initUnixDomainSocket(const std::string& path, int port);
+
     std::string _hostOrIp;
     struct sockaddr_storage sa;
     bool _isValid;

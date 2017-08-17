@@ -165,52 +165,61 @@ Status TransportLayerASIO::setup() {
             warning() << "Skipping empty bind address";
             continue;
         }
-        SockAddr addr(StringData(ip),
-                      _listenerOptions.port,
-                      _listenerOptions.enableIPv6 ? AF_UNSPEC : AF_INET);
-        asio::generic::stream_protocol::endpoint endpoint(addr.raw(), addr.addressSize);
+
+        const auto addrs = SockAddr::createAll(
+            ip, _listenerOptions.port, _listenerOptions.enableIPv6 ? AF_UNSPEC : AF_INET);
+        if (addrs.empty()) {
+            warning() << "Found no addresses for " << ip;
+            continue;
+        }
+
+        for (const auto& addr : addrs) {
+            asio::generic::stream_protocol::endpoint endpoint(addr.raw(), addr.addressSize);
 
 #ifndef _WIN32
-        if (addr.getType() == AF_UNIX) {
-            if (::unlink(ip.c_str()) == -1 && errno != ENOENT) {
-                error() << "Failed to unlink socket file " << ip << " "
-                        << errnoWithDescription(errno);
-                fassertFailedNoTrace(40486);
+            if (addr.getType() == AF_UNIX) {
+                if (::unlink(ip.c_str()) == -1 && errno != ENOENT) {
+                    error() << "Failed to unlink socket file " << ip << " "
+                            << errnoWithDescription(errno);
+                    fassertFailedNoTrace(40486);
+                }
             }
-        }
 #endif
-        if (addr.getType() == AF_INET6 && !_listenerOptions.enableIPv6) {
-            error() << "Specified ipv6 bind address, but ipv6 is disabled";
-            fassertFailedNoTrace(40488);
-        }
+            if (addr.getType() == AF_INET6 && !_listenerOptions.enableIPv6) {
+                error() << "Specified ipv6 bind address, but ipv6 is disabled";
+                fassertFailedNoTrace(40488);
+            }
 
-        GenericAcceptor acceptor(*_ioContext);
-        acceptor.open(endpoint.protocol());
-        acceptor.set_option(GenericAcceptor::reuse_address(true));
+            GenericAcceptor acceptor(*_ioContext);
+            acceptor.open(endpoint.protocol());
+            acceptor.set_option(GenericAcceptor::reuse_address(true));
 
-        acceptor.non_blocking(true, ec);
-        if (ec) {
-            return errorCodeToStatus(ec);
-        }
+            acceptor.non_blocking(true, ec);
+            if (ec) {
+                return errorCodeToStatus(ec);
+            }
 
-        acceptor.bind(endpoint, ec);
-        if (ec) {
-            return errorCodeToStatus(ec);
-        }
+            acceptor.bind(endpoint, ec);
+            if (ec) {
+                return errorCodeToStatus(ec);
+            }
 
 #ifndef _WIN32
-        if (addr.getType() == AF_UNIX) {
-            if (::chmod(ip.c_str(), serverGlobalParams.unixSocketPermissions) == -1) {
-                error() << "Failed to chmod socket file " << ip << " "
-                        << errnoWithDescription(errno);
-                fassertFailedNoTrace(40487);
+            if (addr.getType() == AF_UNIX) {
+                if (::chmod(ip.c_str(), serverGlobalParams.unixSocketPermissions) == -1) {
+                    error() << "Failed to chmod socket file " << ip << " "
+                            << errnoWithDescription(errno);
+                    fassertFailedNoTrace(40487);
+                }
             }
-        }
 #endif
-        _acceptors.emplace_back(std::move(acceptor));
+            _acceptors.emplace_back(std::move(acceptor));
+        }
     }
 
-    invariant(!_acceptors.empty());
+    if (_acceptors.empty()) {
+        return Status(ErrorCodes::SocketException, "No available addresses/ports to bind to");
+    }
 
 #ifdef MONGO_CONFIG_SSL
     const auto& sslParams = getSSLGlobalParams();

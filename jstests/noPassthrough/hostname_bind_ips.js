@@ -1,7 +1,7 @@
 (function() {
     'use strict';
 
-    var proc = MongoRunner.runMongod({bind_ip: "localhost,::1", "ipv6": "", waitForConnect: false});
+    var proc = MongoRunner.runMongod({bind_ip: "localhost", "ipv6": "", waitForConnect: false});
     assert.neq(proc, null);
 
     assert.soon(function() {
