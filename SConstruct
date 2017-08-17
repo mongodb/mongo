@@ -2903,6 +2903,7 @@ def doConfigure(myenv):
             x.fetch_sub(y);
             x.exchange(y);
             x.compare_exchange_strong(y, x);
+            x.is_lock_free();
             return x.load();
         }}
         """.format(base_type)
