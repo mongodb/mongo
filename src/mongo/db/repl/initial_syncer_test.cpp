@@ -627,9 +627,9 @@ TEST_F(InitialSyncerTest, StartupSetsInitialDataTimestampAndStableTimestampOnSuc
     auto opCtx = makeOpCtx();
 
     // Set initial data timestamp forward first.
-    auto storageEngine = opCtx.get()->getServiceContext()->getGlobalStorageEngine();
-    _storageInterface->setInitialDataTimestamp(storageEngine, SnapshotName(Timestamp(5, 5)));
-    _storageInterface->setStableTimestamp(storageEngine, SnapshotName(Timestamp(6, 6)));
+    auto serviceCtx = opCtx.get()->getServiceContext();
+    _storageInterface->setInitialDataTimestamp(serviceCtx, SnapshotName(Timestamp(5, 5)));
+    _storageInterface->setStableTimestamp(serviceCtx, SnapshotName(Timestamp(6, 6)));
 
     ASSERT_OK(initialSyncer->startup(opCtx.get(), maxAttempts));
     ASSERT_TRUE(initialSyncer->isActive());

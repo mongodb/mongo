@@ -134,11 +134,11 @@ public:
     StatusWith<StorageInterface::CollectionCount> getCollectionCount(
         OperationContext* opCtx, const NamespaceString& nss) override;
 
-    void setStableTimestamp(StorageEngine* storageEngine, SnapshotName snapshotName) override;
+    void setStableTimestamp(ServiceContext* serviceCtx, SnapshotName snapshotName) override;
 
-    void setInitialDataTimestamp(StorageEngine* storageEngine, SnapshotName snapshotName) override;
+    void setInitialDataTimestamp(ServiceContext* serviceCtx, SnapshotName snapshotName) override;
 
-    Status recoverToStableTimestamp(StorageEngine* storageEngine) override;
+    Status recoverToStableTimestamp(ServiceContext* serviceCtx) override;
 
     /**
      * Checks that the "admin" database contains a supported version of the auth data schema.

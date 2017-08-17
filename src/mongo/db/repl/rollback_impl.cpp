@@ -115,10 +115,10 @@ Status RollbackImpl::runRollback(OperationContext* opCtx) {
     }
 
     // Recover to the stable timestamp while holding the global exclusive lock.
-    auto storageEngine = opCtx->getServiceContext()->getGlobalStorageEngine();
+    auto serviceCtx = opCtx->getServiceContext();
     {
         Lock::GlobalWrite globalWrite(opCtx);
-        status = _storageInterface->recoverToStableTimestamp(storageEngine);
+        status = _storageInterface->recoverToStableTimestamp(serviceCtx);
         if (!status.isOK()) {
             return status;
         }

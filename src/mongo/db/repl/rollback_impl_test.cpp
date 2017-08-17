@@ -47,7 +47,7 @@ NamespaceString nss("local.oplog.rs");
 
 class StorageInterfaceRollback : public StorageInterfaceImpl {
 public:
-    void setStableTimestamp(StorageEngine* storageEngine, SnapshotName snapshotName) override {
+    void setStableTimestamp(ServiceContext* serviceCtx, SnapshotName snapshotName) override {
         stdx::lock_guard<stdx::mutex> lock(_mutex);
         _stableTimestamp = Timestamp(snapshotName.asU64());
     }
@@ -56,7 +56,7 @@ public:
      * If '_recoverToTimestampStatus' is non-empty, returns it. If '_recoverToTimestampStatus' is
      * empty, updates '_currTimestamp' to be equal to '_stableTimestamp' and returns an OK status.
      */
-    Status recoverToStableTimestamp(StorageEngine* storageEngine) override {
+    Status recoverToStableTimestamp(ServiceContext* serviceCtx) override {
         stdx::lock_guard<stdx::mutex> lock(_mutex);
         if (_recoverToTimestampStatus) {
             return _recoverToTimestampStatus.get();

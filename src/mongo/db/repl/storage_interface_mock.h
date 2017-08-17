@@ -244,15 +244,15 @@ public:
         return 0;
     }
 
-    void setStableTimestamp(StorageEngine* storageEngine, SnapshotName snapshotName) override;
+    void setStableTimestamp(ServiceContext* serviceCtx, SnapshotName snapshotName) override;
 
-    void setInitialDataTimestamp(StorageEngine* storageEngine, SnapshotName snapshotName) override;
+    void setInitialDataTimestamp(ServiceContext* serviceCtx, SnapshotName snapshotName) override;
 
     SnapshotName getStableTimestamp() const;
 
     SnapshotName getInitialDataTimestamp() const;
 
-    Status recoverToStableTimestamp(StorageEngine* storageEngine) override {
+    Status recoverToStableTimestamp(ServiceContext* serviceCtx) override {
         return Status{ErrorCodes::IllegalOperation, "recoverToStableTimestamp not implemented."};
     }
 

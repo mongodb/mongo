@@ -92,9 +92,8 @@ void ReplicationRecoveryImpl::recoverFromOplog(OperationContext* opCtx) try {
     if (!checkpointTimestamp.isNull()) {
         // If we have a checkpoint timestamp, we set the initial data timestamp now so that
         // the operations we apply below can be given the proper timestamps.
-        _storageInterface->setInitialDataTimestamp(
-            opCtx->getServiceContext()->getGlobalStorageEngine(),
-            SnapshotName(checkpointTimestamp));
+        _storageInterface->setInitialDataTimestamp(opCtx->getServiceContext(),
+                                                   SnapshotName(checkpointTimestamp));
     }
 
     // If we don't have a checkpoint timestamp, then we are either not running a storage engine
@@ -105,9 +104,8 @@ void ReplicationRecoveryImpl::recoverFromOplog(OperationContext* opCtx) try {
     // oplog.
     ON_BLOCK_EXIT([&] {
         if (checkpointTimestamp.isNull() && topOfOplog) {
-            _storageInterface->setInitialDataTimestamp(
-                opCtx->getServiceContext()->getGlobalStorageEngine(),
-                SnapshotName(topOfOplog->getTimestamp()));
+            _storageInterface->setInitialDataTimestamp(opCtx->getServiceContext(),
+                                                       SnapshotName(topOfOplog->getTimestamp()));
         }
     });
 

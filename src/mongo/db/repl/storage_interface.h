@@ -280,14 +280,13 @@ public:
      * Sets the highest timestamp at which the storage engine is allowed to take a checkpoint.
      * This timestamp can never decrease, and thus should be a timestamp that can never roll back.
      */
-    virtual void setStableTimestamp(StorageEngine* storageEngine, SnapshotName snapshotName) = 0;
+    virtual void setStableTimestamp(ServiceContext* serviceCtx, SnapshotName snapshotName) = 0;
 
     /**
      * Tells the storage engine the timestamp of the data at startup. This is necessary because
      * timestamps are not persisted in the storage layer.
      */
-    virtual void setInitialDataTimestamp(StorageEngine* storageEngine,
-                                         SnapshotName snapshotName) = 0;
+    virtual void setInitialDataTimestamp(ServiceContext* serviceCtx, SnapshotName snapshotName) = 0;
 
     /**
      * Reverts the state of all database data to the last stable timestamp.
@@ -298,7 +297,7 @@ public:
      *
      * The 'stable' timestamp is set by calling StorageInterface::setStableTimestamp.
      */
-    virtual Status recoverToStableTimestamp(StorageEngine* storageEngine) = 0;
+    virtual Status recoverToStableTimestamp(ServiceContext* serviceCtx) = 0;
 };
 
 }  // namespace repl

@@ -2326,7 +2326,7 @@ Status ReplicationCoordinatorImpl::processReplSetInitiate(OperationContext* opCt
     // Sets the initial data timestamp on the storage engine so it can assign a timestamp
     // to data on disk. We do this after writing the "initiating set" oplog entry.
     auto initialDataTS = SnapshotName(lastAppliedOpTime.getTimestamp().asULL());
-    _storage->setInitialDataTimestamp(getServiceContext()->getGlobalStorageEngine(), initialDataTS);
+    _storage->setInitialDataTimestamp(getServiceContext(), initialDataTS);
 
     _finishReplSetInitiate(newConfig, myIndex.getValue());
 
@@ -3016,8 +3016,7 @@ void ReplicationCoordinatorImpl::_setStableTimestampForStorage_inlock() {
     if (stableTimestamp) {
         LOG(2) << "Setting replication's stable timestamp to " << stableTimestamp.value();
 
-        auto storageEngine = getServiceContext()->getGlobalStorageEngine();
-        _storage->setStableTimestamp(storageEngine, SnapshotName(stableTimestamp.get()));
+        _storage->setStableTimestamp(getServiceContext(), SnapshotName(stableTimestamp.get()));
 
         _cleanupStableTimestampCandidates(&_stableTimestampCandidates, stableTimestamp.get());
     }

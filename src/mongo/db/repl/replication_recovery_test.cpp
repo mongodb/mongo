@@ -54,7 +54,7 @@ const NamespaceString testNs("a.a");
 
 class StorageInterfaceRecovery : public StorageInterfaceImpl {
 public:
-    void setInitialDataTimestamp(StorageEngine* storageEngine, SnapshotName snapshotName) override {
+    void setInitialDataTimestamp(ServiceContext* serviceCtx, SnapshotName snapshotName) override {
         stdx::lock_guard<stdx::mutex> lock(_mutex);
         _initialDataTimestamp = snapshotName;
     }
