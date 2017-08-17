@@ -180,5 +180,26 @@
     assert.eq(latestChange.operationType, "invalidate");
     assert(!latestChange.hasOwnProperty("fullDocument"));
 
+    // TODO(russotto): Can just use "coll" here once read majority is working.
+    // For now, using the old collection results in us reading stale data sometimes.
+    const coll2 = db.real_get_more;
+    jsTestLog("Testing full document lookup with a real getMore");
+    assert.commandWorked(db.createCollection(coll2.getName()));
+    assert.writeOK(coll2.insert({_id: "getMoreEnabled"}));
+    replTest.awaitReplication();
+    res = assert.commandWorked(db.runCommand({
+        aggregate: coll2.getName(),
+        pipeline: [{$changeStream: {fullDocument: "updateLookup"}}],
+        cursor: {}
+    }));
+    assert.writeOK(coll2.update({_id: "getMoreEnabled"}, {$set: {updated: true}}));
+    res = assert.commandWorked(db.runCommand({
+        getMore: res.cursor.id,
+        collection: getCollectionNameFromFullNamespace(res.cursor.ns),
+        batchSize: 2
+    }));
+    assert.eq(res.cursor.nextBatch.length, 1);
+    assert.docEq(res.cursor.nextBatch[0]["fullDocument"], {_id: "getMoreEnabled", updated: true});
+
     replTest.stopSet();
 }());

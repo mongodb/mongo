@@ -393,7 +393,8 @@ PlanExecutor::ExecState PlanExecutor::getNextSnapshotted(Snapshotted<BSONObj>* o
 bool PlanExecutor::shouldWaitForInserts() {
     // If this is an awaitData-respecting operation and we have time left and we're not interrupted,
     // we should wait for inserts.
-    if (mongo::shouldWaitForInserts(_opCtx) && _opCtx->checkForInterruptNoAssert().isOK() &&
+    if (_cq && _cq->getQueryRequest().isTailable() && _cq->getQueryRequest().isAwaitData() &&
+        mongo::shouldWaitForInserts(_opCtx) && _opCtx->checkForInterruptNoAssert().isOK() &&
         _opCtx->getRemainingMaxTimeMicros() > Microseconds::zero()) {
         // For operations with a last committed opTime, we should not wait if the replication
         // coordinator's lastCommittedOpTime has changed.
