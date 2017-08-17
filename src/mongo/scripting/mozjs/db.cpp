@@ -44,30 +44,25 @@ namespace mozjs {
 
 const char* const DBInfo::className = "DB";
 
-void DBInfo::getProperty(JSContext* cx,
-                         JS::HandleObject obj,
-                         JS::HandleId id,
-                         JS::MutableHandleValue vp) {
-    // 2nd look into real values, may be cached collection object
-    if (!vp.isUndefined()) {
-        auto scope = getScope(cx);
-        auto opContext = scope->getOpContext();
+void DBInfo::resolve(JSContext* cx, JS::HandleObject obj, JS::HandleId id, bool* resolvedp) {
+    *resolvedp = false;
 
-        if (opContext && vp.isObject()) {
-            ObjectWrapper o(cx, vp);
-        }
-
-        return;
-    }
+    JS::RootedValue coll(cx);
 
     JS::RootedObject parent(cx);
     if (!JS_GetPrototype(cx, obj, &parent))
         uasserted(ErrorCodes::JSInterpreterFailure, "Couldn't get prototype");
 
     ObjectWrapper parentWrapper(cx, parent);
+    ObjectWrapper o(cx, obj);
 
+    // Check if this exists on the parent, ie. DBCollection::resolve case
     if (parentWrapper.hasOwnField(id)) {
-        parentWrapper.getValue(id, vp);
+        parentWrapper.getValue(id, &coll);
+
+        o.defineProperty(id, coll, 0);
+
+        *resolvedp = true;
         return;
     }
 
@@ -86,15 +81,17 @@ void DBInfo::getProperty(JSContext* cx,
     JS::RootedValue getCollection(cx);
     parentWrapper.getValue(InternedString::getCollection, &getCollection);
 
+    // Check if getCollection has been installed yet
+    // It is undefined if the user has a db name the same as one of methods/properties of the DB
+    // object.
     if (!(getCollection.isObject() && JS_ObjectIsFunction(cx, getCollection.toObjectOrNull()))) {
-        uasserted(ErrorCodes::BadValue, "getCollection is not a function");
+        return;
     }
 
     JS::AutoValueArray<1> args(cx);
 
     idw.toValue(args[0]);
 
-    JS::RootedValue coll(cx);
     ObjectWrapper(cx, obj).callMethod(getCollection, args, &coll);
 
     uassert(16861,
@@ -104,7 +101,7 @@ void DBInfo::getProperty(JSContext* cx,
     // cache collection for reuse, don't enumerate
     ObjectWrapper(cx, obj).defineProperty(id, coll, 0);
 
-    vp.set(coll);
+    *resolvedp = true;
 }
 
 void DBInfo::construct(JSContext* cx, JS::CallArgs args) {

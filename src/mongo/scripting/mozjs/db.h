@@ -44,10 +44,7 @@ namespace mozjs {
  */
 struct DBInfo : public BaseInfo {
     static void construct(JSContext* cx, JS::CallArgs args);
-    static void getProperty(JSContext* cx,
-                            JS::HandleObject obj,
-                            JS::HandleId id,
-                            JS::MutableHandleValue vp);
+    static void resolve(JSContext* cx, JS::HandleObject obj, JS::HandleId id, bool* resolvedp);
 
     static const char* const className;
 };

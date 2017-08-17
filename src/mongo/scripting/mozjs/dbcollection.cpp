@@ -43,11 +43,11 @@ namespace mozjs {
 
 const char* const DBCollectionInfo::className = "DBCollection";
 
-void DBCollectionInfo::getProperty(JSContext* cx,
-                                   JS::HandleObject obj,
-                                   JS::HandleId id,
-                                   JS::MutableHandleValue vp) {
-    DBInfo::getProperty(cx, obj, id, vp);
+void DBCollectionInfo::resolve(JSContext* cx,
+                               JS::HandleObject obj,
+                               JS::HandleId id,
+                               bool* resolvedp) {
+    DBInfo::resolve(cx, obj, id, resolvedp);
 }
 
 void DBCollectionInfo::construct(JSContext* cx, JS::CallArgs args) {
