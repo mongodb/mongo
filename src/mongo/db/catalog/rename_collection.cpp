@@ -164,31 +164,42 @@ Status renameCollectionCommon(OperationContext* opCtx,
     if (sourceDB == targetDB) {
         return writeConflictRetry(opCtx, "renameCollection", target.ns(), [&] {
             WriteUnitOfWork wunit(opCtx);
-            OptionalCollectionUUID dropTargetUUID;
-            if (targetColl) {
-                // No logOp necessary because the entire renameCollection command is one logOp.
-                repl::UnreplicatedWritesBlock uwb(opCtx);
-                dropTargetUUID = targetColl->uuid();
-                Status s = targetDB->dropCollection(opCtx, target.ns());
-                if (!s.isOK()) {
-                    return s;
+            auto opObserver = getGlobalServiceContext()->getOpObserver();
+            if (!targetColl) {
+                // Target collection does not exist.
+                auto stayTemp = options.stayTemp;
+                {
+                    // No logOp necessary because the entire renameCollection command is one logOp.
+                    repl::UnreplicatedWritesBlock uwb(opCtx);
+                    status = targetDB->renameCollection(opCtx, source.ns(), target.ns(), stayTemp);
+                    if (!status.isOK()) {
+                        return status;
+                    }
                 }
+                opObserver->onRenameCollection(
+                    opCtx, source, target, sourceUUID, options.dropTarget, {}, {}, stayTemp);
+                wunit.commit();
+                return Status::OK();
             }
 
-            Status s =
-                targetDB->renameCollection(opCtx, source.ns(), target.ns(), options.stayTemp);
-            if (!s.isOK()) {
-                return s;
+            // Target collection exists - drop it.
+            invariant(options.dropTarget);
+            auto dropTargetUUID = targetColl->uuid();
+            auto renameOpTime = opObserver->onRenameCollection(
+                opCtx, source, target, sourceUUID, true, dropTargetUUID, {}, options.stayTemp);
+
+            // No logOp necessary because the entire renameCollection command is one logOp.
+            repl::UnreplicatedWritesBlock uwb(opCtx);
+
+            status = targetDB->dropCollection(opCtx, target.ns(), renameOpTime);
+            if (!status.isOK()) {
+                return status;
             }
 
-            getGlobalServiceContext()->getOpObserver()->onRenameCollection(opCtx,
-                                                                           NamespaceString(source),
-                                                                           NamespaceString(target),
-                                                                           sourceUUID,
-                                                                           options.dropTarget,
-                                                                           dropTargetUUID,
-                                                                           /*dropSourceUUID*/ {},
-                                                                           options.stayTemp);
+            status = targetDB->renameCollection(opCtx, source.ns(), target.ns(), options.stayTemp);
+            if (!status.isOK()) {
+                return status;
+            }
 
             wunit.commit();
             return Status::OK();
