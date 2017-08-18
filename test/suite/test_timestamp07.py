@@ -136,7 +136,7 @@ class test_timestamp07(wttest.WiredTigerTestCase, suite_subprocess):
         self.assertEqual(count3, valcnt3)
 
     # Return whether or not eviction happened since the last call.
-    def did_eviction(self):
+    def check_eviction(self):
         # Get a statistics cursor and look at the number of dirty pages
         # evicted.  Keep track of the last read value so we can determine
         # if the value changed since the last call to this function.
@@ -146,11 +146,14 @@ class test_timestamp07(wttest.WiredTigerTestCase, suite_subprocess):
         # Return True if the new value is more, False otherwise.
         #print "Old: " + str(self.modified_evicted)
         # print "New: " + str(evict_dirty)
-        ret = self.modified_evicted < evict_dirty
+        did_eviction = self.modified_evicted < evict_dirty
         stat_cursor.close()
         self.modified_evicted = evict_dirty
         # print "Evict ret: " + str(ret)
-        return ret
+
+        # XXX we can't guarantee that eviction will always happen, but make
+        # sure it doesn't happen if not expected.
+        self.assertTrue(not did_eviction or self.evicts)
 
     # Check that a cursor sees the expected values after a checkpoint.
     def ckpt_backup(self, check_value, valcnt, valcnt2, valcnt3):
@@ -193,7 +196,7 @@ class test_timestamp07(wttest.WiredTigerTestCase, suite_subprocess):
             c3[k] = self.value
             self.session.commit_transaction('commit_timestamp=' + timestamp_str(k))
 
-        self.assertEqual(self.did_eviction(), self.evicts)
+        self.check_eviction()
         # Now check that we see the expected state when reading at each
         # timestamp.
         for i, t in enumerate(orig_keys):
@@ -225,7 +228,7 @@ class test_timestamp07(wttest.WiredTigerTestCase, suite_subprocess):
             # print "Commit key " + str(k) + " ts " + ts
             count += 1
 
-        self.assertEqual(self.did_eviction(), self.evicts)
+        self.check_eviction()
 
         # print "Updated " + str(count) + " keys to value2"
 
@@ -263,7 +266,7 @@ class test_timestamp07(wttest.WiredTigerTestCase, suite_subprocess):
             # print "Commit key " + str(k) + " ts " + ts
             count += 1
 
-        self.assertEqual(self.did_eviction(), self.evicts)
+        self.check_eviction()
         # print "Updated " + str(count) + " keys to value3"
 
         # Flush the log but don't checkpoint
