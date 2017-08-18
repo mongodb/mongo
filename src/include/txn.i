@@ -319,8 +319,15 @@ __wt_txn_visible_all(
 	int cmp;
 
 	/* Timestamp check. */
-	if (!txn_global->has_pinned_timestamp || timestamp == NULL)
+	if (timestamp == NULL || __wt_timestamp_iszero(timestamp))
 		return (true);
+
+	/*
+	 * If no oldest timestamp has been supplied, updates have to stay in
+	 * cache until we are shutting down.
+	 */
+	if (!txn_global->has_pinned_timestamp)
+		return (F_ISSET(S2C(session), WT_CONN_CLOSING));
 
 	WT_WITH_TIMESTAMP_READLOCK(session, &txn_global->rwlock,
 	    cmp = __wt_timestamp_cmp(timestamp, &txn_global->pinned_timestamp));
