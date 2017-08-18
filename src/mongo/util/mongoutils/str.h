@@ -239,6 +239,28 @@ inline std::string ltrim(const std::string& s) {
     return p;
 }
 
+/**
+ * UTF-8 multi-byte code points consist of one leading byte of the form 11xxxxxx, and potentially
+ * many continuation bytes of the form 10xxxxxx. This method checks whether 'charByte' is a
+ * continuation byte.
+ */
+inline bool isUTF8ContinuationByte(char charByte) {
+    return (charByte & 0xc0) == 0x80;
+}
+
+/**
+ * Assuming 'str' stores a UTF-8 string, returns the number of UTF codepoints. The return value is
+ * undefined if the input is not a well formed UTF-8 string.
+ */
+inline size_t lengthInUTF8CodePoints(mongo::StringData str) {
+    size_t strLen = 0;
+    for (char byte : str) {
+        strLen += !isUTF8ContinuationByte(byte);
+    }
+
+    return strLen;
+}
+
 }  // namespace str
 
 }  // namespace mongoutils

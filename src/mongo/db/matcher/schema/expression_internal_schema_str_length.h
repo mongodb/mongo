@@ -56,11 +56,8 @@ public:
             return false;
         }
 
-        // BSONElement::valuestrsize() includes the terminating null character, so subtract 1 before
-        // comparing its length.
-        int lenWithoutNullTerm = elem.valuestrsize() - 1;
-
-        return getComparator()(lenWithoutNullTerm);
+        auto len = str::lengthInUTF8CodePoints(elem.valueStringData());
+        return getComparator()(len);
     };
 
     void debugString(StringBuilder& debug, int level) const final;

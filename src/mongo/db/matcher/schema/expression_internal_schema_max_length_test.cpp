@@ -83,6 +83,60 @@ TEST(InternalSchemaMaxLengthMatchExpression, RejectsNull) {
     ASSERT_FALSE(maxLength.matchesBSON(BSON("a" << BSONNULL)));
 }
 
+TEST(InternalSchemaMaxLengthMatchExpression, TreatsMultiByteCodepointAsOneCharacter) {
+    InternalSchemaMaxLengthMatchExpression nonMatchingMaxLength;
+    InternalSchemaMaxLengthMatchExpression matchingMaxLength;
+
+    ASSERT_OK(nonMatchingMaxLength.init("a", 0));
+    ASSERT_OK(matchingMaxLength.init("a", 1));
+
+    // This string has one code point, so it should meet maximum length 1 but not maximum length 0.
+    constexpr auto testString = u8"\U0001f4a9";
+    ASSERT_FALSE(nonMatchingMaxLength.matchesBSON(BSON("a" << testString)));
+    ASSERT_TRUE(matchingMaxLength.matchesBSON(BSON("a" << testString)));
+}
+
+TEST(InternalSchemaMaxLengthMatchExpression, CorectlyCountsUnicodeCodepoints) {
+    InternalSchemaMaxLengthMatchExpression nonMatchingMaxLength;
+    InternalSchemaMaxLengthMatchExpression matchingMaxLength;
+
+    ASSERT_OK(nonMatchingMaxLength.init("a", 4));
+    ASSERT_OK(matchingMaxLength.init("a", 5));
+
+    // A test string that contains single-byte, 2-byte, 3-byte, and 4-byte codepoints.
+    constexpr auto testString =
+        u8":"            // Single-byte character
+        u8"\u00e9"       // 2-byte character
+        u8")"            // Single-byte character
+        u8"\U0001f4a9"   // 4-byte character
+        u8"\U000020ac";  // 3-byte character
+
+    // This string has five code points, so it should meet maximum length 5 but not maximum
+    // length 4.
+    ASSERT_FALSE(nonMatchingMaxLength.matchesBSON(BSON("a" << testString)));
+    ASSERT_TRUE(matchingMaxLength.matchesBSON(BSON("a" << testString)));
+}
+
+TEST(InternalSchemaMaxLengthMatchExpression, DealsWithInvalidUTF8) {
+    InternalSchemaMaxLengthMatchExpression maxLength;
+
+    ASSERT_OK(maxLength.init("a", 1));
+
+    // Several kinds of invalid byte sequences listed in the Wikipedia article about UTF-8:
+    // https://en.wikipedia.org/wiki/UTF-8
+    constexpr auto testStringUnexpectedContinuationByte = "\bf";
+    constexpr auto testStringOverlongEncoding = "\xf0\x82\x82\xac";
+    constexpr auto testStringInvalidCodePoint = "\xed\xa0\x80";  // U+d800 is not allowed
+    constexpr auto testStringLeadingByteWithoutContinuationByte = "\xdf";
+
+    // Because these inputs are invalid, we don't have any expectations about the answers we get.
+    // Our only requirement is that the test does not crash.
+    std::ignore = maxLength.matchesBSON(BSON("a" << testStringUnexpectedContinuationByte));
+    std::ignore = maxLength.matchesBSON(BSON("a" << testStringOverlongEncoding));
+    std::ignore = maxLength.matchesBSON(BSON("a" << testStringInvalidCodePoint));
+    std::ignore = maxLength.matchesBSON(BSON("a" << testStringLeadingByteWithoutContinuationByte));
+}
+
 TEST(InternalSchemaMaxLengthMatchExpression, NestedArraysWorkWithDottedPaths) {
     InternalSchemaMaxLengthMatchExpression maxLength;
     ASSERT_OK(maxLength.init("a.b", 2));

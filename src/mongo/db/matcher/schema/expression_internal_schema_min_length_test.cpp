@@ -82,6 +82,60 @@ TEST(InternalSchemaMinLengthMatchExpression, RejectsNull) {
     ASSERT_FALSE(minLength.matchesBSON(BSON("a" << BSONNULL)));
 }
 
+TEST(InternalSchemaMinLengthMatchExpression, TreatsMultiByteCodepointAsOneCharacter) {
+    InternalSchemaMinLengthMatchExpression matchingMinLength;
+    InternalSchemaMinLengthMatchExpression nonMatchingMinLength;
+
+    ASSERT_OK(matchingMinLength.init("a", 1));
+    ASSERT_OK(nonMatchingMinLength.init("a", 2));
+
+    // This string has one code point, so it should meet minimum length 1 but not minimum length 2.
+    constexpr auto testString = u8"\U0001f4a9";
+    ASSERT_TRUE(matchingMinLength.matchesBSON(BSON("a" << testString)));
+    ASSERT_FALSE(nonMatchingMinLength.matchesBSON(BSON("a" << testString)));
+}
+
+TEST(InternalSchemaMinLengthMatchExpression, CorectlyCountsUnicodeCodepoints) {
+    InternalSchemaMinLengthMatchExpression matchingMinLength;
+    InternalSchemaMinLengthMatchExpression nonMatchingMinLength;
+
+    ASSERT_OK(matchingMinLength.init("a", 5));
+    ASSERT_OK(nonMatchingMinLength.init("a", 6));
+
+    // A test string that contains single-byte, 2-byte, 3-byte, and 4-byte code points.
+    constexpr auto testString =
+        u8":"            // Single-byte character
+        u8"\u00e9"       // 2-byte character
+        u8")"            // Single-byte character
+        u8"\U0001f4a9"   // 4-byte character
+        u8"\U000020ac";  // 3-byte character
+
+    // This string has five code points, so it should meet minimum length 5 but not minimum
+    // length 6.
+    ASSERT_TRUE(matchingMinLength.matchesBSON(BSON("a" << testString)));
+    ASSERT_FALSE(nonMatchingMinLength.matchesBSON(BSON("a" << testString)));
+}
+
+TEST(InternalSchemaMinLengthMatchExpression, DealsWithInvalidUTF8) {
+    InternalSchemaMinLengthMatchExpression minLength;
+
+    ASSERT_OK(minLength.init("a", 1));
+
+    // Several kinds of invalid byte sequences listed in the Wikipedia article about UTF-8:
+    // https://en.wikipedia.org/wiki/UTF-8
+    constexpr auto testStringUnexpectedContinuationByte = "\bf";
+    constexpr auto testStringOverlongEncoding = "\xf0\x82\x82\xac";
+    constexpr auto testStringInvalidCodePoint = "\xed\xa0\x80";  // U+d800 is not allowed
+    constexpr auto testStringLeadingByteWithoutContinuationByte = "\xdf";
+
+    // Because these inputs are invalid, we don't have any expectations about the answers we get.
+    // Our only requirement is that the test does not crash.
+    std::ignore = minLength.matchesBSON(BSON("a" << testStringUnexpectedContinuationByte));
+    std::ignore = minLength.matchesBSON(BSON("a" << testStringOverlongEncoding));
+    std::ignore = minLength.matchesBSON(BSON("a" << testStringInvalidCodePoint));
+    std::ignore = minLength.matchesBSON(BSON("a" << testStringLeadingByteWithoutContinuationByte));
+}
+
 TEST(InternalSchemaMinLengthMatchExpression, NestedFieldsWorkWithDottedPaths) {
     InternalSchemaMinLengthMatchExpression minLength;
     ASSERT_OK(minLength.init("a.b", 2));

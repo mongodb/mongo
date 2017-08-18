@@ -5,7 +5,9 @@ selector:
   - src/third_party/JSON-Schema-Test-Suite/tests/draft4/**/*.json
   include_files:
   - src/third_party/JSON-Schema-Test-Suite/tests/draft4/maximum.json
+  - src/third_party/JSON-Schema-Test-Suite/tests/draft4/maxLength.json
   - src/third_party/JSON-Schema-Test-Suite/tests/draft4/minimum.json
+  - src/third_party/JSON-Schema-Test-Suite/tests/draft4/minLength.json
   - src/third_party/JSON-Schema-Test-Suite/tests/draft4/multipleOf.json
   - src/third_party/JSON-Schema-Test-Suite/tests/draft4/pattern.json
 

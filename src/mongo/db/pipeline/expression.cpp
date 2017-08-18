@@ -171,15 +171,6 @@ intrusive_ptr<Expression> Expression::parseOperand(
 namespace {
 /**
  * UTF-8 multi-byte code points consist of one leading byte of the form 11xxxxxx, and potentially
- * many continuation bytes of the form 10xxxxxx. This method checks whether 'charByte' is a
- * continuation byte.
- */
-bool isContinuationByte(char charByte) {
-    return (charByte & 0xc0) == 0x80;
-}
-
-/**
- * UTF-8 multi-byte code points consist of one leading byte of the form 11xxxxxx, and potentially
  * many continuation bytes of the form 10xxxxxx. This method checks whether 'charByte' is a leading
  * byte.
  */
@@ -2692,8 +2683,9 @@ Value ExpressionIndexOfCP::evaluate(const Document& root) const {
             startByteIndex = byteIx;
         }
 
-        uassert(
-            40095, "$indexOfCP found bad UTF-8 in the input", !isContinuationByte(input[byteIx]));
+        uassert(40095,
+                "$indexOfCP found bad UTF-8 in the input",
+                !str::isUTF8ContinuationByte(input[byteIx]));
         byteIx += getCodePointLength(input[byteIx]);
     }
 
@@ -3882,7 +3874,7 @@ Value ExpressionSubstrBytes::evaluate(const Document& root) const {
     uassert(28656,
             str::stream() << getOpName()
                           << ":  Invalid range, starting index is a UTF-8 continuation byte.",
-            (lower >= str.length() || !isContinuationByte(str[lower])));
+            (lower >= str.length() || !str::isUTF8ContinuationByte(str[lower])));
 
     // Check the byte after the last character we'd return. If it is a continuation byte, that
     // means we're in the middle of a UTF-8 character.
@@ -3890,7 +3882,7 @@ Value ExpressionSubstrBytes::evaluate(const Document& root) const {
         28657,
         str::stream() << getOpName()
                       << ":  Invalid range, ending index is in the middle of a UTF-8 character.",
-        (lower + length >= str.length() || !isContinuationByte(str[lower + length])));
+        (lower + length >= str.length() || !str::isUTF8ContinuationByte(str[lower + length])));
 
     if (lower >= str.length()) {
         // If lower > str.length() then string::substr() will throw out_of_range, so return an
@@ -3955,7 +3947,7 @@ Value ExpressionSubstrCP::evaluate(const Document& root) const {
         }
         uassert(34456,
                 str::stream() << getOpName() << ": invalid UTF-8 string",
-                !isContinuationByte(str[startIndexBytes]));
+                !str::isUTF8ContinuationByte(str[startIndexBytes]));
         size_t codePointLength = getCodePointLength(str[startIndexBytes]);
         uassert(
             34457, str::stream() << getOpName() << ": invalid UTF-8 string", codePointLength <= 4);
@@ -3967,7 +3959,7 @@ Value ExpressionSubstrCP::evaluate(const Document& root) const {
     for (int i = 0; i < length && endIndexBytes < str.size(); i++) {
         uassert(34458,
                 str::stream() << getOpName() << ": invalid UTF-8 string",
-                !isContinuationByte(str[endIndexBytes]));
+                !str::isUTF8ContinuationByte(str[endIndexBytes]));
         size_t codePointLength = getCodePointLength(str[endIndexBytes]);
         uassert(
             34459, str::stream() << getOpName() << ": invalid UTF-8 string", codePointLength <= 4);
@@ -4016,11 +4008,7 @@ Value ExpressionStrLenCP::evaluate(const Document& root) const {
             val.getType() == String);
 
     std::string stringVal = val.getString();
-
-    size_t strLen = 0;
-    for (char byte : stringVal) {
-        strLen += !isContinuationByte(byte);
-    }
+    size_t strLen = str::lengthInUTF8CodePoints(stringVal);
 
     uassert(34472,
             "string length could not be represented as an int.",
