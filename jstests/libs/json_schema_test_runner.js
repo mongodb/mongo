@@ -20,11 +20,12 @@
         const valid = test["valid"];
 
         coll.drop();
-        assert.writeOK(coll.insert({foo: data}));
+        assert.writeOK(coll.insert({schema_test_wrapper: data}));
 
         let actualCount;
         try {
-            actualCount = coll.find({$jsonSchema: {properties: {foo: schema}}}).itcount();
+            actualCount =
+                coll.find({$jsonSchema: {properties: {schema_test_wrapper: schema}}}).itcount();
         } catch (e) {
             throw new Error(tojson(e) + ": Failed to parse JSON Schema " + tojson(schema) +
                             " and data : " + tojson(data));

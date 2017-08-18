@@ -1009,5 +1009,122 @@ TEST(JSONSchemaParserTest, MaxItemsTranslatesCorrectlyWithNonArrayType) {
             }]
     }]})"));
 }
+
+TEST(JSONSchemaParserTest, RequiredFailsToParseIfNotAnArray) {
+    BSONObj schema = fromjson("{required: 'field'}");
+    auto result = JSONSchemaParser::parse(schema);
+    ASSERT_EQ(result.getStatus(), ErrorCodes::TypeMismatch);
+}
+
+TEST(JSONSchemaParserTest, RequiredFailsToParseArrayIsEmpty) {
+    BSONObj schema = fromjson("{required: []}");
+    auto result = JSONSchemaParser::parse(schema);
+    ASSERT_EQ(result.getStatus(), ErrorCodes::FailedToParse);
+}
+
+TEST(JSONSchemaParserTest, RequiredFailsToParseIfArrayContainsNonString) {
+    BSONObj schema = fromjson("{required: ['foo', 1]}");
+    auto result = JSONSchemaParser::parse(schema);
+    ASSERT_EQ(result.getStatus(), ErrorCodes::TypeMismatch);
+}
+
+TEST(JSONSchemaParserTest, RequiredFailsToParseIfArrayContainsDuplicates) {
+    BSONObj schema = fromjson("{required: ['foo', 'bar', 'foo']}");
+    auto result = JSONSchemaParser::parse(schema);
+    ASSERT_EQ(result.getStatus(), ErrorCodes::FailedToParse);
+}
+
+TEST(JSONSchemaParserTest, TopLevelRequiredTranslatesCorrectly) {
+    BSONObj schema = fromjson("{required: ['foo', 'bar']}");
+    auto result = JSONSchemaParser::parse(schema);
+    ASSERT_OK(result.getStatus());
+    ASSERT_SERIALIZES_TO(
+        result.getValue().get(),
+        fromjson("{$and: [{$and: [{bar: {$exists: true}}, {foo: {$exists: true}}]}]}"));
+}
+
+TEST(JSONSchemaParserTest, TopLevelRequiredTranslatesCorrectlyWithProperties) {
+    BSONObj schema = fromjson("{required: ['foo'], properties: {foo: {type: 'number'}}}");
+    auto result = JSONSchemaParser::parse(schema);
+    ASSERT_OK(result.getStatus());
+    ASSERT_SERIALIZES_TO(result.getValue().get(), fromjson(R"(
+        {$and: [
+            {$and: [{$and: [{foo: {$_internalSchemaType: 'number'}}]}]},
+            {$and: [{foo: {$exists: true}}]}
+        ]
+    })"));
+}
+
+TEST(JSONSchemaParserTest, RequiredTranslatesCorrectlyInsideProperties) {
+    BSONObj schema = fromjson("{properties: {x: {required: ['y']}}}");
+    auto result = JSONSchemaParser::parse(schema);
+    ASSERT_OK(result.getStatus());
+    ASSERT_SERIALIZES_TO(result.getValue().get(), fromjson(R"(
+        {
+            $and: [{
+                $and: [{
+                    $or: [
+                        {$nor: [{x: {$exists: true}}]},
+                        {
+                          $and: [{
+                              $or: [
+                                  {$nor: [{x: {$_internalSchemaType: 3}}]},
+                                  {
+                                    $and:
+                                        [{x: {$_internalSchemaObjectMatch: {y: {$exists: true}}}}]
+                                  }
+                              ]
+                          }]
+                        }
+                    ]
+                }]
+            }]
+        }
+    )"));
+}
+
+TEST(JSONSchemaParserTest, RequiredTranslatesCorrectlyInsidePropertiesWithSiblingProperties) {
+    BSONObj schema =
+        fromjson("{properties: {x:{required: ['y'], properties: {y: {type: 'number'}}}}}");
+    auto result = JSONSchemaParser::parse(schema);
+    ASSERT_OK(result.getStatus());
+    ASSERT_SERIALIZES_TO(result.getValue().get(), fromjson(R"(
+        {
+            $and: [{
+                $and: [{
+                    $or: [
+                        {$nor: [{x: {$exists: true}}]},
+                        {
+                          $and: [
+                              {
+                                $or: [
+                                    {$nor: [{x: {$_internalSchemaType: 3}}]},
+                                    {
+                                      x: {
+                                          $_internalSchemaObjectMatch:
+                                           {$and: [{$and: [{y: {$_internalSchemaType: 'number'}}]}]}
+                                      }
+                                    }
+                                ]
+                              },
+                              {
+                                $or: [
+                                    {$nor: [{x: {$_internalSchemaType: 3}}]},
+                                    {
+                                      $and: [{
+                                          x: {$_internalSchemaObjectMatch: {y: {$exists: true}}}
+                                      }]
+                                    }
+                                ]
+                              }
+                          ]
+                        }
+                    ]
+                }]
+            }]
+        }
+    )"));
+}
+
 }  // namespace
 }  // namespace mongo
