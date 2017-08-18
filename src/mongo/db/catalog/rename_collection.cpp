@@ -52,6 +52,7 @@
 #include "mongo/db/repl/replication_coordinator_global.h"
 #include "mongo/db/s/collection_sharding_state.h"
 #include "mongo/db/service_context.h"
+#include "mongo/util/log.h"
 #include "mongo/util/scopeguard.h"
 
 namespace mongo {
@@ -78,6 +79,13 @@ Status renameCollectionCommon(OperationContext* opCtx,
                               OptionalCollectionUUID targetUUID,
                               repl::OpTime renameOpTimeFromApplyOps,
                               const RenameCollectionOptions& options) {
+    // A valid 'renameOpTimeFromApplyOps' is not allowed when writes are replicated.
+    if (!renameOpTimeFromApplyOps.isNull() && opCtx->writesAreReplicated()) {
+        return Status(
+            ErrorCodes::BadValue,
+            "renameCollection() cannot accept a rename optime when writes are replicated.");
+    }
+
     DisableDocumentValidation validationDisabler(opCtx);
 
     boost::optional<Lock::GlobalWrite> globalWriteLock;
@@ -187,6 +195,18 @@ Status renameCollectionCommon(OperationContext* opCtx,
             auto dropTargetUUID = targetColl->uuid();
             auto renameOpTime = opObserver->onRenameCollection(
                 opCtx, source, target, sourceUUID, true, dropTargetUUID, {}, options.stayTemp);
+
+            if (!renameOpTimeFromApplyOps.isNull()) {
+                // 'renameOpTime' must be null because a valid 'renameOpTimeFromApplyOps' implies
+                // replicated writes are not enabled.
+                if (!renameOpTime.isNull()) {
+                    severe() << "renameCollection: " << source << " to " << target
+                             << " (with dropTarget=true) - unexpected renameCollection oplog entry"
+                             << " written to the oplog with optime " << renameOpTime;
+                    fassertFailed(40616);
+                }
+                renameOpTime = renameOpTimeFromApplyOps;
+            }
 
             // No logOp necessary because the entire renameCollection command is one logOp.
             repl::UnreplicatedWritesBlock uwb(opCtx);
