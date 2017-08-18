@@ -63,11 +63,22 @@ void UUIDCatalog::onDropCollection(OperationContext* opCtx, CollectionUUID uuid)
 }
 
 void UUIDCatalog::onRenameCollection(OperationContext* opCtx,
-                                     Collection* newColl,
+                                     GetNewCollectionFunction getNewCollection,
                                      CollectionUUID uuid) {
     Collection* oldColl = removeUUIDCatalogEntry(uuid);
-    registerUUIDCatalogEntry(uuid, newColl);
+    opCtx->recoveryUnit()->onCommit([this, getNewCollection, uuid] {
+        // Reset current UUID entry in case some other operation updates the UUID catalog before the
+        // WUOW is committed. registerUUIDCatalogEntry() is a no-op if there's an existing UUID
+        // entry.
+        removeUUIDCatalogEntry(uuid);
+        auto newColl = getNewCollection();
+        invariant(newColl);
+        registerUUIDCatalogEntry(uuid, newColl);
+    });
     opCtx->recoveryUnit()->onRollback([this, oldColl, uuid] {
+        // Reset current UUID entry in case some other operation updates the UUID catalog before the
+        // WUOW is rolled back. registerUUIDCatalogEntry() is a no-op if there's an existing UUID
+        // entry.
         removeUUIDCatalogEntry(uuid);
         registerUUIDCatalogEntry(uuid, oldColl);
     });

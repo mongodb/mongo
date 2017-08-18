@@ -527,11 +527,14 @@ repl::OpTime OpObserverImpl::onRenameCollection(OperationContext* opCtx,
 
     // Finally update the UUID Catalog.
     if (uuid) {
-        auto db = dbHolder().get(opCtx, toCollection.db());
-        auto newColl = db->getCollection(opCtx, toCollection);
-        invariant(newColl);
+        auto getNewCollection = [opCtx, toCollection] {
+            auto db = dbHolder().get(opCtx, toCollection.db());
+            auto newColl = db->getCollection(opCtx, toCollection);
+            invariant(newColl);
+            return newColl;
+        };
         UUIDCatalog& catalog = UUIDCatalog::get(opCtx);
-        catalog.onRenameCollection(opCtx, newColl, uuid.get());
+        catalog.onRenameCollection(opCtx, getNewCollection, uuid.get());
     }
 
     return renameOpTime;

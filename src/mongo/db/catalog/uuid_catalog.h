@@ -33,6 +33,7 @@
 #include "mongo/base/disallow_copying.h"
 #include "mongo/db/catalog/collection.h"
 #include "mongo/db/service_context.h"
+#include "mongo/stdx/functional.h"
 #include "mongo/util/uuid.h"
 
 namespace mongo {
@@ -66,8 +67,13 @@ public:
 
     /**
      * Combination of onDropCollection and onCreateCollection.
+     * 'getNewCollection' is a function that returns collection to be registered when the current
+     * write unit of work is committed.
      */
-    void onRenameCollection(OperationContext* opCtx, Collection* newColl, CollectionUUID uuid);
+    using GetNewCollectionFunction = stdx::function<Collection*()>;
+    void onRenameCollection(OperationContext* opCtx,
+                            GetNewCollectionFunction getNewCollection,
+                            CollectionUUID uuid);
 
     /**
      * Implies onDropCollection for all collections in db, but is not transactional.
