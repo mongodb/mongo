@@ -812,7 +812,7 @@ void renameOutOfTheWay(OperationContext* opCtx, RenameCollectionInfo info, Datab
     // Renaming the collection that was clashing with the attempted rename
     // operation to a different collection name.
     auto renameStatus = renameCollectionForApplyOps(
-        opCtx, db->name(), tempRenameCollUUID.getField("uuid"), tempRenameCmd.obj());
+        opCtx, db->name(), tempRenameCollUUID.getField("uuid"), tempRenameCmd.obj(), {});
 
     if (!renameStatus.isOK()) {
         severe() << "Unable to rename collection " << info.renameTo << " out of the way to "
@@ -839,7 +839,7 @@ void rollbackRenameCollection(OperationContext* opCtx, UUID uuid, RenameCollecti
     cmd.append("dropTarget", false);
     BSONObj obj = cmd.obj();
 
-    auto status = renameCollectionForApplyOps(opCtx, dbName, ui.getField("uuid"), obj);
+    auto status = renameCollectionForApplyOps(opCtx, dbName, ui.getField("uuid"), obj, {});
 
     // If we try to roll back a collection to a collection name that currently exists
     // because another collection was renamed or created with the same collection name,
@@ -850,7 +850,7 @@ void rollbackRenameCollection(OperationContext* opCtx, UUID uuid, RenameCollecti
 
         // Retrying to renameCollection command again now that the conflicting
         // collection has been renamed out of the way.
-        status = renameCollectionForApplyOps(opCtx, dbName, ui.getField("uuid"), obj);
+        status = renameCollectionForApplyOps(opCtx, dbName, ui.getField("uuid"), obj, {});
 
         if (!status.isOK()) {
             severe() << "Rename collection failed to roll back twice. We were unable to rename "

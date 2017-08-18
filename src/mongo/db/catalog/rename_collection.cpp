@@ -76,6 +76,7 @@ Status renameCollectionCommon(OperationContext* opCtx,
                               const NamespaceString& source,
                               const NamespaceString& target,
                               OptionalCollectionUUID targetUUID,
+                              repl::OpTime renameOpTimeFromApplyOps,
                               const RenameCollectionOptions& options) {
     DisableDocumentValidation validationDisabler(opCtx);
 
@@ -349,14 +350,15 @@ Status renameCollection(OperationContext* opCtx,
                         const NamespaceString& target,
                         const RenameCollectionOptions& options) {
     OptionalCollectionUUID noTargetUUID;
-    return renameCollectionCommon(opCtx, source, target, noTargetUUID, options);
+    return renameCollectionCommon(opCtx, source, target, noTargetUUID, {}, options);
 }
 
 
 Status renameCollectionForApplyOps(OperationContext* opCtx,
                                    const std::string& dbName,
                                    const BSONElement& ui,
-                                   const BSONObj& cmd) {
+                                   const BSONObj& cmd,
+                                   const repl::OpTime& renameOpTime) {
 
     const auto sourceNsElt = cmd.firstElement();
     const auto targetNsElt = cmd["to"];
@@ -412,6 +414,6 @@ Status renameCollectionForApplyOps(OperationContext* opCtx,
     RenameCollectionOptions options;
     options.dropTarget = cmd["dropTarget"].trueValue();
     options.stayTemp = cmd["stayTemp"].trueValue();
-    return renameCollectionCommon(opCtx, sourceNss, targetNss, targetUUID, options);
+    return renameCollectionCommon(opCtx, sourceNss, targetNss, targetUUID, renameOpTime, options);
 }
 }  // namespace mongo
