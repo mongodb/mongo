@@ -76,6 +76,18 @@ namespace mongo {
 
 namespace {
 
+// Because the hostname having a slash is used by `mongo::SockAddr` to determine if a hostname is a
+// Unix Domain Socket endpoint, this function uses the same logic.  (See
+// `mongo::SockAddr::Sockaddr(StringData, int, sa_family_t)`).  A user explicitly specifying a Unix
+// Domain Socket in the present working directory, through a code path which supplies `sa_family_t`
+// as `AF_UNIX` will cause this code to lie.  This will, in turn, cause the
+// `SSLManager::parseAndValidatePeerCertificate` code to believe a socket is a host, which will then
+// cause a connection failure if and only if that domain socket also has a certificate for SSL and
+// the connection is an SSL connection.
+bool isUnixDomainSocket(const std::string& hostname) {
+    return end(hostname) != std::find(begin(hostname), end(hostname) '/');
+}
+
 const transport::Session::Decoration<SSLPeerInfo> peerInfoForSession =
     transport::Session::declareDecoration<SSLPeerInfo>();
 
@@ -1386,7 +1398,7 @@ StatusWith<boost::optional<SSLPeerInfo>> SSLManager::parseAndValidatePeerCertifi
         msgBuilder << "The server certificate does not match the host name. Hostname: "
                    << remoteHost << " does not match " << certificateNames.str();
         std::string msg = msgBuilder.str();
-        if (_allowInvalidCertificates || _allowInvalidHostnames) {
+        if (_allowInvalidCertificates || _allowInvalidHostnames || isUnixDomainSocket(remoteHost)) {
             warning() << msg;
         } else {
             error() << msg;
