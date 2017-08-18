@@ -538,8 +538,7 @@ retry:	if (F_ISSET(clsm, WT_CLSM_MERGE)) {
 				chunk = lsm_tree->chunk[ngood - 1];
 				clsm->chunks[ngood - 1]->switch_txn =
 				    chunk->switch_txn;
-				if (__wt_txn_visible_all(
-				    session, chunk->switch_txn, NULL))
+				if (__wt_lsm_chunk_visible_all(session, chunk))
 					break;
 			}
 		} else {

@@ -97,6 +97,11 @@ struct __wt_lsm_chunk {
 					 * out, or by compact to get the most
 					 * recent chunk flushed.
 					 */
+	WT_DECL_TIMESTAMP(switch_timestamp)/*
+					 * The timestamp used to decide when
+					 * updates need to detect conflicts.
+					 */
+	WT_SPINLOCK timestamp_spinlock;
 
 	uint32_t id;			/* ID used to generate URIs */
 	uint32_t generation;		/* Merge generation */
@@ -107,10 +112,11 @@ struct __wt_lsm_chunk {
 	int8_t evicted;			/* 1/0: in-memory chunk was evicted */
 	uint8_t flushing;		/* 1/0: chunk flush in progress */
 
-#define	WT_LSM_CHUNK_BLOOM	0x01
-#define	WT_LSM_CHUNK_MERGING	0x02
-#define	WT_LSM_CHUNK_ONDISK	0x04
-#define	WT_LSM_CHUNK_STABLE	0x08
+#define	WT_LSM_CHUNK_BLOOM		0x01
+#define	WT_LSM_CHUNK_HAS_TIMESTAMP	0x02
+#define	WT_LSM_CHUNK_MERGING		0x04
+#define	WT_LSM_CHUNK_ONDISK		0x08
+#define	WT_LSM_CHUNK_STABLE		0x10
 	uint32_t flags;
 };
 

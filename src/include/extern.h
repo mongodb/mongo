@@ -478,6 +478,7 @@ extern int __wt_lsm_tree_worker(WT_SESSION_IMPL *session, const char *uri, int (
 extern int __wt_lsm_get_chunk_to_flush(WT_SESSION_IMPL *session, WT_LSM_TREE *lsm_tree, bool force, WT_LSM_CHUNK **chunkp) WT_GCC_FUNC_DECL_ATTRIBUTE((warn_unused_result));
 extern int __wt_lsm_work_switch( WT_SESSION_IMPL *session, WT_LSM_WORK_UNIT **entryp, bool *ran) WT_GCC_FUNC_DECL_ATTRIBUTE((warn_unused_result));
 extern int __wt_lsm_work_bloom(WT_SESSION_IMPL *session, WT_LSM_TREE *lsm_tree) WT_GCC_FUNC_DECL_ATTRIBUTE((warn_unused_result));
+extern bool __wt_lsm_chunk_visible_all( WT_SESSION_IMPL *session, WT_LSM_CHUNK *chunk);
 extern int __wt_lsm_checkpoint_chunk(WT_SESSION_IMPL *session, WT_LSM_TREE *lsm_tree, WT_LSM_CHUNK *chunk) WT_GCC_FUNC_DECL_ATTRIBUTE((warn_unused_result));
 extern int __wt_lsm_free_chunks(WT_SESSION_IMPL *session, WT_LSM_TREE *lsm_tree) WT_GCC_FUNC_DECL_ATTRIBUTE((warn_unused_result));
 extern int __wt_lsm_worker_start(WT_SESSION_IMPL *session, WT_LSM_WORKER_ARGS *args) WT_GCC_FUNC_DECL_ATTRIBUTE((warn_unused_result));
