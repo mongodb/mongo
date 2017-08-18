@@ -3314,7 +3314,6 @@ const char *wiredtiger_version(int *majorp, int *minorp, int *patchp)
  * Error returns
  *******************************************/
 /*!
- * @anchor error_returns
  * @name Error returns
  * Most functions and methods in WiredTiger return an integer code indicating
  * whether the operation succeeded or failed.  A return of zero indicates

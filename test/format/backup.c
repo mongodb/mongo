@@ -36,6 +36,7 @@ static void
 check_copy(void)
 {
 	WT_CONNECTION *conn;
+	WT_DECL_RET;
 	WT_SESSION *session;
 
 	wts_open(g.home_backup, false, &conn);
@@ -44,9 +45,14 @@ check_copy(void)
 	    conn->open_session(conn, NULL, NULL, &session),
 	    "%s", g.home_backup);
 
-	testutil_checkfmt(
-	    session->verify(session, g.uri, NULL),
-	    "%s: %s", g.home_backup, g.uri);
+	/*
+	 * Verify can return EBUSY if the handle isn't available. Don't yield
+	 * and retry, in the case of LSM, the handle may not be available for
+	 * a long time.
+	 */
+	ret = session->verify(session, g.uri, NULL);
+	testutil_assertfmt(ret == 0 || ret == EBUSY,
+	    "WT_SESSION.verify: %s: %s", g.home_backup, g.uri);
 
 	testutil_checkfmt(conn->close(conn, NULL), "%s", g.home_backup);
 }

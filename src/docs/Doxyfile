@@ -206,8 +206,8 @@ TAB_SIZE               = 8
 # You can put \n's in the value part of an alias to insert newlines.
 
 ALIASES                = "notyet{1}=Note: <b>"\1"</b> not yet supported in WiredTiger.\n@todo fix when \1 supported\n\n" \
-                         "errors=@returns zero on success and a non-zero error code on failure.  See @ref error_returns \"Error Returns\" for details." \
-                         "ebusy_errors=@returns zero on success, EBUSY if there are open cursors on the object and a non-zero error code on failure.  See @ref error_returns \"Error Returns\" for details." \
+                         "errors=@returns zero on success and a non-zero error code on failure.  See @ref error_handling \"Error handling\" for details." \
+                         "ebusy_errors=@returns zero on success, EBUSY if the object is not available for exclusive access, and a non-zero error code on failure.  See @ref error_handling \"Error handling\" for details." \
                          "ex_ref{1}=@ref \1 \"\1\"" \
                          "ref_single=@ref" \
                          "subpage_single=@subpage" \
