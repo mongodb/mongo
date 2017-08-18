@@ -75,6 +75,7 @@ env.Library(
         'move_timing_helper.cpp',
         'namespace_metadata_change_notifications.cpp',
         'operation_sharding_state.cpp',
+        'session_catalog_migration_source.cpp',
         'read_only_catalog_cache_loader.cpp',
         'shard_identity_rollback_notifier.cpp',
         'shard_metadata_util.cpp',
@@ -330,3 +331,15 @@ env.CppUnitTest(
         'split_vector',
     ]
 )
+
+env.CppUnitTest(
+    target='session_catalog_migration_source_test',
+    source=[
+        'session_catalog_migration_source_test.cpp',
+    ],
+    LIBDEPS=[
+        '$BUILD_DIR/mongo/db/repl/mock_repl_coord_server_fixture',
+        'sharding',
+    ]
+)
+
