@@ -11,10 +11,12 @@ from __future__ import print_function
 import collections
 import datetime
 import itertools
+import logging
 import operator
 import optparse
 import os
 import sys
+import time
 import warnings
 
 try:
@@ -23,8 +25,10 @@ except ImportError:
     from urllib.parse import urlparse
 
 import requests
+import requests.exceptions
 import yaml
 
+LOGGER = logging.getLogger(__name__)
 
 if sys.version_info[0] == 2:
     _STRING_TYPES = (basestring,)
@@ -342,6 +346,8 @@ class TestHistory(object):
     # revisions.
     DEFAULT_LIMIT = 20
 
+    DEFAULT_NUM_RETRIES = 5
+
     _MISSING_DISTRO = Missing("distro")
 
     def __init__(self,
@@ -366,6 +372,9 @@ class TestHistory(object):
         self._tasks = tasks if tasks is not None else []
         self._variants = variants if variants is not None else []
         self._distros = distros if distros is not None else []
+
+        # The number of API call retries on error. It can be set to 0 to disable the feature.
+        self.num_retries = TestHistory.DEFAULT_NUM_RETRIES
 
         self._test_history_url = "{api_server}/rest/v1/projects/{project}/test_history".format(
             api_server=api_server,
@@ -395,10 +404,8 @@ class TestHistory(object):
         # pagination by making subsequent requests using "afterRevision".
         while start_revision != end_revision:
             params["afterRevision"] = start_revision
-            response = requests.get(url=self._test_history_url, params=params)
-            response.raise_for_status()
 
-            test_results = response.json()
+            test_results = self._get_history(params)
             if not test_results:
                 break
 
@@ -443,10 +450,8 @@ class TestHistory(object):
         # duplicate test results.
         while True:
             params["afterDate"] = start_time
-            response = requests.get(url=self._test_history_url, params=params)
-            response.raise_for_status()
 
-            test_results = response.json()
+            test_results = self._get_history(params)
             if not test_results:
                 break
 
@@ -461,6 +466,49 @@ class TestHistory(object):
                 break
 
         return list(history_data)
+
+    def _get_history(self, params):
+        """
+        Calls the test_history API endpoint with the given parameters and returns the JSON result.
+
+        The API calls will be retried on HTTP and connection errors.
+        """
+        retries = 0
+        while True:
+            try:
+                LOGGER.debug("Request to the test_history endpoint")
+                start = time.time()
+                response = requests.get(url=self._test_history_url, params=params)
+                LOGGER.debug("Request took %fs", round(time.time() - start, 2))
+                response.raise_for_status()
+                return self._get_json(response)
+            except (requests.exceptions.HTTPError,
+                    requests.exceptions.ConnectionError, JSONResponseError) as err:
+                if isinstance(err, JSONResponseError):
+                    err = err.cause
+                retries += 1
+                LOGGER.error("Error while querying the test_history API: %s", str(err))
+                if retries > self.num_retries:
+                    raise err
+                # We use 'retries' as the value for the backoff duration to space out the
+                # requests when doing multiple retries.
+                backoff_secs = retries
+                LOGGER.info("Retrying after %ds", backoff_secs)
+                time.sleep(backoff_secs)
+            except:
+                LOGGER.exception("Unexpected error while querying the test_history API"
+                                 " with params: %s", params)
+                raise
+
+    @staticmethod
+    def _get_json(response):
+        try:
+            return response.json()
+        except ValueError as err:
+            # ValueError can be raised if the connection is interrupted and we receive a truncated
+            # json response. We raise a JSONResponseError instead to distinguish this error from
+            # other ValueErrors.
+            raise JSONResponseError(err)
 
     def _process_test_result(self, test_result):
         """
@@ -549,6 +597,15 @@ class TestHistory(object):
         }
 
 
+class JSONResponseError(Exception):
+    """An exception raised when failing to decode the JSON from an Evergreen response."""
+
+    def __init__(self, cause):
+        """Initializes the JSONResponseError with the exception raised by the requests library
+        when decoding the response."""
+        self.cause = cause
+
+
 def main():
     """
     Utility computing test failure rates from the Evergreen API.
@@ -623,6 +680,12 @@ def main():
                       default="",
                       help="Comma-separated list of Evergreen build distros to analyze.")
 
+    parser.add_option("--numRequestRetries", dest="num_request_retries",
+                      metavar="<num-request-retries>",
+                      default=TestHistory.DEFAULT_NUM_RETRIES,
+                      help=("The number of times a request to the Evergreen API will be retried on"
+                            " failure. Defaults to '%default'."))
+
     (options, tests) = parser.parse_args()
 
     for (option_name, option_dest) in (("--sinceDate", "since_date"),
@@ -692,6 +755,7 @@ def main():
                                tasks=options.tasks.split(","),
                                variants=options.variants.split(","),
                                distros=options.distros.split(","))
+    test_history.num_retries = options.num_request_retries
 
     if options.since_revision:
         history_data = test_history.get_history_by_revision(
