@@ -80,7 +80,7 @@
             },
 
             // minvalid:
-            t: term,
+            t: NumberLong(term),
             ts: ts(minValid),
         };
 
@@ -251,114 +251,6 @@
     });
 
     //
-    // 3.2 -> 3.4 upgrade cases
-    //
-
-    runTest({
-        oplogEntries: [1, 2, 3],
-        collectionContents: [1, 2, 3],
-        deletePoint: null,
-        begin: 3,
-        minValid: 6,
-        expectedState: 'RECOVERING',
-        expectedApplied: [1, 2, 3],
-    });
-
-    runTest({
-        oplogEntries: [1, 2, 3, 4, 5],
-        collectionContents: [1, 2, 3],
-        deletePoint: null,
-        begin: 3,
-        minValid: 6,
-        expectedState: 'RECOVERING',
-        expectedApplied: [1, 2, 3, 4, 5],
-    });
-
-    runTest({
-        oplogEntries: [1, 2, 3, 4, 5],
-        collectionContents: [1, 2, 3, 4, 5],
-        deletePoint: null,
-        begin: null,
-        minValid: 6,
-        expectedState: 'RECOVERING',
-        expectedApplied: [1, 2, 3, 4, 5],
-    });
-
-    //
-    // 3.4 -> 3.2 -> 3.4 downgrade/reupgrade cases
-    //
-
-    runTest({
-        oplogEntries: [1, 2, 3],
-        collectionContents: [1, 2, 3],
-        deletePoint: 4,
-        begin: 3,
-        minValid: 6,
-        expectedState: 'RECOVERING',
-        expectedApplied: [1, 2, 3],
-    });
-
-    runTest({
-        oplogEntries: [1, 2, 3, 4, 5],
-        collectionContents: [1, 2, 3],
-        deletePoint: 4,
-        begin: 3,
-        minValid: 6,
-        expectedState: 'RECOVERING',
-        expectedApplied: [1, 2, 3],
-    });
-
-    runTest({
-        oplogEntries: [1, 2, 3, /*4,*/ 5, 6],
-        collectionContents: [1, 2, 3],
-        deletePoint: 4,
-        begin: 3,
-        minValid: 6,
-        expectedState: 'RECOVERING',
-        expectedApplied: [1, 2, 3],
-    });
-
-    runTest({
-        oplogEntries: [1, 2, 3],
-        collectionContents: [1, 2, 3],
-        deletePoint: 2,
-        begin: null,
-        minValid: 3,
-        expectedState: 'SECONDARY',
-        expectedApplied: [1, 2, 3],
-    });
-
-    runTest({
-        oplogEntries: [1, 2, 3],
-        collectionContents: [1, 2, 3],
-        deletePoint: 2,
-        begin: 3,
-        minValid: 6,
-        expectedState: 'RECOVERING',
-        expectedApplied: [1, 2, 3],
-    });
-
-    runTest({
-        oplogEntries: [1, 2, 3, 4, 5],
-        collectionContents: [1, 2, 3],
-        deletePoint: 2,
-        begin: 3,
-        minValid: 6,
-        expectedState: 'RECOVERING',
-        expectedApplied: [1, 2, 3, 4, 5],
-    });
-
-    runTest({
-        oplogEntries: [1, 2, 3, 4, 5, 6],
-        collectionContents: [1, 2, 3],
-        deletePoint: 2,
-        begin: 3,
-        minValid: 6,
-        expectedState: 'SECONDARY',
-        expectedApplied: [1, 2, 3, 4, 5, 6],
-    });
-
-    //
     // These states should be impossible to get into.
     //
 
@@ -387,16 +279,6 @@
         begin: 3,
         minValid: null,  // doesn't matter.
         expectedState: 'FATAL',
-    });
-
-    runTest({
-        oplogEntries: [1, 2, 3, 4, 5, 6],
-        collectionContents: [1, 2, 3],
-        deletePoint: 2,
-        begin: 3,
-        minValid: 3,
-        expectedState: 'SECONDARY',
-        expectedApplied: [1, 2, 3, 4, 5, 6],
     });
 
     runTest({
