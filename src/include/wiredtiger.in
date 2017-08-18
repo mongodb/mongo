@@ -1543,7 +1543,7 @@ struct __wt_session {
 	 * @snippet ex_all.c Reset the session
 	 *
 	 * @param session the session handle
-	 * @ebusy_errors
+	 * @errors
 	 */
 	int __F(reset)(WT_SESSION *session);
 
