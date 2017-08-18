@@ -1055,7 +1055,7 @@ TEST_F(SetNodeTest, ApplyCannotOverwriteImmutablePath) {
         node.apply(getApplyParams(doc.root()["a"]["b"])),
         AssertionException,
         ErrorCodes::ImmutableField,
-        "Updating the path 'a.b' to b: 1 would modify the immutable field 'a.b'");
+        "Performing an update on the path 'a.b' would modify the immutable field 'a.b'");
 }
 
 TEST_F(SetNodeTest, ApplyCanPerformNoopOnImmutablePath) {
@@ -1179,7 +1179,7 @@ TEST_F(SetNodeTest, ApplyCannotOverwriteSuffixOfImmutablePath) {
         node.apply(getApplyParams(doc.root()["a"]["b"]["c"])),
         AssertionException,
         ErrorCodes::ImmutableField,
-        "Updating the path 'a.b.c' to c: 1 would modify the immutable field 'a.b'");
+        "Performing an update on the path 'a.b.c' would modify the immutable field 'a.b'");
 }
 
 TEST_F(SetNodeTest, ApplyCanPerformNoopOnSuffixOfImmutablePath) {

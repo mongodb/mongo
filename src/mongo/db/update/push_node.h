@@ -32,13 +32,13 @@
 #include <limits>
 #include <vector>
 
-#include "mongo/db/update/path_creating_node.h"
+#include "mongo/db/update/modifier_node.h"
 #include "mongo/db/update/push_sorter.h"
 #include "mongo/stdx/memory.h"
 
 namespace mongo {
 
-class PushNode final : public PathCreatingNode {
+class PushNode final : public ModifierNode {
 public:
     PushNode()
         : _slice(std::numeric_limits<long long>::max()),
@@ -57,27 +57,40 @@ public:
     }
 
 protected:
-    UpdateExistingElementResult updateExistingElement(mutablebson::Element* element,
-                                                      std::shared_ptr<FieldRef> elementPath,
-                                                      LogBuilder* logBuilder) const final;
+    ModifyResult updateExistingElement(mutablebson::Element* element,
+                                       std::shared_ptr<FieldRef> elementPath) const final;
     void setValueForNewElement(mutablebson::Element* element) const final;
+    void logUpdate(LogBuilder* logBuilder,
+                   StringData pathTaken,
+                   mutablebson::Element element,
+                   ModifyResult modifyResult) const final;
+
+    bool allowCreation() const final {
+        return true;
+    }
+
 
 private:
-    /**
-     * Used to describe the result of the PerformPush operation. Note that appending to any empty
-     * array is always considered kModifyArray. That's because we want $push onto an empty to array
-     * to trigger a log entry with a $set on the entire array.
-     */
-    enum class PushResult {
-        kNoOp,                // The array is left exactly as it was.
-        kAppendToEndOfArray,  // The only change to the array is items appended to the end.
-        kModifyArray          // Any other modification of the array.
-    };
+    // A helper for performPush().
+    static ModifyResult insertElementsWithPosition(mutablebson::Element* array,
+                                                   long long position,
+                                                   const std::vector<BSONElement>& valuesToPush);
 
-    static PushResult insertElementsWithPosition(mutablebson::Element* array,
-                                                 long long position,
-                                                 const std::vector<BSONElement> valuesToPush);
-    PushResult performPush(mutablebson::Element* element, FieldRef* elementPath) const;
+    /**
+     * Inserts the elements from '_valuesToPush' in the 'element' array using '_position' to
+     * determine where to insert. This function also applies any '_slice' and or '_sort' that is
+     * specified. The return value of this function will indicate to logUpdate() what kind of oplog
+     * entries should be generated.
+     *
+     * Returns:
+     *   - ModifyResult::kNoOp if '_valuesToPush' is empty and no slice or sort gets performed;
+     *   - ModifyResult::kArrayAppendUpdate if the 'elements' array is initially non-empty, all
+     *     inserted values are appended to the end, and no slice or sort gets performed; or
+     *   - ModifyResult::kNormalUpdate if 'elements' is initially an empty array, values get
+     *     inserted at the beginning or in the middle of the array, or a slice or sort gets
+     *     performed.
+     */
+    ModifyResult performPush(mutablebson::Element* element, FieldRef* elementPath) const;
 
     static const StringData kEachClauseName;
     static const StringData kSliceClauseName;

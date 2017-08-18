@@ -32,24 +32,15 @@
 
 namespace mongo {
 
-UpdateNode::ApplyResult ArrayCullingNode::apply(ApplyParams applyParams) const {
-    if (!applyParams.pathToCreate->empty()) {
-        // There were path components we could not traverse. We treat this as a no-op, unless it
-        // would have been impossible to create those elements, which we check with
-        // checkViability().
-        UpdateLeafNode::checkViability(
-            applyParams.element, *(applyParams.pathToCreate), *(applyParams.pathTaken));
-
-        return ApplyResult::noopResult();
-    }
-
-    // This operation only applies to arrays
+ModifierNode::ModifyResult ArrayCullingNode::updateExistingElement(
+    mutablebson::Element* element, std::shared_ptr<FieldRef> elementPath) const {
+    invariant(element->ok());
     uassert(ErrorCodes::BadValue,
             "Cannot apply $pull to a non-array value",
-            applyParams.element.getType() == mongo::Array);
+            element->getType() == mongo::Array);
 
     size_t numRemoved = 0;
-    auto cursor = applyParams.element.leftChild();
+    auto cursor = element->leftChild();
     while (cursor.ok()) {
         // Make sure to get the next array element now, because if we remove the 'cursor' element,
         // the rightSibling pointer will be invalidated.
@@ -61,51 +52,18 @@ UpdateNode::ApplyResult ArrayCullingNode::apply(ApplyParams applyParams) const {
         cursor = nextElement;
     }
 
-    if (numRemoved == 0) {
-        return ApplyResult::noopResult();  // Skip the index check, immutable path check, and
-                                           // logging steps.
-    }
+    return (numRemoved == 0) ? ModifyResult::kNoOp : ModifyResult::kNormalUpdate;
+}
 
-    ApplyResult applyResult;
+void ArrayCullingNode::validateUpdate(mutablebson::ConstElement updatedElement,
+                                      mutablebson::ConstElement leftSibling,
+                                      mutablebson::ConstElement rightSibling,
+                                      std::uint32_t recursionLevel,
+                                      ModifyResult modifyResult) const {
+    invariant(modifyResult == ModifyResult::kNormalUpdate);
 
-    // Determine if indexes are affected.
-    if (!applyParams.indexData ||
-        !applyParams.indexData->mightBeIndexed(applyParams.pathTaken->dottedField())) {
-        applyResult.indexesAffected = false;
-    }
-
-    // No need to validate for storage, since we cannot have increased the BSON depth or interfered
-    // with a DBRef.
-
-    // Ensure we are not changing any immutable paths.
-    for (const auto& immutablePath : applyParams.immutablePaths) {
-        uassert(ErrorCodes::ImmutableField,
-                str::stream() << "Performing an update on the path '"
-                              << applyParams.pathTaken->dottedField()
-                              << "' would modify the immutable field '"
-                              << immutablePath->dottedField()
-                              << "'",
-                applyParams.pathTaken->commonPrefixSize(*immutablePath) <
-                    std::min(applyParams.pathTaken->numParts(), immutablePath->numParts()));
-    }
-
-    if (applyParams.logBuilder) {
-        auto& doc = applyParams.logBuilder->getDocument();
-        auto logElement = doc.makeElementArray(applyParams.pathTaken->dottedField());
-
-        for (auto cursor = applyParams.element.leftChild(); cursor.ok();
-             cursor = cursor.rightSibling()) {
-            dassert(cursor.hasValue());
-
-            auto copy = doc.makeElementWithNewFieldName(StringData(), cursor.getValue());
-            uassert(ErrorCodes::InternalError, "could not create copy element", copy.ok());
-            uassertStatusOK(logElement.pushBack(copy));
-        }
-
-        uassertStatusOK(applyParams.logBuilder->addToSets(logElement));
-    }
-
-    return applyResult;
+    // Removing elements from an array cannot increase BSON depth or modify a DBRef, so we can
+    // override validateUpdate to do nothing.
 }
 
 }  // namespace mongo

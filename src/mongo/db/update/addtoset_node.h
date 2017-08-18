@@ -28,7 +28,7 @@
 
 #pragma once
 
-#include "mongo/db/update/path_creating_node.h"
+#include "mongo/db/update/modifier_node.h"
 #include "mongo/stdx/memory.h"
 
 namespace mongo {
@@ -36,7 +36,7 @@ namespace mongo {
 /**
  * Represents the application of an $addToSet to the value at the end of a path.
  */
-class AddToSetNode : public PathCreatingNode {
+class AddToSetNode : public ModifierNode {
 public:
     Status init(BSONElement modExpr, const CollatorInterface* collator) final;
 
@@ -47,10 +47,13 @@ public:
     void setCollator(const CollatorInterface* collator) final;
 
 protected:
-    UpdateExistingElementResult updateExistingElement(mutablebson::Element* element,
-                                                      std::shared_ptr<FieldRef> elementPath,
-                                                      LogBuilder* logBuilder) const final;
+    ModifyResult updateExistingElement(mutablebson::Element* element,
+                                       std::shared_ptr<FieldRef> elementPath) const final;
     void setValueForNewElement(mutablebson::Element* element) const final;
+
+    bool allowCreation() const final {
+        return true;
+    }
 
 private:
     // The array of elements to be added.

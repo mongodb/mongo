@@ -51,7 +51,7 @@ DEATH_TEST(UnsetNodeTest, InitFailsForEmptyElement, "Invariant failure modExpr.o
     node.init(update["$unset"].embeddedObject().firstElement(), collator).transitional_ignore();
 }
 
-DEATH_TEST_F(UnsetNodeTest, ApplyToRootFails, "Invariant failure parent.ok()") {
+DEATH_TEST_F(UnsetNodeTest, ApplyToRootFails, "Invariant failure !applyParams.pathTaken->empty()") {
     auto update = fromjson("{$unset: {}}");
     const CollatorInterface* collator = nullptr;
     UnsetNode node;
@@ -369,10 +369,11 @@ TEST_F(UnsetNodeTest, ApplyCannotRemoveImmutablePath) {
     mutablebson::Document doc(fromjson("{a: {b: 1}}"));
     setPathTaken("a.b");
     addImmutablePath("a.b");
-    ASSERT_THROWS_CODE_AND_WHAT(node.apply(getApplyParams(doc.root()["a"]["b"])),
-                                AssertionException,
-                                ErrorCodes::ImmutableField,
-                                "Unsetting the path 'a.b' would modify the immutable field 'a.b'");
+    ASSERT_THROWS_CODE_AND_WHAT(
+        node.apply(getApplyParams(doc.root()["a"]["b"])),
+        AssertionException,
+        ErrorCodes::ImmutableField,
+        "Performing an update on the path 'a.b' would modify the immutable field 'a.b'");
 }
 
 TEST_F(UnsetNodeTest, ApplyCannotRemovePrefixOfImmutablePath) {
@@ -384,10 +385,11 @@ TEST_F(UnsetNodeTest, ApplyCannotRemovePrefixOfImmutablePath) {
     mutablebson::Document doc(fromjson("{a: {b: 1}}"));
     setPathTaken("a");
     addImmutablePath("a.b");
-    ASSERT_THROWS_CODE_AND_WHAT(node.apply(getApplyParams(doc.root()["a"])),
-                                AssertionException,
-                                ErrorCodes::ImmutableField,
-                                "Unsetting the path 'a' would modify the immutable field 'a.b'");
+    ASSERT_THROWS_CODE_AND_WHAT(
+        node.apply(getApplyParams(doc.root()["a"])),
+        AssertionException,
+        ErrorCodes::ImmutableField,
+        "Performing an update on the path 'a' would modify the immutable field 'a.b'");
 }
 
 TEST_F(UnsetNodeTest, ApplyCannotRemoveSuffixOfImmutablePath) {
@@ -403,7 +405,7 @@ TEST_F(UnsetNodeTest, ApplyCannotRemoveSuffixOfImmutablePath) {
         node.apply(getApplyParams(doc.root()["a"]["b"]["c"])),
         AssertionException,
         ErrorCodes::ImmutableField,
-        "Unsetting the path 'a.b.c' would modify the immutable field 'a.b'");
+        "Performing an update on the path 'a.b.c' would modify the immutable field 'a.b'");
 }
 
 TEST_F(UnsetNodeTest, ApplyCanRemoveImmutablePathIfNoop) {

@@ -47,73 +47,36 @@ Status PopNode::init(BSONElement modExpr, const CollatorInterface* collator) {
     return Status::OK();
 }
 
-UpdateNode::ApplyResult PopNode::apply(ApplyParams applyParams) const {
-    if (applyParams.pathTaken->empty()) {
-        // No components of the path existed. The pop is treated as a no-op in this case.
-        return ApplyResult::noopResult();
-    }
-
-    if (!applyParams.pathToCreate->empty()) {
-        // There were path components we could not traverse. We treat this as a no-op, unless it
-        // would have been impossible to create those elements, which we check with
-        // checkViability().
-        UpdateLeafNode::checkViability(
-            applyParams.element, *(applyParams.pathToCreate), *(applyParams.pathTaken));
-
-        return ApplyResult::noopResult();
-    }
-
-    invariant(!applyParams.pathTaken->empty());
-    invariant(applyParams.pathToCreate->empty());
-
-    // The full path existed, but we must fail if the element at that path is not an array.
-    invariant(applyParams.element.ok());
+ModifierNode::ModifyResult PopNode::updateExistingElement(
+    mutablebson::Element* element, std::shared_ptr<FieldRef> elementPath) const {
+    invariant(element->ok());
     uassert(ErrorCodes::TypeMismatch,
-            str::stream() << "Path '" << applyParams.pathTaken->dottedField()
+            str::stream() << "Path '" << elementPath->dottedField()
                           << "' contains an element of non-array type '"
-                          << typeName(applyParams.element.getType())
+                          << typeName(element->getType())
                           << "'",
-            applyParams.element.getType() == BSONType::Array);
+            element->getType() == BSONType::Array);
 
-    if (!applyParams.element.hasChildren()) {
+    if (!element->hasChildren()) {
         // The path exists and contains an array, but the array is empty.
-        return ApplyResult::noopResult();
+        return ModifyResult::kNoOp;
     }
 
-    ApplyResult applyResult;
-
-    if (!applyParams.indexData ||
-        !applyParams.indexData->mightBeIndexed(applyParams.pathTaken->dottedField())) {
-        applyResult.indexesAffected = false;
-    }
-
-    auto elementToRemove =
-        _popFromFront ? applyParams.element.leftChild() : applyParams.element.rightChild();
+    auto elementToRemove = _popFromFront ? element->leftChild() : element->rightChild();
     invariantOK(elementToRemove.remove());
 
-    // No need to validate for storage, since we cannot have increased the BSON depth or interfered
-    // with a DBRef.
+    return ModifyResult::kNormalUpdate;
+}
 
-    // Ensure we are not changing any immutable paths.
-    for (auto immutablePath = applyParams.immutablePaths.begin();
-         immutablePath != applyParams.immutablePaths.end();
-         ++immutablePath) {
-        uassert(ErrorCodes::ImmutableField,
-                str::stream() << "Performing a $pop on the path '"
-                              << applyParams.pathTaken->dottedField()
-                              << "' would modify the immutable field '"
-                              << (*immutablePath)->dottedField()
-                              << "'",
-                applyParams.pathTaken->commonPrefixSize(**immutablePath) <
-                    std::min(applyParams.pathTaken->numParts(), (*immutablePath)->numParts()));
-    }
+void PopNode::validateUpdate(mutablebson::ConstElement updatedElement,
+                             mutablebson::ConstElement leftSibling,
+                             mutablebson::ConstElement rightSibling,
+                             std::uint32_t recursionLevel,
+                             ModifyResult modifyResult) const {
+    invariant(modifyResult == ModifyResult::kNormalUpdate);
 
-    if (applyParams.logBuilder) {
-        uassertStatusOK(applyParams.logBuilder->addToSetsWithNewFieldName(
-            applyParams.pathTaken->dottedField(), applyParams.element));
-    }
-
-    return applyResult;
+    // Removing elements from an array cannot increase BSON depth or modify a DBRef, so we can
+    // override validateUpdate to do nothing.
 }
 
 }  // namespace mongo

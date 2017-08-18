@@ -462,7 +462,7 @@ TEST_F(RenameNodeTest, ApplyCannotRemoveImmutablePath) {
         node.apply(getApplyParams(doc.root())),
         AssertionException,
         ErrorCodes::ImmutableField,
-        "Unsetting the path 'a.b' using $rename would modify the immutable field 'a.b'");
+        "Performing an update on the path 'a.b' would modify the immutable field 'a.b'");
 }
 
 TEST_F(RenameNodeTest, ApplyCannotRemovePrefixOfImmutablePath) {
@@ -478,7 +478,7 @@ TEST_F(RenameNodeTest, ApplyCannotRemovePrefixOfImmutablePath) {
         node.apply(getApplyParams(doc.root())),
         AssertionException,
         ErrorCodes::ImmutableField,
-        "Unsetting the path 'a' using $rename would modify the immutable field 'a.b'");
+        "Performing an update on the path 'a' would modify the immutable field 'a.b'");
 }
 
 TEST_F(RenameNodeTest, ApplyCannotRemoveSuffixOfImmutablePath) {
@@ -494,7 +494,7 @@ TEST_F(RenameNodeTest, ApplyCannotRemoveSuffixOfImmutablePath) {
         node.apply(getApplyParams(doc.root())),
         AssertionException,
         ErrorCodes::ImmutableField,
-        "Unsetting the path 'a.b.c' using $rename would modify the immutable field 'a.b'");
+        "Performing an update on the path 'a.b.c' would modify the immutable field 'a.b'");
 }
 
 TEST_F(RenameNodeTest, ApplyCanRemoveImmutablePathIfNoop) {
@@ -543,7 +543,7 @@ TEST_F(RenameNodeTest, ApplyCannotOverwriteImmutablePath) {
         node.apply(getApplyParams(doc.root()["b"])),
         AssertionException,
         ErrorCodes::ImmutableField,
-        "Updating the path 'b' to b: 0 would modify the immutable field 'b'");
+        "Performing an update on the path 'b' would modify the immutable field 'b'");
 }
 
 }  // namespace

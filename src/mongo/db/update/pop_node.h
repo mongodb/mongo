@@ -28,16 +28,23 @@
 
 #pragma once
 
-#include "mongo/db/update/update_leaf_node.h"
+#include "mongo/db/update/modifier_node.h"
 #include "mongo/stdx/memory.h"
 
 namespace mongo {
 
-class PopNode final : public UpdateLeafNode {
+class PopNode final : public ModifierNode {
 public:
     Status init(BSONElement modExpr, const CollatorInterface* collator) final;
 
-    ApplyResult apply(ApplyParams applyParams) const final;
+    ModifyResult updateExistingElement(mutablebson::Element* element,
+                                       std::shared_ptr<FieldRef> elementPath) const final;
+
+    void validateUpdate(mutablebson::ConstElement updatedElement,
+                        mutablebson::ConstElement leftSibling,
+                        mutablebson::ConstElement rightSibling,
+                        std::uint32_t recursionLevel,
+                        ModifyResult modifyResult) const final;
 
     std::unique_ptr<UpdateNode> clone() const final {
         return stdx::make_unique<PopNode>(*this);

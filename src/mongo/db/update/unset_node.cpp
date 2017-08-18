@@ -40,70 +40,50 @@ Status UnsetNode::init(BSONElement modExpr, const CollatorInterface* collator) {
     return Status::OK();
 }
 
-UpdateNode::ApplyResult UnsetNode::apply(ApplyParams applyParams) const {
-    if (!applyParams.pathToCreate->empty()) {
-        // A non-empty "pathToCreate" implies that our search did not find the field that we wanted
-        // to delete. We employ a simple and efficient strategy for deleting fields that don't yet
-        // exist.
-        return ApplyResult::noopResult();
-    }
-
-    ApplyResult applyResult;
-
-    // Determine if indexes are affected.
-    if (!applyParams.indexData ||
-        !applyParams.indexData->mightBeIndexed(applyParams.pathTaken->dottedField())) {
-        applyResult.indexesAffected = false;
-    }
-
-    auto parent = applyParams.element.parent();
-    auto leftSibling = applyParams.element.leftSibling();
-    auto rightSibling = applyParams.element.rightSibling();
+ModifierNode::ModifyResult UnsetNode::updateExistingElement(
+    mutablebson::Element* element, std::shared_ptr<FieldRef> elementPath) const {
+    auto parent = element->parent();
 
     invariant(parent.ok());
     if (!parent.isType(BSONType::Array)) {
-        invariantOK(applyParams.element.remove());
+        invariantOK(element->remove());
     } else {
         // Special case: An $unset on an array element sets it to null instead of removing it from
         // the array.
-        invariantOK(applyParams.element.setValueNull());
+        invariantOK(element->setValueNull());
     }
 
-    if (applyParams.validateForStorage) {
+    return ModifyResult::kNormalUpdate;
+}
 
-        // Validate the left and right sibling, in case this element was part of a DBRef.
-        if (leftSibling.ok()) {
-            const bool doRecursiveCheck = false;
-            const uint32_t recursionLevel = 0;
-            storage_validation::storageValid(leftSibling, doRecursiveCheck, recursionLevel);
-        }
+void UnsetNode::validateUpdate(mutablebson::ConstElement updatedElement,
+                               mutablebson::ConstElement leftSibling,
+                               mutablebson::ConstElement rightSibling,
+                               std::uint32_t recursionLevel,
+                               ModifyResult modifyResult) const {
+    invariant(modifyResult == ModifyResult::kNormalUpdate);
 
-        if (rightSibling.ok()) {
-            const bool doRecursiveCheck = false;
-            const uint32_t recursionLevel = 0;
-            storage_validation::storageValid(rightSibling, doRecursiveCheck, recursionLevel);
-        }
+    // We only need to check the left and right sibling to see if the removed element was part of a
+    // now invalid DBRef.
+    const bool doRecursiveCheck = false;
+    const uint32_t recursionLevelForCheck = 0;
+
+    if (leftSibling.ok()) {
+        storage_validation::storageValid(leftSibling, doRecursiveCheck, recursionLevelForCheck);
     }
 
-    // Ensure we are not changing any immutable paths.
-    for (auto immutablePath = applyParams.immutablePaths.begin();
-         immutablePath != applyParams.immutablePaths.end();
-         ++immutablePath) {
-        uassert(ErrorCodes::ImmutableField,
-                str::stream() << "Unsetting the path '" << applyParams.pathTaken->dottedField()
-                              << "' would modify the immutable field '"
-                              << (*immutablePath)->dottedField()
-                              << "'",
-                applyParams.pathTaken->commonPrefixSize(**immutablePath) <
-                    std::min(applyParams.pathTaken->numParts(), (*immutablePath)->numParts()));
+    if (rightSibling.ok()) {
+        storage_validation::storageValid(rightSibling, doRecursiveCheck, recursionLevelForCheck);
     }
+}
 
-    // Log the unset.
-    if (applyParams.logBuilder) {
-        uassertStatusOK(applyParams.logBuilder->addToUnsets(applyParams.pathTaken->dottedField()));
-    }
-
-    return applyResult;
+void UnsetNode::logUpdate(LogBuilder* logBuilder,
+                          StringData pathTaken,
+                          mutablebson::Element element,
+                          ModifyResult modifyResult) const {
+    invariant(logBuilder);
+    invariant(modifyResult == ModifyResult::kNormalUpdate);
+    uassertStatusOK(logBuilder->addToUnsets(pathTaken));
 }
 
 }  // namespace mongo

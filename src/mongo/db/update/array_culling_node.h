@@ -29,7 +29,7 @@
 #pragma once
 
 #include "mongo/base/clonable_ptr.h"
-#include "mongo/db/update/update_leaf_node.h"
+#include "mongo/db/update/modifier_node.h"
 #include "mongo/stdx/memory.h"
 
 namespace mongo {
@@ -41,9 +41,16 @@ namespace mongo {
  * subclass-supplied ElementMatcher to determine which array elements should be removed. The init
  * method for each subclass must populate _matcher with an ElementMatcher implementation.
  */
-class ArrayCullingNode : public UpdateLeafNode {
+class ArrayCullingNode : public ModifierNode {
 public:
-    ApplyResult apply(ApplyParams applyParams) const final;
+    ModifyResult updateExistingElement(mutablebson::Element* element,
+                                       std::shared_ptr<FieldRef> elementPath) const final;
+
+    void validateUpdate(mutablebson::ConstElement updatedElement,
+                        mutablebson::ConstElement leftSibling,
+                        mutablebson::ConstElement rightSibling,
+                        std::uint32_t recursionLevel,
+                        ModifyResult modifyResult) const final;
 
     void setCollator(const CollatorInterface* collator) final {
         _matcher->setCollator(collator);

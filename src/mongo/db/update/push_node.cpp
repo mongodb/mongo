@@ -190,10 +190,10 @@ Status PushNode::init(BSONElement modExpr, const CollatorInterface* collator) {
     return Status::OK();
 }
 
-PushNode::PushResult PushNode::insertElementsWithPosition(
-    mutablebson::Element* array, long long position, const std::vector<BSONElement> valuesToPush) {
+ModifierNode::ModifyResult PushNode::insertElementsWithPosition(
+    mutablebson::Element* array, long long position, const std::vector<BSONElement>& valuesToPush) {
     if (valuesToPush.empty()) {
-        return PushResult::kNoOp;
+        return ModifyResult::kNoOp;
     }
 
     auto& document = array->getDocument();
@@ -205,24 +205,24 @@ PushNode::PushResult PushNode::insertElementsWithPosition(
 
     // We insert the first element of 'valuesToPush' at the location requested in the 'position'
     // variable.
-    PushResult result;
+    ModifyResult result;
     if (arraySize == 0) {
         invariantOK(array->pushBack(firstElementToInsert));
-        result = PushResult::kModifyArray;  // See comment describing PushResult.
+        result = ModifyResult::kNormalUpdate;
     } else if (position > arraySize) {
         invariantOK(array->pushBack(firstElementToInsert));
-        result = PushResult::kAppendToEndOfArray;
+        result = ModifyResult::kArrayAppendUpdate;
     } else if (position > 0) {
         auto insertAfter = getNthChild(*array, position - 1);
         invariantOK(insertAfter.addSiblingRight(firstElementToInsert));
-        result = PushResult::kModifyArray;
+        result = ModifyResult::kNormalUpdate;
     } else if (position < 0 && -position < arraySize) {
         auto insertAfter = getNthChild(*array, arraySize - (-position) - 1);
         invariantOK(insertAfter.addSiblingRight(firstElementToInsert));
-        result = PushResult::kModifyArray;
+        result = ModifyResult::kNormalUpdate;
     } else {
         invariantOK(array->pushFront(firstElementToInsert));
-        result = PushResult::kModifyArray;
+        result = ModifyResult::kNormalUpdate;
     }
 
     // We insert all the rest of the elements after the one we just inserted.
@@ -239,8 +239,8 @@ PushNode::PushResult PushNode::insertElementsWithPosition(
     return result;
 }
 
-PushNode::PushResult PushNode::performPush(mutablebson::Element* element,
-                                           FieldRef* elementPath) const {
+ModifierNode::ModifyResult PushNode::performPush(mutablebson::Element* element,
+                                                 FieldRef* elementPath) const {
     if (element->getType() != BSONType::Array) {
         invariant(elementPath);  // We can only hit this error if we are updating an existing path.
         auto idElem = mutablebson::findFirstChildNamed(element->getDocument().root(), "_id");
@@ -256,12 +256,12 @@ PushNode::PushResult PushNode::performPush(mutablebson::Element* element,
     auto result = insertElementsWithPosition(element, _position, _valuesToPush);
 
     if (_sort) {
-        result = PushResult::kModifyArray;
+        result = ModifyResult::kNormalUpdate;
         sortChildren(*element, *_sort);
     }
 
     while (static_cast<long long>(countChildren(*element)) > std::abs(_slice)) {
-        result = PushResult::kModifyArray;
+        result = ModifyResult::kNormalUpdate;
         if (_slice >= 0) {
             invariantOK(element->popBack());
         } else {
@@ -274,37 +274,37 @@ PushNode::PushResult PushNode::performPush(mutablebson::Element* element,
     return result;
 }
 
-PathCreatingNode::UpdateExistingElementResult PushNode::updateExistingElement(
-    mutablebson::Element* element,
-    std::shared_ptr<FieldRef> elementPath,
-    LogBuilder* logBuilder) const {
-    auto originalSize = countChildren(*element);
+ModifierNode::ModifyResult PushNode::updateExistingElement(
+    mutablebson::Element* element, std::shared_ptr<FieldRef> elementPath) const {
+    return performPush(element, elementPath.get());
+}
 
-    switch (performPush(element, elementPath.get())) {
-        case PushResult::kNoOp:
-            return UpdateExistingElementResult::kNoOp;
-        case PushResult::kAppendToEndOfArray:
-            if (logBuilder) {
-                // Special case: the only modification to the array is to add new elements, so we
-                // can log the update as a $set for each new element, rather than logging a $set
-                // with the entire array contents.
-                auto position = originalSize;
-                for (auto&& valueToLog : _valuesToPush) {
-                    std::string positionString(str::stream() << position);
-                    UpdateInternalNode::FieldRefTempAppend tempAppend(*elementPath, positionString);
-                    uassertStatusOK(logBuilder->addToSetsWithNewFieldName(
-                        elementPath->dottedField(), valueToLog));
+void PushNode::logUpdate(LogBuilder* logBuilder,
+                         StringData pathTaken,
+                         mutablebson::Element element,
+                         ModifyResult modifyResult) const {
+    invariant(logBuilder);
 
-                    ++position;
-                }
-            }
+    if (modifyResult == ModifyResult::kNormalUpdate || modifyResult == ModifyResult::kCreated) {
+        // Simple case: log the entires contents of the updated array.
+        uassertStatusOK(logBuilder->addToSetsWithNewFieldName(pathTaken, element));
+    } else if (modifyResult == ModifyResult::kArrayAppendUpdate) {
+        // This update only modified the array by appending entries to the end. Rather than writing
+        // out the entire contents of the array, we create oplog entries for the newly appended
+        // elements.
+        auto numAppended = _valuesToPush.size();
+        auto arraySize = countChildren(element);
 
-            // Indicate that PathCreatingNode::apply() does not need to do any more logging.
-            return UpdateExistingElementResult::kUpdatedAndLogged;
-        case PushResult::kModifyArray:
-            return UpdateExistingElementResult::kUpdated;
-        default:
-            MONGO_UNREACHABLE;
+        invariant(arraySize > numAppended);
+        auto position = arraySize - numAppended;
+        for (const auto& valueToLog : _valuesToPush) {
+            std::string pathToArrayElement(str::stream() << pathTaken << "." << position);
+            uassertStatusOK(logBuilder->addToSetsWithNewFieldName(pathToArrayElement, valueToLog));
+
+            ++position;
+        }
+    } else {
+        MONGO_UNREACHABLE;
     }
 }
 

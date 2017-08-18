@@ -32,9 +32,10 @@
 
 #include "mongo/bson/mutable/algorithm.h"
 #include "mongo/db/update/field_checker.h"
-#include "mongo/db/update/path_creating_node.h"
+#include "mongo/db/update/modifier_node.h"
 #include "mongo/db/update/path_support.h"
 #include "mongo/db/update/storage_validation.h"
+#include "mongo/db/update/unset_node.h"
 
 namespace mongo {
 
@@ -45,11 +46,11 @@ namespace {
  * field to a destination field behaves logically like a $set on the destination followed by a
  * $unset on the source, and the first of those operations is executed by calling apply on a
  * SetElementNode object. We create a class for this purpose (rather than a stand-alone function) so
- * that it can inherit from PathCreatingNode.
+ * that it can inherit from ModifierNode.
  *
  * Unlike SetNode, SetElementNode takes a mutablebson::Element as its input.
  */
-class SetElementNode : public PathCreatingNode {
+class SetElementNode : public ModifierNode {
 public:
     SetElementNode(mutablebson::Element elemToSet) : _elemToSet(elemToSet) {}
 
@@ -63,9 +64,9 @@ public:
         return Status::OK();
     }
 
-    UpdateExistingElementResult updateExistingElement(mutablebson::Element* element,
-                                                      std::shared_ptr<FieldRef> elementPath,
-                                                      LogBuilder* logBuilder) const final {
+protected:
+    ModifierNode::ModifyResult updateExistingElement(
+        mutablebson::Element* element, std::shared_ptr<FieldRef> elementPath) const final {
         // In the case of a $rename where the source and destination have the same value, (e.g., we
         // are applying {$rename: {a: b}} to the document {a: "foo", b: "foo"}), there's no need to
         // modify the destination element. However, the source and destination values must be
@@ -74,14 +75,22 @@ public:
         auto considerFieldName = false;
         if (_elemToSet.compareWithElement(*element, comparator, considerFieldName) != 0) {
             invariantOK(element->setValueElement(_elemToSet));
-            return UpdateExistingElementResult::kUpdated;
+            return ModifyResult::kNormalUpdate;
         } else {
-            return UpdateExistingElementResult::kNoOp;
+            return ModifyResult::kNoOp;
         }
     }
 
     void setValueForNewElement(mutablebson::Element* element) const final {
         invariantOK(element->setValueElement(_elemToSet));
+    }
+
+    bool allowCreation() const final {
+        return true;
+    }
+
+    bool canSetObjectValue() const final {
+        return true;
     }
 
 private:
@@ -143,7 +152,7 @@ Status RenameNode::init(BSONElement modExpr, const CollatorInterface* collator) 
 UpdateNode::ApplyResult RenameNode::apply(ApplyParams applyParams) const {
     // It would make sense to store fromFieldRef and toFieldRef as members during
     // RenameNode::init(), but FieldRef is not copyable.
-    FieldRef fromFieldRef(_val.fieldName());
+    auto fromFieldRef = std::make_shared<FieldRef>(_val.fieldName());
     FieldRef toFieldRef(_val.valueStringData());
 
     mutablebson::Document& document = applyParams.element.getDocument();
@@ -151,9 +160,9 @@ UpdateNode::ApplyResult RenameNode::apply(ApplyParams applyParams) const {
     size_t fromIdxFound;
     mutablebson::Element fromElement(document.end());
     auto status =
-        pathsupport::findLongestPrefix(fromFieldRef, document.root(), &fromIdxFound, &fromElement);
+        pathsupport::findLongestPrefix(*fromFieldRef, document.root(), &fromIdxFound, &fromElement);
 
-    if (!status.isOK() || !fromElement.ok() || fromIdxFound != (fromFieldRef.numParts() - 1)) {
+    if (!status.isOK() || !fromElement.ok() || fromIdxFound != (fromFieldRef->numParts() - 1)) {
         // We could safely remove this restriction (thereby treating a rename with a non-viable
         // source path as a no-op), but most updates fail on an attempt to update a non-viable path,
         // so we throw an error for consistency.
@@ -176,7 +185,7 @@ UpdateNode::ApplyResult RenameNode::apply(ApplyParams applyParams) const {
             auto idElem = mutablebson::findFirstChildNamed(document.root(), "_id");
             uasserted(ErrorCodes::BadValue,
                       str::stream() << "The source field cannot be an array element, '"
-                                    << fromFieldRef.dottedField()
+                                    << fromFieldRef->dottedField()
                                     << "' in doc with "
                                     << (idElem.ok() ? idElem.toString() : "no id")
                                     << " has an array field called '"
@@ -206,56 +215,29 @@ UpdateNode::ApplyResult RenameNode::apply(ApplyParams applyParams) const {
         }
     }
 
+    // Once we've determined that the rename is valid and found the source element, the actual work
+    // gets broken out into a $set operation and an $unset operation. Note that, generally, we
+    // should call the init() method of a ModifierNode before calling its apply() method, but the
+    // init() methods of SetElementNode and UnsetNode don't do anything, so we can skip them.
     SetElementNode setElement(fromElement);
     auto setElementApplyResult = setElement.apply(applyParams);
 
-    auto leftSibling = fromElement.leftSibling();
-    auto rightSibling = fromElement.rightSibling();
+    ApplyParams unsetParams(applyParams);
+    unsetParams.element = fromElement;
+    unsetParams.pathToCreate = std::make_shared<FieldRef>();
+    unsetParams.pathTaken = fromFieldRef;
 
-    invariant(fromElement.parent().ok());
-    invariantOK(fromElement.remove());
+    UnsetNode unsetElement;
+    auto unsetElementApplyResult = unsetElement.apply(unsetParams);
 
+    // Determine the final result based on the results of the $set and $unset.
     ApplyResult applyResult;
+    applyResult.indexesAffected =
+        setElementApplyResult.indexesAffected || unsetElementApplyResult.indexesAffected;
 
-    if (!applyParams.indexData ||
-        (!setElementApplyResult.indexesAffected &&
-         !applyParams.indexData->mightBeIndexed(fromFieldRef.dottedField()))) {
-        applyResult.indexesAffected = false;
-    }
-
-    if (applyParams.validateForStorage) {
-
-        // Validate the left and right sibling, in case this element was part of a DBRef.
-        if (leftSibling.ok()) {
-            const bool doRecursiveCheck = false;
-            const uint32_t recursionLevel = 0;
-            storage_validation::storageValid(leftSibling, doRecursiveCheck, recursionLevel);
-        }
-
-        if (rightSibling.ok()) {
-            const bool doRecursiveCheck = false;
-            const uint32_t recursionLevel = 0;
-            storage_validation::storageValid(rightSibling, doRecursiveCheck, recursionLevel);
-        }
-    }
-
-    // Ensure we are not changing any immutable paths.
-    for (auto immutablePath = applyParams.immutablePaths.begin();
-         immutablePath != applyParams.immutablePaths.end();
-         ++immutablePath) {
-        uassert(ErrorCodes::ImmutableField,
-                str::stream() << "Unsetting the path '" << fromFieldRef.dottedField()
-                              << "' using $rename would modify the immutable field '"
-                              << (*immutablePath)->dottedField()
-                              << "'",
-                fromFieldRef.commonPrefixSize(**immutablePath) <
-                    std::min(fromFieldRef.numParts(), (*immutablePath)->numParts()));
-    }
-
-    // Log the $unset. The $set was already logged by SetElementNode::apply().
-    if (applyParams.logBuilder) {
-        uassertStatusOK(applyParams.logBuilder->addToUnsets(fromFieldRef.dottedField()));
-    }
+    // The $unset would only be a no-op if the source element did not exist, in which case we would
+    // have exited early with a no-op result.
+    invariant(!unsetElementApplyResult.noop);
 
     return applyResult;
 }

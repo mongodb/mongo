@@ -344,7 +344,7 @@ TEST_F(PopNodeTest, ThrowsWhenPathIsImmutable) {
         popNode.apply(getApplyParams(doc.root()["a"]["b"])),
         AssertionException,
         ErrorCodes::ImmutableField,
-        "Performing a $pop on the path 'a.b' would modify the immutable field 'a.b'");
+        "Performing an update on the path 'a.b' would modify the immutable field 'a.b'");
 }
 
 TEST_F(PopNodeTest, ThrowsWhenPathIsPrefixOfImmutable) {
@@ -366,7 +366,7 @@ TEST_F(PopNodeTest, ThrowsWhenPathIsPrefixOfImmutable) {
         popNode.apply(getApplyParams(doc.root()["a"])),
         AssertionException,
         ErrorCodes::ImmutableField,
-        "Performing a $pop on the path 'a' would modify the immutable field 'a.0'");
+        "Performing an update on the path 'a' would modify the immutable field 'a.0'");
 }
 
 TEST_F(PopNodeTest, ThrowsWhenPathIsSuffixOfImmutable) {
@@ -383,7 +383,7 @@ TEST_F(PopNodeTest, ThrowsWhenPathIsSuffixOfImmutable) {
         popNode.apply(getApplyParams(doc.root()["a"]["b"])),
         AssertionException,
         ErrorCodes::ImmutableField,
-        "Performing a $pop on the path 'a.b' would modify the immutable field 'a'");
+        "Performing an update on the path 'a.b' would modify the immutable field 'a'");
 }
 
 TEST_F(PopNodeTest, NoopOnImmutablePathSucceeds) {
