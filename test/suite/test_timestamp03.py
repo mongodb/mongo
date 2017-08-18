@@ -62,7 +62,6 @@ class test_timestamp03(wttest.WiredTigerTestCase, suite_subprocess):
         ('use_ts_def', dict(ckptcfg='', val='none')),
         ('use_ts_false', dict(ckptcfg='use_timestamp=false', val='all')),
         ('use_ts_true', dict(ckptcfg='use_timestamp=true', val='none')),
-        ('read_ts', dict(ckptcfg='read_timestamp', val='none')),
     ]
 
     conncfg = [
