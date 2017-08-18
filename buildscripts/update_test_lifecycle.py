@@ -11,6 +11,7 @@ from __future__ import division
 import collections
 import datetime
 import logging
+import multiprocessing.dummy
 import optparse
 import os.path
 import posixpath
@@ -71,6 +72,9 @@ DEFAULT_CONFIG = Config(
 DEFAULT_PROJECT = "mongodb-mongo-master"
 
 
+DEFAULT_NUM_THREADS = 12
+
+
 def get_suite_tasks_membership(evg_conf):
     """Return a dictionary with keys of all suites and list of associated tasks."""
     suite_membership = collections.defaultdict(list)
@@ -124,6 +128,51 @@ def create_batch_groups(test_groups, batch_size):
             batch_groups.append(test_group[:batch_size])
             test_group = test_group[batch_size:]
     return batch_groups
+
+
+class TestHistorySource(object):
+
+    """A class used to parallelize requests to buildscripts.test_failures.TestHistory."""
+    def __init__(self, project, variants, distros, start_revision, end_revision,
+                 thread_pool_size=DEFAULT_NUM_THREADS):
+        """
+        Initializes the TestHistorySource.
+
+        Args:
+            project: the Evergreen project name.
+            variants: a list of variant names.
+            distros: a list of distro names.
+            start_revision: the revision delimiting the begining of the history we want to retrieve.
+            end_revision: the revision delimiting the end of the history we want to retrieve.
+            thread_pool_size: the size of the thread pool used to make parallel requests.
+        """
+        self._project = project
+        self._variants = variants
+        self._distros = distros
+        self._start_revision = start_revision
+        self._end_revision = end_revision
+        self._thread_pool = multiprocessing.dummy.Pool(thread_pool_size)
+
+    def get_history_data(self, tests, tasks):
+        """Retrieves the history data for the given tests and tasks.
+
+        The requests for each task will be parallelized using the internal thread pool.
+        """
+        history_data = []
+        jobs = [self._thread_pool.apply_async(self._get_task_history_data, (tests, task))
+                for task in tasks]
+        for job in jobs:
+            history_data.extend(job.get())
+        return history_data
+
+    def _get_task_history_data(self, tests, task):
+        test_history = tf.TestHistory(project=self._project,
+                                      tests=tests,
+                                      tasks=[task],
+                                      variants=self._variants,
+                                      distros=self._distros)
+        return test_history.get_history_by_revision(start_revision=self._start_revision,
+                                                    end_revision=self._end_revision)
 
 
 def callo(args):
@@ -930,6 +979,13 @@ def main():
                             " request. A higher value for this option will reduce the number of"
                             " roundtrips between this client and Evergreen. Defaults to %default."))
 
+    parser.add_option("--requestThreads", type="int", dest="num_request_threads",
+                      metavar="<num-request-threads>",
+                      default=DEFAULT_NUM_THREADS,
+                      help=("The maximum number of threads to use when querying the Evergreen API."
+                            " Batches are processed sequentially but the test history is queried in"
+                            " parallel for each task. Defaults to %default."))
+
     commit_options = optparse.OptionGroup(
         parser,
         title="Commit options",
@@ -1034,8 +1090,16 @@ def main():
     # For efficiency purposes, group the tests and process in batches of batch_size.
     test_groups = create_batch_groups(create_test_groups(tests), options.batch_size)
 
+    test_history_source = TestHistorySource(options.project, variants, distros,
+                                            commit_prior, commit_last,
+                                            options.num_request_threads)
+
     LOGGER.info("Updating the tags")
+    nb_groups = len(test_groups)
+    count = 0
     for tests in test_groups:
+        LOGGER.info("Progress: %s %%", 100 * count / nb_groups)
+        count += 1
         # Find all associated tasks for the test_group if tasks or tests were not specified.
         if use_test_tasks_membership:
             tasks_set = set()
@@ -1045,16 +1109,7 @@ def main():
         if not tasks:
             LOGGER.warning("No tasks found for tests %s, skipping this group.", tests)
             continue
-
-        test_history = tf.TestHistory(project=options.project,
-                                      tests=tests,
-                                      tasks=tasks,
-                                      variants=variants,
-                                      distros=distros)
-
-        history_data = test_history.get_history_by_revision(start_revision=commit_prior,
-                                                            end_revision=commit_last)
-
+        history_data = test_history_source.get_history_data(tests, tasks)
         report = tf.Report(history_data)
         update_tags(lifecycle_tags_file.changelog_lifecycle, config, report)
 

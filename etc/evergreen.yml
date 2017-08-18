@@ -4116,8 +4116,11 @@ tasks:
         # Install Python jira client with pip until it is available in the toolchain
         pip install jira==1.0.10
 
+        # We use a small batch size to avoid hitting the load balancer timeout if the Evergreen
+        # API query is not fast enough.
         python buildscripts/update_test_lifecycle.py                    \
             --project ${project}                                        \
+            --requestBatchSize 20                                       \
             --commit                                                    \
             --resmokeTagFile "etc/test_lifecycle.yml"                   \
             --metadataRepo "git@github.com:mongodb/mongo-test-metadata" \
