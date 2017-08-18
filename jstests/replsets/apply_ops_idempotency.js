@@ -11,6 +11,17 @@
     rst.initiate();
 
     /**
+     * Returns true if this database contains any drop-pending collections.
+     */
+    function containsDropPendingCollection(mydb) {
+        const res =
+            assert.commandWorked(mydb.runCommand("listCollections", {includePendingDrops: true}));
+        const collectionInfos = res.cursor.firstBatch;
+        const collectionNames = collectionInfos.map(c => c.name);
+        return Boolean(collectionNames.find(c => c.indexOf('system.drop.') == 0));
+    }
+
+    /**
      *  Apply ops on mydb, asserting success.
      */
     function assertApplyOpsWorks(mydb, ops) {
@@ -21,6 +32,12 @@
             if (debug) {
                 printjson({applyOps: ops, res});
             }
+
+            // Wait for any drop-pending collections to be removed by the reaper before proceeding.
+            assert.soon(function() {
+                return !containsDropPendingCollection(mydb);
+            });
+
             // If the entire operation succeeded, we're done.
             if (res.ok == 1)
                 return res;
