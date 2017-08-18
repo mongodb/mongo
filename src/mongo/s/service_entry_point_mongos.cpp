@@ -81,7 +81,7 @@ DbResponse ServiceEntryPointMongos::handleRequest(OperationContext* opCtx, const
         ClusterLastErrorInfo::get(client) = std::make_shared<ClusterLastErrorInfo>();
     }
     ClusterLastErrorInfo::get(client)->newRequest();
-    LastError::get(client).startTopLevelRequest();
+    LastError::get(client).startRequest();
     AuthorizationSession::get(opCtx->getClient())->startRequest(opCtx);
 
     DbMessage dbm(message);

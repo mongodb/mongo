@@ -30,6 +30,7 @@
 
 #include "mongo/client/dbclientinterface.h"
 #include "mongo/db/dbmessage.h"
+#include "mongo/db/lasterror.h"
 #include "mongo/util/net/hostandport.h"
 
 namespace mongo {
@@ -102,6 +103,7 @@ public:
 
 private:
     OperationContext* _opCtx;
+    LastError _lastError;  // This LastError will be used for all operations on this client.
 };
 
 }  // namespace mongo

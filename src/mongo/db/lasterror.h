@@ -50,14 +50,9 @@ public:
     void reset(bool valid = false);
 
     /**
-     * when db receives a top level message/request, call this
+     * when db receives a message/request, call this
      */
-    void startTopLevelRequest();
-
-    /**
-     * when DBDirectClient receives a message/request, call this
-     */
-    void startDirectClientRequest();
+    void startRequest();
 
     /**
      * Disables error recording for the current operation.

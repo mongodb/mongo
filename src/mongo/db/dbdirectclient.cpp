@@ -32,15 +32,17 @@
 
 #include "mongo/db/dbdirectclient.h"
 
+#include <boost/core/swap.hpp>
+
 #include "mongo/db/client.h"
 #include "mongo/db/commands.h"
 #include "mongo/db/curop.h"
-#include "mongo/db/lasterror.h"
 #include "mongo/db/operation_context.h"
 #include "mongo/db/wire_version.h"
 #include "mongo/rpc/get_status_from_command_result.h"
 #include "mongo/transport/service_entry_point.h"
 #include "mongo/util/log.h"
+#include "mongo/util/scopeguard.h"
 
 namespace mongo {
 
@@ -122,9 +124,14 @@ QueryOptions DBDirectClient::_lookupAvailableOptions() {
 }
 
 namespace {
-DbResponse loopbackBuildResponse(OperationContext* const opCtx, Message& toSend) {
+DbResponse loopbackBuildResponse(OperationContext* const opCtx,
+                                 LastError* lastError,
+                                 Message& toSend) {
     DirectClientScope directClientScope(opCtx);
-    LastError::get(opCtx->getClient()).startDirectClientRequest();
+    boost::swap(*lastError, LastError::get(opCtx->getClient()));
+    ON_BLOCK_EXIT([&] { boost::swap(*lastError, LastError::get(opCtx->getClient())); });
+
+    LastError::get(opCtx->getClient()).startRequest();
     CurOp curOp(opCtx);
 
     toSend.header().setId(nextMessageId());
@@ -134,7 +141,7 @@ DbResponse loopbackBuildResponse(OperationContext* const opCtx, Message& toSend)
 }  // namespace
 
 bool DBDirectClient::call(Message& toSend, Message& response, bool assertOk, string* actualServer) {
-    auto dbResponse = loopbackBuildResponse(_opCtx, toSend);
+    auto dbResponse = loopbackBuildResponse(_opCtx, &_lastError, toSend);
     invariant(!dbResponse.response.empty());
     response = std::move(dbResponse.response);
 
@@ -142,7 +149,7 @@ bool DBDirectClient::call(Message& toSend, Message& response, bool assertOk, str
 }
 
 void DBDirectClient::say(Message& toSend, bool isRetry, string* actualServer) {
-    auto dbResponse = loopbackBuildResponse(_opCtx, toSend);
+    auto dbResponse = loopbackBuildResponse(_opCtx, &_lastError, toSend);
     invariant(dbResponse.response.empty());
 }
 

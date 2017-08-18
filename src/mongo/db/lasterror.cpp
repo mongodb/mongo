@@ -110,15 +110,10 @@ void LastError::disable() {
     _nPrev--;  // caller is a command that shouldn't count as an operation
 }
 
-void LastError::startTopLevelRequest() {
+void LastError::startRequest() {
     _disabled = false;
     ++_nPrev;
     _hadNotMasterError = false;
-}
-
-void LastError::startDirectClientRequest() {
-    _disabled = false;
-    ++_nPrev;
 }
 
 }  // namespace mongo

@@ -1039,7 +1039,7 @@ DbResponse ServiceEntryPointMongod::handleRequest(OperationContext* opCtx, const
     if (c.isInDirectClient()) {
         invariant(!opCtx->lockState()->inAWriteUnitOfWork());
     } else {
-        LastError::get(c).startTopLevelRequest();
+        LastError::get(c).startRequest();
         AuthorizationSession::get(c)->startRequest(opCtx);
 
         // We should not be holding any locks at this point
