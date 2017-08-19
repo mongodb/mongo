@@ -1602,3 +1602,15 @@ env.Library(
         'sync_tail',
     ],
 )
+
+env.Library(
+    target='mock_repl_coord_server_fixture',
+    source=[
+        'mock_repl_coord_server_fixture.cpp',
+    ],
+    LIBDEPS=[
+        'replmocks',
+        '$BUILD_DIR/mongo/db/service_context_d_test_fixture',
+    ]
+)
+

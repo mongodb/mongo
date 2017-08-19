@@ -36,6 +36,7 @@
 #include "mongo/db/db_raii.h"
 #include "mongo/db/dbdirectclient.h"
 #include "mongo/db/operation_context.h"
+#include "mongo/db/repl/mock_repl_coord_server_fixture.h"
 #include "mongo/db/repl/oplog.h"
 #include "mongo/db/repl/oplog_entry.h"
 #include "mongo/db/repl/optime.h"
@@ -49,65 +50,16 @@
 namespace mongo {
 namespace {
 
-class SessionTest : public ServiceContextMongoDTest {
+class SessionTest : public MockReplCoordServerFixture {
 public:
     void setUp() override {
-        ServiceContextMongoDTest::setUp();
+        MockReplCoordServerFixture::setUp();
 
-        _opCtx = cc().makeOperationContext();
-
-        // Insert code path assumes existence of repl coordinator!
-        repl::ReplSettings replSettings;
-        replSettings.setReplSetString(
-            ConnectionString::forReplicaSet("sessionTxnStateTest", {HostAndPort("a:1")})
-                .toString());
-        replSettings.setMaster(true);
-
-        auto service = getServiceContext();
-        repl::ReplicationCoordinator::set(
-            service, stdx::make_unique<repl::ReplicationCoordinatorMock>(service, replSettings));
-
+        auto service = opCtx()->getServiceContext();
         SessionCatalog::reset_forTest(service);
         SessionCatalog::create(service);
-        SessionCatalog::get(service)->onStepUp(_opCtx.get());
-
-        // Note: internal code does not allow implicit creation of non-capped oplog collection.
-        DBDirectClient client(opCtx());
-        ASSERT_TRUE(
-            client.createCollection(NamespaceString::kRsOplogNamespace.ns(), 1024 * 1024, true));
+        SessionCatalog::get(service)->onStepUp(opCtx());
     }
-
-    void tearDown() override {
-        // ServiceContextMongoDTest::tearDown() will try to create it's own opCtx, and it's not
-        // allowed to have 2 present per client, so destroy this one.
-        _opCtx.reset();
-
-        ServiceContextMongoDTest::tearDown();
-    }
-
-    /**
-     * Helper method for inserting new entries to the oplog. This completely bypasses
-     * fixDocumentForInsert.
-     */
-    void insertOplogEntry(BSONObj entry) {
-        AutoGetCollection autoColl(opCtx(), NamespaceString::kRsOplogNamespace, MODE_IX);
-        auto coll = autoColl.getCollection();
-        ASSERT_TRUE(coll != nullptr);
-
-        auto status = coll->insertDocument(opCtx(),
-                                           InsertStatement(entry),
-                                           &CurOp::get(opCtx())->debug(),
-                                           /* enforceQuota */ false,
-                                           /* fromMigrate */ false);
-        ASSERT_OK(status);
-    }
-
-    OperationContext* opCtx() {
-        return _opCtx.get();
-    }
-
-private:
-    ServiceContext::UniqueOperationContext _opCtx;
 };
 
 TEST_F(SessionTest, CanCreateNewSessionEntry) {
@@ -514,18 +466,22 @@ TEST_F(SessionTest, CheckStatementExecuted) {
 
     // Returns the correct oplog entry if the statement has completed.
     auto optimeTs = Timestamp(50, 10);
-    insertOplogEntry(BSON("ts" << optimeTs << "t" << 1LL << "h" << 0LL << "op"
-                               << "i"
-                               << "ns"
-                               << "a.b"
-                               << "o"
-                               << BSON("_id" << 1 << "x" << 5)
-                               << "txnNumber"
-                               << txnNum
-                               << "stmtId"
-                               << stmtId
-                               << "prevTs"
-                               << Timestamp(0, 0)));
+
+    OperationSessionInfo opSessionInfo;
+    opSessionInfo.setSessionId(sessionId);
+    opSessionInfo.setTxnNumber(txnNum);
+
+    repl::OplogEntry oplogEntry(repl::OpTime(optimeTs, 1),
+                                0,
+                                repl::OpTypeEnum::kInsert,
+                                NamespaceString("a.b"),
+                                0,
+                                BSON("_id" << 1 << "x" << 5));
+    oplogEntry.setOperationSessionInfo(opSessionInfo);
+    oplogEntry.setStatementId(stmtId);
+    oplogEntry.setPrevWriteTsInTransaction(Timestamp(0, 0));
+    insertOplogEntry(oplogEntry);
+
     {
         AutoGetCollection autoColl(opCtx(), NamespaceString("a.b"), MODE_IX);
         WriteUnitOfWork wuow(opCtx());

@@ -1528,8 +1528,7 @@ env.CppUnitTest(
         'session_test.cpp',
     ],
     LIBDEPS=[
-        '$BUILD_DIR/mongo/db/repl/replmocks',
-        'service_context_d_test_fixture',
+        '$BUILD_DIR/mongo/db/repl/mock_repl_coord_server_fixture',
         'write_ops',
     ],
 )
@@ -1540,8 +1539,7 @@ env.CppUnitTest(
         'transaction_history_iterator_test.cpp',
     ],
     LIBDEPS=[
-        '$BUILD_DIR/mongo/db/repl/replmocks',
-        'service_context_d_test_fixture',
+        '$BUILD_DIR/mongo/db/repl/mock_repl_coord_server_fixture',
         'write_ops',
     ],
 )

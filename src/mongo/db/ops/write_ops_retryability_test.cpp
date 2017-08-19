@@ -36,6 +36,7 @@
 #include "mongo/db/ops/write_ops.h"
 #include "mongo/db/ops/write_ops_retryability.h"
 #include "mongo/db/query/find_and_modify_request.h"
+#include "mongo/db/repl/mock_repl_coord_server_fixture.h"
 #include "mongo/db/repl/oplog_entry.h"
 #include "mongo/db/repl/replication_coordinator_mock.h"
 #include "mongo/db/service_context.h"
@@ -117,62 +118,7 @@ TEST_F(WriteOpsRetryability, ParseOplogEntryForDelete) {
     ASSERT_BSONOBJ_EQ(res.getUpsertedId(), BSONObj());
 }
 
-class FindAndModifyRetryability : public ServiceContextMongoDTest {
-public:
-    void setUp() override {
-        ServiceContextMongoDTest::setUp();
-
-        _opCtx = cc().makeOperationContext();
-
-        // Insert code path assumes existence of repl coordinator!
-        repl::ReplSettings replSettings;
-        replSettings.setReplSetString(
-            ConnectionString::forReplicaSet("sessionTxnStateTest", {HostAndPort("a:1")})
-                .toString());
-        replSettings.setMaster(true);
-
-        auto service = getServiceContext();
-        repl::ReplicationCoordinator::set(
-            service, stdx::make_unique<repl::ReplicationCoordinatorMock>(service, replSettings));
-
-        // Note: internal code does not allow implicit creation of non-capped oplog collection.
-        DBDirectClient client(opCtx());
-        ASSERT_TRUE(
-            client.createCollection(NamespaceString::kRsOplogNamespace.ns(), 1024 * 1024, true));
-    }
-
-    void tearDown() override {
-        // ServiceContextMongoDTest::tearDown() will try to create it's own opCtx, and it's not
-        // allowed to have 2 present per client, so destroy this one.
-        _opCtx.reset();
-
-        ServiceContextMongoDTest::tearDown();
-    }
-
-    /**
-     * Helper method for inserting new entries to the oplog. This completely bypasses
-     * fixDocumentForInsert.
-     */
-    void insertOplogEntry(BSONObj entry) {
-        AutoGetCollection autoColl(opCtx(), NamespaceString::kRsOplogNamespace, MODE_IX);
-        auto coll = autoColl.getCollection();
-        ASSERT_TRUE(coll != nullptr);
-
-        auto status = coll->insertDocument(opCtx(),
-                                           InsertStatement(entry),
-                                           &CurOp::get(opCtx())->debug(),
-                                           /* enforceQuota */ false,
-                                           /* fromMigrate */ false);
-        ASSERT_OK(status);
-    }
-
-    OperationContext* opCtx() {
-        return _opCtx.get();
-    }
-
-private:
-    ServiceContext::UniqueOperationContext _opCtx;
-};
+using FindAndModifyRetryability = MockReplCoordServerFixture;
 
 NamespaceString kNs("test.user");
 
@@ -200,7 +146,7 @@ TEST_F(FindAndModifyRetryability, ErrorIfRequestIsUpsertButOplogIsUpdate) {
     repl::OplogEntry noteOplog(
         repl::OpTime(imageTs, 1), 0, repl::OpTypeEnum::kNoop, kNs, BSON("x" << 1 << "z" << 1));
 
-    insertOplogEntry(noteOplog.toBSON());
+    insertOplogEntry(noteOplog);
 
     repl::OplogEntry oplog(
         repl::OpTime(), 0, repl::OpTypeEnum::kUpdate, kNs, BSON("x" << 1), BSON("y" << 1));
@@ -227,7 +173,7 @@ TEST_F(FindAndModifyRetryability, ErrorIfRequestIsPostImageButOplogHasPre) {
     repl::OplogEntry noteOplog(
         repl::OpTime(imageTs, 1), 0, repl::OpTypeEnum::kNoop, kNs, BSON("x" << 1 << "z" << 1));
 
-    insertOplogEntry(noteOplog.toBSON());
+    insertOplogEntry(noteOplog);
 
     repl::OplogEntry updateOplog(repl::OpTime(),
                                  0,
@@ -249,7 +195,7 @@ TEST_F(FindAndModifyRetryability, ErrorIfRequestIsUpdateButOplogIsDelete) {
     repl::OplogEntry noteOplog(
         repl::OpTime(imageTs, 1), 0, repl::OpTypeEnum::kNoop, kNs, BSON("x" << 1 << "z" << 1));
 
-    insertOplogEntry(noteOplog.toBSON());
+    insertOplogEntry(noteOplog);
 
     repl::OplogEntry oplog(repl::OpTime(), 0, repl::OpTypeEnum::kDelete, kNs, BSON("_id" << 1));
     oplog.setPreImageTs(imageTs);
@@ -265,7 +211,7 @@ TEST_F(FindAndModifyRetryability, ErrorIfRequestIsPreImageButOplogHasPost) {
     repl::OplogEntry noteOplog(
         repl::OpTime(imageTs, 1), 0, repl::OpTypeEnum::kNoop, kNs, BSON("x" << 1 << "z" << 1));
 
-    insertOplogEntry(noteOplog.toBSON());
+    insertOplogEntry(noteOplog);
 
     repl::OplogEntry updateOplog(repl::OpTime(),
                                  0,
@@ -287,7 +233,7 @@ TEST_F(FindAndModifyRetryability, UpdateWithPreImage) {
     repl::OplogEntry noteOplog(
         repl::OpTime(imageTs, 1), 0, repl::OpTypeEnum::kNoop, kNs, BSON("x" << 1 << "z" << 1));
 
-    insertOplogEntry(noteOplog.toBSON());
+    insertOplogEntry(noteOplog);
 
     repl::OplogEntry updateOplog(repl::OpTime(),
                                  0,
@@ -315,7 +261,7 @@ TEST_F(FindAndModifyRetryability, UpdateWithPostImage) {
     repl::OplogEntry noteOplog(
         repl::OpTime(imageTs, 1), 0, repl::OpTypeEnum::kNoop, kNs, BSON("a" << 1 << "b" << 1));
 
-    insertOplogEntry(noteOplog.toBSON());
+    insertOplogEntry(noteOplog);
 
     repl::OplogEntry updateOplog(repl::OpTime(),
                                  0,
@@ -359,7 +305,7 @@ TEST_F(FindAndModifyRetryability, BasicRemove) {
     repl::OplogEntry noteOplog(
         repl::OpTime(imageTs, 1), 0, repl::OpTypeEnum::kNoop, kNs, BSON("_id" << 20 << "a" << 1));
 
-    insertOplogEntry(noteOplog.toBSON());
+    insertOplogEntry(noteOplog);
 
     repl::OplogEntry removeOplog(
         repl::OpTime(), 0, repl::OpTypeEnum::kDelete, kNs, BSON("_id" << 20));
