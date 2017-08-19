@@ -65,6 +65,14 @@ ISODate = function(isoDateStr) {
         throw Error("invalid ISO date");
 
     var year = parseInt(res[1], 10) || 1970;  // this should always be present
+    // If the year < 100, then we add 100 years and take it off later, because the Date.UTC constructor
+    // assumes that if the year is less than 100, then it should be 19xx, e.g. 1901 for 1.
+    // Given the regular expression ensures that years are 4 digits long (i.e. have to have leading
+    // zeroes), a year of 0000-0099 is intentional, not accidental.
+    var applyYearOffset = year < 100;
+    if (applyYearOffset) {
+        year += 100;
+    }
     var month = (parseInt(res[2], 10) || 1) - 1;
     var date = parseInt(res[3], 10) || 0;
     var hour = parseInt(res[5], 10) || 0;
@@ -105,7 +113,15 @@ ISODate = function(isoDateStr) {
         time += ofs;
     }
 
-    return new Date(time);
+    var rv = new Date(time);
+
+    if (applyYearOffset) {
+        var currentYear = rv.getUTCFullYear();
+        currentYear -= 100;
+        rv.setUTCFullYear(currentYear);
+    }
+
+    return rv;
 };
 
 // Regular Expression
