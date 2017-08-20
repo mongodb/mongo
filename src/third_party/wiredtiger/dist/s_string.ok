@@ -74,6 +74,7 @@ Checksum
 Checksums
 CityHash
 CloseHandle
+Cmvz
 Collet
 Comparator
 Config
@@ -264,6 +265,7 @@ NoAddr
 Noll
 Nul
 OOB
+OPLOG
 OPTYPE
 OUTBUFF
 OVFL
@@ -528,6 +530,7 @@ checkpointer
 checkpointing
 checksum
 checksums
+checksys
 checkvalue
 children's
 chk
@@ -940,6 +943,7 @@ msvc
 multi
 multiblock
 multicore
+multicycle
 multiprocess
 multisocket
 multithreaded
@@ -1284,6 +1288,7 @@ vtype
 vunpack
 vw
 vxr
+vz
 waitpid
 waker
 wakeup

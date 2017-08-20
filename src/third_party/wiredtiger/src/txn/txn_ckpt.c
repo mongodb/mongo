@@ -571,43 +571,17 @@ __checkpoint_prepare(WT_SESSION_IMPL *session, const char *cfg[])
 	WT_TXN *txn;
 	WT_TXN_GLOBAL *txn_global;
 	WT_TXN_STATE *txn_state;
-	char timestamp_buf[2 * WT_TIMESTAMP_SIZE + 1], timestamp_config[100];
-	const char *query_cfg[] = { WT_CONFIG_BASE(session,
-	    WT_CONNECTION_query_timestamp), "get=stable", NULL };
 	const char *txn_cfg[] = { WT_CONFIG_BASE(session,
 	    WT_SESSION_begin_transaction), "isolation=snapshot", NULL, NULL };
+	bool use_timestamp;
 
 	conn = S2C(session);
 	txn = &session->txn;
 	txn_global = &conn->txn_global;
 	txn_state = WT_SESSION_TXN_STATE(session);
 
-	/*
-	 * Someone giving us a specific timestamp overrides the general
-	 * use_timestamp.
-	 */
-	WT_RET(__wt_config_gets(session, cfg, "read_timestamp", &cval));
-	if (cval.len > 0) {
-		WT_RET(__wt_snprintf(timestamp_config, sizeof(timestamp_config),
-		    "read_timestamp=%.*s", (int)cval.len, cval.str));
-		txn_cfg[2] = timestamp_config;
-	} else if (txn_global->has_stable_timestamp) {
-		WT_RET(__wt_config_gets(session, cfg, "use_timestamp", &cval));
-		/*
-		 * Get the stable timestamp currently set.  Then set that as
-		 * the read timestamp for the transaction.
-		 */
-		if (cval.val != 0) {
-			if ((ret = __wt_txn_global_query_timestamp(session,
-			    timestamp_buf, query_cfg)) != 0 &&
-			    ret != WT_NOTFOUND)
-				return (ret);
-			WT_RET(__wt_snprintf(timestamp_config,
-			    sizeof(timestamp_config),
-			    "read_timestamp=%s", timestamp_buf));
-			txn_cfg[2] = timestamp_config;
-		}
-	}
+	WT_RET(__wt_config_gets(session, cfg, "use_timestamp", &cval));
+	use_timestamp = (cval.val != 0);
 
 	/*
 	 * Start a snapshot transaction for the checkpoint.
@@ -667,15 +641,33 @@ __checkpoint_prepare(WT_SESSION_IMPL *session, const char *cfg[])
 	 */
 	txn_state->id = txn_state->pinned_id =
 	    txn_state->metadata_pinned = WT_TXN_NONE;
-	__wt_writeunlock(session, &txn_global->rwlock);
 
 #ifdef HAVE_TIMESTAMPS
 	/*
-	 * Now that the checkpoint transaction is published, clear it from the
-	 * regular lists.
+	 * Set the checkpoint transaction's timestamp, if requested.
+	 *
+	 * We rely on having the global transaction data locked so the oldest
+	 * timestamp can't move past the stable timestamp.
 	 */
-	__wt_txn_clear_commit_timestamp(session);
-	__wt_txn_clear_read_timestamp(session);
+	WT_ASSERT(session, !F_ISSET(txn,
+	    WT_TXN_HAS_TS_COMMIT | WT_TXN_HAS_TS_READ |
+	    WT_TXN_PUBLIC_TS_COMMIT | WT_TXN_PUBLIC_TS_READ));
+
+	if (use_timestamp && txn_global->has_stable_timestamp) {
+		__wt_timestamp_set(
+		    &txn->read_timestamp, &txn_global->stable_timestamp);
+		F_SET(txn, WT_TXN_HAS_TS_READ);
+	}
+#else
+	WT_UNUSED(use_timestamp);
+#endif
+
+	__wt_writeunlock(session, &txn_global->rwlock);
+
+#ifdef HAVE_TIMESTAMPS
+	if (F_ISSET(txn, WT_TXN_HAS_TS_READ))
+		__wt_verbose_timestamp(session, &txn->read_timestamp,
+		    "Checkpoint requested at stable timestamp");
 #endif
 
 	/*

@@ -58,8 +58,12 @@ typedef struct {
 	uint64_t orig_btree_checkpoint_gen;
 	uint64_t orig_txn_checkpoint_gen;
 
-	/* Track the oldest transaction running when reconciliation starts. */
+	/*
+	 * Track the oldest running transaction and the stable timestamp when
+	 * reconciliation starts.
+	 */
 	uint64_t last_running;
+	WT_DECL_TIMESTAMP(stable_timestamp)
 
 	/* Track the page's maximum transaction. */
 	uint64_t max_txn;
@@ -506,6 +510,13 @@ __wt_reconcile(WT_SESSION_IMPL *session, WT_REF *ref,
 			WT_TRET(session->block_manager_cleanup(session));
 
 		WT_TRET(__rec_destroy_session(session));
+
+		/*
+		 * We track removed overflow objects in case there's a reader
+		 * in transit when they're removed. Any form of eviction locks
+		 * out readers, we can discard them all.
+		 */
+		__wt_ovfl_discard_remove(session, page);
 	}
 	WT_RET(ret);
 
@@ -881,6 +892,7 @@ __rec_init(WT_SESSION_IMPL *session,
 	WT_BTREE *btree;
 	WT_PAGE *page;
 	WT_RECONCILE *r;
+	WT_TXN_GLOBAL *txn_global;
 
 	btree = S2BT(session);
 	page = ref->page;
@@ -924,7 +936,13 @@ __rec_init(WT_SESSION_IMPL *session,
 	 * transaction running when reconciliation starts is considered
 	 * uncommitted.
 	 */
-	WT_ORDERED_READ(r->last_running, S2C(session)->txn_global.last_running);
+	txn_global = &S2C(session)->txn_global;
+	WT_ORDERED_READ(r->last_running, txn_global->last_running);
+#ifdef HAVE_TIMESTAMPS
+	WT_WITH_TIMESTAMP_READLOCK(session, &txn_global->rwlock,
+	    __wt_timestamp_set(
+		&r->stable_timestamp, &txn_global->stable_timestamp));
+#endif
 
 	/*
 	 * Lookaside table eviction is configured when eviction gets aggressive,
@@ -1194,6 +1212,64 @@ __rec_update_move(WT_SESSION_IMPL *session, WT_BOUNDARY *bnd, WT_SAVE_UPD *supd)
 }
 
 /*
+ * __rec_append_orig_value --
+ *	Append the key's original value to its update list.
+ */
+static int
+__rec_append_orig_value(WT_SESSION_IMPL *session,
+    WT_PAGE *page, WT_UPDATE *upd_list, WT_CELL_UNPACK *unpack)
+{
+	WT_DECL_ITEM(tmp);
+	WT_DECL_RET;
+	WT_UPDATE *append, *upd;
+	size_t size;
+
+	/* If at least one standard update is globally visible, we're done. */
+	for (upd = upd_list; upd != NULL; upd = upd->next)
+		if (WT_UPDATE_DATA_VALUE(upd) &&
+		    __wt_txn_upd_visible_all(session, upd))
+			return (0);
+
+	/*
+	 * We need the original on-page value for some reader: get a copy and
+	 * append it to the end of the update list with a transaction ID that
+	 * guarantees its visibility.
+	 *
+	 * If we don't have a value cell, it's an insert/append list key/value
+	 * pair which simply doesn't exist for some reader; place a deleted
+	 * record at the end of the update list.
+	 */
+	append = NULL;			/* -Wconditional-uninitialized */
+	size = 0;			/* -Wconditional-uninitialized */
+	if (unpack == NULL || unpack->type == WT_CELL_DEL)
+		WT_RET(__wt_update_alloc(session,
+		    NULL, &append, &size, WT_UPDATE_DELETED));
+	else {
+		WT_RET(__wt_scr_alloc(session, 0, &tmp));
+		WT_ERR(__wt_page_cell_data_ref(session, page, unpack, tmp));
+		WT_ERR(__wt_update_alloc(
+		    session, tmp, &append, &size, WT_UPDATE_STANDARD));
+	}
+
+	/*
+	 * Give the entry no transaction ID to ensure global visibility, append
+	 * it to the update list.
+	 *
+	 * Note the change to the actual reader-accessible update list: from now
+	 * on, the original on-page value appears at the end of the update list,
+	 * even if this reconciliation subsequently fails.
+	 */
+	append->txnid = WT_TXN_NONE;
+	for (upd = upd_list; upd->next != NULL; upd = upd->next)
+		;
+	WT_PUBLISH(upd->next, append);
+	__wt_cache_page_inmem_incr(session, page, size);
+
+err:	__wt_scr_free(session, &tmp);
+	return (ret);
+}
+
+/*
  * __rec_txn_read --
  *	Return the update in a list that should be written (or NULL if none can
  * be written).
@@ -1203,18 +1279,14 @@ __rec_txn_read(WT_SESSION_IMPL *session, WT_RECONCILE *r,
     WT_INSERT *ins, void *ripcip, WT_CELL_UNPACK *vpack, WT_UPDATE **updp)
 {
 	WT_BTREE *btree;
-	WT_DECL_RET;
-	WT_DECL_ITEM(tmp);
-	WT_DECL_TIMESTAMP(min_timestamp)
 	WT_DECL_TIMESTAMP(max_timestamp)
 	WT_PAGE *page;
-	WT_UPDATE *append, *upd, *upd_list;
-	size_t size, update_mem;
-	uint64_t max_txn, min_txn, txnid;
-	bool append_origv, skipped;
+	WT_UPDATE *upd, *upd_list;
+	size_t update_mem;
+	uint64_t max_txn, txnid;
+	bool skipped;
 
 	*updp = NULL;
-	append = NULL;			/* -Wconditional-uninitialized */
 
 	btree = S2BT(session);
 	page = r->page;
@@ -1235,9 +1307,7 @@ __rec_txn_read(WT_SESSION_IMPL *session, WT_RECONCILE *r,
 	max_txn = WT_TXN_NONE;
 #ifdef HAVE_TIMESTAMPS
 	__wt_timestamp_set_zero(&max_timestamp);
-	__wt_timestamp_set_inf(&min_timestamp);
 #endif
-	min_txn = UINT64_MAX;
 
 	if (F_ISSET(r, WT_EVICTING)) {
 		/* Discard obsolete updates. */
@@ -1258,8 +1328,6 @@ __rec_txn_read(WT_SESSION_IMPL *session, WT_RECONCILE *r,
 			 */
 			if (WT_TXNID_LT(max_txn, txnid))
 				max_txn = txnid;
-			if (WT_TXNID_LT(txnid, min_txn))
-				min_txn = txnid;
 
 			/*
 			 * Find the first update we can use.
@@ -1285,17 +1353,13 @@ __rec_txn_read(WT_SESSION_IMPL *session, WT_RECONCILE *r,
 
 			if (*updp == NULL)
 				*updp = upd;
+
 #ifdef HAVE_TIMESTAMPS
 			/* Track min/max timestamps. */
 			if (__wt_timestamp_cmp(
-			    &max_timestamp, &upd->timestamp) < 0)
+			    &upd->timestamp, &max_timestamp) > 0)
 				__wt_timestamp_set(
 				    &max_timestamp, &upd->timestamp);
-
-			if (__wt_timestamp_cmp(
-			    &min_timestamp, &upd->timestamp) > 0)
-				__wt_timestamp_set(
-				    &min_timestamp, &upd->timestamp);
 #endif
 		}
 	} else
@@ -1325,7 +1389,7 @@ __rec_txn_read(WT_SESSION_IMPL *session, WT_RECONCILE *r,
 			}
 		}
 
-	/* Reconciliation should never see a reserved update. */
+	/* Reconciliation should never see an aborted or reserved update. */
 	WT_ASSERT(session, *updp == NULL ||
 	    ((*updp)->txnid != WT_TXN_ABORTED &&
 	    (*updp)->type != WT_UPDATE_RESERVED));
@@ -1370,18 +1434,17 @@ __rec_txn_read(WT_SESSION_IMPL *session, WT_RECONCILE *r,
 	if (!skipped && (F_ISSET(btree, WT_BTREE_LOOKASIDE) ||
 	    __wt_txn_visible_all(session,
 	    max_txn, WT_TIMESTAMP_NULL(&max_timestamp)))) {
-#ifdef HAVE_DIAGNOSTIC
 		/*
 		 * The checkpoint transaction is special.  Make sure we never
 		 * write (metadata) updates from a checkpoint in a concurrent
 		 * session.
 		 */
-		txnid = *updp == NULL ? WT_TXN_NONE : (*updp)->txnid;
-		WT_ASSERT(session, txnid == WT_TXN_NONE ||
-		    txnid != S2C(session)->txn_global.checkpoint_state.id ||
+		WT_ASSERT(session, *updp == NULL ||
+		    (*updp)->txnid !=
+		    S2C(session)->txn_global.checkpoint_state.id ||
 		    WT_SESSION_IS_CHECKPOINT(session));
-#endif
-		return (0);
+
+		goto check_original_value;
 	}
 
 	/*
@@ -1400,7 +1463,7 @@ __rec_txn_read(WT_SESSION_IMPL *session, WT_RECONCILE *r,
 	 */
 	if (!F_ISSET(r, WT_EVICTING)) {
 		r->leave_dirty = true;
-		return (0);
+		goto check_original_value;
 	}
 
 	/*
@@ -1441,7 +1504,20 @@ __rec_txn_read(WT_SESSION_IMPL *session, WT_RECONCILE *r,
 	if (skipped)
 		r->update_mem_uncommitted += update_mem;
 
-	append_origv = false;
+#ifdef HAVE_TIMESTAMPS
+	/*
+	 * Don't allow lookaside eviction with updates newer than the stable
+	 * timestamp.  Also don't recommend lookaside eviction in that case.
+	 */
+	if (__wt_timestamp_cmp(&max_timestamp, &r->stable_timestamp) > 0) {
+		if (!F_ISSET(r, WT_EVICT_UPDATE_RESTORE))
+			return (EBUSY);
+
+		if (!skipped)
+			r->update_mem_uncommitted += update_mem;
+	}
+#endif
+
 	if (F_ISSET(r, WT_EVICT_UPDATE_RESTORE)) {
 		/*
 		 * The save/restore eviction path.
@@ -1456,58 +1532,6 @@ __rec_txn_read(WT_SESSION_IMPL *session, WT_RECONCILE *r,
 
 		/* The page can't be marked clean. */
 		r->leave_dirty = true;
-	} else {
-		/*
-		 * The lookaside table eviction path.
-		 *
-		 * If at least one update is globally visible, copy the update
-		 * list and ignore the current on-page value. If no update is
-		 * globally visible, readers require the page's original value.
-		 */
-		if (!__wt_txn_visible_all(
-		    session, min_txn, WT_TIMESTAMP_NULL(&min_timestamp)))
-			append_origv = true;
-	}
-
-	/*
-	 * We need the original on-page value for some reason: get a copy and
-	 * append it to the end of the update list with a transaction ID that
-	 * guarantees its visibility.
-	 */
-	if (append_origv) {
-		/*
-		 * If we don't have a value cell, it's an insert/append list
-		 * key/value pair which simply doesn't exist for some reader;
-		 * place a deleted record at the end of the update list.
-		 */
-		size = 0;		/* -Wconditional-uninitialized */
-		if (vpack == NULL || vpack->type == WT_CELL_DEL)
-			WT_RET(__wt_update_alloc(session,
-			    NULL, &append, &size, WT_UPDATE_DELETED));
-		else {
-			WT_RET(__wt_scr_alloc(session, 0, &tmp));
-			if ((ret = __wt_page_cell_data_ref(
-			    session, page, vpack, tmp)) == 0)
-				ret = __wt_update_alloc(session,
-				    tmp, &append, &size, WT_UPDATE_STANDARD);
-			__wt_scr_free(session, &tmp);
-			WT_RET(ret);
-		}
-
-		/*
-		 * Give the entry no transaction ID to ensure global visibility,
-		 * append it to the update list.
-		 *
-		 * Note the change to the actual reader-accessible update list:
-		 * from now on, the original on-page value appears at the end
-		 * of the update list, even if this reconciliation subsequently
-		 * fails.
-		 */
-		append->txnid = WT_TXN_NONE;
-		for (upd = upd_list; upd->next != NULL; upd = upd->next)
-			;
-		WT_PUBLISH(upd->next, append);
-		__wt_cache_page_inmem_incr(session, page, size);
 	}
 
 	/*
@@ -1521,7 +1545,23 @@ __rec_txn_read(WT_SESSION_IMPL *session, WT_RECONCILE *r,
 	 * that transaction ID is globally visible, we know we no longer need
 	 * the lookaside table records, allowing them to be discarded.
 	 */
-	return (__rec_update_save(session, r, ins, ripcip, *updp));
+	WT_RET(__rec_update_save(session, r, ins, ripcip, *updp));
+
+check_original_value:
+	/*
+	 * Returning an update means the original on-page value might be lost,
+	 * and that's a problem if there's a reader that needs it. There are
+	 * two cases: any lookaside table eviction (because the backing disk
+	 * image is rewritten), or any reconciliation of a backing overflow
+	 * record that will be physically removed once it's no longer needed.
+	 */
+	if (*updp != NULL &&
+	    (F_ISSET(r, WT_EVICT_LOOKASIDE) ||
+	    (vpack != NULL &&
+	    vpack->ovfl && vpack->raw != WT_CELL_VALUE_OVFL_RM)))
+		WT_RET(__rec_append_orig_value(session, page, *updp, vpack));
+
+	return (0);
 }
 
 /*
@@ -4708,7 +4748,7 @@ __rec_col_var(WT_SESSION_IMPL *session,
 			 * file, otherwise we'll leak blocks on the checkpoint.
 			 * That's safe because if the backing overflow value is
 			 * still needed by any running transaction, we'll cache
-			 * a copy in the reconciliation tracking structures.
+			 * a copy in the update list.
 			 *
 			 * Regardless, we avoid copying in overflow records: if
 			 * there's a WT_INSERT entry that modifies a reference
@@ -4793,8 +4833,8 @@ record_loop:	/*
 				 * The on-page value will never be accessed,
 				 * write a placeholder record.
 				 */
-				data = "@";
-				size = 1;
+				data = "ovfl-unused";
+				size = WT_STORE_SIZE(strlen("ovfl-unused"));
 			} else {
 				update_no_copy = false;	/* Maybe data copy */
 
@@ -4928,7 +4968,8 @@ compare:		/*
 		 */
 		if (ovfl_state == OVFL_UNUSED &&
 		    vpack->raw != WT_CELL_VALUE_OVFL_RM)
-			WT_ERR(__wt_ovfl_remove(session, page, upd, vpack));
+			WT_ERR(__wt_ovfl_remove(
+			    session, page, vpack, !F_ISSET(r, WT_EVICTING)));
 	}
 
 	/* Walk any append list. */
@@ -5535,8 +5576,9 @@ __rec_row_leaf(WT_SESSION_IMPL *session,
 				 * The on-page value will never be accessed,
 				 * write a placeholder record.
 				 */
-				WT_ERR(__rec_cell_build_val(
-				    session, r, "@", 1, (uint64_t)0));
+				WT_ERR(__rec_cell_build_val(session, r,
+				    "ovfl-unused", strlen("ovfl-unused"),
+				    (uint64_t)0));
 			} else {
 				val->buf.data = val_cell;
 				val->buf.size = __wt_cell_total_len(vpack);
@@ -5554,8 +5596,8 @@ __rec_row_leaf(WT_SESSION_IMPL *session,
 			 */
 			if (vpack != NULL &&
 			    vpack->ovfl && vpack->raw != WT_CELL_VALUE_OVFL_RM)
-				WT_ERR(__wt_ovfl_remove(
-				    session, page, upd, vpack));
+				WT_ERR(__wt_ovfl_remove(session,
+				    page, vpack, !F_ISSET(r, WT_EVICTING)));
 
 			switch (upd->type) {
 			case WT_UPDATE_DELETED:

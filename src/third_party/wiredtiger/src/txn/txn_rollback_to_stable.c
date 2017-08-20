@@ -37,10 +37,10 @@ __txn_rollback_to_stable_lookaside_fixup(WT_SESSION_IMPL *session)
 	 * updated while rolling back, accessing it without a lock would
 	 * violate protocol.
 	 */
-	txn_global = &S2C(session)->txn_global;
-	__wt_readlock(session, &txn_global->rwlock);
-	__wt_timestamp_set(&rollback_timestamp, &txn_global->stable_timestamp);
-	__wt_readunlock(session, &txn_global->rwlock);
+	txn_global = &conn->txn_global;
+	WT_WITH_TIMESTAMP_READLOCK(session, &txn_global->rwlock,
+	    __wt_timestamp_set(
+		&rollback_timestamp, &txn_global->stable_timestamp));
 
 	__wt_las_cursor(session, &cursor, &session_flags);
 
@@ -120,17 +120,61 @@ __txn_abort_newer_update(WT_SESSION_IMPL *session,
 }
 
 /*
- * __txn_abort_newer_row_skip --
+ * __txn_abort_newer_insert --
  *	Apply the update abort check to each entry in an insert skip list
  */
 static void
-__txn_abort_newer_row_skip(WT_SESSION_IMPL *session,
+__txn_abort_newer_insert(WT_SESSION_IMPL *session,
     WT_INSERT_HEAD *head, wt_timestamp_t *rollback_timestamp)
 {
 	WT_INSERT *ins;
 
 	WT_SKIP_FOREACH(ins, head)
 		__txn_abort_newer_update(session, ins->upd, rollback_timestamp);
+}
+
+/*
+ * __txn_abort_newer_col_var --
+ *	Abort updates on a variable length col leaf page with timestamps newer
+ *	than the rollback timestamp.
+ */
+static void
+__txn_abort_newer_col_var(
+    WT_SESSION_IMPL *session, WT_PAGE *page, wt_timestamp_t *rollback_timestamp)
+{
+	WT_COL *cip;
+	WT_INSERT_HEAD *ins;
+	uint32_t i;
+
+	/* Review the changes to the original on-page data items */
+	WT_COL_FOREACH(page, cip, i)
+		if ((ins = WT_COL_UPDATE(page, cip)) != NULL)
+			__txn_abort_newer_insert(session,
+			    ins, rollback_timestamp);
+
+	/* Review the append list */
+	if ((ins = WT_COL_APPEND(page)) != NULL)
+		__txn_abort_newer_insert(session, ins, rollback_timestamp);
+}
+
+/*
+ * __txn_abort_newer_col_fix --
+ *	Abort updates on a fixed length col leaf page with timestamps newer than
+ *	the rollback timestamp.
+ */
+static void
+__txn_abort_newer_col_fix(
+    WT_SESSION_IMPL *session, WT_PAGE *page, wt_timestamp_t *rollback_timestamp)
+{
+	WT_INSERT_HEAD *ins;
+
+	/* Review the changes to the original on-page data items */
+	if ((ins = WT_COL_UPDATE_SINGLE(page)) != NULL)
+		__txn_abort_newer_insert(session, ins, rollback_timestamp);
+
+	/* Review the append list */
+	if ((ins = WT_COL_APPEND(page)) != NULL)
+		__txn_abort_newer_insert(session, ins, rollback_timestamp);
 }
 
 /*
@@ -152,8 +196,7 @@ __txn_abort_newer_row_leaf(
 	 * page.
 	 */
 	if ((insert = WT_ROW_INSERT_SMALLEST(page)) != NULL)
-		__txn_abort_newer_row_skip(
-		    session, insert, rollback_timestamp);
+		__txn_abort_newer_insert(session, insert, rollback_timestamp);
 
 	/*
 	 * Review updates that belong to keys that are on the disk image,
@@ -165,7 +208,7 @@ __txn_abort_newer_row_leaf(
 			    session, upd, rollback_timestamp);
 
 		if ((insert = WT_ROW_INSERT(page, rip)) != NULL)
-			__txn_abort_newer_row_skip(
+			__txn_abort_newer_insert(
 			    session, insert, rollback_timestamp);
 	}
 }
@@ -182,6 +225,13 @@ __txn_abort_newer_updates(
 
 	page = ref->page;
 	switch (page->type) {
+	case WT_PAGE_COL_FIX:
+		__txn_abort_newer_col_fix(session, page, rollback_timestamp);
+		break;
+	case WT_PAGE_COL_VAR:
+		__txn_abort_newer_col_var(session, page, rollback_timestamp);
+		break;
+	case WT_PAGE_COL_INT:
 	case WT_PAGE_ROW_INT:
 		/*
 		 * There is nothing to do for internal pages, since we aren't
@@ -193,9 +243,7 @@ __txn_abort_newer_updates(
 	case WT_PAGE_ROW_LEAF:
 		__txn_abort_newer_row_leaf(session, page, rollback_timestamp);
 		break;
-	default:
-		WT_RET_MSG(session, EINVAL, "rollback_to_stable "
-		    "is only supported for row store btrees");
+	WT_ILLEGAL_VALUE(session);
 	}
 
 	return (0);
@@ -209,14 +257,11 @@ static int
 __txn_rollback_to_stable_custom_skip(
     WT_SESSION_IMPL *session, WT_REF *ref, void *context, bool *skipp)
 {
-	WT_UNUSED(session);
 	WT_UNUSED(context);
+	WT_UNUSED(session);
 
 	/* Review all pages that are in memory. */
-	if (ref->state == WT_REF_MEM || ref->state == WT_REF_DELETED)
-		*skipp = false;
-	else
-		*skipp = true;
+	*skipp = !(ref->state == WT_REF_MEM || ref->state == WT_REF_DELETED);
 	return (0);
 }
 
@@ -284,8 +329,7 @@ __txn_rollback_to_stable_btree(
 		 * Add the btree ID to the bitstring, so we can exclude any
 		 * lookaside entries for this btree.
 		 */
-		__bit_set(
-		    S2C(session)->stable_rollback_bitstring, btree->id);
+		__bit_set(S2C(session)->stable_rollback_bitstring, btree->id);
 		return (0);
 	}
 
@@ -297,19 +341,15 @@ __txn_rollback_to_stable_btree(
 	if (btree->root.page == NULL)
 		return (0);
 
-	if (btree->type != BTREE_ROW)
-		WT_RET_MSG(session, EINVAL, "rollback_to_stable "
-		    "is only supported for row store btrees");
-
 	/*
 	 * Copy the stable timestamp, otherwise we'd need to lock it each time
 	 * it's accessed. Even though the stable timestamp isn't supposed to be
 	 * updated while rolling back, accessing it without a lock would
 	 * violate protocol.
 	 */
-	__wt_readlock(session, &txn_global->rwlock);
-	__wt_timestamp_set(&rollback_timestamp, &txn_global->stable_timestamp);
-	__wt_readunlock(session, &txn_global->rwlock);
+	WT_WITH_TIMESTAMP_READLOCK(session, &txn_global->rwlock,
+	    __wt_timestamp_set(
+		&rollback_timestamp, &txn_global->stable_timestamp));
 
 	/*
 	 * Ensure the eviction server is out of the file - we don't
@@ -333,15 +373,12 @@ static int
 __txn_rollback_to_stable_check(WT_SESSION_IMPL *session)
 {
 	WT_TXN_GLOBAL *txn_global;
-	bool active_txns, stable_set;
+	bool txn_active;
 
 	txn_global = &S2C(session)->txn_global;
-	__wt_readlock(session, &txn_global->rwlock);
-	stable_set = !__wt_timestamp_iszero(&txn_global->stable_timestamp);
-	__wt_readunlock(session, &txn_global->rwlock);
-	if (!stable_set)
-		WT_RET_MSG(session, EINVAL, "rollback_to_stable requires a "
-		    "stable timestamp");
+	if (!txn_global->has_stable_timestamp)
+		WT_RET_MSG(session, EINVAL,
+		    "rollback_to_stable requires a stable timestamp");
 
 	/*
 	 * Help the user - see if they have any active transactions. I'd
@@ -349,8 +386,8 @@ __txn_rollback_to_stable_check(WT_SESSION_IMPL *session)
 	 * require peeking into all open sessions, which isn't really
 	 * kosher.
 	 */
-	WT_RET(__wt_txn_are_any_active(session, &active_txns));
-	if (active_txns)
+	WT_RET(__wt_txn_activity_check(session, &txn_active));
+	if (txn_active)
 		WT_RET_MSG(session, EINVAL,
 		    "rollback_to_stable illegal with active transactions");
 
@@ -369,9 +406,8 @@ __wt_txn_rollback_to_stable(WT_SESSION_IMPL *session, const char *cfg[])
 #ifndef HAVE_TIMESTAMPS
 	WT_UNUSED(cfg);
 
-	WT_RET_MSG(session, EINVAL, "rollback_to_stable "
-	    "requires a version of WiredTiger built with timestamp "
-	    "support");
+	WT_RET_MSG(session, ENOTSUP, "rollback_to_stable "
+	    "requires a version of WiredTiger built with timestamp support");
 #else
 	WT_CONNECTION_IMPL *conn;
 	WT_DECL_RET;

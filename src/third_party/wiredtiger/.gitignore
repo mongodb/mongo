@@ -134,6 +134,7 @@ _wiredtiger.pyd
 **/test/packing/packing-test
 **/test/readonly/t
 **/test/recovery/random-abort
+**/test/recovery/timestamp-abort
 **/test/recovery/truncated-log
 **/test/salvage/t
 **/test/syscall/test_wt2336_base

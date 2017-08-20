@@ -386,8 +386,9 @@ struct __wt_page_modify {
 
 		/* Cached overflow value cell/update address pairs. */
 		struct {
-			WT_CELL   *cell;
-			WT_UPDATE *upd;
+			WT_CELL	*cell;
+			uint8_t	*data;
+			size_t	 size;
 		} *remove;
 		size_t	 remove_allocated;
 		uint32_t remove_next;
@@ -895,10 +896,11 @@ struct __wt_update {
 
 	uint32_t size;			/* data length */
 
-#define	WT_UPDATE_DELETED	0	/* deleted */
-#define	WT_UPDATE_MODIFIED	1	/* partial-update modify value */
-#define	WT_UPDATE_RESERVED	2	/* reserved */
-#define	WT_UPDATE_STANDARD	3	/* complete value */
+#define	WT_UPDATE_INVALID	0	/* diagnostic check */
+#define	WT_UPDATE_DELETED	1	/* deleted */
+#define	WT_UPDATE_MODIFIED	2	/* partial-update modify value */
+#define	WT_UPDATE_RESERVED	3	/* reserved */
+#define	WT_UPDATE_STANDARD	4	/* complete value */
 	uint8_t type;			/* type (one byte to conserve memory) */
 
 	/* If the update includes a complete value. */
@@ -936,7 +938,7 @@ struct __wt_update {
  *	Limit update chains to a small value to avoid penalizing reads and
  * permit truncation.
  */
-#define	WT_MAX_MODIFY_UPDATE	100
+#define	WT_MAX_MODIFY_UPDATE	10
 
 /*
  * WT_INSERT --

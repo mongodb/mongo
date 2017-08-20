@@ -8,8 +8,6 @@
 
 #include "wt_internal.h"
 
-static int __conn_statistics_config(WT_SESSION_IMPL *, const char *[]);
-
 /*
  * ext_collate --
  *	Call the collation function (external API version).
@@ -187,45 +185,6 @@ __wt_conn_remove_collator(WT_SESSION_IMPL *session)
 	}
 
 	return (ret);
-}
-
-/*
- * __conn_compat_config --
- *	Configure compatibility version.
- */
-static int
-__conn_compat_config(WT_SESSION_IMPL *session, const char **cfg)
-{
-	WT_CONFIG_ITEM cval;
-	WT_CONNECTION_IMPL *conn;
-	uint16_t patch;
-
-	conn = S2C(session);
-	WT_RET(__wt_config_gets(session, cfg,
-	    "compatibility.release", &cval));
-	if (cval.len != 0) {
-		/*
-		 * Accept either a major.minor release string or a
-		 * major.minor.patch release string.  We ignore the patch
-		 * value, but allow it in the string.
-		 */
-		if (sscanf(cval.str, "%" SCNu16 ".%" SCNu16,
-		    &conn->compat_major, &conn->compat_minor) != 2 &&
-		    sscanf(cval.str, "%" SCNu16 ".%" SCNu16 ".%" SCNu16,
-		    &conn->compat_major, &conn->compat_minor, &patch) != 3)
-			WT_RET_MSG(session,
-			    EINVAL, "illegal compatibility release");
-		if (conn->compat_major > WIREDTIGER_VERSION_MAJOR)
-			WT_RET_MSG(session, EINVAL, "unknown major version");
-		if (conn->compat_major == WIREDTIGER_VERSION_MAJOR &&
-		    conn->compat_minor > WIREDTIGER_VERSION_MINOR)
-			WT_RET_MSG(session,
-			    EINVAL, "illegal compatibility version");
-	} else {
-		conn->compat_major = WIREDTIGER_VERSION_MAJOR;
-		conn->compat_minor = WIREDTIGER_VERSION_MINOR;
-	}
-	return (0);
 }
 
 /*
@@ -1143,57 +1102,12 @@ __conn_reconfigure(WT_CONNECTION *wt_conn, const char *config)
 	WT_CONNECTION_IMPL *conn;
 	WT_DECL_RET;
 	WT_SESSION_IMPL *session;
-	const char *p;
-	bool locked;
 
 	conn = (WT_CONNECTION_IMPL *)wt_conn;
-	locked = false;
 
 	CONNECTION_API_CALL(conn, session, reconfigure, config, cfg);
-
-	/* Serialize reconfiguration. */
-	__wt_spin_lock(session, &conn->reconfig_lock);
-	locked = true;
-
-	/*
-	 * The configuration argument has been checked for validity, update the
-	 * previous connection configuration.
-	 *
-	 * DO NOT merge the configuration before the reconfigure calls.  Some
-	 * of the underlying reconfiguration functions do explicit checks with
-	 * the second element of the configuration array, knowing the defaults
-	 * are in slot #1 and the application's modifications are in slot #2.
-	 *
-	 * First, replace the base configuration set up by CONNECTION_API_CALL
-	 * with the current connection configuration, otherwise reconfiguration
-	 * functions will find the base value instead of previously configured
-	 * value.
-	 */
-	cfg[0] = conn->cfg;
-	cfg[1] = config;
-
-	/* Second, reconfigure the system. */
-	WT_ERR(__conn_compat_config(session, cfg));
-	WT_ERR(__conn_statistics_config(session, cfg));
-	WT_ERR(__wt_async_reconfig(session, cfg));
-	WT_ERR(__wt_cache_config(session, true, cfg));
-	WT_ERR(__wt_checkpoint_server_create(session, cfg));
-	WT_ERR(__wt_logmgr_reconfig(session, cfg));
-	WT_ERR(__wt_lsm_manager_reconfig(session, cfg));
-	WT_ERR(__wt_statlog_create(session, cfg));
-	WT_ERR(__wt_sweep_config(session, cfg));
-	WT_ERR(__wt_verbose_config(session, cfg));
-	WT_ERR(__wt_timing_stress_config(session, cfg));
-
-	/* Third, merge everything together, creating a new connection state. */
-	WT_ERR(__wt_config_merge(session, cfg, NULL, &p));
-	__wt_free(session, conn->cfg);
-	conn->cfg = p;
-
-err:	if (locked)
-		__wt_spin_unlock(session, &conn->reconfig_lock);
-
-	API_END_RET(session, ret);
+	ret = __wt_conn_reconfig(session, cfg);
+err:	API_END_RET(session, ret);
 }
 
 /*
@@ -1274,8 +1188,7 @@ __conn_rollback_to_stable(WT_CONNECTION *wt_conn, const char *config)
 
 	conn = (WT_CONNECTION_IMPL *)wt_conn;
 
-	CONNECTION_API_CALL(
-	    conn, session, rollback_to_stable, config, cfg);
+	CONNECTION_API_CALL(conn, session, rollback_to_stable, config, cfg);
 	WT_TRET(__wt_txn_rollback_to_stable(session, cfg));
 err:	API_END_RET(session, ret);
 }
@@ -1788,94 +1701,6 @@ err:	/*
 	return (ret);
 }
 
-/*
- * __conn_statistics_config --
- *	Set statistics configuration.
- */
-static int
-__conn_statistics_config(WT_SESSION_IMPL *session, const char *cfg[])
-{
-	WT_CONFIG_ITEM cval, sval;
-	WT_CONNECTION_IMPL *conn;
-	WT_DECL_RET;
-	uint32_t flags;
-	int set;
-
-	conn = S2C(session);
-
-	WT_RET(__wt_config_gets(session, cfg, "statistics", &cval));
-
-	flags = 0;
-	set = 0;
-	if ((ret = __wt_config_subgets(
-	    session, &cval, "none", &sval)) == 0 && sval.val != 0) {
-		flags = 0;
-		++set;
-	}
-	WT_RET_NOTFOUND_OK(ret);
-
-	if ((ret = __wt_config_subgets(
-	    session, &cval, "fast", &sval)) == 0 && sval.val != 0) {
-		LF_SET(WT_STAT_TYPE_FAST);
-		++set;
-	}
-	WT_RET_NOTFOUND_OK(ret);
-
-	if ((ret = __wt_config_subgets(
-	    session, &cval, "all", &sval)) == 0 && sval.val != 0) {
-		LF_SET(
-		    WT_STAT_TYPE_ALL | WT_STAT_TYPE_CACHE_WALK |
-		    WT_STAT_TYPE_FAST | WT_STAT_TYPE_TREE_WALK);
-		++set;
-	}
-	WT_RET_NOTFOUND_OK(ret);
-
-	if (set > 1)
-		WT_RET_MSG(session, EINVAL,
-		    "Only one of all, fast, none configuration values should "
-		    "be specified");
-
-	/*
-	 * Now that we've parsed general statistics categories, process
-	 * sub-categories.
-	 */
-	if ((ret = __wt_config_subgets(
-	    session, &cval, "cache_walk", &sval)) == 0 && sval.val != 0)
-		/*
-		 * Configuring cache walk statistics implies fast statistics.
-		 * Keep that knowledge internal for now - it may change in the
-		 * future.
-		 */
-		LF_SET(WT_STAT_TYPE_FAST | WT_STAT_TYPE_CACHE_WALK);
-	WT_RET_NOTFOUND_OK(ret);
-
-	if ((ret = __wt_config_subgets(
-	    session, &cval, "tree_walk", &sval)) == 0 && sval.val != 0)
-		/*
-		 * Configuring tree walk statistics implies fast statistics.
-		 * Keep that knowledge internal for now - it may change in the
-		 * future.
-		 */
-		LF_SET(WT_STAT_TYPE_FAST | WT_STAT_TYPE_TREE_WALK);
-	WT_RET_NOTFOUND_OK(ret);
-
-	if ((ret = __wt_config_subgets(
-	    session, &cval, "clear", &sval)) == 0 && sval.val != 0) {
-		if (!LF_ISSET(WT_STAT_TYPE_ALL | WT_STAT_TYPE_CACHE_WALK |
-		    WT_STAT_TYPE_FAST | WT_STAT_TYPE_TREE_WALK))
-			WT_RET_MSG(session, EINVAL,
-			    "the value \"clear\" can only be specified if "
-			    "statistics are enabled");
-		LF_SET(WT_STAT_CLEAR);
-	}
-	WT_RET_NOTFOUND_OK(ret);
-
-	/* Configuring statistics clears any existing values. */
-	conn->stat_flags = flags;
-
-	return (0);
-}
-
 /* Simple structure for name and flag configuration searches. */
 typedef struct {
 	const char *name;
@@ -1916,6 +1741,7 @@ __wt_verbose_config(WT_SESSION_IMPL *session, const char *cfg[])
 		{ "split",		WT_VERB_SPLIT },
 		{ "temporary",		WT_VERB_TEMPORARY },
 		{ "thread_group",	WT_VERB_THREAD_GROUP },
+		{ "timestamp",		WT_VERB_TIMESTAMP },
 		{ "transaction",	WT_VERB_TRANSACTION },
 		{ "verify",		WT_VERB_VERIFY },
 		{ "version",		WT_VERB_VERSION },
@@ -2344,7 +2170,7 @@ wiredtiger_open(const char *home, WT_EVENT_HANDLER *event_handler,
 	/*
 	 * Set compatibility versions early so that any subsystem sees it.
 	 */
-	WT_ERR(__conn_compat_config(session, cfg));
+	WT_ERR(__wt_conn_compat_config(session, cfg));
 
 	/*
 	 * If the application didn't configure its own file system, configure
@@ -2531,7 +2357,7 @@ wiredtiger_open(const char *home, WT_EVENT_HANDLER *event_handler,
 	WT_ERR(__wt_config_gets(session, cfg, "mmap", &cval));
 	conn->mmap = cval.val != 0;
 
-	WT_ERR(__conn_statistics_config(session, cfg));
+	WT_ERR(__wt_conn_statistics_config(session, cfg));
 	WT_ERR(__wt_lsm_manager_config(session, cfg));
 	WT_ERR(__wt_sweep_config(session, cfg));
 

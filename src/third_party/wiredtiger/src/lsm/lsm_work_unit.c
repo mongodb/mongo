@@ -256,6 +256,63 @@ err:
 }
 
 /*
+ * __wt_lsm_chunk_visible_all --
+ *	Setup a timestamp and check visibility for a chunk, can be called
+ *	from multiple threads in parallel
+ */
+bool
+__wt_lsm_chunk_visible_all(
+    WT_SESSION_IMPL *session, WT_LSM_CHUNK *chunk)
+{
+	/* Once a chunk has been flushed it's contents must be visible */
+	if (F_ISSET(chunk, WT_LSM_CHUNK_ONDISK | WT_LSM_CHUNK_STABLE))
+		return (true);
+
+	if (chunk->switch_txn == WT_TXN_NONE ||
+	    !__wt_txn_visible_all(session, chunk->switch_txn, NULL))
+		return (false);
+
+#ifdef HAVE_TIMESTAMPS
+	{
+	WT_TXN_GLOBAL *txn_global;
+
+	txn_global = &S2C(session)->txn_global;
+
+	/*
+	 * Once all transactions with updates in the chunk are visible all
+	 * timestamps associated with those updates are assigned so setup a
+	 * timestamp for visibility checking.
+	 */
+	if (txn_global->has_commit_timestamp ||
+	    txn_global->has_pinned_timestamp) {
+		if (!F_ISSET(chunk, WT_LSM_CHUNK_HAS_TIMESTAMP)) {
+			__wt_spin_lock(session, &chunk->timestamp_spinlock);
+			/* Set the timestamp if we won the race */
+			if (!F_ISSET(chunk, WT_LSM_CHUNK_HAS_TIMESTAMP)) {
+				__wt_readlock(session, &txn_global->rwlock);
+				__wt_timestamp_set(&chunk->switch_timestamp,
+				    &txn_global->commit_timestamp);
+				__wt_readunlock(session, &txn_global->rwlock);
+				F_SET(chunk, WT_LSM_CHUNK_HAS_TIMESTAMP);
+			}
+			__wt_spin_unlock(session, &chunk->timestamp_spinlock);
+		}
+		if (!__wt_txn_visible_all(
+		    session, chunk->switch_txn, &chunk->switch_timestamp))
+			return (false);
+	} else
+		/*
+		 * If timestamps aren't in use when the chunk becomes visible
+		 * use the zero timestamp for visibility checks. Otherwise
+		 * there could be confusion if timestamps start being used.
+		 */
+		F_SET(chunk, WT_LSM_CHUNK_HAS_TIMESTAMP);
+	}
+#endif
+	return (true);
+}
+
+/*
  * __wt_lsm_checkpoint_chunk --
  *	Flush a single LSM chunk to disk.
  */
@@ -295,14 +352,12 @@ __wt_lsm_checkpoint_chunk(WT_SESSION_IMPL *session,
 	/* Stop if a running transaction needs the chunk. */
 	WT_RET(__wt_txn_update_oldest(
 	    session, WT_TXN_OLDEST_STRICT | WT_TXN_OLDEST_WAIT));
-	if (chunk->switch_txn == WT_TXN_NONE ||
-	    !__wt_txn_visible_all(session, chunk->switch_txn, NULL)) {
+	if (!__wt_lsm_chunk_visible_all(session, chunk)) {
 		__wt_verbose(session, WT_VERB_LSM,
 		    "LSM worker %s: running transaction, return",
 		    chunk->uri);
 		return (0);
 	}
-
 	if (!__wt_atomic_cas8(&chunk->flushing, 0, 1))
 		return (0);
 	flush_set = true;

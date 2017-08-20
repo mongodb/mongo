@@ -69,7 +69,6 @@ struct __wt_named_snapshot {
 
 struct __wt_txn_state {
 	WT_CACHE_LINE_PAD_BEGIN
-	WT_RWLOCK rwlock;
 	volatile uint64_t id;
 	volatile uint64_t pinned_id;
 	volatile uint64_t metadata_pinned;
@@ -104,6 +103,9 @@ struct __wt_txn_global {
 
 	/* Protects the active transaction states. */
 	WT_RWLOCK rwlock;
+
+	/* Protects logging, checkpoints and transaction visibility. */
+	WT_RWLOCK visibility_rwlock;
 
 	/* List of transactions sorted by commit timestamp. */
 	WT_RWLOCK commit_timestamp_rwlock;

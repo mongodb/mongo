@@ -49,7 +49,6 @@ __wt_ovfl_read(WT_SESSION_IMPL *session,
 {
 	WT_DECL_RET;
 	WT_OVFL_TRACK *track;
-	WT_UPDATE *upd;
 	size_t i;
 
 	*decoded = false;
@@ -74,14 +73,13 @@ __wt_ovfl_read(WT_SESSION_IMPL *session,
 	__wt_readlock(session, &S2BT(session)->ovfl_lock);
 	if (__wt_cell_type_raw(unpack->cell) == WT_CELL_VALUE_OVFL_RM) {
 		track = page->modify->ovfl_track;
-		for (upd = NULL, i = 0; i < track->remove_next; ++i)
+		for (i = 0; i < track->remove_next; ++i)
 			if (track->remove[i].cell == unpack->cell) {
-				upd = track->remove[i].upd;
+				store->data = track->remove[i].data;
+				store->size = track->remove[i].size;
 				break;
 			}
 		WT_ASSERT(session, i < track->remove_next);
-		store->data = upd->data;
-		store->size = upd->size;
 		*decoded = true;
 	} else
 		ret = __ovfl_read(session, unpack->data, unpack->size, store);
@@ -91,104 +89,23 @@ __wt_ovfl_read(WT_SESSION_IMPL *session,
 }
 
 /*
- * __ovfl_cache_col_visible --
- *	column-store: check for a globally visible update.
+ * __wt_ovfl_discard_remove --
+ *	Free the on-page overflow value cache.
  */
-static bool
-__ovfl_cache_col_visible(
-    WT_SESSION_IMPL *session, WT_UPDATE *upd, WT_CELL_UNPACK *unpack)
+void
+__wt_ovfl_discard_remove(WT_SESSION_IMPL *session, WT_PAGE *page)
 {
-	/*
-	 * Column-store is harder than row_store: we're here because there's a
-	 * reader in the system that might read the original version of an
-	 * overflow record, which might match a number of records.  For example,
-	 * the original overflow value was for records 100-200, we've replaced
-	 * each of those records individually, but there exists a reader that
-	 * might read any one of those records, and all of those records have
-	 * different update entries with different transaction IDs.  Since it's
-	 * infeasible to determine if there's a globally visible update for each
-	 * reader for each record, we test the simple case where a single record
-	 * has a single, globally visible update.  If that's not the case, cache
-	 * the value.
-	 */
-	if (__wt_cell_rle(unpack) == 1 &&
-	    WT_UPDATE_DATA_VALUE(upd) && __wt_txn_upd_visible_all(session, upd))
-		return (true);
-	return (false);
-}
+	WT_OVFL_TRACK *track;
+	uint32_t i;
 
-/*
- * __ovfl_cache_row_visible --
- *	row-store: check for a globally visible update.
- */
-static bool
-__ovfl_cache_row_visible(WT_SESSION_IMPL *session, WT_UPDATE *upd)
-{
-	/* Check to see if there's a globally visible update. */
-	for (; upd != NULL; upd = upd->next)
-		 if (WT_UPDATE_DATA_VALUE(upd) &&
-		     __wt_txn_upd_visible_all(session, upd))
-			return (true);
-
-	return (false);
-}
-
-/*
- * __ovfl_cache_append_update --
- *	Append an overflow value to the update list.
- */
-static int
-__ovfl_cache_append_update(WT_SESSION_IMPL *session, WT_PAGE *page,
-    WT_UPDATE *upd_list, WT_CELL_UNPACK *unpack, WT_UPDATE **updp)
-{
-	WT_DECL_ITEM(tmp);
-	WT_DECL_RET;
-	WT_UPDATE *append, *upd;
-	size_t size;
-
-	*updp = NULL;
-
-	/* Read the overflow value. */
-	WT_RET(__wt_scr_alloc(session, 1024, &tmp));
-	WT_ERR(__wt_dsk_cell_data_ref(session, page->type, unpack, tmp));
-
-	/*
-	 * Create an update entry with no transaction ID to ensure global
-	 * visibility, append it to the update list.
-	 *
-	 * We don't need locks or barriers in this function: any thread reading
-	 * the update list will see our newly appended record or not, it doesn't
-	 * matter until the on-page cell is set to WT_CELL_VALUE_OVFL_RM. That
-	 * involves atomic operations which will act as our barrier. Regardless,
-	 * we update the page footprint as part of this operation, which acts as
-	 * a barrier as well.
-	 *
-	 * The update transaction ID choice is tricky, to work around an issue
-	 * in variable-length column store. Imagine an overflow value with an
-	 * RLE greater than 1. We append a copy to the end of an update chain,
-	 * but it's possible it's the overflow value for more than one record,
-	 * and appending it to the end of one record's update chain means a
-	 * subsequent enter of a globally visible value to one of the records
-	 * would allow the truncation of the overflow chain that leaves other
-	 * records without a value. If appending such an overflow record, set
-	 * the transaction ID to the first possible transaction ID. That ID is
-	 * old enough to be globally visible, but we can use it as a flag if an
-	 * update record cannot be discarded when truncating an update chain.
-	 */
-	WT_ERR(__wt_update_alloc(
-	    session, tmp, &append, &size, WT_UPDATE_STANDARD));
-	append->txnid = page->type == WT_PAGE_COL_VAR &&
-	    __wt_cell_rle(unpack) > 1 ? WT_TXN_FIRST : WT_TXN_NONE;
-	for (upd = upd_list; upd->next != NULL; upd = upd->next)
-		;
-	WT_PUBLISH(upd->next, append);
-
-	__wt_cache_page_inmem_incr(session, page, size);
-
-	*updp = append;
-
-err:	__wt_scr_free(session, &tmp);
-	return (ret);
+	if (page->modify != NULL &&
+	    (track = page->modify->ovfl_track) != NULL) {
+		for (i = 0; i < track->remove_next; ++i)
+			__wt_free(session, track->remove[i].data);
+		__wt_free(session, page->modify->ovfl_track->remove);
+		track->remove_allocated = 0;
+		track->remove_next = 0;
+	}
 }
 
 /*
@@ -196,29 +113,32 @@ err:	__wt_scr_free(session, &tmp);
  *	Cache an overflow value.
  */
 static int
-__ovfl_cache(WT_SESSION_IMPL *session,
-    WT_PAGE *page, WT_UPDATE *upd_list, WT_CELL_UNPACK *unpack)
+__ovfl_cache(WT_SESSION_IMPL *session, WT_PAGE *page, WT_CELL_UNPACK *unpack)
 {
+	WT_DECL_ITEM(tmp);
+	WT_DECL_RET;
 	WT_OVFL_TRACK *track;
-	WT_UPDATE *upd;
 
-	/* Append a copy of the overflow value to the update list. */
-	WT_RET(__ovfl_cache_append_update(
-	    session, page, upd_list, unpack, &upd));
+	/* Read the overflow value. */
+	WT_RET(__wt_scr_alloc(session, 1024, &tmp));
+	WT_ERR(__wt_dsk_cell_data_ref(session, page->type, unpack, tmp));
 
 	/* Allocating tracking structures as necessary. */
 	if (page->modify->ovfl_track == NULL)
-		WT_RET(__wt_ovfl_track_init(session, page));
+		WT_ERR(__wt_ovfl_track_init(session, page));
 	track = page->modify->ovfl_track;
 
-	/* Add the value's information to the update list. */
-	WT_RET(__wt_realloc_def(session,
+	/* Copy the overflow item into place. */
+	WT_ERR(__wt_realloc_def(session,
 	    &track->remove_allocated, track->remove_next + 1, &track->remove));
 	track->remove[track->remove_next].cell = unpack->cell;
-	track->remove[track->remove_next].upd = upd;
+	WT_ERR(__wt_strndup(session,
+	    tmp->data, tmp->size, &track->remove[track->remove_next].data));
+	track->remove[track->remove_next].size = tmp->size;
 	++track->remove_next;
 
-	return (0);
+err:	__wt_scr_free(session, &tmp);
+	return (ret);
 }
 
 /*
@@ -227,12 +147,14 @@ __ovfl_cache(WT_SESSION_IMPL *session,
  */
 int
 __wt_ovfl_remove(WT_SESSION_IMPL *session,
-    WT_PAGE *page, WT_UPDATE *upd_list, WT_CELL_UNPACK *unpack)
+    WT_PAGE *page, WT_CELL_UNPACK *unpack, bool checkpoint)
 {
-	bool visible;
-
 	/*
-	 * This function solves a problem in reconciliation. The scenario is:
+	 * This function solves two problems in reconciliation.
+	 *
+	 * The first problem is snapshot readers needing on-page overflow values
+	 * that have been removed. The scenario is as follows:
+	 *
 	 *     - reconciling a leaf page that references an overflow item
 	 *     - the item is updated and the update committed
 	 *     - a checkpoint runs, freeing the backing overflow blocks
@@ -263,28 +185,16 @@ __wt_ovfl_remove(WT_SESSION_IMPL *session,
 	 * per overflow item.  We don't do any of that because overflow values
 	 * are supposed to be rare and we shouldn't see contention for the lock.
 	 *
-	 * Check for a globally visible update.  If there is a globally visible
-	 * update, we don't need to cache the item because it's not possible for
-	 * a running thread to have moved past it.
+	 * We only have to do this for checkpoints: in any eviction mode, there
+	 * can't be threads sitting in our update lists.
 	 */
-	switch (page->type) {
-	case WT_PAGE_COL_VAR:
-		visible = __ovfl_cache_col_visible(session, upd_list, unpack);
-		break;
-	case WT_PAGE_ROW_LEAF:
-		visible = __ovfl_cache_row_visible(session, upd_list);
-		break;
-	WT_ILLEGAL_VALUE(session);
-	}
+	if (checkpoint)
+		WT_RET(__ovfl_cache(session, page, unpack));
 
 	/*
-	 * If there's no globally visible update, there's a reader in the system
-	 * that might try and read the old value, cache it.
-	 */
-	if (!visible)
-		WT_RET(__ovfl_cache(session, page, upd_list, unpack));
-
-	/*
+	 * The second problem is to only remove the underlying blocks once,
+	 * solved by the WT_CELL_VALUE_OVFL_RM flag.
+	 *
 	 * Queue the on-page cell to be set to WT_CELL_VALUE_OVFL_RM and the
 	 * underlying overflow value's blocks to be freed when reconciliation
 	 * completes.

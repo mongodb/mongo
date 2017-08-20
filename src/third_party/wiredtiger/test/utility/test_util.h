@@ -117,6 +117,18 @@ typedef struct {
 } while (0)
 
 /*
+ * testutil_checksys --
+ *	Complain and quit if a function call fails, returning errno. The error
+ * test must be specified, not just the call, because system calls fail in a
+ * variety of ways.
+ */
+#define	testutil_checksys(call) do {					\
+	if (call)							\
+		testutil_die(						\
+		    errno, "%s/%d: %s", __func__, __LINE__, #call);	\
+} while (0)
+
+/*
  * testutil_checkfmt --
  *	Complain and quit if a function call fails, with additional arguments.
  */

@@ -263,6 +263,13 @@ __wt_update_alloc(WT_SESSION_IMPL *session, const WT_ITEM *value,
 	*updp = NULL;
 
 	/*
+	 * The code paths leading here are convoluted: assert we never attempt
+	 * to allocate an update structure if only intending to insert one we
+	 * already have.
+	 */
+	WT_ASSERT(session, modify_type != WT_UPDATE_INVALID);
+
+	/*
 	 * Allocate the WT_UPDATE structure and room for the value, then copy
 	 * the value into place.
 	 */
@@ -304,14 +311,11 @@ __wt_update_obsolete_check(
 	 * Walk the list of updates, looking for obsolete updates at the end.
 	 *
 	 * Only updates with globally visible, self-contained data can terminate
-	 * update chains, ignore modified and reserved updates. Special case the
-	 * first transaction ID, it flags column-store overflow values which can
-	 * never be discarded.
+	 * update chains.
 	 */
 	for (first = NULL, count = 0; upd != NULL; upd = upd->next, count++)
 		if (WT_UPDATE_DATA_VALUE(upd) &&
-		    __wt_txn_upd_visible_all(session, upd) &&
-		    upd->txnid != WT_TXN_FIRST) {
+		    __wt_txn_upd_visible_all(session, upd)) {
 			if (first == NULL)
 				first = upd;
 		} else if (upd->txnid != WT_TXN_ABORTED)

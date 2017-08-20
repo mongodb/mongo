@@ -584,10 +584,14 @@ wts_verify(const char *tag)
 		testutil_check(conn->set_timestamp(conn, config_buf));
 	}
 
-	/* Session operations for LSM can return EBUSY. */
+	/*
+	 * Verify can return EBUSY if the handle isn't available. Don't yield
+	 * and retry, in the case of LSM, the handle may not be available for
+	 * a long time.
+	 */
 	ret = session->verify(session, g.uri, "strict");
-	if (ret != 0 && !(ret == EBUSY && DATASOURCE("lsm")))
-		testutil_die(ret, "session.verify: %s: %s", g.uri, tag);
+	testutil_assertfmt(
+	    ret == 0 || ret == EBUSY, "session.verify: %s: %s", g.uri, tag);
 
 	if (g.logging != 0)
 		(void)g.wt_api->msg_printf(g.wt_api, session,

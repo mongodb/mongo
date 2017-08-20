@@ -81,7 +81,7 @@ main(int argc, char *argv[])
 	 * This test should not run unless long tests flag is set. The test
 	 * runs for 15 minutes.
 	 */
-	if (!testutil_is_flag_set("WT3363_CHECKPOINT_OP_RACES"))
+	if (!testutil_is_flag_set("TESTUTIL_ENABLE_TIMING_TESTS"))
 		return (EXIT_SUCCESS);
 
 	opts = &_opts;

@@ -88,8 +88,8 @@ COMMANDS="
 2>&1 ./s_docs > ${t_pfx}s_docs
 2>&1 ./s_export > ${t_pfx}s_export
 2>&1 ./s_funcs > ${t_pfx}s_funcs
+2>&1 ./s_function > ${t_pfx}s_function
 2>&1 ./s_getopt > ${t_pfx}s_getopt
-2>&1 ./s_label > ${t_pfx}s_label
 2>&1 ./s_lang > ${t_pfx}s_lang
 2>&1 ./s_longlines > ${t_pfx}s_longlines
 2>&1 ./s_python > ${t_pfx}s_python

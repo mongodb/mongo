@@ -3,11 +3,11 @@
 WiredTiger operations return a value of 0 on success and a non-zero
 value on error.  Error codes may be either positive or negative:
 positive error codes are standard error codes as described for
-POSIX-like systems (for example, EINVAL or EBUSY), negative error codes
-are WiredTiger-specific (for example, WT_ROLLBACK).
+POSIX-like systems (for example, \c EINVAL or \c EBUSY), negative error
+codes are WiredTiger-specific (for example, \c WT_ROLLBACK).
 
 WiredTiger-specific error codes always appear in the -31,800 to -31,999
-range.
+range, inclusive.
 
 @m_if{java}
 Informational return values, like <code>wiredtiger.WT_NOTFOUND</code>
@@ -29,11 +29,22 @@ correctly-written WiredTiger application will likely catch
 errors. Note that no further WiredTiger calls are required after
 \c WiredTigerPanicException is caught (and further calls will themselves
 immediately fail).
+@m_endif
 
-The following is a complete list of possible WiredTiger-specific
-return values, all constants defined in the com.wiredtiger.db.wiredtiger class:
+WiredTiger returns \c EBUSY for operations requiring exclusive access, when
+an object is not available for exclusive access. For example, the
+WT_SESSION::drop or WT_SESSION::verify methods will fail if the object
+has open cursors. Note that internal WiredTiger threads may temporarily
+open cursors on objects (for example, threads performing operations like
+statistics logging), and operations may temporarily fail and return \c EBUSY
+when there are no application cursors open on the object.
+
+@m_if{java}
+The following is a complete list of the WiredTiger-specific return
+values, all constants defined in the com.wiredtiger.db.wiredtiger class:
 @m_else
-The following is a list of possible WiredTiger-specific errors:
+The following is a complete list of the WiredTiger-specific return
+values:
 @m_endif
 
 @if IGNORE_BUILT_BY_API_ERR_BEGIN

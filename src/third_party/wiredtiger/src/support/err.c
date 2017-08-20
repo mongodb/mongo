@@ -533,17 +533,20 @@ __wt_panic(WT_SESSION_IMPL *session)
 }
 
 /*
- * __wt_illegal_value --
+ * __wt_illegal_value_func --
  *	A standard error message when we detect an illegal value.
  */
 int
-__wt_illegal_value(WT_SESSION_IMPL *session, const char *name)
+__wt_illegal_value_func(
+    WT_SESSION_IMPL *session, const char *tag, const char *file, int line)
     WT_GCC_FUNC_ATTRIBUTE((cold))
     WT_GCC_FUNC_ATTRIBUTE((visibility("default")))
 {
-	__wt_errx(session, "%s%s%s",
-	    name == NULL ? "" : name, name == NULL ? "" : ": ",
-	    "encountered an illegal file format or internal value");
+	__wt_errx(session, "%s%s%s: (%s, %d)",
+	    tag == NULL ? "" : tag,
+	    tag == NULL ? "" : ": ",
+	    "encountered an illegal file format or internal value",
+	    file, line);
 
 	return (__wt_panic(session));
 }

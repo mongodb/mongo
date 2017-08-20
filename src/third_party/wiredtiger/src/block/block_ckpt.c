@@ -342,6 +342,11 @@ __ckpt_verify(WT_SESSION_IMPL *session, WT_CKPT *ckptbase)
 				break;
 			/* FALLTHROUGH */
 		default:
+			/*
+			 * Don't convert to WT_ILLEGAL_VALUE, it won't compile
+			 * on some gcc compilers because they don't understand
+			 * FALLTHROUGH as part of a macro.
+			 */
 			return (
 			    __wt_illegal_value(session, "checkpoint array"));
 		}

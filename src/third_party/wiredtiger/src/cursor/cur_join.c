@@ -499,9 +499,7 @@ __curjoin_entry_in_range(WT_SESSION_IMPL *session, WT_CURSOR_JOIN_ENTRY *entry,
 			passed = (cmp < 0);
 			break;
 
-		default:
-			WT_RET(__wt_illegal_value(session, NULL));
-			break;
+		WT_ILLEGAL_VALUE(session);
 		}
 
 		if (!passed) {
