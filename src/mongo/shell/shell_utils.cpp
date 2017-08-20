@@ -35,8 +35,6 @@
 
 #include "mongo/client/dbclientinterface.h"
 #include "mongo/client/replica_set_monitor.h"
-#include "mongo/db/catalog/index_key_validate.h"
-#include "mongo/db/index/external_key_generator.h"
 #include "mongo/platform/random.h"
 #include "mongo/scripting/engine.h"
 #include "mongo/shell/bench.h"
@@ -160,28 +158,6 @@ BSONObj getBuildInfo(const BSONObj& a, void* data) {
     return BSON("" << b.done());
 }
 
-BSONObj isKeyTooLarge(const BSONObj& a, void* data) {
-    uassert(17428, "keyTooLarge takes exactly 2 arguments", a.nFields() == 2);
-    BSONObjIterator i(a);
-    BSONObj index = i.next().Obj();
-    BSONObj doc = i.next().Obj();
-
-    return BSON("" << isAnyIndexKeyTooLarge(index, doc));
-}
-
-BSONObj validateIndexKey(const BSONObj& a, void* data) {
-    BSONObj key = a[0].Obj();
-    // This is related to old upgrade-checking code when v:1 indexes were the latest version, hence
-    // always validate using v:1 rules here.
-    Status indexValid =
-        index_key_validate::validateKeyPattern(key, IndexDescriptor::IndexVersion::kV1);
-    if (!indexValid.isOK()) {
-        return BSON("" << BSON("ok" << false << "type" << indexValid.codeString() << "errmsg"
-                                    << indexValid.reason()));
-    }
-    return BSON("" << BSON("ok" << true));
-}
-
 BSONObj computeSHA256Block(const BSONObj& a, void* data) {
     std::vector<ConstDataRange> blocks;
 
@@ -250,8 +226,6 @@ void installShellUtils(Scope& scope) {
     scope.injectNative("_isWindows", isWindows);
     scope.injectNative("interpreterVersion", interpreterVersion);
     scope.injectNative("getBuildInfo", getBuildInfo);
-    scope.injectNative("isKeyTooLarge", isKeyTooLarge);
-    scope.injectNative("validateIndexKey", validateIndexKey);
     scope.injectNative("computeSHA256Block", computeSHA256Block);
 
 #ifndef MONGO_SAFE_SHELL
