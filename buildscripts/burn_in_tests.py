@@ -17,7 +17,7 @@ import sys
 import urlparse
 import yaml
 
-API_SERVER_DEFAULT = "http://evergreen-api.mongodb.com:8080"
+API_SERVER_DEFAULT = "https://evergreen.mongodb.com"
 
 # Get relative imports to work when the package is not installed on the PYTHONPATH.
 if __name__ == "__main__" and __package__ is None:
