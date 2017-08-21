@@ -42,7 +42,8 @@
        to ensure we're validating the entire contents of the collection */
 
     // For checkDBHashes
-    rst.checkReplicatedDataHashes();
+    var excludedDBs = jsTest.options().excludedDBsFromDBHash || [];
+    rst.checkReplicatedDataHashes(undefined, excludedDBs);
 
     load('jstests/hooks/run_validate_collections.js');
 
