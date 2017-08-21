@@ -47,6 +47,7 @@
 #include "mongo/stdx/mutex.h"
 #include "mongo/util/log.h"
 #include "mongo/util/md5.hpp"
+#include "mongo/util/net/sock.h"
 #include "mongo/util/timer.h"
 
 namespace mongo {

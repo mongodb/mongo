@@ -32,10 +32,6 @@
 #include "mongo/platform/process_id.h"
 #include "mongo/s/catalog/sharding_catalog_client.h"
 
-// TODO(SERVER-29687) Remove this include. A bunch of places assume they can call
-// getHostName()/getHostNameCached() by including server_options.h.
-#include "mongo/util/net/sock.h"
-
 namespace mongo {
 
 const int DEFAULT_UNIX_PERMS = 0700;

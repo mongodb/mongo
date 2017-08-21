@@ -65,6 +65,7 @@
 #include "mongo/transport/transport_layer.h"
 #include "mongo/util/fail_point_service.h"
 #include "mongo/util/log.h"
+#include "mongo/util/net/sock.h"
 #include "mongo/util/scopeguard.h"
 
 namespace mongo {

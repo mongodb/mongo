@@ -46,6 +46,7 @@
 #include "mongo/db/commands.h"
 #include "mongo/db/service_context.h"
 #include "mongo/util/log.h"
+#include "mongo/util/net/sock.h"
 #include "mongo/util/scopeguard.h"
 
 #if defined(__linux__) || defined(__APPLE__) || defined(__FreeBSD__) || defined(__sun) || \

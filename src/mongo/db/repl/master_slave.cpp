@@ -73,6 +73,7 @@
 #include "mongo/stdx/thread.h"
 #include "mongo/util/exit.h"
 #include "mongo/util/log.h"
+#include "mongo/util/net/sock.h"
 #include "mongo/util/quick_exit.h"
 
 using std::cout;

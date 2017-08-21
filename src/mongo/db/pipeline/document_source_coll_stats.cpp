@@ -33,6 +33,7 @@
 #include "mongo/bson/bsonobj.h"
 #include "mongo/db/pipeline/lite_parsed_document_source.h"
 #include "mongo/db/stats/top.h"
+#include "mongo/util/net/sock.h"
 #include "mongo/util/time_support.h"
 
 using boost::intrusive_ptr;
