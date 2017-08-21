@@ -29,10 +29,11 @@
 # test_compat01.py
 # Check compatibility API
 
-import fnmatch, os, shutil, sys, time
+import fnmatch, os
+import wiredtiger, wttest
 from suite_subprocess import suite_subprocess
+from wtdataset import SimpleDataSet, simple_key
 from wtscenario import make_scenarios
-import wttest
 
 class test_compat01(wttest.WiredTigerTestCase, suite_subprocess):
     # Add enough entries and use a small log size to generate more than
@@ -177,6 +178,25 @@ class test_compat01(wttest.WiredTigerTestCase, suite_subprocess):
 
     def test_restart(self):
         self.run_test(False)
+
+class test_reconfig_fail(wttest.WiredTigerTestCase):
+
+    # Test an active transaction blocks upgrade/downgrade configuration.
+    def test_reconfig_fail(self):
+        uri = 'table:reconfig_fail'
+        ds = SimpleDataSet(self, uri, 100, key_format='S')
+        ds.populate()
+
+        self.session.begin_transaction("isolation=snapshot")
+        c = self.session.open_cursor(uri, None)
+        c.set_key(ds.key(20))
+        c.set_value("abcde")
+        self.assertEquals(c.update(), 0)
+
+        compat_str = 'compatibility=(release="3.0.0")'
+        msg = '/system must be quiescent/'
+        self.assertRaisesWithMessage(wiredtiger.WiredTigerError,
+            lambda:self.conn.reconfigure(compat_str), msg)
 
 if __name__ == '__main__':
     wttest.run()

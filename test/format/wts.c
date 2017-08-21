@@ -72,34 +72,6 @@ compressor(uint32_t compress_flag)
 }
 
 /*
- * compatibility --
- *	Configure compatibility.
- */
-static const char *
-compatibility(uint32_t compat_flag)
-{
-	const char *p;
-
-	p = "unrecognized compatibility flag";
-	switch (compat_flag) {
-	case COMPAT_NONE:
-		p = "";
-		break;
-	case COMPAT_V1:
-		p = "2.6";
-		break;
-	case COMPAT_V2:
-		p = "3.0";
-		break;
-	default:
-		testutil_die(EINVAL,
-		    "illegal compatibility flag: %#" PRIx32, compat_flag);
-		/* NOTREACHED */
-	}
-	return (p);
-}
-
-/*
  * encryptor --
  *	Configure encryption.
  */
@@ -219,17 +191,13 @@ wts_open(const char *home, bool set_api, WT_CONNECTION **connp)
 		    ",eviction=(threads_max=%" PRIu32 ")", g.c_evict_max);
 
 	/* Logging configuration. */
-	if (g.c_logging) {
+	if (g.c_logging)
 		CONFIG_APPEND(p,
 		    ",log=(enabled=true,archive=%d,prealloc=%d"
 		    ",compressor=\"%s\")",
 		    g.c_logging_archive ? 1 : 0,
 		    g.c_logging_prealloc ? 1 : 0,
 		    compressor(g.c_logging_compression_flag));
-		CONFIG_APPEND(p,
-		    ",compatibility=(release=%s)",
-		    compatibility(g.c_compat_flag));
-	}
 
 	if (g.c_encryption)
 		CONFIG_APPEND(p,
