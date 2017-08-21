@@ -279,11 +279,11 @@ typedef void wt_timestamp_t;
  */
 #ifdef HAVE_DIAGNOSTIC
 #define	__wt_scr_alloc(session, size, scratchp)				\
-	__wt_scr_alloc_func(session, size, scratchp, __FILE__, __LINE__)
+	__wt_scr_alloc_func(session, size, scratchp, __func__, __LINE__)
 #define	__wt_page_in(session, ref, flags)				\
-	__wt_page_in_func(session, ref, flags, __FILE__, __LINE__)
+	__wt_page_in_func(session, ref, flags, __func__, __LINE__)
 #define	__wt_page_swap(session, held, want, flags)			\
-	__wt_page_swap_func(session, held, want, flags, __FILE__, __LINE__)
+	__wt_page_swap_func(session, held, want, flags, __func__, __LINE__)
 #else
 #define	__wt_scr_alloc(session, size, scratchp)				\
 	__wt_scr_alloc_func(session, size, scratchp)
@@ -295,7 +295,7 @@ typedef void wt_timestamp_t;
 
 /* Called on unexpected code path: locate the failure. */
 #define	__wt_illegal_value(session, msg)				\
-	__wt_illegal_value_func(session, msg, __FILE__, __LINE__)
+	__wt_illegal_value_func(session, msg, __func__, __LINE__)
 
 /* Random number generator state. */
 union __wt_rand_state {

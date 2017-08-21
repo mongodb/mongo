@@ -65,4 +65,5 @@ __F
 __WIREDTIGER_EXT_H_
 __WIREDTIGER_H_
 __WT_INTERNAL_H
+__func__
 __wt_bswap16

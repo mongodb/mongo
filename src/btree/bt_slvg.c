@@ -496,7 +496,7 @@ __slvg_trk_init(WT_SESSION_IMPL *session,
 	trk->shared->ref = 1;
 
 	trk->ss = ss;
-	WT_ERR(__wt_strndup(session, addr, addr_size, &trk->trk_addr));
+	WT_ERR(__wt_memdup(session, addr, addr_size, &trk->trk_addr));
 	trk->trk_addr_size = (uint8_t)addr_size;
 	trk->trk_size = size;
 	trk->trk_gen = gen;
@@ -683,7 +683,7 @@ __slvg_trk_leaf_ovfl(
 	WT_CELL_FOREACH(btree, dsk, cell, unpack, i) {
 		__wt_cell_unpack(cell, unpack);
 		if (unpack->ovfl) {
-			WT_RET(__wt_strndup(session, unpack->data,
+			WT_RET(__wt_memdup(session, unpack->data,
 			    unpack->size, &trk->trk_ovfl_addr[ovfl_cnt].addr));
 			trk->trk_ovfl_addr[ovfl_cnt].size =
 			    (uint8_t)unpack->size;
@@ -1171,7 +1171,7 @@ __slvg_col_build_internal(
 		ref->page = NULL;
 
 		WT_ERR(__wt_calloc_one(session, &addr));
-		WT_ERR(__wt_strndup(
+		WT_ERR(__wt_memdup(
 		    session, trk->trk_addr, trk->trk_addr_size, &addr->addr));
 		addr->size = trk->trk_addr_size;
 		addr->type =
@@ -1824,7 +1824,7 @@ __slvg_row_build_internal(
 		ref->page = NULL;
 
 		WT_ERR(__wt_calloc_one(session, &addr));
-		WT_ERR(__wt_strndup(
+		WT_ERR(__wt_memdup(
 		    session, trk->trk_addr, trk->trk_addr_size, &addr->addr));
 		addr->size = trk->trk_addr_size;
 		addr->type =

@@ -55,6 +55,7 @@ CET
 CFLAGS
 CHECKKEY
 CKPT
+CLOEXEC
 CMP
 CONCAT
 CONFIG
@@ -923,6 +924,7 @@ mem
 memalign
 membar
 memcpy
+memdup
 memget
 memmove
 memset

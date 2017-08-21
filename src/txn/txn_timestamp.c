@@ -262,8 +262,7 @@ __wt_txn_global_query_timestamp(
 	WT_UNUSED(cfg);
 
 	WT_RET_MSG(session, ENOTSUP,
-	    "WT_CONNECTION.query_timestamp requires a version of WiredTiger "
-	    "built with timestamp support");
+	    "requires a version of WiredTiger built with timestamp support");
 #endif
 }
 
@@ -454,7 +453,7 @@ __wt_txn_global_set_timestamp(WT_SESSION_IMPL *session, const char *cfg[])
 		WT_RET(__wt_txn_update_pinned_timestamp(session));
 	}
 #else
-		WT_RET_MSG(session, EINVAL, "set_timestamp requires a "
+		WT_RET_MSG(session, ENOTSUP, "set_timestamp requires a "
 		    "version of WiredTiger built with timestamp support");
 #endif
 	return (0);
@@ -482,7 +481,7 @@ __wt_txn_set_timestamp(WT_SESSION_IMPL *session, const char *cfg[])
 		    session, "commit", &txn->commit_timestamp, &cval));
 		__wt_txn_set_commit_timestamp(session);
 #else
-		WT_RET_MSG(session, EINVAL, "commit_timestamp requires a "
+		WT_RET_MSG(session, ENOTSUP, "commit_timestamp requires a "
 		    "version of WiredTiger built with timestamp support");
 #endif
 	}

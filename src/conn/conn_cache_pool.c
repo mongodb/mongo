@@ -47,7 +47,7 @@ int
 __wt_cache_pool_config(WT_SESSION_IMPL *session, const char **cfg)
 {
 	WT_CACHE_POOL *cp;
-	WT_CONFIG_ITEM cval;
+	WT_CONFIG_ITEM cval, cval_cache_size;
 	WT_CONNECTION_IMPL *conn, *entry;
 	WT_DECL_RET;
 	char *pool_name;
@@ -78,7 +78,7 @@ __wt_cache_pool_config(WT_SESSION_IMPL *session, const char **cfg)
 		}
 
 		if (__wt_config_gets(session,
-		    &cfg[1], "cache_size", &cval) != WT_NOTFOUND)
+		    &cfg[1], "cache_size", &cval_cache_size) != WT_NOTFOUND)
 			WT_RET_MSG(session, EINVAL,
 			    "Only one of cache_size and shared_cache can be "
 			    "in the configuration");
@@ -221,8 +221,7 @@ __wt_cache_pool_config(WT_SESSION_IMPL *session, const char **cfg)
 
 	F_SET(conn, WT_CONN_CACHE_POOL);
 err:	__wt_spin_unlock(session, &__wt_process.spinlock);
-	if (!updating)
-		__wt_free(session, pool_name);
+	__wt_free(session, pool_name);
 	if (ret != 0 && created) {
 		__wt_free(session, cp->name);
 		__wt_cond_destroy(session, &cp->cache_pool_cond);

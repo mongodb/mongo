@@ -83,7 +83,7 @@ __rebalance_leaf_append(WT_SESSION_IMPL *session,
 
 	WT_RET(__wt_calloc_one(session, &copy_addr));
 	copy->addr = copy_addr;
-	WT_RET(__wt_strndup(session, addr, addr_len, &copy_addr->addr));
+	WT_RET(__wt_memdup(session, addr, addr_len, &copy_addr->addr));
 	copy_addr->size = (uint8_t)addr_len;
 	copy_addr->type = (uint8_t)addr_type;
 
@@ -110,7 +110,7 @@ __rebalance_fl_append(WT_SESSION_IMPL *session,
 	    session, &rs->fl_allocated, rs->fl_next + 1, &rs->fl));
 	copy = &rs->fl[rs->fl_next++];
 
-	WT_RET(__wt_strndup(session, addr, addr_len, &copy->addr));
+	WT_RET(__wt_memdup(session, addr, addr_len, &copy->addr));
 	copy->size = (uint8_t)addr_len;
 	copy->type = 0;
 
