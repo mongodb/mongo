@@ -38,7 +38,6 @@
 namespace mongo {
 
 class CollatorInterface;
-class ExtensionsCallback;
 
 struct ProjectionStageParams {
     enum ProjectionImplementation {
@@ -51,8 +50,6 @@ struct ProjectionStageParams {
         // The projection is simple inclusion and we expect an object.
         SIMPLE_DOC
     };
-
-    ProjectionStageParams(const ExtensionsCallback& wc) : extensionsCallback(&wc) {}
 
     ProjectionImplementation projImpl = NO_FAST_PATH;
 
@@ -67,9 +64,6 @@ struct ProjectionStageParams {
     // If (COVERED_ONE_INDEX == projObj) this is the key pattern we're extracting covered data
     // from.  Otherwise, this field is ignored.
     BSONObj coveredKeyObj;
-
-    // Used for creating context for the match extensions processing. Not owned.
-    const ExtensionsCallback* extensionsCallback;
 
     // The collator this operation should use to compare strings. If null, the collation is a simple
     // binary compare.

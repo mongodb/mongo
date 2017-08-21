@@ -49,7 +49,6 @@
 #include "mongo/db/exec/queued_data_stage.h"
 #include "mongo/db/exec/working_set.h"
 #include "mongo/db/index/index_descriptor.h"
-#include "mongo/db/matcher/extensions_callback_disallow_extensions.h"
 #include "mongo/db/query/cursor_request.h"
 #include "mongo/db/query/cursor_response.h"
 #include "mongo/db/query/find_common.h"
@@ -245,8 +244,8 @@ public:
             }
             // The collator is null because collection objects are compared using binary comparison.
             const CollatorInterface* collator = nullptr;
-            StatusWithMatchExpression statusWithMatcher = MatchExpressionParser::parse(
-                filterElt.Obj(), ExtensionsCallbackDisallowExtensions(), collator);
+            StatusWithMatchExpression statusWithMatcher =
+                MatchExpressionParser::parse(filterElt.Obj(), collator);
             if (!statusWithMatcher.isOK()) {
                 return appendCommandStatus(result, statusWithMatcher.getStatus());
             }

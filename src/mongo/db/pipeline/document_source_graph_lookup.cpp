@@ -33,7 +33,6 @@
 #include "mongo/base/init.h"
 #include "mongo/db/bson/dotted_path_support.h"
 #include "mongo/db/jsobj.h"
-#include "mongo/db/matcher/extensions_callback_disallow_extensions.h"
 #include "mongo/db/pipeline/document.h"
 #include "mongo/db/pipeline/document_comparator.h"
 #include "mongo/db/pipeline/document_path_support.h"
@@ -544,22 +543,15 @@ intrusive_ptr<DocumentSource> DocumentSourceGraphLookUp::createFromBson(
                     argument.type() == Object);
 
             // We don't need to keep ahold of the MatchExpression, but we do need to ensure that
-            // the specified object is parseable.
-            auto parsedMatchExpression = MatchExpressionParser::parse(
-                argument.embeddedObject(), ExtensionsCallbackDisallowExtensions(), nullptr);
+            // the specified object is parseable and does not contain extensions.
+            auto parsedMatchExpression =
+                MatchExpressionParser::parse(argument.embeddedObject(), nullptr);
 
             uassert(40186,
                     str::stream()
                         << "Failed to parse 'restrictSearchWithMatch' option to $graphLookup: "
                         << parsedMatchExpression.getStatus().reason(),
                     parsedMatchExpression.isOK());
-
-            uassert(40187,
-                    str::stream()
-                        << "Failed to parse 'restrictSearchWithMatch' option to $graphLookup: "
-                        << "$near not supported.",
-                    !QueryPlannerCommon::hasNode(parsedMatchExpression.getValue().get(),
-                                                 MatchExpression::GEO_NEAR));
 
             additionalFilter = argument.embeddedObject().getOwned();
             continue;

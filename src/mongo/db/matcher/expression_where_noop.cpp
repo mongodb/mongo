@@ -40,7 +40,7 @@ WhereNoOpMatchExpression::WhereNoOpMatchExpression(WhereParams params)
     : WhereMatchExpressionBase(std::move(params)) {}
 
 bool WhereNoOpMatchExpression::matches(const MatchableDocument* doc, MatchDetails* details) const {
-    return false;
+    MONGO_UNREACHABLE;
 }
 
 std::unique_ptr<MatchExpression> WhereNoOpMatchExpression::shallowClone() const {

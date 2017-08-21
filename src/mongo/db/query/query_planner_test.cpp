@@ -35,7 +35,6 @@
 #include "mongo/db/jsobj.h"
 #include "mongo/db/json.h"
 #include "mongo/db/matcher/expression_always_boolean.h"
-#include "mongo/db/matcher/extensions_callback_disallow_extensions.h"
 #include "mongo/db/query/collation/collator_interface_mock.h"
 #include "mongo/db/query/query_planner.h"
 #include "mongo/db/query/query_planner_test_fixture.h"
@@ -4268,8 +4267,7 @@ TEST_F(QueryPlannerTest, CacheDataFromTaggedTreeFailsOnBadInput) {
 
     auto qr = stdx::make_unique<QueryRequest>(NamespaceString("test.collection"));
     qr->setFilter(BSON("a" << 3));
-    auto statusWithCQ = CanonicalQuery::canonicalize(
-        opCtx.get(), std::move(qr), ExtensionsCallbackDisallowExtensions());
+    auto statusWithCQ = CanonicalQuery::canonicalize(opCtx.get(), std::move(qr));
     ASSERT_OK(statusWithCQ.getStatus());
     std::unique_ptr<CanonicalQuery> scopedCq = std::move(statusWithCQ.getValue());
     scopedCq->root()->setTag(new IndexTag(1));
@@ -4284,8 +4282,7 @@ TEST_F(QueryPlannerTest, TagAccordingToCacheFailsOnBadInput) {
 
     auto qr = stdx::make_unique<QueryRequest>(nss);
     qr->setFilter(BSON("a" << 3));
-    auto statusWithCQ = CanonicalQuery::canonicalize(
-        opCtx.get(), std::move(qr), ExtensionsCallbackDisallowExtensions());
+    auto statusWithCQ = CanonicalQuery::canonicalize(opCtx.get(), std::move(qr));
     ASSERT_OK(statusWithCQ.getStatus());
     std::unique_ptr<CanonicalQuery> scopedCq = std::move(statusWithCQ.getValue());
 
@@ -4314,8 +4311,7 @@ TEST_F(QueryPlannerTest, TagAccordingToCacheFailsOnBadInput) {
     // Regenerate canonical query in order to clear tags.
     auto newQR = stdx::make_unique<QueryRequest>(nss);
     newQR->setFilter(BSON("a" << 3));
-    statusWithCQ = CanonicalQuery::canonicalize(
-        opCtx.get(), std::move(newQR), ExtensionsCallbackDisallowExtensions());
+    statusWithCQ = CanonicalQuery::canonicalize(opCtx.get(), std::move(newQR));
     ASSERT_OK(statusWithCQ.getStatus());
     scopedCq = std::move(statusWithCQ.getValue());
 

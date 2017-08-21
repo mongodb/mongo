@@ -30,7 +30,6 @@
 
 #include "mongo/bson/bsontypes.h"
 #include "mongo/bson/json.h"
-#include "mongo/db/matcher/extensions_callback_disallow_extensions.h"
 #include "mongo/db/query/collation/collator_interface_mock.h"
 #include "mongo/db/query/index_bounds_builder.h"
 #include "mongo/db/query/index_entry.h"
@@ -687,12 +686,10 @@ TEST(QuerySolutionTest, IndexScanNodeHasFieldExcludesSimpleBoundsStringFieldWhen
 std::unique_ptr<ParsedProjection> createParsedProjection(const BSONObj& query,
                                                          const BSONObj& projObj) {
     const CollatorInterface* collator = nullptr;
-    StatusWithMatchExpression queryMatchExpr =
-        MatchExpressionParser::parse(query, ExtensionsCallbackDisallowExtensions(), collator);
+    StatusWithMatchExpression queryMatchExpr = MatchExpressionParser::parse(query, collator);
     ASSERT(queryMatchExpr.isOK());
     ParsedProjection* out = nullptr;
-    Status status = ParsedProjection::make(
-        projObj, queryMatchExpr.getValue().get(), &out, ExtensionsCallbackDisallowExtensions());
+    Status status = ParsedProjection::make(projObj, queryMatchExpr.getValue().get(), &out);
     if (!status.isOK()) {
         FAIL(mongoutils::str::stream() << "failed to parse projection " << projObj << " (query: "
                                        << query

@@ -35,9 +35,9 @@
 #include <algorithm>
 
 #include "mongo/db/matcher/expression_parser.h"
-#include "mongo/db/matcher/extensions_callback_disallow_extensions.h"
 #include "mongo/db/matcher/extensions_callback_noop.h"
 #include "mongo/db/namespace_string.h"
+#include "mongo/db/pipeline/expression_context_for_test.h"
 #include "mongo/db/query/query_knobs.h"
 #include "mongo/db/query/query_planner.h"
 #include "mongo/db/query/query_planner_test_lib.h"
@@ -249,8 +249,13 @@ void QueryPlannerTest::runQueryFull(const BSONObj& query,
     qr->setMin(minObj);
     qr->setMax(maxObj);
     qr->setSnapshot(snapshot);
+    boost::intrusive_ptr<ExpressionContextForTest> expCtx(new ExpressionContextForTest());
     auto statusWithCQ =
-        CanonicalQuery::canonicalize(opCtx.get(), std::move(qr), ExtensionsCallbackNoop());
+        CanonicalQuery::canonicalize(opCtx.get(),
+                                     std::move(qr),
+                                     expCtx,
+                                     ExtensionsCallbackNoop(),
+                                     MatchExpressionParser::kAllowAllSpecialFeatures);
     ASSERT_OK(statusWithCQ.getStatus());
     cq = std::move(statusWithCQ.getValue());
 
@@ -328,8 +333,13 @@ void QueryPlannerTest::runInvalidQueryFull(const BSONObj& query,
     qr->setMin(minObj);
     qr->setMax(maxObj);
     qr->setSnapshot(snapshot);
+    boost::intrusive_ptr<ExpressionContextForTest> expCtx(new ExpressionContextForTest());
     auto statusWithCQ =
-        CanonicalQuery::canonicalize(opCtx.get(), std::move(qr), ExtensionsCallbackNoop());
+        CanonicalQuery::canonicalize(opCtx.get(),
+                                     std::move(qr),
+                                     expCtx,
+                                     ExtensionsCallbackNoop(),
+                                     MatchExpressionParser::kAllowAllSpecialFeatures);
     ASSERT_OK(statusWithCQ.getStatus());
     cq = std::move(statusWithCQ.getValue());
 
@@ -349,8 +359,13 @@ void QueryPlannerTest::runQueryAsCommand(const BSONObj& cmdObj) {
     std::unique_ptr<QueryRequest> qr(
         assertGet(QueryRequest::makeFromFindCommand(nss, cmdObj, isExplain)));
 
+    boost::intrusive_ptr<ExpressionContextForTest> expCtx(new ExpressionContextForTest());
     auto statusWithCQ =
-        CanonicalQuery::canonicalize(opCtx.get(), std::move(qr), ExtensionsCallbackNoop());
+        CanonicalQuery::canonicalize(opCtx.get(),
+                                     std::move(qr),
+                                     expCtx,
+                                     ExtensionsCallbackNoop(),
+                                     MatchExpressionParser::kAllowAllSpecialFeatures);
     ASSERT_OK(statusWithCQ.getStatus());
     cq = std::move(statusWithCQ.getValue());
 
@@ -370,8 +385,13 @@ void QueryPlannerTest::runInvalidQueryAsCommand(const BSONObj& cmdObj) {
     std::unique_ptr<QueryRequest> qr(
         assertGet(QueryRequest::makeFromFindCommand(nss, cmdObj, isExplain)));
 
+    boost::intrusive_ptr<ExpressionContextForTest> expCtx(new ExpressionContextForTest());
     auto statusWithCQ =
-        CanonicalQuery::canonicalize(opCtx.get(), std::move(qr), ExtensionsCallbackNoop());
+        CanonicalQuery::canonicalize(opCtx.get(),
+                                     std::move(qr),
+                                     expCtx,
+                                     ExtensionsCallbackNoop(),
+                                     MatchExpressionParser::kAllowAllSpecialFeatures);
     ASSERT_OK(statusWithCQ.getStatus());
     cq = std::move(statusWithCQ.getValue());
 
@@ -452,8 +472,7 @@ void QueryPlannerTest::assertHasOneSolutionOf(const std::vector<std::string>& so
 
 std::unique_ptr<MatchExpression> QueryPlannerTest::parseMatchExpression(
     const BSONObj& obj, const CollatorInterface* collator) {
-    StatusWithMatchExpression status =
-        MatchExpressionParser::parse(obj, ExtensionsCallbackDisallowExtensions(), collator);
+    StatusWithMatchExpression status = MatchExpressionParser::parse(obj, collator);
     if (!status.isOK()) {
         FAIL(str::stream() << "failed to parse query: " << obj.toString() << ". Reason: "
                            << status.getStatus().toString());

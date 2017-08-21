@@ -310,7 +310,14 @@ Status ClearFilters::clear(OperationContext* opCtx,
         qr->setSort(entry.sort);
         qr->setProj(entry.projection);
         qr->setCollation(entry.collation);
-        auto statusWithCQ = CanonicalQuery::canonicalize(opCtx, std::move(qr), extensionsCallback);
+        const boost::intrusive_ptr<ExpressionContext> expCtx;
+        auto statusWithCQ =
+            CanonicalQuery::canonicalize(opCtx,
+                                         std::move(qr),
+                                         expCtx,
+                                         extensionsCallback,
+                                         MatchExpressionParser::kAllowAllSpecialFeatures &
+                                             ~MatchExpressionParser::AllowedFeatures::kExpr);
         invariantOK(statusWithCQ.getStatus());
         std::unique_ptr<CanonicalQuery> cq = std::move(statusWithCQ.getValue());
 

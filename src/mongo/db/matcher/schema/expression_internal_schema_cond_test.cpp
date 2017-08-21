@@ -30,7 +30,6 @@
 
 #include "mongo/bson/json.h"
 #include "mongo/db/matcher/expression_parser.h"
-#include "mongo/db/matcher/extensions_callback_disallow_extensions.h"
 #include "mongo/db/matcher/schema/expression_internal_schema_cond.h"
 #include "mongo/db/matcher/schema/expression_internal_schema_object_match.h"
 #include "mongo/unittest/unittest.h"
@@ -46,14 +45,11 @@ std::unique_ptr<InternalSchemaCondMatchExpression> createCondMatchExpression(BSO
     auto cond = stdx::make_unique<InternalSchemaCondMatchExpression>();
 
     const CollatorInterface* kSimpleCollator = nullptr;
-    auto conditionExpr = MatchExpressionParser::parse(
-        condition, ExtensionsCallbackDisallowExtensions(), kSimpleCollator);
+    auto conditionExpr = MatchExpressionParser::parse(condition, kSimpleCollator);
     ASSERT_OK(conditionExpr.getStatus());
-    auto thenBranchExpr = MatchExpressionParser::parse(
-        thenBranch, ExtensionsCallbackDisallowExtensions(), kSimpleCollator);
+    auto thenBranchExpr = MatchExpressionParser::parse(thenBranch, kSimpleCollator);
     ASSERT_OK(thenBranchExpr.getStatus());
-    auto elseBranchExpr = MatchExpressionParser::parse(
-        elseBranch, ExtensionsCallbackDisallowExtensions(), kSimpleCollator);
+    auto elseBranchExpr = MatchExpressionParser::parse(elseBranch, kSimpleCollator);
 
     cond->init({{std::move(conditionExpr.getValue()),
                  std::move(thenBranchExpr.getValue()),

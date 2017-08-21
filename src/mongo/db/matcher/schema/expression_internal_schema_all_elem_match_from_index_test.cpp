@@ -31,7 +31,6 @@
 #include "mongo/db/jsobj.h"
 #include "mongo/db/json.h"
 #include "mongo/db/matcher/expression_parser.h"
-#include "mongo/db/matcher/extensions_callback_disallow_extensions.h"
 #include "mongo/db/matcher/schema/expression_internal_schema_all_elem_match_from_index.h"
 #include "mongo/unittest/unittest.h"
 
@@ -42,16 +41,14 @@ constexpr CollatorInterface* kSimpleCollator = nullptr;
 
 TEST(InternalSchemaAllElemMatchFromIndexMatchExpression, MatchesEmptyQuery) {
     auto query = fromjson("{a: {$_internalSchemaAllElemMatchFromIndex: [2, {}]}}");
-    auto expr = MatchExpressionParser::parse(
-        query, ExtensionsCallbackDisallowExtensions(), kSimpleCollator);
+    auto expr = MatchExpressionParser::parse(query, kSimpleCollator);
     ASSERT_OK(expr.getStatus());
     ASSERT_TRUE(expr.getValue()->matchesBSON(BSON("a" << BSON_ARRAY(1 << 2 << 3 << 4))));
 }
 
 TEST(InternalSchemaAllElemMatchFromIndexMatchExpression, MatchesValidQueries) {
     auto query = fromjson("{a: {$_internalSchemaAllElemMatchFromIndex: [2, {a: {$lt: 5}}]}}");
-    auto expr = MatchExpressionParser::parse(
-        query, ExtensionsCallbackDisallowExtensions(), kSimpleCollator);
+    auto expr = MatchExpressionParser::parse(query, kSimpleCollator);
     ASSERT_OK(expr.getStatus());
     ASSERT_TRUE(expr.getValue()->matchesBSON(BSON("a" << BSON_ARRAY(1 << 2 << 3 << 4))));
 
@@ -63,24 +60,21 @@ TEST(InternalSchemaAllElemMatchFromIndexMatchExpression, MatchesValidQueries) {
 
 TEST(InternalSchemaAllElemMatchFromIndexMatchExpression, RejectsNonArrayElements) {
     auto query = fromjson("{a: {$_internalSchemaAllElemMatchFromIndex: [2, {a: {$lt: 5}}]}}");
-    auto expr = MatchExpressionParser::parse(
-        query, ExtensionsCallbackDisallowExtensions(), kSimpleCollator);
+    auto expr = MatchExpressionParser::parse(query, kSimpleCollator);
     ASSERT_OK(expr.getStatus());
     ASSERT_FALSE(expr.getValue()->matchesBSON(BSON("a" << BSON("a" << 1))));
 }
 
 TEST(InternalSchemaAllElemMatchFromIndexMatchExpression, MatchesArraysWithLessElementsThanIndex) {
     auto query = fromjson("{a: {$_internalSchemaAllElemMatchFromIndex: [2, {a: {$lt: 5}}]}}");
-    auto expr = MatchExpressionParser::parse(
-        query, ExtensionsCallbackDisallowExtensions(), kSimpleCollator);
+    auto expr = MatchExpressionParser::parse(query, kSimpleCollator);
     ASSERT_OK(expr.getStatus());
     ASSERT_TRUE(expr.getValue()->matchesBSON(BSON("a" << BSON_ARRAY(1))));
 }
 
 TEST(InternalSchemaAllElemMatchFromIndexMatchExpression, NestedArraysMatchSubexpression) {
     auto query = fromjson("{a: {$_internalSchemaAllElemMatchFromIndex: [2, {a: {$lt: 5}}]}}");
-    auto expr = MatchExpressionParser::parse(
-        query, ExtensionsCallbackDisallowExtensions(), kSimpleCollator);
+    auto expr = MatchExpressionParser::parse(query, kSimpleCollator);
     ASSERT_OK(expr.getStatus());
     ASSERT_TRUE(
         expr.getValue()->matchesBSON(BSON("a" << BSON_ARRAY(1 << 2 << BSON_ARRAY(3 << 4) << 4))));
@@ -92,8 +86,7 @@ TEST(InternalSchemaAllElemMatchFromIndexMatchExpression, NestedArraysMatchSubexp
 
 TEST(InternalSchemaAllElemMatchFromIndexMatchExpression, MatchedQueriesWithDottedPaths) {
     auto query = fromjson("{'a.b': {$_internalSchemaAllElemMatchFromIndex: [2, {a: {$lt: 5}}]}}");
-    auto expr = MatchExpressionParser::parse(
-        query, ExtensionsCallbackDisallowExtensions(), kSimpleCollator);
+    auto expr = MatchExpressionParser::parse(query, kSimpleCollator);
     ASSERT_OK(expr.getStatus());
     ASSERT_TRUE(
         expr.getValue()->matchesBSON(BSON("a" << BSON("b" << BSON_ARRAY(1 << 2 << 3 << 4)))));

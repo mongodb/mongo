@@ -164,8 +164,13 @@ public:
             return appendCommandStatus(result, qr.getStatus());
         }
 
-        auto cq =
-            CanonicalQuery::canonicalize(opCtx, std::move(qr.getValue()), ExtensionsCallbackNoop());
+        const boost::intrusive_ptr<ExpressionContext> expCtx;
+        auto cq = CanonicalQuery::canonicalize(opCtx,
+                                               std::move(qr.getValue()),
+                                               expCtx,
+                                               ExtensionsCallbackNoop(),
+                                               MatchExpressionParser::kAllowAllSpecialFeatures &
+                                                   ~MatchExpressionParser::AllowedFeatures::kExpr);
         if (!cq.isOK()) {
             return appendCommandStatus(result, cq.getStatus());
         }

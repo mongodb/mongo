@@ -32,8 +32,6 @@
 
 #include <regex>
 
-#include "mongo/db/matcher/extensions_callback_disallow_extensions.h"
-
 namespace mongo {
 
 namespace {
@@ -105,8 +103,7 @@ const std::regex ExpressionWithPlaceholder::placeholderRegex("^[a-z][a-zA-Z0-9]*
 // static
 StatusWith<std::unique_ptr<ExpressionWithPlaceholder>> ExpressionWithPlaceholder::parse(
     BSONObj rawFilter, const CollatorInterface* collator) {
-    StatusWithMatchExpression statusWithFilter =
-        MatchExpressionParser::parse(rawFilter, ExtensionsCallbackDisallowExtensions(), collator);
+    StatusWithMatchExpression statusWithFilter = MatchExpressionParser::parse(rawFilter, collator);
 
     if (!statusWithFilter.isOK()) {
         return statusWithFilter.getStatus();

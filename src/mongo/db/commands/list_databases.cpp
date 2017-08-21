@@ -35,7 +35,6 @@
 #include "mongo/db/commands.h"
 #include "mongo/db/concurrency/d_concurrency.h"
 #include "mongo/db/matcher/expression.h"
-#include "mongo/db/matcher/extensions_callback_disallow_extensions.h"
 #include "mongo/db/operation_context.h"
 #include "mongo/db/service_context.h"
 #include "mongo/db/storage/storage_engine.h"
@@ -100,8 +99,7 @@ public:
             // The collator is null because database metadata objects are compared using simple
             // binary comparison.
             const CollatorInterface* collator = nullptr;
-            auto statusWithMatcher = MatchExpressionParser::parse(
-                filterElt.Obj(), ExtensionsCallbackDisallowExtensions(), collator);
+            auto statusWithMatcher = MatchExpressionParser::parse(filterElt.Obj(), collator);
             if (!statusWithMatcher.isOK()) {
                 return appendCommandStatus(result, statusWithMatcher.getStatus());
             }

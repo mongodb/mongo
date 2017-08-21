@@ -30,7 +30,6 @@
 
 #include "mongo/db/json.h"
 #include "mongo/db/matcher/expression_with_placeholder.h"
-#include "mongo/db/matcher/extensions_callback_disallow_extensions.h"
 #include "mongo/db/query/collation/collator_interface_mock.h"
 #include "mongo/unittest/unittest.h"
 
@@ -174,6 +173,21 @@ TEST(ExpressionWithPlaceholderTest, TextSearchExpressionFailsToParse) {
 TEST(ExpressionWithPlaceholderTest, WhereExpressionFailsToParse) {
     const CollatorInterface* collator = nullptr;
     auto rawFilter = fromjson("{$where: 'sleep(100)'}");
+    auto status = ExpressionWithPlaceholder::parse(rawFilter, collator);
+    ASSERT_NOT_OK(status.getStatus());
+}
+
+TEST(ExpressionWithPlaceholderTest, GeoNearExpressionFailsToParse) {
+    const CollatorInterface* collator = nullptr;
+    auto rawFilter =
+        fromjson("{i: {$nearSphere: {$geometry: {type: 'Point', coordinates: [0, 0]}}}}");
+    auto status = ExpressionWithPlaceholder::parse(rawFilter, collator);
+    ASSERT_NOT_OK(status.getStatus());
+}
+
+TEST(ExpressionWithPlaceholderTest, ExprExpressionFailsToParse) {
+    const CollatorInterface* collator = nullptr;
+    auto rawFilter = fromjson("{i: {$expr: 5}}");
     auto status = ExpressionWithPlaceholder::parse(rawFilter, collator);
     ASSERT_NOT_OK(status.getStatus());
 }

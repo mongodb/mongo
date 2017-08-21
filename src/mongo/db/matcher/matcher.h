@@ -36,6 +36,7 @@
 #include "mongo/bson/bsonobj.h"
 #include "mongo/db/matcher/expression.h"
 #include "mongo/db/matcher/expression_parser.h"
+#include "mongo/db/matcher/extensions_callback_noop.h"
 #include "mongo/db/matcher/match_details.h"
 
 
@@ -54,8 +55,11 @@ public:
      * 'collator' must outlive the returned Matcher and any MatchExpression cloned from it.
      */
     explicit Matcher(const BSONObj& pattern,
-                     const ExtensionsCallback& extensionsCallback,
-                     const CollatorInterface* collator);
+                     const CollatorInterface* collator,
+                     const boost::intrusive_ptr<ExpressionContext>& expCtx = nullptr,
+                     const ExtensionsCallback& extensionsCallback = ExtensionsCallbackNoop(),
+                     MatchExpressionParser::AllowedFeatureSet allowedFeatures =
+                         MatchExpressionParser::kBanAllSpecialFeatures);
 
     bool matches(const BSONObj& doc, MatchDetails* details = NULL) const;
 

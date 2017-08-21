@@ -413,7 +413,13 @@ Status ChunkManagerTargeter::targetUpdate(
     if (!collation.isEmpty()) {
         qr->setCollation(collation);
     }
-    auto cq = CanonicalQuery::canonicalize(opCtx, std::move(qr), ExtensionsCallbackNoop());
+    const boost::intrusive_ptr<ExpressionContext> expCtx;
+    auto cq = CanonicalQuery::canonicalize(opCtx,
+                                           std::move(qr),
+                                           expCtx,
+                                           ExtensionsCallbackNoop(),
+                                           MatchExpressionParser::kAllowAllSpecialFeatures &
+                                               ~MatchExpressionParser::AllowedFeatures::kExpr);
     if (!cq.isOK()) {
         return Status(cq.getStatus().code(),
                       str::stream() << "Could not parse update query " << updateDoc.getQ()
@@ -486,7 +492,13 @@ Status ChunkManagerTargeter::targetDelete(
     if (!collation.isEmpty()) {
         qr->setCollation(collation);
     }
-    auto cq = CanonicalQuery::canonicalize(opCtx, std::move(qr), ExtensionsCallbackNoop());
+    const boost::intrusive_ptr<ExpressionContext> expCtx;
+    auto cq = CanonicalQuery::canonicalize(opCtx,
+                                           std::move(qr),
+                                           expCtx,
+                                           ExtensionsCallbackNoop(),
+                                           MatchExpressionParser::kAllowAllSpecialFeatures &
+                                               ~MatchExpressionParser::AllowedFeatures::kExpr);
     if (!cq.isOK()) {
         return Status(cq.getStatus().code(),
                       str::stream() << "Could not parse delete query " << deleteDoc.getQ()

@@ -346,8 +346,14 @@ DbResponse Strategy::queryOp(OperationContext* opCtx, const NamespaceString& nss
     ReadPreferenceSetting::get(opCtx) =
         uassertStatusOK(ReadPreferenceSetting::fromContainingBSON(q.query, defaultReadPref));
 
-    auto canonicalQuery =
-        uassertStatusOK(CanonicalQuery::canonicalize(opCtx, q, ExtensionsCallbackNoop()));
+    const boost::intrusive_ptr<ExpressionContext> expCtx;
+    auto canonicalQuery = uassertStatusOK(
+        CanonicalQuery::canonicalize(opCtx,
+                                     q,
+                                     expCtx,
+                                     ExtensionsCallbackNoop(),
+                                     MatchExpressionParser::kAllowAllSpecialFeatures &
+                                         ~MatchExpressionParser::AllowedFeatures::kExpr));
 
     // If the $explain flag was set, we must run the operation on the shards as an explain command
     // rather than a find command.

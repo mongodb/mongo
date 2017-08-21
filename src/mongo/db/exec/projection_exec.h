@@ -68,8 +68,7 @@ public:
 
     ProjectionExec(const BSONObj& spec,
                    const MatchExpression* queryExpression,
-                   const CollatorInterface* collator,
-                   const ExtensionsCallback& extensionsCallback);
+                   const CollatorInterface* collator);
 
     ~ProjectionExec();
 

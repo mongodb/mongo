@@ -31,7 +31,6 @@
 #include "mongo/db/json.h"
 #include "mongo/db/matcher/expression_always_boolean.h"
 #include "mongo/db/matcher/expression_parser.h"
-#include "mongo/db/matcher/extensions_callback_disallow_extensions.h"
 #include "mongo/unittest/unittest.h"
 #include <memory>
 
@@ -49,13 +48,11 @@ using namespace mongo;
 
 unique_ptr<ParsedProjection> createParsedProjection(const BSONObj& query, const BSONObj& projObj) {
     const CollatorInterface* collator = nullptr;
-    StatusWithMatchExpression statusWithMatcher =
-        MatchExpressionParser::parse(query, ExtensionsCallbackDisallowExtensions(), collator);
+    StatusWithMatchExpression statusWithMatcher = MatchExpressionParser::parse(query, collator);
     ASSERT(statusWithMatcher.isOK());
     std::unique_ptr<MatchExpression> queryMatchExpr = std::move(statusWithMatcher.getValue());
     ParsedProjection* out = NULL;
-    Status status = ParsedProjection::make(
-        projObj, queryMatchExpr.get(), &out, ExtensionsCallbackDisallowExtensions());
+    Status status = ParsedProjection::make(projObj, queryMatchExpr.get(), &out);
     if (!status.isOK()) {
         FAIL(mongoutils::str::stream() << "failed to parse projection " << projObj << " (query: "
                                        << query
@@ -80,13 +77,11 @@ void assertInvalidProjection(const char* queryStr, const char* projStr) {
     BSONObj query = fromjson(queryStr);
     BSONObj projObj = fromjson(projStr);
     const CollatorInterface* collator = nullptr;
-    StatusWithMatchExpression statusWithMatcher =
-        MatchExpressionParser::parse(query, ExtensionsCallbackDisallowExtensions(), collator);
+    StatusWithMatchExpression statusWithMatcher = MatchExpressionParser::parse(query, collator);
     ASSERT(statusWithMatcher.isOK());
     std::unique_ptr<MatchExpression> queryMatchExpr = std::move(statusWithMatcher.getValue());
     ParsedProjection* out = NULL;
-    Status status = ParsedProjection::make(
-        projObj, queryMatchExpr.get(), &out, ExtensionsCallbackDisallowExtensions());
+    Status status = ParsedProjection::make(projObj, queryMatchExpr.get(), &out);
     std::unique_ptr<ParsedProjection> destroy(out);
     ASSERT(!status.isOK());
 }
@@ -163,6 +158,24 @@ TEST(ParsedProjectionTest, InvalidPositionalOperatorProjections) {
     assertInvalidProjection("{a: [1, 2, 3]}", "{'.$': 1}");
 }
 
+TEST(ParsedProjectionTest, InvalidElemMatchTextProjection) {
+    assertInvalidProjection("{}", "{a: {$elemMatch: {$text: {$search: 'str'}}}}");
+}
+
+TEST(ParsedProjectionTest, InvalidElemMatchWhereProjection) {
+    assertInvalidProjection("{}", "{a: {$elemMatch: {$where: 'this.a == this.b'}}}");
+}
+
+TEST(ParsedProjectionTest, InvalidElemMatchGeoNearProjection) {
+    assertInvalidProjection(
+        "{}",
+        "{a: {$elemMatch: {$nearSphere: {$geometry: {type: 'Point', coordinates: [0, 0]}}}}}");
+}
+
+TEST(ParsedProjectionTest, InvalidElemMatchExprProjection) {
+    assertInvalidProjection("{}", "{a: {$elemMatch: {$expr: 5}}}");
+}
+
 TEST(ParsedProjectionTest, ValidPositionalOperatorProjections) {
     createParsedProjection("{a: 1}", "{'a.$': 1}");
     createParsedProjection("{a: 1}", "{'a.foo.bar.$': 1}");
@@ -191,15 +204,13 @@ TEST(ParsedProjectionTest, InvalidPositionalProjectionDefaultPathMatchExpression
 
     ParsedProjection* out = NULL;
     BSONObj projObj = fromjson("{'a.$': 1}");
-    Status status = ParsedProjection::make(
-        projObj, queryMatchExpr.get(), &out, ExtensionsCallbackDisallowExtensions());
+    Status status = ParsedProjection::make(projObj, queryMatchExpr.get(), &out);
     ASSERT(!status.isOK());
     std::unique_ptr<ParsedProjection> destroy(out);
 
     // Projecting onto empty field should fail.
     BSONObj emptyFieldProjObj = fromjson("{'.$': 1}");
-    status = ParsedProjection::make(
-        emptyFieldProjObj, queryMatchExpr.get(), &out, ExtensionsCallbackDisallowExtensions());
+    status = ParsedProjection::make(emptyFieldProjObj, queryMatchExpr.get(), &out);
     ASSERT(!status.isOK());
 }
 

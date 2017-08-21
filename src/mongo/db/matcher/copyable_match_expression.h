@@ -29,6 +29,7 @@
 #pragma once
 
 #include "mongo/db/matcher/expression_parser.h"
+#include "mongo/db/matcher/extensions_callback_noop.h"
 
 namespace mongo {
 
@@ -50,11 +51,15 @@ public:
      * encounter an error.
      */
     CopyableMatchExpression(BSONObj matchAST,
-                            std::unique_ptr<const ExtensionsCallback> extensionsCallback,
-                            const CollatorInterface* collator)
+                            const CollatorInterface* collator,
+                            const boost::intrusive_ptr<ExpressionContext>& expCtx = nullptr,
+                            std::unique_ptr<const ExtensionsCallback> extensionsCallback =
+                                stdx::make_unique<ExtensionsCallbackNoop>(),
+                            MatchExpressionParser::AllowedFeatureSet allowedFeatures =
+                                MatchExpressionParser::kBanAllSpecialFeatures)
         : _matchAST(matchAST), _extensionsCallback(std::move(extensionsCallback)) {
-        StatusWithMatchExpression parseResult =
-            MatchExpressionParser::parse(_matchAST, *_extensionsCallback, collator);
+        StatusWithMatchExpression parseResult = MatchExpressionParser::parse(
+            _matchAST, collator, expCtx, *_extensionsCallback, allowedFeatures);
         uassertStatusOK(parseResult.getStatus());
         _matchExpr = std::move(parseResult.getValue());
     }
@@ -67,9 +72,18 @@ public:
      * if there other CopyableMatchExpression objects referencing this MatchExpression, they don't
      * see the change in collator.
      */
-    void setCollator(const CollatorInterface* collator) {
-        StatusWithMatchExpression parseResult =
-            MatchExpressionParser::parse(_matchAST, *_extensionsCallback, collator);
+    void setCollator(const CollatorInterface* collator,
+                     const boost::intrusive_ptr<ExpressionContext>& expCtx = nullptr) {
+        // We can allow all features because any features that were allowed in the original
+        // MatchExpression construction should be allowed now.
+        MatchExpressionParser::AllowedFeatureSet allowedFeatures =
+            MatchExpressionParser::kAllowAllSpecialFeatures;
+        if (!expCtx) {
+            allowedFeatures = allowedFeatures & ~MatchExpressionParser::AllowedFeatures::kExpr;
+        }
+
+        StatusWithMatchExpression parseResult = MatchExpressionParser::parse(
+            _matchAST, collator, expCtx, *_extensionsCallback, allowedFeatures);
         invariantOK(parseResult.getStatus());
         _matchExpr = std::move(parseResult.getValue());
     }

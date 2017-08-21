@@ -33,8 +33,6 @@
 #include "mongo/bson/bsonmisc.h"
 #include "mongo/bson/bsonobj.h"
 #include "mongo/bson/json.h"
-#include "mongo/db/matcher/extensions_callback_noop.h"
-#include "mongo/db/matcher/matcher.h"
 #include "mongo/db/pipeline/aggregation_context_fixture.h"
 #include "mongo/db/pipeline/document.h"
 #include "mongo/db/pipeline/document_source_match.h"
@@ -381,8 +379,8 @@ DEATH_TEST_F(DocumentSourceMatchTest,
              "Invariant failure expression::isPathPrefixOf") {
     const auto expCtx = getExpCtx();
     const auto matchSpec = BSON("a.b" << 1 << "b.c" << 1);
-    const auto matchExpression = unittest::assertGet(
-        MatchExpressionParser::parse(matchSpec, ExtensionsCallbackNoop(), expCtx->getCollator()));
+    const auto matchExpression =
+        unittest::assertGet(MatchExpressionParser::parse(matchSpec, expCtx->getCollator()));
     DocumentSourceMatch::descendMatchOnPath(matchExpression.get(), "a", expCtx);
 }
 
@@ -391,8 +389,8 @@ DEATH_TEST_F(DocumentSourceMatchTest,
              "Invariant failure node->matchType()") {
     const auto expCtx = getExpCtx();
     const auto matchSpec = BSON("a" << BSON("$elemMatch" << BSON("a.b" << 1)));
-    const auto matchExpression = unittest::assertGet(
-        MatchExpressionParser::parse(matchSpec, ExtensionsCallbackNoop(), expCtx->getCollator()));
+    const auto matchExpression =
+        unittest::assertGet(MatchExpressionParser::parse(matchSpec, expCtx->getCollator()));
     BSONObjBuilder out;
     matchExpression->serialize(&out);
     DocumentSourceMatch::descendMatchOnPath(matchExpression.get(), "a", expCtx);
@@ -406,16 +404,16 @@ DEATH_TEST_F(DocumentSourceMatchTest,
              "Invariant failure") {
     const auto expCtx = getExpCtx();
     const auto matchSpec = BSON("a" << BSON("$elemMatch" << BSON("$gt" << 0)));
-    const auto matchExpression = unittest::assertGet(
-        MatchExpressionParser::parse(matchSpec, ExtensionsCallbackNoop(), expCtx->getCollator()));
+    const auto matchExpression =
+        unittest::assertGet(MatchExpressionParser::parse(matchSpec, expCtx->getCollator()));
     DocumentSourceMatch::descendMatchOnPath(matchExpression.get(), "a", expCtx);
 }
 
 TEST_F(DocumentSourceMatchTest, ShouldMatchCorrectlyAfterDescendingMatch) {
     const auto expCtx = getExpCtx();
     const auto matchSpec = BSON("a.b" << 1 << "a.c" << 1 << "a.d" << 1);
-    const auto matchExpression = unittest::assertGet(
-        MatchExpressionParser::parse(matchSpec, ExtensionsCallbackNoop(), expCtx->getCollator()));
+    const auto matchExpression =
+        unittest::assertGet(MatchExpressionParser::parse(matchSpec, expCtx->getCollator()));
 
     const auto descendedMatch =
         DocumentSourceMatch::descendMatchOnPath(matchExpression.get(), "a", expCtx);

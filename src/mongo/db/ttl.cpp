@@ -49,7 +49,6 @@
 #include "mongo/db/db_raii.h"
 #include "mongo/db/exec/delete.h"
 #include "mongo/db/index/index_descriptor.h"
-#include "mongo/db/matcher/extensions_callback_disallow_extensions.h"
 #include "mongo/db/namespace_string.h"
 #include "mongo/db/ops/insert.h"
 #include "mongo/db/query/internal_plans.h"
@@ -243,8 +242,7 @@ private:
             BSON(keyFieldName << BSON("$gte" << kDawnOfTime << "$lte" << expirationTime));
         auto qr = stdx::make_unique<QueryRequest>(collectionNSS);
         qr->setFilter(query);
-        auto canonicalQuery = CanonicalQuery::canonicalize(
-            opCtx, std::move(qr), ExtensionsCallbackDisallowExtensions());
+        auto canonicalQuery = CanonicalQuery::canonicalize(opCtx, std::move(qr));
         invariantOK(canonicalQuery.getStatus());
 
         DeleteStageParams params;

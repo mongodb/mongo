@@ -36,7 +36,6 @@
 #include "mongo/db/dbdirectclient.h"
 #include "mongo/db/exec/multi_plan.h"
 #include "mongo/db/exec/plan_stage.h"
-#include "mongo/db/matcher/extensions_callback_disallow_extensions.h"
 #include "mongo/db/pipeline/dependencies.h"
 #include "mongo/db/pipeline/document_source.h"
 #include "mongo/db/pipeline/document_source_cursor.h"
@@ -101,8 +100,7 @@ protected:
         if (hint) {
             qr->setHint(*hint);
         }
-        auto cq = uassertStatusOK(CanonicalQuery::canonicalize(
-            &_opCtx, std::move(qr), ExtensionsCallbackDisallowExtensions()));
+        auto cq = uassertStatusOK(CanonicalQuery::canonicalize(&_opCtx, std::move(qr)));
 
         auto exec = uassertStatusOK(
             getExecutor(&_opCtx, ctx.getCollection(), std::move(cq), PlanExecutor::NO_YIELD));

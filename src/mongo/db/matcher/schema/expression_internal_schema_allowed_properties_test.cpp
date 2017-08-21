@@ -30,7 +30,6 @@
 
 #include "mongo/bson/json.h"
 #include "mongo/db/matcher/expression_parser.h"
-#include "mongo/db/matcher/extensions_callback_disallow_extensions.h"
 #include "mongo/db/matcher/schema/expression_internal_schema_allowed_properties.h"
 #include "mongo/unittest/unittest.h"
 
@@ -41,8 +40,7 @@ TEST(InternalSchemaAllowedPropertiesMatchExpression, MatchesObjectsWithListedPro
     auto filter = fromjson(
         "{$_internalSchemaAllowedProperties: {properties: ['a', 'b'],"
         "namePlaceholder: 'i', patternProperties: [], otherwise: {i: 0}}}");
-    auto expr = MatchExpressionParser::parse(
-        filter, ExtensionsCallbackDisallowExtensions(), kSimpleCollator);
+    auto expr = MatchExpressionParser::parse(filter, kSimpleCollator);
     ASSERT_OK(expr.getStatus());
 
     ASSERT_TRUE(expr.getValue()->matchesBSON(fromjson("{a: 1, b: 1}")));
@@ -61,8 +59,7 @@ TEST(InternalSchemaAllowedPropertiesMatchExpression, MatchesObjectsWithMatchingP
             ],
             otherwise: {i: {$type: 'string'}}
         }})");
-    auto expr = MatchExpressionParser::parse(
-        filter, ExtensionsCallbackDisallowExtensions(), kSimpleCollator);
+    auto expr = MatchExpressionParser::parse(filter, kSimpleCollator);
     ASSERT_OK(expr.getStatus());
 
     ASSERT_TRUE(expr.getValue()->matchesBSON(fromjson("{puppies: 2, kittens: 3, phoneNum: 1234}")));
@@ -75,8 +72,7 @@ TEST(InternalSchemaAllowedPropertiesMatchExpression,
     auto filter = fromjson(
         "{$_internalSchemaAllowedProperties: {properties: ['a'], namePlaceholder: 'a',"
         "patternProperties: [{regex: /a/, expression: {a: {$gt: 5}}}], otherwise: {a: 0}}}");
-    auto expr = MatchExpressionParser::parse(
-        filter, ExtensionsCallbackDisallowExtensions(), kSimpleCollator);
+    auto expr = MatchExpressionParser::parse(filter, kSimpleCollator);
     ASSERT_OK(expr.getStatus());
 
     ASSERT_TRUE(expr.getValue()->matchesBSON(fromjson("{a: 6}")));
@@ -95,8 +91,7 @@ TEST(InternalSchemaAllowedPropertiesMatchExpression, OtherwiseEnforcedWhenApprop
             ],
             otherwise: {i: {$type: 'string'}}
         }})");
-    auto expr = MatchExpressionParser::parse(
-        filter, ExtensionsCallbackDisallowExtensions(), kSimpleCollator);
+    auto expr = MatchExpressionParser::parse(filter, kSimpleCollator);
     ASSERT_OK(expr.getStatus());
 
     ASSERT_TRUE(expr.getValue()->matchesBSON(fromjson("{foo: 'bar'}")));
@@ -107,8 +102,7 @@ TEST(InternalSchemaAllowedPropertiesMatchExpression, EquivalentToClone) {
     auto filter = fromjson(
         "{$_internalSchemaAllowedProperties: {properties: ['a'], namePlaceholder: 'i',"
         "patternProperties: [{regex: /a/, expression: {i: 1}}], otherwise: {i: 7}}}");
-    auto expr = MatchExpressionParser::parse(
-        filter, ExtensionsCallbackDisallowExtensions(), kSimpleCollator);
+    auto expr = MatchExpressionParser::parse(filter, kSimpleCollator);
     ASSERT_OK(expr.getStatus());
     auto clone = expr.getValue()->shallowClone();
     ASSERT_TRUE(expr.getValue()->equivalent(clone.get()));

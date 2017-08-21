@@ -42,7 +42,6 @@
 #include "mongo/db/exec/queued_data_stage.h"
 #include "mongo/db/json.h"
 #include "mongo/db/matcher/expression_parser.h"
-#include "mongo/db/matcher/extensions_callback_disallow_extensions.h"
 #include "mongo/db/namespace_string.h"
 #include "mongo/db/query/get_executor.h"
 #include "mongo/db/query/plan_executor.h"
@@ -165,8 +164,8 @@ public:
         // Make the filter.
         BSONObj filterObj = BSON("foo" << 7);
         const CollatorInterface* collator = nullptr;
-        StatusWithMatchExpression statusWithMatcher = MatchExpressionParser::parse(
-            filterObj, ExtensionsCallbackDisallowExtensions(), collator);
+        StatusWithMatchExpression statusWithMatcher =
+            MatchExpressionParser::parse(filterObj, collator);
         verify(statusWithMatcher.isOK());
         unique_ptr<MatchExpression> filter = std::move(statusWithMatcher.getValue());
         // Make the stage.
@@ -176,8 +175,7 @@ public:
         // Hand the plans off to the MPS.
         auto qr = stdx::make_unique<QueryRequest>(nss);
         qr->setFilter(BSON("foo" << 7));
-        auto statusWithCQ = CanonicalQuery::canonicalize(
-            opCtx(), std::move(qr), ExtensionsCallbackDisallowExtensions());
+        auto statusWithCQ = CanonicalQuery::canonicalize(opCtx(), std::move(qr));
         verify(statusWithCQ.isOK());
         unique_ptr<CanonicalQuery> cq = std::move(statusWithCQ.getValue());
         verify(NULL != cq.get());
@@ -235,8 +233,7 @@ public:
         auto qr = stdx::make_unique<QueryRequest>(nss);
         qr->setFilter(BSON("a" << 1 << "b" << 1));
         qr->setSort(BSON("b" << 1));
-        auto statusWithCQ = CanonicalQuery::canonicalize(
-            opCtx(), std::move(qr), ExtensionsCallbackDisallowExtensions());
+        auto statusWithCQ = CanonicalQuery::canonicalize(opCtx(), std::move(qr));
         verify(statusWithCQ.isOK());
         unique_ptr<CanonicalQuery> cq = std::move(statusWithCQ.getValue());
         ASSERT(NULL != cq.get());
@@ -340,8 +337,7 @@ public:
 
         auto qr = stdx::make_unique<QueryRequest>(nss);
         qr->setFilter(BSON("x" << 1));
-        auto cq = uassertStatusOK(CanonicalQuery::canonicalize(
-            opCtx(), std::move(qr), ExtensionsCallbackDisallowExtensions()));
+        auto cq = uassertStatusOK(CanonicalQuery::canonicalize(opCtx(), std::move(qr)));
         unique_ptr<MultiPlanStage> mps =
             make_unique<MultiPlanStage>(&_opCtx, ctx.getCollection(), cq.get());
 
@@ -417,8 +413,7 @@ public:
         // Create the executor (Matching all documents).
         auto qr = stdx::make_unique<QueryRequest>(nss);
         qr->setFilter(BSON("foo" << BSON("$gte" << 0)));
-        auto cq = uassertStatusOK(CanonicalQuery::canonicalize(
-            opCtx(), std::move(qr), ExtensionsCallbackDisallowExtensions()));
+        auto cq = uassertStatusOK(CanonicalQuery::canonicalize(opCtx(), std::move(qr)));
         auto exec =
             uassertStatusOK(getExecutor(&_opCtx, coll, std::move(cq), PlanExecutor::NO_YIELD));
 

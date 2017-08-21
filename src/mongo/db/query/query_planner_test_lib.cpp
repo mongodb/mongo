@@ -36,7 +36,6 @@
 #include "mongo/db/jsobj.h"
 #include "mongo/db/json.h"
 #include "mongo/db/matcher/expression_parser.h"
-#include "mongo/db/matcher/extensions_callback_disallow_extensions.h"
 #include "mongo/db/query/collation/collator_factory_mock.h"
 #include "mongo/db/query/query_planner.h"
 #include "mongo/db/query/query_solution.h"
@@ -67,8 +66,8 @@ bool filterMatches(const BSONObj& testFilter,
         testCollator = std::move(collator.getValue());
     }
 
-    StatusWithMatchExpression statusWithMatcher = MatchExpressionParser::parse(
-        testFilter, ExtensionsCallbackDisallowExtensions(), testCollator.get());
+    StatusWithMatchExpression statusWithMatcher =
+        MatchExpressionParser::parse(testFilter, testCollator.get());
     if (!statusWithMatcher.isOK()) {
         return false;
     }

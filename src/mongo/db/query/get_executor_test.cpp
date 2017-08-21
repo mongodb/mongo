@@ -37,7 +37,6 @@
 
 #include "mongo/bson/simple_bsonobj_comparator.h"
 #include "mongo/db/json.h"
-#include "mongo/db/matcher/extensions_callback_disallow_extensions.h"
 #include "mongo/db/query/query_settings.h"
 #include "mongo/db/query/query_test_service_context.h"
 #include "mongo/stdx/unordered_set.h"
@@ -65,8 +64,7 @@ unique_ptr<CanonicalQuery> canonicalize(const char* queryStr,
     qr->setFilter(fromjson(queryStr));
     qr->setSort(fromjson(sortStr));
     qr->setProj(fromjson(projStr));
-    auto statusWithCQ = CanonicalQuery::canonicalize(
-        opCtx.get(), std::move(qr), ExtensionsCallbackDisallowExtensions());
+    auto statusWithCQ = CanonicalQuery::canonicalize(opCtx.get(), std::move(qr));
     ASSERT_OK(statusWithCQ.getStatus());
     return std::move(statusWithCQ.getValue());
 }

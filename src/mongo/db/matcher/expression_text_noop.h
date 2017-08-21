@@ -41,6 +41,10 @@ public:
         return _ftsQuery;
     }
 
+    bool matchesSingleElement(const BSONElement& e, MatchDetails* details = nullptr) const final {
+        MONGO_UNREACHABLE;
+    }
+
     std::unique_ptr<MatchExpression> shallowClone() const final;
 
 private:

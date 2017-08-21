@@ -33,7 +33,6 @@
 #include "mongo/db/commands/index_filter_commands.h"
 
 #include "mongo/db/json.h"
-#include "mongo/db/matcher/extensions_callback_disallow_extensions.h"
 #include "mongo/db/operation_context_noop.h"
 #include "mongo/db/query/collation/collator_interface_mock.h"
 #include "mongo/db/query/plan_ranker.h"
@@ -132,8 +131,7 @@ void addQueryShapeToPlanCache(OperationContext* opCtx,
     qr->setSort(fromjson(sortStr));
     qr->setProj(fromjson(projectionStr));
     qr->setCollation(fromjson(collationStr));
-    auto statusWithCQ =
-        CanonicalQuery::canonicalize(opCtx, std::move(qr), ExtensionsCallbackDisallowExtensions());
+    auto statusWithCQ = CanonicalQuery::canonicalize(opCtx, std::move(qr));
     ASSERT_OK(statusWithCQ.getStatus());
     std::unique_ptr<CanonicalQuery> cq = std::move(statusWithCQ.getValue());
 
@@ -162,8 +160,7 @@ bool planCacheContains(const PlanCache& planCache,
     qr->setSort(fromjson(sortStr));
     qr->setProj(fromjson(projectionStr));
     qr->setCollation(fromjson(collationStr));
-    auto statusWithInputQuery = CanonicalQuery::canonicalize(
-        opCtx.get(), std::move(qr), ExtensionsCallbackDisallowExtensions());
+    auto statusWithInputQuery = CanonicalQuery::canonicalize(opCtx.get(), std::move(qr));
     ASSERT_OK(statusWithInputQuery.getStatus());
     unique_ptr<CanonicalQuery> inputQuery = std::move(statusWithInputQuery.getValue());
 
@@ -183,8 +180,7 @@ bool planCacheContains(const PlanCache& planCache,
         qr->setSort(entry->sort);
         qr->setProj(entry->projection);
         qr->setCollation(entry->collation);
-        auto statusWithCurrentQuery = CanonicalQuery::canonicalize(
-            opCtx.get(), std::move(qr), ExtensionsCallbackDisallowExtensions());
+        auto statusWithCurrentQuery = CanonicalQuery::canonicalize(opCtx.get(), std::move(qr));
         ASSERT_OK(statusWithCurrentQuery.getStatus());
         unique_ptr<CanonicalQuery> currentQuery = std::move(statusWithCurrentQuery.getValue());
 

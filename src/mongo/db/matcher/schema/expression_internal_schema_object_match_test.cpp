@@ -29,7 +29,6 @@
 
 #include "mongo/db/json.h"
 #include "mongo/db/matcher/expression_parser.h"
-#include "mongo/db/matcher/extensions_callback_disallow_extensions.h"
 #include "mongo/db/matcher/matcher.h"
 #include "mongo/db/matcher/schema/expression_internal_schema_object_match.h"
 #include "mongo/db/query/collation/collator_interface_mock.h"
@@ -40,8 +39,7 @@ namespace mongo {
 namespace {
 
 TEST(InternalSchemaObjectMatchExpression, RejectsNonObjectElements) {
-    auto subExpr = MatchExpressionParser::parse(
-        BSON("b" << 1), ExtensionsCallbackDisallowExtensions(), nullptr);
+    auto subExpr = MatchExpressionParser::parse(BSON("b" << 1), nullptr);
     ASSERT_OK(subExpr.getStatus());
 
     InternalSchemaObjectMatchExpression objMatch;
@@ -56,7 +54,6 @@ TEST(InternalSchemaObjectMatchExpression, RejectsNonObjectElements) {
 TEST(InternalSchemaObjectMatchExpression, RejectsObjectsThatDontMatch) {
     auto subExpr = MatchExpressionParser::parse(BSON("b" << BSON("$type"
                                                                  << "string")),
-                                                ExtensionsCallbackDisallowExtensions(),
                                                 nullptr);
     ASSERT_OK(subExpr.getStatus());
 
@@ -70,7 +67,6 @@ TEST(InternalSchemaObjectMatchExpression, RejectsObjectsThatDontMatch) {
 TEST(InternalSchemaObjectMatchExpression, AcceptsObjectsThatMatch) {
     auto subExpr = MatchExpressionParser::parse(BSON("b" << BSON("$type"
                                                                  << "string")),
-                                                ExtensionsCallbackDisallowExtensions(),
                                                 nullptr);
     ASSERT_OK(subExpr.getStatus());
 
@@ -92,7 +88,6 @@ TEST(InternalSchemaObjectMatchExpression, AcceptsObjectsThatMatch) {
 TEST(InternalSchemaObjectMatchExpression, DottedPathAcceptsObjectsThatMatch) {
     auto subExpr = MatchExpressionParser::parse(BSON("b.c.d" << BSON("$type"
                                                                      << "string")),
-                                                ExtensionsCallbackDisallowExtensions(),
                                                 nullptr);
     ASSERT_OK(subExpr.getStatus());
 
@@ -107,8 +102,7 @@ TEST(InternalSchemaObjectMatchExpression, DottedPathAcceptsObjectsThatMatch) {
 }
 
 TEST(InternalSchemaObjectMatchExpression, EmptyMatchAcceptsAllObjects) {
-    auto subExpr =
-        MatchExpressionParser::parse(BSONObj(), ExtensionsCallbackDisallowExtensions(), nullptr);
+    auto subExpr = MatchExpressionParser::parse(BSONObj(), nullptr);
     ASSERT_OK(subExpr.getStatus());
 
     InternalSchemaObjectMatchExpression objMatch;
@@ -130,8 +124,7 @@ TEST(InternalSchemaObjectMatchExpression, NestedObjectMatchReturnsCorrectPath) {
         "           $or: [{c: {$type: 'string'}}, {c: {$gt: 0}}]"
         "       }}}"
         "    }}}");
-    auto objMatch =
-        MatchExpressionParser::parse(query, ExtensionsCallbackDisallowExtensions(), nullptr);
+    auto objMatch = MatchExpressionParser::parse(query, nullptr);
     ASSERT_OK(objMatch.getStatus());
 
     ASSERT_EQ(objMatch.getValue()->path(), "a");
@@ -145,8 +138,7 @@ TEST(InternalSchemaObjectMatchExpression, MatchesNestedObjectMatch) {
         "           c: 3"
         "       }}}"
         "    }}}");
-    auto objMatch =
-        MatchExpressionParser::parse(query, ExtensionsCallbackDisallowExtensions(), nullptr);
+    auto objMatch = MatchExpressionParser::parse(query, nullptr);
     ASSERT_OK(objMatch.getStatus());
 
     ASSERT_FALSE(objMatch.getValue()->matchesBSON(fromjson("{a: 1}")));
@@ -160,20 +152,20 @@ TEST(InternalSchemaObjectMatchExpression, EquivalentReturnsCorrectResults) {
         "    {a: {$_internalSchemaObjectMatch: {"
         "        b: 3"
         "    }}}");
-    Matcher objectMatch(query, ExtensionsCallbackDisallowExtensions(), nullptr);
+    Matcher objectMatch(query, nullptr);
 
     query = fromjson(
         "    {a: {$_internalSchemaObjectMatch: {"
         "        b: {$eq: 3}"
         "    }}}");
-    Matcher objectMatchEq(query, ExtensionsCallbackDisallowExtensions(), nullptr);
+    Matcher objectMatchEq(query, nullptr);
     ASSERT_TRUE(objectMatch.getMatchExpression()->equivalent(objectMatchEq.getMatchExpression()));
 
     query = fromjson(
         "    {a: {$_internalSchemaObjectMatch: {"
         "        c: {$eq: 3}"
         "    }}}");
-    Matcher objectMatchNotEq(query, ExtensionsCallbackDisallowExtensions(), nullptr);
+    Matcher objectMatchNotEq(query, nullptr);
     ASSERT_FALSE(
         objectMatch.getMatchExpression()->equivalent(objectMatchNotEq.getMatchExpression()));
 }
@@ -184,8 +176,7 @@ TEST(InternalSchemaObjectMatchExpression, SubExpressionRespectsCollator) {
         "{a: {$_internalSchemaObjectMatch: {"
         "	b: {$eq: 'FOO'}"
         "}}}");
-    auto objectMatch =
-        MatchExpressionParser::parse(query, ExtensionsCallbackDisallowExtensions(), &collator);
+    auto objectMatch = MatchExpressionParser::parse(query, &collator);
     ASSERT_OK(objectMatch.getStatus());
 
     ASSERT_TRUE(objectMatch.getValue()->matchesBSON(fromjson("{a: {b: 'FOO'}}")));
@@ -195,8 +186,7 @@ TEST(InternalSchemaObjectMatchExpression, SubExpressionRespectsCollator) {
 
 TEST(InternalSchemaObjectMatchExpression, RejectsArraysContainingMatchingSubObject) {
     auto query = fromjson("{a: {$_internalSchemaObjectMatch: {b: 1}}}");
-    auto objMatch =
-        MatchExpressionParser::parse(query, ExtensionsCallbackDisallowExtensions(), nullptr);
+    auto objMatch = MatchExpressionParser::parse(query, nullptr);
     ASSERT_OK(objMatch.getStatus());
 
     ASSERT_FALSE(objMatch.getValue()->matchesBSON(fromjson("{a: 1}")));

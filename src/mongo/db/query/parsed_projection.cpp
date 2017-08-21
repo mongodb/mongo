@@ -28,9 +28,8 @@
 
 #include "mongo/db/query/parsed_projection.h"
 
-#include "mongo/db/query/query_request.h"
-
 #include "mongo/bson/simple_bsonobj_comparator.h"
+#include "mongo/db/query/query_request.h"
 
 namespace mongo {
 
@@ -49,8 +48,7 @@ using std::string;
 // static
 Status ParsedProjection::make(const BSONObj& spec,
                               const MatchExpression* const query,
-                              ParsedProjection** out,
-                              const ExtensionsCallback& extensionsCallback) {
+                              ParsedProjection** out) {
     // Whether we're including or excluding fields.
     enum class IncludeExclude { kUninitialized, kInclude, kExclude };
     IncludeExclude includeExclude = IncludeExclude::kUninitialized;
@@ -128,10 +126,11 @@ Status ParsedProjection::make(const BSONObj& spec,
                 // is ok because the parsed MatchExpression is not used after being created. We are
                 // only parsing here in order to ensure that the elemMatch projection is valid.
                 //
-                // TODO: Is there a faster way of validating the elemMatchObj?
+                // Match expression extensions such as $text, $where, $geoNear, $near, $nearSphere,
+                // and $expr are not allowed in $elemMatch projections.
                 const CollatorInterface* collator = nullptr;
                 StatusWithMatchExpression statusWithMatcher =
-                    MatchExpressionParser::parse(elemMatchObj, extensionsCallback, collator);
+                    MatchExpressionParser::parse(elemMatchObj, collator);
                 if (!statusWithMatcher.isOK()) {
                     return statusWithMatcher.getStatus();
                 }

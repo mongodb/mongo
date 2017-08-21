@@ -214,8 +214,14 @@ Status UpdateDriver::populateDocumentWithQueryFields(OperationContext* opCtx,
     // $where/$text clauses do not make sense, hence empty ExtensionsCallback.
     auto qr = stdx::make_unique<QueryRequest>(NamespaceString(""));
     qr->setFilter(query);
+    const boost::intrusive_ptr<ExpressionContext> expCtx;
     auto statusWithCQ =
-        CanonicalQuery::canonicalize(opCtx, std::move(qr), ExtensionsCallbackNoop());
+        CanonicalQuery::canonicalize(opCtx,
+                                     std::move(qr),
+                                     expCtx,
+                                     ExtensionsCallbackNoop(),
+                                     MatchExpressionParser::kAllowAllSpecialFeatures &
+                                         ~MatchExpressionParser::AllowedFeatures::kExpr);
     if (!statusWithCQ.isOK()) {
         return statusWithCQ.getStatus();
     }

@@ -38,8 +38,8 @@
 #include "mongo/db/exec/subplan.h"
 #include "mongo/db/jsobj.h"
 #include "mongo/db/json.h"
-#include "mongo/db/matcher/extensions_callback_disallow_extensions.h"
 #include "mongo/db/matcher/extensions_callback_noop.h"
+#include "mongo/db/pipeline/expression_context_for_test.h"
 #include "mongo/db/query/canonical_query.h"
 #include "mongo/db/query/get_executor.h"
 #include "mongo/dbtests/dbtests.h"
@@ -79,8 +79,13 @@ protected:
         bool isExplain = false;
         auto qr = unittest::assertGet(QueryRequest::makeFromFindCommand(nss, cmdObj, isExplain));
 
+        boost::intrusive_ptr<ExpressionContextForTest> expCtx(new ExpressionContextForTest());
         auto cq = unittest::assertGet(
-            CanonicalQuery::canonicalize(opCtx(), std::move(qr), ExtensionsCallbackNoop()));
+            CanonicalQuery::canonicalize(opCtx(),
+                                         std::move(qr),
+                                         expCtx,
+                                         ExtensionsCallbackNoop(),
+                                         MatchExpressionParser::kAllowAllSpecialFeatures));
         return cq;
     }
 
@@ -115,8 +120,7 @@ public:
 
         auto qr = stdx::make_unique<QueryRequest>(nss);
         qr->setFilter(query);
-        auto statusWithCQ = CanonicalQuery::canonicalize(
-            opCtx(), std::move(qr), ExtensionsCallbackDisallowExtensions());
+        auto statusWithCQ = CanonicalQuery::canonicalize(opCtx(), std::move(qr));
         ASSERT_OK(statusWithCQ.getStatus());
         std::unique_ptr<CanonicalQuery> cq = std::move(statusWithCQ.getValue());
 
@@ -161,8 +165,7 @@ public:
 
         auto qr = stdx::make_unique<QueryRequest>(nss);
         qr->setFilter(query);
-        auto statusWithCQ = CanonicalQuery::canonicalize(
-            opCtx(), std::move(qr), ExtensionsCallbackDisallowExtensions());
+        auto statusWithCQ = CanonicalQuery::canonicalize(opCtx(), std::move(qr));
         ASSERT_OK(statusWithCQ.getStatus());
         std::unique_ptr<CanonicalQuery> cq = std::move(statusWithCQ.getValue());
 
@@ -219,8 +222,7 @@ public:
 
         auto qr = stdx::make_unique<QueryRequest>(nss);
         qr->setFilter(query);
-        auto statusWithCQ = CanonicalQuery::canonicalize(
-            opCtx(), std::move(qr), ExtensionsCallbackDisallowExtensions());
+        auto statusWithCQ = CanonicalQuery::canonicalize(opCtx(), std::move(qr));
         ASSERT_OK(statusWithCQ.getStatus());
         std::unique_ptr<CanonicalQuery> cq = std::move(statusWithCQ.getValue());
 
@@ -278,8 +280,7 @@ public:
 
         auto qr = stdx::make_unique<QueryRequest>(nss);
         qr->setFilter(query);
-        auto statusWithCQ = CanonicalQuery::canonicalize(
-            opCtx(), std::move(qr), ExtensionsCallbackDisallowExtensions());
+        auto statusWithCQ = CanonicalQuery::canonicalize(opCtx(), std::move(qr));
         ASSERT_OK(statusWithCQ.getStatus());
         std::unique_ptr<CanonicalQuery> cq = std::move(statusWithCQ.getValue());
 
@@ -461,8 +462,7 @@ public:
         {
             BSONObj queryObj = fromjson("{$or:[{a:1}, {b:1}], e:1}");
             const CollatorInterface* collator = nullptr;
-            StatusWithMatchExpression expr = MatchExpressionParser::parse(
-                queryObj, ExtensionsCallbackDisallowExtensions(), collator);
+            StatusWithMatchExpression expr = MatchExpressionParser::parse(queryObj, collator);
             ASSERT_OK(expr.getStatus());
             std::unique_ptr<MatchExpression> rewrittenExpr =
                 SubplanStage::rewriteToRootedOr(std::move(expr.getValue()));
@@ -479,8 +479,7 @@ public:
         {
             BSONObj queryObj = fromjson("{$or:[{a:1}, {b:1}], e:1, f:1}");
             const CollatorInterface* collator = nullptr;
-            StatusWithMatchExpression expr = MatchExpressionParser::parse(
-                queryObj, ExtensionsCallbackDisallowExtensions(), collator);
+            StatusWithMatchExpression expr = MatchExpressionParser::parse(queryObj, collator);
             ASSERT_OK(expr.getStatus());
             std::unique_ptr<MatchExpression> rewrittenExpr =
                 SubplanStage::rewriteToRootedOr(std::move(expr.getValue()));
@@ -497,8 +496,7 @@ public:
         {
             BSONObj queryObj = fromjson("{$or:[{a:1,b:1}, {c:1,d:1}], e:1,f:1}");
             const CollatorInterface* collator = nullptr;
-            StatusWithMatchExpression expr = MatchExpressionParser::parse(
-                queryObj, ExtensionsCallbackDisallowExtensions(), collator);
+            StatusWithMatchExpression expr = MatchExpressionParser::parse(queryObj, collator);
             ASSERT_OK(expr.getStatus());
             std::unique_ptr<MatchExpression> rewrittenExpr =
                 SubplanStage::rewriteToRootedOr(std::move(expr.getValue()));
@@ -534,8 +532,7 @@ public:
 
         auto qr = stdx::make_unique<QueryRequest>(nss);
         qr->setFilter(query);
-        auto cq = unittest::assertGet(CanonicalQuery::canonicalize(
-            opCtx(), std::move(qr), ExtensionsCallbackDisallowExtensions()));
+        auto cq = unittest::assertGet(CanonicalQuery::canonicalize(opCtx(), std::move(qr)));
 
         Collection* collection = ctx.getCollection();
 
@@ -596,8 +593,7 @@ public:
         auto qr = stdx::make_unique<QueryRequest>(nss);
         qr->setFilter(fromjson("{$or: [{a: 1}, {a: {$ne:1}}]}"));
         qr->setSort(BSON("d" << 1));
-        auto cq = unittest::assertGet(CanonicalQuery::canonicalize(
-            opCtx(), std::move(qr), ExtensionsCallbackDisallowExtensions()));
+        auto cq = unittest::assertGet(CanonicalQuery::canonicalize(opCtx(), std::move(qr)));
 
         Collection* collection = ctx.getCollection();
 

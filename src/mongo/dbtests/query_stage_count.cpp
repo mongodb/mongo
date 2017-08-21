@@ -42,7 +42,6 @@
 #include "mongo/db/exec/working_set.h"
 #include "mongo/db/matcher/expression.h"
 #include "mongo/db/matcher/expression_parser.h"
-#include "mongo/db/matcher/extensions_callback_disallow_extensions.h"
 #include "mongo/dbtests/dbtests.h"
 
 namespace QueryStageCount {
@@ -150,8 +149,8 @@ public:
         unique_ptr<WorkingSet> ws(new WorkingSet);
 
         const CollatorInterface* collator = nullptr;
-        StatusWithMatchExpression statusWithMatcher = MatchExpressionParser::parse(
-            request.getQuery(), ExtensionsCallbackDisallowExtensions(), collator);
+        StatusWithMatchExpression statusWithMatcher =
+            MatchExpressionParser::parse(request.getQuery(), collator);
         ASSERT(statusWithMatcher.isOK());
         unique_ptr<MatchExpression> expression = std::move(statusWithMatcher.getValue());
 

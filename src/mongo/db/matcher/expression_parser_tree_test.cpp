@@ -36,15 +36,13 @@
 #include "mongo/db/json.h"
 #include "mongo/db/matcher/expression.h"
 #include "mongo/db/matcher/expression_leaf.h"
-#include "mongo/db/matcher/extensions_callback_disallow_extensions.h"
 
 namespace mongo {
 
 TEST(MatchExpressionParserTreeTest, OR1) {
     BSONObj query = BSON("$or" << BSON_ARRAY(BSON("x" << 1) << BSON("y" << 2)));
     const CollatorInterface* collator = nullptr;
-    StatusWithMatchExpression result =
-        MatchExpressionParser::parse(query, ExtensionsCallbackDisallowExtensions(), collator);
+    StatusWithMatchExpression result = MatchExpressionParser::parse(query, collator);
     ASSERT_TRUE(result.isOK());
 
     ASSERT(result.getValue()->matchesBSON(BSON("x" << 1)));
@@ -57,8 +55,7 @@ TEST(MatchExpressionParserTreeTest, OREmbedded) {
     BSONObj query1 = BSON("$or" << BSON_ARRAY(BSON("x" << 1) << BSON("y" << 2)));
     BSONObj query2 = BSON("$or" << BSON_ARRAY(query1));
     const CollatorInterface* collator = nullptr;
-    StatusWithMatchExpression result =
-        MatchExpressionParser::parse(query2, ExtensionsCallbackDisallowExtensions(), collator);
+    StatusWithMatchExpression result = MatchExpressionParser::parse(query2, collator);
     ASSERT_TRUE(result.isOK());
 
     ASSERT(result.getValue()->matchesBSON(BSON("x" << 1)));
@@ -71,8 +68,7 @@ TEST(MatchExpressionParserTreeTest, OREmbedded) {
 TEST(MatchExpressionParserTreeTest, AND1) {
     BSONObj query = BSON("$and" << BSON_ARRAY(BSON("x" << 1) << BSON("y" << 2)));
     const CollatorInterface* collator = nullptr;
-    StatusWithMatchExpression result =
-        MatchExpressionParser::parse(query, ExtensionsCallbackDisallowExtensions(), collator);
+    StatusWithMatchExpression result = MatchExpressionParser::parse(query, collator);
     ASSERT_TRUE(result.isOK());
 
     ASSERT(!result.getValue()->matchesBSON(BSON("x" << 1)));
@@ -86,8 +82,7 @@ TEST(MatchExpressionParserTreeTest, AND1) {
 TEST(MatchExpressionParserTreeTest, NOREmbedded) {
     BSONObj query = BSON("$nor" << BSON_ARRAY(BSON("x" << 1) << BSON("y" << 2)));
     const CollatorInterface* collator = nullptr;
-    StatusWithMatchExpression result =
-        MatchExpressionParser::parse(query, ExtensionsCallbackDisallowExtensions(), collator);
+    StatusWithMatchExpression result = MatchExpressionParser::parse(query, collator);
     ASSERT_TRUE(result.isOK());
 
     ASSERT(!result.getValue()->matchesBSON(BSON("x" << 1)));
@@ -99,8 +94,7 @@ TEST(MatchExpressionParserTreeTest, NOREmbedded) {
 TEST(MatchExpressionParserTreeTest, NOT1) {
     BSONObj query = BSON("x" << BSON("$not" << BSON("$gt" << 5)));
     const CollatorInterface* collator = nullptr;
-    StatusWithMatchExpression result =
-        MatchExpressionParser::parse(query, ExtensionsCallbackDisallowExtensions(), collator);
+    StatusWithMatchExpression result = MatchExpressionParser::parse(query, collator);
     ASSERT_TRUE(result.isOK());
 
     ASSERT(result.getValue()->matchesBSON(BSON("x" << 2)));
@@ -112,8 +106,7 @@ TEST(MatchExpressionParserLeafTest, NotRegex1) {
     b.appendRegex("$not", "abc", "i");
     BSONObj query = BSON("x" << b.obj());
     const CollatorInterface* collator = nullptr;
-    StatusWithMatchExpression result =
-        MatchExpressionParser::parse(query, ExtensionsCallbackDisallowExtensions(), collator);
+    StatusWithMatchExpression result = MatchExpressionParser::parse(query, collator);
     ASSERT_TRUE(result.isOK());
 
     ASSERT(!result.getValue()->matchesBSON(BSON("x"

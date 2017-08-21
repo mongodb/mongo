@@ -39,7 +39,6 @@
 #include "mongo/db/exec/plan_stage.h"
 #include "mongo/db/json.h"
 #include "mongo/db/matcher/expression_parser.h"
-#include "mongo/db/matcher/extensions_callback_disallow_extensions.h"
 #include "mongo/db/namespace_string.h"
 #include "mongo/db/query/plan_executor.h"
 #include "mongo/dbtests/dbtests.h"
@@ -83,8 +82,8 @@ public:
         AutoGetCollectionForReadCommand ctx(&_opCtx, NamespaceString(ns()));
 
         const CollatorInterface* collator = nullptr;
-        StatusWithMatchExpression statusWithMatcher = MatchExpressionParser::parse(
-            filterObj, ExtensionsCallbackDisallowExtensions(), collator);
+        StatusWithMatchExpression statusWithMatcher =
+            MatchExpressionParser::parse(filterObj, collator);
         verify(statusWithMatcher.isOK());
         unique_ptr<MatchExpression> filterExpr = std::move(statusWithMatcher.getValue());
 

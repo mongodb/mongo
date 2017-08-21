@@ -39,7 +39,6 @@
 #include "mongo/db/auth/privilege_parser.h"
 #include "mongo/db/jsobj.h"
 #include "mongo/db/matcher/expression_parser.h"
-#include "mongo/db/matcher/extensions_callback_disallow_extensions.h"
 #include "mongo/db/namespace_string.h"
 #include "mongo/db/operation_context_noop.h"
 #include "mongo/db/update/update_driver.h"
@@ -296,8 +295,7 @@ Status AuthzManagerExternalStateMock::_queryVector(
     const BSONObj& query,
     std::vector<BSONObjCollection::iterator>* result) {
     CollatorInterface* collator = nullptr;
-    StatusWithMatchExpression parseResult =
-        MatchExpressionParser::parse(query, ExtensionsCallbackDisallowExtensions(), collator);
+    StatusWithMatchExpression parseResult = MatchExpressionParser::parse(query, collator);
     if (!parseResult.isOK()) {
         return parseResult.getStatus();
     }

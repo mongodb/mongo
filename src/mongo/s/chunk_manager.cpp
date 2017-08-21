@@ -113,8 +113,14 @@ void ChunkManager::getShardIdsForQuery(OperationContext* opCtx,
         qr->setCollation(_defaultCollator->getSpec().toBSON());
     }
 
-    std::unique_ptr<CanonicalQuery> cq = uassertStatusOK(
-        CanonicalQuery::canonicalize(opCtx, std::move(qr), ExtensionsCallbackNoop()));
+    const boost::intrusive_ptr<ExpressionContext> expCtx;
+    auto cq = uassertStatusOK(
+        CanonicalQuery::canonicalize(opCtx,
+                                     std::move(qr),
+                                     expCtx,
+                                     ExtensionsCallbackNoop(),
+                                     MatchExpressionParser::kAllowAllSpecialFeatures &
+                                         ~MatchExpressionParser::AllowedFeatures::kExpr));
 
     // Query validation
     if (QueryPlannerCommon::hasNode(cq->root(), MatchExpression::GEO_NEAR)) {

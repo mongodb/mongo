@@ -55,7 +55,6 @@
 #include "mongo/db/jsobj.h"
 #include "mongo/db/keypattern.h"
 #include "mongo/db/matcher/expression.h"
-#include "mongo/db/matcher/extensions_callback_disallow_extensions.h"
 #include "mongo/db/operation_context.h"
 #include "mongo/db/ops/delete.h"
 #include "mongo/db/query/collation/collation_spec.h"
@@ -667,8 +666,8 @@ Status IndexCatalogImpl::_isSpecOk(OperationContext* opCtx, const BSONObj& spec)
         }
 
         // The collator must outlive the constructed MatchExpression.
-        StatusWithMatchExpression statusWithMatcher = MatchExpressionParser::parse(
-            filterElement.Obj(), ExtensionsCallbackDisallowExtensions(), collator.get());
+        StatusWithMatchExpression statusWithMatcher =
+            MatchExpressionParser::parse(filterElement.Obj(), collator.get());
         if (!statusWithMatcher.isOK()) {
             return statusWithMatcher.getStatus();
         }

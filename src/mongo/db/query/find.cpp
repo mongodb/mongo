@@ -536,8 +536,14 @@ std::string runQuery(OperationContext* opCtx,
     beginQueryOp(opCtx, nss, q.query, q.ntoreturn, q.ntoskip);
 
     // Parse the qm into a CanonicalQuery.
-
-    auto statusWithCQ = CanonicalQuery::canonicalize(opCtx, q, ExtensionsCallbackReal(opCtx, &nss));
+    const boost::intrusive_ptr<ExpressionContext> expCtx;
+    auto statusWithCQ =
+        CanonicalQuery::canonicalize(opCtx,
+                                     q,
+                                     expCtx,
+                                     ExtensionsCallbackReal(opCtx, &nss),
+                                     MatchExpressionParser::kAllowAllSpecialFeatures &
+                                         ~MatchExpressionParser::AllowedFeatures::kExpr);
     if (!statusWithCQ.isOK()) {
         uasserted(17287,
                   str::stream() << "Can't canonicalize query: "

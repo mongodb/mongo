@@ -33,7 +33,6 @@
 #include "mongo/db/matcher/expression.h"
 #include "mongo/db/matcher/expression_leaf.h"
 #include "mongo/db/matcher/expression_parser.h"
-#include "mongo/db/matcher/extensions_callback_disallow_extensions.h"
 #include "mongo/db/matcher/schema/expression_internal_schema_xor.h"
 #include "mongo/unittest/unittest.h"
 
@@ -50,8 +49,7 @@ TEST(InternalSchemaXorOp, MatchesNothingWhenHasNoClauses) {
 TEST(InternalSchemaXorOp, MatchesSingleClause) {
     BSONObj matchPredicate = fromjson("{$_internalSchemaXor: [{a: { $ne: 5 }}]}");
     const CollatorInterface* collator = nullptr;
-    auto expr = MatchExpressionParser::parse(
-        matchPredicate, ExtensionsCallbackDisallowExtensions(), collator);
+    auto expr = MatchExpressionParser::parse(matchPredicate, collator);
 
     ASSERT_OK(expr.getStatus());
     ASSERT_TRUE(expr.getValue()->matchesBSON(BSON("a" << 4)));
@@ -65,8 +63,7 @@ TEST(InternalSchemaXorOp, MatchesThreeClauses) {
     BSONObj matchPredicate =
         fromjson("{$_internalSchemaXor: [{a: { $gt: 10 }}, {a: { $lt: 0 }}, {b: 0}]}");
 
-    auto expr = MatchExpressionParser::parse(
-        matchPredicate, ExtensionsCallbackDisallowExtensions(), collator);
+    auto expr = MatchExpressionParser::parse(matchPredicate, collator);
 
     ASSERT_OK(expr.getStatus());
     ASSERT_TRUE(expr.getValue()->matchesBSON(BSON("a" << -1)));
@@ -84,8 +81,7 @@ TEST(InternalSchemaXorOp, DoesNotUseElemMatchKey) {
 
     BSONObj matchPredicate = fromjson("{$_internalSchemaXor: [{a: 1}, {b: 2}]}");
 
-    auto expr = MatchExpressionParser::parse(
-        matchPredicate, ExtensionsCallbackDisallowExtensions(), collator);
+    auto expr = MatchExpressionParser::parse(matchPredicate, collator);
     MatchDetails details;
     details.requestElemMatchKey();
     ASSERT_OK(expr.getStatus());

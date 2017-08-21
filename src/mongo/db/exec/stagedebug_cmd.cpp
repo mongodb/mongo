@@ -248,8 +248,14 @@ public:
             BSONObj argObj = e.Obj();
             if (filterTag == e.fieldName()) {
                 const CollatorInterface* collator = nullptr;
+                boost::intrusive_ptr<ExpressionContext> expCtx;
                 StatusWithMatchExpression statusWithMatcher = MatchExpressionParser::parse(
-                    argObj, ExtensionsCallbackReal(opCtx, &collection->ns()), collator);
+                    argObj,
+                    collator,
+                    expCtx,
+                    ExtensionsCallbackReal(opCtx, &collection->ns()),
+                    MatchExpressionParser::kAllowAllSpecialFeatures &
+                        ~MatchExpressionParser::AllowedFeatures::kExpr);
                 if (!statusWithMatcher.isOK()) {
                     return NULL;
                 }

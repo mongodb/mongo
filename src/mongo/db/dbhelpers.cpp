@@ -113,7 +113,14 @@ RecordId Helpers::findOne(OperationContext* opCtx,
     auto qr = stdx::make_unique<QueryRequest>(collection->ns());
     qr->setFilter(query);
 
-    auto statusWithCQ = CanonicalQuery::canonicalize(opCtx, std::move(qr), extensionsCallback);
+    const boost::intrusive_ptr<ExpressionContext> expCtx;
+    auto statusWithCQ =
+        CanonicalQuery::canonicalize(opCtx,
+                                     std::move(qr),
+                                     expCtx,
+                                     extensionsCallback,
+                                     MatchExpressionParser::kAllowAllSpecialFeatures &
+                                         ~MatchExpressionParser::AllowedFeatures::kExpr);
     massert(17244, "Could not canonicalize " + query.toString(), statusWithCQ.isOK());
     unique_ptr<CanonicalQuery> cq = std::move(statusWithCQ.getValue());
 

@@ -42,11 +42,13 @@
 namespace mongo {
 
 Matcher::Matcher(const BSONObj& pattern,
+                 const CollatorInterface* collator,
+                 const boost::intrusive_ptr<ExpressionContext>& expCtx,
                  const ExtensionsCallback& extensionsCallback,
-                 const CollatorInterface* collator)
+                 const MatchExpressionParser::AllowedFeatureSet allowedFeatures)
     : _pattern(pattern) {
-    StatusWithMatchExpression statusWithMatcher =
-        MatchExpressionParser::parse(pattern, extensionsCallback, collator);
+    StatusWithMatchExpression statusWithMatcher = MatchExpressionParser::parse(
+        pattern, collator, expCtx, extensionsCallback, allowedFeatures);
     uassert(16810,
             mongoutils::str::stream() << "bad query: " << statusWithMatcher.getStatus().toString(),
             statusWithMatcher.isOK());

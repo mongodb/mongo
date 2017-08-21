@@ -207,7 +207,14 @@ StatusWith<unique_ptr<CanonicalQuery>> PlanCacheCommand::canonicalize(OperationC
     qr->setProj(projObj);
     qr->setCollation(collationObj);
     const ExtensionsCallbackReal extensionsCallback(opCtx, &nss);
-    auto statusWithCQ = CanonicalQuery::canonicalize(opCtx, std::move(qr), extensionsCallback);
+    const boost::intrusive_ptr<ExpressionContext> expCtx;
+    auto statusWithCQ =
+        CanonicalQuery::canonicalize(opCtx,
+                                     std::move(qr),
+                                     expCtx,
+                                     extensionsCallback,
+                                     MatchExpressionParser::kAllowAllSpecialFeatures &
+                                         ~MatchExpressionParser::AllowedFeatures::kExpr);
     if (!statusWithCQ.isOK()) {
         return statusWithCQ.getStatus();
     }

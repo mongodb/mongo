@@ -31,7 +31,7 @@
 #include <algorithm>
 
 #include "mongo/bson/json.h"
-#include "mongo/db/matcher/extensions_callback_disallow_extensions.h"
+#include "mongo/db/matcher/extensions_callback_noop.h"
 #include "mongo/db/pipeline/aggregation_request.h"
 #include "mongo/db/query/parsed_distinct.h"
 #include "mongo/db/query/query_test_service_context.h"
@@ -51,7 +51,7 @@ TEST(ParsedDistinctTest, ConvertToAggregationNoQuery) {
     auto pd = ParsedDistinct::parse(opCtx,
                                     testns,
                                     fromjson("{distinct: 'testcoll', key: 'x'}"),
-                                    ExtensionsCallbackDisallowExtensions(),
+                                    ExtensionsCallbackNoop(),
                                     !isExplain);
     ASSERT_OK(pd.getStatus());
 
@@ -109,7 +109,7 @@ TEST(ParsedDistinctTest, ConvertToAggregationWithAllOptions) {
                                          << "aComment"
                                          << "maxTimeMS"
                                          << 100),
-                                    ExtensionsCallbackDisallowExtensions(),
+                                    ExtensionsCallbackNoop(),
                                     !isExplain);
     ASSERT_OK(pd.getStatus());
 
@@ -155,7 +155,7 @@ TEST(ParsedDistinctTest, ConvertToAggregationWithQuery) {
     auto pd = ParsedDistinct::parse(opCtx,
                                     testns,
                                     fromjson("{distinct: 'testcoll', key: 'y', query: {z: 7}}"),
-                                    ExtensionsCallbackDisallowExtensions(),
+                                    ExtensionsCallbackNoop(),
                                     !isExplain);
     ASSERT_OK(pd.getStatus());
 
@@ -196,7 +196,7 @@ TEST(ParsedDistinctTest, ExplainNotIncludedWhenConvertingToAggregationCommand) {
     auto pd = ParsedDistinct::parse(opCtx,
                                     testns,
                                     fromjson("{distinct: 'testcoll', key: 'x'}"),
-                                    ExtensionsCallbackDisallowExtensions(),
+                                    ExtensionsCallbackNoop(),
                                     isExplain);
     ASSERT_OK(pd.getStatus());
 

@@ -36,15 +36,15 @@
 #include "mongo/db/json.h"
 #include "mongo/db/matcher/expression.h"
 #include "mongo/db/matcher/expression_leaf.h"
-#include "mongo/db/matcher/extensions_callback_disallow_extensions.h"
+#include "mongo/db/matcher/extensions_callback_noop.h"
+#include "mongo/db/pipeline/expression_context_for_test.h"
 
 namespace mongo {
 
 TEST(MatchExpressionParserTest, SimpleEQ1) {
     BSONObj query = BSON("x" << 2);
     const CollatorInterface* collator = nullptr;
-    StatusWithMatchExpression result =
-        MatchExpressionParser::parse(query, ExtensionsCallbackDisallowExtensions(), collator);
+    StatusWithMatchExpression result = MatchExpressionParser::parse(query, collator);
     ASSERT_TRUE(result.isOK());
 
     ASSERT(result.getValue()->matchesBSON(BSON("x" << 2)));
@@ -54,8 +54,7 @@ TEST(MatchExpressionParserTest, SimpleEQ1) {
 TEST(MatchExpressionParserTest, Multiple1) {
     BSONObj query = BSON("x" << 5 << "y" << BSON("$gt" << 5 << "$lt" << 8));
     const CollatorInterface* collator = nullptr;
-    StatusWithMatchExpression result =
-        MatchExpressionParser::parse(query, ExtensionsCallbackDisallowExtensions(), collator);
+    StatusWithMatchExpression result = MatchExpressionParser::parse(query, collator);
     ASSERT_TRUE(result.isOK());
 
     ASSERT(result.getValue()->matchesBSON(BSON("x" << 5 << "y" << 7)));
@@ -68,24 +67,22 @@ TEST(MatchExpressionParserTest, Multiple1) {
 TEST(AtomicMatchExpressionTest, AtomicOperator1) {
     BSONObj query = BSON("x" << 5 << "$atomic" << BSON("$gt" << 5 << "$lt" << 8));
     const CollatorInterface* collator = nullptr;
-    StatusWithMatchExpression result =
-        MatchExpressionParser::parse(query, ExtensionsCallbackDisallowExtensions(), collator);
+    StatusWithMatchExpression result = MatchExpressionParser::parse(query, collator);
     ASSERT_TRUE(result.isOK());
 
     query = BSON("x" << 5 << "$isolated" << 1);
-    result = MatchExpressionParser::parse(query, ExtensionsCallbackDisallowExtensions(), collator);
+    result = MatchExpressionParser::parse(query, collator);
     ASSERT_TRUE(result.isOK());
 
     query = BSON("x" << 5 << "y" << BSON("$isolated" << 1));
-    result = MatchExpressionParser::parse(query, ExtensionsCallbackDisallowExtensions(), collator);
+    result = MatchExpressionParser::parse(query, collator);
     ASSERT_FALSE(result.isOK());
 }
 
 TEST(MatchExpressionParserTest, MinDistanceWithoutNearFailsToParse) {
     BSONObj query = fromjson("{loc: {$minDistance: 10}}");
     const CollatorInterface* collator = nullptr;
-    StatusWithMatchExpression result =
-        MatchExpressionParser::parse(query, ExtensionsCallbackDisallowExtensions(), collator);
+    StatusWithMatchExpression result = MatchExpressionParser::parse(query, collator);
     ASSERT_FALSE(result.isOK());
 }
 
@@ -229,31 +226,26 @@ TEST(StatusWithTest, Fib1) {
 
 TEST(MatchExpressionParserTest, AlwaysFalseFailsToParseNonOneArguments) {
     auto queryIntArgument = BSON("$alwaysFalse" << 0);
-    auto expr = MatchExpressionParser::parse(
-        queryIntArgument, ExtensionsCallbackDisallowExtensions(), nullptr);
+    auto expr = MatchExpressionParser::parse(queryIntArgument, nullptr);
     ASSERT_EQ(expr.getStatus(), ErrorCodes::FailedToParse);
 
     auto queryStringArgument = BSON("$alwaysFalse"
                                     << "");
-    expr = MatchExpressionParser::parse(
-        queryStringArgument, ExtensionsCallbackDisallowExtensions(), nullptr);
+    expr = MatchExpressionParser::parse(queryStringArgument, nullptr);
     ASSERT_EQ(expr.getStatus(), ErrorCodes::FailedToParse);
 
     auto queryDoubleArgument = BSON("$alwaysFalse" << 1.1);
-    expr = MatchExpressionParser::parse(
-        queryDoubleArgument, ExtensionsCallbackDisallowExtensions(), nullptr);
+    expr = MatchExpressionParser::parse(queryDoubleArgument, nullptr);
     ASSERT_EQ(expr.getStatus(), ErrorCodes::FailedToParse);
 
     auto queryFalseArgument = BSON("$alwaysFalse" << true);
-    expr = MatchExpressionParser::parse(
-        queryFalseArgument, ExtensionsCallbackDisallowExtensions(), nullptr);
+    expr = MatchExpressionParser::parse(queryFalseArgument, nullptr);
     ASSERT_EQ(expr.getStatus(), ErrorCodes::FailedToParse);
 }
 
 TEST(MatchExpressionParserTest, AlwaysFalseParsesIntegerArgument) {
     auto query = BSON("$alwaysFalse" << 1);
-    auto expr =
-        MatchExpressionParser::parse(query, ExtensionsCallbackDisallowExtensions(), nullptr);
+    auto expr = MatchExpressionParser::parse(query, nullptr);
     ASSERT_OK(expr.getStatus());
 
     ASSERT_FALSE(expr.getValue()->matchesBSON(fromjson("{}")));
@@ -263,35 +255,138 @@ TEST(MatchExpressionParserTest, AlwaysFalseParsesIntegerArgument) {
 
 TEST(MatchExpressionParserTest, AlwaysTrueFailsToParseNonOneArguments) {
     auto queryIntArgument = BSON("$alwaysTrue" << 0);
-    auto expr = MatchExpressionParser::parse(
-        queryIntArgument, ExtensionsCallbackDisallowExtensions(), nullptr);
+    auto expr = MatchExpressionParser::parse(queryIntArgument, nullptr);
     ASSERT_EQ(expr.getStatus(), ErrorCodes::FailedToParse);
 
     auto queryStringArgument = BSON("$alwaysTrue"
                                     << "");
-    expr = MatchExpressionParser::parse(
-        queryStringArgument, ExtensionsCallbackDisallowExtensions(), nullptr);
+    expr = MatchExpressionParser::parse(queryStringArgument, nullptr);
     ASSERT_EQ(expr.getStatus(), ErrorCodes::FailedToParse);
 
     auto queryDoubleArgument = BSON("$alwaysTrue" << 1.1);
-    expr = MatchExpressionParser::parse(
-        queryDoubleArgument, ExtensionsCallbackDisallowExtensions(), nullptr);
+    expr = MatchExpressionParser::parse(queryDoubleArgument, nullptr);
     ASSERT_EQ(expr.getStatus(), ErrorCodes::FailedToParse);
 
     auto queryFalseArgument = BSON("$alwaysTrue" << true);
-    expr = MatchExpressionParser::parse(
-        queryFalseArgument, ExtensionsCallbackDisallowExtensions(), nullptr);
+    expr = MatchExpressionParser::parse(queryFalseArgument, nullptr);
     ASSERT_EQ(expr.getStatus(), ErrorCodes::FailedToParse);
 }
 
 TEST(MatchExpressionParserTest, AlwaysTrueParsesIntegerArgument) {
     auto query = BSON("$alwaysTrue" << 1);
-    auto expr =
-        MatchExpressionParser::parse(query, ExtensionsCallbackDisallowExtensions(), nullptr);
+    auto expr = MatchExpressionParser::parse(query, nullptr);
     ASSERT_OK(expr.getStatus());
 
     ASSERT_TRUE(expr.getValue()->matchesBSON(fromjson("{}")));
     ASSERT_TRUE(expr.getValue()->matchesBSON(fromjson("{x: 1}")));
     ASSERT_TRUE(expr.getValue()->matchesBSON(fromjson("{x: 'blah'}")));
+}
+
+TEST(MatchExpressionParserTest, TextFailsToParseWhenDisallowed) {
+    auto query = fromjson("{$text: {$search: 'str'}}");
+    const CollatorInterface* collator = nullptr;
+    ASSERT_NOT_OK(MatchExpressionParser::parse(query, collator).getStatus());
+}
+
+TEST(MatchExpressionParserTest, TextParsesSuccessfullyWhenAllowed) {
+    auto query = fromjson("{$text: {$search: 'str'}}");
+    const CollatorInterface* collator = nullptr;
+    const boost::intrusive_ptr<ExpressionContextForTest> expCtx(new ExpressionContextForTest());
+    ASSERT_OK(MatchExpressionParser::parse(query,
+                                           collator,
+                                           expCtx,
+                                           ExtensionsCallbackNoop(),
+                                           MatchExpressionParser::AllowedFeatures::kText)
+                  .getStatus());
+}
+
+TEST(MatchExpressionParserTest, WhereFailsToParseWhenDisallowed) {
+    auto query = fromjson("{$where: 'this.a == this.b'}");
+    const CollatorInterface* collator = nullptr;
+    ASSERT_NOT_OK(MatchExpressionParser::parse(query, collator).getStatus());
+}
+
+TEST(MatchExpressionParserTest, WhereParsesSuccessfullyWhenAllowed) {
+    auto query = fromjson("{$where: 'this.a == this.b'}");
+    const CollatorInterface* collator = nullptr;
+    const boost::intrusive_ptr<ExpressionContextForTest> expCtx(new ExpressionContextForTest());
+    ASSERT_OK(MatchExpressionParser::parse(query,
+                                           collator,
+                                           expCtx,
+                                           ExtensionsCallbackNoop(),
+                                           MatchExpressionParser::AllowedFeatures::kJavascript)
+                  .getStatus());
+}
+
+TEST(MatchExpressionParserTest, NearSphereFailsToParseWhenDisallowed) {
+    auto query = fromjson("{a: {$nearSphere: {$geometry: {type: 'Point', coordinates: [0, 0]}}}}");
+    const CollatorInterface* collator = nullptr;
+    ASSERT_NOT_OK(MatchExpressionParser::parse(query, collator).getStatus());
+}
+
+TEST(MatchExpressionParserTest, NearSphereParsesSuccessfullyWhenAllowed) {
+    auto query = fromjson("{a: {$nearSphere: {$geometry: {type: 'Point', coordinates: [0, 0]}}}}");
+    const CollatorInterface* collator = nullptr;
+    const boost::intrusive_ptr<ExpressionContextForTest> expCtx(new ExpressionContextForTest());
+    ASSERT_OK(MatchExpressionParser::parse(query,
+                                           collator,
+                                           expCtx,
+                                           ExtensionsCallbackNoop(),
+                                           MatchExpressionParser::AllowedFeatures::kGeoNear)
+                  .getStatus());
+}
+
+TEST(MatchExpressionParserTest, GeoNearFailsToParseWhenDisallowed) {
+    auto query = fromjson("{a: {$geoNear: {$geometry: {type: 'Point', coordinates: [0, 0]}}}}");
+    const CollatorInterface* collator = nullptr;
+    ASSERT_NOT_OK(MatchExpressionParser::parse(query, collator).getStatus());
+}
+
+TEST(MatchExpressionParserTest, GeoNearParsesSuccessfullyWhenAllowed) {
+    auto query = fromjson("{a: {$geoNear: {$geometry: {type: 'Point', coordinates: [0, 0]}}}}");
+    const CollatorInterface* collator = nullptr;
+    const boost::intrusive_ptr<ExpressionContextForTest> expCtx(new ExpressionContextForTest());
+    ASSERT_OK(MatchExpressionParser::parse(query,
+                                           collator,
+                                           expCtx,
+                                           ExtensionsCallbackNoop(),
+                                           MatchExpressionParser::AllowedFeatures::kGeoNear)
+                  .getStatus());
+}
+
+TEST(MatchExpressionParserTest, NearFailsToParseWhenDisallowed) {
+    auto query = fromjson("{a: {$near: {$geometry: {type: 'Point', coordinates: [0, 0]}}}}");
+    const CollatorInterface* collator = nullptr;
+    ASSERT_NOT_OK(MatchExpressionParser::parse(query, collator).getStatus());
+}
+
+TEST(MatchExpressionParserTest, NearParsesSuccessfullyWhenAllowed) {
+    auto query = fromjson("{a: {$near: {$geometry: {type: 'Point', coordinates: [0, 0]}}}}");
+    const CollatorInterface* collator = nullptr;
+    const boost::intrusive_ptr<ExpressionContextForTest> expCtx(new ExpressionContextForTest());
+    ASSERT_OK(MatchExpressionParser::parse(query,
+                                           collator,
+                                           expCtx,
+                                           ExtensionsCallbackNoop(),
+                                           MatchExpressionParser::AllowedFeatures::kGeoNear)
+                  .getStatus());
+}
+
+TEST(MatchExpressionParserTest, ExprFailsToParseWhenDisallowed) {
+    auto query = fromjson("{a: {$expr: 5}}");
+    const CollatorInterface* collator = nullptr;
+    ASSERT_NOT_OK(MatchExpressionParser::parse(query, collator).getStatus());
+}
+
+TEST(MatchExpressionParserTest, ExprParsesSuccessfullyWhenAllowed) {
+    auto query = fromjson("{a: {$expr: 5}}");
+    const CollatorInterface* collator = nullptr;
+    const boost::intrusive_ptr<ExpressionContextForTest> expCtx(new ExpressionContextForTest());
+    ASSERT_OK(MatchExpressionParser::parse(query,
+                                           collator,
+                                           expCtx,
+                                           ExtensionsCallbackNoop(),
+                                           MatchExpressionParser::AllowedFeatures::kExpr)
+                  .getStatus());
 }
 }

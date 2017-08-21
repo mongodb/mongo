@@ -43,7 +43,6 @@
 #include "mongo/db/exec/plan_stage.h"
 #include "mongo/db/json.h"
 #include "mongo/db/matcher/expression_parser.h"
-#include "mongo/db/matcher/extensions_callback_disallow_extensions.h"
 #include "mongo/db/query/plan_executor.h"
 #include "mongo/db/service_context.h"
 #include "mongo/dbtests/dbtests.h"
@@ -78,8 +77,7 @@ public:
 
         // Create a plan executor to hold it
         auto qr = stdx::make_unique<QueryRequest>(nss);
-        auto statusWithCQ = CanonicalQuery::canonicalize(
-            &_opCtx, std::move(qr), ExtensionsCallbackDisallowExtensions());
+        auto statusWithCQ = CanonicalQuery::canonicalize(&_opCtx, std::move(qr));
         ASSERT_OK(statusWithCQ.getStatus());
         std::unique_ptr<CanonicalQuery> cq = std::move(statusWithCQ.getValue());
 

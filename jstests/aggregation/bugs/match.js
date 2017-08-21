@@ -51,10 +51,10 @@ function assertResults(expectedResults, matchSpec) {
 assertError(2, {a: {$mod: [0 /* invalid */, 0]}});
 
 // $where not allowed.
-assertError(16395, {$where: 'true'});
+assertError(ErrorCodes.BadValue, {$where: 'true'});
 
 // Geo not allowed.
-assertError(16424, {$match: {a: {$near: [0, 0]}}});
+assertError(ErrorCodes.BadValue, {$match: {a: {$near: [0, 0]}}});
 
 // Update modifier not allowed.
 if (0) {  // SERVER-6650

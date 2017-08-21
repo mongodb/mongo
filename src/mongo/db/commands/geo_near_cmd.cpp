@@ -215,7 +215,14 @@ public:
         qr->setLimit(numWanted);
         qr->setCollation(collation);
         const ExtensionsCallbackReal extensionsCallback(opCtx, &nss);
-        auto statusWithCQ = CanonicalQuery::canonicalize(opCtx, std::move(qr), extensionsCallback);
+        const boost::intrusive_ptr<ExpressionContext> expCtx;
+        auto statusWithCQ =
+            CanonicalQuery::canonicalize(opCtx,
+                                         std::move(qr),
+                                         expCtx,
+                                         extensionsCallback,
+                                         MatchExpressionParser::kAllowAllSpecialFeatures &
+                                             ~MatchExpressionParser::AllowedFeatures::kExpr);
         if (!statusWithCQ.isOK()) {
             errmsg = "Can't parse filter / create query";
             return false;

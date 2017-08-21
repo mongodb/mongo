@@ -33,9 +33,9 @@
 #include "mongo/db/json.h"
 #include "mongo/db/matcher/expression.h"
 #include "mongo/db/matcher/expression_parser.h"
-#include "mongo/db/matcher/extensions_callback_disallow_extensions.h"
 #include "mongo/db/matcher/extensions_callback_noop.h"
 #include "mongo/db/matcher/matcher.h"
+#include "mongo/db/pipeline/expression_context_for_test.h"
 #include "mongo/unittest/unittest.h"
 
 namespace mongo {
@@ -54,9 +54,17 @@ BSONObj serialize(MatchExpression* match) {
 }
 
 TEST(SerializeBasic, AndExpressionWithOneChildSerializesCorrectly) {
-    Matcher original(fromjson("{$and: [{x: 0}]}"), ExtensionsCallbackNoop(), kSimpleCollator);
-    Matcher reserialized(
-        serialize(original.getMatchExpression()), ExtensionsCallbackNoop(), kSimpleCollator);
+    boost::intrusive_ptr<ExpressionContextForTest> expCtx(new ExpressionContextForTest());
+    Matcher original(fromjson("{$and: [{x: 0}]}"),
+                     kSimpleCollator,
+                     expCtx,
+                     ExtensionsCallbackNoop(),
+                     MatchExpressionParser::kAllowAllSpecialFeatures);
+    Matcher reserialized(serialize(original.getMatchExpression()),
+                         kSimpleCollator,
+                         expCtx,
+                         ExtensionsCallbackNoop(),
+                         MatchExpressionParser::kAllowAllSpecialFeatures);
     ASSERT_BSONOBJ_EQ(*reserialized.getQuery(), fromjson("{$and: [{x: {$eq: 0}}]}"));
     ASSERT_BSONOBJ_EQ(*reserialized.getQuery(), serialize(reserialized.getMatchExpression()));
 
@@ -68,10 +76,17 @@ TEST(SerializeBasic, AndExpressionWithOneChildSerializesCorrectly) {
 }
 
 TEST(SerializeBasic, AndExpressionWithTwoChildrenSerializesCorrectly) {
-    Matcher original(
-        fromjson("{$and: [{x: 1}, {x: 2}]}"), ExtensionsCallbackNoop(), kSimpleCollator);
-    Matcher reserialized(
-        serialize(original.getMatchExpression()), ExtensionsCallbackNoop(), kSimpleCollator);
+    boost::intrusive_ptr<ExpressionContextForTest> expCtx(new ExpressionContextForTest());
+    Matcher original(fromjson("{$and: [{x: 1}, {x: 2}]}"),
+                     kSimpleCollator,
+                     expCtx,
+                     ExtensionsCallbackNoop(),
+                     MatchExpressionParser::kAllowAllSpecialFeatures);
+    Matcher reserialized(serialize(original.getMatchExpression()),
+                         kSimpleCollator,
+                         expCtx,
+                         ExtensionsCallbackNoop(),
+                         MatchExpressionParser::kAllowAllSpecialFeatures);
     ASSERT_BSONOBJ_EQ(*reserialized.getQuery(), fromjson("{$and: [{x: {$eq: 1}}, {x: {$eq: 2}}]}"));
     ASSERT_BSONOBJ_EQ(*reserialized.getQuery(), serialize(reserialized.getMatchExpression()));
 
@@ -83,10 +98,17 @@ TEST(SerializeBasic, AndExpressionWithTwoChildrenSerializesCorrectly) {
 }
 
 TEST(SerializeBasic, AndExpressionWithTwoIdenticalChildrenSerializesCorrectly) {
-    Matcher original(
-        fromjson("{$and: [{x: 1}, {x: 1}]}"), ExtensionsCallbackNoop(), kSimpleCollator);
-    Matcher reserialized(
-        serialize(original.getMatchExpression()), ExtensionsCallbackNoop(), kSimpleCollator);
+    boost::intrusive_ptr<ExpressionContextForTest> expCtx(new ExpressionContextForTest());
+    Matcher original(fromjson("{$and: [{x: 1}, {x: 1}]}"),
+                     kSimpleCollator,
+                     expCtx,
+                     ExtensionsCallbackNoop(),
+                     MatchExpressionParser::kAllowAllSpecialFeatures);
+    Matcher reserialized(serialize(original.getMatchExpression()),
+                         kSimpleCollator,
+                         expCtx,
+                         ExtensionsCallbackNoop(),
+                         MatchExpressionParser::kAllowAllSpecialFeatures);
     ASSERT_BSONOBJ_EQ(*reserialized.getQuery(), fromjson("{$and: [{x: {$eq: 1}}, {x: {$eq: 1}}]}"));
     ASSERT_BSONOBJ_EQ(*reserialized.getQuery(), serialize(reserialized.getMatchExpression()));
 
@@ -98,10 +120,17 @@ TEST(SerializeBasic, AndExpressionWithTwoIdenticalChildrenSerializesCorrectly) {
 }
 
 TEST(SerializeBasic, ExpressionOr) {
-    Matcher original(
-        fromjson("{$or: [{x: 'A'}, {x: 'B'}]}"), ExtensionsCallbackNoop(), kSimpleCollator);
-    Matcher reserialized(
-        serialize(original.getMatchExpression()), ExtensionsCallbackNoop(), kSimpleCollator);
+    boost::intrusive_ptr<ExpressionContextForTest> expCtx(new ExpressionContextForTest());
+    Matcher original(fromjson("{$or: [{x: 'A'}, {x: 'B'}]}"),
+                     kSimpleCollator,
+                     expCtx,
+                     ExtensionsCallbackNoop(),
+                     MatchExpressionParser::kAllowAllSpecialFeatures);
+    Matcher reserialized(serialize(original.getMatchExpression()),
+                         kSimpleCollator,
+                         expCtx,
+                         ExtensionsCallbackNoop(),
+                         MatchExpressionParser::kAllowAllSpecialFeatures);
     ASSERT_BSONOBJ_EQ(*reserialized.getQuery(),
                       fromjson("{$or: [{x: {$eq: 'A'}}, {x: {$eq: 'B'}}]}"));
     ASSERT_BSONOBJ_EQ(*reserialized.getQuery(), serialize(reserialized.getMatchExpression()));
@@ -114,11 +143,17 @@ TEST(SerializeBasic, ExpressionOr) {
 }
 
 TEST(SerializeBasic, ExpressionElemMatchObjectSerializesCorrectly) {
+    boost::intrusive_ptr<ExpressionContextForTest> expCtx(new ExpressionContextForTest());
     Matcher original(fromjson("{x: {$elemMatch: {a: {$gt: 0}, b: {$gt: 0}}}}"),
+                     kSimpleCollator,
+                     expCtx,
                      ExtensionsCallbackNoop(),
-                     kSimpleCollator);
-    Matcher reserialized(
-        serialize(original.getMatchExpression()), ExtensionsCallbackNoop(), kSimpleCollator);
+                     MatchExpressionParser::kAllowAllSpecialFeatures);
+    Matcher reserialized(serialize(original.getMatchExpression()),
+                         kSimpleCollator,
+                         expCtx,
+                         ExtensionsCallbackNoop(),
+                         MatchExpressionParser::kAllowAllSpecialFeatures);
     ASSERT_BSONOBJ_EQ(*reserialized.getQuery(),
                       fromjson("{x: {$elemMatch: {$and: [{a: {$gt: 0}}, {b: {$gt: 0}}]}}}"));
     ASSERT_BSONOBJ_EQ(*reserialized.getQuery(), serialize(reserialized.getMatchExpression()));
@@ -131,11 +166,17 @@ TEST(SerializeBasic, ExpressionElemMatchObjectSerializesCorrectly) {
 }
 
 TEST(SerializeBasic, ExpressionElemMatchObjectWithEmptyStringSerializesCorrectly) {
+    boost::intrusive_ptr<ExpressionContextForTest> expCtx(new ExpressionContextForTest());
     Matcher original(fromjson("{'': {$elemMatch: {a: {$gt: 0}, b: {$gt: 0}}}}"),
+                     kSimpleCollator,
+                     expCtx,
                      ExtensionsCallbackNoop(),
-                     kSimpleCollator);
-    Matcher reserialized(
-        serialize(original.getMatchExpression()), ExtensionsCallbackNoop(), kSimpleCollator);
+                     MatchExpressionParser::kAllowAllSpecialFeatures);
+    Matcher reserialized(serialize(original.getMatchExpression()),
+                         kSimpleCollator,
+                         expCtx,
+                         ExtensionsCallbackNoop(),
+                         MatchExpressionParser::kAllowAllSpecialFeatures);
     ASSERT_BSONOBJ_EQ(*reserialized.getQuery(),
                       fromjson("{'': {$elemMatch: {$and: [{a: {$gt: 0}}, {b: {$gt: 0}}]}}}"));
     ASSERT_BSONOBJ_EQ(*reserialized.getQuery(), serialize(reserialized.getMatchExpression()));
@@ -148,11 +189,17 @@ TEST(SerializeBasic, ExpressionElemMatchObjectWithEmptyStringSerializesCorrectly
 }
 
 TEST(SerializeBasic, ExpressionElemMatchValueSerializesCorrectly) {
+    boost::intrusive_ptr<ExpressionContextForTest> expCtx(new ExpressionContextForTest());
     Matcher original(fromjson("{x: {$elemMatch: {$lt: 1, $gt: -1}}}"),
+                     kSimpleCollator,
+                     expCtx,
                      ExtensionsCallbackNoop(),
-                     kSimpleCollator);
-    Matcher reserialized(
-        serialize(original.getMatchExpression()), ExtensionsCallbackNoop(), kSimpleCollator);
+                     MatchExpressionParser::kAllowAllSpecialFeatures);
+    Matcher reserialized(serialize(original.getMatchExpression()),
+                         kSimpleCollator,
+                         expCtx,
+                         ExtensionsCallbackNoop(),
+                         MatchExpressionParser::kAllowAllSpecialFeatures);
     ASSERT_BSONOBJ_EQ(*reserialized.getQuery(), fromjson("{x: {$elemMatch: {$lt: 1, $gt: -1}}}"));
     ASSERT_BSONOBJ_EQ(*reserialized.getQuery(), serialize(reserialized.getMatchExpression()));
 
@@ -167,13 +214,21 @@ TEST(SerializeBasic, ExpressionElemMatchValueSerializesCorrectly) {
 }
 
 TEST(SerializeBasic, ExpressionElemMatchValueWithRegexSerializesCorrectly) {
+    boost::intrusive_ptr<ExpressionContextForTest> expCtx(new ExpressionContextForTest());
     const auto match = BSON("x" << BSON("$elemMatch" << BSON("$regex"
                                                              << "abc"
                                                              << "$options"
                                                              << "i")));
-    Matcher original(match, ExtensionsCallbackNoop(), kSimpleCollator);
-    Matcher reserialized(
-        serialize(original.getMatchExpression()), ExtensionsCallbackNoop(), kSimpleCollator);
+    Matcher original(match,
+                     kSimpleCollator,
+                     expCtx,
+                     ExtensionsCallbackNoop(),
+                     MatchExpressionParser::kAllowAllSpecialFeatures);
+    Matcher reserialized(serialize(original.getMatchExpression()),
+                         kSimpleCollator,
+                         expCtx,
+                         ExtensionsCallbackNoop(),
+                         MatchExpressionParser::kAllowAllSpecialFeatures);
     ASSERT_BSONOBJ_EQ(*reserialized.getQuery(), match);
     ASSERT_BSONOBJ_EQ(*reserialized.getQuery(), serialize(reserialized.getMatchExpression()));
 
@@ -188,11 +243,17 @@ TEST(SerializeBasic, ExpressionElemMatchValueWithRegexSerializesCorrectly) {
 }
 
 TEST(SerializeBasic, ExpressionElemMatchValueWithEmptyStringSerializesCorrectly) {
+    boost::intrusive_ptr<ExpressionContextForTest> expCtx(new ExpressionContextForTest());
     Matcher original(fromjson("{x: {$elemMatch: {$lt: 1, $gt: -1}}}"),
+                     kSimpleCollator,
+                     expCtx,
                      ExtensionsCallbackNoop(),
-                     kSimpleCollator);
-    Matcher reserialized(
-        serialize(original.getMatchExpression()), ExtensionsCallbackNoop(), kSimpleCollator);
+                     MatchExpressionParser::kAllowAllSpecialFeatures);
+    Matcher reserialized(serialize(original.getMatchExpression()),
+                         kSimpleCollator,
+                         expCtx,
+                         ExtensionsCallbackNoop(),
+                         MatchExpressionParser::kAllowAllSpecialFeatures);
     ASSERT_BSONOBJ_EQ(*reserialized.getQuery(), fromjson("{x: {$elemMatch: {$lt: 1, $gt: -1}}}"));
     ASSERT_BSONOBJ_EQ(*reserialized.getQuery(), serialize(reserialized.getMatchExpression()));
 
@@ -207,9 +268,17 @@ TEST(SerializeBasic, ExpressionElemMatchValueWithEmptyStringSerializesCorrectly)
 }
 
 TEST(SerializeBasic, ExpressionSizeSerializesCorrectly) {
-    Matcher original(fromjson("{x: {$size: 2}}"), ExtensionsCallbackNoop(), kSimpleCollator);
-    Matcher reserialized(
-        serialize(original.getMatchExpression()), ExtensionsCallbackNoop(), kSimpleCollator);
+    boost::intrusive_ptr<ExpressionContextForTest> expCtx(new ExpressionContextForTest());
+    Matcher original(fromjson("{x: {$size: 2}}"),
+                     kSimpleCollator,
+                     expCtx,
+                     ExtensionsCallbackNoop(),
+                     MatchExpressionParser::kAllowAllSpecialFeatures);
+    Matcher reserialized(serialize(original.getMatchExpression()),
+                         kSimpleCollator,
+                         expCtx,
+                         ExtensionsCallbackNoop(),
+                         MatchExpressionParser::kAllowAllSpecialFeatures);
     ASSERT_BSONOBJ_EQ(*reserialized.getQuery(), fromjson("{x: {$size: 2}}"));
     ASSERT_BSONOBJ_EQ(*reserialized.getQuery(), serialize(reserialized.getMatchExpression()));
 
@@ -221,9 +290,17 @@ TEST(SerializeBasic, ExpressionSizeSerializesCorrectly) {
 }
 
 TEST(SerializeBasic, ExpressionAllSerializesCorrectly) {
-    Matcher original(fromjson("{x: {$all: [1, 2]}}"), ExtensionsCallbackNoop(), kSimpleCollator);
-    Matcher reserialized(
-        serialize(original.getMatchExpression()), ExtensionsCallbackNoop(), kSimpleCollator);
+    boost::intrusive_ptr<ExpressionContextForTest> expCtx(new ExpressionContextForTest());
+    Matcher original(fromjson("{x: {$all: [1, 2]}}"),
+                     kSimpleCollator,
+                     expCtx,
+                     ExtensionsCallbackNoop(),
+                     MatchExpressionParser::kAllowAllSpecialFeatures);
+    Matcher reserialized(serialize(original.getMatchExpression()),
+                         kSimpleCollator,
+                         expCtx,
+                         ExtensionsCallbackNoop(),
+                         MatchExpressionParser::kAllowAllSpecialFeatures);
     ASSERT_BSONOBJ_EQ(*reserialized.getQuery(), fromjson("{$and: [{x: {$eq: 1}}, {x: {$eq: 2}}]}"));
     ASSERT_BSONOBJ_EQ(*reserialized.getQuery(), serialize(reserialized.getMatchExpression()));
 
@@ -235,9 +312,17 @@ TEST(SerializeBasic, ExpressionAllSerializesCorrectly) {
 }
 
 TEST(SerializeBasic, ExpressionAllWithEmptyArraySerializesCorrectly) {
-    Matcher original(fromjson("{x: {$all: []}}"), ExtensionsCallbackNoop(), kSimpleCollator);
-    Matcher reserialized(
-        serialize(original.getMatchExpression()), ExtensionsCallbackNoop(), kSimpleCollator);
+    boost::intrusive_ptr<ExpressionContextForTest> expCtx(new ExpressionContextForTest());
+    Matcher original(fromjson("{x: {$all: []}}"),
+                     kSimpleCollator,
+                     expCtx,
+                     ExtensionsCallbackNoop(),
+                     MatchExpressionParser::kAllowAllSpecialFeatures);
+    Matcher reserialized(serialize(original.getMatchExpression()),
+                         kSimpleCollator,
+                         expCtx,
+                         ExtensionsCallbackNoop(),
+                         MatchExpressionParser::kAllowAllSpecialFeatures);
     ASSERT_BSONOBJ_EQ(*reserialized.getQuery(), fromjson("{$alwaysFalse: 1}"));
     ASSERT_BSONOBJ_EQ(*reserialized.getQuery(), serialize(reserialized.getMatchExpression()));
 
@@ -246,10 +331,17 @@ TEST(SerializeBasic, ExpressionAllWithEmptyArraySerializesCorrectly) {
 }
 
 TEST(SerializeBasic, ExpressionAllWithRegex) {
-    Matcher original(
-        fromjson("{x: {$all: [/a.b.c/, /.d.e./]}}"), ExtensionsCallbackNoop(), kSimpleCollator);
-    Matcher reserialized(
-        serialize(original.getMatchExpression()), ExtensionsCallbackNoop(), kSimpleCollator);
+    boost::intrusive_ptr<ExpressionContextForTest> expCtx(new ExpressionContextForTest());
+    Matcher original(fromjson("{x: {$all: [/a.b.c/, /.d.e./]}}"),
+                     kSimpleCollator,
+                     expCtx,
+                     ExtensionsCallbackNoop(),
+                     MatchExpressionParser::kAllowAllSpecialFeatures);
+    Matcher reserialized(serialize(original.getMatchExpression()),
+                         kSimpleCollator,
+                         expCtx,
+                         ExtensionsCallbackNoop(),
+                         MatchExpressionParser::kAllowAllSpecialFeatures);
 
     ASSERT_BSONOBJ_EQ(*reserialized.getQuery(),
                       BSON("$and" << BSON_ARRAY(BSON("x" << BSON("$regex"
@@ -266,9 +358,17 @@ TEST(SerializeBasic, ExpressionAllWithRegex) {
 }
 
 TEST(SerializeBasic, ExpressionEqSerializesCorrectly) {
-    Matcher original(fromjson("{x: {$eq: {a: 1}}}"), ExtensionsCallbackNoop(), kSimpleCollator);
-    Matcher reserialized(
-        serialize(original.getMatchExpression()), ExtensionsCallbackNoop(), kSimpleCollator);
+    boost::intrusive_ptr<ExpressionContextForTest> expCtx(new ExpressionContextForTest());
+    Matcher original(fromjson("{x: {$eq: {a: 1}}}"),
+                     kSimpleCollator,
+                     expCtx,
+                     ExtensionsCallbackNoop(),
+                     MatchExpressionParser::kAllowAllSpecialFeatures);
+    Matcher reserialized(serialize(original.getMatchExpression()),
+                         kSimpleCollator,
+                         expCtx,
+                         ExtensionsCallbackNoop(),
+                         MatchExpressionParser::kAllowAllSpecialFeatures);
     ASSERT_BSONOBJ_EQ(*reserialized.getQuery(), fromjson("{x: {$eq: {a: 1}}}"));
     ASSERT_BSONOBJ_EQ(*reserialized.getQuery(), serialize(reserialized.getMatchExpression()));
 
@@ -283,9 +383,17 @@ TEST(SerializeBasic, ExpressionEqSerializesCorrectly) {
 }
 
 TEST(SerializeBasic, ExpressionNeSerializesCorrectly) {
-    Matcher original(fromjson("{x: {$ne: {a: 1}}}"), ExtensionsCallbackNoop(), kSimpleCollator);
-    Matcher reserialized(
-        serialize(original.getMatchExpression()), ExtensionsCallbackNoop(), kSimpleCollator);
+    boost::intrusive_ptr<ExpressionContextForTest> expCtx(new ExpressionContextForTest());
+    Matcher original(fromjson("{x: {$ne: {a: 1}}}"),
+                     kSimpleCollator,
+                     expCtx,
+                     ExtensionsCallbackNoop(),
+                     MatchExpressionParser::kAllowAllSpecialFeatures);
+    Matcher reserialized(serialize(original.getMatchExpression()),
+                         kSimpleCollator,
+                         expCtx,
+                         ExtensionsCallbackNoop(),
+                         MatchExpressionParser::kAllowAllSpecialFeatures);
     ASSERT_BSONOBJ_EQ(*reserialized.getQuery(), fromjson("{$nor: [{x: {$eq: {a: 1}}}]}"));
     ASSERT_BSONOBJ_EQ(*reserialized.getQuery(), serialize(reserialized.getMatchExpression()));
 
@@ -297,12 +405,18 @@ TEST(SerializeBasic, ExpressionNeSerializesCorrectly) {
 }
 
 TEST(SerializeBasic, ExpressionNeWithRegexObjectSerializesCorrectly) {
+    boost::intrusive_ptr<ExpressionContextForTest> expCtx(new ExpressionContextForTest());
     Matcher original(BSON("x" << BSON("$ne" << BSON("$regex"
                                                     << "abc"))),
+                     kSimpleCollator,
+                     expCtx,
                      ExtensionsCallbackNoop(),
-                     kSimpleCollator);
-    Matcher reserialized(
-        serialize(original.getMatchExpression()), ExtensionsCallbackNoop(), kSimpleCollator);
+                     MatchExpressionParser::kAllowAllSpecialFeatures);
+    Matcher reserialized(serialize(original.getMatchExpression()),
+                         kSimpleCollator,
+                         expCtx,
+                         ExtensionsCallbackNoop(),
+                         MatchExpressionParser::kAllowAllSpecialFeatures);
     ASSERT_BSONOBJ_EQ(*reserialized.getQuery(),
                       BSON("$nor" << BSON_ARRAY(BSON("x" << BSON("$eq" << BSON("$regex"
                                                                                << "abc"))))));
@@ -316,9 +430,17 @@ TEST(SerializeBasic, ExpressionNeWithRegexObjectSerializesCorrectly) {
 }
 
 TEST(SerializeBasic, ExpressionLtSerializesCorrectly) {
-    Matcher original(fromjson("{x: {$lt: 3}}"), ExtensionsCallbackNoop(), kSimpleCollator);
-    Matcher reserialized(
-        serialize(original.getMatchExpression()), ExtensionsCallbackNoop(), kSimpleCollator);
+    boost::intrusive_ptr<ExpressionContextForTest> expCtx(new ExpressionContextForTest());
+    Matcher original(fromjson("{x: {$lt: 3}}"),
+                     kSimpleCollator,
+                     expCtx,
+                     ExtensionsCallbackNoop(),
+                     MatchExpressionParser::kAllowAllSpecialFeatures);
+    Matcher reserialized(serialize(original.getMatchExpression()),
+                         kSimpleCollator,
+                         expCtx,
+                         ExtensionsCallbackNoop(),
+                         MatchExpressionParser::kAllowAllSpecialFeatures);
     ASSERT_BSONOBJ_EQ(*reserialized.getQuery(), fromjson("{x: {$lt: 3}}"));
     ASSERT_BSONOBJ_EQ(*reserialized.getQuery(), serialize(reserialized.getMatchExpression()));
 
@@ -330,9 +452,17 @@ TEST(SerializeBasic, ExpressionLtSerializesCorrectly) {
 }
 
 TEST(SerializeBasic, ExpressionGtSerializesCorrectly) {
-    Matcher original(fromjson("{x: {$gt: 3}}"), ExtensionsCallbackNoop(), kSimpleCollator);
-    Matcher reserialized(
-        serialize(original.getMatchExpression()), ExtensionsCallbackNoop(), kSimpleCollator);
+    boost::intrusive_ptr<ExpressionContextForTest> expCtx(new ExpressionContextForTest());
+    Matcher original(fromjson("{x: {$gt: 3}}"),
+                     kSimpleCollator,
+                     expCtx,
+                     ExtensionsCallbackNoop(),
+                     MatchExpressionParser::kAllowAllSpecialFeatures);
+    Matcher reserialized(serialize(original.getMatchExpression()),
+                         kSimpleCollator,
+                         expCtx,
+                         ExtensionsCallbackNoop(),
+                         MatchExpressionParser::kAllowAllSpecialFeatures);
     ASSERT_BSONOBJ_EQ(*reserialized.getQuery(), fromjson("{x: {$gt: 3}}"));
     ASSERT_BSONOBJ_EQ(*reserialized.getQuery(), serialize(reserialized.getMatchExpression()));
 
@@ -344,9 +474,17 @@ TEST(SerializeBasic, ExpressionGtSerializesCorrectly) {
 }
 
 TEST(SerializeBasic, ExpressionGteSerializesCorrectly) {
-    Matcher original(fromjson("{x: {$gte: 3}}"), ExtensionsCallbackNoop(), kSimpleCollator);
-    Matcher reserialized(
-        serialize(original.getMatchExpression()), ExtensionsCallbackNoop(), kSimpleCollator);
+    boost::intrusive_ptr<ExpressionContextForTest> expCtx(new ExpressionContextForTest());
+    Matcher original(fromjson("{x: {$gte: 3}}"),
+                     kSimpleCollator,
+                     expCtx,
+                     ExtensionsCallbackNoop(),
+                     MatchExpressionParser::kAllowAllSpecialFeatures);
+    Matcher reserialized(serialize(original.getMatchExpression()),
+                         kSimpleCollator,
+                         expCtx,
+                         ExtensionsCallbackNoop(),
+                         MatchExpressionParser::kAllowAllSpecialFeatures);
     ASSERT_BSONOBJ_EQ(*reserialized.getQuery(), fromjson("{x: {$gte: 3}}"));
     ASSERT_BSONOBJ_EQ(*reserialized.getQuery(), serialize(reserialized.getMatchExpression()));
 
@@ -358,9 +496,17 @@ TEST(SerializeBasic, ExpressionGteSerializesCorrectly) {
 }
 
 TEST(SerializeBasic, ExpressionLteSerializesCorrectly) {
-    Matcher original(fromjson("{x: {$lte: 3}}"), ExtensionsCallbackNoop(), kSimpleCollator);
-    Matcher reserialized(
-        serialize(original.getMatchExpression()), ExtensionsCallbackNoop(), kSimpleCollator);
+    boost::intrusive_ptr<ExpressionContextForTest> expCtx(new ExpressionContextForTest());
+    Matcher original(fromjson("{x: {$lte: 3}}"),
+                     kSimpleCollator,
+                     expCtx,
+                     ExtensionsCallbackNoop(),
+                     MatchExpressionParser::kAllowAllSpecialFeatures);
+    Matcher reserialized(serialize(original.getMatchExpression()),
+                         kSimpleCollator,
+                         expCtx,
+                         ExtensionsCallbackNoop(),
+                         MatchExpressionParser::kAllowAllSpecialFeatures);
     ASSERT_BSONOBJ_EQ(*reserialized.getQuery(), fromjson("{x: {$lte: 3}}"));
     ASSERT_BSONOBJ_EQ(*reserialized.getQuery(), serialize(reserialized.getMatchExpression()));
 
@@ -372,9 +518,17 @@ TEST(SerializeBasic, ExpressionLteSerializesCorrectly) {
 }
 
 TEST(SerializeBasic, ExpressionRegexWithObjSerializesCorrectly) {
-    Matcher original(fromjson("{x: {$regex: 'a.b'}}"), ExtensionsCallbackNoop(), kSimpleCollator);
-    Matcher reserialized(
-        serialize(original.getMatchExpression()), ExtensionsCallbackNoop(), kSimpleCollator);
+    boost::intrusive_ptr<ExpressionContextForTest> expCtx(new ExpressionContextForTest());
+    Matcher original(fromjson("{x: {$regex: 'a.b'}}"),
+                     kSimpleCollator,
+                     expCtx,
+                     ExtensionsCallbackNoop(),
+                     MatchExpressionParser::kAllowAllSpecialFeatures);
+    Matcher reserialized(serialize(original.getMatchExpression()),
+                         kSimpleCollator,
+                         expCtx,
+                         ExtensionsCallbackNoop(),
+                         MatchExpressionParser::kAllowAllSpecialFeatures);
     ASSERT_BSONOBJ_EQ(*reserialized.getQuery(),
                       BSON("x" << BSON("$regex"
                                        << "a.b")));
@@ -388,9 +542,17 @@ TEST(SerializeBasic, ExpressionRegexWithObjSerializesCorrectly) {
 }
 
 TEST(SerializeBasic, ExpressionRegexWithValueAndOptionsSerializesCorrectly) {
-    Matcher original(fromjson("{x: /a.b/i}"), ExtensionsCallbackNoop(), kSimpleCollator);
-    Matcher reserialized(
-        serialize(original.getMatchExpression()), ExtensionsCallbackNoop(), kSimpleCollator);
+    boost::intrusive_ptr<ExpressionContextForTest> expCtx(new ExpressionContextForTest());
+    Matcher original(fromjson("{x: /a.b/i}"),
+                     kSimpleCollator,
+                     expCtx,
+                     ExtensionsCallbackNoop(),
+                     MatchExpressionParser::kAllowAllSpecialFeatures);
+    Matcher reserialized(serialize(original.getMatchExpression()),
+                         kSimpleCollator,
+                         expCtx,
+                         ExtensionsCallbackNoop(),
+                         MatchExpressionParser::kAllowAllSpecialFeatures);
     ASSERT_BSONOBJ_EQ(*reserialized.getQuery(),
                       BSON("x" << BSON("$regex"
                                        << "a.b"
@@ -406,9 +568,17 @@ TEST(SerializeBasic, ExpressionRegexWithValueAndOptionsSerializesCorrectly) {
 }
 
 TEST(SerializeBasic, ExpressionRegexWithValueSerializesCorrectly) {
-    Matcher original(fromjson("{x: /a.b/}"), ExtensionsCallbackNoop(), kSimpleCollator);
-    Matcher reserialized(
-        serialize(original.getMatchExpression()), ExtensionsCallbackNoop(), kSimpleCollator);
+    boost::intrusive_ptr<ExpressionContextForTest> expCtx(new ExpressionContextForTest());
+    Matcher original(fromjson("{x: /a.b/}"),
+                     kSimpleCollator,
+                     expCtx,
+                     ExtensionsCallbackNoop(),
+                     MatchExpressionParser::kAllowAllSpecialFeatures);
+    Matcher reserialized(serialize(original.getMatchExpression()),
+                         kSimpleCollator,
+                         expCtx,
+                         ExtensionsCallbackNoop(),
+                         MatchExpressionParser::kAllowAllSpecialFeatures);
     ASSERT_BSONOBJ_EQ(*reserialized.getQuery(),
                       BSON("x" << BSON("$regex"
                                        << "a.b")));
@@ -422,10 +592,17 @@ TEST(SerializeBasic, ExpressionRegexWithValueSerializesCorrectly) {
 }
 
 TEST(SerializeBasic, ExpressionRegexWithEqObjSerializesCorrectly) {
-    Matcher original(
-        fromjson("{x: {$eq: {$regex: 'a.b'}}}"), ExtensionsCallbackNoop(), kSimpleCollator);
-    Matcher reserialized(
-        serialize(original.getMatchExpression()), ExtensionsCallbackNoop(), kSimpleCollator);
+    boost::intrusive_ptr<ExpressionContextForTest> expCtx(new ExpressionContextForTest());
+    Matcher original(fromjson("{x: {$eq: {$regex: 'a.b'}}}"),
+                     kSimpleCollator,
+                     expCtx,
+                     ExtensionsCallbackNoop(),
+                     MatchExpressionParser::kAllowAllSpecialFeatures);
+    Matcher reserialized(serialize(original.getMatchExpression()),
+                         kSimpleCollator,
+                         expCtx,
+                         ExtensionsCallbackNoop(),
+                         MatchExpressionParser::kAllowAllSpecialFeatures);
     ASSERT_BSONOBJ_EQ(*reserialized.getQuery(), fromjson("{x: {$eq: {$regex: 'a.b'}}}"));
     ASSERT_BSONOBJ_EQ(*reserialized.getQuery(), serialize(reserialized.getMatchExpression()));
 
@@ -440,9 +617,17 @@ TEST(SerializeBasic, ExpressionRegexWithEqObjSerializesCorrectly) {
 }
 
 TEST(SerializeBasic, ExpressionModSerializesCorrectly) {
-    Matcher original(fromjson("{x: {$mod: [2, 1]}}"), ExtensionsCallbackNoop(), kSimpleCollator);
-    Matcher reserialized(
-        serialize(original.getMatchExpression()), ExtensionsCallbackNoop(), kSimpleCollator);
+    boost::intrusive_ptr<ExpressionContextForTest> expCtx(new ExpressionContextForTest());
+    Matcher original(fromjson("{x: {$mod: [2, 1]}}"),
+                     kSimpleCollator,
+                     expCtx,
+                     ExtensionsCallbackNoop(),
+                     MatchExpressionParser::kAllowAllSpecialFeatures);
+    Matcher reserialized(serialize(original.getMatchExpression()),
+                         kSimpleCollator,
+                         expCtx,
+                         ExtensionsCallbackNoop(),
+                         MatchExpressionParser::kAllowAllSpecialFeatures);
     ASSERT_BSONOBJ_EQ(*reserialized.getQuery(), fromjson("{x: {$mod: [2, 1]}}"));
     ASSERT_BSONOBJ_EQ(*reserialized.getQuery(), serialize(reserialized.getMatchExpression()));
 
@@ -454,9 +639,17 @@ TEST(SerializeBasic, ExpressionModSerializesCorrectly) {
 }
 
 TEST(SerializeBasic, ExpressionExistsTrueSerializesCorrectly) {
-    Matcher original(fromjson("{x: {$exists: true}}"), ExtensionsCallbackNoop(), kSimpleCollator);
-    Matcher reserialized(
-        serialize(original.getMatchExpression()), ExtensionsCallbackNoop(), kSimpleCollator);
+    boost::intrusive_ptr<ExpressionContextForTest> expCtx(new ExpressionContextForTest());
+    Matcher original(fromjson("{x: {$exists: true}}"),
+                     kSimpleCollator,
+                     expCtx,
+                     ExtensionsCallbackNoop(),
+                     MatchExpressionParser::kAllowAllSpecialFeatures);
+    Matcher reserialized(serialize(original.getMatchExpression()),
+                         kSimpleCollator,
+                         expCtx,
+                         ExtensionsCallbackNoop(),
+                         MatchExpressionParser::kAllowAllSpecialFeatures);
     ASSERT_BSONOBJ_EQ(*reserialized.getQuery(), fromjson("{x: {$exists: true}}"));
     ASSERT_BSONOBJ_EQ(*reserialized.getQuery(), serialize(reserialized.getMatchExpression()));
 
@@ -468,9 +661,17 @@ TEST(SerializeBasic, ExpressionExistsTrueSerializesCorrectly) {
 }
 
 TEST(SerializeBasic, ExpressionExistsFalseSerializesCorrectly) {
-    Matcher original(fromjson("{x: {$exists: false}}"), ExtensionsCallbackNoop(), kSimpleCollator);
-    Matcher reserialized(
-        serialize(original.getMatchExpression()), ExtensionsCallbackNoop(), kSimpleCollator);
+    boost::intrusive_ptr<ExpressionContextForTest> expCtx(new ExpressionContextForTest());
+    Matcher original(fromjson("{x: {$exists: false}}"),
+                     kSimpleCollator,
+                     expCtx,
+                     ExtensionsCallbackNoop(),
+                     MatchExpressionParser::kAllowAllSpecialFeatures);
+    Matcher reserialized(serialize(original.getMatchExpression()),
+                         kSimpleCollator,
+                         expCtx,
+                         ExtensionsCallbackNoop(),
+                         MatchExpressionParser::kAllowAllSpecialFeatures);
     ASSERT_BSONOBJ_EQ(*reserialized.getQuery(), fromjson("{$nor: [{x: {$exists: true}}]}"));
     ASSERT_BSONOBJ_EQ(*reserialized.getQuery(), serialize(reserialized.getMatchExpression()));
 
@@ -482,9 +683,17 @@ TEST(SerializeBasic, ExpressionExistsFalseSerializesCorrectly) {
 }
 
 TEST(SerializeBasic, ExpressionInSerializesCorrectly) {
-    Matcher original(fromjson("{x: {$in: [1, 2, 3]}}"), ExtensionsCallbackNoop(), kSimpleCollator);
-    Matcher reserialized(
-        serialize(original.getMatchExpression()), ExtensionsCallbackNoop(), kSimpleCollator);
+    boost::intrusive_ptr<ExpressionContextForTest> expCtx(new ExpressionContextForTest());
+    Matcher original(fromjson("{x: {$in: [1, 2, 3]}}"),
+                     kSimpleCollator,
+                     expCtx,
+                     ExtensionsCallbackNoop(),
+                     MatchExpressionParser::kAllowAllSpecialFeatures);
+    Matcher reserialized(serialize(original.getMatchExpression()),
+                         kSimpleCollator,
+                         expCtx,
+                         ExtensionsCallbackNoop(),
+                         MatchExpressionParser::kAllowAllSpecialFeatures);
     ASSERT_BSONOBJ_EQ(*reserialized.getQuery(), fromjson("{x: {$in: [1, 2, 3]}}"));
     ASSERT_BSONOBJ_EQ(*reserialized.getQuery(), serialize(reserialized.getMatchExpression()));
 
@@ -499,9 +708,17 @@ TEST(SerializeBasic, ExpressionInSerializesCorrectly) {
 }
 
 TEST(SerializeBasic, ExpressionInWithEmptyArraySerializesCorrectly) {
-    Matcher original(fromjson("{x: {$in: []}}"), ExtensionsCallbackNoop(), kSimpleCollator);
-    Matcher reserialized(
-        serialize(original.getMatchExpression()), ExtensionsCallbackNoop(), kSimpleCollator);
+    boost::intrusive_ptr<ExpressionContextForTest> expCtx(new ExpressionContextForTest());
+    Matcher original(fromjson("{x: {$in: []}}"),
+                     kSimpleCollator,
+                     expCtx,
+                     ExtensionsCallbackNoop(),
+                     MatchExpressionParser::kAllowAllSpecialFeatures);
+    Matcher reserialized(serialize(original.getMatchExpression()),
+                         kSimpleCollator,
+                         expCtx,
+                         ExtensionsCallbackNoop(),
+                         MatchExpressionParser::kAllowAllSpecialFeatures);
     ASSERT_BSONOBJ_EQ(*reserialized.getQuery(), fromjson("{x: {$in: []}}"));
     ASSERT_BSONOBJ_EQ(*reserialized.getQuery(), serialize(reserialized.getMatchExpression()));
 
@@ -510,10 +727,17 @@ TEST(SerializeBasic, ExpressionInWithEmptyArraySerializesCorrectly) {
 }
 
 TEST(SerializeBasic, ExpressionInWithRegexSerializesCorrectly) {
-    Matcher original(
-        fromjson("{x: {$in: [/\\d+/, /\\w+/]}}"), ExtensionsCallbackNoop(), kSimpleCollator);
-    Matcher reserialized(
-        serialize(original.getMatchExpression()), ExtensionsCallbackNoop(), kSimpleCollator);
+    boost::intrusive_ptr<ExpressionContextForTest> expCtx(new ExpressionContextForTest());
+    Matcher original(fromjson("{x: {$in: [/\\d+/, /\\w+/]}}"),
+                     kSimpleCollator,
+                     expCtx,
+                     ExtensionsCallbackNoop(),
+                     MatchExpressionParser::kAllowAllSpecialFeatures);
+    Matcher reserialized(serialize(original.getMatchExpression()),
+                         kSimpleCollator,
+                         expCtx,
+                         ExtensionsCallbackNoop(),
+                         MatchExpressionParser::kAllowAllSpecialFeatures);
     ASSERT_BSONOBJ_EQ(*reserialized.getQuery(), fromjson("{x: {$in: [/\\d+/, /\\w+/]}}"));
     ASSERT_BSONOBJ_EQ(*reserialized.getQuery(), serialize(reserialized.getMatchExpression()));
 
@@ -528,9 +752,17 @@ TEST(SerializeBasic, ExpressionInWithRegexSerializesCorrectly) {
 }
 
 TEST(SerializeBasic, ExpressionNinSerializesCorrectly) {
-    Matcher original(fromjson("{x: {$nin: [1, 2, 3]}}"), ExtensionsCallbackNoop(), kSimpleCollator);
-    Matcher reserialized(
-        serialize(original.getMatchExpression()), ExtensionsCallbackNoop(), kSimpleCollator);
+    boost::intrusive_ptr<ExpressionContextForTest> expCtx(new ExpressionContextForTest());
+    Matcher original(fromjson("{x: {$nin: [1, 2, 3]}}"),
+                     kSimpleCollator,
+                     expCtx,
+                     ExtensionsCallbackNoop(),
+                     MatchExpressionParser::kAllowAllSpecialFeatures);
+    Matcher reserialized(serialize(original.getMatchExpression()),
+                         kSimpleCollator,
+                         expCtx,
+                         ExtensionsCallbackNoop(),
+                         MatchExpressionParser::kAllowAllSpecialFeatures);
     ASSERT_BSONOBJ_EQ(*reserialized.getQuery(), fromjson("{$nor: [{x: {$in: [1, 2, 3]}}]}"));
     ASSERT_BSONOBJ_EQ(*reserialized.getQuery(), serialize(reserialized.getMatchExpression()));
 
@@ -545,10 +777,17 @@ TEST(SerializeBasic, ExpressionNinSerializesCorrectly) {
 }
 
 TEST(SerializeBasic, ExpressionNinWithRegexValueSerializesCorrectly) {
-    Matcher original(
-        fromjson("{x: {$nin: [/abc/, /def/, /xyz/]}}"), ExtensionsCallbackNoop(), kSimpleCollator);
-    Matcher reserialized(
-        serialize(original.getMatchExpression()), ExtensionsCallbackNoop(), kSimpleCollator);
+    boost::intrusive_ptr<ExpressionContextForTest> expCtx(new ExpressionContextForTest());
+    Matcher original(fromjson("{x: {$nin: [/abc/, /def/, /xyz/]}}"),
+                     kSimpleCollator,
+                     expCtx,
+                     ExtensionsCallbackNoop(),
+                     MatchExpressionParser::kAllowAllSpecialFeatures);
+    Matcher reserialized(serialize(original.getMatchExpression()),
+                         kSimpleCollator,
+                         expCtx,
+                         ExtensionsCallbackNoop(),
+                         MatchExpressionParser::kAllowAllSpecialFeatures);
     ASSERT_BSONOBJ_EQ(*reserialized.getQuery(),
                       fromjson("{$nor: [{x: {$in: [/abc/, /def/, /xyz/]}}]}"));
     ASSERT_BSONOBJ_EQ(*reserialized.getQuery(), serialize(reserialized.getMatchExpression()));
@@ -563,10 +802,17 @@ TEST(SerializeBasic, ExpressionNinWithRegexValueSerializesCorrectly) {
 }
 
 TEST(SerializeBasic, ExpressionBitsAllSetSerializesCorrectly) {
-    Matcher original(
-        fromjson("{x: {$bitsAllSet: [1, 3]}}"), ExtensionsCallbackNoop(), kSimpleCollator);
-    Matcher reserialized(
-        serialize(original.getMatchExpression()), ExtensionsCallbackNoop(), kSimpleCollator);
+    boost::intrusive_ptr<ExpressionContextForTest> expCtx(new ExpressionContextForTest());
+    Matcher original(fromjson("{x: {$bitsAllSet: [1, 3]}}"),
+                     kSimpleCollator,
+                     expCtx,
+                     ExtensionsCallbackNoop(),
+                     MatchExpressionParser::kAllowAllSpecialFeatures);
+    Matcher reserialized(serialize(original.getMatchExpression()),
+                         kSimpleCollator,
+                         expCtx,
+                         ExtensionsCallbackNoop(),
+                         MatchExpressionParser::kAllowAllSpecialFeatures);
     ASSERT_BSONOBJ_EQ(*reserialized.getQuery(), fromjson("{x: {$bitsAllSet: [1, 3]}}"));
     ASSERT_BSONOBJ_EQ(*reserialized.getQuery(), serialize(reserialized.getMatchExpression()));
 
@@ -578,10 +824,17 @@ TEST(SerializeBasic, ExpressionBitsAllSetSerializesCorrectly) {
 }
 
 TEST(SerializeBasic, ExpressionBitsAllClearSerializesCorrectly) {
-    Matcher original(
-        fromjson("{x: {$bitsAllClear: [1, 3]}}"), ExtensionsCallbackNoop(), kSimpleCollator);
-    Matcher reserialized(
-        serialize(original.getMatchExpression()), ExtensionsCallbackNoop(), kSimpleCollator);
+    boost::intrusive_ptr<ExpressionContextForTest> expCtx(new ExpressionContextForTest());
+    Matcher original(fromjson("{x: {$bitsAllClear: [1, 3]}}"),
+                     kSimpleCollator,
+                     expCtx,
+                     ExtensionsCallbackNoop(),
+                     MatchExpressionParser::kAllowAllSpecialFeatures);
+    Matcher reserialized(serialize(original.getMatchExpression()),
+                         kSimpleCollator,
+                         expCtx,
+                         ExtensionsCallbackNoop(),
+                         MatchExpressionParser::kAllowAllSpecialFeatures);
     ASSERT_BSONOBJ_EQ(*reserialized.getQuery(), fromjson("{x: {$bitsAllClear: [1, 3]}}"));
     ASSERT_BSONOBJ_EQ(*reserialized.getQuery(), serialize(reserialized.getMatchExpression()));
 
@@ -593,10 +846,17 @@ TEST(SerializeBasic, ExpressionBitsAllClearSerializesCorrectly) {
 }
 
 TEST(SerializeBasic, ExpressionBitsAnySetSerializesCorrectly) {
-    Matcher original(
-        fromjson("{x: {$bitsAnySet: [1, 3]}}"), ExtensionsCallbackNoop(), kSimpleCollator);
-    Matcher reserialized(
-        serialize(original.getMatchExpression()), ExtensionsCallbackNoop(), kSimpleCollator);
+    boost::intrusive_ptr<ExpressionContextForTest> expCtx(new ExpressionContextForTest());
+    Matcher original(fromjson("{x: {$bitsAnySet: [1, 3]}}"),
+                     kSimpleCollator,
+                     expCtx,
+                     ExtensionsCallbackNoop(),
+                     MatchExpressionParser::kAllowAllSpecialFeatures);
+    Matcher reserialized(serialize(original.getMatchExpression()),
+                         kSimpleCollator,
+                         expCtx,
+                         ExtensionsCallbackNoop(),
+                         MatchExpressionParser::kAllowAllSpecialFeatures);
     ASSERT_BSONOBJ_EQ(*reserialized.getQuery(), fromjson("{x: {$bitsAnySet: [1, 3]}}"));
     ASSERT_BSONOBJ_EQ(*reserialized.getQuery(), serialize(reserialized.getMatchExpression()));
 
@@ -608,10 +868,17 @@ TEST(SerializeBasic, ExpressionBitsAnySetSerializesCorrectly) {
 }
 
 TEST(SerializeBasic, ExpressionBitsAnyClearSerializesCorrectly) {
-    Matcher original(
-        fromjson("{x: {$bitsAnyClear: [1, 3]}}"), ExtensionsCallbackNoop(), kSimpleCollator);
-    Matcher reserialized(
-        serialize(original.getMatchExpression()), ExtensionsCallbackNoop(), kSimpleCollator);
+    boost::intrusive_ptr<ExpressionContextForTest> expCtx(new ExpressionContextForTest());
+    Matcher original(fromjson("{x: {$bitsAnyClear: [1, 3]}}"),
+                     kSimpleCollator,
+                     expCtx,
+                     ExtensionsCallbackNoop(),
+                     MatchExpressionParser::kAllowAllSpecialFeatures);
+    Matcher reserialized(serialize(original.getMatchExpression()),
+                         kSimpleCollator,
+                         expCtx,
+                         ExtensionsCallbackNoop(),
+                         MatchExpressionParser::kAllowAllSpecialFeatures);
     ASSERT_BSONOBJ_EQ(*reserialized.getQuery(), fromjson("{x: {$bitsAnyClear: [1, 3]}}"));
     ASSERT_BSONOBJ_EQ(*reserialized.getQuery(), serialize(reserialized.getMatchExpression()));
 
@@ -626,9 +893,17 @@ TEST(SerializeBasic, ExpressionBitsAnyClearSerializesCorrectly) {
 }
 
 TEST(SerializeBasic, ExpressionNotSerializesCorrectly) {
-    Matcher original(fromjson("{x: {$not: {$eq: 3}}}"), ExtensionsCallbackNoop(), kSimpleCollator);
-    Matcher reserialized(
-        serialize(original.getMatchExpression()), ExtensionsCallbackNoop(), kSimpleCollator);
+    boost::intrusive_ptr<ExpressionContextForTest> expCtx(new ExpressionContextForTest());
+    Matcher original(fromjson("{x: {$not: {$eq: 3}}}"),
+                     kSimpleCollator,
+                     expCtx,
+                     ExtensionsCallbackNoop(),
+                     MatchExpressionParser::kAllowAllSpecialFeatures);
+    Matcher reserialized(serialize(original.getMatchExpression()),
+                         kSimpleCollator,
+                         expCtx,
+                         ExtensionsCallbackNoop(),
+                         MatchExpressionParser::kAllowAllSpecialFeatures);
     ASSERT_BSONOBJ_EQ(*reserialized.getQuery(), fromjson("{$nor: [{$and: [{x: {$eq: 3}}]}]}"));
     ASSERT_BSONOBJ_EQ(*reserialized.getQuery(), serialize(reserialized.getMatchExpression()));
 
@@ -640,10 +915,17 @@ TEST(SerializeBasic, ExpressionNotSerializesCorrectly) {
 }
 
 TEST(SerializeBasic, ExpressionNotWithMultipleChildrenSerializesCorrectly) {
-    Matcher original(
-        fromjson("{x: {$not: {$lt: 1, $gt: 3}}}"), ExtensionsCallbackNoop(), kSimpleCollator);
-    Matcher reserialized(
-        serialize(original.getMatchExpression()), ExtensionsCallbackNoop(), kSimpleCollator);
+    boost::intrusive_ptr<ExpressionContextForTest> expCtx(new ExpressionContextForTest());
+    Matcher original(fromjson("{x: {$not: {$lt: 1, $gt: 3}}}"),
+                     kSimpleCollator,
+                     expCtx,
+                     ExtensionsCallbackNoop(),
+                     MatchExpressionParser::kAllowAllSpecialFeatures);
+    Matcher reserialized(serialize(original.getMatchExpression()),
+                         kSimpleCollator,
+                         expCtx,
+                         ExtensionsCallbackNoop(),
+                         MatchExpressionParser::kAllowAllSpecialFeatures);
     ASSERT_BSONOBJ_EQ(*reserialized.getQuery(),
                       fromjson("{$nor: [{$and: [{x: {$lt: 1}}, {x: {$gt: 3}}]}]}}"));
     ASSERT_BSONOBJ_EQ(*reserialized.getQuery(), serialize(reserialized.getMatchExpression()));
@@ -656,10 +938,17 @@ TEST(SerializeBasic, ExpressionNotWithMultipleChildrenSerializesCorrectly) {
 }
 
 TEST(SerializeBasic, ExpressionNotWithBitTestSerializesCorrectly) {
-    Matcher original(
-        fromjson("{x: {$not: {$bitsAnySet: [1, 3]}}}"), ExtensionsCallbackNoop(), kSimpleCollator);
-    Matcher reserialized(
-        serialize(original.getMatchExpression()), ExtensionsCallbackNoop(), kSimpleCollator);
+    boost::intrusive_ptr<ExpressionContextForTest> expCtx(new ExpressionContextForTest());
+    Matcher original(fromjson("{x: {$not: {$bitsAnySet: [1, 3]}}}"),
+                     kSimpleCollator,
+                     expCtx,
+                     ExtensionsCallbackNoop(),
+                     MatchExpressionParser::kAllowAllSpecialFeatures);
+    Matcher reserialized(serialize(original.getMatchExpression()),
+                         kSimpleCollator,
+                         expCtx,
+                         ExtensionsCallbackNoop(),
+                         MatchExpressionParser::kAllowAllSpecialFeatures);
     ASSERT_BSONOBJ_EQ(*reserialized.getQuery(),
                       fromjson("{$nor: [{$and: [{x: {$bitsAnySet: [1, 3]}}]}]}"));
     ASSERT_BSONOBJ_EQ(*reserialized.getQuery(), serialize(reserialized.getMatchExpression()));
@@ -672,10 +961,17 @@ TEST(SerializeBasic, ExpressionNotWithBitTestSerializesCorrectly) {
 }
 
 TEST(SerializeBasic, ExpressionNotWithRegexObjSerializesCorrectly) {
-    Matcher original(
-        fromjson("{x: {$not: {$regex: 'a.b'}}}"), ExtensionsCallbackNoop(), kSimpleCollator);
-    Matcher reserialized(
-        serialize(original.getMatchExpression()), ExtensionsCallbackNoop(), kSimpleCollator);
+    boost::intrusive_ptr<ExpressionContextForTest> expCtx(new ExpressionContextForTest());
+    Matcher original(fromjson("{x: {$not: {$regex: 'a.b'}}}"),
+                     kSimpleCollator,
+                     expCtx,
+                     ExtensionsCallbackNoop(),
+                     MatchExpressionParser::kAllowAllSpecialFeatures);
+    Matcher reserialized(serialize(original.getMatchExpression()),
+                         kSimpleCollator,
+                         expCtx,
+                         ExtensionsCallbackNoop(),
+                         MatchExpressionParser::kAllowAllSpecialFeatures);
     ASSERT_BSONOBJ_EQ(*reserialized.getQuery(),
                       BSON("$nor" << BSON_ARRAY(BSON("x" << BSON("$regex"
                                                                  << "a.b")))));
@@ -689,9 +985,17 @@ TEST(SerializeBasic, ExpressionNotWithRegexObjSerializesCorrectly) {
 }
 
 TEST(SerializeBasic, ExpressionNotWithRegexValueSerializesCorrectly) {
-    Matcher original(fromjson("{x: {$not: /a.b/}}"), ExtensionsCallbackNoop(), kSimpleCollator);
-    Matcher reserialized(
-        serialize(original.getMatchExpression()), ExtensionsCallbackNoop(), kSimpleCollator);
+    boost::intrusive_ptr<ExpressionContextForTest> expCtx(new ExpressionContextForTest());
+    Matcher original(fromjson("{x: {$not: /a.b/}}"),
+                     kSimpleCollator,
+                     expCtx,
+                     ExtensionsCallbackNoop(),
+                     MatchExpressionParser::kAllowAllSpecialFeatures);
+    Matcher reserialized(serialize(original.getMatchExpression()),
+                         kSimpleCollator,
+                         expCtx,
+                         ExtensionsCallbackNoop(),
+                         MatchExpressionParser::kAllowAllSpecialFeatures);
     ASSERT_BSONOBJ_EQ(*reserialized.getQuery(),
                       BSON("$nor" << BSON_ARRAY(BSON("x" << BSON("$regex"
                                                                  << "a.b")))));
@@ -705,9 +1009,17 @@ TEST(SerializeBasic, ExpressionNotWithRegexValueSerializesCorrectly) {
 }
 
 TEST(SerializeBasic, ExpressionNotWithRegexValueAndOptionsSerializesCorrectly) {
-    Matcher original(fromjson("{x: {$not: /a.b/i}}"), ExtensionsCallbackNoop(), kSimpleCollator);
-    Matcher reserialized(
-        serialize(original.getMatchExpression()), ExtensionsCallbackNoop(), kSimpleCollator);
+    boost::intrusive_ptr<ExpressionContextForTest> expCtx(new ExpressionContextForTest());
+    Matcher original(fromjson("{x: {$not: /a.b/i}}"),
+                     kSimpleCollator,
+                     expCtx,
+                     ExtensionsCallbackNoop(),
+                     MatchExpressionParser::kAllowAllSpecialFeatures);
+    Matcher reserialized(serialize(original.getMatchExpression()),
+                         kSimpleCollator,
+                         expCtx,
+                         ExtensionsCallbackNoop(),
+                         MatchExpressionParser::kAllowAllSpecialFeatures);
     ASSERT_BSONOBJ_EQ(*reserialized.getQuery(),
                       BSON("$nor" << BSON_ARRAY(BSON("x" << BSON("$regex"
                                                                  << "a.b"
@@ -723,13 +1035,19 @@ TEST(SerializeBasic, ExpressionNotWithRegexValueAndOptionsSerializesCorrectly) {
 }
 
 TEST(SerializeBasic, ExpressionNotWithGeoSerializesCorrectly) {
+    boost::intrusive_ptr<ExpressionContextForTest> expCtx(new ExpressionContextForTest());
     Matcher original(fromjson("{x: {$not: {$geoIntersects: {$geometry: {type: 'Polygon', "
                               "coordinates: [[[0,0], [5,0], "
                               "[5, 5], [0, 5], [0, 0]]]}}}}}"),
+                     kSimpleCollator,
+                     expCtx,
                      ExtensionsCallbackNoop(),
-                     kSimpleCollator);
-    Matcher reserialized(
-        serialize(original.getMatchExpression()), ExtensionsCallbackNoop(), kSimpleCollator);
+                     MatchExpressionParser::kAllowAllSpecialFeatures);
+    Matcher reserialized(serialize(original.getMatchExpression()),
+                         kSimpleCollator,
+                         expCtx,
+                         ExtensionsCallbackNoop(),
+                         MatchExpressionParser::kAllowAllSpecialFeatures);
     ASSERT_BSONOBJ_EQ(
         *reserialized.getQuery(),
         fromjson("{$nor: [{$and: [{x: {$geoIntersects: {$geometry: {type: 'Polygon', coordinates: "
@@ -752,10 +1070,17 @@ TEST(SerializeBasic, ExpressionNotWithGeoSerializesCorrectly) {
 }
 
 TEST(SerializeBasic, ExpressionNorSerializesCorrectly) {
-    Matcher original(
-        fromjson("{$nor: [{x: 3}, {x: {$lt: 1}}]}"), ExtensionsCallbackNoop(), kSimpleCollator);
-    Matcher reserialized(
-        serialize(original.getMatchExpression()), ExtensionsCallbackNoop(), kSimpleCollator);
+    boost::intrusive_ptr<ExpressionContextForTest> expCtx(new ExpressionContextForTest());
+    Matcher original(fromjson("{$nor: [{x: 3}, {x: {$lt: 1}}]}"),
+                     kSimpleCollator,
+                     expCtx,
+                     ExtensionsCallbackNoop(),
+                     MatchExpressionParser::kAllowAllSpecialFeatures);
+    Matcher reserialized(serialize(original.getMatchExpression()),
+                         kSimpleCollator,
+                         expCtx,
+                         ExtensionsCallbackNoop(),
+                         MatchExpressionParser::kAllowAllSpecialFeatures);
     ASSERT_BSONOBJ_EQ(*reserialized.getQuery(), fromjson("{$nor: [{x: {$eq: 3}}, {x: {$lt: 1}}]}"));
     ASSERT_BSONOBJ_EQ(*reserialized.getQuery(), serialize(reserialized.getMatchExpression()));
 
@@ -770,9 +1095,17 @@ TEST(SerializeBasic, ExpressionNorSerializesCorrectly) {
 }
 
 TEST(SerializeBasic, ExpressionTypeSerializesCorrectly) {
-    Matcher original(fromjson("{x: {$type: 2}}"), ExtensionsCallbackNoop(), kSimpleCollator);
-    Matcher reserialized(
-        serialize(original.getMatchExpression()), ExtensionsCallbackNoop(), kSimpleCollator);
+    boost::intrusive_ptr<ExpressionContextForTest> expCtx(new ExpressionContextForTest());
+    Matcher original(fromjson("{x: {$type: 2}}"),
+                     kSimpleCollator,
+                     expCtx,
+                     ExtensionsCallbackNoop(),
+                     MatchExpressionParser::kAllowAllSpecialFeatures);
+    Matcher reserialized(serialize(original.getMatchExpression()),
+                         kSimpleCollator,
+                         expCtx,
+                         ExtensionsCallbackNoop(),
+                         MatchExpressionParser::kAllowAllSpecialFeatures);
     ASSERT_BSONOBJ_EQ(*reserialized.getQuery(), fromjson("{x: {$type: 2}}"));
     ASSERT_BSONOBJ_EQ(*reserialized.getQuery(), serialize(reserialized.getMatchExpression()));
 
@@ -784,9 +1117,17 @@ TEST(SerializeBasic, ExpressionTypeSerializesCorrectly) {
 }
 
 TEST(SerializeBasic, ExpressionTypeWithNumberSerializesCorrectly) {
-    Matcher original(fromjson("{x: {$type: 'number'}}"), ExtensionsCallbackNoop(), kSimpleCollator);
-    Matcher reserialized(
-        serialize(original.getMatchExpression()), ExtensionsCallbackNoop(), kSimpleCollator);
+    boost::intrusive_ptr<ExpressionContextForTest> expCtx(new ExpressionContextForTest());
+    Matcher original(fromjson("{x: {$type: 'number'}}"),
+                     kSimpleCollator,
+                     expCtx,
+                     ExtensionsCallbackNoop(),
+                     MatchExpressionParser::kAllowAllSpecialFeatures);
+    Matcher reserialized(serialize(original.getMatchExpression()),
+                         kSimpleCollator,
+                         expCtx,
+                         ExtensionsCallbackNoop(),
+                         MatchExpressionParser::kAllowAllSpecialFeatures);
     ASSERT_BSONOBJ_EQ(*reserialized.getQuery(), fromjson("{x: {$type: 'number'}}"));
     ASSERT_BSONOBJ_EQ(*reserialized.getQuery(), serialize(reserialized.getMatchExpression()));
 
@@ -798,10 +1139,8 @@ TEST(SerializeBasic, ExpressionTypeWithNumberSerializesCorrectly) {
 }
 
 TEST(SerializeInternalSchema, InternalSchemaTypeExpressionSerializesCorrectly) {
-    Matcher original(
-        fromjson("{x: {$_internalSchemaType: 2}}"), ExtensionsCallbackNoop(), kSimpleCollator);
-    Matcher reserialized(
-        serialize(original.getMatchExpression()), ExtensionsCallbackNoop(), kSimpleCollator);
+    Matcher original(fromjson("{x: {$_internalSchemaType: 2}}"), kSimpleCollator);
+    Matcher reserialized(serialize(original.getMatchExpression()), kSimpleCollator);
     ASSERT_BSONOBJ_EQ(*reserialized.getQuery(), fromjson("{x: {$_internalSchemaType: 2}}"));
     ASSERT_BSONOBJ_EQ(*reserialized.getQuery(), serialize(reserialized.getMatchExpression()));
 
@@ -813,11 +1152,8 @@ TEST(SerializeInternalSchema, InternalSchemaTypeExpressionSerializesCorrectly) {
 }
 
 TEST(SerializeInternalSchema, InternalSchemaTypeExpressionWithNumberSerializesCorrectly) {
-    Matcher original(fromjson("{x: {$_internalSchemaType: 'number'}}"),
-                     ExtensionsCallbackNoop(),
-                     kSimpleCollator);
-    Matcher reserialized(
-        serialize(original.getMatchExpression()), ExtensionsCallbackNoop(), kSimpleCollator);
+    Matcher original(fromjson("{x: {$_internalSchemaType: 'number'}}"), kSimpleCollator);
+    Matcher reserialized(serialize(original.getMatchExpression()), kSimpleCollator);
     ASSERT_BSONOBJ_EQ(*reserialized.getQuery(), fromjson("{x: {$_internalSchemaType: 'number'}}"));
     ASSERT_BSONOBJ_EQ(*reserialized.getQuery(), serialize(reserialized.getMatchExpression()));
 
@@ -829,9 +1165,17 @@ TEST(SerializeInternalSchema, InternalSchemaTypeExpressionWithNumberSerializesCo
 }
 
 TEST(SerializeBasic, ExpressionEmptySerializesCorrectly) {
-    Matcher original(fromjson("{}"), ExtensionsCallbackNoop(), kSimpleCollator);
-    Matcher reserialized(
-        serialize(original.getMatchExpression()), ExtensionsCallbackNoop(), kSimpleCollator);
+    boost::intrusive_ptr<ExpressionContextForTest> expCtx(new ExpressionContextForTest());
+    Matcher original(fromjson("{}"),
+                     kSimpleCollator,
+                     expCtx,
+                     ExtensionsCallbackNoop(),
+                     MatchExpressionParser::kAllowAllSpecialFeatures);
+    Matcher reserialized(serialize(original.getMatchExpression()),
+                         kSimpleCollator,
+                         expCtx,
+                         ExtensionsCallbackNoop(),
+                         MatchExpressionParser::kAllowAllSpecialFeatures);
     ASSERT_BSONOBJ_EQ(*reserialized.getQuery(), fromjson("{}"));
     ASSERT_BSONOBJ_EQ(*reserialized.getQuery(), serialize(reserialized.getMatchExpression()));
 
@@ -840,10 +1184,17 @@ TEST(SerializeBasic, ExpressionEmptySerializesCorrectly) {
 }
 
 TEST(SerializeBasic, ExpressionWhereSerializesCorrectly) {
-    Matcher original(
-        fromjson("{$where: 'this.a == this.b'}"), ExtensionsCallbackNoop(), kSimpleCollator);
-    Matcher reserialized(
-        serialize(original.getMatchExpression()), ExtensionsCallbackNoop(), kSimpleCollator);
+    boost::intrusive_ptr<ExpressionContextForTest> expCtx(new ExpressionContextForTest());
+    Matcher original(fromjson("{$where: 'this.a == this.b'}"),
+                     kSimpleCollator,
+                     expCtx,
+                     ExtensionsCallbackNoop(),
+                     MatchExpressionParser::kAllowAllSpecialFeatures);
+    Matcher reserialized(serialize(original.getMatchExpression()),
+                         kSimpleCollator,
+                         expCtx,
+                         ExtensionsCallbackNoop(),
+                         MatchExpressionParser::kAllowAllSpecialFeatures);
     ASSERT_BSONOBJ_EQ(
         *reserialized.getQuery(),
         BSONObjBuilder().appendCodeWScope("$where", "this.a == this.b", BSONObj()).obj());
@@ -851,20 +1202,34 @@ TEST(SerializeBasic, ExpressionWhereSerializesCorrectly) {
 }
 
 TEST(SerializeBasic, ExpressionWhereWithScopeSerializesCorrectly) {
+    boost::intrusive_ptr<ExpressionContextForTest> expCtx(new ExpressionContextForTest());
     Matcher original(BSON("$where" << BSONCodeWScope("this.a == this.b", BSON("x" << 3))),
+                     kSimpleCollator,
+                     expCtx,
                      ExtensionsCallbackNoop(),
-                     kSimpleCollator);
-    Matcher reserialized(
-        serialize(original.getMatchExpression()), ExtensionsCallbackNoop(), kSimpleCollator);
+                     MatchExpressionParser::kAllowAllSpecialFeatures);
+    Matcher reserialized(serialize(original.getMatchExpression()),
+                         kSimpleCollator,
+                         expCtx,
+                         ExtensionsCallbackNoop(),
+                         MatchExpressionParser::kAllowAllSpecialFeatures);
     ASSERT_BSONOBJ_EQ(*reserialized.getQuery(),
                       BSON("$where" << BSONCodeWScope("this.a == this.b", BSON("x" << 3))));
     ASSERT_BSONOBJ_EQ(*reserialized.getQuery(), serialize(reserialized.getMatchExpression()));
 }
 
 TEST(SerializeBasic, ExpressionCommentSerializesCorrectly) {
-    Matcher original(fromjson("{$comment: 'Hello'}"), ExtensionsCallbackNoop(), kSimpleCollator);
-    Matcher reserialized(
-        serialize(original.getMatchExpression()), ExtensionsCallbackNoop(), kSimpleCollator);
+    boost::intrusive_ptr<ExpressionContextForTest> expCtx(new ExpressionContextForTest());
+    Matcher original(fromjson("{$comment: 'Hello'}"),
+                     kSimpleCollator,
+                     expCtx,
+                     ExtensionsCallbackNoop(),
+                     MatchExpressionParser::kAllowAllSpecialFeatures);
+    Matcher reserialized(serialize(original.getMatchExpression()),
+                         kSimpleCollator,
+                         expCtx,
+                         ExtensionsCallbackNoop(),
+                         MatchExpressionParser::kAllowAllSpecialFeatures);
     ASSERT_BSONOBJ_EQ(*reserialized.getQuery(), fromjson("{}"));
     ASSERT_BSONOBJ_EQ(*reserialized.getQuery(), serialize(reserialized.getMatchExpression()));
 
@@ -876,14 +1241,20 @@ TEST(SerializeBasic, ExpressionCommentSerializesCorrectly) {
 }
 
 TEST(SerializeBasic, ExpressionGeoWithinSerializesCorrectly) {
+    boost::intrusive_ptr<ExpressionContextForTest> expCtx(new ExpressionContextForTest());
     Matcher original(
         fromjson(
             "{x: {$geoWithin: {$geometry: "
             "{type: 'Polygon', coordinates: [[[0, 0], [10, 0], [10, 10], [0, 10], [0, 0]]]}}}}"),
+        kSimpleCollator,
+        expCtx,
         ExtensionsCallbackNoop(),
-        kSimpleCollator);
-    Matcher reserialized(
-        serialize(original.getMatchExpression()), ExtensionsCallbackNoop(), kSimpleCollator);
+        MatchExpressionParser::kAllowAllSpecialFeatures);
+    Matcher reserialized(serialize(original.getMatchExpression()),
+                         kSimpleCollator,
+                         expCtx,
+                         ExtensionsCallbackNoop(),
+                         MatchExpressionParser::kAllowAllSpecialFeatures);
     ASSERT_BSONOBJ_EQ(
         *reserialized.getQuery(),
         fromjson("{x: {$geoWithin: {$geometry: {type: 'Polygon', coordinates: [[[0,0], [10,0], "
@@ -898,14 +1269,20 @@ TEST(SerializeBasic, ExpressionGeoWithinSerializesCorrectly) {
 }
 
 TEST(SerializeBasic, ExpressionGeoIntersectsSerializesCorrectly) {
+    boost::intrusive_ptr<ExpressionContextForTest> expCtx(new ExpressionContextForTest());
     Matcher original(
         fromjson(
             "{x: {$geoIntersects: {$geometry: {type: 'Polygon', coordinates: [[[0,0], [5,0], [5, "
             "5], [0, 5], [0, 0]]]}}}}"),
+        kSimpleCollator,
+        expCtx,
         ExtensionsCallbackNoop(),
-        kSimpleCollator);
-    Matcher reserialized(
-        serialize(original.getMatchExpression()), ExtensionsCallbackNoop(), kSimpleCollator);
+        MatchExpressionParser::kAllowAllSpecialFeatures);
+    Matcher reserialized(serialize(original.getMatchExpression()),
+                         kSimpleCollator,
+                         expCtx,
+                         ExtensionsCallbackNoop(),
+                         MatchExpressionParser::kAllowAllSpecialFeatures);
     ASSERT_BSONOBJ_EQ(
         *reserialized.getQuery(),
         fromjson("{x: {$geoIntersects: {$geometry: {type: 'Polygon', coordinates: [[[0,0], [5,0], "
@@ -927,13 +1304,19 @@ TEST(SerializeBasic, ExpressionGeoIntersectsSerializesCorrectly) {
 }
 
 TEST(SerializeBasic, ExpressionNearSerializesCorrectly) {
+    boost::intrusive_ptr<ExpressionContextForTest> expCtx(new ExpressionContextForTest());
     Matcher original(
         fromjson("{x: {$near: {$geometry: {type: 'Point', coordinates: [0, 0]}, $maxDistance: 10, "
                  "$minDistance: 1}}}"),
+        kSimpleCollator,
+        expCtx,
         ExtensionsCallbackNoop(),
-        kSimpleCollator);
-    Matcher reserialized(
-        serialize(original.getMatchExpression()), ExtensionsCallbackNoop(), kSimpleCollator);
+        MatchExpressionParser::kAllowAllSpecialFeatures);
+    Matcher reserialized(serialize(original.getMatchExpression()),
+                         kSimpleCollator,
+                         expCtx,
+                         ExtensionsCallbackNoop(),
+                         MatchExpressionParser::kAllowAllSpecialFeatures);
     ASSERT_BSONOBJ_EQ(
         *reserialized.getQuery(),
         fromjson("{x: {$near: {$geometry: {type: 'Point', coordinates: [0, 0]}, $maxDistance: 10, "
@@ -942,14 +1325,20 @@ TEST(SerializeBasic, ExpressionNearSerializesCorrectly) {
 }
 
 TEST(SerializeBasic, ExpressionNearSphereSerializesCorrectly) {
+    boost::intrusive_ptr<ExpressionContextForTest> expCtx(new ExpressionContextForTest());
     Matcher original(
         fromjson(
             "{x: {$nearSphere: {$geometry: {type: 'Point', coordinates: [0, 0]}, $maxDistance: 10, "
             "$minDistance: 1}}}"),
+        kSimpleCollator,
+        expCtx,
         ExtensionsCallbackNoop(),
-        kSimpleCollator);
-    Matcher reserialized(
-        serialize(original.getMatchExpression()), ExtensionsCallbackNoop(), kSimpleCollator);
+        MatchExpressionParser::kAllowAllSpecialFeatures);
+    Matcher reserialized(serialize(original.getMatchExpression()),
+                         kSimpleCollator,
+                         expCtx,
+                         ExtensionsCallbackNoop(),
+                         MatchExpressionParser::kAllowAllSpecialFeatures);
     ASSERT_BSONOBJ_EQ(
         *reserialized.getQuery(),
         fromjson("{x: {$nearSphere: {$geometry: {type: 'Point', coordinates: [0, 0]}, "
@@ -958,11 +1347,17 @@ TEST(SerializeBasic, ExpressionNearSphereSerializesCorrectly) {
 }
 
 TEST(SerializeBasic, ExpressionTextSerializesCorrectly) {
+    boost::intrusive_ptr<ExpressionContextForTest> expCtx(new ExpressionContextForTest());
     Matcher original(fromjson("{$text: {$search: 'a', $language: 'en', $caseSensitive: true}}"),
+                     kSimpleCollator,
+                     expCtx,
                      ExtensionsCallbackNoop(),
-                     kSimpleCollator);
-    Matcher reserialized(
-        serialize(original.getMatchExpression()), ExtensionsCallbackNoop(), kSimpleCollator);
+                     MatchExpressionParser::kAllowAllSpecialFeatures);
+    Matcher reserialized(serialize(original.getMatchExpression()),
+                         kSimpleCollator,
+                         expCtx,
+                         ExtensionsCallbackNoop(),
+                         MatchExpressionParser::kAllowAllSpecialFeatures);
     ASSERT_BSONOBJ_EQ(*reserialized.getQuery(),
                       fromjson("{$text: {$search: 'a', $language: 'en', $caseSensitive: true, "
                                "$diacriticSensitive: false}}"));
@@ -970,11 +1365,17 @@ TEST(SerializeBasic, ExpressionTextSerializesCorrectly) {
 }
 
 TEST(SerializeBasic, ExpressionTextWithDefaultLanguageSerializesCorrectly) {
+    boost::intrusive_ptr<ExpressionContextForTest> expCtx(new ExpressionContextForTest());
     Matcher original(fromjson("{$text: {$search: 'a', $caseSensitive: false}}"),
+                     kSimpleCollator,
+                     expCtx,
                      ExtensionsCallbackNoop(),
-                     kSimpleCollator);
-    Matcher reserialized(
-        serialize(original.getMatchExpression()), ExtensionsCallbackNoop(), kSimpleCollator);
+                     MatchExpressionParser::kAllowAllSpecialFeatures);
+    Matcher reserialized(serialize(original.getMatchExpression()),
+                         kSimpleCollator,
+                         expCtx,
+                         ExtensionsCallbackNoop(),
+                         MatchExpressionParser::kAllowAllSpecialFeatures);
     ASSERT_BSONOBJ_EQ(*reserialized.getQuery(),
                       fromjson("{$text: {$search: 'a', $language: '', $caseSensitive: false, "
                                "$diacriticSensitive: false}}"));
@@ -982,110 +1383,162 @@ TEST(SerializeBasic, ExpressionTextWithDefaultLanguageSerializesCorrectly) {
 }
 
 TEST(SerializeBasic, ExpressionAlwaysTrueSerializesCorrectly) {
-    Matcher original(
-        fromjson("{$alwaysTrue: 1}"), ExtensionsCallbackDisallowExtensions(), kSimpleCollator);
+    boost::intrusive_ptr<ExpressionContextForTest> expCtx(new ExpressionContextForTest());
+    Matcher original(fromjson("{$alwaysTrue: 1}"),
+                     kSimpleCollator,
+                     expCtx,
+                     ExtensionsCallbackNoop(),
+                     MatchExpressionParser::kAllowAllSpecialFeatures);
     Matcher reserialized(serialize(original.getMatchExpression()),
-                         ExtensionsCallbackDisallowExtensions(),
-                         kSimpleCollator);
+                         kSimpleCollator,
+                         expCtx,
+                         ExtensionsCallbackNoop(),
+                         MatchExpressionParser::kAllowAllSpecialFeatures);
     ASSERT_BSONOBJ_EQ(*reserialized.getQuery(), fromjson("{$alwaysTrue: 1}"));
     ASSERT_BSONOBJ_EQ(*reserialized.getQuery(), serialize(reserialized.getMatchExpression()));
 }
 
 TEST(SerializeBasic, ExpressionAlwaysFalseSerializesCorrectly) {
-    Matcher original(
-        fromjson("{$alwaysFalse: 1}"), ExtensionsCallbackDisallowExtensions(), kSimpleCollator);
+    boost::intrusive_ptr<ExpressionContextForTest> expCtx(new ExpressionContextForTest());
+    Matcher original(fromjson("{$alwaysFalse: 1}"),
+                     kSimpleCollator,
+                     expCtx,
+                     ExtensionsCallbackNoop(),
+                     MatchExpressionParser::kAllowAllSpecialFeatures);
     Matcher reserialized(serialize(original.getMatchExpression()),
-                         ExtensionsCallbackDisallowExtensions(),
-                         kSimpleCollator);
+                         kSimpleCollator,
+                         expCtx,
+                         ExtensionsCallbackNoop(),
+                         MatchExpressionParser::kAllowAllSpecialFeatures);
     ASSERT_BSONOBJ_EQ(*reserialized.getQuery(), fromjson("{$alwaysFalse: 1}"));
     ASSERT_BSONOBJ_EQ(*reserialized.getQuery(), serialize(reserialized.getMatchExpression()));
 }
 
 TEST(SerializeInternalSchema, ExpressionInternalSchemaAllElemMatchFromIndexSerializesCorrectly) {
+    boost::intrusive_ptr<ExpressionContextForTest> expCtx(new ExpressionContextForTest());
     Matcher original(fromjson("{x: {$_internalSchemaAllElemMatchFromIndex: [2, {y: 1}]}}"),
-                     ExtensionsCallbackDisallowExtensions(),
-                     kSimpleCollator);
+                     kSimpleCollator,
+                     expCtx,
+                     ExtensionsCallbackNoop(),
+                     MatchExpressionParser::kAllowAllSpecialFeatures);
     Matcher reserialized(serialize(original.getMatchExpression()),
-                         ExtensionsCallbackDisallowExtensions(),
-                         kSimpleCollator);
+                         kSimpleCollator,
+                         expCtx,
+                         ExtensionsCallbackNoop(),
+                         MatchExpressionParser::kAllowAllSpecialFeatures);
     ASSERT_BSONOBJ_EQ(*reserialized.getQuery(),
                       fromjson("{x: {$_internalSchemaAllElemMatchFromIndex: [2, {y: {$eq: 1}}]}}"));
 }
 
 TEST(SerializeInternalSchema, ExpressionInternalSchemaMinItemsSerializesCorrectly) {
+    boost::intrusive_ptr<ExpressionContextForTest> expCtx(new ExpressionContextForTest());
     Matcher original(fromjson("{x: {$_internalSchemaMinItems: 1}}"),
-                     ExtensionsCallbackDisallowExtensions(),
-                     kSimpleCollator);
+                     kSimpleCollator,
+                     expCtx,
+                     ExtensionsCallbackNoop(),
+                     MatchExpressionParser::kAllowAllSpecialFeatures);
     Matcher reserialized(serialize(original.getMatchExpression()),
-                         ExtensionsCallbackDisallowExtensions(),
-                         kSimpleCollator);
+                         kSimpleCollator,
+                         expCtx,
+                         ExtensionsCallbackNoop(),
+                         MatchExpressionParser::kAllowAllSpecialFeatures);
     ASSERT_BSONOBJ_EQ(*reserialized.getQuery(), fromjson("{x: {$_internalSchemaMinItems: 1}}"));
     ASSERT_BSONOBJ_EQ(*reserialized.getQuery(), serialize(reserialized.getMatchExpression()));
 }
 
 TEST(SerializeInternalSchema, ExpressionInternalSchemaMaxItemsSerializesCorrectly) {
+    boost::intrusive_ptr<ExpressionContextForTest> expCtx(new ExpressionContextForTest());
     Matcher original(fromjson("{x: {$_internalSchemaMaxItems: 1}}"),
-                     ExtensionsCallbackDisallowExtensions(),
-                     kSimpleCollator);
+                     kSimpleCollator,
+                     expCtx,
+                     ExtensionsCallbackNoop(),
+                     MatchExpressionParser::kAllowAllSpecialFeatures);
     Matcher reserialized(serialize(original.getMatchExpression()),
-                         ExtensionsCallbackDisallowExtensions(),
-                         kSimpleCollator);
+                         kSimpleCollator,
+                         expCtx,
+                         ExtensionsCallbackNoop(),
+                         MatchExpressionParser::kAllowAllSpecialFeatures);
     ASSERT_BSONOBJ_EQ(*reserialized.getQuery(), fromjson("{x: {$_internalSchemaMaxItems: 1}}"));
     ASSERT_BSONOBJ_EQ(*reserialized.getQuery(), serialize(reserialized.getMatchExpression()));
 }
 
 TEST(SerializeInternalSchema, ExpressionInternalSchemaUniqueItemsSerializesCorrectly) {
+    boost::intrusive_ptr<ExpressionContextForTest> expCtx(new ExpressionContextForTest());
     Matcher original(fromjson("{x: {$_internalSchemaUniqueItems: true}}"),
-                     ExtensionsCallbackDisallowExtensions(),
-                     kSimpleCollator);
+                     kSimpleCollator,
+                     expCtx,
+                     ExtensionsCallbackNoop(),
+                     MatchExpressionParser::kAllowAllSpecialFeatures);
     Matcher reserialized(serialize(original.getMatchExpression()),
-                         ExtensionsCallbackDisallowExtensions(),
-                         kSimpleCollator);
+                         kSimpleCollator,
+                         expCtx,
+                         ExtensionsCallbackNoop(),
+                         MatchExpressionParser::kAllowAllSpecialFeatures);
     ASSERT_BSONOBJ_EQ(*reserialized.getQuery(),
                       fromjson("{x: {$_internalSchemaUniqueItems: true}}"));
     ASSERT_BSONOBJ_EQ(*reserialized.getQuery(), serialize(reserialized.getMatchExpression()));
 }
 
 TEST(SerializeInternalSchema, ExpressionInternalSchemaObjectMatchSerializesCorrectly) {
+    boost::intrusive_ptr<ExpressionContextForTest> expCtx(new ExpressionContextForTest());
     Matcher original(fromjson("{x: {$_internalSchemaObjectMatch: {y: 1}}}"),
-                     ExtensionsCallbackDisallowExtensions(),
-                     kSimpleCollator);
+                     kSimpleCollator,
+                     expCtx,
+                     ExtensionsCallbackNoop(),
+                     MatchExpressionParser::kAllowAllSpecialFeatures);
     Matcher reserialized(serialize(original.getMatchExpression()),
-                         ExtensionsCallbackDisallowExtensions(),
-                         kSimpleCollator);
+                         kSimpleCollator,
+                         expCtx,
+                         ExtensionsCallbackNoop(),
+                         MatchExpressionParser::kAllowAllSpecialFeatures);
     ASSERT_BSONOBJ_EQ(*reserialized.getQuery(),
                       fromjson("{x: {$_internalSchemaObjectMatch: {y: {$eq: 1}}}}"));
 }
 
 TEST(SerializeInternalSchema, ExpressionInternalSchemaMinLengthSerializesCorrectly) {
+    boost::intrusive_ptr<ExpressionContextForTest> expCtx(new ExpressionContextForTest());
     Matcher original(fromjson("{x: {$_internalSchemaMinLength: 1}}"),
-                     ExtensionsCallbackDisallowExtensions(),
-                     kSimpleCollator);
+                     kSimpleCollator,
+                     expCtx,
+                     ExtensionsCallbackNoop(),
+                     MatchExpressionParser::kAllowAllSpecialFeatures);
     Matcher reserialized(serialize(original.getMatchExpression()),
-                         ExtensionsCallbackDisallowExtensions(),
-                         kSimpleCollator);
+                         kSimpleCollator,
+                         expCtx,
+                         ExtensionsCallbackNoop(),
+                         MatchExpressionParser::kAllowAllSpecialFeatures);
     ASSERT_BSONOBJ_EQ(*reserialized.getQuery(), fromjson("{x: {$_internalSchemaMinLength: 1}}"));
     ASSERT_BSONOBJ_EQ(*reserialized.getQuery(), serialize(reserialized.getMatchExpression()));
 }
 
 TEST(SerializeInternalSchema, ExpressionInternalSchemaMaxLengthSerializesCorrectly) {
+    boost::intrusive_ptr<ExpressionContextForTest> expCtx(new ExpressionContextForTest());
     Matcher original(fromjson("{x: {$_internalSchemaMaxLength: 1}}"),
-                     ExtensionsCallbackDisallowExtensions(),
-                     kSimpleCollator);
+                     kSimpleCollator,
+                     expCtx,
+                     ExtensionsCallbackNoop(),
+                     MatchExpressionParser::kAllowAllSpecialFeatures);
     Matcher reserialized(serialize(original.getMatchExpression()),
-                         ExtensionsCallbackDisallowExtensions(),
-                         kSimpleCollator);
+                         kSimpleCollator,
+                         expCtx,
+                         ExtensionsCallbackNoop(),
+                         MatchExpressionParser::kAllowAllSpecialFeatures);
     ASSERT_BSONOBJ_EQ(*reserialized.getQuery(), fromjson("{x: {$_internalSchemaMaxLength: 1}}"));
     ASSERT_BSONOBJ_EQ(*reserialized.getQuery(), serialize(reserialized.getMatchExpression()));
 }
 
 TEST(SerializeInternalSchema, ExpressionInternalSchemaCondSerializesCorrectly) {
+    boost::intrusive_ptr<ExpressionContextForTest> expCtx(new ExpressionContextForTest());
     Matcher original(fromjson("{$_internalSchemaCond: [{a: 1}, {b: 2}, {c: 3}]}}"),
-                     ExtensionsCallbackDisallowExtensions(),
-                     kSimpleCollator);
+                     kSimpleCollator,
+                     expCtx,
+                     ExtensionsCallbackNoop(),
+                     MatchExpressionParser::kAllowAllSpecialFeatures);
     Matcher reserialized(serialize(original.getMatchExpression()),
-                         ExtensionsCallbackDisallowExtensions(),
-                         kSimpleCollator);
+                         kSimpleCollator,
+                         expCtx,
+                         ExtensionsCallbackNoop(),
+                         MatchExpressionParser::kAllowAllSpecialFeatures);
     BSONObjBuilder builder;
     ASSERT_BSONOBJ_EQ(
         *reserialized.getQuery(),
@@ -1094,34 +1547,52 @@ TEST(SerializeInternalSchema, ExpressionInternalSchemaCondSerializesCorrectly) {
 }
 
 TEST(SerializeInternalSchema, ExpressionInternalSchemaMinPropertiesSerializesCorrectly) {
+    boost::intrusive_ptr<ExpressionContextForTest> expCtx(new ExpressionContextForTest());
     const CollatorInterface* collator = nullptr;
     Matcher original(fromjson("{$_internalSchemaMinProperties: 1}"),
-                     ExtensionsCallbackDisallowExtensions(),
-                     collator);
-    Matcher reserialized(
-        serialize(original.getMatchExpression()), ExtensionsCallbackDisallowExtensions(), collator);
+                     collator,
+                     expCtx,
+                     ExtensionsCallbackNoop(),
+                     MatchExpressionParser::kAllowAllSpecialFeatures);
+    Matcher reserialized(serialize(original.getMatchExpression()),
+                         collator,
+                         expCtx,
+                         ExtensionsCallbackNoop(),
+                         MatchExpressionParser::kAllowAllSpecialFeatures);
     ASSERT_BSONOBJ_EQ(*reserialized.getQuery(), fromjson("{$_internalSchemaMinProperties: 1}"));
     ASSERT_BSONOBJ_EQ(*reserialized.getQuery(), serialize(reserialized.getMatchExpression()));
 }
 
 TEST(SerializeInternalSchema, ExpressionInternalSchemaMaxPropertiesSerializesCorrectly) {
+    boost::intrusive_ptr<ExpressionContextForTest> expCtx(new ExpressionContextForTest());
     const CollatorInterface* collator = nullptr;
     Matcher original(fromjson("{$_internalSchemaMaxProperties: 1}"),
-                     ExtensionsCallbackDisallowExtensions(),
-                     collator);
-    Matcher reserialized(
-        serialize(original.getMatchExpression()), ExtensionsCallbackDisallowExtensions(), collator);
+                     collator,
+                     expCtx,
+                     ExtensionsCallbackNoop(),
+                     MatchExpressionParser::kAllowAllSpecialFeatures);
+    Matcher reserialized(serialize(original.getMatchExpression()),
+                         collator,
+                         expCtx,
+                         ExtensionsCallbackNoop(),
+                         MatchExpressionParser::kAllowAllSpecialFeatures);
     ASSERT_BSONOBJ_EQ(*reserialized.getQuery(), fromjson("{$_internalSchemaMaxProperties: 1}"));
     ASSERT_BSONOBJ_EQ(*reserialized.getQuery(), serialize(reserialized.getMatchExpression()));
 }
 
 TEST(SerializeInternalSchema, ExpressionInternalSchemaFmodSerializesCorrectly) {
+    boost::intrusive_ptr<ExpressionContextForTest> expCtx(new ExpressionContextForTest());
     Matcher original(
         fromjson("{a: {$_internalSchemaFmod: [NumberDecimal('2.3'), NumberDecimal('1.1')]}}"),
+        kSimpleCollator,
+        expCtx,
         ExtensionsCallbackNoop(),
-        kSimpleCollator);
-    Matcher reserialized(
-        serialize(original.getMatchExpression()), ExtensionsCallbackNoop(), kSimpleCollator);
+        MatchExpressionParser::kAllowAllSpecialFeatures);
+    Matcher reserialized(serialize(original.getMatchExpression()),
+                         kSimpleCollator,
+                         expCtx,
+                         ExtensionsCallbackNoop(),
+                         MatchExpressionParser::kAllowAllSpecialFeatures);
 
     ASSERT_BSONOBJ_EQ(
         *reserialized.getQuery(),
@@ -1134,13 +1605,19 @@ TEST(SerializeInternalSchema, ExpressionInternalSchemaFmodSerializesCorrectly) {
 }
 
 TEST(SerializeInternalSchema, ExpressionInternalSchemaMatchArrayIndexSerializesCorrectly) {
+    boost::intrusive_ptr<ExpressionContextForTest> expCtx(new ExpressionContextForTest());
     constexpr CollatorInterface* collator = nullptr;
     Matcher original(fromjson("{a: {$_internalSchemaMatchArrayIndex:"
                               "{index: 2, namePlaceholder: 'i', expression: {i: {$lt: 3}}}}}"),
-                     ExtensionsCallbackDisallowExtensions(),
-                     collator);
-    Matcher reserialized(
-        serialize(original.getMatchExpression()), ExtensionsCallbackDisallowExtensions(), collator);
+                     collator,
+                     expCtx,
+                     ExtensionsCallbackNoop(),
+                     MatchExpressionParser::kAllowAllSpecialFeatures);
+    Matcher reserialized(serialize(original.getMatchExpression()),
+                         collator,
+                         expCtx,
+                         ExtensionsCallbackNoop(),
+                         MatchExpressionParser::kAllowAllSpecialFeatures);
     ASSERT_BSONOBJ_EQ(*reserialized.getQuery(),
                       fromjson("{a: {$_internalSchemaMatchArrayIndex:"
                                "{index: 2, namePlaceholder: 'i', expression: {i: {$lt: 3}}}}}"));
@@ -1154,11 +1631,8 @@ TEST(SerializeInternalSchema, ExpressionInternalSchemaAllowedPropertiesSerialize
             namePlaceholder: 'i',
             patternProperties: [{regex: /b/, expression: {i: {$type: 'number'}}}]
         }})"),
-                     ExtensionsCallbackDisallowExtensions(),
                      kSimpleCollator);
-    Matcher reserialized(serialize(original.getMatchExpression()),
-                         ExtensionsCallbackDisallowExtensions(),
-                         kSimpleCollator);
+    Matcher reserialized(serialize(original.getMatchExpression()), kSimpleCollator);
     ASSERT_BSONOBJ_EQ(*reserialized.getQuery(), fromjson(R"({$_internalSchemaAllowedProperties: {
             properties: ['a'],
             namePlaceholder: 'i',

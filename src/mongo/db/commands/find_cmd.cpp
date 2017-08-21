@@ -151,8 +151,14 @@ public:
         // Finish the parsing step by using the QueryRequest to create a CanonicalQuery.
 
         ExtensionsCallbackReal extensionsCallback(opCtx, &nss);
+        const boost::intrusive_ptr<ExpressionContext> expCtx;
         auto statusWithCQ =
-            CanonicalQuery::canonicalize(opCtx, std::move(qrStatus.getValue()), extensionsCallback);
+            CanonicalQuery::canonicalize(opCtx,
+                                         std::move(qrStatus.getValue()),
+                                         expCtx,
+                                         extensionsCallback,
+                                         MatchExpressionParser::kAllowAllSpecialFeatures &
+                                             ~MatchExpressionParser::AllowedFeatures::kExpr);
         if (!statusWithCQ.isOK()) {
             return statusWithCQ.getStatus();
         }
@@ -257,7 +263,14 @@ public:
 
         // Finish the parsing step by using the QueryRequest to create a CanonicalQuery.
         ExtensionsCallbackReal extensionsCallback(opCtx, &nss);
-        auto statusWithCQ = CanonicalQuery::canonicalize(opCtx, std::move(qr), extensionsCallback);
+        const boost::intrusive_ptr<ExpressionContext> expCtx;
+        auto statusWithCQ =
+            CanonicalQuery::canonicalize(opCtx,
+                                         std::move(qr),
+                                         expCtx,
+                                         extensionsCallback,
+                                         MatchExpressionParser::kAllowAllSpecialFeatures &
+                                             ~MatchExpressionParser::AllowedFeatures::kExpr);
         if (!statusWithCQ.isOK()) {
             return appendCommandStatus(result, statusWithCQ.getStatus());
         }

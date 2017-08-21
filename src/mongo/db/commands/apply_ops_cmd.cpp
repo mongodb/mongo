@@ -43,7 +43,6 @@
 #include "mongo/db/db_raii.h"
 #include "mongo/db/dbdirectclient.h"
 #include "mongo/db/jsobj.h"
-#include "mongo/db/matcher/matcher.h"
 #include "mongo/db/operation_context.h"
 #include "mongo/db/repl/apply_ops.h"
 #include "mongo/db/repl/oplog.h"

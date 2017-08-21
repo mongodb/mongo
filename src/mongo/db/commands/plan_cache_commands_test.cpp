@@ -35,7 +35,6 @@
 #include <algorithm>
 
 #include "mongo/db/json.h"
-#include "mongo/db/matcher/extensions_callback_disallow_extensions.h"
 #include "mongo/db/operation_context_noop.h"
 #include "mongo/db/query/plan_ranker.h"
 #include "mongo/db/query/query_solution.h"
@@ -142,8 +141,7 @@ TEST(PlanCacheCommandsTest, planCacheListQueryShapesOneKey) {
     qr->setSort(fromjson("{a: -1}"));
     qr->setProj(fromjson("{_id: 0}"));
     qr->setCollation(fromjson("{locale: 'mock_reverse_string'}"));
-    auto statusWithCQ = CanonicalQuery::canonicalize(
-        opCtx.get(), std::move(qr), ExtensionsCallbackDisallowExtensions());
+    auto statusWithCQ = CanonicalQuery::canonicalize(opCtx.get(), std::move(qr));
     ASSERT_OK(statusWithCQ.getStatus());
     unique_ptr<CanonicalQuery> cq = std::move(statusWithCQ.getValue());
 
@@ -174,8 +172,7 @@ TEST(PlanCacheCommandsTest, planCacheClearAllShapes) {
     // Create a canonical query
     auto qr = stdx::make_unique<QueryRequest>(nss);
     qr->setFilter(fromjson("{a: 1}"));
-    auto statusWithCQ = CanonicalQuery::canonicalize(
-        opCtx.get(), std::move(qr), ExtensionsCallbackDisallowExtensions());
+    auto statusWithCQ = CanonicalQuery::canonicalize(opCtx.get(), std::move(qr));
     ASSERT_OK(statusWithCQ.getStatus());
     unique_ptr<CanonicalQuery> cq = std::move(statusWithCQ.getValue());
 
@@ -310,14 +307,12 @@ TEST(PlanCacheCommandsTest, planCacheClearOneKey) {
     // Create 2 canonical queries.
     auto qrA = stdx::make_unique<QueryRequest>(nss);
     qrA->setFilter(fromjson("{a: 1}"));
-    auto statusWithCQA = CanonicalQuery::canonicalize(
-        opCtx.get(), std::move(qrA), ExtensionsCallbackDisallowExtensions());
+    auto statusWithCQA = CanonicalQuery::canonicalize(opCtx.get(), std::move(qrA));
     ASSERT_OK(statusWithCQA.getStatus());
     auto qrB = stdx::make_unique<QueryRequest>(nss);
     qrB->setFilter(fromjson("{b: 1}"));
     unique_ptr<CanonicalQuery> cqA = std::move(statusWithCQA.getValue());
-    auto statusWithCQB = CanonicalQuery::canonicalize(
-        opCtx.get(), std::move(qrB), ExtensionsCallbackDisallowExtensions());
+    auto statusWithCQB = CanonicalQuery::canonicalize(opCtx.get(), std::move(qrB));
     ASSERT_OK(statusWithCQB.getStatus());
     unique_ptr<CanonicalQuery> cqB = std::move(statusWithCQB.getValue());
 
@@ -365,15 +360,13 @@ TEST(PlanCacheCommandsTest, planCacheClearOneKeyCollation) {
     // Create 2 canonical queries, one with collation.
     auto qr = stdx::make_unique<QueryRequest>(nss);
     qr->setFilter(fromjson("{a: 'foo'}"));
-    auto statusWithCQ = CanonicalQuery::canonicalize(
-        opCtx.get(), std::move(qr), ExtensionsCallbackDisallowExtensions());
+    auto statusWithCQ = CanonicalQuery::canonicalize(opCtx.get(), std::move(qr));
     ASSERT_OK(statusWithCQ.getStatus());
     unique_ptr<CanonicalQuery> cq = std::move(statusWithCQ.getValue());
     auto qrCollation = stdx::make_unique<QueryRequest>(nss);
     qrCollation->setFilter(fromjson("{a: 'foo'}"));
     qrCollation->setCollation(fromjson("{locale: 'mock_reverse_string'}"));
-    auto statusWithCQCollation = CanonicalQuery::canonicalize(
-        opCtx.get(), std::move(qrCollation), ExtensionsCallbackDisallowExtensions());
+    auto statusWithCQCollation = CanonicalQuery::canonicalize(opCtx.get(), std::move(qrCollation));
     ASSERT_OK(statusWithCQCollation.getStatus());
     unique_ptr<CanonicalQuery> cqCollation = std::move(statusWithCQCollation.getValue());
 
@@ -519,8 +512,7 @@ TEST(PlanCacheCommandsTest, planCacheListPlansOnlyOneSolutionTrue) {
     // Create a canonical query
     auto qr = stdx::make_unique<QueryRequest>(nss);
     qr->setFilter(fromjson("{a: 1}"));
-    auto statusWithCQ = CanonicalQuery::canonicalize(
-        opCtx.get(), std::move(qr), ExtensionsCallbackDisallowExtensions());
+    auto statusWithCQ = CanonicalQuery::canonicalize(opCtx.get(), std::move(qr));
     ASSERT_OK(statusWithCQ.getStatus());
     unique_ptr<CanonicalQuery> cq = std::move(statusWithCQ.getValue());
 
@@ -547,8 +539,7 @@ TEST(PlanCacheCommandsTest, planCacheListPlansOnlyOneSolutionFalse) {
     // Create a canonical query
     auto qr = stdx::make_unique<QueryRequest>(nss);
     qr->setFilter(fromjson("{a: 1}"));
-    auto statusWithCQ = CanonicalQuery::canonicalize(
-        opCtx.get(), std::move(qr), ExtensionsCallbackDisallowExtensions());
+    auto statusWithCQ = CanonicalQuery::canonicalize(opCtx.get(), std::move(qr));
     ASSERT_OK(statusWithCQ.getStatus());
     unique_ptr<CanonicalQuery> cq = std::move(statusWithCQ.getValue());
 
@@ -578,15 +569,13 @@ TEST(PlanCacheCommandsTest, planCacheListPlansCollation) {
     // Create 2 canonical queries, one with collation.
     auto qr = stdx::make_unique<QueryRequest>(nss);
     qr->setFilter(fromjson("{a: 'foo'}"));
-    auto statusWithCQ = CanonicalQuery::canonicalize(
-        opCtx.get(), std::move(qr), ExtensionsCallbackDisallowExtensions());
+    auto statusWithCQ = CanonicalQuery::canonicalize(opCtx.get(), std::move(qr));
     ASSERT_OK(statusWithCQ.getStatus());
     unique_ptr<CanonicalQuery> cq = std::move(statusWithCQ.getValue());
     auto qrCollation = stdx::make_unique<QueryRequest>(nss);
     qrCollation->setFilter(fromjson("{a: 'foo'}"));
     qrCollation->setCollation(fromjson("{locale: 'mock_reverse_string'}"));
-    auto statusWithCQCollation = CanonicalQuery::canonicalize(
-        opCtx.get(), std::move(qrCollation), ExtensionsCallbackDisallowExtensions());
+    auto statusWithCQCollation = CanonicalQuery::canonicalize(opCtx.get(), std::move(qrCollation));
     ASSERT_OK(statusWithCQCollation.getStatus());
     unique_ptr<CanonicalQuery> cqCollation = std::move(statusWithCQCollation.getValue());
 

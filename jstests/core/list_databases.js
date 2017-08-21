@@ -61,4 +61,20 @@
         db.adminCommand({listDatabases: 1, nameOnly: true, filter: {name: /zap/}}));
     assert.eq(1, cmdRes.databases.length, tojson(cmdRes));
     verifyNameOnly(cmdRes);
+
+    // No extensions are allowed in filters.
+    assert.commandFailed(db.adminCommand({listDatabases: 1, filter: {$text: {$search: "str"}}}));
+    assert.commandFailed(db.adminCommand({
+        listDatabases: 1,
+        filter: {
+            $where: function() {
+                return true;
+            }
+        }
+    }));
+    assert.commandFailed(db.adminCommand({
+        listDatabases: 1,
+        filter: {a: {$nearSphere: {$geometry: {type: "Point", coordinates: [0, 0]}}}}
+    }));
+    assert.commandFailed(db.adminCommand({listDatabases: 1, filter: {a: {$expr: 5}}}));
 }());

@@ -35,7 +35,6 @@
 
 #include "mongo/db/json.h"
 #include "mongo/db/matcher/expression_parser.h"
-#include "mongo/db/matcher/extensions_callback_disallow_extensions.h"
 #include "mongo/db/query/collation/collator_interface_mock.h"
 #include "mongo/db/query/expression_index.h"
 #include "mongo/unittest/unittest.h"
@@ -60,8 +59,7 @@ double NaN = numeric_limits<double>::quiet_NaN();
  */
 MatchExpression* parseMatchExpression(const BSONObj& obj) {
     const CollatorInterface* collator = nullptr;
-    StatusWithMatchExpression status =
-        MatchExpressionParser::parse(obj, ExtensionsCallbackDisallowExtensions(), collator);
+    StatusWithMatchExpression status = MatchExpressionParser::parse(obj, collator);
     ASSERT_TRUE(status.isOK());
     MatchExpression* expr(status.getValue().release());
     return expr;

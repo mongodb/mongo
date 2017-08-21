@@ -63,6 +63,62 @@ TEST(PullNodeTest, InitWithBadTopLevelOperatorFails) {
     ASSERT_EQUALS(ErrorCodes::BadValue, status);
 }
 
+TEST(PullNodeTest, InitWithTextFails) {
+    auto update = fromjson("{$pull: {a: {$text: {$search: 'str'}}}}");
+    const CollatorInterface* collator = nullptr;
+    PullNode node;
+    auto status = node.init(update["$pull"]["a"], collator);
+    ASSERT_NOT_OK(status);
+    ASSERT_EQUALS(ErrorCodes::BadValue, status);
+}
+
+TEST(PullNodeTest, InitWithWhereFails) {
+    auto update = fromjson("{$pull: {a: {$where: 'this.a == this.b'}}}");
+    const CollatorInterface* collator = nullptr;
+    PullNode node;
+    auto status = node.init(update["$pull"]["a"], collator);
+    ASSERT_NOT_OK(status);
+    ASSERT_EQUALS(ErrorCodes::BadValue, status);
+}
+
+TEST(PullNodeTest, InitWithGeoNearElemFails) {
+    auto update =
+        fromjson("{$pull: {a: {$nearSphere: {$geometry: {type: 'Point', coordinates: [0, 0]}}}}}");
+    const CollatorInterface* collator = nullptr;
+    PullNode node;
+    auto status = node.init(update["$pull"]["a"], collator);
+    ASSERT_NOT_OK(status);
+    ASSERT_EQUALS(ErrorCodes::BadValue, status);
+}
+
+TEST(PullNodeTest, InitWithGeoNearObjectFails) {
+    auto update = fromjson(
+        "{$pull: {a: {b: {$nearSphere: {$geometry: {type: 'Point', coordinates: [0, 0]}}}}}}");
+    const CollatorInterface* collator = nullptr;
+    PullNode node;
+    auto status = node.init(update["$pull"]["a"], collator);
+    ASSERT_NOT_OK(status);
+    ASSERT_EQUALS(ErrorCodes::BadValue, status);
+}
+
+TEST(PullNodeTest, InitWithExprElemFails) {
+    auto update = fromjson("{$pull: {a: {$expr: 5}}}");
+    const CollatorInterface* collator = nullptr;
+    PullNode node;
+    auto status = node.init(update["$pull"]["a"], collator);
+    ASSERT_NOT_OK(status);
+    ASSERT_EQUALS(ErrorCodes::BadValue, status);
+}
+
+TEST(PullNodeTest, InitWithExprObjectFails) {
+    auto update = fromjson("{$pull: {a: {b: {$expr: 5}}}}");
+    const CollatorInterface* collator = nullptr;
+    PullNode node;
+    auto status = node.init(update["$pull"]["a"], collator);
+    ASSERT_NOT_OK(status);
+    ASSERT_EQUALS(ErrorCodes::BadValue, status);
+}
+
 TEST_F(PullNodeTest, TargetNotFound) {
     auto update = fromjson("{$pull : {a: {$lt: 1}}}");
     const CollatorInterface* collator = nullptr;
@@ -352,6 +408,62 @@ TEST_F(PullNodeTest, ApplyStringMatchAfterSetCollator) {
     CollatorInterfaceMock mockCollator(CollatorInterfaceMock::MockType::kAlwaysEqual);
     node.setCollator(&mockCollator);
     mutablebson::Document doc2(fromjson("{ a : ['a', 'b', 'c', 'd'] }"));
+    resetApplyParams();
+    setPathTaken("a");
+    result = node.apply(getApplyParams(doc2.root()["a"]));
+    ASSERT_FALSE(result.noop);
+    ASSERT_FALSE(result.indexesAffected);
+    ASSERT_EQUALS(fromjson("{a: []}"), doc2);
+    ASSERT_FALSE(doc2.isInPlaceModeEnabled());
+}
+
+TEST_F(PullNodeTest, ApplyElementMatchAfterSetCollator) {
+    auto update = fromjson("{$pull : {a: {$gte: 'c'}}}");
+    PullNode node;
+    const CollatorInterface* collator = nullptr;
+    ASSERT_OK(node.init(update["$pull"]["a"], collator));
+
+    // First without a collator.
+    mutablebson::Document doc(fromjson("{ a : ['a', 'b', 'c', 'd'] }"));
+    setPathTaken("a");
+    auto result = node.apply(getApplyParams(doc.root()["a"]));
+    ASSERT_FALSE(result.noop);
+    ASSERT_FALSE(result.indexesAffected);
+    ASSERT_EQUALS(fromjson("{a: ['a', 'b']}"), doc);
+    ASSERT_FALSE(doc.isInPlaceModeEnabled());
+
+    // Now with a collator.
+    CollatorInterfaceMock mockCollator(CollatorInterfaceMock::MockType::kAlwaysEqual);
+    node.setCollator(&mockCollator);
+    mutablebson::Document doc2(fromjson("{ a : ['a', 'b', 'c', 'd'] }"));
+    resetApplyParams();
+    setPathTaken("a");
+    result = node.apply(getApplyParams(doc2.root()["a"]));
+    ASSERT_FALSE(result.noop);
+    ASSERT_FALSE(result.indexesAffected);
+    ASSERT_EQUALS(fromjson("{a: []}"), doc2);
+    ASSERT_FALSE(doc2.isInPlaceModeEnabled());
+}
+
+TEST_F(PullNodeTest, ApplyObjectMatchAfterSetCollator) {
+    auto update = fromjson("{$pull : {a: {b: 'y'}}}");
+    PullNode node;
+    const CollatorInterface* collator = nullptr;
+    ASSERT_OK(node.init(update["$pull"]["a"], collator));
+
+    // First without a collator.
+    mutablebson::Document doc(fromjson("{a : [{b: 'w'}, {b: 'x'}, {b: 'y'}, {b: 'z'}]}"));
+    setPathTaken("a");
+    auto result = node.apply(getApplyParams(doc.root()["a"]));
+    ASSERT_FALSE(result.noop);
+    ASSERT_FALSE(result.indexesAffected);
+    ASSERT_EQUALS(fromjson("{a : [{b: 'w'}, {b: 'x'}, {b: 'z'}]}"), doc);
+    ASSERT_FALSE(doc.isInPlaceModeEnabled());
+
+    // Now with a collator.
+    CollatorInterfaceMock mockCollator(CollatorInterfaceMock::MockType::kAlwaysEqual);
+    node.setCollator(&mockCollator);
+    mutablebson::Document doc2(fromjson("{a : [{b: 'w'}, {b: 'x'}, {b: 'y'}, {b: 'z'}]}"));
     resetApplyParams();
     setPathTaken("a");
     result = node.apply(getApplyParams(doc2.root()["a"]));

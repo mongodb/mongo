@@ -74,7 +74,6 @@
 #include "mongo/db/json.h"
 #include "mongo/db/keypattern.h"
 #include "mongo/db/lasterror.h"
-#include "mongo/db/matcher/extensions_callback_disallow_extensions.h"
 #include "mongo/db/namespace_string.h"
 #include "mongo/db/op_observer.h"
 #include "mongo/db/ops/insert.h"
@@ -696,8 +695,7 @@ public:
             qr->setFilter(query);
             qr->setSort(sort);
 
-            auto statusWithCQ = CanonicalQuery::canonicalize(
-                opCtx, std::move(qr), ExtensionsCallbackDisallowExtensions());
+            auto statusWithCQ = CanonicalQuery::canonicalize(opCtx, std::move(qr));
             if (!statusWithCQ.isOK()) {
                 uasserted(17240, "Can't canonicalize query " + query.toString());
                 return false;

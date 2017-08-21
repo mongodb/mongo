@@ -44,7 +44,6 @@
 #include "mongo/db/exec/working_set_common.h"
 #include "mongo/db/json.h"
 #include "mongo/db/matcher/expression_parser.h"
-#include "mongo/db/matcher/extensions_callback_disallow_extensions.h"
 #include "mongo/db/namespace_string.h"
 #include "mongo/db/pipeline/document_source_cursor.h"
 #include "mongo/db/pipeline/expression_context_for_test.h"
@@ -105,8 +104,7 @@ public:
         // Canonicalize the query.
         auto qr = stdx::make_unique<QueryRequest>(nss);
         qr->setFilter(filterObj);
-        auto statusWithCQ = CanonicalQuery::canonicalize(
-            &_opCtx, std::move(qr), ExtensionsCallbackDisallowExtensions());
+        auto statusWithCQ = CanonicalQuery::canonicalize(&_opCtx, std::move(qr));
         verify(statusWithCQ.isOK());
         unique_ptr<CanonicalQuery> cq = std::move(statusWithCQ.getValue());
         verify(NULL != cq.get());
@@ -157,8 +155,7 @@ public:
         unique_ptr<PlanStage> root(new FetchStage(&_opCtx, ws.get(), ix, NULL, coll));
 
         auto qr = stdx::make_unique<QueryRequest>(nss);
-        auto statusWithCQ = CanonicalQuery::canonicalize(
-            &_opCtx, std::move(qr), ExtensionsCallbackDisallowExtensions());
+        auto statusWithCQ = CanonicalQuery::canonicalize(&_opCtx, std::move(qr));
         verify(statusWithCQ.isOK());
         unique_ptr<CanonicalQuery> cq = std::move(statusWithCQ.getValue());
         verify(NULL != cq.get());

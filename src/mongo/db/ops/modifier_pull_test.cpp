@@ -40,17 +40,10 @@
 #include "mongo/db/update/log_builder.h"
 #include "mongo/unittest/unittest.h"
 
+namespace mongo {
+
 namespace {
 
-using mongo::BSONObj;
-using mongo::CollatorInterface;
-using mongo::CollatorInterfaceMock;
-using mongo::LogBuilder;
-using mongo::ModifierInterface;
-using mongo::ModifierPull;
-using mongo::Status;
-using mongo::StringData;
-using mongo::fromjson;
 using mongo::mutablebson::Document;
 using mongo::mutablebson::Element;
 
@@ -89,6 +82,62 @@ private:
     BSONObj _modObj;
     ModifierPull _mod;
 };
+
+TEST(SimpleMod, InitWithTextFails) {
+    auto update = fromjson("{$pull: {a: {$text: {$search: 'str'}}}}");
+    const CollatorInterface* collator = nullptr;
+    ModifierPull node;
+    auto status = node.init(update["$pull"]["a"], ModifierInterface::Options::normal(collator));
+    ASSERT_NOT_OK(status);
+    ASSERT_EQUALS(ErrorCodes::BadValue, status);
+}
+
+TEST(SimpleMod, InitWithWhereFails) {
+    auto update = fromjson("{$pull: {a: {$where: 'this.a == this.b'}}}");
+    const CollatorInterface* collator = nullptr;
+    ModifierPull node;
+    auto status = node.init(update["$pull"]["a"], ModifierInterface::Options::normal(collator));
+    ASSERT_NOT_OK(status);
+    ASSERT_EQUALS(ErrorCodes::BadValue, status);
+}
+
+TEST(SimpleMod, InitWithGeoNearElemFails) {
+    auto update =
+        fromjson("{$pull: {a: {$nearSphere: {$geometry: {type: 'Point', coordinates: [0, 0]}}}}}");
+    const CollatorInterface* collator = nullptr;
+    ModifierPull node;
+    auto status = node.init(update["$pull"]["a"], ModifierInterface::Options::normal(collator));
+    ASSERT_NOT_OK(status);
+    ASSERT_EQUALS(ErrorCodes::BadValue, status);
+}
+
+TEST(SimpleMod, InitWithGeoNearObjectFails) {
+    auto update = fromjson(
+        "{$pull: {a: {b: {$nearSphere: {$geometry: {type: 'Point', coordinates: [0, 0]}}}}}}");
+    const CollatorInterface* collator = nullptr;
+    ModifierPull node;
+    auto status = node.init(update["$pull"]["a"], ModifierInterface::Options::normal(collator));
+    ASSERT_NOT_OK(status);
+    ASSERT_EQUALS(ErrorCodes::BadValue, status);
+}
+
+TEST(SimpleMod, InitWithExprElemFails) {
+    auto update = fromjson("{$pull: {a: {$expr: 5}}}");
+    const CollatorInterface* collator = nullptr;
+    ModifierPull node;
+    auto status = node.init(update["$pull"]["a"], ModifierInterface::Options::normal(collator));
+    ASSERT_NOT_OK(status);
+    ASSERT_EQUALS(ErrorCodes::BadValue, status);
+}
+
+TEST(SimpleMod, InitWithExprObjectFails) {
+    auto update = fromjson("{$pull: {a: {b: {$expr: 5}}}}");
+    const CollatorInterface* collator = nullptr;
+    ModifierPull node;
+    auto status = node.init(update["$pull"]["a"], ModifierInterface::Options::normal(collator));
+    ASSERT_NOT_OK(status);
+    ASSERT_EQUALS(ErrorCodes::BadValue, status);
+}
 
 TEST(SimpleMod, PrepareOKTargetNotFound) {
     Document doc(fromjson("{}"));
@@ -712,3 +761,4 @@ TEST(MatchingRegressions, SERVER_3988) {
 }
 
 }  // namespace
+}  // namespace mongo

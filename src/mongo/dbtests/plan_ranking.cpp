@@ -43,7 +43,6 @@
 #include "mongo/db/exec/multi_plan.h"
 #include "mongo/db/index/index_descriptor.h"
 #include "mongo/db/json.h"
-#include "mongo/db/matcher/extensions_callback_disallow_extensions.h"
 #include "mongo/db/namespace_string.h"
 #include "mongo/db/query/get_executor.h"
 #include "mongo/db/query/query_knobs.h"
@@ -201,8 +200,7 @@ public:
         {
             auto qr = stdx::make_unique<QueryRequest>(nss);
             qr->setFilter(BSON("a" << 100 << "b" << 1));
-            auto statusWithCQ = CanonicalQuery::canonicalize(
-                opCtx(), std::move(qr), ExtensionsCallbackDisallowExtensions());
+            auto statusWithCQ = CanonicalQuery::canonicalize(opCtx(), std::move(qr));
             verify(statusWithCQ.isOK());
             cq = std::move(statusWithCQ.getValue());
             ASSERT(cq.get());
@@ -221,8 +219,7 @@ public:
         {
             auto qr = stdx::make_unique<QueryRequest>(nss);
             qr->setFilter(BSON("a" << 100 << "b" << 1));
-            auto statusWithCQ = CanonicalQuery::canonicalize(
-                opCtx(), std::move(qr), ExtensionsCallbackDisallowExtensions());
+            auto statusWithCQ = CanonicalQuery::canonicalize(opCtx(), std::move(qr));
             verify(statusWithCQ.isOK());
             cq = std::move(statusWithCQ.getValue());
         }
@@ -257,8 +254,7 @@ public:
         // Run the query {a:1, b:{$gt:1}.
         auto qr = stdx::make_unique<QueryRequest>(nss);
         qr->setFilter(BSON("a" << 1 << "b" << BSON("$gt" << 1)));
-        auto statusWithCQ = CanonicalQuery::canonicalize(
-            opCtx(), std::move(qr), ExtensionsCallbackDisallowExtensions());
+        auto statusWithCQ = CanonicalQuery::canonicalize(opCtx(), std::move(qr));
         verify(statusWithCQ.isOK());
         unique_ptr<CanonicalQuery> cq = std::move(statusWithCQ.getValue());
         ASSERT(NULL != cq.get());
@@ -299,8 +295,7 @@ public:
         auto qr = stdx::make_unique<QueryRequest>(nss);
         qr->setFilter(BSON("a" << 27));
         qr->setProj(BSON("_id" << 0 << "a" << 1 << "b" << 1));
-        auto statusWithCQ = CanonicalQuery::canonicalize(
-            opCtx(), std::move(qr), ExtensionsCallbackDisallowExtensions());
+        auto statusWithCQ = CanonicalQuery::canonicalize(opCtx(), std::move(qr));
         ASSERT_OK(statusWithCQ.getStatus());
         unique_ptr<CanonicalQuery> cq = std::move(statusWithCQ.getValue());
         ASSERT(NULL != cq.get());
@@ -334,8 +329,7 @@ public:
         // There is no data that matches this query but we don't know that until EOF.
         auto qr = stdx::make_unique<QueryRequest>(nss);
         qr->setFilter(BSON("a" << 1 << "b" << 1 << "c" << 99));
-        auto statusWithCQ = CanonicalQuery::canonicalize(
-            opCtx(), std::move(qr), ExtensionsCallbackDisallowExtensions());
+        auto statusWithCQ = CanonicalQuery::canonicalize(opCtx(), std::move(qr));
         ASSERT_OK(statusWithCQ.getStatus());
         unique_ptr<CanonicalQuery> cq = std::move(statusWithCQ.getValue());
         ASSERT(NULL != cq.get());
@@ -374,8 +368,7 @@ public:
         qr->setFilter(BSON("a" << 2));
         qr->setProj(BSON("_id" << 0 << "a" << 1 << "b" << 1));
 
-        auto statusWithCQ = CanonicalQuery::canonicalize(
-            opCtx(), std::move(qr), ExtensionsCallbackDisallowExtensions());
+        auto statusWithCQ = CanonicalQuery::canonicalize(opCtx(), std::move(qr));
         ASSERT_OK(statusWithCQ.getStatus());
         unique_ptr<CanonicalQuery> cq = std::move(statusWithCQ.getValue());
         ASSERT(NULL != cq.get());
@@ -408,8 +401,7 @@ public:
         // Run the query {a:N+1, b:1}.  (No such document.)
         auto qr = stdx::make_unique<QueryRequest>(nss);
         qr->setFilter(BSON("a" << N + 1 << "b" << 1));
-        auto statusWithCQ = CanonicalQuery::canonicalize(
-            opCtx(), std::move(qr), ExtensionsCallbackDisallowExtensions());
+        auto statusWithCQ = CanonicalQuery::canonicalize(opCtx(), std::move(qr));
         verify(statusWithCQ.isOK());
         unique_ptr<CanonicalQuery> cq = std::move(statusWithCQ.getValue());
         ASSERT(NULL != cq.get());
@@ -445,8 +437,7 @@ public:
         // Run the query {a:N+1, b:1}.  (No such document.)
         auto qr = stdx::make_unique<QueryRequest>(nss);
         qr->setFilter(BSON("a" << BSON("$gte" << N + 1) << "b" << 1));
-        auto statusWithCQ = CanonicalQuery::canonicalize(
-            opCtx(), std::move(qr), ExtensionsCallbackDisallowExtensions());
+        auto statusWithCQ = CanonicalQuery::canonicalize(opCtx(), std::move(qr));
         verify(statusWithCQ.isOK());
         unique_ptr<CanonicalQuery> cq = std::move(statusWithCQ.getValue());
         ASSERT(NULL != cq.get());
@@ -476,8 +467,7 @@ public:
         auto qr = stdx::make_unique<QueryRequest>(nss);
         qr->setFilter(BSON("_id" << BSON("$gte" << 20 << "$lte" << 200)));
         qr->setSort(BSON("c" << 1));
-        auto statusWithCQ = CanonicalQuery::canonicalize(
-            opCtx(), std::move(qr), ExtensionsCallbackDisallowExtensions());
+        auto statusWithCQ = CanonicalQuery::canonicalize(opCtx(), std::move(qr));
         ASSERT_OK(statusWithCQ.getStatus());
         unique_ptr<CanonicalQuery> cq = std::move(statusWithCQ.getValue());
 
@@ -506,8 +496,7 @@ public:
         // Look for A Space Odyssey.
         auto qr = stdx::make_unique<QueryRequest>(nss);
         qr->setFilter(BSON("foo" << 2001));
-        auto statusWithCQ = CanonicalQuery::canonicalize(
-            opCtx(), std::move(qr), ExtensionsCallbackDisallowExtensions());
+        auto statusWithCQ = CanonicalQuery::canonicalize(opCtx(), std::move(qr));
         verify(statusWithCQ.isOK());
         unique_ptr<CanonicalQuery> cq = std::move(statusWithCQ.getValue());
         ASSERT(NULL != cq.get());
@@ -541,8 +530,7 @@ public:
         auto qr = stdx::make_unique<QueryRequest>(nss);
         qr->setFilter(BSON("a" << 1));
         qr->setSort(BSON("d" << 1));
-        auto statusWithCQ = CanonicalQuery::canonicalize(
-            opCtx(), std::move(qr), ExtensionsCallbackDisallowExtensions());
+        auto statusWithCQ = CanonicalQuery::canonicalize(opCtx(), std::move(qr));
         ASSERT_OK(statusWithCQ.getStatus());
         unique_ptr<CanonicalQuery> cq = std::move(statusWithCQ.getValue());
         ASSERT(NULL != cq.get());
@@ -579,8 +567,7 @@ public:
         // than an index scan on 'a'.
         auto qr = stdx::make_unique<QueryRequest>(nss);
         qr->setFilter(fromjson("{a: 1, b: 1, c: {$gte: 5000}}"));
-        auto statusWithCQ = CanonicalQuery::canonicalize(
-            opCtx(), std::move(qr), ExtensionsCallbackDisallowExtensions());
+        auto statusWithCQ = CanonicalQuery::canonicalize(opCtx(), std::move(qr));
         ASSERT_OK(statusWithCQ.getStatus());
         unique_ptr<CanonicalQuery> cq = std::move(statusWithCQ.getValue());
         ASSERT(NULL != cq.get());
@@ -612,8 +599,7 @@ public:
 
         auto qr = stdx::make_unique<QueryRequest>(nss);
         qr->setFilter(fromjson("{a: 9, b: {$ne: 10}, c: 9}"));
-        auto statusWithCQ = CanonicalQuery::canonicalize(
-            opCtx(), std::move(qr), ExtensionsCallbackDisallowExtensions());
+        auto statusWithCQ = CanonicalQuery::canonicalize(opCtx(), std::move(qr));
         ASSERT_OK(statusWithCQ.getStatus());
         unique_ptr<CanonicalQuery> cq = std::move(statusWithCQ.getValue());
         ASSERT(NULL != cq.get());

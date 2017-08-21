@@ -43,7 +43,6 @@
 #include "mongo/db/db_raii.h"
 #include "mongo/db/dbdirectclient.h"
 #include "mongo/db/index/index_descriptor.h"
-#include "mongo/db/matcher/extensions_callback_disallow_extensions.h"
 #include "mongo/db/matcher/matcher.h"
 #include "mongo/db/op_observer.h"
 #include "mongo/db/operation_context.h"
@@ -269,10 +268,9 @@ Status _checkPrecondition(OperationContext* opCtx,
         }
         const CollatorInterface* collator = collection->getDefaultCollator();
 
-        // Apply-ops would never have a $where/$text matcher. Using the "DisallowExtensions"
-        // callback ensures that parsing will throw an error if $where or $text are found.
-        Matcher matcher(
-            preCondition["res"].Obj(), ExtensionsCallbackDisallowExtensions(), collator);
+        // applyOps does not allow any extensions, such as $text, $where, $geoNear, $near,
+        // $nearSphere, or $expr.
+        Matcher matcher(preCondition["res"].Obj(), collator);
         if (!matcher.matches(realres)) {
             result->append("got", realres);
             result->append("whatFailed", preCondition);

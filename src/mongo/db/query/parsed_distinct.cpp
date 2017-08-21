@@ -201,7 +201,13 @@ StatusWith<ParsedDistinct> ParsedDistinct::parse(OperationContext* opCtx,
 
     qr->setExplain(isExplain);
 
-    auto cq = CanonicalQuery::canonicalize(opCtx, std::move(qr), extensionsCallback);
+    const boost::intrusive_ptr<ExpressionContext> expCtx;
+    auto cq = CanonicalQuery::canonicalize(opCtx,
+                                           std::move(qr),
+                                           expCtx,
+                                           extensionsCallback,
+                                           MatchExpressionParser::kAllowAllSpecialFeatures &
+                                               ~MatchExpressionParser::AllowedFeatures::kExpr);
     if (!cq.isOK()) {
         return cq.getStatus();
     }

@@ -83,4 +83,23 @@
         ]
     },
                         []);
+
+    // No extensions are allowed in filters.
+    assert.throws(function() {
+        mydb.getCollectionInfos({$text: {$search: "str"}});
+    });
+    assert.throws(function() {
+        mydb.getCollectionInfos({
+            $where: function() {
+                return true;
+            }
+        });
+    });
+    assert.throws(function() {
+        mydb.getCollectionInfos(
+            {a: {$nearSphere: {$geometry: {type: "Point", coordinates: [0, 0]}}}});
+    });
+    assert.throws(function() {
+        mydb.getCollectionInfos({a: {$expr: 5}});
+    });
 }());

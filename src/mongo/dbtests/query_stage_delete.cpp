@@ -41,7 +41,6 @@
 #include "mongo/db/exec/collection_scan.h"
 #include "mongo/db/exec/delete.h"
 #include "mongo/db/exec/queued_data_stage.h"
-#include "mongo/db/matcher/extensions_callback_disallow_extensions.h"
 #include "mongo/db/query/canonical_query.h"
 #include "mongo/db/service_context.h"
 #include "mongo/dbtests/dbtests.h"
@@ -106,8 +105,7 @@ public:
     unique_ptr<CanonicalQuery> canonicalize(const BSONObj& query) {
         auto qr = stdx::make_unique<QueryRequest>(nss);
         qr->setFilter(query);
-        auto statusWithCQ = CanonicalQuery::canonicalize(
-            &_opCtx, std::move(qr), ExtensionsCallbackDisallowExtensions());
+        auto statusWithCQ = CanonicalQuery::canonicalize(&_opCtx, std::move(qr));
         ASSERT_OK(statusWithCQ.getStatus());
         return std::move(statusWithCQ.getValue());
     }

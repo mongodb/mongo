@@ -140,7 +140,7 @@ PlanStage* buildStages(OperationContext* opCtx,
                 return nullptr;
             }
 
-            ProjectionStageParams params(ExtensionsCallbackReal(opCtx, &collection->ns()));
+            ProjectionStageParams params;
             params.projObj = pn->projection;
             params.collator = cq.getCollator();
 
@@ -390,7 +390,7 @@ bool StageBuilder::build(OperationContext* opCtx,
     // queries that disallow extensions, can be properly executed. If the query does not have
     // $text/$where context (and $text/$where are allowed), then no attempt should be made to
     // execute the query.
-    invariant(!cq.hasNoopExtensions());
+    invariant(!cq.canHaveNoopMatchNodes());
 
     if (nullptr == wsIn || nullptr == rootOut) {
         return false;

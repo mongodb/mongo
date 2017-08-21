@@ -33,6 +33,7 @@
 #include "mongo/db/json.h"
 #include "mongo/db/matcher/extensions_callback_noop.h"
 #include "mongo/db/namespace_string.h"
+#include "mongo/db/pipeline/expression_context_for_test.h"
 #include "mongo/db/query/canonical_query.h"
 #include "mongo/s/chunk_manager.h"
 #include "mongo/s/shard_key_pattern.h"
@@ -56,8 +57,14 @@ protected:
         const NamespaceString nss("test.foo");
         auto qr = stdx::make_unique<QueryRequest>(nss);
         qr->setFilter(queryObj);
-        auto statusWithCQ = CanonicalQuery::canonicalize(
-            operationContext(), std::move(qr), ExtensionsCallbackNoop());
+        boost::intrusive_ptr<ExpressionContextForTest> expCtx(new ExpressionContextForTest());
+        auto statusWithCQ =
+            CanonicalQuery::canonicalize(operationContext(),
+                                         std::move(qr),
+                                         expCtx,
+                                         ExtensionsCallbackNoop(),
+                                         MatchExpressionParser::kAllowAllSpecialFeatures);
+
         ASSERT_OK(statusWithCQ.getStatus());
         return std::move(statusWithCQ.getValue());
     }

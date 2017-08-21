@@ -35,7 +35,6 @@
 #include "mongo/db/exec/working_set_computed_data.h"
 #include "mongo/db/json.h"
 #include "mongo/db/matcher/expression_parser.h"
-#include "mongo/db/matcher/extensions_callback_disallow_extensions.h"
 #include "mongo/db/query/collation/collator_interface_mock.h"
 #include "mongo/unittest/unittest.h"
 #include <memory>
@@ -51,8 +50,7 @@ using std::unique_ptr;
  */
 unique_ptr<MatchExpression> parseMatchExpression(const BSONObj& obj) {
     const CollatorInterface* collator = nullptr;
-    StatusWithMatchExpression status =
-        MatchExpressionParser::parse(obj, ExtensionsCallbackDisallowExtensions(), collator);
+    StatusWithMatchExpression status = MatchExpressionParser::parse(obj, collator);
     ASSERT_TRUE(status.isOK());
     return std::move(status.getValue());
 }
@@ -85,8 +83,7 @@ void testTransform(const char* specStr,
     BSONObj spec = fromjson(specStr);
     BSONObj query = fromjson(queryStr);
     unique_ptr<MatchExpression> queryExpression = parseMatchExpression(query);
-    ProjectionExec exec(
-        spec, queryExpression.get(), collator, ExtensionsCallbackDisallowExtensions());
+    ProjectionExec exec(spec, queryExpression.get(), collator);
 
     // Create working set member.
     WorkingSetMember wsm;
@@ -169,8 +166,7 @@ BSONObj transformMetaSortKeyCovered(const BSONObj& sortKey,
     wsm->addComputed(new SortKeyComputedData(sortKey));
     ws.transitionToRecordIdAndIdx(wsid);
 
-    ProjectionExec projExec(
-        fromjson(projSpec), nullptr, nullptr, ExtensionsCallbackDisallowExtensions());
+    ProjectionExec projExec(fromjson(projSpec), nullptr, nullptr);
     ASSERT_OK(projExec.transform(wsm));
 
     return wsm->obj.value();
@@ -183,7 +179,7 @@ BSONObj transformCovered(BSONObj projSpec, const IndexKeyDatum& ikd) {
     wsm->keyData.push_back(ikd);
     ws.transitionToRecordIdAndIdx(wsid);
 
-    ProjectionExec projExec(projSpec, nullptr, nullptr, ExtensionsCallbackDisallowExtensions());
+    ProjectionExec projExec(projSpec, nullptr, nullptr);
     ASSERT_OK(projExec.transform(wsm));
 
     return wsm->obj.value();

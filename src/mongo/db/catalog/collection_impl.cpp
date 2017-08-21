@@ -56,7 +56,6 @@
 #include "mongo/db/index/index_access_method.h"
 #include "mongo/db/keypattern.h"
 #include "mongo/db/matcher/expression_parser.h"
-#include "mongo/db/matcher/extensions_callback_disallow_extensions.h"
 #include "mongo/db/op_observer.h"
 #include "mongo/db/operation_context.h"
 #include "mongo/db/ops/update_request.h"
@@ -107,28 +106,6 @@ MONGO_INITIALIZER(InitializeParseValidationActionImpl)(InitializerContext* const
 
 // Used below to fail during inserts.
 MONGO_FP_DECLARE(failCollectionInserts);
-
-const auto bannedExpressionsInValidators = std::set<StringData>{
-    "$geoNear", "$near", "$nearSphere", "$text", "$where",
-};
-
-Status checkValidatorForBannedExpressions(const BSONObj& validator) {
-    for (auto field : validator) {
-        const auto name = field.fieldNameStringData();
-        if (name[0] == '$' && bannedExpressionsInValidators.count(name)) {
-            return {ErrorCodes::InvalidOptions,
-                    str::stream() << name << " is not allowed in collection validators"};
-        }
-
-        if (field.type() == Object || field.type() == Array) {
-            auto status = checkValidatorForBannedExpressions(field.Obj());
-            if (!status.isOK())
-                return status;
-        }
-    }
-
-    return Status::OK();
-}
 
 // Uses the collator factory to convert the BSON representation of a collator to a
 // CollatorInterface. Returns null if the BSONObj is empty. We expect the stored collation to be
@@ -305,14 +282,7 @@ StatusWithMatchExpression CollectionImpl::parseValidator(const BSONObj& validato
                               << " database"};
     }
 
-    {
-        auto status = checkValidatorForBannedExpressions(validator);
-        if (!status.isOK())
-            return status;
-    }
-
-    auto statusWithMatcher = MatchExpressionParser::parse(
-        validator, ExtensionsCallbackDisallowExtensions(), _collator.get());
+    auto statusWithMatcher = MatchExpressionParser::parse(validator, _collator.get());
     if (!statusWithMatcher.isOK())
         return statusWithMatcher.getStatus();
 

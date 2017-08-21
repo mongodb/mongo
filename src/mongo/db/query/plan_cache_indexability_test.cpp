@@ -30,7 +30,6 @@
 
 #include "mongo/db/json.h"
 #include "mongo/db/matcher/expression_parser.h"
-#include "mongo/db/matcher/extensions_callback_disallow_extensions.h"
 #include "mongo/db/query/collation/collator_interface_mock.h"
 #include "mongo/db/query/index_entry.h"
 #include "mongo/db/query/plan_cache_indexability.h"
@@ -41,8 +40,7 @@ namespace {
 
 std::unique_ptr<MatchExpression> parseMatchExpression(const BSONObj& obj,
                                                       const CollatorInterface* collator = nullptr) {
-    StatusWithMatchExpression status =
-        MatchExpressionParser::parse(obj, ExtensionsCallbackDisallowExtensions(), collator);
+    StatusWithMatchExpression status = MatchExpressionParser::parse(obj, collator);
     if (!status.isOK()) {
         FAIL(str::stream() << "failed to parse query: " << obj.toString() << ". Reason: "
                            << status.getStatus().toString());

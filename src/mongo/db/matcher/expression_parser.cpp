@@ -102,7 +102,8 @@ StatusWithMatchExpression MatchExpressionParser::_parseComparison(
     ComparisonMatchExpression* cmp,
     const BSONElement& e,
     const CollatorInterface* collator,
-    const boost::intrusive_ptr<ExpressionContext>& expCtx) {
+    const boost::intrusive_ptr<ExpressionContext>& expCtx,
+    AllowedFeatureSet allowedFeatures) {
     std::unique_ptr<ComparisonMatchExpression> temp(cmp);
 
     // Non-equality comparison match expressions cannot have
@@ -114,8 +115,11 @@ StatusWithMatchExpression MatchExpressionParser::_parseComparison(
     }
 
     if (_isAggExpression(e, expCtx)) {
-        auto expr = _parseAggExpression(e, expCtx);
-        auto s = temp->init(name, expr);
+        auto expr = _parseAggExpression(e, expCtx, allowedFeatures);
+        if (!expr.isOK()) {
+            return expr.getStatus();
+        }
+        auto s = temp->init(name, expr.getValue());
         if (!s.isOK()) {
             return s;
         }
@@ -138,12 +142,14 @@ StatusWithMatchExpression MatchExpressionParser::_parseSubField(
     const BSONElement& e,
     const CollatorInterface* collator,
     const boost::intrusive_ptr<ExpressionContext>& expCtx,
+    AllowedFeatureSet allowedFeatures,
     bool topLevel) {
     if (mongoutils::str::equals("$eq", e.fieldName()))
-        return _parseComparison(name, new EqualityMatchExpression(), e, collator, expCtx);
+        return _parseComparison(
+            name, new EqualityMatchExpression(), e, collator, expCtx, allowedFeatures);
 
     if (mongoutils::str::equals("$not", e.fieldName())) {
-        return _parseNot(name, e, collator, expCtx, topLevel);
+        return _parseNot(name, e, collator, expCtx, allowedFeatures, topLevel);
     }
 
     auto parseExpMatchType = MatchExpressionParser::parsePathAcceptingKeyword(e);
@@ -159,21 +165,25 @@ StatusWithMatchExpression MatchExpressionParser::_parseSubField(
 
     switch (*parseExpMatchType) {
         case PathAcceptingKeyword::LESS_THAN:
-            return _parseComparison(name, new LTMatchExpression(), e, collator, expCtx);
+            return _parseComparison(
+                name, new LTMatchExpression(), e, collator, expCtx, allowedFeatures);
         case PathAcceptingKeyword::LESS_THAN_OR_EQUAL:
-            return _parseComparison(name, new LTEMatchExpression(), e, collator, expCtx);
+            return _parseComparison(
+                name, new LTEMatchExpression(), e, collator, expCtx, allowedFeatures);
         case PathAcceptingKeyword::GREATER_THAN:
-            return _parseComparison(name, new GTMatchExpression(), e, collator, expCtx);
+            return _parseComparison(
+                name, new GTMatchExpression(), e, collator, expCtx, allowedFeatures);
         case PathAcceptingKeyword::GREATER_THAN_OR_EQUAL:
-            return _parseComparison(name, new GTEMatchExpression(), e, collator, expCtx);
+            return _parseComparison(
+                name, new GTEMatchExpression(), e, collator, expCtx, allowedFeatures);
         case PathAcceptingKeyword::NOT_EQUAL: {
             if (RegEx == e.type()) {
                 // Just because $ne can be rewritten as the negation of an
                 // equality does not mean that $ne of a regex is allowed. See SERVER-1705.
                 return {Status(ErrorCodes::BadValue, "Can't have regex as arg to $ne.")};
             }
-            StatusWithMatchExpression s =
-                _parseComparison(name, new EqualityMatchExpression(), e, collator, expCtx);
+            StatusWithMatchExpression s = _parseComparison(
+                name, new EqualityMatchExpression(), e, collator, expCtx, allowedFeatures);
             if (!s.isOK())
                 return s;
             std::unique_ptr<NotMatchExpression> n = stdx::make_unique<NotMatchExpression>();
@@ -183,7 +193,8 @@ StatusWithMatchExpression MatchExpressionParser::_parseSubField(
             return {std::move(n)};
         }
         case PathAcceptingKeyword::EQUALITY:
-            return _parseComparison(name, new EqualityMatchExpression(), e, collator, expCtx);
+            return _parseComparison(
+                name, new EqualityMatchExpression(), e, collator, expCtx, allowedFeatures);
 
         case PathAcceptingKeyword::IN_EXPR: {
             if (e.type() != Array)
@@ -291,14 +302,14 @@ StatusWithMatchExpression MatchExpressionParser::_parseSubField(
         }
 
         case PathAcceptingKeyword::ELEM_MATCH:
-            return _parseElemMatch(name, e, collator, expCtx, topLevel);
+            return _parseElemMatch(name, e, collator, expCtx, allowedFeatures, topLevel);
 
         case PathAcceptingKeyword::ALL:
-            return _parseAll(name, e, collator, expCtx, topLevel);
+            return _parseAll(name, e, collator, expCtx, allowedFeatures, topLevel);
 
         case PathAcceptingKeyword::WITHIN:
         case PathAcceptingKeyword::GEO_INTERSECTS:
-            return _parseGeo(name, *parseExpMatchType, context);
+            return _parseGeo(name, *parseExpMatchType, context, allowedFeatures);
 
         case PathAcceptingKeyword::GEO_NEAR:
             return {Status(ErrorCodes::BadValue,
@@ -341,7 +352,7 @@ StatusWithMatchExpression MatchExpressionParser::_parseSubField(
                               str::stream() << "$_internalSchemaObjectMatch must be an object");
             }
 
-            auto parsedSubObjExpr = _parse(e.Obj(), collator, expCtx, topLevel);
+            auto parsedSubObjExpr = _parse(e.Obj(), collator, expCtx, allowedFeatures, topLevel);
             if (!parsedSubObjExpr.isOK()) {
                 return parsedSubObjExpr;
             }
@@ -427,7 +438,7 @@ StatusWithMatchExpression MatchExpressionParser::_parseSubField(
                                   << "must be an object");
             }
             StatusWithMatchExpression query =
-                _parse(second.embeddedObject(), collator, expCtx, topLevel);
+                _parse(second.embeddedObject(), collator, expCtx, allowedFeatures, topLevel);
             if (!query.isOK()) {
                 return query.getStatus();
             }
@@ -452,6 +463,7 @@ StatusWithMatchExpression MatchExpressionParser::_parse(
     const BSONObj& obj,
     const CollatorInterface* collator,
     const boost::intrusive_ptr<ExpressionContext>& expCtx,
+    AllowedFeatureSet allowedFeatures,
     bool topLevel) {
     std::unique_ptr<AndMatchExpression> root = stdx::make_unique<AndMatchExpression>();
 
@@ -466,7 +478,8 @@ StatusWithMatchExpression MatchExpressionParser::_parse(
                 if (e.type() != Array)
                     return {Status(ErrorCodes::BadValue, "$or must be an array")};
                 std::unique_ptr<OrMatchExpression> temp = stdx::make_unique<OrMatchExpression>();
-                Status s = _parseTreeList(e.Obj(), temp.get(), collator, expCtx, childIsTopLevel);
+                Status s = _parseTreeList(
+                    e.Obj(), temp.get(), collator, expCtx, allowedFeatures, childIsTopLevel);
                 if (!s.isOK())
                     return s;
                 root->add(temp.release());
@@ -474,7 +487,8 @@ StatusWithMatchExpression MatchExpressionParser::_parse(
                 if (e.type() != Array)
                     return {Status(ErrorCodes::BadValue, "$and must be an array")};
                 std::unique_ptr<AndMatchExpression> temp = stdx::make_unique<AndMatchExpression>();
-                Status s = _parseTreeList(e.Obj(), temp.get(), collator, expCtx, childIsTopLevel);
+                Status s = _parseTreeList(
+                    e.Obj(), temp.get(), collator, expCtx, allowedFeatures, childIsTopLevel);
                 if (!s.isOK())
                     return s;
                 root->add(temp.release());
@@ -482,7 +496,8 @@ StatusWithMatchExpression MatchExpressionParser::_parse(
                 if (e.type() != Array)
                     return {Status(ErrorCodes::BadValue, "$nor must be an array")};
                 std::unique_ptr<NorMatchExpression> temp = stdx::make_unique<NorMatchExpression>();
-                Status s = _parseTreeList(e.Obj(), temp.get(), collator, expCtx, childIsTopLevel);
+                Status s = _parseTreeList(
+                    e.Obj(), temp.get(), collator, expCtx, allowedFeatures, childIsTopLevel);
                 if (!s.isOK())
                     return s;
                 root->add(temp.release());
@@ -494,11 +509,19 @@ StatusWithMatchExpression MatchExpressionParser::_parse(
                 // Don't do anything with the expression; CanonicalQuery::init() will look through
                 // the BSONObj again for a $atomic/$isolated.
             } else if (mongoutils::str::equals("where", rest)) {
+                if ((allowedFeatures & AllowedFeatures::kJavascript) == 0u) {
+                    return {Status(ErrorCodes::BadValue, "$where is not allowed in this context")};
+                }
+
                 StatusWithMatchExpression s = _extensionsCallback->parseWhere(e);
                 if (!s.isOK())
                     return s;
                 root->add(s.getValue().release());
             } else if (mongoutils::str::equals("text", rest)) {
+                if ((allowedFeatures & AllowedFeatures::kText) == 0u) {
+                    return {Status(ErrorCodes::BadValue, "$text is not allowed in this context")};
+                }
+
                 StatusWithMatchExpression s = _extensionsCallback->parseText(e);
                 if (!s.isOK()) {
                     return s;
@@ -526,7 +549,11 @@ StatusWithMatchExpression MatchExpressionParser::_parse(
             } else if (mongoutils::str::equals("_internalSchemaCond", rest)) {
                 auto condExpr =
                     _parseInternalSchemaFixedArityArgument<InternalSchemaCondMatchExpression>(
-                        InternalSchemaCondMatchExpression::kName, e, collator, expCtx);
+                        InternalSchemaCondMatchExpression::kName,
+                        e,
+                        collator,
+                        expCtx,
+                        allowedFeatures);
                 if (!condExpr.isOK()) {
                     return condExpr.getStatus();
                 }
@@ -537,8 +564,8 @@ StatusWithMatchExpression MatchExpressionParser::_parse(
                     return {
                         Status(ErrorCodes::TypeMismatch, "$_internalSchemaXor must be an array")};
                 auto xorExpr = stdx::make_unique<InternalSchemaXorMatchExpression>();
-                Status s =
-                    _parseTreeList(e.Obj(), xorExpr.get(), collator, expCtx, childIsTopLevel);
+                Status s = _parseTreeList(
+                    e.Obj(), xorExpr.get(), collator, expCtx, allowedFeatures, childIsTopLevel);
                 if (!s.isOK())
                     return s;
                 root->add(xorExpr.release());
@@ -587,8 +614,13 @@ StatusWithMatchExpression MatchExpressionParser::_parse(
         }
 
         if (_isExpressionDocument(e, false, expCtx)) {
-            Status s =
-                _parseSub(e.fieldName(), e.Obj(), root.get(), collator, expCtx, childIsTopLevel);
+            Status s = _parseSub(e.fieldName(),
+                                 e.Obj(),
+                                 root.get(),
+                                 collator,
+                                 expCtx,
+                                 allowedFeatures,
+                                 childIsTopLevel);
             if (!s.isOK())
                 return s;
             continue;
@@ -602,8 +634,8 @@ StatusWithMatchExpression MatchExpressionParser::_parse(
             continue;
         }
 
-        auto eq =
-            _parseComparison(e.fieldName(), new EqualityMatchExpression(), e, collator, expCtx);
+        auto eq = _parseComparison(
+            e.fieldName(), new EqualityMatchExpression(), e, collator, expCtx, allowedFeatures);
         if (!eq.isOK())
             return eq;
 
@@ -624,6 +656,7 @@ Status MatchExpressionParser::_parseSub(const char* name,
                                         AndMatchExpression* root,
                                         const CollatorInterface* collator,
                                         const boost::intrusive_ptr<ExpressionContext>& expCtx,
+                                        AllowedFeatureSet allowedFeatures,
                                         bool topLevel) {
     // The one exception to {field : {fully contained argument} } is, of course, geo.  Example:
     // sub == { field : {$near[Sphere]: [0,0], $maxDistance: 1000, $minDistance: 10 } }
@@ -638,17 +671,10 @@ Status MatchExpressionParser::_parseSub(const char* name,
     if (geoIt.more()) {
         BSONElement firstElt = geoIt.next();
         if (firstElt.isABSONObj()) {
-            const char* fieldName = firstElt.fieldName();
-            // TODO: Having these $fields here isn't ideal but we don't want to pull in anything
-            // from db/geo at this point, since it may not actually be linked in...
-            if (mongoutils::str::equals(fieldName, "$near") ||
-                mongoutils::str::equals(fieldName, "$nearSphere") ||
-                mongoutils::str::equals(fieldName, "$geoNear")) {
+            if (MatchExpressionParser::parsePathAcceptingKeyword(firstElt) ==
+                PathAcceptingKeyword::GEO_NEAR) {
                 StatusWithMatchExpression s =
-                    _parseGeo(name,
-                              *MatchExpressionParser::parsePathAcceptingKeyword(
-                                  firstElt, PathAcceptingKeyword::EQUALITY),
-                              sub);
+                    _parseGeo(name, PathAcceptingKeyword::GEO_NEAR, sub, allowedFeatures);
                 if (s.isOK()) {
                     root->add(s.getValue().release());
                 }
@@ -664,8 +690,8 @@ Status MatchExpressionParser::_parseSub(const char* name,
         BSONElement deep = j.next();
 
         const bool childIsTopLevel = false;
-        StatusWithMatchExpression s =
-            _parseSubField(sub, root, name, deep, collator, expCtx, childIsTopLevel);
+        StatusWithMatchExpression s = _parseSubField(
+            sub, root, name, deep, collator, expCtx, allowedFeatures, childIsTopLevel);
         if (!s.isOK())
             return s.getStatus();
 
@@ -885,6 +911,7 @@ StatusWithMatchExpression MatchExpressionParser::_parseElemMatch(
     const BSONElement& e,
     const CollatorInterface* collator,
     const boost::intrusive_ptr<ExpressionContext>& expCtx,
+    AllowedFeatureSet allowedFeatures,
     bool topLevel) {
     if (e.type() != Object)
         return {Status(ErrorCodes::BadValue, "$elemMatch needs an Object")};
@@ -919,7 +946,7 @@ StatusWithMatchExpression MatchExpressionParser::_parseElemMatch(
         // value case
 
         AndMatchExpression theAnd;
-        Status s = _parseSub("", obj, &theAnd, collator, expCtx, topLevel);
+        Status s = _parseSub("", obj, &theAnd, collator, expCtx, allowedFeatures, topLevel);
         if (!s.isOK())
             return s;
 
@@ -943,7 +970,7 @@ StatusWithMatchExpression MatchExpressionParser::_parseElemMatch(
 
     // object case
 
-    StatusWithMatchExpression subRaw = _parse(obj, collator, expCtx, topLevel);
+    StatusWithMatchExpression subRaw = _parse(obj, collator, expCtx, allowedFeatures, topLevel);
     if (!subRaw.isOK())
         return subRaw;
     std::unique_ptr<MatchExpression> sub = std::move(subRaw.getValue());
@@ -968,6 +995,7 @@ StatusWithMatchExpression MatchExpressionParser::_parseAll(
     const BSONElement& e,
     const CollatorInterface* collator,
     const boost::intrusive_ptr<ExpressionContext>& expCtx,
+    AllowedFeatureSet allowedFeatures,
     bool topLevel) {
     if (e.type() != Array)
         return {Status(ErrorCodes::BadValue, "$all needs an array")};
@@ -997,8 +1025,12 @@ StatusWithMatchExpression MatchExpressionParser::_parseAll(
             }
 
             const bool childIsTopLevel = false;
-            StatusWithMatchExpression inner = _parseElemMatch(
-                name, hopefullyElemMatchObj.firstElement(), collator, expCtx, childIsTopLevel);
+            StatusWithMatchExpression inner = _parseElemMatch(name,
+                                                              hopefullyElemMatchObj.firstElement(),
+                                                              collator,
+                                                              expCtx,
+                                                              allowedFeatures,
+                                                              childIsTopLevel);
             if (!inner.isOK())
                 return inner;
             myAnd->add(inner.getValue().release());
@@ -1249,7 +1281,8 @@ StatusWithMatchExpression MatchExpressionParser::_parseInternalSchemaFixedArityA
     StringData name,
     const BSONElement& input,
     const CollatorInterface* collator,
-    const boost::intrusive_ptr<ExpressionContext>& expCtx) {
+    const boost::intrusive_ptr<ExpressionContext>& expCtx,
+    AllowedFeatureSet allowedFeatures) {
     constexpr auto arity = T::arity();
     if (input.type() != BSONType::Array) {
         return {ErrorCodes::FailedToParse,
@@ -1278,7 +1311,7 @@ StatusWithMatchExpression MatchExpressionParser::_parseInternalSchemaFixedArityA
         }
 
         const bool isTopLevel = false;
-        auto subexpr = _parse(elem.embeddedObject(), collator, expCtx, isTopLevel);
+        auto subexpr = _parse(elem.embeddedObject(), collator, expCtx, allowedFeatures, isTopLevel);
         if (!subexpr.isOK()) {
             return subexpr.getStatus();
         }
@@ -1586,7 +1619,8 @@ StatusWithMatchExpression MatchExpressionParser::_parseInternalSchemaAllowedProp
 
 StatusWithMatchExpression MatchExpressionParser::_parseGeo(const char* name,
                                                            PathAcceptingKeyword type,
-                                                           const BSONObj& section) {
+                                                           const BSONObj& section,
+                                                           AllowedFeatureSet allowedFeatures) {
     if (PathAcceptingKeyword::WITHIN == type || PathAcceptingKeyword::GEO_INTERSECTS == type) {
         std::unique_ptr<GeoExpression> gq = stdx::make_unique<GeoExpression>(name);
         Status parseStatus = gq->parseFrom(section);
@@ -1602,6 +1636,12 @@ StatusWithMatchExpression MatchExpressionParser::_parseGeo(const char* name,
         return {std::move(e)};
     } else {
         invariant(PathAcceptingKeyword::GEO_NEAR == type);
+
+        if ((allowedFeatures & AllowedFeatures::kGeoNear) == 0u) {
+            return {Status(ErrorCodes::BadValue,
+                           "$geoNear, $near, and $nearSphere are not allowed in this context")};
+        }
+
         std::unique_ptr<GeoNearExpression> nq = stdx::make_unique<GeoNearExpression>(name);
         Status s = nq->parseFrom(section);
         if (!s.isOK()) {
@@ -1633,9 +1673,15 @@ bool MatchExpressionParser::_isAggExpression(
     return obj.firstElementFieldName() == kAggExpression;
 }
 
-boost::intrusive_ptr<Expression> MatchExpressionParser::_parseAggExpression(
-    BSONElement elem, const boost::intrusive_ptr<ExpressionContext>& expCtx) {
+StatusWith<boost::intrusive_ptr<Expression>> MatchExpressionParser::_parseAggExpression(
+    BSONElement elem,
+    const boost::intrusive_ptr<ExpressionContext>& expCtx,
+    AllowedFeatureSet allowedFeatures) {
     invariant(expCtx);
+
+    if ((allowedFeatures & AllowedFeatures::kExpr) == 0u) {
+        return {Status(ErrorCodes::BadValue, "$expr is not allowed in this context")};
+    }
 
     auto expr = Expression::parseOperand(
         expCtx, elem.embeddedObject().firstElement(), expCtx->variablesParseState);
