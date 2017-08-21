@@ -249,7 +249,7 @@ void Listener::initAndListen() {
 
     SOCKET maxfd = 0;  // needed for select()
     for (unsigned i = 0; i < _socks.size(); i++) {
-        if (::listen(_socks[i], SOMAXCONN) != 0) {
+        if (::listen(_socks[i], serverGlobalParams.listenBacklog) != 0) {
             error() << "listen(): listen() failed " << errnoWithDescription();
             return;
         }
@@ -428,7 +428,7 @@ void Listener::initAndListen() {
     }
 
     for (unsigned i = 0; i < _socks.size(); i++) {
-        if (::listen(_socks[i], SOMAXCONN) != 0) {
+        if (::listen(_socks[i], serverGlobalParams.listenBacklog) != 0) {
             error() << "listen(): listen() failed " << errnoWithDescription();
             return;
         }

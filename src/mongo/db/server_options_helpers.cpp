@@ -199,6 +199,11 @@ Status addGeneralServerOptions(moe::OptionSection* options) {
     options->addOptionChaining(
         "net.ipv6", "ipv6", moe::Switch, "enable IPv6 support (disabled by default)");
 
+    options
+        ->addOptionChaining(
+            "net.listenBacklog", "listenBacklog", moe::Int, "set socket listen backlog size")
+        .setDefault(moe::Value(SOMAXCONN));
+
     options->addOptionChaining(
         "net.maxIncomingConnections", "maxConns", moe::Int, maxConnInfoBuilder.str().c_str());
 
@@ -805,6 +810,10 @@ Status storeServerOptions(const moe::Environment& params) {
     if (params.count("net.ipv6") && params["net.ipv6"].as<bool>() == true) {
         serverGlobalParams.enableIPv6 = true;
         enableIPv6();
+    }
+
+    if (params.count("net.listenBacklog")) {
+        serverGlobalParams.listenBacklog = params["net.listenBacklog"].as<int>();
     }
 
     if (params.count("net.transportLayer")) {

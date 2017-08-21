@@ -53,6 +53,8 @@ struct ServerGlobalParams {
     bool enableIPv6 = false;
     bool rest = false;  // --rest
 
+    int listenBacklog = 0;  // --listenBacklog, real default is SOMAXCONN
+
     bool indexBuildRetry = true;  // --noIndexBuildRetry
 
     AtomicBool quiet{false};  // --quiet

@@ -262,7 +262,7 @@ Status TransportLayerASIO::start() {
     }
 
     for (auto& acceptor : _acceptors) {
-        acceptor.listen();
+        acceptor.listen(serverGlobalParams.listenBacklog);
         _acceptConnection(acceptor);
     }
 
