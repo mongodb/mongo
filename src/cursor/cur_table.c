@@ -971,8 +971,7 @@ __wt_curtable_open(WT_SESSION_IMPL *session,
 	ctable = NULL;
 
 	tablename = uri;
-	if (!WT_PREFIX_SKIP(tablename, "table:"))
-		return (__wt_unexpected_object_type(session, uri, "table:"));
+	WT_PREFIX_SKIP_REQUIRED(session, tablename, "table:");
 	columns = strchr(tablename, '(');
 	if (columns == NULL)
 		size = strlen(tablename);

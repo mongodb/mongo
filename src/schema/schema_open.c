@@ -21,7 +21,7 @@ __wt_schema_colgroup_name(WT_SESSION_IMPL *session,
 	const char *tablename;
 
 	tablename = table->name;
-	(void)WT_PREFIX_SKIP(tablename, "table:");
+	WT_PREFIX_SKIP_REQUIRED(session, tablename, "table:");
 
 	return ((table->ncolgroups == 0) ?
 	    __wt_buf_fmt(session, buf, "colgroup:%s", tablename) :
@@ -285,7 +285,7 @@ __schema_open_index(WT_SESSION_IMPL *session,
 
 	/* Build a search key. */
 	tablename = table->name;
-	(void)WT_PREFIX_SKIP(tablename, "table:");
+	WT_PREFIX_SKIP_REQUIRED(session, tablename, "table:");
 	WT_ERR(__wt_scr_alloc(session, 512, &tmp));
 	WT_ERR(__wt_buf_fmt(session, tmp, "index:%s:", tablename));
 

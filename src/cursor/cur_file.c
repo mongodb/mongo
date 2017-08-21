@@ -629,23 +629,22 @@ __wt_curfile_open(WT_SESSION_IMPL *session, const char *uri,
 	if (bulk)
 		LF_SET(WT_BTREE_BULK | WT_DHANDLE_EXCLUSIVE);
 
+	WT_ASSERT(session, WT_PREFIX_MATCH(uri, "file:"));
+
 	/* Get the handle and lock it while the cursor is using it. */
-	if (WT_PREFIX_MATCH(uri, "file:")) {
-		/*
-		 * If we are opening exclusive and don't want a bulk cursor
-		 * open to fail with EBUSY due to a database-wide checkpoint,
-		 * get the handle while holding the checkpoint lock.
-		 */
-		if (LF_ISSET(WT_DHANDLE_EXCLUSIVE) && checkpoint_wait)
-			WT_WITH_CHECKPOINT_LOCK(session,
-			    ret = __wt_session_get_btree_ckpt(
-			    session, uri, cfg, flags));
-		else
-			ret = __wt_session_get_btree_ckpt(
-			    session, uri, cfg, flags);
-		WT_RET(ret);
-	} else
-		WT_RET(__wt_bad_object_type(session, uri));
+	/*
+	 * If we are opening exclusive and don't want a bulk cursor
+	 * open to fail with EBUSY due to a database-wide checkpoint,
+	 * get the handle while holding the checkpoint lock.
+	 */
+	if (LF_ISSET(WT_DHANDLE_EXCLUSIVE) && checkpoint_wait)
+		WT_WITH_CHECKPOINT_LOCK(session,
+		    ret = __wt_session_get_btree_ckpt(
+		    session, uri, cfg, flags));
+	else
+		ret = __wt_session_get_btree_ckpt(
+		    session, uri, cfg, flags);
+	WT_RET(ret);
 
 	WT_ERR(__curfile_create(session, owner, cfg, bulk, bitmap, cursorp));
 

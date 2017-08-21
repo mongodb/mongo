@@ -214,6 +214,12 @@
 #define	WT_PREFIX_SKIP(str, pfx)					\
 	(WT_PREFIX_MATCH(str, pfx) ? ((str) += strlen(pfx), 1) : 0)
 
+/* Assert that a string matches a prefix, and move past it. */
+#define	WT_PREFIX_SKIP_REQUIRED(session, str, pfx) do {			\
+	WT_ASSERT(session, WT_PREFIX_MATCH(str, pfx));			\
+	(str) += strlen(pfx);						\
+} while (0)
+
 /*
  * Check if a variable string equals a constant string.  Inline the common
  * case for WiredTiger of a single byte string.  This is required because not

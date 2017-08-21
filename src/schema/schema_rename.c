@@ -24,11 +24,9 @@ __rename_file(
 	newvalue = oldvalue = NULL;
 
 	filename = uri;
-	if (!WT_PREFIX_SKIP(filename, "file:"))
-		return (__wt_unexpected_object_type(session, uri, "file:"));
+	WT_PREFIX_SKIP_REQUIRED(session, filename, "file:");
 	newfile = newuri;
-	if (!WT_PREFIX_SKIP(newfile, "file:"))
-		return (__wt_unexpected_object_type(session, newuri, "file:"));
+	WT_PREFIX_SKIP_REQUIRED(session, newfile, "file:");
 
 	WT_RET(__wt_schema_backup_check(session, filename));
 	WT_RET(__wt_schema_backup_check(session, newfile));
@@ -98,7 +96,7 @@ __rename_tree(WT_SESSION_IMPL *session,
 	value = NULL;
 
 	newname = newuri;
-	(void)WT_PREFIX_SKIP(newname, "table:");
+	WT_PREFIX_SKIP_REQUIRED(session, newname, "table:");
 
 	/*
 	 * Create the new data source URI and update the schema value.

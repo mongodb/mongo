@@ -25,8 +25,7 @@ __drop_file(
 	remove_files = cval.val != 0;
 
 	filename = uri;
-	if (!WT_PREFIX_SKIP(filename, "file:"))
-		return (__wt_unexpected_object_type(session, uri, "file:"));
+	WT_PREFIX_SKIP_REQUIRED(session, filename, "file:");
 
 	WT_RET(__wt_schema_backup_check(session, filename));
 	/* Close all btree handles associated with this file. */
@@ -111,7 +110,7 @@ __drop_table(WT_SESSION_IMPL *session, const char *uri, const char *cfg[])
 	u_int i;
 
 	name = uri;
-	(void)WT_PREFIX_SKIP(name, "table:");
+	WT_PREFIX_SKIP_REQUIRED(session, name, "table:");
 
 	table = NULL;
 	WT_ERR(__wt_schema_get_table(

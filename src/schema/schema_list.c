@@ -55,7 +55,7 @@ __schema_find_table(WT_SESSION_IMPL *session,
 restart:
 	TAILQ_FOREACH(table, &session->tablehash[bucket], hashq) {
 		tablename = table->name;
-		(void)WT_PREFIX_SKIP(tablename, "table:");
+		WT_PREFIX_SKIP_REQUIRED(session, tablename, "table:");
 		if (WT_STRING_MATCH(tablename, name, namelen)) {
 			/*
 			 * Ignore stale tables.
