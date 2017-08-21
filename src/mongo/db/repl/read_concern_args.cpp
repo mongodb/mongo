@@ -57,6 +57,9 @@ const string ReadConcernArgs::kAfterOpTimeFieldName("afterOpTime");
 const string ReadConcernArgs::kAfterClusterTimeFieldName("afterClusterTime");
 const string ReadConcernArgs::kLevelFieldName("level");
 
+const OperationContext::Decoration<ReadConcernArgs> ReadConcernArgs::get =
+    OperationContext::declareDecoration<ReadConcernArgs>();
+
 ReadConcernArgs::ReadConcernArgs() = default;
 
 ReadConcernArgs::ReadConcernArgs(boost::optional<ReadConcernLevel> level)
