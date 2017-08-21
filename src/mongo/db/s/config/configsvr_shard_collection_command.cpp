@@ -743,7 +743,7 @@ public:
         boost::optional<DistLockManager::ScopedDistLock> backwardsCompatibleLock(
             uassertStatusOK(Grid::get(opCtx)->catalogClient()->getDistLockManager()->lock(
                 opCtx,
-                dbname + "-movePrimary",
+                nss.db() + "-movePrimary",
                 "shardCollection",
                 DistLockManager::kDefaultLockTimeout)));
 
@@ -752,7 +752,7 @@ public:
         // the collection UUIDs inconsistent between the moved collection and the config server.
         boost::optional<DistLockManager::ScopedDistLock> scopedDatabaseDistLock(
             uassertStatusOK(Grid::get(opCtx)->catalogClient()->getDistLockManager()->lock(
-                opCtx, dbname, "shardCollection", DistLockManager::kDefaultLockTimeout)));
+                opCtx, nss.db(), "shardCollection", DistLockManager::kDefaultLockTimeout)));
 
         // Lock the collection to prevent older mongos instances from trying to shard or drop it
         // concurrently.
