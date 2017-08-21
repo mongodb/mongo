@@ -90,14 +90,18 @@ public:
     void serverNegotiate(const BSONObj& input, BSONObjBuilder* output);
 
     /*
-     * Returns a new Message compressed with the compressor pointed to by _preferred.
+     * Returns a new Message containing the compressed contentx of 'msg'. If compressorId is null,
+     * then it selects the first negotiated compressor. Otherwise, it uses the compressor with the
+     * given identifier. It is intended that this value echo back a value returned as the out
+     * parameter value for compressorId from a call to decompressMessage.
      *
      * If _negotiated is empty (meaning compression was not negotiated or is not supported), then
      * it will return a ref-count bumped copy of the input message.
      *
      * If an error occurs in the compressor, it will return a Status error.
      */
-    StatusWith<Message> compressMessage(const Message& msg);
+    StatusWith<Message> compressMessage(const Message& msg,
+                                        const MessageCompressorId* compressorId = nullptr);
 
     /*
      * Returns a new Message containing the decompressed copy of the input message.
@@ -111,8 +115,13 @@ public:
      * pointer to the global MessageCompressorRegistry and can lookup any message's compressor
      * by ID number through that registry. As long as the compressor has been enabled process-wide,
      * it can decompress any message without negotiation.
+     *
+     * If the 'compressorId' parameter is non-null, it will be populated with the compressor
+     * used. If 'decompressMessage' returns succesfully, then that value can be fed back into
+     * compressMessage, ensuring that the same compressor is used on both sides of a conversation.
      */
-    StatusWith<Message> decompressMessage(const Message& msg);
+    StatusWith<Message> decompressMessage(const Message& msg,
+                                          MessageCompressorId* compressorId = nullptr);
 
     static MessageCompressorManager& forSession(const transport::SessionHandle& session);
 

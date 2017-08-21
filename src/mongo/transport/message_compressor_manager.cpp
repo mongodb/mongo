@@ -81,11 +81,18 @@ MessageCompressorManager::MessageCompressorManager()
 MessageCompressorManager::MessageCompressorManager(MessageCompressorRegistry* factory)
     : _registry{factory} {}
 
-StatusWith<Message> MessageCompressorManager::compressMessage(const Message& msg) {
-    if (_negotiated.size() == 0) {
+StatusWith<Message> MessageCompressorManager::compressMessage(
+    const Message& msg, const MessageCompressorId* compressorId) {
+
+    MessageCompressorBase* compressor = nullptr;
+    if (compressorId) {
+        compressor = _registry->getCompressor(*compressorId);
+        invariant(compressor);
+    } else if (!_negotiated.empty()) {
+        compressor = _negotiated[0];
+    } else {
         return {msg};
     }
-    auto compressor = _negotiated[0];
 
     LOG(3) << "Compressing message with " << compressor->getName();
 
@@ -125,7 +132,8 @@ StatusWith<Message> MessageCompressorManager::compressMessage(const Message& msg
     return {Message(outputMessageBuffer)};
 }
 
-StatusWith<Message> MessageCompressorManager::decompressMessage(const Message& msg) {
+StatusWith<Message> MessageCompressorManager::decompressMessage(const Message& msg,
+                                                                MessageCompressorId* compressorId) {
     auto inputHeader = msg.header();
     ConstDataRangeCursor input(inputHeader.data(), inputHeader.data() + inputHeader.dataLen());
     CompressionHeader compressionHeader(&input);
@@ -134,6 +142,10 @@ StatusWith<Message> MessageCompressorManager::decompressMessage(const Message& m
     if (!compressor) {
         return {ErrorCodes::InternalError,
                 "Compression algorithm specified in message is not available"};
+    }
+
+    if (compressorId) {
+        *compressorId = compressor->getId();
     }
 
     LOG(3) << "Decompressing message with " << compressor->getName();

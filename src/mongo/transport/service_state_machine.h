@@ -37,6 +37,7 @@
 #include "mongo/stdx/memory.h"
 #include "mongo/stdx/mutex.h"
 #include "mongo/stdx/thread.h"
+#include "mongo/transport/message_compressor_base.h"
 #include "mongo/transport/service_entry_point.h"
 #include "mongo/transport/service_executor.h"
 #include "mongo/transport/session.h"
@@ -198,8 +199,8 @@ private:
     const std::string _threadName;
     stdx::function<void()> _cleanupHook;
 
-    bool inExhaust = false;
-    bool wasCompressed = false;
+    bool _inExhaust = false;
+    boost::optional<MessageCompressorId> _compressorId;
     Message _inMessage;
     int64_t _counter = 0;
 
