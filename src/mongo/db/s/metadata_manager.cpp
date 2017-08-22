@@ -397,9 +397,7 @@ void scheduleCleanup(executor::TaskExecutor* executor,
     LOG(1) << "Scheduling cleanup on " << nss.ns() << " at " << when;
     std::ignore = executor->scheduleWorkAt(
         when, [ executor, nss = std::move(nss), epoch = std::move(epoch) ](auto&) {
-            while (MONGO_FAIL_POINT(suspendRangeDeletion)) {
-                sleepsecs(1);
-            }
+            MONGO_FAIL_POINT_PAUSE_WHILE_SET(suspendRangeDeletion);
             const int maxToDelete = std::max(int(internalQueryExecYieldIterations.load()), 1);
             Client::initThreadIfNotAlready("Collection Range Deleter");
             auto UniqueOpCtx = Client::getCurrent()->makeOperationContext();

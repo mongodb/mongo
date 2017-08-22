@@ -16,6 +16,8 @@
  * - checkResults: A function that asserts whether the command should succeed or fail. If the
  *                 command is expected to succeed, the function should assert the expected results.
  *                 *when the range has not been deleted from the donor.*
+ * - checkAvailableReadConcernResults: Same as checkResults above, except asserts the expected
+ *                                     results for the command run with read concern 'available'.
  * - behavior: Must be one of "unshardedOnly", "unversioned", or "versioned". Determines what
  *             checks the test performs against the system profilers of the secondaries.
  */
@@ -42,6 +44,8 @@
         assert(test.setUp && typeof(test.setUp) === "function");
         assert(test.command && typeof(test.command) === "object");
         assert(test.checkResults && typeof(test.checkResults) === "function");
+        assert(test.checkAvailableReadConcernResults &&
+               typeof(test.checkAvailableReadConcernResults) === "function");
         assert(test.behavior === "unshardedOnly" || test.behavior === "unversioned" ||
                test.behavior === "versioned");
     };
@@ -80,6 +84,11 @@
             command: {aggregate: coll, pipeline: [{$match: {x: 1}}], cursor: {batchSize: 10}},
             checkResults: function(res) {
                 // The command should work and return correct results.
+                assert.commandWorked(res);
+                assert.eq(1, res.cursor.firstBatch.length, tojson(res));
+            },
+            checkAvailableReadConcernResults: function(res) {
+                // The command should work and return orphaned results.
                 assert.commandWorked(res);
                 assert.eq(1, res.cursor.firstBatch.length, tojson(res));
             },
@@ -122,6 +131,11 @@
                 assert.commandWorked(res);
                 assert.eq(1, res.n, tojson(res));
             },
+            checkAvailableReadConcernResults: function(res) {
+                // The command should work and return orphaned results.
+                assert.commandWorked(res);
+                assert.eq(1, res.n, tojson(res));
+            },
             behavior: "versioned"
         },
         cpuload: {skip: "does not return user data"},
@@ -142,6 +156,11 @@
             },
             command: {distinct: coll, key: "x"},
             checkResults: function(res) {
+                assert.commandWorked(res);
+                assert.eq(1, res.values.length, tojson(res));
+            },
+            checkAvailableReadConcernResults: function(res) {
+                // The command should work and return orphaned results.
                 assert.commandWorked(res);
                 assert.eq(1, res.values.length, tojson(res));
             },
@@ -171,6 +190,11 @@
                 assert.commandWorked(res);
                 assert.eq(1, res.cursor.firstBatch.length, tojson(res));
             },
+            checkAvailableReadConcernResults: function(res) {
+                // The command should work and return orphaned results.
+                assert.commandWorked(res);
+                assert.eq(1, res.cursor.firstBatch.length, tojson(res));
+            },
             behavior: "versioned"
         },
         findAndModify: {skip: "primary only"},
@@ -189,6 +213,11 @@
             checkResults: function(res) {
                 assert.commandWorked(res);
                 // Expect the command to return correct results, since it will read orphaned data.
+                assert.eq(1, res.results.length, res);
+            },
+            checkAvailableReadConcernResults: function(res) {
+                assert.commandWorked(res);
+                // Command is unversioned, so 'available' has no additional effect.
                 assert.eq(1, res.results.length, res);
             },
             behavior: "unversioned"
@@ -217,6 +246,10 @@
             },
             command: {group: {ns: coll, key: {x: 1}}},
             checkResults: function(res) {
+                // Expect the command to fail, since it cannot run on sharded collections.
+                assert.commandFailedWithCode(res, ErrorCodes.IllegalOperation, tojson(res));
+            },
+            checkAvailableReadConcernResults: function(res) {
                 // Expect the command to fail, since it cannot run on sharded collections.
                 assert.commandFailedWithCode(res, ErrorCodes.IllegalOperation, tojson(res));
             },
@@ -332,13 +365,6 @@
     let freshMongos = st.s0;
     let staleMongos = st.s1;
 
-    assert.commandWorked(staleMongos.adminCommand({enableSharding: db}));
-    st.ensurePrimaryShard(db, st.shard0.shardName);
-
-    // Turn on system profiler on secondaries to collect data on all database operations.
-    assert.commandWorked(donorShardSecondary.getDB(db).setProfilingLevel(2));
-    assert.commandWorked(recipientShardSecondary.getDB(db).setProfilingLevel(2));
-
     let res = st.s.adminCommand({listCommands: 1});
     assert.commandWorked(res);
 
@@ -356,14 +382,20 @@
 
         jsTest.log("testing command " + tojson(test.command));
 
-        assert.commandWorked(staleMongos.adminCommand({shardCollection: nss, key: {x: 1}}));
-        assert.commandWorked(staleMongos.adminCommand({split: nss, middle: {x: 0}}));
+        assert.commandWorked(freshMongos.adminCommand({enableSharding: db}));
+        st.ensurePrimaryShard(db, st.shard0.shardName);
+        assert.commandWorked(freshMongos.adminCommand({shardCollection: nss, key: {x: 1}}));
+        assert.commandWorked(freshMongos.adminCommand({split: nss, middle: {x: 0}}));
 
         // Do dummy read from the stale mongos so that it loads the routing table into memory once.
         assert.commandWorked(staleMongos.getDB(db).runCommand({find: coll}));
 
         // Do any test-specific setup.
         test.setUp(staleMongos);
+
+        // Turn on system profiler on secondaries to collect data on all database operations.
+        assert.commandWorked(donorShardSecondary.getDB(db).setProfilingLevel(2));
+        assert.commandWorked(recipientShardSecondary.getDB(db).setProfilingLevel(2));
 
         // Suspend range deletion on the donor shard.
         donorShardPrimary.adminCommand(
@@ -376,77 +408,117 @@
             to: st.shard1.shardName,
         }));
 
-        let res = staleMongos.getDB(db).runCommand(
-            Object.extend(test.command, {$readPreference: {mode: 'secondary'}}));
+        // Make a read preference secondary copy of the command.
+        let cmdReadPreferenceSecondary = JSON.parse(JSON.stringify(test.command));
+        Object.extend(cmdReadPreferenceSecondary, {$readPreference: {mode: 'secondary'}});
 
+        // Make a read preference secondary and read concern 'available' copy of the command.
+        let cmdPrefSecondaryConcernAvailable =
+            JSON.parse(JSON.stringify(cmdReadPreferenceSecondary));
+        Object.extend(cmdPrefSecondaryConcernAvailable, {readConcern: {level: 'available'}});
+
+        let availableReadConcernRes =
+            staleMongos.getDB(db).runCommand(cmdPrefSecondaryConcernAvailable);
+        test.checkAvailableReadConcernResults(availableReadConcernRes);
+
+        let res = staleMongos.getDB(db).runCommand(cmdReadPreferenceSecondary);
         test.checkResults(res);
 
-        // Build the query to identify the operation in the system profiler.
+        // Build the query to identify the command in the system profiler.
         let commandProfile = buildCommandProfile(test.command);
 
         if (test.behavior === "unshardedOnly") {
-            // Check that neither the donor shard secondary nor recipient shard secondary
-            // received the request.
+            // Check that neither the donor nor recipient shard secondaries received either request.
             profilerHasZeroMatchingEntriesOrThrow(
                 {profileDB: donorShardSecondary.getDB(db), filter: commandProfile});
             profilerHasZeroMatchingEntriesOrThrow(
                 {profileDB: recipientShardSecondary.getDB(db), filter: commandProfile});
         } else if (test.behavior === "unversioned") {
-            // Check that the donor shard secondary received the request *without* an attached
-            // shardVersion and returned success.
+            // Check that the donor shard secondary received both requests *without* an attached
+            // shardVersion and returned success for both.
             profilerHasSingleMatchingEntryOrThrow({
                 profileDB: donorShardSecondary.getDB(db),
                 filter: Object.extend({
                     "command.shardVersion": {"$exists": false},
                     "command.$readPreference": {"mode": "secondary"},
+                    "command.readConcern": {"level": 'available'},
+                    "exceptionCode": {"$exists": false}
+                },
+                                      commandProfile)
+            });
+            profilerHasSingleMatchingEntryOrThrow({
+                profileDB: donorShardSecondary.getDB(db),
+                filter: Object.extend({
+                    "command.shardVersion": {"$exists": false},
+                    "command.$readPreference": {"mode": "secondary"},
+                    "command.readConcern": {"$exists": false},
                     "exceptionCode": {"$exists": false}
                 },
                                       commandProfile)
             });
 
-            // Check that the recipient shard secondary did not receive the request.
+            // Check that the recipient shard secondary did not receive either request.
             profilerHasZeroMatchingEntriesOrThrow(
                 {profileDB: recipientShardSecondary.getDB(db), filter: commandProfile});
         } else if (test.behavior === "versioned") {
-            // Check that the donor shard secondary returned stale shardVersion.
+            // Check that the donor shard secondary received the 'available' read concern request
+            // and returned success, despite the mongos' stale routing table.
             profilerHasSingleMatchingEntryOrThrow({
                 profileDB: donorShardSecondary.getDB(db),
                 filter: Object.extend({
                     "command.shardVersion": {"$exists": true},
                     "command.$readPreference": {"mode": "secondary"},
-                    "exceptionCode": ErrorCodes.SendStaleConfig
+                    "command.readConcern": {"level": "available"},
+                    "exceptionCode": {"$exists": false}
                 },
                                       commandProfile)
             });
 
-            // Check that the recipient shard secondary received the request and returned stale
-            // shardVersion once, even though the mongos is fresh, because the secondary was
-            // stale.
+            // Check that the donor shard secondary then returned stale shardVersion for the regular
+            // request (sans 'available' read concern).
             profilerHasSingleMatchingEntryOrThrow({
                 profileDB: donorShardSecondary.getDB(db),
                 filter: Object.extend({
                     "command.shardVersion": {"$exists": true},
                     "command.$readPreference": {"mode": "secondary"},
+                    "command.readConcern": {"$exists": false},
                     "exceptionCode": ErrorCodes.SendStaleConfig
                 },
                                       commandProfile)
             });
 
-            // Check that the recipient shard secondary received the request again and returned
-            // success.
+            // Check that the recipient shard secondary received the regular request and also
+            // returned stale shardVersion once, even though the mongos is fresh, because the
+            // secondary was stale.
             profilerHasSingleMatchingEntryOrThrow({
                 profileDB: recipientShardSecondary.getDB(db),
                 filter: Object.extend({
                     "command.shardVersion": {"$exists": true},
                     "command.$readPreference": {"mode": "secondary"},
+                    "command.readConcern": {"$exists": false},
+                    "exceptionCode": ErrorCodes.SendStaleConfig
+                },
+                                      commandProfile)
+            });
+
+            // Check that the recipient shard secondary received the regular request again and
+            // finally returned success.
+            profilerHasSingleMatchingEntryOrThrow({
+                profileDB: recipientShardSecondary.getDB(db),
+                filter: Object.extend({
+                    "command.shardVersion": {"$exists": true},
+                    "command.$readPreference": {"mode": "secondary"},
+                    "command.readConcern": {"$exists": false},
                     "exceptionCode": {"$exists": false}
                 },
                                       commandProfile)
             });
         }
 
-        // Clean up the collection by dropping it. This also drops all associated indexes.
-        assert.commandWorked(freshMongos.getDB(db).runCommand({drop: coll}));
+        // Clean up the collection by dropping the DB. This also drops all associated indexes and
+        // clears the profiler collection.
+        // Do this from staleMongos, so staleMongos purges the database entry from its cache.
+        assert.commandWorked(staleMongos.getDB(db).runCommand({dropDatabase: 1}));
     }
 
     st.stop();

@@ -415,19 +415,6 @@ bool runCommandImpl(OperationContext* opCtx,
 
     BSONObjBuilder inPlaceReplyBob = replyBuilder->getInPlaceReplyBuilder(bytesToReserve);
 
-    {
-        auto readConcernArgsStatus =
-            _extractReadConcern(cmd, command->supportsNonLocalReadConcern(db, cmd));
-        if (!readConcernArgsStatus.isOK()) {
-            auto result =
-                Command::appendCommandStatus(inPlaceReplyBob, readConcernArgsStatus.getStatus());
-            inPlaceReplyBob.doneFast();
-            replyBuilder->setMetadata(rpc::makeEmptyMetadata());
-            return result;
-        }
-        repl::ReadConcernArgs::get(opCtx) = std::move(readConcernArgsStatus.getValue());
-    }
-
     Status rcStatus = waitForReadConcern(opCtx, repl::ReadConcernArgs::get(opCtx));
     if (!rcStatus.isOK()) {
         if (rcStatus == ErrorCodes::ExceededTimeLimit) {
@@ -668,11 +655,17 @@ void execCommandDatabase(OperationContext* opCtx,
             opCtx->setDeadlineAfterNowBy(Milliseconds{maxTimeMS});
         }
 
+        repl::ReadConcernArgs::get(opCtx) = uassertStatusOK(_extractReadConcern(
+            request.body,
+            command->supportsNonLocalReadConcern(request.getDatabase().toString(), request.body)));
+
         // We do not redo shard version handling if this command was issued via the direct client.
         if ((serverGlobalParams.featureCompatibility.version.load() ==
                  ServerGlobalParams::FeatureCompatibility::Version::k36 ||
              iAmPrimary) &&
-            !opCtx->getClient()->isInDirectClient()) {
+            !opCtx->getClient()->isInDirectClient() &&
+            repl::ReadConcernArgs::get(opCtx).getLevel() !=
+                repl::ReadConcernLevel::kAvailableReadConcern) {
             // Handle a shard version that may have been sent along with the command.
             auto commandNS = NamespaceString(command->parseNs(dbname, request.body));
             auto& oss = OperationShardingState::get(opCtx);
