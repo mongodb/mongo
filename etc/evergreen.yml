@@ -5702,6 +5702,8 @@ buildvariants:
   - name: jsCore_decimal
   - name: jsCore_decimal_WT
   - name: sharding_WT_ese
+    distros:
+    - windows-64-vs2015-large
   - name: jsCore_auth
   - name: generational_jstestfuzz
   - name: generational_jstestfuzz_WT
@@ -5722,7 +5724,11 @@ buildvariants:
   - name: replica_sets_WT_ese
   - name: sasl
   - name: sharding_auth
+    distros:
+    - windows-64-vs2015-large
   - name: sharding_auth_audit_WT
+    distros:
+    - windows-64-vs2015-large
   - name: snmp
   - name: snmp_WT
   - name: ssl
@@ -5828,7 +5834,11 @@ buildvariants:
   - name: master_slave_jscore_passthrough
   - name: sasl
   - name: sharding_auth
+    distros:
+    - windows-64-vs2015-large
   - name: sharding_auth_audit_WT
+    distros:
+    - windows-64-vs2015-large
   - name: snmp
   - name: ssl
   - name: sslSpecial
@@ -5946,7 +5956,11 @@ buildvariants:
   - name: sharded_collections_jscore_passthrough
   - name: sharded_collections_jscore_passthrough_WT
   - name: sharding
+    distros:
+    - windows-64-vs2015-large
   - name: sharding_WT
+    distros:
+    - windows-64-vs2015-large
   - name: sharding_gle_auth_basics_passthrough
   - name: sharding_gle_auth_basics_passthrough_WT
   - name: sharding_gle_auth_basics_passthrough_write_cmd
@@ -5956,6 +5970,8 @@ buildvariants:
   - name: sharding_jscore_op_query_passthrough_WT
   - name: sharding_jscore_passthrough_wire_ops_WT
   - name: sharding_last_stable_mongos_and_mixed_shards
+    distros:
+    - windows-64-vs2015-large
   - name: slow1
   - name: slow1_WT
   - name: ssl
