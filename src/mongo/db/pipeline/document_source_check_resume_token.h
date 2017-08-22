@@ -33,13 +33,56 @@
 #include "mongo/db/pipeline/resume_token.h"
 
 namespace mongo {
+// Currently the two resume sources take the same specification.
+typedef DocumentSourceEnsureResumeTokenPresentSpec DocumentSourceShardCheckResumabilitySpec;
+
+/**
+ * This checks for resumability on a single shard in the sharded case. The rules are
+ *
+ * - If the first document in the pipeline for this shard has a matching resume token, we can
+ *   always resume.
+ * - If the oplog is empty, we can resume.  An empty oplog is rare and can only occur
+ *   on a secondary that has just started up from a primary that has not taken a write.
+ *   In particular, an empty oplog cannot be the result of oplog truncation.
+ * - If neither of the above is true, the least-recent document in the oplog must precede the resume
+ *   token.  If we do this check after seeing the first document in the pipeline in the shard, or
+ *   after seeing that there are no documents in the pipeline after the resume token in the shard,
+ *   we're guaranteed not to miss any documents.
+ *
+ * - Otherwise we cannot resume, as we do not know if this shard lost documents between the resume
+ *   token and the first matching document in the pipeline.
+ *
+ * This source need only run on a sharded collection.  For unsharded collections,
+ * DocumentSourceEnsureResumeTokenPresent is sufficient.
+ */
+class DocumentSourceShardCheckResumability final : public DocumentSourceNeedsMongod {
+public:
+    GetNextResult getNext() final;
+    const char* getSourceName() const final;
+
+    Value serialize(boost::optional<ExplainOptions::Verbosity> explain = boost::none) const final;
+
+    static boost::intrusive_ptr<DocumentSourceShardCheckResumability> create(
+        const boost::intrusive_ptr<ExpressionContext>& expCtx,
+        DocumentSourceShardCheckResumabilitySpec spec);
+
+private:
+    /**
+     * Use the create static method to create a DocumentSourceShardCheckResumability.
+     */
+    DocumentSourceShardCheckResumability(const boost::intrusive_ptr<ExpressionContext>& expCtx,
+                                         DocumentSourceShardCheckResumabilitySpec spec);
+
+    ResumeToken _token;
+    bool _verifiedResumability;
+};
 
 /**
  * This stage is used internally for change streams to ensure that the resume token is in the
  * stream.  It is not intended to be created by the user.
  */
-class DocumentSourceCheckResumeToken final : public DocumentSource,
-                                             public SplittableDocumentSource {
+class DocumentSourceEnsureResumeTokenPresent final : public DocumentSource,
+                                                     public SplittableDocumentSource {
 public:
     GetNextResult getNext() final;
     const char* getSourceName() const final;
@@ -49,17 +92,20 @@ public:
      * be at any shard.
      */
     boost::intrusive_ptr<DocumentSource> getShardSource() final {
-        return nullptr;
+        DocumentSourceShardCheckResumabilitySpec shardSpec;
+        shardSpec.setResumeToken(_token);
+        return DocumentSourceShardCheckResumability::create(pExpCtx, shardSpec);
     };
+
     boost::intrusive_ptr<DocumentSource> getMergeSource() final {
         return this;
     };
 
     Value serialize(boost::optional<ExplainOptions::Verbosity> explain = boost::none) const final;
 
-    static boost::intrusive_ptr<DocumentSourceCheckResumeToken> create(
+    static boost::intrusive_ptr<DocumentSourceEnsureResumeTokenPresent> create(
         const boost::intrusive_ptr<ExpressionContext>& expCtx,
-        DocumentSourceCheckResumeTokenSpec spec);
+        DocumentSourceEnsureResumeTokenPresentSpec spec);
 
     const ResumeToken& getTokenForTest() {
         return _token;
@@ -67,10 +113,10 @@ public:
 
 private:
     /**
-     * Use the create static method to create a DocumentSourceCheckResumeToken.
+     * Use the create static method to create a DocumentSourceEnsureResumeTokenPresent.
      */
-    DocumentSourceCheckResumeToken(const boost::intrusive_ptr<ExpressionContext>& expCtx,
-                                   DocumentSourceCheckResumeTokenSpec spec);
+    DocumentSourceEnsureResumeTokenPresent(const boost::intrusive_ptr<ExpressionContext>& expCtx,
+                                           DocumentSourceEnsureResumeTokenPresentSpec spec);
 
     ResumeToken _token;
     bool _seenDoc;

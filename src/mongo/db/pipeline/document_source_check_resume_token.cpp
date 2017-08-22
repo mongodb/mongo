@@ -32,27 +32,28 @@
 
 using boost::intrusive_ptr;
 namespace mongo {
-const char* DocumentSourceCheckResumeToken::getSourceName() const {
-    return "$_checkResumeToken";
+const char* DocumentSourceEnsureResumeTokenPresent::getSourceName() const {
+    return "$_ensureResumeTokenPresent";
 }
 
-Value DocumentSourceCheckResumeToken::serialize(
+Value DocumentSourceEnsureResumeTokenPresent::serialize(
     boost::optional<ExplainOptions::Verbosity> explain) const {
     // This stage is created by the DocumentSourceChangeStream stage, so serializing it here
     // would result in it being created twice.
     return Value();
 }
 
-intrusive_ptr<DocumentSourceCheckResumeToken> DocumentSourceCheckResumeToken::create(
-    const intrusive_ptr<ExpressionContext>& expCtx, DocumentSourceCheckResumeTokenSpec spec) {
-    return new DocumentSourceCheckResumeToken(expCtx, std::move(spec));
+intrusive_ptr<DocumentSourceEnsureResumeTokenPresent>
+DocumentSourceEnsureResumeTokenPresent::create(const intrusive_ptr<ExpressionContext>& expCtx,
+                                               DocumentSourceEnsureResumeTokenPresentSpec spec) {
+    return new DocumentSourceEnsureResumeTokenPresent(expCtx, std::move(spec));
 }
 
-DocumentSourceCheckResumeToken::DocumentSourceCheckResumeToken(
-    const intrusive_ptr<ExpressionContext>& expCtx, DocumentSourceCheckResumeTokenSpec spec)
+DocumentSourceEnsureResumeTokenPresent::DocumentSourceEnsureResumeTokenPresent(
+    const intrusive_ptr<ExpressionContext>& expCtx, DocumentSourceEnsureResumeTokenPresentSpec spec)
     : DocumentSource(expCtx), _token(spec.getResumeToken()), _seenDoc(false) {}
 
-DocumentSource::GetNextResult DocumentSourceCheckResumeToken::getNext() {
+DocumentSource::GetNextResult DocumentSourceEnsureResumeTokenPresent::getNext() {
     pExpCtx->checkForInterrupt();
 
     auto nextInput = pSource->getNext();
@@ -76,4 +77,63 @@ DocumentSource::GetNextResult DocumentSourceCheckResumeToken::getNext() {
     return pSource->getNext();
 }
 
+const char* DocumentSourceShardCheckResumability::getSourceName() const {
+    return "$_checkShardResumability";
+}
+
+Value DocumentSourceShardCheckResumability::serialize(
+    boost::optional<ExplainOptions::Verbosity> explain) const {
+    // This stage is created by the DocumentSourceChangeNotification stage, so serializing it here
+    // would result in it being created twice.
+    return Value();
+}
+
+intrusive_ptr<DocumentSourceShardCheckResumability> DocumentSourceShardCheckResumability::create(
+    const intrusive_ptr<ExpressionContext>& expCtx, DocumentSourceShardCheckResumabilitySpec spec) {
+    return new DocumentSourceShardCheckResumability(expCtx, std::move(spec));
+}
+
+DocumentSourceShardCheckResumability::DocumentSourceShardCheckResumability(
+    const intrusive_ptr<ExpressionContext>& expCtx, DocumentSourceShardCheckResumabilitySpec spec)
+    : DocumentSourceNeedsMongod(expCtx),
+      _token(spec.getResumeToken()),
+      _verifiedResumability(false) {}
+
+DocumentSource::GetNextResult DocumentSourceShardCheckResumability::getNext() {
+    pExpCtx->checkForInterrupt();
+
+    auto nextInput = pSource->getNext();
+    if (_verifiedResumability)
+        return nextInput;
+
+    _verifiedResumability = true;
+    if (nextInput.isAdvanced()) {
+        auto doc = nextInput.getDocument();
+
+        ResumeToken receivedToken(doc["_id"]);
+        if (receivedToken == _token) {
+            // Pass along the document, as the DocumentSourceEnsureResumeTokenPresent stage on the
+            // merger will
+            // need to see it.
+            return nextInput;
+        }
+    }
+    // If we make it here, we need to look up the first document in the oplog and compare it
+    // with the resume token.
+    auto firstEntryExpCtx = pExpCtx->copyWith(pExpCtx->ns);
+    auto matchSpec = BSON("$match" << BSONObj());
+    auto pipeline = uassertStatusOK(_mongod->makePipeline({matchSpec}, firstEntryExpCtx));
+    if (auto first = pipeline->getNext()) {
+        auto firstOplogEntry = Value(*first);
+        uassert(40576,
+                "resume of change notification was not possible, as the resume point may no longer "
+                "be in the oplog. ",
+                firstOplogEntry["ts"].getTimestamp() < _token.getTimestamp());
+        return nextInput;
+    }
+    // Very unusual case: the oplog is empty.  We can always resume.  It should never be possible
+    // that the oplog is empty and we got a document matching the filter, however.
+    invariant(nextInput.isEOF());
+    return nextInput;
+}
 }  // namespace mongo

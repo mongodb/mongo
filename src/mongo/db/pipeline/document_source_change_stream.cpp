@@ -155,7 +155,7 @@ public:
 
 private:
     /**
-     * Use the create static method to create a DocumentSourceCheckResumeToken.
+     * Use the create static method to create a DocumentSourceCloseCursor.
      */
     DocumentSourceCloseCursor(const boost::intrusive_ptr<ExpressionContext>& expCtx)
         : DocumentSource(expCtx) {}
@@ -237,15 +237,21 @@ list<intrusive_ptr<DocumentSource>> DocumentSourceChangeStream::createFromBson(
     uassert(40573, "The $changeStream stage is only supported on replica sets", replCoord);
     Timestamp startFrom = replCoord->getLastCommittedOpTime().getTimestamp();
 
-    intrusive_ptr<DocumentSourceCheckResumeToken> resumeStage = nullptr;
+    intrusive_ptr<DocumentSource> resumeStage = nullptr;
     auto spec = DocumentSourceChangeStreamSpec::parse(IDLParserErrorContext("$changeStream"),
                                                       elem.embeddedObject());
     if (auto resumeAfter = spec.getResumeAfter()) {
         ResumeToken token = resumeAfter.get();
         startFrom = token.getTimestamp();
-        DocumentSourceCheckResumeTokenSpec spec;
-        spec.setResumeToken(std::move(token));
-        resumeStage = DocumentSourceCheckResumeToken::create(expCtx, std::move(spec));
+        if (expCtx->needsMerge) {
+            DocumentSourceShardCheckResumabilitySpec spec;
+            spec.setResumeToken(std::move(token));
+            resumeStage = DocumentSourceShardCheckResumability::create(expCtx, std::move(spec));
+        } else {
+            DocumentSourceEnsureResumeTokenPresentSpec spec;
+            spec.setResumeToken(std::move(token));
+            resumeStage = DocumentSourceEnsureResumeTokenPresent::create(expCtx, std::move(spec));
+        }
     }
     const bool changeStreamIsResuming = resumeStage != nullptr;
 

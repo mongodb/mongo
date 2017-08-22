@@ -73,7 +73,7 @@ structs:
                            should return a full document or just changes for an update.
 
 
-  DocumentSourceCheckResumeTokenSpec:
+  DocumentSourceEnsureResumeTokenPresentSpec:
       description: A document used to specify the internal stage which checks the presence of the
                    resume token.
       fields:

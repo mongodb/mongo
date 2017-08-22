@@ -40,12 +40,14 @@
 #include "mongo/db/pipeline/document_value_test_util.h"
 #include "mongo/db/pipeline/expression_context.h"
 #include "mongo/db/pipeline/resume_token.h"
+#include "mongo/db/pipeline/stub_mongod_interface.h"
 #include "mongo/db/service_context.h"
 #include "mongo/stdx/memory.h"
 #include "mongo/unittest/death_test.h"
 #include "mongo/unittest/unittest.h"
 
 using boost::intrusive_ptr;
+using std::deque;
 
 namespace mongo {
 namespace {
@@ -74,20 +76,33 @@ protected:
     /**
      * Convenience method to create the class under test with a given timestamp, id, and namespace.
      */
-    intrusive_ptr<DocumentSourceCheckResumeToken> createCheckResumeToken(Timestamp ts,
-                                                                         StringData id,
-                                                                         StringData ns = kTestNs) {
+    intrusive_ptr<DocumentSourceEnsureResumeTokenPresent> createCheckResumeToken(
+        Timestamp ts, StringData id, StringData ns = kTestNs) {
         auto token = ResumeToken::parse(BSON(
             "clusterTime" << BSON("ts" << ts) << "ns" << ns << "documentKey" << BSON("_id" << id)));
-        DocumentSourceCheckResumeTokenSpec spec;
+        DocumentSourceEnsureResumeTokenPresentSpec spec;
         spec.setResumeToken(token);
-        auto checkResumeToken = DocumentSourceCheckResumeToken::create(getExpCtx(), spec);
+        auto checkResumeToken = DocumentSourceEnsureResumeTokenPresent::create(getExpCtx(), spec);
         checkResumeToken->setSource(_mock.get());
         return checkResumeToken;
     }
 
-private:
     intrusive_ptr<DocumentSourceMock> _mock;
+};
+
+class ShardCheckResumabilityTest : public CheckResumeTokenTest {
+protected:
+    intrusive_ptr<DocumentSourceShardCheckResumability> createShardCheckResumability(
+        Timestamp ts, StringData id, StringData ns = kTestNs) {
+        auto token = ResumeToken::parse(BSON(
+            "clusterTime" << BSON("ts" << ts) << "ns" << ns << "documentKey" << BSON("_id" << id)));
+        DocumentSourceShardCheckResumabilitySpec spec;
+        spec.setResumeToken(token);
+        auto shardCheckResumability =
+            DocumentSourceShardCheckResumability::create(getExpCtx(), spec);
+        shardCheckResumability->setSource(_mock.get());
+        return shardCheckResumability;
+    }
 };
 
 TEST_F(CheckResumeTokenTest, ShouldSucceedWithOnlyResumeToken) {
@@ -191,6 +206,201 @@ TEST_F(CheckResumeTokenTest, ShouldFailWithNoDocuments) {
 
     auto checkResumeToken = createCheckResumeToken(resumeTimestamp, "0");
     ASSERT_THROWS_CODE(checkResumeToken->getNext(), AssertionException, 40584);
+}
+
+/**
+ * A mock MongodInterface which allows mocking a foreign pipeline.
+ */
+class MockMongodInterface final : public StubMongodInterface {
+public:
+    MockMongodInterface(deque<DocumentSource::GetNextResult> mockResults)
+        : _mockResults(std::move(mockResults)) {}
+
+    bool isSharded(const NamespaceString& ns) final {
+        return false;
+    }
+
+    StatusWith<std::unique_ptr<Pipeline, Pipeline::Deleter>> makePipeline(
+        const std::vector<BSONObj>& rawPipeline,
+        const boost::intrusive_ptr<ExpressionContext>& expCtx) final {
+        auto pipeline = Pipeline::parse(rawPipeline, expCtx);
+        if (!pipeline.isOK()) {
+            return pipeline.getStatus();
+        }
+
+        pipeline.getValue()->addInitialSource(DocumentSourceMock::create(_mockResults));
+        pipeline.getValue()->optimizePipeline();
+
+        return pipeline;
+    }
+
+private:
+    deque<DocumentSource::GetNextResult> _mockResults;
+};
+
+TEST_F(ShardCheckResumabilityTest,
+       ShouldSucceedIfResumeTokenIsPresentAndEarliestOplogEntryBeforeToken) {
+    Timestamp oplogTimestamp(100, 1);
+    Timestamp resumeTimestamp(100, 2);
+
+    auto shardCheckResumability = createShardCheckResumability(resumeTimestamp, "ID");
+    deque<DocumentSource::GetNextResult> mockOplog({Document{{"ts", oplogTimestamp}}});
+    shardCheckResumability->injectMongodInterface(std::make_shared<MockMongodInterface>(mockOplog));
+    addDocument(resumeTimestamp, "ID");
+    // We should see the resume token.
+    auto result = shardCheckResumability->getNext();
+    ASSERT_TRUE(result.isAdvanced());
+    auto& doc = result.getDocument();
+    ASSERT_VALUE_EQ(Value(resumeTimestamp), doc["_id"]["clusterTime"]["ts"]);
+}
+
+TEST_F(ShardCheckResumabilityTest,
+       ShouldSucceedIfResumeTokenIsPresentAndEarliestOplogEntryAfterToken) {
+    Timestamp resumeTimestamp(100, 1);
+    Timestamp oplogTimestamp(100, 2);
+
+    auto shardCheckResumability = createShardCheckResumability(resumeTimestamp, "ID");
+    deque<DocumentSource::GetNextResult> mockOplog({Document{{"ts", oplogTimestamp}}});
+    shardCheckResumability->injectMongodInterface(std::make_shared<MockMongodInterface>(mockOplog));
+    addDocument(resumeTimestamp, "ID");
+    // We should see the resume token.
+    auto result = shardCheckResumability->getNext();
+    ASSERT_TRUE(result.isAdvanced());
+    auto& doc = result.getDocument();
+    ASSERT_VALUE_EQ(Value(resumeTimestamp), doc["_id"]["clusterTime"]["ts"]);
+}
+
+TEST_F(ShardCheckResumabilityTest, ShouldSucceedIfResumeTokenIsPresentAndOplogIsEmpty) {
+    Timestamp resumeTimestamp(100, 1);
+
+    auto shardCheckResumability = createShardCheckResumability(resumeTimestamp, "ID");
+    deque<DocumentSource::GetNextResult> mockOplog;
+    shardCheckResumability->injectMongodInterface(std::make_shared<MockMongodInterface>(mockOplog));
+    addDocument(resumeTimestamp, "ID");
+    // We should see the resume token.
+    auto result = shardCheckResumability->getNext();
+    ASSERT_TRUE(result.isAdvanced());
+    auto& doc = result.getDocument();
+    ASSERT_VALUE_EQ(Value(resumeTimestamp), doc["_id"]["clusterTime"]["ts"]);
+}
+
+TEST_F(ShardCheckResumabilityTest,
+       ShouldSucceedWithNoDocumentsInPipelineAndEarliestOplogEntryBeforeToken) {
+    Timestamp oplogTimestamp(100, 1);
+    Timestamp resumeTimestamp(100, 2);
+
+    auto shardCheckResumability = createShardCheckResumability(resumeTimestamp, "0");
+    deque<DocumentSource::GetNextResult> mockOplog({Document{{"ts", oplogTimestamp}}});
+    shardCheckResumability->injectMongodInterface(std::make_shared<MockMongodInterface>(mockOplog));
+    auto result = shardCheckResumability->getNext();
+    ASSERT_TRUE(result.isEOF());
+}
+
+TEST_F(ShardCheckResumabilityTest,
+       ShouldFailWithNoDocumentsInPipelineAndEarliestOplogEntryAfterToken) {
+    Timestamp resumeTimestamp(100, 1);
+    Timestamp oplogTimestamp(100, 2);
+
+    auto shardCheckResumability = createShardCheckResumability(resumeTimestamp, "0");
+    deque<DocumentSource::GetNextResult> mockOplog({Document{{"ts", oplogTimestamp}}});
+    shardCheckResumability->injectMongodInterface(std::make_shared<MockMongodInterface>(mockOplog));
+    ASSERT_THROWS_CODE(shardCheckResumability->getNext(), AssertionException, 40576);
+}
+
+TEST_F(ShardCheckResumabilityTest, ShouldSucceedWithNoDocumentsInPipelineAndOplogIsEmpty) {
+    Timestamp resumeTimestamp(100, 2);
+
+    auto shardCheckResumability = createShardCheckResumability(resumeTimestamp, "0");
+    deque<DocumentSource::GetNextResult> mockOplog;
+    shardCheckResumability->injectMongodInterface(std::make_shared<MockMongodInterface>(mockOplog));
+    auto result = shardCheckResumability->getNext();
+    ASSERT_TRUE(result.isEOF());
+}
+
+TEST_F(ShardCheckResumabilityTest,
+       ShouldSucceedWithLaterDocumentsInPipelineAndEarliestOplogEntryBeforeToken) {
+    Timestamp oplogTimestamp(100, 1);
+    Timestamp resumeTimestamp(100, 2);
+    Timestamp docTimestamp(100, 3);
+
+    auto shardCheckResumability = createShardCheckResumability(resumeTimestamp, "0");
+    addDocument(docTimestamp, "ID");
+    deque<DocumentSource::GetNextResult> mockOplog({Document{{"ts", oplogTimestamp}}});
+    shardCheckResumability->injectMongodInterface(std::make_shared<MockMongodInterface>(mockOplog));
+    auto result = shardCheckResumability->getNext();
+    ASSERT_TRUE(result.isAdvanced());
+    auto& doc = result.getDocument();
+    ASSERT_VALUE_EQ(Value(docTimestamp), doc["_id"]["clusterTime"]["ts"]);
+}
+
+TEST_F(ShardCheckResumabilityTest,
+       ShouldFailWithLaterDocumentsInPipelineAndEarliestOplogEntryAfterToken) {
+    Timestamp resumeTimestamp(100, 1);
+    Timestamp oplogTimestamp(100, 2);
+    Timestamp docTimestamp(100, 3);
+
+    auto shardCheckResumability = createShardCheckResumability(resumeTimestamp, "0");
+    addDocument(docTimestamp, "ID");
+    deque<DocumentSource::GetNextResult> mockOplog({Document{{"ts", oplogTimestamp}}});
+    shardCheckResumability->injectMongodInterface(std::make_shared<MockMongodInterface>(mockOplog));
+    ASSERT_THROWS_CODE(shardCheckResumability->getNext(), AssertionException, 40576);
+}
+
+TEST_F(ShardCheckResumabilityTest, ShouldIgnoreOplogAfterFirstDoc) {
+    Timestamp oplogTimestamp(100, 1);
+    Timestamp resumeTimestamp(100, 2);
+    Timestamp oplogFutureTimestamp(100, 3);
+    Timestamp docTimestamp(100, 4);
+
+    auto shardCheckResumability = createShardCheckResumability(resumeTimestamp, "0");
+    addDocument(docTimestamp, "ID");
+    deque<DocumentSource::GetNextResult> mockOplog({Document{{"ts", oplogTimestamp}}});
+    shardCheckResumability->injectMongodInterface(std::make_shared<MockMongodInterface>(mockOplog));
+    auto result1 = shardCheckResumability->getNext();
+    ASSERT_TRUE(result1.isAdvanced());
+    auto& doc1 = result1.getDocument();
+    ASSERT_VALUE_EQ(Value(docTimestamp), doc1["_id"]["clusterTime"]["ts"]);
+
+    mockOplog = {Document{{"ts", oplogFutureTimestamp}}};
+    shardCheckResumability->injectMongodInterface(std::make_shared<MockMongodInterface>(mockOplog));
+    auto result2 = shardCheckResumability->getNext();
+    ASSERT_TRUE(result2.isEOF());
+}
+
+TEST_F(ShardCheckResumabilityTest, ShouldSucceedWhenOplogEntriesExistBeforeAndAfterResumeToken) {
+    Timestamp oplogTimestamp(100, 1);
+    Timestamp resumeTimestamp(100, 2);
+    Timestamp oplogFutureTimestamp(100, 3);
+    Timestamp docTimestamp(100, 4);
+
+    auto shardCheckResumability = createShardCheckResumability(resumeTimestamp, "0");
+    addDocument(docTimestamp, "ID");
+    deque<DocumentSource::GetNextResult> mockOplog(
+        {{Document{{"ts", oplogTimestamp}}}, {Document{{"ts", oplogFutureTimestamp}}}});
+    shardCheckResumability->injectMongodInterface(std::make_shared<MockMongodInterface>(mockOplog));
+    auto result1 = shardCheckResumability->getNext();
+    ASSERT_TRUE(result1.isAdvanced());
+    auto& doc1 = result1.getDocument();
+    ASSERT_VALUE_EQ(Value(docTimestamp), doc1["_id"]["clusterTime"]["ts"]);
+    auto result2 = shardCheckResumability->getNext();
+    ASSERT_TRUE(result2.isEOF());
+}
+
+TEST_F(ShardCheckResumabilityTest, ShouldIgnoreOplogAfterFirstEOF) {
+    Timestamp oplogTimestamp(100, 1);
+    Timestamp resumeTimestamp(100, 2);
+    Timestamp oplogFutureTimestamp(100, 3);
+
+    auto shardCheckResumability = createShardCheckResumability(resumeTimestamp, "0");
+    deque<DocumentSource::GetNextResult> mockOplog({Document{{"ts", oplogTimestamp}}});
+    shardCheckResumability->injectMongodInterface(std::make_shared<MockMongodInterface>(mockOplog));
+    auto result1 = shardCheckResumability->getNext();
+    ASSERT_TRUE(result1.isEOF());
+
+    mockOplog = {Document{{"ts", oplogFutureTimestamp}}};
+    shardCheckResumability->injectMongodInterface(std::make_shared<MockMongodInterface>(mockOplog));
+    auto result2 = shardCheckResumability->getNext();
+    ASSERT_TRUE(result2.isEOF());
 }
 
 }  // namespace
