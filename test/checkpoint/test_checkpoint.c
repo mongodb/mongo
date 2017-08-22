@@ -65,7 +65,7 @@ main(int argc, char *argv[])
 	runs = 1;
 
 	while ((ch = __wt_getopt(
-	    progname, argc, argv, "C:c:h:k:l:n:r:sT:t:W:")) != EOF)
+	    progname, argc, argv, "C:c:h:k:l:n:r:T:t:W:")) != EOF)
 		switch (ch) {
 		case 'c':
 			g.checkpoint_name = __wt_optarg;
@@ -92,25 +92,6 @@ main(int argc, char *argv[])
 		case 'r':			/* runs */
 			runs = atoi(__wt_optarg);
 			break;
-		case 's':
-			/*
-			 * disabled below block temporarily to avoid spurious
-			 * test failures as per ticket WT-3446 and
-			 * to be reverted when WT-3386 is merged.
-			 */
-#if 0
-#ifdef HAVE_TIMESTAMPS
-			g.use_timestamps = true;
-#endif
-			break;
-#endif
-			/*
-			 * The below code segment to be deleted as part of
-			 * reverting the above block i.e. WT-3386
-			 */
-			fprintf(stderr,
-			    "Checkpoint Timestamp testing is not supported\n");
-			return (EXIT_FAILURE);
 		case 't':
 			switch (__wt_optarg[0]) {
 			case 'c':
@@ -339,12 +320,10 @@ type_to_string(table_type type)
 static int
 usage(void)
 {
-	//    progname, argc, argv, "c:C:h:k:l:n:r:t:T:W:")) != EOF)
-
 	fprintf(stderr,
 	    "usage: %s "
 	    "[-C wiredtiger-config] [-c checkpoint] [-h home] [-k keys]\n\t"
-	    "[-l log] [-n ops] [-r runs] [-s] [-t f|r|v] [-T table-config]\n\t"
+	    "[-l log] [-n ops] [-r runs] [-T table-config] [-t f|r|v]\n\t"
 	    "[-W workers]\n",
 	    progname);
 	fprintf(stderr, "%s",
@@ -355,9 +334,8 @@ usage(void)
 	    "\t-l specify a log file\n"
 	    "\t-n set number of operations each thread does\n"
 	    "\t-r set number of runs (0 for continuous)\n"
-	    "\t-s enable transaction timestamps\n"
-	    "\t-t set a file type ( col | mix | row | lsm )\n"
 	    "\t-T specify a table configuration\n"
+	    "\t-t set a file type ( col | mix | row | lsm )\n"
 	    "\t-W set number of worker threads\n");
 	return (EXIT_FAILURE);
 }
