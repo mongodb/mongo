@@ -64,7 +64,7 @@ using std::vector;
 using CreateDatabaseTest = ConfigServerTestFixture;
 
 TEST_F(CreateDatabaseTest, createDatabaseSuccess) {
-    const string dbname = "db1";
+    const std::string dbname = "db1";
 
     ShardType s0;
     s0.setName("shard0000");
@@ -110,7 +110,7 @@ TEST_F(CreateDatabaseTest, createDatabaseSuccess) {
     onCommand([&](const RemoteCommandRequest& request) {
         ASSERT_EQUALS(s0.getHost(), request.target.toString());
         ASSERT_EQUALS("admin", request.dbname);
-        string cmdName = request.cmdObj.firstElement().fieldName();
+        std::string cmdName = request.cmdObj.firstElement().fieldName();
         ASSERT_EQUALS("listDatabases", cmdName);
         ASSERT_FALSE(request.cmdObj.hasField(repl::ReadConcernArgs::kReadConcernFieldName));
 
@@ -125,7 +125,7 @@ TEST_F(CreateDatabaseTest, createDatabaseSuccess) {
     onCommand([&](const RemoteCommandRequest& request) {
         ASSERT_EQUALS(s1.getHost(), request.target.toString());
         ASSERT_EQUALS("admin", request.dbname);
-        string cmdName = request.cmdObj.firstElement().fieldName();
+        std::string cmdName = request.cmdObj.firstElement().fieldName();
         ASSERT_EQUALS("listDatabases", cmdName);
         ASSERT_FALSE(request.cmdObj.hasField(repl::ReadConcernArgs::kReadConcernFieldName));
 
@@ -140,7 +140,7 @@ TEST_F(CreateDatabaseTest, createDatabaseSuccess) {
     onCommand([&](const RemoteCommandRequest& request) {
         ASSERT_EQUALS(s2.getHost(), request.target.toString());
         ASSERT_EQUALS("admin", request.dbname);
-        string cmdName = request.cmdObj.firstElement().fieldName();
+        std::string cmdName = request.cmdObj.firstElement().fieldName();
         ASSERT_EQUALS("listDatabases", cmdName);
 
         ASSERT_BSONOBJ_EQ(
@@ -154,7 +154,7 @@ TEST_F(CreateDatabaseTest, createDatabaseSuccess) {
 }
 
 TEST_F(CreateDatabaseTest, createDatabaseDistLockHeld) {
-    const string dbname = "db2";
+    const std::string dbname = "db2";
 
     ASSERT_OK(distLockCatalog()
                   ->grabLock(operationContext(),
@@ -172,7 +172,7 @@ TEST_F(CreateDatabaseTest, createDatabaseDistLockHeld) {
 }
 
 TEST_F(CreateDatabaseTest, createDatabaseDBExists) {
-    const string dbname = "db3";
+    const std::string dbname = "db3";
 
     ShardType shard;
     shard.setName("shard0");
@@ -188,8 +188,8 @@ TEST_F(CreateDatabaseTest, createDatabaseDBExists) {
 }
 
 TEST_F(CreateDatabaseTest, createDatabaseDBExistsDifferentCase) {
-    const string dbname = "db4";
-    const string dbnameDiffCase = "Db4";
+    const std::string dbname = "db4";
+    const std::string dbnameDiffCase = "Db4";
 
     ShardType shard;
     shard.setName("shard0");
@@ -205,7 +205,7 @@ TEST_F(CreateDatabaseTest, createDatabaseDBExistsDifferentCase) {
 }
 
 TEST_F(CreateDatabaseTest, createDatabaseNoShards) {
-    const string dbname = "db5";
+    const std::string dbname = "db5";
 
     Status status =
         ShardingCatalogManager::get(operationContext())->createDatabase(operationContext(), dbname);

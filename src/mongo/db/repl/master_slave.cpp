@@ -170,7 +170,7 @@ BSONObj ReplSource::jsobj() {
 
     BSONObjBuilder dbsNextPassBuilder;
     int n = 0;
-    for (set<string>::iterator i = addDbNextPass.begin(); i != addDbNextPass.end(); i++) {
+    for (set<std::string>::iterator i = addDbNextPass.begin(); i != addDbNextPass.end(); i++) {
         n++;
         dbsNextPassBuilder.appendBool(*i, 1);
     }
@@ -179,7 +179,8 @@ BSONObj ReplSource::jsobj() {
 
     BSONObjBuilder incompleteCloneDbsBuilder;
     n = 0;
-    for (set<string>::iterator i = incompleteCloneDbs.begin(); i != incompleteCloneDbs.end(); i++) {
+    for (set<std::string>::iterator i = incompleteCloneDbs.begin(); i != incompleteCloneDbs.end();
+         i++) {
         n++;
         incompleteCloneDbsBuilder.appendBool(*i, 1);
     }
@@ -190,7 +191,7 @@ BSONObj ReplSource::jsobj() {
 }
 
 void ReplSource::ensureMe(OperationContext* opCtx) {
-    string myname = getHostName();
+    std::string myname = getHostName();
 
     // local.me is an identifier for a server for getLastError w:2+
     bool exists = Helpers::getSingleton(opCtx, "local.me", _me);
@@ -381,7 +382,7 @@ public:
     }
 
     virtual bool run(OperationContext* opCtx,
-                     const string& ns,
+                     const std::string& ns,
                      const BSONObj& cmdObj,
                      BSONObjBuilder& result) {
         HandshakeArgs handshake;
@@ -399,7 +400,7 @@ public:
 } handshakeCmd;
 
 bool replHandshake(DBClientConnection* conn, const OID& myRID) {
-    string myname = getHostName();
+    std::string myname = getHostName();
 
     BSONObjBuilder cmd;
     cmd.append("handshake", myRID);
@@ -450,7 +451,7 @@ void ReplSource::forceResync(OperationContext* opCtx, const char* requester) {
         BSONElement e = i.next();
         if (e.eoo())
             break;
-        string name = e.embeddedObject().getField("name").valuestr();
+        std::string name = e.embeddedObject().getField("name").valuestr();
         if (!e.embeddedObject().getBoolField("empty")) {
             if (name != "local") {
                 if (only.empty() || only == name) {
@@ -481,7 +482,7 @@ Status ReplSource::_updateIfDoneWithInitialSync() {
     return Status::OK();
 }
 
-void ReplSource::resyncDrop(OperationContext* opCtx, const string& dbName) {
+void ReplSource::resyncDrop(OperationContext* opCtx, const std::string& dbName) {
     log() << "resync: dropping database " << dbName;
     invariant(opCtx->lockState()->isW());
 
@@ -531,13 +532,13 @@ void ReplSource::resync(OperationContext* opCtx, const std::string& dbName) {
 
 static DatabaseIgnorer ___databaseIgnorer;
 
-void DatabaseIgnorer::doIgnoreUntilAfter(const string& db, const Timestamp& futureOplogTime) {
+void DatabaseIgnorer::doIgnoreUntilAfter(const std::string& db, const Timestamp& futureOplogTime) {
     if (futureOplogTime > _ignores[db]) {
         _ignores[db] = futureOplogTime;
     }
 }
 
-bool DatabaseIgnorer::ignoreAt(const string& db, const Timestamp& currentOplogTime) {
+bool DatabaseIgnorer::ignoreAt(const std::string& db, const Timestamp& currentOplogTime) {
     if (_ignores[db].isNull()) {
         return false;
     }
@@ -627,7 +628,7 @@ bool ReplSource::handleDuplicateDbName(OperationContext* opCtx,
 
     // The database is present on the master and no conflicting databases
     // are present on the master.  Drop any local conflicts.
-    for (set<string>::const_iterator i = duplicates.begin(); i != duplicates.end(); ++i) {
+    for (set<std::string>::const_iterator i = duplicates.begin(); i != duplicates.end(); ++i) {
         ___databaseIgnorer.doIgnoreUntilAfter(*i, lastTime);
         incompleteCloneDbs.erase(*i);
         addDbNextPass.erase(*i);
@@ -822,10 +823,10 @@ void ReplSource::_sync_pullOpLog_applyOperation(OperationContext* opCtx,
 }
 
 void ReplSource::syncToTailOfRemoteLog() {
-    string _ns = ns();
+    std::string _ns = ns();
     BSONObjBuilder b;
     if (!only.empty()) {
-        b.appendRegex("ns", string("^") + pcrecpp::RE::QuoteMeta(only));
+        b.appendRegex("ns", std::string("^") + pcrecpp::RE::QuoteMeta(only));
     }
     BSONObj last = oplogReader.findOne(_ns.c_str(), Query(b.done()).sort(BSON("$natural" << -1)));
     if (!last.isEmpty()) {
@@ -873,7 +874,7 @@ public:
 */
 int ReplSource::_sync_pullOpLog(OperationContext* opCtx, int& nApplied) {
     int okResultCode = restartSyncAfterSleep;
-    string ns = string("local.oplog.$") + sourceName();
+    std::string ns = std::string("local.oplog.$") + sourceName();
     LOG(2) << "sync_pullOpLog " << ns << " syncedTo:" << syncedTo.toStringLong() << '\n';
 
     bool tailing = true;
@@ -893,7 +894,7 @@ int ReplSource::_sync_pullOpLog(OperationContext* opCtx, int& nApplied) {
                 BSONElement e = i.next();
                 if (e.eoo())
                     break;
-                string name = e.embeddedObject().getField("name").valuestr();
+                std::string name = e.embeddedObject().getField("name").valuestr();
                 if (!e.embeddedObject().getBoolField("empty")) {
                     if (name != "local") {
                         if (only.empty() || only == name) {
@@ -916,7 +917,7 @@ int ReplSource::_sync_pullOpLog(OperationContext* opCtx, int& nApplied) {
         if (!only.empty()) {
             // note we may here skip a LOT of data table scanning, a lot of work for the master.
             // maybe append "\\." here?
-            query.appendRegex("ns", string("^") + pcrecpp::RE::QuoteMeta(only));
+            query.appendRegex("ns", std::string("^") + pcrecpp::RE::QuoteMeta(only));
         }
         BSONObj queryObj = query.done();
         // e.g. queryObj = { ts: { $gte: syncedTo } }
@@ -935,7 +936,7 @@ int ReplSource::_sync_pullOpLog(OperationContext* opCtx, int& nApplied) {
 
     // show any deferred database creates from a previous pass
     {
-        set<string>::iterator i = addDbNextPass.begin();
+        set<std::string>::iterator i = addDbNextPass.begin();
         if (i != addDbNextPass.end()) {
             BSONObjBuilder b;
             b.append("ns", *i + '.');
@@ -978,7 +979,7 @@ int ReplSource::_sync_pullOpLog(OperationContext* opCtx, int& nApplied) {
         BSONObj op = oplogReader.nextSafe();
         BSONElement ts = op.getField("ts");
         if (ts.type() != Date && ts.type() != bsonTimestamp) {
-            string err = op.getStringField("$err");
+            std::string err = op.getStringField("$err");
             if (!err.empty()) {
                 // 13051 is "tailable cursor requested on non capped collection"
                 if (op.getIntField("code") == 13051) {
@@ -1143,7 +1144,7 @@ int ReplSource::sync(OperationContext* opCtx, int& nApplied) {
 
     // FIXME Handle cases where this db isn't on default port, or default port is spec'd in
     // hostName.
-    if ((string("localhost") == hostName || string("127.0.0.1") == hostName) &&
+    if ((std::string("localhost") == hostName || std::string("127.0.0.1") == hostName) &&
         serverGlobalParams.port == ServerGlobalParams::DefaultDBPort) {
         log() << "can't sync from self (localhost). sources configuration may be wrong." << endl;
         sleepsecs(5);
@@ -1275,7 +1276,7 @@ static void replMain(OperationContext* opCtx) {
         if (s) {
             stringstream ss;
             ss << "sleep " << s << " sec before next pass";
-            string msg = ss.str();
+            std::string msg = ss.str();
             if (!serverGlobalParams.quiet.load())
                 log() << msg << endl;
             ReplInfo r(msg.c_str());

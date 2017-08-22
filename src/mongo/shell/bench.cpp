@@ -683,7 +683,7 @@ void BenchRunWorker::generateLoadOnConnection(DBClientBase* conn) {
     invariant(bsonTemplateEvaluator.setId(_id) == BsonTemplateEvaluator::StatusSuccess);
 
     if (_config->username != "") {
-        string errmsg;
+        std::string errmsg;
         if (!conn->auth("admin", _config->username, _config->password, errmsg)) {
             uasserted(15931, "Authenticating to connection for _benchThread failed: " + errmsg);
         }
@@ -955,7 +955,7 @@ void BenchRunWorker::generateLoadOnConnection(DBClientBase* conn) {
                             if (!result["err"].eoo() && result["err"].type() == String &&
                                 (_config->throwGLE || op.throwGLE))
                                 throw DBException(result["code"].eoo() ? 0 : result["code"].Int(),
-                                                  (string) "From benchRun GLE" +
+                                                  (std::string) "From benchRun GLE" +
                                                       causedBy(result["err"].String()));
                         }
                     } break;
@@ -1024,7 +1024,7 @@ void BenchRunWorker::generateLoadOnConnection(DBClientBase* conn) {
                             if (!result["err"].eoo() && result["err"].type() == String &&
                                 (_config->throwGLE || op.throwGLE))
                                 throw DBException(result["code"].eoo() ? 0 : result["code"].Int(),
-                                                  (string) "From benchRun GLE" +
+                                                  (std::string) "From benchRun GLE" +
                                                       causedBy(result["err"].String()));
                         }
                     } break;
@@ -1073,7 +1073,7 @@ void BenchRunWorker::generateLoadOnConnection(DBClientBase* conn) {
                             if (!result["err"].eoo() && result["err"].type() == String &&
                                 (_config->throwGLE || op.throwGLE))
                                 throw DBException(result["code"].eoo() ? 0 : result["code"].Int(),
-                                                  (string) "From benchRun GLE " +
+                                                  (std::string) "From benchRun GLE " +
                                                       causedBy(result["err"].String()));
                         }
                     } break;
@@ -1174,7 +1174,7 @@ void BenchRunWorker::run() {
     try {
         std::unique_ptr<DBClientBase> conn(_config->createConnection());
         if (!_config->username.empty()) {
-            string errmsg;
+            std::string errmsg;
             if (!conn->auth("admin", _config->username, _config->password, errmsg)) {
                 uasserted(15932, "Authenticating to connection for benchThread failed: " + errmsg);
             }
@@ -1206,7 +1206,7 @@ void BenchRunner::start() {
         std::unique_ptr<DBClientBase> conn(_config->createConnection());
         // Must authenticate to admin db in order to run serverStatus command
         if (_config->username != "") {
-            string errmsg;
+            std::string errmsg;
             if (!conn->auth("admin", _config->username, _config->password, errmsg)) {
                 uasserted(
                     16704,
@@ -1242,7 +1242,7 @@ void BenchRunner::stop() {
     {
         std::unique_ptr<DBClientBase> conn(_config->createConnection());
         if (_config->username != "") {
-            string errmsg;
+            std::string errmsg;
             // this can only fail if admin access was revoked since start of run
             if (!conn->auth("admin", _config->username, _config->password, errmsg)) {
                 uasserted(
