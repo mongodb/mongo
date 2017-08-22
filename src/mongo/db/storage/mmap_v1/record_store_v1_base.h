@@ -189,13 +189,12 @@ public:
 
     void deleteRecord(OperationContext* opCtx, const RecordId& dl);
 
-    StatusWith<RecordId> insertRecord(OperationContext* opCtx,
-                                      const char* data,
-                                      int len,
-                                      bool enforceQuota);
+    StatusWith<RecordId> insertRecord(
+        OperationContext* opCtx, const char* data, int len, Timestamp, bool enforceQuota);
 
     Status insertRecordsWithDocWriter(OperationContext* opCtx,
                                       const DocWriter* const* docs,
+                                      const Timestamp*,
                                       size_t nDocs,
                                       RecordId* idsOut) final;
 

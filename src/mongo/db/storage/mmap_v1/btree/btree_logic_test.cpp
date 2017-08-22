@@ -2238,7 +2238,8 @@ public:
         this->locate(key1, 0, true, this->_helper.headManager.getHead(&opCtx), 1);
 
         // Add another record to produce another diskloc.
-        StatusWith<RecordId> s = this->_helper.recordStore.insertRecord(&opCtx, "a", 1, false);
+        StatusWith<RecordId> s =
+            this->_helper.recordStore.insertRecord(&opCtx, "a", 1, Timestamp(), false);
 
         ASSERT_TRUE(s.isOK());
         ASSERT_EQUALS(3, this->_helper.recordStore.numRecords(NULL));

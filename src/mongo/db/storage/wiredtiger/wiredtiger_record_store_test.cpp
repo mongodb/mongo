@@ -113,11 +113,11 @@ TEST(WiredTigerRecordStoreTest, Isolation1) {
         {
             WriteUnitOfWork uow(opCtx.get());
 
-            StatusWith<RecordId> res = rs->insertRecord(opCtx.get(), "a", 2, false);
+            StatusWith<RecordId> res = rs->insertRecord(opCtx.get(), "a", 2, Timestamp(), false);
             ASSERT_OK(res.getStatus());
             id1 = res.getValue();
 
-            res = rs->insertRecord(opCtx.get(), "a", 2, false);
+            res = rs->insertRecord(opCtx.get(), "a", 2, Timestamp(), false);
             ASSERT_OK(res.getStatus());
             id2 = res.getValue();
 
@@ -164,11 +164,11 @@ TEST(WiredTigerRecordStoreTest, Isolation2) {
         {
             WriteUnitOfWork uow(opCtx.get());
 
-            StatusWith<RecordId> res = rs->insertRecord(opCtx.get(), "a", 2, false);
+            StatusWith<RecordId> res = rs->insertRecord(opCtx.get(), "a", 2, Timestamp(), false);
             ASSERT_OK(res.getStatus());
             id1 = res.getValue();
 
-            res = rs->insertRecord(opCtx.get(), "a", 2, false);
+            res = rs->insertRecord(opCtx.get(), "a", 2, Timestamp(), false);
             ASSERT_OK(res.getStatus());
             id2 = res.getValue();
 
@@ -215,7 +215,8 @@ StatusWith<RecordId> insertBSON(ServiceContext::UniqueOperationContext& opCtx,
     Status status = wrs->oplogDiskLocRegister(opCtx.get(), opTime);
     if (!status.isOK())
         return StatusWith<RecordId>(status);
-    StatusWith<RecordId> res = rs->insertRecord(opCtx.get(), obj.objdata(), obj.objsize(), false);
+    StatusWith<RecordId> res =
+        rs->insertRecord(opCtx.get(), obj.objdata(), obj.objsize(), opTime, false);
     if (res.isOK())
         wuow.commit();
     return res;
@@ -229,7 +230,7 @@ TEST(WiredTigerRecordStoreTest, CappedCursorRollover) {
         ServiceContext::UniqueOperationContext opCtx(harnessHelper->newOperationContext());
         for (int i = 0; i < 3; ++i) {
             WriteUnitOfWork uow(opCtx.get());
-            StatusWith<RecordId> res = rs->insertRecord(opCtx.get(), "a", 2, false);
+            StatusWith<RecordId> res = rs->insertRecord(opCtx.get(), "a", 2, Timestamp(), false);
             ASSERT_OK(res.getStatus());
             uow.commit();
         }
@@ -249,7 +250,7 @@ TEST(WiredTigerRecordStoreTest, CappedCursorRollover) {
         auto opCtx = harnessHelper->newOperationContext(client3.get());
         for (int i = 0; i < 100; i++) {
             WriteUnitOfWork uow(opCtx.get());
-            StatusWith<RecordId> res = rs->insertRecord(opCtx.get(), "a", 2, false);
+            StatusWith<RecordId> res = rs->insertRecord(opCtx.get(), "a", 2, Timestamp(), false);
             ASSERT_OK(res.getStatus());
             uow.commit();
         }
@@ -267,7 +268,7 @@ RecordId _oplogOrderInsertOplog(OperationContext* opCtx,
     Status status = rs->oplogDiskLocRegister(opCtx, opTime);
     ASSERT_OK(status);
     BSONObj obj = BSON("ts" << opTime);
-    StatusWith<RecordId> res = rs->insertRecord(opCtx, obj.objdata(), obj.objsize(), false);
+    StatusWith<RecordId> res = rs->insertRecord(opCtx, obj.objdata(), obj.objsize(), opTime, false);
     ASSERT_OK(res.getStatus());
     return res.getValue();
 }
@@ -383,7 +384,7 @@ TEST(WiredTigerRecordStoreTest, CappedCursorYieldFirst) {
     {  // first insert a document
         ServiceContext::UniqueOperationContext opCtx(harnessHelper->newOperationContext());
         WriteUnitOfWork uow(opCtx.get());
-        StatusWith<RecordId> res = rs->insertRecord(opCtx.get(), "a", 2, false);
+        StatusWith<RecordId> res = rs->insertRecord(opCtx.get(), "a", 2, Timestamp(), false);
         ASSERT_OK(res.getStatus());
         id1 = res.getValue();
         uow.commit();
@@ -427,7 +428,7 @@ StatusWith<RecordId> insertBSONWithSize(OperationContext* opCtx,
     if (!status.isOK()) {
         return StatusWith<RecordId>(status);
     }
-    StatusWith<RecordId> res = rs->insertRecord(opCtx, obj.objdata(), obj.objsize(), false);
+    StatusWith<RecordId> res = rs->insertRecord(opCtx, obj.objdata(), obj.objsize(), opTime, false);
     if (res.isOK()) {
         wuow.commit();
     }

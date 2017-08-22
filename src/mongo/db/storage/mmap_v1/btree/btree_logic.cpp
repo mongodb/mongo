@@ -1855,7 +1855,8 @@ Status BtreeLogic<BtreeLayout>::initAsEmpty(OperationContext* opCtx) {
 template <class BtreeLayout>
 DiskLoc BtreeLogic<BtreeLayout>::_addBucket(OperationContext* opCtx) {
     DummyDocWriter docWriter(BtreeLayout::BucketSize);
-    StatusWith<RecordId> loc = _recordStore->insertRecordWithDocWriter(opCtx, &docWriter);
+    StatusWith<RecordId> loc =
+        _recordStore->insertRecordWithDocWriter(opCtx, &docWriter, Timestamp());
     // XXX: remove this(?) or turn into massert or sanely bubble it back up.
     uassertStatusOK(loc.getStatus());
 

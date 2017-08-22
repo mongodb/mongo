@@ -192,7 +192,7 @@ public:
             for (int j = 0; j < 2; j++) {
                 auto doc = BSON("_id" << j);
                 ASSERT_OK(rs->insertRecord(
-                    &_opCtx, doc.objdata(), doc.objsize(), /*enforceQuota*/ false));
+                    &_opCtx, doc.objdata(), doc.objsize(), Timestamp(), /*enforceQuota*/ false));
             }
             wunit.commit();
         }
@@ -267,7 +267,7 @@ public:
             for (int j = 0; j < 2; j++) {
                 auto doc = BSON("_id" << j);
                 ASSERT_OK(rs->insertRecord(
-                    &_opCtx, doc.objdata(), doc.objsize(), /*enforceQuota*/ false));
+                    &_opCtx, doc.objdata(), doc.objsize(), Timestamp(), /*enforceQuota*/ false));
             }
             wunit.commit();
         }
@@ -415,7 +415,8 @@ public:
             rs->deleteRecord(&_opCtx, id1);
             auto doc = BSON("_id" << 3);
             ASSERT_OK(
-                rs->insertRecord(&_opCtx, doc.objdata(), doc.objsize(), /*enforceQuota*/ false)
+                rs->insertRecord(
+                      &_opCtx, doc.objdata(), doc.objsize(), Timestamp(), /*enforceQuota*/ false)
                     .getStatus());
             wunit.commit();
         }

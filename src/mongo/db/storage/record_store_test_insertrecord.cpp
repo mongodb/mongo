@@ -61,7 +61,7 @@ TEST(RecordStoreTestHarness, InsertRecord) {
         {
             WriteUnitOfWork uow(opCtx.get());
             StatusWith<RecordId> res =
-                rs->insertRecord(opCtx.get(), data.c_str(), data.size() + 1, false);
+                rs->insertRecord(opCtx.get(), data.c_str(), data.size() + 1, Timestamp(), false);
             ASSERT_OK(res.getStatus());
             loc = res.getValue();
             uow.commit();
@@ -96,7 +96,7 @@ TEST(RecordStoreTestHarness, InsertMultipleRecords) {
 
             WriteUnitOfWork uow(opCtx.get());
             StatusWith<RecordId> res =
-                rs->insertRecord(opCtx.get(), data.c_str(), data.size() + 1, false);
+                rs->insertRecord(opCtx.get(), data.c_str(), data.size() + 1, Timestamp(), false);
             ASSERT_OK(res.getStatus());
             locs[i] = res.getValue();
             uow.commit();
@@ -128,7 +128,7 @@ TEST(RecordStoreTestHarness, InsertRecordUsingDocWriter) {
 
             WriteUnitOfWork uow(opCtx.get());
             StatusWith<RecordId> res =
-                rs->insertRecordWithDocWriterT(opCtx.get(), &docWriter, Timestamp(1));
+                rs->insertRecordWithDocWriter(opCtx.get(), &docWriter, Timestamp(1));
             ASSERT_OK(res.getStatus());
             loc = res.getValue();
             uow.commit();
@@ -163,7 +163,7 @@ TEST(RecordStoreTestHarness, InsertMultipleRecordsUsingDocWriter) {
 
             WriteUnitOfWork uow(opCtx.get());
             StatusWith<RecordId> res =
-                rs->insertRecordWithDocWriterT(opCtx.get(), &docWriter, Timestamp(1));
+                rs->insertRecordWithDocWriter(opCtx.get(), &docWriter, Timestamp(1));
             ASSERT_OK(res.getStatus());
             locs[i] = res.getValue();
             uow.commit();

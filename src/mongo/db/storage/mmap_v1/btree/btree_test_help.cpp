@@ -74,8 +74,8 @@ BtreeLogicTestHelper<OnDiskFormat>::BtreeLogicTestHelper(const BSONObj& order)
     // Generate a valid record location for a "fake" record, which we will repeatedly use
     // thoughout the tests.
     OperationContextNoop opCtx;
-    StatusWith<RecordId> s =
-        recordStore.insertRecord(&opCtx, randomData.c_str(), randomData.length(), false);
+    StatusWith<RecordId> s = recordStore.insertRecord(
+        &opCtx, randomData.c_str(), randomData.length(), Timestamp(), false);
 
     ASSERT_TRUE(s.isOK());
     ASSERT_EQUALS(1, recordStore.numRecords(NULL));

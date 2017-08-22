@@ -371,44 +371,23 @@ public:
 
     virtual void deleteRecord(OperationContext* opCtx, const RecordId& dl) = 0;
 
-    virtual StatusWith<RecordId> insertRecordT(OperationContext* opCtx,
-                                               const char* data,
-                                               int len,
-                                               Timestamp timestamp,
-                                               bool enforceQuota) {
-        return insertRecord(opCtx, data, len, enforceQuota);
-    }
-
     virtual StatusWith<RecordId> insertRecord(OperationContext* opCtx,
                                               const char* data,
                                               int len,
+                                              Timestamp timestamp,
                                               bool enforceQuota) = 0;
-
-    virtual Status insertRecordsT(OperationContext* opCtx,
-                                  std::vector<Record>* records,
-                                  std::vector<Timestamp>* timestamps,
-                                  bool enforceQuota) {
-        int index = 0;
-        for (auto& record : *records) {
-            StatusWith<RecordId> res = insertRecordT(opCtx,
-                                                     record.data.data(),
-                                                     record.data.size(),
-                                                     (*timestamps)[index++],
-                                                     enforceQuota);
-            if (!res.isOK())
-                return res.getStatus();
-
-            record.id = res.getValue();
-        }
-        return Status::OK();
-    }
 
     virtual Status insertRecords(OperationContext* opCtx,
                                  std::vector<Record>* records,
+                                 std::vector<Timestamp>* timestamps,
                                  bool enforceQuota) {
+        int index = 0;
         for (auto& record : *records) {
-            StatusWith<RecordId> res =
-                insertRecord(opCtx, record.data.data(), record.data.size(), enforceQuota);
+            StatusWith<RecordId> res = insertRecord(opCtx,
+                                                    record.data.data(),
+                                                    record.data.size(),
+                                                    (*timestamps)[index++],
+                                                    enforceQuota);
             if (!res.isOK())
                 return res.getStatus();
 
@@ -426,35 +405,20 @@ public:
      * On success, if idsOut is non-null the RecordIds of the inserted records will be written into
      * it. It must have space for nDocs RecordIds.
      */
-    virtual Status insertRecordsWithDocWriterT(OperationContext* opCtx,
-                                               const DocWriter* const* docs,
-                                               Timestamp* timestamps,
-                                               size_t nDocs,
-                                               RecordId* idsOut = nullptr) {
-        return insertRecordsWithDocWriter(opCtx, docs, nDocs, idsOut);
-    };
-
     virtual Status insertRecordsWithDocWriter(OperationContext* opCtx,
                                               const DocWriter* const* docs,
+                                              const Timestamp* timestamps,
                                               size_t nDocs,
                                               RecordId* idsOut = nullptr) = 0;
 
     /**
      * A thin wrapper around insertRecordsWithDocWriter() to simplify handling of single DocWriters.
      */
-    StatusWith<RecordId> insertRecordWithDocWriterT(OperationContext* opCtx,
-                                                    const DocWriter* doc,
-                                                    Timestamp timestamp) {
+    StatusWith<RecordId> insertRecordWithDocWriter(OperationContext* opCtx,
+                                                   const DocWriter* doc,
+                                                   Timestamp timestamp) {
         RecordId out;
-        Status status = insertRecordsWithDocWriterT(opCtx, &doc, &timestamp, 1, &out);
-        if (!status.isOK())
-            return status;
-        return out;
-    }
-
-    StatusWith<RecordId> insertRecordWithDocWriter(OperationContext* opCtx, const DocWriter* doc) {
-        RecordId out;
-        Status status = insertRecordsWithDocWriter(opCtx, &doc, 1, &out);
+        Status status = insertRecordsWithDocWriter(opCtx, &doc, &timestamp, 1, &out);
         if (!status.isOK())
             return status;
         return out;

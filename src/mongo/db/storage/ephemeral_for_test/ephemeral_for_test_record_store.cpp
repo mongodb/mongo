@@ -391,10 +391,8 @@ StatusWith<RecordId> EphemeralForTestRecordStore::extractAndCheckLocForOplog(con
     return status;
 }
 
-StatusWith<RecordId> EphemeralForTestRecordStore::insertRecord(OperationContext* opCtx,
-                                                               const char* data,
-                                                               int len,
-                                                               bool enforceQuota) {
+StatusWith<RecordId> EphemeralForTestRecordStore::insertRecord(
+    OperationContext* opCtx, const char* data, int len, Timestamp, bool enforceQuota) {
     if (_isCapped && len > _cappedMaxSize) {
         // We use dataSize for capped rollover and we don't want to delete everything if we know
         // this won't fit.
@@ -426,6 +424,7 @@ StatusWith<RecordId> EphemeralForTestRecordStore::insertRecord(OperationContext*
 
 Status EphemeralForTestRecordStore::insertRecordsWithDocWriter(OperationContext* opCtx,
                                                                const DocWriter* const* docs,
+                                                               const Timestamp*,
                                                                size_t nDocs,
                                                                RecordId* idsOut) {
     stdx::lock_guard<stdx::mutex> lock(_data->recordsMutex);

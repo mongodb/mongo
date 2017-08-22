@@ -64,7 +64,8 @@ TEST(RecordStoreTestHarness, UpdateWithDamages) {
         ServiceContext::UniqueOperationContext opCtx(harnessHelper->newOperationContext());
         {
             WriteUnitOfWork uow(opCtx.get());
-            StatusWith<RecordId> res = rs->insertRecord(opCtx.get(), rec.data(), rec.size(), false);
+            StatusWith<RecordId> res =
+                rs->insertRecord(opCtx.get(), rec.data(), rec.size(), Timestamp(), false);
             ASSERT_OK(res.getStatus());
             loc = res.getValue();
             uow.commit();
@@ -129,7 +130,8 @@ TEST(RecordStoreTestHarness, UpdateWithOverlappingDamageEvents) {
         ServiceContext::UniqueOperationContext opCtx(harnessHelper->newOperationContext());
         {
             WriteUnitOfWork uow(opCtx.get());
-            StatusWith<RecordId> res = rs->insertRecord(opCtx.get(), rec.data(), rec.size(), false);
+            StatusWith<RecordId> res =
+                rs->insertRecord(opCtx.get(), rec.data(), rec.size(), Timestamp(), false);
             ASSERT_OK(res.getStatus());
             loc = res.getValue();
             uow.commit();
@@ -192,7 +194,8 @@ TEST(RecordStoreTestHarness, UpdateWithOverlappingDamageEventsReversed) {
         ServiceContext::UniqueOperationContext opCtx(harnessHelper->newOperationContext());
         {
             WriteUnitOfWork uow(opCtx.get());
-            StatusWith<RecordId> res = rs->insertRecord(opCtx.get(), rec.data(), rec.size(), false);
+            StatusWith<RecordId> res =
+                rs->insertRecord(opCtx.get(), rec.data(), rec.size(), Timestamp(), false);
             ASSERT_OK(res.getStatus());
             loc = res.getValue();
             uow.commit();
@@ -253,7 +256,8 @@ TEST(RecordStoreTestHarness, UpdateWithNoDamages) {
         ServiceContext::UniqueOperationContext opCtx(harnessHelper->newOperationContext());
         {
             WriteUnitOfWork uow(opCtx.get());
-            StatusWith<RecordId> res = rs->insertRecord(opCtx.get(), rec.data(), rec.size(), false);
+            StatusWith<RecordId> res =
+                rs->insertRecord(opCtx.get(), rec.data(), rec.size(), Timestamp(), false);
             ASSERT_OK(res.getStatus());
             loc = res.getValue();
             uow.commit();

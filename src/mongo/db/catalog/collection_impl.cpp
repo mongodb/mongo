@@ -302,7 +302,7 @@ Status CollectionImpl::insertDocumentsForOplog(OperationContext* opCtx,
     invariant(!_indexCatalog.haveAnyIndexes());
     invariant(!_mustTakeCappedLockOnInsert);
 
-    Status status = _recordStore->insertRecordsWithDocWriterT(opCtx, docs, timestamps, nDocs);
+    Status status = _recordStore->insertRecordsWithDocWriter(opCtx, docs, timestamps, nDocs);
     if (!status.isOK())
         return status;
 
@@ -407,7 +407,7 @@ Status CollectionImpl::insertDocument(OperationContext* opCtx,
     // TODO SERVER-30638: using timestamp 0 for these inserts, which are non-oplog so we don't yet
     // care about their correct timestamps.
     StatusWith<RecordId> loc = _recordStore->insertRecord(
-        opCtx, doc.objdata(), doc.objsize(), _enforceQuota(enforceQuota));
+        opCtx, doc.objdata(), doc.objsize(), Timestamp(), _enforceQuota(enforceQuota));
 
     if (!loc.isOK())
         return loc.getStatus();
@@ -467,7 +467,7 @@ Status CollectionImpl::_insertDocuments(OperationContext* opCtx,
         timestamps.push_back(timestamp);
     }
     Status status =
-        _recordStore->insertRecordsT(opCtx, &records, &timestamps, _enforceQuota(enforceQuota));
+        _recordStore->insertRecords(opCtx, &records, &timestamps, _enforceQuota(enforceQuota));
     if (!status.isOK())
         return status;
 
@@ -689,7 +689,7 @@ StatusWith<RecordId> CollectionImpl::_updateDocumentWithMove(OperationContext* o
                                                              const SnapshotId& sid) {
     // Insert new record.
     // TODO SERVER-30638, thread through actual timestamps.
-    StatusWith<RecordId> newLocation = _recordStore->insertRecordT(
+    StatusWith<RecordId> newLocation = _recordStore->insertRecord(
         opCtx, newDoc.objdata(), newDoc.objsize(), Timestamp(), _enforceQuota(enforceQuota));
     if (!newLocation.isOK()) {
         return newLocation;

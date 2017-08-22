@@ -139,36 +139,19 @@ public:
 
     virtual void deleteRecord(OperationContext* opCtx, const RecordId& id);
 
-    virtual Status insertRecordsT(OperationContext* opCtx,
-                                  std::vector<Record>* records,
-                                  std::vector<Timestamp>* timestamps,
-                                  bool enforceQuota);
-
-    virtual StatusWith<RecordId> insertRecordT(
-        OperationContext* opCtx, const char* data, int len, Timestamp timestamp, bool enforceQuota);
-
     virtual Status insertRecords(OperationContext* opCtx,
                                  std::vector<Record>* records,
+                                 std::vector<Timestamp>* timestamps,
                                  bool enforceQuota);
 
-    virtual StatusWith<RecordId> insertRecord(OperationContext* opCtx,
-                                              const char* data,
-                                              int len,
-                                              bool enforceQuota);
-
-    virtual Status insertRecordsWithDocWriterT(OperationContext* opCtx,
-                                               const DocWriter* const* docs,
-                                               Timestamp* timestamps,
-                                               size_t nDocs,
-                                               RecordId* idsOut);
+    virtual StatusWith<RecordId> insertRecord(
+        OperationContext* opCtx, const char* data, int len, Timestamp timestamp, bool enforceQuota);
 
     virtual Status insertRecordsWithDocWriter(OperationContext* opCtx,
                                               const DocWriter* const* docs,
+                                              const Timestamp* timestamps,
                                               size_t nDocs,
-                                              RecordId* idsOut) {
-        invariant(false);
-    };
-
+                                              RecordId* idsOut);
 
     virtual Status updateRecord(OperationContext* opCtx,
                                 const RecordId& oldLocation,
@@ -311,7 +294,7 @@ private:
 
     Status _insertRecords(OperationContext* opCtx,
                           Record* records,
-                          Timestamp* timestamps,
+                          const Timestamp* timestamps,
                           size_t nRecords);
 
     RecordId _nextId();

@@ -106,7 +106,8 @@ public:
     }
 
     RecordId insertRecord(OperationContext* opCtx, std::string contents = "abcd") {
-        auto id = rs->insertRecord(opCtx, contents.c_str(), contents.length() + 1, false);
+        auto id =
+            rs->insertRecord(opCtx, contents.c_str(), contents.length() + 1, Timestamp(), false);
         ASSERT_OK(id);
         return id.getValue();
     }

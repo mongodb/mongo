@@ -77,7 +77,7 @@ TEST(KVEngineTestHarness, SimpleRS1) {
     {
         MyOperationContext opCtx(engine);
         WriteUnitOfWork uow(&opCtx);
-        StatusWith<RecordId> res = rs->insertRecord(&opCtx, "abc", 4, false);
+        StatusWith<RecordId> res = rs->insertRecord(&opCtx, "abc", 4, Timestamp(), false);
         ASSERT_OK(res.getStatus());
         loc = res.getValue();
         uow.commit();
@@ -117,7 +117,7 @@ TEST(KVEngineTestHarness, Restart1) {
         {
             MyOperationContext opCtx(engine);
             WriteUnitOfWork uow(&opCtx);
-            StatusWith<RecordId> res = rs->insertRecord(&opCtx, "abc", 4, false);
+            StatusWith<RecordId> res = rs->insertRecord(&opCtx, "abc", 4, Timestamp(), false);
             ASSERT_OK(res.getStatus());
             loc = res.getValue();
             uow.commit();

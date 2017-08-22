@@ -247,7 +247,9 @@ void KVCatalog::FeatureTracker::putInfo(OperationContext* opCtx, const FeatureBi
         // This is the first time a feature is being marked as in-use or not in-use, so we must
         // insert the feature document rather than update it.
         const bool enforceQuota = false;
-        auto rid = _catalog->_rs->insertRecord(opCtx, obj.objdata(), obj.objsize(), enforceQuota);
+        // TODO SERVER-30638: using timestamp 0 for these inserts
+        auto rid = _catalog->_rs->insertRecord(
+            opCtx, obj.objdata(), obj.objsize(), Timestamp(), enforceQuota);
         fassert(40113, rid.getStatus());
         _rid = rid.getValue();
     } else {
@@ -364,8 +366,10 @@ Status KVCatalog::newCollection(OperationContext* opCtx,
         b.append("md", md.toBSON());
         obj = b.obj();
     }
-
-    StatusWith<RecordId> res = _rs->insertRecord(opCtx, obj.objdata(), obj.objsize(), false);
+    const bool enforceQuota = false;
+    // TODO SERVER-30638: using timestamp 0 for these inserts.
+    StatusWith<RecordId> res =
+        _rs->insertRecord(opCtx, obj.objdata(), obj.objsize(), Timestamp(), enforceQuota);
     if (!res.isOK())
         return res.getStatus();
 

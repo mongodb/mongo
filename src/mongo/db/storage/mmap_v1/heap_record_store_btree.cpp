@@ -65,10 +65,8 @@ void HeapRecordStoreBtree::deleteRecord(OperationContext* opCtx, const RecordId&
     invariant(_records.erase(loc) == 1);
 }
 
-StatusWith<RecordId> HeapRecordStoreBtree::insertRecord(OperationContext* opCtx,
-                                                        const char* data,
-                                                        int len,
-                                                        bool enforceQuota) {
+StatusWith<RecordId> HeapRecordStoreBtree::insertRecord(
+    OperationContext* opCtx, const char* data, int len, Timestamp, bool enforceQuota) {
     MmapV1RecordHeader rec(len);
     memcpy(rec.data.get(), data, len);
 
@@ -82,6 +80,7 @@ StatusWith<RecordId> HeapRecordStoreBtree::insertRecord(OperationContext* opCtx,
 
 Status HeapRecordStoreBtree::insertRecordsWithDocWriter(OperationContext* opCtx,
                                                         const DocWriter* const* docs,
+                                                        const Timestamp*,
                                                         size_t nDocs,
                                                         RecordId* idsOut) {
     // This class is only for unit tests of the mmapv1 btree code and this is how it is called.

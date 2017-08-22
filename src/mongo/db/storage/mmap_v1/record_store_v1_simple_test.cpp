@@ -123,7 +123,8 @@ TEST(SimpleRecordStoreV1, AllocQuantized) {
     SimpleRecordStoreV1 rs(&opCtx, myns, md, &em, false);
 
     BSONObj obj = docForRecordSize(300);
-    StatusWith<RecordId> result = rs.insertRecord(&opCtx, obj.objdata(), obj.objsize(), false);
+    StatusWith<RecordId> result =
+        rs.insertRecord(&opCtx, obj.objdata(), obj.objsize(), Timestamp(), false);
     ASSERT(result.isOK());
 
     // The length of the allocated record is quantized.
@@ -141,7 +142,8 @@ TEST(SimpleRecordStoreV1, AllocNonQuantized) {
     SimpleRecordStoreV1 rs(&opCtx, myns, md, &em, false);
 
     BSONObj obj = docForRecordSize(300);
-    StatusWith<RecordId> result = rs.insertRecord(&opCtx, obj.objdata(), obj.objsize(), false);
+    StatusWith<RecordId> result =
+        rs.insertRecord(&opCtx, obj.objdata(), obj.objsize(), Timestamp(), false);
     ASSERT(result.isOK());
 
     // The length of the allocated record is quantized.
@@ -159,7 +161,8 @@ TEST(SimpleRecordStoreV1, AllocNonQuantizedStillAligned) {
     SimpleRecordStoreV1 rs(&opCtx, myns, md, &em, false);
 
     BSONObj obj = docForRecordSize(298);
-    StatusWith<RecordId> result = rs.insertRecord(&opCtx, obj.objdata(), obj.objsize(), false);
+    StatusWith<RecordId> result =
+        rs.insertRecord(&opCtx, obj.objdata(), obj.objsize(), Timestamp(), false);
     ASSERT(result.isOK());
 
     // The length of the allocated record is quantized.
@@ -177,7 +180,7 @@ TEST(SimpleRecordStoreV1, AllocQuantizedWithDocWriter) {
     SimpleRecordStoreV1 rs(&opCtx, myns, md, &em, false);
 
     BsonDocWriter docWriter(docForRecordSize(300), true);
-    StatusWith<RecordId> result = rs.insertRecordWithDocWriter(&opCtx, &docWriter);
+    StatusWith<RecordId> result = rs.insertRecordWithDocWriter(&opCtx, &docWriter, Timestamp());
     ASSERT(result.isOK());
 
     // The length of the allocated record is quantized.
@@ -197,7 +200,7 @@ TEST(SimpleRecordStoreV1, AllocNonQuantizedDocWriter) {
     SimpleRecordStoreV1 rs(&opCtx, myns + "$x", md, &em, false);
 
     BsonDocWriter docWriter(docForRecordSize(300), false);
-    StatusWith<RecordId> result = rs.insertRecordWithDocWriter(&opCtx, &docWriter);
+    StatusWith<RecordId> result = rs.insertRecordWithDocWriter(&opCtx, &docWriter, Timestamp());
     ASSERT(result.isOK());
 
     // The length of the allocated record is not quantized.
@@ -215,7 +218,7 @@ TEST(SimpleRecordStoreV1, AllocAlignedDocWriter) {
     SimpleRecordStoreV1 rs(&opCtx, myns + "$x", md, &em, false);
 
     BsonDocWriter docWriter(docForRecordSize(298), false);
-    StatusWith<RecordId> result = rs.insertRecordWithDocWriter(&opCtx, &docWriter);
+    StatusWith<RecordId> result = rs.insertRecordWithDocWriter(&opCtx, &docWriter, Timestamp());
     ASSERT(result.isOK());
 
     ASSERT_EQUALS(300,
@@ -236,7 +239,8 @@ TEST(SimpleRecordStoreV1, AllocUseQuantizedDeletedRecordWithoutSplit) {
     }
 
     BsonDocWriter docWriter(docForRecordSize(300), true);
-    StatusWith<RecordId> actualLocation = rs.insertRecordWithDocWriter(&opCtx, &docWriter);
+    StatusWith<RecordId> actualLocation =
+        rs.insertRecordWithDocWriter(&opCtx, &docWriter, Timestamp());
     ASSERT_OK(actualLocation.getStatus());
 
     {
@@ -261,7 +265,8 @@ TEST(SimpleRecordStoreV1, AllocUseQuantizedDeletedRecordWithSplit) {
     }
 
     BsonDocWriter docWriter(docForRecordSize(300), true);
-    StatusWith<RecordId> actualLocation = rs.insertRecordWithDocWriter(&opCtx, &docWriter);
+    StatusWith<RecordId> actualLocation =
+        rs.insertRecordWithDocWriter(&opCtx, &docWriter, Timestamp());
     ASSERT_OK(actualLocation.getStatus());
 
     {
@@ -286,7 +291,8 @@ TEST(SimpleRecordStoreV1, AllocUseNonQuantizedDeletedRecordWithoutSplit) {
     }
 
     BsonDocWriter docWriter(docForRecordSize(300), false);
-    StatusWith<RecordId> actualLocation = rs.insertRecordWithDocWriter(&opCtx, &docWriter);
+    StatusWith<RecordId> actualLocation =
+        rs.insertRecordWithDocWriter(&opCtx, &docWriter, Timestamp());
     ASSERT_OK(actualLocation.getStatus());
 
     {
@@ -311,7 +317,8 @@ TEST(SimpleRecordStoreV1, AllocUseNonQuantizedDeletedRecordWithSplit) {
     }
 
     BsonDocWriter docWriter(docForRecordSize(300), false);
-    StatusWith<RecordId> actualLocation = rs.insertRecordWithDocWriter(&opCtx, &docWriter);
+    StatusWith<RecordId> actualLocation =
+        rs.insertRecordWithDocWriter(&opCtx, &docWriter, Timestamp());
     ASSERT_OK(actualLocation.getStatus());
 
     {
@@ -338,7 +345,8 @@ TEST(SimpleRecordStoreV1, GrabBagIsUsed) {
     }
 
     BsonDocWriter docWriter(docForRecordSize(256), false);
-    StatusWith<RecordId> actualLocation = rs.insertRecordWithDocWriter(&opCtx, &docWriter);
+    StatusWith<RecordId> actualLocation =
+        rs.insertRecordWithDocWriter(&opCtx, &docWriter, Timestamp());
     ASSERT_OK(actualLocation.getStatus());
 
     {
@@ -366,7 +374,8 @@ TEST(SimpleRecordStoreV1, GrabBagIsPoppedEvenIfUnneeded) {
     }
 
     BsonDocWriter docWriter(docForRecordSize(1000), false);
-    StatusWith<RecordId> actualLocation = rs.insertRecordWithDocWriter(&opCtx, &docWriter);
+    StatusWith<RecordId> actualLocation =
+        rs.insertRecordWithDocWriter(&opCtx, &docWriter, Timestamp());
     ASSERT_OK(actualLocation.getStatus());
 
     {
@@ -394,7 +403,8 @@ TEST(SimpleRecordStoreV1, GrabBagIsPoppedEvenIfUnusable) {
     }
 
     BsonDocWriter docWriter(docForRecordSize(8 * 1024 * 1024), false);
-    StatusWith<RecordId> actualLocation = rs.insertRecordWithDocWriter(&opCtx, &docWriter);
+    StatusWith<RecordId> actualLocation =
+        rs.insertRecordWithDocWriter(&opCtx, &docWriter, Timestamp());
     ASSERT_OK(actualLocation.getStatus());
 
     {
@@ -415,7 +425,7 @@ TEST(SimpleRecordStoreV1, FullSimple1) {
 
 
     ASSERT_EQUALS(0, md->numRecords());
-    StatusWith<RecordId> result = rs.insertRecord(&opCtx, "abc", 4, 1000);
+    StatusWith<RecordId> result = rs.insertRecord(&opCtx, "abc", 4, Timestamp(), true);
     ASSERT_TRUE(result.isOK());
     ASSERT_EQUALS(1, md->numRecords());
     RecordData recordData = rs.dataFor(&opCtx, result.getValue());

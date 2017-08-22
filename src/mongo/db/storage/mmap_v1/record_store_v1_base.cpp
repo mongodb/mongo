@@ -301,6 +301,7 @@ DiskLoc RecordStoreV1Base::getPrevRecordInExtent(OperationContext* opCtx,
 
 Status RecordStoreV1Base::insertRecordsWithDocWriter(OperationContext* opCtx,
                                                      const DocWriter* const* docs,
+                                                     const Timestamp*,
                                                      size_t nDocs,
                                                      RecordId* idsOut) {
     for (size_t i = 0; i < nDocs; i++) {
@@ -339,10 +340,8 @@ Status RecordStoreV1Base::insertRecordsWithDocWriter(OperationContext* opCtx,
 }
 
 
-StatusWith<RecordId> RecordStoreV1Base::insertRecord(OperationContext* opCtx,
-                                                     const char* data,
-                                                     int len,
-                                                     bool enforceQuota) {
+StatusWith<RecordId> RecordStoreV1Base::insertRecord(
+    OperationContext* opCtx, const char* data, int len, Timestamp, bool enforceQuota) {
     if (len < 4) {
         return StatusWith<RecordId>(ErrorCodes::InvalidLength, "record has to be >= 4 bytes");
     }

@@ -280,8 +280,9 @@ Status NamespaceDetailsCollectionCatalogEntry::prepareForIndexBuild(OperationCon
                                                                     const IndexDescriptor* desc) {
     BSONObj spec = desc->infoObj();
     // 1) entry in system.indexs
+    // TODO SERVER-30638: using timestamp 0 for these inserts.
     StatusWith<RecordId> systemIndexesEntry =
-        _indexRecordStore->insertRecord(opCtx, spec.objdata(), spec.objsize(), false);
+        _indexRecordStore->insertRecord(opCtx, spec.objdata(), spec.objsize(), Timestamp(), false);
     if (!systemIndexesEntry.isOK())
         return systemIndexesEntry.getStatus();
 
@@ -391,8 +392,9 @@ void NamespaceDetailsCollectionCatalogEntry::_updateSystemNamespaces(OperationCo
         opCtx, _namespacesRecordId, newEntry.objdata(), newEntry.objsize(), false, NULL);
 
     if (ErrorCodes::NeedsDocumentMove == result) {
+        // TODO SERVER-30638: using timestamp 0 for these inserts.
         StatusWith<RecordId> newLocation = _namespacesRecordStore->insertRecord(
-            opCtx, newEntry.objdata(), newEntry.objsize(), false);
+            opCtx, newEntry.objdata(), newEntry.objsize(), Timestamp(), false);
         fassert(40074, newLocation.getStatus().isOK());
 
         // Invalidate old namespace record

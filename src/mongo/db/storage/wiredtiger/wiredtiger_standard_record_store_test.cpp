@@ -223,7 +223,8 @@ TEST(WiredTigerRecordStoreTest, SizeStorer1) {
         {
             WriteUnitOfWork uow(opCtx.get());
             for (int i = 0; i < N; i++) {
-                StatusWith<RecordId> res = rs->insertRecord(opCtx.get(), "a", 2, false);
+                StatusWith<RecordId> res =
+                    rs->insertRecord(opCtx.get(), "a", 2, Timestamp(), false);
                 ASSERT_OK(res.getStatus());
             }
             uow.commit();
@@ -329,7 +330,7 @@ private:
             ServiceContext::UniqueOperationContext opCtx(harnessHelper->newOperationContext());
             WriteUnitOfWork uow(opCtx.get());
             for (int i = 0; i < expectedNumRecords; i++) {
-                ASSERT_OK(rs->insertRecord(opCtx.get(), "a", 2, false).getStatus());
+                ASSERT_OK(rs->insertRecord(opCtx.get(), "a", 2, Timestamp(), false).getStatus());
             }
             uow.commit();
         }

@@ -205,7 +205,7 @@ TEST(WiredTigerRecordStoreTest, PrefixedTableScan) {
         ServiceContext::UniqueOperationContext opCtx(harnessHelper->newOperationContext());
         for (int num = 0; num < numDocs; ++num) {
             WriteUnitOfWork uow(opCtx.get());
-            StatusWith<RecordId> res = rs->insertRecord(opCtx.get(), "a", 2, false);
+            StatusWith<RecordId> res = rs->insertRecord(opCtx.get(), "a", 2, Timestamp(), false);
             ASSERT_OK(res.getStatus());
             uow.commit();
         }
@@ -231,7 +231,7 @@ TEST(WiredTigerRecordStoreTest, PrefixedSeekingCursor) {
         ServiceContext::UniqueOperationContext opCtx(harnessHelper->newOperationContext());
         for (int num = 0; num < numDocs; ++num) {
             WriteUnitOfWork uow(opCtx.get());
-            StatusWith<RecordId> res = rs->insertRecord(opCtx.get(), "a", 2, false);
+            StatusWith<RecordId> res = rs->insertRecord(opCtx.get(), "a", 2, Timestamp(), false);
             if (startRecordId.isNull()) {
                 startRecordId = res.getValue();
             }

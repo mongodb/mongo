@@ -1104,23 +1104,16 @@ void WiredTigerRecordStore::reclaimOplog(OperationContext* opCtx) {
            << " records totaling to " << _dataSize.load() << " bytes";
 }
 
-Status WiredTigerRecordStore::insertRecordsT(OperationContext* opCtx,
-                                             std::vector<Record>* records,
-                                             std::vector<Timestamp>* timestamps,
-                                             bool enforceQuota) {
-    return _insertRecords(opCtx, records->data(), timestamps->data(), records->size());
-}
-
 Status WiredTigerRecordStore::insertRecords(OperationContext* opCtx,
                                             std::vector<Record>* records,
+                                            std::vector<Timestamp>* timestamps,
                                             bool enforceQuota) {
-    invariant(false);
-    return Status::OK();
+    return _insertRecords(opCtx, records->data(), timestamps->data(), records->size());
 }
 
 Status WiredTigerRecordStore::_insertRecords(OperationContext* opCtx,
                                              Record* records,
-                                             Timestamp* timestamps,
+                                             const Timestamp* timestamps,
                                              size_t nRecords) {
     // We are kind of cheating on capped collections since we write all of them at once ....
     // Simplest way out would be to just block vector writes for everything except oplog ?
@@ -1198,21 +1191,9 @@ Status WiredTigerRecordStore::_insertRecords(OperationContext* opCtx,
     return Status::OK();
 }
 
-StatusWith<RecordId> WiredTigerRecordStore::insertRecordT(
+StatusWith<RecordId> WiredTigerRecordStore::insertRecord(
     OperationContext* opCtx, const char* data, int len, Timestamp timestamp, bool enforceQuota) {
     Record record = {RecordId(), RecordData(data, len)};
-    Status status = _insertRecords(opCtx, &record, &timestamp, 1);
-    if (!status.isOK())
-        return StatusWith<RecordId>(status);
-    return StatusWith<RecordId>(record.id);
-}
-
-StatusWith<RecordId> WiredTigerRecordStore::insertRecord(OperationContext* opCtx,
-                                                         const char* data,
-                                                         int len,
-                                                         bool enforceQuota) {
-    Record record = {RecordId(), RecordData(data, len)};
-    Timestamp timestamp;
     Status status = _insertRecords(opCtx, &record, &timestamp, 1);
     if (!status.isOK())
         return StatusWith<RecordId>(status);
@@ -1234,11 +1215,11 @@ void WiredTigerRecordStore::notifyCappedWaitersIfNeeded() {
     }
 }
 
-Status WiredTigerRecordStore::insertRecordsWithDocWriterT(OperationContext* opCtx,
-                                                          const DocWriter* const* docs,
-                                                          Timestamp* timestamps,
-                                                          size_t nDocs,
-                                                          RecordId* idsOut) {
+Status WiredTigerRecordStore::insertRecordsWithDocWriter(OperationContext* opCtx,
+                                                         const DocWriter* const* docs,
+                                                         const Timestamp* timestamps,
+                                                         size_t nDocs,
+                                                         RecordId* idsOut) {
     std::unique_ptr<Record[]> records(new Record[nDocs]);
 
     // First get all the sizes so we can allocate a single buffer for all documents. Eventually it

@@ -369,7 +369,8 @@ void SimpleRecordStoreV1::_compactExtent(OperationContext* opCtx,
                 // start of the compact, this insert will allocate a record in a new extent.
                 // See the comment in compact() for more details.
                 CompactDocWriter writer(recOld, rawDataSize, allocationSize);
-                StatusWith<RecordId> status = insertRecordWithDocWriter(opCtx, &writer);
+                StatusWith<RecordId> status =
+                    insertRecordWithDocWriter(opCtx, &writer, Timestamp());
                 uassertStatusOK(status.getStatus());
                 const MmapV1RecordHeader* newRec =
                     recordFor(DiskLoc::fromRecordId(status.getValue()));
