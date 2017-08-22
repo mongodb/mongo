@@ -31,6 +31,7 @@
 #include <memory>
 
 #include "mongo/db/catalog/health_log_gen.h"
+#include "mongo/db/db_raii.h"
 #include "mongo/db/query/plan_executor.h"
 #include "mongo/db/repl/dbcheck_gen.h"
 #include "mongo/util/md5.hpp"
@@ -38,7 +39,6 @@
 namespace mongo {
 
 // Forward declarations.
-class AutoGetCollection;
 class Collection;
 class OperationContext;
 
@@ -158,14 +158,42 @@ private:
 };
 
 /**
- * Get a new, locked, collection handle.
- *
- * Equivalent to the AutoGetCollectionForRead constructor, except that if the collection is missing
- * it will report that to the health log.
+ * Get the given database in MODE_S, while also blocking stepdown (SERVER-28544) and allowing writes
+ * to "local".
  */
-std::unique_ptr<AutoGetCollection> getCollectionForDbCheck(OperationContext* opCtx,
-                                                           const NamespaceString& nss,
-                                                           const OplogEntriesEnum& type);
+class AutoGetDbForDbCheck {
+public:
+    AutoGetDbForDbCheck(OperationContext* opCtx, const NamespaceString& nss);
+
+    Database* getDb(void) {
+        return agd.getDb();
+    }
+
+private:
+    Lock::DBLock localLock;
+    AutoGetDb agd;
+};
+
+/**
+ * Get the given collection in MODE_S, except that if the collection is missing it will report that
+ * to the health log, and it takes an IX lock on "local" as a workaround to SERVER-28544 and to
+ * ensure correct flush lock acquisition for MMAPV1.
+ */
+class AutoGetCollectionForDbCheck {
+public:
+    AutoGetCollectionForDbCheck(OperationContext* opCtx,
+                                const NamespaceString& nss,
+                                const OplogEntriesEnum& type);
+    Collection* getCollection(void) {
+        return _collection;
+    }
+
+private:
+    AutoGetDbForDbCheck _agd;
+    Lock::CollectionLock _collLock;
+    Collection* _collection;
+};
+
 
 /**
  * Gather the index information for a collection.

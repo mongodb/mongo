@@ -170,6 +170,9 @@ public:
     // The following methods assume isValid() is true for this NamespaceString.
     //
 
+    bool isHealthlog() const {
+        return isLocal() && coll() == "system.healthlog";
+    }
     bool isSystem() const {
         return coll().startsWith("system.");
     }

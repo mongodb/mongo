@@ -26,6 +26,8 @@
  * then also delete it in the license file.
  */
 
+#define MONGO_LOG_DEFAULT_COMPONENT ::mongo::logger::LogComponent::kCommand
+
 #include "mongo/platform/basic.h"
 
 #include "mongo/db/auth/authorization_session.h"
@@ -41,6 +43,8 @@
 #include "mongo/db/repl/oplog.h"
 #include "mongo/db/repl/optime.h"
 #include "mongo/util/background.h"
+
+#include "mongo/util/log.h"
 
 namespace mongo {
 
@@ -66,14 +70,45 @@ struct DbCheckCollectionInfo {
  */
 using DbCheckRun = std::vector<DbCheckCollectionInfo>;
 
+/**
+ * Check if dbCheck can run on the given namespace.
+ */
+bool canRunDbCheckOn(const NamespaceString& nss) {
+    if (nss.isLocal()) {
+        return false;
+    }
+
+    // TODO: SERVER-30826.
+    const std::set<StringData> replicatedSystemCollections{"system.backup_users",
+                                                           "system.js",
+                                                           "system.new_users",
+                                                           "system.roles",
+                                                           "system.users",
+                                                           "system.version",
+                                                           "system.views"};
+    if (nss.isSystem()) {
+        if (replicatedSystemCollections.count(nss.coll()) == 0) {
+            return false;
+        }
+    }
+
+    return true;
+}
+
 std::unique_ptr<DbCheckRun> singleCollectionRun(OperationContext* opCtx,
                                                 const std::string& dbName,
                                                 const DbCheckSingleInvocation& invocation) {
     NamespaceString nss(dbName, invocation.getColl());
     AutoGetCollectionForRead agc(opCtx, nss);
+
     uassert(ErrorCodes::NamespaceNotFound,
             "Collection " + invocation.getColl() + " not found",
             agc.getCollection());
+
+    uassert(40619,
+            "Cannot run dbCheck on " + nss.toString() + " because it is not replicated",
+            canRunDbCheckOn(nss));
+
     auto start = invocation.getMinKey();
     auto end = invocation.getMaxKey();
     auto maxCount = invocation.getMaxCount();
@@ -88,6 +123,9 @@ std::unique_ptr<DbCheckRun> singleCollectionRun(OperationContext* opCtx,
 std::unique_ptr<DbCheckRun> fullDatabaseRun(OperationContext* opCtx,
                                             const std::string& dbName,
                                             const DbCheckAllInvocation& invocation) {
+    uassert(
+        ErrorCodes::InvalidNamespace, "Cannot run dbCheck on local database", dbName != "local");
+
     // Read the list of collections in a database-level lock.
     AutoGetDb agd(opCtx, StringData(dbName), MODE_S);
     auto db = agd.getDb();
@@ -142,7 +180,7 @@ std::unique_ptr<DbCheckRun> getRun(OperationContext* opCtx,
 class DbCheckJob : public BackgroundJob {
 public:
     DbCheckJob(const StringData& dbName, std::unique_ptr<DbCheckRun> run)
-        : BackgroundJob(true), _dbName(dbName.toString()), _run(std::move(run)) {}
+        : BackgroundJob(true), _done(false), _dbName(dbName.toString()), _run(std::move(run)) {}
 
 protected:
     virtual std::string name() const override {
@@ -154,9 +192,17 @@ protected:
         Client::initThread(name());
 
         for (const auto& coll : *_run) {
-            _doCollection(coll);
+            try {
+                _doCollection(coll);
+            } catch (const DBException& e) {
+                auto logEntry = dbCheckErrorHealthLogEntry(
+                    coll.nss, "dbCheck failed", OplogEntriesEnum::Batch, e.toStatus());
+                HealthLog::get(Client::getCurrent()->getServiceContext()).log(*logEntry);
+                return;
+            }
 
             if (_done) {
+                log() << "dbCheck terminated due to stepdown";
                 return;
             }
         }
@@ -266,8 +312,14 @@ private:
         auto uniqueOpCtx = Client::getCurrent()->makeOperationContext();
         auto opCtx = uniqueOpCtx.get();
 
-        // While we get the prev/next UUID information, we need a database-level lock.
-        AutoGetDb agd(opCtx, _dbName, MODE_S);
+        // While we get the prev/next UUID information, we need a database-level lock, plus a global
+        // IX lock (see SERVER-28544).
+        AutoGetDbForDbCheck agd(opCtx, info.nss);
+
+        if (_stepdownHasOccurred(opCtx, info.nss)) {
+            _done = true;
+            return true;
+        }
 
         auto collection = agd.getDb()->getCollection(opCtx, info.nss);
 
@@ -295,18 +347,8 @@ private:
         entry.setIndexes(indices);
         entry.setOptions(options);
 
-        StatusWith<repl::OpTime> optime =
-            writeConflictRetry(opCtx, "log dbCheck to oplog", collection->ns().ns(), [&] {
-                WriteUnitOfWork uow(opCtx);
-                // Send information on this collection over the oplog for the secondary to check.
-                auto optime = _logOp(opCtx, collection->ns(), collection->uuid(), entry.toBSON());
-                uow.commit();
-                return optime;
-            });
-
-        if (!optime.isOK()) {
-            return true;
-        }
+        // Send information on this collection over the oplog for the secondary to check.
+        auto optime = _logOp(opCtx, collection->ns(), collection->uuid(), entry.toBSON());
 
         DbCheckCollectionInformation collectionInfo;
         collectionInfo.collectionName = collection->ns().coll().toString();
@@ -315,11 +357,8 @@ private:
         collectionInfo.indexes = entry.getIndexes();
         collectionInfo.options = entry.getOptions();
 
-        auto hle = dbCheckCollectionEntry(collection->ns(),
-                                          *collection->uuid(),
-                                          collectionInfo,
-                                          collectionInfo,
-                                          optime.getValue());
+        auto hle = dbCheckCollectionEntry(
+            collection->ns(), *collection->uuid(), collectionInfo, collectionInfo, optime);
 
         HealthLog::get(opCtx).log(*hle);
 
@@ -335,99 +374,97 @@ private:
         auto opCtx = uniqueOpCtx.get();
         DbCheckOplogBatch batch;
 
-        using Result = StatusWith<BatchStats>;
-        auto result = writeConflictRetry(opCtx, "dbCheck batch", info.nss.ns(), [&] {
-            WriteUnitOfWork uow(opCtx);
+        // Find the relevant collection.
+        AutoGetCollectionForDbCheck agc(opCtx, info.nss, OplogEntriesEnum::Batch);
 
-            // Find the relevant collection.
-            auto agc = getCollectionForDbCheck(opCtx, info.nss, OplogEntriesEnum::Batch);
-            auto collection = agc->getCollection();
-            if (!collection) {
-                return Result(ErrorCodes::NamespaceNotFound, "dbCheck collection no longer exists");
-            }
+        if (_stepdownHasOccurred(opCtx, info.nss)) {
+            _done = true;
+            return Status(ErrorCodes::PrimarySteppedDown, "dbCheck terminated due to stepdown");
+        }
 
-            boost::optional<DbCheckHasher> hasher;
-            try {
-                hasher.emplace(opCtx,
-                               collection,
-                               first,
-                               info.end,
-                               std::min(batchDocs, info.maxCount),
-                               std::min(batchBytes, info.maxSize));
-            } catch (const DBException& e) {
-                return Result(e.toStatus());
-            }
+        auto collection = agc.getCollection();
 
-            Status status = hasher->hashAll();
+        if (!collection) {
+            return {ErrorCodes::NamespaceNotFound, "dbCheck collection no longer exists"};
+        }
 
-            if (!status.isOK()) {
-                return Result(status);
-            }
+        boost::optional<DbCheckHasher> hasher;
+        try {
+            hasher.emplace(opCtx,
+                           collection,
+                           first,
+                           info.end,
+                           std::min(batchDocs, info.maxCount),
+                           std::min(batchBytes, info.maxSize));
+        } catch (const DBException& e) {
+            return e.toStatus();
+        }
 
-            std::string md5 = hasher->total();
+        Status status = hasher->hashAll();
 
-            batch.setType(OplogEntriesEnum::Batch);
-            batch.setNss(info.nss);
-            batch.setMd5(md5);
-            batch.setMinKey(first);
-            batch.setMaxKey(BSONKey(hasher->lastKey()));
+        if (!status.isOK()) {
+            return status;
+        }
 
-            BatchStats result;
+        std::string md5 = hasher->total();
 
-            // Send information on this batch over the oplog.
-            auto optime = _logOp(opCtx, info.nss, collection->uuid(), batch.toBSON());
+        batch.setType(OplogEntriesEnum::Batch);
+        batch.setNss(info.nss);
+        batch.setMd5(md5);
+        batch.setMinKey(first);
+        batch.setMaxKey(BSONKey(hasher->lastKey()));
 
-            if (!optime.isOK()) {
-                return Result(optime.getStatus());
-            }
+        BatchStats result;
 
-            result.time = optime.getValue();
+        // Send information on this batch over the oplog.
+        result.time = _logOp(opCtx, info.nss, collection->uuid(), batch.toBSON());
 
-            uow.commit();
-
-            result.nDocs = hasher->docsSeen();
-            result.nBytes = hasher->bytesSeen();
-            result.lastKey = hasher->lastKey();
-            result.md5 = md5;
-
-            return Result(result);
-        });
+        result.nDocs = hasher->docsSeen();
+        result.nBytes = hasher->bytesSeen();
+        result.lastKey = hasher->lastKey();
+        result.md5 = md5;
 
         return result;
     }
 
-    StatusWith<repl::OpTime> _logOp(OperationContext* opCtx,
-                                    const NamespaceString& nss,
-                                    OptionalCollectionUUID uuid,
-                                    const BSONObj& obj) {
-        // Stepdown takes a global S lock (see SERVER-28544).  We therefore take an incompatible
-        // lock to ensure that stepdown can't happen between when we check if this thread has been
-        // interrupted and when we attempt to write to the oplog.
-        Lock::GlobalLock lock(opCtx, MODE_IX, std::numeric_limits<unsigned int>::max());
-
+    /**
+     * Return `true` iff the primary the check is running on has stepped down.
+     */
+    bool _stepdownHasOccurred(OperationContext* opCtx, const NamespaceString& nss) {
         Status status = opCtx->checkForInterruptNoAssert();
 
         if (!status.isOK()) {
-            _done = true;
-            return status;
+            return true;
         }
 
         auto coord = repl::ReplicationCoordinator::get(opCtx);
 
         if (!coord->canAcceptWritesFor(opCtx, nss)) {
-            _done = true;
-            return Status(ErrorCodes::PrimarySteppedDown, "dbCheck terminated by stepdown");
+            return true;
         }
 
-        return repl::logOp(opCtx,
-                           "c",
-                           nss,
-                           uuid,
-                           obj,
-                           nullptr,
-                           false,
-                           kUninitializedStmtId,
-                           repl::PreAndPostImageTimestamps());
+        return false;
+    }
+
+    repl::OpTime _logOp(OperationContext* opCtx,
+                        const NamespaceString& nss,
+                        OptionalCollectionUUID uuid,
+                        const BSONObj& obj) {
+        return writeConflictRetry(
+            opCtx, "dbCheck oplog entry", NamespaceString::kRsOplogNamespace.ns(), [&] {
+                WriteUnitOfWork uow(opCtx);
+                repl::OpTime result = repl::logOp(opCtx,
+                                                  "c",
+                                                  nss,
+                                                  uuid,
+                                                  obj,
+                                                  nullptr,
+                                                  false,
+                                                  kUninitializedStmtId,
+                                                  repl::PreAndPostImageTimestamps());
+                uow.commit();
+                return result;
+            });
     }
 };
 

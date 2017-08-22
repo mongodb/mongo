@@ -31,6 +31,7 @@
 #include "mongo/bson/simple_bsonelement_comparator.h"
 #include "mongo/db/catalog/collection_catalog_entry.h"
 #include "mongo/db/catalog/database.h"
+#include "mongo/db/catalog/database_holder.h"
 #include "mongo/db/catalog/health_log.h"
 #include "mongo/db/catalog/index_catalog.h"
 #include "mongo/db/catalog/uuid_catalog.h"
@@ -366,26 +367,27 @@ BSONObj collectionOptions(OperationContext* opCtx, Collection* collection) {
     return collection->getCatalogEntry()->getCollectionOptions(opCtx).toBSON();
 }
 
-std::unique_ptr<AutoGetCollection> getCollectionForDbCheck(OperationContext* opCtx,
-                                                           const NamespaceString& nss,
-                                                           const OplogEntriesEnum& type) {
-    // We require a MODE_S lock to keep intervening updates from invalidating the hash before we
-    // submit it to the oplog. This lock is held between the start of the batch and submitting the
-    // hash to the oplog.
-    auto result = stdx::make_unique<AutoGetCollection>(opCtx, nss, MODE_S);
-    auto collection = result->getCollection();
+AutoGetDbForDbCheck::AutoGetDbForDbCheck(OperationContext* opCtx, const NamespaceString& nss)
+    : localLock(opCtx, "local"_sd, MODE_IX), agd(opCtx, nss.db(), MODE_S) {}
+
+AutoGetCollectionForDbCheck::AutoGetCollectionForDbCheck(OperationContext* opCtx,
+                                                         const NamespaceString& nss,
+                                                         const OplogEntriesEnum& type)
+    : _agd(opCtx, nss), _collLock(opCtx->lockState(), nss.ns(), MODE_S) {
+    std::string msg;
+    if (!_agd.getDb()) {
+        msg = "Database under dbCheck no longer exists";
+    } else if (_agd.getDb()->getViewCatalog()->lookup(opCtx, nss.ns())) {
+        msg = "Collection under dbCheck renamed to view";
+    } else {
+        msg = "Collection under dbCheck no longer exists";
+    }
+
+    _collection = _agd.getDb()->getCollection(opCtx, nss);
 
     // If the collection gets deleted after the check is launched, record that in the health log.
-    if (!collection) {
-        auto db = result->getDb();
+    if (!_collection) {
         std::string msg;
-        if (!db) {
-            msg = "Database under dbCheck no longer exists";
-        } else if (db->getViewCatalog()->lookup(opCtx, nss.ns())) {
-            msg = "Collection under dbCheck renamed to view";
-        } else {
-            msg = "Collection under dbCheck no longer exists";
-        }
 
         auto entry = dbCheckHealthLogEntry(nss,
                                            SeverityEnum::Error,
@@ -394,8 +396,6 @@ std::unique_ptr<AutoGetCollection> getCollectionForDbCheck(OperationContext* opC
                                            BSON("success" << false << "error" << msg));
         HealthLog::get(opCtx).log(*entry);
     }
-
-    return result;
 }
 
 namespace {
@@ -403,8 +403,8 @@ namespace {
 Status dbCheckBatchOnSecondary(OperationContext* opCtx,
                                const repl::OpTime& optime,
                                const DbCheckOplogBatch& entry) {
-    auto agc = getCollectionForDbCheck(opCtx, entry.getNss(), entry.getType());
-    Collection* collection = agc->getCollection();
+    AutoGetCollectionForDbCheck agc(opCtx, entry.getNss(), entry.getType());
+    Collection* collection = agc.getCollection();
     std::string msg = "replication consistency check";
 
     if (!collection) {
