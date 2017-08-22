@@ -24,6 +24,7 @@
   }                                                     \
 } while (0)
 
+using std::string;
 using pcrecpp::StringPiece;
 
 static void CheckSTLComparator() {
