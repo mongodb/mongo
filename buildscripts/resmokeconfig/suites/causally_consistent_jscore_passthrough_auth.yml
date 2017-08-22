@@ -140,6 +140,8 @@ selector:
   - jstests/core/geo_distinct.js
   - jstests/core/geo_s2ordering.js
   - jstests/core/group1.js
+  - jstests/core/group2.js
+  - jstests/core/maxscan.js
   - jstests/core/nan.js
   - jstests/core/null2.js
   - jstests/core/not2.js
@@ -168,10 +170,6 @@ selector:
   - jstests/core/views/views_stats.js
   - jstests/core/orf.js #explain.executionStats is not CC
   - jstests/core/rename7.js
-  # TODO: SERVER-30497
-  - jstests/core/maxscan.js
-  # TODO: SERVER-30498
-  - jstests/core/group2.js
   # TODO: SERVER-30582
   - jstests/core/agg_hint.js
   - jstests/core/explain_agg_write_concern.js
