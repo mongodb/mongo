@@ -866,7 +866,7 @@ StatusWithMatchExpression MatchExpressionParser::_parseType(
     const char* name,
     const BSONElement& elt,
     const boost::intrusive_ptr<ExpressionContext>& expCtx) {
-    auto parsedType = MatcherTypeAlias::parse(elt);
+    auto parsedType = MatcherTypeAlias::parse(elt, MatcherTypeAlias::kTypeAliasMap);
     if (!parsedType.isOK()) {
         return parsedType.getStatus();
     }

@@ -36,6 +36,13 @@ namespace mongo {
 
 class JSONSchemaParser {
 public:
+    // Primitive type name constants.
+    static constexpr StringData kSchemaTypeArray = "array"_sd;
+    static constexpr StringData kSchemaTypeBoolean = "boolean"_sd;
+    static constexpr StringData kSchemaTypeNull = "null"_sd;
+    static constexpr StringData kSchemaTypeObject = "object"_sd;
+    static constexpr StringData kSchemaTypeString = "string"_sd;
+
     /**
      * Converts a JSON schema, represented as BSON, into a semantically equivalent match expression
      * tree. Returns a non-OK status if the schema is invalid or cannot be parsed.

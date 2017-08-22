@@ -172,8 +172,9 @@ TEST(JSONSchemaParserTest, MaximumTranslatesCorrectlyWithTypeNumber) {
                                })"));
 }
 
-TEST(JSONSchemaParserTest, MaximumTranslatesCorrectlyWithTypeLong) {
-    BSONObj schema = fromjson("{properties: {num: {type: 'long', maximum: 0}}, type: 'object'}");
+TEST(JSONSchemaParserTest, MaximumTranslatesCorrectlyWithBsonTypeLong) {
+    BSONObj schema =
+        fromjson("{properties: {num: {bsonType: 'long', maximum: 0}}, type: 'object'}");
     auto result = JSONSchemaParser::parse(schema);
     ASSERT_OK(result.getStatus());
     ASSERT_SERIALIZES_TO(result.getValue().get(), fromjson(R"({
@@ -322,8 +323,9 @@ TEST(JSONSchemaParserTest, MaxLengthTranslatesCorrectlyWithTypeString) {
                                })"));
 }
 
-TEST(JSONSchemaParserTest, MinimumTranslatesCorrectlyWithTypeLong) {
-    BSONObj schema = fromjson("{properties: {num: {type: 'long', minimum: 0}}, type: 'object'}");
+TEST(JSONSchemaParserTest, MinimumTranslatesCorrectlyWithBsonTypeLong) {
+    BSONObj schema =
+        fromjson("{properties: {num: {bsonType: 'long', minimum: 0}}, type: 'object'}");
     auto result = JSONSchemaParser::parse(schema);
     ASSERT_OK(result.getStatus());
     ASSERT_SERIALIZES_TO(result.getValue().get(), fromjson(R"({
@@ -384,7 +386,8 @@ TEST(JSONSchemaParserTest, MinimumTranslatesCorrectlyWithNoType) {
 
 TEST(JSONSchemaParserTest, MaximumTranslatesCorrectlyWithExclusiveMaximumTrue) {
     BSONObj schema = fromjson(
-        "{properties: {num: {type: 'long', maximum: 0, exclusiveMaximum: true}}, type: 'object'}");
+        "{properties: {num: {bsonType: 'long', maximum: 0, exclusiveMaximum: true}},"
+        "type: 'object'}");
     auto result = JSONSchemaParser::parse(schema);
     ASSERT_OK(result.getStatus());
     ASSERT_SERIALIZES_TO(result.getValue().get(), fromjson(R"({
@@ -406,7 +409,8 @@ TEST(JSONSchemaParserTest, MaximumTranslatesCorrectlyWithExclusiveMaximumTrue) {
 
 TEST(JSONSchemaParserTest, MaximumTranslatesCorrectlyWithExclusiveMaximumFalse) {
     BSONObj schema = fromjson(
-        "{properties: {num: {type: 'long', maximum: 0, exclusiveMaximum: false}}, type: 'object'}");
+        "{properties: {num: {bsonType: 'long', maximum: 0, exclusiveMaximum: false}},"
+        "type: 'object'}");
     auto result = JSONSchemaParser::parse(schema);
     ASSERT_OK(result.getStatus());
     ASSERT_SERIALIZES_TO(result.getValue().get(), fromjson(R"({
@@ -440,7 +444,8 @@ TEST(JSONSchemaParserTest, FailsToParseIfExclusiveMaximumIsNotABoolean) {
 
 TEST(JSONSchemaParserTest, MinimumTranslatesCorrectlyWithExclusiveMinimumTrue) {
     BSONObj schema = fromjson(
-        "{properties: {num: {type: 'long', minimum: 0, exclusiveMinimum: true}}, type: 'object'}");
+        "{properties: {num: {bsonType: 'long', minimum: 0, exclusiveMinimum: true}},"
+        "type: 'object'}");
     auto result = JSONSchemaParser::parse(schema);
     ASSERT_OK(result.getStatus());
     ASSERT_SERIALIZES_TO(result.getValue().get(), fromjson(R"({
@@ -462,7 +467,8 @@ TEST(JSONSchemaParserTest, MinimumTranslatesCorrectlyWithExclusiveMinimumTrue) {
 
 TEST(JSONSchemaParserTest, MinimumTranslatesCorrectlyWithExclusiveMinimumFalse) {
     BSONObj schema = fromjson(
-        "{properties: {num: {type: 'long', minimum: 0, exclusiveMinimum: false}}, type: 'object'}");
+        "{properties: {num: {bsonType: 'long', minimum: 0, exclusiveMinimum: false}},"
+        "type: 'object'}");
     auto result = JSONSchemaParser::parse(schema);
     ASSERT_OK(result.getStatus());
     ASSERT_SERIALIZES_TO(result.getValue().get(), fromjson(R"({
@@ -1124,6 +1130,31 @@ TEST(JSONSchemaParserTest, RequiredTranslatesCorrectlyInsidePropertiesWithSiblin
             }]
         }
     )"));
+}
+
+TEST(JSONSchemaParserTest, SharedJsonAndBsonTypeAliasesTranslateIdentically) {
+    for (auto&& mapEntry : MatcherTypeAlias::kJsonSchemaTypeAliasMap) {
+        auto typeAlias = mapEntry.first;
+        // JSON Schema spells its bool type as "boolean", whereas MongoDB calls it "bool".
+        auto bsonTypeAlias =
+            (typeAlias == JSONSchemaParser::kSchemaTypeBoolean) ? "bool" : typeAlias;
+
+        BSONObj typeSchema = BSON("properties" << BSON("f" << BSON("type" << typeAlias)));
+        BSONObj bsonTypeSchema =
+            BSON("properties" << BSON("f" << BSON("bsonType" << bsonTypeAlias)));
+        auto typeResult = JSONSchemaParser::parse(typeSchema);
+        ASSERT_OK(typeResult.getStatus());
+        auto bsonTypeResult = JSONSchemaParser::parse(bsonTypeSchema);
+        ASSERT_OK(bsonTypeResult.getStatus());
+
+        BSONObjBuilder typeBuilder;
+        typeResult.getValue()->serialize(&typeBuilder);
+
+        BSONObjBuilder bsonTypeBuilder;
+        bsonTypeResult.getValue()->serialize(&bsonTypeBuilder);
+
+        ASSERT_BSONOBJ_EQ(typeBuilder.obj(), bsonTypeBuilder.obj());
+    }
 }
 
 }  // namespace

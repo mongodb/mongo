@@ -39,27 +39,28 @@ namespace mongo {
 namespace {
 
 TEST(MatcherTypeAliasTest, ParseFromStringCanParseNumberAlias) {
-    auto result = MatcherTypeAlias::parseFromStringAlias("number");
+    auto result = MatcherTypeAlias::parseFromStringAlias("number", MatcherTypeAlias::kTypeAliasMap);
     ASSERT_OK(result.getStatus());
     ASSERT_TRUE(result.getValue().allNumbers);
 }
 
 TEST(MatcherTypeAliasTest, ParseFromStringCanParseLongAlias) {
-    auto result = MatcherTypeAlias::parseFromStringAlias("long");
+    auto result = MatcherTypeAlias::parseFromStringAlias("long", MatcherTypeAlias::kTypeAliasMap);
     ASSERT_OK(result.getStatus());
     ASSERT_FALSE(result.getValue().allNumbers);
     ASSERT_EQ(result.getValue().bsonType, BSONType::NumberLong);
 }
 
 TEST(MatcherTypeAliasTest, ParseFromStringFailsToParseUnknownAlias) {
-    auto result = MatcherTypeAlias::parseFromStringAlias("unknown");
+    auto result =
+        MatcherTypeAlias::parseFromStringAlias("unknown", MatcherTypeAlias::kTypeAliasMap);
     ASSERT_NOT_OK(result.getStatus());
 }
 
 TEST(MatcherTypeAliasTest, ParseFromElementCanParseNumberAlias) {
     auto obj = BSON(""
                     << "number");
-    auto result = MatcherTypeAlias::parse(obj.firstElement());
+    auto result = MatcherTypeAlias::parse(obj.firstElement(), MatcherTypeAlias::kTypeAliasMap);
     ASSERT_OK(result.getStatus());
     ASSERT_TRUE(result.getValue().allNumbers);
 }
@@ -67,7 +68,7 @@ TEST(MatcherTypeAliasTest, ParseFromElementCanParseNumberAlias) {
 TEST(MatcherTypeAliasTest, ParseFromElementCanParseLongAlias) {
     auto obj = BSON(""
                     << "long");
-    auto result = MatcherTypeAlias::parse(obj.firstElement());
+    auto result = MatcherTypeAlias::parse(obj.firstElement(), MatcherTypeAlias::kTypeAliasMap);
     ASSERT_OK(result.getStatus());
     ASSERT_FALSE(result.getValue().allNumbers);
     ASSERT_EQ(result.getValue().bsonType, BSONType::NumberLong);
@@ -76,30 +77,30 @@ TEST(MatcherTypeAliasTest, ParseFromElementCanParseLongAlias) {
 TEST(MatcherTypeAliasTest, ParseFromElementFailsToParseUnknownAlias) {
     auto obj = BSON(""
                     << "unknown");
-    auto result = MatcherTypeAlias::parse(obj.firstElement());
+    auto result = MatcherTypeAlias::parse(obj.firstElement(), MatcherTypeAlias::kTypeAliasMap);
     ASSERT_NOT_OK(result.getStatus());
 }
 
 TEST(MatcherTypeAliasTest, ParseFromElementFailsToParseWrongElementType) {
     auto obj = BSON("" << BSON(""
                                << ""));
-    auto result = MatcherTypeAlias::parse(obj.firstElement());
+    auto result = MatcherTypeAlias::parse(obj.firstElement(), MatcherTypeAlias::kTypeAliasMap);
     ASSERT_NOT_OK(result.getStatus());
 
     obj = fromjson("{'': null}");
-    result = MatcherTypeAlias::parse(obj.firstElement());
+    result = MatcherTypeAlias::parse(obj.firstElement(), MatcherTypeAlias::kTypeAliasMap);
     ASSERT_NOT_OK(result.getStatus());
 }
 
 TEST(MatcherTypeAliasTest, ParseFromElementFailsToParseUnknownBSONType) {
     auto obj = BSON("" << 99);
-    auto result = MatcherTypeAlias::parse(obj.firstElement());
+    auto result = MatcherTypeAlias::parse(obj.firstElement(), MatcherTypeAlias::kTypeAliasMap);
     ASSERT_NOT_OK(result.getStatus());
 }
 
 TEST(MatcherTypeAliasTest, ParseFromElementCanParseIntegerTypeCode) {
     auto obj = BSON("" << 2);
-    auto result = MatcherTypeAlias::parse(obj.firstElement());
+    auto result = MatcherTypeAlias::parse(obj.firstElement(), MatcherTypeAlias::kTypeAliasMap);
     ASSERT_OK(result.getStatus());
     ASSERT_FALSE(result.getValue().allNumbers);
     ASSERT_EQ(result.getValue().bsonType, BSONType::String);
@@ -107,7 +108,7 @@ TEST(MatcherTypeAliasTest, ParseFromElementCanParseIntegerTypeCode) {
 
 TEST(MatcherTypeAliasTest, ParseFromElementCanParseDoubleTypeCode) {
     auto obj = BSON("" << 2.0);
-    auto result = MatcherTypeAlias::parse(obj.firstElement());
+    auto result = MatcherTypeAlias::parse(obj.firstElement(), MatcherTypeAlias::kTypeAliasMap);
     ASSERT_OK(result.getStatus());
     ASSERT_FALSE(result.getValue().allNumbers);
     ASSERT_EQ(result.getValue().bsonType, BSONType::String);

@@ -33,6 +33,7 @@
 #include "mongo/bson/bsonelement.h"
 #include "mongo/bson/bsontypes.h"
 #include "mongo/stdx/unordered_map.h"
+#include "mongo/util/string_map.h"
 
 namespace mongo {
 
@@ -42,19 +43,30 @@ namespace mongo {
  */
 struct MatcherTypeAlias {
     static constexpr StringData kMatchesAllNumbersAlias = "number"_sd;
-    static const stdx::unordered_map<std::string, BSONType> typeAliasMap;
+
+    // Maps from the set of type aliases accepted by the $type query operator to the corresponding
+    // BSON types. Excludes "number", since this alias maps to a set of BSON types.
+    static const StringMap<BSONType> kTypeAliasMap;
+
+    // Maps from the set of JSON Schema primitive types to the corresponding BSON types. Excludes
+    // "number", since this alias maps to a set of BSON types.
+    //
+    // TODO SERVER-30742: Should we (or can we) support the JSON Schema "integer" type?
+    static const StringMap<BSONType> kJsonSchemaTypeAliasMap;
 
     /**
-     * Creates a MatcherTypeAlias from a BSONElement. Returns an error if the element does not
-     * contain a valid numerical type code or a valid string type alias.
+     * Given a mapping from string alias to BSON type, creates a MatcherTypeAlias from a
+     * BSONElement. Returns an error if the element does not contain a valid numerical type code or
+     * a valid string type alias.
      */
-    static StatusWith<MatcherTypeAlias> parse(BSONElement);
+    static StatusWith<MatcherTypeAlias> parse(BSONElement, const StringMap<BSONType>& aliasMap);
 
     /**
-     * Creates a MatcherTypeAlias from a type alias string, or returns an error if the alias is not
-     * valid.
+     * Given a mapping from string alias to BSON type, creates a MatcherTypeAlias from an alias
+     * string, or returns an error if the alias is not valid.
      */
-    static StatusWith<MatcherTypeAlias> parseFromStringAlias(StringData typeAlias);
+    static StatusWith<MatcherTypeAlias> parseFromStringAlias(StringData typeAlias,
+                                                             const StringMap<BSONType>& aliasMap);
 
     MatcherTypeAlias() = default;
 

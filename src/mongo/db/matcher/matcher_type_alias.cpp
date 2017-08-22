@@ -30,11 +30,13 @@
 
 #include "mongo/db/matcher/matcher_type_alias.h"
 
+#include "mongo/db/matcher/schema/json_schema_parser.h"
+
 namespace mongo {
 
 constexpr StringData MatcherTypeAlias::kMatchesAllNumbersAlias;
 
-const stdx::unordered_map<std::string, BSONType> MatcherTypeAlias::typeAliasMap = {
+const StringMap<BSONType> MatcherTypeAlias::kTypeAliasMap = {
     {typeName(BSONType::NumberDouble), BSONType::NumberDouble},
     {typeName(BSONType::String), BSONType::String},
     {typeName(BSONType::Object), BSONType::Object},
@@ -57,15 +59,24 @@ const stdx::unordered_map<std::string, BSONType> MatcherTypeAlias::typeAliasMap 
     {typeName(BSONType::MaxKey), BSONType::MaxKey},
     {typeName(BSONType::MinKey), BSONType::MinKey}};
 
-StatusWith<MatcherTypeAlias> MatcherTypeAlias::parseFromStringAlias(StringData typeAlias) {
+const StringMap<BSONType> MatcherTypeAlias::kJsonSchemaTypeAliasMap = {
+    {JSONSchemaParser::kSchemaTypeArray, BSONType::Array},
+    {JSONSchemaParser::kSchemaTypeBoolean, BSONType::Bool},
+    {JSONSchemaParser::kSchemaTypeNull, BSONType::jstNULL},
+    {JSONSchemaParser::kSchemaTypeObject, BSONType::Object},
+    {JSONSchemaParser::kSchemaTypeString, BSONType::String},
+};
+
+StatusWith<MatcherTypeAlias> MatcherTypeAlias::parseFromStringAlias(
+    StringData typeAlias, const StringMap<BSONType>& aliasMap) {
     if (typeAlias == MatcherTypeAlias::kMatchesAllNumbersAlias) {
         MatcherTypeAlias type;
         type.allNumbers = true;
         return type;
     }
 
-    auto it = MatcherTypeAlias::typeAliasMap.find(typeAlias.toString());
-    if (it == MatcherTypeAlias::typeAliasMap.end()) {
+    auto it = aliasMap.find(typeAlias.toString());
+    if (it == aliasMap.end()) {
         return Status(ErrorCodes::BadValue,
                       str::stream() << "Unknown type name alias: " << typeAlias);
     }
@@ -73,13 +84,14 @@ StatusWith<MatcherTypeAlias> MatcherTypeAlias::parseFromStringAlias(StringData t
     return {it->second};
 }
 
-StatusWith<MatcherTypeAlias> MatcherTypeAlias::parse(BSONElement elt) {
+StatusWith<MatcherTypeAlias> MatcherTypeAlias::parse(BSONElement elt,
+                                                     const StringMap<BSONType>& aliasMap) {
     if (!elt.isNumber() && elt.type() != BSONType::String) {
         return Status(ErrorCodes::TypeMismatch, "type must be represented as a number or a string");
     }
 
     if (elt.type() == BSONType::String) {
-        return parseFromStringAlias(elt.valueStringData());
+        return parseFromStringAlias(elt.valueStringData(), aliasMap);
     }
 
     invariant(elt.isNumber());

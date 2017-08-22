@@ -76,8 +76,8 @@
 
     // Test that schemas whose top-level type is not object matches nothing.
     assert.eq(0, coll.find({$jsonSchema: {type: "string"}}).itcount());
-    assert.eq(0, coll.find({$jsonSchema: {type: "long"}}).itcount());
-    assert.eq(0, coll.find({$jsonSchema: {type: "objectId"}}).itcount());
+    assert.eq(0, coll.find({$jsonSchema: {bsonType: "long"}}).itcount());
+    assert.eq(0, coll.find({$jsonSchema: {bsonType: "objectId"}}).itcount());
 
     // Test that type:"number" only matches numbers, or documents where the field is missing.
     assert.eq([{_id: 0}, {_id: 1}, {_id: 2}, {_id: 3}, {_id: 4}, {_id: 5}, {_id: 9}],
@@ -101,15 +101,16 @@
 
     // Test that type:"long" only matches longs, or documents where the field is missing.
     assert.eq([{_id: 4}, {_id: 5}, {_id: 9}],
-              coll.find({$jsonSchema: {properties: {num: {type: "long"}}}}, {_id: 1})
+              coll.find({$jsonSchema: {properties: {num: {bsonType: "long"}}}}, {_id: 1})
                   .sort({_id: 1})
                   .toArray());
 
     // Test that maximum restriction is enforced correctly with type:"long".
-    assert.eq([{_id: 5}, {_id: 9}],
-              coll.find({$jsonSchema: {properties: {num: {type: "long", maximum: 0}}}}, {_id: 1})
-                  .sort({_id: 1})
-                  .toArray());
+    assert.eq(
+        [{_id: 5}, {_id: 9}],
+        coll.find({$jsonSchema: {properties: {num: {bsonType: "long", maximum: 0}}}}, {_id: 1})
+            .sort({_id: 1})
+            .toArray());
 
     // Test that maximum restriction without a numeric type specified only applies to numbers.
     assert.eq([{_id: 1}, {_id: 3}, {_id: 5}, {_id: 6}, {_id: 7}, {_id: 8}, {_id: 9}],
