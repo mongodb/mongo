@@ -253,6 +253,8 @@ jsTestOptions = function() {
                 TestData.hasOwnProperty("skipValidationOnNamespaceNotFound")
                 ? TestData.skipValidationOnNamespaceNotFound
                 : true,
+            skipCheckingUUIDsConsistentAcrossCluster:
+                TestData.skipCheckingUUIDsConsistentAcrossCluster || false,
             jsonSchemaTestFile: TestData.jsonSchemaTestFile,
             excludedDBsFromDBHash: TestData.excludedDBsFromDBHash,
         });

@@ -10,6 +10,11 @@
 // sequence), idle (connection is connected but not used before a shard change), and new
 // (connection connected after shard change).
 //
+
+// Checking UUID consistency involves talking to shard primaries, but by the end of this test, one
+// shard does not have a primary.
+TestData.skipCheckingUUIDsConsistentAcrossCluster = true;
+
 (function() {
     'use strict';
 

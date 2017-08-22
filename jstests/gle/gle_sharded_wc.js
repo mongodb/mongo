@@ -5,6 +5,10 @@
 // so cannot be run on the ephemeralForTest storage engine, as it accepts all journaled writes.
 // @tags: [SERVER-21420]
 
+// Checking UUID consistency involves talking to the shard primaries, but by the end of this test,
+// one shard does not have a primary.
+TestData.skipCheckingUUIDsConsistentAcrossCluster = true;
+
 (function() {
     'use strict';
 

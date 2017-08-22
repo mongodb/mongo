@@ -3,6 +3,11 @@
 // NOTE: Basic write functionality is tested via the passthrough tests, this file should contain
 // *only* mongos-specific tests.
 //
+
+// Checking UUID consistency involves talking to the config server primary, but there is no config
+// server primary by the end of this test.
+TestData.skipCheckingUUIDsConsistentAcrossCluster = true;
+
 (function() {
     "use strict";
 

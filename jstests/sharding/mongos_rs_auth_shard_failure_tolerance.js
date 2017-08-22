@@ -11,6 +11,10 @@
 // (connection connected after shard change).
 //
 
+// Checking UUID consistency involves talking to shard primaries, but by the end of this test, one
+// shard does not have a primary.
+TestData.skipCheckingUUIDsConsistentAcrossCluster = true;
+
 var options = {rs: true, rsOptions: {nodes: 2}, keyFile: "jstests/libs/key1"};
 
 var st = new ShardingTest({shards: 3, mongos: 1, other: options});

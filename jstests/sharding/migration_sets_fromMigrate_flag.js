@@ -14,6 +14,11 @@
 //         delete op is done during chunk migration within the chunk range.
 //
 
+// This test inserts documents into a sharded collection by directly writing to the shards, so the
+// collection is created on the non-primary shard with a shard-generated UUID rather than with a
+// UUID propagated from the primary shard.
+TestData.skipCheckingUUIDsConsistentAcrossCluster = true;
+
 load('./jstests/libs/chunk_manipulation_util.js');
 
 (function() {

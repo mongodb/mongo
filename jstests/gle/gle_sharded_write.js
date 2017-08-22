@@ -2,6 +2,10 @@
 // Ensures GLE correctly reports basic write stats and failures
 // Note that test should work correctly with and without write commands.
 //
+
+// Checking UUID consistency involves talking to shards, but this test shuts down one shard.
+TestData.skipCheckingUUIDsConsistentAcrossCluster = true;
+
 (function() {
     'use strict';
 

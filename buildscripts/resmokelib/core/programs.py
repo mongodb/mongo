@@ -203,6 +203,10 @@ def mongo_shell_program(logger, executable=None, connection_string=None, filenam
     # Load this file to allow a callback to validate collections before shutting down mongod.
     eval_sb.append("load('jstests/libs/override_methods/validate_collections_on_shutdown.js');")
 
+    # Load a callback to check UUID consistency before shutting down a ShardingTest.
+    eval_sb.append(
+        "load('jstests/libs/override_methods/check_uuids_consistent_across_cluster.js');")
+
     eval_str = "; ".join(eval_sb)
     args.append("--eval")
     args.append(eval_str)
