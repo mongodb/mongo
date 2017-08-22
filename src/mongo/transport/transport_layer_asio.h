@@ -127,16 +127,23 @@ private:
     void _acceptConnection(GenericAcceptor& acceptor);
 
     stdx::mutex _mutex;
-    std::vector<GenericAcceptor> _acceptors;
 
-    // Only used if _listenerOptions.async is false.
-    stdx::thread _listenerThread;
-
+    // It is important that the io_context be declared before the
+    // vector of acceptors (or any other state that is associated with
+    // the io_context), so that we destroy any existing acceptors or
+    // other io_service associated state before we drop the refcount
+    // on the io_context, which may destroy it.
     std::shared_ptr<asio::io_context> _ioContext;
+
 #ifdef MONGO_CONFIG_SSL
     std::unique_ptr<asio::ssl::context> _sslContext;
     SSLParams::SSLModes _sslMode;
 #endif
+
+    std::vector<GenericAcceptor> _acceptors;
+
+    // Only used if _listenerOptions.async is false.
+    stdx::thread _listenerThread;
 
     ServiceEntryPoint* const _sep = nullptr;
     AtomicWord<bool> _running{false};
