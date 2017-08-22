@@ -177,7 +177,7 @@ that differ in their output from isprint() even in the "C" locale. */
 #define PRINTABLE(c) ((c) >= 32 && (c) < 127)
 #endif
 
-#define PRINTOK(c) (locale_set? isprint(c) : PRINTABLE(c))
+#define PRINTOK(c) (locale_set? (((c) < 256) && isprint(c)) : PRINTABLE(c))
 
 /* Posix support is disabled in 16 or 32 bit only mode. */
 #if !defined SUPPORT_PCRE8 && !defined NOPOSIX
@@ -426,11 +426,11 @@ argument, the casting might be incorrectly applied. */
 #define PCRE_COPY_NAMED_SUBSTRING32(rc, re, bptr, offsets, count, \
     namesptr, cbuffer, size) \
   rc = pcre32_copy_named_substring((pcre32 *)re, (PCRE_SPTR32)bptr, offsets, \
-    count, (PCRE_SPTR32)namesptr, (PCRE_UCHAR32 *)cbuffer, size/2)
+    count, (PCRE_SPTR32)namesptr, (PCRE_UCHAR32 *)cbuffer, size/4)
 
 #define PCRE_COPY_SUBSTRING32(rc, bptr, offsets, count, i, cbuffer, size) \
   rc = pcre32_copy_substring((PCRE_SPTR32)bptr, offsets, count, i, \
-    (PCRE_UCHAR32 *)cbuffer, size/2)
+    (PCRE_UCHAR32 *)cbuffer, size/4)
 
 #define PCRE_DFA_EXEC32(count, re, extra, bptr, len, start_offset, options, \
     offsets, size_offsets, workspace, size_workspace) \
@@ -1982,6 +1982,7 @@ return(result);
 static int pchar(pcre_uint32 c, FILE *f)
 {
 int n = 0;
+char tempbuffer[16];
 if (PRINTOK(c))
   {
   if (f != NULL) fprintf(f, "%c", c);
@@ -2003,6 +2004,8 @@ if (c < 0x100)
   }
 
 if (f != NULL) n = fprintf(f, "\\x{%02x}", c);
+  else n = sprintf(tempbuffer, "\\x{%02x}", c);
+
 return n >= 0 ? n : 0;
 }
 
@@ -4831,7 +4834,16 @@ while (!done)
         continue;
 
         case 'O':
-        while(isdigit(*p)) n = n * 10 + *p++ - '0';
+        while(isdigit(*p))
+          {
+          if (n > (INT_MAX-10)/10)   /* Hack to stop fuzzers */
+            {
+            printf("** \\O argument is too big\n");
+            yield = 1;
+            goto EXIT;
+            }
+          n = n * 10 + *p++ - '0';
+          }
         if (n > size_offsets_max)
           {
           size_offsets_max = n;
@@ -5042,7 +5054,7 @@ while (!done)
 
     if ((all_use_dfa || use_dfa) && find_match_limit)
       {
-      printf("**Match limit not relevant for DFA matching: ignored\n");
+      printf("** Match limit not relevant for DFA matching: ignored\n");
       find_match_limit = 0;
       }
 
@@ -5255,10 +5267,17 @@ while (!done)
 
         if (do_allcaps)
           {
-          if (new_info(re, NULL, PCRE_INFO_CAPTURECOUNT, &count) < 0)
-            goto SKIP_DATA;
-          count++;   /* Allow for full match */
-          if (count * 2 > use_size_offsets) count = use_size_offsets/2;
+          if (all_use_dfa || use_dfa)
+            {
+            fprintf(outfile, "** Show all captures ignored after DFA matching\n");
+            }
+          else
+           {
+            if (new_info(re, NULL, PCRE_INFO_CAPTURECOUNT, &count) < 0)
+              goto SKIP_DATA;
+            count++;   /* Allow for full match */
+            if (count * 2 > use_size_offsets) count = use_size_offsets/2;
+            }
           }
 
         /* Output the captured substrings. Note that, for the matched string,

@@ -57,6 +57,7 @@
 } while (0)
 
 using std::vector;
+using std::string;
 using pcrecpp::StringPiece;
 using pcrecpp::Scanner;
 

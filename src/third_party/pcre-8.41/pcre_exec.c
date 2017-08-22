@@ -669,7 +669,7 @@ if (ecode == NULL)
     return match((PCRE_PUCHAR)&rdepth, NULL, NULL, 0, NULL, NULL, 1);
   else
     {
-    int len = (char *)&rdepth - (char *)eptr;
+    int len = (int)((char *)&rdepth - (char *)eptr);
     return (len > 0)? -len : len;
     }
   }
