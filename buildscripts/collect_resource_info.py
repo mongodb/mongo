@@ -9,7 +9,6 @@ from __future__ import print_function
 
 import contextlib
 from datetime import datetime
-import json
 import optparse
 import os
 import sys
@@ -37,7 +36,7 @@ def open_or_use_stdout(filename):
 
 def main():
 
-    usage = "usage: %prog [options] interval"
+    usage = "usage: %prog [options]"
     parser = optparse.OptionParser(description=__doc__, usage=usage)
     parser.add_option("-i", "--interval",
                       dest="interval",
@@ -52,7 +51,7 @@ def main():
                            " Any other value is treated as the output file name. By default,"
                            " output is written to stdout.")
 
-    (options, args) = parser.parse_args()
+    (options, _) = parser.parse_args()
 
     with open_or_use_stdout(options.outfile) as fp:
         while True:
@@ -88,6 +87,7 @@ def main():
                     sys_res_dict["command"] = process.get("command", "")
                     sys_res_dict["cpu_user"] = process["cpu"]["user"]
                     sys_res_dict["cpu_sys"] = process["cpu"]["system"]
+                    sys_res_dict["io_wait"] = process["cpu"]["iowait"]
                     sys_res_dict["io_write"] = process["io"]["writeBytes"]
                     sys_res_dict["io_read"] = process["io"]["readBytes"]
                     sys_res_dict["mem_used"] = process["mem"]["rss"]
@@ -98,8 +98,10 @@ def main():
 
                 print(dumps(sys_res_dict, sort_keys=True), file=fp)
 
-                # Flush internal buffers associated with file to disk.
-                os.fsync(fp.fileno())
+                if fp.fileno() != sys.stdout.fileno():
+                    # Flush internal buffers associated with file to disk.
+                    fp.flush()
+                    os.fsync(fp.fileno())
             time.sleep(options.interval)
 
 if __name__ == "__main__":
