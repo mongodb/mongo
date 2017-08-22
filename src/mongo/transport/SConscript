@@ -163,21 +163,6 @@ env.CppUnitTest(
     ],
 )
 
-asioEnv = env.Clone()
-asioEnv.InjectThirdPartyIncludePaths('asio')
-
-asioEnv.CppIntegrationTest(
-    target='ticket_asio_integration_test',
-    source=[
-        'ticket_asio_integration_test.cpp',
-    ],
-    LIBDEPS=[
-        'transport_layer',
-        '$BUILD_DIR/mongo/client/clientdriver',
-        '$BUILD_DIR/mongo/util/version_impl',
-    ],
-)
-
 env.CppUnitTest(
     target='transport_layer_mock_test',
     source=[
