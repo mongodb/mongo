@@ -43,6 +43,7 @@
 #include <vector>
 #include "pcrecpp.h"
 
+using std::string;
 using pcrecpp::StringPiece;
 using pcrecpp::RE;
 using pcrecpp::RE_Options;
