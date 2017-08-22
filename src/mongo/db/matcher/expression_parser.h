@@ -313,6 +313,9 @@ private:
     boost::intrusive_ptr<Expression> _parseAggExpression(
         BSONElement elem, const boost::intrusive_ptr<ExpressionContext>& expCtx);
 
+    StatusWithMatchExpression _parseInternalSchemaAllowedProperties(
+        const BSONElement& elem, const CollatorInterface* collator);
+
     // Performs parsing for the match extensions. We do not own this pointer - it has to live
     // as long as the parser is active.
     const ExtensionsCallback* _extensionsCallback;

@@ -177,6 +177,9 @@ const char* encodeMatchType(MatchExpression::MatchType mt) {
         case MatchExpression::INTERNAL_SCHEMA_ALL_ELEM_MATCH_FROM_INDEX:
             return "internalSchemaAllElemMatchFromIndex";
 
+        case MatchExpression::INTERNAL_SCHEMA_ALLOWED_PROPERTIES:
+            return "internalSchemaAllowedProperties";
+
         case MatchExpression::INTERNAL_SCHEMA_COND:
             return "internalSchemaCond";
 

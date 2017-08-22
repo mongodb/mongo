@@ -1146,5 +1146,26 @@ TEST(SerializeInternalSchema, ExpressionInternalSchemaMatchArrayIndexSerializesC
                                "{index: 2, namePlaceholder: 'i', expression: {i: {$lt: 3}}}}}"));
     ASSERT_BSONOBJ_EQ(*reserialized.getQuery(), serialize(reserialized.getMatchExpression()));
 }
+
+TEST(SerializeInternalSchema, ExpressionInternalSchemaAllowedPropertiesSerializesCorrectly) {
+    Matcher original(fromjson(R"({$_internalSchemaAllowedProperties: {
+            properties: ['a'],
+            otherwise: {i: {$gt: 10}},
+            namePlaceholder: 'i',
+            patternProperties: [{regex: /b/, expression: {i: {$type: 'number'}}}]
+        }})"),
+                     ExtensionsCallbackDisallowExtensions(),
+                     kSimpleCollator);
+    Matcher reserialized(serialize(original.getMatchExpression()),
+                         ExtensionsCallbackDisallowExtensions(),
+                         kSimpleCollator);
+    ASSERT_BSONOBJ_EQ(*reserialized.getQuery(), fromjson(R"({$_internalSchemaAllowedProperties: {
+            properties: ['a'],
+            namePlaceholder: 'i',
+            patternProperties: [{regex: /b/, expression: {i: {$type: 'number'}}}],
+            otherwise: {i: {$gt: 10}}
+        }})"));
+    ASSERT_BSONOBJ_EQ(*reserialized.getQuery(), serialize(reserialized.getMatchExpression()));
+}
 }  // namespace
 }  // namespace mongo

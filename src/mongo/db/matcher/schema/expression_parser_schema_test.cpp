@@ -671,5 +671,272 @@ TEST(MatchExpressionParserSchemaTest, InternalTypeCanParseLongCode) {
     ASSERT_FALSE(typeExpr->matchesAllNumbers());
     ASSERT_EQ(typeExpr->getBSONType(), BSONType::NumberLong);
 }
+
+TEST(MatchExpressionParserSchemaTest, AllowedPropertiesFailsParsingIfAFieldIsMissing) {
+    auto query = fromjson(
+        "{$_internalSchemaAllowedProperties:"
+        "{namePlaceholder: 'i', patternProperties: [], otherwise: {i: 1}}}}");
+    ASSERT_EQ(
+        MatchExpressionParser::parse(query, ExtensionsCallbackDisallowExtensions(), kSimpleCollator)
+            .getStatus(),
+        ErrorCodes::FailedToParse);
+
+    query = fromjson(
+        "{$_internalSchemaAllowedProperties:"
+        "{properties: [], patternProperties: [], otherwise: {i: 1}}}}");
+    ASSERT_EQ(
+        MatchExpressionParser::parse(query, ExtensionsCallbackDisallowExtensions(), kSimpleCollator)
+            .getStatus(),
+        ErrorCodes::FailedToParse);
+
+    query = fromjson(
+        "{$_internalSchemaAllowedProperties:"
+        "{properties: [], namePlaceholder: 'i', otherwise: {i: 1}}}}");
+    ASSERT_EQ(
+        MatchExpressionParser::parse(query, ExtensionsCallbackDisallowExtensions(), kSimpleCollator)
+            .getStatus(),
+        ErrorCodes::FailedToParse);
+
+    query = fromjson(
+        "{$_internalSchemaAllowedProperties:"
+        "{properties: [], namePlaceholder: 'i', patternProperties: []}}");
+    ASSERT_EQ(
+        MatchExpressionParser::parse(query, ExtensionsCallbackDisallowExtensions(), kSimpleCollator)
+            .getStatus(),
+        ErrorCodes::FailedToParse);
+}
+
+TEST(MatchExpressionParserSchemaTest, AllowedPropertiesFailsParsingIfNamePlaceholderNotAString) {
+    auto query = fromjson(
+        "{$_internalSchemaAllowedProperties:"
+        "{properties: [], namePlaceholder: 7, patternProperties: [], otherwise: {i: 1}}}}");
+    ASSERT_EQ(
+        MatchExpressionParser::parse(query, ExtensionsCallbackDisallowExtensions(), kSimpleCollator)
+            .getStatus(),
+        ErrorCodes::TypeMismatch);
+
+    query = fromjson(
+        "{$_internalSchemaAllowedProperties:"
+        "{properties: [], namePlaceholder: /i/, patternProperties: [], otherwise: {i: 1}}}}");
+    ASSERT_EQ(
+        MatchExpressionParser::parse(query, ExtensionsCallbackDisallowExtensions(), kSimpleCollator)
+            .getStatus(),
+        ErrorCodes::TypeMismatch);
+}
+
+TEST(MatchExpressionParserSchemaTest, AllowedPropertiesFailsParsingIfNamePlaceholderNotValid) {
+    auto query = fromjson(
+        "{$_internalSchemaAllowedProperties: {properties: [], namePlaceholder: 'Capital',"
+        "patternProperties: [], otherwise: {Capital: 1}}}}");
+    ASSERT_EQ(
+        MatchExpressionParser::parse(query, ExtensionsCallbackDisallowExtensions(), kSimpleCollator)
+            .getStatus(),
+        ErrorCodes::BadValue);
+
+    query = fromjson(
+        "{$_internalSchemaAllowedProperties:"
+        "{properties: [], namePlaceholder: '', patternProperties: [], otherwise: {'': 1}}}}");
+    ASSERT_EQ(
+        MatchExpressionParser::parse(query, ExtensionsCallbackDisallowExtensions(), kSimpleCollator)
+            .getStatus(),
+        ErrorCodes::BadValue);
+}
+
+TEST(MatchExpressionParserSchemaTest, AllowedPropertiesFailsParsingIfPropertiesNotAllStrings) {
+    auto query = fromjson(
+        "{$_internalSchemaAllowedProperties:"
+        "{properties: [7], namePlaceholder: 'i', patternProperties: [], otherwise: {i: 1}}}}");
+    ASSERT_EQ(
+        MatchExpressionParser::parse(query, ExtensionsCallbackDisallowExtensions(), kSimpleCollator)
+            .getStatus(),
+        ErrorCodes::TypeMismatch);
+
+    query = fromjson(
+        "{$_internalSchemaAllowedProperties: {properties: ['x', {}], namePlaceholder: 'i',"
+        "patternProperties: [], otherwise: {i: 1}}}}");
+    ASSERT_EQ(
+        MatchExpressionParser::parse(query, ExtensionsCallbackDisallowExtensions(), kSimpleCollator)
+            .getStatus(),
+        ErrorCodes::TypeMismatch);
+}
+
+TEST(MatchExpressionParserSchemaTest,
+     AllowedPropertiesFailsParsingIfPatternPropertiesNotAllObjects) {
+    auto query = fromjson(
+        "{$_internalSchemaAllowedProperties:"
+        "{properties: [], namePlaceholder: 'i', patternProperties: ['blah'], otherwise: {i: 1}}}}");
+    ASSERT_EQ(
+        MatchExpressionParser::parse(query, ExtensionsCallbackDisallowExtensions(), kSimpleCollator)
+            .getStatus(),
+        ErrorCodes::TypeMismatch);
+
+    query = fromjson(
+        "{$_internalSchemaAllowedProperties: {properties: [], namePlaceholder: 'i',"
+        "otherwise: {i: 1}, patternProperties: [{regex: /a/, expression: {i: 0}}, 'blah']}}}");
+    ASSERT_EQ(
+        MatchExpressionParser::parse(query, ExtensionsCallbackDisallowExtensions(), kSimpleCollator)
+            .getStatus(),
+        ErrorCodes::TypeMismatch);
+}
+
+TEST(MatchExpressionParserSchemaTest,
+     AllowedPropertiesFailsParsingIfPatternPropertiesHasUnknownFields) {
+    auto query = fromjson(
+        "{$_internalSchemaAllowedProperties: {properties: [], namePlaceholder: 'i',"
+        "patternProperties: [{foo: 1, bar: 1}], otherwise: {i: 1}}}}");
+    ASSERT_EQ(
+        MatchExpressionParser::parse(query, ExtensionsCallbackDisallowExtensions(), kSimpleCollator)
+            .getStatus(),
+        ErrorCodes::FailedToParse);
+
+    query = fromjson(
+        "{$_internalSchemaAllowedProperties: {properties: [], namePlaceholder: 'i',"
+        "patternProperties: [{regex: /a/, blah: 0}], otherwise: {i: 1}}}}");
+    ASSERT_EQ(
+        MatchExpressionParser::parse(query, ExtensionsCallbackDisallowExtensions(), kSimpleCollator)
+            .getStatus(),
+        ErrorCodes::FailedToParse);
+}
+
+TEST(MatchExpressionParserSchemaTest,
+     AllowedPropertiesFailsParsingIfPatternPropertiesRegexMissingOrWrongType) {
+    auto query = fromjson(
+        "{$_internalSchemaAllowedProperties: {properties: [], namePlaceholder: 'i',"
+        "otherwise: {i: 0}, patternProperties: [{expression: {i: 0}}]}}}");
+    ASSERT_EQ(
+        MatchExpressionParser::parse(query, ExtensionsCallbackDisallowExtensions(), kSimpleCollator)
+            .getStatus(),
+        ErrorCodes::FailedToParse);
+
+    query = fromjson(
+        "{$_internalSchemaAllowedProperties: {properties: [], namePlaceholder: 'i',"
+        "otherwise: {i: 0}, patternProperties: [{regex: 7, expression: {i: 0}}]}}}");
+    ASSERT_EQ(
+        MatchExpressionParser::parse(query, ExtensionsCallbackDisallowExtensions(), kSimpleCollator)
+            .getStatus(),
+        ErrorCodes::TypeMismatch);
+
+    query = fromjson(
+        "{$_internalSchemaAllowedProperties: {properties: [], namePlaceholder: 'i',"
+        "otherwise: {i: 0}, patternProperties: [{regex: 'notARegex', expression: {i: 0}}]}}}");
+    ASSERT_EQ(
+        MatchExpressionParser::parse(query, ExtensionsCallbackDisallowExtensions(), kSimpleCollator)
+            .getStatus(),
+        ErrorCodes::TypeMismatch);
+}
+
+TEST(MatchExpressionParserSchemaTest,
+     AllowedPropertiesFailsParsingIfPatternPropertiesExpressionInvalid) {
+    auto query = fromjson(
+        "{$_internalSchemaAllowedProperties: {properties: [], namePlaceholder: 'i',"
+        "otherwise: {i: 0}, patternProperties: [{regex: /a/}]}}}");
+    ASSERT_EQ(
+        MatchExpressionParser::parse(query, ExtensionsCallbackDisallowExtensions(), kSimpleCollator)
+            .getStatus(),
+        ErrorCodes::FailedToParse);
+
+    query = fromjson(
+        "{$_internalSchemaAllowedProperties: {properties: [], namePlaceholder: 'i',"
+        "otherwise: {i: 0}, patternProperties: [{regex: /a/, expression: 'blah'}]}}}");
+    ASSERT_EQ(
+        MatchExpressionParser::parse(query, ExtensionsCallbackDisallowExtensions(), kSimpleCollator)
+            .getStatus(),
+        ErrorCodes::TypeMismatch);
+}
+
+TEST(MatchExpressionParserSchemaTest,
+     AllowedPropertiesFailsParsingIfPatternPropertiesRegexHasFlags) {
+    auto query = fromjson(
+        "{$_internalSchemaAllowedProperties: {properties: [], namePlaceholder: 'i',"
+        "otherwise: {i: 0}, patternProperties: [{regex: /a/i, expression: {i: 0}}]}}}");
+    ASSERT_EQ(
+        MatchExpressionParser::parse(query, ExtensionsCallbackDisallowExtensions(), kSimpleCollator)
+            .getStatus(),
+        ErrorCodes::BadValue);
+}
+
+TEST(MatchExpressionParserSchemaTest, AllowedPropertiesFailsParsingIfMismatchingNamePlaceholders) {
+    auto query = fromjson(
+        "{$_internalSchemaAllowedProperties:"
+        "{properties: [], namePlaceholder: 'i', patternProperties: [], otherwise: {j: 1}}}}");
+    ASSERT_EQ(
+        MatchExpressionParser::parse(query, ExtensionsCallbackDisallowExtensions(), kSimpleCollator)
+            .getStatus(),
+        ErrorCodes::FailedToParse);
+
+    query = fromjson(
+        "{$_internalSchemaAllowedProperties: {properties: [], namePlaceholder: 'i',"
+        "patternProperties: [{regex: /a/, expression: {w: 7}}], otherwise: {i: 'foo'}}}}");
+    ASSERT_EQ(
+        MatchExpressionParser::parse(query, ExtensionsCallbackDisallowExtensions(), kSimpleCollator)
+            .getStatus(),
+        ErrorCodes::FailedToParse);
+}
+
+TEST(MatchExpressionParserSchemaTest, AllowedPropertiesFailsParsingIfOtherwiseIncorrectType) {
+    auto query = fromjson(
+        "{$_internalSchemaAllowedProperties:"
+        "{properties: [], namePlaceholder: 'i', patternProperties: [], otherwise: false}}}}");
+    ASSERT_EQ(
+        MatchExpressionParser::parse(query, ExtensionsCallbackDisallowExtensions(), kSimpleCollator)
+            .getStatus(),
+        ErrorCodes::TypeMismatch);
+
+    query = fromjson(
+        "{$_internalSchemaAllowedProperties:"
+        "{properties: [], namePlaceholder: 'i', patternProperties: [], otherwise: [{i: 7}]}}}}");
+    ASSERT_EQ(
+        MatchExpressionParser::parse(query, ExtensionsCallbackDisallowExtensions(), kSimpleCollator)
+            .getStatus(),
+        ErrorCodes::TypeMismatch);
+}
+
+TEST(MatchExpressionParserSchemaTest, AllowedPropertiesFailsParsingIfOtherwiseNotAValidExpression) {
+    auto query = fromjson(
+        "{$_internalSchemaAllowedProperties: {properties: [], namePlaceholder: 'i',"
+        "patternProperties: [], otherwise: {i: {$invalid: 1}}}}}}");
+    ASSERT_EQ(
+        MatchExpressionParser::parse(query, ExtensionsCallbackDisallowExtensions(), kSimpleCollator)
+            .getStatus(),
+        ErrorCodes::BadValue);
+
+    query = fromjson(
+        "{$_internalSchemaAllowedProperties:"
+        "{properties: [], namePlaceholder: 'i', patternProperties: [], otherwise: {}}}}}");
+    ASSERT_EQ(
+        MatchExpressionParser::parse(query, ExtensionsCallbackDisallowExtensions(), kSimpleCollator)
+            .getStatus(),
+        ErrorCodes::FailedToParse);
+}
+
+TEST(MatchExpressionParserSchemaTest, AllowedPropertiesParsesSuccessfully) {
+    auto query = fromjson(
+        "{$_internalSchemaAllowedProperties: {properties: ['phoneNumber', 'address'],"
+        "namePlaceholder: 'i', otherwise: {i: {$gt: 10}},"
+        "patternProperties: [{regex: /[nN]umber/, expression: {i: {$type: 'number'}}}]}}}");
+    auto allowedProperties = MatchExpressionParser::parse(
+        query, ExtensionsCallbackDisallowExtensions(), kSimpleCollator);
+    ASSERT_OK(allowedProperties.getStatus());
+
+    ASSERT_TRUE(allowedProperties.getValue()->matchesBSON(
+        fromjson("{phoneNumber: 123, address: 'earth'}")));
+    ASSERT_TRUE(allowedProperties.getValue()->matchesBSON(
+        fromjson("{phoneNumber: 3.14, workNumber: 456}")));
+
+    ASSERT_FALSE(allowedProperties.getValue()->matchesBSON(fromjson("{otherNumber: 'blah'}")));
+    ASSERT_FALSE(allowedProperties.getValue()->matchesBSON(fromjson("{phoneNumber: 'blah'}")));
+    ASSERT_FALSE(allowedProperties.getValue()->matchesBSON(fromjson("{other: 'blah'}")));
+}
+
+TEST(MatchExpressionParserSchemaTest, AllowedPropertiesAcceptsEmptyPropertiesAndPatternProperties) {
+    auto query = fromjson(
+        "{$_internalSchemaAllowedProperties:"
+        "{properties: [], namePlaceholder: 'i', patternProperties: [], otherwise: {i: 1}}}}");
+    auto allowedProperties = MatchExpressionParser::parse(
+        query, ExtensionsCallbackDisallowExtensions(), kSimpleCollator);
+    ASSERT_OK(allowedProperties.getStatus());
+
+    ASSERT_TRUE(allowedProperties.getValue()->matchesBSON(BSONObj()));
+}
 }  // namespace
 }  // namespace mongo

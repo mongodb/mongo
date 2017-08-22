@@ -27,9 +27,13 @@
  *    exception statement from all source files in the program, then also delete
  *    it in the license file.
  */
+
 #include "mongo/platform/basic.h"
 
 #include "mongo/db/matcher/expression_parser.h"
+
+#include <boost/container/flat_set.hpp>
+#include <pcrecpp.h>
 
 #include "mongo/base/init.h"
 #include "mongo/bson/bsonmisc.h"
@@ -43,6 +47,7 @@
 #include "mongo/db/matcher/expression_type.h"
 #include "mongo/db/matcher/expression_with_placeholder.h"
 #include "mongo/db/matcher/schema/expression_internal_schema_all_elem_match_from_index.h"
+#include "mongo/db/matcher/schema/expression_internal_schema_allowed_properties.h"
 #include "mongo/db/matcher/schema/expression_internal_schema_cond.h"
 #include "mongo/db/matcher/schema/expression_internal_schema_fmod.h"
 #include "mongo/db/matcher/schema/expression_internal_schema_match_array_index.h"
@@ -457,7 +462,6 @@ StatusWithMatchExpression MatchExpressionParser::_parse(
         if (e.fieldName()[0] == '$') {
             const char* rest = e.fieldName() + 1;
 
-            // TODO: optimize if block?
             if (mongoutils::str::equals("or", rest)) {
                 if (e.type() != Array)
                     return {Status(ErrorCodes::BadValue, "$or must be an array")};
@@ -513,6 +517,12 @@ StatusWithMatchExpression MatchExpressionParser::_parse(
                 eq->setCollator(str::equals("id", rest) ? collator : nullptr);
 
                 root->add(eq.release());
+            } else if (mongoutils::str::equals("_internalSchemaAllowedProperties", rest)) {
+                auto allowedProperties = _parseInternalSchemaAllowedProperties(e, collator);
+                if (!allowedProperties.isOK()) {
+                    return allowedProperties.getStatus();
+                }
+                root->add(allowedProperties.getValue().release());
             } else if (mongoutils::str::equals("_internalSchemaCond", rest)) {
                 auto condExpr =
                     _parseInternalSchemaFixedArityArgument<InternalSchemaCondMatchExpression>(
@@ -901,7 +911,8 @@ StatusWithMatchExpression MatchExpressionParser::_parseElemMatch(
             !mongoutils::str::equals("$or", elt.fieldName()) &&
             !mongoutils::str::equals("$where", elt.fieldName()) &&
             !mongoutils::str::equals("$_internalSchemaMinProperties", elt.fieldName()) &&
-            !mongoutils::str::equals("$_internalSchemaMaxProperties", elt.fieldName());
+            !mongoutils::str::equals("$_internalSchemaMaxProperties", elt.fieldName()) &&
+            !mongoutils::str::equals("$_internalSchemaAllowedProperties", elt.fieldName());
     }
 
     if (isElemMatchValue) {
@@ -1312,6 +1323,170 @@ StatusWithMatchExpression MatchExpressionParser::_parseTopLevelInternalSchemaSin
     return {std::move(matchExpression)};
 }
 
+namespace {
+/**
+ * Looks at the field named 'namePlaceholderFieldName' within 'containingObject' and parses a name
+ * placeholder from that element. 'expressionName' is the name of the expression that requires the
+ * name placeholder and is used to generate helpful error messages.
+ */
+StatusWith<StringData> parseNamePlaceholder(const BSONObj& containingObject,
+                                            StringData namePlaceholderFieldName,
+                                            StringData expressionName) {
+    auto namePlaceholderElem = containingObject[namePlaceholderFieldName];
+    if (!namePlaceholderElem) {
+        return {ErrorCodes::FailedToParse,
+                str::stream() << expressionName << " requires a '" << namePlaceholderFieldName
+                              << "'"};
+    } else if (namePlaceholderElem.type() != BSONType::String) {
+        return {ErrorCodes::TypeMismatch,
+                str::stream() << expressionName << " requires '" << namePlaceholderFieldName
+                              << "' to be a string, not "
+                              << namePlaceholderElem.type()};
+    }
+    return {namePlaceholderElem.valueStringData()};
+}
+
+/**
+ * Looks at the field named 'exprWithPlaceholderFieldName' within 'containingObject' and parses an
+ * ExpressionWithPlaceholder from that element. Fails if an error occurs during parsing, or if the
+ * ExpressionWithPlaceholder has a different name placeholder than 'expectedPlaceholder'.
+ * 'expressionName' is the name of the expression that requires the ExpressionWithPlaceholder and is
+ * used to generate helpful error messages.
+ */
+StatusWith<std::unique_ptr<ExpressionWithPlaceholder>> parseExprWithPlaceholder(
+    const BSONObj& containingObject,
+    StringData exprWithPlaceholderFieldName,
+    StringData expressionName,
+    StringData expectedPlaceholder,
+    const CollatorInterface* collator) {
+    auto exprWithPlaceholderElem = containingObject[exprWithPlaceholderFieldName];
+    if (!exprWithPlaceholderElem) {
+        return {ErrorCodes::FailedToParse,
+                str::stream() << expressionName << " requires '" << exprWithPlaceholderFieldName
+                              << "'"};
+    } else if (exprWithPlaceholderElem.type() != BSONType::Object) {
+        return {ErrorCodes::TypeMismatch,
+                str::stream() << expressionName << " found '" << exprWithPlaceholderFieldName
+                              << "', which is an incompatible type: "
+                              << exprWithPlaceholderElem.type()};
+    }
+
+    auto result =
+        ExpressionWithPlaceholder::parse(exprWithPlaceholderElem.embeddedObject(), collator);
+    if (!result.isOK()) {
+        return result.getStatus();
+    }
+
+    if (result.getValue()->getPlaceholder() != expectedPlaceholder) {
+        return {ErrorCodes::FailedToParse,
+                str::stream() << expressionName << " expected a name placeholder of "
+                              << expectedPlaceholder
+                              << ", but '"
+                              << exprWithPlaceholderElem.fieldName()
+                              << "' has a mismatching placeholder '"
+                              << result.getValue()->getPlaceholder()
+                              << "'"};
+    }
+    return result;
+}
+
+StatusWith<std::vector<InternalSchemaAllowedPropertiesMatchExpression::PatternSchema>>
+parsePatternProperties(BSONElement patternPropertiesElem,
+                       StringData expectedPlaceholder,
+                       const CollatorInterface* collator) {
+    if (!patternPropertiesElem) {
+        return {ErrorCodes::FailedToParse,
+                str::stream() << InternalSchemaAllowedPropertiesMatchExpression::kName
+                              << " requires 'patternProperties'"};
+    } else if (patternPropertiesElem.type() != BSONType::Array) {
+        return {ErrorCodes::TypeMismatch,
+                str::stream() << InternalSchemaAllowedPropertiesMatchExpression::kName
+                              << " requires 'patternProperties' to be an array, not "
+                              << patternPropertiesElem.type()};
+    }
+
+    std::vector<InternalSchemaAllowedPropertiesMatchExpression::PatternSchema> patternProperties;
+    for (auto&& constraintElem : patternPropertiesElem.embeddedObject()) {
+        if (constraintElem.type() != BSONType::Object) {
+            return {ErrorCodes::TypeMismatch,
+                    str::stream() << InternalSchemaAllowedPropertiesMatchExpression::kName
+                                  << " requires 'patternProperties' to be an array of objects"};
+        }
+
+        auto constraint = constraintElem.embeddedObject();
+        if (constraint.nFields() != 2) {
+            return {ErrorCodes::FailedToParse,
+                    str::stream() << InternalSchemaAllowedPropertiesMatchExpression::kName
+                                  << " requires 'patternProperties' to be an array of objects "
+                                     "containing exactly two fields, 'regex' and 'expression'"};
+        }
+
+        auto expressionWithPlaceholder =
+            parseExprWithPlaceholder(constraint,
+                                     "expression"_sd,
+                                     InternalSchemaAllowedPropertiesMatchExpression::kName,
+                                     expectedPlaceholder,
+                                     collator);
+        if (!expressionWithPlaceholder.isOK()) {
+            return expressionWithPlaceholder.getStatus();
+        }
+
+        auto regexElem = constraint["regex"];
+        if (!regexElem) {
+            return {
+                ErrorCodes::FailedToParse,
+                str::stream() << InternalSchemaAllowedPropertiesMatchExpression::kName
+                              << " requires each object in 'patternProperties' to have a 'regex'"};
+        }
+        if (regexElem.type() != BSONType::RegEx) {
+            return {ErrorCodes::TypeMismatch,
+                    str::stream() << InternalSchemaAllowedPropertiesMatchExpression::kName
+                                  << " requires 'patternProperties' to be an array of objects, "
+                                     "where 'regex' is a regular expression"};
+        } else if (*regexElem.regexFlags() != '\0') {
+            return {
+                ErrorCodes::BadValue,
+                str::stream()
+                    << InternalSchemaAllowedPropertiesMatchExpression::kName
+                    << " does not accept regex flags for pattern schemas in 'patternProperties'"};
+        }
+
+        patternProperties.emplace_back(
+            InternalSchemaAllowedPropertiesMatchExpression::Pattern(regexElem.regex()),
+            std::move(expressionWithPlaceholder.getValue()));
+    }
+
+    return std::move(patternProperties);
+}
+
+StatusWith<boost::container::flat_set<StringData>> parseProperties(BSONElement propertiesElem) {
+    if (!propertiesElem) {
+        return {ErrorCodes::FailedToParse,
+                str::stream() << InternalSchemaAllowedPropertiesMatchExpression::kName
+                              << " requires 'properties' to be present"};
+    } else if (propertiesElem.type() != BSONType::Array) {
+        return {ErrorCodes::TypeMismatch,
+                str::stream() << InternalSchemaAllowedPropertiesMatchExpression::kName
+                              << " requires 'properties' to be an array, not "
+                              << propertiesElem.type()};
+    }
+
+    std::vector<StringData> properties;
+    for (auto&& property : propertiesElem.embeddedObject()) {
+        if (property.type() != BSONType::String) {
+            return {
+                ErrorCodes::TypeMismatch,
+                str::stream() << InternalSchemaAllowedPropertiesMatchExpression::kName
+                              << " requires 'properties' to be an array of strings, but found a "
+                              << property.type()};
+        }
+        properties.push_back(property.valueStringData());
+    }
+
+    return boost::container::flat_set<StringData>(properties.begin(), properties.end());
+}
+}  // namespace
+
 StatusWithMatchExpression MatchExpressionParser::_parseInternalSchemaMatchArrayIndex(
     const char* path, const BSONElement& elem, const CollatorInterface* collator) {
     if (elem.type() != BSONType::Object) {
@@ -1333,45 +1508,20 @@ StatusWithMatchExpression MatchExpressionParser::_parseInternalSchemaMatchArrayI
         return index.getStatus();
     }
 
-    auto namePlaceholderElem = subobj["namePlaceholder"];
-    if (!namePlaceholderElem) {
-        return {ErrorCodes::FailedToParse,
-                str::stream() << InternalSchemaMatchArrayIndexMatchExpression::kName
-                              << " requires a 'namePlaceholder'"};
-    } else if (namePlaceholderElem.type() != BSONType::String) {
-        return {ErrorCodes::TypeMismatch,
-                str::stream() << InternalSchemaMatchArrayIndexMatchExpression::kName
-                              << " requires 'namePlaceholder' to be a string, not "
-                              << namePlaceholderElem.type()};
-    }
-
-    auto expressionElem = subobj["expression"];
-    if (!expressionElem) {
-        return {ErrorCodes::FailedToParse,
-                str::stream() << InternalSchemaMatchArrayIndexMatchExpression::kName
-                              << " requires an 'expression'"};
-    } else if (expressionElem.type() != BSONType::Object) {
-        return {ErrorCodes::TypeMismatch,
-                str::stream() << InternalSchemaMatchArrayIndexMatchExpression::kName
-                              << " requires 'expression' to be an object, not "
-                              << expressionElem.type()};
+    auto namePlaceholder = parseNamePlaceholder(
+        subobj, "namePlaceholder"_sd, InternalSchemaMatchArrayIndexMatchExpression::kName);
+    if (!namePlaceholder.isOK()) {
+        return namePlaceholder.getStatus();
     }
 
     auto expressionWithPlaceholder =
-        ExpressionWithPlaceholder::parse(expressionElem.embeddedObject(), collator);
+        parseExprWithPlaceholder(subobj,
+                                 "expression"_sd,
+                                 InternalSchemaMatchArrayIndexMatchExpression::kName,
+                                 namePlaceholder.getValue(),
+                                 collator);
     if (!expressionWithPlaceholder.isOK()) {
         return expressionWithPlaceholder.getStatus();
-    }
-
-    if (namePlaceholderElem.valueStringData() !=
-        expressionWithPlaceholder.getValue()->getPlaceholder()) {
-        return {ErrorCodes::FailedToParse,
-                str::stream() << InternalSchemaMatchArrayIndexMatchExpression::kName
-                              << " has a 'namePlaceholder' of '"
-                              << namePlaceholderElem.valueStringData()
-                              << "', but 'expression' has a mismatching placeholder '"
-                              << expressionWithPlaceholder.getValue()->getPlaceholder()
-                              << "'"};
     }
 
     auto matchArrayIndexExpr = stdx::make_unique<InternalSchemaMatchArrayIndexMatchExpression>();
@@ -1381,6 +1531,57 @@ StatusWithMatchExpression MatchExpressionParser::_parseInternalSchemaMatchArrayI
         return initStatus;
     }
     return {std::move(matchArrayIndexExpr)};
+}
+
+StatusWithMatchExpression MatchExpressionParser::_parseInternalSchemaAllowedProperties(
+    const BSONElement& elem, const CollatorInterface* collator) {
+    if (elem.type() != BSONType::Object) {
+        return {ErrorCodes::TypeMismatch,
+                str::stream() << InternalSchemaAllowedPropertiesMatchExpression::kName
+                              << " must be an object"};
+    }
+
+    auto subobj = elem.embeddedObject();
+    if (subobj.nFields() != 4) {
+        return {ErrorCodes::FailedToParse,
+                str::stream() << InternalSchemaAllowedPropertiesMatchExpression::kName
+                              << " requires exactly four fields: 'properties', 'namePlaceholder', "
+                                 "'patternProperties' and 'otherwise'"};
+    }
+
+    auto namePlaceholder = parseNamePlaceholder(
+        subobj, "namePlaceholder"_sd, InternalSchemaAllowedPropertiesMatchExpression::kName);
+    if (!namePlaceholder.isOK()) {
+        return namePlaceholder.getStatus();
+    }
+
+    auto patternProperties =
+        parsePatternProperties(subobj["patternProperties"], namePlaceholder.getValue(), collator);
+    if (!patternProperties.isOK()) {
+        return patternProperties.getStatus();
+    }
+
+    auto otherwise = parseExprWithPlaceholder(subobj,
+                                              "otherwise"_sd,
+                                              InternalSchemaAllowedPropertiesMatchExpression::kName,
+                                              namePlaceholder.getValue(),
+                                              collator);
+    if (!otherwise.isOK()) {
+        return otherwise.getStatus();
+    }
+
+    auto properties = parseProperties(subobj["properties"]);
+    if (!properties.isOK()) {
+        return properties.getStatus();
+    }
+
+    auto allowedPropertiesExpr =
+        stdx::make_unique<InternalSchemaAllowedPropertiesMatchExpression>();
+    allowedPropertiesExpr->init(std::move(properties.getValue()),
+                                namePlaceholder.getValue(),
+                                std::move(patternProperties.getValue()),
+                                std::move(otherwise.getValue()));
+    return {std::move(allowedPropertiesExpr)};
 }
 
 StatusWithMatchExpression MatchExpressionParser::_parseGeo(const char* name,
