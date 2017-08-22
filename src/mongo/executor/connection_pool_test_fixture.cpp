@@ -188,8 +188,8 @@ void ConnectionImpl::setup(Milliseconds timeout, SetupCallback cb) {
         _setupQueue.pop_front();
         _pushSetupQueue.pop_front();
 
-        auto cb = connPtr->_setupCallback;
-        cb(connPtr, callback());
+        auto refreshCb = connPtr->_setupCallback;
+        refreshCb(connPtr, callback());
     }
 }
 
@@ -209,8 +209,8 @@ void ConnectionImpl::refresh(Milliseconds timeout, RefreshCallback cb) {
         _refreshQueue.pop_front();
         _pushRefreshQueue.pop_front();
 
-        auto cb = connPtr->_refreshCallback;
-        cb(connPtr, callback());
+        auto refreshCb = connPtr->_refreshCallback;
+        refreshCb(connPtr, callback());
     }
 }
 
