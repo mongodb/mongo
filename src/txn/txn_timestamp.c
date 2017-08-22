@@ -407,7 +407,7 @@ __wt_txn_global_set_timestamp(WT_SESSION_IMPL *session, const char *cfg[])
 	    __wt_timestamp_cmp(&oldest_ts, &stable_ts) > 0) {
 		__wt_writeunlock(session, &txn_global->rwlock);
 		WT_RET_MSG(session, EINVAL,
-		    "set_timestamp: oldest timestamp must be later than "
+		    "set_timestamp: oldest timestamp must not be later than "
 		    "stable timestamp");
 	}
 
