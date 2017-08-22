@@ -52,11 +52,11 @@
 
 #include <pcre.h>
 
+namespace pcrecpp {
+
 using std::memcmp;
 using std::strlen;
 using std::string;
-
-namespace pcrecpp {
 
 class PCRECPP_EXP_DEFN StringPiece {
  private:
