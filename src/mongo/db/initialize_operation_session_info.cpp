@@ -46,6 +46,8 @@ void initializeOperationSessionInfo(OperationContext* opCtx,
     auto osi = OperationSessionInfoFromClient::parse("OperationSessionInfo"_sd, requestBody);
 
     if (osi.getSessionId()) {
+        stdx::lock_guard<Client> lk(*opCtx->getClient());
+
         opCtx->setLogicalSessionId(makeLogicalSessionId(osi.getSessionId().get(), opCtx));
 
         LogicalSessionCache* lsc = LogicalSessionCache::get(opCtx->getServiceContext());
@@ -53,6 +55,8 @@ void initializeOperationSessionInfo(OperationContext* opCtx,
     }
 
     if (osi.getTxnNumber()) {
+        stdx::lock_guard<Client> lk(*opCtx->getClient());
+
         uassert(ErrorCodes::IllegalOperation,
                 "Transaction number requires a sessionId to be specified",
                 opCtx->getLogicalSessionId());
