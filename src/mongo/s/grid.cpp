@@ -64,6 +64,7 @@ using std::ostringstream;
 using std::set;
 using std::setfill;
 using std::setw;
+using std::string;
 using std::stringstream;
 using std::vector;
 
@@ -205,7 +206,7 @@ void Grid::setAllowLocalHost(bool allow) {
 bool Grid::addShard(string* name,
                     const ConnectionString& servers,
                     long long maxSize,
-                    string& errMsg) {
+                    std::string& errMsg) {
     // name can be NULL, so provide a dummy one here to avoid testing it elsewhere
     string nameInternal;
     if (!name) {

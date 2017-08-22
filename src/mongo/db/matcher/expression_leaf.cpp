@@ -196,7 +196,7 @@ void ComparisonMatchExpression::debugString(StringBuilder& debug, int level) con
 }
 
 void ComparisonMatchExpression::toBSON(BSONObjBuilder* out) const {
-    string opString = "";
+    std::string opString = "";
     switch (matchType()) {
         case LT:
             opString = "$lt";
