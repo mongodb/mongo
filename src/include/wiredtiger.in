@@ -1757,8 +1757,9 @@ struct __wt_session {
 	 * @param session the session handle
 	 * @configstart{WT_SESSION.timestamp_transaction, see dist/api_data.py}
 	 * @config{commit_timestamp, set the commit timestamp for the current
-	 * transaction\, see @ref transaction_timestamps., a string; default
-	 * empty.}
+	 * transaction.  It is an error to set the commit timestamp on a
+	 * transaction that is not running\, see @ref transaction_timestamps., a
+	 * string; default empty.}
 	 * @configend
 	 * @errors
 	 */
