@@ -236,6 +236,8 @@ private:
     std::string _uri(StringData ident) const;
     bool _drop(StringData ident);
 
+    void _setOldestTimestamp(SnapshotName oldestTimestamp);
+
     WT_CONNECTION* _conn;
     WT_EVENT_HANDLER _eventHandler;
     std::unique_ptr<WiredTigerSessionCache> _sessionCache;
