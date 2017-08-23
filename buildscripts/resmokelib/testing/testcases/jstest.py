@@ -105,6 +105,19 @@ class JSTestCase(interface.TestCase):
             # Directory already exists.
             pass
 
+        process_kwargs = self.shell_options.get("process_kwargs", {}).copy()
+
+        if "KRB5_CONFIG" in process_kwargs and "KRB5CCNAME" not in process_kwargs:
+            # Use a job-specific credential cache for JavaScript tests involving Kerberos.
+            krb5_dir = os.path.join(data_dir, "krb5")
+            try:
+                os.makedirs(krb5_dir)
+            except os.error:
+                pass
+            process_kwargs["KRB5CCNAME"] = "DIR:" + os.path.join(krb5_dir, ".")
+
+        self.shell_options["process_kwargs"] = process_kwargs
+
     def _get_data_dir(self, global_vars):
         """
         Returns the value that the mongo shell should set for the
