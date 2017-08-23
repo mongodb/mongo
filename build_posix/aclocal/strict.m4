@@ -90,6 +90,13 @@ AC_DEFUN([AM_CLANG_WARNINGS], [
 	w="$w -Wno-reserved-id-macro"
 	w="$w -Wno-zero-length-array"
 
+	# Added when switching to building with clang 3.4.2
+	w="$w -Wno-array-bounds"
+	w="$w -Wno-parentheses-equality"
+	w="$w -Wno-self-assign"
+	w="$w -Wno-unreachable-code"
+	w="$w -Wno-unreachable-code-return"
+
 	# We should turn on cast-qual, but not as a fatal error: see WT-2690.
 	# For now, turn it off.
 	# w="$w -Wno-error=cast-qual"
