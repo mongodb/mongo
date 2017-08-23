@@ -56,7 +56,7 @@ class test_timestamp07(wttest.WiredTigerTestCase, suite_subprocess):
 
     nkeys = [
         ('100keys', dict(nkeys=100)),
-        ('500keys', dict(nkeys=500)),
+#        ('500keys', dict(nkeys=500)),
 #        ('1000keys', dict(nkeys=1000)),
     ]
 
