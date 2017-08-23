@@ -1018,28 +1018,6 @@ void WiredTigerKVEngine::setStableTimestamp(SnapshotName stableTimestamp) {
     if (_checkpointThread) {
         _checkpointThread->setStableTimestamp(stableTimestamp);
     }
-
-    // Communicate to WiredTiger that it can clean up timestamp data earlier than the timestamp
-    // provided.  No future queries will need point-in-time reads at a timestamp prior to the one
-    // provided here.
-    _setOldestTimestamp(stableTimestamp);
-}
-
-void WiredTigerKVEngine::_setOldestTimestamp(SnapshotName oldestTimestamp) {
-    if (oldestTimestamp == SnapshotName()) {
-        // No oldestTimestamp to set, yet.
-        return;
-    }
-
-    char oldestTSConfigString["oldest_timestamp="_sd.size() + (8 * 2) /* 16 hexadecimal digits */ +
-                              1 /* trailing null */];
-    auto size = std::snprintf(oldestTSConfigString,
-                              sizeof(oldestTSConfigString),
-                              "oldest_timestamp=%llx",
-                              static_cast<unsigned long long>(oldestTimestamp.asU64()));
-    invariant(static_cast<std::size_t>(size) < sizeof(oldestTSConfigString));
-    invariantWTOK(_conn->set_timestamp(_conn, oldestTSConfigString));
-    LOG(2) << "oldest_timestamp set to " << oldestTSConfigString;
 }
 
 void WiredTigerKVEngine::setInitialDataTimestamp(SnapshotName initialDataTimestamp) {
