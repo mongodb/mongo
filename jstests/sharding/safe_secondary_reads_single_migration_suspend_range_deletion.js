@@ -402,10 +402,14 @@
             {configureFailPoint: 'suspendRangeDeletion', mode: 'alwaysOn'});
 
         // Do a moveChunk from the fresh mongos to make the other mongos stale.
+        // Use {w:2} (all) write concern so the metadata change gets persisted to the secondary
+        // before stalely versioned commands are sent against the secondary.
         assert.commandWorked(freshMongos.adminCommand({
             moveChunk: nss,
             find: {x: 0},
             to: st.shard1.shardName,
+            _secondaryThrottle: true,
+            writeConcern: {w: 2},
         }));
 
         // Make a read preference secondary copy of the command.
@@ -514,6 +518,8 @@
                                       commandProfile)
             });
         }
+
+        donorShardPrimary.adminCommand({configureFailPoint: 'suspendRangeDeletion', mode: 'off'});
 
         // Clean up the collection by dropping the DB. This also drops all associated indexes and
         // clears the profiler collection.

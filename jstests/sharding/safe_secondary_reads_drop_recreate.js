@@ -326,6 +326,12 @@
             assert.commandWorked(freshMongos.getDB(db).runCommand({drop: coll}));
             assert.commandWorked(freshMongos.getDB(db).runCommand({create: coll}));
 
+            // Ensure the latest version changes have been persisted and propagate to the secondary
+            // before we target it with versioned commands.
+            assert.commandWorked(
+                st.rs0.getPrimary().getDB('admin').runCommand({forceRoutingTableRefresh: nss}));
+            st.rs0.awaitReplication();
+
             let res = staleMongos.getDB(db).runCommand(
                 Object.assign({}, test.command, {$readPreference: {mode: 'secondary'}}));
 
@@ -378,6 +384,12 @@
             assert.commandWorked(freshMongos.getDB(db).runCommand({drop: coll}));
             assert.commandWorked(freshMongos.getDB(db).runCommand({create: coll}));
             assert.commandWorked(freshMongos.adminCommand({shardCollection: nss, key: {x: 1}}));
+
+            // Ensure the latest version changes have been persisted and propagate to the secondary
+            // before we target it with versioned commands.
+            assert.commandWorked(
+                st.rs0.getPrimary().getDB('admin').runCommand({forceRoutingTableRefresh: nss}));
+            st.rs0.awaitReplication();
 
             let res = staleMongos.getDB(db).runCommand(
                 Object.assign({}, test.command, {$readPreference: {mode: 'secondary'}}));
@@ -439,10 +451,14 @@
             assert.commandWorked(freshMongos.getDB(db).runCommand({drop: coll}));
             assert.commandWorked(freshMongos.getDB(db).runCommand({create: coll}));
             assert.commandWorked(freshMongos.adminCommand({shardCollection: nss, key: {x: 1}}));
+            // Use {w:2} (all) write concern in the moveChunk operation so the metadata change gets
+            // persisted to the secondary before versioned commands are sent against the secondary.
             assert.commandWorked(freshMongos.adminCommand({
                 moveChunk: nss,
                 find: {x: 0},
                 to: st.shard1.shardName,
+                _secondaryThrottle: true,
+                writeConcern: {w: 2},
             }));
 
             let res = staleMongos.getDB(db).runCommand(
