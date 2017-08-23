@@ -77,13 +77,13 @@ public:
     virtual void kill(OperationContext* opCtx) = 0;
 
     /**
-     * Sets the operation context for the cursor. Must be called before the first call to next().
-     * The cursor attaches to a new OperationContext on each getMore.
+     * Sets the operation context for the cursor.
      */
     virtual void reattachToOperationContext(OperationContext* opCtx) = 0;
 
     /**
-     * Detaches the cursor from its current OperationContext.
+     * Detaches the cursor from its current OperationContext. Must be called before the
+     * OperationContext in use is deleted.
      */
     virtual void detachFromOperationContext() = 0;
 

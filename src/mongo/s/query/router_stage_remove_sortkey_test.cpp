@@ -40,20 +40,19 @@ namespace mongo {
 
 namespace {
 
-// Note: Though the next() method on RouterExecStage and its subclasses depend on an
-// OperationContext* provided via a preceding call to reattachToOperationContext(), these stages are
-// mocked in this test using RouterStageMock. RouterStageMock does not actually use the
-// OperationContext, so we omit the call to rettachToOperationContext in these tests.
+// These tests use router stages, which do not actually use their OperationContext, so rather than
+// going through the trouble of making one, we'll just use nullptr throughout.
+OperationContext* opCtx = nullptr;
 
 TEST(RouterStageRemoveSortKeyTest, RemovesSortKey) {
-    auto mockStage = stdx::make_unique<RouterStageMock>();
+    auto mockStage = stdx::make_unique<RouterStageMock>(opCtx);
     mockStage->queueResult(BSON("a" << 4 << "$sortKey" << 1 << "b" << 3));
     mockStage->queueResult(BSON("$sortKey" << BSON("" << 3) << "c" << BSON("d"
                                                                            << "foo")));
     mockStage->queueResult(BSON("a" << 3));
     mockStage->queueResult(BSONObj());
 
-    auto sortKeyStage = stdx::make_unique<RouterStageRemoveSortKey>(std::move(mockStage));
+    auto sortKeyStage = stdx::make_unique<RouterStageRemoveSortKey>(opCtx, std::move(mockStage));
 
     auto firstResult = sortKeyStage->next();
     ASSERT_OK(firstResult.getStatus());
@@ -83,11 +82,11 @@ TEST(RouterStageRemoveSortKeyTest, RemovesSortKey) {
 }
 
 TEST(RouterStageRemoveSortKeyTest, PropagatesError) {
-    auto mockStage = stdx::make_unique<RouterStageMock>();
+    auto mockStage = stdx::make_unique<RouterStageMock>(opCtx);
     mockStage->queueResult(BSON("$sortKey" << 1));
     mockStage->queueError(Status(ErrorCodes::BadValue, "bad thing happened"));
 
-    auto sortKeyStage = stdx::make_unique<RouterStageRemoveSortKey>(std::move(mockStage));
+    auto sortKeyStage = stdx::make_unique<RouterStageRemoveSortKey>(opCtx, std::move(mockStage));
 
     auto firstResult = sortKeyStage->next();
     ASSERT_OK(firstResult.getStatus());
@@ -101,12 +100,12 @@ TEST(RouterStageRemoveSortKeyTest, PropagatesError) {
 }
 
 TEST(RouterStageRemoveSortKeyTest, ToleratesMidStreamEOF) {
-    auto mockStage = stdx::make_unique<RouterStageMock>();
+    auto mockStage = stdx::make_unique<RouterStageMock>(opCtx);
     mockStage->queueResult(BSON("a" << 1 << "$sortKey" << 1 << "b" << 1));
     mockStage->queueEOF();
     mockStage->queueResult(BSON("a" << 2 << "$sortKey" << 1 << "b" << 2));
 
-    auto sortKeyStage = stdx::make_unique<RouterStageRemoveSortKey>(std::move(mockStage));
+    auto sortKeyStage = stdx::make_unique<RouterStageRemoveSortKey>(opCtx, std::move(mockStage));
 
     auto firstResult = sortKeyStage->next();
     ASSERT_OK(firstResult.getStatus());
@@ -128,12 +127,12 @@ TEST(RouterStageRemoveSortKeyTest, ToleratesMidStreamEOF) {
 }
 
 TEST(RouterStageRemoveSortKeyTest, RemotesExhausted) {
-    auto mockStage = stdx::make_unique<RouterStageMock>();
+    auto mockStage = stdx::make_unique<RouterStageMock>(opCtx);
     mockStage->queueResult(BSON("a" << 1 << "$sortKey" << 1 << "b" << 1));
     mockStage->queueResult(BSON("a" << 2 << "$sortKey" << 1 << "b" << 2));
     mockStage->markRemotesExhausted();
 
-    auto sortKeyStage = stdx::make_unique<RouterStageRemoveSortKey>(std::move(mockStage));
+    auto sortKeyStage = stdx::make_unique<RouterStageRemoveSortKey>(opCtx, std::move(mockStage));
     ASSERT_TRUE(sortKeyStage->remotesExhausted());
 
     auto firstResult = sortKeyStage->next();
@@ -155,11 +154,11 @@ TEST(RouterStageRemoveSortKeyTest, RemotesExhausted) {
 }
 
 TEST(RouterStageRemoveSortKeyTest, ForwardsAwaitDataTimeout) {
-    auto mockStage = stdx::make_unique<RouterStageMock>();
+    auto mockStage = stdx::make_unique<RouterStageMock>(opCtx);
     auto mockStagePtr = mockStage.get();
     ASSERT_NOT_OK(mockStage->getAwaitDataTimeout().getStatus());
 
-    auto sortKeyStage = stdx::make_unique<RouterStageRemoveSortKey>(std::move(mockStage));
+    auto sortKeyStage = stdx::make_unique<RouterStageRemoveSortKey>(opCtx, std::move(mockStage));
     ASSERT_OK(sortKeyStage->setAwaitDataTimeout(Milliseconds(789)));
 
     auto awaitDataTimeout = mockStagePtr->getAwaitDataTimeout();

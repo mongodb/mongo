@@ -34,8 +34,10 @@
 
 namespace mongo {
 
-RouterStageSkip::RouterStageSkip(std::unique_ptr<RouterExecStage> child, long long skip)
-    : RouterExecStage(std::move(child)), _skip(skip) {
+RouterStageSkip::RouterStageSkip(OperationContext* opCtx,
+                                 std::unique_ptr<RouterExecStage> child,
+                                 long long skip)
+    : RouterExecStage(opCtx, std::move(child)), _skip(skip) {
     invariant(skip > 0);
 }
 

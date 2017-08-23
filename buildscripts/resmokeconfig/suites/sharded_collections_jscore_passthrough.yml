@@ -40,6 +40,7 @@ selector:
   - jstests/core/startup_log.js  # "local" database.
   - jstests/core/storageDetailsCommand.js  # diskStorageStats.
   - jstests/core/tailable_skip_limit.js # capped collections.
+  - jstests/core/tailable_getmore_batch_size.js # capped collections.
   - jstests/core/top.js  # top.
   # The following tests fail because mongos behaves differently from mongod when testing certain
   # functionality. The differences are in a comment next to the failing test.

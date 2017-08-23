@@ -52,8 +52,9 @@ class OperationContext;
  */
 class RouterExecStage {
 public:
-    RouterExecStage() = default;
-    RouterExecStage(std::unique_ptr<RouterExecStage> child) : _child(std::move(child)) {}
+    RouterExecStage(OperationContext* opCtx) : _opCtx(opCtx) {}
+    RouterExecStage(OperationContext* opCtx, std::unique_ptr<RouterExecStage> child)
+        : _opCtx(opCtx), _child(std::move(child)) {}
 
     virtual ~RouterExecStage() = default;
 
@@ -71,6 +72,10 @@ public:
     /**
      * Must be called before destruction to abandon a not-yet-exhausted plan. May block waiting for
      * responses from remote hosts.
+     *
+     * Note that 'opCtx' may or may not be the same as the operation context to which this cursor is
+     * currently attached. This is so that a killing thread may call this method with its own
+     * operation context.
      */
     virtual void kill(OperationContext* opCtx) = 0;
 
@@ -144,8 +149,8 @@ protected:
     }
 
 private:
-    std::unique_ptr<RouterExecStage> _child;
     OperationContext* _opCtx = nullptr;
+    std::unique_ptr<RouterExecStage> _child;
 };
 
 }  // namespace mongo

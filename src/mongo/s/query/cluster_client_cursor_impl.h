@@ -123,7 +123,8 @@ public:
     /**
      * Constructs a cluster client cursor.
      */
-    ClusterClientCursorImpl(executor::TaskExecutor* executor,
+    ClusterClientCursorImpl(OperationContext* opCtx,
+                            executor::TaskExecutor* executor,
                             ClusterClientCursorParams&& params,
                             boost::optional<LogicalSessionId> lsid);
 
@@ -131,7 +132,8 @@ private:
     /**
      * Constructs the pipeline of MergerPlanStages which will be used to answer the query.
      */
-    std::unique_ptr<RouterExecStage> buildMergerPlan(executor::TaskExecutor* executor,
+    std::unique_ptr<RouterExecStage> buildMergerPlan(OperationContext* opCtx,
+                                                     executor::TaskExecutor* executor,
                                                      ClusterClientCursorParams* params);
 
     ClusterClientCursorParams _params;

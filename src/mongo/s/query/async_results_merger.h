@@ -83,8 +83,14 @@ public:
      * buffered results onto _mergeQueue.
      *
      * The TaskExecutor* must remain valid for the lifetime of the ARM.
+     *
+     * If 'opCtx' may be deleted before this AsyncResultsMerger, the caller must call
+     * detachFromOperationContext() before deleting 'opCtx', and call reattachToOperationContext()
+     * with a new, valid OperationContext before the next use.
      */
-    AsyncResultsMerger(executor::TaskExecutor* executor, ClusterClientCursorParams* params);
+    AsyncResultsMerger(OperationContext* opCtx,
+                       executor::TaskExecutor* executor,
+                       ClusterClientCursorParams* params);
 
     /**
      * In order to be destroyed, either the ARM must have been kill()'ed or all cursors must have
@@ -105,6 +111,18 @@ public:
      * the cursor is not tailable + awaitData).
      */
     Status setAwaitDataTimeout(Milliseconds awaitDataTimeout);
+
+    /**
+     * Signals to the AsyncResultsMerger that the caller is finished using it in the current
+     * context.
+     */
+    void detachFromOperationContext();
+
+    /**
+     * Provides a new OperationContext to be used by the AsyncResultsMerger - the caller must call
+     * detachFromOperationContext() before 'opCtx' is deleted.
+     */
+    void reattachToOperationContext(OperationContext* opCtx);
 
     /**
      * Returns true if there is no need to schedule remote work in order to take the next action.
@@ -157,7 +175,7 @@ public:
      * non-exhausted remotes.
      * If there is no sort, the event is signaled when some remote has a buffered result.
      */
-    StatusWith<executor::TaskExecutor::EventHandle> nextEvent(OperationContext* opCtx);
+    StatusWith<executor::TaskExecutor::EventHandle> nextEvent();
 
     /**
      * Starts shutting down this ARM by canceling all pending requests. Returns a handle to an event
@@ -170,6 +188,10 @@ public:
      * killing is considered complete and the ARM may be destroyed immediately.
      *
      * May be called multiple times (idempotent).
+     *
+     * Note that 'opCtx' may or may not be the same as the operation context to which this cursor is
+     * currently attached. This is so that a killing thread may call this method with its own
+     * operation context.
      */
     executor::TaskExecutor::EventHandle kill(OperationContext* opCtx);
 
@@ -263,7 +285,7 @@ private:
      *
      * Returns success if the command to retrieve the next batch was scheduled successfully.
      */
-    Status askForNextBatch_inlock(OperationContext* opCtx, size_t remoteIndex);
+    Status askForNextBatch_inlock(size_t remoteIndex);
 
     /**
      * Checks whether or not the remote cursors are all exhausted.
@@ -294,7 +316,6 @@ private:
      * buffered.
      */
     void handleBatchResponse(const executor::TaskExecutor::RemoteCommandCallbackArgs& cbData,
-                             OperationContext* opCtx,
                              size_t remoteIndex);
     /**
      * Adds the batch of results to the RemoteCursorData. Returns false if there was an error
@@ -321,10 +342,8 @@ private:
      */
     void scheduleKillCursors_inlock(OperationContext* opCtx);
 
-    // Not owned here.
+    OperationContext* _opCtx;
     executor::TaskExecutor* _executor;
-
-    // Not owned here.
     ClusterClientCursorParams* _params;
 
     // The metadata obj to pass along with the command request. Used to indicate that the command is

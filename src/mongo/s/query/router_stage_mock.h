@@ -42,6 +42,7 @@ namespace mongo {
  */
 class RouterStageMock final : public RouterExecStage {
 public:
+    RouterStageMock(OperationContext* opCtx) : RouterExecStage(opCtx) {}
     ~RouterStageMock() final {}
 
     StatusWith<ClusterQueryResult> next() final;

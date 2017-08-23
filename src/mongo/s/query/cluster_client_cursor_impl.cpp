@@ -63,15 +63,16 @@ std::unique_ptr<ClusterClientCursor> ClusterClientCursorGuard::releaseCursor() {
 ClusterClientCursorGuard ClusterClientCursorImpl::make(OperationContext* opCtx,
                                                        executor::TaskExecutor* executor,
                                                        ClusterClientCursorParams&& params) {
-    std::unique_ptr<ClusterClientCursor> cursor(
-        new ClusterClientCursorImpl(executor, std::move(params), opCtx->getLogicalSessionId()));
+    std::unique_ptr<ClusterClientCursor> cursor(new ClusterClientCursorImpl(
+        opCtx, executor, std::move(params), opCtx->getLogicalSessionId()));
     return ClusterClientCursorGuard(opCtx, std::move(cursor));
 }
 
-ClusterClientCursorImpl::ClusterClientCursorImpl(executor::TaskExecutor* executor,
+ClusterClientCursorImpl::ClusterClientCursorImpl(OperationContext* opCtx,
+                                                 executor::TaskExecutor* executor,
                                                  ClusterClientCursorParams&& params,
                                                  boost::optional<LogicalSessionId> lsid)
-    : _params(std::move(params)), _root(buildMergerPlan(executor, &_params)), _lsid(lsid) {}
+    : _params(std::move(params)), _root(buildMergerPlan(opCtx, executor, &_params)), _lsid(lsid) {}
 
 ClusterClientCursorImpl::ClusterClientCursorImpl(std::unique_ptr<RouterStageMock> root,
                                                  ClusterClientCursorParams&& params,
@@ -140,7 +141,7 @@ boost::optional<LogicalSessionId> ClusterClientCursorImpl::getLsid() const {
 }
 
 std::unique_ptr<RouterExecStage> ClusterClientCursorImpl::buildMergerPlan(
-    executor::TaskExecutor* executor, ClusterClientCursorParams* params) {
+    OperationContext* opCtx, executor::TaskExecutor* executor, ClusterClientCursorParams* params) {
     const auto skip = params->skip;
     const auto limit = params->limit;
     const bool hasSort = !params->sort.isEmpty();
@@ -153,18 +154,19 @@ std::unique_ptr<RouterExecStage> ClusterClientCursorImpl::buildMergerPlan(
         return stdx::make_unique<RouterStageAggregationMerge>(std::move(params->mergePipeline));
     }
 
-    std::unique_ptr<RouterExecStage> root = stdx::make_unique<RouterStageMerge>(executor, params);
+    std::unique_ptr<RouterExecStage> root =
+        stdx::make_unique<RouterStageMerge>(opCtx, executor, params);
 
     if (skip) {
-        root = stdx::make_unique<RouterStageSkip>(std::move(root), *skip);
+        root = stdx::make_unique<RouterStageSkip>(opCtx, std::move(root), *skip);
     }
 
     if (limit) {
-        root = stdx::make_unique<RouterStageLimit>(std::move(root), *limit);
+        root = stdx::make_unique<RouterStageLimit>(opCtx, std::move(root), *limit);
     }
 
     if (hasSort) {
-        root = stdx::make_unique<RouterStageRemoveSortKey>(std::move(root));
+        root = stdx::make_unique<RouterStageRemoveSortKey>(opCtx, std::move(root));
     }
 
     return root;

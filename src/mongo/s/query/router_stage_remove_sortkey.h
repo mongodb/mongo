@@ -39,7 +39,7 @@ namespace mongo {
  */
 class RouterStageRemoveSortKey final : public RouterExecStage {
 public:
-    RouterStageRemoveSortKey(std::unique_ptr<RouterExecStage> child);
+    RouterStageRemoveSortKey(OperationContext* opCtx, std::unique_ptr<RouterExecStage> child);
 
     StatusWith<ClusterQueryResult> next() final;
 

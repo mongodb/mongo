@@ -43,7 +43,9 @@ namespace mongo {
  */
 class RouterStageMerge final : public RouterExecStage {
 public:
-    RouterStageMerge(executor::TaskExecutor* executor, ClusterClientCursorParams* params);
+    RouterStageMerge(OperationContext* opCtx,
+                     executor::TaskExecutor* executor,
+                     ClusterClientCursorParams* params);
 
     StatusWith<ClusterQueryResult> next() final;
 
@@ -52,6 +54,15 @@ public:
     bool remotesExhausted() final;
 
     Status setAwaitDataTimeout(Milliseconds awaitDataTimeout) final;
+
+protected:
+    void doReattachToOperationContext() override {
+        _arm.reattachToOperationContext(getOpCtx());
+    }
+
+    virtual void doDetachFromOperationContext() {
+        _arm.detachFromOperationContext();
+    }
 
 private:
     // Not owned here.

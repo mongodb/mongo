@@ -37,7 +37,8 @@ namespace mongo {
 
 RouterStageAggregationMerge::RouterStageAggregationMerge(
     std::unique_ptr<Pipeline, Pipeline::Deleter> mergePipeline)
-    : _mergePipeline(std::move(mergePipeline)) {}
+    : RouterExecStage(mergePipeline->getContext()->opCtx),
+      _mergePipeline(std::move(mergePipeline)) {}
 
 StatusWith<ClusterQueryResult> RouterStageAggregationMerge::next() {
     // Pipeline::getNext will return a boost::optional<Document> or boost::none if EOF.

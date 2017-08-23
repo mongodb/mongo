@@ -331,7 +331,6 @@ BSONObj establishMergingMongosCursor(
 
     params.mergePipeline = std::move(pipelineForMerging);
     params.remotes = std::move(cursors);
-    params.batchSize = request.getBatchSize();
 
     auto ccc = ClusterClientCursorImpl::make(
         opCtx, Grid::get(opCtx)->getExecutorPool()->getArbitraryExecutor(), std::move(params));
@@ -340,8 +339,6 @@ BSONObj establishMergingMongosCursor(
     BSONObjBuilder cursorResponse;
 
     CursorResponseBuilder responseBuilder(true, &cursorResponse);
-
-    ccc->reattachToOperationContext(opCtx);
 
     for (long long objCount = 0; objCount < request.getBatchSize(); ++objCount) {
         auto next = uassertStatusOK(ccc->next());

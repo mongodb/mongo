@@ -37,7 +37,9 @@ namespace mongo {
  */
 class RouterStageLimit final : public RouterExecStage {
 public:
-    RouterStageLimit(std::unique_ptr<RouterExecStage> child, long long limit);
+    RouterStageLimit(OperationContext* opCtx,
+                     std::unique_ptr<RouterExecStage> child,
+                     long long limit);
 
     StatusWith<ClusterQueryResult> next() final;
 

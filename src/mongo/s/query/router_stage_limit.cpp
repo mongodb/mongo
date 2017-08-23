@@ -34,8 +34,10 @@
 
 namespace mongo {
 
-RouterStageLimit::RouterStageLimit(std::unique_ptr<RouterExecStage> child, long long limit)
-    : RouterExecStage(std::move(child)), _limit(limit) {
+RouterStageLimit::RouterStageLimit(OperationContext* opCtx,
+                                   std::unique_ptr<RouterExecStage> child,
+                                   long long limit)
+    : RouterExecStage(opCtx, std::move(child)), _limit(limit) {
     invariant(limit > 0);
 }
 

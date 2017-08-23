@@ -132,7 +132,7 @@ protected:
             _params->isAllowPartialResults = qr->isAllowPartialResults();
         }
 
-        arm = stdx::make_unique<AsyncResultsMerger>(executor(), _params.get());
+        arm = stdx::make_unique<AsyncResultsMerger>(operationContext(), executor(), _params.get());
     }
 
     /**
@@ -234,7 +234,7 @@ TEST_F(AsyncResultsMergerTest, SingleShardUnsorted) {
     ASSERT_FALSE(arm->remotesExhausted());
 
     // Schedule requests.
-    auto readyEvent = unittest::assertGet(arm->nextEvent(nullptr));
+    auto readyEvent = unittest::assertGet(arm->nextEvent());
 
     // Before any responses are delivered, ARM is not ready to return results.
     ASSERT_FALSE(arm->ready());
@@ -278,7 +278,7 @@ TEST_F(AsyncResultsMergerTest, SingleShardSorted) {
     ASSERT_FALSE(arm->remotesExhausted());
 
     // Schedule requests.
-    auto readyEvent = unittest::assertGet(arm->nextEvent(nullptr));
+    auto readyEvent = unittest::assertGet(arm->nextEvent());
 
     // Before any responses are delivered, ARM is not ready to return results.
     ASSERT_FALSE(arm->ready());
@@ -322,7 +322,7 @@ TEST_F(AsyncResultsMergerTest, MultiShardUnsorted) {
     ASSERT_FALSE(arm->remotesExhausted());
 
     // Schedule requests.
-    auto readyEvent = unittest::assertGet(arm->nextEvent(nullptr));
+    auto readyEvent = unittest::assertGet(arm->nextEvent());
 
     // Before any responses are delivered, ARM is not ready to return results.
     ASSERT_FALSE(arm->ready());
@@ -354,7 +354,7 @@ TEST_F(AsyncResultsMergerTest, MultiShardUnsorted) {
     ASSERT_FALSE(arm->ready());
 
     // Make next event to be signaled.
-    readyEvent = unittest::assertGet(arm->nextEvent(nullptr));
+    readyEvent = unittest::assertGet(arm->nextEvent());
 
     // Second shard responds; the handleBatchResponse callback is run and ARM's remote gets updated.
     responses.clear();
@@ -394,7 +394,7 @@ TEST_F(AsyncResultsMergerTest, MultiShardSorted) {
     ASSERT_FALSE(arm->remotesExhausted());
 
     // Schedule requests.
-    auto readyEvent = unittest::assertGet(arm->nextEvent(nullptr));
+    auto readyEvent = unittest::assertGet(arm->nextEvent());
 
     // Before any responses are delivered, ARM is not ready to return results.
     ASSERT_FALSE(arm->ready());
@@ -457,7 +457,7 @@ TEST_F(AsyncResultsMergerTest, MultiShardMultipleGets) {
     ASSERT_FALSE(arm->remotesExhausted());
 
     // Schedule requests.
-    auto readyEvent = unittest::assertGet(arm->nextEvent(nullptr));
+    auto readyEvent = unittest::assertGet(arm->nextEvent());
 
     // First shard responds; the handleBatchResponse callback is run and ARM's remote gets updated.
     std::vector<CursorResponse> responses;
@@ -486,7 +486,7 @@ TEST_F(AsyncResultsMergerTest, MultiShardMultipleGets) {
     ASSERT_FALSE(arm->ready());
 
     // Make next event to be signaled.
-    readyEvent = unittest::assertGet(arm->nextEvent(nullptr));
+    readyEvent = unittest::assertGet(arm->nextEvent());
 
     // Second shard responds; the handleBatchResponse callback is run and ARM's remote gets updated.
     responses.clear();
@@ -514,7 +514,7 @@ TEST_F(AsyncResultsMergerTest, MultiShardMultipleGets) {
     ASSERT_FALSE(arm->ready());
 
     // Make next event to be signaled.
-    readyEvent = unittest::assertGet(arm->nextEvent(nullptr));
+    readyEvent = unittest::assertGet(arm->nextEvent());
 
     // First shard returns remainder of results.
     responses.clear();
@@ -552,7 +552,7 @@ TEST_F(AsyncResultsMergerTest, CompoundSortKey) {
 
     // Schedule requests.
     ASSERT_FALSE(arm->ready());
-    auto readyEvent = unittest::assertGet(arm->nextEvent(nullptr));
+    auto readyEvent = unittest::assertGet(arm->nextEvent());
     ASSERT_FALSE(arm->ready());
 
     // Deliver responses.
@@ -604,7 +604,7 @@ TEST_F(AsyncResultsMergerTest, SortedButNoSortKey) {
     makeCursorFromExistingCursors(std::move(cursors), findCmd);
 
     ASSERT_FALSE(arm->ready());
-    auto readyEvent = unittest::assertGet(arm->nextEvent(nullptr));
+    auto readyEvent = unittest::assertGet(arm->nextEvent());
     ASSERT_FALSE(arm->ready());
 
     // Parsing the batch results in an error because the sort key is missing.
@@ -621,7 +621,7 @@ TEST_F(AsyncResultsMergerTest, SortedButNoSortKey) {
     ASSERT_EQ(statusWithNext.getStatus().code(), ErrorCodes::InternalError);
 
     // Required to kill the 'arm' on error before destruction.
-    auto killEvent = arm->kill(nullptr);
+    auto killEvent = arm->kill(operationContext());
     executor()->waitForEvent(killEvent);
 }
 
@@ -650,7 +650,7 @@ TEST_F(AsyncResultsMergerTest, HasFirstBatch) {
     ASSERT_FALSE(arm->ready());
 
     // Schedule requests.
-    auto readyEvent = unittest::assertGet(arm->nextEvent(nullptr));
+    auto readyEvent = unittest::assertGet(arm->nextEvent());
 
     // Before any responses are delivered, ARM is not ready to return results.
     ASSERT_FALSE(arm->ready());
@@ -709,7 +709,7 @@ TEST_F(AsyncResultsMergerTest, OneShardHasInitialBatchOtherShardExhausted) {
     ASSERT_FALSE(arm->ready());
 
     // Schedule requests.
-    auto readyEvent = unittest::assertGet(arm->nextEvent(nullptr));
+    auto readyEvent = unittest::assertGet(arm->nextEvent());
 
     // Before any responses are delivered, ARM is not ready to return results.
     ASSERT_FALSE(arm->ready());
@@ -749,7 +749,7 @@ TEST_F(AsyncResultsMergerTest, StreamResultsFromOneShardIfOtherDoesntRespond) {
     makeCursorFromExistingCursors(std::move(cursors));
 
     ASSERT_FALSE(arm->ready());
-    auto readyEvent = unittest::assertGet(arm->nextEvent(nullptr));
+    auto readyEvent = unittest::assertGet(arm->nextEvent());
     ASSERT_FALSE(arm->ready());
 
     // Both shards respond with the first batch.
@@ -772,7 +772,7 @@ TEST_F(AsyncResultsMergerTest, StreamResultsFromOneShardIfOtherDoesntRespond) {
     ASSERT_BSONOBJ_EQ(fromjson("{_id: 4}"), *unittest::assertGet(arm->nextReady()).getResult());
 
     ASSERT_FALSE(arm->ready());
-    readyEvent = unittest::assertGet(arm->nextEvent(nullptr));
+    readyEvent = unittest::assertGet(arm->nextEvent());
     ASSERT_FALSE(arm->ready());
 
     // When we ask the shards for their next batch, the first shard responds and the second shard
@@ -791,7 +791,7 @@ TEST_F(AsyncResultsMergerTest, StreamResultsFromOneShardIfOtherDoesntRespond) {
     ASSERT_BSONOBJ_EQ(fromjson("{_id: 6}"), *unittest::assertGet(arm->nextReady()).getResult());
 
     ASSERT_FALSE(arm->ready());
-    readyEvent = unittest::assertGet(arm->nextEvent(nullptr));
+    readyEvent = unittest::assertGet(arm->nextEvent());
     ASSERT_FALSE(arm->ready());
 
     // We can continue to return results from first shard, while second shard remains unresponsive.
@@ -810,7 +810,7 @@ TEST_F(AsyncResultsMergerTest, StreamResultsFromOneShardIfOtherDoesntRespond) {
     // Kill cursor before deleting it, as the second remote cursor has not been exhausted. We don't
     // wait on 'killEvent' here, as the blackholed request's callback will only run on shutdown of
     // the network interface.
-    auto killEvent = arm->kill(nullptr);
+    auto killEvent = arm->kill(operationContext());
     ASSERT_TRUE(killEvent.isValid());
 }
 
@@ -820,7 +820,7 @@ TEST_F(AsyncResultsMergerTest, ErrorOnMismatchedCursorIds) {
     makeCursorFromExistingCursors(std::move(cursors));
 
     ASSERT_FALSE(arm->ready());
-    auto readyEvent = unittest::assertGet(arm->nextEvent(nullptr));
+    auto readyEvent = unittest::assertGet(arm->nextEvent());
     ASSERT_FALSE(arm->ready());
 
     std::vector<CursorResponse> responses;
@@ -834,7 +834,7 @@ TEST_F(AsyncResultsMergerTest, ErrorOnMismatchedCursorIds) {
     ASSERT(!arm->nextReady().isOK());
 
     // Required to kill the 'arm' on error before destruction.
-    auto killEvent = arm->kill(nullptr);
+    auto killEvent = arm->kill(operationContext());
     executor()->waitForEvent(killEvent);
 }
 
@@ -846,7 +846,7 @@ TEST_F(AsyncResultsMergerTest, BadResponseReceivedFromShard) {
     makeCursorFromExistingCursors(std::move(cursors));
 
     ASSERT_FALSE(arm->ready());
-    auto readyEvent = unittest::assertGet(arm->nextEvent(nullptr));
+    auto readyEvent = unittest::assertGet(arm->nextEvent());
     ASSERT_FALSE(arm->ready());
 
     std::vector<BSONObj> batch1 = {fromjson("{_id: 1}"), fromjson("{_id: 2}")};
@@ -863,7 +863,7 @@ TEST_F(AsyncResultsMergerTest, BadResponseReceivedFromShard) {
     ASSERT(!statusWithNext.isOK());
 
     // Required to kill the 'arm' on error before destruction.
-    auto killEvent = arm->kill(nullptr);
+    auto killEvent = arm->kill(operationContext());
     executor()->waitForEvent(killEvent);
 }
 
@@ -875,7 +875,7 @@ TEST_F(AsyncResultsMergerTest, ErrorReceivedFromShard) {
     makeCursorFromExistingCursors(std::move(cursors));
 
     ASSERT_FALSE(arm->ready());
-    auto readyEvent = unittest::assertGet(arm->nextEvent(nullptr));
+    auto readyEvent = unittest::assertGet(arm->nextEvent());
     ASSERT_FALSE(arm->ready());
 
     std::vector<CursorResponse> responses;
@@ -896,7 +896,7 @@ TEST_F(AsyncResultsMergerTest, ErrorReceivedFromShard) {
     ASSERT_EQ(statusWithNext.getStatus().reason(), "bad thing happened");
 
     // Required to kill the 'arm' on error before destruction.
-    auto killEvent = arm->kill(nullptr);
+    auto killEvent = arm->kill(operationContext());
     executor()->waitForEvent(killEvent);
 }
 
@@ -906,10 +906,10 @@ TEST_F(AsyncResultsMergerTest, ErrorCantScheduleEventBeforeLastSignaled) {
     makeCursorFromExistingCursors(std::move(cursors));
 
     ASSERT_FALSE(arm->ready());
-    auto readyEvent = unittest::assertGet(arm->nextEvent(nullptr));
+    auto readyEvent = unittest::assertGet(arm->nextEvent());
 
-    // Error to call nextEvent() before the previous event is signaled.
-    ASSERT_NOT_OK(arm->nextEvent(nullptr).getStatus());
+    // Error to call nextEvent()() before the previous event is signaled.
+    ASSERT_NOT_OK(arm->nextEvent().getStatus());
 
     std::vector<CursorResponse> responses;
     std::vector<BSONObj> batch = {fromjson("{_id: 1}"), fromjson("{_id: 2}")};
@@ -926,7 +926,7 @@ TEST_F(AsyncResultsMergerTest, ErrorCantScheduleEventBeforeLastSignaled) {
     ASSERT_TRUE(unittest::assertGet(arm->nextReady()).isEOF());
 
     // Required to kill the 'arm' on error before destruction.
-    auto killEvent = arm->kill(nullptr);
+    auto killEvent = arm->kill(operationContext());
     executor()->waitForEvent(killEvent);
 }
 
@@ -936,8 +936,8 @@ TEST_F(AsyncResultsMergerTest, NextEventAfterTaskExecutorShutdown) {
     makeCursorFromExistingCursors(std::move(cursors));
 
     executor()->shutdown();
-    ASSERT_EQ(ErrorCodes::ShutdownInProgress, arm->nextEvent(nullptr).getStatus());
-    auto killEvent = arm->kill(nullptr);
+    ASSERT_EQ(ErrorCodes::ShutdownInProgress, arm->nextEvent().getStatus());
+    auto killEvent = arm->kill(operationContext());
     ASSERT_FALSE(killEvent.isValid());
 }
 
@@ -948,13 +948,13 @@ TEST_F(AsyncResultsMergerTest, KillAfterTaskExecutorShutdownWithOutstandingBatch
 
     // Make a request to the shard that will never get answered.
     ASSERT_FALSE(arm->ready());
-    auto readyEvent = unittest::assertGet(arm->nextEvent(nullptr));
+    auto readyEvent = unittest::assertGet(arm->nextEvent());
     ASSERT_FALSE(arm->ready());
     blackHoleNextRequest();
 
     // Executor shuts down before a response is received.
     executor()->shutdown();
-    auto killEvent = arm->kill(nullptr);
+    auto killEvent = arm->kill(operationContext());
     ASSERT_FALSE(killEvent.isValid());
 }
 
@@ -964,7 +964,7 @@ TEST_F(AsyncResultsMergerTest, KillNoBatchesRequested) {
     makeCursorFromExistingCursors(std::move(cursors));
 
     ASSERT_FALSE(arm->ready());
-    auto killedEvent = arm->kill(nullptr);
+    auto killedEvent = arm->kill(operationContext());
 
     // Killed cursors are considered ready, but return an error when you try to receive the next
     // doc.
@@ -982,7 +982,7 @@ TEST_F(AsyncResultsMergerTest, KillAllBatchesReceived) {
     makeCursorFromExistingCursors(std::move(cursors));
 
     ASSERT_FALSE(arm->ready());
-    auto readyEvent = unittest::assertGet(arm->nextEvent(nullptr));
+    auto readyEvent = unittest::assertGet(arm->nextEvent());
     ASSERT_FALSE(arm->ready());
 
     std::vector<CursorResponse> responses;
@@ -996,7 +996,7 @@ TEST_F(AsyncResultsMergerTest, KillAllBatchesReceived) {
                              CursorResponse::ResponseType::SubsequentResponse);
 
     // Kill should be able to return right away if there are no pending batches.
-    auto killedEvent = arm->kill(nullptr);
+    auto killedEvent = arm->kill(operationContext());
     ASSERT_TRUE(arm->ready());
     ASSERT_NOT_OK(arm->nextReady().getStatus());
     executor()->waitForEvent(killedEvent);
@@ -1010,7 +1010,7 @@ TEST_F(AsyncResultsMergerTest, KillTwoOutstandingBatches) {
     makeCursorFromExistingCursors(std::move(cursors));
 
     ASSERT_FALSE(arm->ready());
-    auto readyEvent = unittest::assertGet(arm->nextEvent(nullptr));
+    auto readyEvent = unittest::assertGet(arm->nextEvent());
     ASSERT_FALSE(arm->ready());
 
     std::vector<CursorResponse> responses;
@@ -1020,7 +1020,7 @@ TEST_F(AsyncResultsMergerTest, KillTwoOutstandingBatches) {
                              CursorResponse::ResponseType::SubsequentResponse);
 
     // Kill event will only be signalled once the callbacks for the pending batches have run.
-    auto killedEvent = arm->kill(nullptr);
+    auto killedEvent = arm->kill(operationContext());
 
     // The pending requests have been canceled, so run their callbacks.
     runReadyCallbacks();
@@ -1036,7 +1036,7 @@ TEST_F(AsyncResultsMergerTest, NextEventErrorsAfterKill) {
     makeCursorFromExistingCursors(std::move(cursors));
 
     ASSERT_FALSE(arm->ready());
-    auto readyEvent = unittest::assertGet(arm->nextEvent(nullptr));
+    auto readyEvent = unittest::assertGet(arm->nextEvent());
     ASSERT_FALSE(arm->ready());
 
     std::vector<CursorResponse> responses;
@@ -1045,10 +1045,10 @@ TEST_F(AsyncResultsMergerTest, NextEventErrorsAfterKill) {
     scheduleNetworkResponses(std::move(responses),
                              CursorResponse::ResponseType::SubsequentResponse);
 
-    auto killedEvent = arm->kill(nullptr);
+    auto killedEvent = arm->kill(operationContext());
 
     // Attempting to schedule more network operations on a killed arm is an error.
-    ASSERT_NOT_OK(arm->nextEvent(nullptr).getStatus());
+    ASSERT_NOT_OK(arm->nextEvent().getStatus());
 
     executor()->waitForEvent(killedEvent);
 }
@@ -1057,9 +1057,9 @@ TEST_F(AsyncResultsMergerTest, KillCalledTwice) {
     std::vector<ClusterClientCursorParams::RemoteCursor> cursors;
     cursors.emplace_back(kTestShardIds[0], kTestShardHosts[0], CursorResponse(_nss, 1, {}));
     makeCursorFromExistingCursors(std::move(cursors));
-    auto killedEvent1 = arm->kill(nullptr);
+    auto killedEvent1 = arm->kill(operationContext());
     ASSERT(killedEvent1.isValid());
-    auto killedEvent2 = arm->kill(nullptr);
+    auto killedEvent2 = arm->kill(operationContext());
     ASSERT(killedEvent2.isValid());
     executor()->waitForEvent(killedEvent1);
     executor()->waitForEvent(killedEvent2);
@@ -1072,7 +1072,7 @@ TEST_F(AsyncResultsMergerTest, TailableBasic) {
     makeCursorFromExistingCursors(std::move(cursors), findCmd);
 
     ASSERT_FALSE(arm->ready());
-    auto readyEvent = unittest::assertGet(arm->nextEvent(nullptr));
+    auto readyEvent = unittest::assertGet(arm->nextEvent());
     ASSERT_FALSE(arm->ready());
 
     std::vector<CursorResponse> responses;
@@ -1093,7 +1093,7 @@ TEST_F(AsyncResultsMergerTest, TailableBasic) {
     ASSERT_FALSE(arm->remotesExhausted());
 
     ASSERT_FALSE(arm->ready());
-    readyEvent = unittest::assertGet(arm->nextEvent(nullptr));
+    readyEvent = unittest::assertGet(arm->nextEvent());
     ASSERT_FALSE(arm->ready());
 
     responses.clear();
@@ -1110,7 +1110,7 @@ TEST_F(AsyncResultsMergerTest, TailableBasic) {
     ASSERT_TRUE(unittest::assertGet(arm->nextReady()).isEOF());
     ASSERT_FALSE(arm->remotesExhausted());
 
-    auto killedEvent = arm->kill(nullptr);
+    auto killedEvent = arm->kill(operationContext());
     executor()->waitForEvent(killedEvent);
 }
 
@@ -1121,7 +1121,7 @@ TEST_F(AsyncResultsMergerTest, TailableEmptyBatch) {
     makeCursorFromExistingCursors(std::move(cursors), findCmd);
 
     ASSERT_FALSE(arm->ready());
-    auto readyEvent = unittest::assertGet(arm->nextEvent(nullptr));
+    auto readyEvent = unittest::assertGet(arm->nextEvent());
     ASSERT_FALSE(arm->ready());
 
     // Remote responds with an empty batch and a non-zero cursor id.
@@ -1138,7 +1138,7 @@ TEST_F(AsyncResultsMergerTest, TailableEmptyBatch) {
     ASSERT_TRUE(unittest::assertGet(arm->nextReady()).isEOF());
     ASSERT_FALSE(arm->remotesExhausted());
 
-    auto killedEvent = arm->kill(nullptr);
+    auto killedEvent = arm->kill(operationContext());
     executor()->waitForEvent(killedEvent);
 }
 
@@ -1149,7 +1149,7 @@ TEST_F(AsyncResultsMergerTest, TailableExhaustedCursor) {
     makeCursorFromExistingCursors(std::move(cursors), findCmd);
 
     ASSERT_FALSE(arm->ready());
-    auto readyEvent = unittest::assertGet(arm->nextEvent(nullptr));
+    auto readyEvent = unittest::assertGet(arm->nextEvent());
     ASSERT_FALSE(arm->ready());
 
     // Remote responds with an empty batch and a zero cursor id.
@@ -1174,7 +1174,7 @@ TEST_F(AsyncResultsMergerTest, GetMoreBatchSizes) {
     makeCursorFromExistingCursors(std::move(cursors), findCmd);
 
     ASSERT_FALSE(arm->ready());
-    auto readyEvent = unittest::assertGet(arm->nextEvent(nullptr));
+    auto readyEvent = unittest::assertGet(arm->nextEvent());
     ASSERT_FALSE(arm->ready());
 
     std::vector<CursorResponse> responses;
@@ -1195,7 +1195,7 @@ TEST_F(AsyncResultsMergerTest, GetMoreBatchSizes) {
 
     std::vector<BSONObj> batch2 = {fromjson("{_id: 3}")};
     responses.emplace_back(_nss, CursorId(0), batch2);
-    readyEvent = unittest::assertGet(arm->nextEvent(nullptr));
+    readyEvent = unittest::assertGet(arm->nextEvent());
 
     BSONObj scheduledCmd = getFirstPendingRequest().cmdObj;
     auto request = GetMoreRequest::parseFromBSON("anydbname", scheduledCmd);
@@ -1221,7 +1221,7 @@ TEST_F(AsyncResultsMergerTest, SendsSecondaryOkAsMetadata) {
                                   ReadPreferenceSetting(ReadPreference::Nearest));
 
     ASSERT_FALSE(arm->ready());
-    auto readyEvent = unittest::assertGet(arm->nextEvent(nullptr));
+    auto readyEvent = unittest::assertGet(arm->nextEvent());
     ASSERT_FALSE(arm->ready());
 
     BSONObj cmdRequestMetadata = getFirstPendingRequest().metadata;
@@ -1251,7 +1251,7 @@ TEST_F(AsyncResultsMergerTest, AllowPartialResults) {
     makeCursorFromExistingCursors(std::move(cursors), findCmd);
 
     ASSERT_FALSE(arm->ready());
-    auto readyEvent = unittest::assertGet(arm->nextEvent(nullptr));
+    auto readyEvent = unittest::assertGet(arm->nextEvent());
     ASSERT_FALSE(arm->ready());
 
     // An error occurs with the first host.
@@ -1275,7 +1275,7 @@ TEST_F(AsyncResultsMergerTest, AllowPartialResults) {
     ASSERT_BSONOBJ_EQ(fromjson("{_id: 2}"), *unittest::assertGet(arm->nextReady()).getResult());
 
     ASSERT_FALSE(arm->ready());
-    readyEvent = unittest::assertGet(arm->nextEvent(nullptr));
+    readyEvent = unittest::assertGet(arm->nextEvent());
     ASSERT_FALSE(arm->ready());
 
     // Now the second host becomes unreachable. We should still be willing to return results from
@@ -1294,7 +1294,7 @@ TEST_F(AsyncResultsMergerTest, AllowPartialResults) {
     ASSERT_BSONOBJ_EQ(fromjson("{_id: 3}"), *unittest::assertGet(arm->nextReady()).getResult());
 
     ASSERT_FALSE(arm->ready());
-    readyEvent = unittest::assertGet(arm->nextEvent(nullptr));
+    readyEvent = unittest::assertGet(arm->nextEvent());
     ASSERT_FALSE(arm->ready());
 
     // Once the last reachable shard indicates that its cursor is closed, we're done.
@@ -1316,7 +1316,7 @@ TEST_F(AsyncResultsMergerTest, AllowPartialResultsSingleNode) {
     makeCursorFromExistingCursors(std::move(cursors), findCmd);
 
     ASSERT_FALSE(arm->ready());
-    auto readyEvent = unittest::assertGet(arm->nextEvent(nullptr));
+    auto readyEvent = unittest::assertGet(arm->nextEvent());
     ASSERT_FALSE(arm->ready());
 
     std::vector<CursorResponse> responses;
@@ -1332,7 +1332,7 @@ TEST_F(AsyncResultsMergerTest, AllowPartialResultsSingleNode) {
     ASSERT_BSONOBJ_EQ(fromjson("{_id: 2}"), *unittest::assertGet(arm->nextReady()).getResult());
 
     ASSERT_FALSE(arm->ready());
-    readyEvent = unittest::assertGet(arm->nextEvent(nullptr));
+    readyEvent = unittest::assertGet(arm->nextEvent());
     ASSERT_FALSE(arm->ready());
 
     // The lone host involved in this query returns an error. This should simply cause us to return
@@ -1350,7 +1350,7 @@ TEST_F(AsyncResultsMergerTest, AllowPartialResultsOnRetriableErrorNoRetries) {
     makeCursorFromExistingCursors(std::move(cursors), findCmd);
 
     ASSERT_FALSE(arm->ready());
-    auto readyEvent = unittest::assertGet(arm->nextEvent(nullptr));
+    auto readyEvent = unittest::assertGet(arm->nextEvent());
     ASSERT_FALSE(arm->ready());
 
     // First host returns single result
@@ -1380,7 +1380,7 @@ TEST_F(AsyncResultsMergerTest, ReturnsErrorOnRetriableError) {
     makeCursorFromExistingCursors(std::move(cursors), findCmd);
 
     ASSERT_FALSE(arm->ready());
-    auto readyEvent = unittest::assertGet(arm->nextEvent(nullptr));
+    auto readyEvent = unittest::assertGet(arm->nextEvent());
     ASSERT_FALSE(arm->ready());
 
     // Both hosts return network (retriable) errors.
@@ -1396,7 +1396,7 @@ TEST_F(AsyncResultsMergerTest, ReturnsErrorOnRetriableError) {
     ASSERT_EQ(statusWithNext.getStatus().reason(), "host unreachable");
 
     // Required to kill the 'arm' on error before destruction.
-    auto killEvent = arm->kill(nullptr);
+    auto killEvent = arm->kill(operationContext());
     executor()->waitForEvent(killEvent);
 }
 
@@ -1407,7 +1407,7 @@ TEST_F(AsyncResultsMergerTest, GetMoreRequestIncludesMaxTimeMS) {
     makeCursorFromExistingCursors(std::move(cursors), findCmd);
 
     ASSERT_FALSE(arm->ready());
-    auto readyEvent = unittest::assertGet(arm->nextEvent(nullptr));
+    auto readyEvent = unittest::assertGet(arm->nextEvent());
     ASSERT_FALSE(arm->ready());
 
     std::vector<CursorResponse> responses;
@@ -1425,7 +1425,7 @@ TEST_F(AsyncResultsMergerTest, GetMoreRequestIncludesMaxTimeMS) {
     ASSERT_OK(arm->setAwaitDataTimeout(Milliseconds(789)));
 
     ASSERT_FALSE(arm->ready());
-    readyEvent = unittest::assertGet(arm->nextEvent(nullptr));
+    readyEvent = unittest::assertGet(arm->nextEvent());
     ASSERT_FALSE(arm->ready());
 
     // Pending getMore request should include maxTimeMS.
@@ -1456,7 +1456,7 @@ TEST_F(AsyncResultsMergerTest, GetMoreRequestWithoutTailableCantHaveMaxTime) {
     makeCursorFromExistingCursors(std::move(cursors), findCmd);
 
     ASSERT_NOT_OK(arm->setAwaitDataTimeout(Milliseconds(789)));
-    auto killEvent = arm->kill(nullptr);
+    auto killEvent = arm->kill(operationContext());
     executor()->waitForEvent(killEvent);
 }
 
@@ -1467,7 +1467,7 @@ TEST_F(AsyncResultsMergerTest, GetMoreRequestWithoutAwaitDataCantHaveMaxTime) {
     makeCursorFromExistingCursors(std::move(cursors), findCmd);
 
     ASSERT_NOT_OK(arm->setAwaitDataTimeout(Milliseconds(789)));
-    auto killEvent = arm->kill(nullptr);
+    auto killEvent = arm->kill(operationContext());
     executor()->waitForEvent(killEvent);
 }
 
@@ -1478,13 +1478,13 @@ TEST_F(AsyncResultsMergerTest, ShardCanErrorInBetweenReadyAndNextEvent) {
     makeCursorFromExistingCursors(std::move(cursors), findCmd);
 
     ASSERT_FALSE(arm->ready());
-    auto readyEvent = unittest::assertGet(arm->nextEvent(nullptr));
+    auto readyEvent = unittest::assertGet(arm->nextEvent());
     scheduleErrorResponse({ErrorCodes::BadValue, "bad thing happened"});
 
-    ASSERT_EQ(ErrorCodes::BadValue, arm->nextEvent(nullptr).getStatus());
+    ASSERT_EQ(ErrorCodes::BadValue, arm->nextEvent().getStatus());
 
     // Required to kill the 'arm' on error before destruction.
-    auto killEvent = arm->kill(nullptr);
+    auto killEvent = arm->kill(operationContext());
     executor()->waitForEvent(killEvent);
 }
 

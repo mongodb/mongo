@@ -274,8 +274,6 @@ StatusWith<CursorId> runQueryWithoutRetrying(OperationContext* opCtx,
     auto cursorState = ClusterCursorManager::CursorState::NotExhausted;
     int bytesBuffered = 0;
 
-    ccc->reattachToOperationContext(opCtx);
-
     while (!FindCommon::enoughForFirstBatch(query.getQueryRequest(), results->size())) {
         auto next = ccc->next();
 
