@@ -1157,5 +1157,143 @@ TEST(JSONSchemaParserTest, SharedJsonAndBsonTypeAliasesTranslateIdentically) {
     }
 }
 
+TEST(JSONSchemaParserTest, MinPropertiesFailsToParseIfNotNumber) {
+    BSONObj schema = fromjson("{minProperties: null}");
+    auto result = JSONSchemaParser::parse(schema);
+    ASSERT_NOT_OK(result.getStatus());
+}
+
+TEST(JSONSchemaParserTest, MaxPropertiesFailsToParseIfNotNumber) {
+    BSONObj schema = fromjson("{maxProperties: null}");
+    auto result = JSONSchemaParser::parse(schema);
+    ASSERT_NOT_OK(result.getStatus());
+}
+
+TEST(JSONSchemaParserTest, MinPropertiesFailsToParseIfNegative) {
+    BSONObj schema = fromjson("{minProperties: -2}");
+    auto result = JSONSchemaParser::parse(schema);
+    ASSERT_NOT_OK(result.getStatus());
+}
+
+TEST(JSONSchemaParserTest, MaxPropertiesFailsToParseIfNegative) {
+    BSONObj schema = fromjson("{maxProperties: -2}");
+    auto result = JSONSchemaParser::parse(schema);
+    ASSERT_NOT_OK(result.getStatus());
+}
+
+TEST(JSONSchemaParserTest, MinPropertiesFailsToParseIfNotAnInteger) {
+    BSONObj schema = fromjson("{minProperties: 1.1}");
+    auto result = JSONSchemaParser::parse(schema);
+    ASSERT_NOT_OK(result.getStatus());
+}
+
+TEST(JSONSchemaParserTest, MaxPropertiesFailsToParseIfNotAnInteger) {
+    BSONObj schema = fromjson("{maxProperties: 1.1}");
+    auto result = JSONSchemaParser::parse(schema);
+    ASSERT_NOT_OK(result.getStatus());
+}
+
+TEST(JSONSchemaParserTest, TopLevelMinPropertiesTranslatesCorrectly) {
+    BSONObj schema = fromjson("{minProperties: 0}");
+    auto result = JSONSchemaParser::parse(schema);
+    ASSERT_SERIALIZES_TO(result.getValue().get(),
+                         fromjson("{$and: [{$_internalSchemaMinProperties: 0}]}"));
+}
+
+TEST(JSONSchemaParserTest, TopLevelMaxPropertiesTranslatesCorrectly) {
+    BSONObj schema = fromjson("{maxProperties: 0}");
+    auto result = JSONSchemaParser::parse(schema);
+    ASSERT_SERIALIZES_TO(result.getValue().get(),
+                         fromjson("{$and: [{$_internalSchemaMaxProperties: 0}]}"));
+}
+
+TEST(JSONSchemaParserTest, NestedMinPropertiesTranslatesCorrectly) {
+    BSONObj schema =
+        fromjson("{properties: {obj: {type: 'object', minProperties: 2}}, required: ['obj']}");
+    auto result = JSONSchemaParser::parse(schema);
+    ASSERT_SERIALIZES_TO(result.getValue().get(), fromjson(R"(
+        {
+            $and: [
+                {
+                  $and: [{
+                      $and: [
+                          {obj: {$_internalSchemaObjectMatch: {$_internalSchemaMinProperties: 2}}},
+                          {obj: {$_internalSchemaType: 3}}
+                      ]
+                  }]
+                },
+                {$and: [{obj: {$exists: true}}]}
+            ]
+        }
+    )"));
+}
+
+TEST(JSONSchemaParserTest, NestedMaxPropertiesTranslatesCorrectly) {
+    BSONObj schema =
+        fromjson("{properties: {obj: {type: 'object', maxProperties: 2}}, required: ['obj']}");
+    auto result = JSONSchemaParser::parse(schema);
+    ASSERT_SERIALIZES_TO(result.getValue().get(), fromjson(R"(
+        {
+            $and: [
+                {
+                  $and: [{
+                      $and: [
+                          {obj: {$_internalSchemaObjectMatch: {$_internalSchemaMaxProperties: 2}}},
+                          {obj: {$_internalSchemaType: 3}}
+                      ]
+                  }]
+                },
+                {$and: [{obj: {$exists: true}}]}
+            ]
+        }
+    )"));
+}
+
+TEST(JSONSchemaParserTest, NestedMinPropertiesTranslatesCorrectlyWithoutRequired) {
+    BSONObj schema = fromjson("{properties: {obj: {type: 'object', minProperties: 2}}}");
+    auto result = JSONSchemaParser::parse(schema);
+    ASSERT_SERIALIZES_TO(result.getValue().get(), fromjson(R"(
+        {
+            $and: [{
+                $and: [{
+                    $or: [
+                        {$nor: [{obj: {$exists: true}}]},
+                        {
+                          $and: [
+                              {obj:
+                                {$_internalSchemaObjectMatch: {$_internalSchemaMinProperties: 2}}},
+                              {obj: {$_internalSchemaType: 3}}
+                          ]
+                        }
+                    ]
+                }]
+            }]
+        }
+    )"));
+}
+
+TEST(JSONSchemaParserTest, NestedMaxPropertiesTranslatesCorrectlyWithoutRequired) {
+    BSONObj schema = fromjson("{properties: {obj: {type: 'object', maxProperties: 2}}}");
+    auto result = JSONSchemaParser::parse(schema);
+    ASSERT_SERIALIZES_TO(result.getValue().get(), fromjson(R"(
+        {
+            $and: [{
+                $and: [{
+                    $or: [
+                        {$nor: [{obj: {$exists: true}}]},
+                        {
+                          $and: [
+                              {obj:
+                                {$_internalSchemaObjectMatch: {$_internalSchemaMaxProperties: 2}}},
+                              {obj: {$_internalSchemaType: 3}}
+                          ]
+                        }
+                    ]
+                }]
+            }]
+        }
+    )"));
+}
+
 }  // namespace
 }  // namespace mongo

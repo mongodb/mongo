@@ -40,8 +40,10 @@
 #include "mongo/db/matcher/schema/expression_internal_schema_fmod.h"
 #include "mongo/db/matcher/schema/expression_internal_schema_max_items.h"
 #include "mongo/db/matcher/schema/expression_internal_schema_max_length.h"
+#include "mongo/db/matcher/schema/expression_internal_schema_max_properties.h"
 #include "mongo/db/matcher/schema/expression_internal_schema_min_items.h"
 #include "mongo/db/matcher/schema/expression_internal_schema_min_length.h"
+#include "mongo/db/matcher/schema/expression_internal_schema_min_properties.h"
 #include "mongo/db/matcher/schema/expression_internal_schema_object_match.h"
 #include "mongo/db/matcher/schema/expression_internal_schema_unique_items.h"
 #include "mongo/db/matcher/schema/expression_internal_schema_xor.h"
@@ -60,9 +62,11 @@ constexpr StringData kSchemaExclusiveMinimumKeyword = "exclusiveMinimum"_sd;
 constexpr StringData kSchemaItemsKeyword = "items"_sd;
 constexpr StringData kSchemaMaxItemsKeyword = "maxItems"_sd;
 constexpr StringData kSchemaMaxLengthKeyword = "maxLength"_sd;
+constexpr StringData kSchemaMaxPropertiesKeyword = "maxProperties"_sd;
 constexpr StringData kSchemaMaximumKeyword = "maximum"_sd;
 constexpr StringData kSchemaMinItemsKeyword = "minItems"_sd;
 constexpr StringData kSchemaMinLengthKeyword = "minLength"_sd;
+constexpr StringData kSchemaMinPropertiesKeyword = "minProperties"_sd;
 constexpr StringData kSchemaMinimumKeyword = "minimum"_sd;
 constexpr StringData kSchemaMultipleOfKeyword = "multipleOf"_sd;
 constexpr StringData kSchemaNotKeyword = "not"_sd;
@@ -477,6 +481,39 @@ StatusWithMatchExpression parseProperties(
 }
 
 /**
+ * Parses 'minProperties' and 'maxProperties' JSON Schema keywords.
+ */
+template <class T>
+StatusWithMatchExpression parseNumProperties(StringData path,
+                                             BSONElement numProperties,
+                                             InternalSchemaTypeExpression* typeExpr) {
+    auto parsedNumProps =
+        MatchExpressionParser::parseIntegerElementToNonNegativeLong(numProperties);
+    if (!parsedNumProps.isOK()) {
+        return parsedNumProps.getStatus();
+    }
+
+    auto expr = stdx::make_unique<T>();
+    auto status = expr->init(parsedNumProps.getValue());
+    if (!status.isOK()) {
+        return status;
+    }
+
+    if (path.empty()) {
+        // This is a top-level schema.
+        return {std::move(expr)};
+    }
+
+    auto objectMatch = stdx::make_unique<InternalSchemaObjectMatchExpression>();
+    auto objectMatchStatus = objectMatch->init(std::move(expr), path);
+    if (!objectMatchStatus.isOK()) {
+        return objectMatchStatus;
+    }
+
+    return makeRestriction(BSONType::Object, path, std::move(objectMatch), typeExpr);
+}
+
+/**
  * Parses the logical keywords in 'keywordMap' to their equivalent match expressions
  * and, on success, adds the results to 'andExpr'.
  *
@@ -610,6 +647,24 @@ Status translateObjectKeywords(StringMap<BSONElement>* keywordMap,
         andExpr->add(requiredExpr.getValue().release());
     }
 
+    if (auto minPropertiesElt = keywordMap->get(kSchemaMinPropertiesKeyword)) {
+        auto minPropExpr = parseNumProperties<InternalSchemaMinPropertiesMatchExpression>(
+            path, minPropertiesElt, typeExpr);
+        if (!minPropExpr.isOK()) {
+            return minPropExpr.getStatus();
+        }
+        andExpr->add(minPropExpr.getValue().release());
+    }
+
+    if (auto maxPropertiesElt = keywordMap->get(kSchemaMaxPropertiesKeyword)) {
+        auto maxPropExpr = parseNumProperties<InternalSchemaMaxPropertiesMatchExpression>(
+            path, maxPropertiesElt, typeExpr);
+        if (!maxPropExpr.isOK()) {
+            return maxPropExpr.getStatus();
+        }
+        andExpr->add(maxPropExpr.getValue().release());
+    }
+
     return Status::OK();
 }
 
@@ -731,9 +786,11 @@ StatusWithMatchExpression _parse(StringData path, BSONObj schema) {
         {kSchemaExclusiveMinimumKeyword, {}},
         {kSchemaMaxItemsKeyword, {}},
         {kSchemaMaxLengthKeyword, {}},
+        {kSchemaMaxPropertiesKeyword, {}},
         {kSchemaMaximumKeyword, {}},
         {kSchemaMinItemsKeyword, {}},
         {kSchemaMinLengthKeyword, {}},
+        {kSchemaMinPropertiesKeyword, {}},
         {kSchemaMinimumKeyword, {}},
         {kSchemaMultipleOfKeyword, {}},
         {kSchemaNotKeyword, {}},
