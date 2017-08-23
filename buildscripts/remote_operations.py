@@ -135,15 +135,15 @@ class RemoteOperations(object):
             if operation_dir is not None:
                 operation_param = "cd {}; {}".format(operation_dir, operation_param)
             dollar = ""
-            if self.use_shell:
-                # To ensure any single quotes in operation_param are handled correctly when
+            if re.search("\"|'", operation_param):
+                # To ensure any quotes in operation_param are handled correctly when
                 # invoking the operation_param, escape with \ and add $ in the front.
                 # See https://stackoverflow.com/questions/8254120/
                 #   how-to-escape-a-single-quote-in-single-quote-string-in-bash
-                if "'" in operation_param:
-                    operation_param = "{}".format(operation_param.replace("'", "\\'"))
-                    dollar = "$"
-            cmd = "ssh {} {} {}'{}'".format(
+                operation_param = "{}".format(operation_param.replace("'", r"\'"))
+                operation_param = "{}".format(operation_param.replace("\"", r"\""))
+                dollar = "$"
+            cmd = "ssh {} {} /bin/bash -c \"{}'{}'\"".format(
                 self.ssh_options,
                 self.user_host,
                 dollar,
@@ -187,9 +187,10 @@ class RemoteOperations(object):
                     operation_type, _OPERATIONS))
 
         final_ret = 0
+        buff = ""
         for cmd in cmds:
-            ret, buff = self._perform_operation(cmd)
-            buff += buff
+            ret, new_buff = self._perform_operation(cmd)
+            buff += new_buff
             final_ret = final_ret or ret
 
         return final_ret, buff
