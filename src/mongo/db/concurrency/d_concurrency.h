@@ -188,10 +188,10 @@ public:
                    EnqueueOnly enqueueOnly);
 
         ~GlobalLock() {
-            _unlock();
-            if (!_opCtx->lockState()->isLocked()) {
+            if (isLocked() && _isOutermostLock) {
                 _opCtx->recoveryUnit()->abandonSnapshot();
             }
+            _unlock();
         }
 
         /**
@@ -211,6 +211,7 @@ public:
         OperationContext* const _opCtx;
         LockResult _result;
         ResourceLock _pbwm;
+        const bool _isOutermostLock;
     };
 
 

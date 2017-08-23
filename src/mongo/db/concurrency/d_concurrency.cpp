@@ -147,7 +147,8 @@ Lock::GlobalLock::GlobalLock(OperationContext* opCtx,
                              EnqueueOnly enqueueOnly)
     : _opCtx(opCtx),
       _result(LOCK_INVALID),
-      _pbwm(opCtx->lockState(), resourceIdParallelBatchWriterMode) {
+      _pbwm(opCtx->lockState(), resourceIdParallelBatchWriterMode),
+      _isOutermostLock(!opCtx->lockState()->isLocked()) {
     _enqueue(lockMode, timeoutMs);
 }
 
@@ -179,7 +180,6 @@ void Lock::GlobalLock::_unlock() {
         _result = LOCK_INVALID;
     }
 }
-
 
 Lock::DBLock::DBLock(OperationContext* opCtx, StringData db, LockMode mode)
     : _id(RESOURCE_DATABASE, db),
