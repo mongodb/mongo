@@ -2,6 +2,8 @@
 (function() {
     "use strict";
 
+    load('jstests/libs/uuid_util.js');
+
     const oplogProjection = {$project: {"_id.clusterTime": 0}};
     function getCollectionNameFromFullNamespace(ns) {
         return ns.split(/\.(.+)/)[1];
@@ -65,10 +67,11 @@
     jsTestLog("Testing single insert");
     let cursor = startWatchingChanges([{$changeStream: {}}], db.t1);
     assert.writeOK(db.t1.insert({_id: 0, a: 1}));
+    const t1Uuid = getUUIDFromListCollections(db, db.t1.getName());
     let expected = {
         _id: {
             documentKey: {_id: 0},
-            ns: "test.t1",
+            uuid: t1Uuid,
         },
         documentKey: {_id: 0},
         fullDocument: {_id: 0, a: 1},
@@ -83,7 +86,7 @@
     expected = {
         _id: {
             documentKey: {_id: 1},
-            ns: "test.t1",
+            uuid: t1Uuid,
         },
         documentKey: {_id: 1},
         fullDocument: {_id: 1, a: 2},
@@ -96,7 +99,7 @@
     cursor = startWatchingChanges([{$changeStream: {}}], db.t1);
     assert.writeOK(db.t1.update({_id: 0}, {a: 3}));
     expected = {
-        _id: {documentKey: {_id: 0}, ns: "test.t1"},
+        _id: {documentKey: {_id: 0}, uuid: t1Uuid},
         documentKey: {_id: 0},
         fullDocument: {_id: 0, a: 3},
         ns: {db: "test", coll: "t1"},
@@ -108,7 +111,7 @@
     cursor = startWatchingChanges([{$changeStream: {}}], db.t1);
     assert.writeOK(db.t1.update({_id: 0}, {b: 3}));
     expected = {
-        _id: {documentKey: {_id: 0}, ns: "test.t1"},
+        _id: {documentKey: {_id: 0}, uuid: t1Uuid},
         documentKey: {_id: 0},
         fullDocument: {_id: 0, b: 3},
         ns: {db: "test", coll: "t1"},
@@ -122,7 +125,7 @@
     expected = {
         _id: {
             documentKey: {_id: 2},
-            ns: "test.t1",
+            uuid: t1Uuid,
         },
         documentKey: {_id: 2},
         fullDocument: {_id: 2, a: 4},
@@ -136,7 +139,7 @@
     cursor = startWatchingChanges([{$changeStream: {}}], db.t1);
     assert.writeOK(db.t1.update({_id: 3}, {$inc: {b: 2}}));
     expected = {
-        _id: {documentKey: {_id: 3}, ns: "test.t1"},
+        _id: {documentKey: {_id: 3}, uuid: t1Uuid},
         documentKey: {_id: 3},
         ns: {db: "test", coll: "t1"},
         operationType: "update",
@@ -148,7 +151,7 @@
     cursor = startWatchingChanges([{$changeStream: {}}], db.t1);
     assert.writeOK(db.t1.remove({_id: 1}));
     expected = {
-        _id: {documentKey: {_id: 1}, ns: "test.t1"},
+        _id: {documentKey: {_id: 1}, uuid: t1Uuid},
         documentKey: {_id: 1},
         ns: {db: "test", coll: "t1"},
         operationType: "delete",
@@ -159,11 +162,12 @@
     cursor = startWatchingChanges([{$changeStream: {}}], db.t1);
     let t2cursor = startWatchingChanges([{$changeStream: {}}], db.t2);
     assert.writeOK(db.t2.insert({_id: 100, c: 1}));
+    const t2Uuid = getUUIDFromListCollections(db, db.t2.getName());
     assertNextBatchMatches({cursor: cursor, expectedBatch: []});
     expected = {
         _id: {
             documentKey: {_id: 100},
-            ns: "test.t2",
+            uuid: t2Uuid,
         },
         documentKey: {_id: 100},
         fullDocument: {_id: 100, c: 1},
@@ -180,7 +184,7 @@
     jsTestLog("Testing rename");
     t2cursor = startWatchingChanges([{$changeStream: {}}], db.t2);
     assert.writeOK(db.t2.renameCollection("t3"));
-    expected = {_id: {ns: "test.$cmd"}, operationType: "invalidate"};
+    expected = {_id: {uuid: t2Uuid}, operationType: "invalidate"};
     assertNextBatchMatches({cursor: t2cursor, expectedBatch: [expected]});
 
     jsTestLog("Testing insert that looks like rename");
@@ -195,11 +199,12 @@
     const tailableCursor = db.tailable1.aggregate([{$changeStream: {}}, oplogProjection]);
     assert(!tailableCursor.hasNext());
     assert.writeOK(db.tailable1.insert({_id: 101, a: 1}));
+    const tailable1Uuid = getUUIDFromListCollections(db, db.tailable1.getName());
     assert(tailableCursor.hasNext());
     assert.docEq(tailableCursor.next(), {
         _id: {
             documentKey: {_id: 101},
-            ns: "test.tailable1",
+            uuid: tailable1Uuid,
         },
         documentKey: {_id: 101},
         fullDocument: {_id: 101, a: 1},
@@ -208,6 +213,8 @@
     });
 
     jsTestLog("Testing awaitdata");
+    db.createCollection("tailable2");
+    const tailable2Uuid = getUUIDFromListCollections(db, db.tailable2.getName());
     let res = assert.commandWorked(db.runCommand(
         {aggregate: "tailable2", pipeline: [{$changeStream: {}}, oplogProjection], cursor: {}}));
     let aggcursor = res.cursor;
@@ -243,7 +250,7 @@
     assert.docEq(aggcursor.nextBatch[0], {
         _id: {
             documentKey: {_id: 102},
-            ns: "test.tailable2",
+            uuid: tailable2Uuid,
         },
         documentKey: {_id: 102},
         fullDocument: {_id: 102, a: 2},
@@ -361,21 +368,6 @@
     }));
     resumeCursor = res.cursor;
     assert.docEq(getOneDoc(resumeCursor), thirdInsertChangeDoc);
-    assertNextBatchIsEmpty(resumeCursor);
-
-    jsTestLog("Testing that resume is possible after the collection is dropped.");
-    assert(db.resume1.drop());
-    const invalidateDoc = getOneDoc(resumeCursor);
-    assert.eq(invalidateDoc.operationType, "invalidate");
-    res = assert.commandWorked(db.runCommand({
-        aggregate: "resume1",
-        pipeline: [{$changeStream: {resumeAfter: firstInsertChangeDoc._id}}],
-        cursor: {batchSize: 0}
-    }));
-    resumeCursor = res.cursor;
-    assert.docEq(getOneDoc(resumeCursor), secondInsertChangeDoc);
-    assert.docEq(getOneDoc(resumeCursor), thirdInsertChangeDoc);
-    assert.docEq(getOneDoc(resumeCursor), invalidateDoc);
     assertNextBatchIsEmpty(resumeCursor);
 
     replTest.stopSet();

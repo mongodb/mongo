@@ -31,6 +31,7 @@
 #include "mongo/db/pipeline/document_source_change_stream.h"
 
 #include "mongo/bson/simple_bsonelement_comparator.h"
+#include "mongo/db/catalog/uuid_catalog.h"
 #include "mongo/db/pipeline/close_change_stream_exception.h"
 #include "mongo/db/pipeline/document_source_check_resume_token.h"
 #include "mongo/db/pipeline/document_source_limit.h"
@@ -65,6 +66,7 @@ constexpr StringData DocumentSourceChangeStream::kDocumentKeyField;
 constexpr StringData DocumentSourceChangeStream::kFullDocumentField;
 constexpr StringData DocumentSourceChangeStream::kIdField;
 constexpr StringData DocumentSourceChangeStream::kNamespaceField;
+constexpr StringData DocumentSourceChangeStream::kUuidField;
 constexpr StringData DocumentSourceChangeStream::kOperationTypeField;
 constexpr StringData DocumentSourceChangeStream::kStageName;
 constexpr StringData DocumentSourceChangeStream::kTimestampField;
@@ -242,6 +244,10 @@ list<intrusive_ptr<DocumentSource>> DocumentSourceChangeStream::createFromBson(
                                                       elem.embeddedObject());
     if (auto resumeAfter = spec.getResumeAfter()) {
         ResumeToken token = resumeAfter.get();
+        auto resumeNamespace = UUIDCatalog::get(expCtx->opCtx).lookupNSSByUUID(token.getUuid());
+        uassert(40615,
+                "The resume token UUID does not exist. Has the collection been dropped?",
+                !resumeNamespace.isEmpty());
         startFrom = token.getTimestamp();
         if (expCtx->needsMerge) {
             DocumentSourceShardCheckResumabilitySpec spec;
@@ -297,6 +303,9 @@ Document DocumentSourceChangeStream::Transformation::applyTransformation(const D
     Value ts = input[repl::OplogEntry::kTimestampFieldName];
     Value ns = input[repl::OplogEntry::kNamespaceFieldName];
     checkValueType(ns, repl::OplogEntry::kNamespaceFieldName, BSONType::String);
+    Value uuid = input[repl::OplogEntry::kUuidFieldName];
+    if (!uuid.missing())
+        checkValueType(uuid, repl::OplogEntry::kUuidFieldName, BSONType::BinData);
     NamespaceString nss(ns.getString());
     Value id = input.getNestedField("o._id");
     // Non-replace updates have the _id in field "o2".
@@ -353,6 +362,9 @@ Document DocumentSourceChangeStream::Transformation::applyTransformation(const D
         default: { MONGO_UNREACHABLE; }
     }
 
+    // UUID should always be present except for invalidate entries.
+    invariant(operationType == kInvalidateOpType || !uuid.missing());
+
     // Construct the result document.
     Value documentKey;
     if (!documentId.missing()) {
@@ -360,7 +372,7 @@ Document DocumentSourceChangeStream::Transformation::applyTransformation(const D
     }
     // Note that 'documentKey' might be missing, in which case it will not appear in the output.
     Document resumeToken{{kClusterTimeField, Document{{kTimestampField, ts}}},
-                         {kNamespaceField, ns},
+                         {kUuidField, uuid},
                          {kDocumentKeyField, documentKey}};
     doc.addField(kIdField, Value(resumeToken));
     doc.addField(kOperationTypeField, Value(operationType));
@@ -390,6 +402,7 @@ DocumentSource::GetDepsReturn DocumentSourceChangeStream::Transformation::addDep
     deps->fields.insert(repl::OplogEntry::kOpTypeFieldName.toString());
     deps->fields.insert(repl::OplogEntry::kTimestampFieldName.toString());
     deps->fields.insert(repl::OplogEntry::kNamespaceFieldName.toString());
+    deps->fields.insert(repl::OplogEntry::kUuidFieldName.toString());
     deps->fields.insert(repl::OplogEntry::kObjectFieldName.toString());
     deps->fields.insert(repl::OplogEntry::kObject2FieldName.toString());
     return DocumentSource::GetDepsReturn::EXHAUSTIVE_ALL;

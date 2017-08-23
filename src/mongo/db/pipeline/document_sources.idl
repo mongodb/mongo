@@ -117,10 +117,10 @@ structs:
               type: ResumeTokenClusterTime
               description: The timestamp of the oplog entry represented by this resume token.
 
-          ns:
-              cpp_name: ns
-              type: string
-              description: The namespace of the oplog entry represented by this resume token.
+          uuid:
+              cpp_name: uuid
+              type: uuid
+              description: The UUID of the oplog entry represented by this resume token.
 
           documentKey:
               cpp_name: documentKey

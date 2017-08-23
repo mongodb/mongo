@@ -32,6 +32,7 @@
 #include "mongo/bson/bsonobj.h"
 #include "mongo/bson/timestamp.h"
 #include "mongo/db/pipeline/value.h"
+#include "mongo/util/uuid.h"
 
 namespace mongo {
 /**
@@ -52,6 +53,10 @@ public:
         return _timestamp;
     }
 
+    UUID getUuid() const {
+        return _uuid;
+    }
+
     Document toDocument() const;
 
     BSONObj toBSON() const;
@@ -69,7 +74,7 @@ private:
     explicit ResumeToken(const BSONObj& resumeBson);
 
     Timestamp _timestamp;
-    std::string _namespace;
+    UUID _uuid;
     Value _documentId;
 };
 }  // namespace mongo

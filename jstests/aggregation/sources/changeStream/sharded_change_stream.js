@@ -30,4 +30,6 @@
 
     // Test that it is still disallowed even if it's not specified as the first stage.
     assertErrorCode(shardedCollection, [{$project: {_id: 0}}, {$changeStream: {}}], 40567);
+
+    shardingTest.stop();
 }());

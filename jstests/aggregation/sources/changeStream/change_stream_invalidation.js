@@ -3,6 +3,8 @@
 (function() {
     "use strict";
 
+    load('jstests/libs/uuid_util.js');
+
     // Strip the oplog fields we aren't testing.
     const oplogProjection = {$project: {"_id.clusterTime": 0}};
 
@@ -45,6 +47,8 @@
     assert.neq(aggcursor.id, 0);
     assert.eq(aggcursor.firstBatch.length, 0);
 
+    const collGetMoreUuid = getUUIDFromListCollections(db, collGetMore.getName());
+
     // Drop the collection and test that we return "invalidate" entry and close the cursor.
     jsTestLog("Testing getMore command closes cursor for invalidate entries");
     collGetMore.drop();
@@ -53,11 +57,13 @@
     aggcursor = res.cursor;
     assert.eq(aggcursor.id, 0, "expected invalidation to cause the cursor to be closed");
     assert.eq(aggcursor.nextBatch.length, 1);
-    assert.docEq(aggcursor.nextBatch[0], {_id: {ns: "test.$cmd"}, operationType: "invalidate"});
+    assert.docEq(aggcursor.nextBatch[0],
+                 {_id: {uuid: collGetMoreUuid}, operationType: "invalidate"});
 
     jsTestLog("Testing aggregate command closes cursor for invalidate entries");
     const collAgg = db.change_stream_agg_invalidations;
     db.createCollection(collAgg.getName());
+    const collAggUuid = getUUIDFromListCollections(db, collAgg.getName());
     // Get a valid resume token that the next aggregate command can use.
     aggcursor = startWatchingChanges([{$changeStream: {}}], collAgg);
     assert.eq(aggcursor.firstBatch.length, 0);
@@ -80,16 +86,23 @@
     assert.eq(aggcursor.nextBatch.length, 1);
     const resumeToken = aggcursor.nextBatch[0]._id;
 
+    // It should not possible to resume a change stream after a collection drop, even if the
+    // invalidate has not been received.
     assert(collAgg.drop());
-    res = assert.commandWorked(db.runCommand({
+    // Wait for the drop to actually happen.
+    assert.soon(function() {
+        const visibleRes = assert.commandWorked(db.runCommand("listCollections"));
+        const allRes =
+            assert.commandWorked(db.runCommand("listCollections", {includePendingDrops: true}));
+        const visibleCollections = visibleRes.cursor.firstBatch;
+        const allCollections = allRes.cursor.firstBatch;
+        return visibleCollections.length == allCollections.length;
+    });
+    res = assert.commandFailed(db.runCommand({
         aggregate: collAgg.getName(),
         pipeline: [{$changeStream: {resumeAfter: resumeToken}}, oplogProjection],
         cursor: {}
     }));
-    aggcursor = res.cursor;
-    assert.eq(aggcursor.id, 0, "expected invalidation to cause the cursor to be closed");
-    assert.eq(aggcursor.firstBatch.length, 1);
-    assert.docEq(aggcursor.firstBatch, [{_id: {ns: "test.$cmd"}, operationType: "invalidate"}]);
 
     replTest.stopSet();
 }());

@@ -40,7 +40,7 @@ ResumeToken::ResumeToken(const BSONObj& resumeBson) {
     auto token =
         ResumeTokenInternal::parse(IDLParserErrorContext("$changeStream.resumeAfter"), resumeBson);
     _timestamp = token.getClusterTime().getTimestamp();
-    _namespace = token.getNs().toString();
+    _uuid = token.getUuid();
     _documentId = token.getDocumentKey();
 }
 
@@ -49,13 +49,13 @@ ResumeToken::ResumeToken(const Value& resumeValue) {
     Value clusterTime = resumeTokenDoc[ResumeTokenInternal::kClusterTimeFieldName];
     Value timestamp = clusterTime[ResumeTokenClusterTime::kTimestampFieldName];
     _timestamp = timestamp.getTimestamp();
-    Value ns = resumeTokenDoc[ResumeTokenInternal::kNsFieldName];
-    _namespace = ns.getString();
+    Value uuid = resumeTokenDoc[ResumeTokenInternal::kUuidFieldName];
+    _uuid = uuid.getUuid();
     _documentId = resumeTokenDoc[ResumeTokenInternal::kDocumentKeyFieldName];
 }
 
 bool ResumeToken::operator==(const ResumeToken& other) {
-    return _timestamp == other._timestamp && _namespace == other._namespace &&
+    return _timestamp == other._timestamp && _uuid == other._uuid &&
         ValueComparator::kInstance.evaluate(_documentId == other._documentId);
 }
 
@@ -63,7 +63,7 @@ Document ResumeToken::toDocument() const {
     ResumeTokenClusterTime clusterTime;
     clusterTime.setTimestamp(_timestamp);
     return Document({{ResumeTokenInternal::kClusterTimeFieldName, clusterTime.toBSON()},
-                     {{ResumeTokenInternal::kNsFieldName}, _namespace},
+                     {{ResumeTokenInternal::kUuidFieldName}, _uuid},
                      {{ResumeTokenInternal::kDocumentKeyFieldName}, _documentId}});
 }
 

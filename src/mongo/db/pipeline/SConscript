@@ -328,6 +328,7 @@ env.Library(
     LIBDEPS=[
         'document_source',
         'pipeline',
+        '$BUILD_DIR/mongo/db/catalog/uuid_catalog',
     ],
 )
 

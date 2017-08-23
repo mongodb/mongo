@@ -32,6 +32,7 @@
 #include "mongo/base/string_data.h"
 #include "mongo/db/pipeline/value_internal.h"
 #include "mongo/platform/unordered_set.h"
+#include "mongo/util/uuid.h"
 
 namespace mongo {
 class BSONElement;
@@ -116,6 +117,9 @@ public:
     explicit Value(const MinKeyLabeler&) : _storage(MinKey) {}        // MINKEY
     explicit Value(const MaxKeyLabeler&) : _storage(MaxKey) {}        // MAXKEY
     explicit Value(const Date_t& date) : _storage(Date, date.toMillisSinceEpoch()) {}
+    explicit Value(const UUID& uuid)
+        : _storage(BinData,
+                   BSONBinData(uuid.toCDR().data(), uuid.toCDR().length(), BinDataType::newUUID)) {}
 
     explicit Value(const char*) = delete;  // Use StringData instead to prevent accidentally
                                            // terminating the string at the first null byte.
@@ -187,6 +191,7 @@ public:
     std::string getCode() const;
     int getInt() const;
     long long getLong() const;
+    UUID getUuid() const;
     const std::vector<Value>& getArray() const {
         return _storage.getArray();
     }
@@ -448,5 +453,11 @@ inline long long Value::getLong() const {
 
     verify(type == NumberLong);
     return _storage.longValue;
+}
+
+inline UUID Value::getUuid() const {
+    verify(_storage.binDataType() == BinDataType::newUUID);
+    auto stringData = _storage.getString();
+    return UUID::fromCDR({stringData.rawData(), stringData.size()});
 }
 };

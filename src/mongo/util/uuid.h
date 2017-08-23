@@ -61,6 +61,7 @@ class UUID {
     friend class LogicalSessionIdToClient;
     friend class LogicalSessionFromClient;
     friend class repl::OplogEntryBase;
+    friend class ResumeTokenInternal;
 
 public:
     /**

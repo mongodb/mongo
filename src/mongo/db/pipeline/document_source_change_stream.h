@@ -100,6 +100,10 @@ public:
     // transformation.
     static constexpr StringData kNamespaceField = "ns"_sd;
 
+    // The name of the subfield of '_id' where the UUID of the namespace will be located after the
+    // transformation.
+    static constexpr StringData kUuidField = "uuid"_sd;
+
     // The name of the field where the type of the operation will be located after the
     // transformation.
     static constexpr StringData kOperationTypeField = "operationType"_sd;

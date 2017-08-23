@@ -3,6 +3,8 @@
 (function() {
     "use strict";
 
+    load('jstests/libs/uuid_util.js');
+
     const replTest = new ReplSetTest({name: "changeStreamTest", nodes: 1});
     const nodes = replTest.startSet();
     replTest.initiate();
@@ -122,8 +124,9 @@ eventFn();`,
         event: () => assert.writeOK(db.changes.insert({_id: "wake up"}))
     });
     assert.eq(getMoreResponse.cursor.nextBatch.length, 1);
+    const changesCollectionUuid = getUUIDFromListCollections(db, changesCollection.getName());
     assert.docEq(getMoreResponse.cursor.nextBatch[0], {
-        _id: {documentKey: {_id: "wake up"}, ns: changesCollection.getFullName()},
+        _id: {documentKey: {_id: "wake up"}, uuid: changesCollectionUuid},
         documentKey: {_id: "wake up"},
         fullDocument: {_id: "wake up"},
         ns: {db: db.getName(), coll: changesCollection.getName()},

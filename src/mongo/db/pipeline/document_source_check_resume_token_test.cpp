@@ -45,6 +45,7 @@
 #include "mongo/stdx/memory.h"
 #include "mongo/unittest/death_test.h"
 #include "mongo/unittest/unittest.h"
+#include "mongo/util/uuid.h"
 
 using boost::intrusive_ptr;
 using std::deque;
@@ -62,10 +63,10 @@ protected:
      * Puts an arbitrary document with resume token corresponding to the given timestamp, id, and
      * namespace in the mock queue.
      */
-    void addDocument(Timestamp ts, std::string id, StringData ns = kTestNs) {
+    void addDocument(Timestamp ts, std::string id, UUID uuid = testUuid()) {
         _mock->queue.push_back(Document{{"_id",
                                          Document{{"clusterTime", Document{{"ts", ts}}},
-                                                  {"ns", ns},
+                                                  {"uuid", uuid},
                                                   {"documentKey", Document{{"_id", id}}}}}});
     }
 
@@ -77,14 +78,24 @@ protected:
      * Convenience method to create the class under test with a given timestamp, id, and namespace.
      */
     intrusive_ptr<DocumentSourceEnsureResumeTokenPresent> createCheckResumeToken(
-        Timestamp ts, StringData id, StringData ns = kTestNs) {
-        auto token = ResumeToken::parse(BSON(
-            "clusterTime" << BSON("ts" << ts) << "ns" << ns << "documentKey" << BSON("_id" << id)));
+        Timestamp ts, StringData id, UUID uuid = testUuid()) {
+        auto token = ResumeToken::parse(BSON("clusterTime" << BSON("ts" << ts) << "uuid" << uuid
+                                                           << "documentKey"
+                                                           << BSON("_id" << id)));
         DocumentSourceEnsureResumeTokenPresentSpec spec;
         spec.setResumeToken(token);
         auto checkResumeToken = DocumentSourceEnsureResumeTokenPresent::create(getExpCtx(), spec);
         checkResumeToken->setSource(_mock.get());
         return checkResumeToken;
+    }
+
+    /**
+     * This method is required to avoid a static initialization fiasco resulting from calling
+     * UUID::gen() in file or class static scope.
+     */
+    static const UUID& testUuid() {
+        static const UUID* uuid_gen = new UUID(UUID::gen());
+        return *uuid_gen;
     }
 
     intrusive_ptr<DocumentSourceMock> _mock;
@@ -93,9 +104,10 @@ protected:
 class ShardCheckResumabilityTest : public CheckResumeTokenTest {
 protected:
     intrusive_ptr<DocumentSourceShardCheckResumability> createShardCheckResumability(
-        Timestamp ts, StringData id, StringData ns = kTestNs) {
-        auto token = ResumeToken::parse(BSON(
-            "clusterTime" << BSON("ts" << ts) << "ns" << ns << "documentKey" << BSON("_id" << id)));
+        Timestamp ts, StringData id, UUID uuid = testUuid()) {
+        auto token = ResumeToken::parse(BSON("clusterTime" << BSON("ts" << ts) << "uuid" << uuid
+                                                           << "documentKey"
+                                                           << BSON("_id" << id)));
         DocumentSourceShardCheckResumabilitySpec spec;
         spec.setResumeToken(token);
         auto shardCheckResumability =
@@ -193,8 +205,10 @@ TEST_F(CheckResumeTokenTest, ShouldFailIfTokenHasWrongDocumentId) {
 TEST_F(CheckResumeTokenTest, ShouldFailIfTokenHasWrongNamespace) {
     Timestamp resumeTimestamp(100, 1);
 
-    auto checkResumeToken = createCheckResumeToken(resumeTimestamp, "1", "test1.ns");
-    addDocument(resumeTimestamp, "1", "test2.ns");
+    auto resumeTokenUUID = UUID::gen();
+    auto checkResumeToken = createCheckResumeToken(resumeTimestamp, "1", resumeTokenUUID);
+    auto otherUUID = UUID::gen();
+    addDocument(resumeTimestamp, "1", otherUUID);
     ASSERT_THROWS_CODE(checkResumeToken->getNext(), AssertionException, 40585);
 }
 
