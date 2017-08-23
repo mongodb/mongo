@@ -44,6 +44,7 @@
 #include "mongo/db/s/sharding_state_recovery.h"
 #include "mongo/s/catalog/sharding_catalog_client.h"
 #include "mongo/s/catalog/type_chunk.h"
+#include "mongo/s/catalog_cache_loader.h"
 #include "mongo/s/client/shard_registry.h"
 #include "mongo/s/grid.h"
 #include "mongo/s/request_types/commit_chunk_migration_request_type.h"
@@ -409,17 +410,42 @@ Status MigrationSourceManager::commitChunkMetadataOnConfig(OperationContext* opC
                            << redact(status)});
     }
 
-    // Do a best effort attempt to incrementally refresh the metadata. If this fails, just clear it
-    // up so that subsequent requests will try to do a full refresh.
+    // Do a best effort attempt to incrementally refresh the metadata before leaving the critical
+    // section. It is okay if the refresh fails because that will cause the metadata to be cleared
+    // and subsequent callers will try to do a full refresh.
     ChunkVersion unusedShardVersion;
     Status refreshStatus =
         ShardingState::get(opCtx)->refreshMetadataNow(opCtx, getNss(), &unusedShardVersion);
 
-    if (refreshStatus.isOK()) {
-        AutoGetCollection autoColl(opCtx, getNss(), MODE_IS);
+    if (!refreshStatus.isOK()) {
+        AutoGetCollection autoColl(opCtx, getNss(), MODE_IX, MODE_X);
 
-        auto css = CollectionShardingState::get(opCtx, getNss());
-        auto refreshedMetadata = css->getMetadata();
+        CollectionShardingState::get(opCtx, getNss())->refreshMetadata(opCtx, nullptr);
+
+        log() << "Failed to refresh metadata after a "
+              << (migrationCommitStatus.isOK() ? "failed commit attempt" : "successful commit")
+              << ". Metadata was cleared so it will get a full refresh when accessed again."
+              << causedBy(redact(refreshStatus));
+
+        // migrationCommitStatus may be OK or an error. The migration is considered a success at
+        // this point if the commit succeeded. The metadata refresh either occurred or the metadata
+        // was safely cleared.
+        return {migrationCommitStatus.code(),
+                str::stream() << "Orphaned range not cleaned up. Failed to refresh metadata after"
+                                 " migration commit due to '"
+                              << refreshStatus.toString()
+                              << "', and commit failed due to '"
+                              << migrationCommitStatus.toString()
+                              << "'"};
+    }
+
+    {
+        // TODO: This scope for the metadata is needed until SERVER-30083 is resolved.
+
+        auto refreshedMetadata = [&] {
+            AutoGetCollection autoColl(opCtx, getNss(), MODE_IS);
+            return CollectionShardingState::get(opCtx, getNss())->getMetadata();
+        }();
 
         if (!refreshedMetadata) {
             return {ErrorCodes::NamespaceNotSharded,
@@ -438,25 +464,13 @@ Status MigrationSourceManager::commitChunkMetadataOnConfig(OperationContext* opC
         // Migration succeeded
         log() << "Migration succeeded and updated collection version to "
               << refreshedMetadata->getCollVersion();
-    } else {
-        AutoGetCollection autoColl(opCtx, getNss(), MODE_IX, MODE_X);
-
-        CollectionShardingState::get(opCtx, getNss())->refreshMetadata(opCtx, nullptr);
-
-        log() << "Failed to refresh metadata after a failed commit attempt. Metadata was cleared "
-                 "so it will get a full refresh when accessed again"
-              << causedBy(redact(refreshStatus));
-
-        // We don't know whether migration succeeded or failed
-        return {migrationCommitStatus.code(),
-                str::stream() << "Orphaned range not cleaned up. Failed to refresh metadata after"
-                                 " migration commit due to "
-                              << refreshStatus.toString()};
     }
 
     MONGO_FAIL_POINT_PAUSE_WHILE_SET(hangBeforeLeavingCriticalSection);
 
     scopedGuard.Dismiss();
+
+    // Exit critical section, clear old scoped collection metadata.
     _cleanup(opCtx);
 
     Grid::get(opCtx)
@@ -470,6 +484,35 @@ Status MigrationSourceManager::commitChunkMetadataOnConfig(OperationContext* opC
                                << _args.getToShardId()),
                     ShardingCatalogClient::kMajorityWriteConcern)
         .transitional_ignore();
+
+    // Wait for the metadata update to be persisted before attempting to delete orphaned
+    // documents so that metadata changes propagate to secondaries first.
+    CatalogCacheLoader::get(opCtx).waitForCollectionFlush(opCtx, getNss());
+
+    const auto range = ChunkRange(_args.getMinKey(), _args.getMaxKey());
+
+    auto notification = [&] {
+        auto const whenToClean = _args.getWaitForDelete() ? CollectionShardingState::kNow
+                                                          : CollectionShardingState::kDelayed;
+        AutoGetCollection autoColl(opCtx, getNss(), MODE_IS);
+        return CollectionShardingState::get(opCtx, getNss())->cleanUpRange(range, whenToClean);
+    }();
+
+    if (_args.getWaitForDelete()) {
+        log() << "Waiting for cleanup of " << getNss().ns() << " range "
+              << redact(range.toString());
+        return notification.waitStatus(opCtx);
+    }
+
+    if (notification.ready() && !notification.waitStatus(opCtx).isOK()) {
+        warning() << "Failed to initiate cleanup of " << getNss().ns() << " range "
+                  << redact(range.toString())
+                  << " due to: " << redact(notification.waitStatus(opCtx));
+    } else {
+        log() << "Leaving cleanup of " << getNss().ns() << " range " << redact(range.toString())
+              << " to complete in background";
+        notification.abandon();
+    }
 
     return Status::OK();
 }
@@ -526,6 +569,9 @@ void MigrationSourceManager::_cleanup(OperationContext* opCtx) {
     }
 
     _state = kDone;
+
+    // Clear the old scoped metadata so range deletion of the migrated chunk may proceed.
+    _collectionMetadata = ScopedCollectionMetadata();
 }
 
 std::shared_ptr<Notification<void>> MigrationSourceManager::getMigrationCriticalSectionSignal(

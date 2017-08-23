@@ -58,8 +58,7 @@ var moveChunkStepNames = {
     startedMoveChunk: 3,    // called _recvChunkStart on recipient
     reachedSteadyState: 4,  // recipient reports state is "steady"
     chunkDataCommitted: 5,  // called _recvChunkCommit on recipient
-    committed: 6,
-    done: 7
+    committed: 6
 };
 
 function numberToName(names, stepNumber) {
@@ -97,9 +96,9 @@ function proceedToMoveChunkStep(shardConnection, stepNumber) {
 }
 
 function configureMoveChunkFailPoint(shardConnection, stepNumber, mode) {
-    assert.between(migrateStepNames.copiedIndexes,
+    assert.between(moveChunkStepNames.parsedOptions,
                    stepNumber,
-                   migrateStepNames.done,
+                   moveChunkStepNames.committed,
                    "incorrect stepNumber",
                    true);
     assert.commandWorked(shardConnection.adminCommand(
