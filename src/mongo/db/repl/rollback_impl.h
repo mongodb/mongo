@@ -95,14 +95,24 @@ public:
         virtual ~Listener() = default;
 
         /**
-         *  Function called after we transition to ROLLBACK.
+         * Function called after we transition to ROLLBACK.
          */
-        virtual void onTransitionToRollback() {}
+        virtual void onTransitionToRollback() noexcept {}
 
         /**
-         *  Function called after we find the common point.
+         * Function called after we find the common point.
          */
-        virtual void onCommonPointFound(Timestamp commonPoint) {}
+        virtual void onCommonPointFound(Timestamp commonPoint) noexcept {}
+
+        /**
+         * Function called after we recover to the stable timestamp.
+         */
+        virtual void onRecoverToStableTimestamp() noexcept {}
+
+        /**
+         * Function called after we recover from the oplog.
+         */
+        virtual void onRecoverFromOplog() noexcept {}
     };
 
     /**
@@ -157,6 +167,17 @@ private:
      * 'opCtx' cannot be null.
      */
     Status _transitionToRollback(OperationContext* opCtx);
+
+    /**
+     * Recovers to the stable timestamp while holding the global exclusive lock.
+     */
+    Status _recoverToStableTimestamp(OperationContext* opCtx);
+
+    /**
+     * Runs the oplog recovery logic. This involves applying oplog operations between the stable
+     * timestamp and the common point.
+     */
+    Status _oplogRecovery(OperationContext* opCtx);
 
     /**
      * If we detected that we rolled back the shardIdentity document as part of this rollback

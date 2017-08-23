@@ -114,16 +114,19 @@ Status RollbackImpl::runRollback(OperationContext* opCtx) {
         return status;
     }
 
-    // Recover to the stable timestamp while holding the global exclusive lock.
-    auto serviceCtx = opCtx->getServiceContext();
-    {
-        Lock::GlobalWrite globalWrite(opCtx);
-        status = _storageInterface->recoverToStableTimestamp(serviceCtx);
-        if (!status.isOK()) {
-            return status;
-        }
+    // Recover to the stable timestamp.
+    status = _recoverToStableTimestamp(opCtx);
+    if (!status.isOK()) {
+        return status;
     }
+    _listener->onRecoverToStableTimestamp();
 
+    // Run the oplog recovery logic.
+    status = _oplogRecovery(opCtx);
+    if (!status.isOK()) {
+        return status;
+    }
+    _listener->onRecoverFromOplog();
 
     // At this point these functions need to always be called before returning, even on failure.
     // These functions fassert on failure.
@@ -133,7 +136,6 @@ Status RollbackImpl::runRollback(OperationContext* opCtx) {
         _transitionFromRollbackToSecondary(opCtx);
     });
 
-    // TODO: The rest of roll back.
     return Status::OK();
 }
 
@@ -191,6 +193,32 @@ StatusWith<Timestamp> RollbackImpl::_findCommonPoint() {
     }
     return commonPointSW.getValue().first.getTimestamp();
 }
+
+Status RollbackImpl::_recoverToStableTimestamp(OperationContext* opCtx) {
+    if (_isInShutdown()) {
+        return Status(ErrorCodes::ShutdownInProgress, "rollback shutting down");
+    }
+    // Recover to the stable timestamp while holding the global exclusive lock.
+    auto serviceCtx = opCtx->getServiceContext();
+    {
+        Lock::GlobalWrite globalWrite(opCtx);
+        try {
+            return _storageInterface->recoverToStableTimestamp(serviceCtx);
+        } catch (...) {
+            return exceptionToStatus();
+        }
+    }
+}
+
+Status RollbackImpl::_oplogRecovery(OperationContext* opCtx) {
+    if (_isInShutdown()) {
+        return Status(ErrorCodes::ShutdownInProgress, "rollback shutting down");
+    }
+    // Run the recovery process.
+    _replicationProcess->getReplicationRecovery()->recoverFromOplog(opCtx);
+    return Status::OK();
+}
+
 
 void RollbackImpl::_checkShardIdentityRollback(OperationContext* opCtx) {
     invariant(opCtx);

@@ -122,6 +122,14 @@ protected:
     bool _transitionedToRollback = false;
     stdx::function<void()> _onTransitionToRollbackFn = [this]() { _transitionedToRollback = true; };
 
+    bool _recoveredToStableTimestamp = false;
+    stdx::function<void()> _onRecoverToStableTimestampFn = [this]() {
+        _recoveredToStableTimestamp = true;
+    };
+
+    bool _recoveredFromOplog = false;
+    stdx::function<void()> _onRecoverFromOplogFn = [this]() { _recoveredFromOplog = true; };
+
     Timestamp _commonPointFound;
     stdx::function<void(Timestamp commonPoint)> _onCommonPointFoundFn =
         [this](Timestamp commonPoint) { _commonPointFound = commonPoint; };
@@ -158,12 +166,20 @@ class RollbackImplTest::Listener : public RollbackImpl::Listener {
 public:
     Listener(RollbackImplTest* test) : _test(test) {}
 
-    void onTransitionToRollback() {
+    void onTransitionToRollback() noexcept {
         _test->_onTransitionToRollbackFn();
     }
 
-    void onCommonPointFound(Timestamp commonPoint) {
+    void onCommonPointFound(Timestamp commonPoint) noexcept {
         _test->_onCommonPointFoundFn(commonPoint);
+    }
+
+    void onRecoverToStableTimestamp() noexcept {
+        _test->_onRecoverToStableTimestampFn();
+    }
+
+    void onRecoverFromOplog() noexcept {
+        _test->_onRecoverFromOplogFn();
     }
 
 private:
@@ -236,7 +252,7 @@ TEST_F(RollbackImplTest, RollbackPersistsCommonPointToOplogTruncateAfterPoint) {
     _remoteOplog->setOperations({makeOpAndRecordId(2)});
     _localOplog->setOperations({makeOpAndRecordId(2)});
 
-    ASSERT_EQUALS(Status::OK(), _rollback->runRollback(_opCtx.get()));
+    ASSERT_OK(_rollback->runRollback(_opCtx.get()));
 
     // Check that the common point was saved.
     auto truncateAfterPoint =
@@ -322,6 +338,37 @@ TEST_F(RollbackImplTest, RollbackReturnsBadStatusIfIncrementRollbackIDFails) {
 
     // Check that a bad status was returned since incrementing the rollback id should have failed.
     ASSERT_EQUALS(ErrorCodes::NamespaceNotFound, status.code());
+}
+
+TEST_F(RollbackImplTest, RollbackCallsRecoverFromOplog) {
+    auto op = makeOpAndRecordId(1);
+    _remoteOplog->setOperations({op});
+    _localOplog->setOperations({op});
+
+    // Run rollback.
+    ASSERT_OK(_rollback->runRollback(_opCtx.get()));
+
+    // Make sure oplog recovery was executed.
+    ASSERT(_recoveredFromOplog);
+}
+
+TEST_F(RollbackImplTest, RollbackSkipsRecoverFromOplogWhenShutdownEarly) {
+    auto op = makeOpAndRecordId(1);
+    _remoteOplog->setOperations({op});
+    _localOplog->setOperations({op});
+
+    _onRecoverToStableTimestampFn = [this]() {
+        _recoveredToStableTimestamp = true;
+        _rollback->shutdown();
+    };
+
+    // Run rollback.
+    auto status = _rollback->runRollback(_opCtx.get());
+
+    // Make sure shutdown occurred before oplog recovery.
+    ASSERT_EQUALS(ErrorCodes::ShutdownInProgress, _rollback->runRollback(_opCtx.get()));
+    ASSERT(_recoveredToStableTimestamp);
+    ASSERT_FALSE(_recoveredFromOplog);
 }
 
 TEST_F(RollbackImplTest, RollbackSucceeds) {
