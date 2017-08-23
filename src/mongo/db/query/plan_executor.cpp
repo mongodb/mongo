@@ -65,6 +65,11 @@ const OperationContext::Decoration<bool> shouldWaitForInserts =
 const OperationContext::Decoration<repl::OpTime> clientsLastKnownCommittedOpTime =
     OperationContext::declareDecoration<repl::OpTime>();
 
+struct CappedInsertNotifierData {
+    shared_ptr<CappedInsertNotifier> notifier;
+    uint64_t lastEOFVersion = ~0;
+};
+
 namespace {
 
 namespace {
@@ -407,30 +412,45 @@ bool PlanExecutor::shouldWaitForInserts() {
     return false;
 }
 
-bool PlanExecutor::waitForInserts() {
-    // If we cannot yield, we should retry immediately.
+std::shared_ptr<CappedInsertNotifier> PlanExecutor::getCappedInsertNotifier() {
+    // If we cannot yield, we should retry immediately when we hit EOF, so do not get
+    // a CappedInsertNotifier.
     if (!_yieldPolicy->canReleaseLocksDuringExecution())
-        return true;
+        return nullptr;
 
-    // We can only wait if we have a collection; otherwise retry immediately.
+    // We can only wait if we have a collection; otherwise we should retry immediately when
+    // we hit EOF.
     dassert(_opCtx->lockState()->isCollectionLockedForMode(_nss.ns(), MODE_IS));
     auto db = dbHolder().get(_opCtx, _nss.db());
     if (!db)
-        return true;
+        return nullptr;
     auto collection = db->getCollection(_opCtx, _nss);
     if (!collection)
+        return nullptr;
+
+    return collection->getCappedInsertNotifier();
+}
+
+bool PlanExecutor::waitForInserts(CappedInsertNotifierData* notifierData) {
+    // We tested to see if we could wait when getting the CappedInsertNotifier.
+    if (!notifierData->notifier)
         return true;
 
-    auto notifier = collection->getCappedInsertNotifier();
-    uint64_t notifierVersion = notifier->getVersion();
+    // The notifier wait() method will not wait unless the version passed to it matches the
+    // current version of the notifier.  Since the version passed to it is the current version
+    // of the notifier at the time of the previous EOF, we require two EOFs in a row with no
+    // notifier version change in order to wait.  This is sufficient to ensure we never wait
+    // when data is available.
     auto curOp = CurOp::get(_opCtx);
     curOp->pauseTimer();
     ON_BLOCK_EXIT([curOp] { curOp->resumeTimer(); });
     auto opCtx = _opCtx;
-    bool yieldResult = _yieldPolicy->yield(nullptr, [opCtx, notifier, notifierVersion] {
+    uint64_t currentNotifierVersion = notifierData->notifier->getVersion();
+    bool yieldResult = _yieldPolicy->yield(nullptr, [opCtx, notifierData] {
         const auto timeout = opCtx->getRemainingMaxTimeMicros();
-        notifier->wait(notifierVersion, timeout);
+        notifierData->notifier->wait(notifierData->lastEOFVersion, timeout);
     });
+    notifierData->lastEOFVersion = currentNotifierVersion;
     return yieldResult;
 }
 
@@ -471,6 +491,13 @@ PlanExecutor::ExecState PlanExecutor::getNextImpl(Snapshotted<BSONObj>* objOut, 
     // Incremented on every writeConflict, reset to 0 on any successful call to _root->work.
     size_t writeConflictsInARow = 0;
 
+    // Capped insert data; declared outside the loop so we hold a shared pointer to the capped
+    // insert notifier the entire time we are in the loop.  Holding a shared pointer to the capped
+    // insert notifier is necessary for the notifierVersion to advance.
+    CappedInsertNotifierData cappedInsertNotifierData;
+    if (shouldWaitForInserts()) {
+        cappedInsertNotifierData.notifier = getCappedInsertNotifier();
+    }
     for (;;) {
         // These are the conditions which can cause us to yield:
         //   1) The yield policy's timer elapsed, or
@@ -563,7 +590,7 @@ PlanExecutor::ExecState PlanExecutor::getNextImpl(Snapshotted<BSONObj>* objOut, 
             // Fall through to yield check at end of large conditional.
         } else if (PlanStage::IS_EOF == code) {
             if (shouldWaitForInserts()) {
-                const bool locksReacquiredAfterYield = waitForInserts();
+                const bool locksReacquiredAfterYield = waitForInserts(&cappedInsertNotifierData);
                 if (locksReacquiredAfterYield) {
                     // There may be more results, try to get more data.
                     continue;

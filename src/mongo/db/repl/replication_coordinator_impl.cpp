@@ -3039,7 +3039,6 @@ void ReplicationCoordinatorImpl::_advanceCommitPoint_inlock(const OpTime& commit
 
 void ReplicationCoordinatorImpl::_updateCommitPoint_inlock() {
     auto committedOpTime = _topCoord->getLastCommittedOpTime();
-    _externalState->notifyOplogMetadataWaiters(committedOpTime);
 
     // Update the stable timestamp.
     _setStableTimestampForStorage_inlock();
@@ -3060,10 +3059,11 @@ void ReplicationCoordinatorImpl::_updateCommitPoint_inlock() {
 
         // Update committed snapshot and wake up any threads waiting on read concern or
         // write concern.
-        //
-        // This function is only called on secondaries, so only threads waiting for
-        // committed snapshot need to be woken up.
         _updateCommittedSnapshot_inlock(newSnapshot);
+    } else {
+        // Even if we have no new snapshot, we need to notify waiters that the commit point
+        // moved.
+        _externalState->notifyOplogMetadataWaiters(committedOpTime);
     }
 }
 

@@ -799,6 +799,7 @@ void ReplicationCoordinatorExternalStateImpl::updateCommittedSnapshot(SnapshotIn
     auto manager = _service->getGlobalStorageEngine()->getSnapshotManager();
     invariant(manager);  // This should never be called if there is no SnapshotManager.
     manager->setCommittedSnapshot(newCommitPoint.name, newCommitPoint.opTime.getTimestamp());
+    notifyOplogMetadataWaiters(newCommitPoint.opTime);
 }
 
 void ReplicationCoordinatorExternalStateImpl::createSnapshot(OperationContext* opCtx,

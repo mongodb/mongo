@@ -41,6 +41,8 @@
 namespace mongo {
 
 class BSONObj;
+class CappedInsertNotifier;
+struct CappedInsertNotifierData;
 class Collection;
 class CursorManager;
 class PlanExecutor;
@@ -447,10 +449,14 @@ private:
     // should be returned immediately.
     bool shouldWaitForInserts();
 
+    // Gets the CappedInsertNotifier for a capped collection.  Returns nullptr if this plan executor
+    // is not capable of yielding based on a notifier.
+    std::shared_ptr<CappedInsertNotifier> getCappedInsertNotifier();
+
     // Yields locks and waits for inserts to the collection.  Returns true if there may be new
     // inserts, false if there is a timeout or an interrupt.  If this planExecutor cannot yield,
     // returns true immediately.
-    bool waitForInserts();
+    bool waitForInserts(CappedInsertNotifierData* notifierData);
 
     ExecState getNextImpl(Snapshotted<BSONObj>* objOut, RecordId* dlOut);
 
