@@ -28,6 +28,7 @@
 
 #pragma once
 
+#include <boost/optional.hpp>
 #include <regex>
 
 #include "mongo/db/matcher/expression_parser.h"
@@ -55,28 +56,47 @@ public:
     /**
      * Construct a new ExpressionWithPlaceholder. 'filter' must point to a valid MatchExpression.
      */
-    ExpressionWithPlaceholder(std::string placeholder, std::unique_ptr<MatchExpression> filter)
+    ExpressionWithPlaceholder(boost::optional<std::string> placeholder,
+                              std::unique_ptr<MatchExpression> filter)
         : _placeholder(std::move(placeholder)), _filter(std::move(filter)) {
         invariant(static_cast<bool>(_filter));
     }
 
     /**
-     * Returns true if this expression has both a placeholder and filter
-     * equivalent to 'other'.
+     * Returns true if this expression has both a placeholder and filter equivalent to 'other'.
      */
     bool equivalent(const ExpressionWithPlaceholder* other) const;
 
-    StringData getPlaceholder() const {
-        return _placeholder;
+    /**
+     * Uses this filter to match against 'elem' as if it is wrapped in a BSONObj with a single
+     * field whose name is given by getPlaceholder(). If the placeholder name does not exist, then
+     * the filter expression does not refer to any specific paths.
+     */
+    bool matchesBSONElement(BSONElement elem, MatchDetails* details = nullptr) const {
+        return _filter->matchesBSONElement(elem, details);
+    }
+
+    /**
+     * If this object has a placeholder, returns a view of the placeholder as a StringData.
+     */
+    boost::optional<StringData> getPlaceholder() const {
+        if (_placeholder) {
+            return StringData(*_placeholder);
+        }
+        return boost::none;
     }
 
     MatchExpression* getFilter() const {
         return _filter.get();
     }
 
+    std::unique_ptr<ExpressionWithPlaceholder> shallowClone() const {
+        return stdx::make_unique<ExpressionWithPlaceholder>(_placeholder, _filter->shallowClone());
+    }
+
 private:
     // The top-level field that _filter is over.
-    const std::string _placeholder;
+    const boost::optional<std::string> _placeholder;
     const std::unique_ptr<MatchExpression> _filter;
 };
 

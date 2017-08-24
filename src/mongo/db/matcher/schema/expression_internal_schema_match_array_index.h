@@ -68,7 +68,7 @@ public:
             element = iterator.next();
         }
 
-        return _expression->getFilter()->matchesSingleElement(element, details);
+        return _expression->matchesBSONElement(element, details);
     }
 
     void serialize(BSONObjBuilder* builder) const final;

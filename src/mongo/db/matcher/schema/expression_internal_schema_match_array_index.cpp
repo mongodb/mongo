@@ -72,7 +72,7 @@ void InternalSchemaMatchArrayIndexMatchExpression::serialize(BSONObjBuilder* bui
     {
         BSONObjBuilder matchArrayElemSubobj(pathSubobj.subobjStart(kName));
         matchArrayElemSubobj.append("index", _index);
-        matchArrayElemSubobj.append("namePlaceholder", _expression->getPlaceholder());
+        matchArrayElemSubobj.append("namePlaceholder", _expression->getPlaceholder().value_or(""));
         {
             BSONObjBuilder subexprSubObj(matchArrayElemSubobj.subobjStart("expression"));
             _expression->getFilter()->serialize(&subexprSubObj);
@@ -86,11 +86,7 @@ void InternalSchemaMatchArrayIndexMatchExpression::serialize(BSONObjBuilder* bui
 std::unique_ptr<MatchExpression> InternalSchemaMatchArrayIndexMatchExpression::shallowClone()
     const {
     auto clone = stdx::make_unique<InternalSchemaMatchArrayIndexMatchExpression>();
-    invariantOK(clone->init(
-        path(),
-        _index,
-        stdx::make_unique<ExpressionWithPlaceholder>(_expression->getPlaceholder().toString(),
-                                                     _expression->getFilter()->shallowClone())));
+    invariantOK(clone->init(path(), _index, _expression->shallowClone()));
     return std::move(clone);
 }
 }  // namespace mongo

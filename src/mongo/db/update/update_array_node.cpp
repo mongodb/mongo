@@ -85,7 +85,7 @@ UpdateNode::ApplyResult UpdateArrayNode::apply(ApplyParams applyParams) const {
             } else {
                 auto filter = _arrayFilters.find(update.first);
                 invariant(filter != _arrayFilters.end());
-                if (filter->second->getFilter()->matchesBSONElement(arrayElement)) {
+                if (filter->second->matchesBSONElement(arrayElement)) {
                     matchingElements[i].push_back(update.second.get());
                 }
             }

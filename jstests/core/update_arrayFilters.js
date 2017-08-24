@@ -31,8 +31,7 @@
         res = coll.update({_id: 0}, {$set: {"a.$[i]": 5}}, {arrayFilters: [{i: 0, j: 0}]});
         assert.writeErrorWithCode(res, ErrorCodes.FailedToParse);
         assert.neq(-1,
-                   res.getWriteError().errmsg.indexOf(
-                       "Each array filter must use a single top-level field name"),
+                   res.getWriteError().errmsg.indexOf("Expected a single top-level field name"),
                    "update failed for a reason other than failing to parse array filters");
 
         // Multiple array filters with the same id fails to parse.
@@ -54,9 +53,20 @@
                 "The array filter for identifier 'j' was not used in the update { $set: { a.$[i]: 5.0 } }"),
             "update failed for a reason other than unused array filter");
 
+        // Array filter without a top-level field name fails to parse.
+        res = coll.update({_id: 0}, {$set: {"a.$[i]": 5}}, {arrayFilters: [{$alwaysTrue: 1}]});
+        assert.writeErrorWithCode(res, ErrorCodes.FailedToParse);
+        assert.neq(
+            -1,
+            res.getWriteError().errmsg.indexOf(
+                "Cannot use an expression without a top-level field name in arrayFilters"),
+            "update failed for a reason other than missing a top-level field name in arrayFilter");
+
         // Good value for arrayFilters succeeds.
         assert.writeOK(coll.update(
             {_id: 0}, {$set: {"a.$[i]": 5, "a.$[j]": 6}}, {arrayFilters: [{i: 0}, {j: 0}]}));
+        assert.writeOK(coll.update(
+            {_id: 0}, {$set: {"a.$[i]": 5}}, {arrayFilters: [{$or: [{i: 0}, {$and: [{}]}]}]}));
     }
 
     //
@@ -104,6 +114,11 @@
         query: {_id: 0},
         update: {$set: {"a.$[i]": 5, "a.$[j]": 6}},
         arrayFilters: [{i: 0}, {j: 0}]
+    }));
+    assert.eq(null, coll.findAndModify({
+        query: {_id: 0},
+        update: {$set: {"a.$[i]": 5}},
+        arrayFilters: [{$or: [{i: 0}, {$and: [{}]}]}]
     }));
 
     //

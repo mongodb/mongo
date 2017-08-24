@@ -37,55 +37,42 @@ namespace mongo {
 namespace {
 
 /**
-* Finds the top-level field that 'expr' is over. This must be unique and not the empty string.
-*/
-StatusWith<StringData> parseTopLevelFieldName(MatchExpression* expr) {
-    switch (expr->getCategory()) {
-        case MatchExpression::MatchCategory::kLeaf:
-        case MatchExpression::MatchCategory::kArrayMatching: {
-            auto firstDotPos = expr->path().find('.');
-            if (firstDotPos == std::string::npos) {
-                return expr->path();
-            }
-            return expr->path().substr(0, firstDotPos);
+ * Finds the top-level field that 'expr' is over. Returns boost::none if the expression does not
+ * have a top-level field name, or a non-OK status if there are multiple top-level field names.
+ */
+StatusWith<boost::optional<StringData>> parseTopLevelFieldName(MatchExpression* expr) {
+    if (auto pathExpr = dynamic_cast<PathMatchExpression*>(expr)) {
+        auto firstDotPos = pathExpr->path().find('.');
+        if (firstDotPos == std::string::npos) {
+            return {pathExpr->path()};
         }
-        case MatchExpression::MatchCategory::kLogical: {
-            if (expr->numChildren() == 0) {
-                return Status(ErrorCodes::FailedToParse, "No top-level field name found.");
+        return {pathExpr->path().substr(0, firstDotPos)};
+    } else if (expr->getCategory() == MatchExpression::MatchCategory::kLogical) {
+        boost::optional<StringData> placeholder;
+        for (size_t i = 0; i < expr->numChildren(); ++i) {
+            auto statusWithId = parseTopLevelFieldName(expr->getChild(i));
+            if (!statusWithId.isOK()) {
+                return statusWithId.getStatus();
             }
 
-            StringData placeholder;
-            for (size_t i = 0; i < expr->numChildren(); ++i) {
-                auto statusWithId = parseTopLevelFieldName(expr->getChild(i));
-                if (!statusWithId.isOK()) {
-                    return statusWithId.getStatus();
-                }
-
-                if (placeholder == StringData()) {
-                    placeholder = statusWithId.getValue();
-                    continue;
-                }
-
-                if (placeholder != statusWithId.getValue()) {
-                    return Status(
-                        ErrorCodes::FailedToParse,
-                        str::stream()
-                            << "Each array filter must use a single top-level field name, found '"
-                            << placeholder
-                            << "' and '"
-                            << statusWithId.getValue()
-                            << "'");
-                }
+            if (!placeholder) {
+                placeholder = statusWithId.getValue();
+                continue;
             }
-            return placeholder;
+
+            if (statusWithId.getValue() && placeholder != statusWithId.getValue()) {
+                return Status(ErrorCodes::FailedToParse,
+                              str::stream() << "Expected a single top-level field name, found '"
+                                            << *placeholder
+                                            << "' and '"
+                                            << *statusWithId.getValue()
+                                            << "'");
+            }
         }
-        case MatchExpression::MatchCategory::kOther: {
-            return Status(ErrorCodes::FailedToParse,
-                          str::stream() << "Match expression does not support placeholders.");
-        }
+        return placeholder;
     }
 
-    MONGO_UNREACHABLE;
+    return {boost::none};
 }
 
 }  // namespace
@@ -114,13 +101,17 @@ StatusWith<std::unique_ptr<ExpressionWithPlaceholder>> ExpressionWithPlaceholder
     if (!statusWithId.isOK()) {
         return statusWithId.getStatus();
     }
-    auto placeholder = statusWithId.getValue().toString();
-    if (!std::regex_match(placeholder, placeholderRegex)) {
-        return Status(ErrorCodes::BadValue,
-                      str::stream() << "The top-level field name must be an alphanumeric "
-                                       "string beginning with a lowercase letter, found '"
-                                    << placeholder
-                                    << "'");
+
+    boost::optional<std::string> placeholder;
+    if (statusWithId.getValue()) {
+        placeholder = statusWithId.getValue()->toString();
+        if (!std::regex_match(*placeholder, placeholderRegex)) {
+            return Status(ErrorCodes::BadValue,
+                          str::stream() << "The top-level field name must be an alphanumeric "
+                                           "string beginning with a lowercase letter, found '"
+                                        << *placeholder
+                                        << "'");
+        }
     }
 
     auto exprWithPlaceholder =

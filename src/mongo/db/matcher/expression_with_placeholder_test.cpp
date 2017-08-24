@@ -43,7 +43,8 @@ TEST(ExpressionWithPlaceholderTest, ParseBasic) {
     const CollatorInterface* collator = nullptr;
     auto rawFilter = fromjson("{i: 0}");
     auto filter = assertGet(ExpressionWithPlaceholder::parse(rawFilter, collator));
-    ASSERT_EQ(filter->getPlaceholder(), "i");
+    ASSERT(filter->getPlaceholder());
+    ASSERT_EQ(*filter->getPlaceholder(), "i");
     ASSERT_TRUE(filter->getFilter()->matchesBSON(fromjson("{i: 0}")));
     ASSERT_FALSE(filter->getFilter()->matchesBSON(fromjson("{i: 1}")));
 }
@@ -52,7 +53,8 @@ TEST(ExpressionWithPlaceholderTest, ParseDottedField) {
     const CollatorInterface* collator = nullptr;
     auto rawFilter = fromjson("{'i.a': 0, 'i.b': 1}");
     auto filter = assertGet(ExpressionWithPlaceholder::parse(rawFilter, collator));
-    ASSERT_EQ(filter->getPlaceholder(), "i");
+    ASSERT(filter->getPlaceholder());
+    ASSERT_EQ(*filter->getPlaceholder(), "i");
     ASSERT_TRUE(filter->getFilter()->matchesBSON(fromjson("{i: {a: 0, b: 1}}")));
     ASSERT_FALSE(filter->getFilter()->matchesBSON(fromjson("{i: {a: 0, b: 0}}")));
 }
@@ -61,7 +63,8 @@ TEST(ExpressionWithPlaceholderTest, ParseLogicalQuery) {
     const CollatorInterface* collator = nullptr;
     auto rawFilter = fromjson("{$and: [{i: {$gte: 0}}, {i: {$lte: 0}}]}");
     auto filter = assertGet(ExpressionWithPlaceholder::parse(rawFilter, collator));
-    ASSERT_EQ(filter->getPlaceholder(), "i");
+    ASSERT(filter->getPlaceholder());
+    ASSERT_EQ(*filter->getPlaceholder(), "i");
     ASSERT_TRUE(filter->getFilter()->matchesBSON(fromjson("{i: 0}")));
     ASSERT_FALSE(filter->getFilter()->matchesBSON(fromjson("{i: 1}")));
 }
@@ -70,7 +73,8 @@ TEST(ExpressionWithPlaceholderTest, ParseElemMatch) {
     const CollatorInterface* collator = nullptr;
     auto rawFilter = fromjson("{i: {$elemMatch: {a: 0}}}");
     auto filter = assertGet(ExpressionWithPlaceholder::parse(rawFilter, collator));
-    ASSERT_EQ(filter->getPlaceholder(), "i");
+    ASSERT(filter->getPlaceholder());
+    ASSERT_EQ(*filter->getPlaceholder(), "i");
     ASSERT_TRUE(filter->getFilter()->matchesBSON(fromjson("{i: [{a: 0}]}")));
     ASSERT_FALSE(filter->getFilter()->matchesBSON(fromjson("{i: [{a: 1}]}")));
 }
@@ -79,7 +83,8 @@ TEST(ExpressionWithPlaceholderTest, ParseCollation) {
     CollatorInterfaceMock collator(CollatorInterfaceMock::MockType::kAlwaysEqual);
     auto rawFilter = fromjson("{i: 'abc'}");
     auto filter = assertGet(ExpressionWithPlaceholder::parse(rawFilter, &collator));
-    ASSERT_EQ(filter->getPlaceholder(), "i");
+    ASSERT(filter->getPlaceholder());
+    ASSERT_EQ(*filter->getPlaceholder(), "i");
     ASSERT_TRUE(filter->getFilter()->matchesBSON(fromjson("{i: 'cba'}")));
     ASSERT_FALSE(filter->getFilter()->matchesBSON(fromjson("{i: 0}")));
 }
@@ -88,7 +93,8 @@ TEST(ExpressionWithPlaceholderTest, ParseIdContainsNumbersAndCapitals) {
     const CollatorInterface* collator = nullptr;
     auto rawFilter = fromjson("{iA3: 0}");
     auto filter = assertGet(ExpressionWithPlaceholder::parse(rawFilter, collator));
-    ASSERT_EQ(filter->getPlaceholder(), "iA3");
+    ASSERT(filter->getPlaceholder());
+    ASSERT_EQ(*filter->getPlaceholder(), "iA3");
     ASSERT_TRUE(filter->getFilter()->matchesBSON(fromjson("{'iA3': 0}")));
     ASSERT_FALSE(filter->getFilter()->matchesBSON(fromjson("{'iA3': 1}")));
 }
@@ -100,18 +106,63 @@ TEST(ExpressionWithPlaceholderTest, BadMatchExpressionFailsToParse) {
     ASSERT_NOT_OK(status.getStatus());
 }
 
-TEST(ExpressionWithPlaceholderTest, EmptyMatchExpressionFailsToParse) {
-    const CollatorInterface* collator = nullptr;
+TEST(ExpressionWithPlaceholderTest, EmptyMatchExpressionParsesSuccessfully) {
+    constexpr CollatorInterface* collator = nullptr;
     auto rawFilter = fromjson("{}");
-    auto status = ExpressionWithPlaceholder::parse(rawFilter, collator);
-    ASSERT_NOT_OK(status.getStatus());
+    auto result = assertGet(ExpressionWithPlaceholder::parse(rawFilter, collator));
+    ASSERT_FALSE(result->getPlaceholder());
 }
 
-TEST(ExpressionWithPlaceholderTest, NestedEmptyMatchExpressionFailsToParse) {
-    const CollatorInterface* collator = nullptr;
-    auto rawFilter = fromjson("{$or: [{i: 0}, {$and: [{}]}]}");
-    auto status = ExpressionWithPlaceholder::parse(rawFilter, collator);
-    ASSERT_NOT_OK(status.getStatus());
+TEST(ExpressionWithPlaceholderTest, NestedEmptyMatchExpressionParsesSuccessfully) {
+    constexpr CollatorInterface* collator = nullptr;
+    auto rawFilter = fromjson("{$or: [{$and: [{}]}]}");
+    auto result = assertGet(ExpressionWithPlaceholder::parse(rawFilter, collator));
+    ASSERT_FALSE(result->getPlaceholder());
+}
+
+TEST(ExpressionWithPlaceholderTest,
+     NestedMatchExpressionParsesSuccessfullyWhenSomeClausesHaveNoFieldName) {
+    constexpr CollatorInterface* collator = nullptr;
+    auto rawFilter = fromjson("{$or: [{$and: [{}]}, {i: 0}, {i: 1}, {$and: [{}]}]}");
+    auto result = assertGet(ExpressionWithPlaceholder::parse(rawFilter, collator));
+    ASSERT(result->getPlaceholder());
+    ASSERT_EQ(*result->getPlaceholder(), "i"_sd);
+}
+
+TEST(ExpressionWithPlaceholderTest, SuccessfullyParsesExpressionsWithTypeOther) {
+    constexpr CollatorInterface* collator = nullptr;
+    auto rawFilter =
+        fromjson("{a: {$_internalSchemaObjectMatch: {$_internalSchemaMinProperties: 5}}}");
+    auto result = assertGet(ExpressionWithPlaceholder::parse(rawFilter, collator));
+    ASSERT(result->getPlaceholder());
+    ASSERT_EQ(*result->getPlaceholder(), "a"_sd);
+
+    rawFilter = fromjson("{a: {$_internalSchemaType: 'string'}}");
+    result = assertGet(ExpressionWithPlaceholder::parse(rawFilter, collator));
+    ASSERT(result->getPlaceholder());
+    ASSERT_EQ(*result->getPlaceholder(), "a"_sd);
+
+    rawFilter = fromjson("{$_internalSchemaMinProperties: 1}}");
+    result = assertGet(ExpressionWithPlaceholder::parse(rawFilter, collator));
+    ASSERT_FALSE(result->getPlaceholder());
+
+    rawFilter = fromjson("{$_internalSchemaCond: [{a: {$exists: true}}, {b: 1}, {c: 1}]}");
+    result = assertGet(ExpressionWithPlaceholder::parse(rawFilter, collator));
+    ASSERT_FALSE(result->getPlaceholder());
+}
+
+TEST(ExpressionWithPlaceholderTest, SuccessfullyParsesAlwaysTrue) {
+    constexpr CollatorInterface* collator = nullptr;
+    auto rawFilter = fromjson("{$alwaysTrue: 1}");
+    auto result = assertGet(ExpressionWithPlaceholder::parse(rawFilter, collator));
+    ASSERT_FALSE(result->getPlaceholder());
+}
+
+TEST(ExpressionWithPlaceholderTest, SuccessfullyParsesAlwaysFalse) {
+    constexpr CollatorInterface* collator = nullptr;
+    auto rawFilter = fromjson("{$alwaysFalse: 1}");
+    auto result = assertGet(ExpressionWithPlaceholder::parse(rawFilter, collator));
+    ASSERT_FALSE(result->getPlaceholder());
 }
 
 TEST(ExpressionWithPlaceholderTest, EmptyFieldNameFailsToParse) {
@@ -205,6 +256,60 @@ TEST(ExpressionWithPlaceholderTest, EquivalentIfPlaceholderAndExpressionMatch) {
         expressionWithPlaceholder2.getValue().get()));
 }
 
+TEST(ExpressionWithPlaceholderTest, EmptyMatchExpressionsAreEquivalent) {
+    constexpr auto collator = nullptr;
+    auto rawFilter1 = fromjson("{}");
+    auto expressionWithPlaceholder1 = ExpressionWithPlaceholder::parse(rawFilter1, collator);
+    ASSERT_OK(expressionWithPlaceholder1.getStatus());
+
+    auto rawFilter2 = fromjson("{}");
+    auto expressionWithPlaceholder2 = ExpressionWithPlaceholder::parse(rawFilter2, collator);
+    ASSERT_OK(expressionWithPlaceholder2.getStatus());
+    ASSERT(expressionWithPlaceholder1.getValue()->equivalent(
+        expressionWithPlaceholder2.getValue().get()));
+}
+
+TEST(ExpressionWithPlaceholderTest, NestedEmptyMatchExpressionsAreEquivalent) {
+    constexpr auto collator = nullptr;
+    auto rawFilter1 = fromjson("{$or: [{$and: [{}]}]}");
+    auto expressionWithPlaceholder1 = ExpressionWithPlaceholder::parse(rawFilter1, collator);
+    ASSERT_OK(expressionWithPlaceholder1.getStatus());
+
+    auto rawFilter2 = fromjson("{$or: [{$and: [{}]}]}");
+    auto expressionWithPlaceholder2 = ExpressionWithPlaceholder::parse(rawFilter2, collator);
+    ASSERT_OK(expressionWithPlaceholder2.getStatus());
+    ASSERT(expressionWithPlaceholder1.getValue()->equivalent(
+        expressionWithPlaceholder2.getValue().get()));
+}
+
+TEST(ExpressionWithPlaceholderTest, SameObjectMatchesAreEquivalent) {
+    constexpr auto collator = nullptr;
+    auto rawFilter1 =
+        fromjson("{a: {$_internalSchemaObjectMatch: {$_internalSchemaMaxProperties: 2}}}");
+    auto expressionWithPlaceholder1 = ExpressionWithPlaceholder::parse(rawFilter1, collator);
+    ASSERT_OK(expressionWithPlaceholder1.getStatus());
+
+    auto rawFilter2 =
+        fromjson("{a: {$_internalSchemaObjectMatch: {$_internalSchemaMaxProperties: 2}}}");
+    auto expressionWithPlaceholder2 = ExpressionWithPlaceholder::parse(rawFilter2, collator);
+    ASSERT_OK(expressionWithPlaceholder2.getStatus());
+    ASSERT(expressionWithPlaceholder1.getValue()->equivalent(
+        expressionWithPlaceholder2.getValue().get()));
+}
+
+TEST(ExpressionWithPlaceholderTest, AlwaysTruesAreEquivalent) {
+    constexpr auto collator = nullptr;
+    auto rawFilter1 = fromjson("{$alwaysTrue: 1}");
+    auto expressionWithPlaceholder1 = ExpressionWithPlaceholder::parse(rawFilter1, collator);
+    ASSERT_OK(expressionWithPlaceholder1.getStatus());
+
+    auto rawFilter2 = fromjson("{$alwaysTrue: 1}");
+    auto expressionWithPlaceholder2 = ExpressionWithPlaceholder::parse(rawFilter2, collator);
+    ASSERT_OK(expressionWithPlaceholder2.getStatus());
+    ASSERT(expressionWithPlaceholder1.getValue()->equivalent(
+        expressionWithPlaceholder2.getValue().get()));
+}
+
 TEST(ExpressionWithPlaceholderTest, NotEquivalentIfPlaceholderDoesNotMatch) {
     constexpr auto collator = nullptr;
     auto rawFilter1 = fromjson("{i: {$type: 'array'}}");
@@ -212,6 +317,19 @@ TEST(ExpressionWithPlaceholderTest, NotEquivalentIfPlaceholderDoesNotMatch) {
     ASSERT_OK(expressionWithPlaceholder1.getStatus());
 
     auto rawFilter2 = fromjson("{j: {$type: 'array'}}");
+    auto expressionWithPlaceholder2 = ExpressionWithPlaceholder::parse(rawFilter2, collator);
+    ASSERT_OK(expressionWithPlaceholder2.getStatus());
+    ASSERT_FALSE(expressionWithPlaceholder1.getValue()->equivalent(
+        expressionWithPlaceholder2.getValue().get()));
+}
+
+TEST(ExpressionWithPlaceholder, NotEquivalentIfOnePlaceholderIsEmpty) {
+    constexpr auto collator = nullptr;
+    auto rawFilter1 = fromjson("{}");
+    auto expressionWithPlaceholder1 = ExpressionWithPlaceholder::parse(rawFilter1, collator);
+    ASSERT_OK(expressionWithPlaceholder1.getStatus());
+
+    auto rawFilter2 = fromjson("{i: 5}");
     auto expressionWithPlaceholder2 = ExpressionWithPlaceholder::parse(rawFilter2, collator);
     ASSERT_OK(expressionWithPlaceholder2.getStatus());
     ASSERT_FALSE(expressionWithPlaceholder1.getValue()->equivalent(

@@ -1585,14 +1585,13 @@ TEST(SerializeInternalSchema, ExpressionInternalSchemaCondSerializesCorrectly) {
 
 TEST(SerializeInternalSchema, ExpressionInternalSchemaMinPropertiesSerializesCorrectly) {
     boost::intrusive_ptr<ExpressionContextForTest> expCtx(new ExpressionContextForTest());
-    const CollatorInterface* collator = nullptr;
     Matcher original(fromjson("{$_internalSchemaMinProperties: 1}"),
-                     collator,
+                     kSimpleCollator,
                      expCtx,
                      ExtensionsCallbackNoop(),
                      MatchExpressionParser::kAllowAllSpecialFeatures);
     Matcher reserialized(serialize(original.getMatchExpression()),
-                         collator,
+                         kSimpleCollator,
                          expCtx,
                          ExtensionsCallbackNoop(),
                          MatchExpressionParser::kAllowAllSpecialFeatures);
@@ -1602,14 +1601,13 @@ TEST(SerializeInternalSchema, ExpressionInternalSchemaMinPropertiesSerializesCor
 
 TEST(SerializeInternalSchema, ExpressionInternalSchemaMaxPropertiesSerializesCorrectly) {
     boost::intrusive_ptr<ExpressionContextForTest> expCtx(new ExpressionContextForTest());
-    const CollatorInterface* collator = nullptr;
     Matcher original(fromjson("{$_internalSchemaMaxProperties: 1}"),
-                     collator,
+                     kSimpleCollator,
                      expCtx,
                      ExtensionsCallbackNoop(),
                      MatchExpressionParser::kAllowAllSpecialFeatures);
     Matcher reserialized(serialize(original.getMatchExpression()),
-                         collator,
+                         kSimpleCollator,
                          expCtx,
                          ExtensionsCallbackNoop(),
                          MatchExpressionParser::kAllowAllSpecialFeatures);
@@ -1643,15 +1641,14 @@ TEST(SerializeInternalSchema, ExpressionInternalSchemaFmodSerializesCorrectly) {
 
 TEST(SerializeInternalSchema, ExpressionInternalSchemaMatchArrayIndexSerializesCorrectly) {
     boost::intrusive_ptr<ExpressionContextForTest> expCtx(new ExpressionContextForTest());
-    constexpr CollatorInterface* collator = nullptr;
     Matcher original(fromjson("{a: {$_internalSchemaMatchArrayIndex:"
                               "{index: 2, namePlaceholder: 'i', expression: {i: {$lt: 3}}}}}"),
-                     collator,
+                     kSimpleCollator,
                      expCtx,
                      ExtensionsCallbackNoop(),
                      MatchExpressionParser::kAllowAllSpecialFeatures);
     Matcher reserialized(serialize(original.getMatchExpression()),
-                         collator,
+                         kSimpleCollator,
                          expCtx,
                          ExtensionsCallbackNoop(),
                          MatchExpressionParser::kAllowAllSpecialFeatures);
@@ -1662,19 +1659,54 @@ TEST(SerializeInternalSchema, ExpressionInternalSchemaMatchArrayIndexSerializesC
 }
 
 TEST(SerializeInternalSchema, ExpressionInternalSchemaAllowedPropertiesSerializesCorrectly) {
+    boost::intrusive_ptr<ExpressionContextForTest> expCtx(new ExpressionContextForTest());
     Matcher original(fromjson(R"({$_internalSchemaAllowedProperties: {
             properties: ['a'],
             otherwise: {i: {$gt: 10}},
             namePlaceholder: 'i',
             patternProperties: [{regex: /b/, expression: {i: {$type: 'number'}}}]
         }})"),
-                     kSimpleCollator);
-    Matcher reserialized(serialize(original.getMatchExpression()), kSimpleCollator);
+                     kSimpleCollator,
+                     expCtx,
+                     ExtensionsCallbackNoop(),
+                     MatchExpressionParser::kAllowAllSpecialFeatures);
+    Matcher reserialized(serialize(original.getMatchExpression()),
+                         kSimpleCollator,
+                         expCtx,
+                         ExtensionsCallbackNoop(),
+                         MatchExpressionParser::kAllowAllSpecialFeatures);
     ASSERT_BSONOBJ_EQ(*reserialized.getQuery(), fromjson(R"({$_internalSchemaAllowedProperties: {
             properties: ['a'],
             namePlaceholder: 'i',
             patternProperties: [{regex: /b/, expression: {i: {$type: ['number']}}}],
             otherwise: {i: {$gt: 10}}
+        }})"));
+    ASSERT_BSONOBJ_EQ(*reserialized.getQuery(), serialize(reserialized.getMatchExpression()));
+}
+
+TEST(SerializeInternalSchema,
+     ExpressionInternalSchemaAllowedPropertiesEmptyOtherwiseSerializesCorrectly) {
+    boost::intrusive_ptr<ExpressionContextForTest> expCtx(new ExpressionContextForTest());
+    Matcher original(fromjson(R"({$_internalSchemaAllowedProperties: {
+            properties: [],
+            otherwise: {},
+            namePlaceholder: 'i',
+            patternProperties: []
+        }})"),
+                     kSimpleCollator,
+                     expCtx,
+                     ExtensionsCallbackNoop(),
+                     MatchExpressionParser::kAllowAllSpecialFeatures);
+    Matcher reserialized(serialize(original.getMatchExpression()),
+                         kSimpleCollator,
+                         expCtx,
+                         ExtensionsCallbackNoop(),
+                         MatchExpressionParser::kAllowAllSpecialFeatures);
+    ASSERT_BSONOBJ_EQ(*reserialized.getQuery(), fromjson(R"({$_internalSchemaAllowedProperties: {
+            properties: [],
+            namePlaceholder: 'i',
+            patternProperties: [],
+            otherwise: {}
         }})"));
     ASSERT_BSONOBJ_EQ(*reserialized.getQuery(), serialize(reserialized.getMatchExpression()));
 }

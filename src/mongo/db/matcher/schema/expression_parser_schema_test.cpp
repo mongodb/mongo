@@ -768,12 +768,6 @@ TEST(MatchExpressionParserSchemaTest, AllowedPropertiesFailsParsingIfOtherwiseNo
         "patternProperties: [], otherwise: {i: {$invalid: 1}}}}}}");
     ASSERT_EQ(MatchExpressionParser::parse(query, kSimpleCollator).getStatus(),
               ErrorCodes::BadValue);
-
-    query = fromjson(
-        "{$_internalSchemaAllowedProperties:"
-        "{properties: [], namePlaceholder: 'i', patternProperties: [], otherwise: {}}}}}");
-    ASSERT_EQ(MatchExpressionParser::parse(query, kSimpleCollator).getStatus(),
-              ErrorCodes::FailedToParse);
 }
 
 TEST(MatchExpressionParserSchemaTest, AllowedPropertiesParsesSuccessfully) {
@@ -803,5 +797,16 @@ TEST(MatchExpressionParserSchemaTest, AllowedPropertiesAcceptsEmptyPropertiesAnd
 
     ASSERT_TRUE(allowedProperties.getValue()->matchesBSON(BSONObj()));
 }
+
+TEST(MatchExpressionParserSchemaTest, AllowedPropertiesAcceptsEmptyOtherwiseExpression) {
+    auto query = fromjson(
+        "{$_internalSchemaAllowedProperties:"
+        "{properties: [], namePlaceholder: 'i', patternProperties: [], otherwise: {}}}}}");
+    auto allowedProperties = MatchExpressionParser::parse(query, kSimpleCollator);
+    ASSERT_OK(allowedProperties.getStatus());
+
+    ASSERT_TRUE(allowedProperties.getValue()->matchesBSON(BSONObj()));
+}
+
 }  // namespace
 }  // namespace mongo

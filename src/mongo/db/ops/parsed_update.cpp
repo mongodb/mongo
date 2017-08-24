@@ -160,15 +160,20 @@ Status ParsedUpdate::parseArrayFilters() {
                                         << arrayFilterStatus.getStatus().reason());
         }
         auto arrayFilter = std::move(arrayFilterStatus.getValue());
-
-        if (_arrayFilters.find(arrayFilter->getPlaceholder()) != _arrayFilters.end()) {
+        auto fieldName = arrayFilter->getPlaceholder();
+        if (!fieldName) {
+            return Status(
+                ErrorCodes::FailedToParse,
+                "Cannot use an expression without a top-level field name in arrayFilters");
+        }
+        if (_arrayFilters.find(*fieldName) != _arrayFilters.end()) {
             return Status(ErrorCodes::FailedToParse,
                           str::stream()
                               << "Found multiple array filters with the same top-level field name "
-                              << arrayFilter->getPlaceholder());
+                              << *fieldName);
         }
 
-        _arrayFilters[arrayFilter->getPlaceholder()] = std::move(arrayFilter);
+        _arrayFilters[*fieldName] = std::move(arrayFilter);
     }
 
     return Status::OK();

@@ -1416,14 +1416,15 @@ StatusWith<std::unique_ptr<ExpressionWithPlaceholder>> parseExprWithPlaceholder(
         return result.getStatus();
     }
 
-    if (result.getValue()->getPlaceholder() != expectedPlaceholder) {
+    auto placeholder = result.getValue()->getPlaceholder();
+    if (placeholder && (*placeholder != expectedPlaceholder)) {
         return {ErrorCodes::FailedToParse,
                 str::stream() << expressionName << " expected a name placeholder of "
                               << expectedPlaceholder
                               << ", but '"
                               << exprWithPlaceholderElem.fieldName()
                               << "' has a mismatching placeholder '"
-                              << result.getValue()->getPlaceholder()
+                              << *placeholder
                               << "'"};
     }
     return result;

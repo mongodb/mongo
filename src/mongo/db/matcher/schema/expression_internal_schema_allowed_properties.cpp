@@ -99,7 +99,7 @@ bool InternalSchemaAllowedPropertiesMatchExpression::_matchesBSONObj(const BSONO
         for (auto&& constraint : _patternProperties) {
             if (constraint.first.regex->PartialMatch(property.fieldName())) {
                 checkOtherwise = false;
-                if (!constraint.second->getFilter()->matchesSingleElement(property)) {
+                if (!constraint.second->matchesBSONElement(property)) {
                     return false;
                 }
             }
@@ -110,7 +110,7 @@ bool InternalSchemaAllowedPropertiesMatchExpression::_matchesBSONObj(const BSONO
             checkOtherwise = false;
         }
 
-        if (checkOtherwise && !_otherwise->getFilter()->matchesSingleElement(property)) {
+        if (checkOtherwise && !_otherwise->matchesBSONElement(property)) {
             return false;
         }
     }
@@ -152,19 +152,14 @@ std::unique_ptr<MatchExpression> InternalSchemaAllowedPropertiesMatchExpression:
     clonedPatternProperties.reserve(_patternProperties.size());
     for (auto&& constraint : _patternProperties) {
         clonedPatternProperties.emplace_back(Pattern(constraint.first.rawRegex),
-                                             stdx::make_unique<ExpressionWithPlaceholder>(
-                                                 constraint.second->getPlaceholder().toString(),
-                                                 constraint.second->getFilter()->shallowClone()));
+                                             constraint.second->shallowClone());
     }
-
-    auto clonedOtherwise = stdx::make_unique<ExpressionWithPlaceholder>(
-        _otherwise->getPlaceholder().toString(), _otherwise->getFilter()->shallowClone());
 
     auto clone = stdx::make_unique<InternalSchemaAllowedPropertiesMatchExpression>();
     clone->init(_properties,
                 _namePlaceholder,
                 std::move(clonedPatternProperties),
-                std::move(clonedOtherwise));
+                _otherwise->shallowClone());
     return {std::move(clone)};
 }
 }  // namespace mongo

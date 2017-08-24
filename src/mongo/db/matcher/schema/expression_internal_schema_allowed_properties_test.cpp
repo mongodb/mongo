@@ -106,5 +106,13 @@ TEST(InternalSchemaAllowedPropertiesMatchExpression, EquivalentToClone) {
     ASSERT_OK(expr.getStatus());
     auto clone = expr.getValue()->shallowClone();
     ASSERT_TRUE(expr.getValue()->equivalent(clone.get()));
+
+    filter = fromjson(
+        "{$_internalSchemaAllowedProperties: {properties: [], namePlaceholder: 'i',"
+        "patternProperties: [], otherwise: {}}}");
+    expr = MatchExpressionParser::parse(filter, kSimpleCollator);
+    ASSERT_OK(expr.getStatus());
+    clone = expr.getValue()->shallowClone();
+    ASSERT_TRUE(expr.getValue()->equivalent(clone.get()));
 }
 }  // namespace mongo
