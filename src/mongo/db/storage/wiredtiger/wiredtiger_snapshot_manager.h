@@ -94,6 +94,8 @@ public:
 private:
     mutable stdx::mutex _mutex;  // Guards all members.
     boost::optional<SnapshotName> _committedSnapshot;
+    Timestamp _oldestKeptTimestamp;  // The timestamp communicated to WiredTiger before which no
+                                     // timestamp history is preserved.
     WT_SESSION* _session;
     WT_CONNECTION* _conn;
 };
