@@ -39,6 +39,7 @@
 #include "mongo/db/repl/scatter_gather_runner.h"
 #include "mongo/platform/unordered_set.h"
 #include "mongo/stdx/functional.h"
+#include "mongo/stdx/memory.h"
 
 namespace mongo {
 
@@ -124,7 +125,7 @@ public:
     unordered_set<HostAndPort> getResponders() const;
 
 private:
-    std::unique_ptr<Algorithm> _algorithm;
+    std::shared_ptr<Algorithm> _algorithm;
     std::unique_ptr<ScatterGatherRunner> _runner;
     bool _isCanceled = false;
 };

@@ -36,6 +36,7 @@
 #include "mongo/db/repl/repl_set_request_votes_args.h"
 #include "mongo/db/repl/scatter_gather_runner.h"
 #include "mongo/rpc/get_status_from_command_result.h"
+#include "mongo/stdx/memory.h"
 #include "mongo/util/log.h"
 
 namespace mongo {
@@ -170,9 +171,9 @@ StatusWith<executor::TaskExecutor::EventHandle> VoteRequester::start(
     bool dryRun,
     OpTime lastDurableOpTime,
     int primaryIndex) {
-    _algorithm.reset(
-        new Algorithm(rsConfig, candidateIndex, term, dryRun, lastDurableOpTime, primaryIndex));
-    _runner.reset(new ScatterGatherRunner(_algorithm.get(), executor));
+    _algorithm = std::make_shared<Algorithm>(
+        rsConfig, candidateIndex, term, dryRun, lastDurableOpTime, primaryIndex);
+    _runner = stdx::make_unique<ScatterGatherRunner>(_algorithm, executor);
     return _runner->start();
 }
 

@@ -148,7 +148,7 @@ public:
     long long getOriginalConfigVersion() const;
 
 private:
-    std::unique_ptr<Algorithm> _algorithm;
+    std::shared_ptr<Algorithm> _algorithm;
     std::unique_ptr<ScatterGatherRunner> _runner;
     long long _originalConfigVersion;
     bool _isCanceled;

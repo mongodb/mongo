@@ -282,14 +282,14 @@ bool QuorumChecker::hasReceivedSufficientResponses() const {
 Status checkQuorumGeneral(executor::TaskExecutor* executor,
                           const ReplSetConfig& rsConfig,
                           const int myIndex) {
-    QuorumChecker checker(&rsConfig, myIndex);
-    ScatterGatherRunner runner(&checker, executor);
+    auto checker = std::make_shared<QuorumChecker>(&rsConfig, myIndex);
+    ScatterGatherRunner runner(checker, executor);
     Status status = runner.run();
     if (!status.isOK()) {
         return status;
     }
 
-    return checker.getFinalStatus();
+    return checker->getFinalStatus();
 }
 
 Status checkQuorumForInitiate(executor::TaskExecutor* executor,

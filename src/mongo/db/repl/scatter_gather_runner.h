@@ -54,9 +54,10 @@ public:
     /**
      * Constructs a new runner whose underlying algorithm is "algorithm".
      *
-     * "algorithm" and "executor" must remain in scope until the runner's destructor completes.
+     * "executor" must remain in scope until the runner's destructor completes.
+     * "algorithm" is shared between the runner and the caller.
      */
-    explicit ScatterGatherRunner(ScatterGatherAlgorithm* algorithm,
+    explicit ScatterGatherRunner(std::shared_ptr<ScatterGatherAlgorithm> algorithm,
                                  executor::TaskExecutor* executor);
 
     /**
@@ -92,7 +93,8 @@ private:
      */
     class RunnerImpl {
     public:
-        explicit RunnerImpl(ScatterGatherAlgorithm* algorithm, executor::TaskExecutor* executor);
+        explicit RunnerImpl(std::shared_ptr<ScatterGatherAlgorithm> algorithm,
+                            executor::TaskExecutor* executor);
 
         /**
          * On success, returns an event handle that will be signaled when the runner has
@@ -121,8 +123,8 @@ private:
          */
         void _signalSufficientResponsesReceived();
 
-        executor::TaskExecutor* _executor;   // Not owned here.
-        ScatterGatherAlgorithm* _algorithm;  // Not owned here.
+        executor::TaskExecutor* _executor;  // Not owned here.
+        std::shared_ptr<ScatterGatherAlgorithm> _algorithm;
         executor::TaskExecutor::EventHandle _sufficientResponsesReceived;
         std::vector<executor::TaskExecutor::CallbackHandle> _callbacks;
         bool _started = false;

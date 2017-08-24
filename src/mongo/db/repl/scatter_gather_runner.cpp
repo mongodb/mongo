@@ -48,9 +48,9 @@ using EventHandle = executor::TaskExecutor::EventHandle;
 using RemoteCommandCallbackArgs = executor::TaskExecutor::RemoteCommandCallbackArgs;
 using RemoteCommandCallbackFn = executor::TaskExecutor::RemoteCommandCallbackFn;
 
-ScatterGatherRunner::ScatterGatherRunner(ScatterGatherAlgorithm* algorithm,
+ScatterGatherRunner::ScatterGatherRunner(std::shared_ptr<ScatterGatherAlgorithm> algorithm,
                                          executor::TaskExecutor* executor)
-    : _executor(executor), _impl(std::make_shared<RunnerImpl>(algorithm, executor)) {}
+    : _executor(executor), _impl(std::make_shared<RunnerImpl>(std::move(algorithm), executor)) {}
 
 Status ScatterGatherRunner::run() {
     auto finishEvh = start();
@@ -79,9 +79,9 @@ void ScatterGatherRunner::cancel() {
 /**
  * Scatter gather runner implementation.
  */
-ScatterGatherRunner::RunnerImpl::RunnerImpl(ScatterGatherAlgorithm* algorithm,
+ScatterGatherRunner::RunnerImpl::RunnerImpl(std::shared_ptr<ScatterGatherAlgorithm> algorithm,
                                             executor::TaskExecutor* executor)
-    : _executor(executor), _algorithm(algorithm) {}
+    : _executor(executor), _algorithm(std::move(algorithm)) {}
 
 StatusWith<EventHandle> ScatterGatherRunner::RunnerImpl::start(
     const RemoteCommandCallbackFn processResponseCB) {

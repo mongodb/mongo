@@ -35,6 +35,7 @@
 #include "mongo/base/status.h"
 #include "mongo/db/repl/repl_set_config.h"
 #include "mongo/db/repl/scatter_gather_runner.h"
+#include "mongo/stdx/memory.h"
 #include "mongo/util/log.h"
 
 namespace mongo {
@@ -132,8 +133,8 @@ StatusWith<executor::TaskExecutor::EventHandle> ElectCmdRunner::start(
     const ReplSetConfig& currentConfig,
     int selfIndex,
     const std::vector<HostAndPort>& targets) {
-    _algorithm.reset(new Algorithm(currentConfig, selfIndex, targets, OID::gen()));
-    _runner.reset(new ScatterGatherRunner(_algorithm.get(), executor));
+    _algorithm = std::make_shared<Algorithm>(currentConfig, selfIndex, targets, OID::gen());
+    _runner = stdx::make_unique<ScatterGatherRunner>(_algorithm, executor);
     return _runner->start();
 }
 

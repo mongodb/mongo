@@ -37,6 +37,7 @@
 #include "mongo/db/repl/repl_set_config.h"
 #include "mongo/db/repl/scatter_gather_runner.h"
 #include "mongo/rpc/get_status_from_command_result.h"
+#include "mongo/stdx/memory.h"
 #include "mongo/util/log.h"
 #include "mongo/util/scopeguard.h"
 #include "mongo/util/time_support.h"
@@ -215,8 +216,8 @@ StatusWith<executor::TaskExecutor::EventHandle> FreshnessChecker::start(
     int selfIndex,
     const std::vector<HostAndPort>& targets) {
     _originalConfigVersion = currentConfig.getConfigVersion();
-    _algorithm.reset(new Algorithm(lastOpTimeApplied, currentConfig, selfIndex, targets));
-    _runner.reset(new ScatterGatherRunner(_algorithm.get(), executor));
+    _algorithm = std::make_shared<Algorithm>(lastOpTimeApplied, currentConfig, selfIndex, targets);
+    _runner = stdx::make_unique<ScatterGatherRunner>(_algorithm, executor);
     return _runner->start();
 }
 
