@@ -136,68 +136,6 @@ __session_clear(WT_SESSION_IMPL *session)
 }
 
 /*
- * __session_alter --
- *	Alter a table setting.
- */
-static int
-__session_alter(WT_SESSION *wt_session, const char *uri, const char *config)
-{
-	WT_DECL_RET;
-	WT_SESSION_IMPL *session;
-
-	session = (WT_SESSION_IMPL *)wt_session;
-
-	SESSION_API_CALL(session, alter, config, cfg);
-
-	/* In-memory ignores alter operations. */
-	if (F_ISSET(S2C(session), WT_CONN_IN_MEMORY))
-		goto err;
-
-	/* Disallow objects in the WiredTiger name space. */
-	WT_ERR(__wt_str_name_check(session, uri));
-
-	/*
-	 * We replace the default configuration listing with the current
-	 * configuration.  Otherwise the defaults for values that can be
-	 * altered would override settings used by the user in create.
-	 */
-	cfg[0] = cfg[1];
-	cfg[1] = NULL;
-	WT_WITH_CHECKPOINT_LOCK(session,
-	    WT_WITH_SCHEMA_LOCK(session,
-		ret = __wt_schema_worker(session, uri, __wt_alter, NULL, cfg,
-		WT_BTREE_ALTER | WT_DHANDLE_EXCLUSIVE)));
-
-err:	if (ret != 0)
-		WT_STAT_CONN_INCR(session, session_table_alter_fail);
-	else
-		WT_STAT_CONN_INCR(session, session_table_alter_success);
-	API_END_RET_NOTFOUND_MAP(session, ret);
-}
-
-/*
- * __session_alter_readonly --
- *	WT_SESSION->alter method; readonly version.
- */
-static int
-__session_alter_readonly(
-    WT_SESSION *wt_session, const char *uri, const char *config)
-{
-	WT_DECL_RET;
-	WT_SESSION_IMPL *session;
-
-	WT_UNUSED(uri);
-	WT_UNUSED(config);
-
-	session = (WT_SESSION_IMPL *)wt_session;
-	SESSION_API_CALL_NOCONF(session, alter);
-
-	WT_STAT_CONN_INCR(session, session_table_alter_fail);
-	ret = __wt_session_notsup(session);
-err:	API_END_RET(session, ret);
-}
-
-/*
  * __session_close --
  *	WT_SESSION->close method.
  */
@@ -521,6 +459,68 @@ err:		if (cursor != NULL)
 		ret = WT_NOTFOUND;
 
 	API_END_RET_NOTFOUND_MAP(session, ret);
+}
+
+/*
+ * __session_alter --
+ *	Alter a table setting.
+ */
+static int
+__session_alter(WT_SESSION *wt_session, const char *uri, const char *config)
+{
+	WT_DECL_RET;
+	WT_SESSION_IMPL *session;
+
+	session = (WT_SESSION_IMPL *)wt_session;
+
+	SESSION_API_CALL(session, alter, config, cfg);
+
+	/* In-memory ignores alter operations. */
+	if (F_ISSET(S2C(session), WT_CONN_IN_MEMORY))
+		goto err;
+
+	/* Disallow objects in the WiredTiger name space. */
+	WT_ERR(__wt_str_name_check(session, uri));
+
+	/*
+	 * We replace the default configuration listing with the current
+	 * configuration.  Otherwise the defaults for values that can be
+	 * altered would override settings used by the user in create.
+	 */
+	cfg[0] = cfg[1];
+	cfg[1] = NULL;
+	WT_WITH_CHECKPOINT_LOCK(session,
+	    WT_WITH_SCHEMA_LOCK(session,
+		ret = __wt_schema_worker(session, uri, __wt_alter, NULL, cfg,
+		WT_BTREE_ALTER | WT_DHANDLE_EXCLUSIVE)));
+
+err:	if (ret != 0)
+		WT_STAT_CONN_INCR(session, session_table_alter_fail);
+	else
+		WT_STAT_CONN_INCR(session, session_table_alter_success);
+	API_END_RET_NOTFOUND_MAP(session, ret);
+}
+
+/*
+ * __session_alter_readonly --
+ *	WT_SESSION->alter method; readonly version.
+ */
+static int
+__session_alter_readonly(
+    WT_SESSION *wt_session, const char *uri, const char *config)
+{
+	WT_DECL_RET;
+	WT_SESSION_IMPL *session;
+
+	WT_UNUSED(uri);
+	WT_UNUSED(config);
+
+	session = (WT_SESSION_IMPL *)wt_session;
+	SESSION_API_CALL_NOCONF(session, alter);
+
+	WT_STAT_CONN_INCR(session, session_table_alter_fail);
+	ret = __wt_session_notsup(session);
+err:	API_END_RET(session, ret);
 }
 
 /*
@@ -1768,11 +1768,11 @@ __open_session(WT_CONNECTION_IMPL *conn,
 	static const WT_SESSION stds = {
 		NULL,
 		NULL,
-		__session_alter,
 		__session_close,
 		__session_reconfigure,
 		__wt_session_strerror,
 		__session_open_cursor,
+		__session_alter,
 		__session_create,
 		__wt_session_compact,
 		__session_drop,
@@ -1797,11 +1797,11 @@ __open_session(WT_CONNECTION_IMPL *conn,
 	}, stds_readonly = {
 		NULL,
 		NULL,
-		__session_alter_readonly,
 		__session_close,
 		__session_reconfigure,
 		__wt_session_strerror,
 		__session_open_cursor,
+		__session_alter_readonly,
 		__session_create_readonly,
 		__wt_session_compact_readonly,
 		__session_drop_readonly,

@@ -1125,8 +1125,7 @@ methods = {
 
 'WT_SESSION.timestamp_transaction' : Method([
     Config('commit_timestamp', '', r'''
-        set the commit timestamp for the current transaction.  It is an error
-        to set the commit timestamp on a transaction that is not running, see
+        set the commit timestamp for the current transaction, see
         @ref transaction_timestamps'''),
 ]),
 
