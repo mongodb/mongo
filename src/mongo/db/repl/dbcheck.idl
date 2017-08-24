@@ -90,6 +90,9 @@ structs:
       maxKey:
         type: _id_key
         cpp_name: maxKey
+      maxRate:
+        type: safeInt64
+        optional: true
 
   DbCheckOplogCollection:
     description: "Oplog entry for dbCheck collection metadata"

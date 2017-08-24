@@ -58,6 +58,7 @@ struct DbCheckCollectionInfo {
     BSONKey end;
     int64_t maxCount;
     int64_t maxSize;
+    int64_t maxRate;
 };
 
 /**
@@ -77,7 +78,8 @@ std::unique_ptr<DbCheckRun> singleCollectionRun(OperationContext* opCtx,
     auto end = invocation.getMaxKey();
     auto maxCount = invocation.getMaxCount();
     auto maxSize = invocation.getMaxSize();
-    auto info = DbCheckCollectionInfo{nss, start, end, maxCount, maxSize};
+    auto maxRate = invocation.getMaxCountPerSecond();
+    auto info = DbCheckCollectionInfo{nss, start, end, maxCount, maxSize, maxRate};
     auto result = stdx::make_unique<DbCheckRun>();
     result->push_back(info);
     return result;
@@ -94,9 +96,10 @@ std::unique_ptr<DbCheckRun> fullDatabaseRun(OperationContext* opCtx,
     uassert(ErrorCodes::NamespaceNotFound, "Database " + dbName + " not found", agd.getDb());
 
     int64_t max = std::numeric_limits<int64_t>::max();
+    auto rate = invocation.getMaxCountPerSecond();
 
     for (Collection* coll : *db) {
-        DbCheckCollectionInfo info{coll->ns(), BSONKey::min(), BSONKey::max(), max, max};
+        DbCheckCollectionInfo info{coll->ns(), BSONKey::min(), BSONKey::max(), max, max, rate};
         result->push_back(info);
     }
 
@@ -178,7 +181,20 @@ private:
         int64_t totalBytesSeen = 0;
         int64_t totalDocsSeen = 0;
 
+        // Limit the rate of the check.
+        using Clock = stdx::chrono::system_clock;
+        using TimePoint = stdx::chrono::time_point<Clock>;
+        TimePoint lastStart = Clock::now();
+        int64_t docsInCurrentInterval = 0;
+
         do {
+            using namespace std::literals::chrono_literals;
+
+            if (Clock::now() - lastStart > 1s) {
+                lastStart = Clock::now();
+                docsInCurrentInterval = 0;
+            }
+
             auto result = _runBatch(info, start, kBatchDocs, kBatchBytes);
 
             if (_done) {
@@ -212,12 +228,21 @@ private:
             // Update our running totals.
             totalDocsSeen += stats.nDocs;
             totalBytesSeen += stats.nBytes;
+            docsInCurrentInterval += stats.nDocs;
 
             // Check if we've exceeded any limits.
             bool reachedLast = stats.lastKey >= info.end;
             bool tooManyDocs = totalDocsSeen >= info.maxCount;
             bool tooManyBytes = totalBytesSeen >= info.maxSize;
             reachedEnd = reachedLast || tooManyDocs || tooManyBytes;
+
+            if (docsInCurrentInterval > info.maxRate && info.maxRate > 0) {
+                // If an extremely low max rate has been set (substantially smaller than the batch
+                // size) we might want to sleep for multiple seconds between batches.
+                int64_t timesExceeded = docsInCurrentInterval / info.maxRate;
+
+                stdx::this_thread::sleep_for(timesExceeded * 1s - (Clock::now() - lastStart));
+            }
         } while (!reachedEnd);
     }
 
