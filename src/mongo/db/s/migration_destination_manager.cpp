@@ -244,10 +244,10 @@ void MigrationDestinationManager::setStateFailWarn(std::string msg) {
 
 bool MigrationDestinationManager::isActive() const {
     stdx::lock_guard<stdx::mutex> lk(_mutex);
-    return _isActive(lk);
+    return _isActive_inlock();
 }
 
-bool MigrationDestinationManager::_isActive(WithLock) const {
+bool MigrationDestinationManager::_isActive_inlock() const {
     return _sessionId.is_initialized();
 }
 
@@ -283,7 +283,7 @@ void MigrationDestinationManager::report(BSONObjBuilder& b) {
 
 BSONObj MigrationDestinationManager::getMigrationStatusReport() {
     stdx::lock_guard<stdx::mutex> lk(_mutex);
-    if (_isActive(lk)) {
+    if (_isActive_inlock()) {
         return migrationutil::makeMigrationStatusDocument(
             _nss, _fromShard, _toShard, false, _min, _max);
     } else {

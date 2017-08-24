@@ -399,7 +399,7 @@ void MigrationManager::interruptAndDisableMigrations() {
         }
     }
 
-    _checkDrained(lock);
+    _checkDrained_inlock();
 }
 
 void MigrationManager::drainActiveMigrations() {
@@ -470,15 +470,14 @@ shared_ptr<Notification<RemoteCommandResponse>> MigrationManager::_schedule(
 
     auto retVal = migration.completionNotification;
 
-    _schedule(lock, opCtx, fromHostStatus.getValue(), std::move(migration));
+    _schedule_inlock(opCtx, fromHostStatus.getValue(), std::move(migration));
 
     return retVal;
 }
 
-void MigrationManager::_schedule(WithLock lock,
-                                 OperationContext* opCtx,
-                                 const HostAndPort& targetHost,
-                                 Migration migration) {
+void MigrationManager::_schedule_inlock(OperationContext* opCtx,
+                                        const HostAndPort& targetHost,
+                                        Migration migration) {
     executor::TaskExecutor* const executor =
         Grid::get(opCtx)->getExecutorPool()->getFixedExecutor();
 
@@ -527,7 +526,7 @@ void MigrationManager::_schedule(WithLock lock,
                 auto opCtx = cc().makeOperationContext();
 
                 stdx::lock_guard<stdx::mutex> lock(_mutex);
-                _complete(lock, opCtx.get(), itMigration, args.response);
+                _complete_inlock(opCtx.get(), itMigration, args.response);
             });
 
     if (callbackHandleWithStatus.isOK()) {
@@ -535,13 +534,12 @@ void MigrationManager::_schedule(WithLock lock,
         return;
     }
 
-    _complete(lock, opCtx, itMigration, std::move(callbackHandleWithStatus.getStatus()));
+    _complete_inlock(opCtx, itMigration, std::move(callbackHandleWithStatus.getStatus()));
 }
 
-void MigrationManager::_complete(WithLock lock,
-                                 OperationContext* opCtx,
-                                 MigrationsList::iterator itMigration,
-                                 const RemoteCommandResponse& remoteCommandResponse) {
+void MigrationManager::_complete_inlock(OperationContext* opCtx,
+                                        MigrationsList::iterator itMigration,
+                                        const RemoteCommandResponse& remoteCommandResponse) {
     const NamespaceString nss(itMigration->nss);
 
     // Make sure to signal the notification last, after the distributed lock is freed, so that we
@@ -559,13 +557,13 @@ void MigrationManager::_complete(WithLock lock,
         Grid::get(opCtx)->catalogClient()->getDistLockManager()->unlock(
             opCtx, _lockSessionID, nss.ns());
         _activeMigrations.erase(it);
-        _checkDrained(lock);
+        _checkDrained_inlock();
     }
 
     notificationToSignal->set(remoteCommandResponse);
 }
 
-void MigrationManager::_checkDrained(WithLock) {
+void MigrationManager::_checkDrained_inlock() {
     if (_state == State::kEnabled || _state == State::kRecovering) {
         return;
     }

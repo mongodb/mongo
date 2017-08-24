@@ -43,7 +43,6 @@
 #include "mongo/stdx/condition_variable.h"
 #include "mongo/stdx/mutex.h"
 #include "mongo/stdx/thread.h"
-#include "mongo/util/concurrency/with_lock.h"
 #include "mongo/util/timer.h"
 
 namespace mongo {
@@ -175,8 +174,10 @@ private:
     /**
      * Checks whether the MigrationDestinationManager is currently handling a migration by checking
      * that the migration "_sessionId" is initialized.
+     *
+     * Expects the caller to have the class _mutex locked!
      */
-    bool _isActive(WithLock) const;
+    bool _isActive_inlock() const;
 
     // Mutex to guard all fields
     mutable stdx::mutex _mutex;
