@@ -35,7 +35,7 @@
 namespace mongo {
 
 /**
- * WithLock is an attestation to pass as an argument to functions that must be called only while
+ * WithLock is an attestion to pass as an argument to functions that must be called only while
  * holding a lock, as a rigorous alternative to an unchecked naming convention and/or stern
  * comments.  It helps prevent a common usage error.
  *
