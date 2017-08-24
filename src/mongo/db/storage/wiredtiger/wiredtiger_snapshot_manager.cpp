@@ -61,15 +61,6 @@ void WiredTigerSnapshotManager::setCommittedSnapshot(const SnapshotName& name, T
 
     invariant(!_committedSnapshot || *_committedSnapshot <= name);
     _committedSnapshot = name;
-
-    char oldestTSConfigString["oldest_timestamp="_sd.size() + (8 * 2) /* 16 hexadecimal digits */ +
-                              1 /* trailing null */];
-    auto size = std::snprintf(
-        oldestTSConfigString, sizeof(oldestTSConfigString), "oldest_timestamp=%llx", ts.asULL());
-    invariant(static_cast<std::size_t>(size) < sizeof(oldestTSConfigString));
-    invariantWTOK(_conn->set_timestamp(_conn, oldestTSConfigString));
-    _oldestKeptTimestamp = ts;
-    LOG(2) << "oldest_timestamp set to " << oldestTSConfigString;
 }
 
 void WiredTigerSnapshotManager::cleanupUnneededSnapshots() {
@@ -121,21 +112,26 @@ SnapshotName WiredTigerSnapshotManager::beginTransactionOnCommittedSnapshot(
 
 void WiredTigerSnapshotManager::beginTransactionOnOplog(WiredTigerOplogManager* oplogManager,
                                                         WT_SESSION* session) const {
-    auto allCommittedTimestamp = oplogManager->getOplogReadTimestamp();
-    stdx::lock_guard<stdx::mutex> lock(_mutex);
+    size_t retries = 1000;
+    int status;
+    do {
+        stdx::lock_guard<stdx::mutex> lock(_mutex);
+        auto allCommittedTimestamp = oplogManager->getOplogReadTimestamp();
+        char readTSConfigString[15 /* read_timestamp= */ + (8 * 2) /* 16 hexadecimal digits */ +
+                                1 /* trailing null */];
+        auto size = std::snprintf(readTSConfigString,
+                                  sizeof(readTSConfigString),
+                                  "read_timestamp=%llx",
+                                  static_cast<unsigned long long>(allCommittedTimestamp));
+        invariant(static_cast<std::size_t>(size) < sizeof(readTSConfigString));
 
-    // Choose a read timestamp that is >= oldest_timestamp, but <= all_committed.
-    // Using "unsigned long long" here to ensure that the snprintf works with %llx on all
-    // platforms.
-    unsigned long long readTimestamp =
-        std::max<std::uint64_t>(allCommittedTimestamp, _oldestKeptTimestamp.asULL());
+        status = session->begin_transaction(session, readTSConfigString);
 
-    char readTSConfigString[15 /* read_timestamp= */ + (8 * 2) /* 16 hexadecimal digits */ +
-                            1 /* trailing null */];
-    auto size = std::snprintf(
-        readTSConfigString, sizeof(readTSConfigString), "read_timestamp=%llx", readTimestamp);
-    invariant(static_cast<std::size_t>(size) < sizeof(readTSConfigString));
-    invariantWTOK(session->begin_transaction(session, readTSConfigString));
+        // If begin_transaction returns EINVAL, we will assume it is due to the oldest_timestamp
+        // racing ahead of the read_timestamp.  Rather than synchronizing for this rare case,
+        // we will retry a number of times before giving up.
+    } while (status == EINVAL && --retries > 0);
+    invariantWTOK(status);
 }
 
 }  // namespace mongo

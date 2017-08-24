@@ -236,14 +236,16 @@ private:
     std::string _uri(StringData ident) const;
     bool _drop(StringData ident);
 
+    void _setOldestTimestamp(SnapshotName oldestTimestamp);
+
     WT_CONNECTION* _conn;
     WT_EVENT_HANDLER _eventHandler;
     std::unique_ptr<WiredTigerSessionCache> _sessionCache;
 
-    // Mutex used to protect use of _oplogManager and _oplogManagerCount by this instance of KV
+    // Mutex to protect use of _oplogManager and _oplogManagerCount by this instance of KV
     // engine.
-    // Other uses by the record store are managed by itself and do not need to lock, other
-    // than at shutdown (delete).
+    // Uses of _oplogManager by the oplog record stores themselves are safe without locking, since
+    // those record stores manage the oplogManager lifetime.
     mutable stdx::mutex _oplogManagerMutex;
     std::unique_ptr<WiredTigerOplogManager> _oplogManager;
     std::size_t _oplogManagerCount = 0;
