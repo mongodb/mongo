@@ -2292,5 +2292,67 @@ TEST(JSONSchemaParserTest, AdditionalItemsGeneratesEmptyExpressionIfItemsAnObjec
         }]
     }]})"));
 }
+
+TEST(JSONSchemaParserTest, FailsToParseIfEnumIsNotAnArray) {
+    BSONObj schema = fromjson("{properties: {foo: {enum: 'foo'}}}");
+    auto result = JSONSchemaParser::parse(schema);
+    ASSERT_EQ(result.getStatus(), ErrorCodes::TypeMismatch);
+}
+
+TEST(JSONSchemaParserTest, FailsToParseEnumIfArrayIsEmpty) {
+    BSONObj schema = fromjson("{properties: {foo: {enum: []}}}");
+    auto result = JSONSchemaParser::parse(schema);
+    ASSERT_EQ(result.getStatus(), ErrorCodes::FailedToParse);
+}
+
+TEST(JSONSchemaParserTest, FailsToParseEnumIfArrayContainsDuplicateValue) {
+    BSONObj schema = fromjson("{properties: {foo: {enum: [1, 2, 1]}}}");
+    auto result = JSONSchemaParser::parse(schema);
+    ASSERT_EQ(result.getStatus(), ErrorCodes::FailedToParse);
+
+    schema = fromjson("{properties: {foo: {enum: [{a: 1, b: 1}, {b: 1, a: 1}]}}}");
+    result = JSONSchemaParser::parse(schema);
+    ASSERT_EQ(result.getStatus(), ErrorCodes::FailedToParse);
+}
+
+TEST(JSONSchemaParserTest, EnumTranslatesCorrectly) {
+    BSONObj schema = fromjson("{properties: {foo: {enum: [1, '2', [3]]}}}");
+    auto result = JSONSchemaParser::parse(schema);
+    ASSERT_OK(result.getStatus());
+    ASSERT_SERIALIZES_TO(result.getValue().get(), fromjson(R"({
+        $and: [{
+            $and: [{
+                $or: [
+                    {$nor: [{foo: {$exists: true}}]},
+                    {
+                      $and: [{
+                          $or: [
+                              {foo: {$_internalSchemaEq: 1}},
+                              {foo: {$_internalSchemaEq: "2"}},
+                              {foo: {$_internalSchemaEq: [3]}}
+                          ]
+                      }]
+                    }
+                ]
+            }]
+        }]
+    })"));
+}
+
+TEST(JSONSchemaParserTest, TopLevelEnumTranslatesCorrectly) {
+    BSONObj schema = fromjson("{enum: [1, {foo: 1}]}}}");
+    auto result = JSONSchemaParser::parse(schema);
+    ASSERT_OK(result.getStatus());
+    ASSERT_SERIALIZES_TO(result.getValue().get(),
+                         fromjson("{$and: [{$or: [{$_internalSchemaRootDocEq: {foo: 1}}]}]}"));
+}
+
+TEST(JSONSchemaParserTest, TopLevelEnumWithZeroObjectsTranslatesCorrectly) {
+    BSONObj schema = fromjson("{enum: [1, 'impossible', true]}}}");
+    auto result = JSONSchemaParser::parse(schema);
+    ASSERT_OK(result.getStatus());
+    ASSERT_SERIALIZES_TO(result.getValue().get(), fromjson("{$and: [{$alwaysFalse: 1}]}"));
+}
+
 }  // namespace
 }  // namespace mongo

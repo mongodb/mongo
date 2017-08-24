@@ -42,7 +42,49 @@
 #include "mongo/util/stringutils.h"
 
 namespace mongo {
+
+namespace {
+
+template <class ObjectIterator>
+int compareObjects(const BSONObj& firstObj,
+                   const BSONObj& secondObj,
+                   const BSONObj& idxKey,
+                   BSONObj::ComparisonRulesSet rules,
+                   const StringData::ComparatorInterface* comparator) {
+    if (firstObj.isEmpty())
+        return secondObj.isEmpty() ? 0 : -1;
+    if (secondObj.isEmpty())
+        return 1;
+
+    ObjectIterator firstIter(firstObj);
+    ObjectIterator secondIter(secondObj);
+    ObjectIterator idxKeyIter(idxKey);
+
+    while (true) {
+        BSONElement l = firstIter.next();
+        BSONElement r = secondIter.next();
+
+        if (l.eoo())
+            return r.eoo() ? 0 : -1;
+        if (r.eoo())
+            return 1;
+
+        auto x = l.woCompare(r, rules, comparator);
+
+        if (idxKeyIter.more() && idxKeyIter.next().number() < 0)
+            x = -x;
+
+        if (x != 0)
+            return x;
+    }
+
+    MONGO_UNREACHABLE;
+}
+
+}  // namespace
+
 using namespace std;
+
 /* BSONObj ------------------------------------------------------------*/
 
 void BSONObj::_assertInvalid() const {
@@ -104,7 +146,7 @@ bool BSONObj::valid(BSONVersion version) const {
 
 int BSONObj::woCompare(const BSONObj& r,
                        const Ordering& o,
-                       bool considerFieldName,
+                       ComparisonRulesSet rules,
                        const StringData::ComparatorInterface* comparator) const {
     if (isEmpty())
         return r.isEmpty() ? 0 : -1;
@@ -126,7 +168,7 @@ int BSONObj::woCompare(const BSONObj& r,
 
         int x;
         {
-            x = l.woCompare(r, considerFieldName, comparator);
+            x = l.woCompare(r, rules, comparator);
             if (o.descending(mask))
                 x = -x;
         }
@@ -140,47 +182,11 @@ int BSONObj::woCompare(const BSONObj& r,
 /* well ordered compare */
 int BSONObj::woCompare(const BSONObj& r,
                        const BSONObj& idxKey,
-                       bool considerFieldName,
+                       ComparisonRulesSet rules,
                        const StringData::ComparatorInterface* comparator) const {
-    if (isEmpty())
-        return r.isEmpty() ? 0 : -1;
-    if (r.isEmpty())
-        return 1;
-
-    bool ordered = !idxKey.isEmpty();
-
-    BSONObjIterator i(*this);
-    BSONObjIterator j(r);
-    BSONObjIterator k(idxKey);
-    while (1) {
-        // so far, equal...
-
-        BSONElement l = i.next();
-        BSONElement r = j.next();
-        BSONElement o;
-        if (ordered)
-            o = k.next();
-        if (l.eoo())
-            return r.eoo() ? 0 : -1;
-        if (r.eoo())
-            return 1;
-
-        int x;
-        /*
-                    if( ordered && o.type() == String && strcmp(o.valuestr(), "ascii-proto") == 0 &&
-                        l.type() == String && r.type() == String ) {
-                        // note: no negative support yet, as this is just sort of a POC
-                        x = _stricmp(l.valuestr(), r.valuestr());
-                    }
-                    else*/ {
-            x = l.woCompare(r, considerFieldName, comparator);
-            if (ordered && o.number() < 0)
-                x = -x;
-        }
-        if (x != 0)
-            return x;
-    }
-    return -1;
+    return (rules & ComparisonRules::kIgnoreFieldOrder)
+        ? compareObjects<BSONObjIteratorSorted>(*this, r, idxKey, rules, comparator)
+        : compareObjects<BSONObjIterator>(*this, r, idxKey, rules, comparator);
 }
 
 bool BSONObj::isPrefixOf(const BSONObj& otherObj,

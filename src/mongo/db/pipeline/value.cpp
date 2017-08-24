@@ -648,7 +648,7 @@ inline static int cmp(const T& left, const T& right) {
 int Value::compare(const Value& rL,
                    const Value& rR,
                    const StringData::ComparatorInterface* stringComparator) {
-    // Note, this function needs to behave identically to BSON's compareElementValues().
+    // Note, this function needs to behave identically to BSONElement::compareElements().
     // Additionally, any changes here must be replicated in hash_combine().
     BSONType lType = rL.getType();
     BSONType rType = rR.getType();
@@ -660,7 +660,8 @@ int Value::compare(const Value& rL,
         return ret;
 
     switch (lType) {
-        // Order of types is the same as in compareElementValues() to make it easier to verify
+        // Order of types is the same as in BSONElement::compareElements() to make it easier to
+        // verify.
 
         // These are valueless types
         case EOO:
@@ -802,7 +803,9 @@ int Value::compare(const Value& rL,
             return rL.getStringData().compare(rR.getStringData());
         }
 
-        case RegEx:  // same as String in this impl but keeping order same as compareElementValues
+        case RegEx:
+            // same as String in this impl but keeping order same as
+            // BSONElement::compareElements().
             return rL.getStringData().compare(rR.getStringData());
 
         case CodeWScope: {
@@ -826,7 +829,7 @@ void Value::hash_combine(size_t& seed,
     boost::hash_combine(seed, canonicalizeBSONType(type));
 
     switch (type) {
-        // Order of types is the same as in Value::compare() and compareElementValues().
+        // Order of types is the same as in Value::compare() and BSONElement::compareElements().
 
         // These are valueless types
         case EOO:

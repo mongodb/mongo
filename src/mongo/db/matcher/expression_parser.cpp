@@ -50,6 +50,7 @@
 #include "mongo/db/matcher/schema/expression_internal_schema_all_elem_match_from_index.h"
 #include "mongo/db/matcher/schema/expression_internal_schema_allowed_properties.h"
 #include "mongo/db/matcher/schema/expression_internal_schema_cond.h"
+#include "mongo/db/matcher/schema/expression_internal_schema_eq.h"
 #include "mongo/db/matcher/schema/expression_internal_schema_fmod.h"
 #include "mongo/db/matcher/schema/expression_internal_schema_match_array_index.h"
 #include "mongo/db/matcher/schema/expression_internal_schema_max_items.h"
@@ -59,6 +60,7 @@
 #include "mongo/db/matcher/schema/expression_internal_schema_min_length.h"
 #include "mongo/db/matcher/schema/expression_internal_schema_min_properties.h"
 #include "mongo/db/matcher/schema/expression_internal_schema_object_match.h"
+#include "mongo/db/matcher/schema/expression_internal_schema_root_doc_eq.h"
 #include "mongo/db/matcher/schema/expression_internal_schema_unique_items.h"
 #include "mongo/db/matcher/schema/expression_internal_schema_xor.h"
 #include "mongo/db/matcher/schema/json_schema_parser.h"
@@ -458,6 +460,15 @@ StatusWithMatchExpression MatchExpressionParser::_parseSubField(
         case PathAcceptingKeyword::INTERNAL_SCHEMA_TYPE: {
             return _parseType<InternalSchemaTypeExpression>(name, e);
         }
+
+        case PathAcceptingKeyword::INTERNAL_SCHEMA_EQ: {
+            auto eqExpr = stdx::make_unique<InternalSchemaEqMatchExpression>();
+            auto status = eqExpr->init(name, e);
+            if (!status.isOK()) {
+                return status;
+            }
+            return {std::move(eqExpr)};
+        }
     }
 
     return {Status(ErrorCodes::BadValue,
@@ -639,6 +650,22 @@ StatusWithMatchExpression MatchExpressionParser::_parse(
 
                 auto alwaysTrueExpr = stdx::make_unique<AlwaysTrueMatchExpression>();
                 root->add(alwaysTrueExpr.release());
+            } else if (mongoutils::str::equals("_internalSchemaRootDocEq", rest)) {
+                if (!topLevel) {
+                    return {Status(ErrorCodes::FailedToParse,
+                                   str::stream() << InternalSchemaRootDocEqMatchExpression::kName
+                                                 << " must be at the top level")};
+                }
+
+                if (e.type() != BSONType::Object) {
+                    return {Status(ErrorCodes::TypeMismatch,
+                                   str::stream() << InternalSchemaRootDocEqMatchExpression::kName
+                                                 << " must be an object, found type "
+                                                 << e.type())};
+                }
+                auto rootDocEq = stdx::make_unique<InternalSchemaRootDocEqMatchExpression>();
+                rootDocEq->init(e.embeddedObject());
+                root->add(rootDocEq.release());
             } else {
                 return {Status(ErrorCodes::BadValue,
                                mongoutils::str::stream() << "unknown top level operator: "
@@ -1704,11 +1731,11 @@ MONGO_INITIALIZER(MatchExpressionParser)(InitializerContext* context) {
             // TODO: SERVER-19565 Add $eq after auditing callers.
             {"_internalSchemaAllElemMatchFromIndex",
              PathAcceptingKeyword::INTERNAL_SCHEMA_ALL_ELEM_MATCH_FROM_INDEX},
+            {"_internalSchemaEq", PathAcceptingKeyword::INTERNAL_SCHEMA_EQ},
             {"_internalSchemaFmod", PathAcceptingKeyword::INTERNAL_SCHEMA_FMOD},
             {"_internalSchemaMatchArrayIndex",
              PathAcceptingKeyword::INTERNAL_SCHEMA_MATCH_ARRAY_INDEX},
             {"_internalSchemaMaxItems", PathAcceptingKeyword::INTERNAL_SCHEMA_MAX_ITEMS},
-            {"_internalSchemaMaxLength", PathAcceptingKeyword::INTERNAL_SCHEMA_MAX_LENGTH},
             {"_internalSchemaMaxLength", PathAcceptingKeyword::INTERNAL_SCHEMA_MAX_LENGTH},
             {"_internalSchemaMinItems", PathAcceptingKeyword::INTERNAL_SCHEMA_MIN_ITEMS},
             {"_internalSchemaMinItems", PathAcceptingKeyword::INTERNAL_SCHEMA_MIN_ITEMS},

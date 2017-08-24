@@ -808,5 +808,47 @@ TEST(MatchExpressionParserSchemaTest, AllowedPropertiesAcceptsEmptyOtherwiseExpr
     ASSERT_TRUE(allowedProperties.getValue()->matchesBSON(BSONObj()));
 }
 
+TEST(MatchExpressionParserSchemaTest, EqParsesSuccessfully) {
+    auto query = fromjson("{foo: {$_internalSchemaEq: 1}}");
+    auto eqExpr = MatchExpressionParser::parse(query, kSimpleCollator);
+    ASSERT_OK(eqExpr.getStatus());
+
+    ASSERT_TRUE(eqExpr.getValue()->matchesBSON(fromjson("{foo: 1}")));
+    ASSERT_FALSE(eqExpr.getValue()->matchesBSON(fromjson("{foo: [1]}")));
+    ASSERT_FALSE(eqExpr.getValue()->matchesBSON(fromjson("{not_foo: 1}")));
+}
+
+TEST(MatchExpressionParserSchemaTest, RootDocEqFailsToParseNonObjects) {
+    auto query = fromjson("{$_internalSchemaRootDocEq: 1}");
+    auto rootDocEq = MatchExpressionParser::parse(query, kSimpleCollator);
+    ASSERT_EQ(rootDocEq.getStatus(), ErrorCodes::TypeMismatch);
+
+    query = fromjson("{$_internalSchemaRootDocEq: [{}]}");
+    rootDocEq = MatchExpressionParser::parse(query, kSimpleCollator);
+    ASSERT_EQ(rootDocEq.getStatus(), ErrorCodes::TypeMismatch);
+}
+
+TEST(MatchExpressionParserSchemaTest, RootDocEqMustBeTopLevel) {
+    auto query = fromjson("{a: {$_internalSchemaRootDocEq: 1}}");
+    auto rootDocEq = MatchExpressionParser::parse(query, kSimpleCollator);
+    ASSERT_EQ(rootDocEq.getStatus(), ErrorCodes::BadValue);
+
+    query = fromjson("{$or: [{a: 1}, {$_internalSchemaRootDocEq: 1}]}");
+    rootDocEq = MatchExpressionParser::parse(query, kSimpleCollator);
+    ASSERT_EQ(rootDocEq.getStatus(), ErrorCodes::FailedToParse);
+
+    query = fromjson("{a: {$elemMatch: {$_internalSchemaRootDocEq: 1}}}");
+    rootDocEq = MatchExpressionParser::parse(query, kSimpleCollator);
+    ASSERT_EQ(rootDocEq.getStatus(), ErrorCodes::BadValue);
+}
+
+TEST(MatchExpressionParserSchemaTest, RootDocEqParsesSuccessfully) {
+    auto query = fromjson("{$_internalSchemaRootDocEq: {}}");
+    auto eqExpr = MatchExpressionParser::parse(query, kSimpleCollator);
+    ASSERT_OK(eqExpr.getStatus());
+
+    ASSERT_TRUE(eqExpr.getValue()->matchesBSON(fromjson("{}")));
+}
+
 }  // namespace
 }  // namespace mongo

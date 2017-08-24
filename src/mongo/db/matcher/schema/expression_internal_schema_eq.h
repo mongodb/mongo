@@ -1,0 +1,82 @@
+/**
+ * Copyright (C) 2017 MongoDB Inc.
+ *
+ * This program is free software: you can redistribute it and/or  modify
+ * it under the terms of the GNU Affero General Public License, version 3,
+ * as published by the Free Software Foundation.
+ *
+ * This program is distributed in the hope that it will be useful,
+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+ * GNU Affero General Public License for more details.
+ *
+ * You should have received a copy of the GNU Affero General Public License
+ * along with this program.  If not, see <http://www.gnu.org/licenses/>.
+ *
+ * As a special exception, the copyright holders give permission to link the
+ * code of portions of this program with the OpenSSL library under certain
+ * conditions as described in each individual source file and distribute
+ * linked combinations including the program with the OpenSSL library. You
+ * must comply with the GNU Affero General Public License in all respects
+ * for all of the code used other than as permitted herein. If you modify
+ * file(s) with this exception, you may extend this exception to your
+ * version of the file(s), but you are not obligated to do so. If you do not
+ * wish to do so, delete this exception statement from your version. If you
+ * delete this exception statement from all source files in the program,
+ * then also delete it in the license file.
+ */
+
+#pragma once
+
+#include "mongo/bson/unordered_fields_bsonelement_comparator.h"
+#include "mongo/db/matcher/expression_leaf.h"
+
+namespace mongo {
+
+/**
+ * MatchExpression for $_internalSchemaEq, which behaves similar to $eq except:
+ *
+ * - leaf arrays are not traversed.
+ * - comparisons between objects do not consider field order.
+ * - null element values only match the literal null, and not missing or undefined values.
+ * - always uses simple string comparison semantics, even if the query has a non-simple collation.
+ */
+class InternalSchemaEqMatchExpression final : public LeafMatchExpression {
+public:
+    static constexpr StringData kName = "$_internalSchemaEq"_sd;
+
+    InternalSchemaEqMatchExpression() : LeafMatchExpression(MatchType::INTERNAL_SCHEMA_EQ) {}
+
+    Status init(StringData path, BSONElement rhs);
+
+    std::unique_ptr<MatchExpression> shallowClone() const final;
+
+    bool matchesSingleElement(const BSONElement&, MatchDetails*) const final;
+
+    void debugString(StringBuilder& debug, int level) const final;
+
+    void serialize(BSONObjBuilder* out) const final;
+
+    bool equivalent(const MatchExpression* other) const final;
+
+    size_t numChildren() const final {
+        return 0;
+    }
+
+    MatchExpression* getChild(size_t i) const final {
+        MONGO_UNREACHABLE;
+    }
+
+    std::vector<MatchExpression*>* getChildVector() final {
+        return nullptr;
+    }
+
+    bool shouldExpandLeafArray() const final {
+        return false;
+    }
+
+private:
+    UnorderedFieldsBSONElementComparator _eltCmp;
+    BSONElement _rhsElem;
+};
+}  // namespace mongo

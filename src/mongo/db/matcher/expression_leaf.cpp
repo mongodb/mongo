@@ -122,7 +122,8 @@ bool ComparisonMatchExpression::matchesSingleElement(const BSONElement& e,
         }
     }
 
-    int x = compareElementValues(e, _rhs, _collator);
+    int x = BSONElement::compareElements(
+        e, _rhs, BSONElement::ComparisonRules::kConsiderFieldName, _collator);
 
     switch (matchType()) {
         case LT:

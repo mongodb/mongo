@@ -89,9 +89,10 @@ bool _isSubsetOf(const ComparisonMatchExpression* lhs, const ComparisonMatchExpr
         return false;
     }
 
-    // Either collator may be used by compareElementValues() here, since either the collators are
+    // Either collator may be used by compareElements() here, since either the collators are
     // the same or lhsData does not contain string comparison.
-    int cmp = compareElementValues(lhsData, rhsData, rhs->getCollator());
+    int cmp = BSONElement::compareElements(
+        lhsData, rhsData, BSONElement::ComparisonRules::kConsiderFieldName, rhs->getCollator());
 
     // Check whether the two expressions are equivalent.
     if (lhs->matchType() == rhs->matchType() && cmp == 0) {

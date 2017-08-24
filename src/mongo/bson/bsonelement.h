@@ -57,13 +57,6 @@ typedef BSONElement be;
 typedef BSONObj bo;
 typedef BSONObjBuilder bob;
 
-/** l and r MUST have same type when called: check that first.
-    If comparator is non-null, it is used for all comparisons between two strings.
-*/
-int compareElementValues(const BSONElement& l,
-                         const BSONElement& r,
-                         const StringData::ComparatorInterface* comparator = nullptr);
-
 /** BSONElement represents an "element" in a BSONObj.  So for the object { a : 3, b : "abc" },
     'a : 3' is the first element (key+value).
 
@@ -87,6 +80,25 @@ public:
      * by a BSONObj::ComparatorInterface.
      */
     using DeferredComparison = BSONComparatorInterfaceBase<BSONElement>::DeferredComparison;
+
+    /**
+     * Set of rules that dictate the behavior of the comparison APIs.
+     */
+    using ComparisonRules = BSONComparatorInterfaceBase<BSONElement>::ComparisonRules;
+    using ComparisonRulesSet = BSONComparatorInterfaceBase<BSONElement>::ComparisonRulesSet;
+
+    /**
+     * Compares two BSON elements of the same canonical type.
+     *
+     * Returns <0 if 'l' is less than the element 'r'.
+     *         >0 if 'l' is greater than the element 'r'.
+     *          0 if 'l' is equal to the element 'r'.
+     */
+    static int compareElements(const BSONElement& l,
+                               const BSONElement& r,
+                               ComparisonRulesSet rules,
+                               const StringData::ComparatorInterface* comparator);
+
 
     /** These functions, which start with a capital letter, throw if the
         element is not of the required type. Example:
@@ -518,14 +530,16 @@ public:
      */
     bool binaryEqualValues(const BSONElement& rhs) const;
 
-    /** Well ordered comparison.
-        @return <0: l<r. 0:l==r. >0:l>r
-        order by type, field name, and field value.
-        If considerFieldName is true, pay attention to the field name.
-        If comparator is non-null, it is used for all comparisons between two strings.
-    */
-    int woCompare(const BSONElement& e,
-                  bool considerFieldName = true,
+    /**
+     * Compares two BSON Elements using the rules specified by 'rules' and the 'comparator' for
+     * string comparisons.
+     *
+     * Returns <0 if 'this' is less than 'elem'.
+     *         >0 if 'this' is greater than 'elem'.
+     *          0 if 'this' is equal to 'elem'.
+     */
+    int woCompare(const BSONElement& elem,
+                  ComparisonRulesSet rules = ComparisonRules::kConsiderFieldName,
                   const StringData::ComparatorInterface* comparator = nullptr) const;
 
     DeferredComparison operator<(const BSONElement& other) const {

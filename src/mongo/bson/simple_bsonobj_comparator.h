@@ -42,12 +42,11 @@ public:
     static const SimpleBSONObjComparator kInstance;
 
     int compare(const BSONObj& lhs, const BSONObj& rhs) const final {
-        return lhs.woCompare(rhs, BSONObj(), true, nullptr);
+        return lhs.woCompare(rhs, BSONObj(), ComparisonRules::kConsiderFieldName, nullptr);
     }
 
     void hash_combine(size_t& seed, const BSONObj& toHash) const final {
-        const bool considerFieldName = true;
-        hashCombineBSONObj(seed, toHash, considerFieldName, nullptr);
+        hashCombineBSONObj(seed, toHash, ComparisonRules::kConsiderFieldName, nullptr);
     }
 };
 

@@ -6,7 +6,6 @@ selector:
   exclude_files:
   - src/third_party/JSON-Schema-Test-Suite/tests/draft4/default.json
   - src/third_party/JSON-Schema-Test-Suite/tests/draft4/definitions.json
-  - src/third_party/JSON-Schema-Test-Suite/tests/draft4/enum.json
   - src/third_party/JSON-Schema-Test-Suite/tests/draft4/optional/bignum.json
   - src/third_party/JSON-Schema-Test-Suite/tests/draft4/optional/ecmascript-regex.json
   - src/third_party/JSON-Schema-Test-Suite/tests/draft4/optional/format.json

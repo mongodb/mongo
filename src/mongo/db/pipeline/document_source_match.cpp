@@ -258,6 +258,7 @@ Document redactSafePortionDollarOps(BSONObj expr) {
             case PathAcceptingKeyword::GEO_INTERSECTS:
             case PathAcceptingKeyword::GEO_NEAR:
             case PathAcceptingKeyword::INTERNAL_SCHEMA_ALL_ELEM_MATCH_FROM_INDEX:
+            case PathAcceptingKeyword::INTERNAL_SCHEMA_EQ:
             case PathAcceptingKeyword::INTERNAL_SCHEMA_FMOD:
             case PathAcceptingKeyword::INTERNAL_SCHEMA_MATCH_ARRAY_INDEX:
             case PathAcceptingKeyword::INTERNAL_SCHEMA_MAX_ITEMS:

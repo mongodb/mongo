@@ -186,6 +186,9 @@ const char* encodeMatchType(MatchExpression::MatchType mt) {
         case MatchExpression::INTERNAL_SCHEMA_COND:
             return "internalSchemaCond";
 
+        case MatchExpression::INTERNAL_SCHEMA_EQ:
+            return "internalSchemaEq";
+
         case MatchExpression::INTERNAL_SCHEMA_FMOD:
             return "internalSchemaFmod";
 
@@ -203,6 +206,9 @@ const char* encodeMatchType(MatchExpression::MatchType mt) {
 
         case MatchExpression::INTERNAL_SCHEMA_OBJECT_MATCH:
             return "internalSchemaObjectMatch";
+
+        case MatchExpression::INTERNAL_SCHEMA_ROOT_DOC_EQ:
+            return "internalSchemaRootDocEq";
 
         case MatchExpression::INTERNAL_SCHEMA_MIN_LENGTH:
             return "internalSchemaMinLength";

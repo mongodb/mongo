@@ -43,10 +43,18 @@ template <typename T>
 void BSONComparatorInterfaceBase<T>::hashCombineBSONObj(
     size_t& seed,
     const BSONObj& objToHash,
-    bool considerFieldName,
+    ComparisonRulesSet rules,
     const StringData::ComparatorInterface* stringComparator) {
-    for (auto elem : objToHash) {
-        hashCombineBSONElement(seed, elem, considerFieldName, stringComparator);
+
+    if (rules & ComparisonRules::kIgnoreFieldOrder) {
+        BSONObjIteratorSorted iter(objToHash);
+        while (iter.more()) {
+            hashCombineBSONElement(seed, iter.next(), rules, stringComparator);
+        }
+    } else {
+        for (auto elem : objToHash) {
+            hashCombineBSONElement(seed, elem, rules, stringComparator);
+        }
     }
 }
 
@@ -54,18 +62,16 @@ template <typename T>
 void BSONComparatorInterfaceBase<T>::hashCombineBSONElement(
     size_t& hash,
     BSONElement elemToHash,
-    bool considerFieldName,
+    ComparisonRulesSet rules,
     const StringData::ComparatorInterface* stringComparator) {
     boost::hash_combine(hash, elemToHash.canonicalType());
 
     const StringData fieldName = elemToHash.fieldNameStringData();
-    if (considerFieldName && !fieldName.empty()) {
+    if ((rules & ComparisonRules::kConsiderFieldName) && !fieldName.empty()) {
         SimpleStringDataComparator::kInstance.hash_combine(hash, fieldName);
     }
 
     switch (elemToHash.type()) {
-        // Order of types is the same as in compareElementValues().
-
         case mongo::EOO:
         case mongo::Undefined:
         case mongo::jstNULL:
@@ -145,7 +151,7 @@ void BSONComparatorInterfaceBase<T>::hashCombineBSONElement(
         case mongo::Array:
             hashCombineBSONObj(hash,
                                elemToHash.embeddedObject(),
-                               true,  // considerFieldName
+                               rules | ComparisonRules::kConsiderFieldName,
                                stringComparator);
             break;
 
@@ -166,7 +172,7 @@ void BSONComparatorInterfaceBase<T>::hashCombineBSONElement(
                 hash, StringData(elemToHash.codeWScopeCode(), elemToHash.codeWScopeCodeLen()));
             hashCombineBSONObj(hash,
                                elemToHash.codeWScopeObject(),
-                               true,  // considerFieldName
+                               rules | ComparisonRules::kConsiderFieldName,
                                &SimpleStringDataComparator::kInstance);
             break;
         }

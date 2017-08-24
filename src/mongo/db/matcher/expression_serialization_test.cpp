@@ -1747,5 +1747,21 @@ TEST(SerializeInternalSchema,
         }})"));
     ASSERT_BSONOBJ_EQ(*reserialized.getQuery(), serialize(reserialized.getMatchExpression()));
 }
+
+TEST(SerializeInternalSchema, ExpressionInternalSchemaEqSerializesCorrectly) {
+    Matcher original(fromjson("{x: {$_internalSchemaEq: {y: 1}}}"), kSimpleCollator);
+    Matcher reserialized(serialize(original.getMatchExpression()), kSimpleCollator);
+
+    ASSERT_BSONOBJ_EQ(*reserialized.getQuery(), fromjson("{x: {$_internalSchemaEq: {y: 1}}}"));
+    ASSERT_BSONOBJ_EQ(*reserialized.getQuery(), serialize(reserialized.getMatchExpression()));
+}
+
+TEST(SerializeInternalSchema, ExpressionInternalSchemaRootDocEqSerializesCorrectly) {
+    Matcher original(fromjson("{$_internalSchemaRootDocEq: {y: 1}}"), kSimpleCollator);
+    Matcher reserialized(serialize(original.getMatchExpression()), kSimpleCollator);
+
+    ASSERT_BSONOBJ_EQ(*reserialized.getQuery(), fromjson("{$_internalSchemaRootDocEq: {y: 1}}"));
+    ASSERT_BSONOBJ_EQ(*reserialized.getQuery(), serialize(reserialized.getMatchExpression()));
+}
 }  // namespace
 }  // namespace mongo

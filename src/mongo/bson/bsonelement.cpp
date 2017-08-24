@@ -321,6 +321,160 @@ int compareElementStringValues(const BSONElement& leftStr, const BSONElement& ri
 
 }  // namespace
 
+int BSONElement::compareElements(const BSONElement& l,
+                                 const BSONElement& r,
+                                 ComparisonRulesSet rules,
+                                 const StringData::ComparatorInterface* comparator) {
+    switch (l.type()) {
+        case BSONType::EOO:
+        case BSONType::Undefined:  // EOO and Undefined are same canonicalType
+        case BSONType::jstNULL:
+        case BSONType::MaxKey:
+        case BSONType::MinKey: {
+            auto f = l.canonicalType() - r.canonicalType();
+            if (f < 0)
+                return -1;
+            return f == 0 ? 0 : 1;
+        }
+        case BSONType::Bool:
+            return *l.value() - *r.value();
+        case BSONType::bsonTimestamp:
+            // unsigned compare for timestamps - note they are not really dates but (ordinal +
+            // time_t)
+            if (l.timestamp() < r.timestamp())
+                return -1;
+            return l.timestamp() == r.timestamp() ? 0 : 1;
+        case BSONType::Date:
+            // Signed comparisons for Dates.
+            {
+                const Date_t a = l.Date();
+                const Date_t b = r.Date();
+                if (a < b)
+                    return -1;
+                return a == b ? 0 : 1;
+            }
+
+        case BSONType::NumberInt: {
+            // All types can precisely represent all NumberInts, so it is safe to simply convert to
+            // whatever rhs's type is.
+            switch (r.type()) {
+                case NumberInt:
+                    return compareInts(l._numberInt(), r._numberInt());
+                case NumberLong:
+                    return compareLongs(l._numberInt(), r._numberLong());
+                case NumberDouble:
+                    return compareDoubles(l._numberInt(), r._numberDouble());
+                case NumberDecimal:
+                    return compareIntToDecimal(l._numberInt(), r._numberDecimal());
+                default:
+                    invariant(false);
+            }
+        }
+
+        case BSONType::NumberLong: {
+            switch (r.type()) {
+                case NumberLong:
+                    return compareLongs(l._numberLong(), r._numberLong());
+                case NumberInt:
+                    return compareLongs(l._numberLong(), r._numberInt());
+                case NumberDouble:
+                    return compareLongToDouble(l._numberLong(), r._numberDouble());
+                case NumberDecimal:
+                    return compareLongToDecimal(l._numberLong(), r._numberDecimal());
+                default:
+                    invariant(false);
+            }
+        }
+
+        case BSONType::NumberDouble: {
+            switch (r.type()) {
+                case NumberDouble:
+                    return compareDoubles(l._numberDouble(), r._numberDouble());
+                case NumberInt:
+                    return compareDoubles(l._numberDouble(), r._numberInt());
+                case NumberLong:
+                    return compareDoubleToLong(l._numberDouble(), r._numberLong());
+                case NumberDecimal:
+                    return compareDoubleToDecimal(l._numberDouble(), r._numberDecimal());
+                default:
+                    invariant(false);
+            }
+        }
+
+        case BSONType::NumberDecimal: {
+            switch (r.type()) {
+                case NumberDecimal:
+                    return compareDecimals(l._numberDecimal(), r._numberDecimal());
+                case NumberInt:
+                    return compareDecimalToInt(l._numberDecimal(), r._numberInt());
+                case NumberLong:
+                    return compareDecimalToLong(l._numberDecimal(), r._numberLong());
+                case NumberDouble:
+                    return compareDecimalToDouble(l._numberDecimal(), r._numberDouble());
+                default:
+                    invariant(false);
+            }
+        }
+
+        case BSONType::jstOID:
+            return memcmp(l.value(), r.value(), OID::kOIDSize);
+        case BSONType::Code:
+            return compareElementStringValues(l, r);
+        case BSONType::Symbol:
+        case BSONType::String: {
+            if (comparator) {
+                return comparator->compare(l.valueStringData(), r.valueStringData());
+            } else {
+                return compareElementStringValues(l, r);
+            }
+        }
+        case BSONType::Object:
+        case BSONType::Array: {
+            return l.embeddedObject().woCompare(
+                r.embeddedObject(),
+                BSONObj(),
+                rules | BSONElement::ComparisonRules::kConsiderFieldName,
+                comparator);
+        }
+        case BSONType::DBRef: {
+            int lsz = l.valuesize();
+            int rsz = r.valuesize();
+            if (lsz - rsz != 0)
+                return lsz - rsz;
+            return memcmp(l.value(), r.value(), lsz);
+        }
+        case BSONType::BinData: {
+            int lsz = l.objsize();  // our bin data size in bytes, not including the subtype byte
+            int rsz = r.objsize();
+            if (lsz - rsz != 0)
+                return lsz - rsz;
+            return memcmp(l.value() + 4, r.value() + 4, lsz + 1 /*+1 for subtype byte*/);
+        }
+        case BSONType::RegEx: {
+            int c = strcmp(l.regex(), r.regex());
+            if (c)
+                return c;
+            return strcmp(l.regexFlags(), r.regexFlags());
+        }
+        case BSONType::CodeWScope: {
+            int cmp = StringData(l.codeWScopeCode(), l.codeWScopeCodeLen() - 1)
+                          .compare(StringData(r.codeWScopeCode(), r.codeWScopeCodeLen() - 1));
+            if (cmp)
+                return cmp;
+
+            // When comparing the scope object, we should consider field names. Special string
+            // comparison semantics do not apply to strings nested inside the CodeWScope scope
+            // object, so we do not pass through the string comparator.
+            return l.codeWScopeObject().woCompare(
+                r.codeWScopeObject(),
+                BSONObj(),
+                rules | BSONElement::ComparisonRules::kConsiderFieldName);
+        }
+    }
+
+    MONGO_UNREACHABLE;
+}
+
 /** transform a BSON array into a vector of BSONElements.
     we match array # positions with their vector position, and ignore
     any fields with non-numeric field names.
@@ -347,23 +501,20 @@ std::vector<BSONElement> BSONElement::Array() const {
     return v;
 }
 
-/* wo = "well ordered"
-   note: (mongodb related) : this can only change in behavior when index version # changes
-*/
-int BSONElement::woCompare(const BSONElement& e,
-                           bool considerFieldName,
+int BSONElement::woCompare(const BSONElement& elem,
+                           ComparisonRulesSet rules,
                            const StringData::ComparatorInterface* comparator) const {
-    if (type() != e.type()) {
+    if (type() != elem.type()) {
         int lt = (int)canonicalType();
-        int rt = (int)e.canonicalType();
+        int rt = (int)elem.canonicalType();
         if (int diff = lt - rt)
             return diff;
     }
-    if (considerFieldName) {
-        if (int diff = strcmp(fieldName(), e.fieldName()))
+    if (rules & ComparisonRules::kConsiderFieldName) {
+        if (int diff = fieldNameStringData().compare(elem.fieldNameStringData()))
             return diff;
     }
-    return compareElementValues(*this, e, comparator);
+    return compareElements(*this, elem, rules, comparator);
 }
 
 bool BSONElement::binaryEqual(const BSONElement& rhs) const {
@@ -808,161 +959,6 @@ bool BSONObj::coerceVector(std::vector<T>* out) const {
         out->push_back(t);
     }
     return true;
-}
-
-/**
- * l and r must be same canonicalType when called.
- */
-int compareElementValues(const BSONElement& l,
-                         const BSONElement& r,
-                         const StringData::ComparatorInterface* comparator) {
-    int f;
-
-    switch (l.type()) {
-        case EOO:
-        case Undefined:  // EOO and Undefined are same canonicalType
-        case jstNULL:
-        case MaxKey:
-        case MinKey:
-            f = l.canonicalType() - r.canonicalType();
-            if (f < 0)
-                return -1;
-            return f == 0 ? 0 : 1;
-        case Bool:
-            return *l.value() - *r.value();
-        case bsonTimestamp:
-            // unsigned compare for timestamps - note they are not really dates but (ordinal +
-            // time_t)
-            if (l.timestamp() < r.timestamp())
-                return -1;
-            return l.timestamp() == r.timestamp() ? 0 : 1;
-        case Date:
-            // Signed comparisons for Dates.
-            {
-                const Date_t a = l.Date();
-                const Date_t b = r.Date();
-                if (a < b)
-                    return -1;
-                return a == b ? 0 : 1;
-            }
-
-        case NumberInt: {
-            // All types can precisely represent all NumberInts, so it is safe to simply convert to
-            // whatever rhs's type is.
-            switch (r.type()) {
-                case NumberInt:
-                    return compareInts(l._numberInt(), r._numberInt());
-                case NumberLong:
-                    return compareLongs(l._numberInt(), r._numberLong());
-                case NumberDouble:
-                    return compareDoubles(l._numberInt(), r._numberDouble());
-                case NumberDecimal:
-                    return compareIntToDecimal(l._numberInt(), r._numberDecimal());
-                default:
-                    invariant(false);
-            }
-        }
-
-        case NumberLong: {
-            switch (r.type()) {
-                case NumberLong:
-                    return compareLongs(l._numberLong(), r._numberLong());
-                case NumberInt:
-                    return compareLongs(l._numberLong(), r._numberInt());
-                case NumberDouble:
-                    return compareLongToDouble(l._numberLong(), r._numberDouble());
-                case NumberDecimal:
-                    return compareLongToDecimal(l._numberLong(), r._numberDecimal());
-                default:
-                    invariant(false);
-            }
-        }
-
-        case NumberDouble: {
-            switch (r.type()) {
-                case NumberDouble:
-                    return compareDoubles(l._numberDouble(), r._numberDouble());
-                case NumberInt:
-                    return compareDoubles(l._numberDouble(), r._numberInt());
-                case NumberLong:
-                    return compareDoubleToLong(l._numberDouble(), r._numberLong());
-                case NumberDecimal:
-                    return compareDoubleToDecimal(l._numberDouble(), r._numberDecimal());
-                default:
-                    invariant(false);
-            }
-        }
-
-        case NumberDecimal: {
-            switch (r.type()) {
-                case NumberDecimal:
-                    return compareDecimals(l._numberDecimal(), r._numberDecimal());
-                case NumberInt:
-                    return compareDecimalToInt(l._numberDecimal(), r._numberInt());
-                case NumberLong:
-                    return compareDecimalToLong(l._numberDecimal(), r._numberLong());
-                case NumberDouble:
-                    return compareDecimalToDouble(l._numberDecimal(), r._numberDouble());
-                default:
-                    invariant(false);
-            }
-        }
-
-        case jstOID:
-            return memcmp(l.value(), r.value(), OID::kOIDSize);
-        case Code:
-            return compareElementStringValues(l, r);
-        case Symbol:
-        case String: {
-            if (comparator) {
-                return comparator->compare(l.valueStringData(), r.valueStringData());
-            } else {
-                return compareElementStringValues(l, r);
-            }
-        }
-        case Object:
-        case Array:
-            // woCompare parameters: r, ordering, considerFieldName, comparator.
-            // r: the BSONObj to compare with.
-            // ordering: the sort directions for each key.
-            // considerFieldName: whether field names should be considered in comparison.
-            // comparator: used for all string comparisons, if non-null.
-            return l.embeddedObject().woCompare(r.embeddedObject(), BSONObj(), true, comparator);
-        case DBRef: {
-            int lsz = l.valuesize();
-            int rsz = r.valuesize();
-            if (lsz - rsz != 0)
-                return lsz - rsz;
-            return memcmp(l.value(), r.value(), lsz);
-        }
-        case BinData: {
-            int lsz = l.objsize();  // our bin data size in bytes, not including the subtype byte
-            int rsz = r.objsize();
-            if (lsz - rsz != 0)
-                return lsz - rsz;
-            return memcmp(l.value() + 4, r.value() + 4, lsz + 1 /*+1 for subtype byte*/);
-        }
-        case RegEx: {
-            int c = strcmp(l.regex(), r.regex());
-            if (c)
-                return c;
-            return strcmp(l.regexFlags(), r.regexFlags());
-        }
-        case CodeWScope: {
-            int cmp = StringData(l.codeWScopeCode(), l.codeWScopeCodeLen() - 1)
-                          .compare(StringData(r.codeWScopeCode(), r.codeWScopeCodeLen() - 1));
-            if (cmp)
-                return cmp;
-
-            // When comparing the scope object, we should consider field names. Special string
-            // comparison semantics do not apply to strings nested inside the CodeWScope scope
-            // object, so we do not pass through the string comparator.
-            return l.codeWScopeObject().woCompare(r.codeWScopeObject(), BSONObj(), true);
-        }
-        default:
-            verify(false);
-    }
-    return -1;
 }
 
 }  // namespace mongo

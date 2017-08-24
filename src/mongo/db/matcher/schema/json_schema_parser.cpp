@@ -35,12 +35,14 @@
 #include <boost/container/flat_set.hpp>
 
 #include "mongo/bson/bsontypes.h"
+#include "mongo/bson/unordered_fields_bsonelement_comparator.h"
 #include "mongo/db/matcher/expression_always_boolean.h"
 #include "mongo/db/matcher/expression_parser.h"
 #include "mongo/db/matcher/matcher_type_set.h"
 #include "mongo/db/matcher/schema/expression_internal_schema_all_elem_match_from_index.h"
 #include "mongo/db/matcher/schema/expression_internal_schema_allowed_properties.h"
 #include "mongo/db/matcher/schema/expression_internal_schema_cond.h"
+#include "mongo/db/matcher/schema/expression_internal_schema_eq.h"
 #include "mongo/db/matcher/schema/expression_internal_schema_fmod.h"
 #include "mongo/db/matcher/schema/expression_internal_schema_match_array_index.h"
 #include "mongo/db/matcher/schema/expression_internal_schema_max_items.h"
@@ -50,6 +52,7 @@
 #include "mongo/db/matcher/schema/expression_internal_schema_min_length.h"
 #include "mongo/db/matcher/schema/expression_internal_schema_min_properties.h"
 #include "mongo/db/matcher/schema/expression_internal_schema_object_match.h"
+#include "mongo/db/matcher/schema/expression_internal_schema_root_doc_eq.h"
 #include "mongo/db/matcher/schema/expression_internal_schema_unique_items.h"
 #include "mongo/db/matcher/schema/expression_internal_schema_xor.h"
 #include "mongo/logger/log_component_settings.h"
@@ -70,6 +73,7 @@ constexpr StringData kSchemaAllOfKeyword = "allOf"_sd;
 constexpr StringData kSchemaAnyOfKeyword = "anyOf"_sd;
 constexpr StringData kSchemaDependenciesKeyword = "dependencies"_sd;
 constexpr StringData kSchemaDescriptionKeyword = "description"_sd;
+constexpr StringData kSchemaEnumKeyword = "enum"_sd;
 constexpr StringData kSchemaExclusiveMaximumKeyword = "exclusiveMaximum"_sd;
 constexpr StringData kSchemaExclusiveMinimumKeyword = "exclusiveMinimum"_sd;
 constexpr StringData kSchemaItemsKeyword = "items"_sd;
@@ -408,6 +412,60 @@ StatusWithMatchExpression parseLogicalKeyword(StringData path,
     }
 
     return {std::move(listOfExpr)};
+}
+
+StatusWithMatchExpression parseEnum(StringData path, BSONElement enumElement) {
+    if (enumElement.type() != BSONType::Array) {
+        return {ErrorCodes::TypeMismatch,
+                str::stream() << "$jsonSchema keyword '" << kSchemaEnumKeyword
+                              << "' must be an array, but found an element of type "
+                              << enumElement.type()};
+    }
+
+    auto enumArray = enumElement.embeddedObject();
+    if (enumArray.isEmpty()) {
+        return {ErrorCodes::FailedToParse,
+                str::stream() << "$jsonSchema keyword '" << kSchemaEnumKeyword
+                              << "' cannot be an empty array"};
+    }
+
+    auto orExpr = stdx::make_unique<OrMatchExpression>();
+    UnorderedFieldsBSONElementComparator eltComp;
+    BSONEltSet eqSet = eltComp.makeBSONEltSet();
+    for (auto&& arrayElem : enumArray) {
+        auto insertStatus = eqSet.insert(arrayElem);
+        if (!insertStatus.second) {
+            return {ErrorCodes::FailedToParse,
+                    str::stream() << "$jsonSchema keyword '" << kSchemaEnumKeyword
+                                  << "' array cannot contain duplicate values."};
+        }
+
+        // 'enum' at the top-level implies a literal object match on the root document.
+        if (path.empty()) {
+            // Top-level non-object enum values can be safely ignored, since MongoDB only stores
+            // objects, not scalars or arrays.
+            if (arrayElem.type() == BSONType::Object) {
+                auto rootDocEq = stdx::make_unique<InternalSchemaRootDocEqMatchExpression>();
+                rootDocEq->init(arrayElem.embeddedObject());
+                orExpr->add(rootDocEq.release());
+            }
+        } else {
+            auto eqExpr = stdx::make_unique<InternalSchemaEqMatchExpression>();
+            auto initStatus = eqExpr->init(path, arrayElem);
+            if (!initStatus.isOK()) {
+                return initStatus;
+            }
+
+            orExpr->add(eqExpr.release());
+        }
+    }
+
+    // Make sure that the OR expression has at least 1 child.
+    if (orExpr->numChildren() == 0) {
+        return {stdx::make_unique<AlwaysFalseMatchExpression>()};
+    }
+
+    return {std::move(orExpr)};
 }
 
 /**
@@ -1079,6 +1137,14 @@ Status translateLogicalKeywords(StringMap<BSONElement>* keywordMap,
         andExpr->add(notMatchExpr.release());
     }
 
+    if (auto enumElt = keywordMap->get(kSchemaEnumKeyword)) {
+        auto enumExpr = parseEnum(path, enumElt);
+        if (!enumExpr.isOK()) {
+            return enumExpr.getStatus();
+        }
+        andExpr->add(enumExpr.getValue().release());
+    }
+
     return Status::OK();
 }
 
@@ -1361,6 +1427,7 @@ StatusWithMatchExpression _parse(StringData path, BSONObj schema, bool ignoreUnk
         {kSchemaBsonTypeKeyword, {}},
         {kSchemaDependenciesKeyword, {}},
         {kSchemaDescriptionKeyword, {}},
+        {kSchemaEnumKeyword, {}},
         {kSchemaExclusiveMaximumKeyword, {}},
         {kSchemaExclusiveMinimumKeyword, {}},
         {kSchemaItemsKeyword, {}},

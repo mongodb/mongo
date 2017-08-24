@@ -102,6 +102,12 @@ public:
      */
     using DeferredComparison = BSONComparatorInterfaceBase<BSONObj>::DeferredComparison;
 
+    /**
+     * Set of rules that dictate the behavior of the comparison APIs.
+     */
+    using ComparisonRules = BSONComparatorInterfaceBase<BSONObj>::ComparisonRules;
+    using ComparisonRulesSet = BSONComparatorInterfaceBase<BSONObj>::ComparisonRulesSet;
+
     static const char kMinBSONLength = 5;
 
     /** Construct an empty BSONObj -- that is, {}. */
@@ -393,26 +399,22 @@ public:
     // See bsonobj_comparator_interface.h for details.
     //
 
-    /**wo='well ordered'.  fields must be in same order in each object.
-       Ordering is with respect to the signs of the elements
-       and allows ascending / descending key mixing.
-       If comparator is non-null, it is used for all comparisons between two strings.
-       @return  <0 if l<r. 0 if l==r. >0 if l>r
-    */
+    /**
+     * Compares two BSON Objects using the rules specified by 'rules', 'comparator' for
+     * string comparisons, and 'o' for ascending vs. descending ordering.
+     *
+     * Returns <0 if 'this' is less than 'obj'.
+     *         >0 if 'this' is greater than 'obj'.
+     *          0 if 'this' is equal to 'obj'.
+     */
     int woCompare(const BSONObj& r,
                   const Ordering& o,
-                  bool considerFieldName = true,
+                  ComparisonRulesSet rules = ComparisonRules::kConsiderFieldName,
                   const StringData::ComparatorInterface* comparator = nullptr) const;
 
-    /**wo='well ordered'.  fields must be in same order in each object.
-       Ordering is with respect to the signs of the elements
-       and allows ascending / descending key mixing.
-       If comparator is non-null, it is used for all comparisons between two strings.
-       @return  <0 if l<r. 0 if l==r. >0 if l>r
-    */
     int woCompare(const BSONObj& r,
                   const BSONObj& ordering = BSONObj(),
-                  bool considerFieldName = true,
+                  ComparisonRulesSet rules = ComparisonRules::kConsiderFieldName,
                   const StringData::ComparatorInterface* comparator = nullptr) const;
 
     DeferredComparison operator<(const BSONObj& other) const {
