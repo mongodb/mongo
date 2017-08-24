@@ -252,4 +252,52 @@
                       {b: null},
                       {a: NumberLong(3), b: 3},
                       false);
+
+    // Test that the 'type' keyword rejects an array of aliases if one of those aliases is invalid.
+    assert.throws(() => coll.find({$jsonSchema: {f: {type: ["number", "objectId"]}}}).itcount());
+    assert.throws(() => coll.find({$jsonSchema: {f: {type: ["object", "unknown"]}}}).itcount());
+
+    // Test that the 'bsonType' keyword rejects an array of aliases if one of those aliases is
+    // invalid.
+    assert.throws(() => coll.find({$jsonSchema: {f: {bsonType: ["number", "unknown"]}}}).itcount());
+    assert.throws(() => coll.find({$jsonSchema: {bsonType: ["unknown"]}}).itcount());
+
+    // Test that the 'type' keyword rejects an array which contains a numerical type alias.
+    assert.throws(() => coll.find({$jsonSchema: {f: {type: ["number", 2]}}}).itcount());
+
+    // Test that the 'bsonType' keyword rejects an array which contains a numerical type alias.
+    assert.throws(() => coll.find({$jsonSchema: {f: {bsonType: ["number", 2]}}}).itcount());
+
+    // Test that the 'type' keyword rejects an array which contains duplicate aliases.
+    assert.throws(
+        () => coll.find({$jsonSchema: {f: {type: ["number", "string", "number"]}}}).itcount());
+
+    // Test that the 'bsonType' keyword rejects an array which contains duplicate aliases.
+    assert.throws(
+        () => coll.find({$jsonSchema: {f: {bsonType: ["number", "string", "number"]}}}).itcount());
+
+    // Test that the 'type' keyword can accept an array of type aliases.
+    assertSchemaMatch(coll, {properties: {f: {type: ["number", "string"]}}}, {f: 1}, true);
+    assertSchemaMatch(coll, {properties: {f: {type: ["number", "string"]}}}, {f: "str"}, true);
+    assertSchemaMatch(coll, {properties: {f: {type: ["number", "string"]}}}, {}, true);
+    assertSchemaMatch(
+        coll, {properties: {f: {type: ["number", "string"]}}}, {f: ["str", 1]}, false);
+    assertSchemaMatch(coll, {properties: {f: {type: ["number", "string"]}}}, {f: {}}, false);
+
+    // Test that the 'bsonType' keyword can accept an array of type aliases.
+    assertSchemaMatch(coll, {properties: {f: {bsonType: ["objectId", "double"]}}}, {f: 1}, true);
+    assertSchemaMatch(
+        coll, {properties: {f: {bsonType: ["objectId", "double"]}}}, {f: ObjectId()}, true);
+    assertSchemaMatch(coll, {properties: {f: {bsonType: ["objectId", "double"]}}}, {}, true);
+    assertSchemaMatch(coll, {properties: {f: {bsonType: ["objectId", "double"]}}}, {f: [1]}, false);
+    assertSchemaMatch(
+        coll, {properties: {f: {bsonType: ["objectId", "double"]}}}, {f: NumberInt(1)}, false);
+
+    // Test that the 'type' keyword with an array of types is valid at the top-level.
+    assertSchemaMatch(coll, {type: ["object", "string"]}, {}, true);
+    assertSchemaMatch(coll, {type: ["object", "string"]}, {foo: 1, bar: 1}, true);
+
+    // Test that the 'bsonType' keyword with an array of types is valid at the top-level.
+    assertSchemaMatch(coll, {bsonType: ["object", "double"]}, {}, true);
+    assertSchemaMatch(coll, {bsonType: ["object", "double"]}, {foo: 1, bar: 1}, true);
 }());

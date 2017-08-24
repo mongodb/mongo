@@ -64,9 +64,9 @@ TEST(ExpressionTypeTest, MatchesElementNumber) {
     ASSERT_EQ(BSONType::NumberDouble, match3["a"].type());
 
     TypeMatchExpression typeExpr;
-    MatcherTypeAlias type;
-    type.allNumbers = true;
-    ASSERT_OK(typeExpr.init("a", type));
+    MatcherTypeSet typeSet;
+    typeSet.allNumbers = true;
+    ASSERT_OK(typeExpr.init("a", std::move(typeSet)));
     ASSERT_EQ("a", typeExpr.path());
     ASSERT_TRUE(typeExpr.matchesSingleElement(match1["a"]));
     ASSERT_TRUE(typeExpr.matchesSingleElement(match2["a"]));
@@ -190,15 +190,49 @@ TEST(ExpressionTypeTest, InternalSchemaTypeArrayOnlyMatchesArrays) {
 
 TEST(ExpressionTypeTest, InternalSchemaTypeNumberDoesNotMatchArrays) {
     InternalSchemaTypeExpression expr;
-    MatcherTypeAlias typeAlias;
-    typeAlias.allNumbers = true;
-    ASSERT_OK(expr.init("a", typeAlias));
+    MatcherTypeSet typeSet;
+    typeSet.allNumbers = true;
+    ASSERT_OK(expr.init("a", std::move(typeSet)));
     ASSERT_FALSE(expr.matchesBSON(fromjson("{a: []}")));
     ASSERT_FALSE(expr.matchesBSON(fromjson("{a: [1]}")));
     ASSERT_FALSE(expr.matchesBSON(fromjson("{a: ['b', 2, 3]}")));
     ASSERT_FALSE(expr.matchesBSON(fromjson("{a: [{b: 1}, {b: 2}]}")));
     ASSERT_FALSE(expr.matchesBSON(fromjson("{a: {b: []}}")));
     ASSERT_TRUE(expr.matchesBSON(fromjson("{a: 1}")));
+}
+
+TEST(ExpressionTypeTest, TypeExprWithMultipleTypesMatchesAllSuchTypes) {
+    TypeMatchExpression expr;
+    MatcherTypeSet typeSet;
+    typeSet.allNumbers = true;
+    typeSet.bsonTypes.insert(BSONType::String);
+    typeSet.bsonTypes.insert(BSONType::Object);
+    ASSERT_OK(expr.init("a", std::move(typeSet)));
+
+    ASSERT_FALSE(expr.matchesBSON(fromjson("{a: []}")));
+    ASSERT_TRUE(expr.matchesBSON(fromjson("{a: 1}")));
+    ASSERT_TRUE(expr.matchesBSON(fromjson("{a: [1]}")));
+    ASSERT_TRUE(expr.matchesBSON(fromjson("{a: [{b: 1}, {b: 2}]}")));
+    ASSERT_FALSE(expr.matchesBSON(fromjson("{a: null}")));
+    ASSERT_TRUE(expr.matchesBSON(fromjson("{a: 'str'}")));
+    ASSERT_TRUE(expr.matchesBSON(fromjson("{a: ['str']}")));
+}
+
+TEST(ExpressionTypeTest, InternalSchemaTypeExprWithMultipleTypesMatchesAllSuchTypes) {
+    InternalSchemaTypeExpression expr;
+    MatcherTypeSet typeSet;
+    typeSet.allNumbers = true;
+    typeSet.bsonTypes.insert(BSONType::String);
+    typeSet.bsonTypes.insert(BSONType::Object);
+    ASSERT_OK(expr.init("a", std::move(typeSet)));
+
+    ASSERT_FALSE(expr.matchesBSON(fromjson("{a: []}")));
+    ASSERT_TRUE(expr.matchesBSON(fromjson("{a: 1}")));
+    ASSERT_FALSE(expr.matchesBSON(fromjson("{a: [1]}")));
+    ASSERT_FALSE(expr.matchesBSON(fromjson("{a: [{b: 1}, {b: 2}]}")));
+    ASSERT_FALSE(expr.matchesBSON(fromjson("{a: null}")));
+    ASSERT_TRUE(expr.matchesBSON(fromjson("{a: 'str'}")));
+    ASSERT_FALSE(expr.matchesBSON(fromjson("{a: ['str']}")));
 }
 
 }  // namespace

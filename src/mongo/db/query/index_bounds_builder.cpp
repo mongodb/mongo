@@ -520,7 +520,7 @@ void IndexBoundsBuilder::translate(const MatchExpression* expr,
     } else if (MatchExpression::TYPE_OPERATOR == expr->matchType()) {
         const TypeMatchExpression* tme = static_cast<const TypeMatchExpression*>(expr);
 
-        if (tme->getBSONType() == BSONType::Array) {
+        if (tme->typeSet().hasType(BSONType::Array)) {
             // We have $type:"array". Since arrays are indexed by creating a key for each element,
             // we have to fetch all indexed documents and check whether the full document contains
             // an array.
@@ -531,17 +531,30 @@ void IndexBoundsBuilder::translate(const MatchExpression* expr,
 
         // If we are matching all numbers, we just use the bounds for NumberInt, as these bounds
         // also include all NumberDouble and NumberLong values.
-        BSONType type = tme->matchesAllNumbers() ? BSONType::NumberInt : tme->getBSONType();
-        BSONObjBuilder bob;
-        bob.appendMinForType("", type);
-        bob.appendMaxForType("", type);
-        BSONObj dataObj = bob.obj();
-        verify(dataObj.isOwned());
-        oilOut->intervals.push_back(
-            makeRangeInterval(dataObj, BoundInclusion::kIncludeBothStartAndEndKeys));
+        if (tme->typeSet().allNumbers) {
+            BSONObjBuilder bob;
+            bob.appendMinForType("", BSONType::NumberInt);
+            bob.appendMaxForType("", BSONType::NumberInt);
+            oilOut->intervals.push_back(
+                makeRangeInterval(bob.obj(), BoundInclusion::kIncludeBothStartAndEndKeys));
+        }
 
-        *tightnessOut = tme->matchesAllNumbers() ? IndexBoundsBuilder::EXACT
-                                                 : IndexBoundsBuilder::INEXACT_FETCH;
+        for (auto type : tme->typeSet().bsonTypes) {
+            BSONObjBuilder bob;
+            bob.appendMinForType("", type);
+            bob.appendMaxForType("", type);
+            oilOut->intervals.push_back(
+                makeRangeInterval(bob.obj(), BoundInclusion::kIncludeBothStartAndEndKeys));
+        }
+
+        // If we're only matching the "number" type, then the bounds are exact. Otherwise, the
+        // bounds may be inexact.
+        *tightnessOut = (tme->typeSet().isSingleType() && tme->typeSet().allNumbers)
+            ? IndexBoundsBuilder::EXACT
+            : IndexBoundsBuilder::INEXACT_FETCH;
+
+        // Sort the intervals, and merge redundant ones.
+        unionize(oilOut);
     } else if (MatchExpression::MATCH_IN == expr->matchType()) {
         const InMatchExpression* ime = static_cast<const InMatchExpression*>(expr);
 

@@ -892,13 +892,19 @@ StatusWithMatchExpression MatchExpressionParser::_parseType(
     const char* name,
     const BSONElement& elt,
     const boost::intrusive_ptr<ExpressionContext>& expCtx) {
-    auto parsedType = MatcherTypeAlias::parse(elt, MatcherTypeAlias::kTypeAliasMap);
-    if (!parsedType.isOK()) {
-        return parsedType.getStatus();
+    auto typeSet = MatcherTypeSet::parse(elt, MatcherTypeSet::kTypeAliasMap);
+    if (!typeSet.isOK()) {
+        return typeSet.getStatus();
     }
 
     auto typeExpr = stdx::make_unique<T>();
-    auto status = typeExpr->init(name, parsedType.getValue());
+
+    if (typeSet.getValue().isEmpty()) {
+        return {Status(ErrorCodes::FailedToParse,
+                       str::stream() << typeExpr->name() << " must match at least one type")};
+    }
+
+    auto status = typeExpr->init(name, std::move(typeSet.getValue()));
     if (!status.isOK()) {
         return status;
     }

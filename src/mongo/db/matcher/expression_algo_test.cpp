@@ -1059,7 +1059,7 @@ TEST(SplitMatchExpression, ShouldMoveTypeAcrossRename) {
     ASSERT_TRUE(splitExpr.first.get());
     BSONObjBuilder firstBob;
     splitExpr.first->serialize(&firstBob);
-    ASSERT_BSONOBJ_EQ(firstBob.obj(), fromjson("{c: {$type: 16}}"));
+    ASSERT_BSONOBJ_EQ(firstBob.obj(), fromjson("{c: {$type: [16]}}"));
 
     ASSERT_FALSE(splitExpr.second.get());
 }

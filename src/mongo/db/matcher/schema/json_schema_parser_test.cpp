@@ -113,13 +113,13 @@ TEST(JSONSchemaParserTest, NestedTypeObjectTranslatesCorrectly) {
                                                   $and: [{
                                                       $or: [
                                                           {$nor: [{b: {$exists: true}}]},
-                                                          {$and: [{b: {$_internalSchemaType: 2}}]}
+                                                          {$and: [{b: {$_internalSchemaType: [2]}}]}
                                                       ]
                                                   }]
                                                }
                                            }
                                        },
-                                       {a: {$_internalSchemaType: 3}}
+                                       {a: {$_internalSchemaType: [3]}}
                                    ]
                                  }
                              ]
@@ -144,7 +144,7 @@ TEST(JSONSchemaParserTest, TypeNumberTranslatesCorrectly) {
                                        $and: [{
                                            $or: [
                                                {$nor: [{num: {$exists: true}}]},
-                                               {$and: [{num: {$_internalSchemaType: 'number'}}]}
+                                               {$and: [{num: {$_internalSchemaType: ['number']}}]}
                                            ]
                                        }]
                                    }]
@@ -163,7 +163,7 @@ TEST(JSONSchemaParserTest, MaximumTranslatesCorrectlyWithTypeNumber) {
                                                {
                                                  $and: [
                                                      {num: {$lte: 0}},
-                                                     {num: {$_internalSchemaType: 'number'}}
+                                                     {num: {$_internalSchemaType: ['number']}}
                                                  ]
                                                }
                                            ]
@@ -185,7 +185,7 @@ TEST(JSONSchemaParserTest, MaximumTranslatesCorrectlyWithBsonTypeLong) {
                                                {
                                                  $and: [
                                                      {num: {$lte: 0}},
-                                                     {num: {$_internalSchemaType: 18}}
+                                                     {num: {$_internalSchemaType: [18]}}
                                                  ]
                                                }
                                            ]
@@ -203,7 +203,7 @@ TEST(JSONSchemaParserTest, MaximumTranslatesCorrectlyWithTypeString) {
                          $and: [{
                              $or: [
                                  {$nor: [{num: {$exists: true}}]},
-                                 {$and: [{$alwaysTrue: 1}, {num: {$_internalSchemaType: 2}}]}
+                                 {$and: [{$alwaysTrue: 1}, {num: {$_internalSchemaType: [2]}}]}
                              ]
                          }]
                      }]
@@ -222,7 +222,7 @@ TEST(JSONSchemaParserTest, MaximumTranslatesCorrectlyWithNoType) {
                                  {
                                    $and: [{
                                        $or: [
-                                           {$nor: [{num: {$_internalSchemaType: 'number'}}]},
+                                           {$nor: [{num: {$_internalSchemaType: ['number']}}]},
                                            {num: {$lte: 0}}
                                        ]
                                    }]
@@ -263,7 +263,7 @@ TEST(JSONSchemaParserTest, MinimumTranslatesCorrectlyWithTypeNumber) {
                                                {
                                                  $and: [
                                                      {num: {$gte: 0}},
-                                                     {num: {$_internalSchemaType: 'number'}}
+                                                     {num: {$_internalSchemaType: ['number']}}
                                                  ]
                                                }
                                            ]
@@ -292,7 +292,7 @@ TEST(JSONSchemaParserTest, MaxLengthTranslatesCorrectlyWithIntegralDouble) {
                                                {
                                                  $and: [
                                                      {foo: {$_internalSchemaMaxLength: 5}},
-                                                     {foo: {$_internalSchemaType: 2}}
+                                                     {foo: {$_internalSchemaType: [2]}}
                                                  ]
                                                }
                                            ]
@@ -314,7 +314,7 @@ TEST(JSONSchemaParserTest, MaxLengthTranslatesCorrectlyWithTypeString) {
                                                {
                                                  $and: [
                                                      {foo: {$_internalSchemaMaxLength: 5}},
-                                                     {foo: {$_internalSchemaType: 2}}
+                                                     {foo: {$_internalSchemaType: [2]}}
                                                  ]
                                                }
                                            ]
@@ -336,7 +336,7 @@ TEST(JSONSchemaParserTest, MinimumTranslatesCorrectlyWithBsonTypeLong) {
                                                {
                                                  $and: [
                                                      {num: {$gte: 0}},
-                                                     {num: {$_internalSchemaType: 18}}
+                                                     {num: {$_internalSchemaType: [18]}}
                                                  ]
                                                }
                                            ]
@@ -354,7 +354,7 @@ TEST(JSONSchemaParserTest, MinimumTranslatesCorrectlyWithTypeString) {
                          $and: [{
                              $or: [
                                  {$nor: [{num: {$exists: true}}]},
-                                 {$and: [{$alwaysTrue: 1}, {num: {$_internalSchemaType: 2}}]}
+                                 {$and: [{$alwaysTrue: 1}, {num: {$_internalSchemaType: [2]}}]}
                              ]
                          }]
                      }]
@@ -373,7 +373,7 @@ TEST(JSONSchemaParserTest, MinimumTranslatesCorrectlyWithNoType) {
                                  {
                                    $and: [{
                                        $or: [
-                                           {$nor: [{num: {$_internalSchemaType: 'number'}}]},
+                                           {$nor: [{num: {$_internalSchemaType: ['number']}}]},
                                            {num: {$gte: 0}}
                                        ]
                                    }]
@@ -398,7 +398,7 @@ TEST(JSONSchemaParserTest, MaximumTranslatesCorrectlyWithExclusiveMaximumTrue) {
                                                {
                                                  $and: [
                                                      {num: {$lt: 0}},
-                                                     {num: {$_internalSchemaType: 18}}
+                                                     {num: {$_internalSchemaType: [18]}}
                                                  ]
                                                }
                                            ]
@@ -421,7 +421,7 @@ TEST(JSONSchemaParserTest, MaximumTranslatesCorrectlyWithExclusiveMaximumFalse) 
                                                {
                                                  $and: [
                                                      {num: {$lte: 0}},
-                                                     {num: {$_internalSchemaType: 18}}
+                                                     {num: {$_internalSchemaType: [18]}}
                                                  ]
                                                }
                                            ]
@@ -456,7 +456,7 @@ TEST(JSONSchemaParserTest, MinimumTranslatesCorrectlyWithExclusiveMinimumTrue) {
                                                {
                                                  $and: [
                                                      {num: {$gt: 0}},
-                                                     {num: {$_internalSchemaType: 18}}
+                                                     {num: {$_internalSchemaType: [18]}}
                                                  ]
                                                }
                                            ]
@@ -479,7 +479,7 @@ TEST(JSONSchemaParserTest, MinimumTranslatesCorrectlyWithExclusiveMinimumFalse) 
                                                {
                                                  $and: [
                                                      {num: {$gte: 0}},
-                                                     {num: {$_internalSchemaType: 18}}
+                                                     {num: {$_internalSchemaType: [18]}}
                                                  ]
                                                }
                                            ]
@@ -532,7 +532,7 @@ TEST(JSONSchemaParserTest, MinLengthTranslatesCorrectlyWithTypeString) {
                                                {
                                                  $and: [
                                                      {foo: {$_internalSchemaMinLength: 5}},
-                                                     {foo: {$_internalSchemaType: 2}}
+                                                     {foo: {$_internalSchemaType: [2]}}
                                                  ]
                                                }
                                            ]
@@ -554,7 +554,7 @@ TEST(JSONSchemaParserTest, MinLengthTranslatesCorrectlyWithIntegralDouble) {
                                                {
                                                  $and: [
                                                      {foo: {$_internalSchemaMinLength: 5}},
-                                                     {foo: {$_internalSchemaType: 2}}
+                                                     {foo: {$_internalSchemaType: [2]}}
                                                  ]
                                                }
                                            ]
@@ -580,15 +580,15 @@ TEST(JSONSchemaParserTest, PatternTranslatesCorrectlyWithString) {
         fromjson("{properties: {foo: {type: 'string', pattern: 'abc'}}, type: 'object'}");
     auto result = JSONSchemaParser::parse(schema);
     ASSERT_OK(result.getStatus());
-    BSONObj expected =
-        BSON("$and" << BSON_ARRAY(BSON(
-                 "$and" << BSON_ARRAY(BSON(
-                     "$or" << BSON_ARRAY(
-                         BSON("$nor" << BSON_ARRAY(BSON("foo" << BSON("$exists" << true))))
-                         << BSON("$and" << BSON_ARRAY(
-                                     BSON("foo" << BSON("$regex"
-                                                        << "abc"))
-                                     << BSON("foo" << BSON("$_internalSchemaType" << 2))))))))));
+    BSONObj expected = BSON(
+        "$and" << BSON_ARRAY(BSON(
+            "$and" << BSON_ARRAY(BSON(
+                "$or" << BSON_ARRAY(
+                    BSON("$nor" << BSON_ARRAY(BSON("foo" << BSON("$exists" << true))))
+                    << BSON("$and" << BSON_ARRAY(BSON("foo" << BSON("$regex"
+                                                                    << "abc"))
+                                                 << BSON("foo" << BSON("$_internalSchemaType"
+                                                                       << BSON_ARRAY(2)))))))))));
     ASSERT_SERIALIZES_TO(result.getValue().get(), expected);
 }
 
@@ -624,7 +624,7 @@ TEST(JSONSchemaParserTest, MultipleOfTranslatesCorrectlyWithTypeNumber) {
                                  {
                                    $and: [
                                        {foo: {$_internalSchemaFmod: [NumberDecimal('5.3'), 0]}},
-                                       {foo: {$_internalSchemaType: 'number'}}
+                                       {foo: {$_internalSchemaType: ['number']}}
                                    ]
                                  }
                              ]
@@ -663,14 +663,14 @@ TEST(JSONSchemaParserTest, AllOfTranslatesCorrectly) {
                    {$and: [{
                         $and: [
                             {$and: [{
-                                $or: [ 
-                                    {$nor: [{foo: {$_internalSchemaType: "number"}}]}, 
-                                    {foo: {$gte: 0}} 
+                                $or: [
+                                    {$nor: [{foo: {$_internalSchemaType: ['number']}}]},
+                                    {foo: {$gte: 0}}
                                 ]
-                            }]}, 
+                            }]},
                             {$and: [{
                                 $or: [
-                                    {$nor: [{foo: {$_internalSchemaType: "number"}}]},
+                                    {$nor: [{foo: {$_internalSchemaType: ['number']}}]},
                                     {foo: {$lte: 10}}
                                 ]
                             }]}
@@ -686,13 +686,13 @@ TEST(JSONSchemaParserTest, TopLevelAllOfTranslatesCorrectly) {
     auto result = JSONSchemaParser::parse(schema);
     ASSERT_OK(result.getStatus());
     ASSERT_SERIALIZES_TO(result.getValue().get(), fromjson(R"(
-        {$and: [{ 
-            $and: [{ 
-                $and: [{ 
+        {$and: [{
+            $and: [{
+                $and: [{
                     $and: [{
                         $or: [
-                            {$nor: [{foo: {$exists: true}}]}, 
-                            {$and: [{foo: {$_internalSchemaType: 2}}]} 
+                            {$nor: [{foo: {$exists: true}}]},
+                            {$and: [{foo: {$_internalSchemaType: [2]}}]}
                         ]
                     }]
                 }]
@@ -726,11 +726,11 @@ TEST(JSONSchemaParserTest, AnyOfTranslatesCorrectly) {
         {$and: [{
             $and: [{
                 $or: [
-                    {$nor: [{foo: {$exists: true}}]}, 
+                    {$nor: [{foo: {$exists: true}}]},
                     {$and: [{
                         $or: [
-                            {$and: [{foo: {$_internalSchemaType: "number"}}]}, 
-                            {$and: [{foo: {$_internalSchemaType: 2}}]}
+                            {$and: [{foo: {$_internalSchemaType: ['number']}}]},
+                            {$and: [{foo: {$_internalSchemaType: [2]}}]}
                         ]
                     }]}
                 ]
@@ -748,8 +748,8 @@ TEST(JSONSchemaParserTest, TopLevelAnyOfTranslatesCorrectly) {
                 $and: [{
                     $and: [{
                         $or: [
-                            {$nor: [{foo: {$exists: true}}]}, 
-                            {$and: [{foo: {$_internalSchemaType: 2}}]}
+                            {$nor: [{foo: {$exists: true}}]},
+                            {$and: [{foo: {$_internalSchemaType: [2]}}]}
                         ]
                     }]
                 }]
@@ -783,18 +783,18 @@ TEST(JSONSchemaParserTest, OneOfTranslatesCorrectly) {
         {$and: [{
             $and: [{
                 $or: [
-                    {$nor: [{foo: {$exists: true}}]}, 
+                    {$nor: [{foo: {$exists: true}}]},
                     {$and: [{
                         $_internalSchemaXor: [
                             {$and: [{
                                 $or: [
-                                    {$nor: [{foo: {$_internalSchemaType: "number"}}]}, 
+                                    {$nor: [{foo: {$_internalSchemaType: ['number']}}]},
                                     {foo: {$gte: 0}}
                                 ]
-                            }]}, 
+                            }]},
                             {$and: [{
                                 $or: [
-                                    {$nor: [{foo: {$_internalSchemaType: "number"}}]},
+                                    {$nor: [{foo: {$_internalSchemaType: ['number']}}]},
                                     {foo: {$lte: 10}}
                                 ]
                             }]}
@@ -815,8 +815,8 @@ TEST(JSONSchemaParserTest, TopLevelOneOfTranslatesCorrectly) {
                 $and: [{
                     $and: [{
                         $or: [
-                            {$nor: [{foo: {$exists: true}}]}, 
-                            {$and: [{foo: {$_internalSchemaType: 2}}]}
+                            {$nor: [{foo: {$exists: true}}]},
+                            {$and: [{foo: {$_internalSchemaType: [2]}}]}
                         ]
                     }]
                 }]
@@ -844,10 +844,10 @@ TEST(JSONSchemaParserTest, NotTranslatesCorrectly) {
         {$and: [{
             $and: [{
                 $or: [
-                    {$nor: [{foo: {$exists: true}}]}, 
+                    {$nor: [{foo: {$exists: true}}]},
                     {$and: [{
                         $nor: [{
-                            $and: [{foo: {$_internalSchemaType: "number"}}]
+                            $and: [{foo: {$_internalSchemaType: ['number']}}]
                         }]
                     }]}
                 ]
@@ -865,8 +865,8 @@ TEST(JSONSchemaParserTest, TopLevelNotTranslatesCorrectly) {
                 $and: [{
                     $and: [{
                         $or: [
-                            {$nor: [{foo: {$exists: true}}]}, 
-                            {$and: [{foo: {$_internalSchemaType: 2}}]}
+                            {$nor: [{foo: {$exists: true}}]},
+                            {$and: [{foo: {$_internalSchemaType: [2]}}]}
                         ]
                     }]
                 }]
@@ -905,7 +905,7 @@ TEST(JSONSchemaParserTest, MinItemsTranslatesCorrectlyWithNoType) {
                       {
                         $and: [{
                             $or: [
-                                {$nor: [{a: {$_internalSchemaType: 4}}]},
+                                {$nor: [{a: {$_internalSchemaType: [4]}}]},
                                 {a: {$_internalSchemaMinItems: 1}}
                             ]
                         }]
@@ -924,7 +924,7 @@ TEST(JSONSchemaParserTest, MinItemsTranslatesCorrectlyWithArrayType) {
               $and: [{
                   $or: [
                       {$nor: [{a: {$exists: true}}]},
-                      {$and: [{a: {$_internalSchemaMinItems: 1}}, {a: {$_internalSchemaType: 4}}]}
+                      {$and: [{a: {$_internalSchemaMinItems: 1}}, {a: {$_internalSchemaType: [4]}}]}
                   ]
               }]
         }]})"));
@@ -939,7 +939,7 @@ TEST(JSONSchemaParserTest, MinItemsTranslatesCorrectlyWithNonArrayType) {
               $and: [{
                   $or: [
                       {$nor: [{a: {$exists: true}}]},
-                      {$and: [{$alwaysTrue: 1}, {a: {$_internalSchemaType: "number"}}]}
+                      {$and: [{$alwaysTrue: 1}, {a: {$_internalSchemaType: ['number']}}]}
                   ]
               }]
         }]})"));
@@ -976,7 +976,7 @@ TEST(JSONSchemaParserTest, MaxItemsTranslatesCorrectlyWithNoType) {
                       {
                         $and: [{
                             $or: [
-                                {$nor: [{a: {$_internalSchemaType: 4}}]},
+                                {$nor: [{a: {$_internalSchemaType: [4]}}]},
                                 {a: {$_internalSchemaMaxItems: 1}}
                             ]
                         }]
@@ -995,7 +995,7 @@ TEST(JSONSchemaParserTest, MaxItemsTranslatesCorrectlyWithArrayType) {
               $and: [{
                   $or: [
                       {$nor: [{a: {$exists: true}}]},
-                      {$and: [{a: {$_internalSchemaMaxItems: 1}}, {a: {$_internalSchemaType: 4}}]}
+                      {$and: [{a: {$_internalSchemaMaxItems: 1}}, {a: {$_internalSchemaType: [4]}}]}
                   ]
               }]
         }]})"));
@@ -1010,7 +1010,7 @@ TEST(JSONSchemaParserTest, MaxItemsTranslatesCorrectlyWithNonArrayType) {
             $and: [{
                 $or: [
                     {$nor: [{a: {$exists: true}}]},
-                    {$and: [{$alwaysTrue: 1}, {a: {$_internalSchemaType: 2}}]}
+                    {$and: [{$alwaysTrue: 1}, {a: {$_internalSchemaType: [2]}}]}
                 ]
             }]
     }]})"));
@@ -1055,7 +1055,7 @@ TEST(JSONSchemaParserTest, TopLevelRequiredTranslatesCorrectlyWithProperties) {
     ASSERT_OK(result.getStatus());
     ASSERT_SERIALIZES_TO(result.getValue().get(), fromjson(R"(
         {$and: [
-            {$and: [{$and: [{foo: {$_internalSchemaType: 'number'}}]}]},
+            {$and: [{$and: [{foo: {$_internalSchemaType: ['number']}}]}]},
             {$and: [{foo: {$exists: true}}]}
         ]
     })"));
@@ -1074,7 +1074,7 @@ TEST(JSONSchemaParserTest, RequiredTranslatesCorrectlyInsideProperties) {
                         {
                           $and: [{
                               $or: [
-                                  {$nor: [{x: {$_internalSchemaType: 3}}]},
+                                  {$nor: [{x: {$_internalSchemaType: [3]}}]},
                                   {
                                     $and:
                                         [{x: {$_internalSchemaObjectMatch: {y: {$exists: true}}}}]
@@ -1104,18 +1104,19 @@ TEST(JSONSchemaParserTest, RequiredTranslatesCorrectlyInsidePropertiesWithSiblin
                           $and: [
                               {
                                 $or: [
-                                    {$nor: [{x: {$_internalSchemaType: 3}}]},
+                                    {$nor: [{x: {$_internalSchemaType: [3]}}]},
                                     {
                                       x: {
                                           $_internalSchemaObjectMatch:
-                                           {$and: [{$and: [{y: {$_internalSchemaType: 'number'}}]}]}
+                                           {$and: [{$and: [{y:
+                                             {$_internalSchemaType: ['number']}}]}]}
                                       }
                                     }
                                 ]
                               },
                               {
                                 $or: [
-                                    {$nor: [{x: {$_internalSchemaType: 3}}]},
+                                    {$nor: [{x: {$_internalSchemaType: [3]}}]},
                                     {
                                       $and: [{
                                           x: {$_internalSchemaObjectMatch: {y: {$exists: true}}}
@@ -1133,7 +1134,7 @@ TEST(JSONSchemaParserTest, RequiredTranslatesCorrectlyInsidePropertiesWithSiblin
 }
 
 TEST(JSONSchemaParserTest, SharedJsonAndBsonTypeAliasesTranslateIdentically) {
-    for (auto&& mapEntry : MatcherTypeAlias::kJsonSchemaTypeAliasMap) {
+    for (auto&& mapEntry : MatcherTypeSet::kJsonSchemaTypeAliasMap) {
         auto typeAlias = mapEntry.first;
         // JSON Schema spells its bool type as "boolean", whereas MongoDB calls it "bool".
         auto bsonTypeAlias =
@@ -1218,7 +1219,7 @@ TEST(JSONSchemaParserTest, NestedMinPropertiesTranslatesCorrectly) {
                   $and: [{
                       $and: [
                           {obj: {$_internalSchemaObjectMatch: {$_internalSchemaMinProperties: 2}}},
-                          {obj: {$_internalSchemaType: 3}}
+                          {obj: {$_internalSchemaType: [3]}}
                       ]
                   }]
                 },
@@ -1239,7 +1240,7 @@ TEST(JSONSchemaParserTest, NestedMaxPropertiesTranslatesCorrectly) {
                   $and: [{
                       $and: [
                           {obj: {$_internalSchemaObjectMatch: {$_internalSchemaMaxProperties: 2}}},
-                          {obj: {$_internalSchemaType: 3}}
+                          {obj: {$_internalSchemaType: [3]}}
                       ]
                   }]
                 },
@@ -1262,7 +1263,7 @@ TEST(JSONSchemaParserTest, NestedMinPropertiesTranslatesCorrectlyWithoutRequired
                           $and: [
                               {obj:
                                 {$_internalSchemaObjectMatch: {$_internalSchemaMinProperties: 2}}},
-                              {obj: {$_internalSchemaType: 3}}
+                              {obj: {$_internalSchemaType: [3]}}
                           ]
                         }
                     ]
@@ -1285,9 +1286,115 @@ TEST(JSONSchemaParserTest, NestedMaxPropertiesTranslatesCorrectlyWithoutRequired
                           $and: [
                               {obj:
                                 {$_internalSchemaObjectMatch: {$_internalSchemaMaxProperties: 2}}},
-                              {obj: {$_internalSchemaType: 3}}
+                              {obj: {$_internalSchemaType: [3]}}
                           ]
                         }
+                    ]
+                }]
+            }]
+        }
+    )"));
+}
+
+TEST(JSONSchemaParserTest, FailsToParseIfTypeArrayHasRepeatedAlias) {
+    BSONObj schema = fromjson("{properties: {obj: {type: ['object', 'string', 'object']}}}");
+    auto result = JSONSchemaParser::parse(schema);
+    ASSERT_NOT_OK(result.getStatus());
+}
+
+TEST(JSONSchemaParserTest, FailsToParseIfBsonTypeArrayHasRepeatedAlias) {
+    BSONObj schema = fromjson("{properties: {obj: {bsonType: ['object', 'string', 'object']}}}");
+    auto result = JSONSchemaParser::parse(schema);
+    ASSERT_NOT_OK(result.getStatus());
+}
+
+TEST(JSONSchemaParserTest, FailsToParseIfTypeArrayIsEmpty) {
+    BSONObj schema = fromjson("{properties: {obj: {type: []}}}");
+    auto result = JSONSchemaParser::parse(schema);
+    ASSERT_NOT_OK(result.getStatus());
+}
+
+TEST(JSONSchemaParserTest, FailsToParseIfBsonTypeArrayIsEmpty) {
+    BSONObj schema = fromjson("{properties: {obj: {bsonType: []}}}");
+    auto result = JSONSchemaParser::parse(schema);
+    ASSERT_NOT_OK(result.getStatus());
+}
+
+TEST(JSONSchemaParserTest, FailsToParseIfTypeArrayContainsNonString) {
+    BSONObj schema = fromjson("{properties: {obj: {type: [1]}}}");
+    auto result = JSONSchemaParser::parse(schema);
+    ASSERT_NOT_OK(result.getStatus());
+}
+
+TEST(JSONSchemaParserTest, FailsToParseIfBsonTypeArrayContainsNonString) {
+    BSONObj schema = fromjson("{properties: {obj: {bsonType: [1]}}}");
+    auto result = JSONSchemaParser::parse(schema);
+    ASSERT_NOT_OK(result.getStatus());
+}
+
+TEST(JSONSchemaParserTest, FailsToParseIfTypeArrayContainsUnknownAlias) {
+    BSONObj schema = fromjson("{properties: {obj: {type: ['objectId']}}}");
+    auto result = JSONSchemaParser::parse(schema);
+    ASSERT_NOT_OK(result.getStatus());
+}
+
+TEST(JSONSchemaParserTest, FailsToParseIfBsonTypeArrayContainsUnknownAlias) {
+    BSONObj schema = fromjson("{properties: {obj: {bsonType: ['unknown']}}}");
+    auto result = JSONSchemaParser::parse(schema);
+    ASSERT_NOT_OK(result.getStatus());
+}
+
+TEST(JSONSchemaParserTest, CanTranslateTopLevelTypeArrayWithoutObject) {
+    BSONObj schema = fromjson("{type: ['number', 'string']}}}");
+    auto result = JSONSchemaParser::parse(schema);
+    ASSERT_SERIALIZES_TO(result.getValue().get(), fromjson("{$alwaysFalse: 1}"));
+}
+
+TEST(JSONSchemaParserTest, CanTranslateTopLevelBsonTypeArrayWithoutObject) {
+    BSONObj schema = fromjson("{bsonType: ['number', 'string']}}}");
+    auto result = JSONSchemaParser::parse(schema);
+    ASSERT_SERIALIZES_TO(result.getValue().get(), fromjson("{$alwaysFalse: 1}"));
+}
+
+TEST(JSONSchemaParserTest, CanTranslateTopLevelTypeArrayWithObject) {
+    BSONObj schema = fromjson("{type: ['number', 'object']}}}");
+    auto result = JSONSchemaParser::parse(schema);
+    ASSERT_SERIALIZES_TO(result.getValue().get(), fromjson("{}"));
+}
+
+TEST(JSONSchemaParserTest, CanTranslateTopLevelBsonTypeArrayWithObject) {
+    BSONObj schema = fromjson("{bsonType: ['number', 'object']}}}");
+    auto result = JSONSchemaParser::parse(schema);
+    ASSERT_SERIALIZES_TO(result.getValue().get(), fromjson("{}"));
+}
+
+TEST(JSONSchemaParserTest, CanTranslateNestedTypeArray) {
+    BSONObj schema = fromjson("{properties: {a: {type: ['number', 'object']}}}");
+    auto result = JSONSchemaParser::parse(schema);
+    ASSERT_SERIALIZES_TO(result.getValue().get(), fromjson(R"(
+        {
+            $and: [{
+                $and: [{
+                    $or: [
+                        {$nor: [{a: {$exists: true}}]},
+                        {$and: [{a: {$_internalSchemaType: ['number', 3]}}]}
+                    ]
+                }]
+            }]
+        }
+    )"));
+}
+
+TEST(JSONSchemaParserTest, CanTranslateNestedBsonTypeArray) {
+    BSONObj schema = fromjson("{properties: {a: {bsonType: ['number', 'objectId']}}}");
+    auto result = JSONSchemaParser::parse(schema);
+    ASSERT_SERIALIZES_TO(result.getValue().get(), fromjson(R"(
+        {
+            $and: [{
+                $and: [{
+                    $or: [
+                        {$nor: [{a: {$exists: true}}]},
+                        {$and: [{a: {$_internalSchemaType: ['number', 7]}}]}
                     ]
                 }]
             }]

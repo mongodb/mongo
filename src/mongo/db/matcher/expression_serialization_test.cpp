@@ -1106,7 +1106,7 @@ TEST(SerializeBasic, ExpressionTypeSerializesCorrectly) {
                          expCtx,
                          ExtensionsCallbackNoop(),
                          MatchExpressionParser::kAllowAllSpecialFeatures);
-    ASSERT_BSONOBJ_EQ(*reserialized.getQuery(), fromjson("{x: {$type: 2}}"));
+    ASSERT_BSONOBJ_EQ(*reserialized.getQuery(), fromjson("{x: {$type: [2]}}"));
     ASSERT_BSONOBJ_EQ(*reserialized.getQuery(), serialize(reserialized.getMatchExpression()));
 
     BSONObj obj = fromjson("{x: 3}");
@@ -1128,7 +1128,7 @@ TEST(SerializeBasic, ExpressionTypeWithNumberSerializesCorrectly) {
                          expCtx,
                          ExtensionsCallbackNoop(),
                          MatchExpressionParser::kAllowAllSpecialFeatures);
-    ASSERT_BSONOBJ_EQ(*reserialized.getQuery(), fromjson("{x: {$type: 'number'}}"));
+    ASSERT_BSONOBJ_EQ(*reserialized.getQuery(), fromjson("{x: {$type: ['number']}}"));
     ASSERT_BSONOBJ_EQ(*reserialized.getQuery(), serialize(reserialized.getMatchExpression()));
 
     BSONObj obj = fromjson("{x: 3}");
@@ -1138,10 +1138,27 @@ TEST(SerializeBasic, ExpressionTypeWithNumberSerializesCorrectly) {
     ASSERT_EQ(original.matches(obj), reserialized.matches(obj));
 }
 
+TEST(SerializeBasic, ExpressionTypeWithMultipleTypesSerializesCorrectly) {
+    Matcher original(fromjson("{x: {$type: ['double', 'string', 'object', 'number']}}"),
+                     kSimpleCollator);
+    Matcher reserialized(serialize(original.getMatchExpression()), kSimpleCollator);
+    ASSERT_BSONOBJ_EQ(*reserialized.getQuery(), fromjson("{x: {$type: ['number', 1, 2, 3]}}"));
+    ASSERT_BSONOBJ_EQ(*reserialized.getQuery(), serialize(reserialized.getMatchExpression()));
+
+    BSONObj obj = fromjson("{x: 3}");
+    ASSERT_EQ(original.matches(obj), reserialized.matches(obj));
+    obj = fromjson("{x: 'foo'}");
+    ASSERT_EQ(original.matches(obj), reserialized.matches(obj));
+    obj = fromjson("{x: []}");
+    ASSERT_EQ(original.matches(obj), reserialized.matches(obj));
+    obj = fromjson("{x: {}}");
+    ASSERT_EQ(original.matches(obj), reserialized.matches(obj));
+}
+
 TEST(SerializeInternalSchema, InternalSchemaTypeExpressionSerializesCorrectly) {
     Matcher original(fromjson("{x: {$_internalSchemaType: 2}}"), kSimpleCollator);
     Matcher reserialized(serialize(original.getMatchExpression()), kSimpleCollator);
-    ASSERT_BSONOBJ_EQ(*reserialized.getQuery(), fromjson("{x: {$_internalSchemaType: 2}}"));
+    ASSERT_BSONOBJ_EQ(*reserialized.getQuery(), fromjson("{x: {$_internalSchemaType: [2]}}"));
     ASSERT_BSONOBJ_EQ(*reserialized.getQuery(), serialize(reserialized.getMatchExpression()));
 
     BSONObj obj = fromjson("{x: 3}");
@@ -1154,13 +1171,33 @@ TEST(SerializeInternalSchema, InternalSchemaTypeExpressionSerializesCorrectly) {
 TEST(SerializeInternalSchema, InternalSchemaTypeExpressionWithNumberSerializesCorrectly) {
     Matcher original(fromjson("{x: {$_internalSchemaType: 'number'}}"), kSimpleCollator);
     Matcher reserialized(serialize(original.getMatchExpression()), kSimpleCollator);
-    ASSERT_BSONOBJ_EQ(*reserialized.getQuery(), fromjson("{x: {$_internalSchemaType: 'number'}}"));
+    ASSERT_BSONOBJ_EQ(*reserialized.getQuery(),
+                      fromjson("{x: {$_internalSchemaType: ['number']}}"));
     ASSERT_BSONOBJ_EQ(*reserialized.getQuery(), serialize(reserialized.getMatchExpression()));
 
     BSONObj obj = fromjson("{x: 3}");
     ASSERT_EQ(original.matches(obj), reserialized.matches(obj));
 
     obj = fromjson("{x: '3'}");
+    ASSERT_EQ(original.matches(obj), reserialized.matches(obj));
+}
+
+TEST(SerializeInternalSchema, InternalSchemaTypeWithMultipleTypesSerializesCorrectly) {
+    Matcher original(
+        fromjson("{x: {$_internalSchemaType: ['double', 'string', 'object', 'number']}}"),
+        kSimpleCollator);
+    Matcher reserialized(serialize(original.getMatchExpression()), kSimpleCollator);
+    ASSERT_BSONOBJ_EQ(*reserialized.getQuery(),
+                      fromjson("{x: {$_internalSchemaType: ['number', 1, 2, 3]}}"));
+    ASSERT_BSONOBJ_EQ(*reserialized.getQuery(), serialize(reserialized.getMatchExpression()));
+
+    BSONObj obj = fromjson("{x: 3}");
+    ASSERT_EQ(original.matches(obj), reserialized.matches(obj));
+    obj = fromjson("{x: 'foo'}");
+    ASSERT_EQ(original.matches(obj), reserialized.matches(obj));
+    obj = fromjson("{x: []}");
+    ASSERT_EQ(original.matches(obj), reserialized.matches(obj));
+    obj = fromjson("{x: {}}");
     ASSERT_EQ(original.matches(obj), reserialized.matches(obj));
 }
 
@@ -1636,7 +1673,7 @@ TEST(SerializeInternalSchema, ExpressionInternalSchemaAllowedPropertiesSerialize
     ASSERT_BSONOBJ_EQ(*reserialized.getQuery(), fromjson(R"({$_internalSchemaAllowedProperties: {
             properties: ['a'],
             namePlaceholder: 'i',
-            patternProperties: [{regex: /b/, expression: {i: {$type: 'number'}}}],
+            patternProperties: [{regex: /b/, expression: {i: {$type: ['number']}}}],
             otherwise: {i: {$gt: 10}}
         }})"));
     ASSERT_BSONOBJ_EQ(*reserialized.getQuery(), serialize(reserialized.getMatchExpression()));

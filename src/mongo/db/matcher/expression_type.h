@@ -29,7 +29,7 @@
 #pragma once
 
 #include "mongo/db/matcher/expression_leaf.h"
-#include "mongo/db/matcher/matcher_type_alias.h"
+#include "mongo/db/matcher/matcher_type_set.h"
 
 namespace mongo {
 
@@ -45,14 +45,14 @@ public:
      */
     virtual StringData name() const = 0;
 
-    Status init(StringData path, MatcherTypeAlias type) {
-        _type = std::move(type);
+    Status init(StringData path, MatcherTypeSet typeSet) {
+        _typeSet = std::move(typeSet);
         return setPath(path);
     }
 
     std::unique_ptr<MatchExpression> shallowClone() const final {
         auto expr = stdx::make_unique<T>();
-        invariantOK(expr->init(path(), _type));
+        invariantOK(expr->init(path(), _typeSet));
         if (getTag()) {
             expr->setTag(getTag()->clone());
         }
@@ -61,17 +61,12 @@ public:
 
     bool matchesSingleElement(const BSONElement& elem,
                               MatchDetails* details = nullptr) const final {
-        return getType().elementMatchesType(elem);
+        return _typeSet.hasType(elem.type());
     }
 
     void debugString(StringBuilder& debug, int level) const final {
         _debugAddSpace(debug, level);
-        debug << path() << " " << name() << ": ";
-        if (matchesAllNumbers()) {
-            debug << MatcherTypeAlias::kMatchesAllNumbersAlias;
-        } else {
-            debug << _type.bsonType;
-        }
+        debug << path() << " " << name() << ": " << _typeSet.toBSONArray().toString();
 
         MatchExpression::TagData* td = getTag();
         if (td) {
@@ -83,11 +78,9 @@ public:
 
     void serialize(BSONObjBuilder* out) const final {
         BSONObjBuilder subBuilder(out->subobjStart(path()));
-        if (matchesAllNumbers()) {
-            subBuilder.append(name(), MatcherTypeAlias::kMatchesAllNumbersAlias);
-        } else {
-            subBuilder.append(name(), _type.bsonType);
-        }
+        BSONArrayBuilder arrBuilder(subBuilder.subarrayStart(name()));
+        _typeSet.toBSONArray(&arrBuilder);
+        arrBuilder.doneFast();
         subBuilder.doneFast();
     }
 
@@ -101,31 +94,19 @@ public:
             return false;
         }
 
-        if (_type.allNumbers) {
-            return realOther->_type.allNumbers;
-        }
-
-        return _type.bsonType == realOther->_type.bsonType;
-    }
-
-    BSONType getBSONType() const {
-        return _type.bsonType;
-    }
-
-    MatcherTypeAlias getType() const {
-        return _type;
+        return _typeSet == realOther->_typeSet;
     }
 
     /**
-     * Whether or not to match against all number types (NumberDouble, NumberLong, and NumberInt).
-     * Defaults to false. If this is true, _type is EOO.
+     * Returns a representation of the set of matching types.
      */
-    bool matchesAllNumbers() const {
-        return _type.allNumbers;
+    const MatcherTypeSet& typeSet() const {
+        return _typeSet;
     }
 
 private:
-    MatcherTypeAlias _type;
+    // The set of matching types.
+    MatcherTypeSet _typeSet;
 };
 
 class TypeMatchExpression final : public TypeMatchExpressionBase<TypeMatchExpression> {

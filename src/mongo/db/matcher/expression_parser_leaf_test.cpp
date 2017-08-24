@@ -1446,7 +1446,9 @@ TEST(MatchExpressionParserLeafTest, TypeStringnameDouble) {
     ASSERT_OK(typeNumberDouble.getStatus());
     TypeMatchExpression* tmeNumberDouble =
         static_cast<TypeMatchExpression*>(typeNumberDouble.getValue().get());
-    ASSERT_EQ(tmeNumberDouble->getBSONType(), BSONType::NumberDouble);
+    ASSERT_FALSE(tmeNumberDouble->typeSet().allNumbers);
+    ASSERT_EQ(tmeNumberDouble->typeSet().bsonTypes.size(), 1u);
+    ASSERT_TRUE(tmeNumberDouble->typeSet().hasType(BSONType::NumberDouble));
     ASSERT_TRUE(tmeNumberDouble->matchesBSON(fromjson("{a: 5.4}")));
     ASSERT_FALSE(tmeNumberDouble->matchesBSON(fromjson("{a: NumberInt(5)}")));
 }
@@ -1458,7 +1460,9 @@ TEST(MatchExpressionParserLeafTest, TypeStringNameNumberDecimal) {
     ASSERT_OK(typeNumberDecimal.getStatus());
     TypeMatchExpression* tmeNumberDecimal =
         static_cast<TypeMatchExpression*>(typeNumberDecimal.getValue().get());
-    ASSERT_EQ(tmeNumberDecimal->getBSONType(), BSONType::NumberDecimal);
+    ASSERT_FALSE(tmeNumberDecimal->typeSet().allNumbers);
+    ASSERT_EQ(tmeNumberDecimal->typeSet().bsonTypes.size(), 1u);
+    ASSERT_TRUE(tmeNumberDecimal->typeSet().hasType(BSONType::NumberDecimal));
     ASSERT_TRUE(tmeNumberDecimal->matchesBSON(BSON("a" << mongo::Decimal128("1"))));
     ASSERT_FALSE(tmeNumberDecimal->matchesBSON(fromjson("{a: true}")));
 }
@@ -1470,7 +1474,9 @@ TEST(MatchExpressionParserLeafTest, TypeStringnameNumberInt) {
     ASSERT_OK(typeNumberInt.getStatus());
     TypeMatchExpression* tmeNumberInt =
         static_cast<TypeMatchExpression*>(typeNumberInt.getValue().get());
-    ASSERT_EQ(tmeNumberInt->getBSONType(), BSONType::NumberInt);
+    ASSERT_FALSE(tmeNumberInt->typeSet().allNumbers);
+    ASSERT_EQ(tmeNumberInt->typeSet().bsonTypes.size(), 1u);
+    ASSERT_TRUE(tmeNumberInt->typeSet().hasType(BSONType::NumberInt));
     ASSERT_TRUE(tmeNumberInt->matchesBSON(fromjson("{a: NumberInt(5)}")));
     ASSERT_FALSE(tmeNumberInt->matchesBSON(fromjson("{a: 5.4}")));
 }
@@ -1482,7 +1488,9 @@ TEST(MatchExpressionParserLeafTest, TypeStringnameNumberLong) {
     ASSERT_OK(typeNumberLong.getStatus());
     TypeMatchExpression* tmeNumberLong =
         static_cast<TypeMatchExpression*>(typeNumberLong.getValue().get());
-    ASSERT_EQ(tmeNumberLong->getBSONType(), BSONType::NumberLong);
+    ASSERT_FALSE(tmeNumberLong->typeSet().allNumbers);
+    ASSERT_EQ(tmeNumberLong->typeSet().bsonTypes.size(), 1u);
+    ASSERT_TRUE(tmeNumberLong->typeSet().hasType(BSONType::NumberLong));
     ASSERT_TRUE(tmeNumberLong->matchesBSON(BSON("a" << -1LL)));
     ASSERT_FALSE(tmeNumberLong->matchesBSON(fromjson("{a: true}")));
 }
@@ -1493,7 +1501,9 @@ TEST(MatchExpressionParserLeafTest, TypeStringnameString) {
         MatchExpressionParser::parse(fromjson("{a: {$type: 'string'}}"), collator);
     ASSERT_OK(typeString.getStatus());
     TypeMatchExpression* tmeString = static_cast<TypeMatchExpression*>(typeString.getValue().get());
-    ASSERT_EQ(tmeString->getBSONType(), BSONType::String);
+    ASSERT_FALSE(tmeString->typeSet().allNumbers);
+    ASSERT_EQ(tmeString->typeSet().bsonTypes.size(), 1u);
+    ASSERT_TRUE(tmeString->typeSet().hasType(BSONType::String));
     ASSERT_TRUE(tmeString->matchesBSON(fromjson("{a: 'hello world'}")));
     ASSERT_FALSE(tmeString->matchesBSON(fromjson("{a: 5.4}")));
 }
@@ -1504,7 +1514,9 @@ TEST(MatchExpressionParserLeafTest, TypeStringnamejstOID) {
         MatchExpressionParser::parse(fromjson("{a: {$type: 'objectId'}}"), collator);
     ASSERT_OK(typejstOID.getStatus());
     TypeMatchExpression* tmejstOID = static_cast<TypeMatchExpression*>(typejstOID.getValue().get());
-    ASSERT_EQ(tmejstOID->getBSONType(), BSONType::jstOID);
+    ASSERT_FALSE(tmejstOID->typeSet().allNumbers);
+    ASSERT_EQ(tmejstOID->typeSet().bsonTypes.size(), 1u);
+    ASSERT_TRUE(tmejstOID->typeSet().hasType(BSONType::jstOID));
     ASSERT_TRUE(tmejstOID->matchesBSON(fromjson("{a: ObjectId('000000000000000000000000')}")));
     ASSERT_FALSE(tmejstOID->matchesBSON(fromjson("{a: 'hello world'}")));
 }
@@ -1516,7 +1528,9 @@ TEST(MatchExpressionParserLeafTest, TypeStringnamejstNULL) {
     ASSERT_OK(typejstNULL.getStatus());
     TypeMatchExpression* tmejstNULL =
         static_cast<TypeMatchExpression*>(typejstNULL.getValue().get());
-    ASSERT_EQ(tmejstNULL->getBSONType(), BSONType::jstNULL);
+    ASSERT_FALSE(tmejstNULL->typeSet().allNumbers);
+    ASSERT_EQ(tmejstNULL->typeSet().bsonTypes.size(), 1u);
+    ASSERT_TRUE(tmejstNULL->typeSet().hasType(BSONType::jstNULL));
     ASSERT_TRUE(tmejstNULL->matchesBSON(fromjson("{a: null}")));
     ASSERT_FALSE(tmejstNULL->matchesBSON(fromjson("{a: true}")));
 }
@@ -1527,7 +1541,9 @@ TEST(MatchExpressionParserLeafTest, TypeStringnameBool) {
         MatchExpressionParser::parse(fromjson("{a: {$type: 'bool'}}"), collator);
     ASSERT_OK(typeBool.getStatus());
     TypeMatchExpression* tmeBool = static_cast<TypeMatchExpression*>(typeBool.getValue().get());
-    ASSERT_EQ(tmeBool->getBSONType(), BSONType::Bool);
+    ASSERT_FALSE(tmeBool->typeSet().allNumbers);
+    ASSERT_EQ(tmeBool->typeSet().bsonTypes.size(), 1u);
+    ASSERT_TRUE(tmeBool->typeSet().hasType(BSONType::Bool));
     ASSERT_TRUE(tmeBool->matchesBSON(fromjson("{a: true}")));
     ASSERT_FALSE(tmeBool->matchesBSON(fromjson("{a: null}")));
 }
@@ -1538,7 +1554,9 @@ TEST(MatchExpressionParserLeafTest, TypeStringnameObject) {
         MatchExpressionParser::parse(fromjson("{a: {$type: 'object'}}"), collator);
     ASSERT_OK(typeObject.getStatus());
     TypeMatchExpression* tmeObject = static_cast<TypeMatchExpression*>(typeObject.getValue().get());
-    ASSERT_EQ(tmeObject->getBSONType(), BSONType::Object);
+    ASSERT_FALSE(tmeObject->typeSet().allNumbers);
+    ASSERT_EQ(tmeObject->typeSet().bsonTypes.size(), 1u);
+    ASSERT_TRUE(tmeObject->typeSet().hasType(BSONType::Object));
     ASSERT_TRUE(tmeObject->matchesBSON(fromjson("{a: {}}")));
     ASSERT_FALSE(tmeObject->matchesBSON(fromjson("{a: []}")));
 }
@@ -1549,7 +1567,9 @@ TEST(MatchExpressionParserLeafTest, TypeStringnameArray) {
         MatchExpressionParser::parse(fromjson("{a: {$type: 'array'}}"), collator);
     ASSERT_OK(typeArray.getStatus());
     TypeMatchExpression* tmeArray = static_cast<TypeMatchExpression*>(typeArray.getValue().get());
-    ASSERT_EQ(tmeArray->getBSONType(), BSONType::Array);
+    ASSERT_FALSE(tmeArray->typeSet().allNumbers);
+    ASSERT_EQ(tmeArray->typeSet().bsonTypes.size(), 1u);
+    ASSERT_TRUE(tmeArray->typeSet().hasType(BSONType::Array));
     ASSERT_TRUE(tmeArray->matchesBSON(fromjson("{a: [[]]}")));
     ASSERT_FALSE(tmeArray->matchesBSON(fromjson("{a: {}}")));
 }
@@ -1560,10 +1580,31 @@ TEST(MatchExpressionParserLeafTest, TypeStringnameNumber) {
         MatchExpressionParser::parse(fromjson("{a: {$type: 'number'}}"), collator);
     ASSERT_OK(typeNumber.getStatus());
     TypeMatchExpression* tmeNumber = static_cast<TypeMatchExpression*>(typeNumber.getValue().get());
+    ASSERT_TRUE(tmeNumber->typeSet().allNumbers);
+    ASSERT_EQ(tmeNumber->typeSet().bsonTypes.size(), 0u);
     ASSERT_TRUE(tmeNumber->matchesBSON(fromjson("{a: 5.4}")));
     ASSERT_TRUE(tmeNumber->matchesBSON(fromjson("{a: NumberInt(5)}")));
     ASSERT_TRUE(tmeNumber->matchesBSON(BSON("a" << -1LL)));
     ASSERT_FALSE(tmeNumber->matchesBSON(fromjson("{a: ''}")));
+}
+
+TEST(MatchExpressionParserLeafTest, CanParseArrayOfTypes) {
+    const CollatorInterface* collator = nullptr;
+    StatusWithMatchExpression typeNumber =
+        MatchExpressionParser::parse(fromjson("{a: {$type: ['number', 2, 'object']}}"), collator);
+    ASSERT_OK(typeNumber.getStatus());
+    TypeMatchExpression* tme = static_cast<TypeMatchExpression*>(typeNumber.getValue().get());
+    ASSERT_TRUE(tme->typeSet().allNumbers);
+    ASSERT_EQ(tme->typeSet().bsonTypes.size(), 2u);
+    ASSERT_TRUE(tme->typeSet().hasType(BSONType::String));
+    ASSERT_TRUE(tme->typeSet().hasType(BSONType::Object));
+}
+
+TEST(MatchExpressionParserLeafTest, EmptyArrayFailsToParse) {
+    const CollatorInterface* collator = nullptr;
+    StatusWithMatchExpression typeNumber =
+        MatchExpressionParser::parse(fromjson("{a: {$type: []}}"), collator);
+    ASSERT_NOT_OK(typeNumber.getStatus());
 }
 
 TEST(MatchExpressionParserLeafTest, InvalidTypeCodeLessThanMinKeyFailsToParse) {
@@ -1599,7 +1640,10 @@ TEST(MatchExpressionParserLeafTest, ValidTypeCodesParseSuccessfully) {
         auto expression = MatchExpressionParser::parse(predicate, collator);
         ASSERT_OK(expression.getStatus());
         auto typeExpression = static_cast<TypeMatchExpression*>(expression.getValue().get());
-        ASSERT_EQ(type, typeExpression->getBSONType());
+        ASSERT_FALSE(typeExpression->typeSet().allNumbers);
+        ASSERT_EQ(typeExpression->typeSet().bsonTypes.size(), 1u);
+        ASSERT_TRUE(typeExpression->typeSet().isSingleType());
+        ASSERT_TRUE(typeExpression->typeSet().hasType(type));
     }
 }
 

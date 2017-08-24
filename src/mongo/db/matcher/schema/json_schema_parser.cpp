@@ -35,7 +35,7 @@
 #include "mongo/bson/bsontypes.h"
 #include "mongo/db/matcher/expression_always_boolean.h"
 #include "mongo/db/matcher/expression_parser.h"
-#include "mongo/db/matcher/matcher_type_alias.h"
+#include "mongo/db/matcher/matcher_type_set.h"
 #include "mongo/db/matcher/schema/expression_internal_schema_all_elem_match_from_index.h"
 #include "mongo/db/matcher/schema/expression_internal_schema_fmod.h"
 #include "mongo/db/matcher/schema/expression_internal_schema_max_items.h"
@@ -105,16 +105,19 @@ StatusWithMatchExpression _parse(StringData path, BSONObj schema);
  * enforce this restriction, should the types match (e.g. $_internalSchemaMaxItems). 'statedType' is
  * a parsed representation of the JSON Schema type keyword which is in effect.
  */
-std::unique_ptr<MatchExpression> makeRestriction(MatcherTypeAlias restrictionType,
+std::unique_ptr<MatchExpression> makeRestriction(const MatcherTypeSet& restrictionType,
                                                  StringData path,
                                                  std::unique_ptr<MatchExpression> restrictionExpr,
                                                  InternalSchemaTypeExpression* statedType) {
-    if (statedType) {
-        const bool bothNumeric = restrictionType.allNumbers &&
-            (statedType->matchesAllNumbers() || isNumericBSONType(statedType->getBSONType()));
-        const bool bsonTypesMatch = restrictionType.bsonType == statedType->getBSONType();
+    invariant(restrictionType.isSingleType());
 
-        if (bothNumeric || bsonTypesMatch) {
+    if (statedType && statedType->typeSet().isSingleType()) {
+        // Use NumberInt in the "number" case as a stand-in.
+        BSONType statedBSONType = statedType->typeSet().allNumbers
+            ? BSONType::NumberInt
+            : *statedType->typeSet().bsonTypes.begin();
+
+        if (restrictionType.hasType(statedBSONType)) {
             // This restriction applies to the type that is already being enforced. We return the
             // restriction unmodified.
             return restrictionExpr;
@@ -145,20 +148,50 @@ std::unique_ptr<MatchExpression> makeRestriction(MatcherTypeAlias restrictionTyp
 }
 
 StatusWith<std::unique_ptr<InternalSchemaTypeExpression>> parseType(
-    StringData path, BSONElement typeElt, const StringMap<BSONType>& aliasMap) {
-    if (typeElt.type() != BSONType::String) {
+    StringData path,
+    StringData keywordName,
+    BSONElement typeElt,
+    const StringMap<BSONType>& aliasMap) {
+    if (typeElt.type() != BSONType::String && typeElt.type() != BSONType::Array) {
         return {Status(ErrorCodes::TypeMismatch,
-                       str::stream() << "$jsonSchema keyword '" << kSchemaTypeKeyword
-                                     << "' must be a string")};
+                       str::stream() << "$jsonSchema keyword '" << keywordName
+                                     << "' must be either a string or an array of strings")};
     }
 
-    auto parsedType = MatcherTypeAlias::parseFromStringAlias(typeElt.valueStringData(), aliasMap);
-    if (!parsedType.isOK()) {
-        return parsedType.getStatus();
+    std::set<StringData> aliases;
+    if (typeElt.type() == BSONType::String) {
+        aliases.insert(typeElt.valueStringData());
+    } else {
+        for (auto&& typeArrayEntry : typeElt.embeddedObject()) {
+            if (typeArrayEntry.type() != BSONType::String) {
+                return {Status(ErrorCodes::TypeMismatch,
+                               str::stream() << "$jsonSchema keyword '" << keywordName
+                                             << "' array elements must be strings")};
+            }
+
+            auto insertionResult = aliases.insert(typeArrayEntry.valueStringData());
+            if (!insertionResult.second) {
+                return {Status(ErrorCodes::FailedToParse,
+                               str::stream() << "$jsonSchema keyword '" << keywordName
+                                             << "' has duplicate value: "
+                                             << typeArrayEntry.valueStringData())};
+            }
+        }
+    }
+
+    auto typeSet = MatcherTypeSet::fromStringAliases(std::move(aliases), aliasMap);
+    if (!typeSet.isOK()) {
+        return typeSet.getStatus();
+    }
+
+    if (typeSet.getValue().isEmpty()) {
+        return {Status(ErrorCodes::FailedToParse,
+                       str::stream() << "$jsonSchema keyword '" << keywordName
+                                     << "' must name at least one type")};
     }
 
     auto typeExpr = stdx::make_unique<InternalSchemaTypeExpression>();
-    auto initStatus = typeExpr->init(path, parsedType.getValue());
+    auto initStatus = typeExpr->init(path, std::move(typeSet.getValue()));
     if (!initStatus.isOK()) {
         return initStatus;
     }
@@ -192,7 +225,7 @@ StatusWithMatchExpression parseMaximum(StringData path,
         return status;
     }
 
-    MatcherTypeAlias restrictionType;
+    MatcherTypeSet restrictionType;
     restrictionType.allNumbers = true;
     return makeRestriction(restrictionType, path, std::move(expr), typeExpr);
 }
@@ -223,7 +256,7 @@ StatusWithMatchExpression parseMinimum(StringData path,
         return status;
     }
 
-    MatcherTypeAlias restrictionType;
+    MatcherTypeSet restrictionType;
     restrictionType.allNumbers = true;
     return makeRestriction(restrictionType, path, std::move(expr), typeExpr);
 }
@@ -301,7 +334,7 @@ StatusWithMatchExpression parseMultipleOf(StringData path,
         return status;
     }
 
-    MatcherTypeAlias restrictionType;
+    MatcherTypeSet restrictionType;
     restrictionType.allNumbers = true;
     return makeRestriction(restrictionType, path, std::move(expr), typeExpr);
 }
@@ -831,13 +864,15 @@ StatusWithMatchExpression _parse(StringData path, BSONObj schema) {
 
     std::unique_ptr<InternalSchemaTypeExpression> typeExpr;
     if (typeElem) {
-        auto parseTypeResult = parseType(path, typeElem, MatcherTypeAlias::kJsonSchemaTypeAliasMap);
+        auto parseTypeResult =
+            parseType(path, kSchemaTypeKeyword, typeElem, MatcherTypeSet::kJsonSchemaTypeAliasMap);
         if (!parseTypeResult.isOK()) {
             return parseTypeResult.getStatus();
         }
         typeExpr = std::move(parseTypeResult.getValue());
     } else if (bsonTypeElem) {
-        auto parseBsonTypeResult = parseType(path, bsonTypeElem, MatcherTypeAlias::kTypeAliasMap);
+        auto parseBsonTypeResult =
+            parseType(path, kSchemaBsonTypeKeyword, bsonTypeElem, MatcherTypeSet::kTypeAliasMap);
         if (!parseBsonTypeResult.isOK()) {
             return parseBsonTypeResult.getStatus();
         }
@@ -867,7 +902,7 @@ StatusWithMatchExpression _parse(StringData path, BSONObj schema) {
         return translationStatus;
     }
 
-    if (path.empty() && typeExpr && typeExpr->getBSONType() != BSONType::Object) {
+    if (path.empty() && typeExpr && !typeExpr->typeSet().hasType(BSONType::Object)) {
         // This is a top-level schema which requires that the type is something other than
         // "object". Since we only know how to store objects, this schema matches nothing.
         return {stdx::make_unique<AlwaysFalseMatchExpression>()};

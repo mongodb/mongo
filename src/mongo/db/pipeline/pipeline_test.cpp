@@ -908,7 +908,7 @@ TEST(PipelineOptimizationTest, MatchCannotMoveAcrossProjectRenameOfDottedPath) {
 
 TEST(PipelineOptimizationTest, MatchWithTypeShouldMoveAcrossRename) {
     string inputPipe = "[{$addFields: {a: '$b'}}, {$match: {a: {$type: 4}}}]";
-    string outputPipe = "[{$match: {b: {$type: 4}}}, {$addFields: {a: '$b'}}]";
+    string outputPipe = "[{$match: {b: {$type: [4]}}}, {$addFields: {a: '$b'}}]";
     assertPipelineOptimizesTo(inputPipe, outputPipe);
 }
 
