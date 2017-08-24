@@ -7,10 +7,10 @@
  */
 
 /*
- * Default hash table size; use a prime number of buckets rather than assuming
- * a good hash (Reference Sedgewick, Algorithms in C, "Hash Functions").
+ * Default hash table size; we don't need a prime number of buckets
+ * because we always use a good hash function.
  */
-#define	WT_HASH_ARRAY_SIZE	509
+#define	WT_HASH_ARRAY_SIZE	512
 
 /*******************************************
  * Global per-process structure.
