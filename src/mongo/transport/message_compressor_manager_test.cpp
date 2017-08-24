@@ -201,11 +201,11 @@ TEST(MessageCompressorManager, SERVER_28008) {
     // but with a different ordering for the preferred compressor.
 
     std::unique_ptr<MessageCompressorBase> zlibCompressor =
-        std::make_unique<ZlibMessageCompressor>();
+        stdx::make_unique<ZlibMessageCompressor>();
     const auto zlibId = zlibCompressor->getId();
 
     std::unique_ptr<MessageCompressorBase> snappyCompressor =
-        std::make_unique<SnappyMessageCompressor>();
+        stdx::make_unique<SnappyMessageCompressor>();
     const auto snappyId = snappyCompressor->getId();
 
     MessageCompressorRegistry registry;
