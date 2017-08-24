@@ -55,8 +55,8 @@ class ServiceStateMachine : public std::enable_shared_from_this<ServiceStateMach
     ServiceStateMachine& operator=(ServiceStateMachine&) = delete;
 
 public:
-    ServiceStateMachine(ServiceStateMachine&&) = default;
-    ServiceStateMachine& operator=(ServiceStateMachine&&) = default;
+    ServiceStateMachine(ServiceStateMachine&&) = delete;
+    ServiceStateMachine& operator=(ServiceStateMachine&&) = delete;
 
     /*
      * Creates a new ServiceStateMachine for a given session/service context. If sync is true,

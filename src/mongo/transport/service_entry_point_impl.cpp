@@ -73,7 +73,7 @@ void ServiceEntryPointImpl::startSession(transport::SessionHandle session) {
         return;
     }
 
-    launchServiceWorkerThread([ this, ssm = std::move(ssm) ]() mutable {
+    auto workerTask = [this, ssm]() mutable {
         _nWorkers.addAndFetch(1);
         const auto guard = MakeGuard([this, &ssm] { _nWorkers.subtractAndFetch(1); });
 
@@ -96,7 +96,19 @@ void ServiceEntryPointImpl::startSession(transport::SessionHandle session) {
             if (_nWorkers.load() > numCores)
                 stdx::this_thread::yield();
         }
-    });
+    };
+
+    const auto launchResult = launchServiceWorkerThread(std::move(workerTask));
+    if (launchResult.isOK()) {
+        return;
+    }
+
+    // We never got off the ground. Manually remove the new SSM from
+    // the list of sessions and close the associated socket. The SSM
+    // will be destroyed.
+    stdx::lock_guard<decltype(_sessionsMutex)> lk(_sessionsMutex);
+    _sessions.erase(ssmIt);
+    ssm->terminateIfTagsDontMatch(0);
 }
 
 void ServiceEntryPointImpl::endAllSessions(transport::Session::TagMask tags) {

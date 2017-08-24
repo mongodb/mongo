@@ -58,7 +58,7 @@ void* runFunc(void* ctx) {
 }
 }  // namespace
 
-void launchServiceWorkerThread(stdx::function<void()> task) {
+Status launchServiceWorkerThread(stdx::function<void()> task) {
     auto ctx = stdx::make_unique<stdx::function<void()>>(std::move(task));
 
     try {
@@ -105,8 +105,10 @@ void launchServiceWorkerThread(stdx::function<void()> task) {
 #endif  // __linux__
 
     } catch (...) {
-        log() << "failed to create service entry worker thread";
+        return {ErrorCodes::InternalError, "failed to create service entry worker thread"};
     }
+
+    return Status::OK();
 }
 
 }  // namespace mongo
