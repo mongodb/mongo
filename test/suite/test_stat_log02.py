@@ -75,12 +75,12 @@ class test_stat_log02(wttest.WiredTigerTestCase):
         # We wait for 30 sleeps then fail
         number_sleeps = 0
         while True:
-            time.sleep(1)
             files = glob.glob(dir + '/' + 'WiredTigerStat.[0-9]*')
             for f in files:
                 if os.stat(f).st_size != 0:
                     return
 
+            time.sleep(1)
             number_sleeps += 1
             self.assertLess(number_sleeps, 30)
 
@@ -109,6 +109,7 @@ class test_stat_log02(wttest.WiredTigerTestCase):
                     if "file:foo.wt" in data["wiredTigerTables"]:
                         return
 
+            time.sleep(1)
             number_sleeps += 1
             self.assertLess(number_sleeps, 30)
 
