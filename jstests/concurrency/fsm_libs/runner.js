@@ -537,18 +537,30 @@ var runner = (function() {
                 cleanup.push(workload);
             });
 
+            if (cluster.shouldPerformContinuousStepdowns()) {
+                cluster.startContinuousFailover();
+            }
+
             try {
-                // Start this set of foreground workload threads.
-                threadMgr.spawnAll(cluster, executionOptions);
-                // Allow 20% of foreground threads to fail. This allows the workloads to run on
-                // underpowered test hosts.
-                threadMgr.checkFailed(0.2);
+                try {
+                    // Start this set of foreground workload threads.
+                    threadMgr.spawnAll(cluster, executionOptions);
+                    // Allow 20% of foreground threads to fail. This allows the workloads to run on
+                    // underpowered test hosts.
+                    threadMgr.checkFailed(0.2);
+                } finally {
+                    // Threads must be joined before destruction, so do this
+                    // even in the presence of exceptions.
+                    errors.push(...threadMgr.joinAll().map(
+                        e => new WorkloadFailure(
+                            e.err, e.stack, e.tid, 'Foreground ' + e.workloads.join(' '))));
+                }
             } finally {
-                // Threads must be joined before destruction, so do this
-                // even in the presence of exceptions.
-                errors.push(...threadMgr.joinAll().map(
-                    e => new WorkloadFailure(
-                        e.err, e.stack, e.tid, 'Foreground ' + e.workloads.join(' '))));
+                if (cluster.shouldPerformContinuousStepdowns()) {
+                    // Suspend the stepdown threads prior to calling cleanupWorkload() to avoid
+                    // causing a failover to happen while the data consistency checks are running.
+                    cluster.stopContinuousFailover();
+                }
             }
         } finally {
             // Call each foreground workload's teardown function. After all teardowns have completed

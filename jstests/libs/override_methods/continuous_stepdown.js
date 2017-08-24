@@ -132,8 +132,8 @@ let ContinuousStepdown;
         };
 
         /**
-         * Sets the stepdown thread's counter to 0, and waits for it to finish. Returns the stepdown
-         * thread's return value.
+         * Sets the stepdown thread's counter to 0, and waits for it to finish. Throws if the
+         * stepdown thread did not exit successfully.
          */
         this.stop = function() {
             if (!_thread) {
@@ -148,7 +148,7 @@ let ContinuousStepdown;
             const retVal = _thread.returnData();
             _thread = null;
 
-            return assert.commandWorked(retVal);
+            assert.commandWorked(retVal);
         };
     };
 
@@ -209,7 +209,7 @@ let ContinuousStepdown;
              * Overrides stopSet to terminate the failover thread.
              */
             this.stopSet = function() {
-                this.stopContinuousFailover();
+                this.stopContinuousFailover({waitForPrimary: false});
                 _originalStopSetFn.apply(this, arguments);
             };
 
@@ -251,13 +251,19 @@ let ContinuousStepdown;
             /**
              * Blocking method, which tells the thread running continuousPrimaryStepdownFn to stop
              * and waits for it to terminate.
+             *
+             * If waitForPrimary is true, blocks until a new primary has been elected.
              */
-            this.stopContinuousFailover = function() {
+            this.stopContinuousFailover = function({waitForPrimary: waitForPrimary = false} = {}) {
                 if (!_stepdownThread.hasStarted()) {
                     return;
                 }
 
-                return _stepdownThread.stop();
+                _stepdownThread.stop();
+
+                if (waitForPrimary) {
+                    this.getPrimary();
+                }
             };
         };
 
@@ -316,15 +322,17 @@ let ContinuousStepdown;
             /**
              * Calls stopContinuousFailover on the config server and each shard replica set as
              * specified by the stepdownOptions object.
+             *
+             * If waitForPrimary is true, blocks until each replica set has elected a primary.
              */
-            this.stopContinuousFailover = function() {
+            this.stopContinuousFailover = function({waitForPrimary: waitForPrimary = false} = {}) {
                 if (stepdownOptions.configStepdown) {
-                    this.configRS.stopContinuousFailover();
+                    this.configRS.stopContinuousFailover({waitForPrimary: waitForPrimary});
                 }
 
                 if (stepdownOptions.shardStepdown) {
                     this._rs.forEach(function(rst) {
-                        rst.test.stopContinuousFailover();
+                        rst.test.stopContinuousFailover({waitForPrimary: waitForPrimary});
                     });
                 }
             };
