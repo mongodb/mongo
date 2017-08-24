@@ -50,7 +50,7 @@ StatusWith<bool> SaslPLAINServerConversation::step(StringData inputData, std::st
     // Expecting user input on the form: [authz-id]\0authn-id\0pwd
     std::string input = inputData.toString();
 
-    SecureString pwd = "";
+    SecureAllocatorAuthDomain::SecureString pwd = "";
     try {
         size_t firstNull = inputData.find('\0');
         if (firstNull == std::string::npos) {
@@ -78,7 +78,7 @@ StatusWith<bool> SaslPLAINServerConversation::step(StringData inputData, std::st
                           str::stream()
                               << "SASL authorization identity must match authentication identity");
         }
-        pwd = SecureString(input.substr(secondNull + 1).c_str());
+        pwd = SecureAllocatorAuthDomain::SecureString(input.substr(secondNull + 1).c_str());
         if (pwd->empty()) {
             return Status(ErrorCodes::AuthenticationFailed,
                           str::stream()

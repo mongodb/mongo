@@ -174,7 +174,21 @@ struct ServerGlobalParams {
         // "3.2" feature compatibility mode.
         AtomicWord<bool> validateFeaturesAsMaster{true};
     } featureCompatibility;
+
+    std::vector<std::string> disabledSecureAllocatorDomains;
 };
 
 extern ServerGlobalParams serverGlobalParams;
+
+template <typename NameTrait>
+struct TraitNamedDomain {
+    static bool peg() {
+        const auto& dsmd = serverGlobalParams.disabledSecureAllocatorDomains;
+        const auto contains = [&](StringData dt) {
+            return std::find(dsmd.begin(), dsmd.end(), dt) != dsmd.end();
+        };
+        static const bool ret = !(contains("*"_sd) || contains(NameTrait::DomainType));
+        return ret;
+    }
+};
 }

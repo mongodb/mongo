@@ -37,7 +37,7 @@
 namespace mongo {
 
 TEST(SecureAllocator, SecureVector) {
-    SecureVector<int> vec;
+    SecureAllocatorDefaultDomain::SecureVector<int> vec;
 
     vec->push_back(1);
     vec->push_back(2);
@@ -50,19 +50,19 @@ TEST(SecureAllocator, SecureVector) {
 }
 
 TEST(SecureAllocator, SecureString) {
-    SecureString str;
+    SecureAllocatorDefaultDomain::SecureString str;
 
     str->resize(2000, 'x');
-    ASSERT_EQUALS(0, str->compare(*SecureString(2000, 'x')));
+    ASSERT_EQUALS(0, str->compare(*SecureAllocatorDefaultDomain::SecureString(2000, 'x')));
 
-    SecureString str2(str);
+    SecureAllocatorDefaultDomain::SecureString str2(str);
     ASSERT_NOT_EQUALS(&*str, &*str2);
     str2 = str;
     ASSERT_NOT_EQUALS(&*str, &*str2);
 
     auto strPtr = &*str;
     auto str2Ptr = &*str2;
-    SecureString str3(std::move(str));
+    SecureAllocatorDefaultDomain::SecureString str3(std::move(str));
     ASSERT_EQUALS(strPtr, &*str3);
     str3 = std::move(str2);
     ASSERT_EQUALS(str2Ptr, &*str3);
@@ -72,8 +72,8 @@ TEST(SecureAllocator, SecureString) {
 // design (page per object), you couldn't make more than 8-50 objects before running out of lockable
 // pages.
 TEST(SecureAllocator, ManySecureBytes) {
-    std::array<SecureHandle<char>, 4096> chars;
-    std::vector<SecureHandle<char>> e_chars(4096, 'e');
+    std::array<SecureAllocatorDefaultDomain::SecureHandle<char>, 4096> chars;
+    std::vector<SecureAllocatorDefaultDomain::SecureHandle<char>> e_chars(4096, 'e');
 }
 
 TEST(SecureAllocator, NonDefaultConstructibleWorks) {
@@ -82,7 +82,42 @@ TEST(SecureAllocator, NonDefaultConstructibleWorks) {
         Foo() = delete;
     };
 
-    SecureHandle<Foo> foo(10);
+    SecureAllocatorDefaultDomain::SecureHandle<Foo> foo(10);
+}
+
+TEST(SecureAllocator, allocatorCanBeDisabled) {
+    static size_t pegInvokationCountLast;
+    static size_t pegInvokationCount;
+    pegInvokationCountLast = 0;
+    pegInvokationCount = 0;
+    struct UnsecureAllocatorTrait {
+        static bool peg() {
+            pegInvokationCount++;
+
+            return false;
+        }
+    };
+    using UnsecureAllocatorDomain = SecureAllocatorDomain<UnsecureAllocatorTrait>;
+
+    {
+        std::vector<UnsecureAllocatorDomain::SecureHandle<char>> more_e_chars(4096, 'e');
+        ASSERT_GT(pegInvokationCount, pegInvokationCountLast);
+        pegInvokationCountLast = pegInvokationCount;
+
+        UnsecureAllocatorDomain::SecureString str;
+        ASSERT_GT(pegInvokationCount, pegInvokationCountLast);
+        pegInvokationCountLast = pegInvokationCount;
+
+        str->resize(2000, 'x');
+        ASSERT_GT(pegInvokationCount, pegInvokationCountLast);
+        pegInvokationCountLast = pegInvokationCount;
+
+        ASSERT_EQUALS(0, str->compare(*UnsecureAllocatorDomain::SecureString(2000, 'x')));
+        ASSERT_GT(pegInvokationCount, pegInvokationCountLast);
+        pegInvokationCountLast = pegInvokationCount;
+    }
+
+    ASSERT_GT(pegInvokationCount, pegInvokationCountLast);
 }
 
 }  // namespace mongo

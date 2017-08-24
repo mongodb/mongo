@@ -379,4 +379,7 @@ void deallocate(void* ptr, std::size_t bytes) {
 }
 
 }  // namespace secure_allocator_details
+
+constexpr StringData SecureAllocatorAuthDomainTrait::DomainType;
+
 }  // namespace mongo

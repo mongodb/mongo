@@ -32,6 +32,7 @@
 #include <string>
 
 #include "mongo/base/disallow_copying.h"
+#include "mongo/base/secure_allocator.h"
 #include "mongo/base/status.h"
 #include "mongo/bson/mutable/element.h"
 #include "mongo/bson/oid.h"
@@ -44,6 +45,7 @@
 #include "mongo/db/auth/user_name_hash.h"
 #include "mongo/db/jsobj.h"
 #include "mongo/db/namespace_string.h"
+#include "mongo/db/server_options.h"
 #include "mongo/platform/unordered_map.h"
 #include "mongo/stdx/condition_variable.h"
 #include "mongo/stdx/functional.h"

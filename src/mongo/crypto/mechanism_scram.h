@@ -33,6 +33,7 @@
 #include "mongo/base/secure_allocator.h"
 #include "mongo/base/status.h"
 #include "mongo/crypto/sha1_block.h"
+#include "mongo/db/auth/authorization_manager.h"
 #include "mongo/db/jsobj.h"
 
 namespace mongo {
@@ -97,7 +98,7 @@ public:
     // to a callback, which fills the memory.
     template <typename T>
     explicit SCRAMSecrets(T initializationFun)
-        : _ptr(std::make_shared<SecureHandle<SCRAMSecretsHolder>>()) {
+        : _ptr(std::make_shared<SecureAllocatorAuthDomain::SecureHandle<SCRAMSecretsHolder>>()) {
         initializationFun((*this)->clientKey, (*this)->storedKey, (*this)->serverKey);
     }
 
@@ -106,20 +107,20 @@ public:
         return static_cast<bool>(_ptr);
     }
 
-    const SecureHandle<SCRAMSecretsHolder>& operator*() const& {
+    const SecureAllocatorAuthDomain::SecureHandle<SCRAMSecretsHolder>& operator*() const& {
         invariant(_ptr);
         return *_ptr;
     }
     void operator*() && = delete;
 
-    const SecureHandle<SCRAMSecretsHolder>& operator->() const& {
+    const SecureAllocatorAuthDomain::SecureHandle<SCRAMSecretsHolder>& operator->() const& {
         invariant(_ptr);
         return *_ptr;
     }
     void operator->() && = delete;
 
 private:
-    std::shared_ptr<SecureHandle<SCRAMSecretsHolder>> _ptr;
+    std::shared_ptr<SecureAllocatorAuthDomain::SecureHandle<SCRAMSecretsHolder>> _ptr;
 };
 
 /*
