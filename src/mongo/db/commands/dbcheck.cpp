@@ -467,8 +467,16 @@ public:
                                        const BSONObj& cmdObj) {
         // For now, just use `find` permissions.
         const NamespaceString nss(parseNs(dbname, cmdObj));
-        auto hasTerm = cmdObj.hasField("term");
-        return AuthorizationSession::get(client)->checkAuthForFind(nss, hasTerm);
+
+        // First, check that we can read this collection.
+        Status status = AuthorizationSession::get(client)->checkAuthForFind(nss, false);
+
+        if (!status.isOK()) {
+            return status;
+        }
+
+        // Then check that we can read the health log.
+        return AuthorizationSession::get(client)->checkAuthForFind(HealthLog::nss, false);
     }
 
     virtual bool run(OperationContext* opCtx,
