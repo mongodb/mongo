@@ -247,16 +247,16 @@ Status renameCollectionCommon(OperationContext* opCtx,
     Collection* tmpColl = nullptr;
     OptionalCollectionUUID newUUID;
     {
-        CollectionOptions options = sourceColl->getCatalogEntry()->getCollectionOptions(opCtx);
+        auto collectionOptions = sourceColl->getCatalogEntry()->getCollectionOptions(opCtx);
         // Renaming across databases will result in a new UUID, as otherwise we'd require
         // two collections with the same uuid (temporarily).
-        options.temp = true;
+        collectionOptions.temp = true;
         if (targetUUID)
             newUUID = targetUUID;
         else if (enableCollectionUUIDs)
             newUUID = UUID::gen();
 
-        options.uuid = newUUID;
+        collectionOptions.uuid = newUUID;
 
         writeConflictRetry(opCtx, "renameCollection", tmpName.ns(), [&] {
             WriteUnitOfWork wunit(opCtx);
@@ -265,7 +265,7 @@ Status renameCollectionCommon(OperationContext* opCtx,
             repl::UnreplicatedWritesBlock uwb(opCtx);
             tmpColl = targetDB->createCollection(opCtx,
                                                  tmpName.ns(),
-                                                 options,
+                                                 collectionOptions,
                                                  false);  // _id index build with others later.
 
             wunit.commit();
