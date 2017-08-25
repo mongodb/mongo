@@ -46,7 +46,7 @@
 
     print("add an admin user");
     master.getDB("admin").createUser({user: "foo", pwd: "bar", roles: jsTest.adminUserRoles},
-                                     {w: 3, wtimeout: 30000});
+                                     {w: 3, wtimeout: replSetTest.kDefaultTimeoutMS});
     var m = replSetTest.nodes[0];
 
     print("starting 1 and 2 with key file");
