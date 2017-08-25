@@ -2035,7 +2035,7 @@ tasks:
   - func: "do setup"
   - func: "run jstestfuzz"
     vars:
-      jstestfuzz_vars: -g
+      jstestfuzz_vars: -g -f 50
   - <<: *run_jstestfuzz_tests
     vars:
       <<: *jstestfuzz_config_vars
@@ -2048,7 +2048,7 @@ tasks:
   - func: "do setup"
   - func: "run jstestfuzz"
     vars:
-      jstestfuzz_vars: -g
+      jstestfuzz_vars: -g -f 50
   - <<: *run_jstestfuzz_tests
     vars:
       <<: *jstestfuzz_config_vars
