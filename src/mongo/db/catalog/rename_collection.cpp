@@ -253,7 +253,7 @@ Status renameCollectionCommon(OperationContext* opCtx,
         collectionOptions.temp = true;
         if (targetUUID)
             newUUID = targetUUID;
-        else if (enableCollectionUUIDs)
+        else if (collectionOptions.uuid && enableCollectionUUIDs)
             newUUID = UUID::gen();
 
         collectionOptions.uuid = newUUID;

@@ -104,6 +104,7 @@ protected:
     OpObserverMock* _opObserver = nullptr;
     NamespaceString _sourceNss;
     NamespaceString _targetNss;
+    NamespaceString _targetNssDifferentDb;
 };
 
 // static
@@ -140,6 +141,7 @@ void RenameCollectionTest::setUp() {
 
     _sourceNss = NamespaceString("test.foo");
     _targetNss = NamespaceString("test.bar");
+    _targetNssDifferentDb = NamespaceString("test2.bar");
 }
 
 void RenameCollectionTest::tearDown() {
@@ -178,10 +180,40 @@ void _createCollection(OperationContext* opCtx,
 }
 
 /**
+ * Returns a collection options with a generated UUID.
+ */
+CollectionOptions _makeCollectionOptionsWithUuid() {
+    CollectionOptions options;
+    options.uuid = UUID::gen();
+    return options;
+}
+
+/**
  * Returns true if collection exists.
  */
 bool _collectionExists(OperationContext* opCtx, const NamespaceString& nss) {
     return AutoGetCollectionForRead(opCtx, nss).getCollection() != nullptr;
+}
+
+/**
+ * Returns collection options.
+ */
+CollectionOptions _getCollectionOptions(OperationContext* opCtx, const NamespaceString& nss) {
+    AutoGetCollectionForRead autoColl(opCtx, nss);
+    auto collection = autoColl.getCollection();
+    ASSERT_TRUE(collection) << "Unable to get collections options for " << nss
+                            << " because collection does not exist.";
+    auto catalogEntry = collection->getCatalogEntry();
+    return catalogEntry->getCollectionOptions(opCtx);
+}
+
+/**
+ * Returns UUID of collection.
+ */
+CollectionUUID _getCollectionUuid(OperationContext* opCtx, const NamespaceString& nss) {
+    auto options = _getCollectionOptions(opCtx, nss);
+    ASSERT_TRUE(options.uuid);
+    return *(options.uuid);
 }
 
 /**
@@ -222,6 +254,34 @@ TEST_F(RenameCollectionTest, RenameCollectionReturnsNotMasterIfNotPrimary) {
     ASSERT_FALSE(_replCoord->canAcceptWritesForDatabase(_opCtx.get(), _sourceNss.db()));
     ASSERT_EQUALS(ErrorCodes::NotMaster,
                   renameCollection(_opCtx.get(), _sourceNss, _targetNss, {}));
+}
+
+TEST_F(RenameCollectionTest, RenameCollectionAcrossDatabaseWithoutUuid) {
+    _createCollection(_opCtx.get(), _sourceNss);
+    ASSERT_OK(renameCollection(_opCtx.get(), _sourceNss, _targetNssDifferentDb, {}));
+    ASSERT_FALSE(_collectionExists(_opCtx.get(), _sourceNss));
+    ASSERT_FALSE(_getCollectionOptions(_opCtx.get(), _targetNssDifferentDb).uuid);
+}
+
+TEST_F(RenameCollectionTest, RenameCollectionAcrossDatabaseWithUuid) {
+    auto options = _makeCollectionOptionsWithUuid();
+    _createCollection(_opCtx.get(), _sourceNss, options);
+    ASSERT_OK(renameCollection(_opCtx.get(), _sourceNss, _targetNssDifferentDb, {}));
+    ASSERT_FALSE(_collectionExists(_opCtx.get(), _sourceNss));
+    ASSERT_NOT_EQUALS(options.uuid, _getCollectionUuid(_opCtx.get(), _targetNssDifferentDb));
+}
+
+TEST_F(RenameCollectionTest, RenameCollectionForApplyOpsAcrossDatabaseWithTargetUuid) {
+    _createCollection(_opCtx.get(), _sourceNss);
+    auto dbName = _sourceNss.db().toString();
+    auto uuid = UUID::gen();
+    auto uuidDoc = BSON("ui" << uuid);
+    auto cmd = BSON("renameCollection" << _sourceNss.ns() << "to" << _targetNssDifferentDb.ns()
+                                       << "dropTarget"
+                                       << true);
+    ASSERT_OK(renameCollectionForApplyOps(_opCtx.get(), dbName, uuidDoc["ui"], cmd, {}));
+    ASSERT_FALSE(_collectionExists(_opCtx.get(), _sourceNss));
+    ASSERT_EQUALS(uuid, _getCollectionUuid(_opCtx.get(), _targetNssDifferentDb));
 }
 
 TEST_F(RenameCollectionTest,
