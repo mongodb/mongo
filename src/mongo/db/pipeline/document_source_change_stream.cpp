@@ -234,7 +234,7 @@ list<intrusive_ptr<DocumentSource>> DocumentSourceChangeStream::createFromBson(
 
     auto replCoord = repl::ReplicationCoordinator::get(expCtx->opCtx);
     uassert(40573, "The $changeStream stage is only supported on replica sets", replCoord);
-    Timestamp startFrom = replCoord->getLastCommittedOpTime().getTimestamp();
+    Timestamp startFrom = replCoord->getMyLastAppliedOpTime().getTimestamp();
 
     intrusive_ptr<DocumentSource> resumeStage = nullptr;
     auto spec = DocumentSourceChangeStreamSpec::parse(IDLParserErrorContext("$changeStream"),
