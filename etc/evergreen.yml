@@ -201,7 +201,7 @@ functions:
         rm -rf rocksdb
         git clone https://github.com/facebook/rocksdb.git
         cd rocksdb
-        make static_lib
+        make USE_RTTI=1 static_lib
         fi
 
   "build new tools" :
