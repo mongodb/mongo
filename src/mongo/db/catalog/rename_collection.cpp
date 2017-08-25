@@ -246,8 +246,11 @@ Status renameCollectionCommon(OperationContext* opCtx,
     const auto& tmpName = tmpNameResult.getValue();
     Collection* tmpColl = nullptr;
     OptionalCollectionUUID newUUID;
+    bool isSourceCollectionTemporary = false;
     {
         auto collectionOptions = sourceColl->getCatalogEntry()->getCollectionOptions(opCtx);
+        isSourceCollectionTemporary = collectionOptions.temp;
+
         // Renaming across databases will result in a new UUID, as otherwise we'd require
         // two collections with the same uuid (temporarily).
         collectionOptions.temp = true;
@@ -344,9 +347,15 @@ Status renameCollectionCommon(OperationContext* opCtx,
                 dropTargetUUID = targetColl->uuid();
                 status = targetDB->dropCollection(opCtx, target.ns());
             }
-            if (status.isOK())
-                status =
-                    targetDB->renameCollection(opCtx, tmpName.ns(), target.ns(), options.stayTemp);
+            if (status.isOK()) {
+                // When renaming the temporary collection in the target database, we have to take
+                // into account the CollectionOptions.temp value of the source collection and the
+                // 'stayTemp' option requested by the caller.
+                // If the source collection is not temporary, the resulting target collection must
+                // not be temporary.
+                auto stayTemp = isSourceCollectionTemporary && options.stayTemp;
+                status = targetDB->renameCollection(opCtx, tmpName.ns(), target.ns(), stayTemp);
+            }
             if (status.isOK())
                 status = sourceDB->dropCollection(opCtx, source.ns());
 

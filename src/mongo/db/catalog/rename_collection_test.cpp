@@ -229,18 +229,6 @@ bool _isTempCollection(OperationContext* opCtx, const NamespaceString& nss) {
     return options.temp;
 }
 
-/**
- * Creates a temporary collection.
- */
-void _createTempCollection(OperationContext* opCtx, const NamespaceString& nss) {
-    CollectionOptions options;
-    options.temp = true;
-    _createCollection(opCtx, nss, options);
-    ASSERT_TRUE(_isTempCollection(opCtx, nss)) << "Created collection " << nss
-                                               << " but collection is not temporary per options "
-                                               << options.toBSON();
-}
-
 TEST_F(RenameCollectionTest, RenameCollectionReturnsNamespaceNotFoundIfDatabaseDoesNotExist) {
     ASSERT_FALSE(AutoGetDb(_opCtx.get(), _sourceNss.db(), MODE_X).getDb());
     ASSERT_EQUALS(ErrorCodes::NamespaceNotFound,
@@ -408,28 +396,66 @@ DEATH_TEST_F(RenameCollectionTest,
     ASSERT_OK(renameCollectionForApplyOps(_opCtx.get(), dbName, {}, cmd, renameOpTime));
 }
 
-TEST_F(RenameCollectionTest, RenameCollectionMakesTargetNonTemporaryIfStayTempIsFalse) {
-    _createTempCollection(_opCtx.get(), _sourceNss);
+void _testRenameCollectionStayTemp(OperationContext* opCtx,
+                                   const NamespaceString& sourceNss,
+                                   const NamespaceString& targetNss,
+                                   bool stayTemp,
+                                   bool isSourceCollectionTemporary) {
+    CollectionOptions collectionOptions;
+    collectionOptions.temp = isSourceCollectionTemporary;
+    _createCollection(opCtx, sourceNss, collectionOptions);
+
     RenameCollectionOptions options;
-    ASSERT_FALSE(options.stayTemp);
-    ASSERT_OK(renameCollection(_opCtx.get(), _sourceNss, _targetNss, options));
-    ASSERT_FALSE(_collectionExists(_opCtx.get(), _sourceNss))
-        << "source collection " << _sourceNss << " still exists after successful rename";
-    ASSERT_FALSE(_isTempCollection(_opCtx.get(), _targetNss))
-        << "target collection " << _targetNss
-        << " is still temporary after rename with stayTemp set to false.";
+    options.stayTemp = stayTemp;
+    ASSERT_OK(renameCollection(opCtx, sourceNss, targetNss, options));
+    ASSERT_FALSE(_collectionExists(opCtx, sourceNss)) << "source collection " << sourceNss
+                                                      << " still exists after successful rename";
+
+    if (!isSourceCollectionTemporary) {
+        ASSERT_FALSE(_isTempCollection(opCtx, targetNss))
+            << "target collection " << targetNss
+            << " cannot not be temporary after rename if source collection is not temporary.";
+    } else if (stayTemp) {
+        ASSERT_TRUE(_isTempCollection(opCtx, targetNss))
+            << "target collection " << targetNss
+            << " is no longer temporary after rename with stayTemp set to true.";
+    } else {
+        ASSERT_FALSE(_isTempCollection(opCtx, targetNss))
+            << "target collection " << targetNss
+            << " still temporary after rename with stayTemp set to false.";
+    }
 }
 
-TEST_F(RenameCollectionTest, RenameCollectionKeepsTargetAsTemporaryIfStayTempIsTrue) {
-    _createTempCollection(_opCtx.get(), _sourceNss);
-    RenameCollectionOptions options;
-    options.stayTemp = true;
-    ASSERT_OK(renameCollection(_opCtx.get(), _sourceNss, _targetNss, options));
-    ASSERT_FALSE(_collectionExists(_opCtx.get(), _sourceNss))
-        << "source collection " << _sourceNss << " still exists after successful rename";
-    ASSERT_TRUE(_isTempCollection(_opCtx.get(), _targetNss))
-        << "target collection " << _targetNss
-        << " is no longer temporary after rename with stayTemp set to true.";
+TEST_F(RenameCollectionTest, RenameSameDatabaseStayTempFalse) {
+    _testRenameCollectionStayTemp(_opCtx.get(), _sourceNss, _targetNss, false, true);
+}
+
+TEST_F(RenameCollectionTest, RenameSameDatabaseStayTempTrue) {
+    _testRenameCollectionStayTemp(_opCtx.get(), _sourceNss, _targetNss, true, true);
+}
+
+TEST_F(RenameCollectionTest, RenameDifferentDatabaseStayTempFalse) {
+    _testRenameCollectionStayTemp(_opCtx.get(), _sourceNss, _targetNssDifferentDb, false, true);
+}
+
+TEST_F(RenameCollectionTest, RenameDifferentDatabaseStayTempTrue) {
+    _testRenameCollectionStayTemp(_opCtx.get(), _sourceNss, _targetNssDifferentDb, true, true);
+}
+
+TEST_F(RenameCollectionTest, RenameSameDatabaseStayTempFalseSourceNotTemporary) {
+    _testRenameCollectionStayTemp(_opCtx.get(), _sourceNss, _targetNss, false, false);
+}
+
+TEST_F(RenameCollectionTest, RenameSameDatabaseStayTempTrueSourceNotTemporary) {
+    _testRenameCollectionStayTemp(_opCtx.get(), _sourceNss, _targetNss, true, false);
+}
+
+TEST_F(RenameCollectionTest, RenameDifferentDatabaseStayTempFalseSourceNotTemporary) {
+    _testRenameCollectionStayTemp(_opCtx.get(), _sourceNss, _targetNssDifferentDb, false, false);
+}
+
+TEST_F(RenameCollectionTest, RenameDifferentDatabaseStayTempTrueSourceNotTemporary) {
+    _testRenameCollectionStayTemp(_opCtx.get(), _sourceNss, _targetNssDifferentDb, true, false);
 }
 
 }  // namespace
