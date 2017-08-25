@@ -66,11 +66,8 @@ public:
     Status checkAuthForOperation(OperationContext* opCtx,
                                  const std::string& dbname,
                                  const BSONObj& cmdObj) override {
-        AuthorizationSession* authSession = AuthorizationSession::get(opCtx->getClient());
-        if (!authSession->isAuthorizedForActionsOnResource(ResourcePattern::forClusterResource(),
-                                                           ActionType::startSession)) {
-            return Status(ErrorCodes::Unauthorized, "Unauthorized");
-        }
+        // Anybody may start a session. The command body below checks
+        // that only a single user is logged in.
         return Status::OK();
     }
 

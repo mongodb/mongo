@@ -172,24 +172,6 @@ TEST_F(LogicalSessionIdTest, ConstructorFromClientWithPassedUidWithPermissions) 
     ASSERT_EQ(lsid.getUid(), uid);
 }
 
-TEST_F(LogicalSessionIdTest, ConstructorFromClientWithPassedUidWithNonImpersonatePermissions) {
-    auto id = UUID::gen();
-    auto uid = SHA256Block{};
-    addSimpleUser(UserName("simple", "test"));
-
-    LogicalSessionFromClient req;
-    req.setId(id);
-    req.setUid(uid);
-
-    LogicalSessionId lsid = makeLogicalSessionId(
-        req,
-        _opCtx.get(),
-        {Privilege{ResourcePattern::forClusterResource(), ActionType::startSession}});
-
-    ASSERT_EQ(lsid.getId(), id);
-    ASSERT_EQ(lsid.getUid(), uid);
-}
-
 TEST_F(LogicalSessionIdTest, ConstructorFromClientWithPassedUidWithoutAuthedUser) {
     auto id = UUID::gen();
     auto uid = SHA256Block{};

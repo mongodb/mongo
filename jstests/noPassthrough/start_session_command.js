@@ -29,7 +29,7 @@
 
     // test that we can run startSession authenticated when the server is running without --auth
 
-    admin.createUser({user: 'user0', pwd: 'password', roles: jsTest.basicUserRoles});
+    admin.createUser({user: 'user0', pwd: 'password', roles: []});
     admin.auth("user0", "password");
 
     result = admin.runCommand(request);

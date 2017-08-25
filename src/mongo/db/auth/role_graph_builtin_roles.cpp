@@ -651,11 +651,6 @@ void addInternalRolePrivileges(PrivilegeVector* privileges) {
     RoleGraph::generateUniversalPrivileges(privileges);
 }
 
-void addAnyBuiltinRolePrivileges(PrivilegeVector* privileges) {
-    Privilege::addPrivilegeToPrivilegeVector(
-        privileges, Privilege(ResourcePattern::forClusterResource(), ActionType::startSession));
-}
-
 }  // namespace
 
 bool RoleGraph::addPrivilegesForBuiltinRole(const RoleName& roleName, PrivilegeVector* result) {
@@ -702,7 +697,6 @@ bool RoleGraph::addPrivilegesForBuiltinRole(const RoleName& roleName, PrivilegeV
     }
 
     // One of the roles has matched, otherwise we would have returned already.
-    addAnyBuiltinRolePrivileges(result);
     return true;
 }
 
