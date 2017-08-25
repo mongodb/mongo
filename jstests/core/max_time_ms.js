@@ -43,23 +43,23 @@ assert.doesNotThrow(function() {
 //
 // Simple positive test for getmore:
 // - Issue a find() that returns 2 batches: a fast batch, then a slow batch.
-// - The find() has a 1-second time limit; the first batch should run "instantly", but the second
+// - The find() has a 4-second time limit; the first batch should run "instantly", but the second
 //   batch takes ~15 seconds, so the getmore should be aborted.
 //
 
 t.drop();
-t.insert([{}, {}, {}]);                                // fast batch
-t.insert([{slow: true}, {slow: true}, {slow: true}]);  // slow batch
+t.insert([{_id: 0}, {_id: 1}, {_id: 2}]);                                      // fast batch
+t.insert([{_id: 3, slow: true}, {_id: 4, slow: true}, {_id: 5, slow: true}]);  // slow batch
 cursor = t.find({
-    $where: function() {
-        if (this.slow) {
-            sleep(5 * 1000);
-        }
-        return true;
-    }
-});
+              $where: function() {
+                  if (this.slow) {
+                      sleep(5 * 1000);
+                  }
+                  return true;
+              }
+          }).sort({_id: 1});
 cursor.batchSize(3);
-cursor.maxTimeMS(1000);
+cursor.maxTimeMS(4 * 1000);
 assert.doesNotThrow(function() {
     cursor.next();
     cursor.next();
@@ -79,16 +79,16 @@ assert.throws(function() {
 //
 
 t.drop();
-t.insert([{}, {}, {}]);            // fast batch
-t.insert([{}, {}, {slow: true}]);  // slow batch
+t.insert([{_id: 0}, {_id: 1}, {_id: 2}]);              // fast batch
+t.insert([{_id: 3}, {_id: 4}, {_id: 5, slow: true}]);  // slow batch
 cursor = t.find({
-    $where: function() {
-        if (this.slow) {
-            sleep(2 * 1000);
-        }
-        return true;
-    }
-});
+              $where: function() {
+                  if (this.slow) {
+                      sleep(2 * 1000);
+                  }
+                  return true;
+              }
+          }).sort({_id: 1});
 cursor.batchSize(3);
 cursor.maxTimeMS(10 * 1000);
 assert.doesNotThrow(function() {
@@ -110,16 +110,16 @@ assert.doesNotThrow(function() {
 
 t.drop();
 for (var i = 0; i < 5; i++) {
-    t.insert([{}, {}, {slow: true}]);
+    t.insert([{_id: 3 * i}, {_id: (3 * i) + 1}, {_id: (3 * i) + 2, slow: true}]);
 }
 cursor = t.find({
-    $where: function() {
-        if (this.slow) {
-            sleep(2 * 1000);
-        }
-        return true;
-    }
-});
+              $where: function() {
+                  if (this.slow) {
+                      sleep(2 * 1000);
+                  }
+                  return true;
+              }
+          }).sort({_id: 1});
 cursor.batchSize(3);
 cursor.maxTimeMS(6 * 1000);
 assert.throws(function() {
@@ -134,16 +134,16 @@ assert.throws(function() {
 
 t.drop();
 for (var i = 0; i < 5; i++) {
-    t.insert([{}, {}, {slow: true}]);
+    t.insert([{_id: 3 * i}, {_id: (3 * i) + 1}, {_id: (3 * i) + 2, slow: true}]);
 }
 cursor = t.find({
-    $where: function() {
-        if (this.slow) {
-            sleep(2 * 1000);
-        }
-        return true;
-    }
-});
+              $where: function() {
+                  if (this.slow) {
+                      sleep(2 * 1000);
+                  }
+                  return true;
+              }
+          }).sort({_id: 1});
 cursor.batchSize(3);
 cursor.maxTimeMS(20 * 1000);
 assert.doesNotThrow(function() {
@@ -342,16 +342,16 @@ assert.eq(1, t.getDB().adminCommand({configureFailPoint: "maxTimeAlwaysTimeOut",
 
 // maxTimeNeverTimeOut positive test for getmore.
 t.drop();
-t.insert([{}, {}, {}]);                                // fast batch
-t.insert([{slow: true}, {slow: true}, {slow: true}]);  // slow batch
+t.insert([{_id: 0}, {_id: 1}, {_id: 2}]);                                      // fast batch
+t.insert([{_id: 3, slow: true}, {_id: 4, slow: true}, {_id: 5, slow: true}]);  // slow batch
 cursor = t.find({
-    $where: function() {
-        if (this.slow) {
-            sleep(2 * 1000);
-        }
-        return true;
-    }
-});
+              $where: function() {
+                  if (this.slow) {
+                      sleep(2 * 1000);
+                  }
+                  return true;
+              }
+          }).sort({_id: 1});
 cursor.batchSize(3);
 cursor.maxTimeMS(2 * 1000);
 assert.doesNotThrow(function() {
