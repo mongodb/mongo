@@ -60,7 +60,7 @@ try {
         } else {
             return false;
         }
-    }, "index not started on secondary", 30000, 50);
+    }, "index not started on secondary");
 } finally {
     // Turn off failpoint and let the index build resumes.
     assert.commandWorked(
