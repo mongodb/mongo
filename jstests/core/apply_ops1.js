@@ -286,9 +286,44 @@
         'applyOps should fail on unknown operation type "x" with valid "ns" value');
 
     assert.eq(0, t.find().count(), "Non-zero amount of documents in collection to start");
-    assert.commandFailed(
-        db.adminCommand({applyOps: [{"op": "i", "ns": t.getFullName(), "o": {_id: 5, x: 17}}]}),
-        "Applying an insert operation on a non-existent collection should fail");
+
+    /**
+     * Test function for running CRUD operations on non-existent namespaces using various
+     * combinations of invalid namespaces (collection/database), allowAtomic and alwaysUpsert.
+     *
+     * Leave 'expectedErrorCode' undefined if this command is expected to run successfully.
+     */
+    function testCrudOperationOnNonExistentNamespace(optype, o, o2, expectedErrorCode) {
+        expectedErrorCode = expectedErrorCode || ErrorCodes.OK;
+        const t2 = db.getSiblingDB('apply_ops1_no_such_db').getCollection('t');
+        [t, t2].forEach(coll => {
+            const op = {op: optype, ns: coll.getFullName(), o: o, o2: o2};
+            [false, true].forEach(allowAtomic => {
+                [false, true].forEach(alwaysUpsert => {
+                    const cmd = {
+                        applyOps: [op],
+                        allowAtomic: allowAtomic,
+                        alwaysUpsert: alwaysUpsert
+                    };
+                    jsTestLog('Testing applyOps on non-existent namespace: ' + tojson(cmd));
+                    if (expectedErrorCode === ErrorCodes.OK) {
+                        assert.commandWorked(db.adminCommand(cmd));
+                    } else {
+                        assert.commandFailedWithCode(db.adminCommand(cmd), expectedErrorCode);
+                    }
+                });
+            });
+        });
+    }
+
+    // Insert and update operations on non-existent collections/databases should return
+    // NamespaceNotFound.
+    testCrudOperationOnNonExistentNamespace('i', {_id: 0}, {}, ErrorCodes.NamespaceNotFound);
+    testCrudOperationOnNonExistentNamespace('u', {x: 0}, {_id: 0}, ErrorCodes.NamespaceNotFound);
+
+    // Delete operations on non-existent collections/databases should return OK for idempotency
+    // reasons.
+    testCrudOperationOnNonExistentNamespace('d', {_id: 0}, {});
 
     assert.commandWorked(db.createCollection(t.getName()));
     var a = assert.commandWorked(
