@@ -52,6 +52,7 @@ UUIDCatalog& UUIDCatalog::get(OperationContext* opCtx) {
 void UUIDCatalog::onCreateCollection(OperationContext* opCtx,
                                      Collection* coll,
                                      CollectionUUID uuid) {
+    removeUUIDCatalogEntry(uuid);
     registerUUIDCatalogEntry(uuid, coll);
     opCtx->recoveryUnit()->onRollback([this, uuid] { removeUUIDCatalogEntry(uuid); });
 }
