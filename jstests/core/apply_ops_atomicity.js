@@ -29,10 +29,12 @@
     var newDBName = "apply_ops_atomicity";
     var newDB = db.getSiblingDB(newDBName);
     assert.commandWorked(newDB.dropDatabase());
-    // Do an update on a non-existent database, since only 'u' ops can implicitly create
-    // collections.
-    assert.commandWorked(newDB.runCommand(
-        {applyOps: [{op: "u", ns: newDBName + ".foo", o: {_id: 5, x: 17}, o2: {_id: 5, x: 16}}]}));
+    // Updates on a non-existent database no longer implicitly create collections and will fail with
+    // a NamespaceNotFound error.
+    assert.commandFailedWithCode(newDB.runCommand({
+        applyOps: [{op: "u", ns: newDBName + ".foo", o: {_id: 5, x: 17}, o2: {_id: 5, x: 16}}]
+    }),
+                                 ErrorCodes.NamespaceNotFound);
 
     var sawTooManyLocksError = false;
 

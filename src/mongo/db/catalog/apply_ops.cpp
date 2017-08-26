@@ -126,12 +126,11 @@ Status _applyOps(OperationContext* opCtx,
             if (*opType == 'n')
                 continue;
 
-            const std::string ns = opObj["ns"].String();
-            const NamespaceString nss{ns};
+            const NamespaceString nss(opObj["ns"].String());
 
             // Need to check this here, or OldClientContext may fail an invariant.
-            if (*opType != 'c' && !NamespaceString(ns).isValid())
-                return {ErrorCodes::InvalidNamespace, "invalid ns: " + ns};
+            if (*opType != 'c' && !nss.isValid())
+                return {ErrorCodes::InvalidNamespace, "invalid ns: " + nss.ns()};
 
             Status status(ErrorCodes::InternalError, "");
 
@@ -139,18 +138,34 @@ Status _applyOps(OperationContext* opCtx,
                 invariant(opCtx->lockState()->isW());
                 invariant(*opType != 'c');
 
-                if (!dbHolder().get(opCtx, ns)) {
+                auto db = dbHolder().get(opCtx, nss.ns());
+                if (!db) {
                     throw DBException(
                         "cannot create a database in atomic applyOps mode; will retry without "
                         "atomicity",
                         ErrorCodes::NamespaceNotFound);
                 }
 
-                OldClientContext ctx(opCtx, ns);
+                // When processing an update on a non-existent collection, applyOperation_inlock()
+                // returns UpdateOperationFailed on updates and allows the collection to be
+                // implicitly created on upserts. We detect both cases here and fail early with
+                // NamespaceNotFound.
+                auto collection = db->getCollection(nss);
+                if (!collection && !nss.isSystemDotIndexes() &&
+                    (*opType == 'i' || *opType == 'u')) {
+                    throw DBException(str::stream() << "cannot apply insert or update operation on "
+                                                       "a non-existent namespace "
+                                                    << nss.ns()
+                                                    << ": "
+                                                    << redact(opObj),
+                                      ErrorCodes::NamespaceNotFound);
+                }
+
+                OldClientContext ctx(opCtx, nss.ns());
                 status = repl::applyOperation_inlock(opCtx, ctx.db(), opObj, alwaysUpsert);
                 if (!status.isOK())
                     return status;
-                logOpForDbHash(opCtx, ns.c_str());
+                logOpForDbHash(opCtx, nss.ns().c_str());
             } else {
                 try {
                     MONGO_WRITE_CONFLICT_RETRY_LOOP_BEGIN {
@@ -158,15 +173,30 @@ Status _applyOps(OperationContext* opCtx,
                             invariant(opCtx->lockState()->isW());
                             status = repl::applyCommand_inlock(opCtx, opObj, true);
                         } else {
-                            Lock::DBLock dbWriteLock(opCtx->lockState(), nss.db(), MODE_IX);
-                            Lock::CollectionLock lock(opCtx->lockState(), nss.ns(), MODE_IX);
-                            OldClientContext ctx(opCtx, ns);
+                            AutoGetCollection autoColl(opCtx, nss, MODE_IX);
+                            if (!autoColl.getCollection() && !nss.isSystemDotIndexes()) {
+                                // For idempotency reasons, return success on delete operations.
+                                if (*opType == 'd') {
+                                    status = Status::OK();
+                                } else {
+                                    throw DBException(
+                                        str::stream()
+                                            << "cannot apply insert or update operation on"
+                                               " a non-existent namespace "
+                                            << nss.ns()
+                                            << ": "
+                                            << mongo::redact(opObj),
+                                        ErrorCodes::NamespaceNotFound);
+                                }
+                            } else {
+                                OldClientContext ctx(opCtx, nss.ns());
 
-                            status =
-                                repl::applyOperation_inlock(opCtx, ctx.db(), opObj, alwaysUpsert);
+                                status = repl::applyOperation_inlock(
+                                    opCtx, ctx.db(), opObj, alwaysUpsert);
+                            }
                         }
                     }
-                    MONGO_WRITE_CONFLICT_RETRY_LOOP_END(opCtx, "applyOps", ns);
+                    MONGO_WRITE_CONFLICT_RETRY_LOOP_END(opCtx, "applyOps", nss.ns());
                 } catch (const DBException& ex) {
                     ab.append(false);
                     result->append("applied", ++(*numApplied));
@@ -178,7 +208,7 @@ Status _applyOps(OperationContext* opCtx,
                     return Status(ErrorCodes::UnknownError, ex.what());
                 }
                 WriteUnitOfWork wuow(opCtx);
-                logOpForDbHash(opCtx, ns.c_str());
+                logOpForDbHash(opCtx, nss.ns().c_str());
                 wuow.commit();
             }
 
