@@ -32,8 +32,10 @@ int
 main(void)
 {
 	uint64_t ncalls, r, r2, s;
-	uint8_t buf[WT_INTPACK64_MAXSIZE], *p;
+	uint8_t buf[WT_INTPACK64_MAXSIZE + 8];	/* -Werror=array-bounds */
+	uint8_t *p;
 	const uint8_t *cp;
+	size_t used_len;
 	int i;
 
 	memset(buf, 0xff, sizeof(buf));	/* -Werror=maybe-uninitialized */
@@ -46,6 +48,8 @@ main(void)
 #if 1
 			p = buf;
 			testutil_check(__wt_vpack_uint(&p, sizeof(buf), r));
+			used_len = (size_t)(p - buf);
+			testutil_assert(used_len <= WT_INTPACK64_MAXSIZE);
 			cp = buf;
 			testutil_check(
 			    __wt_vunpack_uint(&cp, sizeof(buf), &r2));
