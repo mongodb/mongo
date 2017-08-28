@@ -172,6 +172,20 @@ TEST_F(LogicalSessionIdTest, ConstructorFromClientWithPassedUidWithPermissions) 
     ASSERT_EQ(lsid.getUid(), uid);
 }
 
+TEST_F(LogicalSessionIdTest, ConstructorFromClientWithOwnUidWithNonImpersonatePermissions) {
+    User* user = addSimpleUser(UserName("simple", "test"));
+    auto id = UUID::gen();
+    auto uid = user->getDigest();
+
+    LogicalSessionFromClient req;
+    req.setId(id);
+    req.setUid(uid);
+
+    LogicalSessionId lsid = makeLogicalSessionId(req, _opCtx.get());
+    ASSERT_EQ(lsid.getId(), id);
+    ASSERT_EQ(lsid.getUid(), uid);
+}
+
 TEST_F(LogicalSessionIdTest, ConstructorFromClientWithPassedUidWithoutAuthedUser) {
     auto id = UUID::gen();
     auto uid = SHA256Block{};
