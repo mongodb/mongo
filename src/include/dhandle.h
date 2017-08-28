@@ -64,6 +64,11 @@ struct __wt_data_handle {
 	TAILQ_ENTRY(__wt_data_handle) q;
 	TAILQ_ENTRY(__wt_data_handle) hashq;
 
+	const char *name;		/* Object name as a URI */
+	uint64_t name_hash;		/* Hash of name */
+	const char *checkpoint;		/* Checkpoint name (or NULL) */
+	const char **cfg;		/* Configuration information */
+
 	/*
 	 * Sessions caching a connection's data handle will have a non-zero
 	 * reference count; sessions using a connection's data handle will
@@ -75,15 +80,15 @@ struct __wt_data_handle {
 	time_t	 timeofdeath;		/* Use count went to 0 */
 	WT_SESSION_IMPL *excl_session;	/* Session with exclusive use, if any */
 
-	uint64_t name_hash;		/* Hash of name */
-	const char *name;		/* Object name as a URI */
-	const char *checkpoint;		/* Checkpoint name (or NULL) */
-	const char **cfg;		/* Configuration information */
-
-	bool compact_skip;		/* If the handle failed to compact */
-
 	WT_DATA_SOURCE *dsrc;		/* Data source for this handle */
 	void *handle;			/* Generic handle */
+
+	enum {
+		WT_DHANDLE_TYPE_BTREE,
+		WT_DHANDLE_TYPE_TABLE
+	} type;
+
+	bool compact_skip;		/* If the handle failed to compact */
 
 	/*
 	 * Data handles can be closed without holding the schema lock; threads

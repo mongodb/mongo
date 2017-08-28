@@ -160,12 +160,12 @@ __compact_handle_append(WT_SESSION_IMPL *session, const char *cfg[])
 
 	WT_UNUSED(cfg);
 
-	WT_RET(__wt_session_get_btree(
+	WT_RET(__wt_session_get_dhandle(
 	    session, session->dhandle->name, NULL, NULL, 0));
 
 	/* Set compact active on the handle. */
 	if ((ret = __compact_start(session)) != 0) {
-		WT_TRET(__wt_session_release_btree(session));
+		WT_TRET(__wt_session_release_dhandle(session));
 		return (ret);
 	}
 
@@ -381,7 +381,7 @@ err:	session->compact = NULL;
 		WT_WITH_DHANDLE(session, session->op_handle[i],
 		    WT_TRET(__compact_end(session)));
 		WT_WITH_DHANDLE(session, session->op_handle[i],
-		    WT_TRET(__wt_session_release_btree(session)));
+		    WT_TRET(__wt_session_release_dhandle(session)));
 	}
 
 	__wt_free(session, session->op_handle);

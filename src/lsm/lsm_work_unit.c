@@ -373,7 +373,7 @@ __wt_lsm_checkpoint_chunk(WT_SESSION_IMPL *session,
 	 * We can wait here for checkpoints and fsyncs to complete, which can
 	 * take a long time.
 	 */
-	WT_ERR(__wt_session_get_btree(session, chunk->uri, NULL, NULL, 0));
+	WT_ERR(__wt_session_get_dhandle(session, chunk->uri, NULL, NULL, 0));
 	release_btree = true;
 
 	/*
@@ -408,7 +408,7 @@ __wt_lsm_checkpoint_chunk(WT_SESSION_IMPL *session,
 		WT_ERR_MSG(session, ret, "LSM checkpoint");
 
 	release_btree = false;
-	WT_ERR(__wt_session_release_btree(session));
+	WT_ERR(__wt_session_release_dhandle(session));
 
 	/* Now the file is written, get the chunk size. */
 	WT_ERR(__wt_lsm_tree_set_chunk_size(session, chunk));
@@ -449,7 +449,7 @@ __wt_lsm_checkpoint_chunk(WT_SESSION_IMPL *session,
 err:	if (flush_set)
 		WT_PUBLISH(chunk->flushing, 0);
 	if (release_btree)
-		WT_TRET(__wt_session_release_btree(session));
+		WT_TRET(__wt_session_release_dhandle(session));
 
 	return (ret);
 }
@@ -539,11 +539,11 @@ __lsm_discard_handle(
     WT_SESSION_IMPL *session, const char *uri, const char *checkpoint)
 {
 	/* This will fail with EBUSY if the file is still in use. */
-	WT_RET(__wt_session_get_btree(session, uri, checkpoint, NULL,
+	WT_RET(__wt_session_get_dhandle(session, uri, checkpoint, NULL,
 	    WT_DHANDLE_EXCLUSIVE | WT_DHANDLE_LOCK_ONLY));
 
 	F_SET(session->dhandle, WT_DHANDLE_DISCARD_KILL);
-	return (__wt_session_release_btree(session));
+	return (__wt_session_release_dhandle(session));
 }
 
 /*

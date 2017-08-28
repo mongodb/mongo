@@ -809,7 +809,7 @@ __evict_clear_all_walks(WT_SESSION_IMPL *session)
 	conn = S2C(session);
 
 	TAILQ_FOREACH(dhandle, &conn->dhqh, q)
-		if (WT_PREFIX_MATCH(dhandle->name, "file:"))
+		if (dhandle->type == WT_DHANDLE_TYPE_BTREE)
 			WT_WITH_DHANDLE(session, dhandle,
 			    WT_TRET(__evict_clear_walk(session)));
 	return (ret);
@@ -1399,8 +1399,8 @@ retry:	while (slot < max_entries) {
 		if (dhandle == NULL)
 			break;
 
-		/* Ignore non-file handles, or handles that aren't open. */
-		if (!WT_PREFIX_MATCH(dhandle->name, "file:") ||
+		/* Ignore non-btree handles, or handles that aren't open. */
+		if (dhandle->type != WT_DHANDLE_TYPE_BTREE ||
 		    !F_ISSET(dhandle, WT_DHANDLE_OPEN))
 			continue;
 
@@ -2527,7 +2527,7 @@ __wt_verbose_dump_cache(WT_SESSION_IMPL *session)
 		    WT_DHANDLE_NEXT(session, dhandle, &conn->dhqh, q));
 		if (dhandle == NULL)
 			break;
-		if (!WT_PREFIX_MATCH(dhandle->name, "file:") ||
+		if (dhandle->type != WT_DHANDLE_TYPE_BTREE ||
 		    !F_ISSET(dhandle, WT_DHANDLE_OPEN))
 			continue;
 

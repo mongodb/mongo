@@ -441,7 +441,7 @@ __curfile_close(WT_CURSOR *cursor)
 	if (session->dhandle != NULL) {
 		/* Decrement the data-source's in-use counter. */
 		__wt_cursor_dhandle_decr_use(session);
-		WT_TRET(__wt_session_release_btree(session));
+		WT_TRET(__wt_session_release_dhandle(session));
 	}
 
 err:	API_END_RET(session, ret);
@@ -651,6 +651,6 @@ __wt_curfile_open(WT_SESSION_IMPL *session, const char *uri,
 	return (0);
 
 err:	/* If the cursor could not be opened, release the handle. */
-	WT_TRET(__wt_session_release_btree(session));
+	WT_TRET(__wt_session_release_dhandle(session));
 	return (ret);
 }

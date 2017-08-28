@@ -829,7 +829,8 @@ __curtable_close(WT_CURSOR *cursor)
 	__wt_free(session, ctable->cg_cursors);
 	__wt_free(session, ctable->cg_valcopy);
 	__wt_free(session, ctable->idx_cursors);
-	__wt_schema_release_table(session, ctable->table);
+
+	WT_TRET(__wt_schema_release_table(session, ctable->table));
 	/* The URI is owned by the table. */
 	cursor->internal_uri = NULL;
 	WT_TRET(__wt_cursor_close(cursor));
@@ -854,7 +855,7 @@ __curtable_complete(WT_SESSION_IMPL *session, WT_TABLE *table)
 	if (!complete)
 		WT_RET_MSG(session, EINVAL,
 		    "'%s' not available until all column groups are created",
-		    table->name);
+		    table->iface.name);
 	return (0);
 }
 
@@ -974,10 +975,13 @@ __wt_curtable_open(WT_SESSION_IMPL *session,
 	WT_PREFIX_SKIP_REQUIRED(session, tablename, "table:");
 	columns = strchr(tablename, '(');
 	if (columns == NULL)
-		size = strlen(tablename);
-	else
+		WT_RET(__wt_schema_get_table_uri(
+		    session, uri, false, 0, &table));
+	else {
 		size = WT_PTRDIFF(columns, tablename);
-	WT_RET(__wt_schema_get_table(session, tablename, size, false, &table));
+		WT_RET(__wt_schema_get_table(
+		    session, tablename, size, false, 0, &table));
+	}
 
 	WT_RET(__curtable_complete(session, table));	/* completeness check */
 
@@ -986,7 +990,7 @@ __wt_curtable_open(WT_SESSION_IMPL *session,
 		ret = __wt_open_cursor(session,
 		    table->cgroups[0]->source, NULL, cfg, cursorp);
 
-		__wt_schema_release_table(session, table);
+		WT_TRET(__wt_schema_release_table(session, table));
 		if (ret == 0) {
 			/* Fix up the public URI to match what was passed in. */
 			cursor = *cursorp;
@@ -1001,7 +1005,7 @@ __wt_curtable_open(WT_SESSION_IMPL *session,
 	cursor = &ctable->iface;
 	*cursor = iface;
 	cursor->session = &session->iface;
-	cursor->internal_uri = table->name;
+	cursor->internal_uri = table->iface.name;
 	cursor->key_format = table->key_format;
 	cursor->value_format = table->value_format;
 

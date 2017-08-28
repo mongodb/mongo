@@ -92,7 +92,7 @@ __rename_tree(WT_SESSION_IMPL *session,
 	const char *newname, *olduri, *suffix;
 	char *value;
 
-	olduri = table->name;
+	olduri = table->iface.name;
 	value = NULL;
 
 	newname = newuri;
@@ -132,7 +132,7 @@ __rename_tree(WT_SESSION_IMPL *session,
 	 * and substitute the new name temporarily.
 	 */
 	WT_ERR(__wt_scr_alloc(session, 0, &ns));
-	table->name = newuri;
+	table->iface.name = newuri;
 	if (is_colgroup)
 		WT_ERR(__wt_schema_colgroup_source(
 		    session, table, suffix, value, ns));
@@ -172,7 +172,7 @@ err:	__wt_scr_free(session, &nn);
 	__wt_scr_free(session, &nv);
 	__wt_scr_free(session, &os);
 	__wt_free(session, value);
-	table->name = olduri;
+	table->iface.name = olduri;
 	return (ret);
 }
 
@@ -210,8 +210,8 @@ __rename_table(WT_SESSION_IMPL *session,
 	oldname = uri;
 	(void)WT_PREFIX_SKIP(oldname, "table:");
 
-	WT_RET(__wt_schema_get_table(
-	    session, oldname, strlen(oldname), false, &table));
+	WT_RET(__wt_schema_get_table(session,
+	    oldname, strlen(oldname), false, WT_DHANDLE_EXCLUSIVE, &table));
 
 	/* Rename the column groups. */
 	for (i = 0; i < WT_COLGROUPS(table); i++)
@@ -224,14 +224,14 @@ __rename_table(WT_SESSION_IMPL *session,
 		WT_ERR(__rename_tree(session, table, newuri,
 		    table->indices[i]->name, cfg));
 
-	WT_ERR(__wt_schema_remove_table(session, table));
-	table = NULL;
+	/* Make sure the table data handle is closed. */
+	F_SET(&table->iface, WT_DHANDLE_DISCARD);
 
 	/* Rename the table. */
 	WT_ERR(__metadata_rename(session, uri, newuri));
 
 err:	if (table != NULL)
-		__wt_schema_release_table(session, table);
+		WT_TRET(__wt_schema_release_table(session, table));
 	return (ret);
 }
 
@@ -273,9 +273,6 @@ __wt_schema_rename(WT_SESSION_IMPL *session,
 		    &session->iface, uri, newuri, (WT_CONFIG_ARG *)cfg);
 	else
 		ret = __wt_bad_object_type(session, uri);
-
-	/* Bump the schema generation so that stale data is ignored. */
-	(void)__wt_gen_next(session, WT_GEN_SCHEMA);
 
 	WT_TRET(__wt_meta_track_off(session, true, ret != 0));
 

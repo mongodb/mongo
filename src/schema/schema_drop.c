@@ -59,7 +59,7 @@ __drop_colgroup(
 	WT_DECL_RET;
 	WT_TABLE *table;
 
-	WT_ASSERT(session, F_ISSET(session, WT_SESSION_LOCKED_TABLE));
+	WT_ASSERT(session, F_ISSET(session, WT_SESSION_LOCKED_TABLE_WRITE));
 
 	/* If we can get the colgroup, detach it from the table. */
 	if ((ret = __wt_schema_get_colgroup(
@@ -82,14 +82,10 @@ __drop_index(
 {
 	WT_INDEX *idx;
 	WT_DECL_RET;
-	WT_TABLE *table;
 
 	/* If we can get the index, detach it from the table. */
-	if ((ret = __wt_schema_get_index(
-	    session, uri, force, &table, &idx)) == 0) {
-		table->idx_complete = false;
+	if ((ret = __wt_schema_get_index(session, uri, true, force, &idx)) == 0)
 		WT_TRET(__wt_schema_drop(session, idx->source, cfg));
-	}
 
 	WT_TRET(__wt_metadata_remove(session, uri));
 	return (ret);
@@ -100,7 +96,8 @@ __drop_index(
  *	WT_SESSION::drop for a table.
  */
 static int
-__drop_table(WT_SESSION_IMPL *session, const char *uri, const char *cfg[])
+__drop_table(
+    WT_SESSION_IMPL *session, const char *uri, const char *cfg[])
 {
 	WT_COLGROUP *colgroup;
 	WT_DECL_RET;
@@ -108,13 +105,27 @@ __drop_table(WT_SESSION_IMPL *session, const char *uri, const char *cfg[])
 	WT_TABLE *table;
 	const char *name;
 	u_int i;
+	bool tracked;
 
 	name = uri;
 	WT_PREFIX_SKIP_REQUIRED(session, name, "table:");
 
 	table = NULL;
-	WT_ERR(__wt_schema_get_table(
-	    session, name, strlen(name), true, &table));
+	tracked = false;
+
+	/*
+	 * Open the table to check that it was setup correctly.  Keep the
+	 * handle exclusive until it is released at the end of the call.
+	 */
+	WT_ERR(__wt_schema_get_table_uri(
+	    session, uri, true, WT_DHANDLE_EXCLUSIVE, &table));
+	F_SET(&table->iface, WT_DHANDLE_DISCARD);
+	if (WT_META_TRACKING(session)) {
+		WT_WITH_DHANDLE(session, &table->iface,
+		    ret = __wt_meta_track_handle_lock(session, false));
+		WT_ERR(ret);
+		tracked = true;
+	}
 
 	/* Drop the column groups. */
 	for (i = 0; i < WT_COLGROUPS(table); i++) {
@@ -143,14 +154,14 @@ __drop_table(WT_SESSION_IMPL *session, const char *uri, const char *cfg[])
 		WT_ERR(__wt_metadata_remove(session, idx->name));
 	}
 
-	WT_ERR(__wt_schema_remove_table(session, table));
-	table = NULL;
+	/* Make sure the table data handle is closed. */
+	F_SET(&table->iface, WT_DHANDLE_DISCARD);
 
 	/* Remove the metadata entry (ignore missing items). */
 	WT_ERR(__wt_metadata_remove(session, uri));
 
-err:	if (table != NULL)
-		__wt_schema_release_table(session, table);
+err:	if (table != NULL && !tracked)
+		WT_TRET(__wt_schema_release_table(session, table));
 	return (ret);
 }
 
@@ -198,9 +209,6 @@ __wt_schema_drop(WT_SESSION_IMPL *session, const char *uri, const char *cfg[])
 	 */
 	if (ret == WT_NOTFOUND || ret == ENOENT)
 		ret = force ? 0 : ENOENT;
-
-	/* Bump the schema generation so that stale data is ignored. */
-	(void)__wt_gen_next(session, WT_GEN_SCHEMA);
 
 	WT_TRET(__wt_meta_track_off(session, true, ret != 0));
 

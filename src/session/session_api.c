@@ -182,9 +182,6 @@ __session_close(WT_SESSION *wt_session, const char *config)
 	/* Discard cached handles. */
 	__wt_session_close_cache(session);
 
-	/* Close all tables. */
-	WT_TRET(__wt_schema_close_tables(session));
-
 	/* Confirm we're not holding any hazard pointers. */
 	__wt_hazard_close(session);
 
@@ -835,8 +832,6 @@ __session_reset(WT_SESSION *wt_session)
 	WT_ERR(__wt_txn_context_check(session, false));
 
 	WT_TRET(__wt_session_reset_cursors(session, true));
-
-	WT_TRET(__wt_schema_sweep_tables(session));
 
 	/* Release common session resources. */
 	WT_TRET(__wt_session_release_resources(session));
@@ -1883,13 +1878,8 @@ __open_session(WT_CONNECTION_IMPL *conn,
 	if (session_ret->dhhash == NULL)
 		WT_ERR(__wt_calloc(session, WT_HASH_ARRAY_SIZE,
 		    sizeof(struct __dhandles_hash), &session_ret->dhhash));
-	if (session_ret->tablehash == NULL)
-		WT_ERR(__wt_calloc(session, WT_HASH_ARRAY_SIZE,
-		    sizeof(struct __tables_hash), &session_ret->tablehash));
-	for (i = 0; i < WT_HASH_ARRAY_SIZE; i++) {
+	for (i = 0; i < WT_HASH_ARRAY_SIZE; i++)
 		TAILQ_INIT(&session_ret->dhhash[i]);
-		TAILQ_INIT(&session_ret->tablehash[i]);
-	}
 
 	/* Initialize transaction support: default to read-committed. */
 	session_ret->isolation = WT_ISO_READ_COMMITTED;

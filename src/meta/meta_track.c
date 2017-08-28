@@ -148,7 +148,7 @@ __meta_track_apply(WT_SESSION_IMPL *session, WT_META_TRACK *trk)
 		break;
 	case WT_ST_LOCK:
 		WT_WITH_DHANDLE(session, trk->dhandle,
-		    ret = __wt_session_release_btree(session));
+		    ret = __wt_session_release_dhandle(session));
 		break;
 	case WT_ST_FILEOP:
 	case WT_ST_REMOVE:
@@ -180,7 +180,7 @@ __meta_track_unroll(WT_SESSION_IMPL *session, WT_META_TRACK *trk)
 		if (trk->created)
 			F_SET(trk->dhandle, WT_DHANDLE_DISCARD);
 		WT_WITH_DHANDLE(session, trk->dhandle,
-		    ret = __wt_session_release_btree(session));
+		    ret = __wt_session_release_dhandle(session));
 		break;
 	case WT_ST_FILEOP:	/* File operation */
 		/*
