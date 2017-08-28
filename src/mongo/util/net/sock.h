@@ -70,6 +70,9 @@ extern const int portRecvFlags;
 
 const int SOCK_FAMILY_UNKNOWN_ERROR = 13078;
 
+void setSocketKeepAliveParams(int sock,
+                              unsigned int maxKeepIdleSecs = 300,
+                              unsigned int maxKeepIntvlSecs = 300);
 void disableNagle(int sock);
 
 // Generate a string representation for getaddrinfo return codes

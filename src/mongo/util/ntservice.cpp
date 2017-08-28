@@ -287,7 +287,7 @@ void installServiceOrDie(const wstring& serviceName,
     SC_HANDLE schSCManager = ::OpenSCManager(NULL, NULL, SC_MANAGER_ALL_ACCESS);
     if (schSCManager == NULL) {
         DWORD err = ::GetLastError();
-        log() << "Error connecting to the Service Control Manager: " << GetWinErrMsg(err);
+        log() << "Error connecting to the Service Control Manager: " << windows::GetErrMsg(err);
         quickExit(EXIT_NTSERVICE_ERROR);
     }
 
@@ -336,7 +336,7 @@ void installServiceOrDie(const wstring& serviceName,
                                   NULL);                      // user account password
     if (schService == NULL) {
         DWORD err = ::GetLastError();
-        log() << "Error creating service: " << GetWinErrMsg(err);
+        log() << "Error creating service: " << windows::GetErrMsg(err);
         ::CloseServiceHandle(schSCManager);
         quickExit(EXIT_NTSERVICE_ERROR);
     }
@@ -441,7 +441,7 @@ void removeServiceOrDie(const wstring& serviceName) {
     SC_HANDLE schSCManager = ::OpenSCManager(NULL, NULL, SC_MANAGER_ALL_ACCESS);
     if (schSCManager == NULL) {
         DWORD err = ::GetLastError();
-        log() << "Error connecting to the Service Control Manager: " << GetWinErrMsg(err);
+        log() << "Error connecting to the Service Control Manager: " << windows::GetErrMsg(err);
         quickExit(EXIT_NTSERVICE_ERROR);
     }
 

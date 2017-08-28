@@ -59,6 +59,7 @@ networkEnv.Library(
         '$BUILD_DIR/mongo/util/options_parser/options_parser',
         '$BUILD_DIR/third_party/shim_asio',
         'hostandport',
+        '$BUILD_DIR/mongo/util/winutil',
     ],
 )
 

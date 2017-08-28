@@ -300,6 +300,12 @@ if env['MONGO_ALLOCATOR'] == 'tcmalloc':
         ],
     )
 
+env.Library(
+    target='winutil',
+    source=[
+        'winutil.cpp',
+    ],
+)
 
 env.Library(
     target='ntservice',
