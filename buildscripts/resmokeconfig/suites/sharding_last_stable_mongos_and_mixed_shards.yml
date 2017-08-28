@@ -4,6 +4,8 @@ selector:
   roots:
   - jstests/sharding/*.js
   exclude_files:
+  # SERVER-30899 We changed the meaning of 'fromRouter' - impacting sorts on metadata.
+  - jstests/sharding/agg_sort.js
   # Doesn't use ShardingTest so won't actually be run in a mixed version configuration
   - jstests/sharding/config_version_rollback.js
   # Behavior change to addShard

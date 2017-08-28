@@ -449,7 +449,7 @@ public:
         EXHAUSTIVE_FIELDS = 0x2,
 
         // Later stages won't need more metadata from input. For example, a $group stage will group
-        // documents together, discarding their text score.
+        // documents together, discarding their text score and sort keys.
         EXHAUSTIVE_META = 0x4,
 
         // Later stages won't need either fields or metadata.

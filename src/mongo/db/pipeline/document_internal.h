@@ -196,6 +196,7 @@ public:
     enum MetaType : char {
         TEXT_SCORE,
         RAND_VAL,
+        SORT_KEY,
 
         NUM_FIELDS
     };
@@ -280,6 +281,9 @@ public:
         if (source.hasRandMetaField()) {
             setRandMetaField(source.getRandMetaField());
         }
+        if (source.hasSortKeyMetaField()) {
+            setSortKeyMetaField(source.getSortKeyMetaField());
+        }
     }
 
     bool hasTextScore() const {
@@ -302,6 +306,17 @@ public:
     void setRandMetaField(double val) {
         _metaFields.set(MetaType::RAND_VAL);
         _randVal = val;
+    }
+
+    bool hasSortKeyMetaField() const {
+        return _metaFields.test(MetaType::SORT_KEY);
+    }
+    BSONObj getSortKeyMetaField() const {
+        return _sortKey;
+    }
+    void setSortKeyMetaField(BSONObj sortKey) {
+        _metaFields.set(MetaType::SORT_KEY);
+        _sortKey = sortKey.getOwned();
     }
 
 private:
@@ -385,6 +400,7 @@ private:
     std::bitset<MetaType::NUM_FIELDS> _metaFields;
     double _textScore;
     double _randVal;
+    BSONObj _sortKey;
     // When adding a field, make sure to update clone() method
 
     // Defined in document.cpp

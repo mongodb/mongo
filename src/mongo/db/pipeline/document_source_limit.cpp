@@ -49,9 +49,7 @@ REGISTER_DOCUMENT_SOURCE(limit,
                          LiteParsedDocumentSourceDefault::parse,
                          DocumentSourceLimit::createFromBson);
 
-const char* DocumentSourceLimit::getSourceName() const {
-    return "$limit";
-}
+constexpr StringData DocumentSourceLimit::kStageName;
 
 Pipeline::SourceContainer::iterator DocumentSourceLimit::doOptimizeAt(
     Pipeline::SourceContainer::iterator itr, Pipeline::SourceContainer* container) {

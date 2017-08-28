@@ -50,9 +50,7 @@ REGISTER_DOCUMENT_SOURCE(skip,
                          LiteParsedDocumentSourceDefault::parse,
                          DocumentSourceSkip::createFromBson);
 
-const char* DocumentSourceSkip::getSourceName() const {
-    return "$skip";
-}
+constexpr StringData DocumentSourceSkip::kStageName;
 
 DocumentSource::GetNextResult DocumentSourceSkip::getNext() {
     pExpCtx->checkForInterrupt();

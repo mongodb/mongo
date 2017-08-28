@@ -92,6 +92,11 @@ DocumentSource::GetNextResult DocumentSourceSampleFromRandomCursor::getNext() {
 
     MutableDocument md(nextResult.releaseDocument());
     md.setRandMetaField(_randMetaFieldVal);
+    if (pExpCtx->needsMerge) {
+        // This stage will be merged by sorting results according to this random metadata field, but
+        // the merging logic expects to sort by the sort key metadata.
+        md.setSortKeyMetaField(BSON("" << _randMetaFieldVal));
+    }
     return md.freeze();
 }
 

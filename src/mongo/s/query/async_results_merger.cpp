@@ -61,7 +61,9 @@ AsyncResultsMerger::AsyncResultsMerger(OperationContext* opCtx,
       _mergeQueue(MergingComparator(_remotes, _params->sort)) {
     size_t remoteIndex = 0;
     for (const auto& remote : _params->remotes) {
-        _remotes.emplace_back(remote.hostAndPort, remote.cursorResponse.getCursorId());
+        _remotes.emplace_back(remote.hostAndPort,
+                              remote.cursorResponse.getNSS(),
+                              remote.cursorResponse.getCursorId());
 
         // We don't check the return value of addBatchToBuffer here; if there was an error,
         // it will be stored in the remote and the first call to ready() will return true.
@@ -269,7 +271,7 @@ Status AsyncResultsMerger::askForNextBatch_inlock(size_t remoteIndex) {
         adjustedBatchSize = *_params->batchSize - remote.fetchedCount;
     }
 
-    BSONObj cmdObj = GetMoreRequest(_params->nsString,
+    BSONObj cmdObj = GetMoreRequest(remote.cursorNss,
                                     remote.cursorId,
                                     adjustedBatchSize,
                                     _awaitDataTimeout,
@@ -582,8 +584,11 @@ executor::TaskExecutor::EventHandle AsyncResultsMerger::kill(OperationContext* o
 //
 
 AsyncResultsMerger::RemoteCursorData::RemoteCursorData(HostAndPort hostAndPort,
+                                                       NamespaceString cursorNss,
                                                        CursorId establishedCursorId)
-    : cursorId(establishedCursorId), shardHostAndPort(std::move(hostAndPort)) {}
+    : cursorId(establishedCursorId),
+      cursorNss(std::move(cursorNss)),
+      shardHostAndPort(std::move(hostAndPort)) {}
 
 const HostAndPort& AsyncResultsMerger::RemoteCursorData::getTargetHost() const {
     return shardHostAndPort;

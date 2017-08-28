@@ -1,5 +1,5 @@
 /**
- * Copyright (C) 2016 MongoDB Inc.
+ * Copyright (C) 2017 MongoDB Inc.
  *
  * This program is free software: you can redistribute it and/or  modify
  * it under the terms of the GNU Affero General Public License, version 3,
@@ -28,48 +28,36 @@
 
 #pragma once
 
-#include "mongo/db/pipeline/document_source.h"
-#include "mongo/db/pipeline/document_source_sort.h"
+#include "mongo/s/query/router_exec_stage.h"
+
+#include "mongo/db/pipeline/pipeline.h"
 
 namespace mongo {
 
-class DocumentSourceSample final : public DocumentSource, public SplittableDocumentSource {
+/**
+ * Inserts a pipeline into the router execution tree, drawing results from the input stage, feeding
+ * them through the pipeline, and outputting the results of the pipeline.
+ */
+class RouterStagePipeline final : public RouterExecStage {
 public:
-    static constexpr StringData kStageName = "$sample"_sd;
+    RouterStagePipeline(std::unique_ptr<RouterExecStage> child,
+                        std::unique_ptr<Pipeline, Pipeline::Deleter> mergePipeline);
 
-    GetNextResult getNext() final;
-    const char* getSourceName() const final {
-        return kStageName.rawData();
-    }
-    Value serialize(boost::optional<ExplainOptions::Verbosity> explain = boost::none) const final;
+    StatusWith<ClusterQueryResult> next() final;
 
-    StageConstraints constraints() const final {
-        StageConstraints constraints;
-        constraints.hostRequirement = HostTypeRequirement::kAnyShardOrMongoS;
-        return constraints;
-    }
+    void kill(OperationContext* opCtx) final;
 
-    GetDepsReturn getDependencies(DepsTracker* deps) const final {
-        return SEE_NEXT;
-    }
+    bool remotesExhausted() final;
 
-    boost::intrusive_ptr<DocumentSource> getShardSource() final;
-    boost::intrusive_ptr<DocumentSource> getMergeSource() final;
+protected:
+    Status doSetAwaitDataTimeout(Milliseconds awaitDataTimeout) final;
 
-    long long getSampleSize() const {
-        return _size;
-    }
+    void doReattachToOperationContext() final;
 
-    static boost::intrusive_ptr<DocumentSource> createFromBson(
-        BSONElement elem, const boost::intrusive_ptr<ExpressionContext>& expCtx);
+    void doDetachFromOperationContext() final;
 
 private:
-    explicit DocumentSourceSample(const boost::intrusive_ptr<ExpressionContext>& pExpCtx);
-
-    long long _size;
-
-    // Uses a $sort stage to randomly sort the documents.
-    boost::intrusive_ptr<DocumentSourceSort> _sortStage;
+    std::unique_ptr<Pipeline, Pipeline::Deleter> _mergePipeline;
 };
 
 }  // namespace mongo

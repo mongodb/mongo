@@ -51,8 +51,6 @@ public:
 
     bool remotesExhausted() final;
 
-    Status setAwaitDataTimeout(Milliseconds awaitDataTimeout) final;
-
     /**
      * Queues a BSONObj to be returned.
      */
@@ -78,6 +76,9 @@ public:
      * Gets the timeout for awaitData, or an error if none was set.
      */
     StatusWith<Milliseconds> getAwaitDataTimeout();
+
+protected:
+    Status doSetAwaitDataTimeout(Milliseconds awaitDataTimeout) final;
 
 private:
     std::queue<StatusWith<ClusterQueryResult>> _resultsQueue;

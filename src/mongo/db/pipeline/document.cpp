@@ -45,6 +45,9 @@ using std::vector;
 
 const DocumentStorage DocumentStorage::kEmptyDoc;
 
+const std::vector<StringData> Document::allMetadataFieldNames = {
+    Document::metaFieldTextScore, Document::metaFieldRandVal, Document::metaFieldSortKey};
+
 Position DocumentStorage::findField(StringData requested) const {
     int reqSize = requested.size();  // get size calculation out of the way if needed
 
@@ -201,6 +204,7 @@ intrusive_ptr<DocumentStorage> DocumentStorage::clone() const {
     out->_metaFields = _metaFields;
     out->_textScore = _textScore;
     out->_randVal = _randVal;
+    out->_sortKey = _sortKey.getOwned();
 
     // Tell values that they have been memcpyed (updates ref counts)
     for (DocumentStorageIterator it = out->iteratorAll(); !it.atEnd(); it.advance()) {
@@ -265,8 +269,9 @@ BSONObj Document::toBson() const {
     return bb.obj();
 }
 
-const StringData Document::metaFieldTextScore("$textScore"_sd);
-const StringData Document::metaFieldRandVal("$randVal"_sd);
+constexpr StringData Document::metaFieldTextScore;
+constexpr StringData Document::metaFieldRandVal;
+constexpr StringData Document::metaFieldSortKey;
 
 BSONObj Document::toBsonWithMetaData() const {
     BSONObjBuilder bb;
@@ -275,6 +280,8 @@ BSONObj Document::toBsonWithMetaData() const {
         bb.append(metaFieldTextScore, getTextScore());
     if (hasRandMetaField())
         bb.append(metaFieldRandVal, getRandMetaField());
+    if (hasSortKeyMetaField())
+        bb.append(metaFieldSortKey, getSortKeyMetaField());
     return bb.obj();
 }
 
@@ -291,6 +298,9 @@ Document Document::fromBsonWithMetaData(const BSONObj& bson) {
                 continue;
             } else if (fieldName == metaFieldRandVal) {
                 md.setRandMetaField(elem.Double());
+                continue;
+            } else if (fieldName == metaFieldSortKey) {
+                md.setSortKeyMetaField(elem.Obj());
                 continue;
             }
         }
@@ -465,6 +475,10 @@ void Document::serializeForSorter(BufBuilder& buf) const {
         buf.appendNum(char(DocumentStorage::MetaType::RAND_VAL + 1));
         buf.appendNum(getRandMetaField());
     }
+    if (hasSortKeyMetaField()) {
+        buf.appendNum(char(DocumentStorage::MetaType::SORT_KEY + 1));
+        getSortKeyMetaField().appendSelfToBufBuilder(buf);
+    }
     buf.appendNum(char(0));
 }
 
@@ -481,6 +495,9 @@ Document Document::deserializeForSorter(BufReader& buf, const SorterDeserializeS
             doc.setTextScore(buf.read<LittleEndian<double>>());
         } else if (marker == char(DocumentStorage::MetaType::RAND_VAL) + 1) {
             doc.setRandMetaField(buf.read<LittleEndian<double>>());
+        } else if (marker == char(DocumentStorage::MetaType::SORT_KEY) + 1) {
+            doc.setSortKeyMetaField(
+                BSONObj::deserializeForSorter(buf, BSONObj::SorterDeserializeSettings()));
         } else {
             uasserted(28744, "Unrecognized marker, unable to deserialize buffer");
         }

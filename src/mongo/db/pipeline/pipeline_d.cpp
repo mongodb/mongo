@@ -448,6 +448,13 @@ StatusWith<std::unique_ptr<PlanExecutor, PlanExecutor::Deleter>> attemptToGetExe
     return getExecutorFind(
         opCtx, collection, nss, std::move(cq.getValue()), PlanExecutor::YIELD_AUTO, plannerOpts);
 }
+
+BSONObj removeSortKeyMetaProjection(BSONObj projectionObj) {
+    if (!projectionObj[Document::metaFieldSortKey]) {
+        return projectionObj;
+    }
+    return projectionObj.removeField(Document::metaFieldSortKey);
+}
 }  // namespace
 
 void PipelineD::prepareCursorSource(Collection* collection,
@@ -526,20 +533,18 @@ void PipelineD::prepareCursorSource(Collection* collection,
 
     BSONObj projForQuery = deps.toProjection();
 
-    /*
-      Look for an initial sort; we'll try to add this to the
-      Cursor we create.  If we're successful in doing that (further down),
-      we'll remove the $sort from the pipeline, because the documents
-      will already come sorted in the specified order as a result of the
-      index scan.
-    */
+    // Look for an initial sort; we'll try to add this to the Cursor we create. If we're successful
+    // in doing that, we'll remove the $sort from the pipeline, because the documents will already
+    // come sorted in the specified order as a result of the index scan.
     intrusive_ptr<DocumentSourceSort> sortStage;
     BSONObj sortObj;
     if (!sources.empty()) {
         sortStage = dynamic_cast<DocumentSourceSort*>(sources.front().get());
         if (sortStage) {
-            // build the sort key
-            sortObj = sortStage->serializeSortKey(/*explain*/ false).toBson();
+            sortObj = sortStage
+                          ->sortKeyPattern(
+                              DocumentSourceSort::SortKeySerialization::kForPipelineSerialization)
+                          .toBson();
         }
     }
 
@@ -611,26 +616,30 @@ StatusWith<std::unique_ptr<PlanExecutor, PlanExecutor::Deleter>> PipelineD::prep
         plannerOpts |= QueryPlannerParams::IS_COUNT;
     }
 
-    // The only way to get a text score is to let the query system handle the projection. In all
-    // other cases, unless the query system can do an index-covered projection and avoid going to
-    // the raw record at all, it is faster to have ParsedDeps filter the fields we need.
-    if (!deps.getNeedTextScore()) {
+    // The only way to get a text score or the sort key is to let the query system handle the
+    // projection. In all other cases, unless the query system can do an index-covered projection
+    // and avoid going to the raw record at all, it is faster to have ParsedDeps filter the fields
+    // we need.
+    if (!deps.getNeedTextScore() && !deps.getNeedSortKey()) {
         plannerOpts |= QueryPlannerParams::NO_UNCOVERED_PROJECTIONS;
     }
 
-    BSONObj emptyProjection;
+    const BSONObj emptyProjection;
+    const BSONObj metaSortProjection = BSON("$meta"
+                                            << "sortKey");
     if (sortStage) {
         // See if the query system can provide a non-blocking sort.
-        auto swExecutorSort = attemptToGetExecutor(opCtx,
-                                                   collection,
-                                                   nss,
-                                                   expCtx,
-                                                   oplogReplay,
-                                                   queryObj,
-                                                   emptyProjection,
-                                                   *sortObj,
-                                                   aggRequest,
-                                                   plannerOpts);
+        auto swExecutorSort =
+            attemptToGetExecutor(opCtx,
+                                 collection,
+                                 nss,
+                                 expCtx,
+                                 oplogReplay,
+                                 queryObj,
+                                 expCtx->needsMerge ? metaSortProjection : emptyProjection,
+                                 *sortObj,
+                                 aggRequest,
+                                 plannerOpts);
 
         if (swExecutorSort.isOK()) {
             // Success! Now see if the query system can also cover the projection.
@@ -682,6 +691,14 @@ StatusWith<std::unique_ptr<PlanExecutor, PlanExecutor::Deleter>> PipelineD::prep
     // Either there was no $sort stage, or the query system could not provide a non-blocking
     // sort.
     dassert(sortObj->isEmpty());
+    *projectionObj = removeSortKeyMetaProjection(*projectionObj);
+    if (deps.getNeedSortKey() && !deps.getNeedTextScore()) {
+        // A sort key requirement would have prevented us from being able to add this parameter
+        // before, but now we know the query system won't cover the sort, so we will be able to
+        // compute the sort key ourselves during the $sort stage, and thus don't need a query
+        // projection to do so.
+        plannerOpts |= QueryPlannerParams::NO_UNCOVERED_PROJECTIONS;
+    }
 
     // See if the query system can cover the projection.
     auto swExecutorProj = attemptToGetExecutor(opCtx,

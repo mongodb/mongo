@@ -37,6 +37,8 @@ namespace mongo {
 
 class DocumentSourceMergeCursors : public DocumentSource {
 public:
+    static constexpr StringData kStageName = "$mergeCursors"_sd;
+
     struct CursorDescriptor {
         CursorDescriptor(ConnectionString connectionString, std::string ns, CursorId cursorId)
             : connectionString(std::move(connectionString)),
@@ -48,14 +50,17 @@ public:
         CursorId cursorId;
     };
 
-    // virtuals from DocumentSource
     GetNextResult getNext() final;
-    const char* getSourceName() const final;
+
+    const char* getSourceName() const final {
+        return kStageName.rawData();
+    }
+
     Value serialize(boost::optional<ExplainOptions::Verbosity> explain = boost::none) const final;
 
     StageConstraints constraints() const final {
         StageConstraints constraints;
-        constraints.hostRequirement = HostTypeRequirement::kAnyShardOrMongoS;
+        constraints.hostRequirement = HostTypeRequirement::kAnyShard;
         constraints.requiredPosition = PositionRequirement::kFirst;
         constraints.requiresInputDocSource = false;
         constraints.isAllowedInsideFacetStage = false;

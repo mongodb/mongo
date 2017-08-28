@@ -229,5 +229,22 @@
         expectedCount: 100
     });
 
+    // Test that a pipeline whose merging half can be run on mongos using only the mongos execution
+    // machinery returns the correct results.
+    assertMergeOnMongoS({
+        testName: "agg_mongos_merge_all_mongos_runnable_skip_and_limit_stages",
+        pipeline: [
+            {$match: {_id: {$gte: -5, $lte: 100}}},
+            {$sort: {_id: -1}},
+            {$skip: 5},
+            {$limit: 10},
+            {$skip: 5},
+            {$limit: 1},
+        ],
+        batchSize: 10,
+        expectedCount: 1
+    });
+    // TODO SERVER-30882 Find a way to assert that all stages get absorbed by mongos.
+
     st.stop();
 })();

@@ -202,7 +202,9 @@ private:
      * reported from the remote.
      */
     struct RemoteCursorData {
-        RemoteCursorData(HostAndPort hostAndPort, CursorId establishedCursorId);
+        RemoteCursorData(HostAndPort hostAndPort,
+                         NamespaceString cursorNss,
+                         CursorId establishedCursorId);
 
         /**
          * Returns the resolved host and port on which the remote cursor resides.
@@ -229,6 +231,10 @@ private:
         // will be set to a valid non-zero cursor id. If a remote cursor is now exhausted, this
         // member will be set to zero.
         CursorId cursorId;
+
+        // The namespace this cursor belongs to - note this may be different than the namespace of
+        // the operation if there is a view.
+        NamespaceString cursorNss;
 
         // The exact host in the shard on which the cursor resides.
         HostAndPort shardHostAndPort;

@@ -332,6 +332,13 @@ BSONObj establishMergingMongosCursor(
     params.mergePipeline = std::move(pipelineForMerging);
     params.remotes = std::move(cursors);
 
+    // A batch size of 0 is legal for the initial aggregate, but not valid for getMores, the batch
+    // size we pass here is used for getMores, so do not specify a batch size if the initial request
+    // had a batch size of 0.
+    params.batchSize = request.getBatchSize() == 0
+        ? boost::none
+        : boost::optional<long long>(request.getBatchSize());
+
     auto ccc = ClusterClientCursorImpl::make(
         opCtx, Grid::get(opCtx)->getExecutorPool()->getArbitraryExecutor(), std::move(params));
 
@@ -582,10 +589,6 @@ Status ClusterAggregate::runAggregate(OperationContext* opCtx,
     // If we reach here, we have a merge pipeline to dispatch.
     invariant(pipelineForMerging);
 
-    // We need a DocumentSourceMergeCursors regardless of whether we merge on mongoS or on a shard.
-    pipelineForMerging->addInitialSource(
-        DocumentSourceMergeCursors::create(parseCursors(cursors), mergeCtx));
-
     // First, check whether we can merge on the mongoS.
     if (pipelineForMerging->canRunOnMongos() && !internalQueryProhibitMergingOnMongoS.load()) {
         // Register the new mongoS cursor, and retrieve the initial batch of results.
@@ -602,6 +605,8 @@ Status ClusterAggregate::runAggregate(OperationContext* opCtx,
     }
 
     // If we cannot merge on mongoS, establish the merge cursor on a shard.
+    pipelineForMerging->addInitialSource(
+        DocumentSourceMergeCursors::create(parseCursors(cursors), mergeCtx));
     auto mergeCmdObj = createCommandForMergingShard(request, mergeCtx, cmdObj, pipelineForMerging);
 
     auto mergeResponse = uassertStatusOK(establishMergingShardCursor(

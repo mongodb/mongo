@@ -43,12 +43,6 @@ public:
 
     StatusWith<ClusterQueryResult> next() final;
 
-    void kill(OperationContext* opCtx) final;
-
-    bool remotesExhausted() final;
-
-    Status setAwaitDataTimeout(Milliseconds awaitDataTimeout) final;
-
 private:
     long long _skip;
 

@@ -32,11 +32,11 @@ env.Library(
 env.Library(
     target="router_exec_stage",
     source=[
-        "router_stage_aggregation_merge.cpp",
         "router_stage_limit.cpp",
         "router_stage_merge.cpp",
         "router_stage_mock.cpp",
-        "router_stage_remove_sortkey.cpp",
+        "router_stage_pipeline.cpp",
+        "router_stage_remove_metadata_fields.cpp",
         "router_stage_skip.cpp",
     ],
     LIBDEPS=[
@@ -48,7 +48,7 @@ env.CppUnitTest(
     target="router_exec_stage_test",
     source=[
         "router_stage_limit_test.cpp",
-        "router_stage_remove_sortkey_test.cpp",
+        "router_stage_remove_metadata_fields_test.cpp",
         "router_stage_skip_test.cpp",
     ],
     LIBDEPS=[

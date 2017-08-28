@@ -34,9 +34,27 @@ namespace mongo {
 
 class DocumentSourceSkip final : public DocumentSource, public SplittableDocumentSource {
 public:
-    // virtuals from DocumentSource
+    static constexpr StringData kStageName = "$skip"_sd;
+
+    /**
+     * Convenience method for creating a $skip stage.
+     */
+    static boost::intrusive_ptr<DocumentSourceSkip> create(
+        const boost::intrusive_ptr<ExpressionContext>& pExpCtx, long long nToSkip);
+
+    /**
+     * Parses the user-supplied BSON into a $skip stage.
+     *
+     * Throws a AssertionException if 'elem' is an invalid $skip specification.
+     */
+    static boost::intrusive_ptr<DocumentSource> createFromBson(
+        BSONElement elem, const boost::intrusive_ptr<ExpressionContext>& pExpCtx);
+
     GetNextResult getNext() final;
-    const char* getSourceName() const final;
+
+    const char* getSourceName() const final {
+        return kStageName.rawData();
+    }
 
     StageConstraints constraints() const final {
         StageConstraints constraints;
@@ -76,20 +94,6 @@ public:
     void setSkip(long long newSkip) {
         _nToSkip = newSkip;
     }
-
-    /**
-     * Convenience method for creating a $skip stage.
-     */
-    static boost::intrusive_ptr<DocumentSourceSkip> create(
-        const boost::intrusive_ptr<ExpressionContext>& pExpCtx, long long nToSkip);
-
-    /**
-     * Parses the user-supplied BSON into a $skip stage.
-     *
-     * Throws a AssertionException if 'elem' is an invalid $skip specification.
-     */
-    static boost::intrusive_ptr<DocumentSource> createFromBson(
-        BSONElement elem, const boost::intrusive_ptr<ExpressionContext>& pExpCtx);
 
 private:
     explicit DocumentSourceSkip(const boost::intrusive_ptr<ExpressionContext>& pExpCtx,

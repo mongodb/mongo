@@ -39,10 +39,20 @@ namespace mongo {
 class DocumentSourceSort final : public DocumentSource, public SplittableDocumentSource {
 public:
     static const uint64_t kMaxMemoryUsageBytes = 100 * 1024 * 1024;
+    static constexpr StringData kStageName = "$sort"_sd;
 
-    // virtuals from DocumentSource
+    enum class SortKeySerialization {
+        kForExplain,
+        kForPipelineSerialization,
+        kForSortKeyMerging,
+    };
+
     GetNextResult getNext() final;
-    const char* getSourceName() const final;
+
+    const char* getSourceName() const final {
+        return kStageName.rawData();
+    }
+
     void serializeToArray(
         std::vector<Value>& array,
         boost::optional<ExplainOptions::Verbosity> explain = boost::none) const final;
@@ -73,8 +83,10 @@ public:
     boost::intrusive_ptr<DocumentSource> getShardSource() final;
     boost::intrusive_ptr<DocumentSource> getMergeSource() final;
 
-    /// Write out a Document whose contents are the sort key.
-    Document serializeSortKey(bool explain) const;
+    /**
+     * Write out a Document whose contents are the sort key pattern.
+     */
+    Document sortKeyPattern(SortKeySerialization) const;
 
     /**
      * Parses a $sort stage from the user-supplied BSON.
@@ -101,7 +113,7 @@ public:
      * coming from another DocumentSource. Once all documents have been added, the caller must call
      * loadingDone() before using getNext() to receive the documents in sorted order.
      */
-    void loadDocument(const Document& doc);
+    void loadDocument(Document&& doc);
 
     /**
      * Signals to the sort stage that there will be no more input documents. It is an error to call
@@ -179,11 +191,15 @@ private:
     SortOptions makeSortOptions() const;
 
     /**
-     * Returns the sort key for 'doc' based on the SortPattern. Attempts to generate the key using a
-     * fast path that does not handle arrays. If an array is encountered, falls back on
-     * extractKeyWithArray().
+     * Returns the sort key for 'doc', as well as the document that should be entered into the
+     * sorter to eventually be returned. If we will need to later merge the sorted results with
+     * other results, this method adds the sort key as metadata onto 'doc' to speed up the merge
+     * later.
+     *
+     * Attempts to generate the key using a fast path that does not handle arrays. If an array is
+     * encountered, falls back on extractKeyWithArray().
      */
-    Value extractKey(const Document& doc) const;
+    std::pair<Value, Document> extractSortKey(Document&& doc) const;
 
     /**
      * Returns the sort key for 'doc' based on the SortPattern, or ErrorCodes::InternalError if an
@@ -198,9 +214,10 @@ private:
     StatusWith<Value> extractKeyPart(const Document& doc, const SortPatternPart& keyPart) const;
 
     /**
-     * Returns the sort key for 'doc' based on the SortPattern.
+     * Returns the sort key for 'doc' based on the SortPattern. Note this is in the BSONObj format -
+     * with empty field names.
      */
-    Value extractKeyWithArray(const Document& doc) const;
+    BSONObj extractKeyWithArray(const Document& doc) const;
 
     int compare(const Value& lhs, const Value& rhs) const;
 

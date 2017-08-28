@@ -145,8 +145,9 @@ TEST(DependenciesToProjectionTest, ShouldAttemptToExcludeOtherFieldsIfOnlyTextSc
     deps.needWholeDocument = false;
     deps.setNeedTextScore(true);
     ASSERT_BSONOBJ_EQ(deps.toProjection(),
-                      BSON("_id" << 0 << "$noFieldsNeeded" << 1 << Document::metaFieldTextScore
-                                 << metaTextScore));
+                      BSON(Document::metaFieldTextScore << metaTextScore << "_id" << 0
+                                                        << "$noFieldsNeeded"
+                                                        << 1));
 }
 
 TEST(DependenciesToProjectionTest,

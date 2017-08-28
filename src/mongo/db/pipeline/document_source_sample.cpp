@@ -40,16 +40,14 @@
 namespace mongo {
 using boost::intrusive_ptr;
 
+constexpr StringData DocumentSourceSample::kStageName;
+
 DocumentSourceSample::DocumentSourceSample(const intrusive_ptr<ExpressionContext>& pExpCtx)
     : DocumentSource(pExpCtx), _size(0) {}
 
 REGISTER_DOCUMENT_SOURCE(sample,
                          LiteParsedDocumentSourceDefault::parse,
                          DocumentSourceSample::createFromBson);
-
-const char* DocumentSourceSample::getSourceName() const {
-    return "$sample";
-}
 
 DocumentSource::GetNextResult DocumentSourceSample::getNext() {
     if (_size == 0)
@@ -84,7 +82,7 @@ DocumentSource::GetNextResult DocumentSourceSample::getNext() {
 }
 
 Value DocumentSourceSample::serialize(boost::optional<ExplainOptions::Verbosity> explain) const {
-    return Value(DOC(getSourceName() << DOC("size" << _size)));
+    return Value(DOC(kStageName << DOC("size" << _size)));
 }
 
 namespace {

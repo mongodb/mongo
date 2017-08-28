@@ -57,16 +57,4 @@ StatusWith<ClusterQueryResult> RouterStageLimit::next() {
     return childResult;
 }
 
-void RouterStageLimit::kill(OperationContext* opCtx) {
-    getChildStage()->kill(opCtx);
-}
-
-bool RouterStageLimit::remotesExhausted() {
-    return getChildStage()->remotesExhausted();
-}
-
-Status RouterStageLimit::setAwaitDataTimeout(Milliseconds awaitDataTimeout) {
-    return getChildStage()->setAwaitDataTimeout(awaitDataTimeout);
-}
-
 }  // namespace mongo

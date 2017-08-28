@@ -8,7 +8,6 @@ selector:
   - jstests/aggregation/sources/*/*.js
   exclude_files:
   # The following tests start their own ShardingTest.
-  - jstests/aggregation/bugs/server6118.js
   - jstests/aggregation/bugs/server6179.js
   - jstests/aggregation/bugs/server7781.js
   - jstests/aggregation/mongos_merge.js

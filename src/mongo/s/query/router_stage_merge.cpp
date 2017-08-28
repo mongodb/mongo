@@ -69,7 +69,7 @@ bool RouterStageMerge::remotesExhausted() {
     return _arm.remotesExhausted();
 }
 
-Status RouterStageMerge::setAwaitDataTimeout(Milliseconds awaitDataTimeout) {
+Status RouterStageMerge::doSetAwaitDataTimeout(Milliseconds awaitDataTimeout) {
     return _arm.setAwaitDataTimeout(awaitDataTimeout);
 }
 

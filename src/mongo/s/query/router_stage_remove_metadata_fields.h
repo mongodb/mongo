@@ -28,35 +28,27 @@
 
 #pragma once
 
-#include "mongo/s/query/router_exec_stage.h"
+#include <vector>
 
-#include "mongo/db/pipeline/pipeline.h"
+#include "mongo/s/query/router_exec_stage.h"
 
 namespace mongo {
 
 /**
- * Draws results from a Pipeline with a DocumentSourceMergeCursors at its head, which is the
- * underlying source of the stream of merged documents manipulated by the RouterStage pipeline.
+ * Removes metadata fields from a BSON object.
  */
-class RouterStageAggregationMerge final : public RouterExecStage {
+class RouterStageRemoveMetadataFields final : public RouterExecStage {
 public:
-    RouterStageAggregationMerge(std::unique_ptr<Pipeline, Pipeline::Deleter> mergePipeline);
+    RouterStageRemoveMetadataFields(OperationContext* opCtx,
+                                    std::unique_ptr<RouterExecStage> child,
+                                    std::vector<StringData> fieldsToRemove);
 
     StatusWith<ClusterQueryResult> next() final;
 
-    void kill(OperationContext* opCtx) final;
-
-    bool remotesExhausted() final;
-
-    Status setAwaitDataTimeout(Milliseconds awaitDataTimeout) final;
-
-protected:
-    void doReattachToOperationContext() final;
-
-    void doDetachFromOperationContext() final;
-
 private:
-    std::unique_ptr<Pipeline, Pipeline::Deleter> _mergePipeline;
+    // Use a StringMap so we can look up by StringData - avoiding a string allocation on each field
+    // in each object. The value here is meaningless.
+    std::vector<StringData> _metaFields;
 };
 
 }  // namespace mongo

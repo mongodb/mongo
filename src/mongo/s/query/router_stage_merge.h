@@ -53,7 +53,8 @@ public:
 
     bool remotesExhausted() final;
 
-    Status setAwaitDataTimeout(Milliseconds awaitDataTimeout) final;
+protected:
+    Status doSetAwaitDataTimeout(Milliseconds awaitDataTimeout) final;
 
 protected:
     void doReattachToOperationContext() override {

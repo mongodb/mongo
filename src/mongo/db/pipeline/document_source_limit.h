@@ -34,9 +34,25 @@ namespace mongo {
 
 class DocumentSourceLimit final : public DocumentSource, public SplittableDocumentSource {
 public:
-    // virtuals from DocumentSource
+    static constexpr StringData kStageName = "$limit"_sd;
+
+    /**
+     * Create a new $limit stage.
+     */
+    static boost::intrusive_ptr<DocumentSourceLimit> create(
+        const boost::intrusive_ptr<ExpressionContext>& pExpCtx, long long limit);
+
+    /**
+     * Parse a $limit stage from a BSON stage specification. 'elem's field name must be "$limit".
+     */
+    static boost::intrusive_ptr<DocumentSource> createFromBson(
+        BSONElement elem, const boost::intrusive_ptr<ExpressionContext>& pExpCtx);
+
     GetNextResult getNext() final;
-    const char* getSourceName() const final;
+    const char* getSourceName() const final {
+        return kStageName.rawData();
+    }
+
     BSONObjSet getOutputSorts() final {
         return pSource ? pSource->getOutputSorts()
                        : SimpleBSONObjComparator::kInstance.makeBSONObjSet();
@@ -58,15 +74,6 @@ public:
     GetDepsReturn getDependencies(DepsTracker* deps) const final {
         return SEE_NEXT;  // This doesn't affect needed fields
     }
-
-    /**
-      Create a new limiting DocumentSource.
-
-      @param pExpCtx the expression context for the pipeline
-      @returns the DocumentSource
-     */
-    static boost::intrusive_ptr<DocumentSourceLimit> create(
-        const boost::intrusive_ptr<ExpressionContext>& pExpCtx, long long limit);
 
     /**
      * Returns the current DocumentSourceLimit for use in the shards pipeline. Running this stage on
@@ -92,20 +99,6 @@ public:
     void setLimit(long long newLimit) {
         _limit = newLimit;
     }
-
-    /**
-      Create a limiting DocumentSource from BSON.
-
-      This is a convenience method that uses the above, and operates on
-      a BSONElement that has been deteremined to be an Object with an
-      element named $limit.
-
-      @param pBsonElement the BSONELement that defines the limit
-      @param pExpCtx the expression context
-      @returns the grouping DocumentSource
-     */
-    static boost::intrusive_ptr<DocumentSource> createFromBson(
-        BSONElement elem, const boost::intrusive_ptr<ExpressionContext>& pExpCtx);
 
 private:
     DocumentSourceLimit(const boost::intrusive_ptr<ExpressionContext>& pExpCtx, long long limit);

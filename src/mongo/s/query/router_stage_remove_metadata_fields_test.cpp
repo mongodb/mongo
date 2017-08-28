@@ -1,37 +1,38 @@
 /**
- *    Copyright 2015 MongoDB Inc.
+ * Copyright (C) 2017 MongoDB Inc.
  *
- *    This program is free software: you can redistribute it and/or  modify
- *    it under the terms of the GNU Affero General Public License, version 3,
- *    as published by the Free Software Foundation.
+ * This program is free software: you can redistribute it and/or  modify
+ * it under the terms of the GNU Affero General Public License, version 3,
+ * as published by the Free Software Foundation.
  *
- *    This program is distributed in the hope that it will be useful,
- *    but WITHOUT ANY WARRANTY; without even the implied warranty of
- *    MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
- *    GNU Affero General Public License for more details.
+ * This program is distributed in the hope that it will be useful,
+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+ * GNU Affero General Public License for more details.
  *
- *    You should have received a copy of the GNU Affero General Public License
- *    along with this program.  If not, see <http://www.gnu.org/licenses/>.
+ * You should have received a copy of the GNU Affero General Public License
+ * along with this program.  If not, see <http://www.gnu.org/licenses/>.
  *
- *    As a special exception, the copyright holders give permission to link the
- *    code of portions of this program with the OpenSSL library under certain
- *    conditions as described in each individual source file and distribute
- *    linked combinations including the program with the OpenSSL library. You
- *    must comply with the GNU Affero General Public License in all respects for
- *    all of the code used other than as permitted herein. If you modify file(s)
- *    with this exception, you may extend this exception to your version of the
- *    file(s), but you are not obligated to do so. If you do not wish to do so,
- *    delete this exception statement from your version. If you delete this
- *    exception statement from all source files in the program, then also delete
- *    it in the license file.
+ * As a special exception, the copyright holders give permission to link the
+ * code of portions of this program with the OpenSSL library under certain
+ * conditions as described in each individual source file and distribute
+ * linked combinations including the program with the OpenSSL library. You
+ * must comply with the GNU Affero General Public License in all respects
+ * for all of the code used other than as permitted herein. If you modify
+ * file(s) with this exception, you may extend this exception to your
+ * version of the file(s), but you are not obligated to do so. If you do not
+ * wish to do so, delete this exception statement from your version. If you
+ * delete this exception statement from all source files in the program,
+ * then also delete it in the license file.
  */
 
 #include "mongo/platform/basic.h"
 
-#include "mongo/s/query/router_stage_remove_sortkey.h"
+#include "mongo/s/query/router_stage_remove_metadata_fields.h"
 
 #include "mongo/bson/bsonobj.h"
 #include "mongo/bson/bsonobjbuilder.h"
+#include "mongo/db/pipeline/document.h"
 #include "mongo/s/query/router_stage_mock.h"
 #include "mongo/stdx/memory.h"
 #include "mongo/unittest/unittest.h"
@@ -44,15 +45,20 @@ namespace {
 // going through the trouble of making one, we'll just use nullptr throughout.
 OperationContext* opCtx = nullptr;
 
-TEST(RouterStageRemoveSortKeyTest, RemovesSortKey) {
+TEST(RouterStageRemoveMetadataFieldsTest, RemovesMetaDataFields) {
     auto mockStage = stdx::make_unique<RouterStageMock>(opCtx);
     mockStage->queueResult(BSON("a" << 4 << "$sortKey" << 1 << "b" << 3));
     mockStage->queueResult(BSON("$sortKey" << BSON("" << 3) << "c" << BSON("d"
                                                                            << "foo")));
     mockStage->queueResult(BSON("a" << 3));
+    mockStage->queueResult(BSON("a" << 3 << "$randVal" << 4 << "$sortKey" << 2));
+    mockStage->queueResult(
+        BSON("$textScore" << 2 << "a" << 3 << "$randVal" << 4 << "$sortKey" << 2));
+    mockStage->queueResult(BSON("$textScore" << 2));
     mockStage->queueResult(BSONObj());
 
-    auto sortKeyStage = stdx::make_unique<RouterStageRemoveSortKey>(opCtx, std::move(mockStage));
+    auto sortKeyStage = stdx::make_unique<RouterStageRemoveMetadataFields>(
+        opCtx, std::move(mockStage), Document::allMetadataFieldNames);
 
     auto firstResult = sortKeyStage->next();
     ASSERT_OK(firstResult.getStatus());
@@ -74,19 +80,35 @@ TEST(RouterStageRemoveSortKeyTest, RemovesSortKey) {
     auto fourthResult = sortKeyStage->next();
     ASSERT_OK(fourthResult.getStatus());
     ASSERT(fourthResult.getValue().getResult());
-    ASSERT_BSONOBJ_EQ(*fourthResult.getValue().getResult(), BSONObj());
+    ASSERT_BSONOBJ_EQ(*fourthResult.getValue().getResult(), BSON("a" << 3));
 
     auto fifthResult = sortKeyStage->next();
     ASSERT_OK(fifthResult.getStatus());
-    ASSERT(fifthResult.getValue().isEOF());
+    ASSERT(fifthResult.getValue().getResult());
+    ASSERT_BSONOBJ_EQ(*fifthResult.getValue().getResult(), BSON("a" << 3));
+
+    auto sixthResult = sortKeyStage->next();
+    ASSERT_OK(sixthResult.getStatus());
+    ASSERT(sixthResult.getValue().getResult());
+    ASSERT_BSONOBJ_EQ(*sixthResult.getValue().getResult(), BSONObj());
+
+    auto seventhResult = sortKeyStage->next();
+    ASSERT_OK(seventhResult.getStatus());
+    ASSERT(seventhResult.getValue().getResult());
+    ASSERT_BSONOBJ_EQ(*seventhResult.getValue().getResult(), BSONObj());
+
+    auto eighthResult = sortKeyStage->next();
+    ASSERT_OK(eighthResult.getStatus());
+    ASSERT(eighthResult.getValue().isEOF());
 }
 
-TEST(RouterStageRemoveSortKeyTest, PropagatesError) {
+TEST(RouterStageRemoveMetadataFieldsTest, PropagatesError) {
     auto mockStage = stdx::make_unique<RouterStageMock>(opCtx);
     mockStage->queueResult(BSON("$sortKey" << 1));
     mockStage->queueError(Status(ErrorCodes::BadValue, "bad thing happened"));
 
-    auto sortKeyStage = stdx::make_unique<RouterStageRemoveSortKey>(opCtx, std::move(mockStage));
+    auto sortKeyStage = stdx::make_unique<RouterStageRemoveMetadataFields>(
+        opCtx, std::move(mockStage), std::vector<StringData>{"$sortKey"_sd});
 
     auto firstResult = sortKeyStage->next();
     ASSERT_OK(firstResult.getStatus());
@@ -99,13 +121,14 @@ TEST(RouterStageRemoveSortKeyTest, PropagatesError) {
     ASSERT_EQ(secondResult.getStatus().reason(), "bad thing happened");
 }
 
-TEST(RouterStageRemoveSortKeyTest, ToleratesMidStreamEOF) {
+TEST(RouterStageRemoveMetadataFieldsTest, ToleratesMidStreamEOF) {
     auto mockStage = stdx::make_unique<RouterStageMock>(opCtx);
     mockStage->queueResult(BSON("a" << 1 << "$sortKey" << 1 << "b" << 1));
     mockStage->queueEOF();
     mockStage->queueResult(BSON("a" << 2 << "$sortKey" << 1 << "b" << 2));
 
-    auto sortKeyStage = stdx::make_unique<RouterStageRemoveSortKey>(opCtx, std::move(mockStage));
+    auto sortKeyStage = stdx::make_unique<RouterStageRemoveMetadataFields>(
+        opCtx, std::move(mockStage), std::vector<StringData>{"$sortKey"_sd});
 
     auto firstResult = sortKeyStage->next();
     ASSERT_OK(firstResult.getStatus());
@@ -126,13 +149,14 @@ TEST(RouterStageRemoveSortKeyTest, ToleratesMidStreamEOF) {
     ASSERT(fourthResult.getValue().isEOF());
 }
 
-TEST(RouterStageRemoveSortKeyTest, RemotesExhausted) {
+TEST(RouterStageRemoveMetadataFieldsTest, RemotesExhausted) {
     auto mockStage = stdx::make_unique<RouterStageMock>(opCtx);
     mockStage->queueResult(BSON("a" << 1 << "$sortKey" << 1 << "b" << 1));
     mockStage->queueResult(BSON("a" << 2 << "$sortKey" << 1 << "b" << 2));
     mockStage->markRemotesExhausted();
 
-    auto sortKeyStage = stdx::make_unique<RouterStageRemoveSortKey>(opCtx, std::move(mockStage));
+    auto sortKeyStage = stdx::make_unique<RouterStageRemoveMetadataFields>(
+        opCtx, std::move(mockStage), std::vector<StringData>{"$sortKey"_sd});
     ASSERT_TRUE(sortKeyStage->remotesExhausted());
 
     auto firstResult = sortKeyStage->next();
@@ -153,12 +177,13 @@ TEST(RouterStageRemoveSortKeyTest, RemotesExhausted) {
     ASSERT_TRUE(sortKeyStage->remotesExhausted());
 }
 
-TEST(RouterStageRemoveSortKeyTest, ForwardsAwaitDataTimeout) {
+TEST(RouterStageRemoveMetadataFieldsTest, ForwardsAwaitDataTimeout) {
     auto mockStage = stdx::make_unique<RouterStageMock>(opCtx);
     auto mockStagePtr = mockStage.get();
     ASSERT_NOT_OK(mockStage->getAwaitDataTimeout().getStatus());
 
-    auto sortKeyStage = stdx::make_unique<RouterStageRemoveSortKey>(opCtx, std::move(mockStage));
+    auto sortKeyStage = stdx::make_unique<RouterStageRemoveMetadataFields>(
+        opCtx, std::move(mockStage), std::vector<StringData>{"$sortKey"_sd});
     ASSERT_OK(sortKeyStage->setAwaitDataTimeout(Milliseconds(789)));
 
     auto awaitDataTimeout = mockStagePtr->getAwaitDataTimeout();

@@ -68,7 +68,7 @@ bool RouterStageMock::remotesExhausted() {
     return _remotesExhausted;
 }
 
-Status RouterStageMock::setAwaitDataTimeout(Milliseconds awaitDataTimeout) {
+Status RouterStageMock::doSetAwaitDataTimeout(Milliseconds awaitDataTimeout) {
     _awaitDataTimeout = awaitDataTimeout;
     return Status::OK();
 }

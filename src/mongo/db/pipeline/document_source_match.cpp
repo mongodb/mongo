@@ -471,10 +471,11 @@ BSONObj DocumentSourceMatch::getQuery() const {
 
 DocumentSource::GetDepsReturn DocumentSourceMatch::getDependencies(DepsTracker* deps) const {
     if (isTextQuery()) {
-        // A $text aggregation field should return EXHAUSTIVE_ALL, since we don't necessarily know
-        // what field it will be searching without examining indices.
+        // A $text aggregation field should return EXHAUSTIVE_FIELDS, since we don't necessarily
+        // know what field it will be searching without examining indices.
         deps->needWholeDocument = true;
-        return EXHAUSTIVE_ALL;
+        deps->setNeedTextScore(true);
+        return EXHAUSTIVE_FIELDS;
     }
 
     addDependencies(deps);
@@ -493,7 +494,11 @@ void DocumentSourceMatch::addDependencies(DepsTracker* deps) const {
 
 DocumentSourceMatch::DocumentSourceMatch(const BSONObj& query,
                                          const intrusive_ptr<ExpressionContext>& pExpCtx)
-    : DocumentSource(pExpCtx), _predicate(query.getOwned()), _isTextQuery(isTextQuery(query)) {
+    : DocumentSource(pExpCtx),
+      _predicate(query.getOwned()),
+      _isTextQuery(isTextQuery(query)),
+      _dependencies(_isTextQuery ? DepsTracker::MetadataAvailable::kTextScore
+                                 : DepsTracker::MetadataAvailable::kNoMetadata) {
     StatusWithMatchExpression status = uassertStatusOK(
         MatchExpressionParser::parse(_predicate,
                                      pExpCtx->getCollator(),

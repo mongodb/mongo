@@ -107,7 +107,25 @@ string optionString(size_t options) {
         ss << "INDEX_INTERSECTION ";
     }
     if (options & QueryPlannerParams::KEEP_MUTATIONS) {
-        ss << "KEEP_MUTATIONS";
+        ss << "KEEP_MUTATIONS ";
+    }
+    if (options & QueryPlannerParams::IS_COUNT) {
+        ss << "IS_COUNT ";
+    }
+    if (options & QueryPlannerParams::SPLIT_LIMITED_SORT) {
+        ss << "SPLIT_LIMITED_SORT ";
+    }
+    if (options & QueryPlannerParams::CANNOT_TRIM_IXISECT) {
+        ss << "CANNOT_TRIM_IXISECT ";
+    }
+    if (options & QueryPlannerParams::SNAPSHOT_USE_ID) {
+        ss << "SNAPSHOT_USE_ID ";
+    }
+    if (options & QueryPlannerParams::NO_UNCOVERED_PROJECTIONS) {
+        ss << "NO_UNCOVERED_PROJECTIONS ";
+    }
+    if (options & QueryPlannerParams::GENERATE_COVERED_IXSCANS) {
+        ss << "GENERATE_COVERED_IXSCANS ";
     }
 
     return ss;

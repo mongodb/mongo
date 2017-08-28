@@ -264,6 +264,12 @@ public:
     }
 
     /**
+     * Removes and returns the first stage of the pipeline if its name is 'targetStageName'. Returns
+     * nullptr if there is no first stage, or if the stage's name is not 'targetStageName'.
+     */
+    boost::intrusive_ptr<DocumentSource> popFrontStageWithName(StringData targetStageName);
+
+    /**
      * PipelineD is a "sister" class that has additional functionality for the Pipeline. It exists
      * because of linkage requirements. Pipeline needs to function in mongod and mongos. PipelineD
      * contains extra functionality required in mongod, and which can't appear in mongos because the
