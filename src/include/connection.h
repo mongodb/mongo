@@ -379,7 +379,6 @@ struct __wt_connection_impl {
 
 	/* Set of btree IDs not being rolled back */
 	uint8_t *stable_rollback_bitstring;
-	uint32_t stable_rollback_maxfile;
 
 					/* Locked: collator list */
 	TAILQ_HEAD(__wt_coll_qh, __wt_named_collator) collqh;
