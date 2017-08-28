@@ -68,6 +68,9 @@ struct SSLPeerInfo;
 extern const int portSendFlags;
 extern const int portRecvFlags;
 
+void setSocketKeepAliveParams(int sock,
+                              unsigned int maxKeepIdleSecs = 300,
+                              unsigned int maxKeepIntvlSecs = 300);
 void disableNagle(int sock);
 
 #if !defined(_WIN32)

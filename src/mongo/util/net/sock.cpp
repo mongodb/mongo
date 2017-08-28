@@ -49,6 +49,10 @@
 #if defined(__OpenBSD__)
 #include <sys/uio.h>
 #endif
+#else
+#include <mstcpip.h>
+#include <winsock2.h>
+#include <ws2tcpip.h>
 #endif
 
 #include "mongo/config.h"
@@ -65,6 +69,7 @@
 #include "mongo/util/net/socket_exception.h"
 #include "mongo/util/net/ssl_manager.h"
 #include "mongo/util/quick_exit.h"
+#include "mongo/util/winutil.h"
 
 namespace mongo {
 
@@ -105,6 +110,7 @@ void networkWarnWithDescription(const Socket& socket, StringData call, int error
 
 const double kMaxConnectTimeoutMS = 5000;
 
+
 }  // namespace
 
 static bool ipv6 = false;
@@ -140,23 +146,104 @@ void setSockTimeouts(int sock, double secs) {
 #endif
 }
 
-#if defined(_WIN32)
-void disableNagle(int sock) {
-    int x = 1;
-    if (setsockopt(sock, IPPROTO_TCP, TCP_NODELAY, (char*)&x, sizeof(x)))
-        error() << "disableNagle failed: " << errnoWithDescription();
-    if (setsockopt(sock, SOL_SOCKET, SO_KEEPALIVE, (char*)&x, sizeof(x)))
-        error() << "SO_KEEPALIVE failed: " << errnoWithDescription();
-}
+#ifdef _WIN32
+#ifdef _UNICODE
+#define X_STR_CONST(str) (L##str)
 #else
+#define X_STR_CONST(str) (str)
+#endif
+const CString kKeepAliveGroup(
+    X_STR_CONST("SYSTEM\\CurrentControlSet\\Services\\Tcpip\\Parameters"));
+const CString kKeepAliveTime(X_STR_CONST("KeepAliveTime"));
+const CString kKeepAliveInterval(X_STR_CONST("KeepAliveInterval"));
+#undef X_STR_CONST
+#endif
 
-void disableNagle(int sock) {
-    int x = 1;
+void setSocketKeepAliveParams(int sock,
+                              unsigned int maxKeepIdleSecs,
+                              unsigned int maxKeepIntvlSecs) {
+#ifdef _WIN32
+    // Defaults per MSDN when registry key does not exist.
+    // Expressed in seconds here to be consistent with posix,
+    // though Windows uses milliseconds.
+    const DWORD kWindowsKeepAliveTimeSecsDefault = 2 * 60 * 60;
+    const DWORD kWindowsKeepAliveIntervalSecsDefault = 1;
 
+    const auto getKey = [](const CString& key, DWORD default_value) {
+        auto withval = windows::getDWORDRegistryKey(kKeepAliveGroup, key);
+        if (withval.isOK()) {
+            auto val = withval.getValue();
+            // Return seconds
+            return val ? (val.get() / 1000) : default_value;
+        }
+        error() << "can't get KeepAlive parameter: " << withval.getStatus();
+        return default_value;
+    };
+
+    const auto keepIdleSecs = getKey(kKeepAliveTime, kWindowsKeepAliveTimeSecsDefault);
+    const auto keepIntvlSecs = getKey(kKeepAliveInterval, kWindowsKeepAliveIntervalSecsDefault);
+
+    if ((keepIdleSecs > maxKeepIdleSecs) || (keepIntvlSecs > maxKeepIntvlSecs)) {
+        DWORD sent = 0;
+        struct tcp_keepalive keepalive;
+        keepalive.onoff = TRUE;
+        keepalive.keepalivetime = std::min<DWORD>(keepIdleSecs, maxKeepIdleSecs) * 1000;
+        keepalive.keepaliveinterval = std::min<DWORD>(keepIntvlSecs, maxKeepIntvlSecs) * 1000;
+        if (WSAIoctl(sock,
+                     SIO_KEEPALIVE_VALS,
+                     &keepalive,
+                     sizeof(keepalive),
+                     nullptr,
+                     0,
+                     &sent,
+                     nullptr,
+                     nullptr)) {
+            error() << "failed setting keepalive values: " << WSAGetLastError();
+        }
+    }
+#elif defined(__APPLE__) || defined(__linux__)
+    const auto updateSockOpt =
+        [sock](int level, int optnum, unsigned int maxval, StringData optname) {
+            unsigned int optval = 1;
+            socklen_t len = sizeof(optval);
+
+            if (getsockopt(sock, level, optnum, (char*)&optval, &len)) {
+                error() << "can't get " << optname << ": " << errnoWithDescription();
+            }
+
+            if (optval > maxval) {
+                optval = maxval;
+                if (setsockopt(sock, level, optnum, (char*)&optval, sizeof(optval))) {
+                    error() << "can't set " << optname << ": " << errnoWithDescription();
+                }
+            }
+        };
+
+#ifdef __APPLE__
+    updateSockOpt(IPPROTO_TCP, TCP_KEEPALIVE, maxKeepIdleSecs, "TCP_KEEPALIVE");
+#endif
+
+#ifdef __linux__
 #ifdef SOL_TCP
-    int level = SOL_TCP;
+    const int level = SOL_TCP;
 #else
-    int level = SOL_SOCKET;
+    const int level = SOL_SOCKET;
+#endif
+    updateSockOpt(level, TCP_KEEPIDLE, maxKeepIdleSecs, "TCP_KEEPIDLE");
+    updateSockOpt(level, TCP_KEEPINTVL, maxKeepIntvlSecs, "TCP_KEEPINTVL");
+#endif
+
+#endif
+}
+
+void disableNagle(int sock) {
+    int x = 1;
+#ifdef _WIN32
+    const int level = IPPROTO_TCP;
+#elif defined(SOL_TCP)
+    const int level = SOL_TCP;
+#else
+    const int level = SOL_SOCKET;
 #endif
 
     if (setsockopt(sock, level, TCP_NODELAY, (char*)&x, sizeof(x)))
@@ -165,34 +252,10 @@ void disableNagle(int sock) {
 #ifdef SO_KEEPALIVE
     if (setsockopt(sock, SOL_SOCKET, SO_KEEPALIVE, (char*)&x, sizeof(x)))
         error() << "SO_KEEPALIVE failed: " << errnoWithDescription();
-
-#ifdef __linux__
-    socklen_t len = sizeof(x);
-    if (getsockopt(sock, level, TCP_KEEPIDLE, (char*)&x, &len))
-        error() << "can't get TCP_KEEPIDLE: " << errnoWithDescription();
-
-    if (x > 300) {
-        x = 300;
-        if (setsockopt(sock, level, TCP_KEEPIDLE, (char*)&x, sizeof(x))) {
-            error() << "can't set TCP_KEEPIDLE: " << errnoWithDescription();
-        }
-    }
-
-    len = sizeof(x);  // just in case it changed
-    if (getsockopt(sock, level, TCP_KEEPINTVL, (char*)&x, &len))
-        error() << "can't get TCP_KEEPINTVL: " << errnoWithDescription();
-
-    if (x > 300) {
-        x = 300;
-        if (setsockopt(sock, level, TCP_KEEPINTVL, (char*)&x, sizeof(x))) {
-            error() << "can't set TCP_KEEPINTVL: " << errnoWithDescription();
-        }
-    }
 #endif
-#endif
+
+    setSocketKeepAliveParams(sock);
 }
-
-#endif
 
 // --- SockAddr
 

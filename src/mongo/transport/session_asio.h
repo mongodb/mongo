@@ -34,6 +34,7 @@
 #include "mongo/config.h"
 #include "mongo/transport/asio_utils.h"
 #include "mongo/transport/transport_layer_asio.h"
+#include "mongo/util/net/sock.h"
 #ifdef MONGO_CONFIG_SSL
 #include "mongo/util/net/ssl_manager.h"
 #include "mongo/util/net/ssl_types.h"
@@ -114,34 +115,7 @@ public:
         if (family == AF_INET || family == AF_INET6) {
             _socket.set_option(asio::ip::tcp::no_delay(true));
             _socket.set_option(asio::socket_base::keep_alive(true));
-#ifdef __linux__
-            const auto sock = _socket.native_handle();
-            // On linux the default keep alive value may be very high - say an hour.
-            // Here we set it to a minimum of 5 minutes if the default value was over five minutes.
-            // See SERVER-3604.
-            int val = 1;
-            socklen_t len = sizeof(val);
-            if (getsockopt(sock, IPPROTO_TCP, TCP_KEEPIDLE, (char*)&val, &len))
-                error() << "can't get TCP_KEEPIDLE: " << errnoWithDescription();
-
-            if (val > 300) {
-                val = 300;
-                if (setsockopt(sock, IPPROTO_TCP, TCP_KEEPIDLE, (char*)&val, sizeof(val))) {
-                    error() << "can't set TCP_KEEPIDLE: " << errnoWithDescription();
-                }
-            }
-
-            len = sizeof(val);  // just in case it changed
-            if (getsockopt(sock, IPPROTO_TCP, TCP_KEEPINTVL, (char*)&val, &len))
-                error() << "can't get TCP_KEEPINTVL: " << errnoWithDescription();
-
-            if (val > 300) {
-                val = 300;
-                if (setsockopt(sock, IPPROTO_TCP, TCP_KEEPINTVL, (char*)&val, sizeof(val))) {
-                    error() << "can't set TCP_KEEPINTVL: " << errnoWithDescription();
-                }
-            }
-#endif
+            setSocketKeepAliveParams(_socket.native_handle());
         }
 
         _local = endpointToHostAndPort(_socket.local_endpoint());
