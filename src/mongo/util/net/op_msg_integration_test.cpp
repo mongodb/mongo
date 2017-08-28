@@ -139,14 +139,19 @@ TEST(OpMsg, CloseConnectionOnFireAndForgetNotMasterError) {
                                output))
             << output;
         ON_BLOCK_EXIT([&] {
-            ASSERT(conn.runCommand("admin",
-                                   fromjson(R"({
+            try {
+                uassertStatusOK(conn.connect(host, "integration_test-cleanup"));
+                ASSERT(conn.runCommand("admin",
+                                       fromjson(R"({
                                           configureFailPoint:
                                               'skipCheckingForNotMasterInCommandDispatch',
                                           mode: 'off'
                                       })"),
-                                   output))
-                << output;
+                                       output))
+                    << output;
+            } catch (...) {
+                std::terminate();
+            }
         });
 
 
